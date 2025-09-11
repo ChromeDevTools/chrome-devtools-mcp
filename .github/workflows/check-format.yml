@@ -1,4 +1,4 @@
-name: Check Code Format
+name: Check code format
 
 permissions: read-all
 
@@ -13,17 +13,19 @@ jobs:
     runs-on: ubuntu-latest # You can also use 'macos-latest' or 'windows-latest'
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4 # Use the latest stable version
+      - name: Check out repository
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          fetch-depth: 2
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4 # Use the latest stable version
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
-          node-version: '22' # Specify the Node.js version your project uses (e.g., '18', '20', '22')
-          cache: 'npm' # Caches npm dependencies to speed up builds
+          cache: npm
+          node-version-file: '.nvmrc'
 
       - name: Install dependencies
-        run: npm ci # Use 'npm ci' for clean installs in CI environments, or 'npm install' if you prefer
+        run: npm ci
 
       - name: Run format check
         run: npm run check-format
