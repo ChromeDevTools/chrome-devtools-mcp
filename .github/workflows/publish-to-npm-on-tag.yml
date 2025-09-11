@@ -21,6 +21,7 @@ jobs:
           NPM_TOKEN: ${{secrets.NPM_TOKEN}}
           TAG_NAME: ${{github.ref_name}}
         run: |
+          exit 0 # for now disable.
           npm config set registry 'https://wombat-dressing-room.appspot.com/'
           npm config set '//wombat-dressing-room.appspot.com/:_authToken' '${NPM_TOKEN}'
           npm publish --provenance --access public
