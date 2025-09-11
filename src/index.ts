@@ -34,9 +34,8 @@ import path from 'node:path';
 import fs from 'node:fs';
 import assert from 'node:assert';
 
-export const args = yargs(hideBin(process.argv))
+export const yargsInstance = yargs(hideBin(process.argv))
   .scriptName('npx chrome-devtools-mcp@latest')
-  .wrap(100)
   .option('browserUrl', {
     type: 'string',
     description: 'The browser URL to connect to',
@@ -102,7 +101,9 @@ export const args = yargs(hideBin(process.argv))
     ['$0 --help', 'Print CLI options'],
   ])
 
-  .help()
+  .help();
+export const args = yargsInstance
+  .wrap(Math.min(120, yargsInstance.terminalWidth()))
   .parseSync();
 
 if (args.logFile) {

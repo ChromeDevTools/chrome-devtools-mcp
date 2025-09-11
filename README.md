@@ -151,26 +151,22 @@ Run `npx chrome-devtools-mcp@latest --help` to see all available configuration o
 
 ```sh
 Options:
-      --version         Show version number                                                [boolean]
-  -u, --browserUrl      The browser URL to connect to                                       [string]
-      --headless        Whether to run in headless (no UI) mode           [boolean] [default: false]
-  -e, --executablePath  Path to custom Chrome executable                                    [string]
-      --isolated        If specified, creates a temporary user-data-dir that is automatically
-                        cleaned up after the browser is closed.           [boolean] [default: false]
-      --channel         System installed browser channel to use.
-                                               [string] [choices: "stable", "canary", "beta", "dev"]
-      --help            Show help                                                          [boolean]
+      --version         Show version number  [boolean]
+  -u, --browserUrl      The browser URL to connect to  [string]
+      --headless        Whether to run in headless (no UI) mode  [boolean] [default: false]
+  -e, --executablePath  Path to custom Chrome executable  [string]
+      --isolated        If specified, creates a temporary user-data-dir that is automatically cleaned up after the browser is closed.  [boolean] [default: false]
+      --channel         System installed browser channel to use.  [string] [choices: "stable", "canary", "beta", "dev"]
+      --help            Show help  [boolean]
 
 Examples:
-  npx chrome-devtools-mcp@latest --browserUrl         Connect to an existing browser instance
-  http://127.0.0.1:9222
-  npx chrome-devtools-mcp@latest --channel beta       Use Chrome Beta installed on this system
-  npx chrome-devtools-mcp@latest --channel canary     Use Chrome Canary installed on this system
-  npx chrome-devtools-mcp@latest --channel dev        Use Chrome Dev installed on this system
-  npx chrome-devtools-mcp@latest --channel stable     Use stable Chrome installed on this system
-  npx chrome-devtools-mcp@latest --logFile            Save logs to a file
-  /tmp/log.txt
-  npx chrome-devtools-mcp@latest --help               Print CLI options
+  npx chrome-devtools-mcp@latest --browserUrl http://127.0.0.1:9222  Connect to an existing browser instance
+  npx chrome-devtools-mcp@latest --channel beta                      Use Chrome Beta installed on this system
+  npx chrome-devtools-mcp@latest --channel canary                    Use Chrome Canary installed on this system
+  npx chrome-devtools-mcp@latest --channel dev                       Use Chrome Dev installed on this system
+  npx chrome-devtools-mcp@latest --channel stable                    Use stable Chrome installed on this system
+  npx chrome-devtools-mcp@latest --logFile /tmp/log.txt              Save logs to a file
+  npx chrome-devtools-mcp@latest --help                              Print CLI options
 ```
 
 <!-- END AUTO GENERATED CLI -->
