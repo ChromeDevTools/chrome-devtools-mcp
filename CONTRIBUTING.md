@@ -32,6 +32,11 @@ use GitHub pull requests for this purpose. Consult
 [GitHub Help](https://help.github.com/articles/about-pull-requests/) for more
 information on using pull requests.
 
+### Conventional commits
+
+Please follow [conventional commits](https://www.conventionalcommits.org/en/v1.0.0/)
+for PR and commit titles.
+
 ## Installation
 
 ```sh
