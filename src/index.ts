@@ -34,53 +34,60 @@ import path from 'node:path';
 import fs from 'node:fs';
 import assert from 'node:assert';
 
-export const args = yargs(hideBin(process.argv))
-  .scriptName('npx chrome-devtools-mcp@latest')
-  .wrap(100)
-  .option('browserUrl', {
-    type: 'string',
-    description: 'The browser URL to connect to',
+export const cliOptions = {
+  browserUrl: {
+    type: 'string' as const,
+    description:
+      'Connect to a running Chrome instance using port forwarding. For more details see: https://developer.chrome.com/docs/devtools/remote-debugging/local-server.',
     alias: 'u',
-    coerce: url => {
+    coerce: (url: string) => {
       new URL(url);
       return url;
     },
-  })
-  .option('headless', {
-    type: 'boolean',
-    description: 'Whether to run in headless (no UI) mode',
+  },
+  headless: {
+    type: 'boolean' as const,
+    description: 'Whether to run in headless (no UI) mode.',
     default: false,
-  })
-  .option('executablePath', {
-    type: 'string',
-    description: 'Path to custom Chrome executable',
+  },
+  executablePath: {
+    type: 'string' as const,
+    description: 'Path to custom Chrome executable.',
     conflicts: 'browserUrl',
     alias: 'e',
-  })
-  .option('isolated', {
-    type: 'boolean',
+  },
+  isolated: {
+    type: 'boolean' as const,
     description:
       'If specified, creates a temporary user-data-dir that is automatically cleaned up after the browser is closed.',
     default: false,
-  })
-  .option('customDevtools', {
-    type: 'string',
-    description: 'Path to custom DevTools',
+  },
+  customDevtools: {
+    type: 'string' as const,
+    description: 'Path to custom DevTools.',
     hidden: true,
     conflicts: 'browserUrl',
     alias: 'd',
-  })
-  .option('channel', {
-    type: 'string',
-    description: 'System installed browser channel to use.',
-    choices: ['stable', 'canary', 'beta', 'dev'],
+  },
+  channel: {
+    type: 'string' as const,
+    description:
+      'Specify a different Chrome channel that should be used.',
+    choices: ['stable', 'canary', 'beta', 'dev'] as const,
     conflicts: ['browserUrl', 'executablePath'],
-  })
-  .option('logFile', {
-    type: 'string',
-    describe: 'Save the logs to file',
+    default: 'stable',
+  },
+  logFile: {
+    type: 'string' as const,
+    describe: 'Save the logs to file.',
     hidden: true,
-  })
+  },
+};
+
+export const args = yargs(hideBin(process.argv))
+  .scriptName('npx chrome-devtools-mcp@latest')
+  .wrap(100)
+  .options(cliOptions)
   .check(args => {
     // We can't set default in the options else
     // Yargs will complain
@@ -101,7 +108,6 @@ export const args = yargs(hideBin(process.argv))
     ['$0 --logFile /tmp/log.txt', 'Save logs to a file'],
     ['$0 --help', 'Print CLI options'],
   ])
-
   .help()
   .parseSync();
 
