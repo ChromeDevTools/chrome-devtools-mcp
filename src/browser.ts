@@ -54,21 +54,22 @@ async function ensureBrowserConnected(browserURL: string) {
   return browser;
 }
 
-async function ensureBrowserLaunched(
-  headless: boolean,
-  isolated: boolean,
-  customDevToolsPath?: string,
-  executablePath?: string,
-  channel?: Channel,
-): Promise<Browser> {
-  if (browser?.connected) {
-    return browser;
-  }
+type McpLaunchOptions = {
+  executablePath?: string;
+  customDevTools?: string;
+  channel?: Channel;
+  userDataDir?: string;
+  headless: boolean;
+  isolated: boolean;
+};
+
+export async function launch(options: McpLaunchOptions): Promise<Browser> {
+  const {channel, executablePath, customDevTools, headless, isolated} = options;
   const profileDirName =
     channel && channel !== 'stable' ? `mcp-profile-${channel}` : 'mcp-profile';
 
-  let userDataDir: string | undefined;
-  if (!isolated) {
+  let userDataDir = options.userDataDir;
+  if (!isolated && !userDataDir) {
     userDataDir = path.join(
       os.homedir(),
       '.cache',
@@ -85,8 +86,8 @@ async function ensureBrowserLaunched(
     '--no-first-run',
     '--hide-crash-restore-bubble',
   ];
-  if (customDevToolsPath) {
-    args.push(`--custom-devtools-frontend=file://${customDevToolsPath}`);
+  if (customDevTools) {
+    args.push(`--custom-devtools-frontend=file://${customDevTools}`);
   }
   let puppeterChannel: ChromeReleaseChannel | undefined;
   if (!executablePath) {
@@ -95,16 +96,45 @@ async function ensureBrowserLaunched(
         ? (`chrome-${channel}` as ChromeReleaseChannel)
         : 'chrome';
   }
-  browser = await puppeteer.launch({
-    ...connectOptions,
-    channel: puppeterChannel,
-    executablePath,
-    defaultViewport: null,
-    userDataDir,
-    pipe: true,
-    headless,
-    args,
-  });
+
+  try {
+    return await puppeteer.launch({
+      ...connectOptions,
+      channel: puppeterChannel,
+      executablePath,
+      defaultViewport: null,
+      userDataDir,
+      pipe: true,
+      headless,
+      args,
+    });
+  } catch (error) {
+    // TODO: check browser logs for `Failed to create a ProcessSingleton for
+    // your profile directory` instead.
+    if (
+      userDataDir &&
+      (error as Error).message.includes(
+        '(Target.setDiscoverTargets): Target closed',
+      )
+    ) {
+      throw new Error(
+        `The browser is already running for ${userDataDir}. Use --isolated to run multiple browser instances.`,
+        {
+          cause: error,
+        },
+      );
+    }
+    throw error;
+  }
+}
+
+async function ensureBrowserLaunched(
+  options: McpLaunchOptions,
+): Promise<Browser> {
+  if (browser?.connected) {
+    return browser;
+  }
+  browser = await launch(options);
   return browser;
 }
 
@@ -118,13 +148,7 @@ export async function resolveBrowser(options: {
 }) {
   const browser = options.browserUrl
     ? await ensureBrowserConnected(options.browserUrl)
-    : await ensureBrowserLaunched(
-        options.headless,
-        options.isolated,
-        options.customDevTools,
-        options.executablePath,
-        options.channel,
-      );
+    : await ensureBrowserLaunched(options);
 
   return browser;
 }
