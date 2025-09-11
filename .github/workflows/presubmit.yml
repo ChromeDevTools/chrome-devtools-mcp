@@ -56,7 +56,7 @@ jobs:
           diff_file=$(mktemp doc_diff_XXXXXX)
           git diff --color > $diff_file
           if [[ -s $diff_file ]]; then
-            echo "Please update the documentation by running 'npm run docs'. The following was the diff"
+            echo "Please update the documentation by running 'npm run generate-docs'. The following was the diff"
             cat $diff_file
             rm $diff_file
             exit 1

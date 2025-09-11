@@ -8,8 +8,8 @@ import {Client} from '@modelcontextprotocol/sdk/client/index.js';
 import {StdioClientTransport} from '@modelcontextprotocol/sdk/client/stdio.js';
 import type {Tool} from '@modelcontextprotocol/sdk/types.js';
 import {ToolCategories} from '../build/src/tools/categories.js';
+import {cliOptions} from '../build/src/index.js';
 import fs from 'fs';
-import {spawnSync} from 'child_process';
 
 const MCP_SERVER_PATH = 'build/src/index.js';
 const OUTPUT_PATH = './docs/tool-reference.md';
@@ -102,27 +102,62 @@ function updateReadmeWithToolsTOC(toolsTOC: string): void {
   console.log('Updated README.md with tools table of contents');
 }
 
-function updateReadmeWithConfigOptions(help: string): void {
+function generateConfigOptionsMarkdown(): string {
+  let markdown = '';
+
+  for (const [optionName, optionConfig] of Object.entries(cliOptions)) {
+    // Skip hidden options
+    if (optionConfig.hidden) {
+      continue;
+    }
+
+    const aliasText = optionConfig.alias ? `, \`-${optionConfig.alias}\`` : '';
+    const description = optionConfig.description || optionConfig.describe || '';
+
+    // Start with option name and description
+    markdown += `- **\`--${optionName}\`${aliasText}**\n`;
+    markdown += `  ${description}\n`;
+
+    // Add type information
+    markdown += `  - **Type:** ${optionConfig.type}\n`;
+
+    // Add choices if available
+    if (optionConfig.choices) {
+      markdown += `  - **Choices:** ${optionConfig.choices.map(c => `\`${c}\``).join(', ')}\n`;
+    }
+
+    // Add default if available
+    if (optionConfig.default !== undefined) {
+      markdown += `  - **Default:** \`${optionConfig.default}\`\n`;
+    }
+
+    markdown += '\n';
+  }
+
+  return markdown.trim();
+}
+
+function updateReadmeWithOptionsMarkdown(optionsMarkdown: string): void {
   const readmeContent = fs.readFileSync(README_PATH, 'utf8');
 
-  const beginMarker = '<!-- BEGIN AUTO GENERATED CLI -->';
-  const endMarker = '<!-- END AUTO GENERATED CLI -->';
+  const beginMarker = '<!-- BEGIN AUTO GENERATED OPTIONS -->';
+  const endMarker = '<!-- END AUTO GENERATED OPTIONS -->';
 
   const beginIndex = readmeContent.indexOf(beginMarker);
   const endIndex = readmeContent.indexOf(endMarker);
 
   if (beginIndex === -1 || endIndex === -1) {
-    console.warn('Could not find auto-generated config markers in README.md');
+    console.warn('Could not find auto-generated options markers in README.md');
     return;
   }
 
   const before = readmeContent.substring(0, beginIndex + beginMarker.length);
   const after = readmeContent.substring(endIndex);
 
-  const updatedContent = before + '\n\n```sh\n' + help + '```\n\n' + after;
+  const updatedContent = before + '\n\n' + optionsMarkdown + '\n\n' + after;
 
   fs.writeFileSync(README_PATH, updatedContent);
-  console.log('Updated README.md with config options');
+  console.log('Updated README.md with options markdown');
 }
 
 async function generateToolDocumentation(): Promise<void> {
@@ -280,15 +315,12 @@ async function generateToolDocumentation(): Promise<void> {
     const toolsTOC = generateToolsTOC(categories, sortedCategories);
     updateReadmeWithToolsTOC(toolsTOC);
 
-    const helpResult = spawnSync('npx chrome-devtools-mcp --help', {
-      shell: true,
-      cwd: process.cwd(),
-      env: process.env,
-    });
-    updateReadmeWithConfigOptions(helpResult.stdout.toString('utf-8'));
-
+    // Generate and update configuration options
+    const optionsMarkdown = generateConfigOptionsMarkdown();
+    updateReadmeWithOptionsMarkdown(optionsMarkdown);
     // Clean up
     await client.close();
+    process.exit(0);
   } catch (error) {
     console.error('Error generating documentation:', error);
     process.exit(1);

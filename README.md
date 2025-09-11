@@ -8,7 +8,7 @@ prototype!
 
 `chrome-devtools-mcp` exposes content of the browser instance to the MCP clients
 allowing them to inspect, debug, and modify any data in the browser or DevTools.
-Avoid sharing sensitive or personal information that you do want to share with
+Avoid sharing sensitive or personal information that you don't want to share with
 MCP clients.
 
 ## Requirements
@@ -33,7 +33,7 @@ Add the following config to your MCP client:
 ```
 
 > [!NOTE]  
-> `Using `chrome-devtools-mcp@latest` ensures that your MCP client will always use the latest version of the Chrome DevTools MCP server.
+> Using `chrome-devtools-mcp@latest` ensures that your MCP client will always use the latest version of the Chrome DevTools MCP server.
 
 ### MCP Client specific configuration
 
@@ -119,7 +119,37 @@ claude mcp add chrome-devtools-mcp npx chrome-devtools-mcp@latest
 
 ## Configuration
 
-For example, to launch the system-installed Chrome Canary pass `--channel=canary` as an argument:
+The Chrome DevTools MCP server supports the following configuration option:
+
+<!-- BEGIN AUTO GENERATED OPTIONS -->
+
+- **`--browserUrl`, `-u`**
+  Connect to a running Chrome instance using port forwarding. For more details see: https://developer.chrome.com/docs/devtools/remote-debugging/local-server.
+  - **Type:** string
+
+- **`--headless`**
+  Whether to run in headless (no UI) mode.
+  - **Type:** boolean
+  - **Default:** `false`
+
+- **`--executablePath`, `-e`**
+  Path to custom Chrome executable.
+  - **Type:** string
+
+- **`--isolated`**
+  If specified, creates a temporary user-data-dir that is automatically cleaned up after the browser is closed.
+  - **Type:** boolean
+  - **Default:** `false`
+
+- **`--channel`**
+  Specify a different Chrome channel that should be used.
+  - **Type:** string
+  - **Choices:** `stable`, `canary`, `beta`, `dev`
+  - **Default:** `stable`
+
+<!-- END AUTO GENERATED OPTIONS -->
+
+Pass them via the `args` property in the JSON configuration. For example:
 
 ```json
 {
@@ -129,44 +159,27 @@ For example, to launch the system-installed Chrome Canary pass `--channel=canary
       "args": [
         "chrome-devtools-mcp@latest"
         "--channel=canary",
+        "--headless=true",
+        "--isolated=true",
       ]
     }
   }
 }
 ```
 
+You can also run `npx chrome-devtools-mcp@latest --help` to see all available configuration options.
+
+## Concepts
+
 ### User data directory
 
-`chrome-devtools-mcp` starts a Chrome's stable channel instance using the user
-data directory at `$HOME/.cache/chrome-devtools-mcp/mcp-profile-$CHANNEL` on
-Linux/MacOS and `%HOMEPATH%/.cache/chrome-devtools-mcp/mcp-profile-$CHANNEL` in
-Windows. The user data directory is not cleared between runs and shared across
-all instances of `chrome-devtools-mcp`.
+`chrome-devtools-mcp` starts a Chrome's stable channel instance using the following user
+data directory:
 
-## CLI
+- Linux / MacOS: `$HOME/.cache/chrome-devtools-mcp/mcp-profile-$CHANNEL`
+- Window: `%HOMEPATH%/.cache/chrome-devtools-mcp/mcp-profile-$CHANNEL`
 
-Run `npx chrome-devtools-mcp@latest --help` to see all available configuration options:
-
-<!-- BEGIN AUTO GENERATED CLI -->
-
-```sh
-Options:
-      --version         Show version number  [boolean]
-  -u, --browserUrl      The browser URL to connect to  [string]
-      --headless        Whether to run in headless (no UI) mode  [boolean] [default: false]
-  -e, --executablePath  Path to custom Chrome executable  [string]
-      --isolated        If specified, creates a temporary user-data-dir that is automatically cleaned up after the browser is closed.  [boolean] [default: false]
-      --channel         System installed browser channel to use.  [string] [choices: "stable", "canary", "beta", "dev"]
-      --help            Show help  [boolean]
-
-Examples:
-  npx chrome-devtools-mcp@latest --browserUrl http://127.0.0.1:9222  Connect to an existing browser instance
-  npx chrome-devtools-mcp@latest --channel beta                      Use Chrome Beta installed on this system
-  npx chrome-devtools-mcp@latest --channel canary                    Use Chrome Canary installed on this system
-  npx chrome-devtools-mcp@latest --channel dev                       Use Chrome Dev installed on this system
-  npx chrome-devtools-mcp@latest --channel stable                    Use stable Chrome installed on this system
-  npx chrome-devtools-mcp@latest --logFile /tmp/log.txt              Save logs to a file
-  npx chrome-devtools-mcp@latest --help                              Print CLI options
-```
-
-<!-- END AUTO GENERATED CLI -->
+The user data directory is not cleared between runs and shared across
+all instances of `chrome-devtools-mcp`. Set the `isolated` option to `true`
+to use a temporary user data dir instead which will be cleared automatically after
+the browser is closed.
