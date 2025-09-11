@@ -119,7 +119,7 @@ function updateReadmeWithConfigOptions(help: string): void {
   const before = readmeContent.substring(0, beginIndex + beginMarker.length);
   const after = readmeContent.substring(endIndex);
 
-  const updatedContent = before + '\n\n```sh\n' + help + '```\n' + after;
+  const updatedContent = before + '\n\n```sh\n' + help + '```\n\n' + after;
 
   fs.writeFileSync(README_PATH, updatedContent);
   console.log('Updated README.md with config options');

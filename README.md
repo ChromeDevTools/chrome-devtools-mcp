@@ -168,4 +168,5 @@ Examples:
   npx chrome-devtools-mcp@latest --logFile /tmp/log.txt              Save logs to a file
   npx chrome-devtools-mcp@latest --help                              Print CLI options
 ```
+
 <!-- END AUTO GENERATED CLI -->
