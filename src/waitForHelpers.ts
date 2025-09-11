@@ -49,9 +49,14 @@ async function waitForStableDom(
     }
   });
 
-  return stableDomObserver.evaluate(async observer => {
-    return await observer.resolver.promise;
-  });
+  return Promise.race([
+    stableDomObserver.evaluate(async observer => {
+      return await observer.resolver.promise;
+    }),
+    timeout(3000, signal).then(() => {
+      throw new Error('Timeout');
+    }),
+  ]);
 }
 
 async function waitForNavigationStarted(page: CdpPage, signal: AbortSignal) {
@@ -101,7 +106,10 @@ function timeout(time: number, signal?: AbortSignal): Promise<void> {
  * a potential navigation, after which it waits
  * for the DOM to be stable before returning.
  */
-export async function performAction(page: Page, callback: () => Promise<void>) {
+export async function waitForEventsAfterAction(
+  page: Page,
+  callback: () => Promise<void>,
+) {
   const controller = new AbortController();
 
   const navigationStartedPromise = waitForNavigationStarted(
@@ -122,12 +130,7 @@ export async function performAction(page: Page, callback: () => Promise<void>) {
 
     // Wait for stable dom after navigation so we execute in
     // the correct context
-    await Promise.race([
-      waitForStableDom(page, controller.signal),
-      timeout(3000, controller.signal).then(() => {
-        throw new Error('Timeout');
-      }),
-    ]);
+    await waitForStableDom(page, controller.signal);
   } catch (error) {
     logger(error);
   } finally {

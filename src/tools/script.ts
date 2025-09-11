@@ -6,6 +6,7 @@
 import z from 'zod';
 import {defineTool} from './ToolDefinition.js';
 import {ToolCategories} from './categories.js';
+import {waitForEventsAfterAction} from '../waitForHelpers.js';
 
 export const evaluateScript = defineTool({
   name: 'evaluate_script',
@@ -26,13 +27,14 @@ export const evaluateScript = defineTool({
 
     const script = `(async () => {
       return JSON.stringify(await (${request.params.function})());
-      })()`;
+    })()`;
 
-    const result = await page.evaluate(script);
-
-    response.appendResponseLine('Script ran on page and returned:');
-    response.appendResponseLine('```json');
-    response.appendResponseLine(`${result}`);
-    response.appendResponseLine('```');
+    await waitForEventsAfterAction(page, async () => {
+      const result = await page.evaluate(script);
+      response.appendResponseLine('Script ran on page and returned:');
+      response.appendResponseLine('```json');
+      response.appendResponseLine(`${result}`);
+      response.appendResponseLine('```');
+    });
   },
 });
