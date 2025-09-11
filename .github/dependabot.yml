@@ -1,0 +1,29 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: 'sunday'
+      time: '02:00'
+      timezone: Europe/Berlin
+    groups:
+      dependencies:
+        dependency-type: production
+        patterns:
+          - '*'
+      dev-dependencies:
+        dependency-type: development
+        patterns:
+          - '*'
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: 'sunday'
+      time: '04:00'
+      timezone: Europe/Berlin
+    groups:
+      all:
+        patterns:
+          - '*'
