@@ -11,7 +11,7 @@
     "build": "tsc && node --experimental-strip-types scripts/post-build.ts",
     "format": "eslint --cache --fix . ;prettier --write --cache .",
     "check-format": "eslint --cache .; prettier --check --cache .;",
-    "generate-docs": "node --experimental-strip-types scripts/generate-docs.ts",
+    "generate-docs": "npm run build && node --experimental-strip-types scripts/generate-docs.ts",
     "start": "npm run build && node build/src/index.js",
     "start-debug": "DEBUG=mcp:* DEBUG_COLORS=false npm run build && node build/src/index.js",
     "test": "npm run build && npx puppeteer browsers install chrome@latest && PUPPETEER_CHROME_VERSION=latest node --test-force-exit --test 'build/tests/**/*.test.js'",
