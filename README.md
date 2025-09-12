@@ -24,7 +24,7 @@ Add the following config to your MCP client:
 ```json
 {
   "mcpServers": {
-    "chrome-devtools-mcp": {
+    "chrome-devtools": {
       "command": "npx",
       "args": ["chrome-devtools-mcp@latest"]
     }
@@ -38,16 +38,11 @@ Add the following config to your MCP client:
 ### MCP Client specific configuration
 
 <details>
-  <summary>Cursor</summary>
-  Follow https://docs.cursor.com/en/context/mcp#using-mcp-json and use the config provided above.
-</details>
-
-<details>
   <summary>Claude Code</summary>
-    Use the Claude Code CLI to add the Chrome DevTools MCP server ([guide](https://docs.anthropic.com/en/docs/claude-code/mcp)):
+    Use the Claude Code CLI to add the Chrome DevTools MCP server (<a href="https://docs.anthropic.com/en/docs/claude-code/mcp">guide</a>):
 
 ```bash
-claude mcp add chrome-devtools-mcp npx chrome-devtools-mcp@latest
+claude mcp add chrome-devtools npx chrome-devtools-mcp@latest
 ```
 
 </details>
@@ -59,23 +54,28 @@ claude mcp add chrome-devtools-mcp npx chrome-devtools-mcp@latest
 
 <details>
   <summary>Copilot / VS Code</summary>
-  Follow the MCP install [guide](https://code.visualstudio.com/docs/copilot/chat/mcp-servers#_add-an-mcp-server),
+  Follow the MCP install <a href="https://code.visualstudio.com/docs/copilot/chat/mcp-servers#_add-an-mcp-server">guide</a>,
   with the standard config from above. You can also install the Chrome DevTools MCP server using the VS Code CLI:
   
   ```bash
-  code --add-mcp '{"name":"chrome-devtools-mcp","command":"npx","args":["chrome-devtools-mcp@latest"]}'
+  code --add-mcp '{"name":"chrome-devtools","command":"npx","args":["chrome-devtools-mcp@latest"]}'
   ```
 </details>
 
 <details>
+  <summary>Cursor</summary>
+  Follow https://docs.cursor.com/en/context/mcp#using-mcp-json and use the config provided above.
+</details>
+
+<details>
   <summary>Gemini CLI</summary>
-  Follow the [MCP guide](https://github.com/google-gemini/gemini-cli/blob/main/docs/tools/mcp-server.md#how-to-set-up-your-mcp-server)
+  Follow the <a href="https://github.com/google-gemini/gemini-cli/blob/main/docs/tools/mcp-server.md#how-to-set-up-your-mcp-server">MCP guide</a>
   using the standard config from above.
 </details>
 
 <details>
   <summary>Gemini Code Assist</summary>
-  Follow the [configure MCP guide](https://cloud.google.com/gemini/docs/codeassist/use-agentic-chat-pair-programmer#configure-mcp-servers)
+  Follow the <a href="https://cloud.google.com/gemini/docs/codeassist/use-agentic-chat-pair-programmer#configure-mcp-servers">configure MCP guide</a>
   using the standard config from above.
 </details>
 
