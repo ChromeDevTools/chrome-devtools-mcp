@@ -1,4 +1,4 @@
-name: Compile and run unit tests
+name: Compile and run tests
 
 permissions: read-all
 
@@ -10,8 +10,15 @@ on:
 
 jobs:
   run-tests:
-    runs-on: ubuntu-latest
-
+    name: Tests on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - windows-latest
+          - macos-latest
     steps:
       - name: Check out repository
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
@@ -28,10 +35,8 @@ jobs:
         run: npm ci
 
       - name: Disable AppArmor
+        if: ${{ matrix.os == 'ubuntu-latest' }}
         run: echo 0 | sudo tee /proc/sys/kernel/apparmor_restrict_unprivileged_userns
-
-      - name: Build the project
-        run: npm run build
 
       - name: Run tests
         run: npm run test
