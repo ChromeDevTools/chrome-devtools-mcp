@@ -1,6 +1,6 @@
 # Chrome DevTools MCP
 
-`chrome-devtools-mcp` is a Model-Context-Protocol (MCP) server that allows
+`chrome-devtools-mcp` is a Model-Context-Protocol (MCP) server that brings
 clients to automate tasks in Chrome for debugging and testing purposes.
 
 ## Key features
