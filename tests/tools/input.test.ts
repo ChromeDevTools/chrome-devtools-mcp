@@ -112,7 +112,7 @@ describe('input', () => {
       });
     });
 
-    it.only('waits for stable DOM', async () => {
+    it('waits for stable DOM', async () => {
       server.addHtmlRoute(
         '/unstable',
         html`

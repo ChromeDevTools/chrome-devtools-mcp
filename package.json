@@ -14,9 +14,9 @@
     "generate-docs": "npm run build && node --experimental-strip-types scripts/generate-docs.ts",
     "start": "npm run build && node build/src/index.js",
     "start-debug": "DEBUG=mcp:* DEBUG_COLORS=false npm run build && node build/src/index.js",
-    "test": "npm run build && npx puppeteer browsers install chrome@latest && PUPPETEER_CHROME_VERSION=latest node --test-force-exit --test 'build/tests/**/*.test.js'",
-    "test:only": "npm run build && npx puppeteer browsers install chrome@latest && PUPPETEER_CHROME_VERSION=latest node --test-force-exit --test --test-only 'build/tests/**/*.test.js'",
-    "test:only:no-build": "npx puppeteer browsers install chrome@latest && PUPPETEER_CHROME_VERSION=latest node --test-force-exit --test --test-only 'build/tests/**/*.test.js'",
+    "test": "npm run build && npx puppeteer browsers install chrome@latest && node --test-reporter spec --test-force-exit --test 'build/tests/**/*.test.js'",
+    "test:only": "npm run build && npx puppeteer browsers install chrome@latest && node --test-reporter spec --test-force-exit --test --test-only 'build/tests/**/*.test.js'",
+    "test:only:no-build": "npx puppeteer browsers install chrome@latest && node --test-reporter spec --test-force-exit --test --test-only 'build/tests/**/*.test.js'",
     "prepare": "node --experimental-strip-types scripts/prepare.ts"
   },
   "files": [
@@ -33,9 +33,9 @@
   },
   "homepage": "https://github.com/ChromeDevTools/chrome-devtools-mcp#readme",
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.17.5",
-    "debug": "^4.4.1",
-    "puppeteer-core": "^24.20.0",
+    "@modelcontextprotocol/sdk": "1.17.5",
+    "debug": "4.4.1",
+    "puppeteer-core": "24.20.0",
     "yargs": "18.0.0"
   },
   "devDependencies": {
@@ -50,7 +50,6 @@
     "chrome-devtools-frontend": "1.0.1514545",
     "eslint": "^9.35.0",
     "globals": "^16.4.0",
-    "gts": "^6.0.2",
     "prettier": "^3.6.2",
     "puppeteer": "^24.20.0",
     "sinon": "^21.0.0",

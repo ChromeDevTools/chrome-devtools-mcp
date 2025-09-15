@@ -8,8 +8,10 @@
  * @type {import('prettier').Config}
  */
 module.exports = {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  ...require('gts/.prettierrc.json'),
+  bracketSpacing: false,
+  singleQuote: true,
+  trailingComma: 'all',
+  arrowParens: 'avoid',
   singleAttributePerLine: true,
   htmlWhitespaceSensitivity: 'strict',
 };
