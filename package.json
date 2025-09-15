@@ -20,7 +20,10 @@
     "prepare": "node --experimental-strip-types scripts/prepare.ts"
   },
   "files": [
-    "build/src"
+    "build/src",
+    "build/node_modules",
+    "LICENSE",
+    "!*.tsbuildinfo"
   ],
   "repository": "ChromeDevTools/chrome-devtools-mcp",
   "author": "Google LLC",
