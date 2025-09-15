@@ -10,7 +10,7 @@ on:
 
 jobs:
   run-tests:
-    name: Tests on ${{ matrix.os }}
+    name: Tests on ${{ matrix.os }} with node ${{ matrix.node }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -19,6 +19,9 @@ jobs:
           - ubuntu-latest
           - windows-latest
           - macos-latest
+        node:
+          - 22
+          - 24
     steps:
       - name: Check out repository
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
@@ -29,7 +32,7 @@ jobs:
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
           cache: npm
-          node-version-file: '.nvmrc'
+          node-version: ${{ matrix.node }}
 
       - name: Install dependencies
         run: npm ci
@@ -40,3 +43,14 @@ jobs:
 
       - name: Run tests
         run: npm run test
+
+  # Gating job for branch protection.
+  test-success:
+    name: '[Required] Tests passed'
+    runs-on: ubuntu-latest
+    needs: run-tests
+    if: ${{ !cancelled() }}
+    steps:
+      - if: ${{ needs.run-tests.result != 'success' }}
+        run: 'exit 1'
+      - run: 'exit 0'
