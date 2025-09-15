@@ -22,10 +22,7 @@
   "files": [
     "build/src"
   ],
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/ChromeDevTools/chrome-devtools-mcp.git"
-  },
+  "repository": "ChromeDevTools/chrome-devtools-mcp",
   "author": "Google LLC",
   "license": "Apache-2.0",
   "bugs": {
