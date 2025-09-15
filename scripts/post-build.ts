@@ -68,15 +68,42 @@ function main(): void {
   const i18nDir = path.join(BUILD_DIR, devtoolsFrontEndCorePath, 'i18n');
   fs.mkdirSync(i18nDir, {recursive: true});
   const i18nFile = path.join(i18nDir, 'i18n.js');
-  const i18nContent = `export const i18n = {
-    registerUIStrings: () => {},
-    getLocalizedString: (_, str) => {
-      // So that the string passed in gets output verbatim.
-      return str;
-    },
-    lockedLazyString: () => {},
-    getLazilyComputedLocalizedString: () => {}
-  };`;
+  const i18nContent = `
+export const i18n = {
+  registerUIStrings: () => {},
+  getLocalizedString: (_, str) => {
+    // So that the string passed in gets output verbatim.
+    return str;
+  },
+  lockedLazyString: () => {},
+  getLazilyComputedLocalizedString: () => {},
+};
+
+// TODO(jacktfranklin): once the DocumentLatency insight does not depend on
+// this method, we can remove this stub.
+export const TimeUtilities = {
+  millisToString(x) {
+    const separator = '\xA0';
+    const formatter = new Intl.NumberFormat('en-US', {
+      style: 'unit',
+      unitDisplay: 'narrow',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 1,
+      unit: 'millisecond',
+    });
+
+    const parts = formatter.formatToParts(x);
+    for (const part of parts) {
+      if (part.type === 'literal') {
+        if (part.value === ' ') {
+          part.value = separator;
+        }
+      }
+    }
+
+    return parts.map(part => part.value).join('');
+  }
+};`;
   writeFile(i18nFile, i18nContent);
 
   // Create codemirror.next mock.
@@ -94,7 +121,10 @@ function main(): void {
   const rootDir = path.join(BUILD_DIR, devtoolsFrontEndCorePath, 'root');
   fs.mkdirSync(rootDir, {recursive: true});
   const runtimeFile = path.join(rootDir, 'Runtime.js');
-  const runtimeContent = 'export default {};';
+  const runtimeContent = `
+export function getChromeVersion() { return ''; };
+export const hostConfig = {};
+  `;
   writeFile(runtimeFile, runtimeContent);
 
   // Update protocol_client to remove:

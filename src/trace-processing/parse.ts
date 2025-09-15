@@ -4,9 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {PerformanceInsightFormatter} from '../../node_modules/chrome-devtools-frontend/front_end/models/ai_assistance/data_formatters/PerformanceInsightFormatter.js';
+import {PerformanceTraceFormatter} from '../../node_modules/chrome-devtools-frontend/front_end/models/ai_assistance/data_formatters/PerformanceTraceFormatter.js';
 import * as TraceEngine from '../../node_modules/chrome-devtools-frontend/front_end/models/trace/trace.js';
 import {logger} from '../logger.js';
+import {AgentFocus} from '../../node_modules/chrome-devtools-frontend/front_end/models/ai_assistance/performance/AIContext.js';
 
 const engine = TraceEngine.TraceModel.Model.createWithAllHandlers();
 
@@ -62,38 +63,9 @@ export async function parseRawTraceBuffer(
 // TODO(jactkfranklin): move the formatters from DevTools to use here.
 // This is a very temporary helper to output some text from the tool call to aid development.
 export function insightOutput(result: TraceResult): string {
-  const mainNavigationId =
-    result.parsedTrace.data.Meta.mainFrameNavigations.at(0)?.args.data
-      ?.navigationId;
-  if (!mainNavigationId) {
-    return '';
-  }
-
-  let text = '';
-  const insightsForNav = result.insights.get(mainNavigationId);
-  if (!insightsForNav) {
-    text += 'No Performance insights were found for this trace.';
-    return text;
-  }
-
-  const failingInsightKeys = Object.keys(insightsForNav.model).filter(
-    insightKey => {
-      const key = insightKey as keyof TraceEngine.Insights.Types.InsightModels;
-      const data = insightsForNav.model[key] ?? null;
-      return data?.state === 'fail';
-    },
-  ) as Array<keyof TraceEngine.Insights.Types.InsightModels>;
-  logger(`Found failing Insight keys: ${failingInsightKeys.join(', ')}`);
-
-  for (const failingKey of failingInsightKeys) {
-    const modelData = insightsForNav.model[failingKey];
-    const formatter = new PerformanceInsightFormatter(
-      result.parsedTrace,
-      modelData,
-    );
-
-    const output = formatter.formatInsight();
-    text += `${output}\n`;
-  }
-  return text;
+  const focus = AgentFocus.full(result.parsedTrace);
+  const serializer = new TraceEngine.EventsSerializer.EventsSerializer();
+  const formatter = new PerformanceTraceFormatter(focus, serializer);
+  const output = formatter.formatTraceSummary();
+  return output;
 }
