@@ -3,7 +3,7 @@ name: publish-on-tag
 on:
   push:
     tags:
-      - 'v*'
+      - 'chrome-devtools-mcp-v*'
 
 jobs:
   publish:
