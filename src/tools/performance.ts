@@ -49,7 +49,6 @@ export const startTrace = defineTool({
       });
     }
 
-    // This panel may be opened with trace data recorded in other tools.
     // Keep in sync with the categories arrays in:
     // https://source.chromium.org/chromium/chromium/src/+/main:third_party/devtools-frontend/src/front_end/panels/timeline/TimelineController.ts
     // https://github.com/GoogleChrome/lighthouse/blob/master/lighthouse-core/gather/gatherers/trace.js
@@ -125,7 +124,7 @@ async function stopTracingAndAppendOutput(
         response.appendResponseLine(insightText);
       } else {
         response.appendResponseLine(
-          'No insights has been found. The performance looks good!',
+          'No insights have been found. The performance looks good!',
         );
       }
     }
