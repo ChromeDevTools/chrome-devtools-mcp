@@ -33,6 +33,7 @@ import * as snapshotTools from './tools/snapshot.js';
 import path from 'node:path';
 import fs from 'node:fs';
 import assert from 'node:assert';
+import {Mutex} from './Mutex.js';
 
 export const cliOptions = {
   browserUrl: {
@@ -169,6 +170,8 @@ Avoid sharing sensitive or personal information that you do want to share with M
   );
 };
 
+const toolMutex = new Mutex();
+
 function registerTool(tool: ToolDefinition): void {
   server.registerTool(
     tool.name,
@@ -178,35 +181,39 @@ function registerTool(tool: ToolDefinition): void {
       annotations: tool.annotations,
     },
     async (params): Promise<CallToolResult> => {
-      logger(`${tool.name} request: ${JSON.stringify(params, null, '  ')}`);
-      const context = await getContext();
-      const response = new McpResponse();
-      await tool.handler(
-        {
-          params,
-        },
-        response,
-        context,
-      );
+      const guard = await toolMutex.acquire();
       try {
-        const content = await response.handle(tool.name, context);
+        logger(`${tool.name} request: ${JSON.stringify(params, null, '  ')}`);
+        const context = await getContext();
+        const response = new McpResponse();
+        await tool.handler(
+          {
+            params,
+          },
+          response,
+          context,
+        );
+        try {
+          const content = await response.handle(tool.name, context);
+          return {
+            content,
+          };
+        } catch (error) {
+          const errorText =
+            error instanceof Error ? error.message : String(error);
 
-        return {
-          content,
-        };
-      } catch (error) {
-        const errorText =
-          error instanceof Error ? error.message : String(error);
-
-        return {
-          content: [
-            {
-              type: 'text',
-              text: errorText,
-            },
-          ],
-          isError: true,
-        };
+          return {
+            content: [
+              {
+                type: 'text',
+                text: errorText,
+              },
+            ],
+            isError: true,
+          };
+        }
+      } finally {
+        guard.dispose();
       }
     },
   );
