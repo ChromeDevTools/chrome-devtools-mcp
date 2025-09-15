@@ -147,8 +147,6 @@ describe('input', () => {
           return Number(button?.textContent);
         });
 
-        console.log(handlerResolveTime, buttonChangeTime);
-
         assert(handlerResolveTime > buttonChangeTime, 'Waited for navigation');
       });
     });

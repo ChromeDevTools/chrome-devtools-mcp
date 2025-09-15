@@ -113,9 +113,7 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
     // your profile directory` instead.
     if (
       userDataDir &&
-      (error as Error).message.includes(
-        '(Target.setDiscoverTargets): Target closed',
-      )
+      (error as Error).message.includes('The browser is already running')
     ) {
       throw new Error(
         `The browser is already running for ${userDataDir}. Use --isolated to run multiple browser instances.`,
