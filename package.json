@@ -14,9 +14,9 @@
     "generate-docs": "npm run build && node --experimental-strip-types scripts/generate-docs.ts",
     "start": "npm run build && node build/src/index.js",
     "start-debug": "DEBUG=mcp:* DEBUG_COLORS=false npm run build && node build/src/index.js",
-    "test": "npm run build && npx puppeteer browsers install chrome@latest && node --test-reporter spec --test-force-exit --test 'build/tests/**/*.test.js'",
-    "test:only": "npm run build && npx puppeteer browsers install chrome@latest && node --test-reporter spec --test-force-exit --test --test-only 'build/tests/**/*.test.js'",
-    "test:only:no-build": "npx puppeteer browsers install chrome@latest && node --test-reporter spec --test-force-exit --test --test-only 'build/tests/**/*.test.js'",
+    "test": "npm run build && node --test-reporter spec --test-force-exit --test 'build/tests/**/*.test.js'",
+    "test:only": "npm run build && node --test-reporter spec --test-force-exit --test --test-only 'build/tests/**/*.test.js'",
+    "test:only:no-build": "node --test-reporter spec --test-force-exit --test --test-only 'build/tests/**/*.test.js'",
     "prepare": "node --experimental-strip-types scripts/prepare.ts"
   },
   "files": [

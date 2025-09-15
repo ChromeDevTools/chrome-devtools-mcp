@@ -49,9 +49,31 @@ export const startTrace = defineTool({
       });
     }
 
-    // TODO(jacktfranklin): determine the exact list of categories and
-    // align with DevTools
-    await page.tracing.start();
+    // This panel may be opened with trace data recorded in other tools.
+    // Keep in sync with the categories arrays in:
+    // https://source.chromium.org/chromium/chromium/src/+/main:third_party/devtools-frontend/src/front_end/panels/timeline/TimelineController.ts
+    // https://github.com/GoogleChrome/lighthouse/blob/master/lighthouse-core/gather/gatherers/trace.js
+    const categories = [
+      '-*',
+      'blink.console',
+      'blink.user_timing',
+      'devtools.timeline',
+      'disabled-by-default-devtools.screenshot',
+      'disabled-by-default-devtools.timeline',
+      'disabled-by-default-devtools.timeline.invalidationTracking',
+      'disabled-by-default-devtools.timeline.frame',
+      'disabled-by-default-devtools.timeline.stack',
+      'disabled-by-default-v8.cpu_profiler',
+      'disabled-by-default-v8.cpu_profiler.hires',
+      'latencyInfo',
+      'loading',
+      'disabled-by-default-lighthouse',
+      'v8.execute',
+      'v8',
+    ];
+    await page.tracing.start({
+      categories,
+    });
 
     if (request.params.reload) {
       await page.goto(pageUrlForTracing, {
@@ -98,8 +120,14 @@ async function stopTracingAndAppendOutput(
     response.appendResponseLine('The performance trace has been stopped.');
     if (result) {
       const insightText = insightOutput(result);
-      response.appendResponseLine('Insights with performance opportunities:');
-      response.appendResponseLine(insightText);
+      if (insightText) {
+        response.appendResponseLine('Insights with performance opportunities:');
+        response.appendResponseLine(insightText);
+      } else {
+        response.appendResponseLine(
+          'No insights has been found. The performance looks good!',
+        );
+      }
     }
   } catch (e) {
     logger(
