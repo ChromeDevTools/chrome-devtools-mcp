@@ -5,6 +5,10 @@ on:
     tags:
       - 'chrome-devtools-mcp-v*'
 
+permissions:
+  id-token: write # Required for OIDC
+  contents: read
+
 jobs:
   publish:
     runs-on: ubuntu-latest
@@ -30,10 +34,5 @@ jobs:
         run: npm run build
 
       - name: Publish
-        env:
-          NPM_TOKEN: ${{secrets.NPM_TOKEN}}
-          TAG_NAME: ${{github.ref_name}}
         run: |
-          npm config set registry 'https://wombat-dressing-room.appspot.com/'
-          npm config set '//wombat-dressing-room.appspot.com/:_authToken' '${NPM_TOKEN}'
           npm publish --provenance --access public
