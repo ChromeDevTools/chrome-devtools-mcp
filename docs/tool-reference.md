@@ -259,11 +259,21 @@
 
 ### `evaluate_script`
 
-**Description:** Evaluate a JavaScript function inside the currently selected page. Returns the response as JSON.
+**Description:** Evaluate a JavaScript function inside the currently selected page. Returns the response as JSON
+so returned values have to JSON-serializable.
 
 **Parameters:**
 
-- **function** (string) **(required)**: A JavaScript function to run in the currently selected page. Example: `() => {return document.title}` or `async () => {return await fetch("example.com")}`
+- **args** (array) _(optional)_: An optional list of arguments to pass to the function.
+- **function** (string) **(required)**: A JavaScript function to run in the currently selected page.
+  Example without arguments: `() => {
+  return document.title
+}` or `async () => {
+  return await fetch("example.com")
+}`.
+  Example with arguments: `(el) => {
+  return el.innerText;
+}`
 
 ---
 
