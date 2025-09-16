@@ -1,5 +1,7 @@
 # Chrome DevTools MCP
 
+[![npm chrome-devtools-mcp package](https://img.shields.io/npm/v/chrome-devtools-mcp.svg)](https://npmjs.org/package/chrome-devtools-mcp)
+
 `chrome-devtools-mcp` is a Model-Context-Protocol (MCP) server that brings
 the power of Chrome DevTools to coding agents. Using it, coding agents can live
 debug style, performance or networking issues directly in Chrome.
