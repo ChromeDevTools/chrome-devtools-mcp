@@ -61,9 +61,9 @@ Testing 2`,
         result[0].text,
         `# test response
 ## Page content
-uid=0 RootWebArea ""
-  uid=1 button "Click me" focusable focused
-  uid=2 textbox "" value="Input"
+uid=1_0 RootWebArea ""
+  uid=1_1 button "Click me" focusable focused
+  uid=1_2 textbox "" value="Input"
 `,
       );
     });
@@ -87,9 +87,9 @@ uid=0 RootWebArea ""
         result[0].text,
         `# test response
 ## Page content
-uid=0 RootWebArea "My test page"
-  uid=1 StaticText "username"
-  uid=2 textbox "username" value="mcp" focusable focused
+uid=1_0 RootWebArea "My test page"
+  uid=1_1 StaticText "username"
+  uid=1_2 textbox "username" value="mcp" focusable focused
 `,
       );
     });

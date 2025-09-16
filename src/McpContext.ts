@@ -21,8 +21,14 @@ import path from 'node:path';
 import {listPages} from './tools/pages.js';
 
 export interface TextSnapshotNode extends SerializedAXNode {
-  id: number;
+  id: string;
   children: TextSnapshotNode[];
+}
+
+export interface TextSnapshot {
+  root: TextSnapshotNode;
+  idToNode: Map<string, TextSnapshotNode>;
+  snapshotId: string;
 }
 
 export class McpContext implements Context {
@@ -33,8 +39,7 @@ export class McpContext implements Context {
   #pages: Page[] = [];
   #selectedPageIdx = 0;
   // The most recent snapshot.
-  #textSnapshot: TextSnapshotNode | null = null;
-  #idToNodeMap = new Map<number, TextSnapshotNode>();
+  #textSnapshot: TextSnapshot | null = null;
   #networkCollector: NetworkCollector;
   #consoleCollector: PageCollector<ConsoleMessage | Error>;
 
@@ -42,6 +47,8 @@ export class McpContext implements Context {
   #networkConditions: string | null = null;
   #cpuThrottlingRate = 1;
   #dialog?: Dialog;
+
+  #nextSnapshotId = 1;
 
   private constructor(browser: Browser, logger: Debugger) {
     this.browser = browser;
@@ -192,11 +199,19 @@ export class McpContext implements Context {
     newPage.setDefaultNavigationTimeout(10_000);
   }
 
-  async getElementByUid(uid: number): Promise<ElementHandle<Element>> {
-    if (!this.#idToNodeMap.size) {
+  async getElementByUid(uid: string): Promise<ElementHandle<Element>> {
+    if (!this.#textSnapshot?.idToNode.size) {
       throw new Error('No snapshot found. Use browser_snapshot to capture one');
     }
-    const node = this.#idToNodeMap.get(uid);
+    const [snapshotId] = uid.split('_');
+
+    if (this.#textSnapshot.snapshotId !== snapshotId) {
+      throw new Error(
+        'This uid is coming from a stale snapshot. Call take_snapshot to get a fresh snapshot.',
+      );
+    }
+
+    const node = this.#textSnapshot?.idToNode.get(uid);
     if (!node) {
       throw new Error('No such element found in the snapshot');
     }
@@ -222,35 +237,39 @@ export class McpContext implements Context {
   /**
    * Creates a text snapshot of a page.
    */
-  async createTextSnapshot(): Promise<TextSnapshotNode | null> {
+  async createTextSnapshot(): Promise<void> {
     const page = this.getSelectedPage();
     const rootNode = await page.accessibility.snapshot();
     if (!rootNode) {
-      return null;
+      return;
     }
 
+    const snapshotId = this.#nextSnapshotId++;
     // Iterate through the whole accessibility node tree and assign node ids that
     // will be used for the tree serialization and mapping ids back to nodes.
     let idCounter = 0;
-    this.#idToNodeMap.clear();
+    const idToNode = new Map<string, TextSnapshotNode>();
     const assignIds = (node: SerializedAXNode): TextSnapshotNode => {
       const nodeWithId: TextSnapshotNode = {
         ...node,
-        id: idCounter++,
+        id: `${snapshotId}_${idCounter++}`,
         children: node.children
           ? node.children.map(child => assignIds(child))
           : [],
       };
-      this.#idToNodeMap.set(nodeWithId.id, nodeWithId);
+      idToNode.set(nodeWithId.id, nodeWithId);
       return nodeWithId;
     };
 
     const rootNodeWithId = assignIds(rootNode);
-    this.#textSnapshot = rootNodeWithId;
-    return rootNodeWithId;
+    this.#textSnapshot = {
+      root: rootNodeWithId,
+      snapshotId: String(snapshotId),
+      idToNode,
+    };
   }
 
-  getTextSnapshot(): TextSnapshotNode | null {
+  getTextSnapshot(): TextSnapshot | null {
     return this.#textSnapshot;
   }
 

@@ -94,7 +94,7 @@ describe('screenshot', () => {
           {
             params: {
               format: 'png',
-              uid: 1,
+              uid: '1_1',
             },
           },
           response,
@@ -105,7 +105,7 @@ describe('screenshot', () => {
         assert.equal(response.images[0].mimeType, 'image/png');
         assert.equal(
           response.responseLines.at(0),
-          'Took a screenshot of node with uid "1".',
+          'Took a screenshot of node with uid "1_1".',
         );
       });
     });

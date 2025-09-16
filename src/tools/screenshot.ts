@@ -22,7 +22,7 @@ export const screenshot = defineTool({
       .default('png')
       .describe('Type of format to save the screenshot as. Default is "png"'),
     uid: z
-      .number()
+      .string()
       .optional()
       .describe(
         'The uid of an element on the page from the page content snapshot. If omitted takes a pages screenshot.',

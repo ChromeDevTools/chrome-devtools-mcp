@@ -103,5 +103,55 @@ describe('script', () => {
         assert.strictEqual(JSON.parse(lineEvaluation), 'Works');
       });
     });
+
+    it('work with one argument', async () => {
+      await withBrowser(async (response, context) => {
+        const page = context.getSelectedPage();
+
+        await page.setContent(html`<button id="test">test</button>`);
+
+        await context.createTextSnapshot();
+
+        await evaluateScript.handler(
+          {
+            params: {
+              function: String(async (el: Element) => {
+                return el.id;
+              }),
+              args: [{uid: '1_1'}],
+            },
+          },
+          response,
+          context,
+        );
+        const lineEvaluation = response.responseLines.at(2)!;
+        assert.strictEqual(JSON.parse(lineEvaluation), 'test');
+      });
+    });
+
+    it('work with multiple args', async () => {
+      await withBrowser(async (response, context) => {
+        const page = context.getSelectedPage();
+
+        await page.setContent(html`<button id="test">test</button>`);
+
+        await context.createTextSnapshot();
+
+        await evaluateScript.handler(
+          {
+            params: {
+              function: String((container: Element, child: Element) => {
+                return container.contains(child);
+              }),
+              args: [{uid: '1_0'}, {uid: '1_1'}],
+            },
+          },
+          response,
+          context,
+        );
+        const lineEvaluation = response.responseLines.at(2)!;
+        assert.strictEqual(JSON.parse(lineEvaluation), true);
+      });
+    });
   });
 });

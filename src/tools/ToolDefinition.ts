@@ -60,7 +60,7 @@ export type Context = Readonly<{
   getPageByIdx(idx: number): Page;
   newPage(): Promise<Page>;
   setSelectedPageIdx(idx: number): void;
-  getElementByUid(uid: number): Promise<ElementHandle<Element>>;
+  getElementByUid(uid: string): Promise<ElementHandle<Element>>;
   setNetworkConditions(conditions: string | null): void;
   setCpuThrottlingRate(rate: number): void;
   saveTemporaryFile(

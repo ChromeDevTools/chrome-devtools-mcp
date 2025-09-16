@@ -19,7 +19,7 @@ export const click = defineTool({
   },
   schema: {
     uid: z
-      .number()
+      .string()
       .describe(
         'The uid of an element on the page from the page content snapshot',
       ),
@@ -58,7 +58,7 @@ export const hover = defineTool({
   },
   schema: {
     uid: z
-      .number()
+      .string()
       .describe(
         'The uid of an element on the page from the page content snapshot',
       ),
@@ -87,7 +87,7 @@ export const fill = defineTool({
   },
   schema: {
     uid: z
-      .number()
+      .string()
       .describe(
         'The uid of an element on the page from the page content snapshot',
       ),
@@ -115,8 +115,8 @@ export const drag = defineTool({
     readOnlyHint: false,
   },
   schema: {
-    from_uid: z.number().describe('The uid of the element to drag'),
-    to_uid: z.number().describe('The uid of the element to drop into'),
+    from_uid: z.string().describe('The uid of the element to drag'),
+    to_uid: z.string().describe('The uid of the element to drop into'),
   },
   handler: async (request, response, context) => {
     const fromHandle = await context.getElementByUid(request.params.from_uid);
@@ -147,7 +147,7 @@ export const fillForm = defineTool({
     elements: z
       .array(
         z.object({
-          uid: z.number().describe('The uid of the element to fill out'),
+          uid: z.string().describe('The uid of the element to fill out'),
           value: z.string().describe('Value for the element'),
         }),
       )
@@ -178,7 +178,7 @@ export const uploadFile = defineTool({
   },
   schema: {
     uid: z
-      .number()
+      .string()
       .describe(
         'The uid of the file input element or an element that will open file chooser on the page from the page content snapshot',
       ),
