@@ -13,13 +13,13 @@ import type {ElementHandle} from 'puppeteer-core';
 describe('snapshotFormatter', () => {
   it('formats a snapshot with value properties', () => {
     const snapshot: TextSnapshotNode = {
-      id: 1,
+      id: '1_1',
       role: 'textbox',
       name: 'textbox',
       value: 'value',
       children: [
         {
-          id: 2,
+          id: '1_2',
           role: 'statictext',
           name: 'text',
           children: [],
@@ -36,21 +36,21 @@ describe('snapshotFormatter', () => {
     const formatted = formatA11ySnapshot(snapshot);
     assert.strictEqual(
       formatted,
-      `uid=1 textbox "textbox" value="value"
-  uid=2 statictext "text"
+      `uid=1_1 textbox "textbox" value="value"
+  uid=1_2 statictext "text"
 `,
     );
   });
 
   it('formats a snapshot with boolean properties', () => {
     const snapshot: TextSnapshotNode = {
-      id: 1,
+      id: '1_1',
       role: 'button',
       name: 'button',
       disabled: true,
       children: [
         {
-          id: 2,
+          id: '1_2',
           role: 'statictext',
           name: 'text',
           children: [],
@@ -67,21 +67,21 @@ describe('snapshotFormatter', () => {
     const formatted = formatA11ySnapshot(snapshot);
     assert.strictEqual(
       formatted,
-      `uid=1 button "button" disableable disabled
-  uid=2 statictext "text"
+      `uid=1_1 button "button" disableable disabled
+  uid=1_2 statictext "text"
 `,
     );
   });
 
   it('formats a snapshot with checked properties', () => {
     const snapshot: TextSnapshotNode = {
-      id: 1,
+      id: '1_1',
       role: 'checkbox',
       name: 'checkbox',
       checked: true,
       children: [
         {
-          id: 2,
+          id: '1_2',
           role: 'statictext',
           name: 'text',
           children: [],
@@ -98,20 +98,20 @@ describe('snapshotFormatter', () => {
     const formatted = formatA11ySnapshot(snapshot);
     assert.strictEqual(
       formatted,
-      `uid=1 checkbox "checkbox" checked checked="true"
-  uid=2 statictext "text"
+      `uid=1_1 checkbox "checkbox" checked checked="true"
+  uid=1_2 statictext "text"
 `,
     );
   });
 
   it('formats a snapshot with multiple different type attributes', () => {
     const snapshot: TextSnapshotNode = {
-      id: 1,
+      id: '1_1',
       role: 'root',
       name: 'root',
       children: [
         {
-          id: 2,
+          id: '1_2',
           role: 'button',
           name: 'button',
           focused: true,
@@ -122,7 +122,7 @@ describe('snapshotFormatter', () => {
           },
         },
         {
-          id: 3,
+          id: '1_3',
           role: 'textbox',
           name: 'textbox',
           value: 'value',
@@ -140,9 +140,9 @@ describe('snapshotFormatter', () => {
     const formatted = formatA11ySnapshot(snapshot);
     assert.strictEqual(
       formatted,
-      `uid=1 root "root"
-  uid=2 button "button" disableable disabled focusable focused
-  uid=3 textbox "textbox" value="value"
+      `uid=1_1 root "root"
+  uid=1_2 button "button" disableable disabled focusable focused
+  uid=1_3 textbox "textbox" value="value"
 `,
     );
   });

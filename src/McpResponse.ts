@@ -145,9 +145,9 @@ Call browser_handle_dialog to handle it before continuing.`);
     }
 
     if (this.#includeSnapshot) {
-      const rootNode = context.getTextSnapshot();
-      if (rootNode) {
-        const formattedSnapshot = formatA11ySnapshot(rootNode);
+      const snapshot = context.getTextSnapshot();
+      if (snapshot) {
+        const formattedSnapshot = formatA11ySnapshot(snapshot.root);
         response.push('## Page content');
         response.push(formattedSnapshot);
       }

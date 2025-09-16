@@ -34,7 +34,7 @@ describe('input', () => {
         await click.handler(
           {
             params: {
-              uid: 1,
+              uid: '1_1',
             },
           },
           response,
@@ -58,7 +58,7 @@ describe('input', () => {
         await click.handler(
           {
             params: {
-              uid: 1,
+              uid: '1_1',
               dblClick: true,
             },
           },
@@ -92,7 +92,7 @@ describe('input', () => {
         const clickPromise = click.handler(
           {
             params: {
-              uid: 1,
+              uid: '1_1',
             },
           },
           response,
@@ -135,7 +135,7 @@ describe('input', () => {
           .handler(
             {
               params: {
-                uid: 1,
+                uid: '1_1',
               },
             },
             response,
@@ -163,7 +163,7 @@ describe('input', () => {
         await hover.handler(
           {
             params: {
-              uid: 1,
+              uid: '1_1',
             },
           },
           response,
@@ -188,7 +188,7 @@ describe('input', () => {
         await fill.handler(
           {
             params: {
-              uid: 1,
+              uid: '1_1',
               value: 'test',
             },
           },
@@ -232,8 +232,8 @@ describe('input', () => {
         await drag.handler(
           {
             params: {
-              from_uid: 1,
-              to_uid: 2,
+              from_uid: '1_1',
+              to_uid: '1_2',
             },
           },
           response,
@@ -265,11 +265,11 @@ describe('input', () => {
             params: {
               elements: [
                 {
-                  uid: 2,
+                  uid: '1_2',
                   value: 'test',
                 },
                 {
-                  uid: 4,
+                  uid: '1_4',
                   value: 'test2',
                 },
               ],
@@ -313,7 +313,7 @@ describe('input', () => {
         await uploadFile.handler(
           {
             params: {
-              uid: 1,
+              uid: '1_1',
               filePath: testFilePath,
             },
           },
@@ -348,7 +348,7 @@ describe('input', () => {
         await uploadFile.handler(
           {
             params: {
-              uid: 1,
+              uid: '1_1',
               filePath: testFilePath,
             },
           },
@@ -383,7 +383,7 @@ describe('input', () => {
           uploadFile.handler(
             {
               params: {
-                uid: 1,
+                uid: '1_1',
                 filePath: testFilePath,
               },
             },

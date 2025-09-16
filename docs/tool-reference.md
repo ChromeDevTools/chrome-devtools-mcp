@@ -43,7 +43,7 @@
 **Parameters:**
 
 - **dblClick** (boolean) _(optional)_: Set to true for double clicks. Default is false.
-- **uid** (number) **(required)**: The uid of an element on the page from the page content snapshot
+- **uid** (string) **(required)**: The uid of an element on the page from the page content snapshot
 
 ---
 
@@ -53,8 +53,8 @@
 
 **Parameters:**
 
-- **from_uid** (number) **(required)**: The uid of the element to [`drag`](#drag)
-- **to_uid** (number) **(required)**: The uid of the element to drop into
+- **from_uid** (string) **(required)**: The uid of the element to [`drag`](#drag)
+- **to_uid** (string) **(required)**: The uid of the element to drop into
 
 ---
 
@@ -64,7 +64,7 @@
 
 **Parameters:**
 
-- **uid** (number) **(required)**: The uid of an element on the page from the page content snapshot
+- **uid** (string) **(required)**: The uid of an element on the page from the page content snapshot
 - **value** (string) **(required)**: The value to [`fill`](#fill) in
 
 ---
@@ -96,7 +96,7 @@
 
 **Parameters:**
 
-- **uid** (number) **(required)**: The uid of an element on the page from the page content snapshot
+- **uid** (string) **(required)**: The uid of an element on the page from the page content snapshot
 
 ---
 
@@ -107,7 +107,7 @@
 **Parameters:**
 
 - **filePath** (string) **(required)**: The local path of the file to upload
-- **uid** (number) **(required)**: The uid of the file input element or an element that will open file chooser on the page from the page content snapshot
+- **uid** (string) **(required)**: The uid of the file input element or an element that will open file chooser on the page from the page content snapshot
 
 ---
 
@@ -283,7 +283,7 @@
 
 - **format** (enum: "png", "jpeg") _(optional)_: Type of format to save the screenshot as. Default is "png"
 - **fullPage** (boolean) _(optional)_: If set to true takes a screenshot of the full page instead of the currently visible viewport. Incompatible with uid.
-- **uid** (number) _(optional)_: The uid of an element on the page from the page content snapshot. If omitted takes a pages screenshot.
+- **uid** (string) _(optional)_: The uid of an element on the page from the page content snapshot. If omitted takes a pages screenshot.
 
 ---
 
