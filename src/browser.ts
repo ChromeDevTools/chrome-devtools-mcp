@@ -66,7 +66,9 @@ type McpLaunchOptions = {
 export async function launch(options: McpLaunchOptions): Promise<Browser> {
   const {channel, executablePath, customDevTools, headless, isolated} = options;
   const profileDirName =
-    channel && channel !== 'stable' ? `mcp-profile-${channel}` : 'mcp-profile';
+    channel && channel !== 'stable'
+      ? `chrome-profile-${channel}`
+      : 'chrome-profile';
 
   let userDataDir = options.userDataDir;
   if (!isolated && !userDataDir) {

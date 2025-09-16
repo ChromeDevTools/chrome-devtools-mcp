@@ -189,8 +189,8 @@ You can also run `npx chrome-devtools-mcp@latest --help` to see all available co
 `chrome-devtools-mcp` starts a Chrome's stable channel instance using the following user
 data directory:
 
-- Linux / MacOS: `$HOME/.cache/chrome-devtools-mcp/mcp-profile-$CHANNEL`
-- Window: `%HOMEPATH%/.cache/chrome-devtools-mcp/mcp-profile-$CHANNEL`
+- Linux / MacOS: `$HOME/.cache/chrome-devtools-mcp/chrome-profile-$CHANNEL`
+- Window: `%HOMEPATH%/.cache/chrome-devtools-mcp/chrome-profile-$CHANNEL`
 
 The user data directory is not cleared between runs and shared across
 all instances of `chrome-devtools-mcp`. Set the `isolated` option to `true`
