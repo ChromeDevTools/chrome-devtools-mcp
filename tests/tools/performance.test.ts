@@ -7,9 +7,17 @@ import {describe, it, afterEach} from 'node:test';
 import assert from 'assert';
 import sinon from 'sinon';
 
-import {startTrace, stopTrace} from '../../src/tools/performance.js';
+import {
+  analyzeInsight,
+  startTrace,
+  stopTrace,
+} from '../../src/tools/performance.js';
 import {withBrowser} from '../utils.js';
 import {loadTraceAsBuffer} from '../trace-processing/fixtures/load.js';
+import {
+  parseRawTraceBuffer,
+  TraceResult,
+} from '../../src/trace-processing/parse.js';
 
 describe('performance', () => {
   afterEach(() => {
@@ -20,7 +28,7 @@ describe('performance', () => {
     it('starts a trace recording', async () => {
       await withBrowser(async (response, context) => {
         context.setIsRunningPerformanceTrace(false);
-        const selectedPage = await context.getSelectedPage();
+        const selectedPage = context.getSelectedPage();
         const startTracingStub = sinon.stub(selectedPage.tracing, 'start');
         await startTrace.handler(
           {params: {reload: true, autoStop: false}},
@@ -39,7 +47,7 @@ describe('performance', () => {
 
     it('can navigate to about:blank and record a page reload', async () => {
       await withBrowser(async (response, context) => {
-        const selectedPage = await context.getSelectedPage();
+        const selectedPage = context.getSelectedPage();
         sinon.stub(selectedPage, 'url').callsFake(() => 'https://www.test.com');
         const gotoStub = sinon.stub(selectedPage, 'goto');
         const startTracingStub = sinon.stub(selectedPage.tracing, 'start');
@@ -64,11 +72,11 @@ describe('performance', () => {
       });
     });
 
-    it('can autostop a recording', async () => {
+    it('can autostop and store a recording', async () => {
       const rawData = loadTraceAsBuffer('basic-trace.json.gz');
 
       await withBrowser(async (response, context) => {
-        const selectedPage = await context.getSelectedPage();
+        const selectedPage = context.getSelectedPage();
         sinon.stub(selectedPage, 'url').callsFake(() => 'https://www.test.com');
         sinon.stub(selectedPage, 'goto').callsFake(() => Promise.resolve(null));
         const startTracingStub = sinon.stub(selectedPage.tracing, 'start');
@@ -100,6 +108,7 @@ describe('performance', () => {
           false,
           'Tracing was stopped',
         );
+        assert.strictEqual(context.recordedTraces().length, 1);
         assert.ok(
           response.responseLines
             .join('\n')
@@ -111,7 +120,7 @@ describe('performance', () => {
     it('errors if a recording is already active', async () => {
       await withBrowser(async (response, context) => {
         context.setIsRunningPerformanceTrace(true);
-        const selectedPage = await context.getSelectedPage();
+        const selectedPage = context.getSelectedPage();
         const startTracingStub = sinon.stub(selectedPage.tracing, 'start');
         await startTrace.handler(
           {params: {reload: true, autoStop: false}},
@@ -123,6 +132,79 @@ describe('performance', () => {
           response.responseLines
             .join('\n')
             .match(/a performance trace is already running/),
+        );
+      });
+    });
+  });
+
+  describe('performance_analyze_insight', () => {
+    async function parseTrace(fileName: string): Promise<TraceResult> {
+      const rawData = loadTraceAsBuffer(fileName);
+      const result = await parseRawTraceBuffer(rawData);
+      assert.ok(result);
+      return result;
+    }
+
+    it('returns the information on the insight', async t => {
+      const trace = await parseTrace('web-dev-with-commit.json.gz');
+      await withBrowser(async (response, context) => {
+        context.storeTraceRecording(trace);
+        context.setIsRunningPerformanceTrace(false);
+
+        await analyzeInsight.handler(
+          {
+            params: {
+              insightName: 'LCPBreakdown',
+            },
+          },
+          response,
+          context,
+        );
+
+        t.assert.snapshot(response.responseLines.join('\n'));
+      });
+    });
+
+    it('returns an error if the insight does not exist', async () => {
+      const trace = await parseTrace('web-dev-with-commit.json.gz');
+      await withBrowser(async (response, context) => {
+        context.storeTraceRecording(trace);
+        context.setIsRunningPerformanceTrace(false);
+
+        await analyzeInsight.handler(
+          {
+            params: {
+              insightName: 'MadeUpInsightName',
+            },
+          },
+          response,
+          context,
+        );
+        assert.ok(
+          response.responseLines
+            .join('\n')
+            .match(/No Insight with the name MadeUpInsightName found./),
+        );
+      });
+    });
+
+    it('returns an error if no trace has been recorded', async () => {
+      await withBrowser(async (response, context) => {
+        await analyzeInsight.handler(
+          {
+            params: {
+              insightName: 'LCPBreakdown',
+            },
+          },
+          response,
+          context,
+        );
+        assert.ok(
+          response.responseLines
+            .join('\n')
+            .match(
+              /No recorded traces found. Record a performance trace so you have Insights to analyze./,
+            ),
         );
       });
     });
@@ -140,7 +222,7 @@ describe('performance', () => {
       const rawData = loadTraceAsBuffer('basic-trace.json.gz');
       await withBrowser(async (response, context) => {
         context.setIsRunningPerformanceTrace(true);
-        const selectedPage = await context.getSelectedPage();
+        const selectedPage = context.getSelectedPage();
         const stopTracingStub = sinon
           .stub(selectedPage.tracing, 'stop')
           .callsFake(async () => {
@@ -152,6 +234,7 @@ describe('performance', () => {
             'The performance trace has been stopped.',
           ),
         );
+        assert.strictEqual(context.recordedTraces().length, 1);
         sinon.assert.calledOnce(stopTracingStub);
       });
     });

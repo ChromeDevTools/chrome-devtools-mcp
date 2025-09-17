@@ -73,11 +73,7 @@ uid=1_0 RootWebArea ""
     await withBrowser(async (response, context) => {
       const page = context.getSelectedPage();
       await page.setContent(
-        html`<label
-          >username<input
-            name="username"
-            value="mcp"
-        /></label>`,
+        html`<label>username<input name="username" value="mcp" /></label>`,
       );
       await page.focus('input');
       response.setIncludeSnapshot(true);

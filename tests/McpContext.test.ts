@@ -5,12 +5,12 @@
  */
 import {describe, it} from 'node:test';
 import assert from 'assert';
-
+import {TraceResult} from '../src/trace-processing/parse.js';
 import {withBrowser} from './utils.js';
 
-describe('McpResponse', () => {
+describe('McpContext', () => {
   it('list pages', async () => {
-    await withBrowser(async (response, context) => {
+    await withBrowser(async (_response, context) => {
       const page = context.getSelectedPage();
       await page.setContent(`<!DOCTYPE html>
 <button>Click me</button><input type="text" value="Input">`);
@@ -26,6 +26,16 @@ describe('McpResponse', () => {
           'This uid is coming from a stale snapshot. Call take_snapshot to get a fresh snapshot',
         );
       }
+    });
+  });
+
+  it('can store and retrieve performance traces', async () => {
+    await withBrowser(async (_response, context) => {
+      const fakeTrace1 = {} as unknown as TraceResult;
+      const fakeTrace2 = {} as unknown as TraceResult;
+      context.storeTraceRecording(fakeTrace1);
+      context.storeTraceRecording(fakeTrace2);
+      assert.deepEqual(context.recordedTraces(), [fakeTrace1, fakeTrace2]);
     });
   });
 });

@@ -7,6 +7,7 @@
 import z from 'zod';
 import {Dialog, ElementHandle, Page} from 'puppeteer-core';
 import {ToolCategories} from './categories.js';
+import {TraceResult} from '../trace-processing/parse.js';
 
 export interface ToolDefinition<
   Schema extends Zod.ZodRawShape = Zod.ZodRawShape,
@@ -54,6 +55,8 @@ export interface Response {
 export type Context = Readonly<{
   isRunningPerformanceTrace(): boolean;
   setIsRunningPerformanceTrace(x: boolean): void;
+  recordedTraces(): TraceResult[];
+  storeTraceRecording(result: TraceResult): void;
   getSelectedPage(): Page;
   getDialog(): Dialog | undefined;
   clearDialog(): void;

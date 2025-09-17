@@ -6,7 +6,12 @@
 
 import z from 'zod';
 import {Context, defineTool, Response} from './ToolDefinition.js';
-import {insightOutput, parseRawTraceBuffer} from '../trace-processing/parse.js';
+import {
+  getInsightOutput,
+  getTraceSummary,
+  InsightName,
+  parseRawTraceBuffer,
+} from '../trace-processing/parse.js';
 import {logger} from '../logger.js';
 import {Page} from 'puppeteer-core';
 import {ToolCategories} from './categories.js';
@@ -108,6 +113,43 @@ export const stopTrace = defineTool({
   },
 });
 
+export const analyzeInsight = defineTool({
+  name: 'performance_analyze_insight',
+  description:
+    'Provides more detailed information on a specific Performance Insight that was highlighed in the results of a trace recording',
+  annotations: {
+    category: ToolCategories.PERFORMANCE,
+    readOnlyHint: true,
+  },
+  schema: {
+    insightName: z
+      .string()
+      .describe(
+        'The name of the Insight you want more information on. For example: "DocumentLatency" or "LCPBreakdown"',
+      ),
+  },
+  handler: async (request, response, context) => {
+    const lastRecording = context.recordedTraces().at(-1);
+    if (!lastRecording) {
+      response.appendResponseLine(
+        'No recorded traces found. Record a performance trace so you have Insights to analyze.',
+      );
+      return;
+    }
+
+    const insightOutput = getInsightOutput(
+      lastRecording,
+      request.params.insightName as InsightName,
+    );
+    if ('error' in insightOutput) {
+      response.appendResponseLine(insightOutput.error);
+      return;
+    }
+
+    response.appendResponseLine(insightOutput.output);
+  },
+});
+
 async function stopTracingAndAppendOutput(
   page: Page,
   response: Response,
@@ -118,7 +160,8 @@ async function stopTracingAndAppendOutput(
     const result = await parseRawTraceBuffer(traceEventsBuffer);
     response.appendResponseLine('The performance trace has been stopped.');
     if (result) {
-      const insightText = insightOutput(result);
+      context.storeTraceRecording(result);
+      const insightText = getTraceSummary(result);
       if (insightText) {
         response.appendResponseLine('Insights with performance opportunities:');
         response.appendResponseLine(insightText);

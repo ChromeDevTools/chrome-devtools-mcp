@@ -19,6 +19,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import {listPages} from './tools/pages.js';
+import {TraceResult} from './trace-processing/parse.js';
 
 export interface TextSnapshotNode extends SerializedAXNode {
   id: string;
@@ -49,6 +50,7 @@ export class McpContext implements Context {
   #dialog?: Dialog;
 
   #nextSnapshotId = 1;
+  #traceResults: TraceResult[] = [];
 
   private constructor(browser: Browser, logger: Debugger) {
     this.browser = browser;
@@ -291,5 +293,13 @@ export class McpContext implements Context {
       this.logger(err);
       throw new Error('Could not save a screenshot to a file');
     }
+  }
+
+  storeTraceRecording(result: TraceResult): void {
+    this.#traceResults.push(result);
+  }
+
+  recordedTraces(): TraceResult[] {
+    return this.#traceResults;
   }
 }

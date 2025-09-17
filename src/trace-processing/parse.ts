@@ -5,6 +5,7 @@
  */
 
 import {PerformanceTraceFormatter} from '../../node_modules/chrome-devtools-frontend/front_end/models/ai_assistance/data_formatters/PerformanceTraceFormatter.js';
+import {PerformanceInsightFormatter} from '../../node_modules/chrome-devtools-frontend/front_end/models/ai_assistance/data_formatters/PerformanceInsightFormatter.js';
 import * as TraceEngine from '../../node_modules/chrome-devtools-frontend/front_end/models/trace/trace.js';
 import {logger} from '../logger.js';
 import {AgentFocus} from '../../node_modules/chrome-devtools-frontend/front_end/models/ai_assistance/performance/AIContext.js';
@@ -60,12 +61,51 @@ export async function parseRawTraceBuffer(
   }
 }
 
-// TODO(jactkfranklin): move the formatters from DevTools to use here.
-// This is a very temporary helper to output some text from the tool call to aid development.
-export function insightOutput(result: TraceResult): string {
+export function getTraceSummary(result: TraceResult): string {
   const focus = AgentFocus.full(result.parsedTrace);
   const serializer = new TraceEngine.EventsSerializer.EventsSerializer();
   const formatter = new PerformanceTraceFormatter(focus, serializer);
   const output = formatter.formatTraceSummary();
   return output;
+}
+
+export type InsightName = keyof TraceEngine.Insights.Types.InsightModels;
+export type InsightOutput = {output: string} | {error: string};
+
+export function getInsightOutput(
+  result: TraceResult,
+  insightName: InsightName,
+): InsightOutput {
+  // Currently, we do not support inspecting traces with multiple navigations. We either:
+  // 1. Find Insights from the first navigation (common case: user records a trace with a page reload to test load performance)
+  // 2. Fall back to finding Insights not associated with a navigation (common case: user tests an interaction without a page load).
+  const mainNavigationId =
+    result.parsedTrace.data.Meta.mainFrameNavigations.at(0)?.args.data
+      ?.navigationId;
+
+  const insightsForNav = result.insights.get(
+    mainNavigationId ?? TraceEngine.Types.Events.NO_NAVIGATION,
+  );
+
+  if (!insightsForNav) {
+    return {
+      error: 'No Performance Insights for this trace.',
+    };
+  }
+
+  const matchingInsight =
+    insightName in insightsForNav.model
+      ? insightsForNav.model[insightName]
+      : null;
+  if (!matchingInsight) {
+    return {
+      error: `No Insight with the name ${insightName} found. Double check the name you provided is accurate and try again.`,
+    };
+  }
+
+  const formatter = new PerformanceInsightFormatter(
+    result.parsedTrace,
+    matchingInsight,
+  );
+  return {output: formatter.formatInsight()};
 }
