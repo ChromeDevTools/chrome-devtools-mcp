@@ -156,7 +156,7 @@ async function getContext(): Promise<McpContext> {
     channel: args.channel as Channel,
     isolated: args.isolated,
   });
-  if (!context) {
+  if (context?.browser !== browser) {
     context = await McpContext.from(browser, logger);
   }
   return context;
