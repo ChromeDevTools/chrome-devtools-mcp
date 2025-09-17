@@ -22,7 +22,8 @@
   - [`emulate_cpu`](#emulate_cpu)
   - [`emulate_network`](#emulate_network)
   - [`resize_page`](#resize_page)
-- **[Performance](#performance)** (2 tools)
+- **[Performance](#performance)** (3 tools)
+  - [`performance_analyze_insight`](#performance_analyze_insight)
   - [`performance_start_trace`](#performance_start_trace)
   - [`performance_stop_trace`](#performance_stop_trace)
 - **[Network](#network)** (2 tools)
@@ -216,6 +217,16 @@
 
 ## Performance
 
+### `performance_analyze_insight`
+
+**Description:** Provides more detailed information on a specific Performance Insight that was highlighed in the results of a trace recording
+
+**Parameters:**
+
+- **insightName** (string) **(required)**: The name of the Insight you want more information on. For example: "DocumentLatency" or "LCPBreakdown"
+
+---
+
 ### `performance_start_trace`
 
 **Description:** Starts a performance trace recording
@@ -266,14 +277,15 @@ so returned values have to JSON-serializable.
 
 - **args** (array) _(optional)_: An optional list of arguments to pass to the function.
 - **function** (string) **(required)**: A JavaScript function to run in the currently selected page.
-  Example without arguments: `() => {
+Example without arguments: `() => {
   return document.title
 }` or `async () => {
   return await fetch("example.com")
 }`.
-  Example with arguments: `(el) => {
+Example with arguments: `(el) => {
   return el.innerText;
 }`
+
 
 ---
 
