@@ -82,6 +82,12 @@ export const cliOptions = {
     describe: 'Save the logs to file.',
     hidden: true,
   },
+  experimentalDevTools: {
+    type: 'boolean' as const,
+    describe: 'Whether to enable automation over DevTools targets',
+    default: false,
+    hidden: true,
+  },
 };
 
 const yargsInstance = yargs(hideBin(process.argv))
@@ -155,9 +161,12 @@ async function getContext(): Promise<McpContext> {
     customDevTools: args.customDevtools,
     channel: args.channel as Channel,
     isolated: args.isolated,
+    devtools: args.experimentalDevTools,
   });
   if (context?.browser !== browser) {
-    context = await McpContext.from(browser, logger);
+    context = await McpContext.from(browser, logger, {
+      devtools: args.experimentalDevTools,
+    });
   }
   return context;
 }

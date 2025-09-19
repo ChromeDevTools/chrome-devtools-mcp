@@ -17,6 +17,7 @@ describe('browser', () => {
       headless: true,
       isolated: false,
       userDataDir: folderPath,
+      devtools: false,
     });
     try {
       try {
@@ -24,6 +25,7 @@ describe('browser', () => {
           headless: true,
           isolated: false,
           userDataDir: folderPath,
+          devtools: false,
         });
         await browser2.close();
         assert.fail('not reached');

@@ -17,38 +17,45 @@ import fs from 'fs';
 
 let browser: Browser | undefined;
 
-const ignoredPrefixes = new Set([
-  'chrome://',
-  'chrome-extension://',
-  'chrome-untrusted://',
-  'devtools://',
-]);
+function makeTargetFilter(devtools: boolean) {
+  const ignoredPrefixes = new Set([
+    'chrome://',
+    'chrome-extension://',
+    'chrome-untrusted://',
+  ]);
 
-function targetFilter(target: Target): boolean {
-  if (target.url() === 'chrome://newtab/') {
-    return true;
+  if (!devtools) {
+    ignoredPrefixes.add('devtools://');
   }
-  for (const prefix of ignoredPrefixes) {
-    if (target.url().startsWith(prefix)) {
-      return false;
+  return function targetFilter(target: Target): boolean {
+    if (target.url() === 'chrome://newtab/') {
+      return true;
     }
-  }
-  return true;
+    for (const prefix of ignoredPrefixes) {
+      if (target.url().startsWith(prefix)) {
+        return false;
+      }
+    }
+    return true;
+  };
 }
 
 const connectOptions: ConnectOptions = {
-  targetFilter,
   // We do not expect any single CDP command to take more than 10sec.
   protocolTimeout: 10_000,
 };
 
-async function ensureBrowserConnected(browserURL: string) {
+async function ensureBrowserConnected(options: {
+  browserURL: string;
+  devtools: boolean;
+}) {
   if (browser?.connected) {
     return browser;
   }
   browser = await puppeteer.connect({
     ...connectOptions,
-    browserURL,
+    targetFilter: makeTargetFilter(options.devtools),
+    browserURL: options.browserURL,
     defaultViewport: null,
   });
   return browser;
@@ -61,6 +68,7 @@ type McpLaunchOptions = {
   userDataDir?: string;
   headless: boolean;
   isolated: boolean;
+  devtools: boolean;
 };
 
 export async function launch(options: McpLaunchOptions): Promise<Browser> {
@@ -91,6 +99,9 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
   if (customDevTools) {
     args.push(`--custom-devtools-frontend=file://${customDevTools}`);
   }
+  if (options.devtools) {
+    args.push('--auto-open-devtools-for-tabs');
+  }
   let puppeterChannel: ChromeReleaseChannel | undefined;
   if (!executablePath) {
     puppeterChannel =
@@ -102,6 +113,7 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
   try {
     return await puppeteer.launch({
       ...connectOptions,
+      targetFilter: makeTargetFilter(options.devtools),
       channel: puppeterChannel,
       executablePath,
       defaultViewport: null,
@@ -138,16 +150,16 @@ async function ensureBrowserLaunched(
   return browser;
 }
 
-export async function resolveBrowser(options: {
-  browserUrl?: string;
-  executablePath?: string;
-  customDevTools?: string;
-  channel?: Channel;
-  headless: boolean;
-  isolated: boolean;
-}) {
+export async function resolveBrowser(
+  options: McpLaunchOptions & {
+    browserUrl?: string;
+  },
+) {
   const browser = options.browserUrl
-    ? await ensureBrowserConnected(options.browserUrl)
+    ? await ensureBrowserConnected({
+        browserURL: options.browserUrl,
+        devtools: options.devtools,
+      })
     : await ensureBrowserLaunched(options);
 
   return browser;
