@@ -156,10 +156,9 @@ The Chrome DevTools MCP server supports the following configuration option:
   - **Default:** `false`
 
 - **`--channel`**
-  Specify a different Chrome channel that should be used.
+  Specify a different Chrome channel that should be used. The default is the stable channel version.
   - **Type:** string
   - **Choices:** `stable`, `canary`, `beta`, `dev`
-  - **Default:** `stable`
 
 <!-- END AUTO GENERATED OPTIONS -->
 
