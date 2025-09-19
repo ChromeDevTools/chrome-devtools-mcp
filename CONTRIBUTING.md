@@ -81,3 +81,7 @@ npx @modelcontextprotocol/inspector node build/src/index.js --log-file=/your/des
 ```
 
 You can use the `DEBUG` environment variable as usual to control categories that are logged.
+
+### Updating documentation
+
+When adding a new tool or updating a tool name or description, make sure to run `npm run docs` to generate the tool reference documentation.

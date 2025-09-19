@@ -190,7 +190,7 @@ async function generateToolDocumentation(): Promise<void> {
     console.log(`Found ${tools.length} tools`);
 
     // Generate markdown documentation
-    let markdown = `<!-- AUTO GENERATED DO NOT EDIT - run 'npm run generate-docs' to update-->
+    let markdown = `<!-- AUTO GENERATED DO NOT EDIT - run 'npm run docs' to update-->
 
 # Chrome DevTools MCP Tool Reference
 
