@@ -49,8 +49,8 @@ export class McpContext implements Context {
   #consoleCollector: PageCollector<ConsoleMessage | Error>;
 
   #isRunningTrace = false;
-  #networkConditions: string | null = null;
-  #cpuThrottlingRate = 1;
+  #networkConditionsMap = new WeakMap<Page, string>();
+  #cpuThrottlingRateMap = new WeakMap<Page, number>();
   #dialog?: Dialog;
 
   #nextSnapshotId = 1;
@@ -130,19 +130,27 @@ export class McpContext implements Context {
   }
 
   setNetworkConditions(conditions: string | null): void {
-    this.#networkConditions = conditions;
+    const page = this.getSelectedPage();
+    if (conditions === null) {
+      this.#networkConditionsMap.delete(page);
+    } else {
+      this.#networkConditionsMap.set(page, conditions);
+    }
   }
 
   getNetworkConditions(): string | null {
-    return this.#networkConditions;
+    const page = this.getSelectedPage();
+    return this.#networkConditionsMap.get(page) ?? null;
   }
 
   setCpuThrottlingRate(rate: number): void {
-    this.#cpuThrottlingRate = rate;
+    const page = this.getSelectedPage();
+    this.#cpuThrottlingRateMap.set(page, rate);
   }
 
   getCpuThrottlingRate(): number {
-    return this.#cpuThrottlingRate;
+    const page = this.getSelectedPage();
+    return this.#cpuThrottlingRateMap.get(page) ?? 1;
   }
 
   setIsRunningPerformanceTrace(x: boolean): void {

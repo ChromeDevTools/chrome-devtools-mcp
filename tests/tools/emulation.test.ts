@@ -57,6 +57,27 @@ describe('emulation', () => {
         assert.strictEqual(context.getNetworkConditions(), null);
       });
     });
+
+    it('report correctly for the currently selected page', async () => {
+      await withBrowser(async (response, context) => {
+        await context.newPage();
+        await emulateNetwork.handler(
+          {
+            params: {
+              throttlingOption: 'Slow 3G',
+            },
+          },
+          response,
+          context,
+        );
+
+        assert.strictEqual(context.getNetworkConditions(), 'Slow 3G');
+
+        context.setSelectedPageIdx(0);
+
+        assert.strictEqual(context.getNetworkConditions(), null);
+      });
+    });
   });
 
   describe('cpu', () => {
@@ -88,6 +109,27 @@ describe('emulation', () => {
           response,
           context,
         );
+
+        assert.strictEqual(context.getCpuThrottlingRate(), 1);
+      });
+    });
+
+    it('report correctly for the currently selected page', async () => {
+      await withBrowser(async (response, context) => {
+        await context.newPage();
+        await emulateCpu.handler(
+          {
+            params: {
+              throttlingRate: 4,
+            },
+          },
+          response,
+          context,
+        );
+
+        assert.strictEqual(context.getCpuThrottlingRate(), 4);
+
+        context.setSelectedPageIdx(0);
 
         assert.strictEqual(context.getCpuThrottlingRate(), 1);
       });
