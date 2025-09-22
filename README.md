@@ -204,3 +204,14 @@ The user data directory is not cleared between runs and shared across
 all instances of `chrome-devtools-mcp`. Set the `isolated` option to `true`
 to use a temporary user data dir instead which will be cleared automatically after
 the browser is closed.
+
+## Known limitations
+
+### Operating system sandboxes
+
+Some MCP clients allow sandboxing the MCP server using MacOS Seatbelt or linux
+containers. If sandboxes are enabled, `chrome-devtools-mcp` is not able to start
+Chrome that requires permissions to create its own sandboxes. As a workaround,
+either disable sandboxing for `chrome-devtools-mcp` in your MCP client or use
+`--connect-url` to connect to a Chrome instance that you start manually outside
+of the MCP client sandbox.
