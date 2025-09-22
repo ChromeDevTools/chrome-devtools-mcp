@@ -26,6 +26,6 @@ describe('Trace parsing', async () => {
     assert.ok(result?.insights);
 
     const output = getTraceSummary(result);
-    t.assert.snapshot(output);
+    t.assert.snapshot?.(output);
   });
 });

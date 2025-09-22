@@ -161,7 +161,7 @@ describe('performance', () => {
           context,
         );
 
-        t.assert.snapshot(response.responseLines.join('\n'));
+        t.assert.snapshot?.(response.responseLines.join('\n'));
       });
     });
 

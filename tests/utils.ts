@@ -3,7 +3,7 @@
  * Copyright 2025 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-
+import '../src/polyfill.js';
 import puppeteer, {Browser} from 'puppeteer';
 import {HTTPRequest, HTTPResponse} from 'puppeteer-core';
 import {McpResponse} from '../src/McpResponse.js';
