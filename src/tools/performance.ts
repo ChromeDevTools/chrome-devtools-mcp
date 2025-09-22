@@ -18,7 +18,7 @@ import {ToolCategories} from './categories.js';
 
 export const startTrace = defineTool({
   name: 'performance_start_trace',
-  description: 'Starts a performance trace recording',
+  description: 'Starts a performance trace recording on the selected page.',
   annotations: {
     category: ToolCategories.PERFORMANCE,
     readOnlyHint: true,
@@ -98,7 +98,8 @@ export const startTrace = defineTool({
 
 export const stopTrace = defineTool({
   name: 'performance_stop_trace',
-  description: 'Stops the active performance trace recording',
+  description:
+    'Stops the active performance trace recording on the selected page.',
   annotations: {
     category: ToolCategories.PERFORMANCE,
     readOnlyHint: true,
@@ -116,7 +117,7 @@ export const stopTrace = defineTool({
 export const analyzeInsight = defineTool({
   name: 'performance_analyze_insight',
   description:
-    'Provides more detailed information on a specific Performance Insight that was highlighed in the results of a trace recording',
+    'Provides more detailed information on a specific Performance Insight that was highlighed in the results of a trace recording.',
   annotations: {
     category: ToolCategories.PERFORMANCE,
     readOnlyHint: true,
