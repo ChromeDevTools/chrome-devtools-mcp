@@ -2,15 +2,16 @@
 
 [![npm chrome-devtools-mcp package](https://img.shields.io/npm/v/chrome-devtools-mcp.svg)](https://npmjs.org/package/chrome-devtools-mcp)
 
-`chrome-devtools-mcp` is a Model-Context-Protocol (MCP) server that brings
-the power of Chrome DevTools to coding agents. Using it, coding agents can live
-debug style, performance or networking issues directly in Chrome.
+`chrome-devtools-mcp` lets your coding agent (such as Gemini, Claude, Cursor or Copilot)
+control and inspect a live Chrome browser. It acts as a Model-Context-Protocol
+(MCP) server, giving your AI coding assistant access to the full power of
+Chrome DevTools for reliable automation, in-depth debugging, and performance analysis.
 
 ## Key features
 
 - **Get performance insights**: Uses [Chrome
   DevTools](https://github.com/ChromeDevTools/devtools-frontend) to record
-  traces and extract performance insights.
+  traces and extract actionable performance insights.
 - **Advanced browser debugging**: Analyze network requests, take screenshots and
   check the browser console.
 - **Reliable automation**. Uses
@@ -48,7 +49,7 @@ Add the following config to your MCP client:
 > [!NOTE]  
 > Using `chrome-devtools-mcp@latest` ensures that your MCP client will always use the latest version of the Chrome DevTools MCP server.
 
-### MCP Client specific configuration
+### MCP Client configuration
 
 <details>
   <summary>Claude Code</summary>
