@@ -219,7 +219,7 @@
 
 ### `performance_analyze_insight`
 
-**Description:** Provides more detailed information on a specific Performance Insight that was highlighed in the results of a trace recording
+**Description:** Provides more detailed information on a specific Performance Insight that was highlighed in the results of a trace recording.
 
 **Parameters:**
 
@@ -229,7 +229,7 @@
 
 ### `performance_start_trace`
 
-**Description:** Starts a performance trace recording
+**Description:** Starts a performance trace recording on the selected page.
 
 **Parameters:**
 
@@ -240,7 +240,7 @@
 
 ### `performance_stop_trace`
 
-**Description:** Stops the active performance trace recording
+**Description:** Stops the active performance trace recording on the selected page.
 
 **Parameters:** None
 
