@@ -1,6 +1,13 @@
 {
   "compilerOptions": {
-    "target": "esnext",
+    "target": "es2023",
+    "lib": [
+      "ES2023",
+      "DOM",
+      "ES2024.Promise",
+      "ESNext.Iterator",
+      "ESNext.Collection"
+    ],
     "module": "nodenext",
     "moduleResolution": "nodenext",
     "outDir": "./build",
