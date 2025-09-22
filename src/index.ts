@@ -113,9 +113,7 @@ export const args = yargsInstance
   .help()
   .parseSync();
 
-if (args.logFile) {
-  saveLogsToFile(args.logFile);
-}
+const logFile = args.logFile ? saveLogsToFile(args.logFile) : undefined;
 
 function readPackageJson(): {version?: string} {
   const currentDir = import.meta.dirname;
@@ -155,6 +153,7 @@ async function getContext(): Promise<McpContext> {
     customDevTools: args.customDevtools,
     channel: args.channel as Channel,
     isolated: args.isolated,
+    logFile,
   });
   if (context?.browser !== browser) {
     context = await McpContext.from(browser, logger);

@@ -14,7 +14,7 @@ const namespacesToEnable = [
   ...(process.env['DEBUG'] ? [process.env['DEBUG']] : []),
 ];
 
-export function saveLogsToFile(fileName: string) {
+export function saveLogsToFile(fileName: string): fs.WriteStream {
   // Enable overrides everything so we need to add them
   debug.enable(namespacesToEnable.join(','));
 
@@ -27,6 +27,7 @@ export function saveLogsToFile(fileName: string) {
     logFile.end();
     process.exit(1);
   });
+  return logFile;
 }
 
 export const logger = debug(mcpDebugNamespace);

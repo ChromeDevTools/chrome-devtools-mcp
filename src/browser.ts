@@ -61,6 +61,7 @@ type McpLaunchOptions = {
   userDataDir?: string;
   headless: boolean;
   isolated: boolean;
+  logFile?: fs.WriteStream;
 };
 
 export async function launch(options: McpLaunchOptions): Promise<Browser> {
@@ -100,7 +101,7 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
   }
 
   try {
-    return await puppeteer.launch({
+    const browser = await puppeteer.launch({
       ...connectOptions,
       channel: puppeterChannel,
       executablePath,
@@ -110,6 +111,13 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
       headless,
       args,
     });
+    if (options.logFile) {
+      // FIXME: we are probably subscribing too late to catch startup logs. We
+      // should expose the process earlier or expose the getRecentLogs() getter.
+      browser.process()?.stderr?.pipe(options.logFile);
+      browser.process()?.stdout?.pipe(options.logFile);
+    }
+    return browser;
   } catch (error) {
     // TODO: check browser logs for `Failed to create a ProcessSingleton for
     // your profile directory` instead.
@@ -145,6 +153,7 @@ export async function resolveBrowser(options: {
   channel?: Channel;
   headless: boolean;
   isolated: boolean;
+  logFile?: fs.WriteStream;
 }) {
   const browser = options.browserUrl
     ? await ensureBrowserConnected(options.browserUrl)
