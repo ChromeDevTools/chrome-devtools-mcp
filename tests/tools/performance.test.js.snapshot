@@ -5,18 +5,18 @@ exports[`performance > performance_analyze_insight > returns the information on 
 This insight is used to analyze the time spent that contributed to the final LCP time and identify which of the 4 phases (or 2 if there was no LCP resource) are contributing most to the delay in rendering the LCP element.
 
 ## Detailed analysis:
-The Largest Contentful Paint (LCP) time for this navigation was 129.2 ms.
+The Largest Contentful Paint (LCP) time for this navigation was 129 ms.
 The LCP element is an image fetched from \`https://web-dev.imgix.net/image/kheDArv5csY6rvQUJDbWRscckLr1/4i7JstVZvgTFk9dxCe4a.svg\`.
 ## LCP resource network request: https://web-dev.imgix.net/image/kheDArv5csY6rvQUJDbWRscckLr1/4i7JstVZvgTFk9dxCe4a.svg
 Timings:
-- Queued at: 41.1 ms
-- Request sent at: 46.6 ms
-- Download complete at: 55.8 ms
-- Main thread processing completed at: 58.2 ms
+- Queued at: 41 ms
+- Request sent at: 47 ms
+- Download complete at: 56 ms
+- Main thread processing completed at: 58 ms
 Durations:
 - Download time: 0.3 ms
-- Main thread processing time: 2.3 ms
-- Total duration: 17.1 ms
+- Main thread processing time: 2 ms
+- Total duration: 17 ms
 Redirects: no redirects
 Status code: 200
 MIME Type: image/svg+xml
@@ -29,10 +29,10 @@ Initiators (root request to the request that directly loaded this one): none
 
 We can break this time down into the 4 phases that combine to make the LCP time:
 
-- Time to first byte: 7.9 ms (6.1% of total LCP time)
-- Resource load delay: 33.2 ms (25.7% of total LCP time)
-- Resource load duration: 14.7 ms (11.4% of total LCP time)
-- Element render delay: 73.4 ms (56.8% of total LCP time)
+- Time to first byte: 8 ms (6.1% of total LCP time)
+- Resource load delay: 33 ms (25.7% of total LCP time)
+- Resource load duration: 15 ms (11.4% of total LCP time)
+- Element render delay: 73 ms (56.8% of total LCP time)
 
 ## Estimated savings: none
 

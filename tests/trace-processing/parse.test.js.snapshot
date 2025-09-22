@@ -6,10 +6,10 @@ Network throttling: none
 Metrics (lab / observed):
   - LCP: 129 ms, event: (eventKey: r-6063, ts: 122411126100)
   - LCP breakdown:
-    - TTFB: 7.9 ms, bounds: {min: 122410996889, max: 122411004828}
-    - Load delay: 33.2 ms, bounds: {min: 122411004828, max: 122411037986}
-    - Load duration: 14.7 ms, bounds: {min: 122411037986, max: 122411052690}
-    - Render delay: 73.4 ms, bounds: {min: 122411052690, max: 122411126100}
+    - TTFB: 8 ms, bounds: {min: 122410996889, max: 122411004828}
+    - Load delay: 33 ms, bounds: {min: 122411004828, max: 122411037986}
+    - Load duration: 15 ms, bounds: {min: 122411037986, max: 122411052690}
+    - Render delay: 73 ms, bounds: {min: 122411052690, max: 122411126100}
   - CLS: 0.00
 Metrics (field / real users): n/a – no data for this page in CrUX
 Available insights:
