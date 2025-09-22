@@ -27,7 +27,6 @@ export class WaitForHelper {
    * for the DOM to be stable before returning.
    */
   async waitForStableDom(): Promise<void> {
-    // TODO: use CPU mutplier
     const stableDomObserver = await this.#page.evaluateHandle(timeout => {
       let timeoutId: ReturnType<typeof setTimeout>;
       function callback() {
@@ -77,7 +76,6 @@ export class WaitForHelper {
   }
 
   async waitForNavigationStarted() {
-    // TODO: CPU mutliper
     // Currently Puppeteer does not have API
     // For when a navigation is about to start
     const navigationStartedPromise = new Promise<boolean>(resolve => {
