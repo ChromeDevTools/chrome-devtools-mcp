@@ -84,11 +84,7 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
     });
   }
 
-  const args: LaunchOptions['args'] = [
-    '--remote-debugging-pipe',
-    '--no-first-run',
-    '--hide-crash-restore-bubble',
-  ];
+  const args: LaunchOptions['args'] = ['--hide-crash-restore-bubble'];
   if (customDevTools) {
     args.push(`--custom-devtools-frontend=file://${customDevTools}`);
   }
@@ -119,11 +115,11 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
     }
     return browser;
   } catch (error) {
-    // TODO: check browser logs for `Failed to create a ProcessSingleton for
-    // your profile directory` instead.
     if (
       userDataDir &&
-      (error as Error).message.includes('The browser is already running')
+      ((error as Error).message.includes('The browser is already running') ||
+        (error as Error).message.includes('Target closed') ||
+        (error as Error).message.includes('Connection closed'))
     ) {
       throw new Error(
         `The browser is already running for ${userDataDir}. Use --isolated to run multiple browser instances.`,
