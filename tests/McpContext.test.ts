@@ -43,9 +43,9 @@ describe('McpContext', () => {
   it('should update default timeout when cpu throttling changes', async () => {
     await withBrowser(async (_response, context) => {
       const page = await context.newPage();
-      const timeoutBefore = page.getDefaultNavigationTimeout();
+      const timeoutBefore = page.getDefaultTimeout();
       context.setCpuThrottlingRate(2);
-      const timeoutAfter = page.getDefaultNavigationTimeout();
+      const timeoutAfter = page.getDefaultTimeout();
       assert(timeoutBefore < timeoutAfter, 'Timeout was less then expected');
     });
   });
