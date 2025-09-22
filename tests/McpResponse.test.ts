@@ -162,7 +162,7 @@ Emulating: 4x slowdown`,
       });
       await dialogPromise;
       const result = await response.handle('test', context);
-      context.getDialog()?.dismiss();
+      await context.getDialog()?.dismiss();
       assert.strictEqual(
         result[0].text,
         `# test response
