@@ -77,7 +77,15 @@ claude mcp add chrome-devtools npx chrome-devtools-mcp@latest
 
 <details>
   <summary>Cursor</summary>
-  Follow https://docs.cursor.com/en/context/mcp#using-mcp-json and use the config provided above.
+
+**Click the button to install:**
+
+[<img src="https://cursor.com/deeplink/mcp-install-dark.svg" alt="Install in Cursor">](https://cursor.com/en/install-mcp?name=chrome-devtools&config=eyJjb21tYW5kIjoibnB4IGNocm9tZS1kZXZ0b29scy1tY3BAbGF0ZXN0In0%3D)
+
+**Or install manually:**
+
+Go to `Cursor Settings` -> `MCP` -> `New MCP Server`. Use the config provided above.
+
 </details>
 
 <details>
