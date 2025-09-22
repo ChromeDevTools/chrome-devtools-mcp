@@ -50,7 +50,7 @@
     "@types/yargs": "^17.0.33",
     "@typescript-eslint/eslint-plugin": "^8.43.0",
     "@typescript-eslint/parser": "^8.43.0",
-    "chrome-devtools-frontend": "1.0.1515796",
+    "chrome-devtools-frontend": "1.0.1516909",
     "eslint": "^9.35.0",
     "globals": "^16.4.0",
     "prettier": "^3.6.2",
