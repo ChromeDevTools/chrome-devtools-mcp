@@ -20,6 +20,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {listPages} from './tools/pages.js';
 import {TraceResult} from './trace-processing/parse.js';
+import {WaitForHelper} from './WaitForHelper.js';
 
 export interface TextSnapshotNode extends SerializedAXNode {
   id: string;
@@ -31,6 +32,9 @@ export interface TextSnapshot {
   idToNode: Map<string, TextSnapshotNode>;
   snapshotId: string;
 }
+
+const DEFAULT_TIMEOUT = 5_000;
+const NAVIGATION_TIMEOUT = 10_000;
 
 export class McpContext implements Context {
   browser: Browser;
@@ -68,10 +72,10 @@ export class McpContext implements Context {
     this.#consoleCollector = new PageCollector(
       this.browser,
       (page, collect) => {
-        page.on('console', (event: ConsoleMessage) => {
+        page.on('console', event => {
           collect(event);
         });
-        page.on('pageerror', (event: Error) => {
+        page.on('pageerror', event => {
           collect(event);
         });
       },
@@ -195,10 +199,10 @@ export class McpContext implements Context {
     newPage.on('dialog', this.#dialogHandler);
 
     // For waiters 5sec timeout should be sufficient.
-    newPage.setDefaultTimeout(5_000);
+    newPage.setDefaultTimeout(DEFAULT_TIMEOUT);
     // 10sec should be enough for the load event to be emitted during
     // navigations.
-    newPage.setDefaultNavigationTimeout(10_000);
+    newPage.setDefaultNavigationTimeout(NAVIGATION_TIMEOUT);
   }
 
   async getElementByUid(uid: string): Promise<ElementHandle<Element>> {
@@ -301,5 +305,11 @@ export class McpContext implements Context {
 
   recordedTraces(): TraceResult[] {
     return this.#traceResults;
+  }
+
+  waitForEventsAfterAction(action: () => Promise<unknown>): Promise<void> {
+    const page = this.getSelectedPage();
+    const waitForHelper = new WaitForHelper(page);
+    return waitForHelper.waitForEventsAfterAction(action);
   }
 }

@@ -6,8 +6,7 @@
 import z from 'zod';
 import {defineTool} from './ToolDefinition.js';
 import {ToolCategories} from './categories.js';
-import {waitForEventsAfterAction} from '../waitForHelpers.js';
-import {JSHandle} from 'puppeteer-core';
+import type {JSHandle} from 'puppeteer-core';
 
 export const evaluateScript = defineTool({
   name: 'evaluate_script',
@@ -51,7 +50,7 @@ Example with arguments: \`(el) => {
       for (const el of request.params.args ?? []) {
         args.push(await context.getElementByUid(el.uid));
       }
-      await waitForEventsAfterAction(page, async () => {
+      await context.waitForEventsAfterAction(async () => {
         const result = await page.evaluate(
           async (fn, ...args) => {
             // @ts-expect-error no types.

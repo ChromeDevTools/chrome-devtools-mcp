@@ -8,7 +8,6 @@ import z from 'zod';
 import {defineTool} from './ToolDefinition.js';
 import {ElementHandle} from 'puppeteer-core';
 import {ToolCategories} from './categories.js';
-import {waitForEventsAfterAction} from '../waitForHelpers.js';
 
 export const click = defineTool({
   name: 'click',
@@ -32,7 +31,7 @@ export const click = defineTool({
     const uid = request.params.uid;
     const handle = await context.getElementByUid(uid);
     try {
-      await waitForEventsAfterAction(handle.frame.page(), async () => {
+      await context.waitForEventsAfterAction(async () => {
         await handle.asLocator().click({
           count: request.params.dblClick ? 2 : 1,
         });
@@ -67,7 +66,7 @@ export const hover = defineTool({
     const uid = request.params.uid;
     const handle = await context.getElementByUid(uid);
     try {
-      await waitForEventsAfterAction(handle.frame.page(), async () => {
+      await context.waitForEventsAfterAction(async () => {
         await handle.asLocator().hover();
       });
       response.appendResponseLine(`Successfully hovered over the element`);
@@ -96,7 +95,7 @@ export const fill = defineTool({
   handler: async (request, response, context) => {
     const handle = await context.getElementByUid(request.params.uid);
     try {
-      await waitForEventsAfterAction(handle.frame.page(), async () => {
+      await context.waitForEventsAfterAction(async () => {
         await handle.asLocator().fill(request.params.value);
       });
       response.appendResponseLine(`Successfully filled out the element`);
@@ -122,7 +121,7 @@ export const drag = defineTool({
     const fromHandle = await context.getElementByUid(request.params.from_uid);
     const toHandle = await context.getElementByUid(request.params.to_uid);
     try {
-      await waitForEventsAfterAction(fromHandle.frame.page(), async () => {
+      await context.waitForEventsAfterAction(async () => {
         await fromHandle.drag(toHandle);
         await new Promise(resolve => setTimeout(resolve, 50));
         await toHandle.drop(fromHandle);
@@ -157,7 +156,7 @@ export const fillForm = defineTool({
     for (const element of request.params.elements) {
       const handle = await context.getElementByUid(element.uid);
       try {
-        await waitForEventsAfterAction(handle.frame.page(), async () => {
+        await context.waitForEventsAfterAction(async () => {
           await handle.asLocator().fill(element.value);
         });
       } finally {

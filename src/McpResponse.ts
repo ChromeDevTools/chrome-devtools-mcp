@@ -21,7 +21,7 @@ export class McpResponse implements Response {
   #attachedNetworkRequestUrl?: string;
   #includeConsoleData: boolean = false;
   #textResponseLines: string[] = [];
-  #formatedConsoleData?: string[];
+  #formattedConsoleData?: string[];
   #images: ImageContentData[] = [];
 
   setIncludePages(value: boolean): void {
@@ -97,7 +97,7 @@ export class McpResponse implements Response {
         formattedConsoleMessages = await Promise.all(
           consoleMessages.map(message => formatConsoleEvent(message)),
         );
-        this.#formatedConsoleData = formattedConsoleMessages;
+        this.#formattedConsoleData = formattedConsoleMessages;
       }
     }
 
@@ -167,9 +167,9 @@ Call browser_handle_dialog to handle it before continuing.`);
       }
     }
 
-    if (this.#includeConsoleData && this.#formatedConsoleData) {
+    if (this.#includeConsoleData && this.#formattedConsoleData) {
       response.push('## Console messages');
-      response.push(...this.#formatedConsoleData);
+      response.push(...this.#formattedConsoleData);
     }
 
     const text: TextContent = {

@@ -70,6 +70,7 @@ export type Context = Readonly<{
     data: Uint8Array<ArrayBufferLike>,
     mimeType: 'image/png' | 'image/jpeg',
   ): Promise<{filename: string}>;
+  waitForEventsAfterAction(action: () => Promise<unknown>): Promise<void>;
 }>;
 
 export function defineTool<Schema extends Zod.ZodRawShape>(

@@ -7,7 +7,6 @@
 import z from 'zod';
 import {defineTool} from './ToolDefinition.js';
 import {ToolCategories} from './categories.js';
-import {waitForEventsAfterAction} from '../waitForHelpers.js';
 
 export const listPages = defineTool({
   name: 'list_pages',
@@ -79,7 +78,7 @@ export const newPage = defineTool({
   handler: async (request, response, context) => {
     const page = await context.newPage();
 
-    await waitForEventsAfterAction(page, async () => {
+    await context.waitForEventsAfterAction(async () => {
       await page.goto(request.params.url);
     });
 
@@ -100,7 +99,7 @@ export const navigatePage = defineTool({
   handler: async (request, response, context) => {
     const page = context.getSelectedPage();
 
-    await waitForEventsAfterAction(page, async () => {
+    await context.waitForEventsAfterAction(async () => {
       await page.goto(request.params.url);
     });
 
