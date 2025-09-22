@@ -9,15 +9,21 @@ import {logger} from './logger.js';
 
 export class WaitForHelper {
   #abortController = new AbortController();
-  #genericTimeout: number;
+  #page: CdpPage;
+  #stableDomTimeout: number;
   #stableDomFor: number;
   #expectNavigationIn: number;
-  #page: CdpPage;
+  #navigationTimeout: number;
 
-  constructor(page: Page) {
-    this.#genericTimeout = 3000;
-    this.#stableDomFor = 100;
-    this.#expectNavigationIn = 100;
+  constructor(
+    page: Page,
+    cpuTimeoutMultiplier: number,
+    networkTimeoutMultiplier: number,
+  ) {
+    this.#stableDomTimeout = 3000 * cpuTimeoutMultiplier;
+    this.#stableDomFor = 100 * cpuTimeoutMultiplier;
+    this.#expectNavigationIn = 100 * cpuTimeoutMultiplier;
+    this.#navigationTimeout = 3000 * networkTimeoutMultiplier;
     this.#page = page as unknown as CdpPage;
   }
 
@@ -69,7 +75,7 @@ export class WaitForHelper {
       stableDomObserver.evaluate(async observer => {
         return await observer.resolver.promise;
       }),
-      this.timeout(this.#genericTimeout).then(() => {
+      this.timeout(this.#stableDomTimeout).then(() => {
         throw new Error('Timeout');
       }),
     ]);
@@ -128,7 +134,7 @@ export class WaitForHelper {
       const navigationStated = await navigationStartedPromise;
       if (navigationStated) {
         await this.#page.waitForNavigation({
-          timeout: this.#genericTimeout,
+          timeout: this.#navigationTimeout,
           signal: this.#abortController.signal,
         });
       }

@@ -56,12 +56,12 @@ npx @modelcontextprotocol/inspector node build/src/index.js
 
 Add the MCP server to your client's config.
 
-```
+```json
 {
   "mcpServers": {
     "chrome-devtools": {
       "command": "node",
-      "args": ["/path-to/build/src/index.js"],
+      "args": ["/path-to/build/src/index.js"]
     }
   }
 }

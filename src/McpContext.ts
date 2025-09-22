@@ -11,6 +11,7 @@ import {
   HTTPRequest,
   Page,
   SerializedAXNode,
+  PredefinedNetworkConditions,
 } from 'puppeteer-core';
 import {Context} from './tools/ToolDefinition.js';
 import {Debugger} from 'debug';
@@ -35,6 +36,23 @@ export interface TextSnapshot {
 
 const DEFAULT_TIMEOUT = 5_000;
 const NAVIGATION_TIMEOUT = 10_000;
+
+function getNetworkMultiplierFromString(condition: string | null): number {
+  const puppeteerCondition =
+    condition as keyof typeof PredefinedNetworkConditions;
+
+  switch (puppeteerCondition) {
+    case 'Fast 4G':
+      return 1;
+    case 'Slow 4G':
+      return 2.5;
+    case 'Fast 3G':
+      return 5;
+    case 'Slow 3G':
+      return 10;
+  }
+  return 1;
+}
 
 export class McpContext implements Context {
   browser: Browser;
@@ -136,6 +154,7 @@ export class McpContext implements Context {
     } else {
       this.#networkConditionsMap.set(page, conditions);
     }
+    this.#updateSelectedPageTimeouts();
   }
 
   getNetworkConditions(): string | null {
@@ -146,6 +165,7 @@ export class McpContext implements Context {
   setCpuThrottlingRate(rate: number): void {
     const page = this.getSelectedPage();
     this.#cpuThrottlingRateMap.set(page, rate);
+    this.#updateSelectedPageTimeouts();
   }
 
   getCpuThrottlingRate(): number {
@@ -205,12 +225,22 @@ export class McpContext implements Context {
     this.#selectedPageIdx = idx;
     const newPage = this.getSelectedPage();
     newPage.on('dialog', this.#dialogHandler);
+    this.#updateSelectedPageTimeouts();
+  }
 
+  #updateSelectedPageTimeouts() {
+    const page = this.getSelectedPage();
     // For waiters 5sec timeout should be sufficient.
-    newPage.setDefaultTimeout(DEFAULT_TIMEOUT);
+    // Increased in case we throttle the CPU
+    const cpuMultiplier = this.getCpuThrottlingRate();
+    page.setDefaultTimeout(DEFAULT_TIMEOUT * cpuMultiplier);
     // 10sec should be enough for the load event to be emitted during
     // navigations.
-    newPage.setDefaultNavigationTimeout(NAVIGATION_TIMEOUT);
+    // Increased in case we throttle the network requests
+    const networkMultiplier = getNetworkMultiplierFromString(
+      this.getNetworkConditions(),
+    );
+    page.setDefaultNavigationTimeout(NAVIGATION_TIMEOUT * networkMultiplier);
   }
 
   async getElementByUid(uid: string): Promise<ElementHandle<Element>> {
@@ -315,9 +345,26 @@ export class McpContext implements Context {
     return this.#traceResults;
   }
 
+  getWaitForHelper(
+    page: Page,
+    cpuMultiplier: number,
+    networkMultiplier: number,
+  ) {
+    return new WaitForHelper(page, cpuMultiplier, networkMultiplier);
+  }
+
   waitForEventsAfterAction(action: () => Promise<unknown>): Promise<void> {
     const page = this.getSelectedPage();
-    const waitForHelper = new WaitForHelper(page);
+    const cpuMultiplier = this.getCpuThrottlingRate();
+    const networkMultiplier = getNetworkMultiplierFromString(
+      this.getNetworkConditions(),
+    );
+
+    const waitForHelper = this.getWaitForHelper(
+      page,
+      cpuMultiplier,
+      networkMultiplier,
+    );
     return waitForHelper.waitForEventsAfterAction(action);
   }
 }

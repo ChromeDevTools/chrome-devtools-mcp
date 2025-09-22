@@ -7,6 +7,7 @@ import {describe, it} from 'node:test';
 import assert from 'assert';
 import {TraceResult} from '../src/trace-processing/parse.js';
 import {withBrowser} from './utils.js';
+import sinon from 'sinon';
 
 describe('McpContext', () => {
   it('list pages', async () => {
@@ -36,6 +37,40 @@ describe('McpContext', () => {
       context.storeTraceRecording(fakeTrace1);
       context.storeTraceRecording(fakeTrace2);
       assert.deepEqual(context.recordedTraces(), [fakeTrace1, fakeTrace2]);
+    });
+  });
+
+  it('should update default timeout when cpu throttling changes', async () => {
+    await withBrowser(async (_response, context) => {
+      const page = await context.newPage();
+      const timeoutBefore = page.getDefaultNavigationTimeout();
+      context.setCpuThrottlingRate(2);
+      const timeoutAfter = page.getDefaultNavigationTimeout();
+      assert(timeoutBefore < timeoutAfter, 'Timeout was less then expected');
+    });
+  });
+
+  it('should update default timeout when network conditions changes', async () => {
+    await withBrowser(async (_response, context) => {
+      const page = await context.newPage();
+      const timeoutBefore = page.getDefaultNavigationTimeout();
+      context.setNetworkConditions('Slow 3G');
+      const timeoutAfter = page.getDefaultNavigationTimeout();
+      assert(timeoutBefore < timeoutAfter, 'Timeout was less then expected');
+    });
+  });
+
+  it('should call waitForEventsAfterAction with correct multipliers', async () => {
+    await withBrowser(async (_response, context) => {
+      const page = await context.newPage();
+
+      context.setCpuThrottlingRate(2);
+      context.setNetworkConditions('Slow 3G');
+      const stub = sinon.spy(context, 'getWaitForHelper');
+
+      await context.waitForEventsAfterAction(async () => {});
+
+      sinon.assert.calledWithExactly(stub, page, 2, 10);
     });
   });
 });
