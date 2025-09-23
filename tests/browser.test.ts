@@ -7,6 +7,7 @@ import {describe, it} from 'node:test';
 import assert from 'node:assert';
 import os from 'node:os';
 import path from 'node:path';
+import {executablePath} from 'puppeteer';
 import {launch} from '../src/browser.js';
 
 describe('browser', () => {
@@ -17,6 +18,7 @@ describe('browser', () => {
       headless: true,
       isolated: false,
       userDataDir: folderPath,
+      executablePath: executablePath(),
     });
     try {
       try {
@@ -24,6 +26,7 @@ describe('browser', () => {
           headless: true,
           isolated: false,
           userDataDir: folderPath,
+          executablePath: executablePath(),
         });
         await browser2.close();
         assert.fail('not reached');

@@ -9,12 +9,19 @@ import {describe, it} from 'node:test';
 import assert from 'node:assert';
 import fs from 'node:fs';
 import {ToolDefinition} from '../src/tools/ToolDefinition.js';
+import {executablePath} from 'puppeteer';
 
 describe('e2e', () => {
   async function withClient(cb: (client: Client) => Promise<void>) {
     const transport = new StdioClientTransport({
       command: 'node',
-      args: ['build/src/index.js', '--headless', '--isolated'],
+      args: [
+        'build/src/index.js',
+        '--headless',
+        '--isolated',
+        '--executable-path',
+        executablePath(),
+      ],
     });
     const client = new Client(
       {
