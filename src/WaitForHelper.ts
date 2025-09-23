@@ -126,18 +126,22 @@ export class WaitForHelper {
   async waitForEventsAfterAction(
     action: () => Promise<unknown>,
   ): Promise<void> {
-    const navigationStartedPromise = this.waitForNavigationStarted();
+    const navigationFinished = this.waitForNavigationStarted()
+      .then(navigationStated => {
+        if (navigationStated) {
+          return this.#page.waitForNavigation({
+            timeout: this.#navigationTimeout,
+            signal: this.#abortController.signal,
+          });
+        }
+        return;
+      })
+      .catch(error => logger(error));
 
     await action();
 
     try {
-      const navigationStated = await navigationStartedPromise;
-      if (navigationStated) {
-        await this.#page.waitForNavigation({
-          timeout: this.#navigationTimeout,
-          signal: this.#abortController.signal,
-        });
-      }
+      await navigationFinished;
 
       // Wait for stable dom after navigation so we execute in
       // the correct context

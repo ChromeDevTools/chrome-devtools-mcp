@@ -364,7 +364,6 @@ export class McpContext implements Context {
     const networkMultiplier = getNetworkMultiplierFromString(
       this.getNetworkConditions(),
     );
-
     const waitForHelper = this.getWaitForHelper(
       page,
       cpuMultiplier,
