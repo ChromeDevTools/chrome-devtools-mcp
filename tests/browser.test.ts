@@ -10,13 +10,7 @@ import path from 'node:path';
 import {launch} from '../src/browser.js';
 
 describe('browser', () => {
-  it('cannot launch multiple times with the same profile', async t => {
-    if (os.platform() === 'win32' || os.platform() === 'linux') {
-      t.skip(
-        'Flaky on Windows and Ubuntu images in GitHub actions. Not able to reproduce locally (b/446864025)',
-      );
-      return;
-    }
+  it('cannot launch multiple times with the same profile', async () => {
     const tmpDir = os.tmpdir();
     const folderPath = path.join(tmpDir, `temp-folder-${crypto.randomUUID()}`);
     const browser1 = await launch({
