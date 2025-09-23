@@ -3,9 +3,7 @@
   "version": "0.2.1",
   "description": "MCP server for Chrome DevTools",
   "type": "module",
-  "bin": {
-    "chrome-devtools-mcp": "./build/src/index.js"
-  },
+  "bin": "./build/src/index.js",
   "main": "index.js",
   "scripts": {
     "build": "tsc && node --experimental-strip-types --no-warnings=ExperimentalWarning scripts/post-build.ts",

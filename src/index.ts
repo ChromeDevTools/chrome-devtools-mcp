@@ -84,6 +84,23 @@ export const cliOptions = {
   },
 };
 
+function readPackageJson(): {version?: string} {
+  const currentDir = import.meta.dirname;
+  const packageJsonPath = path.join(currentDir, '..', '..', 'package.json');
+  if (!fs.existsSync(packageJsonPath)) {
+    return {};
+  }
+  try {
+    const json = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8'));
+    assert.strict(json['name'], 'chrome-devtools-mcp');
+    return json;
+  } catch {
+    return {};
+  }
+}
+
+const version = readPackageJson().version ?? 'unknown';
+
 const yargsInstance = yargs(hideBin(process.argv))
   .scriptName('npx chrome-devtools-mcp@latest')
   .options(cliOptions)
@@ -111,26 +128,11 @@ const yargsInstance = yargs(hideBin(process.argv))
 export const args = yargsInstance
   .wrap(Math.min(120, yargsInstance.terminalWidth()))
   .help()
+  .version(version)
   .parseSync();
 
 const logFile = args.logFile ? saveLogsToFile(args.logFile) : undefined;
 
-function readPackageJson(): {version?: string} {
-  const currentDir = import.meta.dirname;
-  const packageJsonPath = path.join(currentDir, '..', '..', 'package.json');
-  if (!fs.existsSync(packageJsonPath)) {
-    return {};
-  }
-  try {
-    const json = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8'));
-    assert.strict(json['name'], 'chrome-devtools-mcp');
-    return json;
-  } catch {
-    return {};
-  }
-}
-
-const version = readPackageJson().version ?? 'unknown';
 logger(`Starting Chrome DevTools MCP Server v${version}`);
 const server = new McpServer(
   {
