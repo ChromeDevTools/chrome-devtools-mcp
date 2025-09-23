@@ -61,6 +61,7 @@ export async function ensureBrowserConnected(options: {
     targetFilter: makeTargetFilter(enableExtensions),
     defaultViewport: null,
     handleDevToolsAsPage: true,
+    protocolTimeout: 30_000,
   };
 
   let autoConnect = false;

@@ -21,6 +21,7 @@ import * as screenshotTools from './screenshot.js';
 import * as scriptTools from './script.js';
 import * as slimTools from './slim/tools.js';
 import * as snapshotTools from './snapshot.js';
+import * as stylesTools from './styles.js';
 import type {ToolDefinition} from './ToolDefinition.js';
 
 export const createTools = (args: ParsedArguments) => {
@@ -41,6 +42,7 @@ export const createTools = (args: ParsedArguments) => {
         ...Object.values(screenshotTools),
         ...Object.values(scriptTools),
         ...Object.values(snapshotTools),
+        ...Object.values(stylesTools),
       ];
 
   const tools = [];

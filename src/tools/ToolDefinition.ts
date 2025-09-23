@@ -199,6 +199,15 @@ export type Context = Readonly<{
   getExtensionServiceWorkerId(
     extensionServiceWorker: ExtensionServiceWorker,
   ): string | undefined;
+  /** Resolve CDP DOM.NodeId for an element handle via DOM.requestNode. */
+  getNodeIdFromHandle(
+    handle: ElementHandle<Element>,
+    page: Page,
+  ): Promise<number>;
+  /** Ensure the CSS domain is enabled for the given Puppeteer page. */
+  ensureCssDomainEnabledForPage(page: Page): Promise<void>;
+  /** Ensure the DOM domain is enabled for the given Puppeteer page. */
+  ensureDomDomainEnabledForPage(page: Page): Promise<void>;
 }>;
 
 export type ContextPage = Readonly<{
