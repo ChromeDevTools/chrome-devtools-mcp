@@ -117,6 +117,9 @@ export class McpResponse implements Response {
     if (networkConditions) {
       response.push(`## Network emulation`);
       response.push(`Emulating: ${networkConditions}`);
+      response.push(
+        `Navigation timeout set to ${context.getNavigationTimeout()}`,
+      );
     }
 
     const cpuThrottlingRate = context.getCpuThrottlingRate();

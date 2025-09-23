@@ -104,7 +104,8 @@ uid=1_0 RootWebArea "My test page"
         result[0].text,
         `# test response
 ## Network emulation
-Emulating: Slow 3G`,
+Emulating: Slow 3G
+Navigation timeout set to 100000`,
       );
     });
   });

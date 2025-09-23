@@ -243,6 +243,11 @@ export class McpContext implements Context {
     page.setDefaultNavigationTimeout(NAVIGATION_TIMEOUT * networkMultiplier);
   }
 
+  getNavigationTimeout() {
+    const page = this.getSelectedPage();
+    return page.getDefaultNavigationTimeout();
+  }
+
   async getElementByUid(uid: string): Promise<ElementHandle<Element>> {
     if (!this.#textSnapshot?.idToNode.size) {
       throw new Error('No snapshot found. Use browser_snapshot to capture one');
