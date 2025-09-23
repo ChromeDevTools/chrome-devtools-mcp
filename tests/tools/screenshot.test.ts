@@ -64,7 +64,7 @@ describe('screenshot', () => {
       await withBrowser(async (response, context) => {
         const page = context.getSelectedPage();
         await page.setContent(
-          `<div style="color:blue;">test</div>`.repeat(5_000),
+          `<div style="color:blue;">test</div>`.repeat(7_000),
         );
         await screenshot.handler(
           {params: {format: 'png', fullPage: true}},

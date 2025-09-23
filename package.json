@@ -16,10 +16,10 @@
     "docs:generate": "node --experimental-strip-types scripts/generate-docs.ts",
     "start": "npm run build && node build/src/index.js",
     "start-debug": "DEBUG=mcp:* DEBUG_COLORS=false npm run build && node build/src/index.js",
-    "test": "npm run build && node --require ./build/tests/setup.js --test-reporter spec --test-force-exit --test 'build/tests/**/*.test.js'",
-    "test:only": "npm run build && node --require ./build/tests/setup.js --test-reporter spec --test-force-exit --test --test-only 'build/tests/**/*.test.js'",
-    "test:only:no-build": "node --require ./build/tests/setup.js --test-reporter spec --test-force-exit --test --test-only 'build/tests/**/*.test.js'",
-    "test:update-snapshots": "npm run build && node --require ./build/tests/setup.js --test-force-exit --test --test-update-snapshots 'build/tests/**/*.test.js'",
+    "test": "npm run build && node --require ./build/tests/setup.js --test-reporter spec --test-force-exit --test \"build/tests/**/*.test.js\"",
+    "test:only": "npm run build && node --require ./build/tests/setup.js --test-reporter spec --test-force-exit --test --test-only \"build/tests/**/*.test.js\"",
+    "test:only:no-build": "node --require ./build/tests/setup.js --test-reporter spec --test-force-exit --test --test-only \"build/tests/**/*.test.js\"",
+    "test:update-snapshots": "npm run build && node --require ./build/tests/setup.js --test-force-exit --test --test-update-snapshots \"build/tests/**/*.test.js\"",
     "prepare": "node --experimental-strip-types scripts/prepare.ts"
   },
   "files": [

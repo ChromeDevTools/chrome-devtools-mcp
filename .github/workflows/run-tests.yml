@@ -35,13 +35,16 @@ jobs:
           node-version: ${{ matrix.node }}
 
       - name: Install dependencies
+        shell: bash
         run: npm ci
 
       - name: Disable AppArmor
         if: ${{ matrix.os == 'ubuntu-latest' }}
+        shell: bash
         run: echo 0 | sudo tee /proc/sys/kernel/apparmor_restrict_unprivileged_userns
 
       - name: Run tests
+        shell: bash
         run: npm run test
 
   # Gating job for branch protection.

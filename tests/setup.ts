@@ -4,12 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import {it} from 'node:test';
+import path from 'node:path';
 
 // This is run by Node when we execute the tests via the --require flag.
 it.snapshot.setResolveSnapshotPath(testPath => {
   // By default the snapshots go into the build directory, but we want them
   // in the tests/ directory.
-  const correctPath = testPath?.replace('/build/tests', '/tests');
+  const correctPath = testPath?.replace(path.join('build', 'tests'), 'tests');
   return correctPath + '.snapshot';
 });
 
