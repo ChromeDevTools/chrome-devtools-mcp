@@ -101,6 +101,11 @@ Go to `Cursor Settings` -> `MCP` -> `New MCP Server`. Use the config provided ab
   using the standard config from above.
 </details>
 
+### Opening a browser window
+
+To interact with Chrome through MCP, you need to ask your agent (Claude, Cursor, Copilot, Gemini, etc.) to open a new browser window. The MCP server itself does
+not automatically launch one.  
+
 ## Tools
 
 <!-- BEGIN AUTO GENERATED TOOLS -->
