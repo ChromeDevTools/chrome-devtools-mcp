@@ -246,4 +246,18 @@ Log>`),
       assert.ok(result[0].text.toString().includes('Hello from the test'));
     });
   });
+
+  it('adds a message when no console messages exist', async () => {
+    await withBrowser(async (response, context) => {
+      response.setIncludeConsoleData(true);
+      const result = await response.handle('test', context);
+      assert.ok(result[0].text);
+      assert.strictEqual(
+        result[0].text.toString(),
+        `# test response
+## Console messages
+<no console messages found>`,
+      );
+    });
+  });
 });

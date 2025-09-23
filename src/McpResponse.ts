@@ -172,7 +172,11 @@ Call browser_handle_dialog to handle it before continuing.`);
 
     if (this.#includeConsoleData && this.#formattedConsoleData) {
       response.push('## Console messages');
-      response.push(...this.#formattedConsoleData);
+      if (this.#formattedConsoleData.length) {
+        response.push(...this.#formattedConsoleData);
+      } else {
+        response.push('<no console messages found>');
+      }
     }
 
     const text: TextContent = {
