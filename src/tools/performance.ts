@@ -11,6 +11,7 @@ import {
   getTraceSummary,
   InsightName,
   parseRawTraceBuffer,
+  traceResultIsSuccess,
 } from '../trace-processing/parse.js';
 import {logger} from '../logger.js';
 import {Page} from 'puppeteer-core';
@@ -160,22 +161,26 @@ async function stopTracingAndAppendOutput(
     const traceEventsBuffer = await page.tracing.stop();
     const result = await parseRawTraceBuffer(traceEventsBuffer);
     response.appendResponseLine('The performance trace has been stopped.');
-    if (result) {
+    if (traceResultIsSuccess(result)) {
       context.storeTraceRecording(result);
-      const insightText = getTraceSummary(result);
-      if (insightText) {
-        response.appendResponseLine('Insights with performance opportunities:');
-        response.appendResponseLine(insightText);
-      } else {
-        response.appendResponseLine(
-          'No insights have been found. The performance looks good!',
-        );
-      }
+      response.appendResponseLine(
+        'Here is a high level summary of the trace and the Insights that were found:',
+      );
+      const traceSummaryText = getTraceSummary(result);
+      response.appendResponseLine(traceSummaryText);
+    } else {
+      response.appendResponseLine(
+        'There was an unexpected error parsing the trace:',
+      );
+      response.appendResponseLine(result.error);
     }
   } catch (e) {
-    logger(
-      `Error stopping performance trace: ${e instanceof Error ? e.message : JSON.stringify(e)}`,
+    const errorText = e instanceof Error ? e.message : JSON.stringify(e);
+    logger(`Error stopping performance trace: ${errorText}`);
+    response.appendResponseLine(
+      'An error occured generating the response for this trace:',
     );
+    response.appendResponseLine(errorText);
   } finally {
     context.setIsRunningPerformanceTrace(false);
   }

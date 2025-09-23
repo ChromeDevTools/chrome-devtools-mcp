@@ -14,19 +14,33 @@ const engine = TraceEngine.TraceModel.Model.createWithAllHandlers();
 
 export interface TraceResult {
   parsedTrace: TraceEngine.TraceModel.ParsedTrace;
-  insights: TraceEngine.Insights.Types.TraceInsightSets;
+  insights: TraceEngine.Insights.Types.TraceInsightSets | null;
+}
+
+export function traceResultIsSuccess(
+  x: TraceResult | TraceParseError,
+): x is TraceResult {
+  return 'parsedTrace' in x;
+}
+
+export interface TraceParseError {
+  error: string;
 }
 
 export async function parseRawTraceBuffer(
   buffer: Uint8Array<ArrayBufferLike> | undefined,
-): Promise<TraceResult | null> {
+): Promise<TraceResult | TraceParseError> {
   engine.resetProcessor();
   if (!buffer) {
-    return null;
+    return {
+      error: 'No buffer was provided.',
+    };
   }
   const asString = new TextDecoder().decode(buffer);
   if (!asString) {
-    return null;
+    return {
+      error: 'Decoding the trace buffer returned an empty string.',
+    };
   }
   try {
     const data = JSON.parse(asString) as
@@ -39,25 +53,23 @@ export async function parseRawTraceBuffer(
     await engine.parse(events);
     const parsedTrace = engine.parsedTrace();
     if (!parsedTrace) {
-      return null;
+      return {
+        error: 'No parsed trace was returned from the trace engine.',
+      };
     }
 
-    const insights = parsedTrace?.insights;
-    if (!insights) {
-      return null;
-    }
+    const insights = parsedTrace?.insights ?? null;
 
     return {
       parsedTrace,
       insights,
     };
   } catch (e) {
-    if (e instanceof Error) {
-      logger(`Error parsing trace: ${e.message}`);
-    } else {
-      logger(`Error parsing trace: ${JSON.stringify(e)}`);
-    }
-    return null;
+    const errorText = e instanceof Error ? e.message : JSON.stringify(e);
+    logger(`Unexpeced error parsing trace: ${errorText}`);
+    return {
+      error: errorText,
+    };
   }
 }
 
@@ -76,6 +88,12 @@ export function getInsightOutput(
   result: TraceResult,
   insightName: InsightName,
 ): InsightOutput {
+  if (!result.insights) {
+    return {
+      error: 'No Performance insights are available for this trace.',
+    };
+  }
+
   // Currently, we do not support inspecting traces with multiple navigations. We either:
   // 1. Find Insights from the first navigation (common case: user records a trace with a page reload to test load performance)
   // 2. Fall back to finding Insights not associated with a navigation (common case: user tests an interaction without a page load).

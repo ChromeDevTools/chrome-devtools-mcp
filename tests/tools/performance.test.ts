@@ -17,6 +17,7 @@ import {loadTraceAsBuffer} from '../trace-processing/fixtures/load.js';
 import {
   parseRawTraceBuffer,
   TraceResult,
+  traceResultIsSuccess,
 } from '../../src/trace-processing/parse.js';
 
 describe('performance', () => {
@@ -141,7 +142,9 @@ describe('performance', () => {
     async function parseTrace(fileName: string): Promise<TraceResult> {
       const rawData = loadTraceAsBuffer(fileName);
       const result = await parseRawTraceBuffer(rawData);
-      assert.ok(result);
+      if (!traceResultIsSuccess(result)) {
+        assert.fail(`Unexpected trace parse error: ${result.error}`);
+      }
       return result;
     }
 
@@ -236,6 +239,31 @@ describe('performance', () => {
         );
         assert.strictEqual(context.recordedTraces().length, 1);
         sinon.assert.calledOnce(stopTracingStub);
+      });
+    });
+
+    it('returns an error message if parsing the trace buffer fails', async t => {
+      await withBrowser(async (response, context) => {
+        context.setIsRunningPerformanceTrace(true);
+        const selectedPage = context.getSelectedPage();
+        sinon
+          .stub(selectedPage.tracing, 'stop')
+          .returns(Promise.resolve(undefined));
+        await stopTrace.handler({params: {}}, response, context);
+        t.assert.snapshot(response.responseLines.join('\n'));
+      });
+    });
+
+    it('returns the high level summary of the performance trace', async t => {
+      const rawData = loadTraceAsBuffer('web-dev-with-commit.json.gz');
+      await withBrowser(async (response, context) => {
+        context.setIsRunningPerformanceTrace(true);
+        const selectedPage = context.getSelectedPage();
+        sinon.stub(selectedPage.tracing, 'stop').callsFake(async () => {
+          return rawData;
+        });
+        await stopTrace.handler({params: {}}, response, context);
+        t.assert.snapshot(response.responseLines.join('\n'));
       });
     });
   });
