@@ -138,7 +138,13 @@ export class WaitForHelper {
       })
       .catch(error => logger(error));
 
-    await action();
+    try {
+      await action();
+    } catch (error) {
+      // Clear up pending promises
+      this.#abortController.abort();
+      throw error;
+    }
 
     try {
       await navigationFinished;
