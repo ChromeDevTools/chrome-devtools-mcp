@@ -101,6 +101,19 @@ Go to `Cursor Settings` -> `MCP` -> `New MCP Server`. Use the config provided ab
   using the standard config from above.
 </details>
 
+### Your first prompt
+
+Enter the following prompt in your MCP Client to check if everything is working:
+
+```
+Check the performance of https://developers.chrome.com
+```
+
+Your MCP client should open the browser and record a performance trace.
+
+> [!NOTE]  
+> The MCP server will start the browser automatically once the MCP client uses a tool that requires a running browser instance. Connecting to the Chrome DevTools MCP server on its own will not automatically start the browser.
+
 ## Tools
 
 <!-- BEGIN AUTO GENERATED TOOLS -->
