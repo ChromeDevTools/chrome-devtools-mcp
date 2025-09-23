@@ -118,7 +118,7 @@ export class McpResponse implements Response {
       response.push(`## Network emulation`);
       response.push(`Emulating: ${networkConditions}`);
       response.push(
-        `Navigation timeout set to ${context.getNavigationTimeout()}`,
+        `Navigation timeout set to ${context.getNavigationTimeout()} ms`,
       );
     }
 
