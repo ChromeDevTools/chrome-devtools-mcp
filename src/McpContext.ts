@@ -73,6 +73,8 @@ export class McpContext implements Context {
 
   #nextSnapshotId = 1;
   #traceResults: TraceResult[] = [];
+  #cssDomainEnabled = new WeakSet<Page>();
+  #domDomainEnabled = new WeakSet<Page>();
 
   private constructor(browser: Browser, logger: Debugger) {
     this.browser = browser;
@@ -370,5 +372,65 @@ export class McpContext implements Context {
       networkMultiplier,
     );
     return waitForHelper.waitForEventsAfterAction(action);
+  }
+
+  async ensureCssDomainEnabled(): Promise<void> {
+    const page = this.getSelectedPage();
+    if (this.#cssDomainEnabled.has(page)) {
+      return;
+    }
+    // @ts-expect-error internal API
+    const client = page._client();
+    await client.send('CSS.enable');
+    this.#cssDomainEnabled.add(page);
+  }
+
+  async ensureDomDomainEnabled(): Promise<void> {
+    const page = this.getSelectedPage();
+    if (this.#domDomainEnabled.has(page)) {
+      return;
+    }
+    // @ts-expect-error internal API
+    const client = page._client();
+    await client.send('DOM.enable');
+    // Warm up DOM agent to ensure node ids are tracked.
+    try {
+      await client.send('DOM.getDocument', {depth: 1});
+    } catch {
+      // ignore
+    }
+    this.#domDomainEnabled.add(page);
+  }
+
+  async getNodeIdFromHandle(handle: ElementHandle<Element>): Promise<number> {
+    const page = this.getSelectedPage();
+    await this.ensureDomDomainEnabled();
+    // @ts-expect-error internal API
+    const client = page._client();
+    // Access the underlying RemoteObject id
+    const objectId: string | undefined = handle.remoteObject().objectId;
+    if (!objectId) {
+      throw new Error('Unable to resolve CDP objectId for element handle');
+    }
+    try {
+      const {nodeId} = await client.send('DOM.requestNode', {objectId});
+      return nodeId as number;
+    } catch {
+      const {node} = await client.send('DOM.describeNode', {objectId});
+      if (node?.nodeId) {
+        return node.nodeId as number;
+      }
+      if (node?.backendNodeId) {
+        const {nodeIds} = await client.send(
+          'DOM.pushNodesByBackendIdsToFrontend',
+          {backendNodeIds: [node.backendNodeId]},
+        );
+        const first = (nodeIds as number[])[0];
+        if (first) {
+          return first;
+        }
+      }
+      throw new Error('Unable to resolve DOM.NodeId for element');
+    }
   }
 }

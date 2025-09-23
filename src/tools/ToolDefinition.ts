@@ -71,6 +71,12 @@ export type Context = Readonly<{
     mimeType: 'image/png' | 'image/jpeg',
   ): Promise<{filename: string}>;
   waitForEventsAfterAction(action: () => Promise<unknown>): Promise<void>;
+  /** Resolve CDP DOM.NodeId for an element handle via DOM.requestNode. */
+  getNodeIdFromHandle(handle: ElementHandle<Element>): Promise<number>;
+  /** Ensure the CSS domain is enabled for the selected page. */
+  ensureCssDomainEnabled(): Promise<void>;
+  /** Ensure the DOM domain is enabled for the selected page. */
+  ensureDomDomainEnabled(): Promise<void>;
 }>;
 
 export function defineTool<Schema extends Zod.ZodRawShape>(

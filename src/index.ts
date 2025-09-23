@@ -29,6 +29,7 @@ import * as performanceTools from './tools/performance.js';
 import * as screenshotTools from './tools/screenshot.js';
 import * as scriptTools from './tools/script.js';
 import * as snapshotTools from './tools/snapshot.js';
+import * as stylesTools from './tools/styles.js';
 
 import path from 'node:path';
 import fs from 'node:fs';
@@ -230,6 +231,7 @@ const tools = [
   ...Object.values(screenshotTools),
   ...Object.values(scriptTools),
   ...Object.values(snapshotTools),
+  ...Object.values(stylesTools),
 ];
 for (const tool of tools) {
   registerTool(tool as unknown as ToolDefinition);
