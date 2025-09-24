@@ -1,0 +1,10 @@
+{
+  "name": "chrome-devtools-mcp",
+  "version": "0.2.6",
+  "mcpServers": {
+    "chrome-devtools": {
+      "command": "node",
+      "args": ["${extensionPath}${/}build${/}src${/}index.js"]
+    }
+  }
+}
