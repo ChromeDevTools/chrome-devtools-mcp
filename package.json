@@ -33,6 +33,7 @@
     "url": "https://github.com/ChromeDevTools/chrome-devtools-mcp/issues"
   },
   "homepage": "https://github.com/ChromeDevTools/chrome-devtools-mcp#readme",
+  "mcpName": "io.github.ChromeDevTools/chrome-devtools-mcp",
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.18.1",
     "debug": "4.4.3",
