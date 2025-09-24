@@ -203,10 +203,10 @@ Pass them via the `args` property in the JSON configuration. For example:
     "chrome-devtools": {
       "command": "npx",
       "args": [
-        "chrome-devtools-mcp@latest"
+        "chrome-devtools-mcp@latest",
         "--channel=canary",
         "--headless=true",
-        "--isolated=true",
+        "--isolated=true"
       ]
     }
   }
