@@ -101,6 +101,12 @@ Go to `Cursor Settings` -> `MCP` -> `New MCP Server`. Use the config provided ab
   using the standard config from above.
 </details>
 
+<details>
+  <summary>Codex</summary>
+  Follow the <a href="https://github.com/openai/codex/blob/main/docs/advanced.md#model-context-protocol-mcp">configure MCP guide</a>
+  using the standard config from above.
+</details>
+
 ### Your first prompt
 
 Enter the following prompt in your MCP Client to check if everything is working:
