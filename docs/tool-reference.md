@@ -29,9 +29,16 @@
 - **[Network](#network)** (2 tools)
   - [`get_network_request`](#get_network_request)
   - [`list_network_requests`](#list_network_requests)
-- **[Debugging](#debugging)** (4 tools)
+- **[Debugging](#debugging)** (11 tools)
+  - [`diff_computed_styles`](#diff_computed_styles)
+  - [`diff_computed_styles_snapshot`](#diff_computed_styles_snapshot)
   - [`evaluate_script`](#evaluate_script)
+  - [`get_box_model`](#get_box_model)
+  - [`get_computed_styles`](#get_computed_styles)
+  - [`get_computed_styles_batch`](#get_computed_styles_batch)
+  - [`get_visibility`](#get_visibility)
   - [`list_console_messages`](#list_console_messages)
+  - [`save_computed_styles_snapshot`](#save_computed_styles_snapshot)
   - [`take_screenshot`](#take_screenshot)
   - [`take_snapshot`](#take_snapshot)
 
@@ -268,6 +275,30 @@
 
 ## Debugging
 
+### `diff_computed_styles`
+
+**Description:** Return the changed computed properties between two elements (A vs B).
+
+**Parameters:**
+
+- **properties** (array) _(optional)_: Optional filter list
+- **uidA** (string) **(required)**: First element uid
+- **uidB** (string) **(required)**: Second element uid
+
+---
+
+### `diff_computed_styles_snapshot`
+
+**Description:** Diff current computed styles of an element against a saved snapshot.
+
+**Parameters:**
+
+- **name** (string) **(required)**: Snapshot name
+- **properties** (array) _(optional)_: Optional filter list
+- **uid** (string) **(required)**: Element uid to compare against the snapshot
+
+---
+
 ### `evaluate_script`
 
 **Description:** Evaluate a JavaScript function inside the currently selected page. Returns the response as JSON
@@ -288,11 +319,66 @@ so returned values have to JSON-serializable.
 
 ---
 
+### `get_box_model`
+
+**Description:** Return box model for an element (content/padding/border/margin) and rects (content, padding, border, margin, client, bounding).
+
+**Parameters:**
+
+- **uid** (string) **(required)**: The uid of an element on the page from the page content snapshot
+
+---
+
+### `get_computed_styles`
+
+**Description:** Return CSS computed styles for an element. Optionally filter properties and include rule origins.
+
+**Parameters:**
+
+- **includeSources** (boolean) _(optional)_: If true, include best-effort winning rule origins
+- **properties** (array) _(optional)_: Optional filter list
+- **uid** (string) **(required)**: The uid of an element on the page from the page content snapshot
+
+---
+
+### `get_computed_styles_batch`
+
+**Description:** Return CSS computed styles for multiple elements. Optionally filter properties.
+
+**Parameters:**
+
+- **properties** (array) _(optional)_: Optional filter list
+- **uids** (array) **(required)**: The uids of elements on the page from the page content snapshot
+
+---
+
+### `get_visibility`
+
+**Description:** Return visibility diagnostics for an element: isVisible and reasons.
+
+**Parameters:**
+
+- **uid** (string) **(required)**: The uid of an element on the page from the page content snapshot
+
+---
+
 ### `list_console_messages`
 
 **Description:** List all console messages for the currently selected page
 
 **Parameters:** None
+
+---
+
+### `save_computed_styles_snapshot`
+
+**Description:** Save a named snapshot of computed styles for specified elements.
+
+**Parameters:**
+
+- **name** (string) **(required)**: Snapshot name
+- **properties** (array) _(optional)_: Optional filter list
+- **uids** (array) **(required)**: The uids of elements on the page from the page content snapshot
 
 ---
 
