@@ -18,7 +18,8 @@
     "test:only": "npm run build && node --require ./build/tests/setup.js --no-warnings=ExperimentalWarning --test-reporter spec --test-force-exit --test --test-only \"build/tests/**/*.test.js\"",
     "test:only:no-build": "node --require ./build/tests/setup.js --no-warnings=ExperimentalWarning --test-reporter spec --test-force-exit --test --test-only \"build/tests/**/*.test.js\"",
     "test:update-snapshots": "npm run build && node --require ./build/tests/setup.js --no-warnings=ExperimentalWarning --test-force-exit --test --test-update-snapshots \"build/tests/**/*.test.js\"",
-    "prepare": "node --experimental-strip-types scripts/prepare.ts"
+    "prepare": "node --experimental-strip-types scripts/prepare.ts",
+    "sync-server-json-version": "node  --experimental-strip-types scripts/sync-server-json-version.ts && npm run format"
   },
   "files": [
     "build/src",
