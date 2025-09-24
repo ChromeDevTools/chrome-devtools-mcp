@@ -58,5 +58,8 @@
     "sinon": "^21.0.0",
     "typescript": "^5.9.2",
     "typescript-eslint": "^8.43.0"
+  },
+  "engines": {
+    "node": ">=22.12.0"
   }
 }

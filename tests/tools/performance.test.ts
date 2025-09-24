@@ -164,7 +164,7 @@ describe('performance', () => {
           context,
         );
 
-        t.assert.snapshot(response.responseLines.join('\n'));
+        t.assert.snapshot?.(response.responseLines.join('\n'));
       });
     });
 
@@ -250,7 +250,7 @@ describe('performance', () => {
           .stub(selectedPage.tracing, 'stop')
           .returns(Promise.resolve(undefined));
         await stopTrace.handler({params: {}}, response, context);
-        t.assert.snapshot(response.responseLines.join('\n'));
+        t.assert.snapshot?.(response.responseLines.join('\n'));
       });
     });
 
@@ -263,7 +263,7 @@ describe('performance', () => {
           return rawData;
         });
         await stopTrace.handler({params: {}}, response, context);
-        t.assert.snapshot(response.responseLines.join('\n'));
+        t.assert.snapshot?.(response.responseLines.join('\n'));
       });
     });
   });

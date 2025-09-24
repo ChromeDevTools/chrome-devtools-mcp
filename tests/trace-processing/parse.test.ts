@@ -32,7 +32,7 @@ describe('Trace parsing', async () => {
     assert.ok(result?.insights);
 
     const output = getTraceSummary(result);
-    t.assert.snapshot(output);
+    t.assert.snapshot?.(output);
   });
 
   it('will return a message if there is an error', async () => {

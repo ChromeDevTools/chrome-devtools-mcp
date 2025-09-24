@@ -27,7 +27,7 @@ MCP clients.
 
 ## Requirements
 
-- [Node.js 22](https://nodejs.org/) or newer.
+- [Node.js 22.12.0](https://nodejs.org/) or newer.
 - [Chrome](https://www.google.com/chrome/) current stable version or newer.
 - [npm](https://www.npmjs.com/).
 

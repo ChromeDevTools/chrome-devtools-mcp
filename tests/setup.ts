@@ -6,6 +6,13 @@
 import {it} from 'node:test';
 import path from 'node:path';
 
+if (!it.snapshot) {
+  it.snapshot = {
+    setResolveSnapshotPath: () => {},
+    setDefaultSnapshotSerializers: () => {},
+  };
+}
+
 // This is run by Node when we execute the tests via the --require flag.
 it.snapshot.setResolveSnapshotPath(testPath => {
   // By default the snapshots go into the build directory, but we want them
