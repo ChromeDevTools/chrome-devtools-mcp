@@ -67,6 +67,17 @@ claude mcp add chrome-devtools npx chrome-devtools-mcp@latest
 </details>
 
 <details>
+  <summary>Codex</summary>
+  Follow the <a href="https://github.com/openai/codex/blob/main/docs/advanced.md#model-context-protocol-mcp">configure MCP guide</a>
+  using the standard config from above. You can also install the Chrome DevTools MCP server using the Codex CLI:
+
+```bash
+codex mcp add chrome-devtools -- npx chrome-devtools-mcp@latest
+```
+
+</details>
+
+<details>
   <summary>Copilot / VS Code</summary>
   Follow the MCP install <a href="https://code.visualstudio.com/docs/copilot/chat/mcp-servers#_add-an-mcp-server">guide</a>,
   with the standard config from above. You can also install the Chrome DevTools MCP server using the VS Code CLI:
@@ -99,16 +110,6 @@ Go to `Cursor Settings` -> `MCP` -> `New MCP Server`. Use the config provided ab
   <summary>Gemini Code Assist</summary>
   Follow the <a href="https://cloud.google.com/gemini/docs/codeassist/use-agentic-chat-pair-programmer#configure-mcp-servers">configure MCP guide</a>
   using the standard config from above.
-</details>
-
-<details>
-  <summary>Codex</summary>
-  Follow the <a href="https://github.com/openai/codex/blob/main/docs/advanced.md#model-context-protocol-mcp">configure MCP guide</a>
-  using the standard config from above. You can also install the Chrome DevTools MCP server using the Codex CLI:
-
-  ```bash
-  codex mcp add chrome-devtools -- npx chrome-devtools-mcp@latest
-  ```
 </details>
 
 ### Your first prompt
