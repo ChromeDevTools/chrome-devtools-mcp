@@ -62,6 +62,7 @@ export type Context = Readonly<{
   clearDialog(): void;
   getPageByIdx(idx: number): Page;
   newPage(): Promise<Page>;
+  closePage(pageIdx: number): Promise<void>;
   setSelectedPageIdx(idx: number): void;
   getElementByUid(uid: string): Promise<ElementHandle<Element>>;
   setNetworkConditions(conditions: string | null): void;

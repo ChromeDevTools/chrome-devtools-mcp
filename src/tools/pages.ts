@@ -45,7 +45,7 @@ export const selectPage = defineTool({
 
 export const closePage = defineTool({
   name: 'close_page',
-  description: `Closes the page by its index.`,
+  description: `Closes the page by its index. The last open page cannot be closed.`,
   annotations: {
     category: ToolCategories.NAVIGATION_AUTOMATION,
     readOnlyHint: false,
@@ -58,9 +58,7 @@ export const closePage = defineTool({
       ),
   },
   handler: async (request, response, context) => {
-    const page = context.getPageByIdx(request.params.pageIdx);
-    context.setSelectedPageIdx(0);
-    await page.close({runBeforeUnload: false});
+    await context.closePage(request.params.pageIdx);
     response.setIncludePages(true);
   },
 });

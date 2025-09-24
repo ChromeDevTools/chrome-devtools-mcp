@@ -116,7 +116,7 @@
 
 ### `close_page`
 
-**Description:** Closes the page by its index.
+**Description:** Closes the page by its index. The last open page cannot be closed.
 
 **Parameters:**
 

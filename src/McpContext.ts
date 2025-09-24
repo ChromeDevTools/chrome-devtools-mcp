@@ -131,6 +131,16 @@ export class McpContext implements Context {
     this.#consoleCollector.addPage(page);
     return page;
   }
+  async closePage(pageIdx: number): Promise<void> {
+    if (this.#pages.length === 1) {
+      throw new Error(
+        'Unable to close the last page in the browser. It is fine to keep the last page open.',
+      );
+    }
+    const page = this.getPageByIdx(pageIdx);
+    this.setSelectedPageIdx(0);
+    await page.close({runBeforeUnload: false});
+  }
 
   getNetworkRequestByUrl(url: string): HTTPRequest {
     const requests = this.getNetworkRequests();
