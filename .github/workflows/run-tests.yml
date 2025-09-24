@@ -21,6 +21,7 @@ jobs:
           - macos-latest
         node:
           - 22
+          - 23
           - 24
     steps:
       - name: Check out repository
