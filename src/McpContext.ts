@@ -13,7 +13,7 @@ import {
   SerializedAXNode,
   PredefinedNetworkConditions,
 } from 'puppeteer-core';
-import {Context} from './tools/ToolDefinition.js';
+import {CLOSE_PAGE_ERROR, Context} from './tools/ToolDefinition.js';
 import {Debugger} from 'debug';
 import {NetworkCollector, PageCollector} from './PageCollector.js';
 import fs from 'node:fs/promises';
@@ -133,9 +133,7 @@ export class McpContext implements Context {
   }
   async closePage(pageIdx: number): Promise<void> {
     if (this.#pages.length === 1) {
-      throw new Error(
-        'Unable to close the last page in the browser. It is fine to keep the last page open.',
-      );
+      throw new Error(CLOSE_PAGE_ERROR);
     }
     const page = this.getPageByIdx(pageIdx);
     this.setSelectedPageIdx(0);

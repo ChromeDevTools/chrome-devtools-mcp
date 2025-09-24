@@ -56,15 +56,12 @@ describe('pages', () => {
     it('cannot close the last page', async () => {
       await withBrowser(async (response, context) => {
         const page = context.getSelectedPage();
-        try {
-          await closePage.handler({params: {pageIdx: 0}}, response, context);
-          assert.fail('not reached');
-        } catch (err) {
-          assert.strictEqual(
-            err.message,
-            'Unable to close the last page in the browser. It is fine to keep the last page open.',
-          );
-        }
+        await closePage.handler({params: {pageIdx: 0}}, response, context);
+        assert.deepStrictEqual(
+          response.responseLines[0],
+          `The last open page cannot be closed. It is fine to keep it open.`,
+        );
+        assert.ok(response.includePages);
         assert.ok(!page.isClosed());
       });
     });

@@ -79,3 +79,6 @@ export function defineTool<Schema extends Zod.ZodRawShape>(
 ) {
   return definition;
 }
+
+export const CLOSE_PAGE_ERROR =
+  'The last open page cannot be closed. It is fine to keep it open.';

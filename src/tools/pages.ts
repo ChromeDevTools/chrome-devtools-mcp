@@ -5,7 +5,7 @@
  */
 
 import z from 'zod';
-import {defineTool} from './ToolDefinition.js';
+import {CLOSE_PAGE_ERROR, defineTool} from './ToolDefinition.js';
 import {ToolCategories} from './categories.js';
 
 export const listPages = defineTool({
@@ -58,7 +58,15 @@ export const closePage = defineTool({
       ),
   },
   handler: async (request, response, context) => {
-    await context.closePage(request.params.pageIdx);
+    try {
+      await context.closePage(request.params.pageIdx);
+    } catch (err) {
+      if (err.message === CLOSE_PAGE_ERROR) {
+        response.appendResponseLine(err.message);
+      } else {
+        throw err;
+      }
+    }
     response.setIncludePages(true);
   },
 });
