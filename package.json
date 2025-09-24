@@ -38,7 +38,7 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.18.1",
     "debug": "4.4.3",
-    "puppeteer-core": "24.22.2",
+    "puppeteer-core": "24.22.3",
     "yargs": "18.0.0"
   },
   "devDependencies": {
@@ -54,7 +54,7 @@
     "eslint": "^9.35.0",
     "globals": "^16.4.0",
     "prettier": "^3.6.2",
-    "puppeteer": "24.22.2",
+    "puppeteer": "24.22.3",
     "sinon": "^21.0.0",
     "typescript": "^5.9.2",
     "typescript-eslint": "^8.43.0"
