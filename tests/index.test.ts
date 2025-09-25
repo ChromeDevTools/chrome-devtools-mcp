@@ -89,7 +89,7 @@ describe('e2e', () => {
           continue;
         }
         const fileTools = await import(`../src/tools/${file}`);
-        for (const maybeTool of Object.values(fileTools)) {
+        for (const maybeTool of Object.values<object>(fileTools)) {
           if ('name' in maybeTool) {
             definedNames.push(maybeTool.name);
           }
