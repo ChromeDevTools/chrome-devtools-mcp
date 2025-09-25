@@ -12,11 +12,10 @@ import {McpServer} from '@modelcontextprotocol/sdk/server/mcp.js';
 import {StdioServerTransport} from '@modelcontextprotocol/sdk/server/stdio.js';
 import type {CallToolResult} from '@modelcontextprotocol/sdk/types.js';
 import {SetLevelRequestSchema} from '@modelcontextprotocol/sdk/types.js';
-import yargs from 'yargs';
-import {hideBin} from 'yargs/helpers';
 
 import type {Channel} from './browser.js';
 import {resolveBrowser} from './browser.js';
+import {parseArguments} from './cli.js';
 import {logger, saveLogsToFile} from './logger.js';
 import {McpContext} from './McpContext.js';
 import {McpResponse} from './McpResponse.js';
@@ -31,55 +30,6 @@ import * as screenshotTools from './tools/screenshot.js';
 import * as scriptTools from './tools/script.js';
 import * as snapshotTools from './tools/snapshot.js';
 import type {ToolDefinition} from './tools/ToolDefinition.js';
-
-export const cliOptions = {
-  browserUrl: {
-    type: 'string' as const,
-    description:
-      'Connect to a running Chrome instance using port forwarding. For more details see: https://developer.chrome.com/docs/devtools/remote-debugging/local-server.',
-    alias: 'u',
-    coerce: (url: string) => {
-      new URL(url);
-      return url;
-    },
-  },
-  headless: {
-    type: 'boolean' as const,
-    description: 'Whether to run in headless (no UI) mode.',
-    default: false,
-  },
-  executablePath: {
-    type: 'string' as const,
-    description: 'Path to custom Chrome executable.',
-    conflicts: 'browserUrl',
-    alias: 'e',
-  },
-  isolated: {
-    type: 'boolean' as const,
-    description:
-      'If specified, creates a temporary user-data-dir that is automatically cleaned up after the browser is closed.',
-    default: false,
-  },
-  customDevtools: {
-    type: 'string' as const,
-    description: 'Path to custom DevTools.',
-    hidden: true,
-    conflicts: 'browserUrl',
-    alias: 'd',
-  },
-  channel: {
-    type: 'string' as const,
-    description:
-      'Specify a different Chrome channel that should be used. The default is the stable channel version.',
-    choices: ['stable', 'canary', 'beta', 'dev'] as const,
-    conflicts: ['browserUrl', 'executablePath'],
-  },
-  logFile: {
-    type: 'string' as const,
-    describe: 'Save the logs to file.',
-    hidden: true,
-  },
-};
 
 function readPackageJson(): {version?: string} {
   const currentDir = import.meta.dirname;
@@ -98,35 +48,7 @@ function readPackageJson(): {version?: string} {
 
 const version = readPackageJson().version ?? 'unknown';
 
-const yargsInstance = yargs(hideBin(process.argv))
-  .scriptName('npx chrome-devtools-mcp@latest')
-  .options(cliOptions)
-  .check(args => {
-    // We can't set default in the options else
-    // Yargs will complain
-    if (!args.channel && !args.browserUrl) {
-      args.channel = 'stable';
-    }
-    return true;
-  })
-  .example([
-    [
-      '$0 --browserUrl http://127.0.0.1:9222',
-      'Connect to an existing browser instance',
-    ],
-    ['$0 --channel beta', 'Use Chrome Beta installed on this system'],
-    ['$0 --channel canary', 'Use Chrome Canary installed on this system'],
-    ['$0 --channel dev', 'Use Chrome Dev installed on this system'],
-    ['$0 --channel stable', 'Use stable Chrome installed on this system'],
-    ['$0 --logFile /tmp/log.txt', 'Save logs to a file'],
-    ['$0 --help', 'Print CLI options'],
-  ]);
-
-export const args = yargsInstance
-  .wrap(Math.min(120, yargsInstance.terminalWidth()))
-  .help()
-  .version(version)
-  .parseSync();
+export const args = parseArguments(version);
 
 const logFile = args.logFile ? saveLogsToFile(args.logFile) : undefined;
 

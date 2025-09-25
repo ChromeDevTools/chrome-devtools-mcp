@@ -10,7 +10,7 @@ import {Client} from '@modelcontextprotocol/sdk/client/index.js';
 import {StdioClientTransport} from '@modelcontextprotocol/sdk/client/stdio.js';
 import type {Tool} from '@modelcontextprotocol/sdk/types.js';
 
-import {cliOptions} from '../build/src/main.js';
+import {cliOptions} from '../build/src/cli.js';
 import {ToolCategories} from '../build/src/tools/categories.js';
 
 const MCP_SERVER_PATH = 'build/src/index.js';
