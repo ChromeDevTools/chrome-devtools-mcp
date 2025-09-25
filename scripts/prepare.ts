@@ -31,4 +31,4 @@ async function main() {
   console.log('Clean up of chrome-devtools-frontend complete.');
 }
 
-main();
+void main();

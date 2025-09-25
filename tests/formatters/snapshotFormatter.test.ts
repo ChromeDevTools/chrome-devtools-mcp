@@ -4,11 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {formatA11ySnapshot} from '../../src/formatters/snapshotFormatter.js';
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
-import type {TextSnapshotNode} from '../../src/McpContext.js';
+
 import type {ElementHandle} from 'puppeteer-core';
+
+import {formatA11ySnapshot} from '../../src/formatters/snapshotFormatter.js';
+import type {TextSnapshotNode} from '../../src/McpContext.js';
 
 describe('snapshotFormatter', () => {
   it('formats a snapshot with value properties', () => {

@@ -4,10 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import assert from 'node:assert';
 import {describe, it} from 'node:test';
-import assert from 'assert';
+
+import type {ConsoleMessage} from 'puppeteer-core';
+
 import {formatConsoleEvent} from '../../src/formatters/consoleFormatter.js';
-import {ConsoleMessage} from 'puppeteer-core';
 
 function getMockConsoleMessage(options: {
   type: string;
@@ -69,7 +71,7 @@ describe('consoleFormatter', () => {
           columnNumber: 5,
         },
       });
-      const result = await formatConsoleEvent(message as ConsoleMessage);
+      const result = await formatConsoleEvent(message);
       assert.equal(result, 'Log> script.js:10:5: Hello, world!');
     });
 
@@ -84,7 +86,7 @@ describe('consoleFormatter', () => {
           columnNumber: 5,
         },
       });
-      const result = await formatConsoleEvent(message as ConsoleMessage);
+      const result = await formatConsoleEvent(message);
       assert.equal(
         result,
         'Log> script.js:10:5: Processing file: file.txt {"id":1,"status":"done"}',
@@ -192,7 +194,7 @@ describe('consoleFormatter', () => {
         text: 'Hello from iframe',
         location: {},
       });
-      const result = await formatConsoleEvent(message as ConsoleMessage);
+      const result = await formatConsoleEvent(message);
       assert.equal(result, 'Log> <unknown>: Hello from iframe');
     });
 
@@ -205,7 +207,7 @@ describe('consoleFormatter', () => {
           columnNumber: 5,
         },
       });
-      const result = await formatConsoleEvent(message as ConsoleMessage);
+      const result = await formatConsoleEvent(message);
       assert.equal(result, 'Log> <unknown>: Hello from iframe');
     });
   });

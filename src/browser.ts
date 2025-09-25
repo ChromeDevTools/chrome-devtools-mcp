@@ -4,16 +4,18 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import puppeteer, {
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+
+import type {
   Browser,
   ChromeReleaseChannel,
   ConnectOptions,
   LaunchOptions,
   Target,
 } from 'puppeteer-core';
-import os from 'node:os';
-import path from 'node:path';
-import fs from 'fs';
+import puppeteer from 'puppeteer-core';
 
 let browser: Browser | undefined;
 
@@ -54,7 +56,7 @@ async function ensureBrowserConnected(browserURL: string) {
   return browser;
 }
 
-type McpLaunchOptions = {
+interface McpLaunchOptions {
   executablePath?: string;
   customDevTools?: string;
   channel?: Channel;
@@ -62,7 +64,7 @@ type McpLaunchOptions = {
   headless: boolean;
   isolated: boolean;
   logFile?: fs.WriteStream;
-};
+}
 
 export async function launch(options: McpLaunchOptions): Promise<Browser> {
   const {channel, executablePath, customDevTools, headless, isolated} = options;

@@ -4,10 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import z from 'zod';
-import {defineTool} from './ToolDefinition.js';
 import {PredefinedNetworkConditions} from 'puppeteer-core';
+import z from 'zod';
+
 import {ToolCategories} from './categories.js';
+import {defineTool} from './ToolDefinition.js';
 
 const throttlingOptions: [string, ...string[]] = [
   'No emulation',

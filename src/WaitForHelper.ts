@@ -3,8 +3,9 @@
  * Copyright 2025 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
+import type {Page, Protocol} from 'puppeteer-core';
 import type {CdpPage} from 'puppeteer-core/internal/cdp/Page.js';
-import {Page, Protocol} from 'puppeteer-core';
+
 import {logger} from './logger.js';
 
 export class WaitForHelper {

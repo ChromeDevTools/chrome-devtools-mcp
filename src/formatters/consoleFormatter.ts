@@ -4,7 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {ConsoleMessage, JSHandle, ConsoleMessageLocation} from 'puppeteer-core';
+import type {
+  ConsoleMessage,
+  JSHandle,
+  ConsoleMessageLocation,
+} from 'puppeteer-core';
 
 const logLevels: Record<string, string> = {
   log: 'Log',
@@ -69,7 +73,11 @@ async function formatConsoleMessage(msg: ConsoleMessage): Promise<string> {
 
 async function formatArgs(args: readonly JSHandle[]): Promise<string> {
   const argValues = await Promise.all(
-    args.map(arg => arg.jsonValue().catch(() => {})),
+    args.map(arg =>
+      arg.jsonValue().catch(() => {
+        // Ignore errors
+      }),
+    ),
   );
 
   return argValues

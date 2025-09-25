@@ -3,12 +3,13 @@
  * Copyright 2025 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import {before, after, afterEach} from 'node:test';
 import http, {
   type IncomingMessage,
   type Server,
   type ServerResponse,
-} from 'http';
+} from 'node:http';
+import {before, after, afterEach} from 'node:test';
+
 import {html} from './utils.js';
 
 class TestServer {

@@ -3,7 +3,12 @@
  * Copyright 2025 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import {
+import fs from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+
+import type {Debugger} from 'debug';
+import type {
   Browser,
   ConsoleMessage,
   Dialog,
@@ -13,14 +18,12 @@ import {
   SerializedAXNode,
   PredefinedNetworkConditions,
 } from 'puppeteer-core';
-import {CLOSE_PAGE_ERROR, Context} from './tools/ToolDefinition.js';
-import {Debugger} from 'debug';
+
 import {NetworkCollector, PageCollector} from './PageCollector.js';
-import fs from 'node:fs/promises';
-import os from 'node:os';
-import path from 'node:path';
 import {listPages} from './tools/pages.js';
-import {TraceResult} from './trace-processing/parse.js';
+import {CLOSE_PAGE_ERROR} from './tools/ToolDefinition.js';
+import type {Context} from './tools/ToolDefinition.js';
+import type {TraceResult} from './trace-processing/parse.js';
 import {WaitForHelper} from './WaitForHelper.js';
 
 export interface TextSnapshotNode extends SerializedAXNode {
@@ -118,7 +121,7 @@ export class McpContext implements Context {
     return this.#networkCollector.getData(page);
   }
 
-  getConsoleData(): (ConsoleMessage | Error)[] {
+  getConsoleData(): Array<ConsoleMessage | Error> {
     const page = this.getSelectedPage();
     return this.#consoleCollector.getData(page);
   }

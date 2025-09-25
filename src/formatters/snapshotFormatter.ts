@@ -7,7 +7,7 @@ import type {TextSnapshotNode} from '../McpContext.js';
 
 export function formatA11ySnapshot(
   serializedAXNodeRoot: TextSnapshotNode,
-  depth: number = 0,
+  depth = 0,
 ): string {
   let result = '';
   const attributes = getAttributes(serializedAXNodeRoot);

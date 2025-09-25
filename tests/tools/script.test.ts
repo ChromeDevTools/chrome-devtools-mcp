@@ -3,11 +3,10 @@
  * Copyright 2025 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
+import assert from 'node:assert';
 import {describe, it} from 'node:test';
-import assert from 'assert';
 
 import {evaluateScript} from '../../src/tools/script.js';
-
 import {html, withBrowser} from '../utils.js';
 
 describe('script', () => {

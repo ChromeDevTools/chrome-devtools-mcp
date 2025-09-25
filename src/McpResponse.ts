@@ -3,24 +3,28 @@
  * Copyright 2025 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import type {ImageContentData, Response} from './tools/ToolDefinition.js';
-import type {McpContext} from './McpContext.js';
-import {ImageContent, TextContent} from '@modelcontextprotocol/sdk/types.js';
+import type {
+  ImageContent,
+  TextContent,
+} from '@modelcontextprotocol/sdk/types.js';
+
+import {formatConsoleEvent} from './formatters/consoleFormatter.js';
 import {
   getFormattedHeaderValue,
   getShortDescriptionForRequest,
   getStatusFromRequest,
 } from './formatters/networkFormatter.js';
 import {formatA11ySnapshot} from './formatters/snapshotFormatter.js';
-import {formatConsoleEvent} from './formatters/consoleFormatter.js';
+import type {McpContext} from './McpContext.js';
+import type {ImageContentData, Response} from './tools/ToolDefinition.js';
 import {paginate, type PaginationOptions} from './utils/pagination.js';
 
 export class McpResponse implements Response {
-  #includePages: boolean = false;
-  #includeSnapshot: boolean = false;
-  #includeNetworkRequests: boolean = false;
+  #includePages = false;
+  #includeSnapshot = false;
+  #includeNetworkRequests = false;
   #attachedNetworkRequestUrl?: string;
-  #includeConsoleData: boolean = false;
+  #includeConsoleData = false;
   #textResponseLines: string[] = [];
   #formattedConsoleData?: string[];
   #images: ImageContentData[] = [];

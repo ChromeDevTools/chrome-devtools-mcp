@@ -4,13 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import assert from 'node:assert';
 import {describe, it} from 'node:test';
-import assert from 'assert';
-import {getMockRequest, getMockResponse} from '../utils.js';
+
 import {
   getFormattedHeaderValue,
   getShortDescriptionForRequest,
 } from '../../src/formatters/networkFormatter.js';
+import {getMockRequest, getMockResponse} from '../utils.js';
 
 describe('networkFormatter', () => {
   describe('getShortDescriptionForRequest', () => {

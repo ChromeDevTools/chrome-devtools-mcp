@@ -5,8 +5,9 @@
  */
 
 import z from 'zod';
-import {defineTool} from './ToolDefinition.js';
+
 import {ToolCategories} from './categories.js';
+import {defineTool} from './ToolDefinition.js';
 
 export const listNetworkRequests = defineTool({
   name: 'list_network_requests',

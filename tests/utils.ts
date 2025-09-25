@@ -4,11 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import puppeteer, {Browser} from 'puppeteer';
-import {HTTPRequest, HTTPResponse} from 'puppeteer-core';
-import {McpResponse} from '../src/McpResponse.js';
-import {McpContext} from '../src/McpContext.js';
 import logger from 'debug';
+import type {Browser} from 'puppeteer';
+import puppeteer from 'puppeteer';
+import type {HTTPRequest, HTTPResponse} from 'puppeteer-core';
+
+import {McpContext} from '../src/McpContext.js';
+import {McpResponse} from '../src/McpResponse.js';
 
 let browser: Browser | undefined;
 

@@ -4,14 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import z from 'zod';
-import {Dialog, ElementHandle, Page} from 'puppeteer-core';
-import {ToolCategories} from './categories.js';
-import {TraceResult} from '../trace-processing/parse.js';
+import type {Dialog, ElementHandle, Page} from 'puppeteer-core';
+import type z from 'zod';
 
-export interface ToolDefinition<
-  Schema extends Zod.ZodRawShape = Zod.ZodRawShape,
-> {
+import type {TraceResult} from '../trace-processing/parse.js';
+
+import type {ToolCategories} from './categories.js';
+
+export interface ToolDefinition<Schema extends z.ZodRawShape = z.ZodRawShape> {
   name: string;
   description: string;
   annotations: {
@@ -30,14 +30,14 @@ export interface ToolDefinition<
   ) => Promise<void>;
 }
 
-export interface Request<Schema extends Zod.ZodRawShape> {
+export interface Request<Schema extends z.ZodRawShape> {
   params: z.objectOutputType<Schema, z.ZodTypeAny>;
 }
 
-export type ImageContentData = {
+export interface ImageContentData {
   data: string;
   mimeType: string;
-};
+}
 
 export interface Response {
   appendResponseLine(value: string): void;
@@ -77,7 +77,7 @@ export type Context = Readonly<{
   waitForEventsAfterAction(action: () => Promise<unknown>): Promise<void>;
 }>;
 
-export function defineTool<Schema extends Zod.ZodRawShape>(
+export function defineTool<Schema extends z.ZodRawShape>(
   definition: ToolDefinition<Schema>,
 ) {
   return definition;

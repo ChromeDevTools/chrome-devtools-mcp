@@ -3,11 +3,14 @@
  * Copyright 2025 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
+import assert from 'node:assert';
 import {describe, it} from 'node:test';
-import assert from 'assert';
-import {TraceResult} from '../src/trace-processing/parse.js';
-import {withBrowser} from './utils.js';
+
 import sinon from 'sinon';
+
+import type {TraceResult} from '../src/trace-processing/parse.js';
+
+import {withBrowser} from './utils.js';
 
 describe('McpContext', () => {
   it('list pages', async () => {
@@ -68,7 +71,9 @@ describe('McpContext', () => {
       context.setNetworkConditions('Slow 3G');
       const stub = sinon.spy(context, 'getWaitForHelper');
 
-      await context.waitForEventsAfterAction(async () => {});
+      await context.waitForEventsAfterAction(async () => {
+        // trigger the waiting only
+      });
 
       sinon.assert.calledWithExactly(stub, page, 2, 10);
     });

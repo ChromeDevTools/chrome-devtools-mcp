@@ -4,18 +4,21 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type {Page} from 'puppeteer-core';
 import z from 'zod';
-import {Context, defineTool, Response} from './ToolDefinition.js';
+
+import {logger} from '../logger.js';
+import type {InsightName} from '../trace-processing/parse.js';
 import {
   getInsightOutput,
   getTraceSummary,
-  InsightName,
   parseRawTraceBuffer,
   traceResultIsSuccess,
 } from '../trace-processing/parse.js';
-import {logger} from '../logger.js';
-import {Page} from 'puppeteer-core';
+
 import {ToolCategories} from './categories.js';
+import type {Context, Response} from './ToolDefinition.js';
+import {defineTool} from './ToolDefinition.js';
 
 export const startTrace = defineTool({
   name: 'performance_start_trace',

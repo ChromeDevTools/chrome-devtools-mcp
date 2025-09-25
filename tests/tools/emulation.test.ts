@@ -3,8 +3,9 @@
  * Copyright 2025 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import {describe, it} from 'node:test';
 import assert from 'node:assert';
+import {describe, it} from 'node:test';
+
 import {emulateCpu, emulateNetwork} from '../../src/tools/emulation.js';
 import {withBrowser} from '../utils.js';
 

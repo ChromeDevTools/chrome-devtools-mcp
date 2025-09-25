@@ -3,13 +3,12 @@
  * Copyright 2025 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
+import assert from 'node:assert';
 import {describe, it} from 'node:test';
-import assert from 'assert';
 
 import {screenshot} from '../../src/tools/screenshot.js';
-
-import {withBrowser} from '../utils.js';
 import {screenshots} from '../snapshot.js';
+import {withBrowser} from '../utils.js';
 
 describe('screenshot', () => {
   describe('browser_take_screenshot', () => {

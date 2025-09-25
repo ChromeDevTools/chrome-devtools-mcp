@@ -3,12 +3,14 @@
  * Copyright 2025 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import {describe, it} from 'node:test';
 import assert from 'node:assert';
+import {describe, it} from 'node:test';
+
 import {
   getTraceSummary,
   parseRawTraceBuffer,
 } from '../../src/trace-processing/parse.js';
+
 import {loadTraceAsBuffer} from './fixtures/load.js';
 
 describe('Trace parsing', async () => {

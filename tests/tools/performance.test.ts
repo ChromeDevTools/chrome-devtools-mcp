@@ -3,8 +3,9 @@
  * Copyright 2025 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
+import assert from 'node:assert';
 import {describe, it, afterEach} from 'node:test';
-import assert from 'assert';
+
 import sinon from 'sinon';
 
 import {
@@ -12,13 +13,13 @@ import {
   startTrace,
   stopTrace,
 } from '../../src/tools/performance.js';
-import {withBrowser} from '../utils.js';
-import {loadTraceAsBuffer} from '../trace-processing/fixtures/load.js';
+import type {TraceResult} from '../../src/trace-processing/parse.js';
 import {
   parseRawTraceBuffer,
-  TraceResult,
   traceResultIsSuccess,
 } from '../../src/trace-processing/parse.js';
+import {loadTraceAsBuffer} from '../trace-processing/fixtures/load.js';
+import {withBrowser} from '../utils.js';
 
 describe('performance', () => {
   afterEach(() => {
@@ -83,8 +84,8 @@ describe('performance', () => {
         const startTracingStub = sinon.stub(selectedPage.tracing, 'start');
         const stopTracingStub = sinon
           .stub(selectedPage.tracing, 'stop')
-          .callsFake(async () => {
-            return rawData;
+          .callsFake(() => {
+            return Promise.resolve(rawData);
           });
 
         const clock = sinon.useFakeTimers();

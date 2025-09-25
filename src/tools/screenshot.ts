@@ -4,10 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type {ElementHandle, Page} from 'puppeteer-core';
 import z from 'zod';
-import {ElementHandle, Page} from 'puppeteer-core';
-import {defineTool} from './ToolDefinition.js';
+
 import {ToolCategories} from './categories.js';
+import {defineTool} from './ToolDefinition.js';
 
 export const screenshot = defineTool({
   name: 'take_screenshot',

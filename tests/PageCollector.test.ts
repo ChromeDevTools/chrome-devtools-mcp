@@ -3,10 +3,13 @@
  * Copyright 2025 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
+import assert from 'node:assert';
 import {describe, it} from 'node:test';
-import assert from 'assert';
-import {Browser, Frame, Page, PageEvents} from 'puppeteer-core';
+
+import type {Browser, Frame, Page, PageEvents} from 'puppeteer-core';
+
 import {PageCollector} from '../src/PageCollector.js';
+
 import {getMockRequest} from './utils.js';
 
 function getMockPage(): Page {
@@ -31,7 +34,9 @@ function getMockBrowser(): Browser {
     pages() {
       return Promise.resolve(pages);
     },
-    on(_type, _handler) {},
+    on(_type, _handler) {
+      // Mock
+    },
   } as Browser;
 }
 

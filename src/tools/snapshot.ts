@@ -4,10 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import z from 'zod';
-import {defineTool} from './ToolDefinition.js';
 import {Locator} from 'puppeteer-core';
+import z from 'zod';
+
 import {ToolCategories} from './categories.js';
+import {defineTool} from './ToolDefinition.js';
 
 export const takeSnapshot = defineTool({
   name: 'take_snapshot',

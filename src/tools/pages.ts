@@ -5,8 +5,9 @@
  */
 
 import z from 'zod';
-import {CLOSE_PAGE_ERROR, defineTool} from './ToolDefinition.js';
+
 import {ToolCategories} from './categories.js';
+import {CLOSE_PAGE_ERROR, defineTool} from './ToolDefinition.js';
 
 export const listPages = defineTool({
   name: 'list_pages',

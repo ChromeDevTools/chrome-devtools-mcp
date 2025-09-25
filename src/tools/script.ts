@@ -3,10 +3,11 @@
  * Copyright 2025 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import z from 'zod';
-import {defineTool} from './ToolDefinition.js';
-import {ToolCategories} from './categories.js';
 import type {JSHandle} from 'puppeteer-core';
+import z from 'zod';
+
+import {ToolCategories} from './categories.js';
+import {defineTool} from './ToolDefinition.js';
 
 export const evaluateScript = defineTool({
   name: 'evaluate_script',
@@ -45,7 +46,7 @@ Example with arguments: \`(el) => {
   handler: async (request, response, context) => {
     const page = context.getSelectedPage();
     const fn = await page.evaluateHandle(`(${request.params.function})`);
-    const args: JSHandle<unknown>[] = [fn];
+    const args: Array<JSHandle<unknown>> = [fn];
     try {
       for (const el of request.params.args ?? []) {
         args.push(await context.getElementByUid(el.uid));
@@ -64,7 +65,9 @@ Example with arguments: \`(el) => {
         response.appendResponseLine('```');
       });
     } finally {
-      Promise.allSettled(args.map(arg => arg.dispose())).catch(() => {});
+      Promise.allSettled(args.map(arg => arg.dispose())).catch(() => {
+        // Ignore errors
+      });
     }
   },
 });

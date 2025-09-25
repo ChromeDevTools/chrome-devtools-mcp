@@ -3,10 +3,10 @@
  * Copyright 2025 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
+import assert from 'node:assert';
+import fs from 'node:fs/promises';
+import path from 'node:path';
 import {describe, it} from 'node:test';
-import assert from 'assert';
-import fs from 'fs/promises';
-import path from 'path';
 
 import {
   click,
@@ -16,9 +16,8 @@ import {
   fillForm,
   uploadFile,
 } from '../../src/tools/input.js';
-
-import {html, withBrowser} from '../utils.js';
 import {serverHooks} from '../server.js';
+import {html, withBrowser} from '../utils.js';
 
 describe('input', () => {
   const server = serverHooks();

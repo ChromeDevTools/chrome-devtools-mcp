@@ -43,6 +43,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.35.0",
+    "@stylistic/eslint-plugin": "^5.4.0",
     "@types/debug": "^4.1.12",
     "@types/filesystem": "^0.0.36",
     "@types/node": "^24.3.3",
@@ -52,12 +53,14 @@
     "@typescript-eslint/parser": "^8.43.0",
     "chrome-devtools-frontend": "1.0.1516909",
     "eslint": "^9.35.0",
+    "eslint-plugin-import": "^2.32.0",
+    "eslint-import-resolver-typescript": "^4.4.4",
     "globals": "^16.4.0",
     "prettier": "^3.6.2",
     "puppeteer": "24.22.3",
     "sinon": "^21.0.0",
-    "typescript": "^5.9.2",
-    "typescript-eslint": "^8.43.0"
+    "typescript-eslint": "^8.43.0",
+    "typescript": "^5.9.2"
   },
   "engines": {
     "node": ">=22.12.0"

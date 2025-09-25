@@ -4,23 +4,25 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import assert from 'node:assert';
+import fs from 'node:fs';
+import path from 'node:path';
+
 import {McpServer} from '@modelcontextprotocol/sdk/server/mcp.js';
 import {StdioServerTransport} from '@modelcontextprotocol/sdk/server/stdio.js';
-import {
-  CallToolResult,
-  SetLevelRequestSchema,
-} from '@modelcontextprotocol/sdk/types.js';
+import type {CallToolResult} from '@modelcontextprotocol/sdk/types.js';
+import {SetLevelRequestSchema} from '@modelcontextprotocol/sdk/types.js';
 import yargs from 'yargs';
 import {hideBin} from 'yargs/helpers';
 
-import {McpResponse} from './McpResponse.js';
-import {McpContext} from './McpContext.js';
-
-import {ToolDefinition} from './tools/ToolDefinition.js';
+import type {Channel} from './browser.js';
+import {resolveBrowser} from './browser.js';
 import {logger, saveLogsToFile} from './logger.js';
-import {Channel, resolveBrowser} from './browser.js';
-import * as emulationTools from './tools/emulation.js';
+import {McpContext} from './McpContext.js';
+import {McpResponse} from './McpResponse.js';
+import {Mutex} from './Mutex.js';
 import * as consoleTools from './tools/console.js';
+import * as emulationTools from './tools/emulation.js';
 import * as inputTools from './tools/input.js';
 import * as networkTools from './tools/network.js';
 import * as pagesTools from './tools/pages.js';
@@ -28,11 +30,7 @@ import * as performanceTools from './tools/performance.js';
 import * as screenshotTools from './tools/screenshot.js';
 import * as scriptTools from './tools/script.js';
 import * as snapshotTools from './tools/snapshot.js';
-
-import path from 'node:path';
-import fs from 'node:fs';
-import assert from 'node:assert';
-import {Mutex} from './Mutex.js';
+import type {ToolDefinition} from './tools/ToolDefinition.js';
 
 export const cliOptions = {
   browserUrl: {

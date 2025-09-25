@@ -4,10 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type {ElementHandle} from 'puppeteer-core';
 import z from 'zod';
-import {defineTool} from './ToolDefinition.js';
-import {ElementHandle} from 'puppeteer-core';
+
 import {ToolCategories} from './categories.js';
+import {defineTool} from './ToolDefinition.js';
 
 export const click = defineTool({
   name: 'click',
@@ -43,7 +44,7 @@ export const click = defineTool({
       );
       response.setIncludeSnapshot(true);
     } finally {
-      handle.dispose();
+      void handle.dispose();
     }
   },
 });
@@ -72,7 +73,7 @@ export const hover = defineTool({
       response.appendResponseLine(`Successfully hovered over the element`);
       response.setIncludeSnapshot(true);
     } finally {
-      handle.dispose();
+      void handle.dispose();
     }
   },
 });
@@ -101,7 +102,7 @@ export const fill = defineTool({
       response.appendResponseLine(`Successfully filled out the element`);
       response.setIncludeSnapshot(true);
     } finally {
-      handle.dispose();
+      void handle.dispose();
     }
   },
 });
@@ -129,8 +130,8 @@ export const drag = defineTool({
       response.appendResponseLine(`Successfully dragged an element`);
       response.setIncludeSnapshot(true);
     } finally {
-      fromHandle.dispose();
-      toHandle.dispose();
+      void fromHandle.dispose();
+      void toHandle.dispose();
     }
   },
 });
@@ -160,7 +161,7 @@ export const fillForm = defineTool({
           await handle.asLocator().fill(element.value);
         });
       } finally {
-        handle.dispose();
+        void handle.dispose();
       }
     }
     response.appendResponseLine(`Successfully filled out the form`);
@@ -211,7 +212,7 @@ export const uploadFile = defineTool({
       response.setIncludeSnapshot(true);
       response.appendResponseLine(`File uploaded from ${filePath}.`);
     } finally {
-      handle.dispose();
+      void handle.dispose();
     }
   },
 });

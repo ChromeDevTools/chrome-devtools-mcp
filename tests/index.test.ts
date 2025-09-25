@@ -3,12 +3,12 @@
  * Copyright 2025 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import {Client} from '@modelcontextprotocol/sdk/client/index.js';
-import {StdioClientTransport} from '@modelcontextprotocol/sdk/client/stdio.js';
-import {describe, it} from 'node:test';
 import assert from 'node:assert';
 import fs from 'node:fs';
-import {ToolDefinition} from '../src/tools/ToolDefinition.js';
+import {describe, it} from 'node:test';
+
+import {Client} from '@modelcontextprotocol/sdk/client/index.js';
+import {StdioClientTransport} from '@modelcontextprotocol/sdk/client/stdio.js';
 import {executablePath} from 'puppeteer';
 
 describe('e2e', () => {
@@ -89,7 +89,7 @@ describe('e2e', () => {
           continue;
         }
         const fileTools = await import(`../src/tools/${file}`);
-        for (const maybeTool of Object.values(fileTools) as ToolDefinition[]) {
+        for (const maybeTool of Object.values(fileTools)) {
           if ('name' in maybeTool) {
             definedNames.push(maybeTool.name);
           }

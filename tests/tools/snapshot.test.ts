@@ -3,11 +3,11 @@
  * Copyright 2025 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
+import assert from 'node:assert';
 import {describe, it} from 'node:test';
-import assert from 'assert';
 
-import {html, withBrowser} from '../utils.js';
 import {takeSnapshot, waitFor} from '../../src/tools/snapshot.js';
+import {html, withBrowser} from '../utils.js';
 
 describe('snapshot', () => {
   describe('browser_snapshot', () => {
@@ -45,7 +45,7 @@ describe('snapshot', () => {
     });
     it('should work with element that show up later', async () => {
       await withBrowser(async (response, context) => {
-        const page = await context.getSelectedPage();
+        const page = context.getSelectedPage();
 
         const handlePromise = waitFor.handler(
           {
@@ -72,7 +72,7 @@ describe('snapshot', () => {
     });
     it('should work with aria elements', async () => {
       await withBrowser(async (response, context) => {
-        const page = await context.getSelectedPage();
+        const page = context.getSelectedPage();
 
         await page.setContent(
           html`<main><h1>Header</h1><div>Text</div></main>`,

@@ -3,13 +3,17 @@
  * Copyright 2025 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import {it} from 'node:test';
 import path from 'node:path';
+import {it} from 'node:test';
 
 if (!it.snapshot) {
   it.snapshot = {
-    setResolveSnapshotPath: () => {},
-    setDefaultSnapshotSerializers: () => {},
+    setResolveSnapshotPath: () => {
+      // Internally empty
+    },
+    setDefaultSnapshotSerializers: () => {
+      // Internally empty
+    },
   };
 }
 

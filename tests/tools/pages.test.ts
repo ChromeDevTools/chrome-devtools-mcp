@@ -3,8 +3,8 @@
  * Copyright 2025 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
+import assert from 'node:assert';
 import {describe, it} from 'node:test';
-import assert from 'assert';
 
 import {
   listPages,
@@ -16,7 +16,6 @@ import {
   resizePage,
   handleDialog,
 } from '../../src/tools/pages.js';
-
 import {withBrowser} from '../utils.js';
 
 describe('pages', () => {

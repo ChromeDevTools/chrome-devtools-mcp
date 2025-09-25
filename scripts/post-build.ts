@@ -4,8 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import * as fs from 'fs';
-import * as path from 'path';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+
 import tsConfig from '../tsconfig.json' with {type: 'json'};
 
 const BUILD_DIR = path.join(process.cwd(), 'build');

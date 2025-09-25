@@ -4,12 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import fs from 'node:fs';
+
 import {Client} from '@modelcontextprotocol/sdk/client/index.js';
 import {StdioClientTransport} from '@modelcontextprotocol/sdk/client/stdio.js';
 import type {Tool} from '@modelcontextprotocol/sdk/types.js';
-import {ToolCategories} from '../build/src/tools/categories.js';
+
 import {cliOptions} from '../build/src/main.js';
-import fs from 'fs';
+import {ToolCategories} from '../build/src/tools/categories.js';
 
 const MCP_SERVER_PATH = 'build/src/index.js';
 const OUTPUT_PATH = './docs/tool-reference.md';

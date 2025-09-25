@@ -4,13 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-export type PaginationOptions = {
+export interface PaginationOptions {
   pageSize?: number;
   pageIdx?: number;
-};
+}
 
-export type PaginationResult<TItem> = {
-  items: readonly TItem[];
+export interface PaginationResult<Item> {
+  items: readonly Item[];
   currentPage: number;
   totalPages: number;
   hasNextPage: boolean;
@@ -18,14 +18,14 @@ export type PaginationResult<TItem> = {
   startIndex: number;
   endIndex: number;
   invalidPage: boolean;
-};
+}
 
 const DEFAULT_PAGE_SIZE = 20;
 
-export function paginate<TItem>(
-  items: readonly TItem[],
+export function paginate<Item>(
+  items: readonly Item[],
   options?: PaginationOptions,
-): PaginationResult<TItem> {
+): PaginationResult<Item> {
   const total = items.length;
 
   if (!options || noPaginationOptions(options)) {
