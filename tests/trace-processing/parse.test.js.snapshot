@@ -4,7 +4,7 @@ Bounds: {min: 122410994891, max: 122416385853}
 CPU throttling: none
 Network throttling: none
 Metrics (lab / observed):
-  - LCP: 129 ms, event: (eventKey: r-6063, ts: 122411126100)
+  - LCP: 129 ms, event: (eventKey: r-6063, ts: 122411126100), nodeId: 7
   - LCP breakdown:
     - TTFB: 8 ms, bounds: {min: 122410996889, max: 122411004828}
     - Load delay: 33 ms, bounds: {min: 122411004828, max: 122411037986}

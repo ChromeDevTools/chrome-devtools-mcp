@@ -74,9 +74,11 @@ export async function parseRawTraceBuffer(
 }
 
 export function getTraceSummary(result: TraceResult): string {
-  const focus = AgentFocus.full(result.parsedTrace);
-  const serializer = new TraceEngine.EventsSerializer.EventsSerializer();
-  const formatter = new PerformanceTraceFormatter(focus, serializer);
+  const focus = AgentFocus.fromParsedTrace(result.parsedTrace);
+  const formatter = new PerformanceTraceFormatter(
+    focus,
+    PerformanceInsightFormatter.create,
+  );
   const output = formatter.formatTraceSummary();
   return output;
 }
@@ -122,7 +124,7 @@ export function getInsightOutput(
   }
 
   const formatter = new PerformanceInsightFormatter(
-    result.parsedTrace,
+    AgentFocus.fromParsedTrace(result.parsedTrace),
     matchingInsight,
   );
   return {output: formatter.formatInsight()};
