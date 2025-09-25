@@ -103,6 +103,30 @@ export const TimeUtilities = {
 
     return parts.map(part => part.value).join('');
   }
+};
+
+// TODO(jacktfranklin): once the ImageDelivery insight does not depend on this method, we can remove this stub.
+export const ByteUtilities = {
+  bytesToString(x) {
+    const separator = '\xA0';
+    const formatter = new Intl.NumberFormat('en-US', {
+      style: 'unit',
+      unit: 'kilobyte',
+      unitDisplay: 'narrow',
+      minimumFractionDigits: 1,
+      maximumFractionDigits: 1,
+    });
+    const parts = formatter.formatToParts(x / 1000);
+    for (const part of parts) {
+      if (part.type === 'literal') {
+        if (part.value === ' ') {
+          part.value = separator;
+        }
+      }
+    }
+
+    return parts.map(part => part.value).join('');
+  }
 };`;
   writeFile(i18nFile, i18nContent);
 
