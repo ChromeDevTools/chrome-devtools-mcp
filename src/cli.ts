@@ -51,8 +51,8 @@ export const cliOptions = {
   },
   logFile: {
     type: 'string' as const,
-    describe: 'Save the logs to file.',
-    hidden: true,
+    describe:
+      'Path to a file to write debug logs to. Set the env variable `DEBUG` to `*` to enable verbose logs. Useful for submitting bug reports.',
   },
 };
 

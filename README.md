@@ -201,6 +201,10 @@ The Chrome DevTools MCP server supports the following configuration option:
   - **Type:** string
   - **Choices:** `stable`, `canary`, `beta`, `dev`
 
+- **`--logFile`**
+  Path to a file to write debug logs to. Set the env variable `DEBUG` to `*` to enable verbose logs. Useful for submitting bug reports.
+  - **Type:** string
+
 <!-- END AUTO GENERATED OPTIONS -->
 
 Pass them via the `args` property in the JSON configuration. For example:
