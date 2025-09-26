@@ -73,11 +73,19 @@ export async function parseRawTraceBuffer(
   }
 }
 
+const extraFormatDescriptions = `Information on performance traces may contain main thread activity represented as call frames and network requests.
+
+${PerformanceTraceFormatter.callFrameDataFormatDescription}
+
+${PerformanceTraceFormatter.networkDataFormatDescription}
+`;
 export function getTraceSummary(result: TraceResult): string {
   const focus = AgentFocus.fromParsedTrace(result.parsedTrace);
   const formatter = new PerformanceTraceFormatter(focus);
   const output = formatter.formatTraceSummary();
-  return output;
+  return `${extraFormatDescriptions}
+
+${output}`;
 }
 
 export type InsightName = keyof TraceEngine.Insights.Types.InsightModels;
