@@ -261,7 +261,7 @@ export class McpContext implements Context {
 
   async getElementByUid(uid: string): Promise<ElementHandle<Element>> {
     if (!this.#textSnapshot?.idToNode.size) {
-      throw new Error('No snapshot found. Use browser_snapshot to capture one');
+      throw new Error('No snapshot found. Use take_snapshot to capture one');
     }
     const [snapshotId] = uid.split('_');
 
