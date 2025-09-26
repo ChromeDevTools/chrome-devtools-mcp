@@ -17,5 +17,8 @@ export const consoleTool = defineTool({
   schema: {},
   handler: async (_request, response) => {
     response.setIncludeConsoleData(true);
+    return (response as any).cleanedConsoleData ?? [];
+
+
   },
 });
