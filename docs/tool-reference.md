@@ -229,12 +229,12 @@
 
 ### `performance_start_trace`
 
-**Description:** Starts a performance trace recording on the selected page.
+**Description:** Starts a performance trace recording on the selected page. This can be used to look for performance problems and insights to improve the performance of the page. It will also report Core Web Vital (CWV) scores for the page.
 
 **Parameters:**
 
 - **autoStop** (boolean) **(required)**: Determines if the trace recording should be automatically stopped.
-- **reload** (boolean) **(required)**: Determines if, once tracing has started, the page should be automatically reloaded
+- **reload** (boolean) **(required)**: Determines if, once tracing has started, the page should be automatically reloaded.
 
 ---
 
