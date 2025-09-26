@@ -108,6 +108,7 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
       pipe: true,
       headless,
       args,
+      dumpio: true,
     });
     if (options.logFile) {
       // FIXME: we are probably subscribing too late to catch startup logs. We
