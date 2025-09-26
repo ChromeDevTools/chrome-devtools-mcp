@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import assert from 'node:assert';
+import {rm, stat, mkdir, chmod} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
 import {describe, it} from 'node:test';
 
 import {screenshot} from '../../src/tools/screenshot.js';
@@ -105,6 +108,103 @@ describe('screenshot', () => {
         assert.equal(
           response.responseLines.at(0),
           'Took a screenshot of node with uid "1_1".',
+        );
+      });
+    });
+
+    it('with filePath', async () => {
+      await withBrowser(async (response, context) => {
+        const filePath = join(tmpdir(), 'test-screenshot.png');
+        try {
+          const fixture = screenshots.basic;
+          const page = context.getSelectedPage();
+          await page.setContent(fixture.html);
+          await screenshot.handler(
+            {params: {format: 'png', filePath}},
+            response,
+            context,
+          );
+
+          assert.equal(response.images.length, 0);
+          assert.equal(
+            response.responseLines.at(0),
+            "Took a screenshot of the current page's viewport.",
+          );
+          assert.equal(
+            response.responseLines.at(1),
+            `Saved screenshot to ${filePath}.`,
+          );
+
+          const stats = await stat(filePath);
+          assert.ok(stats.isFile());
+          assert.ok(stats.size > 0);
+        } finally {
+          await rm(filePath, {force: true});
+        }
+      });
+    });
+
+    it('with unwritable filePath', async () => {
+      const dir = join(tmpdir(), 'readonly-dir-for-screenshot-test');
+      await mkdir(dir, {recursive: true});
+      await chmod(dir, 0o500);
+      const filePath = join(dir, 'test-screenshot.png');
+
+      try {
+        await withBrowser(async (response, context) => {
+          const fixture = screenshots.basic;
+          const page = context.getSelectedPage();
+          await page.setContent(fixture.html);
+          await screenshot.handler(
+            {params: {format: 'png', filePath}},
+            response,
+            context,
+          );
+
+          assert.equal(response.images.length, 0);
+          assert.equal(
+            response.responseLines.at(0),
+            "Took a screenshot of the current page's viewport.",
+          );
+          assert.ok(
+            response.responseLines
+              .at(1)
+              ?.startsWith(`Could not write screenshot to ${filePath}.`),
+            `Expected error message for unwritable path, but got: ${response.responseLines.at(
+              1,
+            )}`,
+          );
+        });
+      } finally {
+        await chmod(dir, 0o700);
+        await rm(dir, {recursive: true, force: true});
+      }
+    });
+
+    it('with malformed filePath', async () => {
+      await withBrowser(async (response, context) => {
+        const filePath = 'malformed\0path.png';
+        const fixture = screenshots.basic;
+        const page = context.getSelectedPage();
+        await page.setContent(fixture.html);
+        await screenshot.handler(
+          {params: {format: 'png', filePath}},
+          response,
+          context,
+        );
+
+        assert.equal(response.images.length, 0);
+        assert.equal(
+          response.responseLines.at(0),
+          "Took a screenshot of the current page's viewport.",
+        );
+        assert.ok(
+          response.responseLines
+            .at(1)
+            ?.startsWith(`Could not write screenshot to ${filePath}.`),
+          `Expected error message for malformed path, but got: ${response.responseLines.at(
+            1,
+          )}`,
         );
       });
     });
