@@ -75,10 +75,7 @@ export async function parseRawTraceBuffer(
 
 export function getTraceSummary(result: TraceResult): string {
   const focus = AgentFocus.fromParsedTrace(result.parsedTrace);
-  const formatter = new PerformanceTraceFormatter(
-    focus,
-    PerformanceInsightFormatter.create,
-  );
+  const formatter = new PerformanceTraceFormatter(focus);
   const output = formatter.formatTraceSummary();
   return output;
 }

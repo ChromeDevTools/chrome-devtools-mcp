@@ -6,7 +6,7 @@ This insight is used to analyze the time spent that contributed to the final LCP
 
 ## Detailed analysis:
 The Largest Contentful Paint (LCP) time for this navigation was 129 ms.
-The LCP element is an image fetched from https://web-dev.imgix.net/image/kheDArv5csY6rvQUJDbWRscckLr1/4i7JstVZvgTFk9dxCe4a.svg (eventKey: s-1314).
+The LCP element is an image fetched from https://web-dev.imgix.net/image/kheDArv5csY6rvQUJDbWRscckLr1/4i7JstVZvgTFk9dxCe4a.svg (eventKey: s-1314, ts: 122411037986).
 ## LCP resource network request: https://web-dev.imgix.net/image/kheDArv5csY6rvQUJDbWRscckLr1/4i7JstVZvgTFk9dxCe4a.svg
 eventKey: s-1314
 Timings:
