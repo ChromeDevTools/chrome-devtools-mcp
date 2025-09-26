@@ -22,7 +22,8 @@ import {defineTool} from './ToolDefinition.js';
 
 export const startTrace = defineTool({
   name: 'performance_start_trace',
-  description: 'Starts a performance trace recording on the selected page.',
+  description:
+    'Starts a performance trace recording on the selected page. This can be used to look for performance problems and insights to improve the performance of the page. It will also report Core Web Vital (CWV) scores for the page.',
   annotations: {
     category: ToolCategories.PERFORMANCE,
     readOnlyHint: true,
@@ -31,7 +32,7 @@ export const startTrace = defineTool({
     reload: z
       .boolean()
       .describe(
-        'Determines if, once tracing has started, the page should be automatically reloaded',
+        'Determines if, once tracing has started, the page should be automatically reloaded.',
       ),
     autoStop: z
       .boolean()
