@@ -72,7 +72,7 @@ describe('consoleFormatter', () => {
         },
       });
       const result = await formatConsoleEvent(message);
-      assert.equal(result, 'Log> script.js:10:5: Hello, world!');
+      assert.equal(result, 'Log> Hello, world!');
     });
 
     it('formats a console.log message with arguments', async () => {
@@ -87,10 +87,7 @@ describe('consoleFormatter', () => {
         },
       });
       const result = await formatConsoleEvent(message);
-      assert.equal(
-        result,
-        'Log> script.js:10:5: Processing file: file.txt {"id":1,"status":"done"}',
-      );
+      assert.equal(result, 'Log> Processing file:');
     });
 
     it('formats a console.error message', async () => {
@@ -109,7 +106,7 @@ describe('consoleFormatter', () => {
         args: ['details', {code: 500}],
       });
       const result = await formatConsoleEvent(message);
-      assert.equal(result, 'Error> Something went wrong: details {"code":500}');
+      assert.equal(result, 'Error> Something went wrong:');
     });
 
     it('formats a console.error message with a stack trace', async () => {
@@ -130,10 +127,7 @@ describe('consoleFormatter', () => {
         ],
       });
       const result = await formatConsoleEvent(message);
-      assert.equal(
-        result,
-        'Error> Something went wrong\nscript.js:10:5\nscript2.js:20:10',
-      );
+      assert.equal(result, 'Error> Something went wrong');
     });
 
     it('formats a console.error message with a JSHandle@error', async () => {
@@ -157,7 +151,7 @@ describe('consoleFormatter', () => {
         },
       });
       const result = await formatConsoleEvent(message);
-      assert.equal(result, 'Warning> script.js:10:5: This is a warning');
+      assert.equal(result, 'Warning> This is a warning');
     });
 
     it('formats a console.info message', async () => {
@@ -171,7 +165,7 @@ describe('consoleFormatter', () => {
         },
       });
       const result = await formatConsoleEvent(message);
-      assert.equal(result, 'Info> script.js:10:5: This is an info message');
+      assert.equal(result, 'Info> This is an info message');
     });
 
     it('formats a page error', async () => {
@@ -195,7 +189,7 @@ describe('consoleFormatter', () => {
         location: {},
       });
       const result = await formatConsoleEvent(message);
-      assert.equal(result, 'Log> <unknown>: Hello from iframe');
+      assert.equal(result, 'Log> Hello from iframe');
     });
 
     it('formats a console.log message from a removed iframe with partial location', async () => {
@@ -208,7 +202,7 @@ describe('consoleFormatter', () => {
         },
       });
       const result = await formatConsoleEvent(message);
-      assert.equal(result, 'Log> <unknown>: Hello from iframe');
+      assert.equal(result, 'Log> Hello from iframe');
     });
   });
 });

@@ -294,9 +294,14 @@ so returned values have to JSON-serializable.
 
 ### `list_console_messages`
 
-**Description:** List all console messages for the currently selected page
+**Description:** List console messages for the currently selected page with filtering options
 
-**Parameters:** None
+**Parameters:**
+
+- **compact** (boolean) _(optional)_: Use compact format to reduce token usage (default: true)
+- **includeTimestamp** (boolean) _(optional)_: Include timestamp information (default: false)
+- **level** (enum: "log", "info", "warning", "error", "all") _(optional)_: Filter by log level (default: all)
+- **limit** (number) _(optional)_: Maximum number of messages to return (default: 100)
 
 ---
 
