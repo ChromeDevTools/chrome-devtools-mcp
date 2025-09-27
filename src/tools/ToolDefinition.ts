@@ -46,7 +46,15 @@ export interface Response {
     value: boolean,
     options?: {pageSize?: number; pageIdx?: number; resourceTypes?: string[]},
   ): void;
-  setIncludeConsoleData(value: boolean): void;
+  setIncludeConsoleData(
+    value: boolean,
+    options?: {
+      level?: string;
+      limit?: number;
+      compact?: boolean;
+      includeTimestamp?: boolean;
+    },
+  ): void;
   setIncludeSnapshot(value: boolean): void;
   attachImage(value: ImageContentData): void;
   attachNetworkRequest(url: string): void;

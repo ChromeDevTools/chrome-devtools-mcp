@@ -21,20 +21,33 @@ const logLevels: Record<string, string> = {
 
 export async function formatConsoleEvent(
   event: ConsoleMessage | Error,
+  options?: {
+    compact?: boolean;
+    includeTimestamp?: boolean;
+  },
 ): Promise<string> {
   // Check if the event object has the .type() method, which is unique to ConsoleMessage
   if ('type' in event) {
-    return await formatConsoleMessage(event);
+    return await formatConsoleMessage(event, options);
   }
   return `Error: ${event.message}`;
 }
 
-async function formatConsoleMessage(msg: ConsoleMessage): Promise<string> {
+async function formatConsoleMessage(
+  msg: ConsoleMessage,
+  options?: {
+    compact?: boolean;
+    includeTimestamp?: boolean;
+  },
+): Promise<string> {
   const logLevel = logLevels[msg.type()];
   const args = msg.args();
+  const compact = options?.compact !== false; // Default to true
+  const includeTimestamp = options?.includeTimestamp || false;
 
   if (logLevel === 'Error') {
-    let message = `${logLevel}> `;
+    let message = compact ? 'Error> ' : `${logLevel}> `;
+
     if (msg.text() === 'JSHandle@error') {
       const errorHandle = args[0] as JSHandle<Error>;
       message += await errorHandle
@@ -42,36 +55,56 @@ async function formatConsoleMessage(msg: ConsoleMessage): Promise<string> {
           return error.toString();
         })
         .catch(() => {
-          return 'Error occured';
+          return 'Error occurred';
         });
       void errorHandle.dispose().catch();
 
-      const formattedArgs = await formatArgs(args.slice(1));
-      if (formattedArgs) {
-        message += ` ${formattedArgs}`;
+      if (!compact) {
+        const formattedArgs = await formatArgs(args.slice(1), compact);
+        if (formattedArgs) {
+          message += ` ${formattedArgs}`;
+        }
       }
     } else {
       message += msg.text();
-      const formattedArgs = await formatArgs(args);
-      if (formattedArgs) {
-        message += ` ${formattedArgs}`;
-      }
-      for (const frame of msg.stackTrace()) {
-        message += '\n' + formatStackFrame(frame);
+      if (!compact) {
+        const formattedArgs = await formatArgs(args, compact);
+        if (formattedArgs) {
+          message += ` ${formattedArgs}`;
+        }
+        // Only include stack trace in non-compact mode
+        for (const frame of msg.stackTrace()) {
+          message += '\n' + formatStackFrame(frame);
+        }
       }
     }
     return message;
   }
 
-  const formattedArgs = await formatArgs(args);
   const text = msg.text();
 
-  return `${logLevel}> ${formatStackFrame(
-    msg.location(),
-  )}: ${text} ${formattedArgs}`.trim();
+  if (compact) {
+    // Compact format: just the log level and text, no location/args
+    return `${logLevel}> ${text}`;
+  } else {
+    // Verbose format: include location and formatted args
+    const formattedArgs = await formatArgs(args, compact);
+    const locationInfo = includeTimestamp
+      ? formatStackFrame(msg.location())
+      : '';
+
+    return `${logLevel}> ${locationInfo}: ${text} ${formattedArgs}`.trim();
+  }
 }
 
-async function formatArgs(args: readonly JSHandle[]): Promise<string> {
+async function formatArgs(
+  args: readonly JSHandle[],
+  compact = true,
+): Promise<string> {
+  if (compact && args.length === 0) {
+    return '';
+  }
+
   const argValues = await Promise.all(
     args.map(arg =>
       arg.jsonValue().catch(() => {
@@ -82,8 +115,25 @@ async function formatArgs(args: readonly JSHandle[]): Promise<string> {
 
   return argValues
     .map(value => {
-      return typeof value === 'object' ? JSON.stringify(value) : String(value);
+      if (typeof value === 'object') {
+        if (compact) {
+          // In compact mode, simplify objects
+          if (Array.isArray(value)) {
+            return `[Array(${value.length})]`;
+          }
+          if (value === null) {
+            return 'null';
+          }
+          return '[Object]';
+        } else {
+          // In verbose mode, stringify with truncation
+          const json = JSON.stringify(value);
+          return json.length > 200 ? json.slice(0, 200) + '...' : json;
+        }
+      }
+      return String(value);
     })
+    .filter(Boolean)
     .join(' ');
 }
 

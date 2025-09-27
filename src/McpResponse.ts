@@ -25,6 +25,12 @@ export class McpResponse implements Response {
   #includeSnapshot = false;
   #attachedNetworkRequestUrl?: string;
   #includeConsoleData = false;
+  #consoleOptions?: {
+    level: string;
+    limit: number;
+    compact: boolean;
+    includeTimestamp: boolean;
+  };
   #textResponseLines: string[] = [];
   #formattedConsoleData?: string[];
   #images: ImageContentData[] = [];
@@ -68,8 +74,24 @@ export class McpResponse implements Response {
     };
   }
 
-  setIncludeConsoleData(value: boolean): void {
+  setIncludeConsoleData(
+    value: boolean,
+    options?: {
+      level?: string;
+      limit?: number;
+      compact?: boolean;
+      includeTimestamp?: boolean;
+    },
+  ): void {
     this.#includeConsoleData = value;
+    if (value && options) {
+      this.#consoleOptions = {
+        level: options.level || 'all',
+        limit: options.limit || 100,
+        compact: options.compact !== false,
+        includeTimestamp: options.includeTimestamp || false,
+      };
+    }
   }
 
   attachNetworkRequest(url: string): void {
@@ -129,8 +151,42 @@ export class McpResponse implements Response {
     if (this.#includeConsoleData) {
       const consoleMessages = context.getConsoleData();
       if (consoleMessages) {
+        let filteredMessages = consoleMessages;
+
+        // Filter by level if specified
+        if (
+          this.#consoleOptions?.level &&
+          this.#consoleOptions.level !== 'all'
+        ) {
+          filteredMessages = consoleMessages.filter(message => {
+            if ('type' in message) {
+              return message.type() === this.#consoleOptions!.level;
+            }
+            return this.#consoleOptions!.level === 'error';
+          });
+        }
+
+        // Apply limit
+        if (this.#consoleOptions?.limit) {
+          filteredMessages = filteredMessages.slice(
+            0,
+            this.#consoleOptions.limit,
+          );
+        }
+
+        // Remove duplicates
+        const uniqueMessages = new Map<string, (typeof filteredMessages)[0]>();
+        for (const message of filteredMessages) {
+          const key = 'type' in message ? message.text() : message.message;
+          if (!uniqueMessages.has(key)) {
+            uniqueMessages.set(key, message);
+          }
+        }
+
         formattedConsoleMessages = await Promise.all(
-          consoleMessages.map(message => formatConsoleEvent(message)),
+          Array.from(uniqueMessages.values()).map(message =>
+            formatConsoleEvent(message, this.#consoleOptions),
+          ),
         );
         this.#formattedConsoleData = formattedConsoleMessages;
       }
