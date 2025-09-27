@@ -22,6 +22,14 @@ export const screenshot = defineTool({
       .enum(['png', 'jpeg'])
       .default('png')
       .describe('Type of format to save the screenshot as. Default is "png"'),
+    quality: z
+      .number()
+      .min(0)
+      .max(100)
+      .optional()
+      .describe(
+        'Compression quality for JPEG format (0-100). Higher values mean better quality but larger file sizes. Ignored for PNG format.',
+      ),
     uid: z
       .string()
       .optional()
@@ -50,6 +58,8 @@ export const screenshot = defineTool({
     const screenshot = await pageOrHandle.screenshot({
       type: request.params.format,
       fullPage: request.params.fullPage,
+      quality: request.params.quality,
+      optimizeForSpeed: true, // Bonus: optimize encoding for speed
     });
 
     if (request.params.uid) {
