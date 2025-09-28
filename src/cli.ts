@@ -49,6 +49,12 @@ export const cliOptions = {
     choices: ['stable', 'canary', 'beta', 'dev'] as const,
     conflicts: ['browserUrl', 'executablePath'],
   },
+  loadExtension: {
+    type: 'string' as const,
+    description:
+      'Load an unpacked Chrome extension from the specified directory path.',
+    conflicts: 'browserUrl',
+  },
   logFile: {
     type: 'string' as const,
     describe:

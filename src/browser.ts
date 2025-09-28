@@ -63,11 +63,12 @@ interface McpLaunchOptions {
   userDataDir?: string;
   headless: boolean;
   isolated: boolean;
+  loadExtension?: string;
   logFile?: fs.WriteStream;
 }
 
 export async function launch(options: McpLaunchOptions): Promise<Browser> {
-  const {channel, executablePath, customDevTools, headless, isolated} = options;
+  const {channel, executablePath, customDevTools, headless, isolated, loadExtension} = options;
   const profileDirName =
     channel && channel !== 'stable'
       ? `chrome-profile-${channel}`
@@ -89,6 +90,10 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
   const args: LaunchOptions['args'] = ['--hide-crash-restore-bubble'];
   if (customDevTools) {
     args.push(`--custom-devtools-frontend=file://${customDevTools}`);
+  }
+  if (loadExtension) {
+    args.push(`--load-extension=${loadExtension}`);
+    args.push('--enable-experimental-extension-apis');
   }
   let puppeterChannel: ChromeReleaseChannel | undefined;
   if (!executablePath) {
@@ -151,6 +156,7 @@ export async function resolveBrowser(options: {
   channel?: Channel;
   headless: boolean;
   isolated: boolean;
+  loadExtension?: string;
   logFile?: fs.WriteStream;
 }) {
   const browser = options.browserUrl

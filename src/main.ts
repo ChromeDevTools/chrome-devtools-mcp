@@ -74,6 +74,7 @@ async function getContext(): Promise<McpContext> {
     customDevTools: args.customDevtools,
     channel: args.channel as Channel,
     isolated: args.isolated,
+    loadExtension: args.loadExtension,
     logFile,
   });
   if (context?.browser !== browser) {
