@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import './polyfill.js';
+
 import assert from 'node:assert';
 import fs from 'node:fs';
 import path from 'node:path';
