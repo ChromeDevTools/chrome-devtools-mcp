@@ -2,7 +2,7 @@
 
 [![npm chrome-devtools-mcp-for-extension package](https://img.shields.io/npm/v/chrome-devtools-mcp-for-extension.svg)](https://npmjs.org/package/chrome-devtools-mcp-for-extension)
 
-An MCP server that lets AI assistants control Chrome and develop Chrome extensions.
+An MCP server for Chrome extension development and automation.
 
 Based on [chrome-devtools-mcp](https://github.com/ChromeDevTools/chrome-devtools-mcp) by Google.
 
@@ -68,7 +68,7 @@ claude mcp add chrome-devtools-extension npx chrome-devtools-mcp-for-extension@l
 
 ### 3. Try your first command
 
-Tell your AI: "List all my Chrome extensions"
+Try: "List all my Chrome extensions"
 
 ## Features
 
@@ -82,7 +82,7 @@ Tell your AI: "List all my Chrome extensions"
 
 # 日本語 / Japanese
 
-**AI が Chrome を制御して Chrome 拡張機能を開発するための MCP サーバー**
+**Chrome 拡張機能開発用の MCP サーバー**
 
 ## クイックスタート
 
