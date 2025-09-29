@@ -78,6 +78,8 @@ async function getContext(): Promise<McpContext> {
     isolated: args.isolated,
     loadExtension: args.loadExtension as string | undefined,
     loadExtensionsDir: args.loadExtensionsDir as string | undefined,
+    loadSystemExtensions: args.loadSystemExtensions as boolean | undefined,
+    userDataDir: args.userDataDir as string | undefined,
     logFile,
   });
   if (context?.browser !== browser) {

@@ -22,9 +22,55 @@ import {
   detectAnySystemChromeProfile,
   isSandboxedEnvironment,
   logSystemProfileInfo,
+  type SystemChromeProfile,
 } from './system-profile.js';
 
 let browser: Browser | undefined;
+
+/**
+ * Sync bookmarks from system Chrome profile to automation profile
+ * This allows bookmarks to appear in the browser UI
+ */
+async function syncBookmarksFromSystemProfile(
+  targetUserDataDir: string,
+  systemProfile: SystemChromeProfile,
+): Promise<void> {
+  const sysBookmarks = path.join(systemProfile.path, 'Default', 'Bookmarks');
+  const targetDefault = path.join(targetUserDataDir, 'Default');
+  const targetBookmarks = path.join(targetDefault, 'Bookmarks');
+  const targetPrefs = path.join(targetDefault, 'Preferences');
+
+  try {
+    // Create Default profile directory
+    await fs.promises.mkdir(targetDefault, { recursive: true });
+
+    // 1) Copy Bookmarks file if it exists
+    if (fs.existsSync(sysBookmarks)) {
+      await fs.promises.copyFile(sysBookmarks, targetBookmarks);
+      console.error(`  📚 Copied bookmarks from system profile`);
+    }
+
+    // 2) Enable bookmark bar in Preferences
+    let prefs: any = {};
+    if (fs.existsSync(targetPrefs)) {
+      try {
+        const prefsContent = await fs.promises.readFile(targetPrefs, 'utf8');
+        prefs = JSON.parse(prefsContent);
+      } catch (e) {
+        // If parsing fails, start with empty prefs
+      }
+    }
+
+    // Ensure bookmark bar is visible
+    prefs.bookmark_bar = prefs.bookmark_bar || {};
+    prefs.bookmark_bar.show_on_all_tabs = true;
+
+    await fs.promises.writeFile(targetPrefs, JSON.stringify(prefs, null, 2));
+    console.error(`  ✅ Enabled bookmark bar display`);
+  } catch (error) {
+    console.error(`  ⚠️ Failed to sync bookmarks:`, error);
+  }
+}
 
 const ignoredPrefixes = new Set([
   'chrome://',
@@ -331,36 +377,31 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
   let usingSystemProfile = false;
 
   if (!isolated && !userDataDir) {
-    // Try to detect and use system Chrome profile first
+    // Use a separate profile for automation but sync bookmarks from system
+    userDataDir = path.join(
+      os.homedir(),
+      '.cache',
+      'chrome-devtools-mcp',
+      profileDirName,
+    );
+    await fs.promises.mkdir(userDataDir, {
+      recursive: true,
+    });
+
+    // Sync bookmarks from system Chrome profile if it exists
     const systemProfile = detectSystemChromeProfile(channel) || detectAnySystemChromeProfile();
-
     if (systemProfile) {
-      // Always use system profile if it exists, regardless of sandboxing
-      userDataDir = systemProfile.path;
-      usingSystemProfile = true;
-      console.error(`✅ Using system Chrome profile: ${systemProfile.channel} (${userDataDir})`);
-
-      if (isSandboxedEnvironment()) {
-        console.error(`⚠️  Note: Running in sandboxed environment`);
-      }
-    } else {
-      // Fallback to custom profile directory
-      userDataDir = path.join(
-        os.homedir(),
-        '.cache',
-        'chrome-devtools-mcp',
-        profileDirName,
-      );
-      await fs.promises.mkdir(userDataDir, {
-        recursive: true,
-      });
-      console.error(`📁 Using custom profile directory: ${userDataDir}`);
-      console.error(`⚠️  No system Chrome profile found - using isolated profile`);
-      logSystemProfileInfo();
+      await syncBookmarksFromSystemProfile(userDataDir, systemProfile);
+      console.error(`✅ Synced bookmarks from system Chrome profile: ${systemProfile.channel}`);
     }
+
+    console.error(`📁 Using automation profile: ${userDataDir}`);
   }
 
-  const args: LaunchOptions['args'] = ['--hide-crash-restore-bubble'];
+  const args: LaunchOptions['args'] = [
+    '--hide-crash-restore-bubble',
+    '--profile-directory=Default',  // Ensure we use the Default profile
+  ];
   if (customDevTools) {
     args.push(`--custom-devtools-frontend=file://${customDevTools}`);
   }
