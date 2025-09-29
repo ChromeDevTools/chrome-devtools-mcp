@@ -1,268 +1,217 @@
-# Chrome DevTools MCP
+# Chrome DevTools MCP for Extension Development
 
-[![npm chrome-devtools-mcp package](https://img.shields.io/npm/v/chrome-devtools-mcp.svg)](https://npmjs.org/package/chrome-devtools-mcp)
+[![npm chrome-devtools-mcp-for-extension package](https://img.shields.io/npm/v/chrome-devtools-mcp-for-extension.svg)](https://npmjs.org/package/chrome-devtools-mcp-for-extension)
 
-`chrome-devtools-mcp` lets your coding agent (such as Gemini, Claude, Cursor or Copilot)
-control and inspect a live Chrome browser. It acts as a Model-Context-Protocol
-(MCP) server, giving your AI coding assistant access to the full power of
-Chrome DevTools for reliable automation, in-depth debugging, and performance analysis.
+**An enhanced fork of [chrome-devtools-mcp](https://github.com/ChromeDevTools/chrome-devtools-mcp) with Chrome extension development superpowers.**
 
-## Key features
+This fork adds comprehensive Chrome extension development features to the original Chrome DevTools MCP by Google, enabling AI-powered extension development, testing, and automated Web Store submission.
 
-- **Get performance insights**: Uses [Chrome
-  DevTools](https://github.com/ChromeDevTools/devtools-frontend) to record
-  traces and extract actionable performance insights.
-- **Advanced browser debugging**: Analyze network requests, take screenshots and
-  check the browser console.
-- **Reliable automation**. Uses
-  [puppeteer](https://github.com/puppeteer/puppeteer) to automate actions in
-  Chrome and automatically wait for action results.
+---
 
-## Disclaimers
+**[chrome-devtools-mcp](https://github.com/ChromeDevTools/chrome-devtools-mcp) を拡張したChrome拡張機能開発用フォークです。**
 
-`chrome-devtools-mcp` exposes content of the browser instance to the MCP clients
-allowing them to inspect, debug, and modify any data in the browser or DevTools.
-Avoid sharing sensitive or personal information that you don't want to share with
-MCP clients.
+このフォークは、Google による元の Chrome DevTools MCP に Chrome 拡張機能の開発機能を追加し、AI 支援による拡張機能の開発、テスト、Web Store への自動申請を可能にします。
 
-## Requirements
+## 🚀 What's New in This Fork / このフォークの新機能
 
-- [Node.js 22.12.0](https://nodejs.org/) or newer.
-- [Chrome](https://www.google.com/chrome/) current stable version or newer.
-- [npm](https://www.npmjs.com/).
+### Added Features / 追加された機能
+- ✨ **Chrome Extension Support** - Load and debug unpacked extensions / 開発中の拡張機能のロードとデバッグ
+- 🤖 **Web Store Automation** - Automated submission process / Web Store への自動申請
+- 📸 **Screenshot Generation** - Auto-generate store screenshots / ストア用スクリーンショットの自動生成
+- 🔄 **Hot Reload** - Instant extension reloading / 拡張機能の即時リロード
+- 🐛 **Service Worker Debugging** - Direct background script access / バックグラウンドスクリプトへの直接アクセス
 
-## Getting started
+### Original Features (Preserved) / 元の機能（保持）
+- 📊 Performance insights via Chrome DevTools / Chrome DevTools によるパフォーマンス分析
+- 🔍 Advanced browser debugging / 高度なブラウザデバッグ
+- 🤖 Reliable automation with Puppeteer / Puppeteer による自動化
+- 🌐 Network analysis and screenshots / ネットワーク分析とスクリーンショット
 
-Add the following config to your MCP client:
+## 📦 Installation / インストール
 
+```bash
+npm install -g chrome-devtools-mcp-for-extension
+```
+
+## 🎯 Quick Start / クイックスタート
+
+### 1. Install with Claude Code / Claude Code でインストール
+
+```bash
+claude mcp add chrome-devtools-extension npx chrome-devtools-mcp-for-extension@latest
+```
+
+This automatically creates the configuration in `~/.claude/config.json`
+このコマンドで `~/.claude/config.json` に自動的に設定が作成されます
+
+<details>
+<summary>For other MCP clients (manual configuration) / 他のMCPクライアント用（手動設定）</summary>
+
+**Configuration file locations / 設定ファイルの場所:**
+
+- **Cursor**: `~/.cursor/extensions_config.json`
+- **VS Code Copilot**: `.vscode/settings.json`
+- **Cline**: Follow Cline's MCP setup guide
+
+**JSON configuration / JSON設定:**
 ```json
 {
   "mcpServers": {
-    "chrome-devtools": {
+    "chrome-devtools-extension": {
       "command": "npx",
-      "args": ["chrome-devtools-mcp@latest"]
+      "args": ["chrome-devtools-mcp-for-extension@latest"]
     }
   }
 }
 ```
 
-> [!NOTE]  
-> Using `chrome-devtools-mcp@latest` ensures that your MCP client will always use the latest version of the Chrome DevTools MCP server.
-
-### MCP Client configuration
-
-<details>
-  <summary>Claude Code</summary>
-    Use the Claude Code CLI to add the Chrome DevTools MCP server (<a href="https://docs.anthropic.com/en/docs/claude-code/mcp">guide</a>):
-
-```bash
-claude mcp add chrome-devtools npx chrome-devtools-mcp@latest
-```
-
-</details>
-
-<details>
-  <summary>Cline</summary>
-  Follow https://docs.cline.bot/mcp/configuring-mcp-servers and use the config provided above.
-</details>
-
-<details>
-  <summary>Codex</summary>
-  Follow the <a href="https://github.com/openai/codex/blob/main/docs/advanced.md#model-context-protocol-mcp">configure MCP guide</a>
-  using the standard config from above. You can also install the Chrome DevTools MCP server using the Codex CLI:
-
-```bash
-codex mcp add chrome-devtools -- npx chrome-devtools-mcp@latest
-```
-
-</details>
-
-<details>
-  <summary>Copilot / VS Code</summary>
-  Follow the MCP install <a href="https://code.visualstudio.com/docs/copilot/chat/mcp-servers#_add-an-mcp-server">guide</a>,
-  with the standard config from above. You can also install the Chrome DevTools MCP server using the VS Code CLI:
-  
-  ```bash
-  code --add-mcp '{"name":"chrome-devtools","command":"npx","args":["chrome-devtools-mcp@latest"]}'
-  ```
-</details>
-
-<details>
-  <summary>Cursor</summary>
-
-**Click the button to install:**
-
-[<img src="https://cursor.com/deeplink/mcp-install-dark.svg" alt="Install in Cursor">](https://cursor.com/en/install-mcp?name=chrome-devtools&config=eyJjb21tYW5kIjoibnB4IGNocm9tZS1kZXZ0b29scy1tY3BAbGF0ZXN0In0%3D)
-
-**Or install manually:**
-
-Go to `Cursor Settings` -> `MCP` -> `New MCP Server`. Use the config provided above.
-
-</details>
-
-<details>
-  <summary>Gemini CLI</summary>
-Install the Chrome DevTools MCP server using the Gemini CLI.
-
-**Project wide:**
-
-```bash
-gemini mcp add chrome-devtools npx chrome-devtools-mcp@latest
-```
-
-**Globally:**
-
-```bash
-gemini mcp add -s user chrome-devtools npx chrome-devtools-mcp@latest
-```
-
-Alternatively, follow the <a href="https://github.com/google-gemini/gemini-cli/blob/main/docs/tools/mcp-server.md#how-to-set-up-your-mcp-server">MCP guide</a> and use the standard config from above.
-
-</details>
-
-<details>
-  <summary>Gemini Code Assist</summary>
-  Follow the <a href="https://cloud.google.com/gemini/docs/codeassist/use-agentic-chat-pair-programmer#configure-mcp-servers">configure MCP guide</a>
-  using the standard config from above.
-</details>
-
-<details>
-  <summary>JetBrains AI Assistant & Junie</summary>
-
-Go to `Settings | Tools | AI Assistant | Model Context Protocol (MCP)` -> `Add`. Use the config provided above.
-The same way chrome-devtools-mcp can be configured for JetBrains Junie in `Settings | Tools | Junie | MCP Settings` -> `Add`. Use the config provided above.
-
-</details>
-
-### Your first prompt
-
-Enter the following prompt in your MCP Client to check if everything is working:
-
-```
-Check the performance of https://developers.chrome.com
-```
-
-Your MCP client should open the browser and record a performance trace.
-
-> [!NOTE]  
-> The MCP server will start the browser automatically once the MCP client uses a tool that requires a running browser instance. Connecting to the Chrome DevTools MCP server on its own will not automatically start the browser.
-
-## Tools
-
-<!-- BEGIN AUTO GENERATED TOOLS -->
-
-- **Input automation** (7 tools)
-  - [`click`](docs/tool-reference.md#click)
-  - [`drag`](docs/tool-reference.md#drag)
-  - [`fill`](docs/tool-reference.md#fill)
-  - [`fill_form`](docs/tool-reference.md#fill_form)
-  - [`handle_dialog`](docs/tool-reference.md#handle_dialog)
-  - [`hover`](docs/tool-reference.md#hover)
-  - [`upload_file`](docs/tool-reference.md#upload_file)
-- **Navigation automation** (7 tools)
-  - [`close_page`](docs/tool-reference.md#close_page)
-  - [`list_pages`](docs/tool-reference.md#list_pages)
-  - [`navigate_page`](docs/tool-reference.md#navigate_page)
-  - [`navigate_page_history`](docs/tool-reference.md#navigate_page_history)
-  - [`new_page`](docs/tool-reference.md#new_page)
-  - [`select_page`](docs/tool-reference.md#select_page)
-  - [`wait_for`](docs/tool-reference.md#wait_for)
-- **Emulation** (3 tools)
-  - [`emulate_cpu`](docs/tool-reference.md#emulate_cpu)
-  - [`emulate_network`](docs/tool-reference.md#emulate_network)
-  - [`resize_page`](docs/tool-reference.md#resize_page)
-- **Performance** (3 tools)
-  - [`performance_analyze_insight`](docs/tool-reference.md#performance_analyze_insight)
-  - [`performance_start_trace`](docs/tool-reference.md#performance_start_trace)
-  - [`performance_stop_trace`](docs/tool-reference.md#performance_stop_trace)
-- **Network** (2 tools)
-  - [`get_network_request`](docs/tool-reference.md#get_network_request)
-  - [`list_network_requests`](docs/tool-reference.md#list_network_requests)
-- **Debugging** (4 tools)
-  - [`evaluate_script`](docs/tool-reference.md#evaluate_script)
-  - [`list_console_messages`](docs/tool-reference.md#list_console_messages)
-  - [`take_screenshot`](docs/tool-reference.md#take_screenshot)
-  - [`take_snapshot`](docs/tool-reference.md#take_snapshot)
-
-<!-- END AUTO GENERATED TOOLS -->
-
-## Configuration
-
-The Chrome DevTools MCP server supports the following configuration option:
-
-<!-- BEGIN AUTO GENERATED OPTIONS -->
-
-- **`--browserUrl`, `-u`**
-  Connect to a running Chrome instance using port forwarding. For more details see: https://developer.chrome.com/docs/devtools/remote-debugging/local-server.
-  - **Type:** string
-
-- **`--headless`**
-  Whether to run in headless (no UI) mode.
-  - **Type:** boolean
-  - **Default:** `false`
-
-- **`--executablePath`, `-e`**
-  Path to custom Chrome executable.
-  - **Type:** string
-
-- **`--isolated`**
-  If specified, creates a temporary user-data-dir that is automatically cleaned up after the browser is closed.
-  - **Type:** boolean
-  - **Default:** `false`
-
-- **`--channel`**
-  Specify a different Chrome channel that should be used. The default is the stable channel version.
-  - **Type:** string
-  - **Choices:** `stable`, `canary`, `beta`, `dev`
-
-- **`--logFile`**
-  Path to a file to write debug logs to. Set the env variable `DEBUG` to `*` to enable verbose logs. Useful for submitting bug reports.
-  - **Type:** string
-
-<!-- END AUTO GENERATED OPTIONS -->
-
-Pass them via the `args` property in the JSON configuration. For example:
-
+**With extension loading / 拡張機能ロード付き:**
 ```json
 {
   "mcpServers": {
-    "chrome-devtools": {
+    "chrome-devtools-extension": {
       "command": "npx",
       "args": [
-        "chrome-devtools-mcp@latest",
-        "--channel=canary",
-        "--headless=true",
-        "--isolated=true"
+        "chrome-devtools-mcp-for-extension@latest",
+        "--loadExtension=/path/to/your/extension"
       ]
     }
   }
 }
 ```
+</details>
 
-You can also run `npx chrome-devtools-mcp@latest --help` to see all available configuration options.
+### 2. Restart Claude Code / Claude Code を再起動
 
-## Concepts
+### 3. Try your first command / 最初のコマンドを試す
 
-### User data directory
+Tell your AI / AI に指示:
+- English: "List all my Chrome extensions"
+- 日本語: "Chrome の全拡張機能をリストして"
 
-`chrome-devtools-mcp` starts a Chrome's stable channel instance using the following user
-data directory:
+## 🛠 Extension Development Tools / 拡張機能開発ツール
 
-- Linux / MacOS: `$HOME/.cache/chrome-devtools-mcp/chrome-profile-$CHANNEL`
-- Window: `%HOMEPATH%/.cache/chrome-devtools-mcp/chrome-profile-$CHANNEL`
+### Exclusive to this fork / このフォーク専用
 
-The user data directory is not cleared between runs and shared across
-all instances of `chrome-devtools-mcp`. Set the `isolated` option to `true`
-to use a temporary user data dir instead which will be cleared automatically after
-the browser is closed.
+| Tool / ツール | Description / 説明 |
+|--------------|-------------------|
+| `list_extensions` | List all installed extensions / インストール済み拡張機能一覧 |
+| `reload_extension` | Reload extension after changes / 変更後の拡張機能リロード |
+| `inspect_service_worker` | Debug background scripts / バックグラウンドスクリプトのデバッグ |
+| `submit_to_webstore` | Automate Web Store submission / Web Store 申請の自動化 |
+| `generate_extension_screenshots` | Create store screenshots / ストア用スクリーンショット生成 |
 
-## Known limitations
+### From original project / 元プロジェクトから
 
-### Operating system sandboxes
+- **Navigation**: navigate_page, new_page, close_page, list_pages
+- **Interaction**: click, fill, fill_form, drag, hover
+- **Debugging**: take_screenshot, evaluate_script, list_console_messages
+- **Performance**: performance_start_trace, performance_analyze_insight
+- **Network**: list_network_requests, get_network_request
 
-Some MCP clients allow sandboxing the MCP server using macOS Seatbelt or Linux
-containers. If sandboxes are enabled, `chrome-devtools-mcp` is not able to start
-Chrome that requires permissions to create its own sandboxes. As a workaround,
-either disable sandboxing for `chrome-devtools-mcp` in your MCP client or use
-`--connect-url` to connect to a Chrome instance that you start manually outside
-of the MCP client sandbox.
+## 💡 Use Cases / 使用例
+
+### Extension Development / 拡張機能開発
+```
+"Create a Chrome extension that blocks ads"
+"Chrome の広告ブロック拡張機能を作成して"
+
+"Debug why my content script isn't working"
+"コンテンツスクリプトが動かない原因をデバッグして"
+
+"Submit my extension to Chrome Web Store"
+"拡張機能を Chrome Web Store に申請して"
+```
+
+### Testing & QA / テストと品質保証
+```
+"Test my extension on Google.com"
+"Google.com で拡張機能をテストして"
+
+"Generate screenshots for store listing"
+"ストア掲載用のスクリーンショットを生成して"
+
+"Check console errors from my extension"
+"拡張機能のコンソールエラーを確認して"
+```
+
+## 📋 Chrome Web Store Automation / Web Store 自動化
+
+This fork automates the entire submission process:
+このフォークは申請プロセス全体を自動化します：
+
+1. **Manifest Validation** - Check V3 compliance / Manifest V3 準拠チェック
+2. **Package Creation** - Optimized ZIP generation / 最適化された ZIP 生成
+3. **Screenshot Generation** - All required sizes / 必要な全サイズ
+4. **Form Filling** - Automated dashboard navigation / ダッシュボードの自動操作
+5. **Submission** - Complete the process / プロセスの完了
+
+### Generated Screenshots / 生成されるスクリーンショット
+- 1280x800 - Main screenshots / メインスクリーンショット
+- 440x280 - Small promotional tile / 小プロモーションタイル
+- 920x680 - Large promotional tile / 大プロモーションタイル
+- 1400x560 - Marquee image / マーキー画像
+
+## ⚙️ Configuration Options / 設定オプション
+
+### Extension-specific (New) / 拡張機能専用（新規）
+- `--loadExtension` - Path to extension / 拡張機能のパス
+- `--loadSystemExtensions` - Use system extensions / システムの拡張機能を使用
+
+### Browser options (Original) / ブラウザオプション（元から）
+- `--headless` - Headless mode / ヘッドレスモード
+- `--channel` - Chrome channel (stable, canary, beta, dev)
+- `--isolated` - Temporary profile / 一時プロファイル
+- `--browserUrl` - Connect to existing Chrome / 既存の Chrome に接続
+
+## 📖 Documentation / ドキュメント
+
+- [MCP Setup Guide / MCP 設定ガイド](./MCP_SETUP.md)
+- [Tool Reference / ツールリファレンス](./docs/tool-reference.md)
+- [Original Documentation / 元のドキュメント](https://github.com/ChromeDevTools/chrome-devtools-mcp)
+
+## 🤝 Compatibility / 互換性
+
+Works with / 対応:
+- **Claude Code** (recommended / 推奨)
+- Cursor
+- VS Code Copilot
+- Cline
+- Any MCP-compatible client / MCP 対応クライアント
+
+## ⚠️ Important Notes / 重要な注意事項
+
+1. **Security**: Extension code access is exposed to AI / セキュリティ: 拡張機能コードは AI に公開されます
+2. **Headless limitations**: Some extensions require UI / ヘッドレス制限: 一部の拡張機能は UI が必要
+3. **Manifest V3**: Required for Web Store / Manifest V3: Web Store に必要
+
+## 🙏 Credits / クレジット
+
+This is a fork of [chrome-devtools-mcp](https://github.com/ChromeDevTools/chrome-devtools-mcp) by Google LLC.
+
+このプロジェクトは Google LLC による [chrome-devtools-mcp](https://github.com/ChromeDevTools/chrome-devtools-mcp) のフォークです。
+
+### Original Project Team / 元プロジェクトチーム
+Thank you to the Chrome DevTools team for creating the excellent foundation that made this extension-focused fork possible.
+
+Chrome DevTools チームが作成した優れた基盤に感謝します。これにより、この拡張機能に特化したフォークが可能になりました。
+
+### This Fork / このフォーク
+Enhanced with Chrome extension development features by [usedhonda](https://github.com/usedhonda).
+
+[usedhonda](https://github.com/usedhonda) により Chrome 拡張機能開発機能が追加されました。
+
+## 📄 License / ライセンス
+
+Apache-2.0 (Same as original / 元プロジェクトと同じ)
+
+## 🔗 Links / リンク
+
+- **This Fork / このフォーク**: [GitHub](https://github.com/usedhonda/chrome-devtools-mcp) | [npm](https://www.npmjs.com/package/chrome-devtools-mcp-for-extension)
+- **Original / オリジナル**: [GitHub](https://github.com/ChromeDevTools/chrome-devtools-mcp) | [npm](https://www.npmjs.com/package/chrome-devtools-mcp)
+- **Issues / 問題報告**: [Report here / こちらから](https://github.com/usedhonda/chrome-devtools-mcp/issues)
+
+---
+
+**For Chrome extension developers, by Chrome extension developers.**
+**Chrome 拡張機能開発者のために、Chrome 拡張機能開発者によって作られました。**

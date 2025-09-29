@@ -2,26 +2,17 @@
 
 We'd love to accept your patches and contributions to this project.
 
+This is a fork of [chrome-devtools-mcp](https://github.com/ChromeDevTools/chrome-devtools-mcp) by Google, enhanced with Chrome extension development features.
+
 ## Before you begin
 
-### Sign our Contributor License Agreement
+### Contributing Guidelines
 
-Contributions to this project must be accompanied by a
-[Contributor License Agreement](https://cla.developers.google.com/about) (CLA).
-You (or your employer) retain the copyright to your contribution; this simply
-gives us permission to use and redistribute your contributions as part of the
-project.
+This fork focuses on Chrome extension development features. When contributing:
 
-If you or your current employer have already signed the Google CLA (even if it
-was for a different project), you probably don't need to do it again.
-
-Visit <https://cla.developers.google.com/> to see your current agreements or to
-sign a new one.
-
-### Review our community guidelines
-
-This project follows
-[Google's Open Source Community Guidelines](https://opensource.google/conduct/).
+- Ensure changes maintain compatibility with the original Chrome DevTools MCP functionality
+- New features should enhance Chrome extension development workflow
+- Follow the same coding standards as the original project
 
 ## Contribution process
 
@@ -40,7 +31,7 @@ for PR and commit titles.
 ## Installation
 
 ```sh
-git clone https://github.com/ChromeDevTools/chrome-devtools-mcp.git
+git clone https://github.com/usedhonda/chrome-devtools-mcp.git
 cd chrome-devtools-mcp
 npm ci
 npm run build
@@ -59,7 +50,7 @@ Add the MCP server to your client's config.
 ```json
 {
   "mcpServers": {
-    "chrome-devtools": {
+    "chrome-devtools-extension": {
       "command": "node",
       "args": ["/path-to/build/src/index.js"]
     }
