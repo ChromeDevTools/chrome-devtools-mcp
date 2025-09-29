@@ -442,7 +442,7 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
   console.error(`  Profile Type: ${usingSystemProfile ? 'System Profile (auto-detected)' : 'Custom Profile'}`);
   console.error(`  Headless: ${headless}`);
   console.error(`  Args: ${JSON.stringify(args, null, 2)}`);
-  console.error(`  Ignored Default Args: ${extensionPaths.length > 0 ? '["--disable-extensions"]' : 'none'}`);
+  console.error(`  Ignored Default Args: ["--disable-extensions", "--enable-automation"]`);
 
   try {
     const browser = await puppeteer.launch({
@@ -454,8 +454,7 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
       pipe: true,
       headless,
       args,
-      ignoreDefaultArgs:
-        extensionPaths.length > 0 ? ['--disable-extensions', '--enable-automation'] : ['--enable-automation'],
+      ignoreDefaultArgs: ['--disable-extensions', '--enable-automation'],
     });
     if (options.logFile) {
       // FIXME: we are probably subscribing too late to catch startup logs. We
