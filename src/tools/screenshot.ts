@@ -5,6 +5,7 @@
  */
 
 import {writeFile} from 'node:fs/promises';
+
 import type {ElementHandle, Page} from 'puppeteer-core';
 import z from 'zod';
 
