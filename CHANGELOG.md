@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.1](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.5.0...chrome-devtools-mcp-v0.5.1) (2025-09-29)
+
+
+### Bug Fixes
+
+* update package.json engines to reflect node20 support ([#210](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/210)) ([b31e647](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/b31e64713e0524f28cbf760fad27b25829ec419d))
+
 ## [0.5.0](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.4.0...chrome-devtools-mcp-v0.5.0) (2025-09-29)
 
 
