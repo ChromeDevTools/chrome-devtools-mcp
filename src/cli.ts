@@ -21,36 +21,8 @@ function getDefaultUserDataDir(): string {
 }
 
 function getDefaultExtensionsDir(): string | undefined {
-  const currentDir = process.cwd();
-  const extensionsDir = path.join(currentDir, 'extensions');
-
-  // Check if extensions directory exists and has valid extensions
-  if (fs.existsSync(extensionsDir)) {
-    try {
-      const entries = fs.readdirSync(extensionsDir, { withFileTypes: true });
-      const hasValidExtensions = entries.some(entry => {
-        if (entry.isDirectory()) {
-          const manifestPath = path.join(extensionsDir, entry.name, 'manifest.json');
-          if (fs.existsSync(manifestPath)) {
-            try {
-              const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
-              return manifest.manifest_version;
-            } catch {
-              return false;
-            }
-          }
-        }
-        return false;
-      });
-
-      if (hasValidExtensions) {
-        return extensionsDir;
-      }
-    } catch {
-      // Ignore errors and return undefined
-    }
-  }
-
+  // Disabled automatic detection of ./extensions folder
+  // Users should explicitly use --loadExtension or --loadExtensionsDir flags
   return undefined;
 }
 
