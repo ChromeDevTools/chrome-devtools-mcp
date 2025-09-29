@@ -21,6 +21,28 @@ This fork significantly restructures the original Chrome DevTools MCP for extens
 - **Web Store Automation**: 2 tools for automated submission and screenshot generation
 - **Focus**: Extension-specific operations added to comprehensive browser automation
 
+### Chrome Security & Technical Challenges Solved
+
+#### Extension Loading Security Restrictions
+Chrome's security model makes automated extension loading complex for legitimate development:
+
+- **Chrome 137+ Policy Changes**: Google disabled `--load-extension` by default in automation contexts
+- **Solution**: Added `--disable-features=DisableLoadExtensionCommandLineSwitch` flag bypass
+- **Automation Detection**: Chrome blocks many operations when detecting automated control
+- **Solution**: `--disable-blink-features=AutomationControlled` for real-world testing scenarios
+
+#### Puppeteer Integration Challenges
+- **Default Args Conflict**: Puppeteer's `--disable-extensions` conflicts with extension loading
+- **Solution**: Selective `ignoreDefaultArgs` removal only when extensions are present
+- **Profile Management**: System profile access vs. temporary profile isolation
+- **Solution**: Automatic fallback to temporary profiles when system profile conflicts occur
+
+#### Manifest Discovery & Validation
+- **Build System Variations**: Extensions may be in `/dist`, `/build`, `/extension` subdirectories
+- **Solution**: Intelligent manifest.json discovery across common build patterns
+- **Manifest V3 Compliance**: Strict validation for Web Store compatibility
+- **Solution**: Comprehensive validation with actionable security warnings
+
 ### New Automation Tools
 - `webstore-submission.ts`: Full Chrome Web Store submission automation
 - `webstore-auto-screenshot.ts`: Multi-format screenshot generation for store listings
