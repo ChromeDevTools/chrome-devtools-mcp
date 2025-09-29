@@ -28,15 +28,15 @@ claude mcp add chrome-devtools-extension npx chrome-devtools-mcp-for-extension@l
 ```
 
 <details>
-<summary>Configuration file locations / 設定ファイルの場所</summary>
+<summary>Configuration file locations</summary>
 
-**Configuration file locations / 設定ファイルの場所:**
+**Configuration file locations:**
 
 - **Cursor**: `~/.cursor/extensions_config.json`
 - **VS Code Copilot**: `.vscode/settings.json`
 - **Cline**: Follow Cline's MCP setup guide
 
-**JSON configuration / JSON設定:**
+**JSON configuration:**
 ```json
 {
   "mcpServers": {
@@ -48,7 +48,7 @@ claude mcp add chrome-devtools-extension npx chrome-devtools-mcp-for-extension@l
 }
 ```
 
-**With extension loading / 拡張機能ロード付き:**
+**With extension loading:**
 ```json
 {
   "mcpServers": {
@@ -64,9 +64,9 @@ claude mcp add chrome-devtools-extension npx chrome-devtools-mcp-for-extension@l
 ```
 </details>
 
-### 2. Restart Claude Code / Claude Code を再起動
+### 2. Restart Claude Code
 
-### 3. Try your first command / 最初のコマンドを試す
+### 3. Try your first command
 
 Tell your AI: "List all my Chrome extensions"
 
