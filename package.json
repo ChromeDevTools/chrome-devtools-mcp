@@ -37,6 +37,7 @@
   "mcpName": "io.github.ChromeDevTools/chrome-devtools-mcp",
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.18.1",
+    "archiver": "^7.0.1",
     "debug": "4.4.3",
     "puppeteer-core": "24.22.3",
     "yargs": "18.0.0"
@@ -44,6 +45,7 @@
   "devDependencies": {
     "@eslint/js": "^9.35.0",
     "@stylistic/eslint-plugin": "^5.4.0",
+    "@types/archiver": "^6.0.2",
     "@types/debug": "^4.1.12",
     "@types/filesystem": "^0.0.36",
     "@types/node": "^24.3.3",
