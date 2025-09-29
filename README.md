@@ -75,6 +75,23 @@ claude mcp add chrome-devtools npx chrome-devtools-mcp@latest
 codex mcp add chrome-devtools -- npx chrome-devtools-mcp@latest
 ```
 
+**On Windows 11**
+
+Configure the Chrome install location and increase the startup timeout by updating `.codex/config.toml` and adding the following `env` and `startup_timeout_ms` parameters:
+
+```
+[mcp_servers.chrome-devtools]
+command = "cmd"
+args = [
+    "/c",
+    "npx",
+    "-y",
+    "chrome-devtools-mcp@latest",
+]
+env = { SystemRoot="C:\\Windows", PROGRAMFILES="C:\\Program Files" }
+startup_timeout_ms = 20_000
+```
+
 </details>
 
 <details>
