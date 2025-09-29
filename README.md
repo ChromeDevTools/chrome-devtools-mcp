@@ -66,6 +66,21 @@ claude mcp add chrome-devtools-extension npx chrome-devtools-mcp-for-extension@l
   }
 }
 ```
+
+**Debug mode:**
+```json
+{
+  "mcpServers": {
+    "chrome-devtools-extension": {
+      "command": "npx",
+      "args": ["chrome-devtools-mcp-for-extension@latest"],
+      "env": {
+        "DEBUG": "mcp:*"
+      }
+    }
+  }
+}
+```
 </details>
 
 ---
@@ -230,44 +245,6 @@ claude mcp add chrome-devtools-extension npx chrome-devtools-mcp-for-extension@l
 }
 ```
 
-<details>
-<summary>Configuration file locations & advanced options</summary>
-
-**Configuration file locations:**
-- **Cursor**: `~/.cursor/extensions_config.json`
-- **VS Code Copilot**: `.vscode/settings.json`
-- **Cline**: Follow Cline's MCP setup guide
-
-**With extension auto-loading:**
-```json
-{
-  "mcpServers": {
-    "chrome-devtools-extension": {
-      "command": "npx",
-      "args": [
-        "chrome-devtools-mcp-for-extension@latest",
-        "--loadExtension=/path/to/your/extension"
-      ]
-    }
-  }
-}
-```
-
-**Debug mode:**
-```json
-{
-  "mcpServers": {
-    "chrome-devtools-extension": {
-      "command": "npx",
-      "args": ["chrome-devtools-mcp-for-extension@latest"],
-      "env": {
-        "DEBUG": "mcp:*"
-      }
-    }
-  }
-}
-```
-</details>
 
 ### 2. Restart your AI client
 
