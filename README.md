@@ -2,21 +2,59 @@
 
 [![npm chrome-devtools-mcp-for-extension package](https://img.shields.io/npm/v/chrome-devtools-mcp-for-extension.svg)](https://npmjs.org/package/chrome-devtools-mcp-for-extension)
 
+**Zero-config Chrome extension testing with your real browser environment**
+
 AI-powered Chrome extension development with automated testing, debugging, and Web Store submission.
 
 **Built for:** Claude Code, Cursor, VS Code Copilot, Cline, and other MCP-compatible AI tools
 
-## Quick Start
+---
 
-### 1. Add to your MCP client
+## 🎯 Why This Tool?
+
+### The Problem
+- **Puppeteer/Playwright**: Disable extensions by default, require complex configuration
+- **Traditional Testing**: Hours of setup, maintaining separate test profiles
+- **Extension Development**: Can't test in real user environments
+
+### The Solution
+- ✅ **Zero setup**: Uses your system Chrome profile automatically
+- ✅ **Real environment**: Tests with your actual extensions and settings
+- ✅ **No copying**: Direct profile access, instant sync
+- ✅ **Always enabled**: Extensions work automatically, no configuration needed
+
+---
+
+## 📊 How It Compares
+
+| Feature | This Tool | Puppeteer/Playwright | Original chrome-devtools-mcp |
+|---------|-----------|----------------------|------------------------------|
+| Extension Support | ✅ Always enabled | ❌ Disabled by default | ⚠️ Manual config required |
+| Setup Required | ❌ None | ✅ Complex config files | ✅ Multiple flags needed |
+| Real User Profile | ✅ Direct access | ❌ Temporary profiles | ⚠️ Optional |
+| Profile Copying | ❌ No copying needed | ⚠️ Manual setup | ⚠️ Manual setup |
+| Web Store Automation | ✅ Built-in | ❌ None | ❌ None |
+| Extension Debugging | ✅ Service worker + console | ⚠️ Limited | ❌ None |
+
+---
+
+## 🚀 Quick Start
+
+### 1. Install (30 seconds)
 
 **Claude Code users (recommended):**
 ```bash
-# Install globally for all projects
 claude mcp add --scope user chrome-devtools-extension npx chrome-devtools-mcp-for-extension@latest
 ```
 
-**Manual configuration:**
+<details>
+<summary>Other MCP clients (Cursor, VS Code Copilot, Cline)</summary>
+
+Add to your MCP configuration file:
+
+**Cursor**: `~/.cursor/extensions_config.json`
+**VS Code Copilot**: `.vscode/settings.json`
+
 ```json
 {
   "mcpServers": {
@@ -28,16 +66,53 @@ claude mcp add --scope user chrome-devtools-extension npx chrome-devtools-mcp-fo
 }
 ```
 
+</details>
+
 ### 2. Restart your AI client
 
-### 3. Try it out
-```
-"Create a Chrome extension that blocks ads"
-"List all my Chrome extensions"
-"Submit my extension to Chrome Web Store"
+### 3. Verify installation
+Ask your AI: **"List all my Chrome extensions"**
+✅ You should see your installed extensions listed
+
+### 4. Start developing
+See [Common Workflows](#-common-workflows) below for typical use cases
+
+---
+
+## 💡 See The Difference
+
+### Traditional Approach (Puppeteer)
+```javascript
+// ❌ Complex 15+ line setup
+const browser = await puppeteer.launch({
+  headless: false,
+  args: [
+    '--disable-extensions-except=/path/to/your/extension',
+    '--load-extension=/path/to/your/extension',
+    '--user-data-dir=/tmp/test-profile',
+    // ... 10+ more flags
+  ],
+  ignoreDefaultArgs: ['--disable-extensions'],
+});
+// Still doesn't use your real Chrome environment!
 ```
 
-## What You Can Do
+### Zero-Config Approach (This Tool)
+```bash
+# ✅ One command
+claude mcp add chrome-devtools-extension npx chrome-devtools-mcp-for-extension@latest
+
+# Then just ask:
+"Test my extension on youtube.com"
+"Debug why my content script isn't working"
+"Submit my extension to Chrome Web Store"
+
+# That's it! Uses your actual Chrome with all your extensions
+```
+
+---
+
+## ✨ Core Capabilities
 
 - 🧩 **Extension Development**: Load, debug, and reload Chrome extensions during development
 - 🏪 **Automated Web Store Submission**: Complete publishing workflow with form filling and screenshots
@@ -45,29 +120,81 @@ claude mcp add --scope user chrome-devtools-extension npx chrome-devtools-mcp-fo
 - 🐛 **Advanced Debugging**: Service worker inspection, console monitoring, error detection
 - 📸 **Screenshot Generation**: Auto-create store listing images in all required formats
 
-## Configuration Options
+---
 
-<details>
-<summary>Manual MCP Configuration</summary>
+## 📚 Common Workflows
 
-**Configuration file locations:**
-- **Cursor**: `~/.cursor/extensions_config.json`
-- **VS Code Copilot**: `.vscode/settings.json`
-- **Cline**: Follow Cline's MCP setup guide
-
-**Basic configuration:**
-```json
-{
-  "mcpServers": {
-    "chrome-devtools-extension": {
-      "command": "npx",
-      "args": ["chrome-devtools-mcp-for-extension@latest"]
-    }
-  }
-}
+### Create & Test Extension
+```
+1. "Create a Chrome extension that blocks ads on YouTube"
+2. "List extensions to verify it loaded"
+3. "Test the extension on youtube.com"
+4. "Show any errors from the extension"
 ```
 
-**With extension auto-loading:**
+### Debug Extension Issues
+```
+1. "List extensions and show any errors"
+2. "Inspect service worker for my-ad-blocker"
+3. "Show console messages from the extension"
+4. "Reload the extension with latest changes"
+```
+
+### Publish to Web Store
+```
+1. "Generate screenshots for my extension"
+2. "Validate my manifest for Web Store compliance"
+3. "Submit my extension to Chrome Web Store"
+```
+
+### Performance Testing
+```
+1. "Start performance trace on current page"
+2. "Test the extension's impact on page load"
+3. "Show performance insights"
+```
+
+---
+
+## 🛠️ Extension Development Tools
+
+Quick reference for the 3 core extension tools:
+
+| Tool | Purpose | Example Command |
+|------|---------|-----------------|
+| `list_extensions` | View all extensions with status | "List all my Chrome extensions" |
+| `reload_extension` | Hot-reload during development | "Reload my-extension" |
+| `inspect_service_worker` | Debug background scripts | "Debug service worker for my-extension" |
+
+<details>
+<summary>📖 Detailed Tool Documentation</summary>
+
+### `list_extensions` - Extension Inventory
+**Purpose**: Comprehensive extension status monitoring
+**Technical**: Accesses `chrome://extensions/` via shadow DOM manipulation
+**Output**: Extension metadata, enabled/disabled status, version, error detection
+**Use Case**: "List all my Chrome extensions" → Shows development and installed extensions
+
+### `reload_extension` - Development Hot-Reload
+**Purpose**: Streamlined extension development workflow
+**Technical**: Finds extensions by name/partial match, triggers reload via Chrome extension API
+**Output**: Confirmation of reload success/failure with error details
+**Use Case**: "Reload my ad-blocker extension" → Instantly applies code changes
+
+### `inspect_service_worker` - Debug Integration
+**Purpose**: Deep debugging of extension background processes
+**Technical**: Opens DevTools for service workers, supports Manifest V2/V3 architectures
+**Output**: Direct DevTools access to extension console, network, sources
+**Use Case**: "Debug why my content script isn't working" → Opens debugging interface
+
+</details>
+
+---
+
+<details>
+<summary>⚙️ Advanced Configuration</summary>
+
+## Auto-load Development Extension
 ```json
 {
   "mcpServers": {
@@ -82,7 +209,9 @@ claude mcp add --scope user chrome-devtools-extension npx chrome-devtools-mcp-fo
 }
 ```
 
-**Debug mode:**
+⚠️ **Note**: `--loadExtension` flag may be deprecated in Chrome 137+. Using system profile (default) is recommended.
+
+## Debug Mode
 ```json
 {
   "mcpServers": {
@@ -96,130 +225,135 @@ claude mcp add --scope user chrome-devtools-extension npx chrome-devtools-mcp-fo
   }
 }
 ```
+
+## Custom Chrome Channel
+```json
+{
+  "mcpServers": {
+    "chrome-devtools-extension": {
+      "command": "npx",
+      "args": [
+        "chrome-devtools-mcp-for-extension@latest",
+        "--channel=canary"
+      ]
+    }
+  }
+}
+```
+
+Options: `stable` (default), `beta`, `dev`, `canary`
+
+## Isolated Profile Mode
+```json
+{
+  "mcpServers": {
+    "chrome-devtools-extension": {
+      "command": "npx",
+      "args": [
+        "chrome-devtools-mcp-for-extension@latest",
+        "--isolated"
+      ]
+    }
+  }
+}
+```
+
+Forces temporary profile instead of system profile.
+
 </details>
 
 ---
 
-## Technical Details
+<details>
+<summary>🏗️ Technical Architecture & Implementation</summary>
 
-### What Makes This Different
+## What Makes This Different
 
 This fork significantly restructures the original Chrome DevTools MCP for extension-focused development:
 
-### Added Extension-Specific Tools
-- **Extension Management**: 3 specialized tools for extension development workflow
-- **Web Store Automation**: 2 tools for automated submission and screenshot generation
-- **Focus**: Extension-specific operations added to comprehensive browser automation
+### System Profile Architecture (v0.6.0+)
 
-### Chrome Security & Technical Challenges Solved
+**Zero-Config Design:**
+```typescript
+// Automatically detects and uses system Chrome profile
+if (!isolated && !userDataDir) {
+  const systemProfile = detectSystemChromeProfile(channel) || detectAnySystemChromeProfile();
 
-#### Extension Loading Security Restrictions
-Chrome's security model makes automated extension loading complex for legitimate development:
+  if (systemProfile) {
+    userDataDir = systemProfile.path;  // Direct access, no copying
+    usingSystemProfile = true;
+  }
+}
+```
 
-- **Chrome 137+ Policy Changes**: Google disabled `--load-extension` by default in automation contexts
-- **Solution**: Added `--disable-features=DisableLoadExtensionCommandLineSwitch` flag bypass
-- **Automation Detection**: Chrome blocks many operations when detecting automated control
-- **Solution**: `--disable-blink-features=AutomationControlled` for real-world testing scenarios
+**Profile Paths:**
+- macOS: `~/Library/Application Support/Google/Chrome`
+- Windows: `%LOCALAPPDATA%\Google\Chrome\User Data`
+- Linux: `~/.config/google-chrome`
 
-#### Puppeteer Integration Challenges
-- **Default Args Conflict**: Puppeteer's `--disable-extensions` conflicts with extension loading
-- **Solution**: Selective `ignoreDefaultArgs` removal only when extensions are present
-- **Profile Management**: System profile access vs. temporary profile isolation
-- **Solution**: Automatic fallback to temporary profiles when system profile conflicts occur
+**Detection Priority:**
+1. Specified channel (via `--channel` flag)
+2. Fallback: stable → beta → dev → canary
+3. Last resort: Creates temporary isolated profile
 
-#### Manifest Discovery & Validation
-- **Build System Variations**: Extensions may be in `/dist`, `/build`, `/extension` subdirectories
-- **Solution**: Intelligent manifest.json discovery across common build patterns
-- **Manifest V3 Compliance**: Strict validation for Web Store compatibility
-- **Solution**: Comprehensive validation with actionable security warnings
+### Extension Loading Architecture
 
-### New Automation Tools
-- `webstore-submission.ts`: Full Chrome Web Store submission automation
-- `webstore-auto-screenshot.ts`: Multi-format screenshot generation for store listings
-- Enhanced manifest validation with Web Store compliance checking
+**Unconditional Extension Enablement (v0.6.1+):**
+```typescript
+// Always remove --disable-extensions flag
+ignoreDefaultArgs: ['--disable-extensions', '--enable-automation']
+```
 
-### Added Dependencies
-- **archiver**: ZIP package creation for extension submission
-- **Enhanced manifest parsing**: Validates Manifest V3 compliance and permissions
+**Why this design:**
+- Puppeteer's default `--disable-extensions` conflicts with extension development
+- Previous versions used conditional logic (buggy, removed in v0.6.1)
+- Current approach: **Always enable all extensions** for predictable behavior
 
-### MCP Server Coexistence
-- **Server Name**: `chrome-devtools-extension` (vs original `chrome-devtools`)
-- **Package Name**: `chrome-devtools-mcp-for-extension`
-- **Purpose**: Allows both servers to run simultaneously for different use cases
+### Chrome Security Challenges Solved
 
-## Implementation Details
+#### Chrome 137+ Breaking Changes
+- **Problem**: Chrome 137+ disabled `--load-extension` in automation contexts
+- **Solution**: Added `--disable-features=DisableLoadExtensionCommandLineSwitch` bypass
+- **Impact**: Development extensions can still be loaded via CLI flags
 
-### Architecture
+#### Automation Detection Bypass
+- **Problem**: Chrome blocks many operations when detecting automated control
+- **Solution**: `--disable-blink-features=AutomationControlled` for real-world testing
+- **Use Case**: Google login, OAuth flows, Web Store submission
+
+#### Profile Management Strategy
+- **Default**: Direct system profile access (no copying, instant sync)
+- **Fallback**: Temporary profile with bookmarks copy (when Chrome is already running)
+- **Override**: `--isolated` flag for completely separate profile
+
+### Architecture Diagram
+
 ```
 Extension Development Flow:
 ┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
 │ AI Assistant    │───▶│ MCP Server       │───▶│ Chrome Browser  │
 │ (Claude/Cursor) │    │ (Extension Tools)│    │ + Extensions    │
 └─────────────────┘    └──────────────────┘    └─────────────────┘
-                              │
-                              ▼
-                       ┌──────────────────┐
-                       │ Web Store        │
-                       │ Automation       │
-                       └──────────────────┘
+                              │                         │
+                              ▼                         ▼
+                       ┌──────────────────┐    ┌─────────────────┐
+                       │ Web Store        │    │ System Profile  │
+                       │ Automation       │    │ (Direct Access) │
+                       └──────────────────┘    └─────────────────┘
 ```
 
-### Extension Management Tools (3 Tools)
+### Web Store Automation Tools
 
-#### 1. `list_extensions` - Extension Inventory
-- **Purpose**: Comprehensive extension status monitoring
-- **Technical**: Accesses `chrome://extensions/` via shadow DOM manipulation
-- **Output**: Extension metadata, enabled/disabled status, version, error detection
-- **Use Case**: "List all my Chrome extensions" → Shows development and installed extensions
-
-#### 2. `reload_extension` - Development Hot-Reload
-- **Purpose**: Streamlined extension development workflow
-- **Technical**: Finds extensions by name/partial match, triggers reload via Chrome extension API
-- **Output**: Confirmation of reload success/failure with error details
-- **Use Case**: "Reload my ad-blocker extension" → Instantly applies code changes
-
-#### 3. `inspect_service_worker` - Debug Integration
-- **Purpose**: Deep debugging of extension background processes
-- **Technical**: Opens DevTools for service workers, supports Manifest V2/V3 architectures
-- **Output**: Direct DevTools access to extension console, network, sources
-- **Use Case**: "Debug why my content script isn't working" → Opens debugging interface
-
-### Automation Tools
-
-#### Web Store Submission (`submit_to_webstore`)
-**Comprehensive submission automation including:**
-
-1. **Manifest Validation**
-   - Manifest V3 compliance checking
-   - Permission validation and security warnings
-   - File structure verification
-
-2. **Package Creation**
-   - Automated ZIP generation with optimal compression
-   - Exclusion of development files (`node_modules`, `.git`, tests)
-   - Size optimization for Web Store limits
-
-3. **Store Listing Generation**
-   - Auto-generated descriptions based on manifest permissions
-   - Category suggestions based on functionality
-   - SEO-optimized content structure
-
-4. **Browser Automation**
-   - Automated login flow handling
-   - Form field population from manifest data
-   - File upload automation
-   - Error detection and reporting
+#### Submission Workflow (`submit_to_webstore`)
+1. **Manifest Validation**: Manifest V3 compliance, permission security analysis
+2. **Package Creation**: ZIP generation with optimized compression, development file exclusion
+3. **Store Listing**: Auto-generated descriptions based on manifest permissions
+4. **Browser Automation**: Login flow, form population, file upload, error detection
 
 #### Screenshot Generation (`generate_extension_screenshots`)
-**Multi-format screenshot creation:**
-
-- **Primary Screenshots**: 1280x800 (Web Store requirement)
-- **Promotional Tiles**:
-  - Small: 440x280
-  - Large: 920x680
-  - Marquee: 1400x560
-- **Automated Capture**: Extension popup, options page, in-context usage
-- **Smart Navigation**: Tests extension across multiple websites
+- **Primary**: 1280x800 (Web Store requirement)
+- **Promotional Tiles**: Small (440x280), Large (920x680), Marquee (1400x560)
+- **Smart Capture**: Extension popup, options page, in-context usage
 
 ### Manifest Validation System
 
@@ -235,90 +369,140 @@ interface ManifestValidation {
 **Validation Features:**
 - Manifest V3 compliance enforcement
 - Permission analysis with security implications
-- Icon size recommendations
+- Icon size recommendations (16x16, 48x48, 128x128)
 - Service worker file verification
 - Host permission optimization suggestions
 
+### Added Dependencies
+- **archiver** (7.0.1): ZIP package creation for extension submission
+- **puppeteer-core** (24.22.3): Chrome automation with extension support
+- **@modelcontextprotocol/sdk** (1.18.1): MCP server implementation
 
-## Features
+### MCP Server Coexistence
+- **Server Name**: `chrome-devtools-extension` (vs original `chrome-devtools`)
+- **Package Name**: `chrome-devtools-mcp-for-extension`
+- **Purpose**: Allows both servers to run simultaneously for different use cases
 
-### 🧩 Extension Development
-- **Live Development**: Load and reload extensions during development
-- **Debug Integration**: Service worker and background script debugging
-- **Manifest Analysis**: V3 compliance checking and optimization
-- **Error Detection**: Real-time extension error monitoring
+</details>
 
-### 🏪 Web Store Automation
-- **Automated Submission**: End-to-end publishing workflow
-- **Screenshot Generation**: Multi-size promotional images
-- **Listing Optimization**: AI-generated store descriptions
-- **Compliance Checking**: Web Store policy validation
+---
 
-### 🔧 Browser Control
-- **Extension-Aware Navigation**: Understands extension contexts
-- **Permission Testing**: Validate extension permissions in real scenarios
-- **Cross-Origin Testing**: Test extensions across different domains
-- **Performance Analysis**: Extension impact measurement
+<details>
+<summary>👨‍💻 Developer Reference</summary>
 
-### 🔍 Advanced Debugging
-- **Console Integration**: Extension console log aggregation
-- **Network Monitoring**: Extension-specific request tracking
-- **Storage Analysis**: Extension storage (local, sync, session) inspection
-- **Message Passing**: Inter-component communication debugging
-
-## Developer Information
-
-### Supported Extension Types
+## Supported Extension Types
 - **Manifest V3**: Full support (recommended)
 - **Service Workers**: Background script debugging
 - **Content Scripts**: Page interaction testing
 - **Popup Extensions**: UI testing and screenshots
 - **Options Pages**: Settings interface validation
 
-### Browser Compatibility
+## Browser Compatibility
 - **Chrome**: Primary target (latest stable)
 - **Chrome Canary**: Development testing
 - **Chromium**: Community builds
 - **Edge**: Chromium-based versions
 
-### Development Workflow Integration
-```bash
-# Typical AI-assisted development flow:
-1. "Create a Chrome extension that blocks ads"
-2. "Test the extension on youtube.com"
-3. "Debug why the content script isn't working"
-4. "Generate screenshots for the Web Store"
-5. "Submit the extension to Chrome Web Store"
-```
-
-### Technical Requirements
+## Technical Requirements
 - **Node.js**: 22.12.0+ (for latest Chrome DevTools Protocol)
 - **Chrome**: Any version with extension support
-- **Storage**: ~50MB for dependencies and Chrome profile
+- **Storage**: ~50MB for dependencies
 - **Network**: Required for Web Store automation
 
-### Extension Loading Capabilities
-- **Development Extensions**: Unpacked extensions from filesystem
-- **Dynamic Loading**: Runtime extension installation
-- **Hot Reloading**: Instant updates during development
+## Extension Loading Capabilities
+- **Startup Loading**: Extensions loaded at Chrome startup via `--loadExtension`
+- **System Extensions**: Auto-loads all extensions from Chrome profile (default)
+- **Manual Reloading**: Update extensions via `reload_extension` MCP tool
 - **Multi-Extension**: Support for multiple extensions simultaneously
 
-### Security Considerations
-- **Isolated Profiles**: Optional temporary Chrome profiles
-- **Permission Scoping**: Extension permissions are sandboxed
-- **Secure Storage**: No sensitive data persistence
-- **Web Store Auth**: Uses standard Google OAuth flow
+⚠️ **Note**: Runtime extension installation not supported. Extensions must be loaded at startup.
+
+## Security & Privacy Considerations
+- **System Profile Access**: Uses system Chrome profile by default (includes cookies, sessions, history, bookmarks)
+- **Profile Isolation**: Use `--isolated` flag for temporary profile without personal data
+- **Extension Sandboxing**: Extension permissions are sandboxed per Chrome security model
+- **Web Store Auth**: Uses standard Google OAuth flow (no credentials stored)
+
+⚠️ **Warning**: When using system profile, the MCP server has access to all data in your Chrome profile. Use `--isolated` mode for testing sensitive operations.
+
+</details>
+
+---
+
+<details>
+<summary>❓ Troubleshooting</summary>
+
+## Extension Not Loading
+
+**Check manifest.json:**
+```
+"List extensions and show any errors"
+```
+
+**Verify extension is in correct directory:**
+- Manifest must be at root: `/your-extension/manifest.json`
+- Not: `/your-extension/dist/manifest.json`
+
+**Solution:**
+```json
+// Use --loadExtension with correct path
+"args": ["chrome-devtools-mcp-for-extension@latest", "--loadExtension=/correct/path"]
+```
+
+## Service Worker Not Inspecting
+
+**Extension may not be active:**
+```
+"List extensions"  // Check if enabled
+"Reload my-extension"  // Restart extension
+```
+
+**DevTools window not appearing:**
+- Service worker only runs when needed
+- Trigger extension action first (click popup, run content script)
+
+## Web Store Submission Fails
+
+**Manifest V3 compliance:**
+```
+"Validate my manifest for Web Store compliance"
+```
+
+**Common issues:**
+- Missing required icons (16x16, 48x48, 128x128)
+- Invalid permissions (host_permissions format)
+- Service worker not specified
+
+## Extensions Disabled After Chrome Update
+
+**Chrome 137+ breaking change:**
+- `--load-extension` may be restricted in newer Chrome versions
+- **Solution**: Use system profile (default) instead of `--loadExtension` flag
+
+## Profile Lock Conflicts
+
+**Error: "User Data Directory is already in use"**
+- Close regular Chrome before starting MCP server
+- Or use `--isolated` flag for separate profile
+
+</details>
 
 ---
 
 # 日本語 / Japanese
 
-**Chrome 拡張機能開発用の MCP サーバー**
+**Chrome拡張機能開発用のAI支援MCPサーバー**
 
-## クイックスタート
+ゼロコンフィグで実環境テストが可能なChrome拡張機能開発ツール
 
-MCP クライアントに設定を追加：
+## インストール
 
+**Claude Code ユーザー:**
+```bash
+claude mcp add --scope user chrome-devtools-extension npx chrome-devtools-mcp-for-extension@latest
+```
+
+**その他のMCPクライアント:**
 ```json
 {
   "mcpServers": {
@@ -330,26 +514,35 @@ MCP クライアントに設定を追加：
 }
 ```
 
-## 機能
+## 主な機能
 
-- **拡張機能開発**: ロード、デバッグ、リロード
-- **Web Store 自動申請**: スクリーンショット生成付き
-- **ブラウザ制御**: ナビゲーション、フォーム操作、スクリーンショット
-- **パフォーマンス分析**: Chrome DevTools 統合
-
-## Use Cases
-
-```
-"Create a Chrome extension that blocks ads"
-"Debug why my content script isn't working"
-"Submit my extension to Chrome Web Store"
-"Generate screenshots for store listing"
-```
+- 🧩 **拡張機能の開発・デバッグ・リロード**: ライブ開発環境
+- 🏪 **Chrome Web Store への自動申請**: スクリーンショット生成付き
+- 🔧 **実環境でのブラウザテスト**: 既存の拡張機能と共存
+- 🐛 **高度なデバッグ**: サービスワーカー検査、コンソール監視
+- 📸 **ストア用画像の自動生成**: 複数サイズ対応
 
 ## 使用例
 
 ```
-"広告ブロック拡張機能を作成して"
-"コンテンツスクリプトが動かない原因をデバッグして"
-"Web Store に拡張機能を申請して"
+「広告ブロック拡張機能を作成して」
+「拡張機能のエラーを確認して」
+「サービスワーカーをデバッグして」
+「Web Storeに申請して」
 ```
+
+## なぜこのツールか？
+
+- ✅ **設定不要**: システムのChromeプロファイルを自動使用
+- ✅ **実環境テスト**: 実際の拡張機能・設定でテスト可能
+- ✅ **コピー不要**: プロファイルの直接アクセス、即座に同期
+- ✅ **常時有効**: 拡張機能が自動的に有効化
+
+詳細は英語セクションを参照してください。
+
+---
+
+**Version**: 0.6.2
+**Repository**: https://github.com/usedhonda/chrome-devtools-mcp
+**License**: Apache-2.0
+**Original**: Chrome DevTools MCP by Google LLC
