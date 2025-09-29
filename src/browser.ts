@@ -5,6 +5,7 @@
  */
 
 import fs from 'node:fs';
+import { promises as fsPromises } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
@@ -540,22 +541,60 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
 
     return browser;
   } catch (error) {
+    // When system profile is already in use, create a minimal copy for automation
+    if (usingSystemProfile &&
+        ((error as Error).message.includes('The browser is already running') ||
+         (error as Error).message.includes('Target closed') ||
+         (error as Error).message.includes('Connection closed'))) {
+      console.error(`⚠️  Chrome is already running with system profile.`);
+      console.error(`📋 Creating a temporary copy of system profile for automation...`);
+
+      // Create a temporary copy of the system profile
+      const tempProfileDir = path.join(os.tmpdir(), `chrome-mcp-${Date.now()}`);
+      try {
+        // Copy only essential data (bookmarks, extensions) without locking files
+        await fsPromises.mkdir(tempProfileDir, { recursive: true });
+
+        // Copy bookmarks if they exist
+        const bookmarksPath = path.join(userDataDir!, 'Default', 'Bookmarks');
+        try {
+          await fsPromises.access(bookmarksPath);
+          const bookmarksDestDir = path.join(tempProfileDir, 'Default');
+          await fsPromises.mkdir(bookmarksDestDir, { recursive: true });
+          await fsPromises.copyFile(bookmarksPath, path.join(bookmarksDestDir, 'Bookmarks'));
+          console.error(`✅ Bookmarks copied from system profile`);
+        } catch {
+          // Bookmarks don't exist or can't be accessed, skip
+        }
+
+        // Retry with the temporary profile by recursively calling launch
+        console.error(`🔄 Retrying with temporary profile copy...`);
+        const retryOptions = { ...options };
+        retryOptions.userDataDir = tempProfileDir;
+        return launch(retryOptions);
+      } catch (copyError) {
+        console.error(`❌ Failed to create temporary profile copy: ${copyError}`);
+        // Fall through to regular error handling
+      }
+    }
+
+    // For non-system profiles, maintain the blocking behavior
     if (
+      !usingSystemProfile &&
       userDataDir &&
       ((error as Error).message.includes('The browser is already running') ||
         (error as Error).message.includes('Target closed') ||
         (error as Error).message.includes('Connection closed'))
     ) {
-      const profileType = usingSystemProfile ? 'system Chrome profile' : 'custom profile';
       throw new Error(
-        `The browser is already running for ${profileType}: ${userDataDir}. Use --isolated to run multiple browser instances.`,
+        `The browser is already running for custom profile: ${userDataDir}. Use --isolated to run multiple browser instances.`,
         {
           cause: error,
         },
       );
     }
 
-    // If system profile failed, suggest fallback options
+    // If system profile failed for other reasons, suggest fallback options
     if (usingSystemProfile) {
       console.error(`❌ Failed to launch Chrome with system profile: ${userDataDir}`);
       console.error(`💡 Suggestion: Try with --isolated flag for temporary profile, or --userDataDir to specify custom location`);
