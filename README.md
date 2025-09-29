@@ -16,10 +16,10 @@ Chrome extension development traditionally requires manual testing, debugging, a
 
 This fork significantly restructures the original Chrome DevTools MCP for extension-focused development:
 
-### Reduced Tool Surface (39 → 3 User Tools)
-- **Original**: 39 general browser automation tools
-- **This Fork**: 3 specialized extension tools + automated submission tools
-- **Focus**: Extension-specific operations rather than general web automation
+### Added Extension-Specific Tools
+- **Extension Management**: 3 specialized tools for extension development workflow
+- **Web Store Automation**: 2 tools for automated submission and screenshot generation
+- **Focus**: Extension-specific operations added to comprehensive browser automation
 
 ### New Automation Tools
 - `webstore-submission.ts`: Full Chrome Web Store submission automation
@@ -52,22 +52,25 @@ Extension Development Flow:
                        └──────────────────┘
 ```
 
-### Core Tools
+### Extension Management Tools (3 Tools)
 
-#### 1. Extension Management (`list_extensions`)
-- Accesses `chrome://extensions/` via shadow DOM manipulation
-- Extracts extension metadata, status, and error information
-- Provides actionable insights for debugging
+#### 1. `list_extensions` - Extension Inventory
+- **Purpose**: Comprehensive extension status monitoring
+- **Technical**: Accesses `chrome://extensions/` via shadow DOM manipulation
+- **Output**: Extension metadata, enabled/disabled status, version, error detection
+- **Use Case**: "List all my Chrome extensions" → Shows development and installed extensions
 
-#### 2. Development Workflow (`reload_extension`)
-- Enables hot-reloading during development
-- Finds extensions by name or partial match
-- Handles developer mode requirements
+#### 2. `reload_extension` - Development Hot-Reload
+- **Purpose**: Streamlined extension development workflow
+- **Technical**: Finds extensions by name/partial match, triggers reload via Chrome extension API
+- **Output**: Confirmation of reload success/failure with error details
+- **Use Case**: "Reload my ad-blocker extension" → Instantly applies code changes
 
-#### 3. Debug Integration (`inspect_service_worker`)
-- Opens DevTools for service workers and background pages
-- Supports both Manifest V2 and V3 architectures
-- Enables real-time debugging of extension scripts
+#### 3. `inspect_service_worker` - Debug Integration
+- **Purpose**: Deep debugging of extension background processes
+- **Technical**: Opens DevTools for service workers, supports Manifest V2/V3 architectures
+- **Output**: Direct DevTools access to extension console, network, sources
+- **Use Case**: "Debug why my content script isn't working" → Opens debugging interface
 
 ### Automation Tools
 
