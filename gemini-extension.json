@@ -1,10 +1,10 @@
 {
-  "name": "chrome-devtools-mcp",
+  "name": "chrome-devtools-mcp-for-extension",
   "version": "latest",
   "mcpServers": {
-    "chrome-devtools": {
+    "chrome-devtools-extension": {
       "command": "npx",
-      "args": ["chrome-devtools-mcp@latest"]
+      "args": ["chrome-devtools-mcp-for-extension@latest"]
     }
   }
 }

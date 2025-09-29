@@ -41,7 +41,7 @@ function readPackageJson(): {version?: string} {
   }
   try {
     const json = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8'));
-    assert.strict(json['name'], 'chrome-devtools-mcp');
+    assert.strict(json['name'], 'chrome-devtools-mcp-for-extension');
     return json;
   } catch {
     return {};
@@ -54,11 +54,11 @@ export const args = parseArguments(version);
 
 const logFile = args.logFile ? saveLogsToFile(args.logFile) : undefined;
 
-logger(`Starting Chrome DevTools MCP Server v${version}`);
+logger(`Starting Chrome DevTools MCP for Extension Development v${version}`);
 const server = new McpServer(
   {
-    name: 'chrome_devtools',
-    title: 'Chrome DevTools MCP server',
+    name: 'chrome-devtools-extension',
+    title: 'Chrome DevTools MCP for Extension Development',
     version,
   },
   {capabilities: {logging: {}}},
