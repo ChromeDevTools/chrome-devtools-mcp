@@ -47,13 +47,9 @@ AI-powered Chrome extension development with automated testing, debugging, and W
 claude mcp add --scope user chrome-devtools-extension npx chrome-devtools-mcp-for-extension@latest
 ```
 
-<details>
 <summary>Other MCP clients (Cursor, VS Code Copilot, Cline)</summary>
 
 Add to your MCP configuration file:
-
-**Cursor**: `~/.cursor/extensions_config.json`
-**VS Code Copilot**: `.vscode/settings.json`
 
 ```json
 {
@@ -66,7 +62,6 @@ Add to your MCP configuration file:
 }
 ```
 
-</details>
 
 ### 2. Restart your AI client
 
@@ -76,39 +71,6 @@ Ask your AI: **"List all my Chrome extensions"**
 
 ### 4. Start developing
 See [Common Workflows](#-common-workflows) below for typical use cases
-
----
-
-## 💡 See The Difference
-
-### Traditional Approach (Puppeteer)
-```javascript
-// ❌ Complex 15+ line setup
-const browser = await puppeteer.launch({
-  headless: false,
-  args: [
-    '--disable-extensions-except=/path/to/your/extension',
-    '--load-extension=/path/to/your/extension',
-    '--user-data-dir=/tmp/test-profile',
-    // ... 10+ more flags
-  ],
-  ignoreDefaultArgs: ['--disable-extensions'],
-});
-// Still doesn't use your real Chrome environment!
-```
-
-### Zero-Config Approach (This Tool)
-```bash
-# ✅ One command
-claude mcp add chrome-devtools-extension npx chrome-devtools-mcp-for-extension@latest
-
-# Then just ask:
-"Test my extension on youtube.com"
-"Debug why my content script isn't working"
-"Submit my extension to Chrome Web Store"
-
-# That's it! Uses your actual Chrome with all your extensions
-```
 
 ---
 
