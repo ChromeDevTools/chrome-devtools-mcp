@@ -11,4 +11,5 @@ export enum ToolCategories {
   PERFORMANCE = 'Performance',
   NETWORK = 'Network',
   DEBUGGING = 'Debugging',
+  EXTENSION_DEVELOPMENT = 'Extension development',
 }

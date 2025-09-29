@@ -1,3 +1,7 @@
+# Claude Code
+CLAUDE.md
+.claude/
+
 # Logs
 logs
 *.log
@@ -145,4 +149,78 @@ build/
 
 log.txt
 
+# OS specific
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+
+# IDE and Editor
+.idea/
+*.swp
+*.swo
+*~
+*.sublime-project
+*.sublime-workspace
+
+# Chrome/Puppeteer specific
+.puppeteer_cache/
+chrome-profile-*/
+user-data-dir/
+
+# MCP specific
+.mcp-cache/
+mcp-logs/
+*.heapsnapshot
+*.cpuprofile
+*.trace
+
+# Claude specific
+.claude/
+docs/log/claude/
+CLAUDE.local.md
+
+# Extension development (for testing)
+test-extension/
+test-extensions/
+sample-extensions/
+*.crx
+*.pem
+unpacked-extensions/
+
+# Debug and profiling
+debug.log*
+*.log.*
+
+# Backup files
+*.bak
+*.backup
+*.old
+*.orig
+
+# Package manager specific (but keep lock files)
+.pnpm-store/
+
+# Temporary files
+.tmp/
+*.tmp
+temp/
+tmp/
+
+# Test specific
+test-results/
+test-output/
+
+# Documentation build
+docs/_build/
+docs/.docusaurus/
+
+# Misc
+.history/
+.prettierignore
+*.pid.lock
+*.seed

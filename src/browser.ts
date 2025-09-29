@@ -56,6 +56,54 @@ async function ensureBrowserConnected(browserURL: string) {
   return browser;
 }
 
+function scanExtensionsDirectory(extensionsDir: string): string[] {
+  const extensionPaths: string[] = [];
+
+  try {
+    if (!fs.existsSync(extensionsDir)) {
+      console.warn(`Extensions directory not found: ${extensionsDir}`);
+      return extensionPaths;
+    }
+
+    const entries = fs.readdirSync(extensionsDir, {withFileTypes: true});
+
+    for (const entry of entries) {
+      if (entry.isDirectory()) {
+        const extensionPath = path.join(extensionsDir, entry.name);
+        const manifestPath = path.join(extensionPath, 'manifest.json');
+
+        if (fs.existsSync(manifestPath)) {
+          try {
+            const manifestContent = fs.readFileSync(manifestPath, 'utf-8');
+            const manifest = JSON.parse(manifestContent);
+
+            if (manifest.manifest_version) {
+              extensionPaths.push(extensionPath);
+              console.log(
+                `Found extension: ${entry.name} (v${manifest.version || 'unknown'})`,
+              );
+            }
+          } catch (error) {
+            console.warn(
+              `Invalid manifest.json in ${entry.name}: ${error instanceof Error ? error.message : String(error)}`,
+            );
+          }
+        }
+      }
+    }
+
+    console.log(
+      `Scanned ${extensionsDir}: found ${extensionPaths.length} valid extensions`,
+    );
+  } catch (error) {
+    console.error(
+      `Error scanning extensions directory ${extensionsDir}: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+
+  return extensionPaths;
+}
+
 interface McpLaunchOptions {
   executablePath?: string;
   customDevTools?: string;
@@ -64,11 +112,20 @@ interface McpLaunchOptions {
   headless: boolean;
   isolated: boolean;
   loadExtension?: string;
+  loadExtensionsDir?: string;
   logFile?: fs.WriteStream;
 }
 
 export async function launch(options: McpLaunchOptions): Promise<Browser> {
-  const {channel, executablePath, customDevTools, headless, isolated, loadExtension} = options;
+  const {
+    channel,
+    executablePath,
+    customDevTools,
+    headless,
+    isolated,
+    loadExtension,
+    loadExtensionsDir,
+  } = options;
   const profileDirName =
     channel && channel !== 'stable'
       ? `chrome-profile-${channel}`
@@ -91,9 +148,22 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
   if (customDevTools) {
     args.push(`--custom-devtools-frontend=file://${customDevTools}`);
   }
+  // Collect all extension paths
+  const extensionPaths: string[] = [];
+
   if (loadExtension) {
-    args.push(`--load-extension=${loadExtension}`);
+    extensionPaths.push(loadExtension);
+  }
+
+  if (loadExtensionsDir) {
+    const scannedExtensions = scanExtensionsDirectory(loadExtensionsDir);
+    extensionPaths.push(...scannedExtensions);
+  }
+
+  if (extensionPaths.length > 0) {
+    args.push(`--load-extension=${extensionPaths.join(',')}`);
     args.push('--enable-experimental-extension-apis');
+    console.log(`Loading ${extensionPaths.length} Chrome extension(s)`);
   }
   let puppeterChannel: ChromeReleaseChannel | undefined;
   if (!executablePath) {
@@ -113,6 +183,8 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
       pipe: true,
       headless,
       args,
+      ignoreDefaultArgs:
+        extensionPaths.length > 0 ? ['--disable-extensions'] : undefined,
     });
     if (options.logFile) {
       // FIXME: we are probably subscribing too late to catch startup logs. We
@@ -157,6 +229,7 @@ export async function resolveBrowser(options: {
   headless: boolean;
   isolated: boolean;
   loadExtension?: string;
+  loadExtensionsDir?: string;
   logFile?: fs.WriteStream;
 }) {
   const browser = options.browserUrl

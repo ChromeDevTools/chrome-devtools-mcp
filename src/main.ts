@@ -20,8 +20,10 @@ import {logger, saveLogsToFile} from './logger.js';
 import {McpContext} from './McpContext.js';
 import {McpResponse} from './McpResponse.js';
 import {Mutex} from './Mutex.js';
+import * as bookmarkTools from './tools/bookmarks.js';
 import * as consoleTools from './tools/console.js';
 import * as emulationTools from './tools/emulation.js';
+import * as extensionTools from './tools/extensions.js';
 import * as inputTools from './tools/input.js';
 import * as networkTools from './tools/network.js';
 import * as pagesTools from './tools/pages.js';
@@ -74,7 +76,8 @@ async function getContext(): Promise<McpContext> {
     customDevTools: args.customDevtools,
     channel: args.channel as Channel,
     isolated: args.isolated,
-    loadExtension: args.loadExtension,
+    loadExtension: args.loadExtension as string | undefined,
+    loadExtensionsDir: args.loadExtensionsDir as string | undefined,
     logFile,
   });
   if (context?.browser !== browser) {
@@ -141,8 +144,10 @@ function registerTool(tool: ToolDefinition): void {
 }
 
 const tools = [
+  ...Object.values(bookmarkTools),
   ...Object.values(consoleTools),
   ...Object.values(emulationTools),
+  ...Object.values(extensionTools),
   ...Object.values(inputTools),
   ...Object.values(networkTools),
   ...Object.values(pagesTools),

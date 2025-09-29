@@ -55,6 +55,12 @@ export const cliOptions = {
       'Load an unpacked Chrome extension from the specified directory path.',
     conflicts: 'browserUrl',
   },
+  loadExtensionsDir: {
+    type: 'string' as const,
+    description:
+      'Load all unpacked Chrome extensions from the specified directory. Each subdirectory with manifest.json will be loaded as an extension.',
+    conflicts: 'browserUrl',
+  },
   logFile: {
     type: 'string' as const,
     describe:
