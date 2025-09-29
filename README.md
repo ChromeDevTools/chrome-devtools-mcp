@@ -224,33 +224,6 @@ interface ManifestValidation {
 - Service worker file verification
 - Host permission optimization suggestions
 
-## Quick Start
-
-### 1. Add to your MCP client
-
-**Claude Code users:**
-```bash
-claude mcp add chrome-devtools-extension npx chrome-devtools-mcp-for-extension@latest
-```
-
-**Manual configuration:**
-```json
-{
-  "mcpServers": {
-    "chrome-devtools-extension": {
-      "command": "npx",
-      "args": ["chrome-devtools-mcp-for-extension@latest"]
-    }
-  }
-}
-```
-
-
-### 2. Restart your AI client
-
-### 3. Try your first command
-
-Try: `"List all my Chrome extensions"` or `"Create a simple Chrome extension"`
 
 ## Features
 
