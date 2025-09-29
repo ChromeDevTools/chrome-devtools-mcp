@@ -17,6 +17,7 @@ import {
 } from './formatters/networkFormatter.js';
 import {formatA11ySnapshot} from './formatters/snapshotFormatter.js';
 import type {McpContext} from './McpContext.js';
+import {handleDialog} from './tools/pages.js';
 import type {ImageContentData, Response} from './tools/ToolDefinition.js';
 import {paginate, type PaginationOptions} from './utils/pagination.js';
 
@@ -167,7 +168,7 @@ export class McpResponse implements Response {
     if (dialog) {
       response.push(`# Open dialog
 ${dialog.type()}: ${dialog.message()} (default value: ${dialog.message()}).
-Call browser_handle_dialog to handle it before continuing.`);
+Call ${handleDialog.name} to handle it before continuing.`);
     }
 
     if (this.#includePages) {
