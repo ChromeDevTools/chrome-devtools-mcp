@@ -171,7 +171,11 @@ describe('screenshot', () => {
 
     it('with malformed filePath', async () => {
       await withBrowser(async (response, context) => {
-        const filePath = 'malformed\0path.png';
+        // Use a platform-specific invalid character.
+        // On Windows, characters like '<', '>', ':', '"', '/', '\', '|', '?', '*' are invalid.
+        // On POSIX, the null byte is invalid.
+        const invalidChar = process.platform === 'win32' ? '>' : '\0';
+        const filePath = `malformed${invalidChar}path.png`;
         const fixture = screenshots.basic;
         const page = context.getSelectedPage();
         await page.setContent(fixture.html);
