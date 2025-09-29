@@ -21,6 +21,7 @@ import type {
 
 import {NetworkCollector, PageCollector} from './PageCollector.js';
 import {listPages} from './tools/pages.js';
+import {takeSnapshot} from './tools/snapshot.js';
 import {CLOSE_PAGE_ERROR} from './tools/ToolDefinition.js';
 import type {Context} from './tools/ToolDefinition.js';
 import type {TraceResult} from './trace-processing/parse.js';
@@ -261,7 +262,9 @@ export class McpContext implements Context {
 
   async getElementByUid(uid: string): Promise<ElementHandle<Element>> {
     if (!this.#textSnapshot?.idToNode.size) {
-      throw new Error('No snapshot found. Use browser_snapshot to capture one');
+      throw new Error(
+        `No snapshot found. Use ${takeSnapshot.name} to capture one.`,
+      );
     }
     const [snapshotId] = uid.split('_');
 

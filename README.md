@@ -27,7 +27,7 @@ MCP clients.
 
 ## Requirements
 
-- [Node.js 22.12.0](https://nodejs.org/) or newer.
+- [Node.js 20](https://nodejs.org/) or a newer [latest maintainance LTS](https://github.com/nodejs/Release#release-schedule) version.
 - [Chrome](https://www.google.com/chrome/) current stable version or newer.
 - [npm](https://www.npmjs.com/).
 
@@ -73,6 +73,23 @@ claude mcp add chrome-devtools npx chrome-devtools-mcp@latest
 
 ```bash
 codex mcp add chrome-devtools -- npx chrome-devtools-mcp@latest
+```
+
+**On Windows 11**
+
+Configure the Chrome install location and increase the startup timeout by updating `.codex/config.toml` and adding the following `env` and `startup_timeout_ms` parameters:
+
+```
+[mcp_servers.chrome-devtools]
+command = "cmd"
+args = [
+    "/c",
+    "npx",
+    "-y",
+    "chrome-devtools-mcp@latest",
+]
+env = { SystemRoot="C:\\Windows", PROGRAMFILES="C:\\Program Files" }
+startup_timeout_ms = 20_000
 ```
 
 </details>
