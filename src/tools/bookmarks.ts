@@ -4,43 +4,176 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import z from 'zod';
+import {z} from 'zod';
+import * as fs from 'fs';
+import * as path from 'path';
+import * as os from 'os';
 
 import {ToolCategories} from './categories.js';
 import {defineTool} from './ToolDefinition.js';
 
-// Read bookmarks from environment variables
-function getBookmarks(): Record<string, string> {
-  const bookmarksEnv = process.env.BOOKMARKS;
-  if (!bookmarksEnv) {
-    return {};
+// Chrome bookmark file interface
+interface ChromeBookmark {
+  id: string;
+  name: string;
+  type: 'url' | 'folder';
+  url?: string;
+  children?: ChromeBookmark[];
+}
+
+interface ChromeBookmarksFile {
+  roots: {
+    bookmark_bar: ChromeBookmark;
+    other: ChromeBookmark;
+    synced: ChromeBookmark;
+  };
+}
+
+// Default hardcoded bookmarks - fallback when Chrome bookmarks cannot be loaded
+function getDefaultBookmarks(): Record<string, string> {
+  return {
+    'dashboard': 'https://chrome.google.com/webstore/devconsole',
+    'new_item': 'https://chrome.google.com/webstore/devconsole/register',
+    'analytics': 'https://chrome.google.com/webstore/devconsole/analytics',
+    'payments': 'https://chrome.google.com/webstore/devconsole/payments',
+    'support': 'https://support.google.com/chrome_webstore/contact/developer_support',
+    'extensions': 'chrome://extensions/',
+    'extensions_dev': 'chrome://extensions/?id=',
+    'policy': 'https://developer.chrome.com/docs/webstore/program-policies/',
+    'docs': 'https://developer.chrome.com/docs/extensions/',
+    'localhost': 'http://localhost:3000',
+    'localhost8080': 'http://localhost:8080',
+    'suno': 'https://suno.com/create',
+    'chatgpt': 'https://chatgpt.com'
+  };
+}
+
+/**
+ * Get Chrome bookmarks file path based on the operating system
+ */
+function getChromeBookmarksPath(): string {
+  const platform = process.platform;
+  const homeDir = os.homedir();
+
+  switch (platform) {
+    case 'darwin': // macOS
+      return path.join(homeDir, 'Library', 'Application Support', 'Google', 'Chrome', 'Default', 'Bookmarks');
+    case 'win32': // Windows
+      return path.join(homeDir, 'AppData', 'Local', 'Google', 'Chrome', 'User Data', 'Default', 'Bookmarks');
+    case 'linux': // Linux
+      return path.join(homeDir, '.config', 'google-chrome', 'Default', 'Bookmarks');
+    default:
+      return path.join(homeDir, '.config', 'google-chrome', 'Default', 'Bookmarks');
+  }
+}
+
+/**
+ * Recursively extract bookmark URLs from Chrome bookmark structure
+ */
+function extractBookmarkUrls(bookmark: ChromeBookmark, prefix: string = ''): Record<string, string> {
+  const result: Record<string, string> = {};
+  const MAX_BOOKMARKS = 100; // Limit to 100 bookmarks to prevent response size issues
+  let bookmarkCount = 0;
+
+  // Helper function to recursively extract bookmarks with limit
+  function extract(node: ChromeBookmark) {
+    if (bookmarkCount >= MAX_BOOKMARKS) return;
+
+    if (node.type === 'url' && node.url && node.name) {
+      // Create a safe key from bookmark name
+      const key = node.name.toLowerCase()
+        .replace(/[^a-z0-9]/g, '_')
+        .replace(/_+/g, '_')
+        .replace(/^_|_$/g, '');
+
+      if (key && !result[key]) {
+        result[key] = node.url;
+        bookmarkCount++;
+      }
+    }
+
+    if (node.children && bookmarkCount < MAX_BOOKMARKS) {
+      for (const child of node.children) {
+        extract(child);
+        if (bookmarkCount >= MAX_BOOKMARKS) break;
+      }
+    }
   }
 
+  extract(bookmark);
+  return result;
+}
+
+/**
+ * Load Chrome bookmarks from the user's Chrome profile
+ */
+function loadChromeBookmarks(): Record<string, string> {
   try {
-    return JSON.parse(bookmarksEnv);
+    const bookmarksPath = getChromeBookmarksPath();
+    console.error(`📚 Attempting to load Chrome bookmarks from: ${bookmarksPath}`);
+
+    if (!fs.existsSync(bookmarksPath)) {
+      console.error(`⚠️  Chrome bookmarks file not found: ${bookmarksPath}`);
+      return {};
+    }
+
+    const bookmarksData = fs.readFileSync(bookmarksPath, 'utf8');
+    const bookmarksJson: ChromeBookmarksFile = JSON.parse(bookmarksData);
+
+    const allBookmarks: Record<string, string> = {};
+
+    // Extract bookmarks from all roots
+    Object.assign(allBookmarks, extractBookmarkUrls(bookmarksJson.roots.bookmark_bar));
+    Object.assign(allBookmarks, extractBookmarkUrls(bookmarksJson.roots.other));
+    Object.assign(allBookmarks, extractBookmarkUrls(bookmarksJson.roots.synced));
+
+    const bookmarkCount = Object.keys(allBookmarks).length;
+    console.error(`✅ Successfully loaded ${bookmarkCount} Chrome bookmarks${bookmarkCount >= 100 ? ' (limited to 100)' : ''}`);
+    return allBookmarks;
   } catch (error) {
-    console.warn('Failed to parse BOOKMARKS environment variable:', error);
+    console.error('❌ Failed to load Chrome bookmarks:');
+    console.error('   Path:', getChromeBookmarksPath());
+    console.error('   Error:', error instanceof Error ? error.message : String(error));
+    if (error instanceof Error && error.stack) {
+      console.error('   Stack:', error.stack);
+    }
     return {};
   }
 }
 
+/**
+ * Get all bookmarks: merged Chrome bookmarks with default fallback
+ */
+function getBookmarks(): Record<string, string> {
+  const defaultBookmarks = getDefaultBookmarks();
+  const chromeBookmarks = loadChromeBookmarks();
+
+  // Merge bookmarks: Chrome bookmarks take precedence, but defaults are always included
+  return {
+    ...defaultBookmarks,
+    ...chromeBookmarks
+  };
+}
+
 export const listBookmarks = defineTool({
   name: 'list_bookmarks',
-  description: `List all available bookmarks configured in the MCP server. These bookmarks provide quick access to commonly used development URLs.`,
+  description: `List all available bookmarks including both Chrome bookmarks from the user's profile and default development bookmarks. Automatically loads bookmarks from Chrome's bookmark file and merges them with predefined development URLs.`,
   annotations: {
     category: ToolCategories.NAVIGATION_AUTOMATION,
     readOnlyHint: true,
   },
   schema: {},
   handler: async (_request, response, _context) => {
-    const bookmarks = getBookmarks();
-    const bookmarkNames = Object.keys(bookmarks);
+    const defaultBookmarks = getDefaultBookmarks();
+    const chromeBookmarks = loadChromeBookmarks();
+    const allBookmarks = getBookmarks();
+    const bookmarkNames = Object.keys(allBookmarks);
 
     if (bookmarkNames.length === 0) {
       response.appendResponseLine('No bookmarks configured.');
       response.appendResponseLine('');
       response.appendResponseLine(
-        '💡 **Tip:** Configure bookmarks using the BOOKMARKS environment variable in your MCP server settings.',
+        '💡 **Tip:** Chrome bookmarks could not be loaded. Check if Chrome is installed and has bookmarks.',
       );
       return;
     }
@@ -48,11 +181,26 @@ export const listBookmarks = defineTool({
     response.appendResponseLine('📚 **Available Bookmarks:**');
     response.appendResponseLine('');
 
+    // Show loading status
+    const chromeBookmarkCount = Object.keys(chromeBookmarks).length;
+    const defaultBookmarkCount = Object.keys(defaultBookmarks).length;
+
+    if (chromeBookmarkCount > 0) {
+      response.appendResponseLine(`✅ Loaded ${chromeBookmarkCount} bookmarks from Chrome profile${chromeBookmarkCount >= 100 ? ' (limited to 100)' : ''}`);
+      response.appendResponseLine(`📋 ${defaultBookmarkCount} default development bookmarks included`);
+    } else {
+      response.appendResponseLine(`⚠️  Could not load Chrome bookmarks, using ${defaultBookmarkCount} default bookmarks`);
+    }
+    response.appendResponseLine('');
+
     bookmarkNames.forEach(name => {
-      const url = bookmarks[name];
-      response.appendResponseLine(`• **${name}**: ${url}`);
+      const url = allBookmarks[name];
+      const source = chromeBookmarks[name] ? '🌐' : '🔧';
+      response.appendResponseLine(`${source} **${name}**: ${url}`);
     });
 
+    response.appendResponseLine('');
+    response.appendResponseLine('**Legend:** 🌐 = Chrome bookmark, 🔧 = Default bookmark');
     response.appendResponseLine('');
     response.appendResponseLine(
       `Use \`navigate_bookmark name="<bookmark_name>"\` to navigate to any of these URLs.`,
@@ -62,7 +210,7 @@ export const listBookmarks = defineTool({
 
 export const navigateBookmark = defineTool({
   name: 'navigate_bookmark',
-  description: `Navigate to a predefined bookmark URL. Bookmarks are configured in the MCP server environment and provide quick access to commonly used development resources.`,
+  description: `Navigate to a bookmark URL from Chrome bookmarks or default development bookmarks. Automatically includes bookmarks from the user's Chrome profile merged with predefined development resources.`,
   annotations: {
     category: ToolCategories.NAVIGATION_AUTOMATION,
     readOnlyHint: false,

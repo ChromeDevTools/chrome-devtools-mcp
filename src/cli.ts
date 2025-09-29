@@ -4,8 +4,55 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import yargs from 'yargs';
 import {hideBin} from 'yargs/helpers';
+
+// Auto-detection functions for zero-config setup
+function getDefaultUserDataDir(): string {
+  return path.join(
+    os.homedir(),
+    '.cache',
+    'chrome-devtools-mcp',
+    'chrome-profile'
+  );
+}
+
+function getDefaultExtensionsDir(): string | undefined {
+  const currentDir = process.cwd();
+  const extensionsDir = path.join(currentDir, 'extensions');
+
+  // Check if extensions directory exists and has valid extensions
+  if (fs.existsSync(extensionsDir)) {
+    try {
+      const entries = fs.readdirSync(extensionsDir, { withFileTypes: true });
+      const hasValidExtensions = entries.some(entry => {
+        if (entry.isDirectory()) {
+          const manifestPath = path.join(extensionsDir, entry.name, 'manifest.json');
+          if (fs.existsSync(manifestPath)) {
+            try {
+              const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
+              return manifest.manifest_version;
+            } catch {
+              return false;
+            }
+          }
+        }
+        return false;
+      });
+
+      if (hasValidExtensions) {
+        return extensionsDir;
+      }
+    } catch {
+      // Ignore errors and return undefined
+    }
+  }
+
+  return undefined;
+}
 
 export const cliOptions = {
   browserUrl: {
@@ -61,6 +108,18 @@ export const cliOptions = {
       'Load all unpacked Chrome extensions from the specified directory. Each subdirectory with manifest.json will be loaded as an extension.',
     conflicts: 'browserUrl',
   },
+  loadSystemExtensions: {
+    type: 'boolean' as const,
+    description:
+      'Automatically discover and load extensions installed in the system Chrome profile. This includes extensions from Chrome Web Store and sideloaded extensions.',
+    default: false,
+    conflicts: 'browserUrl',
+  },
+  userDataDir: {
+    type: 'string' as const,
+    description: 'Specify a custom user data directory for Chrome to use instead of the default. Auto-detected if not specified.',
+    conflicts: 'browserUrl',
+  },
   logFile: {
     type: 'string' as const,
     describe:
@@ -73,14 +132,30 @@ export function parseArguments(version: string, argv = process.argv) {
     .scriptName('npx chrome-devtools-mcp@latest')
     .options(cliOptions)
     .check(args => {
-      // We can't set default in the options else
-      // Yargs will complain
+      // Auto-configuration for zero-config setup
       if (!args.channel && !args.browserUrl && !args.executablePath) {
         args.channel = 'stable';
       }
+
+      // Don't set userDataDir here - let browser.ts handle auto-detection
+      // This allows browser.ts to detect and use the system Chrome profile
+
+      // Auto-detect extensions directory if not specified
+      if (!args.loadExtensionsDir && !args.browserUrl) {
+        const autoExtensionsDir = getDefaultExtensionsDir();
+        if (autoExtensionsDir) {
+          args.loadExtensionsDir = autoExtensionsDir;
+          console.error(`🔧 Auto-detected extensions directory: ${autoExtensionsDir}`);
+        }
+      }
+
       return true;
     })
     .example([
+      [
+        '$0',
+        'Zero-config startup: auto-detects extensions, bookmarks, and profile',
+      ],
       [
         '$0 --browserUrl http://127.0.0.1:9222',
         'Connect to an existing browser instance',
@@ -89,6 +164,8 @@ export function parseArguments(version: string, argv = process.argv) {
       ['$0 --channel canary', 'Use Chrome Canary installed on this system'],
       ['$0 --channel dev', 'Use Chrome Dev installed on this system'],
       ['$0 --channel stable', 'Use stable Chrome installed on this system'],
+      ['$0 --loadSystemExtensions', 'Auto-discover and load system Chrome extensions'],
+      ['$0 --loadExtensionsDir ./extensions --loadSystemExtensions', 'Load both development and system extensions'],
       ['$0 --logFile /tmp/log.txt', 'Save logs to a file'],
       ['$0 --help', 'Print CLI options'],
     ]);
