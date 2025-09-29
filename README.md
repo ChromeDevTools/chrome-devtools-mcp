@@ -2,17 +2,77 @@
 
 [![npm chrome-devtools-mcp-for-extension package](https://img.shields.io/npm/v/chrome-devtools-mcp-for-extension.svg)](https://npmjs.org/package/chrome-devtools-mcp-for-extension)
 
-A specialized MCP (Model Context Protocol) server that enables AI coding assistants to develop, test, and publish Chrome extensions through automated browser control. This fork of Google's [chrome-devtools-mcp](https://github.com/ChromeDevTools/chrome-devtools-mcp) focuses specifically on Chrome extension development workflows.
+AI-powered Chrome extension development with automated testing, debugging, and Web Store submission.
 
-**Built for:** Claude, Cursor, VS Code Copilot, Cline, and other MCP-compatible AI tools
+**Built for:** Claude Code, Cursor, VS Code Copilot, Cline, and other MCP-compatible AI tools
 
-## Technical Background
+## Quick Start
 
-Chrome extension development traditionally requires manual testing, debugging, and Web Store submission processes. This MCP server automates these workflows by providing AI assistants with direct browser control capabilities, specifically tailored for extension development.
+### 1. Add to Claude Code
+```bash
+claude mcp add chrome-devtools-extension npx chrome-devtools-mcp-for-extension@latest
+```
 
-**Key Innovation:** Unlike general-purpose browser automation tools, this server understands Chrome extension architecture, manifest validation, and Web Store requirements, enabling AI assistants to guide developers through the complete extension lifecycle.
+### 2. Restart Claude Code
 
-## Technical Changes from Original
+### 3. Try it out
+```
+"Create a Chrome extension that blocks ads"
+"List all my Chrome extensions"
+"Submit my extension to Chrome Web Store"
+```
+
+## What You Can Do
+
+- 🧩 **Extension Development**: Load, debug, and reload Chrome extensions during development
+- 🏪 **Automated Web Store Submission**: Complete publishing workflow with form filling and screenshots
+- 🔧 **Browser Testing**: Test extensions across real websites with full Chrome functionality
+- 🐛 **Advanced Debugging**: Service worker inspection, console monitoring, error detection
+- 📸 **Screenshot Generation**: Auto-create store listing images in all required formats
+
+## Configuration Options
+
+<details>
+<summary>Manual MCP Configuration</summary>
+
+**Configuration file locations:**
+- **Cursor**: `~/.cursor/extensions_config.json`
+- **VS Code Copilot**: `.vscode/settings.json`
+- **Cline**: Follow Cline's MCP setup guide
+
+**Basic configuration:**
+```json
+{
+  "mcpServers": {
+    "chrome-devtools-extension": {
+      "command": "npx",
+      "args": ["chrome-devtools-mcp-for-extension@latest"]
+    }
+  }
+}
+```
+
+**With extension auto-loading:**
+```json
+{
+  "mcpServers": {
+    "chrome-devtools-extension": {
+      "command": "npx",
+      "args": [
+        "chrome-devtools-mcp-for-extension@latest",
+        "--loadExtension=/path/to/your/extension"
+      ]
+    }
+  }
+}
+```
+</details>
+
+---
+
+## Technical Details
+
+### What Makes This Different
 
 This fork significantly restructures the original Chrome DevTools MCP for extension-focused development:
 
