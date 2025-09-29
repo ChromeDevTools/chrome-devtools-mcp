@@ -193,6 +193,11 @@ sample-extensions/
 *.pem
 unpacked-extensions/
 
+# Local development data
+data/
+extensions/
+test-*.sh
+
 # Debug and profiling
 debug.log*
 *.log.*
