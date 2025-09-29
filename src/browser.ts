@@ -90,13 +90,16 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
   if (customDevTools) {
     args.push(`--custom-devtools-frontend=file://${customDevTools}`);
   }
-  let puppeterChannel: ChromeReleaseChannel | undefined;
-  if (!executablePath) {
-    puppeterChannel =
-      channel && channel !== 'stable'
-        ? (`chrome-${channel}` as ChromeReleaseChannel)
-        : 'chrome';
-  }
+// Prefer executablePath over channel
+let puppeterChannel: ChromeReleaseChannel | undefined;
+if (!executablePath) {
+  puppeterChannel =
+    channel && channel !== 'stable'
+      ? (`chrome-${channel}` as ChromeReleaseChannel)
+      : 'chrome';
+} else {
+  puppeterChannel = undefined; // <-- ensures channel is not set when executablePath is used
+}
 
   try {
     const browser = await puppeteer.launch({
