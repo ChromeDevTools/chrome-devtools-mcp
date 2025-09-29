@@ -27,25 +27,29 @@ This fork adds comprehensive Chrome extension development features to the origin
 - 🤖 Reliable automation with Puppeteer / Puppeteer による自動化
 - 🌐 Network analysis and screenshots / ネットワーク分析とスクリーンショット
 
-## 📦 Installation / インストール
-
-```bash
-npm install -g chrome-devtools-mcp-for-extension
-```
-
 ## 🎯 Quick Start / クイックスタート
 
-### 1. Install with Claude Code / Claude Code でインストール
+Add this configuration to your MCP client / MCP クライアントに以下の設定を追加：
+
+```json
+{
+  "mcpServers": {
+    "chrome-devtools-extension": {
+      "command": "npx",
+      "args": ["chrome-devtools-mcp-for-extension@latest"]
+    }
+  }
+}
+```
+
+**Claude Code users can also use / Claude Code ユーザーはコマンドも利用可能：**
 
 ```bash
 claude mcp add chrome-devtools-extension npx chrome-devtools-mcp-for-extension@latest
 ```
 
-This automatically creates the configuration in `~/.claude/config.json`
-このコマンドで `~/.claude/config.json` に自動的に設定が作成されます
-
 <details>
-<summary>For other MCP clients (manual configuration) / 他のMCPクライアント用（手動設定）</summary>
+<summary>Configuration file locations / 設定ファイルの場所</summary>
 
 **Configuration file locations / 設定ファイルの場所:**
 
