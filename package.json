@@ -1,7 +1,7 @@
 {
-  "name": "chrome-devtools-mcp",
-  "version": "0.4.0",
-  "description": "MCP server for Chrome DevTools",
+  "name": "chrome-devtools-mcp-for-extension",
+  "version": "0.5.0",
+  "description": "Enhanced Chrome DevTools MCP server with Chrome extension development and Web Store submission tools",
   "type": "module",
   "bin": "./build/src/index.js",
   "main": "index.js",
@@ -27,14 +27,23 @@
     "LICENSE",
     "!*.tsbuildinfo"
   ],
-  "repository": "ChromeDevTools/chrome-devtools-mcp",
-  "author": "Google LLC",
+  "repository": "usedhonda/chrome-devtools-mcp",
+  "author": "usedhonda (forked from Google LLC)",
   "license": "Apache-2.0",
   "bugs": {
-    "url": "https://github.com/ChromeDevTools/chrome-devtools-mcp/issues"
+    "url": "https://github.com/usedhonda/chrome-devtools-mcp/issues"
   },
-  "homepage": "https://github.com/ChromeDevTools/chrome-devtools-mcp#readme",
-  "mcpName": "io.github.ChromeDevTools/chrome-devtools-mcp",
+  "homepage": "https://github.com/usedhonda/chrome-devtools-mcp#readme",
+  "mcpName": "io.github.usedhonda/chrome-devtools-mcp-for-extension",
+  "keywords": [
+    "mcp",
+    "chrome",
+    "devtools",
+    "chrome-extension",
+    "webstore",
+    "browser-automation",
+    "extension-development"
+  ],
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.18.1",
     "archiver": "^7.0.1",
