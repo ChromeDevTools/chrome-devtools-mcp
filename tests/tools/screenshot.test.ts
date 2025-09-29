@@ -155,24 +155,12 @@ describe('screenshot', () => {
           const fixture = screenshots.basic;
           const page = context.getSelectedPage();
           await page.setContent(fixture.html);
-          await screenshot.handler(
-            {params: {format: 'png', filePath}},
-            response,
-            context,
-          );
-
-          assert.equal(response.images.length, 0);
-          assert.equal(
-            response.responseLines.at(0),
-            "Took a screenshot of the current page's viewport.",
-          );
-          assert.ok(
-            response.responseLines
-              .at(1)
-              ?.startsWith(`Could not write screenshot to ${filePath}.`),
-            `Expected error message for unwritable path, but got: ${response.responseLines.at(
-              1,
-            )}`,
+          await assert.rejects(
+            screenshot.handler(
+              {params: {format: 'png', filePath}},
+              response,
+              context,
+            ),
           );
         });
       } finally {
@@ -187,24 +175,12 @@ describe('screenshot', () => {
         const fixture = screenshots.basic;
         const page = context.getSelectedPage();
         await page.setContent(fixture.html);
-        await screenshot.handler(
-          {params: {format: 'png', filePath}},
-          response,
-          context,
-        );
-
-        assert.equal(response.images.length, 0);
-        assert.equal(
-          response.responseLines.at(0),
-          "Took a screenshot of the current page's viewport.",
-        );
-        assert.ok(
-          response.responseLines
-            .at(1)
-            ?.startsWith(`Could not write screenshot to ${filePath}.`),
-          `Expected error message for malformed path, but got: ${response.responseLines.at(
-            1,
-          )}`,
+        await assert.rejects(
+          screenshot.handler(
+            {params: {format: 'png', filePath}},
+            response,
+            context,
+          ),
         );
       });
     });
