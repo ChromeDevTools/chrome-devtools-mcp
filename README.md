@@ -2,41 +2,138 @@
 
 [![npm chrome-devtools-mcp-for-extension package](https://img.shields.io/npm/v/chrome-devtools-mcp-for-extension.svg)](https://npmjs.org/package/chrome-devtools-mcp-for-extension)
 
-An MCP server for Chrome extension development and automation.
+A specialized MCP (Model Context Protocol) server that enables AI coding assistants to develop, test, and publish Chrome extensions through automated browser control. This fork of Google's [chrome-devtools-mcp](https://github.com/ChromeDevTools/chrome-devtools-mcp) focuses specifically on Chrome extension development workflows.
 
-Based on [chrome-devtools-mcp](https://github.com/ChromeDevTools/chrome-devtools-mcp) by Google.
+**Built for:** Claude, Cursor, VS Code Copilot, Cline, and other MCP-compatible AI tools
 
-## Quick Start
+## Technical Background
 
-Add this configuration to your MCP client:
+Chrome extension development traditionally requires manual testing, debugging, and Web Store submission processes. This MCP server automates these workflows by providing AI assistants with direct browser control capabilities, specifically tailored for extension development.
 
-```json
-{
-  "mcpServers": {
-    "chrome-devtools-extension": {
-      "command": "npx",
-      "args": ["chrome-devtools-mcp-for-extension@latest"]
-    }
-  }
+**Key Innovation:** Unlike general-purpose browser automation tools, this server understands Chrome extension architecture, manifest validation, and Web Store requirements, enabling AI assistants to guide developers through the complete extension lifecycle.
+
+## Technical Changes from Original
+
+This fork significantly restructures the original Chrome DevTools MCP for extension-focused development:
+
+### Reduced Tool Surface (39 → 3 User Tools)
+- **Original**: 39 general browser automation tools
+- **This Fork**: 3 specialized extension tools + automated submission tools
+- **Focus**: Extension-specific operations rather than general web automation
+
+### New Automation Tools
+- `webstore-submission.ts`: Full Chrome Web Store submission automation
+- `webstore-auto-screenshot.ts`: Multi-format screenshot generation for store listings
+- Enhanced manifest validation with Web Store compliance checking
+
+### Added Dependencies
+- **archiver**: ZIP package creation for extension submission
+- **Enhanced manifest parsing**: Validates Manifest V3 compliance and permissions
+
+### MCP Server Coexistence
+- **Server Name**: `chrome-devtools-extension` (vs original `chrome-devtools`)
+- **Package Name**: `chrome-devtools-mcp-for-extension`
+- **Purpose**: Allows both servers to run simultaneously for different use cases
+
+## Implementation Details
+
+### Architecture
+```
+Extension Development Flow:
+┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
+│ AI Assistant    │───▶│ MCP Server       │───▶│ Chrome Browser  │
+│ (Claude/Cursor) │    │ (Extension Tools)│    │ + Extensions    │
+└─────────────────┘    └──────────────────┘    └─────────────────┘
+                              │
+                              ▼
+                       ┌──────────────────┐
+                       │ Web Store        │
+                       │ Automation       │
+                       └──────────────────┘
+```
+
+### Core Tools
+
+#### 1. Extension Management (`list_extensions`)
+- Accesses `chrome://extensions/` via shadow DOM manipulation
+- Extracts extension metadata, status, and error information
+- Provides actionable insights for debugging
+
+#### 2. Development Workflow (`reload_extension`)
+- Enables hot-reloading during development
+- Finds extensions by name or partial match
+- Handles developer mode requirements
+
+#### 3. Debug Integration (`inspect_service_worker`)
+- Opens DevTools for service workers and background pages
+- Supports both Manifest V2 and V3 architectures
+- Enables real-time debugging of extension scripts
+
+### Automation Tools
+
+#### Web Store Submission (`submit_to_webstore`)
+**Comprehensive submission automation including:**
+
+1. **Manifest Validation**
+   - Manifest V3 compliance checking
+   - Permission validation and security warnings
+   - File structure verification
+
+2. **Package Creation**
+   - Automated ZIP generation with optimal compression
+   - Exclusion of development files (`node_modules`, `.git`, tests)
+   - Size optimization for Web Store limits
+
+3. **Store Listing Generation**
+   - Auto-generated descriptions based on manifest permissions
+   - Category suggestions based on functionality
+   - SEO-optimized content structure
+
+4. **Browser Automation**
+   - Automated login flow handling
+   - Form field population from manifest data
+   - File upload automation
+   - Error detection and reporting
+
+#### Screenshot Generation (`generate_extension_screenshots`)
+**Multi-format screenshot creation:**
+
+- **Primary Screenshots**: 1280x800 (Web Store requirement)
+- **Promotional Tiles**:
+  - Small: 440x280
+  - Large: 920x680
+  - Marquee: 1400x560
+- **Automated Capture**: Extension popup, options page, in-context usage
+- **Smart Navigation**: Tests extension across multiple websites
+
+### Manifest Validation System
+
+```typescript
+interface ManifestValidation {
+  required: string[];      // name, version, manifest_version
+  warnings: string[];      // description length, icon sizes
+  security: string[];      // dangerous permissions analysis
+  suggestions: string[];   // optimization recommendations
 }
 ```
 
-**Claude Code users:**
+**Validation Features:**
+- Manifest V3 compliance enforcement
+- Permission analysis with security implications
+- Icon size recommendations
+- Service worker file verification
+- Host permission optimization suggestions
 
+## Quick Start
+
+### 1. Add to your MCP client
+
+**Claude Code users:**
 ```bash
 claude mcp add chrome-devtools-extension npx chrome-devtools-mcp-for-extension@latest
 ```
 
-<details>
-<summary>Configuration file locations</summary>
-
-**Configuration file locations:**
-
-- **Cursor**: `~/.cursor/extensions_config.json`
-- **VS Code Copilot**: `.vscode/settings.json`
-- **Cline**: Follow Cline's MCP setup guide
-
-**JSON configuration:**
+**Manual configuration:**
 ```json
 {
   "mcpServers": {
@@ -48,7 +145,15 @@ claude mcp add chrome-devtools-extension npx chrome-devtools-mcp-for-extension@l
 }
 ```
 
-**With extension loading:**
+<details>
+<summary>Configuration file locations & advanced options</summary>
+
+**Configuration file locations:**
+- **Cursor**: `~/.cursor/extensions_config.json`
+- **VS Code Copilot**: `.vscode/settings.json`
+- **Cline**: Follow Cline's MCP setup guide
+
+**With extension auto-loading:**
 ```json
 {
   "mcpServers": {
@@ -62,21 +167,97 @@ claude mcp add chrome-devtools-extension npx chrome-devtools-mcp-for-extension@l
   }
 }
 ```
+
+**Debug mode:**
+```json
+{
+  "mcpServers": {
+    "chrome-devtools-extension": {
+      "command": "npx",
+      "args": ["chrome-devtools-mcp-for-extension@latest"],
+      "env": {
+        "DEBUG": "mcp:*"
+      }
+    }
+  }
+}
+```
 </details>
 
-### 2. Restart Claude Code
+### 2. Restart your AI client
 
 ### 3. Try your first command
 
-Try: "List all my Chrome extensions"
+Try: `"List all my Chrome extensions"` or `"Create a simple Chrome extension"`
 
 ## Features
 
-- **Extension Development**: Load, debug, and reload Chrome extensions
-- **Web Store Automation**: Automated submission with screenshots
-- **Browser Control**: Navigate, click, fill forms, take screenshots
-- **Performance Analysis**: Chrome DevTools integration
-- **Network Debugging**: Request monitoring and analysis
+### 🧩 Extension Development
+- **Live Development**: Load and reload extensions during development
+- **Debug Integration**: Service worker and background script debugging
+- **Manifest Analysis**: V3 compliance checking and optimization
+- **Error Detection**: Real-time extension error monitoring
+
+### 🏪 Web Store Automation
+- **Automated Submission**: End-to-end publishing workflow
+- **Screenshot Generation**: Multi-size promotional images
+- **Listing Optimization**: AI-generated store descriptions
+- **Compliance Checking**: Web Store policy validation
+
+### 🔧 Browser Control
+- **Extension-Aware Navigation**: Understands extension contexts
+- **Permission Testing**: Validate extension permissions in real scenarios
+- **Cross-Origin Testing**: Test extensions across different domains
+- **Performance Analysis**: Extension impact measurement
+
+### 🔍 Advanced Debugging
+- **Console Integration**: Extension console log aggregation
+- **Network Monitoring**: Extension-specific request tracking
+- **Storage Analysis**: Extension storage (local, sync, session) inspection
+- **Message Passing**: Inter-component communication debugging
+
+## Developer Information
+
+### Supported Extension Types
+- **Manifest V3**: Full support (recommended)
+- **Service Workers**: Background script debugging
+- **Content Scripts**: Page interaction testing
+- **Popup Extensions**: UI testing and screenshots
+- **Options Pages**: Settings interface validation
+
+### Browser Compatibility
+- **Chrome**: Primary target (latest stable)
+- **Chrome Canary**: Development testing
+- **Chromium**: Community builds
+- **Edge**: Chromium-based versions
+
+### Development Workflow Integration
+```bash
+# Typical AI-assisted development flow:
+1. "Create a Chrome extension that blocks ads"
+2. "Test the extension on youtube.com"
+3. "Debug why the content script isn't working"
+4. "Generate screenshots for the Web Store"
+5. "Submit the extension to Chrome Web Store"
+```
+
+### Technical Requirements
+- **Node.js**: 22.12.0+ (for latest Chrome DevTools Protocol)
+- **Chrome**: Any version with extension support
+- **Storage**: ~50MB for dependencies and Chrome profile
+- **Network**: Required for Web Store automation
+
+### Extension Loading Capabilities
+- **Development Extensions**: Unpacked extensions from filesystem
+- **Dynamic Loading**: Runtime extension installation
+- **Hot Reloading**: Instant updates during development
+- **Multi-Extension**: Support for multiple extensions simultaneously
+
+### Security Considerations
+- **Isolated Profiles**: Optional temporary Chrome profiles
+- **Permission Scoping**: Extension permissions are sandboxed
+- **Secure Storage**: No sensitive data persistence
+- **Web Store Auth**: Uses standard Google OAuth flow
 
 ---
 
