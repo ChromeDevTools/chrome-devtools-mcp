@@ -2,30 +2,15 @@
 
 [![npm chrome-devtools-mcp-for-extension package](https://img.shields.io/npm/v/chrome-devtools-mcp-for-extension.svg)](https://npmjs.org/package/chrome-devtools-mcp-for-extension)
 
-**An enhanced fork of [chrome-devtools-mcp](https://github.com/ChromeDevTools/chrome-devtools-mcp) with Chrome extension development superpowers.**
+An MCP server that lets AI assistants control Chrome and develop Chrome extensions.
 
-This fork adds comprehensive Chrome extension development features to the original Chrome DevTools MCP by Google, enabling AI-powered extension development, testing, and automated Web Store submission.
+Based on [chrome-devtools-mcp](https://github.com/ChromeDevTools/chrome-devtools-mcp) by Google.
 
 ---
 
-**[chrome-devtools-mcp](https://github.com/ChromeDevTools/chrome-devtools-mcp) を拡張したChrome拡張機能開発用フォークです。**
+**AI が Chrome を制御して Chrome 拡張機能を開発するための MCP サーバーです。**
 
-このフォークは、Google による元の Chrome DevTools MCP に Chrome 拡張機能の開発機能を追加し、AI 支援による拡張機能の開発、テスト、Web Store への自動申請を可能にします。
-
-## 🚀 What's New in This Fork / このフォークの新機能
-
-### Added Features / 追加された機能
-- ✨ **Chrome Extension Support** - Load and debug unpacked extensions / 開発中の拡張機能のロードとデバッグ
-- 🤖 **Web Store Automation** - Automated submission process / Web Store への自動申請
-- 📸 **Screenshot Generation** - Auto-generate store screenshots / ストア用スクリーンショットの自動生成
-- 🔄 **Hot Reload** - Instant extension reloading / 拡張機能の即時リロード
-- 🐛 **Service Worker Debugging** - Direct background script access / バックグラウンドスクリプトへの直接アクセス
-
-### Original Features (Preserved) / 元の機能（保持）
-- 📊 Performance insights via Chrome DevTools / Chrome DevTools によるパフォーマンス分析
-- 🔍 Advanced browser debugging / 高度なブラウザデバッグ
-- 🤖 Reliable automation with Puppeteer / Puppeteer による自動化
-- 🌐 Network analysis and screenshots / ネットワーク分析とスクリーンショット
+Google の [chrome-devtools-mcp](https://github.com/ChromeDevTools/chrome-devtools-mcp) をベースにした Chrome 拡張機能開発特化版です。
 
 ## 🎯 Quick Start / クイックスタート
 
@@ -93,25 +78,33 @@ Tell your AI / AI に指示:
 - English: "List all my Chrome extensions"
 - 日本語: "Chrome の全拡張機能をリストして"
 
-## 🛠 Extension Development Tools / 拡張機能開発ツール
+## Features
 
-### Exclusive to this fork / このフォーク専用
+- **Extension Development**: Load, debug, and reload Chrome extensions
+- **Web Store Automation**: Automated submission with screenshots
+- **Browser Control**: Navigate, click, fill forms, take screenshots
+- **Performance Analysis**: Chrome DevTools integration
+- **Network Debugging**: Request monitoring and analysis
 
-| Tool / ツール | Description / 説明 |
-|--------------|-------------------|
-| `list_extensions` | List all installed extensions / インストール済み拡張機能一覧 |
-| `reload_extension` | Reload extension after changes / 変更後の拡張機能リロード |
-| `inspect_service_worker` | Debug background scripts / バックグラウンドスクリプトのデバッグ |
-| `submit_to_webstore` | Automate Web Store submission / Web Store 申請の自動化 |
-| `generate_extension_screenshots` | Create store screenshots / ストア用スクリーンショット生成 |
+## 機能詳細
 
-### From original project / 元プロジェクトから
+### Chrome 拡張機能開発
+- 開発中の拡張機能のロードとリロード
+- service worker（バックグラウンドスクリプト）のデバッグ
+- 拡張機能のコンソールログとエラー確認
+- ストレージAPIの読み書き確認
 
-- **Navigation**: navigate_page, new_page, close_page, list_pages
-- **Interaction**: click, fill, fill_form, drag, hover
-- **Debugging**: take_screenshot, evaluate_script, list_console_messages
-- **Performance**: performance_start_trace, performance_analyze_insight
-- **Network**: list_network_requests, get_network_request
+### Web Store 申請自動化
+- manifest.json の自動検証
+- ZIP パッケージの自動作成
+- Web Store フォームの自動入力
+- ストア用スクリーンショットの自動生成
+
+### ブラウザ制御・デバッグ
+- ページナビゲーションと要素操作
+- スクリーンショット撮影
+- ネットワークリクエスト分析
+- パフォーマンス計測とトレース
 
 ## 💡 Use Cases / 使用例
 
