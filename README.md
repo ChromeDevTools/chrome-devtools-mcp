@@ -8,12 +8,26 @@ AI-powered Chrome extension development with automated testing, debugging, and W
 
 ## Quick Start
 
-### 1. Add to Claude Code
+### 1. Add to your MCP client
+
+**Claude Code users:**
 ```bash
 claude mcp add chrome-devtools-extension npx chrome-devtools-mcp-for-extension@latest
 ```
 
-### 2. Restart Claude Code
+**Manual configuration:**
+```json
+{
+  "mcpServers": {
+    "chrome-devtools-extension": {
+      "command": "npx",
+      "args": ["chrome-devtools-mcp-for-extension@latest"]
+    }
+  }
+}
+```
+
+### 2. Restart your AI client
 
 ### 3. Try it out
 ```
