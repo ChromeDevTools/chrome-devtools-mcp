@@ -6,6 +6,8 @@
 
 import z from 'zod';
 
+import {logger} from '../logger.js';
+
 import {ToolCategories} from './categories.js';
 import {CLOSE_PAGE_ERROR, defineTool} from './ToolDefinition.js';
 
@@ -195,12 +197,22 @@ export const handleDialog = defineTool({
 
     switch (request.params.action) {
       case 'accept': {
-        await dialog.accept(request.params.promptText);
+        try {
+          await dialog.accept(request.params.promptText);
+        } catch (err) {
+          // Likely already handled by the user outside of MCP.
+          logger(err);
+        }
         response.appendResponseLine('Successfully accepted the dialog');
         break;
       }
       case 'dismiss': {
-        await dialog.dismiss();
+        try {
+          await dialog.dismiss();
+        } catch (err) {
+          // Likely already handled.
+          logger(err);
+        }
         response.appendResponseLine('Successfully dismissed the dialog');
         break;
       }
