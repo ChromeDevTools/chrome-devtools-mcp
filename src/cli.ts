@@ -4,27 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import fs from 'node:fs';
-import os from 'node:os';
-import path from 'node:path';
 import yargs from 'yargs';
 import {hideBin} from 'yargs/helpers';
-
-// Auto-detection functions for zero-config setup
-function getDefaultUserDataDir(): string {
-  return path.join(
-    os.homedir(),
-    '.cache',
-    'chrome-devtools-mcp',
-    'chrome-profile'
-  );
-}
-
-function getDefaultExtensionsDir(): string | undefined {
-  // Disabled automatic detection of ./extensions folder
-  // Users should explicitly use --loadExtension or --loadExtensionsDir flags
-  return undefined;
-}
 
 export const cliOptions = {
   browserUrl: {
@@ -109,24 +90,12 @@ export function parseArguments(version: string, argv = process.argv) {
         args.channel = 'stable';
       }
 
-      // Don't set userDataDir here - let browser.ts handle auto-detection
-      // This allows browser.ts to detect and use the system Chrome profile
-
-      // Auto-detect extensions directory if not specified
-      if (!args.loadExtensionsDir && !args.browserUrl) {
-        const autoExtensionsDir = getDefaultExtensionsDir();
-        if (autoExtensionsDir) {
-          args.loadExtensionsDir = autoExtensionsDir;
-          console.error(`🔧 Auto-detected extensions directory: ${autoExtensionsDir}`);
-        }
-      }
-
       return true;
     })
     .example([
       [
         '$0',
-        'Zero-config startup: auto-detects extensions, bookmarks, and profile',
+        'Zero-config startup: auto-detects profile and bookmarks',
       ],
       [
         '$0 --browserUrl http://127.0.0.1:9222',
