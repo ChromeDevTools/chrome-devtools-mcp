@@ -549,7 +549,7 @@ export const toggleExtensionState = defineTool({
 
 export const openExtensionPopup = defineTool({
   name: 'open_extension_popup',
-  description: `Open a Chrome extension's popup in a testable context. The popup will be opened as a page that can be interacted with using standard tools like take_snapshot, click, and evaluate_script.`,
+  description: `Select an already-opened Chrome extension popup window for testing. The user should manually click the extension icon first to open the popup, then this tool will detect and select it. After selection, you can use take_snapshot, click, evaluate_script, etc. on the popup.`,
   annotations: {
     category: ToolCategories.EXTENSION_DEVELOPMENT,
     readOnlyHint: false,
@@ -582,12 +582,12 @@ export const openExtensionPopup = defineTool({
 
             if (name.toLowerCase().includes(searchName.toLowerCase())) {
               const id = card.getAttribute('id') || '';
-              return {found: true, id, name};
+              return {found: true as const, id, name};
             }
           }
         }
 
-        return {found: false};
+        return {found: false as const};
       }, extensionName);
 
       if (!extensionInfo) {
@@ -607,85 +607,48 @@ export const openExtensionPopup = defineTool({
       );
 
       try {
-        // Find service worker target
         const browser = page.browser();
         if (!browser) {
           response.appendResponseLine('❌ Failed to get browser instance.');
           return;
         }
 
-        const targets = await browser.targets();
+        response.appendResponseLine('🔧 Looking for open popup window...');
 
-        const workerTarget = targets.find(
-          (target: any) =>
-            target.type() === 'service_worker' &&
-            target.url().includes(extensionInfo.id),
-        );
-
-        if (!workerTarget) {
-          response.appendResponseLine(
-            '❌ Service worker not found. Extension may not have a service worker (MV2 extensions are not supported).',
-          );
-          return;
-        }
-
-        const worker = await workerTarget.worker();
-        if (!worker) {
-          response.appendResponseLine(
-            '❌ Failed to get service worker context.',
-          );
-          return;
-        }
-
-        response.appendResponseLine('🔧 Opening popup via service worker...');
-
-        // Open popup
-        await worker.evaluate('chrome.action.openPopup();');
-
-        // Wait for popup target
-        const popupTarget = await browser.waitForTarget(
-          (target: any) =>
-            target.type() === 'page' &&
-            target.url().includes(extensionInfo.id) &&
-            target.url().includes('popup'),
-          {timeout: 5000},
-        );
-
-        if (!popupTarget) {
-          response.appendResponseLine(
-            '❌ Popup did not open within timeout.',
-          );
-          return;
-        }
-
-        const popupPage = await popupTarget.page();
-        if (!popupPage) {
-          response.appendResponseLine(
-            '❌ Failed to get popup page reference.',
-          );
-          return;
-        }
-
-        // Add popup page to context and select it
+        // Get all pages
         const pages = await browser.pages();
-        const popupIndex = pages.indexOf(popupPage);
 
-        if (popupIndex !== -1) {
-          context.setSelectedPageIdx(popupIndex);
-          response.appendResponseLine('');
-          response.appendResponseLine(
-            `✅ Popup opened: ${extensionInfo.name}`,
-          );
-          response.appendResponseLine(`📄 Popup URL: ${popupPage.url()}`);
-          response.appendResponseLine('');
-          response.appendResponseLine(
-            '💡 You can now use take_snapshot, click, evaluate_script, etc. on the popup',
-          );
-        } else {
-          response.appendResponseLine(
-            '⚠️ Popup opened but could not be selected automatically.',
-          );
+        // Find popup page by URL (contains extension ID)
+        let popupPage = null;
+        let popupIndex = -1;
+
+        for (let i = 0; i < pages.length; i++) {
+          const p = pages[i];
+          const url = p.url();
+          if (url && url.includes(extensionInfo.id)) {
+            popupPage = p;
+            popupIndex = i;
+            break;
+          }
         }
+
+        if (!popupPage) {
+          response.appendResponseLine('❌ Popup window not found.');
+          response.appendResponseLine('💡 Please manually click the extension icon to open the popup first.');
+          return;
+        }
+
+        // Select the popup page
+        context.setSelectedPageIdx(popupIndex);
+        response.appendResponseLine('');
+        response.appendResponseLine(
+          `✅ Popup window selected: ${extensionInfo.name}`,
+        );
+        response.appendResponseLine(`📄 Popup URL: ${popupPage.url()}`);
+        response.appendResponseLine('');
+        response.appendResponseLine(
+          '💡 You can now use take_snapshot, click, evaluate_script, etc. on the popup',
+        );
       } catch (error) {
         response.appendResponseLine(
           `❌ Error: ${error instanceof Error ? error.message : String(error)}`,
