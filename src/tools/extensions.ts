@@ -331,7 +331,16 @@ export const reloadExtension = defineTool({
               shadowRoot.querySelector('#name')?.textContent?.trim() || '';
 
             if (name.toLowerCase().includes(searchName.toLowerCase())) {
-              const reloadButton = shadowRoot.querySelector('#reload-button');
+              // Try multiple selectors for reload button
+              let reloadButton = shadowRoot.querySelector('#reload-button');
+              if (!reloadButton) {
+                reloadButton = shadowRoot.querySelector('cr-icon-button[id="reload-button"]');
+              }
+              if (!reloadButton) {
+                // Try finding by aria-label or title
+                reloadButton = shadowRoot.querySelector('[aria-label*="Reload"]');
+              }
+
               if (reloadButton && !reloadButton.hasAttribute('hidden')) {
                 (reloadButton as HTMLElement).click();
                 return {success: true};
@@ -339,7 +348,7 @@ export const reloadExtension = defineTool({
                 return {
                   success: false,
                   reason:
-                    'Reload button not available (extension not in developer mode)',
+                    'Reload button not available (extension not in developer mode or button hidden)',
                 };
               }
             }
@@ -458,7 +467,12 @@ export const toggleExtensionState = defineTool({
                 shadowRoot.querySelector('#name')?.textContent?.trim() || '';
 
               if (name.toLowerCase().includes(searchName.toLowerCase())) {
-                const enableToggle = shadowRoot.querySelector('#enable-toggle');
+                // Try both selectors: #enable-toggle (older Chrome) and cr-toggle (newer Chrome)
+                let enableToggle = shadowRoot.querySelector('#enable-toggle');
+                if (!enableToggle) {
+                  enableToggle = shadowRoot.querySelector('cr-toggle');
+                }
+
                 const currentEnabled =
                   enableToggle?.getAttribute('checked') === '';
 
@@ -485,7 +499,7 @@ export const toggleExtensionState = defineTool({
                 } else {
                   return {
                     success: false,
-                    reason: 'Enable/disable toggle not found',
+                    reason: 'Enable/disable toggle not found (tried #enable-toggle and cr-toggle)',
                   };
                 }
               }
