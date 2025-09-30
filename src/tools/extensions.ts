@@ -340,13 +340,16 @@ export const reloadExtension = defineTool({
               shadowRoot.querySelector('#name')?.textContent?.trim() || '';
 
             if (name.toLowerCase().includes(searchName.toLowerCase())) {
-              // Try multiple selectors for reload button
-              let reloadButton = shadowRoot.querySelector('#reload-button');
+              // Try multiple selectors for reload button (dev-reload-button in developer mode)
+              let reloadButton = shadowRoot.querySelector('#dev-reload-button');
               if (!reloadButton) {
-                reloadButton = shadowRoot.querySelector('cr-icon-button[id="reload-button"]');
+                reloadButton = shadowRoot.querySelector('#reload-button');
               }
               if (!reloadButton) {
-                // Try finding by aria-label or title
+                // Try finding by aria-label (supports both English and Japanese)
+                reloadButton = shadowRoot.querySelector('[aria-label*="再読み込み"]');
+              }
+              if (!reloadButton) {
                 reloadButton = shadowRoot.querySelector('[aria-label*="Reload"]');
               }
 
