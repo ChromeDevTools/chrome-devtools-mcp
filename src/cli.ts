@@ -76,6 +76,10 @@ export const cliOptions = {
     type: 'string' as const,
     description: `Proxy server configuration for Chrome passed as --proxy-server when launching the browser. See https://www.chromium.org/developers/design-documents/network-settings/ for details.`,
   },
+  acceptInsecureCerts: {
+    type: 'boolean' as const,
+    description: `If enabled, ignores errors relative to self-signed and expired certificates. Use with caution.`,
+  },
 };
 
 export function parseArguments(version: string, argv = process.argv) {

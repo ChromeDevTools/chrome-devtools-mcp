@@ -280,6 +280,10 @@ The Chrome DevTools MCP server supports the following configuration option:
   Proxy server configuration for Chrome passed as --proxy-server when launching the browser. See https://www.chromium.org/developers/design-documents/network-settings/ for details.
   - **Type:** string
 
+- **`--acceptInsecureCerts`**
+  If enabled, ignores errors relative to self-signed and expired certificates. Use with caution.
+  - **Type:** boolean
+
 <!-- END AUTO GENERATED OPTIONS -->
 
 Pass them via the `args` property in the JSON configuration. For example:

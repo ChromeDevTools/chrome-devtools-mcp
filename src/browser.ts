@@ -57,6 +57,7 @@ export async function ensureBrowserConnected(browserURL: string) {
 }
 
 interface McpLaunchOptions {
+  acceptInsecureCerts?: boolean;
   executablePath?: string;
   customDevTools?: string;
   channel?: Channel;
@@ -116,6 +117,7 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
       pipe: true,
       headless,
       args,
+      acceptInsecureCerts: options.acceptInsecureCerts,
     });
     if (options.logFile) {
       // FIXME: we are probably subscribing too late to catch startup logs. We

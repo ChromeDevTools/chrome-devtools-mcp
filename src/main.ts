@@ -84,6 +84,7 @@ async function getContext(): Promise<McpContext> {
         logFile,
         viewport: args.viewport,
         args: extraArgs,
+        acceptInsecureCerts: args.acceptInsecureCerts,
       });
 
   if (context?.browser !== browser) {
