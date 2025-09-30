@@ -670,12 +670,6 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
       headless: effectiveHeadless,
       args,
       ignoreDefaultArgs: ['--disable-extensions', '--enable-automation'],
-      // enableExtensions: Provide unpacked extension folder paths
-      // These paths can point to System Chrome's extension directories
-      // (e.g., ~/Library/.../Chrome/Default/Extensions/<id>/<version>/)
-      // No need to copy extensions to CfT profile
-      // Reference: https://pptr.dev/guides/chrome-extensions
-      enableExtensions: extensionPaths.length > 0 ? extensionPaths : undefined,
     });
 
     // Log actual spawn args for debugging
