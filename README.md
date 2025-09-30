@@ -29,15 +29,7 @@ System extensions auto-load, development extensions easy to configure.
 
 ### 1. Basic Installation (System Extensions Only)
 
-**Claude Code users (recommended):**
-```bash
-claude mcp add --scope user chrome-devtools-extension npx chrome-devtools-mcp-for-extension@latest
-```
-
-<details>
-<summary>Other MCP clients (Cursor, VS Code Copilot, Cline)</summary>
-
-Add to your global MCP configuration file (`~/.claude.json` or equivalent):
+Add to `~/.claude.json` (or your MCP client's global configuration):
 
 ```json
 {
@@ -49,7 +41,6 @@ Add to your global MCP configuration file (`~/.claude.json` or equivalent):
   }
 }
 ```
-</details>
 
 This will auto-load your system Chrome extensions. **For development extensions**, see step 2.
 
@@ -553,14 +544,7 @@ npx chrome-devtools-mcp-for-extension@latest --isolated
 
 ## インストール
 
-**Claude Code ユーザー:**
-```bash
-claude mcp add --scope user chrome-devtools-extension npx chrome-devtools-mcp-for-extension@latest
-```
-
-**その他のMCPクライアント:**
-
-`~/.claude.json` に以下を追加:
+`~/.claude.json`（または使用しているMCPクライアントのグローバル設定ファイル）に以下を追加:
 
 ```json
 {
