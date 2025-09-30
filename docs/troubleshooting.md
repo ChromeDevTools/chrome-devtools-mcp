@@ -21,4 +21,4 @@ This usually indicates either a non-supported Node version is in use or that the
 
 This indicates that the browser could not be started. Make sure that no Chrome
 instances are running or close them. Make sure you have the latest stable Chrome
-installed and that [your system is able to run Chrome].
+installed and that [your system is able to run Chrome](https://support.google.com/chrome/a/answer/7100626?hl=en).
