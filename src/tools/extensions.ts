@@ -51,9 +51,8 @@ export const listExtensions = defineTool({
               '';
             const version =
               shadowRoot.querySelector('#version')?.textContent?.trim() || '';
-            const enabled = !shadowRoot
-              .querySelector('#enable-toggle')
-              ?.hasAttribute('disabled');
+            const enableToggle = shadowRoot.querySelector('#enable-toggle');
+            const enabled = enableToggle?.getAttribute('checked') === '';
             const id = card.getAttribute('id') || 'unknown';
             const errorsBadge = shadowRoot.querySelector(
               '#errors-button .badge',
