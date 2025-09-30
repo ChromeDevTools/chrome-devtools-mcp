@@ -36,11 +36,14 @@ export const waitFor = defineTool({
   },
   handler: async (request, response, context) => {
     const page = context.getSelectedPage();
+    const frames = page.frames();
 
-    await Locator.race([
-      page.locator(`aria/${request.params.text}`),
-      page.locator(`text/${request.params.text}`),
-    ]).wait();
+    const locators = frames.flatMap(frame => [
+      frame.locator(`aria/${request.params.text}`),
+      frame.locator(`text/${request.params.text}`),
+    ]);
+
+    await Locator.race(locators).wait();
 
     response.appendResponseLine(
       `Element with text "${request.params.text}" found.`,
