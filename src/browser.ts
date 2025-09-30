@@ -142,6 +142,58 @@ function scanExtensionsDirectory(extensionsDir: string): string[] {
 }
 
 /**
+ * Get system Chrome executable path
+ */
+function getSystemChromeExecutable(channel?: Channel): string {
+  const platform = os.platform();
+
+  if (platform === 'darwin') {
+    // macOS
+    if (channel === 'canary') {
+      return '/Applications/Google Chrome Canary.app/Contents/MacOS/Google Chrome Canary';
+    } else if (channel === 'beta') {
+      return '/Applications/Google Chrome Beta.app/Contents/MacOS/Google Chrome Beta';
+    } else if (channel === 'dev') {
+      return '/Applications/Google Chrome Dev.app/Contents/MacOS/Google Chrome Dev';
+    }
+    return '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+  } else if (platform === 'win32') {
+    // Windows
+    const programFiles = process.env['ProgramFiles'] || 'C:\\Program Files';
+    const programFilesX86 = process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)';
+
+    if (channel === 'canary') {
+      return path.join(process.env.LOCALAPPDATA || '', 'Google', 'Chrome SxS', 'Application', 'chrome.exe');
+    } else if (channel === 'beta') {
+      return path.join(programFiles, 'Google', 'Chrome Beta', 'Application', 'chrome.exe');
+    } else if (channel === 'dev') {
+      return path.join(programFiles, 'Google', 'Chrome Dev', 'Application', 'chrome.exe');
+    }
+
+    // Try both Program Files locations
+    const path1 = path.join(programFiles, 'Google', 'Chrome', 'Application', 'chrome.exe');
+    const path2 = path.join(programFilesX86, 'Google', 'Chrome', 'Application', 'chrome.exe');
+
+    if (fs.existsSync(path1)) return path1;
+    if (fs.existsSync(path2)) return path2;
+    return path1; // Default fallback
+  } else {
+    // Linux
+    if (channel === 'canary' || channel === 'dev') {
+      return '/usr/bin/google-chrome-unstable';
+    } else if (channel === 'beta') {
+      return '/usr/bin/google-chrome-beta';
+    }
+
+    // Try google-chrome first, fallback to chromium
+    if (fs.existsSync('/usr/bin/google-chrome')) {
+      return '/usr/bin/google-chrome';
+    }
+    return '/usr/bin/chromium-browser';
+  }
+}
+
+/**
  * Get System Chrome User Data directory (not Chrome for Testing)
  */
 function getSystemChromeUserDataDir(channel?: Channel): string {
@@ -568,8 +620,18 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
   // Add Google login automation detection bypass
   args.push('--disable-blink-features=AutomationControlled');
   console.error('Added Google login bypass: --disable-blink-features=AutomationControlled');
+
+  // Use system Chrome instead of Chrome for Testing when loading extensions
   let puppeterChannel: ChromeReleaseChannel | undefined;
-  if (!executablePath) {
+  let effectiveExecutablePath = executablePath;
+
+  if (!executablePath && extensionPaths.length > 0) {
+    // Auto-detect system Chrome executable for extension support
+    effectiveExecutablePath = getSystemChromeExecutable(channel);
+    console.error(`🔍 Auto-detected system Chrome: ${effectiveExecutablePath}`);
+    console.error(`💡 Using system Chrome for extension support (not Chrome for Testing)`);
+  } else if (!executablePath) {
+    // No extensions, use Chrome for Testing via channel
     puppeterChannel =
       channel && channel !== 'stable'
         ? (`chrome-${channel}` as ChromeReleaseChannel)
@@ -579,7 +641,7 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
   // Log complete Chrome configuration before launch
   console.error('Chrome Launch Configuration:');
   console.error(`  Channel: ${puppeterChannel || 'default'}`);
-  console.error(`  Executable: ${executablePath || 'auto-detected'}`);
+  console.error(`  Executable: ${effectiveExecutablePath || 'auto-detected'}`);
   console.error(`  User Data Dir: ${userDataDir || 'temporary'}`);
   console.error(`  Profile Directory: ${profileDirectory}`);
   console.error(`  Profile Type: ${usingSystemProfile ? 'System Profile (auto-detected)' : 'Custom Profile'}`);
@@ -600,7 +662,7 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
     const browser = await puppeteer.launch({
       ...connectOptions,
       channel: puppeterChannel,
-      executablePath,
+      executablePath: effectiveExecutablePath,
       defaultViewport: null,
       userDataDir,
       pipe: true,
