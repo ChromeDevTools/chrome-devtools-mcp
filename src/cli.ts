@@ -72,6 +72,10 @@ export const cliOptions = {
       };
     },
   },
+  proxyServer: {
+    type: 'string' as const,
+    description: `Proxy server configuration for Chrome passed as --proxy-server when launching the browser. See https://www.chromium.org/developers/design-documents/network-settings/ for details.`,
+  },
 };
 
 export function parseArguments(version: string, argv = process.argv) {

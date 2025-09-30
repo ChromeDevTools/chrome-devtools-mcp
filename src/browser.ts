@@ -68,6 +68,7 @@ interface McpLaunchOptions {
     width: number;
     height: number;
   };
+  args?: string[];
 }
 
 export async function launch(options: McpLaunchOptions): Promise<Browser> {
@@ -90,7 +91,10 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
     });
   }
 
-  const args: LaunchOptions['args'] = ['--hide-crash-restore-bubble'];
+  const args: LaunchOptions['args'] = [
+    ...(options.args ?? []),
+    '--hide-crash-restore-bubble',
+  ];
   if (customDevTools) {
     args.push(`--custom-devtools-frontend=file://${customDevTools}`);
   }

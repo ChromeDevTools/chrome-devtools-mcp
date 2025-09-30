@@ -69,6 +69,10 @@ server.server.setRequestHandler(SetLevelRequestSchema, () => {
 
 let context: McpContext;
 async function getContext(): Promise<McpContext> {
+  const extraArgs: string[] = [];
+  if (args.proxyServer) {
+    extraArgs.push(`--proxy-server=${args.proxyServer}`);
+  }
   const browser = args.browserUrl
     ? await ensureBrowserConnected(args.browserUrl)
     : await ensureBrowserLaunched({
@@ -79,6 +83,7 @@ async function getContext(): Promise<McpContext> {
         isolated: args.isolated,
         logFile,
         viewport: args.viewport,
+        args: extraArgs,
       });
 
   if (context?.browser !== browser) {

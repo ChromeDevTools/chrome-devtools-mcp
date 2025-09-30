@@ -276,6 +276,10 @@ The Chrome DevTools MCP server supports the following configuration option:
   Initial viewport size for the Chromee instances started by the server. For example, `1280x720`
   - **Type:** string
 
+- **`--proxyServer`**
+  Proxy server configuration for Chrome passed as --proxy-server when launching the browser. See https://www.chromium.org/developers/design-documents/network-settings/ for details.
+  - **Type:** string
+
 <!-- END AUTO GENERATED OPTIONS -->
 
 Pass them via the `args` property in the JSON configuration. For example:
