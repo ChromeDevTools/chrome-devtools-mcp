@@ -42,4 +42,31 @@ describe('browser', () => {
       await browser1.close();
     }
   });
+
+  it('launches with the initial viewport', async () => {
+    const tmpDir = os.tmpdir();
+    const folderPath = path.join(tmpDir, `temp-folder-${crypto.randomUUID()}`);
+    const browser = await launch({
+      headless: true,
+      isolated: false,
+      userDataDir: folderPath,
+      executablePath: executablePath(),
+      viewport: {
+        width: 700,
+        height: 500,
+      },
+    });
+    try {
+      const [page] = await browser.pages();
+      const result = await page.evaluate(() => {
+        return {width: window.innerWidth, height: window.innerHeight};
+      });
+      assert.deepStrictEqual(result, {
+        width: 700,
+        height: 500,
+      });
+    } finally {
+      await browser.close();
+    }
+  });
 });

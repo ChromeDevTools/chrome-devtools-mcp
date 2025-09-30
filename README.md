@@ -272,6 +272,10 @@ The Chrome DevTools MCP server supports the following configuration option:
   Path to a file to write debug logs to. Set the env variable `DEBUG` to `*` to enable verbose logs. Useful for submitting bug reports.
   - **Type:** string
 
+- **`--viewport`**
+  Initial viewport size for the Chromee instances started by the server. For example, `1280x720`
+  - **Type:** string
+
 <!-- END AUTO GENERATED OPTIONS -->
 
 Pass them via the `args` property in the JSON configuration. For example:

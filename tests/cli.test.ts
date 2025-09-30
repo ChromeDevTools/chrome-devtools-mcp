@@ -55,4 +55,24 @@ describe('cli args parsing', () => {
       executablePath: '/tmp/test 123/chrome',
     });
   });
+
+  it('parses viewport', async () => {
+    const args = parseArguments('1.0.0', [
+      'node',
+      'main.js',
+      '--viewport',
+      '888x777',
+    ]);
+    assert.deepStrictEqual(args, {
+      _: [],
+      headless: false,
+      isolated: false,
+      $0: 'npx chrome-devtools-mcp@latest',
+      channel: 'stable',
+      viewport: {
+        width: 888,
+        height: 777,
+      },
+    });
+  });
 });

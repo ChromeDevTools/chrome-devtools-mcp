@@ -54,6 +54,25 @@ export const cliOptions = {
     describe:
       'Path to a file to write debug logs to. Set the env variable `DEBUG` to `*` to enable verbose logs. Useful for submitting bug reports.',
   },
+  viewport: {
+    type: 'string' as const,
+    describe:
+      'Initial viewport size for the Chromee instances started by the server. For example, `1280x720`',
+    coerce: (arg: string | undefined) => {
+      if (arg === undefined) {
+        return;
+      }
+      const [width, height] = arg.split('x').map(Number);
+      console.log(arg);
+      if (!width || !height || Number.isNaN(width) || Number.isNaN(height)) {
+        throw new Error('Invalid viewport. Expected format is `1280x720`.');
+      }
+      return {
+        width,
+        height,
+      };
+    },
+  },
 };
 
 export function parseArguments(version: string, argv = process.argv) {
@@ -79,6 +98,10 @@ export function parseArguments(version: string, argv = process.argv) {
       ['$0 --channel stable', 'Use stable Chrome installed on this system'],
       ['$0 --logFile /tmp/log.txt', 'Save logs to a file'],
       ['$0 --help', 'Print CLI options'],
+      [
+        '$0 --viewport 1280x720',
+        'Launch Chrome with the initial viewport size of 1280x720px',
+      ],
     ]);
 
   return yargsInstance
