@@ -35,44 +35,15 @@ export async function waitForFrameByUrlMatch(
   await cdp.send('Runtime.enable');
   await cdp.send('DOM.enable');
 
-  // Strategy: Find iframe in DOM, then match Frame ID
+  // Strategy: Use Page.getFrameTree and match by pattern
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
     try {
-      // Get document root
-      const {root} = await cdp.send('DOM.getDocument', {depth: -1});
-
-      // Query all iframes
-      const {nodeIds} = await cdp.send('DOM.querySelectorAll', {
-        nodeId: root.nodeId,
-        selector: 'iframe',
-      });
-
-      // Check each iframe's src
-      for (const nodeId of nodeIds) {
-        const attrs = await cdp.send('DOM.getAttributes', {nodeId});
-        const srcIndex = attrs.attributes.indexOf('src');
-        if (srcIndex >= 0 && srcIndex + 1 < attrs.attributes.length) {
-          const src = attrs.attributes[srcIndex + 1];
-          if (pattern.test(src)) {
-            // Get contentDocument frame ID
-            const {node} = await cdp.send('DOM.describeNode', {nodeId});
-            if (node.contentDocument) {
-              const frameId = node.contentDocument.frameId || node.frameId;
-              if (frameId) {
-                return {frameId, frameUrl: src};
-              }
-            }
-
-            // Fallback: try Frame Tree match
-            const tree = await cdp.send('Page.getFrameTree');
-            const hit = findFrameByUrl(tree.frameTree, src);
-            if (hit) return hit;
-          }
-        }
-      }
+      const tree = await cdp.send('Page.getFrameTree');
+      const hit = findFrameByPattern(tree.frameTree, pattern);
+      if (hit) return hit;
     } catch (e) {
-      // DOM may not be ready yet, continue waiting
+      // Frame tree may not be ready yet, continue waiting
     }
 
     // Wait a bit before retry
@@ -81,15 +52,15 @@ export async function waitForFrameByUrlMatch(
 
   throw new Error(`Timeout waiting for iframe by url match: ${pattern}`);
 
-  function findFrameByUrl(
+  function findFrameByPattern(
     node: any,
-    url: string,
+    rx: RegExp,
   ): {frameId: string; frameUrl: string} | null {
-    if (node?.frame?.url === url) {
+    if (node?.frame?.url && rx.test(node.frame.url)) {
       return {frameId: node.frame.id, frameUrl: node.frame.url};
     }
     for (const c of node.childFrames ?? []) {
-      const r = findFrameByUrl(c, url);
+      const r = findFrameByPattern(c, rx);
       if (r) return r;
     }
     return null;
