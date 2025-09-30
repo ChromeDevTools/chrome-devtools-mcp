@@ -8,7 +8,7 @@ import path from 'node:path';
 import type {CDPSession} from 'puppeteer';
 
 export type InspectResult = {
-  frameId: string;
+  frameId: string | null;
   frameUrl: string;
   html: string;
   screenshotBase64?: string;
@@ -117,58 +117,66 @@ export async function inspectIframe(
       html,
     };
   } catch (oopifError) {
-    // Fallback: Try regular iframe via DOM.querySelectorAll
-    await cdp.send('DOM.enable');
-    const {root} = await cdp.send('DOM.getDocument', {depth: -1});
-
-    // Query all iframes
-    const {nodeIds} = await cdp.send('DOM.querySelectorAll', {
-      nodeId: root.nodeId,
-      selector: 'iframe',
-    });
-
-    // Find the iframe matching the pattern
-    let targetFrameId: string | null = null;
-    let targetFrameUrl: string | null = null;
-
-    for (const nodeId of nodeIds) {
-      const {node} = await cdp.send('DOM.describeNode', {nodeId});
-      const src = node.attributes?.find(
-        (attr, i, arr) => attr === 'src' && arr[i + 1],
-      );
-      const srcValue = src ? node.attributes![node.attributes!.indexOf(src) + 1] : '';
-
-      if (urlPattern.test(srcValue)) {
-        targetFrameId = node.frameId || null;
-        targetFrameUrl = srcValue;
-        break;
-      }
-    }
-
-    if (!targetFrameId || !targetFrameUrl) {
-      throw new Error(
-        `Iframe not found (tried both OOPIF and regular iframe): ${urlPattern}`,
-      );
-    }
-
-    // Execute in the frame context using Page.createIsolatedWorld
-    const {executionContextId} = await cdp.send('Page.createIsolatedWorld', {
-      frameId: targetFrameId,
-    });
-
+    // Fallback: Access iframe content through parent page's DOM
     await cdp.send('Runtime.enable');
-    const htmlResult = await cdp.send('Runtime.evaluate', {
-      expression: 'document.documentElement.outerHTML',
+
+    const iframeAccessScript = `
+      (function() {
+        const pattern = ${urlPattern};
+        const iframes = Array.from(document.querySelectorAll('iframe'));
+
+        for (const iframe of iframes) {
+          if (pattern.test(iframe.src)) {
+            try {
+              // Try to access contentDocument/contentWindow
+              const doc = iframe.contentDocument || iframe.contentWindow?.document;
+              if (doc) {
+                return {
+                  success: true,
+                  src: iframe.src,
+                  html: doc.documentElement.outerHTML
+                };
+              }
+            } catch (securityError) {
+              // If blocked by same-origin policy, return error details
+              return {
+                success: false,
+                src: iframe.src,
+                error: 'SecurityError: ' + securityError.message
+              };
+            }
+          }
+        }
+
+        return {
+          success: false,
+          error: 'Iframe not found matching pattern: ' + pattern.toString()
+        };
+      })()
+    `;
+
+    const evalResult = await cdp.send('Runtime.evaluate', {
+      expression: iframeAccessScript,
       returnByValue: true,
-      contextId: executionContextId,
     });
 
-    const html = String(htmlResult?.result?.value ?? '');
+    const data = evalResult?.result?.value as {
+      success: boolean;
+      src?: string;
+      html?: string;
+      error?: string;
+    };
+
+    if (!data?.success) {
+      throw new Error(
+        `Iframe access failed: ${data?.error || 'Unknown error'}`,
+      );
+    }
 
     return {
-      frameId: targetFrameId,
-      frameUrl: targetFrameUrl,
-      html,
+      frameId: null,
+      frameUrl: data.src || '',
+      html: data.html || '',
     };
   }
 }
