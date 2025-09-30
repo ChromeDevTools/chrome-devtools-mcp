@@ -25,6 +25,7 @@ import {
   logSystemProfileInfo,
   type SystemChromeProfile,
 } from './system-profile.js';
+import { setupDedicatedProfile } from './profile-manager.js';
 
 let browser: Browser | undefined;
 
@@ -64,21 +65,6 @@ async function ensureBrowserConnected(browserURL: string) {
     defaultViewport: null,
   });
   return browser;
-}
-
-/**
- * Get the last used Chrome profile directory name from Local State
- */
-function getLastUsedProfile(userDataDir: string): string {
-  const localStatePath = path.join(userDataDir, 'Local State');
-  try {
-    const localStateContent = fs.readFileSync(localStatePath, 'utf8');
-    const localState = JSON.parse(localStateContent);
-    return localState?.profile?.last_used || 'Default';
-  } catch (error) {
-    console.warn(`Could not read Local State: ${error instanceof Error ? error.message : String(error)}`);
-    return 'Default';
-  }
 }
 
 function scanExtensionsDirectory(extensionsDir: string): string[] {
@@ -350,22 +336,17 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
   let profileDirectory = 'Default';
 
   if (!isolated && !userDataDir) {
-    // Try to use system Chrome profile directly
-    const systemProfile = detectSystemChromeProfile(channel) || detectAnySystemChromeProfile();
-
-    if (systemProfile) {
-      // Use system profile directly for better user experience
-      userDataDir = systemProfile.path;
-      usingSystemProfile = true;
-
-      // Detect last used profile directory
-      profileDirectory = getLastUsedProfile(userDataDir);
-
-      console.error(`✅ Using system Chrome profile: ${systemProfile.channel}`);
-      console.error(`   Path: ${userDataDir}`);
-      console.error(`   Profile Directory: ${profileDirectory}`);
-    } else {
-      // Fallback to isolated profile if no system Chrome found
+    // Use dedicated profile with symlinks to system extensions and bookmarks
+    try {
+      const dedicatedProfile = await setupDedicatedProfile(channel);
+      userDataDir = dedicatedProfile.userDataDir;
+      profileDirectory = dedicatedProfile.profileDirectory;
+      usingSystemProfile = false; // Using dedicated profile, not system profile
+    } catch (error) {
+      // Fallback to isolated profile if setup fails
+      console.error(
+        `⚠️  Failed to setup dedicated profile: ${error instanceof Error ? error.message : String(error)}`,
+      );
       userDataDir = path.join(
         os.homedir(),
         '.cache',
@@ -375,7 +356,7 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
       await fs.promises.mkdir(userDataDir, {
         recursive: true,
       });
-      console.error(`📁 Using isolated profile (no system Chrome found)`);
+      console.error(`📁 Using isolated profile (fallback)`);
     }
   }
 

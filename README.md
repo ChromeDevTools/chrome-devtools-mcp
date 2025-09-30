@@ -443,13 +443,41 @@ interface ManifestValidation {
 - `--load-extension` may be restricted in newer Chrome versions
 - **Solution**: Use system profile (default) instead of `--loadExtension` flag
 
-## Concurrent Chrome Usage
+## Dedicated Profile Architecture
 
-**Can I use Chrome while the MCP server is running?**
+**How does the MCP server handle Chrome profiles?**
 
-Yes! The MCP server can run alongside your regular Chrome browser. Chrome is robust enough to handle concurrent access to the same profile.
+The MCP server uses a **dedicated profile with symlinks** to provide the best of both worlds:
 
-**Note:** If you experience any issues with concurrent usage, you can use the `--isolated` flag to run with a separate profile:
+### What Gets Shared (via Symlinks)
+- ✅ **Extensions**: Your installed Chrome extensions are accessible via symlink
+- ✅ **Bookmarks**: Your bookmarks are shared (read-only)
+
+### What Stays Private (Dedicated Profile)
+- 🔒 **Cookies & Login State**: Separate login state for security
+- 🔒 **Browsing History**: Independent history
+- 🔒 **Preferences**: MCP-specific settings
+
+### Profile Location
+```
+~/.cache/chrome-devtools-mcp/chrome-profile-dedicated/
+└── Default/
+    ├── Extensions/    → (symlink to system Chrome)
+    ├── Bookmarks      → (symlink to system Chrome)
+    ├── Cookies        (dedicated)
+    └── ...
+```
+
+### First Launch
+- **Initial setup**: Extensions and bookmarks are automatically linked
+- **Google Login required**: You'll need to log in once (login state is not shared from your main Chrome)
+- **Subsequent launches**: Login state is preserved in the dedicated profile
+
+### Concurrent Usage
+✅ **Yes!** The MCP server runs alongside your regular Chrome browser without conflicts. Each uses its own profile directory.
+
+### Isolated Mode
+For testing or if you prefer a completely empty profile:
 ```bash
 npx chrome-devtools-mcp-for-extension@latest --isolated
 ```
