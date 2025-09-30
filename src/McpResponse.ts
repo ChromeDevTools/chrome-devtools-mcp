@@ -16,6 +16,8 @@ import {
   getStatusFromRequest,
 } from './formatters/networkFormatter.js';
 import {formatA11ySnapshot} from './formatters/snapshotFormatter.js';
+import {formatExtensionsPage} from './formatters/extensionsPageFormatter.js';
+import {getDevelopmentExtensionPaths} from './browser.js';
 import type {McpContext} from './McpContext.js';
 import type {ImageContentData, Response} from './tools/ToolDefinition.js';
 import {paginate, type PaginationOptions} from './utils/pagination.js';
@@ -185,9 +187,24 @@ Call browser_handle_dialog to handle it before continuing.`);
     if (this.#includeSnapshot) {
       const snapshot = context.getTextSnapshot();
       if (snapshot) {
-        const formattedSnapshot = formatA11ySnapshot(snapshot.root);
-        response.push('## Page content');
-        response.push(formattedSnapshot);
+        const pageUrl = context.getSelectedPage().url();
+        const isExtensionsPage = pageUrl.startsWith('chrome://extensions');
+
+        let formattedSnapshot: string;
+        if (isExtensionsPage) {
+          // Use structured extensions page formatter
+          const developmentPaths = getDevelopmentExtensionPaths();
+          formattedSnapshot = formatExtensionsPage(
+            snapshot.root,
+            developmentPaths,
+          );
+          response.push(formattedSnapshot);
+        } else {
+          // Use standard accessibility tree formatter
+          formattedSnapshot = formatA11ySnapshot(snapshot.root);
+          response.push('## Page content');
+          response.push(formattedSnapshot);
+        }
       }
     }
 

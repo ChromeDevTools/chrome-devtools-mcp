@@ -22,10 +22,17 @@ export function formatA11ySnapshot(
 }
 
 function getAttributes(serializedAXNodeRoot: TextSnapshotNode): string[] {
+  // Prefer description for buttons/switches with empty names
+  const displayLabel =
+    serializedAXNodeRoot.name ||
+    serializedAXNodeRoot.description ||
+    serializedAXNodeRoot.roledescription ||
+    '';
+
   const attributes = [
     `uid=${serializedAXNodeRoot.id}`,
     serializedAXNodeRoot.role,
-    `"${serializedAXNodeRoot.name || ''}"`, // Corrected: Added quotes around name
+    `"${displayLabel}"`,
   ];
 
   // Value properties

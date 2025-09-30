@@ -606,8 +606,6 @@ AIに質問:
 }
 ```
 
-詳細は [MCP設定ガイド](docs/mcp-configuration-guide.md) を参照してください。
-
 ---
 
 ## 主な機能

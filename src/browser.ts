@@ -314,6 +314,13 @@ interface McpLaunchOptions {
   logFile?: fs.WriteStream;
 }
 
+// Store development extension paths globally for later retrieval
+let developmentExtensionPaths: string[] = [];
+
+export function getDevelopmentExtensionPaths(): string[] {
+  return developmentExtensionPaths;
+}
+
 export async function launch(options: McpLaunchOptions): Promise<Browser> {
   const {
     channel,
@@ -325,6 +332,9 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
     loadExtensionsDir,
     loadSystemExtensions,
   } = options;
+
+  // Reset development extension paths
+  developmentExtensionPaths = [];
   const profileDirName =
     channel && channel !== 'stable'
       ? `chrome-profile-${channel}`
@@ -368,6 +378,7 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
           const manifest = JSON.parse(manifestContent);
           if (manifest.manifest_version) {
             extensionPaths.push(loadExtension);
+            developmentExtensionPaths.push(loadExtension); // Track as development extension
             console.error(`✅ Single extension validated: ${loadExtension}`);
           } else {
             console.error(`❌ Invalid manifest.json in ${loadExtension}: missing manifest_version`);
@@ -386,6 +397,7 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
   if (loadExtensionsDir) {
     const scannedExtensions = scanExtensionsDirectory(loadExtensionsDir);
     extensionPaths.push(...scannedExtensions);
+    developmentExtensionPaths.push(...scannedExtensions); // Track as development extensions
   }
 
   // System extension discovery (default: true unless isolated flag is set)
