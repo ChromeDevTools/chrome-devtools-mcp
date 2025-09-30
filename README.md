@@ -443,41 +443,44 @@ interface ManifestValidation {
 - `--load-extension` may be restricted in newer Chrome versions
 - **Solution**: Use system profile (default) instead of `--loadExtension` flag
 
-## Dedicated Profile Architecture
+## System Extensions Loading (v0.7.1+)
 
-**How does the MCP server handle Chrome profiles?**
+**How does the MCP server handle Chrome extensions?**
 
-The MCP server uses a **dedicated profile with symlinks** to provide the best of both worlds:
+The MCP server uses an **isolated profile with `--load-extension`** to provide system extensions while maintaining independence:
 
-### What Gets Shared (via Symlinks)
-- ✅ **Extensions**: Your installed Chrome extensions are accessible via symlink
-- ✅ **Bookmarks**: Your bookmarks are shared (read-only)
+### Default Behavior
+- ✅ **Independent Chrome Instance**: Runs separately from your main Chrome browser
+- ✅ **System Extensions Loaded**: Your installed Chrome extensions are automatically loaded via `--load-extension`
+- ✅ **Concurrent Usage**: Works alongside your regular Chrome browser without conflicts
+- 🔒 **Isolated Login State**: First launch requires Google login (for security)
+- 🔒 **Isolated Profile**: Uses `~/.cache/chrome-devtools-mcp/chrome-profile/`
 
-### What Stays Private (Dedicated Profile)
-- 🔒 **Cookies & Login State**: Separate login state for security
-- 🔒 **Browsing History**: Independent history
-- 🔒 **Preferences**: MCP-specific settings
+### What Works
+- ✅ **Extensions**: All system Chrome extensions are dynamically loaded
+- ✅ **Bookmarks**: Accessible via MCP tools (`list_bookmarks`, `navigate_bookmark`)
+- ✅ **Login State**: Preserved in isolated profile after first login
+
+### What Doesn't Work
+- ❌ **Bookmarks in Browser UI**: Not displayed in browser bookmarks bar (use MCP tools instead)
+- ❌ **Shared Login State**: System Chrome login state is not shared (first login required)
 
 ### Profile Location
 ```
-~/.cache/chrome-devtools-mcp/chrome-profile-dedicated/
+~/.cache/chrome-devtools-mcp/chrome-profile/
 └── Default/
-    ├── Extensions/    → (symlink to system Chrome)
-    ├── Bookmarks      → (symlink to system Chrome)
-    ├── Cookies        (dedicated)
-    └── ...
+    ├── Cookies        (isolated)
+    ├── Login Data     (isolated)
+    └── ...            (all files isolated)
 ```
 
 ### First Launch
-- **Initial setup**: Extensions and bookmarks are automatically linked
-- **Google Login required**: You'll need to log in once (login state is not shared from your main Chrome)
-- **Subsequent launches**: Login state is preserved in the dedicated profile
+- **Extensions**: Automatically loaded from system Chrome via `--load-extension`
+- **Google Login required**: You'll need to log in once (login state is isolated for security)
+- **Subsequent launches**: Login state is preserved in the isolated profile
 
-### Concurrent Usage
-✅ **Yes!** The MCP server runs alongside your regular Chrome browser without conflicts. Each uses its own profile directory.
-
-### Isolated Mode
-For testing or if you prefer a completely empty profile:
+### Isolated Mode (No Extensions)
+To run without any extensions:
 ```bash
 npx chrome-devtools-mcp-for-extension@latest --isolated
 ```

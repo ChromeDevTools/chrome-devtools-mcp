@@ -25,7 +25,6 @@ import {
   logSystemProfileInfo,
   type SystemChromeProfile,
 } from './system-profile.js';
-import { setupDedicatedProfile } from './profile-manager.js';
 
 let browser: Browser | undefined;
 
@@ -335,29 +334,18 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
   let usingSystemProfile = false;
   let profileDirectory = 'Default';
 
-  if (!isolated && !userDataDir) {
-    // Use dedicated profile with symlinks to system extensions and bookmarks
-    try {
-      const dedicatedProfile = await setupDedicatedProfile(channel);
-      userDataDir = dedicatedProfile.userDataDir;
-      profileDirectory = dedicatedProfile.profileDirectory;
-      usingSystemProfile = false; // Using dedicated profile, not system profile
-    } catch (error) {
-      // Fallback to isolated profile if setup fails
-      console.error(
-        `⚠️  Failed to setup dedicated profile: ${error instanceof Error ? error.message : String(error)}`,
-      );
-      userDataDir = path.join(
-        os.homedir(),
-        '.cache',
-        'chrome-devtools-mcp',
-        profileDirName,
-      );
-      await fs.promises.mkdir(userDataDir, {
-        recursive: true,
-      });
-      console.error(`📁 Using isolated profile (fallback)`);
-    }
+  if (!userDataDir) {
+    // Use isolated profile (independent from system Chrome)
+    userDataDir = path.join(
+      os.homedir(),
+      '.cache',
+      'chrome-devtools-mcp',
+      profileDirName,
+    );
+    await fs.promises.mkdir(userDataDir, {
+      recursive: true,
+    });
+    console.error(`📁 Using isolated profile: ${userDataDir}`);
   }
 
   const args: LaunchOptions['args'] = [
@@ -400,12 +388,13 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
     extensionPaths.push(...scannedExtensions);
   }
 
-  // System extension discovery
-  if (loadSystemExtensions) {
+  // System extension discovery (default: true unless isolated flag is set)
+  const shouldLoadSystemExtensions = loadSystemExtensions ?? !isolated;
+  if (shouldLoadSystemExtensions) {
     const systemExtensions = discoverSystemExtensions(channel);
     if (systemExtensions.length > 0) {
       extensionPaths.push(...systemExtensions);
-      console.error(`🔗 Integrated ${systemExtensions.length} system extensions with development extensions`);
+      console.error(`✅ Loaded ${systemExtensions.length} system Chrome extension(s)`);
     } else {
       console.warn(`⚠️  No system extensions found or accessible`);
     }
