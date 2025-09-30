@@ -105,6 +105,14 @@ startup_timeout_ms = 20_000
 </details>
 
 <details>
+  <summary>Visual Studio</summary>
+  
+  **Click the button to install:**
+  
+  [<img src="https://img.shields.io/badge/Visual_Studio-Install-C16FDE?logo=visualstudio&logoColor=white" alt="Install in Visual Studio">](https://vs-open.link/mcp-install?%7B%22name%22%3A%22chrome-devtools%22%2C%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22chrome-devtools-mcp%40latest%22%5D%7D)
+</details>
+
+<details>
   <summary>Cursor</summary>
 
 **Click the button to install:**
