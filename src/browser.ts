@@ -535,6 +535,7 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
   let userDataDir = options.userDataDir;
   let usingSystemProfile = false;
   let profileDirectory = 'Default';
+  let needsSystemProfile = false;
 
   if (!userDataDir) {
     // Use isolated profile (independent from system Chrome)
@@ -628,6 +629,7 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
   if (!executablePath && extensionPaths.length > 0) {
     // Auto-detect system Chrome executable for extension support
     effectiveExecutablePath = getSystemChromeExecutable(channel);
+    needsSystemProfile = true;
     console.error(`🔍 Auto-detected system Chrome: ${effectiveExecutablePath}`);
     console.error(`💡 Using system Chrome for extension support (not Chrome for Testing)`);
   } else if (!executablePath) {
@@ -636,6 +638,12 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
       channel && channel !== 'stable'
         ? (`chrome-${channel}` as ChromeReleaseChannel)
         : 'chrome';
+  }
+
+  // If using system Chrome, also use system Chrome's profile
+  if (needsSystemProfile && !options.userDataDir) {
+    userDataDir = getSystemChromeUserDataDir(channel);
+    console.error(`📁 Switching to system Chrome profile: ${userDataDir}`);
   }
 
   // Log complete Chrome configuration before launch
