@@ -448,6 +448,15 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
   console.error(`  Ignored Default Args: ["--disable-extensions", "--enable-automation"]`);
 
   try {
+    // IMPORTANT: Chrome extensions (especially MV3 content scripts and service workers)
+    // DO NOT work in headless mode. Always use headless:false when loading extensions.
+    // Reference: https://groups.google.com/a/chromium.org/g/headless-dev/c/nEoeUkoNI0o/m/9KZ4Os46AQAJ
+    const effectiveHeadless = extensionPaths.length > 0 ? false : headless;
+
+    if (extensionPaths.length > 0 && headless) {
+      console.warn('⚠️  WARNING: Extensions require headful mode. Forcing headless:false');
+    }
+
     const browser = await puppeteer.launch({
       ...connectOptions,
       channel: puppeterChannel,
@@ -455,9 +464,14 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
       defaultViewport: null,
       userDataDir,
       pipe: true,
-      headless,
+      headless: effectiveHeadless,
       args,
       ignoreDefaultArgs: ['--disable-extensions', '--enable-automation'],
+      // enableExtensions: Provide unpacked extension folder paths
+      // These paths can point to System Chrome's extension directories
+      // (e.g., ~/Library/.../Chrome/Default/Extensions/<id>/<version>/)
+      // No need to copy extensions to CfT profile
+      // Reference: https://pptr.dev/guides/chrome-extensions
       enableExtensions: extensionPaths.length > 0 ? extensionPaths : undefined,
     });
 
