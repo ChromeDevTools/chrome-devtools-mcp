@@ -36,7 +36,7 @@ claude mcp add --scope user chrome-devtools-extension npx chrome-devtools-mcp-fo
 
 <summary>Other MCP clients (Cursor, VS Code Copilot, Cline)</summary>
 
-Add to your MCP configuration file:
+Add to your global MCP configuration file (`~/.claude.json` or equivalent):
 
 ```json
 {
@@ -159,6 +159,9 @@ Quick reference for the 3 core extension tools:
 <summary>⚙️ Advanced Configuration</summary>
 
 ## Auto-load Development Extension
+
+Add to `~/.claude.json`:
+
 ```json
 {
   "mcpServers": {
@@ -176,6 +179,9 @@ Quick reference for the 3 core extension tools:
 ⚠️ **Note**: `--loadExtension` flag may be deprecated in Chrome 137+. Using system profile (default) is recommended.
 
 ## Debug Mode
+
+Add to `~/.claude.json`:
+
 ```json
 {
   "mcpServers": {
@@ -191,6 +197,9 @@ Quick reference for the 3 core extension tools:
 ```
 
 ## Custom Chrome Channel
+
+Add to `~/.claude.json`:
+
 ```json
 {
   "mcpServers": {
@@ -208,6 +217,9 @@ Quick reference for the 3 core extension tools:
 Options: `stable` (default), `beta`, `dev`, `canary`
 
 ## Isolated Profile Mode
+
+Add to `~/.claude.json`:
+
 ```json
 {
   "mcpServers": {
@@ -408,9 +420,20 @@ interface ManifestValidation {
 - Not: `/your-extension/dist/manifest.json`
 
 **Solution:**
+
+Update `~/.claude.json`:
 ```json
-// Use --loadExtension with correct path
-"args": ["chrome-devtools-mcp-for-extension@latest", "--loadExtension=/correct/path"]
+{
+  "mcpServers": {
+    "chrome-devtools-extension": {
+      "command": "npx",
+      "args": [
+        "chrome-devtools-mcp-for-extension@latest",
+        "--loadExtension=/correct/path"
+      ]
+    }
+  }
+}
 ```
 
 ## Service Worker Not Inspecting
@@ -503,6 +526,9 @@ claude mcp add --scope user chrome-devtools-extension npx chrome-devtools-mcp-fo
 ```
 
 **その他のMCPクライアント:**
+
+`~/.claude.json` に以下を追加:
+
 ```json
 {
   "mcpServers": {

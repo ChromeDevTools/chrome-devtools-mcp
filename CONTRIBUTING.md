@@ -45,18 +45,20 @@ npx @modelcontextprotocol/inspector node build/src/index.js
 
 ### Testing with an MCP client
 
-Add the MCP server to your client's config.
+Add the MCP server to your global MCP configuration at `~/.claude.json`:
 
 ```json
 {
   "mcpServers": {
     "chrome-devtools-extension": {
       "command": "node",
-      "args": ["/path-to/build/src/index.js"]
+      "args": ["/absolute/path/to/chrome-devtools-mcp/build/src/index.js"]
     }
   }
 }
 ```
+
+**Note:** This uses the local build for development. For end-users, the configuration would use `npx` with the published package instead.
 
 #### Using with VS Code SSH
 

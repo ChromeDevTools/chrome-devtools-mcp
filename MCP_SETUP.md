@@ -20,28 +20,63 @@ This automatically creates the configuration and handles everything for you.
 
 ### For Other MCP Clients (Manual Setup)
 
-Add to your MCP client configuration:
+#### Global Configuration (Recommended)
+
+Add to the **root level** of your MCP client configuration file:
 
 ```json
 {
   "mcpServers": {
     "chrome-devtools-extension": {
       "command": "npx",
-      "args": ["chrome-devtools-mcp-for-extension@latest"],
-      "env": {}
+      "args": ["chrome-devtools-mcp-for-extension@latest"]
     }
   }
 }
 ```
 
+**Benefits of global configuration:**
+- ✅ Applies to all projects automatically
+- ✅ Single source of truth for MCP settings
+- ✅ Easy to maintain and update
+- ✅ No need to configure per-project
+
 **Configuration file locations:**
+- **Claude Code**: `~/.claude.json` (global mcpServers section)
 - **Cursor**: `~/.cursor/extensions_config.json`
-- **VS Code Copilot**: `.vscode/settings.json`
+- **VS Code Copilot**: `.vscode/settings.json` or global settings
 - **Cline**: Follow Cline's MCP setup guide
 
-### With Options
+#### Project-Specific Configuration (Not Recommended)
 
-You can add various options to customize the behavior:
+For Claude Code, you can also add project-specific configuration, but it's generally not needed:
+
+```json
+{
+  "mcpServers": {
+    "chrome-devtools-extension": {
+      "command": "npx",
+      "args": ["chrome-devtools-mcp-for-extension@latest"]
+    }
+  },
+  "projects": {
+    "/path/to/your/project": {
+      "mcpServers": {
+        "chrome-devtools-extension": {
+          "command": "npx",
+          "args": ["chrome-devtools-mcp-for-extension@latest"]
+        }
+      }
+    }
+  }
+}
+```
+
+**Note:** Project-specific settings override global settings. Use this only if you need different configurations for different projects
+
+### With Options (Global Configuration)
+
+You can add various options to customize the behavior in your global configuration:
 
 ```json
 {
@@ -52,8 +87,7 @@ You can add various options to customize the behavior:
         "chrome-devtools-mcp-for-extension@latest",
         "--headless=false",
         "--loadExtension=/path/to/your/extension"
-      ],
-      "env": {}
+      ]
     }
   }
 }
@@ -69,7 +103,9 @@ You can add various options to customize the behavior:
 - `--isolated`: Use temporary profile instead of system profile
 - `--userDataDir`: Custom Chrome profile directory
 
-## 🚀 Usage Examples
+## 🚀 Usage Examples (Global Configuration)
+
+All examples below use **global configuration** in `~/.claude.json`. These configurations apply to all your projects.
 
 ### Basic Setup (Zero Configuration)
 ```json
@@ -77,8 +113,7 @@ You can add various options to customize the behavior:
   "mcpServers": {
     "chrome-devtools-extension": {
       "command": "npx",
-      "args": ["chrome-devtools-mcp-for-extension@latest"],
-      "env": {}
+      "args": ["chrome-devtools-mcp-for-extension@latest"]
     }
   }
 }
@@ -95,8 +130,22 @@ This will automatically detect and use your system Chrome profile with all insta
         "chrome-devtools-mcp-for-extension@latest",
         "--headless=false",
         "--loadExtension=/Users/yourname/my-extension"
-      ],
-      "env": {}
+      ]
+    }
+  }
+}
+```
+
+### Load Multiple Extensions from Directory
+```json
+{
+  "mcpServers": {
+    "chrome-devtools-extension": {
+      "command": "npx",
+      "args": [
+        "chrome-devtools-mcp-for-extension@latest",
+        "--loadExtensionsDir=/Users/yourname/projects/Chrome-Extension"
+      ]
     }
   }
 }
@@ -111,11 +160,98 @@ This will automatically detect and use your system Chrome profile with all insta
       "args": [
         "chrome-devtools-mcp-for-extension@latest",
         "--isolated"
-      ],
-      "env": {}
+      ]
     }
   }
 }
+```
+
+## 📋 Configuration Scope: Global vs Project-Specific
+
+### Global Configuration (Recommended)
+
+**Location:** Root level of `~/.claude.json`
+
+```json
+{
+  "mcpServers": {
+    "chrome-devtools-extension": {
+      "command": "npx",
+      "args": ["chrome-devtools-mcp-for-extension@latest"]
+    }
+  }
+}
+```
+
+**When to use:**
+- ✅ You want the same MCP configuration for all projects
+- ✅ You want to simplify maintenance (single place to update)
+- ✅ You're developing multiple extensions that share the same setup
+- ✅ Most common use case - **recommended for most users**
+
+### Project-Specific Configuration (Advanced)
+
+**Location:** Inside `projects` section of `~/.claude.json`
+
+```json
+{
+  "mcpServers": {
+    "chrome-devtools-extension": {
+      "command": "npx",
+      "args": ["chrome-devtools-mcp-for-extension@latest"]
+    }
+  },
+  "projects": {
+    "/Users/yourname/project-a": {
+      "mcpServers": {
+        "chrome-devtools-extension": {
+          "command": "npx",
+          "args": [
+            "chrome-devtools-mcp-for-extension@latest",
+            "--loadExtension=/Users/yourname/project-a/extension"
+          ]
+        }
+      }
+    }
+  }
+}
+```
+
+**When to use:**
+- You need different extension configurations for different projects
+- Project-A needs `--isolated` mode, but Project-B needs system extensions
+- You want to override global settings for specific projects
+
+**Note:** Project-specific settings **override** global settings when working in that project.
+
+### Updating Configuration
+
+#### Update Global Configuration (Recommended)
+
+```bash
+# Backup first
+cp ~/.claude.json ~/.claude.json.backup
+
+# Update using jq
+jq '.mcpServers."chrome-devtools-extension".args = [
+  "chrome-devtools-mcp-for-extension@latest",
+  "--loadExtensionsDir=/path/to/extensions"
+]' ~/.claude.json > ~/.claude.json.tmp && mv ~/.claude.json.tmp ~/.claude.json
+```
+
+#### Update Project-Specific Configuration (Advanced)
+
+```bash
+# Backup first
+cp ~/.claude.json ~/.claude.json.backup
+
+# Update using jq
+jq --arg project "/path/to/your/project" '
+  .projects[$project].mcpServers."chrome-devtools-extension".args = [
+    "chrome-devtools-mcp-for-extension@latest",
+    "--loadExtension=/path/to/extension"
+  ]
+' ~/.claude.json > ~/.claude.json.tmp && mv ~/.claude.json.tmp ~/.claude.json
 ```
 
 ## 🔄 After Configuration
