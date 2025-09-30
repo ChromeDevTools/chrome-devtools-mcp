@@ -146,7 +146,10 @@ describe('screenshot', () => {
 
     it('with unwritable filePath', async () => {
       if (process.platform === 'win32') {
-        const filePath = join(tmpdir(), 'readonly-file-for-screenshot-test.png');
+        const filePath = join(
+          tmpdir(),
+          'readonly-file-for-screenshot-test.png',
+        );
         // Create the file and make it read-only.
         await writeFile(filePath, '');
         await chmod(filePath, 0o400);

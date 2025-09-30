@@ -48,7 +48,7 @@ export const screenshot = defineTool({
       .string()
       .optional()
       .describe(
-        'The path to save the screenshot to. If provided, the screenshot will be saved to this path instead of being attached to the response.',
+        'The absolute path, or a path relative to the current working directory, to save the screenshot to instead of attaching it to the response.',
       ),
   },
   handler: async (request, response, context) => {

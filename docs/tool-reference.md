@@ -306,7 +306,7 @@ so returned values have to JSON-serializable.
 
 **Parameters:**
 
-- **filePath** (string) _(optional)_: The path to save the screenshot to. If provided, the screenshot will be saved to this path instead of being attached to the response.
+- **filePath** (string) _(optional)_: The absolute path, or a path relative to the current working directory, to save the screenshot to instead of attaching it to the response.
 - **format** (enum: "png", "jpeg") _(optional)_: Type of format to save the screenshot as. Default is "png"
 - **fullPage** (boolean) _(optional)_: If set to true takes a screenshot of the full page instead of the currently visible viewport. Incompatible with uid.
 - **quality** (number) _(optional)_: Compression quality for JPEG format (0-100). Higher values mean better quality but larger file sizes. Ignored for PNG format.
