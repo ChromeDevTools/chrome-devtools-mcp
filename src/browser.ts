@@ -458,6 +458,7 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
       headless,
       args,
       ignoreDefaultArgs: ['--disable-extensions', '--enable-automation'],
+      enableExtensions: extensionPaths.length > 0 ? extensionPaths : undefined,
     });
 
     // Log actual spawn args for debugging
