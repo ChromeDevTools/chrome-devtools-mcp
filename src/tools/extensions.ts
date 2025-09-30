@@ -30,7 +30,11 @@ export const listExtensions = defineTool({
       await page.goto('chrome://extensions/', {waitUntil: 'networkidle0'});
 
       const extensions = await page.evaluate(() => {
-        const extensionCards = document.querySelectorAll('extensions-item');
+        const manager = document.querySelector('extensions-manager');
+        if (!manager?.shadowRoot) return null;
+        const itemList = manager.shadowRoot.querySelector('extensions-item-list');
+        if (!itemList?.shadowRoot) return null;
+        const extensionCards = itemList.shadowRoot.querySelectorAll('extensions-item');
         const results: Array<{
           id: string;
           name: string;
@@ -72,6 +76,11 @@ export const listExtensions = defineTool({
 
         return results;
       });
+
+      if (!extensions) {
+        response.appendResponseLine('❌ Failed to query extensions page');
+        return;
+      }
 
       response.appendResponseLine('Installed Chrome Extensions:');
       response.appendResponseLine('');
@@ -116,7 +125,11 @@ export const getExtensionInfo = defineTool({
       await page.goto('chrome://extensions/', {waitUntil: 'networkidle0'});
 
       const extensionInfo = await page.evaluate((searchName: string) => {
-        const extensionCards = document.querySelectorAll('extensions-item');
+        const manager = document.querySelector('extensions-manager');
+        if (!manager?.shadowRoot) return null;
+        const itemList = manager.shadowRoot.querySelector('extensions-item-list');
+        if (!itemList?.shadowRoot) return null;
+        const extensionCards = itemList.shadowRoot.querySelectorAll('extensions-item');
 
         for (const card of Array.from(extensionCards)) {
           const shadowRoot = card.shadowRoot;
@@ -181,6 +194,11 @@ export const getExtensionInfo = defineTool({
         return {found: false};
       }, extensionName);
 
+      if (!extensionInfo) {
+        response.appendResponseLine('❌ Failed to query extensions page');
+        return;
+      }
+
       if (extensionInfo.found) {
         response.appendResponseLine(`## Extension: ${extensionInfo.name}`);
         response.appendResponseLine('');
@@ -243,7 +261,11 @@ export const reloadExtension = defineTool({
 
       // Get extension info before reload
       const beforeState = await page.evaluate((searchName: string) => {
-        const extensionCards = document.querySelectorAll('extensions-item');
+        const manager = document.querySelector('extensions-manager');
+        if (!manager?.shadowRoot) return null;
+        const itemList = manager.shadowRoot.querySelector('extensions-item-list');
+        if (!itemList?.shadowRoot) return null;
+        const extensionCards = itemList.shadowRoot.querySelectorAll('extensions-item');
 
         for (const card of Array.from(extensionCards)) {
           const shadowRoot = card.shadowRoot;
@@ -272,6 +294,11 @@ export const reloadExtension = defineTool({
         return {found: false};
       }, extensionName);
 
+      if (!beforeState) {
+        response.appendResponseLine('❌ Failed to query extensions page');
+        return;
+      }
+
       if (!beforeState.found) {
         response.appendResponseLine(
           `❌ Extension not found: "${extensionName}"`,
@@ -291,7 +318,11 @@ export const reloadExtension = defineTool({
 
       // Perform reload
       const reloadResult = await page.evaluate((searchName: string) => {
-        const extensionCards = document.querySelectorAll('extensions-item');
+        const manager = document.querySelector('extensions-manager');
+        if (!manager?.shadowRoot) return null;
+        const itemList = manager.shadowRoot.querySelector('extensions-item-list');
+        if (!itemList?.shadowRoot) return null;
+        const extensionCards = itemList.shadowRoot.querySelectorAll('extensions-item');
 
         for (const card of Array.from(extensionCards)) {
           const shadowRoot = card.shadowRoot;
@@ -318,6 +349,11 @@ export const reloadExtension = defineTool({
         return {success: false, reason: 'Extension not found'};
       }, extensionName);
 
+      if (!reloadResult) {
+        response.appendResponseLine('❌ Failed to execute reload');
+        return;
+      }
+
       if (!reloadResult.success) {
         response.appendResponseLine(`❌ Failed: ${reloadResult.reason}`);
         return;
@@ -328,7 +364,11 @@ export const reloadExtension = defineTool({
 
       // Check for errors after reload
       const afterState = await page.evaluate((searchName: string) => {
-        const extensionCards = document.querySelectorAll('extensions-item');
+        const manager = document.querySelector('extensions-manager');
+        if (!manager?.shadowRoot) return null;
+        const itemList = manager.shadowRoot.querySelector('extensions-item-list');
+        if (!itemList?.shadowRoot) return null;
+        const extensionCards = itemList.shadowRoot.querySelectorAll('extensions-item');
 
         for (const card of Array.from(extensionCards)) {
           const shadowRoot = card.shadowRoot;
@@ -357,6 +397,11 @@ export const reloadExtension = defineTool({
 
         return {found: false, hasErrors: false};
       }, extensionName);
+
+      if (!afterState) {
+        response.appendResponseLine('⚠️ Warning: Could not verify reload status');
+        return;
+      }
 
       response.appendResponseLine('');
       if (afterState.hasErrors) {
@@ -400,7 +445,11 @@ export const toggleExtensionState = defineTool({
 
       const result = await page.evaluate(
         (searchName: string, targetEnabled: boolean) => {
-          const extensionCards = document.querySelectorAll('extensions-item');
+          const manager = document.querySelector('extensions-manager');
+        if (!manager?.shadowRoot) return null;
+        const itemList = manager.shadowRoot.querySelector('extensions-item-list');
+        if (!itemList?.shadowRoot) return null;
+        const extensionCards = itemList.shadowRoot.querySelectorAll('extensions-item');
 
           for (const card of Array.from(extensionCards)) {
             const shadowRoot = card.shadowRoot;
@@ -449,6 +498,11 @@ export const toggleExtensionState = defineTool({
         desiredEnabled,
       );
 
+      if (!result) {
+        response.appendResponseLine('❌ Failed to query extensions page');
+        return;
+      }
+
       if (!result.success) {
         response.appendResponseLine(`❌ Failed: ${result.reason}`);
         return;
@@ -488,7 +542,11 @@ export const openExtensionPopup = defineTool({
       await page.goto('chrome://extensions/', {waitUntil: 'networkidle0'});
 
       const extensionInfo = await page.evaluate((searchName: string) => {
-        const extensionCards = document.querySelectorAll('extensions-item');
+        const manager = document.querySelector('extensions-manager');
+        if (!manager?.shadowRoot) return null;
+        const itemList = manager.shadowRoot.querySelector('extensions-item-list');
+        if (!itemList?.shadowRoot) return null;
+        const extensionCards = itemList.shadowRoot.querySelectorAll('extensions-item');
 
         for (const card of Array.from(extensionCards)) {
           const shadowRoot = card.shadowRoot;
@@ -505,6 +563,11 @@ export const openExtensionPopup = defineTool({
 
         return {found: false};
       }, extensionName);
+
+      if (!extensionInfo) {
+        response.appendResponseLine('❌ Failed to query extensions page');
+        return;
+      }
 
       if (!extensionInfo.found) {
         response.appendResponseLine(
@@ -657,7 +720,11 @@ export const inspectServiceWorker = defineTool({
       await page.goto('chrome://extensions/', {waitUntil: 'networkidle0'});
 
       const inspectResult = await page.evaluate((searchName: string) => {
-        const extensionCards = document.querySelectorAll('extensions-item');
+        const manager = document.querySelector('extensions-manager');
+        if (!manager?.shadowRoot) return null;
+        const itemList = manager.shadowRoot.querySelector('extensions-item-list');
+        if (!itemList?.shadowRoot) return null;
+        const extensionCards = itemList.shadowRoot.querySelectorAll('extensions-item');
 
         for (const card of Array.from(extensionCards)) {
           const shadowRoot = card.shadowRoot;
@@ -702,6 +769,11 @@ export const inspectServiceWorker = defineTool({
 
         return {success: false, reason: 'Extension not found'};
       }, extensionName);
+
+      if (!inspectResult) {
+        response.appendResponseLine('❌ Failed to find extension');
+        return;
+      }
 
       if (inspectResult.success) {
         response.appendResponseLine(

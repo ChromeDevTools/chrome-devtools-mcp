@@ -571,9 +571,14 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
 async function ensureBrowserLaunched(
   options: McpLaunchOptions,
 ): Promise<Browser> {
+  console.error(`[ensureBrowserLaunched] browser exists: ${!!browser}, connected: ${browser?.connected}`);
+
   if (browser?.connected) {
+    console.error(`[ensureBrowserLaunched] Reusing existing browser`);
     return browser;
   }
+
+  console.error(`[ensureBrowserLaunched] Launching new browser`);
   browser = await launch(options);
   return browser;
 }

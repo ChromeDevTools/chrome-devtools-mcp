@@ -131,6 +131,19 @@ function registerTool(tool: ToolDefinition): void {
           const errorText =
             error instanceof Error ? error.message : String(error);
 
+          // Detect browser closed error and provide helpful message
+          if (errorText.includes('Target closed') || errorText.includes('Session closed')) {
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: `Browser connection lost. The Chrome instance was closed or disconnected.\n\nPlease restart the MCP server to reconnect.`,
+                },
+              ],
+              isError: true,
+            };
+          }
+
           return {
             content: [
               {
