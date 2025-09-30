@@ -2,9 +2,9 @@
 
 [![npm chrome-devtools-mcp-for-extension package](https://img.shields.io/npm/v/chrome-devtools-mcp-for-extension.svg)](https://npmjs.org/package/chrome-devtools-mcp-for-extension)
 
-**Zero-config Chrome extension testing with your real browser environment**
+**AI-powered Chrome extension development with automated testing, debugging, and Web Store submission**
 
-AI-powered Chrome extension development with automated testing, debugging, and Web Store submission.
+System extensions auto-load, development extensions easy to configure.
 
 **Built for:** Claude Code, Cursor, VS Code Copilot, Cline, and other MCP-compatible AI tools
 
@@ -18,22 +18,23 @@ AI-powered Chrome extension development with automated testing, debugging, and W
 - **Extension Development**: Can't test in real user environments
 
 ### The Solution
-- ✅ **Zero setup**: Uses your system Chrome profile automatically
+- ✅ **System extensions auto-load**: Your installed Chrome extensions work automatically
+- ✅ **Easy dev extension setup**: Simple `--loadExtensionsDir` configuration for development
 - ✅ **Real environment**: Tests with your actual extensions and settings
-- ✅ **No copying**: Direct profile access, instant sync
-- ✅ **Always enabled**: Extensions work automatically, no configuration needed
+- ✅ **Independent instance**: Runs alongside your regular Chrome without conflicts
 
 ---
 
 ## 🚀 Quick Start
 
-### 1. Install (30 seconds)
+### 1. Basic Installation (System Extensions Only)
 
 **Claude Code users (recommended):**
 ```bash
 claude mcp add --scope user chrome-devtools-extension npx chrome-devtools-mcp-for-extension@latest
 ```
 
+<details>
 <summary>Other MCP clients (Cursor, VS Code Copilot, Cline)</summary>
 
 Add to your global MCP configuration file (`~/.claude.json` or equivalent):
@@ -48,15 +49,47 @@ Add to your global MCP configuration file (`~/.claude.json` or equivalent):
   }
 }
 ```
+</details>
 
+This will auto-load your system Chrome extensions. **For development extensions**, see step 2.
 
-### 2. Restart your AI client
+### 2. Development Extensions Setup (Optional)
 
-### 3. Verify installation
+To load your development extensions, add `--loadExtensionsDir`:
+
+Add to `~/.claude.json`:
+```json
+{
+  "mcpServers": {
+    "chrome-devtools-extension": {
+      "command": "npx",
+      "args": [
+        "chrome-devtools-mcp-for-extension@latest",
+        "--loadExtensionsDir=/path/to/your/extensions"
+      ]
+    }
+  }
+}
+```
+
+**Example directory structure:**
+```
+/path/to/your/extensions/
+├── my-extension-1/
+│   └── manifest.json
+├── my-extension-2/
+│   └── manifest.json
+```
+
+See [MCP Configuration Guide](docs/mcp-configuration-guide.md) for more options.
+
+### 3. Restart your AI client
+
+### 4. Verify installation
 Ask your AI: **"List all my Chrome extensions"**
-✅ You should see your installed extensions listed
+✅ You should see your system extensions (and development extensions if configured)
 
-### 4. Start developing
+### 5. Start developing
 See [Common Workflows](#-common-workflows) below for typical use cases
 
 ---
