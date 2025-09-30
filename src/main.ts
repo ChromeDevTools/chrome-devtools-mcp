@@ -82,9 +82,12 @@ async function getContext(): Promise<McpContext> {
     userDataDir: args.userDataDir as string | undefined,
     logFile,
   });
-  if (context?.browser !== browser) {
+
+  // Always recreate context if browser reference changed or context doesn't exist
+  if (!context || context.browser !== browser) {
     context = await McpContext.from(browser, logger);
   }
+
   return context;
 }
 

@@ -134,6 +134,29 @@ To test your own extensions under development, add `--loadExtensionsDir`:
 
 ---
 
+## 🔍 Check Installed Version
+
+To verify which version is being used by your AI client:
+
+```
+"What version of chrome-devtools-mcp-for-extension are you using?"
+```
+
+The AI will call the tool with `--version` flag to check.
+
+**Troubleshooting cache issues:**
+- If you're not getting the latest version with `@latest`:
+  - Clear npx cache: `npx clear-npx-cache` or `rm -rf ~/.npm/_npx`
+  - Or use specific version: `chrome-devtools-mcp-for-extension@0.8.1`
+  - Restart your AI client completely
+
+**Direct check (manual):**
+```bash
+npx chrome-devtools-mcp-for-extension@latest --version
+```
+
+---
+
 ## 🛠️ Extension Development Tools
 
 Quick reference for the 3 core extension tools:
