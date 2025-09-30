@@ -549,7 +549,7 @@ export const toggleExtensionState = defineTool({
 
 export const openExtensionPopup = defineTool({
   name: 'open_extension_popup',
-  description: `Select an already-opened Chrome extension popup window for testing. The user should manually click the extension icon first to open the popup, then this tool will detect and select it. After selection, you can use take_snapshot, click, evaluate_script, etc. on the popup.`,
+  description: `Select an already-opened Chrome extension popup window for testing. If no extension name is provided, it will automatically detect and select the currently active popup window. If an extension name is provided, it will search for that specific extension's popup. After selection, you can use take_snapshot, click, evaluate_script, etc. on the popup.`,
   annotations: {
     category: ToolCategories.EXTENSION_DEVELOPMENT,
     readOnlyHint: false,
@@ -557,13 +557,54 @@ export const openExtensionPopup = defineTool({
   schema: {
     extensionName: z
       .string()
-      .describe('The name or partial name of the extension'),
+      .optional()
+      .describe('(Optional) The name or partial name of the extension. If omitted, will use the currently active popup.'),
   },
   handler: async (request, response, context) => {
     const page = context.getSelectedPage();
     const {extensionName} = request.params;
 
     await context.waitForEventsAfterAction(async () => {
+      const browser = page.browser();
+      if (!browser) {
+        response.appendResponseLine('❌ Failed to get browser instance.');
+        return;
+      }
+
+      // If no extension name provided, check if current page is already a popup
+      if (!extensionName) {
+        const currentUrl = page.url();
+        if (currentUrl.startsWith('chrome-extension://')) {
+          response.appendResponseLine('✅ Already on an extension popup window');
+          response.appendResponseLine(`📄 Popup URL: ${currentUrl}`);
+          response.appendResponseLine('');
+          response.appendResponseLine(
+            '💡 You can now use take_snapshot, click, evaluate_script, etc. on the popup',
+          );
+          return;
+        }
+
+        // If not on popup, try to find any open popup
+        const pages = await browser.pages();
+        for (let i = 0; i < pages.length; i++) {
+          const p = pages[i];
+          const url = p.url();
+          if (url.startsWith('chrome-extension://')) {
+            context.setSelectedPageIdx(i);
+            response.appendResponseLine('✅ Found and selected open popup window');
+            response.appendResponseLine(`📄 Popup URL: ${url}`);
+            response.appendResponseLine('');
+            response.appendResponseLine(
+              '💡 You can now use take_snapshot, click, evaluate_script, etc. on the popup',
+            );
+            return;
+          }
+        }
+
+        response.appendResponseLine('❌ No extension popup window found.');
+        response.appendResponseLine('💡 Please manually click the extension icon to open the popup first.');
+        return;
+      }
       // First, get extension ID
       await page.goto('chrome://extensions/', {waitUntil: 'networkidle0'});
 
