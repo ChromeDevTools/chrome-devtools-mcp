@@ -33,9 +33,11 @@ describe('browser', () => {
         await browser2.close();
         assert.fail('not reached');
       } catch (err) {
-        assert.strictEqual(
-          err.message,
-          `The browser is already running for ${folderPath}. Use --isolated to run multiple browser instances.`,
+        // Puppeteer throws this error when profile is already in use
+        assert.ok(
+          err.message.includes('The browser is already running for') ||
+          err.message.includes('Chrome is already using this profile'),
+          `Expected profile lock error, got: ${err.message}`
         );
       }
     } finally {

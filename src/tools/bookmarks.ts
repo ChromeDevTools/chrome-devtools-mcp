@@ -142,65 +142,38 @@ function loadChromeBookmarks(): Record<string, string> {
 }
 
 /**
- * Get all bookmarks: merged Chrome bookmarks with default fallback
+ * Get all bookmarks: returns only default development bookmarks for privacy
+ * User's personal Chrome bookmarks are not loaded to protect privacy
  */
 function getBookmarks(): Record<string, string> {
-  const defaultBookmarks = getDefaultBookmarks();
-  const chromeBookmarks = loadChromeBookmarks();
-
-  // Merge bookmarks: Chrome bookmarks take precedence, but defaults are always included
-  return {
-    ...defaultBookmarks,
-    ...chromeBookmarks
-  };
+  return getDefaultBookmarks();
 }
 
 export const listBookmarks = defineTool({
   name: 'list_bookmarks',
-  description: `List all available bookmarks including both Chrome bookmarks from the user's profile and default development bookmarks. Automatically loads bookmarks from Chrome's bookmark file and merges them with predefined development URLs.`,
+  description: `List all available bookmarks. Returns hardcoded development bookmarks only. User's personal Chrome bookmarks are not loaded to protect privacy.`,
   annotations: {
     category: ToolCategories.NAVIGATION_AUTOMATION,
     readOnlyHint: true,
   },
   schema: {},
   handler: async (_request, response, _context) => {
-    const defaultBookmarks = getDefaultBookmarks();
-    const chromeBookmarks = loadChromeBookmarks();
     const allBookmarks = getBookmarks();
     const bookmarkNames = Object.keys(allBookmarks);
 
     if (bookmarkNames.length === 0) {
       response.appendResponseLine('No bookmarks configured.');
-      response.appendResponseLine('');
-      response.appendResponseLine(
-        '💡 **Tip:** Chrome bookmarks could not be loaded. Check if Chrome is installed and has bookmarks.',
-      );
       return;
     }
 
-    response.appendResponseLine('📚 **Available Bookmarks:**');
-    response.appendResponseLine('');
-
-    // Show loading status
-    const chromeBookmarkCount = Object.keys(chromeBookmarks).length;
-    const defaultBookmarkCount = Object.keys(defaultBookmarks).length;
-
-    if (chromeBookmarkCount > 0) {
-      response.appendResponseLine(`✅ Loaded ${chromeBookmarkCount} bookmarks from Chrome profile${chromeBookmarkCount >= 100 ? ' (limited to 100)' : ''}`);
-      response.appendResponseLine(`📋 ${defaultBookmarkCount} default development bookmarks included`);
-    } else {
-      response.appendResponseLine(`⚠️  Could not load Chrome bookmarks, using ${defaultBookmarkCount} default bookmarks`);
-    }
+    response.appendResponseLine('📚 **Available Development Bookmarks:**');
     response.appendResponseLine('');
 
     bookmarkNames.forEach(name => {
       const url = allBookmarks[name];
-      const source = chromeBookmarks[name] ? '🌐' : '🔧';
-      response.appendResponseLine(`${source} **${name}**: ${url}`);
+      response.appendResponseLine(`🔧 **${name}**: ${url}`);
     });
 
-    response.appendResponseLine('');
-    response.appendResponseLine('**Legend:** 🌐 = Chrome bookmark, 🔧 = Default bookmark');
     response.appendResponseLine('');
     response.appendResponseLine(
       `Use \`navigate_bookmark name="<bookmark_name>"\` to navigate to any of these URLs.`,
@@ -210,7 +183,7 @@ export const listBookmarks = defineTool({
 
 export const navigateBookmark = defineTool({
   name: 'navigate_bookmark',
-  description: `Navigate to a bookmark URL from Chrome bookmarks or default development bookmarks. Automatically includes bookmarks from the user's Chrome profile merged with predefined development resources.`,
+  description: `Navigate to a bookmark URL from default development bookmarks. User's personal Chrome bookmarks are not loaded to protect privacy.`,
   annotations: {
     category: ToolCategories.NAVIGATION_AUTOMATION,
     readOnlyHint: false,
