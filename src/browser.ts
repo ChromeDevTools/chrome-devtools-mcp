@@ -591,11 +591,11 @@ export async function resolveBrowser(options: {
   userDataDir?: string;
   logFile?: fs.WriteStream;
 }) {
-  const browser = options.browserUrl
+  const resolvedBrowser = options.browserUrl
     ? await ensureBrowserConnected(options.browserUrl)
     : await ensureBrowserLaunched(options);
 
-  return browser;
+  return resolvedBrowser;
 }
 
 export {
