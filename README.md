@@ -29,7 +29,7 @@ System extensions auto-load, development extensions easy to configure.
 
 ### 1. Add Configuration
 
-Add the following to `~/.claude.json`:
+Add the following :
 
 ```json
 {
@@ -67,13 +67,11 @@ To test your own extensions under development, add `--loadExtensionsDir`:
 {
   "mcpServers": {
     "chrome-devtools-extension": {
-      "type": "stdio",
       "command": "npx",
       "args": [
         "chrome-devtools-mcp-for-extension@latest",
         "--loadExtensionsDir=/path/to/your/extensions"
-      ],
-      "env": {}
+      ]
     }
   }
 }
@@ -590,7 +588,7 @@ AIに質問:
 
 ---
 
-## 開発用拡張機能のロード（オプション）
+## 開発用拡張機能のロード（--loadExtensionsDirあり）
 
 開発中の拡張機能をテストする場合:
 
@@ -598,13 +596,11 @@ AIに質問:
 {
   "mcpServers": {
     "chrome-devtools-extension": {
-      "type": "stdio",
       "command": "npx",
       "args": [
         "chrome-devtools-mcp-for-extension@latest",
         "--loadExtensionsDir=/path/to/your/extensions"
-      ],
-      "env": {}
+      ]
     }
   }
 }
