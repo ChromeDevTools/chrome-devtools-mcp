@@ -584,7 +584,37 @@ export const openExtensionPopup = defineTool({
           return;
         }
 
-        // If not on popup, try to find any open popup
+        // Check for iframe-embedded popup in current page
+        const iframePopups = await page.evaluate(() => {
+          return Array.from(document.querySelectorAll('iframe'))
+            .filter((iframe) => iframe.src.startsWith('chrome-extension://'))
+            .map((iframe) => ({
+              src: iframe.src,
+              id: iframe.id,
+              className: iframe.className,
+            }));
+        });
+
+        if (iframePopups.length > 0) {
+          response.appendResponseLine(
+            '✅ Extension popup found (embedded as iframe)',
+          );
+          response.appendResponseLine(`📄 Popup URL: ${iframePopups[0].src}`);
+          response.appendResponseLine('');
+          response.appendResponseLine(
+            '💡 This popup is embedded in the current page as an iframe.',
+          );
+          response.appendResponseLine(
+            '   You can interact with it using regular page tools:',
+          );
+          response.appendResponseLine('   - take_snapshot (includes iframe content)');
+          response.appendResponseLine('   - click on elements');
+          response.appendResponseLine('   - fill forms');
+          response.appendResponseLine('   - evaluate_script');
+          return;
+        }
+
+        // If not on popup or iframe, try to find any open popup window
         const pages = await browser.pages();
         for (let i = 0; i < pages.length; i++) {
           const p = pages[i];
@@ -602,7 +632,9 @@ export const openExtensionPopup = defineTool({
         }
 
         response.appendResponseLine('❌ No extension popup window found.');
-        response.appendResponseLine('💡 Please manually click the extension icon to open the popup first.');
+        response.appendResponseLine(
+          '💡 Please manually click the extension icon to open the popup first.',
+        );
         return;
       }
       // First, get extension ID
@@ -674,8 +706,46 @@ export const openExtensionPopup = defineTool({
         }
 
         if (!popupPage) {
+          // Check for iframe-embedded popup with this extension ID
+          response.appendResponseLine('🔧 Checking for iframe-embedded popup...');
+
+          // Go back to the original page to check for iframes
+          await page.goBack();
+
+          const iframePopups = await page.evaluate((extId: string) => {
+            return Array.from(document.querySelectorAll('iframe'))
+              .filter((iframe) => iframe.src.includes(extId))
+              .map((iframe) => ({
+                src: iframe.src,
+                id: iframe.id,
+                className: iframe.className,
+              }));
+          }, extensionInfo.id);
+
+          if (iframePopups.length > 0) {
+            response.appendResponseLine('');
+            response.appendResponseLine(
+              `✅ Extension popup found (embedded as iframe): ${extensionInfo.name}`,
+            );
+            response.appendResponseLine(`📄 Popup URL: ${iframePopups[0].src}`);
+            response.appendResponseLine('');
+            response.appendResponseLine(
+              '💡 This popup is embedded in the current page as an iframe.',
+            );
+            response.appendResponseLine(
+              '   You can interact with it using regular page tools:',
+            );
+            response.appendResponseLine('   - take_snapshot (includes iframe content)');
+            response.appendResponseLine('   - click on elements');
+            response.appendResponseLine('   - fill forms');
+            response.appendResponseLine('   - evaluate_script');
+            return;
+          }
+
           response.appendResponseLine('❌ Popup window not found.');
-          response.appendResponseLine('💡 Please manually click the extension icon to open the popup first.');
+          response.appendResponseLine(
+            '💡 Please manually click the extension icon to open the popup first.',
+          );
           return;
         }
 
