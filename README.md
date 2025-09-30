@@ -29,7 +29,7 @@ System extensions auto-load, development extensions easy to configure.
 
 ### 1. Add Configuration
 
-Add the following :
+Add the following to `~/.claude.json`:
 
 ```json
 {
