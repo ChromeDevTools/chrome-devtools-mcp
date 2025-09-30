@@ -142,6 +142,151 @@ function scanExtensionsDirectory(extensionsDir: string): string[] {
 }
 
 /**
+ * Get System Chrome User Data directory (not Chrome for Testing)
+ */
+function getSystemChromeUserDataDir(channel?: Channel): string {
+  const homeDir = os.homedir();
+  const platform = os.platform();
+
+  if (platform === 'darwin') {
+    // macOS
+    let chromeDataPath = path.join(homeDir, 'Library', 'Application Support', 'Google', 'Chrome');
+    if (channel === 'canary') {
+      chromeDataPath = path.join(homeDir, 'Library', 'Application Support', 'Google', 'Chrome Canary');
+    } else if (channel === 'beta') {
+      chromeDataPath = path.join(homeDir, 'Library', 'Application Support', 'Google', 'Chrome Beta');
+    } else if (channel === 'dev') {
+      chromeDataPath = path.join(homeDir, 'Library', 'Application Support', 'Google', 'Chrome Dev');
+    }
+    return chromeDataPath;
+  } else if (platform === 'win32') {
+    // Windows
+    let chromeDataPath = path.join(homeDir, 'AppData', 'Local', 'Google', 'Chrome', 'User Data');
+    if (channel === 'canary') {
+      chromeDataPath = path.join(homeDir, 'AppData', 'Local', 'Google', 'Chrome SxS', 'User Data');
+    } else if (channel === 'beta') {
+      chromeDataPath = path.join(homeDir, 'AppData', 'Local', 'Google', 'Chrome Beta', 'User Data');
+    } else if (channel === 'dev') {
+      chromeDataPath = path.join(homeDir, 'AppData', 'Local', 'Google', 'Chrome Dev', 'User Data');
+    }
+    return chromeDataPath;
+  } else {
+    // Linux
+    let chromeDataPath = path.join(homeDir, '.config', 'google-chrome');
+    if (channel === 'canary') {
+      chromeDataPath = path.join(homeDir, '.config', 'google-chrome-unstable');
+    } else if (channel === 'beta') {
+      chromeDataPath = path.join(homeDir, '.config', 'google-chrome-beta');
+    } else if (channel === 'dev') {
+      chromeDataPath = path.join(homeDir, '.config', 'google-chrome-unstable');
+    }
+
+    // Check if google-chrome exists, fallback to chromium
+    if (!fs.existsSync(chromeDataPath)) {
+      const chromiumPath = path.join(homeDir, '.config', 'chromium');
+      if (fs.existsSync(chromiumPath)) {
+        return chromiumPath;
+      }
+    }
+    return chromeDataPath;
+  }
+}
+
+/**
+ * Read Local State file to get last used profile
+ */
+function readLocalState(userDataDir: string): {
+  lastUsed?: string;
+} {
+  const localStatePath = path.join(userDataDir, 'Local State');
+
+  try {
+    if (!fs.existsSync(localStatePath)) {
+      return {};
+    }
+
+    const content = fs.readFileSync(localStatePath, 'utf-8');
+    const json = JSON.parse(content);
+    const lastUsed = json?.profile?.last_used;
+
+    if (typeof lastUsed === 'string') {
+      return { lastUsed };
+    }
+  } catch (error) {
+    console.warn(`Failed to read Local State: ${error instanceof Error ? error.message : String(error)}`);
+  }
+
+  return {};
+}
+
+/**
+ * Compare version strings (e.g., "2.3.2_0" vs "2.3.1_0")
+ */
+function compareVersion(a: string, b: string): number {
+  // Normalize: "2.3.2_0" → [2, 3, 2]
+  const normalize = (v: string) =>
+    v.split('_')[0].split('.').map(x => parseInt(x, 10) || 0);
+
+  const aParts = normalize(a);
+  const bParts = normalize(b);
+  const maxLen = Math.max(aParts.length, bParts.length);
+
+  for (let i = 0; i < maxLen; i++) {
+    const diff = (aParts[i] || 0) - (bParts[i] || 0);
+    if (diff !== 0) return diff;
+  }
+
+  return 0;
+}
+
+/**
+ * Scan one profile's Extensions directory and return extension paths
+ */
+function scanExtensionsInProfile(profileDir: string): string[] {
+  const extensionPaths: string[] = [];
+  const extensionsDir = path.join(profileDir, 'Extensions');
+
+  if (!fs.existsSync(extensionsDir)) {
+    return extensionPaths;
+  }
+
+  try {
+    const extensionIds = fs.readdirSync(extensionsDir, { withFileTypes: true });
+
+    for (const extensionEntry of extensionIds) {
+      if (!extensionEntry.isDirectory()) continue;
+
+      const extensionIdPath = path.join(extensionsDir, extensionEntry.name);
+
+      try {
+        const versions = fs.readdirSync(extensionIdPath, { withFileTypes: true })
+          .filter(e => e.isDirectory())
+          .map(e => e.name);
+
+        if (versions.length === 0) continue;
+
+        // Find the latest version
+        const latestVersion = versions.sort(compareVersion).pop()!;
+        const versionPath = path.join(extensionIdPath, latestVersion);
+        const manifestPath = path.join(versionPath, 'manifest.json');
+
+        const manifest = validateExtensionManifest(manifestPath);
+        if (manifest) {
+          extensionPaths.push(versionPath);
+          console.error(`  ✅ ${manifest.name} v${manifest.version} (MV${manifest.manifest_version})`);
+        }
+      } catch (error) {
+        console.warn(`Error processing extension ${extensionEntry.name}: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+  } catch (error) {
+    console.error(`Error scanning extensions in ${extensionsDir}: ${error instanceof Error ? error.message : String(error)}`);
+  }
+
+  return extensionPaths;
+}
+
+/**
  * Get the Chrome extensions directory path for the current platform
  */
 function getChromeExtensionsDirectory(channel?: Channel): string {
@@ -237,66 +382,59 @@ function validateExtensionManifest(manifestPath: string): ExtensionManifest | nu
 
 /**
  * Discover Chrome extensions installed in the system
+ * Uses Local State to determine the active profile, or uses specified profile
  */
-function discoverSystemExtensions(channel?: Channel): string[] {
-  const extensionPaths: string[] = [];
-  const extensionsDir = getChromeExtensionsDirectory(channel);
+function discoverSystemExtensions(channel?: Channel, chromeProfile?: string): string[] {
+  console.error(`🔍 Discovering system Chrome extensions...`);
 
-  console.error(`🔍 Discovering system Chrome extensions in: ${extensionsDir}`);
+  const userDataDir = getSystemChromeUserDataDir(channel);
+  console.error(`📁 Chrome User Data: ${userDataDir}`);
 
-  try {
-    if (!fs.existsSync(extensionsDir)) {
-      console.warn(`System Chrome extensions directory not found: ${extensionsDir}`);
-      return extensionPaths;
+  // Determine target profile
+  let targetProfile: string;
+
+  if (chromeProfile) {
+    // CLI-specified profile takes priority
+    targetProfile = chromeProfile;
+    console.error(`🎯 Using CLI-specified profile: ${targetProfile}`);
+  } else {
+    // Read Local State to get last used profile
+    const { lastUsed } = readLocalState(userDataDir);
+    targetProfile = lastUsed || 'Default';
+
+    if (lastUsed) {
+      console.error(`🎯 Using last-used profile from Local State: ${targetProfile}`);
+    } else {
+      console.error(`🎯 Local State not found, using Default profile`);
     }
-
-    const extensionIds = fs.readdirSync(extensionsDir, { withFileTypes: true });
-
-    for (const extensionEntry of extensionIds) {
-      if (!extensionEntry.isDirectory()) continue;
-
-      const extensionIdPath = path.join(extensionsDir, extensionEntry.name);
-
-      try {
-        // Each extension ID directory contains version subdirectories
-        const versions = fs.readdirSync(extensionIdPath, { withFileTypes: true });
-
-        // Find the latest/most recent version
-        let latestVersion = '';
-        let latestPath = '';
-
-        for (const versionEntry of versions) {
-          if (!versionEntry.isDirectory()) continue;
-
-          const versionPath = path.join(extensionIdPath, versionEntry.name);
-          const manifestPath = path.join(versionPath, 'manifest.json');
-
-          const manifest = validateExtensionManifest(manifestPath);
-          if (manifest) {
-            // Use the first valid version found (Chrome keeps the latest active)
-            if (!latestVersion || versionEntry.name > latestVersion) {
-              latestVersion = versionEntry.name;
-              latestPath = versionPath;
-            }
-          }
-        }
-
-        if (latestPath && latestVersion) {
-          const manifest = validateExtensionManifest(path.join(latestPath, 'manifest.json'));
-          if (manifest) {
-            extensionPaths.push(latestPath);
-            console.error(`  ✅ Found: ${manifest.name} v${manifest.version} (Manifest v${manifest.manifest_version})`);
-          }
-        }
-      } catch (error) {
-        console.warn(`Error processing extension ${extensionEntry.name}: ${error instanceof Error ? error.message : String(error)}`);
-      }
-    }
-
-    console.error(`📦 System extension discovery complete: ${extensionPaths.length} valid extensions found`);
-  } catch (error) {
-    console.error(`Error discovering system extensions: ${error instanceof Error ? error.message : String(error)}`);
   }
+
+  // Check if target profile exists
+  const profileDir = path.join(userDataDir, targetProfile);
+  if (!fs.existsSync(profileDir)) {
+    console.warn(`⚠️  Profile directory not found: ${targetProfile}`);
+
+    // Fallback to Default
+    if (targetProfile !== 'Default') {
+      console.error(`📁 Falling back to Default profile`);
+      targetProfile = 'Default';
+      const defaultProfileDir = path.join(userDataDir, targetProfile);
+
+      if (!fs.existsSync(defaultProfileDir)) {
+        console.error(`❌ Default profile also not found. No extensions will be loaded.`);
+        return [];
+      }
+    } else {
+      console.error(`❌ Default profile not found. No extensions will be loaded.`);
+      return [];
+    }
+  }
+
+  // Scan the target profile
+  console.error(`📂 Scanning profile: ${targetProfile}`);
+  const extensionPaths = scanExtensionsInProfile(path.join(userDataDir, targetProfile));
+
+  console.error(`📦 Total: ${extensionPaths.length} extension(s) found in profile "${targetProfile}"`);
 
   return extensionPaths;
 }
@@ -311,6 +449,7 @@ interface McpLaunchOptions {
   loadExtension?: string;
   loadExtensionsDir?: string;
   loadSystemExtensions?: boolean;
+  chromeProfile?: string;
   logFile?: fs.WriteStream;
 }
 
@@ -331,6 +470,7 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
     loadExtension,
     loadExtensionsDir,
     loadSystemExtensions,
+    chromeProfile,
   } = options;
 
   // Reset development extension paths
@@ -403,7 +543,7 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
   // System extension discovery (default: true unless isolated flag is set)
   const shouldLoadSystemExtensions = loadSystemExtensions ?? !isolated;
   if (shouldLoadSystemExtensions) {
-    const systemExtensions = discoverSystemExtensions(channel);
+    const systemExtensions = discoverSystemExtensions(channel, chromeProfile);
     if (systemExtensions.length > 0) {
       extensionPaths.push(...systemExtensions);
       console.error(`✅ Loaded ${systemExtensions.length} system Chrome extension(s)`);
@@ -608,6 +748,7 @@ export async function resolveBrowser(options: {
   loadExtension?: string;
   loadExtensionsDir?: string;
   loadSystemExtensions?: boolean;
+  chromeProfile?: string;
   userDataDir?: string;
   logFile?: fs.WriteStream;
 }) {

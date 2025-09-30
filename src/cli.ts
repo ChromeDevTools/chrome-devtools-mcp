@@ -68,6 +68,12 @@ export const cliOptions = {
     default: false,
     conflicts: 'browserUrl',
   },
+  chromeProfile: {
+    type: 'string' as const,
+    description:
+      'Specify Chrome profile name (e.g., "Default", "Profile 1", "Profile 2"). If not specified, uses last_used from Local State. Only effective when --loadSystemExtensions is true.',
+    conflicts: 'browserUrl',
+  },
   userDataDir: {
     type: 'string' as const,
     description: 'Specify a custom user data directory for Chrome to use instead of the default. Auto-detected if not specified.',

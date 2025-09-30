@@ -79,6 +79,7 @@ async function getContext(): Promise<McpContext> {
     loadExtension: args.loadExtension as string | undefined,
     loadExtensionsDir: args.loadExtensionsDir as string | undefined,
     loadSystemExtensions: args.loadSystemExtensions as boolean | undefined,
+    chromeProfile: args.chromeProfile as string | undefined,
     userDataDir: args.userDataDir as string | undefined,
     logFile,
   });
