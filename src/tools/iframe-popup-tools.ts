@@ -32,44 +32,64 @@ export async function waitForFrameByUrlMatch(
   timeoutMs = 5000,
 ): Promise<{frameId: string; frameUrl: string}> {
   await cdp.send('Page.enable');
-  // First quick scan
-  const tree = await cdp.send('Page.getFrameTree');
-  const hit = scanTree(tree.frameTree, pattern);
-  if (hit) return hit;
+  await cdp.send('Runtime.enable');
+  await cdp.send('DOM.enable');
 
-  // Then wait for navigation events
+  // Strategy: Find iframe in DOM, then match Frame ID
   const start = Date.now();
-  return await new Promise((resolve, reject) => {
-    function onNav(ev: any) {
-      const {frame} = ev;
-      if (frame?.url && pattern.test(frame.url)) {
-        cleanup();
-        resolve({frameId: frame.id, frameUrl: frame.url});
-      }
-    }
-    function onTimeout() {
-      cleanup();
-      reject(
-        new Error(`Timeout waiting for frame by url match: ${pattern}`),
-      );
-    }
-    function cleanup() {
-      cdp.off('Page.frameNavigated', onNav);
-    }
-    cdp.on('Page.frameNavigated', onNav);
-    const left = Math.max(0, timeoutMs - (Date.now() - start));
-    setTimeout(onTimeout, left);
-  });
+  while (Date.now() - start < timeoutMs) {
+    try {
+      // Get document root
+      const {root} = await cdp.send('DOM.getDocument', {depth: -1});
 
-  function scanTree(
+      // Query all iframes
+      const {nodeIds} = await cdp.send('DOM.querySelectorAll', {
+        nodeId: root.nodeId,
+        selector: 'iframe',
+      });
+
+      // Check each iframe's src
+      for (const nodeId of nodeIds) {
+        const attrs = await cdp.send('DOM.getAttributes', {nodeId});
+        const srcIndex = attrs.attributes.indexOf('src');
+        if (srcIndex >= 0 && srcIndex + 1 < attrs.attributes.length) {
+          const src = attrs.attributes[srcIndex + 1];
+          if (pattern.test(src)) {
+            // Get contentDocument frame ID
+            const {node} = await cdp.send('DOM.describeNode', {nodeId});
+            if (node.contentDocument) {
+              const frameId = node.contentDocument.frameId || node.frameId;
+              if (frameId) {
+                return {frameId, frameUrl: src};
+              }
+            }
+
+            // Fallback: try Frame Tree match
+            const tree = await cdp.send('Page.getFrameTree');
+            const hit = findFrameByUrl(tree.frameTree, src);
+            if (hit) return hit;
+          }
+        }
+      }
+    } catch (e) {
+      // DOM may not be ready yet, continue waiting
+    }
+
+    // Wait a bit before retry
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+
+  throw new Error(`Timeout waiting for iframe by url match: ${pattern}`);
+
+  function findFrameByUrl(
     node: any,
-    rx: RegExp,
+    url: string,
   ): {frameId: string; frameUrl: string} | null {
-    if (node?.frame?.url && rx.test(node.frame.url)) {
+    if (node?.frame?.url === url) {
       return {frameId: node.frame.id, frameUrl: node.frame.url};
     }
     for (const c of node.childFrames ?? []) {
-      const r = scanTree(c, rx);
+      const r = findFrameByUrl(c, url);
       if (r) return r;
     }
     return null;
