@@ -141,12 +141,16 @@ export async function inspectIframe(
       );
     }
 
-    // Execute in the frame context
+    // Execute in the frame context using Page.createIsolatedWorld
+    const {executionContextId} = await cdp.send('Page.createIsolatedWorld', {
+      frameId: frame.id,
+    });
+
     await cdp.send('Runtime.enable');
     const htmlResult = await cdp.send('Runtime.evaluate', {
       expression: 'document.documentElement.outerHTML',
       returnByValue: true,
-      contextId: frame.id,
+      contextId: executionContextId,
     });
 
     const html = String(htmlResult?.result?.value ?? '');
