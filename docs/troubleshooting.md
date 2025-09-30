@@ -14,7 +14,7 @@
 ### `Error [ERR_MODULE_NOT_FOUND]: Cannot find module ...`
 
 This usually indicates either a non-supported Node version is in use or that the
-`npm`/`npx` cache is corrupted. Try clearing the cache, unsintalling
+`npm`/`npx` cache is corrupted. Try clearing the cache, uninstalling
 `chrome-devtools-mcp` and installing it again.
 
 ### `Target closed` error
