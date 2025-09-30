@@ -55,7 +55,10 @@ export const listExtensions = defineTool({
               '';
             const version =
               shadowRoot.querySelector('#version')?.textContent?.trim() || '';
-            const enableToggle = shadowRoot.querySelector('#enable-toggle');
+            let enableToggle = shadowRoot.querySelector('#enable-toggle');
+            if (!enableToggle) {
+              enableToggle = shadowRoot.querySelector('cr-toggle');
+            }
             const enabled = enableToggle?.getAttribute('checked') === '';
             const id = card.getAttribute('id') || 'unknown';
             const errorsBadge = shadowRoot.querySelector(
@@ -143,7 +146,10 @@ export const getExtensionInfo = defineTool({
                 '';
               const version =
                 shadowRoot.querySelector('#version')?.textContent?.trim() || '';
-              const enableToggle = shadowRoot.querySelector('#enable-toggle');
+              let enableToggle = shadowRoot.querySelector('#enable-toggle');
+              if (!enableToggle) {
+                enableToggle = shadowRoot.querySelector('cr-toggle');
+              }
               const enabled = enableToggle?.getAttribute('checked') === '';
               const id = card.getAttribute('id') || 'unknown';
               const errorsBadge = shadowRoot.querySelector(
@@ -276,7 +282,10 @@ export const reloadExtension = defineTool({
             if (name.toLowerCase().includes(searchName.toLowerCase())) {
               const version =
                 shadowRoot.querySelector('#version')?.textContent?.trim() || '';
-              const enableToggle = shadowRoot.querySelector('#enable-toggle');
+              let enableToggle = shadowRoot.querySelector('#enable-toggle');
+              if (!enableToggle) {
+                enableToggle = shadowRoot.querySelector('cr-toggle');
+              }
               const enabled = enableToggle?.getAttribute('checked') === '';
               const id = card.getAttribute('id') || 'unknown';
 
