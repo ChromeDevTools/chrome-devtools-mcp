@@ -89,34 +89,74 @@ export async function inspectIframe(
   urlPattern: RegExp,
   waitMs = 8000,
 ): Promise<InspectResult> {
-  // Enable OOPIF auto-attach
-  await enableOopifAutoAttach(cdp);
+  // Try OOPIF detection first
+  try {
+    await enableOopifAutoAttach(cdp);
+    const child = await waitForExtensionChildTarget(cdp, urlPattern, waitMs);
 
-  // Wait for child target (extension iframe)
-  const child = await waitForExtensionChildTarget(cdp, urlPattern, waitMs);
+    // Enable Page/Runtime in child session
+    await sendToChildSession(cdp, child.sessionId, 'Page.enable', {});
+    await sendToChildSession(cdp, child.sessionId, 'Runtime.enable', {});
 
-  // Enable Page/Runtime in child session
-  await sendToChildSession(cdp, child.sessionId, 'Page.enable', {});
-  await sendToChildSession(cdp, child.sessionId, 'Runtime.enable', {});
+    // Evaluate outerHTML in child session
+    const htmlResult = await sendToChildSession(
+      cdp,
+      child.sessionId,
+      'Runtime.evaluate',
+      {
+        expression: 'document.documentElement.outerHTML',
+        returnByValue: true,
+      },
+    );
 
-  // Evaluate outerHTML in child session
-  const htmlResult = await sendToChildSession(
-    cdp,
-    child.sessionId,
-    'Runtime.evaluate',
-    {
+    const html = String(htmlResult?.result?.value ?? '');
+
+    return {
+      frameId: child.targetId,
+      frameUrl: child.url,
+      html,
+    };
+  } catch (oopifError) {
+    // Fallback: Try regular iframe via Page.getFrameTree
+    await cdp.send('Page.enable');
+    const {frameTree} = await cdp.send('Page.getFrameTree');
+
+    const findFrame = (node: any): any => {
+      if (urlPattern.test(node.frame.url)) {
+        return node.frame;
+      }
+      if (node.childFrames) {
+        for (const child of node.childFrames) {
+          const found = findFrame(child);
+          if (found) return found;
+        }
+      }
+      return null;
+    };
+
+    const frame = findFrame(frameTree);
+    if (!frame) {
+      throw new Error(
+        `Iframe not found (tried both OOPIF and regular iframe): ${urlPattern}`,
+      );
+    }
+
+    // Execute in the frame context
+    await cdp.send('Runtime.enable');
+    const htmlResult = await cdp.send('Runtime.evaluate', {
       expression: 'document.documentElement.outerHTML',
       returnByValue: true,
-    },
-  );
+      contextId: frame.id,
+    });
 
-  const html = String(htmlResult?.result?.value ?? '');
+    const html = String(htmlResult?.result?.value ?? '');
 
-  return {
-    frameId: child.targetId, // Use targetId as frameId for OOPIF
-    frameUrl: child.url,
-    html,
-  };
+    return {
+      frameId: frame.id,
+      frameUrl: frame.url,
+      html,
+    };
+  }
 }
 
 async function sendToChildSession(
