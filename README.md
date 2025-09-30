@@ -27,9 +27,9 @@ System extensions auto-load, development extensions easy to configure.
 
 ## 🚀 Quick Start
 
-### 1. Basic Installation (System Extensions Only)
+### 1. Add Configuration
 
-Add to `~/.claude.json` (or your MCP client's global configuration):
+Add the following to `~/.claude.json`:
 
 ```json
 {
@@ -42,13 +42,25 @@ Add to `~/.claude.json` (or your MCP client's global configuration):
 }
 ```
 
-This will auto-load your system Chrome extensions. **For development extensions**, see step 2.
+> **Note**: For other MCP clients (Cursor, VS Code Copilot, Cline), add to your client's global configuration file.
 
-### 2. Development Extensions Setup (Optional)
+### 2. Restart Your AI Client
 
-To load your development extensions, add `--loadExtensionsDir`:
+### 3. Test It
 
-Add to `~/.claude.json`:
+Ask your AI:
+```
+"List all my Chrome extensions"
+```
+
+✅ You should see your installed Chrome extensions
+
+---
+
+## 🔧 Load Development Extensions (Optional)
+
+To test your own extensions under development, add `--loadExtensionsDir`:
+
 ```json
 {
   "mcpServers": {
@@ -63,7 +75,7 @@ Add to `~/.claude.json`:
 }
 ```
 
-**Example directory structure:**
+**Directory structure example:**
 ```
 /path/to/your/extensions/
 ├── my-extension-1/
@@ -72,16 +84,7 @@ Add to `~/.claude.json`:
 │   └── manifest.json
 ```
 
-See [MCP Configuration Guide](docs/mcp-configuration-guide.md) for more options.
-
-### 3. Restart your AI client
-
-### 4. Verify installation
-Ask your AI: **"List all my Chrome extensions"**
-✅ You should see your system extensions (and development extensions if configured)
-
-### 5. Start developing
-See [Common Workflows](#-common-workflows) below for typical use cases
+**More options**: See [MCP Configuration Guide](docs/mcp-configuration-guide.md)
 
 ---
 
@@ -540,11 +543,13 @@ npx chrome-devtools-mcp-for-extension@latest --isolated
 
 **Chrome拡張機能開発用のAI支援MCPサーバー**
 
-ゼロコンフィグで実環境テストが可能なChrome拡張機能開発ツール
+システム拡張機能を自動ロード、開発用拡張機能も簡単設定
 
-## インストール
+## クイックスタート
 
-`~/.claude.json`（または使用しているMCPクライアントのグローバル設定ファイル）に以下を追加:
+### 1. 設定を追加
+
+`~/.claude.json` に以下を追加:
 
 ```json
 {
@@ -557,13 +562,47 @@ npx chrome-devtools-mcp-for-extension@latest --isolated
 }
 ```
 
+### 2. AIクライアントを再起動
+
+### 3. 動作確認
+
+AIに質問:
+```
+「Chrome拡張機能を一覧表示して」
+```
+
+✅ インストール済みの拡張機能が表示されます
+
+---
+
+## 開発用拡張機能のロード（オプション）
+
+開発中の拡張機能をテストする場合:
+
+```json
+{
+  "mcpServers": {
+    "chrome-devtools-extension": {
+      "command": "npx",
+      "args": [
+        "chrome-devtools-mcp-for-extension@latest",
+        "--loadExtensionsDir=/path/to/your/extensions"
+      ]
+    }
+  }
+}
+```
+
+詳細は [MCP設定ガイド](docs/mcp-configuration-guide.md) を参照してください。
+
+---
+
 ## 主な機能
 
 - 🧩 **拡張機能の開発・デバッグ・リロード**: ライブ開発環境
 - 🏪 **Chrome Web Store への自動申請**: スクリーンショット生成付き
 - 🔧 **実環境でのブラウザテスト**: 既存の拡張機能と共存
 - 🐛 **高度なデバッグ**: サービスワーカー検査、コンソール監視
-- 📸 **ストア用画像の自動生成**: 複数サイズ対応
 
 ## 使用例
 
@@ -574,14 +613,7 @@ npx chrome-devtools-mcp-for-extension@latest --isolated
 「Web Storeに申請して」
 ```
 
-## なぜこのツールか？
-
-- ✅ **設定不要**: システムのChromeプロファイルを自動使用
-- ✅ **実環境テスト**: 実際の拡張機能・設定でテスト可能
-- ✅ **コピー不要**: プロファイルの直接アクセス、即座に同期
-- ✅ **常時有効**: 拡張機能が自動的に有効化
-
-詳細は英語セクションを参照してください。
+その他の詳細は英語セクションを参照してください。
 
 ---
 
