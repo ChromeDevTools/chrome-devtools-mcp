@@ -95,6 +95,30 @@ startup_timeout_ms = 20_000
 </details>
 
 <details>
+  <summary>Copilot CLI</summary>
+
+Start Copilot CLI:
+
+```
+copilot
+```
+
+Start the dialog to add a new MCP server by running:
+
+```
+/mcp add
+```
+
+Configure the following fields and press `CTR-S` to save the configuration:
+
+- **Server name:** `chrome-devtools`
+- **Server Type:** `[1] Local`
+- **Command:** `npx`
+- **Arguments:** `-y, chrome-devtools-mcp@latest`
+
+</details>
+
+<details>
   <summary>Copilot / VS Code</summary>
   Follow the MCP install <a href="https://code.visualstudio.com/docs/copilot/chat/mcp-servers#_add-an-mcp-server">guide</a>,
   with the standard config from above. You can also install the Chrome DevTools MCP server using the VS Code CLI:
@@ -102,14 +126,6 @@ startup_timeout_ms = 20_000
   ```bash
   code --add-mcp '{"name":"chrome-devtools","command":"npx","args":["chrome-devtools-mcp@latest"]}'
   ```
-</details>
-
-<details>
-  <summary>Visual Studio</summary>
-  
-  **Click the button to install:**
-  
-  [<img src="https://img.shields.io/badge/Visual_Studio-Install-C16FDE?logo=visualstudio&logoColor=white" alt="Install in Visual Studio">](https://vs-open.link/mcp-install?%7B%22name%22%3A%22chrome-devtools%22%2C%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22chrome-devtools-mcp%40latest%22%5D%7D)
 </details>
 
 <details>
@@ -157,6 +173,14 @@ Alternatively, follow the <a href="https://github.com/google-gemini/gemini-cli/b
 Go to `Settings | Tools | AI Assistant | Model Context Protocol (MCP)` -> `Add`. Use the config provided above.
 The same way chrome-devtools-mcp can be configured for JetBrains Junie in `Settings | Tools | Junie | MCP Settings` -> `Add`. Use the config provided above.
 
+</details>
+
+<details>
+  <summary>Visual Studio</summary>
+  
+  **Click the button to install:**
+  
+  [<img src="https://img.shields.io/badge/Visual_Studio-Install-C16FDE?logo=visualstudio&logoColor=white" alt="Install in Visual Studio">](https://vs-open.link/mcp-install?%7B%22name%22%3A%22chrome-devtools%22%2C%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22chrome-devtools-mcp%40latest%22%5D%7D)
 </details>
 
 ### Your first prompt
