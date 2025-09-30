@@ -1,6 +1,7 @@
 // src/tools/iframe-popup-tools.ts
 // Tools for inspecting & editing in-page iframe popups via CDP.
 // These tools enable direct access to iframe-embedded extension popups.
+// Uses OOPIF (Out-Of-Process iFrame) detection via Target.setAutoAttach.
 
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -12,6 +13,12 @@ export type InspectResult = {
   html: string;
   screenshotBase64?: string;
   consoleLogs?: string[];
+};
+
+export type ChildTarget = {
+  sessionId: string;
+  targetId: string;
+  url: string;
 };
 
 export async function findExtensionIdViaTargets(
@@ -26,79 +33,136 @@ export async function findExtensionIdViaTargets(
   return new URL(ext.url).host;
 }
 
-export async function waitForFrameByUrlMatch(
+export async function enableOopifAutoAttach(cdp: CDPSession): Promise<void> {
+  await cdp.send('Target.setDiscoverTargets', {discover: true});
+  await cdp.send('Target.setAutoAttach', {
+    autoAttach: true,
+    waitForDebuggerOnStart: false,
+    flatten: true, // Essential for OOPIF detection
+  });
+}
+
+export async function waitForExtensionChildTarget(
   cdp: CDPSession,
   pattern: RegExp,
-  timeoutMs = 5000,
-): Promise<{frameId: string; frameUrl: string}> {
-  await cdp.send('Page.enable');
-  await cdp.send('Runtime.enable');
-  await cdp.send('DOM.enable');
-
-  // Strategy: Use Page.getFrameTree and match by pattern
+  timeoutMs = 8000,
+): Promise<ChildTarget> {
   const start = Date.now();
-  while (Date.now() - start < timeoutMs) {
-    try {
-      const tree = await cdp.send('Page.getFrameTree');
-      const hit = findFrameByPattern(tree.frameTree, pattern);
-      if (hit) return hit;
-    } catch (e) {
-      // Frame tree may not be ready yet, continue waiting
-    }
+  return await new Promise((resolve, reject) => {
+    let resolved = false;
 
-    // Wait a bit before retry
-    await new Promise(resolve => setTimeout(resolve, 100));
-  }
+    const onAttach = (e: any) => {
+      const url = e?.targetInfo?.url || '';
+      if (pattern.test(url)) {
+        resolved = true;
+        cleanup();
+        resolve({
+          sessionId: e.sessionId,
+          targetId: e.targetInfo.targetId,
+          url,
+        });
+      }
+    };
 
-  throw new Error(`Timeout waiting for iframe by url match: ${pattern}`);
+    const onTimeout = () => {
+      if (!resolved) {
+        cleanup();
+        reject(
+          new Error(
+            `Timeout: extension popup child target not found (pattern: ${pattern})`,
+          ),
+        );
+      }
+    };
 
-  function findFrameByPattern(
-    node: any,
-    rx: RegExp,
-  ): {frameId: string; frameUrl: string} | null {
-    if (node?.frame?.url && rx.test(node.frame.url)) {
-      return {frameId: node.frame.id, frameUrl: node.frame.url};
-    }
-    for (const c of node.childFrames ?? []) {
-      const r = findFrameByPattern(c, rx);
-      if (r) return r;
-    }
-    return null;
-  }
+    const cleanup = () => {
+      cdp.off('Target.attachedToTarget', onAttach);
+    };
+
+    cdp.on('Target.attachedToTarget', onAttach);
+    setTimeout(onTimeout, Math.max(0, timeoutMs - (Date.now() - start)));
+  });
 }
 
 export async function inspectIframe(
   cdp: CDPSession,
   urlPattern: RegExp,
-  waitMs = 5000,
+  waitMs = 8000,
 ): Promise<InspectResult> {
-  await cdp.send('Runtime.enable');
-  await cdp.send('DOM.enable');
-  await cdp.send('Log.enable');
+  // Enable OOPIF auto-attach
+  await enableOopifAutoAttach(cdp);
 
-  const {frameId, frameUrl} = await waitForFrameByUrlMatch(
+  // Wait for child target (extension iframe)
+  const child = await waitForExtensionChildTarget(cdp, urlPattern, waitMs);
+
+  // Enable Page/Runtime in child session
+  await sendToChildSession(cdp, child.sessionId, 'Page.enable', {});
+  await sendToChildSession(cdp, child.sessionId, 'Runtime.enable', {});
+
+  // Evaluate outerHTML in child session
+  const htmlResult = await sendToChildSession(
     cdp,
-    urlPattern,
-    waitMs,
+    child.sessionId,
+    'Runtime.evaluate',
+    {
+      expression: 'document.documentElement.outerHTML',
+      returnByValue: true,
+    },
   );
 
-  const {executionContextId} = await cdp.send('Page.createIsolatedWorld', {
-    frameId,
-    worldName: 'mcp',
-    // grantUniveralAccess is a known CDP option in some builds. It's optional here.
-  });
-
-  const {result} = await cdp.send('Runtime.evaluate', {
-    contextId: executionContextId,
-    expression: 'document.documentElement.outerHTML',
-    returnByValue: true,
-  });
+  const html = String(htmlResult?.result?.value ?? '');
 
   return {
-    frameId,
-    frameUrl,
-    html: String(result.value ?? ''),
+    frameId: child.targetId, // Use targetId as frameId for OOPIF
+    frameUrl: child.url,
+    html,
   };
+}
+
+async function sendToChildSession(
+  cdp: CDPSession,
+  sessionId: string,
+  method: string,
+  params: any,
+): Promise<any> {
+  const id = Math.floor(Math.random() * 1000000);
+  const message = JSON.stringify({id, method, params});
+
+  // Send message to child target
+  await cdp.send('Target.sendMessageToTarget', {sessionId, message});
+
+  // Wait for response from child target
+  return await new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      cleanup();
+      reject(new Error(`Timeout waiting for response from child session: ${method}`));
+    }, 5000);
+
+    const onMessage = (e: any) => {
+      if (e.sessionId === sessionId) {
+        try {
+          const response = JSON.parse(e.message);
+          if (response.id === id) {
+            cleanup();
+            if (response.error) {
+              reject(new Error(`CDP error: ${JSON.stringify(response.error)}`));
+            } else {
+              resolve(response.result);
+            }
+          }
+        } catch (err) {
+          // Ignore parse errors for other messages
+        }
+      }
+    };
+
+    const cleanup = () => {
+      clearTimeout(timeout);
+      cdp.off('Target.receivedMessageFromTarget', onMessage);
+    };
+
+    cdp.on('Target.receivedMessageFromTarget', onMessage);
+  });
 }
 
 export async function patchAndReload(
