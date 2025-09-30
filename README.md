@@ -443,29 +443,16 @@ interface ManifestValidation {
 - `--load-extension` may be restricted in newer Chrome versions
 - **Solution**: Use system profile (default) instead of `--loadExtension` flag
 
-## Profile Lock Conflicts
+## Concurrent Chrome Usage
 
-**Error: "Chrome is already using this profile"**
+**Can I use Chrome while the MCP server is running?**
 
-This error occurs when Chrome is already running with the system profile. The MCP server detects profile lock files and fails immediately to prevent conflicts.
+Yes! The MCP server can run alongside your regular Chrome browser. Chrome is robust enough to handle concurrent access to the same profile.
 
-**Solution:**
-1. **Close all Chrome windows** - The simplest solution is to completely quit Chrome before starting the MCP server
-2. **Use isolated profile** - Run with `--isolated` flag to use a temporary profile:
-   ```bash
-   npx chrome-devtools-mcp-for-extension@latest --isolated
-   ```
-3. **Use custom profile** - Specify a custom profile directory:
-   ```bash
-   npx chrome-devtools-mcp-for-extension@latest --userDataDir=/path/to/custom/profile
-   ```
-
-**Why This Happens:**
-- Chrome creates lock files (`SingletonLock`, `SingletonCookie`, `SingletonSocket`) when a profile is in use
-- Multiple Chrome instances cannot share the same profile simultaneously
-- The MCP server now detects these locks early and fails fast with a clear error message
-
-**Note:** Previous versions silently fell back to a temporary profile, which caused confusion. Version 0.6.4+ fails immediately with a clear error instead.
+**Note:** If you experience any issues with concurrent usage, you can use the `--isolated` flag to run with a separate profile:
+```bash
+npx chrome-devtools-mcp-for-extension@latest --isolated
+```
 
 </details>
 

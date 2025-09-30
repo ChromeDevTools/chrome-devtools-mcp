@@ -81,24 +81,6 @@ function getLastUsedProfile(userDataDir: string): string {
   }
 }
 
-/**
- * Check if Chrome profile is already in use (locked)
- * Throws an error if the profile is locked
- */
-function assertProfileNotInUse(userDataDir: string): void {
-  const lockFiles = ['SingletonLock', 'SingletonCookie', 'SingletonSocket'];
-  const hasLock = lockFiles.some(lockFile =>
-    fs.existsSync(path.join(userDataDir, lockFile))
-  );
-
-  if (hasLock) {
-    throw new Error(
-      `Chrome is already using this profile: ${userDataDir}\n` +
-      `Please close Chrome and try again.`
-    );
-  }
-}
-
 function scanExtensionsDirectory(extensionsDir: string): string[] {
   const extensionPaths: string[] = [];
 
@@ -375,9 +357,6 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
       // Use system profile directly for better user experience
       userDataDir = systemProfile.path;
       usingSystemProfile = true;
-
-      // Check if profile is already in use
-      assertProfileNotInUse(userDataDir);
 
       // Detect last used profile directory
       profileDirectory = getLastUsedProfile(userDataDir);
