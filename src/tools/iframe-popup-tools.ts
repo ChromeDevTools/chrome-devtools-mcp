@@ -117,25 +117,35 @@ export async function inspectIframe(
       html,
     };
   } catch (oopifError) {
-    // Fallback: Try regular iframe via Page.getFrameTree
-    await cdp.send('Page.enable');
-    const {frameTree} = await cdp.send('Page.getFrameTree');
+    // Fallback: Try regular iframe via DOM.querySelectorAll
+    await cdp.send('DOM.enable');
+    const {root} = await cdp.send('DOM.getDocument', {depth: -1});
 
-    const findFrame = (node: any): any => {
-      if (urlPattern.test(node.frame.url)) {
-        return node.frame;
-      }
-      if (node.childFrames) {
-        for (const child of node.childFrames) {
-          const found = findFrame(child);
-          if (found) return found;
-        }
-      }
-      return null;
-    };
+    // Query all iframes
+    const {nodeIds} = await cdp.send('DOM.querySelectorAll', {
+      nodeId: root.nodeId,
+      selector: 'iframe',
+    });
 
-    const frame = findFrame(frameTree);
-    if (!frame) {
+    // Find the iframe matching the pattern
+    let targetFrameId: string | null = null;
+    let targetFrameUrl: string | null = null;
+
+    for (const nodeId of nodeIds) {
+      const {node} = await cdp.send('DOM.describeNode', {nodeId});
+      const src = node.attributes?.find(
+        (attr, i, arr) => attr === 'src' && arr[i + 1],
+      );
+      const srcValue = src ? node.attributes![node.attributes!.indexOf(src) + 1] : '';
+
+      if (urlPattern.test(srcValue)) {
+        targetFrameId = node.frameId || null;
+        targetFrameUrl = srcValue;
+        break;
+      }
+    }
+
+    if (!targetFrameId || !targetFrameUrl) {
       throw new Error(
         `Iframe not found (tried both OOPIF and regular iframe): ${urlPattern}`,
       );
@@ -143,7 +153,7 @@ export async function inspectIframe(
 
     // Execute in the frame context using Page.createIsolatedWorld
     const {executionContextId} = await cdp.send('Page.createIsolatedWorld', {
-      frameId: frame.id,
+      frameId: targetFrameId,
     });
 
     await cdp.send('Runtime.enable');
@@ -156,8 +166,8 @@ export async function inspectIframe(
     const html = String(htmlResult?.result?.value ?? '');
 
     return {
-      frameId: frame.id,
-      frameUrl: frame.url,
+      frameId: targetFrameId,
+      frameUrl: targetFrameUrl,
       html,
     };
   }
