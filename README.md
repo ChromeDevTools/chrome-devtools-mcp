@@ -35,8 +35,10 @@ Add the following to `~/.claude.json`:
 {
   "mcpServers": {
     "chrome-devtools-extension": {
+      "type": "stdio",
       "command": "npx",
-      "args": ["chrome-devtools-mcp-for-extension@latest"]
+      "args": ["chrome-devtools-mcp-for-extension@latest"],
+      "env": {}
     }
   }
 }
@@ -65,11 +67,13 @@ To test your own extensions under development, add `--loadExtensionsDir`:
 {
   "mcpServers": {
     "chrome-devtools-extension": {
+      "type": "stdio",
       "command": "npx",
       "args": [
         "chrome-devtools-mcp-for-extension@latest",
         "--loadExtensionsDir=/path/to/your/extensions"
-      ]
+      ],
+      "env": {}
     }
   }
 }
@@ -193,11 +197,13 @@ Add to `~/.claude.json`:
 {
   "mcpServers": {
     "chrome-devtools-extension": {
+      "type": "stdio",
       "command": "npx",
       "args": [
         "chrome-devtools-mcp-for-extension@latest",
         "--loadExtension=/path/to/your/extension"
-      ]
+      ],
+      "env": {}
     }
   }
 }
@@ -213,6 +219,7 @@ Add to `~/.claude.json`:
 {
   "mcpServers": {
     "chrome-devtools-extension": {
+      "type": "stdio",
       "command": "npx",
       "args": ["chrome-devtools-mcp-for-extension@latest"],
       "env": {
@@ -231,11 +238,13 @@ Add to `~/.claude.json`:
 {
   "mcpServers": {
     "chrome-devtools-extension": {
+      "type": "stdio",
       "command": "npx",
       "args": [
         "chrome-devtools-mcp-for-extension@latest",
         "--channel=canary"
-      ]
+      ],
+      "env": {}
     }
   }
 }
@@ -251,11 +260,13 @@ Add to `~/.claude.json`:
 {
   "mcpServers": {
     "chrome-devtools-extension": {
+      "type": "stdio",
       "command": "npx",
       "args": [
         "chrome-devtools-mcp-for-extension@latest",
         "--isolated"
-      ]
+      ],
+      "env": {}
     }
   }
 }
@@ -453,11 +464,13 @@ Update `~/.claude.json`:
 {
   "mcpServers": {
     "chrome-devtools-extension": {
+      "type": "stdio",
       "command": "npx",
       "args": [
         "chrome-devtools-mcp-for-extension@latest",
         "--loadExtension=/correct/path"
-      ]
+      ],
+      "env": {}
     }
   }
 }
@@ -555,8 +568,10 @@ npx chrome-devtools-mcp-for-extension@latest --isolated
 {
   "mcpServers": {
     "chrome-devtools-extension": {
+      "type": "stdio",
       "command": "npx",
-      "args": ["chrome-devtools-mcp-for-extension@latest"]
+      "args": ["chrome-devtools-mcp-for-extension@latest"],
+      "env": {}
     }
   }
 }
@@ -583,11 +598,13 @@ AIに質問:
 {
   "mcpServers": {
     "chrome-devtools-extension": {
+      "type": "stdio",
       "command": "npx",
       "args": [
         "chrome-devtools-mcp-for-extension@latest",
         "--loadExtensionsDir=/path/to/your/extensions"
-      ]
+      ],
+      "env": {}
     }
   }
 }
