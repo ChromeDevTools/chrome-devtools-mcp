@@ -25,19 +25,6 @@ AI-powered Chrome extension development with automated testing, debugging, and W
 
 ---
 
-## 📊 How It Compares
-
-| Feature | This Tool | Puppeteer/Playwright | Original chrome-devtools-mcp |
-|---------|-----------|----------------------|------------------------------|
-| Extension Support | ✅ Always enabled | ❌ Disabled by default | ⚠️ Manual config required |
-| Setup Required | ❌ None | ✅ Complex config files | ✅ Multiple flags needed |
-| Real User Profile | ✅ Direct access | ❌ Temporary profiles | ⚠️ Optional |
-| Profile Copying | ❌ No copying needed | ⚠️ Manual setup | ⚠️ Manual setup |
-| Web Store Automation | ✅ Built-in | ❌ None | ❌ None |
-| Extension Debugging | ✅ Service worker + console | ⚠️ Limited | ❌ None |
-
----
-
 ## 🚀 Quick Start
 
 ### 1. Install (30 seconds)
@@ -128,6 +115,21 @@ Quick reference for the 3 core extension tools:
 | `reload_extension` | Hot-reload during development | "Reload my-extension" |
 | `inspect_service_worker` | Debug background scripts | "Debug service worker for my-extension" |
 
+
+---
+
+## 📊 How It Compares
+
+| Feature | This Tool | Puppeteer/Playwright | Original chrome-devtools-mcp |
+|---------|-----------|----------------------|------------------------------|
+| Extension Support | ✅ Always enabled | ❌ Disabled by default | ⚠️ Manual config required |
+| Setup Required | ❌ None | ✅ Complex config files | ✅ Multiple flags needed |
+| Real User Profile | ✅ Direct access | ❌ Temporary profiles | ⚠️ Optional |
+| Profile Copying | ❌ No copying needed | ⚠️ Manual setup | ⚠️ Manual setup |
+| Web Store Automation | ✅ Built-in | ❌ None | ❌ None |
+| Extension Debugging | ✅ Service worker + console | ⚠️ Limited | ❌ None |
+
+---
 <details>
 <summary>📖 Detailed Tool Documentation</summary>
 
