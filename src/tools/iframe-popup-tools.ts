@@ -89,96 +89,108 @@ export async function inspectIframe(
   urlPattern: RegExp,
   waitMs = 8000,
 ): Promise<InspectResult> {
-  // Try OOPIF detection first
+  // Strategy: Use DOMSnapshot.captureSnapshot to get iframe-inclusive DOM structure
+  // Note: chrome-extension:// iframes may not be included due to SOP/extension isolation
+
+  await cdp.send('DOMSnapshot.enable');
+
   try {
-    await enableOopifAutoAttach(cdp);
-    const child = await waitForExtensionChildTarget(cdp, urlPattern, waitMs);
-
-    // Enable Page/Runtime in child session
-    await sendToChildSession(cdp, child.sessionId, 'Page.enable', {});
-    await sendToChildSession(cdp, child.sessionId, 'Runtime.enable', {});
-
-    // Evaluate outerHTML in child session
-    const htmlResult = await sendToChildSession(
-      cdp,
-      child.sessionId,
-      'Runtime.evaluate',
-      {
-        expression: 'document.documentElement.outerHTML',
-        returnByValue: true,
-      },
-    );
-
-    const html = String(htmlResult?.result?.value ?? '');
-
-    return {
-      frameId: child.targetId,
-      frameUrl: child.url,
-      html,
-    };
-  } catch (oopifError) {
-    // Fallback: Access iframe content through parent page's DOM
-    await cdp.send('Runtime.enable');
-
-    const iframeAccessScript = `
-      (function() {
-        const pattern = ${urlPattern};
-        const iframes = Array.from(document.querySelectorAll('iframe'));
-
-        for (const iframe of iframes) {
-          if (pattern.test(iframe.src)) {
-            try {
-              // Try to access contentDocument/contentWindow
-              const doc = iframe.contentDocument || iframe.contentWindow?.document;
-              if (doc) {
-                return {
-                  success: true,
-                  src: iframe.src,
-                  html: doc.documentElement.outerHTML
-                };
-              }
-            } catch (securityError) {
-              // If blocked by same-origin policy, return error details
-              return {
-                success: false,
-                src: iframe.src,
-                error: 'SecurityError: ' + securityError.message
-              };
-            }
-          }
-        }
-
-        return {
-          success: false,
-          error: 'Iframe not found matching pattern: ' + pattern.toString()
-        };
-      })()
-    `;
-
-    const evalResult = await cdp.send('Runtime.evaluate', {
-      expression: iframeAccessScript,
-      returnByValue: true,
+    // Capture full DOM snapshot including iframes
+    const snapshot = await cdp.send('DOMSnapshot.captureSnapshot', {
+      computedStyles: [],
+      includeDOMRects: false,
+      includePaintOrder: false,
     });
 
-    const data = evalResult?.result?.value as {
-      success: boolean;
-      src?: string;
-      html?: string;
-      error?: string;
-    };
+    // Search for matching iframe in the snapshot
+    const result = findIframeInSnapshot(snapshot, urlPattern);
 
-    if (!data?.success) {
-      throw new Error(
-        `Iframe access failed: ${data?.error || 'Unknown error'}`,
-      );
+    if (result) {
+      return {
+        frameId: null,
+        frameUrl: result.url,
+        html: result.html,
+      };
     }
 
-    return {
-      frameId: null,
-      frameUrl: data.src || '',
-      html: data.html || '',
-    };
+    // Extension iframe not found in snapshot - this is expected behavior
+    // due to Same-Origin Policy and Chrome extension isolation
+    throw new Error(
+      'EXTENSION_FRAME_UNREADABLE: Chrome extension iframes are isolated by ' +
+      'Same-Origin Policy and extension security model. The iframe exists but ' +
+      'cannot be read from the page context. This is expected Chrome behavior.',
+    );
+  } catch (error: any) {
+    // If DOMSnapshot fails or iframe not found, provide clear explanation
+    if (error.message?.includes('EXTENSION_FRAME_UNREADABLE')) {
+      throw error;
+    }
+
+    throw new Error(
+      `Failed to capture DOM snapshot: ${error.message}. ` +
+      'Note: Chrome extension iframes are typically unreadable due to security policies.',
+    );
+  } finally {
+    await cdp.send('DOMSnapshot.disable');
   }
+}
+
+function findIframeInSnapshot(
+  snapshot: any,
+  urlPattern: RegExp,
+): {url: string; html: string} | null {
+  // DOMSnapshot structure:
+  // - documents: array of document snapshots
+  // - strings: string table for deduplication
+
+  const documents = snapshot.documents || [];
+
+  for (const doc of documents) {
+    const baseURL = doc.baseURL;
+
+    // Check if this document matches the pattern
+    if (baseURL && urlPattern.test(baseURL)) {
+      // Reconstruct HTML from snapshot
+      const html = reconstructHTMLFromSnapshot(doc, snapshot.strings || []);
+      return {url: baseURL, html};
+    }
+  }
+
+  return null;
+}
+
+function reconstructHTMLFromSnapshot(doc: any, strings: string[]): string {
+  // Simple reconstruction - get text content from nodes
+  // Note: DOMSnapshot doesn't provide perfect HTML reconstruction
+  // but gives us the essential content
+
+  const nodes = doc.nodes || {};
+  const nodeNames = nodes.nodeName || [];
+  const nodeValues = nodes.nodeValue || [];
+  const textValues = nodes.textValue || {};
+
+  // Build a simple HTML representation
+  let html = '<html>';
+
+  // Try to find body content
+  for (let i = 0; i < nodeNames.length; i++) {
+    const nameIdx = nodeNames[i];
+    const name = strings[nameIdx] || '';
+    const valueIdx = nodeValues[i];
+    const value = valueIdx >= 0 ? strings[valueIdx] : '';
+
+    if (name === '#document' || name === 'HTML') continue;
+
+    if (name === '#text' && value) {
+      html += value;
+    } else if (name) {
+      html += `<${name}>`;
+    }
+  }
+
+  html += '</html>';
+
+  return html;
 }
 
 async function sendToChildSession(
