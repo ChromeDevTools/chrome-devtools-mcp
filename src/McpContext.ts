@@ -340,17 +340,20 @@ export class McpContext implements Context {
 
   async saveTemporaryFile(
     data: Uint8Array<ArrayBufferLike>,
-    mimeType: 'image/png' | 'image/jpeg',
+    mimeType: 'image/png' | 'image/jpeg' | 'image/webp',
   ): Promise<{filename: string}> {
     try {
       const dir = await fs.mkdtemp(
         path.join(os.tmpdir(), 'chrome-devtools-mcp-'),
       );
-      const filename = path.join(
-        dir,
-        mimeType == 'image/png' ? `screenshot.png` : 'screenshot.jpg',
-      );
-      await fs.writeFile(path.join(dir, `screenshot.png`), data);
+      const ext =
+        mimeType === 'image/png'
+          ? 'png'
+          : mimeType === 'image/jpeg'
+            ? 'jpg'
+            : 'webp';
+      const filename = path.join(dir, `screenshot.${ext}`);
+      await fs.writeFile(filename, data);
       return {filename};
     } catch (err) {
       this.logger(err);
