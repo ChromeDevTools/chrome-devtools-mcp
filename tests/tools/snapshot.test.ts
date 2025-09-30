@@ -96,7 +96,6 @@ describe('snapshot', () => {
       });
     });
 
-
     it('should work with iframe content', async () => {
       await withBrowser(async (response, context) => {
         const page = await context.getSelectedPage();
