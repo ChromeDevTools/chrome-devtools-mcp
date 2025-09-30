@@ -887,3 +887,153 @@ export const inspectServiceWorker = defineTool({
     });
   },
 });
+// Import iframe popup tools
+import * as iframePopupTools from './iframe-popup-tools.js';
+
+export const inspectIframePopup = defineTool({
+  name: 'inspect_iframe_popup',
+  description: `Inspect an iframe-embedded extension popup using CDP. This tool can access iframe content that normal Puppeteer cannot reach. Returns the full HTML of the iframe popup.`,
+  annotations: {
+    category: ToolCategories.EXTENSION_DEVELOPMENT,
+    readOnlyHint: true,
+  },
+  schema: {
+    urlPattern: z
+      .string()
+      .describe(
+        'Regular expression pattern to match the iframe URL (e.g., "chrome-extension://[^/]+/popup\\.html$")',
+      ),
+    waitMs: z
+      .number()
+      .optional()
+      .describe('Maximum time to wait for iframe (default: 5000ms)'),
+  },
+  handler: async (request, response, context) => {
+    const page = context.getSelectedPage();
+    const {urlPattern, waitMs} = request.params;
+
+    await context.waitForEventsAfterAction(async () => {
+      try {
+        const cdp = await page.createCDPSession();
+        const pattern = new RegExp(urlPattern);
+        const result = await iframePopupTools.inspectIframe(
+          cdp,
+          pattern,
+          waitMs ?? 5000,
+        );
+
+        response.appendResponseLine('✅ Successfully inspected iframe popup');
+        response.appendResponseLine('');
+        response.appendResponseLine(`📄 Frame URL: ${result.frameUrl}`);
+        response.appendResponseLine(`🆔 Frame ID: ${result.frameId}`);
+        response.appendResponseLine('');
+        response.appendResponseLine('📝 HTML Content:');
+        response.appendResponseLine('```html');
+        response.appendResponseLine(
+          result.html.length > 2000
+            ? result.html.substring(0, 2000) + '\n... (truncated)'
+            : result.html,
+        );
+        response.appendResponseLine('```');
+
+        await cdp.detach();
+      } catch (error) {
+        response.appendResponseLine(
+          `❌ Error: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    });
+  },
+});
+
+export const patchIframePopup = defineTool({
+  name: 'patch_iframe_popup',
+  description: `Patch local extension source files and reload the extension. This allows live editing of iframe-embedded popups. The extension must be loaded from a local directory.`,
+  annotations: {
+    category: ToolCategories.EXTENSION_DEVELOPMENT,
+    readOnlyHint: false,
+  },
+  schema: {
+    extensionPath: z
+      .string()
+      .describe('Absolute path to the extension directory'),
+    patches: z
+      .array(
+        z.object({
+          file: z
+            .string()
+            .describe('Relative path to file within extension (e.g., "popup.html")'),
+          find: z
+            .string()
+            .describe('Regular expression pattern to find'),
+          replace: z.string().describe('Replacement string'),
+        }),
+      )
+      .describe('Array of patches to apply'),
+  },
+  handler: async (request, response, context) => {
+    const page = context.getSelectedPage();
+    const {extensionPath, patches} = request.params;
+
+    await context.waitForEventsAfterAction(async () => {
+      try {
+        const cdp = await page.createCDPSession();
+
+        response.appendResponseLine(
+          `🔧 Applying ${patches.length} patch(es) to extension...`,
+        );
+
+        await iframePopupTools.patchAndReload(cdp, extensionPath, patches);
+
+        response.appendResponseLine('');
+        response.appendResponseLine('✅ Patches applied successfully');
+        response.appendResponseLine('🔄 Extension reloaded');
+        response.appendResponseLine('');
+        response.appendResponseLine('Applied patches:');
+        for (const p of patches) {
+          response.appendResponseLine(
+            `  • ${p.file}: "${p.find}" → "${p.replace}"`,
+          );
+        }
+
+        await cdp.detach();
+      } catch (error) {
+        response.appendResponseLine(
+          `❌ Error: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    });
+  },
+});
+
+export const reloadIframeExtension = defineTool({
+  name: 'reload_iframe_extension',
+  description: `Reload the extension via its service worker using chrome.runtime.reload(). Useful after manually editing extension files.`,
+  annotations: {
+    category: ToolCategories.EXTENSION_DEVELOPMENT,
+    readOnlyHint: false,
+  },
+  schema: {},
+  handler: async (request, response, context) => {
+    const page = context.getSelectedPage();
+
+    await context.waitForEventsAfterAction(async () => {
+      try {
+        const cdp = await page.createCDPSession();
+
+        response.appendResponseLine('🔄 Reloading extension...');
+
+        await iframePopupTools.reloadExtension(cdp);
+
+        response.appendResponseLine('');
+        response.appendResponseLine('✅ Extension reloaded successfully');
+
+        await cdp.detach();
+      } catch (error) {
+        response.appendResponseLine(
+          `❌ Error: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    });
+  },
+});
