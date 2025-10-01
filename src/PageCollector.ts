@@ -9,6 +9,11 @@ import type {Browser, HTTPRequest, Page} from 'puppeteer-core';
 export class PageCollector<T> {
   #browser: Browser;
   #initializer: (page: Page, collector: (item: T) => void) => void;
+  /**
+   * The Array in this map should only be set once
+   * As we use the reference to it.
+   * Use methods that manipulate the array in place.
+   */
   protected storage = new WeakMap<Page, T[]>();
 
   constructor(
@@ -30,7 +35,6 @@ export class PageCollector<T> {
       if (!page) {
         return;
       }
-
       this.#initializePage(page);
     });
   }
@@ -44,6 +48,9 @@ export class PageCollector<T> {
       return;
     }
 
+    const stored: T[] = [];
+    this.storage.set(page, stored);
+
     page.on('framenavigated', frame => {
       // Only reset the storage on main frame navigation
       if (frame !== page.mainFrame()) {
@@ -52,16 +59,16 @@ export class PageCollector<T> {
       this.cleanup(page);
     });
     this.#initializer(page, value => {
-      const stored = this.storage.get(page) ?? [];
       stored.push(value);
-      this.storage.set(page, stored);
     });
   }
 
   protected cleanup(page: Page) {
-    const collection = this.storage.get(page) ?? [];
-    // Keep the reference alive
-    collection.length = 0;
+    const collection = this.storage.get(page);
+    if (collection) {
+      // Keep the reference alive
+      collection.length = 0;
+    }
   }
 
   getData(page: Page): T[] {
@@ -72,6 +79,9 @@ export class PageCollector<T> {
 export class NetworkCollector extends PageCollector<HTTPRequest> {
   override cleanup(page: Page) {
     const requests = this.storage.get(page) ?? [];
+    if (!requests) {
+      return;
+    }
     const lastRequestIdx = requests.findLastIndex(request => {
       return request.frame() === page.mainFrame()
         ? request.isNavigationRequest()
@@ -79,6 +89,7 @@ export class NetworkCollector extends PageCollector<HTTPRequest> {
     });
     // Keep all requests since the last navigation request including that
     // navigation request itself.
-    this.storage.set(page, requests.slice(Math.max(lastRequestIdx, 0)));
+    // Keep the reference
+    requests.splice(0, Math.max(lastRequestIdx, 0));
   }
 }

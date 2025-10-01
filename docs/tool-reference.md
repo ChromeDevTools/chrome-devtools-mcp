@@ -138,6 +138,7 @@
 
 **Parameters:**
 
+- **timeout** (integer) _(optional)_: Maximum wait time in milliseconds. If set to 0, the default timeout will be used.
 - **url** (string) **(required)**: URL to navigate the page to
 
 ---
@@ -149,6 +150,7 @@
 **Parameters:**
 
 - **navigate** (enum: "back", "forward") **(required)**: Whether to navigate back or navigate forward in the selected pages history
+- **timeout** (integer) _(optional)_: Maximum wait time in milliseconds. If set to 0, the default timeout will be used.
 
 ---
 
@@ -158,6 +160,7 @@
 
 **Parameters:**
 
+- **timeout** (integer) _(optional)_: Maximum wait time in milliseconds. If set to 0, the default timeout will be used.
 - **url** (string) **(required)**: URL to load in a new page.
 
 ---
@@ -179,6 +182,7 @@
 **Parameters:**
 
 - **text** (string) **(required)**: Text to appear on the page
+- **timeout** (integer) _(optional)_: Maximum wait time in milliseconds. If set to 0, the default timeout will be used.
 
 ---
 
@@ -306,6 +310,7 @@ so returned values have to JSON-serializable.
 
 **Parameters:**
 
+- **filePath** (string) _(optional)_: The absolute path, or a path relative to the current working directory, to save the screenshot to instead of attaching it to the response.
 - **format** (enum: "png", "jpeg", "webp") _(optional)_: Type of format to save the screenshot as. Default is "png"
 - **fullPage** (boolean) _(optional)_: If set to true takes a screenshot of the full page instead of the currently visible viewport. Incompatible with uid.
 - **quality** (number) _(optional)_: Compression quality for JPEG and WebP formats (0-100). Higher values mean better quality but larger file sizes. Ignored for PNG format.

@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.6.0](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.5.1...chrome-devtools-mcp-v0.6.0) (2025-10-01)
+
+
+### Features
+
+* **screenshot:** add WebP format support with quality parameter ([#220](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/220)) ([03e02a2](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/03e02a2d769fbfc0c98599444dfed5413d15ae6e))
+* **screenshot:** adds ability to output screenshot to a specific pat… ([#172](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/172)) ([f030726](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/f03072698ddda8587ce23229d733405f88b7c89e))
+* support --accept-insecure-certs CLI ([#231](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/231)) ([efb106d](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/efb106dc94af0057f88c89f810beb65114eeaa4b))
+* support --proxy-server CLI ([#230](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/230)) ([dfacc75](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/dfacc75ee9f46137b5194e35fc604b89a00ff53f))
+* support initial viewport in the CLI ([#229](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/229)) ([ef61a08](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/ef61a08707056c5078d268a83a2c95d10e224f31))
+* support timeouts in wait_for and navigations ([#228](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/228)) ([36e64d5](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/36e64d5ae21e8bb244a18201a23a16932947e938))
+
+
+### Bug Fixes
+
+* **network:** show only selected request ([#236](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/236)) ([73f0aec](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/73f0aecd8a48b9d1ee354897fe14d785c80e863e))
+* PageCollector subscribing multiple times ([#241](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/241)) ([0412878](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/0412878bf51ae46e48a171183bb38cfbbee1038a))
+* snapshot does not capture Iframe content ([#217](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/217)) ([ce356f2](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/ce356f256545e805db74664797de5f42e7b92bed)), closes [#186](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/186)
+
 ## [0.5.1](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.5.0...chrome-devtools-mcp-v0.5.1) (2025-09-29)
 
 

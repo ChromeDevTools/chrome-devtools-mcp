@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {writeFile} from 'node:fs/promises';
+
 import type {ElementHandle, Page} from 'puppeteer-core';
 import z from 'zod';
 
@@ -42,6 +44,12 @@ export const screenshot = defineTool({
       .describe(
         'If set to true takes a screenshot of the full page instead of the currently visible viewport. Incompatible with uid.',
       ),
+    filePath: z
+      .string()
+      .optional()
+      .describe(
+        'The absolute path, or a path relative to the current working directory, to save the screenshot to instead of attaching it to the response.',
+      ),
   },
   handler: async (request, response, context) => {
     if (request.params.uid && request.params.fullPage) {
@@ -76,7 +84,12 @@ export const screenshot = defineTool({
       );
     }
 
-    if (screenshot.length >= 2_000_000) {
+    if (request.params.filePath) {
+      await writeFile(request.params.filePath, screenshot);
+      response.appendResponseLine(
+        `Saved screenshot to ${request.params.filePath}.`,
+      );
+    } else if (screenshot.length >= 2_000_000) {
       const {filename} = await context.saveTemporaryFile(
         screenshot,
         `image/${request.params.format}`,

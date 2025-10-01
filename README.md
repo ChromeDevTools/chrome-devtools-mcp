@@ -7,6 +7,8 @@ control and inspect a live Chrome browser. It acts as a Model-Context-Protocol
 (MCP) server, giving your AI coding assistant access to the full power of
 Chrome DevTools for reliable automation, in-depth debugging, and performance analysis.
 
+## [Tool reference](./docs/tool-reference.md) | [Changelog](./CHANGELOG.md) | [Contributing](./CONTRIBUTING.md) | [Troubleshooting](./docs/troubleshooting.md)
+
 ## Key features
 
 - **Get performance insights**: Uses [Chrome
@@ -40,7 +42,7 @@ Add the following config to your MCP client:
   "mcpServers": {
     "chrome-devtools": {
       "command": "npx",
-      "args": ["chrome-devtools-mcp@latest"]
+      "args": ["-y", "chrome-devtools-mcp@latest"]
     }
   }
 }
@@ -95,6 +97,30 @@ startup_timeout_ms = 20_000
 </details>
 
 <details>
+  <summary>Copilot CLI</summary>
+
+Start Copilot CLI:
+
+```
+copilot
+```
+
+Start the dialog to add a new MCP server by running:
+
+```
+/mcp add
+```
+
+Configure the following fields and press `CTR-S` to save the configuration:
+
+- **Server name:** `chrome-devtools`
+- **Server Type:** `[1] Local`
+- **Command:** `npx`
+- **Arguments:** `-y, chrome-devtools-mcp@latest`
+
+</details>
+
+<details>
   <summary>Copilot / VS Code</summary>
   Follow the MCP install <a href="https://code.visualstudio.com/docs/copilot/chat/mcp-servers#_add-an-mcp-server">guide</a>,
   with the standard config from above. You can also install the Chrome DevTools MCP server using the VS Code CLI:
@@ -105,19 +131,11 @@ startup_timeout_ms = 20_000
 </details>
 
 <details>
-  <summary>Visual Studio</summary>
-  
-  **Click the button to install:**
-  
-  [<img src="https://img.shields.io/badge/Visual_Studio-Install-C16FDE?logo=visualstudio&logoColor=white" alt="Install in Visual Studio">](https://vs-open.link/mcp-install?%7B%22name%22%3A%22chrome-devtools%22%2C%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22chrome-devtools-mcp%40latest%22%5D%7D)
-</details>
-
-<details>
   <summary>Cursor</summary>
 
 **Click the button to install:**
 
-[<img src="https://cursor.com/deeplink/mcp-install-dark.svg" alt="Install in Cursor">](https://cursor.com/en/install-mcp?name=chrome-devtools&config=eyJjb21tYW5kIjoibnB4IGNocm9tZS1kZXZ0b29scy1tY3BAbGF0ZXN0In0%3D)
+[<img src="https://cursor.com/deeplink/mcp-install-dark.svg" alt="Install in Cursor">](https://cursor.com/en/install-mcp?name=chrome-devtools&config=eyJjb21tYW5kIjoibnB4IC15IGNocm9tZS1kZXZ0b29scy1tY3BAbGF0ZXN0In0%3D)
 
 **Or install manually:**
 
@@ -159,6 +177,14 @@ The same way chrome-devtools-mcp can be configured for JetBrains Junie in `Setti
 
 </details>
 
+<details>
+  <summary>Visual Studio</summary>
+  
+  **Click the button to install:**
+  
+  [<img src="https://img.shields.io/badge/Visual_Studio-Install-C16FDE?logo=visualstudio&logoColor=white" alt="Install in Visual Studio">](https://vs-open.link/mcp-install?%7B%22name%22%3A%22chrome-devtools%22%2C%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22chrome-devtools-mcp%40latest%22%5D%7D)
+</details>
+
 ### Your first prompt
 
 Enter the following prompt in your MCP Client to check if everything is working:
@@ -173,6 +199,8 @@ Your MCP client should open the browser and record a performance trace.
 > The MCP server will start the browser automatically once the MCP client uses a tool that requires a running browser instance. Connecting to the Chrome DevTools MCP server on its own will not automatically start the browser.
 
 ## Tools
+
+If you run into any issues, checkout our [troubleshooting guide](./docs/troubleshooting.md).
 
 <!-- BEGIN AUTO GENERATED TOOLS -->
 
@@ -243,6 +271,18 @@ The Chrome DevTools MCP server supports the following configuration option:
 - **`--logFile`**
   Path to a file to write debug logs to. Set the env variable `DEBUG` to `*` to enable verbose logs. Useful for submitting bug reports.
   - **Type:** string
+
+- **`--viewport`**
+  Initial viewport size for the Chromee instances started by the server. For example, `1280x720`
+  - **Type:** string
+
+- **`--proxyServer`**
+  Proxy server configuration for Chrome passed as --proxy-server when launching the browser. See https://www.chromium.org/developers/design-documents/network-settings/ for details.
+  - **Type:** string
+
+- **`--acceptInsecureCerts`**
+  If enabled, ignores errors relative to self-signed and expired certificates. Use with caution.
+  - **Type:** boolean
 
 <!-- END AUTO GENERATED OPTIONS -->
 

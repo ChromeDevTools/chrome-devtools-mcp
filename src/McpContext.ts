@@ -302,7 +302,9 @@ export class McpContext implements Context {
    */
   async createTextSnapshot(): Promise<void> {
     const page = this.getSelectedPage();
-    const rootNode = await page.accessibility.snapshot();
+    const rootNode = await page.accessibility.snapshot({
+      includeIframes: true,
+    });
     if (!rootNode) {
       return;
     }
