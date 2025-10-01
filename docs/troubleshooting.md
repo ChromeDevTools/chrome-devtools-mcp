@@ -15,7 +15,12 @@
 
 This usually indicates either a non-supported Node version is in use or that the
 `npm`/`npx` cache is corrupted. Try clearing the cache, uninstalling
-`chrome-devtools-mcp` and installing it again.
+`chrome-devtools-mcp` and installing it again. Clear the cache by running:
+
+```sh
+rm -rf ~/.npm/_npx # NOTE: this might remove other installed npx executables.
+npm cache clean --force
+```
 
 ### `Target closed` error
 

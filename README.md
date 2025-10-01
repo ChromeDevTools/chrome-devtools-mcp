@@ -200,6 +200,8 @@ Your MCP client should open the browser and record a performance trace.
 
 ## Tools
 
+If you run into any issues, checkout our [troubleshooting guide](./docs/troubleshooting.md).
+
 <!-- BEGIN AUTO GENERATED TOOLS -->
 
 - **Input automation** (7 tools)
