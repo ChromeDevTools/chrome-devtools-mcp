@@ -58,6 +58,20 @@ function getNetworkMultiplierFromString(condition: string | null): number {
   return 1;
 }
 
+function getExtensionFromMimeType(
+  mimeType: 'image/png' | 'image/jpeg' | 'image/webp',
+) {
+  switch (mimeType) {
+    case 'image/png':
+      return 'png';
+    case 'image/jpeg':
+      return 'jpeg';
+    case 'image/webp':
+      return 'webp';
+  }
+  throw new Error(`No mapping for Mime type ${mimeType}.`);
+}
+
 export class McpContext implements Context {
   browser: Browser;
   logger: Debugger;
@@ -346,14 +360,25 @@ export class McpContext implements Context {
       const dir = await fs.mkdtemp(
         path.join(os.tmpdir(), 'chrome-devtools-mcp-'),
       );
-      const ext =
-        mimeType === 'image/png'
-          ? 'png'
-          : mimeType === 'image/jpeg'
-            ? 'jpg'
-            : 'webp';
-      const filename = path.join(dir, `screenshot.${ext}`);
+
+      const filename = path.join(
+        dir,
+        `screenshot.${getExtensionFromMimeType(mimeType)}`,
+      );
       await fs.writeFile(filename, data);
+      return {filename};
+    } catch (err) {
+      this.logger(err);
+      throw new Error('Could not save a screenshot to a file');
+    }
+  }
+  async saveFile(
+    data: Uint8Array<ArrayBufferLike>,
+    filename: string,
+  ): Promise<{filename: string}> {
+    try {
+      const filePath = path.resolve(filename);
+      await fs.writeFile(filePath, data);
       return {filename};
     } catch (err) {
       this.logger(err);
