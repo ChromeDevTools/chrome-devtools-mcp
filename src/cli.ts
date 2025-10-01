@@ -4,12 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type {Options as YargsOptions} from 'yargs';
 import yargs from 'yargs';
 import {hideBin} from 'yargs/helpers';
 
 export const cliOptions = {
   browserUrl: {
-    type: 'string' as const,
+    type: 'string',
     description:
       'Connect to a running Chrome instance using port forwarding. For more details see: https://developer.chrome.com/docs/devtools/remote-debugging/local-server.',
     alias: 'u',
@@ -19,43 +20,43 @@ export const cliOptions = {
     },
   },
   headless: {
-    type: 'boolean' as const,
+    type: 'boolean',
     description: 'Whether to run in headless (no UI) mode.',
     default: false,
   },
   executablePath: {
-    type: 'string' as const,
+    type: 'string',
     description: 'Path to custom Chrome executable.',
     conflicts: 'browserUrl',
     alias: 'e',
   },
   isolated: {
-    type: 'boolean' as const,
+    type: 'boolean',
     description:
       'If specified, creates a temporary user-data-dir that is automatically cleaned up after the browser is closed.',
     default: false,
   },
   customDevtools: {
-    type: 'string' as const,
+    type: 'string',
     description: 'Path to custom DevTools.',
     hidden: true,
     conflicts: 'browserUrl',
     alias: 'd',
   },
   channel: {
-    type: 'string' as const,
+    type: 'string',
     description:
       'Specify a different Chrome channel that should be used. The default is the stable channel version.',
     choices: ['stable', 'canary', 'beta', 'dev'] as const,
     conflicts: ['browserUrl', 'executablePath'],
   },
   logFile: {
-    type: 'string' as const,
+    type: 'string',
     describe:
       'Path to a file to write debug logs to. Set the env variable `DEBUG` to `*` to enable verbose logs. Useful for submitting bug reports.',
   },
   viewport: {
-    type: 'string' as const,
+    type: 'string',
     describe:
       'Initial viewport size for the Chromee instances started by the server. For example, `1280x720`',
     coerce: (arg: string | undefined) => {
@@ -73,14 +74,14 @@ export const cliOptions = {
     },
   },
   proxyServer: {
-    type: 'string' as const,
+    type: 'string',
     description: `Proxy server configuration for Chrome passed as --proxy-server when launching the browser. See https://www.chromium.org/developers/design-documents/network-settings/ for details.`,
   },
   acceptInsecureCerts: {
-    type: 'boolean' as const,
+    type: 'boolean',
     description: `If enabled, ignores errors relative to self-signed and expired certificates. Use with caution.`,
   },
-};
+} satisfies Record<string, YargsOptions>;
 
 export function parseArguments(version: string, argv = process.argv) {
   const yargsInstance = yargs(hideBin(argv))
