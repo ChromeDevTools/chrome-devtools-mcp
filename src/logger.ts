@@ -24,15 +24,7 @@ export function saveLogsToFile(fileName: string): fs.WriteStream {
     logFile.write(`${chunks.join(' ')}\n`);
   };
   logFile.on('error', function (error) {
-    console.log(
-      JSON.stringify({
-        jsonrpc: '2.0',
-        method: 'error/logging-file-creation',
-        params: {
-          error: `Error when opening/writing to log file: ${error.message}`,
-        },
-      } satisfies JSONRPCNotification),
-    );
+    console.error(`Error when opening/writing to log file: ${error.message}`);
     logFile.end();
     process.exit(1);
   });
