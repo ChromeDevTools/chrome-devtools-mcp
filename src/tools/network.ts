@@ -84,6 +84,5 @@ export const getNetworkRequest = defineTool({
   },
   handler: async (request, response, _context) => {
     response.attachNetworkRequest(request.params.url);
-    response.setIncludeNetworkRequests(true);
   },
 });
