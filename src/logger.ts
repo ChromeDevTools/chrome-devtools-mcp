@@ -5,7 +5,6 @@
  */
 import fs from 'node:fs';
 
-import type {JSONRPCNotification} from '@modelcontextprotocol/sdk/types.js';
 import debug from 'debug';
 
 const mcpDebugNamespace = 'mcp:log';
