@@ -29,9 +29,18 @@ MCP clients.
 
 ## Requirements
 
-- [Node.js 20](https://nodejs.org/) or a newer [latest maintainance LTS](https://github.com/nodejs/Release#release-schedule) version.
-- [Chrome](https://www.google.com/chrome/) current stable version or newer.
-- [npm](https://www.npmjs.com/).
+- [Node.js](https://nodejs.org/) version 20.19.0 or newer (latest [LTS maintenance version](https://github.com/nodejs/Release#release-schedule) recommended)
+- [Chrome](https://www.google.com/chrome/) - current stable version or newer
+- [npm](https://www.npmjs.com/) - included with Node.js
+
+## Verification
+
+To verify your installations, run:
+
+```bash
+node --version  # Should be v20.19.0 or higher
+npm --version
+```
 
 ## Getting started
 
