@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import assert from 'node:assert';
+import fs from 'node:fs/promises';
+import path from 'node:path';
 import {describe, it} from 'node:test';
 
 import {evaluateScript} from '../../src/tools/script.js';
@@ -151,6 +153,39 @@ describe('script', () => {
         const lineEvaluation = response.responseLines.at(2)!;
         assert.strictEqual(JSON.parse(lineEvaluation), true);
       });
+    });
+
+    it('saves result to file when filePath is provided', async () => {
+      const testFilePath = path.join(process.cwd(), 'test-script-result.json');
+
+      await withBrowser(async (response, context) => {
+        const page = context.getSelectedPage();
+        await page.setContent(html`<div id="data">{"key":"value"}</div>`);
+
+        await evaluateScript.handler(
+          {
+            params: {
+              function: String(() => ({result: 'test', number: 42})),
+              filePath: testFilePath,
+            },
+          },
+          response,
+          context,
+        );
+
+        assert.strictEqual(
+          response.responseLines[0],
+          `Saved script result to ${testFilePath}.`,
+        );
+        assert.strictEqual(response.responseLines.length, 1);
+
+        // Verify file was created and contains expected JSON
+        const fileContent = await fs.readFile(testFilePath, 'utf-8');
+        const parsed = JSON.parse(fileContent);
+        assert.deepEqual(parsed, {result: 'test', number: 42});
+      });
+
+      await fs.unlink(testFilePath);
     });
   });
 });

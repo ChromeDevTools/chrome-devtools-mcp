@@ -7,6 +7,7 @@
 import type {Dialog, ElementHandle, Page} from 'puppeteer-core';
 import z from 'zod';
 
+import type {TextSnapshot} from '../McpContext.js';
 import type {TraceResult} from '../trace-processing/parse.js';
 
 import type {ToolCategories} from './categories.js';
@@ -79,6 +80,8 @@ export type Context = Readonly<{
     filename: string,
   ): Promise<{filename: string}>;
   waitForEventsAfterAction(action: () => Promise<unknown>): Promise<void>;
+  createTextSnapshot(): Promise<void>;
+  getTextSnapshot(): TextSnapshot | null;
 }>;
 
 export function defineTool<Schema extends z.ZodRawShape>(

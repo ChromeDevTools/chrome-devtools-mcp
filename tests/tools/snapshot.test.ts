@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import assert from 'node:assert';
+import fs from 'node:fs/promises';
+import path from 'node:path';
 import {describe, it} from 'node:test';
 
 import {takeSnapshot, waitFor} from '../../src/tools/snapshot.js';
@@ -16,6 +18,33 @@ describe('snapshot', () => {
         await takeSnapshot.handler({params: {}}, response, context);
         assert.ok(response.includeSnapshot);
       });
+    });
+
+    it('saves snapshot to file when filePath is provided', async () => {
+      const testFilePath = path.join(process.cwd(), 'test-snapshot.txt');
+
+      await withBrowser(async (response, context) => {
+        const page = context.getSelectedPage();
+        await page.setContent(html`<button>Click me</button>`);
+
+        await takeSnapshot.handler(
+          {params: {filePath: testFilePath}},
+          response,
+          context,
+        );
+
+        assert.strictEqual(response.includeSnapshot, false);
+        assert.strictEqual(
+          response.responseLines[0],
+          `Saved snapshot to ${testFilePath}.`,
+        );
+
+        // Verify file was created and contains button text
+        const fileContent = await fs.readFile(testFilePath, 'utf-8');
+        assert.ok(fileContent.includes('Click me'));
+      });
+
+      await fs.unlink(testFilePath);
     });
   });
   describe('browser_wait_for', () => {
