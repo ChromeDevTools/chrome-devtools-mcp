@@ -4,12 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {Dialog, ElementHandle, Page} from 'puppeteer-core';
+import type { Dialog, ElementHandle, Page } from 'puppeteer-core';
 import type z from 'zod';
 
-import type {TraceResult} from '../trace-processing/parse.js';
+import type { TraceResult } from '../trace-processing/parse.js';
 
-import type {ToolCategories} from './categories.js';
+import type { ToolCategories } from './categories.js';
 
 export interface ToolDefinition<Schema extends z.ZodRawShape = z.ZodRawShape> {
   name: string;
@@ -44,7 +44,7 @@ export interface Response {
   setIncludePages(value: boolean): void;
   setIncludeNetworkRequests(
     value: boolean,
-    options?: {pageSize?: number; pageIdx?: number; resourceTypes?: string[]},
+    options?: { pageSize?: number; pageIdx?: number; resourceTypes?: string[] },
   ): void;
   setIncludeConsoleData(value: boolean): void;
   setIncludeSnapshot(value: boolean): void;
@@ -73,8 +73,11 @@ export type Context = Readonly<{
   saveTemporaryFile(
     data: Uint8Array<ArrayBufferLike>,
     mimeType: 'image/png' | 'image/jpeg',
-  ): Promise<{filename: string}>;
+  ): Promise<{ filename: string }>;
   waitForEventsAfterAction(action: () => Promise<unknown>): Promise<void>;
+  // Added for multi-page device emulation support
+  createPagesSnapshot(): Promise<Page[]>;
+  getPages(): Page[];
 }>;
 
 export function defineTool<Schema extends z.ZodRawShape>(
