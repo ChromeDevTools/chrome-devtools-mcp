@@ -54,6 +54,16 @@ export const cliOptions = {
     describe:
       'Path to a file to write debug logs to. Set the env variable `DEBUG` to `*` to enable verbose logs. Useful for submitting bug reports.',
   },
+  allowedOrigins: {
+    type: 'string' as const,
+    describe:
+      'Semicolon-separated list of origins the browser is allowed to request. If not specified, all origins are allowed (except those in blockedOrigins). Example: https://example.com;https://api.example.com',
+  },
+  blockedOrigins: {
+    type: 'string' as const,
+    describe:
+      'Semicolon-separated list of origins the browser is blocked from requesting. Takes precedence over allowedOrigins. Example: https://ads.example.com;https://tracker.example.com',
+  },
 };
 
 export function parseArguments(version: string, argv = process.argv) {
@@ -78,6 +88,14 @@ export function parseArguments(version: string, argv = process.argv) {
       ['$0 --channel dev', 'Use Chrome Dev installed on this system'],
       ['$0 --channel stable', 'Use stable Chrome installed on this system'],
       ['$0 --logFile /tmp/log.txt', 'Save logs to a file'],
+      [
+        '$0 --allowedOrigins "https://example.com;https://api.example.com"',
+        'Only allow requests to specific origins',
+      ],
+      [
+        '$0 --blockedOrigins "https://ads.example.com;https://tracker.com"',
+        'Block requests to specific origins',
+      ],
       ['$0 --help', 'Print CLI options'],
     ]);
 

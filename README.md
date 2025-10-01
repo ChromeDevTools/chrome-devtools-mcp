@@ -268,6 +268,14 @@ The Chrome DevTools MCP server supports the following configuration option:
   Path to a file to write debug logs to. Set the env variable `DEBUG` to `*` to enable verbose logs. Useful for submitting bug reports.
   - **Type:** string
 
+- **`--allowedOrigins`**
+  Semicolon-separated list of origins the browser is allowed to request. If not specified, all origins are allowed (except those in blockedOrigins). Example: https://example.com;https://api.example.com
+  - **Type:** string
+
+- **`--blockedOrigins`**
+  Semicolon-separated list of origins the browser is blocked from requesting. Takes precedence over allowedOrigins. Example: https://ads.example.com;https://tracker.example.com
+  - **Type:** string
+
 <!-- END AUTO GENERATED OPTIONS -->
 
 Pass them via the `args` property in the JSON configuration. For example:

@@ -25,6 +25,7 @@ import {takeSnapshot} from './tools/snapshot.js';
 import {CLOSE_PAGE_ERROR} from './tools/ToolDefinition.js';
 import type {Context} from './tools/ToolDefinition.js';
 import type {TraceResult} from './trace-processing/parse.js';
+import type {UrlValidator} from './utils/urlValidator.js';
 import {WaitForHelper} from './WaitForHelper.js';
 
 export interface TextSnapshotNode extends SerializedAXNode {
@@ -77,10 +78,16 @@ export class McpContext implements Context {
 
   #nextSnapshotId = 1;
   #traceResults: TraceResult[] = [];
+  #urlValidator?: UrlValidator;
 
-  private constructor(browser: Browser, logger: Debugger) {
+  private constructor(
+    browser: Browser,
+    logger: Debugger,
+    urlValidator?: UrlValidator,
+  ) {
     this.browser = browser;
     this.logger = logger;
+    this.#urlValidator = urlValidator;
 
     this.#networkCollector = new NetworkCollector(
       this.browser,
@@ -109,10 +116,52 @@ export class McpContext implements Context {
     this.setSelectedPageIdx(0);
     await this.#networkCollector.init();
     await this.#consoleCollector.init();
+    if (this.#urlValidator?.hasRestrictions()) {
+      await this.#setupRequestInterception();
+    }
   }
 
-  static async from(browser: Browser, logger: Debugger) {
-    const context = new McpContext(browser, logger);
+  async #setupRequestInterception() {
+    const pages = await this.browser.pages();
+    for (const page of pages) {
+      await this.#enableRequestInterceptionForPage(page);
+    }
+
+    this.browser.on('targetcreated', async target => {
+      const page = await target.page();
+      if (page) {
+        await this.#enableRequestInterceptionForPage(page);
+      }
+    });
+  }
+
+  async #enableRequestInterceptionForPage(page: Page) {
+    try {
+      await page.setRequestInterception(true);
+
+      page.on('request', interceptedRequest => {
+        if (interceptedRequest.isInterceptResolutionHandled()) {
+          return;
+        }
+
+        const url = interceptedRequest.url();
+        if (this.#urlValidator && !this.#urlValidator.isAllowed(url)) {
+          void interceptedRequest.abort('blockedbyclient', 0);
+        } else {
+          void interceptedRequest.continue({}, 0);
+        }
+      });
+    } catch (error) {
+      this.logger(`Failed to enable request interception for page: ${error}`);
+    }
+  }
+
+  static async from(
+    browser: Browser,
+    logger: Debugger,
+    urlValidator?: UrlValidator,
+  ) {
+    const context = new McpContext(browser, logger, urlValidator);
     await context.#init();
     return context;
   }
@@ -133,6 +182,9 @@ export class McpContext implements Context {
     this.setSelectedPageIdx(pages.indexOf(page));
     this.#networkCollector.addPage(page);
     this.#consoleCollector.addPage(page);
+    if (this.#urlValidator?.hasRestrictions()) {
+      await this.#enableRequestInterceptionForPage(page);
+    }
     return page;
   }
   async closePage(pageIdx: number): Promise<void> {
