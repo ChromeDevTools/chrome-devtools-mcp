@@ -63,7 +63,6 @@ export const cliOptions = {
         return;
       }
       const [width, height] = arg.split('x').map(Number);
-      console.log(arg);
       if (!width || !height || Number.isNaN(width) || Number.isNaN(height)) {
         throw new Error('Invalid viewport. Expected format is `1280x720`.');
       }
