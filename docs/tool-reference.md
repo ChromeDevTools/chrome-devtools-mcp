@@ -138,6 +138,7 @@
 
 **Parameters:**
 
+- **timeout** (integer) _(optional)_: Maximum wait time in milliseconds. If set to 0, the default timeout will be used.
 - **url** (string) **(required)**: URL to navigate the page to
 
 ---
@@ -149,6 +150,7 @@
 **Parameters:**
 
 - **navigate** (enum: "back", "forward") **(required)**: Whether to navigate back or navigate forward in the selected pages history
+- **timeout** (integer) _(optional)_: Maximum wait time in milliseconds. If set to 0, the default timeout will be used.
 
 ---
 
@@ -158,6 +160,7 @@
 
 **Parameters:**
 
+- **timeout** (integer) _(optional)_: Maximum wait time in milliseconds. If set to 0, the default timeout will be used.
 - **url** (string) **(required)**: URL to load in a new page.
 
 ---
@@ -179,6 +182,7 @@
 **Parameters:**
 
 - **text** (string) **(required)**: Text to appear on the page
+- **timeout** (integer) _(optional)_: Maximum wait time in milliseconds. If set to 0, the default timeout will be used.
 
 ---
 

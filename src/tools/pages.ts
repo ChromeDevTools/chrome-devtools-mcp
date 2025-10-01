@@ -9,7 +9,7 @@ import z from 'zod';
 import {logger} from '../logger.js';
 
 import {ToolCategories} from './categories.js';
-import {CLOSE_PAGE_ERROR, defineTool} from './ToolDefinition.js';
+import {CLOSE_PAGE_ERROR, defineTool, timeoutSchema} from './ToolDefinition.js';
 
 export const listPages = defineTool({
   name: 'list_pages',
@@ -83,12 +83,15 @@ export const newPage = defineTool({
   },
   schema: {
     url: z.string().describe('URL to load in a new page.'),
+    ...timeoutSchema,
   },
   handler: async (request, response, context) => {
     const page = await context.newPage();
 
     await context.waitForEventsAfterAction(async () => {
-      await page.goto(request.params.url);
+      await page.goto(request.params.url, {
+        timeout: request.params.timeout,
+      });
     });
 
     response.setIncludePages(true);
@@ -104,12 +107,15 @@ export const navigatePage = defineTool({
   },
   schema: {
     url: z.string().describe('URL to navigate the page to'),
+    ...timeoutSchema,
   },
   handler: async (request, response, context) => {
     const page = context.getSelectedPage();
 
     await context.waitForEventsAfterAction(async () => {
-      await page.goto(request.params.url);
+      await page.goto(request.params.url, {
+        timeout: request.params.timeout,
+      });
     });
 
     response.setIncludePages(true);
@@ -129,15 +135,18 @@ export const navigatePageHistory = defineTool({
       .describe(
         'Whether to navigate back or navigate forward in the selected pages history',
       ),
+    ...timeoutSchema,
   },
   handler: async (request, response, context) => {
     const page = context.getSelectedPage();
-
+    const options = {
+      timeout: request.params.timeout,
+    };
     try {
       if (request.params.navigate === 'back') {
-        await page.goBack();
+        await page.goBack(options);
       } else {
-        await page.goForward();
+        await page.goForward(options);
       }
     } catch {
       response.appendResponseLine(
