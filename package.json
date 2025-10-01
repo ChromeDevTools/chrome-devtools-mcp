@@ -41,7 +41,8 @@
     "core-js": "3.45.1",
     "debug": "4.4.3",
     "puppeteer-core": "24.22.3",
-    "yargs": "18.0.0"
+    "yargs": "18.0.0",
+    "zod": "3.24.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.35.0",

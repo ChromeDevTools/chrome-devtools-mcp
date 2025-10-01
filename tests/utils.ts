@@ -4,12 +4,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import logger from 'debug';
+import type {Debugger} from 'debug';
 import type {Browser} from 'puppeteer';
 import puppeteer from 'puppeteer';
 import type {HTTPRequest, HTTPResponse} from 'puppeteer-core';
 
 import {McpContext} from '../src/McpContext.js';
 import {McpResponse} from '../src/McpResponse.js';
+
+export function createLogger(namespace = 'test'): Debugger {
+  return logger(namespace);
+}
 
 let browser: Browser | undefined;
 

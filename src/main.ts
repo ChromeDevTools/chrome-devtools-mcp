@@ -32,6 +32,7 @@ import * as screenshotTools from './tools/screenshot.js';
 import * as scriptTools from './tools/script.js';
 import * as snapshotTools from './tools/snapshot.js';
 import type {ToolDefinition} from './tools/ToolDefinition.js';
+import {UrlValidator} from './utils/urlValidator.js';
 
 function readPackageJson(): {version?: string} {
   const currentDir = import.meta.dirname;
@@ -55,6 +56,14 @@ export const args = parseArguments(version);
 const logFile = args.logFile ? saveLogsToFile(args.logFile) : undefined;
 
 logger(`Starting Chrome DevTools MCP Server v${version}`);
+
+const allowedOrigins = UrlValidator.parseOrigins(args.allowedOrigins);
+const blockedOrigins = UrlValidator.parseOrigins(args.blockedOrigins);
+const urlValidator =
+  allowedOrigins.length > 0 || blockedOrigins.length > 0
+    ? new UrlValidator({allowedOrigins, blockedOrigins}, logger)
+    : undefined;
+
 const server = new McpServer(
   {
     name: 'chrome_devtools',
@@ -79,7 +88,7 @@ async function getContext(): Promise<McpContext> {
     logFile,
   });
   if (context?.browser !== browser) {
-    context = await McpContext.from(browser, logger);
+    context = await McpContext.from(browser, logger, urlValidator);
   }
   return context;
 }
