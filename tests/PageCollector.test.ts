@@ -124,7 +124,7 @@ describe('PageCollector', () => {
     assert.equal(collector.getData(page).length, 1);
   });
 
-  it('should only subscribe once ', async () => {
+  it('should only subscribe once', async () => {
     const browser = getMockBrowser();
     const page = (await browser.pages())[0];
     const request = getMockRequest();
@@ -149,8 +149,8 @@ describe('PageCollector', () => {
 
     assert.equal(collector.getData(page).length, 1);
 
-    // page.emit('request', request);
+    page.emit('request', request);
 
-    // assert.equal(collector.getData(page).length, 2);
+    assert.equal(collector.getData(page).length, 2);
   });
 });
