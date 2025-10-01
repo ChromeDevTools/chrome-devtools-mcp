@@ -60,17 +60,20 @@ export const emulateCpu = defineTool({
   schema: {
     throttlingRate: z
       .number()
-      .min(1)
+      .min(0)
       .max(20)
       .describe(
-        'The CPU throttling rate representing the slowdown factor 1-20x. Set the rate to 1 to disable throttling',
+        'The CPU throttling rate representing the slowdown factor 1-20x. Set the rate to 0 to disable throttling.',
       ),
   },
   handler: async (request, _response, context) => {
     const page = context.getSelectedPage();
     const {throttlingRate} = request.params;
 
-    await page.emulateCPUThrottling(throttlingRate);
+    await page.emulateCPUThrottling(
+      throttlingRate === 0 ? null : throttlingRate,
+    );
     context.setCpuThrottlingRate(throttlingRate);
   },
 });
+

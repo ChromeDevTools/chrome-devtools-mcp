@@ -98,7 +98,7 @@ describe('emulation', () => {
       });
     });
 
-    it('disables cpu throttling', async () => {
+    it('disables cpu throttling when the rate is 1', async () => {
       await withBrowser(async (response, context) => {
         context.setCpuThrottlingRate(4); // Set it to something first.
         await emulateCpu.handler(
@@ -112,6 +112,23 @@ describe('emulation', () => {
         );
 
         assert.strictEqual(context.getCpuThrottlingRate(), 1);
+      });
+    });
+
+    it('disables cpu throttling when the rate is 0', async () => {
+      await withBrowser(async (response, context) => {
+        context.setCpuThrottlingRate(4); // Set it to something first.
+        await emulateCpu.handler(
+          {
+            params: {
+              throttlingRate: 0,
+            },
+          },
+          response,
+          context,
+        );
+
+        assert.strictEqual(context.getCpuThrottlingRate(), 0);
       });
     });
 
@@ -137,3 +154,4 @@ describe('emulation', () => {
     });
   });
 });
+
