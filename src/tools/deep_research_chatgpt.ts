@@ -321,6 +321,10 @@ async function enableDeepResearchMode(
       const menuItems = Array.from(
         document.querySelectorAll('[role="menuitemradio"]'),
       );
+
+      // デバッグ: 見つかったmenuitemradioを全て列挙
+      const debugInfo = menuItems.map(item => item.textContent?.trim()).join(', ');
+
       const deepResearchItem = menuItems.find(
         (item) =>
           item.textContent?.includes('Deep Research') ||
@@ -330,7 +334,7 @@ async function enableDeepResearchMode(
       if (!deepResearchItem) {
         return {
           success: false,
-          error: 'DeepResearch menuitemradio が見つかりません',
+          error: `DeepResearch menuitemradio が見つかりません (found: ${menuItems.length} items: ${debugInfo})`,
         };
       }
 
