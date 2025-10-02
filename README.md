@@ -29,7 +29,7 @@ MCP clients.
 
 ## Requirements
 
-- [Node.js 20](https://nodejs.org/) or a newer [latest maintainance LTS](https://github.com/nodejs/Release#release-schedule) version.
+- [Node.js](https://nodejs.org/) v20.19 or a newer [latest maintenance LTS](https://github.com/nodejs/Release#release-schedule) version.
 - [Chrome](https://www.google.com/chrome/) current stable version or newer.
 - [npm](https://www.npmjs.com/).
 
@@ -280,7 +280,7 @@ The Chrome DevTools MCP server supports the following configuration option:
   - **Type:** string
 
 - **`--viewport`**
-  Initial viewport size for the Chromee instances started by the server. For example, `1280x720`
+  Initial viewport size for the Chrome instances started by the server. For example, `1280x720`
   - **Type:** string
 
 - **`--proxyServer`**

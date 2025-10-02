@@ -58,7 +58,7 @@ export const cliOptions = {
   viewport: {
     type: 'string',
     describe:
-      'Initial viewport size for the Chromee instances started by the server. For example, `1280x720`',
+      'Initial viewport size for the Chrome instances started by the server. For example, `1280x720`',
     coerce: (arg: string | undefined) => {
       if (arg === undefined) {
         return;
