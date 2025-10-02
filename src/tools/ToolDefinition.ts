@@ -75,6 +75,10 @@ export type Context = Readonly<{
     data: Uint8Array<ArrayBufferLike>,
     mimeType: 'image/png' | 'image/jpeg' | 'image/webp',
   ): Promise<{filename: string}>;
+  saveFile(
+    data: Uint8Array<ArrayBufferLike>,
+    filename: string,
+  ): Promise<{filename: string}>;
   waitForEventsAfterAction(action: () => Promise<unknown>): Promise<void>;
   createTextSnapshot(): Promise<void>;
   getTextSnapshot(): TextSnapshot | null;

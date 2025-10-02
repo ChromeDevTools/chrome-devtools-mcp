@@ -314,7 +314,7 @@ You can also run `npx chrome-devtools-mcp@latest --help` to see all available co
 data directory:
 
 - Linux / MacOS: `$HOME/.cache/chrome-devtools-mcp/chrome-profile-$CHANNEL`
-- Window: `%HOMEPATH%/.cache/chrome-devtools-mcp/chrome-profile-$CHANNEL`
+- Windows: `%HOMEPATH%/.cache/chrome-devtools-mcp/chrome-profile-$CHANNEL`
 
 The user data directory is not cleared between runs and shared across
 all instances of `chrome-devtools-mcp`. Set the `isolated` option to `true`
