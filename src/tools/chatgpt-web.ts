@@ -279,16 +279,10 @@ export const askChatGPTWeb = defineTool({
 
       // Click send button
       const sent = await page.evaluate(() => {
-        const buttons = Array.from(document.querySelectorAll('button'));
-        const sendButton = buttons.find((btn) => {
-          const svg = btn.querySelector('svg');
-          return (
-            svg &&
-            !(btn as HTMLButtonElement).disabled &&
-            btn.offsetParent !== null
-          );
-        });
-        if (sendButton) {
+        const sendButton = document.querySelector(
+          'button[data-testid="send-button"]',
+        ) as HTMLButtonElement;
+        if (sendButton && !sendButton.disabled) {
           sendButton.click();
           return true;
         }
@@ -299,6 +293,17 @@ export const askChatGPTWeb = defineTool({
         response.appendResponseLine('❌ 送信ボタンが見つかりません');
         return;
       }
+
+      // Wait for message to actually be sent (user message appears in DOM)
+      await page.waitForFunction(
+        () => {
+          const messages = document.querySelectorAll(
+            '[data-message-author-role="user"]',
+          );
+          return messages.length > 0;
+        },
+        {timeout: 10000},
+      );
 
       response.appendResponseLine('✅ 質問送信完了');
 
