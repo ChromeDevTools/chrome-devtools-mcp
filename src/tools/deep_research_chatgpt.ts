@@ -295,18 +295,17 @@ async function enableDeepResearchMode(
   try {
     response.appendResponseLine('DeepResearchモードを有効化中...');
 
-    // Step 1: Click "+" button
+    // Step 1: Click "+" button (ファイルの追加など)
     const plusClicked = await page.evaluate(() => {
       const buttons = Array.from(document.querySelectorAll('button'));
       const plusButton = buttons.find((btn) => {
         const aria = btn.getAttribute('aria-label') || '';
-        const desc = btn.getAttribute('description') || '';
-        return aria.includes('ファイルの追加') || desc.includes('ファイルの追加');
+        return aria.includes('ファイルの追加');
       });
 
       if (!plusButton)
-        return {success: false, error: '+ボタンが見つかりません'};
-      plusButton.click();
+        return {success: false, error: '+ボタン（ファイルの追加など）が見つかりません'};
+      (plusButton as HTMLElement).click();
       return {success: true};
     });
 
@@ -314,9 +313,9 @@ async function enableDeepResearchMode(
       return {success: false, error: plusClicked.error};
     }
 
-    await new Promise((resolve) => setTimeout(resolve, 800));
+    await new Promise((resolve) => setTimeout(resolve, 500));
 
-    // Step 2: Select DeepResearch option
+    // Step 2: Click "Deep Research" menuitemradio
     const deepResearchSelected = await page.evaluate(() => {
       const menuItems = Array.from(
         document.querySelectorAll('[role="menuitemradio"]'),
@@ -324,13 +323,13 @@ async function enableDeepResearchMode(
       const deepResearchItem = menuItems.find(
         (item) =>
           item.textContent?.includes('Deep Research') ||
-          item.textContent?.includes('ディープリサーチ'),
+          item.textContent?.includes('リサーチ'),
       );
 
       if (!deepResearchItem) {
         return {
           success: false,
-          error: 'DeepResearchオプションが見つかりません',
+          error: 'DeepResearch menuitemradio が見つかりません',
         };
       }
 
@@ -342,15 +341,15 @@ async function enableDeepResearchMode(
       return {success: false, error: deepResearchSelected.error};
     }
 
-    response.appendResponseLine('✅ DeepResearchモード有効化');
+    response.appendResponseLine('✅ DeepResearch menuitemradio をクリック');
     await new Promise((resolve) => setTimeout(resolve, 1000));
 
-    // Verify mode was actually enabled
+    // Step 3: Verify mode was actually enabled (composer-pill detection)
     const verification = await detectDeepResearchMode(page);
     if (!verification.isEnabled) {
       return {
         success: false,
-        error: 'DeepResearchモードの有効化に失敗しました（確認できませんでした）',
+        error: 'DeepResearchモードの有効化に失敗しました（リサーチpillが検出されませんでした）',
       };
     }
 
