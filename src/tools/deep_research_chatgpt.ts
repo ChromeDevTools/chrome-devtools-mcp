@@ -315,35 +315,45 @@ async function enableDeepResearchMode(
 
     response.appendResponseLine('✅ +ボタン（ファイルの追加など）をクリック');
 
-    // Wait for menu to appear (deep combinator for shadow DOM)
-    await page.waitForSelector(':scope >>> [role="menuitemradio"]', { visible: true, timeout: 5000 });
+    // Wait for menu to appear
+    await page.waitForSelector('[role="menuitemradio"]', { visible: true, timeout: 5000 });
     await new Promise((resolve) => setTimeout(resolve, 500));
 
-    // Step 2: Click "Deep Research" menuitemradio (deep combinator for shadow DOM)
-    const menuItems = await page.$$eval(':scope >>> [role="menuitemradio"]', (els: Element[]) =>
-      els.map((el: Element) => ({
-        text: (el as HTMLElement).innerText.trim(),
-        index: els.indexOf(el),
-      }))
-    );
+    // Step 2: Find and click "Deep Research" menuitemradio
+    const deepResearchResult = await page.evaluate(() => {
+      const menuItems = Array.from(document.querySelectorAll('[role="menuitemradio"]'));
 
-    const deepResearchIndex = menuItems.findIndex(
-      (item: { text: string; index: number }) =>
-        item.text.includes('Deep Research') || item.text.includes('リサーチ')
-    );
+      const deepResearchItem = menuItems.find((item) =>
+        item.textContent?.includes('Deep Research') || item.textContent?.includes('リサーチ')
+      );
 
-    if (deepResearchIndex === -1) {
-      return {
-        success: false,
-        error: `DeepResearch menuitemradio が見つかりません (found: ${menuItems.length} items: ${menuItems.map((m: { text: string }) => m.text).join(', ')})`,
-      };
+      if (!deepResearchItem) {
+        return {
+          success: false,
+          error: `DeepResearch menuitemradio が見つかりません (found: ${menuItems.length} items: ${menuItems.map(m => m.textContent?.trim()).join(', ')})`,
+        };
+      }
+
+      // Check if already checked
+      const isChecked = deepResearchItem.getAttribute('aria-checked') === 'true';
+
+      if (!isChecked) {
+        (deepResearchItem as HTMLElement).click();
+      }
+
+      return { success: true, alreadyEnabled: isChecked };
+    });
+
+    if (!deepResearchResult.success) {
+      return { success: false, error: deepResearchResult.error };
     }
 
-    // Click the found menuitemradio
-    const menuItemElements = await page.$$(':scope >>> [role="menuitemradio"]');
-    await menuItemElements[deepResearchIndex].click();
+    if (deepResearchResult.alreadyEnabled) {
+      response.appendResponseLine('✅ DeepResearch は既に有効です');
+    } else {
+      response.appendResponseLine('✅ DeepResearch menuitemradio をクリック');
+    }
 
-    response.appendResponseLine('✅ DeepResearch menuitemradio をクリック');
     await new Promise((resolve) => setTimeout(resolve, 1000));
 
     // Step 3: Verify mode was actually enabled (composer-pill detection)
