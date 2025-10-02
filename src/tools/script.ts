@@ -3,7 +3,6 @@
  * Copyright 2025 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import {writeFile} from 'node:fs/promises';
 
 import type {JSHandle} from 'puppeteer-core';
 import z from 'zod';
@@ -69,9 +68,11 @@ Example with arguments: \`(el) => {
         );
 
         if (request.params.filePath) {
-          await writeFile(request.params.filePath, result);
+          const encoder = new TextEncoder();
+          const data = encoder.encode(result);
+          const file = await context.saveFile(data, request.params.filePath);
           response.appendResponseLine(
-            `Saved script result to ${request.params.filePath}.`,
+            `Saved script result to ${file.filename}.`,
           );
         } else {
           response.appendResponseLine('Script ran on page and returned:');
