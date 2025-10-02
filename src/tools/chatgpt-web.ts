@@ -167,9 +167,17 @@ export const askChatGPTWeb = defineTool({
       .describe(
         'Force creation of a new chat instead of reusing existing project chat. Default: false',
       ),
+    useDeepResearch: z
+      .boolean()
+      .optional()
+      .describe(
+        'Enable DeepResearch mode for complex research tasks requiring comprehensive analysis. ' +
+          'Use when the question involves market research, comparative analysis, trend analysis, ' +
+          'or requires gathering information from multiple sources. Default: false',
+      ),
   },
   handler: async (request, response, context) => {
-    const {question, projectName, createNewChat = false} = request.params;
+    const {question, projectName, createNewChat = false, useDeepResearch = false} = request.params;
 
     // Sanitize question
     const sanitizedQuestion = sanitizeQuestion(question);
@@ -257,6 +265,57 @@ export const askChatGPTWeb = defineTool({
         }
       }
 
+      // Step 3.5: Enable DeepResearch mode if requested
+      if (useDeepResearch) {
+        response.appendResponseLine('DeepResearchモードを有効化中...');
+
+        // Click the "+" button to open tools menu
+        const menuOpened = await page.evaluate(() => {
+          const buttons = Array.from(document.querySelectorAll('button'));
+          const plusButton = buttons.find((btn) => {
+            const aria = btn.getAttribute('aria-label') || '';
+            const desc = btn.getAttribute('description') || '';
+            return (
+              aria.includes('ファイルの追加') ||
+              desc.includes('ファイルの追加')
+            );
+          });
+          if (plusButton) {
+            (plusButton as HTMLElement).click();
+            return true;
+          }
+          return false;
+        });
+
+        if (menuOpened) {
+          await new Promise((resolve) => setTimeout(resolve, 500));
+
+          // Click "Deep Research" menu item
+          const deepResearchEnabled = await page.evaluate(() => {
+            const menuItems = Array.from(
+              document.querySelectorAll('[role="menuitemradio"]'),
+            );
+            const deepResearchItem = menuItems.find((item) =>
+              item.textContent?.includes('Deep Research'),
+            );
+            if (deepResearchItem) {
+              (deepResearchItem as HTMLElement).click();
+              return true;
+            }
+            return false;
+          });
+
+          if (deepResearchEnabled) {
+            response.appendResponseLine('✅ DeepResearchモード有効化完了');
+            await new Promise((resolve) => setTimeout(resolve, 500));
+          } else {
+            response.appendResponseLine(
+              '⚠️ DeepResearchオプションが見つかりませんでした',
+            );
+          }
+        }
+      }
+
       // Step 4: Send question
       response.appendResponseLine('質問を送信中...');
 
@@ -312,19 +371,73 @@ export const askChatGPTWeb = defineTool({
 
       response.appendResponseLine('✅ 質問送信完了');
 
-      // Step 5: Monitor streaming with progress updates
-      response.appendResponseLine(
-        'ChatGPTの回答を待機中... (10秒ごとに進捗を表示)',
-      );
+      // Step 5: Monitor streaming/research with progress updates
+      if (useDeepResearch) {
+        response.appendResponseLine(
+          'DeepResearchを実行中... (10秒ごとに進捗を表示)',
+        );
+      } else {
+        response.appendResponseLine(
+          'ChatGPTの回答を待機中... (10秒ごとに進捗を表示)',
+        );
+      }
 
       const startTime = Date.now();
       let lastText = '';
+      let lastProgress = '';
 
       while (true) {
         await new Promise((resolve) => setTimeout(resolve, 2000));
 
-        const status = await page.evaluate(() => {
-          // Check if streaming - check both textContent and aria-label
+        const status = await page.evaluate((isDeepResearch) => {
+          // DeepResearch progress detection
+          if (isDeepResearch) {
+            // Look for research progress indicators
+            const progressElements = Array.from(
+              document.querySelectorAll('[role="status"], [aria-live="polite"]'),
+            );
+            const progressText = progressElements
+              .map((el) => el.textContent)
+              .join(' ');
+
+            // Check if DeepResearch is still running
+            const buttons = Array.from(document.querySelectorAll('button'));
+            const isRunning = buttons.some((btn) => {
+              const text = btn.textContent || '';
+              const aria = btn.getAttribute('aria-label') || '';
+              return (
+                text.includes('停止') ||
+                text.includes('リサーチを停止') ||
+                aria.includes('停止')
+              );
+            });
+
+            if (!isRunning) {
+              // Research completed - get the report
+              const assistantMessages = document.querySelectorAll(
+                '[data-message-author-role="assistant"]',
+              );
+              if (assistantMessages.length === 0)
+                return {completed: false, progress: progressText};
+
+              const latestMessage =
+                assistantMessages[assistantMessages.length - 1];
+              return {
+                completed: true,
+                text: latestMessage.textContent || '',
+                isDeepResearch: true,
+              };
+            }
+
+            return {
+              completed: false,
+              streaming: true,
+              progress: progressText,
+              currentText: progressText.substring(0, 200),
+            };
+          }
+
+          // Normal streaming detection
           const buttons = Array.from(document.querySelectorAll('button'));
           const isStreaming = buttons.some((btn) => {
             const text = btn.textContent || '';
@@ -377,12 +490,14 @@ export const askChatGPTWeb = defineTool({
             streaming: true,
             currentText,
           };
-        });
+        }, useDeepResearch);
 
         if (status.completed) {
-          response.appendResponseLine(
-            `\n✅ 回答完了 (所要時間: ${Math.floor((Date.now() - startTime) / 1000)}秒)`,
-          );
+          const completionMessage = useDeepResearch
+            ? `\n✅ DeepResearch完了 (所要時間: ${Math.floor((Date.now() - startTime) / 1000)}秒)`
+            : `\n✅ 回答完了 (所要時間: ${Math.floor((Date.now() - startTime) / 1000)}秒)`;
+          response.appendResponseLine(completionMessage);
+
           if (status.thinkingTime) {
             response.appendResponseLine(
               `🤔 思考時間: ${status.thinkingTime}秒`,
@@ -429,6 +544,9 @@ export const askChatGPTWeb = defineTool({
 
           // Save conversation log
           const chatUrl = page.url();
+          const modelName = useDeepResearch
+            ? 'ChatGPT DeepResearch'
+            : 'ChatGPT 5 Thinking';
           const logPath = await saveConversationLog(
             project,
             sanitizedQuestion,
@@ -436,7 +554,7 @@ export const askChatGPTWeb = defineTool({
             {
               thinkingTime: status.thinkingTime,
               chatUrl,
-              model: 'ChatGPT 5 Thinking',
+              model: modelName,
             },
           );
 
@@ -451,11 +569,18 @@ export const askChatGPTWeb = defineTool({
 
         // Show progress every 10 seconds
         const elapsedSeconds = Math.floor((Date.now() - startTime) / 1000);
-        if (elapsedSeconds % 10 === 0 && status.currentText !== lastText) {
-          lastText = status.currentText || '';
-          response.appendResponseLine(
-            `⏱️ ${elapsedSeconds}秒経過 - 現在のテキスト: ${lastText.substring(0, 100)}...`,
-          );
+        if (elapsedSeconds % 10 === 0) {
+          if (useDeepResearch && status.progress !== lastProgress) {
+            lastProgress = status.progress || '';
+            response.appendResponseLine(
+              `⏱️ ${elapsedSeconds}秒経過 - 進捗: ${lastProgress.substring(0, 100)}...`,
+            );
+          } else if (status.currentText !== lastText) {
+            lastText = status.currentText || '';
+            response.appendResponseLine(
+              `⏱️ ${elapsedSeconds}秒経過 - 現在のテキスト: ${lastText.substring(0, 100)}...`,
+            );
+          }
         }
       }
     } catch (error) {
