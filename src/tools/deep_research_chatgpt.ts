@@ -296,7 +296,7 @@ async function enableDeepResearchMode(
     response.appendResponseLine('DeepResearchモードを有効化中...');
 
     // Step 1: Click "+" button (ファイルの追加など)
-    const plusClicked = await page.evaluate(() => {
+    const plusButtonSelector = await page.evaluate(() => {
       const buttons = Array.from(document.querySelectorAll('button'));
       const plusButton = buttons.find((btn) => {
         const aria = btn.getAttribute('aria-label') || '';
@@ -305,13 +305,18 @@ async function enableDeepResearchMode(
 
       if (!plusButton)
         return {success: false, error: '+ボタン（ファイルの追加など）が見つかりません'};
-      (plusButton as HTMLElement).click();
-      return {success: true};
+
+      // Return selector info instead of clicking
+      const ariaLabel = plusButton.getAttribute('aria-label');
+      return {success: true, ariaLabel};
     });
 
-    if (!plusClicked.success) {
-      return {success: false, error: plusClicked.error};
+    if (!plusButtonSelector.success) {
+      return {success: false, error: plusButtonSelector.error};
     }
+
+    // Use Puppeteer's click for reliable interaction
+    await page.click(`button[aria-label="${plusButtonSelector.ariaLabel}"]`);
 
     response.appendResponseLine('✅ +ボタン（ファイルの追加など）をクリック');
 
