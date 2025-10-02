@@ -217,8 +217,10 @@ export const askChatGPTWeb = defineTool({
       }
 
       // Step 3: Create new chat if needed
+      let isNewChat = false;
       if (createNewChat || page.url() === 'https://chatgpt.com/') {
         response.appendResponseLine('新規チャットを作成中...');
+        isNewChat = true;
 
         // Click "新しいチャット"
         await page.evaluate(() => {
@@ -373,7 +375,7 @@ export const askChatGPTWeb = defineTool({
           }
 
           // Rename chat if it's a new chat
-          if (createNewChat || !page.url().includes('/c/')) {
+          if (isNewChat) {
             response.appendResponseLine('チャット名を変更中...');
 
             // Wait for chat to be created
@@ -434,6 +436,13 @@ export const askChatGPTWeb = defineTool({
                 response.appendResponseLine(
                   `✅ チャット名を「[Project: ${project}]」に変更`,
                 );
+
+                // Close the menu popup by clicking outside
+                await page.evaluate(() => {
+                  const body = document.body;
+                  body.click();
+                });
+                await new Promise((resolve) => setTimeout(resolve, 300));
               }
             }
           }
