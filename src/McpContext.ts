@@ -58,9 +58,7 @@ function getNetworkMultiplierFromString(condition: string | null): number {
   return 1;
 }
 
-function getExtensionFromMimeType(
-  mimeType: 'image/png' | 'image/jpeg' | 'image/webp',
-) {
+function getExtensionFromMimeType(mimeType: string) {
   switch (mimeType) {
     case 'image/png':
       return 'png';
@@ -369,7 +367,7 @@ export class McpContext implements Context {
       return {filename};
     } catch (err) {
       this.logger(err);
-      throw new Error('Could not save a screenshot to a file');
+      throw new Error('Could not save a screenshot to a file', {cause: err});
     }
   }
   async saveFile(
@@ -382,7 +380,7 @@ export class McpContext implements Context {
       return {filename};
     } catch (err) {
       this.logger(err);
-      throw new Error('Could not save a screenshot to a file');
+      throw new Error('Could not save a screenshot to a file', {cause: err});
     }
   }
 
