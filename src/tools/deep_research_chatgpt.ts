@@ -315,39 +315,33 @@ async function enableDeepResearchMode(
 
     response.appendResponseLine('✅ +ボタン（ファイルの追加など）をクリック');
 
-    // Wait for menu to appear
-    await page.waitForSelector('[role="menuitemradio"]', { timeout: 5000 });
+    // Wait for menu to appear (pierce shadow DOM)
+    await page.waitForSelector('pierce/[role="menuitemradio"]', { visible: true, timeout: 5000 });
     await new Promise((resolve) => setTimeout(resolve, 500));
 
-    // Step 2: Click "Deep Research" menuitemradio
-    const deepResearchSelected = await page.evaluate(() => {
-      const menuItems = Array.from(
-        document.querySelectorAll('[role="menuitemradio"]'),
-      );
+    // Step 2: Click "Deep Research" menuitemradio (pierce shadow DOM)
+    const menuItems = await page.$$eval('pierce/[role="menuitemradio"]', (els: Element[]) =>
+      els.map((el: Element) => ({
+        text: (el as HTMLElement).innerText.trim(),
+        index: els.indexOf(el),
+      }))
+    );
 
-      // デバッグ: 見つかったmenuitemradioを全て列挙
-      const debugInfo = menuItems.map(item => item.textContent?.trim()).join(', ');
+    const deepResearchIndex = menuItems.findIndex(
+      (item: { text: string; index: number }) =>
+        item.text.includes('Deep Research') || item.text.includes('リサーチ')
+    );
 
-      const deepResearchItem = menuItems.find(
-        (item) =>
-          item.textContent?.includes('Deep Research') ||
-          item.textContent?.includes('リサーチ'),
-      );
-
-      if (!deepResearchItem) {
-        return {
-          success: false,
-          error: `DeepResearch menuitemradio が見つかりません (found: ${menuItems.length} items: ${debugInfo})`,
-        };
-      }
-
-      (deepResearchItem as HTMLElement).click();
-      return {success: true};
-    });
-
-    if (!deepResearchSelected.success) {
-      return {success: false, error: deepResearchSelected.error};
+    if (deepResearchIndex === -1) {
+      return {
+        success: false,
+        error: `DeepResearch menuitemradio が見つかりません (found: ${menuItems.length} items: ${menuItems.map((m: { text: string }) => m.text).join(', ')})`,
+      };
     }
+
+    // Click the found menuitemradio
+    const menuItemElements = await page.$$('pierce/[role="menuitemradio"]');
+    await menuItemElements[deepResearchIndex].click();
 
     response.appendResponseLine('✅ DeepResearch menuitemradio をクリック');
     await new Promise((resolve) => setTimeout(resolve, 1000));
