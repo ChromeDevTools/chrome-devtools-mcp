@@ -314,7 +314,10 @@ async function enableDeepResearchMode(
     }
 
     response.appendResponseLine('✅ +ボタン（ファイルの追加など）をクリック');
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+
+    // Wait for menu to appear
+    await page.waitForSelector('[role="menuitemradio"]', { timeout: 5000 });
+    await new Promise((resolve) => setTimeout(resolve, 500));
 
     // Step 2: Click "Deep Research" menuitemradio
     const deepResearchSelected = await page.evaluate(() => {
