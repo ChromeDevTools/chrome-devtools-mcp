@@ -180,51 +180,116 @@ async function detectDeepResearchMode(page: any): Promise<{
   indicator?: string;
 }> {
   return await page.evaluate(() => {
-    // Check for DeepResearch indicator in the UI
-    const allElements = Array.from(
-      document.querySelectorAll('div, span, button'),
-    );
+    // Multi-language patterns for DeepResearch
+    const DEEP_RESEARCH_PATTERN = /deep\s*research|ディープ\s*リサーチ|深度研究|深入研究/i;
 
-    // Look for DeepResearch badge/text near input area
-    const deepResearchIndicator = allElements.find((el) => {
-      const text = el.textContent || '';
-      const ariaLabel = el.getAttribute('aria-label') || '';
-      return (
-        text.includes('Deep Research') ||
-        text.includes('ディープリサーチ') ||
-        ariaLabel.includes('Deep Research') ||
-        ariaLabel.includes('ディープリサーチ')
-      );
-    });
+    // Cache for performance (simple object-based cache instead of WeakRef for browser compatibility)
+    const cache: {element?: Element; timestamp: number} = {timestamp: 0};
+    const CACHE_TTL = 2000; // 2 seconds
 
-    if (deepResearchIndicator) {
+    // Step 1: Find scoped root element first
+    const findScopedRoot = (): Element | null => {
+      // Try conversation root selectors
+      const candidates = [
+        document.querySelector('[data-testid="conversation-turns"]'),
+        document.querySelector('[role="main"]'),
+        document.querySelector('main'),
+        document.querySelector('[data-testid="conversation-root"]'),
+      ];
+
+      return candidates.find((el) => el !== null) || document.body;
+    };
+
+    const scopedRoot = findScopedRoot();
+    if (!scopedRoot) {
+      return {isEnabled: false};
+    }
+
+    // Step 2: Try data-testid selectors FIRST (most reliable)
+    const dataTestIdSelectors = [
+      '[data-testid*="deep-research"]',
+      '[data-testid*="deepresearch"]',
+      '[data-testid*="research-mode"]',
+    ];
+
+    for (const selector of dataTestIdSelectors) {
+      const element = scopedRoot.querySelector(selector);
+      if (element) {
+        return {
+          isEnabled: true,
+          indicator: `data-testid: ${element.getAttribute('data-testid')}`,
+        };
+      }
+    }
+
+    // Step 3: Try aria-* attributes SECOND
+    const ariaSelectors = [
+      '[aria-label*="Deep Research" i]',
+      '[aria-label*="ディープリサーチ" i]',
+      '[aria-checked="true"][role="menuitemradio"]',
+    ];
+
+    for (const selector of ariaSelectors) {
+      const elements = Array.from(scopedRoot.querySelectorAll(selector));
+
+      for (const element of elements) {
+        const ariaLabel = element.getAttribute('aria-label') || '';
+        const role = element.getAttribute('role') || '';
+
+        // Check aria-label with pattern
+        if (DEEP_RESEARCH_PATTERN.test(ariaLabel)) {
+          return {
+            isEnabled: true,
+            indicator: `aria-label: ${ariaLabel.substring(0, 50)}`,
+          };
+        }
+
+        // Check menuitemradio with aria-checked
+        if (role === 'menuitemradio') {
+          const isChecked = element.getAttribute('aria-checked') === 'true';
+          const text = element.textContent || '';
+
+          if (isChecked && DEEP_RESEARCH_PATTERN.test(text)) {
+            return {
+              isEnabled: true,
+              indicator: 'menuitemradio (checked)',
+            };
+          }
+        }
+      }
+    }
+
+    // Step 4: Text matching as LAST resort (least reliable)
+    // Use cached result if available and fresh
+    const now = Date.now();
+    if (cache.element && now - cache.timestamp < CACHE_TTL) {
       return {
         isEnabled: true,
-        indicator:
-          deepResearchIndicator.textContent?.substring(0, 50) ||
-          'DeepResearch',
+        indicator: 'cached indicator',
       };
     }
 
-    // Check for the "+" button state (if DeepResearch is selected)
-    const menuItems = Array.from(
-      document.querySelectorAll('[role="menuitemradio"]'),
+    // Search within scoped root only, not entire document
+    const textElements = Array.from(
+      scopedRoot.querySelectorAll('div, span, button'),
     );
-    const deepResearchSelected = menuItems.some((item) => {
-      const text = item.textContent || '';
-      const isChecked = item.getAttribute('aria-checked') === 'true';
-      return (
-        isChecked &&
-        (text.includes('Deep Research') || text.includes('ディープリサーチ'))
-      );
-    });
 
-    return {
-      isEnabled: deepResearchSelected,
-      indicator: deepResearchSelected
-        ? 'DeepResearch (selected in menu)'
-        : undefined,
-    };
+    for (const element of textElements) {
+      const text = element.textContent || '';
+
+      if (DEEP_RESEARCH_PATTERN.test(text)) {
+        // Update cache
+        cache.element = element;
+        cache.timestamp = now;
+
+        return {
+          isEnabled: true,
+          indicator: text.substring(0, 50),
+        };
+      }
+    }
+
+    return {isEnabled: false};
   });
 }
 
