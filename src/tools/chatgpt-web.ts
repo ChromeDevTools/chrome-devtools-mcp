@@ -324,13 +324,18 @@ export const askChatGPTWeb = defineTool({
         await new Promise((resolve) => setTimeout(resolve, 2000));
 
         const status = await page.evaluate(() => {
-          // Check if streaming
+          // Check if streaming - check both textContent and aria-label
           const buttons = Array.from(document.querySelectorAll('button'));
-          const isStreaming = buttons.some(
-            (btn) =>
-              btn.textContent?.includes('ストリーミングの停止') ||
-              btn.textContent?.includes('停止'),
-          );
+          const isStreaming = buttons.some((btn) => {
+            const text = btn.textContent || '';
+            const aria = btn.getAttribute('aria-label') || '';
+            return (
+              text.includes('ストリーミングの停止') ||
+              text.includes('停止') ||
+              aria.includes('ストリーミングの停止') ||
+              aria.includes('停止')
+            );
+          });
 
           if (!isStreaming) {
             // Get final response
