@@ -181,31 +181,37 @@ async function detectDeepResearchMode(page: any): Promise<{
 }> {
   return await page.evaluate(() => {
     // Multi-language patterns for DeepResearch
-    const DEEP_RESEARCH_PATTERN = /deep\s*research|ディープ\s*リサーチ|深度研究|深入研究/i;
+    const DEEP_RESEARCH_PATTERN = /リサーチ|deep\s*research|ディープ\s*リサーチ|深度研究|深入研究/i;
 
-    // Cache for performance (simple object-based cache instead of WeakRef for browser compatibility)
-    const cache: {element?: Element; timestamp: number} = {timestamp: 0};
-    const CACHE_TTL = 2000; // 2 seconds
+    // Step 1: Check for the "リサーチ" pill button near prompt (MOST RELIABLE)
+    // When DeepResearch is ON, a pill button appears in the composer form
+    const promptTextarea = document.querySelector('#prompt-textarea');
+    if (promptTextarea) {
+      const form = promptTextarea.closest('form');
+      if (form) {
+        const pillButton = Array.from(form.querySelectorAll('button')).find(
+          (btn) => {
+            const text = btn.textContent?.trim() || '';
+            const ariaLabel = btn.getAttribute('aria-label') || '';
+            // Check for pill button with research text
+            return (
+              btn.className.includes('composer-pill') &&
+              DEEP_RESEARCH_PATTERN.test(text + ' ' + ariaLabel)
+            );
+          }
+        );
 
-    // Step 1: Find scoped root element first
-    const findScopedRoot = (): Element | null => {
-      // Try conversation root selectors
-      const candidates = [
-        document.querySelector('[data-testid="conversation-turns"]'),
-        document.querySelector('[role="main"]'),
-        document.querySelector('main'),
-        document.querySelector('[data-testid="conversation-root"]'),
-      ];
-
-      return candidates.find((el) => el !== null) || document.body;
-    };
-
-    const scopedRoot = findScopedRoot();
-    if (!scopedRoot) {
-      return {isEnabled: false};
+        if (pillButton) {
+          const text = pillButton.textContent?.trim() || '';
+          return {
+            isEnabled: true,
+            indicator: `composer-pill: "${text}"`,
+          };
+        }
+      }
     }
 
-    // Step 2: Try data-testid selectors FIRST (most reliable)
+    // Step 2: Try data-testid selectors
     const dataTestIdSelectors = [
       '[data-testid*="deep-research"]',
       '[data-testid*="deepresearch"]',
@@ -213,7 +219,7 @@ async function detectDeepResearchMode(page: any): Promise<{
     ];
 
     for (const selector of dataTestIdSelectors) {
-      const element = scopedRoot.querySelector(selector);
+      const element = document.querySelector(selector);
       if (element) {
         return {
           isEnabled: true,
@@ -230,7 +236,7 @@ async function detectDeepResearchMode(page: any): Promise<{
     ];
 
     for (const selector of ariaSelectors) {
-      const elements = Array.from(scopedRoot.querySelectorAll(selector));
+      const elements = Array.from(document.querySelectorAll(selector));
 
       for (const element of elements) {
         const ariaLabel = element.getAttribute('aria-label') || '';
@@ -260,31 +266,17 @@ async function detectDeepResearchMode(page: any): Promise<{
     }
 
     // Step 4: Text matching as LAST resort (least reliable)
-    // Use cached result if available and fresh
-    const now = Date.now();
-    if (cache.element && now - cache.timestamp < CACHE_TTL) {
-      return {
-        isEnabled: true,
-        indicator: 'cached indicator',
-      };
-    }
-
-    // Search within scoped root only, not entire document
     const textElements = Array.from(
-      scopedRoot.querySelectorAll('div, span, button'),
+      document.querySelectorAll('div, span, button'),
     );
 
     for (const element of textElements) {
       const text = element.textContent || '';
 
       if (DEEP_RESEARCH_PATTERN.test(text)) {
-        // Update cache
-        cache.element = element;
-        cache.timestamp = now;
-
         return {
           isEnabled: true,
-          indicator: text.substring(0, 50),
+          indicator: `text match: ${text.substring(0, 50).trim()}`,
         };
       }
     }
@@ -351,7 +343,20 @@ async function enableDeepResearchMode(
     }
 
     response.appendResponseLine('✅ DeepResearchモード有効化');
-    await new Promise((resolve) => setTimeout(resolve, 500));
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+
+    // Verify mode was actually enabled
+    const verification = await detectDeepResearchMode(page);
+    if (!verification.isEnabled) {
+      return {
+        success: false,
+        error: 'DeepResearchモードの有効化に失敗しました（確認できませんでした）',
+      };
+    }
+
+    response.appendResponseLine(
+      `✅ モード確認完了: DeepResearch有効 (${verification.indicator})`,
+    );
 
     return {success: true};
   } catch (error) {
@@ -442,6 +447,19 @@ async function sendQuestion(
   response: any,
   question: string,
 ): Promise<{success: boolean; error?: string}> {
+  // Final verification before sending
+  const finalCheck = await detectDeepResearchMode(page);
+  if (!finalCheck.isEnabled) {
+    return {
+      success: false,
+      error:
+        'DeepResearchモードが無効です。送信前の最終確認に失敗しました。',
+    };
+  }
+
+  response.appendResponseLine(
+    `✅ 送信前確認: DeepResearchモード有効 (${finalCheck.indicator})`,
+  );
   response.appendResponseLine('リサーチテーマを送信中...');
 
   const questionSent = await page.evaluate((questionText: string) => {

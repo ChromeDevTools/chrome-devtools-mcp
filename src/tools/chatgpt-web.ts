@@ -307,7 +307,38 @@ export const askChatGPTWeb = defineTool({
 
           if (deepResearchEnabled) {
             response.appendResponseLine('✅ DeepResearchモード有効化完了');
-            await new Promise((resolve) => setTimeout(resolve, 500));
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+
+            // Verify mode was actually enabled (check for composer-pill button)
+            const verified = await page.evaluate(() => {
+              const DEEP_RESEARCH_PATTERN = /リサーチ|deep\s*research|ディープ\s*リサーチ|深度研究|深入研究/i;
+              const promptTextarea = document.querySelector('#prompt-textarea');
+              if (promptTextarea) {
+                const form = promptTextarea.closest('form');
+                if (form) {
+                  const pillButton = Array.from(form.querySelectorAll('button')).find(
+                    (btn) => {
+                      const text = btn.textContent?.trim() || '';
+                      const ariaLabel = btn.getAttribute('aria-label') || '';
+                      return (
+                        btn.className.includes('composer-pill') &&
+                        DEEP_RESEARCH_PATTERN.test(text + ' ' + ariaLabel)
+                      );
+                    }
+                  );
+                  return !!pillButton;
+                }
+              }
+              return false;
+            });
+
+            if (verified) {
+              response.appendResponseLine('✅ モード確認完了: DeepResearch有効（composer-pill検出）');
+            } else {
+              response.appendResponseLine(
+                '⚠️ DeepResearchモードの確認に失敗しました',
+              );
+            }
           } else {
             response.appendResponseLine(
               '⚠️ DeepResearchオプションが見つかりませんでした',
@@ -316,7 +347,39 @@ export const askChatGPTWeb = defineTool({
         }
       }
 
-      // Step 4: Send question
+      // Step 4: Send question (with final mode verification)
+      if (useDeepResearch) {
+        const finalCheck = await page.evaluate(() => {
+          const DEEP_RESEARCH_PATTERN = /リサーチ|deep\s*research|ディープ\s*リサーチ|深度研究|深入研究/i;
+          const promptTextarea = document.querySelector('#prompt-textarea');
+          if (promptTextarea) {
+            const form = promptTextarea.closest('form');
+            if (form) {
+              const pillButton = Array.from(form.querySelectorAll('button')).find(
+                (btn) => {
+                  const text = btn.textContent?.trim() || '';
+                  const ariaLabel = btn.getAttribute('aria-label') || '';
+                  return (
+                    btn.className.includes('composer-pill') &&
+                    DEEP_RESEARCH_PATTERN.test(text + ' ' + ariaLabel)
+                  );
+                }
+              );
+              return !!pillButton;
+            }
+          }
+          return false;
+        });
+
+        if (!finalCheck) {
+          response.appendResponseLine(
+            '❌ エラー: DeepResearchモードが無効です（composer-pill未検出）。送信を中止します。',
+          );
+          return;
+        }
+        response.appendResponseLine('✅ 送信前確認: DeepResearchモード有効（composer-pill検出）');
+      }
+
       response.appendResponseLine('質問を送信中...');
 
       const questionSent = await page.evaluate((questionText) => {
