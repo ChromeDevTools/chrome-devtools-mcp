@@ -315,12 +315,12 @@ async function enableDeepResearchMode(
 
     response.appendResponseLine('✅ +ボタン（ファイルの追加など）をクリック');
 
-    // Wait for menu to appear (pierce shadow DOM)
-    await page.waitForSelector('pierce/[role="menuitemradio"]', { visible: true, timeout: 5000 });
+    // Wait for menu to appear (deep combinator for shadow DOM)
+    await page.waitForSelector('>>> [role="menuitemradio"]', { visible: true, timeout: 5000 });
     await new Promise((resolve) => setTimeout(resolve, 500));
 
-    // Step 2: Click "Deep Research" menuitemradio (pierce shadow DOM)
-    const menuItems = await page.$$eval('pierce/[role="menuitemradio"]', (els: Element[]) =>
+    // Step 2: Click "Deep Research" menuitemradio (deep combinator for shadow DOM)
+    const menuItems = await page.$$eval('>>> [role="menuitemradio"]', (els: Element[]) =>
       els.map((el: Element) => ({
         text: (el as HTMLElement).innerText.trim(),
         index: els.indexOf(el),
@@ -340,7 +340,7 @@ async function enableDeepResearchMode(
     }
 
     // Click the found menuitemradio
-    const menuItemElements = await page.$$('pierce/[role="menuitemradio"]');
+    const menuItemElements = await page.$$('>>> [role="menuitemradio"]');
     await menuItemElements[deepResearchIndex].click();
 
     response.appendResponseLine('✅ DeepResearch menuitemradio をクリック');
