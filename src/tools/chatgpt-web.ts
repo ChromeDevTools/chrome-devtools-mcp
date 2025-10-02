@@ -428,6 +428,16 @@ export const askChatGPTWeb = defineTool({
                     textbox.dispatchEvent(
                       new Event('input', {bubbles: true}),
                     );
+
+                    // Press Enter to confirm
+                    textbox.dispatchEvent(
+                      new KeyboardEvent('keydown', {
+                        key: 'Enter',
+                        code: 'Enter',
+                        keyCode: 13,
+                        bubbles: true,
+                      }),
+                    );
                     textbox.blur();
                   }
                 }, project);
