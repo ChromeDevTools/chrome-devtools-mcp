@@ -295,30 +295,7 @@ async function enableDeepResearchMode(
   try {
     response.appendResponseLine('DeepResearchモードを有効化中...');
 
-    // Step 1: Click じっくり思考 button with haspopup="menu"
-    const thinkingMenuClicked = await page.evaluate(() => {
-      const buttons = Array.from(document.querySelectorAll('button'));
-      const thinkingMenuButton = buttons.find((btn) => {
-        const text = btn.textContent?.trim() || '';
-        return text.includes('じっくり思考') && btn.getAttribute('haspopup') === 'menu';
-      });
-
-      if (!thinkingMenuButton) {
-        return {success: false, error: 'じっくり思考メニューボタンが見つかりません'};
-      }
-
-      (thinkingMenuButton as HTMLElement).click();
-      return {success: true};
-    });
-
-    if (!thinkingMenuClicked.success) {
-      return {success: false, error: thinkingMenuClicked.error};
-    }
-
-    response.appendResponseLine('✅ じっくり思考メニューを開く');
-    await new Promise((resolve) => setTimeout(resolve, 500));
-
-    // Step 2: Click "+" button (ファイルの追加など)
+    // Step 1: Click "+" button (ファイルの追加など)
     const plusClicked = await page.evaluate(() => {
       const buttons = Array.from(document.querySelectorAll('button'));
       const plusButton = buttons.find((btn) => {
@@ -339,7 +316,7 @@ async function enableDeepResearchMode(
     response.appendResponseLine('✅ +ボタン（ファイルの追加など）をクリック');
     await new Promise((resolve) => setTimeout(resolve, 500));
 
-    // Step 3: Click "Deep Research" menuitemradio
+    // Step 2: Click "Deep Research" menuitemradio
     const deepResearchSelected = await page.evaluate(() => {
       const menuItems = Array.from(
         document.querySelectorAll('[role="menuitemradio"]'),
