@@ -316,11 +316,11 @@ async function enableDeepResearchMode(
     response.appendResponseLine('✅ +ボタン（ファイルの追加など）をクリック');
 
     // Wait for menu to appear (deep combinator for shadow DOM)
-    await page.waitForSelector('>>> [role="menuitemradio"]', { visible: true, timeout: 5000 });
+    await page.waitForSelector(':scope >>> [role="menuitemradio"]', { visible: true, timeout: 5000 });
     await new Promise((resolve) => setTimeout(resolve, 500));
 
     // Step 2: Click "Deep Research" menuitemradio (deep combinator for shadow DOM)
-    const menuItems = await page.$$eval('>>> [role="menuitemradio"]', (els: Element[]) =>
+    const menuItems = await page.$$eval(':scope >>> [role="menuitemradio"]', (els: Element[]) =>
       els.map((el: Element) => ({
         text: (el as HTMLElement).innerText.trim(),
         index: els.indexOf(el),
@@ -340,7 +340,7 @@ async function enableDeepResearchMode(
     }
 
     // Click the found menuitemradio
-    const menuItemElements = await page.$$('>>> [role="menuitemradio"]');
+    const menuItemElements = await page.$$(':scope >>> [role="menuitemradio"]');
     await menuItemElements[deepResearchIndex].click();
 
     response.appendResponseLine('✅ DeepResearch menuitemradio をクリック');
