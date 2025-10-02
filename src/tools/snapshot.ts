@@ -4,8 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {writeFile} from 'node:fs/promises';
-
 import {Locator} from 'puppeteer-core';
 import z from 'zod';
 
@@ -41,10 +39,10 @@ identifier (uid). Always use the latest snapshot. Prefer taking a snapshot over 
     const formattedSnapshot = formatA11ySnapshot(snapshot.root);
 
     if (request.params.filePath) {
-      await writeFile(request.params.filePath, formattedSnapshot);
-      response.appendResponseLine(
-        `Saved snapshot to ${request.params.filePath}.`,
-      );
+      const encoder = new TextEncoder();
+      const data = encoder.encode(formattedSnapshot);
+      const file = await context.saveFile(data, request.params.filePath);
+      response.appendResponseLine(`Saved snapshot to ${file.filename}.`);
     } else {
       response.setIncludeSnapshot(true);
     }
