@@ -13,6 +13,58 @@ import {ToolCategories} from './categories.js';
 import {defineTool} from './ToolDefinition.js';
 
 /**
+ * Path to store chat session data
+ */
+const CHAT_SESSIONS_FILE = path.join(
+  process.cwd(),
+  'docs/ask/chatgpt/.chat-sessions.json',
+);
+
+interface ChatSession {
+  chatId: string;
+  url: string;
+  lastUsed: string;
+  title?: string;
+}
+
+interface ChatSessions {
+  [projectName: string]: ChatSession;
+}
+
+/**
+ * Load chat sessions from JSON file
+ */
+async function loadChatSessions(): Promise<ChatSessions> {
+  try {
+    const data = await fs.promises.readFile(CHAT_SESSIONS_FILE, 'utf-8');
+    return JSON.parse(data);
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Save a chat session for a project
+ */
+async function saveChatSession(
+  projectName: string,
+  session: ChatSession,
+): Promise<void> {
+  const sessions = await loadChatSessions();
+  sessions[projectName] = session;
+
+  // Ensure directory exists
+  const dir = path.dirname(CHAT_SESSIONS_FILE);
+  await fs.promises.mkdir(dir, {recursive: true});
+
+  await fs.promises.writeFile(
+    CHAT_SESSIONS_FILE,
+    JSON.stringify(sessions, null, 2),
+    'utf-8',
+  );
+}
+
+/**
  * Sanitize question to remove sensitive information like passwords
  */
 function sanitizeQuestion(text: string): string {
@@ -145,82 +197,35 @@ export const askChatGPTWeb = defineTool({
 
       response.appendResponseLine('✅ ログイン確認完了');
 
-      // Step 2: Search for existing chat or create new one
+      // Step 2: Load existing session or create new chat
+      let isNewChat = false;
+      let sessionChatId: string | undefined;
+
       if (!createNewChat) {
-        response.appendResponseLine(
-          `既存のプロジェクトチャット「[Project: ${project}]」を検索中...`,
-        );
+        // Try to load existing session for this project
+        const sessions = await loadChatSessions();
+        const existingSession = sessions[project];
 
-        // Open search
-        const searchOpened = await page.evaluate(() => {
-          const searchButton = Array.from(
-            document.querySelectorAll('div.group.__menu-item.hoverable'),
-          ).find((elem) => elem.textContent?.includes('チャットを検索')) as
-            | HTMLElement
-            | undefined;
-          if (searchButton) {
-            searchButton.click();
-            return true;
-          }
-          return false;
-        });
-
-        if (searchOpened) {
-          await new Promise((resolve) => setTimeout(resolve, 500));
-
-          // Search for project chat
-          const chatFound = await page.evaluate((projectName) => {
-            const searchInput = document.querySelector(
-              'input[placeholder*="チャットを検索"]',
-            ) as HTMLInputElement;
-            if (searchInput) {
-              searchInput.value = `[Project: ${projectName}]`;
-              searchInput.dispatchEvent(new Event('input', {bubbles: true}));
-              return true;
-            }
-            return false;
-          }, project);
-
-          if (chatFound) {
-            await new Promise((resolve) => setTimeout(resolve, 1000));
-
-            // Try to find and click the chat
-            const existingChat = await page.evaluate((projectName) => {
-              const chatLinks = Array.from(
-                document.querySelectorAll('a[href^="/c/"]'),
-              );
-              const targetChat = chatLinks.find((link) =>
-                link.textContent?.includes(`[Project: ${projectName}]`),
-              );
-              if (targetChat) {
-                (targetChat as HTMLElement).click();
-                return {
-                  found: true,
-                  href: (targetChat as HTMLAnchorElement).href,
-                };
-              }
-              return {found: false};
-            }, project);
-
-            if (existingChat.found) {
-              response.appendResponseLine(
-                `✅ 既存チャットを使用: ${existingChat.href}`,
-              );
-              await new Promise((resolve) => setTimeout(resolve, 1000));
-            } else {
-              response.appendResponseLine(
-                '既存チャットが見つかりませんでした。新規作成します。',
-              );
-            }
-          }
+        if (existingSession) {
+          response.appendResponseLine(
+            `既存のプロジェクトチャットを使用: ${existingSession.url}`,
+          );
+          await page.goto(existingSession.url, {waitUntil: 'networkidle2'});
+          sessionChatId = existingSession.chatId;
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+        } else {
+          response.appendResponseLine(
+            '既存チャットが見つかりませんでした。新規作成します。',
+          );
+          isNewChat = true;
         }
+      } else {
+        isNewChat = true;
       }
 
       // Step 3: Create new chat if needed
-      let isNewChat = false;
-      if (createNewChat || page.url() === 'https://chatgpt.com/') {
+      if (isNewChat) {
         response.appendResponseLine('新規チャットを作成中...');
-        isNewChat = true;
 
         // Click "新しいチャット"
         await page.evaluate(() => {
@@ -379,86 +384,41 @@ export const askChatGPTWeb = defineTool({
             );
           }
 
-          // Rename chat if it's a new chat
+          // Save chat session if it's a new chat
           if (isNewChat) {
-            response.appendResponseLine('チャット名を変更中...');
+            response.appendResponseLine('チャットセッションを保存中...');
 
-            // Wait for chat to be created
-            await new Promise((resolve) => setTimeout(resolve, 2000));
+            // Extract chat ID from URL
+            const chatUrl = page.url();
+            const chatIdMatch = chatUrl.match(/\/c\/([a-f0-9-]+)/);
 
-            // Click chat menu
-            const menuClicked = await page.evaluate(() => {
-              const menuButtons = Array.from(
-                document.querySelectorAll(
-                  'button[aria-label="会話のオプションを開く"]',
-                ),
-              ) as HTMLElement[];
-              // Find the first menu button (current chat)
-              const btn = menuButtons[0];
-              if (btn) {
-                btn.click();
-                return true;
-              }
-              return false;
-            });
-
-            if (menuClicked) {
-              await new Promise((resolve) => setTimeout(resolve, 500));
-
-              // Click "名前を変更する"
-              const renameClicked = await page.evaluate(() => {
-                const menuItems = Array.from(
-                  document.querySelectorAll('[role="menuitem"]'),
-                );
-                const renameItem = menuItems.find((item) =>
-                  item.textContent?.includes('名前を変更する'),
-                );
-                if (renameItem) {
-                  (renameItem as HTMLElement).click();
-                  return true;
-                }
-                return false;
+            if (chatIdMatch) {
+              const chatId = chatIdMatch[1];
+              await saveChatSession(project, {
+                chatId,
+                url: chatUrl,
+                lastUsed: new Date().toISOString(),
+                title: `[Project: ${project}]`,
               });
-
-              if (renameClicked) {
-                await new Promise((resolve) => setTimeout(resolve, 500));
-
-                // Enter new name
-                await page.evaluate((projectName) => {
-                  const textbox = document.querySelector(
-                    'input[type="text"]',
-                  ) as HTMLInputElement;
-                  if (textbox) {
-                    textbox.value = `[Project: ${projectName}]`;
-                    textbox.dispatchEvent(
-                      new Event('input', {bubbles: true}),
-                    );
-
-                    // Press Enter to confirm
-                    textbox.dispatchEvent(
-                      new KeyboardEvent('keydown', {
-                        key: 'Enter',
-                        code: 'Enter',
-                        keyCode: 13,
-                        bubbles: true,
-                      }),
-                    );
-                    textbox.blur();
-                  }
-                }, project);
-
-                await new Promise((resolve) => setTimeout(resolve, 500));
-                response.appendResponseLine(
-                  `✅ チャット名を「[Project: ${project}]」に変更`,
-                );
-
-                // Close the menu popup by clicking outside
-                await page.evaluate(() => {
-                  const body = document.body;
-                  body.click();
-                });
-                await new Promise((resolve) => setTimeout(resolve, 300));
-              }
+              sessionChatId = chatId;
+              response.appendResponseLine(
+                `✅ チャットセッション保存: ${chatId}`,
+              );
+            } else {
+              response.appendResponseLine(
+                '⚠️ チャットIDが取得できませんでした',
+              );
+            }
+          } else {
+            // Update last used timestamp for existing session
+            if (sessionChatId) {
+              const chatUrl = page.url();
+              await saveChatSession(project, {
+                chatId: sessionChatId,
+                url: chatUrl,
+                lastUsed: new Date().toISOString(),
+                title: `[Project: ${project}]`,
+              });
             }
           }
 
