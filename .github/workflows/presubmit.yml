@@ -10,7 +10,7 @@ on:
 
 jobs:
   check-format:
-    name: "[Required] Check correct format"
+    name: '[Required] Check correct format'
     runs-on: ubuntu-latest
 
     steps:
@@ -23,7 +23,7 @@ jobs:
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
           cache: npm
-          node-version-file: ".nvmrc"
+          node-version-file: '.nvmrc'
 
       - name: Install dependencies
         run: npm ci
@@ -32,7 +32,7 @@ jobs:
         run: npm run check-format
 
   check-docs:
-    name: "[Required] Check docs updated"
+    name: '[Required] Check docs updated'
     runs-on: ubuntu-latest
 
     steps:
@@ -45,7 +45,7 @@ jobs:
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
           cache: npm
-          node-version-file: ".nvmrc"
+          node-version-file: '.nvmrc'
 
       - name: Install dependencies
         run: npm ci
