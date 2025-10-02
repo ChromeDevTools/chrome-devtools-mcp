@@ -21,6 +21,7 @@ import {McpContext} from './McpContext.js';
 import {McpResponse} from './McpResponse.js';
 import {Mutex} from './Mutex.js';
 import * as bookmarkTools from './tools/bookmarks.js';
+import * as chatgptWebTools from './tools/chatgpt-web.js';
 import * as consoleTools from './tools/console.js';
 import * as emulationTools from './tools/emulation.js';
 import * as extensionTools from './tools/extensions.js';
@@ -164,6 +165,7 @@ function registerTool(tool: ToolDefinition): void {
 
 const tools = [
   ...Object.values(bookmarkTools),
+  ...Object.values(chatgptWebTools),
   ...Object.values(consoleTools),
   ...Object.values(emulationTools),
   ...Object.values(extensionTools),
