@@ -183,6 +183,18 @@ export const hostConfig = {};
   fs.copyFileSync(devtoolsLicenseFileSource, devtoolsLicenseFileDestination);
 
   copyThirdPartyLicenseFiles();
+
+  // Copy selector JSON files
+  const selectorsDir = path.join(BUILD_DIR, 'src', 'selectors');
+  fs.mkdirSync(selectorsDir, {recursive: true});
+  const selectorsSource = path.join(process.cwd(), 'src', 'selectors', 'chatgpt.json');
+  const selectorsDestination = path.join(selectorsDir, 'chatgpt.json');
+  if (fs.existsSync(selectorsSource)) {
+    fs.copyFileSync(selectorsSource, selectorsDestination);
+    console.log('✅ Copied chatgpt.json to build directory');
+  } else {
+    console.warn('⚠️  chatgpt.json not found, skipping copy');
+  }
 }
 
 main();

@@ -11,6 +11,7 @@ import z from 'zod';
 
 import {ToolCategories} from './categories.js';
 import {defineTool} from './ToolDefinition.js';
+import {loadSelectors, getSelector} from '../selectors/loader.js';
 
 /**
  * Path to store chat session data
@@ -379,28 +380,40 @@ export const askChatGPTWeb = defineTool({
             await new Promise((resolve) => setTimeout(resolve, 1000));
 
             // Verify mode was actually enabled (check for new UI indicators)
-            const verification = await page.evaluate(() => {
+            const selectors = loadSelectors();
+            const verification = await page.evaluate((deleteText, sourcesText, deepResearchPlaceholders) => {
               // Check placeholder text
               const textarea = document.querySelector('textarea');
               const placeholder = textarea?.getAttribute('placeholder') || '';
 
-              // Check for delete button
+              // Check for delete button (using JSON selector)
               const deleteButton = Array.from(document.querySelectorAll('button')).find(btn =>
-                btn.textContent?.includes('リサーチ：クリックして削除')
+                btn.textContent?.includes(deleteText)
               );
 
-              // Check for sources button
+              // Check for sources button (using JSON selector)
               const sourcesButton = Array.from(document.querySelectorAll('button')).find(btn =>
-                btn.textContent?.includes('情報源')
+                btn.textContent?.includes(sourcesText)
+              );
+
+              // Check placeholder against expected patterns
+              const hasCorrectPlaceholder = deepResearchPlaceholders.some((pattern: string) =>
+                placeholder.includes(pattern)
               );
 
               return {
-                hasCorrectPlaceholder: placeholder.includes('詳細なレポート') || placeholder.includes('リサーチ'),
+                hasCorrectPlaceholder,
                 hasDeleteButton: !!deleteButton,
                 hasSourcesButton: !!sourcesButton,
                 placeholder: placeholder
               };
-            });
+            },
+            getSelector('deepResearchDeleteButton').text as string,
+            getSelector('deepResearchSourcesButton').text as string,
+            Array.isArray(selectors.placeholders?.deepResearchMode)
+              ? selectors.placeholders.deepResearchMode
+              : [selectors.placeholders?.deepResearchMode || '']
+            );
 
             if (verification.hasCorrectPlaceholder || verification.hasDeleteButton) {
               response.appendResponseLine('✅ モード確認完了: DeepResearch有効');
@@ -419,21 +432,32 @@ export const askChatGPTWeb = defineTool({
 
       // Step 4: Send question (with final mode verification)
       if (useDeepResearch) {
-        const finalCheck = await page.evaluate(() => {
+        const selectorsForCheck = loadSelectors();
+        const finalCheck = await page.evaluate((deleteText, deepResearchPlaceholders) => {
           // Check placeholder text
           const textarea = document.querySelector('textarea');
           const placeholder = textarea?.getAttribute('placeholder') || '';
 
-          // Check for delete button
+          // Check for delete button (using JSON selector)
           const deleteButton = Array.from(document.querySelectorAll('button')).find(btn =>
-            btn.textContent?.includes('リサーチ：クリックして削除')
+            btn.textContent?.includes(deleteText)
+          );
+
+          // Check if placeholder matches DeepResearch patterns
+          const placeholderMatches = deepResearchPlaceholders.some((pattern: string) =>
+            placeholder.includes(pattern)
           );
 
           return {
-            isEnabled: placeholder.includes('詳細なレポート') || placeholder.includes('リサーチ') || !!deleteButton,
+            isEnabled: placeholderMatches || !!deleteButton,
             placeholder: placeholder
           };
-        });
+        },
+        getSelector('deepResearchDeleteButton').text as string,
+        Array.isArray(selectorsForCheck.placeholders?.deepResearchMode)
+          ? selectorsForCheck.placeholders.deepResearchMode
+          : [selectorsForCheck.placeholders?.deepResearchMode || '']
+        );
 
         if (!finalCheck.isEnabled) {
           response.appendResponseLine(

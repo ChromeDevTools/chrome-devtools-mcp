@@ -20,10 +20,12 @@ import {logger, saveLogsToFile} from './logger.js';
 import {McpContext} from './McpContext.js';
 import {McpResponse} from './McpResponse.js';
 import {Mutex} from './Mutex.js';
+import {runStartupCheck} from './startup-check.js';
 import * as bookmarkTools from './tools/bookmarks.js';
 import * as chatgptWebTools from './tools/chatgpt-web.js';
 import * as deepResearchChatGPTTools from './tools/deep_research_chatgpt.js';
 import * as consoleTools from './tools/console.js';
+import * as diagnoseUiTools from './tools/diagnose-ui.js';
 import * as emulationTools from './tools/emulation.js';
 import * as extensionTools from './tools/extensions.js';
 import * as inputTools from './tools/input.js';
@@ -70,6 +72,8 @@ server.server.setRequestHandler(SetLevelRequestSchema, () => {
 });
 
 let context: McpContext;
+let uiHealthCheckRun = false; // Track if UI health check has been run
+
 async function getContext(): Promise<McpContext> {
   const browser = await resolveBrowser({
     browserUrl: args.browserUrl,
@@ -89,6 +93,15 @@ async function getContext(): Promise<McpContext> {
   // Always recreate context if browser reference changed or context doesn't exist
   if (!context || context.browser !== browser) {
     context = await McpContext.from(browser, logger);
+
+    // Run UI health check only once per browser instance
+    if (!uiHealthCheckRun) {
+      uiHealthCheckRun = true;
+      // Run in background to avoid blocking startup
+      runStartupCheck(browser).catch(err => {
+        logger(`Startup check failed: ${err}`);
+      });
+    }
   }
 
   return context;
@@ -169,6 +182,7 @@ const tools = [
   ...Object.values(chatgptWebTools),
   ...Object.values(deepResearchChatGPTTools),
   ...Object.values(consoleTools),
+  ...Object.values(diagnoseUiTools),
   ...Object.values(emulationTools),
   ...Object.values(extensionTools),
   ...Object.values(inputTools),

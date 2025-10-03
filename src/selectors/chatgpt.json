@@ -1,0 +1,85 @@
+{
+  "version": "2025-10",
+  "lastUpdated": "2025-10-03",
+  "description": "ChatGPT Web UI selectors for browser automation",
+  "elements": {
+    "newChatLink": {
+      "css": "a[href='/']",
+      "description": "新しいチャット作成リンク"
+    },
+    "tempChatToggle": {
+      "ax": {
+        "role": "button",
+        "nameContains": "一時チャットをオフにする"
+      },
+      "description": "一時チャットON/OFFトグルボタン"
+    },
+    "addFileButton": {
+      "ax": {
+        "role": "button",
+        "ariaLabel": "ファイルの追加"
+      },
+      "description": "ファイル追加（ツールメニューを開く）ボタン"
+    },
+    "deepResearchMenuItem": {
+      "css": "[role='menuitemradio']",
+      "text": "Deep Research",
+      "description": "DeepResearchモード切り替えメニュー項目"
+    },
+    "deepResearchDeleteButton": {
+      "text": "リサーチ：クリックして削除",
+      "description": "DeepResearch削除ボタン（モード確認用）"
+    },
+    "deepResearchSourcesButton": {
+      "text": "情報源",
+      "description": "情報源ボタン（モード確認用）"
+    },
+    "composerTextarea": {
+      "css": "textarea[placeholder]",
+      "description": "メッセージ入力テキストエリア"
+    },
+    "prosemirrorEditor": {
+      "css": ".ProseMirror[contenteditable='true']",
+      "description": "ProseMirrorエディタ"
+    },
+    "sendButton": {
+      "css": "button[data-testid='send-button']",
+      "description": "送信ボタン"
+    },
+    "userMessage": {
+      "css": "[data-message-author-role='user']",
+      "description": "ユーザーメッセージ"
+    },
+    "assistantMessage": {
+      "css": "[data-message-author-role='assistant']",
+      "description": "アシスタントメッセージ"
+    },
+    "stopButton": {
+      "text": [
+        "停止",
+        "リサーチを停止",
+        "ストリーミングの停止"
+      ],
+      "ax": {
+        "ariaLabel": [
+          "停止",
+          "ストリーミングの停止"
+        ]
+      },
+      "description": "ストリーミング停止ボタン"
+    },
+    "thinkingTimeButton": {
+      "ax": {
+        "ariaLabelContains": "思考時間"
+      },
+      "description": "思考時間表示ボタン"
+    }
+  },
+  "placeholders": {
+    "normalMode": "Message ChatGPT",
+    "deepResearchMode": [
+      "詳細なレポート",
+      "リサーチ"
+    ]
+  }
+}
