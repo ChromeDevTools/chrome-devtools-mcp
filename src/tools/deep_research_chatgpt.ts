@@ -348,7 +348,10 @@ async function detectDeepResearchMode(page: any): Promise<{
 }
 
 /**
- * Enable DeepResearch mode by clicking + button and selecting option
+ * Enable DeepResearch mode using new UI structure (2025-10)
+ * - Click "ファイルの追加など" button to open menu
+ * - Select "Deep Research" menuitemradio
+ * - Verify by checking placeholder and delete button
  */
 async function enableDeepResearchMode(
   page: any,
@@ -357,46 +360,80 @@ async function enableDeepResearchMode(
   try {
     response.appendResponseLine('DeepResearchモードを有効化中...');
 
-    // Step 1: +ボタンをクリック（Puppeteer click）
-    const plusButton = await page.$('button[aria-label*="ファイルの追加"]');
-    if (!plusButton) {
-      return { success: false, error: '+ボタンが見つかりません' };
+    // Step 1: Find and click "ファイルの追加など" button (with haspopup="menu")
+    const menuButton = await page.evaluate(() => {
+      const buttons = Array.from(document.querySelectorAll('button[haspopup="menu"]'));
+      const targetButton = buttons.find(btn => {
+        const text = btn.textContent || '';
+        return text.includes('ファイルの追加') || text.includes('追加');
+      });
+      if (targetButton) {
+        (targetButton as HTMLElement).click();
+        return true;
+      }
+      return false;
+    });
+
+    if (!menuButton) {
+      return {success: false, error: '「ファイルの追加など」ボタンが見つかりません'};
     }
-    await plusButton.click();
-    response.appendResponseLine('✅ +ボタンをクリック');
+    response.appendResponseLine('✅ メニューボタンをクリック');
     await new Promise((resolve) => setTimeout(resolve, 500));
 
-    // Step 2: Deep Research menuitemradio をクリック（Puppeteer click）
-    const menuItems = await page.$$('[role="menuitemradio"]');
-    let deepResearchItem = null;
+    // Step 2: Click "Deep Research" menuitemradio from opened menu
+    const deepResearchClicked = await page.evaluate(() => {
+      const menuItems = Array.from(document.querySelectorAll('[role="menuitemradio"]'));
+      const deepResearchItem = menuItems.find(item => {
+        const text = item.textContent || '';
+        return text.includes('Deep Research') || text.includes('リサーチ');
+      });
 
-    for (const item of menuItems) {
-      const text = await item.evaluate((el: any) => el.textContent);
-      if (text?.includes('Deep Research') || text?.includes('リサーチ')) {
-        deepResearchItem = item;
-        break;
+      if (deepResearchItem) {
+        (deepResearchItem as HTMLElement).click();
+        return true;
       }
-    }
+      return false;
+    });
 
-    if (!deepResearchItem) {
-      return { success: false, error: 'Deep Research menuitemradio が見つかりません' };
+    if (!deepResearchClicked) {
+      return {success: false, error: 'Deep Research menuitemradio が見つかりません'};
     }
-
-    await deepResearchItem.click();
-    response.appendResponseLine('✅ Deep Research menuitemradio をクリック');
+    response.appendResponseLine('✅ Deep Research を選択');
     await new Promise((resolve) => setTimeout(resolve, 1000));
 
-    // Step 3: 検証（composer-pill確認）
-    const verification = await detectDeepResearchMode(page);
-    if (!verification.isEnabled) {
+    // Step 3: Verify DeepResearch mode is enabled
+    const verification = await page.evaluate(() => {
+      // Check placeholder text
+      const textarea = document.querySelector('textarea');
+      const placeholder = textarea?.getAttribute('placeholder') || '';
+
+      // Check for delete button
+      const deleteButton = Array.from(document.querySelectorAll('button')).find(btn =>
+        btn.textContent?.includes('リサーチ：クリックして削除')
+      );
+
+      // Check for sources button
+      const sourcesButton = Array.from(document.querySelectorAll('button')).find(btn =>
+        btn.textContent?.includes('情報源')
+      );
+
+      return {
+        hasCorrectPlaceholder: placeholder.includes('詳細なレポート') || placeholder.includes('リサーチ'),
+        hasDeleteButton: !!deleteButton,
+        hasSourcesButton: !!sourcesButton,
+        placeholder: placeholder
+      };
+    });
+
+    if (!verification.hasCorrectPlaceholder && !verification.hasDeleteButton) {
       return {
         success: false,
-        error: 'DeepResearchモードの有効化に失敗しました（リサーチpillが検出されませんでした）',
+        error: `DeepResearchモードの有効化に失敗しました（プレースホルダー: ${verification.placeholder}）`,
       };
     }
 
     response.appendResponseLine(
-      `✅ モード確認完了: DeepResearch有効 (${verification.indicator})`,
+      `✅ モード確認完了: DeepResearch有効 (placeholder + delete button)`,
     );
 
     return {success: true};
@@ -562,7 +599,28 @@ async function handleConversationLoop(
     await new Promise((resolve) => setTimeout(resolve, 3000));
 
     const status = await page.evaluate(() => {
-      // Check for research progress indicator
+      // Check for research progress indicator (NEW UI: loading sources button)
+      const allButtons = Array.from(document.querySelectorAll('button'));
+
+      // NEW: Look for "〜を読み込んでいます X 情報源" button
+      const loadingSourcesButton = allButtons.find(btn => {
+        const text = btn.textContent || '';
+        return text.includes('読み込んでいます') && text.includes('情報源');
+      });
+
+      // Also check for "リサーチを開始しています" button
+      const researchStartButton = allButtons.find(btn =>
+        btn.textContent?.includes('リサーチを開始しています')
+      );
+
+      if (loadingSourcesButton || researchStartButton) {
+        return {
+          phase: 'researching',
+          indicator: loadingSourcesButton ? 'loading sources' : 'starting research'
+        };
+      }
+
+      // Legacy indicators (fallback)
       const progressIndicators = Array.from(
         document.querySelectorAll('div, span'),
       );
@@ -574,7 +632,7 @@ async function handleConversationLoop(
       );
 
       if (isResearching) {
-        return {phase: 'researching'};
+        return {phase: 'researching', indicator: 'text match'};
       }
 
       // Check if ChatGPT is asking a clarifying question
@@ -589,8 +647,8 @@ async function handleConversationLoop(
       const messageText = latestMessage.textContent || '';
 
       // Check if it's still streaming
-      const buttons = Array.from(document.querySelectorAll('button'));
-      const isStreaming = buttons.some((btn) => {
+      const streamButtons = Array.from(document.querySelectorAll('button'));
+      const isStreaming = streamButtons.some((btn) => {
         const text = btn.textContent || '';
         const aria = btn.getAttribute('aria-label') || '';
         return (
@@ -691,17 +749,31 @@ async function monitorResearch(
     await new Promise((resolve) => setTimeout(resolve, 5000));
 
     const researchStatus = await page.evaluate(() => {
-      // Check if research completed
-      const assistantMessages = document.querySelectorAll(
-        '[data-message-author-role="assistant"]',
+      const buttons = Array.from(document.querySelectorAll('button'));
+
+      // Check if still loading sources (NEW UI indicator)
+      const loadingSourcesButton = buttons.find(btn => {
+        const text = btn.textContent || '';
+        return text.includes('読み込んでいます') && text.includes('情報源');
+      });
+
+      // Check for "リサーチを開始しています" button
+      const researchStartButton = buttons.find(btn =>
+        btn.textContent?.includes('リサーチを開始しています')
       );
-      if (assistantMessages.length === 0) {
-        return {completed: false, stillResearching: true};
+
+      if (loadingSourcesButton || researchStartButton) {
+        const sourcesText = loadingSourcesButton?.textContent || '';
+        const match = sourcesText.match(/(\d+)\s*情報源/);
+        const sourcesCount = match ? match[1] : '?';
+        return {
+          completed: false,
+          stillResearching: true,
+          progress: `情報源読み込み中 (${sourcesCount}件)`
+        };
       }
 
-      const latestMessage = assistantMessages[assistantMessages.length - 1];
-
-      // Check if still researching
+      // Legacy: Check if still researching
       const progressIndicators = Array.from(
         document.querySelectorAll('div, span'),
       );
@@ -713,11 +785,20 @@ async function monitorResearch(
       );
 
       if (isResearching) {
-        return {completed: false, stillResearching: true};
+        return {completed: false, stillResearching: true, progress: 'リサーチ中'};
       }
 
+      // Check if research completed
+      const assistantMessages = document.querySelectorAll(
+        '[data-message-author-role="assistant"]',
+      );
+      if (assistantMessages.length === 0) {
+        return {completed: false, stillResearching: true, progress: '待機中'};
+      }
+
+      const latestMessage = assistantMessages[assistantMessages.length - 1];
+
       // Check if streaming
-      const buttons = Array.from(document.querySelectorAll('button'));
       const isStreaming = buttons.some((btn) => {
         const text = btn.textContent || '';
         const aria = btn.getAttribute('aria-label') || '';
@@ -754,8 +835,9 @@ async function monitorResearch(
     progressCounter++;
     if (progressCounter % 6 === 0) {
       const elapsedSeconds = Math.floor((Date.now() - startTime) / 1000);
+      const progressText = researchStatus.progress || 'リサーチ継続中';
       response.appendResponseLine(
-        `⏱️ ${elapsedSeconds}秒経過 - リサーチ継続中...`,
+        `⏱️ ${elapsedSeconds}秒経過 - ${progressText}...`,
       );
     }
   }
