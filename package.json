@@ -1,5 +1,5 @@
 {
-  "name": "chrome-devtools-mcp",
+  "name": "@nimbus21.ai/chrome-devtools-mcp",
   "version": "0.6.0",
   "description": "MCP server for Chrome DevTools",
   "type": "module",
