@@ -149,6 +149,9 @@ export const ByteUtilities = {
   const runtimeContent = `
 export function getChromeVersion() { return ''; };
 export const hostConfig = {};
+export const experiments = {
+  isEnabled() { return false; },
+}
   `;
   writeFile(runtimeFile, runtimeContent);
 
