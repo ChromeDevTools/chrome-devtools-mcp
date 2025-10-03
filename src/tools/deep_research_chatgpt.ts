@@ -343,73 +343,36 @@ async function enableDeepResearchMode(
   try {
     response.appendResponseLine('DeepResearchモードを有効化中...');
 
-    // Step 1: Click "+" button (ファイルの追加など)
-    const plusButtonSelector = await page.evaluate(() => {
-      const buttons = Array.from(document.querySelectorAll('button'));
-      const plusButton = buttons.find((btn) => {
-        const aria = btn.getAttribute('aria-label') || '';
-        return aria.includes('ファイルの追加');
-      });
-
-      if (!plusButton)
-        return {success: false, error: '+ボタン（ファイルの追加など）が見つかりません'};
-
-      // Return selector info instead of clicking
-      const ariaLabel = plusButton.getAttribute('aria-label');
-      return {success: true, ariaLabel};
-    });
-
-    if (!plusButtonSelector.success) {
-      return {success: false, error: plusButtonSelector.error};
+    // Step 1: +ボタンをクリック（Puppeteer click）
+    const plusButton = await page.$('button[aria-label*="ファイルの追加"]');
+    if (!plusButton) {
+      return { success: false, error: '+ボタンが見つかりません' };
     }
+    await plusButton.click();
+    response.appendResponseLine('✅ +ボタンをクリック');
+    await page.waitForTimeout(500);
 
-    // Use Puppeteer's click for reliable interaction
-    await page.click(`button[aria-label="${plusButtonSelector.ariaLabel}"]`);
+    // Step 2: Deep Research menuitemradio をクリック（Puppeteer click）
+    const menuItems = await page.$$('[role="menuitemradio"]');
+    let deepResearchItem = null;
 
-    response.appendResponseLine('✅ +ボタン（ファイルの追加など）をクリック');
-
-    // Wait for menu to appear
-    await page.waitForSelector('[role="menuitemradio"]', { visible: true, timeout: 5000 });
-    await new Promise((resolve) => setTimeout(resolve, 500));
-
-    // Step 2: Find and click "Deep Research" menuitemradio
-    const deepResearchResult = await page.evaluate(() => {
-      const menuItems = Array.from(document.querySelectorAll('[role="menuitemradio"]'));
-
-      const deepResearchItem = menuItems.find((item) =>
-        item.textContent?.includes('Deep Research') || item.textContent?.includes('リサーチ')
-      );
-
-      if (!deepResearchItem) {
-        return {
-          success: false,
-          error: `DeepResearch menuitemradio が見つかりません (found: ${menuItems.length} items: ${menuItems.map(m => m.textContent?.trim()).join(', ')})`,
-        };
+    for (const item of menuItems) {
+      const text = await item.evaluate((el: any) => el.textContent);
+      if (text?.includes('Deep Research') || text?.includes('リサーチ')) {
+        deepResearchItem = item;
+        break;
       }
-
-      // Check if already checked
-      const isChecked = deepResearchItem.getAttribute('aria-checked') === 'true';
-
-      if (!isChecked) {
-        (deepResearchItem as HTMLElement).click();
-      }
-
-      return { success: true, alreadyEnabled: isChecked };
-    });
-
-    if (!deepResearchResult.success) {
-      return { success: false, error: deepResearchResult.error };
     }
 
-    if (deepResearchResult.alreadyEnabled) {
-      response.appendResponseLine('✅ DeepResearch は既に有効です');
-    } else {
-      response.appendResponseLine('✅ DeepResearch menuitemradio をクリック');
+    if (!deepResearchItem) {
+      return { success: false, error: 'Deep Research menuitemradio が見つかりません' };
     }
 
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    await deepResearchItem.click();
+    response.appendResponseLine('✅ Deep Research menuitemradio をクリック');
+    await page.waitForTimeout(1000);
 
-    // Step 3: Verify mode was actually enabled (composer-pill detection)
+    // Step 3: 検証（composer-pill確認）
     const verification = await detectDeepResearchMode(page);
     if (!verification.isEnabled) {
       return {
