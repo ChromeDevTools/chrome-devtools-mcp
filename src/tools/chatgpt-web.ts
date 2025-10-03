@@ -378,34 +378,35 @@ export const askChatGPTWeb = defineTool({
             response.appendResponseLine('✅ DeepResearchモード有効化完了');
             await new Promise((resolve) => setTimeout(resolve, 1000));
 
-            // Verify mode was actually enabled (check for composer-pill button)
-            const verified = await page.evaluate(() => {
-              const DEEP_RESEARCH_PATTERN = /リサーチ|deep\s*research|ディープ\s*リサーチ|深度研究|深入研究/i;
-              const promptTextarea = document.querySelector('#prompt-textarea');
-              if (promptTextarea) {
-                const form = promptTextarea.closest('form');
-                if (form) {
-                  const pillButton = Array.from(form.querySelectorAll('button')).find(
-                    (btn) => {
-                      const text = btn.textContent?.trim() || '';
-                      const ariaLabel = btn.getAttribute('aria-label') || '';
-                      return (
-                        btn.className.includes('composer-pill') &&
-                        DEEP_RESEARCH_PATTERN.test(text + ' ' + ariaLabel)
-                      );
-                    }
-                  );
-                  return !!pillButton;
-                }
-              }
-              return false;
+            // Verify mode was actually enabled (check for new UI indicators)
+            const verification = await page.evaluate(() => {
+              // Check placeholder text
+              const textarea = document.querySelector('textarea');
+              const placeholder = textarea?.getAttribute('placeholder') || '';
+
+              // Check for delete button
+              const deleteButton = Array.from(document.querySelectorAll('button')).find(btn =>
+                btn.textContent?.includes('リサーチ：クリックして削除')
+              );
+
+              // Check for sources button
+              const sourcesButton = Array.from(document.querySelectorAll('button')).find(btn =>
+                btn.textContent?.includes('情報源')
+              );
+
+              return {
+                hasCorrectPlaceholder: placeholder.includes('詳細なレポート') || placeholder.includes('リサーチ'),
+                hasDeleteButton: !!deleteButton,
+                hasSourcesButton: !!sourcesButton,
+                placeholder: placeholder
+              };
             });
 
-            if (verified) {
-              response.appendResponseLine('✅ モード確認完了: DeepResearch有効（composer-pill検出）');
+            if (verification.hasCorrectPlaceholder || verification.hasDeleteButton) {
+              response.appendResponseLine('✅ モード確認完了: DeepResearch有効');
             } else {
               response.appendResponseLine(
-                '⚠️ DeepResearchモードの確認に失敗しました',
+                `⚠️ DeepResearchモードの確認に失敗しました（placeholder: ${verification.placeholder}）`,
               );
             }
           } else {
@@ -419,34 +420,28 @@ export const askChatGPTWeb = defineTool({
       // Step 4: Send question (with final mode verification)
       if (useDeepResearch) {
         const finalCheck = await page.evaluate(() => {
-          const DEEP_RESEARCH_PATTERN = /リサーチ|deep\s*research|ディープ\s*リサーチ|深度研究|深入研究/i;
-          const promptTextarea = document.querySelector('#prompt-textarea');
-          if (promptTextarea) {
-            const form = promptTextarea.closest('form');
-            if (form) {
-              const pillButton = Array.from(form.querySelectorAll('button')).find(
-                (btn) => {
-                  const text = btn.textContent?.trim() || '';
-                  const ariaLabel = btn.getAttribute('aria-label') || '';
-                  return (
-                    btn.className.includes('composer-pill') &&
-                    DEEP_RESEARCH_PATTERN.test(text + ' ' + ariaLabel)
-                  );
-                }
-              );
-              return !!pillButton;
-            }
-          }
-          return false;
+          // Check placeholder text
+          const textarea = document.querySelector('textarea');
+          const placeholder = textarea?.getAttribute('placeholder') || '';
+
+          // Check for delete button
+          const deleteButton = Array.from(document.querySelectorAll('button')).find(btn =>
+            btn.textContent?.includes('リサーチ：クリックして削除')
+          );
+
+          return {
+            isEnabled: placeholder.includes('詳細なレポート') || placeholder.includes('リサーチ') || !!deleteButton,
+            placeholder: placeholder
+          };
         });
 
-        if (!finalCheck) {
+        if (!finalCheck.isEnabled) {
           response.appendResponseLine(
-            '❌ エラー: DeepResearchモードが無効です（composer-pill未検出）。送信を中止します。',
+            `❌ エラー: DeepResearchモードが無効です。送信を中止します。（placeholder: ${finalCheck.placeholder}）`,
           );
           return;
         }
-        response.appendResponseLine('✅ 送信前確認: DeepResearchモード有効（composer-pill検出）');
+        response.appendResponseLine('✅ 送信前確認: DeepResearchモード有効');
       }
 
       response.appendResponseLine('質問を送信中...');
