@@ -4,7 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {HTTPRequest} from 'puppeteer-core';
+import {isUtf8} from 'node:buffer';
+
+import type {HTTPRequest, HTTPResponse} from 'puppeteer-core';
+
+export const BODY_CONTEXT_SIZE_LIMIT = 10000;
 
 export function getShortDescriptionForRequest(request: HTTPRequest): string {
   return `${request.url()} ${request.method()} ${getStatusFromRequest(request)}`;
@@ -36,4 +40,64 @@ export function getFormattedHeaderValue(
     response.push(`- ${name}:${value}`);
   }
   return response;
+}
+
+export async function getFormattedResponseBody(
+  title: string,
+  httpResponse: HTTPResponse,
+  sizeLimit: number,
+): Promise<string> {
+  try {
+    const responseBuffer = await httpResponse.buffer();
+
+    if (isUtf8(responseBuffer)) {
+      const responseAsTest = responseBuffer.toString('utf-8');
+
+      if (responseAsTest.length === 0) {
+        return `${title}\n<empty response>`;
+      }
+
+      return `${title}\n${getSizeLimitedString(responseAsTest, sizeLimit)}`;
+    }
+
+    return `${title}\n<binary data>`;
+  } catch {
+    // buffer() call might fail with CDP exception, in this case we don't print anything in the context
+    return '';
+  }
+}
+
+export async function getFormattedRequestBody(
+  title: string,
+  httpRequest: HTTPRequest,
+  sizeLimit: number,
+): Promise<string> {
+  if (httpRequest.hasPostData()) {
+    const data = httpRequest.postData();
+
+    if (data) {
+      return `${title}\n${getSizeLimitedString(data, sizeLimit)}`;
+    }
+
+    try {
+      const fetchData = await httpRequest.fetchPostData();
+
+      if (fetchData) {
+        return `${title}\n${getSizeLimitedString(fetchData, sizeLimit)}`;
+      }
+    } catch {
+      // fetchPostData() call might fail with CDP exception, in this case we don't print anything in the context
+      return '';
+    }
+  }
+
+  return '';
+}
+
+function getSizeLimitedString(text: string, sizeLimit: number) {
+  if (text.length > sizeLimit) {
+    return `${text.substring(0, sizeLimit) + '... <truncated>'}`;
+  }
+
+  return `${text}`;
 }
