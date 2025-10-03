@@ -3,6 +3,7 @@
  * Copyright 2025 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
+
 import type {JSHandle} from 'puppeteer-core';
 import z from 'zod';
 
@@ -42,6 +43,12 @@ Example with arguments: \`(el) => {
       )
       .optional()
       .describe(`An optional list of arguments to pass to the function.`),
+    filePath: z
+      .string()
+      .optional()
+      .describe(
+        'The absolute path, or a path relative to the current working directory, to save the result to instead of including it in the response.',
+      ),
   },
   handler: async (request, response, context) => {
     const page = context.getSelectedPage();
@@ -59,10 +66,20 @@ Example with arguments: \`(el) => {
           },
           ...args,
         );
-        response.appendResponseLine('Script ran on page and returned:');
-        response.appendResponseLine('```json');
-        response.appendResponseLine(`${result}`);
-        response.appendResponseLine('```');
+
+        if (request.params.filePath) {
+          const encoder = new TextEncoder();
+          const data = encoder.encode(result);
+          const file = await context.saveFile(data, request.params.filePath);
+          response.appendResponseLine(
+            `Saved script result to ${file.filename}.`,
+          );
+        } else {
+          response.appendResponseLine('Script ran on page and returned:');
+          response.appendResponseLine('```json');
+          response.appendResponseLine(`${result}`);
+          response.appendResponseLine('```');
+        }
       });
     } finally {
       Promise.allSettled(args.map(arg => arg.dispose())).catch(() => {
