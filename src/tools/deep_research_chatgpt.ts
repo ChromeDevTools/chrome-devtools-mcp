@@ -364,7 +364,7 @@ async function enableDeepResearchMode(
     }
     await plusButton.click();
     response.appendResponseLine('✅ +ボタンをクリック');
-    await page.waitForTimeout(500);
+    await new Promise((resolve) => setTimeout(resolve, 500));
 
     // Step 2: Deep Research menuitemradio をクリック（Puppeteer click）
     const menuItems = await page.$$('[role="menuitemradio"]');
@@ -384,7 +384,7 @@ async function enableDeepResearchMode(
 
     await deepResearchItem.click();
     response.appendResponseLine('✅ Deep Research menuitemradio をクリック');
-    await page.waitForTimeout(1000);
+    await new Promise((resolve) => setTimeout(resolve, 1000));
 
     // Step 3: 検証（composer-pill確認）
     const verification = await detectDeepResearchMode(page);
