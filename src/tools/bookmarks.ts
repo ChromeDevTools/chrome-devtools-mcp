@@ -44,7 +44,7 @@ function getDefaultBookmarks(): Record<string, string> {
     'localhost': 'http://localhost:3000',
     'localhost8080': 'http://localhost:8080',
     'suno': 'https://suno.com/create',
-    'chatgpt': 'https://chatgpt.com'
+    'chatgpt': 'https://chatgpt.com/?model=gpt-5-thinking'
   };
 }
 

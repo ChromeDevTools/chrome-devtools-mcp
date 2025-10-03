@@ -142,6 +142,8 @@ async function saveConversationLog(
     thinkingTime?: number;
     chatUrl?: string;
     model?: string;
+    chatId?: string;
+    conversationNumber?: number;
   },
 ): Promise<string> {
   // Generate timestamp in yymmdd_HHMMSS format
@@ -163,12 +165,25 @@ async function saveConversationLog(
     .toLowerCase()
     .slice(0, 30);
 
-  const filename = `${timestamp}-${projectName}-${topicSlug}.md`;
-  const logDir = 'docs/ask/chatgpt';
-  const logPath = path.join(process.cwd(), logDir, filename);
+  // If chatId is provided, save in chat-specific folder
+  let logPath: string;
+  if (metadata.chatId) {
+    const conversationNum = String(metadata.conversationNumber || 1).padStart(3, '0');
+    const filename = `${conversationNum}-${timestamp}-${topicSlug}.md`;
+    const logDir = path.join('docs/ask/chatgpt', metadata.chatId);
+    logPath = path.join(process.cwd(), logDir, filename);
 
-  // Ensure directory exists
-  await fs.promises.mkdir(path.dirname(logPath), {recursive: true});
+    // Ensure chat directory exists
+    await fs.promises.mkdir(path.join(process.cwd(), logDir), {recursive: true});
+  } else {
+    // Fallback to old format (flat structure)
+    const filename = `${timestamp}-${projectName}-${topicSlug}.md`;
+    const logDir = 'docs/ask/chatgpt';
+    logPath = path.join(process.cwd(), logDir, filename);
+
+    // Ensure directory exists
+    await fs.promises.mkdir(path.dirname(logPath), {recursive: true});
+  }
 
   const content = `# ${topicSlug}
 
@@ -176,7 +191,7 @@ async function saveConversationLog(
 - **日時**: ${now.toLocaleString('ja-JP')}
 - **プロジェクト**: ${projectName}
 - **AIモデル**: ${metadata.model || 'ChatGPT'}
-${metadata.thinkingTime ? `- **思考時間**: ${metadata.thinkingTime}s\n` : ''}${metadata.chatUrl ? `- **チャットURL**: ${metadata.chatUrl}\n` : ''}
+${metadata.chatId ? `- **チャットID**: ${metadata.chatId}\n` : ''}${metadata.conversationNumber ? `- **会話番号**: ${metadata.conversationNumber}\n` : ''}${metadata.thinkingTime ? `- **思考時間**: ${metadata.thinkingTime}s\n` : ''}${metadata.chatUrl ? `- **チャットURL**: ${metadata.chatUrl}\n` : ''}
 ## ❓ 質問
 
 ${question}
@@ -239,7 +254,7 @@ export const askChatGPTWeb = defineTool({
     try {
       // Step 1: Navigate to ChatGPT
       response.appendResponseLine('ChatGPTに接続中...');
-      await page.goto('https://chatgpt.com/', {waitUntil: 'networkidle2'});
+      await page.goto('https://chatgpt.com/?model=gpt-5-thinking', {waitUntil: 'networkidle2'});
 
       // Check if logged in
       const currentUrl = page.url();
@@ -673,6 +688,13 @@ export const askChatGPTWeb = defineTool({
           const modelName = useDeepResearch
             ? 'ChatGPT DeepResearch'
             : 'ChatGPT 5 Thinking';
+
+          // Get current conversation count
+          const sessions = await loadChatSessions();
+          const projectSessions = sessions[project] || [];
+          const currentSession = projectSessions.find(s => s.chatId === sessionChatId);
+          const conversationNum = currentSession?.conversationCount || 1;
+
           const logPath = await saveConversationLog(
             project,
             sanitizedQuestion,
@@ -681,6 +703,8 @@ export const askChatGPTWeb = defineTool({
               thinkingTime: status.thinkingTime,
               chatUrl,
               model: modelName,
+              chatId: sessionChatId,
+              conversationNumber: conversationNum,
             },
           );
 

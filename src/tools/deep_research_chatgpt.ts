@@ -141,6 +141,8 @@ async function saveConversationLog(
     researchTime?: number;
     chatUrl?: string;
     model?: string;
+    chatId?: string;
+    conversationNumber?: number;
   },
 ): Promise<string> {
   const now = new Date();
@@ -160,11 +162,23 @@ async function saveConversationLog(
     .toLowerCase()
     .slice(0, 30);
 
-  const filename = `${timestamp}-${projectName}-deepresearch-${topicSlug}.md`;
-  const logDir = 'docs/ask/chatgpt';
-  const logPath = path.join(process.cwd(), logDir, filename);
+  // If chatId is provided, save in chat-specific folder
+  let logPath: string;
+  if (metadata.chatId) {
+    const conversationNum = String(metadata.conversationNumber || 1).padStart(3, '0');
+    const filename = `${conversationNum}-${timestamp}-deepresearch-${topicSlug}.md`;
+    const logDir = path.join('docs/ask/chatgpt', metadata.chatId);
+    logPath = path.join(process.cwd(), logDir, filename);
 
-  await fs.promises.mkdir(path.dirname(logPath), {recursive: true});
+    await fs.promises.mkdir(path.join(process.cwd(), logDir), {recursive: true});
+  } else {
+    // Fallback to old format
+    const filename = `${timestamp}-${projectName}-deepresearch-${topicSlug}.md`;
+    const logDir = 'docs/ask/chatgpt';
+    logPath = path.join(process.cwd(), logDir, filename);
+
+    await fs.promises.mkdir(path.dirname(logPath), {recursive: true});
+  }
 
   const content = `# ${topicSlug}
 
@@ -172,7 +186,7 @@ async function saveConversationLog(
 - **日時**: ${now.toLocaleString('ja-JP')}
 - **プロジェクト**: ${projectName}
 - **AIモデル**: ${metadata.model || 'ChatGPT DeepResearch'}
-${metadata.researchTime ? `- **リサーチ時間**: ${metadata.researchTime}秒\n` : ''}${metadata.chatUrl ? `- **チャットURL**: ${metadata.chatUrl}\n` : ''}
+${metadata.chatId ? `- **チャットID**: ${metadata.chatId}\n` : ''}${metadata.conversationNumber ? `- **会話番号**: ${metadata.conversationNumber}\n` : ''}${metadata.researchTime ? `- **リサーチ時間**: ${metadata.researchTime}秒\n` : ''}${metadata.chatUrl ? `- **チャットURL**: ${metadata.chatUrl}\n` : ''}
 ## ❓ リサーチテーマ
 
 ${question}
@@ -927,9 +941,11 @@ export const deepResearchChatGPT = defineTool({
       // Phase 8: Save results
       const chatUrl = page.url();
       const chatIdMatch = chatUrl.match(/\/c\/([a-f0-9-]+)/);
+      let savedChatId: string | undefined;
 
       if (chatIdMatch) {
         const chatId = chatIdMatch[1];
+        savedChatId = chatId;
         const now = new Date().toISOString();
         await saveChatSession(project, {
           chatId,
@@ -951,6 +967,8 @@ export const deepResearchChatGPT = defineTool({
           researchTime: Math.floor((Date.now() - startTime) / 1000),
           chatUrl,
           model: 'ChatGPT DeepResearch',
+          chatId: savedChatId,
+          conversationNumber: 1,
         },
       );
 
