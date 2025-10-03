@@ -85,6 +85,8 @@ async function getContext(): Promise<McpContext> {
         viewport: args.viewport,
         args: extraArgs,
         acceptInsecureCerts: args.acceptInsecureCerts,
+        stealth: args.stealth,
+        chromeArgs: args.chromeArgs as string[] | undefined,
       });
 
   if (context?.browser !== browser) {

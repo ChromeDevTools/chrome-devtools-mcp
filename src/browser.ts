@@ -16,6 +16,11 @@ import type {
   Target,
 } from 'puppeteer-core';
 import puppeteer from 'puppeteer-core';
+import puppeteerExtra from 'puppeteer-extra';
+import StealthPlugin from 'puppeteer-extra-plugin-stealth';
+
+// Add stealth plugin
+puppeteerExtra.use(StealthPlugin());
 
 let browser: Browser | undefined;
 
@@ -70,6 +75,8 @@ interface McpLaunchOptions {
     height: number;
   };
   args?: string[];
+  stealth?: boolean;
+  chromeArgs?: string[];
 }
 
 export async function launch(options: McpLaunchOptions): Promise<Browser> {
@@ -96,6 +103,23 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
     ...(options.args ?? []),
     '--hide-crash-restore-bubble',
   ];
+
+  // Add custom Chrome arguments if provided
+  if (options.chromeArgs) {
+    args.push(...options.chromeArgs);
+  }
+
+  // Add stealth-enhancing arguments if stealth mode is enabled
+  if (options.stealth) {
+    args.push(
+      '--disable-blink-features=AutomationControlled',
+      '--disable-features=IsolateOrigins,site-per-process',
+      '--no-first-run',
+      '--no-service-autorun',
+      '--password-store=basic',
+    );
+  }
+
   if (customDevTools) {
     args.push(`--custom-devtools-frontend=file://${customDevTools}`);
   }
@@ -108,7 +132,10 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
   }
 
   try {
-    const browser = await puppeteer.launch({
+    // Use puppeteer-extra with stealth plugin if stealth mode is enabled
+    const puppeteerInstance = options.stealth ? puppeteerExtra : puppeteer;
+
+    const launchOptions: LaunchOptions = {
       ...connectOptions,
       channel: puppeteerChannel,
       executablePath,
@@ -118,7 +145,14 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
       headless,
       args,
       acceptInsecureCerts: options.acceptInsecureCerts,
-    });
+    };
+
+    // Add ignoreDefaultArgs when stealth is enabled to remove automation flags
+    if (options.stealth) {
+      launchOptions.ignoreDefaultArgs = ['--enable-automation'];
+    }
+
+    const browser = await puppeteerInstance.launch(launchOptions);
     if (options.logFile) {
       // FIXME: we are probably subscribing too late to catch startup logs. We
       // should expose the process earlier or expose the getRecentLogs() getter.

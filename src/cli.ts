@@ -81,6 +81,21 @@ export const cliOptions = {
     type: 'boolean',
     description: `If enabled, ignores errors relative to self-signed and expired certificates. Use with caution.`,
   },
+  stealth: {
+    type: 'boolean',
+    description: `Enable stealth mode to avoid bot detection. Uses puppeteer-extra-plugin-stealth and adds anti-detection Chrome arguments.`,
+    default: false,
+  },
+  chromeArgs: {
+    type: 'string',
+    description: `Additional Chrome arguments to pass to the browser (comma-separated). Example: --chromeArgs="--disable-gpu,--no-sandbox"`,
+    coerce: (arg: string | undefined) => {
+      if (!arg) {
+        return undefined;
+      }
+      return arg.split(',').map(a => a.trim());
+    },
+  },
 } satisfies Record<string, YargsOptions>;
 
 export function parseArguments(version: string, argv = process.argv) {
@@ -109,6 +124,15 @@ export function parseArguments(version: string, argv = process.argv) {
       [
         '$0 --viewport 1280x720',
         'Launch Chrome with the initial viewport size of 1280x720px',
+      ],
+      ['$0 --stealth', 'Enable stealth mode to bypass bot detection'],
+      [
+        '$0 --chromeArgs="--disable-gpu,--no-sandbox"',
+        'Pass custom Chrome arguments',
+      ],
+      [
+        '$0 --stealth --chromeArgs="--window-size=1920,1080"',
+        'Use stealth mode with custom window size',
       ],
     ]);
 

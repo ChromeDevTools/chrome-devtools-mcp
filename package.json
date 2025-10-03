@@ -41,6 +41,8 @@
     "core-js": "3.45.1",
     "debug": "4.4.3",
     "puppeteer-core": "24.22.3",
+    "puppeteer-extra": "^3.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2",
     "yargs": "18.0.0"
   },
   "devDependencies": {
