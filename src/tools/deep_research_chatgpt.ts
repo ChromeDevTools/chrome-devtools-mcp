@@ -684,7 +684,7 @@ async function monitorResearch(
     '⏳ DeepResearchを実行中... (数分かかる場合があります)',
   );
 
-  const MAX_WAIT_TIME = 15 * 60 * 1000; // 15 minutes max
+  const MAX_WAIT_TIME = 60 * 60 * 1000; // 60 minutes max
   let progressCounter = 0;
 
   while (Date.now() - startTime < MAX_WAIT_TIME) {
@@ -762,7 +762,7 @@ async function monitorResearch(
 
   return {
     completed: false,
-    error: 'リサーチがタイムアウトしました（15分経過）',
+    error: 'リサーチがタイムアウトしました（60分経過）',
   };
 }
 
