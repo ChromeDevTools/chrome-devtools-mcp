@@ -12,8 +12,11 @@ import type {ResourceType} from 'puppeteer-core';
 import {formatConsoleEvent} from './formatters/consoleFormatter.js';
 import {
   getFormattedHeaderValue,
+  getFormattedResponseBody,
+  getFormattedRequestBody,
   getShortDescriptionForRequest,
   getStatusFromRequest,
+  BODY_CONTEXT_SIZE_LIMIT,
 } from './formatters/networkFormatter.js';
 import {formatA11ySnapshot} from './formatters/snapshotFormatter.js';
 import type {McpContext} from './McpContext.js';
@@ -137,13 +140,13 @@ export class McpResponse implements Response {
       }
     }
 
-    return this.format(toolName, context);
+    return await this.format(toolName, context);
   }
 
-  format(
+  async format(
     toolName: string,
     context: McpContext,
-  ): Array<TextContent | ImageContent> {
+  ): Promise<Array<TextContent | ImageContent>> {
     const response = [`# ${toolName} response`];
     for (const line of this.#textResponseLines) {
       response.push(line);
@@ -192,7 +195,7 @@ Call ${handleDialog.name} to handle it before continuing.`);
       }
     }
 
-    response.push(...this.#getIncludeNetworkRequestsData(context));
+    response.push(...(await this.#getIncludeNetworkRequestsData(context)));
 
     if (this.#networkRequestsOptions?.include) {
       let requests = context.getNetworkRequests();
@@ -272,7 +275,7 @@ Call ${handleDialog.name} to handle it before continuing.`);
     };
   }
 
-  #getIncludeNetworkRequestsData(context: McpContext): string[] {
+  async #getIncludeNetworkRequestsData(context: McpContext): Promise<string[]> {
     const response: string[] = [];
     const url = this.#attachedNetworkRequestUrl;
     if (!url) {
@@ -286,11 +289,29 @@ Call ${handleDialog.name} to handle it before continuing.`);
       response.push(line);
     }
 
+    const formattedRequestData = await getFormattedRequestBody(
+      '### Request body',
+      httpRequest,
+      BODY_CONTEXT_SIZE_LIMIT,
+    );
+    if (formattedRequestData.length > 0) {
+      response.push(formattedRequestData);
+    }
+
     const httpResponse = httpRequest.response();
     if (httpResponse) {
       response.push(`### Response Headers`);
       for (const line of getFormattedHeaderValue(httpResponse.headers())) {
         response.push(line);
+      }
+
+      const formattedResponseData = await getFormattedResponseBody(
+        '### Response body',
+        httpResponse,
+        BODY_CONTEXT_SIZE_LIMIT,
+      );
+      if (formattedResponseData.length > 0) {
+        response.push(formattedResponseData);
       }
     }
 
