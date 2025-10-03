@@ -25,19 +25,43 @@ interface ChatSession {
   url: string;
   lastUsed: string;
   title?: string;
+  createdAt: string;
+  conversationCount?: number;
 }
 
 interface ChatSessions {
-  [projectName: string]: ChatSession;
+  [projectName: string]: ChatSession[];
 }
 
 /**
- * Load chat sessions from JSON file
+ * Load chat sessions from JSON file with backward compatibility
  */
 async function loadChatSessions(): Promise<ChatSessions> {
   try {
     const data = await fs.promises.readFile(CHAT_SESSIONS_FILE, 'utf-8');
-    return JSON.parse(data);
+    const parsed = JSON.parse(data);
+
+    // Migrate from old format (single object) to new format (array)
+    const migrated: ChatSessions = {};
+    for (const [projectName, value] of Object.entries(parsed)) {
+      if (Array.isArray(value)) {
+        // Already in new format
+        migrated[projectName] = value as ChatSession[];
+      } else {
+        // Old format - convert to array
+        const oldSession = value as any;
+        migrated[projectName] = [{
+          chatId: oldSession.chatId,
+          url: oldSession.url,
+          lastUsed: oldSession.lastUsed,
+          title: oldSession.title,
+          createdAt: oldSession.lastUsed, // Use lastUsed as createdAt for old sessions
+          conversationCount: 1,
+        }];
+      }
+    }
+
+    return migrated;
   } catch {
     return {};
   }
@@ -51,7 +75,31 @@ async function saveChatSession(
   session: ChatSession,
 ): Promise<void> {
   const sessions = await loadChatSessions();
-  sessions[projectName] = session;
+
+  // Initialize project array if it doesn't exist
+  if (!sessions[projectName]) {
+    sessions[projectName] = [];
+  }
+
+  // Check if session with same chatId already exists
+  const existingIndex = sessions[projectName].findIndex(
+    s => s.chatId === session.chatId
+  );
+
+  if (existingIndex >= 0) {
+    // Update existing session
+    sessions[projectName][existingIndex] = {
+      ...sessions[projectName][existingIndex],
+      ...session,
+      lastUsed: new Date().toISOString(),
+    };
+  } else {
+    // Add new session to array
+    sessions[projectName].push({
+      ...session,
+      createdAt: session.createdAt || new Date().toISOString(),
+    });
+  }
 
   const dir = path.dirname(CHAT_SESSIONS_FILE);
   await fs.promises.mkdir(dir, {recursive: true});
@@ -798,13 +846,19 @@ export const deepResearchChatGPT = defineTool({
       if (reuseSession) {
         // Try to load existing session
         const sessions = await loadChatSessions();
-        const existingSession = sessions[project];
+        const projectSessions = sessions[project] || [];
 
-        if (existingSession) {
-          response.appendResponseLine(
-            `既存のプロジェクトチャットを使用: ${existingSession.url}`,
+        if (projectSessions.length > 0) {
+          // Get the most recently used session
+          const sortedSessions = [...projectSessions].sort(
+            (a, b) => new Date(b.lastUsed).getTime() - new Date(a.lastUsed).getTime()
           );
-          await page.goto(existingSession.url, {waitUntil: 'networkidle2'});
+          const latestSession = sortedSessions[0];
+
+          response.appendResponseLine(
+            `既存のプロジェクトチャットを使用: ${latestSession.url}`,
+          );
+          await page.goto(latestSession.url, {waitUntil: 'networkidle2'});
           needsNewChat = false;
           await new Promise((resolve) => setTimeout(resolve, 1000));
         } else {
@@ -913,11 +967,14 @@ export const deepResearchChatGPT = defineTool({
 
       if (chatIdMatch) {
         const chatId = chatIdMatch[1];
+        const now = new Date().toISOString();
         await saveChatSession(project, {
           chatId,
           url: chatUrl,
-          lastUsed: new Date().toISOString(),
+          lastUsed: now,
+          createdAt: now,
           title: `[DeepResearch: ${project}]`,
+          conversationCount: 1,
         });
         response.appendResponseLine(`💾 チャットセッション保存: ${chatId}`);
       }

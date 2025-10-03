@@ -25,19 +25,43 @@ interface ChatSession {
   url: string;
   lastUsed: string;
   title?: string;
+  createdAt: string;
+  conversationCount?: number;
 }
 
 interface ChatSessions {
-  [projectName: string]: ChatSession;
+  [projectName: string]: ChatSession[];
 }
 
 /**
- * Load chat sessions from JSON file
+ * Load chat sessions from JSON file with backward compatibility
  */
 async function loadChatSessions(): Promise<ChatSessions> {
   try {
     const data = await fs.promises.readFile(CHAT_SESSIONS_FILE, 'utf-8');
-    return JSON.parse(data);
+    const parsed = JSON.parse(data);
+
+    // Migrate from old format (single object) to new format (array)
+    const migrated: ChatSessions = {};
+    for (const [projectName, value] of Object.entries(parsed)) {
+      if (Array.isArray(value)) {
+        // Already in new format
+        migrated[projectName] = value as ChatSession[];
+      } else {
+        // Old format - convert to array
+        const oldSession = value as any;
+        migrated[projectName] = [{
+          chatId: oldSession.chatId,
+          url: oldSession.url,
+          lastUsed: oldSession.lastUsed,
+          title: oldSession.title,
+          createdAt: oldSession.lastUsed, // Use lastUsed as createdAt for old sessions
+          conversationCount: 1,
+        }];
+      }
+    }
+
+    return migrated;
   } catch {
     return {};
   }
@@ -51,7 +75,31 @@ async function saveChatSession(
   session: ChatSession,
 ): Promise<void> {
   const sessions = await loadChatSessions();
-  sessions[projectName] = session;
+
+  // Initialize project array if it doesn't exist
+  if (!sessions[projectName]) {
+    sessions[projectName] = [];
+  }
+
+  // Check if session with same chatId already exists
+  const existingIndex = sessions[projectName].findIndex(
+    s => s.chatId === session.chatId
+  );
+
+  if (existingIndex >= 0) {
+    // Update existing session
+    sessions[projectName][existingIndex] = {
+      ...sessions[projectName][existingIndex],
+      ...session,
+      lastUsed: new Date().toISOString(),
+    };
+  } else {
+    // Add new session to array
+    sessions[projectName].push({
+      ...session,
+      createdAt: session.createdAt || new Date().toISOString(),
+    });
+  }
 
   // Ensure directory exists
   const dir = path.dirname(CHAT_SESSIONS_FILE);
@@ -212,14 +260,20 @@ export const askChatGPTWeb = defineTool({
       if (!createNewChat) {
         // Try to load existing session for this project
         const sessions = await loadChatSessions();
-        const existingSession = sessions[project];
+        const projectSessions = sessions[project] || [];
 
-        if (existingSession) {
-          response.appendResponseLine(
-            `既存のプロジェクトチャットを使用: ${existingSession.url}`,
+        if (projectSessions.length > 0) {
+          // Get the most recently used session
+          const sortedSessions = [...projectSessions].sort(
+            (a, b) => new Date(b.lastUsed).getTime() - new Date(a.lastUsed).getTime()
           );
-          await page.goto(existingSession.url, {waitUntil: 'networkidle2'});
-          sessionChatId = existingSession.chatId;
+          const latestSession = sortedSessions[0];
+
+          response.appendResponseLine(
+            `既存のプロジェクトチャットを使用: ${latestSession.url}`,
+          );
+          await page.goto(latestSession.url, {waitUntil: 'networkidle2'});
+          sessionChatId = latestSession.chatId;
           await new Promise((resolve) => setTimeout(resolve, 1000));
         } else {
           response.appendResponseLine(
@@ -577,11 +631,14 @@ export const askChatGPTWeb = defineTool({
 
             if (chatIdMatch) {
               const chatId = chatIdMatch[1];
+              const now = new Date().toISOString();
               await saveChatSession(project, {
                 chatId,
                 url: chatUrl,
-                lastUsed: new Date().toISOString(),
+                lastUsed: now,
+                createdAt: now,
                 title: `[Project: ${project}]`,
+                conversationCount: 1,
               });
               sessionChatId = chatId;
               response.appendResponseLine(
@@ -593,14 +650,20 @@ export const askChatGPTWeb = defineTool({
               );
             }
           } else {
-            // Update last used timestamp for existing session
+            // Update last used timestamp and conversation count for existing session
             if (sessionChatId) {
               const chatUrl = page.url();
+              const sessions = await loadChatSessions();
+              const projectSessions = sessions[project] || [];
+              const existingSession = projectSessions.find(s => s.chatId === sessionChatId);
+
               await saveChatSession(project, {
                 chatId: sessionChatId,
                 url: chatUrl,
                 lastUsed: new Date().toISOString(),
-                title: `[Project: ${project}]`,
+                createdAt: existingSession?.createdAt || new Date().toISOString(),
+                title: existingSession?.title || `[Project: ${project}]`,
+                conversationCount: (existingSession?.conversationCount || 0) + 1,
               });
             }
           }
