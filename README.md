@@ -1,8 +1,18 @@
-# Chrome DevTools MCP
+# Chrome DevTools MCP - Enhanced by NIMBUS21
 
-[![npm chrome-devtools-mcp package](https://img.shields.io/npm/v/chrome-devtools-mcp.svg)](https://npmjs.org/package/chrome-devtools-mcp)
+[![npm @nimbus21.ai/chrome-devtools-mcp package](https://img.shields.io/npm/v/@nimbus21.ai/chrome-devtools-mcp.svg)](https://npmjs.org/package/@nimbus21.ai/chrome-devtools-mcp)
 
-`chrome-devtools-mcp` lets your coding agent (such as Gemini, Claude, Cursor or Copilot)
+> **Note:** This is an **unofficial community-maintained fork** of the original Chrome DevTools MCP server, enhanced and modified by the **NIMBUS21 Team**. This package is not affiliated with or endorsed by Google or the Chrome DevTools team.
+
+## 🚀 Powered by NIMBUS21
+
+This enhanced version is brought to you by **[NIMBUS21](https://nimbus21.com)** - a leading technology innovation company specializing in AI-powered automation, browser automation solutions, and enterprise software development. Visit [nimbus21.ai](https://nimbus21.ai) to explore our cutting-edge AI tools, automation platforms, and developer services.
+
+**NIMBUS21** delivers advanced browser automation frameworks, intelligent testing solutions, and AI-driven development tools for modern web applications. Our expertise in Chrome automation, DevTools integration, and Model Context Protocol (MCP) implementations helps developers and enterprises build more reliable, performant, and intelligent software solutions.
+
+---
+
+`@nimbus21.ai/chrome-devtools-mcp` lets your coding agent (such as Gemini, Claude, Cursor or Copilot)
 control and inspect a live Chrome browser. It acts as a Model-Context-Protocol
 (MCP) server, giving your AI coding assistant access to the full power of
 Chrome DevTools for reliable automation, in-depth debugging, and performance analysis.
@@ -42,14 +52,14 @@ Add the following config to your MCP client:
   "mcpServers": {
     "chrome-devtools": {
       "command": "npx",
-      "args": ["-y", "chrome-devtools-mcp@latest"]
+      "args": ["-y", "@nimbus21.ai/chrome-devtools-mcp@latest"]
     }
   }
 }
 ```
 
-> [!NOTE]  
-> Using `chrome-devtools-mcp@latest` ensures that your MCP client will always use the latest version of the Chrome DevTools MCP server.
+> [!NOTE]
+> Using `@nimbus21.ai/chrome-devtools-mcp@latest` ensures that your MCP client will always use the latest version of the NIMBUS21-enhanced Chrome DevTools MCP server.
 
 ### MCP Client configuration
 
@@ -58,7 +68,7 @@ Add the following config to your MCP client:
     Use the Claude Code CLI to add the Chrome DevTools MCP server (<a href="https://docs.anthropic.com/en/docs/claude-code/mcp">guide</a>):
 
 ```bash
-claude mcp add chrome-devtools npx chrome-devtools-mcp@latest
+claude mcp add chrome-devtools npx @nimbus21.ai/chrome-devtools-mcp@latest
 ```
 
 </details>
@@ -74,7 +84,7 @@ claude mcp add chrome-devtools npx chrome-devtools-mcp@latest
   using the standard config from above. You can also install the Chrome DevTools MCP server using the Codex CLI:
 
 ```bash
-codex mcp add chrome-devtools -- npx chrome-devtools-mcp@latest
+codex mcp add chrome-devtools -- npx @nimbus21.ai/chrome-devtools-mcp@latest
 ```
 
 **On Windows 11**
@@ -88,7 +98,7 @@ args = [
     "/c",
     "npx",
     "-y",
-    "chrome-devtools-mcp@latest",
+    "@nimbus21.ai/chrome-devtools-mcp@latest",
 ]
 env = { SystemRoot="C:\\Windows", PROGRAMFILES="C:\\Program Files" }
 startup_timeout_ms = 20_000
@@ -116,7 +126,7 @@ Configure the following fields and press `CTR-S` to save the configuration:
 - **Server name:** `chrome-devtools`
 - **Server Type:** `[1] Local`
 - **Command:** `npx`
-- **Arguments:** `-y, chrome-devtools-mcp@latest`
+- **Arguments:** `-y, @nimbus21.ai/chrome-devtools-mcp@latest`
 
 </details>
 
@@ -126,7 +136,7 @@ Configure the following fields and press `CTR-S` to save the configuration:
   with the standard config from above. You can also install the Chrome DevTools MCP server using the VS Code CLI:
   
   ```bash
-  code --add-mcp '{"name":"chrome-devtools","command":"npx","args":["chrome-devtools-mcp@latest"]}'
+  code --add-mcp '{"name":"chrome-devtools","command":"npx","args":["@nimbus21.ai/chrome-devtools-mcp@latest"]}'
   ```
 </details>
 
@@ -135,7 +145,7 @@ Configure the following fields and press `CTR-S` to save the configuration:
 
 **Click the button to install:**
 
-[<img src="https://cursor.com/deeplink/mcp-install-dark.svg" alt="Install in Cursor">](https://cursor.com/en/install-mcp?name=chrome-devtools&config=eyJjb21tYW5kIjoibnB4IC15IGNocm9tZS1kZXZ0b29scy1tY3BAbGF0ZXN0In0%3D)
+[<img src="https://cursor.com/deeplink/mcp-install-dark.svg" alt="Install in Cursor">](https://cursor.com/en/install-mcp?name=chrome-devtools&config=eyJjb21tYW5kIjoibnB4IC15IEBuaW1idXMyMS5haS9jaHJvbWUtZGV2dG9vbHMtbWNwQGxhdGVzdCJ9)
 
 **Or install manually:**
 
@@ -150,13 +160,13 @@ Install the Chrome DevTools MCP server using the Gemini CLI.
 **Project wide:**
 
 ```bash
-gemini mcp add chrome-devtools npx chrome-devtools-mcp@latest
+gemini mcp add chrome-devtools npx @nimbus21.ai/chrome-devtools-mcp@latest
 ```
 
 **Globally:**
 
 ```bash
-gemini mcp add -s user chrome-devtools npx chrome-devtools-mcp@latest
+gemini mcp add -s user chrome-devtools npx @nimbus21.ai/chrome-devtools-mcp@latest
 ```
 
 Alternatively, follow the <a href="https://github.com/google-gemini/gemini-cli/blob/main/docs/tools/mcp-server.md#how-to-set-up-your-mcp-server">MCP guide</a> and use the standard config from above.
@@ -182,7 +192,7 @@ The same way chrome-devtools-mcp can be configured for JetBrains Junie in `Setti
   
   **Click the button to install:**
   
-  [<img src="https://img.shields.io/badge/Visual_Studio-Install-C16FDE?logo=visualstudio&logoColor=white" alt="Install in Visual Studio">](https://vs-open.link/mcp-install?%7B%22name%22%3A%22chrome-devtools%22%2C%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22chrome-devtools-mcp%40latest%22%5D%7D)
+  [<img src="https://img.shields.io/badge/Visual_Studio-Install-C16FDE?logo=visualstudio&logoColor=white" alt="Install in Visual Studio">](https://vs-open.link/mcp-install?%7B%22name%22%3A%22chrome-devtools%22%2C%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22@nimbus21.ai/chrome-devtools-mcp%40latest%22%5D%7D)
 </details>
 
 <details>
@@ -301,7 +311,7 @@ Pass them via the `args` property in the JSON configuration. For example:
     "chrome-devtools": {
       "command": "npx",
       "args": [
-        "chrome-devtools-mcp@latest",
+        "@nimbus21.ai/chrome-devtools-mcp@latest",
         "--channel=canary",
         "--headless=true",
         "--isolated=true"
@@ -311,7 +321,7 @@ Pass them via the `args` property in the JSON configuration. For example:
 }
 ```
 
-You can also run `npx chrome-devtools-mcp@latest --help` to see all available configuration options.
+You can also run `npx @nimbus21.ai/chrome-devtools-mcp@latest --help` to see all available configuration options.
 
 ## Concepts
 
