@@ -12,6 +12,7 @@ import z from 'zod';
 import {ToolCategories} from './categories.js';
 import {defineTool} from './ToolDefinition.js';
 import {CHATGPT_CONFIG} from '../config.js';
+import {ensureLoggedIn} from '../login-helper.js';
 
 /**
  * Path to store chat session data
@@ -932,13 +933,16 @@ export const deepResearchChatGPT = defineTool({
         await page.goto(CHATGPT_CONFIG.DEFAULT_URL, {waitUntil: 'networkidle2'});
       }
 
-      // Check if logged in
-      const currentUrl = page.url();
-      if (currentUrl.includes('auth') || currentUrl.includes('login')) {
+      // Ensure logged in (with user guidance if needed)
+      const isLoggedIn = await ensureLoggedIn(page, {
+        maxWaitTime: 300000, // 5 minutes
+        onStatusUpdate: (msg) => response.appendResponseLine(msg),
+      });
+
+      if (!isLoggedIn) {
         response.appendResponseLine(
-          '❌ ChatGPTにログインが必要です。ブラウザで手動ログインしてください。',
+          '❌ ログインがタイムアウトしました。再度実行してください。',
         );
-        response.appendResponseLine(`ログインURL: ${currentUrl}`);
         return;
       }
 
