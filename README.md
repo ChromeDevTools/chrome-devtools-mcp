@@ -205,6 +205,23 @@ Your MCP client should open the browser and record a performance trace.
 > [!NOTE]  
 > The MCP server will start the browser automatically once the MCP client uses a tool that requires a running browser instance. Connecting to the Chrome DevTools MCP server on its own will not automatically start the browser.
 
+### Mobile emulation with Copilot prompts
+
+When you are working inside VS Code Copilot (or any MCP-aware client), you can chain multiple tool invocations in a single prompt and let the agent run them sequentially. The example below opens a local site, switches to the built-in iPhone 12 Pro profile, applies Slow 4G throttling, records a 10-second performance trace, and finally surfaces LCP/CLS insights:
+
+```
+Please use mcp chrome-devtools:
+1. navigate_page http://localhost:5173
+2. emulate_device_profile profile=iPhone-12-Pro
+3. emulate_network throttlingOption="Slow 4G"
+4. performance_start_trace duration=10000
+5. performance_stop_trace
+6. performance_analyze_insight focus="lcp,cls"
+```
+
+> [!TIP]
+> The `profile` parameter is case-sensitive. Use `iPhone-12-Pro` exactly as written (other presets are listed in the [tool reference](./docs/tool-reference.md)).
+
 ## Tools
 
 If you run into any issues, checkout our [troubleshooting guide](./docs/troubleshooting.md).
@@ -227,8 +244,9 @@ If you run into any issues, checkout our [troubleshooting guide](./docs/troubles
   - [`new_page`](docs/tool-reference.md#new_page)
   - [`select_page`](docs/tool-reference.md#select_page)
   - [`wait_for`](docs/tool-reference.md#wait_for)
-- **Emulation** (3 tools)
+- **Emulation** (4 tools)
   - [`emulate_cpu`](docs/tool-reference.md#emulate_cpu)
+  - [`emulate_device_profile`](docs/tool-reference.md#emulate_device_profile)
   - [`emulate_network`](docs/tool-reference.md#emulate_network)
   - [`resize_page`](docs/tool-reference.md#resize_page)
 - **Performance** (3 tools)

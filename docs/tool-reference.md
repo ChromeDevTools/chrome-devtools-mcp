@@ -18,8 +18,9 @@
   - [`new_page`](#new_page)
   - [`select_page`](#select_page)
   - [`wait_for`](#wait_for)
-- **[Emulation](#emulation)** (3 tools)
+- **[Emulation](#emulation)** (4 tools)
   - [`emulate_cpu`](#emulate_cpu)
+  - [`emulate_device_profile`](#emulate_device_profile)
   - [`emulate_network`](#emulate_network)
   - [`resize_page`](#resize_page)
 - **[Performance](#performance)** (3 tools)
@@ -195,6 +196,16 @@
 **Parameters:**
 
 - **throttlingRate** (number) **(required)**: The CPU throttling rate representing the slowdown factor 1-20x. Set the rate to 1 to disable throttling
+
+---
+
+### `emulate_device_profile`
+
+**Description:** Emulates a device profile by applying predefined viewport metrics, touch, user agent, locale, and timezone settings.
+
+**Parameters:**
+
+- **profile** (enum: "iPhone-12-Pro", "Pixel-7") **(required)**: The device profile preset to apply. Supported profiles: iPhone-12-Pro, Pixel-7.
 
 ---
 
