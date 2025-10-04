@@ -1,5 +1,5 @@
 // src/profile-resolver.ts
-// Phase 1 (v0.15.0) + v0.15.1 (MCP_CLIENT_ID support)
+// Phase 1 (v0.15.0) + v0.15.1 (MCP_CLIENT_ID support) + v0.17.0 (Hierarchical profiles)
 // - Hybrid priority (CLI > MCP_USER_DATA_DIR > MCP_PROJECT_ID > AUTO > DEFAULT)
 // - Auto-detection (git root -> nearest package.json -> cwd)
 // - Realpath normalization
@@ -7,6 +7,7 @@
 // - Short SHA-256 hash (8 chars)
 // - CI detection => ephemeral session profile (unless MCP_PERSIST_PROFILES)
 // - Client ID isolation (MCP_CLIENT_ID environment variable)
+// - Hierarchical structure: {project}/{client}/{channel} (v0.17.0)
 // - Minimal console.error() logging of decision
 
 import fs from 'node:fs';
@@ -19,7 +20,7 @@ import { detectClientType } from './client-detector.js';
 export interface ResolvedProfile {
   path: string;
   reason: 'CLI' | 'MCP_USER_DATA_DIR' | 'MCP_PROJECT_ID' | 'AUTO' | 'DEFAULT';
-  projectKey: string; // e.g., "my-ext-app_1a2b3c4d_claude-code"
+  projectKey: string; // e.g., "my-ext-app_1a2b3c4d" (v0.17.0: clientId removed)
   projectName: string; // e.g., "my-ext-app"
   hash: string; // e.g., "1a2b3c4d"
   clientId: string; // e.g., "claude-code" | "codex" | "default"
@@ -121,8 +122,8 @@ export function resolveUserDataDir(opts: ResolveOpts): ResolvedProfile {
   // 3) ENV: MCP_PROJECT_ID (project-scoped persistent profile)
   const projectId = sanitize(opts.env.MCP_PROJECT_ID || '');
   if (projectId) {
-    const key = `${projectId}_${clientId}`;
-    const p = projectProfilePath(key, channel);
+    const key = projectId; // v0.17.0: clientId removed from projectKey
+    const p = projectProfilePath(key, clientId, channel);
     const result: ResolvedProfile = {
       path: p,
       reason: 'MCP_PROJECT_ID',
@@ -147,8 +148,8 @@ export function resolveUserDataDir(opts: ResolveOpts): ResolvedProfile {
     console.error(`[profiles] AUTO detection: name="${name}"`);
     const realRoot = realpathSafe(root);
     const hash = shortHash(realRoot);
-    const key = `${sanitize(name)}_${hash}_${clientId}`;
-    const p = projectProfilePath(key, channel);
+    const key = `${sanitize(name)}_${hash}`; // v0.17.0: clientId removed from projectKey
+    const p = projectProfilePath(key, clientId, channel);
 
     const result: ResolvedProfile = {
       path: p,
@@ -166,8 +167,8 @@ export function resolveUserDataDir(opts: ResolveOpts): ResolvedProfile {
   } catch (e) {
     console.error(`[profiles] AUTO detection FAILED: ${e}`);
     // 5) DEFAULT fallback
-    const key = `project-default_${clientId}`;
-    const p = projectProfilePath(key, channel);
+    const key = 'project-default'; // v0.17.0: clientId removed from projectKey
+    const p = projectProfilePath(key, clientId, channel);
     const result: ResolvedProfile = {
       path: p,
       reason: 'DEFAULT',
@@ -191,8 +192,9 @@ function isCI(env: NodeJS.ProcessEnv): boolean {
   return env.CI === 'true' || env.GITHUB_ACTIONS === 'true';
 }
 
-function projectProfilePath(projectKey: string, channel: string): string {
-  const base = path.join(CACHE_ROOT, 'profiles', projectKey, channel);
+function projectProfilePath(projectKey: string, clientId: string, channel: string): string {
+  // v0.17.0: Hierarchical structure - {project}/{client}/{channel}
+  const base = path.join(CACHE_ROOT, 'profiles', projectKey, clientId, channel);
   return pathNormalize(base);
 }
 
