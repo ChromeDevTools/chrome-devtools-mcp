@@ -26,6 +26,7 @@ import {
   type SystemChromeProfile,
 } from './system-profile.js';
 import { resolveUserDataDir } from './profile-resolver.js';
+import type { RootsInfo } from './roots-manager.js';
 
 let browser: Browser | undefined;
 
@@ -504,6 +505,7 @@ interface McpLaunchOptions {
   loadSystemExtensions?: boolean;
   chromeProfile?: string;
   logFile?: fs.WriteStream;
+  rootsInfo?: RootsInfo; // v0.18.0: Roots-based profile resolution
 }
 
 // Store development extension paths globally for later retrieval
@@ -535,6 +537,7 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
     env: process.env,
     cwd: process.cwd(),
     channel: channel || 'stable',
+    rootsInfo: options.rootsInfo, // v0.18.0: Pass Roots info
   });
 
   const userDataDir = resolved.path;
@@ -894,6 +897,7 @@ export async function resolveBrowser(options: {
   chromeProfile?: string;
   userDataDir?: string;
   logFile?: fs.WriteStream;
+  rootsInfo?: RootsInfo;
 }) {
   const resolvedBrowser = options.browserUrl
     ? await ensureBrowserConnected(options.browserUrl)

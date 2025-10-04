@@ -16,10 +16,11 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { detectProjectName, detectProjectRoot } from './project-detector.js';
 import { detectClientType } from './client-detector.js';
+import type { RootsInfo } from './roots-manager.js';
 
 export interface ResolvedProfile {
   path: string;
-  reason: 'CLI' | 'MCP_USER_DATA_DIR' | 'MCP_PROJECT_ID' | 'AUTO' | 'DEFAULT';
+  reason: 'CLI' | 'MCP_USER_DATA_DIR' | 'MCP_PROJECT_ID' | 'AUTO' | 'DEFAULT' | 'roots/list' | 'MCP_PROJECT_ROOT' | '--project-root';
   projectKey: string; // e.g., "my-ext-app_1a2b3c4d" (v0.17.0: clientId removed)
   projectName: string; // e.g., "my-ext-app"
   hash: string; // e.g., "1a2b3c4d"
@@ -32,6 +33,7 @@ type ResolveOpts = {
   env: NodeJS.ProcessEnv;
   cwd: string;
   channel: 'stable' | 'canary' | 'beta' | 'dev';
+  rootsInfo?: RootsInfo; // v0.18.0: Roots-based profile resolution
 };
 
 const CACHE_ROOT = path.join(os.homedir(), '.cache', 'chrome-devtools-mcp');
@@ -40,6 +42,34 @@ const CACHE_ROOT = path.join(os.homedir(), '.cache', 'chrome-devtools-mcp');
 
 export function resolveUserDataDir(opts: ResolveOpts): ResolvedProfile {
   const channel = opts.channel || 'stable';
+
+  // v0.18.0: PRIORITY 0 - Use Roots info if available
+  if (opts.rootsInfo) {
+    const profilePath = path.join(
+      CACHE_ROOT,
+      'profiles',
+      opts.rootsInfo.profileKey,
+      opts.rootsInfo.clientName,
+      channel,
+    );
+    const normalized = pathNormalize(profilePath);
+    const result: ResolvedProfile = {
+      path: normalized,
+      reason: opts.rootsInfo.source as ResolvedProfile['reason'],
+      projectKey: opts.rootsInfo.profileKey,
+      projectName: opts.rootsInfo.projectName,
+      hash: opts.rootsInfo.profileKey.slice(0, 8), // Use first 8 chars as hash
+      clientId: opts.rootsInfo.clientName,
+      channel,
+    };
+    console.error(
+      `[profiles] Resolved via Roots (${opts.rootsInfo.source}): ${result.path}`,
+    );
+    console.error(
+      `[profiles]   project=${opts.rootsInfo.projectName}, client=${opts.rootsInfo.clientName}, key=${opts.rootsInfo.profileKey}`,
+    );
+    return result;
+  }
 
   // Auto-detect client type from parent process if MCP_CLIENT_ID not set
   let clientId: string;

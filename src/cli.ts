@@ -84,6 +84,12 @@ export const cliOptions = {
     describe:
       'Path to a file to write debug logs to. Set the env variable `DEBUG` to `*` to enable verbose logs. Useful for submitting bug reports.',
   },
+  projectRoot: {
+    type: 'string' as const,
+    description:
+      'Explicitly specify the project root directory for profile isolation. Overrides MCP roots/list. Useful when roots/list is not available.',
+    conflicts: 'browserUrl',
+  },
 };
 
 export function parseArguments(version: string, argv = process.argv) {

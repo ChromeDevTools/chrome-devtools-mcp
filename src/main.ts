@@ -11,7 +11,7 @@ import path from 'node:path';
 import {McpServer} from '@modelcontextprotocol/sdk/server/mcp.js';
 import {StdioServerTransport} from '@modelcontextprotocol/sdk/server/stdio.js';
 import type {CallToolResult} from '@modelcontextprotocol/sdk/types.js';
-import {SetLevelRequestSchema} from '@modelcontextprotocol/sdk/types.js';
+import {SetLevelRequestSchema, RootsListChangedNotificationSchema} from '@modelcontextprotocol/sdk/types.js';
 
 import type {Browser} from 'puppeteer-core';
 
@@ -22,6 +22,7 @@ import {logger, saveLogsToFile} from './logger.js';
 import {McpContext} from './McpContext.js';
 import {McpResponse} from './McpResponse.js';
 import {Mutex} from './Mutex.js';
+import {resolveRoots, type RootsInfo} from './roots-manager.js';
 import {runStartupCheck} from './startup-check.js';
 import * as bookmarkTools from './tools/bookmarks.js';
 import * as chatgptWebTools from './tools/chatgpt-web.js';
@@ -73,10 +74,38 @@ server.server.setRequestHandler(SetLevelRequestSchema, () => {
   return {};
 });
 
+// Handle roots/list_changed notification
+server.server.setNotificationHandler(RootsListChangedNotificationSchema, async () => {
+  logger('[roots] Received roots/list_changed notification - roots have changed');
+  // Invalidate cached roots info
+  cachedRootsInfo = null;
+  logger('[roots] Cached roots cleared - will re-fetch on next browser launch');
+});
+
 let context: McpContext;
 let uiHealthCheckRun = false; // Track if UI health check has been run
+let cachedRootsInfo: RootsInfo | null = null; // Cache roots info
+let initializationComplete = false; // Track if MCP initialization is complete
 
 async function getContext(): Promise<McpContext> {
+  // Wait for initialization to complete before resolving roots
+  if (!initializationComplete) {
+    logger('[roots] Waiting for MCP initialization to complete...');
+    await new Promise(resolve => setTimeout(resolve, 100)); // Brief wait
+    if (!initializationComplete) {
+      logger('[roots] WARNING: MCP not yet initialized, proceeding without roots');
+    }
+  }
+
+  // Resolve roots info (cached or fresh)
+  if (!cachedRootsInfo) {
+    cachedRootsInfo = await resolveRoots(server.server, {
+      cliProjectRoot: args.projectRoot as string | undefined,
+      envProjectRoot: process.env.MCP_PROJECT_ROOT,
+      autoCwd: process.cwd(),
+    });
+  }
+
   const browserOptions = {
     browserUrl: args.browserUrl,
     headless: args.headless,
@@ -90,6 +119,7 @@ async function getContext(): Promise<McpContext> {
     chromeProfile: args.chromeProfile as string | undefined,
     userDataDir: args.userDataDir as string | undefined,
     logFile,
+    rootsInfo: cachedRootsInfo, // Pass roots info to browser
   };
 
   const browser = await resolveBrowser(browserOptions);
@@ -214,6 +244,12 @@ const tools = [
 for (const tool of tools) {
   registerTool(tool as unknown as ToolDefinition);
 }
+
+// Set initialization callback
+server.server.oninitialized = () => {
+  initializationComplete = true;
+  logger('[roots] MCP initialization complete');
+};
 
 const transport = new StdioServerTransport();
 await server.connect(transport);
