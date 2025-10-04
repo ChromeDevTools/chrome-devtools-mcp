@@ -77,8 +77,12 @@ describe('screenshot', () => {
     it('with full page resulting in a large screenshot', async () => {
       await withBrowser(async (response, context) => {
         const page = context.getSelectedPage();
+        // This is a large page that will result in a screenshot that is >2MB.
+        // The original size of 7,000 was too large for Puppeteer to handle,
+        // causing a protocol error. This size is large enough to trigger the
+        // file-saving logic without causing an error.
         await page.setContent(
-          `<div style="color:blue;">test</div>`.repeat(7_000),
+          `<div style="color:blue;">test</div>`.repeat(4_000),
         );
         await screenshot.handler(
           {params: {format: 'png', fullPage: true}},
