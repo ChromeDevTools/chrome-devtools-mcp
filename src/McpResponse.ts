@@ -7,22 +7,22 @@ import type {
   ImageContent,
   TextContent,
 } from '@modelcontextprotocol/sdk/types.js';
-import type { ResourceType } from 'puppeteer-core';
+import type {ResourceType} from 'puppeteer-core';
 
-import { formatConsoleEvent } from './formatters/consoleFormatter.js';
+import {formatConsoleEvent} from './formatters/consoleFormatter.js';
 import {
   getFormattedHeaderValue,
   getShortDescriptionForRequest,
   getStatusFromRequest,
 } from './formatters/networkFormatter.js';
-import { formatA11ySnapshot } from './formatters/snapshotFormatter.js';
-import type { McpContext } from './McpContext.js';
-import type { ImageContentData, Response } from './tools/ToolDefinition.js';
-import { paginate, type PaginationOptions } from './utils/pagination.js';
+import {formatA11ySnapshot} from './formatters/snapshotFormatter.js';
+import type {McpContext} from './McpContext.js';
+import type {ImageContentData, Response} from './tools/ToolDefinition.js';
+import {paginate, type PaginationOptions} from './utils/pagination.js';
 
 export class McpResponse implements Response {
   // ✅ added properties here (not duplicated)
-  public consoleMessages: any[] = [];
+  public consoleMessages: unknown[] = [];
   public cleanedConsoleData: string[] = [];
 
   #includePages = false;
@@ -84,7 +84,7 @@ export class McpResponse implements Response {
         let text =
           typeof entry === 'string'
             ? entry
-            : entry.text ?? JSON.stringify(entry);
+            : (entry.text ?? JSON.stringify(entry));
         text = text.replace(/\bt=\d+(?::\d+){0,2}\b/g, '');
         text = text.replace(/\bLog>\b/g, '');
         text = text.replace(/\s+/g, ' ').trim();
@@ -192,15 +192,16 @@ export class McpResponse implements Response {
       response.push(`Emulating: ${cpuThrottlingRate}x slowdown`);
     }
 
-const dialog = context.getDialog();
-if (dialog) {
-  response.push(`# Open dialog
+    const dialog = context.getDialog();
+    if (dialog) {
+      response.push(`# Open dialog
 ${dialog.type()}: ${dialog.message()} (default value: ${dialog.message()}).`);
 
-  // Add this line to satisfy the test
-  response.push("Call browser_handle_dialog to handle it before continuing.");
-}
-
+      // Add this line to satisfy the test
+      response.push(
+        'Call browser_handle_dialog to handle it before continuing.',
+      );
+    }
 
     if (this.#includePages) {
       const parts = [`## Pages`];
@@ -250,7 +251,7 @@ ${dialog.type()}: ${dialog.message()} (default value: ${dialog.message()}).`);
           response.push('Invalid page number provided. Showing first page.');
         }
 
-        const { startIndex, endIndex, currentPage, totalPages } =
+        const {startIndex, endIndex, currentPage, totalPages} =
           paginationResult;
         response.push(
           `Showing ${startIndex + 1}-${endIndex} of ${requests.length} (Page ${
