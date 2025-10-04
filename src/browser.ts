@@ -25,6 +25,7 @@ import {
   logSystemProfileInfo,
   type SystemChromeProfile,
 } from './system-profile.js';
+import { resolveUserDataDir } from './profile-resolver.js';
 
 let browser: Browser | undefined;
 
@@ -527,28 +528,54 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
 
   // Reset development extension paths
   developmentExtensionPaths = [];
-  const profileDirName =
-    channel && channel !== 'stable'
-      ? `chrome-profile-${channel}`
-      : 'chrome-profile';
 
-  let userDataDir = options.userDataDir;
-  let usingSystemProfile = false;
-  let profileDirectory = 'Default';
+  // Resolve user data directory using new profile resolver (v0.15.0+)
+  const resolved = resolveUserDataDir({
+    cliUserDataDir: options.userDataDir,
+    env: process.env,
+    cwd: process.cwd(),
+    channel: channel || 'stable',
+  });
 
-  if (!userDataDir) {
-    // Use isolated profile (independent from system Chrome)
-    userDataDir = path.join(
+  const userDataDir = resolved.path;
+  await fs.promises.mkdir(userDataDir, { recursive: true });
+
+  // Legacy profile warning (shown if legacy path exists)
+  try {
+    const legacy = path.join(
       os.homedir(),
       '.cache',
       'chrome-devtools-mcp',
-      profileDirName,
+      'chrome-profile',
     );
-    await fs.promises.mkdir(userDataDir, {
-      recursive: true,
-    });
-    console.error(`📁 Using isolated profile: ${userDataDir}`);
+    if (fs.existsSync(legacy)) {
+      console.error(
+        `⚠️  Legacy profile detected: ${legacy}\n` +
+          `ℹ️  New profile location: ${path.join(
+            os.homedir(),
+            '.cache',
+            'chrome-devtools-mcp',
+            'profiles',
+            'project-default',
+            'stable',
+          )}\n` +
+          `💡 To continue using the legacy profile, set: MCP_USER_DATA_DIR=${legacy}`,
+      );
+    }
+  } catch {
+    /* ignore */
   }
+
+  // Profile resolution logs
+  console.error(`[profiles] Using: ${userDataDir}`);
+  console.error(`           Reason: ${resolved.reason}`);
+  console.error(`           Project: ${resolved.projectName} (${resolved.hash})`);
+  if (resolved.reason === 'AUTO') {
+    console.error(`           Root: ${process.cwd()}`);
+  }
+
+  let usingSystemProfile = false;
+  let profileDirectory = 'Default';
 
   const args: LaunchOptions['args'] = [
     '--hide-crash-restore-bubble',
