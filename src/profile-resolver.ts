@@ -14,6 +14,7 @@ import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { detectProjectName, detectProjectRoot } from './project-detector.js';
+import { detectClientType } from './client-detector.js';
 
 export interface ResolvedProfile {
   path: string;
@@ -38,7 +39,17 @@ const CACHE_ROOT = path.join(os.homedir(), '.cache', 'chrome-devtools-mcp');
 
 export function resolveUserDataDir(opts: ResolveOpts): ResolvedProfile {
   const channel = opts.channel || 'stable';
-  const clientId = sanitize(opts.env.MCP_CLIENT_ID || 'default');
+
+  // Auto-detect client type from parent process if MCP_CLIENT_ID not set
+  let clientId: string;
+  if (opts.env.MCP_CLIENT_ID) {
+    clientId = sanitize(opts.env.MCP_CLIENT_ID);
+    console.error(`[profiles] Using explicit MCP_CLIENT_ID: ${clientId}`);
+  } else {
+    const detected = detectClientType();
+    clientId = sanitize(detected);
+    console.error(`[profiles] Auto-detected client from parent process: ${clientId}`);
+  }
 
   // 0) CI detection → ephemeral session directory (unless MCP_PERSIST_PROFILES)
   //    - This happens before other priorities to keep CI clean by default.
