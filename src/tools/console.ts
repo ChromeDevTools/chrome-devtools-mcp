@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import z from 'zod';
+
 import {ToolCategories} from './categories.js';
 import {defineTool} from './ToolDefinition.js';
 
@@ -14,8 +16,18 @@ export const consoleTool = defineTool({
     category: ToolCategories.DEBUGGING,
     readOnlyHint: true,
   },
-  schema: {},
-  handler: async (_request, response) => {
-    response.setIncludeConsoleData(true);
+  schema: {
+    tail: z
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .default(50)
+      .describe(
+        'Maximum number of recent messages to return. Defaults to 50. Omit or set to null to return all messages.',
+      ),
+  },
+  handler: async (request, response) => {
+    response.setIncludeConsoleData(true, request.params.tail);
   },
 });

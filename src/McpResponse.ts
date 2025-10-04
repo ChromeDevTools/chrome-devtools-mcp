@@ -26,6 +26,7 @@ export class McpResponse implements Response {
   #includeSnapshot = false;
   #attachedNetworkRequestUrl?: string;
   #includeConsoleData = false;
+  #consoleTail?: number;
   #textResponseLines: string[] = [];
   #formattedConsoleData?: string[];
   #images: ImageContentData[] = [];
@@ -69,8 +70,9 @@ export class McpResponse implements Response {
     };
   }
 
-  setIncludeConsoleData(value: boolean): void {
+  setIncludeConsoleData(value: boolean, tail?: number): void {
     this.#includeConsoleData = value;
+    this.#consoleTail = tail;
   }
 
   attachNetworkRequest(url: string): void {
@@ -128,7 +130,7 @@ export class McpResponse implements Response {
 
     let formattedConsoleMessages: string[];
     if (this.#includeConsoleData) {
-      const consoleMessages = context.getConsoleData();
+      const consoleMessages = context.getConsoleData(this.#consoleTail);
       if (consoleMessages) {
         formattedConsoleMessages = await Promise.all(
           consoleMessages.map(message => formatConsoleEvent(message)),
