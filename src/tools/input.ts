@@ -216,3 +216,69 @@ export const uploadFile = defineTool({
     }
   },
 });
+
+/**
+ * Split a key combination string into individual keys.
+ * Handles combinations like "Control+A" and special cases like "Control++".
+ * Based on Playwright's implementation.
+ */
+function splitKeyCombo(keyString: string): string[] {
+  const keys: string[] = [];
+  let building = '';
+  for (const char of keyString) {
+    if (char === '+' && building) {
+      // Only split if there's text before +
+      keys.push(building);
+      building = '';
+    } else {
+      building += char;
+    }
+  }
+  keys.push(building);
+  return keys;
+}
+
+export const pressKey = defineTool({
+  name: 'press_key',
+  description: `Press a key or key combination on the keyboard. Supports modifier keys and combinations.`,
+  annotations: {
+    category: ToolCategories.INPUT_AUTOMATION,
+    readOnlyHint: false,
+  },
+  schema: {
+    key: z
+      .string()
+      .describe(
+        'Key to press. Can be a single key (e.g., "Enter", "Escape", "a") or a combination with modifiers (e.g., "Control+A", "Control+Shift+T", "Control++"). Modifier keys: Control, Shift, Alt, Meta.',
+      ),
+  },
+  handler: async (request, response, context) => {
+    const page = context.getSelectedPage();
+    const tokens = splitKeyCombo(request.params.key);
+    const key = tokens[tokens.length - 1];
+    const modifiers = tokens.slice(0, -1);
+
+    await context.waitForEventsAfterAction(async () => {
+      // Press down modifiers
+      for (const modifier of modifiers) {
+        // @ts-expect-error - Puppeteer KeyInput type is too restrictive for dynamic input
+        await page.keyboard.down(modifier);
+      }
+
+      // Press the key
+      // @ts-expect-error - Puppeteer KeyInput type is too restrictive for dynamic input
+      await page.keyboard.press(key);
+
+      // Release modifiers in reverse order
+      for (let i = modifiers.length - 1; i >= 0; i--) {
+        // @ts-expect-error - Puppeteer KeyInput type is too restrictive for dynamic input
+        await page.keyboard.up(modifiers[i]);
+      }
+    });
+
+    response.appendResponseLine(
+      `Successfully pressed key: ${request.params.key}`,
+    );
+    response.setIncludeSnapshot(true);
+  },
+});
