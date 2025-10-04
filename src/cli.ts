@@ -14,8 +14,10 @@ export const cliOptions = {
       'Connect to a running Chrome instance using port forwarding. For more details see: https://developer.chrome.com/docs/devtools/remote-debugging/local-server.',
     alias: 'u',
     coerce: (url: string) => {
-      new URL(url);
-      return url;
+  if (!url || url.trim() === '') {
+    return undefined;
+  }
+  return new URL(url).toString();
     },
   },
   headless: {
