@@ -17,6 +17,7 @@ import crypto from 'node:crypto';
 import { detectProjectName, detectProjectRoot } from './project-detector.js';
 import { detectClientType } from './client-detector.js';
 import type { RootsInfo } from './roots-manager.js';
+import { getProjectRoot } from './project-root-state.js';
 
 export interface ResolvedProfile {
   path: string;
@@ -169,9 +170,71 @@ export function resolveUserDataDir(opts: ResolveOpts): ResolvedProfile {
     return result;
   }
 
-  // 4) AUTO: detect by root -> name -> hash
+  // 3.5) ENV: MCP_PROJECT_ROOT (MCP Roots protocol - actual project directory)
+  const projectRoot = opts.env.MCP_PROJECT_ROOT;
+  if (projectRoot) {
+    console.error(`[profiles] MCP_PROJECT_ROOT detected: "${projectRoot}"`);
+    try {
+      const name = detectProjectName(projectRoot);
+      console.error(`[profiles] MCP_PROJECT_ROOT name="${name}"`);
+      const realRoot = realpathSafe(projectRoot);
+      const hash = shortHash(realRoot);
+      const key = `${sanitize(name)}_${hash}`;
+      const p = projectProfilePath(key, clientId, channel);
+
+      const result: ResolvedProfile = {
+        path: p,
+        reason: 'MCP_PROJECT_ROOT',
+        projectKey: key,
+        projectName: sanitize(name),
+        hash,
+        clientId,
+        channel,
+      };
+      console.error(
+        `[profiles] resolved(MCP_PROJECT_ROOT): ${result.path} (root=${projectRoot}, name=${name}, hash=${hash}, client=${clientId})`,
+      );
+      return result;
+    } catch (e) {
+      console.error(`[profiles] MCP_PROJECT_ROOT resolution failed: ${e}`);
+      // Fall through to AUTO detection
+    }
+  }
+
+  // 4) INITIALIZED_PROJECT_ROOT: Use globally initialized project root (highest priority for AUTO mode)
+  const initializedRoot = getProjectRoot();
+  if (initializedRoot) {
+    console.error(`[profiles] Using initialized project root: "${initializedRoot}"`);
+    try {
+      const name = detectProjectName(initializedRoot);
+      console.error(`[profiles] Initialized root name="${name}"`);
+      const realRoot = realpathSafe(initializedRoot);
+      const hash = shortHash(realRoot);
+      const key = `${sanitize(name)}_${hash}`;
+      const p = projectProfilePath(key, clientId, channel);
+
+      const result: ResolvedProfile = {
+        path: p,
+        reason: 'AUTO',
+        projectKey: key,
+        projectName: sanitize(name),
+        hash,
+        clientId,
+        channel,
+      };
+      console.error(
+        `[profiles] resolved(INITIALIZED_ROOT): ${result.path} (root=${initializedRoot}, name=${name}, hash=${hash}, client=${clientId})`,
+      );
+      return result;
+    } catch (e) {
+      console.error(`[profiles] Initialized root resolution failed: ${e}`);
+      // Fall through to cwd-based AUTO detection
+    }
+  }
+
+  // 5) AUTO: detect by root -> name -> hash (fallback if no initialized root)
   try {
-    console.error(`[profiles] AUTO detection: cwd="${opts.cwd}"`);
+    console.error(`[profiles] AUTO detection (cwd fallback): cwd="${opts.cwd}"`);
     const root = detectProjectRoot(opts.cwd);
     console.error(`[profiles] AUTO detection: root="${root}"`);
     const name = detectProjectName(root);

@@ -24,6 +24,7 @@ import {McpResponse} from './McpResponse.js';
 import {Mutex} from './Mutex.js';
 import {resolveRoots, type RootsInfo} from './roots-manager.js';
 import {runStartupCheck} from './startup-check.js';
+import {setProjectRoot} from './project-root-state.js';
 import * as bookmarkTools from './tools/bookmarks.js';
 import * as chatgptWebTools from './tools/chatgpt-web.js';
 import * as deepResearchChatGPTTools from './tools/deep_research_chatgpt.js';
@@ -105,6 +106,21 @@ async function getContext(): Promise<McpContext> {
       autoCwd: process.cwd(),
     });
   }
+
+  // Initialize project root for profile isolation
+  // Priority: CLI flag > MCP_PROJECT_ROOT env > Roots protocol > cwd
+  const rootFromRoots = cachedRootsInfo?.rootsUris?.[0]
+    ? cachedRootsInfo.rootsUris[0].replace('file://', '')
+    : undefined;
+
+  const projectRootToSet =
+    (args.projectRoot as string | undefined) ||
+    process.env.MCP_PROJECT_ROOT ||
+    rootFromRoots ||
+    process.cwd();
+
+  setProjectRoot(projectRootToSet);
+  logger(`[project-root] Initialized: ${projectRootToSet}`);
 
   const browserOptions = {
     browserUrl: args.browserUrl,

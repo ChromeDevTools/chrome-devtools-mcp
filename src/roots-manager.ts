@@ -56,11 +56,13 @@ export async function fetchRootsFromClient(
 
 /**
  * Generate stable profile key from roots and client info
+ * Format: projectName_hash (e.g., "my-app_2ca5dbf5")
  */
 export function generateProfileKey(
   rootsUris: string[],
   clientName: string,
   clientVersion: string,
+  projectName?: string,
 ): string {
   // Sort URIs for consistent hashing across multi-root workspaces
   const sortedUris = [...rootsUris].sort();
@@ -71,8 +73,14 @@ export function generateProfileKey(
     version: clientVersion,
   });
 
-  // Use first 12 chars of SHA-256 for stable, collision-resistant key
-  const hash = createHash('sha256').update(keyMaterial).digest('hex').slice(0, 12);
+  // Use first 8 chars of SHA-256 for stable, collision-resistant key
+  const hash = createHash('sha256').update(keyMaterial).digest('hex').slice(0, 8);
+
+  // Include project name for clarity (if available)
+  if (projectName) {
+    const sanitized = projectName.replace(/[^a-z0-9_-]/gi, '-').toLowerCase();
+    return `${sanitized}_${hash}`;
+  }
 
   return hash;
 }
@@ -134,8 +142,8 @@ export async function resolveRoots(
   const rootsResult = await fetchRootsFromClient(server);
   if (rootsResult && rootsResult.roots.length > 0) {
     const rootsUris = rootsResult.roots.map(r => r.uri);
-    const profileKey = generateProfileKey(rootsUris, clientName, clientVersion);
     const projectName = extractProjectName(rootsResult.roots);
+    const profileKey = generateProfileKey(rootsUris, clientName, clientVersion, projectName);
 
     console.error(
       `[roots] Resolved via roots/list: key=${profileKey}, project=${projectName}, client=${clientName}`,
@@ -154,8 +162,8 @@ export async function resolveRoots(
   // 2) Fallback: CLI argument --project-root
   if (fallbackOptions.cliProjectRoot) {
     const uri = pathToFileUri(fallbackOptions.cliProjectRoot);
-    const profileKey = generateProfileKey([uri], clientName, clientVersion);
     const projectName = extractProjectName([{uri}]);
+    const profileKey = generateProfileKey([uri], clientName, clientVersion, projectName);
 
     console.error(
       `[roots] Resolved via --project-root: key=${profileKey}, project=${projectName}`,
@@ -174,8 +182,8 @@ export async function resolveRoots(
   // 3) Fallback: Environment variable MCP_PROJECT_ROOT
   if (fallbackOptions.envProjectRoot) {
     const uri = pathToFileUri(fallbackOptions.envProjectRoot);
-    const profileKey = generateProfileKey([uri], clientName, clientVersion);
     const projectName = extractProjectName([{uri}]);
+    const profileKey = generateProfileKey([uri], clientName, clientVersion, projectName);
 
     console.error(
       `[roots] Resolved via MCP_PROJECT_ROOT: key=${profileKey}, project=${projectName}`,
@@ -194,8 +202,8 @@ export async function resolveRoots(
   // 4) Fallback: AUTO (cwd-based, last resort)
   if (fallbackOptions.autoCwd) {
     const uri = pathToFileUri(fallbackOptions.autoCwd);
-    const profileKey = generateProfileKey([uri], clientName, clientVersion);
     const projectName = extractProjectName([{uri}]);
+    const profileKey = generateProfileKey([uri], clientName, clientVersion, projectName);
 
     console.error(
       `[roots] Resolved via AUTO (cwd): key=${profileKey}, project=${projectName}`,
@@ -213,13 +221,14 @@ export async function resolveRoots(
 
   // Absolute fallback
   const fallbackUri = 'file:///unknown';
-  const profileKey = generateProfileKey([fallbackUri], clientName, clientVersion);
+  const fallbackProjectName = 'unknown';
+  const profileKey = generateProfileKey([fallbackUri], clientName, clientVersion, fallbackProjectName);
 
   console.error('[roots] WARNING: No roots available, using fallback');
 
   return {
     profileKey,
-    projectName: 'unknown',
+    projectName: fallbackProjectName,
     rootsUris: [fallbackUri],
     clientName,
     clientVersion,

@@ -27,6 +27,7 @@ import {
 } from './system-profile.js';
 import { resolveUserDataDir } from './profile-resolver.js';
 import type { RootsInfo } from './roots-manager.js';
+import { isProjectRootInitialized, getProjectRoot } from './project-root-state.js';
 
 let browser: Browser | undefined;
 
@@ -899,6 +900,28 @@ export async function resolveBrowser(options: {
   logFile?: fs.WriteStream;
   rootsInfo?: RootsInfo;
 }) {
+  // CRITICAL: Project root must be initialized before launching Chrome
+  // This ensures proper profile isolation for multi-project environments
+  if (!isProjectRootInitialized() && !options.browserUrl && !options.userDataDir) {
+    const errorMsg = [
+      '❌ CRITICAL ERROR: Project root not initialized',
+      '',
+      'Chrome cannot be launched because the MCP client did not provide the project root directory.',
+      'This is required for proper Chrome profile isolation when using multiple projects.',
+      '',
+      '📋 Required client behavior:',
+      '1. Client must call setProjectRoot() immediately after MCP server starts',
+      '2. Or set MCP_PROJECT_ROOT environment variable before launching MCP',
+      '3. Or use --project-root CLI flag',
+      '',
+      `Current state: projectRoot=${getProjectRoot() || 'undefined'}`,
+      `Process cwd: ${process.cwd()}`,
+    ].join('\n');
+
+    console.error(errorMsg);
+    throw new Error('Project root not initialized - cannot launch Chrome without profile isolation');
+  }
+
   const resolvedBrowser = options.browserUrl
     ? await ensureBrowserConnected(options.browserUrl)
     : await ensureBrowserLaunched(options);
