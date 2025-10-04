@@ -10,6 +10,10 @@ import z from 'zod';
 import {ToolCategories} from './categories.js';
 import {defineTool} from './ToolDefinition.js';
 
+/**
+ * A tool for taking a screenshot of the page or a specific element.
+ * @public
+ */
 export const screenshot = defineTool({
   name: 'take_screenshot',
   description: `Take a screenshot of the page or element.`,

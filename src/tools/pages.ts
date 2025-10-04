@@ -11,6 +11,10 @@ import {logger} from '../logger.js';
 import {ToolCategories} from './categories.js';
 import {CLOSE_PAGE_ERROR, defineTool, timeoutSchema} from './ToolDefinition.js';
 
+/**
+ * A tool for listing all open pages in the browser.
+ * @public
+ */
 export const listPages = defineTool({
   name: 'list_pages',
   description: `Get a list of pages open in the browser.`,
@@ -24,6 +28,10 @@ export const listPages = defineTool({
   },
 });
 
+/**
+ * A tool for selecting a page to be the context for future tool calls.
+ * @public
+ */
 export const selectPage = defineTool({
   name: 'select_page',
   description: `Select a page as a context for future tool calls.`,
@@ -46,6 +54,10 @@ export const selectPage = defineTool({
   },
 });
 
+/**
+ * A tool for closing a page by its index.
+ * @public
+ */
 export const closePage = defineTool({
   name: 'close_page',
   description: `Closes the page by its index. The last open page cannot be closed.`,
@@ -74,6 +86,10 @@ export const closePage = defineTool({
   },
 });
 
+/**
+ * A tool for creating a new page and navigating it to a URL.
+ * @public
+ */
 export const newPage = defineTool({
   name: 'new_page',
   description: `Creates a new page`,
@@ -98,6 +114,10 @@ export const newPage = defineTool({
   },
 });
 
+/**
+ * A tool for navigating the currently selected page to a URL.
+ * @public
+ */
 export const navigatePage = defineTool({
   name: 'navigate_page',
   description: `Navigates the currently selected page to a URL.`,
@@ -122,6 +142,11 @@ export const navigatePage = defineTool({
   },
 });
 
+/**
+ * A tool for navigating the currently selected page back or forward in its
+ * history.
+ * @public
+ */
 export const navigatePageHistory = defineTool({
   name: 'navigate_page_history',
   description: `Navigates the currently selected page.`,
@@ -158,6 +183,10 @@ export const navigatePageHistory = defineTool({
   },
 });
 
+/**
+ * A tool for resizing the selected page's viewport.
+ * @public
+ */
 export const resizePage = defineTool({
   name: 'resize_page',
   description: `Resizes the selected page's window so that the page has specified dimension`,
@@ -182,6 +211,10 @@ export const resizePage = defineTool({
   },
 });
 
+/**
+ * A tool for handling a browser dialog (alert, confirm, or prompt).
+ * @public
+ */
 export const handleDialog = defineTool({
   name: 'handle_dialog',
   description: `If a browser dialog was opened, use this command to handle it`,

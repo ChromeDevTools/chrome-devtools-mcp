@@ -10,6 +10,10 @@ import z from 'zod';
 import {ToolCategories} from './categories.js';
 import {defineTool} from './ToolDefinition.js';
 
+/**
+ * A tool for clicking on an element on the page.
+ * @public
+ */
 export const click = defineTool({
   name: 'click',
   description: `Clicks on the provided element`,
@@ -49,6 +53,10 @@ export const click = defineTool({
   },
 });
 
+/**
+ * A tool for hovering over an element on the page.
+ * @public
+ */
 export const hover = defineTool({
   name: 'hover',
   description: `Hover over the provided element`,
@@ -78,6 +86,11 @@ export const hover = defineTool({
   },
 });
 
+/**
+ * A tool for filling an input element or selecting an option in a select
+ * element.
+ * @public
+ */
 export const fill = defineTool({
   name: 'fill',
   description: `Type text into a input, text area or select an option from a <select> element.`,
@@ -107,6 +120,10 @@ export const fill = defineTool({
   },
 });
 
+/**
+ * A tool for dragging an element onto another element.
+ * @public
+ */
 export const drag = defineTool({
   name: 'drag',
   description: `Drag an element onto another element`,
@@ -136,6 +153,10 @@ export const drag = defineTool({
   },
 });
 
+/**
+ * A tool for filling out multiple form elements at once.
+ * @public
+ */
 export const fillForm = defineTool({
   name: 'fill_form',
   description: `Fill out multiple form elements at once`,
@@ -169,6 +190,10 @@ export const fillForm = defineTool({
   },
 });
 
+/**
+ * A tool for uploading a file through a file input element.
+ * @public
+ */
 export const uploadFile = defineTool({
   name: 'upload_file',
   description: 'Upload a file through a provided element.',

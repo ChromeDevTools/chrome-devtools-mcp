@@ -32,6 +32,10 @@ const FILTERABLE_RESOURCE_TYPES: readonly [ResourceType, ...ResourceType[]] = [
   'other',
 ];
 
+/**
+ * A tool for listing all network requests for the currently selected page.
+ * @public
+ */
 export const listNetworkRequests = defineTool({
   name: 'list_network_requests',
   description: `List all requests for the currently selected page`,
@@ -72,6 +76,10 @@ export const listNetworkRequests = defineTool({
   },
 });
 
+/**
+ * A tool for getting a specific network request by its URL.
+ * @public
+ */
 export const getNetworkRequest = defineTool({
   name: 'get_network_request',
   description: `Gets a network request by URL. You can get all requests by calling ${listNetworkRequests.name}.`,

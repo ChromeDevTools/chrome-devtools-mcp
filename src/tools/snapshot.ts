@@ -10,6 +10,10 @@ import z from 'zod';
 import {ToolCategories} from './categories.js';
 import {defineTool, timeoutSchema} from './ToolDefinition.js';
 
+/**
+ * A tool for taking a text snapshot of the currently selected page.
+ * @public
+ */
 export const takeSnapshot = defineTool({
   name: 'take_snapshot',
   description: `Take a text snapshot of the currently selected page. The snapshot lists page elements along with a unique
@@ -24,6 +28,10 @@ identifier (uid). Always use the latest snapshot. Prefer taking a snapshot over 
   },
 });
 
+/**
+ * A tool for waiting for a specified text to appear on the selected page.
+ * @public
+ */
 export const waitFor = defineTool({
   name: 'wait_for',
   description: `Wait for the specified text to appear on the selected page.`,

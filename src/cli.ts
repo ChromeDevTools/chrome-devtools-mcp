@@ -8,6 +8,10 @@ import type {Options as YargsOptions} from 'yargs';
 import yargs from 'yargs';
 import {hideBin} from 'yargs/helpers';
 
+/**
+ * Defines the command-line options for the MCP server.
+ * @public
+ */
 export const cliOptions = {
   browserUrl: {
     type: 'string',
@@ -87,6 +91,14 @@ export const cliOptions = {
   },
 } satisfies Record<string, YargsOptions>;
 
+/**
+ * Parses the command-line arguments for the MCP server.
+ *
+ * @param version - The version of the application.
+ * @param argv - The command-line arguments.
+ * @returns The parsed arguments.
+ * @public
+ */
 export function parseArguments(version: string, argv = process.argv) {
   const yargsInstance = yargs(hideBin(argv))
     .scriptName('npx chrome-devtools-mcp@latest')

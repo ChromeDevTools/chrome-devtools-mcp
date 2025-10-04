@@ -26,6 +26,13 @@ const ignoredPrefixes = new Set([
   'devtools://',
 ]);
 
+/**
+ * Filters Puppeteer targets to determine which ones should be available.
+ *
+ * @param target - The target to filter.
+ * @returns True if the target should be included, false otherwise.
+ * @internal
+ */
 function targetFilter(target: Target): boolean {
   if (target.url() === 'chrome://newtab/') {
     return true;
@@ -44,6 +51,14 @@ const connectOptions: ConnectOptions = {
   protocolTimeout: 10_000,
 };
 
+/**
+ * Ensures that a browser instance is connected at the given URL. If a browser
+ * is already connected, it returns the existing instance.
+ *
+ * @param browserURL - The URL of the browser's debugging endpoint.
+ * @returns A promise that resolves to the connected browser instance.
+ * @public
+ */
 export async function ensureBrowserConnected(browserURL: string) {
   if (browser?.connected) {
     return browser;
@@ -56,22 +71,65 @@ export async function ensureBrowserConnected(browserURL: string) {
   return browser;
 }
 
+/**
+ * Defines the options for launching a browser instance for MCP.
+ * @public
+ */
 interface McpLaunchOptions {
+  /**
+   * Whether to accept insecure certificates.
+   */
   acceptInsecureCerts?: boolean;
+  /**
+   * The path to the browser executable.
+   */
   executablePath?: string;
+  /**
+   * The path to custom DevTools frontend.
+   */
   customDevTools?: string;
+  /**
+   * The Chrome release channel to use.
+   */
   channel?: Channel;
+  /**
+   * The path to the user data directory.
+   */
   userDataDir?: string;
+  /**
+   * Whether to run the browser in headless mode.
+   */
   headless: boolean;
+  /**
+   * Whether to use an isolated profile.
+   */
   isolated: boolean;
+  /**
+   * A writable stream to which browser logs will be written.
+   */
   logFile?: fs.WriteStream;
+  /**
+   * The viewport size.
+   */
   viewport?: {
     width: number;
     height: number;
   };
+  /**
+   * Additional arguments to pass to the browser instance.
+   */
   args?: string[];
 }
 
+/**
+ * Launches a new browser instance with the specified options.
+ *
+ * @param options - The launch options.
+ * @returns A promise that resolves to the launched browser instance.
+ * @throws If the browser is already running for the specified user data
+ * directory and not in isolated mode.
+ * @public
+ */
 export async function launch(options: McpLaunchOptions): Promise<Browser> {
   const {channel, executablePath, customDevTools, headless, isolated} = options;
   const profileDirName =
@@ -152,6 +210,15 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
   }
 }
 
+/**
+ * Ensures that a browser instance is launched. If a browser is already
+ * connected, it returns the existing instance. Otherwise, it launches a new
+ * one.
+ *
+ * @param options - The launch options.
+ * @returns A promise that resolves to the launched browser instance.
+ * @public
+ */
 export async function ensureBrowserLaunched(
   options: McpLaunchOptions,
 ): Promise<Browser> {
@@ -162,4 +229,8 @@ export async function ensureBrowserLaunched(
   return browser;
 }
 
+/**
+ * Defines the available Chrome release channels.
+ * @public
+ */
 export type Channel = 'stable' | 'canary' | 'beta' | 'dev';

@@ -20,6 +20,10 @@ import {ToolCategories} from './categories.js';
 import type {Context, Response} from './ToolDefinition.js';
 import {defineTool} from './ToolDefinition.js';
 
+/**
+ * A tool for starting a performance trace recording on the selected page.
+ * @public
+ */
 export const startTrace = defineTool({
   name: 'performance_start_trace',
   description:
@@ -101,6 +105,10 @@ export const startTrace = defineTool({
   },
 });
 
+/**
+ * A tool for stopping an active performance trace recording on the selected page.
+ * @public
+ */
 export const stopTrace = defineTool({
   name: 'performance_stop_trace',
   description:
@@ -119,6 +127,10 @@ export const stopTrace = defineTool({
   },
 });
 
+/**
+ * A tool for analyzing a specific performance insight from a trace recording.
+ * @public
+ */
 export const analyzeInsight = defineTool({
   name: 'performance_analyze_insight',
   description:
@@ -156,6 +168,15 @@ export const analyzeInsight = defineTool({
   },
 });
 
+/**
+ * Stops the performance trace, parses the results, and appends the output to
+ * the response.
+ *
+ * @param page - The page being traced.
+ * @param response - The response object to append output to.
+ * @param context - The tool context.
+ * @internal
+ */
 async function stopTracingAndAppendOutput(
   page: Page,
   response: Response,

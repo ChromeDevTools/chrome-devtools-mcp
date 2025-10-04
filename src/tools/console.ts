@@ -7,6 +7,10 @@
 import {ToolCategories} from './categories.js';
 import {defineTool} from './ToolDefinition.js';
 
+/**
+ * A tool for listing all console messages for the currently selected page.
+ * @public
+ */
 export const consoleTool = defineTool({
   name: 'list_console_messages',
   description: 'List all console messages for the currently selected page',

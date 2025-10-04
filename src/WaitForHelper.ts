@@ -8,6 +8,11 @@ import type {CdpPage} from 'puppeteer-core/internal/cdp/Page.js';
 
 import {logger} from './logger.js';
 
+/**
+ * A helper class for waiting for various page events, such as stable DOM and
+ * navigation, after performing an action.
+ * @public
+ */
 export class WaitForHelper {
   #abortController = new AbortController();
   #page: CdpPage;
@@ -16,6 +21,12 @@ export class WaitForHelper {
   #expectNavigationIn: number;
   #navigationTimeout: number;
 
+  /**
+   * @param page - The Puppeteer page to wait for events on.
+   * @param cpuTimeoutMultiplier - The multiplier for CPU-bound timeouts.
+   * @param networkTimeoutMultiplier - The multiplier for network-bound
+   * timeouts.
+   */
   constructor(
     page: Page,
     cpuTimeoutMultiplier: number,
@@ -29,9 +40,10 @@ export class WaitForHelper {
   }
 
   /**
-   * A wrapper that executes a action and waits for
-   * a potential navigation, after which it waits
-   * for the DOM to be stable before returning.
+   * Waits for the DOM to be stable (i.e., no mutations for a certain period).
+   *
+   * @returns A promise that resolves when the DOM is stable.
+   * @throws If the timeout is reached before the DOM becomes stable.
    */
   async waitForStableDom(): Promise<void> {
     const stableDomObserver = await this.#page.evaluateHandle(timeout => {
@@ -82,6 +94,12 @@ export class WaitForHelper {
     ]);
   }
 
+  /**
+   * Waits for a navigation to start.
+   *
+   * @returns A promise that resolves to true if a navigation starts, and false
+   * otherwise.
+   */
   async waitForNavigationStarted() {
     // Currently Puppeteer does not have API
     // For when a navigation is about to start
@@ -114,6 +132,12 @@ export class WaitForHelper {
     ]);
   }
 
+  /**
+   * Creates a timeout promise that can be aborted.
+   *
+   * @param time - The timeout in milliseconds.
+   * @returns A promise that resolves after the timeout.
+   */
   timeout(time: number): Promise<void> {
     return new Promise<void>(res => {
       const id = setTimeout(res, time);
@@ -124,6 +148,14 @@ export class WaitForHelper {
     });
   }
 
+  /**
+   * Executes an action and then waits for events to settle, such as navigation
+   * and stable DOM.
+   *
+   * @param action - The action to perform.
+   * @returns A promise that resolves when all events have settled.
+   * @throws If the action throws an error.
+   */
   async waitForEventsAfterAction(
     action: () => Promise<unknown>,
   ): Promise<void> {
