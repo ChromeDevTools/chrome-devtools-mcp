@@ -15,10 +15,10 @@ fi
 
 echo "📋 Found processes: $PIDS"
 
-# Kill each process
+# Kill each process with -9 (force kill)
 for PID in $PIDS; do
-  echo "   Killing PID $PID..."
-  kill $PID 2>/dev/null
+  echo "   Force killing PID $PID..."
+  kill -9 $PID 2>/dev/null
 done
 
 # Wait a moment for processes to terminate
@@ -32,6 +32,9 @@ if [ -z "$REMAINING" ]; then
   echo "📢 Next step: Reload VSCode window"
   echo "   → Press Cmd+R or use Command Palette → 'Developer: Reload Window'"
 else
-  echo "⚠️  Some processes still running:"
+  echo "❌ Failed to terminate some processes:"
   echo "$REMAINING"
+  echo ""
+  echo "💡 Try manually: kill -9 <PID>"
+  exit 1
 fi
