@@ -25,6 +25,10 @@ import {CLOSE_PAGE_ERROR} from './tools/ToolDefinition.js';
 import type {Context} from './tools/ToolDefinition.js';
 import type {TraceResult} from './trace-processing/parse.js';
 import {WaitForHelper} from './WaitForHelper.js';
+import {
+  BrowserConnectionManager,
+  type ConnectionManagerOptions,
+} from './browser-connection-manager.js';
 
 export interface TextSnapshotNode extends SerializedAXNode {
   id: string;
@@ -60,6 +64,7 @@ function getNetworkMultiplierFromString(condition: string | null): number {
 export class McpContext implements Context {
   browser: Browser;
   logger: Debugger;
+  connectionManager: BrowserConnectionManager;
 
   // The most recent page state.
   #pages: Page[] = [];
@@ -77,9 +82,20 @@ export class McpContext implements Context {
   #nextSnapshotId = 1;
   #traceResults: TraceResult[] = [];
 
-  private constructor(browser: Browser, logger: Debugger) {
+  private constructor(
+    browser: Browser,
+    logger: Debugger,
+    browserFactory?: () => Promise<Browser>,
+    connectionOptions?: ConnectionManagerOptions,
+  ) {
     this.browser = browser;
     this.logger = logger;
+    this.connectionManager = new BrowserConnectionManager(connectionOptions);
+
+    // Set up browser instance and factory for reconnection
+    if (browserFactory) {
+      this.connectionManager.setBrowser(browser, browserFactory);
+    }
 
     this.#networkCollector = new NetworkCollector(
       this.browser,
@@ -110,10 +126,33 @@ export class McpContext implements Context {
     await this.#consoleCollector.init();
   }
 
-  static async from(browser: Browser, logger: Debugger) {
-    const context = new McpContext(browser, logger);
+  static async from(
+    browser: Browser,
+    logger: Debugger,
+    browserFactory?: () => Promise<Browser>,
+    connectionOptions?: ConnectionManagerOptions,
+  ) {
+    const context = new McpContext(browser, logger, browserFactory, connectionOptions);
     await context.#init();
     return context;
+  }
+
+  /**
+   * Update browser instance after reconnection
+   */
+  async updateBrowser(newBrowser: Browser): Promise<void> {
+    this.browser = newBrowser;
+    this.connectionManager.setBrowser(newBrowser, async () => newBrowser);
+
+    // Reinitialize collectors for new browser
+    await this.#networkCollector.init();
+    await this.#consoleCollector.init();
+
+    // Recreate pages snapshot
+    await this.createPagesSnapshot();
+    this.setSelectedPageIdx(0);
+
+    this.logger('Browser instance updated after reconnection');
   }
 
   getNetworkRequests(): HTTPRequest[] {

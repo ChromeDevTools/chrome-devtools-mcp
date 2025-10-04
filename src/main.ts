@@ -13,6 +13,8 @@ import {StdioServerTransport} from '@modelcontextprotocol/sdk/server/stdio.js';
 import type {CallToolResult} from '@modelcontextprotocol/sdk/types.js';
 import {SetLevelRequestSchema} from '@modelcontextprotocol/sdk/types.js';
 
+import type {Browser} from 'puppeteer-core';
+
 import type {Channel} from './browser.js';
 import {resolveBrowser} from './browser.js';
 import {parseArguments} from './cli.js';
@@ -75,7 +77,7 @@ let context: McpContext;
 let uiHealthCheckRun = false; // Track if UI health check has been run
 
 async function getContext(): Promise<McpContext> {
-  const browser = await resolveBrowser({
+  const browserOptions = {
     browserUrl: args.browserUrl,
     headless: args.headless,
     executablePath: args.executablePath,
@@ -88,11 +90,27 @@ async function getContext(): Promise<McpContext> {
     chromeProfile: args.chromeProfile as string | undefined,
     userDataDir: args.userDataDir as string | undefined,
     logFile,
-  });
+  };
+
+  const browser = await resolveBrowser(browserOptions);
+
+  // Browser factory function for reconnection
+  const browserFactory = async () => {
+    logger('Reconnecting browser...');
+    return await resolveBrowser(browserOptions);
+  };
 
   // Always recreate context if browser reference changed or context doesn't exist
   if (!context || context.browser !== browser) {
-    context = await McpContext.from(browser, logger);
+    // Connection manager options with reconnect callback
+    const connectionOptions = {
+      onReconnect: async (newBrowser: Browser) => {
+        logger('Updating context with reconnected browser...');
+        await context.updateBrowser(newBrowser);
+      },
+    };
+
+    context = await McpContext.from(browser, logger, browserFactory, connectionOptions);
 
     // Run UI health check only once per browser instance
     if (!uiHealthCheckRun) {
