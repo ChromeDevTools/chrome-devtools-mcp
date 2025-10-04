@@ -24,6 +24,13 @@ if (major === 22 && minor < 12) {
   process.exit(1);
 }
 
+if (major === 21) {
+  console.error(
+    `ERROR: \`chrome-devtools-mcp\` does not support Node ${process.version}. Please upgrade to Node 20.19.0 LTS or a newer LTS.`,
+  );
+  process.exit(1);
+}
+
 if (major < 20) {
   console.error(
     `ERROR: \`chrome-devtools-mcp\` does not support Node ${process.version}. Please upgrade to Node 20.19.0 LTS or a newer LTS.`,
