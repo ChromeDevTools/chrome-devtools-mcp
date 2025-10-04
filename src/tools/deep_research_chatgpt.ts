@@ -11,6 +11,7 @@ import z from 'zod';
 
 import {ToolCategories} from './categories.js';
 import {defineTool} from './ToolDefinition.js';
+import {CHATGPT_CONFIG} from '../config.js';
 
 /**
  * Path to store chat session data
@@ -928,7 +929,7 @@ export const deepResearchChatGPT = defineTool({
       }
 
       if (needsNewChat) {
-        await page.goto('https://chatgpt.com/?model=gpt-5-thinking', {waitUntil: 'networkidle2'});
+        await page.goto(CHATGPT_CONFIG.DEFAULT_URL, {waitUntil: 'networkidle2'});
       }
 
       // Check if logged in

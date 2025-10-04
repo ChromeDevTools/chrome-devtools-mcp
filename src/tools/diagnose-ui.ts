@@ -10,6 +10,7 @@ import z from 'zod';
 
 import {ToolCategories} from './categories.js';
 import {defineTool} from './ToolDefinition.js';
+import {CHATGPT_CONFIG} from '../config.js';
 
 /**
  * ChatGPT UI Diagnostic Tool
@@ -258,8 +259,8 @@ export const diagnoseChatgptUi = defineTool({
   },
   schema: {
     url: z.string()
-      .default('https://chatgpt.com/')
-      .describe('ChatGPT URL to diagnose (default: https://chatgpt.com/)'),
+      .default(CHATGPT_CONFIG.DEFAULT_URL)
+      .describe(`ChatGPT URL to diagnose (default: ${CHATGPT_CONFIG.DEFAULT_URL})`),
     waitForLoad: z.number()
       .default(5000)
       .describe('Time to wait for page to load in milliseconds (default: 5000)'),

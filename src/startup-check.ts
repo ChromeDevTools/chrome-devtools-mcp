@@ -5,6 +5,7 @@
  */
 
 import type { Browser, Page } from 'puppeteer-core';
+import {CHATGPT_CONFIG} from './config.js';
 
 interface UIElement {
   name: string;
@@ -90,7 +91,7 @@ export async function verifyUIHealth(browser: Browser): Promise<void> {
 
     // Navigate to ChatGPT with short timeout
     console.error('   Navigating to ChatGPT...');
-    await page.goto('https://chatgpt.com/', {
+    await page.goto(CHATGPT_CONFIG.DEFAULT_URL, {
       waitUntil: 'networkidle2',
       timeout: 30000,
     });
