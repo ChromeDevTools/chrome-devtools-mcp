@@ -4,8 +4,9 @@
 
 echo "🔍 Looking for chrome-devtools-mcp-for-extension processes..."
 
-# Find PIDs for chrome-devtools-mcp-for-extension processes
-PIDS=$(ps aux | grep "chrome-devtools-mcp-for-extension" | grep -v grep | awk '{print $2}')
+# Find PIDs for node processes running this project's index.js
+PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+PIDS=$(ps aux | grep "node.*${PROJECT_DIR}/build/src/index.js" | grep -v grep | awk '{print $2}')
 
 if [ -z "$PIDS" ]; then
   echo "⚠️  No chrome-devtools-mcp-for-extension processes found"
@@ -25,9 +26,9 @@ done
 sleep 1
 
 # Verify termination
-REMAINING=$(ps aux | grep "chrome-devtools-mcp-for-extension" | grep -v grep)
+REMAINING=$(ps aux | grep "node.*${PROJECT_DIR}/build/src/index.js" | grep -v grep)
 if [ -z "$REMAINING" ]; then
-  echo "✅ All chrome-devtools-mcp-for-extension processes terminated"
+  echo "✅ All MCP processes for this project terminated"
   echo ""
   echo "📢 Next step: Reload VSCode window"
   echo "   → Press Cmd+R or use Command Palette → 'Developer: Reload Window'"
