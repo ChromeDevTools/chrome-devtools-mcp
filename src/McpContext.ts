@@ -138,11 +138,79 @@ export class McpContext implements Context {
   }
 
   /**
+   * Reinitialize CDP protocol domains after reconnection
+   * This ensures proper CDP event handling after browser restart
+   */
+  async reinitializeCDP(): Promise<void> {
+    try {
+      // Get CDP client from the browser
+      const client = await (this.browser as any)._client();
+
+      if (!client) {
+        this.logger('Warning: Unable to get CDP client for reinitialization');
+        return;
+      }
+
+      // 1. Enable Target discovery and auto-attach
+      // This is critical for multi-target scenarios (iframes, workers, etc.)
+      try {
+        await client.send('Target.setDiscoverTargets', { discover: true });
+        this.logger('CDP: Target discovery enabled');
+      } catch (err) {
+        this.logger('Warning: Failed to enable target discovery:', err);
+      }
+
+      try {
+        await client.send('Target.setAutoAttach', {
+          autoAttach: true,
+          waitForDebuggerOnStart: false,
+          flatten: true
+        });
+        this.logger('CDP: Auto-attach configured');
+      } catch (err) {
+        this.logger('Warning: Failed to configure auto-attach:', err);
+      }
+
+      // 2. Enable essential CDP domains for each page
+      const pages = await this.browser.pages();
+      for (const page of pages) {
+        try {
+          const pageClient = (page as any)._client();
+          if (pageClient) {
+            // Enable Network domain for request interception
+            await pageClient.send('Network.enable');
+
+            // Enable Runtime domain for console messages and exceptions
+            await pageClient.send('Runtime.enable');
+
+            // Enable Log domain for browser logs
+            await pageClient.send('Log.enable');
+
+            this.logger(`CDP domains enabled for page: ${page.url()}`);
+          }
+        } catch (err) {
+          this.logger(`Warning: Failed to enable CDP domains for page ${page.url()}:`, err);
+        }
+      }
+
+      this.logger('CDP protocol reinitialization completed');
+    } catch (err) {
+      this.logger('Error during CDP reinitialization:', err);
+      // Don't throw - this is a best-effort operation
+      // The browser should still be usable even if CDP setup partially fails
+    }
+  }
+
+  /**
    * Update browser instance after reconnection
    */
   async updateBrowser(newBrowser: Browser): Promise<void> {
     this.browser = newBrowser;
     this.connectionManager.setBrowser(newBrowser, async () => newBrowser);
+
+    // Reinitialize CDP protocol domains BEFORE collectors
+    // This ensures CDP events are properly set up
+    await this.reinitializeCDP();
 
     // Reinitialize collectors for new browser
     await this.#networkCollector.init();

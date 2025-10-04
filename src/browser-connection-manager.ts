@@ -12,6 +12,7 @@
  */
 
 import type {Browser, Page} from 'puppeteer';
+import {ProtocolError, TimeoutError} from 'puppeteer';
 
 /**
  * Connection manager options
@@ -36,9 +37,22 @@ const DEFAULT_OPTIONS = {
 };
 
 /**
+ * Connection state enum
+ */
+enum ConnectionState {
+  CONNECTED = 'CONNECTED',
+  RECONNECTING = 'RECONNECTING',
+  CLOSED = 'CLOSED',
+}
+
+/**
  * Browser Connection Manager
  *
- * Provides automatic reconnection for CDP operations
+ * Provides automatic reconnection for CDP operations with:
+ * - Single-flight pattern to prevent concurrent reconnections
+ * - Event-driven detection via browser 'disconnected' event
+ * - State machine tracking (CONNECTED | RECONNECTING | CLOSED)
+ * - Exponential backoff with jitter to prevent thundering herd
  */
 export class BrowserConnectionManager {
   private reconnectAttempts = 0;
@@ -46,16 +60,38 @@ export class BrowserConnectionManager {
   private browser: Browser | null = null;
   private browserFactory: (() => Promise<Browser>) | null = null;
 
+  /** Single-flight pattern: prevents concurrent reconnection attempts */
+  private reconnectInFlight: Promise<void> | null = null;
+
+  /** Shared reconnection sequence for multiple operations */
+  private reconnectSequenceInFlight: Promise<void> | null = null;
+
+  /** Current connection state */
+  private state: ConnectionState = ConnectionState.CLOSED;
+
   constructor(options: ConnectionManagerOptions = {}) {
     this.options = {...DEFAULT_OPTIONS, ...options};
   }
 
   /**
    * Set browser instance and factory for reconnection
+   *
+   * @param browser - Browser instance to manage
+   * @param factory - Factory function to create new browser instances on reconnection
    */
   setBrowser(browser: Browser, factory: () => Promise<Browser>): void {
     this.browser = browser;
     this.browserFactory = factory;
+    this.state = ConnectionState.CONNECTED;
+
+    // Event-driven detection: hook into browser 'disconnected' event
+    this.browser.on('disconnected', () => {
+      this.log('Browser disconnected event fired');
+      this.setState(ConnectionState.CLOSED);
+      // Trigger immediate reconnection (will be handled by next operation)
+    });
+
+    this.log('Browser instance set, state: CONNECTED');
   }
 
   /**
@@ -77,12 +113,60 @@ export class BrowserConnectionManager {
   }
 
   /**
-   * Retry operation with exponential backoff
+   * Retry operation with exponential backoff and jitter
+   *
+   * Implements single-flight pattern at the sequence level:
+   * - Multiple concurrent operations share the same reconnection sequence
+   * - Only one reconnection sequence runs at a time
+   * - All waiting operations retry after the shared sequence completes
+   *
+   * Adds ±20% randomness to retry delays to prevent thundering herd problem.
+   *
+   * @param operation - Operation to retry
+   * @param operationName - Name of operation for logging
+   * @returns Result of operation
    */
   private async retryWithReconnect<T>(
     operation: () => Promise<T>,
     operationName: string,
   ): Promise<T> {
+    // Single-flight pattern: if a reconnection sequence is already running,
+    // wait for it to complete, then try the operation once
+    if (this.reconnectSequenceInFlight) {
+      this.log(`${operationName}: Waiting for ongoing reconnection sequence...`);
+      try {
+        await this.reconnectSequenceInFlight;
+        this.log(`${operationName}: Reconnection sequence completed, retrying operation...`);
+        return await operation();
+      } catch (error) {
+        // Reconnection sequence failed, propagate the error
+        throw error;
+      }
+    }
+
+    // Start a new reconnection sequence
+    this.reconnectSequenceInFlight = this._runReconnectionSequence();
+
+    try {
+      await this.reconnectSequenceInFlight;
+      this.log(`${operationName}: Reconnection sequence completed, retrying operation...`);
+      return await operation();
+    } catch (error) {
+      throw error;
+    } finally {
+      // Clear the in-flight sequence
+      this.reconnectSequenceInFlight = null;
+    }
+  }
+
+  /**
+   * Run a full reconnection sequence with exponential backoff
+   *
+   * This is the actual retry loop that multiple operations can share.
+   *
+   * @private
+   */
+  private async _runReconnectionSequence(): Promise<void> {
     const maxAttempts = this.options.maxReconnectAttempts ?? 3;
     const initialDelay = this.options.initialRetryDelay ?? 1000;
     const maxDelay = this.options.maxRetryDelay ?? 10000;
@@ -91,20 +175,25 @@ export class BrowserConnectionManager {
       this.reconnectAttempts++;
       const attemptNum = attempt + 1;
 
-      this.log(`Reconnect attempt ${attemptNum}/${maxAttempts} for ${operationName}...`);
+      this.log(`Reconnect attempt ${attemptNum}/${maxAttempts}...`);
 
       // Exponential backoff with max delay
-      const delay = Math.min(
+      const baseDelay = Math.min(
         initialDelay * Math.pow(2, attempt),
         maxDelay,
       );
 
+      // Add jitter: ±20% randomness to prevent thundering herd
+      const jitter = baseDelay * 0.2 * (Math.random() * 2 - 1);
+      const delay = Math.max(0, baseDelay + jitter);
+
+      this.log(`Waiting ${delay.toFixed(0)}ms before reconnect attempt...`);
       await this.sleep(delay);
 
       try {
         await this.reconnectBrowser();
-        this.log(`Reconnection successful, retrying ${operationName}...`);
-        return await operation();
+        this.log(`Reconnection successful`);
+        return; // Success!
       } catch (error) {
         if (attempt === maxAttempts - 1) {
           // Last attempt failed
@@ -119,8 +208,20 @@ export class BrowserConnectionManager {
 
   /**
    * Check if error is a CDP connection error
+   *
+   * Uses type-safe error detection with instanceof checks and falls back
+   * to string matching for compatibility.
+   *
+   * @param error - Error to check
+   * @returns true if error is a CDP connection error
    */
   private isCDPConnectionError(error: any): boolean {
+    // Type-safe detection using instanceof
+    if (error instanceof ProtocolError || error instanceof TimeoutError) {
+      return true;
+    }
+
+    // Fallback: string matching for error messages
     const errorMessage = error?.message || '';
     return (
       errorMessage.includes('Target closed') ||
@@ -132,12 +233,42 @@ export class BrowserConnectionManager {
   }
 
   /**
-   * Reconnect browser instance
+   * Reconnect browser instance with single-flight pattern
+   *
+   * Ensures only one reconnection attempt happens at a time.
+   * Multiple concurrent calls will wait for the same reconnection promise.
+   *
+   * @returns Promise that resolves when reconnection is complete
    */
   private async reconnectBrowser(): Promise<void> {
+    // Single-flight pattern: return existing promise if reconnection is already in progress
+    if (this.reconnectInFlight) {
+      this.log('Reconnection already in progress, waiting...');
+      return this.reconnectInFlight;
+    }
+
+    // Create new reconnection promise
+    this.reconnectInFlight = this._doReconnect();
+
+    try {
+      await this.reconnectInFlight;
+    } finally {
+      // Clear in-flight promise when complete
+      this.reconnectInFlight = null;
+    }
+  }
+
+  /**
+   * Internal reconnection logic
+   *
+   * @private
+   */
+  private async _doReconnect(): Promise<void> {
     if (!this.browserFactory) {
       throw new Error('Browser factory not set. Cannot reconnect.');
     }
+
+    this.setState(ConnectionState.RECONNECTING);
 
     try {
       // Close old browser if still connected
@@ -154,6 +285,13 @@ export class BrowserConnectionManager {
     const newBrowser = await this.browserFactory();
     this.browser = newBrowser;
 
+    // Re-attach disconnected event handler
+    this.browser.on('disconnected', () => {
+      this.log('Browser disconnected event fired');
+      this.setState(ConnectionState.CLOSED);
+    });
+
+    this.setState(ConnectionState.CONNECTED);
     this.log('Browser reconnected successfully');
 
     // Notify callback if provided
@@ -188,7 +326,21 @@ ${lastError?.message || 'Unknown error'}
   }
 
   /**
+   * Set connection state and log transition
+   *
+   * @param newState - New connection state
+   */
+  private setState(newState: ConnectionState): void {
+    if (this.state !== newState) {
+      this.log(`State transition: ${this.state} -> ${newState}`);
+      this.state = newState;
+    }
+  }
+
+  /**
    * Log message if logging is enabled
+   *
+   * @param message - Message to log
    */
   private log(message: string): void {
     if (this.options.enableLogging !== false) {
@@ -226,9 +378,29 @@ ${lastError?.message || 'Unknown error'}
 
   /**
    * Check if browser is currently connected
+   *
+   * @returns true if browser is connected
    */
   isConnected(): boolean {
     return this.browser?.isConnected() ?? false;
+  }
+
+  /**
+   * Get current connection state
+   *
+   * @returns Current connection state (CONNECTED | RECONNECTING | CLOSED)
+   */
+  getState(): string {
+    return this.state;
+  }
+
+  /**
+   * Check if reconnection is currently in progress
+   *
+   * @returns true if reconnection is in progress
+   */
+  isReconnecting(): boolean {
+    return this.state === ConnectionState.RECONNECTING;
   }
 }
 
