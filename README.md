@@ -291,6 +291,10 @@ The Chrome DevTools MCP server supports the following configuration option:
   If enabled, ignores errors relative to self-signed and expired certificates. Use with caution.
   - **Type:** boolean
 
+- **`--protocolTimeout`**
+  Timeout for the Chrome DevTools Protocol operations in milliseconds.
+  - **Type:** number
+
 <!-- END AUTO GENERATED OPTIONS -->
 
 Pass them via the `args` property in the JSON configuration. For example:

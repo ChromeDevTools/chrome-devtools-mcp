@@ -38,18 +38,23 @@ function targetFilter(target: Target): boolean {
   return true;
 }
 
-const connectOptions: ConnectOptions = {
-  targetFilter,
-  // We do not expect any single CDP command to take more than 10sec.
-  protocolTimeout: 10_000,
-};
+function getConnectOptions(protocolTimeout: number): ConnectOptions {
+  return {
+    targetFilter,
+    // We do not expect any single CDP command to take more than 10sec.
+    protocolTimeout,
+  };
+}
 
-export async function ensureBrowserConnected(browserURL: string) {
+export async function ensureBrowserConnected(
+  browserURL: string,
+  protocolTimeout = 10_000,
+) {
   if (browser?.connected) {
     return browser;
   }
   browser = await puppeteer.connect({
-    ...connectOptions,
+    ...getConnectOptions(protocolTimeout),
     browserURL,
     defaultViewport: null,
   });
@@ -70,6 +75,7 @@ interface McpLaunchOptions {
     height: number;
   };
   args?: string[];
+  protocolTimeout?: number;
 }
 
 export async function launch(options: McpLaunchOptions): Promise<Browser> {
@@ -112,7 +118,7 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
 
   try {
     const browser = await puppeteer.launch({
-      ...connectOptions,
+      ...getConnectOptions(options.protocolTimeout ?? 10_000),
       channel: puppeteerChannel,
       executablePath,
       defaultViewport: null,
@@ -162,6 +168,7 @@ export async function ensureBrowserLaunched(
     return browser;
   }
   browser = await launch(options);
+
   return browser;
 }
 

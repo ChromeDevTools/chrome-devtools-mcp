@@ -74,7 +74,7 @@ async function getContext(): Promise<McpContext> {
     extraArgs.push(`--proxy-server=${args.proxyServer}`);
   }
   const browser = args.browserUrl
-    ? await ensureBrowserConnected(args.browserUrl)
+    ? await ensureBrowserConnected(args.browserUrl, args.protocolTimeout)
     : await ensureBrowserLaunched({
         headless: args.headless,
         executablePath: args.executablePath,
@@ -85,6 +85,7 @@ async function getContext(): Promise<McpContext> {
         viewport: args.viewport,
         args: extraArgs,
         acceptInsecureCerts: args.acceptInsecureCerts,
+        protocolTimeout: args.protocolTimeout,
       });
 
   if (context?.browser !== browser) {

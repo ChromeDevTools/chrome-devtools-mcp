@@ -88,6 +88,11 @@ export const cliOptions = {
     type: 'boolean',
     description: `If enabled, ignores errors relative to self-signed and expired certificates. Use with caution.`,
   },
+  protocolTimeout: {
+    type: 'number',
+    describe:
+      'Timeout for the Chrome DevTools Protocol operations in milliseconds.',
+  },
 } satisfies Record<string, YargsOptions>;
 
 export function parseArguments(version: string, argv = process.argv) {
