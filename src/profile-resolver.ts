@@ -1,11 +1,12 @@
 // src/profile-resolver.ts
-// Phase 1 (v0.15.0)
+// Phase 1 (v0.15.0) + v0.15.1 (MCP_CLIENT_ID support)
 // - Hybrid priority (CLI > MCP_USER_DATA_DIR > MCP_PROJECT_ID > AUTO > DEFAULT)
 // - Auto-detection (git root -> nearest package.json -> cwd)
 // - Realpath normalization
 // - Tilde (~) expansion
 // - Short SHA-256 hash (8 chars)
 // - CI detection => ephemeral session profile (unless MCP_PERSIST_PROFILES)
+// - Client ID isolation (MCP_CLIENT_ID environment variable)
 // - Minimal console.error() logging of decision
 
 import fs from 'node:fs';
@@ -17,9 +18,10 @@ import { detectProjectName, detectProjectRoot } from './project-detector.js';
 export interface ResolvedProfile {
   path: string;
   reason: 'CLI' | 'MCP_USER_DATA_DIR' | 'MCP_PROJECT_ID' | 'AUTO' | 'DEFAULT';
-  projectKey: string; // e.g., "my-ext-app_1a2b3c4d"
+  projectKey: string; // e.g., "my-ext-app_1a2b3c4d_claude-code"
   projectName: string; // e.g., "my-ext-app"
   hash: string; // e.g., "1a2b3c4d"
+  clientId: string; // e.g., "claude-code" | "codex" | "default"
   channel: string; // "stable" | "canary" | "beta" | "dev"
 }
 
@@ -36,6 +38,7 @@ const CACHE_ROOT = path.join(os.homedir(), '.cache', 'chrome-devtools-mcp');
 
 export function resolveUserDataDir(opts: ResolveOpts): ResolvedProfile {
   const channel = opts.channel || 'stable';
+  const clientId = sanitize(opts.env.MCP_CLIENT_ID || 'default');
 
   // 0) CI detection → ephemeral session directory (unless MCP_PERSIST_PROFILES)
   //    - This happens before other priorities to keep CI clean by default.
@@ -57,15 +60,16 @@ export function resolveUserDataDir(opts: ResolveOpts): ResolvedProfile {
     const result: ResolvedProfile = {
       path: tempPath,
       reason: 'AUTO', // keep enum as specified (no EPHEMERAL type in Phase 1)
-      projectKey: `session-${sessionId}`,
+      projectKey: `session-${sessionId}_${clientId}`,
       projectName: 'ci-session',
       hash: sessionId,
+      clientId,
       channel,
     };
 
     // concise decision log (resolver-side)
     console.error(
-      `[profiles] resolved(AUTO, ci-ephemeral): ${result.path} (session=${sessionId})`,
+      `[profiles] resolved(AUTO, ci-ephemeral): ${result.path} (session=${sessionId}, client=${clientId})`,
     );
     return result;
   }
@@ -76,12 +80,13 @@ export function resolveUserDataDir(opts: ResolveOpts): ResolvedProfile {
     const result: ResolvedProfile = {
       path: p,
       reason: 'CLI',
-      projectKey: stripHomeForKey(p),
+      projectKey: `${stripHomeForKey(p)}_${clientId}`,
       projectName: 'cli',
       hash: shortHash(p),
+      clientId,
       channel,
     };
-    console.error(`[profiles] resolved(CLI): ${result.path}`);
+    console.error(`[profiles] resolved(CLI): ${result.path} (client=${clientId})`);
     return result;
   }
 
@@ -92,29 +97,32 @@ export function resolveUserDataDir(opts: ResolveOpts): ResolvedProfile {
     const result: ResolvedProfile = {
       path: p,
       reason: 'MCP_USER_DATA_DIR',
-      projectKey: stripHomeForKey(p),
+      projectKey: `${stripHomeForKey(p)}_${clientId}`,
       projectName: 'env',
       hash: shortHash(p),
+      clientId,
       channel,
     };
-    console.error(`[profiles] resolved(MCP_USER_DATA_DIR): ${result.path}`);
+    console.error(`[profiles] resolved(MCP_USER_DATA_DIR): ${result.path} (client=${clientId})`);
     return result;
   }
 
   // 3) ENV: MCP_PROJECT_ID (project-scoped persistent profile)
   const projectId = sanitize(opts.env.MCP_PROJECT_ID || '');
   if (projectId) {
-    const p = projectProfilePath(projectId, channel);
+    const key = `${projectId}_${clientId}`;
+    const p = projectProfilePath(key, channel);
     const result: ResolvedProfile = {
       path: p,
       reason: 'MCP_PROJECT_ID',
-      projectKey: projectId,
+      projectKey: key,
       projectName: projectId,
       hash: shortHash(projectId),
+      clientId,
       channel,
     };
     console.error(
-      `[profiles] resolved(MCP_PROJECT_ID): ${result.path} (projectId=${projectId})`,
+      `[profiles] resolved(MCP_PROJECT_ID): ${result.path} (projectId=${projectId}, client=${clientId})`,
     );
     return result;
   }
@@ -125,7 +133,7 @@ export function resolveUserDataDir(opts: ResolveOpts): ResolvedProfile {
     const name = detectProjectName(root);
     const realRoot = realpathSafe(root);
     const hash = shortHash(realRoot);
-    const key = `${sanitize(name)}_${hash}`;
+    const key = `${sanitize(name)}_${hash}_${clientId}`;
     const p = projectProfilePath(key, channel);
 
     const result: ResolvedProfile = {
@@ -134,26 +142,28 @@ export function resolveUserDataDir(opts: ResolveOpts): ResolvedProfile {
       projectKey: key,
       projectName: sanitize(name),
       hash,
+      clientId,
       channel,
     };
     console.error(
-      `[profiles] resolved(AUTO): ${result.path} (root=${root}, name=${name}, hash=${hash})`,
+      `[profiles] resolved(AUTO): ${result.path} (root=${root}, name=${name}, hash=${hash}, client=${clientId})`,
     );
     return result;
   } catch (e) {
     // 5) DEFAULT fallback
-    const key = 'project-default';
+    const key = `project-default_${clientId}`;
     const p = projectProfilePath(key, channel);
     const result: ResolvedProfile = {
       path: p,
       reason: 'DEFAULT',
       projectKey: key,
-      projectName: key,
+      projectName: 'project-default',
       hash: '00000000',
+      clientId,
       channel,
     };
     console.error(
-      `[profiles] resolved(DEFAULT): ${result.path} (reason=${(e as Error)?.message || 'fallback'})`,
+      `[profiles] resolved(DEFAULT): ${result.path} (reason=${(e as Error)?.message || 'fallback'}, client=${clientId})`,
     );
     return result;
   }

@@ -570,6 +570,7 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
   console.error(`[profiles] Using: ${userDataDir}`);
   console.error(`           Reason: ${resolved.reason}`);
   console.error(`           Project: ${resolved.projectName} (${resolved.hash})`);
+  console.error(`           Client:  ${resolved.clientId}`);
   if (resolved.reason === 'AUTO') {
     console.error(`           Root: ${process.cwd()}`);
   }
@@ -677,17 +678,20 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
   console.error(`  Args: ${JSON.stringify(args, null, 2)}`);
   console.error(`  Ignored Default Args: ["--disable-extensions", "--enable-automation"]`);
 
+  // IMPORTANT: Chrome extensions (especially MV3 content scripts and service workers)
+  // DO NOT work in headless mode. Always use headless:false when loading extensions.
+  // Reference: https://groups.google.com/a/chromium.org/g/headless-dev/c/nEoeUkoNI0o/m/9KZ4Os46AQAJ
+  const effectiveHeadless = extensionPaths.length > 0 ? false : headless;
+
+  if (extensionPaths.length > 0 && headless) {
+    console.warn('⚠️  WARNING: Extensions require headful mode. Forcing headless:false');
+  }
+
+  let browser: Browser;
+  let finalUserDataDir = userDataDir;
+
   try {
-    // IMPORTANT: Chrome extensions (especially MV3 content scripts and service workers)
-    // DO NOT work in headless mode. Always use headless:false when loading extensions.
-    // Reference: https://groups.google.com/a/chromium.org/g/headless-dev/c/nEoeUkoNI0o/m/9KZ4Os46AQAJ
-    const effectiveHeadless = extensionPaths.length > 0 ? false : headless;
-
-    if (extensionPaths.length > 0 && headless) {
-      console.warn('⚠️  WARNING: Extensions require headful mode. Forcing headless:false');
-    }
-
-    const browser = await puppeteer.launch({
+    browser = await puppeteer.launch({
       ...connectOptions,
       channel: puppeterChannel,
       executablePath: effectiveExecutablePath,
@@ -698,6 +702,61 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
       args,
       ignoreDefaultArgs: ['--disable-extensions', '--enable-automation'],
     });
+  } catch (e: any) {
+    // Profile lock collision fallback (v0.15.1)
+    const errorMsg = String(e.message || '').toLowerCase();
+    const isProfileLocked =
+      errorMsg.includes('in use') ||
+      errorMsg.includes('lock') ||
+      errorMsg.includes('another chrome') ||
+      errorMsg.includes('profile appears to be');
+
+    if (isProfileLocked) {
+      // Fallback to ephemeral session
+      const sessionId = `${process.pid}-${Date.now()}`;
+      const tempPath = path.join(
+        os.homedir(),
+        '.cache',
+        'chrome-devtools-mcp',
+        'sessions',
+        sessionId,
+        channel || 'stable',
+      );
+      await fs.promises.mkdir(tempPath, { recursive: true });
+
+      console.error(`⚠️  Profile locked: ${userDataDir}`);
+      console.error(`📁 Falling back to ephemeral session: ${tempPath}`);
+      console.error(`💡 To avoid this, set MCP_CLIENT_ID (e.g., "claude-code", "codex")`);
+
+      // Clean up on exit
+      process.on('exit', () => {
+        try {
+          fs.rmSync(tempPath, { recursive: true, force: true });
+        } catch {
+          /* ignore */
+        }
+      });
+
+      finalUserDataDir = tempPath;
+
+      // Retry with ephemeral profile
+      browser = await puppeteer.launch({
+        ...connectOptions,
+        channel: puppeterChannel,
+        executablePath: effectiveExecutablePath,
+        defaultViewport: null,
+        userDataDir: tempPath,
+        pipe: true,
+        headless: effectiveHeadless,
+        args,
+        ignoreDefaultArgs: ['--disable-extensions', '--enable-automation'],
+      });
+    } else {
+      throw e;
+    }
+  }
+
+  try {
 
     // Log actual spawn args for debugging
     const spawnArgs = browser.process()?.spawnargs;
