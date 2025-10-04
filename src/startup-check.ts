@@ -6,7 +6,7 @@
 
 import type { Browser, Page } from 'puppeteer-core';
 import {CHATGPT_CONFIG} from './config.js';
-import {ensureLoggedIn} from './login-helper.js';
+import {isLoginRequired} from './login-helper.js';
 
 interface UIElement {
   name: string;
@@ -100,18 +100,18 @@ export async function verifyUIHealth(browser: Browser): Promise<void> {
     // Wait for page to be ready
     await new Promise((resolve) => setTimeout(resolve, 2000));
 
-    // Ensure logged in with user guidance
+    // Check login status (but don't wait for login to avoid timeout)
     console.error('   Checking login status...');
-    const isLoggedIn = await ensureLoggedIn(page, {
-      maxWaitTime: 300000, // 5 minutes
-      onStatusUpdate: (msg) => console.error(`   ${msg}`),
-    });
+    const needsLogin = await isLoginRequired(page);
 
-    if (!isLoggedIn) {
-      console.error('⚠️  Login timeout - skipping UI verification');
-      console.error('   Please restart and log in to ChatGPT');
+    if (needsLogin) {
+      console.error('⚠️  ChatGPT login required');
+      console.error('   💡 Login will be prompted when you use ChatGPT tools');
+      console.error('   Skipping UI verification - will verify after login');
       return;
     }
+
+    console.error('✅ Already logged in');
 
     // Check each UI element
     const results: Array<{ element: UIElement; found: boolean }> = [];
