@@ -140,8 +140,11 @@ export function resolveUserDataDir(opts: ResolveOpts): ResolvedProfile {
 
   // 4) AUTO: detect by root -> name -> hash
   try {
+    console.error(`[profiles] AUTO detection: cwd="${opts.cwd}"`);
     const root = detectProjectRoot(opts.cwd);
+    console.error(`[profiles] AUTO detection: root="${root}"`);
     const name = detectProjectName(root);
+    console.error(`[profiles] AUTO detection: name="${name}"`);
     const realRoot = realpathSafe(root);
     const hash = shortHash(realRoot);
     const key = `${sanitize(name)}_${hash}_${clientId}`;
@@ -161,6 +164,7 @@ export function resolveUserDataDir(opts: ResolveOpts): ResolvedProfile {
     );
     return result;
   } catch (e) {
+    console.error(`[profiles] AUTO detection FAILED: ${e}`);
     // 5) DEFAULT fallback
     const key = `project-default_${clientId}`;
     const p = projectProfilePath(key, channel);
