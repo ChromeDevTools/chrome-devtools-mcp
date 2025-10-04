@@ -6,10 +6,24 @@
 
 import type {HTTPRequest} from 'puppeteer-core';
 
+/**
+ * Gets a short, one-line description of a network request.
+ *
+ * @param request - The HTTP request.
+ * @returns A short description of the request.
+ * @public
+ */
 export function getShortDescriptionForRequest(request: HTTPRequest): string {
   return `${request.url()} ${request.method()} ${getStatusFromRequest(request)}`;
 }
 
+/**
+ * Gets the status of a network request as a string.
+ *
+ * @param request - The HTTP request.
+ * @returns The status of the request.
+ * @public
+ */
 export function getStatusFromRequest(request: HTTPRequest): string {
   const httpResponse = request.response();
   const failure = request.failure();
@@ -28,6 +42,13 @@ export function getStatusFromRequest(request: HTTPRequest): string {
   return status;
 }
 
+/**
+ * Formats a record of headers into an array of strings.
+ *
+ * @param headers - The headers to format.
+ * @returns An array of formatted header strings.
+ * @public
+ */
 export function getFormattedHeaderValue(
   headers: Record<string, string>,
 ): string[] {

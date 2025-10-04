@@ -19,6 +19,14 @@ const logLevels: Record<string, string> = {
   assert: 'Assert',
 };
 
+/**
+ * Formats a console event (either a ConsoleMessage or an Error) into a
+ * human-readable string.
+ *
+ * @param event - The console event to format.
+ * @returns A promise that resolves to the formatted string.
+ * @public
+ */
 export async function formatConsoleEvent(
   event: ConsoleMessage | Error,
 ): Promise<string> {
@@ -29,6 +37,13 @@ export async function formatConsoleEvent(
   return `Error: ${event.message}`;
 }
 
+/**
+ * Formats a ConsoleMessage into a human-readable string.
+ *
+ * @param msg - The ConsoleMessage to format.
+ * @returns A promise that resolves to the formatted string.
+ * @internal
+ */
 async function formatConsoleMessage(msg: ConsoleMessage): Promise<string> {
   const logLevel = logLevels[msg.type()];
   const args = msg.args();
@@ -71,6 +86,13 @@ async function formatConsoleMessage(msg: ConsoleMessage): Promise<string> {
   )}: ${text} ${formattedArgs}`.trim();
 }
 
+/**
+ * Formats an array of JSHandles into a single string.
+ *
+ * @param args - The JSHandles to format.
+ * @returns A promise that resolves to the formatted string.
+ * @internal
+ */
 async function formatArgs(args: readonly JSHandle[]): Promise<string> {
   const argValues = await Promise.all(
     args.map(arg =>
@@ -87,6 +109,13 @@ async function formatArgs(args: readonly JSHandle[]): Promise<string> {
     .join(' ');
 }
 
+/**
+ * Formats a stack frame location into a string.
+ *
+ * @param stackFrame - The stack frame location to format.
+ * @returns The formatted string.
+ * @internal
+ */
 function formatStackFrame(stackFrame: ConsoleMessageLocation): string {
   if (!stackFrame?.url) {
     return '<unknown>';

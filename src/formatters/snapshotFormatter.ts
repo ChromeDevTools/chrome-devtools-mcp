@@ -5,6 +5,14 @@
  */
 import type {TextSnapshotNode} from '../McpContext.js';
 
+/**
+ * Formats an accessibility snapshot tree into a human-readable string.
+ *
+ * @param serializedAXNodeRoot - The root node of the accessibility snapshot.
+ * @param depth - The current depth in the tree, used for indentation.
+ * @returns The formatted string representation of the snapshot.
+ * @public
+ */
 export function formatA11ySnapshot(
   serializedAXNodeRoot: TextSnapshotNode,
   depth = 0,
@@ -21,6 +29,13 @@ export function formatA11ySnapshot(
   return result;
 }
 
+/**
+ * Extracts and formats the attributes of a text snapshot node.
+ *
+ * @param serializedAXNodeRoot - The text snapshot node.
+ * @returns An array of strings representing the node's attributes.
+ * @internal
+ */
 function getAttributes(serializedAXNodeRoot: TextSnapshotNode): string[] {
   const attributes = [
     `uid=${serializedAXNodeRoot.id}`,

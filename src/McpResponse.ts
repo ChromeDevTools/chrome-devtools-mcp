@@ -21,6 +21,11 @@ import {handleDialog} from './tools/pages.js';
 import type {ImageContentData, Response} from './tools/ToolDefinition.js';
 import {paginate, type PaginationOptions} from './utils/pagination.js';
 
+/**
+ * Represents a response from an MCP tool, handling the collection and
+ * formatting of various data types like text, images, and network requests.
+ * @public
+ */
 export class McpResponse implements Response {
   #includePages = false;
   #includeSnapshot = false;
@@ -35,14 +40,31 @@ export class McpResponse implements Response {
     resourceTypes?: ResourceType[];
   };
 
+  /**
+   * Sets whether to include page information in the response.
+   *
+   * @param value - True to include page information, false otherwise.
+   */
   setIncludePages(value: boolean): void {
     this.#includePages = value;
   }
 
+  /**
+   * Sets whether to include a snapshot in the response.
+   *
+   * @param value - True to include a snapshot, false otherwise.
+   */
   setIncludeSnapshot(value: boolean): void {
     this.#includeSnapshot = value;
   }
 
+  /**
+   * Sets whether to include network requests in the response, with optional
+   * pagination and filtering.
+   *
+   * @param value - True to include network requests, false otherwise.
+   * @param options - Options for pagination and resource type filtering.
+   */
   setIncludeNetworkRequests(
     value: boolean,
     options?: {
@@ -69,52 +91,103 @@ export class McpResponse implements Response {
     };
   }
 
+  /**
+   * Sets whether to include console data in the response.
+   *
+   * @param value - True to include console data, false otherwise.
+   */
   setIncludeConsoleData(value: boolean): void {
     this.#includeConsoleData = value;
   }
 
+  /**
+   * Attaches a specific network request to the response by its URL.
+   *
+   * @param url - The URL of the network request to attach.
+   */
   attachNetworkRequest(url: string): void {
     this.#attachedNetworkRequestUrl = url;
   }
 
+  /**
+   * Gets whether page information is included in the response.
+   */
   get includePages(): boolean {
     return this.#includePages;
   }
 
+  /**
+   * Gets whether network requests are included in the response.
+   */
   get includeNetworkRequests(): boolean {
     return this.#networkRequestsOptions?.include ?? false;
   }
 
+  /**
+   * Gets whether console data is included in the response.
+   */
   get includeConsoleData(): boolean {
     return this.#includeConsoleData;
   }
+  /**
+   * Gets the URL of the attached network request.
+   */
   get attachedNetworkRequestUrl(): string | undefined {
     return this.#attachedNetworkRequestUrl;
   }
+  /**
+   * Gets the page index for network request pagination.
+   */
   get networkRequestsPageIdx(): number | undefined {
     return this.#networkRequestsOptions?.pagination?.pageIdx;
   }
 
+  /**
+   * Appends a line of text to the response.
+   *
+   * @param value - The line of text to append.
+   */
   appendResponseLine(value: string): void {
     this.#textResponseLines.push(value);
   }
 
+  /**
+   * Attaches an image to the response.
+   *
+   * @param value - The image data to attach.
+   */
   attachImage(value: ImageContentData): void {
     this.#images.push(value);
   }
 
+  /**
+   * Gets the lines of text in the response.
+   */
   get responseLines(): readonly string[] {
     return this.#textResponseLines;
   }
 
+  /**
+   * Gets the images attached to the response.
+   */
   get images(): ImageContentData[] {
     return this.#images;
   }
 
+  /**
+   * Gets whether a snapshot is included in the response.
+   */
   get includeSnapshot(): boolean {
     return this.#includeSnapshot;
   }
 
+  /**
+   * Handles the response by creating snapshots and formatting the data.
+   *
+   * @param toolName - The name of the tool that generated the response.
+   * @param context - The MCP context.
+   * @returns A promise that resolves to an array of text and image content.
+   */
   async handle(
     toolName: string,
     context: McpContext,
@@ -140,6 +213,13 @@ export class McpResponse implements Response {
     return this.format(toolName, context);
   }
 
+  /**
+   * Formats the response into an array of text and image content.
+   *
+   * @param toolName - The name of the tool that generated the response.
+   * @param context - The MCP context.
+   * @returns An array of text and image content.
+   */
   format(
     toolName: string,
     context: McpContext,
@@ -314,6 +394,10 @@ Call ${handleDialog.name} to handle it before continuing.`);
     return response;
   }
 
+  /**
+   * Resets the response lines for testing purposes.
+   * @internal
+   */
   resetResponseLineForTesting() {
     this.#textResponseLines = [];
   }

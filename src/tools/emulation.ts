@@ -15,6 +15,10 @@ const throttlingOptions: [string, ...string[]] = [
   ...Object.keys(PredefinedNetworkConditions),
 ];
 
+/**
+ * A tool for emulating network conditions on the selected page.
+ * @public
+ */
 export const emulateNetwork = defineTool({
   name: 'emulate_network',
   description: `Emulates network conditions such as throttling on the selected page.`,
@@ -50,6 +54,10 @@ export const emulateNetwork = defineTool({
   },
 });
 
+/**
+ * A tool for emulating CPU throttling on the selected page.
+ * @public
+ */
 export const emulateCpu = defineTool({
   name: 'emulate_cpu',
   description: `Emulates CPU throttling by slowing down the selected page's execution.`,

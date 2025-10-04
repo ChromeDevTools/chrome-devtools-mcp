@@ -12,21 +12,53 @@ import {logger} from '../logger.js';
 
 const engine = TraceEngine.TraceModel.Model.createWithAllHandlers();
 
+/**
+ * Represents the successful result of parsing a performance trace.
+ * @public
+ */
 export interface TraceResult {
+  /**
+   * The parsed trace data from the trace engine.
+   */
   parsedTrace: TraceEngine.TraceModel.ParsedTrace;
+  /**
+   * The performance insights extracted from the trace, or null if none.
+   */
   insights: TraceEngine.Insights.Types.TraceInsightSets | null;
 }
 
+/**
+ * Type guard to check if a trace parsing result was successful.
+ *
+ * @param x - The result to check.
+ * @returns True if the result is a successful TraceResult, false otherwise.
+ * @public
+ */
 export function traceResultIsSuccess(
   x: TraceResult | TraceParseError,
 ): x is TraceResult {
   return 'parsedTrace' in x;
 }
 
+/**
+ * Represents an error that occurred during trace parsing.
+ * @public
+ */
 export interface TraceParseError {
+  /**
+   * The error message.
+   */
   error: string;
 }
 
+/**
+ * Parses a raw performance trace buffer into a structured TraceResult.
+ *
+ * @param buffer - The raw trace data as a Uint8Array.
+ * @returns A promise that resolves to a TraceResult on success, or a
+ * TraceParseError on failure.
+ * @public
+ */
 export async function parseRawTraceBuffer(
   buffer: Uint8Array<ArrayBufferLike> | undefined,
 ): Promise<TraceResult | TraceParseError> {
@@ -79,6 +111,13 @@ ${PerformanceTraceFormatter.callFrameDataFormatDescription}
 
 ${PerformanceTraceFormatter.networkDataFormatDescription}
 `;
+/**
+ * Generates a high-level summary of a parsed performance trace.
+ *
+ * @param result - The successful trace parsing result.
+ * @returns A string containing the trace summary.
+ * @public
+ */
 export function getTraceSummary(result: TraceResult): string {
   const focus = AgentFocus.fromParsedTrace(result.parsedTrace);
   const formatter = new PerformanceTraceFormatter(focus);
@@ -88,9 +127,27 @@ export function getTraceSummary(result: TraceResult): string {
 ${output}`;
 }
 
+/**
+ * The names of the available performance insights.
+ * @public
+ */
 export type InsightName = keyof TraceEngine.Insights.Types.InsightModels;
+/**
+ * The output of an insight analysis, which can be either the formatted output
+ * string or an error.
+ * @public
+ */
 export type InsightOutput = {output: string} | {error: string};
 
+/**
+ * Gets the detailed output for a specific performance insight from a trace result.
+ *
+ * @param result - The successful trace parsing result.
+ * @param insightName - The name of the insight to analyze.
+ * @returns An object containing either the formatted output string or an error
+ * message.
+ * @public
+ */
 export function getInsightOutput(
   result: TraceResult,
   insightName: InsightName,

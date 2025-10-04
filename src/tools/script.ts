@@ -9,6 +9,10 @@ import z from 'zod';
 import {ToolCategories} from './categories.js';
 import {defineTool} from './ToolDefinition.js';
 
+/**
+ * A tool for evaluating a JavaScript function in the context of the page.
+ * @public
+ */
 export const evaluateScript = defineTool({
   name: 'evaluate_script',
   description: `Evaluate a JavaScript function inside the currently selected page. Returns the response as JSON
