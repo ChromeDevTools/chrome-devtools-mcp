@@ -12,7 +12,7 @@ import z from 'zod';
 import {ToolCategories} from './categories.js';
 import {defineTool} from './ToolDefinition.js';
 import {CHATGPT_CONFIG} from '../config.js';
-import {ensureLoggedIn} from '../login-helper.js';
+import {isLoginRequired} from '../login-helper.js';
 
 /**
  * Path to store chat session data
@@ -933,16 +933,17 @@ export const deepResearchChatGPT = defineTool({
         await page.goto(CHATGPT_CONFIG.DEFAULT_URL, {waitUntil: 'networkidle2'});
       }
 
-      // Ensure logged in (with user guidance if needed)
-      const isLoggedIn = await ensureLoggedIn(page, {
-        maxWaitTime: 300000, // 5 minutes
-        onStatusUpdate: (msg) => response.appendResponseLine(msg),
-      });
+      // Check if login is required (don't wait - stop immediately)
+      const needsLogin = await isLoginRequired(page);
 
-      if (!isLoggedIn) {
-        response.appendResponseLine(
-          '❌ ログインがタイムアウトしました。再度実行してください。',
-        );
+      if (needsLogin) {
+        response.appendResponseLine('\n❌ ChatGPTへのログインが必要です');
+        response.appendResponseLine('');
+        response.appendResponseLine('📱 ブラウザウィンドウでChatGPTにログインしてください：');
+        response.appendResponseLine('   1. ブラウザウィンドウの「ログイン」ボタンをクリック');
+        response.appendResponseLine('   2. メールアドレスまたはGoogleアカウントでログイン');
+        response.appendResponseLine('   3. ログイン完了後、このツールを再実行してください');
+        response.appendResponseLine('');
         return;
       }
 
