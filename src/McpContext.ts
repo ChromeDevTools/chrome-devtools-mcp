@@ -10,6 +10,7 @@ import path from 'node:path';
 import type {Debugger} from 'debug';
 import type {
   Browser,
+  CDPSession,
   ConsoleMessage,
   Dialog,
   ElementHandle,
@@ -82,6 +83,10 @@ export class McpContext implements Context {
   #nextSnapshotId = 1;
   #traceResults: TraceResult[] = [];
 
+  // CDP Session management (v0.8.4+)
+  #browserSession?: CDPSession;
+  #pageSessions = new Map<Page, CDPSession>();
+
   private constructor(
     browser: Browser,
     logger: Debugger,
@@ -138,30 +143,40 @@ export class McpContext implements Context {
   }
 
   /**
+   * Dispose all CDP sessions to prevent memory leaks
+   */
+  async #disposeSessions(): Promise<void> {
+    await Promise.allSettled([
+      this.#browserSession?.detach(),
+      ...[...this.#pageSessions.values()].map(s => s.detach())
+    ]);
+    this.#browserSession = undefined;
+    this.#pageSessions.clear();
+  }
+
+  /**
    * Reinitialize CDP protocol domains after reconnection
    * This ensures proper CDP event handling after browser restart
    */
   async reinitializeCDP(): Promise<void> {
     try {
-      // Get CDP client from the browser
-      const client = await (this.browser as any)._client();
+      // 1. Dispose old sessions to prevent leaks
+      await this.#disposeSessions();
 
-      if (!client) {
-        this.logger('Warning: Unable to get CDP client for reinitialization');
-        return;
-      }
+      // 2. Create browser-level CDP session (public API, not _client())
+      this.#browserSession = await this.browser.target().createCDPSession();
+      this.logger('CDP: Browser-level session created');
 
-      // 1. Enable Target discovery and auto-attach
-      // This is critical for multi-target scenarios (iframes, workers, etc.)
+      // 3. Enable Target discovery and auto-attach
       try {
-        await client.send('Target.setDiscoverTargets', { discover: true });
+        await this.#browserSession.send('Target.setDiscoverTargets', { discover: true });
         this.logger('CDP: Target discovery enabled');
       } catch (err) {
         this.logger('Warning: Failed to enable target discovery:', err);
       }
 
       try {
-        await client.send('Target.setAutoAttach', {
+        await this.#browserSession.send('Target.setAutoAttach', {
           autoAttach: true,
           waitForDebuggerOnStart: false,
           flatten: true
@@ -171,26 +186,32 @@ export class McpContext implements Context {
         this.logger('Warning: Failed to configure auto-attach:', err);
       }
 
-      // 2. Enable essential CDP domains for each page
-      const pages = await this.browser.pages();
-      for (const page of pages) {
-        try {
-          const pageClient = (page as any)._client();
-          if (pageClient) {
-            // Enable Network domain for request interception
-            await pageClient.send('Network.enable');
+      // 4. Enable essential CDP domains for all targets
+      for (const target of this.browser.targets()) {
+        const type = target.type();
 
-            // Enable Runtime domain for console messages and exceptions
-            await pageClient.send('Runtime.enable');
+        if (type === 'page') {
+          const page = await target.page();
+          if (!page) continue;
 
-            // Enable Log domain for browser logs
-            await pageClient.send('Log.enable');
+          try {
+            const session = await page.createCDPSession();
 
-            this.logger(`CDP domains enabled for page: ${page.url()}`);
+            await Promise.allSettled([
+              session.send('Network.enable'),
+              session.send('Runtime.enable'),
+              session.send('Log.enable'),
+            ]);
+
+            this.#pageSessions.set(page, session);
+            this.logger(`CDP domains enabled for ${type}: ${page.url()}`);
+          } catch (err) {
+            this.logger(`Warning: Failed to enable CDP domains for ${type} ${page.url()}:`, err);
           }
-        } catch (err) {
-          this.logger(`Warning: Failed to enable CDP domains for page ${page.url()}:`, err);
         }
+
+        // Service Worker / Worker support can be added here if needed
+        // if (type === 'service_worker' || type === 'worker') { ... }
       }
 
       this.logger('CDP protocol reinitialization completed');
@@ -205,6 +226,9 @@ export class McpContext implements Context {
    * Update browser instance after reconnection
    */
   async updateBrowser(newBrowser: Browser): Promise<void> {
+    // Dispose old sessions first
+    await this.#disposeSessions();
+
     this.browser = newBrowser;
     this.connectionManager.setBrowser(newBrowser, async () => newBrowser);
 
