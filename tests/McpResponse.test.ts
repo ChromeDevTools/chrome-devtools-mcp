@@ -105,7 +105,7 @@ uid=1_0 RootWebArea "My test page"
         `# test response
 ## Network emulation
 Emulating: Slow 3G
-Navigation timeout set to 100000 ms`,
+Default navigation timeout set to 100000 ms`,
       );
     });
   });
@@ -169,7 +169,7 @@ Emulating: 4x slowdown`,
         `# test response
 # Open dialog
 alert: test (default value: test).
-Call browser_handle_dialog to handle it before continuing.`,
+Call handle_dialog to handle it before continuing.`,
       );
     });
   });

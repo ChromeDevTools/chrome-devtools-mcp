@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import './polyfill.js';
+
 import assert from 'node:assert';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -14,7 +16,7 @@ import type {CallToolResult} from '@modelcontextprotocol/sdk/types.js';
 import {SetLevelRequestSchema} from '@modelcontextprotocol/sdk/types.js';
 
 import type {Channel} from './browser.js';
-import {resolveBrowser} from './browser.js';
+import {ensureBrowserConnected, ensureBrowserLaunched} from './browser.js';
 import {parseArguments} from './cli.js';
 import {logger, saveLogsToFile} from './logger.js';
 import {McpContext} from './McpContext.js';
@@ -67,15 +69,24 @@ server.server.setRequestHandler(SetLevelRequestSchema, () => {
 
 let context: McpContext;
 async function getContext(): Promise<McpContext> {
-  const browser = await resolveBrowser({
-    browserUrl: args.browserUrl,
-    headless: args.headless,
-    executablePath: args.executablePath,
-    customDevTools: args.customDevtools,
-    channel: args.channel as Channel,
-    isolated: args.isolated,
-    logFile,
-  });
+  const extraArgs: string[] = [];
+  if (args.proxyServer) {
+    extraArgs.push(`--proxy-server=${args.proxyServer}`);
+  }
+  const browser = args.browserUrl
+    ? await ensureBrowserConnected(args.browserUrl)
+    : await ensureBrowserLaunched({
+        headless: args.headless,
+        executablePath: args.executablePath,
+        customDevTools: args.customDevtools,
+        channel: args.channel as Channel,
+        isolated: args.isolated,
+        logFile,
+        viewport: args.viewport,
+        args: extraArgs,
+        acceptInsecureCerts: args.acceptInsecureCerts,
+      });
+
   if (context?.browser !== browser) {
     context = await McpContext.from(browser, logger);
   }

@@ -42,7 +42,7 @@ async function formatConsoleMessage(msg: ConsoleMessage): Promise<string> {
           return error.toString();
         })
         .catch(() => {
-          return 'Error occured';
+          return 'Error occurred';
         });
       void errorHandle.dispose().catch();
 

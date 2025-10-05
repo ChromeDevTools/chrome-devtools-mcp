@@ -197,7 +197,7 @@ export const uploadFile = defineTool({
         // a type=file element. In this case, we want to default to
         // Page.waitForFileChooser() and upload the file this way.
         try {
-          const page = await context.getSelectedPage();
+          const page = context.getSelectedPage();
           const [fileChooser] = await Promise.all([
             page.waitForFileChooser({timeout: 3000}),
             handle.asLocator().click(),

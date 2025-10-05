@@ -44,7 +44,7 @@ const connectOptions: ConnectOptions = {
   protocolTimeout: 10_000,
 };
 
-async function ensureBrowserConnected(browserURL: string) {
+export async function ensureBrowserConnected(browserURL: string) {
   if (browser?.connected) {
     return browser;
   }
@@ -57,6 +57,7 @@ async function ensureBrowserConnected(browserURL: string) {
 }
 
 interface McpLaunchOptions {
+  acceptInsecureCerts?: boolean;
   executablePath?: string;
   customDevTools?: string;
   channel?: Channel;
@@ -64,6 +65,11 @@ interface McpLaunchOptions {
   headless: boolean;
   isolated: boolean;
   logFile?: fs.WriteStream;
+  viewport?: {
+    width: number;
+    height: number;
+  };
+  args?: string[];
 }
 
 export async function launch(options: McpLaunchOptions): Promise<Browser> {
@@ -86,37 +92,49 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
     });
   }
 
-  const args: LaunchOptions['args'] = ['--hide-crash-restore-bubble'];
+  const args: LaunchOptions['args'] = [
+    ...(options.args ?? []),
+    '--hide-crash-restore-bubble',
+  ];
   if (customDevTools) {
     args.push(`--custom-devtools-frontend=file://${customDevTools}`);
   }
   // Prefer executablePath over channel
-  let puppeterChannel: ChromeReleaseChannel | undefined;
-  if (!executablePath) {
-    puppeterChannel =
-      channel && channel !== 'stable'
-        ? (`chrome-${channel}` as ChromeReleaseChannel)
-        : 'chrome';
-  } else {
-    puppeterChannel = undefined; // <-- ensures channel is not set when executablePath is used
-  }
+let puppeteerChannel: ChromeReleaseChannel | undefined;
 
+if (!executablePath) {
+  puppeteerChannel =
+    channel && channel !== 'stable'
+      ? (`chrome-${channel}` as ChromeReleaseChannel)
+      : 'chrome';
+} else {
+  puppeteerChannel = undefined; // <-- ensures channel is not set when executablePath is used
+}
   try {
     const browser = await puppeteer.launch({
       ...connectOptions,
-      channel: puppeterChannel,
+      channel: puppeteerChannel,
       executablePath,
       defaultViewport: null,
       userDataDir,
       pipe: true,
       headless,
       args,
+      acceptInsecureCerts: options.acceptInsecureCerts,
     });
     if (options.logFile) {
       // FIXME: we are probably subscribing too late to catch startup logs. We
       // should expose the process earlier or expose the getRecentLogs() getter.
       browser.process()?.stderr?.pipe(options.logFile);
       browser.process()?.stdout?.pipe(options.logFile);
+    }
+    if (options.viewport) {
+      const [page] = await browser.pages();
+      // @ts-expect-error internal API for now.
+      await page?.resize({
+        contentWidth: options.viewport.width,
+        contentHeight: options.viewport.height,
+      });
     }
     return browser;
   } catch (error) {
@@ -137,29 +155,13 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
   }
 }
 
-async function ensureBrowserLaunched(
+export async function ensureBrowserLaunched(
   options: McpLaunchOptions,
 ): Promise<Browser> {
   if (browser?.connected) {
     return browser;
   }
   browser = await launch(options);
-  return browser;
-}
-
-export async function resolveBrowser(options: {
-  browserUrl?: string;
-  executablePath?: string;
-  customDevTools?: string;
-  channel?: Channel;
-  headless: boolean;
-  isolated: boolean;
-  logFile?: fs.WriteStream;
-}) {
-  const browser = options.browserUrl
-    ? await ensureBrowserConnected(options.browserUrl)
-    : await ensureBrowserLaunched(options);
-
   return browser;
 }
 

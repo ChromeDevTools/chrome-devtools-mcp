@@ -6,25 +6,37 @@
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
-import type {Browser, Frame, Page, PageEvents} from 'puppeteer-core';
+import type {Browser, Frame, Page, Target} from 'puppeteer-core';
 
 import {PageCollector} from '../src/PageCollector.js';
 
 import {getMockRequest} from './utils.js';
 
+function mockListener() {
+  const listeners: Record<string, Array<(data: unknown) => void>> = {};
+  return {
+    on(eventName: string, listener: (data: unknown) => void) {
+      if (listeners[eventName]) {
+        listeners[eventName].push(listener);
+      } else {
+        listeners[eventName] = [listener];
+      }
+    },
+    emit(eventName: string, data: unknown) {
+      for (const listener of listeners[eventName] ?? []) {
+        listener(data);
+      }
+    },
+  };
+}
+
 function getMockPage(): Page {
-  const listeners: Record<keyof PageEvents, (data: unknown) => void> = {};
   const mainFrame = {} as Frame;
   return {
-    on(eventName, listener) {
-      listeners[eventName] = listener;
-    },
-    emit(eventName, data) {
-      listeners[eventName]?.(data);
-    },
     mainFrame() {
       return mainFrame;
     },
+    ...mockListener(),
   } as Page;
 }
 
@@ -34,9 +46,7 @@ function getMockBrowser(): Browser {
     pages() {
       return Promise.resolve(pages);
     },
-    on(_type, _handler) {
-      // Mock
-    },
+    ...mockListener(),
   } as Browser;
 }
 
@@ -112,5 +122,35 @@ describe('PageCollector', () => {
     page.emit('request', request);
 
     assert.equal(collector.getData(page).length, 1);
+  });
+
+  it('should only subscribe once', async () => {
+    const browser = getMockBrowser();
+    const page = (await browser.pages())[0];
+    const request = getMockRequest();
+    const collector = new PageCollector(browser, (pageListener, collect) => {
+      pageListener.on('request', req => {
+        collect(req);
+      });
+    });
+    await collector.init();
+    browser.emit('targetcreated', {
+      page() {
+        return Promise.resolve(page);
+      },
+    } as Target);
+
+    // The page inside part is async so we need to await some time
+    await new Promise<void>(res => res());
+
+    assert.equal(collector.getData(page).length, 0);
+
+    page.emit('request', request);
+
+    assert.equal(collector.getData(page).length, 1);
+
+    page.emit('request', request);
+
+    assert.equal(collector.getData(page).length, 2);
   });
 });
