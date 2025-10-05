@@ -11,6 +11,7 @@ import z from 'zod';
 import {ToolCategories} from './categories.js';
 import {defineTool} from './ToolDefinition.js';
 import {CHATGPT_CONFIG} from '../config.js';
+import {isLoginRequired} from '../login-helper.js';
 
 /**
  * ChatGPT UI Diagnostic Tool
@@ -276,6 +277,15 @@ export const diagnoseChatgptUi = defineTool({
       // Navigate to ChatGPT
       response.appendResponseLine(`📡 Navigating to ${url}...`);
       await page.goto(url, { waitUntil: 'networkidle0', timeout: 30000 });
+
+      // Check if login is required
+      const needsLogin = await isLoginRequired(page);
+      if (needsLogin) {
+        response.appendResponseLine('\n❌ ChatGPTへのログインが必要です');
+        response.appendResponseLine('📱 ブラウザウィンドウでログインしてから再実行してください');
+        return;
+      }
+      response.appendResponseLine('✅ Login check passed');
 
       // Wait for page to stabilize
       response.appendResponseLine(`⏳ Waiting ${waitForLoad}ms for page to stabilize...`);

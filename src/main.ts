@@ -4,6 +4,37 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+// Mock browser globals for chrome-devtools-frontend (Node.js environment)
+// NOTE: chrome-devtools-frontend expects browser globals (location, self, localStorage)
+// These are only needed for trace-processing modules, not for core MCP functionality
+if (typeof globalThis.location === 'undefined') {
+  (globalThis as any).location = {
+    search: '',
+    href: '',
+    protocol: 'file:',
+    host: '',
+    hostname: '',
+    port: '',
+    pathname: '',
+    hash: '',
+  };
+}
+
+if (typeof globalThis.self === 'undefined') {
+  (globalThis as any).self = globalThis;
+}
+
+if (typeof globalThis.localStorage === 'undefined') {
+  (globalThis as any).localStorage = {
+    getItem: () => null,
+    setItem: () => {},
+    removeItem: () => {},
+    clear: () => {},
+    key: () => null,
+    length: 0,
+  };
+}
+
 import assert from 'node:assert';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -25,6 +56,7 @@ import {Mutex} from './Mutex.js';
 import {resolveRoots, type RootsInfo} from './roots-manager.js';
 import {runStartupCheck} from './startup-check.js';
 import {setProjectRoot} from './project-root-state.js';
+import {setupGraceful} from './graceful.js';
 import * as bookmarkTools from './tools/bookmarks.js';
 import * as chatgptWebTools from './tools/chatgpt-web.js';
 import * as deepResearchChatGPTTools from './tools/deep_research_chatgpt.js';
@@ -88,6 +120,18 @@ let uiHealthCheckRun = false; // Track if UI health check has been run
 let cachedRootsInfo: RootsInfo | null = null; // Cache roots info
 let initializationComplete = false; // Track if MCP initialization is complete
 
+// Setup graceful shutdown
+const graceful = setupGraceful({
+  getBrowser: () => context?.browser,
+  onBeforeExit: async () => {
+    logger('[graceful] Running pre-exit cleanup...');
+    // Close log file if exists
+    if (logFile) {
+      logFile.close();
+    }
+  },
+});
+
 async function getContext(): Promise<McpContext> {
   // Wait for initialization to complete before resolving roots
   if (!initializationComplete) {
@@ -139,6 +183,12 @@ async function getContext(): Promise<McpContext> {
   };
 
   const browser = await resolveBrowser(browserOptions);
+
+  // Announce browser PID for graceful shutdown
+  const browserPid = browser.process()?.pid;
+  if (browserPid) {
+    await graceful.announceBrowserPid(browserPid);
+  }
 
   // Browser factory function for reconnection
   const browserFactory = async () => {
