@@ -10,12 +10,20 @@ updates:
     groups:
       dependencies:
         dependency-type: production
+        exclude-patterns:
+          - 'puppeteer*'
         patterns:
           - '*'
       dev-dependencies:
         dependency-type: development
+        exclude-patterns:
+          - 'puppeteer*'
         patterns:
           - '*'
+      puppeteer:
+        dependency-type: development
+        patterns:
+          - 'puppeteer*'
   - package-ecosystem: github-actions
     directory: /
     schedule:
