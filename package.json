@@ -37,7 +37,7 @@
   "homepage": "https://github.com/ChromeDevTools/chrome-devtools-mcp#readme",
   "mcpName": "io.github.ChromeDevTools/chrome-devtools-mcp",
   "dependencies": {
-    "@modelcontextprotocol/sdk": "1.18.2",
+    "@modelcontextprotocol/sdk": "1.19.1",
     "core-js": "3.45.1",
     "debug": "4.4.3",
     "puppeteer-core": "24.22.3",
