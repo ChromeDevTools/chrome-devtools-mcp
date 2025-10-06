@@ -21,7 +21,6 @@ updates:
         patterns:
           - '*'
       puppeteer:
-        dependency-type: development
         patterns:
           - 'puppeteer*'
   - package-ecosystem: github-actions
