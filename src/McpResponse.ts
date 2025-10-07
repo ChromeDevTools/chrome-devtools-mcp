@@ -7,7 +7,7 @@ import type {
   ImageContent,
   TextContent,
 } from '@modelcontextprotocol/sdk/types.js';
-import type {HTTPRequest, HTTPResponse, ResourceType} from 'puppeteer-core';
+import type {ResourceType} from 'puppeteer-core';
 
 import {formatConsoleEvent} from './formatters/consoleFormatter.js';
 import {
@@ -144,12 +144,12 @@ export class McpResponse implements Response {
       );
 
       this.#attachedNetworkRequestData.requestBody =
-        await this.processRequestBody(request);
+        await getFormattedRequestBody(request);
 
       const response = request.response();
       if (response) {
         this.#attachedNetworkRequestData.responseBody =
-          await this.processResponseBody(response);
+          await getFormattedResponseBody(response);
       }
     }
 
@@ -164,28 +164,6 @@ export class McpResponse implements Response {
     }
 
     return this.format(toolName, context);
-  }
-
-  async processResponseBody(
-    httpResponse: HTTPResponse,
-  ): Promise<string | undefined> {
-    const formattedResponseData = await getFormattedResponseBody(httpResponse);
-    if (formattedResponseData.length > 0) {
-      return formattedResponseData;
-    }
-
-    return undefined;
-  }
-
-  async processRequestBody(
-    httpRequest: HTTPRequest,
-  ): Promise<string | undefined> {
-    const formattedRequestData = await getFormattedRequestBody(httpRequest);
-    if (formattedRequestData.length > 0) {
-      return formattedRequestData;
-    }
-
-    return undefined;
   }
 
   format(

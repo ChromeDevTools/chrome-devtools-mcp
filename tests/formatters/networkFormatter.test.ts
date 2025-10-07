@@ -122,7 +122,7 @@ describe('networkFormatter', () => {
 
       const result = await getFormattedRequestBody(request, 200);
 
-      assert.strictEqual(result, '');
+      assert.strictEqual(result, undefined);
     });
     it('shows request body when postData is available', async () => {
       const request = getMockRequest({
@@ -173,7 +173,7 @@ describe('networkFormatter', () => {
 
       const result = await getFormattedRequestBody(request, 200);
 
-      assert.strictEqual(result, '');
+      assert.strictEqual(result, undefined);
     });
   });
 
@@ -232,7 +232,7 @@ describe('networkFormatter', () => {
 
       const result = await getFormattedResponseBody(response, 200);
 
-      assert.strictEqual(result, '');
+      assert.strictEqual(result, undefined);
     });
   });
 });
