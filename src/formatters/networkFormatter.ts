@@ -8,7 +8,7 @@ import {isUtf8} from 'node:buffer';
 
 import type {HTTPRequest, HTTPResponse} from 'puppeteer-core';
 
-export const BODY_CONTEXT_SIZE_LIMIT = 10000;
+const BODY_CONTEXT_SIZE_LIMIT = 10000;
 
 export function getShortDescriptionForRequest(request: HTTPRequest): string {
   return `${request.url()} ${request.method()} ${getStatusFromRequest(request)}`;
@@ -44,7 +44,7 @@ export function getFormattedHeaderValue(
 
 export async function getFormattedResponseBody(
   httpResponse: HTTPResponse,
-  sizeLimit: number,
+  sizeLimit: number = BODY_CONTEXT_SIZE_LIMIT,
 ): Promise<string> {
   try {
     const responseBuffer = await httpResponse.buffer();
@@ -68,7 +68,7 @@ export async function getFormattedResponseBody(
 
 export async function getFormattedRequestBody(
   httpRequest: HTTPRequest,
-  sizeLimit: number,
+  sizeLimit: number = BODY_CONTEXT_SIZE_LIMIT,
 ): Promise<string> {
   if (httpRequest.hasPostData()) {
     const data = httpRequest.postData();

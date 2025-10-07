@@ -16,7 +16,6 @@ import {
   getFormattedRequestBody,
   getShortDescriptionForRequest,
   getStatusFromRequest,
-  BODY_CONTEXT_SIZE_LIMIT,
 } from './formatters/networkFormatter.js';
 import {formatA11ySnapshot} from './formatters/snapshotFormatter.js';
 import type {McpContext} from './McpContext.js';
@@ -172,10 +171,7 @@ export class McpResponse implements Response {
   async processResponseBody(
     httpResponse: HTTPResponse,
   ): Promise<string | null> {
-    const formattedResponseData = await getFormattedResponseBody(
-      httpResponse,
-      BODY_CONTEXT_SIZE_LIMIT,
-    );
+    const formattedResponseData = await getFormattedResponseBody(httpResponse);
     if (formattedResponseData.length > 0) {
       return formattedResponseData;
     }
@@ -184,12 +180,9 @@ export class McpResponse implements Response {
   }
 
   async processRequestBody(httpRequest: HTTPRequest): Promise<string | null> {
-    const formattedResponseData = await getFormattedRequestBody(
-      httpRequest,
-      BODY_CONTEXT_SIZE_LIMIT,
-    );
-    if (formattedResponseData.length > 0) {
-      return formattedResponseData;
+    const formattedRequestData = await getFormattedRequestBody(httpRequest);
+    if (formattedRequestData.length > 0) {
+      return formattedRequestData;
     }
 
     return null;
