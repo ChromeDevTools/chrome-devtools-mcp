@@ -23,10 +23,10 @@ import {handleDialog} from './tools/pages.js';
 import type {ImageContentData, Response} from './tools/ToolDefinition.js';
 import {paginate, type PaginationOptions} from './utils/pagination.js';
 
-export interface NetworkRequestData {
+interface NetworkRequestData {
   networkRequestUrl: string;
-  requestBody: string | null;
-  responseBody: string | null;
+  requestBody?: string;
+  responseBody?: string;
 }
 
 export class McpResponse implements Response {
@@ -84,8 +84,6 @@ export class McpResponse implements Response {
   attachNetworkRequest(url: string): void {
     this.#attachedNetworkRequestData = {
       networkRequestUrl: url,
-      responseBody: null,
-      requestBody: null,
     };
   }
 
@@ -170,22 +168,24 @@ export class McpResponse implements Response {
 
   async processResponseBody(
     httpResponse: HTTPResponse,
-  ): Promise<string | null> {
+  ): Promise<string | undefined> {
     const formattedResponseData = await getFormattedResponseBody(httpResponse);
     if (formattedResponseData.length > 0) {
       return formattedResponseData;
     }
 
-    return null;
+    return undefined;
   }
 
-  async processRequestBody(httpRequest: HTTPRequest): Promise<string | null> {
+  async processRequestBody(
+    httpRequest: HTTPRequest,
+  ): Promise<string | undefined> {
     const formattedRequestData = await getFormattedRequestBody(httpRequest);
     if (formattedRequestData.length > 0) {
       return formattedRequestData;
     }
 
-    return null;
+    return undefined;
   }
 
   format(
