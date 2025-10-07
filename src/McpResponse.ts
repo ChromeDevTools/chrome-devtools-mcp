@@ -7,9 +7,9 @@ import type {
   ImageContent,
   TextContent,
 } from '@modelcontextprotocol/sdk/types.js';
-import type {ResourceType} from 'puppeteer-core';
+import type { HTTPRequest, HTTPResponse, ResourceType } from 'puppeteer-core';
 
-import {formatConsoleEvent} from './formatters/consoleFormatter.js';
+import { formatConsoleEvent } from './formatters/consoleFormatter.js';
 import {
   getFormattedHeaderValue,
   getFormattedResponseBody,
@@ -18,16 +18,23 @@ import {
   getStatusFromRequest,
   BODY_CONTEXT_SIZE_LIMIT,
 } from './formatters/networkFormatter.js';
-import {formatA11ySnapshot} from './formatters/snapshotFormatter.js';
-import type {McpContext} from './McpContext.js';
-import {handleDialog} from './tools/pages.js';
-import type {ImageContentData, Response} from './tools/ToolDefinition.js';
-import {paginate, type PaginationOptions} from './utils/pagination.js';
+import { formatA11ySnapshot } from './formatters/snapshotFormatter.js';
+import { McpContext } from './McpContext.js';
+import { handleDialog } from './tools/pages.js';
+import type { ImageContentData, Response } from './tools/ToolDefinition.js';
+
+import { paginate, type PaginationOptions } from './utils/pagination.js';
+
+export type NetworkRequestData = {
+  networkRequestUrl: string;
+  requestBody: string | null;
+  responseBody: string | null;
+}
 
 export class McpResponse implements Response {
   #includePages = false;
   #includeSnapshot = false;
-  #attachedNetworkRequestUrl?: string;
+  #attachedNetworkRequestData?: NetworkRequestData;
   #includeConsoleData = false;
   #textResponseLines: string[] = [];
   #formattedConsoleData?: string[];
@@ -64,9 +71,9 @@ export class McpResponse implements Response {
       pagination:
         options?.pageSize || options?.pageIdx
           ? {
-              pageSize: options.pageSize,
-              pageIdx: options.pageIdx,
-            }
+            pageSize: options.pageSize,
+            pageIdx: options.pageIdx,
+          }
           : undefined,
       resourceTypes: options?.resourceTypes,
     };
@@ -77,7 +84,11 @@ export class McpResponse implements Response {
   }
 
   attachNetworkRequest(url: string): void {
-    this.#attachedNetworkRequestUrl = url;
+    this.#attachedNetworkRequestData = {
+      networkRequestUrl: url,
+      responseBody: null,
+      requestBody: null
+    };
   }
 
   get includePages(): boolean {
@@ -92,7 +103,7 @@ export class McpResponse implements Response {
     return this.#includeConsoleData;
   }
   get attachedNetworkRequestUrl(): string | undefined {
-    return this.#attachedNetworkRequestUrl;
+    return this.#attachedNetworkRequestData?.networkRequestUrl;
   }
   get networkRequestsPageIdx(): number | undefined {
     return this.#networkRequestsOptions?.pagination?.pageIdx;
@@ -130,6 +141,14 @@ export class McpResponse implements Response {
     }
 
     let formattedConsoleMessages: string[];
+
+    if (this.#attachedNetworkRequestData?.networkRequestUrl) {
+      const request = context.getNetworkRequestByUrl(this.#attachedNetworkRequestData.networkRequestUrl);
+
+      this.#attachedNetworkRequestData.requestBody = await this.processRequestBody(request);
+      this.#attachedNetworkRequestData.responseBody = await this.processResponseBody(request.response());
+    }
+
     if (this.#includeConsoleData) {
       const consoleMessages = context.getConsoleData();
       if (consoleMessages) {
@@ -140,13 +159,46 @@ export class McpResponse implements Response {
       }
     }
 
-    return await this.format(toolName, context);
+    return this.format(toolName, context);
   }
 
-  async format(
+  async processResponseBody(httpResponse: HTTPResponse | null): Promise<string | null> {
+    if (!httpResponse) {
+      return null;
+    }
+
+    const formattedResponseData = await getFormattedResponseBody(
+      httpResponse,
+      BODY_CONTEXT_SIZE_LIMIT,
+    );
+    if (formattedResponseData.length > 0) {
+      return formattedResponseData;
+    }
+
+    return null;
+  }
+
+
+  async processRequestBody(httpRequest: HTTPRequest): Promise<string | null> {
+    if (!httpRequest) {
+      return null;
+    }
+
+    const formattedResponseData = await getFormattedRequestBody(
+      httpRequest,
+      BODY_CONTEXT_SIZE_LIMIT,
+    );
+    if (formattedResponseData.length > 0) {
+      return formattedResponseData;
+    }
+
+    return null;
+  }
+
+  format(
     toolName: string,
     context: McpContext,
-  ): Promise<Array<TextContent | ImageContent>> {
+  ): Array<TextContent | ImageContent> {
     const response = [`# ${toolName} response`];
     for (const line of this.#textResponseLines) {
       response.push(line);
@@ -195,7 +247,7 @@ Call ${handleDialog.name} to handle it before continuing.`);
       }
     }
 
-    response.push(...(await this.#getIncludeNetworkRequestsData(context)));
+    response.push(...this.#getIncludeNetworkRequestsData(context));
 
     if (this.#networkRequestsOptions?.include) {
       let requests = context.getNetworkRequests();
@@ -256,7 +308,7 @@ Call ${handleDialog.name} to handle it before continuing.`);
       response.push('Invalid page number provided. Showing first page.');
     }
 
-    const {startIndex, endIndex, currentPage, totalPages} = paginationResult;
+    const { startIndex, endIndex, currentPage, totalPages } = paginationResult;
     response.push(
       `Showing ${startIndex + 1}-${endIndex} of ${data.length} (Page ${currentPage + 1} of ${totalPages}).`,
     );
@@ -275,12 +327,13 @@ Call ${handleDialog.name} to handle it before continuing.`);
     };
   }
 
-  async #getIncludeNetworkRequestsData(context: McpContext): Promise<string[]> {
+  #getIncludeNetworkRequestsData(context: McpContext): string[] {
     const response: string[] = [];
-    const url = this.#attachedNetworkRequestUrl;
+    const url = this.#attachedNetworkRequestData?.networkRequestUrl;
     if (!url) {
       return response;
     }
+
     const httpRequest = context.getNetworkRequestByUrl(url);
     response.push(`## Request ${httpRequest.url()}`);
     response.push(`Status:  ${getStatusFromRequest(httpRequest)}`);
@@ -289,13 +342,9 @@ Call ${handleDialog.name} to handle it before continuing.`);
       response.push(line);
     }
 
-    const formattedRequestData = await getFormattedRequestBody(
-      '### Request body',
-      httpRequest,
-      BODY_CONTEXT_SIZE_LIMIT,
-    );
-    if (formattedRequestData.length > 0) {
-      response.push(formattedRequestData);
+    if(this.#attachedNetworkRequestData?.requestBody) {
+      response.push(`### Request Body`);
+      response.push(this.#attachedNetworkRequestData.requestBody)
     }
 
     const httpResponse = httpRequest.response();
@@ -304,15 +353,11 @@ Call ${handleDialog.name} to handle it before continuing.`);
       for (const line of getFormattedHeaderValue(httpResponse.headers())) {
         response.push(line);
       }
+    }
 
-      const formattedResponseData = await getFormattedResponseBody(
-        '### Response body',
-        httpResponse,
-        BODY_CONTEXT_SIZE_LIMIT,
-      );
-      if (formattedResponseData.length > 0) {
-        response.push(formattedResponseData);
-      }
+    if(this.#attachedNetworkRequestData?.responseBody) {
+      response.push(`### Response Body`);
+      response.push(this.#attachedNetworkRequestData.responseBody)
     }
 
     const httpFailure = httpRequest.failure();

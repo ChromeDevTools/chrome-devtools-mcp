@@ -111,16 +111,16 @@ describe('networkFormatter', () => {
         fetchPostData: Promise.resolve('test'),
       });
 
-      const result = await getFormattedRequestBody('body', request, 200);
+      const result = await getFormattedRequestBody(request, 200);
 
-      assert.strictEqual(result, 'body\ntest');
+      assert.strictEqual(result, 'test');
     });
     it('shows empty string when no postData available', async () => {
       const request = getMockRequest({
         hasPostData: false,
       });
 
-      const result = await getFormattedRequestBody('body', request, 200);
+      const result = await getFormattedRequestBody(request, 200);
 
       assert.strictEqual(result, '');
     });
@@ -132,27 +132,27 @@ describe('networkFormatter', () => {
         hasPostData: true,
       });
 
-      const result = await getFormattedRequestBody('body', request, 200);
+      const result = await getFormattedRequestBody(request, 200);
 
       assert.strictEqual(
         result,
-        `body\n${JSON.stringify({
+        `${JSON.stringify({
           request: 'body',
         })}`,
       );
     });
     it('shows trunkated string correctly with postData', async () => {
-      const response = getMockRequest({
+      const request = getMockRequest({
         postData: 'some text that is longer than expected',
         hasPostData: true,
       });
 
-      const result = await getFormattedRequestBody('body', response, 20);
+      const result = await getFormattedRequestBody(request, 20);
 
-      assert.strictEqual(result, 'body\nsome text that is lo... <truncated>');
+      assert.strictEqual(result, 'some text that is lo... <truncated>');
     });
     it('shows trunkated string correctly with fetchPostData', async () => {
-      const response = getMockRequest({
+      const request = getMockRequest({
         fetchPostData: Promise.resolve(
           'some text that is longer than expected',
         ),
@@ -160,9 +160,9 @@ describe('networkFormatter', () => {
         hasPostData: true,
       });
 
-      const result = await getFormattedRequestBody('body', response, 20);
+      const result = await getFormattedRequestBody(request, 20);
 
-      assert.strictEqual(result, 'body\nsome text that is lo... <truncated>');
+      assert.strictEqual(result, 'some text that is lo... <truncated>');
     });
     it('shows nothing on exception', async () => {
       const request = getMockRequest({
@@ -171,7 +171,7 @@ describe('networkFormatter', () => {
         fetchPostData: Promise.reject(new ProtocolError()),
       });
 
-      const result = await getFormattedRequestBody('body', request, 200);
+      const result = await getFormattedRequestBody(request, 200);
 
       assert.strictEqual(result, '');
     });
@@ -184,9 +184,9 @@ describe('networkFormatter', () => {
         return Promise.resolve(Buffer.from(''));
       };
 
-      const result = await getFormattedResponseBody('body', response, 20);
+      const result = await getFormattedResponseBody(response, 200);
 
-      assert.strictEqual(result, 'body\n<empty response>');
+      assert.strictEqual(result, '<empty response>');
     });
     it('handles base64 text correctly', async () => {
       const binaryBuffer = Buffer.from([
@@ -197,9 +197,9 @@ describe('networkFormatter', () => {
         return Promise.resolve(binaryBuffer);
       };
 
-      const result = await getFormattedResponseBody('body', response, 20);
+      const result = await getFormattedResponseBody(response, 200);
 
-      assert.strictEqual(result, 'body\n<binary data>');
+      assert.strictEqual(result, '<binary data>');
     });
     it('handles the text limit correctly', async () => {
       const response = getMockResponse();
@@ -209,9 +209,9 @@ describe('networkFormatter', () => {
         );
       };
 
-      const result = await getFormattedResponseBody('body', response, 20);
+      const result = await getFormattedResponseBody(response, 20);
 
-      assert.strictEqual(result, 'body\nsome text that is lo... <truncated>');
+      assert.strictEqual(result, 'some text that is lo... <truncated>');
     });
     it('handles the text format correctly', async () => {
       const response = getMockResponse();
@@ -219,9 +219,9 @@ describe('networkFormatter', () => {
         return Promise.resolve(Buffer.from(JSON.stringify({response: 'body'})));
       };
 
-      const result = await getFormattedResponseBody('body', response, 200);
+      const result = await getFormattedResponseBody(response, 200);
 
-      assert.strictEqual(result, `body\n${JSON.stringify({response: 'body'})}`);
+      assert.strictEqual(result, `${JSON.stringify({response: 'body'})}`);
     });
     it('handles error correctly', async () => {
       const response = getMockResponse();
@@ -230,7 +230,7 @@ describe('networkFormatter', () => {
         return Promise.reject(new ProtocolError());
       };
 
-      const result = await getFormattedResponseBody('body', response, 200);
+      const result = await getFormattedResponseBody(response, 200);
 
       assert.strictEqual(result, '');
     });

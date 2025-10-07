@@ -43,7 +43,6 @@ export function getFormattedHeaderValue(
 }
 
 export async function getFormattedResponseBody(
-  title: string,
   httpResponse: HTTPResponse,
   sizeLimit: number,
 ): Promise<string> {
@@ -54,13 +53,13 @@ export async function getFormattedResponseBody(
       const responseAsTest = responseBuffer.toString('utf-8');
 
       if (responseAsTest.length === 0) {
-        return `${title}\n<empty response>`;
+        return `<empty response>`;
       }
 
-      return `${title}\n${getSizeLimitedString(responseAsTest, sizeLimit)}`;
+      return `${getSizeLimitedString(responseAsTest, sizeLimit)}`;
     }
 
-    return `${title}\n<binary data>`;
+    return `<binary data>`;
   } catch {
     // buffer() call might fail with CDP exception, in this case we don't print anything in the context
     return '';
@@ -68,7 +67,6 @@ export async function getFormattedResponseBody(
 }
 
 export async function getFormattedRequestBody(
-  title: string,
   httpRequest: HTTPRequest,
   sizeLimit: number,
 ): Promise<string> {
@@ -76,14 +74,14 @@ export async function getFormattedRequestBody(
     const data = httpRequest.postData();
 
     if (data) {
-      return `${title}\n${getSizeLimitedString(data, sizeLimit)}`;
+      return `${getSizeLimitedString(data, sizeLimit)}`;
     }
 
     try {
       const fetchData = await httpRequest.fetchPostData();
 
       if (fetchData) {
-        return `${title}\n${getSizeLimitedString(fetchData, sizeLimit)}`;
+        return `${getSizeLimitedString(fetchData, sizeLimit)}`;
       }
     } catch {
       // fetchPostData() call might fail with CDP exception, in this case we don't print anything in the context
