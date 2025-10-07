@@ -44,7 +44,7 @@ export function getFormattedHeaderValue(
 
 export async function getFormattedResponseBody(
   httpResponse: HTTPResponse,
-  sizeLimit: number = BODY_CONTEXT_SIZE_LIMIT,
+  sizeLimit = BODY_CONTEXT_SIZE_LIMIT,
 ): Promise<string | undefined> {
   try {
     const responseBuffer = await httpResponse.buffer();
