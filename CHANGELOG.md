@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.6.1](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.6.0...chrome-devtools-mcp-v0.6.1) (2025-10-07)
+
+
+### Bug Fixes
+
+* change default screen size in headless ([#299](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/299)) ([357db65](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/357db65d18f87b1299a0f6212b7ec982ef187171))
+* **cli:** tolerate empty browser URLs ([#298](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/298)) ([098a904](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/098a904b363f3ad81595ed58c25d34dd7d82bcd8))
+* guard performance_stop_trace when tracing inactive ([#295](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/295)) ([8200194](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/8200194c8037cc30b8ab815e5ee0d0b2b000bea6))
+
 ## [0.6.0](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.5.1...chrome-devtools-mcp-v0.6.0) (2025-10-01)
 
 
