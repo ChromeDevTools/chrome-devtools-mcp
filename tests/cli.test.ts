@@ -38,6 +38,25 @@ describe('cli args parsing', () => {
     });
   });
 
+  it('parses an empty browser url', async () => {
+    const args = parseArguments('1.0.0', [
+      'node',
+      'main.js',
+      '--browserUrl',
+      '',
+    ]);
+    assert.deepStrictEqual(args, {
+      _: [],
+      headless: false,
+      isolated: false,
+      $0: 'npx chrome-devtools-mcp@latest',
+      'browser-url': undefined,
+      browserUrl: undefined,
+      u: undefined,
+      channel: 'stable',
+    });
+  });
+
   it('parses with executable path', async () => {
     const args = parseArguments('1.0.0', [
       'node',
