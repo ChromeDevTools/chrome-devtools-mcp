@@ -148,8 +148,12 @@ export class McpResponse implements Response {
 
       this.#attachedNetworkRequestData.requestBody =
         await this.processRequestBody(request);
-      this.#attachedNetworkRequestData.responseBody =
-        await this.processResponseBody(request.response());
+
+      const response = request.response();
+      if (response) {
+        this.#attachedNetworkRequestData.responseBody =
+          await this.processResponseBody(response);
+      }
     }
 
     if (this.#includeConsoleData) {
@@ -166,12 +170,8 @@ export class McpResponse implements Response {
   }
 
   async processResponseBody(
-    httpResponse: HTTPResponse | null,
+    httpResponse: HTTPResponse,
   ): Promise<string | null> {
-    if (!httpResponse) {
-      return null;
-    }
-
     const formattedResponseData = await getFormattedResponseBody(
       httpResponse,
       BODY_CONTEXT_SIZE_LIMIT,
@@ -184,10 +184,6 @@ export class McpResponse implements Response {
   }
 
   async processRequestBody(httpRequest: HTTPRequest): Promise<string | null> {
-    if (!httpRequest) {
-      return null;
-    }
-
     const formattedResponseData = await getFormattedRequestBody(
       httpRequest,
       BODY_CONTEXT_SIZE_LIMIT,
