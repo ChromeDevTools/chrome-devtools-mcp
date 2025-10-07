@@ -99,6 +99,9 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
   if (customDevTools) {
     args.push(`--custom-devtools-frontend=file://${customDevTools}`);
   }
+  if (headless) {
+    args.push('--screen-info={3840x2160}');
+  }
   let puppeteerChannel: ChromeReleaseChannel | undefined;
   if (!executablePath) {
     puppeteerChannel =

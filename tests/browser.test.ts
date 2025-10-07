@@ -52,8 +52,8 @@ describe('browser', () => {
       userDataDir: folderPath,
       executablePath: executablePath(),
       viewport: {
-        width: 700,
-        height: 500,
+        width: 1501,
+        height: 801,
       },
     });
     try {
@@ -62,8 +62,8 @@ describe('browser', () => {
         return {width: window.innerWidth, height: window.innerHeight};
       });
       assert.deepStrictEqual(result, {
-        width: 700,
-        height: 500,
+        width: 1501,
+        height: 801,
       });
     } finally {
       await browser.close();
