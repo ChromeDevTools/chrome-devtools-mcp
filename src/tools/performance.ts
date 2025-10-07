@@ -111,7 +111,7 @@ export const stopTrace = defineTool({
   },
   schema: {},
   handler: async (_request, response, context) => {
-    if (!context.isRunningPerformanceTrace) {
+    if (!context.isRunningPerformanceTrace()) {
       return;
     }
     const page = context.getSelectedPage();
