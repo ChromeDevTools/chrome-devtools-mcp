@@ -4,12 +4,14 @@ on:
   push:
     tags:
       - 'chrome-devtools-mcp-v*'
-  workflow_call:
+  workflow_dispatch:
     inputs:
       npm-publish:
+        description: 'Whether or not to try to publish to NPM'
         default: false
         type: boolean
       mcp-publish:
+        description: 'Whether or not to try to publish to MCP registry'
         default: true
         type: boolean
 
@@ -20,6 +22,7 @@ permissions:
 jobs:
   publish-to-npm:
     runs-on: ubuntu-latest
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.npm-publish }}
     steps:
       - name: Check out repository
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
@@ -49,6 +52,7 @@ jobs:
 
   publish-to-mcp-registry:
     runs-on: ubuntu-latest
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.mcp-publish }}
     needs: publish-to-npm
     steps:
       - name: Check out repository
