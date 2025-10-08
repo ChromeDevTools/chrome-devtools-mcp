@@ -4,6 +4,14 @@ on:
   push:
     tags:
       - 'chrome-devtools-mcp-v*'
+  workflow_call:
+    inputs:
+      npm-publish:
+        default: false
+        type: boolean
+      mcp-publish:
+        default: true
+        type: boolean
 
 permissions:
   id-token: write # Required for OIDC
@@ -70,7 +78,9 @@ jobs:
 
       - name: Install MCP Publisher
         run: |
-          curl -L "https://github.com/modelcontextprotocol/registry/releases/download/v1.1.0/mcp-publisher_1.1.0_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" | tar xz mcp-publisher
+          export VERSION="1.2.1"
+          export OS=$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')
+          curl -L "https://github.com/modelcontextprotocol/registry/releases/download/v${VERSION}/mcp-publisher_${VERSION}_${OS}.tar.gz" | tar xz mcp-publisher
 
       - name: Login to MCP Registry
         run: ./mcp-publisher login github-oidc
