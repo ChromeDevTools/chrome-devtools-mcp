@@ -12,6 +12,8 @@ import type {ResourceType} from 'puppeteer-core';
 import {formatConsoleEvent} from './formatters/consoleFormatter.js';
 import {
   getFormattedHeaderValue,
+  getFormattedResponseBody,
+  getFormattedRequestBody,
   getShortDescriptionForRequest,
   getStatusFromRequest,
 } from './formatters/networkFormatter.js';
@@ -21,10 +23,16 @@ import {handleDialog} from './tools/pages.js';
 import type {ImageContentData, Response} from './tools/ToolDefinition.js';
 import {paginate, type PaginationOptions} from './utils/pagination.js';
 
+interface NetworkRequestData {
+  networkRequestUrl: string;
+  requestBody?: string;
+  responseBody?: string;
+}
+
 export class McpResponse implements Response {
   #includePages = false;
   #includeSnapshot = false;
-  #attachedNetworkRequestUrl?: string;
+  #attachedNetworkRequestData?: NetworkRequestData;
   #includeConsoleData = false;
   #textResponseLines: string[] = [];
   #formattedConsoleData?: string[];
@@ -74,7 +82,9 @@ export class McpResponse implements Response {
   }
 
   attachNetworkRequest(url: string): void {
-    this.#attachedNetworkRequestUrl = url;
+    this.#attachedNetworkRequestData = {
+      networkRequestUrl: url,
+    };
   }
 
   get includePages(): boolean {
@@ -89,7 +99,7 @@ export class McpResponse implements Response {
     return this.#includeConsoleData;
   }
   get attachedNetworkRequestUrl(): string | undefined {
-    return this.#attachedNetworkRequestUrl;
+    return this.#attachedNetworkRequestData?.networkRequestUrl;
   }
   get networkRequestsPageIdx(): number | undefined {
     return this.#networkRequestsOptions?.pagination?.pageIdx;
@@ -127,6 +137,22 @@ export class McpResponse implements Response {
     }
 
     let formattedConsoleMessages: string[];
+
+    if (this.#attachedNetworkRequestData?.networkRequestUrl) {
+      const request = context.getNetworkRequestByUrl(
+        this.#attachedNetworkRequestData.networkRequestUrl,
+      );
+
+      this.#attachedNetworkRequestData.requestBody =
+        await getFormattedRequestBody(request);
+
+      const response = request.response();
+      if (response) {
+        this.#attachedNetworkRequestData.responseBody =
+          await getFormattedResponseBody(response);
+      }
+    }
+
     if (this.#includeConsoleData) {
       const consoleMessages = context.getConsoleData();
       if (consoleMessages) {
@@ -274,10 +300,11 @@ Call ${handleDialog.name} to handle it before continuing.`);
 
   #getIncludeNetworkRequestsData(context: McpContext): string[] {
     const response: string[] = [];
-    const url = this.#attachedNetworkRequestUrl;
+    const url = this.#attachedNetworkRequestData?.networkRequestUrl;
     if (!url) {
       return response;
     }
+
     const httpRequest = context.getNetworkRequestByUrl(url);
     response.push(`## Request ${httpRequest.url()}`);
     response.push(`Status:  ${getStatusFromRequest(httpRequest)}`);
@@ -286,12 +313,22 @@ Call ${handleDialog.name} to handle it before continuing.`);
       response.push(line);
     }
 
+    if (this.#attachedNetworkRequestData?.requestBody) {
+      response.push(`### Request Body`);
+      response.push(this.#attachedNetworkRequestData.requestBody);
+    }
+
     const httpResponse = httpRequest.response();
     if (httpResponse) {
       response.push(`### Response Headers`);
       for (const line of getFormattedHeaderValue(httpResponse.headers())) {
         response.push(line);
       }
+    }
+
+    if (this.#attachedNetworkRequestData?.responseBody) {
+      response.push(`### Response Body`);
+      response.push(this.#attachedNetworkRequestData.responseBody);
     }
 
     const httpFailure = httpRequest.failure();

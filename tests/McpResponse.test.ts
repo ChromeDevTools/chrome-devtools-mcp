@@ -6,7 +6,7 @@
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
-import {getMockRequest, html, withBrowser} from './utils.js';
+import {getMockRequest, getMockResponse, html, withBrowser} from './utils.js';
 
 describe('McpResponse', () => {
   it('list pages', async () => {
@@ -199,6 +199,51 @@ http://example.com GET [pending]`,
       };
       const result = await response.handle('test', context);
       assert.strictEqual(result[0].text, `# test response`);
+    });
+  });
+
+  it('add network request when attached with POST data', async () => {
+    await withBrowser(async (response, context) => {
+      response.setIncludeNetworkRequests(true);
+      const httpResponse = getMockResponse();
+      httpResponse.buffer = () => {
+        return Promise.resolve(Buffer.from(JSON.stringify({response: 'body'})));
+      };
+      httpResponse.headers = () => {
+        return {
+          'Content-Type': 'application/json',
+        };
+      };
+      const request = getMockRequest({
+        method: 'POST',
+        hasPostData: true,
+        postData: JSON.stringify({request: 'body'}),
+        response: httpResponse,
+      });
+      context.getNetworkRequests = () => {
+        return [request];
+      };
+      response.attachNetworkRequest(request.url());
+
+      const result = await response.handle('test', context);
+
+      assert.strictEqual(
+        result[0].text,
+        `# test response
+## Request http://example.com
+Status:  [success - 200]
+### Request Headers
+- content-size:10
+### Request Body
+${JSON.stringify({request: 'body'})}
+### Response Headers
+- Content-Type:application/json
+### Response Body
+${JSON.stringify({response: 'body'})}
+## Network requests
+Showing 1-1 of 1 (Page 1 of 1).
+http://example.com POST [success - 200]`,
+      );
     });
   });
 
