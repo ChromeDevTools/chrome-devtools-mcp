@@ -40,8 +40,6 @@ function targetFilter(target: Target): boolean {
 
 const connectOptions: ConnectOptions = {
   targetFilter,
-  // We do not expect any single CDP command to take more than 10sec.
-  protocolTimeout: 10_000,
 };
 
 export async function ensureBrowserConnected(browserURL: string) {
