@@ -62,7 +62,7 @@ export async function getFormattedResponseBody(
     return `<binary data>`;
   } catch {
     // buffer() call might fail with CDP exception, in this case we don't print anything in the context
-    return undefined;
+    return;
   }
 }
 
@@ -85,11 +85,11 @@ export async function getFormattedRequestBody(
       }
     } catch {
       // fetchPostData() call might fail with CDP exception, in this case we don't print anything in the context
-      return undefined;
+      return;
     }
   }
 
-  return undefined;
+  return;
 }
 
 function getSizeLimitedString(text: string, sizeLimit: number) {
