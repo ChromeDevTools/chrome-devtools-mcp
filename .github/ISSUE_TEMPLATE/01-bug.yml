@@ -1,6 +1,8 @@
 name: Bug report
 description: File a bug report for chrome-devtools-mcp
-title: '[Bug] '
+title: '<short description of the bug>'
+labels:
+  - 'bug'
 body:
   - id: description
     type: textarea
@@ -19,10 +21,8 @@ body:
       description: >
         Steps to reproduce the behavior:
       placeholder: |
-        1. Go to '...'
-        2. Click on '....'
-        3. Scroll down to '....'
-        4. See error
+        1. Use tool '...'
+        2. Then use tool '...'
 
   - id: expectation
     type: textarea
