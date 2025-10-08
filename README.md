@@ -111,7 +111,7 @@ Start the dialog to add a new MCP server by running:
 /mcp add
 ```
 
-Configure the following fields and press `CTR-S` to save the configuration:
+Configure the following fields and press `CTRL+S` to save the configuration:
 
 - **Server name:** `chrome-devtools`
 - **Server Type:** `[1] Local`
