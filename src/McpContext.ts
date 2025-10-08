@@ -19,6 +19,7 @@ import type {
   PredefinedNetworkConditions,
 } from 'puppeteer-core';
 
+import type {ListenerMap} from './PageCollector.js';
 import {NetworkCollector, PageCollector} from './PageCollector.js';
 import {listPages} from './tools/pages.js';
 import {takeSnapshot} from './tools/snapshot.js';
@@ -94,26 +95,24 @@ export class McpContext implements Context {
     this.browser = browser;
     this.logger = logger;
 
-    this.#networkCollector = new NetworkCollector(
-      this.browser,
-      (page, collect) => {
-        page.on('request', request => {
+    this.#networkCollector = new NetworkCollector(this.browser, collect => {
+      return {
+        request: request => {
           collect(request);
-        });
-      },
-    );
+        },
+      } as ListenerMap;
+    });
 
-    this.#consoleCollector = new PageCollector(
-      this.browser,
-      (page, collect) => {
-        page.on('console', event => {
+    this.#consoleCollector = new PageCollector(this.browser, collect => {
+      return {
+        console: event => {
           collect(event);
-        });
-        page.on('pageerror', event => {
+        },
+        pageerror: event => {
           collect(event);
-        });
-      },
-    );
+        },
+      } as ListenerMap;
+    });
   }
 
   async #init() {

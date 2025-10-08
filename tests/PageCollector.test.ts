@@ -8,6 +8,7 @@ import {describe, it} from 'node:test';
 
 import type {Browser, Frame, Page, Target} from 'puppeteer-core';
 
+import type {ListenerMap} from '../src/PageCollector.js';
 import {PageCollector} from '../src/PageCollector.js';
 
 import {getMockRequest} from './utils.js';
@@ -55,10 +56,12 @@ describe('PageCollector', () => {
     const browser = getMockBrowser();
     const page = (await browser.pages())[0];
     const request = getMockRequest();
-    const collector = new PageCollector(browser, (page, collect) => {
-      page.on('request', req => {
-        collect(req);
-      });
+    const collector = new PageCollector(browser, collect => {
+      return {
+        request: req => {
+          collect(req);
+        },
+      } as ListenerMap;
     });
     await collector.init();
     page.emit('request', request);
@@ -71,10 +74,12 @@ describe('PageCollector', () => {
     const page = (await browser.pages())[0];
     const mainFrame = page.mainFrame();
     const request = getMockRequest();
-    const collector = new PageCollector(browser, (page, collect) => {
-      page.on('request', req => {
-        collect(req);
-      });
+    const collector = new PageCollector(browser, collect => {
+      return {
+        request: req => {
+          collect(req);
+        },
+      } as ListenerMap;
     });
     await collector.init();
     page.emit('request', request);
@@ -89,10 +94,12 @@ describe('PageCollector', () => {
     const browser = getMockBrowser();
     const page = (await browser.pages())[0];
     const request = getMockRequest();
-    const collector = new PageCollector(browser, (page, collect) => {
-      page.on('request', req => {
-        collect(req);
-      });
+    const collector = new PageCollector(browser, collect => {
+      return {
+        request: req => {
+          collect(req);
+        },
+      } as ListenerMap;
     });
     await collector.init();
     page.emit('request', request);
@@ -106,10 +113,12 @@ describe('PageCollector', () => {
     const page = (await browser.pages())[0];
     const mainFrame = page.mainFrame();
     const request = getMockRequest();
-    const collector = new PageCollector(browser, (page, collect) => {
-      page.on('request', req => {
-        collect(req);
-      });
+    const collector = new PageCollector(browser, collect => {
+      return {
+        request: req => {
+          collect(req);
+        },
+      } as ListenerMap;
     });
     await collector.init();
     page.emit('request', request);
@@ -128,10 +137,12 @@ describe('PageCollector', () => {
     const browser = getMockBrowser();
     const page = (await browser.pages())[0];
     const request = getMockRequest();
-    const collector = new PageCollector(browser, (pageListener, collect) => {
-      pageListener.on('request', req => {
-        collect(req);
-      });
+    const collector = new PageCollector(browser, collect => {
+      return {
+        request: req => {
+          collect(req);
+        },
+      } as ListenerMap;
     });
     await collector.init();
     browser.emit('targetcreated', {
