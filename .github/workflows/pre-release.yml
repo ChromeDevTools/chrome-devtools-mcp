@@ -1,0 +1,27 @@
+name: Pre-release
+
+permissions: read-all
+
+on:
+  push:
+    branches:
+      - release-please-*
+
+jobs:
+  pre-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          fetch-depth: 2
+
+      - name: Install MCP Publisher
+        run: |
+          export TAG=$(curl -sL https://api.github.com/repos/modelcontextprotocol/registry/releases/latest | jq -r ".tag_name")
+          export VERSION="${TAG#v}"
+          export OS=$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')
+          curl -L "https://github.com/modelcontextprotocol/registry/releases/download/${TAG}/mcp-publisher_${VERSION}_${OS}.tar.gz" | tar xz mcp-publisher
+
+      - name: Verify server.json
+        run: npm run verify-server-json-version
