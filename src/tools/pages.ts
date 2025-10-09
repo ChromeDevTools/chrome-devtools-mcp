@@ -142,16 +142,33 @@ export const navigatePageHistory = defineTool({
     const options = {
       timeout: request.params.timeout,
     };
+
     try {
+      let result;
       if (request.params.navigate === 'back') {
-        await page.goBack(options);
+        result = await page.goBack(options);
       } else {
-        await page.goForward(options);
+        result = await page.goForward(options);
       }
-    } catch {
-      response.appendResponseLine(
-        `Unable to navigate ${request.params.navigate} in currently selected page.`,
-      );
+
+      // If result is null, navigation wasn't possible (no history)
+      if (result === null) {
+        const direction = request.params.navigate === 'back' ? 'previous' : 'next';
+        response.appendResponseLine(
+          `Cannot navigate ${request.params.navigate}, no ${direction} page in history.`,
+        );
+      }
+    } catch (error) {
+      // Provide more specific error messages based on the error type
+      if (error.message && error.message.includes('timeout')) {
+        response.appendResponseLine(
+          `Navigation ${request.params.navigate} timed out after ${request.params.timeout || 30000}ms.`,
+        );
+      } else {
+        response.appendResponseLine(
+          `Unable to navigate ${request.params.navigate}: ${error.message || 'Unknown error occurred'}`,
+        );
+      }
     }
 
     response.setIncludePages(true);
