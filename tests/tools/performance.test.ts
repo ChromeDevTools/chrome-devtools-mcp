@@ -218,7 +218,11 @@ describe('performance', () => {
     it('does nothing if the trace is not running and does not error', async () => {
       await withBrowser(async (response, context) => {
         context.setIsRunningPerformanceTrace(false);
+        const selectedPage = context.getSelectedPage();
+        const stopTracingStub = sinon.stub(selectedPage.tracing, 'stop');
         await stopTrace.handler({params: {}}, response, context);
+        sinon.assert.notCalled(stopTracingStub);
+        assert.strictEqual(context.isRunningPerformanceTrace(), false);
       });
     });
 

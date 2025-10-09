@@ -223,7 +223,7 @@
 
 ### `performance_analyze_insight`
 
-**Description:** Provides more detailed information on a specific Performance Insight that was highlighed in the results of a trace recording.
+**Description:** Provides more detailed information on a specific Performance Insight that was highlighted in the results of a trace recording.
 
 **Parameters:**
 

@@ -14,8 +14,15 @@ export const cliOptions = {
     description:
       'Connect to a running Chrome instance using port forwarding. For more details see: https://developer.chrome.com/docs/devtools/remote-debugging/local-server.',
     alias: 'u',
-    coerce: (url: string) => {
-      new URL(url);
+    coerce: (url: string | undefined) => {
+      if (!url) {
+        return;
+      }
+      try {
+        new URL(url);
+      } catch {
+        throw new Error(`Provided browserUrl ${url} is not valid URL.`);
+      }
       return url;
     },
   },
@@ -58,7 +65,7 @@ export const cliOptions = {
   viewport: {
     type: 'string',
     describe:
-      'Initial viewport size for the Chromee instances started by the server. For example, `1280x720`',
+      'Initial viewport size for the Chrome instances started by the server. For example, `1280x720`. In headless mode, max size is 3840x2160px.',
     coerce: (arg: string | undefined) => {
       if (arg === undefined) {
         return;
