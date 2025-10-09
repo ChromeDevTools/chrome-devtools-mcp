@@ -1,8 +1,7 @@
 name: Bug report
 description: File a bug report for chrome-devtools-mcp
 title: '<short description of the bug>'
-labels:
-  - 'bug'
+type: 'Bug'
 body:
   - id: description
     type: textarea
