@@ -153,7 +153,8 @@ export const navigatePageHistory = defineTool({
 
       // If result is null, navigation wasn't possible (no history)
       if (result === null) {
-        const direction = request.params.navigate === 'back' ? 'previous' : 'next';
+        const direction =
+          request.params.navigate === 'back' ? 'previous' : 'next';
         response.appendResponseLine(
           `Cannot navigate ${request.params.navigate}, no ${direction} page in history.`,
         );
