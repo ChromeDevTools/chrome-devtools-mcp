@@ -52,12 +52,7 @@ export async function ensureBrowserConnected(options: {
     targetFilter: makeTargetFilter(options.devtools),
     browserURL: options.browserURL,
     defaultViewport: null,
-    // @ts-expect-error no types.
-    _isPageTarget(target) {
-      return (
-        target.type() === 'other' && target.url().startsWith('devtools://')
-      );
-    },
+    handleDevToolsAsPage: options.devtools,
   });
   return browser;
 }
@@ -77,7 +72,7 @@ interface McpLaunchOptions {
   };
   args?: string[];
   devtools: boolean;
-};
+}
 
 export async function launch(options: McpLaunchOptions): Promise<Browser> {
   const {channel, executablePath, customDevTools, headless, isolated} = options;
@@ -131,12 +126,7 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
       headless,
       args,
       acceptInsecureCerts: options.acceptInsecureCerts,
-      // @ts-expect-error no types.
-      _isPageTarget(target) {
-        return (
-          target.type() === 'other' && target.url().startsWith('devtools://')
-        );
-      },
+      handleDevToolsAsPage: options.devtools,
     });
     if (options.logFile) {
       // FIXME: we are probably subscribing too late to catch startup logs. We

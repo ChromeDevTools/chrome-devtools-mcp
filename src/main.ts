@@ -76,9 +76,9 @@ async function getContext(): Promise<McpContext> {
   const devtools = args.experimentalDevtools ?? false;
   const browser = args.browserUrl
     ? await ensureBrowserConnected({
-      browserURL: args.browserUrl,
-      devtools,
-    })
+        browserURL: args.browserUrl,
+        devtools,
+      })
     : await ensureBrowserLaunched({
         headless: args.headless,
         executablePath: args.executablePath,
@@ -93,9 +93,7 @@ async function getContext(): Promise<McpContext> {
       });
 
   if (context?.browser !== browser) {
-    context = await McpContext.from(browser, logger, {
-      devtools,
-    });
+    context = await McpContext.from(browser, logger);
   }
   return context;
 }
