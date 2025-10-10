@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.1](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.7.0...chrome-devtools-mcp-v0.7.1) (2025-10-10)
+
+
+### Bug Fixes
+
+* document that console and requests are since the last nav ([#335](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/335)) ([9ad7cbb](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/9ad7cbb2de3d285e46e5f3e7c098b0a7535c7e7a))
+
 ## [0.7.0](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.6.1...chrome-devtools-mcp-v0.7.0) (2025-10-10)
 
 
