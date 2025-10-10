@@ -40,7 +40,7 @@
     "@modelcontextprotocol/sdk": "1.19.1",
     "core-js": "3.45.1",
     "debug": "4.4.3",
-    "puppeteer-core": "^24.23.1",
+    "puppeteer-core": "^24.24.0",
     "yargs": "18.0.0",
     "zod": "^3.25.76"
   },
@@ -60,7 +60,7 @@
     "eslint-plugin-import": "^2.32.0",
     "globals": "^16.4.0",
     "prettier": "^3.6.2",
-    "puppeteer": "24.23.1",
+    "puppeteer": "24.24.0",
     "sinon": "^21.0.0",
     "typescript": "^5.9.2",
     "typescript-eslint": "^8.43.0"
