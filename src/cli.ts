@@ -43,13 +43,6 @@ export const cliOptions = {
       'If specified, creates a temporary user-data-dir that is automatically cleaned up after the browser is closed.',
     default: false,
   },
-  customDevtools: {
-    type: 'string',
-    description: 'Path to custom DevTools.',
-    hidden: true,
-    conflicts: 'browserUrl',
-    alias: 'd',
-  },
   channel: {
     type: 'string',
     description:
@@ -89,9 +82,14 @@ export const cliOptions = {
     description: `If enabled, ignores errors relative to self-signed and expired certificates. Use with caution.`,
   },
   experimentalDevtools: {
-    type: 'boolean' as const,
+    type: 'boolean',
     describe: 'Whether to enable automation over DevTools targets',
     hidden: true,
+  },
+  chromeArg: {
+    type: 'array',
+    describe:
+      'Additional arguments for Chrome. Only applies when Chrome is launched by chrome-devtools-mcp.',
   },
 } satisfies Record<string, YargsOptions>;
 
@@ -121,6 +119,10 @@ export function parseArguments(version: string, argv = process.argv) {
       [
         '$0 --viewport 1280x720',
         'Launch Chrome with the initial viewport size of 1280x720px',
+      ],
+      [
+        `$0 --chrome-arg='--no-sandbox' --chrome-arg='--disable-setuid-sandbox'`,
+        'Launch Chrome without sandboxes. Use with caution.',
       ],
     ]);
 

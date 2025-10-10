@@ -69,7 +69,7 @@ server.server.setRequestHandler(SetLevelRequestSchema, () => {
 
 let context: McpContext;
 async function getContext(): Promise<McpContext> {
-  const extraArgs: string[] = [];
+  const extraArgs: string[] = (args.chromeArg ?? []).map(String);
   if (args.proxyServer) {
     extraArgs.push(`--proxy-server=${args.proxyServer}`);
   }
@@ -82,7 +82,6 @@ async function getContext(): Promise<McpContext> {
     : await ensureBrowserLaunched({
         headless: args.headless,
         executablePath: args.executablePath,
-        customDevTools: args.customDevtools,
         channel: args.channel as Channel,
         isolated: args.isolated,
         logFile,
