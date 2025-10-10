@@ -223,7 +223,6 @@ Call ${handleDialog.name} to handle it before continuing.`);
     if (this.#networkRequestsOptions?.include) {
       let requests = context.getNetworkRequests();
 
-      // Apply resource type filtering if specified
       if (this.#networkRequestsOptions.resourceTypes?.length) {
         const normalizedTypes = new Set(
           this.#networkRequestsOptions.resourceTypes,
@@ -234,7 +233,15 @@ Call ${handleDialog.name} to handle it before continuing.`);
         });
       }
 
+      const preservationEnabled = context.isNetworkLogPreservationEnabled();
+      
       response.push('## Network requests');
+      if (preservationEnabled) {
+        response.push('🔒 **Preservation Mode: ACTIVE** (requests persist across navigations)');
+      } else {
+        response.push('📋 Normal mode (logs cleared on navigation). Enable preservation to keep history.');
+      }
+      
       if (requests.length) {
         const data = this.#dataWithPagination(
           requests,
