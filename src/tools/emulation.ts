@@ -12,12 +12,13 @@ import {defineTool} from './ToolDefinition.js';
 
 const throttlingOptions: [string, ...string[]] = [
   'No emulation',
+  'Offline',
   ...Object.keys(PredefinedNetworkConditions),
 ];
 
 export const emulateNetwork = defineTool({
   name: 'emulate_network',
-  description: `Emulates network conditions such as throttling on the selected page.`,
+  description: `Emulates network conditions such as throttling or offline mode on the selected page.`,
   annotations: {
     category: ToolCategories.EMULATION,
     readOnlyHint: false,
@@ -26,7 +27,7 @@ export const emulateNetwork = defineTool({
     throttlingOption: z
       .enum(throttlingOptions)
       .describe(
-        `The network throttling option to emulate. Available throttling options are: ${throttlingOptions.join(', ')}. Set to "No emulation" to disable.`,
+        `The network throttling option to emulate. Available throttling options are: ${throttlingOptions.join(', ')}. Set to "No emulation" to disable. Set to "Offline" to simulate offline network conditions.`,
       ),
   },
   handler: async (request, _response, context) => {
@@ -36,6 +37,17 @@ export const emulateNetwork = defineTool({
     if (conditions === 'No emulation') {
       await page.emulateNetworkConditions(null);
       context.setNetworkConditions(null);
+      return;
+    }
+
+    if (conditions === 'Offline') {
+      await page.emulateNetworkConditions({
+        offline: true,
+        download: 0,
+        upload: 0,
+        latency: 0,
+      });
+      context.setNetworkConditions('Offline');
       return;
     }
 

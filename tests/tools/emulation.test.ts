@@ -11,6 +11,21 @@ import {withBrowser} from '../utils.js';
 
 describe('emulation', () => {
   describe('network', () => {
+    it('emulates offline network conditions', async () => {
+      await withBrowser(async (response, context) => {
+        await emulateNetwork.handler(
+          {
+            params: {
+              throttlingOption: 'Offline',
+            },
+          },
+          response,
+          context,
+        );
+
+        assert.strictEqual(context.getNetworkConditions(), 'Offline');
+      });
+    });
     it('emulates network throttling when the throttling option is valid ', async () => {
       await withBrowser(async (response, context) => {
         await emulateNetwork.handler(
