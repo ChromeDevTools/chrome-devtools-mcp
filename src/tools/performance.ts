@@ -111,7 +111,7 @@ export const stopTrace = defineTool({
   },
   schema: {},
   handler: async (_request, response, context) => {
-    if (!context.isRunningPerformanceTrace) {
+    if (!context.isRunningPerformanceTrace()) {
       return;
     }
     const page = context.getSelectedPage();
@@ -122,7 +122,7 @@ export const stopTrace = defineTool({
 export const analyzeInsight = defineTool({
   name: 'performance_analyze_insight',
   description:
-    'Provides more detailed information on a specific Performance Insight that was highlighed in the results of a trace recording.',
+    'Provides more detailed information on a specific Performance Insight that was highlighted in the results of a trace recording.',
   annotations: {
     category: ToolCategories.PERFORMANCE,
     readOnlyHint: true,
@@ -167,9 +167,6 @@ async function stopTracingAndAppendOutput(
     response.appendResponseLine('The performance trace has been stopped.');
     if (traceResultIsSuccess(result)) {
       context.storeTraceRecording(result);
-      response.appendResponseLine(
-        'Here is a high level summary of the trace and the Insights that were found:',
-      );
       const traceSummaryText = getTraceSummary(result);
       response.appendResponseLine(traceSummaryText);
     } else {
@@ -182,7 +179,7 @@ async function stopTracingAndAppendOutput(
     const errorText = e instanceof Error ? e.message : JSON.stringify(e);
     logger(`Error stopping performance trace: ${errorText}`);
     response.appendResponseLine(
-      'An error occured generating the response for this trace:',
+      'An error occurred generating the response for this trace:',
     );
     response.appendResponseLine(errorText);
   } finally {

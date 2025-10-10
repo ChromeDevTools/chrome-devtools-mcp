@@ -267,7 +267,7 @@ describe('pages', () => {
         );
       });
     });
-    it('can dismiss alread dismissed dialog dialogs', async () => {
+    it('can dismiss already dismissed dialog dialogs', async () => {
       await withBrowser(async (response, context) => {
         const page = context.getSelectedPage();
         const dialogPromise = new Promise<Dialog>(resolve => {

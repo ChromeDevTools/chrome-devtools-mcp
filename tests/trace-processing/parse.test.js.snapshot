@@ -1,4 +1,49 @@
 exports[`Trace parsing > can format results of a trace 1`] = `
+## Summary of Performance trace findings:
+URL: https://web.dev/
+Bounds: {min: 122410994891, max: 122416385853}
+CPU throttling: none
+Network throttling: none
+Metrics (lab / observed):
+  - LCP: 129 ms, event: (eventKey: r-6063, ts: 122411126100), nodeId: 7
+  - LCP breakdown:
+    - TTFB: 8 ms, bounds: {min: 122410996889, max: 122411004828}
+    - Load delay: 33 ms, bounds: {min: 122411004828, max: 122411037986}
+    - Load duration: 15 ms, bounds: {min: 122411037986, max: 122411052690}
+    - Render delay: 73 ms, bounds: {min: 122411052690, max: 122411126100}
+  - CLS: 0.00
+Metrics (field / real users): n/a – no data for this page in CrUX
+Available insights:
+  - insight name: LCPBreakdown
+    description: Each [subpart has specific improvement strategies](https://web.dev/articles/optimize-lcp#lcp-breakdown). Ideally, most of the LCP time should be spent on loading the resources, not within delays.
+    relevant trace bounds: {min: 122410996889, max: 122411126100}
+    example question: Help me optimize my LCP score
+    example question: Which LCP phase was most problematic?
+    example question: What can I do to reduce the LCP time for this page load?
+  - insight name: LCPDiscovery
+    description: Optimize LCP by making the LCP image [discoverable](https://web.dev/articles/optimize-lcp#1_eliminate_resource_load_delay) from the HTML immediately, and [avoiding lazy-loading](https://web.dev/articles/lcp-lazy-loading)
+    relevant trace bounds: {min: 122411004828, max: 122411055039}
+    example question: Suggest fixes to reduce my LCP
+    example question: What can I do to reduce my LCP discovery time?
+    example question: Why is LCP discovery time important?
+  - insight name: RenderBlocking
+    description: Requests are blocking the page's initial render, which may delay LCP. [Deferring or inlining](https://web.dev/learn/performance/understanding-the-critical-path#render-blocking_resources) can move these network requests out of the critical path.
+    relevant trace bounds: {min: 122411037528, max: 122411053852}
+    example question: Show me the most impactful render blocking requests that I should focus on
+    example question: How can I reduce the number of render blocking requests?
+  - insight name: DocumentLatency
+    description: Your first network request is the most important.  Reduce its latency by avoiding redirects, ensuring a fast server response, and enabling text compression.
+    relevant trace bounds: {min: 122410998910, max: 122411043781}
+    estimated metric savings: FCP 0 ms, LCP 0 ms
+    estimated wasted bytes: 77.1 kB
+    example question: How do I decrease the initial loading time of my page?
+    example question: Did anything slow down the request for this document?
+  - insight name: ThirdParties
+    description: 3rd party code can significantly impact load performance. [Reduce and defer loading of 3rd party code](https://web.dev/articles/optimizing-content-efficiency-loading-third-party-javascript/) to prioritize your page's content.
+    relevant trace bounds: {min: 122411037881, max: 122416229595}
+    example question: Which third parties are having the largest impact on my page performance?
+
+## Details on call tree & network request formats:
 Information on performance traces may contain main thread activity represented as call frames and network requests.
 
 Each call frame is presented in the following format:
@@ -53,48 +98,4 @@ Durations (all in milliseconds):
 - \`responseHeaders\`: A list (separated by '|') of values for specific, pre-defined response headers, enclosed in square brackets.
 The order of headers corresponds to an internal fixed list. If a header is not present, its value will be empty.
 
-
-
-URL: https://web.dev/
-Bounds: {min: 122410994891, max: 122416385853}
-CPU throttling: none
-Network throttling: none
-Metrics (lab / observed):
-  - LCP: 129 ms, event: (eventKey: r-6063, ts: 122411126100), nodeId: 7
-  - LCP breakdown:
-    - TTFB: 8 ms, bounds: {min: 122410996889, max: 122411004828}
-    - Load delay: 33 ms, bounds: {min: 122411004828, max: 122411037986}
-    - Load duration: 15 ms, bounds: {min: 122411037986, max: 122411052690}
-    - Render delay: 73 ms, bounds: {min: 122411052690, max: 122411126100}
-  - CLS: 0.00
-Metrics (field / real users): n/a – no data for this page in CrUX
-Available insights:
-  - insight name: LCPBreakdown
-    description: Each [subpart has specific improvement strategies](https://web.dev/articles/optimize-lcp#lcp-breakdown). Ideally, most of the LCP time should be spent on loading the resources, not within delays.
-    relevant trace bounds: {min: 122410996889, max: 122411126100}
-    example question: Help me optimize my LCP score
-    example question: Which LCP phase was most problematic?
-    example question: What can I do to reduce the LCP time for this page load?
-  - insight name: LCPDiscovery
-    description: Optimize LCP by making the LCP image [discoverable](https://web.dev/articles/optimize-lcp#1_eliminate_resource_load_delay) from the HTML immediately, and [avoiding lazy-loading](https://web.dev/articles/lcp-lazy-loading)
-    relevant trace bounds: {min: 122411004828, max: 122411055039}
-    example question: Suggest fixes to reduce my LCP
-    example question: What can I do to reduce my LCP discovery time?
-    example question: Why is LCP discovery time important?
-  - insight name: RenderBlocking
-    description: Requests are blocking the page's initial render, which may delay LCP. [Deferring or inlining](https://web.dev/learn/performance/understanding-the-critical-path#render-blocking_resources) can move these network requests out of the critical path.
-    relevant trace bounds: {min: 122411037528, max: 122411053852}
-    example question: Show me the most impactful render blocking requests that I should focus on
-    example question: How can I reduce the number of render blocking requests?
-  - insight name: DocumentLatency
-    description: Your first network request is the most important.  Reduce its latency by avoiding redirects, ensuring a fast server response, and enabling text compression.
-    relevant trace bounds: {min: 122410998910, max: 122411043781}
-    estimated metric savings: FCP 0 ms, LCP 0 ms
-    estimated wasted bytes: 77.1 kB
-    example question: How do I decrease the initial loading time of my page?
-    example question: Did anything slow down the request for this document?
-  - insight name: ThirdParties
-    description: 3rd party code can significantly impact load performance. [Reduce and defer loading of 3rd party code](https://web.dev/articles/optimizing-content-efficiency-loading-third-party-javascript/) to prioritize your page's content.
-    relevant trace bounds: {min: 122411037881, max: 122416229595}
-    example question: Which third parties are having the largest impact on my page performance?
 `;

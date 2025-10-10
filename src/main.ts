@@ -69,22 +69,26 @@ server.server.setRequestHandler(SetLevelRequestSchema, () => {
 
 let context: McpContext;
 async function getContext(): Promise<McpContext> {
-  const extraArgs: string[] = [];
+  const extraArgs: string[] = (args.chromeArg ?? []).map(String);
   if (args.proxyServer) {
     extraArgs.push(`--proxy-server=${args.proxyServer}`);
   }
+  const devtools = args.experimentalDevtools ?? false;
   const browser = args.browserUrl
-    ? await ensureBrowserConnected(args.browserUrl)
+    ? await ensureBrowserConnected({
+        browserURL: args.browserUrl,
+        devtools,
+      })
     : await ensureBrowserLaunched({
         headless: args.headless,
         executablePath: args.executablePath,
-        customDevTools: args.customDevtools,
         channel: args.channel as Channel,
         isolated: args.isolated,
         logFile,
         viewport: args.viewport,
         args: extraArgs,
         acceptInsecureCerts: args.acceptInsecureCerts,
+        devtools,
       });
 
   if (context?.browser !== browser) {
@@ -143,6 +147,9 @@ function registerTool(tool: ToolDefinition): void {
             isError: true,
           };
         }
+      } catch (err) {
+        logger(`${tool.name} error: ${err.message}`);
+        throw err;
       } finally {
         guard.dispose();
       }

@@ -211,11 +211,11 @@
 
 ### `emulate_network`
 
-**Description:** Emulates network conditions such as throttling on the selected page.
+**Description:** Emulates network conditions such as throttling or offline mode on the selected page.
 
 **Parameters:**
 
-- **throttlingOption** (enum: "No emulation", "Slow 3G", "Fast 3G", "Slow 4G", "Fast 4G") **(required)**: The network throttling option to emulate. Available throttling options are: No emulation, Slow 3G, Fast 3G, Slow 4G, Fast 4G. Set to "No emulation" to disable.
+- **throttlingOption** (enum: "No emulation", "Offline", "Slow 3G", "Fast 3G", "Slow 4G", "Fast 4G") **(required)**: The network throttling option to emulate. Available throttling options are: No emulation, Offline, Slow 3G, Fast 3G, Slow 4G, Fast 4G. Set to "No emulation" to disable. Set to "Offline" to simulate offline network conditions.
 
 ---
 
@@ -234,7 +234,7 @@
 
 ### `performance_analyze_insight`
 
-**Description:** Provides more detailed information on a specific Performance Insight that was highlighed in the results of a trace recording.
+**Description:** Provides more detailed information on a specific Performance Insight that was highlighted in the results of a trace recording.
 
 **Parameters:**
 
@@ -275,7 +275,7 @@
 
 ### `list_network_requests`
 
-**Description:** List all requests for the currently selected page
+**Description:** List all requests for the currently selected page since the last navigation.
 
 **Parameters:**
 
@@ -309,7 +309,7 @@ so returned values have to JSON-serializable.
 
 ### `list_console_messages`
 
-**Description:** List all console messages for the currently selected page
+**Description:** List all console messages for the currently selected page since the last navigation.
 
 **Parameters:** None
 

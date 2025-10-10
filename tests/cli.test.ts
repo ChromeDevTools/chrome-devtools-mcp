@@ -38,6 +38,25 @@ describe('cli args parsing', () => {
     });
   });
 
+  it('parses an empty browser url', async () => {
+    const args = parseArguments('1.0.0', [
+      'node',
+      'main.js',
+      '--browserUrl',
+      '',
+    ]);
+    assert.deepStrictEqual(args, {
+      _: [],
+      headless: false,
+      isolated: false,
+      $0: 'npx chrome-devtools-mcp@latest',
+      'browser-url': undefined,
+      browserUrl: undefined,
+      u: undefined,
+      channel: 'stable',
+    });
+  });
+
   it('parses with executable path', async () => {
     const args = parseArguments('1.0.0', [
       'node',
@@ -73,6 +92,24 @@ describe('cli args parsing', () => {
         width: 888,
         height: 777,
       },
+    });
+  });
+
+  it('parses viewport', async () => {
+    const args = parseArguments('1.0.0', [
+      'node',
+      'main.js',
+      `--chrome-arg='--no-sandbox'`,
+      `--chrome-arg='--disable-setuid-sandbox'`,
+    ]);
+    assert.deepStrictEqual(args, {
+      _: [],
+      headless: false,
+      isolated: false,
+      $0: 'npx chrome-devtools-mcp@latest',
+      channel: 'stable',
+      'chrome-arg': ['--no-sandbox', '--disable-setuid-sandbox'],
+      chromeArg: ['--no-sandbox', '--disable-setuid-sandbox'],
     });
   });
 });

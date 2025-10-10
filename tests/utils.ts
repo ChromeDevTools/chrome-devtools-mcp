@@ -46,6 +46,9 @@ export function getMockRequest(
     response?: HTTPResponse;
     failure?: HTTPRequest['failure'];
     resourceType?: string;
+    hasPostData?: boolean;
+    postData?: string;
+    fetchPostData?: Promise<string>;
   } = {},
 ): HTTPRequest {
   return {
@@ -54,6 +57,15 @@ export function getMockRequest(
     },
     method() {
       return options.method ?? 'GET';
+    },
+    fetchPostData() {
+      return options.fetchPostData ?? Promise.reject();
+    },
+    hasPostData() {
+      return options.hasPostData ?? false;
+    },
+    postData() {
+      return options.postData;
     },
     response() {
       return options.response ?? null;

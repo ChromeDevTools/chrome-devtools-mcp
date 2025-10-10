@@ -21,6 +21,7 @@ describe('browser', () => {
       isolated: false,
       userDataDir: folderPath,
       executablePath: executablePath(),
+      devtools: false,
     });
     try {
       try {
@@ -29,6 +30,7 @@ describe('browser', () => {
           isolated: false,
           userDataDir: folderPath,
           executablePath: executablePath(),
+          devtools: false,
         });
         await browser2.close();
         assert.fail('not reached');
@@ -52,9 +54,10 @@ describe('browser', () => {
       userDataDir: folderPath,
       executablePath: executablePath(),
       viewport: {
-        width: 700,
-        height: 500,
+        width: 1501,
+        height: 801,
       },
+      devtools: false,
     });
     try {
       const [page] = await browser.pages();
@@ -62,8 +65,8 @@ describe('browser', () => {
         return {width: window.innerWidth, height: window.innerHeight};
       });
       assert.deepStrictEqual(result, {
-        width: 700,
-        height: 500,
+        width: 1501,
+        height: 801,
       });
     } finally {
       await browser.close();

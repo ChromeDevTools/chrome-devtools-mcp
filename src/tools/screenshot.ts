@@ -4,8 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {writeFile} from 'node:fs/promises';
-
 import type {ElementHandle, Page} from 'puppeteer-core';
 import z from 'zod';
 
@@ -85,10 +83,8 @@ export const screenshot = defineTool({
     }
 
     if (request.params.filePath) {
-      await writeFile(request.params.filePath, screenshot);
-      response.appendResponseLine(
-        `Saved screenshot to ${request.params.filePath}.`,
-      );
+      const file = await context.saveFile(screenshot, request.params.filePath);
+      response.appendResponseLine(`Saved screenshot to ${file.filename}.`);
     } else if (screenshot.length >= 2_000_000) {
       const {filename} = await context.saveTemporaryFile(
         screenshot,

@@ -14,8 +14,15 @@ export const cliOptions = {
     description:
       'Connect to a running Chrome instance using port forwarding. For more details see: https://developer.chrome.com/docs/devtools/remote-debugging/local-server.',
     alias: 'u',
-    coerce: (url: string) => {
-      new URL(url);
+    coerce: (url: string | undefined) => {
+      if (!url) {
+        return;
+      }
+      try {
+        new URL(url);
+      } catch {
+        throw new Error(`Provided browserUrl ${url} is not valid URL.`);
+      }
       return url;
     },
   },
@@ -36,13 +43,6 @@ export const cliOptions = {
       'If specified, creates a temporary user-data-dir that is automatically cleaned up after the browser is closed.',
     default: false,
   },
-  customDevtools: {
-    type: 'string',
-    description: 'Path to custom DevTools.',
-    hidden: true,
-    conflicts: 'browserUrl',
-    alias: 'd',
-  },
   channel: {
     type: 'string',
     description:
@@ -58,7 +58,7 @@ export const cliOptions = {
   viewport: {
     type: 'string',
     describe:
-      'Initial viewport size for the Chromee instances started by the server. For example, `1280x720`',
+      'Initial viewport size for the Chrome instances started by the server. For example, `1280x720`. In headless mode, max size is 3840x2160px.',
     coerce: (arg: string | undefined) => {
       if (arg === undefined) {
         return;
@@ -80,6 +80,16 @@ export const cliOptions = {
   acceptInsecureCerts: {
     type: 'boolean',
     description: `If enabled, ignores errors relative to self-signed and expired certificates. Use with caution.`,
+  },
+  experimentalDevtools: {
+    type: 'boolean',
+    describe: 'Whether to enable automation over DevTools targets',
+    hidden: true,
+  },
+  chromeArg: {
+    type: 'array',
+    describe:
+      'Additional arguments for Chrome. Only applies when Chrome is launched by chrome-devtools-mcp.',
   },
 } satisfies Record<string, YargsOptions>;
 
@@ -109,6 +119,10 @@ export function parseArguments(version: string, argv = process.argv) {
       [
         '$0 --viewport 1280x720',
         'Launch Chrome with the initial viewport size of 1280x720px',
+      ],
+      [
+        `$0 --chrome-arg='--no-sandbox' --chrome-arg='--disable-setuid-sandbox'`,
+        'Launch Chrome without sandboxes. Use with caution.',
       ],
     ]);
 

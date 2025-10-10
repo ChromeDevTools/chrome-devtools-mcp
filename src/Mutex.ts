@@ -7,13 +7,10 @@
 export class Mutex {
   static Guard = class Guard {
     #mutex: Mutex;
-    #onRelease?: () => void;
-    constructor(mutex: Mutex, onRelease?: () => void) {
+    constructor(mutex: Mutex) {
       this.#mutex = mutex;
-      this.#onRelease = onRelease;
     }
     dispose(): void {
-      this.#onRelease?.();
       return this.#mutex.release();
     }
   };
@@ -22,9 +19,7 @@ export class Mutex {
   #acquirers: Array<() => void> = [];
 
   // This is FIFO.
-  async acquire(
-    onRelease?: () => void,
-  ): Promise<InstanceType<typeof Mutex.Guard>> {
+  async acquire(): Promise<InstanceType<typeof Mutex.Guard>> {
     if (!this.#locked) {
       this.#locked = true;
       return new Mutex.Guard(this);
@@ -32,7 +27,7 @@ export class Mutex {
     const {resolve, promise} = Promise.withResolvers<void>();
     this.#acquirers.push(resolve);
     await promise;
-    return new Mutex.Guard(this, onRelease);
+    return new Mutex.Guard(this);
   }
 
   release(): void {

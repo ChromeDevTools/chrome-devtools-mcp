@@ -1,0 +1,72 @@
+name: Bug report
+description: File a bug report for chrome-devtools-mcp
+title: '<short description of the bug>'
+type: 'Bug'
+body:
+  - id: description
+    type: textarea
+    attributes:
+      label: Description of the bug
+      description: >
+        A clear and concise description of what the bug is.
+      placeholder:
+    validations:
+      required: true
+
+  - id: reproduce
+    type: textarea
+    attributes:
+      label: Reproduction
+      description: >
+        Steps to reproduce the behavior:
+      placeholder: |
+        1. Use tool '...'
+        2. Then use tool '...'
+
+  - id: expectation
+    type: textarea
+    attributes:
+      label: Expectation
+      description: A clear and concise description of what you expected to happen.
+
+  - id: mcp-configuration
+    type: textarea
+    attributes:
+      label: MCP configuration
+
+  - id: node-version
+    type: input
+    attributes:
+      label: Node version
+      description: >
+        Please verify you have the minimal supported version listed in the README.md
+
+  - id: chrome-version
+    type: input
+    attributes:
+      label: Chrome version
+
+  - id: coding-agent-version
+    type: input
+    attributes:
+      label: Coding agent version
+
+  - id: model-version
+    type: input
+    attributes:
+      label: Model version
+
+  - id: chat-log
+    type: input
+    attributes:
+      label: Chat log
+
+  - id: operating-system
+    type: dropdown
+    attributes:
+      label: Operating system
+      description: What supported operating system are you running?
+      options:
+        - Windows
+        - macOS
+        - Linux
