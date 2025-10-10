@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.0](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.7.1...chrome-devtools-mcp-v0.8.0) (2025-10-10)
+
+
+### Features
+
+* support passing args to Chrome ([#338](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/338)) ([e1b5363](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/e1b536365363e1e1a3aa7661dd84290c794510ad))
+
 ## [0.7.1](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.7.0...chrome-devtools-mcp-v0.7.1) (2025-10-10)
 
 
