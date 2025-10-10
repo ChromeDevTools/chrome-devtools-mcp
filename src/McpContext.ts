@@ -134,9 +134,16 @@ export class McpContext implements Context {
     return this.#networkCollector.getData(page);
   }
 
-  getConsoleData(): Array<ConsoleMessage | Error> {
+  getConsoleData(tail?: number): Array<ConsoleMessage | Error> {
     const page = this.getSelectedPage();
-    return this.#consoleCollector.getData(page);
+    const allMessages = this.#consoleCollector.getData(page);
+
+    // If tail is specified, return only the last N messages
+    if (tail !== undefined && tail > 0) {
+      return allMessages.slice(-tail);
+    }
+
+    return allMessages;
   }
 
   async newPage(): Promise<Page> {
