@@ -356,26 +356,6 @@ Add the `--browser-url` option to your MCP client configuration. The value of th
 
 Start the Chrome browser with the remote debugging port enabled. Make sure to close any running Chrome instances before starting a new one with the debugging port enabled.
 
-**macOS**
-
-```bash
-/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome --remote-debugging-port=9222
-```
-
-**Linux**
-
-```bash
-/usr/bin/google-chrome --remote-debugging-port=9222
-```
-
-**Windows**
-
-```bash
-"C:\Program Files\Google\Chrome\Application\chrome.exe" --remote-debugging-port=9222
-```
-
-**Step 3: Use a non-default user data directory**
-
 For security reasons, Chrome requires you to use a non-default user data directory when enabling the remote debugging port. You can specify a custom directory using the `--user-data-dir` flag. This ensures that your regular browsing profile and data are not exposed to the debugging session.
 
 **macOS**
@@ -399,7 +379,7 @@ For security reasons, Chrome requires you to use a non-default user data directo
 > [!WARNING]  
 > Enabling the remote debugging port opens up a debugging port on the running browser instance. Any application on your machine can connect to this port and control the browser. Make sure that you are not browsing any sensitive websites while the debugging port is open.
 
-**Step 4: Ensure the ports are the same**
+**Step 3: Ensure the ports are the same**
 
 The port number in the `--browser-url` option in your MCP client configuration must be the same as the port number you used to start the Chrome browser.
 
