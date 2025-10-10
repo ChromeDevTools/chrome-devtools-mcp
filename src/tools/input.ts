@@ -4,11 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {ElementHandle} from 'puppeteer-core';
+import type {ElementHandle, KeyInput} from 'puppeteer-core';
 import z from 'zod';
 
+import {splitKeyCombo} from '../third_party/playwright/keyboard.js';
 import {ToolCategories} from './categories.js';
-import {defineTool} from './ToolDefinition.js';
+import {defineTool, uidSchema} from './ToolDefinition.js';
 
 export const click = defineTool({
   name: 'click',
@@ -18,15 +19,8 @@ export const click = defineTool({
     readOnlyHint: false,
   },
   schema: {
-    uid: z
-      .string()
-      .describe(
-        'The uid of an element on the page from the page content snapshot',
-      ),
-    dblClick: z
-      .boolean()
-      .optional()
-      .describe('Set to true for double clicks. Default is false.'),
+    uid: uidSchema,
+    dblClick: z.boolean().optional().describe('Double click (default: false)'),
   },
   handler: async (request, response, context) => {
     const uid = request.params.uid;
@@ -57,11 +51,7 @@ export const hover = defineTool({
     readOnlyHint: false,
   },
   schema: {
-    uid: z
-      .string()
-      .describe(
-        'The uid of an element on the page from the page content snapshot',
-      ),
+    uid: uidSchema,
   },
   handler: async (request, response, context) => {
     const uid = request.params.uid;
@@ -80,18 +70,14 @@ export const hover = defineTool({
 
 export const fill = defineTool({
   name: 'fill',
-  description: `Type text into a input, text area or select an option from a <select> element.`,
+  description: `Type text into input, text area, or select option from <select> element`,
   annotations: {
     category: ToolCategories.INPUT_AUTOMATION,
     readOnlyHint: false,
   },
   schema: {
-    uid: z
-      .string()
-      .describe(
-        'The uid of an element on the page from the page content snapshot',
-      ),
-    value: z.string().describe('The value to fill in'),
+    uid: uidSchema,
+    value: z.string().describe('Value to fill'),
   },
   handler: async (request, response, context) => {
     const handle = await context.getElementByUid(request.params.uid);
@@ -115,8 +101,8 @@ export const drag = defineTool({
     readOnlyHint: false,
   },
   schema: {
-    from_uid: z.string().describe('The uid of the element to drag'),
-    to_uid: z.string().describe('The uid of the element to drop into'),
+    from_uid: z.string().describe('Element uid to drag'),
+    to_uid: z.string().describe('Element uid to drop into'),
   },
   handler: async (request, response, context) => {
     const fromHandle = await context.getElementByUid(request.params.from_uid);
@@ -147,11 +133,11 @@ export const fillForm = defineTool({
     elements: z
       .array(
         z.object({
-          uid: z.string().describe('The uid of the element to fill out'),
-          value: z.string().describe('Value for the element'),
+          uid: z.string().describe('Element uid'),
+          value: z.string().describe('Value'),
         }),
       )
-      .describe('Elements from snapshot to fill out.'),
+      .describe('Elements to fill'),
   },
   handler: async (request, response, context) => {
     for (const element of request.params.elements) {
@@ -177,12 +163,8 @@ export const uploadFile = defineTool({
     readOnlyHint: false,
   },
   schema: {
-    uid: z
-      .string()
-      .describe(
-        'The uid of the file input element or an element that will open file chooser on the page from the page content snapshot',
-      ),
-    filePath: z.string().describe('The local path of the file to upload'),
+    uid: z.string().describe('File input element uid or element that opens file chooser'),
+    filePath: z.string().describe('Local file path'),
   },
   handler: async (request, response, context) => {
     const {uid, filePath} = request.params;
@@ -217,61 +199,33 @@ export const uploadFile = defineTool({
   },
 });
 
-/**
- * Split a key combination string into individual keys.
- * Handles combinations like "Control+A" and special cases like "Control++".
- * Based on Playwright's implementation.
- */
-function splitKeyCombo(keyString: string): string[] {
-  const keys: string[] = [];
-  let building = '';
-  for (const char of keyString) {
-    if (char === '+' && building) {
-      // Only split if there's text before +
-      keys.push(building);
-      building = '';
-    } else {
-      building += char;
-    }
-  }
-  keys.push(building);
-  return keys;
-}
-
 export const pressKey = defineTool({
   name: 'press_key',
-  description: `Press a key or key combination on the keyboard. Supports modifier keys and combinations.`,
+  description: `Press a key or key combination. Use this when other input methods like fill() cannot be used (e.g., keyboard shortcuts, navigation keys, or special key combinations).`,
   annotations: {
     category: ToolCategories.INPUT_AUTOMATION,
     readOnlyHint: false,
   },
   schema: {
-    key: z
-      .string()
-      .describe(
-        'Key to press. Can be a single key (e.g., "Enter", "Escape", "a") or a combination with modifiers (e.g., "Control+A", "Control+Shift+T", "Control++"). Modifier keys: Control, Shift, Alt, Meta.',
-      ),
+    key: z.string().describe('Key or combination (e.g., "Enter", "Control+A", "Control++"). Modifiers: Control, Shift, Alt, Meta'),
   },
   handler: async (request, response, context) => {
     const page = context.getSelectedPage();
     const tokens = splitKeyCombo(request.params.key);
-    const key = tokens[tokens.length - 1];
-    const modifiers = tokens.slice(0, -1);
+    const key = tokens[tokens.length - 1] as KeyInput;
+    const modifiers = tokens.slice(0, -1) as KeyInput[];
 
     await context.waitForEventsAfterAction(async () => {
       // Press down modifiers
       for (const modifier of modifiers) {
-        // @ts-expect-error - Puppeteer KeyInput type is too restrictive for dynamic input
         await page.keyboard.down(modifier);
       }
 
       // Press the key
-      // @ts-expect-error - Puppeteer KeyInput type is too restrictive for dynamic input
       await page.keyboard.press(key);
 
       // Release modifiers in reverse order
       for (let i = modifiers.length - 1; i >= 0; i--) {
-        // @ts-expect-error - Puppeteer KeyInput type is too restrictive for dynamic input
         await page.keyboard.up(modifiers[i]);
       }
     });
