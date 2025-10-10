@@ -200,11 +200,11 @@
 
 ### `emulate_network`
 
-**Description:** Emulates network conditions such as throttling on the selected page.
+**Description:** Emulates network conditions such as throttling or offline mode on the selected page.
 
 **Parameters:**
 
-- **throttlingOption** (enum: "No emulation", "Slow 3G", "Fast 3G", "Slow 4G", "Fast 4G") **(required)**: The network throttling option to emulate. Available throttling options are: No emulation, Slow 3G, Fast 3G, Slow 4G, Fast 4G. Set to "No emulation" to disable.
+- **throttlingOption** (enum: "No emulation", "Offline", "Slow 3G", "Fast 3G", "Slow 4G", "Fast 4G") **(required)**: The network throttling option to emulate. Available throttling options are: No emulation, Offline, Slow 3G, Fast 3G, Slow 4G, Fast 4G. Set to "No emulation" to disable. Set to "Offline" to simulate offline network conditions.
 
 ---
 
