@@ -167,9 +167,6 @@ async function stopTracingAndAppendOutput(
     response.appendResponseLine('The performance trace has been stopped.');
     if (traceResultIsSuccess(result)) {
       context.storeTraceRecording(result);
-      response.appendResponseLine(
-        'Here is a high level summary of the trace and the Insights that were found:',
-      );
       const traceSummaryText = getTraceSummary(result);
       response.appendResponseLine(traceSummaryText);
     } else {
