@@ -60,7 +60,6 @@ export async function ensureBrowserConnected(options: {
 interface McpLaunchOptions {
   acceptInsecureCerts?: boolean;
   executablePath?: string;
-  customDevTools?: string;
   channel?: Channel;
   userDataDir?: string;
   headless: boolean;
@@ -75,7 +74,7 @@ interface McpLaunchOptions {
 }
 
 export async function launch(options: McpLaunchOptions): Promise<Browser> {
-  const {channel, executablePath, customDevTools, headless, isolated} = options;
+  const {channel, executablePath, headless, isolated} = options;
   const profileDirName =
     channel && channel !== 'stable'
       ? `chrome-profile-${channel}`
@@ -98,9 +97,6 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
     ...(options.args ?? []),
     '--hide-crash-restore-bubble',
   ];
-  if (customDevTools) {
-    args.push(`--custom-devtools-frontend=file://${customDevTools}`);
-  }
   if (headless) {
     args.push('--screen-info={3840x2160}');
   }

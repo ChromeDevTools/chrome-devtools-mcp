@@ -82,7 +82,6 @@ async function getContext(): Promise<McpContext> {
     : await ensureBrowserLaunched({
         headless: args.headless,
         executablePath: args.executablePath,
-        customDevTools: args.customDevtools,
         channel: args.channel as Channel,
         isolated: args.isolated,
         logFile,
