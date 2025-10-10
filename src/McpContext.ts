@@ -19,7 +19,7 @@ import type {
   PredefinedNetworkConditions,
 } from 'puppeteer-core';
 
-import {NetworkCollector, PageCollector} from './PageCollector.js';
+import {NetworkCollector, PageCollector, PreservedNetworkRequest} from './PageCollector.js';
 import {listPages} from './tools/pages.js';
 import {takeSnapshot} from './tools/snapshot.js';
 import {CLOSE_PAGE_ERROR} from './tools/ToolDefinition.js';
@@ -132,6 +132,32 @@ export class McpContext implements Context {
   getNetworkRequests(): HTTPRequest[] {
     const page = this.getSelectedPage();
     return this.#networkCollector.getData(page);
+  }
+
+  getPreservedNetworkRequests(): PreservedNetworkRequest[] {
+    const page = this.getSelectedPage();
+    return this.#networkCollector.getPreservedData(page);
+  }
+
+  enableNetworkLogPreservation(options?: {
+    includeRequestBodies?: boolean;
+    includeResponseBodies?: boolean;
+    maxRequests?: number;
+  }): void {
+    this.#networkCollector.enablePreservation(options);
+  }
+
+  disableNetworkLogPreservation(): void {
+    this.#networkCollector.disablePreservation();
+  }
+
+  isNetworkLogPreservationEnabled(): boolean {
+    return this.#networkCollector.isPreservationEnabled();
+  }
+
+  clearPreservedNetworkLogs(): void {
+    const page = this.getSelectedPage();
+    this.#networkCollector.clearPreservedData(page);
   }
 
   getConsoleData(): Array<ConsoleMessage | Error> {
