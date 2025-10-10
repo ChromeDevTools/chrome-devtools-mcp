@@ -264,7 +264,7 @@
 
 ### `list_network_requests`
 
-**Description:** List all requests for the currently selected page
+**Description:** List all requests for the currently selected page since the last navigation.
 
 **Parameters:**
 
@@ -298,7 +298,7 @@ so returned values have to JSON-serializable.
 
 ### `list_console_messages`
 
-**Description:** List all console messages for the currently selected page
+**Description:** List all console messages for the currently selected page since the last navigation.
 
 **Parameters:** None
 
