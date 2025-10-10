@@ -328,6 +328,83 @@ all instances of `chrome-devtools-mcp`. Set the `isolated` option to `true`
 to use a temporary user data dir instead which will be cleared automatically after
 the browser is closed.
 
+### Connecting to a running Chrome instance
+
+You can connect to a running Chrome instance by using the `--browser-url` option. This is useful if you want to use your existing Chrome profile or if you are running the MCP server in a sandboxed environment that does not allow starting a new Chrome instance.
+
+Here is a step-by-step guide on how to connect to a running Chrome Stable instance:
+
+**Step 1: Configure the MCP client**
+
+Add the `--browser-url` option to your MCP client configuration. The value of this option should be the URL of the running Chrome instance, including the port number.
+
+```json
+{
+  "mcpServers": {
+    "chrome-devtools": {
+      "command": "npx",
+      "args": [
+        "chrome-devtools-mcp@latest",
+        "--browser-url=http://localhost:9222"
+      ]
+    }
+  }
+}
+```
+
+**Step 2: Start the Chrome browser**
+
+Start the Chrome browser with the remote debugging port enabled. Make sure to close any running Chrome instances before starting a new one with the debugging port enabled.
+
+**macOS**
+
+```bash
+/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome --remote-debugging-port=9222
+```
+
+**Linux**
+
+```bash
+/usr/bin/google-chrome --remote-debugging-port=9222
+```
+
+**Windows**
+
+```bash
+"C:\Program Files\Google\Chrome\Application\chrome.exe" --remote-debugging-port=9222
+```
+
+**Step 3: Use a non-default user data directory**
+
+For security reasons, Chrome requires you to use a non-default user data directory when enabling the remote debugging port. You can specify a custom directory using the `--user-data-dir` flag. This ensures that your regular browsing profile and data are not exposed to the debugging session.
+
+**macOS**
+
+```bash
+/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome --remote-debugging-port=9222 --user-data-dir=/tmp/chrome-profile-stable
+```
+
+**Linux**
+
+```bash
+/usr/bin/google-chrome --remote-debugging-port=9222 --user-data-dir=/tmp/chrome-profile-stable
+```
+
+**Windows**
+
+```bash
+"C:\Program Files\Google\Chrome\Application\chrome.exe" --remote-debugging-port=9222 --user-data-dir="%TEMP%\chrome-profile-stable"
+```
+
+> [!WARNING]  
+> Enabling the remote debugging port opens up a debugging port on the running browser instance. Any application on your machine can connect to this port and control the browser. Make sure that you are not browsing any sensitive websites while the debugging port is open.
+
+**Step 4: Ensure the ports are the same**
+
+The port number in the `--browser-url` option in your MCP client configuration must be the same as the port number you used to start the Chrome browser.
+
+For more details on remote debugging, see the [Chrome DevTools documentation](https://developer.chrome.com/docs/devtools/remote-debugging/).
+
 ## Known limitations
 
 ### Operating system sandboxes
