@@ -11,7 +11,6 @@ import path from 'node:path';
 import type {
   Browser,
   ChromeReleaseChannel,
-  ConnectOptions,
   LaunchOptions,
   Target,
 } from 'puppeteer-core';
@@ -19,37 +18,41 @@ import puppeteer from 'puppeteer-core';
 
 let browser: Browser | undefined;
 
-const ignoredPrefixes = new Set([
-  'chrome://',
-  'chrome-extension://',
-  'chrome-untrusted://',
-  'devtools://',
-]);
+function makeTargetFilter(devtools: boolean) {
+  const ignoredPrefixes = new Set([
+    'chrome://',
+    'chrome-extension://',
+    'chrome-untrusted://',
+  ]);
 
-function targetFilter(target: Target): boolean {
-  if (target.url() === 'chrome://newtab/') {
-    return true;
+  if (!devtools) {
+    ignoredPrefixes.add('devtools://');
   }
-  for (const prefix of ignoredPrefixes) {
-    if (target.url().startsWith(prefix)) {
-      return false;
+  return function targetFilter(target: Target): boolean {
+    if (target.url() === 'chrome://newtab/') {
+      return true;
     }
-  }
-  return true;
+    for (const prefix of ignoredPrefixes) {
+      if (target.url().startsWith(prefix)) {
+        return false;
+      }
+    }
+    return true;
+  };
 }
 
-const connectOptions: ConnectOptions = {
-  targetFilter,
-};
-
-export async function ensureBrowserConnected(browserURL: string) {
+export async function ensureBrowserConnected(options: {
+  browserURL: string;
+  devtools: boolean;
+}) {
   if (browser?.connected) {
     return browser;
   }
   browser = await puppeteer.connect({
-    ...connectOptions,
-    browserURL,
+    targetFilter: makeTargetFilter(options.devtools),
+    browserURL: options.browserURL,
     defaultViewport: null,
+    handleDevToolsAsPage: options.devtools,
   });
   return browser;
 }
@@ -68,6 +71,7 @@ interface McpLaunchOptions {
     height: number;
   };
   args?: string[];
+  devtools: boolean;
 }
 
 export async function launch(options: McpLaunchOptions): Promise<Browser> {
@@ -101,6 +105,9 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
     args.push('--screen-info={3840x2160}');
   }
   let puppeteerChannel: ChromeReleaseChannel | undefined;
+  if (options.devtools) {
+    args.push('--auto-open-devtools-for-tabs');
+  }
   if (!executablePath) {
     puppeteerChannel =
       channel && channel !== 'stable'
@@ -110,8 +117,8 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
 
   try {
     const browser = await puppeteer.launch({
-      ...connectOptions,
       channel: puppeteerChannel,
+      targetFilter: makeTargetFilter(options.devtools),
       executablePath,
       defaultViewport: null,
       userDataDir,
@@ -119,6 +126,7 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
       headless,
       args,
       acceptInsecureCerts: options.acceptInsecureCerts,
+      handleDevToolsAsPage: options.devtools,
     });
     if (options.logFile) {
       // FIXME: we are probably subscribing too late to catch startup logs. We

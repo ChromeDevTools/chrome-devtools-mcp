@@ -21,6 +21,7 @@ describe('browser', () => {
       isolated: false,
       userDataDir: folderPath,
       executablePath: executablePath(),
+      devtools: false,
     });
     try {
       try {
@@ -29,6 +30,7 @@ describe('browser', () => {
           isolated: false,
           userDataDir: folderPath,
           executablePath: executablePath(),
+          devtools: false,
         });
         await browser2.close();
         assert.fail('not reached');
@@ -55,6 +57,7 @@ describe('browser', () => {
         width: 1501,
         height: 801,
       },
+      devtools: false,
     });
     try {
       const [page] = await browser.pages();
