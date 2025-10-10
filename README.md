@@ -294,7 +294,6 @@ The Chrome DevTools MCP server supports the following configuration option:
 - **`--chromeArg`**
   Additional arguments for Chrome. Only applies when Chrome is launched by chrome-devtools-mcp.
   - **Type:** array
-  - **Default:** ``
 
 <!-- END AUTO GENERATED OPTIONS -->
 

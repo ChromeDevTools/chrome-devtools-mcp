@@ -90,7 +90,6 @@ export const cliOptions = {
     type: 'array',
     describe:
       'Additional arguments for Chrome. Only applies when Chrome is launched by chrome-devtools-mcp.',
-    default: [],
   },
 } satisfies Record<string, YargsOptions>;
 
@@ -122,7 +121,7 @@ export function parseArguments(version: string, argv = process.argv) {
         'Launch Chrome with the initial viewport size of 1280x720px',
       ],
       [
-        `$0 --chrome-args='--no-sandbox' --chrome-args='--disable-setuid-sandbox'`,
+        `$0 --chrome-arg='--no-sandbox' --chrome-arg='--disable-setuid-sandbox'`,
         'Launch Chrome without sandboxes. Use with caution.',
       ],
     ]);

@@ -17,8 +17,6 @@ describe('cli args parsing', () => {
       isolated: false,
       $0: 'npx chrome-devtools-mcp@latest',
       channel: 'stable',
-      'chrome-arg': [],
-      chromeArg: [],
     });
   });
 
@@ -37,8 +35,6 @@ describe('cli args parsing', () => {
       'browser-url': 'http://localhost:3000',
       browserUrl: 'http://localhost:3000',
       u: 'http://localhost:3000',
-      'chrome-arg': [],
-      chromeArg: [],
     });
   });
 
@@ -58,8 +54,6 @@ describe('cli args parsing', () => {
       browserUrl: undefined,
       u: undefined,
       channel: 'stable',
-      'chrome-arg': [],
-      chromeArg: [],
     });
   });
 
@@ -78,8 +72,6 @@ describe('cli args parsing', () => {
       'executable-path': '/tmp/test 123/chrome',
       e: '/tmp/test 123/chrome',
       executablePath: '/tmp/test 123/chrome',
-      'chrome-arg': [],
-      chromeArg: [],
     });
   });
 
@@ -100,8 +92,6 @@ describe('cli args parsing', () => {
         width: 888,
         height: 777,
       },
-      'chrome-arg': [],
-      chromeArg: [],
     });
   });
 
