@@ -89,8 +89,16 @@ export class McpContext implements Context {
 
   #nextSnapshotId = 1;
   #traceResults: TraceResult[] = [];
+  #devtools = false;
 
-  private constructor(browser: Browser, logger: Debugger) {
+  private constructor(
+    browser: Browser,
+    logger: Debugger,
+    options: {
+      devtools: boolean;
+    },
+  ) {
+    this.#devtools = options.devtools;
     this.browser = browser;
     this.logger = logger;
 
@@ -123,8 +131,14 @@ export class McpContext implements Context {
     await this.#consoleCollector.init();
   }
 
-  static async from(browser: Browser, logger: Debugger) {
-    const context = new McpContext(browser, logger);
+  static async from(
+    browser: Browser,
+    logger: Debugger,
+    options: {
+      devtools: boolean;
+    },
+  ) {
+    const context = new McpContext(browser, logger, options);
     await context.#init();
     return context;
   }
@@ -302,6 +316,16 @@ export class McpContext implements Context {
    */
   async createPagesSnapshot(): Promise<Page[]> {
     this.#pages = await this.browser.pages();
+    // if (this.#devtools) {
+    //   for (const target of this.browser.targets()) {
+    //     if (
+    //       target.type() === 'other' &&
+    //       target.url().startsWith('devtools://')
+    //     ) {
+    //       this.#pages.push(await target.asPage());
+    //     }
+    //   }
+    // }
     return this.#pages;
   }
 

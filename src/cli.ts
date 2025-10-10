@@ -88,6 +88,11 @@ export const cliOptions = {
     type: 'boolean',
     description: `If enabled, ignores errors relative to self-signed and expired certificates. Use with caution.`,
   },
+  experimentalDevtools: {
+    type: 'boolean' as const,
+    describe: 'Whether to enable automation over DevTools targets',
+    hidden: true,
+  },
 } satisfies Record<string, YargsOptions>;
 
 export function parseArguments(version: string, argv = process.argv) {

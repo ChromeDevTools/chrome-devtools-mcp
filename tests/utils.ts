@@ -35,7 +35,9 @@ export async function withBrowser(
     }),
   );
   const response = new McpResponse();
-  const context = await McpContext.from(browser, logger('test'));
+  const context = await McpContext.from(browser, logger('test'), {
+    devtools: false,
+  });
 
   await cb(response, context);
 }
