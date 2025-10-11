@@ -19,9 +19,17 @@ export const screenshot = defineTool({
   },
   schema: {
     format: z
-      .enum(['png', 'jpeg'])
+      .enum(['png', 'jpeg', 'webp'])
       .default('png')
       .describe('Type of format to save the screenshot as. Default is "png"'),
+    quality: z
+      .number()
+      .min(0)
+      .max(100)
+      .optional()
+      .describe(
+        'Compression quality for JPEG and WebP formats (0-100). Higher values mean better quality but larger file sizes. Ignored for PNG format.',
+      ),
     uid: z
       .string()
       .optional()
@@ -33,6 +41,12 @@ export const screenshot = defineTool({
       .optional()
       .describe(
         'If set to true takes a screenshot of the full page instead of the currently visible viewport. Incompatible with uid.',
+      ),
+    filePath: z
+      .string()
+      .optional()
+      .describe(
+        'The absolute path, or a path relative to the current working directory, to save the screenshot to instead of attaching it to the response.',
       ),
   },
   handler: async (request, response, context) => {
@@ -50,6 +64,8 @@ export const screenshot = defineTool({
     const screenshot = await pageOrHandle.screenshot({
       type: request.params.format,
       fullPage: request.params.fullPage,
+      quality: request.params.quality,
+      optimizeForSpeed: true, // Bonus: optimize encoding for speed
     });
 
     if (request.params.uid) {
@@ -66,7 +82,10 @@ export const screenshot = defineTool({
       );
     }
 
-    if (screenshot.length >= 2_000_000) {
+    if (request.params.filePath) {
+      const file = await context.saveFile(screenshot, request.params.filePath);
+      response.appendResponseLine(`Saved screenshot to ${file.filename}.`);
+    } else if (screenshot.length >= 2_000_000) {
       const {filename} = await context.saveTemporaryFile(
         screenshot,
         `image/${request.params.format}`,

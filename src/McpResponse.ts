@@ -12,18 +12,27 @@ import type {ResourceType} from 'puppeteer-core';
 import {formatConsoleEvent} from './formatters/consoleFormatter.js';
 import {
   getFormattedHeaderValue,
+  getFormattedResponseBody,
+  getFormattedRequestBody,
   getShortDescriptionForRequest,
   getStatusFromRequest,
 } from './formatters/networkFormatter.js';
 import {formatA11ySnapshot} from './formatters/snapshotFormatter.js';
 import type {McpContext} from './McpContext.js';
+import {handleDialog} from './tools/pages.js';
 import type {ImageContentData, Response} from './tools/ToolDefinition.js';
 import {paginate, type PaginationOptions} from './utils/pagination.js';
+
+interface NetworkRequestData {
+  networkRequestUrl: string;
+  requestBody?: string;
+  responseBody?: string;
+}
 
 export class McpResponse implements Response {
   #includePages = false;
   #includeSnapshot = false;
-  #attachedNetworkRequestUrl?: string;
+  #attachedNetworkRequestData?: NetworkRequestData;
   #includeConsoleData = false;
   #textResponseLines: string[] = [];
   #formattedConsoleData?: string[];
@@ -73,7 +82,9 @@ export class McpResponse implements Response {
   }
 
   attachNetworkRequest(url: string): void {
-    this.#attachedNetworkRequestUrl = url;
+    this.#attachedNetworkRequestData = {
+      networkRequestUrl: url,
+    };
   }
 
   get includePages(): boolean {
@@ -88,7 +99,7 @@ export class McpResponse implements Response {
     return this.#includeConsoleData;
   }
   get attachedNetworkRequestUrl(): string | undefined {
-    return this.#attachedNetworkRequestUrl;
+    return this.#attachedNetworkRequestData?.networkRequestUrl;
   }
   get networkRequestsPageIdx(): number | undefined {
     return this.#networkRequestsOptions?.pagination?.pageIdx;
@@ -126,6 +137,22 @@ export class McpResponse implements Response {
     }
 
     let formattedConsoleMessages: string[];
+
+    if (this.#attachedNetworkRequestData?.networkRequestUrl) {
+      const request = context.getNetworkRequestByUrl(
+        this.#attachedNetworkRequestData.networkRequestUrl,
+      );
+
+      this.#attachedNetworkRequestData.requestBody =
+        await getFormattedRequestBody(request);
+
+      const response = request.response();
+      if (response) {
+        this.#attachedNetworkRequestData.responseBody =
+          await getFormattedResponseBody(response);
+      }
+    }
+
     if (this.#includeConsoleData) {
       const consoleMessages = context.getConsoleData();
       if (consoleMessages) {
@@ -153,7 +180,7 @@ export class McpResponse implements Response {
       response.push(`## Network emulation`);
       response.push(`Emulating: ${networkConditions}`);
       response.push(
-        `Navigation timeout set to ${context.getNavigationTimeout()} ms`,
+        `Default navigation timeout set to ${context.getNavigationTimeout()} ms`,
       );
     }
 
@@ -167,7 +194,7 @@ export class McpResponse implements Response {
     if (dialog) {
       response.push(`# Open dialog
 ${dialog.type()}: ${dialog.message()} (default value: ${dialog.message()}).
-Call browser_handle_dialog to handle it before continuing.`);
+Call ${handleDialog.name} to handle it before continuing.`);
     }
 
     if (this.#includePages) {
@@ -209,30 +236,12 @@ Call browser_handle_dialog to handle it before continuing.`);
 
       response.push('## Network requests');
       if (requests.length) {
-        const paginationResult = paginate(
+        const data = this.#dataWithPagination(
           requests,
           this.#networkRequestsOptions.pagination,
         );
-        if (paginationResult.invalidPage) {
-          response.push('Invalid page number provided. Showing first page.');
-        }
-
-        const {startIndex, endIndex, currentPage, totalPages} =
-          paginationResult;
-        response.push(
-          `Showing ${startIndex + 1}-${endIndex} of ${requests.length} (Page ${currentPage + 1} of ${totalPages}).`,
-        );
-
-        if (this.#networkRequestsOptions.pagination) {
-          if (paginationResult.hasNextPage) {
-            response.push(`Next page: ${currentPage + 1}`);
-          }
-          if (paginationResult.hasPreviousPage) {
-            response.push(`Previous page: ${currentPage - 1}`);
-          }
-        }
-
-        for (const request of paginationResult.items) {
+        response.push(...data.info);
+        for (const request of data.items) {
           response.push(getShortDescriptionForRequest(request));
         }
       } else {
@@ -263,12 +272,39 @@ Call browser_handle_dialog to handle it before continuing.`);
     return [text, ...images];
   }
 
+  #dataWithPagination<T>(data: T[], pagination?: PaginationOptions) {
+    const response = [];
+    const paginationResult = paginate<T>(data, pagination);
+    if (paginationResult.invalidPage) {
+      response.push('Invalid page number provided. Showing first page.');
+    }
+
+    const {startIndex, endIndex, currentPage, totalPages} = paginationResult;
+    response.push(
+      `Showing ${startIndex + 1}-${endIndex} of ${data.length} (Page ${currentPage + 1} of ${totalPages}).`,
+    );
+    if (pagination) {
+      if (paginationResult.hasNextPage) {
+        response.push(`Next page: ${currentPage + 1}`);
+      }
+      if (paginationResult.hasPreviousPage) {
+        response.push(`Previous page: ${currentPage - 1}`);
+      }
+    }
+
+    return {
+      info: response,
+      items: paginationResult.items,
+    };
+  }
+
   #getIncludeNetworkRequestsData(context: McpContext): string[] {
     const response: string[] = [];
-    const url = this.#attachedNetworkRequestUrl;
+    const url = this.#attachedNetworkRequestData?.networkRequestUrl;
     if (!url) {
       return response;
     }
+
     const httpRequest = context.getNetworkRequestByUrl(url);
     response.push(`## Request ${httpRequest.url()}`);
     response.push(`Status:  ${getStatusFromRequest(httpRequest)}`);
@@ -277,12 +313,22 @@ Call browser_handle_dialog to handle it before continuing.`);
       response.push(line);
     }
 
+    if (this.#attachedNetworkRequestData?.requestBody) {
+      response.push(`### Request Body`);
+      response.push(this.#attachedNetworkRequestData.requestBody);
+    }
+
     const httpResponse = httpRequest.response();
     if (httpResponse) {
       response.push(`### Response Headers`);
       for (const line of getFormattedHeaderValue(httpResponse.headers())) {
         response.push(line);
       }
+    }
+
+    if (this.#attachedNetworkRequestData?.responseBody) {
+      response.push(`### Response Body`);
+      response.push(this.#attachedNetworkRequestData.responseBody);
     }
 
     const httpFailure = httpRequest.failure();

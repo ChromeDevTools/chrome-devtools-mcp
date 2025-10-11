@@ -6,6 +6,8 @@
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
+import type {Dialog} from 'puppeteer-core';
+
 import {
   listPages,
   newPage,
@@ -249,6 +251,35 @@ describe('pages', () => {
           alert('test');
         });
         await dialogPromise;
+        await handleDialog.handler(
+          {
+            params: {
+              action: 'dismiss',
+            },
+          },
+          response,
+          context,
+        );
+        assert.strictEqual(context.getDialog(), undefined);
+        assert.strictEqual(
+          response.responseLines[0],
+          'Successfully dismissed the dialog',
+        );
+      });
+    });
+    it('can dismiss already dismissed dialog dialogs', async () => {
+      await withBrowser(async (response, context) => {
+        const page = context.getSelectedPage();
+        const dialogPromise = new Promise<Dialog>(resolve => {
+          page.on('dialog', dialog => {
+            resolve(dialog);
+          });
+        });
+        page.evaluate(() => {
+          alert('test');
+        });
+        const dialog = await dialogPromise;
+        await dialog.dismiss();
         await handleDialog.handler(
           {
             params: {

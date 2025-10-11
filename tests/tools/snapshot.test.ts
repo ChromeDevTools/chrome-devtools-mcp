@@ -95,5 +95,32 @@ describe('snapshot', () => {
         assert.ok(response.includeSnapshot);
       });
     });
+
+    it('should work with iframe content', async () => {
+      await withBrowser(async (response, context) => {
+        const page = await context.getSelectedPage();
+
+        await page.setContent(
+          html`<h1>Top level</h1>
+            <iframe srcdoc="<p>Hello iframe</p>"></iframe>`,
+        );
+
+        await waitFor.handler(
+          {
+            params: {
+              text: 'Hello iframe',
+            },
+          },
+          response,
+          context,
+        );
+
+        assert.equal(
+          response.responseLines[0],
+          'Element with text "Hello iframe" found.',
+        );
+        assert.ok(response.includeSnapshot);
+      });
+    });
   });
 });

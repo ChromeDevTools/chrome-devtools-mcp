@@ -8,7 +8,7 @@ import {Locator} from 'puppeteer-core';
 import z from 'zod';
 
 import {ToolCategories} from './categories.js';
-import {defineTool} from './ToolDefinition.js';
+import {defineTool, timeoutSchema} from './ToolDefinition.js';
 
 export const takeSnapshot = defineTool({
   name: 'take_snapshot',
@@ -33,14 +33,24 @@ export const waitFor = defineTool({
   },
   schema: {
     text: z.string().describe('Text to appear on the page'),
+    ...timeoutSchema,
   },
   handler: async (request, response, context) => {
     const page = context.getSelectedPage();
+    const frames = page.frames();
 
-    await Locator.race([
-      page.locator(`aria/${request.params.text}`),
-      page.locator(`text/${request.params.text}`),
-    ]).wait();
+    const locator = Locator.race(
+      frames.flatMap(frame => [
+        frame.locator(`aria/${request.params.text}`),
+        frame.locator(`text/${request.params.text}`),
+      ]),
+    );
+
+    if (request.params.timeout) {
+      locator.setTimeout(request.params.timeout);
+    }
+
+    await locator.wait();
 
     response.appendResponseLine(
       `Element with text "${request.params.text}" found.`,

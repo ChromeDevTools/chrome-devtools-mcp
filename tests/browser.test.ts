@@ -21,6 +21,7 @@ describe('browser', () => {
       isolated: false,
       userDataDir: folderPath,
       executablePath: executablePath(),
+      devtools: false,
     });
     try {
       try {
@@ -29,6 +30,7 @@ describe('browser', () => {
           isolated: false,
           userDataDir: folderPath,
           executablePath: executablePath(),
+          devtools: false,
         });
         await browser2.close();
         assert.fail('not reached');
@@ -40,6 +42,34 @@ describe('browser', () => {
       }
     } finally {
       await browser1.close();
+    }
+  });
+
+  it('launches with the initial viewport', async () => {
+    const tmpDir = os.tmpdir();
+    const folderPath = path.join(tmpDir, `temp-folder-${crypto.randomUUID()}`);
+    const browser = await launch({
+      headless: true,
+      isolated: false,
+      userDataDir: folderPath,
+      executablePath: executablePath(),
+      viewport: {
+        width: 1501,
+        height: 801,
+      },
+      devtools: false,
+    });
+    try {
+      const [page] = await browser.pages();
+      const result = await page.evaluate(() => {
+        return {width: window.innerWidth, height: window.innerHeight};
+      });
+      assert.deepStrictEqual(result, {
+        width: 1501,
+        height: 801,
+      });
+    } finally {
+      await browser.close();
     }
   });
 });

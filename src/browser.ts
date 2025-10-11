@@ -11,7 +11,6 @@ import path from 'node:path';
 import type {
   Browser,
   ChromeReleaseChannel,
-  ConnectOptions,
   LaunchOptions,
   Target,
 } from 'puppeteer-core';
@@ -19,51 +18,60 @@ import puppeteer from 'puppeteer-core';
 
 let browser: Browser | undefined;
 
-const ignoredPrefixes = new Set([
-  'chrome://',
-  'chrome-extension://',
-  'chrome-untrusted://',
-  'devtools://',
-]);
+function makeTargetFilter(devtools: boolean) {
+  const ignoredPrefixes = new Set([
+    'chrome://',
+    'chrome-extension://',
+    'chrome-untrusted://',
+  ]);
 
-function targetFilter(target: Target): boolean {
-  if (target.url() === 'chrome://newtab/') {
-    return true;
+  if (!devtools) {
+    ignoredPrefixes.add('devtools://');
   }
-  for (const prefix of ignoredPrefixes) {
-    if (target.url().startsWith(prefix)) {
-      return false;
+  return function targetFilter(target: Target): boolean {
+    if (target.url() === 'chrome://newtab/') {
+      return true;
     }
-  }
-  return true;
+    for (const prefix of ignoredPrefixes) {
+      if (target.url().startsWith(prefix)) {
+        return false;
+      }
+    }
+    return true;
+  };
 }
 
-const connectOptions: ConnectOptions = {
-  targetFilter,
-  // We do not expect any single CDP command to take more than 10sec.
-  protocolTimeout: 10_000,
-};
-
-async function ensureBrowserConnected(browserURL: string) {
+export async function ensureBrowserConnected(options: {
+  browserURL: string;
+  devtools: boolean;
+}) {
   if (browser?.connected) {
     return browser;
   }
   browser = await puppeteer.connect({
-    ...connectOptions,
-    browserURL,
+    targetFilter: makeTargetFilter(options.devtools),
+    browserURL: options.browserURL,
     defaultViewport: null,
+    handleDevToolsAsPage: options.devtools,
   });
   return browser;
 }
 
 interface McpLaunchOptions {
+  acceptInsecureCerts?: boolean;
   executablePath?: string;
-  customDevTools?: string;
+  customDevTools?: string; // Added back for customDevTools logic in launch
   channel?: Channel;
   userDataDir?: string;
   headless: boolean;
   isolated: boolean;
   logFile?: fs.WriteStream;
+  viewport?: {
+    width: number;
+    height: number;
+  };
+  args?: string[];
+  devtools: boolean;
 }
 
 function resolveExecutablePath(channel: Channel): string | undefined {
@@ -79,10 +87,10 @@ function resolveExecutablePath(channel: Channel): string | undefined {
     channel === 'canary'
       ? 'Chrome SxS'
       : channel === 'dev'
-        ? 'Chrome Dev'
-        : channel === 'beta'
-          ? 'Chrome Beta'
-          : '';
+      ? 'Chrome Dev'
+      : channel === 'beta'
+      ? 'Chrome Beta'
+      : '';
 
   const chromePath = path.join(
     programFiles,
@@ -97,6 +105,7 @@ function resolveExecutablePath(channel: Channel): string | undefined {
 }
 
 export async function launch(options: McpLaunchOptions): Promise<Browser> {
+  // Ensure customDevTools is destructured for use in args below
   const {channel, executablePath, customDevTools, headless, isolated} = options;
   const profileDirName =
     channel && channel !== 'stable'
@@ -115,12 +124,23 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
       recursive: true,
     });
   }
-  const args: LaunchOptions['args'] = ['--hide-crash-restore-bubble'];
+
+  // --- Start Merged Args & Path Resolution ---
+  const args: LaunchOptions['args'] = [
+    ...(options.args ?? []),
+    '--hide-crash-restore-bubble',
+  ];
   if (customDevTools) {
     args.push(`--custom-devtools-frontend=file://${customDevTools}`);
   }
+  if (headless) {
+    args.push('--screen-info={3840x2160}');
+  }
+  if (options.devtools) {
+    args.push('--auto-open-devtools-for-tabs');
+  }
 
-  let puppeterChannel: ChromeReleaseChannel | undefined;
+  let puppeteerChannel: ChromeReleaseChannel | undefined;
   let resolvedExecutablePath = executablePath;
 
   if (!resolvedExecutablePath) {
@@ -128,28 +148,39 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
   }
 
   if (!resolvedExecutablePath) {
-    puppeterChannel =
+    puppeteerChannel =
       channel && channel !== 'stable'
         ? (`chrome-${channel}` as ChromeReleaseChannel)
         : 'chrome';
   }
+  // --- End Merged Args & Path Resolution ---
 
   try {
     const browser = await puppeteer.launch({
-      ...connectOptions,
-      channel: puppeterChannel,
-      executablePath: resolvedExecutablePath,
+      channel: puppeteerChannel,
+      targetFilter: makeTargetFilter(options.devtools),
+      executablePath: resolvedExecutablePath, // Uses the resolved path
       defaultViewport: null,
       userDataDir,
       pipe: true,
       headless,
       args,
+      acceptInsecureCerts: options.acceptInsecureCerts,
+      handleDevToolsAsPage: options.devtools,
     });
     if (options.logFile) {
       // FIXME: we are probably subscribing too late to catch startup logs. We
       // should expose the process earlier or expose the getRecentLogs() getter.
       browser.process()?.stderr?.pipe(options.logFile);
       browser.process()?.stdout?.pipe(options.logFile);
+    }
+    if (options.viewport) {
+      const [page] = await browser.pages();
+      // @ts-expect-error internal API for now.
+      await page?.resize({
+        contentWidth: options.viewport.width,
+        contentHeight: options.viewport.height,
+      });
     }
     return browser;
   } catch (error) {
@@ -170,29 +201,13 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
   }
 }
 
-async function ensureBrowserLaunched(
+export async function ensureBrowserLaunched(
   options: McpLaunchOptions,
 ): Promise<Browser> {
   if (browser?.connected) {
     return browser;
   }
   browser = await launch(options);
-  return browser;
-}
-
-export async function resolveBrowser(options: {
-  browserUrl?: string;
-  executablePath?: string;
-  customDevTools?: string;
-  channel?: Channel;
-  headless: boolean;
-  isolated: boolean;
-  logFile?: fs.WriteStream;
-}) {
-  const browser = options.browserUrl
-    ? await ensureBrowserConnected(options.browserUrl)
-    : await ensureBrowserLaunched(options);
-
   return browser;
 }
 

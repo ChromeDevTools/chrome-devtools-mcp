@@ -34,7 +34,7 @@ const FILTERABLE_RESOURCE_TYPES: readonly [ResourceType, ...ResourceType[]] = [
 
 export const listNetworkRequests = defineTool({
   name: 'list_network_requests',
-  description: `List all requests for the currently selected page`,
+  description: `List all requests for the currently selected page since the last navigation.`,
   annotations: {
     category: ToolCategories.NETWORK,
     readOnlyHint: true,
@@ -84,6 +84,5 @@ export const getNetworkRequest = defineTool({
   },
   handler: async (request, response, _context) => {
     response.attachNetworkRequest(request.params.url);
-    response.setIncludeNetworkRequests(true);
   },
 });

@@ -5,7 +5,7 @@
  */
 
 import type {Dialog, ElementHandle, Page} from 'puppeteer-core';
-import type z from 'zod';
+import z from 'zod';
 
 import type {TraceResult} from '../trace-processing/parse.js';
 
@@ -72,7 +72,11 @@ export type Context = Readonly<{
   setCpuThrottlingRate(rate: number): void;
   saveTemporaryFile(
     data: Uint8Array<ArrayBufferLike>,
-    mimeType: 'image/png' | 'image/jpeg',
+    mimeType: 'image/png' | 'image/jpeg' | 'image/webp',
+  ): Promise<{filename: string}>;
+  saveFile(
+    data: Uint8Array<ArrayBufferLike>,
+    filename: string,
   ): Promise<{filename: string}>;
   waitForEventsAfterAction(action: () => Promise<unknown>): Promise<void>;
 }>;
@@ -85,3 +89,16 @@ export function defineTool<Schema extends z.ZodRawShape>(
 
 export const CLOSE_PAGE_ERROR =
   'The last open page cannot be closed. It is fine to keep it open.';
+
+export const timeoutSchema = {
+  timeout: z
+    .number()
+    .int()
+    .optional()
+    .describe(
+      `Maximum wait time in milliseconds. If set to 0, the default timeout will be used.`,
+    )
+    .transform(value => {
+      return value && value <= 0 ? undefined : value;
+    }),
+};

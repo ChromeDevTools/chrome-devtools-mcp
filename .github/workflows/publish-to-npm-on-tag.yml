@@ -4,6 +4,16 @@ on:
   push:
     tags:
       - 'chrome-devtools-mcp-v*'
+  workflow_dispatch:
+    inputs:
+      npm-publish:
+        description: 'Try to publish to NPM'
+        default: false
+        type: boolean
+      mcp-publish:
+        description: 'Try to publish to MCP registry'
+        default: true
+        type: boolean
 
 permissions:
   id-token: write # Required for OIDC
@@ -12,6 +22,7 @@ permissions:
 jobs:
   publish-to-npm:
     runs-on: ubuntu-latest
+    if: ${{ (github.event_name != 'workflow_dispatch') || (inputs.npm-publish && always()) }}
     steps:
       - name: Check out repository
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
@@ -42,6 +53,7 @@ jobs:
   publish-to-mcp-registry:
     runs-on: ubuntu-latest
     needs: publish-to-npm
+    if: ${{ (github.event_name != 'workflow_dispatch' && needs.publish-to-npm.result == 'success') || (inputs.mcp-publish && always()) }}
     steps:
       - name: Check out repository
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
@@ -70,7 +82,9 @@ jobs:
 
       - name: Install MCP Publisher
         run: |
-          curl -L "https://github.com/modelcontextprotocol/registry/releases/download/v1.1.0/mcp-publisher_1.1.0_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" | tar xz mcp-publisher
+          export VERSION="1.2.1"
+          export OS=$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')
+          curl -L "https://github.com/modelcontextprotocol/registry/releases/download/v${VERSION}/mcp-publisher_${VERSION}_${OS}.tar.gz" | tar xz mcp-publisher
 
       - name: Login to MCP Registry
         run: ./mcp-publisher login github-oidc

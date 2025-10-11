@@ -38,5 +38,17 @@ describe('network', () => {
         );
       });
     });
+    it('should not add the request list', async () => {
+      await withBrowser(async (response, context) => {
+        const page = await context.getSelectedPage();
+        await page.goto('data:text/html,<div>Hello MCP</div>');
+        await getNetworkRequest.handler(
+          {params: {url: 'data:text/html,<div>Hello MCP</div>'}},
+          response,
+          context,
+        );
+        assert(!response.includeNetworkRequests);
+      });
+    });
   });
 });
