@@ -340,7 +340,7 @@ Here is a step-by-step guide on how to connect to a running Chrome Stable instan
 
 **Step 1: Configure the MCP client**
 
-Add the `--browser-url` option to your MCP client configuration. The value of this option should be the URL of the running Chrome instance. `http://localhost:9222` is a common default.
+Add the `--browser-url` option to your MCP client configuration. The value of this option should be the URL of the running Chrome instance. `http://127.0.0.1:9222` is a common default.
 
 ```json
 {
@@ -349,7 +349,7 @@ Add the `--browser-url` option to your MCP client configuration. The value of th
       "command": "npx",
       "args": [
         "chrome-devtools-mcp@latest",
-        "--browser-url=http://localhost:9222"
+        "--browser-url=http://127.0.0.1:9222"
       ]
     }
   }
