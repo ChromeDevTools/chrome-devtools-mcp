@@ -188,6 +188,15 @@ The same way chrome-devtools-mcp can be configured for JetBrains Junie in `Setti
 </details>
 
 <details>
+  <summary>Kiro</summary>
+
+In **Kiro Settings**, go to `Configure MCP` > `Open Workspace or User MCP Config` > Use the configuration snippet provided above.
+
+Or, from the IDE **Activity Bar** > `Kiro` > `MCP Servers` > `Click Open MCP Config`. Use the configuration snippet provided above.
+
+</details>
+
+<details>
   <summary>Visual Studio</summary>
   
   **Click the button to install:**
