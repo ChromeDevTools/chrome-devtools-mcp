@@ -66,6 +66,36 @@ interface McpLaunchOptions {
   logFile?: fs.WriteStream;
 }
 
+function resolveExecutablePath(channel: Channel): string | undefined {
+  if (os.platform() !== 'win32') {
+    return undefined;
+  }
+  const programFiles = process.env['PROGRAMFILES'];
+  if (!programFiles) {
+    return undefined;
+  }
+
+  const channelPathPart =
+    channel === 'canary'
+      ? 'Chrome SxS'
+      : channel === 'dev'
+        ? 'Chrome Dev'
+        : channel === 'beta'
+          ? 'Chrome Beta'
+          : '';
+
+  const chromePath = path.join(
+    programFiles,
+    'Google',
+    'Chrome',
+    channelPathPart,
+    'Application',
+    'chrome.exe',
+  );
+
+  return fs.existsSync(chromePath) ? chromePath : undefined;
+}
+
 export async function launch(options: McpLaunchOptions): Promise<Browser> {
   const {channel, executablePath, customDevTools, headless, isolated} = options;
   const profileDirName =
@@ -85,13 +115,19 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
       recursive: true,
     });
   }
-
   const args: LaunchOptions['args'] = ['--hide-crash-restore-bubble'];
   if (customDevTools) {
     args.push(`--custom-devtools-frontend=file://${customDevTools}`);
   }
+
   let puppeterChannel: ChromeReleaseChannel | undefined;
-  if (!executablePath) {
+  let resolvedExecutablePath = executablePath;
+
+  if (!resolvedExecutablePath) {
+    resolvedExecutablePath = resolveExecutablePath(channel as Channel);
+  }
+
+  if (!resolvedExecutablePath) {
     puppeterChannel =
       channel && channel !== 'stable'
         ? (`chrome-${channel}` as ChromeReleaseChannel)
@@ -102,7 +138,7 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
     const browser = await puppeteer.launch({
       ...connectOptions,
       channel: puppeterChannel,
-      executablePath,
+      executablePath: resolvedExecutablePath,
       defaultViewport: null,
       userDataDir,
       pipe: true,
