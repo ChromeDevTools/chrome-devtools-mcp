@@ -60,6 +60,7 @@ export async function ensureBrowserConnected(options: {
 interface McpLaunchOptions {
   acceptInsecureCerts?: boolean;
   executablePath?: string;
+  customDevTools?: string; // Added back for customDevTools logic in launch
   channel?: Channel;
   userDataDir?: string;
   headless: boolean;
@@ -73,8 +74,39 @@ interface McpLaunchOptions {
   devtools: boolean;
 }
 
+function resolveExecutablePath(channel: Channel): string | undefined {
+  if (os.platform() !== 'win32') {
+    return undefined;
+  }
+  const programFiles = process.env['PROGRAMFILES'];
+  if (!programFiles) {
+    return undefined;
+  }
+
+  const channelPathPart =
+    channel === 'canary'
+      ? 'Chrome SxS'
+      : channel === 'dev'
+      ? 'Chrome Dev'
+      : channel === 'beta'
+      ? 'Chrome Beta'
+      : '';
+
+  const chromePath = path.join(
+    programFiles,
+    'Google',
+    'Chrome',
+    channelPathPart,
+    'Application',
+    'chrome.exe',
+  );
+
+  return fs.existsSync(chromePath) ? chromePath : undefined;
+}
+
 export async function launch(options: McpLaunchOptions): Promise<Browser> {
-  const {channel, executablePath, headless, isolated} = options;
+  // Ensure customDevTools is destructured for use in args below
+  const {channel, executablePath, customDevTools, headless, isolated} = options;
   const profileDirName =
     channel && channel !== 'stable'
       ? `chrome-profile-${channel}`
@@ -93,29 +125,41 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
     });
   }
 
+  // --- Start Merged Args & Path Resolution ---
   const args: LaunchOptions['args'] = [
     ...(options.args ?? []),
     '--hide-crash-restore-bubble',
   ];
+  if (customDevTools) {
+    args.push(`--custom-devtools-frontend=file://${customDevTools}`);
+  }
   if (headless) {
     args.push('--screen-info={3840x2160}');
   }
-  let puppeteerChannel: ChromeReleaseChannel | undefined;
   if (options.devtools) {
     args.push('--auto-open-devtools-for-tabs');
   }
-  if (!executablePath) {
+
+  let puppeteerChannel: ChromeReleaseChannel | undefined;
+  let resolvedExecutablePath = executablePath;
+
+  if (!resolvedExecutablePath) {
+    resolvedExecutablePath = resolveExecutablePath(channel as Channel);
+  }
+
+  if (!resolvedExecutablePath) {
     puppeteerChannel =
       channel && channel !== 'stable'
         ? (`chrome-${channel}` as ChromeReleaseChannel)
         : 'chrome';
   }
+  // --- End Merged Args & Path Resolution ---
 
   try {
     const browser = await puppeteer.launch({
       channel: puppeteerChannel,
       targetFilter: makeTargetFilter(options.devtools),
-      executablePath,
+      executablePath: resolvedExecutablePath, // Uses the resolved path
       defaultViewport: null,
       userDataDir,
       pipe: true,
