@@ -60,6 +60,7 @@ Add the following config to your MCP client:
 ```bash
 amp mcp add chrome-devtools -- npx chrome-devtools-mcp@latest
 ```
+
 </details>
 
 <details>
