@@ -54,6 +54,16 @@ Add the following config to your MCP client:
 ### MCP Client configuration
 
 <details>
+  <summary>Amp</summary>
+  Follow https://ampcode.com/manual#mcp and use the config provided above. You can also install the Chrome DevTools MCP server using the CLI:
+
+```bash
+amp mcp add chrome-devtools -- npx chrome-devtools-mcp@latest
+```
+
+</details>
+
+<details>
   <summary>Claude Code</summary>
     Use the Claude Code CLI to add the Chrome DevTools MCP server (<a href="https://docs.anthropic.com/en/docs/claude-code/mcp">guide</a>):
 
