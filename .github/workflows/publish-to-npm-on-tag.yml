@@ -77,9 +77,6 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Bump
-        run: npm run sync-server-json-version
-
       - name: Install MCP Publisher
         run: |
           export VERSION="1.2.1"
