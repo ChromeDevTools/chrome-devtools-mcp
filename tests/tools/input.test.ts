@@ -15,6 +15,7 @@ import {
   drag,
   fillForm,
   uploadFile,
+  pressKey,
 } from '../../src/tools/input.js';
 import {serverHooks} from '../server.js';
 import {html, withBrowser} from '../utils.js';
@@ -399,6 +400,152 @@ describe('input', () => {
         assert.strictEqual(response.includeSnapshot, false);
 
         await fs.unlink(testFilePath);
+      });
+    });
+  });
+
+  describe('pressKey', () => {
+    it('presses a simple key', async () => {
+      await withBrowser(async (response, context) => {
+        const page = context.getSelectedPage();
+        await page.setContent(`<!DOCTYPE html>
+<input id="test-input" />
+<div id="result"></div>
+<script>
+  document.getElementById('test-input').addEventListener('keydown', (e) => {
+    document.getElementById('result').innerText = e.key;
+  });
+</script>`);
+        await context.createTextSnapshot();
+        await page.focus('#test-input');
+        await pressKey.handler(
+          {
+            params: {
+              key: 'Enter',
+            },
+          },
+          response,
+          context,
+        );
+        assert.strictEqual(
+          response.responseLines[0],
+          'Successfully pressed key: Enter',
+        );
+        assert.ok(response.includeSnapshot);
+        const result = await page.$eval(
+          '#result',
+          el => (el as HTMLElement).innerText,
+        );
+        assert.strictEqual(result, 'Enter');
+      });
+    });
+
+    it('presses a key combination', async () => {
+      await withBrowser(async (response, context) => {
+        const page = context.getSelectedPage();
+        await page.setContent(`<!DOCTYPE html>
+<textarea id="test-input">Hello World</textarea>
+<script>
+  const input = document.getElementById('test-input');
+  input.focus();
+  input.setSelectionRange(0, 0);
+</script>`);
+        await context.createTextSnapshot();
+        await pressKey.handler(
+          {
+            params: {
+              key: 'Control+A',
+            },
+          },
+          response,
+          context,
+        );
+        assert.strictEqual(
+          response.responseLines[0],
+          'Successfully pressed key: Control+A',
+        );
+        assert.ok(response.includeSnapshot);
+        // Verify text is selected by getting selection
+        const selected = await page.evaluate(() => {
+          const input = document.getElementById(
+            'test-input',
+          ) as HTMLTextAreaElement;
+          return (
+            input.selectionStart === 0 &&
+            input.selectionEnd === input.value.length
+          );
+        });
+        assert.ok(selected, 'Text should be selected');
+      });
+    });
+
+    it('presses plus key with modifier (Control++)', async () => {
+      await withBrowser(async (response, context) => {
+        const page = context.getSelectedPage();
+        await page.setContent(`<!DOCTYPE html>
+<div id="result"></div>
+<script>
+  document.addEventListener('keydown', (e) => {
+    if (e.ctrlKey && e.key === '+') {
+      document.getElementById('result').innerText = 'ctrl-plus';
+    }
+  });
+</script>`);
+        await context.createTextSnapshot();
+        await pressKey.handler(
+          {
+            params: {
+              key: 'Control++',
+            },
+          },
+          response,
+          context,
+        );
+        assert.strictEqual(
+          response.responseLines[0],
+          'Successfully pressed key: Control++',
+        );
+        assert.ok(response.includeSnapshot);
+        const result = await page.$eval(
+          '#result',
+          el => (el as HTMLElement).innerText,
+        );
+        assert.strictEqual(result, 'ctrl-plus');
+      });
+    });
+
+    it('presses multiple modifiers', async () => {
+      await withBrowser(async (response, context) => {
+        const page = context.getSelectedPage();
+        await page.setContent(`<!DOCTYPE html>
+<div id="result"></div>
+<script>
+  document.addEventListener('keydown', (e) => {
+    if (e.ctrlKey && e.shiftKey && e.key === 'T') {
+      document.getElementById('result').innerText = 'ctrl-shift-t';
+    }
+  });
+</script>`);
+        await context.createTextSnapshot();
+        await pressKey.handler(
+          {
+            params: {
+              key: 'Control+Shift+T',
+            },
+          },
+          response,
+          context,
+        );
+        assert.strictEqual(
+          response.responseLines[0],
+          'Successfully pressed key: Control+Shift+T',
+        );
+        assert.ok(response.includeSnapshot);
+        const result = await page.$eval(
+          '#result',
+          el => (el as HTMLElement).innerText,
+        );
+        assert.strictEqual(result, 'ctrl-shift-t');
       });
     });
   });
