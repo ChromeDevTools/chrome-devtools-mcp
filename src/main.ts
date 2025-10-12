@@ -151,9 +151,14 @@ const tools = [
   ...Object.values(screenshotTools),
   ...Object.values(scriptTools),
   ...Object.values(snapshotTools),
-];
+] as ToolDefinition[];
+
+tools.sort((a, b) => {
+  return a.name.localeCompare(b.name);
+});
+
 for (const tool of tools) {
-  registerTool(tool as unknown as ToolDefinition);
+  registerTool(tool);
 }
 
 const transport = new StdioServerTransport();
