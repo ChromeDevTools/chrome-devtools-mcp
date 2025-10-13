@@ -70,3 +70,11 @@ body:
         - Windows
         - macOS
         - Linux
+
+  - type: checkboxes
+    id: provide-pr
+    attributes:
+      label: What kinds of cats do you like?
+      description: You may select more than one.
+      options:
+        - label: I want to provide a PR to fix this bug
