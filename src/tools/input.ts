@@ -7,7 +7,7 @@
 import type {ElementHandle} from 'puppeteer-core';
 import z from 'zod';
 
-import type {McpContext} from '../McpContext.js';
+import type {McpContext, TextSnapshotNode} from '../McpContext.js';
 
 import {ToolCategories} from './categories.js';
 import {defineTool} from './ToolDefinition.js';
@@ -80,6 +80,43 @@ export const hover = defineTool({
   },
 });
 
+// The AXNode for an option doesn't contain its `value`. We set text content of the option as value.
+// If the form is a combobox, we need to find the correct option by its text value.
+// To do that, loop through the children while checking which child's text matches the requested value (requested value is actually the text content).
+// When the correct option is found, use the element handle to get the real value.
+async function selectOption(
+  handle: ElementHandle,
+  aXNode: TextSnapshotNode,
+  value: string,
+) {
+  let optionFound = false;
+  for (const child of aXNode.children) {
+    if (child.role === 'option' && child.name === value && child.value) {
+      optionFound = true;
+      const childHandle = await child.elementHandle();
+      if (childHandle) {
+        try {
+          const childValueHandle = await childHandle.getProperty('value');
+          try {
+            const childValue = await childValueHandle.jsonValue();
+            if (childValue) {
+              await handle.asLocator().fill(childValue.toString());
+            }
+          } finally {
+            void childValueHandle.dispose();
+          }
+          break;
+        } finally {
+          void childHandle.dispose();
+        }
+      }
+    }
+  }
+  if (!optionFound) {
+    throw new Error(`Could not find option with text "${value}"`);
+  }
+}
+
 async function fillFormElement(
   uid: string,
   value: string,
@@ -87,25 +124,9 @@ async function fillFormElement(
 ) {
   const handle = await context.getElementByUid(uid);
   try {
-    // The AXNode for an option doesn't contain its `value`. We set text content of the option as value.
-    // If the form is a combobox, we need to find the correct option by its text value.
-    // To do that, loop through the children while checking which child's text matches the requested value (requested value is actually the text content).
-    // When the correct option is found, use the element handle to get the real value.
     const aXNode = context.getAXNodeByUid(uid);
-    if (aXNode && aXNode.role === 'combobox' && aXNode.children) {
-      for (const child of aXNode.children) {
-        if (child.role === 'option' && child.name === value && child.value) {
-          const childHandle = await child.elementHandle();
-          if (childHandle) {
-            const childValueHandle = await childHandle.getProperty('value');
-            const childValue = await childValueHandle.jsonValue();
-            if (childValue) {
-              await handle.asLocator().fill(childValue.toString());
-            }
-            break;
-          }
-        }
-      }
+    if (aXNode && aXNode.role === 'combobox') {
+      await selectOption(handle, aXNode, value);
     } else {
       await handle.asLocator().fill(value);
     }
