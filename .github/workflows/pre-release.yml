@@ -16,6 +16,12 @@ jobs:
         with:
           fetch-depth: 2
 
+      - name: Set up Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          cache: npm
+          node-version-file: '.nvmrc'
+
       - name: Install MCP Publisher
         run: |
           export TAG=$(curl -sL https://api.github.com/repos/modelcontextprotocol/registry/releases/latest | jq -r ".tag_name")
