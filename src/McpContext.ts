@@ -330,13 +330,13 @@ export class McpContext implements Context {
     // will be used for the tree serialization and mapping ids back to nodes.
     let idCounter = 0;
     const idToNode = new Map<string, TextSnapshotNode>();
-    const assignIds = async (
-      node: SerializedAXNode,
-    ): Promise<TextSnapshotNode> => {
+    const assignIds = (node: SerializedAXNode): TextSnapshotNode => {
       const nodeWithId: TextSnapshotNode = {
         ...node,
         id: `${snapshotId}_${idCounter++}`,
-        children: [],
+        children: node.children
+          ? node.children.map(child => assignIds(child))
+          : [],
       };
 
       // The AXNode for an option doesn't contain its `value`.
@@ -347,10 +347,6 @@ export class McpContext implements Context {
           nodeWithId.value = optionText.toString();
         }
       }
-
-      nodeWithId.children = node.children
-        ? await Promise.all(node.children.map(child => assignIds(child)))
-        : [];
 
       idToNode.set(nodeWithId.id, nodeWithId);
       return nodeWithId;
