@@ -100,7 +100,7 @@ describe('snapshotFormatter', () => {
     const formatted = formatA11ySnapshot(snapshot);
     assert.strictEqual(
       formatted,
-      `uid=1_1 checkbox "checkbox" checked checked="true"
+      `uid=1_1 checkbox "checkbox" checked
   uid=1_2 statictext "text"
 `,
     );

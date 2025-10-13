@@ -28,69 +28,32 @@ function getAttributes(serializedAXNodeRoot: TextSnapshotNode): string[] {
     `"${serializedAXNodeRoot.name || ''}"`, // Corrected: Added quotes around name
   ];
 
-  // Value properties
-  const valueProperties = [
-    'value',
-    'valuetext',
-    'valuemin',
-    'valuemax',
-    'level',
-    'autocomplete',
-    'haspopup',
-    'invalid',
-    'orientation',
-    'description',
-    'keyshortcuts',
-    'roledescription',
-  ] as const;
-  for (const property of valueProperties) {
-    if (
-      property in serializedAXNodeRoot &&
-      serializedAXNodeRoot[property] !== undefined
-    ) {
-      attributes.push(`${property}="${serializedAXNodeRoot[property]}"`);
-    }
-  }
+  const excluded = new Set(['id', 'role', 'name', 'elementHandle', 'children']);
 
-  // Boolean properties that also have an 'able' attribute
-  const booleanPropertyMap = {
+  const booleanPropertyMap: Record<string, string> = {
     disabled: 'disableable',
     expanded: 'expandable',
     focused: 'focusable',
     selected: 'selectable',
   };
-  for (const [property, ableAttribute] of Object.entries(booleanPropertyMap)) {
-    if (property in serializedAXNodeRoot) {
-      attributes.push(ableAttribute);
-      if (serializedAXNodeRoot[property as keyof typeof booleanPropertyMap]) {
-        attributes.push(property);
+
+  for (const attr of Object.keys(serializedAXNodeRoot).sort()) {
+    if (excluded.has(attr)) {
+      continue;
+    }
+    const value = (serializedAXNodeRoot as unknown as Record<string, unknown>)[
+      attr
+    ];
+    if (typeof value === 'boolean') {
+      if (booleanPropertyMap[attr]) {
+        attributes.push(booleanPropertyMap[attr]);
       }
-    }
-  }
-
-  const booleanProperties = [
-    'modal',
-    'multiline',
-    'readonly',
-    'required',
-    'multiselectable',
-  ] as const;
-
-  for (const property of booleanProperties) {
-    if (property in serializedAXNodeRoot && serializedAXNodeRoot[property]) {
-      attributes.push(property);
-    }
-  }
-
-  // Mixed boolean/string attributes
-  for (const property of ['pressed', 'checked'] as const) {
-    if (property in serializedAXNodeRoot) {
-      attributes.push(property);
-      if (serializedAXNodeRoot[property]) {
-        attributes.push(`${property}="${serializedAXNodeRoot[property]}"`);
+      if (value) {
+        attributes.push(attr);
       }
+    } else if (typeof value === 'string' || typeof value === 'number') {
+      attributes.push(`${attr}="${value}"`);
     }
   }
-
   return attributes;
 }

@@ -89,7 +89,7 @@ uid=1_0 RootWebArea ""
 ## Page content
 uid=1_0 RootWebArea "My test page"
   uid=1_1 StaticText "username"
-  uid=1_2 textbox "username" value="mcp" focusable focused
+  uid=1_2 textbox "username" focusable focused value="mcp"
 `,
       );
     });
