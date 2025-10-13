@@ -56,6 +56,7 @@ export class PageCollector<T> {
       if (!page) {
         return;
       }
+      console.log('destro');
       this.#cleanupPageDestroyed(page);
     });
   }

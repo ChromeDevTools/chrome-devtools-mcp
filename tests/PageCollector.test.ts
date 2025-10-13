@@ -23,6 +23,9 @@ function mockListener() {
         listeners[eventName] = [listener];
       }
     },
+    off(_eventName: string, _listener: (data: unknown) => void) {
+      // no-op
+    },
     emit(eventName: string, data: unknown) {
       for (const listener of listeners[eventName] ?? []) {
         listener(data);
@@ -165,7 +168,7 @@ describe('PageCollector', () => {
     assert.equal(collector.getData(page).length, 2);
   });
 
-  it.only('should clear data on page destroy', async () => {
+  it('should clear data on page destroy', async () => {
     const browser = getMockBrowser();
     const page = (await browser.pages())[0];
     const request = getMockRequest();
