@@ -15,7 +15,6 @@ import {
 
 export type ListenerMap<EventMap extends PageEvents = PageEvents> = {
   [K in keyof EventMap]?: (event: EventMap[K]) => void;
-  // request: (event: PageEvents['request']) => void;
 };
 
 export class PageCollector<T> {
@@ -105,6 +104,7 @@ export class PageCollector<T> {
         page.off(name, listener as Handler<unknown>);
       }
     }
+    this.storage.delete(page);
   }
 
   getData(page: Page): T[] {

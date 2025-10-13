@@ -164,4 +164,33 @@ describe('PageCollector', () => {
 
     assert.equal(collector.getData(page).length, 2);
   });
+
+  it.only('should clear data on page destroy', async () => {
+    const browser = getMockBrowser();
+    const page = (await browser.pages())[0];
+    const request = getMockRequest();
+    const collector = new PageCollector(browser, collect => {
+      return {
+        request: req => {
+          collect(req);
+        },
+      } as ListenerMap;
+    });
+    await collector.init();
+
+    page.emit('request', request);
+
+    assert.equal(collector.getData(page).length, 1);
+
+    browser.emit('targetdestroyed', {
+      page() {
+        return Promise.resolve(page);
+      },
+    } as Target);
+
+    // The page inside part is async so we need to await some time
+    await new Promise<void>(res => res());
+
+    assert.equal(collector.getData(page).length, 0);
+  });
 });
