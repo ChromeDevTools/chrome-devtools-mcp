@@ -202,6 +202,35 @@ describe('input', () => {
         assert.ok(await page.$('text/test'));
       });
     });
+
+    it('fills out a select by text', async () => {
+      await withBrowser(async (response, context) => {
+        const page = context.getSelectedPage();
+        await page.setContent(
+          `<!DOCTYPE html><select><option value="v1">one</option><option value="v2">two</option></select>`,
+        );
+        await context.createTextSnapshot();
+        await fill.handler(
+          {
+            params: {
+              uid: '1_1',
+              value: 'two',
+            },
+          },
+          response,
+          context,
+        );
+        assert.strictEqual(
+          response.responseLines[0],
+          'Successfully filled out the element',
+        );
+        assert.ok(response.includeSnapshot);
+        const selectedValue = await page.evaluate(
+          () => document.querySelector('select')!.value,
+        );
+        assert.strictEqual(selectedValue, 'v2');
+      });
+    });
   });
 
   describe('drags', () => {

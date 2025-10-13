@@ -272,6 +272,10 @@ export class McpContext implements Context {
     return page.getDefaultNavigationTimeout();
   }
 
+  getAXNodeByUid(uid: string) {
+    return this.#textSnapshot?.idToNode.get(uid);
+  }
+
   async getElementByUid(uid: string): Promise<ElementHandle<Element>> {
     if (!this.#textSnapshot?.idToNode.size) {
       throw new Error(
@@ -334,6 +338,16 @@ export class McpContext implements Context {
           ? node.children.map(child => assignIds(child))
           : [],
       };
+
+      // The AXNode for an option doesn't contain its `value`.
+      // Therefore, set text content of the option as value.
+      if (node.role === 'option') {
+        const optionText = node.name;
+        if (optionText) {
+          nodeWithId.value = optionText.toString();
+        }
+      }
+
       idToNode.set(nodeWithId.id, nodeWithId);
       return nodeWithId;
     };

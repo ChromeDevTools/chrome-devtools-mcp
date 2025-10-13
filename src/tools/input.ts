@@ -7,6 +7,8 @@
 import type {ElementHandle} from 'puppeteer-core';
 import z from 'zod';
 
+import type {McpContext, TextSnapshotNode} from '../McpContext.js';
+
 import {ToolCategories} from './categories.js';
 import {defineTool} from './ToolDefinition.js';
 
@@ -78,6 +80,61 @@ export const hover = defineTool({
   },
 });
 
+// The AXNode for an option doesn't contain its `value`. We set text content of the option as value.
+// If the form is a combobox, we need to find the correct option by its text value.
+// To do that, loop through the children while checking which child's text matches the requested value (requested value is actually the text content).
+// When the correct option is found, use the element handle to get the real value.
+async function selectOption(
+  handle: ElementHandle,
+  aXNode: TextSnapshotNode,
+  value: string,
+) {
+  let optionFound = false;
+  for (const child of aXNode.children) {
+    if (child.role === 'option' && child.name === value && child.value) {
+      optionFound = true;
+      const childHandle = await child.elementHandle();
+      if (childHandle) {
+        try {
+          const childValueHandle = await childHandle.getProperty('value');
+          try {
+            const childValue = await childValueHandle.jsonValue();
+            if (childValue) {
+              await handle.asLocator().fill(childValue.toString());
+            }
+          } finally {
+            void childValueHandle.dispose();
+          }
+          break;
+        } finally {
+          void childHandle.dispose();
+        }
+      }
+    }
+  }
+  if (!optionFound) {
+    throw new Error(`Could not find option with text "${value}"`);
+  }
+}
+
+async function fillFormElement(
+  uid: string,
+  value: string,
+  context: McpContext,
+) {
+  const handle = await context.getElementByUid(uid);
+  try {
+    const aXNode = context.getAXNodeByUid(uid);
+    if (aXNode && aXNode.role === 'combobox') {
+      await selectOption(handle, aXNode, value);
+    } else {
+      await handle.asLocator().fill(value);
+    }
+  } finally {
+    void handle.dispose();
+  }
+}
+
 export const fill = defineTool({
   name: 'fill',
   description: `Type text into a input, text area or select an option from a <select> element.`,
@@ -94,16 +151,15 @@ export const fill = defineTool({
     value: z.string().describe('The value to fill in'),
   },
   handler: async (request, response, context) => {
-    const handle = await context.getElementByUid(request.params.uid);
-    try {
-      await context.waitForEventsAfterAction(async () => {
-        await handle.asLocator().fill(request.params.value);
-      });
-      response.appendResponseLine(`Successfully filled out the element`);
-      response.setIncludeSnapshot(true);
-    } finally {
-      void handle.dispose();
-    }
+    await context.waitForEventsAfterAction(async () => {
+      await fillFormElement(
+        request.params.uid,
+        request.params.value,
+        context as McpContext,
+      );
+    });
+    response.appendResponseLine(`Successfully filled out the element`);
+    response.setIncludeSnapshot(true);
   },
 });
 
@@ -155,14 +211,13 @@ export const fillForm = defineTool({
   },
   handler: async (request, response, context) => {
     for (const element of request.params.elements) {
-      const handle = await context.getElementByUid(element.uid);
-      try {
-        await context.waitForEventsAfterAction(async () => {
-          await handle.asLocator().fill(element.value);
-        });
-      } finally {
-        void handle.dispose();
-      }
+      await context.waitForEventsAfterAction(async () => {
+        await fillFormElement(
+          element.uid,
+          element.value,
+          context as McpContext,
+        );
+      });
     }
     response.appendResponseLine(`Successfully filled out the form`);
     response.setIncludeSnapshot(true);
