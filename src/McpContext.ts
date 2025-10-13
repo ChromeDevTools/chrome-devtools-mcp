@@ -352,7 +352,7 @@ export class McpContext implements Context {
       return nodeWithId;
     };
 
-    const rootNodeWithId = await assignIds(rootNode);
+    const rootNodeWithId = assignIds(rootNode);
     this.#textSnapshot = {
       root: rootNodeWithId,
       snapshotId: String(snapshotId),
