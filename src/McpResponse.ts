@@ -192,8 +192,12 @@ export class McpResponse implements Response {
 
     const dialog = context.getDialog();
     if (dialog) {
+      const defaultValueIfNeeded =
+        dialog.type() === 'prompt'
+          ? ` (default value: "${dialog.defaultValue()}")`
+          : '';
       response.push(`# Open dialog
-${dialog.type()}: ${dialog.message()} (default value: ${dialog.defaultValue()}).
+${dialog.type()}: ${dialog.message()}${defaultValueIfNeeded}.
 Call ${handleDialog.name} to handle it before continuing.`);
     }
 
