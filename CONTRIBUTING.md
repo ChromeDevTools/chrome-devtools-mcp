@@ -39,6 +39,8 @@ for PR and commit titles.
 
 ## Installation
 
+Check that you are using node version specified in .nvmrc, then run following commands:
+
 ```sh
 git clone https://github.com/ChromeDevTools/chrome-devtools-mcp.git
 cd chrome-devtools-mcp

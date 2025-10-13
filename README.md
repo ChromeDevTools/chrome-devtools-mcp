@@ -54,6 +54,16 @@ Add the following config to your MCP client:
 ### MCP Client configuration
 
 <details>
+  <summary>Amp</summary>
+  Follow https://ampcode.com/manual#mcp and use the config provided above. You can also install the Chrome DevTools MCP server using the CLI:
+
+```bash
+amp mcp add chrome-devtools -- npx chrome-devtools-mcp@latest
+```
+
+</details>
+
+<details>
   <summary>Claude Code</summary>
     Use the Claude Code CLI to add the Chrome DevTools MCP server (<a href="https://docs.anthropic.com/en/docs/claude-code/mcp">guide</a>):
 
@@ -178,6 +188,15 @@ The same way chrome-devtools-mcp can be configured for JetBrains Junie in `Setti
 </details>
 
 <details>
+  <summary>Kiro</summary>
+
+In **Kiro Settings**, go to `Configure MCP` > `Open Workspace or User MCP Config` > Use the configuration snippet provided above.
+
+Or, from the IDE **Activity Bar** > `Kiro` > `MCP Servers` > `Click Open MCP Config`. Use the configuration snippet provided above.
+
+</details>
+
+<details>
   <summary>Visual Studio</summary>
   
   **Click the button to install:**
@@ -291,6 +310,10 @@ The Chrome DevTools MCP server supports the following configuration option:
   If enabled, ignores errors relative to self-signed and expired certificates. Use with caution.
   - **Type:** boolean
 
+- **`--chromeArg`**
+  Additional arguments for Chrome. Only applies when Chrome is launched by chrome-devtools-mcp.
+  - **Type:** array
+
 <!-- END AUTO GENERATED OPTIONS -->
 
 Pass them via the `args` property in the JSON configuration. For example:
@@ -327,6 +350,69 @@ The user data directory is not cleared between runs and shared across
 all instances of `chrome-devtools-mcp`. Set the `isolated` option to `true`
 to use a temporary user data dir instead which will be cleared automatically after
 the browser is closed.
+
+### Connecting to a running Chrome instance
+
+You can connect to a running Chrome instance by using the `--browser-url` option. This is useful if you want to use your existing Chrome profile or if you are running the MCP server in a sandboxed environment that does not allow starting a new Chrome instance.
+
+Here is a step-by-step guide on how to connect to a running Chrome Stable instance:
+
+**Step 1: Configure the MCP client**
+
+Add the `--browser-url` option to your MCP client configuration. The value of this option should be the URL of the running Chrome instance. `http://127.0.0.1:9222` is a common default.
+
+```json
+{
+  "mcpServers": {
+    "chrome-devtools": {
+      "command": "npx",
+      "args": [
+        "chrome-devtools-mcp@latest",
+        "--browser-url=http://127.0.0.1:9222"
+      ]
+    }
+  }
+}
+```
+
+**Step 2: Start the Chrome browser**
+
+> [!WARNING]  
+> Enabling the remote debugging port opens up a debugging port on the running browser instance. Any application on your machine can connect to this port and control the browser. Make sure that you are not browsing any sensitive websites while the debugging port is open.
+
+Start the Chrome browser with the remote debugging port enabled. Make sure to close any running Chrome instances before starting a new one with the debugging port enabled. The port number you choose must be the same as the one you specified in the `--browser-url` option in your MCP client configuration.
+
+For security reasons, [Chrome requires you to use a non-default user data directory](https://developer.chrome.com/blog/remote-debugging-port) when enabling the remote debugging port. You can specify a custom directory using the `--user-data-dir` flag. This ensures that your regular browsing profile and data are not exposed to the debugging session.
+
+**macOS**
+
+```bash
+/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome --remote-debugging-port=9222 --user-data-dir=/tmp/chrome-profile-stable
+```
+
+**Linux**
+
+```bash
+/usr/bin/google-chrome --remote-debugging-port=9222 --user-data-dir=/tmp/chrome-profile-stable
+```
+
+**Windows**
+
+```bash
+"C:\Program Files\Google\Chrome\Application\chrome.exe" --remote-debugging-port=9222 --user-data-dir="%TEMP%\chrome-profile-stable"
+```
+
+**Step 3: Test your setup**
+
+After configuring the MCP client and starting the Chrome browser, you can test your setup by running a simple prompt in your MCP client:
+
+```
+Check the performance of https://developers.chrome.com
+```
+
+Your MCP client should connect to the running Chrome instance and receive a performance report.
+
+For more details on remote debugging, see the [Chrome DevTools documentation](https://developer.chrome.com/docs/devtools/remote-debugging/).
 
 ## Known limitations
 

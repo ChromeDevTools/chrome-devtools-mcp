@@ -12,6 +12,7 @@ updates:
         dependency-type: production
         exclude-patterns:
           - 'puppeteer*'
+          - 'chrome-devtools-frontend'
         patterns:
           - '*'
       dev-dependencies:
@@ -23,6 +24,9 @@ updates:
       puppeteer:
         patterns:
           - 'puppeteer*'
+      chrome-devtools-frontend:
+        patterns:
+          - 'chrome-devtools-frontend'
   - package-ecosystem: github-actions
     directory: /
     schedule:

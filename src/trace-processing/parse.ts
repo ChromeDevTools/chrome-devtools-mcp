@@ -77,15 +77,17 @@ const extraFormatDescriptions = `Information on performance traces may contain m
 
 ${PerformanceTraceFormatter.callFrameDataFormatDescription}
 
-${PerformanceTraceFormatter.networkDataFormatDescription}
-`;
+${PerformanceTraceFormatter.networkDataFormatDescription}`;
+
 export function getTraceSummary(result: TraceResult): string {
   const focus = AgentFocus.fromParsedTrace(result.parsedTrace);
   const formatter = new PerformanceTraceFormatter(focus);
-  const output = formatter.formatTraceSummary();
-  return `${extraFormatDescriptions}
+  const summaryText = formatter.formatTraceSummary();
+  return `## Summary of Performance trace findings:
+${summaryText}
 
-${output}`;
+## Details on call tree & network request formats:
+${extraFormatDescriptions}`;
 }
 
 export type InsightName = keyof TraceEngine.Insights.Types.InsightModels;
