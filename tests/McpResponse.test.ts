@@ -159,7 +159,7 @@ Emulating: 4x slowdown`,
         });
       });
       page.evaluate(() => {
-        alert('test');
+        prompt('message', 'default');
       });
       await dialogPromise;
       const result = await response.handle('test', context);
@@ -168,7 +168,7 @@ Emulating: 4x slowdown`,
         result[0].text,
         `# test response
 # Open dialog
-alert: test (default value: test).
+prompt: test (default value: default).
 Call handle_dialog to handle it before continuing.`,
       );
     });
