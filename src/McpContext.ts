@@ -272,6 +272,10 @@ export class McpContext implements Context {
     return page.getDefaultNavigationTimeout();
   }
 
+  getAXNodeByUid(uid: string) {
+    return this.#textSnapshot?.idToNode.get(uid);
+  }
+
   async getElementByUid(uid: string): Promise<ElementHandle<Element>> {
     if (!this.#textSnapshot?.idToNode.size) {
       throw new Error(
@@ -326,19 +330,37 @@ export class McpContext implements Context {
     // will be used for the tree serialization and mapping ids back to nodes.
     let idCounter = 0;
     const idToNode = new Map<string, TextSnapshotNode>();
-    const assignIds = (node: SerializedAXNode): TextSnapshotNode => {
+    const assignIds = async (
+      node: SerializedAXNode,
+    ): Promise<TextSnapshotNode> => {
       const nodeWithId: TextSnapshotNode = {
         ...node,
         id: `${snapshotId}_${idCounter++}`,
-        children: node.children
-          ? node.children.map(child => assignIds(child))
-          : [],
+        children: [],
       };
+
+      // The AXNode for an option doesn't contain its `value`.
+      // Therefore, set text content of the option as value.
+      if (node.role === 'option') {
+        const handle = await node.elementHandle();
+        if (handle) {
+          const textContentHandle = await handle.getProperty('textContent');
+          const optionText = await textContentHandle.jsonValue();
+          if (optionText) {
+            nodeWithId.value = optionText.toString();
+          }
+        }
+      }
+
+      nodeWithId.children = node.children
+        ? await Promise.all(node.children.map(child => assignIds(child)))
+        : [];
+
       idToNode.set(nodeWithId.id, nodeWithId);
       return nodeWithId;
     };
 
-    const rootNodeWithId = assignIds(rootNode);
+    const rootNodeWithId = await assignIds(rootNode);
     this.#textSnapshot = {
       root: rootNodeWithId,
       snapshotId: String(snapshotId),
