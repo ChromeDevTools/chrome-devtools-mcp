@@ -342,13 +342,9 @@ export class McpContext implements Context {
       // The AXNode for an option doesn't contain its `value`.
       // Therefore, set text content of the option as value.
       if (node.role === 'option') {
-        const handle = await node.elementHandle();
-        if (handle) {
-          const textContentHandle = await handle.getProperty('textContent');
-          const optionText = await textContentHandle.jsonValue();
-          if (optionText) {
-            nodeWithId.value = optionText.toString();
-          }
+        const optionText = node.name;
+        if (optionText) {
+          nodeWithId.value = optionText.toString();
         }
       }
 
