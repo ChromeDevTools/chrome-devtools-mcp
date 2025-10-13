@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.8.1](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.8.0...chrome-devtools-mcp-v0.8.1) (2025-10-13)
+
+
+### Bug Fixes
+
+* add an option value to the snapshot ([#362](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/362)) ([207137e](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/207137edd6d8af2f49277d88a30d8afa51671631))
+* improve navigate_page_history error messages ([#321](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/321)) ([0624029](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/0624029e0f8735345d202d29dde446b8869d9561))
+* return the default dialog value correctly ([#366](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/366)) ([f08f808](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/f08f8080d0be1074a48e5c2ab0a6533f01f65928))
+
 ## [0.8.0](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.7.1...chrome-devtools-mcp-v0.8.0) (2025-10-10)
 
 
