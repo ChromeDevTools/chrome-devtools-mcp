@@ -166,7 +166,9 @@ describe('pages', () => {
         assert.ok(
           response.responseLines
             .at(0)
-            ?.startsWith('Unable to navigate forward in currently selected page.'),
+            ?.startsWith(
+              'Unable to navigate forward in currently selected page.',
+            ),
         );
         assert.ok(response.includePages);
       });
