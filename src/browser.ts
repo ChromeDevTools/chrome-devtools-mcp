@@ -142,9 +142,7 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
   } catch (error) {
     if (
       userDataDir &&
-      ((error as Error).message.includes('The browser is already running') ||
-        (error as Error).message.includes('Target closed') ||
-        (error as Error).message.includes('Connection closed'))
+      (error as Error).message.includes('The browser is already running')
     ) {
       throw new Error(
         `The browser is already running for ${userDataDir}. Use --isolated to run multiple browser instances.`,
