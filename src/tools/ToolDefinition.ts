@@ -50,7 +50,7 @@ export interface Response {
   setIncludeConsoleData(value: boolean): void;
   setIncludeSnapshot(value: boolean): void;
   attachImage(value: ImageContentData): void;
-  attachNetworkRequest(url: string): void;
+  attachNetworkRequest(reqid: number): void;
 }
 
 /**

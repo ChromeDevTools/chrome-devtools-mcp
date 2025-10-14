@@ -155,19 +155,8 @@ export class McpContext implements Context {
     await page.close({runBeforeUnload: false});
   }
 
-  getNetworkRequestByUrl(url: string): HTTPRequest {
-    const requests = this.getNetworkRequests();
-    if (!requests.length) {
-      throw new Error('No requests found for selected page');
-    }
-
-    for (const request of requests) {
-      if (request.url() === url) {
-        return request;
-      }
-    }
-
-    throw new Error('Request not found for selected page');
+  getNetworkRequestById(reqid: number): HTTPRequest {
+    return this.#networkCollector.getById(this.getSelectedPage(), reqid);
   }
 
   setNetworkConditions(conditions: string | null): void {

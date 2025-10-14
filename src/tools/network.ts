@@ -80,9 +80,14 @@ export const getNetworkRequest = defineTool({
     readOnlyHint: true,
   },
   schema: {
-    url: z.string().describe('The URL of the request.'),
+    reqid: z
+      .number()
+      .describe(
+        'The reqid of a request on the page from the listed network requests',
+      ),
+    // url: z.string().describe('The URL of the request.'),
   },
   handler: async (request, response, _context) => {
-    response.attachNetworkRequest(request.params.url);
+    response.attachNetworkRequest(request.params.reqid);
   },
 });

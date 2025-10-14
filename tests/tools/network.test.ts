@@ -28,14 +28,11 @@ describe('network', () => {
         const page = await context.getSelectedPage();
         await page.goto('data:text/html,<div>Hello MCP</div>');
         await getNetworkRequest.handler(
-          {params: {url: 'data:text/html,<div>Hello MCP</div>'}},
+          {params: {reqid: 1}},
           response,
           context,
         );
-        assert.equal(
-          response.attachedNetworkRequestUrl,
-          'data:text/html,<div>Hello MCP</div>',
-        );
+        assert.equal(response.attachedNetworkRequestId, 1);
       });
     });
     it('should not add the request list', async () => {
@@ -43,7 +40,7 @@ describe('network', () => {
         const page = await context.getSelectedPage();
         await page.goto('data:text/html,<div>Hello MCP</div>');
         await getNetworkRequest.handler(
-          {params: {url: 'data:text/html,<div>Hello MCP</div>'}},
+          {params: {reqid: 1}},
           response,
           context,
         );

@@ -258,7 +258,7 @@
 
 **Parameters:**
 
-- **url** (string) **(required)**: The URL of the request.
+- **reqid** (number) **(required)**: The reqid of a request on the page from the listed network requests
 
 ---
 
