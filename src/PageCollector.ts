@@ -44,7 +44,6 @@ export class PageCollector<T> {
    * Use methods that manipulate the array in place.
    */
   protected storage = new WeakMap<Page, Array<WithSymbolId<T>>>();
-  protected idGenerator = new WeakMap<Page, () => number>();
 
   constructor(
     browser: Browser,
