@@ -15,7 +15,7 @@ export function getShortDescriptionForRequest(
   id: number,
 ): string {
   // TODO truncate the URL
-  return `uid ${id} - ${request.url()} ${request.method()} ${getStatusFromRequest(request)}`;
+  return `reqid ${id} - ${request.url()} ${request.method()} ${getStatusFromRequest(request)}`;
 }
 
 export function getStatusFromRequest(request: HTTPRequest): string {

@@ -23,20 +23,20 @@ describe('networkFormatter', () => {
       const request = getMockRequest();
       const result = getShortDescriptionForRequest(request, 1);
 
-      assert.equal(result, 'uid 1 - http://example.com GET [pending]');
+      assert.equal(result, 'reqid 1 - http://example.com GET [pending]');
     });
     it('shows correct method', async () => {
       const request = getMockRequest({method: 'POST'});
       const result = getShortDescriptionForRequest(request, 1);
 
-      assert.equal(result, 'uid 1 - http://example.com POST [pending]');
+      assert.equal(result, 'reqid 1 - http://example.com POST [pending]');
     });
     it('shows correct status for request with response code in 200', async () => {
       const response = getMockResponse();
       const request = getMockRequest({response});
       const result = getShortDescriptionForRequest(request, 1);
 
-      assert.equal(result, 'uid 1 - http://example.com GET [success - 200]');
+      assert.equal(result, 'reqid 1 - http://example.com GET [success - 200]');
     });
     it('shows correct status for request with response code in 100', async () => {
       const response = getMockResponse({
@@ -45,7 +45,7 @@ describe('networkFormatter', () => {
       const request = getMockRequest({response});
       const result = getShortDescriptionForRequest(request, 1);
 
-      assert.equal(result, 'uid 1 - http://example.com GET [failed - 199]');
+      assert.equal(result, 'reqid 1 - http://example.com GET [failed - 199]');
     });
     it('shows correct status for request with response code above 200', async () => {
       const response = getMockResponse({
@@ -54,7 +54,7 @@ describe('networkFormatter', () => {
       const request = getMockRequest({response});
       const result = getShortDescriptionForRequest(request, 1);
 
-      assert.equal(result, 'uid 1 - http://example.com GET [failed - 300]');
+      assert.equal(result, 'reqid 1 - http://example.com GET [failed - 300]');
     });
     it('shows correct status for request that failed', async () => {
       const request = getMockRequest({
@@ -68,7 +68,7 @@ describe('networkFormatter', () => {
 
       assert.equal(
         result,
-        'uid 1 - http://example.com GET [failed - Error in Network]',
+        'reqid 1 - http://example.com GET [failed - Error in Network]',
       );
     });
   });
