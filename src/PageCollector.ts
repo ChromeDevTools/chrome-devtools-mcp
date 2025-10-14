@@ -17,6 +17,19 @@ export type ListenerMap<EventMap extends PageEvents = PageEvents> = {
   [K in keyof EventMap]?: (event: EventMap[K]) => void;
 };
 
+function createIdGenerator() {
+  // TODO: Reset after max
+  let i = 1;
+  return () => {
+    return i++;
+  };
+}
+
+export const stableIdSymbol = Symbol('stableIdSymbol');
+type WithSymbolId<T> = T & {
+  [stableIdSymbol]?: number;
+};
+
 export class PageCollector<T> {
   #browser: Browser;
   #listenersInitializer: (
@@ -28,7 +41,8 @@ export class PageCollector<T> {
    * As we use the reference to it.
    * Use methods that manipulate the array in place.
    */
-  protected storage = new WeakMap<Page, T[]>();
+  protected storage = new WeakMap<Page, Array<WithSymbolId<T>>>();
+  protected idGenerator = new WeakMap<Page, () => number>();
 
   constructor(
     browser: Browser,
@@ -56,7 +70,6 @@ export class PageCollector<T> {
       if (!page) {
         return;
       }
-      console.log('destro');
       this.#cleanupPageDestroyed(page);
     });
   }
@@ -70,10 +83,14 @@ export class PageCollector<T> {
       return;
     }
 
-    const stored: T[] = [];
+    const idGenerator = createIdGenerator();
+    const stored: Array<WithSymbolId<T>> = [];
     this.storage.set(page, stored);
+
     const listeners = this.#listenersInitializer(value => {
-      stored.push(value);
+      const withId = value as WithSymbolId<T>;
+      withId[stableIdSymbol] = idGenerator();
+      stored.push(withId);
     });
     listeners['framenavigated'] = (frame: Frame) => {
       // Only reset the storage on main frame navigation
@@ -110,6 +127,10 @@ export class PageCollector<T> {
 
   getData(page: Page): T[] {
     return this.storage.get(page) ?? [];
+  }
+
+  getIdForResource(resource: WithSymbolId<T>): number {
+    return resource[stableIdSymbol] ?? -1;
   }
 }
 

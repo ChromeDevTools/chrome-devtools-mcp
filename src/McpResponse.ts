@@ -246,7 +246,12 @@ Call ${handleDialog.name} to handle it before continuing.`);
         );
         response.push(...data.info);
         for (const request of data.items) {
-          response.push(getShortDescriptionForRequest(request));
+          response.push(
+            getShortDescriptionForRequest(
+              request,
+              context.getNetworkRequestStableId(request),
+            ),
+          );
         }
       } else {
         response.push('No requests found.');
@@ -347,7 +352,7 @@ Call ${handleDialog.name} to handle it before continuing.`);
       let indent = 0;
       for (const request of redirectChain.reverse()) {
         response.push(
-          `${'  '.repeat(indent)}${getShortDescriptionForRequest(request)}`,
+          `${'  '.repeat(indent)}${getShortDescriptionForRequest(request, context.getNetworkRequestStableId(request))}`,
         );
         indent++;
       }

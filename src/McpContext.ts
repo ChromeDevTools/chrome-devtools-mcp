@@ -426,4 +426,8 @@ export class McpContext implements Context {
     );
     return waitForHelper.waitForEventsAfterAction(action);
   }
+
+  getNetworkRequestStableId(request: HTTPRequest): number {
+    return this.#networkCollector.getIdForResource(request);
+  }
 }

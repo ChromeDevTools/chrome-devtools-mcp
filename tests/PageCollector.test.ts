@@ -6,7 +6,7 @@
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
-import type {Browser, Frame, Page, Target} from 'puppeteer-core';
+import type {Browser, Frame, HTTPRequest, Page, Target} from 'puppeteer-core';
 
 import type {ListenerMap} from '../src/PageCollector.js';
 import {PageCollector} from '../src/PageCollector.js';
@@ -195,5 +195,28 @@ describe('PageCollector', () => {
     await new Promise<void>(res => res());
 
     assert.equal(collector.getData(page).length, 0);
+  });
+
+  it('should assign ids to requests', async () => {
+    const browser = getMockBrowser();
+    const page = (await browser.pages())[0];
+    const request1 = getMockRequest();
+    const request2 = getMockRequest();
+    const collector = new PageCollector<HTTPRequest>(browser, collect => {
+      return {
+        request: req => {
+          collect(req);
+        },
+      } as ListenerMap;
+    });
+    await collector.init();
+
+    page.emit('request', request1);
+    page.emit('request', request2);
+
+    assert.equal(collector.getData(page).length, 2);
+
+    assert.equal(collector.getIdForResource(request1), 1);
+    assert.equal(collector.getIdForResource(request2), 2);
   });
 });

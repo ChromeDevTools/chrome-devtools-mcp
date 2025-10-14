@@ -10,8 +10,12 @@ import type {HTTPRequest, HTTPResponse} from 'puppeteer-core';
 
 const BODY_CONTEXT_SIZE_LIMIT = 10000;
 
-export function getShortDescriptionForRequest(request: HTTPRequest): string {
-  return `${request.url()} ${request.method()} ${getStatusFromRequest(request)}`;
+export function getShortDescriptionForRequest(
+  request: HTTPRequest,
+  id: number,
+): string {
+  // TODO truncate the URL
+  return `uid ${id} - ${request.url()} ${request.method()} ${getStatusFromRequest(request)}`;
 }
 
 export function getStatusFromRequest(request: HTTPRequest): string {

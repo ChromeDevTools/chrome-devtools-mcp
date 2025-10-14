@@ -202,15 +202,16 @@ Call handle_dialog to handle it before continuing.`,
     await withBrowser(async (response, context) => {
       response.setIncludeNetworkRequests(true);
       context.getNetworkRequests = () => {
-        return [getMockRequest()];
+        return [getMockRequest({stableId: 1}), getMockRequest({stableId: 2})];
       };
       const result = await response.handle('test', context);
       assert.strictEqual(
         result[0].text,
         `# test response
 ## Network requests
-Showing 1-1 of 1 (Page 1 of 1).
-http://example.com GET [pending]`,
+Showing 1-2 of 2 (Page 1 of 1).
+uid 1 - http://example.com GET [pending]
+uid 2 - http://example.com GET [pending]`,
       );
     });
   });
@@ -266,7 +267,7 @@ ${JSON.stringify({request: 'body'})}
 ${JSON.stringify({response: 'body'})}
 ## Network requests
 Showing 1-1 of 1 (Page 1 of 1).
-http://example.com POST [success - 200]`,
+uid 1 - http://example.com POST [success - 200]`,
       );
     });
   });
@@ -289,7 +290,7 @@ Status:  [pending]
 - content-size:10
 ## Network requests
 Showing 1-1 of 1 (Page 1 of 1).
-http://example.com GET [pending]`,
+uid 1 - http://example.com GET [pending]`,
       );
     });
   });
@@ -354,8 +355,8 @@ describe('McpResponse network request filtering', () => {
         `# test response
 ## Network requests
 Showing 1-2 of 2 (Page 1 of 1).
-http://example.com GET [pending]
-http://example.com GET [pending]`,
+uid 1 - http://example.com GET [pending]
+uid 1 - http://example.com GET [pending]`,
       );
     });
   });
@@ -378,7 +379,7 @@ http://example.com GET [pending]`,
         `# test response
 ## Network requests
 Showing 1-1 of 1 (Page 1 of 1).
-http://example.com GET [pending]`,
+uid 1 - http://example.com GET [pending]`,
       );
     });
   });
@@ -423,11 +424,11 @@ No requests found.`,
         `# test response
 ## Network requests
 Showing 1-5 of 5 (Page 1 of 1).
-http://example.com GET [pending]
-http://example.com GET [pending]
-http://example.com GET [pending]
-http://example.com GET [pending]
-http://example.com GET [pending]`,
+uid 1 - http://example.com GET [pending]
+uid 1 - http://example.com GET [pending]
+uid 1 - http://example.com GET [pending]
+uid 1 - http://example.com GET [pending]
+uid 1 - http://example.com GET [pending]`,
       );
     });
   });
@@ -452,11 +453,11 @@ http://example.com GET [pending]`,
         `# test response
 ## Network requests
 Showing 1-5 of 5 (Page 1 of 1).
-http://example.com GET [pending]
-http://example.com GET [pending]
-http://example.com GET [pending]
-http://example.com GET [pending]
-http://example.com GET [pending]`,
+uid 1 - http://example.com GET [pending]
+uid 1 - http://example.com GET [pending]
+uid 1 - http://example.com GET [pending]
+uid 1 - http://example.com GET [pending]
+uid 1 - http://example.com GET [pending]`,
       );
     });
   });
