@@ -18,9 +18,11 @@ export type ListenerMap<EventMap extends PageEvents = PageEvents> = {
 };
 
 function createIdGenerator() {
-  // TODO: Reset after max
   let i = 1;
   return () => {
+    if (i === Number.MAX_SAFE_INTEGER) {
+      i = 0;
+    }
     return i++;
   };
 }
