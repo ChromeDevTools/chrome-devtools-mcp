@@ -4,11 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {
-  ConsoleMessage,
-  JSHandle,
-  ConsoleMessageLocation,
-} from 'puppeteer-core';
+import type {ConsoleMessage, JSHandle} from 'puppeteer-core';
 
 const logLevels: Record<string, string> = {
   log: 'Log',
@@ -31,66 +27,37 @@ export async function formatConsoleEvent(
 
 async function formatConsoleMessage(msg: ConsoleMessage): Promise<string> {
   const logLevel = logLevels[msg.type()];
+  const text = msg.text();
   const args = msg.args();
 
-  if (logLevel === 'Error') {
-    let message = `${logLevel}> `;
-    if (msg.text() === 'JSHandle@error') {
-      const errorHandle = args[0] as JSHandle<Error>;
-      message += await errorHandle
-        .evaluate(error => {
-          return error.toString();
-        })
-        .catch(() => {
-          return 'Error occurred';
-        });
-      void errorHandle.dispose().catch();
-
-      const formattedArgs = await formatArgs(args.slice(1));
-      if (formattedArgs) {
-        message += ` ${formattedArgs}`;
-      }
-    } else {
-      message += msg.text();
-      const formattedArgs = await formatArgs(args);
-      if (formattedArgs) {
-        message += ` ${formattedArgs}`;
-      }
-      for (const frame of msg.stackTrace()) {
-        message += '\n' + formatStackFrame(frame);
-      }
-    }
-    return message;
-  }
-
-  const formattedArgs = await formatArgs(args);
-  const text = msg.text();
-
-  return `${logLevel}> ${formatStackFrame(
-    msg.location(),
-  )}: ${text} ${formattedArgs}`.trim();
+  const formattedArgs = await formatArgs(args, text);
+  return `${logLevel}> ${text} ${formattedArgs}`.trim();
 }
 
-async function formatArgs(args: readonly JSHandle[]): Promise<string> {
-  const argValues = await Promise.all(
-    args.map(arg =>
-      arg.jsonValue().catch(() => {
-        // Ignore errors
-      }),
-    ),
-  );
-
-  return argValues
-    .map(value => {
-      return typeof value === 'object' ? JSON.stringify(value) : String(value);
-    })
-    .join(' ');
-}
-
-function formatStackFrame(stackFrame: ConsoleMessageLocation): string {
-  if (!stackFrame?.url) {
-    return '<unknown>';
+// Only includes the first arg and indicates that there are more args
+async function formatArgs(
+  args: readonly JSHandle[],
+  messageText: string,
+): Promise<string> {
+  if (args.length === 0) {
+    return '';
   }
-  const filename = stackFrame.url.replace(/^.*\//, '');
-  return `${filename}:${stackFrame.lineNumber}:${stackFrame.columnNumber}`;
+
+  let formattedArgs = '';
+  const firstArg = await args[0].jsonValue().catch(() => {
+    // Ignore errors
+  });
+
+  if (firstArg !== messageText) {
+    formattedArgs +=
+      typeof firstArg === 'object'
+        ? JSON.stringify(firstArg)
+        : String(firstArg);
+  }
+
+  if (args.length > 1) {
+    return `${formattedArgs} ...`;
+  }
+
+  return formattedArgs;
 }

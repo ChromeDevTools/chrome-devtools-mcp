@@ -65,17 +65,22 @@ describe('consoleFormatter', () => {
       const message = getMockConsoleMessage({
         type: 'log',
         text: 'Hello, world!',
-        location: {
-          url: 'http://example.com/script.js',
-          lineNumber: 10,
-          columnNumber: 5,
-        },
       });
       const result = await formatConsoleEvent(message);
-      assert.equal(result, 'Log> script.js:10:5: Hello, world!');
+      assert.equal(result, 'Log> Hello, world!');
     });
 
-    it('formats a console.log message with arguments', async () => {
+    it('formats a console.log message with one argument', async () => {
+      const message = getMockConsoleMessage({
+        type: 'log',
+        text: 'Processing file:',
+        args: ['file.txt'],
+      });
+      const result = await formatConsoleEvent(message);
+      assert.equal(result, 'Log> Processing file: file.txt');
+    });
+
+    it('formats a console.log message with multiple arguments', async () => {
       const message = getMockConsoleMessage({
         type: 'log',
         text: 'Processing file:',
@@ -87,10 +92,7 @@ describe('consoleFormatter', () => {
         },
       });
       const result = await formatConsoleEvent(message);
-      assert.equal(
-        result,
-        'Log> script.js:10:5: Processing file: file.txt {"id":1,"status":"done"}',
-      );
+      assert.equal(result, 'Log> Processing file: file.txt ...');
     });
 
     it('formats a console.error message', async () => {
@@ -102,76 +104,42 @@ describe('consoleFormatter', () => {
       assert.equal(result, 'Error> Something went wrong');
     });
 
-    it('formats a console.error message with arguments', async () => {
+    it('formats a console.error message with one argument', async () => {
       const message = getMockConsoleMessage({
         type: 'error',
         text: 'Something went wrong:',
         args: ['details', {code: 500}],
       });
       const result = await formatConsoleEvent(message);
-      assert.equal(result, 'Error> Something went wrong: details {"code":500}');
+      assert.equal(result, 'Error> Something went wrong: details');
     });
 
-    it('formats a console.error message with a stack trace', async () => {
+    it('formats a console.error message with multiple arguments', async () => {
       const message = getMockConsoleMessage({
         type: 'error',
-        text: 'Something went wrong',
-        stackTrace: [
-          {
-            url: 'http://example.com/script.js',
-            lineNumber: 10,
-            columnNumber: 5,
-          },
-          {
-            url: 'http://example.com/script2.js',
-            lineNumber: 20,
-            columnNumber: 10,
-          },
-        ],
+        text: 'Something went wrong:',
+        args: ['details', {code: 500}],
       });
       const result = await formatConsoleEvent(message);
-      assert.equal(
-        result,
-        'Error> Something went wrong\nscript.js:10:5\nscript2.js:20:10',
-      );
-    });
-
-    it('formats a console.error message with a JSHandle@error', async () => {
-      const message = getMockConsoleMessage({
-        type: 'error',
-        text: 'JSHandle@error',
-        args: [new Error('mock stack')],
-      });
-      const result = await formatConsoleEvent(message);
-      assert.ok(result.startsWith('Error> Error: mock stack'));
+      assert.equal(result, 'Error> Something went wrong: details ...');
     });
 
     it('formats a console.warn message', async () => {
       const message = getMockConsoleMessage({
         type: 'warning',
         text: 'This is a warning',
-        location: {
-          url: 'http://example.com/script.js',
-          lineNumber: 10,
-          columnNumber: 5,
-        },
       });
       const result = await formatConsoleEvent(message);
-      assert.equal(result, 'Warning> script.js:10:5: This is a warning');
+      assert.equal(result, 'Warning> This is a warning');
     });
 
     it('formats a console.info message', async () => {
       const message = getMockConsoleMessage({
         type: 'info',
         text: 'This is an info message',
-        location: {
-          url: 'http://example.com/script.js',
-          lineNumber: 10,
-          columnNumber: 5,
-        },
       });
       const result = await formatConsoleEvent(message);
-      assert.equal(result, 'Info> script.js:10:5: This is an info message');
+      assert.equal(result, 'Info> This is an info message');
     });
 
     it('formats a page error', async () => {
@@ -186,29 +154,6 @@ describe('consoleFormatter', () => {
       error.stack = undefined;
       const result = await formatConsoleEvent(error);
       assert.equal(result, 'Error: Page crashed');
-    });
-
-    it('formats a console.log message from a removed iframe - no location', async () => {
-      const message = getMockConsoleMessage({
-        type: 'log',
-        text: 'Hello from iframe',
-        location: {},
-      });
-      const result = await formatConsoleEvent(message);
-      assert.equal(result, 'Log> <unknown>: Hello from iframe');
-    });
-
-    it('formats a console.log message from a removed iframe with partial location', async () => {
-      const message = getMockConsoleMessage({
-        type: 'log',
-        text: 'Hello from iframe',
-        location: {
-          lineNumber: 10,
-          columnNumber: 5,
-        },
-      });
-      const result = await formatConsoleEvent(message);
-      assert.equal(result, 'Log> <unknown>: Hello from iframe');
     });
   });
 });
