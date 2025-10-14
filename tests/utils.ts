@@ -10,6 +10,7 @@ import type {HTTPRequest, HTTPResponse} from 'puppeteer-core';
 
 import {McpContext} from '../src/McpContext.js';
 import {McpResponse} from '../src/McpResponse.js';
+import {stableIdSymbol} from '../src/PageCollector.js';
 
 let browser: Browser | undefined;
 
@@ -49,6 +50,7 @@ export function getMockRequest(
     hasPostData?: boolean;
     postData?: string;
     fetchPostData?: Promise<string>;
+    stableId?: number;
   } = {},
 ): HTTPRequest {
   return {
@@ -84,7 +86,8 @@ export function getMockRequest(
     redirectChain(): HTTPRequest[] {
       return [];
     },
-  } as HTTPRequest;
+    [stableIdSymbol]: options.stableId ?? 1,
+  } as unknown as HTTPRequest;
 }
 
 export function getMockResponse(
