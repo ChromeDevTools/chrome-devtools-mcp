@@ -9,6 +9,7 @@ on:
 
 jobs:
   pre-release:
+    name: 'Verify MCP server schema unchanged'
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
