@@ -210,8 +210,8 @@ Call handle_dialog to handle it before continuing.`,
         `# test response
 ## Network requests
 Showing 1-2 of 2 (Page 1 of 1).
-reqid 1 - http://example.com GET [pending]
-reqid 2 - http://example.com GET [pending]`,
+reqid=1 http://example.com GET [pending]
+reqid=2 http://example.com GET [pending]`,
       );
     });
   });
@@ -267,7 +267,7 @@ ${JSON.stringify({request: 'body'})}
 ${JSON.stringify({response: 'body'})}
 ## Network requests
 Showing 1-1 of 1 (Page 1 of 1).
-reqid 1 - http://example.com POST [success - 200]`,
+reqid=1 http://example.com POST [success - 200]`,
       );
     });
   });
@@ -290,7 +290,7 @@ Status:  [pending]
 - content-size:10
 ## Network requests
 Showing 1-1 of 1 (Page 1 of 1).
-reqid 1 - http://example.com GET [pending]`,
+reqid=1 http://example.com GET [pending]`,
       );
     });
   });
@@ -355,8 +355,8 @@ describe('McpResponse network request filtering', () => {
         `# test response
 ## Network requests
 Showing 1-2 of 2 (Page 1 of 1).
-reqid 1 - http://example.com GET [pending]
-reqid 1 - http://example.com GET [pending]`,
+reqid=1 http://example.com GET [pending]
+reqid=1 http://example.com GET [pending]`,
       );
     });
   });
@@ -379,7 +379,7 @@ reqid 1 - http://example.com GET [pending]`,
         `# test response
 ## Network requests
 Showing 1-1 of 1 (Page 1 of 1).
-reqid 1 - http://example.com GET [pending]`,
+reqid=1 http://example.com GET [pending]`,
       );
     });
   });
@@ -424,11 +424,11 @@ No requests found.`,
         `# test response
 ## Network requests
 Showing 1-5 of 5 (Page 1 of 1).
-reqid 1 - http://example.com GET [pending]
-reqid 1 - http://example.com GET [pending]
-reqid 1 - http://example.com GET [pending]
-reqid 1 - http://example.com GET [pending]
-reqid 1 - http://example.com GET [pending]`,
+reqid=1 http://example.com GET [pending]
+reqid=1 http://example.com GET [pending]
+reqid=1 http://example.com GET [pending]
+reqid=1 http://example.com GET [pending]
+reqid=1 http://example.com GET [pending]`,
       );
     });
   });
@@ -453,11 +453,11 @@ reqid 1 - http://example.com GET [pending]`,
         `# test response
 ## Network requests
 Showing 1-5 of 5 (Page 1 of 1).
-reqid 1 - http://example.com GET [pending]
-reqid 1 - http://example.com GET [pending]
-reqid 1 - http://example.com GET [pending]
-reqid 1 - http://example.com GET [pending]
-reqid 1 - http://example.com GET [pending]`,
+reqid=1 http://example.com GET [pending]
+reqid=1 http://example.com GET [pending]
+reqid=1 http://example.com GET [pending]
+reqid=1 http://example.com GET [pending]
+reqid=1 http://example.com GET [pending]`,
       );
     });
   });
