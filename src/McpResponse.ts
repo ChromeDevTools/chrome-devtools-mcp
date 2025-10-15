@@ -24,7 +24,7 @@ import type {ImageContentData, Response} from './tools/ToolDefinition.js';
 import {paginate, type PaginationOptions} from './utils/pagination.js';
 
 interface NetworkRequestData {
-  networkRequestUrl: string;
+  networkRequestStableId: number;
   requestBody?: string;
   responseBody?: string;
 }
@@ -106,9 +106,9 @@ export class McpResponse implements Response {
     };
   }
 
-  attachNetworkRequest(url: string): void {
+  attachNetworkRequest(reqid: number): void {
     this.#attachedNetworkRequestData = {
-      networkRequestUrl: url,
+      networkRequestStableId: reqid,
     };
   }
 
@@ -123,8 +123,8 @@ export class McpResponse implements Response {
   get includeConsoleData(): boolean {
     return this.#consoleDataOptions?.include ?? false;
   }
-  get attachedNetworkRequestUrl(): string | undefined {
-    return this.#attachedNetworkRequestData?.networkRequestUrl;
+  get attachedNetworkRequestId(): number | undefined {
+    return this.#attachedNetworkRequestData?.networkRequestStableId;
   }
   get networkRequestsPageIdx(): number | undefined {
     return this.#networkRequestsOptions?.pagination?.pageIdx;
@@ -167,9 +167,9 @@ export class McpResponse implements Response {
       await context.createTextSnapshot();
     }
 
-    if (this.#attachedNetworkRequestData?.networkRequestUrl) {
-      const request = context.getNetworkRequestByUrl(
-        this.#attachedNetworkRequestData.networkRequestUrl,
+    if (this.#attachedNetworkRequestData?.networkRequestStableId) {
+      const request = context.getNetworkRequestById(
+        this.#attachedNetworkRequestData.networkRequestStableId,
       );
 
       this.#attachedNetworkRequestData.requestBody =
@@ -350,12 +350,12 @@ Call ${handleDialog.name} to handle it before continuing.`);
 
   #getIncludeNetworkRequestsData(context: McpContext): string[] {
     const response: string[] = [];
-    const url = this.#attachedNetworkRequestData?.networkRequestUrl;
+    const url = this.#attachedNetworkRequestData?.networkRequestStableId;
     if (!url) {
       return response;
     }
 
-    const httpRequest = context.getNetworkRequestByUrl(url);
+    const httpRequest = context.getNetworkRequestById(url);
     response.push(`## Request ${httpRequest.url()}`);
     response.push(`Status:  ${getStatusFromRequest(httpRequest)}`);
     response.push(`### Request Headers`);

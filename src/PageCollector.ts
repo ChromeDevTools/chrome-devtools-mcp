@@ -133,6 +133,21 @@ export class PageCollector<T> {
   getIdForResource(resource: WithSymbolId<T>): number {
     return resource[stableIdSymbol] ?? -1;
   }
+
+  getById(page: Page, stableId: number): T {
+    const data = this.storage.get(page);
+    if (!data || !data.length) {
+      throw new Error('No requests found for selected page');
+    }
+
+    for (const collected of data) {
+      if (collected[stableIdSymbol] === stableId) {
+        return collected;
+      }
+    }
+
+    throw new Error('Request not found for selected page');
+  }
 }
 
 export class NetworkCollector extends PageCollector<HTTPRequest> {

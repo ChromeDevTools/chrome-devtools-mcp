@@ -248,7 +248,10 @@ reqid=2 GET http://example.com [pending]`,
       context.getNetworkRequests = () => {
         return [request];
       };
-      response.attachNetworkRequest(request.url());
+      context.getNetworkRequestById = () => {
+        return request;
+      };
+      response.attachNetworkRequest(1);
 
       const result = await response.handle('test', context);
 
@@ -279,7 +282,10 @@ reqid=1 POST http://example.com [success - 200]`,
       context.getNetworkRequests = () => {
         return [request];
       };
-      response.attachNetworkRequest(request.url());
+      context.getNetworkRequestById = () => {
+        return request;
+      };
+      response.attachNetworkRequest(1);
       const result = await response.handle('test', context);
       assert.strictEqual(
         result[0].text,
