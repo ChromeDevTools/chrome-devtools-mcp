@@ -95,7 +95,7 @@ uid=1_0 RootWebArea "My test page"
     });
   });
 
-  it.only('returns verbose snapshot', async () => {
+  it('returns verbose snapshot', async () => {
     await withBrowser(async (response, context) => {
       const page = context.getSelectedPage();
       await page.setContent(html`<aside>test</aside>`);
