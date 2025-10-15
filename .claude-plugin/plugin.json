@@ -1,0 +1,11 @@
+{
+  "name": "chrome-devtools-mcp",
+  "version": "latest",
+  "description": "Control and inspect a live Chrome browser through MCP - automate actions, debug, and analyze performance using Chrome DevTools",
+  "mcpServers": {
+    "chrome-devtools": {
+      "command": "npx",
+      "args": ["chrome-devtools-mcp@latest"]
+    }
+  }
+}
