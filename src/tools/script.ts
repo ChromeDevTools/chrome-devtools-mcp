@@ -19,7 +19,7 @@ so returned values have to JSON-serializable.`,
   },
   schema: {
     function: z.string().describe(
-      `A JavaScript function to run in the currently selected page.
+      `A JavaScript function to run in the currently selected page. Just define the function and let the tool do the execution.
 Example without arguments: \`() => {
   return document.title
 }\` or \`async () => {
