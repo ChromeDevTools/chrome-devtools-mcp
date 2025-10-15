@@ -141,21 +141,19 @@ function registerTool(tool: ToolDefinition): void {
   );
 }
 
-const tools = [
-  ...Object.values(consoleTools),
-  ...Object.values(emulationTools),
-  ...Object.values(inputTools),
-  ...Object.values(networkTools),
-  ...Object.values(pagesTools),
-  ...Object.values(performanceTools),
-  ...Object.values(screenshotTools),
-  ...Object.values(scriptTools),
-  ...Object.values(snapshotTools),
-] as ToolDefinition[];
-
-tools.sort((a, b) => {
-  return a.name.localeCompare(b.name);
-});
+const tools = (
+  [
+    ...Object.values(consoleTools),
+    ...Object.values(emulationTools),
+    ...Object.values(inputTools),
+    ...Object.values(networkTools),
+    ...Object.values(pagesTools),
+    ...Object.values(performanceTools),
+    ...Object.values(screenshotTools),
+    ...Object.values(scriptTools),
+    ...Object.values(snapshotTools),
+  ] as ToolDefinition[]
+).sort((a, b) => a.name.localeCompare(b.name));
 
 for (const tool of tools) {
   registerTool(tool);
