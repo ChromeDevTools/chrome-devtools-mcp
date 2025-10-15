@@ -7,14 +7,14 @@
 import type {ElementHandle, Page} from 'puppeteer-core';
 import z from 'zod';
 
-import {ToolCategories} from './categories.js';
+import {ToolCategory} from './categories.js';
 import {defineTool} from './ToolDefinition.js';
 
 export const screenshot = defineTool({
   name: 'take_screenshot',
   description: `Take a screenshot of the page or element.`,
   annotations: {
-    category: ToolCategories.DEBUGGING,
+    category: ToolCategory.CORE,
     readOnlyHint: true,
   },
   schema: {

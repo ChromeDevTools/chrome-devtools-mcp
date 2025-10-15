@@ -7,7 +7,7 @@
 import type {ResourceType} from 'puppeteer-core';
 import z from 'zod';
 
-import {ToolCategories} from './categories.js';
+import {ToolCategory} from './categories.js';
 import {defineTool} from './ToolDefinition.js';
 
 const FILTERABLE_RESOURCE_TYPES: readonly [ResourceType, ...ResourceType[]] = [
@@ -36,7 +36,7 @@ export const listNetworkRequests = defineTool({
   name: 'list_network_requests',
   description: `List all requests for the currently selected page since the last navigation.`,
   annotations: {
-    category: ToolCategories.NETWORK,
+    category: ToolCategory.NETWORK,
     readOnlyHint: true,
   },
   schema: {
@@ -76,7 +76,7 @@ export const getNetworkRequest = defineTool({
   name: 'get_network_request',
   description: `Gets a network request by URL. You can get all requests by calling ${listNetworkRequests.name}.`,
   annotations: {
-    category: ToolCategories.NETWORK,
+    category: ToolCategory.NETWORK,
     readOnlyHint: true,
   },
   schema: {

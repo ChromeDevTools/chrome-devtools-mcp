@@ -2,22 +2,24 @@
 
 # Chrome DevTools MCP Tool Reference
 
-- **[Input automation](#input-automation)** (7 tools)
-  - [`click`](#click)
-  - [`drag`](#drag)
-  - [`fill`](#fill)
-  - [`fill_form`](#fill_form)
-  - [`handle_dialog`](#handle_dialog)
-  - [`hover`](#hover)
-  - [`upload_file`](#upload_file)
-- **[Navigation automation](#navigation-automation)** (7 tools)
+- **[Core automation](#core-automation)** (10 tools)
   - [`close_page`](#close_page)
+  - [`handle_dialog`](#handle_dialog)
   - [`list_pages`](#list_pages)
   - [`navigate_page`](#navigate_page)
   - [`navigate_page_history`](#navigate_page_history)
   - [`new_page`](#new_page)
   - [`select_page`](#select_page)
+  - [`take_screenshot`](#take_screenshot)
+  - [`take_snapshot`](#take_snapshot)
   - [`wait_for`](#wait_for)
+- **[Input automation](#input-automation)** (6 tools)
+  - [`click`](#click)
+  - [`drag`](#drag)
+  - [`fill`](#fill)
+  - [`fill_form`](#fill_form)
+  - [`hover`](#hover)
+  - [`upload_file`](#upload_file)
 - **[Emulation](#emulation)** (3 tools)
   - [`emulate_cpu`](#emulate_cpu)
   - [`emulate_network`](#emulate_network)
@@ -29,54 +31,19 @@
 - **[Network](#network)** (2 tools)
   - [`get_network_request`](#get_network_request)
   - [`list_network_requests`](#list_network_requests)
-- **[Debugging](#debugging)** (4 tools)
+- **[Debugging](#debugging)** (2 tools)
   - [`evaluate_script`](#evaluate_script)
   - [`list_console_messages`](#list_console_messages)
-  - [`take_screenshot`](#take_screenshot)
-  - [`take_snapshot`](#take_snapshot)
 
-## Input automation
+## Core automation
 
-### `click`
+### `close_page`
 
-**Description:** Clicks on the provided element
+**Description:** Closes the page by its index. The last open page cannot be closed.
 
 **Parameters:**
 
-- **dblClick** (boolean) _(optional)_: Set to true for double clicks. Default is false.
-- **uid** (string) **(required)**: The uid of an element on the page from the page content snapshot
-
----
-
-### `drag`
-
-**Description:** [`Drag`](#drag) an element onto another element
-
-**Parameters:**
-
-- **from_uid** (string) **(required)**: The uid of the element to [`drag`](#drag)
-- **to_uid** (string) **(required)**: The uid of the element to drop into
-
----
-
-### `fill`
-
-**Description:** Type text into a input, text area or select an option from a &lt;select&gt; element.
-
-**Parameters:**
-
-- **uid** (string) **(required)**: The uid of an element on the page from the page content snapshot
-- **value** (string) **(required)**: The value to [`fill`](#fill) in
-
----
-
-### `fill_form`
-
-**Description:** [`Fill`](#fill) out multiple form elements at once
-
-**Parameters:**
-
-- **elements** (array) **(required)**: Elements from snapshot to [`fill`](#fill) out.
+- **pageIdx** (number) **(required)**: The index of the page to close. Call [`list_pages`](#list_pages) to list pages.
 
 ---
 
@@ -88,39 +55,6 @@
 
 - **action** (enum: "accept", "dismiss") **(required)**: Whether to dismiss or accept the dialog
 - **promptText** (string) _(optional)_: Optional prompt text to enter into the dialog.
-
----
-
-### `hover`
-
-**Description:** [`Hover`](#hover) over the provided element
-
-**Parameters:**
-
-- **uid** (string) **(required)**: The uid of an element on the page from the page content snapshot
-
----
-
-### `upload_file`
-
-**Description:** Upload a file through a provided element.
-
-**Parameters:**
-
-- **filePath** (string) **(required)**: The local path of the file to upload
-- **uid** (string) **(required)**: The uid of the file input element or an element that will open file chooser on the page from the page content snapshot
-
----
-
-## Navigation automation
-
-### `close_page`
-
-**Description:** Closes the page by its index. The last open page cannot be closed.
-
-**Parameters:**
-
-- **pageIdx** (number) **(required)**: The index of the page to close. Call [`list_pages`](#list_pages) to list pages.
 
 ---
 
@@ -175,6 +109,31 @@
 
 ---
 
+### `take_screenshot`
+
+**Description:** Take a screenshot of the page or element.
+
+**Parameters:**
+
+- **filePath** (string) _(optional)_: The absolute path, or a path relative to the current working directory, to save the screenshot to instead of attaching it to the response.
+- **format** (enum: "png", "jpeg", "webp") _(optional)_: Type of format to save the screenshot as. Default is "png"
+- **fullPage** (boolean) _(optional)_: If set to true takes a screenshot of the full page instead of the currently visible viewport. Incompatible with uid.
+- **quality** (number) _(optional)_: Compression quality for JPEG and WebP formats (0-100). Higher values mean better quality but larger file sizes. Ignored for PNG format.
+- **uid** (string) _(optional)_: The uid of an element on the page from the page content snapshot. If omitted takes a pages screenshot.
+
+---
+
+### `take_snapshot`
+
+**Description:** Take a text snapshot of the currently selected page based on the a11y tree. The snapshot lists page elements along with a unique
+identifier (uid). Always use the latest snapshot. Prefer taking a snapshot over taking a screenshot.
+
+**Parameters:**
+
+- **verbose** (boolean) _(optional)_: Whether to include all possible information available in the full a11y tree. Default is false.
+
+---
+
 ### `wait_for`
 
 **Description:** Wait for the specified text to appear on the selected page.
@@ -183,6 +142,72 @@
 
 - **text** (string) **(required)**: Text to appear on the page
 - **timeout** (integer) _(optional)_: Maximum wait time in milliseconds. If set to 0, the default timeout will be used.
+
+---
+
+## Input automation
+
+### `click`
+
+**Description:** Clicks on the provided element
+
+**Parameters:**
+
+- **dblClick** (boolean) _(optional)_: Set to true for double clicks. Default is false.
+- **uid** (string) **(required)**: The uid of an element on the page from the page content snapshot
+
+---
+
+### `drag`
+
+**Description:** [`Drag`](#drag) an element onto another element
+
+**Parameters:**
+
+- **from_uid** (string) **(required)**: The uid of the element to [`drag`](#drag)
+- **to_uid** (string) **(required)**: The uid of the element to drop into
+
+---
+
+### `fill`
+
+**Description:** Type text into a input, text area or select an option from a &lt;select&gt; element.
+
+**Parameters:**
+
+- **uid** (string) **(required)**: The uid of an element on the page from the page content snapshot
+- **value** (string) **(required)**: The value to [`fill`](#fill) in
+
+---
+
+### `fill_form`
+
+**Description:** [`Fill`](#fill) out multiple form elements at once
+
+**Parameters:**
+
+- **elements** (array) **(required)**: Elements from snapshot to [`fill`](#fill) out.
+
+---
+
+### `hover`
+
+**Description:** [`Hover`](#hover) over the provided element
+
+**Parameters:**
+
+- **uid** (string) **(required)**: The uid of an element on the page from the page content snapshot
+
+---
+
+### `upload_file`
+
+**Description:** Upload a file through a provided element.
+
+**Parameters:**
+
+- **filePath** (string) **(required)**: The local path of the file to upload
+- **uid** (string) **(required)**: The uid of the file input element or an element that will open file chooser on the page from the page content snapshot
 
 ---
 
@@ -301,30 +326,5 @@ so returned values have to JSON-serializable.
 **Description:** List all console messages for the currently selected page since the last navigation.
 
 **Parameters:** None
-
----
-
-### `take_screenshot`
-
-**Description:** Take a screenshot of the page or element.
-
-**Parameters:**
-
-- **filePath** (string) _(optional)_: The absolute path, or a path relative to the current working directory, to save the screenshot to instead of attaching it to the response.
-- **format** (enum: "png", "jpeg", "webp") _(optional)_: Type of format to save the screenshot as. Default is "png"
-- **fullPage** (boolean) _(optional)_: If set to true takes a screenshot of the full page instead of the currently visible viewport. Incompatible with uid.
-- **quality** (number) _(optional)_: Compression quality for JPEG and WebP formats (0-100). Higher values mean better quality but larger file sizes. Ignored for PNG format.
-- **uid** (string) _(optional)_: The uid of an element on the page from the page content snapshot. If omitted takes a pages screenshot.
-
----
-
-### `take_snapshot`
-
-**Description:** Take a text snapshot of the currently selected page based on the a11y tree. The snapshot lists page elements along with a unique
-identifier (uid). Always use the latest snapshot. Prefer taking a snapshot over taking a screenshot.
-
-**Parameters:**
-
-- **verbose** (boolean) _(optional)_: Whether to include all possible information available in the full a11y tree. Default is false.
 
 ---

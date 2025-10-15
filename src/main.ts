@@ -88,10 +88,13 @@ debug, and modify any data in the browser or DevTools.
 Avoid sharing sensitive or personal information that you do not want to share with MCP clients.`,
   );
 };
-
+const enabledCategories = new Set(args.categories);
 const toolMutex = new Mutex();
 
 function registerTool(tool: ToolDefinition): void {
+  if (!enabledCategories.has(tool.annotations.category.toLowerCase())) {
+    return;
+  }
   server.registerTool(
     tool.name,
     {

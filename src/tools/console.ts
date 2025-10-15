@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {ToolCategories} from './categories.js';
+import {ToolCategory} from './categories.js';
 import {defineTool} from './ToolDefinition.js';
 
 export const consoleTool = defineTool({
@@ -12,7 +12,7 @@ export const consoleTool = defineTool({
   description:
     'List all console messages for the currently selected page since the last navigation.',
   annotations: {
-    category: ToolCategories.DEBUGGING,
+    category: ToolCategory.DEBUGGING,
     readOnlyHint: true,
   },
   schema: {},

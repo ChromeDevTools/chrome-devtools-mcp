@@ -7,7 +7,7 @@
 import {PredefinedNetworkConditions} from 'puppeteer-core';
 import z from 'zod';
 
-import {ToolCategories} from './categories.js';
+import {ToolCategory} from './categories.js';
 import {defineTool} from './ToolDefinition.js';
 
 const throttlingOptions: [string, ...string[]] = [
@@ -20,7 +20,7 @@ export const emulateNetwork = defineTool({
   name: 'emulate_network',
   description: `Emulates network conditions such as throttling or offline mode on the selected page.`,
   annotations: {
-    category: ToolCategories.EMULATION,
+    category: ToolCategory.EMULATION,
     readOnlyHint: false,
   },
   schema: {
@@ -66,7 +66,7 @@ export const emulateCpu = defineTool({
   name: 'emulate_cpu',
   description: `Emulates CPU throttling by slowing down the selected page's execution.`,
   annotations: {
-    category: ToolCategories.EMULATION,
+    category: ToolCategory.EMULATION,
     readOnlyHint: false,
   },
   schema: {

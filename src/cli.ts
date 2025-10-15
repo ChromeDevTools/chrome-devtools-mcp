@@ -8,6 +8,8 @@ import type {Options as YargsOptions} from 'yargs';
 import yargs from 'yargs';
 import {hideBin} from 'yargs/helpers';
 
+import {ToolCategory} from './tools/categories.js';
+
 export const cliOptions = {
   browserUrl: {
     type: 'string',
@@ -90,6 +92,27 @@ export const cliOptions = {
     type: 'array',
     describe:
       'Additional arguments for Chrome. Only applies when Chrome is launched by chrome-devtools-mcp.',
+  },
+  categories: {
+    type: 'string',
+    describe:
+      'Categories of tools to expose. The `core` category cannot be disabled.',
+    default: Object.keys(ToolCategory)
+      .map(item => item.toLowerCase())
+      .join(','),
+    coerce: (arg: string) => {
+      if (!arg) {
+        return [ToolCategory.CORE];
+      }
+      const catgories = arg
+        .split(',')
+        .map(cat => cat.trim())
+        .filter(cat => cat !== '');
+      if (!catgories.length) {
+        return [ToolCategory.CORE];
+      }
+      return catgories;
+    },
   },
 } satisfies Record<string, YargsOptions>;
 

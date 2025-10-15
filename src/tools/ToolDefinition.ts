@@ -10,14 +10,14 @@ import z from 'zod';
 import type {TextSnapshotNode} from '../McpContext.js';
 import type {TraceResult} from '../trace-processing/parse.js';
 
-import type {ToolCategories} from './categories.js';
+import type {ToolCategory} from './categories.js';
 
 export interface ToolDefinition<Schema extends z.ZodRawShape = z.ZodRawShape> {
   name: string;
   description: string;
   annotations: {
     title?: string;
-    category: ToolCategories;
+    category: ToolCategory;
     /**
      * If true, the tool does not modify its environment.
      */

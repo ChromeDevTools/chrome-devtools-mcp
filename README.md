@@ -230,22 +230,24 @@ If you run into any issues, checkout our [troubleshooting guide](./docs/troubles
 
 <!-- BEGIN AUTO GENERATED TOOLS -->
 
-- **Input automation** (7 tools)
-  - [`click`](docs/tool-reference.md#click)
-  - [`drag`](docs/tool-reference.md#drag)
-  - [`fill`](docs/tool-reference.md#fill)
-  - [`fill_form`](docs/tool-reference.md#fill_form)
-  - [`handle_dialog`](docs/tool-reference.md#handle_dialog)
-  - [`hover`](docs/tool-reference.md#hover)
-  - [`upload_file`](docs/tool-reference.md#upload_file)
-- **Navigation automation** (7 tools)
+- **Core automation** (10 tools)
   - [`close_page`](docs/tool-reference.md#close_page)
+  - [`handle_dialog`](docs/tool-reference.md#handle_dialog)
   - [`list_pages`](docs/tool-reference.md#list_pages)
   - [`navigate_page`](docs/tool-reference.md#navigate_page)
   - [`navigate_page_history`](docs/tool-reference.md#navigate_page_history)
   - [`new_page`](docs/tool-reference.md#new_page)
   - [`select_page`](docs/tool-reference.md#select_page)
+  - [`take_screenshot`](docs/tool-reference.md#take_screenshot)
+  - [`take_snapshot`](docs/tool-reference.md#take_snapshot)
   - [`wait_for`](docs/tool-reference.md#wait_for)
+- **Input automation** (6 tools)
+  - [`click`](docs/tool-reference.md#click)
+  - [`drag`](docs/tool-reference.md#drag)
+  - [`fill`](docs/tool-reference.md#fill)
+  - [`fill_form`](docs/tool-reference.md#fill_form)
+  - [`hover`](docs/tool-reference.md#hover)
+  - [`upload_file`](docs/tool-reference.md#upload_file)
 - **Emulation** (3 tools)
   - [`emulate_cpu`](docs/tool-reference.md#emulate_cpu)
   - [`emulate_network`](docs/tool-reference.md#emulate_network)
@@ -257,11 +259,9 @@ If you run into any issues, checkout our [troubleshooting guide](./docs/troubles
 - **Network** (2 tools)
   - [`get_network_request`](docs/tool-reference.md#get_network_request)
   - [`list_network_requests`](docs/tool-reference.md#list_network_requests)
-- **Debugging** (4 tools)
+- **Debugging** (2 tools)
   - [`evaluate_script`](docs/tool-reference.md#evaluate_script)
   - [`list_console_messages`](docs/tool-reference.md#list_console_messages)
-  - [`take_screenshot`](docs/tool-reference.md#take_screenshot)
-  - [`take_snapshot`](docs/tool-reference.md#take_snapshot)
 
 <!-- END AUTO GENERATED TOOLS -->
 
@@ -313,6 +313,11 @@ The Chrome DevTools MCP server supports the following configuration option:
 - **`--chromeArg`**
   Additional arguments for Chrome. Only applies when Chrome is launched by chrome-devtools-mcp.
   - **Type:** array
+
+- **`--categories`**
+  Categories of tools to expose. The `core` category cannot be disabled.
+  - **Type:** string
+  - **Default:** `core,input,emulation,performance,network,debugging`
 
 <!-- END AUTO GENERATED OPTIONS -->
 

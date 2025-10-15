@@ -8,7 +8,15 @@ import {describe, it} from 'node:test';
 
 import {parseArguments} from '../src/cli.js';
 
-describe('cli args parsing', () => {
+describe.only('cli args parsing', () => {
+  const defaultCategories = [
+    'core',
+    'input',
+    'emulation',
+    'performance',
+    'network',
+    'debugging',
+  ];
   it('parses with default args', async () => {
     const args = parseArguments('1.0.0', ['node', 'main.js']);
     assert.deepStrictEqual(args, {
@@ -17,6 +25,7 @@ describe('cli args parsing', () => {
       isolated: false,
       $0: 'npx chrome-devtools-mcp@latest',
       channel: 'stable',
+      categories: defaultCategories,
     });
   });
 
@@ -35,6 +44,7 @@ describe('cli args parsing', () => {
       'browser-url': 'http://localhost:3000',
       browserUrl: 'http://localhost:3000',
       u: 'http://localhost:3000',
+      categories: defaultCategories,
     });
   });
 
@@ -54,6 +64,7 @@ describe('cli args parsing', () => {
       browserUrl: undefined,
       u: undefined,
       channel: 'stable',
+      categories: defaultCategories,
     });
   });
 
@@ -72,6 +83,7 @@ describe('cli args parsing', () => {
       'executable-path': '/tmp/test 123/chrome',
       e: '/tmp/test 123/chrome',
       executablePath: '/tmp/test 123/chrome',
+      categories: defaultCategories,
     });
   });
 
@@ -92,6 +104,7 @@ describe('cli args parsing', () => {
         width: 888,
         height: 777,
       },
+      categories: defaultCategories,
     });
   });
 
@@ -110,6 +123,24 @@ describe('cli args parsing', () => {
       channel: 'stable',
       'chrome-arg': ['--no-sandbox', '--disable-setuid-sandbox'],
       chromeArg: ['--no-sandbox', '--disable-setuid-sandbox'],
+      categories: defaultCategories,
+    });
+  });
+
+  it('parses custom categories', async () => {
+    const args = parseArguments('1.0.0', [
+      'node',
+      'main.js',
+      '--categories',
+      'core,input',
+    ]);
+    assert.deepStrictEqual(args, {
+      _: [],
+      headless: false,
+      isolated: false,
+      $0: 'npx chrome-devtools-mcp@latest',
+      channel: 'stable',
+      categories: ['core', 'input'],
     });
   });
 });
