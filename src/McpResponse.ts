@@ -7,7 +7,7 @@ import type {
   ImageContent,
   TextContent,
 } from '@modelcontextprotocol/sdk/types.js';
-import type {ResourceType} from 'puppeteer-core';
+import type {ConsoleMessage, ResourceType} from 'puppeteer-core';
 
 import {formatConsoleEvent} from './formatters/consoleFormatter.js';
 import {
@@ -29,10 +29,17 @@ interface NetworkRequestData {
   responseBody?: string;
 }
 
+export interface ConsoleMessageData {
+  type: string;
+  message: string;
+  args: string[];
+}
+
 export class McpResponse implements Response {
   #includePages = false;
   #includeSnapshot = false;
   #attachedNetworkRequestData?: NetworkRequestData;
+  #consoleMessagesData?: ConsoleMessageData[];
   #textResponseLines: string[] = [];
   #images: ImageContentData[] = [];
   #networkRequestsOptions?: {
@@ -182,13 +189,44 @@ export class McpResponse implements Response {
       }
     }
 
-    return await this.format(toolName, context);
+    if (this.#consoleDataOptions?.include) {
+      const messages = context.getConsoleData();
+
+      this.#consoleMessagesData = await Promise.all(
+        messages.map(async (item): Promise<ConsoleMessageData> => {
+          if ('args' in item) {
+            const consoleMessage = item as ConsoleMessage;
+            return {
+              type: consoleMessage.type(),
+              message: consoleMessage.text(),
+              args: await Promise.all(
+                consoleMessage.args().map(async arg => {
+                  const stringArg = await arg.jsonValue().catch(() => {
+                    // Ignore errors.
+                  });
+                  return typeof stringArg === 'object'
+                    ? JSON.stringify(stringArg)
+                    : String(stringArg);
+                }),
+              ),
+            };
+          }
+          return {
+            type: 'error',
+            message: (item as Error).message,
+            args: [],
+          };
+        }),
+      );
+    }
+
+    return this.format(toolName, context);
   }
 
-  async format(
+  format(
     toolName: string,
     context: McpContext,
-  ): Promise<Array<TextContent | ImageContent>> {
+  ): Array<TextContent | ImageContent> {
     const response = [`# ${toolName} response`];
     for (const line of this.#textResponseLines) {
       response.push(line);
@@ -278,18 +316,7 @@ Call ${handleDialog.name} to handle it before continuing.`);
     }
 
     if (this.#consoleDataOptions?.include) {
-      let messages = context.getConsoleData();
-
-      if (this.#consoleDataOptions.types?.length) {
-        const normalizedTypes = new Set(this.#consoleDataOptions.types);
-        messages = messages.filter(message => {
-          if (!('type' in message)) {
-            return normalizedTypes.has('error');
-          }
-          const type = message.type();
-          return normalizedTypes.has(type);
-        });
-      }
+      const messages = this.#consoleMessagesData ?? [];
 
       response.push('## Console messages');
       if (messages.length) {
@@ -299,9 +326,7 @@ Call ${handleDialog.name} to handle it before continuing.`);
         );
         response.push(...data.info);
         response.push(
-          ...(await Promise.all(
-            data.items.map(message => formatConsoleEvent(message)),
-          )),
+          ...data.items.map(message => formatConsoleEvent(message)),
         );
       } else {
         response.push('<no console messages found>');

@@ -25,8 +25,12 @@ describe('console', () => {
           '<script>console.error("This is an error")</script>',
         );
         await consoleTool.handler({params: {}}, response, context);
-        const formattedResponse = await response.format('test', context);
+        await response.handle('test', context);
+
+        const formattedResponse = response.format('test', context);
+
         const textContent = formattedResponse[0] as {text: string};
+        assert.ok(textContent.text.includes('Error>'));
         assert.ok(textContent.text.includes('This is an error'));
       });
     });

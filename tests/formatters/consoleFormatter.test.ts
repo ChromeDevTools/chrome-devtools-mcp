@@ -7,153 +7,109 @@
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
-import type {ConsoleMessage} from 'puppeteer-core';
-
 import {formatConsoleEvent} from '../../src/formatters/consoleFormatter.js';
-
-function getMockConsoleMessage(options: {
-  type: string;
-  text: string;
-  location?: {
-    url?: string;
-    lineNumber?: number;
-    columnNumber?: number;
-  };
-  stackTrace?: Array<{
-    url: string;
-    lineNumber: number;
-    columnNumber: number;
-  }>;
-  args?: unknown[];
-}): ConsoleMessage {
-  return {
-    type() {
-      return options.type;
-    },
-    text() {
-      return options.text;
-    },
-    location() {
-      return options.location ?? {};
-    },
-    stackTrace() {
-      return options.stackTrace ?? [];
-    },
-    args() {
-      return (
-        options.args?.map(arg => {
-          return {
-            evaluate(fn: (arg: unknown) => unknown) {
-              return Promise.resolve(fn(arg));
-            },
-            jsonValue() {
-              return Promise.resolve(arg);
-            },
-            dispose() {
-              return Promise.resolve();
-            },
-          };
-        }) ?? []
-      );
-    },
-  } as ConsoleMessage;
-}
+import type {ConsoleMessageData} from '../../src/McpResponse.js';
 
 describe('consoleFormatter', () => {
   describe('formatConsoleEvent', () => {
-    it('formats a console.log message', async () => {
-      const message = getMockConsoleMessage({
+    it('formats a console.log message', () => {
+      const message: ConsoleMessageData = {
         type: 'log',
-        text: 'Hello, world!',
-      });
-      const result = await formatConsoleEvent(message);
+        message: 'Hello, world!',
+        args: [],
+      };
+      const result = formatConsoleEvent(message);
       assert.equal(result, 'Log> Hello, world!');
     });
 
-    it('formats a console.log message with one argument', async () => {
-      const message = getMockConsoleMessage({
+    it('formats a console.log message with one argument', () => {
+      const message: ConsoleMessageData = {
         type: 'log',
-        text: 'Processing file:',
+        message: 'Processing file:',
         args: ['file.txt'],
-      });
-      const result = await formatConsoleEvent(message);
+      };
+      const result = formatConsoleEvent(message);
       assert.equal(result, 'Log> Processing file: file.txt');
     });
 
-    it('formats a console.log message with multiple arguments', async () => {
-      const message = getMockConsoleMessage({
+    it('formats a console.log message with multiple arguments', () => {
+      const message: ConsoleMessageData = {
         type: 'log',
-        text: 'Processing file:',
-        args: ['file.txt', {id: 1, status: 'done'}],
-        location: {
-          url: 'http://example.com/script.js',
-          lineNumber: 10,
-          columnNumber: 5,
-        },
-      });
-      const result = await formatConsoleEvent(message);
+        message: 'Processing file:',
+        args: ['file.txt', JSON.stringify({id: 1, status: 'done'})],
+      };
+      const result = formatConsoleEvent(message);
       assert.equal(result, 'Log> Processing file: file.txt ...');
     });
 
-    it('formats a console.error message', async () => {
-      const message = getMockConsoleMessage({
+    it('formats a console.error message', () => {
+      const message: ConsoleMessageData = {
         type: 'error',
-        text: 'Something went wrong',
-      });
-      const result = await formatConsoleEvent(message);
+        message: 'Something went wrong',
+        args: [],
+      };
+      const result = formatConsoleEvent(message);
       assert.equal(result, 'Error> Something went wrong');
     });
 
-    it('formats a console.error message with one argument', async () => {
-      const message = getMockConsoleMessage({
+    it('formats a console.error message with one argument', () => {
+      const message: ConsoleMessageData = {
         type: 'error',
-        text: 'Something went wrong:',
+        message: 'Something went wrong:',
         args: ['details'],
-      });
-      const result = await formatConsoleEvent(message);
+      };
+      const result = formatConsoleEvent(message);
       assert.equal(result, 'Error> Something went wrong: details');
     });
 
-    it('formats a console.error message with multiple arguments', async () => {
-      const message = getMockConsoleMessage({
+    it('formats a console.error message with multiple arguments', () => {
+      const message: ConsoleMessageData = {
         type: 'error',
-        text: 'Something went wrong:',
-        args: ['details', {code: 500}],
-      });
-      const result = await formatConsoleEvent(message);
+        message: 'Something went wrong:',
+        args: ['details', JSON.stringify({code: 500})],
+      };
+      const result = formatConsoleEvent(message);
       assert.equal(result, 'Error> Something went wrong: details ...');
     });
 
-    it('formats a console.warn message', async () => {
-      const message = getMockConsoleMessage({
+    it('formats a console.warn message', () => {
+      const message: ConsoleMessageData = {
         type: 'warning',
-        text: 'This is a warning',
-      });
-      const result = await formatConsoleEvent(message);
+        message: 'This is a warning',
+        args: [],
+      };
+      const result = formatConsoleEvent(message);
       assert.equal(result, 'Warning> This is a warning');
     });
 
-    it('formats a console.info message', async () => {
-      const message = getMockConsoleMessage({
+    it('formats a console.info message', () => {
+      const message: ConsoleMessageData = {
         type: 'info',
-        text: 'This is an info message',
-      });
-      const result = await formatConsoleEvent(message);
+        message: 'This is an info message',
+        args: [],
+      };
+      const result = formatConsoleEvent(message);
       assert.equal(result, 'Info> This is an info message');
     });
 
-    it('formats a page error', async () => {
-      const error = new Error('Page crashed');
-      error.stack = 'Error: Page crashed\n    at <anonymous>:1:1';
-      const result = await formatConsoleEvent(error);
-      assert.equal(result, 'Error: Page crashed');
+    it('formats a page error', () => {
+      const error: ConsoleMessageData = {
+        type: 'error',
+        message: 'Error: Page crashed',
+        args: [],
+      };
+      const result = formatConsoleEvent(error);
+      assert.equal(result, 'Error> Error: Page crashed');
     });
 
-    it('formats a page error without a stack', async () => {
-      const error = new Error('Page crashed');
-      error.stack = undefined;
-      const result = await formatConsoleEvent(error);
-      assert.equal(result, 'Error: Page crashed');
+    it('formats a page error without a stack', () => {
+      const error: ConsoleMessageData = {
+        type: 'error',
+        message: 'Error: Page crashed',
+        args: [],
+      };
+      const result = formatConsoleEvent(error);
+      assert.equal(result, 'Error> Error: Page crashed');
     });
   });
 });
