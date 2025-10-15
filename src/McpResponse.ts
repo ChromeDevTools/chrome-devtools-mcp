@@ -32,6 +32,7 @@ interface NetworkRequestData {
 export class McpResponse implements Response {
   #includePages = false;
   #includeSnapshot = false;
+  #includeVerboseSnapshot = false;
   #attachedNetworkRequestData?: NetworkRequestData;
   #includeConsoleData = false;
   #textResponseLines: string[] = [];
@@ -47,8 +48,9 @@ export class McpResponse implements Response {
     this.#includePages = value;
   }
 
-  setIncludeSnapshot(value: boolean): void {
+  setIncludeSnapshot(value: boolean, verbose = false): void {
     this.#includeSnapshot = value;
+    this.#includeVerboseSnapshot = verbose;
   }
 
   setIncludeNetworkRequests(
@@ -125,6 +127,10 @@ export class McpResponse implements Response {
     return this.#includeSnapshot;
   }
 
+  get includeVersboseSnapshot(): boolean {
+    return this.#includeVerboseSnapshot;
+  }
+
   async handle(
     toolName: string,
     context: McpContext,
@@ -133,7 +139,7 @@ export class McpResponse implements Response {
       await context.createPagesSnapshot();
     }
     if (this.#includeSnapshot) {
-      await context.createTextSnapshot();
+      await context.createTextSnapshot(this.#includeVerboseSnapshot);
     }
 
     let formattedConsoleMessages: string[];

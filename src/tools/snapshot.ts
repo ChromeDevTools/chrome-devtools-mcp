@@ -12,15 +12,22 @@ import {defineTool, timeoutSchema} from './ToolDefinition.js';
 
 export const takeSnapshot = defineTool({
   name: 'take_snapshot',
-  description: `Take a text snapshot of the currently selected page. The snapshot lists page elements along with a unique
+  description: `Take a text snapshot of the currently selected page based on the a11y tree. The snapshot lists page elements along with a unique
 identifier (uid). Always use the latest snapshot. Prefer taking a snapshot over taking a screenshot.`,
   annotations: {
     category: ToolCategories.DEBUGGING,
     readOnlyHint: true,
   },
-  schema: {},
-  handler: async (_request, response) => {
-    response.setIncludeSnapshot(true);
+  schema: {
+    verbose: z
+      .boolean()
+      .optional()
+      .describe(
+        'Whether to include all possible information available in the full a11y tree. Default is false.',
+      ),
+  },
+  handler: async (request, response) => {
+    response.setIncludeSnapshot(true, request.params.verbose ?? false);
   },
 });
 

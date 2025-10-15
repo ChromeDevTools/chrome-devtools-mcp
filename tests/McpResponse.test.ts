@@ -61,9 +61,9 @@ Testing 2`,
         result[0].text,
         `# test response
 ## Page content
-uid=1_0 RootWebArea ""
+uid=1_0 RootWebArea
   uid=1_1 button "Click me" focusable focused
-  uid=1_2 textbox "" value="Input"
+  uid=1_2 textbox value="Input"
 `,
       );
     });
@@ -90,6 +90,28 @@ uid=1_0 RootWebArea ""
 uid=1_0 RootWebArea "My test page"
   uid=1_1 StaticText "username"
   uid=1_2 textbox "username" focusable focused value="mcp"
+`,
+      );
+    });
+  });
+
+  it.only('returns verbose snapshot', async () => {
+    await withBrowser(async (response, context) => {
+      const page = context.getSelectedPage();
+      await page.setContent(html`<aside>test</aside>`);
+      response.setIncludeSnapshot(true, true);
+      const result = await response.handle('test', context);
+      assert.equal(result[0].type, 'text');
+      assert.strictEqual(
+        result[0].text,
+        `# test response
+## Page content
+uid=1_0 RootWebArea "My test page"
+  uid=1_1 ignored
+    uid=1_2 ignored
+      uid=1_3 complementary
+        uid=1_4 StaticText "test"
+          uid=1_5 InlineTextBox "test"
 `,
       );
     });

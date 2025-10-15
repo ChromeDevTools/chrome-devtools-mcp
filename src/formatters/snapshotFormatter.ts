@@ -22,11 +22,18 @@ export function formatA11ySnapshot(
 }
 
 function getAttributes(serializedAXNodeRoot: TextSnapshotNode): string[] {
-  const attributes = [
-    `uid=${serializedAXNodeRoot.id}`,
-    serializedAXNodeRoot.role,
-    `"${serializedAXNodeRoot.name || ''}"`, // Corrected: Added quotes around name
-  ];
+  const attributes = [`uid=${serializedAXNodeRoot.id}`];
+  if (serializedAXNodeRoot.role) {
+    // To match representation in DevTools.
+    attributes.push(
+      serializedAXNodeRoot.role === 'none'
+        ? 'ignored'
+        : serializedAXNodeRoot.role,
+    );
+  }
+  if (serializedAXNodeRoot.name) {
+    attributes.push(`"${serializedAXNodeRoot.name}"`);
+  }
 
   const excluded = new Set(['id', 'role', 'name', 'elementHandle', 'children']);
 
