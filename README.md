@@ -211,6 +211,13 @@ Go to `Settings | AI | Manage MCP Servers` -> `+ Add` to [add an MCP Server](htt
 
 </details>
 
+<details>
+  <summary>Qoder</summary>
+
+In **Qoder Settings**, go to `MCP Server` > `Add` > Use the configuration snippet provided above.
+
+</details>
+
 ### Your first prompt
 
 Enter the following prompt in your MCP Client to check if everything is working:
