@@ -197,6 +197,15 @@ Or, from the IDE **Activity Bar** > `Kiro` > `MCP Servers` > `Click Open MCP Con
 </details>
 
 <details>
+  <summary>Qoder</summary>
+
+In **Qoder Settings**, go to `MCP Server` > `+ Add` > Use the configuration snippet provided above.
+
+Alternatively, follow the <a href="https://docs.qoder.com/user-guide/chat/model-context-protocol">MCP guide</a> and use the standard config from above.
+
+</details>
+
+<details>
   <summary>Visual Studio</summary>
   
   **Click the button to install:**
@@ -208,15 +217,6 @@ Or, from the IDE **Activity Bar** > `Kiro` > `MCP Servers` > `Click Open MCP Con
   <summary>Warp</summary>
 
 Go to `Settings | AI | Manage MCP Servers` -> `+ Add` to [add an MCP Server](https://docs.warp.dev/knowledge-and-collaboration/mcp#adding-an-mcp-server). Use the config provided above.
-
-</details>
-
-<details>
-  <summary>Qoder</summary>
-
-In **Qoder Settings**, go to `MCP Server` > `+ Add` > Use the configuration snippet provided above.
-
-Alternatively, follow the <a href="https://docs.qoder.com/user-guide/chat/model-context-protocol">MCP guide</a> and use the standard config from above.
 
 </details>
 
