@@ -319,8 +319,7 @@ reqid=1 GET http://example.com [pending]`,
       // Cannot check the full text because it contains local file path
       assert.ok(
         result[0].text.toString().startsWith(`# test response
-## Console messages
-Log>`),
+## Console messages`),
       );
       assert.ok(result[0].text.toString().includes('Hello from the test'));
     });
