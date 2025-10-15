@@ -40,7 +40,7 @@ export const consoleTool = defineTool({
   description:
     'List all console messages for the currently selected page since the last navigation.',
   annotations: {
-    category: ToolCategories.NETWORK,
+    category: ToolCategories.DEBUGGING,
     readOnlyHint: true,
   },
   schema: {
