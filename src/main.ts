@@ -58,22 +58,25 @@ async function getContext(): Promise<McpContext> {
     extraArgs.push(`--proxy-server=${args.proxyServer}`);
   }
   const devtools = args.experimentalDevtools ?? false;
-  const browser = args.browserUrl
-    ? await ensureBrowserConnected({
-        browserURL: args.browserUrl,
-        devtools,
-      })
-    : await ensureBrowserLaunched({
-        headless: args.headless,
-        executablePath: args.executablePath,
-        channel: args.channel as Channel,
-        isolated: args.isolated,
-        logFile,
-        viewport: args.viewport,
-        args: extraArgs,
-        acceptInsecureCerts: args.acceptInsecureCerts,
-        devtools,
-      });
+  const browser =
+    args.browserUrl || args.wsEndpoint
+      ? await ensureBrowserConnected({
+          browserURL: args.browserUrl,
+          wsEndpoint: args.wsEndpoint,
+          wsHeaders: args.wsHeaders,
+          devtools,
+        })
+      : await ensureBrowserLaunched({
+          headless: args.headless,
+          executablePath: args.executablePath,
+          channel: args.channel as Channel,
+          isolated: args.isolated,
+          logFile,
+          viewport: args.viewport,
+          args: extraArgs,
+          acceptInsecureCerts: args.acceptInsecureCerts,
+          devtools,
+        });
 
   if (context?.browser !== browser) {
     context = await McpContext.from(browser, logger);

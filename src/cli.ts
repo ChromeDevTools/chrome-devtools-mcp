@@ -14,6 +14,7 @@ export const cliOptions = {
     description:
       'Connect to a running Chrome instance using port forwarding. For more details see: https://developer.chrome.com/docs/devtools/remote-debugging/local-server.',
     alias: 'u',
+    conflicts: 'wsEndpoint',
     coerce: (url: string | undefined) => {
       if (!url) {
         return;
@@ -26,6 +27,54 @@ export const cliOptions = {
       return url;
     },
   },
+  wsEndpoint: {
+    type: 'string',
+    description:
+      'WebSocket endpoint to connect to a running Chrome instance (e.g., ws://127.0.0.1:9222/devtools/browser/<id>). Alternative to --browserUrl.',
+    alias: 'w',
+    conflicts: 'browserUrl',
+    coerce: (url: string | undefined) => {
+      if (!url) {
+        return;
+      }
+      try {
+        const parsed = new URL(url);
+        if (parsed.protocol !== 'ws:' && parsed.protocol !== 'wss:') {
+          throw new Error(
+            `Provided wsEndpoint ${url} must use ws:// or wss:// protocol.`,
+          );
+        }
+        return url;
+      } catch (error) {
+        if ((error as Error).message.includes('ws://')) {
+          throw error;
+        }
+        throw new Error(`Provided wsEndpoint ${url} is not valid URL.`);
+      }
+    },
+  },
+  wsHeaders: {
+    type: 'string',
+    description:
+      'Custom headers for WebSocket connection in JSON format (e.g., \'{"Authorization":"Bearer token"}\'). Only works with --wsEndpoint.',
+    implies: 'wsEndpoint',
+    coerce: (val: string | undefined) => {
+      if (!val) {
+        return;
+      }
+      try {
+        const parsed = JSON.parse(val);
+        if (typeof parsed !== 'object' || Array.isArray(parsed)) {
+          throw new Error('Headers must be a JSON object');
+        }
+        return parsed as Record<string, string>;
+      } catch (error) {
+        throw new Error(
+          `Invalid JSON for wsHeaders: ${(error as Error).message}`,
+        );
+      }
+    },
+  },
   headless: {
     type: 'boolean',
     description: 'Whether to run in headless (no UI) mode.',
@@ -34,7 +83,7 @@ export const cliOptions = {
   executablePath: {
     type: 'string',
     description: 'Path to custom Chrome executable.',
-    conflicts: 'browserUrl',
+    conflicts: ['browserUrl', 'wsEndpoint'],
     alias: 'e',
   },
   isolated: {
@@ -48,7 +97,7 @@ export const cliOptions = {
     description:
       'Specify a different Chrome channel that should be used. The default is the stable channel version.',
     choices: ['stable', 'canary', 'beta', 'dev'] as const,
-    conflicts: ['browserUrl', 'executablePath'],
+    conflicts: ['browserUrl', 'wsEndpoint', 'executablePath'],
   },
   logFile: {
     type: 'string',
@@ -100,7 +149,12 @@ export function parseArguments(version: string, argv = process.argv) {
     .check(args => {
       // We can't set default in the options else
       // Yargs will complain
-      if (!args.channel && !args.browserUrl && !args.executablePath) {
+      if (
+        !args.channel &&
+        !args.browserUrl &&
+        !args.wsEndpoint &&
+        !args.executablePath
+      ) {
         args.channel = 'stable';
       }
       return true;
@@ -108,7 +162,15 @@ export function parseArguments(version: string, argv = process.argv) {
     .example([
       [
         '$0 --browserUrl http://127.0.0.1:9222',
-        'Connect to an existing browser instance',
+        'Connect to an existing browser instance via HTTP',
+      ],
+      [
+        '$0 --wsEndpoint ws://127.0.0.1:9222/devtools/browser/abc123',
+        'Connect to an existing browser instance via WebSocket',
+      ],
+      [
+        `$0 --wsEndpoint ws://127.0.0.1:9222/devtools/browser/abc123 --wsHeaders '{"Authorization":"Bearer token"}'`,
+        'Connect via WebSocket with custom headers',
       ],
       ['$0 --channel beta', 'Use Chrome Beta installed on this system'],
       ['$0 --channel canary', 'Use Chrome Canary installed on this system'],

@@ -112,4 +112,55 @@ describe('cli args parsing', () => {
       chromeArg: ['--no-sandbox', '--disable-setuid-sandbox'],
     });
   });
+
+  it('parses wsEndpoint with ws:// protocol', async () => {
+    const args = parseArguments('1.0.0', [
+      'node',
+      'main.js',
+      '--wsEndpoint',
+      'ws://127.0.0.1:9222/devtools/browser/abc123',
+    ]);
+    assert.deepStrictEqual(args, {
+      _: [],
+      headless: false,
+      isolated: false,
+      $0: 'npx chrome-devtools-mcp@latest',
+      'ws-endpoint': 'ws://127.0.0.1:9222/devtools/browser/abc123',
+      wsEndpoint: 'ws://127.0.0.1:9222/devtools/browser/abc123',
+      w: 'ws://127.0.0.1:9222/devtools/browser/abc123',
+    });
+  });
+
+  it('parses wsEndpoint with wss:// protocol', async () => {
+    const args = parseArguments('1.0.0', [
+      'node',
+      'main.js',
+      '--wsEndpoint',
+      'wss://example.com:9222/devtools/browser/abc123',
+    ]);
+    assert.deepStrictEqual(args, {
+      _: [],
+      headless: false,
+      isolated: false,
+      $0: 'npx chrome-devtools-mcp@latest',
+      'ws-endpoint': 'wss://example.com:9222/devtools/browser/abc123',
+      wsEndpoint: 'wss://example.com:9222/devtools/browser/abc123',
+      w: 'wss://example.com:9222/devtools/browser/abc123',
+    });
+  });
+
+  it('parses wsHeaders with valid JSON', async () => {
+    const args = parseArguments('1.0.0', [
+      'node',
+      'main.js',
+      '--wsEndpoint',
+      'ws://127.0.0.1:9222/devtools/browser/abc123',
+      '--wsHeaders',
+      '{"Authorization":"Bearer token","X-Custom":"value"}',
+    ]);
+    assert.deepStrictEqual(args.wsHeaders, {
+      Authorization: 'Bearer token',
+      'X-Custom': 'value',
+    });
+  });
 });
