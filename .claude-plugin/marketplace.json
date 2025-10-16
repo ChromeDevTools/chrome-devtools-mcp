@@ -1,5 +1,5 @@
 {
-  "name": "chrome-devtools",
+  "name": "chrome-devtools-plugins",
   "owner": {
     "name": "Chrome DevTools Team",
     "email": "devtools-dev@chromium.org"
