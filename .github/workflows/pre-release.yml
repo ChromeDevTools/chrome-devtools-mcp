@@ -26,7 +26,7 @@ jobs:
       - name: Install MCP Publisher
         run: |
           export OS=$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')
-          curl -L "https://github.com/modelcontextprotocol/registry/releases/download/latest/mcp-publisher_${OS}.tar.gz" | tar xz mcp-publisher
+          curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_${OS}.tar.gz" | tar xz mcp-publisher
 
       - name: Verify server.json
         run: npm run verify-server-json-version
