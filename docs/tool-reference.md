@@ -284,7 +284,7 @@ so returned values have to JSON-serializable.
 **Parameters:**
 
 - **args** (array) _(optional)_: An optional list of arguments to pass to the function.
-- **function** (string) **(required)**: A JavaScript function expression to be executed by the tool in the currently selected page.
+- **function** (string) **(required)**: A JavaScript function declaration to be executed by the tool in the currently selected page.
   Example without arguments: `() => {
   return document.title
 }` or `async () => {
