@@ -421,6 +421,8 @@ Check the performance of https://developers.chrome.com
 
 Your MCP client should connect to the running Chrome instance and receive a performance report.
 
+If you hit VM-to-host port forwarding issues, see the “Remote debugging between virtual machine (VM) and host fails” section in [`docs/troubleshooting.md`](./docs/troubleshooting.md#remote-debugging-between-virtual-machine-vm-and-host-fails).
+
 For more details on remote debugging, see the [Chrome DevTools documentation](https://developer.chrome.com/docs/devtools/remote-debugging/).
 
 ## Known limitations

@@ -27,3 +27,14 @@ npm cache clean --force
 This indicates that the browser could not be started. Make sure that no Chrome
 instances are running or close them. Make sure you have the latest stable Chrome
 installed and that [your system is able to run Chrome](https://support.google.com/chrome/a/answer/7100626?hl=en).
+
+### Remote debugging between virtual machine (VM) and host fails
+
+When connecting DevTools inside a VM to Chrome running on the host, any domain is rejected by Chrome because of host header validation. Tunneling the port over SSH bypasses this restriction. In the VM, run:
+
+```sh
+ssh -N -L 127.0.0.1:9222:127.0.0.1:9222 <user>@<host-ip>
+```
+
+Point the MCP connection inside the VM to `http://127.0.0.1:9222` and DevTools
+will reach the host browser without triggering the Host validation.
