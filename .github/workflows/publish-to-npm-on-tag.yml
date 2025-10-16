@@ -79,9 +79,8 @@ jobs:
 
       - name: Install MCP Publisher
         run: |
-          export TAG=$(curl -sL https://api.github.com/repos/modelcontextprotocol/registry/releases/latest | jq -r ".tag_name")
           export OS=$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')
-          curl -L "https://github.com/modelcontextprotocol/registry/releases/download/${TAG}/mcp-publisher_${OS}.tar.gz" | tar xz mcp-publisher
+          curl -L "https://github.com/modelcontextprotocol/registry/releases/download/latest/mcp-publisher_${OS}.tar.gz" | tar xz mcp-publisher
 
       - name: Login to MCP Registry
         run: ./mcp-publisher login github-oidc
