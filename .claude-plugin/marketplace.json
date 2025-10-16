@@ -1,5 +1,7 @@
 {
   "name": "chrome-devtools-plugins",
+  "version": "1.0.0",
+  "description": "Bundled plugins for actuating and debugging the Chrome browser.",
   "owner": {
     "name": "Chrome DevTools Team",
     "email": "devtools-dev@chromium.org"
