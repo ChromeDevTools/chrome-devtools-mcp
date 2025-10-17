@@ -29,11 +29,14 @@ import license from 'rollup-plugin-license';
 
 const isProduction = process.env.NODE_ENV === 'production';
 
-/** @type {import('rollup').RollupOptions} */
-const sdk = {
-  input: './build/src/third_party/modelcontextprotocol-sdk/index.js',
+const allowed_licenses = ['MIT', 'Apache 2.0', 'Apache-2.0', 'BSD-3-Clause', 'BSD-2-Clause', 'ISC', '0BSD'];
+
+/** @returns {import('rollup').RollupOptions} */
+const bundleDependency = (wrapperIndexPath, extraOutputOptions = {}) => ({
+  input: wrapperIndexPath,
   output: {
-    file: './build/src/third_party/modelcontextprotocol-sdk/index.js',
+    ...extraOutputOptions,
+    file: wrapperIndexPath,
     sourcemap: !isProduction,
     format: 'esm',
   },
@@ -48,7 +51,6 @@ const sdk = {
       thirdParty: {
         allow: {
           test: dependency => {
-            let allowed_licenses = ['MIT', 'Apache 2.0', 'BSD-2-Clause', 'ISC'];
             return allowed_licenses.includes(dependency.license);
           },
           failOnUnlicensed: true,
@@ -90,6 +92,9 @@ const sdk = {
     json(),
     nodeResolve(),
   ],
-};
+});
 
-export default [sdk];
+export default [
+  bundleDependency('./build/src/third_party/modelcontextprotocol-sdk/index.js'),
+  bundleDependency('./build/src/third_party/puppeteer-core/index.js', {inlineDynamicImports: true}),
+];
