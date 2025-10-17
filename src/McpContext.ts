@@ -95,13 +95,7 @@ export class McpContext implements Context {
     this.browser = browser;
     this.logger = logger;
 
-    this.#networkCollector = new NetworkCollector(this.browser, collect => {
-      return {
-        request: request => {
-          collect(request);
-        },
-      } as ListenerMap;
-    });
+    this.#networkCollector = new NetworkCollector(this.browser);
 
     this.#consoleCollector = new PageCollector(this.browser, collect => {
       return {

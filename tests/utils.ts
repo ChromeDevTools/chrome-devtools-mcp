@@ -6,7 +6,7 @@
 import logger from 'debug';
 import type {Browser} from 'puppeteer';
 import puppeteer from 'puppeteer';
-import type {HTTPRequest, HTTPResponse} from 'puppeteer-core';
+import type {Frame, HTTPRequest, HTTPResponse} from 'puppeteer-core';
 
 import {McpContext} from '../src/McpContext.js';
 import {McpResponse} from '../src/McpResponse.js';
@@ -51,6 +51,8 @@ export function getMockRequest(
     postData?: string;
     fetchPostData?: Promise<string>;
     stableId?: number;
+    navigationRequest?: boolean;
+    frame?: Frame;
   } = {},
 ): HTTPRequest {
   return {
@@ -85,6 +87,12 @@ export function getMockRequest(
     },
     redirectChain(): HTTPRequest[] {
       return [];
+    },
+    isNavigationRequest() {
+      return options.navigationRequest ?? false;
+    },
+    frame() {
+      return options.frame ?? ({} as Frame);
     },
     [stableIdSymbol]: options.stableId ?? 1,
   } as unknown as HTTPRequest;

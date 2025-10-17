@@ -9,7 +9,7 @@ import {describe, it} from 'node:test';
 import type {Browser, Frame, HTTPRequest, Page, Target} from 'puppeteer-core';
 
 import type {ListenerMap} from '../src/PageCollector.js';
-import {PageCollector} from '../src/PageCollector.js';
+import {NetworkCollector, PageCollector} from '../src/PageCollector.js';
 
 import {getMockRequest} from './utils.js';
 
@@ -218,5 +218,36 @@ describe('PageCollector', () => {
 
     assert.equal(collector.getIdForResource(request1), 1);
     assert.equal(collector.getIdForResource(request2), 2);
+  });
+});
+
+describe('NetworkCollector', () => {
+  it('clean up after navigation and be able to add data after', async () => {
+    const browser = getMockBrowser();
+    const page = (await browser.pages())[0];
+    const mainFrame = page.mainFrame();
+    const request = getMockRequest();
+    const navRequest = getMockRequest({
+      navigationRequest: true,
+      frame: page.mainFrame(),
+    });
+    const request2 = getMockRequest();
+    const collector = new NetworkCollector(browser);
+    await collector.init();
+    page.emit('request', request);
+    page.emit('request', navRequest);
+
+    assert.equal(collector.getData(page)[0], request);
+    assert.equal(collector.getData(page)[1], navRequest);
+    page.emit('framenavigated', mainFrame);
+
+    assert.equal(collector.getData(page).length, 1);
+    assert.equal(collector.getData(page)[0], navRequest);
+
+    page.emit('request', request2);
+
+    assert.equal(collector.getData(page).length, 2);
+    assert.equal(collector.getData(page)[0], navRequest);
+    assert.equal(collector.getData(page)[0], request2);
   });
 });

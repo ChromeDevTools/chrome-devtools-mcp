@@ -38,12 +38,14 @@ export class PageCollector<T> {
     collector: (item: T) => void,
   ) => ListenerMap<PageEvents>;
   #listeners = new WeakMap<Page, ListenerMap>();
+  #maxNavigationSaved = 3;
+
   /**
-   * The Array in this map should only be set once
-   * As we use the reference to it.
-   * Use methods that manipulate the array in place.
+   * This maps a Page to a list of navigations with a sub-list
+   * of all collected resources.
+   * The newer navigations come first.
    */
-  protected storage = new WeakMap<Page, Array<WithSymbolId<T>>>();
+  protected storage = new WeakMap<Page, Array<Array<WithSymbolId<T>>>>();
 
   constructor(
     browser: Browser,
@@ -85,20 +87,23 @@ export class PageCollector<T> {
     }
 
     const idGenerator = createIdGenerator();
-    const stored: Array<WithSymbolId<T>> = [];
-    this.storage.set(page, stored);
+    const storedLists: Array<Array<WithSymbolId<T>>> = [[]];
+    this.storage.set(page, storedLists);
 
     const listeners = this.#listenersInitializer(value => {
       const withId = value as WithSymbolId<T>;
       withId[stableIdSymbol] = idGenerator();
-      stored.push(withId);
+
+      const navigations = this.storage.get(page) ?? [[]];
+      navigations[0].push(withId);
     });
+
     listeners['framenavigated'] = (frame: Frame) => {
-      // Only reset the storage on main frame navigation
+      // Only split the storage on main frame navigation
       if (frame !== page.mainFrame()) {
         return;
       }
-      this.cleanupAfterNavigation(page);
+      this.splitAfterNavigation(page);
     };
 
     for (const [name, listener] of Object.entries(listeners)) {
@@ -108,12 +113,14 @@ export class PageCollector<T> {
     this.#listeners.set(page, listeners);
   }
 
-  protected cleanupAfterNavigation(page: Page) {
-    const collection = this.storage.get(page);
-    if (collection) {
-      // Keep the reference alive
-      collection.length = 0;
+  protected splitAfterNavigation(page: Page) {
+    const navigations = this.storage.get(page);
+    if (!navigations) {
+      return;
     }
+    // Add the latest navigation first
+    navigations.unshift([]);
+    navigations.splice(this.#maxNavigationSaved);
   }
 
   #cleanupPageDestroyed(page: Page) {
@@ -127,7 +134,11 @@ export class PageCollector<T> {
   }
 
   getData(page: Page): T[] {
-    return this.storage.get(page) ?? [];
+    const navigations = this.storage.get(page);
+    if (!navigations) {
+      return [];
+    }
+    return navigations[0];
   }
 
   getIdForResource(resource: WithSymbolId<T>): number {
@@ -135,14 +146,16 @@ export class PageCollector<T> {
   }
 
   getById(page: Page, stableId: number): T {
-    const data = this.storage.get(page);
-    if (!data || !data.length) {
+    const navigations = this.storage.get(page);
+    if (!navigations) {
       throw new Error('No requests found for selected page');
     }
 
-    for (const collected of data) {
-      if (collected[stableIdSymbol] === stableId) {
-        return collected;
+    for (const navigation of navigations) {
+      for (const collected of navigation) {
+        if (collected[stableIdSymbol] === stableId) {
+          return collected;
+        }
       }
     }
 
@@ -151,19 +164,39 @@ export class PageCollector<T> {
 }
 
 export class NetworkCollector extends PageCollector<HTTPRequest> {
-  override cleanupAfterNavigation(page: Page) {
-    const requests = this.storage.get(page) ?? [];
-    if (!requests) {
+  constructor(browser: Browser) {
+    super(browser, collect => {
+      return {
+        request: req => {
+          collect(req);
+        },
+      } as ListenerMap;
+    });
+  }
+  override splitAfterNavigation(page: Page) {
+    const navigations = this.storage.get(page) ?? [];
+    if (!navigations) {
       return;
     }
+
+    const requests = navigations[0];
+
     const lastRequestIdx = requests.findLastIndex(request => {
       return request.frame() === page.mainFrame()
         ? request.isNavigationRequest()
         : false;
     });
+
     // Keep all requests since the last navigation request including that
     // navigation request itself.
     // Keep the reference
-    requests.splice(0, Math.max(lastRequestIdx, 0));
+    if (lastRequestIdx) {
+      const fromCurrentNavigation = requests.splice(
+        Math.min(lastRequestIdx, 0),
+      );
+      navigations.unshift(fromCurrentNavigation);
+    } else {
+      navigations.unshift([]);
+    }
   }
 }
