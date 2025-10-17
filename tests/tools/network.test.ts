@@ -45,7 +45,6 @@ describe('network', () => {
         const page = await context.getSelectedPage();
         await page.goto('data:text/html,<div>Hello 1</div>');
         await page.goto('data:text/html,<div>Hello 2</div>');
-        console.log('Last navigtation');
         await page.goto('data:text/html,<div>Hello 3</div>');
         await listNetworkRequests.handler(
           {

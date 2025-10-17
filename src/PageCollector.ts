@@ -141,7 +141,6 @@ export class PageCollector<T> {
 
     const data: T[] = [];
     for (let index = includePreviousNavigations ?? 0; index >= 0; index--) {
-      console.log('Loop index', index);
       data.push(...navigations[index]);
     }
     return data;
@@ -174,7 +173,6 @@ export class NetworkCollector extends PageCollector<HTTPRequest> {
     super(browser, collect => {
       return {
         request: req => {
-          console.log('Collected');
           collect(req);
         },
       } as ListenerMap;
