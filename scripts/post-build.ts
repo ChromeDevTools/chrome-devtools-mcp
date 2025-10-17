@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { execSync } from 'node:child_process';
+import {execSync} from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
