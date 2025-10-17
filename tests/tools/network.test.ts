@@ -40,7 +40,7 @@ describe('network', () => {
       });
     });
 
-    it.only('list requests from previous navigations', async t => {
+    it('list requests from previous navigations', async t => {
       await withBrowser(async (response, context) => {
         const page = await context.getSelectedPage();
         await page.goto('data:text/html,<div>Hello 1</div>');
