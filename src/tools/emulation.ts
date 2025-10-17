@@ -6,7 +6,7 @@
 
 import {PredefinedNetworkConditions} from 'puppeteer-core';
 
-import {z} from '../third_party/modelcontextprotocol-sdk/index.js';
+import {zod} from '../third_party/modelcontextprotocol-sdk/index.js';
 
 import {ToolCategories} from './categories.js';
 import {defineTool} from './ToolDefinition.js';
@@ -25,7 +25,7 @@ export const emulateNetwork = defineTool({
     readOnlyHint: false,
   },
   schema: {
-    throttlingOption: z
+    throttlingOption: zod
       .enum(throttlingOptions)
       .describe(
         `The network throttling option to emulate. Available throttling options are: ${throttlingOptions.join(', ')}. Set to "No emulation" to disable. Set to "Offline" to simulate offline network conditions.`,
@@ -71,7 +71,7 @@ export const emulateCpu = defineTool({
     readOnlyHint: false,
   },
   schema: {
-    throttlingRate: z
+    throttlingRate: zod
       .number()
       .min(1)
       .max(20)

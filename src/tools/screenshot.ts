@@ -6,7 +6,7 @@
 
 import type {ElementHandle, Page} from 'puppeteer-core';
 
-import {z} from '../third_party/modelcontextprotocol-sdk/index.js';
+import {zod} from '../third_party/modelcontextprotocol-sdk/index.js';
 
 import {ToolCategories} from './categories.js';
 import {defineTool} from './ToolDefinition.js';
@@ -19,11 +19,11 @@ export const screenshot = defineTool({
     readOnlyHint: true,
   },
   schema: {
-    format: z
+    format: zod
       .enum(['png', 'jpeg', 'webp'])
       .default('png')
       .describe('Type of format to save the screenshot as. Default is "png"'),
-    quality: z
+    quality: zod
       .number()
       .min(0)
       .max(100)
@@ -31,19 +31,19 @@ export const screenshot = defineTool({
       .describe(
         'Compression quality for JPEG and WebP formats (0-100). Higher values mean better quality but larger file sizes. Ignored for PNG format.',
       ),
-    uid: z
+    uid: zod
       .string()
       .optional()
       .describe(
         'The uid of an element on the page from the page content snapshot. If omitted takes a pages screenshot.',
       ),
-    fullPage: z
+    fullPage: zod
       .boolean()
       .optional()
       .describe(
         'If set to true takes a screenshot of the full page instead of the currently visible viewport. Incompatible with uid.',
       ),
-    filePath: z
+    filePath: zod
       .string()
       .optional()
       .describe(

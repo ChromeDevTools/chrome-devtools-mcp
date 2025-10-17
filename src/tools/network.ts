@@ -6,7 +6,7 @@
 
 import type {ResourceType} from 'puppeteer-core';
 
-import {z} from '../third_party/modelcontextprotocol-sdk/index.js';
+import {zod} from '../third_party/modelcontextprotocol-sdk/index.js';
 
 import {ToolCategories} from './categories.js';
 import {defineTool} from './ToolDefinition.js';
@@ -41,7 +41,7 @@ export const listNetworkRequests = defineTool({
     readOnlyHint: true,
   },
   schema: {
-    pageSize: z
+    pageSize: zod
       .number()
       .int()
       .positive()
@@ -49,7 +49,7 @@ export const listNetworkRequests = defineTool({
       .describe(
         'Maximum number of requests to return. When omitted, returns all requests.',
       ),
-    pageIdx: z
+    pageIdx: zod
       .number()
       .int()
       .min(0)
@@ -57,8 +57,8 @@ export const listNetworkRequests = defineTool({
       .describe(
         'Page number to return (0-based). When omitted, returns the first page.',
       ),
-    resourceTypes: z
-      .array(z.enum(FILTERABLE_RESOURCE_TYPES))
+    resourceTypes: zod
+      .array(zod.enum(FILTERABLE_RESOURCE_TYPES))
       .optional()
       .describe(
         'Filter requests to only return requests of the specified resource types. When omitted or empty, returns all requests.',
@@ -81,7 +81,7 @@ export const getNetworkRequest = defineTool({
     readOnlyHint: true,
   },
   schema: {
-    reqid: z
+    reqid: zod
       .number()
       .describe(
         'The reqid of a request on the page from the listed network requests',

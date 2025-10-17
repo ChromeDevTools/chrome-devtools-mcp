@@ -6,7 +6,7 @@
 
 import {Locator} from 'puppeteer-core';
 
-import {z} from '../third_party/modelcontextprotocol-sdk/index.js';
+import {zod} from '../third_party/modelcontextprotocol-sdk/index.js';
 
 import {ToolCategories} from './categories.js';
 import {defineTool, timeoutSchema} from './ToolDefinition.js';
@@ -20,7 +20,7 @@ identifier (uid). Always use the latest snapshot. Prefer taking a snapshot over 
     readOnlyHint: true,
   },
   schema: {
-    verbose: z
+    verbose: zod
       .boolean()
       .optional()
       .describe(
@@ -40,7 +40,7 @@ export const waitFor = defineTool({
     readOnlyHint: true,
   },
   schema: {
-    text: z.string().describe('Text to appear on the page'),
+    text: zod.string().describe('Text to appear on the page'),
     ...timeoutSchema,
   },
   handler: async (request, response, context) => {

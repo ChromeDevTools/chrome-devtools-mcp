@@ -5,7 +5,7 @@
  */
 import type {JSHandle} from 'puppeteer-core';
 
-import {z} from '../third_party/modelcontextprotocol-sdk/index.js';
+import {zod} from '../third_party/modelcontextprotocol-sdk/index.js';
 
 import {ToolCategories} from './categories.js';
 import {defineTool} from './ToolDefinition.js';
@@ -19,7 +19,7 @@ so returned values have to JSON-serializable.`,
     readOnlyHint: false,
   },
   schema: {
-    function: z.string().describe(
+    function: zod.string().describe(
       `A JavaScript function declaration to be executed by the tool in the currently selected page.
 Example without arguments: \`() => {
   return document.title
@@ -31,10 +31,10 @@ Example with arguments: \`(el) => {
 }\`
 `,
     ),
-    args: z
+    args: zod
       .array(
-        z.object({
-          uid: z
+        zod.object({
+          uid: zod
             .string()
             .describe(
               'The uid of an element on the page from the page content snapshot',
