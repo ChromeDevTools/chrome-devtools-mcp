@@ -191,9 +191,7 @@ export class NetworkCollector extends PageCollector<HTTPRequest> {
     // navigation request itself.
     // Keep the reference
     if (lastRequestIdx) {
-      const fromCurrentNavigation = requests.splice(
-        Math.min(lastRequestIdx, 0),
-      );
+      const fromCurrentNavigation = requests.splice(lastRequestIdx);
       navigations.unshift(fromCurrentNavigation);
     } else {
       navigations.unshift([]);

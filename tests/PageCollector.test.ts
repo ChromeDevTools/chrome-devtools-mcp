@@ -222,7 +222,7 @@ describe('PageCollector', () => {
 });
 
 describe('NetworkCollector', () => {
-  it('clean up after navigation and be able to add data after', async () => {
+  it('correctly picks up navigation requests to latest navigation', async () => {
     const browser = getMockBrowser();
     const page = (await browser.pages())[0];
     const mainFrame = page.mainFrame();
@@ -248,6 +248,6 @@ describe('NetworkCollector', () => {
 
     assert.equal(collector.getData(page).length, 2);
     assert.equal(collector.getData(page)[0], navRequest);
-    assert.equal(collector.getData(page)[0], request2);
+    assert.equal(collector.getData(page)[1], request2);
   });
 });
