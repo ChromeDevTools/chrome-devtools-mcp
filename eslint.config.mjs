@@ -27,7 +27,11 @@ export default defineConfig([
 
       parserOptions: {
         projectService: {
-          allowDefaultProject: ['.prettierrc.cjs', 'eslint.config.mjs'],
+          allowDefaultProject: [
+            '.prettierrc.cjs',
+            'eslint.config.mjs',
+            'rollup.config.mjs',
+          ],
         },
       },
 
