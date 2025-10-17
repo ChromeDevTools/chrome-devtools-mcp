@@ -6,11 +6,6 @@
 
 import './polyfill.js';
 
-import {McpServer} from '@modelcontextprotocol/sdk/server/mcp.js';
-import {StdioServerTransport} from '@modelcontextprotocol/sdk/server/stdio.js';
-import type {CallToolResult} from '@modelcontextprotocol/sdk/types.js';
-import {SetLevelRequestSchema} from '@modelcontextprotocol/sdk/types.js';
-
 import type {Channel} from './browser.js';
 import {ensureBrowserConnected, ensureBrowserLaunched} from './browser.js';
 import {parseArguments} from './cli.js';
@@ -18,6 +13,7 @@ import {logger, saveLogsToFile} from './logger.js';
 import {McpContext} from './McpContext.js';
 import {McpResponse} from './McpResponse.js';
 import {Mutex} from './Mutex.js';
+import {McpServer,StdioServerTransport,type CallToolResult,SetLevelRequestSchema} from './third_party/modelcontextprotocol-sdk/index.js';
 import * as consoleTools from './tools/console.js';
 import * as emulationTools from './tools/emulation.js';
 import * as inputTools from './tools/input.js';

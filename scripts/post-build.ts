@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { execSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
@@ -57,6 +58,10 @@ function copyThirdPartyLicenseFiles() {
     const destinationFile = path.join(destinationDir, 'LICENSE');
     fs.copyFileSync(licenseFile, destinationFile);
   }
+}
+
+async function bundle(path: string): Promise<void> {
+  execSync(`npx esbuild ${path} --bundle --outfile=${path} --platform=node --allow-overwrite --target=es2022 --format=esm`);
 }
 
 function main(): void {
@@ -183,6 +188,8 @@ export const hostConfig = {};
   fs.copyFileSync(devtoolsLicenseFileSource, devtoolsLicenseFileDestination);
 
   copyThirdPartyLicenseFiles();
+
+  bundle('./build/src/third_party/modelcontextprotocol-sdk/index.js');
 }
 
 main();

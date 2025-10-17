@@ -3,10 +3,6 @@
  * Copyright 2025 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import type {
-  ImageContent,
-  TextContent,
-} from '@modelcontextprotocol/sdk/types.js';
 import type {ConsoleMessage, ResourceType} from 'puppeteer-core';
 
 import {formatConsoleEvent} from './formatters/consoleFormatter.js';
@@ -19,6 +15,10 @@ import {
 } from './formatters/networkFormatter.js';
 import {formatA11ySnapshot} from './formatters/snapshotFormatter.js';
 import type {McpContext} from './McpContext.js';
+import type {
+  ImageContent,
+  TextContent,
+} from './third_party/modelcontextprotocol-sdk/index.js';
 import {handleDialog} from './tools/pages.js';
 import type {ImageContentData, Response} from './tools/ToolDefinition.js';
 import {paginate, type PaginationOptions} from './utils/pagination.js';
