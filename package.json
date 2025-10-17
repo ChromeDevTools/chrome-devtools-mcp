@@ -49,7 +49,6 @@
     "@rollup/plugin-commonjs": "^28.0.8",
     "@rollup/plugin-json": "^6.1.0",
     "@rollup/plugin-node-resolve": "^16.0.3",
-    "@rollup/wasm-node": "4.52.4",
     "@stylistic/eslint-plugin": "^5.4.0",
     "@types/debug": "^4.1.12",
     "@types/filesystem": "^0.0.36",
