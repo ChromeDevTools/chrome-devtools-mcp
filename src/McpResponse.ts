@@ -21,7 +21,8 @@ import type {
 } from './third_party/modelcontextprotocol-sdk/index.js';
 import {handleDialog} from './tools/pages.js';
 import type {ImageContentData, Response} from './tools/ToolDefinition.js';
-import {paginate, type PaginationOptions} from './utils/pagination.js';
+import {paginate} from './utils/pagination.js';
+import type {PaginationOptions} from './utils/types.js';
 
 interface NetworkRequestData {
   networkRequestStableId: number;
@@ -65,9 +66,7 @@ export class McpResponse implements Response {
 
   setIncludeNetworkRequests(
     value: boolean,
-    options?: {
-      pageSize?: number;
-      pageIdx?: number;
+    options?: PaginationOptions & {
       resourceTypes?: ResourceType[];
     },
   ): void {
@@ -91,9 +90,7 @@ export class McpResponse implements Response {
 
   setIncludeConsoleData(
     value: boolean,
-    options?: {
-      pageSize?: number;
-      pageIdx?: number;
+    options?: PaginationOptions & {
       types?: string[];
     },
   ): void {

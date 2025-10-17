@@ -9,6 +9,7 @@ import z from 'zod';
 
 import type {TextSnapshotNode} from '../McpContext.js';
 import type {TraceResult} from '../trace-processing/parse.js';
+import type {PaginationOptions} from '../utils/types.js';
 
 import type {ToolCategories} from './categories.js';
 
@@ -45,11 +46,15 @@ export interface Response {
   setIncludePages(value: boolean): void;
   setIncludeNetworkRequests(
     value: boolean,
-    options?: {pageSize?: number; pageIdx?: number; resourceTypes?: string[]},
+    options?: PaginationOptions & {
+      resourceTypes?: string[];
+    },
   ): void;
   setIncludeConsoleData(
     value: boolean,
-    options?: {pageSize?: number; pageIdx?: number; types?: string[]},
+    options?: PaginationOptions & {
+      types?: string[];
+    },
   ): void;
   setIncludeSnapshot(value: boolean): void;
   setIncludeSnapshot(value: boolean, verbose?: boolean): void;
