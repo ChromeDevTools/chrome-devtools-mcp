@@ -21,6 +21,45 @@ describe('network', () => {
         assert.strictEqual(response.networkRequestsPageIdx, undefined);
       });
     });
+
+    it('list requests form current navigations only', async t => {
+      await withBrowser(async (response, context) => {
+        const page = await context.getSelectedPage();
+        await page.goto('data:text/html,<div>Hello 1</div>');
+        await page.goto('data:text/html,<div>Hello 2</div>');
+        await page.goto('data:text/html,<div>Hello 3</div>');
+        await listNetworkRequests.handler(
+          {
+            params: {},
+          },
+          response,
+          context,
+        );
+        const responseData = await response.handle('list_request', context);
+        t.assert.snapshot?.(responseData[0].text);
+      });
+    });
+
+    it.only('list requests from previous navigations', async t => {
+      await withBrowser(async (response, context) => {
+        const page = await context.getSelectedPage();
+        await page.goto('data:text/html,<div>Hello 1</div>');
+        await page.goto('data:text/html,<div>Hello 2</div>');
+        console.log('Last navigtation');
+        await page.goto('data:text/html,<div>Hello 3</div>');
+        await listNetworkRequests.handler(
+          {
+            params: {
+              includePreviousNavigations: 1,
+            },
+          },
+          response,
+          context,
+        );
+        const responseData = await response.handle('list_request', context);
+        t.assert.snapshot?.(responseData[0].text);
+      });
+    });
   });
   describe('network_get_request', () => {
     it('attaches request', async () => {
@@ -32,6 +71,7 @@ describe('network', () => {
           response,
           context,
         );
+
         assert.equal(response.attachedNetworkRequestId, 1);
       });
     });

@@ -250,4 +250,40 @@ describe('NetworkCollector', () => {
     assert.equal(collector.getData(page)[0], navRequest);
     assert.equal(collector.getData(page)[1], request2);
   });
+
+  it('correctly picks up after multiple back to back navigations', async () => {
+    const browser = getMockBrowser();
+    const page = (await browser.pages())[0];
+    const mainFrame = page.mainFrame();
+    const navRequest = getMockRequest({
+      navigationRequest: true,
+      frame: page.mainFrame(),
+    });
+    const navRequest2 = getMockRequest({
+      navigationRequest: true,
+      frame: page.mainFrame(),
+    });
+    const request = getMockRequest();
+
+    const collector = new NetworkCollector(browser);
+    await collector.init();
+    page.emit('request', navRequest);
+    assert.equal(collector.getData(page)[0], navRequest);
+
+    page.emit('framenavigated', mainFrame);
+    assert.equal(collector.getData(page).length, 1);
+    assert.equal(collector.getData(page)[0], navRequest);
+
+    page.emit('request', navRequest2);
+    assert.equal(collector.getData(page).length, 2);
+    assert.equal(collector.getData(page)[0], navRequest);
+    assert.equal(collector.getData(page)[1], navRequest2);
+
+    page.emit('framenavigated', mainFrame);
+    assert.equal(collector.getData(page).length, 1);
+    assert.equal(collector.getData(page)[0], navRequest2);
+
+    page.emit('request', request);
+    assert.equal(collector.getData(page).length, 2);
+  });
 });

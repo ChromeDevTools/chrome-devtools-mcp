@@ -42,6 +42,7 @@ export class McpResponse implements Response {
     include: boolean;
     pagination?: PaginationOptions;
     resourceTypes?: ResourceType[];
+    includePreviousNavigations?: number;
   };
   #consoleDataOptions?: {
     include: boolean;
@@ -62,6 +63,7 @@ export class McpResponse implements Response {
     value: boolean,
     options?: PaginationOptions & {
       resourceTypes?: ResourceType[];
+      includePreviousNavigations?: number;
     },
   ): void {
     if (!value) {
@@ -79,6 +81,7 @@ export class McpResponse implements Response {
             }
           : undefined,
       resourceTypes: options?.resourceTypes,
+      includePreviousNavigations: options?.includePreviousNavigations,
     };
   }
 
@@ -346,7 +349,9 @@ Call ${handleDialog.name} to handle it before continuing.`);
     response.push(...this.#formatConsoleData(data.consoleData));
 
     if (this.#networkRequestsOptions?.include) {
-      let requests = context.getNetworkRequests();
+      let requests = context.getNetworkRequests(
+        this.#networkRequestsOptions?.includePreviousNavigations,
+      );
 
       // Apply resource type filtering if specified
       if (this.#networkRequestsOptions.resourceTypes?.length) {
