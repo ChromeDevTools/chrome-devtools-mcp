@@ -1,32 +1,23 @@
 /**
- * Copyright 2021 Google LLC.
- * Copyright (c) Microsoft Corporation.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * @license
+ * Copyright 2025 Google Inc.
+ * SPDX-License-Identifier: Apache-2.0
  */
+
 import path from 'node:path';
 
-import commonjs from '@rollup/plugin-commonjs';
-import json from '@rollup/plugin-json';
 import {nodeResolve} from '@rollup/plugin-node-resolve';
 import cleanup from 'rollup-plugin-cleanup';
 import license from 'rollup-plugin-license';
 
+const isProduction = process.env.NODE_ENV === 'production';
+
+/** @type {import('rollup').RollupOptions} */
 const sdk = {
   input: './build/src/third_party/modelcontextprotocol-sdk/index.js',
   output: {
     file: './build/src/third_party/modelcontextprotocol-sdk/index.js',
-    sourcemap: false,
+    sourcemap: !isProduction,
     format: 'esm',
   },
   plugins: [
@@ -37,7 +28,6 @@ const sdk = {
       comments: [/Copyright/i],
     }),
     license({
-      debug: true,
       thirdParty: {
         allow: {
           test: dependency => {
@@ -79,8 +69,6 @@ const sdk = {
         },
       },
     }),
-    commonjs(),
-    json(),
     nodeResolve(),
   ],
 };
