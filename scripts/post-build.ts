@@ -60,7 +60,7 @@ function copyThirdPartyLicenseFiles() {
   }
 }
 
-async function bundle(path: string): Promise<void> {
+function bundle(path: string): void {
   execSync(`npx esbuild ${path} --bundle --outfile=${path} --platform=node --allow-overwrite --target=es2022 --format=esm`);
 }
 
