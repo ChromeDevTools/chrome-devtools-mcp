@@ -6,7 +6,7 @@
   "bin": "./build/src/index.js",
   "main": "index.js",
   "scripts": {
-    "build": "tsc && node --experimental-strip-types --no-warnings=ExperimentalWarning scripts/post-build.ts",
+    "build": "tsc && node --experimental-strip-types --no-warnings=ExperimentalWarning scripts/post-build.ts && npx rollup -c rollup.config.mjs",
     "typecheck": "tsc --noEmit",
     "format": "eslint --cache --fix . && prettier --write --cache .",
     "check-format": "eslint --cache . && prettier --check --cache .;",
@@ -37,7 +37,6 @@
   "homepage": "https://github.com/ChromeDevTools/chrome-devtools-mcp#readme",
   "mcpName": "io.github.ChromeDevTools/chrome-devtools-mcp",
   "dependencies": {
-    "@modelcontextprotocol/sdk": "1.20.0",
     "core-js": "3.46.0",
     "debug": "4.4.3",
     "puppeteer-core": "^24.24.1",
@@ -46,6 +45,10 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.35.0",
+    "@modelcontextprotocol/sdk": "1.20.0",
+    "@rollup/plugin-commonjs": "^28.0.8",
+    "@rollup/plugin-json": "^6.1.0",
+    "@rollup/plugin-node-resolve": "^16.0.3",
     "@stylistic/eslint-plugin": "^5.4.0",
     "@types/debug": "^4.1.12",
     "@types/filesystem": "^0.0.36",
@@ -61,6 +64,8 @@
     "globals": "^16.4.0",
     "prettier": "^3.6.2",
     "puppeteer": "24.24.1",
+    "rollup-plugin-cleanup": "^3.2.1",
+    "rollup-plugin-license": "^3.6.0",
     "sinon": "^21.0.0",
     "typescript": "^5.9.2",
     "typescript-eslint": "^8.43.0"
