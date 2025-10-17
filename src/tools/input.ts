@@ -5,9 +5,9 @@
  */
 
 import type {ElementHandle} from 'puppeteer-core';
-import z from 'zod';
 
 import type {McpContext, TextSnapshotNode} from '../McpContext.js';
+import {z} from '../third_party/modelcontextprotocol-sdk/index.js';
 
 import {ToolCategories} from './categories.js';
 import {defineTool} from './ToolDefinition.js';

@@ -5,9 +5,9 @@
  */
 
 import type {Page} from 'puppeteer-core';
-import z from 'zod';
 
 import {logger} from '../logger.js';
+import {z} from '../third_party/modelcontextprotocol-sdk/index.js';
 import type {InsightName} from '../trace-processing/parse.js';
 import {
   getInsightOutput,
