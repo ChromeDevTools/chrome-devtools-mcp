@@ -63,12 +63,22 @@ export const listNetworkRequests = defineTool({
       .describe(
         'Filter requests to only return requests of the specified resource types. When omitted or empty, returns all requests.',
       ),
+    includePreviousNavigations: z
+      .number()
+      .int()
+      .positive()
+      .max(2)
+      .optional()
+      .describe(
+        'Number of previous navigations to include. Current navigation is always included.',
+      ),
   },
   handler: async (request, response) => {
     response.setIncludeNetworkRequests(true, {
       pageSize: request.params.pageSize,
       pageIdx: request.params.pageIdx,
       resourceTypes: request.params.resourceTypes,
+      includePreviousNavigations: request.params.includePreviousNavigations,
     });
   },
 });

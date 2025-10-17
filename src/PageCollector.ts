@@ -133,12 +133,18 @@ export class PageCollector<T> {
     this.storage.delete(page);
   }
 
-  getData(page: Page): T[] {
+  getData(page: Page, includePreviousNavigations?: number): T[] {
     const navigations = this.storage.get(page);
     if (!navigations) {
       return [];
     }
-    return navigations[0];
+
+    const data: T[] = [];
+    for (let index = includePreviousNavigations ?? 0; index >= 0; index--) {
+      console.log('Loop index', index);
+      data.push(...navigations[index]);
+    }
+    return data;
   }
 
   getIdForResource(resource: WithSymbolId<T>): number {
@@ -168,6 +174,7 @@ export class NetworkCollector extends PageCollector<HTTPRequest> {
     super(browser, collect => {
       return {
         request: req => {
+          console.log('Collected');
           collect(req);
         },
       } as ListenerMap;
@@ -190,7 +197,7 @@ export class NetworkCollector extends PageCollector<HTTPRequest> {
     // Keep all requests since the last navigation request including that
     // navigation request itself.
     // Keep the reference
-    if (lastRequestIdx) {
+    if (lastRequestIdx !== -1) {
       const fromCurrentNavigation = requests.splice(lastRequestIdx);
       navigations.unshift(fromCurrentNavigation);
     } else {

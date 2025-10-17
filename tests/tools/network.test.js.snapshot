@@ -1,0 +1,14 @@
+exports[`network > network_list_requests > list requests form current navigations only 1`] = `
+# list_request response
+## Network requests
+Showing 1-1 of 1 (Page 1 of 1).
+reqid=3 GET data:text/html,<div>Hello 3</div> [success - 200]
+`;
+
+exports[`network > network_list_requests > list requests from previous navigations 1`] = `
+# list_request response
+## Network requests
+Showing 1-2 of 2 (Page 1 of 1).
+reqid=2 GET data:text/html,<div>Hello 2</div> [success - 200]
+reqid=3 GET data:text/html,<div>Hello 3</div> [success - 200]
+`;
