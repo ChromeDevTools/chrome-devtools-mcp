@@ -9,7 +9,7 @@ import {Locator} from 'puppeteer-core';
 import {zod} from '../third_party/modelcontextprotocol-sdk/index.js';
 
 import {ToolCategories} from './categories.js';
-import {defineTool, timeoutSchema} from './ToolDefinition.js';
+import {defineTool, snapshotSchema, timeoutSchema} from './ToolDefinition.js';
 
 export const takeSnapshot = defineTool({
   name: 'take_snapshot',
@@ -20,12 +20,7 @@ identifier (uid). Always use the latest snapshot. Prefer taking a snapshot over 
     readOnlyHint: true,
   },
   schema: {
-    verbose: zod
-      .boolean()
-      .optional()
-      .describe(
-        'Whether to include all possible information available in the full a11y tree. Default is false.',
-      ),
+    ...snapshotSchema,
   },
   handler: async (request, response) => {
     response.setIncludeSnapshot(true, request.params.verbose ?? false);
@@ -41,6 +36,9 @@ export const waitFor = defineTool({
   },
   schema: {
     text: zod.string().describe('Text to appear on the page'),
+    snapshot: zod.object({
+      ...snapshotSchema,
+    }).optional().describe('Options for the snapshot included in the response'),
     ...timeoutSchema,
   },
   handler: async (request, response, context) => {
@@ -64,6 +62,6 @@ export const waitFor = defineTool({
       `Element with text "${request.params.text}" found.`,
     );
 
-    response.setIncludeSnapshot(true);
+    response.setIncludeSnapshot(true, request.params.snapshot?.verbose ?? false);
   },
 });
