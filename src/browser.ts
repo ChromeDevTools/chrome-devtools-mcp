@@ -14,7 +14,8 @@ import type {
   LaunchOptions,
   Target,
 } from 'puppeteer-core';
-import puppeteer from 'puppeteer-core';
+
+import {puppeteer} from './third_party/puppeteer-core/index.js';
 
 let browser: Browser | undefined;
 
