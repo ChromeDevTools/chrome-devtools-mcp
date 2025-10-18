@@ -319,7 +319,15 @@ Call ${handleDialog.name} to handle it before continuing.`);
     }
 
     if (this.#consoleDataOptions?.include) {
-      const messages = this.#consoleMessagesData ?? [];
+      let messages = this.#consoleMessagesData ?? [];
+
+      // Apply type filtering if specified
+      if (this.#consoleDataOptions.types?.length) {
+        const normalizedTypes = new Set(
+          this.#consoleDataOptions.types,
+        );
+        messages = messages.filter(message => normalizedTypes.has(message.type));
+      }
 
       response.push('## Console messages');
       if (messages.length) {
