@@ -4,34 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {ResourceType} from 'puppeteer-core';
-
 import {zod} from '../third_party/modelcontextprotocol-sdk/index.js';
 
 import {ToolCategories} from './categories.js';
-import {defineTool} from './ToolDefinition.js';
-
-const FILTERABLE_RESOURCE_TYPES: readonly [ResourceType, ...ResourceType[]] = [
-  'document',
-  'stylesheet',
-  'image',
-  'media',
-  'font',
-  'script',
-  'texttrack',
-  'xhr',
-  'fetch',
-  'prefetch',
-  'eventsource',
-  'websocket',
-  'manifest',
-  'signedexchange',
-  'ping',
-  'cspviolationreport',
-  'preflight',
-  'fedcm',
-  'other',
-];
+import {defineTool, networkRequestsSchema} from './ToolDefinition.js';
 
 export const listNetworkRequests = defineTool({
   name: 'list_network_requests',
@@ -41,28 +17,7 @@ export const listNetworkRequests = defineTool({
     readOnlyHint: true,
   },
   schema: {
-    pageSize: zod
-      .number()
-      .int()
-      .positive()
-      .optional()
-      .describe(
-        'Maximum number of requests to return. When omitted, returns all requests.',
-      ),
-    pageIdx: zod
-      .number()
-      .int()
-      .min(0)
-      .optional()
-      .describe(
-        'Page number to return (0-based). When omitted, returns the first page.',
-      ),
-    resourceTypes: zod
-      .array(zod.enum(FILTERABLE_RESOURCE_TYPES))
-      .optional()
-      .describe(
-        'Filter requests to only return requests of the specified resource types. When omitted or empty, returns all requests.',
-      ),
+    ...networkRequestsSchema,
   },
   handler: async (request, response) => {
     response.setIncludeNetworkRequests(true, {

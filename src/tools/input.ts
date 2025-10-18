@@ -10,7 +10,7 @@ import type {McpContext, TextSnapshotNode} from '../McpContext.js';
 import {zod} from '../third_party/modelcontextprotocol-sdk/index.js';
 
 import {ToolCategories} from './categories.js';
-import {defineTool} from './ToolDefinition.js';
+import {defineTool, snapshotSchema} from './ToolDefinition.js';
 
 export const click = defineTool({
   name: 'click',
@@ -29,6 +29,9 @@ export const click = defineTool({
       .boolean()
       .optional()
       .describe('Set to true for double clicks. Default is false.'),
+    snapshot: zod.object({
+      ...snapshotSchema,
+    }).optional().describe('Options for the snapshot included in the response'),
   },
   handler: async (request, response, context) => {
     const uid = request.params.uid;
@@ -44,7 +47,7 @@ export const click = defineTool({
           ? `Successfully double clicked on the element`
           : `Successfully clicked on the element`,
       );
-      response.setIncludeSnapshot(true);
+      response.setIncludeSnapshot(true, request.params.snapshot?.verbose ?? false);
     } finally {
       void handle.dispose();
     }
@@ -64,6 +67,9 @@ export const hover = defineTool({
       .describe(
         'The uid of an element on the page from the page content snapshot',
       ),
+    snapshot: zod.object({
+      ...snapshotSchema,
+    }).optional().describe('Options for the snapshot included in the response'),
   },
   handler: async (request, response, context) => {
     const uid = request.params.uid;
@@ -73,7 +79,7 @@ export const hover = defineTool({
         await handle.asLocator().hover();
       });
       response.appendResponseLine(`Successfully hovered over the element`);
-      response.setIncludeSnapshot(true);
+      response.setIncludeSnapshot(true, request.params.snapshot?.verbose ?? false);
     } finally {
       void handle.dispose();
     }
@@ -149,6 +155,9 @@ export const fill = defineTool({
         'The uid of an element on the page from the page content snapshot',
       ),
     value: zod.string().describe('The value to fill in'),
+    snapshot: zod.object({
+      ...snapshotSchema,
+    }).optional().describe('Options for the snapshot included in the response'),
   },
   handler: async (request, response, context) => {
     await context.waitForEventsAfterAction(async () => {
@@ -159,7 +168,7 @@ export const fill = defineTool({
       );
     });
     response.appendResponseLine(`Successfully filled out the element`);
-    response.setIncludeSnapshot(true);
+    response.setIncludeSnapshot(true, request.params.snapshot?.verbose ?? false);
   },
 });
 
@@ -173,6 +182,9 @@ export const drag = defineTool({
   schema: {
     from_uid: zod.string().describe('The uid of the element to drag'),
     to_uid: zod.string().describe('The uid of the element to drop into'),
+    snapshot: zod.object({
+      ...snapshotSchema,
+    }).optional().describe('Options for the snapshot included in the response'),
   },
   handler: async (request, response, context) => {
     const fromHandle = await context.getElementByUid(request.params.from_uid);
@@ -184,7 +196,7 @@ export const drag = defineTool({
         await toHandle.drop(fromHandle);
       });
       response.appendResponseLine(`Successfully dragged an element`);
-      response.setIncludeSnapshot(true);
+      response.setIncludeSnapshot(true, request.params.snapshot?.verbose ?? false);
     } finally {
       void fromHandle.dispose();
       void toHandle.dispose();
@@ -208,6 +220,9 @@ export const fillForm = defineTool({
         }),
       )
       .describe('Elements from snapshot to fill out.'),
+    snapshot: zod.object({
+      ...snapshotSchema,
+    }).optional().describe('Options for the snapshot included in the response'),
   },
   handler: async (request, response, context) => {
     for (const element of request.params.elements) {
@@ -220,7 +235,7 @@ export const fillForm = defineTool({
       });
     }
     response.appendResponseLine(`Successfully filled out the form`);
-    response.setIncludeSnapshot(true);
+    response.setIncludeSnapshot(true, request.params.snapshot?.verbose ?? false);
   },
 });
 
@@ -238,6 +253,9 @@ export const uploadFile = defineTool({
         'The uid of the file input element or an element that will open file chooser on the page from the page content snapshot',
       ),
     filePath: zod.string().describe('The local path of the file to upload'),
+    snapshot: zod.object({
+      ...snapshotSchema,
+    }).optional().describe('Options for the snapshot included in the response'),
   },
   handler: async (request, response, context) => {
     const {uid, filePath} = request.params;
@@ -264,7 +282,7 @@ export const uploadFile = defineTool({
           );
         }
       }
-      response.setIncludeSnapshot(true);
+      response.setIncludeSnapshot(true, request.params.snapshot?.verbose ?? false);
       response.appendResponseLine(`File uploaded from ${filePath}.`);
     } finally {
       void handle.dispose();

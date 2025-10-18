@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {Dialog, ElementHandle, Page} from 'puppeteer-core';
+import type {ConsoleMessageType, Dialog, ElementHandle, Page, ResourceType} from 'puppeteer-core';
 
 import type {TextSnapshotNode} from '../McpContext.js';
 import {zod} from '../third_party/modelcontextprotocol-sdk/index.js';
@@ -115,3 +115,109 @@ export const timeoutSchema = {
       return value && value <= 0 ? undefined : value;
     }),
 };
+
+export const snapshotSchema = {
+  verbose: zod
+    .boolean()
+    .optional()
+    .describe(
+      'Whether to include all possible information available in the full a11y tree. Default is false.',
+    ),
+};
+
+const FILTERABLE_MESSAGE_TYPES: readonly [
+  ConsoleMessageType,
+  ...ConsoleMessageType[],
+] = [
+    'log',
+    'debug',
+    'info',
+    'error',
+    'warn',
+    'dir',
+    'dirxml',
+    'table',
+    'trace',
+    'clear',
+    'startGroup',
+    'startGroupCollapsed',
+    'endGroup',
+    'assert',
+    'profile',
+    'profileEnd',
+    'count',
+    'timeEnd',
+    'verbose',
+  ]
+  
+export const consoleMessagesSchema = {
+  pageSize: zod
+    .number()
+    .int()
+    .positive()
+    .optional()
+    .describe(
+      'Maximum number of messages to return. When omitted, returns all requests.',
+    ),
+  pageIdx: zod
+    .number()
+    .int()
+    .min(0)
+    .optional()
+    .describe(
+      'Page number to return (0-based). When omitted, returns the first page.',
+    ),
+  types: zod
+    .array(zod.enum(FILTERABLE_MESSAGE_TYPES))
+    .optional()
+    .describe(
+      'Filter messages to only return messages of the specified resource types. When omitted or empty, returns all messages.',
+    ),
+};
+
+const FILTERABLE_RESOURCE_TYPES: readonly [ResourceType, ...ResourceType[]] = [
+  'document',
+  'stylesheet',
+  'image',
+  'media',
+  'font',
+  'script',
+  'texttrack',
+  'xhr',
+  'fetch',
+  'prefetch',
+  'eventsource',
+  'websocket',
+  'manifest',
+  'signedexchange',
+  'ping',
+  'cspviolationreport',
+  'preflight',
+  'fedcm',
+  'other',
+];
+
+export const networkRequestsSchema = {
+  pageSize: zod
+    .number()
+    .int()
+    .positive()
+    .optional()
+    .describe(
+      'Maximum number of requests to return. When omitted, returns all requests.',
+    ),
+  pageIdx: zod
+    .number()
+    .int()
+    .min(0)
+    .optional()
+    .describe(
+      'Page number to return (0-based). When omitted, returns the first page.',
+    ),
+  resourceTypes: zod
+    .array(zod.enum(FILTERABLE_RESOURCE_TYPES))
+    .optional()
+    .describe(
+      'Filter requests to only return requests of the specified resource types. When omitted or empty, returns all requests.',
+    ),
+}

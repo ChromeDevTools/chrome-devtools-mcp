@@ -4,37 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {ConsoleMessageType} from 'puppeteer-core';
-
-import {zod} from '../third_party/modelcontextprotocol-sdk/index.js';
-
 import {ToolCategories} from './categories.js';
-import {defineTool} from './ToolDefinition.js';
-
-const FILTERABLE_MESSAGE_TYPES: readonly [
-  ConsoleMessageType,
-  ...ConsoleMessageType[],
-] = [
-  'log',
-  'debug',
-  'info',
-  'error',
-  'warn',
-  'dir',
-  'dirxml',
-  'table',
-  'trace',
-  'clear',
-  'startGroup',
-  'startGroupCollapsed',
-  'endGroup',
-  'assert',
-  'profile',
-  'profileEnd',
-  'count',
-  'timeEnd',
-  'verbose',
-];
+import {consoleMessagesSchema, defineTool} from './ToolDefinition.js';
 
 export const consoleTool = defineTool({
   name: 'list_console_messages',
@@ -45,28 +16,7 @@ export const consoleTool = defineTool({
     readOnlyHint: true,
   },
   schema: {
-    pageSize: zod
-      .number()
-      .int()
-      .positive()
-      .optional()
-      .describe(
-        'Maximum number of messages to return. When omitted, returns all requests.',
-      ),
-    pageIdx: zod
-      .number()
-      .int()
-      .min(0)
-      .optional()
-      .describe(
-        'Page number to return (0-based). When omitted, returns the first page.',
-      ),
-    types: zod
-      .array(zod.enum(FILTERABLE_MESSAGE_TYPES))
-      .optional()
-      .describe(
-        'Filter messages to only return messages of the specified resource types. When omitted or empty, returns all messages.',
-      ),
+    ...consoleMessagesSchema,
   },
   handler: async (request, response) => {
     response.setIncludeConsoleData(true, {
