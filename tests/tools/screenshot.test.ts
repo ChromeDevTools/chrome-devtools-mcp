@@ -74,7 +74,7 @@ describe('screenshot', () => {
       });
     });
 
-    it.only('with full page resulting in a large screenshot', async () => {
+    it('with full page resulting in a large screenshot', async () => {
       await withBrowser(async (response, context) => {
         const page = context.getSelectedPage();
 
