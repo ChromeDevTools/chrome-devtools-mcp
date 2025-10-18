@@ -111,6 +111,9 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
   const args: LaunchOptions['args'] = [
     ...(options.args ?? []),
     '--hide-crash-restore-bubble',
+    // Fix cookie handling for subdomain patterns (e.g., dev.app.example.com)
+    // Disable third-party cookie partitioning which can interfere with secure cookies
+    '--disable-features=ThirdPartyStoragePartitioning,PartitionedCookies',
   ];
   if (headless) {
     args.push('--screen-info={3840x2160}');
