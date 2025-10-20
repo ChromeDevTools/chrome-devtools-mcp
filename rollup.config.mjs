@@ -14,6 +14,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+/**
+ * @fileoverview take from {@link https://github.com/GoogleChromeLabs/chromium-bidi/blob/main/rollup.config.mjs | chromium-bidi}
+ * and modified to specific requirement.
+ */
+
 import path from 'node:path';
 
 import commonjs from '@rollup/plugin-commonjs';
@@ -22,11 +27,14 @@ import {nodeResolve} from '@rollup/plugin-node-resolve';
 import cleanup from 'rollup-plugin-cleanup';
 import license from 'rollup-plugin-license';
 
+const isProduction = process.env.NODE_ENV === 'production';
+
+/** @type {import('rollup').RollupOptions} */
 const sdk = {
   input: './build/src/third_party/modelcontextprotocol-sdk/index.js',
   output: {
     file: './build/src/third_party/modelcontextprotocol-sdk/index.js',
-    sourcemap: false,
+    sourcemap: !isProduction,
     format: 'esm',
   },
   plugins: [
@@ -37,7 +45,6 @@ const sdk = {
       comments: [/Copyright/i],
     }),
     license({
-      debug: true,
       thirdParty: {
         allow: {
           test: dependency => {

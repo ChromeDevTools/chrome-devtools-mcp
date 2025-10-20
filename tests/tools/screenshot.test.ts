@@ -11,7 +11,7 @@ import {describe, it} from 'node:test';
 
 import {screenshot} from '../../src/tools/screenshot.js';
 import {screenshots} from '../snapshot.js';
-import {withBrowser} from '../utils.js';
+import {html, withBrowser} from '../utils.js';
 
 describe('screenshot', () => {
   describe('browser_take_screenshot', () => {
@@ -77,9 +77,20 @@ describe('screenshot', () => {
     it('with full page resulting in a large screenshot', async () => {
       await withBrowser(async (response, context) => {
         const page = context.getSelectedPage();
+
         await page.setContent(
-          `<div style="color:blue;">test</div>`.repeat(7_000),
+          html`${`<div style="color:blue;">test</div>`.repeat(6500)}
+            <div
+              id="red"
+              style="color:blue;"
+              >test</div
+            > `,
         );
+        await page.evaluate(() => {
+          const el = document.querySelector('#red');
+          return el?.scrollIntoViewIfNeeded();
+        });
+
         await screenshot.handler(
           {params: {format: 'png', fullPage: true}},
           response,

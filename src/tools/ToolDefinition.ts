@@ -5,15 +5,17 @@
  */
 
 import type {Dialog, ElementHandle, Page} from 'puppeteer-core';
-import z from 'zod';
 
 import type {TextSnapshotNode} from '../McpContext.js';
+import {zod} from '../third_party/modelcontextprotocol-sdk/index.js';
 import type {TraceResult} from '../trace-processing/parse.js';
 import type {PaginationOptions} from '../utils/types.js';
 
 import type {ToolCategories} from './categories.js';
 
-export interface ToolDefinition<Schema extends z.ZodRawShape = z.ZodRawShape> {
+export interface ToolDefinition<
+  Schema extends zod.ZodRawShape = zod.ZodRawShape,
+> {
   name: string;
   description: string;
   annotations: {
@@ -32,8 +34,8 @@ export interface ToolDefinition<Schema extends z.ZodRawShape = z.ZodRawShape> {
   ) => Promise<void>;
 }
 
-export interface Request<Schema extends z.ZodRawShape> {
-  params: z.objectOutputType<Schema, z.ZodTypeAny>;
+export interface Request<Schema extends zod.ZodRawShape> {
+  params: zod.objectOutputType<Schema, zod.ZodTypeAny>;
 }
 
 export interface ImageContentData {
@@ -93,7 +95,7 @@ export type Context = Readonly<{
   waitForEventsAfterAction(action: () => Promise<unknown>): Promise<void>;
 }>;
 
-export function defineTool<Schema extends z.ZodRawShape>(
+export function defineTool<Schema extends zod.ZodRawShape>(
   definition: ToolDefinition<Schema>,
 ) {
   return definition;
@@ -103,7 +105,7 @@ export const CLOSE_PAGE_ERROR =
   'The last open page cannot be closed. It is fine to keep it open.';
 
 export const timeoutSchema = {
-  timeout: z
+  timeout: zod
     .number()
     .int()
     .optional()

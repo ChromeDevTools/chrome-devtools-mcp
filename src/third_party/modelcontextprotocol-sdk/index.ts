@@ -12,3 +12,4 @@ export {
   type ImageContent,
   type TextContent,
 } from '@modelcontextprotocol/sdk/types.js';
+export {z as zod} from 'zod';

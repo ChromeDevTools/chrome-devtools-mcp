@@ -4,9 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import z from 'zod';
-
 import {logger} from '../logger.js';
+import {zod} from '../third_party/modelcontextprotocol-sdk/index.js';
 
 import {ToolCategories} from './categories.js';
 import {CLOSE_PAGE_ERROR, defineTool, timeoutSchema} from './ToolDefinition.js';
@@ -32,7 +31,7 @@ export const selectPage = defineTool({
     readOnlyHint: true,
   },
   schema: {
-    pageIdx: z
+    pageIdx: zod
       .number()
       .describe(
         'The index of the page to select. Call list_pages to list pages.',
@@ -54,7 +53,7 @@ export const closePage = defineTool({
     readOnlyHint: false,
   },
   schema: {
-    pageIdx: z
+    pageIdx: zod
       .number()
       .describe(
         'The index of the page to close. Call list_pages to list pages.',
@@ -82,7 +81,7 @@ export const newPage = defineTool({
     readOnlyHint: false,
   },
   schema: {
-    url: z.string().describe('URL to load in a new page.'),
+    url: zod.string().describe('URL to load in a new page.'),
     ...timeoutSchema,
   },
   handler: async (request, response, context) => {
@@ -106,7 +105,7 @@ export const navigatePage = defineTool({
     readOnlyHint: false,
   },
   schema: {
-    url: z.string().describe('URL to navigate the page to'),
+    url: zod.string().describe('URL to navigate the page to'),
     ...timeoutSchema,
   },
   handler: async (request, response, context) => {
@@ -130,7 +129,7 @@ export const navigatePageHistory = defineTool({
     readOnlyHint: false,
   },
   schema: {
-    navigate: z
+    navigate: zod
       .enum(['back', 'forward'])
       .describe(
         'Whether to navigate back or navigate forward in the selected pages history',
@@ -167,8 +166,8 @@ export const resizePage = defineTool({
     readOnlyHint: false,
   },
   schema: {
-    width: z.number().describe('Page width'),
-    height: z.number().describe('Page height'),
+    width: zod.number().describe('Page width'),
+    height: zod.number().describe('Page height'),
   },
   handler: async (request, response, context) => {
     const page = context.getSelectedPage();
@@ -191,10 +190,10 @@ export const handleDialog = defineTool({
     readOnlyHint: false,
   },
   schema: {
-    action: z
+    action: zod
       .enum(['accept', 'dismiss'])
       .describe('Whether to dismiss or accept the dialog'),
-    promptText: z
+    promptText: zod
       .string()
       .optional()
       .describe('Optional prompt text to enter into the dialog.'),

@@ -125,8 +125,7 @@ Configure the following fields and press `CTRL+S` to save the configuration:
 
 - **Server name:** `chrome-devtools`
 - **Server Type:** `[1] Local`
-- **Command:** `npx`
-- **Arguments:** `-y, chrome-devtools-mcp@latest`
+- **Command:** `npx -y chrome-devtools-mcp@latest`
 
 </details>
 

@@ -5,9 +5,9 @@
  */
 
 import type {ElementHandle} from 'puppeteer-core';
-import z from 'zod';
 
 import type {McpContext, TextSnapshotNode} from '../McpContext.js';
+import {zod} from '../third_party/modelcontextprotocol-sdk/index.js';
 
 import {ToolCategories} from './categories.js';
 import {defineTool} from './ToolDefinition.js';
@@ -20,12 +20,12 @@ export const click = defineTool({
     readOnlyHint: false,
   },
   schema: {
-    uid: z
+    uid: zod
       .string()
       .describe(
         'The uid of an element on the page from the page content snapshot',
       ),
-    dblClick: z
+    dblClick: zod
       .boolean()
       .optional()
       .describe('Set to true for double clicks. Default is false.'),
@@ -59,7 +59,7 @@ export const hover = defineTool({
     readOnlyHint: false,
   },
   schema: {
-    uid: z
+    uid: zod
       .string()
       .describe(
         'The uid of an element on the page from the page content snapshot',
@@ -143,12 +143,12 @@ export const fill = defineTool({
     readOnlyHint: false,
   },
   schema: {
-    uid: z
+    uid: zod
       .string()
       .describe(
         'The uid of an element on the page from the page content snapshot',
       ),
-    value: z.string().describe('The value to fill in'),
+    value: zod.string().describe('The value to fill in'),
   },
   handler: async (request, response, context) => {
     await context.waitForEventsAfterAction(async () => {
@@ -171,8 +171,8 @@ export const drag = defineTool({
     readOnlyHint: false,
   },
   schema: {
-    from_uid: z.string().describe('The uid of the element to drag'),
-    to_uid: z.string().describe('The uid of the element to drop into'),
+    from_uid: zod.string().describe('The uid of the element to drag'),
+    to_uid: zod.string().describe('The uid of the element to drop into'),
   },
   handler: async (request, response, context) => {
     const fromHandle = await context.getElementByUid(request.params.from_uid);
@@ -200,11 +200,11 @@ export const fillForm = defineTool({
     readOnlyHint: false,
   },
   schema: {
-    elements: z
+    elements: zod
       .array(
-        z.object({
-          uid: z.string().describe('The uid of the element to fill out'),
-          value: z.string().describe('Value for the element'),
+        zod.object({
+          uid: zod.string().describe('The uid of the element to fill out'),
+          value: zod.string().describe('Value for the element'),
         }),
       )
       .describe('Elements from snapshot to fill out.'),
@@ -232,12 +232,12 @@ export const uploadFile = defineTool({
     readOnlyHint: false,
   },
   schema: {
-    uid: z
+    uid: zod
       .string()
       .describe(
         'The uid of the file input element or an element that will open file chooser on the page from the page content snapshot',
       ),
-    filePath: z.string().describe('The local path of the file to upload'),
+    filePath: zod.string().describe('The local path of the file to upload'),
   },
   handler: async (request, response, context) => {
     const {uid, filePath} = request.params;
