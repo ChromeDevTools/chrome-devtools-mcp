@@ -36,7 +36,7 @@ describe('console', () => {
       });
     });
 
-    it.only('work with primitive unhandled errors', async () => {
+    it('work with primitive unhandled errors', async () => {
       await withBrowser(async (response, context) => {
         const page = await context.newPage();
         await page.setContent('<script>throw undefined;</script>');
