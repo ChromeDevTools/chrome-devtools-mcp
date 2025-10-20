@@ -29,7 +29,7 @@ import license from 'rollup-plugin-license';
 
 const isProduction = process.env.NODE_ENV === 'production';
 
-const allowed_licenses = [
+const allowedLicenses = [
   'MIT',
   'Apache 2.0',
   'Apache-2.0',
@@ -59,7 +59,7 @@ const bundleDependency = (wrapperIndexPath, extraOutputOptions = {}) => ({
       thirdParty: {
         allow: {
           test: dependency => {
-            return allowed_licenses.includes(dependency.license);
+            return allowedLicenses.includes(dependency.license);
           },
           failOnUnlicensed: true,
           failOnViolation: true,

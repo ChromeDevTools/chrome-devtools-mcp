@@ -40,7 +40,6 @@
   "dependencies": {
     "core-js": "3.46.0",
     "debug": "4.4.3",
-    "puppeteer-core": "^24.24.1",
     "yargs": "18.0.0"
   },
   "devDependencies": {
