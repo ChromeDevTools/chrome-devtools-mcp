@@ -12,7 +12,7 @@ import {
 } from '../../src/formatters/consoleFormatter.js';
 import type {ConsoleMessageData} from '../../src/McpResponse.js';
 
-describe.only('consoleFormatter', () => {
+describe('consoleFormatter', () => {
   describe('formatConsoleEventShort', () => {
     it('formats a console.log message', t => {
       const message: ConsoleMessageData = {
