@@ -6,7 +6,6 @@
 
 
 import {zod} from '../third_party/modelcontextprotocol-sdk/index.js';
-import {Locator} from '../third_party/puppeteer-core/index.js';
 
 import {ToolCategories} from './categories.js';
 import {defineTool, timeoutSchema} from './ToolDefinition.js';
