@@ -91,7 +91,12 @@ export class PageCollector<T> {
     this.storage.set(page, storedLists);
 
     const listeners = this.#listenersInitializer(value => {
-      const withId = value as WithSymbolId<T>;
+      let withId: WithSymbolId<T>;
+      if (value === undefined || value === null) {
+        withId = {} as WithSymbolId<T>;
+      } else {
+        withId = value as WithSymbolId<T>;
+      }
       withId[stableIdSymbol] = idGenerator();
 
       const navigations = this.storage.get(page) ?? [[]];
