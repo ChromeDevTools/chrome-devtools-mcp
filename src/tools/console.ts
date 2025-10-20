@@ -85,7 +85,7 @@ export const getConsoleMessage = defineTool({
     readOnlyHint: true,
   },
   schema: {
-    msgid: z
+    msgid: zod
       .number()
       .describe(
         'The msgid of a console message on the page from the listed console messages',
