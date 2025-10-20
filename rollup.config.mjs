@@ -48,7 +48,7 @@ const allowedLicenses = [
 const bundleDependency = (
   wrapperIndexPath,
   extraOutputOptions = {},
-  external = []
+  external = [],
 ) => ({
   input: wrapperIndexPath,
   output: {
@@ -74,7 +74,10 @@ const bundleDependency = (
           failOnViolation: true,
         },
         output: {
-          file: path.join(path.dirname(wrapperIndexPath), 'THIRD_PARTY_NOTICES'),
+          file: path.join(
+            path.dirname(wrapperIndexPath),
+            'THIRD_PARTY_NOTICES',
+          ),
           template(dependencies) {
             const stringified_dependencies = dependencies.map(dependency => {
               let arr = [];
@@ -113,6 +116,6 @@ export default [
     {
       inlineDynamicImports: true,
     },
-    ['./bidi.js', '../bidi/bidi.js']
+    ['./bidi.js', '../bidi/bidi.js'],
   ),
 ];
