@@ -93,7 +93,10 @@ export type Context = Readonly<{
     filename: string,
   ): Promise<{filename: string}>;
   waitForEventsAfterAction(action: () => Promise<unknown>): Promise<void>;
-  waitForTextOnPage(params: {text: string, timeout?: number|undefined}): Promise<Element>;
+  waitForTextOnPage(params: {
+    text: string;
+    timeout?: number | undefined;
+  }): Promise<Element>;
 }>;
 
 export function defineTool<Schema extends zod.ZodRawShape>(

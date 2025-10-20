@@ -29,7 +29,15 @@ import license from 'rollup-plugin-license';
 
 const isProduction = process.env.NODE_ENV === 'production';
 
-const allowed_licenses = ['MIT', 'Apache 2.0', 'Apache-2.0', 'BSD-3-Clause', 'BSD-2-Clause', 'ISC', '0BSD'];
+const allowed_licenses = [
+  'MIT',
+  'Apache 2.0',
+  'Apache-2.0',
+  'BSD-3-Clause',
+  'BSD-2-Clause',
+  'ISC',
+  '0BSD',
+];
 
 /** @returns {import('rollup').RollupOptions} */
 const bundleDependency = (wrapperIndexPath, extraOutputOptions = {}) => ({
@@ -96,5 +104,7 @@ const bundleDependency = (wrapperIndexPath, extraOutputOptions = {}) => ({
 
 export default [
   bundleDependency('./build/src/third_party/modelcontextprotocol-sdk/index.js'),
-  bundleDependency('./build/src/third_party/puppeteer-core/index.js', {inlineDynamicImports: true}),
+  bundleDependency('./build/src/third_party/puppeteer-core/index.js', {
+    inlineDynamicImports: true,
+  }),
 ];

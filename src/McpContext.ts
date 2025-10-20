@@ -94,7 +94,11 @@ export class McpContext implements Context {
 
   #locatorClass: typeof Locator;
 
-  private constructor(browser: Browser, logger: Debugger, locatorClass: typeof Locator) {
+  private constructor(
+    browser: Browser,
+    logger: Debugger,
+    locatorClass: typeof Locator,
+  ) {
     this.browser = browser;
     this.logger = logger;
     this.#locatorClass = locatorClass;
@@ -126,7 +130,11 @@ export class McpContext implements Context {
     await this.#consoleCollector.init();
   }
 
-  static async from(browser: Browser, logger: Debugger, locatorClass: typeof Locator = Locator) {
+  static async from(
+    browser: Browser,
+    logger: Debugger,
+    locatorClass: typeof Locator = Locator,
+  ) {
     const context = new McpContext(browser, logger, locatorClass);
     await context.#init();
     return context;
@@ -433,7 +441,13 @@ export class McpContext implements Context {
     return this.#networkCollector.getIdForResource(request);
   }
 
-  waitForTextOnPage({text, timeout}: {text: string, timeout?: number|undefined}): Promise<Element> {
+  waitForTextOnPage({
+    text,
+    timeout,
+  }: {
+    text: string;
+    timeout?: number | undefined;
+  }): Promise<Element> {
     const page = this.getSelectedPage();
     const frames = page.frames();
 

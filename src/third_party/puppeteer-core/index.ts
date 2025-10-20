@@ -4,5 +4,5 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-export {Locator,PredefinedNetworkConditions} from 'puppeteer-core';
+export {Locator, PredefinedNetworkConditions} from 'puppeteer-core';
 export {default as puppeteer} from 'puppeteer-core';
