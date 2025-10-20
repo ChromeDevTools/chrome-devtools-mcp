@@ -13,8 +13,7 @@ import type {
   ChromeReleaseChannel,
   LaunchOptions,
   Target,
-} from 'puppeteer-core';
-
+} from './third_party/puppeteer-core/index.js';
 import {puppeteer} from './third_party/puppeteer-core/index.js';
 
 let browser: Browser | undefined;

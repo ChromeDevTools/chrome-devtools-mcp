@@ -4,10 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {Page} from 'puppeteer-core';
-
 import {logger} from '../logger.js';
 import {zod} from '../third_party/modelcontextprotocol-sdk/index.js';
+import type {Page} from '../third_party/puppeteer-core/index.js';
 import type {InsightName} from '../trace-processing/parse.js';
 import {
   getInsightOutput,

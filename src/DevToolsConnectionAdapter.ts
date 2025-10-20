@@ -4,9 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {type ConnectionTransport} from 'puppeteer-core';
-
 import {Connection} from '../node_modules/chrome-devtools-frontend/front_end/core/protocol_client/InspectorBackend.js';
+
+import {type ConnectionTransport} from './third_party/puppeteer-core/index.js';
 
 /**
  * Allows a puppeteer {@link ConnectionTransport} to act like a DevTools {@link Connection}.

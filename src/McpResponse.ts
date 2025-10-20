@@ -3,8 +3,6 @@
  * Copyright 2025 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import type {ConsoleMessage, ResourceType} from 'puppeteer-core';
-
 import type {ConsoleMessageData} from './formatters/consoleFormatter.js';
 import {
   formatConsoleEventShort,
@@ -23,6 +21,10 @@ import type {
   ImageContent,
   TextContent,
 } from './third_party/modelcontextprotocol-sdk/index.js';
+import type {
+  ConsoleMessage,
+  ResourceType,
+} from './third_party/puppeteer-core/index.js';
 import {handleDialog} from './tools/pages.js';
 import type {ImageContentData, Response} from './tools/ToolDefinition.js';
 import {paginate} from './utils/pagination.js';

@@ -4,9 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {ElementHandle, Page} from 'puppeteer-core';
-
 import {zod} from '../third_party/modelcontextprotocol-sdk/index.js';
+import type {ElementHandle, Page} from '../third_party/puppeteer-core/index.js';
 
 import {ToolCategories} from './categories.js';
 import {defineTool} from './ToolDefinition.js';

@@ -6,3 +6,4 @@
 
 export {Locator, PredefinedNetworkConditions} from 'puppeteer-core';
 export {default as puppeteer} from 'puppeteer-core';
+export type * from 'puppeteer-core';

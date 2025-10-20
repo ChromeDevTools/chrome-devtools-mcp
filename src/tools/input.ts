@@ -4,10 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {ElementHandle} from 'puppeteer-core';
-
 import type {McpContext, TextSnapshotNode} from '../McpContext.js';
 import {zod} from '../third_party/modelcontextprotocol-sdk/index.js';
+import type {ElementHandle} from '../third_party/puppeteer-core/index.js';
 
 import {ToolCategories} from './categories.js';
 import {defineTool} from './ToolDefinition.js';

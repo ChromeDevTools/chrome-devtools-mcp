@@ -8,6 +8,10 @@ import os from 'node:os';
 import path from 'node:path';
 
 import type {Debugger} from 'debug';
+
+import type {ListenerMap} from './PageCollector.js';
+import {NetworkCollector, PageCollector} from './PageCollector.js';
+import {Locator} from './third_party/puppeteer-core/index.js';
 import type {
   Browser,
   ConsoleMessage,
@@ -17,11 +21,7 @@ import type {
   Page,
   SerializedAXNode,
   PredefinedNetworkConditions,
-} from 'puppeteer-core';
-
-import type {ListenerMap} from './PageCollector.js';
-import {NetworkCollector, PageCollector} from './PageCollector.js';
-import {Locator} from './third_party/puppeteer-core/index.js';
+} from './third_party/puppeteer-core/index.js';
 import {listPages} from './tools/pages.js';
 import {takeSnapshot} from './tools/snapshot.js';
 import {CLOSE_PAGE_ERROR} from './tools/ToolDefinition.js';

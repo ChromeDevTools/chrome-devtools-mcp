@@ -11,7 +11,7 @@ import {
   type HTTPRequest,
   type Page,
   type PageEvents,
-} from 'puppeteer-core';
+} from './third_party/puppeteer-core/index.js';
 
 export type ListenerMap<EventMap extends PageEvents = PageEvents> = {
   [K in keyof EventMap]?: (event: EventMap[K]) => void;
