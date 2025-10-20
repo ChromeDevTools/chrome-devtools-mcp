@@ -39,8 +39,17 @@ const allowedLicenses = [
   '0BSD',
 ];
 
-/** @returns {import('rollup').RollupOptions} */
-const bundleDependency = (wrapperIndexPath, extraOutputOptions = {}) => ({
+/**
+ * @param {string} wrapperIndexPath
+ * @param {import('rollup').OutputOptions} [extraOutputOptions={}]
+ * @param {string[]} [external=[]]
+ * @returns {import('rollup').RollupOptions}
+ */
+const bundleDependency = (
+  wrapperIndexPath,
+  extraOutputOptions = {},
+  external = []
+) => ({
   input: wrapperIndexPath,
   output: {
     ...extraOutputOptions,
@@ -65,13 +74,7 @@ const bundleDependency = (wrapperIndexPath, extraOutputOptions = {}) => ({
           failOnViolation: true,
         },
         output: {
-          file: path.join(
-            'build',
-            'src',
-            'third_party',
-            'modelcontextprotocol-sdk',
-            'THIRD_PARTY_NOTICES',
-          ),
+          file: path.join(path.dirname(wrapperIndexPath), 'THIRD_PARTY_NOTICES'),
           template(dependencies) {
             const stringified_dependencies = dependencies.map(dependency => {
               let arr = [];
@@ -100,11 +103,16 @@ const bundleDependency = (wrapperIndexPath, extraOutputOptions = {}) => ({
     json(),
     nodeResolve(),
   ],
+  external,
 });
 
 export default [
   bundleDependency('./build/src/third_party/modelcontextprotocol-sdk/index.js'),
-  bundleDependency('./build/src/third_party/puppeteer-core/index.js', {
-    inlineDynamicImports: true,
-  }),
+  bundleDependency(
+    './build/src/third_party/puppeteer-core/index.js',
+    {
+      inlineDynamicImports: true,
+    },
+    ['./bidi.js', '../bidi/bidi.js']
+  ),
 ];
