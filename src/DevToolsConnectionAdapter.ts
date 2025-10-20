@@ -11,7 +11,7 @@ import {Connection} from '../node_modules/chrome-devtools-frontend/front_end/cor
 /**
  * Allows a puppeteer {@link ConnectionTransport} to act like a DevTools {@link Connection}.
  */
-class _DevToolsConnectionAdapter extends Connection {
+export class DevToolsConnectionAdapter extends Connection {
   #transport: ConnectionTransport | null;
   #onDisconnect: ((arg0: string) => void) | null = null;
 
