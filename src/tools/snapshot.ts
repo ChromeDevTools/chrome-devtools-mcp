@@ -44,21 +44,7 @@ export const waitFor = defineTool({
     ...timeoutSchema,
   },
   handler: async (request, response, context) => {
-    const page = context.getSelectedPage();
-    const frames = page.frames();
-
-    const locator = Locator.race(
-      frames.flatMap(frame => [
-        frame.locator(`aria/${request.params.text}`),
-        frame.locator(`text/${request.params.text}`),
-      ]),
-    );
-
-    if (request.params.timeout) {
-      locator.setTimeout(request.params.timeout);
-    }
-
-    await locator.wait();
+    await context.waitForTextOnPage(request.params);
 
     response.appendResponseLine(
       `Element with text "${request.params.text}" found.`,

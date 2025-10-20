@@ -5,7 +5,7 @@
  */
 import logger from 'debug';
 import type {Browser} from 'puppeteer';
-import puppeteer from 'puppeteer';
+import puppeteer, {Locator} from 'puppeteer';
 import type {Frame, HTTPRequest, HTTPResponse} from 'puppeteer-core';
 
 import {McpContext} from '../src/McpContext.js';
@@ -36,7 +36,7 @@ export async function withBrowser(
     }),
   );
   const response = new McpResponse();
-  const context = await McpContext.from(browser, logger('test'));
+  const context = await McpContext.from(browser, logger('test'), Locator);
 
   await cb(response, context);
 }
