@@ -13,13 +13,11 @@ msgid=2 [log] Processing file: (1 args)
 exports[`consoleFormatter > formatConsoleEventVerbose > formats a console.error message 1`] = `
 ID: 4
 Message: error> Something went wrong
-
 `;
 
 exports[`consoleFormatter > formatConsoleEventVerbose > formats a console.log message 1`] = `
 ID: 1
 Message: log> Hello, world!
-
 `;
 
 exports[`consoleFormatter > formatConsoleEventVerbose > formats a console.log message with multiple arguments 1`] = `

@@ -4,7 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {ConsoleMessageData} from '../McpResponse.js';
+export interface ConsoleMessageData {
+  consoleMessageStableId: number;
+  type?: string;
+  message?: string;
+  args?: string[];
+}
 
 // The short format for a console message, based on a previous format.
 export function formatConsoleEventShort(msg: ConsoleMessageData): string {
@@ -28,7 +33,7 @@ export function formatConsoleEventVerbose(msg: ConsoleMessageData): string {
     `ID: ${msg.consoleMessageStableId}`,
     `Message: ${msg.type}> ${msg.message}`,
     formatArgs(msg),
-  ];
+  ].filter(line => !!line);
 
   return result.join('\n');
 }

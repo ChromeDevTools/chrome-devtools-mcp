@@ -28,10 +28,7 @@ describe('console', () => {
           '<script>console.error("This is an error")</script>',
         );
         await listConsoleMessages.handler({params: {}}, response, context);
-        await response.handle('test', context);
-
-        const formattedResponse = response.format('test', context);
-
+        const formattedResponse = await response.handle('test', context);
         const textContent = formattedResponse[0] as {text: string};
         assert.ok(
           textContent.text.includes('msgid=1 [error] This is an error'),
@@ -54,9 +51,7 @@ describe('console', () => {
           response,
           context,
         );
-        await response.handle('test', context);
-
-        const formattedResponse = response.format('test', context);
+        const formattedResponse = await response.handle('test', context);
         const textContent = formattedResponse[0] as {text: string};
         assert.ok(
           textContent.text.includes('msgid=1 [error] This is an error'),

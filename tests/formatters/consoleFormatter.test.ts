@@ -6,11 +6,11 @@
 
 import {describe, it} from 'node:test';
 
+import type {ConsoleMessageData} from '../../src/formatters/consoleFormatter.js';
 import {
   formatConsoleEventShort,
   formatConsoleEventVerbose,
 } from '../../src/formatters/consoleFormatter.js';
-import type {ConsoleMessageData} from '../../src/McpResponse.js';
 
 describe('consoleFormatter', () => {
   describe('formatConsoleEventShort', () => {

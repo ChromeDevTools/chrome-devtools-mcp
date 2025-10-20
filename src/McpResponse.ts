@@ -5,6 +5,7 @@
  */
 import type {ConsoleMessage, ResourceType} from 'puppeteer-core';
 
+import type {ConsoleMessageData} from './formatters/consoleFormatter.js';
 import {
   formatConsoleEventShort,
   formatConsoleEventVerbose,
@@ -27,26 +28,12 @@ import type {ImageContentData, Response} from './tools/ToolDefinition.js';
 import {paginate} from './utils/pagination.js';
 import type {PaginationOptions} from './utils/types.js';
 
-interface NetworkRequestData {
-  networkRequestStableId: number;
-  requestBody?: string;
-  responseBody?: string;
-}
-
-export interface ConsoleMessageData {
-  consoleMessageStableId: number;
-  type?: string;
-  message?: string;
-  args?: string[];
-}
-
 export class McpResponse implements Response {
   #includePages = false;
   #includeSnapshot = false;
   #includeVerboseSnapshot = false;
-  #attachedNetworkRequestData?: NetworkRequestData;
-  #attachedConsoleMessageData?: ConsoleMessageData;
-  #consoleMessagesData?: ConsoleMessageData[];
+  #attachedNetworkRequestId?: number;
+  #attachedConsoleMessageId?: number;
   #textResponseLines: string[] = [];
   #images: ImageContentData[] = [];
   #networkRequestsOptions?: {
@@ -118,15 +105,11 @@ export class McpResponse implements Response {
   }
 
   attachNetworkRequest(reqid: number): void {
-    this.#attachedNetworkRequestData = {
-      networkRequestStableId: reqid,
-    };
+    this.#attachedNetworkRequestId = reqid;
   }
 
-  attachConsoleMessage(id: number): void {
-    this.#attachedConsoleMessageData = {
-      consoleMessageStableId: id,
-    };
+  attachConsoleMessage(msgid: number): void {
+    this.#attachedConsoleMessageId = msgid;
   }
 
   get includePages(): boolean {
@@ -141,7 +124,7 @@ export class McpResponse implements Response {
     return this.#consoleDataOptions?.include ?? false;
   }
   get attachedNetworkRequestId(): number | undefined {
-    return this.#attachedNetworkRequestData?.networkRequestStableId;
+    return this.#attachedNetworkRequestId;
   }
   get networkRequestsPageIdx(): number | undefined {
     return this.#networkRequestsOptions?.pagination?.pageIdx;
@@ -188,31 +171,34 @@ export class McpResponse implements Response {
       await context.createTextSnapshot(this.#includeVerboseSnapshot);
     }
 
-    if (this.#attachedNetworkRequestData?.networkRequestStableId) {
+    const bodies: {
+      requestBody?: string;
+      responseBody?: string;
+    } = {};
+
+    if (this.#attachedNetworkRequestId) {
       const request = context.getNetworkRequestById(
-        this.#attachedNetworkRequestData.networkRequestStableId,
+        this.#attachedNetworkRequestId,
       );
 
-      this.#attachedNetworkRequestData.requestBody =
-        await getFormattedRequestBody(request);
+      bodies.requestBody = await getFormattedRequestBody(request);
 
       const response = request.response();
       if (response) {
-        this.#attachedNetworkRequestData.responseBody =
-          await getFormattedResponseBody(response);
+        bodies.responseBody = await getFormattedResponseBody(response);
       }
     }
 
-    if (this.#attachedConsoleMessageData?.consoleMessageStableId) {
+    let consoleData: ConsoleMessageData | undefined;
+
+    if (this.#attachedConsoleMessageId) {
       const message = context.getConsoleMessageById(
-        this.#attachedConsoleMessageData.consoleMessageStableId,
+        this.#attachedConsoleMessageId,
       );
-      const consoleMessageStableId =
-        this.#attachedConsoleMessageData.consoleMessageStableId;
-      let data: ConsoleMessageData;
+      const consoleMessageStableId = this.#attachedConsoleMessageId;
       if ('args' in message) {
         const consoleMessage = message as ConsoleMessage;
-        data = {
+        consoleData = {
           consoleMessageStableId,
           type: consoleMessage.type(),
           message: consoleMessage.text(),
@@ -228,16 +214,16 @@ export class McpResponse implements Response {
           ),
         };
       } else {
-        data = {
+        consoleData = {
           consoleMessageStableId,
           type: 'error',
           message: (message as Error).message,
           args: [],
         };
       }
-      this.#attachedConsoleMessageData = data;
     }
 
+    let consoleListData: ConsoleMessageData[] | undefined;
     if (this.#consoleDataOptions?.include) {
       let messages = context.getConsoleData();
 
@@ -251,7 +237,7 @@ export class McpResponse implements Response {
         });
       }
 
-      this.#consoleMessagesData = await Promise.all(
+      consoleListData = await Promise.all(
         messages.map(async (item): Promise<ConsoleMessageData> => {
           const consoleMessageStableId =
             context.getConsoleMessageStableId(item);
@@ -283,12 +269,24 @@ export class McpResponse implements Response {
       );
     }
 
-    return this.format(toolName, context);
+    return this.format(toolName, context, {
+      bodies,
+      consoleData,
+      consoleListData,
+    });
   }
 
   format(
     toolName: string,
     context: McpContext,
+    data: {
+      bodies: {
+        requestBody?: string;
+        responseBody?: string;
+      };
+      consoleData: ConsoleMessageData | undefined;
+      consoleListData: ConsoleMessageData[] | undefined;
+    },
   ): Array<TextContent | ImageContent> {
     const response = [`# ${toolName} response`];
     for (const line of this.#textResponseLines) {
@@ -342,8 +340,8 @@ Call ${handleDialog.name} to handle it before continuing.`);
       }
     }
 
-    response.push(...this.#getIncludeNetworkRequestsData(context));
-    response.push(...this.#getAttachedConsoleMessageData());
+    response.push(...this.#getIncludeNetworkRequestsData(context, data.bodies));
+    response.push(...this.#getAttachedConsoleMessageData(data.consoleData));
 
     if (this.#networkRequestsOptions?.include) {
       let requests = context.getNetworkRequests();
@@ -380,7 +378,7 @@ Call ${handleDialog.name} to handle it before continuing.`);
     }
 
     if (this.#consoleDataOptions?.include) {
-      const messages = this.#consoleMessagesData ?? [];
+      const messages = data.consoleListData ?? [];
 
       response.push('## Console messages');
       if (messages.length) {
@@ -437,9 +435,10 @@ Call ${handleDialog.name} to handle it before continuing.`);
     };
   }
 
-  #getAttachedConsoleMessageData(): string[] {
+  #getAttachedConsoleMessageData(
+    data: ConsoleMessageData | undefined,
+  ): string[] {
     const response: string[] = [];
-    const data = this.#attachedConsoleMessageData;
     if (!data) {
       return response;
     }
@@ -448,14 +447,20 @@ Call ${handleDialog.name} to handle it before continuing.`);
     return response;
   }
 
-  #getIncludeNetworkRequestsData(context: McpContext): string[] {
+  #getIncludeNetworkRequestsData(
+    context: McpContext,
+    data: {
+      requestBody?: string;
+      responseBody?: string;
+    },
+  ): string[] {
     const response: string[] = [];
-    const url = this.#attachedNetworkRequestData?.networkRequestStableId;
-    if (!url) {
+    const id = this.#attachedNetworkRequestId;
+    if (!id) {
       return response;
     }
 
-    const httpRequest = context.getNetworkRequestById(url);
+    const httpRequest = context.getNetworkRequestById(id);
     response.push(`## Request ${httpRequest.url()}`);
     response.push(`Status:  ${getStatusFromRequest(httpRequest)}`);
     response.push(`### Request Headers`);
@@ -463,9 +468,9 @@ Call ${handleDialog.name} to handle it before continuing.`);
       response.push(line);
     }
 
-    if (this.#attachedNetworkRequestData?.requestBody) {
+    if (data.requestBody) {
       response.push(`### Request Body`);
-      response.push(this.#attachedNetworkRequestData.requestBody);
+      response.push(data.requestBody);
     }
 
     const httpResponse = httpRequest.response();
@@ -476,9 +481,9 @@ Call ${handleDialog.name} to handle it before continuing.`);
       }
     }
 
-    if (this.#attachedNetworkRequestData?.responseBody) {
+    if (data.responseBody) {
       response.push(`### Response Body`);
-      response.push(this.#attachedNetworkRequestData.responseBody);
+      response.push(data.responseBody);
     }
 
     const httpFailure = httpRequest.failure();
