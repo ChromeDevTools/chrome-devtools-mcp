@@ -47,20 +47,20 @@ Example with arguments: \`(el) => {
   handler: async (request, response, context) => {
     const args: Array<JSHandle<unknown>> = [];
     try {
-      const frames: Frame[] = [];
+      const frames = new Set<Frame>();
       for (const el of request.params.args ?? []) {
         const handle = await context.getElementByUid(el.uid);
-        frames.push(handle.frame);
+        frames.add(handle.frame);
         args.push(handle);
       }
       let pageOrFrame: Page | Frame;
       // We can't evaluate the element handle across frames
-      if (frames.length > 1) {
+      if (frames.size > 1) {
         throw new Error(
           "Elements from different frames can't be evaluated together.",
         );
       } else {
-        pageOrFrame = frames[0] ?? context.getSelectedPage();
+        pageOrFrame = [...frames.values()][0] ?? context.getSelectedPage();
       }
       const fn = await pageOrFrame.evaluateHandle(
         `(${request.params.function})`,
