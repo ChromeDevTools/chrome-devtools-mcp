@@ -29,8 +29,9 @@
 - **[Network](#network)** (2 tools)
   - [`get_network_request`](#get_network_request)
   - [`list_network_requests`](#list_network_requests)
-- **[Debugging](#debugging)** (4 tools)
+- **[Debugging](#debugging)** (5 tools)
   - [`evaluate_script`](#evaluate_script)
+  - [`get_console_message`](#get_console_message)
   - [`list_console_messages`](#list_console_messages)
   - [`take_screenshot`](#take_screenshot)
   - [`take_snapshot`](#take_snapshot)
@@ -293,6 +294,16 @@ so returned values have to JSON-serializable.
   Example with arguments: `(el) => {
   return el.innerText;
 }`
+
+---
+
+### `get_console_message`
+
+**Description:** Gets a console message by its ID. You can get all messages by calling [`list_console_messages`](#list_console_messages).
+
+**Parameters:**
+
+- **msgid** (number) **(required)**: The msgid of a console message on the page from the listed console messages
 
 ---
 

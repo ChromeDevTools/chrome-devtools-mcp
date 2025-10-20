@@ -15,33 +15,55 @@ const logLevels: Record<string, string> = {
   assert: 'Assert',
 };
 
-export function formatConsoleEvent(msg: ConsoleMessageData): string {
-  const logLevel = logLevels[msg.type] ?? 'Log';
-  const text = msg.message;
-
-  const formattedArgs = formatArgs(msg.args, text);
-  return `${logLevel}> ${text} ${formattedArgs}`.trim();
+// The short format for a console message, based on a previous format.
+export function formatConsoleEventShort(msg: ConsoleMessageData): string {
+  const args = msg.args ? formatArgs(msg, false) : '';
+  return `msgid=${msg.consoleMessageStableId} [${msg.type}] ${msg.message}${args}`;
 }
 
-// Only includes the first arg and indicates that there are more args
-function formatArgs(args: string[], messageText: string): string {
-  if (args.length === 0) {
+// The verbose format for a console message, including all details.
+export function formatConsoleEventVerbose(msg: ConsoleMessageData): string {
+  const logLevel = msg.type ? (logLevels[msg.type] ?? 'Log') : 'Log';
+  let result = `${logLevel}> ${msg.message}`;
+
+  if (msg.args && msg.args.length > 0) {
+    result += formatArgs(msg, true);
+  }
+
+  result += `
+  ID: ${msg.consoleMessageStableId}`;
+  result += `
+  Type: ${msg.type}`;
+
+  return result;
+}
+
+// If `includeAllArgs` is false, only includes the first arg and indicates that there are more args.
+function formatArgs(
+  consoleData: ConsoleMessageData,
+  includeAllArgs = false,
+): string {
+  if (!consoleData.args || consoleData.args.length === 0) {
     return '';
   }
 
   let formattedArgs = '';
-  const firstArg = args[0];
+  // In the short format version, we only include the first arg.
+  const messageArgsToFormat = includeAllArgs
+    ? consoleData.args
+    : [consoleData.args[0]];
 
-  if (firstArg !== messageText) {
-    formattedArgs +=
-      typeof firstArg === 'object'
-        ? JSON.stringify(firstArg)
-        : String(firstArg);
+  for (const arg of messageArgsToFormat) {
+    if (arg !== consoleData.message) {
+      formattedArgs += ' ';
+      formattedArgs +=
+        typeof arg === 'object' ? JSON.stringify(arg) : String(arg);
+    }
   }
 
-  if (args.length > 1) {
-    return `${formattedArgs} ...`;
+  if (!includeAllArgs && consoleData.args.length > 1) {
+    formattedArgs += ` ...`;
   }
 
-  return formattedArgs;
+  return formattedArgs.length > 0 ? ` Args:${formattedArgs}` : '';
 }

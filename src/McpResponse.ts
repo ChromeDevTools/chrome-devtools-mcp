@@ -5,7 +5,10 @@
  */
 import type {ConsoleMessage, ResourceType} from 'puppeteer-core';
 
-import {formatConsoleEvent} from './formatters/consoleFormatter.js';
+import {
+  formatConsoleEventShort,
+  formatConsoleEventVerbose,
+} from './formatters/consoleFormatter.js';
 import {
   getFormattedHeaderValue,
   getFormattedResponseBody,
@@ -31,9 +34,10 @@ interface NetworkRequestData {
 }
 
 export interface ConsoleMessageData {
-  type: string;
-  message: string;
-  args: string[];
+  consoleMessageStableId: number;
+  type?: string;
+  message?: string;
+  args?: string[];
 }
 
 export class McpResponse implements Response {
@@ -41,6 +45,7 @@ export class McpResponse implements Response {
   #includeSnapshot = false;
   #includeVerboseSnapshot = false;
   #attachedNetworkRequestData?: NetworkRequestData;
+  #attachedConsoleMessageData?: ConsoleMessageData;
   #consoleMessagesData?: ConsoleMessageData[];
   #textResponseLines: string[] = [];
   #images: ImageContentData[] = [];
@@ -118,6 +123,12 @@ export class McpResponse implements Response {
     };
   }
 
+  attachConsoleMessage(id: number): void {
+    this.#attachedConsoleMessageData = {
+      consoleMessageStableId: id,
+    };
+  }
+
   get includePages(): boolean {
     return this.#includePages;
   }
@@ -192,14 +203,62 @@ export class McpResponse implements Response {
       }
     }
 
+    if (this.#attachedConsoleMessageData?.consoleMessageStableId) {
+      const message = context.getConsoleMessageById(
+        this.#attachedConsoleMessageData.consoleMessageStableId,
+      );
+      const consoleMessageStableId =
+        this.#attachedConsoleMessageData.consoleMessageStableId;
+      let data: ConsoleMessageData;
+      if ('args' in message) {
+        const consoleMessage = message as ConsoleMessage;
+        data = {
+          consoleMessageStableId,
+          type: consoleMessage.type(),
+          message: consoleMessage.text(),
+          args: await Promise.all(
+            consoleMessage.args().map(async arg => {
+              const stringArg = await arg.jsonValue().catch(() => {
+                // Ignore errors.
+              });
+              return typeof stringArg === 'object'
+                ? JSON.stringify(stringArg)
+                : String(stringArg);
+            }),
+          ),
+        };
+      } else {
+        data = {
+          consoleMessageStableId,
+          type: 'error',
+          message: (message as Error).message,
+          args: [],
+        };
+      }
+      this.#attachedConsoleMessageData = data;
+    }
+
     if (this.#consoleDataOptions?.include) {
-      const messages = context.getConsoleData();
+      let messages = context.getConsoleData();
+
+      if (this.#consoleDataOptions.types?.length) {
+        const normalizedTypes = new Set(this.#consoleDataOptions.types);
+        messages = messages.filter(message => {
+          if ('type' in message) {
+            return normalizedTypes.has(message.type());
+          }
+          return normalizedTypes.has('error');
+        });
+      }
 
       this.#consoleMessagesData = await Promise.all(
         messages.map(async (item): Promise<ConsoleMessageData> => {
+          const consoleMessageStableId =
+            context.getConsoleMessageStableId(item);
           if ('args' in item) {
             const consoleMessage = item as ConsoleMessage;
             return {
+              consoleMessageStableId,
               type: consoleMessage.type(),
               message: consoleMessage.text(),
               args: await Promise.all(
@@ -215,6 +274,7 @@ export class McpResponse implements Response {
             };
           }
           return {
+            consoleMessageStableId,
             type: 'error',
             message: (item as Error).message,
             args: [],
@@ -283,6 +343,7 @@ Call ${handleDialog.name} to handle it before continuing.`);
     }
 
     response.push(...this.#getIncludeNetworkRequestsData(context));
+    response.push(...this.#getAttachedConsoleMessageData());
 
     if (this.#networkRequestsOptions?.include) {
       let requests = context.getNetworkRequests();
@@ -329,7 +390,7 @@ Call ${handleDialog.name} to handle it before continuing.`);
         );
         response.push(...data.info);
         response.push(
-          ...data.items.map(message => formatConsoleEvent(message)),
+          ...data.items.map(message => formatConsoleEventShort(message)),
         );
       } else {
         response.push('<no console messages found>');
@@ -374,6 +435,18 @@ Call ${handleDialog.name} to handle it before continuing.`);
       info: response,
       items: paginationResult.items,
     };
+  }
+
+  #getAttachedConsoleMessageData(): string[] {
+    const response: string[] = [];
+    const data = this.#attachedConsoleMessageData;
+    if (!data) {
+      return response;
+    }
+
+    response.push(`## Console Message ${data.consoleMessageStableId}`);
+    response.push(formatConsoleEventVerbose(data));
+    return response;
   }
 
   #getIncludeNetworkRequestsData(context: McpContext): string[] {

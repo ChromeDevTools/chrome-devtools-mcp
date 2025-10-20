@@ -35,7 +35,7 @@ const FILTERABLE_MESSAGE_TYPES: readonly [
   'verbose',
 ];
 
-export const consoleTool = defineTool({
+export const listConsoleMessages = defineTool({
   name: 'list_console_messages',
   description:
     'List all console messages for the currently selected page since the last navigation.',
@@ -73,5 +73,24 @@ export const consoleTool = defineTool({
       pageIdx: request.params.pageIdx,
       types: request.params.types,
     });
+  },
+});
+
+export const getConsoleMessage = defineTool({
+  name: 'get_console_message',
+  description: `Gets a console message by its ID. You can get all messages by calling ${listConsoleMessages.name}.`,
+  annotations: {
+    category: ToolCategories.DEBUGGING,
+    readOnlyHint: true,
+  },
+  schema: {
+    msgid: z
+      .number()
+      .describe(
+        'The msgid of a console message on the page from the listed console messages',
+      ),
+  },
+  handler: async (request, response) => {
+    response.attachConsoleMessage(request.params.msgid);
   },
 });

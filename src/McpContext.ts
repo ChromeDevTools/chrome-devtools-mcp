@@ -132,6 +132,14 @@ export class McpContext implements Context {
     return this.#consoleCollector.getData(page);
   }
 
+  getConsoleMessageStableId(message: ConsoleMessage | Error): number {
+    return this.#consoleCollector.getIdForResource(message);
+  }
+
+  getConsoleMessageById(id: number): ConsoleMessage | Error {
+    return this.#consoleCollector.getById(this.getSelectedPage(), id);
+  }
+
   async newPage(): Promise<Page> {
     const page = await this.browser.newPage();
     const pages = await this.createPagesSnapshot();

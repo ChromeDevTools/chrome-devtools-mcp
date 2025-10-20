@@ -60,6 +60,7 @@ export interface Response {
   setIncludeSnapshot(value: boolean, verbose?: boolean): void;
   attachImage(value: ImageContentData): void;
   attachNetworkRequest(reqid: number): void;
+  attachConsoleMessage(msgid: number): void;
 }
 
 /**
