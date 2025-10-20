@@ -44,7 +44,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.35.0",
-    "@modelcontextprotocol/sdk": "1.20.0",
+    "@modelcontextprotocol/sdk": "1.20.1",
     "@rollup/plugin-commonjs": "^28.0.8",
     "@rollup/plugin-json": "^6.1.0",
     "@rollup/plugin-node-resolve": "^16.0.3",
@@ -63,7 +63,7 @@
     "globals": "^16.4.0",
     "prettier": "^3.6.2",
     "puppeteer": "24.25.0",
-    "rollup": "4.52.4",
+    "rollup": "4.52.5",
     "rollup-plugin-cleanup": "^3.2.1",
     "rollup-plugin-license": "^3.6.0",
     "sinon": "^21.0.0",
