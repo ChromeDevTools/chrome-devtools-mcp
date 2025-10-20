@@ -133,6 +133,7 @@ export class McpContext implements Context {
   static async from(
     browser: Browser,
     logger: Debugger,
+    /* Let tests use unbundled Locator class to avoid overly strict checks within puppeteer that fail when mixing bundled and unbundled class instances */
     locatorClass: typeof Locator = Locator,
   ) {
     const context = new McpContext(browser, logger, locatorClass);
