@@ -340,8 +340,8 @@ Call ${handleDialog.name} to handle it before continuing.`);
       }
     }
 
-    response.push(...this.#getIncludeNetworkRequestsData(context, data.bodies));
-    response.push(...this.#getAttachedConsoleMessageData(data.consoleData));
+    response.push(...this.#formatNetworkRequestData(context, data.bodies));
+    response.push(...this.#formatConsoleData(data.consoleData));
 
     if (this.#networkRequestsOptions?.include) {
       let requests = context.getNetworkRequests();
@@ -435,9 +435,7 @@ Call ${handleDialog.name} to handle it before continuing.`);
     };
   }
 
-  #getAttachedConsoleMessageData(
-    data: ConsoleMessageData | undefined,
-  ): string[] {
+  #formatConsoleData(data: ConsoleMessageData | undefined): string[] {
     const response: string[] = [];
     if (!data) {
       return response;
@@ -447,7 +445,7 @@ Call ${handleDialog.name} to handle it before continuing.`);
     return response;
   }
 
-  #getIncludeNetworkRequestsData(
+  #formatNetworkRequestData(
     context: McpContext,
     data: {
       requestBody?: string;
