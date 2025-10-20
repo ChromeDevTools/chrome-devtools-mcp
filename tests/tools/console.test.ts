@@ -35,6 +35,19 @@ describe('console', () => {
         );
       });
     });
+
+    it.only('work with primitive unhandled errors', async () => {
+      await withBrowser(async (response, context) => {
+        const page = await context.newPage();
+        await page.setContent('<script>throw undefined;</script>');
+        await listConsoleMessages.handler({params: {}}, response, context);
+        const formattedResponse = await response.handle('test', context);
+        const textContent = formattedResponse[0] as {text: string};
+        assert.ok(
+          textContent.text.includes('msgid=1 [error] undefined (0 args)'),
+        );
+      });
+    });
   });
 
   describe('get_console_message', () => {
