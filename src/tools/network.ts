@@ -63,10 +63,8 @@ export const listNetworkRequests = defineTool({
         'Filter requests to only return requests of the specified resource types. When omitted or empty, returns all requests.',
       ),
     includePreviousNavigations: zod
-      .number()
-      .int()
-      .positive()
-      .max(2)
+      .boolean()
+      .default(false)
       .optional()
       .describe(
         'Number of previous navigations to include. Current navigation is always included.',

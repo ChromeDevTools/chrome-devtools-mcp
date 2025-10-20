@@ -133,14 +133,18 @@ export class PageCollector<T> {
     this.storage.delete(page);
   }
 
-  getData(page: Page, includePreviousNavigations?: number): T[] {
+  getData(page: Page, includePreviousNavigations?: boolean): T[] {
     const navigations = this.storage.get(page);
     if (!navigations) {
       return [];
     }
 
+    if (!includePreviousNavigations) {
+      return navigations[0];
+    }
+
     const data: T[] = [];
-    for (let index = includePreviousNavigations ?? 0; index >= 0; index--) {
+    for (let index = this.#maxNavigationSaved; index >= 0; index--) {
       data.push(...navigations[index]);
     }
     return data;

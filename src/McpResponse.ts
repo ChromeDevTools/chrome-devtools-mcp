@@ -42,7 +42,7 @@ export class McpResponse implements Response {
     include: boolean;
     pagination?: PaginationOptions;
     resourceTypes?: ResourceType[];
-    includePreviousNavigations?: number;
+    includePreviousNavigations?: boolean;
   };
   #consoleDataOptions?: {
     include: boolean;
@@ -63,7 +63,7 @@ export class McpResponse implements Response {
     value: boolean,
     options?: PaginationOptions & {
       resourceTypes?: ResourceType[];
-      includePreviousNavigations?: number;
+      includePreviousNavigations?: boolean;
     },
   ): void {
     if (!value) {

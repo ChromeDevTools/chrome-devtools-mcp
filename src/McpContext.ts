@@ -141,7 +141,7 @@ export class McpContext implements Context {
     return context;
   }
 
-  getNetworkRequests(includePreviousNavigations?: number): HTTPRequest[] {
+  getNetworkRequests(includePreviousNavigations?: boolean): HTTPRequest[] {
     const page = this.getSelectedPage();
     return this.#networkCollector.getData(page, includePreviousNavigations);
   }

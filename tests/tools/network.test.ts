@@ -49,7 +49,7 @@ describe('network', () => {
         await listNetworkRequests.handler(
           {
             params: {
-              includePreviousNavigations: 1,
+              includePreviousNavigations: true,
             },
           },
           response,
