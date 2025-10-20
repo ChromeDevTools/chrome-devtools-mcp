@@ -6,7 +6,8 @@
   "bin": "./build/src/index.js",
   "main": "index.js",
   "scripts": {
-    "build": "tsc && node --experimental-strip-types --no-warnings=ExperimentalWarning scripts/post-build.ts && rollup -c rollup.config.mjs",
+    "clean": "node -e \"require('fs').rmSync('build', {recursive: true, force: true})\"",
+    "build": "npm run clean && tsc && node --experimental-strip-types --no-warnings=ExperimentalWarning scripts/post-build.ts && rollup -c rollup.config.mjs",
     "typecheck": "tsc --noEmit",
     "format": "eslint --cache --fix . && prettier --write --cache .",
     "check-format": "eslint --cache . && prettier --check --cache .;",
