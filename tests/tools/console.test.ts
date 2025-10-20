@@ -59,10 +59,6 @@ describe('console', () => {
         const formattedResponse = response.format('test', context);
         const textContent = formattedResponse[0] as {text: string};
         assert.ok(
-          textContent.text.includes('## Console Message 1'),
-          'Should contain console message title',
-        );
-        assert.ok(
           textContent.text.includes('msgid=1 [error] This is an error'),
           'Should contain console message body',
         );

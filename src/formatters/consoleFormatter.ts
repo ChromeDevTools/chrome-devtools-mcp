@@ -6,64 +6,49 @@
 
 import type {ConsoleMessageData} from '../McpResponse.js';
 
-const logLevels: Record<string, string> = {
-  log: 'Log',
-  info: 'Info',
-  warning: 'Warning',
-  error: 'Error',
-  exception: 'Exception',
-  assert: 'Assert',
-};
-
 // The short format for a console message, based on a previous format.
 export function formatConsoleEventShort(msg: ConsoleMessageData): string {
-  const args = msg.args ? formatArgs(msg, false) : '';
-  return `msgid=${msg.consoleMessageStableId} [${msg.type}] ${msg.message}${args}`;
+  return `msgid=${msg.consoleMessageStableId} [${msg.type}] ${msg.message} (${msg.args?.length ?? 0} args)`;
+}
+
+function getArgs(msg: ConsoleMessageData) {
+  const args = [...(msg.args ?? [])];
+
+  // If there is no text, the first argument serves as text (see formatMessage).
+  if (!msg.message) {
+    args.shift();
+  }
+
+  return args;
 }
 
 // The verbose format for a console message, including all details.
 export function formatConsoleEventVerbose(msg: ConsoleMessageData): string {
-  const logLevel = msg.type ? (logLevels[msg.type] ?? 'Log') : 'Log';
-  let result = `${logLevel}> ${msg.message}`;
+  const result = [
+    `ID: ${msg.consoleMessageStableId}`,
+    `Message: ${msg.type}> ${msg.message}`,
+    formatArgs(msg),
+  ];
 
-  if (msg.args && msg.args.length > 0) {
-    result += formatArgs(msg, true);
-  }
-
-  result += `
-  ID: ${msg.consoleMessageStableId}`;
-  result += `
-  Type: ${msg.type}`;
-
-  return result;
+  return result.join('\n');
 }
 
-// If `includeAllArgs` is false, only includes the first arg and indicates that there are more args.
-function formatArgs(
-  consoleData: ConsoleMessageData,
-  includeAllArgs = false,
-): string {
-  if (!consoleData.args || consoleData.args.length === 0) {
+function formatArg(arg: unknown) {
+  return typeof arg === 'object' ? JSON.stringify(arg) : String(arg);
+}
+
+function formatArgs(consoleData: ConsoleMessageData): string {
+  const args = getArgs(consoleData);
+
+  if (!args.length) {
     return '';
   }
 
-  let formattedArgs = '';
-  // In the short format version, we only include the first arg.
-  const messageArgsToFormat = includeAllArgs
-    ? consoleData.args
-    : [consoleData.args[0]];
+  const result = ['### Arguments'];
 
-  for (const arg of messageArgsToFormat) {
-    if (arg !== consoleData.message) {
-      formattedArgs += ' ';
-      formattedArgs +=
-        typeof arg === 'object' ? JSON.stringify(arg) : String(arg);
-    }
+  for (const [key, arg] of args.entries()) {
+    result.push(`Arg #${key}: ${formatArg(arg)}`);
   }
 
-  if (!includeAllArgs && consoleData.args.length > 1) {
-    formattedArgs += ` ...`;
-  }
-
-  return formattedArgs.length > 0 ? ` Args:${formattedArgs}` : '';
+  return result.join('\n');
 }

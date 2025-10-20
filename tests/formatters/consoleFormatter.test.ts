@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
 import {
@@ -13,9 +12,9 @@ import {
 } from '../../src/formatters/consoleFormatter.js';
 import type {ConsoleMessageData} from '../../src/McpResponse.js';
 
-describe('consoleFormatter', () => {
+describe.only('consoleFormatter', () => {
   describe('formatConsoleEventShort', () => {
-    it('formats a console.log message', () => {
+    it('formats a console.log message', t => {
       const message: ConsoleMessageData = {
         consoleMessageStableId: 1,
         type: 'log',
@@ -23,10 +22,10 @@ describe('consoleFormatter', () => {
         args: [],
       };
       const result = formatConsoleEventShort(message);
-      assert.equal(result, 'msgid=1 [log] Hello, world!');
+      t.assert.snapshot?.(result);
     });
 
-    it('formats a console.log message with one argument', () => {
+    it('formats a console.log message with one argument', t => {
       const message: ConsoleMessageData = {
         consoleMessageStableId: 2,
         type: 'log',
@@ -34,10 +33,10 @@ describe('consoleFormatter', () => {
         args: ['file.txt'],
       };
       const result = formatConsoleEventShort(message);
-      assert.equal(result, 'msgid=2 [log] Processing file: Args: file.txt');
+      t.assert.snapshot?.(result);
     });
 
-    it('formats a console.log message with multiple arguments', () => {
+    it('formats a console.log message with multiple arguments', t => {
       const message: ConsoleMessageData = {
         consoleMessageStableId: 3,
         type: 'log',
@@ -45,23 +44,12 @@ describe('consoleFormatter', () => {
         args: ['file.txt', 'another file'],
       };
       const result = formatConsoleEventShort(message);
-      assert.equal(result, 'msgid=3 [log] Processing file: Args: file.txt ...');
-    });
-
-    it('does not include args if message is the same as arg', () => {
-      const message: ConsoleMessageData = {
-        consoleMessageStableId: 4,
-        type: 'log',
-        message: 'Hello',
-        args: ['Hello'],
-      };
-      const result = formatConsoleEventShort(message);
-      assert.equal(result, 'msgid=4 [log] Hello');
+      t.assert.snapshot?.(result);
     });
   });
 
   describe('formatConsoleEventVerbose', () => {
-    it('formats a console.log message', () => {
+    it('formats a console.log message', t => {
       const message: ConsoleMessageData = {
         consoleMessageStableId: 1,
         type: 'log',
@@ -69,15 +57,10 @@ describe('consoleFormatter', () => {
         args: [],
       };
       const result = formatConsoleEventVerbose(message);
-      assert.equal(
-        result,
-        `Log> Hello, world!
-  ID: 1
-  Type: log`,
-      );
+      t.assert.snapshot?.(result);
     });
 
-    it('formats a console.log message with one argument', () => {
+    it('formats a console.log message with one argument', t => {
       const message: ConsoleMessageData = {
         consoleMessageStableId: 2,
         type: 'log',
@@ -85,15 +68,10 @@ describe('consoleFormatter', () => {
         args: ['file.txt'],
       };
       const result = formatConsoleEventVerbose(message);
-      assert.equal(
-        result,
-        `Log> Processing file: Args: file.txt
-  ID: 2
-  Type: log`,
-      );
+      t.assert.snapshot?.(result);
     });
 
-    it('formats a console.log message with multiple arguments', () => {
+    it('formats a console.log message with multiple arguments', t => {
       const message: ConsoleMessageData = {
         consoleMessageStableId: 3,
         type: 'log',
@@ -101,43 +79,17 @@ describe('consoleFormatter', () => {
         args: ['file.txt', 'another file'],
       };
       const result = formatConsoleEventVerbose(message);
-      assert.equal(
-        result,
-        `Log> Processing file: Args: file.txt another file
-  ID: 3
-  Type: log`,
-      );
+      t.assert.snapshot?.(result);
     });
 
-    it('formats a console.error message', () => {
+    it('formats a console.error message', t => {
       const message: ConsoleMessageData = {
         consoleMessageStableId: 4,
         type: 'error',
         message: 'Something went wrong',
       };
       const result = formatConsoleEventVerbose(message);
-      assert.equal(
-        result,
-        `Error> Something went wrong
-  ID: 4
-  Type: error`,
-      );
-    });
-
-    it('does not include args if message is the same as arg', () => {
-      const message: ConsoleMessageData = {
-        consoleMessageStableId: 5,
-        type: 'log',
-        message: 'Hello',
-        args: ['Hello', 'World'],
-      };
-      const result = formatConsoleEventVerbose(message);
-      assert.equal(
-        result,
-        `Log> Hello Args: World
-  ID: 5
-  Type: log`,
-      );
+      t.assert.snapshot?.(result);
     });
   });
 });

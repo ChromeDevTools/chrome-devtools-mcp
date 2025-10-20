@@ -444,7 +444,6 @@ Call ${handleDialog.name} to handle it before continuing.`);
       return response;
     }
 
-    response.push(`## Console Message ${data.consoleMessageStableId}`);
     response.push(formatConsoleEventVerbose(data));
     return response;
   }
