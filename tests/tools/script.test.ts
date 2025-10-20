@@ -156,7 +156,7 @@ describe('script', () => {
       });
     });
 
-    it.only('work for elements inside iframes', async () => {
+    it('work for elements inside iframes', async () => {
       server.addHtmlRoute(
         '/iframe',
         html`<main><button>I am iframe button</button></main>`,
