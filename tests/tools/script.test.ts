@@ -7,9 +7,12 @@ import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
 import {evaluateScript} from '../../src/tools/script.js';
+import {serverHooks} from '../server.js';
 import {html, withBrowser} from '../utils.js';
 
 describe('script', () => {
+  const server = serverHooks();
+
   describe('browser_evaluate_script', () => {
     it('evaluates', async () => {
       await withBrowser(async (response, context) => {
@@ -150,6 +153,37 @@ describe('script', () => {
         );
         const lineEvaluation = response.responseLines.at(2)!;
         assert.strictEqual(JSON.parse(lineEvaluation), true);
+      });
+    });
+
+    it.only('work for elements inside iframes', async () => {
+      server.addHtmlRoute(
+        '/iframe',
+        html`<main><button>I am iframe button</button></main>`,
+      );
+      server.addRoute('/main', async (_req, res) => {
+        res.write(html`<iframe src="/iframe"></iframe>`);
+        res.end();
+      });
+
+      await withBrowser(async (response, context) => {
+        const page = context.getSelectedPage();
+        await page.goto(server.getRoute('/main'));
+        await context.createTextSnapshot();
+        await evaluateScript.handler(
+          {
+            params: {
+              function: String((element: Element) => {
+                return element.textContent;
+              }),
+              args: [{uid: '1_3'}],
+            },
+          },
+          response,
+          context,
+        );
+        const lineEvaluation = response.responseLines.at(2)!;
+        assert.strictEqual(JSON.parse(lineEvaluation), 'I am iframe button');
       });
     });
   });

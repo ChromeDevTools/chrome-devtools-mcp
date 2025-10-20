@@ -3,7 +3,7 @@
  * Copyright 2025 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import type {JSHandle} from 'puppeteer-core';
+import type {Frame, JSHandle, Page} from 'puppeteer-core';
 
 import {zod} from '../third_party/modelcontextprotocol-sdk/index.js';
 
@@ -45,15 +45,29 @@ Example with arguments: \`(el) => {
       .describe(`An optional list of arguments to pass to the function.`),
   },
   handler: async (request, response, context) => {
-    const page = context.getSelectedPage();
-    const fn = await page.evaluateHandle(`(${request.params.function})`);
-    const args: Array<JSHandle<unknown>> = [fn];
+    const args: Array<JSHandle<unknown>> = [];
     try {
+      const frames: Frame[] = [];
       for (const el of request.params.args ?? []) {
-        args.push(await context.getElementByUid(el.uid));
+        const handle = await context.getElementByUid(el.uid);
+        frames.push(handle.frame);
+        args.push(handle);
       }
+      let pageOrFrame: Page | Frame;
+      // We can't evaluate the element handle across frames
+      if (frames.length > 1) {
+        throw new Error(
+          "Elements from different frames can't be evaluated together.",
+        );
+      } else {
+        pageOrFrame = frames[0] ?? context.getSelectedPage();
+      }
+      const fn = await pageOrFrame.evaluateHandle(
+        `(${request.params.function})`,
+      );
+      args.unshift(fn);
       await context.waitForEventsAfterAction(async () => {
-        const result = await page.evaluate(
+        const result = await pageOrFrame.evaluate(
           async (fn, ...args) => {
             // @ts-expect-error no types.
             return JSON.stringify(await fn(...args));
@@ -66,9 +80,7 @@ Example with arguments: \`(el) => {
         response.appendResponseLine('```');
       });
     } finally {
-      Promise.allSettled(args.map(arg => arg.dispose())).catch(() => {
-        // Ignore errors
-      });
+      void Promise.allSettled(args.map(arg => arg.dispose()));
     }
   },
 });
