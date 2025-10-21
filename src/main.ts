@@ -18,7 +18,7 @@ import {
   StdioServerTransport,
   type CallToolResult,
   SetLevelRequestSchema,
-} from './third_party/modelcontextprotocol-sdk/index.js';
+} from './third_party/index.js';
 import * as consoleTools from './tools/console.js';
 import * as emulationTools from './tools/emulation.js';
 import * as inputTools from './tools/input.js';

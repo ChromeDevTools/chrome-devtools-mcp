@@ -5,7 +5,7 @@
  */
 
 import {logger} from '../logger.js';
-import {zod} from '../third_party/modelcontextprotocol-sdk/index.js';
+import {zod} from '../third_party/index.js';
 
 import {ToolCategories} from './categories.js';
 import {CLOSE_PAGE_ERROR, defineTool, timeoutSchema} from './ToolDefinition.js';

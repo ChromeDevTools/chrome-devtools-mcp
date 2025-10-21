@@ -11,3 +11,12 @@ export {default as yargs} from 'yargs';
 export {hideBin} from 'yargs/helpers';
 export {debug} from 'debug';
 export type {Debugger} from 'debug';
+export {McpServer} from '@modelcontextprotocol/sdk/server/mcp.js';
+export {StdioServerTransport} from '@modelcontextprotocol/sdk/server/stdio.js';
+export {
+  type CallToolResult,
+  SetLevelRequestSchema,
+  type ImageContent,
+  type TextContent,
+} from '@modelcontextprotocol/sdk/types.js';
+export {z as zod} from 'zod';

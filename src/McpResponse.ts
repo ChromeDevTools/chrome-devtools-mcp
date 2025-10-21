@@ -20,7 +20,7 @@ import type {McpContext} from './McpContext.js';
 import type {
   ImageContent,
   TextContent,
-} from './third_party/modelcontextprotocol-sdk/index.js';
+} from './third_party/index.js';
 import type {
   ConsoleMessage,
   ResourceType,

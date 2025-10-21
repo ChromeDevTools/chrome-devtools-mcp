@@ -5,7 +5,7 @@
  */
 
 import type {TextSnapshotNode} from '../McpContext.js';
-import {zod} from '../third_party/modelcontextprotocol-sdk/index.js';
+import {zod} from '../third_party/index.js';
 import type {
   Dialog,
   ElementHandle,

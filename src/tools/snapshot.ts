@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {zod} from '../third_party/modelcontextprotocol-sdk/index.js';
+import {zod} from '../third_party/index.js';
 
 import {ToolCategories} from './categories.js';
 import {defineTool, timeoutSchema} from './ToolDefinition.js';
