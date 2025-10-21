@@ -21,7 +21,7 @@ describe('snapshot', () => {
   describe('browser_wait_for', () => {
     it('should work', async () => {
       await withBrowser(async (response, context) => {
-        const page = await context.getSelectedPage();
+        const page = context.getSelectedPage();
 
         await page.setContent(
           html`<main><span>Hello</span><span> </span><div>World</div></main>`,
@@ -98,7 +98,7 @@ describe('snapshot', () => {
 
     it('should work with iframe content', async () => {
       await withBrowser(async (response, context) => {
-        const page = await context.getSelectedPage();
+        const page = context.getSelectedPage();
 
         await page.setContent(
           html`<h1>Top level</h1>

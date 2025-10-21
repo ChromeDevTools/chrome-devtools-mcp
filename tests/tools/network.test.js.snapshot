@@ -1,15 +1,34 @@
+exports[`network > network_get_request > should get request from previous navigations 1`] = `
+# get_request response
+## Request http://localhost:<port>/one
+Status:  [success - 200]
+### Request Headers
+- accept-language:en-US,en;q=0.9
+- upgrade-insecure-requests:1
+- user-agent:Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/141.0.0.0 Safari/537.36
+- sec-ch-ua:"Chromium";v="141", "Not?A_Brand";v="8"
+- sec-ch-ua-mobile:?0
+- sec-ch-ua-platform:"Linux"
+### Response Headers
+- connection:keep-alive
+- content-length:239
+- content-type:text/html; charset=utf-8
+- date:<long date>
+- keep-alive:timeout=5
+`;
+
 exports[`network > network_list_requests > list requests form current navigations only 1`] = `
 # list_request response
 ## Network requests
 Showing 1-1 of 1 (Page 1 of 1).
-reqid=3 GET data:text/html,<div>Hello 3</div> [success - 200]
+reqid=4 GET http://localhost:<port>/three [success - 200]
 `;
 
 exports[`network > network_list_requests > list requests from previous navigations 1`] = `
 # list_request response
 ## Network requests
 Showing 1-3 of 3 (Page 1 of 1).
-reqid=1 GET data:text/html,<div>Hello 1</div> [success - 200]
-reqid=2 GET data:text/html,<div>Hello 2</div> [success - 200]
-reqid=3 GET data:text/html,<div>Hello 3</div> [success - 200]
+reqid=1 GET http://localhost:<port>/one [success - 200]
+reqid=2 GET http://localhost:<port>/two [success - 200]
+reqid=3 GET http://localhost:<port>/three [success - 200]
 `;

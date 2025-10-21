@@ -130,3 +130,15 @@ export function html(
   </body>
 </html>`;
 }
+
+export function stabilizeResponseOutput(text: unknown) {
+  if (typeof text !== 'string') {
+    throw new Error('Input must be string');
+  }
+  let output = text;
+  const dateRegEx = /.{3}, \d{2} .{3} \d{4} \d{2}:\d{2}:\d{2} [A-Z]{3}/g;
+  const localhostRegEx = /http:\/\/localhost:\d{5}\//g;
+  output = output.replaceAll(dateRegEx, '<long date>');
+  output = output.replaceAll(localhostRegEx, 'http://localhost:<port>/');
+  return output;
+}
