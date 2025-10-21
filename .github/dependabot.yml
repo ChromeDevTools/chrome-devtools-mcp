@@ -10,15 +10,13 @@ updates:
     groups:
       dependencies:
         dependency-type: production
-        exclude-patterns:
-          - 'puppeteer*'
-          - 'chrome-devtools-frontend'
         patterns:
           - '*'
       dev-dependencies:
         dependency-type: development
         exclude-patterns:
           - 'puppeteer*'
+          - 'chrome-devtools-frontend'
         patterns:
           - '*'
       puppeteer:
