@@ -187,6 +187,19 @@ The same way chrome-devtools-mcp can be configured for JetBrains Junie in `Setti
 </details>
 
 <details>
+  <summary>Goose</summary>
+  
+#### Click the button to install:
+
+[![Install in Goose](https://block.github.io/goose/img/extension-install-dark.svg)](https://block.github.io/goose/extension/?cmd=npx&arg=-y%20chrome-devtools-mcp%40latest&id=chrome_devtools&name=Chrome%20Devtools&description=Control%20a%20live%20Chrome%20browser%20using%20Model-Context-Protocol)
+
+#### Or install manually:
+
+Go to `Advanced settings` -> `Extensions` -> `Add custom extension`. Name to your liking, use type `STDIO`, and set the `command` to `npx -y chrome-devtools-mcp@latest`. Click "Add Extension".
+
+</details>
+
+<details>
   <summary>Kiro</summary>
 
 In **Kiro Settings**, go to `Configure MCP` > `Open Workspace or User MCP Config` > Use the configuration snippet provided above.
