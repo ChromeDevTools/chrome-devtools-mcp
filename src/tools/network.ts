@@ -66,7 +66,7 @@ export const listNetworkRequests = defineTool({
       .boolean()
       .default(false)
       .optional()
-      .describe('Whether to include request from previous navigations.'),
+      .describe('Whether to include requests from previous navigations.'),
   },
   handler: async (request, response) => {
     response.setIncludeNetworkRequests(true, {

@@ -269,7 +269,7 @@
 
 **Parameters:**
 
-- **includePreviousNavigations** (boolean) _(optional)_: Whether to include request from previous navigations.
+- **includePreviousNavigations** (boolean) _(optional)_: Whether to include requests from previous navigations.
 - **pageIdx** (integer) _(optional)_: Page number to return (0-based). When omitted, returns the first page.
 - **pageSize** (integer) _(optional)_: Maximum number of requests to return. When omitted, returns all requests.
 - **resourceTypes** (array) _(optional)_: Filter requests to only return requests of the specified resource types. When omitted or empty, returns all requests.
