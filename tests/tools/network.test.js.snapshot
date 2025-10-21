@@ -15,6 +15,8 @@ Status:  [success - 200]
 - content-type:text/html; charset=utf-8
 - date:<long date>
 - keep-alive:timeout=5
+### Response Body
+<not available anymore>
 `;
 
 exports[`network > network_list_requests > list requests form current navigations only 1`] = `
