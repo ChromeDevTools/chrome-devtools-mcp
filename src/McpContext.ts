@@ -145,9 +145,11 @@ export class McpContext implements Context {
     return this.#networkCollector.getData(page, includePreviousNavigations);
   }
 
-  getConsoleData(): Array<ConsoleMessage | Error> {
+  getConsoleData(
+    includePreviousNavigations?: boolean,
+  ): Array<ConsoleMessage | Error> {
     const page = this.getSelectedPage();
-    return this.#consoleCollector.getData(page);
+    return this.#consoleCollector.getData(page, includePreviousNavigations);
   }
 
   getConsoleMessageStableId(message: ConsoleMessage | Error): number {

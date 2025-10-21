@@ -56,6 +56,7 @@ export interface Response {
     value: boolean,
     options?: PaginationOptions & {
       types?: string[];
+      includePreviousNavigations?: boolean;
     },
   ): void;
   setIncludeSnapshot(value: boolean): void;

@@ -46,6 +46,7 @@ export class McpResponse implements Response {
     include: boolean;
     pagination?: PaginationOptions;
     types?: string[];
+    includePreviousNavigations?: boolean;
   };
 
   setIncludePages(value: boolean): void {
@@ -87,6 +88,7 @@ export class McpResponse implements Response {
     value: boolean,
     options?: PaginationOptions & {
       types?: string[];
+      includePreviousNavigations?: boolean;
     },
   ): void {
     if (!value) {
@@ -104,6 +106,7 @@ export class McpResponse implements Response {
             }
           : undefined,
       types: options?.types,
+      includePreviousNavigations: options?.includePreviousNavigations,
     };
   }
 
@@ -228,7 +231,9 @@ export class McpResponse implements Response {
 
     let consoleListData: ConsoleMessageData[] | undefined;
     if (this.#consoleDataOptions?.include) {
-      let messages = context.getConsoleData();
+      let messages = context.getConsoleData(
+        this.#consoleDataOptions.includePreviousNavigations,
+      );
 
       if (this.#consoleDataOptions.types?.length) {
         const normalizedTypes = new Set(this.#consoleDataOptions.types);

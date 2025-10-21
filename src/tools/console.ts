@@ -66,12 +66,18 @@ export const listConsoleMessages = defineTool({
       .describe(
         'Filter messages to only return messages of the specified resource types. When omitted or empty, returns all messages.',
       ),
+    includePreviousNavigations: zod
+      .boolean()
+      .default(false)
+      .optional()
+      .describe('Whether to include messages from previous navigations.'),
   },
   handler: async (request, response) => {
     response.setIncludeConsoleData(true, {
       pageSize: request.params.pageSize,
       pageIdx: request.params.pageIdx,
       types: request.params.types,
+      includePreviousNavigations: request.params.includePreviousNavigations,
     });
   },
 });
