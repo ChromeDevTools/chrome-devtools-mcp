@@ -115,7 +115,7 @@ describe('networkFormatter', () => {
 
       assert.strictEqual(result, 'test');
     });
-    it('shows empty string when no postData available', async () => {
+    it('shows not available when no postData available', async () => {
       const request = getMockRequest({
         hasPostData: false,
       });
@@ -164,7 +164,7 @@ describe('networkFormatter', () => {
 
       assert.strictEqual(result, 'some text that is lo... <truncated>');
     });
-    it('shows nothing on exception', async () => {
+    it('shows not available on exception', async () => {
       const request = getMockRequest({
         hasPostData: true,
         postData: undefined,
@@ -173,7 +173,7 @@ describe('networkFormatter', () => {
 
       const result = await getFormattedRequestBody(request, 200);
 
-      assert.strictEqual(result, undefined);
+      assert.strictEqual(result, '<not available anymore>');
     });
   });
 
@@ -232,7 +232,7 @@ describe('networkFormatter', () => {
 
       const result = await getFormattedResponseBody(response, 200);
 
-      assert.strictEqual(result, undefined);
+      assert.strictEqual(result, '<not available anymore>');
     });
   });
 });

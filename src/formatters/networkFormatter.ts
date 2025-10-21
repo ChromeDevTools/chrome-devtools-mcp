@@ -68,8 +68,7 @@ export async function getFormattedResponseBody(
 
     return `<binary data>`;
   } catch {
-    // buffer() call might fail with CDP exception, in this case we don't print anything in the context
-    return;
+    return `<not available anymore>`;
   }
 }
 
@@ -91,8 +90,7 @@ export async function getFormattedRequestBody(
         return `${getSizeLimitedString(fetchData, sizeLimit)}`;
       }
     } catch {
-      // fetchPostData() call might fail with CDP exception, in this case we don't print anything in the context
-      return;
+      return `<not available anymore>`;
     }
   }
 
