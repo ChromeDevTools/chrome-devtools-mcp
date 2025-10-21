@@ -5,7 +5,11 @@
  */
 
 import {zod} from '../third_party/modelcontextprotocol-sdk/index.js';
-import type {Frame, JSHandle, Page} from '../third_party/puppeteer-core/index.js';
+import type {
+  Frame,
+  JSHandle,
+  Page,
+} from '../third_party/puppeteer-core/index.js';
 
 import {ToolCategories} from './categories.js';
 import {defineTool} from './ToolDefinition.js';
