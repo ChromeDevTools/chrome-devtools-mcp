@@ -10,7 +10,7 @@ import type {
   Dialog,
   ElementHandle,
   Page,
-} from '../third_party/puppeteer-core/index.js';
+} from '../third_party/index.js';
 import type {TraceResult} from '../trace-processing/parse.js';
 import type {PaginationOptions} from '../utils/types.js';
 

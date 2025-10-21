@@ -24,7 +24,7 @@ import type {
 import type {
   ConsoleMessage,
   ResourceType,
-} from './third_party/puppeteer-core/index.js';
+} from './third_party/index.js';
 import {handleDialog} from './tools/pages.js';
 import type {ImageContentData, Response} from './tools/ToolDefinition.js';
 import {paginate} from './utils/pagination.js';

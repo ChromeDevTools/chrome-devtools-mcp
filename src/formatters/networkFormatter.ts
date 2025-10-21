@@ -9,7 +9,7 @@ import {isUtf8} from 'node:buffer';
 import type {
   HTTPRequest,
   HTTPResponse,
-} from '../third_party/puppeteer-core/index.js';
+} from '../third_party/index.js';
 
 const BODY_CONTEXT_SIZE_LIMIT = 10000;
 

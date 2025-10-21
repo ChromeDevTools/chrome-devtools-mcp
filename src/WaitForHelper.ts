@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import {logger} from './logger.js';
-import type {Page, Protocol, CdpPage} from './third_party/puppeteer-core/index.js';
+import type {Page, Protocol, CdpPage} from './third_party/index.js';
 
 export class WaitForHelper {
   #abortController = new AbortController();

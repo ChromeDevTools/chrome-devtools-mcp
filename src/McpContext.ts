@@ -10,7 +10,7 @@ import path from 'node:path';
 import type {ListenerMap} from './PageCollector.js';
 import {NetworkCollector, PageCollector} from './PageCollector.js';
 import type {Debugger} from './third_party/index.js';
-import {Locator} from './third_party/puppeteer-core/index.js';
+import {Locator} from './third_party/index.js';
 import type {
   Browser,
   ConsoleMessage,
@@ -20,7 +20,7 @@ import type {
   Page,
   SerializedAXNode,
   PredefinedNetworkConditions,
-} from './third_party/puppeteer-core/index.js';
+} from './third_party/index.js';
 import {listPages} from './tools/pages.js';
 import {takeSnapshot} from './tools/snapshot.js';
 import {CLOSE_PAGE_ERROR} from './tools/ToolDefinition.js';

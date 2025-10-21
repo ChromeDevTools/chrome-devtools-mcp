@@ -5,7 +5,7 @@
  */
 
 import {zod} from '../third_party/index.js';
-import type {ElementHandle, Page} from '../third_party/puppeteer-core/index.js';
+import type {ElementHandle, Page} from '../third_party/index.js';
 
 import {ToolCategories} from './categories.js';
 import {defineTool} from './ToolDefinition.js';

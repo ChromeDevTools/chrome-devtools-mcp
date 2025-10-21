@@ -42,7 +42,7 @@ const allowedLicenses = [
 /**
  * @param {string} wrapperIndexPath
  * @param {import('rollup').OutputOptions} [extraOutputOptions={}]
- * @param {string[]} [external=[]]
+ * @param {import('rollup').ExternalOption} [external=[]]
  * @returns {import('rollup').RollupOptions}
  */
 const bundleDependency = (
@@ -110,12 +110,21 @@ const bundleDependency = (
 });
 
 export default [
-  bundleDependency('./build/src/third_party/index.js'),
-  bundleDependency(
-    './build/src/third_party/puppeteer-core/index.js',
+  bundleDependency('./build/src/third_party/index.js',
     {
       inlineDynamicImports: true,
     },
-    ['./bidi.js', '../bidi/bidi.js'],
+    (source, importer, _isResolved) => {
+      if (source === 'yargs' && importer && importer.includes('puppeteer-core')) {
+        return true;
+      }
+
+      const existingExternals = ['./bidi.js', '../bidi/bidi.js'];
+      if (existingExternals.includes(source)) {
+        return true;
+      }
+      
+      return false;
+    },
   ),
 ];
