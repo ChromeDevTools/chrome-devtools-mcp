@@ -110,6 +110,7 @@ const bundleDependency = (
 });
 
 export default [
+  bundleDependency('./build/src/third_party/index.js'),
   bundleDependency('./build/src/third_party/modelcontextprotocol-sdk/index.js'),
   bundleDependency(
     './build/src/third_party/puppeteer-core/index.js',

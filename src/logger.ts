@@ -5,7 +5,7 @@
  */
 import fs from 'node:fs';
 
-import debug from 'debug';
+import {debug} from './third_party/index.js';
 
 const mcpDebugNamespace = 'mcp:log';
 

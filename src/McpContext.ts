@@ -7,10 +7,9 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
-import type {Debugger} from 'debug';
-
 import type {ListenerMap} from './PageCollector.js';
 import {NetworkCollector, PageCollector} from './PageCollector.js';
+import type {Debugger} from './third_party/index.js';
 import {Locator} from './third_party/puppeteer-core/index.js';
 import type {
   Browser,
