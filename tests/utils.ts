@@ -137,8 +137,19 @@ export function stabilizeResponseOutput(text: unknown) {
   }
   let output = text;
   const dateRegEx = /.{3}, \d{2} .{3} \d{4} \d{2}:\d{2}:\d{2} [A-Z]{3}/g;
-  const localhostRegEx = /http:\/\/localhost:\d{5}\//g;
   output = output.replaceAll(dateRegEx, '<long date>');
+
+  const localhostRegEx = /http:\/\/localhost:\d{5}\//g;
   output = output.replaceAll(localhostRegEx, 'http://localhost:<port>/');
+
+  const userAgentRegEx = /user-agent:.*\n/g;
+  output = output.replaceAll(userAgentRegEx, 'user-agent:<user-agent>\n');
+
+  const chUaRegEx = /sec-ch-ua:"Chromium";v="\d{3}"/g;
+  output = output.replaceAll(chUaRegEx, 'sec-ch-ua:"Chromium";v="<version>"');
+
+  // sec-ch-ua-platform:"Linux"
+  const chUaPlatformRegEx = /sec-ch-ua-platform:"[a-zA-Z]*"/g;
+  output = output.replaceAll(chUaPlatformRegEx, 'sec-ch-ua-platform:"<os>"');
   return output;
 }

@@ -5,10 +5,10 @@ Status:  [success - 200]
 ### Request Headers
 - accept-language:en-US,en;q=0.9
 - upgrade-insecure-requests:1
-- user-agent:Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/141.0.0.0 Safari/537.36
-- sec-ch-ua:"Chromium";v="141", "Not?A_Brand";v="8"
+- user-agent:<user-agent>
+- sec-ch-ua:"Chromium";v="<version>", "Not?A_Brand";v="8"
 - sec-ch-ua-mobile:?0
-- sec-ch-ua-platform:"Linux"
+- sec-ch-ua-platform:"<os>"
 ### Response Headers
 - connection:keep-alive
 - content-length:239
