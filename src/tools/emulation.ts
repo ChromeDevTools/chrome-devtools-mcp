@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {zod,PredefinedNetworkConditions} from '../third_party/index.js';
+import {zod, PredefinedNetworkConditions} from '../third_party/index.js';
 
 import {ToolCategories} from './categories.js';
 import {defineTool} from './ToolDefinition.js';
