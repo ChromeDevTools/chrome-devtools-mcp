@@ -465,4 +465,21 @@ export class McpContext implements Context {
 
     return locator.wait();
   }
+
+  /**
+   * We need to ignore favicon request as they make our test flaky
+   */
+  async setUpNetworkCollectorForTesting() {
+    this.#networkCollector = new NetworkCollector(this.browser, collect => {
+      return {
+        request: req => {
+          if (req.url().includes('favicon.ico')) {
+            return;
+          }
+          collect(req);
+        },
+      } as ListenerMap;
+    });
+    await this.#networkCollector.init();
+  }
 }

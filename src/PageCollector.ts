@@ -173,14 +173,19 @@ export class PageCollector<T> {
 }
 
 export class NetworkCollector extends PageCollector<HTTPRequest> {
-  constructor(browser: Browser) {
-    super(browser, collect => {
+  constructor(
+    browser: Browser,
+    listeners: (
+      collector: (item: HTTPRequest) => void,
+    ) => ListenerMap<PageEvents> = collect => {
       return {
         request: req => {
           collect(req);
         },
       } as ListenerMap;
-    });
+    },
+  ) {
+    super(browser, listeners);
   }
   override splitAfterNavigation(page: Page) {
     const navigations = this.storage.get(page) ?? [];

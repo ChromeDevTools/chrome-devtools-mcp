@@ -30,6 +30,7 @@ describe('network', () => {
       server.addHtmlRoute('/three', html`<main>Third</main>`);
 
       await withBrowser(async (response, context) => {
+        await context.setUpNetworkCollectorForTesting();
         const page = context.getSelectedPage();
         await page.goto(server.getRoute('/one'));
         await page.goto(server.getRoute('/two'));
@@ -52,6 +53,7 @@ describe('network', () => {
       server.addHtmlRoute('/three', html`<main>Third</main>`);
 
       await withBrowser(async (response, context) => {
+        await context.setUpNetworkCollectorForTesting();
         const page = context.getSelectedPage();
         await page.goto(server.getRoute('/one'));
         await page.goto(server.getRoute('/two'));
@@ -96,12 +98,13 @@ describe('network', () => {
         assert(!response.includeNetworkRequests);
       });
     });
-    it.only('should get request from previous navigations', async t => {
+    it('should get request from previous navigations', async t => {
       server.addHtmlRoute('/one', html`<main>First</main>`);
       server.addHtmlRoute('/two', html`<main>Second</main>`);
       server.addHtmlRoute('/three', html`<main>Third</main>`);
 
       await withBrowser(async (response, context) => {
+        await context.setUpNetworkCollectorForTesting();
         const page = context.getSelectedPage();
         await page.goto(server.getRoute('/one'));
         await page.goto(server.getRoute('/two'));
