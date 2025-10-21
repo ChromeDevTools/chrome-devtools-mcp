@@ -18,12 +18,10 @@ import {
 import {formatA11ySnapshot} from './formatters/snapshotFormatter.js';
 import type {McpContext} from './McpContext.js';
 import type {
-  ImageContent,
-  TextContent,
-} from './third_party/index.js';
-import type {
   ConsoleMessage,
+  ImageContent,
   ResourceType,
+  TextContent,
 } from './third_party/index.js';
 import {handleDialog} from './tools/pages.js';
 import type {ImageContentData, Response} from './tools/ToolDefinition.js';

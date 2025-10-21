@@ -9,11 +9,11 @@ import path from 'node:path';
 
 import type {ListenerMap} from './PageCollector.js';
 import {NetworkCollector, PageCollector} from './PageCollector.js';
-import type {Debugger} from './third_party/index.js';
 import {Locator} from './third_party/index.js';
 import type {
   Browser,
   ConsoleMessage,
+  Debugger,
   Dialog,
   ElementHandle,
   HTTPRequest,

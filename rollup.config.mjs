@@ -110,12 +110,17 @@ const bundleDependency = (
 });
 
 export default [
-  bundleDependency('./build/src/third_party/index.js',
+  bundleDependency(
+    './build/src/third_party/index.js',
     {
       inlineDynamicImports: true,
     },
     (source, importer, _isResolved) => {
-      if (source === 'yargs' && importer && importer.includes('puppeteer-core')) {
+      if (
+        source === 'yargs' &&
+        importer &&
+        importer.includes('puppeteer-core')
+      ) {
         return true;
       }
 
@@ -123,7 +128,7 @@ export default [
       if (existingExternals.includes(source)) {
         return true;
       }
-      
+
       return false;
     },
   ),
