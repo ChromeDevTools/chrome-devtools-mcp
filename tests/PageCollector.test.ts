@@ -287,7 +287,7 @@ describe('NetworkCollector', () => {
     assert.equal(collector.getData(page).length, 2);
   });
 
-  it.only('works with previous navigations', async () => {
+  it('works with previous navigations', async () => {
     const browser = getMockBrowser();
     const page = (await browser.pages())[0];
     const mainFrame = page.mainFrame();
