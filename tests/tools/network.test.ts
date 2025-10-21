@@ -71,6 +71,44 @@ describe('network', () => {
         t.assert.snapshot?.(stabilizeResponseOutput(responseData[0].text));
       });
     });
+
+    it('list requests from previous navigations from redirects', async t => {
+      server.addRoute('/redirect', async (_req, res) => {
+        res.writeHead(302, {
+          Location: server.getRoute('/redirected'),
+        });
+        res.end();
+      });
+
+      server.addHtmlRoute(
+        '/redirected',
+        html`<script>
+          document.location.href = '/redirected-page';
+        </script>`,
+      );
+
+      server.addHtmlRoute(
+        '/redirected-page',
+        html`<main>I was redirected 2 times</main>`,
+      );
+
+      await withBrowser(async (response, context) => {
+        await context.setUpNetworkCollectorForTesting();
+        const page = context.getSelectedPage();
+        await page.goto(server.getRoute('/redirect'));
+        await listNetworkRequests.handler(
+          {
+            params: {
+              includePreviousNavigations: true,
+            },
+          },
+          response,
+          context,
+        );
+        const responseData = await response.handle('list_request', context);
+        t.assert.snapshot?.(stabilizeResponseOutput(responseData[0].text));
+      });
+    });
   });
   describe('network_get_request', () => {
     it('attaches request', async () => {

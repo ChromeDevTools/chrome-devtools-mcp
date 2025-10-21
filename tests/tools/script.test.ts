@@ -161,10 +161,7 @@ describe('script', () => {
         '/iframe',
         html`<main><button>I am iframe button</button></main>`,
       );
-      server.addRoute('/main', async (_req, res) => {
-        res.write(html`<iframe src="/iframe"></iframe>`);
-        res.end();
-      });
+      server.addHtmlRoute('/main', html`<iframe src="/iframe"></iframe>`);
 
       await withBrowser(async (response, context) => {
         const page = context.getSelectedPage();

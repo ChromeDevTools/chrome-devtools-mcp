@@ -286,4 +286,36 @@ describe('NetworkCollector', () => {
     page.emit('request', request);
     assert.equal(collector.getData(page).length, 2);
   });
+
+  it.only('works with previous navigations', async () => {
+    const browser = getMockBrowser();
+    const page = (await browser.pages())[0];
+    const mainFrame = page.mainFrame();
+    const navRequest = getMockRequest({
+      navigationRequest: true,
+      frame: page.mainFrame(),
+    });
+    const navRequest2 = getMockRequest({
+      navigationRequest: true,
+      frame: page.mainFrame(),
+    });
+    const request = getMockRequest();
+
+    const collector = new NetworkCollector(browser);
+    await collector.init();
+    page.emit('request', navRequest);
+    assert.equal(collector.getData(page, true).length, 1);
+
+    page.emit('framenavigated', mainFrame);
+    assert.equal(collector.getData(page, true).length, 1);
+
+    page.emit('request', navRequest2);
+    assert.equal(collector.getData(page, true).length, 2);
+
+    page.emit('framenavigated', mainFrame);
+    assert.equal(collector.getData(page, true).length, 2);
+
+    page.emit('request', request);
+    assert.equal(collector.getData(page, true).length, 3);
+  });
 });
