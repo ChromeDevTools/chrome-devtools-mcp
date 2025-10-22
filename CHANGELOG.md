@@ -1,5 +1,50 @@
 # Changelog
 
+## [0.9.0](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.8.1...chrome-devtools-mcp-v0.9.0) (2025-10-22)
+
+
+### 🎉 Features
+
+* add claude marketplace and plugin json ([#396](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/396)) ([0498611](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/0498611429f769c6ccae365674003d2bd538c292))
+* add filters and pagination to the console messages tool ([#387](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/387)) ([15d942c](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/15d942c4f3335b35f1cba8e8634651688323663d))
+* add WebSocket endpoint and custom headers support ([#404](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/404)) ([41d6a10](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/41d6a107baee0d14a1c14573f958d44198de23aa))
+* allow configuring tool categories ([#454](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/454)) ([0fe2b8a](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/0fe2b8a2b4d64b9da5f7d1adccc5425fd7cbec34))
+* expose previous navigations to the MCP ([#419](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/419)) ([165cf9c](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/165cf9c70b7f91dc116558547a870281f29da710))
+* support previous navigation for Console messages ([#452](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/452)) ([6f24362](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/6f243620391f0c608f51d464257cf3222d653e9e))
+* support stable id for network requests ([#375](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/375)) ([f4d7b49](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/f4d7b49bb112b4336bef0d90059485f41f71e4f1))
+* support verbose snapshots ([#388](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/388)) ([d47aaa9](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/d47aaa96ff990c49dd07a481ea1924f85881eafa))
+* tool to get a verbose single console message ([#435](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/435)) ([9205593](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/92055933dc44e5d200dda2ee4ae0e365b24281bb))
+* use stable id for network request querying ([#382](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/382)) ([579819b](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/579819b5e76f7a34c7c5c0877ac1e5e284beb328))
+
+
+### 🛠️ Fixes
+
+* allow evaluating in Frames ([#443](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/443)) ([053f1f8](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/053f1f830d051ec415f4b00e645f5a1aff8554a1))
+* better wording for evaluate_script ([#392](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/392)) ([2313fda](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/2313fdacad72a1bc5c4d8f1cbdd80fd64ba91771))
+* indicate when request and response bodies are not available ([#446](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/446)) ([7d47d6b](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/7d47d6b2f40bf08def29de3ca37b1a4a28ce6777))
+* pageerror for non-error types ([#442](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/442)) ([b6b42ec](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/b6b42ecb998dd4f8fbf4a8e7a49f461333a41103))
+* retrieve data correctly with fewer than 3 navigations ([#451](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/451)) ([4c65f59](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/4c65f59cf9f62662cf903fbbd19b67a8828d674a))
+
+
+### 📄 Documentation
+
+* add instructions for Qoder ([#386](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/386)) ([d8df784](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/d8df784127afd590eb02e0060378465ae115a7a4))
+* add VM-to-host remote debugging workaround ([#399](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/399)) ([9f9dab0](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/9f9dab0787f19c5730b65daf148c382fb2d9e365))
+* Update Copilot CLI instructions ([#423](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/423)) ([c7733a8](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/c7733a818050e50830c9a8e3d62bb80892cf9121))
+
+
+### ♻️ Chores
+
+* bundle all dependencies together ([#450](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/450)) ([914b980](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/914b980113353fd41b301da397aa45975090487a))
+* bundle modelcontextprotocol-sdk ([#409](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/409)) ([6c8432b](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/6c8432b6b69d5d56d0dee01968882492033f2dc1))
+* bundle puppeteer-core ([#417](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/417)) ([b443033](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/b443033000e46a992ea7fa071af0f9ec304b9ea7))
+* bundle zod together with modelcontextprotocol/sdk ([#414](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/414)) ([800e7e8](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/800e7e836433f3f1b2bfafa12ed35a991404d270))
+* cleanup data fetching ([#441](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/441)) ([5c871c3](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/5c871c3bd98127996011f269faddd8d8e7163917))
+* dispose listeners on page destroyed ([#318](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/318)) ([76d5e94](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/76d5e9416d833299561242ac45c0ce7813e61dbe))
+* extract common paginate type ([#415](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/415)) ([29fd602](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/29fd60216ca1394c46a266c6f853f8d65418e861))
+* store the last 3 navigations in PageCollector ([#411](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/411)) ([b873822](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/b8738221d8cf8322d5f968ee829f03dc83238a05))
+* use different format for reqid ([#380](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/380)) ([78bf66a](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/78bf66a7b1eefc93768f39d6d38fd141104fe812))
+
 ## [0.8.1](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.8.0...chrome-devtools-mcp-v0.8.1) (2025-10-13)
 
 
