@@ -10,7 +10,7 @@ import type {Dialog, ElementHandle, Page} from '../third_party/index.js';
 import type {TraceResult} from '../trace-processing/parse.js';
 import type {PaginationOptions} from '../utils/types.js';
 
-import type {ToolCategories} from './categories.js';
+import type { ToolCategories } from './categories.js';
 
 export interface ToolDefinition<
   Schema extends zod.ZodRawShape = zod.ZodRawShape,
@@ -85,6 +85,10 @@ export type Context = Readonly<{
   getAXNodeByUid(uid: string): TextSnapshotNode | undefined;
   setNetworkConditions(conditions: string | null): void;
   setCpuThrottlingRate(rate: number): void;
+  setDeviceEmulation(device: string | null): void;
+  getDeviceEmulation(): string | null;
+  getPages:() => Page[];
+  createPagesSnapshot(): Promise<Page[]> 
   saveTemporaryFile(
     data: Uint8Array<ArrayBufferLike>,
     mimeType: 'image/png' | 'image/jpeg' | 'image/webp',

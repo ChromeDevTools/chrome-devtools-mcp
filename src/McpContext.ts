@@ -86,6 +86,7 @@ export class McpContext implements Context {
   #isRunningTrace = false;
   #networkConditionsMap = new WeakMap<Page, string>();
   #cpuThrottlingRateMap = new WeakMap<Page, number>();
+  #deviceEmulationMap = new WeakMap<Page, string>();
   #dialog?: Dialog;
 
   #nextSnapshotId = 1;
@@ -205,6 +206,20 @@ export class McpContext implements Context {
   getCpuThrottlingRate(): number {
     const page = this.getSelectedPage();
     return this.#cpuThrottlingRateMap.get(page) ?? 1;
+  }
+
+  setDeviceEmulation(device: string | null): void {
+    const page = this.getSelectedPage();
+    if (device === null) {
+      this.#deviceEmulationMap.delete(page);
+    } else {
+      this.#deviceEmulationMap.set(page, device);
+    }
+  }
+
+  getDeviceEmulation(): string | null {
+    const page = this.getSelectedPage();
+    return this.#deviceEmulationMap.get(page) ?? null;
   }
 
   setIsRunningPerformanceTrace(x: boolean): void {
