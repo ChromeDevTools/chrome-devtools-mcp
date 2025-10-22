@@ -4,10 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {PerformanceInsightFormatter} from '../../node_modules/chrome-devtools-frontend/front_end/models/ai_assistance/data_formatters/PerformanceInsightFormatter.js';
-import {PerformanceTraceFormatter} from '../../node_modules/chrome-devtools-frontend/front_end/models/ai_assistance/data_formatters/PerformanceTraceFormatter.js';
-import {AgentFocus} from '../../node_modules/chrome-devtools-frontend/front_end/models/ai_assistance/performance/AIContext.js';
-import * as TraceEngine from '../../node_modules/chrome-devtools-frontend/front_end/models/trace/trace.js';
+import {
+  AgentFocus,
+  TraceEngine,
+  PerformanceTraceFormatter,
+  PerformanceInsightFormatter,
+} from '../../node_modules/chrome-devtools-frontend/mcp/mcp.js';
 import {logger} from '../logger.js';
 
 const engine = TraceEngine.TraceModel.Model.createWithAllHandlers();

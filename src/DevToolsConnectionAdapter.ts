@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+// eslint-disable-next-line no-restricted-imports
 import {ConnectionTransport as DevToolsConnectionTransport} from '../node_modules/chrome-devtools-frontend/front_end/core/protocol_client/ConnectionTransport.js';
 
 import {type ConnectionTransport} from './third_party/index.js';
