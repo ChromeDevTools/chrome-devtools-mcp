@@ -7,14 +7,14 @@
 import {logger} from '../logger.js';
 import {zod} from '../third_party/index.js';
 
-import {ToolCategories} from './categories.js';
+import {ToolCategory} from './categories.js';
 import {CLOSE_PAGE_ERROR, defineTool, timeoutSchema} from './ToolDefinition.js';
 
 export const listPages = defineTool({
   name: 'list_pages',
   description: `Get a list of pages open in the browser.`,
   annotations: {
-    category: ToolCategories.NAVIGATION_AUTOMATION,
+    category: ToolCategory.NAVIGATION,
     readOnlyHint: true,
   },
   schema: {},
@@ -27,7 +27,7 @@ export const selectPage = defineTool({
   name: 'select_page',
   description: `Select a page as a context for future tool calls.`,
   annotations: {
-    category: ToolCategories.NAVIGATION_AUTOMATION,
+    category: ToolCategory.NAVIGATION,
     readOnlyHint: true,
   },
   schema: {
@@ -49,7 +49,7 @@ export const closePage = defineTool({
   name: 'close_page',
   description: `Closes the page by its index. The last open page cannot be closed.`,
   annotations: {
-    category: ToolCategories.NAVIGATION_AUTOMATION,
+    category: ToolCategory.NAVIGATION,
     readOnlyHint: false,
   },
   schema: {
@@ -77,7 +77,7 @@ export const newPage = defineTool({
   name: 'new_page',
   description: `Creates a new page`,
   annotations: {
-    category: ToolCategories.NAVIGATION_AUTOMATION,
+    category: ToolCategory.NAVIGATION,
     readOnlyHint: false,
   },
   schema: {
@@ -101,7 +101,7 @@ export const navigatePage = defineTool({
   name: 'navigate_page',
   description: `Navigates the currently selected page to a URL.`,
   annotations: {
-    category: ToolCategories.NAVIGATION_AUTOMATION,
+    category: ToolCategory.NAVIGATION,
     readOnlyHint: false,
   },
   schema: {
@@ -125,7 +125,7 @@ export const navigatePageHistory = defineTool({
   name: 'navigate_page_history',
   description: `Navigates the currently selected page.`,
   annotations: {
-    category: ToolCategories.NAVIGATION_AUTOMATION,
+    category: ToolCategory.NAVIGATION,
     readOnlyHint: false,
   },
   schema: {
@@ -162,7 +162,7 @@ export const resizePage = defineTool({
   name: 'resize_page',
   description: `Resizes the selected page's window so that the page has specified dimension`,
   annotations: {
-    category: ToolCategories.EMULATION,
+    category: ToolCategory.EMULATION,
     readOnlyHint: false,
   },
   schema: {
@@ -186,7 +186,7 @@ export const handleDialog = defineTool({
   name: 'handle_dialog',
   description: `If a browser dialog was opened, use this command to handle it`,
   annotations: {
-    category: ToolCategories.INPUT_AUTOMATION,
+    category: ToolCategory.INPUT,
     readOnlyHint: false,
   },
   schema: {

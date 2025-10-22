@@ -9,9 +9,19 @@ import {describe, it} from 'node:test';
 import {parseArguments} from '../src/cli.js';
 
 describe('cli args parsing', () => {
+  const defaultArgs = {
+    'category-emulation': true,
+    categoryEmulation: true,
+    'category-performance': true,
+    categoryPerformance: true,
+    'category-network': true,
+    categoryNetwork: true,
+  };
+
   it('parses with default args', async () => {
     const args = parseArguments('1.0.0', ['node', 'main.js']);
     assert.deepStrictEqual(args, {
+      ...defaultArgs,
       _: [],
       headless: false,
       isolated: false,
@@ -28,6 +38,7 @@ describe('cli args parsing', () => {
       'http://localhost:3000',
     ]);
     assert.deepStrictEqual(args, {
+      ...defaultArgs,
       _: [],
       headless: false,
       isolated: false,
@@ -46,6 +57,7 @@ describe('cli args parsing', () => {
       '',
     ]);
     assert.deepStrictEqual(args, {
+      ...defaultArgs,
       _: [],
       headless: false,
       isolated: false,
@@ -65,6 +77,7 @@ describe('cli args parsing', () => {
       '/tmp/test 123/chrome',
     ]);
     assert.deepStrictEqual(args, {
+      ...defaultArgs,
       _: [],
       headless: false,
       isolated: false,
@@ -83,6 +96,7 @@ describe('cli args parsing', () => {
       '888x777',
     ]);
     assert.deepStrictEqual(args, {
+      ...defaultArgs,
       _: [],
       headless: false,
       isolated: false,
@@ -103,6 +117,7 @@ describe('cli args parsing', () => {
       `--chrome-arg='--disable-setuid-sandbox'`,
     ]);
     assert.deepStrictEqual(args, {
+      ...defaultArgs,
       _: [],
       headless: false,
       isolated: false,
@@ -121,6 +136,7 @@ describe('cli args parsing', () => {
       'ws://127.0.0.1:9222/devtools/browser/abc123',
     ]);
     assert.deepStrictEqual(args, {
+      ...defaultArgs,
       _: [],
       headless: false,
       isolated: false,
@@ -139,6 +155,7 @@ describe('cli args parsing', () => {
       'wss://example.com:9222/devtools/browser/abc123',
     ]);
     assert.deepStrictEqual(args, {
+      ...defaultArgs,
       _: [],
       headless: false,
       isolated: false,
@@ -161,6 +178,24 @@ describe('cli args parsing', () => {
     assert.deepStrictEqual(args.wsHeaders, {
       Authorization: 'Bearer token',
       'X-Custom': 'value',
+    });
+  });
+
+  it('parses disabled category', async () => {
+    const args = parseArguments('1.0.0', [
+      'node',
+      'main.js',
+      '--no-category-emulation',
+    ]);
+    assert.deepStrictEqual(args, {
+      ...defaultArgs,
+      _: [],
+      headless: false,
+      isolated: false,
+      $0: 'npx chrome-devtools-mcp@latest',
+      channel: 'stable',
+      'category-emulation': false,
+      categoryEmulation: false,
     });
   });
 });

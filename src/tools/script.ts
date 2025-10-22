@@ -7,7 +7,7 @@
 import {zod} from '../third_party/index.js';
 import type {Frame, JSHandle, Page} from '../third_party/index.js';
 
-import {ToolCategories} from './categories.js';
+import {ToolCategory} from './categories.js';
 import {defineTool} from './ToolDefinition.js';
 
 export const evaluateScript = defineTool({
@@ -15,7 +15,7 @@ export const evaluateScript = defineTool({
   description: `Evaluate a JavaScript function inside the currently selected page. Returns the response as JSON
 so returned values have to JSON-serializable.`,
   annotations: {
-    category: ToolCategories.DEBUGGING,
+    category: ToolCategory.DEBUGGING,
     readOnlyHint: false,
   },
   schema: {

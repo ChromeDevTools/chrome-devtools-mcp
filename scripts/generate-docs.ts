@@ -11,7 +11,7 @@ import {StdioClientTransport} from '@modelcontextprotocol/sdk/client/stdio.js';
 import type {Tool} from '@modelcontextprotocol/sdk/types.js';
 
 import {cliOptions} from '../build/src/cli.js';
-import {ToolCategories} from '../build/src/tools/categories.js';
+import {ToolCategory, labels} from '../build/src/tools/categories.js';
 
 const MCP_SERVER_PATH = 'build/src/index.js';
 const OUTPUT_PATH = './docs/tool-reference.md';
@@ -21,7 +21,7 @@ const README_PATH = './README.md';
 interface ToolWithAnnotations extends Tool {
   annotations?: {
     title?: string;
-    category?: ToolCategories;
+    category?: typeof ToolCategory;
   };
 }
 
@@ -67,7 +67,7 @@ function generateToolsTOC(
 
   for (const category of sortedCategories) {
     const categoryTools = categories[category];
-    const categoryName = category;
+    const categoryName = labels[category];
     toc += `- **${categoryName}** (${categoryTools.length} tools)\n`;
 
     // Sort tools within category for TOC
@@ -209,7 +209,7 @@ async function generateToolDocumentation(): Promise<void> {
     });
 
     // Sort categories using the enum order
-    const categoryOrder = Object.values(ToolCategories);
+    const categoryOrder = Object.values(ToolCategory);
     const sortedCategories = Object.keys(categories).sort((a, b) => {
       const aIndex = categoryOrder.indexOf(a);
       const bIndex = categoryOrder.indexOf(b);
@@ -223,8 +223,8 @@ async function generateToolDocumentation(): Promise<void> {
     // Generate table of contents
     for (const category of sortedCategories) {
       const categoryTools = categories[category];
-      const categoryName = category;
-      const anchorName = category.toLowerCase().replace(/\s+/g, '-');
+      const categoryName = labels[category];
+      const anchorName = categoryName.toLowerCase().replace(/\s+/g, '-');
       markdown += `- **[${categoryName}](#${anchorName})** (${categoryTools.length} tools)\n`;
 
       // Sort tools within category for TOC
@@ -239,8 +239,9 @@ async function generateToolDocumentation(): Promise<void> {
 
     for (const category of sortedCategories) {
       const categoryTools = categories[category];
+      const categoryName = labels[category];
 
-      markdown += `## ${category}\n\n`;
+      markdown += `## ${categoryName}\n\n`;
 
       // Sort tools within category
       categoryTools.sort((a: Tool, b: Tool) => a.name.localeCompare(b.name));

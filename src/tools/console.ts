@@ -7,7 +7,7 @@
 import {zod} from '../third_party/index.js';
 import type {ConsoleMessageType} from '../third_party/index.js';
 
-import {ToolCategories} from './categories.js';
+import {ToolCategory} from './categories.js';
 import {defineTool} from './ToolDefinition.js';
 
 const FILTERABLE_MESSAGE_TYPES: readonly [
@@ -40,7 +40,7 @@ export const listConsoleMessages = defineTool({
   description:
     'List all console messages for the currently selected page since the last navigation.',
   annotations: {
-    category: ToolCategories.DEBUGGING,
+    category: ToolCategory.DEBUGGING,
     readOnlyHint: true,
   },
   schema: {
@@ -86,7 +86,7 @@ export const getConsoleMessage = defineTool({
   name: 'get_console_message',
   description: `Gets a console message by its ID. You can get all messages by calling ${listConsoleMessages.name}.`,
   annotations: {
-    category: ToolCategories.DEBUGGING,
+    category: ToolCategory.DEBUGGING,
     readOnlyHint: true,
   },
   schema: {

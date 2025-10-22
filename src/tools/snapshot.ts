@@ -6,7 +6,7 @@
 
 import {zod} from '../third_party/index.js';
 
-import {ToolCategories} from './categories.js';
+import {ToolCategory} from './categories.js';
 import {defineTool, timeoutSchema} from './ToolDefinition.js';
 
 export const takeSnapshot = defineTool({
@@ -14,7 +14,7 @@ export const takeSnapshot = defineTool({
   description: `Take a text snapshot of the currently selected page based on the a11y tree. The snapshot lists page elements along with a unique
 identifier (uid). Always use the latest snapshot. Prefer taking a snapshot over taking a screenshot.`,
   annotations: {
-    category: ToolCategories.DEBUGGING,
+    category: ToolCategory.DEBUGGING,
     readOnlyHint: true,
   },
   schema: {
@@ -34,7 +34,7 @@ export const waitFor = defineTool({
   name: 'wait_for',
   description: `Wait for the specified text to appear on the selected page.`,
   annotations: {
-    category: ToolCategories.NAVIGATION_AUTOMATION,
+    category: ToolCategory.NAVIGATION,
     readOnlyHint: true,
   },
   schema: {

@@ -19,6 +19,7 @@ import {
   type CallToolResult,
   SetLevelRequestSchema,
 } from './third_party/index.js';
+import {ToolCategory} from './tools/categories.js';
 import * as consoleTools from './tools/console.js';
 import * as emulationTools from './tools/emulation.js';
 import * as inputTools from './tools/input.js';
@@ -96,6 +97,24 @@ Avoid sharing sensitive or personal information that you do not want to share wi
 const toolMutex = new Mutex();
 
 function registerTool(tool: ToolDefinition): void {
+  if (
+    tool.annotations.category === ToolCategory.EMULATION &&
+    args.categoryEmulation === false
+  ) {
+    return;
+  }
+  if (
+    tool.annotations.category === ToolCategory.PERFORMANCE &&
+    args.categoryPerformance === false
+  ) {
+    return;
+  }
+  if (
+    tool.annotations.category === ToolCategory.NETWORK &&
+    args.categoryNetwork === false
+  ) {
+    return;
+  }
   server.registerTool(
     tool.name,
     {

@@ -331,6 +331,21 @@ The Chrome DevTools MCP server supports the following configuration option:
   Additional arguments for Chrome. Only applies when Chrome is launched by chrome-devtools-mcp.
   - **Type:** array
 
+- **`--categoryEmulation`**
+  Set to false to exlcude tools related to emulation.
+  - **Type:** boolean
+  - **Default:** `true`
+
+- **`--categoryPerformance`**
+  Set to false to exlcude tools related to performance.
+  - **Type:** boolean
+  - **Default:** `true`
+
+- **`--categoryNetwork`**
+  Set to false to exlcude tools related to network.
+  - **Type:** boolean
+  - **Default:** `true`
+
 <!-- END AUTO GENERATED OPTIONS -->
 
 Pass them via the `args` property in the JSON configuration. For example:

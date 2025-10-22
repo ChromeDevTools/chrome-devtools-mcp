@@ -10,7 +10,7 @@ import type {Dialog, ElementHandle, Page} from '../third_party/index.js';
 import type {TraceResult} from '../trace-processing/parse.js';
 import type {PaginationOptions} from '../utils/types.js';
 
-import type {ToolCategories} from './categories.js';
+import type {ToolCategory} from './categories.js';
 
 export interface ToolDefinition<
   Schema extends zod.ZodRawShape = zod.ZodRawShape,
@@ -19,7 +19,7 @@ export interface ToolDefinition<
   description: string;
   annotations: {
     title?: string;
-    category: ToolCategories;
+    category: ToolCategory;
     /**
      * If true, the tool does not modify its environment.
      */

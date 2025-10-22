@@ -139,6 +139,21 @@ export const cliOptions = {
     describe:
       'Additional arguments for Chrome. Only applies when Chrome is launched by chrome-devtools-mcp.',
   },
+  categoryEmulation: {
+    type: 'boolean',
+    default: true,
+    describe: 'Set to false to exlcude tools related to emulation.',
+  },
+  categoryPerformance: {
+    type: 'boolean',
+    default: true,
+    describe: 'Set to false to exlcude tools related to performance.',
+  },
+  categoryNetwork: {
+    type: 'boolean',
+    default: true,
+    describe: 'Set to false to exlcude tools related to network.',
+  },
 } satisfies Record<string, YargsOptions>;
 
 export function parseArguments(version: string, argv = process.argv) {
@@ -185,6 +200,12 @@ export function parseArguments(version: string, argv = process.argv) {
         `$0 --chrome-arg='--no-sandbox' --chrome-arg='--disable-setuid-sandbox'`,
         'Launch Chrome without sandboxes. Use with caution.',
       ],
+      ['$0 --no-category-emulation', 'Disable tools in the emulation category'],
+      [
+        '$0 --no-category-performance',
+        'Disable tools in the performance category',
+      ],
+      ['$0 --no-category-network', 'Disable tools in the network category'],
     ]);
 
   return yargsInstance

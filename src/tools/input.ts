@@ -8,14 +8,14 @@ import type {McpContext, TextSnapshotNode} from '../McpContext.js';
 import {zod} from '../third_party/index.js';
 import type {ElementHandle} from '../third_party/index.js';
 
-import {ToolCategories} from './categories.js';
+import {ToolCategory} from './categories.js';
 import {defineTool} from './ToolDefinition.js';
 
 export const click = defineTool({
   name: 'click',
   description: `Clicks on the provided element`,
   annotations: {
-    category: ToolCategories.INPUT_AUTOMATION,
+    category: ToolCategory.INPUT,
     readOnlyHint: false,
   },
   schema: {
@@ -54,7 +54,7 @@ export const hover = defineTool({
   name: 'hover',
   description: `Hover over the provided element`,
   annotations: {
-    category: ToolCategories.INPUT_AUTOMATION,
+    category: ToolCategory.INPUT,
     readOnlyHint: false,
   },
   schema: {
@@ -138,7 +138,7 @@ export const fill = defineTool({
   name: 'fill',
   description: `Type text into a input, text area or select an option from a <select> element.`,
   annotations: {
-    category: ToolCategories.INPUT_AUTOMATION,
+    category: ToolCategory.INPUT,
     readOnlyHint: false,
   },
   schema: {
@@ -166,7 +166,7 @@ export const drag = defineTool({
   name: 'drag',
   description: `Drag an element onto another element`,
   annotations: {
-    category: ToolCategories.INPUT_AUTOMATION,
+    category: ToolCategory.INPUT,
     readOnlyHint: false,
   },
   schema: {
@@ -195,7 +195,7 @@ export const fillForm = defineTool({
   name: 'fill_form',
   description: `Fill out multiple form elements at once`,
   annotations: {
-    category: ToolCategories.INPUT_AUTOMATION,
+    category: ToolCategory.INPUT,
     readOnlyHint: false,
   },
   schema: {
@@ -227,7 +227,7 @@ export const uploadFile = defineTool({
   name: 'upload_file',
   description: 'Upload a file through a provided element.',
   annotations: {
-    category: ToolCategories.INPUT_AUTOMATION,
+    category: ToolCategory.INPUT,
     readOnlyHint: false,
   },
   schema: {

@@ -15,7 +15,7 @@ import {
   traceResultIsSuccess,
 } from '../trace-processing/parse.js';
 
-import {ToolCategories} from './categories.js';
+import {ToolCategory} from './categories.js';
 import type {Context, Response} from './ToolDefinition.js';
 import {defineTool} from './ToolDefinition.js';
 
@@ -24,7 +24,7 @@ export const startTrace = defineTool({
   description:
     'Starts a performance trace recording on the selected page. This can be used to look for performance problems and insights to improve the performance of the page. It will also report Core Web Vital (CWV) scores for the page.',
   annotations: {
-    category: ToolCategories.PERFORMANCE,
+    category: ToolCategory.PERFORMANCE,
     readOnlyHint: true,
   },
   schema: {
@@ -105,7 +105,7 @@ export const stopTrace = defineTool({
   description:
     'Stops the active performance trace recording on the selected page.',
   annotations: {
-    category: ToolCategories.PERFORMANCE,
+    category: ToolCategory.PERFORMANCE,
     readOnlyHint: true,
   },
   schema: {},
@@ -123,7 +123,7 @@ export const analyzeInsight = defineTool({
   description:
     'Provides more detailed information on a specific Performance Insight that was highlighted in the results of a trace recording.',
   annotations: {
-    category: ToolCategories.PERFORMANCE,
+    category: ToolCategory.PERFORMANCE,
     readOnlyHint: true,
   },
   schema: {
