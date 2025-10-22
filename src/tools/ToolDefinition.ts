@@ -49,14 +49,14 @@ export interface Response {
     value: boolean,
     options?: PaginationOptions & {
       resourceTypes?: string[];
-      includePreviousNavigations?: boolean;
+      includePreservedRequests?: boolean;
     },
   ): void;
   setIncludeConsoleData(
     value: boolean,
     options?: PaginationOptions & {
       types?: string[];
-      includePreviousNavigations?: boolean;
+      includePreservedMessages?: boolean;
     },
   ): void;
   setIncludeSnapshot(value: boolean): void;

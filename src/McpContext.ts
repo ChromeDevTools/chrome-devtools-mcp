@@ -140,16 +140,16 @@ export class McpContext implements Context {
     return context;
   }
 
-  getNetworkRequests(includePreviousNavigations?: boolean): HTTPRequest[] {
+  getNetworkRequests(includePreservedRequests?: boolean): HTTPRequest[] {
     const page = this.getSelectedPage();
-    return this.#networkCollector.getData(page, includePreviousNavigations);
+    return this.#networkCollector.getData(page, includePreservedRequests);
   }
 
   getConsoleData(
-    includePreviousNavigations?: boolean,
+    includePreservedMessages?: boolean,
   ): Array<ConsoleMessage | Error> {
     const page = this.getSelectedPage();
-    return this.#consoleCollector.getData(page, includePreviousNavigations);
+    return this.#consoleCollector.getData(page, includePreservedMessages);
   }
 
   getConsoleMessageStableId(message: ConsoleMessage | Error): number {

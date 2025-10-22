@@ -61,7 +61,7 @@ describe('network', () => {
         await listNetworkRequests.handler(
           {
             params: {
-              includePreviousNavigations: true,
+              includePreservedRequests: true,
             },
           },
           response,
@@ -99,7 +99,7 @@ describe('network', () => {
         await listNetworkRequests.handler(
           {
             params: {
-              includePreviousNavigations: true,
+              includePreservedRequests: true,
             },
           },
           response,

@@ -66,18 +66,20 @@ export const listConsoleMessages = defineTool({
       .describe(
         'Filter messages to only return messages of the specified resource types. When omitted or empty, returns all messages.',
       ),
-    includePreviousNavigations: zod
+    includePreservedMessages: zod
       .boolean()
       .default(false)
       .optional()
-      .describe('Whether to include messages from previous navigations.'),
+      .describe(
+        'Set to true to return the preserved messages over the last 3 navigations.',
+      ),
   },
   handler: async (request, response) => {
     response.setIncludeConsoleData(true, {
       pageSize: request.params.pageSize,
       pageIdx: request.params.pageIdx,
       types: request.params.types,
-      includePreviousNavigations: request.params.includePreviousNavigations,
+      includePreservedMessages: request.params.includePreservedMessages,
     });
   },
 });

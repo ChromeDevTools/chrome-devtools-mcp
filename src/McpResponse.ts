@@ -40,13 +40,13 @@ export class McpResponse implements Response {
     include: boolean;
     pagination?: PaginationOptions;
     resourceTypes?: ResourceType[];
-    includePreviousNavigations?: boolean;
+    includePreservedRequests?: boolean;
   };
   #consoleDataOptions?: {
     include: boolean;
     pagination?: PaginationOptions;
     types?: string[];
-    includePreviousNavigations?: boolean;
+    includePreservedMessages?: boolean;
   };
 
   setIncludePages(value: boolean): void {
@@ -62,7 +62,7 @@ export class McpResponse implements Response {
     value: boolean,
     options?: PaginationOptions & {
       resourceTypes?: ResourceType[];
-      includePreviousNavigations?: boolean;
+      includePreservedRequests?: boolean;
     },
   ): void {
     if (!value) {
@@ -80,7 +80,7 @@ export class McpResponse implements Response {
             }
           : undefined,
       resourceTypes: options?.resourceTypes,
-      includePreviousNavigations: options?.includePreviousNavigations,
+      includePreservedRequests: options?.includePreservedRequests,
     };
   }
 
@@ -88,7 +88,7 @@ export class McpResponse implements Response {
     value: boolean,
     options?: PaginationOptions & {
       types?: string[];
-      includePreviousNavigations?: boolean;
+      includePreservedMessages?: boolean;
     },
   ): void {
     if (!value) {
@@ -106,7 +106,7 @@ export class McpResponse implements Response {
             }
           : undefined,
       types: options?.types,
-      includePreviousNavigations: options?.includePreviousNavigations,
+      includePreservedMessages: options?.includePreservedMessages,
     };
   }
 
@@ -232,7 +232,7 @@ export class McpResponse implements Response {
     let consoleListData: ConsoleMessageData[] | undefined;
     if (this.#consoleDataOptions?.include) {
       let messages = context.getConsoleData(
-        this.#consoleDataOptions.includePreviousNavigations,
+        this.#consoleDataOptions.includePreservedMessages,
       );
 
       if (this.#consoleDataOptions.types?.length) {
@@ -353,7 +353,7 @@ Call ${handleDialog.name} to handle it before continuing.`);
 
     if (this.#networkRequestsOptions?.include) {
       let requests = context.getNetworkRequests(
-        this.#networkRequestsOptions?.includePreviousNavigations,
+        this.#networkRequestsOptions?.includePreservedRequests,
       );
 
       // Apply resource type filtering if specified
