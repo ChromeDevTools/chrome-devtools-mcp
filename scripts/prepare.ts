@@ -7,6 +7,8 @@
 import {rm} from 'node:fs/promises';
 import {resolve} from 'node:path';
 
+import {sed} from './sed.ts';
+
 const projectRoot = process.cwd();
 
 const filesToRemove = [
@@ -28,6 +30,28 @@ async function main() {
       process.exit(1);
     }
   }
+  // TODO: remove once https://chromium-review.googlesource.com/c/devtools/devtools-frontend/+/7072054 is available.
+  sed(
+    'node_modules/chrome-devtools-frontend/front_end/core/sdk/NetworkManager.ts',
+    `declare global {
+  // TS typedefs are not up to date
+  interface URLPattern {
+    hash: string;
+    hostname: string;
+    password: string;
+    pathname: string;
+    port: string;
+    protocol: string;
+    search: string;
+    username: string;
+    hasRegExpGroups: boolean;
+    test(url: string): boolean;
+  }
+  /* eslint-disable-next-line @typescript-eslint/naming-convention */
+  var URLPattern: {prototype: URLPattern, new (input: string): URLPattern};
+}`,
+    '',
+  );
   console.log('Clean up of chrome-devtools-frontend complete.');
 }
 

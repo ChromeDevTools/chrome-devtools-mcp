@@ -9,6 +9,8 @@ import * as path from 'node:path';
 
 import tsConfig from '../tsconfig.json' with {type: 'json'};
 
+import {sed} from './sed.ts';
+
 const BUILD_DIR = path.join(process.cwd(), 'build');
 
 /**
@@ -18,22 +20,6 @@ const BUILD_DIR = path.join(process.cwd(), 'build');
  */
 function writeFile(filePath: string, content: string): void {
   fs.writeFileSync(filePath, content, 'utf-8');
-}
-
-/**
- * Replaces content in a file.
- * @param filePath The path to the file.
- * @param find The regex to find.
- * @param replace The string to replace with.
- */
-function sed(filePath: string, find: RegExp, replace: string): void {
-  if (!fs.existsSync(filePath)) {
-    console.warn(`File not found for sed operation: ${filePath}`);
-    return;
-  }
-  const content = fs.readFileSync(filePath, 'utf-8');
-  const newContent = content.replace(find, replace);
-  fs.writeFileSync(filePath, newContent, 'utf-8');
 }
 
 /**
