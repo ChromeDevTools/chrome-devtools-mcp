@@ -4,14 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {Connection} from '../node_modules/chrome-devtools-frontend/front_end/core/protocol_client/InspectorBackend.js';
+import {ConnectionTransport as DevToolsConnectionTransport} from '../node_modules/chrome-devtools-frontend/front_end/core/protocol_client/ConnectionTransport.js';
 
 import {type ConnectionTransport} from './third_party/index.js';
 
 /**
  * Allows a puppeteer {@link ConnectionTransport} to act like a DevTools {@link Connection}.
  */
-export class DevToolsConnectionAdapter extends Connection {
+export class DevToolsConnectionAdapter extends DevToolsConnectionTransport {
   #transport: ConnectionTransport | null;
   #onDisconnect: ((arg0: string) => void) | null = null;
 
