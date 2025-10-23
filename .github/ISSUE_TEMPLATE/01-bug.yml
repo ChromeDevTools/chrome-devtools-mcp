@@ -31,15 +31,16 @@ body:
 
   - id: mcp-configuration
     type: textarea
+    render: json
     attributes:
       label: MCP configuration
 
-  - id: node-version
+  - id: chrome-devtools-mcp-version
     type: input
     attributes:
-      label: Node version
-      description: >
-        Please verify you have the minimal supported version listed in the README.md
+      label: Chrome DevTools MCP version
+    validations:
+      required: true
 
   - id: chrome-version
     type: input
@@ -61,6 +62,13 @@ body:
     attributes:
       label: Chat log
 
+  - id: node-version
+    type: input
+    attributes:
+      label: Node version
+      description: >
+        Please verify you have the minimal supported version listed in the README.md
+        
   - id: operating-system
     type: dropdown
     attributes:
@@ -68,6 +76,7 @@ body:
       description: What supported operating system are you running?
       options:
         - Windows
+        - Windows Subsystem for Linux (WSL)
         - macOS
         - Linux
 
