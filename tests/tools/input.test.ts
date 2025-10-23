@@ -15,7 +15,9 @@ import {
   drag,
   fillForm,
   uploadFile,
+  pressKey,
 } from '../../src/tools/input.js';
+import {parseKey} from '../../src/utils/keyboard.js';
 import {serverHooks} from '../server.js';
 import {html, withBrowser} from '../utils.js';
 
@@ -428,6 +430,61 @@ describe('input', () => {
         assert.strictEqual(response.includeSnapshot, false);
 
         await fs.unlink(testFilePath);
+      });
+    });
+  });
+
+  describe('press_key', () => {
+    it('parses keys', () => {
+      assert.deepStrictEqual(parseKey('Shift+A'), ['A', 'Shift']);
+      assert.deepStrictEqual(parseKey('Shift++'), ['+', 'Shift']);
+      assert.deepStrictEqual(parseKey('Shift'), ['Shift']);
+      assert.deepStrictEqual(parseKey('KeyA'), ['KeyA']);
+    });
+    it('throws on empty key', () => {
+      assert.throws(() => {
+        parseKey('');
+      });
+    });
+    it('throws on invalid key', () => {
+      assert.throws(() => {
+        parseKey('aaaaa');
+      });
+    });
+    it('throws on multiple keys', () => {
+      assert.throws(() => {
+        parseKey('Shift+Shift');
+      });
+    });
+
+    it('processes press_key', async () => {
+      await withBrowser(async (response, context) => {
+        const page = context.getSelectedPage();
+        await page.setContent(`<!DOCTYPE html><script>
+logs=[];
+document.addEventListener('keydown', e => logs.push('d'+e.key));
+document.addEventListener('keyup', e => logs.push('u'+e.key));
+</script>`);
+        await context.createTextSnapshot();
+
+        await pressKey.handler(
+          {
+            params: {
+              key: 'Control+Shift+C',
+            },
+          },
+          response,
+          context,
+        );
+
+        assert.deepStrictEqual(await page.evaluate('logs'), [
+          'dControl',
+          'dShift',
+          'dC',
+          'uC',
+          'uShift',
+          'uControl',
+        ]);
       });
     });
   });

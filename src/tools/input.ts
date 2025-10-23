@@ -6,7 +6,8 @@
 
 import type {McpContext, TextSnapshotNode} from '../McpContext.js';
 import {zod} from '../third_party/index.js';
-import type {ElementHandle} from '../third_party/index.js';
+import type {ElementHandle, KeyInput} from '../third_party/index.js';
+import {parseKey} from '../utils/keyboard.js';
 
 import {ToolCategory} from './categories.js';
 import {defineTool} from './ToolDefinition.js';
@@ -268,5 +269,41 @@ export const uploadFile = defineTool({
     } finally {
       void handle.dispose();
     }
+  },
+});
+
+export const pressKey = defineTool({
+  name: 'press_key',
+  description: `Press a key or key combination. Use this when other input methods like fill() cannot be used (e.g., keyboard shortcuts, navigation keys, or special key combinations).`,
+  annotations: {
+    category: ToolCategory.INPUT,
+    readOnlyHint: false,
+  },
+  schema: {
+    key: zod
+      .string()
+      .describe(
+        'A key or a combination (e.g., "Enter", "Control+A", "Control++", "Control+Shift+R"). Modifiers: Control, Shift, Alt, Meta',
+      ),
+  },
+  handler: async (request, response, context) => {
+    const page = context.getSelectedPage();
+    const tokens = parseKey(request.params.key) as KeyInput[];
+    const [key, ...modifiers] = tokens;
+
+    await context.waitForEventsAfterAction(async () => {
+      for (let i = modifiers.length - 1; i >= 0; i--) {
+        await page.keyboard.down(modifiers[i]);
+      }
+      await page.keyboard.press(key);
+      for (const modifier of modifiers) {
+        await page.keyboard.up(modifier);
+      }
+    });
+
+    response.appendResponseLine(
+      `Successfully pressed key: ${request.params.key}`,
+    );
+    response.setIncludeSnapshot(true);
   },
 });

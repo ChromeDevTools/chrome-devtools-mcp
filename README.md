@@ -238,13 +238,14 @@ If you run into any issues, checkout our [troubleshooting guide](./docs/troubles
 
 <!-- BEGIN AUTO GENERATED TOOLS -->
 
-- **Input automation** (7 tools)
+- **Input automation** (8 tools)
   - [`click`](docs/tool-reference.md#click)
   - [`drag`](docs/tool-reference.md#drag)
   - [`fill`](docs/tool-reference.md#fill)
   - [`fill_form`](docs/tool-reference.md#fill_form)
   - [`handle_dialog`](docs/tool-reference.md#handle_dialog)
   - [`hover`](docs/tool-reference.md#hover)
+  - [`press_key`](docs/tool-reference.md#press_key)
   - [`upload_file`](docs/tool-reference.md#upload_file)
 - **Navigation automation** (7 tools)
   - [`close_page`](docs/tool-reference.md#close_page)

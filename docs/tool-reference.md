@@ -2,13 +2,14 @@
 
 # Chrome DevTools MCP Tool Reference
 
-- **[Input automation](#input-automation)** (7 tools)
+- **[Input automation](#input-automation)** (8 tools)
   - [`click`](#click)
   - [`drag`](#drag)
   - [`fill`](#fill)
   - [`fill_form`](#fill_form)
   - [`handle_dialog`](#handle_dialog)
   - [`hover`](#hover)
+  - [`press_key`](#press_key)
   - [`upload_file`](#upload_file)
 - **[Navigation automation](#navigation-automation)** (7 tools)
   - [`close_page`](#close_page)
@@ -99,6 +100,16 @@
 **Parameters:**
 
 - **uid** (string) **(required)**: The uid of an element on the page from the page content snapshot
+
+---
+
+### `press_key`
+
+**Description:** Press a key or key combination. Use this when other input methods like [`fill`](#fill)() cannot be used (e.g., keyboard shortcuts, navigation keys, or special key combinations).
+
+**Parameters:**
+
+- **key** (string) **(required)**: A key or a combination (e.g., "Enter", "Control+A", "Control++", "Control+Shift+R"). Modifiers: Control, Shift, Alt, Meta
 
 ---
 
