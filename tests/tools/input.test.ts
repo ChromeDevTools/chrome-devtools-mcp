@@ -438,6 +438,11 @@ describe('input', () => {
     it('parses keys', () => {
       assert.deepStrictEqual(parseKey('Shift+A'), ['A', 'Shift']);
       assert.deepStrictEqual(parseKey('Shift++'), ['+', 'Shift']);
+      assert.deepStrictEqual(parseKey('Control+Shift++'), [
+        '+',
+        'Control',
+        'Shift',
+      ]);
       assert.deepStrictEqual(parseKey('Shift'), ['Shift']);
       assert.deepStrictEqual(parseKey('KeyA'), ['KeyA']);
     });

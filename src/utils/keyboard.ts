@@ -5,6 +5,7 @@
  */
 import type {KeyInput} from '../third_party';
 
+// See the KeyInput type for the list of supported keys.
 const validKeys = new Set([
   '0',
   '1',
@@ -273,7 +274,7 @@ function throwIfInvalidKey(key: string): KeyInput {
 }
 
 /**
- * Returns the key, followed by modifiers.
+ * Returns the primary key, followed by modifiers in original order.
  */
 export function parseKey(keyInput: string): [KeyInput, ...KeyInput[]] {
   let key = '';
@@ -287,7 +288,9 @@ export function parseKey(keyInput: string): [KeyInput, ...KeyInput[]] {
       key += ch;
     }
   }
-  if (key) result.push(throwIfInvalidKey(key));
+  if (key) {
+    result.push(throwIfInvalidKey(key));
+  }
 
   if (result.length === 0) {
     throw new Error(`Key ${keyInput} could not be parsed.`);
@@ -297,5 +300,5 @@ export function parseKey(keyInput: string): [KeyInput, ...KeyInput[]] {
     throw new Error(`Key ${keyInput} contains duplicate keys.`);
   }
 
-  return result.reverse() as [KeyInput, ...KeyInput[]];
+  return [result.at(-1), ...result.slice(0, -1)] as [KeyInput, ...KeyInput[]];
 }

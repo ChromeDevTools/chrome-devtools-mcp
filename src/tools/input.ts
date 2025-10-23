@@ -6,7 +6,7 @@
 
 import type {McpContext, TextSnapshotNode} from '../McpContext.js';
 import {zod} from '../third_party/index.js';
-import type {ElementHandle, KeyInput} from '../third_party/index.js';
+import type {ElementHandle} from '../third_party/index.js';
 import {parseKey} from '../utils/keyboard.js';
 
 import {ToolCategory} from './categories.js';
@@ -288,15 +288,15 @@ export const pressKey = defineTool({
   },
   handler: async (request, response, context) => {
     const page = context.getSelectedPage();
-    const tokens = parseKey(request.params.key) as KeyInput[];
+    const tokens = parseKey(request.params.key);
     const [key, ...modifiers] = tokens;
 
     await context.waitForEventsAfterAction(async () => {
-      for (let i = modifiers.length - 1; i >= 0; i--) {
-        await page.keyboard.down(modifiers[i]);
+      for (const modifier of modifiers) {
+        await page.keyboard.down(modifier);
       }
       await page.keyboard.press(key);
-      for (const modifier of modifiers) {
+      for (const modifier of modifiers.toReversed()) {
         await page.keyboard.up(modifier);
       }
     });
