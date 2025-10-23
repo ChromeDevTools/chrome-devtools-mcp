@@ -44,7 +44,7 @@ export const click = defineTool({
           ? `Successfully double clicked on the element`
           : `Successfully clicked on the element`,
       );
-      response.setIncludeSnapshot(true);
+      response.includeSnapshot();
     } finally {
       void handle.dispose();
     }
@@ -73,7 +73,7 @@ export const hover = defineTool({
         await handle.asLocator().hover();
       });
       response.appendResponseLine(`Successfully hovered over the element`);
-      response.setIncludeSnapshot(true);
+      response.includeSnapshot();
     } finally {
       void handle.dispose();
     }
@@ -159,7 +159,7 @@ export const fill = defineTool({
       );
     });
     response.appendResponseLine(`Successfully filled out the element`);
-    response.setIncludeSnapshot(true);
+    response.includeSnapshot();
   },
 });
 
@@ -184,7 +184,7 @@ export const drag = defineTool({
         await toHandle.drop(fromHandle);
       });
       response.appendResponseLine(`Successfully dragged an element`);
-      response.setIncludeSnapshot(true);
+      response.includeSnapshot();
     } finally {
       void fromHandle.dispose();
       void toHandle.dispose();
@@ -220,7 +220,7 @@ export const fillForm = defineTool({
       });
     }
     response.appendResponseLine(`Successfully filled out the form`);
-    response.setIncludeSnapshot(true);
+    response.includeSnapshot();
   },
 });
 
@@ -264,7 +264,7 @@ export const uploadFile = defineTool({
           );
         }
       }
-      response.setIncludeSnapshot(true);
+      response.includeSnapshot();
       response.appendResponseLine(`File uploaded from ${filePath}.`);
     } finally {
       void handle.dispose();
@@ -304,6 +304,6 @@ export const pressKey = defineTool({
     response.appendResponseLine(
       `Successfully pressed key: ${request.params.key}`,
     );
-    response.setIncludeSnapshot(true);
+    response.includeSnapshot();
   },
 });

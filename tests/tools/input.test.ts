@@ -427,7 +427,7 @@ describe('input', () => {
         );
 
         assert.strictEqual(response.responseLines.length, 0);
-        assert.strictEqual(response.includeSnapshot, false);
+        assert.strictEqual(response.snapshotParams, undefined);
 
         await fs.unlink(testFilePath);
       });

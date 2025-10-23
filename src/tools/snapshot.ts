@@ -24,9 +24,18 @@ identifier (uid). Always use the latest snapshot. Prefer taking a snapshot over 
       .describe(
         'Whether to include all possible information available in the full a11y tree. Default is false.',
       ),
+    filePath: zod
+      .string()
+      .optional()
+      .describe(
+        'The absolute path, or a path relative to the current working directory, to save the snapshot to instead of attaching it to the response.',
+      ),
   },
   handler: async (request, response) => {
-    response.setIncludeSnapshot(true, request.params.verbose ?? false);
+    response.includeSnapshot({
+      verbose: request.params.verbose ?? false,
+      filePath: request.params.filePath,
+    });
   },
 });
 
@@ -48,6 +57,6 @@ export const waitFor = defineTool({
       `Element with text "${request.params.text}" found.`,
     );
 
-    response.setIncludeSnapshot(true);
+    response.includeSnapshot();
   },
 });

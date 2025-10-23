@@ -24,14 +24,17 @@ import type {
   TextContent,
 } from './third_party/index.js';
 import {handleDialog} from './tools/pages.js';
-import type {ImageContentData, Response} from './tools/ToolDefinition.js';
+import type {
+  ImageContentData,
+  Response,
+  SnapshotParams,
+} from './tools/ToolDefinition.js';
 import {paginate} from './utils/pagination.js';
 import type {PaginationOptions} from './utils/types.js';
 
 export class McpResponse implements Response {
   #includePages = false;
-  #includeSnapshot = false;
-  #includeVerboseSnapshot = false;
+  #snapshotParams?: SnapshotParams;
   #attachedNetworkRequestId?: number;
   #attachedConsoleMessageId?: number;
   #textResponseLines: string[] = [];
@@ -53,9 +56,10 @@ export class McpResponse implements Response {
     this.#includePages = value;
   }
 
-  setIncludeSnapshot(value: boolean, verbose = false): void {
-    this.#includeSnapshot = value;
-    this.#includeVerboseSnapshot = verbose;
+  includeSnapshot(params?: SnapshotParams): void {
+    this.#snapshotParams = params ?? {
+      verbose: false,
+    };
   }
 
   setIncludeNetworkRequests(
@@ -158,12 +162,8 @@ export class McpResponse implements Response {
     return this.#images;
   }
 
-  get includeSnapshot(): boolean {
-    return this.#includeSnapshot;
-  }
-
-  get includeVersboseSnapshot(): boolean {
-    return this.#includeVerboseSnapshot;
+  get snapshotParams(): SnapshotParams | undefined {
+    return this.#snapshotParams;
   }
 
   async handle(
@@ -173,8 +173,22 @@ export class McpResponse implements Response {
     if (this.#includePages) {
       await context.createPagesSnapshot();
     }
-    if (this.#includeSnapshot) {
-      await context.createTextSnapshot(this.#includeVerboseSnapshot);
+
+    let formattedSnapshot: string | undefined;
+    if (this.#snapshotParams) {
+      await context.createTextSnapshot(this.#snapshotParams.verbose);
+      const snapshot = context.getTextSnapshot();
+      if (snapshot) {
+        if (this.#snapshotParams.filePath) {
+          await context.saveFile(
+            new TextEncoder().encode(formatA11ySnapshot(snapshot.root)),
+            this.#snapshotParams.filePath,
+          );
+          formattedSnapshot = `Saved screenshot to ${this.#snapshotParams.filePath}.`;
+        } else {
+          formattedSnapshot = formatA11ySnapshot(snapshot.root);
+        }
+      }
     }
 
     const bodies: {
@@ -281,6 +295,7 @@ export class McpResponse implements Response {
       bodies,
       consoleData,
       consoleListData,
+      formattedSnapshot,
     });
   }
 
@@ -294,6 +309,7 @@ export class McpResponse implements Response {
       };
       consoleData: ConsoleMessageData | undefined;
       consoleListData: ConsoleMessageData[] | undefined;
+      formattedSnapshot: string | undefined;
     },
   ): Array<TextContent | ImageContent> {
     const response = [`# ${toolName} response`];
@@ -339,13 +355,9 @@ Call ${handleDialog.name} to handle it before continuing.`);
       response.push(...parts);
     }
 
-    if (this.#includeSnapshot) {
-      const snapshot = context.getTextSnapshot();
-      if (snapshot) {
-        const formattedSnapshot = formatA11ySnapshot(snapshot.root);
-        response.push('## Page content');
-        response.push(formattedSnapshot);
-      }
+    if (data.formattedSnapshot) {
+      response.push('## Page content');
+      response.push(data.formattedSnapshot);
     }
 
     response.push(...this.#formatNetworkRequestData(context, data.bodies));

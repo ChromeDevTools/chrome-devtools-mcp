@@ -342,6 +342,7 @@ identifier (uid). Always use the latest snapshot. Prefer taking a snapshot over 
 
 **Parameters:**
 
+- **filePath** (string) _(optional)_: The absolute path, or a path relative to the current working directory, to save the snapshot to instead of attaching it to the response.
 - **verbose** (boolean) _(optional)_: Whether to include all possible information available in the full a11y tree. Default is false.
 
 ---

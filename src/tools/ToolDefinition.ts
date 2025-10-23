@@ -42,6 +42,11 @@ export interface ImageContentData {
   mimeType: string;
 }
 
+export interface SnapshotParams {
+  verbose?: boolean;
+  filePath?: string;
+}
+
 export interface Response {
   appendResponseLine(value: string): void;
   setIncludePages(value: boolean): void;
@@ -59,8 +64,7 @@ export interface Response {
       includePreservedMessages?: boolean;
     },
   ): void;
-  setIncludeSnapshot(value: boolean): void;
-  setIncludeSnapshot(value: boolean, verbose?: boolean): void;
+  includeSnapshot(params?: SnapshotParams): void;
   attachImage(value: ImageContentData): void;
   attachNetworkRequest(reqid: number): void;
   attachConsoleMessage(msgid: number): void;
