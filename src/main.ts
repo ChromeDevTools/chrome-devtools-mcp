@@ -15,6 +15,7 @@ import {McpResponse} from './McpResponse.js';
 import {Mutex} from './Mutex.js';
 import {
   McpServer,
+  StreamableHTTPServerTransport,
   StdioServerTransport,
   type CallToolResult,
   SetLevelRequestSchema,
@@ -184,7 +185,37 @@ for (const tool of tools) {
   registerTool(tool);
 }
 
-const transport = new StdioServerTransport();
-await server.connect(transport);
-logger('Chrome DevTools MCP Server connected');
-logDisclaimers();
+if (args.transport === 'stdio') {
+  const transport = new StdioServerTransport();
+  await server.connect(transport);
+  logger('Chrome DevTools MCP Server connected via stdio');
+  logDisclaimers();
+}
+
+if (args.transport === 'http') {
+  const { default: express } = await import('express');
+  const app = express();
+  app.use(express.json());
+
+  app.all("/mcp", async (req, res) => {
+    const transport = new StreamableHTTPServerTransport({
+      sessionIdGenerator: undefined,
+      enableJsonResponse: true,
+    });
+
+    res.on("close", () => {
+      transport.close();
+    });
+
+    await server.connect(transport);
+    return transport.handleRequest(req, res, req.body);
+  });
+
+  app.listen(3000, () => {
+    logger('Chrome DevTools MCP Server listening on port 3000 via http');
+    logDisclaimers();
+  }).on("error", (error) => {
+    logger('Chrome DevTools MCP Server error:', error);
+    process.exit(1);
+  });
+}

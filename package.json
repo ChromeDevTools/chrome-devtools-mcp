@@ -45,6 +45,7 @@
     "@rollup/plugin-node-resolve": "^16.0.3",
     "@stylistic/eslint-plugin": "^5.4.0",
     "@types/debug": "^4.1.12",
+    "@types/express": "^5.0.3",
     "@types/filesystem": "^0.0.36",
     "@types/node": "^24.3.3",
     "@types/sinon": "^17.0.4",
@@ -66,6 +67,7 @@
     "sinon": "^21.0.0",
     "typescript": "^5.9.2",
     "typescript-eslint": "^8.43.0",
+    "express": "^5.1.0",
     "yargs": "18.0.0"
   },
   "engines": {

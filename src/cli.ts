@@ -154,6 +154,12 @@ export const cliOptions = {
     default: true,
     describe: 'Set to false to exlcude tools related to network.',
   },
+  transport: {
+    type: 'string',
+    description: 'Transport to use for the MCP server. Available options are: stdio, http.',
+    choices: ['stdio', 'http'] as const,
+    default: 'stdio',
+  },
 } satisfies Record<string, YargsOptions>;
 
 export function parseArguments(version: string, argv = process.argv) {
@@ -206,6 +212,7 @@ export function parseArguments(version: string, argv = process.argv) {
         'Disable tools in the performance category',
       ],
       ['$0 --no-category-network', 'Disable tools in the network category'],
+      ['$0 --transport http', 'Use HTTP transport for the MCP server'],
     ]);
 
   return yargsInstance
