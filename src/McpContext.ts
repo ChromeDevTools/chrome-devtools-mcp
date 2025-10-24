@@ -325,10 +325,10 @@ export class McpContext implements Context {
    */
   async createPagesSnapshot(): Promise<Page[]> {
     this.#pages = (await this.browser.pages()).filter(page => {
-      if (this.#options.devtools) {
-        return true;
+      if (page.url().startsWith('devtools://')) {
+        return this.#options.devtools;
       }
-      return !page.url().startsWith('devtools://');
+      return true;
     });
     return this.#pages;
   }
