@@ -51,7 +51,7 @@ export async function ensureBrowserConnected(options: {
   const connectOptions: Parameters<typeof puppeteer.connect>[0] = {
     targetFilter: makeTargetFilter(),
     defaultViewport: null,
-    handleDevToolsAsPage: options.devtools,
+    handleDevToolsAsPage: true,
   };
 
   if (options.wsEndpoint) {
@@ -134,7 +134,7 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
       headless,
       args,
       acceptInsecureCerts: options.acceptInsecureCerts,
-      handleDevToolsAsPage: options.devtools,
+      handleDevToolsAsPage: true,
     });
     if (options.logFile) {
       // FIXME: we are probably subscribing too late to catch startup logs. We

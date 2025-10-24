@@ -347,8 +347,9 @@ Call ${handleDialog.name} to handle it before continuing.`);
       const parts = [`## Pages`];
       let idx = 0;
       for (const page of context.getPages()) {
+        const devToolsPage = context.getDevToolsPage(page);
         parts.push(
-          `${idx}: ${page.url()}${idx === context.getSelectedPageIdx() ? ' [selected]' : ''}`,
+          `${idx}: ${page.url()}${idx === context.getSelectedPageIdx() ? ' [selected]' : ''}${devToolsPage ? ' [has DevTools opened]' : ''}`,
         );
         idx++;
       }
