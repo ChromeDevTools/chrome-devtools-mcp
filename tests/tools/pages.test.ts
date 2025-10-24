@@ -14,7 +14,6 @@ import {
   closePage,
   selectPage,
   navigatePage,
-  navigatePageHistory,
   resizePage,
   handleDialog,
 } from '../../src/tools/pages.js';
@@ -29,7 +28,7 @@ describe('pages', () => {
       });
     });
   });
-  describe('browser_new_page', () => {
+  describe('new_page', () => {
     it('create a page', async () => {
       await withBrowser(async (response, context) => {
         assert.strictEqual(context.getSelectedPageIdx(), 0);
@@ -43,7 +42,7 @@ describe('pages', () => {
       });
     });
   });
-  describe('browser_close_page', () => {
+  describe('close_page', () => {
     it('closes a page', async () => {
       await withBrowser(async (response, context) => {
         const page = await context.newPage();
@@ -67,7 +66,7 @@ describe('pages', () => {
       });
     });
   });
-  describe('browser_select_page', () => {
+  describe('select_page', () => {
     it('selects a page', async () => {
       await withBrowser(async (response, context) => {
         await context.newPage();
@@ -78,7 +77,7 @@ describe('pages', () => {
       });
     });
   });
-  describe('browser_navigate_page', () => {
+  describe('navigate_page', () => {
     it('navigates to correct page', async () => {
       await withBrowser(async (response, context) => {
         await navigatePage.handler(
@@ -118,17 +117,11 @@ describe('pages', () => {
         }
       });
     });
-  });
-  describe('browser_navigate_page_history', () => {
     it('go back', async () => {
       await withBrowser(async (response, context) => {
         const page = context.getSelectedPage();
         await page.goto('data:text/html,<div>Hello MCP</div>');
-        await navigatePageHistory.handler(
-          {params: {navigate: 'back'}},
-          response,
-          context,
-        );
+        await navigatePage.handler({params: {type: 'back'}}, response, context);
 
         assert.equal(
           await page.evaluate(() => document.location.href),
@@ -142,8 +135,8 @@ describe('pages', () => {
         const page = context.getSelectedPage();
         await page.goto('data:text/html,<div>Hello MCP</div>');
         await page.goBack();
-        await navigatePageHistory.handler(
-          {params: {navigate: 'forward'}},
+        await navigatePage.handler(
+          {params: {type: 'forward'}},
           response,
           context,
         );
@@ -155,10 +148,27 @@ describe('pages', () => {
         assert.ok(response.includePages);
       });
     });
+    it('reload', async () => {
+      await withBrowser(async (response, context) => {
+        const page = context.getSelectedPage();
+        await page.goto('data:text/html,<div>Hello MCP</div>');
+        await navigatePage.handler(
+          {params: {type: 'reload'}},
+          response,
+          context,
+        );
+
+        assert.equal(
+          await page.evaluate(() => document.location.href),
+          'data:text/html,<div>Hello MCP</div>',
+        );
+        assert.ok(response.includePages);
+      });
+    });
     it('go forward with error', async () => {
       await withBrowser(async (response, context) => {
-        await navigatePageHistory.handler(
-          {params: {navigate: 'forward'}},
+        await navigatePage.handler(
+          {params: {type: 'forward'}},
           response,
           context,
         );
@@ -166,31 +176,25 @@ describe('pages', () => {
         assert.ok(
           response.responseLines
             .at(0)
-            ?.startsWith(
-              'Unable to navigate forward in currently selected page.',
-            ),
+            ?.startsWith('Unable to navigate forward in the selected page:'),
         );
         assert.ok(response.includePages);
       });
     });
     it('go back with error', async () => {
       await withBrowser(async (response, context) => {
-        await navigatePageHistory.handler(
-          {params: {navigate: 'back'}},
-          response,
-          context,
-        );
+        await navigatePage.handler({params: {type: 'back'}}, response, context);
 
         assert.ok(
           response.responseLines
             .at(0)
-            ?.startsWith('Unable to navigate back in currently selected page.'),
+            ?.startsWith('Unable to navigate back in the selected page:'),
         );
         assert.ok(response.includePages);
       });
     });
   });
-  describe('browser_resize', () => {
+  describe('resize', () => {
     it('create a page', async () => {
       await withBrowser(async (response, context) => {
         assert.strictEqual(context.getSelectedPageIdx(), 0);

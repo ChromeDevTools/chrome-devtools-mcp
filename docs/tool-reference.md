@@ -11,11 +11,10 @@
   - [`hover`](#hover)
   - [`press_key`](#press_key)
   - [`upload_file`](#upload_file)
-- **[Navigation automation](#navigation-automation)** (7 tools)
+- **[Navigation automation](#navigation-automation)** (6 tools)
   - [`close_page`](#close_page)
   - [`list_pages`](#list_pages)
   - [`navigate_page`](#navigate_page)
-  - [`navigate_page_history`](#navigate_page_history)
   - [`new_page`](#new_page)
   - [`select_page`](#select_page)
   - [`wait_for`](#wait_for)
@@ -151,18 +150,8 @@
 **Parameters:**
 
 - **timeout** (integer) _(optional)_: Maximum wait time in milliseconds. If set to 0, the default timeout will be used.
-- **url** (string) **(required)**: URL to navigate the page to
-
----
-
-### `navigate_page_history`
-
-**Description:** Navigates the currently selected page.
-
-**Parameters:**
-
-- **navigate** (enum: "back", "forward") **(required)**: Whether to navigate back or navigate forward in the selected pages history
-- **timeout** (integer) _(optional)_: Maximum wait time in milliseconds. If set to 0, the default timeout will be used.
+- **type** (enum: "url", "back", "forward", "reload") _(optional)_: Navigate the page by URL, back or forward in history, or reload.
+- **url** (string) _(optional)_: Target URL (only type=url)
 
 ---
 

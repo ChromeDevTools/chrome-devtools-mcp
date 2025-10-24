@@ -105,35 +105,13 @@ export const navigatePage = defineTool({
     readOnlyHint: false,
   },
   schema: {
-    url: zod.string().describe('URL to navigate the page to'),
-    ...timeoutSchema,
-  },
-  handler: async (request, response, context) => {
-    const page = context.getSelectedPage();
-
-    await context.waitForEventsAfterAction(async () => {
-      await page.goto(request.params.url, {
-        timeout: request.params.timeout,
-      });
-    });
-
-    response.setIncludePages(true);
-  },
-});
-
-export const navigatePageHistory = defineTool({
-  name: 'navigate_page_history',
-  description: `Navigates the currently selected page.`,
-  annotations: {
-    category: ToolCategory.NAVIGATION,
-    readOnlyHint: false,
-  },
-  schema: {
-    navigate: zod
-      .enum(['back', 'forward'])
+    type: zod
+      .enum(['url', 'back', 'forward', 'reload'])
+      .optional()
       .describe(
-        'Whether to navigate back or navigate forward in the selected pages history',
+        'Navigate the page by URL, back or forward in history, or reload.',
       ),
+    url: zod.string().optional().describe('Target URL (only type=url)'),
     ...timeoutSchema,
   },
   handler: async (request, response, context) => {
@@ -142,17 +120,67 @@ export const navigatePageHistory = defineTool({
       timeout: request.params.timeout,
     };
 
-    try {
-      if (request.params.navigate === 'back') {
-        await page.goBack(options);
-      } else {
-        await page.goForward(options);
-      }
-    } catch (error) {
-      response.appendResponseLine(
-        `Unable to navigate ${request.params.navigate} in currently selected page. ${error.message}`,
-      );
+    if (!request.params.type && !request.params.url) {
+      throw new Error('Either URL or a type is required.');
     }
+
+    if (!request.params.type) {
+      request.params.type = 'url';
+    }
+
+    await context.waitForEventsAfterAction(async () => {
+      switch (request.params.type) {
+        case 'url':
+          if (!request.params.url) {
+            throw new Error('A URL is required for navigation of type=url.');
+          }
+          try {
+            await page.goto(request.params.url, options);
+            response.appendResponseLine(
+              `Successfully navigated to ${request.params.url}.`,
+            );
+          } catch (error) {
+            response.appendResponseLine(
+              `Unable to navigate in the  selected page: ${error.message}.`,
+            );
+          }
+          break;
+        case 'back':
+          try {
+            await page.goBack(options);
+            response.appendResponseLine(
+              `Successfully navigated back to ${page.url()}.`,
+            );
+          } catch (error) {
+            response.appendResponseLine(
+              `Unable to navigate back in the selected page: ${error.message}.`,
+            );
+          }
+          break;
+        case 'forward':
+          try {
+            await page.goForward(options);
+            response.appendResponseLine(
+              `Successfully navigated forward to ${page.url()}.`,
+            );
+          } catch (error) {
+            response.appendResponseLine(
+              `Unable to navigate forward in the selected page: ${error.message}.`,
+            );
+          }
+          break;
+        case 'reload':
+          try {
+            await page.reload(options);
+            response.appendResponseLine(`Successfully reloaded the page.`);
+          } catch (error) {
+            response.appendResponseLine(
+              `Unable to reload the selected page: ${error.message}.`,
+            );
+          }
+          break;
+      }
+    });
 
     response.setIncludePages(true);
   },
