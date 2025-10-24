@@ -184,7 +184,7 @@ export class McpResponse implements Response {
             new TextEncoder().encode(formatA11ySnapshot(snapshot.root)),
             this.#snapshotParams.filePath,
           );
-          formattedSnapshot = `Saved screenshot to ${this.#snapshotParams.filePath}.`;
+          formattedSnapshot = `Saved snapshot to ${this.#snapshotParams.filePath}.`;
         } else {
           formattedSnapshot = formatA11ySnapshot(snapshot.root);
         }

@@ -15,7 +15,8 @@ export const takeSnapshot = defineTool({
 identifier (uid). Always use the latest snapshot. Prefer taking a snapshot over taking a screenshot.`,
   annotations: {
     category: ToolCategory.DEBUGGING,
-    readOnlyHint: true,
+    // Not read-only due to filePath param.
+    readOnlyHint: false,
   },
   schema: {
     verbose: zod

@@ -15,7 +15,8 @@ export const screenshot = defineTool({
   description: `Take a screenshot of the page or element.`,
   annotations: {
     category: ToolCategory.DEBUGGING,
-    readOnlyHint: true,
+    // Not read-only due to filePath param.
+    readOnlyHint: false,
   },
   schema: {
     format: zod

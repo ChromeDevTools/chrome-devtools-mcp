@@ -139,7 +139,7 @@ uid=1_0 RootWebArea "My test page"
           result[0].text,
           `# test response
 ## Page content
-Saved screenshot to ${filePath}.`,
+Saved snapshot to ${filePath}.`,
         );
       });
       const content = await readFile(filePath, 'utf-8');
