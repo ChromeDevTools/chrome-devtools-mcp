@@ -78,4 +78,22 @@ describe('McpContext', () => {
       sinon.assert.calledWithExactly(stub, page, 2, 10);
     });
   });
+
+  it('should should detect open DevTools pages', async () => {
+    await withBrowser(
+      async (_response, context) => {
+        const page = await context.newPage();
+        // TODO: we do not know when the CLI flag to auto open DevTools will run
+        // so we need this until
+        // https://github.com/puppeteer/puppeteer/issues/14368 is there.
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        await context.createPagesSnapshot();
+        assert.ok(context.getDevToolsPage(page));
+      },
+      {
+        autoOpenDevToos: true,
+        force: true,
+      },
+    );
+  });
 });

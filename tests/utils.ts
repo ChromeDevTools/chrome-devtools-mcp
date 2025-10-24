@@ -16,14 +16,16 @@ let browser: Browser | undefined;
 
 export async function withBrowser(
   cb: (response: McpResponse, context: McpContext) => Promise<void>,
-  options: {debug?: boolean} = {},
+  options: {debug?: boolean; autoOpenDevToos?: boolean; force?: boolean} = {},
 ) {
   const {debug = false} = options;
-  if (!browser) {
+  if (!browser || options.force) {
     browser = await puppeteer.launch({
       executablePath: process.env.PUPPETEER_EXECUTABLE_PATH,
       headless: !debug,
       defaultViewport: null,
+      devtools: options.autoOpenDevToos ?? false,
+      handleDevToolsAsPage: true,
     });
   }
   const newPage = await browser.newPage();
@@ -40,7 +42,7 @@ export async function withBrowser(
     browser,
     logger('test'),
     {
-      devtools: false,
+      experimentalDevToolsDebugging: false,
     },
     Locator,
   );

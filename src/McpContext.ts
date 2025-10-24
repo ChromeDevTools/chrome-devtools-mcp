@@ -7,6 +7,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
+import {extractUrlLikeFromDevToolsTitle, urlsEqual} from './DevtoolsUtils.js';
 import type {ListenerMap} from './PageCollector.js';
 import {NetworkCollector, PageCollector} from './PageCollector.js';
 import {Locator} from './third_party/index.js';
@@ -40,8 +41,8 @@ export interface TextSnapshot {
 }
 
 interface McpContextOptions {
-  // Whether the DevTools windows are exposed as pages.
-  devtools: boolean;
+  // Whether the DevTools windows are exposed as pages for debugging of DevTools.
+  experimentalDevToolsDebugging: boolean;
 }
 
 const DEFAULT_TIMEOUT = 5_000;
@@ -82,6 +83,7 @@ export class McpContext implements Context {
 
   // The most recent page state.
   #pages: Page[] = [];
+  #pageToDevToolsPage = new Map<Page, Page>();
   #selectedPageIdx = 0;
   // The most recent snapshot.
   #textSnapshot: TextSnapshot | null = null;
@@ -324,17 +326,55 @@ export class McpContext implements Context {
    * Creates a snapshot of the pages.
    */
   async createPagesSnapshot(): Promise<Page[]> {
-    this.#pages = (await this.browser.pages()).filter(page => {
-      if (page.url().startsWith('devtools://')) {
-        return this.#options.devtools;
-      }
-      return true;
+    const allPages = await this.browser.pages();
+
+    this.#pages = allPages.filter(page => {
+      // If we allow debugging DevTools windows, return all pages.
+      // If we are in regular mode, the user should only see non-DevTools page.
+      return (
+        this.#options.experimentalDevToolsDebugging ||
+        !page.url().startsWith('devtools://')
+      );
     });
+
+    await this.#detectOpenDevToolsWindows(allPages);
+
     return this.#pages;
+  }
+
+  async #detectOpenDevToolsWindows(pages: Page[]) {
+    this.#pageToDevToolsPage = new Map<Page, Page>();
+    for (const devToolsPage of pages) {
+      if (devToolsPage.url().startsWith('devtools://')) {
+        try {
+          const data = await devToolsPage
+            // @ts-expect-error no types for _client().
+            ._client()
+            .send('Target.getTargetInfo');
+          const devtoolsPageTitle = data.targetInfo.title;
+          const urlLike = extractUrlLikeFromDevToolsTitle(devtoolsPageTitle);
+          if (!urlLike) {
+            continue;
+          }
+          // TODO: lookup without a loop.
+          for (const page of this.#pages) {
+            if (urlsEqual(page.url(), urlLike)) {
+              this.#pageToDevToolsPage.set(page, devToolsPage);
+            }
+          }
+        } catch {
+          // no-op
+        }
+      }
+    }
   }
 
   getPages(): Page[] {
     return this.#pages;
+  }
+
+  getDevToolsPage(page: Page): Page | undefined {
+    return this.#pageToDevToolsPage.get(page);
   }
 
   /**
