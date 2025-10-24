@@ -39,6 +39,11 @@ export interface TextSnapshot {
   snapshotId: string;
 }
 
+interface McpContextOptions {
+  // Whether the DevTools windows are exposed as pages.
+  devtools: boolean;
+}
+
 const DEFAULT_TIMEOUT = 5_000;
 const NAVIGATION_TIMEOUT = 10_000;
 
@@ -92,15 +97,18 @@ export class McpContext implements Context {
   #traceResults: TraceResult[] = [];
 
   #locatorClass: typeof Locator;
+  #options: McpContextOptions;
 
   private constructor(
     browser: Browser,
     logger: Debugger,
+    options: McpContextOptions,
     locatorClass: typeof Locator,
   ) {
     this.browser = browser;
     this.logger = logger;
     this.#locatorClass = locatorClass;
+    this.#options = options;
 
     this.#networkCollector = new NetworkCollector(this.browser);
 
@@ -132,10 +140,11 @@ export class McpContext implements Context {
   static async from(
     browser: Browser,
     logger: Debugger,
+    opts: McpContextOptions,
     /* Let tests use unbundled Locator class to avoid overly strict checks within puppeteer that fail when mixing bundled and unbundled class instances */
     locatorClass: typeof Locator = Locator,
   ) {
-    const context = new McpContext(browser, logger, locatorClass);
+    const context = new McpContext(browser, logger, opts, locatorClass);
     await context.#init();
     return context;
   }
@@ -315,7 +324,12 @@ export class McpContext implements Context {
    * Creates a snapshot of the pages.
    */
   async createPagesSnapshot(): Promise<Page[]> {
-    this.#pages = await this.browser.pages();
+    this.#pages = (await this.browser.pages()).filter(page => {
+      if (this.#options.devtools) {
+        return true;
+      }
+      return !page.url().startsWith('devtools://');
+    });
     return this.#pages;
   }
 

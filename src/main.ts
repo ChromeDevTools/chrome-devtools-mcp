@@ -81,7 +81,9 @@ async function getContext(): Promise<McpContext> {
         });
 
   if (context?.browser !== browser) {
-    context = await McpContext.from(browser, logger);
+    context = await McpContext.from(browser, logger, {
+      devtools,
+    });
   }
   return context;
 }
