@@ -68,7 +68,7 @@ body:
       label: Node version
       description: >
         Please verify you have the minimal supported version listed in the README.md
-        
+
   - id: operating-system
     type: dropdown
     attributes:
