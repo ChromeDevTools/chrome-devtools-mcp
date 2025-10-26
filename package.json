@@ -51,7 +51,7 @@
     "@types/yargs": "^17.0.33",
     "@typescript-eslint/eslint-plugin": "^8.43.0",
     "@typescript-eslint/parser": "^8.43.0",
-    "chrome-devtools-frontend": "1.0.1532884",
+    "chrome-devtools-frontend": "1.0.1534717",
     "core-js": "3.46.0",
     "debug": "4.4.3",
     "eslint": "^9.35.0",
