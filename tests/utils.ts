@@ -6,7 +6,12 @@
 import logger from 'debug';
 import type {Browser} from 'puppeteer';
 import puppeteer, {Locator} from 'puppeteer';
-import type {Frame, HTTPRequest, HTTPResponse} from 'puppeteer-core';
+import type {
+  Frame,
+  HTTPRequest,
+  HTTPResponse,
+  LaunchOptions,
+} from 'puppeteer-core';
 
 import {McpContext} from '../src/McpContext.js';
 import {McpResponse} from '../src/McpResponse.js';
@@ -18,11 +23,12 @@ export async function withBrowser(
   cb: (response: McpResponse, context: McpContext) => Promise<void>,
   options: {debug?: boolean; autoOpenDevTools?: boolean} = {},
 ) {
-  const launchOptions = {
+  const launchOptions: LaunchOptions = {
     executablePath: process.env.PUPPETEER_EXECUTABLE_PATH,
     headless: !options.debug,
     defaultViewport: null,
     devtools: options.autoOpenDevTools ?? false,
+    pipe: true,
     handleDevToolsAsPage: true,
   };
   const key = JSON.stringify(launchOptions);
