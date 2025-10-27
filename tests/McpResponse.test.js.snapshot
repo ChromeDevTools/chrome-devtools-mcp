@@ -1,0 +1,35 @@
+exports[`McpResponse > returns correctly formatted snapshot for a simple tree 1`] = `
+# test response
+## Page content
+uid=1_0 RootWebArea "My test page" url="about:blank"
+  uid=1_1 button "Click me" focusable focused
+  uid=1_2 textbox value="Input"
+
+`;
+
+exports[`McpResponse > returns values for textboxes 1`] = `
+# test response
+## Page content
+uid=1_0 RootWebArea "My test page" url="about:blank"
+  uid=1_1 StaticText "username"
+  uid=1_2 textbox "username" focusable focused value="mcp"
+
+`;
+
+exports[`McpResponse > returns verbose snapshot 1`] = `
+# test response
+## Page content
+uid=1_0 RootWebArea "My test page" url="about:blank"
+  uid=1_1 ignored
+    uid=1_2 ignored
+      uid=1_3 complementary
+        uid=1_4 StaticText "test"
+          uid=1_5 InlineTextBox "test"
+
+`;
+
+exports[`McpResponse > saves snapshot to file 1`] = `
+# test response
+## Page content
+Saved snapshot to /tmp/test-screenshot.png.
+`;
