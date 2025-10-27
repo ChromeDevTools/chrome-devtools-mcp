@@ -17,14 +17,20 @@ updates:
         exclude-patterns:
           - 'puppeteer*'
           - 'chrome-devtools-frontend'
+          - '@modelcontextprotocol/sdk'
+          - 'yargs'
+          - 'debug'
+          - 'core-js'
         patterns:
           - '*'
-      puppeteer:
+      bundled:
         patterns:
           - 'puppeteer*'
-      chrome-devtools-frontend:
-        patterns:
           - 'chrome-devtools-frontend'
+          - '@modelcontextprotocol/sdk'
+          - 'yargs'
+          - 'debug'
+          - 'core-js'
   - package-ecosystem: github-actions
     directory: /
     schedule:
