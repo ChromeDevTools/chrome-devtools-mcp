@@ -186,6 +186,8 @@ async function stopTracingAndAppendOutput(
   }
 }
 
+// This key is expected to be visible.
+// b/349721878
 const CRUX_API_KEY = 'AIzaSyCCSOx25vrb5z0tbedCB3_JRzzbVW6Uwgw';
 const CRUX_ENDPOINT = `https://chromeuxreport.googleapis.com/v1/records:queryRecord?key=${CRUX_API_KEY}`;
 

@@ -8,13 +8,13 @@ import {describe, it, afterEach} from 'node:test';
 
 import sinon from 'sinon';
 
-import type {Context} from '../../src/tools/ToolDefinition.js';
 import {
   analyzeInsight,
   queryChromeUXReport,
   startTrace,
   stopTrace,
 } from '../../src/tools/performance.js';
+import type {Context} from '../../src/tools/ToolDefinition.js';
 import type {TraceResult} from '../../src/trace-processing/parse.js';
 import {
   parseRawTraceBuffer,
@@ -289,7 +289,7 @@ describe('performance', () => {
         await queryChromeUXReport.handler(
           {params: {origin: 'https://example.com'}},
           response,
-          {} as any,
+          {} as Context,
         );
 
         assert.ok(fetchStub.calledOnce);
@@ -313,7 +313,7 @@ describe('performance', () => {
         await queryChromeUXReport.handler(
           {params: {url: 'https://example.com'}},
           response,
-          {} as any,
+          {} as Context,
         );
 
         assert.ok(fetchStub.calledOnce);
@@ -334,7 +334,7 @@ describe('performance', () => {
             },
           },
           response,
-          {} as any,
+          {} as Context,
         );
 
         assert.ok(
@@ -350,7 +350,7 @@ describe('performance', () => {
         await queryChromeUXReport.handler(
           {params: {}},
           response,
-          {} as any,
+          {} as Context,
         );
 
         assert.ok(
@@ -370,7 +370,7 @@ describe('performance', () => {
         await queryChromeUXReport.handler(
           {params: {origin: 'https://example.com'}},
           response,
-          {} as any,
+          {} as Context,
         );
 
         assert.ok(fetchStub.calledOnce);
