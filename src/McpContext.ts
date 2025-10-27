@@ -337,12 +337,13 @@ export class McpContext implements Context {
       );
     });
 
-    await this.#detectOpenDevToolsWindows(allPages);
+    await this.detectOpenDevToolsWindows();
 
     return this.#pages;
   }
 
-  async #detectOpenDevToolsWindows(pages: Page[]) {
+  async detectOpenDevToolsWindows() {
+    const pages = await this.browser.pages();
     this.#pageToDevToolsPage = new Map<Page, Page>();
     for (const devToolsPage of pages) {
       if (devToolsPage.url().startsWith('devtools://')) {
@@ -375,6 +376,45 @@ export class McpContext implements Context {
 
   getDevToolsPage(page: Page): Page | undefined {
     return this.#pageToDevToolsPage.get(page);
+  }
+
+  async getDevToolsData(): Promise<undefined | {requestId?: number}> {
+    try {
+      const selectedPage = this.getSelectedPage();
+      const devtoolsPage = this.getDevToolsPage(selectedPage);
+      if (devtoolsPage) {
+        const cdpRequestId = await devtoolsPage.evaluate(async () => {
+          // @ts-expect-error no types
+          const UI = await import('/bundled/ui/legacy/legacy.js');
+          // @ts-expect-error no types
+          const SDK = await import('/bundled/core/sdk/sdk.js');
+          const request = UI.Context.Context.instance().flavor(
+            SDK.NetworkRequest.NetworkRequest,
+          );
+          return request?.requestId();
+        });
+        if (!cdpRequestId) {
+          this.logger('no context request');
+          return;
+        }
+        const request = this.#networkCollector.find(selectedPage, request => {
+          // @ts-expect-error id is internal.
+          return request.id === cdpRequestId;
+        });
+        if (!request) {
+          this.logger('no collected request for ' + cdpRequestId);
+          return;
+        }
+        return {
+          requestId: this.#networkCollector.getIdForResource(request),
+        };
+      } else {
+        this.logger('no devtools page deteched');
+      }
+    } catch (err) {
+      this.logger('error getting devtools data', err);
+    }
+    return;
   }
 
   /**

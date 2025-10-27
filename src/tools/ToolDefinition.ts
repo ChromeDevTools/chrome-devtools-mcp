@@ -65,6 +65,7 @@ export interface Response {
     },
   ): void;
   includeSnapshot(params?: SnapshotParams): void;
+  includeDevtoolsData(value: boolean): void;
   attachImage(value: ImageContentData): void;
   attachNetworkRequest(reqid: number): void;
   attachConsoleMessage(msgid: number): void;

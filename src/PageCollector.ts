@@ -173,6 +173,22 @@ export class PageCollector<T> {
 
     throw new Error('Request not found for selected page');
   }
+
+  find(page: Page, filter: (item: T) => boolean): T | undefined {
+    const navigations = this.storage.get(page);
+    if (!navigations) {
+      return;
+    }
+
+    for (const navigation of navigations) {
+      for (const collected of navigation) {
+        if (filter(collected)) {
+          return collected;
+        }
+      }
+    }
+    return;
+  }
 }
 
 export class NetworkCollector extends PageCollector<HTTPRequest> {
