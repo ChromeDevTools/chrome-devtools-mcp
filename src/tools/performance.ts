@@ -228,18 +228,6 @@ export const queryChromeUXReport = defineTool({
       return;
     }
 
-    const body = JSON.stringify({
-      origin,
-      url,
-      formFactor,
-      metrics: [
-        'first_contentful_paint',
-        'largest_contentful_paint',
-        'cumulative_layout_shift',
-        'interaction_to_next_paint',
-      ],
-    });
-
     try {
       const cruxResponse = await fetch(CRUX_ENDPOINT, {
         method: 'POST',
@@ -247,7 +235,11 @@ export const queryChromeUXReport = defineTool({
           'Content-Type': 'application/json',
           referer: 'devtools://mcp',
         },
-        body,
+        body: JSON.stringify({
+          origin,
+          url,
+          formFactor,
+        }),
       });
 
       const data = await cruxResponse.json();
