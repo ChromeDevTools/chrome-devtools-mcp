@@ -33,3 +33,13 @@ exports[`McpResponse > saves snapshot to file 1`] = `
 ## Page content
 Saved snapshot to /tmp/test-screenshot.png.
 `;
+
+exports[`McpResponse > saves snapshot to file 2`] = `
+uid=1_0 RootWebArea "My test page" url="about:blank"
+  uid=1_1 ignored
+    uid=1_2 ignored
+      uid=1_3 complementary
+        uid=1_4 StaticText "test"
+          uid=1_5 InlineTextBox "test"
+
+`;

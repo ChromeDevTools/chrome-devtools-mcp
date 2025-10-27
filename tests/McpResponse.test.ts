@@ -115,16 +115,7 @@ Testing 2`,
         t.assert.snapshot?.(result[0].text);
       });
       const content = await readFile(filePath, 'utf-8');
-      assert.strictEqual(
-        content,
-        `uid=1_0 RootWebArea "My test page" url="about:blank"
-  uid=1_1 ignored
-    uid=1_2 ignored
-      uid=1_3 complementary
-        uid=1_4 StaticText "test"
-          uid=1_5 InlineTextBox "test"
-`,
-      );
+      t.assert.snapshot?.(content);
     } finally {
       await rm(filePath, {force: true});
     }
@@ -459,6 +450,7 @@ No requests found.`,
         ];
       };
       const result = await response.handle('test', context);
+
       assert.strictEqual(
         result[0].text,
         `# test response
