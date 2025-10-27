@@ -86,7 +86,7 @@ describe('McpContext', () => {
         // TODO: we do not know when the CLI flag to auto open DevTools will run
         // so we need this until
         // https://github.com/puppeteer/puppeteer/issues/14368 is there.
-        await new Promise(resolve => setTimeout(resolve, 3000));
+        await new Promise(resolve => setTimeout(resolve, 5000));
         await context.createPagesSnapshot();
         assert.ok(context.getDevToolsPage(page));
       },
