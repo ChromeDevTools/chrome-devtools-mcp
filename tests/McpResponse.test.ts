@@ -54,8 +54,13 @@ Testing 2`,
   it('returns correctly formatted snapshot for a simple tree', async () => {
     await withBrowser(async (response, context) => {
       const page = context.getSelectedPage();
-      await page.setContent(`<!DOCTYPE html>
-<button>Click me</button><input type="text" value="Input">`);
+      await page.setContent(
+        html`<button>Click me</button
+          ><input
+            type="text"
+            value="Input"
+          />`,
+      );
       await page.focus('button');
       response.includeSnapshot();
       const result = await response.handle('test', context);
@@ -64,7 +69,7 @@ Testing 2`,
         result[0].text,
         `# test response
 ## Page content
-uid=1_0 RootWebArea
+uid=1_0 RootWebArea "My test page"
   uid=1_1 button "Click me" focusable focused
   uid=1_2 textbox value="Input"
 `,

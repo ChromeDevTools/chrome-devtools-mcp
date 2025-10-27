@@ -10,14 +10,19 @@ import sinon from 'sinon';
 
 import type {TraceResult} from '../src/trace-processing/parse.js';
 
-import {withBrowser} from './utils.js';
+import {html, withBrowser} from './utils.js';
 
 describe('McpContext', () => {
   it('list pages', async () => {
     await withBrowser(async (_response, context) => {
       const page = context.getSelectedPage();
-      await page.setContent(`<!DOCTYPE html>
-<button>Click me</button><input type="text" value="Input">`);
+      await page.setContent(
+        html`<button>Click me</button
+          ><input
+            type="text"
+            value="Input"
+          />`,
+      );
       await context.createTextSnapshot();
       assert.ok(await context.getElementByUid('1_1'));
       await context.createTextSnapshot();
