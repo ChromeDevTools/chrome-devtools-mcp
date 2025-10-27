@@ -91,8 +91,7 @@ describe('McpContext', () => {
         assert.ok(context.getDevToolsPage(page));
       },
       {
-        autoOpenDevToos: true,
-        force: true,
+        autoOpenDevTools: true,
       },
     );
   });

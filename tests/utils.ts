@@ -12,21 +12,25 @@ import {McpContext} from '../src/McpContext.js';
 import {McpResponse} from '../src/McpResponse.js';
 import {stableIdSymbol} from '../src/PageCollector.js';
 
-let browser: Browser | undefined;
+const browsers = new Map<string, Browser>();
 
 export async function withBrowser(
   cb: (response: McpResponse, context: McpContext) => Promise<void>,
-  options: {debug?: boolean; autoOpenDevToos?: boolean; force?: boolean} = {},
+  options: {debug?: boolean; autoOpenDevTools?: boolean} = {},
 ) {
-  const {debug = false} = options;
-  if (!browser || options.force) {
-    browser = await puppeteer.launch({
-      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH,
-      headless: !debug,
-      defaultViewport: null,
-      devtools: options.autoOpenDevToos ?? false,
-      handleDevToolsAsPage: true,
-    });
+  const launchOptions = {
+    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH,
+    headless: !options.debug,
+    defaultViewport: null,
+    devtools: options.autoOpenDevTools ?? false,
+    handleDevToolsAsPage: true,
+  };
+  const key = JSON.stringify(launchOptions);
+
+  let browser = browsers.get(key);
+  if (!browser) {
+    browser = await puppeteer.launch(launchOptions);
+    browsers.set(key, browser);
   }
   const newPage = await browser.newPage();
   // Close other pages.
