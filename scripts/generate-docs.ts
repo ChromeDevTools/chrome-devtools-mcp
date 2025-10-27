@@ -44,7 +44,7 @@ function addCrossLinks(text: string, tools: ToolWithAnnotations[]): string {
 
   for (const toolName of sortedToolNames) {
     // Create regex to match tool name (case insensitive, word boundaries)
-    const regex = new RegExp(`\\b${toolName.replace(/_/g, '_')}\\b`, 'gi');
+    const regex = new RegExp(`\\b${toolName}\\b`, 'gi');
 
     result = result.replace(regex, match => {
       // Only create link if the match isn't already inside a link
@@ -274,7 +274,8 @@ async function generateToolDocumentation(): Promise<void> {
 
           const propertyNames = Object.keys(properties).sort();
           for (const propName of propertyNames) {
-            const prop = properties[propName] as string;
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const prop = properties[propName] as any;
             const isRequired = required.includes(propName);
             const requiredText = isRequired
               ? ' **(required)**'
@@ -282,7 +283,7 @@ async function generateToolDocumentation(): Promise<void> {
 
             let typeInfo = prop.type || 'unknown';
             if (prop.enum) {
-              typeInfo = `enum: ${prop.enum.map(v => `"${v}"`).join(', ')}`;
+              typeInfo = `enum: ${prop.enum.map((v: string) => `"${v}"`).join(', ')}`;
             }
 
             markdown += `- **${propName}** (${typeInfo})${requiredText}`;
