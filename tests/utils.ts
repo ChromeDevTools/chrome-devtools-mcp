@@ -6,12 +6,7 @@
 import logger from 'debug';
 import type {Browser} from 'puppeteer';
 import puppeteer, {Locator} from 'puppeteer';
-import type {
-  Frame,
-  HTTPRequest,
-  HTTPResponse,
-  LaunchOptions,
-} from 'puppeteer-core';
+import type {Frame, HTTPRequest, HTTPResponse, LaunchOptions} from 'puppeteer-core';
 
 import {McpContext} from '../src/McpContext.js';
 import {McpResponse} from '../src/McpResponse.js';
@@ -21,7 +16,7 @@ const browsers = new Map<string, Browser>();
 
 export async function withBrowser(
   cb: (response: McpResponse, context: McpContext) => Promise<void>,
-  options: {debug?: boolean; autoOpenDevTools?: boolean} = {},
+  options: {debug?: boolean; autoOpenDevTools?: boolean} = {}
 ) {
   const launchOptions: LaunchOptions = {
     executablePath: process.env.PUPPETEER_EXECUTABLE_PATH,
@@ -45,7 +40,7 @@ export async function withBrowser(
       if (page !== newPage) {
         await page.close();
       }
-    }),
+    })
   );
   const response = new McpResponse();
   const context = await McpContext.from(
@@ -54,7 +49,7 @@ export async function withBrowser(
     {
       experimentalDevToolsDebugging: false,
     },
-    Locator,
+    Locator
   );
 
   await cb(response, context);
@@ -72,7 +67,7 @@ export function getMockRequest(
     stableId?: number;
     navigationRequest?: boolean;
     frame?: Frame;
-  } = {},
+  } = {}
 ): HTTPRequest {
   return {
     url() {
@@ -120,7 +115,7 @@ export function getMockRequest(
 export function getMockResponse(
   options: {
     status?: number;
-  } = {},
+  } = {}
 ): HTTPResponse {
   return {
     status() {
@@ -129,10 +124,7 @@ export function getMockResponse(
   } as HTTPResponse;
 }
 
-export function html(
-  strings: TemplateStringsArray,
-  ...values: unknown[]
-): string {
+export function html(strings: TemplateStringsArray, ...values: unknown[]): string {
   const bodyContent = strings.reduce((acc, str, i) => {
     return acc + str + (values[i] || '');
   }, '');
