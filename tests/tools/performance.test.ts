@@ -8,6 +8,7 @@ import {describe, it, afterEach} from 'node:test';
 
 import sinon from 'sinon';
 
+import type {Context} from '../../src/tools/ToolDefinition.js';
 import {
   analyzeInsight,
   queryChromeUXReport,

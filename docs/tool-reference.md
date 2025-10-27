@@ -22,8 +22,9 @@
   - [`emulate_cpu`](#emulate_cpu)
   - [`emulate_network`](#emulate_network)
   - [`resize_page`](#resize_page)
-- **[Performance](#performance)** (3 tools)
+- **[Performance](#performance)** (4 tools)
   - [`performance_analyze_insight`](#performance_analyze_insight)
+  - [`performance_query_chrome_ux_report`](#performance_query_chrome_ux_report)
   - [`performance_start_trace`](#performance_start_trace)
   - [`performance_stop_trace`](#performance_stop_trace)
 - **[Network](#network)** (2 tools)
@@ -232,6 +233,18 @@
 
 ---
 
+### `performance_query_chrome_ux_report`
+
+**Description:** Queries the Chrome UX Report (CrUX) API to get real-user experience metrics (like Core Web Vitals) for a given URL or origin. You must provide EITHER "origin" OR "url", but not both. You can optionally filter by "formFactor".
+
+**Parameters:**
+
+- **formFactor** (enum: "DESKTOP", "PHONE", "TABLET") _(optional)_: The form factor to filter by. If omitted, data for all form factors is aggregated.
+- **origin** (string) _(optional)_: The origin to query, e.g., "https://www.google.com". Do not provide this if "url" is specified.
+- **url** (string) _(optional)_: The specific page URL to query, e.g., "https://www.google.com/search?q=puppies". Do not provide this if "origin" is specified.
+
+---
+
 ### `performance_start_trace`
 
 **Description:** Starts a performance trace recording on the selected page. This can be used to look for performance problems and insights to improve the performance of the page. It will also report Core Web Vital (CWV) scores for the page.
@@ -288,14 +301,15 @@ so returned values have to JSON-serializable.
 
 - **args** (array) _(optional)_: An optional list of arguments to pass to the function.
 - **function** (string) **(required)**: A JavaScript function declaration to be executed by the tool in the currently selected page.
-  Example without arguments: `() => {
+Example without arguments: `() => {
   return document.title
 }` or `async () => {
   return await fetch("example.com")
 }`.
-  Example with arguments: `(el) => {
+Example with arguments: `(el) => {
   return el.innerText;
 }`
+
 
 ---
 
