@@ -29,6 +29,7 @@ export default defineConfig([
         projectService: {
           allowDefaultProject: [
             '.prettierrc.cjs',
+            'puppeteer.config.cjs',
             'eslint.config.mjs',
             'rollup.config.mjs',
           ],
