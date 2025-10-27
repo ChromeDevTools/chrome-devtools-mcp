@@ -39,7 +39,7 @@
   "mcpName": "io.github.ChromeDevTools/chrome-devtools-mcp",
   "devDependencies": {
     "@eslint/js": "^9.35.0",
-    "@modelcontextprotocol/sdk": "1.20.1",
+    "@modelcontextprotocol/sdk": "1.20.2",
     "@rollup/plugin-commonjs": "^28.0.8",
     "@rollup/plugin-json": "^6.1.0",
     "@rollup/plugin-node-resolve": "^16.0.3",
@@ -59,7 +59,7 @@
     "eslint-plugin-import": "^2.32.0",
     "globals": "^16.4.0",
     "prettier": "^3.6.2",
-    "puppeteer": "24.26.0",
+    "puppeteer": "24.26.1",
     "rollup": "4.52.5",
     "rollup-plugin-cleanup": "^3.2.1",
     "rollup-plugin-license": "^3.6.0",
