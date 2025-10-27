@@ -7,9 +7,18 @@ import assert from 'node:assert';
 import {describe, it, afterEach} from 'node:test';
 
 import sinon from 'sinon';
-import {analyzeInsight, queryChromeUXReport, startTrace, stopTrace} from '../../src/tools/performance.js';
+
+import {
+  analyzeInsight,
+  queryChromeUXReport,
+  startTrace,
+  stopTrace,
+} from '../../src/tools/performance.js';
 import type {TraceResult} from '../../src/trace-processing/parse.js';
-import {parseRawTraceBuffer, traceResultIsSuccess} from '../../src/trace-processing/parse.js';
+import {
+  parseRawTraceBuffer,
+  traceResultIsSuccess,
+} from '../../src/trace-processing/parse.js';
 import {loadTraceAsBuffer} from '../trace-processing/fixtures/load.js';
 import {withBrowser} from '../utils.js';
 
@@ -24,10 +33,18 @@ describe('performance', () => {
         context.setIsRunningPerformanceTrace(false);
         const selectedPage = context.getSelectedPage();
         const startTracingStub = sinon.stub(selectedPage.tracing, 'start');
-        await startTrace.handler({params: {reload: true, autoStop: false}}, response, context);
+        await startTrace.handler(
+          {params: {reload: true, autoStop: false}},
+          response,
+          context,
+        );
         sinon.assert.calledOnce(startTracingStub);
         assert.ok(context.isRunningPerformanceTrace());
-        assert.ok(response.responseLines.join('\n').match(/The performance trace is being recorded/));
+        assert.ok(
+          response.responseLines
+            .join('\n')
+            .match(/The performance trace is being recorded/),
+        );
       });
     });
 
@@ -37,7 +54,11 @@ describe('performance', () => {
         sinon.stub(selectedPage, 'url').callsFake(() => 'https://www.test.com');
         const gotoStub = sinon.stub(selectedPage, 'goto');
         const startTracingStub = sinon.stub(selectedPage.tracing, 'start');
-        await startTrace.handler({params: {reload: true, autoStop: false}}, response, context);
+        await startTrace.handler(
+          {params: {reload: true, autoStop: false}},
+          response,
+          context,
+        );
         sinon.assert.calledOnce(startTracingStub);
         sinon.assert.calledWithExactly(gotoStub, 'about:blank', {
           waitUntil: ['networkidle0'],
@@ -46,7 +67,11 @@ describe('performance', () => {
           waitUntil: ['load'],
         });
         assert.ok(context.isRunningPerformanceTrace());
-        assert.ok(response.responseLines.join('\n').match(/The performance trace is being recorded/));
+        assert.ok(
+          response.responseLines
+            .join('\n')
+            .match(/The performance trace is being recorded/),
+        );
       });
     });
 
@@ -58,12 +83,18 @@ describe('performance', () => {
         sinon.stub(selectedPage, 'url').callsFake(() => 'https://www.test.com');
         sinon.stub(selectedPage, 'goto').callsFake(() => Promise.resolve(null));
         const startTracingStub = sinon.stub(selectedPage.tracing, 'start');
-        const stopTracingStub = sinon.stub(selectedPage.tracing, 'stop').callsFake(() => {
-          return Promise.resolve(rawData);
-        });
+        const stopTracingStub = sinon
+          .stub(selectedPage.tracing, 'stop')
+          .callsFake(() => {
+            return Promise.resolve(rawData);
+          });
 
         const clock = sinon.useFakeTimers();
-        const handlerPromise = startTrace.handler({params: {reload: true, autoStop: true}}, response, context);
+        const handlerPromise = startTrace.handler(
+          {params: {reload: true, autoStop: true}},
+          response,
+          context,
+        );
         // In the handler we wait 5 seconds after the page load event (which is
         // what DevTools does), hence we now fake-progress time to allow
         // the handler to complete. We allow extra time because the Trace
@@ -75,9 +106,17 @@ describe('performance', () => {
 
         sinon.assert.calledOnce(startTracingStub);
         sinon.assert.calledOnce(stopTracingStub);
-        assert.strictEqual(context.isRunningPerformanceTrace(), false, 'Tracing was stopped');
+        assert.strictEqual(
+          context.isRunningPerformanceTrace(),
+          false,
+          'Tracing was stopped',
+        );
         assert.strictEqual(context.recordedTraces().length, 1);
-        assert.ok(response.responseLines.join('\n').match(/The performance trace has been stopped/));
+        assert.ok(
+          response.responseLines
+            .join('\n')
+            .match(/The performance trace has been stopped/),
+        );
       });
     });
 
@@ -86,9 +125,17 @@ describe('performance', () => {
         context.setIsRunningPerformanceTrace(true);
         const selectedPage = context.getSelectedPage();
         const startTracingStub = sinon.stub(selectedPage.tracing, 'start');
-        await startTrace.handler({params: {reload: true, autoStop: false}}, response, context);
+        await startTrace.handler(
+          {params: {reload: true, autoStop: false}},
+          response,
+          context,
+        );
         sinon.assert.notCalled(startTracingStub);
-        assert.ok(response.responseLines.join('\n').match(/a performance trace is already running/));
+        assert.ok(
+          response.responseLines
+            .join('\n')
+            .match(/a performance trace is already running/),
+        );
       });
     });
   });
@@ -116,7 +163,7 @@ describe('performance', () => {
             },
           },
           response,
-          context
+          context,
         );
 
         t.assert.snapshot?.(response.responseLines.join('\n'));
@@ -136,9 +183,13 @@ describe('performance', () => {
             },
           },
           response,
-          context
+          context,
         );
-        assert.ok(response.responseLines.join('\n').match(/No Insight with the name MadeUpInsightName found./));
+        assert.ok(
+          response.responseLines
+            .join('\n')
+            .match(/No Insight with the name MadeUpInsightName found./),
+        );
       });
     });
 
@@ -151,9 +202,15 @@ describe('performance', () => {
             },
           },
           response,
-          context
+          context,
         );
-        assert.ok(response.responseLines.join('\n').match(/No recorded traces found. Record a performance trace so you have Insights to analyze./));
+        assert.ok(
+          response.responseLines
+            .join('\n')
+            .match(
+              /No recorded traces found. Record a performance trace so you have Insights to analyze./,
+            ),
+        );
       });
     });
   });
@@ -175,11 +232,17 @@ describe('performance', () => {
       await withBrowser(async (response, context) => {
         context.setIsRunningPerformanceTrace(true);
         const selectedPage = context.getSelectedPage();
-        const stopTracingStub = sinon.stub(selectedPage.tracing, 'stop').callsFake(async () => {
-          return rawData;
-        });
+        const stopTracingStub = sinon
+          .stub(selectedPage.tracing, 'stop')
+          .callsFake(async () => {
+            return rawData;
+          });
         await stopTrace.handler({params: {}}, response, context);
-        assert.ok(response.responseLines.includes('The performance trace has been stopped.'));
+        assert.ok(
+          response.responseLines.includes(
+            'The performance trace has been stopped.',
+          ),
+        );
         assert.strictEqual(context.recordedTraces().length, 1);
         sinon.assert.calledOnce(stopTracingStub);
       });
@@ -189,7 +252,9 @@ describe('performance', () => {
       await withBrowser(async (response, context) => {
         context.setIsRunningPerformanceTrace(true);
         const selectedPage = context.getSelectedPage();
-        sinon.stub(selectedPage.tracing, 'stop').returns(Promise.resolve(undefined));
+        sinon
+          .stub(selectedPage.tracing, 'stop')
+          .returns(Promise.resolve(undefined));
         await stopTrace.handler({params: {}}, response, context);
         t.assert.snapshot?.(response.responseLines.join('\n'));
       });
@@ -216,14 +281,21 @@ describe('performance', () => {
         new Response(JSON.stringify(mockResponse), {
           status: 200,
           headers: {'Content-Type': 'application/json'},
-        })
+        }),
       );
 
       await withBrowser(async (response, context) => {
-        await queryChromeUXReport.handler({params: {origin: 'https://example.com'}}, response, context);
+        await queryChromeUXReport.handler(
+          {params: {origin: 'https://example.com'}},
+          response,
+          context,
+        );
 
         assert.ok(fetchStub.calledOnce);
-        assert.strictEqual(response.responseLines[0], JSON.stringify(mockResponse, null, 2));
+        assert.strictEqual(
+          response.responseLines[0],
+          JSON.stringify(mockResponse, null, 2),
+        );
       });
     });
 
@@ -233,14 +305,21 @@ describe('performance', () => {
         new Response(JSON.stringify(mockResponse), {
           status: 200,
           headers: {'Content-Type': 'application/json'},
-        })
+        }),
       );
 
       await withBrowser(async (response, context) => {
-        await queryChromeUXReport.handler({params: {url: 'https://example.com'}}, response, context);
+        await queryChromeUXReport.handler(
+          {params: {url: 'https://example.com'}},
+          response,
+          context,
+        );
 
         assert.ok(fetchStub.calledOnce);
-        assert.strictEqual(response.responseLines[0], JSON.stringify(mockResponse, null, 2));
+        assert.strictEqual(
+          response.responseLines[0],
+          JSON.stringify(mockResponse, null, 2),
+        );
       });
     });
 
@@ -251,10 +330,14 @@ describe('performance', () => {
             params: {origin: 'https://example.com', url: 'https://example.com'},
           },
           response,
-          context
+          context,
         );
 
-        assert.ok(response.responseLines[0]?.includes('Error: you must provide either "origin" or "url", but not both.'));
+        assert.ok(
+          response.responseLines[0]?.includes(
+            'Error: you must provide either "origin" or "url", but not both.',
+          ),
+        );
       });
     });
 
@@ -262,18 +345,32 @@ describe('performance', () => {
       await withBrowser(async (response, context) => {
         await queryChromeUXReport.handler({params: {}}, response, context);
 
-        assert.ok(response.responseLines[0]?.includes('Error: you must provide either "origin" or "url", but not both.'));
+        assert.ok(
+          response.responseLines[0]?.includes(
+            'Error: you must provide either "origin" or "url", but not both.',
+          ),
+        );
       });
     });
 
     it('handles fetch API error', async () => {
-      const fetchStub = sinon.stub(global, 'fetch').rejects(new Error('API is down'));
+      const fetchStub = sinon
+        .stub(global, 'fetch')
+        .rejects(new Error('API is down'));
 
       await withBrowser(async (response, context) => {
-        await queryChromeUXReport.handler({params: {origin: 'https://example.com'}}, response, context);
+        await queryChromeUXReport.handler(
+          {params: {origin: 'https://example.com'}},
+          response,
+          context,
+        );
 
         assert.ok(fetchStub.calledOnce);
-        assert.ok(response.responseLines[0]?.includes('An error occurred fetching CrUX data:'));
+        assert.ok(
+          response.responseLines[0]?.includes(
+            'An error occurred fetching CrUX data:',
+          ),
+        );
         assert.strictEqual(response.responseLines[1], 'API is down');
       });
     });

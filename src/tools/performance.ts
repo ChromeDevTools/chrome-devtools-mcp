@@ -8,7 +8,12 @@ import {logger} from '../logger.js';
 import {zod} from '../third_party/index.js';
 import type {Page} from '../third_party/index.js';
 import type {InsightName} from '../trace-processing/parse.js';
-import {getInsightOutput, getTraceSummary, parseRawTraceBuffer, traceResultIsSuccess} from '../trace-processing/parse.js';
+import {
+  getInsightOutput,
+  getTraceSummary,
+  parseRawTraceBuffer,
+  traceResultIsSuccess,
+} from '../trace-processing/parse.js';
 
 import {ToolCategory} from './categories.js';
 import type {Context, Response} from './ToolDefinition.js';
@@ -23,13 +28,21 @@ export const startTrace = defineTool({
     readOnlyHint: true,
   },
   schema: {
-    reload: zod.boolean().describe('Determines if, once tracing has started, the page should be automatically reloaded.'),
-    autoStop: zod.boolean().describe('Determines if the trace recording should be automatically stopped.'),
+    reload: zod
+      .boolean()
+      .describe(
+        'Determines if, once tracing has started, the page should be automatically reloaded.',
+      ),
+    autoStop: zod
+      .boolean()
+      .describe(
+        'Determines if the trace recording should be automatically stopped.',
+      ),
   },
   handler: async (request, response, context) => {
     if (context.isRunningPerformanceTrace()) {
       response.appendResponseLine(
-        'Error: a performance trace is already running. Use performance_stop_trace to stop it. Only one trace can be running at any given time.'
+        'Error: a performance trace is already running. Use performance_stop_trace to stop it. Only one trace can be running at any given time.',
       );
       return;
     }
@@ -80,14 +93,17 @@ export const startTrace = defineTool({
       await new Promise(resolve => setTimeout(resolve, 5_000));
       await stopTracingAndAppendOutput(page, response, context);
     } else {
-      response.appendResponseLine(`The performance trace is being recorded. Use performance_stop_trace to stop it.`);
+      response.appendResponseLine(
+        `The performance trace is being recorded. Use performance_stop_trace to stop it.`,
+      );
     }
   },
 });
 
 export const stopTrace = defineTool({
   name: 'performance_stop_trace',
-  description: 'Stops the active performance trace recording on the selected page.',
+  description:
+    'Stops the active performance trace recording on the selected page.',
   annotations: {
     category: ToolCategory.PERFORMANCE,
     readOnlyHint: true,
@@ -104,22 +120,32 @@ export const stopTrace = defineTool({
 
 export const analyzeInsight = defineTool({
   name: 'performance_analyze_insight',
-  description: 'Provides more detailed information on a specific Performance Insight that was highlighted in the results of a trace recording.',
+  description:
+    'Provides more detailed information on a specific Performance Insight that was highlighted in the results of a trace recording.',
   annotations: {
     category: ToolCategory.PERFORMANCE,
     readOnlyHint: true,
   },
   schema: {
-    insightName: zod.string().describe('The name of the Insight you want more information on. For example: "DocumentLatency" or "LCPBreakdown"'),
+    insightName: zod
+      .string()
+      .describe(
+        'The name of the Insight you want more information on. For example: "DocumentLatency" or "LCPBreakdown"',
+      ),
   },
   handler: async (request, response, context) => {
     const lastRecording = context.recordedTraces().at(-1);
     if (!lastRecording) {
-      response.appendResponseLine('No recorded traces found. Record a performance trace so you have Insights to analyze.');
+      response.appendResponseLine(
+        'No recorded traces found. Record a performance trace so you have Insights to analyze.',
+      );
       return;
     }
 
-    const insightOutput = getInsightOutput(lastRecording, request.params.insightName as InsightName);
+    const insightOutput = getInsightOutput(
+      lastRecording,
+      request.params.insightName as InsightName,
+    );
     if ('error' in insightOutput) {
       response.appendResponseLine(insightOutput.error);
       return;
@@ -129,7 +155,11 @@ export const analyzeInsight = defineTool({
   },
 });
 
-async function stopTracingAndAppendOutput(page: Page, response: Response, context: Context): Promise<void> {
+async function stopTracingAndAppendOutput(
+  page: Page,
+  response: Response,
+  context: Context,
+): Promise<void> {
   try {
     const traceEventsBuffer = await page.tracing.stop();
     const result = await parseRawTraceBuffer(traceEventsBuffer);
@@ -139,13 +169,17 @@ async function stopTracingAndAppendOutput(page: Page, response: Response, contex
       const traceSummaryText = getTraceSummary(result);
       response.appendResponseLine(traceSummaryText);
     } else {
-      response.appendResponseLine('There was an unexpected error parsing the trace:');
+      response.appendResponseLine(
+        'There was an unexpected error parsing the trace:',
+      );
       response.appendResponseLine(result.error);
     }
   } catch (e) {
     const errorText = e instanceof Error ? e.message : JSON.stringify(e);
     logger(`Error stopping performance trace: ${errorText}`);
-    response.appendResponseLine('An error occurred generating the response for this trace:');
+    response.appendResponseLine(
+      'An error occurred generating the response for this trace:',
+    );
     response.appendResponseLine(errorText);
   } finally {
     context.setIsRunningPerformanceTrace(false);
@@ -159,27 +193,38 @@ const CRUX_ENDPOINT = `https://chromeuxreport.googleapis.com/v1/records:queryRec
 export const queryChromeUXReport = defineTool({
   name: 'performance_query_chrome_ux_report',
   description:
-    'Queries the Chrome UX Report (CrUX) API to get real-user experience metrics (like Core Web Vitals) for a given URL or origin. You must provide EITHER "origin" OR "url", but not both. You can optionally filter by "formFactor".',
+    'Queries the Chrome UX Report (aka CrUX) to get aggregated real-user experience metrics (like Core Web Vitals) for a given URL or origin. You must provide EITHER "origin" OR "url", but not both. You can optionally filter by "formFactor".',
   annotations: {
     category: ToolCategory.PERFORMANCE,
     readOnlyHint: true,
   },
   schema: {
-    origin: zod.string().describe('The origin to query, e.g., "https://www.google.com". Do not provide this if "url" is specified.').optional(),
+    origin: zod
+      .string()
+      .describe(
+        'The origin to query, e.g., "https://www.google.com". Do not provide this if "url" is specified.',
+      )
+      .optional(),
     url: zod
       .string()
-      .describe('The specific page URL to query, e.g., "https://www.google.com/search?q=puppies". Do not provide this if "origin" is specified.')
+      .describe(
+        'The specific page URL to query, e.g., "https://www.google.com/search?q=puppies". Do not provide this if "origin" is specified.',
+      )
       .optional(),
     formFactor: zod
       .enum(['DESKTOP', 'PHONE', 'TABLET'])
-      .describe('The form factor to filter by. If omitted, data for all form factors is aggregated.')
+      .describe(
+        'The form factor to filter by. If omitted, data for all form factors is aggregated.',
+      )
       .optional(),
   },
   handler: async (request, response) => {
     const {origin, url, formFactor} = request.params;
 
     if ((!origin && !url) || (origin && url)) {
-      response.appendResponseLine('Error: you must provide either "origin" or "url", but not both.');
+      response.appendResponseLine(
+        'Error: you must provide either "origin" or "url", but not both.',
+      );
       return;
     }
 
@@ -187,13 +232,21 @@ export const queryChromeUXReport = defineTool({
       origin,
       url,
       formFactor,
-      metrics: ['first_contentful_paint', 'largest_contentful_paint', 'cumulative_layout_shift', 'interaction_to_next_paint'],
+      metrics: [
+        'first_contentful_paint',
+        'largest_contentful_paint',
+        'cumulative_layout_shift',
+        'interaction_to_next_paint',
+      ],
     });
 
     try {
       const cruxResponse = await fetch(CRUX_ENDPOINT, {
         method: 'POST',
-        headers: {'Content-Type': 'application/json', referer: 'devtools://mcp'},
+        headers: {
+          'Content-Type': 'application/json',
+          referer: 'devtools://mcp',
+        },
         body,
       });
 
