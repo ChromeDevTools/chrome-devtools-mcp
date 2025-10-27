@@ -31,7 +31,7 @@ uid=1_0 RootWebArea "My test page" url="about:blank"
 exports[`McpResponse > saves snapshot to file 1`] = `
 # test response
 ## Page content
-Saved snapshot to /tmp/test-screenshot.png.
+Saved snapshot to <file>
 `;
 
 exports[`McpResponse > saves snapshot to file 2`] = `

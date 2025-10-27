@@ -170,5 +170,8 @@ export function stabilizeResponseOutput(text: unknown) {
   // sec-ch-ua-platform:"Linux"
   const chUaPlatformRegEx = /sec-ch-ua-platform:"[a-zA-Z]*"/g;
   output = output.replaceAll(chUaPlatformRegEx, 'sec-ch-ua-platform:"<os>"');
+
+  const savedSnapshot = /Saved snapshot to (.*)/g;
+  output = output.replaceAll(savedSnapshot, 'Saved snapshot to <file>');
   return output;
 }
