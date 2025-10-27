@@ -10,6 +10,7 @@ import sinon from 'sinon';
 
 import {
   analyzeInsight,
+  queryChromeUXReport,
   startTrace,
   stopTrace,
 } from '../../src/tools/performance.js';
@@ -269,6 +270,115 @@ describe('performance', () => {
         });
         await stopTrace.handler({params: {}}, response, context);
         t.assert.snapshot?.(response.responseLines.join('\n'));
+      });
+    });
+  });
+
+  describe('performance_query_chrome_ux_report', () => {
+    it('successfully queries with origin', async () => {
+      const mockResponse = {record: {key: {origin: 'https://example.com'}}};
+      const fetchStub = sinon.stub(global, 'fetch').resolves(
+        new Response(JSON.stringify(mockResponse), {
+          status: 200,
+          headers: {'Content-Type': 'application/json'},
+        }),
+      );
+
+      await withBrowser(async response => {
+        await queryChromeUXReport.handler(
+          {params: {origin: 'https://example.com'}},
+          response,
+          {} as any,
+        );
+
+        assert.ok(fetchStub.calledOnce);
+        assert.strictEqual(
+          response.responseLines[0],
+          JSON.stringify(mockResponse, null, 2),
+        );
+      });
+    });
+
+    it('successfully queries with url', async () => {
+      const mockResponse = {record: {key: {url: 'https://example.com'}}};
+      const fetchStub = sinon.stub(global, 'fetch').resolves(
+        new Response(JSON.stringify(mockResponse), {
+          status: 200,
+          headers: {'Content-Type': 'application/json'},
+        }),
+      );
+
+      await withBrowser(async response => {
+        await queryChromeUXReport.handler(
+          {params: {url: 'https://example.com'}},
+          response,
+          {} as any,
+        );
+
+        assert.ok(fetchStub.calledOnce);
+        assert.strictEqual(
+          response.responseLines[0],
+          JSON.stringify(mockResponse, null, 2),
+        );
+      });
+    });
+
+    it('errors if both origin and url are provided', async () => {
+      await withBrowser(async response => {
+        await queryChromeUXReport.handler(
+          {
+            params: {
+              origin: 'https://example.com',
+              url: 'https://example.com',
+            },
+          },
+          response,
+          {} as any,
+        );
+
+        assert.ok(
+          response.responseLines[0]?.includes(
+            'Error: you must provide either "origin" or "url", but not both.',
+          ),
+        );
+      });
+    });
+
+    it('errors if neither origin nor url are provided', async () => {
+      await withBrowser(async response => {
+        await queryChromeUXReport.handler(
+          {params: {}},
+          response,
+          {} as any,
+        );
+
+        assert.ok(
+          response.responseLines[0]?.includes(
+            'Error: you must provide either "origin" or "url", but not both.',
+          ),
+        );
+      });
+    });
+
+    it('handles fetch API error', async () => {
+      const fetchStub = sinon
+        .stub(global, 'fetch')
+        .rejects(new Error('API is down'));
+
+      await withBrowser(async response => {
+        await queryChromeUXReport.handler(
+          {params: {origin: 'https://example.com'}},
+          response,
+          {} as any,
+        );
+
+        assert.ok(fetchStub.calledOnce);
+        assert.ok(
+          response.responseLines[0]?.includes(
+            'An error occurred fetching CrUX data:',
+          ),
+        );
+        assert.strictEqual(response.responseLines[1], 'API is down');
       });
     });
   });
