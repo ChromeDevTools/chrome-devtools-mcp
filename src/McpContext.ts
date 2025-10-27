@@ -362,8 +362,8 @@ export class McpContext implements Context {
               this.#pageToDevToolsPage.set(page, devToolsPage);
             }
           }
-        } catch {
-          // no-op
+        } catch (error) {
+          this.logger('Issue occurred while trying to find DevTools', error);
         }
       }
     }
