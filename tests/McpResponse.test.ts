@@ -106,7 +106,7 @@ Testing 2`,
     });
   });
 
-  it.only('saves snapshot to file', async t => {
+  it('saves snapshot to file', async t => {
     const filePath = join(tmpdir(), 'test-screenshot.png');
     try {
       await withBrowser(async (response, context) => {
@@ -118,7 +118,6 @@ Testing 2`,
         });
         const result = await response.handle('test', context);
         assert.equal(result[0].type, 'text');
-        console.log(result[0].text);
         t.assert.snapshot?.(stabilizeResponseOutput(result[0].text));
       });
       const content = await readFile(filePath, 'utf-8');
