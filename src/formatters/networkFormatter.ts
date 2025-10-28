@@ -13,9 +13,10 @@ const BODY_CONTEXT_SIZE_LIMIT = 10000;
 export function getShortDescriptionForRequest(
   request: HTTPRequest,
   id: number,
+  selectedInDevToolsUI = false,
 ): string {
   // TODO truncate the URL
-  return `reqid=${id} ${request.method()} ${request.url()} ${getStatusFromRequest(request)}`;
+  return `reqid=${id} ${request.method()} ${request.url()} ${getStatusFromRequest(request)}${selectedInDevToolsUI ? ` [selected in DevTools UI]` : ''}`;
 }
 
 export function getStatusFromRequest(request: HTTPRequest): string {

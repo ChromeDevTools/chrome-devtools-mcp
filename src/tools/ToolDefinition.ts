@@ -55,6 +55,7 @@ export interface Response {
     options?: PaginationOptions & {
       resourceTypes?: string[];
       includePreservedRequests?: boolean;
+      networkRequestIdInDevToolsUI?: number;
     },
   ): void;
   setIncludeConsoleData(
@@ -65,7 +66,6 @@ export interface Response {
     },
   ): void;
   includeSnapshot(params?: SnapshotParams): void;
-  includeDevtoolsData(value: boolean): void;
   attachImage(value: ImageContentData): void;
   attachNetworkRequest(reqid: number): void;
   attachConsoleMessage(msgid: number): void;
@@ -103,6 +103,7 @@ export type Context = Readonly<{
     text: string;
     timeout?: number | undefined;
   }): Promise<Element>;
+  getDevToolsData(): Promise<undefined | {requestId?: number}>;
 }>;
 
 export function defineTool<Schema extends zod.ZodRawShape>(

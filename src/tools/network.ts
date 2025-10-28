@@ -70,19 +70,22 @@ export const listNetworkRequests = defineTool({
         'Set to true to return the preserved requests over the last 3 navigations.',
       ),
   },
-  handler: async (request, response) => {
+  handler: async (request, response, context) => {
+    const data = await context.getDevToolsData();
     response.setIncludeNetworkRequests(true, {
       pageSize: request.params.pageSize,
       pageIdx: request.params.pageIdx,
       resourceTypes: request.params.resourceTypes,
       includePreservedRequests: request.params.includePreservedRequests,
+      networkRequestIdInDevToolsUI: data?.requestId,
     });
   },
 });
 
 export const getNetworkRequest = defineTool({
   name: 'get_network_request',
-  description: `Gets a network request by URL. You can get all requests by calling ${listNetworkRequests.name}.`,
+  description: `Gets a network request by reqid. You can get all requests by calling ${listNetworkRequests.name}.
+Get the request currently selected in the DevTools UI by ommitting reqid`,
   annotations: {
     category: ToolCategory.NETWORK,
     readOnlyHint: true,
@@ -90,11 +93,23 @@ export const getNetworkRequest = defineTool({
   schema: {
     reqid: zod
       .number()
+      .optional()
       .describe(
-        'The reqid of a request on the page from the listed network requests',
+        'The reqid of the network request. If omitted, looks up the current request selected in DevTools UI.',
       ),
   },
-  handler: async (request, response, _context) => {
-    response.attachNetworkRequest(request.params.reqid);
+  handler: async (request, response, context) => {
+    if (request.params.reqid) {
+      response.attachNetworkRequest(request.params.reqid);
+    } else {
+      const data = await context.getDevToolsData();
+      if (data?.requestId) {
+        response.attachNetworkRequest(data?.requestId);
+      } else {
+        response.appendResponseLine(
+          `Nothing is currently selected in DevTools UI.`,
+        );
+      }
+    }
   },
 });

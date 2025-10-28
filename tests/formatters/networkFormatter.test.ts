@@ -71,6 +71,16 @@ describe('networkFormatter', () => {
         'reqid=1 GET http://example.com [failed - Error in Network]',
       );
     });
+
+    it('marks requests selected in DevTools UI', async () => {
+      const request = getMockRequest();
+      const result = getShortDescriptionForRequest(request, 1, true);
+
+      assert.equal(
+        result,
+        'reqid=1 GET http://example.com [pending] [selected in DevTools UI]',
+      );
+    });
   });
 
   describe('getFormattedHeaderValue', () => {

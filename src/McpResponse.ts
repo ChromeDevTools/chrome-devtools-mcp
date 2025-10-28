@@ -44,6 +44,7 @@ export class McpResponse implements Response {
     pagination?: PaginationOptions;
     resourceTypes?: ResourceType[];
     includePreservedRequests?: boolean;
+    networkRequestIdInDevToolsUI?: number;
   };
   #consoleDataOptions?: {
     include: boolean;
@@ -51,7 +52,6 @@ export class McpResponse implements Response {
     types?: string[];
     includePreservedMessages?: boolean;
   };
-  #includeDevtoolsData = false;
 
   setIncludePages(value: boolean): void {
     this.#includePages = value;
@@ -63,15 +63,12 @@ export class McpResponse implements Response {
     };
   }
 
-  includeDevtoolsData(value: boolean): void {
-    this.#includeDevtoolsData = value;
-  }
-
   setIncludeNetworkRequests(
     value: boolean,
     options?: PaginationOptions & {
       resourceTypes?: ResourceType[];
       includePreservedRequests?: boolean;
+      networkRequestIdInDevToolsUI?: number;
     },
   ): void {
     if (!value) {
@@ -90,6 +87,7 @@ export class McpResponse implements Response {
           : undefined,
       resourceTypes: options?.resourceTypes,
       includePreservedRequests: options?.includePreservedRequests,
+      networkRequestIdInDevToolsUI: options?.networkRequestIdInDevToolsUI,
     };
   }
 
@@ -296,17 +294,11 @@ export class McpResponse implements Response {
       );
     }
 
-    let devToolsData;
-    if (this.#includeDevtoolsData) {
-      devToolsData = await context.getDevToolsData();
-    }
-
     return this.format(toolName, context, {
       bodies,
       consoleData,
       consoleListData,
       formattedSnapshot,
-      devToolsData,
     });
   }
 
@@ -321,21 +313,11 @@ export class McpResponse implements Response {
       consoleData: ConsoleMessageData | undefined;
       consoleListData: ConsoleMessageData[] | undefined;
       formattedSnapshot: string | undefined;
-      devToolsData?: {requestId?: number};
     },
   ): Array<TextContent | ImageContent> {
     const response = [`# ${toolName} response`];
     for (const line of this.#textResponseLines) {
       response.push(line);
-    }
-
-    response.push('## Network requests inspected in DevTools');
-    if (data.devToolsData?.requestId) {
-      response.push(`Network request: reqid=${data.devToolsData?.requestId}`);
-    } else {
-      response.push(
-        `Nothing inspected right now. Call list_pages to check if anything is selected by the user in DevTools.`,
-      );
     }
 
     const networkConditions = context.getNetworkConditions();
@@ -412,6 +394,8 @@ Call ${handleDialog.name} to handle it before continuing.`);
             getShortDescriptionForRequest(
               request,
               context.getNetworkRequestStableId(request),
+              context.getNetworkRequestStableId(request) ===
+                this.#networkRequestsOptions?.networkRequestIdInDevToolsUI,
             ),
           );
         }

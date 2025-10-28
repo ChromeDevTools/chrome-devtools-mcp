@@ -163,28 +163,28 @@ export class PageCollector<T> {
       throw new Error('No requests found for selected page');
     }
 
-    for (const navigation of navigations) {
-      for (const collected of navigation) {
-        if (collected[stableIdSymbol] === stableId) {
-          return collected;
-        }
-      }
+    const item = this.find(page, item => item[stableIdSymbol] === stableId);
+
+    if (item) {
+      return item;
     }
 
     throw new Error('Request not found for selected page');
   }
 
-  find(page: Page, filter: (item: T) => boolean): T | undefined {
+  find(
+    page: Page,
+    filter: (item: WithSymbolId<T>) => boolean,
+  ): WithSymbolId<T> | undefined {
     const navigations = this.storage.get(page);
     if (!navigations) {
       return;
     }
 
     for (const navigation of navigations) {
-      for (const collected of navigation) {
-        if (filter(collected)) {
-          return collected;
-        }
+      const item = navigation.find(filter);
+      if (item) {
+        return item;
       }
     }
     return;

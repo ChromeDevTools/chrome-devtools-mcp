@@ -21,7 +21,6 @@ import {
 } from './third_party/index.js';
 import {ToolCategory} from './tools/categories.js';
 import * as consoleTools from './tools/console.js';
-import * as devtoolsTools from './tools/devtools.js';
 import * as emulationTools from './tools/emulation.js';
 import * as inputTools from './tools/input.js';
 import * as networkTools from './tools/network.js';
@@ -170,7 +169,6 @@ function registerTool(tool: ToolDefinition): void {
 
 const tools = [
   ...Object.values(consoleTools),
-  ...Object.values(devtoolsTools),
   ...Object.values(emulationTools),
   ...Object.values(inputTools),
   ...Object.values(networkTools),
