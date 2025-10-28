@@ -235,13 +235,13 @@
 
 ### `performance_query_chrome_ux_report`
 
-**Description:** Queries the Chrome UX Report (CrUX) API to get real-user experience metrics (like Core Web Vitals) for a given URL or origin. You must provide EITHER "origin" OR "url", but not both. You can optionally filter by "formFactor".
+**Description:** Queries the Chrome UX Report (aka CrUX) to get aggregated real-user experience metrics (like Core Web Vitals) for a given URL or origin.
 
 **Parameters:**
 
+- **origin** (string) _(optional)_: The origin to query, e.g., "https://web.dev". Do not provide this if "url" is specified.
+- **url** (string) _(optional)_: The specific page URL to query, e.g., "https://web.dev/s/results?q=puppies". Do not provide this if "origin" is specified.
 - **formFactor** (enum: "DESKTOP", "PHONE", "TABLET") _(optional)_: The form factor to filter by. If omitted, data for all form factors is aggregated.
-- **origin** (string) _(optional)_: The origin to query, e.g., "https://www.google.com". Do not provide this if "url" is specified.
-- **url** (string) _(optional)_: The specific page URL to query, e.g., "https://www.google.com/search?q=puppies". Do not provide this if "origin" is specified.
 
 ---
 
