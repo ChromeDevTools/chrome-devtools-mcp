@@ -112,6 +112,10 @@ export const navigatePage = defineTool({
         'Navigate the page by URL, back or forward in history, or reload.',
       ),
     url: zod.string().optional().describe('Target URL (only type=url)'),
+    ignoreCache: zod
+      .boolean()
+      .optional()
+      .describe('Whether to ignore cache on reload.'),
     ...timeoutSchema,
   },
   handler: async (request, response, context) => {
@@ -171,7 +175,10 @@ export const navigatePage = defineTool({
           break;
         case 'reload':
           try {
-            await page.reload(options);
+            await page.reload({
+              ...options,
+              ignoreCache: request.params.ignoreCache,
+            });
             response.appendResponseLine(`Successfully reloaded the page.`);
           } catch (error) {
             response.appendResponseLine(
