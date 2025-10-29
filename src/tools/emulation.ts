@@ -15,73 +15,65 @@ const throttlingOptions: [string, ...string[]] = [
   ...Object.keys(PredefinedNetworkConditions),
 ];
 
-export const emulateNetwork = defineTool({
-  name: 'emulate_network',
-  description: `Emulates network conditions such as throttling or offline mode on the selected page.`,
+export const emulate = defineTool({
+  name: 'emulate',
+  description: `Emulates various features on the selected page.`,
   annotations: {
     category: ToolCategory.EMULATION,
     readOnlyHint: false,
   },
   schema: {
-    throttlingOption: zod
+    networkConditions: zod
       .enum(throttlingOptions)
+      .optional()
       .describe(
-        `The network throttling option to emulate. Available throttling options are: ${throttlingOptions.join(', ')}. Set to "No emulation" to disable. Set to "Offline" to simulate offline network conditions.`,
+        `Throttle network. Set to "No emulation" to disable. If omitted, conditions remain unchanged.`,
       ),
-  },
-  handler: async (request, _response, context) => {
-    const page = context.getSelectedPage();
-    const conditions = request.params.throttlingOption;
-
-    if (conditions === 'No emulation') {
-      await page.emulateNetworkConditions(null);
-      context.setNetworkConditions(null);
-      return;
-    }
-
-    if (conditions === 'Offline') {
-      await page.emulateNetworkConditions({
-        offline: true,
-        download: 0,
-        upload: 0,
-        latency: 0,
-      });
-      context.setNetworkConditions('Offline');
-      return;
-    }
-
-    if (conditions in PredefinedNetworkConditions) {
-      const networkCondition =
-        PredefinedNetworkConditions[
-          conditions as keyof typeof PredefinedNetworkConditions
-        ];
-      await page.emulateNetworkConditions(networkCondition);
-      context.setNetworkConditions(conditions);
-    }
-  },
-});
-
-export const emulateCpu = defineTool({
-  name: 'emulate_cpu',
-  description: `Emulates CPU throttling by slowing down the selected page's execution.`,
-  annotations: {
-    category: ToolCategory.EMULATION,
-    readOnlyHint: false,
-  },
-  schema: {
-    throttlingRate: zod
+    cpuThrottlingRate: zod
       .number()
       .min(1)
       .max(20)
+      .optional()
       .describe(
-        'The CPU throttling rate representing the slowdown factor 1-20x. Set the rate to 1 to disable throttling',
+        'Represents the CPU slowdown factor. Set the rate to 1 to disable throttling. If omitted, throttling remains unchanged.',
       ),
   },
   handler: async (request, _response, context) => {
     const page = context.getSelectedPage();
-    const {throttlingRate} = request.params;
+    const networkConditions = request.params.networkConditions;
+    const cpuThrottlingRate = request.params.cpuThrottlingRate;
 
-    await page.emulateCPUThrottling(throttlingRate);
-    context.setCpuThrottlingRate(throttlingRate);
+    if (networkConditions) {
+      if (networkConditions === 'No emulation') {
+        await page.emulateNetworkConditions(null);
+        context.setNetworkConditions(null);
+        return;
+      }
+
+      if (networkConditions === 'Offline') {
+        await page.emulateNetworkConditions({
+          offline: true,
+          download: 0,
+          upload: 0,
+          latency: 0,
+        });
+        context.setNetworkConditions('Offline');
+        return;
+      }
+
+      if (networkConditions in PredefinedNetworkConditions) {
+        const networkCondition =
+          PredefinedNetworkConditions[
+            networkConditions as keyof typeof PredefinedNetworkConditions
+          ];
+        await page.emulateNetworkConditions(networkCondition);
+        context.setNetworkConditions(networkConditions);
+      }
+    }
+
+    if (cpuThrottlingRate) {
+      await page.emulateCPUThrottling(cpuThrottlingRate);
+      context.setCpuThrottlingRate(cpuThrottlingRate);
+    }
   },
 });

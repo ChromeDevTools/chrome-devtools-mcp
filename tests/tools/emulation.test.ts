@@ -6,17 +6,17 @@
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
-import {emulateCpu, emulateNetwork} from '../../src/tools/emulation.js';
+import {emulate} from '../../src/tools/emulation.js';
 import {withBrowser} from '../utils.js';
 
 describe('emulation', () => {
   describe('network', () => {
     it('emulates offline network conditions', async () => {
       await withBrowser(async (response, context) => {
-        await emulateNetwork.handler(
+        await emulate.handler(
           {
             params: {
-              throttlingOption: 'Offline',
+              networkConditions: 'Offline',
             },
           },
           response,
@@ -26,12 +26,12 @@ describe('emulation', () => {
         assert.strictEqual(context.getNetworkConditions(), 'Offline');
       });
     });
-    it('emulates network throttling when the throttling option is valid ', async () => {
+    it('emulates network throttling when the throttling option is valid', async () => {
       await withBrowser(async (response, context) => {
-        await emulateNetwork.handler(
+        await emulate.handler(
           {
             params: {
-              throttlingOption: 'Slow 3G',
+              networkConditions: 'Slow 3G',
             },
           },
           response,
@@ -44,10 +44,10 @@ describe('emulation', () => {
 
     it('disables network emulation', async () => {
       await withBrowser(async (response, context) => {
-        await emulateNetwork.handler(
+        await emulate.handler(
           {
             params: {
-              throttlingOption: 'No emulation',
+              networkConditions: 'No emulation',
             },
           },
           response,
@@ -60,10 +60,10 @@ describe('emulation', () => {
 
     it('does not set throttling when the network throttling is not one of the predefined options', async () => {
       await withBrowser(async (response, context) => {
-        await emulateNetwork.handler(
+        await emulate.handler(
           {
             params: {
-              throttlingOption: 'Slow 11G',
+              networkConditions: 'Slow 11G',
             },
           },
           response,
@@ -77,10 +77,10 @@ describe('emulation', () => {
     it('report correctly for the currently selected page', async () => {
       await withBrowser(async (response, context) => {
         await context.newPage();
-        await emulateNetwork.handler(
+        await emulate.handler(
           {
             params: {
-              throttlingOption: 'Slow 3G',
+              networkConditions: 'Slow 3G',
             },
           },
           response,
@@ -99,10 +99,10 @@ describe('emulation', () => {
   describe('cpu', () => {
     it('emulates cpu throttling when the rate is valid (1-20x)', async () => {
       await withBrowser(async (response, context) => {
-        await emulateCpu.handler(
+        await emulate.handler(
           {
             params: {
-              throttlingRate: 4,
+              cpuThrottlingRate: 4,
             },
           },
           response,
@@ -116,10 +116,10 @@ describe('emulation', () => {
     it('disables cpu throttling', async () => {
       await withBrowser(async (response, context) => {
         context.setCpuThrottlingRate(4); // Set it to something first.
-        await emulateCpu.handler(
+        await emulate.handler(
           {
             params: {
-              throttlingRate: 1,
+              cpuThrottlingRate: 1,
             },
           },
           response,
@@ -133,10 +133,10 @@ describe('emulation', () => {
     it('report correctly for the currently selected page', async () => {
       await withBrowser(async (response, context) => {
         await context.newPage();
-        await emulateCpu.handler(
+        await emulate.handler(
           {
             params: {
-              throttlingRate: 4,
+              cpuThrottlingRate: 4,
             },
           },
           response,

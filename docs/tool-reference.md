@@ -18,9 +18,8 @@
   - [`new_page`](#new_page)
   - [`select_page`](#select_page)
   - [`wait_for`](#wait_for)
-- **[Emulation](#emulation)** (3 tools)
-  - [`emulate_cpu`](#emulate_cpu)
-  - [`emulate_network`](#emulate_network)
+- **[Emulation](#emulation)** (2 tools)
+  - [`emulate`](#emulate)
   - [`resize_page`](#resize_page)
 - **[Performance](#performance)** (3 tools)
   - [`performance_analyze_insight`](#performance_analyze_insight)
@@ -190,23 +189,14 @@
 
 ## Emulation
 
-### `emulate_cpu`
+### `emulate`
 
-**Description:** Emulates CPU throttling by slowing down the selected page's execution.
-
-**Parameters:**
-
-- **throttlingRate** (number) **(required)**: The CPU throttling rate representing the slowdown factor 1-20x. Set the rate to 1 to disable throttling
-
----
-
-### `emulate_network`
-
-**Description:** Emulates network conditions such as throttling or offline mode on the selected page.
+**Description:** Emulates various features on the selected page.
 
 **Parameters:**
 
-- **throttlingOption** (enum: "No emulation", "Offline", "Slow 3G", "Fast 3G", "Slow 4G", "Fast 4G") **(required)**: The network throttling option to emulate. Available throttling options are: No emulation, Offline, Slow 3G, Fast 3G, Slow 4G, Fast 4G. Set to "No emulation" to disable. Set to "Offline" to simulate offline network conditions.
+- **cpuThrottlingRate** (number) _(optional)_: Represents the CPU slowdown factor. Set the rate to 1 to disable throttling. If omitted, throttling remains unchanged.
+- **networkConditions** (enum: "No emulation", "Offline", "Slow 3G", "Fast 3G", "Slow 4G", "Fast 4G") _(optional)_: Throttle network. Set to "No emulation" to disable. If omitted, conditions remain unchanged.
 
 ---
 
