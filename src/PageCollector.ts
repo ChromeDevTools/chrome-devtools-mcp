@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type * as CdpProtocol from '../node_modules/chrome-devtools-frontend/front_end/generated/protocol-proxy-api.js';
 import {IssuesManager, Issue} from '../node_modules/chrome-devtools-frontend/mcp/mcp.js';
 
 import {
@@ -45,6 +44,7 @@ export class PageCollector<T> {
     collector: (item: T) => void,
   ) => ListenerMap<PageEvents>;
   #listeners = new WeakMap<Page, ListenerMap>();
+  #seenIssueKeys = new WeakMap<Page, Set<string>>();
   #maxNavigationSaved = 3;
   #includeAllPages?: boolean;
 
@@ -124,14 +124,22 @@ export class PageCollector<T> {
   }
 
   protected async subscribeForIssues(page: Page) {
+    if (this instanceof NetworkCollector) return;
+    if (!this.#seenIssueKeys.has(page)) {
+      this.#seenIssueKeys.set(page, new Set());
+    }
     const session = await page.createCDPSession();
-     session.on('Audits.issueAdded',(data) => { // TODO unsubscribe
+    session.on('Audits.issueAdded', data => {// TODO unsubscribe
       // @ts-expect-error Types of protocol from Puppeteer and CDP are incopatible for Issues
-        const issue = IssuesManager.createIssuesFromProtocolIssue(null, data.issue)[0]; // returns issue wrapped in array, need to get first element
-        if (!issue) {
-          return;
-        }
-        page.emit('issue', issue);
+      const issue = IssuesManager.createIssuesFromProtocolIssue(null,data.issue)[0]; // returns issue wrapped in array, need to get first element
+      if (!issue) {
+        return;
+      }
+      const seenKeys = this.#seenIssueKeys.get(page)!;
+      const primaryKey = issue.primaryKey();
+      if (seenKeys.has(primaryKey)) return;
+      seenKeys.add(primaryKey);
+      page.emit('issue', issue);
     });
     await session.send('Audits.enable');
   }
@@ -154,6 +162,7 @@ export class PageCollector<T> {
       }
     }
     this.storage.delete(page);
+    this.#seenIssueKeys.delete(page);
   }
 
   getData(page: Page, includePreservedData?: boolean): T[] {
