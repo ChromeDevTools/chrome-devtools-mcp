@@ -35,7 +35,14 @@ function getAttributes(serializedAXNodeRoot: TextSnapshotNode): string[] {
     attributes.push(`"${serializedAXNodeRoot.name}"`);
   }
 
-  const excluded = new Set(['id', 'role', 'name', 'elementHandle', 'children']);
+  const excluded = new Set([
+    'id',
+    'role',
+    'name',
+    'elementHandle',
+    'children',
+    'backendNodeId',
+  ]);
 
   const booleanPropertyMap: Record<string, string> = {
     disabled: 'disableable',
