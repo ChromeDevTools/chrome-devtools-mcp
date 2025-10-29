@@ -3,6 +3,8 @@
  * Copyright 2025 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
+import { Issue } from '../node_modules/chrome-devtools-frontend/mcp/mcp.js';
+
 import type {ConsoleMessageData} from './formatters/consoleFormatter.js';
 import {
   formatConsoleEventShort,
@@ -16,6 +18,7 @@ import {
   getStatusFromRequest,
 } from './formatters/networkFormatter.js';
 import {formatSnapshotNode} from './formatters/snapshotFormatter.js';
+import {getIssueDescription} from './issue-descriptions.js';
 import type {McpContext} from './McpContext.js';
 import type {
   ConsoleMessage,
@@ -269,7 +272,7 @@ export class McpResponse implements Response {
           if ('type' in message) {
             return normalizedTypes.has(message.type());
           }
-          return normalizedTypes.has('error');
+          return normalizedTypes.has('error'); // TODO add filtering
         });
       }
 
@@ -293,6 +296,18 @@ export class McpResponse implements Response {
                     : String(stringArg);
                 }),
               ),
+            };
+          }
+          if (item instanceof Issue.Issue) {
+            const descriptionFile = item.getDescription()?.file;
+            const description = descriptionFile
+              ? getIssueDescription(descriptionFile)
+              : null;
+            return {
+              consoleMessageStableId,
+              type: 'issue',
+              message: item.primaryKey(),
+              args: description ? [description] : [],
             };
           }
           return {

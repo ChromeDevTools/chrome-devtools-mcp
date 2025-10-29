@@ -9,10 +9,11 @@ import type {ConsoleMessageType} from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
 import {defineTool} from './ToolDefinition.js';
+type ConsoleResponseType = ConsoleMessageType | 'issue';
 
 const FILTERABLE_MESSAGE_TYPES: readonly [
-  ConsoleMessageType,
-  ...ConsoleMessageType[],
+  ConsoleResponseType,
+  ...ConsoleResponseType[],
 ] = [
   'log',
   'debug',
@@ -33,6 +34,7 @@ const FILTERABLE_MESSAGE_TYPES: readonly [
   'count',
   'timeEnd',
   'verbose',
+  'issue'
 ];
 
 export const listConsoleMessages = defineTool({
