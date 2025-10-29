@@ -31,7 +31,6 @@ body:
 
   - id: mcp-configuration
     type: textarea
-    render: json
     attributes:
       label: MCP configuration
 
