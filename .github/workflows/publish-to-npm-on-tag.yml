@@ -43,8 +43,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build
-        run: npm run build
+      - name: Build and bundle
+        run: npm run bundle
         env:
           NODE_ENV: 'production'
 
@@ -76,8 +76,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build
-        run: npm run build
+      - name: Build and bundle
+        run: npm run bundle
         env:
           NODE_ENV: 'production'
 

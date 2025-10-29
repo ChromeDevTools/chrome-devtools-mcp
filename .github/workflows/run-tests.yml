@@ -41,7 +41,7 @@ jobs:
         run: npm ci
 
       - name: Build
-        run: npm run build
+        run: npm run bundle
 
       - name: Set up Node.js
         uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0

@@ -9,7 +9,7 @@ import 'core-js/proposals/iterator-helpers.js';
 export type {Options as YargsOptions} from 'yargs';
 export {default as yargs} from 'yargs';
 export {hideBin} from 'yargs/helpers';
-export {debug} from 'debug';
+export {default as debug} from 'debug';
 export type {Debugger} from 'debug';
 export {McpServer} from '@modelcontextprotocol/sdk/server/mcp.js';
 export {StdioServerTransport} from '@modelcontextprotocol/sdk/server/stdio.js';
