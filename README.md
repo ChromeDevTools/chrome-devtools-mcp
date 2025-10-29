@@ -219,6 +219,12 @@ Go to `Settings | AI | Manage MCP Servers` -> `+ Add` to [add an MCP Server](htt
 
 </details>
 
+<details>
+  <summary>Windsurf</summary>
+  Follow the <a href="https://docs.windsurf.com/windsurf/cascade/mcp#mcp-config-json">configure MCP guide</a>
+  using the standard config from above.
+</details>
+
 ### Your first prompt
 
 Enter the following prompt in your MCP Client to check if everything is working:
