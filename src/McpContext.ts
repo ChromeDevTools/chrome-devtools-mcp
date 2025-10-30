@@ -7,7 +7,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
-import {type Issue} from '../node_modules/chrome-devtools-frontend/mcp/mcp.js';
+import {type AggregatedIssue} from '../node_modules/chrome-devtools-frontend/mcp/mcp.js';
 
 import {extractUrlLikeFromDevToolsTitle, urlsEqual} from './DevtoolsUtils.js';
 import type {ListenerMap} from './PageCollector.js';
@@ -96,7 +96,7 @@ export class McpContext implements Context {
   // The most recent snapshot.
   #textSnapshot: TextSnapshot | null = null;
   #networkCollector: NetworkCollector;
-  #consoleCollector: PageCollector<ConsoleMessage | Error | Issue.Issue>;
+  #consoleCollector: PageCollector<ConsoleMessage | Error | AggregatedIssue>;
 
   #isRunningTrace = false;
   #networkConditionsMap = new WeakMap<Page, string>();
@@ -212,16 +212,16 @@ export class McpContext implements Context {
 
   getConsoleData(
     includePreservedMessages?: boolean,
-  ): Array<ConsoleMessage | Error | Issue.Issue> {
+  ): Array<ConsoleMessage | Error | AggregatedIssue> {
     const page = this.getSelectedPage();
     return this.#consoleCollector.getData(page, includePreservedMessages);
   }
 
-  getConsoleMessageStableId(message: ConsoleMessage | Error | Issue.Issue): number {
+  getConsoleMessageStableId(message: ConsoleMessage | Error | AggregatedIssue): number {
     return this.#consoleCollector.getIdForResource(message);
   }
 
-  getConsoleMessageById(id: number): ConsoleMessage | Error | Issue.Issue {
+  getConsoleMessageById(id: number): ConsoleMessage | Error | AggregatedIssue {
     return this.#consoleCollector.getById(this.getSelectedPage(), id);
   }
 
