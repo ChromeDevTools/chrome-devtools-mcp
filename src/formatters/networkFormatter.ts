@@ -16,7 +16,7 @@ export function getShortDescriptionForRequest(
   selectedInDevToolsUI = false,
 ): string {
   // TODO truncate the URL
-  return `reqid=${id} ${request.method()} ${request.url()} ${getStatusFromRequest(request)}${selectedInDevToolsUI ? ` [selected in DevTools UI]` : ''}`;
+  return `reqid=${id} ${request.method()} ${request.url()} ${getStatusFromRequest(request)}${selectedInDevToolsUI ? ` [selected in the DevTools Network panel]` : ''}`;
 }
 
 export function getStatusFromRequest(request: HTTPRequest): string {

@@ -94,7 +94,7 @@ export const getNetworkRequest = defineTool({
       .number()
       .optional()
       .describe(
-        'The reqid of the network request. If omitted, looks up the current request selected in DevTools UI.',
+        'The reqid of the network request. If omitted returns the currently selected request in the DevTools Network panel.',
       ),
   },
   handler: async (request, response, context) => {
@@ -106,7 +106,7 @@ export const getNetworkRequest = defineTool({
         response.attachNetworkRequest(data?.requestId);
       } else {
         response.appendResponseLine(
-          `Nothing is currently selected in DevTools UI.`,
+          `Nothing is currently selected in the DevTools Network panel.`,
         );
       }
     }

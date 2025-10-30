@@ -78,7 +78,7 @@ describe('networkFormatter', () => {
 
       assert.equal(
         result,
-        'reqid=1 GET http://example.com [pending] [selected in DevTools UI]',
+        'reqid=1 GET http://example.com [pending] [selected in the DevTools Network panel]',
       );
     });
   });
