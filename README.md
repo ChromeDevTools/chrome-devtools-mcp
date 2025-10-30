@@ -144,7 +144,7 @@ Configure the following fields and press `CTRL+S` to save the configuration:
 
 **Click the button to install:**
 
-[<img src="https://cursor.com/deeplink/mcp-install-dark.svg" alt="Install in Cursor">](https://cursor.com/en/install-mcp?name=chrome-devtools&config=eyJjb21tYW5kIjoibnB4IC15IGNocm9tZS1kZXZ0b29scy1tY3BAbGF0ZXN0In0%3D)
+[<img src="https://cursor.com/deeplink/mcp-install-dark.svg" alt="Install in Cursor">](https://cursor.com/en/install-mcp?name=chrome-devtools&config=eyJjb21tYW5kIjogIm5weCIsImFyZ3MiOiBbIi15IiwgImNocm9tZS1kZXZ0b29scy1tY3BAbGF0ZXN0Il19)
 
 **Or install manually:**
 
