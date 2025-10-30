@@ -84,8 +84,7 @@ export const listNetworkRequests = defineTool({
 
 export const getNetworkRequest = defineTool({
   name: 'get_network_request',
-  description: `Gets a network request by reqid. You can get all requests by calling ${listNetworkRequests.name}.
-Get the request currently selected in the DevTools UI by ommitting reqid`,
+  description: `Gets a network request by an optional reqid, if omitted returns the request selected in DevTools UI.`,
   annotations: {
     category: ToolCategory.NETWORK,
     readOnlyHint: true,
