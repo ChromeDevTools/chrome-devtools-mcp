@@ -84,7 +84,7 @@ export const listNetworkRequests = defineTool({
 
 export const getNetworkRequest = defineTool({
   name: 'get_network_request',
-  description: `Gets a network request by an optional reqid, if omitted returns the request selected in DevTools UI.`,
+  description: `Gets a network request by an optional reqid, if omitted returns the currently selected request in the DevTools Network panel.`,
   annotations: {
     category: ToolCategory.NETWORK,
     readOnlyHint: true,
