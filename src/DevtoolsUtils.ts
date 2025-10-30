@@ -3,6 +3,13 @@
  * Copyright 2025 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
+
+import {
+  type Issue,
+  type IssuesManager,
+  Common
+} from '../node_modules/chrome-devtools-frontend/mcp/mcp.js';
+
 export function extractUrlLikeFromDevToolsTitle(
   title: string,
 ): string | undefined {
@@ -48,4 +55,14 @@ function normalizeUrl(url: string): string {
   }
 
   return result;
+}
+
+/**
+ * A mock implementation of an issues manager that only implements the methods
+ * that are actually used by the IssuesAggregator
+ */
+export class FakeIssuesManager extends Common.ObjectWrapper.ObjectWrapper<IssuesManager.EventTypes> {
+  issues(): Issue.Issue[] {
+    return [];
+  }
 }
