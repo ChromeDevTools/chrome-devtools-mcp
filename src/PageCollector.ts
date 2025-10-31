@@ -5,13 +5,25 @@
  */
 
 import {
+  type AggregatedIssue,
+  AggregatorEvents,
+  IssuesManager,
+  IssueAggregator,
+} from '../node_modules/chrome-devtools-frontend/mcp/mcp.js';
+
+import {FakeIssuesManager} from './DevtoolsUtils.js';
+import {
   type Browser,
   type Frame,
   type Handler,
   type HTTPRequest,
   type Page,
-  type PageEvents,
+  type PageEvents as PuppeteerPageEvents,
 } from './third_party/index.js';
+
+interface PageEvents extends PuppeteerPageEvents {
+  issue: AggregatedIssue;
+}
 
 export type ListenerMap<EventMap extends PageEvents = PageEvents> = {
   [K in keyof EventMap]?: (event: EventMap[K]) => void;
@@ -38,13 +50,13 @@ export class PageCollector<T> {
     collector: (item: T) => void,
   ) => ListenerMap<PageEvents>;
   #listeners = new WeakMap<Page, ListenerMap>();
+  #seenIssueKeys = new WeakMap<Page, Set<string>>();
   #maxNavigationSaved = 3;
 
-  /**
-   * This maps a Page to a list of navigations with a sub-list
-   * of all collected resources.
-   * The newer navigations come first.
-   */
+  // Store an aggregator and a mock manager for each page.
+  #issuesAggregators = new WeakMap<Page, IssueAggregator>();
+  #mockIssuesManagers = new WeakMap<Page, FakeIssuesManager>();
+
   protected storage = new WeakMap<Page, Array<Array<WithSymbolId<T>>>>();
 
   constructor(
@@ -58,7 +70,7 @@ export class PageCollector<T> {
   async init() {
     const pages = await this.#browser.pages();
     for (const page of pages) {
-      this.#initializePage(page);
+      await this.addPage(page);
     }
 
     this.#browser.on('targetcreated', async target => {
@@ -66,7 +78,7 @@ export class PageCollector<T> {
       if (!page) {
         return;
       }
-      this.#initializePage(page);
+      await this.addPage(page);
     });
     this.#browser.on('targetdestroyed', async target => {
       const page = await target.page();
@@ -77,26 +89,39 @@ export class PageCollector<T> {
     });
   }
 
-  public addPage(page: Page) {
-    this.#initializePage(page);
-  }
-
-  #initializePage(page: Page) {
+  public async addPage(page: Page) {
     if (this.storage.has(page)) {
       return;
     }
+    await this.#initializePage(page);
+  }
 
+  async #initializePage(page: Page) {
     const idGenerator = createIdGenerator();
     const storedLists: Array<Array<WithSymbolId<T>>> = [[]];
     this.storage.set(page, storedLists);
 
-    const listeners = this.#listenersInitializer(value => {
+    // This is the single function responsible for adding items to storage.
+    const collector = (value: T) => {
       const withId = value as WithSymbolId<T>;
-      withId[stableIdSymbol] = idGenerator();
+      // Assign an ID only if it's a new item.
+      if (!withId[stableIdSymbol]) {
+        withId[stableIdSymbol] = idGenerator();
+      }
 
       const navigations = this.storage.get(page) ?? [[]];
-      navigations[0].push(withId);
-    });
+      const currentNavigation = navigations[0];
+
+      // The aggregator sends the same object instance for updates, so we just
+      // need to ensure it's in the list.
+      if (!currentNavigation.includes(withId)) {
+        currentNavigation.push(withId);
+      }
+    };
+
+    await this.subscribeForIssues(page);
+
+    const listeners = this.#listenersInitializer(collector);
 
     listeners['framenavigated'] = (frame: Frame) => {
       // Only split the storage on main frame navigation
@@ -113,12 +138,54 @@ export class PageCollector<T> {
     this.#listeners.set(page, listeners);
   }
 
+  protected async subscribeForIssues(page: Page) {
+    if (this instanceof NetworkCollector) {
+      return;
+    }
+    if (!this.#seenIssueKeys.has(page)) {
+      this.#seenIssueKeys.set(page, new Set());
+    }
+
+    const mockManager = new FakeIssuesManager();
+    // @ts-expect-error Aggregator receives partial IssuesManager
+    const aggregator = new IssueAggregator(mockManager);
+    this.#mockIssuesManagers.set(page, mockManager);
+    this.#issuesAggregators.set(page, aggregator);
+
+    aggregator.addEventListener(
+      AggregatorEvents.AGGREGATED_ISSUE_UPDATED,
+      event => {
+        page.emit('issue', event.data);
+      },
+    );
+
+    const session = await page.createCDPSession();
+    session.on('Audits.issueAdded', data => {
+      // @ts-expect-error Types of protocol from Puppeteer and CDP are incopatible for Issues but it's the same type
+      const issue = IssuesManager.createIssuesFromProtocolIssue(null,data.issue,)[0];
+      if (!issue) {
+        return;
+      }
+      const seenKeys = this.#seenIssueKeys.get(page)!;
+      const primaryKey = issue.primaryKey();
+      if (seenKeys.has(primaryKey)) return;
+      seenKeys.add(primaryKey);
+
+      // Trigger the aggregator via our mock manager. Do NOT call collector() here.
+      const mockManager = this.#mockIssuesManagers.get(page);
+      if (mockManager) {
+        // @ts-expect-error we don't care about issies model being null
+        mockManager.dispatchEventToListeners(IssuesManager.Events.ISSUE_ADDED, {issue, issuesModel: null});
+      }
+    });
+    await session.send('Audits.enable');
+  }
+
   protected splitAfterNavigation(page: Page) {
     const navigations = this.storage.get(page);
     if (!navigations) {
       return;
     }
-    // Add the latest navigation first
     navigations.unshift([]);
     navigations.splice(this.#maxNavigationSaved);
   }
@@ -131,6 +198,9 @@ export class PageCollector<T> {
       }
     }
     this.storage.delete(page);
+    this.#seenIssueKeys.delete(page);
+    this.#issuesAggregators.delete(page);
+    this.#mockIssuesManagers.delete(page);
   }
 
   getData(page: Page, includePreservedData?: boolean): T[] {
@@ -144,7 +214,6 @@ export class PageCollector<T> {
     }
 
     const data: T[] = [];
-
     for (let index = this.#maxNavigationSaved; index >= 0; index--) {
       if (navigations[index]) {
         data.push(...navigations[index]);
@@ -220,9 +289,6 @@ export class NetworkCollector extends PageCollector<HTTPRequest> {
         : false;
     });
 
-    // Keep all requests since the last navigation request including that
-    // navigation request itself.
-    // Keep the reference
     if (lastRequestIdx !== -1) {
       const fromCurrentNavigation = requests.splice(lastRequestIdx);
       navigations.unshift(fromCurrentNavigation);
