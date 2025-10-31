@@ -1,5 +1,36 @@
 # Changelog
 
+## [0.10.0](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.9.0...chrome-devtools-mcp-v0.10.0) (2025-10-31)
+
+
+### 🎉 Features
+
+* add a press_key tool ([#458](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/458)) ([b427392](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/b4273923928704e718e0a0f8b5cc86758416e994))
+* an option to ignore cache on reload ([#485](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/485)) ([8e56307](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/8e56307d623fe3651262287b30544ed70426b0b8))
+* detect network requests inspected in DevTools UI ([#477](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/477)) ([796aed7](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/796aed72b7126ed4332888ffbc06d6cb678265ef))
+* fetch DOM node selected in the DevTools Elements panel ([#486](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/486)) ([4a83574](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/4a83574961d8d6b974037db56fc8bdbbb91f79b6))
+* support page reload ([#462](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/462)) ([d177087](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/d17708798194486b2571092aa67838085da7231e))
+* support saving snapshots to file ([#463](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/463)) ([b0ce08a](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/b0ce08ae2ce422813fef3f28c18f2cb6c976d9fc))
+
+
+### 🛠️ Fixes
+
+* improve get_network_request description ([#500](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/500)) ([2f448e8](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/2f448e84ea8d3a44687c74b3577edf882ef2c19f))
+* work around NTP iframes causing hangs ([#504](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/504)) ([cca5ff4](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/cca5ff471c2d2c663e63ade1e2ea58f9a7f5a2cd))
+
+
+### 📄 Documentation
+
+* add Windsurf to the editor config README ([#493](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/493)) ([63a5d82](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/63a5d824c2d914c9007e2b837fa292f5ba74ceed))
+* remove unnecessary replace ([#475](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/475)) ([40e1753](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/40e1753d2e874bb22005dbebdb551da304a80033))
+
+
+### ♻️ Chores
+
+* connect to DevTools targets by default ([#466](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/466)) ([a41e440](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/a41e4407996b8090f8cccc85f6c4696006fc31ec))
+* detect DevTools page for each page ([#467](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/467)) ([1560ff2](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/1560ff23cad28ab63c1cf9fb1b961db886bc4a3e))
+* merge emulate tools into one ([#494](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/494)) ([c06f452](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/c06f4522ee8f762b59c60c2fd23a0deaaa544766))
+
 ## [0.9.0](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.8.1...chrome-devtools-mcp-v0.9.0) (2025-10-22)
 
 
