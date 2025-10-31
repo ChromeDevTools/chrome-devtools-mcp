@@ -8,6 +8,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
+import {logger} from './logger.js';
 import type {
   Browser,
   ChromeReleaseChannel,
@@ -28,6 +29,10 @@ function makeTargetFilter() {
   return function targetFilter(target: Target): boolean {
     if (target.url() === 'chrome://newtab/') {
       return true;
+    }
+    if (target.url().startsWith('https://ogs.google.com/widget/app/so')) {
+      // Some special frame on the NTP that is not picked up by CDP-auto-attach.
+      return false;
     }
     for (const prefix of ignoredPrefixes) {
       if (target.url().startsWith(prefix)) {
@@ -65,7 +70,9 @@ export async function ensureBrowserConnected(options: {
     throw new Error('Either browserURL or wsEndpoint must be provided');
   }
 
+  logger('Connecting Puppeteer to ', JSON.stringify(connectOptions));
   browser = await puppeteer.connect(connectOptions);
+  logger('Connected Puppeteer');
   return browser;
 }
 

@@ -343,11 +343,13 @@ export class McpContext implements Context {
   }
 
   async detectOpenDevToolsWindows() {
+    this.logger('Detecting open DevTools windows');
     const pages = await this.browser.pages();
     this.#pageToDevToolsPage = new Map<Page, Page>();
     for (const devToolsPage of pages) {
       if (devToolsPage.url().startsWith('devtools://')) {
         try {
+          this.logger('Calling getTargetInfo for ' + devToolsPage.url());
           const data = await devToolsPage
             // @ts-expect-error no types for _client().
             ._client()

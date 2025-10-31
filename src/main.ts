@@ -129,6 +129,7 @@ function registerTool(tool: ToolDefinition): void {
       try {
         logger(`${tool.name} request: ${JSON.stringify(params, null, '  ')}`);
         const context = await getContext();
+        logger(`${tool.name} context: resolved`);
         await context.detectOpenDevToolsWindows();
         const response = new McpResponse();
         await tool.handler(
