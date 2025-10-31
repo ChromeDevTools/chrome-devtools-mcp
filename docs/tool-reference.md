@@ -21,8 +21,9 @@
 - **[Emulation](#emulation)** (2 tools)
   - [`emulate`](#emulate)
   - [`resize_page`](#resize_page)
-- **[Performance](#performance)** (3 tools)
+- **[Performance](#performance)** (4 tools)
   - [`performance_analyze_insight`](#performance_analyze_insight)
+  - [`performance_query_chrome_ux_report`](#performance_query_chrome_ux_report)
   - [`performance_start_trace`](#performance_start_trace)
   - [`performance_stop_trace`](#performance_stop_trace)
 - **[Network](#network)** (2 tools)
@@ -220,6 +221,18 @@
 **Parameters:**
 
 - **insightName** (string) **(required)**: The name of the Insight you want more information on. For example: "DocumentLatency" or "LCPBreakdown"
+
+---
+
+### `performance_query_chrome_ux_report`
+
+**Description:** Queries the Chrome UX Report (aka CrUX) to get aggregated real-user experience metrics (like Core Web Vitals) for a given URL or origin.
+
+**Parameters:**
+
+- **origin** (string) _(optional)_: The origin to query, e.g., "https://web.dev". Do not provide this if "url" is specified.
+- **url** (string) _(optional)_: The specific page URL to query, e.g., "https://web.dev/s/results?q=puppies". Do not provide this if "origin" is specified.
+- **formFactor** (enum: "DESKTOP", "PHONE", "TABLET") _(optional)_: The form factor to filter by. If omitted, data for all form factors is aggregated.
 
 ---
 

@@ -185,3 +185,71 @@ async function stopTracingAndAppendOutput(
     context.setIsRunningPerformanceTrace(false);
   }
 }
+
+// This key is expected to be visible. b/349721878
+const CRUX_API_KEY = 'AIzaSyBn5gimNjhiEyA_euicSKko6IlD3HdgUfk';
+const CRUX_ENDPOINT = `https://chromeuxreport.googleapis.com/v1/records:queryRecord?key=${CRUX_API_KEY}`;
+
+export const queryChromeUXReport = defineTool({
+  name: 'performance_query_chrome_ux_report',
+  description:
+    'Queries the Chrome UX Report (aka CrUX) to get aggregated real-user experience metrics (like Core Web Vitals) for a given URL or origin.',
+  annotations: {
+    category: ToolCategory.PERFORMANCE,
+    readOnlyHint: true,
+  },
+  schema: {
+    origin: zod
+      .string()
+      .describe(
+        'The origin to query, e.g., "https://web.dev". Do not provide this if "url" is specified.',
+      )
+      .optional(),
+    url: zod
+      .string()
+      .describe(
+        'The specific page URL to query, e.g., "https://web.dev/s/results?q=puppies". Do not provide this if "origin" is specified.',
+      )
+      .optional(),
+    formFactor: zod
+      .enum(['DESKTOP', 'PHONE', 'TABLET'])
+      .describe(
+        'The form factor to filter by. If omitted, data for all form factors is aggregated.',
+      )
+      .optional(),
+  },
+  handler: async (request, response) => {
+    const {origin: origin_, url, formFactor} = request.params;
+    // Ensure probably formatted origin (no trailing slash);
+    const origin = URL.parse(origin_ ?? '')?.origin;
+
+    if ((!origin && !url) || (origin && url)) {
+      return response.appendResponseLine(
+        'Error: you must provide either "origin" or "url", but not both.',
+      );
+    }
+
+    try {
+      const cruxResponse = await fetch(CRUX_ENDPOINT, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          referer: 'devtools://mcp',
+        },
+        body: JSON.stringify({
+          origin,
+          url,
+          formFactor,
+        }),
+      });
+
+      const data = await cruxResponse.json();
+      response.appendResponseLine(JSON.stringify(data, null, 2));
+    } catch (e) {
+      const errorText = e instanceof Error ? e.message : JSON.stringify(e);
+      logger(`Error fetching CrUX data: ${errorText}`);
+      response.appendResponseLine('An error occurred fetching CrUX data:');
+      response.appendResponseLine(errorText);
+    }
+  },
+});
