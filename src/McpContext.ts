@@ -209,8 +209,24 @@ export class McpContext implements Context {
     return this.#consoleCollector.getById(this.getSelectedPage(), id);
   }
 
+  #cdpBackendNodeId?: number;
   async newPage(): Promise<Page> {
     const page = await this.browser.newPage();
+    const session = await page.createCDPSession();
+    await session.send('DOM.enable');
+    await session.send('Overlay.enable');
+    await session.send('Overlay.setInspectMode', {
+      mode: 'searchForNode',
+      highlightConfig: {
+        showInfo: true,
+        showAccessibilityInfo: true,
+        showStyles: true,
+      }
+    });
+    session.on('Overlay.inspectNodeRequested', async (event) => {
+      this.#cdpBackendNodeId = event.backendNodeId;
+      await session.detach();
+    });
     const pages = await this.createPagesSnapshot();
     this.setSelectedPageIdx(pages.indexOf(page));
     this.#networkCollector.addPage(page);
@@ -425,7 +441,9 @@ export class McpContext implements Context {
       const devtoolsPage = this.getDevToolsPage(selectedPage);
       if (!devtoolsPage) {
         this.logger('No DevTools page detected');
-        return {};
+        return {
+          cdpBackendNodeId: this.#cdpBackendNodeId
+        };
       }
       const {cdpRequestId, cdpBackendNodeId} = await devtoolsPage.evaluate(
         async () => {
@@ -449,7 +467,9 @@ export class McpContext implements Context {
     } catch (err) {
       this.logger('error getting devtools data', err);
     }
-    return {};
+    return {
+      cdpBackendNodeId: this.#cdpBackendNodeId
+    };
   }
 
   /**
