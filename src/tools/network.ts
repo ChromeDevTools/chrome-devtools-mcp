@@ -72,12 +72,16 @@ export const listNetworkRequests = defineTool({
   },
   handler: async (request, response, context) => {
     const data = await context.getDevToolsData();
+    response.attachDevToolsData(data);
+    const reqid = data?.cdpRequestId
+      ? context.resolveCdpRequestId(data.cdpRequestId)
+      : undefined;
     response.setIncludeNetworkRequests(true, {
       pageSize: request.params.pageSize,
       pageIdx: request.params.pageIdx,
       resourceTypes: request.params.resourceTypes,
       includePreservedRequests: request.params.includePreservedRequests,
-      networkRequestIdInDevToolsUI: data?.requestId,
+      networkRequestIdInDevToolsUI: reqid,
     });
   },
 });
@@ -102,8 +106,12 @@ export const getNetworkRequest = defineTool({
       response.attachNetworkRequest(request.params.reqid);
     } else {
       const data = await context.getDevToolsData();
-      if (data?.requestId) {
-        response.attachNetworkRequest(data?.requestId);
+      response.attachDevToolsData(data);
+      const reqid = data?.cdpRequestId
+        ? context.resolveCdpRequestId(data.cdpRequestId)
+        : undefined;
+      if (reqid) {
+        response.attachNetworkRequest(reqid);
       } else {
         response.appendResponseLine(
           `Nothing is currently selected in the DevTools Network panel.`,

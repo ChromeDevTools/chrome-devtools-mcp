@@ -9,12 +9,12 @@ import {describe, it} from 'node:test';
 
 import type {ElementHandle} from 'puppeteer-core';
 
-import {formatA11ySnapshot} from '../../src/formatters/snapshotFormatter.js';
+import {formatSnapshotNode} from '../../src/formatters/snapshotFormatter.js';
 import type {TextSnapshotNode} from '../../src/McpContext.js';
 
 describe('snapshotFormatter', () => {
   it('formats a snapshot with value properties', () => {
-    const snapshot: TextSnapshotNode = {
+    const node: TextSnapshotNode = {
       id: '1_1',
       role: 'textbox',
       name: 'textbox',
@@ -35,7 +35,7 @@ describe('snapshotFormatter', () => {
       },
     };
 
-    const formatted = formatA11ySnapshot(snapshot);
+    const formatted = formatSnapshotNode(node);
     assert.strictEqual(
       formatted,
       `uid=1_1 textbox "textbox" value="value"
@@ -45,7 +45,7 @@ describe('snapshotFormatter', () => {
   });
 
   it('formats a snapshot with boolean properties', () => {
-    const snapshot: TextSnapshotNode = {
+    const node: TextSnapshotNode = {
       id: '1_1',
       role: 'button',
       name: 'button',
@@ -66,7 +66,7 @@ describe('snapshotFormatter', () => {
       },
     };
 
-    const formatted = formatA11ySnapshot(snapshot);
+    const formatted = formatSnapshotNode(node);
     assert.strictEqual(
       formatted,
       `uid=1_1 button "button" disableable disabled
@@ -76,7 +76,7 @@ describe('snapshotFormatter', () => {
   });
 
   it('formats a snapshot with checked properties', () => {
-    const snapshot: TextSnapshotNode = {
+    const node: TextSnapshotNode = {
       id: '1_1',
       role: 'checkbox',
       name: 'checkbox',
@@ -97,7 +97,7 @@ describe('snapshotFormatter', () => {
       },
     };
 
-    const formatted = formatA11ySnapshot(snapshot);
+    const formatted = formatSnapshotNode(node);
     assert.strictEqual(
       formatted,
       `uid=1_1 checkbox "checkbox" checked
@@ -107,7 +107,7 @@ describe('snapshotFormatter', () => {
   });
 
   it('formats a snapshot with multiple different type attributes', () => {
-    const snapshot: TextSnapshotNode = {
+    const node: TextSnapshotNode = {
       id: '1_1',
       role: 'root',
       name: 'root',
@@ -139,7 +139,7 @@ describe('snapshotFormatter', () => {
       },
     };
 
-    const formatted = formatA11ySnapshot(snapshot);
+    const formatted = formatSnapshotNode(node);
     assert.strictEqual(
       formatted,
       `uid=1_1 root "root"

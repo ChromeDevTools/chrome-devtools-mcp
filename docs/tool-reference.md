@@ -329,7 +329,8 @@ so returned values have to JSON-serializable.
 ### `take_snapshot`
 
 **Description:** Take a text snapshot of the currently selected page based on the a11y tree. The snapshot lists page elements along with a unique
-identifier (uid). Always use the latest snapshot. Prefer taking a snapshot over taking a screenshot.
+identifier (uid). Always use the latest snapshot. Prefer taking a snapshot over taking a screenshot. The snapshot indicates the element selected
+in the DevTools Elements panel (if any).
 
 **Parameters:**
 

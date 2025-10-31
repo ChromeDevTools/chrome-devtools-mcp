@@ -3,19 +3,26 @@
  * Copyright 2025 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import type {TextSnapshotNode} from '../McpContext.js';
+import type {TextSnapshot, TextSnapshotNode} from '../McpContext.js';
 
-export function formatA11ySnapshot(
-  serializedAXNodeRoot: TextSnapshotNode,
+export function formatSnapshotNode(
+  root: TextSnapshotNode,
+  snapshot?: TextSnapshot,
   depth = 0,
 ): string {
   let result = '';
-  const attributes = getAttributes(serializedAXNodeRoot);
-  const line = ' '.repeat(depth * 2) + attributes.join(' ') + '\n';
+  const attributes = getAttributes(root);
+  const line =
+    ' '.repeat(depth * 2) +
+    attributes.join(' ') +
+    (root.id === snapshot?.selectedElementUid
+      ? ' [selected in the DevTools Elements panel]'
+      : '') +
+    '\n';
   result += line;
 
-  for (const child of serializedAXNodeRoot.children) {
-    result += formatA11ySnapshot(child, depth + 1);
+  for (const child of root.children) {
+    result += formatSnapshotNode(child, snapshot, depth + 1);
   }
 
   return result;

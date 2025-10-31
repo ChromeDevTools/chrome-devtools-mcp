@@ -47,6 +47,11 @@ export interface SnapshotParams {
   filePath?: string;
 }
 
+export interface DevToolsData {
+  cdpRequestId?: string;
+  cdpBackendNodeId?: number;
+}
+
 export interface Response {
   appendResponseLine(value: string): void;
   setIncludePages(value: boolean): void;
@@ -69,6 +74,8 @@ export interface Response {
   attachImage(value: ImageContentData): void;
   attachNetworkRequest(reqid: number): void;
   attachConsoleMessage(msgid: number): void;
+  // Allows re-using DevTools data queried by some tools.
+  attachDevToolsData(data: DevToolsData): void;
 }
 
 /**
@@ -103,7 +110,15 @@ export type Context = Readonly<{
     text: string;
     timeout?: number | undefined;
   }): Promise<Element>;
-  getDevToolsData(): Promise<undefined | {requestId?: number}>;
+  getDevToolsData(): Promise<DevToolsData>;
+  /**
+   * Returns a reqid for a cdpRequestId.
+   */
+  resolveCdpRequestId(cdpRequestId: string): number | undefined;
+  /**
+   * Returns a reqid for a cdpRequestId.
+   */
+  resolveCdpElementId(cdpBackendNodeId: number): string | undefined;
 }>;
 
 export function defineTool<Schema extends zod.ZodRawShape>(

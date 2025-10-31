@@ -25,12 +25,13 @@ import type {
 import {listPages} from './tools/pages.js';
 import {takeSnapshot} from './tools/snapshot.js';
 import {CLOSE_PAGE_ERROR} from './tools/ToolDefinition.js';
-import type {Context} from './tools/ToolDefinition.js';
+import type {Context, DevToolsData} from './tools/ToolDefinition.js';
 import type {TraceResult} from './trace-processing/parse.js';
 import {WaitForHelper} from './WaitForHelper.js';
 
 export interface TextSnapshotNode extends SerializedAXNode {
   id: string;
+  backendNodeId?: number;
   children: TextSnapshotNode[];
 }
 
@@ -38,6 +39,7 @@ export interface TextSnapshot {
   root: TextSnapshotNode;
   idToNode: Map<string, TextSnapshotNode>;
   snapshotId: string;
+  selectedElementUid?: string;
 }
 
 interface McpContextOptions {
@@ -149,6 +151,42 @@ export class McpContext implements Context {
     const context = new McpContext(browser, logger, opts, locatorClass);
     await context.#init();
     return context;
+  }
+
+  resolveCdpRequestId(cdpRequestId: string): number | undefined {
+    const selectedPage = this.getSelectedPage();
+    if (!cdpRequestId) {
+      this.logger('no network request');
+      return;
+    }
+    const request = this.#networkCollector.find(selectedPage, request => {
+      // @ts-expect-error id is internal.
+      return request.id === cdpRequestId;
+    });
+    if (!request) {
+      this.logger('no network request for ' + cdpRequestId);
+      return;
+    }
+    return this.#networkCollector.getIdForResource(request);
+  }
+
+  resolveCdpElementId(cdpBackendNodeId: number): string | undefined {
+    if (!cdpBackendNodeId) {
+      this.logger('no cdpBackendNodeId');
+      return;
+    }
+    // TODO: index by backendNodeId instead.
+    const queue = [this.#textSnapshot?.root];
+    while (queue.length) {
+      const current = queue.pop()!;
+      if (current.backendNodeId === cdpBackendNodeId) {
+        return current.id;
+      }
+      for (const child of current.children) {
+        queue.push(child);
+      }
+    }
+    return;
   }
 
   getNetworkRequests(includePreservedRequests?: boolean): HTTPRequest[] {
@@ -380,12 +418,17 @@ export class McpContext implements Context {
     return this.#pageToDevToolsPage.get(page);
   }
 
-  async getDevToolsData(): Promise<undefined | {requestId?: number}> {
+  async getDevToolsData(): Promise<DevToolsData> {
     try {
+      this.logger('Getting DevTools UI data');
       const selectedPage = this.getSelectedPage();
       const devtoolsPage = this.getDevToolsPage(selectedPage);
-      if (devtoolsPage) {
-        const cdpRequestId = await devtoolsPage.evaluate(async () => {
+      if (!devtoolsPage) {
+        this.logger('No DevTools page detected');
+        return {};
+      }
+      const {cdpRequestId, cdpBackendNodeId} = await devtoolsPage.evaluate(
+        async () => {
           // @ts-expect-error no types
           const UI = await import('/bundled/ui/legacy/legacy.js');
           // @ts-expect-error no types
@@ -393,36 +436,29 @@ export class McpContext implements Context {
           const request = UI.Context.Context.instance().flavor(
             SDK.NetworkRequest.NetworkRequest,
           );
-          return request?.requestId();
-        });
-        if (!cdpRequestId) {
-          this.logger('no context request');
-          return;
-        }
-        const request = this.#networkCollector.find(selectedPage, request => {
-          // @ts-expect-error id is internal.
-          return request.id === cdpRequestId;
-        });
-        if (!request) {
-          this.logger('no collected request for ' + cdpRequestId);
-          return;
-        }
-        return {
-          requestId: this.#networkCollector.getIdForResource(request),
-        };
-      } else {
-        this.logger('no devtools page deteched');
-      }
+          const node = UI.Context.Context.instance().flavor(
+            SDK.DOMModel.DOMNode,
+          );
+          return {
+            cdpRequestId: request?.requestId(),
+            cdpBackendNodeId: node?.backendNodeId(),
+          };
+        },
+      );
+      return {cdpBackendNodeId, cdpRequestId};
     } catch (err) {
       this.logger('error getting devtools data', err);
     }
-    return;
+    return {};
   }
 
   /**
    * Creates a text snapshot of a page.
    */
-  async createTextSnapshot(verbose = false): Promise<void> {
+  async createTextSnapshot(
+    verbose = false,
+    devtoolsData: DevToolsData | undefined = undefined,
+  ): Promise<void> {
     const page = this.getSelectedPage();
     const rootNode = await page.accessibility.snapshot({
       includeIframes: true,
@@ -465,6 +501,12 @@ export class McpContext implements Context {
       snapshotId: String(snapshotId),
       idToNode,
     };
+    const data = devtoolsData ?? (await this.getDevToolsData());
+    if (data?.cdpBackendNodeId) {
+      this.#textSnapshot.selectedElementUid = this.resolveCdpElementId(
+        data?.cdpBackendNodeId,
+      );
+    }
   }
 
   getTextSnapshot(): TextSnapshot | null {

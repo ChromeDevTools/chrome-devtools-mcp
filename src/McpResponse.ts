@@ -15,7 +15,7 @@ import {
   getShortDescriptionForRequest,
   getStatusFromRequest,
 } from './formatters/networkFormatter.js';
-import {formatA11ySnapshot} from './formatters/snapshotFormatter.js';
+import {formatSnapshotNode} from './formatters/snapshotFormatter.js';
 import type {McpContext} from './McpContext.js';
 import type {
   ConsoleMessage,
@@ -25,6 +25,7 @@ import type {
 } from './third_party/index.js';
 import {handleDialog} from './tools/pages.js';
 import type {
+  DevToolsData,
   ImageContentData,
   Response,
   SnapshotParams,
@@ -52,6 +53,11 @@ export class McpResponse implements Response {
     types?: string[];
     includePreservedMessages?: boolean;
   };
+  #devToolsData?: DevToolsData;
+
+  attachDevToolsData(data: DevToolsData): void {
+    this.#devToolsData = data;
+  }
 
   setIncludePages(value: boolean): void {
     this.#includePages = value;
@@ -179,17 +185,22 @@ export class McpResponse implements Response {
 
     let formattedSnapshot: string | undefined;
     if (this.#snapshotParams) {
-      await context.createTextSnapshot(this.#snapshotParams.verbose);
+      await context.createTextSnapshot(
+        this.#snapshotParams.verbose,
+        this.#devToolsData,
+      );
       const snapshot = context.getTextSnapshot();
       if (snapshot) {
         if (this.#snapshotParams.filePath) {
           await context.saveFile(
-            new TextEncoder().encode(formatA11ySnapshot(snapshot.root)),
+            new TextEncoder().encode(
+              formatSnapshotNode(snapshot.root, snapshot),
+            ),
             this.#snapshotParams.filePath,
           );
           formattedSnapshot = `Saved snapshot to ${this.#snapshotParams.filePath}.`;
         } else {
-          formattedSnapshot = formatA11ySnapshot(snapshot.root);
+          formattedSnapshot = formatSnapshotNode(snapshot.root, snapshot);
         }
       }
     }
