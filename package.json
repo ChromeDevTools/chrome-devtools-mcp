@@ -41,7 +41,7 @@
   "devDependencies": {
     "@eslint/js": "^9.35.0",
     "@modelcontextprotocol/sdk": "1.20.2",
-    "@rollup/plugin-commonjs": "^28.0.8",
+    "@rollup/plugin-commonjs": "^29.0.0",
     "@rollup/plugin-json": "^6.1.0",
     "@rollup/plugin-node-resolve": "^16.0.3",
     "@stylistic/eslint-plugin": "^5.4.0",
