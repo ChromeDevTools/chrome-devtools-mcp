@@ -1,9 +1,18 @@
 exports[`Trace parsing > can format results of a trace 1`] = `
 ## Summary of Performance trace findings:
 URL: https://web.dev/
-Bounds: {min: 122410994891, max: 122416385853}
+Trace bounds: {min: 122410994891, max: 122416385853}
 CPU throttling: none
 Network throttling: none
+
+# Available insight sets
+
+The following is a list of insight sets. An insight set covers a specific part of the trace, split by navigations. The insights within each insight set are specific to that part of the trace. Be sure to consider the insight set id and bounds when calling functions. If no specific insight set or navigation is mentioned, assume the user is referring to the first one.
+
+## insight set id: 8463DF94CD61B265B664E7F768183DE3
+
+URL: https://web.dev/
+Bounds: {min: 122410996889, max: 122416385853}
 Metrics (lab / observed):
   - LCP: 129 ms, event: (eventKey: r-6063, ts: 122411126100), nodeId: 7
   - LCP breakdown:
