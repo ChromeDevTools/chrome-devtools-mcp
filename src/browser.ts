@@ -13,51 +13,53 @@ import type {
   Browser,
   ChromeReleaseChannel,
   LaunchOptions,
-  Target,
+  CDPSession,
 } from './third_party/index.js';
 import {puppeteer} from './third_party/index.js';
 
 let browser: Browser | undefined;
 
-function makeTargetFilter() {
-  const ignoredPrefixes = new Set([
-    'chrome://',
-    'chrome-extension://',
-    'chrome-untrusted://',
-  ]);
-
-  return function targetFilter(target: Target): boolean {
-    if (target.url() === 'chrome://newtab/') {
-      return true;
-    }
-    if (target.url().startsWith('https://ogs.google.com/widget/app/so')) {
-      // Some special frame on the NTP that is not picked up by CDP-auto-attach.
-      return false;
-    }
-    for (const prefix of ignoredPrefixes) {
-      if (target.url().startsWith(prefix)) {
-        return false;
-      }
-    }
-    return true;
-  };
+export interface BootstrapOptions {
+  includeExtensionTargets: boolean;
+  bootstrapTimeoutMs: number;
+  verboseBootstrap: boolean;
 }
+
+type TargetFilterEntry = {
+  type?: string;
+  exclude?: boolean;
+};
+
+type BootstrapState = {
+  options: BootstrapOptions;
+  promise: Promise<void>;
+};
+
+type RawCDPSession = CDPSession & {
+  send: (method: string, params?: unknown) => Promise<unknown>;
+  on: (event: string, listener: (event: unknown) => void) => void;
+  off?: (event: string, listener: (event: unknown) => void) => void;
+  removeListener?: (event: string, listener: (event: unknown) => void) => void;
+};
+
+const bootstrapStates = new WeakMap<Browser, BootstrapState>();
 
 export async function ensureBrowserConnected(options: {
   browserURL?: string;
   wsEndpoint?: string;
   wsHeaders?: Record<string, string>;
   devtools: boolean;
+  bootstrap: BootstrapOptions;
 }) {
   if (browser?.connected) {
     return browser;
   }
 
   const connectOptions: Parameters<typeof puppeteer.connect>[0] = {
-    targetFilter: makeTargetFilter(),
     defaultViewport: null,
     handleDevToolsAsPage: true,
   };
+  (connectOptions as {waitForInitialPage?: boolean}).waitForInitialPage = false;
 
   if (options.wsEndpoint) {
     connectOptions.browserWSEndpoint = options.wsEndpoint;
@@ -71,7 +73,15 @@ export async function ensureBrowserConnected(options: {
   }
 
   logger('Connecting Puppeteer to ', JSON.stringify(connectOptions));
-  browser = await puppeteer.connect(connectOptions);
+  const connectedBrowser = await puppeteer.connect(connectOptions);
+  logger('bootstrap: puppeteer.connect resolved');
+  try {
+    await bootstrapBrowser(connectedBrowser, options.bootstrap);
+  } catch (error) {
+    connectedBrowser.disconnect();
+    throw error;
+  }
+  browser = connectedBrowser;
   logger('Connected Puppeteer');
   return browser;
 }
@@ -131,9 +141,8 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
   }
 
   try {
-    const browser = await puppeteer.launch({
+    const launchOptions: Parameters<typeof puppeteer.launch>[0] = {
       channel: puppeteerChannel,
-      targetFilter: makeTargetFilter(),
       executablePath,
       defaultViewport: null,
       userDataDir,
@@ -142,7 +151,9 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
       args,
       acceptInsecureCerts: options.acceptInsecureCerts,
       handleDevToolsAsPage: true,
-    });
+    };
+    (launchOptions as {waitForInitialPage?: boolean}).waitForInitialPage = false;
+    const browser = await puppeteer.launch(launchOptions);
     if (options.logFile) {
       // FIXME: we are probably subscribing too late to catch startup logs. We
       // should expose the process earlier or expose the getRecentLogs() getter.
@@ -175,13 +186,220 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
 }
 
 export async function ensureBrowserLaunched(
-  options: McpLaunchOptions,
+  options: McpLaunchOptions & {bootstrap: BootstrapOptions},
 ): Promise<Browser> {
   if (browser?.connected) {
     return browser;
   }
-  browser = await launch(options);
+  const {bootstrap, ...launchOptions} = options;
+  const launchedBrowser = await launch(launchOptions as McpLaunchOptions);
+  try {
+    await bootstrapBrowser(launchedBrowser, bootstrap);
+  } catch (error) {
+    await launchedBrowser.close().catch(() => {});
+    throw error;
+  }
+  browser = launchedBrowser;
   return browser;
 }
 
 export type Channel = 'stable' | 'canary' | 'beta' | 'dev';
+
+function bootstrapOptionsEqual(
+  a: BootstrapOptions,
+  b: BootstrapOptions,
+): boolean {
+  return (
+    a.includeExtensionTargets === b.includeExtensionTargets &&
+    a.bootstrapTimeoutMs === b.bootstrapTimeoutMs &&
+    a.verboseBootstrap === b.verboseBootstrap
+  );
+}
+
+async function bootstrapBrowser(
+  instance: Browser,
+  options: BootstrapOptions,
+): Promise<void> {
+  logger(
+    `bootstrap: start (includeExtensionTargets=${options.includeExtensionTargets}, timeout=${options.bootstrapTimeoutMs}, verbose=${options.verboseBootstrap})`,
+  );
+  const existingState = bootstrapStates.get(instance);
+  if (existingState) {
+    if (bootstrapOptionsEqual(existingState.options, options)) {
+      await existingState.promise;
+      return;
+    }
+  }
+
+  const promise = configureBootstrap(instance, options).catch(error => {
+    bootstrapStates.delete(instance);
+    throw error;
+  });
+  bootstrapStates.set(instance, {
+    options: {...options},
+    promise,
+  });
+  await promise;
+}
+
+async function configureBootstrap(
+  instance: Browser,
+  options: BootstrapOptions,
+): Promise<void> {
+  if (options.verboseBootstrap) {
+    logger('bootstrap: creating root CDP session');
+  }
+  const session = (await instance
+    .target()
+    .createCDPSession()) as unknown as RawCDPSession;
+  if (options.verboseBootstrap) {
+    logger('bootstrap: root CDP session created');
+  }
+
+  const autoAttachFilter: TargetFilterEntry[] = options.includeExtensionTargets
+    ? [{}]
+    : [
+        {type: 'service_worker', exclude: true},
+        {type: 'background_page', exclude: true},
+        {type: 'iframe', exclude: true},
+        {type: 'worker', exclude: true},
+        {type: 'shared_worker', exclude: true},
+        {type: 'utility', exclude: true},
+      ];
+
+  const waitForFirstPage = waitForFirstPageOrTimeout(
+    session,
+    options.bootstrapTimeoutMs,
+    options.verboseBootstrap,
+  );
+
+  if (options.verboseBootstrap) {
+    logger(
+      'bootstrap: setDiscoverTargets (discover=true, filter=[{}])',
+    );
+  }
+  await sendWithFallback(session, 'Target.setDiscoverTargets', {
+    discover: true,
+    filter: [{}],
+  });
+
+  if (options.verboseBootstrap) {
+    logger(
+      `bootstrap: setAutoAttach (flatten=true, waitForDebuggerOnStart=false, filter=${JSON.stringify(autoAttachFilter)})`,
+    );
+  }
+  await sendWithFallback(session, 'Target.setAutoAttach', {
+    autoAttach: true,
+    flatten: true,
+    waitForDebuggerOnStart: false,
+    filter: autoAttachFilter,
+  });
+
+  await waitForFirstPage;
+}
+
+async function sendWithFallback(
+  session: RawCDPSession,
+  method: 'Target.setDiscoverTargets' | 'Target.setAutoAttach',
+  params: Record<string, unknown>,
+): Promise<void> {
+  try {
+    await session.send(method, params);
+    return;
+  } catch (error) {
+    if (!isFilterNotSupportedError(error)) {
+      throw error;
+    }
+    const fallbackParams =
+      method === 'Target.setDiscoverTargets'
+        ? {discover: true}
+        : {
+            autoAttach: true,
+            flatten: true,
+            waitForDebuggerOnStart: false,
+          };
+    logger(
+      `${method}: filter unsupported, retrying without filter (${(error as Error).message})`,
+    );
+    await session.send(method, fallbackParams);
+  }
+}
+
+function isFilterNotSupportedError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') {
+    return false;
+  }
+  const message = 'message' in error ? String((error as Error).message) : '';
+  return /filter/i.test(message) || /Invalid parameters/.test(message);
+}
+
+function waitForFirstPageOrTimeout(
+  session: RawCDPSession,
+  timeoutMs: number,
+  verbose: boolean,
+): Promise<void> {
+  if (timeoutMs <= 0) {
+    if (verbose) {
+      logger('bootstrap: waiting for first page skipped (timeout <= 0)');
+    }
+    return Promise.resolve();
+  }
+
+  if (verbose) {
+    logger(
+      `bootstrap: waiting for first page or timeout (${timeoutMs} ms)`,
+    );
+  }
+
+  return new Promise(resolve => {
+    let settled = false;
+    let timer: NodeJS.Timeout;
+
+    const cleanup = () => {
+      clearTimeout(timer);
+      if (typeof session.off === 'function') {
+        session.off('Target.attachedToTarget', onAttached);
+      } else if (typeof session.removeListener === 'function') {
+        session.removeListener('Target.attachedToTarget', onAttached);
+      }
+    };
+
+    const done = (logMessage?: string) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      if (logMessage && verbose) {
+        logger(logMessage);
+      }
+      cleanup();
+      resolve();
+    };
+
+    const onAttached = (event: unknown) => {
+      if (!event || typeof event !== 'object') {
+        return;
+      }
+      const attachedEvent = event as {
+        targetInfo?: {
+          type?: string;
+          url?: string;
+        };
+      };
+      const targetInfo = attachedEvent.targetInfo;
+      if (!targetInfo) {
+        return;
+      }
+      if (targetInfo.type === 'page' || targetInfo.type === 'tab') {
+        const urlPart = targetInfo.url ? ` ${targetInfo.url}` : '';
+        done(`bootstrap: first page attached (${targetInfo.type}${urlPart})`);
+      }
+    };
+
+    timer = setTimeout(() => {
+      done('bootstrap: timed out, continuing');
+    }, timeoutMs);
+
+    session.on('Target.attachedToTarget', onAttached);
+  });
+}

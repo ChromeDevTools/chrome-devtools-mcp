@@ -18,8 +18,43 @@ export const listPages = defineTool({
     readOnlyHint: true,
   },
   schema: {},
-  handler: async (_request, response) => {
-    response.setIncludePages(true);
+  handler: async (_request, response, context) => {
+    const summary = await context.getVisiblePagesSummary();
+
+    const filteredCounts = new Map<string, number>();
+    for (const entry of summary.filtered) {
+      filteredCounts.set(
+        entry.reason,
+        (filteredCounts.get(entry.reason) ?? 0) + 1,
+      );
+    }
+
+    if (summary.filtered.length > 0) {
+      const parts: string[] = [];
+      for (const [reason, count] of filteredCounts.entries()) {
+        parts.push(`${reason}: ${count}`);
+      }
+      logger(
+        `list_pages: returning ${summary.pages.length} pages; filtered ${summary.filtered.length} (${parts.join(', ')})`,
+      );
+    } else {
+      logger(
+        `list_pages: returning ${summary.pages.length} pages; filtered 0`,
+      );
+    }
+
+    const pagesPayload = summary.pages.map(page => {
+      return {
+        index: page.index,
+        id: page.id,
+        selected: page.selected,
+        title: page.title,
+        url: page.url,
+      };
+    });
+
+    response.appendResponseLine('pages:');
+    response.appendResponseLine(JSON.stringify(pagesPayload, null, 2));
   },
 });
 

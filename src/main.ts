@@ -60,6 +60,11 @@ async function getContext(): Promise<McpContext> {
     extraArgs.push(`--proxy-server=${args.proxyServer}`);
   }
   const devtools = args.experimentalDevtools ?? false;
+  const bootstrapOptions = {
+    includeExtensionTargets: args.includeExtensionTargets ?? false,
+    bootstrapTimeoutMs: args.bootstrapTimeoutMs ?? 2_000,
+    verboseBootstrap: args.verboseBootstrap ?? true,
+  };
   const browser =
     args.browserUrl || args.wsEndpoint
       ? await ensureBrowserConnected({
@@ -67,6 +72,7 @@ async function getContext(): Promise<McpContext> {
           wsEndpoint: args.wsEndpoint,
           wsHeaders: args.wsHeaders,
           devtools,
+          bootstrap: bootstrapOptions,
         })
       : await ensureBrowserLaunched({
           headless: args.headless,
@@ -78,11 +84,13 @@ async function getContext(): Promise<McpContext> {
           args: extraArgs,
           acceptInsecureCerts: args.acceptInsecureCerts,
           devtools,
+          bootstrap: bootstrapOptions,
         });
 
   if (context?.browser !== browser) {
     context = await McpContext.from(browser, logger, {
       experimentalDevToolsDebugging: devtools,
+      includeExtensionTargets: args.includeExtensionTargets ?? false,
     });
   }
   return context;

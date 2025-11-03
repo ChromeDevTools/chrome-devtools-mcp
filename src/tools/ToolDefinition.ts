@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {TextSnapshotNode} from '../McpContext.js';
+import type {TextSnapshotNode, VisiblePagesSummary} from '../McpContext.js';
 import {zod} from '../third_party/index.js';
 import type {Dialog, ElementHandle, Page} from '../third_party/index.js';
 import type {TraceResult} from '../trace-processing/parse.js';
@@ -119,6 +119,7 @@ export type Context = Readonly<{
    * Returns a reqid for a cdpRequestId.
    */
   resolveCdpElementId(cdpBackendNodeId: number): string | undefined;
+  getVisiblePagesSummary(): Promise<VisiblePagesSummary>;
 }>;
 
 export function defineTool<Schema extends zod.ZodRawShape>(

@@ -136,7 +136,9 @@
 
 ### `list_pages`
 
-**Description:** Get a list of pages open in the browser.
+**Description:** Get a list of pages open in the browser. The response includes a JSON array of objects with the fields `index`, `id`, `title`, `url`, and `selected`.
+
+Extension and DevTools targets are filtered out by default to keep bootstrap fast. Pass `--includeExtensionTargets` when starting the server to include them.
 
 **Parameters:** None
 

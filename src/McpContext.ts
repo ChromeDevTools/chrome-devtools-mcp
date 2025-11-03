@@ -42,13 +42,61 @@ export interface TextSnapshot {
   selectedElementUid?: string;
 }
 
+export type VisiblePagesSummary = {
+  pages: Array<{
+    index: number;
+    id: string;
+    title: string;
+    url: string;
+    selected: boolean;
+  }>;
+  filtered: Array<{url: string; reason: string}>;
+};
+
 interface McpContextOptions {
   // Whether the DevTools windows are exposed as pages for debugging of DevTools.
   experimentalDevToolsDebugging: boolean;
+  includeExtensionTargets: boolean;
 }
 
 const DEFAULT_TIMEOUT = 5_000;
 const NAVIGATION_TIMEOUT = 10_000;
+
+function getPageFilterReasonForUrl(
+  url: string,
+  options: McpContextOptions,
+): string | undefined {
+  if (!url) {
+    return;
+  }
+
+  const normalized = url.toLowerCase();
+
+  if (
+    !options.experimentalDevToolsDebugging &&
+    normalized.startsWith('devtools://')
+  ) {
+    return 'devtools target';
+  }
+
+  if (options.includeExtensionTargets) {
+    return;
+  }
+
+  if (normalized.includes('snaps/index.html')) {
+    return 'extension snaps page';
+  }
+
+  if (normalized.includes('offscreen.html')) {
+    return 'extension offscreen page';
+  }
+
+  if (normalized.startsWith('chrome-extension://')) {
+    return 'extension target';
+  }
+
+  return;
+}
 
 function getNetworkMultiplierFromString(condition: string | null): number {
   const puppeteerCondition =
@@ -87,6 +135,7 @@ export class McpContext implements Context {
   #pages: Page[] = [];
   #pageToDevToolsPage = new Map<Page, Page>();
   #selectedPageIdx = 0;
+  #lastFilteredPages: Array<{url: string; reason: string}> = [];
   // The most recent snapshot.
   #textSnapshot: TextSnapshot | null = null;
   #networkCollector: NetworkCollector;
@@ -364,20 +413,9 @@ export class McpContext implements Context {
    * Creates a snapshot of the pages.
    */
   async createPagesSnapshot(): Promise<Page[]> {
-    const allPages = await this.browser.pages();
+    const {visible} = await this.#refreshPages();
 
-    this.#pages = allPages.filter(page => {
-      // If we allow debugging DevTools windows, return all pages.
-      // If we are in regular mode, the user should only see non-DevTools page.
-      return (
-        this.#options.experimentalDevToolsDebugging ||
-        !page.url().startsWith('devtools://')
-      );
-    });
-
-    await this.detectOpenDevToolsWindows();
-
-    return this.#pages;
+    return visible;
   }
 
   async detectOpenDevToolsWindows() {
@@ -416,6 +454,72 @@ export class McpContext implements Context {
 
   getDevToolsPage(page: Page): Page | undefined {
     return this.#pageToDevToolsPage.get(page);
+  }
+
+  async getVisiblePagesSummary(): Promise<VisiblePagesSummary> {
+    const {visible, filtered} = await this.#refreshPages();
+
+    const summaries = await Promise.all(
+      visible.map(async (page, index) => {
+        let title = '';
+        try {
+          title = await page.title();
+        } catch (error) {
+          this.logger('Unable to resolve page title', error);
+        }
+        const target = page.target() as unknown as {
+          _targetId?: string;
+        };
+        const stableId =
+          target._targetId && target._targetId.length > 0
+            ? target._targetId
+            : `${page.url()}#${index}`;
+        return {
+          index,
+          id: stableId,
+          title,
+          url: page.url(),
+          selected: index === this.#selectedPageIdx,
+        };
+      }),
+    );
+
+    return {pages: summaries, filtered};
+  }
+
+  #filterPages(pages: Page[]): {
+    visible: Page[];
+    filtered: Array<{url: string; reason: string}>;
+  } {
+    const visible: Page[] = [];
+    const filtered: Array<{url: string; reason: string}> = [];
+    for (const page of pages) {
+      const reason = getPageFilterReasonForUrl(page.url(), this.#options);
+      if (reason) {
+        filtered.push({
+          url: page.url(),
+          reason,
+        });
+        continue;
+      }
+      visible.push(page);
+    }
+    return {visible, filtered};
+  }
+
+  async #refreshPages(): Promise<{
+    visible: Page[];
+    filtered: Array<{url: string; reason: string}>;
+  }> {
+    const allPages = await this.browser.pages();
+    const result = this.#filterPages(allPages);
+
+    this.#pages = result.visible;
+    this.#lastFilteredPages = result.filtered;
+
+    await this.detectOpenDevToolsWindows();
+
+    return result;
   }
 
   async getDevToolsData(): Promise<DevToolsData> {

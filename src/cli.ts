@@ -139,6 +139,34 @@ export const cliOptions = {
     describe:
       'Additional arguments for Chrome. Only applies when Chrome is launched by chrome-devtools-mcp.',
   },
+  includeExtensionTargets: {
+    type: 'boolean',
+    default: false,
+    describe:
+      'Include extension-related targets (service workers, background pages, iframes) during bootstrap. Enable only if you need to interact with extension targets.',
+  },
+  bootstrapTimeoutMs: {
+    type: 'number',
+    default: 2_000,
+    describe:
+      'Maximum time in milliseconds to wait for the first page to auto-attach during bootstrap before continuing.',
+    coerce: (value: number | undefined) => {
+      if (value === undefined) {
+        return;
+      }
+      const numberValue = Number(value);
+      if (!Number.isFinite(numberValue) || numberValue < 0) {
+        throw new Error('bootstrapTimeoutMs must be a non-negative number.');
+      }
+      return numberValue;
+    },
+  },
+  verboseBootstrap: {
+    type: 'boolean',
+    default: true,
+    describe:
+      'Enable verbose logs for the browser bootstrap process. Disable with --no-verboseBootstrap.',
+  },
   categoryEmulation: {
     type: 'boolean',
     default: true,

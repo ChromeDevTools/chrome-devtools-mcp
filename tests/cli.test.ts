@@ -10,6 +10,12 @@ import {parseArguments} from '../src/cli.js';
 
 describe('cli args parsing', () => {
   const defaultArgs = {
+    'include-extension-targets': false,
+    includeExtensionTargets: false,
+    'bootstrap-timeout-ms': 2_000,
+    bootstrapTimeoutMs: 2_000,
+    'verbose-bootstrap': true,
+    verboseBootstrap: true,
     'category-emulation': true,
     categoryEmulation: true,
     'category-performance': true,
@@ -67,6 +73,37 @@ describe('cli args parsing', () => {
       u: undefined,
       channel: 'stable',
     });
+  });
+
+  it('parses includeExtensionTargets', async () => {
+    const args = parseArguments('1.0.0', [
+      'node',
+      'main.js',
+      '--includeExtensionTargets',
+    ]);
+    assert.equal(args.includeExtensionTargets, true);
+    assert.equal(args['include-extension-targets'], true);
+  });
+
+  it('parses bootstrapTimeoutMs', async () => {
+    const args = parseArguments('1.0.0', [
+      'node',
+      'main.js',
+      '--bootstrapTimeoutMs',
+      '4500',
+    ]);
+    assert.equal(args.bootstrapTimeoutMs, 4_500);
+    assert.equal(args['bootstrap-timeout-ms'], 4_500);
+  });
+
+  it('parses verboseBootstrap', async () => {
+    const args = parseArguments('1.0.0', [
+      'node',
+      'main.js',
+      '--no-verboseBootstrap',
+    ]);
+    assert.equal(args.verboseBootstrap, false);
+    assert.equal(args['verbose-bootstrap'], false);
   });
 
   it('parses with executable path', async () => {

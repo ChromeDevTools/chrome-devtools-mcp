@@ -28,6 +28,15 @@ This indicates that the browser could not be started. Make sure that no Chrome
 instances are running or close them. Make sure you have the latest stable Chrome
 installed and that [your system is able to run Chrome](https://support.google.com/chrome/a/answer/7100626?hl=en).
 
+### Browser appears stuck when extensions like MetaMask are enabled
+
+Some extensions register background pages, service workers, offscreen documents, and iframes that keep Chrome busy during startup. To prevent hangs, the MCP server filters these extension targets during bootstrap and ignores them in the `list_pages` tool.
+
+- Leave the default behavior to get a responsive startup and see only regular web pages.
+- Launch the server with `--includeExtensionTargets` if you need to work with extension targets.
+- Adjust `--bootstrapTimeoutMs` to wait longer than the default 2000 ms before giving up on extension targets.
+- Enable `--verboseBootstrap` (default) to see detailed logs about the new filtered auto-attach loop, and use `--no-verboseBootstrap` to reduce logging noise.
+
 ### Remote debugging between virtual machine (VM) and host fails
 
 When connecting DevTools inside a VM to Chrome running on the host, any domain is rejected by Chrome because of host header validation. Tunneling the port over SSH bypasses this restriction. In the VM, run:

@@ -24,7 +24,24 @@ describe('pages', () => {
     it('list pages', async () => {
       await withBrowser(async (response, context) => {
         await listPages.handler({params: {}}, response, context);
-        assert.ok(response.includePages);
+        assert.strictEqual(response.responseLines[0], 'pages:');
+        const serializedPages = response.responseLines.at(1);
+        assert.ok(serializedPages);
+        const pages = JSON.parse(serializedPages ?? '[]');
+        assert.equal(pages.length, 1);
+        const page = pages[0] as {
+          id: string;
+          index: number;
+          selected: boolean;
+          title: string;
+          url: string;
+        };
+        assert.equal(page.index, 0);
+        assert.equal(page.url, 'about:blank');
+        assert.equal(page.selected, true);
+        assert.equal(page.title, '');
+        assert.equal(typeof page.id, 'string');
+        assert.ok(!response.includePages);
       });
     });
   });

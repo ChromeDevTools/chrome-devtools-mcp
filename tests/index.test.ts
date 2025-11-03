@@ -42,39 +42,59 @@ describe('e2e', () => {
   }
   it('calls a tool', async () => {
     await withClient(async client => {
+      await client.callTool({
+        name: 'select_page',
+        arguments: {
+          pageIdx: 0,
+        },
+      });
       const result = await client.callTool({
         name: 'list_pages',
         arguments: {},
       });
-      assert.deepStrictEqual(result, {
-        content: [
-          {
-            type: 'text',
-            text: '# list_pages response\n## Pages\n0: about:blank [selected]',
-          },
-        ],
-      });
+      const content = (result.content ?? []) as Array<
+        {type: string; text?: string} | undefined
+      >;
+      assert.equal(content.length, 1);
+      const first = content[0];
+      const text = first?.type === 'text' ? first.text ?? '' : '';
+      assert.ok(
+        text.startsWith('# list_pages response\npages:\n['),
+        `Unexpected content: ${text}`,
+      );
+      const serializedPages = text.slice(text.indexOf('pages:\n') + 'pages:\n'.length);
+      const pages = JSON.parse(serializedPages);
+      assert.equal(pages.length, 1);
+      assert.equal(pages[0]?.index, 0);
+      assert.equal(pages[0]?.url, 'about:blank');
+      assert.equal(pages[0]?.selected, true);
+      assert.equal(typeof pages[0]?.id, 'string');
     });
   });
 
   it('calls a tool multiple times', async () => {
     await withClient(async client => {
-      let result = await client.callTool({
+      await client.callTool({
+        name: 'select_page',
+        arguments: {
+          pageIdx: 0,
+        },
+      });
+      await client.callTool({
         name: 'list_pages',
         arguments: {},
       });
-      result = await client.callTool({
+      const result = await client.callTool({
         name: 'list_pages',
         arguments: {},
       });
-      assert.deepStrictEqual(result, {
-        content: [
-          {
-            type: 'text',
-            text: '# list_pages response\n## Pages\n0: about:blank [selected]',
-          },
-        ],
-      });
+      const content = (result.content ?? []) as Array<
+        {type: string; text?: string} | undefined
+      >;
+      assert.equal(content.length, 1);
+      const first = content[0];
+      const text = first?.type === 'text' ? first.text ?? '' : '';
+      assert.ok(text.includes('"index": 0'));
     });
   });
 

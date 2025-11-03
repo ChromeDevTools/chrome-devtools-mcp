@@ -53,6 +53,7 @@ export async function withBrowser(
     logger('test'),
     {
       experimentalDevToolsDebugging: false,
+      includeExtensionTargets: false,
     },
     Locator,
   );

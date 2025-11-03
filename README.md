@@ -336,6 +336,21 @@ The Chrome DevTools MCP server supports the following configuration option:
   Additional arguments for Chrome. Only applies when Chrome is launched by chrome-devtools-mcp.
   - **Type:** array
 
+- **`--includeExtensionTargets`**
+  Include extension-related targets (service workers, background pages, offscreen documents) during bootstrap. Disabled by default to avoid long startup times with heavy extensions such as MetaMask.
+  - **Type:** boolean
+  - **Default:** `false`
+
+- **`--bootstrapTimeoutMs`**
+  Maximum time in milliseconds to wait for a first page to auto-attach during browser bootstrap before continuing.
+  - **Type:** number
+  - **Default:** `2000`
+
+- **`--verboseBootstrap`**
+  Enable verbose bootstrap logging (disable with `--no-verboseBootstrap`).
+  - **Type:** boolean
+  - **Default:** `true`
+
 - **`--categoryEmulation`**
   Set to false to exclude tools related to emulation.
   - **Type:** boolean
