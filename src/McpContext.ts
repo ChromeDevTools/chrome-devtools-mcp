@@ -45,6 +45,8 @@ export interface TextSnapshot {
 interface McpContextOptions {
   // Whether the DevTools windows are exposed as pages for debugging of DevTools.
   experimentalDevToolsDebugging: boolean;
+  // Whether all page-like targets are exposed as pages.
+  experimentalIncludeAllPages?: boolean;
 }
 
 const DEFAULT_TIMEOUT = 5_000;
@@ -114,24 +116,32 @@ export class McpContext implements Context {
     this.#locatorClass = locatorClass;
     this.#options = options;
 
-    this.#networkCollector = new NetworkCollector(this.browser);
+    this.#networkCollector = new NetworkCollector(
+      this.browser,
+      undefined,
+      this.#options.experimentalIncludeAllPages,
+    );
 
-    this.#consoleCollector = new PageCollector(this.browser, collect => {
-      return {
-        console: event => {
-          collect(event);
-        },
-        pageerror: event => {
-          if (event instanceof Error) {
+    this.#consoleCollector = new PageCollector(
+      this.browser,
+      collect => {
+        return {
+          console: event => {
             collect(event);
-          } else {
-            const error = new Error(`${event}`);
-            error.stack = undefined;
-            collect(error);
-          }
-        },
-      } as ListenerMap;
-    });
+          },
+          pageerror: event => {
+            if (event instanceof Error) {
+              collect(event);
+            } else {
+              const error = new Error(`${event}`);
+              error.stack = undefined;
+              collect(error);
+            }
+          },
+        } as ListenerMap;
+      },
+      this.#options.experimentalIncludeAllPages,
+    );
   }
 
   async #init() {
@@ -364,7 +374,9 @@ export class McpContext implements Context {
    * Creates a snapshot of the pages.
    */
   async createPagesSnapshot(): Promise<Page[]> {
-    const allPages = await this.browser.pages();
+    const allPages = await this.browser.pages(
+      this.#options.experimentalIncludeAllPages,
+    );
 
     this.#pages = allPages.filter(page => {
       // If we allow debugging DevTools windows, return all pages.
@@ -382,7 +394,9 @@ export class McpContext implements Context {
 
   async detectOpenDevToolsWindows() {
     this.logger('Detecting open DevTools windows');
-    const pages = await this.browser.pages();
+    const pages = await this.browser.pages(
+      this.#options.experimentalIncludeAllPages,
+    );
     this.#pageToDevToolsPage = new Map<Page, Page>();
     for (const devToolsPage of pages) {
       if (devToolsPage.url().startsWith('devtools://')) {

@@ -134,6 +134,12 @@ export const cliOptions = {
     describe: 'Whether to enable automation over DevTools targets',
     hidden: true,
   },
+  experimentalIncludeAllPages: {
+    type: 'boolean',
+    describe:
+      'Whether to include all kinds of pages such as webviews or background pages as pages.',
+    hidden: true,
+  },
   chromeArg: {
     type: 'array',
     describe:
