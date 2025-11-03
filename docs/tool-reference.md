@@ -215,11 +215,12 @@
 
 ### `performance_analyze_insight`
 
-**Description:** Provides more detailed information on a specific Performance Insight that was highlighted in the results of a trace recording.
+**Description:** Provides more detailed information on a specific Performance Insight of an insight set that was highlighted in the results of a trace recording.
 
 **Parameters:**
 
 - **insightName** (string) **(required)**: The name of the Insight you want more information on. For example: "DocumentLatency" or "LCPBreakdown"
+- **insightSetId** (string) **(required)**: The id for the specific insight set. Only use the ids given in the "Available insight sets" list.
 
 ---
 
@@ -278,14 +279,15 @@ so returned values have to JSON-serializable.
 
 - **args** (array) _(optional)_: An optional list of arguments to pass to the function.
 - **function** (string) **(required)**: A JavaScript function declaration to be executed by the tool in the currently selected page.
-  Example without arguments: `() => {
+Example without arguments: `() => {
   return document.title
 }` or `async () => {
   return await fetch("example.com")
 }`.
-  Example with arguments: `(el) => {
+Example with arguments: `(el) => {
   return el.innerText;
 }`
+
 
 ---
 
