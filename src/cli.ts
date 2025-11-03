@@ -142,17 +142,17 @@ export const cliOptions = {
   categoryEmulation: {
     type: 'boolean',
     default: true,
-    describe: 'Set to false to exlcude tools related to emulation.',
+    describe: 'Set to false to exclude tools related to emulation.',
   },
   categoryPerformance: {
     type: 'boolean',
     default: true,
-    describe: 'Set to false to exlcude tools related to performance.',
+    describe: 'Set to false to exclude tools related to performance.',
   },
   categoryNetwork: {
     type: 'boolean',
     default: true,
-    describe: 'Set to false to exlcude tools related to network.',
+    describe: 'Set to false to exclude tools related to network.',
   },
 } satisfies Record<string, YargsOptions>;
 

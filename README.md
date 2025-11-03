@@ -337,17 +337,17 @@ The Chrome DevTools MCP server supports the following configuration option:
   - **Type:** array
 
 - **`--categoryEmulation`**
-  Set to false to exlcude tools related to emulation.
+  Set to false to exclude tools related to emulation.
   - **Type:** boolean
   - **Default:** `true`
 
 - **`--categoryPerformance`**
-  Set to false to exlcude tools related to performance.
+  Set to false to exclude tools related to performance.
   - **Type:** boolean
   - **Default:** `true`
 
 - **`--categoryNetwork`**
-  Set to false to exlcude tools related to network.
+  Set to false to exclude tools related to network.
   - **Type:** boolean
   - **Default:** `true`
 
