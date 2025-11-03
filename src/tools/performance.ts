@@ -121,12 +121,17 @@ export const stopTrace = defineTool({
 export const analyzeInsight = defineTool({
   name: 'performance_analyze_insight',
   description:
-    'Provides more detailed information on a specific Performance Insight that was highlighted in the results of a trace recording.',
+    'Provides more detailed information on a specific Performance Insight of an insight set that was highlighted in the results of a trace recording.',
   annotations: {
     category: ToolCategory.PERFORMANCE,
     readOnlyHint: true,
   },
   schema: {
+    insightSetId: zod
+      .string()
+      .describe(
+        'The id for the specific insight set. Only use the ids given in the "Available insight sets" list.',
+      ),
     insightName: zod
       .string()
       .describe(
@@ -144,6 +149,7 @@ export const analyzeInsight = defineTool({
 
     const insightOutput = getInsightOutput(
       lastRecording,
+      request.params.insightSetId,
       request.params.insightName as InsightName,
     );
     if ('error' in insightOutput) {

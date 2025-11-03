@@ -158,6 +158,7 @@ describe('performance', () => {
         await analyzeInsight.handler(
           {
             params: {
+              insightSetId: '8463DF94CD61B265B664E7F768183DE3',
               insightName: 'LCPBreakdown',
             },
           },
@@ -178,6 +179,7 @@ describe('performance', () => {
         await analyzeInsight.handler(
           {
             params: {
+              insightSetId: '8463DF94CD61B265B664E7F768183DE3',
               insightName: 'MadeUpInsightName',
             },
           },
@@ -197,6 +199,7 @@ describe('performance', () => {
         await analyzeInsight.handler(
           {
             params: {
+              insightSetId: '8463DF94CD61B265B664E7F768183DE3',
               insightName: 'LCPBreakdown',
             },
           },
