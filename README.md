@@ -153,6 +153,16 @@ Go to `Cursor Settings` -> `MCP` -> `New MCP Server`. Use the config provided ab
 </details>
 
 <details>
+  <summary>Factory CLI</summary>
+Use the Factory CLI to add the Chrome DevTools MCP server (<a href="https://docs.factory.ai/cli/configuration/mcp">guide</a>):
+
+```bash
+droid mcp add chrome-devtools "npx -y chrome-devtools-mcp@latest"
+```
+
+</details>
+
+<details>
   <summary>Gemini CLI</summary>
 Install the Chrome DevTools MCP server using the Gemini CLI.
 
