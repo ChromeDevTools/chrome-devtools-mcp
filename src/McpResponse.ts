@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import {
-  AggregatedIssue, Marked, MarkdownIssueDescription
+  AggregatedIssue, Marked, findTitleFromMarkdownAst
 } from '../node_modules/chrome-devtools-frontend/mcp/mcp.js';
 
 import type {ConsoleMessageData} from './formatters/consoleFormatter.js';
@@ -318,7 +318,7 @@ export class McpResponse implements Response {
             };
             }
             const markdownAst = Marked.Marked.lexer(rawMarkdown);
-            const title = MarkdownIssueDescription.findTitleFromMarkdownAst(markdownAst);
+            const title = findTitleFromMarkdownAst(markdownAst);
             return {
               consoleMessageStableId,
               type: 'issue',
