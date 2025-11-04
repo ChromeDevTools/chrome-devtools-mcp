@@ -62,7 +62,7 @@ function normalizeUrl(url: string): string {
  * that are actually used by the IssuesAggregator
  */
 export class FakeIssuesManager extends Common.ObjectWrapper.ObjectWrapper<IssuesManager.EventTypes> {
-  issues(): Issue.Issue[] {
+  issues(): Issue[] {
     return [];
   }
 }

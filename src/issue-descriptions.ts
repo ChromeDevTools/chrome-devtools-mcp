@@ -8,11 +8,11 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 
 const DESCRIPTIONS_PATH = path.join(
-  process.cwd(),
-  'node_modules/chrome-devtools-frontend/front_end/models/issues_manager/descriptions',
+  import.meta.dirname,
+  '../node_modules/chrome-devtools-frontend/front_end/models/issues_manager/descriptions',
 );
 
-let issueDescriptions: Record<string, string>= {};
+let issueDescriptions: Record<string, string> = {};
 
 /**
  * Reads all issue descriptions from the filesystem into memory.
