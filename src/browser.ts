@@ -30,10 +30,6 @@ function makeTargetFilter() {
     if (target.url() === 'chrome://newtab/') {
       return true;
     }
-    if (target.url().startsWith('https://ogs.google.com/')) {
-      // Some special frame on the NTP that is not picked up by CDP-auto-attach.
-      return false;
-    }
     for (const prefix of ignoredPrefixes) {
       if (target.url().startsWith(prefix)) {
         return false;
