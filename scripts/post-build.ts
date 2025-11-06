@@ -173,13 +173,14 @@ export const hostConfig = {};
 }
 
 function copyDevToolsDescriptionFiles() {
+  const devtoolsIssuesDescriptionPath = 'node_modules/chrome-devtools-frontend/front_end/models/issues_manager/descriptions';
   const sourceDir = path.join(
    process.cwd(),
-   'node_modules/chrome-devtools-frontend/front_end/models/issues_manager/descriptions',
+   devtoolsIssuesDescriptionPath,
     );
    const destDir = path.join(
     BUILD_DIR,
-    'node_modules/chrome-devtools-frontend/front_end/models/issues_manager/descriptions',
+    devtoolsIssuesDescriptionPath,
     );
     fs.cpSync(sourceDir, destDir, {recursive: true});
 }

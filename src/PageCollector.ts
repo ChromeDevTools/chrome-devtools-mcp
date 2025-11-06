@@ -6,12 +6,14 @@
 
 import {
   type AggregatedIssue,
-  AggregatorEvents,
-  IssuesManager,
+  IssueAggregatorEvents,
+  IssuesManagerEvents,
+  createIssuesFromProtocolIssue,
   IssueAggregator,
 } from '../node_modules/chrome-devtools-frontend/mcp/mcp.js';
 
 import {FakeIssuesManager} from './DevtoolsUtils.js';
+import type {ConsoleMessage} from './third_party/index.js';
 import {
   type Browser,
   type Frame,
@@ -50,13 +52,9 @@ export class PageCollector<T> {
     collector: (item: T) => void,
   ) => ListenerMap<PageEvents>;
   #listeners = new WeakMap<Page, ListenerMap>();
-  #seenIssueKeys = new WeakMap<Page, Set<string>>();
   #maxNavigationSaved = 3;
   #includeAllPages?: boolean;
 
-  // Store an aggregator and a mock manager for each page.
-  #issuesAggregators = new WeakMap<Page, IssueAggregator>();
-  #mockIssuesManagers = new WeakMap<Page, FakeIssuesManager>();
 
   protected storage = new WeakMap<Page, Array<Array<WithSymbolId<T>>>>();
 
@@ -88,7 +86,7 @@ export class PageCollector<T> {
       if (!page) {
         return;
       }
-      this.#cleanupPageDestroyed(page);
+      this.cleanupPageDestroyed(page);
     });
   }
 
@@ -122,7 +120,7 @@ export class PageCollector<T> {
       }
     };
 
-    await this.subscribeForIssues(page);
+    // await this.subscribeForIssues(page);
 
     const listeners = this.#listenersInitializer(collector);
 
@@ -141,49 +139,6 @@ export class PageCollector<T> {
     this.#listeners.set(page, listeners);
   }
 
-  protected async subscribeForIssues(page: Page) {
-    if (this instanceof NetworkCollector) {
-      return;
-    }
-    if (!this.#seenIssueKeys.has(page)) {
-      this.#seenIssueKeys.set(page, new Set());
-    }
-
-    const mockManager = new FakeIssuesManager();
-    // @ts-expect-error Aggregator receives partial IssuesManager
-    const aggregator = new IssueAggregator(mockManager);
-    this.#mockIssuesManagers.set(page, mockManager);
-    this.#issuesAggregators.set(page, aggregator);
-
-    aggregator.addEventListener(
-      AggregatorEvents.AGGREGATED_ISSUE_UPDATED,
-      event => {
-        page.emit('issue', event.data);
-      },
-    );
-
-    const session = await page.createCDPSession();
-    session.on('Audits.issueAdded', data => {
-      // @ts-expect-error Types of protocol from Puppeteer and CDP are incopatible for Issues but it's the same type
-      const issue = IssuesManager.createIssuesFromProtocolIssue(null,data.issue,)[0];
-      if (!issue) {
-        return;
-      }
-      const seenKeys = this.#seenIssueKeys.get(page)!;
-      const primaryKey = issue.primaryKey();
-      if (seenKeys.has(primaryKey)) return;
-      seenKeys.add(primaryKey);
-
-      // Trigger the aggregator via our mock manager. Do NOT call collector() here.
-      const mockManager = this.#mockIssuesManagers.get(page);
-      if (mockManager) {
-        // @ts-expect-error we don't care about issies model being null
-        mockManager.dispatchEventToListeners(IssuesManager.Events.ISSUE_ADDED, {issue, issuesModel: null});
-      }
-    });
-    await session.send('Audits.enable');
-  }
-
   protected splitAfterNavigation(page: Page) {
     const navigations = this.storage.get(page);
     if (!navigations) {
@@ -193,7 +148,7 @@ export class PageCollector<T> {
     navigations.splice(this.#maxNavigationSaved);
   }
 
-  #cleanupPageDestroyed(page: Page) {
+  protected cleanupPageDestroyed(page: Page) {
     const listeners = this.#listeners.get(page);
     if (listeners) {
       for (const [name, listener] of Object.entries(listeners)) {
@@ -201,9 +156,6 @@ export class PageCollector<T> {
       }
     }
     this.storage.delete(page);
-    this.#seenIssueKeys.delete(page);
-    this.#issuesAggregators.delete(page);
-    this.#mockIssuesManagers.delete(page);
   }
 
   getData(page: Page, includePreservedData?: boolean): T[] {
@@ -260,6 +212,63 @@ export class PageCollector<T> {
       }
     }
     return;
+  }
+}
+
+export class ConsoleCollector extends PageCollector<ConsoleMessage | Error | AggregatedIssue> {
+  #seenIssueKeys = new WeakMap<Page, Set<string>>();
+  #issuesAggregators = new WeakMap<Page, IssueAggregator>();
+  #mockIssuesManagers = new WeakMap<Page, FakeIssuesManager>();
+
+  override async addPage(page: Page) {
+    await super.addPage(page);
+    await this.subscribeForIssues(page);
+  }
+    async subscribeForIssues(page: Page) {
+    if (!this.#seenIssueKeys.has(page)) {
+      this.#seenIssueKeys.set(page, new Set());
+    }
+
+    const mockManager = new FakeIssuesManager();
+    // @ts-expect-error Aggregator receives partial IssuesManager
+    const aggregator = new IssueAggregator(mockManager);
+    this.#mockIssuesManagers.set(page, mockManager);
+    this.#issuesAggregators.set(page, aggregator);
+
+    aggregator.addEventListener(
+      IssueAggregatorEvents.AGGREGATED_ISSUE_UPDATED,
+      event => {
+        page.emit('issue', event.data);
+      },
+    );
+
+    const session = await page.createCDPSession();
+    session.on('Audits.issueAdded', data => {
+      // @ts-expect-error Types of protocol from Puppeteer and CDP are incopatible for Issues but it's the same type
+      const issue = createIssuesFromProtocolIssue(null,data.issue,)[0];
+      if (!issue) {
+        return;
+      }
+      const seenKeys = this.#seenIssueKeys.get(page)!;
+      const primaryKey = issue.primaryKey();
+      if (seenKeys.has(primaryKey)) return;
+      seenKeys.add(primaryKey);
+
+      // Trigger the aggregator via our mock manager. Do NOT call collector() here.
+      const mockManager = this.#mockIssuesManagers.get(page);
+      if (mockManager) {
+        // @ts-expect-error We don't care that issues model is null
+        mockManager.dispatchEventToListeners(IssuesManagerEvents.ISSUE_ADDED, {issue, issuesModel: null});
+      }
+    });
+    await session.send('Audits.enable');
+  }
+
+  override  cleanupPageDestroyed(page: Page) {
+    super.cleanupPageDestroyed(page);
+    this.#seenIssueKeys.delete(page);
+    this.#issuesAggregators.delete(page);
+    this.#mockIssuesManagers.delete(page);
   }
 }
 
