@@ -11,7 +11,7 @@ import {type AggregatedIssue} from '../node_modules/chrome-devtools-frontend/mcp
 
 import {extractUrlLikeFromDevToolsTitle, urlsEqual} from './DevtoolsUtils.js';
 import type {ListenerMap} from './PageCollector.js';
-import {NetworkCollector, PageCollector} from './PageCollector.js';
+import {NetworkCollector, ConsoleCollector} from './PageCollector.js';
 import {Locator} from './third_party/index.js';
 import type {
   Browser,
@@ -96,7 +96,7 @@ export class McpContext implements Context {
   // The most recent snapshot.
   #textSnapshot: TextSnapshot | null = null;
   #networkCollector: NetworkCollector;
-  #consoleCollector: PageCollector<ConsoleMessage | Error | AggregatedIssue>;
+  #consoleCollector: ConsoleCollector;
 
   #isRunningTrace = false;
   #networkConditionsMap = new WeakMap<Page, string>();
@@ -126,11 +126,14 @@ export class McpContext implements Context {
       this.#options.experimentalIncludeAllPages,
     );
 
-    this.#consoleCollector = new PageCollector(
-      this.browser,
-      collect => {
-        return {
-          console: event => {
+
+    this.#consoleCollector = new ConsoleCollector(this.browser, collect => {
+      return {
+        console: event => {
+          collect(event);
+        },
+        pageerror: event => {
+          if (event instanceof Error) {
             collect(event);
           },
           pageerror: event => {

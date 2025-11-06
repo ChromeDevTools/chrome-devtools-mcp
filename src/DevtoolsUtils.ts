@@ -6,7 +6,7 @@
 
 import {
   type Issue,
-  type IssuesManager,
+  type IssuesManagerEventTypes,
   Common
 } from '../node_modules/chrome-devtools-frontend/mcp/mcp.js';
 
@@ -61,7 +61,7 @@ function normalizeUrl(url: string): string {
  * A mock implementation of an issues manager that only implements the methods
  * that are actually used by the IssuesAggregator
  */
-export class FakeIssuesManager extends Common.ObjectWrapper.ObjectWrapper<IssuesManager.EventTypes> {
+export class FakeIssuesManager extends Common.ObjectWrapper.ObjectWrapper<IssuesManagerEventTypes> {
   issues(): Issue[] {
     return [];
   }
