@@ -74,7 +74,7 @@ describe('emulation', () => {
       });
     });
 
-    it.only('report correctly for the currently selected page', async () => {
+    it('report correctly for the currently selected page', async () => {
       await withBrowser(async (response, context) => {
         await emulate.handler(
           {
