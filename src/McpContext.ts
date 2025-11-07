@@ -127,13 +127,11 @@ export class McpContext implements Context {
     );
 
 
-    this.#consoleCollector = new ConsoleCollector(this.browser, collect => {
-      return {
-        console: event => {
-          collect(event);
-        },
-        pageerror: event => {
-          if (event instanceof Error) {
+    this.#consoleCollector = new ConsoleCollector(
+      this.browser,
+      collect => {
+        return {
+          console: event => {
             collect(event);
           },
           pageerror: event => {
@@ -145,8 +143,8 @@ export class McpContext implements Context {
               collect(error);
             }
           },
-          issue: issue => {
-            collect(issue);
+          issue: event => {
+            collect(event);
           },
         } as ListenerMap;
       },

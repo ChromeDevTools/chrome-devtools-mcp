@@ -55,7 +55,11 @@ export class PageCollector<T> {
   #maxNavigationSaved = 3;
   #includeAllPages?: boolean;
 
-
+  /**
+   * This maps a Page to a list of navigations with a sub-list
+   * of all collected resources.
+   * The newer navigations come first.
+   */
   protected storage = new WeakMap<Page, Array<Array<WithSymbolId<T>>>>();
 
   constructor(
@@ -119,8 +123,6 @@ export class PageCollector<T> {
         currentNavigation.push(withId);
       }
     };
-
-    // await this.subscribeForIssues(page);
 
     const listeners = this.#listenersInitializer(collector);
 
@@ -221,6 +223,9 @@ export class ConsoleCollector extends PageCollector<ConsoleMessage | Error | Agg
   #mockIssuesManagers = new WeakMap<Page, FakeIssuesManager>();
 
   override async addPage(page: Page) {
+    if (this.storage.has(page)) {
+      return;
+    }
     await super.addPage(page);
     await this.subscribeForIssues(page);
   }
@@ -245,7 +250,7 @@ export class ConsoleCollector extends PageCollector<ConsoleMessage | Error | Agg
     const session = await page.createCDPSession();
     session.on('Audits.issueAdded', data => {
       // @ts-expect-error Types of protocol from Puppeteer and CDP are incopatible for Issues but it's the same type
-      const issue = createIssuesFromProtocolIssue(null,data.issue,)[0];
+      const issue = createIssuesFromProtocolIssue(null,data.issue)[0];
       if (!issue) {
         return;
       }
