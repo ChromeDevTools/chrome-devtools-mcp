@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.1](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.10.0...chrome-devtools-mcp-v0.10.1) (2025-11-07)
+
+
+### 🛠️ Fixes
+
+* avoid no page selected errors ([#537](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/537)) ([4724bbb](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/4724bbba9327fc162cd1f0372e608f6ebefc59cc))
+
 ## [0.10.0](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.9.0...chrome-devtools-mcp-v0.10.0) (2025-11-05)
 
 
