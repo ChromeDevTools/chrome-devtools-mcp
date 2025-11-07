@@ -40,7 +40,7 @@ export const selectPage = defineTool({
   handler: async (request, response, context) => {
     const page = context.getPageByIdx(request.params.pageIdx);
     await page.bringToFront();
-    context.setSelectedPageIdx(request.params.pageIdx);
+    context.selectPage(page);
     response.setIncludePages(true);
   },
 });

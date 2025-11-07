@@ -88,7 +88,7 @@ export class McpContext implements Context {
   // The most recent page state.
   #pages: Page[] = [];
   #pageToDevToolsPage = new Map<Page, Page>();
-  #selectedPageIdx = 0;
+  #selectedPage?: Page;
   // The most recent snapshot.
   #textSnapshot: TextSnapshot | null = null;
   #networkCollector: NetworkCollector;
@@ -146,7 +146,6 @@ export class McpContext implements Context {
 
   async #init() {
     await this.createPagesSnapshot();
-    this.setSelectedPageIdx(0);
     await this.#networkCollector.init();
     await this.#consoleCollector.init();
   }
@@ -221,8 +220,8 @@ export class McpContext implements Context {
 
   async newPage(): Promise<Page> {
     const page = await this.browser.newPage();
-    const pages = await this.createPagesSnapshot();
-    this.setSelectedPageIdx(pages.indexOf(page));
+    await this.createPagesSnapshot();
+    this.selectPage(page);
     this.#networkCollector.addPage(page);
     this.#consoleCollector.addPage(page);
     return page;
@@ -232,7 +231,6 @@ export class McpContext implements Context {
       throw new Error(CLOSE_PAGE_ERROR);
     }
     const page = this.getPageByIdx(pageIdx);
-    this.setSelectedPageIdx(0);
     await page.close({runBeforeUnload: false});
   }
 
@@ -283,7 +281,7 @@ export class McpContext implements Context {
   }
 
   getSelectedPage(): Page {
-    const page = this.#pages[this.#selectedPageIdx];
+    const page = this.#selectedPage;
     if (!page) {
       throw new Error('No page selected');
     }
@@ -304,19 +302,20 @@ export class McpContext implements Context {
     return page;
   }
 
-  getSelectedPageIdx(): number {
-    return this.#selectedPageIdx;
-  }
-
   #dialogHandler = (dialog: Dialog): void => {
     this.#dialog = dialog;
   };
 
-  setSelectedPageIdx(idx: number): void {
-    const oldPage = this.getSelectedPage();
-    oldPage.off('dialog', this.#dialogHandler);
-    this.#selectedPageIdx = idx;
-    const newPage = this.getSelectedPage();
+  isPageSelected(page: Page): boolean {
+    return this.#selectedPage === page;
+  }
+
+  selectPage(newPage: Page): void {
+    const oldPage = this.#selectedPage;
+    if (oldPage) {
+      oldPage.off('dialog', this.#dialogHandler);
+    }
+    this.#selectedPage = newPage;
     newPage.on('dialog', this.#dialogHandler);
     this.#updateSelectedPageTimeouts();
   }
@@ -386,6 +385,10 @@ export class McpContext implements Context {
         !page.url().startsWith('devtools://')
       );
     });
+
+    if (!this.#selectedPage || this.#pages.indexOf(this.#selectedPage) === -1) {
+      this.selectPage(this.#pages[0]);
+    }
 
     await this.detectOpenDevToolsWindows();
 

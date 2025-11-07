@@ -362,7 +362,7 @@ Call ${handleDialog.name} to handle it before continuing.`);
       let idx = 0;
       for (const page of context.getPages()) {
         parts.push(
-          `${idx}: ${page.url()}${idx === context.getSelectedPageIdx() ? ' [selected]' : ''}`,
+          `${idx}: ${page.url()}${context.isPageSelected(page) ? ' [selected]' : ''}`,
         );
         idx++;
       }

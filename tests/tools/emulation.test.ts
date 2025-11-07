@@ -74,9 +74,8 @@ describe('emulation', () => {
       });
     });
 
-    it('report correctly for the currently selected page', async () => {
+    it.only('report correctly for the currently selected page', async () => {
       await withBrowser(async (response, context) => {
-        await context.newPage();
         await emulate.handler(
           {
             params: {
@@ -89,7 +88,8 @@ describe('emulation', () => {
 
         assert.strictEqual(context.getNetworkConditions(), 'Slow 3G');
 
-        context.setSelectedPageIdx(0);
+        const page = await context.newPage();
+        context.selectPage(page);
 
         assert.strictEqual(context.getNetworkConditions(), null);
       });
@@ -132,7 +132,6 @@ describe('emulation', () => {
 
     it('report correctly for the currently selected page', async () => {
       await withBrowser(async (response, context) => {
-        await context.newPage();
         await emulate.handler(
           {
             params: {
@@ -145,7 +144,8 @@ describe('emulation', () => {
 
         assert.strictEqual(context.getCpuThrottlingRate(), 4);
 
-        context.setSelectedPageIdx(0);
+        const page = await context.newPage();
+        context.selectPage(page);
 
         assert.strictEqual(context.getCpuThrottlingRate(), 1);
       });

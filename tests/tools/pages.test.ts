@@ -31,13 +31,13 @@ describe('pages', () => {
   describe('new_page', () => {
     it('create a page', async () => {
       await withBrowser(async (response, context) => {
-        assert.strictEqual(context.getSelectedPageIdx(), 0);
+        assert.strictEqual(context.getPageByIdx(0), context.getSelectedPage());
         await newPage.handler(
           {params: {url: 'about:blank'}},
           response,
           context,
         );
-        assert.strictEqual(context.getSelectedPageIdx(), 1);
+        assert.strictEqual(context.getPageByIdx(1), context.getSelectedPage());
         assert.ok(response.includePages);
       });
     });
@@ -46,7 +46,7 @@ describe('pages', () => {
     it('closes a page', async () => {
       await withBrowser(async (response, context) => {
         const page = await context.newPage();
-        assert.strictEqual(context.getSelectedPageIdx(), 1);
+        assert.strictEqual(context.getPageByIdx(1), context.getSelectedPage());
         assert.strictEqual(context.getPageByIdx(1), page);
         await closePage.handler({params: {pageIdx: 1}}, response, context);
         assert.ok(page.isClosed());
@@ -70,9 +70,9 @@ describe('pages', () => {
     it('selects a page', async () => {
       await withBrowser(async (response, context) => {
         await context.newPage();
-        assert.strictEqual(context.getSelectedPageIdx(), 1);
+        assert.strictEqual(context.getPageByIdx(1), context.getSelectedPage());
         await selectPage.handler({params: {pageIdx: 0}}, response, context);
-        assert.strictEqual(context.getSelectedPageIdx(), 0);
+        assert.strictEqual(context.getPageByIdx(0), context.getSelectedPage());
         assert.ok(response.includePages);
       });
     });
@@ -97,7 +97,7 @@ describe('pages', () => {
     it('throws an error if the page was closed not by the MCP server', async () => {
       await withBrowser(async (response, context) => {
         const page = await context.newPage();
-        assert.strictEqual(context.getSelectedPageIdx(), 1);
+        assert.strictEqual(context.getPageByIdx(1), context.getSelectedPage());
         assert.strictEqual(context.getPageByIdx(1), page);
 
         await page.close();
@@ -197,7 +197,6 @@ describe('pages', () => {
   describe('resize', () => {
     it('create a page', async () => {
       await withBrowser(async (response, context) => {
-        assert.strictEqual(context.getSelectedPageIdx(), 0);
         const page = context.getSelectedPage();
         const resizePromise = page.evaluate(() => {
           return new Promise(resolve => {
