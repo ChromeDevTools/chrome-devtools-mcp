@@ -106,7 +106,6 @@ export class PageCollector<T> {
     const storedLists: Array<Array<WithSymbolId<T>>> = [[]];
     this.storage.set(page, storedLists);
 
-    // This is the single function responsible for adding items to storage.
     const collector = (value: T) => {
       const withId = value as WithSymbolId<T>;
       // Assign an ID only if it's a new item.
@@ -117,8 +116,8 @@ export class PageCollector<T> {
       const navigations = this.storage.get(page) ?? [[]];
       const currentNavigation = navigations[0];
 
-      // The aggregator sends the same object instance for updates, so we just
-      // need to ensure it's in the list.
+      // The issues aggregator sends the same object instance for updates, so we just
+      // need to ensure it's not in the list.
       if (!currentNavigation.includes(withId)) {
         currentNavigation.push(withId);
       }
@@ -259,7 +258,6 @@ export class ConsoleCollector extends PageCollector<ConsoleMessage | Error | Agg
       if (seenKeys.has(primaryKey)) return;
       seenKeys.add(primaryKey);
 
-      // Trigger the aggregator via our mock manager. Do NOT call collector() here.
       const mockManager = this.#mockIssuesManagers.get(page);
       if (mockManager) {
         // @ts-expect-error We don't care that issues model is null
