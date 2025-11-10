@@ -61,7 +61,7 @@ Network throttling: none
 
 The following is a list of insight sets. An insight set covers a specific part of the trace, split by navigations. The insights within each insight set are specific to that part of the trace. Be sure to consider the insight set id and bounds when calling functions. If no specific insight set or navigation is mentioned, assume the user is referring to the first one.
 
-## insight set id: 8463DF94CD61B265B664E7F768183DE3
+## insight set id: NAVIGATION_0
 
 URL: https://web.dev/
 Bounds: {min: 122410996889, max: 122416385853}

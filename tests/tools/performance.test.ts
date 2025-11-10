@@ -158,7 +158,7 @@ describe('performance', () => {
         await analyzeInsight.handler(
           {
             params: {
-              insightSetId: '8463DF94CD61B265B664E7F768183DE3',
+              insightSetId: 'NAVIGATION_0',
               insightName: 'LCPBreakdown',
             },
           },
@@ -189,7 +189,7 @@ describe('performance', () => {
         assert.ok(
           response.responseLines
             .join('\n')
-            .match(/No Insight with the name MadeUpInsightName found./),
+            .match(/No Performance Insights for the given insight set id/),
         );
       });
     });
