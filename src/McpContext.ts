@@ -31,8 +31,6 @@ import type {Context, DevToolsData} from './tools/ToolDefinition.js';
 import type {TraceResult} from './trace-processing/parse.js';
 import {WaitForHelper} from './WaitForHelper.js';
 
-
-
 export interface TextSnapshotNode extends SerializedAXNode {
   id: string;
   backendNodeId?: number;
