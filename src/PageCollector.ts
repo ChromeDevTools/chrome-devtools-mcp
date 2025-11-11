@@ -94,36 +94,25 @@ export class PageCollector<T> {
     });
   }
 
-  public async addPage(page: Page) {
+  public addPage(page: Page) {
     if (this.storage.has(page)) {
       return;
     }
-    await this.#initializePage(page);
+    this.#initializePage(page);
   }
 
-  async #initializePage(page: Page) {
+   #initializePage(page: Page) {
     const idGenerator = createIdGenerator();
     const storedLists: Array<Array<WithSymbolId<T>>> = [[]];
     this.storage.set(page, storedLists);
 
-    const collector = (value: T) => {
+    const listeners = this.#listenersInitializer(value => {
       const withId = value as WithSymbolId<T>;
-      // Assign an ID only if it's a new item.
-      if (!withId[stableIdSymbol]) {
-        withId[stableIdSymbol] = idGenerator();
-      }
+      withId[stableIdSymbol] = idGenerator();
 
       const navigations = this.storage.get(page) ?? [[]];
-      const currentNavigation = navigations[0];
-
-      // The issues aggregator sends the same object instance for updates, so we just
-      // need to ensure it's not in the list.
-      if (!currentNavigation.includes(withId)) {
-        currentNavigation.push(withId);
-      }
-    };
-
-    const listeners = this.#listenersInitializer(collector);
+      navigations[0].push(withId);
+    });
 
     listeners['framenavigated'] = (frame: Frame) => {
       // Only split the storage on main frame navigation
@@ -145,6 +134,7 @@ export class PageCollector<T> {
     if (!navigations) {
       return;
     }
+    // Add the latest navigation first
     navigations.unshift([]);
     navigations.splice(this.#maxNavigationSaved);
   }
@@ -221,12 +211,12 @@ export class ConsoleCollector extends PageCollector<ConsoleMessage | Error | Agg
   #issuesAggregators = new WeakMap<Page, IssueAggregator>();
   #mockIssuesManagers = new WeakMap<Page, FakeIssuesManager>();
 
-  override async addPage(page: Page) {
+  override addPage(page: Page): void {
     if (this.storage.has(page)) {
       return;
     }
-    await super.addPage(page);
-    await this.subscribeForIssues(page);
+    super.addPage(page);
+    void this.subscribeForIssues(page);
   }
     async subscribeForIssues(page: Page) {
     if (!this.#seenIssueKeys.has(page)) {
@@ -234,7 +224,6 @@ export class ConsoleCollector extends PageCollector<ConsoleMessage | Error | Agg
     }
 
     const mockManager = new FakeIssuesManager();
-    // @ts-expect-error Aggregator receives partial IssuesManager
     const aggregator = new IssueAggregator(mockManager);
     this.#mockIssuesManagers.set(page, mockManager);
     this.#issuesAggregators.set(page, aggregator);
@@ -242,6 +231,11 @@ export class ConsoleCollector extends PageCollector<ConsoleMessage | Error | Agg
     aggregator.addEventListener(
       IssueAggregatorEvents.AGGREGATED_ISSUE_UPDATED,
       event => {
+        const withId = event.data as WithSymbolId<AggregatedIssue>;
+        // Emit aggregated issue only if it's a new one
+        if (withId[stableIdSymbol]) {
+          return;
+        }
         page.emit('issue', event.data);
       },
     );
@@ -305,6 +299,9 @@ export class NetworkCollector extends PageCollector<HTTPRequest> {
         : false;
     });
 
+    // Keep all requests since the last navigation request including that
+    // navigation request itself.
+    // Keep the reference
     if (lastRequestIdx !== -1) {
       const fromCurrentNavigation = requests.splice(lastRequestIdx);
       navigations.unshift(fromCurrentNavigation);
