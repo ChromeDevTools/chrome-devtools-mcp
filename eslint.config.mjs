@@ -113,6 +113,19 @@ export default defineConfig([
 
       '@stylistic/function-call-spacing': 'error',
       '@stylistic/semi': 'error',
+
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              regex: '.*chrome-devtools-frontend/(?!mcp/mcp.js$).*',
+              message:
+                'Import only the devtools-frontend code exported via node_modules/chrome-devtools-frontend/mcp/mcp.js',
+            },
+          ],
+        },
+      ],
     },
   },
   {
