@@ -218,7 +218,7 @@ export class ConsoleCollector extends PageCollector<ConsoleMessage | Error | Agg
     super.addPage(page);
     void this.subscribeForIssues(page);
   }
-    async subscribeForIssues(page: Page) {
+  async subscribeForIssues(page: Page) {
     if (!this.#seenIssueKeys.has(page)) {
       this.#seenIssueKeys.set(page, new Set());
     }

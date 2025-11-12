@@ -6,10 +6,16 @@
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
-import type {Browser, Frame, HTTPRequest, Page, Target} from 'puppeteer-core';
+import type {Browser, Frame, HTTPRequest, Page, Target, CDPSession} from 'puppeteer-core';
+import sinon from 'sinon';
 
+import {AggregatedIssue} from '../node_modules/chrome-devtools-frontend/mcp/mcp.js';
 import type {ListenerMap} from '../src/PageCollector.js';
-import {NetworkCollector, PageCollector} from '../src/PageCollector.js';
+import {
+  ConsoleCollector,
+  NetworkCollector,
+  PageCollector,
+} from '../src/PageCollector.js';
 
 import {getMockRequest} from './utils.js';
 
@@ -36,9 +42,18 @@ function mockListener() {
 
 function getMockPage(): Page {
   const mainFrame = {} as Frame;
+  const cdpSession = {
+    ...mockListener(),
+    send: () => {
+      // no-op
+    },
+  };
   return {
     mainFrame() {
       return mainFrame;
+    },
+    createCDPSession() {
+      return Promise.resolve(cdpSession as unknown as CDPSession);
     },
     ...mockListener(),
   } as Page;
@@ -287,7 +302,7 @@ describe('NetworkCollector', () => {
     assert.equal(collector.getData(page).length, 2);
   });
 
-  it('works with previous navigations', async () => {
+  it('works with previous navigatedations', async () => {
     const browser = getMockBrowser();
     const page = (await browser.pages())[0];
     const mainFrame = page.mainFrame();
@@ -317,5 +332,112 @@ describe('NetworkCollector', () => {
 
     page.emit('request', request);
     assert.equal(collector.getData(page, true).length, 3);
+  });
+});
+
+describe('ConsoleCollector', () => {
+  it('emits issues on page', async () => {
+    const browser = getMockBrowser();
+    const page = (await browser.pages())[0];
+    const cdpSession = await page.createCDPSession();
+    const onIssuesListener = sinon.spy();
+
+    page.on('issue', onIssuesListener);
+
+    const collector = new ConsoleCollector(browser, collect => {
+      return {
+        issue: issue => {
+          collect(issue as AggregatedIssue);
+        },
+      } as ListenerMap;
+    });
+    await collector.init();
+
+    const issue = {
+      code: 'MixedContentIssue' as const,
+      details: {
+        mixedContentIssueDetails: {
+          insecureURL: "test.url"
+        }
+      },
+    };
+
+    // @ts-expect-error Types of protocol from Puppeteer and CDP are incopatible for Issues but it's the same type
+    cdpSession.emit('Audits.issueAdded', {issue});
+    sinon.assert.calledOnce(onIssuesListener);
+
+    const issueArgument = onIssuesListener.getCall(0).args[0];
+    assert(issueArgument instanceof AggregatedIssue);
+  });
+
+  it('collects issues', async () => {
+    const browser = getMockBrowser();
+    const page = (await browser.pages())[0];
+    const cdpSession = await page.createCDPSession();
+
+    const collector = new ConsoleCollector(browser, collect => {
+      return {
+        issue: issue => {
+          collect(issue as AggregatedIssue);
+        },
+      } as ListenerMap;
+    });
+    await collector.init();
+
+    const issue = {
+      code: 'MixedContentIssue' as const,
+      details: {
+        mixedContentIssueDetails: {
+          insecureURL: "test.url"
+        },
+      },
+    };
+    const issue2 = {
+      code: 'PropertyRuleIssue' as const,
+      details: {
+        propertyRuleIssueDetails: {
+          test: "test"
+        },
+      },
+    };
+
+    // @ts-expect-error Types of protocol from Puppeteer and CDP are incopatible for Issues but it's the same type
+    cdpSession.emit('Audits.issueAdded', {issue});
+       // @ts-expect-error Types of protocol from Puppeteer and CDP are incopatible for Issues but it's the same type
+    cdpSession.emit('Audits.issueAdded', {issue: issue2});
+    const data = collector.getData(page);
+    assert.equal(data.length, 2);
+  });
+
+  it('filters duplicated issues', async () => {
+    const browser = getMockBrowser();
+    const page = (await browser.pages())[0];
+    const cdpSession = await page.createCDPSession();
+
+    const collector = new ConsoleCollector(browser, collect => {
+      return {
+        issue: issue => {
+          collect(issue as AggregatedIssue);
+        },
+      } as ListenerMap;
+    });
+    await collector.init();
+
+    const issue = {
+      code: 'MixedContentIssue' as const,
+      details: {
+        mixedContentIssueDetails: {
+          insecureURL: "test.url"
+        },
+      },
+    };
+
+    // @ts-expect-error Types of protocol from Puppeteer and CDP are incopatible for Issues but it's the same type
+    cdpSession.emit('Audits.issueAdded', {issue});
+    // @ts-expect-error Types of protocol from Puppeteer and CDP are incopatible for Issues but it's the same type
+    cdpSession.emit('Audits.issueAdded', {issue});
+    const collectedIssue = collector.getData(page)[0] as AggregatedIssue;
+    assert.equal(collectedIssue.code(), 'MixedContentIssue');
+    assert.equal(collectedIssue.getAggregatedIssuesCount(), 1);
   });
 });
