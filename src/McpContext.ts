@@ -124,7 +124,6 @@ export class McpContext implements Context {
       this.#options.experimentalIncludeAllPages,
     );
 
-
     this.#consoleCollector = new ConsoleCollector(
       this.browser,
       collect => {
