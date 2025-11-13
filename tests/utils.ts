@@ -158,8 +158,8 @@ export function stabilizeResponseOutput(text: unknown) {
   const dateRegEx = /.{3}, \d{2} .{3} \d{4} \d{2}:\d{2}:\d{2} [A-Z]{3}/g;
   output = output.replaceAll(dateRegEx, '<long date>');
 
-  const localhostRegEx = /http:\/\/localhost:\d{5}\//g;
-  output = output.replaceAll(localhostRegEx, 'http://localhost:<port>/');
+  const localhostRegEx = /localhost:\d{5}/g;
+  output = output.replaceAll(localhostRegEx, 'localhost:<port>');
 
   const userAgentRegEx = /user-agent:.*\n/g;
   output = output.replaceAll(userAgentRegEx, 'user-agent:<user-agent>\n');
