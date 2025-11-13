@@ -48,7 +48,7 @@
     "@types/debug": "^4.1.12",
     "@types/filesystem": "^0.0.36",
     "@types/node": "^24.3.3",
-    "@types/sinon": "^17.0.4",
+    "@types/sinon": "^20.0.0",
     "@types/yargs": "^17.0.33",
     "@typescript-eslint/eslint-plugin": "^8.43.0",
     "@typescript-eslint/parser": "^8.43.0",
