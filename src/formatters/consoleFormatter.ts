@@ -7,6 +7,7 @@
 export interface ConsoleMessageData {
   consoleMessageStableId: number;
   type?: string;
+  item?: unknown;
   message?: string;
   count?: number;
   args?: string[];
