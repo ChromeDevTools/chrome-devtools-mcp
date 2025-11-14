@@ -101,7 +101,7 @@ export class PageCollector<T> {
     this.#initializePage(page);
   }
 
-   #initializePage(page: Page) {
+  #initializePage(page: Page) {
     const idGenerator = createIdGenerator();
     const storedLists: Array<Array<WithSymbolId<T>>> = [[]];
     this.storage.set(page, storedLists);
@@ -206,7 +206,9 @@ export class PageCollector<T> {
   }
 }
 
-export class ConsoleCollector extends PageCollector<ConsoleMessage | Error | AggregatedIssue> {
+export class ConsoleCollector extends PageCollector<
+  ConsoleMessage | Error | AggregatedIssue
+> {
   #seenIssueKeys = new WeakMap<Page, Set<string>>();
   #issuesAggregators = new WeakMap<Page, IssueAggregator>();
   #mockIssuesManagers = new WeakMap<Page, FakeIssuesManager>();
@@ -243,7 +245,7 @@ export class ConsoleCollector extends PageCollector<ConsoleMessage | Error | Agg
     const session = await page.createCDPSession();
     session.on('Audits.issueAdded', data => {
       // @ts-expect-error Types of protocol from Puppeteer and CDP are incopatible for Issues but it's the same type
-      const issue = createIssuesFromProtocolIssue(null,data.issue)[0];
+      const issue = createIssuesFromProtocolIssue(null, data.issue)[0];
       if (!issue) {
         return;
       }
@@ -254,14 +256,17 @@ export class ConsoleCollector extends PageCollector<ConsoleMessage | Error | Agg
 
       const mockManager = this.#mockIssuesManagers.get(page);
       if (mockManager) {
-        // @ts-expect-error We don't care that issues model is null
-        mockManager.dispatchEventToListeners(IssuesManagerEvents.ISSUE_ADDED, {issue, issuesModel: null});
+        mockManager.dispatchEventToListeners(IssuesManagerEvents.ISSUE_ADDED, {
+          issue,
+          // @ts-expect-error We don't care that issues model is null
+          issuesModel: null,
+        });
       }
     });
     await session.send('Audits.enable');
   }
 
-  override  cleanupPageDestroyed(page: Page) {
+  override cleanupPageDestroyed(page: Page) {
     super.cleanupPageDestroyed(page);
     this.#seenIssueKeys.delete(page);
     this.#issuesAggregators.delete(page);

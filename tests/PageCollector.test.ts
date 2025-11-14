@@ -6,7 +6,14 @@
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
-import type {Browser, Frame, HTTPRequest, Page, Target, CDPSession} from 'puppeteer-core';
+import type {
+  Browser,
+  Frame,
+  HTTPRequest,
+  Page,
+  Target,
+  CDPSession,
+} from 'puppeteer-core';
 import sinon from 'sinon';
 
 import {AggregatedIssue} from '../node_modules/chrome-devtools-frontend/mcp/mcp.js';
@@ -302,7 +309,7 @@ describe('NetworkCollector', () => {
     assert.equal(collector.getData(page).length, 2);
   });
 
-  it('works with previous navigatedations', async () => {
+  it('works with previous navigations', async () => {
     const browser = getMockBrowser();
     const page = (await browser.pages())[0];
     const mainFrame = page.mainFrame();
@@ -357,8 +364,8 @@ describe('ConsoleCollector', () => {
       code: 'MixedContentIssue' as const,
       details: {
         mixedContentIssueDetails: {
-          insecureURL: "test.url"
-        }
+          insecureURL: 'test.url',
+        },
       },
     };
 
@@ -388,7 +395,7 @@ describe('ConsoleCollector', () => {
       code: 'MixedContentIssue' as const,
       details: {
         mixedContentIssueDetails: {
-          insecureURL: "test.url"
+          insecureURL: 'test.url',
         },
       },
     };
@@ -396,14 +403,14 @@ describe('ConsoleCollector', () => {
       code: 'PropertyRuleIssue' as const,
       details: {
         propertyRuleIssueDetails: {
-          test: "test"
+          test: 'test',
         },
       },
     };
 
     // @ts-expect-error Types of protocol from Puppeteer and CDP are incopatible for Issues but it's the same type
     cdpSession.emit('Audits.issueAdded', {issue});
-       // @ts-expect-error Types of protocol from Puppeteer and CDP are incopatible for Issues but it's the same type
+    // @ts-expect-error Types of protocol from Puppeteer and CDP are incopatible for Issues but it's the same type
     cdpSession.emit('Audits.issueAdded', {issue: issue2});
     const data = collector.getData(page);
     assert.equal(data.length, 2);
@@ -427,7 +434,7 @@ describe('ConsoleCollector', () => {
       code: 'MixedContentIssue' as const,
       details: {
         mixedContentIssueDetails: {
-          insecureURL: "test.url"
+          insecureURL: 'test.url',
         },
       },
     };
