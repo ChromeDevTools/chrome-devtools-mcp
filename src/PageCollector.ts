@@ -5,13 +5,28 @@
  */
 
 import {
+  type AggregatedIssue,
+  IssueAggregatorEvents,
+  IssuesManagerEvents,
+  createIssuesFromProtocolIssue,
+  IssueAggregator,
+} from '../node_modules/chrome-devtools-frontend/mcp/mcp.js';
+
+import {FakeIssuesManager} from './DevtoolsUtils.js';
+import {logger} from './logger.js';
+import type {ConsoleMessage, Protocol} from './third_party/index.js';
+import {
   type Browser,
   type Frame,
   type Handler,
   type HTTPRequest,
   type Page,
-  type PageEvents,
+  type PageEvents as PuppeteerPageEvents,
 } from './third_party/index.js';
+
+interface PageEvents extends PuppeteerPageEvents {
+  issue: AggregatedIssue;
+}
 
 export type ListenerMap<EventMap extends PageEvents = PageEvents> = {
   [K in keyof EventMap]?: (event: EventMap[K]) => void;
@@ -61,7 +76,7 @@ export class PageCollector<T> {
   async init() {
     const pages = await this.#browser.pages(this.#includeAllPages);
     for (const page of pages) {
-      this.#initializePage(page);
+      await this.addPage(page);
     }
 
     this.#browser.on('targetcreated', async target => {
@@ -69,14 +84,14 @@ export class PageCollector<T> {
       if (!page) {
         return;
       }
-      this.#initializePage(page);
+      await this.addPage(page);
     });
     this.#browser.on('targetdestroyed', async target => {
       const page = await target.page();
       if (!page) {
         return;
       }
-      this.#cleanupPageDestroyed(page);
+      this.cleanupPageDestroyed(page);
     });
   }
 
@@ -88,7 +103,6 @@ export class PageCollector<T> {
     if (this.storage.has(page)) {
       return;
     }
-
     const idGenerator = createIdGenerator();
     const storedLists: Array<Array<WithSymbolId<T>>> = [[]];
     this.storage.set(page, storedLists);
@@ -126,7 +140,7 @@ export class PageCollector<T> {
     navigations.splice(this.#maxNavigationSaved);
   }
 
-  #cleanupPageDestroyed(page: Page) {
+  protected cleanupPageDestroyed(page: Page) {
     const listeners = this.#listeners.get(page);
     if (listeners) {
       for (const [name, listener] of Object.entries(listeners)) {
@@ -147,7 +161,6 @@ export class PageCollector<T> {
     }
 
     const data: T[] = [];
-
     for (let index = this.#maxNavigationSaved; index >= 0; index--) {
       if (navigations[index]) {
         data.push(...navigations[index]);
@@ -191,6 +204,75 @@ export class PageCollector<T> {
       }
     }
     return;
+  }
+}
+
+export class ConsoleCollector extends PageCollector<
+  ConsoleMessage | Error | AggregatedIssue
+> {
+  #seenIssueKeys = new WeakMap<Page, Set<string>>();
+  #issuesAggregators = new WeakMap<Page, IssueAggregator>();
+  #mockIssuesManagers = new WeakMap<Page, FakeIssuesManager>();
+
+  override addPage(page: Page): void {
+    super.addPage(page);
+    void this.subscribeForIssues(page);
+  }
+  async subscribeForIssues(page: Page) {
+    if (this.#seenIssueKeys.has(page)) return;
+
+    this.#seenIssueKeys.set(page, new Set());
+    const mockManager = new FakeIssuesManager();
+    const aggregator = new IssueAggregator(mockManager);
+    this.#mockIssuesManagers.set(page, mockManager);
+    this.#issuesAggregators.set(page, aggregator);
+
+    aggregator.addEventListener(
+      IssueAggregatorEvents.AGGREGATED_ISSUE_UPDATED,
+      event => {
+        const withId = event.data as WithSymbolId<AggregatedIssue>;
+        // Emit aggregated issue only if it's a new one
+        if (withId[stableIdSymbol]) {
+          return;
+        }
+        page.emit('issue', event.data);
+      },
+    );
+    try {
+      const session = await page.createCDPSession();
+      session.on('Audits.issueAdded', data => {
+        const inspectorIssue =
+          data.issue satisfies Protocol.Audits.InspectorIssue;
+        // @ts-expect-error Types of protocol from Puppeteer and CDP are incomparable for InspectorIssueCode, one is union, other is enum
+        const issue = createIssuesFromProtocolIssue(null, inspectorIssue)[0];
+        if (!issue) return;
+
+        const seenKeys = this.#seenIssueKeys.get(page)!;
+        const primaryKey = issue.primaryKey();
+        if (seenKeys.has(primaryKey)) return;
+        seenKeys.add(primaryKey);
+
+        const mockManager = this.#mockIssuesManagers.get(page);
+        if (!mockManager) return;
+
+        mockManager.dispatchEventToListeners(IssuesManagerEvents.ISSUE_ADDED, {
+          issue,
+          // @ts-expect-error We don't care that issues model is null
+          issuesModel: null,
+        });
+      });
+
+      await session.send('Audits.enable');
+    } catch (e) {
+      logger('Error subscribing to issues', e);
+    }
+  }
+
+  override cleanupPageDestroyed(page: Page) {
+    super.cleanupPageDestroyed(page);
+    this.#seenIssueKeys.delete(page);
+    this.#issuesAggregators.delete(page);
+    this.#mockIssuesManagers.delete(page);
   }
 }
 

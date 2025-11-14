@@ -63,7 +63,7 @@ export const i18n = {
     return str;
   },
   lockedLazyString: () => {},
-  getLazilyComputedLocalizedString: () => {},
+  getLazilyComputedLocalizedString: () => ()=>{},
 };
 
 // TODO(jacktfranklin): once the DocumentLatency insight does not depend on
@@ -169,6 +169,15 @@ export const hostConfig = {};
   fs.copyFileSync(devtoolsLicenseFileSource, devtoolsLicenseFileDestination);
 
   copyThirdPartyLicenseFiles();
+  copyDevToolsDescriptionFiles();
+}
+
+function copyDevToolsDescriptionFiles() {
+  const devtoolsIssuesDescriptionPath =
+    'node_modules/chrome-devtools-frontend/front_end/models/issues_manager/descriptions';
+  const sourceDir = path.join(process.cwd(), devtoolsIssuesDescriptionPath);
+  const destDir = path.join(BUILD_DIR, devtoolsIssuesDescriptionPath);
+  fs.cpSync(sourceDir, destDir, {recursive: true});
 }
 
 main();

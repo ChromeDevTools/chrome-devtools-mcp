@@ -7,9 +7,11 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
+import {type AggregatedIssue} from '../node_modules/chrome-devtools-frontend/mcp/mcp.js';
+
 import {extractUrlLikeFromDevToolsTitle, urlsEqual} from './DevtoolsUtils.js';
 import type {ListenerMap} from './PageCollector.js';
-import {NetworkCollector, PageCollector} from './PageCollector.js';
+import {NetworkCollector, ConsoleCollector} from './PageCollector.js';
 import {Locator} from './third_party/index.js';
 import type {
   Browser,
@@ -92,7 +94,7 @@ export class McpContext implements Context {
   // The most recent snapshot.
   #textSnapshot: TextSnapshot | null = null;
   #networkCollector: NetworkCollector;
-  #consoleCollector: PageCollector<ConsoleMessage | Error>;
+  #consoleCollector: ConsoleCollector;
 
   #isRunningTrace = false;
   #networkConditionsMap = new WeakMap<Page, string>();
@@ -122,7 +124,7 @@ export class McpContext implements Context {
       this.#options.experimentalIncludeAllPages,
     );
 
-    this.#consoleCollector = new PageCollector(
+    this.#consoleCollector = new ConsoleCollector(
       this.browser,
       collect => {
         return {
@@ -137,6 +139,9 @@ export class McpContext implements Context {
               error.stack = undefined;
               collect(error);
             }
+          },
+          issue: event => {
+            collect(event);
           },
         } as ListenerMap;
       },
@@ -205,16 +210,18 @@ export class McpContext implements Context {
 
   getConsoleData(
     includePreservedMessages?: boolean,
-  ): Array<ConsoleMessage | Error> {
+  ): Array<ConsoleMessage | Error | AggregatedIssue> {
     const page = this.getSelectedPage();
     return this.#consoleCollector.getData(page, includePreservedMessages);
   }
 
-  getConsoleMessageStableId(message: ConsoleMessage | Error): number {
+  getConsoleMessageStableId(
+    message: ConsoleMessage | Error | AggregatedIssue,
+  ): number {
     return this.#consoleCollector.getIdForResource(message);
   }
 
-  getConsoleMessageById(id: number): ConsoleMessage | Error {
+  getConsoleMessageById(id: number): ConsoleMessage | Error | AggregatedIssue {
     return this.#consoleCollector.getById(this.getSelectedPage(), id);
   }
 
