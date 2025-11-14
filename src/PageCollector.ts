@@ -13,6 +13,7 @@ import {
 } from '../node_modules/chrome-devtools-frontend/mcp/mcp.js';
 
 import {FakeIssuesManager} from './DevtoolsUtils.js';
+import {logger} from './logger.js';
 import type {ConsoleMessage} from './third_party/index.js';
 import {
   type Browser,
@@ -242,28 +243,36 @@ export class ConsoleCollector extends PageCollector<
       },
     );
 
-    const session = await page.createCDPSession();
-    session.on('Audits.issueAdded', data => {
-      // @ts-expect-error Types of protocol from Puppeteer and CDP are incopatible for Issues but it's the same type
-      const issue = createIssuesFromProtocolIssue(null, data.issue)[0];
-      if (!issue) {
-        return;
-      }
-      const seenKeys = this.#seenIssueKeys.get(page)!;
-      const primaryKey = issue.primaryKey();
-      if (seenKeys.has(primaryKey)) return;
-      seenKeys.add(primaryKey);
+    try {
+      const session = await page.createCDPSession();
+      session.on('Audits.issueAdded', data => {
+        // @ts-expect-error Types of protocol from Puppeteer and CDP are incopatible for Issues but it's the same type
+        const issue = createIssuesFromProtocolIssue(null, data.issue)[0];
+        if (!issue) {
+          return;
+        }
+        const seenKeys = this.#seenIssueKeys.get(page)!;
+        const primaryKey = issue.primaryKey();
+        if (seenKeys.has(primaryKey)) return;
+        seenKeys.add(primaryKey);
 
-      const mockManager = this.#mockIssuesManagers.get(page);
-      if (mockManager) {
-        mockManager.dispatchEventToListeners(IssuesManagerEvents.ISSUE_ADDED, {
-          issue,
-          // @ts-expect-error We don't care that issues model is null
-          issuesModel: null,
-        });
-      }
-    });
-    await session.send('Audits.enable');
+        const mockManager = this.#mockIssuesManagers.get(page);
+        if (mockManager) {
+          mockManager.dispatchEventToListeners(
+            IssuesManagerEvents.ISSUE_ADDED,
+            {
+              issue,
+              // @ts-expect-error We don't care that issues model is null
+              issuesModel: null,
+            },
+          );
+        }
+      });
+      await session.send('Audits.enable');
+    } catch (e) {
+      const errorText = e instanceof Error ? e.message : JSON.stringify(e);
+      logger(`Error subscribing to issues: ${errorText}`);
+    }
   }
 
   override cleanupPageDestroyed(page: Page) {

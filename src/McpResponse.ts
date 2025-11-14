@@ -23,6 +23,7 @@ import {
 } from './formatters/networkFormatter.js';
 import {formatSnapshotNode} from './formatters/snapshotFormatter.js';
 import {getIssueDescription} from './issue-descriptions.js';
+import {logger} from './logger.js';
 import type {McpContext} from './McpContext.js';
 import type {
   ConsoleMessage,
@@ -283,57 +284,58 @@ export class McpResponse implements Response {
         });
       }
 
-      consoleListData = await Promise.all(
-        messages.map(async (item): Promise<ConsoleMessageData> => {
-          const consoleMessageStableId =
-            context.getConsoleMessageStableId(item);
-          if ('args' in item) {
-            const consoleMessage = item as ConsoleMessage;
-            return {
-              consoleMessageStableId,
-              type: consoleMessage.type(),
-              message: consoleMessage.text(),
-              args: await Promise.all(
-                consoleMessage.args().map(async arg => {
-                  const stringArg = await arg.jsonValue().catch(() => {
-                    // Ignore errors.
-                  });
-                  return typeof stringArg === 'object'
-                    ? JSON.stringify(stringArg)
-                    : String(stringArg);
-                }),
-              ),
-            };
-          }
-          if (item instanceof AggregatedIssue) {
-            const count = item.getAggregatedIssuesCount();
-            const filename = item.getDescription()?.file;
-            const rawMarkdown = filename ? getIssueDescription(filename) : null;
-            if (!rawMarkdown) {
+      consoleListData = (
+        await Promise.all(
+          messages.map(async (item): Promise<ConsoleMessageData | null> => {
+            const consoleMessageStableId =
+              context.getConsoleMessageStableId(item);
+            if ('args' in item) {
+              const consoleMessage = item as ConsoleMessage;
+              return {
+                consoleMessageStableId,
+                type: consoleMessage.type(),
+                message: consoleMessage.text(),
+                args: await Promise.all(
+                  consoleMessage.args().map(async arg => {
+                    const stringArg = await arg.jsonValue().catch(() => {
+                      // Ignore errors.
+                    });
+                    return typeof stringArg === 'object'
+                      ? JSON.stringify(stringArg)
+                      : String(stringArg);
+                  }),
+                ),
+              };
+            }
+            if (item instanceof AggregatedIssue) {
+              const count = item.getAggregatedIssuesCount();
+              const filename = item.getDescription()?.file;
+              const rawMarkdown = filename
+                ? getIssueDescription(filename)
+                : null;
+              if (!rawMarkdown) {
+                logger(`no markdown ${filename} found for issue:` + item.code);
+                return null;
+              }
+              const markdownAst = Marked.Marked.lexer(rawMarkdown);
+              const title = findTitleFromMarkdownAst(markdownAst);
               return {
                 consoleMessageStableId,
                 type: 'issue',
-                message: `${item.code()} (count: ${count})`,
+                message: `${title}`,
+                count,
                 args: [],
               };
             }
-            const markdownAst = Marked.Marked.lexer(rawMarkdown);
-            const title = findTitleFromMarkdownAst(markdownAst);
             return {
               consoleMessageStableId,
-              type: 'issue',
-              message: `${title} (count: ${count})`,
+              type: 'error',
+              message: (item as Error).message,
               args: [],
             };
-          }
-          return {
-            consoleMessageStableId,
-            type: 'error',
-            message: (item as Error).message,
-            args: [],
-          };
-        }),
-      );
+          }),
+        )
+      ).filter(item => item !== null);
     }
 
     return this.format(toolName, context, {
