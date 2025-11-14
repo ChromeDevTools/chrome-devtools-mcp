@@ -34,7 +34,7 @@ const FILTERABLE_MESSAGE_TYPES: readonly [
   'count',
   'timeEnd',
   'verbose',
-  'issue'
+  'issue',
 ];
 
 export const listConsoleMessages = defineTool({

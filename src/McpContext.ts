@@ -215,7 +215,9 @@ export class McpContext implements Context {
     return this.#consoleCollector.getData(page, includePreservedMessages);
   }
 
-  getConsoleMessageStableId(message: ConsoleMessage | Error | AggregatedIssue): number {
+  getConsoleMessageStableId(
+    message: ConsoleMessage | Error | AggregatedIssue,
+  ): number {
     return this.#consoleCollector.getIdForResource(message);
   }
 

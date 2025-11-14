@@ -4,7 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import {
-  AggregatedIssue, Marked, findTitleFromMarkdownAst
+  AggregatedIssue,
+  Marked,
+  findTitleFromMarkdownAst,
 } from '../node_modules/chrome-devtools-frontend/mcp/mcp.js';
 
 import type {ConsoleMessageData} from './formatters/consoleFormatter.js';
@@ -306,16 +308,14 @@ export class McpResponse implements Response {
           if (item instanceof AggregatedIssue) {
             const count = item.getAggregatedIssuesCount();
             const filename = item.getDescription()?.file;
-            const rawMarkdown = filename
-              ? getIssueDescription(filename)
-              : null;
+            const rawMarkdown = filename ? getIssueDescription(filename) : null;
             if (!rawMarkdown) {
-            return {
-              consoleMessageStableId,
-              type: 'issue',
-              message: `${item.code()} (count: ${count})`,
-              args: [],
-            };
+              return {
+                consoleMessageStableId,
+                type: 'issue',
+                message: `${item.code()} (count: ${count})`,
+                args: [],
+              };
             }
             const markdownAst = Marked.Marked.lexer(rawMarkdown);
             const title = findTitleFromMarkdownAst(markdownAst);
