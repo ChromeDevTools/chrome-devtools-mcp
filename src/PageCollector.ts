@@ -14,7 +14,7 @@ import {
 
 import {FakeIssuesManager} from './DevtoolsUtils.js';
 import {logger} from './logger.js';
-import type {ConsoleMessage} from './third_party/index.js';
+import type {ConsoleMessage, Protocol} from './third_party/index.js';
 import {
   type Browser,
   type Frame,
@@ -96,13 +96,13 @@ export class PageCollector<T> {
   }
 
   public addPage(page: Page) {
-    if (this.storage.has(page)) {
-      return;
-    }
     this.#initializePage(page);
   }
 
   #initializePage(page: Page) {
+    if (this.storage.has(page)) {
+      return;
+    }
     const idGenerator = createIdGenerator();
     const storedLists: Array<Array<WithSymbolId<T>>> = [[]];
     this.storage.set(page, storedLists);
@@ -215,17 +215,13 @@ export class ConsoleCollector extends PageCollector<
   #mockIssuesManagers = new WeakMap<Page, FakeIssuesManager>();
 
   override addPage(page: Page): void {
-    if (this.storage.has(page)) {
-      return;
-    }
     super.addPage(page);
     void this.subscribeForIssues(page);
   }
   async subscribeForIssues(page: Page) {
-    if (!this.#seenIssueKeys.has(page)) {
-      this.#seenIssueKeys.set(page, new Set());
-    }
+    if (this.#seenIssueKeys.has(page)) return;
 
+    this.#seenIssueKeys.set(page, new Set());
     const mockManager = new FakeIssuesManager();
     const aggregator = new IssueAggregator(mockManager);
     this.#mockIssuesManagers.set(page, mockManager);
@@ -242,36 +238,33 @@ export class ConsoleCollector extends PageCollector<
         page.emit('issue', event.data);
       },
     );
-
     try {
       const session = await page.createCDPSession();
       session.on('Audits.issueAdded', data => {
-        // @ts-expect-error Types of protocol from Puppeteer and CDP are incopatible for Issues but it's the same type
-        const issue = createIssuesFromProtocolIssue(null, data.issue)[0];
-        if (!issue) {
-          return;
-        }
+        const inspectorIssue =
+          data.issue satisfies Protocol.Audits.InspectorIssue;
+        // @ts-expect-error Types of protocol from Puppeteer and CDP are incomparable for InspectorIssueCode, one is union, other is enum
+        const issue = createIssuesFromProtocolIssue(null, inspectorIssue)[0];
+        if (!issue) return;
+
         const seenKeys = this.#seenIssueKeys.get(page)!;
         const primaryKey = issue.primaryKey();
         if (seenKeys.has(primaryKey)) return;
         seenKeys.add(primaryKey);
 
         const mockManager = this.#mockIssuesManagers.get(page);
-        if (mockManager) {
-          mockManager.dispatchEventToListeners(
-            IssuesManagerEvents.ISSUE_ADDED,
-            {
-              issue,
-              // @ts-expect-error We don't care that issues model is null
-              issuesModel: null,
-            },
-          );
-        }
+        if (!mockManager) return;
+
+        mockManager.dispatchEventToListeners(IssuesManagerEvents.ISSUE_ADDED, {
+          issue,
+          // @ts-expect-error We don't care that issues model is null
+          issuesModel: null,
+        });
       });
+
       await session.send('Audits.enable');
     } catch (e) {
-      const errorText = e instanceof Error ? e.message : JSON.stringify(e);
-      logger(`Error subscribing to issues: ${errorText}`);
+      logger('Error subscribing to issues', e);
     }
   }
 

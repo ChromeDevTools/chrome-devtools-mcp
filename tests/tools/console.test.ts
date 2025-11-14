@@ -4,8 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import assert from 'node:assert';
-import {describe, it} from 'node:test';
+import {before, describe, it} from 'node:test';
 
+import {loadIssueDescriptions} from '../../src/issue-descriptions.js';
 import {
   getConsoleMessage,
   listConsoleMessages,
@@ -14,6 +15,10 @@ import {withBrowser} from '../utils.js';
 
 describe('console', () => {
   describe('list_console_messages', () => {
+    before(async () => {
+      await loadIssueDescriptions();
+    });
+
     it('list messages', async () => {
       await withBrowser(async (response, context) => {
         await listConsoleMessages.handler({params: {}}, response, context);
@@ -32,6 +37,28 @@ describe('console', () => {
         const textContent = formattedResponse[0] as {text: string};
         assert.ok(
           textContent.text.includes('msgid=1 [error] This is an error'),
+        );
+      });
+    });
+
+    it('lists issues messages', async () => {
+      await withBrowser(async (response, context) => {
+        const page = await context.newPage();
+        const issuePromise = new Promise<void>(resolve => {
+          page.on('issue', () => {
+            resolve();
+          });
+        });
+
+        await page.setContent('<input type="text" name="username" />');
+        await issuePromise;
+        await listConsoleMessages.handler({params: {}}, response, context);
+        const formattedResponse = await response.handle('test', context);
+        const textContent = formattedResponse[0] as {text: string};
+        assert.ok(
+          textContent.text.includes(
+            `msgid=1 [issue] An element doesn't have an autocomplete attribute (count: 1)`,
+          ),
         );
       });
     });

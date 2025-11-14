@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import assert from 'node:assert';
-import {describe, it} from 'node:test';
+import {beforeEach, describe, it} from 'node:test';
 
 import type {
   Browser,
@@ -13,6 +13,7 @@ import type {
   Page,
   Target,
   CDPSession,
+  Protocol,
 } from 'puppeteer-core';
 import sinon from 'sinon';
 
@@ -343,6 +344,21 @@ describe('NetworkCollector', () => {
 });
 
 describe('ConsoleCollector', () => {
+  let issue: Protocol.Audits.InspectorIssue;
+
+  beforeEach(() => {
+    issue = {
+      code: 'MixedContentIssue',
+      details: {
+        mixedContentIssueDetails: {
+          insecureURL: 'test.url',
+          resolutionStatus: 'MixedContentBlocked',
+          mainResourceURL: '',
+        },
+      },
+    };
+  });
+
   it('emits issues on page', async () => {
     const browser = getMockBrowser();
     const page = (await browser.pages())[0];
@@ -359,17 +375,6 @@ describe('ConsoleCollector', () => {
       } as ListenerMap;
     });
     await collector.init();
-
-    const issue = {
-      code: 'MixedContentIssue' as const,
-      details: {
-        mixedContentIssueDetails: {
-          insecureURL: 'test.url',
-        },
-      },
-    };
-
-    // @ts-expect-error Types of protocol from Puppeteer and CDP are incopatible for Issues but it's the same type
     cdpSession.emit('Audits.issueAdded', {issue});
     sinon.assert.calledOnce(onIssuesListener);
 
@@ -391,26 +396,18 @@ describe('ConsoleCollector', () => {
     });
     await collector.init();
 
-    const issue = {
-      code: 'MixedContentIssue' as const,
-      details: {
-        mixedContentIssueDetails: {
-          insecureURL: 'test.url',
-        },
-      },
-    };
     const issue2 = {
-      code: 'PropertyRuleIssue' as const,
+      code: 'ElementAccessibilityIssue' as const,
       details: {
-        propertyRuleIssueDetails: {
-          test: 'test',
+        elementAccessibilityIssueDetails: {
+          nodeId: 1,
+          elementAccessibilityIssueReason: 'DisallowedSelectChild',
+          hasDisallowedAttributes: true,
         },
       },
-    };
+    } satisfies Protocol.Audits.InspectorIssue;
 
-    // @ts-expect-error Types of protocol from Puppeteer and CDP are incopatible for Issues but it's the same type
     cdpSession.emit('Audits.issueAdded', {issue});
-    // @ts-expect-error Types of protocol from Puppeteer and CDP are incopatible for Issues but it's the same type
     cdpSession.emit('Audits.issueAdded', {issue: issue2});
     const data = collector.getData(page);
     assert.equal(data.length, 2);
@@ -430,20 +427,10 @@ describe('ConsoleCollector', () => {
     });
     await collector.init();
 
-    const issue = {
-      code: 'MixedContentIssue' as const,
-      details: {
-        mixedContentIssueDetails: {
-          insecureURL: 'test.url',
-        },
-      },
-    };
-
-    // @ts-expect-error Types of protocol from Puppeteer and CDP are incopatible for Issues but it's the same type
     cdpSession.emit('Audits.issueAdded', {issue});
-    // @ts-expect-error Types of protocol from Puppeteer and CDP are incopatible for Issues but it's the same type
     cdpSession.emit('Audits.issueAdded', {issue});
-    const collectedIssue = collector.getData(page)[0] as AggregatedIssue;
+    const collectedIssue = collector.getData(page)[0];
+    assert(collectedIssue instanceof AggregatedIssue);
     assert.equal(collectedIssue.code(), 'MixedContentIssue');
     assert.equal(collectedIssue.getAggregatedIssuesCount(), 1);
   });

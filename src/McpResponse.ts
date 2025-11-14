@@ -319,10 +319,15 @@ export class McpResponse implements Response {
               }
               const markdownAst = Marked.Marked.lexer(rawMarkdown);
               const title = findTitleFromMarkdownAst(markdownAst);
+              if (!title) {
+                logger('cannot read issue title from ' + filename);
+                return null;
+              }
               return {
                 consoleMessageStableId,
                 type: 'issue',
-                message: `${title}`,
+                item,
+                message: title,
                 count,
                 args: [],
               };
