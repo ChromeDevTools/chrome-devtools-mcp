@@ -160,6 +160,7 @@
 - **timeout** (integer) _(optional)_: Maximum wait time in milliseconds. If set to 0, the default timeout will be used.
 - **type** (enum: "url", "back", "forward", "reload") _(optional)_: Navigate the page by URL, back or forward in history, or reload.
 - **url** (string) _(optional)_: Target URL (only type=url)
+- **initScript** (string) _(optional)_: Script to execute whenever a page is navigated to.
 
 ---
 

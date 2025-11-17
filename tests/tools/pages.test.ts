@@ -300,14 +300,21 @@ describe('pages', () => {
     it('navigates to correct page with initScript', async () => {
       await withBrowser(async (response, context) => {
         await navigatePage.handler(
-          {params: {url: 'data:text/html,<div>Hello MCP</div>', initScript: 'window.initScript = "completed"'}},
+          {
+            params: {
+              url: 'data:text/html,<div>Hello MCP</div>',
+              initScript: 'window.initScript = "completed"',
+            },
+          },
           response,
           context,
         );
         const page = context.getSelectedPage();
 
         // wait for up to 1s for the global variable to set by the initScript to exist
-        await page.waitForFunction("window.initScript==='completed'", {timeout: 1000});
+        await page.waitForFunction("window.initScript==='completed'", {
+          timeout: 1000,
+        });
 
         assert.ok(response.includePages);
       });
