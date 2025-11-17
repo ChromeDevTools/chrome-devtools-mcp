@@ -117,7 +117,7 @@ export const navigatePage = defineTool({
       .optional()
       .describe('Whether to ignore cache on reload.'),
     initScript: zod.string().optional().describe(
-      `(optional) A JavaScript function declaration to be executed by the tool on new document for every page load.
+      `(optional) A JavaScript function to be executed by the tool on new document for every page load before any other scripts.
       `),
     ...timeoutSchema,
   },
