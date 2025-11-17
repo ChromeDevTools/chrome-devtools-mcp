@@ -133,6 +133,9 @@ export const navigatePage = defineTool({
       .describe(
         'Whether to auto accept or beforeunload dialogs triggered by this navigation. Default is accept.',
       ),
+    initScript: zod.string().optional().describe(
+      `(optional) A JavaScript function declaration to be executed by the tool on new document for every page load.
+      `),
     ...timeoutSchema,
   },
   handler: async (request, response, context) => {
@@ -163,6 +166,10 @@ export const navigatePage = defineTool({
         context.clearDialog();
       }
     };
+
+    if (request.params.initScript) {
+      await page.evaluateOnNewDocument(request.params.initScript);
+    }
     page.on('dialog', dialogHandler);
 
     try {
