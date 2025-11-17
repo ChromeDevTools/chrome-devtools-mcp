@@ -157,10 +157,10 @@
 
 - **handleBeforeUnload** (enum: "accept", "decline") _(optional)_: Whether to auto accept or beforeunload dialogs triggered by this navigation. Default is accept.
 - **ignoreCache** (boolean) _(optional)_: Whether to ignore cache on reload.
+- **initScript** (string) _(optional)_: (optional) A JavaScript function to be executed by the tool on new document for every page load before any other scripts.
 - **timeout** (integer) _(optional)_: Maximum wait time in milliseconds. If set to 0, the default timeout will be used.
 - **type** (enum: "url", "back", "forward", "reload") _(optional)_: Navigate the page by URL, back or forward in history, or reload.
 - **url** (string) _(optional)_: Target URL (only type=url)
-- **initScript** (string) _(optional)_: Script to execute whenever a page is navigated to.
 
 ---
 
