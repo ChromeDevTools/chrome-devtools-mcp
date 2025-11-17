@@ -429,7 +429,9 @@ describe('ConsoleCollector', () => {
 
     cdpSession.emit('Audits.issueAdded', {issue});
     cdpSession.emit('Audits.issueAdded', {issue});
-    const collectedIssue = collector.getData(page)[0];
+    const data = collector.getData(page);
+    assert.equal(data.length, 1);
+    const collectedIssue = data[0];
     assert(collectedIssue instanceof AggregatedIssue);
     assert.equal(collectedIssue.code(), 'MixedContentIssue');
     assert.equal(collectedIssue.getAggregatedIssuesCount(), 1);

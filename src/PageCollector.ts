@@ -76,7 +76,7 @@ export class PageCollector<T> {
   async init() {
     const pages = await this.#browser.pages(this.#includeAllPages);
     for (const page of pages) {
-      await this.addPage(page);
+      this.addPage(page);
     }
 
     this.#browser.on('targetcreated', async target => {
@@ -84,7 +84,7 @@ export class PageCollector<T> {
       if (!page) {
         return;
       }
-      await this.addPage(page);
+      this.addPage(page);
     });
     this.#browser.on('targetdestroyed', async target => {
       const page = await target.page();
@@ -245,7 +245,10 @@ export class ConsoleCollector extends PageCollector<
           data.issue satisfies Protocol.Audits.InspectorIssue;
         // @ts-expect-error Types of protocol from Puppeteer and CDP are incomparable for InspectorIssueCode, one is union, other is enum
         const issue = createIssuesFromProtocolIssue(null, inspectorIssue)[0];
-        if (!issue) return;
+        if (!issue) {
+          logger('No issue mapping for for the issue: ', inspectorIssue.code);
+          return;
+        }
 
         const seenKeys = this.#seenIssueKeys.get(page)!;
         const primaryKey = issue.primaryKey();
