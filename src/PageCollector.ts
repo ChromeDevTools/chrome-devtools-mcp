@@ -14,7 +14,7 @@ import {
 
 import {FakeIssuesManager} from './DevtoolsUtils.js';
 import {logger} from './logger.js';
-import type {ConsoleMessage, Protocol} from './third_party/index.js';
+import type {CDPSession, ConsoleMessage} from './third_party/index.js';
 import {
   type Browser,
   type Frame,
@@ -210,23 +210,18 @@ export class PageCollector<T> {
 export class ConsoleCollector extends PageCollector<
   ConsoleMessage | Error | AggregatedIssue
 > {
-  #seenIssueKeys = new WeakMap<Page, Set<string>>();
-  #issuesAggregators = new WeakMap<Page, IssueAggregator>();
-  #mockIssuesManagers = new WeakMap<Page, FakeIssuesManager>();
-
   override addPage(page: Page): void {
+    const subscribed = this.storage.has(page);
     super.addPage(page);
-    void this.subscribeForIssues(page);
+    if (!subscribed) {
+      void this.subscribeForIssues(page);
+    }
   }
-  async subscribeForIssues(page: Page) {
-    if (this.#seenIssueKeys.has(page)) return;
 
-    this.#seenIssueKeys.set(page, new Set());
+  async subscribeForIssues(page: Page) {
+    const seenKeys = new Set<string>();
     const mockManager = new FakeIssuesManager();
     const aggregator = new IssueAggregator(mockManager);
-    this.#mockIssuesManagers.set(page, mockManager);
-    this.#issuesAggregators.set(page, aggregator);
-
     aggregator.addEventListener(
       IssueAggregatorEvents.AGGREGATED_ISSUE_UPDATED,
       event => {
@@ -238,44 +233,44 @@ export class ConsoleCollector extends PageCollector<
         page.emit('issue', event.data);
       },
     );
+
     try {
-      const session = await page.createCDPSession();
+      // @ts-expect-error use existing CDP client (internal Puppeteer API).
+      const session = page._client() as CDPSession;
       session.on('Audits.issueAdded', data => {
-        const inspectorIssue =
-          data.issue satisfies Protocol.Audits.InspectorIssue;
-        // @ts-expect-error Types of protocol from Puppeteer and CDP are incomparable for InspectorIssueCode, one is union, other is enum
-        const issue = createIssuesFromProtocolIssue(null, inspectorIssue)[0];
-        if (!issue) {
-          logger('No issue mapping for for the issue: ', inspectorIssue.code);
-          return;
+        try {
+          const inspectorIssue = data.issue;
+          // @ts-expect-error Types of protocol from Puppeteer and CDP are
+          // incomparable for InspectorIssueCode, one is union, other is enum.
+          const issue = createIssuesFromProtocolIssue(null, inspectorIssue)[0];
+          if (!issue) {
+            logger('No issue mapping for for the issue: ', inspectorIssue.code);
+            return;
+          }
+
+          const primaryKey = issue.primaryKey();
+          if (seenKeys.has(primaryKey)) {
+            return;
+          }
+          seenKeys.add(primaryKey);
+
+          mockManager.dispatchEventToListeners(
+            IssuesManagerEvents.ISSUE_ADDED,
+            {
+              issue,
+              // @ts-expect-error We don't care that issues model is null
+              issuesModel: null,
+            },
+          );
+        } catch (error) {
+          logger('Error creating a new issue', error);
         }
-
-        const seenKeys = this.#seenIssueKeys.get(page)!;
-        const primaryKey = issue.primaryKey();
-        if (seenKeys.has(primaryKey)) return;
-        seenKeys.add(primaryKey);
-
-        const mockManager = this.#mockIssuesManagers.get(page);
-        if (!mockManager) return;
-
-        mockManager.dispatchEventToListeners(IssuesManagerEvents.ISSUE_ADDED, {
-          issue,
-          // @ts-expect-error We don't care that issues model is null
-          issuesModel: null,
-        });
       });
 
       await session.send('Audits.enable');
-    } catch (e) {
-      logger('Error subscribing to issues', e);
+    } catch (error) {
+      logger('Error subscribing to issues', error);
     }
-  }
-
-  override cleanupPageDestroyed(page: Page) {
-    super.cleanupPageDestroyed(page);
-    this.#seenIssueKeys.delete(page);
-    this.#issuesAggregators.delete(page);
-    this.#mockIssuesManagers.delete(page);
   }
 }
 

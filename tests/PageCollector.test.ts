@@ -64,7 +64,11 @@ function getMockPage(): Page {
       return Promise.resolve(cdpSession as unknown as CDPSession);
     },
     ...mockListener(),
-  } as Page;
+    // @ts-expect-error internal API.
+    _client() {
+      return cdpSession;
+    },
+  } satisfies Page;
 }
 
 function getMockBrowser(): Browser {
@@ -362,7 +366,8 @@ describe('ConsoleCollector', () => {
   it('emits issues on page', async () => {
     const browser = getMockBrowser();
     const page = (await browser.pages())[0];
-    const cdpSession = await page.createCDPSession();
+    // @ts-expect-error internal API.
+    const cdpSession = page._client();
     const onIssuesListener = sinon.spy();
 
     page.on('issue', onIssuesListener);
@@ -385,7 +390,8 @@ describe('ConsoleCollector', () => {
   it('collects issues', async () => {
     const browser = getMockBrowser();
     const page = (await browser.pages())[0];
-    const cdpSession = await page.createCDPSession();
+    // @ts-expect-error internal API.
+    const cdpSession = page._client();
 
     const collector = new ConsoleCollector(browser, collect => {
       return {
@@ -416,7 +422,8 @@ describe('ConsoleCollector', () => {
   it('filters duplicated issues', async () => {
     const browser = getMockBrowser();
     const page = (await browser.pages())[0];
-    const cdpSession = await page.createCDPSession();
+    // @ts-expect-error internal API.
+    const cdpSession = page._client();
 
     const collector = new ConsoleCollector(browser, collect => {
       return {
