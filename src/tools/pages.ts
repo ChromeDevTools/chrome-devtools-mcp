@@ -116,9 +116,12 @@ export const navigatePage = defineTool({
       .boolean()
       .optional()
       .describe('Whether to ignore cache on reload.'),
-    initScript: zod.string().optional().describe(
-      `(optional) A JavaScript function to be executed by the tool on new document for every page load before any other scripts.
-      `),
+    initScript: zod
+      .string()
+      .optional()
+      .describe(
+        '(optional) A JavaScript function to be executed by the tool on new document for every page load before any other scripts.',
+      ),
     ...timeoutSchema,
   },
   handler: async (request, response, context) => {
@@ -135,8 +138,8 @@ export const navigatePage = defineTool({
       request.params.type = 'url';
     }
 
-    if(request.params.initScript){
-      page.evaluateOnNewDocument(request.params.initScript);
+    if (request.params.initScript) {
+      await page.evaluateOnNewDocument(request.params.initScript);
     }
 
     await context.waitForEventsAfterAction(async () => {
