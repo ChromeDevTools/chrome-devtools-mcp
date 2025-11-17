@@ -6,6 +6,7 @@
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
+import type {TextContent} from '../../src/third_party/index.js';
 import {
   getNetworkRequest,
   listNetworkRequests,
@@ -43,7 +44,9 @@ describe('network', () => {
           context,
         );
         const responseData = await response.handle('list_request', context);
-        t.assert.snapshot?.(stabilizeResponseOutput(responseData[0].text));
+        t.assert.snapshot?.(
+          stabilizeResponseOutput((responseData[0] as TextContent).text),
+        );
       });
     });
 
@@ -68,7 +71,9 @@ describe('network', () => {
           context,
         );
         const responseData = await response.handle('list_request', context);
-        t.assert.snapshot?.(stabilizeResponseOutput(responseData[0].text));
+        t.assert.snapshot?.(
+          stabilizeResponseOutput((responseData[0] as TextContent).text),
+        );
       });
     });
 
@@ -106,7 +111,9 @@ describe('network', () => {
           context,
         );
         const responseData = await response.handle('list_request', context);
-        t.assert.snapshot?.(stabilizeResponseOutput(responseData[0].text));
+        t.assert.snapshot?.(
+          stabilizeResponseOutput((responseData[0] as TextContent).text),
+        );
       });
     });
   });
@@ -158,7 +165,9 @@ describe('network', () => {
         );
         const responseData = await response.handle('get_request', context);
 
-        t.assert.snapshot?.(stabilizeResponseOutput(responseData[0].text));
+        t.assert.snapshot?.(
+          stabilizeResponseOutput((responseData[0] as TextContent).text),
+        );
       });
     });
   });
