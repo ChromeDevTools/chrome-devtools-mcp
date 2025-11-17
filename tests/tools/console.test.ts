@@ -41,15 +41,14 @@ describe('console', () => {
       });
     });
 
-    it('lists issues messages', async () => {
+    it('lists issues', async () => {
       await withBrowser(async (response, context) => {
         const page = await context.newPage();
         const issuePromise = new Promise<void>(resolve => {
-          page.on('issue', () => {
+          page.once('issue', () => {
             resolve();
           });
         });
-
         await page.setContent('<input type="text" name="username" />');
         await issuePromise;
         await listConsoleMessages.handler({params: {}}, response, context);
@@ -60,6 +59,48 @@ describe('console', () => {
             `msgid=1 [issue] An element doesn't have an autocomplete attribute (count: 1)`,
           ),
         );
+      });
+    });
+
+    it('lists issues after a page reload', async () => {
+      await withBrowser(async (response, context) => {
+        const page = await context.newPage();
+        const issuePromise = new Promise<void>(resolve => {
+          page.once('issue', () => {
+            resolve();
+          });
+        });
+
+        await page.setContent('<input type="text" name="username" />');
+        await issuePromise;
+        await listConsoleMessages.handler({params: {}}, response, context);
+        {
+          const formattedResponse = await response.handle('test', context);
+          const textContent = formattedResponse[0] as {text: string};
+          assert.ok(
+            textContent.text.includes(
+              `msgid=1 [issue] An element doesn't have an autocomplete attribute (count: 1)`,
+            ),
+          );
+        }
+
+        const anotherIssuePromise = new Promise<void>(resolve => {
+          page.once('issue', () => {
+            resolve();
+          });
+        });
+        await page.reload();
+        await page.setContent('<input type="text" name="username" />');
+        await anotherIssuePromise;
+        {
+          const formattedResponse = await response.handle('test', context);
+          const textContent = formattedResponse[0] as {text: string};
+          assert.ok(
+            textContent.text.includes(
+              `msgid=2 [issue] An element doesn't have an autocomplete attribute (count: 1)`,
+            ),
+          );
+        }
       });
     });
 

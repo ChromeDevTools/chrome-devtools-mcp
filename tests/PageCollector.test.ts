@@ -12,7 +12,6 @@ import type {
   HTTPRequest,
   Page,
   Target,
-  CDPSession,
   Protocol,
 } from 'puppeteer-core';
 import sinon from 'sinon';
@@ -59,9 +58,6 @@ function getMockPage(): Page {
   return {
     mainFrame() {
       return mainFrame;
-    },
-    createCDPSession() {
-      return Promise.resolve(cdpSession as unknown as CDPSession);
     },
     ...mockListener(),
     // @ts-expect-error internal API.

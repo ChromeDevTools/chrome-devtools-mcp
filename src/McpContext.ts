@@ -155,6 +155,11 @@ export class McpContext implements Context {
     await this.#consoleCollector.init();
   }
 
+  dispose() {
+    this.#networkCollector.dispose();
+    this.#consoleCollector.dispose();
+  }
+
   static async from(
     browser: Browser,
     logger: Debugger,

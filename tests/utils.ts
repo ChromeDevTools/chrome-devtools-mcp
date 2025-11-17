@@ -18,6 +18,7 @@ import {McpResponse} from '../src/McpResponse.js';
 import {stableIdSymbol} from '../src/PageCollector.js';
 
 const browsers = new Map<string, Browser>();
+let context: McpContext | undefined;
 
 export async function withBrowser(
   cb: (response: McpResponse, context: McpContext) => Promise<void>,
@@ -48,7 +49,10 @@ export async function withBrowser(
     }),
   );
   const response = new McpResponse();
-  const context = await McpContext.from(
+  if (context) {
+    context.dispose();
+  }
+  context = await McpContext.from(
     browser,
     logger('test'),
     {
