@@ -134,7 +134,7 @@ export const navigatePage = defineTool({
         'Whether to auto accept or beforeunload dialogs triggered by this navigation. Default is accept.',
       ),
     initScript: zod.string().optional().describe(
-      `(optional) A JavaScript function declaration to be executed by the tool on new document for every page load.
+      `(optional) A JavaScript function to be executed by the tool on new document for every page load before any other scripts.
       `),
     ...timeoutSchema,
   },
