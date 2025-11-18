@@ -1,6 +1,7 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-10-17/server.schema.json",
   "name": "io.github.ChromeDevTools/chrome-devtools-mcp",
+  "title": "Chrome DevTools MCP",
   "description": "MCP server for Chrome DevTools",
   "repository": {
     "url": "https://github.com/ChromeDevTools/chrome-devtools-mcp",
