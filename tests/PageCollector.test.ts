@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import assert from 'node:assert';
-import {beforeEach, describe, it} from 'node:test';
+import {afterEach, beforeEach, describe, it} from 'node:test';
 
 import type {
   Browser,
@@ -17,6 +17,7 @@ import type {
 import sinon from 'sinon';
 
 import {AggregatedIssue} from '../node_modules/chrome-devtools-frontend/mcp/mcp.js';
+import {setIssuesEnabled} from '../src/features.js';
 import type {ListenerMap} from '../src/PageCollector.js';
 import {
   ConsoleCollector,
@@ -357,6 +358,11 @@ describe('ConsoleCollector', () => {
         },
       },
     };
+    setIssuesEnabled(true);
+  });
+
+  afterEach(() => {
+    setIssuesEnabled(false);
   });
 
   it('emits issues on page', async () => {

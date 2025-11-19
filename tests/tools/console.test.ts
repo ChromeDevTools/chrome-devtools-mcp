@@ -4,8 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import assert from 'node:assert';
-import {before, describe, it} from 'node:test';
+import {afterEach, before, beforeEach, describe, it} from 'node:test';
 
+import {setIssuesEnabled} from '../../src/features.js';
 import {loadIssueDescriptions} from '../../src/issue-descriptions.js';
 import {
   getConsoleMessage,
@@ -41,69 +42,6 @@ describe('console', () => {
       });
     });
 
-    it('lists issues', async () => {
-      await withBrowser(async (response, context) => {
-        const page = await context.newPage();
-        const issuePromise = new Promise<void>(resolve => {
-          page.once('issue', () => {
-            resolve();
-          });
-        });
-        await page.setContent('<input type="text" name="username" />');
-        await issuePromise;
-        await listConsoleMessages.handler({params: {}}, response, context);
-        const formattedResponse = await response.handle('test', context);
-        const textContent = formattedResponse[0] as {text: string};
-        assert.ok(
-          textContent.text.includes(
-            `msgid=1 [issue] An element doesn't have an autocomplete attribute (count: 1)`,
-          ),
-        );
-      });
-    });
-
-    it('lists issues after a page reload', async () => {
-      await withBrowser(async (response, context) => {
-        const page = await context.newPage();
-        const issuePromise = new Promise<void>(resolve => {
-          page.once('issue', () => {
-            resolve();
-          });
-        });
-
-        await page.setContent('<input type="text" name="username" />');
-        await issuePromise;
-        await listConsoleMessages.handler({params: {}}, response, context);
-        {
-          const formattedResponse = await response.handle('test', context);
-          const textContent = formattedResponse[0] as {text: string};
-          assert.ok(
-            textContent.text.includes(
-              `msgid=1 [issue] An element doesn't have an autocomplete attribute (count: 1)`,
-            ),
-          );
-        }
-
-        const anotherIssuePromise = new Promise<void>(resolve => {
-          page.once('issue', () => {
-            resolve();
-          });
-        });
-        await page.reload();
-        await page.setContent('<input type="text" name="username" />');
-        await anotherIssuePromise;
-        {
-          const formattedResponse = await response.handle('test', context);
-          const textContent = formattedResponse[0] as {text: string};
-          assert.ok(
-            textContent.text.includes(
-              `msgid=2 [issue] An element doesn't have an autocomplete attribute (count: 1)`,
-            ),
-          );
-        }
-      });
-    });
-
     it('work with primitive unhandled errors', async () => {
       await withBrowser(async (response, context) => {
         const page = await context.newPage();
@@ -114,6 +52,77 @@ describe('console', () => {
         assert.ok(
           textContent.text.includes('msgid=1 [error] undefined (0 args)'),
         );
+      });
+    });
+
+    describe('issues', () => {
+      beforeEach(() => {
+        setIssuesEnabled(true);
+      });
+      afterEach(() => {
+        setIssuesEnabled(false);
+      });
+      it('lists issues', async () => {
+        await withBrowser(async (response, context) => {
+          const page = await context.newPage();
+          const issuePromise = new Promise<void>(resolve => {
+            page.once('issue', () => {
+              resolve();
+            });
+          });
+          await page.setContent('<input type="text" name="username" />');
+          await issuePromise;
+          await listConsoleMessages.handler({params: {}}, response, context);
+          const formattedResponse = await response.handle('test', context);
+          const textContent = formattedResponse[0] as {text: string};
+          assert.ok(
+            textContent.text.includes(
+              `msgid=1 [issue] An element doesn't have an autocomplete attribute (count: 1)`,
+            ),
+          );
+        });
+      });
+
+      it('lists issues after a page reload', async () => {
+        await withBrowser(async (response, context) => {
+          const page = await context.newPage();
+          const issuePromise = new Promise<void>(resolve => {
+            page.once('issue', () => {
+              resolve();
+            });
+          });
+
+          await page.setContent('<input type="text" name="username" />');
+          await issuePromise;
+          await listConsoleMessages.handler({params: {}}, response, context);
+          {
+            const formattedResponse = await response.handle('test', context);
+            const textContent = formattedResponse[0] as {text: string};
+            assert.ok(
+              textContent.text.includes(
+                `msgid=1 [issue] An element doesn't have an autocomplete attribute (count: 1)`,
+              ),
+            );
+          }
+
+          const anotherIssuePromise = new Promise<void>(resolve => {
+            page.once('issue', () => {
+              resolve();
+            });
+          });
+          await page.reload();
+          await page.setContent('<input type="text" name="username" />');
+          await anotherIssuePromise;
+          {
+            const formattedResponse = await response.handle('test', context);
+            const textContent = formattedResponse[0] as {text: string};
+            assert.ok(
+              textContent.text.includes(
+                `msgid=2 [issue] An element doesn't have an autocomplete attribute (count: 1)`,
+              ),
+            );
+          }
+        });
       });
     });
   });
