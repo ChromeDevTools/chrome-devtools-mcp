@@ -11,6 +11,8 @@ import {
   parseRawTraceBuffer,
 } from '../../src/trace-processing/parse.js';
 
+import '../../src/DevtoolsUtils.js';
+
 import {loadTraceAsBuffer} from './fixtures/load.js';
 
 describe('Trace parsing', async () => {

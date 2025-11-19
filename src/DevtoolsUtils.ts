@@ -8,6 +8,7 @@ import {
   type Issue,
   type IssuesManagerEventTypes,
   Common,
+  I18n,
 } from '../node_modules/chrome-devtools-frontend/mcp/mcp.js';
 
 export function extractUrlLikeFromDevToolsTitle(
@@ -67,3 +68,13 @@ export class FakeIssuesManager extends Common.ObjectWrapper
     return [];
   }
 }
+
+I18n.DevToolsLocale.DevToolsLocale.instance({
+  create: true,
+  data: {
+    navigatorLanguage: 'en-US',
+    settingLanguage: 'en-US',
+    lookupClosestDevToolsLocale: l => l,
+  },
+});
+I18n.i18n.registerLocaleDataForTest('en-US', {});
