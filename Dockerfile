@@ -45,10 +45,6 @@ WORKDIR /app
 COPY --from=builder /app/build ./build
 COPY --from=builder /app/node_modules ./node_modules
 
-# Copy entrypoint script
-COPY docker-entrypoint.sh /usr/local/bin/
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh
-
 # Set environment to tell Puppeteer where Chromium is installed
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 
@@ -60,5 +56,5 @@ RUN groupadd -r mcpuser && useradd -r -g mcpuser -G audio,video mcpuser \
 
 USER mcpuser
 
-# Use entrypoint script that handles optional BROWSER_URL
-ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
+# Expose MCP server via stdio
+ENTRYPOINT ["node", "build/src/index.js"]
