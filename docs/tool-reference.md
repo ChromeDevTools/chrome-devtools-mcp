@@ -11,12 +11,13 @@
   - [`hover`](#hover)
   - [`press_key`](#press_key)
   - [`upload_file`](#upload_file)
-- **[Navigation automation](#navigation-automation)** (6 tools)
+- **[Navigation automation](#navigation-automation)** (7 tools)
   - [`close_page`](#close_page)
   - [`list_pages`](#list_pages)
   - [`navigate_page`](#navigate_page)
   - [`new_page`](#new_page)
   - [`select_page`](#select_page)
+  - [`switch_browser`](#switch_browser)
   - [`wait_for`](#wait_for)
 - **[Emulation](#emulation)** (2 tools)
   - [`emulate`](#emulate)
@@ -173,6 +174,16 @@
 **Parameters:**
 
 - **pageIdx** (number) **(required)**: The index of the page to select. Call [`list_pages`](#list_pages) to list pages.
+
+---
+
+### `switch_browser`
+
+**Description:** Connect to a different browser instance. Disconnects from the current browser (if any) and establishes a new connection. Accepts either HTTP URLs (e.g., http://127.0.0.1:9222) or WebSocket endpoints (e.g., ws://127.0.0.1:9222/devtools/browser/&lt;id&gt;).
+
+**Parameters:**
+
+- **url** (string) **(required)**: Browser connection URL. Can be an HTTP URL (e.g., http://127.0.0.1:9222) which will be auto-converted to WebSocket, or a direct WebSocket endpoint (e.g., ws://127.0.0.1:52862/devtools/browser/&lt;id&gt;).
 
 ---
 

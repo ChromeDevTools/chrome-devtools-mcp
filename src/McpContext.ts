@@ -399,7 +399,9 @@ export class McpContext implements Context {
     });
 
     if (!this.#selectedPage || this.#pages.indexOf(this.#selectedPage) === -1) {
-      this.selectPage(this.#pages[0]);
+      if (this.#pages.length > 0) {
+        this.selectPage(this.#pages[0]);
+      }
     }
 
     await this.detectOpenDevToolsWindows();

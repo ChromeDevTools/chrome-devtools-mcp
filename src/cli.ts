@@ -160,6 +160,12 @@ export const cliOptions = {
     default: true,
     describe: 'Set to false to exclude tools related to network.',
   },
+  noLaunch: {
+    type: 'boolean',
+    default: false,
+    describe:
+      'Do not launch or connect to a browser automatically. Use switch_browser tool to connect manually.',
+  },
 } satisfies Record<string, YargsOptions>;
 
 export function parseArguments(version: string, argv = process.argv) {
@@ -170,6 +176,7 @@ export function parseArguments(version: string, argv = process.argv) {
       // We can't set default in the options else
       // Yargs will complain
       if (
+        !args.noLaunch &&
         !args.channel &&
         !args.browserUrl &&
         !args.wsEndpoint &&

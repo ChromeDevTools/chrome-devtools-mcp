@@ -263,12 +263,13 @@ If you run into any issues, checkout our [troubleshooting guide](./docs/troubles
   - [`hover`](docs/tool-reference.md#hover)
   - [`press_key`](docs/tool-reference.md#press_key)
   - [`upload_file`](docs/tool-reference.md#upload_file)
-- **Navigation automation** (6 tools)
+- **Navigation automation** (7 tools)
   - [`close_page`](docs/tool-reference.md#close_page)
   - [`list_pages`](docs/tool-reference.md#list_pages)
   - [`navigate_page`](docs/tool-reference.md#navigate_page)
   - [`new_page`](docs/tool-reference.md#new_page)
   - [`select_page`](docs/tool-reference.md#select_page)
+  - [`switch_browser`](docs/tool-reference.md#switch_browser)
   - [`wait_for`](docs/tool-reference.md#wait_for)
 - **Emulation** (2 tools)
   - [`emulate`](docs/tool-reference.md#emulate)
@@ -360,6 +361,11 @@ The Chrome DevTools MCP server supports the following configuration option:
   Set to false to exclude tools related to network.
   - **Type:** boolean
   - **Default:** `true`
+
+- **`--noLaunch`**
+  Do not launch or connect to a browser automatically. Use switch_browser tool to connect manually.
+  - **Type:** boolean
+  - **Default:** `false`
 
 <!-- END AUTO GENERATED OPTIONS -->
 

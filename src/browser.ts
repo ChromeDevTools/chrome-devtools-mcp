@@ -19,6 +19,21 @@ import {puppeteer} from './third_party/index.js';
 
 let browser: Browser | undefined;
 
+export async function disconnectBrowser(): Promise<void> {
+  if (browser?.connected) {
+    await browser.close();
+    browser = undefined;
+  }
+}
+
+export function getBrowser(): Browser | undefined {
+  return browser;
+}
+
+export function setBrowser(newBrowser: Browser | undefined): void {
+  browser = newBrowser;
+}
+
 function makeTargetFilter() {
   const ignoredPrefixes = new Set([
     'chrome://',
@@ -67,9 +82,17 @@ export async function ensureBrowserConnected(options: {
   }
 
   logger('Connecting Puppeteer to ', JSON.stringify(connectOptions));
-  browser = await puppeteer.connect(connectOptions);
-  logger('Connected Puppeteer');
-  return browser;
+  try {
+    browser = await puppeteer.connect(connectOptions);
+    logger('Connected Puppeteer successfully');
+    logger('Browser object type:', typeof browser);
+    logger('Browser.connected:', browser?.connected);
+    return browser;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    logger('Failed to connect to Puppeteer:', message);
+    throw new Error(`Puppeteer connection failed: ${message}`);
+  }
 }
 
 interface McpLaunchOptions {

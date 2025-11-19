@@ -8,7 +8,11 @@ import './polyfill.js';
 
 import type {Channel} from './browser.js';
 import {ensureBrowserConnected, ensureBrowserLaunched} from './browser.js';
-import {parseArguments} from './cli.js';
+import {args, VERSION} from './config.js';
+import {
+  getContext as getContextInstance,
+  setContextInstance,
+} from './context.js';
 import {loadIssueDescriptions} from './issue-descriptions.js';
 import {logger, saveLogsToFile} from './logger.js';
 import {McpContext} from './McpContext.js';
@@ -30,14 +34,8 @@ import * as performanceTools from './tools/performance.js';
 import * as screenshotTools from './tools/screenshot.js';
 import * as scriptTools from './tools/script.js';
 import * as snapshotTools from './tools/snapshot.js';
+import * as switchBrowserTool from './tools/switch_browser.js';
 import type {ToolDefinition} from './tools/ToolDefinition.js';
-
-// If moved update release-please config
-// x-release-please-start-version
-const VERSION = '0.10.1';
-// x-release-please-end
-
-export const args = parseArguments(VERSION);
 
 const logFile = args.logFile ? saveLogsToFile(args.logFile) : undefined;
 
@@ -54,39 +52,57 @@ server.server.setRequestHandler(SetLevelRequestSchema, () => {
   return {};
 });
 
-let context: McpContext;
 async function getContext(): Promise<McpContext> {
+  let context = getContextInstance();
+
+  if (args.noLaunch && !context) {
+    throw new Error(
+      'No browser connected. Use the switch_browser tool to connect to a browser instance.',
+    );
+  }
+
   const extraArgs: string[] = (args.chromeArg ?? []).map(String);
   if (args.proxyServer) {
     extraArgs.push(`--proxy-server=${args.proxyServer}`);
   }
   const devtools = args.experimentalDevtools ?? false;
-  const browser =
-    args.browserUrl || args.wsEndpoint
-      ? await ensureBrowserConnected({
-          browserURL: args.browserUrl,
-          wsEndpoint: args.wsEndpoint,
-          wsHeaders: args.wsHeaders,
-          devtools,
-        })
-      : await ensureBrowserLaunched({
-          headless: args.headless,
-          executablePath: args.executablePath,
-          channel: args.channel as Channel,
-          isolated: args.isolated,
-          logFile,
-          viewport: args.viewport,
-          args: extraArgs,
-          acceptInsecureCerts: args.acceptInsecureCerts,
-          devtools,
-        });
 
-  if (context?.browser !== browser) {
-    context = await McpContext.from(browser, logger, {
-      experimentalDevToolsDebugging: devtools,
-      experimentalIncludeAllPages: args.experimentalIncludeAllPages,
-    });
+  if (!args.noLaunch) {
+    const browser =
+      args.browserUrl || args.wsEndpoint
+        ? await ensureBrowserConnected({
+            browserURL: args.browserUrl,
+            wsEndpoint: args.wsEndpoint,
+            wsHeaders: args.wsHeaders,
+            devtools,
+          })
+        : await ensureBrowserLaunched({
+            headless: args.headless,
+            executablePath: args.executablePath,
+            channel: args.channel as Channel,
+            isolated: args.isolated,
+            logFile,
+            viewport: args.viewport,
+            args: extraArgs,
+            acceptInsecureCerts: args.acceptInsecureCerts,
+            devtools,
+          });
+
+    if (context?.browser !== browser) {
+      context = await McpContext.from(browser, logger, {
+        experimentalDevToolsDebugging: devtools,
+        experimentalIncludeAllPages: args.experimentalIncludeAllPages,
+      });
+      setContextInstance(context);
+    }
   }
+
+  if (!context) {
+    throw new Error(
+      'Failed to initialize browser context. This should not happen.',
+    );
+  }
+
   return context;
 }
 
@@ -180,6 +196,7 @@ const tools = [
   ...Object.values(screenshotTools),
   ...Object.values(scriptTools),
   ...Object.values(snapshotTools),
+  ...Object.values(switchBrowserTool),
 ] as ToolDefinition[];
 
 tools.sort((a, b) => {
