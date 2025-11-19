@@ -35,7 +35,7 @@ import type {ToolDefinition} from './tools/ToolDefinition.js';
 
 // If moved update release-please config
 // x-release-please-start-version
-const VERSION = '0.10.1';
+const VERSION = '0.10.2';
 // x-release-please-end
 
 export const args = parseArguments(VERSION);
