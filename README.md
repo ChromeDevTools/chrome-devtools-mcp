@@ -206,6 +206,23 @@ Or, from the IDE **Activity Bar** > `Kiro` > `MCP Servers` > `Click Open MCP Con
 </details>
 
 <details>
+<summary>Openhands</summary>
+
+In the agent_settings.json in your `.openhands` folder add to the "mcpServers":  
+```
+"chrome-devtools": {
+  "command": "npx",
+  "args": [
+    "-y",
+    "chrome-devtools-mcp@latest",
+    "--headless=true",
+    "--isolated=true"
+  ]
+}
+```
+</details>
+
+<details>
   <summary>Qoder</summary>
 
 In **Qoder Settings**, go to `MCP Server` > `+ Add` > Use the configuration snippet provided above.
