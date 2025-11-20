@@ -163,9 +163,9 @@ export const cliOptions = {
   screenshotFormat: {
     type: 'string',
     describe:
-      'Default image format for screenshots. Options: png, jpeg, webp. Default is png.',
+      'Default image format for screenshots. Options: png, jpeg, webp. Default is jpeg.',
     choices: ['png', 'jpeg', 'webp'] as const,
-    default: 'png',
+    default: 'jpeg',
   },
 } satisfies Record<string, YargsOptions>;
 
