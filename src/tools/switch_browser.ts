@@ -14,9 +14,15 @@ import {defineTool} from './ToolDefinition.js';
 
 async function convertHttpToBrowserUrl(
   url: string,
+  timeout: number = 10000,
 ): Promise<string | undefined> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeout);
+
   try {
-    const response = await fetch(`${url}/json/version`);
+    const response = await fetch(`${url}/json/version`, {
+      signal: controller.signal,
+    });
     if (!response.ok) {
       throw new Error(`Failed to fetch browser info: ${response.statusText}`);
     }
@@ -24,9 +30,19 @@ async function convertHttpToBrowserUrl(
     return data.webSocketDebuggerUrl;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+
+    // Provide clearer error message for timeout/abort
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error(
+        `Connection timeout: Could not reach browser at ${url} within ${timeout}ms. Make sure the browser is running and accessible.`,
+      );
+    }
+
     throw new Error(
       `Could not connect to browser at ${url}: ${message}. Make sure the browser is running and the URL is correct.`,
     );
+  } finally {
+    clearTimeout(timeoutId);
   }
 }
 
@@ -73,7 +89,7 @@ export const switchBrowser = defineTool({
       response.appendResponseLine(
         `Fetching WebSocket endpoint from browser at ${url}...`,
       );
-      wsEndpoint = await convertHttpToBrowserUrl(url);
+      wsEndpoint = await convertHttpToBrowserUrl(url, timeout);
       response.appendResponseLine(`Resolved WebSocket endpoint: ${wsEndpoint}`);
       browserURL = url;
     } else {

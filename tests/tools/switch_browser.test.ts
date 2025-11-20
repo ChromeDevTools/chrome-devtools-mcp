@@ -369,4 +369,71 @@ describe('switch_browser', () => {
       }
     }
   });
+
+  it('respects timeout parameter for HTTP fetch and fails quickly', async () => {
+    const browser = await puppeteer.launch({
+      executablePath: executablePath(),
+      headless: true,
+    });
+
+    try {
+      await browser.newPage();
+      const context = await McpContext.from(
+        browser,
+        logger('test'),
+        {
+          experimentalDevToolsDebugging: false,
+        },
+        Locator,
+      );
+      const response = new McpResponse();
+
+      setBrowser(browser);
+      setContextInstance(context);
+
+      // Use a non-routable IP address (TEST-NET-1, should timeout not error immediately)
+      // and a very short timeout to verify fetch timeout works
+      const httpUrl = 'http://192.0.2.1:9222';
+      const shortTimeout = 500; // 500ms
+
+      const startTime = Date.now();
+
+      try {
+        await switchBrowser.handler(
+          {params: {url: httpUrl, timeout: shortTimeout}},
+          response,
+          context,
+        );
+        assert.fail('Should have thrown a timeout error');
+      } catch (error) {
+        const elapsed = Date.now() - startTime;
+
+        assert.ok(error instanceof Error);
+
+        // Should fail within reasonable time (timeout + small buffer)
+        // Not strict assertion since network behavior varies
+        assert.ok(
+          elapsed < shortTimeout + 1000,
+          `Should timeout quickly, took ${elapsed}ms`,
+        );
+
+        // Check for timeout-related error message
+        const hasTimeoutMessage =
+          error.message.includes('Connection timeout') ||
+          error.message.includes('Could not connect to browser at');
+
+        assert.ok(
+          hasTimeoutMessage,
+          `Error should mention timeout, got: ${error.message}`,
+        );
+      }
+
+      // Browser was closed by disconnectBrowser
+      context.dispose();
+    } finally {
+      if (browser.connected) {
+        await browser.close();
+      }
+    }
+  });
 });

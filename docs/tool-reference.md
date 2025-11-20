@@ -183,6 +183,7 @@
 
 **Parameters:**
 
+- **timeout** (number) _(optional)_: Connection timeout in milliseconds. Defaults to 10000 (10 seconds). If the connection cannot be established within this time, an error will be thrown.
 - **url** (string) **(required)**: Browser connection URL. Can be an HTTP URL (e.g., http://127.0.0.1:9222) which will be auto-converted to WebSocket, or a direct WebSocket endpoint (e.g., ws://127.0.0.1:52862/devtools/browser/&lt;id&gt;).
 
 ---
