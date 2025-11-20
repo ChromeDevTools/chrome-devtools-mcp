@@ -86,6 +86,7 @@ async function getContext(): Promise<McpContext> {
     context = await McpContext.from(browser, logger, {
       experimentalDevToolsDebugging: devtools,
       experimentalIncludeAllPages: args.experimentalIncludeAllPages,
+      screenshotFormat: args.screenshotFormat as 'png' | 'jpeg' | 'webp',
     });
   }
   return context;

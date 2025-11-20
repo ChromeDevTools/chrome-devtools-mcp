@@ -22,8 +22,8 @@ export const screenshot = defineTool({
   schema: {
     format: zod
       .enum(['png', 'jpeg', 'webp'])
-      .default('png')
-      .describe('Type of format to save the screenshot as. Default is "png"'),
+      .optional()
+      .describe('Type of format to save the screenshot as. If not specified, uses the configured default format.'),
     quality: zod
       .number()
       .min(0)
@@ -63,8 +63,11 @@ export const screenshot = defineTool({
       pageOrHandle = context.getSelectedPage();
     }
 
+    // Use configured default format if not specified in request
+    const format = request.params.format ?? context.getDefaultScreenshotFormat();
+
     const screenshot = await pageOrHandle.screenshot({
-      type: request.params.format,
+      type: format,
       fullPage: request.params.fullPage,
       quality: request.params.quality,
       optimizeForSpeed: true, // Bonus: optimize encoding for speed
@@ -87,6 +90,7 @@ export const screenshot = defineTool({
     // Detect the actual format of the screenshot data
     // Puppeteer may not always return the requested format
     const actualFormat = detectImageFormat(screenshot);
+    console.error(`[DEBUG] Requested format: ${format}, Detected format: ${actualFormat}`);
 
     if (request.params.filePath) {
       const file = await context.saveFile(screenshot, request.params.filePath);

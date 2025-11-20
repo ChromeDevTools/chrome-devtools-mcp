@@ -120,6 +120,10 @@ export type Context = Readonly<{
    * Returns a reqid for a cdpRequestId.
    */
   resolveCdpElementId(cdpBackendNodeId: number): string | undefined;
+  /**
+   * Returns the configured default screenshot format.
+   */
+  getDefaultScreenshotFormat(): 'png' | 'jpeg' | 'webp';
 }>;
 
 export function defineTool<Schema extends zod.ZodRawShape>(
