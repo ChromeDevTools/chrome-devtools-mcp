@@ -13,6 +13,7 @@ import {
   getContext as getContextInstance,
   setContextInstance,
 } from './context.js';
+import {features} from './features.js';
 import {loadIssueDescriptions} from './issue-descriptions.js';
 import {logger, saveLogsToFile} from './logger.js';
 import {McpContext} from './McpContext.js';
@@ -207,7 +208,9 @@ for (const tool of tools) {
   registerTool(tool);
 }
 
-await loadIssueDescriptions();
+if (features.issues) {
+  await loadIssueDescriptions();
+}
 const transport = new StdioServerTransport();
 await server.connect(transport);
 logger('Chrome DevTools MCP Server connected');

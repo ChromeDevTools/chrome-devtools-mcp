@@ -16,6 +16,7 @@ import {
 } from '../node_modules/chrome-devtools-frontend/mcp/mcp.js';
 
 import {FakeIssuesManager} from './DevtoolsUtils.js';
+import {features} from './features.js';
 import {logger} from './logger.js';
 import type {
   CDPSession,
@@ -231,6 +232,9 @@ export class ConsoleCollector extends PageCollector<
 
   override addPage(page: Page): void {
     super.addPage(page);
+    if (!features.issues) {
+      return;
+    }
     if (!this.#subscribedPages.has(page)) {
       const subscriber = new PageIssueSubscriber(page);
       this.#subscribedPages.set(page, subscriber);

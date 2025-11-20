@@ -64,6 +64,28 @@ amp mcp add chrome-devtools -- npx chrome-devtools-mcp@latest
 </details>
 
 <details>
+  <summary>Antigravity</summary>
+
+To use the Chrome DevTools MCP server, disable the built-in browser in the settings and add the following config to ` ~/.gemini/antigravity/mcp_config.json`:
+
+```bash
+{
+  "mcpServers": {
+    "chrome-devtools": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "chrome-devtools-mcp@latest",
+        "-y"
+      ]
+    }
+  }
+}
+```
+
+</details>
+
+<details>
   <summary>Claude Code</summary>
     Use the Claude Code CLI to add the Chrome DevTools MCP server (<a href="https://docs.anthropic.com/en/docs/claude-code/mcp">guide</a>):
 

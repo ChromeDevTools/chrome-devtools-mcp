@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {features} from '../features.js';
 import {zod} from '../third_party/index.js';
 import type {ConsoleMessageType} from '../third_party/index.js';
 
@@ -11,7 +12,7 @@ import {ToolCategory} from './categories.js';
 import {defineTool} from './ToolDefinition.js';
 type ConsoleResponseType = ConsoleMessageType | 'issue';
 
-const FILTERABLE_MESSAGE_TYPES: readonly [
+const FILTERABLE_MESSAGE_TYPES: [
   ConsoleResponseType,
   ...ConsoleResponseType[],
 ] = [
@@ -36,6 +37,10 @@ const FILTERABLE_MESSAGE_TYPES: readonly [
   'verbose',
   'issue',
 ];
+
+if (features.issues) {
+  FILTERABLE_MESSAGE_TYPES.push('issue');
+}
 
 export const listConsoleMessages = defineTool({
   name: 'list_console_messages',

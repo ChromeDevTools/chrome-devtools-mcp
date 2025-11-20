@@ -28,6 +28,7 @@
     "tests/**/*.ts",
     "node_modules/chrome-devtools-frontend/front_end/core/common",
     "node_modules/chrome-devtools-frontend/front_end/core/host",
+    "node_modules/chrome-devtools-frontend/front_end/core/i18n",
     "node_modules/chrome-devtools-frontend/front_end/core/platform",
     "node_modules/chrome-devtools-frontend/front_end/core/protocol_client",
     "node_modules/chrome-devtools-frontend/front_end/core/root",
@@ -57,14 +58,13 @@
     "node_modules/chrome-devtools-frontend/front_end/models/trace",
     "node_modules/chrome-devtools-frontend/front_end/models/workspace",
     "node_modules/chrome-devtools-frontend/front_end/panels/issues/IssueAggregator.ts",
+    "node_modules/chrome-devtools-frontend/front_end/third_party/i18n",
+    "node_modules/chrome-devtools-frontend/front_end/third_party/intl-messageformat",
     "node_modules/chrome-devtools-frontend/front_end/third_party/legacy-javascript",
     "node_modules/chrome-devtools-frontend/front_end/third_party/marked",
     "node_modules/chrome-devtools-frontend/front_end/third_party/source-map-scopes-codec",
     "node_modules/chrome-devtools-frontend/front_end/third_party/third-party-web",
-    "node_modules/chrome-devtools-frontend/mcp/mcp.ts",
-    "node_modules/chrome-devtools-frontend/front_end/models/issues_manager",
-    "node_modules/chrome-devtools-frontend/front_end/third_party/marked",
-    "node_modules/chrome-devtools-frontend/front_end/panels/issues/IssueAggregator.ts"
+    "node_modules/chrome-devtools-frontend/mcp/mcp.ts"
   ],
   "exclude": ["node_modules/chrome-devtools-frontend/**/*.test.ts"]
 }
