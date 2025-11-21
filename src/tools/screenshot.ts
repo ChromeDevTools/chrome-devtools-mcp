@@ -21,8 +21,8 @@ export const screenshot = defineTool({
   schema: {
     format: zod
       .enum(['png', 'jpeg', 'webp'])
-      .default('png')
-      .describe('Type of format to save the screenshot as. Default is "png"'),
+      .optional()
+      .describe('Type of format to save the screenshot as. If not specified, uses the configured default format.'),
     quality: zod
       .number()
       .min(0)
@@ -62,8 +62,11 @@ export const screenshot = defineTool({
       pageOrHandle = context.getSelectedPage();
     }
 
+    // Use configured default format if not specified in request
+    const format = request.params.format ?? context.getDefaultScreenshotFormat();
+
     const screenshot = await pageOrHandle.screenshot({
-      type: request.params.format,
+      type: format,
       fullPage: request.params.fullPage,
       quality: request.params.quality,
       optimizeForSpeed: true, // Bonus: optimize encoding for speed
@@ -89,12 +92,12 @@ export const screenshot = defineTool({
     } else if (screenshot.length >= 2_000_000) {
       const {filename} = await context.saveTemporaryFile(
         screenshot,
-        `image/${request.params.format}`,
+        `image/${format}`,
       );
       response.appendResponseLine(`Saved screenshot to ${filename}.`);
     } else {
       response.attachImage({
-        mimeType: `image/${request.params.format}`,
+        mimeType: `image/${format}`,
         data: Buffer.from(screenshot).toString('base64'),
       });
     }
