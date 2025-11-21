@@ -30,6 +30,25 @@ describe('screenshot', () => {
         );
       });
     });
+    it('ignores quality', async () => {
+      await withBrowser(async (response, context) => {
+        const fixture = screenshots.basic;
+        const page = context.getSelectedPage();
+        await page.setContent(fixture.html);
+        await screenshot.handler(
+          {params: {format: 'png', quality: 0}},
+          response,
+          context,
+        );
+
+        assert.equal(response.images.length, 1);
+        assert.equal(response.images[0].mimeType, 'image/png');
+        assert.equal(
+          response.responseLines.at(0),
+          "Took a screenshot of the current page's viewport.",
+        );
+      });
+    });
     it('with jpeg', async () => {
       await withBrowser(async (response, context) => {
         await screenshot.handler({params: {format: 'jpeg'}}, response, context);
