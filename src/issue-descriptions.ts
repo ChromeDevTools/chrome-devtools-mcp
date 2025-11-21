@@ -47,3 +47,8 @@ export async function loadIssueDescriptions(): Promise<void> {
 export function getIssueDescription(fileName: string): string | null {
   return issueDescriptions[fileName] ?? null;
 }
+
+export const ISSUE_UTILS = {
+  loadIssueDescriptions,
+  getIssueDescription,
+};

@@ -129,6 +129,12 @@ describe('console', () => {
   });
 
   describe('get_console_message', () => {
+    beforeEach(() => {
+      setIssuesEnabled(true);
+    });
+    afterEach(() => {
+      setIssuesEnabled(false);
+    });
     it('gets a specific console message', async () => {
       await withBrowser(async (response, context) => {
         const page = await context.newPage();
@@ -147,6 +153,32 @@ describe('console', () => {
         assert.ok(
           textContent.text.includes('msgid=1 [error] This is an error'),
           'Should contain console message body',
+        );
+      });
+    });
+
+    it('lists issues', async () => {
+      await withBrowser(async (response, context) => {
+        const page = await context.newPage();
+        const issuePromise = new Promise<void>(resolve => {
+          page.once('issue', () => {
+            resolve();
+          });
+        });
+        await page.setContent('<input type="text" name="username" />');
+        await issuePromise;
+        await listConsoleMessages.handler({params: {}}, response, context);
+        await getConsoleMessage.handler(
+          {params: {msgid: 1}},
+          response,
+          context,
+        );
+        const formattedResponse = await response.handle('test', context);
+        const textContent = formattedResponse[0] as {text: string};
+        assert.ok(
+          textContent.text.includes(
+            "Message: issue> An element doesn't have an autocomplete attribute",
+          ),
         );
       });
     });

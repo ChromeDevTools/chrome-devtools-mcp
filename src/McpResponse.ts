@@ -256,6 +256,12 @@ export class McpResponse implements Response {
             }),
           ),
         };
+      } else if (message instanceof AggregatedIssue) {
+        const result = mapIssuesMessage(message);
+        consoleData = {
+          consoleMessageStableId,
+          ...result,
+        };
       } else {
         consoleData = {
           consoleMessageStableId,
@@ -309,29 +315,10 @@ export class McpResponse implements Response {
               };
             }
             if (item instanceof AggregatedIssue) {
-              const count = item.getAggregatedIssuesCount();
-              const filename = item.getDescription()?.file;
-              const rawMarkdown = filename
-                ? getIssueDescription(filename)
-                : null;
-              if (!rawMarkdown) {
-                logger(`no markdown ${filename} found for issue:` + item.code);
-                return null;
-              }
-              const markdownAst = Marked.Marked.lexer(rawMarkdown);
-              const title =
-                MarkdownIssueDescription.findTitleFromMarkdownAst(markdownAst);
-              if (!title) {
-                logger('cannot read issue title from ' + filename);
-                return null;
-              }
+              const message = mapIssuesMessage(item);
               return {
                 consoleMessageStableId,
-                type: 'issue',
-                item,
-                message: title,
-                count,
-                args: [],
+                ...message,
               };
             }
             return {
@@ -585,4 +572,38 @@ Call ${handleDialog.name} to handle it before continuing.`);
   resetResponseLineForTesting() {
     this.#textResponseLines = [];
   }
+}
+
+function mapIssuesMessage(
+  message: AggregatedIssue,
+): Omit<ConsoleMessageData, 'consoleMessageStableId'> | null {
+  const count = message.getAggregatedIssuesCount();
+  const markdownDescription = message.getDescription();
+  const filename = markdownDescription?.file;
+  if (!markdownDescription) {
+    logger(`no description found for issue:` + message.code);
+    return null;
+  }
+  const rawMarkdown = filename ? getIssueDescription(filename) : null;
+  if (!rawMarkdown) {
+    logger(`no markdown ${filename} found for issue:` + message.code);
+    return null;
+  }
+  const processedMarkdown = MarkdownIssueDescription.substitutePlaceholders(
+    rawMarkdown,
+    markdownDescription.substitutions,
+  );
+  const markdownAst = Marked.Marked.lexer(processedMarkdown);
+  const title = MarkdownIssueDescription.findTitleFromMarkdownAst(markdownAst);
+  if (!title) {
+    logger('cannot read issue title from ' + filename);
+    return null;
+  }
+  return {
+    type: 'issue',
+    item: message,
+    message: title,
+    count,
+    args: [],
+  };
 }

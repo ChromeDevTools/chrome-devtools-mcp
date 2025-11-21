@@ -199,8 +199,13 @@ export class McpContext implements Context {
       this.logger('no cdpBackendNodeId');
       return;
     }
+    if (this.#textSnapshot === null)
+      throw new Error(
+        "The snapshot is not defined, can't resolve backendNodeId: " +
+          cdpBackendNodeId,
+      );
     // TODO: index by backendNodeId instead.
-    const queue = [this.#textSnapshot?.root];
+    const queue = [this.#textSnapshot.root];
     while (queue.length) {
       const current = queue.pop()!;
       if (current.backendNodeId === cdpBackendNodeId) {

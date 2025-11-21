@@ -4,6 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {
+  AggregatedIssue,
+  MarkdownIssueDescription,
+} from '../../node_modules/chrome-devtools-frontend/mcp/mcp.js';
+import {ISSUE_UTILS} from '../issue-descriptions.js';
+
 export interface ConsoleMessageData {
   consoleMessageStableId: number;
   type?: string;
@@ -34,12 +40,19 @@ function getArgs(msg: ConsoleMessageData) {
 
 // The verbose format for a console message, including all details.
 export function formatConsoleEventVerbose(msg: ConsoleMessageData): string {
+  if (msg.item instanceof AggregatedIssue) {
+    const result = [
+      `ID: ${msg.consoleMessageStableId}`,
+      `Message: ${msg.type}> ${formatIssue(msg.item)}`,
+    ];
+    return result.join('\n');
+  }
+
   const result = [
     `ID: ${msg.consoleMessageStableId}`,
     `Message: ${msg.type}> ${msg.message}`,
     formatArgs(msg),
   ].filter(line => !!line);
-
   return result.join('\n');
 }
 
@@ -58,6 +71,39 @@ function formatArgs(consoleData: ConsoleMessageData): string {
 
   for (const [key, arg] of args.entries()) {
     result.push(`Arg #${key}: ${formatArg(arg)}`);
+  }
+
+  return result.join('\n');
+}
+
+export function formatIssue(issue: AggregatedIssue): string {
+  const markdownDescription = issue.getDescription();
+  const filename = markdownDescription?.file;
+  const rawMarkdown = filename
+    ? ISSUE_UTILS.getIssueDescription(filename)
+    : null;
+  if (!markdownDescription || !rawMarkdown) {
+    throw new Error('Error parsing issue description ' + issue.code());
+  }
+  let processedMarkdown = MarkdownIssueDescription.substitutePlaceholders(
+    rawMarkdown,
+    markdownDescription.substitutions,
+  );
+
+  processedMarkdown = processedMarkdown.trim();
+  // Remove heading in order not to conflict with the result response markdown
+  if (processedMarkdown.startsWith('# ')) {
+    processedMarkdown = processedMarkdown.substring(2).trimStart();
+  }
+
+  const result: string[] = [processedMarkdown];
+  const links = markdownDescription.links;
+
+  if (links.length > 0) {
+    result.push('Learn more:');
+    for (const link of links) {
+      result.push(`[${link.linkTitle}](${link.link})`);
+    }
   }
 
   return result.join('\n');
