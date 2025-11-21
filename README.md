@@ -384,10 +384,10 @@ The Chrome DevTools MCP server supports the following configuration option:
   - **Default:** `true`
 
 - **`--screenshot-format`**
-  Default image format for screenshots. Options: png, jpeg, webp. Default is jpeg.
+  Default image format for screenshots. Options: png, jpeg, webp. Default is png.
   - **Type:** string
   - **Choices:** `png`, `jpeg`, `webp`
-  - **Default:** `jpeg`
+  - **Default:** `png`
 
 <!-- END AUTO GENERATED OPTIONS -->
 
@@ -432,7 +432,7 @@ To get the WebSocket endpoint from a running Chrome instance, visit `http://127.
 
 ### Configuring default screenshot format
 
-You can set a default image format for all screenshots using the `--screenshot-format` option. The default is JPEG. You can change it to PNG or WebP if needed:
+You can set a default image format for all screenshots using the `--screenshot-format` option. The default is PNG. You can change it to JPEG or WebP if needed:
 
 ```json
 {
@@ -441,7 +441,7 @@ You can set a default image format for all screenshots using the `--screenshot-f
       "command": "npx",
       "args": [
         "chrome-devtools-mcp@latest",
-        "--screenshot-format=png"
+        "--screenshot-format=jpeg"
       ]
     }
   }
@@ -451,7 +451,10 @@ You can set a default image format for all screenshots using the `--screenshot-f
 When configured, the `take_screenshot` tool will use this format by default unless explicitly overridden by passing a `format` parameter. Supported formats are `png`, `jpeg`, and `webp`.
 
 > [!TIP]
-> JPEG is the default format as it typically produces smaller file sizes than PNG, which improves performance when working with screenshots. WebP offers the best compression while maintaining quality. Use PNG if you need lossless screenshots.
+> PNG is the default format as it provides lossless screenshots. JPEG typically produces smaller file sizes than PNG, which improves performance when working with screenshots. WebP offers the best compression while maintaining quality.
+
+> [!NOTE]
+> **Claude Code users**: If you experience issues with screenshots not displaying correctly, explicitly pass `jpeg` as the format parameter in all `take_screenshot()` calls until the issue is resolved on Claude Code's side. For example: `take_screenshot(format="jpeg")`.
 
 You can also run `npx chrome-devtools-mcp@latest --help` to see all available configuration options.
 

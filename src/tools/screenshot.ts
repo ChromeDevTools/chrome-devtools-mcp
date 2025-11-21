@@ -7,7 +7,6 @@
 import {zod} from '../third_party/index.js';
 import type {ElementHandle, Page} from '../third_party/index.js';
 
-import {detectImageFormat} from '../utils/imageFormat.js';
 import {ToolCategory} from './categories.js';
 import {defineTool} from './ToolDefinition.js';
 
@@ -87,23 +86,18 @@ export const screenshot = defineTool({
       );
     }
 
-    // Detect the actual format of the screenshot data
-    // Puppeteer may not always return the requested format
-    const actualFormat = detectImageFormat(screenshot);
-    console.error(`[DEBUG] Requested format: ${format}, Detected format: ${actualFormat}`);
-
     if (request.params.filePath) {
       const file = await context.saveFile(screenshot, request.params.filePath);
       response.appendResponseLine(`Saved screenshot to ${file.filename}.`);
     } else if (screenshot.length >= 2_000_000) {
       const {filename} = await context.saveTemporaryFile(
         screenshot,
-        actualFormat,
+        `image/${format}`,
       );
       response.appendResponseLine(`Saved screenshot to ${filename}.`);
     } else {
       response.attachImage({
-        mimeType: actualFormat,
+        mimeType: `image/${format}`,
         data: Buffer.from(screenshot).toString('base64'),
       });
     }
