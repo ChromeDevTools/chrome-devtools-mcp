@@ -49,6 +49,8 @@ interface McpContextOptions {
   experimentalDevToolsDebugging: boolean;
   // Whether all page-like targets are exposed as pages.
   experimentalIncludeAllPages?: boolean;
+  // Default screenshot format.
+  screenshotFormat?: 'png' | 'jpeg' | 'webp';
 }
 
 const DEFAULT_TIMEOUT = 5_000;
@@ -290,6 +292,10 @@ export class McpContext implements Context {
 
   clearDialog(): void {
     this.#dialog = undefined;
+  }
+
+  getDefaultScreenshotFormat(): 'png' | 'jpeg' | 'webp' {
+    return this.#options.screenshotFormat ?? 'png';
   }
 
   getSelectedPage(): Page {

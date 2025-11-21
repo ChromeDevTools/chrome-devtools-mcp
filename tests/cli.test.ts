@@ -16,6 +16,8 @@ describe('cli args parsing', () => {
     categoryPerformance: true,
     'category-network': true,
     categoryNetwork: true,
+    'screenshot-format': 'png',
+    screenshotFormat: 'png',
   };
 
   it('parses with default args', async () => {
