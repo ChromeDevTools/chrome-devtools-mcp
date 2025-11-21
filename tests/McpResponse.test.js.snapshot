@@ -88,7 +88,7 @@ exports[`McpResponse > list pages 1`] = `
 
 exports[`McpResponse > returns correctly formatted snapshot for a simple tree 1`] = `
 # test response
-## Page content
+## Latest page snapshot
 uid=1_0 RootWebArea "My test page" url="about:blank"
   uid=1_1 button "Click me" focusable focused
   uid=1_2 textbox value="Input"
@@ -97,7 +97,7 @@ uid=1_0 RootWebArea "My test page" url="about:blank"
 
 exports[`McpResponse > returns values for textboxes 1`] = `
 # test response
-## Page content
+## Latest page snapshot
 uid=1_0 RootWebArea "My test page" url="about:blank"
   uid=1_1 StaticText "username"
   uid=1_2 textbox "username" focusable focused value="mcp"
@@ -106,7 +106,7 @@ uid=1_0 RootWebArea "My test page" url="about:blank"
 
 exports[`McpResponse > returns verbose snapshot 1`] = `
 # test response
-## Page content
+## Latest page snapshot
 uid=1_0 RootWebArea "My test page" url="about:blank"
   uid=1_1 ignored
     uid=1_2 ignored
@@ -118,7 +118,7 @@ uid=1_0 RootWebArea "My test page" url="about:blank"
 
 exports[`McpResponse > saves snapshot to file 1`] = `
 # test response
-## Page content
+## Latest page snapshot
 Saved snapshot to <file>
 `;
 

@@ -408,7 +408,7 @@ Call ${handleDialog.name} to handle it before continuing.`);
     }
 
     if (data.formattedSnapshot) {
-      response.push('## Page content');
+      response.push('## Latest page snapshot');
       response.push(data.formattedSnapshot);
     }
 
