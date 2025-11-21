@@ -16,6 +16,8 @@ describe('cli args parsing', () => {
     categoryPerformance: true,
     'category-network': true,
     categoryNetwork: true,
+    'no-launch': false,
+    noLaunch: false,
   };
 
   it('parses with default args', async () => {
@@ -196,6 +198,50 @@ describe('cli args parsing', () => {
       channel: 'stable',
       'category-emulation': false,
       categoryEmulation: false,
+    });
+  });
+
+  it('parses noLaunch flag', async () => {
+    const args = parseArguments('1.0.0', ['node', 'main.js', '--noLaunch']);
+    assert.deepStrictEqual(args, {
+      ...defaultArgs,
+      _: [],
+      headless: false,
+      isolated: false,
+      $0: 'npx chrome-devtools-mcp@latest',
+      'no-launch': true,
+      noLaunch: true,
+    });
+  });
+
+  it('noLaunch prevents channel default when no connection options provided', async () => {
+    const args = parseArguments('1.0.0', ['node', 'main.js', '--noLaunch']);
+    // When noLaunch is true and no connection options are provided,
+    // channel should not be defaulted to 'stable'
+    assert.strictEqual(args.noLaunch, true);
+    // The channel should not be set when noLaunch is true
+    assert.strictEqual(args.channel, undefined);
+  });
+
+  it('noLaunch with browserUrl', async () => {
+    const args = parseArguments('1.0.0', [
+      'node',
+      'main.js',
+      '--noLaunch',
+      '--browserUrl',
+      'http://localhost:9222',
+    ]);
+    assert.deepStrictEqual(args, {
+      ...defaultArgs,
+      _: [],
+      headless: false,
+      isolated: false,
+      $0: 'npx chrome-devtools-mcp@latest',
+      'no-launch': true,
+      noLaunch: true,
+      'browser-url': 'http://localhost:9222',
+      browserUrl: 'http://localhost:9222',
+      u: 'http://localhost:9222',
     });
   });
 });

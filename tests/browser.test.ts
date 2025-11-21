@@ -10,7 +10,12 @@ import {describe, it} from 'node:test';
 
 import {executablePath} from 'puppeteer';
 
-import {launch} from '../src/browser.js';
+import {
+  launch,
+  disconnectBrowser,
+  getBrowser,
+  setBrowser,
+} from '../src/browser.js';
 
 describe('browser', () => {
   it('cannot launch multiple times with the same profile', async () => {
@@ -71,5 +76,39 @@ describe('browser', () => {
     } finally {
       await browser.close();
     }
+  });
+
+  it('disconnectBrowser closes connected browser', async () => {
+    const tmpDir = os.tmpdir();
+    const folderPath = path.join(tmpDir, `temp-folder-${crypto.randomUUID()}`);
+    const browser = await launch({
+      headless: true,
+      isolated: false,
+      userDataDir: folderPath,
+      executablePath: executablePath(),
+      devtools: false,
+    });
+
+    // Set the browser as the module-level browser
+    setBrowser(browser);
+
+    assert.ok(browser.connected);
+    assert.strictEqual(getBrowser(), browser);
+
+    await disconnectBrowser();
+
+    assert.ok(!browser.connected);
+    assert.strictEqual(getBrowser(), undefined);
+  });
+
+  it('disconnectBrowser handles no browser gracefully', async () => {
+    // Ensure no browser is set
+    setBrowser(undefined);
+    assert.strictEqual(getBrowser(), undefined);
+
+    // Should not throw
+    await disconnectBrowser();
+
+    assert.strictEqual(getBrowser(), undefined);
   });
 });
