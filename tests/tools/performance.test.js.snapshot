@@ -109,7 +109,7 @@ Information on performance traces may contain main thread activity represented a
 
 Each call frame is presented in the following format:
 
-'id;eventKey;name;duration;selfTime;urlIndex;childRange;[S]'
+'id;eventKey;name;duration;selfTime;urlIndex;childRange;[line];[column];[S]'
 
 Key definitions:
 
@@ -120,15 +120,17 @@ Key definitions:
 * selfTime: The time spent directly within the call frame, excluding its children's execution.
 * urlIndex: Index referencing the "All URLs" list. Empty if no specific script URL is associated.
 * childRange: Specifies the direct children of this node using their IDs. If empty ('' or 'S' at the end), the node has no children. If a single number (e.g., '4'), the node has one child with that ID. If in the format 'firstId-lastId' (e.g., '4-5'), it indicates a consecutive range of child IDs from 'firstId' to 'lastId', inclusive.
+* line: An optional field for a call frame's line number. This is where the function is defined.
+* column: An optional field for a call frame's column number. This is where the function is defined.
 * S: _Optional_. The letter 'S' terminates the line if that call frame was selected by the user.
 
 Example Call Tree:
 
-1;r-123;main;500;100;;
-2;r-124;update;200;50;;3
-3;p-49575-15428179-2834-374;animate;150;20;0;4-5;S
-4;p-49575-15428179-3505-1162;calculatePosition;80;80;;
-5;p-49575-15428179-5391-2767;applyStyles;50;50;;
+1;r-123;main;500;100;0;1;;
+2;r-124;update;200;50;;3;0;1;
+3;p-49575-15428179-2834-374;animate;150;20;0;4-5;0;1;S
+4;p-49575-15428179-3505-1162;calculatePosition;80;80;0;1;;
+5;p-49575-15428179-5391-2767;applyStyles;50;50;0;1;;
 
 
 Network requests are formatted like this:
