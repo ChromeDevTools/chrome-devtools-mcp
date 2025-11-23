@@ -163,7 +163,7 @@ export const cliOptions = {
   screenshotFormat: {
     type: 'string',
     describe:
-      'Default image format for screenshots. Options: png, jpeg, webp. Default is png.',
+      'Default image format for screenshots taken by take_screenshot when no format parameter is provided. Options: png, jpeg, webp. Default is png.',
     choices: ['png', 'jpeg', 'webp'] as const,
     default: 'png',
   },

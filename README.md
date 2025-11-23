@@ -430,37 +430,7 @@ You can connect directly to a Chrome WebSocket endpoint and include custom heade
 
 To get the WebSocket endpoint from a running Chrome instance, visit `http://127.0.0.1:9222/json/version` and look for the `webSocketDebuggerUrl` field.
 
-### Configuring default screenshot format
-
-You can set a default image format for all screenshots using the `--screenshot-format` option. The default is PNG. You can change it to JPEG or WebP if needed:
-
-```json
-{
-  "mcpServers": {
-    "chrome-devtools": {
-      "command": "npx",
-      "args": [
-        "chrome-devtools-mcp@latest",
-        "--screenshot-format=jpeg"
-      ]
-    }
-  }
-}
-```
-
-When configured, the `take_screenshot` tool will use this format by default unless explicitly overridden by passing a `format` parameter. Supported formats are `png`, `jpeg`, and `webp`.
-
-> [!TIP]
-> PNG is the default format as it provides lossless screenshots. JPEG typically produces smaller file sizes than PNG, which improves performance when working with screenshots. WebP offers the best compression while maintaining quality.
-
-> [!NOTE]
-> **Claude Code users**: If you experience issues with screenshots not displaying correctly, you can work around this by:
-> 1. Setting the default format to JPEG in your configuration (recommended): Add `--screenshot-format=jpeg` to your MCP server args
-> 2. Explicitly passing `jpeg` as the format parameter in all `take_screenshot()` calls: `take_screenshot(format="jpeg")`
->
-> This workaround is needed until the issue is resolved on Claude Code's side.
-
-You can also run `npx chrome-devtools-mcp@latest --help` to see all available configuration options.
+You can run `npx chrome-devtools-mcp@latest --help` to see all available configuration options.
 
 ## Concepts
 

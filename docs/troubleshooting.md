@@ -38,3 +38,12 @@ ssh -N -L 127.0.0.1:9222:127.0.0.1:9222 <user>@<host-ip>
 
 Point the MCP connection inside the VM to `http://127.0.0.1:9222` and DevTools
 will reach the host browser without triggering the Host validation.
+
+### Screenshots not displaying correctly in Claude Code
+
+If you experience issues with screenshots not displaying correctly in Claude Code, you can work around this by:
+
+1. Setting the default format to JPEG in your configuration (recommended): Add `--screenshot-format=jpeg` to your MCP server args
+2. Explicitly passing `jpeg` as the format parameter in all `take_screenshot()` calls: `take_screenshot(format="jpeg")`
+
+This workaround is needed until the issue is resolved on Claude Code's side.
