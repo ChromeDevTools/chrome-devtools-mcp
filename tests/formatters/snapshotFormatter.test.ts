@@ -148,4 +148,104 @@ describe('snapshotFormatter', () => {
 `,
     );
   });
+
+  it('formats with DevTools data not included into a snapshot', t => {
+    const node: TextSnapshotNode = {
+      id: '1_1',
+      role: 'checkbox',
+      name: 'checkbox',
+      checked: true,
+      children: [
+        {
+          id: '1_2',
+          role: 'statictext',
+          name: 'text',
+          children: [],
+          elementHandle: async (): Promise<ElementHandle<Element> | null> => {
+            return null;
+          },
+        },
+      ],
+      elementHandle: async (): Promise<ElementHandle<Element> | null> => {
+        return null;
+      },
+    };
+
+    const formatted = formatSnapshotNode(node, {
+      snapshotId: '1',
+      root: node,
+      idToNode: new Map(),
+      hasSelectedElement: true,
+      verbose: false,
+    });
+
+    t.assert.snapshot?.(formatted);
+  });
+
+  it('does not include a note if the snapshot is already verbose', t => {
+    const node: TextSnapshotNode = {
+      id: '1_1',
+      role: 'checkbox',
+      name: 'checkbox',
+      checked: true,
+      children: [
+        {
+          id: '1_2',
+          role: 'statictext',
+          name: 'text',
+          children: [],
+          elementHandle: async (): Promise<ElementHandle<Element> | null> => {
+            return null;
+          },
+        },
+      ],
+      elementHandle: async (): Promise<ElementHandle<Element> | null> => {
+        return null;
+      },
+    };
+
+    const formatted = formatSnapshotNode(node, {
+      snapshotId: '1',
+      root: node,
+      idToNode: new Map(),
+      hasSelectedElement: true,
+      verbose: true,
+    });
+
+    t.assert.snapshot?.(formatted);
+  });
+
+  it('formats with DevTools data included into a snapshot', t => {
+    const node: TextSnapshotNode = {
+      id: '1_1',
+      role: 'checkbox',
+      name: 'checkbox',
+      checked: true,
+      children: [
+        {
+          id: '1_2',
+          role: 'statictext',
+          name: 'text',
+          children: [],
+          elementHandle: async (): Promise<ElementHandle<Element> | null> => {
+            return null;
+          },
+        },
+      ],
+      elementHandle: async (): Promise<ElementHandle<Element> | null> => {
+        return null;
+      },
+    };
+
+    const formatted = formatSnapshotNode(node, {
+      snapshotId: '1',
+      root: node,
+      idToNode: new Map(),
+      hasSelectedElement: true,
+      selectedElementUid: '1_1',
+      verbose: false,
+    });
+
+    t.assert.snapshot?.(formatted);
+  });
 });

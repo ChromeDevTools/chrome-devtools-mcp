@@ -68,7 +68,7 @@ export const screenshot = defineTool({
     const screenshot = await pageOrHandle.screenshot({
       type: format,
       fullPage: request.params.fullPage,
-      quality: request.params.quality,
+      quality,
       optimizeForSpeed: true, // Bonus: optimize encoding for speed
     });
 
