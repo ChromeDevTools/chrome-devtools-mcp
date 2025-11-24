@@ -9,6 +9,7 @@ import {afterEach, before, beforeEach, describe, it} from 'node:test';
 
 import {setIssuesEnabled} from '../../src/features.js';
 import {loadIssueDescriptions} from '../../src/issue-descriptions.js';
+import {McpResponse} from '../../src/McpResponse.js';
 import {
   getConsoleMessage,
   listConsoleMessages,
@@ -129,12 +130,6 @@ describe('console', () => {
   });
 
   describe('get_console_message', () => {
-    beforeEach(() => {
-      setIssuesEnabled(true);
-    });
-    afterEach(() => {
-      setIssuesEnabled(false);
-    });
     it('gets a specific console message', async () => {
       await withBrowser(async (response, context) => {
         const page = await context.newPage();
@@ -165,7 +160,7 @@ describe('console', () => {
         setIssuesEnabled(false);
       });
 
-      it('lists issues', async () => {
+      it('gets issue details', async () => {
         await withBrowser(async (response, context) => {
           const page = await context.newPage();
           const issuePromise = new Promise<void>(resolve => {
@@ -176,18 +171,23 @@ describe('console', () => {
           await page.setContent('<input type="text" name="username" />');
           await issuePromise;
           await listConsoleMessages.handler({params: {}}, response, context);
+          const response2 = new McpResponse();
           await getConsoleMessage.handler(
             {params: {msgid: 1}},
-            response,
+            response2,
             context,
           );
-          const formattedResponse = await response.handle('test', context);
+          const formattedResponse = await response2.handle('test', context);
           const textContent = formattedResponse[0] as {text: string};
-          assert.ok(
-            textContent.text.includes(
-              "Message: issue> An element doesn't have an autocomplete attribute",
-            ),
-          );
+          const learnMoreLinks =
+            '[HTML attribute: autocomplete](https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/autocomplete#values)';
+          const detailsDescription =
+            "A form field has an `id` or `name` attribute that the browser's autofill recognizes. However, it doesn't have an `autocomplete` attribute assigned. This might prevent the browser from correctly autofilling the form.\n\nTo fix this issue, provide an `autocomplete` attribute.";
+          const title =
+            "Message: issue> An element doesn't have an autocomplete attribute";
+          assert.ok(textContent.text.includes(title));
+          assert.ok(textContent.text.includes(detailsDescription));
+          assert.ok(textContent.text.includes(learnMoreLinks));
         });
       });
     });
