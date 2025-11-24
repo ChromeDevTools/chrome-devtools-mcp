@@ -22,7 +22,9 @@ export const screenshot = defineTool({
     format: zod
       .enum(['png', 'jpeg', 'webp'])
       .optional()
-      .describe('Type of format to save the screenshot as. If not specified, uses the configured default format.'),
+      .describe(
+        'Type of format to save the screenshot as. If not specified, uses the configured default format.',
+      ),
     quality: zod
       .number()
       .min(0)
@@ -63,12 +65,13 @@ export const screenshot = defineTool({
     }
 
     // Use configured default format if not specified in request
-    const format = request.params.format ?? context.getDefaultScreenshotFormat();
+    const format =
+      request.params.format ?? context.getDefaultScreenshotFormat();
 
     const screenshot = await pageOrHandle.screenshot({
       type: format,
       fullPage: request.params.fullPage,
-      quality,
+      quality: request.params.quality,
       optimizeForSpeed: true, // Bonus: optimize encoding for speed
     });
 
