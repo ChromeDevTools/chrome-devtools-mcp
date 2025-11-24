@@ -20,7 +20,11 @@ export {
   type TextContent,
 } from '@modelcontextprotocol/sdk/types.js';
 export {z as zod} from 'zod';
-export {Locator, PredefinedNetworkConditions} from 'puppeteer-core';
+export {
+  Locator,
+  PredefinedNetworkConditions,
+  CDPSessionEvent,
+} from 'puppeteer-core';
 export {default as puppeteer} from 'puppeteer-core';
 export type * from 'puppeteer-core';
 export type {CdpPage} from 'puppeteer-core/internal/cdp/Page.js';
