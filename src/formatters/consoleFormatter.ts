@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {AggregatedIssue} from '../../node_modules/chrome-devtools-frontend/mcp/mcp.js';
+import type {AggregatedIssue} from '../../node_modules/chrome-devtools-frontend/mcp/mcp.js';
 
 export interface ConsoleMessageData {
   consoleMessageStableId: number;
@@ -41,7 +41,7 @@ export function formatConsoleEventVerbose(msg: ConsoleMessageData): string {
   const result = [
     `ID: ${msg.consoleMessageStableId}`,
     `Message: ${msg.type}> ${aggregatedIssue ? formatIssue(aggregatedIssue, msg.description) : msg.message}`,
-    aggregatedIssue ? undefined: formatArgs(msg),
+    aggregatedIssue ? undefined : formatArgs(msg),
   ].filter(line => !!line);
   return result.join('\n');
 }
