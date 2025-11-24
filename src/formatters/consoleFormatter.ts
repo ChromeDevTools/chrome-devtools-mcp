@@ -9,7 +9,7 @@ import {AggregatedIssue} from '../../node_modules/chrome-devtools-frontend/mcp/m
 export interface ConsoleMessageData {
   consoleMessageStableId: number;
   type?: string;
-  item?: unknown;
+  item?: AggregatedIssue;
   message?: string;
   count?: number;
   description?: string;
@@ -37,18 +37,11 @@ function getArgs(msg: ConsoleMessageData) {
 
 // The verbose format for a console message, including all details.
 export function formatConsoleEventVerbose(msg: ConsoleMessageData): string {
-  if (msg.item instanceof AggregatedIssue) {
-    const result = [
-      `ID: ${msg.consoleMessageStableId}`,
-      `Message: ${msg.type}> ${formatIssue(msg.item, msg.description)}`,
-    ];
-    return result.join('\n');
-  }
-
+  const aggregatedIssue = msg.item;
   const result = [
     `ID: ${msg.consoleMessageStableId}`,
-    `Message: ${msg.type}> ${msg.message}`,
-    formatArgs(msg),
+    `Message: ${msg.type}> ${aggregatedIssue ? formatIssue(aggregatedIssue, msg.description) : msg.message}`,
+    aggregatedIssue ? undefined: formatArgs(msg),
   ].filter(line => !!line);
   return result.join('\n');
 }
