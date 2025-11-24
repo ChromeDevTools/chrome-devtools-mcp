@@ -4,11 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
-  AggregatedIssue,
-  MarkdownIssueDescription,
-} from '../../node_modules/chrome-devtools-frontend/mcp/mcp.js';
-import {ISSUE_UTILS} from '../issue-descriptions.js';
+import {AggregatedIssue} from '../../node_modules/chrome-devtools-frontend/mcp/mcp.js';
 
 export interface ConsoleMessageData {
   consoleMessageStableId: number;
@@ -16,6 +12,7 @@ export interface ConsoleMessageData {
   item?: unknown;
   message?: string;
   count?: number;
+  description?: string;
   args?: string[];
 }
 
@@ -43,7 +40,7 @@ export function formatConsoleEventVerbose(msg: ConsoleMessageData): string {
   if (msg.item instanceof AggregatedIssue) {
     const result = [
       `ID: ${msg.consoleMessageStableId}`,
-      `Message: ${msg.type}> ${formatIssue(msg.item)}`,
+      `Message: ${msg.type}> ${formatIssue(msg.item, msg.description)}`,
     ];
     return result.join('\n');
   }
@@ -76,35 +73,28 @@ function formatArgs(consoleData: ConsoleMessageData): string {
   return result.join('\n');
 }
 
-export function formatIssue(issue: AggregatedIssue): string {
-  const markdownDescription = issue.getDescription();
-  const filename = markdownDescription?.file;
-  const rawMarkdown = filename
-    ? ISSUE_UTILS.getIssueDescription(filename)
-    : null;
-  if (!markdownDescription || !rawMarkdown) {
-    throw new Error('Error parsing issue description ' + issue.code());
-  }
-  let processedMarkdown = MarkdownIssueDescription.substitutePlaceholders(
-    rawMarkdown,
-    markdownDescription.substitutions,
-  );
+export function formatIssue(
+  issue: AggregatedIssue,
+  description?: string,
+): string {
+  const result: string[] = [];
 
-  processedMarkdown = processedMarkdown.trim();
-  // Remove heading in order not to conflict with the result response markdown
-  if (processedMarkdown.startsWith('# ')) {
+  let processedMarkdown = description?.trim();
+  // Remove heading in order not to conflict with the whole console message response markdown
+  if (processedMarkdown?.startsWith('# ')) {
     processedMarkdown = processedMarkdown.substring(2).trimStart();
   }
+  if (processedMarkdown) result.push(processedMarkdown);
 
-  const result: string[] = [processedMarkdown];
-  const links = markdownDescription.links;
-
-  if (links.length > 0) {
+  const links = issue.getDescription()?.links;
+  if (links && links.length > 0) {
     result.push('Learn more:');
     for (const link of links) {
       result.push(`[${link.linkTitle}](${link.link})`);
     }
   }
 
+  if (result.length === 0)
+    return 'No details provided for the issue ' + issue.code();
   return result.join('\n');
 }

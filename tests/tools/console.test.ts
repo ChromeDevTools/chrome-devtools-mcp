@@ -157,29 +157,38 @@ describe('console', () => {
       });
     });
 
-    it('lists issues', async () => {
-      await withBrowser(async (response, context) => {
-        const page = await context.newPage();
-        const issuePromise = new Promise<void>(resolve => {
-          page.once('issue', () => {
-            resolve();
+    describe('issues type', () => {
+      beforeEach(() => {
+        setIssuesEnabled(true);
+      });
+      afterEach(() => {
+        setIssuesEnabled(false);
+      });
+
+      it('lists issues', async () => {
+        await withBrowser(async (response, context) => {
+          const page = await context.newPage();
+          const issuePromise = new Promise<void>(resolve => {
+            page.once('issue', () => {
+              resolve();
+            });
           });
+          await page.setContent('<input type="text" name="username" />');
+          await issuePromise;
+          await listConsoleMessages.handler({params: {}}, response, context);
+          await getConsoleMessage.handler(
+            {params: {msgid: 1}},
+            response,
+            context,
+          );
+          const formattedResponse = await response.handle('test', context);
+          const textContent = formattedResponse[0] as {text: string};
+          assert.ok(
+            textContent.text.includes(
+              "Message: issue> An element doesn't have an autocomplete attribute",
+            ),
+          );
         });
-        await page.setContent('<input type="text" name="username" />');
-        await issuePromise;
-        await listConsoleMessages.handler({params: {}}, response, context);
-        await getConsoleMessage.handler(
-          {params: {msgid: 1}},
-          response,
-          context,
-        );
-        const formattedResponse = await response.handle('test', context);
-        const textContent = formattedResponse[0] as {text: string};
-        assert.ok(
-          textContent.text.includes(
-            "Message: issue> An element doesn't have an autocomplete attribute",
-          ),
-        );
       });
     });
   });

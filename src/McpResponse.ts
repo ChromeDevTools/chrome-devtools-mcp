@@ -4,12 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
-  AggregatedIssue,
-  Marked,
-  MarkdownIssueDescription,
-} from '../node_modules/chrome-devtools-frontend/mcp/mcp.js';
+import {AggregatedIssue} from '../node_modules/chrome-devtools-frontend/mcp/mcp.js';
 
+import {mapIssueToMessageObject} from './DevtoolsUtils.js';
 import type {ConsoleMessageData} from './formatters/consoleFormatter.js';
 import {
   formatConsoleEventShort,
@@ -23,8 +20,6 @@ import {
   getStatusFromRequest,
 } from './formatters/networkFormatter.js';
 import {formatSnapshotNode} from './formatters/snapshotFormatter.js';
-import {getIssueDescription} from './issue-descriptions.js';
-import {logger} from './logger.js';
 import type {McpContext} from './McpContext.js';
 import type {
   ConsoleMessage,
@@ -257,7 +252,7 @@ export class McpResponse implements Response {
           ),
         };
       } else if (message instanceof AggregatedIssue) {
-        const result = mapIssuesMessage(message);
+        const result = mapIssueToMessageObject(message);
         consoleData = {
           consoleMessageStableId,
           ...result,
@@ -315,7 +310,7 @@ export class McpResponse implements Response {
               };
             }
             if (item instanceof AggregatedIssue) {
-              const message = mapIssuesMessage(item);
+              const message = mapIssueToMessageObject(item);
               return {
                 consoleMessageStableId,
                 ...message,
@@ -572,38 +567,4 @@ Call ${handleDialog.name} to handle it before continuing.`);
   resetResponseLineForTesting() {
     this.#textResponseLines = [];
   }
-}
-
-function mapIssuesMessage(
-  message: AggregatedIssue,
-): Omit<ConsoleMessageData, 'consoleMessageStableId'> | null {
-  const count = message.getAggregatedIssuesCount();
-  const markdownDescription = message.getDescription();
-  const filename = markdownDescription?.file;
-  if (!markdownDescription) {
-    logger(`no description found for issue:` + message.code);
-    return null;
-  }
-  const rawMarkdown = filename ? getIssueDescription(filename) : null;
-  if (!rawMarkdown) {
-    logger(`no markdown ${filename} found for issue:` + message.code);
-    return null;
-  }
-  const processedMarkdown = MarkdownIssueDescription.substitutePlaceholders(
-    rawMarkdown,
-    markdownDescription.substitutions,
-  );
-  const markdownAst = Marked.Marked.lexer(processedMarkdown);
-  const title = MarkdownIssueDescription.findTitleFromMarkdownAst(markdownAst);
-  if (!title) {
-    logger('cannot read issue title from ' + filename);
-    return null;
-  }
-  return {
-    type: 'issue',
-    item: message,
-    message: title,
-    count,
-    args: [],
-  };
 }

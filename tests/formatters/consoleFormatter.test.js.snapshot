@@ -36,9 +36,10 @@ Arg #0: file.txt
 `;
 
 exports[`consoleFormatter > formats a console.log message with issue type 1`] = `
-Mock Issue Title
+ID: 5
+Message: issue> Mock Issue Title
 
-This is a mock issue description with a http://example.com/issue-detail.
+This is a mock issue description
 Learn more:
 [Learn more](http://example.com/learnmore)
 [Learn more 2](http://example.com/another-learnmore)

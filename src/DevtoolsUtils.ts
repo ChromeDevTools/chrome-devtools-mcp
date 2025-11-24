@@ -6,10 +6,16 @@
 
 import {
   type Issue,
+  type AggregatedIssue,
   type IssuesManagerEventTypes,
+  MarkdownIssueDescription,
+  Marked,
   Common,
   I18n,
 } from '../node_modules/chrome-devtools-frontend/mcp/mcp.js';
+
+import {ISSUE_UTILS} from './issue-descriptions.js';
+import {logger} from './logger.js';
 
 export function extractUrlLikeFromDevToolsTitle(
   title: string,
@@ -67,6 +73,48 @@ export class FakeIssuesManager extends Common.ObjectWrapper
   issues(): Issue[] {
     return [];
   }
+}
+
+export function mapIssueToMessageObject(issue: AggregatedIssue) {
+  const count = issue.getAggregatedIssuesCount();
+  const markdownDescription = issue.getDescription();
+  const filename = markdownDescription?.file;
+  if (!markdownDescription) {
+    logger(`no description found for issue:` + issue.code);
+    return null;
+  }
+  const rawMarkdown = filename
+    ? ISSUE_UTILS.getIssueDescription(filename)
+    : null;
+  if (!rawMarkdown) {
+    logger(`no markdown ${filename} found for issue:` + issue.code);
+    return null;
+  }
+  let processedMarkdown: string;
+  let title: string | null;
+
+  try {
+    processedMarkdown = MarkdownIssueDescription.substitutePlaceholders(
+      rawMarkdown,
+      markdownDescription.substitutions,
+    );
+    const markdownAst = Marked.Marked.lexer(processedMarkdown);
+    title = MarkdownIssueDescription.findTitleFromMarkdownAst(markdownAst);
+  } catch {
+    logger('error parsing markdown for issue ' + issue.code());
+    return null;
+  }
+  if (!title) {
+    logger('cannot read issue title from ' + filename);
+    return null;
+  }
+  return {
+    type: 'issue',
+    item: issue,
+    message: title,
+    count,
+    description: processedMarkdown,
+  };
 }
 
 I18n.DevToolsLocale.DevToolsLocale.instance({
