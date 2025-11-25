@@ -9,6 +9,8 @@ import './polyfill.js';
 import type {Channel} from './browser.js';
 import {ensureBrowserConnected, ensureBrowserLaunched} from './browser.js';
 import {parseArguments} from './cli.js';
+import {features} from './features.js';
+import {loadIssueDescriptions} from './issue-descriptions.js';
 import {logger, saveLogsToFile} from './logger.js';
 import {McpContext} from './McpContext.js';
 import {McpResponse} from './McpResponse.js';
@@ -33,7 +35,7 @@ import type {ToolDefinition} from './tools/ToolDefinition.js';
 
 // If moved update release-please config
 // x-release-please-start-version
-const VERSION = '0.10.1';
+const VERSION = '0.10.2';
 // x-release-please-end
 
 export const args = parseArguments(VERSION);
@@ -189,6 +191,9 @@ for (const tool of tools) {
   registerTool(tool);
 }
 
+if (features.issues) {
+  await loadIssueDescriptions();
+}
 const transport = new StdioServerTransport();
 await server.connect(transport);
 logger('Chrome DevTools MCP Server connected');

@@ -4,12 +4,26 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import assert from 'node:assert';
-import {describe, it} from 'node:test';
+import {afterEach, beforeEach, describe, it} from 'node:test';
 
-import type {Browser, Frame, HTTPRequest, Page, Target} from 'puppeteer-core';
+import type {
+  Browser,
+  Frame,
+  HTTPRequest,
+  Page,
+  Target,
+  Protocol,
+} from 'puppeteer-core';
+import sinon from 'sinon';
 
+import {AggregatedIssue} from '../node_modules/chrome-devtools-frontend/mcp/mcp.js';
+import {setIssuesEnabled} from '../src/features.js';
 import type {ListenerMap} from '../src/PageCollector.js';
-import {NetworkCollector, PageCollector} from '../src/PageCollector.js';
+import {
+  ConsoleCollector,
+  NetworkCollector,
+  PageCollector,
+} from '../src/PageCollector.js';
 
 import {getMockRequest} from './utils.js';
 
@@ -36,12 +50,22 @@ function mockListener() {
 
 function getMockPage(): Page {
   const mainFrame = {} as Frame;
+  const cdpSession = {
+    ...mockListener(),
+    send: () => {
+      // no-op
+    },
+  };
   return {
     mainFrame() {
       return mainFrame;
     },
     ...mockListener(),
-  } as Page;
+    // @ts-expect-error internal API.
+    _client() {
+      return cdpSession;
+    },
+  } satisfies Page;
 }
 
 function getMockBrowser(): Browser {
@@ -317,5 +341,108 @@ describe('NetworkCollector', () => {
 
     page.emit('request', request);
     assert.equal(collector.getData(page, true).length, 3);
+  });
+});
+
+describe('ConsoleCollector', () => {
+  let issue: Protocol.Audits.InspectorIssue;
+
+  beforeEach(() => {
+    issue = {
+      code: 'MixedContentIssue',
+      details: {
+        mixedContentIssueDetails: {
+          insecureURL: 'test.url',
+          resolutionStatus: 'MixedContentBlocked',
+          mainResourceURL: '',
+        },
+      },
+    };
+    setIssuesEnabled(true);
+  });
+
+  afterEach(() => {
+    setIssuesEnabled(false);
+  });
+
+  it('emits issues on page', async () => {
+    const browser = getMockBrowser();
+    const page = (await browser.pages())[0];
+    // @ts-expect-error internal API.
+    const cdpSession = page._client();
+    const onIssuesListener = sinon.spy();
+
+    page.on('issue', onIssuesListener);
+
+    const collector = new ConsoleCollector(browser, collect => {
+      return {
+        issue: issue => {
+          collect(issue as AggregatedIssue);
+        },
+      } as ListenerMap;
+    });
+    await collector.init();
+    cdpSession.emit('Audits.issueAdded', {issue});
+    sinon.assert.calledOnce(onIssuesListener);
+
+    const issueArgument = onIssuesListener.getCall(0).args[0];
+    assert(issueArgument instanceof AggregatedIssue);
+  });
+
+  it('collects issues', async () => {
+    const browser = getMockBrowser();
+    const page = (await browser.pages())[0];
+    // @ts-expect-error internal API.
+    const cdpSession = page._client();
+
+    const collector = new ConsoleCollector(browser, collect => {
+      return {
+        issue: issue => {
+          collect(issue as AggregatedIssue);
+        },
+      } as ListenerMap;
+    });
+    await collector.init();
+
+    const issue2 = {
+      code: 'ElementAccessibilityIssue' as const,
+      details: {
+        elementAccessibilityIssueDetails: {
+          nodeId: 1,
+          elementAccessibilityIssueReason: 'DisallowedSelectChild',
+          hasDisallowedAttributes: true,
+        },
+      },
+    } satisfies Protocol.Audits.InspectorIssue;
+
+    cdpSession.emit('Audits.issueAdded', {issue});
+    cdpSession.emit('Audits.issueAdded', {issue: issue2});
+    const data = collector.getData(page);
+    assert.equal(data.length, 2);
+  });
+
+  it('filters duplicated issues', async () => {
+    const browser = getMockBrowser();
+    const page = (await browser.pages())[0];
+    // @ts-expect-error internal API.
+    const cdpSession = page._client();
+
+    const collector = new ConsoleCollector(browser, collect => {
+      return {
+        issue: issue => {
+          collect(issue as AggregatedIssue);
+        },
+      } as ListenerMap;
+    });
+    await collector.init();
+
+    cdpSession.emit('Audits.issueAdded', {issue});
+    cdpSession.emit('Audits.issueAdded', {issue});
+    const data = collector.getData(page);
+    assert.equal(data.length, 1);
+    const collectedIssue = data[0];
+    assert(collectedIssue instanceof AggregatedIssue);
+    assert.equal(collectedIssue.code(), 'MixedContentIssue');
+    assert.equal(collectedIssue.getAggregatedIssuesCount(), 1);
   });
 });

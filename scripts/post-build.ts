@@ -53,69 +53,22 @@ function main(): void {
 
   // Create i18n mock
   const i18nDir = path.join(BUILD_DIR, devtoolsFrontEndCorePath, 'i18n');
-  fs.mkdirSync(i18nDir, {recursive: true});
-  const i18nFile = path.join(i18nDir, 'i18n.js');
-  const i18nContent = `
-export const i18n = {
-  registerUIStrings: () => {},
-  getLocalizedString: (_, str) => {
-    // So that the string passed in gets output verbatim.
-    return str;
-  },
-  lockedLazyString: () => {},
-  getLazilyComputedLocalizedString: () => {},
-};
+  const localesFile = path.join(i18nDir, 'locales.js');
+  const localesContent = `
+export const LOCALES = [
+  'en-US',
+];
 
-// TODO(jacktfranklin): once the DocumentLatency insight does not depend on
-// this method, we can remove this stub.
-export const TimeUtilities = {
-  millisToString(x) {
-    const separator = '\xA0';
-    const formatter = new Intl.NumberFormat('en-US', {
-      style: 'unit',
-      unitDisplay: 'narrow',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 1,
-      unit: 'millisecond',
-    });
+export const BUNDLED_LOCALES = [
+  'en-US',
+];
 
-    const parts = formatter.formatToParts(x);
-    for (const part of parts) {
-      if (part.type === 'literal') {
-        if (part.value === ' ') {
-          part.value = separator;
-        }
-      }
-    }
+export const DEFAULT_LOCALE = 'en-US';
 
-    return parts.map(part => part.value).join('');
-  }
-};
+export const REMOTE_FETCH_PATTERN = '@HOST@/remote/serve_file/@VERSION@/core/i18n/locales/@LOCALE@.json';
 
-// TODO(jacktfranklin): once the ImageDelivery insight does not depend on this method, we can remove this stub.
-export const ByteUtilities = {
-  bytesToString(x) {
-    const separator = '\xA0';
-    const formatter = new Intl.NumberFormat('en-US', {
-      style: 'unit',
-      unit: 'kilobyte',
-      unitDisplay: 'narrow',
-      minimumFractionDigits: 1,
-      maximumFractionDigits: 1,
-    });
-    const parts = formatter.formatToParts(x / 1000);
-    for (const part of parts) {
-      if (part.type === 'literal') {
-        if (part.value === ' ') {
-          part.value = separator;
-        }
-      }
-    }
-
-    return parts.map(part => part.value).join('');
-  }
-};`;
-  writeFile(i18nFile, i18nContent);
+export const LOCAL_FETCH_PATTERN = './locales/@LOCALE@.json';`;
+  writeFile(localesFile, localesContent);
 
   // Create codemirror.next mock.
   const codeMirrorDir = path.join(
@@ -169,6 +122,15 @@ export const hostConfig = {};
   fs.copyFileSync(devtoolsLicenseFileSource, devtoolsLicenseFileDestination);
 
   copyThirdPartyLicenseFiles();
+  copyDevToolsDescriptionFiles();
+}
+
+function copyDevToolsDescriptionFiles() {
+  const devtoolsIssuesDescriptionPath =
+    'node_modules/chrome-devtools-frontend/front_end/models/issues_manager/descriptions';
+  const sourceDir = path.join(process.cwd(), devtoolsIssuesDescriptionPath);
+  const destDir = path.join(BUILD_DIR, devtoolsIssuesDescriptionPath);
+  fs.cpSync(sourceDir, destDir, {recursive: true});
 }
 
 main();
