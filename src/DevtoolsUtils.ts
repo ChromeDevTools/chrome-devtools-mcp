@@ -37,6 +37,7 @@ export function urlsEqual(url1: string, url2: string): boolean {
  * 1. We do not care about the protocol.
  * 2. We do not care about trailing slashes.
  * 3. We do not care about "www".
+ * 4. We ignore the hash parts.
  *
  * For example, if the user types "record a trace on foo.com", we would want to
  * match a tab in the connected Chrome instance that is showing "www.foo.com/"
@@ -54,6 +55,13 @@ function normalizeUrl(url: string): string {
   // Remove 'www.'. This ensures that we find the right URL regardless of if the user adds `www` or not.
   if (result.startsWith('www.')) {
     result = result.slice(4);
+  }
+
+  // We use target URLs to locate DevTools but those often do
+  // no include hash.
+  const hashIdx = result.lastIndexOf('#');
+  if (hashIdx !== -1) {
+    result = result.slice(0, hashIdx);
   }
 
   // Remove trailing slash

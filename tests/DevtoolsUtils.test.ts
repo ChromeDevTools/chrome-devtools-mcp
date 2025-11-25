@@ -74,6 +74,17 @@ describe('urlsEqual', () => {
       false,
     );
   });
+
+  it('ignores hash', () => {
+    assert.strictEqual(
+      urlsEqual('https://google.com/#', 'http://www.google.com'),
+      true,
+    );
+    assert.strictEqual(
+      urlsEqual('https://google.com/#21', 'http://www.google.com#12'),
+      true,
+    );
+  });
 });
 
 describe('mapIssueToMessageObject', () => {
