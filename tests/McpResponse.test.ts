@@ -10,6 +10,10 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {describe, it} from 'node:test';
 
+import sinon from 'sinon';
+
+import { AggregatedIssue } from '../node_modules/chrome-devtools-frontend/mcp/mcp.js';
+
 import {
   getMockRequest,
   getMockResponse,
@@ -293,6 +297,46 @@ describe('McpResponse', () => {
       const result = await response.handle('test', context);
       assert.ok(result[0].text);
       t.assert.snapshot?.(result[0].text);
+    });
+  });
+
+  it('doesn\'t list the issue message if mapping returns null', async () => {
+    await withBrowser(async (response, context) => {
+      const mockAggregatedIssue = sinon.createStubInstance(AggregatedIssue);
+          const mockDescription = {
+            file: 'not-existing-description-file.md',
+            links: [],
+          };
+      mockAggregatedIssue.getDescription.returns(mockDescription);
+      response.setIncludeConsoleData(true);
+      context.getConsoleData = () => {
+        return [mockAggregatedIssue];
+      };
+
+      const result = await response.handle('test', context);
+      const text = (result[0].text as string).toString();
+      assert.ok(text.includes('<no console messages found>'));
+    });
+  });
+
+  it('throws error if mapping returns null on get issue details', async () => {
+    await withBrowser(async (response, context) => {
+      const mockAggregatedIssue = sinon.createStubInstance(AggregatedIssue);
+          const mockDescription = {
+            file: 'not-existing-description-file.md',
+            links: [],
+          };
+      mockAggregatedIssue.getDescription.returns(mockDescription);
+      response.attachConsoleMessage(1);
+      context.getConsoleMessageById = () => {
+        return mockAggregatedIssue;
+      };
+
+      try {
+      await response.handle('test', context);
+      } catch (e) {
+        assert.ok(e.message.includes('Can\'t prpovide detals for the msgid 1'));
+      }
     });
   });
 });

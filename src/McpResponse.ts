@@ -252,10 +252,11 @@ export class McpResponse implements Response {
           ),
         };
       } else if (message instanceof AggregatedIssue) {
-        const result = mapIssueToMessageObject(message);
+        const mappedIssueMessage = mapIssueToMessageObject(message);
+        if (!mappedIssueMessage) throw new Error('Can\'t prpovide detals for the msgid ' + consoleMessageStableId);
         consoleData = {
           consoleMessageStableId,
-          ...result,
+          ...mappedIssueMessage,
         };
       } else {
         consoleData = {
@@ -310,10 +311,11 @@ export class McpResponse implements Response {
               };
             }
             if (item instanceof AggregatedIssue) {
-              const message = mapIssueToMessageObject(item);
+              const mappedIssueMessage = mapIssueToMessageObject(item);
+              if (!mappedIssueMessage) return null;
               return {
                 consoleMessageStableId,
-                ...message,
+                ...mappedIssueMessage,
               };
             }
             return {
