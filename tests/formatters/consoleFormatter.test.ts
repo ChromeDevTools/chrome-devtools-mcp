@@ -6,14 +6,12 @@
 
 import {describe, it} from 'node:test';
 
-import sinon from 'sinon';
-
-import {AggregatedIssue} from '../../node_modules/chrome-devtools-frontend/mcp/mcp.js';
 import type {ConsoleMessageData} from '../../src/formatters/consoleFormatter.js';
 import {
   formatConsoleEventShort,
   formatConsoleEventVerbose,
 } from '../../src/formatters/consoleFormatter.js';
+import {getMockAggregatedIssue} from '../utils.js';
 
 describe('consoleFormatter', () => {
   describe('formatConsoleEventShort', () => {
@@ -97,7 +95,15 @@ describe('consoleFormatter', () => {
   });
 
   it('formats a console.log message with issue type', t => {
-    const mockAggregatedIssue = sinon.createStubInstance(AggregatedIssue);
+    const testGenericIssue = {
+      details: () => {
+        return {
+          violatingNodeId: 2,
+          violatingNodeAttribute: 'test',
+        };
+      },
+    };
+    const mockAggregatedIssue = getMockAggregatedIssue();
     const mockDescription = {
       file: 'mock.md',
       links: [
@@ -109,6 +115,8 @@ describe('consoleFormatter', () => {
       ],
     };
     mockAggregatedIssue.getDescription.returns(mockDescription);
+    // @ts-expect-error generic issue stub bypass
+    mockAggregatedIssue.getGenericIssues.returns(new Set([testGenericIssue]));
     const mockDescriptionFileContent =
       '# Mock Issue Title\n\nThis is a mock issue description';
 

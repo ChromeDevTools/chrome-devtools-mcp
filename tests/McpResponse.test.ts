@@ -10,11 +10,8 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {describe, it} from 'node:test';
 
-import sinon from 'sinon';
-
-import {AggregatedIssue} from '../node_modules/chrome-devtools-frontend/mcp/mcp.js';
-
 import {
+  getMockAggregatedIssue,
   getMockRequest,
   getMockResponse,
   html,
@@ -302,7 +299,7 @@ describe('McpResponse', () => {
 
   it("doesn't list the issue message if mapping returns null", async () => {
     await withBrowser(async (response, context) => {
-      const mockAggregatedIssue = sinon.createStubInstance(AggregatedIssue);
+      const mockAggregatedIssue = getMockAggregatedIssue();
       const mockDescription = {
         file: 'not-existing-description-file.md',
         links: [],
@@ -321,7 +318,7 @@ describe('McpResponse', () => {
 
   it('throws error if mapping returns null on get issue details', async () => {
     await withBrowser(async (response, context) => {
-      const mockAggregatedIssue = sinon.createStubInstance(AggregatedIssue);
+      const mockAggregatedIssue = getMockAggregatedIssue();
       const mockDescription = {
         file: 'not-existing-description-file.md',
         links: [],
@@ -335,7 +332,7 @@ describe('McpResponse', () => {
       try {
         await response.handle('test', context);
       } catch (e) {
-        assert.ok(e.message.includes("Can't prpovide detals for the msgid 1"));
+        assert.ok(e.message.includes("Can't provide detals for the msgid 1"));
       }
     });
   });

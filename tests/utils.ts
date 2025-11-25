@@ -13,7 +13,9 @@ import type {
   HTTPResponse,
   LaunchOptions,
 } from 'puppeteer-core';
+import sinon from 'sinon';
 
+import {AggregatedIssue} from '../node_modules/chrome-devtools-frontend/mcp/mcp.js';
 import {McpContext} from '../src/McpContext.js';
 import {McpResponse} from '../src/McpResponse.js';
 import {stableIdSymbol} from '../src/PageCollector.js';
@@ -179,4 +181,13 @@ export function stabilizeResponseOutput(text: unknown) {
   const savedSnapshot = /Saved snapshot to (.*)/g;
   output = output.replaceAll(savedSnapshot, 'Saved snapshot to <file>');
   return output;
+}
+
+export function getMockAggregatedIssue(): sinon.SinonStubbedInstance<AggregatedIssue> {
+  const mockAggregatedIssue = sinon.createStubInstance(AggregatedIssue);
+  mockAggregatedIssue.getGenericIssues.returns(new Set());
+  mockAggregatedIssue.getLowContrastIssues.returns(new Set());
+  mockAggregatedIssue.getElementAccessibilityIssues.returns(new Set());
+  mockAggregatedIssue.getQuirksModeIssues.returns(new Set());
+  return mockAggregatedIssue;
 }

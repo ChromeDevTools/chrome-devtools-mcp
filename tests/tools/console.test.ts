@@ -17,11 +17,10 @@ import {
 import {withBrowser} from '../utils.js';
 
 describe('console', () => {
+  before(async () => {
+    await loadIssueDescriptions();
+  });
   describe('list_console_messages', () => {
-    before(async () => {
-      await loadIssueDescriptions();
-    });
-
     it('list messages', async () => {
       await withBrowser(async (response, context) => {
         await listConsoleMessages.handler({params: {}}, response, context);
@@ -160,7 +159,7 @@ describe('console', () => {
         setIssuesEnabled(false);
       });
 
-      it('gets issue details', async () => {
+      it('gets issue details', async t => {
         await withBrowser(async (response, context) => {
           const page = await context.newPage();
           const issuePromise = new Promise<void>(resolve => {
@@ -169,6 +168,7 @@ describe('console', () => {
             });
           });
           await page.setContent('<input type="text" name="username" />');
+          await context.createTextSnapshot();
           await issuePromise;
           await listConsoleMessages.handler({params: {}}, response, context);
           const response2 = new McpResponse();
@@ -178,16 +178,7 @@ describe('console', () => {
             context,
           );
           const formattedResponse = await response2.handle('test', context);
-          const textContent = formattedResponse[0] as {text: string};
-          const learnMoreLinks =
-            '[HTML attribute: autocomplete](https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/autocomplete#values)';
-          const detailsDescription =
-            "A form field has an `id` or `name` attribute that the browser's autofill recognizes. However, it doesn't have an `autocomplete` attribute assigned. This might prevent the browser from correctly autofilling the form.\n\nTo fix this issue, provide an `autocomplete` attribute.";
-          const title =
-            "Message: issue> An element doesn't have an autocomplete attribute";
-          assert.ok(textContent.text.includes(title));
-          assert.ok(textContent.text.includes(detailsDescription));
-          assert.ok(textContent.text.includes(learnMoreLinks));
+          t.assert.snapshot?.(formattedResponse[0].text);
         });
       });
     });

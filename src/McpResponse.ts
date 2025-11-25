@@ -255,7 +255,7 @@ export class McpResponse implements Response {
         const mappedIssueMessage = mapIssueToMessageObject(message);
         if (!mappedIssueMessage)
           throw new Error(
-            "Can't prpovide detals for the msgid " + consoleMessageStableId,
+            "Can't provide detals for the msgid " + consoleMessageStableId,
           );
         consoleData = {
           consoleMessageStableId,
@@ -402,7 +402,7 @@ Call ${handleDialog.name} to handle it before continuing.`);
     }
 
     response.push(...this.#formatNetworkRequestData(context, data.bodies));
-    response.push(...this.#formatConsoleData(data.consoleData));
+    response.push(...this.#formatConsoleData(context, data.consoleData));
 
     if (this.#networkRequestsOptions?.include) {
       let requests = context.getNetworkRequests(
@@ -500,13 +500,16 @@ Call ${handleDialog.name} to handle it before continuing.`);
     };
   }
 
-  #formatConsoleData(data: ConsoleMessageData | undefined): string[] {
+  #formatConsoleData(
+    context: McpContext,
+    data: ConsoleMessageData | undefined,
+  ): string[] {
     const response: string[] = [];
     if (!data) {
       return response;
     }
 
-    response.push(formatConsoleEventVerbose(data));
+    response.push(formatConsoleEventVerbose(data, context));
     return response;
   }
 

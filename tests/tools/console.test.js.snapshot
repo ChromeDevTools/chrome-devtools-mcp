@@ -1,0 +1,13 @@
+exports[`console > get_console_message > issues type > gets issue details 1`] = `
+# test response
+ID: 1
+Message: issue> An element doesn't have an autocomplete attribute
+
+A form field has an \`id\` or \`name\` attribute that the browser's autofill recognizes. However, it doesn't have an \`autocomplete\` attribute assigned. This might prevent the browser from correctly autofilling the form.
+
+To fix this issue, provide an \`autocomplete\` attribute.
+Learn more:
+[HTML attribute: autocomplete](https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/autocomplete#values)
+### Affected resources
+uid=1_1 data={"violatingNodeAttribute":"name"}
+`;
