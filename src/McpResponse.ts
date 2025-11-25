@@ -253,7 +253,10 @@ export class McpResponse implements Response {
         };
       } else if (message instanceof AggregatedIssue) {
         const mappedIssueMessage = mapIssueToMessageObject(message);
-        if (!mappedIssueMessage) throw new Error('Can\'t prpovide detals for the msgid ' + consoleMessageStableId);
+        if (!mappedIssueMessage)
+          throw new Error(
+            "Can't prpovide detals for the msgid " + consoleMessageStableId,
+          );
         consoleData = {
           consoleMessageStableId,
           ...mappedIssueMessage,
