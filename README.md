@@ -82,6 +82,7 @@ To use the Chrome DevTools MCP server follow the instructions from <a href="http
   }
 }
 ```
+
 This will make the Chrome DevTools MCP server automatically connect to the browser that Antigravity is using. If you are not using port 9222, make sure to adjust accordingly.
 
 </details>
