@@ -243,7 +243,7 @@ Alternatively, follow the <a href="https://docs.qoder.com/user-guide/chat/model-
 <details>
   <summary>Qoder CLI</summary>
 
-Install the Chrome DevTools MCP server using the Qoder CLI  (<a href="https://docs.qoder.com/cli/using-cli#mcp-servsers">guide</a>):
+Install the Chrome DevTools MCP server using the Qoder CLI (<a href="https://docs.qoder.com/cli/using-cli#mcp-servsers">guide</a>):
 
 **Project wide:**
 
@@ -256,6 +256,7 @@ qodercli mcp add chrome-devtools -- npx chrome-devtools-mcp@latest
 ```bash
 qodercli mcp add -s user chrome-devtools -- npx chrome-devtools-mcp@latest
 ```
+
 </details>
 
 <details>
