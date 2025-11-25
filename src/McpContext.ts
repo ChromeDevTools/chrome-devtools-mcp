@@ -3,6 +3,7 @@
  * Copyright 2025 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
+
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -42,6 +43,10 @@ export interface TextSnapshot {
   idToNode: Map<string, TextSnapshotNode>;
   snapshotId: string;
   selectedElementUid?: string;
+  // It might happen that there is a selected element, but it is not part of the
+  // snapshot. This flag indicates if there is any selected element.
+  hasSelectedElement: boolean;
+  verbose: boolean;
 }
 
 interface McpContextOptions {
@@ -529,9 +534,12 @@ export class McpContext implements Context {
       root: rootNodeWithId,
       snapshotId: String(snapshotId),
       idToNode,
+      hasSelectedElement: false,
+      verbose,
     };
     const data = devtoolsData ?? (await this.getDevToolsData());
     if (data?.cdpBackendNodeId) {
+      this.#textSnapshot.hasSelectedElement = true;
       this.#textSnapshot.selectedElementUid = this.resolveCdpElementId(
         data?.cdpBackendNodeId,
       );

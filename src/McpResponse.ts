@@ -3,10 +3,11 @@
  * Copyright 2025 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
+
 import {
   AggregatedIssue,
   Marked,
-  findTitleFromMarkdownAst,
+  MarkdownIssueDescription,
 } from '../node_modules/chrome-devtools-frontend/mcp/mcp.js';
 
 import type {ConsoleMessageData} from './formatters/consoleFormatter.js';
@@ -318,7 +319,8 @@ export class McpResponse implements Response {
                 return null;
               }
               const markdownAst = Marked.Marked.lexer(rawMarkdown);
-              const title = findTitleFromMarkdownAst(markdownAst);
+              const title =
+                MarkdownIssueDescription.findTitleFromMarkdownAst(markdownAst);
               if (!title) {
                 logger('cannot read issue title from ' + filename);
                 return null;
@@ -408,7 +410,7 @@ Call ${handleDialog.name} to handle it before continuing.`);
     }
 
     if (data.formattedSnapshot) {
-      response.push('## Page content');
+      response.push('## Latest page snapshot');
       response.push(data.formattedSnapshot);
     }
 

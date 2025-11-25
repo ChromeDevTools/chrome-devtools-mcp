@@ -3,6 +3,7 @@
  * Copyright 2025 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
+
 import assert from 'node:assert';
 import {rm, stat, mkdir, chmod, writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
@@ -21,6 +22,25 @@ describe('screenshot', () => {
         const page = context.getSelectedPage();
         await page.setContent(fixture.html);
         await screenshot.handler({params: {format: 'png'}}, response, context);
+
+        assert.equal(response.images.length, 1);
+        assert.equal(response.images[0].mimeType, 'image/png');
+        assert.equal(
+          response.responseLines.at(0),
+          "Took a screenshot of the current page's viewport.",
+        );
+      });
+    });
+    it('ignores quality', async () => {
+      await withBrowser(async (response, context) => {
+        const fixture = screenshots.basic;
+        const page = context.getSelectedPage();
+        await page.setContent(fixture.html);
+        await screenshot.handler(
+          {params: {format: 'png', quality: 0}},
+          response,
+          context,
+        );
 
         assert.equal(response.images.length, 1);
         assert.equal(response.images[0].mimeType, 'image/png');

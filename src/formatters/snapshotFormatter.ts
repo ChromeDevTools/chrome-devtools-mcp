@@ -3,6 +3,7 @@
  * Copyright 2025 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
+
 import type {TextSnapshot, TextSnapshotNode} from '../McpContext.js';
 
 export function formatSnapshotNode(
@@ -10,7 +11,20 @@ export function formatSnapshotNode(
   snapshot?: TextSnapshot,
   depth = 0,
 ): string {
-  let result = '';
+  const chunks: string[] = [];
+
+  if (depth === 0) {
+    // Top-level content of the snapshot.
+    if (
+      snapshot?.verbose &&
+      snapshot?.hasSelectedElement &&
+      !snapshot.selectedElementUid
+    ) {
+      chunks.push(`Note: there is a selected element in the DevTools Elements panel but it is not included into the current a11y tree snapshot.
+Get a verbose snapshot to include all elements if you are interested in the selected element.\n\n`);
+    }
+  }
+
   const attributes = getAttributes(root);
   const line =
     ' '.repeat(depth * 2) +
@@ -19,13 +33,13 @@ export function formatSnapshotNode(
       ? ' [selected in the DevTools Elements panel]'
       : '') +
     '\n';
-  result += line;
+  chunks.push(line);
 
   for (const child of root.children) {
-    result += formatSnapshotNode(child, snapshot, depth + 1);
+    chunks.push(formatSnapshotNode(child, snapshot, depth + 1));
   }
 
-  return result;
+  return chunks.join('');
 }
 
 function getAttributes(serializedAXNodeRoot: TextSnapshotNode): string[] {

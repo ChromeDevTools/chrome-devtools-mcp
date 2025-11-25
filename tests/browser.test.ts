@@ -3,6 +3,7 @@
  * Copyright 2025 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
+
 import assert from 'node:assert';
 import os from 'node:os';
 import path from 'node:path';
