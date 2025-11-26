@@ -14,6 +14,7 @@ import {
   getConsoleMessage,
   listConsoleMessages,
 } from '../../src/tools/console.js';
+import {serverHooks} from '../server.js';
 import {withBrowser} from '../utils.js';
 
 describe('console', () => {
@@ -152,6 +153,7 @@ describe('console', () => {
     });
 
     describe('issues type', () => {
+      const server = serverHooks();
       beforeEach(() => {
         setIssuesEnabled(true);
       });
@@ -182,6 +184,12 @@ describe('console', () => {
         });
       });
       it('gets issue details with request id parsing', async t => {
+        server.addRoute('/data.json', (_req, res) => {
+          res.setHeader('Content-Type', 'application/json');
+          res.statusCode = 200;
+          res.end(JSON.stringify({data: 'test data'}));
+        });
+
         await withBrowser(async (response, context) => {
           const page = await context.newPage();
           const issuePromise = new Promise<void>(resolve => {
@@ -189,23 +197,11 @@ describe('console', () => {
               resolve();
             });
           });
-          await page.setRequestInterception(true);
-          page.on('request', request => {
-            if (request.url().includes('example.com')) {
-              void request.respond({
-                status: 200,
-                headers: {
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({}),
-              });
-            } else {
-              void request.continue();
-            }
-          });
+
+          const url = server.getRoute('/data.json');
           await page.setContent(`
             <script>
-              fetch('https://example.com/data.json', {
+              fetch('${url}', {
                   method: 'GET',
                   headers: {
                       'Content-Type': 'application/json',
@@ -216,7 +212,11 @@ describe('console', () => {
           `);
           await context.createTextSnapshot();
           await issuePromise;
-          await listConsoleMessages.handler({params: {types: ['issue']}}, response, context);
+          await listConsoleMessages.handler(
+            {params: {types: ['issue']}},
+            response,
+            context,
+          );
           const response2 = new McpResponse();
           await getConsoleMessage.handler(
             {params: {msgid: 1}},
