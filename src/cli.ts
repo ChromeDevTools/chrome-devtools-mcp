@@ -11,7 +11,7 @@ export const cliOptions = {
   browserUrl: {
     type: 'string',
     description:
-      'Connect to a running Chrome instance using port forwarding. For more details see: https://developer.chrome.com/docs/devtools/remote-debugging/local-server.',
+      'Connect to a running Chrome instance using port forwarding. The value of this option should be the URL of the running Chrome instance together with the configured debugging port. `http://127.0.0.1:9222` is a common default. For more details see: https://github.com/ChromeDevTools/chrome-devtools-mcp?tab=readme-ov-file#connecting-to-a-running-chrome-instance.',
     alias: 'u',
     conflicts: 'wsEndpoint',
     coerce: (url: string | undefined) => {
