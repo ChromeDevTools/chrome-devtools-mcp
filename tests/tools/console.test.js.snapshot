@@ -25,5 +25,5 @@ Note that if an opaque response is sufficient, the request's mode can be set to 
 Learn more:
 [Cross-Origin Resource Sharing (\`CORS\`)](https://web.dev/cross-origin-resource-sharing)
 ### Affected resources
-reqid=1 data={"corsErrorStatus":{"corsError":"PreflightMissingAllowOriginHeader","failedParameter":""},"isWarning":false,"initiatorOrigin":"","clientSecurityState":{"initiatorIsSecureContext":false,"initiatorIPAddressSpace":"Loopback","privateNetworkRequestPolicy":"BlockFromInsecureToMorePrivate"}}
+url=https://example.com/data.json data={"corsErrorStatus":{"corsError":"PreflightMissingAllowOriginHeader","failedParameter":""},"isWarning":false,"initiatorOrigin":"","clientSecurityState":{"initiatorIsSecureContext":false,"initiatorIPAddressSpace":"Loopback","privateNetworkRequestPolicy":"BlockFromInsecureToMorePrivate"}}
 `;

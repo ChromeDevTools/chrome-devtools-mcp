@@ -189,6 +189,20 @@ describe('console', () => {
               resolve();
             });
           });
+          await page.setRequestInterception(true);
+          page.on('request', request => {
+            if (request.url().includes('example.com')) {
+              void request.respond({
+                status: 200,
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({}),
+              });
+            } else {
+              void request.continue();
+            }
+          });
           await page.setContent(`
             <script>
               fetch('https://example.com/data.json', {
