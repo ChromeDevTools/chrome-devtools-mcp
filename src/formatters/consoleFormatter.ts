@@ -100,7 +100,10 @@ export function formatIssue(
     }
   }
 
-  const issues: Array<{details?: () => IssueDetailsWithResources, getDetails?: () => IssueDetailsWithResources}> = [
+  const issues: Array<{
+    details?: () => IssueDetailsWithResources;
+    getDetails?: () => IssueDetailsWithResources;
+  }> = [
     ...issue.getCorsIssues(),
     ...issue.getMixedContentIssues(),
     ...issue.getGenericIssues(),
@@ -111,14 +114,16 @@ export function formatIssue(
   const affectedResources: Array<{
     uid?: string;
     data?: object;
-    request?: string|number;
+    request?: string | number;
   }> = [];
   for (const singleIssue of issues) {
     if (!singleIssue.details && !singleIssue.getDetails) continue;
 
     let details =
       singleIssue.details?.() as unknown as IssueDetailsWithResources;
-    if (!details) details =  singleIssue.getDetails?.() as unknown as IssueDetailsWithResources;
+    if (!details)
+      details =
+        singleIssue.getDetails?.() as unknown as IssueDetailsWithResources;
     if (!details) continue;
 
     let uid;
@@ -156,8 +161,8 @@ export function formatIssue(
     affectedResources.push({
       uid,
       data: data,
-      request
-    });  
+      request,
+    });
   }
   if (affectedResources.length) {
     result.push('### Affected resources');
@@ -165,9 +170,12 @@ export function formatIssue(
   result.push(
     ...affectedResources.map(item => {
       const details = [];
-      if(item.uid) details.push(`uid=${item.uid}`);
-      if(item.data) details.push(`data=${JSON.stringify(item.data)}`);
-      if(item.request) details.push((typeof item.request === 'number' ? `reqid=` : 'url=') + item.request);
+      if (item.uid) details.push(`uid=${item.uid}`);
+      if (item.data) details.push(`data=${JSON.stringify(item.data)}`);
+      if (item.request)
+        details.push(
+          (typeof item.request === 'number' ? `reqid=` : 'url=') + item.request,
+        );
       return details.join(' ');
     }),
   );
