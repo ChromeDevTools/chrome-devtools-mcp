@@ -7,6 +7,7 @@
 import assert from 'node:assert';
 import {afterEach, before, beforeEach, describe, it} from 'node:test';
 
+import {AggregatedIssue} from '../../node_modules/chrome-devtools-frontend/mcp/mcp.js';
 import {setIssuesEnabled} from '../../src/features.js';
 import {loadIssueDescriptions} from '../../src/issue-descriptions.js';
 import {McpResponse} from '../../src/McpResponse.js';
@@ -212,6 +213,17 @@ describe('console', () => {
           `);
           await context.createTextSnapshot();
           await issuePromise;
+          const messages = context.getConsoleData();
+          let issueMsg;
+          for (const message of messages) {
+            if (message instanceof AggregatedIssue) {
+              issueMsg = message;
+              break;
+            }
+          }
+          assert.ok(issueMsg);
+          const id = context.getConsoleMessageStableId(issueMsg);
+          assert.ok(id);
           await listConsoleMessages.handler(
             {params: {types: ['issue']}},
             response,
@@ -219,12 +231,14 @@ describe('console', () => {
           );
           const response2 = new McpResponse();
           await getConsoleMessage.handler(
-            {params: {msgid: 1}},
+            {params: {msgid: id}},
             response2,
             context,
           );
           const formattedResponse = await response2.handle('test', context);
-          t.assert.snapshot?.(formattedResponse[0].text);
+          const rawText = formattedResponse[0].text as string;
+          const sanitizedText = rawText.replaceAll(/ID: \d+/g, 'ID: <ID>');
+          t.assert.snapshot?.(sanitizedText);
         });
       });
     });

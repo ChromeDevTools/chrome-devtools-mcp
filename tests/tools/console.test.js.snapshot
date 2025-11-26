@@ -14,7 +14,7 @@ uid=1_1 data={"violatingNodeAttribute":"name"}
 
 exports[`console > get_console_message > issues type > gets issue details with request id parsing 1`] = `
 # test response
-ID: 1
+ID: <ID>
 Message: issue> Ensure CORS response header values are valid
 
 A cross-origin resource sharing (CORS) request was blocked because of invalid or missing response headers of the request or the associated [preflight request](issueCorsPreflightRequest).
