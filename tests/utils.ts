@@ -189,5 +189,7 @@ export function getMockAggregatedIssue(): sinon.SinonStubbedInstance<AggregatedI
   mockAggregatedIssue.getLowContrastIssues.returns(new Set());
   mockAggregatedIssue.getElementAccessibilityIssues.returns(new Set());
   mockAggregatedIssue.getQuirksModeIssues.returns(new Set());
+  mockAggregatedIssue.getCorsIssues.returns(new Set());
+  mockAggregatedIssue.getMixedContentIssues.returns(new Set());
   return mockAggregatedIssue;
 }

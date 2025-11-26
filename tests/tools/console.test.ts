@@ -159,7 +159,7 @@ describe('console', () => {
         setIssuesEnabled(false);
       });
 
-      it('gets issue details', async t => {
+      it('gets issue details with node id parsing', async t => {
         await withBrowser(async (response, context) => {
           const page = await context.newPage();
           const issuePromise = new Promise<void>(resolve => {
@@ -168,6 +168,38 @@ describe('console', () => {
             });
           });
           await page.setContent('<input type="text" name="username" />');
+          await context.createTextSnapshot();
+          await issuePromise;
+          await listConsoleMessages.handler({params: {}}, response, context);
+          const response2 = new McpResponse();
+          await getConsoleMessage.handler(
+            {params: {msgid: 1}},
+            response2,
+            context,
+          );
+          const formattedResponse = await response2.handle('test', context);
+          t.assert.snapshot?.(formattedResponse[0].text);
+        });
+      });
+      it('gets issue details with request id parsing', async t => {
+        await withBrowser(async (response, context) => {
+          const page = await context.newPage();
+          const issuePromise = new Promise<void>(resolve => {
+            page.once('issue', () => {
+              resolve();
+            });
+          });
+          await page.setContent(`
+            <script>
+              fetch('https://example.com/data.json', {
+                  method: 'GET',
+                  headers: {
+                      'Content-Type': 'application/json',
+                      'X-Custom-Header': 'MyValue'
+                  }
+              });
+            </script>
+          `);
           await context.createTextSnapshot();
           await issuePromise;
           await listConsoleMessages.handler({params: {}}, response, context);

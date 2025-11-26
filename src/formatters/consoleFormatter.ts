@@ -73,6 +73,10 @@ interface IssueDetailsWithResources {
   violatingNodeId?: number;
   nodeId?: number;
   documentNodeId?: number;
+  request?: {
+    requestId?: string;
+    url: string;
+  };
 }
 export function formatIssue(
   issue: AggregatedIssue,
@@ -96,20 +100,29 @@ export function formatIssue(
     }
   }
 
-  const issues: Array<{details?: () => IssueDetailsWithResources}> = [
+  const issues: Array<{details?: () => IssueDetailsWithResources, getDetails?: () => IssueDetailsWithResources}> = [
+    ...issue.getCorsIssues(),
+    ...issue.getMixedContentIssues(),
     ...issue.getGenericIssues(),
     ...issue.getLowContrastIssues(),
     ...issue.getElementAccessibilityIssues(),
     ...issue.getQuirksModeIssues(),
-    // ...issue.getAttributionReportingIssues(), // Uncomment when AttributionReportingIssue has details()
   ];
-  const affectedElement: Array<{uid?: string; data?: object}> = [];
+  const affectedResources: Array<{
+    uid?: string;
+    data?: object;
+    request?: string|number;
+  }> = [];
   for (const singleIssue of issues) {
-    if (!singleIssue.details) break;
+    if (!singleIssue.details && !singleIssue.getDetails) continue;
 
-    const details =
-      singleIssue.details() as unknown as IssueDetailsWithResources;
+    let details =
+      singleIssue.details?.() as unknown as IssueDetailsWithResources;
+    if (!details) details =  singleIssue.getDetails?.() as unknown as IssueDetailsWithResources;
+    if (!details) continue;
+
     let uid;
+    let request: number | string | undefined;
     if (details.violatingNodeId && context) {
       uid = context.resolveCdpElementId(details.violatingNodeId);
     }
@@ -120,19 +133,42 @@ export function formatIssue(
       uid = context.resolveCdpElementId(details.documentNodeId);
     }
 
+    if (details.request) {
+      request = details.request.url;
+      if (details.request.requestId && context) {
+        const resolvedId = context.resolveCdpRequestId(
+          details.request.requestId,
+        );
+        if (resolvedId) {
+          request = resolvedId;
+        }
+      }
+    }
+
     // eslint-disable-next-line
     const data = structuredClone(details) as any;
     delete data.violatingNodeId;
+    delete data.nodeId;
+    delete data.documentNodeId;
     delete data.errorType;
     delete data.frameId;
-    affectedElement.push({uid, data: data});
+    delete data.request;
+    affectedResources.push({
+      uid,
+      data: data,
+      request
+    });  
   }
-  if (affectedElement.length) {
+  if (affectedResources.length) {
     result.push('### Affected resources');
   }
   result.push(
-    ...affectedElement.map(item => {
-      return `uid=${item.uid} data=${JSON.stringify(item.data)}`;
+    ...affectedResources.map(item => {
+      const details = [];
+      if(item.uid) details.push(`uid=${item.uid}`);
+      if(item.data) details.push(`data=${JSON.stringify(item.data)}`);
+      if(item.request) details.push((typeof item.request === 'number' ? `reqid=` : 'url=') + item.request);
+      return details.join(' ');
     }),
   );
   if (result.length === 0)
