@@ -216,7 +216,7 @@ describe('console', () => {
           `);
           await context.createTextSnapshot();
           await issuePromise;
-          await listConsoleMessages.handler({params: {}}, response, context);
+          await listConsoleMessages.handler({params: {types: ['issue']}}, response, context);
           const response2 = new McpResponse();
           await getConsoleMessage.handler(
             {params: {msgid: 1}},
