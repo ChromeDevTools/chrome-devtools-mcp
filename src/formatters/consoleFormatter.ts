@@ -171,11 +171,12 @@ export function formatIssue(
     ...affectedResources.map(item => {
       const details = [];
       if (item.uid) details.push(`uid=${item.uid}`);
-      if (item.data) details.push(`data=${JSON.stringify(item.data)}`);
-      if (item.request)
+      if (item.request) {
         details.push(
           (typeof item.request === 'number' ? `reqid=` : 'url=') + item.request,
         );
+      }
+      if (item.data) details.push(`data=${JSON.stringify(item.data)}`);
       return details.join(' ');
     }),
   );
