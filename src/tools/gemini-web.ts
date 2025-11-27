@@ -249,31 +249,64 @@ export const askGeminiWeb = defineTool({
 
             response.appendResponseLine('質問を送信中...');
 
-            // Input text
+            // Input text using the textbox element
+            // Gemini uses a textbox with role="textbox" or a div with contenteditable
             const questionSent = await page.evaluate((questionText) => {
-                const editor = document.querySelector('div[contenteditable="true"]') as HTMLElement;
-                if (!editor) return false;
+                // Try textbox first (Gemini's current implementation)
+                const textbox = document.querySelector('[role="textbox"]') as HTMLElement;
+                if (textbox) {
+                    textbox.focus();
+                    // Clear existing content
+                    textbox.innerHTML = '';
+                    // Insert text
+                    const p = document.createElement('p');
+                    p.textContent = questionText;
+                    textbox.appendChild(p);
+                    textbox.dispatchEvent(new Event('input', { bubbles: true }));
+                    return true;
+                }
 
-                editor.innerHTML = '';
-                const p = document.createElement('p');
-                p.textContent = questionText;
-                editor.appendChild(p);
-                editor.dispatchEvent(new Event('input', { bubbles: true }));
-                return true;
+                // Fallback to contenteditable
+                const editor = document.querySelector('div[contenteditable="true"]') as HTMLElement;
+                if (editor) {
+                    editor.innerHTML = '';
+                    const p = document.createElement('p');
+                    p.textContent = questionText;
+                    editor.appendChild(p);
+                    editor.dispatchEvent(new Event('input', { bubbles: true }));
+                    return true;
+                }
+
+                return false;
             }, sanitizedQuestion);
 
             if (!questionSent) {
-                response.appendResponseLine('❌ エディタが見つかりません');
+                response.appendResponseLine('❌ 入力欄が見つかりません');
                 return;
             }
 
             await new Promise((resolve) => setTimeout(resolve, 500));
 
-            // Click send button
+            // Click send button - look for "プロンプトを送信" or similar
             const sent = await page.evaluate(() => {
                 const buttons = Array.from(document.querySelectorAll('button'));
-                const sendButton = buttons.find(b => b.getAttribute('aria-label') === '送信' || b.querySelector('mat-icon[data-mat-icon-name="send"]'));
-                if (sendButton) {
+                // Primary: look for "プロンプトを送信" button
+                let sendButton = buttons.find(b =>
+                    b.textContent?.includes('プロンプトを送信') ||
+                    b.textContent?.includes('送信') ||
+                    b.getAttribute('aria-label')?.includes('送信') ||
+                    b.getAttribute('aria-label')?.includes('Send')
+                );
+
+                // Fallback: look for send icon
+                if (!sendButton) {
+                    sendButton = buttons.find(b =>
+                        b.querySelector('mat-icon[data-mat-icon-name="send"]') ||
+                        b.querySelector('[data-icon="send"]')
+                    );
+                }
+
+                if (sendButton && !sendButton.disabled) {
                     (sendButton as HTMLElement).click();
                     return true;
                 }
@@ -288,91 +321,91 @@ export const askGeminiWeb = defineTool({
 
             response.appendResponseLine('回答を待機中...');
 
-            // Wait for response
-            // Gemini usually shows a "Stop responding" button or similar while generating
-            // We can check for the presence of the latest user message and then wait for the assistant message
+            // Wait for response using actual Gemini UI indicators:
+            // - Generating: "回答を停止" button appears, "Gemini が入力中です" text
+            // - Complete: "Gemini が回答しました" text appears
 
             const startTime = Date.now();
-            let lastText = '';
+            let stableCount = 0;
+            let lastResponseText = '';
 
             while (true) {
-                await new Promise((resolve) => setTimeout(resolve, 2000));
+                await new Promise((resolve) => setTimeout(resolve, 1500));
 
                 const status = await page.evaluate(() => {
-                    // Check if generating (look for stop button or spinner)
-                    // This is tricky without exact selectors. 
-                    // We can assume if the last message is from user, it's still thinking/generating
-                    // OR if the last message is from model but empty/streaming.
+                    // Check for generating indicators
+                    const buttons = Array.from(document.querySelectorAll('button'));
+                    const stopButton = buttons.find(b =>
+                        b.textContent?.includes('回答を停止') ||
+                        b.textContent?.includes('Stop') ||
+                        b.getAttribute('aria-label')?.includes('Stop')
+                    );
 
-                    const messageContainers = document.querySelectorAll('message-content'); // Hypothetical selector
-                    // Better: look for model-response or similar
+                    // Check for status text
+                    const bodyText = document.body.innerText;
+                    const isTyping = bodyText.includes('Gemini が入力中です') ||
+                                    bodyText.includes('Gemini is typing');
+                    const isComplete = bodyText.includes('Gemini が回答しました') ||
+                                      bodyText.includes('Gemini has responded');
 
-                    // Generic approach: check for text change in the last response container
-                    // or check for "Stop" button
+                    const isGenerating = !!stopButton || isTyping;
 
-                    // Gemini specific: "Stop response" button
-                    // aria-label="Stop response" or similar
-                    const stopButton = document.querySelector('button[aria-label*="Stop"]');
-                    const isGenerating = !!stopButton;
+                    // Get the response content from model-response elements
+                    const modelResponses = Array.from(document.querySelectorAll('model-response'));
+                    let responseContent = '';
+                    if (modelResponses.length > 0) {
+                        // Get the last model response
+                        const lastResponse = modelResponses[modelResponses.length - 1];
+                        responseContent = lastResponse.textContent || '';
+                    }
 
-                    // Get all response texts
-                    // Gemini responses are usually in specific containers.
-                    // Let's try to find the last response text.
-                    // This is a guess.
-                    const responses = Array.from(document.querySelectorAll('.model-response-text, .message-content, [data-message-id]'));
-                    // If we can't find specific classes, we might need to rely on text content changes.
-
-                    // Fallback: get all text from the main chat area
-                    const chatArea = document.querySelector('main');
-                    const fullText = chatArea?.innerText || '';
+                    // Fallback: get text from main area
+                    if (!responseContent) {
+                        const main = document.querySelector('main');
+                        responseContent = main?.innerText || '';
+                    }
 
                     return {
                         isGenerating,
-                        fullText
+                        isComplete,
+                        responseContent
                     };
                 });
 
-                // If not generating and text hasn't changed for a while, assume done.
-                // But "isGenerating" might be false if it hasn't started yet.
-
-                // Let's use a simpler timeout-based approach for now if we can't reliably detect "generating" state without selectors.
-                // Or better: wait for the text to stabilize.
-
-                if (!status.isGenerating && status.fullText.length > lastText.length) {
-                    // Still receiving content (maybe) or just finished
-                    // If it was generating and now isn't, it's done.
+                // If explicitly marked as complete, we're done
+                if (status.isComplete && !status.isGenerating) {
+                    break;
                 }
 
-                // For this initial version, let's just wait for text to stabilize for 5 seconds.
-                if (status.fullText === lastText && status.fullText.length > 0) {
-                    // Stable for 2 seconds (since loop is 2s)
-                    // Let's wait one more loop to be sure
-                    // Actually, let's just break if it's stable and not generating
-                    if (!status.isGenerating) {
+                // If not generating and response text is stable for 2 iterations, we're done
+                if (!status.isGenerating && status.responseContent === lastResponseText && status.responseContent.length > 0) {
+                    stableCount++;
+                    if (stableCount >= 2) {
                         break;
                     }
+                } else {
+                    stableCount = 0;
                 }
 
-                lastText = status.fullText;
+                lastResponseText = status.responseContent;
 
-                if (Date.now() - startTime > 120000) { // 2 mins timeout
+                if (Date.now() - startTime > 180000) { // 3 mins timeout
+                    response.appendResponseLine('⚠️ タイムアウト（3分）');
                     break;
                 }
             }
 
-            // Get the final response
-            // We need to extract the LAST response.
+            // Get the final response content
             const responseText = await page.evaluate(() => {
-                // Try to find the last model response
-                // This is hard without specific selectors.
-                // Let's return the last chunk of text that looks like a response.
+                // Get content from model-response elements
+                const modelResponses = Array.from(document.querySelectorAll('model-response'));
+                if (modelResponses.length > 0) {
+                    // Get the last model response
+                    const lastResponse = modelResponses[modelResponses.length - 1];
+                    return lastResponse.textContent?.trim() || '';
+                }
 
-                // Heuristic: The text after the last user prompt.
-                // Find all user prompts
-                const userPrompts = Array.from(document.querySelectorAll('.user-query, .user-message')); // Hypothetical
-                // ...
-
-                // Simplest fallback: Return the whole chat text or just the last 2000 chars
+                // Fallback: get text from main area
                 const main = document.querySelector('main');
                 return main?.innerText.slice(-5000) || '';
             });
@@ -412,6 +445,24 @@ export const askGeminiWeb = defineTool({
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
             response.appendResponseLine(`❌ エラー: ${errorMessage}`);
+
+            // Error snapshot
+            try {
+                const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+                const debugDir = path.join(process.cwd(), 'docs/ask/gemini/debug');
+                await fs.promises.mkdir(debugDir, { recursive: true });
+
+                const screenshotPath = path.join(debugDir, `error-${timestamp}.png`) as `${string}.png`;
+                await page.screenshot({ path: screenshotPath });
+                response.appendResponseLine(`📸 エラー時のスクリーンショット: ${screenshotPath}`);
+
+                const htmlPath = path.join(debugDir, `error-${timestamp}.html`);
+                const html = await page.content();
+                await fs.promises.writeFile(htmlPath, html, 'utf-8');
+                response.appendResponseLine(`📄 エラー時のHTML: ${htmlPath}`);
+            } catch (snapshotError) {
+                console.error('Failed to capture error snapshot:', snapshotError);
+            }
         }
     },
 });
