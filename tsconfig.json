@@ -64,7 +64,7 @@
     "node_modules/chrome-devtools-frontend/front_end/third_party/marked",
     "node_modules/chrome-devtools-frontend/front_end/third_party/source-map-scopes-codec",
     "node_modules/chrome-devtools-frontend/front_end/third_party/third-party-web",
-    "node_modules/chrome-devtools-frontend/mcp/mcp.ts"
+    "node_modules/chrome-devtools-frontend/mcp"
   ],
   "exclude": ["node_modules/chrome-devtools-frontend/**/*.test.ts"]
 }
