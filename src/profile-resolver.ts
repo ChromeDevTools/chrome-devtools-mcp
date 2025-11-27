@@ -83,7 +83,30 @@ export function resolveUserDataDir(opts: ResolveOpts): ResolvedProfile {
     console.error(`[profiles] Auto-detected client from parent process: ${clientId}`);
   }
 
-  // 0) CI detection → ephemeral session directory (unless MCP_PERSIST_PROFILES)
+  // 0a) MCP_SHARED_PROFILE → shared profile across all projects
+  //     - Uses a single profile for all projects to avoid re-login
+  if (opts.env.MCP_SHARED_PROFILE === 'true') {
+    const key = 'shared';
+    const p = projectProfilePath(key, clientId, channel);
+    const result: ResolvedProfile = {
+      path: p,
+      reason: 'MCP_USER_DATA_DIR', // Treat as explicit user choice
+      projectKey: key,
+      projectName: 'shared',
+      hash: '00000000',
+      clientId,
+      channel,
+    };
+    console.error(
+      `[profiles] resolved(MCP_SHARED_PROFILE): ${result.path} (client=${clientId})`,
+    );
+    console.error(
+      `[profiles] ℹ️  Using shared profile - login state persists across all projects`,
+    );
+    return result;
+  }
+
+  // 0b) CI detection → ephemeral session directory (unless MCP_PERSIST_PROFILES)
   //    - This happens before other priorities to keep CI clean by default.
   if (isCI(opts.env) && !opts.env.MCP_PERSIST_PROFILES) {
     const sessionId = `${process.pid}-${Date.now()}`;
