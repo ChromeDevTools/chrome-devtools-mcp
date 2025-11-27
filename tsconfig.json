@@ -57,5 +57,7 @@
     "node_modules/chrome-devtools-frontend/front_end/core/root",
     "node_modules/chrome-devtools-frontend/front_end/third_party/third-party-web"
   ],
-  "exclude": ["node_modules/chrome-devtools-frontend/**/*.test.ts"]
+  "exclude": [
+    "node_modules/chrome-devtools-frontend/**/*.test.ts"
+  ]
 }

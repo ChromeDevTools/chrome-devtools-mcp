@@ -27,9 +27,9 @@ if (typeof globalThis.self === 'undefined') {
 if (typeof globalThis.localStorage === 'undefined') {
   (globalThis as any).localStorage = {
     getItem: () => null,
-    setItem: () => {},
-    removeItem: () => {},
-    clear: () => {},
+    setItem: () => { },
+    removeItem: () => { },
+    clear: () => { },
     key: () => null,
     length: 0,
   };
@@ -39,24 +39,24 @@ import assert from 'node:assert';
 import fs from 'node:fs';
 import path from 'node:path';
 
-import {McpServer} from '@modelcontextprotocol/sdk/server/mcp.js';
-import {StdioServerTransport} from '@modelcontextprotocol/sdk/server/stdio.js';
-import type {CallToolResult} from '@modelcontextprotocol/sdk/types.js';
-import {SetLevelRequestSchema, RootsListChangedNotificationSchema} from '@modelcontextprotocol/sdk/types.js';
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import { SetLevelRequestSchema, RootsListChangedNotificationSchema } from '@modelcontextprotocol/sdk/types.js';
 
-import type {Browser} from 'puppeteer-core';
+import type { Browser } from 'puppeteer-core';
 
-import type {Channel} from './browser.js';
-import {resolveBrowser} from './browser.js';
-import {parseArguments} from './cli.js';
-import {logger, saveLogsToFile} from './logger.js';
-import {McpContext} from './McpContext.js';
-import {McpResponse} from './McpResponse.js';
-import {Mutex} from './Mutex.js';
-import {resolveRoots, type RootsInfo} from './roots-manager.js';
-import {runStartupCheck} from './startup-check.js';
-import {setProjectRoot} from './project-root-state.js';
-import {setupGraceful} from './graceful.js';
+import type { Channel } from './browser.js';
+import { resolveBrowser } from './browser.js';
+import { parseArguments } from './cli.js';
+import { logger, saveLogsToFile } from './logger.js';
+import { McpContext } from './McpContext.js';
+import { McpResponse } from './McpResponse.js';
+import { Mutex } from './Mutex.js';
+import { resolveRoots, type RootsInfo } from './roots-manager.js';
+import { runStartupCheck } from './startup-check.js';
+import { setProjectRoot } from './project-root-state.js';
+import { setupGraceful } from './graceful.js';
 import * as bookmarkTools from './tools/bookmarks.js';
 import * as chatgptWebTools from './tools/chatgpt-web.js';
 import * as deepResearchChatGPTTools from './tools/deep_research_chatgpt.js';
@@ -64,6 +64,7 @@ import * as consoleTools from './tools/console.js';
 import * as diagnoseUiTools from './tools/diagnose-ui.js';
 import * as emulationTools from './tools/emulation.js';
 import * as extensionTools from './tools/extensions.js';
+import * as geminiWebTools from './tools/gemini-web.js';
 import * as inputTools from './tools/input.js';
 import * as networkTools from './tools/network.js';
 import * as pagesTools from './tools/pages.js';
@@ -71,9 +72,10 @@ import * as performanceTools from './tools/performance.js';
 import * as screenshotTools from './tools/screenshot.js';
 import * as scriptTools from './tools/script.js';
 import * as snapshotTools from './tools/snapshot.js';
-import type {ToolDefinition} from './tools/ToolDefinition.js';
+import type { ToolDefinition } from './tools/ToolDefinition.js';
 
-function readPackageJson(): {version?: string} {
+
+function readPackageJson(): { version?: string } {
   const currentDir = import.meta.dirname;
   const packageJsonPath = path.join(currentDir, '..', '..', 'package.json');
   if (!fs.existsSync(packageJsonPath)) {
@@ -101,7 +103,7 @@ const server = new McpServer(
     title: 'Chrome DevTools MCP for Extension Development',
     version,
   },
-  {capabilities: {logging: {}}},
+  { capabilities: { logging: {} } },
 );
 server.server.setRequestHandler(SetLevelRequestSchema, () => {
   return {};
@@ -295,6 +297,7 @@ const tools = [
   ...Object.values(bookmarkTools),
   ...Object.values(chatgptWebTools),
   ...Object.values(deepResearchChatGPTTools),
+  ...Object.values(geminiWebTools),
   ...Object.values(consoleTools),
   ...Object.values(diagnoseUiTools),
   ...Object.values(emulationTools),

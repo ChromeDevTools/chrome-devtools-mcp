@@ -27,3 +27,18 @@ export const CHATGPT_CONFIG = {
    */
   DEFAULT_MODEL: 'gpt-5-thinking',
 } as const;
+
+/**
+ * Gemini configuration
+ */
+export const GEMINI_CONFIG = {
+  /**
+   * Default Gemini URL
+   */
+  DEFAULT_URL: 'https://gemini.google.com/',
+
+  /**
+   * Base URL for Gemini
+   */
+  BASE_URL: 'https://gemini.google.com/',
+} as const;

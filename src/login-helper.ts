@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {Page} from 'puppeteer-core';
+import type { Page } from 'puppeteer-core';
 
 /**
  * Check if the page requires login
@@ -25,6 +25,40 @@ export async function isLoginRequired(page: Page): Promise<boolean> {
     return true;
   }
 
+  // Gemini specific check
+  if (currentUrl.includes('gemini.google.com')) {
+    try {
+      const geminiContent = await page.evaluate(() => {
+        const bodyText = document.body.innerText.toLowerCase();
+        // Check for common login page text
+        const hasLoginText = bodyText.includes('sign in') ||
+          bodyText.includes('login') ||
+          bodyText.includes('google account');
+
+        // Check for Gemini composer
+        const hasComposer = !!(
+          document.querySelector('div[contenteditable="true"]') ||
+          document.querySelector('textarea')
+        );
+
+        return { hasLoginText, hasComposer };
+      });
+
+      console.error(`[login-helper] Gemini check: ${JSON.stringify(geminiContent)}`);
+
+      if (geminiContent.hasComposer) {
+        console.error('[login-helper] ❌ Login NOT required (Gemini composer detected)');
+        return false;
+      }
+
+      console.error('[login-helper] ✅ Login required (Gemini composer missing)');
+      return true;
+    } catch (error) {
+      console.error(`[login-helper] Error checking Gemini login: ${error}`);
+      return true;
+    }
+  }
+
   // Method 2: Check page content for login indicators
   try {
     const pageContent = await page.evaluate(() => {
@@ -33,8 +67,8 @@ export async function isLoginRequired(page: Page): Promise<boolean> {
 
       // ChatGPT-specific login indicators
       const hasLoginText = bodyText.includes('log in') ||
-                          bodyText.includes('sign in') ||
-                          bodyText.includes('welcome to chatgpt');
+        bodyText.includes('sign in') ||
+        bodyText.includes('welcome to chatgpt');
 
       // Check for login buttons - NATIVE DOM selectors only
       const hasLoginButton = !!(

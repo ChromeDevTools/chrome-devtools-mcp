@@ -163,4 +163,54 @@ export function checkPlaceholder(
  */
 export function clearCache(): void {
   cachedSelectors = null;
+  cachedGeminiSelectors = null;
+}
+
+export interface GeminiSelectors {
+  version: string;
+  lastUpdated: string;
+  description: string;
+  elements: Record<string, SelectorDef>;
+  placeholders?: {
+    normalMode?: string;
+  };
+}
+
+let cachedGeminiSelectors: GeminiSelectors | null = null;
+
+/**
+ * Load Gemini selectors from JSON file
+ */
+export function loadGeminiSelectors(): GeminiSelectors {
+  if (cachedGeminiSelectors) {
+    return cachedGeminiSelectors;
+  }
+
+  const __filename = fileURLToPath(import.meta.url);
+  const __dirname = path.dirname(__filename);
+  const selectorsPath = path.join(__dirname, 'gemini.json');
+
+  try {
+    const data = fs.readFileSync(selectorsPath, 'utf-8');
+    cachedGeminiSelectors = JSON.parse(data) as GeminiSelectors;
+    return cachedGeminiSelectors;
+  } catch (error) {
+    throw new Error(
+      `Failed to load selectors from ${selectorsPath}: ${error}`,
+    );
+  }
+}
+
+/**
+ * Get a specific Gemini selector definition
+ */
+export function getGeminiSelector(elementName: string): SelectorDef {
+  const selectors = loadGeminiSelectors();
+  const selector = selectors.elements[elementName];
+
+  if (!selector) {
+    throw new Error(`Selector not found: ${elementName}`);
+  }
+
+  return selector;
 }
