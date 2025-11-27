@@ -142,29 +142,22 @@ function registerTool(tool: ToolDefinition): void {
           response,
           context,
         );
-        try {
-          const content = await response.handle(tool.name, context);
-          return {
-            content,
-          };
-        } catch (error) {
-          logger(`${tool.name} response handling error:`, error, error.stack);
-          const errorText =
-            error instanceof Error ? error.message : String(error);
-
-          return {
-            content: [
-              {
-                type: 'text',
-                text: errorText,
-              },
-            ],
-            isError: true,
-          };
-        }
+        const content = await response.handle(tool.name, context);
+        return {
+          content,
+        };
       } catch (err) {
-        logger(`${tool.name} error:`, err, err.stack);
-        throw err;
+        logger(`${tool.name} error:`, err, err?.stack);
+        const errorText = err && 'message' in err ? err.message : String(err);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: errorText,
+            },
+          ],
+          isError: true,
+        };
       } finally {
         guard.dispose();
       }
