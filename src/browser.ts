@@ -30,6 +30,10 @@ function makeTargetFilter() {
     if (target.url() === 'chrome://newtab/') {
       return true;
     }
+    // Could be the only page opened in the browser.
+    if (target.url().startsWith('chrome://inspect')) {
+      return true;
+    }
     for (const prefix of ignoredPrefixes) {
       if (target.url().startsWith(prefix)) {
         return false;

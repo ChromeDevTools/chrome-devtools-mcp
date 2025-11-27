@@ -148,6 +148,7 @@ function registerTool(tool: ToolDefinition): void {
             content,
           };
         } catch (error) {
+          logger(`${tool.name} response handling error:`, error, error.stack);
           const errorText =
             error instanceof Error ? error.message : String(error);
 
@@ -162,7 +163,7 @@ function registerTool(tool: ToolDefinition): void {
           };
         }
       } catch (err) {
-        logger(`${tool.name} error: ${err.message}`);
+        logger(`${tool.name} error:`, err, err.stack);
         throw err;
       } finally {
         guard.dispose();

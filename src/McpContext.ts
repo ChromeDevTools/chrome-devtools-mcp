@@ -407,7 +407,10 @@ export class McpContext implements Context {
       );
     });
 
-    if (!this.#selectedPage || this.#pages.indexOf(this.#selectedPage) === -1) {
+    if (
+      (!this.#selectedPage || this.#pages.indexOf(this.#selectedPage) === -1) &&
+      this.#pages[0]
+    ) {
       this.selectPage(this.#pages[0]);
     }
 
