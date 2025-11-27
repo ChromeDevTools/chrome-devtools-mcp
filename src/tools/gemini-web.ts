@@ -251,17 +251,23 @@ export const askGeminiWeb = defineTool({
 
             // Input text using the textbox element
             // Gemini uses a textbox with role="textbox" or a div with contenteditable
+            // NOTE: Gemini has Trusted Types CSP, so we cannot use innerHTML directly
             const questionSent = await page.evaluate((questionText) => {
+                // Helper to clear element content without innerHTML (CSP-safe)
+                const clearElement = (el: HTMLElement) => {
+                    while (el.firstChild) {
+                        el.removeChild(el.firstChild);
+                    }
+                };
+
                 // Try textbox first (Gemini's current implementation)
                 const textbox = document.querySelector('[role="textbox"]') as HTMLElement;
                 if (textbox) {
                     textbox.focus();
-                    // Clear existing content
-                    textbox.innerHTML = '';
-                    // Insert text
-                    const p = document.createElement('p');
-                    p.textContent = questionText;
-                    textbox.appendChild(p);
+                    // Clear existing content (CSP-safe)
+                    clearElement(textbox);
+                    // Insert text using textContent (CSP-safe)
+                    textbox.textContent = questionText;
                     textbox.dispatchEvent(new Event('input', { bubbles: true }));
                     return true;
                 }
@@ -269,10 +275,8 @@ export const askGeminiWeb = defineTool({
                 // Fallback to contenteditable
                 const editor = document.querySelector('div[contenteditable="true"]') as HTMLElement;
                 if (editor) {
-                    editor.innerHTML = '';
-                    const p = document.createElement('p');
-                    p.textContent = questionText;
-                    editor.appendChild(p);
+                    clearElement(editor);
+                    editor.textContent = questionText;
                     editor.dispatchEvent(new Event('input', { bubbles: true }));
                     return true;
                 }
