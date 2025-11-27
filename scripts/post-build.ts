@@ -67,7 +67,7 @@ function main(): void {
 
   // Create i18n mock
   const i18nDir = path.join(BUILD_DIR, devtoolsFrontEndCorePath, 'i18n');
-  fs.mkdirSync(i18nDir, {recursive: true});
+  fs.mkdirSync(i18nDir, { recursive: true });
   const i18nFile = path.join(i18nDir, 'i18n.js');
   const i18nContent = `
 export const i18n = {
@@ -137,14 +137,14 @@ export const ByteUtilities = {
     devtoolsThirdPartyPath,
     'codemirror.next',
   );
-  fs.mkdirSync(codeMirrorDir, {recursive: true});
+  fs.mkdirSync(codeMirrorDir, { recursive: true });
   const codeMirrorFile = path.join(codeMirrorDir, 'codemirror.next.js');
   const codeMirrorContent = `export default {}`;
   writeFile(codeMirrorFile, codeMirrorContent);
 
   // Create root mock
   const rootDir = path.join(BUILD_DIR, devtoolsFrontEndCorePath, 'root');
-  fs.mkdirSync(rootDir, {recursive: true});
+  fs.mkdirSync(rootDir, { recursive: true });
   const runtimeFile = path.join(rootDir, 'Runtime.js');
   const runtimeContent = `
 export function getChromeVersion() { return ''; };
@@ -186,14 +186,19 @@ export const hostConfig = {};
 
   // Copy selector JSON files
   const selectorsDir = path.join(BUILD_DIR, 'src', 'selectors');
-  fs.mkdirSync(selectorsDir, {recursive: true});
-  const selectorsSource = path.join(process.cwd(), 'src', 'selectors', 'chatgpt.json');
-  const selectorsDestination = path.join(selectorsDir, 'chatgpt.json');
-  if (fs.existsSync(selectorsSource)) {
-    fs.copyFileSync(selectorsSource, selectorsDestination);
-    console.log('✅ Copied chatgpt.json to build directory');
-  } else {
-    console.warn('⚠️  chatgpt.json not found, skipping copy');
+  fs.mkdirSync(selectorsDir, { recursive: true });
+
+  const selectors = ['chatgpt.json', 'gemini.json'];
+
+  for (const selector of selectors) {
+    const source = path.join(process.cwd(), 'src', 'selectors', selector);
+    const destination = path.join(selectorsDir, selector);
+    if (fs.existsSync(source)) {
+      fs.copyFileSync(source, destination);
+      console.log(`✅ Copied ${selector} to build directory`);
+    } else {
+      console.warn(`⚠️  ${selector} not found, skipping copy`);
+    }
   }
 }
 

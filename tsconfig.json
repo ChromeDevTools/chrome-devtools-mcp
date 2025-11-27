@@ -58,6 +58,7 @@
     "node_modules/chrome-devtools-frontend/front_end/third_party/third-party-web"
   ],
   "exclude": [
-    "node_modules/chrome-devtools-frontend/**/*.test.ts"
+    "node_modules/chrome-devtools-frontend/**/*.test.ts",
+    "node_modules/chrome-devtools-frontend/front_end/models/trace/lantern/testing/MetricTestUtils.ts"
   ]
 }
