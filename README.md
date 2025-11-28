@@ -343,9 +343,12 @@ The Chrome DevTools MCP server supports the following configuration option:
   - **Type:** string
 
 - **`--isolated`**
-  If specified, creates a temporary user-data-dir that is automatically cleaned up after the browser is closed.
+  If specified, creates a temporary user-data-dir that is automatically cleaned up after the browser is closed. Defaults to false.
   - **Type:** boolean
-  - **Default:** `false`
+
+- **`--userDataDir`**
+  Path to the user data directory for Chrome. Default is $HOME/.cache/chrome-devtools-mcp/chrome-profile$CHANNEL_SUFFIX_IF_NON_STABLE
+  - **Type:** string
 
 - **`--channel`**
   Specify a different Chrome channel that should be used. The default is the stable channel version.

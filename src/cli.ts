@@ -88,8 +88,13 @@ export const cliOptions = {
   isolated: {
     type: 'boolean',
     description:
-      'If specified, creates a temporary user-data-dir that is automatically cleaned up after the browser is closed.',
-    default: false,
+      'If specified, creates a temporary user-data-dir that is automatically cleaned up after the browser is closed. Defaults to false.',
+  },
+  userDataDir: {
+    type: 'string',
+    description:
+      'Path to the user data directory for Chrome. Default is $HOME/.cache/chrome-devtools-mcp/chrome-profile$CHANNEL_SUFFIX_IF_NON_STABLE',
+    conflicts: ['browserUrl', 'wsEndpoint', 'isolated'],
   },
   channel: {
     type: 'string',
@@ -212,6 +217,10 @@ export function parseArguments(version: string, argv = process.argv) {
         'Disable tools in the performance category',
       ],
       ['$0 --no-category-network', 'Disable tools in the network category'],
+      [
+        '$0 --user-data-dir=/tmp/user-data-dir',
+        'Use a custom user data directory',
+      ],
     ]);
 
   return yargsInstance
