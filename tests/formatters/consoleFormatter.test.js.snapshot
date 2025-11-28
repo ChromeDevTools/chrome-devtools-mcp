@@ -43,6 +43,4 @@ This is a mock issue description
 Learn more:
 [Learn more](http://example.com/learnmore)
 [Learn more 2](http://example.com/another-learnmore)
-### Affected resources
-data={"violatingNodeAttribute":"test"}
 `;

@@ -196,12 +196,7 @@ export function stabilizeResponseOutput(text: unknown) {
 
 export function getMockAggregatedIssue(): sinon.SinonStubbedInstance<AggregatedIssue> {
   const mockAggregatedIssue = sinon.createStubInstance(AggregatedIssue);
-  mockAggregatedIssue.getGenericIssues.returns(new Set());
-  mockAggregatedIssue.getLowContrastIssues.returns(new Set());
-  mockAggregatedIssue.getElementAccessibilityIssues.returns(new Set());
-  mockAggregatedIssue.getQuirksModeIssues.returns(new Set());
-  mockAggregatedIssue.getCorsIssues.returns(new Set());
-  mockAggregatedIssue.getMixedContentIssues.returns(new Set());
+  mockAggregatedIssue.getAllIssues.returns([]);
   return mockAggregatedIssue;
 }
 

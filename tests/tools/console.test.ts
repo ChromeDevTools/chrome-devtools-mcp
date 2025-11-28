@@ -239,7 +239,8 @@ describe('console', () => {
           const rawText = formattedResponse[0].text as string;
           const sanitizedText = rawText
             .replaceAll(/ID: \d+/g, 'ID: <ID>')
-            .replaceAll(/reqid=\d+/g, 'reqid=<reqid>');
+            .replaceAll(/reqid=\d+/g, 'reqid=<reqid>')
+            .replaceAll(/localhost:\d+/g, 'hostname:port');
           t.assert.snapshot?.(sanitizedText);
         });
       });

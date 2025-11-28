@@ -69,15 +69,7 @@ function formatArgs(consoleData: ConsoleMessageData): string {
 
   return result.join('\n');
 }
-interface IssueDetailsWithResources {
-  violatingNodeId?: number;
-  nodeId?: number;
-  documentNodeId?: number;
-  request?: {
-    requestId?: string;
-    url: string;
-  };
-}
+
 export function formatIssue(
   issue: AggregatedIssue,
   description?: string,
@@ -100,45 +92,37 @@ export function formatIssue(
     }
   }
 
-  const issues: Array<{
-    details?: () => IssueDetailsWithResources;
-    getDetails?: () => IssueDetailsWithResources;
-  }> = [
-    ...issue.getCorsIssues(),
-    ...issue.getMixedContentIssues(),
-    ...issue.getGenericIssues(),
-    ...issue.getLowContrastIssues(),
-    ...issue.getElementAccessibilityIssues(),
-    ...issue.getQuirksModeIssues(),
-  ];
+  const issues = issue.getAllIssues();
   const affectedResources: Array<{
     uid?: string;
     data?: object;
     request?: string | number;
   }> = [];
   for (const singleIssue of issues) {
-    if (!singleIssue.details && !singleIssue.getDetails) continue;
-
-    let details =
-      singleIssue.details?.() as unknown as IssueDetailsWithResources;
-    if (!details)
-      details =
-        singleIssue.getDetails?.() as unknown as IssueDetailsWithResources;
+    const details = singleIssue.details();
     if (!details) continue;
+
+    // We send the remaining details as untyped JSON because the DevTools
+    // frontend code is currently not re-usable.
+    // eslint-disable-next-line
+    const data = structuredClone(details) as any;
 
     let uid;
     let request: number | string | undefined;
-    if (details.violatingNodeId && context) {
+    if ('violatingNodeId' in details && details.violatingNodeId && context) {
       uid = context.resolveCdpElementId(details.violatingNodeId);
+      delete data.violatingNodeId;
     }
-    if (details.nodeId && context) {
+    if ('nodeId' in details && details.nodeId && context) {
       uid = context.resolveCdpElementId(details.nodeId);
+      delete data.nodeId;
     }
-    if (details.documentNodeId && context) {
+    if ('documentNodeId' in details && details.documentNodeId && context) {
       uid = context.resolveCdpElementId(details.documentNodeId);
+      delete data.documentNodeId;
     }
 
-    if (details.request) {
+    if ('request' in details && details.request) {
       request = details.request.url;
       if (details.request.requestId && context) {
         const resolvedId = context.resolveCdpRequestId(
@@ -146,18 +130,14 @@ export function formatIssue(
         );
         if (resolvedId) {
           request = resolvedId;
+          delete data.request.requestId;
         }
       }
     }
 
-    // eslint-disable-next-line
-    const data = structuredClone(details) as any;
-    delete data.violatingNodeId;
-    delete data.nodeId;
-    delete data.documentNodeId;
+    // These fields has no use for the MCP client (redundant or irrelevant).
     delete data.errorType;
     delete data.frameId;
-    delete data.request;
     affectedResources.push({
       uid,
       data: data,
@@ -180,7 +160,6 @@ export function formatIssue(
       return details.join(' ');
     }),
   );
-  if (result.length === 0)
-    return 'No details provided for the issue ' + issue.code();
+  if (result.length === 0) return 'No affected resources found';
   return result.join('\n');
 }
