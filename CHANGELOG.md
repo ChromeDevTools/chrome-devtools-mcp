@@ -1,5 +1,36 @@
 # Changelog
 
+## [0.11.0](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.10.2...chrome-devtools-mcp-v0.11.0) (2025-11-28)
+
+
+### 🎉 Features
+
+* support --user-data-dir ([#622](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/622)) ([fcaf553](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/fcaf55354c2afbdbae538e27eb4b6d02f2e87985))
+
+
+### 🛠️ Fixes
+
+* handle error messages that are not instanceof Error ([#618](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/618)) ([a67528a](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/a67528a046746c7131d5265f6c94613d607aaf90))
+* handle the case when all pages are filtered out ([#616](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/616)) ([bff5c65](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/bff5c6569003fdbc207448d89a8be6a9a8172ca0))
+* ignore hash parts of URLs when finding DevTools ([#608](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/608)) ([52533d0](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/52533d0c695354b816807de253f0ec17099aa9d7))
+* ignore quality for png ([#589](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/589)) ([2eaf268](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/2eaf2689c3360f88479f4cdab8ddde5899378e33))
+* include a note about selected elements missing from the snapshot ([#593](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/593)) ([80e77fd](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/80e77fd9a35a3dc5c451cc5b070b8baa574c686c))
+* prevent dropping license notices on some files when publishing ([#604](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/604)) ([94752ff](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/94752ffade847671ebfd15e4013a5b5cdf8377df))
+* rename page content to latest page snapshot ([#579](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/579)) ([9cb99ad](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/9cb99ad3e65054f4ea12a39358719f6630a020d0))
+* **wait_for:** respect the provided timeout ([#630](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/630)) ([6b0984a](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/6b0984aa7dca6f651afd1fed56246893810781c9)), closes [#624](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/624)
+
+
+### 📄 Documentation
+
+* add Antigravity config ([#580](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/580)) ([6f9182f](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/6f9182f4b60f1f6ff8d321fec35545712828686e))
+* Fix Antigravity docs ([#605](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/605)) ([fae2608](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/fae260888748ece77b368a13ee913153caffcef7))
+* update readme to explain agy's browser integration ([#612](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/612)) ([2d89865](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/2d89865ddbff6e77332c6157f687dcc2f0bef892))
+
+
+### ♻️ Chores
+
+* avoid throwing in resolveCdpElementId ([#606](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/606)) ([eb261fd](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/eb261fd48b6753db246d24b77e1f477dc7a9455e))
+
 ## [0.10.2](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.10.1...chrome-devtools-mcp-v0.10.2) (2025-11-19)
 
 
