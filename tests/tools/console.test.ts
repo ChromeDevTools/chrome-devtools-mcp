@@ -237,7 +237,9 @@ describe('console', () => {
           );
           const formattedResponse = await response2.handle('test', context);
           const rawText = formattedResponse[0].text as string;
-          const sanitizedText = rawText.replaceAll(/ID: \d+/g, 'ID: <ID>');
+          const sanitizedText = rawText
+            .replaceAll(/ID: \d+/g, 'ID: <ID>')
+            .replaceAll(/reqid=\d+/g, 'reqid=<reqid>');
           t.assert.snapshot?.(sanitizedText);
         });
       });
