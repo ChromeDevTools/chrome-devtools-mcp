@@ -8,6 +8,10 @@ import {
   type Issue,
   type AggregatedIssue,
   type IssuesManagerEventTypes,
+  type Target,
+  DebuggerModel,
+  Foundation,
+  TargetManager,
   MarkdownIssueDescription,
   Marked,
   ProtocolClient,
@@ -15,8 +19,15 @@ import {
   I18n,
 } from '../node_modules/chrome-devtools-frontend/mcp/mcp.js';
 
+import {PuppeteerDevToolsConnection} from './DevToolsConnectionAdapter.js';
 import {ISSUE_UTILS} from './issue-descriptions.js';
 import {logger} from './logger.js';
+import {Mutex} from './Mutex.js';
+import type {
+  Browser,
+  Page,
+  Target as PuppeteerTarget,
+} from './third_party/index.js';
 
 export function extractUrlLikeFromDevToolsTitle(
   title: string,
@@ -138,3 +149,112 @@ I18n.DevToolsLocale.DevToolsLocale.instance({
   },
 });
 I18n.i18n.registerLocaleDataForTest('en-US', {});
+
+export interface TargetUniverse {
+  /** The DevTools target corresponding to the puppeteer Page */
+  target: Target;
+  universe: Foundation.Universe.Universe;
+}
+export type TargetUniverseFactoryFn = (page: Page) => Promise<TargetUniverse>;
+
+export class UniverseManager {
+  readonly #browser: Browser;
+  readonly #createUniverseFor: TargetUniverseFactoryFn;
+  readonly #universes = new WeakMap<Page, TargetUniverse>();
+
+  /** Guard access to #universes so we don't create unnecessary universes */
+  readonly #mutex = new Mutex();
+
+  constructor(
+    browser: Browser,
+    factory: TargetUniverseFactoryFn = DEFAULT_FACTORY,
+  ) {
+    this.#browser = browser;
+    this.#createUniverseFor = factory;
+  }
+
+  async init(pages: Page[]) {
+    try {
+      await this.#mutex.acquire();
+      const promises = [];
+      for (const page of pages) {
+        promises.push(
+          this.#createUniverseFor(page).then(targetUniverse =>
+            this.#universes.set(page, targetUniverse),
+          ),
+        );
+      }
+
+      this.#browser.on('targetcreated', this.#onTargetCreated);
+      this.#browser.on('targetdestroyed', this.#onTargetDestroyed);
+
+      await Promise.all(promises);
+    } finally {
+      this.#mutex.release();
+    }
+  }
+
+  get(page: Page): TargetUniverse | null {
+    return this.#universes.get(page) ?? null;
+  }
+
+  dispose() {
+    this.#browser.off('targetcreated', this.#onTargetCreated);
+    this.#browser.off('targetdestroyed', this.#onTargetDestroyed);
+  }
+
+  #onTargetCreated = async (target: PuppeteerTarget) => {
+    const page = await target.page();
+    try {
+      await this.#mutex.acquire();
+      if (!page || this.#universes.has(page)) {
+        return;
+      }
+
+      this.#universes.set(page, await this.#createUniverseFor(page));
+    } finally {
+      this.#mutex.release();
+    }
+  };
+
+  #onTargetDestroyed = async (target: PuppeteerTarget) => {
+    const page = await target.page();
+    try {
+      await this.#mutex.acquire();
+      if (!page || !this.#universes.has(page)) {
+        return;
+      }
+      this.#universes.delete(page);
+    } finally {
+      this.#mutex.release();
+    }
+  };
+}
+
+const DEFAULT_FACTORY: TargetUniverseFactoryFn = async (page: Page) => {
+  const settingStorage = new Common.Settings.SettingsStorage({});
+  const universe = new Foundation.Universe.Universe({
+    settingsCreationOptions: {
+      syncedStorage: settingStorage,
+      globalStorage: settingStorage,
+      localStorage: settingStorage,
+      settingRegistrations: Common.SettingRegistration.getRegisteredSettings(),
+    },
+    overrideAutoStartModels: new Set([DebuggerModel]),
+  });
+
+  const session = await page.createCDPSession();
+  const connection = new PuppeteerDevToolsConnection(session);
+
+  const targetManager = universe.context.get(TargetManager);
+  const target = targetManager.createTarget(
+    'main',
+    '',
+    'frame' as any, // eslint-disable-line @typescript-eslint/no-explicit-any
+    /* parentTarget */ null,
+    session.id(),
+    undefined,
+    connection,
+  );
+  return {target, universe};
+};

@@ -88,6 +88,13 @@ export const LOCAL_FETCH_PATTERN = './locales/@LOCALE@.json';`;
   const runtimeContent = `
 export function getChromeVersion() { return ''; };
 export const hostConfig = {};
+export const Runtime = {
+  isDescriptorEnabled: () => true,
+  queryParam: () => null,
+}
+export const experiments = {
+  isEnabled: () => false,
+}
   `;
   writeFile(runtimeFile, runtimeContent);
 
