@@ -77,3 +77,57 @@ export const emulate = defineTool({
     }
   },
 });
+
+export const emulateGeolocation = defineTool({
+  name: 'emulate_geolocation',
+  description: `Emulates geolocation on the selected page. Useful for testing location-based features.`,
+  annotations: {
+    category: ToolCategory.EMULATION,
+    readOnlyHint: false,
+  },
+  schema: {
+    latitude: zod
+      .number()
+      .min(-90)
+      .max(90)
+      .optional()
+      .describe(
+        'Latitude between -90 and 90. Omit latitude and longitude to clear the override.',
+      ),
+    longitude: zod
+      .number()
+      .min(-180)
+      .max(180)
+      .optional()
+      .describe(
+        'Longitude between -180 and 180. Omit latitude and longitude to clear the override.',
+      ),
+  },
+  handler: async (request, _response, context) => {
+    const page = context.getSelectedPage();
+    const {latitude, longitude} = request.params;
+
+    if (latitude === undefined && longitude === undefined) {
+      // Clear geolocation override
+      await page.setGeolocation({
+        latitude: 0,
+        longitude: 0,
+      });
+      context.setGeolocation(null);
+    } else if (latitude !== undefined && longitude !== undefined) {
+      // Set geolocation override
+      await page.setGeolocation({
+        latitude,
+        longitude,
+      });
+      context.setGeolocation({
+        latitude,
+        longitude,
+      });
+    } else {
+      throw new Error(
+        'Both latitude and longitude must be provided, or both must be omitted to clear the override.',
+      );
+    }
+  },
+});

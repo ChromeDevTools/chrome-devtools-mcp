@@ -38,6 +38,11 @@ export interface TextSnapshotNode extends SerializedAXNode {
   children: TextSnapshotNode[];
 }
 
+export interface GeolocationOptions {
+  latitude: number;
+  longitude: number;
+}
+
 export interface TextSnapshot {
   root: TextSnapshotNode;
   idToNode: Map<string, TextSnapshotNode>;
@@ -104,6 +109,7 @@ export class McpContext implements Context {
   #isRunningTrace = false;
   #networkConditionsMap = new WeakMap<Page, string>();
   #cpuThrottlingRateMap = new WeakMap<Page, number>();
+  #geolocationMap = new WeakMap<Page, GeolocationOptions>();
   #dialog?: Dialog;
 
   #nextSnapshotId = 1;
@@ -275,6 +281,20 @@ export class McpContext implements Context {
   getCpuThrottlingRate(): number {
     const page = this.getSelectedPage();
     return this.#cpuThrottlingRateMap.get(page) ?? 1;
+  }
+
+  setGeolocation(geolocation: GeolocationOptions | null): void {
+    const page = this.getSelectedPage();
+    if (geolocation === null) {
+      this.#geolocationMap.delete(page);
+    } else {
+      this.#geolocationMap.set(page, geolocation);
+    }
+  }
+
+  getGeolocation(): GeolocationOptions | null {
+    const page = this.getSelectedPage();
+    return this.#geolocationMap.get(page) ?? null;
   }
 
   setIsRunningPerformanceTrace(x: boolean): void {
