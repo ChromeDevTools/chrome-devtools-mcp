@@ -10,6 +10,7 @@ import {
   type IssuesManagerEventTypes,
   MarkdownIssueDescription,
   Marked,
+  ProtocolClient,
   Common,
   I18n,
 } from '../node_modules/chrome-devtools-frontend/mcp/mcp.js';
@@ -124,6 +125,9 @@ export function mapIssueToMessageObject(issue: AggregatedIssue) {
     description: processedMarkdown,
   };
 }
+
+// DevTools CDP errors can get noisy.
+ProtocolClient.InspectorBackend.test.suppressRequestErrors = true;
 
 I18n.DevToolsLocale.DevToolsLocale.instance({
   create: true,
