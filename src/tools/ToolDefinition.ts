@@ -107,10 +107,7 @@ export type Context = Readonly<{
     filename: string,
   ): Promise<{filename: string}>;
   waitForEventsAfterAction(action: () => Promise<unknown>): Promise<void>;
-  waitForTextOnPage(params: {
-    text: string;
-    timeout?: number | undefined;
-  }): Promise<Element>;
+  waitForTextOnPage(text: string, timeout?: number): Promise<Element>;
   getDevToolsData(): Promise<DevToolsData>;
   /**
    * Returns a reqid for a cdpRequestId.
