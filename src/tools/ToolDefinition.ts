@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {TextSnapshotNode} from '../McpContext.js';
+import type {TextSnapshotNode, GeolocationOptions} from '../McpContext.js';
 import {zod} from '../third_party/index.js';
 import type {Dialog, ElementHandle, Page} from '../third_party/index.js';
 import type {TraceResult} from '../trace-processing/parse.js';
@@ -98,6 +98,7 @@ export type Context = Readonly<{
   getAXNodeByUid(uid: string): TextSnapshotNode | undefined;
   setNetworkConditions(conditions: string | null): void;
   setCpuThrottlingRate(rate: number): void;
+  setGeolocation(geolocation: GeolocationOptions | null): void;
   saveTemporaryFile(
     data: Uint8Array<ArrayBufferLike>,
     mimeType: 'image/png' | 'image/jpeg' | 'image/webp',

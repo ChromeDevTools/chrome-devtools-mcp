@@ -7,7 +7,7 @@
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
-import {emulate} from '../../src/tools/emulation.js';
+import {emulate, emulateGeolocation} from '../../src/tools/emulation.js';
 import {withMcpContext} from '../utils.js';
 
 describe('emulation', () => {
@@ -149,6 +149,102 @@ describe('emulation', () => {
         context.selectPage(page);
 
         assert.strictEqual(context.getCpuThrottlingRate(), 1);
+      });
+    });
+  });
+
+  describe('geolocation', () => {
+    it('emulates geolocation with latitude and longitude', async () => {
+      await withMcpContext(async (response, context) => {
+        await emulateGeolocation.handler(
+          {
+            params: {
+              latitude: 48.137154,
+              longitude: 11.576124,
+            },
+          },
+          response,
+          context,
+        );
+
+        const geolocation = context.getGeolocation();
+        assert.strictEqual(geolocation?.latitude, 48.137154);
+        assert.strictEqual(geolocation?.longitude, 11.576124);
+      });
+    });
+
+    it('clears geolocation override when both params are omitted', async () => {
+      await withMcpContext(async (response, context) => {
+        // First set a geolocation
+        await emulateGeolocation.handler(
+          {
+            params: {
+              latitude: 48.137154,
+              longitude: 11.576124,
+            },
+          },
+          response,
+          context,
+        );
+
+        assert.notStrictEqual(context.getGeolocation(), null);
+
+        // Then clear it by omitting both params
+        await emulateGeolocation.handler(
+          {
+            params: {},
+          },
+          response,
+          context,
+        );
+
+        assert.strictEqual(context.getGeolocation(), null);
+      });
+    });
+
+    it('throws error when only latitude is provided', async () => {
+      await withMcpContext(async (response, context) => {
+        await assert.rejects(
+          async () => {
+            await emulateGeolocation.handler(
+              {
+                params: {
+                  latitude: 48.137154,
+                },
+              },
+              response,
+              context,
+            );
+          },
+          {
+            message:
+              'Both latitude and longitude must be provided, or both must be omitted to clear the override.',
+          },
+        );
+      });
+    });
+
+    it('reports correctly for the currently selected page', async () => {
+      await withMcpContext(async (response, context) => {
+        await emulateGeolocation.handler(
+          {
+            params: {
+              latitude: 48.137154,
+              longitude: 11.576124,
+            },
+          },
+          response,
+          context,
+        );
+
+        const geolocation = context.getGeolocation();
+        assert.strictEqual(geolocation?.latitude, 48.137154);
+        assert.strictEqual(geolocation?.longitude, 11.576124);
+
+        const page = await context.newPage();
+        context.selectPage(page);
+
+        assert.strictEqual(context.getGeolocation(), null);
       });
     });
   });
