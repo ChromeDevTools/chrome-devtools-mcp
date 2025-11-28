@@ -322,7 +322,7 @@ The Chrome DevTools MCP server supports the following configuration option:
 <!-- BEGIN AUTO GENERATED OPTIONS -->
 
 - **`--browserUrl`, `-u`**
-  Connect to a running Chrome instance using port forwarding. For more details see: https://developer.chrome.com/docs/devtools/remote-debugging/local-server.
+  Connect to a running, debuggable Chrome instance (e.g. `http://127.0.0.1:9222`). For more details see: https://github.com/ChromeDevTools/chrome-devtools-mcp#connecting-to-a-running-chrome-instance.
   - **Type:** string
 
 - **`--wsEndpoint`, `-w`**
