@@ -247,6 +247,8 @@ const DEFAULT_FACTORY: TargetUniverseFactoryFn = async (page: Page) => {
   const connection = new PuppeteerDevToolsConnection(session);
 
   const targetManager = universe.context.get(TargetManager);
+  targetManager.observeModels(DebuggerModel, SKIP_ALL_PAUSES);
+
   const target = targetManager.createTarget(
     'main',
     '',
@@ -257,4 +259,19 @@ const DEFAULT_FACTORY: TargetUniverseFactoryFn = async (page: Page) => {
     connection,
   );
   return {target, universe};
+};
+
+// We don't want to pause any DevTools universe session ever on the MCP side.
+//
+// Note that calling `setSkipAllPauses` only affects the session on which it was
+// sent. This means DevTools can still pause, step and do whatever. We just won't
+// see the `Debugger.paused`/`Debugger.resumed` events on the MCP side.
+const SKIP_ALL_PAUSES = {
+  modelAdded(model: DebuggerModel): void {
+    void model.agent.invoke_setSkipAllPauses({skip: true});
+  },
+
+  modelRemoved(): void {
+    // Do nothing.
+  },
 };

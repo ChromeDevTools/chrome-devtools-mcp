@@ -9,7 +9,10 @@ import {afterEach, describe, it} from 'node:test';
 
 import sinon from 'sinon';
 
-import {AggregatedIssue} from '../node_modules/chrome-devtools-frontend/mcp/mcp.js';
+import {
+  AggregatedIssue,
+  DebuggerModel,
+} from '../node_modules/chrome-devtools-frontend/mcp/mcp.js';
 import {
   extractUrlLikeFromDevToolsTitle,
   urlsEqual,
@@ -238,6 +241,25 @@ describe('UniverseManager', () => {
       await manager.init([page]);
 
       assert.notStrictEqual(manager.get(page), null);
+    });
+  });
+
+  it('ignores pauses', async () => {
+    await withBrowser(async (browser, page) => {
+      const manager = new UniverseManager(browser);
+      await manager.init([page]);
+      const targetUniverse = manager.get(page);
+      assert.ok(targetUniverse);
+      const model = targetUniverse.target.model(DebuggerModel);
+      assert.ok(model);
+
+      const pausedSpy = sinon.stub();
+      model.addEventListener('DebuggerPaused' as any, pausedSpy); // eslint-disable-line
+
+      const result = await page.evaluate('debugger; 1 + 1');
+      assert.strictEqual(result, 2);
+
+      sinon.assert.notCalled(pausedSpy);
     });
   });
 });
