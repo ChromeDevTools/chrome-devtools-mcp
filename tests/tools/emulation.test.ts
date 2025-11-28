@@ -8,12 +8,12 @@ import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
 import {emulate} from '../../src/tools/emulation.js';
-import {withBrowser} from '../utils.js';
+import {withMcpContext} from '../utils.js';
 
 describe('emulation', () => {
   describe('network', () => {
     it('emulates offline network conditions', async () => {
-      await withBrowser(async (response, context) => {
+      await withMcpContext(async (response, context) => {
         await emulate.handler(
           {
             params: {
@@ -28,7 +28,7 @@ describe('emulation', () => {
       });
     });
     it('emulates network throttling when the throttling option is valid', async () => {
-      await withBrowser(async (response, context) => {
+      await withMcpContext(async (response, context) => {
         await emulate.handler(
           {
             params: {
@@ -44,7 +44,7 @@ describe('emulation', () => {
     });
 
     it('disables network emulation', async () => {
-      await withBrowser(async (response, context) => {
+      await withMcpContext(async (response, context) => {
         await emulate.handler(
           {
             params: {
@@ -60,7 +60,7 @@ describe('emulation', () => {
     });
 
     it('does not set throttling when the network throttling is not one of the predefined options', async () => {
-      await withBrowser(async (response, context) => {
+      await withMcpContext(async (response, context) => {
         await emulate.handler(
           {
             params: {
@@ -76,7 +76,7 @@ describe('emulation', () => {
     });
 
     it('report correctly for the currently selected page', async () => {
-      await withBrowser(async (response, context) => {
+      await withMcpContext(async (response, context) => {
         await emulate.handler(
           {
             params: {
@@ -99,7 +99,7 @@ describe('emulation', () => {
 
   describe('cpu', () => {
     it('emulates cpu throttling when the rate is valid (1-20x)', async () => {
-      await withBrowser(async (response, context) => {
+      await withMcpContext(async (response, context) => {
         await emulate.handler(
           {
             params: {
@@ -115,7 +115,7 @@ describe('emulation', () => {
     });
 
     it('disables cpu throttling', async () => {
-      await withBrowser(async (response, context) => {
+      await withMcpContext(async (response, context) => {
         context.setCpuThrottlingRate(4); // Set it to something first.
         await emulate.handler(
           {
@@ -132,7 +132,7 @@ describe('emulation', () => {
     });
 
     it('report correctly for the currently selected page', async () => {
-      await withBrowser(async (response, context) => {
+      await withMcpContext(async (response, context) => {
         await emulate.handler(
           {
             params: {

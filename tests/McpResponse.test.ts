@@ -16,12 +16,12 @@ import {
   getMockResponse,
   html,
   stabilizeResponseOutput,
-  withBrowser,
+  withMcpContext,
 } from './utils.js';
 
 describe('McpResponse', () => {
   it('list pages', async t => {
-    await withBrowser(async (response, context) => {
+    await withMcpContext(async (response, context) => {
       response.setIncludePages(true);
       const result = await response.handle('test', context);
       assert.equal(result[0].type, 'text');
@@ -30,7 +30,7 @@ describe('McpResponse', () => {
   });
 
   it('allows response text lines to be added', async t => {
-    await withBrowser(async (response, context) => {
+    await withMcpContext(async (response, context) => {
       response.appendResponseLine('Testing 1');
       response.appendResponseLine('Testing 2');
       const result = await response.handle('test', context);
@@ -40,7 +40,7 @@ describe('McpResponse', () => {
   });
 
   it('does not include anything in response if snapshot is null', async () => {
-    await withBrowser(async (response, context) => {
+    await withMcpContext(async (response, context) => {
       const page = context.getSelectedPage();
       page.accessibility.snapshot = async () => null;
       const result = await response.handle('test', context);
@@ -50,7 +50,7 @@ describe('McpResponse', () => {
   });
 
   it('returns correctly formatted snapshot for a simple tree', async t => {
-    await withBrowser(async (response, context) => {
+    await withMcpContext(async (response, context) => {
       const page = context.getSelectedPage();
       await page.setContent(
         html`<button>Click me</button
@@ -68,7 +68,7 @@ describe('McpResponse', () => {
   });
 
   it('returns values for textboxes', async t => {
-    await withBrowser(async (response, context) => {
+    await withMcpContext(async (response, context) => {
       const page = context.getSelectedPage();
       await page.setContent(
         html`<label
@@ -86,7 +86,7 @@ describe('McpResponse', () => {
   });
 
   it('returns verbose snapshot', async t => {
-    await withBrowser(async (response, context) => {
+    await withMcpContext(async (response, context) => {
       const page = context.getSelectedPage();
       await page.setContent(html`<aside>test</aside>`);
       response.includeSnapshot({
@@ -101,7 +101,7 @@ describe('McpResponse', () => {
   it('saves snapshot to file', async t => {
     const filePath = join(tmpdir(), 'test-screenshot.png');
     try {
-      await withBrowser(async (response, context) => {
+      await withMcpContext(async (response, context) => {
         const page = context.getSelectedPage();
         await page.setContent(html`<aside>test</aside>`);
         response.includeSnapshot({
@@ -120,7 +120,7 @@ describe('McpResponse', () => {
   });
 
   it('adds throttling setting when it is not null', async t => {
-    await withBrowser(async (response, context) => {
+    await withMcpContext(async (response, context) => {
       context.setNetworkConditions('Slow 3G');
       const result = await response.handle('test', context);
       assert.equal(result[0].type, 'text');
@@ -129,7 +129,7 @@ describe('McpResponse', () => {
   });
 
   it('does not include throttling setting when it is null', async () => {
-    await withBrowser(async (response, context) => {
+    await withMcpContext(async (response, context) => {
       const result = await response.handle('test', context);
       context.setNetworkConditions(null);
       assert.equal(result[0].type, 'text');
@@ -137,7 +137,7 @@ describe('McpResponse', () => {
     });
   });
   it('adds image when image is attached', async () => {
-    await withBrowser(async (response, context) => {
+    await withMcpContext(async (response, context) => {
       response.attachImage({data: 'imageBase64', mimeType: 'image/png'});
       const result = await response.handle('test', context);
       assert.strictEqual(result[0].text, `# test response`);
@@ -148,7 +148,7 @@ describe('McpResponse', () => {
   });
 
   it('adds cpu throttling setting when it is over 1', async t => {
-    await withBrowser(async (response, context) => {
+    await withMcpContext(async (response, context) => {
       context.setCpuThrottlingRate(4);
       const result = await response.handle('test', context);
       t.assert.snapshot?.(result[0].text);
@@ -156,7 +156,7 @@ describe('McpResponse', () => {
   });
 
   it('does not include cpu throttling setting when it is 1', async () => {
-    await withBrowser(async (response, context) => {
+    await withMcpContext(async (response, context) => {
       context.setCpuThrottlingRate(1);
       const result = await response.handle('test', context);
       assert.strictEqual(result[0].text, `# test response`);
@@ -164,7 +164,7 @@ describe('McpResponse', () => {
   });
 
   it('adds a prompt dialog', async t => {
-    await withBrowser(async (response, context) => {
+    await withMcpContext(async (response, context) => {
       const page = context.getSelectedPage();
       const dialogPromise = new Promise<void>(resolve => {
         page.on('dialog', () => {
@@ -182,7 +182,7 @@ describe('McpResponse', () => {
   });
 
   it('adds an alert dialog', async t => {
-    await withBrowser(async (response, context) => {
+    await withMcpContext(async (response, context) => {
       const page = context.getSelectedPage();
       const dialogPromise = new Promise<void>(resolve => {
         page.on('dialog', () => {
@@ -200,7 +200,7 @@ describe('McpResponse', () => {
   });
 
   it('add network requests when setting is true', async t => {
-    await withBrowser(async (response, context) => {
+    await withMcpContext(async (response, context) => {
       response.setIncludeNetworkRequests(true);
       context.getNetworkRequests = () => {
         return [getMockRequest({stableId: 1}), getMockRequest({stableId: 2})];
@@ -211,7 +211,7 @@ describe('McpResponse', () => {
   });
 
   it('does not include network requests when setting is false', async () => {
-    await withBrowser(async (response, context) => {
+    await withMcpContext(async (response, context) => {
       response.setIncludeNetworkRequests(false);
       context.getNetworkRequests = () => {
         return [getMockRequest()];
@@ -222,7 +222,7 @@ describe('McpResponse', () => {
   });
 
   it('add network request when attached with POST data', async t => {
-    await withBrowser(async (response, context) => {
+    await withMcpContext(async (response, context) => {
       response.setIncludeNetworkRequests(true);
       const httpResponse = getMockResponse();
       httpResponse.buffer = () => {
@@ -254,7 +254,7 @@ describe('McpResponse', () => {
   });
 
   it('add network request when attached', async t => {
-    await withBrowser(async (response, context) => {
+    await withMcpContext(async (response, context) => {
       response.setIncludeNetworkRequests(true);
       const request = getMockRequest();
       context.getNetworkRequests = () => {
@@ -270,7 +270,7 @@ describe('McpResponse', () => {
   });
 
   it('adds console messages when the setting is true', async t => {
-    await withBrowser(async (response, context) => {
+    await withMcpContext(async (response, context) => {
       response.setIncludeConsoleData(true);
       const page = context.getSelectedPage();
       const consoleMessagePromise = new Promise<void>(resolve => {
@@ -289,7 +289,7 @@ describe('McpResponse', () => {
   });
 
   it('adds a message when no console messages exist', async t => {
-    await withBrowser(async (response, context) => {
+    await withMcpContext(async (response, context) => {
       response.setIncludeConsoleData(true);
       const result = await response.handle('test', context);
       assert.ok(result[0].text);
@@ -298,7 +298,7 @@ describe('McpResponse', () => {
   });
 
   it("doesn't list the issue message if mapping returns null", async () => {
-    await withBrowser(async (response, context) => {
+    await withMcpContext(async (response, context) => {
       const mockAggregatedIssue = getMockAggregatedIssue();
       const mockDescription = {
         file: 'not-existing-description-file.md',
@@ -317,7 +317,7 @@ describe('McpResponse', () => {
   });
 
   it('throws error if mapping returns null on get issue details', async () => {
-    await withBrowser(async (response, context) => {
+    await withMcpContext(async (response, context) => {
       const mockAggregatedIssue = getMockAggregatedIssue();
       const mockDescription = {
         file: 'not-existing-description-file.md',
@@ -340,7 +340,7 @@ describe('McpResponse', () => {
 
 describe('McpResponse network request filtering', () => {
   it('filters network requests by resource type', async t => {
-    await withBrowser(async (response, context) => {
+    await withMcpContext(async (response, context) => {
       response.setIncludeNetworkRequests(true, {
         resourceTypes: ['script', 'stylesheet'],
       });
@@ -358,7 +358,7 @@ describe('McpResponse network request filtering', () => {
   });
 
   it('filters network requests by single resource type', async t => {
-    await withBrowser(async (response, context) => {
+    await withMcpContext(async (response, context) => {
       response.setIncludeNetworkRequests(true, {
         resourceTypes: ['image'],
       });
@@ -375,7 +375,7 @@ describe('McpResponse network request filtering', () => {
   });
 
   it('shows no requests when filter matches nothing', async t => {
-    await withBrowser(async (response, context) => {
+    await withMcpContext(async (response, context) => {
       response.setIncludeNetworkRequests(true, {
         resourceTypes: ['font'],
       });
@@ -392,7 +392,7 @@ describe('McpResponse network request filtering', () => {
   });
 
   it('shows all requests when no filters are provided', async t => {
-    await withBrowser(async (response, context) => {
+    await withMcpContext(async (response, context) => {
       response.setIncludeNetworkRequests(true);
       context.getNetworkRequests = () => {
         return [
@@ -410,7 +410,7 @@ describe('McpResponse network request filtering', () => {
   });
 
   it('shows all requests when empty resourceTypes array is provided', async t => {
-    await withBrowser(async (response, context) => {
+    await withMcpContext(async (response, context) => {
       response.setIncludeNetworkRequests(true, {
         resourceTypes: [],
       });
@@ -431,7 +431,7 @@ describe('McpResponse network request filtering', () => {
 
 describe('McpResponse network pagination', () => {
   it('returns all requests when pagination is not provided', async () => {
-    await withBrowser(async (response, context) => {
+    await withMcpContext(async (response, context) => {
       const requests = Array.from({length: 5}, () => getMockRequest());
       context.getNetworkRequests = () => requests;
       response.setIncludeNetworkRequests(true);
@@ -444,7 +444,7 @@ describe('McpResponse network pagination', () => {
   });
 
   it('returns first page by default', async () => {
-    await withBrowser(async (response, context) => {
+    await withMcpContext(async (response, context) => {
       const requests = Array.from({length: 30}, (_, idx) =>
         getMockRequest({method: `GET-${idx}`}),
       );
@@ -461,7 +461,7 @@ describe('McpResponse network pagination', () => {
   });
 
   it('returns subsequent page when pageIdx provided', async () => {
-    await withBrowser(async (response, context) => {
+    await withMcpContext(async (response, context) => {
       const requests = Array.from({length: 25}, (_, idx) =>
         getMockRequest({method: `GET-${idx}`}),
       );
@@ -479,7 +479,7 @@ describe('McpResponse network pagination', () => {
   });
 
   it('handles invalid page number by showing first page', async () => {
-    await withBrowser(async (response, context) => {
+    await withMcpContext(async (response, context) => {
       const requests = Array.from({length: 5}, () => getMockRequest());
       context.getNetworkRequests = () => requests;
       response.setIncludeNetworkRequests(true, {

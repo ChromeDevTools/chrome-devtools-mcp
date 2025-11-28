@@ -16,7 +16,7 @@ import {
   listConsoleMessages,
 } from '../../src/tools/console.js';
 import {serverHooks} from '../server.js';
-import {withBrowser} from '../utils.js';
+import {withMcpContext} from '../utils.js';
 
 describe('console', () => {
   before(async () => {
@@ -24,14 +24,14 @@ describe('console', () => {
   });
   describe('list_console_messages', () => {
     it('list messages', async () => {
-      await withBrowser(async (response, context) => {
+      await withMcpContext(async (response, context) => {
         await listConsoleMessages.handler({params: {}}, response, context);
         assert.ok(response.includeConsoleData);
       });
     });
 
     it('lists error messages', async () => {
-      await withBrowser(async (response, context) => {
+      await withMcpContext(async (response, context) => {
         const page = await context.newPage();
         await page.setContent(
           '<script>console.error("This is an error")</script>',
@@ -46,7 +46,7 @@ describe('console', () => {
     });
 
     it('work with primitive unhandled errors', async () => {
-      await withBrowser(async (response, context) => {
+      await withMcpContext(async (response, context) => {
         const page = await context.newPage();
         await page.setContent('<script>throw undefined;</script>');
         await listConsoleMessages.handler({params: {}}, response, context);
@@ -66,7 +66,7 @@ describe('console', () => {
         setIssuesEnabled(false);
       });
       it('lists issues', async () => {
-        await withBrowser(async (response, context) => {
+        await withMcpContext(async (response, context) => {
           const page = await context.newPage();
           const issuePromise = new Promise<void>(resolve => {
             page.once('issue', () => {
@@ -87,7 +87,7 @@ describe('console', () => {
       });
 
       it('lists issues after a page reload', async () => {
-        await withBrowser(async (response, context) => {
+        await withMcpContext(async (response, context) => {
           const page = await context.newPage();
           const issuePromise = new Promise<void>(resolve => {
             page.once('issue', () => {
@@ -132,7 +132,7 @@ describe('console', () => {
 
   describe('get_console_message', () => {
     it('gets a specific console message', async () => {
-      await withBrowser(async (response, context) => {
+      await withMcpContext(async (response, context) => {
         const page = await context.newPage();
         await page.setContent(
           '<script>console.error("This is an error")</script>',
@@ -163,7 +163,7 @@ describe('console', () => {
       });
 
       it('gets issue details with node id parsing', async t => {
-        await withBrowser(async (response, context) => {
+        await withMcpContext(async (response, context) => {
           const page = await context.newPage();
           const issuePromise = new Promise<void>(resolve => {
             page.once('issue', () => {
@@ -191,7 +191,7 @@ describe('console', () => {
           res.end(JSON.stringify({data: 'test data'}));
         });
 
-        await withBrowser(async (response, context) => {
+        await withMcpContext(async (response, context) => {
           const page = await context.newPage();
           const issuePromise = new Promise<void>(resolve => {
             page.once('issue', () => {

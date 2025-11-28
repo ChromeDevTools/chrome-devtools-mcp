@@ -12,6 +12,7 @@ import type {
   HTTPRequest,
   HTTPResponse,
   LaunchOptions,
+  Page,
 } from 'puppeteer-core';
 import sinon from 'sinon';
 
@@ -24,7 +25,7 @@ const browsers = new Map<string, Browser>();
 let context: McpContext | undefined;
 
 export async function withBrowser(
-  cb: (response: McpResponse, context: McpContext) => Promise<void>,
+  cb: (browser: Browser, page: Page) => Promise<void>,
   options: {debug?: boolean; autoOpenDevTools?: boolean} = {},
 ) {
   const launchOptions: LaunchOptions = {
@@ -51,20 +52,30 @@ export async function withBrowser(
       }
     }),
   );
-  const response = new McpResponse();
-  if (context) {
-    context.dispose();
-  }
-  context = await McpContext.from(
-    browser,
-    logger('test'),
-    {
-      experimentalDevToolsDebugging: false,
-    },
-    Locator,
-  );
 
-  await cb(response, context);
+  await cb(browser, newPage);
+}
+
+export async function withMcpContext(
+  cb: (response: McpResponse, context: McpContext) => Promise<void>,
+  options: {debug?: boolean; autoOpenDevTools?: boolean} = {},
+) {
+  await withBrowser(async browser => {
+    const response = new McpResponse();
+    if (context) {
+      context.dispose();
+    }
+    context = await McpContext.from(
+      browser,
+      logger('test'),
+      {
+        experimentalDevToolsDebugging: false,
+      },
+      Locator,
+    );
+
+    await cb(response, context);
+  }, options);
 }
 
 export function getMockRequest(
@@ -192,4 +203,55 @@ export function getMockAggregatedIssue(): sinon.SinonStubbedInstance<AggregatedI
   mockAggregatedIssue.getCorsIssues.returns(new Set());
   mockAggregatedIssue.getMixedContentIssues.returns(new Set());
   return mockAggregatedIssue;
+}
+
+export function mockListener() {
+  const listeners: Record<string, Array<(data: unknown) => void>> = {};
+  return {
+    on(eventName: string, listener: (data: unknown) => void) {
+      if (listeners[eventName]) {
+        listeners[eventName].push(listener);
+      } else {
+        listeners[eventName] = [listener];
+      }
+    },
+    off(_eventName: string, _listener: (data: unknown) => void) {
+      // no-op
+    },
+    emit(eventName: string, data: unknown) {
+      for (const listener of listeners[eventName] ?? []) {
+        listener(data);
+      }
+    },
+  };
+}
+
+export function getMockPage(): Page {
+  const mainFrame = {} as Frame;
+  const cdpSession = {
+    ...mockListener(),
+    send: () => {
+      // no-op
+    },
+  };
+  return {
+    mainFrame() {
+      return mainFrame;
+    },
+    ...mockListener(),
+    // @ts-expect-error internal API.
+    _client() {
+      return cdpSession;
+    },
+  } satisfies Page;
+}
+
+export function getMockBrowser(): Browser {
+  const pages = [getMockPage()];
+  return {
+    pages() {
+      return Promise.resolve(pages);
+    },
+    ...mockListener(),
+  } as Browser;
 }

@@ -7,14 +7,7 @@
 import assert from 'node:assert';
 import {afterEach, beforeEach, describe, it} from 'node:test';
 
-import type {
-  Browser,
-  Frame,
-  HTTPRequest,
-  Page,
-  Target,
-  Protocol,
-} from 'puppeteer-core';
+import type {Frame, HTTPRequest, Target, Protocol} from 'puppeteer-core';
 import sinon from 'sinon';
 
 import {AggregatedIssue} from '../node_modules/chrome-devtools-frontend/mcp/mcp.js';
@@ -26,58 +19,7 @@ import {
   PageCollector,
 } from '../src/PageCollector.js';
 
-import {getMockRequest} from './utils.js';
-
-function mockListener() {
-  const listeners: Record<string, Array<(data: unknown) => void>> = {};
-  return {
-    on(eventName: string, listener: (data: unknown) => void) {
-      if (listeners[eventName]) {
-        listeners[eventName].push(listener);
-      } else {
-        listeners[eventName] = [listener];
-      }
-    },
-    off(_eventName: string, _listener: (data: unknown) => void) {
-      // no-op
-    },
-    emit(eventName: string, data: unknown) {
-      for (const listener of listeners[eventName] ?? []) {
-        listener(data);
-      }
-    },
-  };
-}
-
-function getMockPage(): Page {
-  const mainFrame = {} as Frame;
-  const cdpSession = {
-    ...mockListener(),
-    send: () => {
-      // no-op
-    },
-  };
-  return {
-    mainFrame() {
-      return mainFrame;
-    },
-    ...mockListener(),
-    // @ts-expect-error internal API.
-    _client() {
-      return cdpSession;
-    },
-  } satisfies Page;
-}
-
-function getMockBrowser(): Browser {
-  const pages = [getMockPage()];
-  return {
-    pages() {
-      return Promise.resolve(pages);
-    },
-    ...mockListener(),
-  } as Browser;
-}
+import {getMockRequest, getMockBrowser} from './utils.js';
 
 describe('PageCollector', () => {
   it('works', async () => {
