@@ -345,12 +345,20 @@ export const askGeminiWeb = defineTool({
                         b.getAttribute('aria-label')?.includes('Stop')
                     );
 
+                    // Check for "プロンプトを送信" button - this indicates response is complete
+                    const sendButton = buttons.find(b =>
+                        b.textContent?.includes('プロンプトを送信') ||
+                        b.getAttribute('aria-label')?.includes('プロンプトを送信') ||
+                        b.getAttribute('aria-label')?.includes('Send message')
+                    );
+
                     // Check for status text
                     const bodyText = document.body.innerText;
                     const isTyping = bodyText.includes('Gemini が入力中です') ||
                                     bodyText.includes('Gemini is typing');
                     const isComplete = bodyText.includes('Gemini が回答しました') ||
-                                      bodyText.includes('Gemini has responded');
+                                      bodyText.includes('Gemini has responded') ||
+                                      !!sendButton; // "プロンプトを送信" button indicates completion
 
                     const isGenerating = !!stopButton || isTyping;
 
