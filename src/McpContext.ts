@@ -123,41 +123,33 @@ export class McpContext implements Context {
     this.#locatorClass = locatorClass;
     this.#options = options;
 
-    this.#networkCollector = new NetworkCollector(
-      this.browser,
-      undefined,
-      this.#options.experimentalIncludeAllPages,
-    );
+    this.#networkCollector = new NetworkCollector(this.browser);
 
-    this.#consoleCollector = new ConsoleCollector(
-      this.browser,
-      collect => {
-        return {
-          console: event => {
+    this.#consoleCollector = new ConsoleCollector(this.browser, collect => {
+      return {
+        console: event => {
+          collect(event);
+        },
+        pageerror: event => {
+          if (event instanceof Error) {
             collect(event);
-          },
-          pageerror: event => {
-            if (event instanceof Error) {
-              collect(event);
-            } else {
-              const error = new Error(`${event}`);
-              error.stack = undefined;
-              collect(error);
-            }
-          },
-          issue: event => {
-            collect(event);
-          },
-        } as ListenerMap;
-      },
-      this.#options.experimentalIncludeAllPages,
-    );
+          } else {
+            const error = new Error(`${event}`);
+            error.stack = undefined;
+            collect(error);
+          }
+        },
+        issue: event => {
+          collect(event);
+        },
+      } as ListenerMap;
+    });
   }
 
   async #init() {
-    await this.createPagesSnapshot();
-    await this.#networkCollector.init();
-    await this.#consoleCollector.init();
+    const pages = await this.createPagesSnapshot();
+    await this.#networkCollector.init(pages);
+    await this.#consoleCollector.init(pages);
   }
 
   dispose() {
@@ -663,6 +655,6 @@ export class McpContext implements Context {
         },
       } as ListenerMap;
     });
-    await this.#networkCollector.init();
+    await this.#networkCollector.init(await this.browser.pages());
   }
 }

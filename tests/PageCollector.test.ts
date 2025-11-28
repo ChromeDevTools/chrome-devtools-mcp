@@ -33,7 +33,7 @@ describe('PageCollector', () => {
         },
       } as ListenerMap;
     });
-    await collector.init();
+    await collector.init([page]);
     page.emit('request', request);
 
     assert.equal(collector.getData(page)[0], request);
@@ -51,7 +51,7 @@ describe('PageCollector', () => {
         },
       } as ListenerMap;
     });
-    await collector.init();
+    await collector.init([page]);
     page.emit('request', request);
 
     assert.equal(collector.getData(page)[0], request);
@@ -71,7 +71,7 @@ describe('PageCollector', () => {
         },
       } as ListenerMap;
     });
-    await collector.init();
+    await collector.init([page]);
     page.emit('request', request);
     page.emit('framenavigated', {} as Frame);
 
@@ -90,7 +90,7 @@ describe('PageCollector', () => {
         },
       } as ListenerMap;
     });
-    await collector.init();
+    await collector.init([page]);
     page.emit('request', request);
 
     assert.equal(collector.getData(page)[0], request);
@@ -114,7 +114,7 @@ describe('PageCollector', () => {
         },
       } as ListenerMap;
     });
-    await collector.init();
+    await collector.init([page]);
     browser.emit('targetcreated', {
       page() {
         return Promise.resolve(page);
@@ -146,7 +146,7 @@ describe('PageCollector', () => {
         },
       } as ListenerMap;
     });
-    await collector.init();
+    await collector.init([page]);
 
     page.emit('request', request);
 
@@ -176,7 +176,7 @@ describe('PageCollector', () => {
         },
       } as ListenerMap;
     });
-    await collector.init();
+    await collector.init([page]);
 
     page.emit('request', request1);
     page.emit('request', request2);
@@ -200,7 +200,7 @@ describe('NetworkCollector', () => {
     });
     const request2 = getMockRequest();
     const collector = new NetworkCollector(browser);
-    await collector.init();
+    await collector.init([page]);
     page.emit('request', request);
     page.emit('request', navRequest);
 
@@ -233,7 +233,7 @@ describe('NetworkCollector', () => {
     const request = getMockRequest();
 
     const collector = new NetworkCollector(browser);
-    await collector.init();
+    await collector.init([page]);
     page.emit('request', navRequest);
     assert.equal(collector.getData(page)[0], navRequest);
 
@@ -269,7 +269,7 @@ describe('NetworkCollector', () => {
     const request = getMockRequest();
 
     const collector = new NetworkCollector(browser);
-    await collector.init();
+    await collector.init([page]);
     page.emit('request', navRequest);
     assert.equal(collector.getData(page, true).length, 1);
 
@@ -324,7 +324,7 @@ describe('ConsoleCollector', () => {
         },
       } as ListenerMap;
     });
-    await collector.init();
+    await collector.init([page]);
     cdpSession.emit('Audits.issueAdded', {issue});
     sinon.assert.calledOnce(onIssuesListener);
 
@@ -345,7 +345,7 @@ describe('ConsoleCollector', () => {
         },
       } as ListenerMap;
     });
-    await collector.init();
+    await collector.init([page]);
 
     const issue2 = {
       code: 'ElementAccessibilityIssue' as const,
@@ -377,7 +377,7 @@ describe('ConsoleCollector', () => {
         },
       } as ListenerMap;
     });
-    await collector.init();
+    await collector.init([page]);
 
     cdpSession.emit('Audits.issueAdded', {issue});
     cdpSession.emit('Audits.issueAdded', {issue});

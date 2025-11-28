@@ -63,7 +63,6 @@ export class PageCollector<T> {
   ) => ListenerMap<PageEvents>;
   #listeners = new WeakMap<Page, ListenerMap>();
   #maxNavigationSaved = 3;
-  #includeAllPages?: boolean;
 
   /**
    * This maps a Page to a list of navigations with a sub-list
@@ -75,15 +74,12 @@ export class PageCollector<T> {
   constructor(
     browser: Browser,
     listeners: (collector: (item: T) => void) => ListenerMap<PageEvents>,
-    includeAllPages?: boolean,
   ) {
     this.#browser = browser;
     this.#listenersInitializer = listeners;
-    this.#includeAllPages = includeAllPages;
   }
 
-  async init() {
-    const pages = await this.#browser.pages(this.#includeAllPages);
+  async init(pages: Page[]) {
     for (const page of pages) {
       this.addPage(page);
     }
@@ -369,9 +365,8 @@ export class NetworkCollector extends PageCollector<HTTPRequest> {
         },
       } as ListenerMap;
     },
-    includeAllPages?: boolean,
   ) {
-    super(browser, listeners, includeAllPages);
+    super(browser, listeners);
   }
   override splitAfterNavigation(page: Page) {
     const navigations = this.storage.get(page) ?? [];
