@@ -8,12 +8,49 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import z from 'zod';
+import type { Page } from 'puppeteer-core';
 
 import { ToolCategories } from './categories.js';
 import { defineTool } from './ToolDefinition.js';
 import { loadGeminiSelectors, getGeminiSelector } from '../selectors/loader.js';
 import { GEMINI_CONFIG } from '../config.js';
 import { isLoginRequired } from '../login-helper.js';
+
+/**
+ * Navigate with retry logic for handling ERR_ABORTED and other network errors
+ */
+async function navigateWithRetry(
+    page: Page,
+    url: string,
+    options: { waitUntil: 'networkidle2' | 'domcontentloaded' | 'load'; maxRetries?: number } = { waitUntil: 'networkidle2', maxRetries: 3 }
+): Promise<void> {
+    const { waitUntil, maxRetries = 3 } = options;
+    let lastError: Error | null = null;
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+            await page.goto(url, { waitUntil, timeout: 30000 });
+            return; // Success
+        } catch (error) {
+            lastError = error instanceof Error ? error : new Error(String(error));
+
+            // Check if it's a retryable error
+            const isRetryable =
+                lastError.message.includes('ERR_ABORTED') ||
+                lastError.message.includes('ERR_CONNECTION_RESET') ||
+                lastError.message.includes('net::ERR_');
+
+            if (!isRetryable || attempt === maxRetries) {
+                throw lastError;
+            }
+
+            // Wait before retry (exponential backoff)
+            await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+        }
+    }
+
+    throw lastError;
+}
 
 /**
  * Path to store chat session data
@@ -207,7 +244,7 @@ export const askGeminiWeb = defineTool({
 
         try {
             response.appendResponseLine('Geminiに接続中...');
-            await page.goto(GEMINI_CONFIG.DEFAULT_URL, { waitUntil: 'networkidle2' });
+            await navigateWithRetry(page, GEMINI_CONFIG.DEFAULT_URL, { waitUntil: 'networkidle2' });
 
             const needsLogin = await isLoginRequired(page);
             if (needsLogin) {
@@ -232,7 +269,7 @@ export const askGeminiWeb = defineTool({
                     const latestSession = sortedSessions[0];
 
                     response.appendResponseLine(`既存のチャットを使用: ${latestSession.url}`);
-                    await page.goto(latestSession.url, { waitUntil: 'networkidle2' });
+                    await navigateWithRetry(page, latestSession.url, { waitUntil: 'networkidle2' });
                     sessionChatId = latestSession.chatId;
                     await new Promise((resolve) => setTimeout(resolve, 1000));
                 } else {
@@ -244,7 +281,7 @@ export const askGeminiWeb = defineTool({
 
             if (isNewChat) {
                 response.appendResponseLine('新規チャットを作成中...');
-                await page.goto(GEMINI_CONFIG.BASE_URL + 'app', { waitUntil: 'networkidle2' });
+                await navigateWithRetry(page, GEMINI_CONFIG.BASE_URL + 'app', { waitUntil: 'networkidle2' });
             }
 
             response.appendResponseLine('質問を送信中...');
