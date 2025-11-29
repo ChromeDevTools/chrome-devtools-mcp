@@ -387,33 +387,12 @@ export const askGeminiWeb = defineTool({
                             return true;
                         }
 
-                        // Icon-based detection (blue square stop button)
-                        // Check for mat-icon with stop icon
+                        // Icon-based detection: mat-icon with fonticon="stop" or data-mat-icon-name="stop"
                         const matIcon = b.querySelector('mat-icon');
-                        if (matIcon && (matIcon.textContent?.includes('stop') ||
-                                        matIcon.getAttribute('data-mat-icon-name')?.includes('stop'))) {
-                            return true;
-                        }
-
-                        // Check for SVG stop icon (square shape) - common in Gemini UI
-                        const svg = b.querySelector('svg');
-                        if (svg) {
-                            // Stop icon typically has a rect element (square)
-                            const rect = svg.querySelector('rect');
-                            if (rect) {
-                                return true;
-                            }
-                        }
-
-                        // Check for button with blue background (Google's stop button style)
-                        const style = window.getComputedStyle(b);
-                        const bgColor = style.backgroundColor;
-                        if (bgColor.includes('rgb(66, 133, 244)') || // Google blue
-                            bgColor.includes('rgb(26, 115, 232)') || // Another Google blue
-                            bgColor.includes('rgb(138, 180, 248)')) { // Light blue
-                            // Only if button is visible and small (stop button is typically icon-only)
-                            const rect = b.getBoundingClientRect();
-                            if (rect.width > 0 && rect.width < 100) {
+                        if (matIcon) {
+                            const fonticon = matIcon.getAttribute('fonticon');
+                            const iconName = matIcon.getAttribute('data-mat-icon-name');
+                            if (fonticon === 'stop' || iconName === 'stop') {
                                 return true;
                             }
                         }
