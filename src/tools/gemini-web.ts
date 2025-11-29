@@ -383,21 +383,39 @@ export const askGeminiWeb = defineTool({
                     );
 
                     // Check for "プロンプトを送信" button - this indicates response is complete
-                    const sendButton = buttons.find(b =>
-                        b.textContent?.includes('プロンプトを送信') ||
-                        b.getAttribute('aria-label')?.includes('プロンプトを送信') ||
-                        b.getAttribute('aria-label')?.includes('Send message')
-                    );
+                    // Must be enabled (not disabled) to indicate completion
+                    const sendButton = buttons.find(b => {
+                        const hasLabel = b.textContent?.includes('プロンプトを送信') ||
+                            b.getAttribute('aria-label')?.includes('プロンプトを送信') ||
+                            b.getAttribute('aria-label')?.includes('Send message');
+                        return hasLabel && !b.disabled;
+                    });
 
-                    // Check for status text
+                    // Check for status text and thinking indicators
                     const bodyText = document.body.innerText;
                     const isTyping = bodyText.includes('Gemini が入力中です') ||
                                     bodyText.includes('Gemini is typing');
-                    const isComplete = bodyText.includes('Gemini が回答しました') ||
-                                      bodyText.includes('Gemini has responded') ||
-                                      !!sendButton; // "プロンプトを送信" button indicates completion
 
-                    const isGenerating = !!stopButton || isTyping;
+                    // Check for thinking/analyzing indicators (Gemini shows these during processing)
+                    const isThinking = bodyText.includes('Analyzing') ||
+                                      bodyText.includes('分析中') ||
+                                      bodyText.includes('Crafting') ||
+                                      bodyText.includes('作成中') ||
+                                      bodyText.includes('Thinking') ||
+                                      bodyText.includes('思考中') ||
+                                      bodyText.includes('Researching') ||
+                                      bodyText.includes('調査中');
+
+                    // Check for loading spinners or progress indicators
+                    const hasSpinner = document.querySelector('[role="progressbar"]') !== null ||
+                                      document.querySelector('.loading') !== null ||
+                                      document.querySelector('[aria-busy="true"]') !== null;
+
+                    const isComplete = (bodyText.includes('Gemini が回答しました') ||
+                                      bodyText.includes('Gemini has responded') ||
+                                      !!sendButton) && !isThinking && !hasSpinner;
+
+                    const isGenerating = !!stopButton || isTyping || isThinking || hasSpinner;
 
                     // Get the response content from model-response elements
                     const modelResponses = Array.from(document.querySelectorAll('model-response'));
