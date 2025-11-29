@@ -376,11 +376,50 @@ export const askGeminiWeb = defineTool({
                 const status = await page.evaluate(() => {
                     // Check for generating indicators
                     const buttons = Array.from(document.querySelectorAll('button'));
-                    const stopButton = buttons.find(b =>
-                        b.textContent?.includes('回答を停止') ||
-                        b.textContent?.includes('Stop') ||
-                        b.getAttribute('aria-label')?.includes('Stop')
-                    );
+                    const stopButton = buttons.find(b => {
+                        // Text-based detection
+                        const text = b.textContent || '';
+                        const ariaLabel = b.getAttribute('aria-label') || '';
+
+                        if (text.includes('回答を停止') || text.includes('Stop') ||
+                            ariaLabel.includes('Stop') || ariaLabel.includes('停止') ||
+                            ariaLabel.includes('中止') || ariaLabel.includes('Cancel')) {
+                            return true;
+                        }
+
+                        // Icon-based detection (blue square stop button)
+                        // Check for mat-icon with stop icon
+                        const matIcon = b.querySelector('mat-icon');
+                        if (matIcon && (matIcon.textContent?.includes('stop') ||
+                                        matIcon.getAttribute('data-mat-icon-name')?.includes('stop'))) {
+                            return true;
+                        }
+
+                        // Check for SVG stop icon (square shape) - common in Gemini UI
+                        const svg = b.querySelector('svg');
+                        if (svg) {
+                            // Stop icon typically has a rect element (square)
+                            const rect = svg.querySelector('rect');
+                            if (rect) {
+                                return true;
+                            }
+                        }
+
+                        // Check for button with blue background (Google's stop button style)
+                        const style = window.getComputedStyle(b);
+                        const bgColor = style.backgroundColor;
+                        if (bgColor.includes('rgb(66, 133, 244)') || // Google blue
+                            bgColor.includes('rgb(26, 115, 232)') || // Another Google blue
+                            bgColor.includes('rgb(138, 180, 248)')) { // Light blue
+                            // Only if button is visible and small (stop button is typically icon-only)
+                            const rect = b.getBoundingClientRect();
+                            if (rect.width > 0 && rect.width < 100) {
+                                return true;
+                            }
+                        }
+
+                        return false;
+                    });
 
                     // Check for "プロンプトを送信" button - this indicates response is complete
                     // Must be enabled (not disabled) to indicate completion
