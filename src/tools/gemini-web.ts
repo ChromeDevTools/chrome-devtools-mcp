@@ -374,30 +374,20 @@ export const askGeminiWeb = defineTool({
                 await new Promise((resolve) => setTimeout(resolve, 1500));
 
                 const status = await page.evaluate(() => {
-                    // Check for generating indicators
+                    // Check for stop icon (Gemini's thinking/generating indicator)
+                    // The stop icon is in a div.stop-icon with mat-icon[fonticon="stop"]
+                    const stopIcon = document.querySelector('.stop-icon mat-icon[fonticon="stop"]') ||
+                                    document.querySelector('mat-icon[data-mat-icon-name="stop"]') ||
+                                    document.querySelector('.blue-circle.stop-icon');
+                    const hasStopIcon = !!stopIcon;
+
+                    // Also check for stop button (fallback)
                     const buttons = Array.from(document.querySelectorAll('button'));
                     const stopButton = buttons.find(b => {
-                        // Text-based detection
                         const text = b.textContent || '';
                         const ariaLabel = b.getAttribute('aria-label') || '';
-
-                        if (text.includes('回答を停止') || text.includes('Stop') ||
-                            ariaLabel.includes('Stop') || ariaLabel.includes('停止') ||
-                            ariaLabel.includes('中止') || ariaLabel.includes('Cancel')) {
-                            return true;
-                        }
-
-                        // Icon-based detection: mat-icon with fonticon="stop" or data-mat-icon-name="stop"
-                        const matIcon = b.querySelector('mat-icon');
-                        if (matIcon) {
-                            const fonticon = matIcon.getAttribute('fonticon');
-                            const iconName = matIcon.getAttribute('data-mat-icon-name');
-                            if (fonticon === 'stop' || iconName === 'stop') {
-                                return true;
-                            }
-                        }
-
-                        return false;
+                        return text.includes('回答を停止') || text.includes('Stop') ||
+                               ariaLabel.includes('Stop') || ariaLabel.includes('停止');
                     });
 
                     // Check for "プロンプトを送信" button - this indicates response is complete
@@ -431,9 +421,9 @@ export const askGeminiWeb = defineTool({
 
                     const isComplete = (bodyText.includes('Gemini が回答しました') ||
                                       bodyText.includes('Gemini has responded') ||
-                                      !!sendButton) && !isThinking && !hasSpinner;
+                                      !!sendButton) && !isThinking && !hasSpinner && !hasStopIcon;
 
-                    const isGenerating = !!stopButton || isTyping || isThinking || hasSpinner;
+                    const isGenerating = hasStopIcon || !!stopButton || isTyping || isThinking || hasSpinner;
 
                     // Get the response content from model-response elements
                     const modelResponses = Array.from(document.querySelectorAll('model-response'));
