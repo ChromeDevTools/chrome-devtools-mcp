@@ -296,6 +296,9 @@ export const askChatGPTWeb = defineTool({
       response.appendResponseLine('ChatGPTに接続中...');
       await navigateWithRetry(page, CHATGPT_CONFIG.DEFAULT_URL, {waitUntil: 'networkidle2'});
 
+      // Wait for page to fully render (ChatGPT takes time to load UI)
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+
       // Step 2: Check if login is required (don't wait - stop immediately)
       const needsLogin = await isLoginRequired(page);
 
@@ -333,7 +336,7 @@ export const askChatGPTWeb = defineTool({
           );
           await navigateWithRetry(page, latestSession.url, {waitUntil: 'networkidle2'});
           sessionChatId = latestSession.chatId;
-          await new Promise((resolve) => setTimeout(resolve, 1000));
+          await new Promise((resolve) => setTimeout(resolve, 2000));
         } else {
           response.appendResponseLine(
             '既存チャットが見つかりませんでした。新規作成します。',
