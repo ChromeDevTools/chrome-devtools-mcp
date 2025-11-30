@@ -807,49 +807,6 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
       console.error('Applied navigator.webdriver bypass to existing page');
     }
 
-    // Verify extensions were loaded by checking chrome://extensions/
-    if (extensionPaths.length > 0) {
-      console.error('🔍 Verifying extension loading...');
-      try {
-        const pages = await browser.pages();
-        const page = pages[0] || await browser.newPage();
-
-        // Add a small delay to ensure Chrome is fully started
-        await new Promise(resolve => setTimeout(resolve, 2000));
-
-        await page.goto('chrome://extensions/', { waitUntil: 'networkidle0' });
-
-        const loadedExtensions = await page.evaluate(() => {
-          const extensionCards = document.querySelectorAll('extensions-item');
-          const results: Array<{name: string; id: string; enabled: boolean}> = [];
-
-          Array.from(extensionCards).forEach(card => {
-            const shadowRoot = card.shadowRoot;
-            if (shadowRoot) {
-              const name = shadowRoot.querySelector('#name')?.textContent?.trim() || 'Unknown';
-              const enabled = !shadowRoot.querySelector('#enable-toggle')?.hasAttribute('disabled');
-              const id = card.getAttribute('id') || 'unknown';
-              results.push({ name, id, enabled });
-            }
-          });
-
-          return results;
-        });
-
-        console.error(`✅ Extensions verification complete. Found ${loadedExtensions.length} extensions:`);
-        loadedExtensions.forEach((ext, index) => {
-          console.error(`  ${index + 1}. ${ext.name} (${ext.enabled ? 'enabled' : 'disabled'}) - ID: ${ext.id}`);
-        });
-
-        if (loadedExtensions.length === 0) {
-          console.error('⚠️  No extensions found in chrome://extensions/ - this may indicate loading failure');
-        }
-
-      } catch (verificationError) {
-        console.error(`⚠️  Extension verification failed: ${verificationError}`);
-      }
-    }
-
     return browser;
   } catch (error) {
     // Fail fast with clear error message - no silent fallback
