@@ -299,12 +299,16 @@ git push && git push --tags
 
 | Tool | Purpose | Example |
 |------|---------|---------|
-| `list_extensions` | View all extensions | "List my extensions" |
-| `reload_extension` | Hot-reload | "Reload my-extension" |
-| `inspect_service_worker` | Debug background | "Debug service worker" |
+| `open_extension_popup` | Select popup window | "Open my extension popup" |
+| `reload_iframe_extension` | Hot-reload via CDP | "Reload extension" |
+| `patch_iframe_popup` | Edit & reload | "Patch popup.html" |
 | `ask_chatgpt_web` | ChatGPT research | "Ask ChatGPT about..." |
 | `take_snapshot` | Page analysis | "Snapshot current page" |
 | `list_pages` | Browser tabs | "List open pages" |
+
+**Note:** Extension tools use CDP (Chrome DevTools Protocol) for reliable operation.
+Shadow DOM-based tools (`list_extensions`, `reload_extension`, etc.) were removed in v0.19.0
+due to Chrome security restrictions.
 
 **See also:** [Full Tool Documentation](docs/tools-reference.md)
 
@@ -315,7 +319,7 @@ git push && git push --tags
 ### Extension Not Loading
 
 ```
-"List extensions and show any errors"
+"Check extension popup for errors"
 ```
 
 **Common fixes:**
