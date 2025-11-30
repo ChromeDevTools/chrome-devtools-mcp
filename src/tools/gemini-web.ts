@@ -243,21 +243,11 @@ export const askGeminiWeb = defineTool({
         const page = context.getSelectedPage();
 
         try {
-            response.appendResponseLine('Geminiに接続中...');
-            await navigateWithRetry(page, GEMINI_CONFIG.DEFAULT_URL, { waitUntil: 'networkidle2' });
-
-            const needsLogin = await isLoginRequired(page);
-            if (needsLogin) {
-                response.appendResponseLine('\n❌ Geminiへのログインが必要です');
-                response.appendResponseLine('ブラウザでログインしてください。');
-                return;
-            }
-
-            response.appendResponseLine('✅ ログイン確認完了');
-
             let isNewChat = false;
             let sessionChatId: string | undefined;
+            let targetUrl: string;
 
+            // Determine target URL first (avoid unnecessary navigation)
             if (!createNewChat) {
                 const sessions = await loadChatSessions();
                 const projectSessions = sessions[project] || [];
@@ -267,21 +257,27 @@ export const askGeminiWeb = defineTool({
                         (a, b) => new Date(b.lastUsed).getTime() - new Date(a.lastUsed).getTime()
                     );
                     const latestSession = sortedSessions[0];
-
-                    response.appendResponseLine(`既存のチャットを使用: ${latestSession.url}`);
-                    await navigateWithRetry(page, latestSession.url, { waitUntil: 'networkidle2' });
+                    targetUrl = latestSession.url;
                     sessionChatId = latestSession.chatId;
-                    await new Promise((resolve) => setTimeout(resolve, 1000));
+                    response.appendResponseLine(`既存チャット: ${latestSession.chatId}`);
                 } else {
                     isNewChat = true;
+                    targetUrl = GEMINI_CONFIG.BASE_URL + 'app';
                 }
             } else {
                 isNewChat = true;
+                targetUrl = GEMINI_CONFIG.BASE_URL + 'app';
             }
 
-            if (isNewChat) {
-                response.appendResponseLine('新規チャットを作成中...');
-                await navigateWithRetry(page, GEMINI_CONFIG.BASE_URL + 'app', { waitUntil: 'networkidle2' });
+            // Navigate directly to target URL (skip intermediate navigation)
+            response.appendResponseLine('Geminiに接続中...');
+            await navigateWithRetry(page, targetUrl, { waitUntil: 'networkidle2' });
+
+            // Check login only once after navigation
+            const needsLogin = await isLoginRequired(page);
+            if (needsLogin) {
+                response.appendResponseLine('❌ ログインが必要です');
+                return;
             }
 
             response.appendResponseLine('質問を送信中...');
@@ -420,11 +416,10 @@ export const askGeminiWeb = defineTool({
             }
 
             const startTime = Date.now();
-            let stableCount = 0;
             let lastResponseText = '';
 
             while (true) {
-                await new Promise((resolve) => setTimeout(resolve, 1500));
+                await new Promise((resolve) => setTimeout(resolve, 1000));
 
                 const status = await page.evaluate(() => {
                     // Check for stop icon (Gemini's thinking/generating indicator)
@@ -505,14 +500,9 @@ export const askGeminiWeb = defineTool({
                     break;
                 }
 
-                // If not generating and response text is stable for 2 iterations, we're done
+                // If not generating and response text is stable, we're done
                 if (!status.isGenerating && status.responseContent === lastResponseText && status.responseContent.length > 0) {
-                    stableCount++;
-                    if (stableCount >= 2) {
-                        break;
-                    }
-                } else {
-                    stableCount = 0;
+                    break;  // No need to wait for multiple stable iterations
                 }
 
                 lastResponseText = status.responseContent;
