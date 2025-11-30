@@ -366,6 +366,59 @@ export const askGeminiWeb = defineTool({
             // - Generating: "回答を停止" button appears, "Gemini が入力中です" text
             // - Complete: "Gemini が回答しました" text appears
 
+            // First, wait for Gemini to start generating (Stop button/icon to appear)
+            // This can take 2-5 seconds after sending
+            const maxWaitForStart = 15000; // 15 seconds max to start generating
+            const startWaitTime = Date.now();
+            let generationStarted = false;
+
+            while (Date.now() - startWaitTime < maxWaitForStart) {
+                await new Promise((resolve) => setTimeout(resolve, 500));
+
+                const hasStarted = await page.evaluate(() => {
+                    // Check for stop icon (Gemini's generating indicator)
+                    const stopIcon = document.querySelector('.stop-icon mat-icon[fonticon="stop"]') ||
+                                    document.querySelector('mat-icon[data-mat-icon-name="stop"]') ||
+                                    document.querySelector('.blue-circle.stop-icon');
+
+                    // Check for stop button
+                    const buttons = Array.from(document.querySelectorAll('button'));
+                    const stopButton = buttons.find(b => {
+                        const text = b.textContent || '';
+                        const ariaLabel = b.getAttribute('aria-label') || '';
+                        return text.includes('回答を停止') || text.includes('Stop') ||
+                               ariaLabel.includes('Stop') || ariaLabel.includes('停止');
+                    });
+
+                    // Check for typing/thinking indicators
+                    const bodyText = document.body.innerText;
+                    const isTyping = bodyText.includes('Gemini が入力中です') ||
+                                    bodyText.includes('Gemini is typing') ||
+                                    bodyText.includes('Analyzing') ||
+                                    bodyText.includes('分析中') ||
+                                    bodyText.includes('Thinking') ||
+                                    bodyText.includes('思考中');
+
+                    // Check for loading spinners
+                    const hasSpinner = document.querySelector('[role="progressbar"]') !== null ||
+                                      document.querySelector('[aria-busy="true"]') !== null;
+
+                    // Check for model-response appearing (even without stop button)
+                    const hasNewResponse = document.querySelectorAll('model-response').length > 0;
+
+                    return !!stopIcon || !!stopButton || isTyping || hasSpinner || hasNewResponse;
+                });
+
+                if (hasStarted) {
+                    generationStarted = true;
+                    break;
+                }
+            }
+
+            if (!generationStarted) {
+                response.appendResponseLine('⚠️ 生成開始を検出できませんでした（続行します）');
+            }
+
             const startTime = Date.now();
             let stableCount = 0;
             let lastResponseText = '';
