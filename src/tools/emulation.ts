@@ -37,20 +37,42 @@ export const emulate = defineTool({
       .describe(
         'Represents the CPU slowdown factor. Set the rate to 1 to disable throttling. If omitted, throttling remains unchanged.',
       ),
+    latitude: zod
+      .number()
+      .min(-90)
+      .max(90)
+      .optional()
+      .describe(
+        'Latitude between -90 and 90 for geolocation emulation. Must be provided together with longitude.',
+      ),
+    longitude: zod
+      .number()
+      .min(-180)
+      .max(180)
+      .optional()
+      .describe(
+        'Longitude between -180 and 180 for geolocation emulation. Must be provided together with latitude.',
+      ),
+    clearGeolocation: zod
+      .boolean()
+      .optional()
+      .describe('Set to true to clear the geolocation override.'),
   },
   handler: async (request, _response, context) => {
     const page = context.getSelectedPage();
-    const networkConditions = request.params.networkConditions;
-    const cpuThrottlingRate = request.params.cpuThrottlingRate;
+    const {
+      networkConditions,
+      cpuThrottlingRate,
+      latitude,
+      longitude,
+      clearGeolocation,
+    } = request.params;
 
     if (networkConditions) {
       if (networkConditions === 'No emulation') {
         await page.emulateNetworkConditions(null);
         context.setNetworkConditions(null);
-        return;
-      }
-
-      if (networkConditions === 'Offline') {
+      } else if (networkConditions === 'Offline') {
         await page.emulateNetworkConditions({
           offline: true,
           download: 0,
@@ -58,10 +80,7 @@ export const emulate = defineTool({
           latency: 0,
         });
         context.setNetworkConditions('Offline');
-        return;
-      }
-
-      if (networkConditions in PredefinedNetworkConditions) {
+      } else if (networkConditions in PredefinedNetworkConditions) {
         const networkCondition =
           PredefinedNetworkConditions[
             networkConditions as keyof typeof PredefinedNetworkConditions
@@ -75,59 +94,19 @@ export const emulate = defineTool({
       await page.emulateCPUThrottling(cpuThrottlingRate);
       context.setCpuThrottlingRate(cpuThrottlingRate);
     }
-  },
-});
 
-export const emulateGeolocation = defineTool({
-  name: 'emulate_geolocation',
-  description: `Emulates geolocation on the selected page. Useful for testing location-based features.`,
-  annotations: {
-    category: ToolCategory.EMULATION,
-    readOnlyHint: false,
-  },
-  schema: {
-    latitude: zod
-      .number()
-      .min(-90)
-      .max(90)
-      .optional()
-      .describe(
-        'Latitude between -90 and 90. Omit latitude and longitude to clear the override.',
-      ),
-    longitude: zod
-      .number()
-      .min(-180)
-      .max(180)
-      .optional()
-      .describe(
-        'Longitude between -180 and 180. Omit latitude and longitude to clear the override.',
-      ),
-  },
-  handler: async (request, _response, context) => {
-    const page = context.getSelectedPage();
-    const {latitude, longitude} = request.params;
-
-    if (latitude === undefined && longitude === undefined) {
-      // Clear geolocation override
-      await page.setGeolocation({
-        latitude: 0,
-        longitude: 0,
-      });
+    if (clearGeolocation) {
+      await page.setGeolocation({latitude: 0, longitude: 0});
       context.setGeolocation(null);
-    } else if (latitude !== undefined && longitude !== undefined) {
-      // Set geolocation override
-      await page.setGeolocation({
-        latitude,
-        longitude,
-      });
-      context.setGeolocation({
-        latitude,
-        longitude,
-      });
-    } else {
-      throw new Error(
-        'Both latitude and longitude must be provided, or both must be omitted to clear the override.',
-      );
+    } else if (latitude !== undefined || longitude !== undefined) {
+      if (latitude !== undefined && longitude !== undefined) {
+        await page.setGeolocation({latitude, longitude});
+        context.setGeolocation({latitude, longitude});
+      } else {
+        throw new Error(
+          'Both latitude and longitude must be provided together for geolocation emulation.',
+        );
+      }
     }
   },
 });

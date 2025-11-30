@@ -7,7 +7,7 @@
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
-import {emulate, emulateGeolocation} from '../../src/tools/emulation.js';
+import {emulate} from '../../src/tools/emulation.js';
 import {withMcpContext} from '../utils.js';
 
 describe('emulation', () => {
@@ -156,7 +156,7 @@ describe('emulation', () => {
   describe('geolocation', () => {
     it('emulates geolocation with latitude and longitude', async () => {
       await withMcpContext(async (response, context) => {
-        await emulateGeolocation.handler(
+        await emulate.handler(
           {
             params: {
               latitude: 48.137154,
@@ -173,10 +173,10 @@ describe('emulation', () => {
       });
     });
 
-    it('clears geolocation override when both params are omitted', async () => {
+    it('clears geolocation override when clearGeolocation is true', async () => {
       await withMcpContext(async (response, context) => {
         // First set a geolocation
-        await emulateGeolocation.handler(
+        await emulate.handler(
           {
             params: {
               latitude: 48.137154,
@@ -189,10 +189,12 @@ describe('emulation', () => {
 
         assert.notStrictEqual(context.getGeolocation(), null);
 
-        // Then clear it by omitting both params
-        await emulateGeolocation.handler(
+        // Then clear it using clearGeolocation
+        await emulate.handler(
           {
-            params: {},
+            params: {
+              clearGeolocation: true,
+            },
           },
           response,
           context,
@@ -206,7 +208,7 @@ describe('emulation', () => {
       await withMcpContext(async (response, context) => {
         await assert.rejects(
           async () => {
-            await emulateGeolocation.handler(
+            await emulate.handler(
               {
                 params: {
                   latitude: 48.137154,
@@ -218,7 +220,7 @@ describe('emulation', () => {
           },
           {
             message:
-              'Both latitude and longitude must be provided, or both must be omitted to clear the override.',
+              'Both latitude and longitude must be provided together for geolocation emulation.',
           },
         );
       });
@@ -226,7 +228,7 @@ describe('emulation', () => {
 
     it('reports correctly for the currently selected page', async () => {
       await withMcpContext(async (response, context) => {
-        await emulateGeolocation.handler(
+        await emulate.handler(
           {
             params: {
               latitude: 48.137154,

@@ -18,9 +18,8 @@
   - [`new_page`](#new_page)
   - [`select_page`](#select_page)
   - [`wait_for`](#wait_for)
-- **[Emulation](#emulation)** (3 tools)
+- **[Emulation](#emulation)** (2 tools)
   - [`emulate`](#emulate)
-  - [`emulate_geolocation`](#emulate_geolocation)
   - [`resize_page`](#resize_page)
 - **[Performance](#performance)** (3 tools)
   - [`performance_analyze_insight`](#performance_analyze_insight)
@@ -196,19 +195,11 @@
 
 **Parameters:**
 
+- **clearGeolocation** (boolean) _(optional)_: Set to true to clear the geolocation override.
 - **cpuThrottlingRate** (number) _(optional)_: Represents the CPU slowdown factor. Set the rate to 1 to disable throttling. If omitted, throttling remains unchanged.
+- **latitude** (number) _(optional)_: Latitude between -90 and 90 for geolocation emulation. Must be provided together with longitude.
+- **longitude** (number) _(optional)_: Longitude between -180 and 180 for geolocation emulation. Must be provided together with latitude.
 - **networkConditions** (enum: "No emulation", "Offline", "Slow 3G", "Fast 3G", "Slow 4G", "Fast 4G") _(optional)_: Throttle network. Set to "No emulation" to disable. If omitted, conditions remain unchanged.
-
----
-
-### `emulate_geolocation`
-
-**Description:** Emulates geolocation on the selected page. Useful for testing location-based features.
-
-**Parameters:**
-
-- **latitude** (number) _(optional)_: Latitude between -90 and 90. Omit latitude and longitude to clear the override.
-- **longitude** (number) _(optional)_: Longitude between -180 and 180. Omit latitude and longitude to clear the override.
 
 ---
 
