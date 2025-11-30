@@ -8,12 +8,49 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import z from 'zod';
+import type { Page } from 'puppeteer-core';
 
 import {ToolCategories} from './categories.js';
 import {defineTool} from './ToolDefinition.js';
 import {loadSelectors, getSelector} from '../selectors/loader.js';
 import {CHATGPT_CONFIG} from '../config.js';
 import {isLoginRequired} from '../login-helper.js';
+
+/**
+ * Navigate with retry logic for handling ERR_ABORTED and other network errors
+ */
+async function navigateWithRetry(
+    page: Page,
+    url: string,
+    options: { waitUntil: 'networkidle2' | 'domcontentloaded' | 'load'; maxRetries?: number } = { waitUntil: 'networkidle2', maxRetries: 3 }
+): Promise<void> {
+    const { waitUntil, maxRetries = 3 } = options;
+    let lastError: Error | null = null;
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+            await page.goto(url, { waitUntil, timeout: 30000 });
+            return; // Success
+        } catch (error) {
+            lastError = error instanceof Error ? error : new Error(String(error));
+
+            // Check if it's a retryable error
+            const isRetryable =
+                lastError.message.includes('ERR_ABORTED') ||
+                lastError.message.includes('ERR_CONNECTION_RESET') ||
+                lastError.message.includes('net::ERR_');
+
+            if (!isRetryable || attempt === maxRetries) {
+                throw lastError;
+            }
+
+            // Wait before retry (exponential backoff)
+            await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+        }
+    }
+
+    throw lastError;
+}
 
 /**
  * Path to store chat session data
@@ -257,7 +294,7 @@ export const askChatGPTWeb = defineTool({
     try {
       // Step 1: Navigate to ChatGPT
       response.appendResponseLine('ChatGPTに接続中...');
-      await page.goto(CHATGPT_CONFIG.DEFAULT_URL, {waitUntil: 'networkidle2'});
+      await navigateWithRetry(page, CHATGPT_CONFIG.DEFAULT_URL, {waitUntil: 'networkidle2'});
 
       // Step 2: Check if login is required (don't wait - stop immediately)
       const needsLogin = await isLoginRequired(page);
@@ -294,7 +331,7 @@ export const askChatGPTWeb = defineTool({
           response.appendResponseLine(
             `既存のプロジェクトチャットを使用: ${latestSession.url}`,
           );
-          await page.goto(latestSession.url, {waitUntil: 'networkidle2'});
+          await navigateWithRetry(page, latestSession.url, {waitUntil: 'networkidle2'});
           sessionChatId = latestSession.chatId;
           await new Promise((resolve) => setTimeout(resolve, 1000));
         } else {
