@@ -367,8 +367,8 @@ export const askGeminiWeb = defineTool({
             // - Complete: "Gemini が回答しました" text appears
 
             // First, wait for Gemini to start generating (Stop button/icon to appear)
-            // This can take 2-5 seconds after sending
-            const maxWaitForStart = 15000; // 15 seconds max to start generating
+            // This typically takes 1-3 seconds after sending
+            const maxWaitForStart = 5000; // 5 seconds max to start generating
             const startWaitTime = Date.now();
             let generationStarted = false;
 
