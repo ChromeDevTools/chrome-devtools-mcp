@@ -416,20 +416,20 @@ export const askGeminiWeb = defineTool({
             }
 
             const startTime = Date.now();
-            let lastResponseText = '';
 
+            // Phase 2: Wait for stop button/icon to disappear (= generation complete)
             while (true) {
                 await new Promise((resolve) => setTimeout(resolve, 1000));
 
-                const status = await page.evaluate(() => {
-                    // Check for stop icon (Gemini's thinking/generating indicator)
-                    // The stop icon is in a div.stop-icon with mat-icon[fonticon="stop"]
+                const hasStopIndicator = await page.evaluate(() => {
+                    // Check for stop icon
                     const stopIcon = document.querySelector('.stop-icon mat-icon[fonticon="stop"]') ||
                                     document.querySelector('mat-icon[data-mat-icon-name="stop"]') ||
-                                    document.querySelector('.blue-circle.stop-icon');
-                    const hasStopIcon = !!stopIcon;
+                                    document.querySelector('.blue-circle.stop-icon') ||
+                                    document.querySelector('div.stop-icon');
+                    if (stopIcon) return true;
 
-                    // Also check for stop button (fallback)
+                    // Check for stop button
                     const buttons = Array.from(document.querySelectorAll('button'));
                     const stopButton = buttons.find(b => {
                         const text = b.textContent || '';
@@ -437,75 +437,13 @@ export const askGeminiWeb = defineTool({
                         return text.includes('回答を停止') || text.includes('Stop') ||
                                ariaLabel.includes('Stop') || ariaLabel.includes('停止');
                     });
-
-                    // Check for "プロンプトを送信" button - this indicates response is complete
-                    // Must be enabled (not disabled) to indicate completion
-                    const sendButton = buttons.find(b => {
-                        const hasLabel = b.textContent?.includes('プロンプトを送信') ||
-                            b.getAttribute('aria-label')?.includes('プロンプトを送信') ||
-                            b.getAttribute('aria-label')?.includes('Send message');
-                        return hasLabel && !b.disabled;
-                    });
-
-                    // Check for status text and thinking indicators
-                    const bodyText = document.body.innerText;
-                    const isTyping = bodyText.includes('Gemini が入力中です') ||
-                                    bodyText.includes('Gemini is typing');
-
-                    // Check for thinking/analyzing indicators (Gemini shows these during processing)
-                    const isThinking = bodyText.includes('Analyzing') ||
-                                      bodyText.includes('分析中') ||
-                                      bodyText.includes('Crafting') ||
-                                      bodyText.includes('作成中') ||
-                                      bodyText.includes('Thinking') ||
-                                      bodyText.includes('思考中') ||
-                                      bodyText.includes('Researching') ||
-                                      bodyText.includes('調査中');
-
-                    // Check for loading spinners or progress indicators
-                    const hasSpinner = document.querySelector('[role="progressbar"]') !== null ||
-                                      document.querySelector('.loading') !== null ||
-                                      document.querySelector('[aria-busy="true"]') !== null;
-
-                    const isComplete = (bodyText.includes('Gemini が回答しました') ||
-                                      bodyText.includes('Gemini has responded') ||
-                                      !!sendButton) && !isThinking && !hasSpinner && !hasStopIcon;
-
-                    const isGenerating = hasStopIcon || !!stopButton || isTyping || isThinking || hasSpinner;
-
-                    // Get the response content from model-response elements
-                    const modelResponses = Array.from(document.querySelectorAll('model-response'));
-                    let responseContent = '';
-                    if (modelResponses.length > 0) {
-                        // Get the last model response
-                        const lastResponse = modelResponses[modelResponses.length - 1];
-                        responseContent = lastResponse.textContent || '';
-                    }
-
-                    // Fallback: get text from main area
-                    if (!responseContent) {
-                        const main = document.querySelector('main');
-                        responseContent = main?.innerText || '';
-                    }
-
-                    return {
-                        isGenerating,
-                        isComplete,
-                        responseContent
-                    };
+                    return !!stopButton;
                 });
 
-                // If explicitly marked as complete, we're done
-                if (status.isComplete && !status.isGenerating) {
+                // Stop button/icon disappeared = generation complete
+                if (!hasStopIndicator) {
                     break;
                 }
-
-                // If not generating and response text is stable, we're done
-                if (!status.isGenerating && status.responseContent === lastResponseText && status.responseContent.length > 0) {
-                    break;  // No need to wait for multiple stable iterations
-                }
-
-                lastResponseText = status.responseContent;
 
                 if (Date.now() - startTime > 180000) { // 3 mins timeout
                     response.appendResponseLine('⚠️ タイムアウト（3分）');
