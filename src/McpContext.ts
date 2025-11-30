@@ -118,7 +118,13 @@ export class McpContext implements Context {
           collect(event);
         });
         page.on('pageerror', event => {
-          collect(event);
+          if (event instanceof Error) {
+            collect(event);
+          } else {
+            const error = new Error(`${event}`);
+            error.stack = undefined;
+            collect(error);
+          }
         });
       },
     );

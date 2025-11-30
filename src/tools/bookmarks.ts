@@ -44,7 +44,6 @@ function getDefaultBookmarks(): Record<string, string> {
     'docs': 'https://developer.chrome.com/docs/extensions/',
     'localhost': 'http://localhost:3000',
     'localhost8080': 'http://localhost:8080',
-    'suno': 'https://suno.com/create',
     'chatgpt': CHATGPT_CONFIG.DEFAULT_URL
   };
 }

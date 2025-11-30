@@ -33,14 +33,21 @@ export const waitFor = defineTool({
   },
   schema: {
     text: z.string().describe('Text to appear on the page'),
+    timeout: z
+      .number()
+      .optional()
+      .describe('Timeout in milliseconds. Default: 30000'),
   },
   handler: async (request, response, context) => {
     const page = context.getSelectedPage();
+    const timeout = request.params.timeout ?? 30000;
 
-    await Locator.race([
+    let locator = Locator.race([
       page.locator(`aria/${request.params.text}`),
       page.locator(`text/${request.params.text}`),
-    ]).wait();
+    ]);
+    locator = locator.setTimeout(timeout);
+    await locator.wait();
 
     response.appendResponseLine(
       `Element with text "${request.params.text}" found.`,

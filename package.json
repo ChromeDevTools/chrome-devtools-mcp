@@ -1,6 +1,6 @@
 {
   "name": "chrome-devtools-mcp-for-extension",
-  "version": "0.19.3",
+  "version": "0.20.0",
   "description": "MCP server for Chrome extension development with Web Store automation. Fork of chrome-devtools-mcp with extension-specific tools.",
   "type": "module",
   "bin": "./scripts/cli.mjs",
@@ -55,7 +55,7 @@
     "@modelcontextprotocol/sdk": "1.18.1",
     "archiver": "^7.0.1",
     "debug": "4.4.3",
-    "puppeteer": "24.22.3",
+    "puppeteer": "^24.31.0",
     "yargs": "18.0.0"
   },
   "devDependencies": {
@@ -70,7 +70,7 @@
     "@typescript-eslint/eslint-plugin": "^8.43.0",
     "@typescript-eslint/parser": "^8.43.0",
     "chokidar": "^4.0.3",
-    "chrome-devtools-frontend": "1.0.1520535",
+    "chrome-devtools-frontend": "^1.0.1550444",
     "eslint": "^9.35.0",
     "eslint-import-resolver-typescript": "^4.4.4",
     "eslint-plugin-import": "^2.32.0",
