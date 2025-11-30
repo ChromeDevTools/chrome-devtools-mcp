@@ -17,16 +17,14 @@ import {isLoginRequired} from '../login-helper.js';
 import type {Page} from 'puppeteer-core';
 
 /**
- * Wait for ChatGPT response completion using MutationObserver.
- * More reliable than polling for detecting when streaming ends.
+ * Wait for ChatGPT response completion using hybrid polling + stability check.
+ * Polls every 1 second, and confirms completion when response is stable for 2 seconds.
  */
 async function waitForChatGPTComplete(
   page: Page,
   options: {
     isDeepResearch?: boolean;
-    silenceDuration?: number;
     timeout?: number;
-    onProgress?: (status: {elapsed: number; text?: string; progress?: string}) => void;
   } = {},
 ): Promise<{
   completed: boolean;
@@ -37,172 +35,125 @@ async function waitForChatGPTComplete(
 }> {
   const {
     isDeepResearch = false,
-    silenceDuration = 2000,
     timeout = 300000,
   } = options;
 
   const startTime = Date.now();
+  let lastText = '';
+  let stableCount = 0;
+  const STABLE_THRESHOLD = 2; // Need 2 consecutive stable checks (2 seconds)
 
-  // Use MutationObserver for completion detection
-  const result = await page.evaluate(
-    ({isDeepResearch, silenceDuration, timeout}) => {
-      return new Promise<{
-        completed: boolean;
-        timedOut?: boolean;
-        text?: string;
-        thinkingTime?: number;
-        isDeepResearch?: boolean;
-      }>((resolve) => {
-        const startTime = Date.now();
-        let silenceTimeout: ReturnType<typeof setTimeout>;
-        let overallTimeout: ReturnType<typeof setTimeout>;
-        let lastCheckTime = 0;
+  while (true) {
+    // Check timeout
+    if (Date.now() - startTime > timeout) {
+      const finalStatus = await page.evaluate((isDeepResearch) => {
+        const assistantMessages = document.querySelectorAll(
+          '[data-message-author-role="assistant"]',
+        );
+        if (assistantMessages.length > 0) {
+          const latestMessage = assistantMessages[assistantMessages.length - 1];
+          return { text: latestMessage.textContent || '' };
+        }
+        return { text: '' };
+      }, isDeepResearch);
 
-        const checkCompletion = (): {
-          isStreaming: boolean;
-          text?: string;
-          thinkingTime?: number;
-        } => {
-          const buttons = Array.from(document.querySelectorAll('button'));
+      return {
+        completed: false,
+        timedOut: true,
+        text: finalStatus.text,
+        isDeepResearch,
+      };
+    }
 
-          if (isDeepResearch) {
-            // DeepResearch: check for stop button
-            const isRunning = buttons.some((btn) => {
-              const text = btn.textContent || '';
-              const aria = btn.getAttribute('aria-label') || '';
-              return (
-                text.includes('停止') ||
-                text.includes('リサーチを停止') ||
-                aria.includes('停止')
-              );
-            });
+    // Poll status
+    const status = await page.evaluate((isDeepResearch) => {
+      const buttons = Array.from(document.querySelectorAll('button'));
 
-            if (!isRunning) {
-              const assistantMessages = document.querySelectorAll(
-                '[data-message-author-role="assistant"]',
-              );
-              if (assistantMessages.length > 0) {
-                const latestMessage = assistantMessages[assistantMessages.length - 1];
-                return {
-                  isStreaming: false,
-                  text: latestMessage.textContent || '',
-                };
-              }
-            }
-            return {isStreaming: true};
-          }
-
-          // Normal streaming: check for stop button
-          const isStreaming = buttons.some((btn) => {
-            const text = btn.textContent || '';
-            const aria = btn.getAttribute('aria-label') || '';
-            return (
-              text.includes('ストリーミングの停止') ||
-              text.includes('停止') ||
-              aria.includes('ストリーミングの停止') ||
-              aria.includes('停止')
-            );
-          });
-
-          if (!isStreaming) {
-            const assistantMessages = document.querySelectorAll(
-              '[data-message-author-role="assistant"]',
-            );
-            if (assistantMessages.length > 0) {
-              const latestMessage = assistantMessages[assistantMessages.length - 1];
-              const thinkingButton = latestMessage.querySelector(
-                'button[aria-label*="思考時間"]',
-              );
-              const thinkingTime = thinkingButton
-                ? parseInt(
-                    (thinkingButton.textContent || '').match(/\d+/)?.[0] || '0',
-                  )
-                : undefined;
-
-              return {
-                isStreaming: false,
-                text: latestMessage.textContent || '',
-                thinkingTime,
-              };
-            }
-          }
-
-          return {isStreaming: true};
-        };
-
-        const handleSilence = () => {
-          const status = checkCompletion();
-          if (!status.isStreaming) {
-            cleanup();
-            resolve({
-              completed: true,
-              text: status.text,
-              thinkingTime: status.thinkingTime,
-              isDeepResearch,
-            });
-          }
-          // Still streaming, wait for more changes
-        };
-
-        const cleanup = () => {
-          clearTimeout(silenceTimeout);
-          clearTimeout(overallTimeout);
-          observer.disconnect();
-        };
-
-        // Observe the response container
-        const responseContainer =
-          document.querySelector('[role="main"]') || document.body;
-
-        const observer = new MutationObserver(() => {
-          // Reset silence timer on DOM change
-          clearTimeout(silenceTimeout);
-
-          // Throttle status checks to every 500ms
-          const now = Date.now();
-          if (now - lastCheckTime > 500) {
-            lastCheckTime = now;
-            const status = checkCompletion();
-            if (!status.isStreaming) {
-              // Give a small delay to ensure streaming is truly done
-              silenceTimeout = setTimeout(handleSilence, silenceDuration);
-            }
-          } else {
-            silenceTimeout = setTimeout(handleSilence, silenceDuration);
-          }
+      if (isDeepResearch) {
+        // DeepResearch: check for stop button
+        const isRunning = buttons.some((btn) => {
+          const text = btn.textContent || '';
+          const aria = btn.getAttribute('aria-label') || '';
+          return (
+            text.includes('停止') ||
+            text.includes('リサーチを停止') ||
+            aria.includes('停止')
+          );
         });
 
-        // Overall timeout
-        overallTimeout = setTimeout(() => {
-          cleanup();
-          const status = checkCompletion();
-          resolve({
-            completed: !status.isStreaming,
-            timedOut: true,
+        const assistantMessages = document.querySelectorAll(
+          '[data-message-author-role="assistant"]',
+        );
+        const latestMessage = assistantMessages.length > 0
+          ? assistantMessages[assistantMessages.length - 1]
+          : null;
+
+        return {
+          isStreaming: isRunning,
+          text: latestMessage?.textContent || '',
+        };
+      }
+
+      // Normal streaming: check for stop button
+      const isStreaming = buttons.some((btn) => {
+        const text = btn.textContent || '';
+        const aria = btn.getAttribute('aria-label') || '';
+        return (
+          text.includes('ストリーミングの停止') ||
+          text.includes('停止') ||
+          text.includes('Stop') ||
+          aria.includes('ストリーミングの停止') ||
+          aria.includes('停止') ||
+          aria.includes('Stop')
+        );
+      });
+
+      const assistantMessages = document.querySelectorAll(
+        '[data-message-author-role="assistant"]',
+      );
+      let text = '';
+      let thinkingTime: number | undefined;
+
+      if (assistantMessages.length > 0) {
+        const latestMessage = assistantMessages[assistantMessages.length - 1];
+        text = latestMessage.textContent || '';
+        const thinkingButton = latestMessage.querySelector(
+          'button[aria-label*="思考時間"]',
+        );
+        thinkingTime = thinkingButton
+          ? parseInt(
+              (thinkingButton.textContent || '').match(/\d+/)?.[0] || '0',
+            )
+          : undefined;
+      }
+
+      return { isStreaming, text, thinkingTime };
+    }, isDeepResearch);
+
+    // Check if streaming stopped and text is stable
+    if (!status.isStreaming && status.text.length > 0) {
+      if (status.text === lastText) {
+        stableCount++;
+        if (stableCount >= STABLE_THRESHOLD) {
+          return {
+            completed: true,
             text: status.text,
             thinkingTime: status.thinkingTime,
             isDeepResearch,
-          });
-        }, timeout);
-
-        // Start observing
-        observer.observe(responseContainer, {
-          childList: true,
-          subtree: true,
-          characterData: true,
-        });
-
-        // Initial check - maybe already complete
-        const initialStatus = checkCompletion();
-        if (!initialStatus.isStreaming) {
-          silenceTimeout = setTimeout(handleSilence, silenceDuration);
+          };
         }
-      });
-    },
-    {isDeepResearch, silenceDuration, timeout},
-  );
+      } else {
+        stableCount = 1; // Reset but count this as first stable
+        lastText = status.text;
+      }
+    } else {
+      stableCount = 0;
+      lastText = status.text;
+    }
 
-  return result;
+    // Wait 1 second before next poll
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+  }
 }
 
 /**
@@ -718,23 +669,22 @@ export const askChatGPTWeb = defineTool({
 
       response.appendResponseLine('✅ 質問送信完了');
 
-      // Step 5: Wait for response using MutationObserver-based detection
+      // Step 5: Wait for response using hybrid polling + stability check
       if (useDeepResearch) {
         response.appendResponseLine(
-          'DeepResearchを実行中... (MutationObserverで完了を検出)',
+          'DeepResearchを実行中...',
         );
       } else {
         response.appendResponseLine(
-          'ChatGPTの回答を待機中... (MutationObserverで完了を検出)',
+          'ChatGPTの回答を待機中...',
         );
       }
 
       const startTime = Date.now();
 
-      // Use MutationObserver-based completion detection
+      // Use hybrid polling + stability check for completion detection
       const status = await waitForChatGPTComplete(page, {
         isDeepResearch: useDeepResearch,
-        silenceDuration: 2000, // 2 seconds of DOM silence = complete
         timeout: 300000, // 5 minutes max
       });
 

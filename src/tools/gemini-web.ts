@@ -17,13 +17,12 @@ import { GEMINI_CONFIG } from '../config.js';
 import { isLoginRequired } from '../login-helper.js';
 
 /**
- * Wait for Gemini response completion using MutationObserver.
- * More reliable than polling for detecting when streaming ends.
+ * Wait for Gemini response completion using hybrid polling + stability check.
+ * Polls every 1 second, and confirms completion when response is stable for 2 seconds.
  */
 async function waitForGeminiComplete(
   page: Page,
   options: {
-    silenceDuration?: number;
     timeout?: number;
   } = {},
 ): Promise<{
@@ -32,153 +31,114 @@ async function waitForGeminiComplete(
   responseText?: string;
 }> {
   const {
-    silenceDuration = 2000,
     timeout = 180000, // 3 minutes
   } = options;
 
-  // Use MutationObserver for completion detection
-  const result = await page.evaluate(
-    ({silenceDuration, timeout}) => {
-      return new Promise<{
-        completed: boolean;
-        timedOut?: boolean;
-        responseText?: string;
-      }>((resolve) => {
-        let silenceTimeout: ReturnType<typeof setTimeout>;
-        let overallTimeout: ReturnType<typeof setTimeout>;
-        let lastCheckTime = 0;
+  const startTime = Date.now();
+  let lastText = '';
+  let stableCount = 0;
+  const STABLE_THRESHOLD = 2; // Need 2 consecutive stable checks (2 seconds)
 
-        const checkCompletion = (): {
-          isGenerating: boolean;
-          responseText?: string;
-        } => {
-          // Check for stop icon (Gemini's thinking/generating indicator)
-          const stopIcon = document.querySelector('.stop-icon mat-icon[fonticon="stop"]') ||
-                          document.querySelector('mat-icon[data-mat-icon-name="stop"]') ||
-                          document.querySelector('.blue-circle.stop-icon') ||
-                          document.querySelector('div.stop-icon');
-          const hasStopIcon = !!stopIcon;
-
-          // Check for stop button
-          const buttons = Array.from(document.querySelectorAll('button'));
-          const stopButton = buttons.find(b => {
-            const text = b.textContent || '';
-            const ariaLabel = b.getAttribute('aria-label') || '';
-            return text.includes('回答を停止') || text.includes('Stop') ||
-                   ariaLabel.includes('Stop') || ariaLabel.includes('停止');
-          });
-
-          // Check for send button enabled (indicates completion)
-          const sendButton = buttons.find(b => {
-            const hasLabel = b.textContent?.includes('プロンプトを送信') ||
-                b.getAttribute('aria-label')?.includes('プロンプトを送信') ||
-                b.getAttribute('aria-label')?.includes('Send message');
-            return hasLabel && !b.disabled;
-          });
-
-          // Check for thinking indicators
-          const bodyText = document.body.innerText;
-          const isTyping = bodyText.includes('Gemini が入力中です') ||
-                          bodyText.includes('Gemini is typing');
-          const isThinking = bodyText.includes('Analyzing') ||
-                            bodyText.includes('分析中') ||
-                            bodyText.includes('Crafting') ||
-                            bodyText.includes('作成中') ||
-                            bodyText.includes('Thinking') ||
-                            bodyText.includes('思考中');
-
-          // Check for loading indicators
-          const hasSpinner = document.querySelector('[role="progressbar"]') !== null ||
-                            document.querySelector('[aria-busy="true"]') !== null;
-
-          const isGenerating = hasStopIcon || !!stopButton || isTyping || isThinking || hasSpinner;
-          const isComplete = !!sendButton && !isGenerating;
-
-          // Get response text
-          const modelResponses = Array.from(document.querySelectorAll('model-response'));
-          let responseText = '';
-          if (modelResponses.length > 0) {
-            const lastResponse = modelResponses[modelResponses.length - 1];
-            responseText = lastResponse.textContent?.trim() || '';
-          }
-          if (!responseText) {
-            const main = document.querySelector('main');
-            responseText = main?.innerText.slice(-5000) || '';
-          }
-
-          return { isGenerating, responseText };
-        };
-
-        const handleSilence = () => {
-          const status = checkCompletion();
-          if (!status.isGenerating) {
-            cleanup();
-            resolve({
-              completed: true,
-              responseText: status.responseText,
-            });
-          }
-          // Still generating, wait for more changes
-        };
-
-        const cleanup = () => {
-          clearTimeout(silenceTimeout);
-          clearTimeout(overallTimeout);
-          observer.disconnect();
-        };
-
-        // Observe the response container
-        const responseContainer =
-          document.querySelector('[role="main"]') ||
-          document.querySelector('main') ||
-          document.body;
-
-        const observer = new MutationObserver(() => {
-          // Reset silence timer on DOM change
-          clearTimeout(silenceTimeout);
-
-          // Throttle status checks
-          const now = Date.now();
-          if (now - lastCheckTime > 500) {
-            lastCheckTime = now;
-            const status = checkCompletion();
-            if (!status.isGenerating) {
-              silenceTimeout = setTimeout(handleSilence, silenceDuration);
-            }
-          } else {
-            silenceTimeout = setTimeout(handleSilence, silenceDuration);
-          }
-        });
-
-        // Overall timeout
-        overallTimeout = setTimeout(() => {
-          cleanup();
-          const status = checkCompletion();
-          resolve({
-            completed: !status.isGenerating,
-            timedOut: true,
-            responseText: status.responseText,
-          });
-        }, timeout);
-
-        // Start observing
-        observer.observe(responseContainer, {
-          childList: true,
-          subtree: true,
-          characterData: true,
-        });
-
-        // Initial check
-        const initialStatus = checkCompletion();
-        if (!initialStatus.isGenerating && initialStatus.responseText) {
-          silenceTimeout = setTimeout(handleSilence, silenceDuration);
+  while (true) {
+    // Check timeout
+    if (Date.now() - startTime > timeout) {
+      const finalStatus = await page.evaluate(() => {
+        const modelResponses = Array.from(document.querySelectorAll('model-response'));
+        if (modelResponses.length > 0) {
+          const lastResponse = modelResponses[modelResponses.length - 1];
+          return { responseText: lastResponse.textContent?.trim() || '' };
         }
+        const main = document.querySelector('main');
+        return { responseText: main?.innerText.slice(-5000) || '' };
       });
-    },
-    {silenceDuration, timeout},
-  );
 
-  return result;
+      return {
+        completed: false,
+        timedOut: true,
+        responseText: finalStatus.responseText,
+      };
+    }
+
+    // Poll status
+    const status = await page.evaluate(() => {
+      // Check for stop icon (Gemini's thinking/generating indicator)
+      const stopIcon = document.querySelector('.stop-icon mat-icon[fonticon="stop"]') ||
+                      document.querySelector('mat-icon[data-mat-icon-name="stop"]') ||
+                      document.querySelector('.blue-circle.stop-icon') ||
+                      document.querySelector('div.stop-icon');
+      const hasStopIcon = !!stopIcon;
+
+      // Check for stop button
+      const buttons = Array.from(document.querySelectorAll('button'));
+      const stopButton = buttons.find(b => {
+        const text = b.textContent || '';
+        const ariaLabel = b.getAttribute('aria-label') || '';
+        return text.includes('回答を停止') || text.includes('Stop') ||
+               ariaLabel.includes('Stop') || ariaLabel.includes('停止');
+      });
+
+      // Check for send button enabled (indicates completion)
+      const sendButton = buttons.find(b => {
+        const hasLabel = b.textContent?.includes('プロンプトを送信') ||
+            b.getAttribute('aria-label')?.includes('プロンプトを送信') ||
+            b.getAttribute('aria-label')?.includes('Send message');
+        return hasLabel && !b.disabled;
+      });
+
+      // Check for thinking indicators
+      const bodyText = document.body.innerText;
+      const isTyping = bodyText.includes('Gemini が入力中です') ||
+                      bodyText.includes('Gemini is typing');
+      const isThinking = bodyText.includes('Analyzing') ||
+                        bodyText.includes('分析中') ||
+                        bodyText.includes('Crafting') ||
+                        bodyText.includes('作成中') ||
+                        bodyText.includes('Thinking') ||
+                        bodyText.includes('思考中');
+
+      // Check for loading indicators
+      const hasSpinner = document.querySelector('[role="progressbar"]') !== null ||
+                        document.querySelector('[aria-busy="true"]') !== null;
+
+      const isGenerating = hasStopIcon || !!stopButton || isTyping || isThinking || hasSpinner;
+
+      // Get response text
+      const modelResponses = Array.from(document.querySelectorAll('model-response'));
+      let responseText = '';
+      if (modelResponses.length > 0) {
+        const lastResponse = modelResponses[modelResponses.length - 1];
+        responseText = lastResponse.textContent?.trim() || '';
+      }
+      if (!responseText) {
+        const main = document.querySelector('main');
+        responseText = main?.innerText.slice(-5000) || '';
+      }
+
+      return { isGenerating, responseText, hasSendButton: !!sendButton };
+    });
+
+    // Check if generation stopped and text is stable
+    if (!status.isGenerating && status.responseText.length > 0) {
+      if (status.responseText === lastText) {
+        stableCount++;
+        if (stableCount >= STABLE_THRESHOLD) {
+          return {
+            completed: true,
+            responseText: status.responseText,
+          };
+        }
+      } else {
+        stableCount = 1; // Reset but count this as first stable
+        lastText = status.responseText;
+      }
+    } else {
+      stableCount = 0;
+      lastText = status.responseText;
+    }
+
+    // Wait 1 second before next poll
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+  }
 }
 
 /**
@@ -580,12 +540,11 @@ export const askGeminiWeb = defineTool({
                 response.appendResponseLine('⚠️ 生成開始を検出できませんでした（続行します）');
             }
 
-            // Use MutationObserver-based completion detection
-            response.appendResponseLine('回答を待機中... (MutationObserverで完了を検出)');
+            // Use hybrid polling + stability check for completion detection
+            response.appendResponseLine('回答を待機中...');
 
             const startTime = Date.now();
             const completionResult = await waitForGeminiComplete(page, {
-                silenceDuration: 2000,
                 timeout: 180000,
             });
 
