@@ -17,6 +17,171 @@ import { GEMINI_CONFIG } from '../config.js';
 import { isLoginRequired } from '../login-helper.js';
 
 /**
+ * Wait for Gemini response completion using MutationObserver.
+ * More reliable than polling for detecting when streaming ends.
+ */
+async function waitForGeminiComplete(
+  page: Page,
+  options: {
+    silenceDuration?: number;
+    timeout?: number;
+  } = {},
+): Promise<{
+  completed: boolean;
+  timedOut?: boolean;
+  responseText?: string;
+}> {
+  const {
+    silenceDuration = 2000,
+    timeout = 180000, // 3 minutes
+  } = options;
+
+  // Use MutationObserver for completion detection
+  const result = await page.evaluate(
+    ({silenceDuration, timeout}) => {
+      return new Promise<{
+        completed: boolean;
+        timedOut?: boolean;
+        responseText?: string;
+      }>((resolve) => {
+        let silenceTimeout: ReturnType<typeof setTimeout>;
+        let overallTimeout: ReturnType<typeof setTimeout>;
+        let lastCheckTime = 0;
+
+        const checkCompletion = (): {
+          isGenerating: boolean;
+          responseText?: string;
+        } => {
+          // Check for stop icon (Gemini's thinking/generating indicator)
+          const stopIcon = document.querySelector('.stop-icon mat-icon[fonticon="stop"]') ||
+                          document.querySelector('mat-icon[data-mat-icon-name="stop"]') ||
+                          document.querySelector('.blue-circle.stop-icon') ||
+                          document.querySelector('div.stop-icon');
+          const hasStopIcon = !!stopIcon;
+
+          // Check for stop button
+          const buttons = Array.from(document.querySelectorAll('button'));
+          const stopButton = buttons.find(b => {
+            const text = b.textContent || '';
+            const ariaLabel = b.getAttribute('aria-label') || '';
+            return text.includes('回答を停止') || text.includes('Stop') ||
+                   ariaLabel.includes('Stop') || ariaLabel.includes('停止');
+          });
+
+          // Check for send button enabled (indicates completion)
+          const sendButton = buttons.find(b => {
+            const hasLabel = b.textContent?.includes('プロンプトを送信') ||
+                b.getAttribute('aria-label')?.includes('プロンプトを送信') ||
+                b.getAttribute('aria-label')?.includes('Send message');
+            return hasLabel && !b.disabled;
+          });
+
+          // Check for thinking indicators
+          const bodyText = document.body.innerText;
+          const isTyping = bodyText.includes('Gemini が入力中です') ||
+                          bodyText.includes('Gemini is typing');
+          const isThinking = bodyText.includes('Analyzing') ||
+                            bodyText.includes('分析中') ||
+                            bodyText.includes('Crafting') ||
+                            bodyText.includes('作成中') ||
+                            bodyText.includes('Thinking') ||
+                            bodyText.includes('思考中');
+
+          // Check for loading indicators
+          const hasSpinner = document.querySelector('[role="progressbar"]') !== null ||
+                            document.querySelector('[aria-busy="true"]') !== null;
+
+          const isGenerating = hasStopIcon || !!stopButton || isTyping || isThinking || hasSpinner;
+          const isComplete = !!sendButton && !isGenerating;
+
+          // Get response text
+          const modelResponses = Array.from(document.querySelectorAll('model-response'));
+          let responseText = '';
+          if (modelResponses.length > 0) {
+            const lastResponse = modelResponses[modelResponses.length - 1];
+            responseText = lastResponse.textContent?.trim() || '';
+          }
+          if (!responseText) {
+            const main = document.querySelector('main');
+            responseText = main?.innerText.slice(-5000) || '';
+          }
+
+          return { isGenerating, responseText };
+        };
+
+        const handleSilence = () => {
+          const status = checkCompletion();
+          if (!status.isGenerating) {
+            cleanup();
+            resolve({
+              completed: true,
+              responseText: status.responseText,
+            });
+          }
+          // Still generating, wait for more changes
+        };
+
+        const cleanup = () => {
+          clearTimeout(silenceTimeout);
+          clearTimeout(overallTimeout);
+          observer.disconnect();
+        };
+
+        // Observe the response container
+        const responseContainer =
+          document.querySelector('[role="main"]') ||
+          document.querySelector('main') ||
+          document.body;
+
+        const observer = new MutationObserver(() => {
+          // Reset silence timer on DOM change
+          clearTimeout(silenceTimeout);
+
+          // Throttle status checks
+          const now = Date.now();
+          if (now - lastCheckTime > 500) {
+            lastCheckTime = now;
+            const status = checkCompletion();
+            if (!status.isGenerating) {
+              silenceTimeout = setTimeout(handleSilence, silenceDuration);
+            }
+          } else {
+            silenceTimeout = setTimeout(handleSilence, silenceDuration);
+          }
+        });
+
+        // Overall timeout
+        overallTimeout = setTimeout(() => {
+          cleanup();
+          const status = checkCompletion();
+          resolve({
+            completed: !status.isGenerating,
+            timedOut: true,
+            responseText: status.responseText,
+          });
+        }, timeout);
+
+        // Start observing
+        observer.observe(responseContainer, {
+          childList: true,
+          subtree: true,
+          characterData: true,
+        });
+
+        // Initial check
+        const initialStatus = checkCompletion();
+        if (!initialStatus.isGenerating && initialStatus.responseText) {
+          silenceTimeout = setTimeout(handleSilence, silenceDuration);
+        }
+      });
+    },
+    {silenceDuration, timeout},
+  );
+
+  return result;
+}
+
+/**
  * Navigate with retry logic for handling ERR_ABORTED and other network errors
  */
 async function navigateWithRetry(
@@ -415,120 +580,22 @@ export const askGeminiWeb = defineTool({
                 response.appendResponseLine('⚠️ 生成開始を検出できませんでした（続行します）');
             }
 
+            // Use MutationObserver-based completion detection
+            response.appendResponseLine('回答を待機中... (MutationObserverで完了を検出)');
+
             const startTime = Date.now();
-            let lastResponseText = '';
-
-            while (true) {
-                await new Promise((resolve) => setTimeout(resolve, 1000));
-
-                const status = await page.evaluate(() => {
-                    // Check for stop icon (Gemini's thinking/generating indicator)
-                    // The stop icon is in a div.stop-icon with mat-icon[fonticon="stop"]
-                    const stopIcon = document.querySelector('.stop-icon mat-icon[fonticon="stop"]') ||
-                                    document.querySelector('mat-icon[data-mat-icon-name="stop"]') ||
-                                    document.querySelector('.blue-circle.stop-icon');
-                    const hasStopIcon = !!stopIcon;
-
-                    // Also check for stop button (fallback)
-                    const buttons = Array.from(document.querySelectorAll('button'));
-                    const stopButton = buttons.find(b => {
-                        const text = b.textContent || '';
-                        const ariaLabel = b.getAttribute('aria-label') || '';
-                        return text.includes('回答を停止') || text.includes('Stop') ||
-                               ariaLabel.includes('Stop') || ariaLabel.includes('停止');
-                    });
-
-                    // Check for "プロンプトを送信" button - this indicates response is complete
-                    // Must be enabled (not disabled) to indicate completion
-                    const sendButton = buttons.find(b => {
-                        const hasLabel = b.textContent?.includes('プロンプトを送信') ||
-                            b.getAttribute('aria-label')?.includes('プロンプトを送信') ||
-                            b.getAttribute('aria-label')?.includes('Send message');
-                        return hasLabel && !b.disabled;
-                    });
-
-                    // Check for status text and thinking indicators
-                    const bodyText = document.body.innerText;
-                    const isTyping = bodyText.includes('Gemini が入力中です') ||
-                                    bodyText.includes('Gemini is typing');
-
-                    // Check for thinking/analyzing indicators (Gemini shows these during processing)
-                    const isThinking = bodyText.includes('Analyzing') ||
-                                      bodyText.includes('分析中') ||
-                                      bodyText.includes('Crafting') ||
-                                      bodyText.includes('作成中') ||
-                                      bodyText.includes('Thinking') ||
-                                      bodyText.includes('思考中') ||
-                                      bodyText.includes('Researching') ||
-                                      bodyText.includes('調査中');
-
-                    // Check for loading spinners or progress indicators
-                    const hasSpinner = document.querySelector('[role="progressbar"]') !== null ||
-                                      document.querySelector('.loading') !== null ||
-                                      document.querySelector('[aria-busy="true"]') !== null;
-
-                    const isComplete = (bodyText.includes('Gemini が回答しました') ||
-                                      bodyText.includes('Gemini has responded') ||
-                                      !!sendButton) && !isThinking && !hasSpinner && !hasStopIcon;
-
-                    const isGenerating = hasStopIcon || !!stopButton || isTyping || isThinking || hasSpinner;
-
-                    // Get the response content from model-response elements
-                    const modelResponses = Array.from(document.querySelectorAll('model-response'));
-                    let responseContent = '';
-                    if (modelResponses.length > 0) {
-                        // Get the last model response
-                        const lastResponse = modelResponses[modelResponses.length - 1];
-                        responseContent = lastResponse.textContent || '';
-                    }
-
-                    // Fallback: get text from main area
-                    if (!responseContent) {
-                        const main = document.querySelector('main');
-                        responseContent = main?.innerText || '';
-                    }
-
-                    return {
-                        isGenerating,
-                        isComplete,
-                        responseContent
-                    };
-                });
-
-                // If explicitly marked as complete, we're done
-                if (status.isComplete && !status.isGenerating) {
-                    break;
-                }
-
-                // If not generating and response text is stable, we're done
-                if (!status.isGenerating && status.responseContent === lastResponseText && status.responseContent.length > 0) {
-                    break;  // No need to wait for multiple stable iterations
-                }
-
-                lastResponseText = status.responseContent;
-
-                if (Date.now() - startTime > 180000) { // 3 mins timeout
-                    response.appendResponseLine('⚠️ タイムアウト（3分）');
-                    break;
-                }
-            }
-
-            // Get the final response content
-            const responseText = await page.evaluate(() => {
-                // Get content from model-response elements
-                const modelResponses = Array.from(document.querySelectorAll('model-response'));
-                if (modelResponses.length > 0) {
-                    // Get the last model response
-                    const lastResponse = modelResponses[modelResponses.length - 1];
-                    return lastResponse.textContent?.trim() || '';
-                }
-
-                // Fallback: get text from main area
-                const main = document.querySelector('main');
-                return main?.innerText.slice(-5000) || '';
+            const completionResult = await waitForGeminiComplete(page, {
+                silenceDuration: 2000,
+                timeout: 180000,
             });
 
-            response.appendResponseLine('✅ 回答完了');
+            if (completionResult.timedOut) {
+                response.appendResponseLine('⚠️ タイムアウト（3分）');
+            }
+
+            const responseText = completionResult.responseText || '';
+
+            response.appendResponseLine(`✅ 回答完了 (所要時間: ${Math.floor((Date.now() - startTime) / 1000)}秒)`);
 
             // Save session
             if (isNewChat) {
@@ -559,28 +626,14 @@ export const askGeminiWeb = defineTool({
             );
 
             response.appendResponseLine(`📝 会話ログ保存: ${logPath}`);
+            response.appendResponseLine(`🔗 チャットURL: ${page.url()}`);
+            response.appendResponseLine('\n' + '='.repeat(60));
+            response.appendResponseLine('Geminiの回答:\n');
+            response.appendResponseLine(responseText);
 
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
             response.appendResponseLine(`❌ エラー: ${errorMessage}`);
-
-            // Error snapshot
-            try {
-                const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-                const debugDir = path.join(process.cwd(), 'docs/ask/gemini/debug');
-                await fs.promises.mkdir(debugDir, { recursive: true });
-
-                const screenshotPath = path.join(debugDir, `error-${timestamp}.png`) as `${string}.png`;
-                await page.screenshot({ path: screenshotPath });
-                response.appendResponseLine(`📸 エラー時のスクリーンショット: ${screenshotPath}`);
-
-                const htmlPath = path.join(debugDir, `error-${timestamp}.html`);
-                const html = await page.content();
-                await fs.promises.writeFile(htmlPath, html, 'utf-8');
-                response.appendResponseLine(`📄 エラー時のHTML: ${htmlPath}`);
-            } catch (snapshotError) {
-                console.error('Failed to capture error snapshot:', snapshotError);
-            }
         }
     },
 });
