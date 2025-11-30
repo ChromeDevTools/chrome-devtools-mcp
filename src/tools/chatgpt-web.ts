@@ -14,147 +14,6 @@ import {defineTool} from './ToolDefinition.js';
 import {loadSelectors, getSelector} from '../selectors/loader.js';
 import {CHATGPT_CONFIG} from '../config.js';
 import {isLoginRequired} from '../login-helper.js';
-import type {Page} from 'puppeteer-core';
-
-/**
- * Wait for ChatGPT response completion using hybrid polling + stability check.
- * Polls every 1 second, and confirms completion when response is stable for 2 seconds.
- */
-async function waitForChatGPTComplete(
-  page: Page,
-  options: {
-    isDeepResearch?: boolean;
-    timeout?: number;
-  } = {},
-): Promise<{
-  completed: boolean;
-  timedOut?: boolean;
-  text?: string;
-  thinkingTime?: number;
-  isDeepResearch?: boolean;
-}> {
-  const {
-    isDeepResearch = false,
-    timeout = 300000,
-  } = options;
-
-  const startTime = Date.now();
-  let lastText = '';
-  let stableCount = 0;
-  const STABLE_THRESHOLD = 2; // Need 2 consecutive stable checks (2 seconds)
-
-  while (true) {
-    // Check timeout
-    if (Date.now() - startTime > timeout) {
-      const finalStatus = await page.evaluate((isDeepResearch) => {
-        const assistantMessages = document.querySelectorAll(
-          '[data-message-author-role="assistant"]',
-        );
-        if (assistantMessages.length > 0) {
-          const latestMessage = assistantMessages[assistantMessages.length - 1];
-          return { text: latestMessage.textContent || '' };
-        }
-        return { text: '' };
-      }, isDeepResearch);
-
-      return {
-        completed: false,
-        timedOut: true,
-        text: finalStatus.text,
-        isDeepResearch,
-      };
-    }
-
-    // Poll status
-    const status = await page.evaluate((isDeepResearch) => {
-      const buttons = Array.from(document.querySelectorAll('button'));
-
-      if (isDeepResearch) {
-        // DeepResearch: check for stop button
-        const isRunning = buttons.some((btn) => {
-          const text = btn.textContent || '';
-          const aria = btn.getAttribute('aria-label') || '';
-          return (
-            text.includes('停止') ||
-            text.includes('リサーチを停止') ||
-            aria.includes('停止')
-          );
-        });
-
-        const assistantMessages = document.querySelectorAll(
-          '[data-message-author-role="assistant"]',
-        );
-        const latestMessage = assistantMessages.length > 0
-          ? assistantMessages[assistantMessages.length - 1]
-          : null;
-
-        return {
-          isStreaming: isRunning,
-          text: latestMessage?.textContent || '',
-        };
-      }
-
-      // Normal streaming: check for stop button
-      const isStreaming = buttons.some((btn) => {
-        const text = btn.textContent || '';
-        const aria = btn.getAttribute('aria-label') || '';
-        return (
-          text.includes('ストリーミングの停止') ||
-          text.includes('停止') ||
-          text.includes('Stop') ||
-          aria.includes('ストリーミングの停止') ||
-          aria.includes('停止') ||
-          aria.includes('Stop')
-        );
-      });
-
-      const assistantMessages = document.querySelectorAll(
-        '[data-message-author-role="assistant"]',
-      );
-      let text = '';
-      let thinkingTime: number | undefined;
-
-      if (assistantMessages.length > 0) {
-        const latestMessage = assistantMessages[assistantMessages.length - 1];
-        text = latestMessage.textContent || '';
-        const thinkingButton = latestMessage.querySelector(
-          'button[aria-label*="思考時間"]',
-        );
-        thinkingTime = thinkingButton
-          ? parseInt(
-              (thinkingButton.textContent || '').match(/\d+/)?.[0] || '0',
-            )
-          : undefined;
-      }
-
-      return { isStreaming, text, thinkingTime };
-    }, isDeepResearch);
-
-    // Check if streaming stopped and text is stable
-    if (!status.isStreaming && status.text.length > 0) {
-      if (status.text === lastText) {
-        stableCount++;
-        if (stableCount >= STABLE_THRESHOLD) {
-          return {
-            completed: true,
-            text: status.text,
-            thinkingTime: status.thinkingTime,
-            isDeepResearch,
-          };
-        }
-      } else {
-        stableCount = 1; // Reset but count this as first stable
-        lastText = status.text;
-      }
-    } else {
-      stableCount = 0;
-      lastText = status.text;
-    }
-
-    // Wait 1 second before next poll
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-  }
-}
 
 /**
  * Path to store chat session data
@@ -669,122 +528,234 @@ export const askChatGPTWeb = defineTool({
 
       response.appendResponseLine('✅ 質問送信完了');
 
-      // Step 5: Wait for response using hybrid polling + stability check
+      // Step 5: Monitor streaming/research with progress updates
       if (useDeepResearch) {
         response.appendResponseLine(
-          'DeepResearchを実行中...',
+          'DeepResearchを実行中... (10秒ごとに進捗を表示)',
         );
       } else {
         response.appendResponseLine(
-          'ChatGPTの回答を待機中...',
+          'ChatGPTの回答を待機中... (10秒ごとに進捗を表示)',
         );
       }
 
       const startTime = Date.now();
+      let lastText = '';
+      let lastProgress = '';
 
-      // Use hybrid polling + stability check for completion detection
-      const status = await waitForChatGPTComplete(page, {
-        isDeepResearch: useDeepResearch,
-        timeout: 300000, // 5 minutes max
-      });
+      while (true) {
+        await new Promise((resolve) => setTimeout(resolve, 2000));
 
-      if (status.completed) {
-        const completionMessage = useDeepResearch
-          ? `\n✅ DeepResearch完了 (所要時間: ${Math.floor((Date.now() - startTime) / 1000)}秒)`
-          : `\n✅ 回答完了 (所要時間: ${Math.floor((Date.now() - startTime) / 1000)}秒)`;
-        response.appendResponseLine(completionMessage);
+        const status = await page.evaluate((isDeepResearch) => {
+          // DeepResearch progress detection
+          if (isDeepResearch) {
+            // Look for research progress indicators
+            const progressElements = Array.from(
+              document.querySelectorAll('[role="status"], [aria-live="polite"]'),
+            );
+            const progressText = progressElements
+              .map((el) => el.textContent)
+              .join(' ');
 
-        if (status.timedOut) {
-          response.appendResponseLine('⚠️ タイムアウトしましたが、回答を取得しました');
-        }
+            // Check if DeepResearch is still running
+            const buttons = Array.from(document.querySelectorAll('button'));
+            const isRunning = buttons.some((btn) => {
+              const text = btn.textContent || '';
+              const aria = btn.getAttribute('aria-label') || '';
+              return (
+                text.includes('停止') ||
+                text.includes('リサーチを停止') ||
+                aria.includes('停止')
+              );
+            });
 
-        if (status.thinkingTime) {
-          response.appendResponseLine(
-            `🤔 思考時間: ${status.thinkingTime}秒`,
+            if (!isRunning) {
+              // Research completed - get the report
+              const assistantMessages = document.querySelectorAll(
+                '[data-message-author-role="assistant"]',
+              );
+              if (assistantMessages.length === 0)
+                return {completed: false, progress: progressText};
+
+              const latestMessage =
+                assistantMessages[assistantMessages.length - 1];
+              return {
+                completed: true,
+                text: latestMessage.textContent || '',
+                isDeepResearch: true,
+              };
+            }
+
+            return {
+              completed: false,
+              streaming: true,
+              progress: progressText,
+              currentText: progressText.substring(0, 200),
+            };
+          }
+
+          // Normal streaming detection
+          const buttons = Array.from(document.querySelectorAll('button'));
+          const isStreaming = buttons.some((btn) => {
+            const text = btn.textContent || '';
+            const aria = btn.getAttribute('aria-label') || '';
+            return (
+              text.includes('ストリーミングの停止') ||
+              text.includes('停止') ||
+              aria.includes('ストリーミングの停止') ||
+              aria.includes('停止')
+            );
+          });
+
+          if (!isStreaming) {
+            // Get final response
+            const assistantMessages = document.querySelectorAll(
+              '[data-message-author-role="assistant"]',
+            );
+            if (assistantMessages.length === 0) return {completed: false};
+
+            const latestMessage =
+              assistantMessages[assistantMessages.length - 1];
+            const thinkingButton = latestMessage.querySelector(
+              'button[aria-label*="思考時間"]',
+            );
+            const thinkingTime = thinkingButton
+              ? parseInt(
+                  (thinkingButton.textContent || '').match(/\d+/)?.[0] || '0',
+                )
+              : undefined;
+
+            return {
+              completed: true,
+              text: latestMessage.textContent || '',
+              thinkingTime,
+            };
+          }
+
+          // Get current text
+          const assistantMessages = document.querySelectorAll(
+            '[data-message-author-role="assistant"]',
           );
-        }
+          const latestMessage =
+            assistantMessages[assistantMessages.length - 1];
+          const currentText = latestMessage
+            ? latestMessage.textContent?.substring(0, 200)
+            : '';
 
-        // Save chat session if it's a new chat
-        if (isNewChat) {
-          response.appendResponseLine('チャットセッションを保存中...');
+          return {
+            completed: false,
+            streaming: true,
+            currentText,
+          };
+        }, useDeepResearch);
 
-          // Extract chat ID from URL
-          const chatUrl = page.url();
-          const chatIdMatch = chatUrl.match(/\/c\/([a-f0-9-]+)/);
+        if (status.completed) {
+          const completionMessage = useDeepResearch
+            ? `\n✅ DeepResearch完了 (所要時間: ${Math.floor((Date.now() - startTime) / 1000)}秒)`
+            : `\n✅ 回答完了 (所要時間: ${Math.floor((Date.now() - startTime) / 1000)}秒)`;
+          response.appendResponseLine(completionMessage);
 
-          if (chatIdMatch) {
-            const chatId = chatIdMatch[1];
-            const now = new Date().toISOString();
-            await saveChatSession(project, {
-              chatId,
-              url: chatUrl,
-              lastUsed: now,
-              createdAt: now,
-              title: `[Project: ${project}]`,
-              conversationCount: 1,
-            });
-            sessionChatId = chatId;
+          if (status.thinkingTime) {
             response.appendResponseLine(
-              `✅ チャットセッション保存: ${chatId}`,
-            );
-          } else {
-            response.appendResponseLine(
-              '⚠️ チャットIDが取得できませんでした',
+              `🤔 思考時間: ${status.thinkingTime}秒`,
             );
           }
-        } else {
-          // Update last used timestamp and conversation count for existing session
-          if (sessionChatId) {
+
+          // Save chat session if it's a new chat
+          if (isNewChat) {
+            response.appendResponseLine('チャットセッションを保存中...');
+
+            // Extract chat ID from URL
             const chatUrl = page.url();
-            const sessions = await loadChatSessions();
-            const projectSessions = sessions[project] || [];
-            const existingSession = projectSessions.find(s => s.chatId === sessionChatId);
+            const chatIdMatch = chatUrl.match(/\/c\/([a-f0-9-]+)/);
 
-            await saveChatSession(project, {
-              chatId: sessionChatId,
-              url: chatUrl,
-              lastUsed: new Date().toISOString(),
-              createdAt: existingSession?.createdAt || new Date().toISOString(),
-              title: existingSession?.title || `[Project: ${project}]`,
-              conversationCount: (existingSession?.conversationCount || 0) + 1,
-            });
+            if (chatIdMatch) {
+              const chatId = chatIdMatch[1];
+              const now = new Date().toISOString();
+              await saveChatSession(project, {
+                chatId,
+                url: chatUrl,
+                lastUsed: now,
+                createdAt: now,
+                title: `[Project: ${project}]`,
+                conversationCount: 1,
+              });
+              sessionChatId = chatId;
+              response.appendResponseLine(
+                `✅ チャットセッション保存: ${chatId}`,
+              );
+            } else {
+              response.appendResponseLine(
+                '⚠️ チャットIDが取得できませんでした',
+              );
+            }
+          } else {
+            // Update last used timestamp and conversation count for existing session
+            if (sessionChatId) {
+              const chatUrl = page.url();
+              const sessions = await loadChatSessions();
+              const projectSessions = sessions[project] || [];
+              const existingSession = projectSessions.find(s => s.chatId === sessionChatId);
+
+              await saveChatSession(project, {
+                chatId: sessionChatId,
+                url: chatUrl,
+                lastUsed: new Date().toISOString(),
+                createdAt: existingSession?.createdAt || new Date().toISOString(),
+                title: existingSession?.title || `[Project: ${project}]`,
+                conversationCount: (existingSession?.conversationCount || 0) + 1,
+              });
+            }
           }
+
+          // Save conversation log
+          const chatUrl = page.url();
+          const modelName = useDeepResearch
+            ? 'ChatGPT DeepResearch'
+            : 'ChatGPT 5 Thinking';
+
+          // Get current conversation count
+          const sessions = await loadChatSessions();
+          const projectSessions = sessions[project] || [];
+          const currentSession = projectSessions.find(s => s.chatId === sessionChatId);
+          const conversationNum = currentSession?.conversationCount || 1;
+
+          const logPath = await saveConversationLog(
+            project,
+            sanitizedQuestion,
+            status.text || '',
+            {
+              thinkingTime: status.thinkingTime,
+              chatUrl,
+              model: modelName,
+              chatId: sessionChatId,
+              conversationNumber: conversationNum,
+            },
+          );
+
+          response.appendResponseLine(`📝 会話ログ保存: ${logPath}`);
+          response.appendResponseLine(`🔗 チャットURL: ${chatUrl}`);
+          response.appendResponseLine('\n' + '='.repeat(60));
+          response.appendResponseLine('ChatGPTの回答:\n');
+          response.appendResponseLine(status.text || '');
+
+          break;
         }
 
-        // Save conversation log
-        const chatUrl = page.url();
-        const modelName = useDeepResearch
-          ? 'ChatGPT DeepResearch'
-          : 'ChatGPT 5 Thinking';
-
-        // Get current conversation count
-        const sessions = await loadChatSessions();
-        const projectSessions = sessions[project] || [];
-        const currentSession = projectSessions.find(s => s.chatId === sessionChatId);
-        const conversationNum = currentSession?.conversationCount || 1;
-
-        const logPath = await saveConversationLog(
-          project,
-          sanitizedQuestion,
-          status.text || '',
-          {
-            thinkingTime: status.thinkingTime,
-            chatUrl,
-            model: modelName,
-            chatId: sessionChatId,
-            conversationNumber: conversationNum,
-          },
-        );
-
-        response.appendResponseLine(`📝 会話ログ保存: ${logPath}`);
-        response.appendResponseLine(`🔗 チャットURL: ${chatUrl}`);
-        response.appendResponseLine('\n' + '='.repeat(60));
-        response.appendResponseLine('ChatGPTの回答:\n');
-        response.appendResponseLine(status.text || '');
-      } else {
-        response.appendResponseLine('❌ 回答の取得に失敗しました');
-        if (status.timedOut) {
-          response.appendResponseLine('⚠️ タイムアウトしました');
+        // Show progress every 10 seconds
+        const elapsedSeconds = Math.floor((Date.now() - startTime) / 1000);
+        if (elapsedSeconds % 10 === 0) {
+          if (useDeepResearch && status.progress !== lastProgress) {
+            lastProgress = status.progress || '';
+            response.appendResponseLine(
+              `⏱️ ${elapsedSeconds}秒経過 - 進捗: ${lastProgress.substring(0, 100)}...`,
+            );
+          } else if (status.currentText !== lastText) {
+            lastText = status.currentText || '';
+            response.appendResponseLine(
+              `⏱️ ${elapsedSeconds}秒経過 - 現在のテキスト: ${lastText.substring(0, 100)}...`,
+            );
+          }
         }
       }
     } catch (error) {
