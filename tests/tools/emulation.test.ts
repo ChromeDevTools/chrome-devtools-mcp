@@ -159,8 +159,10 @@ describe('emulation', () => {
         await emulate.handler(
           {
             params: {
-              latitude: 48.137154,
-              longitude: 11.576124,
+              geolocation: {
+                latitude: 48.137154,
+                longitude: 11.576124,
+              },
             },
           },
           response,
@@ -173,14 +175,16 @@ describe('emulation', () => {
       });
     });
 
-    it('clears geolocation override when clearGeolocation is true', async () => {
+    it('clears geolocation override when geolocation is set to null', async () => {
       await withMcpContext(async (response, context) => {
         // First set a geolocation
         await emulate.handler(
           {
             params: {
-              latitude: 48.137154,
-              longitude: 11.576124,
+              geolocation: {
+                latitude: 48.137154,
+                longitude: 11.576124,
+              },
             },
           },
           response,
@@ -189,11 +193,11 @@ describe('emulation', () => {
 
         assert.notStrictEqual(context.getGeolocation(), null);
 
-        // Then clear it using clearGeolocation
+        // Then clear it by setting geolocation to null
         await emulate.handler(
           {
             params: {
-              clearGeolocation: true,
+              geolocation: null,
             },
           },
           response,
@@ -204,35 +208,15 @@ describe('emulation', () => {
       });
     });
 
-    it('throws error when only latitude is provided', async () => {
-      await withMcpContext(async (response, context) => {
-        await assert.rejects(
-          async () => {
-            await emulate.handler(
-              {
-                params: {
-                  latitude: 48.137154,
-                },
-              },
-              response,
-              context,
-            );
-          },
-          {
-            message:
-              'Both latitude and longitude must be provided together for geolocation emulation.',
-          },
-        );
-      });
-    });
-
     it('reports correctly for the currently selected page', async () => {
       await withMcpContext(async (response, context) => {
         await emulate.handler(
           {
             params: {
-              latitude: 48.137154,
-              longitude: 11.576124,
+              geolocation: {
+                latitude: 48.137154,
+                longitude: 11.576124,
+              },
             },
           },
           response,

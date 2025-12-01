@@ -37,36 +37,28 @@ export const emulate = defineTool({
       .describe(
         'Represents the CPU slowdown factor. Set the rate to 1 to disable throttling. If omitted, throttling remains unchanged.',
       ),
-    latitude: zod
-      .number()
-      .min(-90)
-      .max(90)
+    geolocation: zod
+      .object({
+        latitude: zod
+          .number()
+          .min(-90)
+          .max(90)
+          .describe('Latitude between -90 and 90.'),
+        longitude: zod
+          .number()
+          .min(-180)
+          .max(180)
+          .describe('Longitude between -180 and 180.'),
+      })
+      .nullable()
       .optional()
       .describe(
-        'Latitude between -90 and 90 for geolocation emulation. Must be provided together with longitude.',
+        'Geolocation to emulate. Set to null to clear the geolocation override.',
       ),
-    longitude: zod
-      .number()
-      .min(-180)
-      .max(180)
-      .optional()
-      .describe(
-        'Longitude between -180 and 180 for geolocation emulation. Must be provided together with latitude.',
-      ),
-    clearGeolocation: zod
-      .boolean()
-      .optional()
-      .describe('Set to true to clear the geolocation override.'),
   },
   handler: async (request, _response, context) => {
     const page = context.getSelectedPage();
-    const {
-      networkConditions,
-      cpuThrottlingRate,
-      latitude,
-      longitude,
-      clearGeolocation,
-    } = request.params;
+    const {networkConditions, cpuThrottlingRate, geolocation} = request.params;
 
     if (networkConditions) {
       if (networkConditions === 'No emulation') {
@@ -95,17 +87,13 @@ export const emulate = defineTool({
       context.setCpuThrottlingRate(cpuThrottlingRate);
     }
 
-    if (clearGeolocation) {
-      await page.setGeolocation({latitude: 0, longitude: 0});
-      context.setGeolocation(null);
-    } else if (latitude !== undefined || longitude !== undefined) {
-      if (latitude !== undefined && longitude !== undefined) {
-        await page.setGeolocation({latitude, longitude});
-        context.setGeolocation({latitude, longitude});
+    if (geolocation !== undefined) {
+      if (geolocation === null) {
+        await page.setGeolocation({latitude: 0, longitude: 0});
+        context.setGeolocation(null);
       } else {
-        throw new Error(
-          'Both latitude and longitude must be provided together for geolocation emulation.',
-        );
+        await page.setGeolocation(geolocation);
+        context.setGeolocation(geolocation);
       }
     }
   },

@@ -195,10 +195,8 @@
 
 **Parameters:**
 
-- **clearGeolocation** (boolean) _(optional)_: Set to true to clear the geolocation override.
 - **cpuThrottlingRate** (number) _(optional)_: Represents the CPU slowdown factor. Set the rate to 1 to disable throttling. If omitted, throttling remains unchanged.
-- **latitude** (number) _(optional)_: Latitude between -90 and 90 for geolocation emulation. Must be provided together with longitude.
-- **longitude** (number) _(optional)_: Longitude between -180 and 180 for geolocation emulation. Must be provided together with latitude.
+- **geolocation** (unknown) _(optional)_: Geolocation to [`emulate`](#emulate). Set to null to clear the geolocation override.
 - **networkConditions** (enum: "No emulation", "Offline", "Slow 3G", "Fast 3G", "Slow 4G", "Fast 4G") _(optional)_: Throttle network. Set to "No emulation" to disable. If omitted, conditions remain unchanged.
 
 ---
