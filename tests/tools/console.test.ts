@@ -5,10 +5,9 @@
  */
 
 import assert from 'node:assert';
-import {afterEach, before, beforeEach, describe, it} from 'node:test';
+import {before, describe, it} from 'node:test';
 
 import {AggregatedIssue} from '../../node_modules/chrome-devtools-frontend/mcp/mcp.js';
-import {setIssuesEnabled} from '../../src/features.js';
 import {loadIssueDescriptions} from '../../src/issue-descriptions.js';
 import {McpResponse} from '../../src/McpResponse.js';
 import {
@@ -59,12 +58,6 @@ describe('console', () => {
     });
 
     describe('issues', () => {
-      beforeEach(() => {
-        setIssuesEnabled(true);
-      });
-      afterEach(() => {
-        setIssuesEnabled(false);
-      });
       it('lists issues', async () => {
         await withMcpContext(async (response, context) => {
           const page = await context.newPage();
@@ -155,12 +148,6 @@ describe('console', () => {
 
     describe('issues type', () => {
       const server = serverHooks();
-      beforeEach(() => {
-        setIssuesEnabled(true);
-      });
-      afterEach(() => {
-        setIssuesEnabled(false);
-      });
 
       it('gets issue details with node id parsing', async t => {
         await withMcpContext(async (response, context) => {

@@ -3,8 +3,6 @@
  * Copyright 2025 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-
-import {features} from '../features.js';
 import {zod} from '../third_party/index.js';
 import type {ConsoleMessageType} from '../third_party/index.js';
 
@@ -37,10 +35,6 @@ const FILTERABLE_MESSAGE_TYPES: [
   'verbose',
   'issue',
 ];
-
-if (features.issues) {
-  FILTERABLE_MESSAGE_TYPES.push('issue');
-}
 
 export const listConsoleMessages = defineTool({
   name: 'list_console_messages',
