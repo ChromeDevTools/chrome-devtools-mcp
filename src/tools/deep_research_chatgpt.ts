@@ -852,35 +852,16 @@ async function monitorResearch(
 
 export const deepResearchChatGPT = defineTool({
   name: 'deep_research_chatgpt',
-  description: `Perform deep research using ChatGPT's DeepResearch mode. This tool automatically handles mode detection, source selection, conversation continuation, and result retrieval. Use this when thorough research is needed.`,
+  description: 'ChatGPT DeepResearch mode. Auto handles mode/sources/results.',
   annotations: {
     category: ToolCategories.NAVIGATION_AUTOMATION,
     readOnlyHint: false,
   },
   schema: {
-    question: z
-      .string()
-      .describe(
-        'The research question or topic. Should be detailed and well-formed.',
-      ),
-    projectName: z
-      .string()
-      .optional()
-      .describe(
-        'Project name for organizing research sessions. Defaults to current working directory name.',
-      ),
-    enableGitHub: z
-      .boolean()
-      .optional()
-      .describe(
-        'Enable GitHub as information source. Auto-detected if question is code-related.',
-      ),
-    reuseSession: z
-      .boolean()
-      .optional()
-      .describe(
-        'Reuse existing project chat session instead of creating new chat. Default: false',
-      ),
+    question: z.string().describe('Research question'),
+    projectName: z.string().optional().describe('Project name (default: cwd)'),
+    enableGitHub: z.boolean().optional().describe('Enable GitHub source'),
+    reuseSession: z.boolean().optional().describe('Reuse existing session'),
   },
   handler: async (request, response, context) => {
     const {question, projectName, enableGitHub, reuseSession = false} =

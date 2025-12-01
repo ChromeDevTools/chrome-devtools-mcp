@@ -9,154 +9,130 @@ import z from 'zod';
 import {ToolCategories} from './categories.js';
 import {CLOSE_PAGE_ERROR, defineTool} from './ToolDefinition.js';
 
-export const listPages = defineTool({
-  name: 'list_pages',
-  description: `Get a list of pages open in the browser.`,
-  annotations: {
-    category: ToolCategories.NAVIGATION_AUTOMATION,
-    readOnlyHint: true,
-  },
-  schema: {},
-  handler: async (_request, response) => {
-    response.setIncludePages(true);
-  },
-});
-
-export const selectPage = defineTool({
-  name: 'select_page',
-  description: `Select a page as a context for future tool calls.`,
-  annotations: {
-    category: ToolCategories.NAVIGATION_AUTOMATION,
-    readOnlyHint: true,
-  },
-  schema: {
-    pageIdx: z
-      .number()
-      .describe(
-        'The index of the page to select. Call list_pages to list pages.',
-      ),
-  },
-  handler: async (request, response, context) => {
-    const page = context.getPageByIdx(request.params.pageIdx);
-    await page.bringToFront();
-    context.setSelectedPageIdx(request.params.pageIdx);
-    response.setIncludePages(true);
-  },
-});
-
-export const closePage = defineTool({
-  name: 'close_page',
-  description: `Closes the page by its index. The last open page cannot be closed.`,
+/**
+ * Consolidated page management tool.
+ * Combines: list_pages, select_page, close_page
+ */
+export const pages = defineTool({
+  name: 'pages',
+  description: 'Manage browser pages: list, select, or close.',
   annotations: {
     category: ToolCategories.NAVIGATION_AUTOMATION,
     readOnlyHint: false,
   },
   schema: {
-    pageIdx: z
-      .number()
-      .describe(
-        'The index of the page to close. Call list_pages to list pages.',
-      ),
+    op: z.enum(['list', 'select', 'close']).describe('Operation'),
+    pageIdx: z.number().optional().describe('Page index (for select/close)'),
   },
   handler: async (request, response, context) => {
-    try {
-      await context.closePage(request.params.pageIdx);
-    } catch (err) {
-      if (err.message === CLOSE_PAGE_ERROR) {
-        response.appendResponseLine(err.message);
-      } else {
-        throw err;
-      }
+    const {op, pageIdx} = request.params;
+
+    switch (op) {
+      case 'list':
+        response.setIncludePages(true);
+        break;
+
+      case 'select':
+        if (pageIdx === undefined) {
+          throw new Error('pageIdx required for select');
+        }
+        const selectPage = context.getPageByIdx(pageIdx);
+        await selectPage.bringToFront();
+        context.setSelectedPageIdx(pageIdx);
+        response.setIncludePages(true);
+        break;
+
+      case 'close':
+        if (pageIdx === undefined) {
+          throw new Error('pageIdx required for close');
+        }
+        try {
+          await context.closePage(pageIdx);
+        } catch (err) {
+          if (err.message === CLOSE_PAGE_ERROR) {
+            response.appendResponseLine(err.message);
+          } else {
+            throw err;
+          }
+        }
+        response.setIncludePages(true);
+        break;
     }
-    response.setIncludePages(true);
   },
 });
 
-export const newPage = defineTool({
-  name: 'new_page',
-  description: `Creates a new page`,
+/**
+ * Consolidated navigation tool.
+ * Combines: navigate_page, navigate_page_history, new_page
+ */
+export const navigate = defineTool({
+  name: 'navigate',
+  description: 'Navigate: goto URL, back, forward, or open new page.',
   annotations: {
     category: ToolCategories.NAVIGATION_AUTOMATION,
     readOnlyHint: false,
   },
   schema: {
-    url: z.string().describe('URL to load in a new page.'),
+    op: z.enum(['goto', 'back', 'forward', 'new']).describe('Operation'),
+    url: z.string().optional().describe('URL (for goto/new)'),
   },
   handler: async (request, response, context) => {
-    const page = await context.newPage();
+    const {op, url} = request.params;
 
-    await context.waitForEventsAfterAction(async () => {
-      await page.goto(request.params.url);
-    });
+    switch (op) {
+      case 'goto':
+        if (!url) {
+          throw new Error('url required for goto');
+        }
+        const gotoPage = context.getSelectedPage();
+        await context.waitForEventsAfterAction(async () => {
+          await gotoPage.goto(url);
+        });
+        response.setIncludePages(true);
+        break;
 
-    response.setIncludePages(true);
-  },
-});
+      case 'new':
+        if (!url) {
+          throw new Error('url required for new');
+        }
+        const newPage = await context.newPage();
+        await context.waitForEventsAfterAction(async () => {
+          await newPage.goto(url);
+        });
+        response.setIncludePages(true);
+        break;
 
-export const navigatePage = defineTool({
-  name: 'navigate_page',
-  description: `Navigates the currently selected page to a URL.`,
-  annotations: {
-    category: ToolCategories.NAVIGATION_AUTOMATION,
-    readOnlyHint: false,
-  },
-  schema: {
-    url: z.string().describe('URL to navigate the page to'),
-  },
-  handler: async (request, response, context) => {
-    const page = context.getSelectedPage();
-
-    await context.waitForEventsAfterAction(async () => {
-      await page.goto(request.params.url);
-    });
-
-    response.setIncludePages(true);
-  },
-});
-
-export const navigatePageHistory = defineTool({
-  name: 'navigate_page_history',
-  description: `Navigates the currently selected page.`,
-  annotations: {
-    category: ToolCategories.NAVIGATION_AUTOMATION,
-    readOnlyHint: false,
-  },
-  schema: {
-    navigate: z
-      .enum(['back', 'forward'])
-      .describe(
-        'Whether to navigate back or navigate forward in the selected pages history',
-      ),
-  },
-  handler: async (request, response, context) => {
-    const page = context.getSelectedPage();
-
-    try {
-      if (request.params.navigate === 'back') {
-        await page.goBack();
-      } else {
-        await page.goForward();
-      }
-    } catch {
-      response.appendResponseLine(
-        `Unable to navigate ${request.params.navigate} in currently selected page.`,
-      );
+      case 'back':
+      case 'forward':
+        const navPage = context.getSelectedPage();
+        try {
+          if (op === 'back') {
+            await navPage.goBack();
+          } else {
+            await navPage.goForward();
+          }
+        } catch {
+          response.appendResponseLine(`Unable to navigate ${op}`);
+        }
+        response.setIncludePages(true);
+        break;
     }
-
-    response.setIncludePages(true);
   },
 });
 
+/**
+ * Resize page dimensions.
+ */
 export const resizePage = defineTool({
   name: 'resize_page',
-  description: `Resizes the selected page's window so that the page has specified dimension`,
+  description: 'Resize page dimensions.',
   annotations: {
     category: ToolCategories.EMULATION,
     readOnlyHint: false,
   },
   schema: {
-    width: z.number().describe('Page width'),
-    height: z.number().describe('Page height'),
+    width: z.number().describe('Width'),
+    height: z.number().describe('Height'),
   },
   handler: async (request, response, context) => {
     const page = context.getSelectedPage();
@@ -171,21 +147,19 @@ export const resizePage = defineTool({
   },
 });
 
+/**
+ * Handle browser dialog (alert, confirm, prompt).
+ */
 export const handleDialog = defineTool({
   name: 'handle_dialog',
-  description: `If a browser dialog was opened, use this command to handle it`,
+  description: 'Handle browser dialog: accept or dismiss.',
   annotations: {
     category: ToolCategories.INPUT_AUTOMATION,
     readOnlyHint: false,
   },
   schema: {
-    action: z
-      .enum(['accept', 'dismiss'])
-      .describe('Whether to dismiss or accept the dialog'),
-    promptText: z
-      .string()
-      .optional()
-      .describe('Optional prompt text to enter into the dialog.'),
+    action: z.enum(['accept', 'dismiss']).describe('Action'),
+    promptText: z.string().optional().describe('Prompt text'),
   },
   handler: async (request, response, context) => {
     const dialog = context.getDialog();
@@ -194,16 +168,14 @@ export const handleDialog = defineTool({
     }
 
     switch (request.params.action) {
-      case 'accept': {
+      case 'accept':
         await dialog.accept(request.params.promptText);
-        response.appendResponseLine('Successfully accepted the dialog');
+        response.appendResponseLine('Dialog accepted');
         break;
-      }
-      case 'dismiss': {
+      case 'dismiss':
         await dialog.dismiss();
-        response.appendResponseLine('Successfully dismissed the dialog');
+        response.appendResponseLine('Dialog dismissed');
         break;
-      }
     }
 
     context.clearDialog();

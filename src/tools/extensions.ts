@@ -10,336 +10,201 @@ import z from 'zod';
 
 import {ToolCategories} from './categories.js';
 import {defineTool} from './ToolDefinition.js';
+import * as iframePopupTools from './iframe-popup-tools.js';
 
-// ========================================
-// Chrome Extension Development Tools
-// ========================================
-//
-// These tools use CDP (Chrome DevTools Protocol) and direct URL access
-// to interact with extensions. Tools that relied on chrome://extensions
-// Shadow DOM scraping have been removed as they are unreliable due to
-// Chrome's security restrictions.
-//
-// Working tools:
-// - openExtensionPopup: Uses page.goto('chrome-extension://ID/popup.html')
-// - closeExtensionPopup: URL validation only
-// - inspectIframePopup: CDP frame attachment
-// - patchIframePopup: File I/O + CDP reload
-// - reloadIframeExtension: CDP + chrome.runtime.reload()
-// ========================================
-
-export const openExtensionPopup = defineTool({
-  name: 'open_extension_popup',
-  description: `Select an already-opened Chrome extension popup window for testing. If no extension name is provided, it will automatically detect and select the currently active popup window. If an extension name is provided, it will search for that specific extension's popup. After selection, you can use take_snapshot, click, evaluate_script, etc. on the popup.`,
+/**
+ * Consolidated extension popup tool.
+ * Combines: open_extension_popup, close_extension_popup
+ */
+export const extensionPopup = defineTool({
+  name: 'extension_popup',
+  description: 'Open or close extension popup window.',
   annotations: {
     category: ToolCategories.EXTENSION_DEVELOPMENT,
     readOnlyHint: false,
   },
   schema: {
-    extensionName: z
-      .string()
-      .optional()
-      .describe('(Optional) The name or partial name of the extension. If omitted, will use the currently active popup.'),
+    op: z.enum(['open', 'close']).describe('Operation'),
+    extensionName: z.string().optional().describe('Extension name filter'),
   },
   handler: async (request, response, context) => {
     const page = context.getSelectedPage();
-    const {extensionName} = request.params;
+    const {op, extensionName} = request.params;
 
     await context.waitForEventsAfterAction(async () => {
       const browser = page.browser();
       if (!browser) {
-        response.appendResponseLine('❌ Failed to get browser instance.');
+        response.appendResponseLine('Failed to get browser instance');
         return;
       }
 
-      // If no extension name provided, check if current page is already a popup
+      if (op === 'close') {
+        const url = page.url();
+        if (!url.startsWith('chrome-extension://')) {
+          response.appendResponseLine('Current page is not an extension popup');
+          response.appendResponseLine(`URL: ${url}`);
+          return;
+        }
+        try {
+          await page.close();
+          response.appendResponseLine('Popup closed');
+        } catch (error) {
+          response.appendResponseLine(
+            `Failed to close: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        }
+        return;
+      }
+
+      // op === 'open'
       if (!extensionName) {
         const currentUrl = page.url();
         if (currentUrl.startsWith('chrome-extension://')) {
-          response.appendResponseLine('✅ Already on an extension popup window');
-          response.appendResponseLine(`📄 Popup URL: ${currentUrl}`);
-          response.appendResponseLine('');
-          response.appendResponseLine(
-            '💡 You can now use take_snapshot, click, evaluate_script, etc. on the popup',
-          );
+          response.appendResponseLine('Already on extension popup');
+          response.appendResponseLine(`URL: ${currentUrl}`);
           return;
         }
 
-        // Check for iframe-embedded popup in current page
+        // Check for iframe-embedded popup
         const iframePopups = await page.evaluate(() => {
           return Array.from(document.querySelectorAll('iframe'))
             .filter((iframe) => iframe.src.startsWith('chrome-extension://'))
-            .map((iframe) => ({
-              src: iframe.src,
-              id: iframe.id,
-              className: iframe.className,
-            }));
+            .map((iframe) => ({src: iframe.src}));
         });
 
         if (iframePopups.length > 0) {
-          response.appendResponseLine(
-            '✅ Extension popup found (embedded as iframe)',
-          );
-          response.appendResponseLine(`📄 Popup URL: ${iframePopups[0].src}`);
-          response.appendResponseLine('');
-          response.appendResponseLine(
-            '💡 This popup is embedded in the current page as an iframe.',
-          );
-          response.appendResponseLine(
-            '   You can interact with it using regular page tools:',
-          );
-          response.appendResponseLine('   - take_snapshot (includes iframe content)');
-          response.appendResponseLine('   - click on elements');
-          response.appendResponseLine('   - fill forms');
-          response.appendResponseLine('   - evaluate_script');
+          response.appendResponseLine('Popup found (iframe)');
+          response.appendResponseLine(`URL: ${iframePopups[0].src}`);
           return;
         }
 
-        // If not on popup or iframe, try to find any open popup window
+        // Find any open popup window
         const pages = await browser.pages();
         for (let i = 0; i < pages.length; i++) {
-          const p = pages[i];
-          const url = p.url();
+          const url = pages[i].url();
           if (url.startsWith('chrome-extension://')) {
             context.setSelectedPageIdx(i);
-            response.appendResponseLine('✅ Found and selected open popup window');
-            response.appendResponseLine(`📄 Popup URL: ${url}`);
-            response.appendResponseLine('');
-            response.appendResponseLine(
-              '💡 You can now use take_snapshot, click, evaluate_script, etc. on the popup',
-            );
+            response.appendResponseLine('Popup window selected');
+            response.appendResponseLine(`URL: ${url}`);
             return;
           }
         }
 
-        response.appendResponseLine('❌ No extension popup window found.');
-        response.appendResponseLine(
-          '💡 Please manually click the extension icon to open the popup first.',
-        );
+        response.appendResponseLine('No popup found. Click extension icon to open.');
         return;
       }
 
-      // If extensionName is provided, search for popup containing that name in URL
-      // This uses URL-based detection, not chrome://extensions Shadow DOM
-      response.appendResponseLine(`🔍 Searching for popup matching: "${extensionName}"`);
+      // Search for popup matching extensionName
+      response.appendResponseLine(`Searching: "${extensionName}"`);
 
       const pages = await browser.pages();
       for (let i = 0; i < pages.length; i++) {
-        const p = pages[i];
-        const url = p.url();
+        const url = pages[i].url();
         if (url.startsWith('chrome-extension://') &&
             url.toLowerCase().includes(extensionName.toLowerCase())) {
           context.setSelectedPageIdx(i);
-          response.appendResponseLine('✅ Found and selected matching popup window');
-          response.appendResponseLine(`📄 Popup URL: ${url}`);
-          response.appendResponseLine('');
-          response.appendResponseLine(
-            '💡 You can now use take_snapshot, click, evaluate_script, etc. on the popup',
-          );
+          response.appendResponseLine('Matching popup selected');
+          response.appendResponseLine(`URL: ${url}`);
           return;
         }
       }
 
-      // Check for any extension popup if exact match not found
+      // Fallback to any extension popup
       for (let i = 0; i < pages.length; i++) {
-        const p = pages[i];
-        const url = p.url();
+        const url = pages[i].url();
         if (url.startsWith('chrome-extension://')) {
           context.setSelectedPageIdx(i);
-          response.appendResponseLine(`⚠️ No popup matching "${extensionName}" found, but found another extension popup`);
-          response.appendResponseLine(`📄 Popup URL: ${url}`);
-          response.appendResponseLine('');
-          response.appendResponseLine(
-            '💡 You can now use take_snapshot, click, evaluate_script, etc. on the popup',
-          );
+          response.appendResponseLine(`No exact match, using: ${url}`);
           return;
         }
       }
 
-      response.appendResponseLine(`❌ No extension popup found matching: "${extensionName}"`);
-      response.appendResponseLine(
-        '💡 Please manually click the extension icon to open the popup first.',
-      );
+      response.appendResponseLine(`No popup found: "${extensionName}"`);
     });
   },
 });
 
-export const closeExtensionPopup = defineTool({
-  name: 'close_extension_popup',
-  description: `Close the currently selected extension popup page.`,
-  annotations: {
-    category: ToolCategories.EXTENSION_DEVELOPMENT,
-    readOnlyHint: false,
-  },
-  schema: {},
-  handler: async (_request, response, context) => {
-    const page = context.getSelectedPage();
-    const url = page.url();
-
-    if (!url.startsWith('chrome-extension://')) {
-      response.appendResponseLine(
-        '❌ Current page is not an extension popup',
-      );
-      response.appendResponseLine(`Current URL: ${url}`);
-      return;
-    }
-
-    try {
-      await page.close();
-      response.appendResponseLine('✅ Extension popup closed');
-    } catch (error) {
-      response.appendResponseLine(
-        `❌ Failed to close popup: ${error instanceof Error ? error.message : String(error)}`,
-      );
-    }
-  },
-});
-
-// Import iframe popup tools
-import * as iframePopupTools from './iframe-popup-tools.js';
-
-export const inspectIframePopup = defineTool({
-  name: 'inspect_iframe_popup',
-  description: `Inspect an iframe-embedded extension popup using CDP. This tool can access iframe content that normal Puppeteer cannot reach. Returns the full HTML of the iframe popup.`,
-  annotations: {
-    category: ToolCategories.EXTENSION_DEVELOPMENT,
-    readOnlyHint: true,
-  },
-  schema: {
-    urlPattern: z
-      .string()
-      .describe(
-        'Regular expression pattern to match the iframe URL (e.g., "chrome-extension://[^/]+/popup\\.html$")',
-      ),
-    waitMs: z
-      .number()
-      .optional()
-      .describe('Maximum time to wait for iframe (default: 5000ms)'),
-  },
-  handler: async (request, response, context) => {
-    const page = context.getSelectedPage();
-    const {urlPattern, waitMs} = request.params;
-
-    await context.waitForEventsAfterAction(async () => {
-      try {
-        const cdp = await page.createCDPSession();
-        const pattern = new RegExp(urlPattern);
-        const result = await iframePopupTools.inspectIframe(
-          cdp,
-          pattern,
-          waitMs ?? 5000,
-        );
-
-        response.appendResponseLine('✅ Successfully inspected iframe popup');
-        response.appendResponseLine('');
-        response.appendResponseLine(`📄 Frame URL: ${result.frameUrl}`);
-        response.appendResponseLine(`🆔 Frame ID: ${result.frameId}`);
-        response.appendResponseLine('');
-        response.appendResponseLine('📝 HTML Content:');
-        response.appendResponseLine('```html');
-        response.appendResponseLine(
-          result.html.length > 2000
-            ? result.html.substring(0, 2000) + '\n... (truncated)'
-            : result.html,
-        );
-        response.appendResponseLine('```');
-
-        await cdp.detach();
-      } catch (error) {
-        response.appendResponseLine(
-          `❌ Error: ${error instanceof Error ? error.message : String(error)}`,
-        );
-      }
-    });
-  },
-});
-
-export const patchIframePopup = defineTool({
-  name: 'patch_iframe_popup',
-  description: `Patch local extension source files and reload the extension. This allows live editing of iframe-embedded popups. The extension must be loaded from a local directory.`,
+/**
+ * Consolidated iframe popup tool.
+ * Combines: inspect_iframe_popup, patch_iframe_popup, reload_iframe_extension
+ */
+export const iframePopup = defineTool({
+  name: 'iframe_popup',
+  description: 'Iframe popup: inspect, patch, or reload extension.',
   annotations: {
     category: ToolCategories.EXTENSION_DEVELOPMENT,
     readOnlyHint: false,
   },
   schema: {
-    extensionPath: z
-      .string()
-      .describe('Absolute path to the extension directory'),
-    patches: z
-      .array(
-        z.object({
-          file: z
-            .string()
-            .describe('Relative path to file within extension (e.g., "popup.html")'),
-          find: z
-            .string()
-            .describe('Regular expression pattern to find'),
-          replace: z.string().describe('Replacement string'),
-        }),
-      )
-      .describe('Array of patches to apply'),
+    op: z.enum(['inspect', 'patch', 'reload']).describe('Operation'),
+    urlPattern: z.string().optional().describe('URL regex (for inspect)'),
+    waitMs: z.number().optional().describe('Wait timeout ms'),
+    extensionPath: z.string().optional().describe('Extension dir path (for patch)'),
+    patches: z.array(
+      z.object({
+        file: z.string().describe('File path'),
+        find: z.string().describe('Regex pattern'),
+        replace: z.string().describe('Replacement'),
+      }),
+    ).optional().describe('Patches array (for patch)'),
   },
   handler: async (request, response, context) => {
     const page = context.getSelectedPage();
-    const {extensionPath, patches} = request.params;
+    const {op, urlPattern, waitMs, extensionPath, patches} = request.params;
 
     await context.waitForEventsAfterAction(async () => {
       try {
         const cdp = await page.createCDPSession();
 
-        response.appendResponseLine(
-          `🔧 Applying ${patches.length} patch(es) to extension...`,
-        );
+        switch (op) {
+          case 'inspect': {
+            if (!urlPattern) {
+              throw new Error('urlPattern required for inspect');
+            }
+            const pattern = new RegExp(urlPattern);
+            const result = await iframePopupTools.inspectIframe(
+              cdp,
+              pattern,
+              waitMs ?? 5000,
+            );
 
-        await iframePopupTools.patchAndReload(cdp, extensionPath, patches);
+            response.appendResponseLine('Iframe inspected');
+            response.appendResponseLine(`URL: ${result.frameUrl}`);
+            response.appendResponseLine(`Frame ID: ${result.frameId}`);
+            response.appendResponseLine('HTML:');
+            response.appendResponseLine(
+              result.html.length > 2000
+                ? result.html.substring(0, 2000) + '... (truncated)'
+                : result.html,
+            );
+            break;
+          }
 
-        response.appendResponseLine('');
-        response.appendResponseLine('✅ Patches applied successfully');
-        response.appendResponseLine('🔄 Extension reloaded');
-        response.appendResponseLine('');
-        response.appendResponseLine('Applied patches:');
-        for (const p of patches) {
-          response.appendResponseLine(
-            `  • ${p.file}: "${p.find}" → "${p.replace}"`,
-          );
+          case 'patch': {
+            if (!extensionPath || !patches) {
+              throw new Error('extensionPath and patches required for patch');
+            }
+            response.appendResponseLine(`Applying ${patches.length} patch(es)...`);
+            await iframePopupTools.patchAndReload(cdp, extensionPath, patches);
+            response.appendResponseLine('Patches applied, extension reloaded');
+            for (const p of patches) {
+              response.appendResponseLine(`  ${p.file}: "${p.find}" -> "${p.replace}"`);
+            }
+            break;
+          }
+
+          case 'reload': {
+            response.appendResponseLine('Reloading extension...');
+            await iframePopupTools.reloadExtension(cdp);
+            response.appendResponseLine('Extension reloaded');
+            break;
+          }
         }
 
         await cdp.detach();
       } catch (error) {
         response.appendResponseLine(
-          `❌ Error: ${error instanceof Error ? error.message : String(error)}`,
-        );
-      }
-    });
-  },
-});
-
-export const reloadIframeExtension = defineTool({
-  name: 'reload_iframe_extension',
-  description: `Reload the extension via its service worker using chrome.runtime.reload(). Useful after manually editing extension files.`,
-  annotations: {
-    category: ToolCategories.EXTENSION_DEVELOPMENT,
-    readOnlyHint: false,
-  },
-  schema: {},
-  handler: async (request, response, context) => {
-    const page = context.getSelectedPage();
-
-    await context.waitForEventsAfterAction(async () => {
-      try {
-        const cdp = await page.createCDPSession();
-
-        response.appendResponseLine('🔄 Reloading extension...');
-
-        await iframePopupTools.reloadExtension(cdp);
-
-        response.appendResponseLine('');
-        response.appendResponseLine('✅ Extension reloaded successfully');
-
-        await cdp.detach();
-      } catch (error) {
-        response.appendResponseLine(
-          `❌ Error: ${error instanceof Error ? error.message : String(error)}`,
+          `Error: ${error instanceof Error ? error.message : String(error)}`,
         );
       }
     });

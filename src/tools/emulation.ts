@@ -15,62 +15,54 @@ const throttlingOptions: [string, ...string[]] = [
   ...Object.keys(PredefinedNetworkConditions),
 ];
 
-export const emulateNetwork = defineTool({
-  name: 'emulate_network',
-  description: `Emulates network conditions such as throttling on the selected page.`,
+/**
+ * Consolidated emulation tool.
+ * Combines: emulate_network, emulate_cpu
+ */
+export const emulate = defineTool({
+  name: 'emulate',
+  description: 'Emulate CPU or network throttling.',
   annotations: {
     category: ToolCategories.EMULATION,
     readOnlyHint: false,
   },
   schema: {
-    throttlingOption: z
-      .enum(throttlingOptions)
-      .describe(
-        `The network throttling option to emulate. Available throttling options are: ${throttlingOptions.join(', ')}. Set to "No emulation" to disable.`,
-      ),
+    target: z.enum(['cpu', 'network']).describe('Emulation target'),
+    throttlingRate: z.number().min(1).max(20).optional().describe('CPU rate 1-20x'),
+    throttlingOption: z.enum(throttlingOptions).optional().describe('Network option'),
   },
-  handler: async (request, _response, context) => {
+  handler: async (request, response, context) => {
+    const {target, throttlingRate, throttlingOption} = request.params;
     const page = context.getSelectedPage();
-    const conditions = request.params.throttlingOption;
 
-    if (conditions === 'No emulation') {
-      await page.emulateNetworkConditions(null);
-      context.setNetworkConditions(null);
-      return;
+    if (target === 'cpu') {
+      if (throttlingRate === undefined) {
+        throw new Error('throttlingRate required for cpu');
+      }
+      await page.emulateCPUThrottling(throttlingRate);
+      context.setCpuThrottlingRate(throttlingRate);
+      response.appendResponseLine(`CPU throttling set to ${throttlingRate}x`);
+    } else {
+      if (!throttlingOption) {
+        throw new Error('throttlingOption required for network');
+      }
+
+      if (throttlingOption === 'No emulation') {
+        await page.emulateNetworkConditions(null);
+        context.setNetworkConditions(null);
+        response.appendResponseLine('Network emulation disabled');
+        return;
+      }
+
+      if (throttlingOption in PredefinedNetworkConditions) {
+        const condition =
+          PredefinedNetworkConditions[
+            throttlingOption as keyof typeof PredefinedNetworkConditions
+          ];
+        await page.emulateNetworkConditions(condition);
+        context.setNetworkConditions(throttlingOption);
+        response.appendResponseLine(`Network set to ${throttlingOption}`);
+      }
     }
-
-    if (conditions in PredefinedNetworkConditions) {
-      const networkCondition =
-        PredefinedNetworkConditions[
-          conditions as keyof typeof PredefinedNetworkConditions
-        ];
-      await page.emulateNetworkConditions(networkCondition);
-      context.setNetworkConditions(conditions);
-    }
-  },
-});
-
-export const emulateCpu = defineTool({
-  name: 'emulate_cpu',
-  description: `Emulates CPU throttling by slowing down the selected page's execution.`,
-  annotations: {
-    category: ToolCategories.EMULATION,
-    readOnlyHint: false,
-  },
-  schema: {
-    throttlingRate: z
-      .number()
-      .min(1)
-      .max(20)
-      .describe(
-        'The CPU throttling rate representing the slowdown factor 1-20x. Set the rate to 1 to disable throttling',
-      ),
-  },
-  handler: async (request, _response, context) => {
-    const page = context.getSelectedPage();
-    const {throttlingRate} = request.params;
-
-    await page.emulateCPUThrottling(throttlingRate);
-    context.setCpuThrottlingRate(throttlingRate);
   },
 });

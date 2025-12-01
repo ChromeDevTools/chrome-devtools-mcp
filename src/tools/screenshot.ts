@@ -12,32 +12,19 @@ import {defineTool} from './ToolDefinition.js';
 
 export const screenshot = defineTool({
   name: 'take_screenshot',
-  description: `Take a screenshot of the page or element.`,
+  description: 'Take screenshot of page or element.',
   annotations: {
     category: ToolCategories.DEBUGGING,
     readOnlyHint: true,
   },
   schema: {
-    format: z
-      .enum(['png', 'jpeg'])
-      .default('png')
-      .describe('Type of format to save the screenshot as. Default is "png"'),
-    uid: z
-      .string()
-      .optional()
-      .describe(
-        'The uid of an element on the page from the page content snapshot. If omitted takes a pages screenshot.',
-      ),
-    fullPage: z
-      .boolean()
-      .optional()
-      .describe(
-        'If set to true takes a screenshot of the full page instead of the currently visible viewport. Incompatible with uid.',
-      ),
+    format: z.enum(['png', 'jpeg']).default('png').describe('Image format'),
+    uid: z.string().optional().describe('Element uid (optional)'),
+    fullPage: z.boolean().optional().describe('Full page screenshot'),
   },
   handler: async (request, response, context) => {
     if (request.params.uid && request.params.fullPage) {
-      throw new Error('Providing both "uid" and "fullPage" is not allowed.');
+      throw new Error('Cannot use both uid and fullPage');
     }
 
     let pageOrHandle: Page | ElementHandle;
@@ -52,26 +39,14 @@ export const screenshot = defineTool({
       fullPage: request.params.fullPage,
     });
 
-    if (request.params.uid) {
-      response.appendResponseLine(
-        `Took a screenshot of node with uid "${request.params.uid}".`,
-      );
-    } else if (request.params.fullPage) {
-      response.appendResponseLine(
-        'Took a screenshot of the full current page.',
-      );
-    } else {
-      response.appendResponseLine(
-        "Took a screenshot of the current page's viewport.",
-      );
-    }
+    response.appendResponseLine('Screenshot taken');
 
     if (screenshot.length >= 2_000_000) {
       const {filename} = await context.saveTemporaryFile(
         screenshot,
         `image/${request.params.format}`,
       );
-      response.appendResponseLine(`Saved screenshot to ${filename}.`);
+      response.appendResponseLine(`Saved: ${filename}`);
     } else {
       response.attachImage({
         mimeType: `image/${request.params.format}`,

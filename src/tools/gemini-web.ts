@@ -234,29 +234,15 @@ ${response}
 
 export const askGeminiWeb = defineTool({
     name: 'ask_gemini_web',
-    description: `Ask Gemini a question via web browser automation. Conversations are organized by project name and logged to docs/ask/gemini/.`,
+    description: 'Ask Gemini via browser. Logs to docs/ask/gemini/.',
     annotations: {
         category: ToolCategories.NAVIGATION_AUTOMATION,
         readOnlyHint: false,
     },
     schema: {
-        question: z
-            .string()
-            .describe(
-                'The question to ask Gemini.',
-            ),
-        projectName: z
-            .string()
-            .optional()
-            .describe(
-                'Project name for organizing conversations. Defaults to current working directory name.',
-            ),
-        createNewChat: z
-            .boolean()
-            .optional()
-            .describe(
-                'Force creation of a new chat. Default: false',
-            ),
+        question: z.string().describe('Question text'),
+        projectName: z.string().optional().describe('Project name (default: cwd)'),
+        createNewChat: z.boolean().optional().describe('Force new chat'),
     },
     handler: async (request, response, context) => {
         const { question, projectName, createNewChat = false } = request.params;

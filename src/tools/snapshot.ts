@@ -12,8 +12,7 @@ import {defineTool} from './ToolDefinition.js';
 
 export const takeSnapshot = defineTool({
   name: 'take_snapshot',
-  description: `Take a text snapshot of the currently selected page. The snapshot lists page elements along with a unique
-identifier (uid). Always use the latest snapshot. Prefer taking a snapshot over taking a screenshot.`,
+  description: 'Get page elements with uids. Prefer over screenshot.',
   annotations: {
     category: ToolCategories.DEBUGGING,
     readOnlyHint: true,
@@ -26,17 +25,14 @@ identifier (uid). Always use the latest snapshot. Prefer taking a snapshot over 
 
 export const waitFor = defineTool({
   name: 'wait_for',
-  description: `Wait for the specified text to appear on the selected page.`,
+  description: 'Wait for text to appear on page.',
   annotations: {
     category: ToolCategories.NAVIGATION_AUTOMATION,
     readOnlyHint: true,
   },
   schema: {
-    text: z.string().describe('Text to appear on the page'),
-    timeout: z
-      .number()
-      .optional()
-      .describe('Timeout in milliseconds. Default: 30000'),
+    text: z.string().describe('Text to wait for'),
+    timeout: z.number().optional().describe('Timeout ms (default: 30000)'),
   },
   handler: async (request, response, context) => {
     const page = context.getSelectedPage();
@@ -49,10 +45,7 @@ export const waitFor = defineTool({
     locator = locator.setTimeout(timeout);
     await locator.wait();
 
-    response.appendResponseLine(
-      `Element with text "${request.params.text}" found.`,
-    );
-
+    response.appendResponseLine(`Found: "${request.params.text}"`);
     response.setIncludeSnapshot(true);
   },
 });

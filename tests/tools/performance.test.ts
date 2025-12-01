@@ -8,11 +8,7 @@ import {describe, it, afterEach} from 'node:test';
 
 import sinon from 'sinon';
 
-import {
-  analyzeInsight,
-  startTrace,
-  stopTrace,
-} from '../../src/tools/performance.js';
+import {performance} from '../../src/tools/performance.js';
 import type {TraceResult} from '../../src/trace-processing/parse.js';
 import {
   parseRawTraceBuffer,
@@ -32,8 +28,8 @@ describe('performance', () => {
         context.setIsRunningPerformanceTrace(false);
         const selectedPage = context.getSelectedPage();
         const startTracingStub = sinon.stub(selectedPage.tracing, 'start');
-        await startTrace.handler(
-          {params: {reload: true, autoStop: false}},
+        await performance.handler(
+          {params: {op: 'start', reload: true, autoStop: false}},
           response,
           context,
         );
@@ -53,8 +49,8 @@ describe('performance', () => {
         sinon.stub(selectedPage, 'url').callsFake(() => 'https://www.test.com');
         const gotoStub = sinon.stub(selectedPage, 'goto');
         const startTracingStub = sinon.stub(selectedPage.tracing, 'start');
-        await startTrace.handler(
-          {params: {reload: true, autoStop: false}},
+        await performance.handler(
+          {params: {op: 'start', reload: true, autoStop: false}},
           response,
           context,
         );
@@ -89,8 +85,8 @@ describe('performance', () => {
           });
 
         const clock = sinon.useFakeTimers();
-        const handlerPromise = startTrace.handler(
-          {params: {reload: true, autoStop: true}},
+        const handlerPromise = performance.handler(
+          {params: {op: 'start', reload: true, autoStop: true}},
           response,
           context,
         );
@@ -124,8 +120,8 @@ describe('performance', () => {
         context.setIsRunningPerformanceTrace(true);
         const selectedPage = context.getSelectedPage();
         const startTracingStub = sinon.stub(selectedPage.tracing, 'start');
-        await startTrace.handler(
-          {params: {reload: true, autoStop: false}},
+        await performance.handler(
+          {params: {op: 'start', reload: true, autoStop: false}},
           response,
           context,
         );
@@ -155,9 +151,10 @@ describe('performance', () => {
         context.storeTraceRecording(trace);
         context.setIsRunningPerformanceTrace(false);
 
-        await analyzeInsight.handler(
+        await performance.handler(
           {
             params: {
+              op: 'analyze',
               insightName: 'LCPBreakdown',
             },
           },
@@ -175,9 +172,10 @@ describe('performance', () => {
         context.storeTraceRecording(trace);
         context.setIsRunningPerformanceTrace(false);
 
-        await analyzeInsight.handler(
+        await performance.handler(
           {
             params: {
+              op: 'analyze',
               insightName: 'MadeUpInsightName',
             },
           },
@@ -194,9 +192,10 @@ describe('performance', () => {
 
     it('returns an error if no trace has been recorded', async () => {
       await withBrowser(async (response, context) => {
-        await analyzeInsight.handler(
+        await performance.handler(
           {
             params: {
+              op: 'analyze',
               insightName: 'LCPBreakdown',
             },
           },
@@ -218,7 +217,7 @@ describe('performance', () => {
     it('does nothing if the trace is not running and does not error', async () => {
       await withBrowser(async (response, context) => {
         context.setIsRunningPerformanceTrace(false);
-        await stopTrace.handler({params: {}}, response, context);
+        await performance.handler({params: {op: 'stop'}}, response, context);
       });
     });
 
@@ -232,7 +231,7 @@ describe('performance', () => {
           .callsFake(async () => {
             return rawData;
           });
-        await stopTrace.handler({params: {}}, response, context);
+        await performance.handler({params: {op: 'stop'}}, response, context);
         assert.ok(
           response.responseLines.includes(
             'The performance trace has been stopped.',
@@ -250,7 +249,7 @@ describe('performance', () => {
         sinon
           .stub(selectedPage.tracing, 'stop')
           .returns(Promise.resolve(undefined));
-        await stopTrace.handler({params: {}}, response, context);
+        await performance.handler({params: {op: 'stop'}}, response, context);
         t.assert.snapshot?.(response.responseLines.join('\n'));
       });
     });
@@ -263,7 +262,7 @@ describe('performance', () => {
         sinon.stub(selectedPage.tracing, 'stop').callsFake(async () => {
           return rawData;
         });
-        await stopTrace.handler({params: {}}, response, context);
+        await performance.handler({params: {op: 'stop'}}, response, context);
         t.assert.snapshot?.(response.responseLines.join('\n'));
       });
     });

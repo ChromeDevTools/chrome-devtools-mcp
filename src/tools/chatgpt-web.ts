@@ -271,7 +271,7 @@ ${response}
 
 export const askChatGPTWeb = defineTool({
   name: 'ask_chatgpt_web',
-  description: `Ask ChatGPT a question via web browser automation. Claude can use this to consult ChatGPT for additional AI perspectives during development. Conversations are organized by project name and logged to docs/ask/chatgpt/.`,
+  description: 'Ask ChatGPT via browser. Logs to docs/ask/chatgpt/.',
   annotations: {
     category: ToolCategories.NAVIGATION_AUTOMATION,
     readOnlyHint: false,
@@ -279,29 +279,19 @@ export const askChatGPTWeb = defineTool({
   schema: {
     question: z
       .string()
-      .describe(
-        'The question to ask ChatGPT. Should be detailed and well-formed for best results.',
-      ),
+      .describe('Question text'),
     projectName: z
       .string()
       .optional()
-      .describe(
-        'Project name for organizing conversations. Defaults to current working directory name.',
-      ),
+      .describe('Project name (default: cwd)'),
     createNewChat: z
       .boolean()
       .optional()
-      .describe(
-        'Force creation of a new chat instead of reusing existing project chat. Default: false',
-      ),
+      .describe('Force new chat'),
     useDeepResearch: z
       .boolean()
       .optional()
-      .describe(
-        'Enable DeepResearch mode for complex research tasks requiring comprehensive analysis. ' +
-          'Use when the question involves market research, comparative analysis, trend analysis, ' +
-          'or requires gathering information from multiple sources. Default: false',
-      ),
+      .describe('Enable DeepResearch mode'),
   },
   handler: async (request, response, context) => {
     const {question, projectName, createNewChat = false, useDeepResearch = false} = request.params;

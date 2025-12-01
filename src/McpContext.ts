@@ -21,7 +21,7 @@ import type {
 } from 'puppeteer-core';
 
 import {NetworkCollector, PageCollector} from './PageCollector.js';
-import {listPages} from './tools/pages.js';
+import {pages} from './tools/pages.js';
 import {CLOSE_PAGE_ERROR} from './tools/ToolDefinition.js';
 import type {Context} from './tools/ToolDefinition.js';
 import type {TraceResult} from './trace-processing/parse.js';
@@ -344,7 +344,7 @@ export class McpContext implements Context {
     }
     if (page.isClosed()) {
       throw new Error(
-        `The selected page has been closed. Call ${listPages.name} to see open pages.`,
+        `The selected page has been closed. Call ${pages.name} to see open pages.`,
       );
     }
     return page;

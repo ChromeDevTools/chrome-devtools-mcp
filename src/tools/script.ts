@@ -11,37 +11,17 @@ import {defineTool} from './ToolDefinition.js';
 
 export const evaluateScript = defineTool({
   name: 'evaluate_script',
-  description: `Evaluate a JavaScript function inside the currently selected page. Returns the response as JSON
-so returned values have to JSON-serializable.`,
+  description: 'Run JavaScript in page, return JSON result.',
   annotations: {
     category: ToolCategories.DEBUGGING,
     readOnlyHint: false,
   },
   schema: {
-    function: z.string().describe(
-      `A JavaScript function to run in the currently selected page.
-Example without arguments: \`() => {
-  return document.title
-}\` or \`async () => {
-  return await fetch("example.com")
-}\`.
-Example with arguments: \`(el) => {
-  return el.innerText;
-}\`
-`,
-    ),
+    function: z.string().describe('JS function string'),
     args: z
-      .array(
-        z.object({
-          uid: z
-            .string()
-            .describe(
-              'The uid of an element on the page from the page content snapshot',
-            ),
-        }),
-      )
+      .array(z.object({ uid: z.string().describe('Element uid') }))
       .optional()
-      .describe(`An optional list of arguments to pass to the function.`),
+      .describe('Element arguments'),
   },
   handler: async (request, response, context) => {
     const page = context.getSelectedPage();
@@ -59,15 +39,11 @@ Example with arguments: \`(el) => {
           },
           ...args,
         );
-        response.appendResponseLine('Script ran on page and returned:');
-        response.appendResponseLine('```json');
-        response.appendResponseLine(`${result}`);
-        response.appendResponseLine('```');
+        response.appendResponseLine('Result:');
+        response.appendResponseLine(result);
       });
     } finally {
-      Promise.allSettled(args.map(arg => arg.dispose())).catch(() => {
-        // Ignore errors
-      });
+      Promise.allSettled(args.map(arg => arg.dispose())).catch(() => {});
     }
   },
 });

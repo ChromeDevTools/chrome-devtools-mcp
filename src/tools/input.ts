@@ -12,21 +12,14 @@ import {defineTool} from './ToolDefinition.js';
 
 export const click = defineTool({
   name: 'click',
-  description: `Clicks on the provided element`,
+  description: 'Click on element by uid.',
   annotations: {
     category: ToolCategories.INPUT_AUTOMATION,
     readOnlyHint: false,
   },
   schema: {
-    uid: z
-      .string()
-      .describe(
-        'The uid of an element on the page from the page content snapshot',
-      ),
-    dblClick: z
-      .boolean()
-      .optional()
-      .describe('Set to true for double clicks. Default is false.'),
+    uid: z.string().describe('Element uid'),
+    dblClick: z.boolean().optional().describe('Double click'),
   },
   handler: async (request, response, context) => {
     const uid = request.params.uid;
@@ -37,11 +30,7 @@ export const click = defineTool({
           count: request.params.dblClick ? 2 : 1,
         });
       });
-      response.appendResponseLine(
-        request.params.dblClick
-          ? `Successfully double clicked on the element`
-          : `Successfully clicked on the element`,
-      );
+      response.appendResponseLine('Clicked');
       response.setIncludeSnapshot(true);
     } finally {
       void handle.dispose();
@@ -51,17 +40,13 @@ export const click = defineTool({
 
 export const hover = defineTool({
   name: 'hover',
-  description: `Hover over the provided element`,
+  description: 'Hover over element by uid.',
   annotations: {
     category: ToolCategories.INPUT_AUTOMATION,
     readOnlyHint: false,
   },
   schema: {
-    uid: z
-      .string()
-      .describe(
-        'The uid of an element on the page from the page content snapshot',
-      ),
+    uid: z.string().describe('Element uid'),
   },
   handler: async (request, response, context) => {
     const uid = request.params.uid;
@@ -70,7 +55,7 @@ export const hover = defineTool({
       await context.waitForEventsAfterAction(async () => {
         await handle.asLocator().hover();
       });
-      response.appendResponseLine(`Successfully hovered over the element`);
+      response.appendResponseLine('Hovered');
       response.setIncludeSnapshot(true);
     } finally {
       void handle.dispose();
@@ -80,18 +65,14 @@ export const hover = defineTool({
 
 export const fill = defineTool({
   name: 'fill',
-  description: `Type text into a input, text area or select an option from a <select> element.`,
+  description: 'Fill input, textarea, or select element.',
   annotations: {
     category: ToolCategories.INPUT_AUTOMATION,
     readOnlyHint: false,
   },
   schema: {
-    uid: z
-      .string()
-      .describe(
-        'The uid of an element on the page from the page content snapshot',
-      ),
-    value: z.string().describe('The value to fill in'),
+    uid: z.string().describe('Element uid'),
+    value: z.string().describe('Value to fill'),
   },
   handler: async (request, response, context) => {
     const handle = await context.getElementByUid(request.params.uid);
@@ -99,7 +80,7 @@ export const fill = defineTool({
       await context.waitForEventsAfterAction(async () => {
         await handle.asLocator().fill(request.params.value);
       });
-      response.appendResponseLine(`Successfully filled out the element`);
+      response.appendResponseLine('Filled');
       response.setIncludeSnapshot(true);
     } finally {
       void handle.dispose();
@@ -109,14 +90,14 @@ export const fill = defineTool({
 
 export const drag = defineTool({
   name: 'drag',
-  description: `Drag an element onto another element`,
+  description: 'Drag element to another element.',
   annotations: {
     category: ToolCategories.INPUT_AUTOMATION,
     readOnlyHint: false,
   },
   schema: {
-    from_uid: z.string().describe('The uid of the element to drag'),
-    to_uid: z.string().describe('The uid of the element to drop into'),
+    from_uid: z.string().describe('Source element uid'),
+    to_uid: z.string().describe('Target element uid'),
   },
   handler: async (request, response, context) => {
     const fromHandle = await context.getElementByUid(request.params.from_uid);
@@ -127,7 +108,7 @@ export const drag = defineTool({
         await new Promise(resolve => setTimeout(resolve, 50));
         await toHandle.drop(fromHandle);
       });
-      response.appendResponseLine(`Successfully dragged an element`);
+      response.appendResponseLine('Dragged');
       response.setIncludeSnapshot(true);
     } finally {
       void fromHandle.dispose();
@@ -138,7 +119,7 @@ export const drag = defineTool({
 
 export const fillForm = defineTool({
   name: 'fill_form',
-  description: `Fill out multiple form elements at once`,
+  description: 'Fill multiple form elements.',
   annotations: {
     category: ToolCategories.INPUT_AUTOMATION,
     readOnlyHint: false,
@@ -147,11 +128,11 @@ export const fillForm = defineTool({
     elements: z
       .array(
         z.object({
-          uid: z.string().describe('The uid of the element to fill out'),
-          value: z.string().describe('Value for the element'),
+          uid: z.string().describe('Element uid'),
+          value: z.string().describe('Value'),
         }),
       )
-      .describe('Elements from snapshot to fill out.'),
+      .describe('Elements to fill'),
   },
   handler: async (request, response, context) => {
     for (const element of request.params.elements) {
@@ -164,25 +145,21 @@ export const fillForm = defineTool({
         void handle.dispose();
       }
     }
-    response.appendResponseLine(`Successfully filled out the form`);
+    response.appendResponseLine('Form filled');
     response.setIncludeSnapshot(true);
   },
 });
 
 export const uploadFile = defineTool({
   name: 'upload_file',
-  description: 'Upload a file through a provided element.',
+  description: 'Upload file through element.',
   annotations: {
     category: ToolCategories.INPUT_AUTOMATION,
     readOnlyHint: false,
   },
   schema: {
-    uid: z
-      .string()
-      .describe(
-        'The uid of the file input element or an element that will open file chooser on the page from the page content snapshot',
-      ),
-    filePath: z.string().describe('The local path of the file to upload'),
+    uid: z.string().describe('File input element uid'),
+    filePath: z.string().describe('Local file path'),
   },
   handler: async (request, response, context) => {
     const {uid, filePath} = request.params;
@@ -193,9 +170,6 @@ export const uploadFile = defineTool({
       try {
         await handle.uploadFile(filePath);
       } catch {
-        // Some sites use a proxy element to trigger file upload instead of
-        // a type=file element. In this case, we want to default to
-        // Page.waitForFileChooser() and upload the file this way.
         try {
           const page = await context.getSelectedPage();
           const [fileChooser] = await Promise.all([
@@ -204,13 +178,11 @@ export const uploadFile = defineTool({
           ]);
           await fileChooser.accept([filePath]);
         } catch {
-          throw new Error(
-            `Failed to upload file. The element could not accept the file directly, and clicking it did not trigger a file chooser.`,
-          );
+          throw new Error('Failed to upload file');
         }
       }
       response.setIncludeSnapshot(true);
-      response.appendResponseLine(`File uploaded from ${filePath}.`);
+      response.appendResponseLine(`Uploaded: ${filePath}`);
     } finally {
       void handle.dispose();
     }

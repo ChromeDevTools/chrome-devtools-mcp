@@ -32,58 +32,39 @@ const FILTERABLE_RESOURCE_TYPES: readonly [ResourceType, ...ResourceType[]] = [
   'other',
 ];
 
-export const listNetworkRequests = defineTool({
-  name: 'list_network_requests',
-  description: `List all requests for the currently selected page`,
+/**
+ * Consolidated network tool.
+ * Combines: list_network_requests, get_network_request
+ */
+export const network = defineTool({
+  name: 'network',
+  description: 'Network requests: list all or get by URL.',
   annotations: {
     category: ToolCategories.NETWORK,
     readOnlyHint: true,
   },
   schema: {
-    pageSize: z
-      .number()
-      .int()
-      .positive()
-      .optional()
-      .describe(
-        'Maximum number of requests to return. When omitted, returns all requests.',
-      ),
-    pageIdx: z
-      .number()
-      .int()
-      .min(0)
-      .optional()
-      .describe(
-        'Page number to return (0-based). When omitted, returns the first page.',
-      ),
-    resourceTypes: z
-      .array(z.enum(FILTERABLE_RESOURCE_TYPES))
-      .optional()
-      .describe(
-        'Filter requests to only return requests of the specified resource types. When omitted or empty, returns all requests.',
-      ),
+    op: z.enum(['list', 'get']).describe('Operation'),
+    url: z.string().optional().describe('Request URL (for get)'),
+    pageSize: z.number().int().positive().optional().describe('Max results'),
+    pageIdx: z.number().int().min(0).optional().describe('Page number'),
+    resourceTypes: z.array(z.enum(FILTERABLE_RESOURCE_TYPES)).optional().describe('Filter types'),
   },
   handler: async (request, response) => {
-    response.setIncludeNetworkRequests(true, {
-      pageSize: request.params.pageSize,
-      pageIdx: request.params.pageIdx,
-      resourceTypes: request.params.resourceTypes,
-    });
-  },
-});
+    const {op, url, pageSize, pageIdx, resourceTypes} = request.params;
 
-export const getNetworkRequest = defineTool({
-  name: 'get_network_request',
-  description: `Gets a network request by URL. You can get all requests by calling ${listNetworkRequests.name}.`,
-  annotations: {
-    category: ToolCategories.NETWORK,
-    readOnlyHint: true,
-  },
-  schema: {
-    url: z.string().describe('The URL of the request.'),
-  },
-  handler: async (request, response, _context) => {
-    response.attachNetworkRequest(request.params.url);
-    response.setIncludeNetworkRequests(true);
+    if (op === 'list') {
+      response.setIncludeNetworkRequests(true, {
+        pageSize,
+        pageIdx,
+        resourceTypes,
+      });
+    } else {
+      if (!url) {
+        throw new Error('url required for get');
+      }
+      response.attachNetworkRequest(url);
+      response.setIncludeNetworkRequests(true);
+    }
   },
 });

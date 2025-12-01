@@ -249,22 +249,15 @@ function generateReport(result: DiagnosticResult): string {
 
 export const diagnoseChatgptUi = defineTool({
   name: 'diagnose_chatgpt_ui',
-  description:
-    'Diagnose ChatGPT UI structure for debugging. ' +
-    'Captures full AX tree, HTML snapshot, screenshot, and generates a diagnostic report. ' +
-    'Use this when ChatGPT UI detection is failing or after ChatGPT updates.',
+  description: 'Diagnose ChatGPT UI. Captures AX tree, HTML, screenshot.',
   annotations: {
     title: 'Diagnose ChatGPT UI',
     category: ToolCategories.DEBUGGING,
     readOnlyHint: true,
   },
   schema: {
-    url: z.string()
-      .default(CHATGPT_CONFIG.DEFAULT_URL)
-      .describe(`ChatGPT URL to diagnose (default: ${CHATGPT_CONFIG.DEFAULT_URL})`),
-    waitForLoad: z.number()
-      .default(5000)
-      .describe('Time to wait for page to load in milliseconds (default: 5000)'),
+    url: z.string().default(CHATGPT_CONFIG.DEFAULT_URL).describe('URL to diagnose'),
+    waitForLoad: z.number().default(5000).describe('Wait time ms'),
   },
   handler: async (request, response, context) => {
     const { url, waitForLoad } = request.params;

@@ -9,7 +9,7 @@ import {defineTool} from './ToolDefinition.js';
 
 export const consoleTool = defineTool({
   name: 'list_console_messages',
-  description: 'List all console messages for the currently selected page',
+  description: 'List console messages for selected page.',
   annotations: {
     category: ToolCategories.DEBUGGING,
     readOnlyHint: true,

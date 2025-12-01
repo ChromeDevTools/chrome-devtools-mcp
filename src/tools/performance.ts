@@ -20,139 +20,108 @@ import {ToolCategories} from './categories.js';
 import type {Context, Response} from './ToolDefinition.js';
 import {defineTool} from './ToolDefinition.js';
 
-export const startTrace = defineTool({
-  name: 'performance_start_trace',
-  description:
-    'Starts a performance trace recording on the selected page. This can be used to look for performance problems and insights to improve the performance of the page. It will also report Core Web Vital (CWV) scores for the page.',
+/**
+ * Consolidated performance tracing tool.
+ * Combines: performance_start_trace, performance_stop_trace, performance_analyze_insight
+ */
+export const performance = defineTool({
+  name: 'performance',
+  description: 'Performance trace: start, stop, or analyze insight.',
   annotations: {
     category: ToolCategories.PERFORMANCE,
     readOnlyHint: true,
   },
   schema: {
-    reload: z
-      .boolean()
-      .describe(
-        'Determines if, once tracing has started, the page should be automatically reloaded.',
-      ),
-    autoStop: z
-      .boolean()
-      .describe(
-        'Determines if the trace recording should be automatically stopped.',
-      ),
+    op: z.enum(['start', 'stop', 'analyze']).describe('Operation'),
+    reload: z.boolean().optional().describe('Reload page on start'),
+    autoStop: z.boolean().optional().describe('Auto-stop after 5s'),
+    insightName: z.string().optional().describe('Insight name (for analyze)'),
   },
   handler: async (request, response, context) => {
-    if (context.isRunningPerformanceTrace()) {
-      response.appendResponseLine(
-        'Error: a performance trace is already running. Use performance_stop_trace to stop it. Only one trace can be running at any given time.',
-      );
-      return;
+    const {op, reload, autoStop, insightName} = request.params;
+
+    switch (op) {
+      case 'start': {
+        if (context.isRunningPerformanceTrace()) {
+          response.appendResponseLine(
+            'Error: trace already running. Use stop first.',
+          );
+          return;
+        }
+        context.setIsRunningPerformanceTrace(true);
+
+        const page = context.getSelectedPage();
+        const pageUrlForTracing = page.url();
+
+        if (reload) {
+          await page.goto('about:blank', {waitUntil: ['networkidle0']});
+        }
+
+        const categories = [
+          '-*',
+          'blink.console',
+          'blink.user_timing',
+          'devtools.timeline',
+          'disabled-by-default-devtools.screenshot',
+          'disabled-by-default-devtools.timeline',
+          'disabled-by-default-devtools.timeline.invalidationTracking',
+          'disabled-by-default-devtools.timeline.frame',
+          'disabled-by-default-devtools.timeline.stack',
+          'disabled-by-default-v8.cpu_profiler',
+          'disabled-by-default-v8.cpu_profiler.hires',
+          'latencyInfo',
+          'loading',
+          'disabled-by-default-lighthouse',
+          'v8.execute',
+          'v8',
+        ];
+        await page.tracing.start({categories});
+
+        if (reload) {
+          await page.goto(pageUrlForTracing, {waitUntil: ['load']});
+        }
+
+        if (autoStop) {
+          await new Promise(resolve => setTimeout(resolve, 5_000));
+          await stopTracingAndAppendOutput(page, response, context);
+        } else {
+          response.appendResponseLine('Trace started. Use stop to finish.');
+        }
+        break;
+      }
+
+      case 'stop': {
+        if (!context.isRunningPerformanceTrace()) {
+          response.appendResponseLine('No trace running.');
+          return;
+        }
+        const page = context.getSelectedPage();
+        await stopTracingAndAppendOutput(page, response, context);
+        break;
+      }
+
+      case 'analyze': {
+        if (!insightName) {
+          throw new Error('insightName required for analyze');
+        }
+        const lastRecording = context.recordedTraces().at(-1);
+        if (!lastRecording) {
+          response.appendResponseLine('No recorded traces. Run a trace first.');
+          return;
+        }
+
+        const insightOutput = getInsightOutput(
+          lastRecording,
+          insightName as InsightName,
+        );
+        if ('error' in insightOutput) {
+          response.appendResponseLine(insightOutput.error);
+          return;
+        }
+        response.appendResponseLine(insightOutput.output);
+        break;
+      }
     }
-    context.setIsRunningPerformanceTrace(true);
-
-    const page = context.getSelectedPage();
-    const pageUrlForTracing = page.url();
-
-    if (request.params.reload) {
-      // Before starting the recording, navigate to about:blank to clear out any state.
-      await page.goto('about:blank', {
-        waitUntil: ['networkidle0'],
-      });
-    }
-
-    // Keep in sync with the categories arrays in:
-    // https://source.chromium.org/chromium/chromium/src/+/main:third_party/devtools-frontend/src/front_end/panels/timeline/TimelineController.ts
-    // https://github.com/GoogleChrome/lighthouse/blob/master/lighthouse-core/gather/gatherers/trace.js
-    const categories = [
-      '-*',
-      'blink.console',
-      'blink.user_timing',
-      'devtools.timeline',
-      'disabled-by-default-devtools.screenshot',
-      'disabled-by-default-devtools.timeline',
-      'disabled-by-default-devtools.timeline.invalidationTracking',
-      'disabled-by-default-devtools.timeline.frame',
-      'disabled-by-default-devtools.timeline.stack',
-      'disabled-by-default-v8.cpu_profiler',
-      'disabled-by-default-v8.cpu_profiler.hires',
-      'latencyInfo',
-      'loading',
-      'disabled-by-default-lighthouse',
-      'v8.execute',
-      'v8',
-    ];
-    await page.tracing.start({
-      categories,
-    });
-
-    if (request.params.reload) {
-      await page.goto(pageUrlForTracing, {
-        waitUntil: ['load'],
-      });
-    }
-
-    if (request.params.autoStop) {
-      await new Promise(resolve => setTimeout(resolve, 5_000));
-      await stopTracingAndAppendOutput(page, response, context);
-    } else {
-      response.appendResponseLine(
-        `The performance trace is being recorded. Use performance_stop_trace to stop it.`,
-      );
-    }
-  },
-});
-
-export const stopTrace = defineTool({
-  name: 'performance_stop_trace',
-  description:
-    'Stops the active performance trace recording on the selected page.',
-  annotations: {
-    category: ToolCategories.PERFORMANCE,
-    readOnlyHint: true,
-  },
-  schema: {},
-  handler: async (_request, response, context) => {
-    if (!context.isRunningPerformanceTrace) {
-      return;
-    }
-    const page = context.getSelectedPage();
-    await stopTracingAndAppendOutput(page, response, context);
-  },
-});
-
-export const analyzeInsight = defineTool({
-  name: 'performance_analyze_insight',
-  description:
-    'Provides more detailed information on a specific Performance Insight that was highlighed in the results of a trace recording.',
-  annotations: {
-    category: ToolCategories.PERFORMANCE,
-    readOnlyHint: true,
-  },
-  schema: {
-    insightName: z
-      .string()
-      .describe(
-        'The name of the Insight you want more information on. For example: "DocumentLatency" or "LCPBreakdown"',
-      ),
-  },
-  handler: async (request, response, context) => {
-    const lastRecording = context.recordedTraces().at(-1);
-    if (!lastRecording) {
-      response.appendResponseLine(
-        'No recorded traces found. Record a performance trace so you have Insights to analyze.',
-      );
-      return;
-    }
-
-    const insightOutput = getInsightOutput(
-      lastRecording,
-      request.params.insightName as InsightName,
-    );
-    if ('error' in insightOutput) {
-      response.appendResponseLine(insightOutput.error);
-      return;
-    }
-
-    response.appendResponseLine(insightOutput.output);
   },
 });
 
@@ -164,26 +133,20 @@ async function stopTracingAndAppendOutput(
   try {
     const traceEventsBuffer = await page.tracing.stop();
     const result = await parseRawTraceBuffer(traceEventsBuffer);
-    response.appendResponseLine('The performance trace has been stopped.');
+    response.appendResponseLine('Trace stopped.');
     if (traceResultIsSuccess(result)) {
       context.storeTraceRecording(result);
-      response.appendResponseLine(
-        'Here is a high level summary of the trace and the Insights that were found:',
-      );
+      response.appendResponseLine('Summary:');
       const traceSummaryText = getTraceSummary(result);
       response.appendResponseLine(traceSummaryText);
     } else {
-      response.appendResponseLine(
-        'There was an unexpected error parsing the trace:',
-      );
+      response.appendResponseLine('Parse error:');
       response.appendResponseLine(result.error);
     }
   } catch (e) {
     const errorText = e instanceof Error ? e.message : JSON.stringify(e);
-    logger(`Error stopping performance trace: ${errorText}`);
-    response.appendResponseLine(
-      'An error occured generating the response for this trace:',
-    );
+    logger(`Error stopping trace: ${errorText}`);
+    response.appendResponseLine('Error:');
     response.appendResponseLine(errorText);
   } finally {
     context.setIsRunningPerformanceTrace(false);
