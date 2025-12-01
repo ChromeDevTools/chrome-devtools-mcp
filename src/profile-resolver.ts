@@ -85,7 +85,10 @@ export function resolveUserDataDir(opts: ResolveOpts): ResolvedProfile {
 
   // 0a) MCP_SHARED_PROFILE → shared profile across all projects
   //     - Uses a single profile for all projects to avoid re-login
-  if (opts.env.MCP_SHARED_PROFILE === 'true') {
+  //     - Default: true (v0.22.0+) - shared profile is the default behavior
+  //     - Set MCP_SHARED_PROFILE=false to use project-isolated profiles
+  const useSharedProfile = opts.env.MCP_SHARED_PROFILE !== 'false';
+  if (useSharedProfile) {
     const key = 'shared';
     const p = projectProfilePath(key, clientId, channel);
     const result: ResolvedProfile = {

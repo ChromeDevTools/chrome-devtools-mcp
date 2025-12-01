@@ -11,7 +11,7 @@ Built for: Claude Code, Cursor, VS Code Copilot, Cline, and other MCP-compatible
 ## 📦 For Users: Quick Start
 
 ### Installation
-
+/
 **Option 1: Direct execution (recommended)**
 ```bash
 npx chrome-devtools-mcp-for-extension@latest
