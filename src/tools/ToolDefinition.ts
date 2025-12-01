@@ -61,6 +61,8 @@ export type Context = Readonly<{
   recordedTraces(): TraceResult[];
   storeTraceRecording(result: TraceResult): void;
   getSelectedPage(): Page;
+  getPages(): Page[];
+  createPagesSnapshot(): Promise<Page[]>;
   getDialog(): Dialog | undefined;
   clearDialog(): void;
   getPageByIdx(idx: number): Page;

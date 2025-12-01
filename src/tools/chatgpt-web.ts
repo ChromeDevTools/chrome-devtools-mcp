@@ -16,6 +16,8 @@ import {loadSelectors, getSelector} from '../selectors/loader.js';
 import {CHATGPT_CONFIG} from '../config.js';
 import {isLoginRequired} from '../login-helper.js';
 
+import type {Context} from './ToolDefinition.js';
+
 /**
  * Navigate with retry logic for handling ERR_ABORTED and other network errors
  */
@@ -50,6 +52,28 @@ async function navigateWithRetry(
     }
 
     throw lastError;
+}
+
+/**
+ * Find or create a dedicated ChatGPT tab
+ * Returns existing ChatGPT tab if found, otherwise creates a new one
+ */
+async function getOrCreateChatGPTPage(context: Context): Promise<Page> {
+    // Refresh pages list
+    await context.createPagesSnapshot();
+    const pages = context.getPages();
+
+    // Look for existing ChatGPT tab
+    for (const page of pages) {
+        const url = page.url();
+        if (url.includes('chatgpt.com') || url.includes('chat.openai.com')) {
+            return page;
+        }
+    }
+
+    // No ChatGPT tab found, create a new one
+    const newPage = await context.newPage();
+    return newPage;
 }
 
 /**
@@ -289,7 +313,8 @@ export const askChatGPTWeb = defineTool({
     const project =
       projectName || path.basename(process.cwd()) || 'unknown-project';
 
-    const page = context.getSelectedPage();
+    // Get or create a dedicated ChatGPT tab
+    const page = await getOrCreateChatGPTPage(context);
 
     try {
       // Step 1: Navigate to ChatGPT

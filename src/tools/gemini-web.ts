@@ -11,7 +11,7 @@ import z from 'zod';
 import type { Page } from 'puppeteer-core';
 
 import { ToolCategories } from './categories.js';
-import { defineTool } from './ToolDefinition.js';
+import { defineTool, type Context } from './ToolDefinition.js';
 import { loadGeminiSelectors, getGeminiSelector } from '../selectors/loader.js';
 import { GEMINI_CONFIG } from '../config.js';
 import { isLoginRequired } from '../login-helper.js';
@@ -50,6 +50,28 @@ async function navigateWithRetry(
     }
 
     throw lastError;
+}
+
+/**
+ * Find or create a dedicated Gemini tab
+ * Returns existing Gemini tab if found, otherwise creates a new one
+ */
+async function getOrCreateGeminiPage(context: Context): Promise<Page> {
+    // Refresh pages list
+    await context.createPagesSnapshot();
+    const pages = context.getPages();
+
+    // Look for existing Gemini tab
+    for (const page of pages) {
+        const url = page.url();
+        if (url.includes('gemini.google.com')) {
+            return page;
+        }
+    }
+
+    // No Gemini tab found, create a new one
+    const newPage = await context.newPage();
+    return newPage;
 }
 
 /**
@@ -240,7 +262,9 @@ export const askGeminiWeb = defineTool({
         const { question, projectName, createNewChat = false } = request.params;
         const sanitizedQuestion = sanitizeQuestion(question);
         const project = projectName || path.basename(process.cwd()) || 'unknown-project';
-        const page = context.getSelectedPage();
+
+        // Get or create a dedicated Gemini tab
+        const page = await getOrCreateGeminiPage(context);
 
         try {
             let isNewChat = false;
