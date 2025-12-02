@@ -165,6 +165,11 @@ export const cliOptions = {
     default: true,
     describe: 'Set to false to exclude tools related to network.',
   },
+  categoryInspection: {
+    type: 'boolean',
+    default: true,
+    describe: 'Set to false to exclude tools related to element inspection.',
+  },
 } satisfies Record<string, YargsOptions>;
 
 export function parseArguments(version: string, argv = process.argv) {
@@ -217,6 +222,10 @@ export function parseArguments(version: string, argv = process.argv) {
         'Disable tools in the performance category',
       ],
       ['$0 --no-category-network', 'Disable tools in the network category'],
+      [
+        '$0 --no-category-inspection',
+        'Disable tools in the inspection category',
+      ],
       [
         '$0 --user-data-dir=/tmp/user-data-dir',
         'Use a custom user data directory',

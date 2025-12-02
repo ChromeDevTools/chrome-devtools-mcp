@@ -34,6 +34,24 @@
   - [`list_console_messages`](#list_console_messages)
   - [`take_screenshot`](#take_screenshot)
   - [`take_snapshot`](#take_snapshot)
+- **[Element inspection](#element-inspection)** (17 tools)
+  - [`capture_dom_snapshot`](#capture_dom_snapshot)
+  - [`compare_elements`](#compare_elements)
+  - [`force_element_state`](#force_element_state)
+  - [`get_accessibility_info`](#get_accessibility_info)
+  - [`get_css_variables`](#get_css_variables)
+  - [`get_dom_tree`](#get_dom_tree)
+  - [`get_element_at_position`](#get_element_at_position)
+  - [`get_element_box_model`](#get_element_box_model)
+  - [`get_element_event_listeners`](#get_element_event_listeners)
+  - [`get_element_styles`](#get_element_styles)
+  - [`get_fonts_info`](#get_fonts_info)
+  - [`hide_highlight`](#hide_highlight)
+  - [`highlight_element`](#highlight_element)
+  - [`inspect_element`](#inspect_element)
+  - [`query_selector`](#query_selector)
+  - [`search_dom`](#search_dom)
+  - [`show_layout_overlay`](#show_layout_overlay)
 
 ## Input automation
 
@@ -337,5 +355,223 @@ in the DevTools Elements panel (if any).
 
 - **filePath** (string) _(optional)_: The absolute path, or a path relative to the current working directory, to save the snapshot to instead of attaching it to the response.
 - **verbose** (boolean) _(optional)_: Whether to include all possible information available in the full a11y tree. Default is false.
+
+---
+
+## Element inspection
+
+### `capture_dom_snapshot`
+
+**Description:** Capture a complete DOM snapshot with computed styles for all elements.
+This is an efficient way to get DOM structure and styles in a single call.
+Useful for analyzing entire page layouts or large sections.
+
+**Parameters:**
+
+- **computedStyles** (array) _(optional)_: CSS properties to capture (default: display, color, background-color, font-size, etc.)
+
+---
+
+### `compare_elements`
+
+**Description:** Compare two elements' styles and attributes to understand their differences.
+Returns a diff of computed styles, showing which properties differ between elements.
+Useful for debugging inconsistent styling or understanding variations.
+
+**Parameters:**
+
+- **properties** (array) _(optional)_: CSS properties to compare (default: common layout/visual properties)
+- **uid1** (string) **(required)**: First element UID
+- **uid2** (string) **(required)**: Second element UID
+
+---
+
+### `force_element_state`
+
+**Description:** Force an element into specific CSS pseudo-states for inspection.
+Use this to inspect :[`hover`](#hover), :active, :focus styles without actually interacting with the element.
+Multiple states can be forced simultaneously.
+
+**Parameters:**
+
+- **states** (array) **(required)**: Pseudo-states to force (e.g., ["[`hover`](#hover)", "focus"])
+- **uid** (string) **(required)**: Element UID from snapshot (e.g., "42_5")
+
+---
+
+### `get_accessibility_info`
+
+**Description:** Get detailed accessibility information for an element.
+Returns ARIA roles, states, properties, and the accessibility tree node.
+Useful for ensuring proper accessibility implementation.
+
+**Parameters:**
+
+- **includeAncestors** (boolean) _(optional)_: Include accessibility info for ancestor elements
+- **uid** (string) **(required)**: Element UID from snapshot (e.g., "42_5")
+
+---
+
+### `get_css_variables`
+
+**Description:** Get CSS custom properties (variables) that apply to an element.
+Returns both the variables defined on the element and inherited variables.
+Useful for understanding design systems and theming.
+
+**Parameters:**
+
+- **uid** (string) **(required)**: Element UID from snapshot (e.g., "42_5")
+
+---
+
+### `get_dom_tree`
+
+**Description:** Get the DOM tree structure starting from a specific element or document root.
+Returns a hierarchical view of elements with their tag names and key attributes.
+Useful for understanding the structure of a component or page section.
+
+**Parameters:**
+
+- **depth** (integer) _(optional)_: How deep to traverse the tree
+- **uid** (string) _(optional)_: Element UID to start from (omit for document root)
+
+---
+
+### `get_element_at_position`
+
+**Description:** Get the element at specific x,y coordinates on the page.
+Returns basic information about the topmost element at that position.
+Useful for identifying elements at specific visual locations.
+
+**Parameters:**
+
+- **x** (integer) **(required)**: X coordinate on the page
+- **y** (integer) **(required)**: Y coordinate on the page
+
+---
+
+### `get_element_box_model`
+
+**Description:** Get the box model (layout) information for an element.
+Returns content, padding, border, and margin dimensions.
+This is equivalent to the box model diagram shown in Chrome DevTools.
+
+**Parameters:**
+
+- **uid** (string) **(required)**: Element UID from snapshot (e.g., "42_5")
+
+---
+
+### `get_element_event_listeners`
+
+**Description:** Get all event listeners attached to an element.
+Returns the event type, handler function preview, and listener options.
+Useful for understanding element interactivity.
+
+**Parameters:**
+
+- **uid** (string) **(required)**: Element UID from snapshot (e.g., "42_5")
+
+---
+
+### `get_element_styles`
+
+**Description:** Get CSS styles for an element including computed styles, matched CSS rules, and inherited styles.
+This is equivalent to the "Styles" panel in Chrome DevTools Elements tab.
+Use this to understand how an element is styled and copy styles from websites.
+
+**Parameters:**
+
+- **includeComputed** (boolean) _(optional)_: Include final computed style values
+- **includeInherited** (boolean) _(optional)_: Include styles inherited from ancestor elements
+- **properties** (array) _(optional)_: Filter to specific CSS properties (e.g., ["color", "font-size"]). If omitted, returns common properties.
+- **uid** (string) **(required)**: Element UID from snapshot (e.g., "42_5")
+
+---
+
+### `get_fonts_info`
+
+**Description:** Get information about fonts used to render text in an element.
+Shows which fonts are actually being used (may differ from CSS font-family).
+Useful for understanding typography and font fallbacks.
+
+**Parameters:**
+
+- **uid** (string) **(required)**: Element UID from snapshot (e.g., "42_5")
+
+---
+
+### `hide_highlight`
+
+**Description:** Hide any active element highlight on the page.
+
+**Parameters:** None
+
+---
+
+### `highlight_element`
+
+**Description:** Visually highlight an element on the page with a colored overlay.
+Useful for verifying you've identified the correct element.
+The highlight shows content (blue), padding (green), border (yellow), and margin (orange).
+
+**Parameters:**
+
+- **duration** (integer) _(optional)_: How long to show highlight in milliseconds (0 = until [`hide_highlight`](#hide_highlight) is called)
+- **uid** (string) **(required)**: Element UID from snapshot (e.g., "42_5")
+
+---
+
+### `inspect_element`
+
+**Description:** Get comprehensive information about an element including its HTML, attributes, and position.
+This is equivalent to inspecting an element in Chrome DevTools Elements panel.
+Returns tag name, id, classes, all attributes, outer HTML, and box model dimensions.
+
+**Parameters:**
+
+- **includeHtml** (boolean) _(optional)_: Include the outer HTML of the element
+- **maxHtmlLength** (integer) _(optional)_: Maximum length of HTML to return (truncated if longer)
+- **uid** (string) **(required)**: Element UID from snapshot (e.g., "42_5")
+
+---
+
+### `query_selector`
+
+**Description:** Find elements using CSS selectors.
+Returns element information for matching elements.
+Use this to find elements by class, id, tag, or complex CSS selectors.
+
+**Parameters:**
+
+- **all** (boolean) _(optional)_: Return all matching elements vs just the first match
+- **limit** (integer) _(optional)_: Maximum number of elements to return when all=true
+- **selector** (string) **(required)**: CSS selector (e.g., ".btn-primary", "#header", "div.container > p")
+
+---
+
+### `search_dom`
+
+**Description:** Search the DOM for elements matching a text query, CSS selector, or XPath.
+Returns matching elements with their basic information.
+Supports plain text search, CSS selectors, and XPath expressions.
+
+**Parameters:**
+
+- **limit** (integer) _(optional)_: Maximum results to return
+- **query** (string) **(required)**: Search query - text content, CSS selector, or XPath expression
+
+---
+
+### `show_layout_overlay`
+
+**Description:** Show CSS Grid or Flexbox layout overlay for an element.
+Visualizes grid lines, flex containers, gaps, and alignment.
+Helps understand and debug complex layouts.
+
+**Parameters:**
+
+- **type** (enum: "grid", "flex") **(required)**: Type of layout overlay to show
+- **uid** (string) **(required)**: Element UID from snapshot (e.g., "42_5")
 
 ---

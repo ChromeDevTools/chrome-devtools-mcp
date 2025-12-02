@@ -11,6 +11,7 @@ export enum ToolCategory {
   PERFORMANCE = 'performance',
   NETWORK = 'network',
   DEBUGGING = 'debugging',
+  INSPECTION = 'inspection',
 }
 
 export const labels = {
@@ -20,4 +21,5 @@ export const labels = {
   [ToolCategory.PERFORMANCE]: 'Performance',
   [ToolCategory.NETWORK]: 'Network',
   [ToolCategory.DEBUGGING]: 'Debugging',
+  [ToolCategory.INSPECTION]: 'Element inspection',
 };

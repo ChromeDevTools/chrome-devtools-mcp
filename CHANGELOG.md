@@ -1,5 +1,28 @@
 # Changelog
 
+## [Unreleased]
+
+### Features
+
+* **inspection:** Add comprehensive element inspection tools for DOM and CSS analysis
+  * `inspect_element` - Get element info, HTML, attributes, and box model
+  * `get_element_styles` - Get computed, matched, and inherited CSS styles
+  * `get_element_box_model` - Get detailed box model layout information
+  * `query_selector` - Find elements using CSS selectors
+  * `highlight_element` / `hide_highlight` - Visually highlight elements on the page
+  * `get_dom_tree` - Get hierarchical DOM tree structure
+  * `capture_dom_snapshot` - Efficient full-page DOM and styles capture
+  * `force_element_state` - Force :hover, :focus, :active pseudo-states
+  * `get_element_event_listeners` - Get event listeners attached to elements
+  * `get_element_at_position` - Get element at x,y coordinates
+  * `search_dom` - Search DOM by text, CSS selector, or XPath
+  * `get_fonts_info` - Get font usage information for elements
+  * `show_layout_overlay` - Show CSS Grid/Flexbox layout overlays
+  * `get_accessibility_info` - Get detailed accessibility tree information
+  * `compare_elements` - Compare styles between two elements
+  * `get_css_variables` - Get CSS custom properties for elements
+* **cli:** Add `--no-category-inspection` flag to disable inspection tools
+
 ## [0.10.2](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.10.1...chrome-devtools-mcp-v0.10.2) (2025-11-19)
 
 

@@ -312,6 +312,24 @@ If you run into any issues, checkout our [troubleshooting guide](./docs/troubles
   - [`list_console_messages`](docs/tool-reference.md#list_console_messages)
   - [`take_screenshot`](docs/tool-reference.md#take_screenshot)
   - [`take_snapshot`](docs/tool-reference.md#take_snapshot)
+- **Element inspection** (17 tools)
+  - [`capture_dom_snapshot`](docs/tool-reference.md#capture_dom_snapshot)
+  - [`compare_elements`](docs/tool-reference.md#compare_elements)
+  - [`force_element_state`](docs/tool-reference.md#force_element_state)
+  - [`get_accessibility_info`](docs/tool-reference.md#get_accessibility_info)
+  - [`get_css_variables`](docs/tool-reference.md#get_css_variables)
+  - [`get_dom_tree`](docs/tool-reference.md#get_dom_tree)
+  - [`get_element_at_position`](docs/tool-reference.md#get_element_at_position)
+  - [`get_element_box_model`](docs/tool-reference.md#get_element_box_model)
+  - [`get_element_event_listeners`](docs/tool-reference.md#get_element_event_listeners)
+  - [`get_element_styles`](docs/tool-reference.md#get_element_styles)
+  - [`get_fonts_info`](docs/tool-reference.md#get_fonts_info)
+  - [`hide_highlight`](docs/tool-reference.md#hide_highlight)
+  - [`highlight_element`](docs/tool-reference.md#highlight_element)
+  - [`inspect_element`](docs/tool-reference.md#inspect_element)
+  - [`query_selector`](docs/tool-reference.md#query_selector)
+  - [`search_dom`](docs/tool-reference.md#search_dom)
+  - [`show_layout_overlay`](docs/tool-reference.md#show_layout_overlay)
 
 <!-- END AUTO GENERATED TOOLS -->
 
@@ -387,6 +405,11 @@ The Chrome DevTools MCP server supports the following configuration option:
 
 - **`--categoryNetwork`**
   Set to false to exclude tools related to network.
+  - **Type:** boolean
+  - **Default:** `true`
+
+- **`--categoryInspection`**
+  Set to false to exclude tools related to element inspection.
   - **Type:** boolean
   - **Default:** `true`
 

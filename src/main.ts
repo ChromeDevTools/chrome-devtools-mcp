@@ -25,6 +25,7 @@ import {ToolCategory} from './tools/categories.js';
 import * as consoleTools from './tools/console.js';
 import * as emulationTools from './tools/emulation.js';
 import * as inputTools from './tools/input.js';
+import * as inspectionTools from './tools/inspection.js';
 import * as networkTools from './tools/network.js';
 import * as pagesTools from './tools/pages.js';
 import * as performanceTools from './tools/performance.js';
@@ -121,6 +122,12 @@ function registerTool(tool: ToolDefinition): void {
   ) {
     return;
   }
+  if (
+    tool.annotations.category === ToolCategory.INSPECTION &&
+    args.categoryInspection === false
+  ) {
+    return;
+  }
   server.registerTool(
     tool.name,
     {
@@ -170,6 +177,7 @@ const tools = [
   ...Object.values(consoleTools),
   ...Object.values(emulationTools),
   ...Object.values(inputTools),
+  ...Object.values(inspectionTools),
   ...Object.values(networkTools),
   ...Object.values(pagesTools),
   ...Object.values(performanceTools),
