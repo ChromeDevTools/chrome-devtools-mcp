@@ -67,10 +67,11 @@ export function generateProfileKey(
   // Sort URIs for consistent hashing across multi-root workspaces
   const sortedUris = [...rootsUris].sort();
 
+  // Note: clientVersion is intentionally excluded from hash
+  // to keep profiles stable across client updates
   const keyMaterial = JSON.stringify({
     roots: sortedUris,
     client: clientName,
-    version: clientVersion,
   });
 
   // Use first 8 chars of SHA-256 for stable, collision-resistant key
