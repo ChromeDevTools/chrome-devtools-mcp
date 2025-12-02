@@ -5,11 +5,15 @@
  */
 
 import assert from 'node:assert';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import {describe, it, afterEach} from 'node:test';
 
 import sinon from 'sinon';
 
 import {
+  analyzeFile,
   analyzeInsight,
   startTrace,
   stopTrace,
@@ -274,6 +278,81 @@ describe('performance', () => {
         await stopTrace.handler({params: {}}, response, context);
         t.assert.snapshot?.(response.responseLines.join('\n'));
       });
+    });
+  });
+
+  describe('performance_analyze_file', () => {
+    it('analyzes a trace file from the filesystem', async () => {
+      const rawData = loadTraceAsBuffer('web-dev-with-commit.json.gz');
+      const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mcp-trace-test-'));
+      const tempFilePath = path.join(tempDir, 'trace.json');
+      fs.writeFileSync(tempFilePath, rawData);
+
+      try {
+        await withMcpContext(async (response, context) => {
+          await analyzeFile.handler(
+            {params: {filePath: tempFilePath}},
+            response,
+            context,
+          );
+
+          const output = response.responseLines.join('\n');
+          assert.ok(
+            output.includes(
+              `Successfully analyzed trace file: ${tempFilePath}`,
+            ),
+          );
+          assert.ok(
+            output.includes('## Summary of Performance trace findings'),
+          );
+          assert.ok(output.includes('URL: https://web.dev/'));
+          assert.strictEqual(context.recordedTraces().length, 1);
+        });
+      } finally {
+        fs.rmSync(tempDir, {recursive: true});
+      }
+    });
+
+    it('returns an error if the file does not exist', async () => {
+      await withMcpContext(async (response, context) => {
+        await analyzeFile.handler(
+          {params: {filePath: '/nonexistent/path/trace.json'}},
+          response,
+          context,
+        );
+
+        assert.ok(
+          response.responseLines
+            .join('\n')
+            .includes('An error occurred reading the trace file:'),
+        );
+        assert.strictEqual(context.recordedTraces().length, 0);
+      });
+    });
+
+    it('returns an error if the file is not valid JSON', async () => {
+      const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mcp-trace-test-'));
+      const tempFilePath = path.join(tempDir, 'invalid.json');
+      fs.writeFileSync(tempFilePath, 'not valid json');
+
+      try {
+        await withMcpContext(async (response, context) => {
+          await analyzeFile.handler(
+            {params: {filePath: tempFilePath}},
+            response,
+            context,
+          );
+
+          assert.ok(
+            response.responseLines
+              .join('\n')
+              .includes('There was an error parsing the trace file:'),
+          );
+          assert.strictEqual(context.recordedTraces().length, 0);
+        });
+      } finally {
+        fs.rmSync(tempDir, {recursive: true});
+      }
     });
   });
 });

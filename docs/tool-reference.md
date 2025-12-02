@@ -21,7 +21,8 @@
 - **[Emulation](#emulation)** (2 tools)
   - [`emulate`](#emulate)
   - [`resize_page`](#resize_page)
-- **[Performance](#performance)** (3 tools)
+- **[Performance](#performance)** (4 tools)
+  - [`performance_analyze_file`](#performance_analyze_file)
   - [`performance_analyze_insight`](#performance_analyze_insight)
   - [`performance_start_trace`](#performance_start_trace)
   - [`performance_stop_trace`](#performance_stop_trace)
@@ -212,6 +213,16 @@
 ---
 
 ## Performance
+
+### `performance_analyze_file`
+
+**Description:** Analyzes a performance trace file from the local filesystem. This can be used to analyze traces exported from Chrome DevTools, Lighthouse, or other tools that generate Chrome trace format files.
+
+**Parameters:**
+
+- **filePath** (string) **(required)**: The absolute path to the trace file to analyze. Supports JSON trace files in Chrome trace format (e.g., trace.json, lighthouse-0.trace.json).
+
+---
 
 ### `performance_analyze_insight`
 

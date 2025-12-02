@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import fs from 'node:fs/promises';
+
 import {logger} from '../logger.js';
 import {zod} from '../third_party/index.js';
 import type {Page} from '../third_party/index.js';
@@ -158,6 +160,50 @@ export const analyzeInsight = defineTool({
     }
 
     response.appendResponseLine(insightOutput.output);
+  },
+});
+
+export const analyzeFile = defineTool({
+  name: 'performance_analyze_file',
+  description:
+    'Analyzes a performance trace file from the local filesystem. This can be used to analyze traces exported from Chrome DevTools, Lighthouse, or other tools that generate Chrome trace format files.',
+  annotations: {
+    category: ToolCategory.PERFORMANCE,
+    readOnlyHint: true,
+  },
+  schema: {
+    filePath: zod
+      .string()
+      .describe(
+        'The absolute path to the trace file to analyze. Supports JSON trace files in Chrome trace format (e.g., trace.json, lighthouse-0.trace.json).',
+      ),
+  },
+  handler: async (request, response, context) => {
+    const {filePath} = request.params;
+
+    try {
+      const buffer = await fs.readFile(filePath);
+      const result = await parseRawTraceBuffer(new Uint8Array(buffer));
+
+      if (traceResultIsSuccess(result)) {
+        context.storeTraceRecording(result);
+        const traceSummaryText = getTraceSummary(result);
+        response.appendResponseLine(
+          `Successfully analyzed trace file: ${filePath}`,
+        );
+        response.appendResponseLine(traceSummaryText);
+      } else {
+        response.appendResponseLine(
+          'There was an error parsing the trace file:',
+        );
+        response.appendResponseLine(result.error);
+      }
+    } catch (e) {
+      const errorText = e instanceof Error ? e.message : JSON.stringify(e);
+      logger(`Error reading trace file: ${errorText}`);
+      response.appendResponseLine('An error occurred reading the trace file:');
+      response.appendResponseLine(errorText);
+    }
   },
 });
 
