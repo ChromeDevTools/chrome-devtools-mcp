@@ -12,7 +12,12 @@ import {
   listNetworkRequests,
 } from '../../src/tools/network.js';
 import {serverHooks} from '../server.js';
-import {html, withMcpContext, stabilizeResponseOutput} from '../utils.js';
+import {
+  getTextContent,
+  html,
+  stabilizeResponseOutput,
+  withMcpContext,
+} from '../utils.js';
 
 describe('network', () => {
   const server = serverHooks();
@@ -44,7 +49,9 @@ describe('network', () => {
           context,
         );
         const responseData = await response.handle('list_request', context);
-        t.assert.snapshot?.(stabilizeResponseOutput(responseData[0].text));
+        t.assert.snapshot?.(
+          stabilizeResponseOutput(getTextContent(responseData[0])),
+        );
       });
     });
 
@@ -69,7 +76,9 @@ describe('network', () => {
           context,
         );
         const responseData = await response.handle('list_request', context);
-        t.assert.snapshot?.(stabilizeResponseOutput(responseData[0].text));
+        t.assert.snapshot?.(
+          stabilizeResponseOutput(getTextContent(responseData[0])),
+        );
       });
     });
 
@@ -107,7 +116,9 @@ describe('network', () => {
           context,
         );
         const responseData = await response.handle('list_request', context);
-        t.assert.snapshot?.(stabilizeResponseOutput(responseData[0].text));
+        t.assert.snapshot?.(
+          stabilizeResponseOutput(getTextContent(responseData[0])),
+        );
       });
     });
   });
@@ -159,7 +170,9 @@ describe('network', () => {
         );
         const responseData = await response.handle('get_request', context);
 
-        t.assert.snapshot?.(stabilizeResponseOutput(responseData[0].text));
+        t.assert.snapshot?.(
+          stabilizeResponseOutput(getTextContent(responseData[0])),
+        );
       });
     });
   });
