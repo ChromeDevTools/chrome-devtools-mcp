@@ -6,14 +6,12 @@
 
 import fs from 'node:fs';
 
-import {Client} from '@modelcontextprotocol/sdk/client/index.js';
-import {StdioClientTransport} from '@modelcontextprotocol/sdk/client/stdio.js';
 import type {Tool} from '@modelcontextprotocol/sdk/types.js';
 
 import {cliOptions} from '../build/src/cli.js';
 import {ToolCategory, labels} from '../build/src/tools/categories.js';
+import {tools} from '../build/src/tools/tools.js';
 
-const MCP_SERVER_PATH = 'build/src/index.js';
 const OUTPUT_PATH = './docs/tool-reference.md';
 const README_PATH = './README.md';
 
@@ -23,6 +21,33 @@ interface ToolWithAnnotations extends Tool {
     title?: string;
     category?: typeof ToolCategory;
   };
+}
+
+interface ZodCheck {
+  kind: string;
+}
+
+interface ZodDef {
+  typeName: string;
+  checks?: ZodCheck[];
+  values?: string[];
+  type?: ZodSchema;
+  innerType?: ZodSchema;
+  schema?: ZodSchema;
+  defaultValue?: () => unknown;
+}
+
+interface ZodSchema {
+  _def: ZodDef;
+  description?: string;
+}
+
+interface TypeInfo {
+  type: string;
+  enum?: string[];
+  items?: TypeInfo;
+  description?: string;
+  default?: unknown;
 }
 
 function escapeHtmlTags(text: string): string {
@@ -162,34 +187,102 @@ function updateReadmeWithOptionsMarkdown(optionsMarkdown: string): void {
   console.log('Updated README.md with options markdown');
 }
 
+// Helper to convert Zod schema to JSON schema-like object for docs
+function getZodTypeInfo(schema: ZodSchema): TypeInfo {
+  let description = schema.description;
+  let def = schema._def;
+  let defaultValue: unknown;
+
+  // Unwrap optional/default/effects
+  while (
+    def.typeName === 'ZodOptional' ||
+    def.typeName === 'ZodDefault' ||
+    def.typeName === 'ZodEffects'
+  ) {
+    if (def.typeName === 'ZodDefault' && def.defaultValue) {
+      defaultValue = def.defaultValue();
+    }
+    const next = def.innerType || def.schema;
+    if (!next) break;
+    schema = next;
+    def = schema._def;
+    if (!description && schema.description) description = schema.description;
+  }
+
+  const result: TypeInfo = {type: 'unknown'};
+  if (description) result.description = description;
+  if (defaultValue !== undefined) result.default = defaultValue;
+
+  switch (def.typeName) {
+    case 'ZodString':
+      result.type = 'string';
+      break;
+    case 'ZodNumber':
+      result.type = def.checks?.some((c: ZodCheck) => c.kind === 'int')
+        ? 'integer'
+        : 'number';
+      break;
+    case 'ZodBoolean':
+      result.type = 'boolean';
+      break;
+    case 'ZodEnum':
+      result.type = 'string';
+      result.enum = def.values;
+      break;
+    case 'ZodArray':
+      result.type = 'array';
+      if (def.type) {
+        result.items = getZodTypeInfo(def.type);
+      }
+      break;
+    default:
+      result.type = 'unknown';
+  }
+  return result;
+}
+
+function isRequired(schema: ZodSchema): boolean {
+  let def = schema._def;
+  while (def.typeName === 'ZodEffects') {
+    if (!def.schema) break;
+    schema = def.schema;
+    def = schema._def;
+  }
+  return def.typeName !== 'ZodOptional' && def.typeName !== 'ZodDefault';
+}
+
 async function generateToolDocumentation(): Promise<void> {
-  console.log('Starting MCP server to query tool definitions...');
-
-  // Create MCP client with stdio transport pointing to the built server
-  const transport = new StdioClientTransport({
-    command: 'node',
-    args: [MCP_SERVER_PATH, '--channel', 'canary'],
-  });
-
-  const client = new Client(
-    {
-      name: 'docs-generator',
-      version: '1.0.0',
-    },
-    {
-      capabilities: {},
-    },
-  );
-
   try {
-    // Connect to the server
-    await client.connect(transport);
-    console.log('Connected to MCP server');
+    console.log('Generating tool documentation from definitions...');
 
-    // List all available tools
-    const {tools} = await client.listTools();
-    const toolsWithAnnotations = tools as ToolWithAnnotations[];
-    console.log(`Found ${tools.length} tools`);
+    // Convert ToolDefinitions to ToolWithAnnotations
+    const toolsWithAnnotations: ToolWithAnnotations[] = tools.map(tool => {
+      const properties: Record<string, TypeInfo> = {};
+      const required: string[] = [];
+
+      for (const [key, schema] of Object.entries(
+        tool.schema as unknown as Record<string, ZodSchema>,
+      )) {
+        const info = getZodTypeInfo(schema);
+        properties[key] = info;
+        if (isRequired(schema)) {
+          required.push(key);
+        }
+      }
+
+      return {
+        name: tool.name,
+        description: tool.description,
+        inputSchema: {
+          type: 'object',
+          properties,
+          required,
+        },
+        annotations: tool.annotations,
+      };
+    });
+
+    console.log(`Found ${toolsWithAnnotations.length} tools`);
 
     // Generate markdown documentation
     let markdown = `<!-- AUTO GENERATED DO NOT EDIT - run 'npm run docs' to update-->
@@ -274,8 +367,7 @@ async function generateToolDocumentation(): Promise<void> {
 
           const propertyNames = Object.keys(properties).sort();
           for (const propName of propertyNames) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const prop = properties[propName] as any;
+            const prop = properties[propName] as TypeInfo;
             const isRequired = required.includes(propName);
             const requiredText = isRequired
               ? ' **(required)**'
@@ -322,8 +414,6 @@ async function generateToolDocumentation(): Promise<void> {
     // Generate and update configuration options
     const optionsMarkdown = generateConfigOptionsMarkdown();
     updateReadmeWithOptionsMarkdown(optionsMarkdown);
-    // Clean up
-    await client.close();
     process.exit(0);
   } catch (error) {
     console.error('Error generating documentation:', error);

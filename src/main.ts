@@ -21,16 +21,8 @@ import {
   SetLevelRequestSchema,
 } from './third_party/index.js';
 import {ToolCategory} from './tools/categories.js';
-import * as consoleTools from './tools/console.js';
-import * as emulationTools from './tools/emulation.js';
-import * as inputTools from './tools/input.js';
-import * as networkTools from './tools/network.js';
-import * as pagesTools from './tools/pages.js';
-import * as performanceTools from './tools/performance.js';
-import * as screenshotTools from './tools/screenshot.js';
-import * as scriptTools from './tools/script.js';
-import * as snapshotTools from './tools/snapshot.js';
 import type {ToolDefinition} from './tools/ToolDefinition.js';
+import {tools} from './tools/tools.js';
 
 // If moved update release-please config
 // x-release-please-start-version
@@ -164,22 +156,6 @@ function registerTool(tool: ToolDefinition): void {
     },
   );
 }
-
-const tools = [
-  ...Object.values(consoleTools),
-  ...Object.values(emulationTools),
-  ...Object.values(inputTools),
-  ...Object.values(networkTools),
-  ...Object.values(pagesTools),
-  ...Object.values(performanceTools),
-  ...Object.values(screenshotTools),
-  ...Object.values(scriptTools),
-  ...Object.values(snapshotTools),
-] as ToolDefinition[];
-
-tools.sort((a, b) => {
-  return a.name.localeCompare(b.name);
-});
 
 for (const tool of tools) {
   registerTool(tool);
