@@ -478,24 +478,42 @@ export const askGeminiWeb = defineTool({
 
             response.appendResponseLine('✅ 回答完了');
 
-            // Save session
-            if (isNewChat) {
-                const chatUrl = page.url();
-                const chatIdMatch = chatUrl.match(/\/app\/([a-f0-9]+)/);
-                const chatId = chatIdMatch ? chatIdMatch[1] : 'unknown-' + Date.now();
+            // Always save/update session (not just for new chats)
+            const chatUrl = page.url();
+            const chatIdMatch = chatUrl.match(/\/app\/([a-f0-9]+)/);
+            const currentChatId = chatIdMatch ? chatIdMatch[1] : null;
+
+            if (currentChatId) {
+                // Check if URL changed (Gemini redirected to new chat)
+                const urlChanged = sessionChatId && currentChatId !== sessionChatId;
+                if (urlChanged) {
+                    response.appendResponseLine(`⚠️ チャットIDが変更されました: ${sessionChatId} → ${currentChatId}`);
+                    isNewChat = true;
+                }
+
+                // Load existing session to get conversation count
+                const sessions = await loadChatSessions();
+                const projectSessions = sessions[project] || [];
+                const existingSession = projectSessions.find(s => s.chatId === currentChatId);
+                const newCount = (existingSession?.conversationCount || 0) + 1;
 
                 await saveChatSession(project, {
-                    chatId,
+                    chatId: currentChatId,
                     url: chatUrl,
                     lastUsed: new Date().toISOString(),
-                    createdAt: new Date().toISOString(),
+                    createdAt: existingSession?.createdAt || new Date().toISOString(),
                     title: `[Project: ${project}]`,
-                    conversationCount: 1,
+                    conversationCount: newCount,
                 });
-                sessionChatId = chatId;
+                sessionChatId = currentChatId;
             }
 
-            // Save log
+            // Save log with conversation number
+            const finalSessions = await loadChatSessions();
+            const finalProjectSessions = finalSessions[project] || [];
+            const finalSession = finalProjectSessions.find(s => s.chatId === sessionChatId);
+            const conversationNumber = finalSession?.conversationCount || 1;
+
             const logPath = await saveConversationLog(
                 project,
                 sanitizedQuestion,
@@ -503,6 +521,7 @@ export const askGeminiWeb = defineTool({
                 {
                     chatUrl: page.url(),
                     chatId: sessionChatId,
+                    conversationNumber,
                 }
             );
 
