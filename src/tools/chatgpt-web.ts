@@ -57,8 +57,9 @@ async function navigateWithRetry(
 /**
  * Find or create a dedicated ChatGPT tab
  * Returns existing ChatGPT tab if found, otherwise creates a new one
+ * Also returns whether navigation is needed
  */
-async function getOrCreateChatGPTPage(context: Context): Promise<Page> {
+async function getOrCreateChatGPTPage(context: Context): Promise<{ page: Page; needsNavigation: boolean }> {
     // Refresh pages list
     await context.createPagesSnapshot();
     const pages = context.getPages();
@@ -67,13 +68,14 @@ async function getOrCreateChatGPTPage(context: Context): Promise<Page> {
     for (const page of pages) {
         const url = page.url();
         if (url.includes('chatgpt.com') || url.includes('chat.openai.com')) {
-            return page;
+            // Already on ChatGPT - no navigation needed
+            return { page, needsNavigation: false };
         }
     }
 
     // No ChatGPT tab found, create a new one
     const newPage = await context.newPage();
-    return newPage;
+    return { page: newPage, needsNavigation: true };
 }
 
 /**
@@ -304,15 +306,18 @@ export const askChatGPTWeb = defineTool({
       projectName || path.basename(process.cwd()) || 'unknown-project';
 
     // Get or create a dedicated ChatGPT tab
-    const page = await getOrCreateChatGPTPage(context);
+    const { page, needsNavigation } = await getOrCreateChatGPTPage(context);
 
     try {
-      // Step 1: Navigate to ChatGPT
+      // Step 1: Navigate to ChatGPT (only if not already there)
       response.appendResponseLine('ChatGPTに接続中...');
-      await navigateWithRetry(page, CHATGPT_CONFIG.DEFAULT_URL, {waitUntil: 'networkidle2'});
-
-      // Wait for page to fully render (ChatGPT takes time to load UI)
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      if (needsNavigation) {
+        await navigateWithRetry(page, CHATGPT_CONFIG.DEFAULT_URL, {waitUntil: 'networkidle2'});
+        // Wait for page to fully render (ChatGPT takes time to load UI)
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+      } else {
+        response.appendResponseLine('✅ 既存のChatGPTタブを再利用');
+      }
 
       // Step 2: Check if login is required (don't wait - stop immediately)
       const needsLogin = await isLoginRequired(page);
