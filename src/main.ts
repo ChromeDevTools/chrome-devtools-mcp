@@ -210,14 +210,14 @@ async function getContext(): Promise<McpContext> {
 
     context = await McpContext.from(browser, logger, browserFactory, connectionOptions);
 
-    // Run UI health check only once per browser instance
-    if (!uiHealthCheckRun) {
-      uiHealthCheckRun = true;
-      // Run in background to avoid blocking startup
-      runStartupCheck(browser).catch(err => {
-        logger(`Startup check failed: ${err}`);
-      });
-    }
+    // UI health check disabled - causes duplicate ChatGPT tabs
+    // TODO: Re-enable after fixing tab management
+    // if (!uiHealthCheckRun) {
+    //   uiHealthCheckRun = true;
+    //   runStartupCheck(browser).catch(err => {
+    //     logger(`Startup check failed: ${err}`);
+    //   });
+    // }
   }
 
   return context;
