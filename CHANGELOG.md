@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.11.1](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.11.0...chrome-devtools-mcp-v0.11.1) (2025-12-05)
+
+
+### 📄 Documentation
+
+* Add AX design principles ([#643](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/643)) ([90ed192](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/90ed192c558d36faf9f6300be1c1fd5abd464d8a))
+
 ## [0.11.0](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.10.2...chrome-devtools-mcp-v0.11.0) (2025-12-03)
 
 
