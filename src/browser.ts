@@ -134,7 +134,7 @@ export async function ensureBrowserConnected(options: {
     browser = await puppeteer.connect(connectOptions);
   } catch (err) {
     throw new Error(
-      'Could not connect to Chrome. Check if Chrome is running and remote debugging is enabled.',
+      'Could not connect to Chrome. Check if Chrome is running and remote debugging is enabled by going to chrome://inspect/#remote-debugging.',
       {
         cause: err,
       },

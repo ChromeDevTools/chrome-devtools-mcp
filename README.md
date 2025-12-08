@@ -351,7 +351,7 @@ The Chrome DevTools MCP server supports the following configuration option:
 <!-- BEGIN AUTO GENERATED OPTIONS -->
 
 - **`--autoConnect`**
-  If specified, automatically connects to a browser (Chrome 145+) running in the user data directory identified by the channel param.
+  If specified, automatically connects to a browser (Chrome 145+) running in the user data directory identified by the channel param. Requires remote debugging being enabled in Chrome here: chrome://inspect/#remote-debugging.
   - **Type:** boolean
   - **Default:** `false`
 
