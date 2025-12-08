@@ -207,10 +207,9 @@ export const resizePage = defineTool({
   handler: async (request, response, context) => {
     const page = context.getSelectedPage();
 
-    // @ts-expect-error internal API for now.
-    await page.resize({
-      contentWidth: request.params.width,
-      contentHeight: request.params.height,
+    await page.setViewport({
+      width: request.params.width,
+      height: request.params.height,
     });
 
     response.setIncludePages(true);
