@@ -54,11 +54,13 @@ async function getContext(): Promise<McpContext> {
   }
   const devtools = args.experimentalDevtools ?? false;
   const browser =
-    args.browserUrl || args.wsEndpoint
+    args.browserUrl || args.wsEndpoint || args.autoConnect
       ? await ensureBrowserConnected({
           browserURL: args.browserUrl,
           wsEndpoint: args.wsEndpoint,
           wsHeaders: args.wsHeaders,
+          // Important: only pass channel, if autoConnect is true.
+          channel: args.autoConnect ? (args.channel as Channel) : undefined,
           devtools,
         })
       : await ensureBrowserLaunched({

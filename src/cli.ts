@@ -8,6 +8,19 @@ import type {YargsOptions} from './third_party/index.js';
 import {yargs, hideBin} from './third_party/index.js';
 
 export const cliOptions = {
+  autoConnect: {
+    type: 'boolean',
+    description:
+      'If specified, automatically connects to a browser (Chrome 145+) running in the user data directory identified by the channel param.',
+    conflicts: ['isolated', 'executablePath', 'userDataDir'],
+    default: false,
+    coerce: (value: boolean | undefined) => {
+      if (!value) {
+        return;
+      }
+      return value;
+    },
+  },
   browserUrl: {
     type: 'string',
     description:
@@ -220,6 +233,14 @@ export function parseArguments(version: string, argv = process.argv) {
       [
         '$0 --user-data-dir=/tmp/user-data-dir',
         'Use a custom user data directory',
+      ],
+      [
+        '$0 --auto-connect',
+        'Connect to a stable Chrome instance running instead of launching a new instance',
+      ],
+      [
+        '$0 --auto-connect --channel=canary',
+        'Connect to a canary Chrome instance running instead of launching a new instance',
       ],
     ]);
 
