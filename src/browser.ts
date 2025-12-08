@@ -81,7 +81,16 @@ export async function ensureBrowserConnected(options: {
   }
 
   logger('Connecting Puppeteer to ', JSON.stringify(connectOptions));
-  browser = await puppeteer.connect(connectOptions);
+  try {
+    browser = await puppeteer.connect(connectOptions);
+  } catch (err) {
+    throw new Error(
+      'Could not connect to Chrome. Check if Chrome is running and remote debugging is enabled.',
+      {
+        cause: err,
+      },
+    );
+  }
   logger('Connected Puppeteer');
   return browser;
 }

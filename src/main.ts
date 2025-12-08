@@ -142,7 +142,10 @@ function registerTool(tool: ToolDefinition): void {
         };
       } catch (err) {
         logger(`${tool.name} error:`, err, err?.stack);
-        const errorText = err && 'message' in err ? err.message : String(err);
+        let errorText = err && 'message' in err ? err.message : String(err);
+        if ('cause' in err && err.cause) {
+          errorText += `\nCause: ${err.cause.message}`;
+        }
         return {
           content: [
             {

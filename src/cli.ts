@@ -236,11 +236,11 @@ export function parseArguments(version: string, argv = process.argv) {
       ],
       [
         '$0 --auto-connect',
-        'Connect to a stable Chrome instance running instead of launching a new instance',
+        'Connect to a stable Chrome instance (Chrome 145+) running instead of launching a new instance',
       ],
       [
         '$0 --auto-connect --channel=canary',
-        'Connect to a canary Chrome instance running instead of launching a new instance',
+        'Connect to a canary Chrome instance (Chrome 145+) running instead of launching a new instance',
       ],
     ]);
 
