@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.12.0](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.11.0...chrome-devtools-mcp-v0.12.0) (2025-12-09)
+
+
+### 🎉 Features
+
+* support --auto-connect to a Chrome instance ([#651](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/651)) ([6ab6d85](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/6ab6d85d50226cf12a62563430f552e783f428b2))
+* support --user-data-dir with --auto-connect ([#654](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/654)) ([e3c59bc](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/e3c59bcd9c284f3be99cc15e22116b887f04cdab))
+
+
+### 🛠️ Fixes
+
+* map channel for resolveDefaultUserDataDir ([#658](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/658)) ([6f59b39](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/6f59b3975abda50536f8b890f3245662b22e3657))
+
+
+### 📄 Documentation
+
+* Add AX design principles ([#643](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/643)) ([90ed192](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/90ed192c558d36faf9f6300be1c1fd5abd464d8a))
+* improve autoConnect docs ([#653](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/653)) ([09111cc](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/09111cc16464bed27cd623f3b345d3885db12521))
+
 ## [0.11.0](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.10.2...chrome-devtools-mcp-v0.11.0) (2025-12-03)
 
 
