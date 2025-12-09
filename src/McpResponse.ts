@@ -4,8 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {AggregatedIssue} from '../node_modules/chrome-devtools-frontend/mcp/mcp.js';
-
 import {mapIssueToMessageObject} from './DevtoolsUtils.js';
 import type {ConsoleMessageData} from './formatters/consoleFormatter.js';
 import {
@@ -21,6 +19,7 @@ import {
 } from './formatters/networkFormatter.js';
 import {formatSnapshotNode} from './formatters/snapshotFormatter.js';
 import type {McpContext} from './McpContext.js';
+import {AggregatedIssue} from './third_party/index.js';
 import type {
   ConsoleMessage,
   ImageContent,

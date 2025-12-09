@@ -8,11 +8,10 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
-import {type AggregatedIssue} from '../node_modules/chrome-devtools-frontend/mcp/mcp.js';
-
 import {extractUrlLikeFromDevToolsTitle, urlsEqual} from './DevtoolsUtils.js';
 import type {ListenerMap} from './PageCollector.js';
 import {NetworkCollector, ConsoleCollector} from './PageCollector.js';
+import {type AggregatedIssue} from './third_party/index.js';
 import {Locator} from './third_party/index.js';
 import type {
   Browser,

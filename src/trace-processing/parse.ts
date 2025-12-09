@@ -4,13 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {logger} from '../logger.js';
 import {
   AgentFocus,
   TraceEngine,
   PerformanceTraceFormatter,
   PerformanceInsightFormatter,
-} from '../../node_modules/chrome-devtools-frontend/mcp/mcp.js';
-import {logger} from '../logger.js';
+} from '../third_party/index.js';
 
 const engine = TraceEngine.TraceModel.Model.createWithAllHandlers();
 

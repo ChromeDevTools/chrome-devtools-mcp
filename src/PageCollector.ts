@@ -4,17 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {
-  AggregatedIssue,
-  Common,
-} from '../node_modules/chrome-devtools-frontend/mcp/mcp.js';
-import {
-  IssueAggregatorEvents,
-  IssuesManagerEvents,
-  createIssuesFromProtocolIssue,
-  IssueAggregator,
-} from '../node_modules/chrome-devtools-frontend/mcp/mcp.js';
-
 import {FakeIssuesManager} from './DevtoolsUtils.js';
 import {logger} from './logger.js';
 import type {
@@ -22,6 +11,14 @@ import type {
   ConsoleMessage,
   Protocol,
   Target,
+  Common,
+} from './third_party/index.js';
+import {
+  type AggregatedIssue,
+  IssueAggregatorEvents,
+  IssuesManagerEvents,
+  createIssuesFromProtocolIssue,
+  IssueAggregator,
 } from './third_party/index.js';
 import {
   type Browser,

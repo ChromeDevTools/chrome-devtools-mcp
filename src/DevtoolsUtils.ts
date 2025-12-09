@@ -4,11 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {PuppeteerDevToolsConnection} from './DevToolsConnectionAdapter.js';
+import {ISSUE_UTILS} from './issue-descriptions.js';
+import {logger} from './logger.js';
+import {Mutex} from './Mutex.js';
 import {
   type Issue,
   type AggregatedIssue,
   type IssuesManagerEventTypes,
-  type Target,
+  type SDKTarget as Target,
   DebuggerModel,
   Foundation,
   TargetManager,
@@ -17,12 +21,7 @@ import {
   ProtocolClient,
   Common,
   I18n,
-} from '../node_modules/chrome-devtools-frontend/mcp/mcp.js';
-
-import {PuppeteerDevToolsConnection} from './DevToolsConnectionAdapter.js';
-import {ISSUE_UTILS} from './issue-descriptions.js';
-import {logger} from './logger.js';
-import {Mutex} from './Mutex.js';
+} from './third_party/index.js';
 import type {
   Browser,
   Page,

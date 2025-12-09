@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {AggregatedIssue} from '../../node_modules/chrome-devtools-frontend/mcp/mcp.js';
 import type {McpContext} from '../McpContext.js';
+import {type AggregatedIssue} from '../third_party/index.js';
 
 export interface ConsoleMessageData {
   consoleMessageStableId: number;

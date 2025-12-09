@@ -4,8 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {CDPConnection as devtools} from '../node_modules/chrome-devtools-frontend/mcp/mcp.js';
-
+import type {CDPConnection as devtools} from './third_party/index.js';
 import type * as puppeteer from './third_party/index.js';
 import {CDPSessionEvent} from './third_party/index.js';
 

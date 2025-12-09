@@ -20,6 +20,7 @@
  */
 
 import path from 'node:path';
+import fs from 'node:fs';
 
 import commonjs from '@rollup/plugin-commonjs';
 import json from '@rollup/plugin-json';
@@ -95,6 +96,35 @@ const bundleDependency = (
               }
               return arr.join('\n');
             });
+
+            // Manual license handling for chrome-devtools-frontend third_party
+            const tsConfig = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'tsconfig.json'), 'utf-8'));
+             const thirdPartyDirectories = tsConfig.include.filter(location => {
+              return location.includes(
+                'node_modules/chrome-devtools-frontend/front_end/third_party',
+              );
+            });
+
+            const manualLicenses = [];
+            // Add chrome-devtools-frontend main license
+            const cdtfLicensePath = path.join(process.cwd(), 'node_modules/chrome-devtools-frontend/LICENSE');
+            if (fs.existsSync(cdtfLicensePath)) {
+              manualLicenses.push(['Name: chrome-devtools-frontend', 'License: Apache-2.0', '', fs.readFileSync(cdtfLicensePath, 'utf-8')].join('\n'));
+            }
+
+            for (const thirdPartyDir of thirdPartyDirectories) {
+              const fullPath = path.join(process.cwd(), thirdPartyDir);
+              const licenseFile = path.join(fullPath, 'LICENSE');
+              if (fs.existsSync(licenseFile)) {
+                 const name = path.basename(thirdPartyDir);
+                 manualLicenses.push([`Name: ${name}`, `License: Custom`, '', fs.readFileSync(licenseFile, 'utf-8').replaceAll('\r', '')].join('\n'));
+              }
+            }
+            
+            if (manualLicenses.length > 0) {
+              stringified_dependencies.push(...manualLicenses);
+            }
+
             const divider =
               '\n\n-------------------- DEPENDENCY DIVIDER --------------------\n\n';
             return stringified_dependencies.join(divider);
