@@ -61,6 +61,7 @@ async function getContext(): Promise<McpContext> {
           wsHeaders: args.wsHeaders,
           // Important: only pass channel, if autoConnect is true.
           channel: args.autoConnect ? (args.channel as Channel) : undefined,
+          userDataDir: args.userDataDir,
           devtools,
         })
       : await ensureBrowserLaunched({

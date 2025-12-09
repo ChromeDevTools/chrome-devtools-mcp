@@ -14,8 +14,14 @@ import type {
   ChromeReleaseChannel,
   LaunchOptions,
   Target,
+  BrowsersChromeReleaseChannel,
 } from './third_party/index.js';
-import {puppeteer} from './third_party/index.js';
+import {
+  puppeteer,
+  resolveDefaultUserDataDir,
+  detectBrowserPlatform,
+  BrowserEnum,
+} from './third_party/index.js';
 
 let browser: Browser | undefined;
 
@@ -49,6 +55,7 @@ export async function ensureBrowserConnected(options: {
   wsHeaders?: Record<string, string>;
   devtools: boolean;
   channel?: Channel;
+  userDataDir?: string;
 }) {
   const {channel} = options;
   if (browser?.connected) {
@@ -68,15 +75,57 @@ export async function ensureBrowserConnected(options: {
     }
   } else if (options.browserURL) {
     connectOptions.browserURL = options.browserURL;
-  } else if (channel) {
-    const puppeteerChannel =
-      channel !== 'stable'
-        ? (`chrome-${channel}` as ChromeReleaseChannel)
-        : 'chrome';
-    connectOptions.channel = puppeteerChannel;
+  } else if (channel || options.userDataDir) {
+    let userDataDir = options.userDataDir;
+    if (!userDataDir) {
+      if (!channel) {
+        throw new Error('Channel must be provided if userDataDir is missing');
+      }
+      const platform = detectBrowserPlatform();
+      if (!platform) {
+        throw new Error('Could not detect required browser platform');
+      }
+      userDataDir = resolveDefaultUserDataDir(
+        BrowserEnum.CHROME,
+        platform,
+        (channel === 'stable'
+          ? 'chrome'
+          : `chrome-${channel}`) as BrowsersChromeReleaseChannel,
+      );
+    }
+
+    // TODO: re-expose this logic via Puppeteer.
+    const portPath = path.join(userDataDir, 'DevToolsActivePort');
+    try {
+      const fileContent = await fs.promises.readFile(portPath, 'utf8');
+      const [rawPort, rawPath] = fileContent
+        .split('\n')
+        .map(line => {
+          return line.trim();
+        })
+        .filter(line => {
+          return !!line;
+        });
+      if (!rawPort || !rawPath) {
+        throw new Error(`Invalid DevToolsActivePort '${fileContent}' found`);
+      }
+      const port = parseInt(rawPort, 10);
+      if (isNaN(port) || port <= 0 || port > 65535) {
+        throw new Error(`Invalid port '${rawPort}' found`);
+      }
+      const browserWSEndpoint = `ws://127.0.0.1:${port}${rawPath}`;
+      connectOptions.browserWSEndpoint = browserWSEndpoint;
+    } catch (error) {
+      throw new Error(
+        `Could not connect to Chrome in ${userDataDir}. Check if Chrome is running and remote debugging is enabled.`,
+        {
+          cause: error,
+        },
+      );
+    }
   } else {
     throw new Error(
-      'Either browserURL, wsEndpoint or channel must be provided',
+      'Either browserURL, wsEndpoint, channel or userDataDir must be provided',
     );
   }
 

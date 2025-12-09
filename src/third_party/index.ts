@@ -29,3 +29,9 @@ export {
 export {default as puppeteer} from 'puppeteer-core';
 export type * from 'puppeteer-core';
 export type {CdpPage} from 'puppeteer-core/internal/cdp/Page.js';
+export {
+  resolveDefaultUserDataDir,
+  detectBrowserPlatform,
+  Browser as BrowserEnum,
+  type ChromeReleaseChannel as BrowsersChromeReleaseChannel,
+} from '@puppeteer/browsers';
