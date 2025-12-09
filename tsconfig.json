@@ -37,6 +37,7 @@
     "node_modules/chrome-devtools-frontend/front_end/foundation/Universe.ts",
     "node_modules/chrome-devtools-frontend/front_end/generated",
     "node_modules/chrome-devtools-frontend/front_end/legacy/legacy-defs.d.ts",
+    "node_modules/chrome-devtools-frontend/front_end/models/annotations",
     "node_modules/chrome-devtools-frontend/front_end/models/ai_assistance/data_formatters/NetworkRequestFormatter.ts",
     "node_modules/chrome-devtools-frontend/front_end/models/ai_assistance/data_formatters/PerformanceInsightFormatter.ts",
     "node_modules/chrome-devtools-frontend/front_end/models/ai_assistance/data_formatters/PerformanceTraceFormatter.ts",
