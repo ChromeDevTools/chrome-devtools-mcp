@@ -90,7 +90,7 @@ describe('browser', () => {
         devtools: false,
       });
       assert.ok(connectedBrowser);
-      assert.ok(connectedBrowser.isConnected());
+      assert.ok(connectedBrowser.connected);
       connectedBrowser.disconnect();
     } finally {
       await browser.close();
