@@ -17,10 +17,10 @@ import type {
 } from 'puppeteer-core';
 import sinon from 'sinon';
 
-import {AggregatedIssue} from '../node_modules/chrome-devtools-frontend/mcp/mcp.js';
 import {McpContext} from '../src/McpContext.js';
 import {McpResponse} from '../src/McpResponse.js';
 import {stableIdSymbol} from '../src/PageCollector.js';
+import {AggregatedIssue} from '../src/third_party/index.js';
 
 export function getTextContent(
   content: CallToolResult['content'][number],

@@ -42,6 +42,8 @@ jobs:
 
       - name: Build
         run: npm run bundle
+        env:
+          NODE_OPTIONS: '--max_old_space_size=4096'
 
       - name: Set up Node.js
         uses: actions/setup-node@395ad3262231945c25e8478fd5baf05154b1d79f # v6.1.0
@@ -62,7 +64,7 @@ jobs:
       - name: Run tests
         shell: bash
         if: ${{ matrix.node != '20' }}
-        run: npm run test
+        run: npm run test:no-build
 
   # Gating job for branch protection.
   test-success:

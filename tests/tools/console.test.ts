@@ -7,9 +7,9 @@
 import assert from 'node:assert';
 import {before, describe, it} from 'node:test';
 
-import {AggregatedIssue} from '../../node_modules/chrome-devtools-frontend/mcp/mcp.js';
 import {loadIssueDescriptions} from '../../src/issue-descriptions.js';
 import {McpResponse} from '../../src/McpResponse.js';
+import {AggregatedIssue} from '../../src/third_party/index.js';
 import {
   getConsoleMessage,
   listConsoleMessages,

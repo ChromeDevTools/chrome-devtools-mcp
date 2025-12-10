@@ -41,10 +41,6 @@ export {
   TraceEngine,
   PerformanceTraceFormatter,
   PerformanceInsightFormatter,
-  // Issue is a type in some contexts, but let's export it as is if it's a class or if we can use export type?
-  // Use export type for pure types if possible, or just export { ... }
-  // The users act as if they are values (classes) mostly, except explicit type imports.
-  // Re-exporting everything as value allows both (if they are values).
   AggregatedIssue,
   type Issue,
   type IssuesManagerEventTypes,

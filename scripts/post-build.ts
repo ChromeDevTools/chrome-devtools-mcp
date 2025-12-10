@@ -20,7 +20,6 @@ function writeFile(filePath: string, content: string): void {
   fs.writeFileSync(filePath, content, 'utf-8');
 }
 
-
 function main(): void {
   const devtoolsThirdPartyPath =
     'node_modules/chrome-devtools-frontend/front_end/third_party';
@@ -96,7 +95,12 @@ function copyDevToolsDescriptionFiles() {
   const devtoolsIssuesDescriptionPath =
     'node_modules/chrome-devtools-frontend/front_end/models/issues_manager/descriptions';
   const sourceDir = path.join(process.cwd(), devtoolsIssuesDescriptionPath);
-  const destDir = path.join(BUILD_DIR, devtoolsIssuesDescriptionPath);
+  const destDir = path.join(
+    BUILD_DIR,
+    'src',
+    'third_party',
+    'issue-descriptions',
+  );
   fs.cpSync(sourceDir, destDir, {recursive: true});
 }
 

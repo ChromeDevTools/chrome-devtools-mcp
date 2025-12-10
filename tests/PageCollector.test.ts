@@ -10,13 +10,13 @@ import {beforeEach, describe, it} from 'node:test';
 import type {Frame, HTTPRequest, Target, Protocol} from 'puppeteer-core';
 import sinon from 'sinon';
 
-import {AggregatedIssue} from '../node_modules/chrome-devtools-frontend/mcp/mcp.js';
 import type {ListenerMap} from '../src/PageCollector.js';
 import {
   ConsoleCollector,
   NetworkCollector,
   PageCollector,
 } from '../src/PageCollector.js';
+import {AggregatedIssue} from '../src/third_party/index.js';
 
 import {getMockRequest, getMockBrowser} from './utils.js';
 

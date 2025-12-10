@@ -10,16 +10,13 @@ import {afterEach, describe, it} from 'node:test';
 import sinon from 'sinon';
 
 import {
-  AggregatedIssue,
-  DebuggerModel,
-} from '../node_modules/chrome-devtools-frontend/mcp/mcp.js';
-import {
   extractUrlLikeFromDevToolsTitle,
   urlsEqual,
   mapIssueToMessageObject,
   UniverseManager,
 } from '../src/DevtoolsUtils.js';
 import {ISSUE_UTILS} from '../src/issue-descriptions.js';
+import {AggregatedIssue, DebuggerModel} from '../src/third_party/index.js';
 import type {Browser, Target} from '../src/third_party/index.js';
 
 import {
