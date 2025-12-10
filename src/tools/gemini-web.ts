@@ -283,6 +283,9 @@ export const askGeminiWeb = defineTool({
             response.appendResponseLine('Geminiに接続中...');
             await navigateWithRetry(page, targetUrl, { waitUntil: 'networkidle2' });
 
+            // Wait for Gemini SPA to fully render (networkidle2 is not enough for SPAs)
+            await new Promise(resolve => setTimeout(resolve, 1000));
+
             // Check login only once after navigation
             const needsLogin = await isLoginRequired(page);
             if (needsLogin) {
