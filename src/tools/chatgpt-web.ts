@@ -617,17 +617,9 @@ export const askChatGPTWeb = defineTool({
               .map((el) => el.textContent)
               .join(' ');
 
-            // Check if DeepResearch is still running
-            const buttons = Array.from(document.querySelectorAll('button'));
-            const isRunning = buttons.some((btn) => {
-              const text = btn.textContent || '';
-              const aria = btn.getAttribute('aria-label') || '';
-              return (
-                text.includes('停止') ||
-                text.includes('リサーチを停止') ||
-                aria.includes('停止')
-              );
-            });
+            // Check if DeepResearch is still running - use stop-button data-testid
+            const stopButton = document.querySelector('button[data-testid="stop-button"]');
+            const isRunning = !!stopButton;
 
             if (!isRunning) {
               // Research completed - get the report
@@ -654,18 +646,10 @@ export const askChatGPTWeb = defineTool({
             };
           }
 
-          // Normal streaming detection
-          const buttons = Array.from(document.querySelectorAll('button'));
-          const isStreaming = buttons.some((btn) => {
-            const text = btn.textContent || '';
-            const aria = btn.getAttribute('aria-label') || '';
-            return (
-              text.includes('ストリーミングの停止') ||
-              text.includes('停止') ||
-              aria.includes('ストリーミングの停止') ||
-              aria.includes('停止')
-            );
-          });
+          // Normal streaming detection - check for stop button by data-testid
+          // When ChatGPT is generating, send-button becomes stop-button
+          const stopButton = document.querySelector('button[data-testid="stop-button"]');
+          const isStreaming = !!stopButton;
 
           if (!isStreaming) {
             // Get final response
