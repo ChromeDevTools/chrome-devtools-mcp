@@ -484,9 +484,73 @@ the browser is closed.
 
 ### Connecting to a running Chrome instance
 
-You can connect to a running Chrome instance by using the `--browser-url` option. This is useful if you want to use your existing Chrome profile or if you are running the MCP server in a sandboxed environment that does not allow starting a new Chrome instance.
+By default, the Chrome DevTools MCP server will start a new Chrome instance with a dedicated profile. This might not be ideal in all situations:
 
-Here is a step-by-step guide on how to connect to a running Chrome Stable instance:
+- If you would like to maintain the same application state when alternating between manual site testing and agent-driven testing.
+- When the MCP needs to sign into a website. Some accounts may prevent sign-in when the browser is controlled via WebDriver (the default launch mechanism for the Chrome DevTools MCP server).
+- If you're running your LLM inside a sandboxed environment, but you would like to connect to a Chrome instance that runs outside the sandbox.
+
+In these cases, start Chrome first and let the Chrome DevTools MCP server connect to it. There are two ways to do so:
+
+- **Automatic connection (available in Chrome 144)**: best for sharing state between manual and agent-driven testing.
+- **Manual connection via remote debugging port**: best when running inside a sandboxed environment.
+
+#### Automatically connecting to a running Chrome instance
+
+**Step 1:** Set up remote debugging in Chrome
+
+In Chrome, do the following to set up remote debugging:
+
+1.  Navigate to `chrome://inspect/#remote-debugging` to enable remote debugging.
+2.  Follow the dialog UI to allow or disallow incoming debugging connections.
+
+**Step 2:** Configure Chrome DevTools MCP server to automatically connect to a running Chrome Instance
+
+To connect the `chrome-devtools-mcp` server to the running Chrome instance, use
+`--autoConnect` command line argument for the MCP server.
+
+The following code snippet is an example configuration for gemini-cli:
+
+```json
+{
+  "mcpServers": {
+    "chrome-devtools": {
+      "command": "npx",
+      "args": [
+        "chrome-devtools-mcp@latest",
+        "--autoConnect",
+        "--channel=canary"
+      ]
+    }
+  }
+}
+```
+
+Note: you have to specify `--channel=canary` until Chrome M144 has reached the
+stable channel.
+
+**Step 3:** Test your setup
+
+Make sure your browser is running. Open gemini-cli and run the following prompt:
+
+```none
+Check the performance of https://developers.chrome.com
+```
+
+Note: The <code>autoConnect</code> option requires the user to start Chrome.
+
+The Chrome DevTools MCP server will try to connect to your running Chrome
+instance. It shows a dialog asking for user permission.
+
+Clicking **Allow** results in the Chrome DevTools MCP server opening
+[developers.chrome.com](http://developers.chrome.com) and taking a performance
+trace.
+
+#### Manual connection using port forwarding
+
+You can connect to a running Chrome instance by using the `--browser-url` option. This is useful if you are running the MCP server in a sandboxed environment that does not allow starting a new Chrome instance.
+
+Here is a step-by-step guide on how to connect to a running Chrome instance:
 
 **Step 1: Configure the MCP client**
 
