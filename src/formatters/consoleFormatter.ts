@@ -4,13 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {AggregatedIssue} from '../../node_modules/chrome-devtools-frontend/mcp/mcp.js';
 import type {McpContext} from '../McpContext.js';
+import type {DevTools} from '../third_party/index.js';
 
 export interface ConsoleMessageData {
   consoleMessageStableId: number;
   type?: string;
-  item?: AggregatedIssue;
+  item?: DevTools.AggregatedIssue;
   message?: string;
   count?: number;
   description?: string;
@@ -71,7 +71,7 @@ function formatArgs(consoleData: ConsoleMessageData): string {
 }
 
 export function formatIssue(
-  issue: AggregatedIssue,
+  issue: DevTools.AggregatedIssue,
   description?: string,
   context?: McpContext,
 ): string {

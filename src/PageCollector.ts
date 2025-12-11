@@ -4,25 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {
-  AggregatedIssue,
-  Common,
-} from '../node_modules/chrome-devtools-frontend/mcp/mcp.js';
-import {
-  IssueAggregatorEvents,
-  IssuesManagerEvents,
-  createIssuesFromProtocolIssue,
-  IssueAggregator,
-} from '../node_modules/chrome-devtools-frontend/mcp/mcp.js';
-
 import {FakeIssuesManager} from './DevtoolsUtils.js';
 import {logger} from './logger.js';
 import type {
+  Target,
   CDPSession,
   ConsoleMessage,
   Protocol,
-  Target,
 } from './third_party/index.js';
+import {DevTools} from './third_party/index.js';
 import {
   type Browser,
   type Frame,
@@ -33,7 +23,7 @@ import {
 } from './third_party/index.js';
 
 interface PageEvents extends PuppeteerPageEvents {
-  issue: AggregatedIssue;
+  issue: DevTools.AggregatedIssue;
 }
 
 export type ListenerMap<EventMap extends PageEvents = PageEvents> = {
@@ -221,7 +211,7 @@ export class PageCollector<T> {
 }
 
 export class ConsoleCollector extends PageCollector<
-  ConsoleMessage | Error | AggregatedIssue
+  ConsoleMessage | Error | DevTools.AggregatedIssue
 > {
   #subscribedPages = new WeakMap<Page, PageIssueSubscriber>();
 
@@ -243,9 +233,9 @@ export class ConsoleCollector extends PageCollector<
 
 class PageIssueSubscriber {
   #issueManager = new FakeIssuesManager();
-  #issueAggregator = new IssueAggregator(this.#issueManager);
+  #issueAggregator = new DevTools.IssueAggregator(this.#issueManager);
   #seenKeys = new Set<string>();
-  #seenIssues = new Set<AggregatedIssue>();
+  #seenIssues = new Set<DevTools.AggregatedIssue>();
   #page: Page;
   #session: CDPSession;
 
@@ -259,14 +249,13 @@ class PageIssueSubscriber {
     this.#issueManager = new FakeIssuesManager();
     if (this.#issueAggregator) {
       this.#issueAggregator.removeEventListener(
-        IssueAggregatorEvents.AGGREGATED_ISSUE_UPDATED,
+        DevTools.IssueAggregatorEvents.AGGREGATED_ISSUE_UPDATED,
         this.#onAggregatedissue,
       );
     }
-    this.#issueAggregator = new IssueAggregator(this.#issueManager);
-
+    this.#issueAggregator = new DevTools.IssueAggregator(this.#issueManager);
     this.#issueAggregator.addEventListener(
-      IssueAggregatorEvents.AGGREGATED_ISSUE_UPDATED,
+      DevTools.IssueAggregatorEvents.AGGREGATED_ISSUE_UPDATED,
       this.#onAggregatedissue,
     );
   }
@@ -289,7 +278,7 @@ class PageIssueSubscriber {
     this.#session.off('Audits.issueAdded', this.#onIssueAdded);
     if (this.#issueAggregator) {
       this.#issueAggregator.removeEventListener(
-        IssueAggregatorEvents.AGGREGATED_ISSUE_UPDATED,
+        DevTools.IssueAggregatorEvents.AGGREGATED_ISSUE_UPDATED,
         this.#onAggregatedissue,
       );
     }
@@ -299,7 +288,7 @@ class PageIssueSubscriber {
   }
 
   #onAggregatedissue = (
-    event: Common.EventTarget.EventTargetEvent<AggregatedIssue>,
+    event: DevTools.Common.EventTarget.EventTargetEvent<DevTools.AggregatedIssue>,
   ) => {
     if (this.#seenIssues.has(event.data)) {
       return;
@@ -322,9 +311,11 @@ class PageIssueSubscriber {
   #onIssueAdded = (data: Protocol.Audits.IssueAddedEvent) => {
     try {
       const inspectorIssue = data.issue;
-      // @ts-expect-error Types of protocol from Puppeteer and CDP are
-      // incomparable for InspectorIssueCode, one is union, other is enum.
-      const issue = createIssuesFromProtocolIssue(null, inspectorIssue)[0];
+      const issue = DevTools.createIssuesFromProtocolIssue(
+        null,
+        // @ts-expect-error Protocol types diverge.
+        inspectorIssue,
+      )[0];
       if (!issue) {
         logger('No issue mapping for for the issue: ', inspectorIssue.code);
         return;
@@ -336,7 +327,7 @@ class PageIssueSubscriber {
       }
       this.#seenKeys.add(primaryKey);
       this.#issueManager.dispatchEventToListeners(
-        IssuesManagerEvents.ISSUE_ADDED,
+        DevTools.IssuesManagerEvents.ISSUE_ADDED,
         {
           issue,
           // @ts-expect-error We don't care that issues model is null

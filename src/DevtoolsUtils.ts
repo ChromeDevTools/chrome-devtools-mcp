@@ -4,25 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
-  type Issue,
-  type AggregatedIssue,
-  type IssuesManagerEventTypes,
-  type Target,
-  DebuggerModel,
-  Foundation,
-  TargetManager,
-  MarkdownIssueDescription,
-  Marked,
-  ProtocolClient,
-  Common,
-  I18n,
-} from '../node_modules/chrome-devtools-frontend/mcp/mcp.js';
-
 import {PuppeteerDevToolsConnection} from './DevToolsConnectionAdapter.js';
 import {ISSUE_UTILS} from './issue-descriptions.js';
 import {logger} from './logger.js';
 import {Mutex} from './Mutex.js';
+import {DevTools} from './third_party/index.js';
 import type {
   Browser,
   Page,
@@ -88,14 +74,14 @@ function normalizeUrl(url: string): string {
  * A mock implementation of an issues manager that only implements the methods
  * that are actually used by the IssuesAggregator
  */
-export class FakeIssuesManager extends Common.ObjectWrapper
-  .ObjectWrapper<IssuesManagerEventTypes> {
-  issues(): Issue[] {
+export class FakeIssuesManager extends DevTools.Common.ObjectWrapper
+  .ObjectWrapper<DevTools.IssuesManagerEventTypes> {
+  issues(): DevTools.Issue[] {
     return [];
   }
 }
 
-export function mapIssueToMessageObject(issue: AggregatedIssue) {
+export function mapIssueToMessageObject(issue: DevTools.AggregatedIssue) {
   const count = issue.getAggregatedIssuesCount();
   const markdownDescription = issue.getDescription();
   const filename = markdownDescription?.file;
@@ -114,12 +100,14 @@ export function mapIssueToMessageObject(issue: AggregatedIssue) {
   let title: string | null;
 
   try {
-    processedMarkdown = MarkdownIssueDescription.substitutePlaceholders(
-      rawMarkdown,
-      markdownDescription.substitutions,
-    );
-    const markdownAst = Marked.Marked.lexer(processedMarkdown);
-    title = MarkdownIssueDescription.findTitleFromMarkdownAst(markdownAst);
+    processedMarkdown =
+      DevTools.MarkdownIssueDescription.substitutePlaceholders(
+        rawMarkdown,
+        markdownDescription.substitutions,
+      );
+    const markdownAst = DevTools.Marked.Marked.lexer(processedMarkdown);
+    title =
+      DevTools.MarkdownIssueDescription.findTitleFromMarkdownAst(markdownAst);
   } catch {
     logger('error parsing markdown for issue ' + issue.code());
     return null;
@@ -138,9 +126,9 @@ export function mapIssueToMessageObject(issue: AggregatedIssue) {
 }
 
 // DevTools CDP errors can get noisy.
-ProtocolClient.InspectorBackend.test.suppressRequestErrors = true;
+DevTools.ProtocolClient.InspectorBackend.test.suppressRequestErrors = true;
 
-I18n.DevToolsLocale.DevToolsLocale.instance({
+DevTools.I18n.DevToolsLocale.DevToolsLocale.instance({
   create: true,
   data: {
     navigatorLanguage: 'en-US',
@@ -148,12 +136,12 @@ I18n.DevToolsLocale.DevToolsLocale.instance({
     lookupClosestDevToolsLocale: l => l,
   },
 });
-I18n.i18n.registerLocaleDataForTest('en-US', {});
+DevTools.I18n.i18n.registerLocaleDataForTest('en-US', {});
 
 export interface TargetUniverse {
   /** The DevTools target corresponding to the puppeteer Page */
-  target: Target;
-  universe: Foundation.Universe.Universe;
+  target: DevTools.SDKTarget;
+  universe: DevTools.Foundation.Universe.Universe;
 }
 export type TargetUniverseFactoryFn = (page: Page) => Promise<TargetUniverse>;
 
@@ -232,22 +220,23 @@ export class UniverseManager {
 }
 
 const DEFAULT_FACTORY: TargetUniverseFactoryFn = async (page: Page) => {
-  const settingStorage = new Common.Settings.SettingsStorage({});
-  const universe = new Foundation.Universe.Universe({
+  const settingStorage = new DevTools.Common.Settings.SettingsStorage({});
+  const universe = new DevTools.Foundation.Universe.Universe({
     settingsCreationOptions: {
       syncedStorage: settingStorage,
       globalStorage: settingStorage,
       localStorage: settingStorage,
-      settingRegistrations: Common.SettingRegistration.getRegisteredSettings(),
+      settingRegistrations:
+        DevTools.Common.SettingRegistration.getRegisteredSettings(),
     },
-    overrideAutoStartModels: new Set([DebuggerModel]),
+    overrideAutoStartModels: new Set([DevTools.DebuggerModel]),
   });
 
   const session = await page.createCDPSession();
   const connection = new PuppeteerDevToolsConnection(session);
 
-  const targetManager = universe.context.get(TargetManager);
-  targetManager.observeModels(DebuggerModel, SKIP_ALL_PAUSES);
+  const targetManager = universe.context.get(DevTools.TargetManager);
+  targetManager.observeModels(DevTools.DebuggerModel, SKIP_ALL_PAUSES);
 
   const target = targetManager.createTarget(
     'main',
@@ -267,7 +256,7 @@ const DEFAULT_FACTORY: TargetUniverseFactoryFn = async (page: Page) => {
 // sent. This means DevTools can still pause, step and do whatever. We just won't
 // see the `Debugger.paused`/`Debugger.resumed` events on the MCP side.
 const SKIP_ALL_PAUSES = {
-  modelAdded(model: DebuggerModel): void {
+  modelAdded(model: DevTools.DebuggerModel): void {
     void model.agent.invoke_setSkipAllPauses({skip: true});
   },
 

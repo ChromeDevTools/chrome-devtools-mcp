@@ -20,7 +20,7 @@ if (!it.snapshot) {
   };
 }
 
-// This is run by Node when we execute the tests via the --require flag.
+// This is run by Node when we execute the tests via the --import flag.
 it.snapshot.setResolveSnapshotPath(testPath => {
   // By default the snapshots go into the build directory, but we want them
   // in the tests/ directory.

@@ -8,12 +8,11 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
-import {type AggregatedIssue} from '../node_modules/chrome-devtools-frontend/mcp/mcp.js';
-
 import {extractUrlLikeFromDevToolsTitle, urlsEqual} from './DevtoolsUtils.js';
 import type {ListenerMap} from './PageCollector.js';
 import {NetworkCollector, ConsoleCollector} from './PageCollector.js';
 import {Locator} from './third_party/index.js';
+import type {DevTools} from './third_party/index.js';
 import type {
   Browser,
   ConsoleMessage,
@@ -222,18 +221,20 @@ export class McpContext implements Context {
 
   getConsoleData(
     includePreservedMessages?: boolean,
-  ): Array<ConsoleMessage | Error | AggregatedIssue> {
+  ): Array<ConsoleMessage | Error | DevTools.AggregatedIssue> {
     const page = this.getSelectedPage();
     return this.#consoleCollector.getData(page, includePreservedMessages);
   }
 
   getConsoleMessageStableId(
-    message: ConsoleMessage | Error | AggregatedIssue,
+    message: ConsoleMessage | Error | DevTools.AggregatedIssue,
   ): number {
     return this.#consoleCollector.getIdForResource(message);
   }
 
-  getConsoleMessageById(id: number): ConsoleMessage | Error | AggregatedIssue {
+  getConsoleMessageById(
+    id: number,
+  ): ConsoleMessage | Error | DevTools.AggregatedIssue {
     return this.#consoleCollector.getById(this.getSelectedPage(), id);
   }
 

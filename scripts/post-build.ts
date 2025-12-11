@@ -7,8 +7,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
-import tsConfig from '../tsconfig.json' with {type: 'json'};
-
 import {sed} from './sed.ts';
 
 const BUILD_DIR = path.join(process.cwd(), 'build');
@@ -20,29 +18,6 @@ const BUILD_DIR = path.join(process.cwd(), 'build');
  */
 function writeFile(filePath: string, content: string): void {
   fs.writeFileSync(filePath, content, 'utf-8');
-}
-
-/**
- * Ensures that licenses for third party files we use gets copied into the build/ dir.
- */
-function copyThirdPartyLicenseFiles() {
-  const thirdPartyDirectories = tsConfig.include.filter(location => {
-    return location.includes(
-      'node_modules/chrome-devtools-frontend/front_end/third_party',
-    );
-  });
-
-  for (const thirdPartyDir of thirdPartyDirectories) {
-    const fullPath = path.join(process.cwd(), thirdPartyDir);
-    const licenseFile = path.join(fullPath, 'LICENSE');
-    if (!fs.existsSync(licenseFile)) {
-      console.error('No LICENSE for', path.basename(thirdPartyDir));
-    }
-
-    const destinationDir = path.join(BUILD_DIR, thirdPartyDir);
-    const destinationFile = path.join(destinationDir, 'LICENSE');
-    fs.copyFileSync(licenseFile, destinationFile);
-  }
 }
 
 function main(): void {
@@ -113,22 +88,6 @@ export const experiments = {
   sed(clientFile, globalAssignment, '');
   sed(clientFile, registerCommands, '');
 
-  const devtoolsLicensePath = path.join(
-    'node_modules',
-    'chrome-devtools-frontend',
-    'LICENSE',
-  );
-  const devtoolsLicenseFileSource = path.join(
-    process.cwd(),
-    devtoolsLicensePath,
-  );
-  const devtoolsLicenseFileDestination = path.join(
-    BUILD_DIR,
-    devtoolsLicensePath,
-  );
-  fs.copyFileSync(devtoolsLicenseFileSource, devtoolsLicenseFileDestination);
-
-  copyThirdPartyLicenseFiles();
   copyDevToolsDescriptionFiles();
 }
 
@@ -136,7 +95,12 @@ function copyDevToolsDescriptionFiles() {
   const devtoolsIssuesDescriptionPath =
     'node_modules/chrome-devtools-frontend/front_end/models/issues_manager/descriptions';
   const sourceDir = path.join(process.cwd(), devtoolsIssuesDescriptionPath);
-  const destDir = path.join(BUILD_DIR, devtoolsIssuesDescriptionPath);
+  const destDir = path.join(
+    BUILD_DIR,
+    'src',
+    'third_party',
+    'issue-descriptions',
+  );
   fs.cpSync(sourceDir, destDir, {recursive: true});
 }
 

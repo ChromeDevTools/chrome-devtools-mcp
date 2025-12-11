@@ -35,3 +35,5 @@ export {
   Browser as BrowserEnum,
   type ChromeReleaseChannel as BrowsersChromeReleaseChannel,
 } from '@puppeteer/browsers';
+
+export * as DevTools from './devtools.js';
