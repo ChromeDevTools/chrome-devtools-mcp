@@ -19,11 +19,7 @@ import {
 } from './formatters/networkFormatter.js';
 import {formatSnapshotNode} from './formatters/snapshotFormatter.js';
 import type {McpContext} from './McpContext.js';
-<<<<<<< HEAD
-import {AggregatedIssue} from './third_party/index.js';
-=======
 import {DevTools} from './third_party/index.js';
->>>>>>> 8e5e779 (build: bundle devtools frontend (#656))
 import type {
   ConsoleMessage,
   ImageContent,

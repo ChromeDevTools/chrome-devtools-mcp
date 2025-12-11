@@ -16,11 +16,7 @@ import {
   UniverseManager,
 } from '../src/DevtoolsUtils.js';
 import {ISSUE_UTILS} from '../src/issue-descriptions.js';
-<<<<<<< HEAD
-import {AggregatedIssue, DebuggerModel} from '../src/third_party/index.js';
-=======
 import {DevTools} from '../src/third_party/index.js';
->>>>>>> 8e5e779 (build: bundle devtools frontend (#656))
 import type {Browser, Target} from '../src/third_party/index.js';
 
 import {

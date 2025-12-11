@@ -9,11 +9,7 @@ import {before, describe, it} from 'node:test';
 
 import {loadIssueDescriptions} from '../../src/issue-descriptions.js';
 import {McpResponse} from '../../src/McpResponse.js';
-<<<<<<< HEAD
-import {AggregatedIssue} from '../../src/third_party/index.js';
-=======
 import {DevTools} from '../../src/third_party/index.js';
->>>>>>> 8e5e779 (build: bundle devtools frontend (#656))
 import {
   getConsoleMessage,
   listConsoleMessages,

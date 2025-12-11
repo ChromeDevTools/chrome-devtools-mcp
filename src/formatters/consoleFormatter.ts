@@ -5,11 +5,7 @@
  */
 
 import type {McpContext} from '../McpContext.js';
-<<<<<<< HEAD
-import {type AggregatedIssue} from '../third_party/index.js';
-=======
 import type {DevTools} from '../third_party/index.js';
->>>>>>> 8e5e779 (build: bundle devtools frontend (#656))
 
 export interface ConsoleMessageData {
   consoleMessageStableId: number;

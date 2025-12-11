@@ -7,18 +7,10 @@
 import {FakeIssuesManager} from './DevtoolsUtils.js';
 import {logger} from './logger.js';
 import type {
+  Target,
   CDPSession,
   ConsoleMessage,
   Protocol,
-  Target,
-  Common,
-} from './third_party/index.js';
-import {
-  type AggregatedIssue,
-  IssueAggregatorEvents,
-  IssuesManagerEvents,
-  createIssuesFromProtocolIssue,
-  IssueAggregator,
 } from './third_party/index.js';
 import {DevTools} from './third_party/index.js';
 import {

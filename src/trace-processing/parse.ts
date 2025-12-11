@@ -5,16 +5,7 @@
  */
 
 import {logger} from '../logger.js';
-<<<<<<< HEAD
-import {
-  AgentFocus,
-  TraceEngine,
-  PerformanceTraceFormatter,
-  PerformanceInsightFormatter,
-} from '../third_party/index.js';
-=======
 import {DevTools} from '../third_party/index.js';
->>>>>>> 8e5e779 (build: bundle devtools frontend (#656))
 
 const engine = DevTools.TraceEngine.TraceModel.Model.createWithAllHandlers();
 
@@ -82,7 +73,7 @@ export async function parseRawTraceBuffer(
 const extraFormatDescriptions = `Information on performance traces may contain main thread activity represented as call frames and network requests.
 
 ${DevTools.PerformanceTraceFormatter.callFrameDataFormatDescription}
-  
+
 ${DevTools.PerformanceTraceFormatter.networkDataFormatDescription}`;
 
 export function getTraceSummary(result: TraceResult): string {

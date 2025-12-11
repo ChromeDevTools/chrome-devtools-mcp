@@ -36,30 +36,4 @@ export {
   type ChromeReleaseChannel as BrowsersChromeReleaseChannel,
 } from '@puppeteer/browsers';
 
-<<<<<<< HEAD
-export {
-  AgentFocus,
-  TraceEngine,
-  PerformanceTraceFormatter,
-  PerformanceInsightFormatter,
-  AggregatedIssue,
-  type Issue,
-  type IssuesManagerEventTypes,
-  type Target as SDKTarget,
-  type CDPConnection,
-  DebuggerModel,
-  Foundation,
-  TargetManager,
-  MarkdownIssueDescription,
-  Marked,
-  ProtocolClient,
-  Common,
-  I18n,
-  IssueAggregatorEvents,
-  IssuesManagerEvents,
-  createIssuesFromProtocolIssue,
-  IssueAggregator,
-} from '../../node_modules/chrome-devtools-frontend/mcp/mcp.js';
-=======
 export * as DevTools from './devtools.js';
->>>>>>> 8e5e779 (build: bundle devtools frontend (#656))

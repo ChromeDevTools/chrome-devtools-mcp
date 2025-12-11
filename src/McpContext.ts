@@ -11,7 +11,6 @@ import path from 'node:path';
 import {extractUrlLikeFromDevToolsTitle, urlsEqual} from './DevtoolsUtils.js';
 import type {ListenerMap} from './PageCollector.js';
 import {NetworkCollector, ConsoleCollector} from './PageCollector.js';
-import {type AggregatedIssue} from './third_party/index.js';
 import {Locator} from './third_party/index.js';
 import type {DevTools} from './third_party/index.js';
 import type {

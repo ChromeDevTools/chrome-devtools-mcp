@@ -16,11 +16,7 @@ import {
   NetworkCollector,
   PageCollector,
 } from '../src/PageCollector.js';
-<<<<<<< HEAD
-import {AggregatedIssue} from '../src/third_party/index.js';
-=======
 import {DevTools} from '../src/third_party/index.js';
->>>>>>> 8e5e779 (build: bundle devtools frontend (#656))
 
 import {getMockRequest, getMockBrowser} from './utils.js';
 

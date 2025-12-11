@@ -4,10 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-<<<<<<< HEAD
-import type {CDPConnection as devtools} from './third_party/index.js';
-=======
->>>>>>> 8e5e779 (build: bundle devtools frontend (#656))
 import type * as puppeteer from './third_party/index.js';
 import type {DevTools} from './third_party/index.js';
 import {CDPSessionEvent} from './third_party/index.js';

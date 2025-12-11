@@ -8,24 +8,7 @@ import {PuppeteerDevToolsConnection} from './DevToolsConnectionAdapter.js';
 import {ISSUE_UTILS} from './issue-descriptions.js';
 import {logger} from './logger.js';
 import {Mutex} from './Mutex.js';
-<<<<<<< HEAD
-import {
-  type Issue,
-  type AggregatedIssue,
-  type IssuesManagerEventTypes,
-  type SDKTarget as Target,
-  DebuggerModel,
-  Foundation,
-  TargetManager,
-  MarkdownIssueDescription,
-  Marked,
-  ProtocolClient,
-  Common,
-  I18n,
-} from './third_party/index.js';
-=======
 import {DevTools} from './third_party/index.js';
->>>>>>> 8e5e779 (build: bundle devtools frontend (#656))
 import type {
   Browser,
   Page,
