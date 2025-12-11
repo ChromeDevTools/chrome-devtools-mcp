@@ -4,8 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+<<<<<<< HEAD
 import type {CDPConnection as devtools} from './third_party/index.js';
+=======
+>>>>>>> 8e5e779 (build: bundle devtools frontend (#656))
 import type * as puppeteer from './third_party/index.js';
+import type {DevTools} from './third_party/index.js';
 import {CDPSessionEvent} from './third_party/index.js';
 
 /**
@@ -16,9 +20,11 @@ import {CDPSessionEvent} from './third_party/index.js';
  * We don't have to recursively listen for 'sessionattached' as the "root" CDP session sees all child session attached
  * events, regardless how deeply nested they are.
  */
-export class PuppeteerDevToolsConnection implements devtools.CDPConnection {
+export class PuppeteerDevToolsConnection
+  implements DevTools.CDPConnection.CDPConnection
+{
   readonly #connection: puppeteer.Connection;
-  readonly #observers = new Set<devtools.CDPConnectionObserver>();
+  readonly #observers = new Set<DevTools.CDPConnection.CDPConnectionObserver>();
   readonly #sessionEventHandlers = new Map<
     string,
     puppeteer.Handler<unknown>
@@ -39,11 +45,14 @@ export class PuppeteerDevToolsConnection implements devtools.CDPConnection {
     this.#startForwardingCdpEvents(session);
   }
 
-  send<T extends devtools.Command>(
+  send<T extends DevTools.CDPConnection.Command>(
     method: T,
-    params: devtools.CommandParams<T>,
+    params: DevTools.CDPConnection.CommandParams<T>,
     sessionId: string | undefined,
-  ): Promise<{result: devtools.CommandResult<T>} | {error: devtools.CDPError}> {
+  ): Promise<
+    | {result: DevTools.CDPConnection.CommandResult<T>}
+    | {error: DevTools.CDPConnection.CDPError}
+  > {
     if (sessionId === undefined) {
       throw new Error(
         'Attempting to send on the root session. This must not happen',
@@ -62,11 +71,11 @@ export class PuppeteerDevToolsConnection implements devtools.CDPConnection {
     /* eslint-enable @typescript-eslint/no-explicit-any */
   }
 
-  observe(observer: devtools.CDPConnectionObserver): void {
+  observe(observer: DevTools.CDPConnection.CDPConnectionObserver): void {
     this.#observers.add(observer);
   }
 
-  unobserve(observer: devtools.CDPConnectionObserver): void {
+  unobserve(observer: DevTools.CDPConnection.CDPConnectionObserver): void {
     this.#observers.delete(observer);
   }
 
@@ -98,7 +107,7 @@ export class PuppeteerDevToolsConnection implements devtools.CDPConnection {
     ) {
       this.#observers.forEach(observer =>
         observer.onEvent({
-          method: type as devtools.Event,
+          method: type as DevTools.CDPConnection.Event,
           sessionId,
           params: event,
         }),

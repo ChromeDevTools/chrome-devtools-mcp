@@ -20,7 +20,11 @@ import sinon from 'sinon';
 import {McpContext} from '../src/McpContext.js';
 import {McpResponse} from '../src/McpResponse.js';
 import {stableIdSymbol} from '../src/PageCollector.js';
+<<<<<<< HEAD
 import {AggregatedIssue} from '../src/third_party/index.js';
+=======
+import {DevTools} from '../src/third_party/index.js';
+>>>>>>> 8e5e779 (build: bundle devtools frontend (#656))
 
 export function getTextContent(
   content: CallToolResult['content'][number],
@@ -214,8 +218,10 @@ export function stabilizeResponseOutput(text: unknown) {
   return output;
 }
 
-export function getMockAggregatedIssue(): sinon.SinonStubbedInstance<AggregatedIssue> {
-  const mockAggregatedIssue = sinon.createStubInstance(AggregatedIssue);
+export function getMockAggregatedIssue(): sinon.SinonStubbedInstance<DevTools.AggregatedIssue> {
+  const mockAggregatedIssue = sinon.createStubInstance(
+    DevTools.AggregatedIssue,
+  );
   mockAggregatedIssue.getAllIssues.returns([]);
   return mockAggregatedIssue;
 }

@@ -19,7 +19,11 @@ import {
 } from './formatters/networkFormatter.js';
 import {formatSnapshotNode} from './formatters/snapshotFormatter.js';
 import type {McpContext} from './McpContext.js';
+<<<<<<< HEAD
 import {AggregatedIssue} from './third_party/index.js';
+=======
+import {DevTools} from './third_party/index.js';
+>>>>>>> 8e5e779 (build: bundle devtools frontend (#656))
 import type {
   ConsoleMessage,
   ImageContent,
@@ -250,7 +254,7 @@ export class McpResponse implements Response {
             }),
           ),
         };
-      } else if (message instanceof AggregatedIssue) {
+      } else if (message instanceof DevTools.AggregatedIssue) {
         const mappedIssueMessage = mapIssueToMessageObject(message);
         if (!mappedIssueMessage)
           throw new Error(
@@ -282,7 +286,7 @@ export class McpResponse implements Response {
           if ('type' in message) {
             return normalizedTypes.has(message.type());
           }
-          if (message instanceof AggregatedIssue) {
+          if (message instanceof DevTools.AggregatedIssue) {
             return normalizedTypes.has('issue');
           }
           return normalizedTypes.has('error');
@@ -312,7 +316,7 @@ export class McpResponse implements Response {
                 ),
               };
             }
-            if (item instanceof AggregatedIssue) {
+            if (item instanceof DevTools.AggregatedIssue) {
               const mappedIssueMessage = mapIssueToMessageObject(item);
               if (!mappedIssueMessage) return null;
               return {

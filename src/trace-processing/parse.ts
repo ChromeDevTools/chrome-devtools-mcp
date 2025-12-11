@@ -5,18 +5,22 @@
  */
 
 import {logger} from '../logger.js';
+<<<<<<< HEAD
 import {
   AgentFocus,
   TraceEngine,
   PerformanceTraceFormatter,
   PerformanceInsightFormatter,
 } from '../third_party/index.js';
+=======
+import {DevTools} from '../third_party/index.js';
+>>>>>>> 8e5e779 (build: bundle devtools frontend (#656))
 
-const engine = TraceEngine.TraceModel.Model.createWithAllHandlers();
+const engine = DevTools.TraceEngine.TraceModel.Model.createWithAllHandlers();
 
 export interface TraceResult {
-  parsedTrace: TraceEngine.TraceModel.ParsedTrace;
-  insights: TraceEngine.Insights.Types.TraceInsightSets | null;
+  parsedTrace: DevTools.TraceEngine.TraceModel.ParsedTrace;
+  insights: DevTools.TraceEngine.Insights.Types.TraceInsightSets | null;
 }
 
 export function traceResultIsSuccess(
@@ -47,9 +51,9 @@ export async function parseRawTraceBuffer(
   try {
     const data = JSON.parse(asString) as
       | {
-          traceEvents: TraceEngine.Types.Events.Event[];
+          traceEvents: DevTools.TraceEngine.Types.Events.Event[];
         }
-      | TraceEngine.Types.Events.Event[];
+      | DevTools.TraceEngine.Types.Events.Event[];
 
     const events = Array.isArray(data) ? data : data.traceEvents;
     await engine.parse(events);
@@ -77,13 +81,13 @@ export async function parseRawTraceBuffer(
 
 const extraFormatDescriptions = `Information on performance traces may contain main thread activity represented as call frames and network requests.
 
-${PerformanceTraceFormatter.callFrameDataFormatDescription}
-
-${PerformanceTraceFormatter.networkDataFormatDescription}`;
+${DevTools.PerformanceTraceFormatter.callFrameDataFormatDescription}
+  
+${DevTools.PerformanceTraceFormatter.networkDataFormatDescription}`;
 
 export function getTraceSummary(result: TraceResult): string {
-  const focus = AgentFocus.fromParsedTrace(result.parsedTrace);
-  const formatter = new PerformanceTraceFormatter(focus);
+  const focus = DevTools.AgentFocus.fromParsedTrace(result.parsedTrace);
+  const formatter = new DevTools.PerformanceTraceFormatter(focus);
   const summaryText = formatter.formatTraceSummary();
   return `## Summary of Performance trace findings:
 ${summaryText}
@@ -92,7 +96,8 @@ ${summaryText}
 ${extraFormatDescriptions}`;
 }
 
-export type InsightName = keyof TraceEngine.Insights.Types.InsightModels;
+export type InsightName =
+  keyof DevTools.TraceEngine.Insights.Types.InsightModels;
 export type InsightOutput = {output: string} | {error: string};
 
 export function getInsightOutput(
@@ -122,8 +127,8 @@ export function getInsightOutput(
     };
   }
 
-  const formatter = new PerformanceInsightFormatter(
-    AgentFocus.fromParsedTrace(result.parsedTrace),
+  const formatter = new DevTools.PerformanceInsightFormatter(
+    DevTools.AgentFocus.fromParsedTrace(result.parsedTrace),
     matchingInsight,
   );
   return {output: formatter.formatInsight()};

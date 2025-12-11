@@ -5,12 +5,16 @@
  */
 
 import type {McpContext} from '../McpContext.js';
+<<<<<<< HEAD
 import {type AggregatedIssue} from '../third_party/index.js';
+=======
+import type {DevTools} from '../third_party/index.js';
+>>>>>>> 8e5e779 (build: bundle devtools frontend (#656))
 
 export interface ConsoleMessageData {
   consoleMessageStableId: number;
   type?: string;
-  item?: AggregatedIssue;
+  item?: DevTools.AggregatedIssue;
   message?: string;
   count?: number;
   description?: string;
@@ -71,7 +75,7 @@ function formatArgs(consoleData: ConsoleMessageData): string {
 }
 
 export function formatIssue(
-  issue: AggregatedIssue,
+  issue: DevTools.AggregatedIssue,
   description?: string,
   context?: McpContext,
 ): string {

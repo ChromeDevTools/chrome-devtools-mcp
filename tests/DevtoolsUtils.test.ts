@@ -16,7 +16,11 @@ import {
   UniverseManager,
 } from '../src/DevtoolsUtils.js';
 import {ISSUE_UTILS} from '../src/issue-descriptions.js';
+<<<<<<< HEAD
 import {AggregatedIssue, DebuggerModel} from '../src/third_party/index.js';
+=======
+import {DevTools} from '../src/third_party/index.js';
+>>>>>>> 8e5e779 (build: bundle devtools frontend (#656))
 import type {Browser, Target} from '../src/third_party/index.js';
 
 import {
@@ -114,7 +118,9 @@ describe('mapIssueToMessageObject', () => {
   });
 
   it('maps aggregated issue with substituted description', () => {
-    const mockAggregatedIssue = sinon.createStubInstance(AggregatedIssue);
+    const mockAggregatedIssue = sinon.createStubInstance(
+      DevTools.AggregatedIssue,
+    );
     mockAggregatedIssue.getDescription.returns(mockDescription);
     mockAggregatedIssue.getAggregatedIssuesCount.returns(1);
 
@@ -142,7 +148,9 @@ describe('mapIssueToMessageObject', () => {
   });
 
   it('returns null for the issue with no description', () => {
-    const mockAggregatedIssue = sinon.createStubInstance(AggregatedIssue);
+    const mockAggregatedIssue = sinon.createStubInstance(
+      DevTools.AggregatedIssue,
+    );
     mockAggregatedIssue.getDescription.returns(null);
 
     const result = mapIssueToMessageObject(mockAggregatedIssue);
@@ -150,7 +158,9 @@ describe('mapIssueToMessageObject', () => {
   });
 
   it('returns null if there is no desciption file', () => {
-    const mockAggregatedIssue = sinon.createStubInstance(AggregatedIssue);
+    const mockAggregatedIssue = sinon.createStubInstance(
+      DevTools.AggregatedIssue,
+    );
     mockAggregatedIssue.getDescription.returns(mockDescription);
     mockAggregatedIssue.getAggregatedIssuesCount.returns(1);
 
@@ -165,7 +175,9 @@ describe('mapIssueToMessageObject', () => {
   });
 
   it("returns null if can't parse the title", () => {
-    const mockAggregatedIssue = sinon.createStubInstance(AggregatedIssue);
+    const mockAggregatedIssue = sinon.createStubInstance(
+      DevTools.AggregatedIssue,
+    );
     mockAggregatedIssue.getDescription.returns(mockDescription);
     mockAggregatedIssue.getAggregatedIssuesCount.returns(1);
 
@@ -181,7 +193,9 @@ describe('mapIssueToMessageObject', () => {
   });
 
   it('returns null if devtools utill function throws an error', () => {
-    const mockAggregatedIssue = sinon.createStubInstance(AggregatedIssue);
+    const mockAggregatedIssue = sinon.createStubInstance(
+      DevTools.AggregatedIssue,
+    );
     mockAggregatedIssue.getDescription.returns(mockDescription);
     mockAggregatedIssue.getAggregatedIssuesCount.returns(1);
 
@@ -247,7 +261,7 @@ describe('UniverseManager', () => {
       await manager.init([page]);
       const targetUniverse = manager.get(page);
       assert.ok(targetUniverse);
-      const model = targetUniverse.target.model(DebuggerModel);
+      const model = targetUniverse.target.model(DevTools.DebuggerModel);
       assert.ok(model);
 
       const pausedSpy = sinon.stub();
