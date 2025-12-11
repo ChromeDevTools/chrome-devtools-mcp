@@ -348,10 +348,16 @@ export class McpContext implements Context {
     const oldPage = this.#selectedPage;
     if (oldPage) {
       oldPage.off('dialog', this.#dialogHandler);
+      void oldPage.emulateFocusedPage(false).catch(error => {
+        this.logger('Error turning off focused page emulation', error);
+      });
     }
     this.#selectedPage = newPage;
     newPage.on('dialog', this.#dialogHandler);
     this.#updateSelectedPageTimeouts();
+    void newPage.emulateFocusedPage(true).catch(error => {
+      this.logger('Error turning on focused page emulation', error);
+    });
   }
 
   #updateSelectedPageTimeouts() {

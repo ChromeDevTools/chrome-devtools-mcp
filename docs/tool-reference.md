@@ -172,7 +172,8 @@
 
 **Parameters:**
 
-- **pageIdx** (number) **(required)**: The index of the page to select. Call [`list_pages`](#list_pages) to list pages.
+- **bringToFront** (boolean) _(optional)_: Whether to focus the page and bring it to the top.
+- **pageIdx** (number) **(required)**: The index of the page to select. Call [`list_pages`](#list_pages) to get available pages.
 
 ---
 

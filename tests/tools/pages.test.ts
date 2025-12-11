@@ -77,6 +77,23 @@ describe('pages', () => {
         assert.ok(response.includePages);
       });
     });
+    it('selects a page and keeps it focused in the background', async () => {
+      await withMcpContext(async (response, context) => {
+        await context.newPage();
+        assert.strictEqual(context.getPageByIdx(1), context.getSelectedPage());
+        assert.strictEqual(
+          await context.getPageByIdx(0).evaluate(() => document.hasFocus()),
+          false,
+        );
+        await selectPage.handler({params: {pageIdx: 0}}, response, context);
+        assert.strictEqual(context.getPageByIdx(0), context.getSelectedPage());
+        assert.strictEqual(
+          await context.getPageByIdx(0).evaluate(() => document.hasFocus()),
+          true,
+        );
+        assert.ok(response.includePages);
+      });
+    });
   });
   describe('navigate_page', () => {
     it('navigates to correct page', async () => {
