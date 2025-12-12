@@ -141,8 +141,17 @@ function generateConfigOptionsMarkdown(): string {
     const aliasText = optionConfig.alias ? `, \`-${optionConfig.alias}\`` : '';
     const description = optionConfig.description || optionConfig.describe || '';
 
+    // Convert camelCase to dash-case
+    const dashCaseName = optionName
+      .replace(/([a-z])([A-Z])/g, '$1-$2')
+      .toLowerCase();
+    const nameDisplay =
+      dashCaseName !== optionName
+        ? `\`--${optionName}\`/ \`--${dashCaseName}\``
+        : `\`--${optionName}\``;
+
     // Start with option name and description
-    markdown += `- **\`--${optionName}\`${aliasText}**\n`;
+    markdown += `- **${nameDisplay}${aliasText}**\n`;
     markdown += `  ${description}\n`;
 
     // Add type information
@@ -365,7 +374,13 @@ async function generateToolDocumentation(): Promise<void> {
 
           markdown += '**Parameters:**\n\n';
 
-          const propertyNames = Object.keys(properties).sort();
+          const propertyNames = Object.keys(properties).sort((a, b) => {
+            const aRequired = required.includes(a);
+            const bRequired = required.includes(b);
+            if (aRequired && !bRequired) return -1;
+            if (!aRequired && bRequired) return 1;
+            return a.localeCompare(b);
+          });
           for (const propName of propertyNames) {
             const prop = properties[propName] as TypeInfo;
             const isRequired = required.includes(propName);

@@ -350,20 +350,20 @@ The Chrome DevTools MCP server supports the following configuration option:
 
 <!-- BEGIN AUTO GENERATED OPTIONS -->
 
-- **`--autoConnect`**
+- **`--autoConnect`/ `--auto-connect`**
   If specified, automatically connects to a browser (Chrome 145+) running in the user data directory identified by the channel param. Requires remote debugging being enabled in Chrome here: chrome://inspect/#remote-debugging.
   - **Type:** boolean
   - **Default:** `false`
 
-- **`--browserUrl`, `-u`**
+- **`--browserUrl`/ `--browser-url`, `-u`**
   Connect to a running, debuggable Chrome instance (e.g. `http://127.0.0.1:9222`). For more details see: https://github.com/ChromeDevTools/chrome-devtools-mcp#connecting-to-a-running-chrome-instance.
   - **Type:** string
 
-- **`--wsEndpoint`, `-w`**
+- **`--wsEndpoint`/ `--ws-endpoint`, `-w`**
   WebSocket endpoint to connect to a running Chrome instance (e.g., ws://127.0.0.1:9222/devtools/browser/<id>). Alternative to --browserUrl.
   - **Type:** string
 
-- **`--wsHeaders`**
+- **`--wsHeaders`/ `--ws-headers`**
   Custom headers for WebSocket connection in JSON format (e.g., '{"Authorization":"Bearer token"}'). Only works with --wsEndpoint.
   - **Type:** string
 
@@ -372,7 +372,7 @@ The Chrome DevTools MCP server supports the following configuration option:
   - **Type:** boolean
   - **Default:** `false`
 
-- **`--executablePath`, `-e`**
+- **`--executablePath`/ `--executable-path`, `-e`**
   Path to custom Chrome executable.
   - **Type:** string
 
@@ -380,7 +380,7 @@ The Chrome DevTools MCP server supports the following configuration option:
   If specified, creates a temporary user-data-dir that is automatically cleaned up after the browser is closed. Defaults to false.
   - **Type:** boolean
 
-- **`--userDataDir`**
+- **`--userDataDir`/ `--user-data-dir`**
   Path to the user data directory for Chrome. Default is $HOME/.cache/chrome-devtools-mcp/chrome-profile$CHANNEL_SUFFIX_IF_NON_STABLE
   - **Type:** string
 
@@ -389,7 +389,7 @@ The Chrome DevTools MCP server supports the following configuration option:
   - **Type:** string
   - **Choices:** `stable`, `canary`, `beta`, `dev`
 
-- **`--logFile`**
+- **`--logFile`/ `--log-file`**
   Path to a file to write debug logs to. Set the env variable `DEBUG` to `*` to enable verbose logs. Useful for submitting bug reports.
   - **Type:** string
 
@@ -397,29 +397,29 @@ The Chrome DevTools MCP server supports the following configuration option:
   Initial viewport size for the Chrome instances started by the server. For example, `1280x720`. In headless mode, max size is 3840x2160px.
   - **Type:** string
 
-- **`--proxyServer`**
+- **`--proxyServer`/ `--proxy-server`**
   Proxy server configuration for Chrome passed as --proxy-server when launching the browser. See https://www.chromium.org/developers/design-documents/network-settings/ for details.
   - **Type:** string
 
-- **`--acceptInsecureCerts`**
+- **`--acceptInsecureCerts`/ `--accept-insecure-certs`**
   If enabled, ignores errors relative to self-signed and expired certificates. Use with caution.
   - **Type:** boolean
 
-- **`--chromeArg`**
+- **`--chromeArg`/ `--chrome-arg`**
   Additional arguments for Chrome. Only applies when Chrome is launched by chrome-devtools-mcp.
   - **Type:** array
 
-- **`--categoryEmulation`**
+- **`--categoryEmulation`/ `--category-emulation`**
   Set to false to exclude tools related to emulation.
   - **Type:** boolean
   - **Default:** `true`
 
-- **`--categoryPerformance`**
+- **`--categoryPerformance`/ `--category-performance`**
   Set to false to exclude tools related to performance.
   - **Type:** boolean
   - **Default:** `true`
 
-- **`--categoryNetwork`**
+- **`--categoryNetwork`/ `--category-network`**
   Set to false to exclude tools related to network.
   - **Type:** boolean
   - **Default:** `true`

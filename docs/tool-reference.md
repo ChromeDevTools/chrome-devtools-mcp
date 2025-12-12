@@ -43,8 +43,8 @@
 
 **Parameters:**
 
-- **dblClick** (boolean) _(optional)_: Set to true for double clicks. Default is false.
 - **uid** (string) **(required)**: The uid of an element on the page from the page content snapshot
+- **dblClick** (boolean) _(optional)_: Set to true for double clicks. Default is false.
 
 ---
 
@@ -161,8 +161,8 @@
 
 **Parameters:**
 
-- **timeout** (integer) _(optional)_: Maximum wait time in milliseconds. If set to 0, the default timeout will be used.
 - **url** (string) **(required)**: URL to load in a new page.
+- **timeout** (integer) _(optional)_: Maximum wait time in milliseconds. If set to 0, the default timeout will be used.
 
 ---
 
@@ -172,8 +172,8 @@
 
 **Parameters:**
 
-- **bringToFront** (boolean) _(optional)_: Whether to focus the page and bring it to the top.
 - **pageIdx** (number) **(required)**: The index of the page to select. Call [`list_pages`](#list_pages) to get available pages.
+- **bringToFront** (boolean) _(optional)_: Whether to focus the page and bring it to the top.
 
 ---
 
@@ -279,7 +279,6 @@ so returned values have to JSON-serializable.
 
 **Parameters:**
 
-- **args** (array) _(optional)_: An optional list of arguments to pass to the function.
 - **function** (string) **(required)**: A JavaScript function declaration to be executed by the tool in the currently selected page.
   Example without arguments: `() => {
   return document.title
@@ -289,6 +288,8 @@ so returned values have to JSON-serializable.
   Example with arguments: `(el) => {
   return el.innerText;
 }`
+
+- **args** (array) _(optional)_: An optional list of arguments to pass to the function.
 
 ---
 
