@@ -29,7 +29,7 @@ Using `.mcp.json` to debug while using a client:
         "/path/to/chrome-devtools-mcp.log"
       ],
       "env": {
-        "DEBUG": "mcp:log"
+        "DEBUG": "*"
       }
     }
   }
