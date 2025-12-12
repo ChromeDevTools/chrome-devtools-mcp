@@ -83,19 +83,27 @@ export class PageCollector<T> {
   }
 
   #onTargetCreated = async (target: Target) => {
-    const page = await target.page();
-    if (!page) {
-      return;
+    try {
+      const page = await target.page();
+      if (!page) {
+        return;
+      }
+      this.addPage(page);
+    } catch (err) {
+      logger('Error getting a page for a target onTargetCreated', err);
     }
-    this.addPage(page);
   };
 
   #onTargetDestroyed = async (target: Target) => {
-    const page = await target.page();
-    if (!page) {
-      return;
+    try {
+      const page = await target.page();
+      if (!page) {
+        return;
+      }
+      this.cleanupPageDestroyed(page);
+    } catch (err) {
+      logger('Error getting a page for a target onTargetDestroyed', err);
     }
-    this.cleanupPageDestroyed(page);
   };
 
   public addPage(page: Page) {
