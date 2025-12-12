@@ -13,7 +13,7 @@
 
 Start the MCP server with debugging enabled and a log file:
 
-- `DEBUG=mcp:log npx chrome-devtools-mcp@latest --log-file=/path/to/chrome-devtools-mcp.log`
+- `DEBUG=* npx chrome-devtools-mcp@latest --log-file=/path/to/chrome-devtools-mcp.log`
 
 Using `.mcp.json` to debug while using a client:
 
