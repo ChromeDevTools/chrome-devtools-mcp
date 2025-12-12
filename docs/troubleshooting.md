@@ -9,6 +9,33 @@
 - Find a specific error in the output of the `chrome-devtools-mcp` server.
   Usually, if your client is an IDE, logs would be in the Output pane.
 
+## Debugging
+
+Start the MCP server with debugging enabled and a log file:
+
+- `DEBUG=mcp:log npx chrome-devtools-mcp@latest --log-file=/path/to/chrome-devtools-mcp.log`
+
+Using `.mcp.json` to debug while using a client:
+
+```json
+{
+  "mcpServers": {
+    "chrome-devtools": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "chrome-devtools-mcp@latest",
+        "--log-file",
+        "/path/to/chrome-devtools-mcp.log"
+      ],
+      "env": {
+        "DEBUG": "mcp:log"
+      }
+    }
+  }
+}
+```
+
 ## Specific problems
 
 ### `Error [ERR_MODULE_NOT_FOUND]: Cannot find module ...`
