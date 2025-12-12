@@ -3,20 +3,36 @@
  * Copyright 2025 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
+
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
-import {emulateCpu, emulateNetwork} from '../../src/tools/emulation.js';
-import {withBrowser} from '../utils.js';
+import {emulate} from '../../src/tools/emulation.js';
+import {withMcpContext} from '../utils.js';
 
 describe('emulation', () => {
   describe('network', () => {
-    it('emulates network throttling when the throttling option is valid ', async () => {
-      await withBrowser(async (response, context) => {
-        await emulateNetwork.handler(
+    it('emulates offline network conditions', async () => {
+      await withMcpContext(async (response, context) => {
+        await emulate.handler(
           {
             params: {
-              throttlingOption: 'Slow 3G',
+              networkConditions: 'Offline',
+            },
+          },
+          response,
+          context,
+        );
+
+        assert.strictEqual(context.getNetworkConditions(), 'Offline');
+      });
+    });
+    it('emulates network throttling when the throttling option is valid', async () => {
+      await withMcpContext(async (response, context) => {
+        await emulate.handler(
+          {
+            params: {
+              networkConditions: 'Slow 3G',
             },
           },
           response,
@@ -28,11 +44,11 @@ describe('emulation', () => {
     });
 
     it('disables network emulation', async () => {
-      await withBrowser(async (response, context) => {
-        await emulateNetwork.handler(
+      await withMcpContext(async (response, context) => {
+        await emulate.handler(
           {
             params: {
-              throttlingOption: 'No emulation',
+              networkConditions: 'No emulation',
             },
           },
           response,
@@ -44,11 +60,11 @@ describe('emulation', () => {
     });
 
     it('does not set throttling when the network throttling is not one of the predefined options', async () => {
-      await withBrowser(async (response, context) => {
-        await emulateNetwork.handler(
+      await withMcpContext(async (response, context) => {
+        await emulate.handler(
           {
             params: {
-              throttlingOption: 'Slow 11G',
+              networkConditions: 'Slow 11G',
             },
           },
           response,
@@ -60,12 +76,11 @@ describe('emulation', () => {
     });
 
     it('report correctly for the currently selected page', async () => {
-      await withBrowser(async (response, context) => {
-        await context.newPage();
-        await emulateNetwork.handler(
+      await withMcpContext(async (response, context) => {
+        await emulate.handler(
           {
             params: {
-              throttlingOption: 'Slow 3G',
+              networkConditions: 'Slow 3G',
             },
           },
           response,
@@ -74,7 +89,8 @@ describe('emulation', () => {
 
         assert.strictEqual(context.getNetworkConditions(), 'Slow 3G');
 
-        context.setSelectedPageIdx(0);
+        const page = await context.newPage();
+        context.selectPage(page);
 
         assert.strictEqual(context.getNetworkConditions(), null);
       });
@@ -83,11 +99,11 @@ describe('emulation', () => {
 
   describe('cpu', () => {
     it('emulates cpu throttling when the rate is valid (1-20x)', async () => {
-      await withBrowser(async (response, context) => {
-        await emulateCpu.handler(
+      await withMcpContext(async (response, context) => {
+        await emulate.handler(
           {
             params: {
-              throttlingRate: 4,
+              cpuThrottlingRate: 4,
             },
           },
           response,
@@ -99,12 +115,12 @@ describe('emulation', () => {
     });
 
     it('disables cpu throttling', async () => {
-      await withBrowser(async (response, context) => {
+      await withMcpContext(async (response, context) => {
         context.setCpuThrottlingRate(4); // Set it to something first.
-        await emulateCpu.handler(
+        await emulate.handler(
           {
             params: {
-              throttlingRate: 1,
+              cpuThrottlingRate: 1,
             },
           },
           response,
@@ -116,12 +132,11 @@ describe('emulation', () => {
     });
 
     it('report correctly for the currently selected page', async () => {
-      await withBrowser(async (response, context) => {
-        await context.newPage();
-        await emulateCpu.handler(
+      await withMcpContext(async (response, context) => {
+        await emulate.handler(
           {
             params: {
-              throttlingRate: 4,
+              cpuThrottlingRate: 4,
             },
           },
           response,
@@ -130,9 +145,92 @@ describe('emulation', () => {
 
         assert.strictEqual(context.getCpuThrottlingRate(), 4);
 
-        context.setSelectedPageIdx(0);
+        const page = await context.newPage();
+        context.selectPage(page);
 
         assert.strictEqual(context.getCpuThrottlingRate(), 1);
+      });
+    });
+  });
+
+  describe('geolocation', () => {
+    it('emulates geolocation with latitude and longitude', async () => {
+      await withMcpContext(async (response, context) => {
+        await emulate.handler(
+          {
+            params: {
+              geolocation: {
+                latitude: 48.137154,
+                longitude: 11.576124,
+              },
+            },
+          },
+          response,
+          context,
+        );
+
+        const geolocation = context.getGeolocation();
+        assert.strictEqual(geolocation?.latitude, 48.137154);
+        assert.strictEqual(geolocation?.longitude, 11.576124);
+      });
+    });
+
+    it('clears geolocation override when geolocation is set to null', async () => {
+      await withMcpContext(async (response, context) => {
+        // First set a geolocation
+        await emulate.handler(
+          {
+            params: {
+              geolocation: {
+                latitude: 48.137154,
+                longitude: 11.576124,
+              },
+            },
+          },
+          response,
+          context,
+        );
+
+        assert.notStrictEqual(context.getGeolocation(), null);
+
+        // Then clear it by setting geolocation to null
+        await emulate.handler(
+          {
+            params: {
+              geolocation: null,
+            },
+          },
+          response,
+          context,
+        );
+
+        assert.strictEqual(context.getGeolocation(), null);
+      });
+    });
+
+    it('reports correctly for the currently selected page', async () => {
+      await withMcpContext(async (response, context) => {
+        await emulate.handler(
+          {
+            params: {
+              geolocation: {
+                latitude: 48.137154,
+                longitude: 11.576124,
+              },
+            },
+          },
+          response,
+          context,
+        );
+
+        const geolocation = context.getGeolocation();
+        assert.strictEqual(geolocation?.latitude, 48.137154);
+        assert.strictEqual(geolocation?.longitude, 11.576124);
+
+        const page = await context.newPage();
+        context.selectPage(page);
+
+        assert.strictEqual(context.getGeolocation(), null);
       });
     });
   });

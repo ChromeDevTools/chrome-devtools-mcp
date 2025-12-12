@@ -3,6 +3,7 @@
  * Copyright 2025 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
+
 import assert from 'node:assert';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -15,19 +16,21 @@ import {
   drag,
   fillForm,
   uploadFile,
+  pressKey,
 } from '../../src/tools/input.js';
+import {parseKey} from '../../src/utils/keyboard.js';
 import {serverHooks} from '../server.js';
-import {html, withBrowser} from '../utils.js';
+import {html, withMcpContext} from '../utils.js';
 
 describe('input', () => {
   const server = serverHooks();
 
   describe('click', () => {
     it('clicks', async () => {
-      await withBrowser(async (response, context) => {
+      await withMcpContext(async (response, context) => {
         const page = context.getSelectedPage();
         await page.setContent(
-          `<!DOCTYPE html><button onclick="this.innerText = 'clicked';">test`,
+          html`<button onclick="this.innerText = 'clicked';">test</button>`,
         );
         await context.createTextSnapshot();
         await click.handler(
@@ -48,10 +51,12 @@ describe('input', () => {
       });
     });
     it('double clicks', async () => {
-      await withBrowser(async (response, context) => {
+      await withMcpContext(async (response, context) => {
         const page = context.getSelectedPage();
         await page.setContent(
-          `<!DOCTYPE html><button ondblclick="this.innerText = 'dblclicked';">test`,
+          html`<button ondblclick="this.innerText = 'dblclicked';"
+            >test</button
+          >`,
         );
         await context.createTextSnapshot();
         await click.handler(
@@ -84,7 +89,7 @@ describe('input', () => {
         res.end();
       });
 
-      await withBrowser(async (response, context) => {
+      await withMcpContext(async (response, context) => {
         const page = context.getSelectedPage();
         await page.goto(server.getRoute('/link'));
         await context.createTextSnapshot();
@@ -126,7 +131,7 @@ describe('input', () => {
           </script>
         `,
       );
-      await withBrowser(async (response, context) => {
+      await withMcpContext(async (response, context) => {
         const page = context.getSelectedPage();
         await page.goto(server.getRoute('/unstable'));
         await context.createTextSnapshot();
@@ -153,10 +158,10 @@ describe('input', () => {
 
   describe('hover', () => {
     it('hovers', async () => {
-      await withBrowser(async (response, context) => {
+      await withMcpContext(async (response, context) => {
         const page = context.getSelectedPage();
         await page.setContent(
-          `<!DOCTYPE html><button onmouseover="this.innerText = 'hovered';">test`,
+          html`<button onmouseover="this.innerText = 'hovered';">test</button>`,
         );
         await context.createTextSnapshot();
         await hover.handler(
@@ -180,9 +185,9 @@ describe('input', () => {
 
   describe('fill', () => {
     it('fills out an input', async () => {
-      await withBrowser(async (response, context) => {
+      await withMcpContext(async (response, context) => {
         const page = context.getSelectedPage();
-        await page.setContent(`<!DOCTYPE html><input>`);
+        await page.setContent(html`<input />`);
         await context.createTextSnapshot();
         await fill.handler(
           {
@@ -202,31 +207,73 @@ describe('input', () => {
         assert.ok(await page.$('text/test'));
       });
     });
+
+    it('fills out a select by text', async () => {
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedPage();
+        await page.setContent(
+          html`<select
+            ><option value="v1">one</option
+            ><option value="v2">two</option></select
+          >`,
+        );
+        await context.createTextSnapshot();
+        await fill.handler(
+          {
+            params: {
+              uid: '1_1',
+              value: 'two',
+            },
+          },
+          response,
+          context,
+        );
+        assert.strictEqual(
+          response.responseLines[0],
+          'Successfully filled out the element',
+        );
+        assert.ok(response.includeSnapshot);
+        const selectedValue = await page.evaluate(
+          () => document.querySelector('select')!.value,
+        );
+        assert.strictEqual(selectedValue, 'v2');
+      });
+    });
   });
 
   describe('drags', () => {
     it('drags one element onto another', async () => {
-      await withBrowser(async (response, context) => {
+      await withMcpContext(async (response, context) => {
         const page = context.getSelectedPage();
-        await page.setContent(`<!DOCTYPE html>
-<div role="button" id="drag" draggable="true">drag me</div>
-<div id="drop" aria-label="drop"
-  style="width: 100px; height: 100px; border: 1px solid black;" ondrop="this.innerText = 'dropped';">
-</div>
-<script>
-    drag.addEventListener("dragstart", (event) => {
-        event.dataTransfer.setData("text/plain", event.target.id);
-    });
-    drop.addEventListener("dragover", (event) => {
-        event.preventDefault();
-        event.dataTransfer.dropEffect = "move";
-    });
-    drop.addEventListener("drop", (event) => {
-        event.preventDefault();
-        const data = event.dataTransfer.getData("text/plain");
-        event.target.appendChild(document.getElementById(data));
-    });
-</script>`);
+        await page.setContent(
+          html`<div
+              role="button"
+              id="drag"
+              draggable="true"
+              >drag me</div
+            >
+            <div
+              id="drop"
+              aria-label="drop"
+              style="width: 100px; height: 100px; border: 1px solid black;"
+              ondrop="this.innerText = 'dropped';"
+            >
+            </div>
+            <script>
+              drag.addEventListener('dragstart', event => {
+                event.dataTransfer.setData('text/plain', event.target.id);
+              });
+              drop.addEventListener('dragover', event => {
+                event.preventDefault();
+                event.dataTransfer.dropEffect = 'move';
+              });
+              drop.addEventListener('drop', event => {
+                event.preventDefault();
+                const data = event.dataTransfer.getData('text/plain');
+                event.target.appendChild(document.getElementById(data));
+              });
+            </script>`,
+        );
         await context.createTextSnapshot();
         await drag.handler(
           {
@@ -250,14 +297,26 @@ describe('input', () => {
 
   describe('fill form', () => {
     it('successfully fills out the form', async () => {
-      await withBrowser(async (response, context) => {
+      await withMcpContext(async (response, context) => {
         const page = context.getSelectedPage();
-        await page.setContent(`<!DOCTYPE html>
-<form>
-  <label>username<input name=username type="text"/></label>
-  <label>email<input name=email type="text"/></label>
-  <input type=submit value="Submit">
-</form>`);
+        await page.setContent(
+          html`<form>
+            <label
+              >username<input
+                name="username"
+                type="text"
+            /></label>
+            <label
+              >email<input
+                name="email"
+                type="text"
+            /></label>
+            <input
+              type="submit"
+              value="Submit"
+            />
+          </form>`,
+        );
         await context.createTextSnapshot();
         await fillForm.handler(
           {
@@ -302,12 +361,16 @@ describe('input', () => {
       const testFilePath = path.join(process.cwd(), 'test.txt');
       await fs.writeFile(testFilePath, 'test file content');
 
-      await withBrowser(async (response, context) => {
+      await withMcpContext(async (response, context) => {
         const page = context.getSelectedPage();
-        await page.setContent(`<!DOCTYPE html>
-<form>
-  <input type="file" id="file-input">
-</form>`);
+        await page.setContent(
+          html`<form>
+            <input
+              type="file"
+              id="file-input"
+            />
+          </form>`,
+        );
         await context.createTextSnapshot();
         await uploadFile.handler(
           {
@@ -333,16 +396,23 @@ describe('input', () => {
       const testFilePath = path.join(process.cwd(), 'test.txt');
       await fs.writeFile(testFilePath, 'test file content');
 
-      await withBrowser(async (response, context) => {
+      await withMcpContext(async (response, context) => {
         const page = context.getSelectedPage();
-        await page.setContent(`<!DOCTYPE html>
-<button id="file-chooser-button">Upload file</button>
-<input type="file" id="file-input" style="display: none;">
-<script>
-  document.getElementById('file-chooser-button').addEventListener('click', () => {
-    document.getElementById('file-input').click();
-  });
-</script>`);
+        await page.setContent(
+          html`<button id="file-chooser-button">Upload file</button>
+            <input
+              type="file"
+              id="file-input"
+              style="display: none;"
+            />
+            <script>
+              document
+                .getElementById('file-chooser-button')
+                .addEventListener('click', () => {
+                  document.getElementById('file-input').click();
+                });
+            </script>`,
+        );
         await context.createTextSnapshot();
         await uploadFile.handler(
           {
@@ -373,9 +443,9 @@ describe('input', () => {
       const testFilePath = path.join(process.cwd(), 'test.txt');
       await fs.writeFile(testFilePath, 'test file content');
 
-      await withBrowser(async (response, context) => {
+      await withMcpContext(async (response, context) => {
         const page = context.getSelectedPage();
-        await page.setContent(`<!DOCTYPE html><div>Not a file input</div>`);
+        await page.setContent(html`<div>Not a file input</div>`);
         await context.createTextSnapshot();
 
         await assert.rejects(
@@ -396,9 +466,71 @@ describe('input', () => {
         );
 
         assert.strictEqual(response.responseLines.length, 0);
-        assert.strictEqual(response.includeSnapshot, false);
+        assert.strictEqual(response.snapshotParams, undefined);
 
         await fs.unlink(testFilePath);
+      });
+    });
+  });
+
+  describe('press_key', () => {
+    it('parses keys', () => {
+      assert.deepStrictEqual(parseKey('Shift+A'), ['A', 'Shift']);
+      assert.deepStrictEqual(parseKey('Shift++'), ['+', 'Shift']);
+      assert.deepStrictEqual(parseKey('Control+Shift++'), [
+        '+',
+        'Control',
+        'Shift',
+      ]);
+      assert.deepStrictEqual(parseKey('Shift'), ['Shift']);
+      assert.deepStrictEqual(parseKey('KeyA'), ['KeyA']);
+    });
+    it('throws on empty key', () => {
+      assert.throws(() => {
+        parseKey('');
+      });
+    });
+    it('throws on invalid key', () => {
+      assert.throws(() => {
+        parseKey('aaaaa');
+      });
+    });
+    it('throws on multiple keys', () => {
+      assert.throws(() => {
+        parseKey('Shift+Shift');
+      });
+    });
+
+    it('processes press_key', async () => {
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedPage();
+        await page.setContent(
+          html`<script>
+            logs = [];
+            document.addEventListener('keydown', e => logs.push('d' + e.key));
+            document.addEventListener('keyup', e => logs.push('u' + e.key));
+          </script>`,
+        );
+        await context.createTextSnapshot();
+
+        await pressKey.handler(
+          {
+            params: {
+              key: 'Control+Shift+C',
+            },
+          },
+          response,
+          context,
+        );
+
+        assert.deepStrictEqual(await page.evaluate('logs'), [
+          'dControl',
+          'dShift',
+          'dC',
+          'uC',
+          'uShift',
+          'uControl',
+        ]);
       });
     });
   });

@@ -4,19 +4,22 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {Dialog, ElementHandle, Page} from 'puppeteer-core';
-import z from 'zod';
-
+import type {TextSnapshotNode, GeolocationOptions} from '../McpContext.js';
+import {zod} from '../third_party/index.js';
+import type {Dialog, ElementHandle, Page} from '../third_party/index.js';
 import type {TraceResult} from '../trace-processing/parse.js';
+import type {PaginationOptions} from '../utils/types.js';
 
-import type {ToolCategories} from './categories.js';
+import type {ToolCategory} from './categories.js';
 
-export interface ToolDefinition<Schema extends z.ZodRawShape = z.ZodRawShape> {
+export interface ToolDefinition<
+  Schema extends zod.ZodRawShape = zod.ZodRawShape,
+> {
   name: string;
   description: string;
   annotations: {
     title?: string;
-    category: ToolCategories;
+    category: ToolCategory;
     /**
      * If true, the tool does not modify its environment.
      */
@@ -30,8 +33,8 @@ export interface ToolDefinition<Schema extends z.ZodRawShape = z.ZodRawShape> {
   ) => Promise<void>;
 }
 
-export interface Request<Schema extends z.ZodRawShape> {
-  params: z.objectOutputType<Schema, z.ZodTypeAny>;
+export interface Request<Schema extends zod.ZodRawShape> {
+  params: zod.objectOutputType<Schema, zod.ZodTypeAny>;
 }
 
 export interface ImageContentData {
@@ -39,17 +42,40 @@ export interface ImageContentData {
   mimeType: string;
 }
 
+export interface SnapshotParams {
+  verbose?: boolean;
+  filePath?: string;
+}
+
+export interface DevToolsData {
+  cdpRequestId?: string;
+  cdpBackendNodeId?: number;
+}
+
 export interface Response {
   appendResponseLine(value: string): void;
   setIncludePages(value: boolean): void;
   setIncludeNetworkRequests(
     value: boolean,
-    options?: {pageSize?: number; pageIdx?: number; resourceTypes?: string[]},
+    options?: PaginationOptions & {
+      resourceTypes?: string[];
+      includePreservedRequests?: boolean;
+      networkRequestIdInDevToolsUI?: number;
+    },
   ): void;
-  setIncludeConsoleData(value: boolean): void;
-  setIncludeSnapshot(value: boolean): void;
+  setIncludeConsoleData(
+    value: boolean,
+    options?: PaginationOptions & {
+      types?: string[];
+      includePreservedMessages?: boolean;
+    },
+  ): void;
+  includeSnapshot(params?: SnapshotParams): void;
   attachImage(value: ImageContentData): void;
-  attachNetworkRequest(url: string): void;
+  attachNetworkRequest(reqid: number): void;
+  attachConsoleMessage(msgid: number): void;
+  // Allows re-using DevTools data queried by some tools.
+  attachDevToolsData(data: DevToolsData): void;
 }
 
 /**
@@ -64,12 +90,15 @@ export type Context = Readonly<{
   getDialog(): Dialog | undefined;
   clearDialog(): void;
   getPageByIdx(idx: number): Page;
+  isPageSelected(page: Page): boolean;
   newPage(): Promise<Page>;
   closePage(pageIdx: number): Promise<void>;
-  setSelectedPageIdx(idx: number): void;
+  selectPage(page: Page): void;
   getElementByUid(uid: string): Promise<ElementHandle<Element>>;
+  getAXNodeByUid(uid: string): TextSnapshotNode | undefined;
   setNetworkConditions(conditions: string | null): void;
   setCpuThrottlingRate(rate: number): void;
+  setGeolocation(geolocation: GeolocationOptions | null): void;
   saveTemporaryFile(
     data: Uint8Array<ArrayBufferLike>,
     mimeType: 'image/png' | 'image/jpeg' | 'image/webp',
@@ -79,9 +108,19 @@ export type Context = Readonly<{
     filename: string,
   ): Promise<{filename: string}>;
   waitForEventsAfterAction(action: () => Promise<unknown>): Promise<void>;
+  waitForTextOnPage(text: string, timeout?: number): Promise<Element>;
+  getDevToolsData(): Promise<DevToolsData>;
+  /**
+   * Returns a reqid for a cdpRequestId.
+   */
+  resolveCdpRequestId(cdpRequestId: string): number | undefined;
+  /**
+   * Returns a reqid for a cdpRequestId.
+   */
+  resolveCdpElementId(cdpBackendNodeId: number): string | undefined;
 }>;
 
-export function defineTool<Schema extends z.ZodRawShape>(
+export function defineTool<Schema extends zod.ZodRawShape>(
   definition: ToolDefinition<Schema>,
 ) {
   return definition;
@@ -91,7 +130,7 @@ export const CLOSE_PAGE_ERROR =
   'The last open page cannot be closed. It is fine to keep it open.';
 
 export const timeoutSchema = {
-  timeout: z
+  timeout: zod
     .number()
     .int()
     .optional()

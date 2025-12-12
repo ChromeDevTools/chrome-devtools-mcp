@@ -4,73 +4,97 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {PredefinedNetworkConditions} from 'puppeteer-core';
-import z from 'zod';
+import {zod, PredefinedNetworkConditions} from '../third_party/index.js';
 
-import {ToolCategories} from './categories.js';
+import {ToolCategory} from './categories.js';
 import {defineTool} from './ToolDefinition.js';
 
 const throttlingOptions: [string, ...string[]] = [
   'No emulation',
+  'Offline',
   ...Object.keys(PredefinedNetworkConditions),
 ];
 
-export const emulateNetwork = defineTool({
-  name: 'emulate_network',
-  description: `Emulates network conditions such as throttling on the selected page.`,
+export const emulate = defineTool({
+  name: 'emulate',
+  description: `Emulates various features on the selected page.`,
   annotations: {
-    category: ToolCategories.EMULATION,
+    category: ToolCategory.EMULATION,
     readOnlyHint: false,
   },
   schema: {
-    throttlingOption: z
+    networkConditions: zod
       .enum(throttlingOptions)
+      .optional()
       .describe(
-        `The network throttling option to emulate. Available throttling options are: ${throttlingOptions.join(', ')}. Set to "No emulation" to disable.`,
+        `Throttle network. Set to "No emulation" to disable. If omitted, conditions remain unchanged.`,
       ),
-  },
-  handler: async (request, _response, context) => {
-    const page = context.getSelectedPage();
-    const conditions = request.params.throttlingOption;
-
-    if (conditions === 'No emulation') {
-      await page.emulateNetworkConditions(null);
-      context.setNetworkConditions(null);
-      return;
-    }
-
-    if (conditions in PredefinedNetworkConditions) {
-      const networkCondition =
-        PredefinedNetworkConditions[
-          conditions as keyof typeof PredefinedNetworkConditions
-        ];
-      await page.emulateNetworkConditions(networkCondition);
-      context.setNetworkConditions(conditions);
-    }
-  },
-});
-
-export const emulateCpu = defineTool({
-  name: 'emulate_cpu',
-  description: `Emulates CPU throttling by slowing down the selected page's execution.`,
-  annotations: {
-    category: ToolCategories.EMULATION,
-    readOnlyHint: false,
-  },
-  schema: {
-    throttlingRate: z
+    cpuThrottlingRate: zod
       .number()
       .min(1)
       .max(20)
+      .optional()
       .describe(
-        'The CPU throttling rate representing the slowdown factor 1-20x. Set the rate to 1 to disable throttling',
+        'Represents the CPU slowdown factor. Set the rate to 1 to disable throttling. If omitted, throttling remains unchanged.',
+      ),
+    geolocation: zod
+      .object({
+        latitude: zod
+          .number()
+          .min(-90)
+          .max(90)
+          .describe('Latitude between -90 and 90.'),
+        longitude: zod
+          .number()
+          .min(-180)
+          .max(180)
+          .describe('Longitude between -180 and 180.'),
+      })
+      .nullable()
+      .optional()
+      .describe(
+        'Geolocation to emulate. Set to null to clear the geolocation override.',
       ),
   },
   handler: async (request, _response, context) => {
     const page = context.getSelectedPage();
-    const {throttlingRate} = request.params;
+    const {networkConditions, cpuThrottlingRate, geolocation} = request.params;
 
-    await page.emulateCPUThrottling(throttlingRate);
-    context.setCpuThrottlingRate(throttlingRate);
+    if (networkConditions) {
+      if (networkConditions === 'No emulation') {
+        await page.emulateNetworkConditions(null);
+        context.setNetworkConditions(null);
+      } else if (networkConditions === 'Offline') {
+        await page.emulateNetworkConditions({
+          offline: true,
+          download: 0,
+          upload: 0,
+          latency: 0,
+        });
+        context.setNetworkConditions('Offline');
+      } else if (networkConditions in PredefinedNetworkConditions) {
+        const networkCondition =
+          PredefinedNetworkConditions[
+            networkConditions as keyof typeof PredefinedNetworkConditions
+          ];
+        await page.emulateNetworkConditions(networkCondition);
+        context.setNetworkConditions(networkConditions);
+      }
+    }
+
+    if (cpuThrottlingRate) {
+      await page.emulateCPUThrottling(cpuThrottlingRate);
+      context.setCpuThrottlingRate(cpuThrottlingRate);
+    }
+
+    if (geolocation !== undefined) {
+      if (geolocation === null) {
+        await page.setGeolocation({latitude: 0, longitude: 0});
+        context.setGeolocation(null);
+      } else {
+        await page.setGeolocation(geolocation);
+        context.setGeolocation(geolocation);
+      }
+    }
   },
 });

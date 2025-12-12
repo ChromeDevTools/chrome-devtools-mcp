@@ -3,6 +3,7 @@
  * Copyright 2025 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
+
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
@@ -10,14 +11,19 @@ import sinon from 'sinon';
 
 import type {TraceResult} from '../src/trace-processing/parse.js';
 
-import {withBrowser} from './utils.js';
+import {html, withMcpContext} from './utils.js';
 
 describe('McpContext', () => {
   it('list pages', async () => {
-    await withBrowser(async (_response, context) => {
+    await withMcpContext(async (_response, context) => {
       const page = context.getSelectedPage();
-      await page.setContent(`<!DOCTYPE html>
-<button>Click me</button><input type="text" value="Input">`);
+      await page.setContent(
+        html`<button>Click me</button
+          ><input
+            type="text"
+            value="Input"
+          />`,
+      );
       await context.createTextSnapshot();
       assert.ok(await context.getElementByUid('1_1'));
       await context.createTextSnapshot();
@@ -34,7 +40,7 @@ describe('McpContext', () => {
   });
 
   it('can store and retrieve performance traces', async () => {
-    await withBrowser(async (_response, context) => {
+    await withMcpContext(async (_response, context) => {
       const fakeTrace1 = {} as unknown as TraceResult;
       const fakeTrace2 = {} as unknown as TraceResult;
       context.storeTraceRecording(fakeTrace1);
@@ -44,7 +50,7 @@ describe('McpContext', () => {
   });
 
   it('should update default timeout when cpu throttling changes', async () => {
-    await withBrowser(async (_response, context) => {
+    await withMcpContext(async (_response, context) => {
       const page = await context.newPage();
       const timeoutBefore = page.getDefaultTimeout();
       context.setCpuThrottlingRate(2);
@@ -54,7 +60,7 @@ describe('McpContext', () => {
   });
 
   it('should update default timeout when network conditions changes', async () => {
-    await withBrowser(async (_response, context) => {
+    await withMcpContext(async (_response, context) => {
       const page = await context.newPage();
       const timeoutBefore = page.getDefaultNavigationTimeout();
       context.setNetworkConditions('Slow 3G');
@@ -64,7 +70,7 @@ describe('McpContext', () => {
   });
 
   it('should call waitForEventsAfterAction with correct multipliers', async () => {
-    await withBrowser(async (_response, context) => {
+    await withMcpContext(async (_response, context) => {
       const page = await context.newPage();
 
       context.setCpuThrottlingRate(2);
@@ -77,5 +83,22 @@ describe('McpContext', () => {
 
       sinon.assert.calledWithExactly(stub, page, 2, 10);
     });
+  });
+
+  it('should should detect open DevTools pages', async () => {
+    await withMcpContext(
+      async (_response, context) => {
+        const page = await context.newPage();
+        // TODO: we do not know when the CLI flag to auto open DevTools will run
+        // so we need this until
+        // https://github.com/puppeteer/puppeteer/issues/14368 is there.
+        await new Promise(resolve => setTimeout(resolve, 5000));
+        await context.createPagesSnapshot();
+        assert.ok(context.getDevToolsPage(page));
+      },
+      {
+        autoOpenDevTools: true,
+      },
+    );
   });
 });

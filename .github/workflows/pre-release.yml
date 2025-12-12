@@ -1,0 +1,32 @@
+name: Pre-release
+
+permissions: read-all
+
+on:
+  push:
+    branches:
+      - release-please-*
+
+jobs:
+  pre-release:
+    name: 'Verify MCP server schema unchanged'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          fetch-depth: 2
+
+      - name: Set up Node.js
+        uses: actions/setup-node@395ad3262231945c25e8478fd5baf05154b1d79f # v6.1.0
+        with:
+          cache: npm
+          node-version-file: '.nvmrc'
+
+      - name: Install MCP Publisher
+        run: |
+          export OS=$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')
+          curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_${OS}.tar.gz" | tar xz mcp-publisher
+
+      - name: Verify server.json
+        run: npm run verify-server-json-version

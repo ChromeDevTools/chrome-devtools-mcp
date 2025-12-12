@@ -4,19 +4,87 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {Options as YargsOptions} from 'yargs';
-import yargs from 'yargs';
-import {hideBin} from 'yargs/helpers';
+import type {YargsOptions} from './third_party/index.js';
+import {yargs, hideBin} from './third_party/index.js';
 
 export const cliOptions = {
+  autoConnect: {
+    type: 'boolean',
+    description:
+      'If specified, automatically connects to a browser (Chrome 145+) running in the user data directory identified by the channel param. Requires remote debugging being enabled in Chrome here: chrome://inspect/#remote-debugging.',
+    conflicts: ['isolated', 'executablePath'],
+    default: false,
+    coerce: (value: boolean | undefined) => {
+      if (!value) {
+        return;
+      }
+      return value;
+    },
+  },
   browserUrl: {
     type: 'string',
     description:
-      'Connect to a running Chrome instance using port forwarding. For more details see: https://developer.chrome.com/docs/devtools/remote-debugging/local-server.',
+      'Connect to a running, debuggable Chrome instance (e.g. `http://127.0.0.1:9222`). For more details see: https://github.com/ChromeDevTools/chrome-devtools-mcp#connecting-to-a-running-chrome-instance.',
     alias: 'u',
-    coerce: (url: string) => {
-      new URL(url);
+    conflicts: 'wsEndpoint',
+    coerce: (url: string | undefined) => {
+      if (!url) {
+        return;
+      }
+      try {
+        new URL(url);
+      } catch {
+        throw new Error(`Provided browserUrl ${url} is not valid URL.`);
+      }
       return url;
+    },
+  },
+  wsEndpoint: {
+    type: 'string',
+    description:
+      'WebSocket endpoint to connect to a running Chrome instance (e.g., ws://127.0.0.1:9222/devtools/browser/<id>). Alternative to --browserUrl.',
+    alias: 'w',
+    conflicts: 'browserUrl',
+    coerce: (url: string | undefined) => {
+      if (!url) {
+        return;
+      }
+      try {
+        const parsed = new URL(url);
+        if (parsed.protocol !== 'ws:' && parsed.protocol !== 'wss:') {
+          throw new Error(
+            `Provided wsEndpoint ${url} must use ws:// or wss:// protocol.`,
+          );
+        }
+        return url;
+      } catch (error) {
+        if ((error as Error).message.includes('ws://')) {
+          throw error;
+        }
+        throw new Error(`Provided wsEndpoint ${url} is not valid URL.`);
+      }
+    },
+  },
+  wsHeaders: {
+    type: 'string',
+    description:
+      'Custom headers for WebSocket connection in JSON format (e.g., \'{"Authorization":"Bearer token"}\'). Only works with --wsEndpoint.',
+    implies: 'wsEndpoint',
+    coerce: (val: string | undefined) => {
+      if (!val) {
+        return;
+      }
+      try {
+        const parsed = JSON.parse(val);
+        if (typeof parsed !== 'object' || Array.isArray(parsed)) {
+          throw new Error('Headers must be a JSON object');
+        }
+        return parsed as Record<string, string>;
+      } catch (error) {
+        throw new Error(
+          `Invalid JSON for wsHeaders: ${(error as Error).message}`,
+        );
+      }
     },
   },
   headless: {
@@ -27,28 +95,26 @@ export const cliOptions = {
   executablePath: {
     type: 'string',
     description: 'Path to custom Chrome executable.',
-    conflicts: 'browserUrl',
+    conflicts: ['browserUrl', 'wsEndpoint'],
     alias: 'e',
   },
   isolated: {
     type: 'boolean',
     description:
-      'If specified, creates a temporary user-data-dir that is automatically cleaned up after the browser is closed.',
-    default: false,
+      'If specified, creates a temporary user-data-dir that is automatically cleaned up after the browser is closed. Defaults to false.',
   },
-  customDevtools: {
+  userDataDir: {
     type: 'string',
-    description: 'Path to custom DevTools.',
-    hidden: true,
-    conflicts: 'browserUrl',
-    alias: 'd',
+    description:
+      'Path to the user data directory for Chrome. Default is $HOME/.cache/chrome-devtools-mcp/chrome-profile$CHANNEL_SUFFIX_IF_NON_STABLE',
+    conflicts: ['browserUrl', 'wsEndpoint', 'isolated'],
   },
   channel: {
     type: 'string',
     description:
       'Specify a different Chrome channel that should be used. The default is the stable channel version.',
     choices: ['stable', 'canary', 'beta', 'dev'] as const,
-    conflicts: ['browserUrl', 'executablePath'],
+    conflicts: ['browserUrl', 'wsEndpoint', 'executablePath'],
   },
   logFile: {
     type: 'string',
@@ -58,7 +124,7 @@ export const cliOptions = {
   viewport: {
     type: 'string',
     describe:
-      'Initial viewport size for the Chrome instances started by the server. For example, `1280x720`',
+      'Initial viewport size for the Chrome instances started by the server. For example, `1280x720`. In headless mode, max size is 3840x2160px.',
     coerce: (arg: string | undefined) => {
       if (arg === undefined) {
         return;
@@ -96,6 +162,37 @@ export const cliOptions = {
       return arg.split(',').map(a => a.trim());
     },
   },
+  experimentalDevtools: {
+    type: 'boolean',
+    describe: 'Whether to enable automation over DevTools targets',
+    hidden: true,
+  },
+  experimentalIncludeAllPages: {
+    type: 'boolean',
+    describe:
+      'Whether to include all kinds of pages such as webviews or background pages as pages.',
+    hidden: true,
+  },
+  chromeArg: {
+    type: 'array',
+    describe:
+      'Additional arguments for Chrome. Only applies when Chrome is launched by chrome-devtools-mcp.',
+  },
+  categoryEmulation: {
+    type: 'boolean',
+    default: true,
+    describe: 'Set to false to exclude tools related to emulation.',
+  },
+  categoryPerformance: {
+    type: 'boolean',
+    default: true,
+    describe: 'Set to false to exclude tools related to performance.',
+  },
+  categoryNetwork: {
+    type: 'boolean',
+    default: true,
+    describe: 'Set to false to exclude tools related to network.',
+  },
 } satisfies Record<string, YargsOptions>;
 
 export function parseArguments(version: string, argv = process.argv) {
@@ -105,7 +202,12 @@ export function parseArguments(version: string, argv = process.argv) {
     .check(args => {
       // We can't set default in the options else
       // Yargs will complain
-      if (!args.channel && !args.browserUrl && !args.executablePath) {
+      if (
+        !args.channel &&
+        !args.browserUrl &&
+        !args.wsEndpoint &&
+        !args.executablePath
+      ) {
         args.channel = 'stable';
       }
       return true;
@@ -113,7 +215,15 @@ export function parseArguments(version: string, argv = process.argv) {
     .example([
       [
         '$0 --browserUrl http://127.0.0.1:9222',
-        'Connect to an existing browser instance',
+        'Connect to an existing browser instance via HTTP',
+      ],
+      [
+        '$0 --wsEndpoint ws://127.0.0.1:9222/devtools/browser/abc123',
+        'Connect to an existing browser instance via WebSocket',
+      ],
+      [
+        `$0 --wsEndpoint ws://127.0.0.1:9222/devtools/browser/abc123 --wsHeaders '{"Authorization":"Bearer token"}'`,
+        'Connect via WebSocket with custom headers',
       ],
       ['$0 --channel beta', 'Use Chrome Beta installed on this system'],
       ['$0 --channel canary', 'Use Chrome Canary installed on this system'],
@@ -133,6 +243,28 @@ export function parseArguments(version: string, argv = process.argv) {
       [
         '$0 --stealth --chromeArgs="--window-size=1920,1080"',
         'Use stealth mode with custom window size',
+      ],
+      [
+        `$0 --chrome-arg='--no-sandbox' --chrome-arg='--disable-setuid-sandbox'`,
+        'Launch Chrome without sandboxes. Use with caution.',
+      ],
+      ['$0 --no-category-emulation', 'Disable tools in the emulation category'],
+      [
+        '$0 --no-category-performance',
+        'Disable tools in the performance category',
+      ],
+      ['$0 --no-category-network', 'Disable tools in the network category'],
+      [
+        '$0 --user-data-dir=/tmp/user-data-dir',
+        'Use a custom user data directory',
+      ],
+      [
+        '$0 --auto-connect',
+        'Connect to a stable Chrome instance (Chrome 145+) running instead of launching a new instance',
+      ],
+      [
+        '$0 --auto-connect --channel=canary',
+        'Connect to a canary Chrome instance (Chrome 145+) running instead of launching a new instance',
       ],
     ]);
 

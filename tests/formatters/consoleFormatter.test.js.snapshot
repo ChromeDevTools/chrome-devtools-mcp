@@ -1,0 +1,46 @@
+exports[`consoleFormatter > formatConsoleEventShort > formats a console.log message 1`] = `
+msgid=1 [log] Hello, world! (0 args)
+`;
+
+exports[`consoleFormatter > formatConsoleEventShort > formats a console.log message with multiple arguments 1`] = `
+msgid=3 [log] Processing file: (2 args)
+`;
+
+exports[`consoleFormatter > formatConsoleEventShort > formats a console.log message with one argument 1`] = `
+msgid=2 [log] Processing file: (1 args)
+`;
+
+exports[`consoleFormatter > formatConsoleEventVerbose > formats a console.error message 1`] = `
+ID: 4
+Message: error> Something went wrong
+`;
+
+exports[`consoleFormatter > formatConsoleEventVerbose > formats a console.log message 1`] = `
+ID: 1
+Message: log> Hello, world!
+`;
+
+exports[`consoleFormatter > formatConsoleEventVerbose > formats a console.log message with multiple arguments 1`] = `
+ID: 3
+Message: log> Processing file:
+### Arguments
+Arg #0: file.txt
+Arg #1: another file
+`;
+
+exports[`consoleFormatter > formatConsoleEventVerbose > formats a console.log message with one argument 1`] = `
+ID: 2
+Message: log> Processing file:
+### Arguments
+Arg #0: file.txt
+`;
+
+exports[`consoleFormatter > formats a console.log message with issue type 1`] = `
+ID: 5
+Message: issue> Mock Issue Title
+
+This is a mock issue description
+Learn more:
+[Learn more](http://example.com/learnmore)
+[Learn more 2](http://example.com/another-learnmore)
+`;

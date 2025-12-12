@@ -4,10 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {Page} from 'puppeteer-core';
-import z from 'zod';
-
 import {logger} from '../logger.js';
+import {zod} from '../third_party/index.js';
+import type {Page} from '../third_party/index.js';
 import type {InsightName} from '../trace-processing/parse.js';
 import {
   getInsightOutput,
@@ -16,7 +15,7 @@ import {
   traceResultIsSuccess,
 } from '../trace-processing/parse.js';
 
-import {ToolCategories} from './categories.js';
+import {ToolCategory} from './categories.js';
 import type {Context, Response} from './ToolDefinition.js';
 import {defineTool} from './ToolDefinition.js';
 
@@ -25,16 +24,16 @@ export const startTrace = defineTool({
   description:
     'Starts a performance trace recording on the selected page. This can be used to look for performance problems and insights to improve the performance of the page. It will also report Core Web Vital (CWV) scores for the page.',
   annotations: {
-    category: ToolCategories.PERFORMANCE,
+    category: ToolCategory.PERFORMANCE,
     readOnlyHint: true,
   },
   schema: {
-    reload: z
+    reload: zod
       .boolean()
       .describe(
         'Determines if, once tracing has started, the page should be automatically reloaded.',
       ),
-    autoStop: z
+    autoStop: zod
       .boolean()
       .describe(
         'Determines if the trace recording should be automatically stopped.',
@@ -106,12 +105,12 @@ export const stopTrace = defineTool({
   description:
     'Stops the active performance trace recording on the selected page.',
   annotations: {
-    category: ToolCategories.PERFORMANCE,
+    category: ToolCategory.PERFORMANCE,
     readOnlyHint: true,
   },
   schema: {},
   handler: async (_request, response, context) => {
-    if (!context.isRunningPerformanceTrace) {
+    if (!context.isRunningPerformanceTrace()) {
       return;
     }
     const page = context.getSelectedPage();
@@ -122,13 +121,18 @@ export const stopTrace = defineTool({
 export const analyzeInsight = defineTool({
   name: 'performance_analyze_insight',
   description:
-    'Provides more detailed information on a specific Performance Insight that was highlighted in the results of a trace recording.',
+    'Provides more detailed information on a specific Performance Insight of an insight set that was highlighted in the results of a trace recording.',
   annotations: {
-    category: ToolCategories.PERFORMANCE,
+    category: ToolCategory.PERFORMANCE,
     readOnlyHint: true,
   },
   schema: {
-    insightName: z
+    insightSetId: zod
+      .string()
+      .describe(
+        'The id for the specific insight set. Only use the ids given in the "Available insight sets" list.',
+      ),
+    insightName: zod
       .string()
       .describe(
         'The name of the Insight you want more information on. For example: "DocumentLatency" or "LCPBreakdown"',
@@ -145,6 +149,7 @@ export const analyzeInsight = defineTool({
 
     const insightOutput = getInsightOutput(
       lastRecording,
+      request.params.insightSetId,
       request.params.insightName as InsightName,
     );
     if ('error' in insightOutput) {
@@ -167,9 +172,6 @@ async function stopTracingAndAppendOutput(
     response.appendResponseLine('The performance trace has been stopped.');
     if (traceResultIsSuccess(result)) {
       context.storeTraceRecording(result);
-      response.appendResponseLine(
-        'Here is a high level summary of the trace and the Insights that were found:',
-      );
       const traceSummaryText = getTraceSummary(result);
       response.appendResponseLine(traceSummaryText);
     } else {

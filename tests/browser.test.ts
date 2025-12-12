@@ -3,6 +3,7 @@
  * Copyright 2025 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
+
 import assert from 'node:assert';
 import os from 'node:os';
 import path from 'node:path';
@@ -10,7 +11,7 @@ import {describe, it} from 'node:test';
 
 import {executablePath} from 'puppeteer';
 
-import {launch} from '../src/browser.js';
+import {ensureBrowserConnected, launch} from '../src/browser.js';
 
 describe('browser', () => {
   it('cannot launch multiple times with the same profile', async () => {
@@ -21,6 +22,7 @@ describe('browser', () => {
       isolated: false,
       userDataDir: folderPath,
       executablePath: executablePath(),
+      devtools: false,
     });
     try {
       try {
@@ -29,6 +31,7 @@ describe('browser', () => {
           isolated: false,
           userDataDir: folderPath,
           executablePath: executablePath(),
+          devtools: false,
         });
         await browser2.close();
         assert.fail('not reached');
@@ -52,9 +55,10 @@ describe('browser', () => {
       userDataDir: folderPath,
       executablePath: executablePath(),
       viewport: {
-        width: 700,
-        height: 500,
+        width: 1501,
+        height: 801,
       },
+      devtools: false,
     });
     try {
       const [page] = await browser.pages();
@@ -62,9 +66,32 @@ describe('browser', () => {
         return {width: window.innerWidth, height: window.innerHeight};
       });
       assert.deepStrictEqual(result, {
-        width: 700,
-        height: 500,
+        width: 1501,
+        height: 801,
       });
+    } finally {
+      await browser.close();
+    }
+  });
+  it('connects to an existing browser with userDataDir', async () => {
+    const tmpDir = os.tmpdir();
+    const folderPath = path.join(tmpDir, `temp-folder-${crypto.randomUUID()}`);
+    const browser = await launch({
+      headless: true,
+      isolated: false,
+      userDataDir: folderPath,
+      executablePath: executablePath(),
+      devtools: false,
+      args: ['--remote-debugging-port=0'],
+    });
+    try {
+      const connectedBrowser = await ensureBrowserConnected({
+        userDataDir: folderPath,
+        devtools: false,
+      });
+      assert.ok(connectedBrowser);
+      assert.ok(connectedBrowser.connected);
+      connectedBrowser.disconnect();
     } finally {
       await browser.close();
     }

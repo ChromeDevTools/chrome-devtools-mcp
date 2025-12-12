@@ -4,17 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {PerformanceInsightFormatter} from '../../node_modules/chrome-devtools-frontend/front_end/models/ai_assistance/data_formatters/PerformanceInsightFormatter.js';
-import {PerformanceTraceFormatter} from '../../node_modules/chrome-devtools-frontend/front_end/models/ai_assistance/data_formatters/PerformanceTraceFormatter.js';
-import {AgentFocus} from '../../node_modules/chrome-devtools-frontend/front_end/models/ai_assistance/performance/AIContext.js';
-import * as TraceEngine from '../../node_modules/chrome-devtools-frontend/front_end/models/trace/trace.js';
 import {logger} from '../logger.js';
+import {DevTools} from '../third_party/index.js';
 
-const engine = TraceEngine.TraceModel.Model.createWithAllHandlers();
+const engine = DevTools.TraceEngine.TraceModel.Model.createWithAllHandlers();
 
 export interface TraceResult {
-  parsedTrace: TraceEngine.TraceModel.ParsedTrace;
-  insights: TraceEngine.Insights.Types.TraceInsightSets | null;
+  parsedTrace: DevTools.TraceEngine.TraceModel.ParsedTrace;
+  insights: DevTools.TraceEngine.Insights.Types.TraceInsightSets | null;
 }
 
 export function traceResultIsSuccess(
@@ -45,9 +42,9 @@ export async function parseRawTraceBuffer(
   try {
     const data = JSON.parse(asString) as
       | {
-          traceEvents: TraceEngine.Types.Events.Event[];
+          traceEvents: DevTools.TraceEngine.Types.Events.Event[];
         }
-      | TraceEngine.Types.Events.Event[];
+      | DevTools.TraceEngine.Types.Events.Event[];
 
     const events = Array.isArray(data) ? data : data.traceEvents;
     await engine.parse(events);
@@ -75,24 +72,28 @@ export async function parseRawTraceBuffer(
 
 const extraFormatDescriptions = `Information on performance traces may contain main thread activity represented as call frames and network requests.
 
-${PerformanceTraceFormatter.callFrameDataFormatDescription}
+${DevTools.PerformanceTraceFormatter.callFrameDataFormatDescription}
 
-${PerformanceTraceFormatter.networkDataFormatDescription}
-`;
+${DevTools.PerformanceTraceFormatter.networkDataFormatDescription}`;
+
 export function getTraceSummary(result: TraceResult): string {
-  const focus = AgentFocus.fromParsedTrace(result.parsedTrace);
-  const formatter = new PerformanceTraceFormatter(focus);
-  const output = formatter.formatTraceSummary();
-  return `${extraFormatDescriptions}
+  const focus = DevTools.AgentFocus.fromParsedTrace(result.parsedTrace);
+  const formatter = new DevTools.PerformanceTraceFormatter(focus);
+  const summaryText = formatter.formatTraceSummary();
+  return `## Summary of Performance trace findings:
+${summaryText}
 
-${output}`;
+## Details on call tree & network request formats:
+${extraFormatDescriptions}`;
 }
 
-export type InsightName = keyof TraceEngine.Insights.Types.InsightModels;
+export type InsightName =
+  keyof DevTools.TraceEngine.Insights.Types.InsightModels;
 export type InsightOutput = {output: string} | {error: string};
 
 export function getInsightOutput(
   result: TraceResult,
+  insightSetId: string,
   insightName: InsightName,
 ): InsightOutput {
   if (!result.insights) {
@@ -101,35 +102,24 @@ export function getInsightOutput(
     };
   }
 
-  // Currently, we do not support inspecting traces with multiple navigations. We either:
-  // 1. Find Insights from the first navigation (common case: user records a trace with a page reload to test load performance)
-  // 2. Fall back to finding Insights not associated with a navigation (common case: user tests an interaction without a page load).
-  const mainNavigationId =
-    result.parsedTrace.data.Meta.mainFrameNavigations.at(0)?.args.data
-      ?.navigationId;
-
-  const insightsForNav = result.insights.get(
-    mainNavigationId ?? TraceEngine.Types.Events.NO_NAVIGATION,
-  );
-
-  if (!insightsForNav) {
+  const insightSet = result.insights.get(insightSetId);
+  if (!insightSet) {
     return {
-      error: 'No Performance Insights for this trace.',
+      error:
+        'No Performance Insights for the given insight set id. Only use ids given in the "Available insight sets" list.',
     };
   }
 
   const matchingInsight =
-    insightName in insightsForNav.model
-      ? insightsForNav.model[insightName]
-      : null;
+    insightName in insightSet.model ? insightSet.model[insightName] : null;
   if (!matchingInsight) {
     return {
       error: `No Insight with the name ${insightName} found. Double check the name you provided is accurate and try again.`,
     };
   }
 
-  const formatter = new PerformanceInsightFormatter(
-    AgentFocus.fromParsedTrace(result.parsedTrace),
+  const formatter = new DevTools.PerformanceInsightFormatter(
+    DevTools.AgentFocus.fromParsedTrace(result.parsedTrace),
     matchingInsight,
   );
   return {output: formatter.formatInsight()};

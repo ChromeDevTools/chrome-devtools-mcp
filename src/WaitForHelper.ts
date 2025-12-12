@@ -3,10 +3,9 @@
  * Copyright 2025 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import type {Page, Protocol} from 'puppeteer-core';
-import type {CdpPage} from 'puppeteer-core/internal/cdp/Page.js';
 
 import {logger} from './logger.js';
+import type {Page, Protocol, CdpPage} from './third_party/index.js';
 
 export class WaitForHelper {
   #abortController = new AbortController();

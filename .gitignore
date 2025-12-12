@@ -146,3 +146,5 @@ build/
 log.txt
 
 .DS_Store
+.bin
+.reports

@@ -3,10 +3,11 @@
  * Copyright 2025 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import type {JSHandle} from 'puppeteer-core';
-import z from 'zod';
 
-import {ToolCategories} from './categories.js';
+import {zod} from '../third_party/index.js';
+import type {Frame, JSHandle, Page} from '../third_party/index.js';
+
+import {ToolCategory} from './categories.js';
 import {defineTool} from './ToolDefinition.js';
 
 export const evaluateScript = defineTool({
@@ -14,12 +15,12 @@ export const evaluateScript = defineTool({
   description: `Evaluate a JavaScript function inside the currently selected page. Returns the response as JSON
 so returned values have to JSON-serializable.`,
   annotations: {
-    category: ToolCategories.DEBUGGING,
+    category: ToolCategory.DEBUGGING,
     readOnlyHint: false,
   },
   schema: {
-    function: z.string().describe(
-      `A JavaScript function to run in the currently selected page.
+    function: zod.string().describe(
+      `A JavaScript function declaration to be executed by the tool in the currently selected page.
 Example without arguments: \`() => {
   return document.title
 }\` or \`async () => {
@@ -30,10 +31,10 @@ Example with arguments: \`(el) => {
 }\`
 `,
     ),
-    args: z
+    args: zod
       .array(
-        z.object({
-          uid: z
+        zod.object({
+          uid: zod
             .string()
             .describe(
               'The uid of an element on the page from the page content snapshot',
@@ -44,15 +45,29 @@ Example with arguments: \`(el) => {
       .describe(`An optional list of arguments to pass to the function.`),
   },
   handler: async (request, response, context) => {
-    const page = context.getSelectedPage();
-    const fn = await page.evaluateHandle(`(${request.params.function})`);
-    const args: Array<JSHandle<unknown>> = [fn];
+    const args: Array<JSHandle<unknown>> = [];
     try {
+      const frames = new Set<Frame>();
       for (const el of request.params.args ?? []) {
-        args.push(await context.getElementByUid(el.uid));
+        const handle = await context.getElementByUid(el.uid);
+        frames.add(handle.frame);
+        args.push(handle);
       }
+      let pageOrFrame: Page | Frame;
+      // We can't evaluate the element handle across frames
+      if (frames.size > 1) {
+        throw new Error(
+          "Elements from different frames can't be evaluated together.",
+        );
+      } else {
+        pageOrFrame = [...frames.values()][0] ?? context.getSelectedPage();
+      }
+      const fn = await pageOrFrame.evaluateHandle(
+        `(${request.params.function})`,
+      );
+      args.unshift(fn);
       await context.waitForEventsAfterAction(async () => {
-        const result = await page.evaluate(
+        const result = await pageOrFrame.evaluate(
           async (fn, ...args) => {
             // @ts-expect-error no types.
             return JSON.stringify(await fn(...args));
@@ -65,9 +80,7 @@ Example with arguments: \`(el) => {
         response.appendResponseLine('```');
       });
     } finally {
-      Promise.allSettled(args.map(arg => arg.dispose())).catch(() => {
-        // Ignore errors
-      });
+      void Promise.allSettled(args.map(arg => arg.dispose()));
     }
   },
 });

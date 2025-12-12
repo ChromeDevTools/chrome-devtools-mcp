@@ -1,0 +1,176 @@
+exports[`McpResponse > add network request when attached 1`] = `
+# test response
+## Request http://example.com
+Status:  [pending]
+### Request Headers
+- content-size:10
+## Network requests
+Showing 1-1 of 1 (Page 1 of 1).
+reqid=1 GET http://example.com [pending]
+`;
+
+exports[`McpResponse > add network request when attached with POST data 1`] = `
+# test response
+## Request http://example.com
+Status:  [success - 200]
+### Request Headers
+- content-size:10
+### Request Body
+{"request":"body"}
+### Response Headers
+- Content-Type:application/json
+### Response Body
+{"response":"body"}
+## Network requests
+Showing 1-1 of 1 (Page 1 of 1).
+reqid=1 POST http://example.com [success - 200]
+`;
+
+exports[`McpResponse > add network requests when setting is true 1`] = `
+# test response
+## Network requests
+Showing 1-2 of 2 (Page 1 of 1).
+reqid=1 GET http://example.com [pending]
+reqid=2 GET http://example.com [pending]
+`;
+
+exports[`McpResponse > adds a message when no console messages exist 1`] = `
+# test response
+## Console messages
+<no console messages found>
+`;
+
+exports[`McpResponse > adds a prompt dialog 1`] = `
+# test response
+# Open dialog
+prompt: message (default value: "default").
+Call handle_dialog to handle it before continuing.
+`;
+
+exports[`McpResponse > adds an alert dialog 1`] = `
+# test response
+# Open dialog
+alert: message.
+Call handle_dialog to handle it before continuing.
+`;
+
+exports[`McpResponse > adds console messages when the setting is true 1`] = `
+# test response
+## Console messages
+Showing 1-1 of 1 (Page 1 of 1).
+msgid=1 [log] Hello from the test (1 args)
+`;
+
+exports[`McpResponse > adds cpu throttling setting when it is over 1 1`] = `
+# test response
+## CPU emulation
+Emulating: 4x slowdown
+`;
+
+exports[`McpResponse > adds throttling setting when it is not null 1`] = `
+# test response
+## Network emulation
+Emulating: Slow 3G
+Default navigation timeout set to 100000 ms
+`;
+
+exports[`McpResponse > allows response text lines to be added 1`] = `
+# test response
+Testing 1
+Testing 2
+`;
+
+exports[`McpResponse > list pages 1`] = `
+# test response
+## Pages
+0: about:blank [selected]
+`;
+
+exports[`McpResponse > returns correctly formatted snapshot for a simple tree 1`] = `
+# test response
+## Latest page snapshot
+uid=1_0 RootWebArea "My test page" url="about:blank"
+  uid=1_1 button "Click me" focusable focused
+  uid=1_2 textbox value="Input"
+
+`;
+
+exports[`McpResponse > returns values for textboxes 1`] = `
+# test response
+## Latest page snapshot
+uid=1_0 RootWebArea "My test page" url="about:blank"
+  uid=1_1 StaticText "username"
+  uid=1_2 textbox "username" focusable focused value="mcp"
+
+`;
+
+exports[`McpResponse > returns verbose snapshot 1`] = `
+# test response
+## Latest page snapshot
+uid=1_0 RootWebArea "My test page" url="about:blank"
+  uid=1_1 ignored
+    uid=1_2 ignored
+      uid=1_3 complementary
+        uid=1_4 StaticText "test"
+          uid=1_5 InlineTextBox "test"
+
+`;
+
+exports[`McpResponse > saves snapshot to file 1`] = `
+# test response
+## Latest page snapshot
+Saved snapshot to <file>
+`;
+
+exports[`McpResponse > saves snapshot to file 2`] = `
+uid=1_0 RootWebArea "My test page" url="about:blank"
+  uid=1_1 ignored
+    uid=1_2 ignored
+      uid=1_3 complementary
+        uid=1_4 StaticText "test"
+          uid=1_5 InlineTextBox "test"
+
+`;
+
+exports[`McpResponse network request filtering > filters network requests by resource type 1`] = `
+# test response
+## Network requests
+Showing 1-2 of 2 (Page 1 of 1).
+reqid=1 GET http://example.com [pending]
+reqid=1 GET http://example.com [pending]
+`;
+
+exports[`McpResponse network request filtering > filters network requests by single resource type 1`] = `
+# test response
+## Network requests
+Showing 1-1 of 1 (Page 1 of 1).
+reqid=1 GET http://example.com [pending]
+`;
+
+exports[`McpResponse network request filtering > shows all requests when empty resourceTypes array is provided 1`] = `
+# test response
+## Network requests
+Showing 1-5 of 5 (Page 1 of 1).
+reqid=1 GET http://example.com [pending]
+reqid=1 GET http://example.com [pending]
+reqid=1 GET http://example.com [pending]
+reqid=1 GET http://example.com [pending]
+reqid=1 GET http://example.com [pending]
+`;
+
+exports[`McpResponse network request filtering > shows all requests when no filters are provided 1`] = `
+# test response
+## Network requests
+Showing 1-5 of 5 (Page 1 of 1).
+reqid=1 GET http://example.com [pending]
+reqid=1 GET http://example.com [pending]
+reqid=1 GET http://example.com [pending]
+reqid=1 GET http://example.com [pending]
+reqid=1 GET http://example.com [pending]
+`;
+
+exports[`McpResponse network request filtering > shows no requests when filter matches nothing 1`] = `
+# test response
+## Network requests
+No requests found.
+`;

@@ -7,7 +7,34 @@
 - When configuring your MCP client, try using the `--yes` argument to `npx` to
   auto-accept installation prompt.
 - Find a specific error in the output of the `chrome-devtools-mcp` server.
-  Usually, if you client is an IDE, logs would be in the Output pane.
+  Usually, if your client is an IDE, logs would be in the Output pane.
+
+## Debugging
+
+Start the MCP server with debugging enabled and a log file:
+
+- `DEBUG=* npx chrome-devtools-mcp@latest --log-file=/path/to/chrome-devtools-mcp.log`
+
+Using `.mcp.json` to debug while using a client:
+
+```json
+{
+  "mcpServers": {
+    "chrome-devtools": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "chrome-devtools-mcp@latest",
+        "--log-file",
+        "/path/to/chrome-devtools-mcp.log"
+      ],
+      "env": {
+        "DEBUG": "*"
+      }
+    }
+  }
+}
+```
 
 ## Specific problems
 
@@ -27,3 +54,14 @@ npm cache clean --force
 This indicates that the browser could not be started. Make sure that no Chrome
 instances are running or close them. Make sure you have the latest stable Chrome
 installed and that [your system is able to run Chrome](https://support.google.com/chrome/a/answer/7100626?hl=en).
+
+### Remote debugging between virtual machine (VM) and host fails
+
+When connecting DevTools inside a VM to Chrome running on the host, any domain is rejected by Chrome because of host header validation. Tunneling the port over SSH bypasses this restriction. In the VM, run:
+
+```sh
+ssh -N -L 127.0.0.1:9222:127.0.0.1:9222 <user>@<host-ip>
+```
+
+Point the MCP connection inside the VM to `http://127.0.0.1:9222` and DevTools
+will reach the host browser without triggering the Host validation.

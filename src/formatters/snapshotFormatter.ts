@@ -3,94 +3,92 @@
  * Copyright 2025 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import type {TextSnapshotNode} from '../McpContext.js';
 
-export function formatA11ySnapshot(
-  serializedAXNodeRoot: TextSnapshotNode,
+import type {TextSnapshot, TextSnapshotNode} from '../McpContext.js';
+
+export function formatSnapshotNode(
+  root: TextSnapshotNode,
+  snapshot?: TextSnapshot,
   depth = 0,
 ): string {
-  let result = '';
-  const attributes = getAttributes(serializedAXNodeRoot);
-  const line = ' '.repeat(depth * 2) + attributes.join(' ') + '\n';
-  result += line;
+  const chunks: string[] = [];
 
-  for (const child of serializedAXNodeRoot.children) {
-    result += formatA11ySnapshot(child, depth + 1);
-  }
-
-  return result;
-}
-
-function getAttributes(serializedAXNodeRoot: TextSnapshotNode): string[] {
-  const attributes = [
-    `uid=${serializedAXNodeRoot.id}`,
-    serializedAXNodeRoot.role,
-    `"${serializedAXNodeRoot.name || ''}"`, // Corrected: Added quotes around name
-  ];
-
-  // Value properties
-  const valueProperties = [
-    'value',
-    'valuetext',
-    'valuemin',
-    'valuemax',
-    'level',
-    'autocomplete',
-    'haspopup',
-    'invalid',
-    'orientation',
-    'description',
-    'keyshortcuts',
-    'roledescription',
-  ] as const;
-  for (const property of valueProperties) {
+  if (depth === 0) {
+    // Top-level content of the snapshot.
     if (
-      property in serializedAXNodeRoot &&
-      serializedAXNodeRoot[property] !== undefined
+      snapshot?.verbose &&
+      snapshot?.hasSelectedElement &&
+      !snapshot.selectedElementUid
     ) {
-      attributes.push(`${property}="${serializedAXNodeRoot[property]}"`);
+      chunks.push(`Note: there is a selected element in the DevTools Elements panel but it is not included into the current a11y tree snapshot.
+Get a verbose snapshot to include all elements if you are interested in the selected element.\n\n`);
     }
   }
 
-  // Boolean properties that also have an 'able' attribute
-  const booleanPropertyMap = {
+  const attributes = getAttributes(root);
+  const line =
+    ' '.repeat(depth * 2) +
+    attributes.join(' ') +
+    (root.id === snapshot?.selectedElementUid
+      ? ' [selected in the DevTools Elements panel]'
+      : '') +
+    '\n';
+  chunks.push(line);
+
+  for (const child of root.children) {
+    chunks.push(formatSnapshotNode(child, snapshot, depth + 1));
+  }
+
+  return chunks.join('');
+}
+
+function getAttributes(serializedAXNodeRoot: TextSnapshotNode): string[] {
+  const attributes = [`uid=${serializedAXNodeRoot.id}`];
+  if (serializedAXNodeRoot.role) {
+    // To match representation in DevTools.
+    attributes.push(
+      serializedAXNodeRoot.role === 'none'
+        ? 'ignored'
+        : serializedAXNodeRoot.role,
+    );
+  }
+  if (serializedAXNodeRoot.name) {
+    attributes.push(`"${serializedAXNodeRoot.name}"`);
+  }
+
+  const excluded = new Set([
+    'id',
+    'role',
+    'name',
+    'elementHandle',
+    'children',
+    'backendNodeId',
+  ]);
+
+  const booleanPropertyMap: Record<string, string> = {
     disabled: 'disableable',
     expanded: 'expandable',
     focused: 'focusable',
     selected: 'selectable',
   };
-  for (const [property, ableAttribute] of Object.entries(booleanPropertyMap)) {
-    if (property in serializedAXNodeRoot) {
-      attributes.push(ableAttribute);
-      if (serializedAXNodeRoot[property as keyof typeof booleanPropertyMap]) {
-        attributes.push(property);
+
+  for (const attr of Object.keys(serializedAXNodeRoot).sort()) {
+    if (excluded.has(attr)) {
+      continue;
+    }
+    const value = (serializedAXNodeRoot as unknown as Record<string, unknown>)[
+      attr
+    ];
+    if (typeof value === 'boolean') {
+      if (booleanPropertyMap[attr]) {
+        attributes.push(booleanPropertyMap[attr]);
       }
-    }
-  }
-
-  const booleanProperties = [
-    'modal',
-    'multiline',
-    'readonly',
-    'required',
-    'multiselectable',
-  ] as const;
-
-  for (const property of booleanProperties) {
-    if (property in serializedAXNodeRoot && serializedAXNodeRoot[property]) {
-      attributes.push(property);
-    }
-  }
-
-  // Mixed boolean/string attributes
-  for (const property of ['pressed', 'checked'] as const) {
-    if (property in serializedAXNodeRoot) {
-      attributes.push(property);
-      if (serializedAXNodeRoot[property]) {
-        attributes.push(`${property}="${serializedAXNodeRoot[property]}"`);
+      if (value) {
+        attributes.push(attr);
       }
+    } else if (typeof value === 'string' || typeof value === 'number') {
+      attributes.push(`${attr}="${value}"`);
     }
   }
-
   return attributes;
 }

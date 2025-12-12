@@ -3,16 +3,20 @@
  * Copyright 2025 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
+
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
 import {evaluateScript} from '../../src/tools/script.js';
-import {html, withBrowser} from '../utils.js';
+import {serverHooks} from '../server.js';
+import {html, withMcpContext} from '../utils.js';
 
 describe('script', () => {
+  const server = serverHooks();
+
   describe('browser_evaluate_script', () => {
     it('evaluates', async () => {
-      await withBrowser(async (response, context) => {
+      await withMcpContext(async (response, context) => {
         await evaluateScript.handler(
           {params: {function: String(() => 2 * 5)}},
           response,
@@ -23,7 +27,7 @@ describe('script', () => {
       });
     });
     it('runs in selected page', async () => {
-      await withBrowser(async (response, context) => {
+      await withMcpContext(async (response, context) => {
         await evaluateScript.handler(
           {params: {function: String(() => document.title)}},
           response,
@@ -53,7 +57,7 @@ describe('script', () => {
     });
 
     it('work for complex objects', async () => {
-      await withBrowser(async (response, context) => {
+      await withMcpContext(async (response, context) => {
         const page = context.getSelectedPage();
 
         await page.setContent(html`<script src="./scripts.js"></script> `);
@@ -81,7 +85,7 @@ describe('script', () => {
     });
 
     it('work for async functions', async () => {
-      await withBrowser(async (response, context) => {
+      await withMcpContext(async (response, context) => {
         const page = context.getSelectedPage();
 
         await page.setContent(html`<script src="./scripts.js"></script> `);
@@ -104,7 +108,7 @@ describe('script', () => {
     });
 
     it('work with one argument', async () => {
-      await withBrowser(async (response, context) => {
+      await withMcpContext(async (response, context) => {
         const page = context.getSelectedPage();
 
         await page.setContent(html`<button id="test">test</button>`);
@@ -129,7 +133,7 @@ describe('script', () => {
     });
 
     it('work with multiple args', async () => {
-      await withBrowser(async (response, context) => {
+      await withMcpContext(async (response, context) => {
         const page = context.getSelectedPage();
 
         await page.setContent(html`<button id="test">test</button>`);
@@ -150,6 +154,34 @@ describe('script', () => {
         );
         const lineEvaluation = response.responseLines.at(2)!;
         assert.strictEqual(JSON.parse(lineEvaluation), true);
+      });
+    });
+
+    it('work for elements inside iframes', async () => {
+      server.addHtmlRoute(
+        '/iframe',
+        html`<main><button>I am iframe button</button></main>`,
+      );
+      server.addHtmlRoute('/main', html`<iframe src="/iframe"></iframe>`);
+
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedPage();
+        await page.goto(server.getRoute('/main'));
+        await context.createTextSnapshot();
+        await evaluateScript.handler(
+          {
+            params: {
+              function: String((element: Element) => {
+                return element.textContent;
+              }),
+              args: [{uid: '1_3'}],
+            },
+          },
+          response,
+          context,
+        );
+        const lineEvaluation = response.responseLines.at(2)!;
+        assert.strictEqual(JSON.parse(lineEvaluation), 'I am iframe button');
       });
     });
   });

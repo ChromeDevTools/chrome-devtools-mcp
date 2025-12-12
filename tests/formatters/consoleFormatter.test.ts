@@ -4,211 +4,130 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
-import type {ConsoleMessage} from 'puppeteer-core';
-
-import {formatConsoleEvent} from '../../src/formatters/consoleFormatter.js';
-
-function getMockConsoleMessage(options: {
-  type: string;
-  text: string;
-  location?: {
-    url?: string;
-    lineNumber?: number;
-    columnNumber?: number;
-  };
-  stackTrace?: Array<{
-    url: string;
-    lineNumber: number;
-    columnNumber: number;
-  }>;
-  args?: unknown[];
-}): ConsoleMessage {
-  return {
-    type() {
-      return options.type;
-    },
-    text() {
-      return options.text;
-    },
-    location() {
-      return options.location ?? {};
-    },
-    stackTrace() {
-      return options.stackTrace ?? [];
-    },
-    args() {
-      return (
-        options.args?.map(arg => {
-          return {
-            evaluate(fn: (arg: unknown) => unknown) {
-              return Promise.resolve(fn(arg));
-            },
-            jsonValue() {
-              return Promise.resolve(arg);
-            },
-            dispose() {
-              return Promise.resolve();
-            },
-          };
-        }) ?? []
-      );
-    },
-  } as ConsoleMessage;
-}
+import type {ConsoleMessageData} from '../../src/formatters/consoleFormatter.js';
+import {
+  formatConsoleEventShort,
+  formatConsoleEventVerbose,
+} from '../../src/formatters/consoleFormatter.js';
+import {getMockAggregatedIssue} from '../utils.js';
 
 describe('consoleFormatter', () => {
-  describe('formatConsoleEvent', () => {
-    it('formats a console.log message', async () => {
-      const message = getMockConsoleMessage({
+  describe('formatConsoleEventShort', () => {
+    it('formats a console.log message', t => {
+      const message: ConsoleMessageData = {
+        consoleMessageStableId: 1,
         type: 'log',
-        text: 'Hello, world!',
-        location: {
-          url: 'http://example.com/script.js',
-          lineNumber: 10,
-          columnNumber: 5,
-        },
-      });
-      const result = await formatConsoleEvent(message);
-      assert.equal(result, 'Log> script.js:10:5: Hello, world!');
+        message: 'Hello, world!',
+        args: [],
+      };
+      const result = formatConsoleEventShort(message);
+      t.assert.snapshot?.(result);
     });
 
-    it('formats a console.log message with arguments', async () => {
-      const message = getMockConsoleMessage({
+    it('formats a console.log message with one argument', t => {
+      const message: ConsoleMessageData = {
+        consoleMessageStableId: 2,
         type: 'log',
-        text: 'Processing file:',
-        args: ['file.txt', {id: 1, status: 'done'}],
-        location: {
-          url: 'http://example.com/script.js',
-          lineNumber: 10,
-          columnNumber: 5,
-        },
-      });
-      const result = await formatConsoleEvent(message);
-      assert.equal(
-        result,
-        'Log> script.js:10:5: Processing file: file.txt {"id":1,"status":"done"}',
-      );
+        message: 'Processing file:',
+        args: ['file.txt'],
+      };
+      const result = formatConsoleEventShort(message);
+      t.assert.snapshot?.(result);
     });
 
-    it('formats a console.error message', async () => {
-      const message = getMockConsoleMessage({
-        type: 'error',
-        text: 'Something went wrong',
-      });
-      const result = await formatConsoleEvent(message);
-      assert.equal(result, 'Error> Something went wrong');
-    });
-
-    it('formats a console.error message with arguments', async () => {
-      const message = getMockConsoleMessage({
-        type: 'error',
-        text: 'Something went wrong:',
-        args: ['details', {code: 500}],
-      });
-      const result = await formatConsoleEvent(message);
-      assert.equal(result, 'Error> Something went wrong: details {"code":500}');
-    });
-
-    it('formats a console.error message with a stack trace', async () => {
-      const message = getMockConsoleMessage({
-        type: 'error',
-        text: 'Something went wrong',
-        stackTrace: [
-          {
-            url: 'http://example.com/script.js',
-            lineNumber: 10,
-            columnNumber: 5,
-          },
-          {
-            url: 'http://example.com/script2.js',
-            lineNumber: 20,
-            columnNumber: 10,
-          },
-        ],
-      });
-      const result = await formatConsoleEvent(message);
-      assert.equal(
-        result,
-        'Error> Something went wrong\nscript.js:10:5\nscript2.js:20:10',
-      );
-    });
-
-    it('formats a console.error message with a JSHandle@error', async () => {
-      const message = getMockConsoleMessage({
-        type: 'error',
-        text: 'JSHandle@error',
-        args: [new Error('mock stack')],
-      });
-      const result = await formatConsoleEvent(message);
-      assert.ok(result.startsWith('Error> Error: mock stack'));
-    });
-
-    it('formats a console.warn message', async () => {
-      const message = getMockConsoleMessage({
-        type: 'warning',
-        text: 'This is a warning',
-        location: {
-          url: 'http://example.com/script.js',
-          lineNumber: 10,
-          columnNumber: 5,
-        },
-      });
-      const result = await formatConsoleEvent(message);
-      assert.equal(result, 'Warning> script.js:10:5: This is a warning');
-    });
-
-    it('formats a console.info message', async () => {
-      const message = getMockConsoleMessage({
-        type: 'info',
-        text: 'This is an info message',
-        location: {
-          url: 'http://example.com/script.js',
-          lineNumber: 10,
-          columnNumber: 5,
-        },
-      });
-      const result = await formatConsoleEvent(message);
-      assert.equal(result, 'Info> script.js:10:5: This is an info message');
-    });
-
-    it('formats a page error', async () => {
-      const error = new Error('Page crashed');
-      error.stack = 'Error: Page crashed\n    at <anonymous>:1:1';
-      const result = await formatConsoleEvent(error);
-      assert.equal(result, 'Error: Page crashed');
-    });
-
-    it('formats a page error without a stack', async () => {
-      const error = new Error('Page crashed');
-      error.stack = undefined;
-      const result = await formatConsoleEvent(error);
-      assert.equal(result, 'Error: Page crashed');
-    });
-
-    it('formats a console.log message from a removed iframe - no location', async () => {
-      const message = getMockConsoleMessage({
+    it('formats a console.log message with multiple arguments', t => {
+      const message: ConsoleMessageData = {
+        consoleMessageStableId: 3,
         type: 'log',
-        text: 'Hello from iframe',
-        location: {},
-      });
-      const result = await formatConsoleEvent(message);
-      assert.equal(result, 'Log> <unknown>: Hello from iframe');
+        message: 'Processing file:',
+        args: ['file.txt', 'another file'],
+      };
+      const result = formatConsoleEventShort(message);
+      t.assert.snapshot?.(result);
+    });
+  });
+
+  describe('formatConsoleEventVerbose', () => {
+    it('formats a console.log message', t => {
+      const message: ConsoleMessageData = {
+        consoleMessageStableId: 1,
+        type: 'log',
+        message: 'Hello, world!',
+        args: [],
+      };
+      const result = formatConsoleEventVerbose(message);
+      t.assert.snapshot?.(result);
     });
 
-    it('formats a console.log message from a removed iframe with partial location', async () => {
-      const message = getMockConsoleMessage({
+    it('formats a console.log message with one argument', t => {
+      const message: ConsoleMessageData = {
+        consoleMessageStableId: 2,
         type: 'log',
-        text: 'Hello from iframe',
-        location: {
-          lineNumber: 10,
-          columnNumber: 5,
-        },
-      });
-      const result = await formatConsoleEvent(message);
-      assert.equal(result, 'Log> <unknown>: Hello from iframe');
+        message: 'Processing file:',
+        args: ['file.txt'],
+      };
+      const result = formatConsoleEventVerbose(message);
+      t.assert.snapshot?.(result);
     });
+
+    it('formats a console.log message with multiple arguments', t => {
+      const message: ConsoleMessageData = {
+        consoleMessageStableId: 3,
+        type: 'log',
+        message: 'Processing file:',
+        args: ['file.txt', 'another file'],
+      };
+      const result = formatConsoleEventVerbose(message);
+      t.assert.snapshot?.(result);
+    });
+
+    it('formats a console.error message', t => {
+      const message: ConsoleMessageData = {
+        consoleMessageStableId: 4,
+        type: 'error',
+        message: 'Something went wrong',
+      };
+      const result = formatConsoleEventVerbose(message);
+      t.assert.snapshot?.(result);
+    });
+  });
+
+  it('formats a console.log message with issue type', t => {
+    const testGenericIssue = {
+      details: () => {
+        return {
+          violatingNodeId: 2,
+          violatingNodeAttribute: 'test',
+        };
+      },
+    };
+    const mockAggregatedIssue = getMockAggregatedIssue();
+    const mockDescription = {
+      file: 'mock.md',
+      links: [
+        {link: 'http://example.com/learnmore', linkTitle: 'Learn more'},
+        {
+          link: 'http://example.com/another-learnmore',
+          linkTitle: 'Learn more 2',
+        },
+      ],
+    };
+    mockAggregatedIssue.getDescription.returns(mockDescription);
+    // @ts-expect-error generic issue stub bypass
+    mockAggregatedIssue.getGenericIssues.returns(new Set([testGenericIssue]));
+    const mockDescriptionFileContent =
+      '# Mock Issue Title\n\nThis is a mock issue description';
+
+    const message: ConsoleMessageData = {
+      consoleMessageStableId: 5,
+      type: 'issue',
+      description: mockDescriptionFileContent,
+      item: mockAggregatedIssue,
+    };
+
+    const result = formatConsoleEventVerbose(message);
+    t.assert.snapshot?.(result);
   });
 });

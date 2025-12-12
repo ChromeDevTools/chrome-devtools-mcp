@@ -1,0 +1,53 @@
+exports[`network > network_get_request > should get request from previous navigations 1`] = `
+# get_request response
+## Request http://localhost:<port>/one
+Status:  [success - 200]
+### Request Headers
+- accept-language:en-US,en;q=0.9
+- upgrade-insecure-requests:1
+- user-agent:<user-agent>
+- sec-ch-ua:"Chromium";v="<version>", "Not A(Brand";v="24"
+- sec-ch-ua-mobile:?0
+- sec-ch-ua-platform:"<os>"
+- accept:text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+- accept-encoding:gzip, deflate, br, zstd
+- connection:keep-alive
+- host:localhost:<port>
+- sec-fetch-dest:document
+- sec-fetch-mode:navigate
+- sec-fetch-site:none
+- sec-fetch-user:?1
+### Response Headers
+- connection:keep-alive
+- content-length:239
+- content-type:text/html; charset=utf-8
+- date:<long date>
+- keep-alive:timeout=5
+### Response Body
+<not available anymore>
+`;
+
+exports[`network > network_list_requests > list requests form current navigations only 1`] = `
+# list_request response
+## Network requests
+Showing 1-1 of 1 (Page 1 of 1).
+reqid=3 GET http://localhost:<port>/three [success - 200]
+`;
+
+exports[`network > network_list_requests > list requests from previous navigations 1`] = `
+# list_request response
+## Network requests
+Showing 1-3 of 3 (Page 1 of 1).
+reqid=1 GET http://localhost:<port>/one [success - 200]
+reqid=2 GET http://localhost:<port>/two [success - 200]
+reqid=3 GET http://localhost:<port>/three [success - 200]
+`;
+
+exports[`network > network_list_requests > list requests from previous navigations from redirects 1`] = `
+# list_request response
+## Network requests
+Showing 1-3 of 3 (Page 1 of 1).
+reqid=1 GET http://localhost:<port>/redirect [failed - 302]
+reqid=2 GET http://localhost:<port>/redirected [success - 200]
+reqid=3 GET http://localhost:<port>/redirected-page [success - 200]
+`;
