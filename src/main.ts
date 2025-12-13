@@ -57,17 +57,13 @@ import { resolveRoots, type RootsInfo } from './roots-manager.js';
 import { runStartupCheck } from './startup-check.js';
 import { setProjectRoot } from './project-root-state.js';
 import { setupGraceful } from './graceful.js';
-import * as bookmarkTools from './tools/bookmarks.js';
 import * as chatgptWebTools from './tools/chatgpt-web.js';
-import * as deepResearchChatGPTTools from './tools/deep_research_chatgpt.js';
 import * as consoleTools from './tools/console.js';
-import * as diagnoseUiTools from './tools/diagnose-ui.js';
 import * as emulationTools from './tools/emulation.js';
-import * as extensionTools from './tools/extensions.js';
 import * as geminiWebTools from './tools/gemini-web.js';
-import * as inputTools from './tools/input.js';
+import { click, fill, fillForm } from './tools/input.js';
 import * as networkTools from './tools/network.js';
-import * as pagesTools from './tools/pages.js';
+import { pages, navigate } from './tools/pages.js';
 import * as performanceTools from './tools/performance.js';
 import * as screenshotTools from './tools/screenshot.js';
 import * as scriptTools from './tools/script.js';
@@ -294,17 +290,16 @@ function registerTool(tool: ToolDefinition): void {
 }
 
 const tools = [
-  ...Object.values(bookmarkTools),
   ...Object.values(chatgptWebTools),
-  ...Object.values(deepResearchChatGPTTools),
   ...Object.values(geminiWebTools),
   ...Object.values(consoleTools),
-  ...Object.values(diagnoseUiTools),
   ...Object.values(emulationTools),
-  ...Object.values(extensionTools),
-  ...Object.values(inputTools),
+  click,
+  fill,
+  fillForm,
   ...Object.values(networkTools),
-  ...Object.values(pagesTools),
+  pages,
+  navigate,
   ...Object.values(performanceTools),
   ...Object.values(screenshotTools),
   ...Object.values(scriptTools),
