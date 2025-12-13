@@ -368,12 +368,20 @@ export class McpContext implements Context {
   };
 
   setSelectedPageIdx(idx: number): void {
-    const oldPage = this.getSelectedPage();
-    oldPage.off('dialog', this.#dialogHandler);
+    // Remove dialog handler from old page if exists
+    const oldPage = this.#pages[this.#selectedPageIdx];
+    if (oldPage && !oldPage.isClosed()) {
+      oldPage.off('dialog', this.#dialogHandler);
+    }
+
     this.#selectedPageIdx = idx;
-    const newPage = this.getSelectedPage();
-    newPage.on('dialog', this.#dialogHandler);
-    this.#updateSelectedPageTimeouts();
+
+    // Add dialog handler to new page if exists
+    const newPage = this.#pages[idx];
+    if (newPage && !newPage.isClosed()) {
+      newPage.on('dialog', this.#dialogHandler);
+      this.#updateSelectedPageTimeouts();
+    }
   }
 
   #updateSelectedPageTimeouts() {
