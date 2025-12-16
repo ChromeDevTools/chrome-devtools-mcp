@@ -499,7 +499,7 @@ In these cases, start Chrome first and let the Chrome DevTools MCP server connec
 
 **Step 1:** Set up remote debugging in Chrome
 
-In Chrome, do the following to set up remote debugging:
+In Chrome (\>= M144), do the following to set up remote debugging:
 
 1.  Navigate to `chrome://inspect/#remote-debugging` to enable remote debugging.
 2.  Follow the dialog UI to allow or disallow incoming debugging connections.
@@ -516,17 +516,13 @@ The following code snippet is an example configuration for gemini-cli:
   "mcpServers": {
     "chrome-devtools": {
       "command": "npx",
-      "args": [
-        "chrome-devtools-mcp@latest",
-        "--autoConnect",
-        "--channel=canary"
-      ]
+      "args": ["chrome-devtools-mcp@latest", "--autoConnect", "--channel=beta"]
     }
   }
 }
 ```
 
-Note: you have to specify `--channel=canary` until Chrome M144 has reached the
+Note: you have to specify `--channel=beta` until Chrome M144 has reached the
 stable channel.
 
 **Step 3:** Test your setup
