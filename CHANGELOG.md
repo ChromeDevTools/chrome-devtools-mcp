@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.12.2](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.12.1...chrome-devtools-mcp-v0.12.2) (2025-12-18)
+
+
+### 📄 Documentation
+
+* add experimental chrome on android guide ([#691](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/691)) ([4a87702](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/4a87702ca6913ed62987f71e080f3d481d13b8d8))
+* autoConnect - clarify how the mcp server selects a profile ([#693](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/693)) ([28b8ff8](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/28b8ff816461760c82e9b19b70f288bc7fa2fa38))
+* enhance cli docs + sort required vs opt params ([#674](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/674)) ([81cbd99](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/81cbd99f52d013d07bdcf21a0840f61a16bacd33))
+* update auto connect docs to mention min Chrome version ([#681](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/681)) ([ab2340f](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/ab2340f40127dcdabde6887a411163ce9d130394))
+
 ## [0.12.1](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.12.0...chrome-devtools-mcp-v0.12.1) (2025-12-12)
 
 
