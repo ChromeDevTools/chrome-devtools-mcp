@@ -62,7 +62,7 @@
     "globals": "^16.4.0",
     "prettier": "^3.6.2",
     "puppeteer": "24.33.0",
-    "rollup": "4.53.3",
+    "rollup": "4.54.0",
     "rollup-plugin-cleanup": "^3.2.1",
     "rollup-plugin-license": "^3.6.0",
     "sinon": "^21.0.0",
