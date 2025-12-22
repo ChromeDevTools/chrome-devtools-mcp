@@ -2,7 +2,7 @@
 
 This is an experimental feature as Puppeteer does not officially support Chrome on Android as a target.
 
-The workflow below works for most users. See [Troubleshooting: DevTools is not detecting the Android device for more help](https://developer.chrome.com/docs/devtools/remote-debugging#troubleshooting) for more help.
+The workflow below works for most users. See [Troubleshooting: DevTools is not detecting the Android device](https://developer.chrome.com/docs/devtools/remote-debugging#troubleshooting) if you encounter any issues.
 
 1. Open the Developer Options screen on your Android. See [Configure on-device developer Options](https://developer.android.com/studio/debug/dev-options.html).
 2. Select Enable USB Debugging.
