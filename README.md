@@ -486,20 +486,20 @@ the browser is closed.
 
 By default, the Chrome DevTools MCP server will start a new Chrome instance with a dedicated profile. This might not be ideal in all situations:
 
-- If you would like to maintain the same application state when alternating between manual site testing and agent-driven testing.
+- If you want to maintain the same application state when alternating between manual site testing and agent-driven testing.
 - When the MCP needs to sign into a website. Some accounts may prevent sign-in when the browser is controlled via WebDriver (the default launch mechanism for the Chrome DevTools MCP server).
-- If you're running your LLM inside a sandboxed environment, but you would like to connect to a Chrome instance that runs outside the sandbox.
+- If you're running your LLM inside a sandboxed environment, but you want to connect to a Chrome instance that runs outside the sandbox.
 
 In these cases, start Chrome first and let the Chrome DevTools MCP server connect to it. There are two ways to do so:
 
-- **Automatic connection (available in Chrome 144)**: best for sharing state between manual and agent-driven testing.
-- **Manual connection via remote debugging port**: best when running inside a sandboxed environment.
+- **Automatic connection (requires Chrome 145+)**: Best for sharing state between manual and agent-driven testing. Requires minimal setup.
+- **Manual connection via remote debugging port**: Best when running inside a sandboxed environment or when you need full control over the Chrome instance.
 
 #### Automatically connecting to a running Chrome instance
 
 **Step 1:** Set up remote debugging in Chrome
 
-In Chrome (\>= M144), do the following to set up remote debugging:
+In Chrome (>= 145), do the following to set up remote debugging:
 
 1.  Navigate to `chrome://inspect/#remote-debugging` to enable remote debugging.
 2.  Follow the dialog UI to allow or disallow incoming debugging connections.
@@ -522,8 +522,7 @@ The following code snippet is an example configuration for gemini-cli:
 }
 ```
 
-Note: you have to specify `--channel=beta` until Chrome M144 has reached the
-stable channel.
+Note: As of December 2024, Chrome 145 is in the stable channel. If you're using an older Chrome version, you may need to specify `--channel=beta` or `--channel=canary` to use a development version that supports this feature.
 
 **Step 3:** Test your setup
 
