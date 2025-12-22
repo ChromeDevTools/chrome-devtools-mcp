@@ -11,11 +11,24 @@
 
 ## Debugging
 
+When reporting issues or diagnosing problems, enable debug logging to capture detailed information.
+
+### Standalone debugging
+
 Start the MCP server with debugging enabled and a log file:
 
-- `DEBUG=* npx chrome-devtools-mcp@latest --log-file=/path/to/chrome-devtools-mcp.log`
+```sh
+DEBUG=* npx chrome-devtools-mcp@latest --log-file=/path/to/chrome-devtools-mcp.log
+```
 
-Using `.mcp.json` to debug while using a client:
+On Windows (PowerShell):
+```powershell
+$env:DEBUG="*"; npx chrome-devtools-mcp@latest --log-file=C:\path\to\chrome-devtools-mcp.log
+```
+
+### Debugging with an MCP client
+
+Configure your MCP client to enable debug logging:
 
 ```json
 {
@@ -24,6 +37,7 @@ Using `.mcp.json` to debug while using a client:
       "type": "stdio",
       "command": "npx",
       "args": [
+        "-y",
         "chrome-devtools-mcp@latest",
         "--log-file",
         "/path/to/chrome-devtools-mcp.log"
@@ -35,6 +49,12 @@ Using `.mcp.json` to debug while using a client:
   }
 }
 ```
+
+The log file will contain detailed information about:
+- Server startup and initialization
+- Tool invocations and parameters
+- Chrome DevTools Protocol (CDP) messages
+- Error stack traces
 
 ## Specific problems
 
@@ -51,9 +71,39 @@ npm cache clean --force
 
 ### `Target closed` error
 
-This indicates that the browser could not be started. Make sure that no Chrome
-instances are running or close them. Make sure you have the latest stable Chrome
-installed and that [your system is able to run Chrome](https://support.google.com/chrome/a/answer/7100626?hl=en).
+This indicates that the browser could not be started or the connection was lost. Common causes and solutions:
+
+1. **Chrome already running**: Close all Chrome instances and try again
+2. **Chrome not installed**: Make sure you have the latest stable Chrome installed
+3. **System requirements**: Verify [your system is able to run Chrome](https://support.google.com/chrome/a/answer/7100626?hl=en)
+4. **Port conflict**: If using `--browser-url`, ensure the debugging port (e.g., 9222) is not already in use
+5. **User data directory locked**: Try using `--isolated` flag to create a temporary profile
+
+Example with isolated mode:
+```sh
+npx -y chrome-devtools-mcp@latest --isolated
+```
+
+### Configuration file not being recognized
+
+If your MCP client is not loading the chrome-devtools-mcp server, check:
+
+1. **File location**: Ensure the configuration file is in the correct location for your MCP client
+2. **JSON syntax**: Validate your JSON using a linter or online validator
+3. **Quotes**: Use double quotes for all JSON strings, not single quotes
+4. **Trailing commas**: Remove any trailing commas in JSON objects or arrays
+
+Example of valid configuration:
+```json
+{
+  "mcpServers": {
+    "chrome-devtools": {
+      "command": "npx",
+      "args": ["-y", "chrome-devtools-mcp@latest"]
+    }
+  }
+}
+```
 
 ### Remote debugging between virtual machine (VM) and host fails
 
