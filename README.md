@@ -242,6 +242,25 @@ Or, from the IDE **Activity Bar** > `Kiro` > `MCP Servers` > `Click Open MCP Con
 </details>
 
 <details>
+  <summary>OpenCode</summary>
+
+Add the following configuration to your `opencode.json` (project-specific) or `~/.config/opencode/config.json` (global):
+
+```json
+{
+  "mcp": {
+    "chrome-devtools": {
+      "type": "local",
+      "command": ["npx", "-y", "chrome-devtools-mcp@latest"],
+      "enabled": true
+    }
+  }
+}
+```
+
+</details>
+
+<details>
   <summary>Qoder</summary>
 
 In **Qoder Settings**, go to `MCP Server` > `+ Add` > Use the configuration snippet provided above.
