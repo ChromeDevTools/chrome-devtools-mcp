@@ -5,7 +5,7 @@
  */
 
 import {logger} from '../logger.js';
-import {zod} from '../third_party/index.js';
+import {DevTools, zod} from '../third_party/index.js';
 import type {Page} from '../third_party/index.js';
 import type {InsightName} from '../trace-processing/parse.js';
 import {
@@ -14,6 +14,7 @@ import {
   parseRawTraceBuffer,
   traceResultIsSuccess,
 } from '../trace-processing/parse.js';
+import {populateCruxData} from '../utils/crux.js';
 
 import {ToolCategory} from './categories.js';
 import type {Context, Response} from './ToolDefinition.js';
@@ -161,6 +162,35 @@ export const analyzeInsight = defineTool({
   },
 });
 
+export const toggleCrux = defineTool({
+  name: 'performance_toggle_crux',
+  description:
+    'Enables or disables the fetching of real-user experience data from the Chrome User Experience Report (CrUX) API during performance traces. When enabled, performance summaries will include field data (LCP, INP, CLS) for the URLs in the trace.',
+  annotations: {
+    category: ToolCategory.PERFORMANCE,
+    readOnlyHint: false,
+  },
+  schema: {
+    enabled: zod
+      .boolean()
+      .describe('Whether to enable or disable CrUX data fetching.'),
+  },
+  handler: async (request, response) => {
+    try {
+      const settings = DevTools.Common.Settings.Settings.instance();
+      const cruxSetting = settings.createSetting('field-data-enabled', true);
+      cruxSetting.set(request.params.enabled);
+      response.appendResponseLine(
+        `CrUX data fetching has been ${request.params.enabled ? 'enabled' : 'disabled'}.`,
+      );
+    } catch {
+      response.appendResponseLine(
+        'Error: Could not update the CrUX setting. It might not be available in this environment.',
+      );
+    }
+  },
+});
+
 async function stopTracingAndAppendOutput(
   page: Page,
   response: Response,
@@ -171,6 +201,7 @@ async function stopTracingAndAppendOutput(
     const result = await parseRawTraceBuffer(traceEventsBuffer);
     response.appendResponseLine('The performance trace has been stopped.');
     if (traceResultIsSuccess(result)) {
+      await populateCruxData(result.parsedTrace);
       context.storeTraceRecording(result);
       const traceSummaryText = getTraceSummary(result);
       response.appendResponseLine(traceSummaryText);

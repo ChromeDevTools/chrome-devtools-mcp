@@ -98,6 +98,9 @@ const logDisclaimers = () => {
 debug, and modify any data in the browser or DevTools.
 Avoid sharing sensitive or personal information that you do not want to share with MCP clients.`,
   );
+  console.error(
+    `Performance tools may send trace URLs to the Google CrUX API to fetch real-user experience data.`,
+  );
 };
 
 const toolMutex = new Mutex();
