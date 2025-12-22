@@ -87,6 +87,27 @@ export const cliOptions = {
       }
     },
   },
+  headers: {
+    type: 'string',
+    description:
+      'Custom headers to add to all network requests made by the browser in JSON format (e.g., \'{"x-env":"visit_from_mcp","x-mock-user":"mcp"}\').',
+    coerce: (val: string | undefined) => {
+      if (!val) {
+        return;
+      }
+      try {
+        const parsed = JSON.parse(val);
+        if (typeof parsed !== 'object' || Array.isArray(parsed)) {
+          throw new Error('Headers must be a JSON object');
+        }
+        return parsed as Record<string, string>;
+      } catch (error) {
+        throw new Error(
+          `Invalid JSON for headers: ${(error as Error).message}`,
+        );
+      }
+    },
+  },
   headless: {
     type: 'boolean',
     description: 'Whether to run in headless (no UI) mode.',

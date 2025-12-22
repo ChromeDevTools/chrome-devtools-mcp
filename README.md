@@ -533,7 +533,8 @@ Make sure your browser is running. Open gemini-cli and run the following prompt:
 Check the performance of https://developers.chrome.com
 ```
 
-Note: The <code>autoConnect</code> option requires the user to start Chrome.
+> [!NOTE]  
+> The <code>autoConnect</code> option requires the user to start Chrome. If the user has multiple active profiles, the MCP server will connect to the default profile (as determined by Chrome). The MCP server has access to all open windows for the selected profile.
 
 The Chrome DevTools MCP server will try to connect to your running Chrome
 instance. It shows a dialog asking for user permission.

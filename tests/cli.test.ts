@@ -222,4 +222,45 @@ describe('cli args parsing', () => {
       autoConnect: true,
     });
   });
+
+  it('parses headers with valid JSON', async () => {
+    const args = parseArguments('1.0.0', [
+      'node',
+      'main.js',
+      '--headers',
+      '{"x-env":"visit_from_mcp","x-mock-user":"mcp"}',
+    ]);
+    assert.deepStrictEqual(args.headers, {
+      'x-env': 'visit_from_mcp',
+      'x-mock-user': 'mcp',
+    });
+  });
+
+  it('throws error for invalid headers JSON', async () => {
+    assert.throws(
+      () => {
+        parseArguments('1.0.0', [
+          'node',
+          'main.js',
+          '--headers',
+          '{"invalid": json}',
+        ]);
+      },
+      /Invalid JSON for headers/
+    );
+  });
+
+  it('throws error for non-object headers', async () => {
+    assert.throws(
+      () => {
+        parseArguments('1.0.0', [
+          'node',
+          'main.js',
+          '--headers',
+          '["array", "of", "headers"]',
+        ]);
+      },
+      /Headers must be a JSON object/
+    );
+  });
 });
