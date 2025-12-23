@@ -5,7 +5,7 @@
  */
 
 import assert from 'node:assert';
-import {describe, it, afterEach} from 'node:test';
+import {describe, it, afterEach, before} from 'node:test';
 
 import sinon from 'sinon';
 
@@ -20,6 +20,8 @@ import {ensureCrUXManager} from '../../src/utils/crux.js';
 import {loadTraceAsBuffer} from '../trace-processing/fixtures/load.js';
 
 describe('crux util', () => {
+  before(() => ensureCrUXManager());
+
   afterEach(() => {
     sinon.restore();
   });

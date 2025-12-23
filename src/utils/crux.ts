@@ -183,19 +183,16 @@ export async function populateCruxData(
   parsedTrace: DevTools.TraceEngine.TraceModel.ParsedTrace,
 ): Promise<void> {
   ensureCrUXManager();
-  try {
-    const settings = DevTools.Common.Settings.Settings.instance();
-    const cruxSetting = settings.createSetting<ConfigSetting>(
-      'field-data',
-      {enabled: false},
-      DevTools.Common.Settings.SettingStorageType.GLOBAL,
-    );
 
-    if (!cruxSetting.get().enabled) {
-      return;
-    }
-  } catch {
-    // Fallback if settings are not available
+  const settings = DevTools.Common.Settings.Settings.instance();
+  const cruxSetting = settings.createSetting(
+    'field-data',
+    {enabled: true},
+    DevTools.Common.Settings.SettingStorageType.GLOBAL,
+  );
+
+  if (!cruxSetting.get().enabled) {
+    return;
   }
 
   const urls = new Set<string>();
