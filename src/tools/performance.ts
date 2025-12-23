@@ -5,7 +5,7 @@
  */
 
 import {logger} from '../logger.js';
-import {DevTools, zod} from '../third_party/index.js';
+import {zod} from '../third_party/index.js';
 import type {Page} from '../third_party/index.js';
 import type {InsightName} from '../trace-processing/parse.js';
 import {
@@ -159,39 +159,6 @@ export const analyzeInsight = defineTool({
     }
 
     response.appendResponseLine(insightOutput.output);
-  },
-});
-
-export const toggleCrux = defineTool({
-  name: 'performance_toggle_crux',
-  description:
-    'Enables or disables the fetching of real-user experience data from the Chrome User Experience Report (CrUX) API during performance traces. When enabled, performance summaries will include field data (LCP, INP, CLS) for the URLs in the trace.',
-  annotations: {
-    category: ToolCategory.PERFORMANCE,
-    readOnlyHint: false,
-  },
-  schema: {
-    enabled: zod
-      .boolean()
-      .describe('Whether to enable or disable CrUX data fetching.'),
-  },
-  handler: async (request, response) => {
-    try {
-      const settings = DevTools.Common.Settings.Settings.instance();
-      const cruxSetting = settings.createSetting(
-        'field-data',
-        {enabled: false},
-        DevTools.Common.Settings.SettingStorageType.GLOBAL,
-      );
-      cruxSetting.set({...cruxSetting.get(), enabled: request.params.enabled});
-      response.appendResponseLine(
-        `CrUX data fetching has been ${request.params.enabled ? 'enabled' : 'disabled'}.`,
-      );
-    } catch {
-      response.appendResponseLine(
-        'Error: Could not update the CrUX setting. It might not be available in this environment.',
-      );
-    }
   },
 });
 

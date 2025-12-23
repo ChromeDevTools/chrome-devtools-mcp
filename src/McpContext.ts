@@ -60,8 +60,8 @@ interface McpContextOptions {
   experimentalIncludeAllPages?: boolean;
 }
 
-const DEFAULT_TIMEOUT = 5_000;
-const NAVIGATION_TIMEOUT = 10_000;
+const DEFAULT_TIMEOUT = 30_000;
+const NAVIGATION_TIMEOUT = 60_000;
 
 function getNetworkMultiplierFromString(condition: string | null): number {
   const puppeteerCondition =

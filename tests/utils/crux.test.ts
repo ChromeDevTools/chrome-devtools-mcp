@@ -65,9 +65,10 @@ describe('crux util', () => {
     const mockCrUXManager = {
       getSelectedScope: () => ({pageScope: 'url', deviceScope: 'ALL'}),
     };
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
     sinon
       .stub(DevTools.CrUXManager.CrUXManager, 'instance')
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .returns(mockCrUXManager as any);
 
     const settings = DevTools.Common.Settings.Settings.instance();

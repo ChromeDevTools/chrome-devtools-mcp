@@ -21,11 +21,10 @@
 - **[Emulation](#emulation)** (2 tools)
   - [`emulate`](#emulate)
   - [`resize_page`](#resize_page)
-- **[Performance](#performance)** (4 tools)
+- **[Performance](#performance)** (3 tools)
   - [`performance_analyze_insight`](#performance_analyze_insight)
   - [`performance_start_trace`](#performance_start_trace)
   - [`performance_stop_trace`](#performance_stop_trace)
-  - [`performance_toggle_crux`](#performance_toggle_crux)
 - **[Network](#network)** (2 tools)
   - [`get_network_request`](#get_network_request)
   - [`list_network_requests`](#list_network_requests)
@@ -243,16 +242,6 @@
 **Description:** Stops the active performance trace recording on the selected page.
 
 **Parameters:** None
-
----
-
-### `performance_toggle_crux`
-
-**Description:** Enables or disables the fetching of real-user experience data from the Chrome User Experience Report (CrUX) API during performance traces. When enabled, performance summaries will include field data (LCP, INP, CLS) for the URLs in the trace.
-
-**Parameters:**
-
-- **enabled** (boolean) **(required)**: Whether to enable or disable CrUX data fetching.
 
 ---
 
