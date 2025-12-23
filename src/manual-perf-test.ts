@@ -93,12 +93,9 @@ async function run() {
 
     // Check trace content (basic check)
     const traceResult = traces[0];
-    // We assume traceResult is valid if we got here and storeTraceRecording was called.
-    // startTrace.handler calls storeTraceRecording only on success.
-    console.log(
-      'Trace result summary:',
-      lines.find(l => l.includes('Trace duration')),
-    );
+    console.log('--- Response Lines ---');
+    console.log(lines.join('\n'));
+    console.log('----------------------');
 
     console.log('SUCCESS: Trace recorded and stopped automatically.');
   } catch (err) {

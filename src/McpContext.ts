@@ -8,7 +8,11 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
-import {extractUrlLikeFromDevToolsTitle, urlsEqual} from './DevtoolsUtils.js';
+import {
+  extractUrlLikeFromDevToolsTitle,
+  urlsEqual,
+  UniverseManager,
+} from './DevtoolsUtils.js';
 import type {ListenerMap} from './PageCollector.js';
 import {NetworkCollector, ConsoleCollector} from './PageCollector.js';
 import {Locator} from './third_party/index.js';
@@ -113,6 +117,7 @@ export class McpContext implements Context {
 
   #nextSnapshotId = 1;
   #traceResults: TraceResult[] = [];
+  #universeManager: UniverseManager;
 
   #locatorClass: typeof Locator;
   #options: McpContextOptions;
@@ -127,6 +132,7 @@ export class McpContext implements Context {
     this.logger = logger;
     this.#locatorClass = locatorClass;
     this.#options = options;
+    this.#universeManager = new UniverseManager(this.browser);
 
     this.#networkCollector = new NetworkCollector(this.browser);
 
@@ -153,11 +159,13 @@ export class McpContext implements Context {
 
   async #init() {
     const pages = await this.createPagesSnapshot();
+    await this.#universeManager.init(pages);
     await this.#networkCollector.init(pages);
     await this.#consoleCollector.init(pages);
   }
 
   dispose() {
+    this.#universeManager.dispose();
     this.#networkCollector.dispose();
     this.#consoleCollector.dispose();
   }
