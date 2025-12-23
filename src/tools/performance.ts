@@ -5,16 +5,15 @@
  */
 
 import {logger} from '../logger.js';
-import {zod} from '../third_party/index.js';
+import {zod, DevTools} from '../third_party/index.js';
 import type {Page} from '../third_party/index.js';
-import type {InsightName} from '../trace-processing/parse.js';
+import type {InsightName, TraceResult} from '../trace-processing/parse.js';
 import {
   getInsightOutput,
   getTraceSummary,
   parseRawTraceBuffer,
   traceResultIsSuccess,
 } from '../trace-processing/parse.js';
-import {populateCruxData} from '../utils/crux.js';
 
 import {ToolCategory} from './categories.js';
 import type {Context, Response} from './ToolDefinition.js';
@@ -172,7 +171,7 @@ async function stopTracingAndAppendOutput(
     const result = await parseRawTraceBuffer(traceEventsBuffer);
     response.appendResponseLine('The performance trace has been stopped.');
     if (traceResultIsSuccess(result)) {
-      await populateCruxData(result.parsedTrace);
+      await populateCruxData(result);
       context.storeTraceRecording(result);
       const traceSummaryText = getTraceSummary(result);
       response.appendResponseLine(traceSummaryText);
@@ -191,5 +190,50 @@ async function stopTracingAndAppendOutput(
     response.appendResponseLine(errorText);
   } finally {
     context.setIsRunningPerformanceTrace(false);
+  }
+}
+
+async function populateCruxData(result: TraceResult): Promise<void> {
+  try {
+    logger('populateCruxData called');
+    const cruxManager = DevTools.CrUXManager.CrUXManager.instance();
+    const settings = DevTools.Common.Settings.Settings.instance();
+    const cruxSetting = settings.createSetting('field-data', {enabled: true});
+    cruxSetting.set({...cruxSetting.get(), enabled: true});
+
+    if (!cruxSetting.get().enabled) {
+      logger('CrUX is disabled in settings');
+      return;
+    }
+
+    const urls = new Set<string>();
+    if (result.insights) {
+      for (const insightSet of result.insights.values()) {
+        urls.add(insightSet.url.href);
+      }
+    } else {
+      const mainUrl = result.parsedTrace.data.Meta.mainFrameURL;
+      if (mainUrl) {
+        urls.add(mainUrl);
+      }
+    }
+
+    if (urls.size === 0) {
+      logger('No URLs found for CrUX data');
+      return;
+    }
+
+    logger(`Fetching CrUX data for ${urls.size} URLs: ${Array.from(urls).join(', ')}`);
+    const cruxData = await Promise.all(
+      Array.from(urls).map(async url => {
+        const data = await cruxManager.getFieldDataForPage(url);
+        logger(`CrUX data for ${url}: ${data ? 'found' : 'not found'}`);
+        return data;
+      }),
+    );
+
+    result.parsedTrace.metadata.cruxFieldData = cruxData;
+  } catch (err) {
+    logger('Error populating CrUX data:', err);
   }
 }
