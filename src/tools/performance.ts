@@ -172,7 +172,7 @@ async function stopTracingAndAppendOutput(
     const result = await parseRawTraceBuffer(traceEventsBuffer);
     response.appendResponseLine('The performance trace has been stopped.');
     if (traceResultIsSuccess(result)) {
-      await populateCruxData(result.parsedTrace);
+      // await populateCruxData(result.parsedTrace);
       context.storeTraceRecording(result);
       const traceSummaryText = getTraceSummary(result);
       response.appendResponseLine(traceSummaryText);
