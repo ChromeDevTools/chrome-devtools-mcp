@@ -197,9 +197,11 @@ async function populateCruxData(result: TraceResult): Promise<void> {
   try {
     logger('populateCruxData called');
     const cruxManager = DevTools.CrUXManager.CrUXManager.instance();
+    cruxManager.setEndpointForTesting(
+      'https://chromeuxreport.googleapis.com/v1/records:queryRecord?key=AIzaSyBn5gimNjhiEyA_euicSKko6IlD3HdgUfk',
+    );
     const settings = DevTools.Common.Settings.Settings.instance();
     const cruxSetting = settings.createSetting('field-data', {enabled: true});
-    cruxSetting.set({...cruxSetting.get(), enabled: true});
 
     if (!cruxSetting.get().enabled) {
       logger('CrUX is disabled in settings');
@@ -223,7 +225,9 @@ async function populateCruxData(result: TraceResult): Promise<void> {
       return;
     }
 
-    logger(`Fetching CrUX data for ${urls.size} URLs: ${Array.from(urls).join(', ')}`);
+    logger(
+      `Fetching CrUX data for ${urls.size} URLs: ${Array.from(urls).join(', ')}`,
+    );
     const cruxData = await Promise.all(
       Array.from(urls).map(async url => {
         const data = await cruxManager.getFieldDataForPage(url);
