@@ -178,8 +178,12 @@ export const toggleCrux = defineTool({
   handler: async (request, response) => {
     try {
       const settings = DevTools.Common.Settings.Settings.instance();
-      const cruxSetting = settings.createSetting('field-data-enabled', true);
-      cruxSetting.set(request.params.enabled);
+      const cruxSetting = settings.createSetting(
+        'field-data',
+        {enabled: false},
+        DevTools.Common.Settings.SettingStorageType.GLOBAL,
+      );
+      cruxSetting.set({...cruxSetting.get(), enabled: request.params.enabled});
       response.appendResponseLine(
         `CrUX data fetching has been ${request.params.enabled ? 'enabled' : 'disabled'}.`,
       );

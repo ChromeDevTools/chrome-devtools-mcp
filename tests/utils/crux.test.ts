@@ -16,6 +16,7 @@ import {
   traceResultIsSuccess,
 } from '../../src/trace-processing/parse.js';
 import {populateCruxData} from '../../src/utils/crux.js';
+import {ensureCrUXManager} from '../../src/utils/crux.js';
 import {loadTraceAsBuffer} from '../trace-processing/fixtures/load.js';
 
 describe('crux util', () => {
@@ -69,6 +70,9 @@ describe('crux util', () => {
       .stub(DevTools.CrUXManager.CrUXManager, 'instance')
       .returns(mockCrUXManager as any);
 
+    const settings = DevTools.Common.Settings.Settings.instance();
+    settings.createSetting('field-data', {enabled: false}).set({enabled: true});
+
     await populateCruxData(result.parsedTrace);
     const summary = getTraceSummary(result);
 
@@ -111,6 +115,9 @@ describe('crux util', () => {
       json: async () => mockResponse,
     } as Response);
 
+    const settings = DevTools.Common.Settings.Settings.instance();
+    settings.createSetting('field-data', {enabled: false}).set({enabled: true});
+
     await populateCruxData(fakeParsedTrace);
 
     assert.ok(fakeParsedTrace.metadata.cruxFieldData);
@@ -144,6 +151,9 @@ describe('crux util', () => {
       ok: false,
       status: 404,
     } as Response);
+
+    const settings = DevTools.Common.Settings.Settings.instance();
+    settings.createSetting('field-data', {enabled: false}).set({enabled: true});
 
     await populateCruxData(fakeParsedTrace);
 

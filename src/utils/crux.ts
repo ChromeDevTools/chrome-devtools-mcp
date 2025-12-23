@@ -185,8 +185,13 @@ export async function populateCruxData(
   ensureCrUXManager();
   try {
     const settings = DevTools.Common.Settings.Settings.instance();
-    const cruxSetting = settings.createSetting('field-data-enabled', true);
-    if (!cruxSetting.get()) {
+    const cruxSetting = settings.createSetting<ConfigSetting>(
+      'field-data',
+      {enabled: false},
+      DevTools.Common.Settings.SettingStorageType.GLOBAL,
+    );
+
+    if (!cruxSetting.get().enabled) {
       return;
     }
   } catch {
