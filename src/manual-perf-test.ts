@@ -41,7 +41,7 @@ async function run() {
     console.log('Context initialized.');
 
     // Pre-navigate to something so we can reload it
-    const targetUrl = 'https://example.com';
+    const targetUrl = 'https://web.dev';
     console.log(`Navigating to ${targetUrl}...`);
     await context.getSelectedPage().goto(targetUrl);
 
