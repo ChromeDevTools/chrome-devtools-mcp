@@ -58,6 +58,8 @@ interface McpContextOptions {
   experimentalDevToolsDebugging: boolean;
   // Whether all page-like targets are exposed as pages.
   experimentalIncludeAllPages?: boolean;
+  // Custom headers to add to all network requests made by the browser.
+  headers?: Record<string, string>;
 }
 
 const DEFAULT_TIMEOUT = 5_000;
@@ -104,6 +106,9 @@ export class McpContext implements Context {
   #textSnapshot: TextSnapshot | null = null;
   #networkCollector: NetworkCollector;
   #consoleCollector: ConsoleCollector;
+  
+  // Custom headers to add to all network requests made by the browser.
+  #headers?: Record<string, string>;
 
   #isRunningTrace = false;
   #networkConditionsMap = new WeakMap<Page, string>();
@@ -127,8 +132,11 @@ export class McpContext implements Context {
     this.logger = logger;
     this.#locatorClass = locatorClass;
     this.#options = options;
+    this.#headers = options.headers;
 
-    this.#networkCollector = new NetworkCollector(this.browser);
+    this.#networkCollector = new NetworkCollector(this.browser, undefined, {
+      headers: this.#headers,
+    });
 
     this.#consoleCollector = new ConsoleCollector(this.browser, collect => {
       return {
@@ -675,6 +683,8 @@ export class McpContext implements Context {
           collect(req);
         },
       } as ListenerMap;
+    }, {
+      headers: this.#headers,
     });
     await this.#networkCollector.init(await this.browser.pages());
   }

@@ -85,9 +85,10 @@ async function getContext(): Promise<McpContext> {
 
   if (context?.browser !== browser) {
     context = await McpContext.from(browser, logger, {
-      experimentalDevToolsDebugging: devtools,
-      experimentalIncludeAllPages: args.experimentalIncludeAllPages,
-    });
+          experimentalDevToolsDebugging: devtools,
+          experimentalIncludeAllPages: args.experimentalIncludeAllPages,
+          headers: args.headers,
+        });
   }
   return context;
 }

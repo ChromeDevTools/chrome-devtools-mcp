@@ -284,6 +284,41 @@ describe('NetworkCollector', () => {
     page.emit('request', request);
     assert.equal(collector.getData(page, true).length, 3);
   });
+
+  it('works with extra headers', async () => {
+    const browser = getMockBrowser();
+    const page = (await browser.pages())[0];
+    
+    let setExtraHTTPHeadersCalled = 0;
+    let setExtraHTTPHeadersArgs = null;
+    
+    page.setExtraHTTPHeaders = async (headers) => {
+      setExtraHTTPHeadersCalled++;
+      setExtraHTTPHeadersArgs = headers;
+      return Promise.resolve();
+    };
+
+    const collector = new NetworkCollector(browser, collect => {
+      return {
+        request: req => {
+          collect(req);
+        },
+      } as ListenerMap;
+    }, {
+      headers: {
+        "x-env": "test_mcp",
+        "x-user": "mock_user"
+      }
+    });
+    
+    await collector.init([page]);
+    
+    assert.equal(setExtraHTTPHeadersCalled > 0, true, 'page.setExtraHTTPHeaders should be called');
+    assert.deepEqual(setExtraHTTPHeadersArgs, {
+      "x-env": "test_mcp",
+      "x-user": "mock_user"
+    }, 'should set extra headers');
+  });
 });
 
 describe('ConsoleCollector', () => {
