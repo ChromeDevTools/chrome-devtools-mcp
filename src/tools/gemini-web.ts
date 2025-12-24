@@ -290,9 +290,15 @@ export const askGeminiWeb = defineTool({
             // Check login only once after navigation
             const needsLogin = await isLoginRequired(page);
             if (needsLogin) {
-                response.appendResponseLine('❌ ログインが必要です');
+                response.appendResponseLine('\n❌ Geminiへのログインが必要です');
+                response.appendResponseLine('');
+                response.appendResponseLine('📱 ブラウザウィンドウでGeminiにログインしてください：');
+                response.appendResponseLine('   1. ブラウザウィンドウでGoogleアカウントを選択');
+                response.appendResponseLine('   2. パスワードを入力してログイン');
+                response.appendResponseLine('   3. ログイン完了後、このツールを再実行してください');
                 return;
             }
+            response.appendResponseLine('✅ ログイン確認完了');
 
             response.appendResponseLine('質問を送信中...');
 
