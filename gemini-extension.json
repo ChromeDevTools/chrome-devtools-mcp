@@ -1,6 +1,7 @@
 {
   "name": "chrome-devtools-mcp",
   "version": "latest",
+  "contextFileName": "gemini-extension.md",
   "mcpServers": {
     "chrome-devtools": {
       "command": "npx",
