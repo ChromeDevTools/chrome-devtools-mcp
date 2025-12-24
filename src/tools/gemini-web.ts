@@ -65,6 +65,7 @@ async function getOrCreateGeminiPage(context: Context): Promise<Page> {
     for (const page of pages) {
         const url = page.url();
         if (url.includes('gemini.google.com')) {
+            await page.bringToFront();
             return page;
         }
     }

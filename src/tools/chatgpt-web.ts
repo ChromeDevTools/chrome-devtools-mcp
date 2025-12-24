@@ -68,7 +68,8 @@ async function getOrCreateChatGPTPage(context: Context): Promise<{ page: Page; n
     for (const page of pages) {
         const url = page.url();
         if (url.includes('chatgpt.com') || url.includes('chat.openai.com')) {
-            // Already on ChatGPT - no navigation needed
+            // Already on ChatGPT - bring to front and no navigation needed
+            await page.bringToFront();
             return { page, needsNavigation: false };
         }
     }
