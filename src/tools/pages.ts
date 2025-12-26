@@ -88,10 +88,18 @@ export const newPage = defineTool({
   },
   schema: {
     url: zod.string().describe('URL to load in a new page.'),
+    headers: zod
+      .record(zod.string())
+      .optional()
+      .describe('Optional headers to send with the navigation request.'),
     ...timeoutSchema,
   },
   handler: async (request, response, context) => {
     const page = await context.newPage();
+
+    if (request.params.headers) {
+      await page.setExtraHTTPHeaders(request.params.headers);
+    }
 
     await context.waitForEventsAfterAction(async () => {
       await page.goto(request.params.url, {
@@ -118,6 +126,10 @@ export const navigatePage = defineTool({
         'Navigate the page by URL, back or forward in history, or reload.',
       ),
     url: zod.string().optional().describe('Target URL (only type=url)'),
+    headers: zod
+      .record(zod.string())
+      .optional()
+      .describe('Optional headers to send with the navigation request.'),
     ignoreCache: zod
       .boolean()
       .optional()
@@ -129,6 +141,10 @@ export const navigatePage = defineTool({
     const options = {
       timeout: request.params.timeout,
     };
+
+    if (request.params.headers) {
+      await page.setExtraHTTPHeaders(request.params.headers);
+    }
 
     if (!request.params.type && !request.params.url) {
       throw new Error('Either URL or a type is required.');
