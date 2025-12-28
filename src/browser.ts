@@ -19,12 +19,27 @@ import {puppeteer} from './third_party/index.js';
 
 let browser: Browser | undefined;
 
+// Global flag to enable extension debugging
+let extensionDebuggingEnabled = false;
+
+export function setExtensionDebuggingEnabled(enabled: boolean): void {
+  extensionDebuggingEnabled = enabled;
+}
+
+export function isExtensionDebuggingEnabled(): boolean {
+  return extensionDebuggingEnabled;
+}
+
 function makeTargetFilter() {
   const ignoredPrefixes = new Set([
     'chrome://',
-    'chrome-extension://',
     'chrome-untrusted://',
   ]);
+
+  // Only filter out chrome-extension:// if extension debugging is disabled
+  if (!extensionDebuggingEnabled) {
+    ignoredPrefixes.add('chrome-extension://');
+  }
 
   return function targetFilter(target: Target): boolean {
     if (target.url() === 'chrome://newtab/') {
@@ -32,6 +47,10 @@ function makeTargetFilter() {
     }
     // Could be the only page opened in the browser.
     if (target.url().startsWith('chrome://inspect')) {
+      return true;
+    }
+    // Allow extension targets when extension debugging is enabled
+    if (extensionDebuggingEnabled && target.url().startsWith('chrome-extension://')) {
       return true;
     }
     for (const prefix of ignoredPrefixes) {

@@ -8,6 +8,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
+import {isExtensionDebuggingEnabled} from './browser.js';
 import {extractUrlLikeFromDevToolsTitle, urlsEqual} from './DevtoolsUtils.js';
 import type {ListenerMap} from './PageCollector.js';
 import {NetworkCollector, ConsoleCollector} from './PageCollector.js';
@@ -23,6 +24,7 @@ import type {
   Page,
   SerializedAXNode,
   PredefinedNetworkConditions,
+  Target,
 } from './third_party/index.js';
 import {listPages} from './tools/pages.js';
 import {takeSnapshot} from './tools/snapshot.js';
@@ -51,6 +53,19 @@ export interface TextSnapshot {
   // snapshot. This flag indicates if there is any selected element.
   hasSelectedElement: boolean;
   verbose: boolean;
+}
+
+export interface ServiceWorkerInfo {
+  type: 'service_worker';
+  url: string;
+  target: Target;
+}
+
+export interface OpenSidepanelResult {
+  success: boolean;
+  url: string;
+  windowId: number;
+  note: string;
 }
 
 interface McpContextOptions {
@@ -472,6 +487,104 @@ export class McpContext implements Context {
 
   getPages(): Page[] {
     return this.#pages;
+  }
+
+  /**
+   * Gets extension service workers when extension debugging is enabled.
+   * Service workers don't have associated Page objects, so we return Target info.
+   */
+  getServiceWorkers(): ServiceWorkerInfo[] {
+    if (!isExtensionDebuggingEnabled()) {
+      return [];
+    }
+
+    const allTargets = this.browser.targets();
+    const serviceWorkers: ServiceWorkerInfo[] = [];
+
+    for (const target of allTargets) {
+      if (target.type() === 'service_worker') {
+        const url = target.url();
+        // Only include extension service workers when extension debugging is enabled
+        if (url.startsWith('chrome-extension://')) {
+          serviceWorkers.push({
+            type: 'service_worker',
+            url,
+            target,
+          });
+        }
+      }
+    }
+
+    return serviceWorkers;
+  }
+
+  /**
+   * Opens an extension's sidepanel in a detached popup window.
+   * Due to Chrome security requirements, chrome.sidePanel.open() requires a user gesture
+   * and cannot be triggered programmatically. This method uses chrome.windows.create()
+   * as the standard workaround for automated extension testing.
+   */
+  async openExtensionSidepanel(extensionId: string): Promise<OpenSidepanelResult> {
+    if (!isExtensionDebuggingEnabled()) {
+      throw new Error('Extension debugging is not enabled. Use --enableExtensions flag.');
+    }
+
+    // Find the extension's service worker
+    const serviceWorkers = this.getServiceWorkers();
+    const extensionWorker = serviceWorkers.find(sw =>
+      sw.url.includes(`chrome-extension://${extensionId}/`)
+    );
+
+    if (!extensionWorker) {
+      throw new Error(
+        `Service worker not found for extension: ${extensionId}. ` +
+        `Make sure the extension is installed and has a service worker.`
+      );
+    }
+
+    const worker = await extensionWorker.target.worker();
+    if (!worker) {
+      throw new Error(`Could not get worker instance for extension: ${extensionId}`);
+    }
+
+    // Open the sidepanel via chrome.windows.create() in the service worker context
+    // The chrome.* APIs are available in the extension's service worker context
+    const result = await worker.evaluate(async () => {
+      // @ts-expect-error chrome is available in extension service worker context
+      const chromeApi = chrome;
+      const manifest = chromeApi.runtime.getManifest();
+      const sidePanelPath = manifest.side_panel?.default_path;
+
+      if (!sidePanelPath) {
+        throw new Error('Extension does not have a side_panel.default_path in manifest.json');
+      }
+
+      const url = chromeApi.runtime.getURL(sidePanelPath);
+
+      // Open as detached popup window (no address bar, minimal chrome UI)
+      const window = await chromeApi.windows.create({
+        url: url,
+        type: 'popup',
+        width: 400,
+        height: 700,
+        focused: true,
+      });
+
+      return {
+        url: url,
+        windowId: window.id ?? -1,
+      };
+    });
+
+    // Refresh pages to include the new sidepanel window
+    await this.createPagesSnapshot();
+
+    return {
+      success: true,
+      url: result.url,
+      windowId: result.windowId,
+      note: 'Sidepanel opened in detached popup window for debugging. Extension code executes identically to docked mode.',
+    };
   }
 
   getDevToolsPage(page: Page): Page | undefined {

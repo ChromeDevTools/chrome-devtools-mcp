@@ -28,10 +28,11 @@
 - **[Network](#network)** (2 tools)
   - [`get_network_request`](#get_network_request)
   - [`list_network_requests`](#list_network_requests)
-- **[Debugging](#debugging)** (5 tools)
+- **[Debugging](#debugging)** (6 tools)
   - [`evaluate_script`](#evaluate_script)
   - [`get_console_message`](#get_console_message)
   - [`list_console_messages`](#list_console_messages)
+  - [`open_extension_sidepanel`](#open_extension_sidepanel)
   - [`take_screenshot`](#take_screenshot)
   - [`take_snapshot`](#take_snapshot)
 
@@ -280,12 +281,12 @@ so returned values have to JSON-serializable.
 **Parameters:**
 
 - **function** (string) **(required)**: A JavaScript function declaration to be executed by the tool in the currently selected page.
-  Example without arguments: `() => {
+Example without arguments: `() => {
   return document.title
 }` or `async () => {
   return await fetch("example.com")
 }`.
-  Example with arguments: `(el) => {
+Example with arguments: `(el) => {
   return el.innerText;
 }`
 
@@ -313,6 +314,21 @@ so returned values have to JSON-serializable.
 - **pageIdx** (integer) _(optional)_: Page number to return (0-based). When omitted, returns the first page.
 - **pageSize** (integer) _(optional)_: Maximum number of messages to return. When omitted, returns all requests.
 - **types** (array) _(optional)_: Filter messages to only return messages of the specified resource types. When omitted or empty, returns all messages.
+
+---
+
+### `open_extension_sidepanel`
+
+**Description:** Opens an extension's sidepanel for debugging. Due to Chrome security restrictions,
+the sidepanel opens in a detached popup window rather than docked to the browser sidebar.
+This provides full debugging capabilities (DOM inspection, console access, script evaluation)
+with identical code execution to docked mode. Only visual docking/layout differs.
+
+After opening, use [`list_pages`](#list_pages) to see the sidepanel and [`select_page`](#select_page) to interact with it.
+
+**Parameters:**
+
+- **extensionId** (string) **(required)**: The ID of the extension whose sidepanel should be opened. Find extension IDs at chrome://extensions or from [`list_pages`](#list_pages) service worker URLs.
 
 ---
 

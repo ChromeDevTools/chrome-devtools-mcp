@@ -11,7 +11,12 @@ import {describe, it} from 'node:test';
 
 import {executablePath} from 'puppeteer';
 
-import {ensureBrowserConnected, launch} from '../src/browser.js';
+import {
+  ensureBrowserConnected,
+  launch,
+  setExtensionDebuggingEnabled,
+  isExtensionDebuggingEnabled,
+} from '../src/browser.js';
 
 describe('browser', () => {
   it('cannot launch multiple times with the same profile', async () => {
@@ -95,5 +100,31 @@ describe('browser', () => {
     } finally {
       await browser.close();
     }
+  });
+});
+
+describe('extension debugging', () => {
+  it('is disabled by default', () => {
+    // Reset to default state
+    setExtensionDebuggingEnabled(false);
+    assert.strictEqual(isExtensionDebuggingEnabled(), false);
+  });
+
+  it('can be enabled', () => {
+    setExtensionDebuggingEnabled(true);
+    assert.strictEqual(isExtensionDebuggingEnabled(), true);
+    // Reset for other tests
+    setExtensionDebuggingEnabled(false);
+  });
+
+  it('can be toggled', () => {
+    setExtensionDebuggingEnabled(false);
+    assert.strictEqual(isExtensionDebuggingEnabled(), false);
+
+    setExtensionDebuggingEnabled(true);
+    assert.strictEqual(isExtensionDebuggingEnabled(), true);
+
+    setExtensionDebuggingEnabled(false);
+    assert.strictEqual(isExtensionDebuggingEnabled(), false);
   });
 });

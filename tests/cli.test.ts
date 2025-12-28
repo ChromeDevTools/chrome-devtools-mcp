@@ -19,6 +19,8 @@ describe('cli args parsing', () => {
     categoryNetwork: true,
     'auto-connect': undefined,
     autoConnect: undefined,
+    'enable-extensions': false,
+    enableExtensions: false,
   };
 
   it('parses with default args', async () => {
@@ -221,5 +223,21 @@ describe('cli args parsing', () => {
       'auto-connect': true,
       autoConnect: true,
     });
+  });
+
+  it('parses --enableExtensions flag', async () => {
+    const args = parseArguments('1.0.0', [
+      'node',
+      'main.js',
+      '--enableExtensions',
+    ]);
+    assert.strictEqual(args.enableExtensions, true);
+    assert.strictEqual(args['enable-extensions'], true);
+  });
+
+  it('enableExtensions defaults to false', async () => {
+    const args = parseArguments('1.0.0', ['node', 'main.js']);
+    assert.strictEqual(args.enableExtensions, false);
+    assert.strictEqual(args['enable-extensions'], false);
   });
 });

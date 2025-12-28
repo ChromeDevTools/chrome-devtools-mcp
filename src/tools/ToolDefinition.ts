@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {TextSnapshotNode, GeolocationOptions} from '../McpContext.js';
+import type {TextSnapshotNode, GeolocationOptions, OpenSidepanelResult} from '../McpContext.js';
 import {zod} from '../third_party/index.js';
 import type {Dialog, ElementHandle, Page} from '../third_party/index.js';
 import type {TraceResult} from '../trace-processing/parse.js';
@@ -118,6 +118,10 @@ export type Context = Readonly<{
    * Returns a reqid for a cdpRequestId.
    */
   resolveCdpElementId(cdpBackendNodeId: number): string | undefined;
+  /**
+   * Opens an extension's sidepanel in a detached popup window.
+   */
+  openExtensionSidepanel(extensionId: string): Promise<OpenSidepanelResult>;
 }>;
 
 export function defineTool<Schema extends zod.ZodRawShape>(

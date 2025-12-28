@@ -178,6 +178,12 @@ export const cliOptions = {
     default: true,
     describe: 'Set to false to exclude tools related to network.',
   },
+  enableExtensions: {
+    type: 'boolean',
+    default: false,
+    describe:
+      'Enable extension debugging support. When enabled, extension contexts (sidepanels, popups, service workers) will be visible and interactable.',
+  },
 } satisfies Record<string, YargsOptions>;
 
 export function parseArguments(version: string, argv = process.argv) {
