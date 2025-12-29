@@ -26,6 +26,7 @@ export const startTrace = defineTool({
   annotations: {
     category: ToolCategory.PERFORMANCE,
     readOnlyHint: true,
+    openWorldHint: true,
   },
   schema: {
     reload: zod
@@ -107,6 +108,7 @@ export const stopTrace = defineTool({
   annotations: {
     category: ToolCategory.PERFORMANCE,
     readOnlyHint: true,
+    openWorldHint: true,
   },
   schema: {},
   handler: async (_request, response, context) => {
@@ -125,6 +127,7 @@ export const analyzeInsight = defineTool({
   annotations: {
     category: ToolCategory.PERFORMANCE,
     readOnlyHint: true,
+    openWorldHint: true,
   },
   schema: {
     insightSetId: zod

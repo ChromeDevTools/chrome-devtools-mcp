@@ -24,6 +24,16 @@ export interface ToolDefinition<
      * If true, the tool does not modify its environment.
      */
     readOnlyHint: boolean;
+    /**
+     * If true, the tool may perform destructive updates to its environment.
+     * If false, the tool performs only additive updates.
+     */
+    destructiveHint?: boolean;
+    /**
+     * If true, this tool may interact with an "open world" of external
+     * entities (e.g., websites, APIs, external services).
+     */
+    openWorldHint?: boolean;
   };
   schema: Schema;
   handler: (

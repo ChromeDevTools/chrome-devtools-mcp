@@ -16,6 +16,7 @@ export const listPages = defineTool({
   annotations: {
     category: ToolCategory.NAVIGATION,
     readOnlyHint: true,
+    openWorldHint: true,
   },
   schema: {},
   handler: async (_request, response) => {
@@ -29,6 +30,7 @@ export const selectPage = defineTool({
   annotations: {
     category: ToolCategory.NAVIGATION,
     readOnlyHint: true,
+    openWorldHint: true,
   },
   schema: {
     pageIdx: zod
@@ -57,6 +59,8 @@ export const closePage = defineTool({
   annotations: {
     category: ToolCategory.NAVIGATION,
     readOnlyHint: false,
+    destructiveHint: true,
+    openWorldHint: true,
   },
   schema: {
     pageIdx: zod
@@ -85,6 +89,8 @@ export const newPage = defineTool({
   annotations: {
     category: ToolCategory.NAVIGATION,
     readOnlyHint: false,
+    destructiveHint: false,
+    openWorldHint: true,
   },
   schema: {
     url: zod.string().describe('URL to load in a new page.'),
@@ -109,6 +115,8 @@ export const navigatePage = defineTool({
   annotations: {
     category: ToolCategory.NAVIGATION,
     readOnlyHint: false,
+    destructiveHint: true,
+    openWorldHint: true,
   },
   schema: {
     type: zod
@@ -205,6 +213,8 @@ export const resizePage = defineTool({
   annotations: {
     category: ToolCategory.EMULATION,
     readOnlyHint: false,
+    destructiveHint: false,
+    openWorldHint: true,
   },
   schema: {
     width: zod.number().describe('Page width'),
@@ -229,6 +239,8 @@ export const handleDialog = defineTool({
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
+    destructiveHint: false,
+    openWorldHint: true,
   },
   schema: {
     action: zod

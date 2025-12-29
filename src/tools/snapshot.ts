@@ -18,6 +18,8 @@ in the DevTools Elements panel (if any).`,
     category: ToolCategory.DEBUGGING,
     // Not read-only due to filePath param.
     readOnlyHint: false,
+    destructiveHint: false,
+    openWorldHint: true,
   },
   schema: {
     verbose: zod
@@ -47,6 +49,7 @@ export const waitFor = defineTool({
   annotations: {
     category: ToolCategory.NAVIGATION,
     readOnlyHint: true,
+    openWorldHint: true,
   },
   schema: {
     text: zod.string().describe('Text to appear on the page'),

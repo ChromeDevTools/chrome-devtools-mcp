@@ -21,6 +21,8 @@ export const emulate = defineTool({
   annotations: {
     category: ToolCategory.EMULATION,
     readOnlyHint: false,
+    destructiveHint: false,
+    openWorldHint: true,
   },
   schema: {
     networkConditions: zod

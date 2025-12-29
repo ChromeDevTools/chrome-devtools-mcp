@@ -18,6 +18,8 @@ export const click = defineTool({
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
+    destructiveHint: false,
+    openWorldHint: true,
   },
   schema: {
     uid: zod
@@ -57,6 +59,8 @@ export const hover = defineTool({
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
+    destructiveHint: false,
+    openWorldHint: true,
   },
   schema: {
     uid: zod
@@ -141,6 +145,8 @@ export const fill = defineTool({
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
+    destructiveHint: false,
+    openWorldHint: true,
   },
   schema: {
     uid: zod
@@ -169,6 +175,8 @@ export const drag = defineTool({
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
+    destructiveHint: false,
+    openWorldHint: true,
   },
   schema: {
     from_uid: zod.string().describe('The uid of the element to drag'),
@@ -198,6 +206,8 @@ export const fillForm = defineTool({
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
+    destructiveHint: false,
+    openWorldHint: true,
   },
   schema: {
     elements: zod
@@ -230,6 +240,8 @@ export const uploadFile = defineTool({
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
+    destructiveHint: false,
+    openWorldHint: true,
   },
   schema: {
     uid: zod
@@ -278,6 +290,8 @@ export const pressKey = defineTool({
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
+    destructiveHint: false,
+    openWorldHint: true,
   },
   schema: {
     key: zod
