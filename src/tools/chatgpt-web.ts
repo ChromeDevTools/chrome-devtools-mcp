@@ -14,7 +14,7 @@ import {ToolCategories} from './categories.js';
 import {defineTool} from './ToolDefinition.js';
 import {loadSelectors, getSelector} from '../selectors/loader.js';
 import {CHATGPT_CONFIG} from '../config.js';
-import {isLoginRequired} from '../login-helper.js';
+import {getLoginStatus, waitForLoginStatus, LoginStatus} from '../login-helper.js';
 
 import type {Context} from './ToolDefinition.js';
 
@@ -320,18 +320,37 @@ export const askChatGPTWeb = defineTool({
         response.appendResponseLine('✅ 既存のChatGPTタブを再利用');
       }
 
-      // Step 2: Check if login is required (don't wait - stop immediately)
-      const needsLogin = await isLoginRequired(page);
+      // Step 2: Check login status using session probe (most reliable)
+      const loginStatus = await getLoginStatus(page, 'chatgpt');
 
-      if (needsLogin) {
+      if (loginStatus === LoginStatus.NEEDS_LOGIN) {
         response.appendResponseLine('\n❌ ChatGPTへのログインが必要です');
         response.appendResponseLine('');
         response.appendResponseLine('📱 ブラウザウィンドウでChatGPTにログインしてください：');
         response.appendResponseLine('   1. ブラウザウィンドウの「ログイン」ボタンをクリック');
         response.appendResponseLine('   2. メールアドレスまたはGoogleアカウントでログイン');
-        response.appendResponseLine('   3. ログイン完了後、このツールを再実行してください');
         response.appendResponseLine('');
-        return;
+
+        // Auto-poll for login completion (max 2 minutes)
+        const finalStatus = await waitForLoginStatus(
+          page,
+          'chatgpt',
+          120000,
+          (msg) => response.appendResponseLine(msg)
+        );
+
+        if (finalStatus !== LoginStatus.LOGGED_IN) {
+          response.appendResponseLine('❌ ログインがタイムアウトしました。再度お試しください。');
+          return;
+        }
+      } else if (loginStatus === LoginStatus.IN_PROGRESS) {
+        // Wait a bit and retry
+        await new Promise(r => setTimeout(r, 2000));
+        const retryStatus = await getLoginStatus(page, 'chatgpt');
+        if (retryStatus !== LoginStatus.LOGGED_IN) {
+          response.appendResponseLine('⚠️ ログイン状態を確認できませんでした。再試行してください。');
+          return;
+        }
       }
 
       response.appendResponseLine('✅ ログイン確認完了');

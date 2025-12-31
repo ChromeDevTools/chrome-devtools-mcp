@@ -7,6 +7,157 @@
 import type { Page } from 'puppeteer-core';
 
 /**
+ * Login status enum for state machine
+ */
+export enum LoginStatus {
+  LOGGED_IN = 'LOGGED_IN',
+  NEEDS_LOGIN = 'NEEDS_LOGIN',
+  IN_PROGRESS = 'IN_PROGRESS', // 2FA or loading
+}
+
+/**
+ * Multi-language ARIA label patterns for Gemini profile button detection
+ */
+const GEMINI_PROFILE_PATTERNS = [
+  'Google Account', // English
+  'Google アカウント', // Japanese
+  'Compte Google', // French
+  'Google-Konto', // German
+  'Cuenta de Google', // Spanish
+  'Account Google', // Italian
+  '구글 계정', // Korean
+  '谷歌帐户', // Chinese Simplified
+  'Google 帳戶', // Chinese Traditional
+];
+
+/**
+ * Probe ChatGPT session via API endpoint (most reliable method)
+ * Based on ChatGPT's recommendation to use /api/auth/session
+ */
+export async function probeChatGPTSession(page: Page): Promise<LoginStatus> {
+  try {
+    const result = await page.evaluate(async () => {
+      try {
+        const r = await fetch('/api/auth/session', { credentials: 'include' });
+        const j = await r.json().catch(() => ({}));
+        return { ok: true, status: r.status, json: j };
+      } catch (e) {
+        return { ok: false, error: String(e) };
+      }
+    });
+
+    if (!result?.ok) {
+      console.error('[login-helper] Session probe failed:', result);
+      return LoginStatus.IN_PROGRESS;
+    }
+
+    const j = result.json ?? {};
+    const loggedIn = j && typeof j === 'object' && Object.keys(j).length > 0;
+    console.error(
+      `[login-helper] ChatGPT session probe: ${loggedIn ? 'LOGGED_IN' : 'NEEDS_LOGIN'}`
+    );
+    return loggedIn ? LoginStatus.LOGGED_IN : LoginStatus.NEEDS_LOGIN;
+  } catch (error) {
+    console.error(`[login-helper] Error probing ChatGPT session: ${error}`);
+    return LoginStatus.IN_PROGRESS;
+  }
+}
+
+/**
+ * Get Gemini login status using ARIA labels (multi-language support)
+ * Based on Gemini's recommendation to use aria-label patterns
+ */
+export async function getGeminiStatus(page: Page): Promise<LoginStatus> {
+  const url = page.url();
+
+  // URL-based check (fastest)
+  if (url.includes('accounts.google.com')) {
+    console.error('[login-helper] Gemini: On Google login page');
+    return LoginStatus.NEEDS_LOGIN;
+  }
+
+  try {
+    const profileFound = await page.evaluate((patterns: string[]) => {
+      for (const pattern of patterns) {
+        if (document.querySelector(`button[aria-label*="${pattern}"]`)) {
+          return true;
+        }
+      }
+      // Fallback: check for nav with chat history (logged-in indicator)
+      if (document.querySelector('nav[aria-label*="Recent"]')) {
+        return true;
+      }
+      return false;
+    }, GEMINI_PROFILE_PATTERNS);
+
+    console.error(
+      `[login-helper] Gemini ARIA check: ${profileFound ? 'LOGGED_IN' : 'NEEDS_LOGIN'}`
+    );
+    return profileFound ? LoginStatus.LOGGED_IN : LoginStatus.NEEDS_LOGIN;
+  } catch (error) {
+    console.error(`[login-helper] Error checking Gemini status: ${error}`);
+    return LoginStatus.IN_PROGRESS;
+  }
+}
+
+/**
+ * Get login status for a specific provider
+ */
+export async function getLoginStatus(
+  page: Page,
+  provider: 'chatgpt' | 'gemini'
+): Promise<LoginStatus> {
+  if (provider === 'chatgpt') {
+    // Try session probe first (most reliable)
+    const sessionStatus = await probeChatGPTSession(page);
+    if (sessionStatus !== LoginStatus.IN_PROGRESS) {
+      return sessionStatus;
+    }
+    // Fallback to DOM-based detection
+    const needsLogin = await isLoginRequired(page);
+    return needsLogin ? LoginStatus.NEEDS_LOGIN : LoginStatus.LOGGED_IN;
+  } else {
+    return await getGeminiStatus(page);
+  }
+}
+
+/**
+ * Wait for login with auto-polling and backoff
+ * Returns when user logs in or timeout occurs
+ */
+export async function waitForLoginStatus(
+  page: Page,
+  provider: 'chatgpt' | 'gemini',
+  timeoutMs: number = 120000,
+  onStatusUpdate?: (message: string) => void
+): Promise<LoginStatus> {
+  const log = onStatusUpdate || console.error;
+  const start = Date.now();
+  let delay = 500;
+
+  log(`⏳ ログイン待機中（最大${Math.floor(timeoutMs / 1000)}秒）...`);
+
+  while (Date.now() - start < timeoutMs) {
+    const status = await getLoginStatus(page, provider);
+    if (status === LoginStatus.LOGGED_IN) {
+      log('✅ ログイン検出！続行します...');
+      return status;
+    }
+
+    const elapsed = Math.floor((Date.now() - start) / 1000);
+    if (elapsed % 10 === 0 && elapsed > 0) {
+      log(`⏳ まだ待機中... (${elapsed}秒経過)`);
+    }
+
+    await new Promise((r) => setTimeout(r, delay));
+    delay = Math.min(3000, Math.floor(delay * 1.5)); // backoff
+  }
+
+  log('❌ タイムアウト: 再度お試しください');
+  return LoginStatus.NEEDS_LOGIN;
+}
+
+/**
  * Check if the page requires login
  * More robust than just checking URL
  */

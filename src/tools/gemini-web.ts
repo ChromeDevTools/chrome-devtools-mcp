@@ -14,7 +14,7 @@ import { ToolCategories } from './categories.js';
 import { defineTool, type Context } from './ToolDefinition.js';
 import { loadGeminiSelectors, getGeminiSelector } from '../selectors/loader.js';
 import { GEMINI_CONFIG } from '../config.js';
-import { isLoginRequired } from '../login-helper.js';
+import { getLoginStatus, waitForLoginStatus, LoginStatus } from '../login-helper.js';
 
 /**
  * Navigate with retry logic for handling ERR_ABORTED and other network errors
@@ -284,20 +284,52 @@ export const askGeminiWeb = defineTool({
             response.appendResponseLine('Geminiに接続中...');
             await navigateWithRetry(page, targetUrl, { waitUntil: 'networkidle2' });
 
-            // Wait for Gemini SPA to fully render (networkidle2 is not enough for SPAs)
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            // Wait for Gemini SPA to fully render using selector-based detection
+            // Instead of fixed 1000ms wait, wait for either profile button (logged in) or login link
+            try {
+                await Promise.race([
+                    page.waitForSelector('button[aria-label*="Account"], button[aria-label*="アカウント"]', { timeout: 10000 }),
+                    page.waitForSelector('a[href*="accounts.google.com"]', { timeout: 10000 }),
+                    page.waitForSelector('[role="textbox"]', { timeout: 10000 }),
+                ]);
+            } catch {
+                // Timeout is acceptable - continue with login check
+                response.appendResponseLine('⚠️ UI安定化待機タイムアウト（続行）');
+            }
 
-            // Check login only once after navigation
-            const needsLogin = await isLoginRequired(page);
-            if (needsLogin) {
+            // Check login using ARIA-based detection (multi-language support)
+            const loginStatus = await getLoginStatus(page, 'gemini');
+
+            if (loginStatus === LoginStatus.NEEDS_LOGIN) {
                 response.appendResponseLine('\n❌ Geminiへのログインが必要です');
                 response.appendResponseLine('');
                 response.appendResponseLine('📱 ブラウザウィンドウでGeminiにログインしてください：');
                 response.appendResponseLine('   1. ブラウザウィンドウでGoogleアカウントを選択');
                 response.appendResponseLine('   2. パスワードを入力してログイン');
-                response.appendResponseLine('   3. ログイン完了後、このツールを再実行してください');
-                return;
+                response.appendResponseLine('');
+
+                // Auto-poll for login completion (max 2 minutes)
+                const finalStatus = await waitForLoginStatus(
+                    page,
+                    'gemini',
+                    120000,
+                    (msg) => response.appendResponseLine(msg)
+                );
+
+                if (finalStatus !== LoginStatus.LOGGED_IN) {
+                    response.appendResponseLine('❌ ログインがタイムアウトしました。再度お試しください。');
+                    return;
+                }
+            } else if (loginStatus === LoginStatus.IN_PROGRESS) {
+                // Wait a bit and retry
+                await new Promise(r => setTimeout(r, 2000));
+                const retryStatus = await getLoginStatus(page, 'gemini');
+                if (retryStatus !== LoginStatus.LOGGED_IN) {
+                    response.appendResponseLine('⚠️ ログイン状態を確認できませんでした。再試行してください。');
+                    return;
+                }
             }
+
             response.appendResponseLine('✅ ログイン確認完了');
 
             response.appendResponseLine('質問を送信中...');
