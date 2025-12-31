@@ -8,15 +8,18 @@ import type { Page } from 'puppeteer-core';
 
 /**
  * Login status enum for state machine
+ * Based on ChatGPT/Gemini recommendations
  */
 export enum LoginStatus {
   LOGGED_IN = 'LOGGED_IN',
   NEEDS_LOGIN = 'NEEDS_LOGIN',
   IN_PROGRESS = 'IN_PROGRESS', // 2FA or loading
+  BLOCKED = 'BLOCKED', // WAF, CAPTCHA, rate limited (ChatGPT recommendation)
 }
 
 /**
  * Multi-language ARIA label patterns for Gemini profile button detection
+ * Extended based on Gemini's recommendation to add PT/RU/AR
  */
 const GEMINI_PROFILE_PATTERNS = [
   'Google Account', // English
@@ -28,33 +31,82 @@ const GEMINI_PROFILE_PATTERNS = [
   '구글 계정', // Korean
   '谷歌帐户', // Chinese Simplified
   'Google 帳戶', // Chinese Traditional
+  'Conta do Google', // Portuguese (Gemini recommendation)
+  'Аккаунт Google', // Russian (Gemini recommendation)
+  'حساب Google', // Arabic (Gemini recommendation)
 ];
 
 /**
  * Probe ChatGPT session via API endpoint (most reliable method)
  * Based on ChatGPT's recommendation to use /api/auth/session
+ * Improved with stricter validation and HTTP status handling
  */
 export async function probeChatGPTSession(page: Page): Promise<LoginStatus> {
   try {
     const result = await page.evaluate(async () => {
       try {
-        const r = await fetch('/api/auth/session', { credentials: 'include' });
+        // Use AbortController for timeout (ChatGPT recommendation)
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+        const r = await fetch('/api/auth/session', {
+          credentials: 'include',
+          cache: 'no-store',
+          signal: controller.signal,
+        });
+        clearTimeout(timeoutId);
+
+        const contentType = r.headers.get('content-type') || '';
+        const isJson = contentType.includes('application/json');
+
+        // Handle non-JSON responses (WAF/interstitial pages)
+        if (!isJson) {
+          return { ok: false, status: r.status, isHtml: true, error: 'Non-JSON response' };
+        }
+
         const j = await r.json().catch(() => ({}));
-        return { ok: true, status: r.status, json: j };
+        return { ok: r.ok, status: r.status, json: j };
       } catch (e) {
-        return { ok: false, error: String(e) };
+        const isAbort = e instanceof Error && e.name === 'AbortError';
+        return { ok: false, error: String(e), isTimeout: isAbort };
       }
     });
+
+    // Handle timeout
+    if (result?.isTimeout) {
+      console.error('[login-helper] Session probe timed out');
+      return LoginStatus.IN_PROGRESS;
+    }
+
+    // Handle HTML response (WAF/blocked)
+    if (result?.isHtml) {
+      console.error('[login-helper] Session probe returned HTML (possibly blocked)');
+      return LoginStatus.BLOCKED;
+    }
+
+    // Handle HTTP error statuses (ChatGPT recommendation)
+    if (result?.status === 429) {
+      console.error('[login-helper] Rate limited (429)');
+      return LoginStatus.BLOCKED;
+    }
+    if (result?.status === 401 || result?.status === 403) {
+      console.error(`[login-helper] Auth error (${result.status})`);
+      return LoginStatus.NEEDS_LOGIN;
+    }
 
     if (!result?.ok) {
       console.error('[login-helper] Session probe failed:', result);
       return LoginStatus.IN_PROGRESS;
     }
 
+    // Stricter validation: check for specific fields (ChatGPT recommendation)
     const j = result.json ?? {};
-    const loggedIn = j && typeof j === 'object' && Object.keys(j).length > 0;
+    const hasUser = j?.user?.id || j?.user?.email;
+    const hasToken = j?.accessToken;
+    const loggedIn = !!(hasUser || hasToken);
+
     console.error(
-      `[login-helper] ChatGPT session probe: ${loggedIn ? 'LOGGED_IN' : 'NEEDS_LOGIN'}`
+      `[login-helper] ChatGPT session probe: ${loggedIn ? 'LOGGED_IN' : 'NEEDS_LOGIN'} (user: ${!!hasUser}, token: ${!!hasToken})`
     );
     return loggedIn ? LoginStatus.LOGGED_IN : LoginStatus.NEEDS_LOGIN;
   } catch (error) {
@@ -66,6 +118,7 @@ export async function probeChatGPTSession(page: Page): Promise<LoginStatus> {
 /**
  * Get Gemini login status using ARIA labels (multi-language support)
  * Based on Gemini's recommendation to use aria-label patterns
+ * Added fail-fast Sign In detection (Gemini recommendation)
  */
 export async function getGeminiStatus(page: Page): Promise<LoginStatus> {
   const url = page.url();
@@ -77,11 +130,21 @@ export async function getGeminiStatus(page: Page): Promise<LoginStatus> {
   }
 
   try {
-    const profileFound = await page.evaluate((patterns: string[]) => {
+    const result = await page.evaluate((patterns: string[]) => {
+      // FAIL-FAST: Check for Sign In link (Gemini recommendation)
+      // This is language-agnostic and very reliable
+      const signInLink = document.querySelector('a[href*="accounts.google.com/ServiceLogin"]');
+      if (signInLink) {
+        return { signInPresent: true, profileFound: false };
+      }
+
+      // Check for Terms of Service / dialog blocking the UI (Gemini recommendation)
+      const hasBlockingDialog = document.querySelector('[role="dialog"]') !== null;
+
       // Method 1: Check aria-label attribute
       for (const pattern of patterns) {
         if (document.querySelector(`button[aria-label*="${pattern}"]`)) {
-          return true;
+          return { signInPresent: false, profileFound: true, hasDialog: hasBlockingDialog };
         }
       }
 
@@ -90,27 +153,39 @@ export async function getGeminiStatus(page: Page): Promise<LoginStatus> {
       for (const pattern of patterns) {
         const found = buttons.some(btn => btn.textContent?.includes(pattern));
         if (found) {
-          return true;
+          return { signInPresent: false, profileFound: true, hasDialog: hasBlockingDialog };
         }
       }
 
       // Fallback: check for nav with chat history (logged-in indicator)
       if (document.querySelector('nav[aria-label*="Recent"]')) {
-        return true;
+        return { signInPresent: false, profileFound: true, hasDialog: hasBlockingDialog };
       }
 
       // Fallback: check for textbox (user is on main chat page)
       if (document.querySelector('[role="textbox"]')) {
-        return true;
+        return { signInPresent: false, profileFound: true, hasDialog: hasBlockingDialog };
       }
 
-      return false;
+      return { signInPresent: false, profileFound: false, hasDialog: hasBlockingDialog };
     }, GEMINI_PROFILE_PATTERNS);
 
+    // Fail-fast: Sign In link present means not logged in
+    if (result.signInPresent) {
+      console.error('[login-helper] Gemini: Sign In link detected (fail-fast)');
+      return LoginStatus.NEEDS_LOGIN;
+    }
+
+    // Logged in but dialog blocking
+    if (result.profileFound && result.hasDialog) {
+      console.error('[login-helper] Gemini: Logged in but dialog present (Terms of Service?)');
+      return LoginStatus.IN_PROGRESS;
+    }
+
     console.error(
-      `[login-helper] Gemini ARIA check: ${profileFound ? 'LOGGED_IN' : 'NEEDS_LOGIN'}`
+      `[login-helper] Gemini check: ${result.profileFound ? 'LOGGED_IN' : 'NEEDS_LOGIN'}`
     );
-    return profileFound ? LoginStatus.LOGGED_IN : LoginStatus.NEEDS_LOGIN;
+    return result.profileFound ? LoginStatus.LOGGED_IN : LoginStatus.NEEDS_LOGIN;
   } catch (error) {
     console.error(`[login-helper] Error checking Gemini status: ${error}`);
     return LoginStatus.IN_PROGRESS;
@@ -167,7 +242,9 @@ export async function waitForLoginStatus(
     }
 
     await new Promise((r) => setTimeout(r, delay));
-    delay = Math.min(3000, Math.floor(delay * 1.5)); // backoff
+    // Backoff with jitter (ChatGPT recommendation: ±10-20% randomization)
+    const jitter = 0.9 + Math.random() * 0.2; // 0.9 to 1.1
+    delay = Math.min(3000, Math.floor(delay * 1.5 * jitter));
   }
 
   log('❌ タイムアウト: 再度お試しください');
