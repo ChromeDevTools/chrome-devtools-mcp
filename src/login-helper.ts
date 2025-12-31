@@ -78,15 +78,32 @@ export async function getGeminiStatus(page: Page): Promise<LoginStatus> {
 
   try {
     const profileFound = await page.evaluate((patterns: string[]) => {
+      // Method 1: Check aria-label attribute
       for (const pattern of patterns) {
         if (document.querySelector(`button[aria-label*="${pattern}"]`)) {
           return true;
         }
       }
+
+      // Method 2: Check button text content (Gemini may not use aria-label)
+      const buttons = Array.from(document.querySelectorAll('button'));
+      for (const pattern of patterns) {
+        const found = buttons.some(btn => btn.textContent?.includes(pattern));
+        if (found) {
+          return true;
+        }
+      }
+
       // Fallback: check for nav with chat history (logged-in indicator)
       if (document.querySelector('nav[aria-label*="Recent"]')) {
         return true;
       }
+
+      // Fallback: check for textbox (user is on main chat page)
+      if (document.querySelector('[role="textbox"]')) {
+        return true;
+      }
+
       return false;
     }, GEMINI_PROFILE_PATTERNS);
 
