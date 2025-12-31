@@ -274,7 +274,10 @@ ${response}
 
 export const askChatGPTWeb = defineTool({
   name: 'ask_chatgpt_web',
-  description: 'Ask ChatGPT via browser. Logs to docs/ask/chatgpt/.',
+  description:
+    'Ask ChatGPT via browser. Logs to docs/ask/chatgpt/. ' +
+    'IMPORTANT: Always continues existing project chat by default. ' +
+    'Only set createNewChat=true when user explicitly says "新規で" or "new chat".',
   annotations: {
     category: ToolCategories.NAVIGATION_AUTOMATION,
     readOnlyHint: false,
@@ -290,7 +293,10 @@ export const askChatGPTWeb = defineTool({
     createNewChat: z
       .boolean()
       .optional()
-      .describe('Force new chat'),
+      .describe(
+        'Force new chat. Only use true when user explicitly requests "新規で" or "new chat". ' +
+        'Default false = always continue existing project chat.'
+      ),
     useDeepResearch: z
       .boolean()
       .optional()

@@ -235,7 +235,10 @@ ${response}
 
 export const askGeminiWeb = defineTool({
     name: 'ask_gemini_web',
-    description: 'Ask Gemini via browser. Logs to docs/ask/gemini/.',
+    description:
+        'Ask Gemini via browser. Logs to docs/ask/gemini/. ' +
+        'IMPORTANT: Always continues existing project chat by default. ' +
+        'Only set createNewChat=true when user explicitly says "新規で" or "new chat".',
     annotations: {
         category: ToolCategories.NAVIGATION_AUTOMATION,
         readOnlyHint: false,
@@ -243,7 +246,10 @@ export const askGeminiWeb = defineTool({
     schema: {
         question: z.string().describe('Question text'),
         projectName: z.string().optional().describe('Project name (default: cwd)'),
-        createNewChat: z.boolean().optional().describe('Force new chat'),
+        createNewChat: z.boolean().optional().describe(
+            'Force new chat. Only use true when user explicitly requests "新規で" or "new chat". ' +
+            'Default false = always continue existing project chat.'
+        ),
     },
     handler: async (request, response, context) => {
         const { question, projectName, createNewChat = false } = request.params;
