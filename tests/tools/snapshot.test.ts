@@ -3,16 +3,17 @@
  * Copyright 2025 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
+
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
 import {takeSnapshot, waitFor} from '../../src/tools/snapshot.js';
-import {html, withBrowser} from '../utils.js';
+import {html, withMcpContext} from '../utils.js';
 
 describe('snapshot', () => {
   describe('browser_snapshot', () => {
     it('includes a snapshot', async () => {
-      await withBrowser(async (response, context) => {
+      await withMcpContext(async (response, context) => {
         await takeSnapshot.handler({params: {}}, response, context);
         assert.ok(response.includeSnapshot);
       });
@@ -20,7 +21,7 @@ describe('snapshot', () => {
   });
   describe('browser_wait_for', () => {
     it('should work', async () => {
-      await withBrowser(async (response, context) => {
+      await withMcpContext(async (response, context) => {
         const page = context.getSelectedPage();
 
         await page.setContent(
@@ -44,7 +45,7 @@ describe('snapshot', () => {
       });
     });
     it('should work with element that show up later', async () => {
-      await withBrowser(async (response, context) => {
+      await withMcpContext(async (response, context) => {
         const page = context.getSelectedPage();
 
         const handlePromise = waitFor.handler(
@@ -71,7 +72,7 @@ describe('snapshot', () => {
       });
     });
     it('should work with aria elements', async () => {
-      await withBrowser(async (response, context) => {
+      await withMcpContext(async (response, context) => {
         const page = context.getSelectedPage();
 
         await page.setContent(
@@ -97,7 +98,7 @@ describe('snapshot', () => {
     });
 
     it('should work with iframe content', async () => {
-      await withBrowser(async (response, context) => {
+      await withMcpContext(async (response, context) => {
         const page = context.getSelectedPage();
 
         await page.setContent(

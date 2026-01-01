@@ -30,6 +30,10 @@ function makeTargetFilter() {
     if (target.url() === 'chrome://newtab/') {
       return true;
     }
+    // Could be the only page opened in the browser.
+    if (target.url().startsWith('chrome://inspect')) {
+      return true;
+    }
     for (const prefix of ignoredPrefixes) {
       if (target.url().startsWith(prefix)) {
         return false;
@@ -44,7 +48,10 @@ export async function ensureBrowserConnected(options: {
   wsEndpoint?: string;
   wsHeaders?: Record<string, string>;
   devtools: boolean;
+  channel?: Channel;
+  userDataDir?: string;
 }) {
+  const {channel} = options;
   if (browser?.connected) {
     return browser;
   }
@@ -62,12 +69,63 @@ export async function ensureBrowserConnected(options: {
     }
   } else if (options.browserURL) {
     connectOptions.browserURL = options.browserURL;
+  } else if (channel || options.userDataDir) {
+    const userDataDir = options.userDataDir;
+    if (userDataDir) {
+      // TODO: re-expose this logic via Puppeteer.
+      const portPath = path.join(userDataDir, 'DevToolsActivePort');
+      try {
+        const fileContent = await fs.promises.readFile(portPath, 'utf8');
+        const [rawPort, rawPath] = fileContent
+          .split('\n')
+          .map(line => {
+            return line.trim();
+          })
+          .filter(line => {
+            return !!line;
+          });
+        if (!rawPort || !rawPath) {
+          throw new Error(`Invalid DevToolsActivePort '${fileContent}' found`);
+        }
+        const port = parseInt(rawPort, 10);
+        if (isNaN(port) || port <= 0 || port > 65535) {
+          throw new Error(`Invalid port '${rawPort}' found`);
+        }
+        const browserWSEndpoint = `ws://127.0.0.1:${port}${rawPath}`;
+        connectOptions.browserWSEndpoint = browserWSEndpoint;
+      } catch (error) {
+        throw new Error(
+          `Could not connect to Chrome in ${userDataDir}. Check if Chrome is running and remote debugging is enabled.`,
+          {
+            cause: error,
+          },
+        );
+      }
+    } else {
+      if (!channel) {
+        throw new Error('Channel must be provided if userDataDir is missing');
+      }
+      connectOptions.channel = (
+        channel === 'stable' ? 'chrome' : `chrome-${channel}`
+      ) as ChromeReleaseChannel;
+    }
   } else {
-    throw new Error('Either browserURL or wsEndpoint must be provided');
+    throw new Error(
+      'Either browserURL, wsEndpoint, channel or userDataDir must be provided',
+    );
   }
 
   logger('Connecting Puppeteer to ', JSON.stringify(connectOptions));
-  browser = await puppeteer.connect(connectOptions);
+  try {
+    browser = await puppeteer.connect(connectOptions);
+  } catch (err) {
+    throw new Error(
+      'Could not connect to Chrome. Check if Chrome is running and remote debugging is enabled by going to chrome://inspect/#remote-debugging.',
+      {
+        cause: err,
+      },
+    );
+  }
   logger('Connected Puppeteer');
   return browser;
 }

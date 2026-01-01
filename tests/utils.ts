@@ -3,6 +3,8 @@
  * Copyright 2025 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
+
+import type {CallToolResult} from '@modelcontextprotocol/sdk/types.js';
 import logger from 'debug';
 import type {Browser} from 'puppeteer';
 import puppeteer, {Locator} from 'puppeteer';
@@ -11,16 +13,39 @@ import type {
   HTTPRequest,
   HTTPResponse,
   LaunchOptions,
+  Page,
 } from 'puppeteer-core';
+import sinon from 'sinon';
 
 import {McpContext} from '../src/McpContext.js';
 import {McpResponse} from '../src/McpResponse.js';
 import {stableIdSymbol} from '../src/PageCollector.js';
+import {DevTools} from '../src/third_party/index.js';
+
+export function getTextContent(
+  content: CallToolResult['content'][number],
+): string {
+  if (content.type === 'text') {
+    return content.text;
+  }
+  throw new Error(`Expected text content but got ${content.type}`);
+}
+
+export function getImageContent(content: CallToolResult['content'][number]): {
+  data: string;
+  mimeType: string;
+} {
+  if (content.type === 'image') {
+    return {data: content.data, mimeType: content.mimeType};
+  }
+  throw new Error(`Expected image content but got ${content.type}`);
+}
 
 const browsers = new Map<string, Browser>();
+let context: McpContext | undefined;
 
 export async function withBrowser(
-  cb: (response: McpResponse, context: McpContext) => Promise<void>,
+  cb: (browser: Browser, page: Page) => Promise<void>,
   options: {debug?: boolean; autoOpenDevTools?: boolean} = {},
 ) {
   const launchOptions: LaunchOptions = {
@@ -47,17 +72,30 @@ export async function withBrowser(
       }
     }),
   );
-  const response = new McpResponse();
-  const context = await McpContext.from(
-    browser,
-    logger('test'),
-    {
-      experimentalDevToolsDebugging: false,
-    },
-    Locator,
-  );
 
-  await cb(response, context);
+  await cb(browser, newPage);
+}
+
+export async function withMcpContext(
+  cb: (response: McpResponse, context: McpContext) => Promise<void>,
+  options: {debug?: boolean; autoOpenDevTools?: boolean} = {},
+) {
+  await withBrowser(async browser => {
+    const response = new McpResponse();
+    if (context) {
+      context.dispose();
+    }
+    context = await McpContext.from(
+      browser,
+      logger('test'),
+      {
+        experimentalDevToolsDebugging: false,
+      },
+      Locator,
+    );
+
+    await cb(response, context);
+  }, options);
 }
 
 export function getMockRequest(
@@ -174,4 +212,63 @@ export function stabilizeResponseOutput(text: unknown) {
   const savedSnapshot = /Saved snapshot to (.*)/g;
   output = output.replaceAll(savedSnapshot, 'Saved snapshot to <file>');
   return output;
+}
+
+export function getMockAggregatedIssue(): sinon.SinonStubbedInstance<DevTools.AggregatedIssue> {
+  const mockAggregatedIssue = sinon.createStubInstance(
+    DevTools.AggregatedIssue,
+  );
+  mockAggregatedIssue.getAllIssues.returns([]);
+  return mockAggregatedIssue;
+}
+
+export function mockListener() {
+  const listeners: Record<string, Array<(data: unknown) => void>> = {};
+  return {
+    on(eventName: string, listener: (data: unknown) => void) {
+      if (listeners[eventName]) {
+        listeners[eventName].push(listener);
+      } else {
+        listeners[eventName] = [listener];
+      }
+    },
+    off(_eventName: string, _listener: (data: unknown) => void) {
+      // no-op
+    },
+    emit(eventName: string, data: unknown) {
+      for (const listener of listeners[eventName] ?? []) {
+        listener(data);
+      }
+    },
+  };
+}
+
+export function getMockPage(): Page {
+  const mainFrame = {} as Frame;
+  const cdpSession = {
+    ...mockListener(),
+    send: () => {
+      // no-op
+    },
+  };
+  return {
+    mainFrame() {
+      return mainFrame;
+    },
+    ...mockListener(),
+    // @ts-expect-error internal API.
+    _client() {
+      return cdpSession;
+    },
+  } satisfies Page;
+}
+
+export function getMockBrowser(): Browser {
+  const pages = [getMockPage()];
+  return {
+    pages() {
+      return Promise.resolve(pages);
+    },
+    ...mockListener(),
+  } as Browser;
 }

@@ -3,6 +3,8 @@
  * Copyright 2025 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
+
+import {mapIssueToMessageObject} from './DevtoolsUtils.js';
 import type {ConsoleMessageData} from './formatters/consoleFormatter.js';
 import {
   formatConsoleEventShort,
@@ -17,6 +19,7 @@ import {
 } from './formatters/networkFormatter.js';
 import {formatSnapshotNode} from './formatters/snapshotFormatter.js';
 import type {McpContext} from './McpContext.js';
+import {DevTools} from './third_party/index.js';
 import type {
   ConsoleMessage,
   ImageContent,
@@ -247,6 +250,16 @@ export class McpResponse implements Response {
             }),
           ),
         };
+      } else if (message instanceof DevTools.AggregatedIssue) {
+        const mappedIssueMessage = mapIssueToMessageObject(message);
+        if (!mappedIssueMessage)
+          throw new Error(
+            "Can't provide detals for the msgid " + consoleMessageStableId,
+          );
+        consoleData = {
+          consoleMessageStableId,
+          ...mappedIssueMessage,
+        };
       } else {
         consoleData = {
           consoleMessageStableId,
@@ -269,40 +282,53 @@ export class McpResponse implements Response {
           if ('type' in message) {
             return normalizedTypes.has(message.type());
           }
+          if (message instanceof DevTools.AggregatedIssue) {
+            return normalizedTypes.has('issue');
+          }
           return normalizedTypes.has('error');
         });
       }
 
-      consoleListData = await Promise.all(
-        messages.map(async (item): Promise<ConsoleMessageData> => {
-          const consoleMessageStableId =
-            context.getConsoleMessageStableId(item);
-          if ('args' in item) {
-            const consoleMessage = item as ConsoleMessage;
+      consoleListData = (
+        await Promise.all(
+          messages.map(async (item): Promise<ConsoleMessageData | null> => {
+            const consoleMessageStableId =
+              context.getConsoleMessageStableId(item);
+            if ('args' in item) {
+              const consoleMessage = item as ConsoleMessage;
+              return {
+                consoleMessageStableId,
+                type: consoleMessage.type(),
+                message: consoleMessage.text(),
+                args: await Promise.all(
+                  consoleMessage.args().map(async arg => {
+                    const stringArg = await arg.jsonValue().catch(() => {
+                      // Ignore errors.
+                    });
+                    return typeof stringArg === 'object'
+                      ? JSON.stringify(stringArg)
+                      : String(stringArg);
+                  }),
+                ),
+              };
+            }
+            if (item instanceof DevTools.AggregatedIssue) {
+              const mappedIssueMessage = mapIssueToMessageObject(item);
+              if (!mappedIssueMessage) return null;
+              return {
+                consoleMessageStableId,
+                ...mappedIssueMessage,
+              };
+            }
             return {
               consoleMessageStableId,
-              type: consoleMessage.type(),
-              message: consoleMessage.text(),
-              args: await Promise.all(
-                consoleMessage.args().map(async arg => {
-                  const stringArg = await arg.jsonValue().catch(() => {
-                    // Ignore errors.
-                  });
-                  return typeof stringArg === 'object'
-                    ? JSON.stringify(stringArg)
-                    : String(stringArg);
-                }),
-              ),
+              type: 'error',
+              message: (item as Error).message,
+              args: [],
             };
-          }
-          return {
-            consoleMessageStableId,
-            type: 'error',
-            message: (item as Error).message,
-            args: [],
-          };
-        }),
-      );
+          }),
+        )
+      ).filter(item => item !== null);
     }
 
     return this.format(toolName, context, {
@@ -370,12 +396,12 @@ Call ${handleDialog.name} to handle it before continuing.`);
     }
 
     if (data.formattedSnapshot) {
-      response.push('## Page content');
+      response.push('## Latest page snapshot');
       response.push(data.formattedSnapshot);
     }
 
     response.push(...this.#formatNetworkRequestData(context, data.bodies));
-    response.push(...this.#formatConsoleData(data.consoleData));
+    response.push(...this.#formatConsoleData(context, data.consoleData));
 
     if (this.#networkRequestsOptions?.include) {
       let requests = context.getNetworkRequests(
@@ -473,13 +499,16 @@ Call ${handleDialog.name} to handle it before continuing.`);
     };
   }
 
-  #formatConsoleData(data: ConsoleMessageData | undefined): string[] {
+  #formatConsoleData(
+    context: McpContext,
+    data: ConsoleMessageData | undefined,
+  ): string[] {
     const response: string[] = [];
     if (!data) {
       return response;
     }
 
-    response.push(formatConsoleEventVerbose(data));
+    response.push(formatConsoleEventVerbose(data, context));
     return response;
   }
 

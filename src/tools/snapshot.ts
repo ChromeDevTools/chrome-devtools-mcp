@@ -53,7 +53,10 @@ export const waitFor = defineTool({
     ...timeoutSchema,
   },
   handler: async (request, response, context) => {
-    await context.waitForTextOnPage(request.params);
+    await context.waitForTextOnPage(
+      request.params.text,
+      request.params.timeout,
+    );
 
     response.appendResponseLine(
       `Element with text "${request.params.text}" found.`,

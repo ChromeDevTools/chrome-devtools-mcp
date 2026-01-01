@@ -11,6 +11,7 @@ import {
   formatConsoleEventShort,
   formatConsoleEventVerbose,
 } from '../../src/formatters/consoleFormatter.js';
+import {getMockAggregatedIssue} from '../utils.js';
 
 describe('consoleFormatter', () => {
   describe('formatConsoleEventShort', () => {
@@ -91,5 +92,42 @@ describe('consoleFormatter', () => {
       const result = formatConsoleEventVerbose(message);
       t.assert.snapshot?.(result);
     });
+  });
+
+  it('formats a console.log message with issue type', t => {
+    const testGenericIssue = {
+      details: () => {
+        return {
+          violatingNodeId: 2,
+          violatingNodeAttribute: 'test',
+        };
+      },
+    };
+    const mockAggregatedIssue = getMockAggregatedIssue();
+    const mockDescription = {
+      file: 'mock.md',
+      links: [
+        {link: 'http://example.com/learnmore', linkTitle: 'Learn more'},
+        {
+          link: 'http://example.com/another-learnmore',
+          linkTitle: 'Learn more 2',
+        },
+      ],
+    };
+    mockAggregatedIssue.getDescription.returns(mockDescription);
+    // @ts-expect-error generic issue stub bypass
+    mockAggregatedIssue.getGenericIssues.returns(new Set([testGenericIssue]));
+    const mockDescriptionFileContent =
+      '# Mock Issue Title\n\nThis is a mock issue description';
+
+    const message: ConsoleMessageData = {
+      consoleMessageStableId: 5,
+      type: 'issue',
+      description: mockDescriptionFileContent,
+      item: mockAggregatedIssue,
+    };
+
+    const result = formatConsoleEventVerbose(message);
+    t.assert.snapshot?.(result);
   });
 });

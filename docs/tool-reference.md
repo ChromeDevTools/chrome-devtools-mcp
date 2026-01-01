@@ -43,8 +43,8 @@
 
 **Parameters:**
 
-- **dblClick** (boolean) _(optional)_: Set to true for double clicks. Default is false.
 - **uid** (string) **(required)**: The uid of an element on the page from the page content snapshot
+- **dblClick** (boolean) _(optional)_: Set to true for double clicks. Default is false.
 
 ---
 
@@ -161,8 +161,8 @@
 
 **Parameters:**
 
-- **timeout** (integer) _(optional)_: Maximum wait time in milliseconds. If set to 0, the default timeout will be used.
 - **url** (string) **(required)**: URL to load in a new page.
+- **timeout** (integer) _(optional)_: Maximum wait time in milliseconds. If set to 0, the default timeout will be used.
 
 ---
 
@@ -172,7 +172,8 @@
 
 **Parameters:**
 
-- **pageIdx** (number) **(required)**: The index of the page to select. Call [`list_pages`](#list_pages) to list pages.
+- **pageIdx** (number) **(required)**: The index of the page to select. Call [`list_pages`](#list_pages) to get available pages.
+- **bringToFront** (boolean) _(optional)_: Whether to focus the page and bring it to the top.
 
 ---
 
@@ -196,6 +197,7 @@
 **Parameters:**
 
 - **cpuThrottlingRate** (number) _(optional)_: Represents the CPU slowdown factor. Set the rate to 1 to disable throttling. If omitted, throttling remains unchanged.
+- **geolocation** (unknown) _(optional)_: Geolocation to [`emulate`](#emulate). Set to null to clear the geolocation override.
 - **networkConditions** (enum: "No emulation", "Offline", "Slow 3G", "Fast 3G", "Slow 4G", "Fast 4G") _(optional)_: Throttle network. Set to "No emulation" to disable. If omitted, conditions remain unchanged.
 
 ---
@@ -277,7 +279,6 @@ so returned values have to JSON-serializable.
 
 **Parameters:**
 
-- **args** (array) _(optional)_: An optional list of arguments to pass to the function.
 - **function** (string) **(required)**: A JavaScript function declaration to be executed by the tool in the currently selected page.
   Example without arguments: `() => {
   return document.title
@@ -287,6 +288,8 @@ so returned values have to JSON-serializable.
   Example with arguments: `(el) => {
   return el.innerText;
 }`
+
+- **args** (array) _(optional)_: An optional list of arguments to pass to the function.
 
 ---
 
