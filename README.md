@@ -242,6 +242,27 @@ Or, from the IDE **Activity Bar** > `Kiro` > `MCP Servers` > `Click Open MCP Con
 </details>
 
 <details>
+  <summary>OpenCode</summary>
+
+Copy the following into your `opencode.json` configuration file.
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "chrome-devtools": {
+      "type": "local",
+      "command": ["npx", "-y", "chrome-devtools-mcp@latest"]
+    },
+  }
+}
+```
+
+> To find the configuration file and properly setup this MCP on OpenCode, visit OpenCode's [Config](https://opencode.ai/docs/config/) and [MCP](https://opencode.ai/docs/mcp-servers/) documentation. 
+
+</details>
+
+<details>
   <summary>Qoder</summary>
 
 In **Qoder Settings**, go to `MCP Server` > `+ Add` > Use the configuration snippet provided above.
