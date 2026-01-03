@@ -87,3 +87,11 @@ You can use the `DEBUG` environment variable as usual to control categories that
 ### Updating documentation
 
 When adding a new tool or updating a tool name or description, make sure to run `npm run docs` to generate the tool reference documentation.
+Control + Shift + m{
+  "mcpServers": {
+    "chrome-devtools": {
+      "command": "npx",
+      "args": ["-y", "chrome-devtools-mcp@latest"]
+    }
+  }
+}
