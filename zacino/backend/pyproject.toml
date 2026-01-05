@@ -1,0 +1,12 @@
+[tool.ruff]
+line-length = 100
+select = ["E", "F", "I", "B", "UP", "ASYNC"]
+ignore = ["E501"]
+
+[tool.ruff.isort]
+known-first-party = ["app"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+addopts = "-q"
+
