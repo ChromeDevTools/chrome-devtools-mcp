@@ -21,7 +21,9 @@
 - **[Emulation](#emulation)** (2 tools)
   - [`emulate`](#emulate)
   - [`resize_page`](#resize_page)
-- **[Performance](#performance)** (3 tools)
+- **[Performance](#performance)** (5 tools)
+  - [`coverage_start`](#coverage_start)
+  - [`coverage_stop`](#coverage_stop)
   - [`performance_analyze_insight`](#performance_analyze_insight)
   - [`performance_start_trace`](#performance_start_trace)
   - [`performance_stop_trace`](#performance_stop_trace)
@@ -214,6 +216,29 @@
 ---
 
 ## Performance
+
+### `coverage_start`
+
+**Description:** Starts code coverage tracking on the selected page. This tracks which JavaScript and CSS code is actually used, helping identify unused code that could be removed to improve page performance.
+
+**Parameters:**
+
+- **includeCSS** (boolean) _(optional)_: Whether to include CSS coverage. Defaults to true.
+- **includeJS** (boolean) _(optional)_: Whether to include JavaScript coverage. Defaults to true.
+- **resetOnNavigation** (boolean) _(optional)_: Whether to reset coverage data on page navigation. Defaults to true.
+
+---
+
+### `coverage_stop`
+
+**Description:** Stops code coverage tracking and returns a comprehensive report showing URLs, total bytes, used bytes, unused bytes, and usage percentage for each JavaScript and CSS resource. Results are sorted by unused bytes (most wasted first) and paginated.
+
+**Parameters:**
+
+- **pageIdx** (integer) _(optional)_: Page index (0-based). Use this to navigate through results. For example, pageIdx: 1 shows the next page.
+- **pageSize** (integer) _(optional)_: Number of results to show per page. Maximum and default is 5 to keep output manageable.
+
+---
 
 ### `performance_analyze_insight`
 

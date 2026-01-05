@@ -81,11 +81,20 @@ export interface Response {
 /**
  * Only add methods required by tools/*.
  */
+export interface CoverageOptions {
+  includeJS: boolean;
+  includeCSS: boolean;
+}
+
 export type Context = Readonly<{
   isRunningPerformanceTrace(): boolean;
   setIsRunningPerformanceTrace(x: boolean): void;
   recordedTraces(): TraceResult[];
   storeTraceRecording(result: TraceResult): void;
+  isRunningCoverage(): boolean;
+  setIsRunningCoverage(x: boolean): void;
+  getCoverageOptions(): CoverageOptions;
+  setCoverageOptions(options: CoverageOptions): void;
   getSelectedPage(): Page;
   getDialog(): Dialog | undefined;
   clearDialog(): void;

@@ -106,6 +106,11 @@ export class McpContext implements Context {
   #consoleCollector: ConsoleCollector;
 
   #isRunningTrace = false;
+  #isRunningCoverage = false;
+  #coverageOptions: {includeJS: boolean; includeCSS: boolean} = {
+    includeJS: true,
+    includeCSS: true,
+  };
   #networkConditionsMap = new WeakMap<Page, string>();
   #cpuThrottlingRateMap = new WeakMap<Page, number>();
   #geolocationMap = new WeakMap<Page, GeolocationOptions>();
@@ -304,6 +309,22 @@ export class McpContext implements Context {
 
   isRunningPerformanceTrace(): boolean {
     return this.#isRunningTrace;
+  }
+
+  setIsRunningCoverage(x: boolean): void {
+    this.#isRunningCoverage = x;
+  }
+
+  isRunningCoverage(): boolean {
+    return this.#isRunningCoverage;
+  }
+
+  setCoverageOptions(options: {includeJS: boolean; includeCSS: boolean}): void {
+    this.#coverageOptions = options;
+  }
+
+  getCoverageOptions(): {includeJS: boolean; includeCSS: boolean} {
+    return this.#coverageOptions;
   }
 
   getDialog(): Dialog | undefined {

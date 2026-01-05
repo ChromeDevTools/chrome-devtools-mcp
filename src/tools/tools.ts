@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import * as consoleTools from './console.js';
+import * as coverageTools from './coverage.js';
 import * as emulationTools from './emulation.js';
 import * as inputTools from './input.js';
 import * as networkTools from './network.js';
@@ -16,6 +17,7 @@ import type {ToolDefinition} from './ToolDefinition.js';
 
 const tools = [
   ...Object.values(consoleTools),
+  ...Object.values(coverageTools),
   ...Object.values(emulationTools),
   ...Object.values(inputTools),
   ...Object.values(networkTools),
