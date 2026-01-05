@@ -1,0 +1,36 @@
+{
+  "name": "zacino-frontend",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0 --port 5173",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview --host 0.0.0.0 --port 4173",
+    "test": "vitest run",
+    "lint": "eslint . --max-warnings=0",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "6.6.3",
+    "@testing-library/react": "16.0.1",
+    "@testing-library/user-event": "14.5.2",
+    "@types/react": "18.3.12",
+    "@types/react-dom": "18.3.1",
+    "@typescript-eslint/eslint-plugin": "8.10.0",
+    "@typescript-eslint/parser": "8.10.0",
+    "@vitejs/plugin-react": "4.3.2",
+    "eslint": "9.13.0",
+    "eslint-plugin-react": "7.37.1",
+    "eslint-plugin-react-hooks": "5.1.0-rc.0",
+    "eslint-plugin-react-refresh": "0.4.13",
+    "jsdom": "25.0.1",
+    "typescript": "5.6.3",
+    "vite": "5.4.9",
+    "vitest": "2.1.4"
+  }
+}
