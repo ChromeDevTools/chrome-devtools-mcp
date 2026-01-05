@@ -1,0 +1,83 @@
+name: CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install backend dependencies
+        working-directory: zacino/backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Lint backend
+        working-directory: zacino/backend
+        run: ruff check app tests
+
+      - name: Test backend
+        working-directory: zacino/backend
+        env:
+          SECRET_KEY: test-secret
+        run: pytest
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install frontend dependencies
+        working-directory: zacino/frontend
+        run: npm ci
+
+      - name: Lint frontend
+        working-directory: zacino/frontend
+        run: npm run lint
+
+      - name: Test frontend
+        working-directory: zacino/frontend
+        run: npm test
+
+      - name: Build frontend
+        working-directory: zacino/frontend
+        run: npm run build
+
+      - name: Build Docker images
+        working-directory: zacino
+        run: docker compose build
+
+      - name: Deploy (compose up)
+        working-directory: zacino
+        env:
+          SECRET_KEY: ${{ secrets.SECRET_KEY }}
+        run: |
+          if [ -n "$SECRET_KEY" ]; then
+            cp .env.example .env
+            sed -i "s|replace-with-strong-secret|$SECRET_KEY|" .env
+            docker compose up -d
+          else
+            echo "Skipping deploy: SECRET_KEY not set"
+          fi
+
+      - name: Notify
+        if: always()
+        env:
+          WEBHOOK_URL: ${{ secrets.WEBHOOK_URL }}
+        run: |
+          if [ -n "$WEBHOOK_URL" ]; then
+            curl -X POST -H 'Content-Type: application/json' \
+              -d '{"status":"'"$GITHUB_JOB"'","result":"'"${{ job.status }}"'"}' \
+              "$WEBHOOK_URL"
+          fi
