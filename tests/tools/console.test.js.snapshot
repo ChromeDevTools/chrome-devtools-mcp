@@ -1,0 +1,29 @@
+exports[`console > get_console_message > issues type > gets issue details with node id parsing 1`] = `
+# test response
+ID: 1
+Message: issue> An element doesn't have an autocomplete attribute
+
+A form field has an \`id\` or \`name\` attribute that the browser's autofill recognizes. However, it doesn't have an \`autocomplete\` attribute assigned. This might prevent the browser from correctly autofilling the form.
+
+To fix this issue, provide an \`autocomplete\` attribute.
+Learn more:
+[HTML attribute: autocomplete](https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/autocomplete#values)
+### Affected resources
+uid=1_1 data={"violatingNodeAttribute":"name"}
+`;
+
+exports[`console > get_console_message > issues type > gets issue details with request id parsing 1`] = `
+# test response
+ID: <ID>
+Message: issue> Ensure CORS response header values are valid
+
+A cross-origin resource sharing (CORS) request was blocked because of invalid or missing response headers of the request or the associated [preflight request](issueCorsPreflightRequest).
+
+To fix this issue, ensure the response to the CORS request and/or the associated [preflight request](issueCorsPreflightRequest) are not missing headers and use valid header values.
+
+Note that if an opaque response is sufficient, the request's mode can be set to \`no-cors\` to fetch the resource with CORS disabled; that way CORS headers are not required but the response content is inaccessible (opaque).
+Learn more:
+[Cross-Origin Resource Sharing (\`CORS\`)](https://web.dev/cross-origin-resource-sharing)
+### Affected resources
+reqid=<reqid> data={"corsErrorStatus":{"corsError":"PreflightMissingAllowOriginHeader","failedParameter":""},"isWarning":false,"request":{"url":"http://hostname:port/data.json"},"initiatorOrigin":"","clientSecurityState":{"initiatorIsSecureContext":false,"initiatorIPAddressSpace":"Loopback","privateNetworkRequestPolicy":"BlockFromInsecureToMorePrivate"}}
+`;

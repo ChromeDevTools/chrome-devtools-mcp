@@ -7,7 +7,34 @@
 - When configuring your MCP client, try using the `--yes` argument to `npx` to
   auto-accept installation prompt.
 - Find a specific error in the output of the `chrome-devtools-mcp` server.
-  Usually, if you client is an IDE, logs would be in the Output pane.
+  Usually, if your client is an IDE, logs would be in the Output pane.
+
+## Debugging
+
+Start the MCP server with debugging enabled and a log file:
+
+- `DEBUG=* npx chrome-devtools-mcp@latest --log-file=/path/to/chrome-devtools-mcp.log`
+
+Using `.mcp.json` to debug while using a client:
+
+```json
+{
+  "mcpServers": {
+    "chrome-devtools": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "chrome-devtools-mcp@latest",
+        "--log-file",
+        "/path/to/chrome-devtools-mcp.log"
+      ],
+      "env": {
+        "DEBUG": "*"
+      }
+    }
+  }
+}
+```
 
 ## Specific problems
 

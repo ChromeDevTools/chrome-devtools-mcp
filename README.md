@@ -7,7 +7,7 @@ control and inspect a live Chrome browser. It acts as a Model-Context-Protocol
 (MCP) server, giving your AI coding assistant access to the full power of
 Chrome DevTools for reliable automation, in-depth debugging, and performance analysis.
 
-## [Tool reference](./docs/tool-reference.md) | [Changelog](./CHANGELOG.md) | [Contributing](./CONTRIBUTING.md) | [Troubleshooting](./docs/troubleshooting.md)
+## [Tool reference](./docs/tool-reference.md) | [Changelog](./CHANGELOG.md) | [Contributing](./CONTRIBUTING.md) | [Troubleshooting](./docs/troubleshooting.md) | [Design Principles](./docs/design-principles.md)
 
 ## Key features
 
@@ -60,6 +60,32 @@ Add the following config to your MCP client:
 ```bash
 amp mcp add chrome-devtools -- npx chrome-devtools-mcp@latest
 ```
+
+</details>
+
+<details>
+  <summary>Antigravity</summary>
+
+To use the Chrome DevTools MCP server follow the instructions from <a href="https://antigravity.google/docs/mcp">Antigravity's docs<a/> to install a custom MCP server. Add the following config to the MCP servers config:
+
+```bash
+{
+  "mcpServers": {
+    "chrome-devtools": {
+      "command": "npx",
+      "args": [
+        "chrome-devtools-mcp@latest",
+        "--browser-url=http://127.0.0.1:9222",
+        "-y"
+      ]
+    }
+  }
+}
+```
+
+This will make the Chrome DevTools MCP server automatically connect to the browser that Antigravity is using. If you are not using port 9222, make sure to adjust accordingly.
+
+Chrome DevTools MCP will not start the browser instance automatically using this approach as as the Chrome DevTools MCP server runs in Antigravity's built-in browser. If the browser is not already running, you have to start it first by clicking the Chrome icon at the top right corner.
 
 </details>
 
@@ -131,12 +157,22 @@ Configure the following fields and press `CTRL+S` to save the configuration:
 
 <details>
   <summary>Copilot / VS Code</summary>
-  Follow the MCP install <a href="https://code.visualstudio.com/docs/copilot/chat/mcp-servers#_add-an-mcp-server">guide</a>,
-  with the standard config from above. You can also install the Chrome DevTools MCP server using the VS Code CLI:
-  
-  ```bash
-  code --add-mcp '{"name":"chrome-devtools","command":"npx","args":["chrome-devtools-mcp@latest"]}'
-  ```
+
+**Click the button to install:**
+
+[<img src="https://img.shields.io/badge/VS_Code-VS_Code?style=flat-square&label=Install%20Server&color=0098FF" alt="Install in VS Code">](https://vscode.dev/redirect/mcp/install?name=io.github.ChromeDevTools%2Fchrome-devtools-mcp&config=%7B%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22chrome-devtools-mcp%22%5D%2C%22env%22%3A%7B%7D%7D)
+
+[<img src="https://img.shields.io/badge/VS_Code_Insiders-VS_Code_Insiders?style=flat-square&label=Install%20Server&color=24bfa5" alt="Install in VS Code Insiders">](https://insiders.vscode.dev/redirect?url=vscode-insiders%3Amcp%2Finstall%3F%257B%2522name%2522%253A%2522io.github.ChromeDevTools%252Fchrome-devtools-mcp%2522%252C%2522config%2522%253A%257B%2522command%2522%253A%2522npx%2522%252C%2522args%2522%253A%255B%2522-y%2522%252C%2522chrome-devtools-mcp%2522%255D%252C%2522env%2522%253A%257B%257D%257D%257D)
+
+**Or install manually:**
+
+Follow the MCP install <a href="https://code.visualstudio.com/docs/copilot/chat/mcp-servers#_add-an-mcp-server">guide</a>,
+with the standard config from above. You can also install the Chrome DevTools MCP server using the VS Code CLI:
+
+```bash
+code --add-mcp '{"name":"io.github.ChromeDevTools/chrome-devtools-mcp","command":"npx","args":["-y","chrome-devtools-mcp"],"env":{}}'
+```
+
 </details>
 
 <details>
@@ -206,11 +242,49 @@ Or, from the IDE **Activity Bar** > `Kiro` > `MCP Servers` > `Click Open MCP Con
 </details>
 
 <details>
+  <summary>OpenCode</summary>
+
+Add the following configuration to your `opencode.json` file. If you don't have one, create it at `~/.config/opencode/opencode.json` (<a href="https://opencode.ai/docs/mcp-servers">guide</a>):
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "chrome-devtools": {
+      "type": "local",
+      "command": ["npx", "-y", "chrome-devtools-mcp@latest"]
+    }
+  }
+}
+```
+
+</details>
+
+<details>
   <summary>Qoder</summary>
 
 In **Qoder Settings**, go to `MCP Server` > `+ Add` > Use the configuration snippet provided above.
 
 Alternatively, follow the <a href="https://docs.qoder.com/user-guide/chat/model-context-protocol">MCP guide</a> and use the standard config from above.
+
+</details>
+
+<details>
+  <summary>Qoder CLI</summary>
+
+Install the Chrome DevTools MCP server using the Qoder CLI (<a href="https://docs.qoder.com/cli/using-cli#mcp-servsers">guide</a>):
+
+**Project wide:**
+
+```bash
+qodercli mcp add chrome-devtools -- npx chrome-devtools-mcp@latest
+```
+
+**Globally:**
+
+```bash
+qodercli mcp add -s user chrome-devtools -- npx chrome-devtools-mcp@latest
+```
 
 </details>
 
@@ -295,15 +369,20 @@ The Chrome DevTools MCP server supports the following configuration option:
 
 <!-- BEGIN AUTO GENERATED OPTIONS -->
 
-- **`--browserUrl`, `-u`**
-  Connect to a running Chrome instance using port forwarding. For more details see: https://developer.chrome.com/docs/devtools/remote-debugging/local-server.
+- **`--autoConnect`/ `--auto-connect`**
+  If specified, automatically connects to a browser (Chrome 145+) running in the user data directory identified by the channel param. Requires remote debugging being enabled in Chrome here: chrome://inspect/#remote-debugging.
+  - **Type:** boolean
+  - **Default:** `false`
+
+- **`--browserUrl`/ `--browser-url`, `-u`**
+  Connect to a running, debuggable Chrome instance (e.g. `http://127.0.0.1:9222`). For more details see: https://github.com/ChromeDevTools/chrome-devtools-mcp#connecting-to-a-running-chrome-instance.
   - **Type:** string
 
-- **`--wsEndpoint`, `-w`**
+- **`--wsEndpoint`/ `--ws-endpoint`, `-w`**
   WebSocket endpoint to connect to a running Chrome instance (e.g., ws://127.0.0.1:9222/devtools/browser/<id>). Alternative to --browserUrl.
   - **Type:** string
 
-- **`--wsHeaders`**
+- **`--wsHeaders`/ `--ws-headers`**
   Custom headers for WebSocket connection in JSON format (e.g., '{"Authorization":"Bearer token"}'). Only works with --wsEndpoint.
   - **Type:** string
 
@@ -312,21 +391,24 @@ The Chrome DevTools MCP server supports the following configuration option:
   - **Type:** boolean
   - **Default:** `false`
 
-- **`--executablePath`, `-e`**
+- **`--executablePath`/ `--executable-path`, `-e`**
   Path to custom Chrome executable.
   - **Type:** string
 
 - **`--isolated`**
-  If specified, creates a temporary user-data-dir that is automatically cleaned up after the browser is closed.
+  If specified, creates a temporary user-data-dir that is automatically cleaned up after the browser is closed. Defaults to false.
   - **Type:** boolean
-  - **Default:** `false`
+
+- **`--userDataDir`/ `--user-data-dir`**
+  Path to the user data directory for Chrome. Default is $HOME/.cache/chrome-devtools-mcp/chrome-profile$CHANNEL_SUFFIX_IF_NON_STABLE
+  - **Type:** string
 
 - **`--channel`**
   Specify a different Chrome channel that should be used. The default is the stable channel version.
   - **Type:** string
   - **Choices:** `stable`, `canary`, `beta`, `dev`
 
-- **`--logFile`**
+- **`--logFile`/ `--log-file`**
   Path to a file to write debug logs to. Set the env variable `DEBUG` to `*` to enable verbose logs. Useful for submitting bug reports.
   - **Type:** string
 
@@ -334,29 +416,29 @@ The Chrome DevTools MCP server supports the following configuration option:
   Initial viewport size for the Chrome instances started by the server. For example, `1280x720`. In headless mode, max size is 3840x2160px.
   - **Type:** string
 
-- **`--proxyServer`**
+- **`--proxyServer`/ `--proxy-server`**
   Proxy server configuration for Chrome passed as --proxy-server when launching the browser. See https://www.chromium.org/developers/design-documents/network-settings/ for details.
   - **Type:** string
 
-- **`--acceptInsecureCerts`**
+- **`--acceptInsecureCerts`/ `--accept-insecure-certs`**
   If enabled, ignores errors relative to self-signed and expired certificates. Use with caution.
   - **Type:** boolean
 
-- **`--chromeArg`**
+- **`--chromeArg`/ `--chrome-arg`**
   Additional arguments for Chrome. Only applies when Chrome is launched by chrome-devtools-mcp.
   - **Type:** array
 
-- **`--categoryEmulation`**
+- **`--categoryEmulation`/ `--category-emulation`**
   Set to false to exclude tools related to emulation.
   - **Type:** boolean
   - **Default:** `true`
 
-- **`--categoryPerformance`**
+- **`--categoryPerformance`/ `--category-performance`**
   Set to false to exclude tools related to performance.
   - **Type:** boolean
   - **Default:** `true`
 
-- **`--categoryNetwork`**
+- **`--categoryNetwork`/ `--category-network`**
   Set to false to exclude tools related to network.
   - **Type:** boolean
   - **Default:** `true`
@@ -421,9 +503,70 @@ the browser is closed.
 
 ### Connecting to a running Chrome instance
 
-You can connect to a running Chrome instance by using the `--browser-url` option. This is useful if you want to use your existing Chrome profile or if you are running the MCP server in a sandboxed environment that does not allow starting a new Chrome instance.
+By default, the Chrome DevTools MCP server will start a new Chrome instance with a dedicated profile. This might not be ideal in all situations:
 
-Here is a step-by-step guide on how to connect to a running Chrome Stable instance:
+- If you would like to maintain the same application state when alternating between manual site testing and agent-driven testing.
+- When the MCP needs to sign into a website. Some accounts may prevent sign-in when the browser is controlled via WebDriver (the default launch mechanism for the Chrome DevTools MCP server).
+- If you're running your LLM inside a sandboxed environment, but you would like to connect to a Chrome instance that runs outside the sandbox.
+
+In these cases, start Chrome first and let the Chrome DevTools MCP server connect to it. There are two ways to do so:
+
+- **Automatic connection (available in Chrome 144)**: best for sharing state between manual and agent-driven testing.
+- **Manual connection via remote debugging port**: best when running inside a sandboxed environment.
+
+#### Automatically connecting to a running Chrome instance
+
+**Step 1:** Set up remote debugging in Chrome
+
+In Chrome (\>= M144), do the following to set up remote debugging:
+
+1.  Navigate to `chrome://inspect/#remote-debugging` to enable remote debugging.
+2.  Follow the dialog UI to allow or disallow incoming debugging connections.
+
+**Step 2:** Configure Chrome DevTools MCP server to automatically connect to a running Chrome Instance
+
+To connect the `chrome-devtools-mcp` server to the running Chrome instance, use
+`--autoConnect` command line argument for the MCP server.
+
+The following code snippet is an example configuration for gemini-cli:
+
+```json
+{
+  "mcpServers": {
+    "chrome-devtools": {
+      "command": "npx",
+      "args": ["chrome-devtools-mcp@latest", "--autoConnect", "--channel=beta"]
+    }
+  }
+}
+```
+
+Note: you have to specify `--channel=beta` until Chrome M144 has reached the
+stable channel.
+
+**Step 3:** Test your setup
+
+Make sure your browser is running. Open gemini-cli and run the following prompt:
+
+```none
+Check the performance of https://developers.chrome.com
+```
+
+> [!NOTE]  
+> The <code>autoConnect</code> option requires the user to start Chrome. If the user has multiple active profiles, the MCP server will connect to the default profile (as determined by Chrome). The MCP server has access to all open windows for the selected profile.
+
+The Chrome DevTools MCP server will try to connect to your running Chrome
+instance. It shows a dialog asking for user permission.
+
+Clicking **Allow** results in the Chrome DevTools MCP server opening
+[developers.chrome.com](http://developers.chrome.com) and taking a performance
+trace.
+
+#### Manual connection using port forwarding
+
+You can connect to a running Chrome instance by using the `--browser-url` option. This is useful if you are running the MCP server in a sandboxed environment that does not allow starting a new Chrome instance.
+
+Here is a step-by-step guide on how to connect to a running Chrome instance:
 
 **Step 1: Configure the MCP client**
 

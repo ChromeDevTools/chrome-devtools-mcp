@@ -119,12 +119,9 @@ export default defineConfig([
         {
           patterns: [
             {
-              group: [
-                '*/node_modules/chrome-devtools-frontend/*',
-                '!*/node_modules/chrome-devtools-frontend/mcp/mcp.js',
-              ],
+              regex: '.*chrome-devtools-frontend/(?!mcp/mcp.js$).*',
               message:
-                'Import devtools-frontend code only from node_modules/chrome-devtools-frontend/mcp/mcp.js',
+                'Import only the devtools-frontend code exported via node_modules/chrome-devtools-frontend/mcp/mcp.js',
             },
           ],
         },

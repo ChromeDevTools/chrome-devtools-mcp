@@ -6,9 +6,12 @@
 
 import './polyfill.js';
 
+import process from 'node:process';
+
 import type {Channel} from './browser.js';
 import {ensureBrowserConnected, ensureBrowserLaunched} from './browser.js';
 import {parseArguments} from './cli.js';
+import {loadIssueDescriptions} from './issue-descriptions.js';
 import {logger, saveLogsToFile} from './logger.js';
 import {McpContext} from './McpContext.js';
 import {McpResponse} from './McpResponse.js';
@@ -20,25 +23,21 @@ import {
   SetLevelRequestSchema,
 } from './third_party/index.js';
 import {ToolCategory} from './tools/categories.js';
-import * as consoleTools from './tools/console.js';
-import * as emulationTools from './tools/emulation.js';
-import * as inputTools from './tools/input.js';
-import * as networkTools from './tools/network.js';
-import * as pagesTools from './tools/pages.js';
-import * as performanceTools from './tools/performance.js';
-import * as screenshotTools from './tools/screenshot.js';
-import * as scriptTools from './tools/script.js';
-import * as snapshotTools from './tools/snapshot.js';
 import type {ToolDefinition} from './tools/ToolDefinition.js';
+import {tools} from './tools/tools.js';
 
 // If moved update release-please config
 // x-release-please-start-version
-const VERSION = '0.10.1';
+const VERSION = '0.12.1';
 // x-release-please-end
 
 export const args = parseArguments(VERSION);
 
 const logFile = args.logFile ? saveLogsToFile(args.logFile) : undefined;
+
+process.on('unhandledRejection', (reason, promise) => {
+  logger('Unhandled promise rejection', promise, reason);
+});
 
 logger(`Starting Chrome DevTools MCP Server v${VERSION}`);
 const server = new McpServer(
@@ -61,18 +60,22 @@ async function getContext(): Promise<McpContext> {
   }
   const devtools = args.experimentalDevtools ?? false;
   const browser =
-    args.browserUrl || args.wsEndpoint
+    args.browserUrl || args.wsEndpoint || args.autoConnect
       ? await ensureBrowserConnected({
           browserURL: args.browserUrl,
           wsEndpoint: args.wsEndpoint,
           wsHeaders: args.wsHeaders,
+          // Important: only pass channel, if autoConnect is true.
+          channel: args.autoConnect ? (args.channel as Channel) : undefined,
+          userDataDir: args.userDataDir,
           devtools,
         })
       : await ensureBrowserLaunched({
           headless: args.headless,
           executablePath: args.executablePath,
           channel: args.channel as Channel,
-          isolated: args.isolated,
+          isolated: args.isolated ?? false,
+          userDataDir: args.userDataDir,
           logFile,
           viewport: args.viewport,
           args: extraArgs,
@@ -140,28 +143,25 @@ function registerTool(tool: ToolDefinition): void {
           response,
           context,
         );
-        try {
-          const content = await response.handle(tool.name, context);
-          return {
-            content,
-          };
-        } catch (error) {
-          const errorText =
-            error instanceof Error ? error.message : String(error);
-
-          return {
-            content: [
-              {
-                type: 'text',
-                text: errorText,
-              },
-            ],
-            isError: true,
-          };
-        }
+        const content = await response.handle(tool.name, context);
+        return {
+          content,
+        };
       } catch (err) {
-        logger(`${tool.name} error: ${err.message}`);
-        throw err;
+        logger(`${tool.name} error:`, err, err?.stack);
+        let errorText = err && 'message' in err ? err.message : String(err);
+        if ('cause' in err && err.cause) {
+          errorText += `\nCause: ${err.cause.message}`;
+        }
+        return {
+          content: [
+            {
+              type: 'text',
+              text: errorText,
+            },
+          ],
+          isError: true,
+        };
       } finally {
         guard.dispose();
       }
@@ -169,26 +169,11 @@ function registerTool(tool: ToolDefinition): void {
   );
 }
 
-const tools = [
-  ...Object.values(consoleTools),
-  ...Object.values(emulationTools),
-  ...Object.values(inputTools),
-  ...Object.values(networkTools),
-  ...Object.values(pagesTools),
-  ...Object.values(performanceTools),
-  ...Object.values(screenshotTools),
-  ...Object.values(scriptTools),
-  ...Object.values(snapshotTools),
-] as ToolDefinition[];
-
-tools.sort((a, b) => {
-  return a.name.localeCompare(b.name);
-});
-
 for (const tool of tools) {
   registerTool(tool);
 }
 
+await loadIssueDescriptions();
 const transport = new StdioServerTransport();
 await server.connect(transport);
 logger('Chrome DevTools MCP Server connected');

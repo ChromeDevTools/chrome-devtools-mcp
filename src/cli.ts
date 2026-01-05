@@ -8,10 +8,23 @@ import type {YargsOptions} from './third_party/index.js';
 import {yargs, hideBin} from './third_party/index.js';
 
 export const cliOptions = {
+  autoConnect: {
+    type: 'boolean',
+    description:
+      'If specified, automatically connects to a browser (Chrome 145+) running in the user data directory identified by the channel param. Requires remote debugging being enabled in Chrome here: chrome://inspect/#remote-debugging.',
+    conflicts: ['isolated', 'executablePath'],
+    default: false,
+    coerce: (value: boolean | undefined) => {
+      if (!value) {
+        return;
+      }
+      return value;
+    },
+  },
   browserUrl: {
     type: 'string',
     description:
-      'Connect to a running Chrome instance using port forwarding. For more details see: https://developer.chrome.com/docs/devtools/remote-debugging/local-server.',
+      'Connect to a running, debuggable Chrome instance (e.g. `http://127.0.0.1:9222`). For more details see: https://github.com/ChromeDevTools/chrome-devtools-mcp#connecting-to-a-running-chrome-instance.',
     alias: 'u',
     conflicts: 'wsEndpoint',
     coerce: (url: string | undefined) => {
@@ -88,8 +101,13 @@ export const cliOptions = {
   isolated: {
     type: 'boolean',
     description:
-      'If specified, creates a temporary user-data-dir that is automatically cleaned up after the browser is closed.',
-    default: false,
+      'If specified, creates a temporary user-data-dir that is automatically cleaned up after the browser is closed. Defaults to false.',
+  },
+  userDataDir: {
+    type: 'string',
+    description:
+      'Path to the user data directory for Chrome. Default is $HOME/.cache/chrome-devtools-mcp/chrome-profile$CHANNEL_SUFFIX_IF_NON_STABLE',
+    conflicts: ['browserUrl', 'wsEndpoint', 'isolated'],
   },
   channel: {
     type: 'string',
@@ -212,6 +230,18 @@ export function parseArguments(version: string, argv = process.argv) {
         'Disable tools in the performance category',
       ],
       ['$0 --no-category-network', 'Disable tools in the network category'],
+      [
+        '$0 --user-data-dir=/tmp/user-data-dir',
+        'Use a custom user data directory',
+      ],
+      [
+        '$0 --auto-connect',
+        'Connect to a stable Chrome instance (Chrome 145+) running instead of launching a new instance',
+      ],
+      [
+        '$0 --auto-connect --channel=canary',
+        'Connect to a canary Chrome instance (Chrome 145+) running instead of launching a new instance',
+      ],
     ]);
 
   return yargsInstance

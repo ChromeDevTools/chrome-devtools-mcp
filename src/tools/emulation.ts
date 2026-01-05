@@ -37,20 +37,34 @@ export const emulate = defineTool({
       .describe(
         'Represents the CPU slowdown factor. Set the rate to 1 to disable throttling. If omitted, throttling remains unchanged.',
       ),
+    geolocation: zod
+      .object({
+        latitude: zod
+          .number()
+          .min(-90)
+          .max(90)
+          .describe('Latitude between -90 and 90.'),
+        longitude: zod
+          .number()
+          .min(-180)
+          .max(180)
+          .describe('Longitude between -180 and 180.'),
+      })
+      .nullable()
+      .optional()
+      .describe(
+        'Geolocation to emulate. Set to null to clear the geolocation override.',
+      ),
   },
   handler: async (request, _response, context) => {
     const page = context.getSelectedPage();
-    const networkConditions = request.params.networkConditions;
-    const cpuThrottlingRate = request.params.cpuThrottlingRate;
+    const {networkConditions, cpuThrottlingRate, geolocation} = request.params;
 
     if (networkConditions) {
       if (networkConditions === 'No emulation') {
         await page.emulateNetworkConditions(null);
         context.setNetworkConditions(null);
-        return;
-      }
-
-      if (networkConditions === 'Offline') {
+      } else if (networkConditions === 'Offline') {
         await page.emulateNetworkConditions({
           offline: true,
           download: 0,
@@ -58,10 +72,7 @@ export const emulate = defineTool({
           latency: 0,
         });
         context.setNetworkConditions('Offline');
-        return;
-      }
-
-      if (networkConditions in PredefinedNetworkConditions) {
+      } else if (networkConditions in PredefinedNetworkConditions) {
         const networkCondition =
           PredefinedNetworkConditions[
             networkConditions as keyof typeof PredefinedNetworkConditions
@@ -74,6 +85,16 @@ export const emulate = defineTool({
     if (cpuThrottlingRate) {
       await page.emulateCPUThrottling(cpuThrottlingRate);
       context.setCpuThrottlingRate(cpuThrottlingRate);
+    }
+
+    if (geolocation !== undefined) {
+      if (geolocation === null) {
+        await page.setGeolocation({latitude: 0, longitude: 0});
+        context.setGeolocation(null);
+      } else {
+        await page.setGeolocation(geolocation);
+        context.setGeolocation(geolocation);
+      }
     }
   },
 });

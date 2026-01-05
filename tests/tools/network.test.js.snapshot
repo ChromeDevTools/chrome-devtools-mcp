@@ -6,9 +6,17 @@ Status:  [success - 200]
 - accept-language:en-US,en;q=0.9
 - upgrade-insecure-requests:1
 - user-agent:<user-agent>
-- sec-ch-ua:"Not_A Brand";v="99", "Chromium";v="142"
+- sec-ch-ua:"Chromium";v="<version>", "Not A(Brand";v="24"
 - sec-ch-ua-mobile:?0
 - sec-ch-ua-platform:"<os>"
+- accept:text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+- accept-encoding:gzip, deflate, br, zstd
+- connection:keep-alive
+- host:localhost:<port>
+- sec-fetch-dest:document
+- sec-fetch-mode:navigate
+- sec-fetch-site:none
+- sec-fetch-user:?1
 ### Response Headers
 - connection:keep-alive
 - content-length:239
