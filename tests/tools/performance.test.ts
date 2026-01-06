@@ -5,7 +5,7 @@
  */
 
 import assert from 'node:assert';
-import {describe, it, afterEach} from 'node:test';
+import {describe, it, afterEach, beforeEach} from 'node:test';
 
 import sinon from 'sinon';
 
@@ -25,6 +25,20 @@ import {withMcpContext} from '../utils.js';
 describe('performance', () => {
   afterEach(() => {
     sinon.restore();
+  });
+
+  beforeEach(() => {
+    sinon.stub(globalThis, 'fetch').callsFake(async url => {
+      const cruxEndpoint =
+        'https://chromeuxreport.googleapis.com/v1/records:queryRecord';
+      if (url.toString().startsWith(cruxEndpoint)) {
+        return new Response(JSON.stringify(cruxResponseFixture()), {
+          status: 200,
+          headers: {'Content-Type': 'application/json'},
+        });
+      }
+      throw new Error(`Unexpected fetch to ${url}`);
+    });
   });
 
   describe('performance_start_trace', () => {
@@ -277,3 +291,74 @@ describe('performance', () => {
     });
   });
 });
+
+function cruxResponseFixture() {
+  return {
+    record: {
+      key: {
+        url: 'https://web.dev/',
+      },
+      metrics: {
+        form_factors: {
+          fractions: {desktop: 0.5056, phone: 0.4796, tablet: 0.0148},
+        },
+        largest_contentful_paint: {
+          histogram: [
+            {start: 0, end: 2500, density: 0.7309},
+            {start: 2500, end: 4000, density: 0.163},
+            {start: 4000, density: 0.1061},
+          ],
+          percentiles: {p75: 2595},
+        },
+        largest_contentful_paint_image_element_render_delay: {
+          percentiles: {p75: 786},
+        },
+        largest_contentful_paint_image_resource_load_delay: {
+          percentiles: {p75: 86},
+        },
+        largest_contentful_paint_image_time_to_first_byte: {
+          percentiles: {p75: 1273},
+        },
+        cumulative_layout_shift: {
+          histogram: [
+            {start: '0.00', end: '0.10', density: 0.8665},
+            {start: '0.10', end: '0.25', density: 0.0716},
+            {start: '0.25', density: 0.0619},
+          ],
+          percentiles: {p75: '0.06'},
+        },
+        interaction_to_next_paint: {
+          histogram: [
+            {start: 0, end: 200, density: 0.8414},
+            {start: 200, end: 500, density: 0.1081},
+            {start: 500, density: 0.0505},
+          ],
+          percentiles: {p75: 140},
+        },
+        largest_contentful_paint_image_resource_load_duration: {
+          percentiles: {p75: 451},
+        },
+        round_trip_time: {
+          histogram: [
+            {start: 0, end: 75, density: 0.3663},
+            {start: 75, end: 275, density: 0.5089},
+            {start: 275, density: 0.1248},
+          ],
+          percentiles: {p75: 178},
+        },
+        first_contentful_paint: {
+          histogram: [
+            {start: 0, end: 1800, density: 0.5899},
+            {start: 1800, end: 3000, density: 0.2439},
+            {start: 3000, density: 0.1662},
+          ],
+          percentiles: {p75: 2425},
+        },
+      },
+      collectionPeriod: {
+        firstDate: {year: 2025, month: 12, day: 8},
+        lastDate: {year: 2026, month: 1, day: 4},
+      },
+    },
+  };
+}
