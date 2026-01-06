@@ -163,11 +163,6 @@ export const cliOptions = {
     describe:
       'Additional arguments for Chrome. Only applies when Chrome is launched by chrome-devtools-mcp.',
   },
-  ignoreDefaultChromeArg: {
-    type: 'array',
-    describe:
-      'Explicitly disable default arguments for Chrome. Only applies when Chrome is launched by chrome-devtools-mcp.',
-  },
   categoryEmulation: {
     type: 'boolean',
     default: true,
@@ -228,10 +223,6 @@ export function parseArguments(version: string, argv = process.argv) {
       [
         `$0 --chrome-arg='--no-sandbox' --chrome-arg='--disable-setuid-sandbox'`,
         'Launch Chrome without sandboxes. Use with caution.',
-      ],
-      [
-        `$0 --ignore-default-chrome-arg='--disable-extensions'`,
-        'Disable the default arguments provided by Puppeteer. Use with caution.',
       ],
       ['$0 --no-category-emulation', 'Disable tools in the emulation category'],
       [
