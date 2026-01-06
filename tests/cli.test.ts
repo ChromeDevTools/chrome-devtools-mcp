@@ -125,7 +125,7 @@ describe('cli args parsing', () => {
     });
   });
 
-  it('parses viewport', async () => {
+  it('parses chrome args', async () => {
     const args = parseArguments('1.0.0', [
       'node',
       'main.js',
