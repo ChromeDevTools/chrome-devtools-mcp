@@ -193,6 +193,7 @@ async function stopTracingAndAppendOutput(
   }
 }
 
+/** We tell CrUXManager to fetch data so it's available when DevTools.PerformanceTraceFormatter is invoked */
 async function populateCruxData(result: TraceResult): Promise<void> {
   logger('populateCruxData called');
   const cruxManager = DevTools.CrUXManager.CrUXManager.instance();
@@ -200,8 +201,10 @@ async function populateCruxData(result: TraceResult): Promise<void> {
   cruxManager.setEndpointForTesting(
     'https://chromeuxreport.googleapis.com/v1/records:queryRecord?key=AIzaSyBn5gimNjhiEyA_euicSKko6IlD3HdgUfk',
   );
-  const settings = DevTools.Common.Settings.Settings.instance();
-  const cruxSetting = settings.createSetting('field-data', {enabled: true});
+  const cruxSetting =
+    DevTools.Common.Settings.Settings.instance().createSetting('field-data', {
+      enabled: true,
+    });
   cruxSetting.set({enabled: true});
 
   // Gather URLs to fetch CrUX data for
@@ -215,6 +218,7 @@ async function populateCruxData(result: TraceResult): Promise<void> {
     logger('No URLs found for CrUX data');
     return;
   }
+
   logger(
     `Fetching CrUX data for ${urlSet.size} URLs: ${Array.from(urlSet).join(', ')}`,
   );
