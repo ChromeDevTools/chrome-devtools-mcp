@@ -194,50 +194,37 @@ async function stopTracingAndAppendOutput(
 }
 
 async function populateCruxData(result: TraceResult): Promise<void> {
-  try {
-    logger('populateCruxData called');
-    const cruxManager = DevTools.CrUXManager.CrUXManager.instance();
-    cruxManager.setEndpointForTesting(
-      'https://chromeuxreport.googleapis.com/v1/records:queryRecord?key=AIzaSyBn5gimNjhiEyA_euicSKko6IlD3HdgUfk',
-    );
-    const settings = DevTools.Common.Settings.Settings.instance();
-    const cruxSetting = settings.createSetting('field-data', {enabled: true});
+  logger('populateCruxData called');
+  const cruxManager = DevTools.CrUXManager.CrUXManager.instance();
+  // go/jtfbx
+  cruxManager.setEndpointForTesting(
+    'https://chromeuxreport.googleapis.com/v1/records:queryRecord?key=AIzaSyBn5gimNjhiEyA_euicSKko6IlD3HdgUfk',
+  );
+  const settings = DevTools.Common.Settings.Settings.instance();
+  const cruxSetting = settings.createSetting('field-data', {enabled: true});
+  cruxSetting.set({enabled: true});
 
-    if (!cruxSetting.get().enabled) {
-      logger('CrUX is disabled in settings');
-      return;
-    }
+  // Gather URLs to fetch CrUX data for
+  const urls = [...(result.parsedTrace.insights?.values() ?? [])].map(c =>
+    c.url.toString(),
+  );
+  urls.push(result.parsedTrace.data.Meta.mainFrameURL);
+  const urlSet = new Set(urls);
 
-    const urls = new Set<string>();
-    if (result.insights) {
-      for (const insightSet of result.insights.values()) {
-        urls.add(insightSet.url.href);
-      }
-    } else {
-      const mainUrl = result.parsedTrace.data.Meta.mainFrameURL;
-      if (mainUrl) {
-        urls.add(mainUrl);
-      }
-    }
-
-    if (urls.size === 0) {
-      logger('No URLs found for CrUX data');
-      return;
-    }
-
-    logger(
-      `Fetching CrUX data for ${urls.size} URLs: ${Array.from(urls).join(', ')}`,
-    );
-    const cruxData = await Promise.all(
-      Array.from(urls).map(async url => {
-        const data = await cruxManager.getFieldDataForPage(url);
-        logger(`CrUX data for ${url}: ${data ? 'found' : 'not found'}`);
-        return data;
-      }),
-    );
-
-    result.parsedTrace.metadata.cruxFieldData = cruxData;
-  } catch (err) {
-    logger('Error populating CrUX data:', err);
+  if (urlSet.size === 0) {
+    logger('No URLs found for CrUX data');
+    return;
   }
+  logger(
+    `Fetching CrUX data for ${urlSet.size} URLs: ${Array.from(urlSet).join(', ')}`,
+  );
+  const cruxData = await Promise.all(
+    Array.from(urlSet).map(async url => {
+      const data = await cruxManager.getFieldDataForPage(url);
+      logger(`CrUX data for ${url}: ${data ? 'found' : 'not found'}`);
+      return data;
+    }),
+  );
+
+  result.parsedTrace.metadata.cruxFieldData = cruxData;
 }

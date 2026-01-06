@@ -71,7 +71,7 @@ exports[`McpResponse > adds throttling setting when it is not null 1`] = `
 # test response
 ## Network emulation
 Emulating: Slow 3G
-Default navigation timeout set to 100000 ms
+Default navigation timeout set to 600000 ms
 `;
 
 exports[`McpResponse > allows response text lines to be added 1`] = `

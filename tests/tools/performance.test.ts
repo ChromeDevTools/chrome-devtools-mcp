@@ -75,7 +75,7 @@ describe('performance', () => {
       });
     });
 
-    it.only('can autostop and store a recording', async () => {
+    it('can autostop and store a recording', async () => {
       const rawData = loadTraceAsBuffer('basic-trace.json.gz');
 
       await withMcpContext(async (response, context) => {
