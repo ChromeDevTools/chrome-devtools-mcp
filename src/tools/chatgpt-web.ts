@@ -284,7 +284,15 @@ export const askChatGPTWeb = defineTool({
   schema: {
     question: z
       .string()
-      .describe('Question text'),
+      .describe(
+        'Detailed question to ask. Structure with: ' +
+        '(1) Context (tech stack, versions, constraints), ' +
+        '(2) Current State (exact error/logs/behavior), ' +
+        '(3) Goal (expected outcome), ' +
+        '(4) Attempts (what was tried, why it failed), ' +
+        '(5) Format (steps/code/table). ' +
+        "IMPORTANT: Do not mention you are an AI/MCP. No secrets/PII. Don't guess missing facts."
+      ),
     projectName: z
       .string()
       .optional()
