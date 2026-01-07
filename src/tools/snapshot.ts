@@ -18,7 +18,6 @@ in the DevTools Elements panel (if any).`,
     category: ToolCategory.DEBUGGING,
     // Not read-only due to filePath param.
     readOnlyHint: false,
-    destructiveHint: false,
     openWorldHint: true,
   },
   schema: {

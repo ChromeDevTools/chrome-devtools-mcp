@@ -18,7 +18,6 @@ export const click = defineTool({
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
-    destructiveHint: false,
     openWorldHint: true,
   },
   schema: {
@@ -59,7 +58,6 @@ export const hover = defineTool({
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
-    destructiveHint: false,
     openWorldHint: true,
   },
   schema: {
@@ -145,7 +143,6 @@ export const fill = defineTool({
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
-    destructiveHint: false,
     openWorldHint: true,
   },
   schema: {
@@ -175,7 +172,6 @@ export const drag = defineTool({
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
-    destructiveHint: false,
     openWorldHint: true,
   },
   schema: {
@@ -206,7 +202,6 @@ export const fillForm = defineTool({
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
-    destructiveHint: false,
     openWorldHint: true,
   },
   schema: {
@@ -240,7 +235,6 @@ export const uploadFile = defineTool({
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
-    destructiveHint: false,
     openWorldHint: true,
   },
   schema: {
@@ -290,7 +284,6 @@ export const pressKey = defineTool({
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
-    destructiveHint: false,
     openWorldHint: true,
   },
   schema: {

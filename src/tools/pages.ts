@@ -59,7 +59,6 @@ export const closePage = defineTool({
   annotations: {
     category: ToolCategory.NAVIGATION,
     readOnlyHint: false,
-    destructiveHint: true,
     openWorldHint: true,
   },
   schema: {
@@ -89,7 +88,6 @@ export const newPage = defineTool({
   annotations: {
     category: ToolCategory.NAVIGATION,
     readOnlyHint: false,
-    destructiveHint: false,
     openWorldHint: true,
   },
   schema: {
@@ -115,7 +113,6 @@ export const navigatePage = defineTool({
   annotations: {
     category: ToolCategory.NAVIGATION,
     readOnlyHint: false,
-    destructiveHint: true,
     openWorldHint: true,
   },
   schema: {
@@ -213,7 +210,6 @@ export const resizePage = defineTool({
   annotations: {
     category: ToolCategory.EMULATION,
     readOnlyHint: false,
-    destructiveHint: false,
     openWorldHint: true,
   },
   schema: {
@@ -239,7 +235,6 @@ export const handleDialog = defineTool({
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
-    destructiveHint: false,
     openWorldHint: true,
   },
   schema: {

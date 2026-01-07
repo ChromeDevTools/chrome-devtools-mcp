@@ -17,7 +17,6 @@ export const screenshot = defineTool({
     category: ToolCategory.DEBUGGING,
     // Not read-only due to filePath param.
     readOnlyHint: false,
-    destructiveHint: false,
     openWorldHint: true,
   },
   schema: {

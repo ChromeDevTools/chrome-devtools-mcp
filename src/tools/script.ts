@@ -17,7 +17,6 @@ so returned values have to JSON-serializable.`,
   annotations: {
     category: ToolCategory.DEBUGGING,
     readOnlyHint: false,
-    destructiveHint: true,
     openWorldHint: true,
   },
   schema: {
