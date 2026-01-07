@@ -35,7 +35,6 @@ export interface ChatGPTSelectors {
   elements: Record<string, SelectorDef>;
   placeholders?: {
     normalMode?: string;
-    deepResearchMode?: string | string[];
   };
 }
 
@@ -138,21 +137,11 @@ export function generateAxMatcher(
 /**
  * Check if placeholder matches expected patterns
  */
-export function checkPlaceholder(
-  placeholder: string,
-  mode: 'normal' | 'deepResearch',
-): boolean {
+export function checkPlaceholder(placeholder: string): boolean {
   const selectors = loadSelectors();
 
-  if (mode === 'normal' && selectors.placeholders?.normalMode) {
+  if (selectors.placeholders?.normalMode) {
     return placeholder.includes(selectors.placeholders.normalMode);
-  }
-
-  if (mode === 'deepResearch' && selectors.placeholders?.deepResearchMode) {
-    const patterns = Array.isArray(selectors.placeholders.deepResearchMode)
-      ? selectors.placeholders.deepResearchMode
-      : [selectors.placeholders.deepResearchMode];
-    return patterns.some((pattern) => placeholder.includes(pattern));
   }
 
   return false;

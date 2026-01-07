@@ -21,19 +21,6 @@
       },
       "description": "ファイル追加（ツールメニューを開く）ボタン"
     },
-    "deepResearchMenuItem": {
-      "css": "[role='menuitemradio']",
-      "text": "Deep Research",
-      "description": "DeepResearchモード切り替えメニュー項目"
-    },
-    "deepResearchDeleteButton": {
-      "text": "リサーチ：クリックして削除",
-      "description": "DeepResearch削除ボタン（モード確認用）"
-    },
-    "deepResearchSourcesButton": {
-      "text": "情報源",
-      "description": "情報源ボタン（モード確認用）"
-    },
     "composerTextarea": {
       "css": "textarea[placeholder]",
       "description": "メッセージ入力テキストエリア"
@@ -57,7 +44,6 @@
     "stopButton": {
       "text": [
         "停止",
-        "リサーチを停止",
         "ストリーミングの停止"
       ],
       "ax": {
@@ -76,10 +62,6 @@
     }
   },
   "placeholders": {
-    "normalMode": "Message ChatGPT",
-    "deepResearchMode": [
-      "詳細なレポート",
-      "リサーチ"
-    ]
+    "normalMode": "Message ChatGPT"
   }
 }
