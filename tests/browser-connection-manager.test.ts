@@ -112,6 +112,13 @@ describe('BrowserConnectionManager', () => {
 
   describe('Exponential backoff with jitter', () => {
     it('should use exponential backoff for retry delays', async () => {
+      // Use deterministic rng (0.5 results in 0 jitter: 0.5*2-1=0)
+      manager = new BrowserConnectionManager({
+        enableLogging: false,
+        rng: () => 0.5,
+        maxReconnectAttempts: 3,
+      });
+
       const sleepSpy = sinon.spy();
       const originalSleep = (manager as any).sleep;
 
@@ -120,17 +127,23 @@ describe('BrowserConnectionManager', () => {
         // Don't actually sleep in tests
       };
 
-      manager.setBrowser(mockBrowser as unknown as Browser, browserFactory);
-
-      let attempt = 0;
-      const failingOperation = async () => {
-        attempt++;
-        if (attempt <= 3) {
-          throw new ProtocolError('Target closed');
+      // Make browserFactory fail multiple times to trigger retries
+      let reconnectAttempt = 0;
+      const failingBrowserFactory = sinon.stub().callsFake(async () => {
+        reconnectAttempt++;
+        if (reconnectAttempt < 3) {
+          throw new Error('Connection failed');
         }
-        return 'success';
+        return mockBrowser;
+      });
+
+      manager.setBrowser(mockBrowser as unknown as Browser, failingBrowserFactory);
+
+      const failingOperation = async () => {
+        throw new ProtocolError('Target closed');
       };
 
+      // This will fail as reconnection fails 3 times
       await manager
         .executeWithRetry(failingOperation, 'test-operation')
         .catch(() => {
@@ -156,6 +169,7 @@ describe('BrowserConnectionManager', () => {
         initialRetryDelay: 1000,
         maxRetryDelay: 3000,
         enableLogging: false,
+        rng: () => 0.5, // Deterministic rng for consistent test
       });
 
       const sleepSpy = sinon.spy();
@@ -163,7 +177,9 @@ describe('BrowserConnectionManager', () => {
         sleepSpy(ms);
       };
 
-      manager.setBrowser(mockBrowser as unknown as Browser, browserFactory);
+      // Make browserFactory always fail to trigger all retry attempts
+      const failingBrowserFactory = sinon.stub().rejects(new Error('Connection failed'));
+      manager.setBrowser(mockBrowser as unknown as Browser, failingBrowserFactory);
 
       const failingOperation = async () => {
         throw new ProtocolError('Target closed');
@@ -212,7 +228,7 @@ describe('BrowserConnectionManager', () => {
         (disconnectedHandler as () => void)();
       }
 
-      // Next operation should trigger reconnection
+      // Setup new browser for reconnection
       const newMockBrowser: any = {
         isConnected: sinon.stub().returns(true),
         on: sinon.stub().returnsThis(),
@@ -222,8 +238,17 @@ describe('BrowserConnectionManager', () => {
       };
       browserFactory.resolves(newMockBrowser);
 
+      // Next operation that fails with CDP error should trigger reconnection
+      let operationCallCount = 0;
       const result = await manager.executeWithRetry(
-        async () => 'success',
+        async () => {
+          operationCallCount++;
+          if (operationCallCount === 1) {
+            // First call fails with CDP error, triggering reconnection
+            throw new ProtocolError('Target closed');
+          }
+          return 'success';
+        },
         'test-operation',
       );
 
@@ -234,7 +259,9 @@ describe('BrowserConnectionManager', () => {
 
   describe('CDP error detection', () => {
     it('should detect ProtocolError as CDP connection error', async () => {
-      manager.setBrowser(mockBrowser as unknown as Browser, browserFactory);
+      // Make reconnection always fail to trigger CDPReconnectionError
+      const failingFactory = sinon.stub().rejects(new Error('Connection failed'));
+      manager.setBrowser(mockBrowser as unknown as Browser, failingFactory);
 
       const error = new ProtocolError('Target closed');
       const operation = async () => {
@@ -251,7 +278,9 @@ describe('BrowserConnectionManager', () => {
     });
 
     it('should detect TimeoutError as CDP connection error', async () => {
-      manager.setBrowser(mockBrowser as unknown as Browser, browserFactory);
+      // Make reconnection always fail to trigger CDPReconnectionError
+      const failingFactory = sinon.stub().rejects(new Error('Connection failed'));
+      manager.setBrowser(mockBrowser as unknown as Browser, failingFactory);
 
       const error = new TimeoutError('Navigation timeout');
       const operation = async () => {
@@ -268,8 +297,6 @@ describe('BrowserConnectionManager', () => {
     });
 
     it('should detect string-based CDP errors (fallback)', async () => {
-      manager.setBrowser(mockBrowser as unknown as Browser, browserFactory);
-
       const testCases = [
         'Protocol error (Target.setDiscoverTargets): Target closed',
         'Session closed. Most likely the page has been closed.',
@@ -278,13 +305,19 @@ describe('BrowserConnectionManager', () => {
       ];
 
       for (const errorMessage of testCases) {
+        // Create fresh manager and failing factory for each test case
+        resetConnectionManager();
+        const testManager = new BrowserConnectionManager({enableLogging: false});
+        const failingFactory = sinon.stub().rejects(new Error('Connection failed'));
+        testManager.setBrowser(mockBrowser as unknown as Browser, failingFactory);
+
         const error = new Error(errorMessage);
         const operation = async () => {
           throw error;
         };
 
         await assert.rejects(
-          manager.executeWithRetry(operation, 'test'),
+          testManager.executeWithRetry(operation, 'test'),
           (err: Error) => {
             assert.ok(
               err.message.includes('Chrome DevTools接続エラー'),
@@ -293,9 +326,6 @@ describe('BrowserConnectionManager', () => {
             return true;
           },
         );
-
-        // Reset for next test
-        browserFactory.resetHistory();
       }
     });
 
@@ -392,7 +422,9 @@ describe('BrowserConnectionManager', () => {
         enableLogging: false,
       });
 
-      manager.setBrowser(mockBrowser as unknown as Browser, browserFactory);
+      // Make reconnection always fail to test max attempts
+      const failingFactory = sinon.stub().rejects(new Error('Connection failed'));
+      manager.setBrowser(mockBrowser as unknown as Browser, failingFactory);
 
       const operation = async () => {
         throw new ProtocolError('Target closed');
@@ -407,11 +439,13 @@ describe('BrowserConnectionManager', () => {
       );
 
       // Should have attempted reconnection 2 times
-      sinon.assert.callCount(browserFactory, 2);
+      sinon.assert.callCount(failingFactory, 2);
     });
 
     it('should throw CDPReconnectionError after max attempts', async () => {
-      manager.setBrowser(mockBrowser as unknown as Browser, browserFactory);
+      // Make reconnection always fail to trigger CDPReconnectionError
+      const failingFactory = sinon.stub().rejects(new Error('Connection failed'));
+      manager.setBrowser(mockBrowser as unknown as Browser, failingFactory);
 
       const operation = async () => {
         throw new ProtocolError('Target closed');
@@ -431,7 +465,9 @@ describe('BrowserConnectionManager', () => {
 
   describe('Utility methods', () => {
     it('should track reconnection attempts', async () => {
-      manager.setBrowser(mockBrowser as unknown as Browser, browserFactory);
+      // Make reconnection always fail to test attempt tracking
+      const failingFactory = sinon.stub().rejects(new Error('Connection failed'));
+      manager.setBrowser(mockBrowser as unknown as Browser, failingFactory);
 
       assert.strictEqual(manager.getReconnectAttempts(), 0);
 
@@ -448,7 +484,9 @@ describe('BrowserConnectionManager', () => {
     });
 
     it('should reset reconnection attempt counter', async () => {
-      manager.setBrowser(mockBrowser as unknown as Browser, browserFactory);
+      // Make reconnection always fail to test attempt tracking and reset
+      const failingFactory = sinon.stub().rejects(new Error('Connection failed'));
+      manager.setBrowser(mockBrowser as unknown as Browser, failingFactory);
 
       const operation = async () => {
         throw new ProtocolError('Target closed');
