@@ -12,6 +12,11 @@ import {parseKey} from '../utils/keyboard.js';
 import {ToolCategory} from './categories.js';
 import {defineTool} from './ToolDefinition.js';
 
+const dblClickSchema = zod
+  .boolean()
+  .optional()
+  .describe('Set to true for double clicks. Default is false.');
+
 export const click = defineTool({
   name: 'click',
   description: `Clicks on the provided element`,
@@ -25,10 +30,7 @@ export const click = defineTool({
       .describe(
         'The uid of an element on the page from the page content snapshot',
       ),
-    dblClick: zod
-      .boolean()
-      .optional()
-      .describe('Set to true for double clicks. Default is false.'),
+    dblClick: dblClickSchema,
   },
   handler: async (request, response, context) => {
     const uid = request.params.uid;
@@ -48,6 +50,35 @@ export const click = defineTool({
     } finally {
       void handle.dispose();
     }
+  },
+});
+
+export const clickAt = defineTool({
+  name: 'click_at',
+  description: `Clicks at the provided coordinates`,
+  annotations: {
+    category: ToolCategory.INPUT,
+    readOnlyHint: false,
+    conditions: ['computerVision'],
+  },
+  schema: {
+    x: zod.number().describe('The x coordinate'),
+    y: zod.number().describe('The y coordinate'),
+    dblClick: dblClickSchema,
+  },
+  handler: async (request, response, context) => {
+    const page = context.getSelectedPage();
+    await context.waitForEventsAfterAction(async () => {
+      await page.mouse.click(request.params.x, request.params.y, {
+        clickCount: request.params.dblClick ? 2 : 1,
+      });
+    });
+    response.appendResponseLine(
+      request.params.dblClick
+        ? `Successfully double clicked at the coordinates`
+        : `Successfully clicked at the coordinates`,
+    );
+    response.includeSnapshot();
   },
 });
 

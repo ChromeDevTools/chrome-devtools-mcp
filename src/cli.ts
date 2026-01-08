@@ -152,6 +152,11 @@ export const cliOptions = {
     describe: 'Whether to enable automation over DevTools targets',
     hidden: true,
   },
+  experimentalVision: {
+    type: 'boolean',
+    describe: 'Whether to enable vision tools',
+    hidden: true,
+  },
   experimentalIncludeAllPages: {
     type: 'boolean',
     describe:

@@ -24,6 +24,7 @@ export interface ToolDefinition<
      * If true, the tool does not modify its environment.
      */
     readOnlyHint: boolean;
+    conditions?: string[];
   };
   schema: Schema;
   handler: (
