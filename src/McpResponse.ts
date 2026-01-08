@@ -17,7 +17,7 @@ import {
   getShortDescriptionForRequest,
   getStatusFromRequest,
 } from './formatters/networkFormatter.js';
-import {formatSnapshotNode} from './formatters/snapshotFormatter.js';
+import {SnapshotFormatter} from './formatters/snapshotFormatter.js';
 import type {McpContext} from './McpContext.js';
 import {DevTools} from './third_party/index.js';
 import type {
@@ -194,16 +194,15 @@ export class McpResponse implements Response {
       );
       const snapshot = context.getTextSnapshot();
       if (snapshot) {
+        const formatter = new SnapshotFormatter(snapshot);
         if (this.#snapshotParams.filePath) {
           await context.saveFile(
-            new TextEncoder().encode(
-              formatSnapshotNode(snapshot.root, snapshot),
-            ),
+            new TextEncoder().encode(formatter.toString()),
             this.#snapshotParams.filePath,
           );
           formattedSnapshot = `Saved snapshot to ${this.#snapshotParams.filePath}.`;
         } else {
-          formattedSnapshot = formatSnapshotNode(snapshot.root, snapshot);
+          formattedSnapshot = formatter.toString();
         }
       }
     }
