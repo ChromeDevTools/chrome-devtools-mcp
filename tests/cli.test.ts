@@ -132,6 +132,7 @@ describe('cli args parsing', () => {
       `--chrome-arg='--no-sandbox'`,
       `--chrome-arg='--disable-setuid-sandbox'`,
     ]);
+    console.log('assert log -> ', args);
     assert.deepStrictEqual(args, {
       ...defaultArgs,
       _: [],
@@ -140,6 +141,31 @@ describe('cli args parsing', () => {
       channel: 'stable',
       'chrome-arg': ['--no-sandbox', '--disable-setuid-sandbox'],
       chromeArg: ['--no-sandbox', '--disable-setuid-sandbox'],
+    });
+  });
+
+  it('parses ignore chrome args', async () => {
+    const args = parseArguments('1.0.0', [
+      'node',
+      'main.js',
+      `--ignore-default-chrome-arg='--disable-extensions'`,
+      `--ignore-default-chrome-arg='--disable-cancel-all-touches'`,
+    ]);
+    console.log('assert log -> ', args);
+    assert.deepStrictEqual(args, {
+      ...defaultArgs,
+      _: [],
+      headless: false,
+      $0: 'npx chrome-devtools-mcp@latest',
+      channel: 'stable',
+      'ignore-default-chrome-arg': [
+        '--disable-extensions',
+        '--disable-cancel-all-touches',
+      ],
+      ignoreDefaultChromeArg: [
+        '--disable-extensions',
+        '--disable-cancel-all-touches',
+      ],
     });
   });
 
