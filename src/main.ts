@@ -15,6 +15,7 @@ import {loadIssueDescriptions} from './issue-descriptions.js';
 import {logger, saveLogsToFile} from './logger.js';
 import {McpContext} from './McpContext.js';
 import {McpResponse} from './McpResponse.js';
+import {ClearcutLogger} from './telemetry/clearcut-logger.js';
 import {Mutex} from './Mutex.js';
 import {
   McpServer,
@@ -33,7 +34,12 @@ const VERSION = '0.12.1';
 
 export const args = parseArguments(VERSION);
 
+
 const logFile = args.logFile ? saveLogsToFile(args.logFile) : undefined;
+let clearcutLogger: ClearcutLogger | undefined;
+if (args.usageStatistics) {
+  clearcutLogger = new ClearcutLogger();
+}
 
 process.on('unhandledRejection', (reason, promise) => {
   logger('Unhandled promise rejection', promise, reason);
@@ -51,6 +57,17 @@ const server = new McpServer(
 server.server.setRequestHandler(SetLevelRequestSchema, () => {
   return {};
 });
+
+// Hook for graceful shutdown
+async function gracefulShutdown() {
+  logger('Graceful shutdown initiated');
+  await clearcutLogger?.logServerShutdown();
+  process.exit(0);
+}
+
+process.on('SIGINT', gracefulShutdown);
+process.on('SIGTERM', gracefulShutdown);
+
 
 let context: McpContext;
 async function getContext(): Promise<McpContext> {
@@ -98,6 +115,14 @@ const logDisclaimers = () => {
 debug, and modify any data in the browser or DevTools.
 Avoid sharing sensitive or personal information that you do not want to share with MCP clients.`,
   );
+
+  if (clearcutLogger) {
+    console.error(
+      `
+Google collects usage statistics to improve Chrome DevTools MCP. To opt-out, run with --no-usage-statistics.
+For more details, visit: https://github.com/ChromeDevTools/chrome-devtools-mcp#usage-statistics`,
+    );
+  }
 };
 
 const toolMutex = new Mutex();
@@ -130,6 +155,8 @@ function registerTool(tool: ToolDefinition): void {
     },
     async (params): Promise<CallToolResult> => {
       const guard = await toolMutex.acquire();
+      const startTime = Date.now();
+      let success = false;
       try {
         logger(`${tool.name} request: ${JSON.stringify(params, null, '  ')}`);
         const context = await getContext();
@@ -144,6 +171,7 @@ function registerTool(tool: ToolDefinition): void {
           context,
         );
         const content = await response.handle(tool.name, context);
+        success = true;
         return {
           content,
         };
@@ -163,6 +191,11 @@ function registerTool(tool: ToolDefinition): void {
           isError: true,
         };
       } finally {
+        void clearcutLogger?.logToolInvocation({
+          toolName: tool.name,
+          success,
+          latencyMs: Date.now() - startTime,
+        });
         guard.dispose();
       }
     },
@@ -176,5 +209,13 @@ for (const tool of tools) {
 await loadIssueDescriptions();
 const transport = new StdioServerTransport();
 await server.connect(transport);
-logger('Chrome DevTools MCP Server connected');
+logger('Chrome DevTools MCP Server connected')
+void clearcutLogger?.logServerStart({
+  browser_url_present: !!args.browserUrl,
+  headless: args.headless,
+  executable_path_present: !!args.executablePath,
+  isolated: args.isolated,
+  log_file_present: !!args.logFile,
+  channel: ClearcutLogger.channelToChromeChannel(args.channel ?? 'stable'),
+});
 logDisclaimers();
