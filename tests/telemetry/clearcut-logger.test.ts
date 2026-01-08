@@ -51,8 +51,8 @@ describe('ClearcutLogger', () => {
       assert.strictEqual(options.method, 'POST');
 
       const body = JSON.parse(options.body);
-      assert.strictEqual(body.log_source_name, 'CHROME_DEVTOOLS_MCP');
-      assert.strictEqual(body.client_info.client_type, 'CHROME_DEVTOOLS_MCP_JS');
+      assert.strictEqual(body.log_source, 2839);
+      assert.strictEqual(body.client_info.client_type, 47);
       assert.strictEqual(body.log_event.length, 1);
 
       const extension = JSON.parse(body.log_event[0].source_extension_json);
@@ -88,6 +88,68 @@ describe('ClearcutLogger', () => {
       const body = JSON.parse(serverStartCall.args[1].body);
       const extension = JSON.parse(body.log_event[0].source_extension_json);
       assert.strictEqual(extension.server_start.flag_usage.headless, true);
+    });
+  });
+
+  describe('logServerShutdown', () => {
+    it('sends correct payload', async () => {
+      const logger = new ClearcutLogger({persistence: mockPersistence});
+      await logger.logServerShutdown();
+
+      assert(fetchMock.calledOnce);
+      const [, options] = fetchMock.firstCall.args;
+      const body = JSON.parse(options.body);
+      const extension = JSON.parse(body.log_event[0].source_extension_json);
+
+      assert.ok(extension.server_shutdown);
+      // Verify session_id is present
+      assert.match(
+        extension.session_id,
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+      );
+    });
+  });
+
+  describe('Session Rotation', () => {
+    let clock: sinon.SinonFakeTimers;
+
+    beforeEach(() => {
+      clock = sinon.useFakeTimers();
+    });
+
+    afterEach(() => {
+      clock.restore();
+    });
+
+    it('rotates session id after 24 hours', async () => {
+      const logger = new ClearcutLogger({persistence: mockPersistence});
+
+      // Trigger first log to capture session ID
+      await logger.logToolInvocation({
+        toolName: 'test',
+        success: true,
+        latencyMs: 1,
+      });
+      const firstCallBody = JSON.parse(fetchMock.lastCall.args[1].body);
+      const firstSessionId = JSON.parse(
+        firstCallBody.log_event[0].source_extension_json,
+      ).session_id;
+
+      // Advance time by 25 hours
+      clock.tick(25 * 60 * 60 * 1000);
+
+      // Trigger second log
+      await logger.logToolInvocation({
+        toolName: 'test',
+        success: true,
+        latencyMs: 1,
+      });
+      const secondCallBody = JSON.parse(fetchMock.lastCall.args[1].body);
+      const secondSessionId = JSON.parse(
+        secondCallBody.log_event[0].source_extension_json,
+      ).session_id;
+
+      assert.notStrictEqual(firstSessionId, secondSessionId);
     });
   });
 
