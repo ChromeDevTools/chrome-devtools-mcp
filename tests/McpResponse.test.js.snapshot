@@ -83,7 +83,7 @@ Testing 2
 exports[`McpResponse > list pages 1`] = `
 # test response
 ## Pages
-0: about:blank [selected]
+1: about:blank [selected]
 `;
 
 exports[`McpResponse > returns correctly formatted snapshot for a simple tree 1`] = `

@@ -43,6 +43,7 @@
     "node_modules/chrome-devtools-frontend/front_end/models/ai_assistance/data_formatters/PerformanceTraceFormatter.ts",
     "node_modules/chrome-devtools-frontend/front_end/models/ai_assistance/data_formatters/UnitFormatters.ts",
     "node_modules/chrome-devtools-frontend/front_end/models/ai_assistance/performance",
+    "node_modules/chrome-devtools-frontend/front_end/models/greendev",
     "node_modules/chrome-devtools-frontend/front_end/models/bindings",
     "node_modules/chrome-devtools-frontend/front_end/models/cpu_profile",
     "node_modules/chrome-devtools-frontend/front_end/models/crux-manager",

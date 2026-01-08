@@ -7,8 +7,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
-import {sed} from './sed.ts';
-
 const BUILD_DIR = path.join(process.cwd(), 'build');
 
 /**
@@ -72,21 +70,6 @@ export const experiments = {
 }
   `;
   writeFile(runtimeFile, runtimeContent);
-
-  // Update protocol_client to remove:
-  // 1. self.Protocol assignment
-  // 2. Call to register backend commands.
-  const protocolClientDir = path.join(
-    BUILD_DIR,
-    devtoolsFrontEndCorePath,
-    'protocol_client',
-  );
-  const clientFile = path.join(protocolClientDir, 'protocol_client.js');
-  const globalAssignment = /self\.Protocol = self\.Protocol \|\| \{\};/;
-  const registerCommands =
-    /InspectorBackendCommands\.registerCommands\(InspectorBackend\.inspectorBackend\);/;
-  sed(clientFile, globalAssignment, '');
-  sed(clientFile, registerCommands, '');
 
   copyDevToolsDescriptionFiles();
 }

@@ -10,6 +10,16 @@ exports[`consoleFormatter > formatConsoleEventShort > formats a console.log mess
 msgid=2 [log] Processing file: (1 args)
 `;
 
+exports[`consoleFormatter > formatConsoleEventVerbose > formats a console message with a stack trace 1`] = `
+ID: 5
+Message: log> Hello stack trace!
+### Stack trace
+at foo (foo.ts:10:2)
+at bar (foo.ts:20:2)
+--- setTimeout -------------------------
+at schedule (util.ts:5:2)
+`;
+
 exports[`consoleFormatter > formatConsoleEventVerbose > formats a console.error message 1`] = `
 ID: 4
 Message: error> Something went wrong

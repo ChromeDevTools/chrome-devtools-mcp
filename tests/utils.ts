@@ -211,6 +211,10 @@ export function stabilizeResponseOutput(text: unknown) {
 
   const savedSnapshot = /Saved snapshot to (.*)/g;
   output = output.replaceAll(savedSnapshot, 'Saved snapshot to <file>');
+
+  const acceptLanguageRegEx = /accept-language:.*\n/g;
+  output = output.replaceAll(acceptLanguageRegEx, 'accept-language:<lang>\n');
+
   return output;
 }
 
