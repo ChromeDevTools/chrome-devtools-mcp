@@ -138,6 +138,42 @@ describe('performance', () => {
         );
       });
     });
+
+    it('supports filePath', async () => {
+      const rawData = loadTraceAsBuffer('basic-trace.json.gz');
+      await withMcpContext(async (response, context) => {
+        const filePath = 'test-trace.json';
+        const selectedPage = context.getSelectedPage();
+        sinon.stub(selectedPage, 'url').callsFake(() => 'https://www.test.com');
+        sinon.stub(selectedPage, 'goto').callsFake(() => Promise.resolve(null));
+        sinon.stub(selectedPage.tracing, 'start');
+        sinon.stub(selectedPage.tracing, 'stop').resolves(rawData);
+        const saveFileStub = sinon
+          .stub(context, 'saveFile')
+          .resolves({filename: filePath});
+
+        const clock = sinon.useFakeTimers({shouldClearNativeTimers: true});
+        try {
+          const handlerPromise = startTrace.handler(
+            {params: {reload: true, autoStop: true, filePath}},
+            response,
+            context,
+          );
+          await clock.tickAsync(6_000);
+          await handlerPromise;
+
+          assert.ok(
+            response.responseLines.includes(
+              `The raw trace data was saved to ${filePath}.`,
+            ),
+          );
+          sinon.assert.calledOnce(saveFileStub);
+          sinon.assert.calledWith(saveFileStub, rawData, filePath);
+        } finally {
+          clock.restore();
+        }
+      });
+    });
   });
 
   describe('performance_analyze_insight', () => {
@@ -273,6 +309,32 @@ describe('performance', () => {
         });
         await stopTrace.handler({params: {}}, response, context);
         t.assert.snapshot?.(response.responseLines.join('\n'));
+      });
+    });
+
+    it('supports filePath', async () => {
+      const rawData = loadTraceAsBuffer('basic-trace.json.gz');
+      await withMcpContext(async (response, context) => {
+        const filePath = 'test-trace.json';
+        context.setIsRunningPerformanceTrace(true);
+        const selectedPage = context.getSelectedPage();
+        const stopTracingStub = sinon
+          .stub(selectedPage.tracing, 'stop')
+          .resolves(rawData);
+        const saveFileStub = sinon
+          .stub(context, 'saveFile')
+          .resolves({filename: filePath});
+
+        await stopTrace.handler({params: {filePath}}, response, context);
+
+        sinon.assert.calledOnce(stopTracingStub);
+        sinon.assert.calledOnce(saveFileStub);
+        sinon.assert.calledWith(saveFileStub, rawData, filePath);
+        assert.ok(
+          response.responseLines.includes(
+            `The raw trace data was saved to ${filePath}.`,
+          ),
+        );
       });
     });
   });

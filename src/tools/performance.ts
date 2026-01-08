@@ -25,7 +25,7 @@ export const startTrace = defineTool({
     'Starts a performance trace recording on the selected page. This can be used to look for performance problems and insights to improve the performance of the page. It will also report Core Web Vital (CWV) scores for the page.',
   annotations: {
     category: ToolCategory.PERFORMANCE,
-    readOnlyHint: true,
+    readOnlyHint: false,
   },
   schema: {
     reload: zod
@@ -37,6 +37,12 @@ export const startTrace = defineTool({
       .boolean()
       .describe(
         'Determines if the trace recording should be automatically stopped.',
+      ),
+    filePath: zod
+      .string()
+      .optional()
+      .describe(
+        'The absolute path, or a path relative to the current working directory, to save the raw trace data.',
       ),
   },
   handler: async (request, response, context) => {
@@ -91,7 +97,12 @@ export const startTrace = defineTool({
 
     if (request.params.autoStop) {
       await new Promise(resolve => setTimeout(resolve, 5_000));
-      await stopTracingAndAppendOutput(page, response, context);
+      await stopTracingAndAppendOutput(
+        page,
+        response,
+        context,
+        request.params.filePath,
+      );
     } else {
       response.appendResponseLine(
         `The performance trace is being recorded. Use performance_stop_trace to stop it.`,
@@ -106,15 +117,27 @@ export const stopTrace = defineTool({
     'Stops the active performance trace recording on the selected page.',
   annotations: {
     category: ToolCategory.PERFORMANCE,
-    readOnlyHint: true,
+    readOnlyHint: false,
   },
-  schema: {},
-  handler: async (_request, response, context) => {
+  schema: {
+    filePath: zod
+      .string()
+      .optional()
+      .describe(
+        'The absolute path, or a path relative to the current working directory, to save the raw trace data.',
+      ),
+  },
+  handler: async (request, response, context) => {
     if (!context.isRunningPerformanceTrace()) {
       return;
     }
     const page = context.getSelectedPage();
-    await stopTracingAndAppendOutput(page, response, context);
+    await stopTracingAndAppendOutput(
+      page,
+      response,
+      context,
+      request.params.filePath,
+    );
   },
 });
 
@@ -165,9 +188,16 @@ async function stopTracingAndAppendOutput(
   page: Page,
   response: Response,
   context: Context,
+  filePath?: string,
 ): Promise<void> {
   try {
     const traceEventsBuffer = await page.tracing.stop();
+    if (filePath && traceEventsBuffer) {
+      const file = await context.saveFile(traceEventsBuffer, filePath);
+      response.appendResponseLine(
+        `The raw trace data was saved to ${file.filename}.`,
+      );
+    }
     const result = await parseRawTraceBuffer(traceEventsBuffer);
     response.appendResponseLine('The performance trace has been stopped.');
     if (traceResultIsSuccess(result)) {
