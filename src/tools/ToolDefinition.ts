@@ -89,10 +89,11 @@ export type Context = Readonly<{
   getSelectedPage(): Page;
   getDialog(): Dialog | undefined;
   clearDialog(): void;
-  getPageByIdx(idx: number): Page;
+  getPageById(pageId: number): Page;
+  getPageId(page: Page): number | undefined;
   isPageSelected(page: Page): boolean;
   newPage(): Promise<Page>;
-  closePage(pageIdx: number): Promise<void>;
+  closePage(pageId: number): Promise<void>;
   selectPage(page: Page): void;
   getElementByUid(uid: string): Promise<ElementHandle<Element>>;
   getAXNodeByUid(uid: string): TextSnapshotNode | undefined;

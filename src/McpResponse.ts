@@ -385,12 +385,10 @@ Call ${handleDialog.name} to handle it before continuing.`);
 
     if (this.#includePages) {
       const parts = [`## Pages`];
-      let idx = 0;
       for (const page of context.getPages()) {
         parts.push(
-          `${idx}: ${page.url()}${context.isPageSelected(page) ? ' [selected]' : ''}`,
+          `${context.getPageId(page)}: ${page.url()}${context.isPageSelected(page) ? ' [selected]' : ''}`,
         );
-        idx++;
       }
       response.push(...parts);
     }
