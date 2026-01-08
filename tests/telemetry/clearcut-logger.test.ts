@@ -13,11 +13,19 @@ import {
   ClearcutLogger,
   CLEARCUT_ENDPOINT,
 } from '../../src/telemetry/clearcut-logger.js';
+import {Persistence, FilePersistence} from '../../src/telemetry/persistence.js';
 
 describe('ClearcutLogger', () => {
+  let mockPersistence: sinon.SinonStubbedInstance<Persistence>;
   let fetchMock: sinon.SinonStub;
 
   beforeEach(() => {
+    mockPersistence = sinon.createStubInstance(FilePersistence, {
+      loadState: Promise.resolve({
+        lastActive: '',
+        firstTimeSent: false,
+      }),
+    });
     fetchMock = sinon.stub(global, 'fetch').resolves({
       ok: true,
       text: () => Promise.resolve('OK'),
@@ -30,7 +38,7 @@ describe('ClearcutLogger', () => {
 
   describe('logToolInvocation', () => {
     it('sends correct payload', async () => {
-      const logger = new ClearcutLogger();
+      const logger = new ClearcutLogger({persistence: mockPersistence});
       await logger.logToolInvocation({
         toolName: 'test_tool',
         success: true,
@@ -59,10 +67,14 @@ describe('ClearcutLogger', () => {
   });
 
   describe('logServerStart', () => {
-    it('logs flag usage', async () => {
-      const logger = new ClearcutLogger();
+    it('logs flag usage and checks daily active', async () => {
+      const logger = new ClearcutLogger({persistence: mockPersistence});
+      // Spy on the logger's logDailyActiveIfNeeded to make sure it's called
+      const logDailySpy = sinon.spy(logger, 'logDailyActiveIfNeeded');
 
       await logger.logServerStart({headless: true});
+
+      assert(logDailySpy.calledOnce);
       
       // Should have logged server start
       const calls = fetchMock.getCalls();
@@ -76,6 +88,61 @@ describe('ClearcutLogger', () => {
       const body = JSON.parse(serverStartCall.args[1].body);
       const extension = JSON.parse(body.log_event[0].source_extension_json);
       assert.strictEqual(extension.server_start.flag_usage.headless, true);
+    });
+  });
+
+  describe('logDailyActiveIfNeeded', () => {
+    it('logs first time installation if not sent', async () => {
+      mockPersistence.loadState.resolves({lastActive: '', firstTimeSent: false});
+      const logger = new ClearcutLogger({persistence: mockPersistence});
+      
+      await logger.logDailyActiveIfNeeded();
+
+      const calls = fetchMock.getCalls();
+      const firstTimeCall = calls.find(call => {
+        const body = JSON.parse(call.args[1].body);
+        const extension = JSON.parse(body.log_event[0].source_extension_json);
+        return !!extension.first_time_installation;
+      });
+
+      assert(firstTimeCall, 'Should have logged first time installation');
+      assert(mockPersistence.saveState.called);
+    });
+
+    it('logs daily active if needed (lastActive > 24h ago)', async () => {
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      
+      mockPersistence.loadState.resolves({
+        lastActive: yesterday.toISOString(),
+        firstTimeSent: true,
+      });
+      
+      const logger = new ClearcutLogger({persistence: mockPersistence});
+      await logger.logDailyActiveIfNeeded();
+
+      const calls = fetchMock.getCalls();
+      const dailyActiveCall = calls.find(call => {
+        const body = JSON.parse(call.args[1].body);
+        const extension = JSON.parse(body.log_event[0].source_extension_json);
+        return !!extension.daily_active;
+      });
+
+      assert(dailyActiveCall, 'Should have logged daily active');
+      assert(mockPersistence.saveState.called);
+    });
+
+    it('does not log if not needed (today)', async () => {
+      mockPersistence.loadState.resolves({
+        lastActive: new Date().toISOString(),
+        firstTimeSent: true,
+      });
+
+      const logger = new ClearcutLogger({persistence: mockPersistence});
+      await logger.logDailyActiveIfNeeded();
+
+      assert(fetchMock.notCalled);
+      assert(mockPersistence.saveState.notCalled);
     });
   });
 });

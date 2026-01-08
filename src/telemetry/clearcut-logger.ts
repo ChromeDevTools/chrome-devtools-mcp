@@ -7,6 +7,11 @@
 import crypto from 'node:crypto';
 
 import {logger} from '../logger.js';
+import {
+  LocalState,
+  FilePersistence,
+  Persistence,
+} from './persistence.js';
 
 // Protobuf message interfaces
 export interface ChromeDevToolsMcpExtension {
@@ -90,10 +95,12 @@ const SESSION_ROTATION_MS = MS_PER_DAY; // 24 hours
 export class ClearcutLogger {
   #sessionId: string;
   #sessionIdGeneratedTime: number;
+  #persistence: Persistence;
 
-  constructor() {
+  constructor(options?: {persistence?: Persistence}) {
     this.#sessionId = crypto.randomUUID();
     this.#sessionIdGeneratedTime = Date.now();
+    this.#persistence = options?.persistence ?? new FilePersistence();
   }
 
   static channelToChromeChannel(channel: string): ChromeChannel {
@@ -126,6 +133,7 @@ export class ClearcutLogger {
   }
 
   async logServerStart(flagUsage: FlagUsage): Promise<void> {
+    await this.logDailyActiveIfNeeded();
     await this.#log({
       server_start: {
         flag_usage: flagUsage,
@@ -137,6 +145,56 @@ export class ClearcutLogger {
     await this.#log({
       server_shutdown: {},
     });
+  }
+
+  async logDailyActiveIfNeeded(): Promise<void> {
+    try {
+      const state = await this.#persistence.loadState();
+
+      if (!state.firstTimeSent) {
+        await this.#log({first_time_installation: {}});
+        state.firstTimeSent = true;
+        await this.#persistence.saveState(state);
+      }
+
+      if (this.#shouldLogDailyActive(state)) {
+        let daysSince = -1;
+        if (state.lastActive) {
+          const lastActiveDate = new Date(state.lastActive);
+          const now = new Date();
+          const diffTime = Math.abs(now.getTime() - lastActiveDate.getTime());
+          daysSince = Math.ceil(diffTime / MS_PER_DAY); 
+        }
+
+        await this.#log({
+          daily_active: {
+            days_since_last_active: daysSince,
+          },
+        });
+
+        // Update persistence
+        state.lastActive = new Date().toISOString();
+        await this.#persistence.saveState(state);
+      }
+    } catch (err) {
+      logger('Error in logDailyActiveIfNeeded:', err);
+    }
+  }
+
+  #shouldLogDailyActive(state: LocalState): boolean {
+    if (!state.lastActive) {
+      return true;
+    }
+    const lastActiveDate = new Date(state.lastActive);
+    const now = new Date();
+    
+    // Compare UTC dates
+    const isSameDay =
+      lastActiveDate.getUTCFullYear() === now.getUTCFullYear() &&
+      lastActiveDate.getUTCMonth() === now.getUTCMonth() &&
+      lastActiveDate.getUTCDate() === now.getUTCDate();
+
+    return !isSameDay;
   }
 
   #rotateSessionIfNeeded(): void {
