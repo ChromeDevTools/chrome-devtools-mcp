@@ -54,9 +54,12 @@ server.server.setRequestHandler(SetLevelRequestSchema, () => {
 
 let context: McpContext;
 async function getContext(): Promise<McpContext> {
-  const extraArgs: string[] = (args.chromeArg ?? []).map(String);
+  const chromeArgs: string[] = (args.chromeArg ?? []).map(String);
+  const ignoreDefaultChromeArgs: string[] = (
+    args.ignoreDefaultChromeArg ?? []
+  ).map(String);
   if (args.proxyServer) {
-    extraArgs.push(`--proxy-server=${args.proxyServer}`);
+    chromeArgs.push(`--proxy-server=${args.proxyServer}`);
   }
   const devtools = args.experimentalDevtools ?? false;
   const browser =
@@ -78,7 +81,8 @@ async function getContext(): Promise<McpContext> {
           userDataDir: args.userDataDir,
           logFile,
           viewport: args.viewport,
-          args: extraArgs,
+          chromeArgs,
+          ignoreDefaultChromeArgs,
           acceptInsecureCerts: args.acceptInsecureCerts,
           devtools,
         });
