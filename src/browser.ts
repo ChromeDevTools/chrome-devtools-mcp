@@ -205,7 +205,6 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
     }
     if (options.viewport) {
       const [page] = await browser.pages();
-      // @ts-expect-error internal API for now.
       await page?.resize({
         contentWidth: options.viewport.width,
         contentHeight: options.viewport.height,
