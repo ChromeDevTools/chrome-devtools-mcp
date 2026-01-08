@@ -8,7 +8,12 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
-import {extractUrlLikeFromDevToolsTitle, urlsEqual} from './DevtoolsUtils.js';
+import type {TargetUniverse} from './DevtoolsUtils.js';
+import {
+  extractUrlLikeFromDevToolsTitle,
+  UniverseManager,
+  urlsEqual,
+} from './DevtoolsUtils.js';
 import type {ListenerMap} from './PageCollector.js';
 import {NetworkCollector, ConsoleCollector} from './PageCollector.js';
 import {Locator} from './third_party/index.js';
@@ -104,6 +109,7 @@ export class McpContext implements Context {
   #textSnapshot: TextSnapshot | null = null;
   #networkCollector: NetworkCollector;
   #consoleCollector: ConsoleCollector;
+  #devtoolsUniverseManager: UniverseManager;
 
   #isRunningTrace = false;
   #networkConditionsMap = new WeakMap<Page, string>();
@@ -152,17 +158,20 @@ export class McpContext implements Context {
         },
       } as ListenerMap;
     });
+    this.#devtoolsUniverseManager = new UniverseManager(this.browser);
   }
 
   async #init() {
     const pages = await this.createPagesSnapshot();
     await this.#networkCollector.init(pages);
     await this.#consoleCollector.init(pages);
+    await this.#devtoolsUniverseManager.init(pages);
   }
 
   dispose() {
     this.#networkCollector.dispose();
     this.#consoleCollector.dispose();
+    this.#devtoolsUniverseManager.dispose();
   }
 
   static async from(
@@ -227,6 +236,10 @@ export class McpContext implements Context {
   ): Array<ConsoleMessage | Error | DevTools.AggregatedIssue> {
     const page = this.getSelectedPage();
     return this.#consoleCollector.getData(page, includePreservedMessages);
+  }
+
+  getDevToolsUniverse(): TargetUniverse | null {
+    return this.#devtoolsUniverseManager.get(this.getSelectedPage());
   }
 
   getConsoleMessageStableId(

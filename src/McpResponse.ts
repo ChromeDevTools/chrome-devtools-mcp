@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {createStackTraceForConsoleMessage} from './DevtoolsUtils.js';
 import type {ConsoleMessageData} from './formatters/consoleFormatter.js';
 import {
   formatConsoleEventShort,
@@ -242,6 +243,11 @@ export class McpResponse implements Response {
       const consoleMessageStableId = this.#attachedConsoleMessageId;
       if ('args' in message) {
         const consoleMessage = message as ConsoleMessage;
+        const devTools = context.getDevToolsUniverse();
+        const stackTrace = devTools
+          ? await createStackTraceForConsoleMessage(devTools, consoleMessage)
+          : undefined;
+
         consoleData = {
           consoleMessageStableId,
           type: consoleMessage.type(),
@@ -256,6 +262,7 @@ export class McpResponse implements Response {
                 : String(stringArg);
             }),
           ),
+          stackTrace,
         };
       } else if (message instanceof DevTools.AggregatedIssue) {
         const formatter = new IssueFormatter(message, {
@@ -308,6 +315,13 @@ export class McpResponse implements Response {
                 context.getConsoleMessageStableId(item);
               if ('args' in item) {
                 const consoleMessage = item as ConsoleMessage;
+                const devTools = context.getDevToolsUniverse();
+                const stackTrace = devTools
+                  ? await createStackTraceForConsoleMessage(
+                      devTools,
+                      consoleMessage,
+                    )
+                  : undefined;
                 return {
                   consoleMessageStableId,
                   type: consoleMessage.type(),
@@ -322,6 +336,7 @@ export class McpResponse implements Response {
                         : String(stringArg);
                     }),
                   ),
+                  stackTrace,
                 };
               }
               if (item instanceof DevTools.AggregatedIssue) {
