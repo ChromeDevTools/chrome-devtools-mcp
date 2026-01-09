@@ -125,6 +125,12 @@ function registerTool(tool: ToolDefinition): void {
   ) {
     return;
   }
+  if (
+    tool.annotations.conditions?.includes('computerVision') &&
+    !args.experimentalVision
+  ) {
+    return;
+  }
   server.registerTool(
     tool.name,
     {

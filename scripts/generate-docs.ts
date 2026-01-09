@@ -20,6 +20,7 @@ interface ToolWithAnnotations extends Tool {
   annotations?: {
     title?: string;
     category?: typeof ToolCategory;
+    conditions?: string[];
   };
 }
 
@@ -265,31 +266,39 @@ async function generateToolDocumentation(): Promise<void> {
     console.log('Generating tool documentation from definitions...');
 
     // Convert ToolDefinitions to ToolWithAnnotations
-    const toolsWithAnnotations: ToolWithAnnotations[] = tools.map(tool => {
-      const properties: Record<string, TypeInfo> = {};
-      const required: string[] = [];
-
-      for (const [key, schema] of Object.entries(
-        tool.schema as unknown as Record<string, ZodSchema>,
-      )) {
-        const info = getZodTypeInfo(schema);
-        properties[key] = info;
-        if (isRequired(schema)) {
-          required.push(key);
+    const toolsWithAnnotations: ToolWithAnnotations[] = tools
+      .filter(tool => {
+        if (!tool.annotations.conditions) {
+          return true;
         }
-      }
+        // Only include unconditional tools.
+        return tool.annotations.conditions.length === 0;
+      })
+      .map(tool => {
+        const properties: Record<string, TypeInfo> = {};
+        const required: string[] = [];
 
-      return {
-        name: tool.name,
-        description: tool.description,
-        inputSchema: {
-          type: 'object',
-          properties,
-          required,
-        },
-        annotations: tool.annotations,
-      };
-    });
+        for (const [key, schema] of Object.entries(
+          tool.schema as unknown as Record<string, ZodSchema>,
+        )) {
+          const info = getZodTypeInfo(schema);
+          properties[key] = info;
+          if (isRequired(schema)) {
+            required.push(key);
+          }
+        }
+
+        return {
+          name: tool.name,
+          description: tool.description,
+          inputSchema: {
+            type: 'object',
+            properties,
+            required,
+          },
+          annotations: tool.annotations,
+        };
+      });
 
     console.log(`Found ${toolsWithAnnotations.length} tools`);
 
