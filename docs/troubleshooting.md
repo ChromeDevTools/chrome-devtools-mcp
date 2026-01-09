@@ -4,8 +4,8 @@
 
 - Run `npx chrome-devtools-mcp@latest --help` to test if the MCP server runs on your machine.
 - Make sure that your MCP client uses the same npm and node version as your terminal.
-- When configuring your MCP client, try using the `--yes` argument to `npx` to
-  auto-accept installation prompt.
+- When configuring your MCP client, try using the `-y` argument to `npx` to
+  auto-accept installation prompts (e.g., `npx -y chrome-devtools-mcp@latest`).
 - Find a specific error in the output of the `chrome-devtools-mcp` server.
   Usually, if your client is an IDE, logs would be in the Output pane.
 
