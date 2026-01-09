@@ -148,7 +148,6 @@ interface McpLaunchOptions {
 }
 
 export async function launch(options: McpLaunchOptions): Promise<Browser> {
-  console.log('🔥', options);
   const {channel, executablePath, headless, isolated} = options;
   const profileDirName =
     channel && channel !== 'stable'
@@ -174,8 +173,6 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
   ];
   const ignoreDefaultArgs: LaunchOptions['ignoreDefaultArgs'] =
     options.ignoreDefaultChromeArgs ?? false;
-
-  console.log(ignoreDefaultArgs);
 
   if (headless) {
     args.push('--screen-info={3840x2160}');
