@@ -211,6 +211,12 @@ export const resizePage = defineTool({
   handler: async (request, response, context) => {
     const page = context.getSelectedPage();
 
+    const client = await page.createCDPSession();
+    const {windowId} = await client.send('Browser.getWindowForTarget');
+    const {bounds} = await client.send('Browser.getWindowBounds', {
+      windowId,
+    });
+
     await page.resize({
       contentWidth: request.params.width,
       contentHeight: request.params.height,
