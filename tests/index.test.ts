@@ -51,7 +51,7 @@ describe('e2e', () => {
         content: [
           {
             type: 'text',
-            text: '# list_pages response\n## Pages\n0: about:blank [selected]',
+            text: '# list_pages response\n## Pages\n1: about:blank [selected]',
           },
         ],
       });
@@ -72,7 +72,7 @@ describe('e2e', () => {
         content: [
           {
             type: 'text',
-            text: '# list_pages response\n## Pages\n0: about:blank [selected]',
+            text: '# list_pages response\n## Pages\n1: about:blank [selected]',
           },
         ],
       });

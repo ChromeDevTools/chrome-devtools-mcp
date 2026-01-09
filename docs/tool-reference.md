@@ -131,7 +131,7 @@
 
 **Parameters:**
 
-- **pageIdx** (number) **(required)**: The index of the page to close. Call [`list_pages`](#list_pages) to list pages.
+- **pageId** (number) **(required)**: The ID of the page to close. Call [`list_pages`](#list_pages) to list pages.
 
 ---
 
@@ -173,7 +173,7 @@
 
 **Parameters:**
 
-- **pageIdx** (number) **(required)**: The index of the page to select. Call [`list_pages`](#list_pages) to get available pages.
+- **pageId** (number) **(required)**: The ID of the page to select. Call [`list_pages`](#list_pages) to get available pages.
 - **bringToFront** (boolean) _(optional)_: Whether to focus the page and bring it to the top.
 
 ---
