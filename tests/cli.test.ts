@@ -143,6 +143,30 @@ describe('cli args parsing', () => {
     });
   });
 
+  it('parses ignore chrome args', async () => {
+    const args = parseArguments('1.0.0', [
+      'node',
+      'main.js',
+      `--ignore-default-chrome-arg='--disable-extensions'`,
+      `--ignore-default-chrome-arg='--disable-cancel-all-touches'`,
+    ]);
+    assert.deepStrictEqual(args, {
+      ...defaultArgs,
+      _: [],
+      headless: false,
+      $0: 'npx chrome-devtools-mcp@latest',
+      channel: 'stable',
+      'ignore-default-chrome-arg': [
+        '--disable-extensions',
+        '--disable-cancel-all-touches',
+      ],
+      ignoreDefaultChromeArg: [
+        '--disable-extensions',
+        '--disable-cancel-all-touches',
+      ],
+    });
+  });
+
   it('parses wsEndpoint with ws:// protocol', async () => {
     const args = parseArguments('1.0.0', [
       'node',

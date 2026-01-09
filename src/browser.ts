@@ -142,7 +142,8 @@ interface McpLaunchOptions {
     width: number;
     height: number;
   };
-  args?: string[];
+  chromeArgs?: string[];
+  ignoreDefaultChromeArgs?: string[];
   devtools: boolean;
 }
 
@@ -167,9 +168,12 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
   }
 
   const args: LaunchOptions['args'] = [
-    ...(options.args ?? []),
-    '--hide-crash-restore-bubble',
+    ...(options.chromeArgs ?? []),
+    '--hide-crash-resore-bubble',
   ];
+  const ignoreDefaultArgs: LaunchOptions['ignoreDefaultArgs'] =
+    options.ignoreDefaultChromeArgs ?? false;
+
   if (headless) {
     args.push('--screen-info={3840x2160}');
   }
@@ -194,6 +198,7 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
       pipe: true,
       headless,
       args,
+      ignoreDefaultArgs: ignoreDefaultArgs,
       acceptInsecureCerts: options.acceptInsecureCerts,
       handleDevToolsAsPage: true,
     });
