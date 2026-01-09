@@ -1,6 +1,6 @@
 {
   "name": "chrome-devtools-mcp",
-  "version": "0.12.1",
+  "version": "0.12.2",
   "description": "MCP server for Chrome DevTools",
   "type": "module",
   "bin": "./build/src/index.js",
