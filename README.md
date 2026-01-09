@@ -321,6 +321,21 @@ Your MCP client should open the browser and record a performance trace.
 
 > [!NOTE]  
 > The MCP server will start the browser automatically once the MCP client uses a tool that requires a running browser instance. Connecting to the Chrome DevTools MCP server on its own will not automatically start the browser.
+## Example: Debugging a WordPress Site Using MCP
+
+This example demonstrates how `chrome-devtools-mcp` can be used to debug
+and analyze a locally hosted WordPress site using Chrome DevTools automation.
+
+### Prerequisites
+- Local WordPress setup (XAMPP, LocalWP, Docker, etc.)
+- Google Chrome
+- Node.js installed
+
+### Steps
+
+1. Start Chrome with remote debugging enabled:
+```bash
+google-chrome --remote-debugging-port=9222
 
 ## Tools
 
