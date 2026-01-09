@@ -73,7 +73,19 @@ Metrics (lab / observed):
     - Load duration: 15 ms, bounds: {min: 122411037986, max: 122411052690}
     - Render delay: 73 ms, bounds: {min: 122411052690, max: 122411126100}
   - CLS: 0.00
-Metrics (field / real users): n/a – no data for this page in CrUX
+Metrics (field / real users):
+  - LCP: 2595 ms (scope: url)
+  - LCP breakdown:
+    - TTFB: 1273 ms (scope: url)
+    - Load delay: 86 ms (scope: url)
+    - Load duration: 451 ms (scope: url)
+    - Render delay: 786 ms (scope: url)
+  - INP: 140 ms (scope: url)
+  - CLS: 0.06 (scope: url)
+  - The above data is from CrUX–Chrome User Experience Report. It's how the page performs for real users.
+  - The values shown above are the p75 measure of all real Chrome users
+  - The scope indicates if the data came from the entire origin, or a specific url
+  - Lab metrics describe how this specific page load performed, while field metrics are an aggregation of results from real-world users. Best practice is to prioritize metrics that are bad in field data. Lab metrics may be better or worse than fields metrics depending on the developer's machine, network, or the actions performed while tracing.
 Available insights:
   - insight name: LCPBreakdown
     description: Each [subpart has specific improvement strategies](https://developer.chrome.com/docs/performance/insights/lcp-breakdown). Ideally, most of the LCP time should be spent on loading the resources, not within delays.
