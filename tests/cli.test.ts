@@ -132,7 +132,6 @@ describe('cli args parsing', () => {
       `--chrome-arg='--no-sandbox'`,
       `--chrome-arg='--disable-setuid-sandbox'`,
     ]);
-    console.log('assert log -> ', args);
     assert.deepStrictEqual(args, {
       ...defaultArgs,
       _: [],
@@ -151,7 +150,6 @@ describe('cli args parsing', () => {
       `--ignore-default-chrome-arg='--disable-extensions'`,
       `--ignore-default-chrome-arg='--disable-cancel-all-touches'`,
     ]);
-    console.log('assert log -> ', args);
     assert.deepStrictEqual(args, {
       ...defaultArgs,
       _: [],
