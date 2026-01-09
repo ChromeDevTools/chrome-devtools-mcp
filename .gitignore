@@ -146,3 +146,8 @@ build/
 log.txt
 
 .DS_Store
+
+# Local development directories
+.ai/
+spike/
+test-extension/

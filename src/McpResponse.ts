@@ -390,6 +390,17 @@ Call ${handleDialog.name} to handle it before continuing.`);
           `${context.getPageId(page)}: ${page.url()}${context.isPageSelected(page) ? ' [selected]' : ''}`,
         );
       }
+
+      // Include service workers when extension debugging is enabled
+      const serviceWorkers = context.getServiceWorkers();
+      if (serviceWorkers.length > 0) {
+        parts.push('');
+        parts.push('## Service Workers');
+        for (const sw of serviceWorkers) {
+          parts.push(`[service_worker] ${sw.url}`);
+        }
+      }
+
       response.push(...parts);
     }
 

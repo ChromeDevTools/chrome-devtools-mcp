@@ -9,7 +9,11 @@ import './polyfill.js';
 import process from 'node:process';
 
 import type {Channel} from './browser.js';
-import {ensureBrowserConnected, ensureBrowserLaunched} from './browser.js';
+import {
+  ensureBrowserConnected,
+  ensureBrowserLaunched,
+  setExtensionDebuggingEnabled,
+} from './browser.js';
 import {parseArguments} from './cli.js';
 import {loadIssueDescriptions} from './issue-descriptions.js';
 import {logger, saveLogsToFile} from './logger.js';
@@ -32,6 +36,12 @@ const VERSION = '0.12.1';
 // x-release-please-end
 
 export const args = parseArguments(VERSION);
+
+// Enable extension debugging if requested
+if (args.enableExtensions) {
+  setExtensionDebuggingEnabled(true);
+  logger('Extension debugging enabled');
+}
 
 const logFile = args.logFile ? saveLogsToFile(args.logFile) : undefined;
 
