@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+// import fs from 'node:fs';
+// import path from 'node:path';
+
 import {logger} from '../logger.js';
 import {zod} from '../third_party/index.js';
 
@@ -217,6 +220,22 @@ export const resizePage = defineTool({
       windowId,
     });
 
+    if (bounds.windowState === 'fullscreen') {
+      // have to call this twice when window is in fullscreen mode
+      await client.send('Browser.setWindowBounds', {
+        windowId,
+        bounds: {windowState: 'normal'},
+      });
+      await client.send('Browser.setWindowBounds', {
+        windowId,
+        bounds: {windowState: 'normal'},
+      });
+    } else if (bounds.windowState !== 'normal') {
+      await client.send('Browser.setWindowBounds', {
+        windowId,
+        bounds: {windowState: 'normal'},
+      });
+    }
     await page.resize({
       contentWidth: request.params.width,
       contentHeight: request.params.height,
