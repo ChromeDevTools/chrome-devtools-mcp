@@ -4,9 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-// import fs from 'node:fs';
-// import path from 'node:path';
-
 import {logger} from '../logger.js';
 import {zod} from '../third_party/index.js';
 
