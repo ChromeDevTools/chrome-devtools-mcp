@@ -213,7 +213,7 @@ describe('pages', () => {
     });
   });
   describe('resize', () => {
-    it('create a page', async () => {
+    it('resize the page', async () => {
       await withMcpContext(async (response, context) => {
         const page = context.getSelectedPage();
         const resizePromise = page.evaluate(() => {
@@ -231,6 +231,118 @@ describe('pages', () => {
           return [window.innerWidth, window.innerHeight];
         });
         assert.deepStrictEqual(dimensions, [700, 500]);
+      });
+    });
+
+    it('resize when window state is normal', async () => {
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedPage();
+        const browser = page.browser();
+        const windowId = await page.windowId();
+        await browser.setWindowBounds(windowId, {windowState: 'normal'});
+
+        const {windowState} = await browser.getWindowBounds(windowId);
+        assert.strictEqual(windowState, 'normal');
+
+        const resizePromise = page.evaluate(() => {
+          return new Promise(resolve => {
+            window.addEventListener('resize', resolve, {once: true});
+          });
+        });
+        await resizePage.handler(
+          {params: {width: 650, height: 450}},
+          response,
+          context,
+        );
+        await resizePromise;
+        const dimensions = await page.evaluate(() => {
+          return [window.innerWidth, window.innerHeight];
+        });
+        assert.deepStrictEqual(dimensions, [650, 450]);
+      });
+    });
+
+    it('resize when window state is minimized', async () => {
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedPage();
+        const browser = page.browser();
+        const windowId = await page.windowId();
+        await browser.setWindowBounds(windowId, {windowState: 'minimized'});
+
+        const {windowState} = await browser.getWindowBounds(windowId);
+        assert.strictEqual(windowState, 'minimized');
+
+        const resizePromise = page.evaluate(() => {
+          return new Promise(resolve => {
+            window.addEventListener('resize', resolve, {once: true});
+          });
+        });
+        await resizePage.handler(
+          {params: {width: 750, height: 550}},
+          response,
+          context,
+        );
+        await resizePromise;
+        const dimensions = await page.evaluate(() => {
+          return [window.innerWidth, window.innerHeight];
+        });
+        assert.deepStrictEqual(dimensions, [750, 550]);
+      });
+    });
+
+    it('resize when window state is maximized', async () => {
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedPage();
+        const browser = page.browser();
+        const windowId = await page.windowId();
+        await browser.setWindowBounds(windowId, {windowState: 'maximized'});
+
+        const {windowState} = await browser.getWindowBounds(windowId);
+        assert.strictEqual(windowState, 'maximized');
+
+        const resizePromise = page.evaluate(() => {
+          return new Promise(resolve => {
+            window.addEventListener('resize', resolve, {once: true});
+          });
+        });
+        await resizePage.handler(
+          {params: {width: 800, height: 600}},
+          response,
+          context,
+        );
+        await resizePromise;
+        const dimensions = await page.evaluate(() => {
+          return [window.innerWidth, window.innerHeight];
+        });
+        assert.deepStrictEqual(dimensions, [800, 600]);
+      });
+    });
+
+    it('resize when window state is fullscreen', async () => {
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedPage();
+        const browser = page.browser();
+        const windowId = await page.windowId();
+        await browser.setWindowBounds(windowId, {windowState: 'fullscreen'});
+
+        const {windowState} = await browser.getWindowBounds(windowId);
+        assert.strictEqual(windowState, 'fullscreen');
+
+        const resizePromise = page.evaluate(() => {
+          return new Promise(resolve => {
+            window.addEventListener('resize', resolve, {once: true});
+          });
+        });
+        await resizePage.handler(
+          {params: {width: 850, height: 650}},
+          response,
+          context,
+        );
+        await resizePromise;
+        const dimensions = await page.evaluate(() => {
+          return [window.innerWidth, window.innerHeight];
+        });
+        assert.deepStrictEqual(dimensions, [850, 650]);
       });
     });
   });
