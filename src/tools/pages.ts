@@ -211,27 +211,17 @@ export const resizePage = defineTool({
   handler: async (request, response, context) => {
     const page = context.getSelectedPage();
 
-    const client = await page.createCDPSession();
-    const {windowId} = await client.send('Browser.getWindowForTarget');
-    const {bounds} = await client.send('Browser.getWindowBounds', {
-      windowId,
-    });
+    const browser = page.browser();
+    const windowId = await page.windowId();
+
+    const bounds = await browser.getWindowBounds(windowId);
 
     if (bounds.windowState === 'fullscreen') {
       // have to call this twice when window is in fullscreen mode
-      await client.send('Browser.setWindowBounds', {
-        windowId,
-        bounds: {windowState: 'normal'},
-      });
-      await client.send('Browser.setWindowBounds', {
-        windowId,
-        bounds: {windowState: 'normal'},
-      });
+      await browser.setWindowBounds(windowId, {windowState: 'normal'});
+      await browser.setWindowBounds(windowId, {windowState: 'normal'});
     } else if (bounds.windowState !== 'normal') {
-      await client.send('Browser.setWindowBounds', {
-        windowId,
-        bounds: {windowState: 'normal'},
-      });
+      await browser.setWindowBounds(windowId, {windowState: 'normal'});
     }
     await page.resize({
       contentWidth: request.params.width,
