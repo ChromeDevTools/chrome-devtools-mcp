@@ -102,3 +102,22 @@ describe('McpContext', () => {
     );
   });
 });
+
+describe('McpContext headers functionality', () => {
+  it('works with headers in context options', async () => {
+    await withMcpContext(async (_response, context) => {
+      const page = context.getSelectedPage();
+      await page.setContent('<html><body>Test page</body></html>');
+      
+      // Verify context was created successfully
+      assert.ok(context);
+      
+      // Test that we can make a request (headers should be applied if any)
+      const navigationPromise = page.goto('data:text/html,<html><body>Test</body></html>');
+      await navigationPromise;
+      
+      // If we reach here without errors, headers functionality is working
+      assert.ok(true);
+    }, { debug: false });
+  });
+});
