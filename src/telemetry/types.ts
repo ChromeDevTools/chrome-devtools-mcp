@@ -13,7 +13,6 @@ export interface ChromeDevToolsMcpExtension {
   tool_invocation?: ToolInvocation;
   server_start?: ServerStart;
   daily_active?: DailyActive;
-  first_time_installation?: FirstTimeInstallation;
 }
 
 export interface ToolInvocation {
@@ -29,8 +28,6 @@ export interface ServerStart {
 export interface DailyActive {
   days_since_last_active: number;
 }
-
-export type FirstTimeInstallation = Record<string, never>;
 
 export type FlagUsage = Record<string, boolean | string | number | undefined>;
 

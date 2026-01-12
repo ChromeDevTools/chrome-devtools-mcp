@@ -228,4 +228,5 @@ const transport = new StdioServerTransport();
 await server.connect(transport);
 logger('Chrome DevTools MCP Server connected');
 logDisclaimers();
+void clearcutLogger?.logDailyActiveIfNeeded();
 void clearcutLogger?.logServerStart(computeFlagUsage(args, cliOptions));
