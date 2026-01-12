@@ -157,6 +157,11 @@ export const cliOptions = {
     describe: 'Whether to enable vision tools',
     hidden: true,
   },
+  experimentalStructuredContent: {
+    type: 'boolean',
+    describe: 'Whether to output structured formatted content.',
+    hidden: true,
+  },
   experimentalIncludeAllPages: {
     type: 'boolean',
     describe:

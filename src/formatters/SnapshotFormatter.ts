@@ -6,20 +6,21 @@
 import type {TextSnapshot, TextSnapshotNode} from '../McpContext.js';
 
 export class SnapshotFormatter {
-  constructor(public snapshot?: TextSnapshot) {}
+  #snapshot: TextSnapshot;
+
+  constructor(snapshot: TextSnapshot) {
+    this.#snapshot = snapshot;
+  }
 
   toString(): string {
-    if (!this.snapshot) {
-      return '';
-    }
     const chunks: string[] = [];
-    const root = this.snapshot.root;
+    const root = this.#snapshot.root;
 
     // Top-level content of the snapshot.
     if (
-      this.snapshot.verbose &&
-      this.snapshot.hasSelectedElement &&
-      !this.snapshot.selectedElementUid
+      this.#snapshot.verbose &&
+      this.#snapshot.hasSelectedElement &&
+      !this.#snapshot.selectedElementUid
     ) {
       chunks.push(`Note: there is a selected element in the DevTools Elements panel but it is not included into the current a11y tree snapshot.
 Get a verbose snapshot to include all elements if you are interested in the selected element.\n\n`);
@@ -30,19 +31,16 @@ Get a verbose snapshot to include all elements if you are interested in the sele
   }
 
   toJSON(): object {
-    if (!this.snapshot) {
-      return {};
-    }
-    return this.#nodeToJSON(this.snapshot.root);
+    return this.#nodeToJSON(this.#snapshot.root);
   }
 
-  #formatNode(node: TextSnapshotNode, depth: number): string {
+  #formatNode(node: TextSnapshotNode, depth = 0): string {
     const chunks: string[] = [];
     const attributes = this.#getAttributes(node);
     const line =
       ' '.repeat(depth * 2) +
       attributes.join(' ') +
-      (node.id === this.snapshot?.selectedElementUid
+      (node.id === this.#snapshot.selectedElementUid
         ? ' [selected in the DevTools Elements panel]'
         : '') +
       '\n';
@@ -57,9 +55,7 @@ Get a verbose snapshot to include all elements if you are interested in the sele
   #nodeToJSON(node: TextSnapshotNode): object {
     const rawAttrs = this.#getAttributesMap(node);
     const children = node.children.map(child => this.#nodeToJSON(child));
-    const result: Record<string, unknown> = {
-      ...rawAttrs,
-    };
+    const result: Record<string, unknown> = structuredClone(rawAttrs);
     if (children.length > 0) {
       result.children = children;
     }
@@ -113,8 +109,12 @@ Get a verbose snapshot to include all elements if you are interested in the sele
     const result: Record<string, unknown> = {};
     if (!excludeSpecial) {
       result.id = node.id;
-      if (node.role) result.role = node.role;
-      if (node.name) result.name = node.name;
+      if (node.role) {
+        result.role = node.role;
+      }
+      if (node.name) {
+        result.name = node.name;
+      }
     }
 
     // Re-implementing the exact logic from original function for #getAttributes to be safe:

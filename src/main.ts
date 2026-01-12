@@ -153,10 +153,22 @@ function registerTool(tool: ToolDefinition): void {
           response,
           context,
         );
-        const {content} = await response.handle(tool.name, context);
-        return {
+        const {content, structuredContent} = await response.handle(
+          tool.name,
+          context,
+        );
+        const result: CallToolResult & {
+          structuredContent?: Record<string, unknown>;
+        } = {
           content,
         };
+        if (args.experimentalStructuredContent) {
+          result.structuredContent = structuredContent as Record<
+            string,
+            unknown
+          >;
+        }
+        return result;
       } catch (err) {
         logger(`${tool.name} error:`, err, err?.stack);
         let errorText = err && 'message' in err ? err.message : String(err);

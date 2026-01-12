@@ -166,7 +166,7 @@ Saved snapshot to <file>
 
 exports[`McpResponse > saves snapshot to file and returns structured content 2`] = `
 {
-  "snapshotFilePath": "/var/folders/hq/m1wr43z9665g5pghys7gkc2w00r23k/T/test-screenshot.png"
+  "snapshotFilePath": "<file>"
 }
 `;
 

@@ -188,6 +188,27 @@ export function html(
 </html>`;
 }
 
+export function stabilizeStructuredContent(content: unknown): unknown {
+  if (typeof content === 'string') {
+    return stabilizeResponseOutput(content);
+  }
+  if (Array.isArray(content)) {
+    return content.map(item => stabilizeStructuredContent(item));
+  }
+  if (typeof content === 'object' && content !== null) {
+    const result: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(content)) {
+      if (key === 'snapshotFilePath' && typeof value === 'string') {
+        result[key] = '<file>';
+      } else {
+        result[key] = stabilizeStructuredContent(value);
+      }
+    }
+    return result;
+  }
+  return content;
+}
+
 export function stabilizeResponseOutput(text: unknown) {
   if (typeof text !== 'string') {
     throw new Error('Input must be string');

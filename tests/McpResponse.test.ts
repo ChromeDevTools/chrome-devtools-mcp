@@ -18,6 +18,7 @@ import {
   getTextContent,
   html,
   stabilizeResponseOutput,
+  stabilizeStructuredContent,
   withMcpContext,
 } from './utils.js';
 
@@ -122,7 +123,13 @@ describe('McpResponse', () => {
         t.assert.snapshot?.(
           stabilizeResponseOutput(getTextContent(content[0])),
         );
-        t.assert.snapshot?.(JSON.stringify(structuredContent, null, 2));
+        t.assert.snapshot?.(
+          JSON.stringify(
+            stabilizeStructuredContent(structuredContent),
+            null,
+            2,
+          ),
+        );
       });
       const content = await readFile(filePath, 'utf-8');
       t.assert.snapshot?.(stabilizeResponseOutput(content));
