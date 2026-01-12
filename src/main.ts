@@ -81,6 +81,7 @@ async function getContext(): Promise<McpContext> {
           args: extraArgs,
           acceptInsecureCerts: args.acceptInsecureCerts,
           devtools,
+          profileDirectory: args.profileDirectory,
         });
 
   if (context?.browser !== browser) {

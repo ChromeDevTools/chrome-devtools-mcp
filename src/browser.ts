@@ -144,6 +144,7 @@ interface McpLaunchOptions {
   };
   args?: string[];
   devtools: boolean;
+  profileDirectory?: string;
 }
 
 export async function launch(options: McpLaunchOptions): Promise<Browser> {
@@ -170,6 +171,9 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
     ...(options.args ?? []),
     '--hide-crash-restore-bubble',
   ];
+  if (options.profileDirectory) {
+    args.push(`--profile-directory=${options.profileDirectory}`);
+  }
   if (headless) {
     args.push('--screen-info={3840x2160}');
   }

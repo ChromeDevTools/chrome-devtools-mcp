@@ -443,6 +443,10 @@ The Chrome DevTools MCP server supports the following configuration option:
   - **Type:** boolean
   - **Default:** `true`
 
+- **`--profileDirectory`/ `--profile-directory`, `-profile-dir`**
+  Specify which Chrome profile to use by its directory name (e.g., "Profile 1", "Default"). Only works with --autoConnect or when launching Chrome.
+  - **Type:** string
+
 <!-- END AUTO GENERATED OPTIONS -->
 
 Pass them via the `args` property in the JSON configuration. For example:

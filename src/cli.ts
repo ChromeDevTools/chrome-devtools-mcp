@@ -183,6 +183,13 @@ export const cliOptions = {
     default: true,
     describe: 'Set to false to exclude tools related to network.',
   },
+  profileDirectory: {
+    type: 'string',
+    description:
+      'Specify which Chrome profile to use by its directory name (e.g., "Profile 1", "Default"). Only works with --autoConnect or when launching Chrome.',
+    alias: 'profile-dir',
+    conflicts: ['browserUrl', 'wsEndpoint'],
+  },
 } satisfies Record<string, YargsOptions>;
 
 export function parseArguments(version: string, argv = process.argv) {
@@ -246,6 +253,14 @@ export function parseArguments(version: string, argv = process.argv) {
       [
         '$0 --auto-connect --channel=canary',
         'Connect to a canary Chrome instance (Chrome 145+) running instead of launching a new instance',
+      ],
+      [
+        '$0 --auto-connect --profile-directory="Profile 1"',
+        'Connect to Chrome using a specific profile (requires Chrome 145+)',
+      ],
+      [
+        '$0 --channel=stable --profile-directory="Work Profile"',
+        'Launch stable Chrome with a specific profile',
       ],
     ]);
 
