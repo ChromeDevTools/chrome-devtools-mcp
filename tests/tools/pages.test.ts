@@ -307,7 +307,7 @@ describe('pages', () => {
           });
         });
         await resizePage.handler(
-          {params: {width: 800, height: 600}},
+          {params: {width: 725, height: 525}},
           response,
           context,
         );
@@ -315,7 +315,7 @@ describe('pages', () => {
         const dimensions = await page.evaluate(() => {
           return [window.innerWidth, window.innerHeight];
         });
-        assert.deepStrictEqual(dimensions, [800, 600]);
+        assert.deepStrictEqual(dimensions, [725, 525]);
       });
     });
 
