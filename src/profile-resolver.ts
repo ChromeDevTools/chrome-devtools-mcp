@@ -51,14 +51,55 @@ export function resolveUserDataDir(opts: ResolveOpts): ResolvedProfile {
 
   // v0.18.0: PRIORITY 0 - Use Roots info if available
   if (opts.rootsInfo) {
-    const profilePath = path.join(
+    const stableProfilePath = path.join(
       CACHE_ROOT,
       'profiles',
       opts.rootsInfo.profileKey,
       opts.rootsInfo.clientName,
       channel,
     );
-    const normalized = pathNormalize(profilePath);
+    const normalized = pathNormalize(stableProfilePath);
+
+    // v0.25.5: Migration from directory-based profile to stable identity profile
+    // Check if directory-based profile exists (for projects that added git later)
+    if (!fs.existsSync(stableProfilePath) && opts.rootsInfo.rootsUris.length > 0) {
+      try {
+        const firstUri = opts.rootsInfo.rootsUris[0];
+        const url = new URL(firstUri);
+        if (url.protocol === 'file:') {
+          const rootPath = url.pathname;
+          const realRoot = realpathSafe(rootPath);
+          const dirHash = shortHash(realRoot);
+          const dirBasedKey = `${opts.rootsInfo.projectName}_${dirHash}`;
+          const dirBasedPath = path.join(
+            CACHE_ROOT,
+            'profiles',
+            dirBasedKey,
+            opts.rootsInfo.clientName,
+            channel,
+          );
+
+          // If directory-based profile exists, create symlink for migration
+          if (fs.existsSync(dirBasedPath)) {
+            console.error(`[profiles] Migration: Found directory-based profile: ${dirBasedPath}`);
+            console.error(`[profiles] Migration: Creating symlink to stable profile: ${stableProfilePath}`);
+            try {
+              // Create parent directories
+              fs.mkdirSync(path.dirname(stableProfilePath), {recursive: true});
+              // Create symlink: stable -> directory-based
+              fs.symlinkSync(dirBasedPath, stableProfilePath, 'dir');
+              console.error(`[profiles] Migration: ✅ Symlink created successfully`);
+            } catch (e) {
+              console.error(`[profiles] Migration: ⚠️ Failed to create symlink: ${e}`);
+            }
+          }
+        }
+      } catch (e) {
+        // Ignore migration errors, continue with normal flow
+        console.error(`[profiles] Migration check failed: ${e}`);
+      }
+    }
+
     const result: ResolvedProfile = {
       path: normalized,
       reason: opts.rootsInfo.source as ResolvedProfile['reason'],
