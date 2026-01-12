@@ -218,7 +218,7 @@ export const resizePage = defineTool({
       const bounds = await browser.getWindowBounds(windowId);
 
       if (bounds.windowState === 'fullscreen') {
-        // have to call this twice when window is in fullscreen mode
+        // Have to call this twice on Ubuntu when the window is in fullscreen mode.
         await browser.setWindowBounds(windowId, {windowState: 'normal'});
         await browser.setWindowBounds(windowId, {windowState: 'normal'});
       } else if (bounds.windowState !== 'normal') {
