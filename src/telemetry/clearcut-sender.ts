@@ -4,8 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {ChromeDevToolsMcpExtension} from './types.js';
 import {logger} from '../logger.js';
+
+import type {ChromeDevToolsMcpExtension} from './types.js';
 
 export class ClearcutSender {
   async send(event: ChromeDevToolsMcpExtension): Promise<void> {

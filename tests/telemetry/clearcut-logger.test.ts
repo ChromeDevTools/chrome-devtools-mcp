@@ -6,6 +6,7 @@
 
 import assert from 'node:assert';
 import {describe, it, mock} from 'node:test';
+
 import {ClearcutLogger} from '../../src/telemetry/clearcut-logger.js';
 import {ClearcutSender} from '../../src/telemetry/clearcut-sender.js';
 

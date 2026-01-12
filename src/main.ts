@@ -15,8 +15,8 @@ import {loadIssueDescriptions} from './issue-descriptions.js';
 import {logger, saveLogsToFile} from './logger.js';
 import {McpContext} from './McpContext.js';
 import {McpResponse} from './McpResponse.js';
-import {ClearcutLogger} from './telemetry/clearcut-logger.js';
 import {Mutex} from './Mutex.js';
+import {ClearcutLogger} from './telemetry/clearcut-logger.js';
 import {
   McpServer,
   StdioServerTransport,

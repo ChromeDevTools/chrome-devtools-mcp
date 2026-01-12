@@ -4,10 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
+import {ClearcutSender} from './clearcut-sender.js';
+import type {
   FlagUsage,
 } from './types.js';
-import {ClearcutSender} from './clearcut-sender.js';
 
 export class ClearcutLogger {
   #sender: ClearcutSender;
