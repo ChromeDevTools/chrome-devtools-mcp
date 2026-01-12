@@ -428,6 +428,10 @@ The Chrome DevTools MCP server supports the following configuration option:
   Additional arguments for Chrome. Only applies when Chrome is launched by chrome-devtools-mcp.
   - **Type:** array
 
+- **`--ignoreDefaultChromeArg`/ `--ignore-default-chrome-arg`**
+  Explicitly disable default arguments for Chrome. Only applies when Chrome is launched by chrome-devtools-mcp.
+  - **Type:** array
+
 - **`--categoryEmulation`/ `--category-emulation`**
   Set to false to exclude tools related to emulation.
   - **Type:** boolean
