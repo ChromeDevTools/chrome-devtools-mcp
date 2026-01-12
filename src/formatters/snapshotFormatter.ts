@@ -3,92 +3,162 @@
  * Copyright 2025 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-
 import type {TextSnapshot, TextSnapshotNode} from '../McpContext.js';
 
-export function formatSnapshotNode(
-  root: TextSnapshotNode,
-  snapshot?: TextSnapshot,
-  depth = 0,
-): string {
-  const chunks: string[] = [];
+export class SnapshotFormatter {
+  constructor(public snapshot?: TextSnapshot) {}
 
-  if (depth === 0) {
+  toString(): string {
+    if (!this.snapshot) {
+      return '';
+    }
+    const chunks: string[] = [];
+    const root = this.snapshot.root;
+
     // Top-level content of the snapshot.
     if (
-      snapshot?.verbose &&
-      snapshot?.hasSelectedElement &&
-      !snapshot.selectedElementUid
+      this.snapshot.verbose &&
+      this.snapshot.hasSelectedElement &&
+      !this.snapshot.selectedElementUid
     ) {
       chunks.push(`Note: there is a selected element in the DevTools Elements panel but it is not included into the current a11y tree snapshot.
 Get a verbose snapshot to include all elements if you are interested in the selected element.\n\n`);
     }
+
+    chunks.push(this.#formatNode(root, 0));
+    return chunks.join('');
   }
 
-  const attributes = getAttributes(root);
-  const line =
-    ' '.repeat(depth * 2) +
-    attributes.join(' ') +
-    (root.id === snapshot?.selectedElementUid
-      ? ' [selected in the DevTools Elements panel]'
-      : '') +
-    '\n';
-  chunks.push(line);
-
-  for (const child of root.children) {
-    chunks.push(formatSnapshotNode(child, snapshot, depth + 1));
+  toJSON(): object {
+    if (!this.snapshot) {
+      return {};
+    }
+    return this.#nodeToJSON(this.snapshot.root);
   }
 
-  return chunks.join('');
-}
+  #formatNode(node: TextSnapshotNode, depth: number): string {
+    const chunks: string[] = [];
+    const attributes = this.#getAttributes(node);
+    const line =
+      ' '.repeat(depth * 2) +
+      attributes.join(' ') +
+      (node.id === this.snapshot?.selectedElementUid
+        ? ' [selected in the DevTools Elements panel]'
+        : '') +
+      '\n';
+    chunks.push(line);
 
-function getAttributes(serializedAXNodeRoot: TextSnapshotNode): string[] {
-  const attributes = [`uid=${serializedAXNodeRoot.id}`];
-  if (serializedAXNodeRoot.role) {
-    // To match representation in DevTools.
-    attributes.push(
-      serializedAXNodeRoot.role === 'none'
-        ? 'ignored'
-        : serializedAXNodeRoot.role,
+    for (const child of node.children) {
+      chunks.push(this.#formatNode(child, depth + 1));
+    }
+    return chunks.join('');
+  }
+
+  #nodeToJSON(node: TextSnapshotNode): object {
+    const rawAttrs = this.#getAttributesMap(node);
+    const children = node.children.map(child => this.#nodeToJSON(child));
+    const result: Record<string, unknown> = {
+      ...rawAttrs,
+    };
+    if (children.length > 0) {
+      result.children = children;
+    }
+    return result;
+  }
+
+  #getAttributes(serializedAXNodeRoot: TextSnapshotNode): string[] {
+    const attributes = [`uid=${serializedAXNodeRoot.id}`];
+
+    if (serializedAXNodeRoot.role) {
+      attributes.push(
+        serializedAXNodeRoot.role === 'none'
+          ? 'ignored'
+          : serializedAXNodeRoot.role,
+      );
+    }
+    if (serializedAXNodeRoot.name) {
+      attributes.push(`"${serializedAXNodeRoot.name}"`);
+    }
+
+    const simpleAttrs = this.#getAttributesMap(
+      serializedAXNodeRoot,
+      /* excludeSpecial */ true,
     );
-  }
-  if (serializedAXNodeRoot.name) {
-    attributes.push(`"${serializedAXNodeRoot.name}"`);
-  }
 
-  const excluded = new Set([
-    'id',
-    'role',
-    'name',
-    'elementHandle',
-    'children',
-    'backendNodeId',
-  ]);
-
-  const booleanPropertyMap: Record<string, string> = {
-    disabled: 'disableable',
-    expanded: 'expandable',
-    focused: 'focusable',
-    selected: 'selectable',
-  };
-
-  for (const attr of Object.keys(serializedAXNodeRoot).sort()) {
-    if (excluded.has(attr)) {
-      continue;
-    }
-    const value = (serializedAXNodeRoot as unknown as Record<string, unknown>)[
-      attr
-    ];
-    if (typeof value === 'boolean') {
-      if (booleanPropertyMap[attr]) {
-        attributes.push(booleanPropertyMap[attr]);
+    for (const attr of Object.keys(serializedAXNodeRoot).sort()) {
+      if (excludedAttributes.has(attr)) {
+        continue;
       }
-      if (value) {
+
+      const mapped = booleanPropertyMap[attr];
+      if (mapped && simpleAttrs[mapped]) {
+        attributes.push(mapped);
+      }
+
+      const val = simpleAttrs[attr];
+      if (val === true) {
         attributes.push(attr);
+      } else if (typeof val === 'string' || typeof val === 'number') {
+        attributes.push(`${attr}="${val}"`);
       }
-    } else if (typeof value === 'string' || typeof value === 'number') {
-      attributes.push(`${attr}="${value}"`);
     }
+
+    return attributes;
   }
-  return attributes;
+
+  #getAttributesMap(
+    node: TextSnapshotNode,
+    excludeSpecial = false,
+  ): Record<string, unknown> {
+    const result: Record<string, unknown> = {};
+    if (!excludeSpecial) {
+      result.id = node.id;
+      if (node.role) result.role = node.role;
+      if (node.name) result.name = node.name;
+    }
+
+    // Re-implementing the exact logic from original function for #getAttributes to be safe:
+    return {
+      ...result,
+      ...this.#extractedAttributes(node),
+    };
+  }
+
+  #extractedAttributes(node: TextSnapshotNode): Record<string, unknown> {
+    const result: Record<string, unknown> = {};
+
+    for (const attr of Object.keys(node).sort()) {
+      if (excludedAttributes.has(attr)) {
+        continue;
+      }
+      const value = (node as unknown as Record<string, unknown>)[attr];
+      if (typeof value === 'boolean') {
+        if (booleanPropertyMap[attr]) {
+          result[booleanPropertyMap[attr]] = true;
+        }
+        if (value) {
+          result[attr] = true;
+        }
+      } else if (typeof value === 'string' || typeof value === 'number') {
+        result[attr] = value;
+      }
+    }
+    return result;
+  }
 }
+
+const booleanPropertyMap: Record<string, string> = {
+  disabled: 'disableable',
+  expanded: 'expandable',
+  focused: 'focusable',
+  selected: 'selectable',
+};
+
+const excludedAttributes = new Set([
+  'id',
+  'role',
+  'name',
+  'elementHandle',
+  'children',
+  'backendNodeId',
+]);

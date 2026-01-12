@@ -153,7 +153,7 @@ function registerTool(tool: ToolDefinition): void {
           response,
           context,
         );
-        const content = await response.handle(tool.name, context);
+        const {content} = await response.handle(tool.name, context);
         return {
           content,
         };
