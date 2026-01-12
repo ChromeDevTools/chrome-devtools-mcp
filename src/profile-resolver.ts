@@ -206,13 +206,13 @@ export function resolveUserDataDir(opts: ResolveOpts): ResolvedProfile {
       const name = detectProjectName(projectRoot);
       console.error(`[profiles] MCP_PROJECT_ROOT name="${name}"`);
 
-      // v0.25.0: Legacy-first approach - check if legacy profile exists
+      // v0.25.0: Check profiles in priority order
+      // 1. Legacy profile
       const realRoot = realpathSafe(projectRoot);
       const legacyHash = shortHash(realRoot);
       const legacyKey = `${sanitize(name)}_${legacyHash}`;
       const legacyPath = projectProfilePath(legacyKey, clientId, channel);
 
-      // If legacy profile exists, use it
       if (fs.existsSync(legacyPath)) {
         console.error(`[profiles] Legacy profile exists, using it: ${legacyPath}`);
         const result: ResolvedProfile = {
@@ -225,34 +225,41 @@ export function resolveUserDataDir(opts: ResolveOpts): ResolvedProfile {
           channel,
           identitySource: 'directory-fallback',
         };
-        console.error(
-          `[profiles] resolved(MCP_PROJECT_ROOT, legacy): ${result.path} (root=${projectRoot}, name=${name}, hash=${legacyHash}, client=${clientId})`,
-        );
         return result;
       }
 
-      // Legacy profile doesn't exist - use stable identity
+      // 2. Check stable identity profile
       const identity = resolveStableIdentity(projectRoot, opts.env);
-      console.error(
-        `[profiles] No legacy profile, using stable identity: ${identity.source} (${identity.confidence}) raw="${identity.raw}"`,
-      );
+      const stableKey = `${sanitize(name)}_${identity.id}`;
+      const stablePath = projectProfilePath(stableKey, clientId, channel);
 
-      const key = `${sanitize(name)}_${identity.id}`;
-      const p = projectProfilePath(key, clientId, channel);
+      if (fs.existsSync(stablePath)) {
+        console.error(`[profiles] Stable identity profile exists: ${stablePath}`);
+        const result: ResolvedProfile = {
+          path: stablePath,
+          reason: 'MCP_PROJECT_ROOT',
+          projectKey: stableKey,
+          projectName: sanitize(name),
+          hash: identity.id,
+          clientId,
+          channel,
+          identitySource: identity.source,
+        };
+        return result;
+      }
 
+      // 3. Create new with stable identity
+      console.error(`[profiles] Creating new profile with stable identity: ${identity.source}`);
       const result: ResolvedProfile = {
-        path: p,
+        path: stablePath,
         reason: 'MCP_PROJECT_ROOT',
-        projectKey: key,
+        projectKey: stableKey,
         projectName: sanitize(name),
         hash: identity.id,
         clientId,
         channel,
         identitySource: identity.source,
       };
-      console.error(
-        `[profiles] resolved(MCP_PROJECT_ROOT, stable): ${result.path} (root=${projectRoot}, name=${name}, identity=${identity.source}, client=${clientId})`,
-      );
       return result;
     } catch (e) {
       console.error(`[profiles] MCP_PROJECT_ROOT resolution failed: ${e}`);
@@ -268,13 +275,13 @@ export function resolveUserDataDir(opts: ResolveOpts): ResolvedProfile {
       const name = detectProjectName(initializedRoot);
       console.error(`[profiles] Initialized root name="${name}"`);
 
-      // v0.25.0: Legacy-first approach - check if legacy profile exists
+      // v0.25.0: Check profiles in priority order
+      // 1. Legacy profile
       const realRoot = realpathSafe(initializedRoot);
       const legacyHash = shortHash(realRoot);
       const legacyKey = `${sanitize(name)}_${legacyHash}`;
       const legacyPath = projectProfilePath(legacyKey, clientId, channel);
 
-      // If legacy profile exists, use it
       if (fs.existsSync(legacyPath)) {
         console.error(`[profiles] Legacy profile exists, using it: ${legacyPath}`);
         const result: ResolvedProfile = {
@@ -287,34 +294,41 @@ export function resolveUserDataDir(opts: ResolveOpts): ResolvedProfile {
           channel,
           identitySource: 'directory-fallback',
         };
-        console.error(
-          `[profiles] resolved(INITIALIZED_ROOT, legacy): ${result.path} (root=${initializedRoot}, name=${name}, hash=${legacyHash}, client=${clientId})`,
-        );
         return result;
       }
 
-      // Legacy profile doesn't exist - use stable identity
+      // 2. Check stable identity profile
       const identity = resolveStableIdentity(initializedRoot, opts.env);
-      console.error(
-        `[profiles] No legacy profile, using stable identity: ${identity.source} (${identity.confidence}) raw="${identity.raw}"`,
-      );
+      const stableKey = `${sanitize(name)}_${identity.id}`;
+      const stablePath = projectProfilePath(stableKey, clientId, channel);
 
-      const key = `${sanitize(name)}_${identity.id}`;
-      const p = projectProfilePath(key, clientId, channel);
+      if (fs.existsSync(stablePath)) {
+        console.error(`[profiles] Stable identity profile exists: ${stablePath}`);
+        const result: ResolvedProfile = {
+          path: stablePath,
+          reason: 'AUTO',
+          projectKey: stableKey,
+          projectName: sanitize(name),
+          hash: identity.id,
+          clientId,
+          channel,
+          identitySource: identity.source,
+        };
+        return result;
+      }
 
+      // 3. Create new with stable identity
+      console.error(`[profiles] Creating new profile with stable identity: ${identity.source}`);
       const result: ResolvedProfile = {
-        path: p,
+        path: stablePath,
         reason: 'AUTO',
-        projectKey: key,
+        projectKey: stableKey,
         projectName: sanitize(name),
         hash: identity.id,
         clientId,
         channel,
         identitySource: identity.source,
       };
-      console.error(
-        `[profiles] resolved(INITIALIZED_ROOT, stable): ${result.path} (root=${initializedRoot}, name=${name}, identity=${identity.source}, client=${clientId})`,
-      );
       return result;
     } catch (e) {
       console.error(`[profiles] Initialized root resolution failed: ${e}`);
@@ -330,13 +344,17 @@ export function resolveUserDataDir(opts: ResolveOpts): ResolvedProfile {
     const name = detectProjectName(root);
     console.error(`[profiles] AUTO detection: name="${name}"`);
 
-    // v0.25.0: Legacy-first approach - check if legacy profile exists
+    // v0.25.0: Check profiles in priority order:
+    // 1. Legacy (realpath-based) profile
+    // 2. Stable identity profile (for moved projects)
+    // 3. Create new with stable identity
+
+    // 1. Check legacy profile
     const realRoot = realpathSafe(root);
     const legacyHash = shortHash(realRoot);
     const legacyKey = `${sanitize(name)}_${legacyHash}`;
     const legacyPath = projectProfilePath(legacyKey, clientId, channel);
 
-    // If legacy profile exists, use it (no migration needed)
     if (fs.existsSync(legacyPath)) {
       console.error(`[profiles] Legacy profile exists, using it: ${legacyPath}`);
       const result: ResolvedProfile = {
@@ -355,19 +373,40 @@ export function resolveUserDataDir(opts: ResolveOpts): ResolvedProfile {
       return result;
     }
 
-    // Legacy profile doesn't exist - use stable identity for new profile
+    // 2. Check stable identity profile (for moved projects)
     const identity = resolveStableIdentity(root, opts.env);
+    const stableKey = `${sanitize(name)}_${identity.id}`;
+    const stablePath = projectProfilePath(stableKey, clientId, channel);
+
+    if (fs.existsSync(stablePath)) {
+      console.error(
+        `[profiles] Stable identity profile exists (project may have moved): ${stablePath}`,
+      );
+      const result: ResolvedProfile = {
+        path: stablePath,
+        reason: 'AUTO',
+        projectKey: stableKey,
+        projectName: sanitize(name),
+        hash: identity.id,
+        clientId,
+        channel,
+        identitySource: identity.source,
+      };
+      console.error(
+        `[profiles] resolved(AUTO, stable-existing): ${result.path} (root=${root}, name=${name}, identity=${identity.source}, client=${clientId})`,
+      );
+      return result;
+    }
+
+    // 3. Neither exists - create new with stable identity
     console.error(
-      `[profiles] No legacy profile, using stable identity: ${identity.source} (${identity.confidence}) raw="${identity.raw}"`,
+      `[profiles] No existing profile, creating with stable identity: ${identity.source} (${identity.confidence}) raw="${identity.raw}"`,
     );
 
-    const key = `${sanitize(name)}_${identity.id}`;
-    const p = projectProfilePath(key, clientId, channel);
-
     const result: ResolvedProfile = {
-      path: p,
+      path: stablePath,
       reason: 'AUTO',
-      projectKey: key,
+      projectKey: stableKey,
       projectName: sanitize(name),
       hash: identity.id,
       clientId,
@@ -375,7 +414,7 @@ export function resolveUserDataDir(opts: ResolveOpts): ResolvedProfile {
       identitySource: identity.source,
     };
     console.error(
-      `[profiles] resolved(AUTO, stable): ${result.path} (root=${root}, name=${name}, identity=${identity.source}, client=${clientId})`,
+      `[profiles] resolved(AUTO, stable-new): ${result.path} (root=${root}, name=${name}, identity=${identity.source}, client=${clientId})`,
     );
     return result;
   } catch (e) {
