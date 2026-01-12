@@ -12,7 +12,11 @@
  */
 
 import {createHash} from 'node:crypto';
+import fs from 'node:fs';
+import {fileURLToPath} from 'node:url';
 import type {Server} from '@modelcontextprotocol/sdk/server/index.js';
+import {detectProjectName} from './project-detector.js';
+import {resolveStableIdentity} from './stable-identity.js';
 
 export interface RootsInfo {
   /** Stable hash key derived from roots URIs + client info */
@@ -57,25 +61,34 @@ export async function fetchRootsFromClient(
 /**
  * Generate stable profile key from roots and client info
  * Format: projectName_hash (e.g., "my-app_2ca5dbf5")
+ *
+ * @param rootsUris - Array of root URIs (used for fallback hash if stableIdentityHash not provided)
+ * @param clientName - Client name (e.g., "claude-code")
+ * @param clientVersion - Client version (not used in hash for stability)
+ * @param projectName - Human-readable project name
+ * @param stableIdentityHash - Optional stable identity hash (from git remote, etc.)
  */
 export function generateProfileKey(
   rootsUris: string[],
   clientName: string,
   clientVersion: string,
   projectName?: string,
+  stableIdentityHash?: string,
 ): string {
-  // Sort URIs for consistent hashing across multi-root workspaces
-  const sortedUris = [...rootsUris].sort();
+  let hash: string;
 
-  // Note: clientVersion is intentionally excluded from hash
-  // to keep profiles stable across client updates
-  const keyMaterial = JSON.stringify({
-    roots: sortedUris,
-    client: clientName,
-  });
-
-  // Use first 8 chars of SHA-256 for stable, collision-resistant key
-  const hash = createHash('sha256').update(keyMaterial).digest('hex').slice(0, 8);
+  if (stableIdentityHash) {
+    // Use stable identity hash (preferred - survives directory moves)
+    hash = stableIdentityHash;
+  } else {
+    // Fallback: URI-based hash
+    const sortedUris = [...rootsUris].sort();
+    const keyMaterial = JSON.stringify({
+      roots: sortedUris,
+      client: clientName,
+    });
+    hash = createHash('sha256').update(keyMaterial).digest('hex').slice(0, 8);
+  }
 
   // Include project name for clarity (if available)
   if (projectName) {
@@ -88,6 +101,8 @@ export function generateProfileKey(
 
 /**
  * Extract project name from roots URIs
+ * Uses detectProjectName() to read package.json name (preferred)
+ * Falls back to directory name if package.json not found
  */
 export function extractProjectName(
   roots: Array<{uri: string; name?: string}>,
@@ -96,19 +111,30 @@ export function extractProjectName(
     return 'unknown';
   }
 
-  // Prefer explicit name if provided
+  // Prefer explicit name if provided by MCP client
   const firstRoot = roots[0];
   if (firstRoot.name) {
     return sanitizeProjectName(firstRoot.name);
   }
 
-  // Extract from file:// URI
+  // Extract from file:// URI using detectProjectName (reads package.json)
   try {
     const url = new URL(firstRoot.uri);
     if (url.protocol === 'file:') {
-      const pathParts = url.pathname.split('/').filter(Boolean);
-      const dirName = pathParts[pathParts.length - 1] || 'root';
-      return sanitizeProjectName(dirName);
+      // Convert URI to file path
+      const rootPath = fileURLToPath(url);
+
+      // Resolve realpath for symlink handling
+      let realPath: string;
+      try {
+        realPath = fs.realpathSync(rootPath);
+      } catch {
+        realPath = rootPath; // Use original if realpath fails
+      }
+
+      // Use detectProjectName to read package.json name
+      const name = detectProjectName(realPath);
+      return sanitizeProjectName(name);
     }
   } catch {
     // Fall through to default
@@ -122,6 +148,43 @@ export function extractProjectName(
  */
 function sanitizeProjectName(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9-_]/g, '-');
+}
+
+/**
+ * Get stable identity hash from a root path
+ * Returns undefined if stable identity cannot be resolved
+ */
+function getStableIdentityHash(rootPath: string): string | undefined {
+  try {
+    const identity = resolveStableIdentity(rootPath);
+    // Only use stable identity for high-confidence sources (git-based)
+    if (identity.confidence === 'high' || identity.source === 'MCP_PROFILE_ID') {
+      return identity.id;
+    }
+  } catch {
+    // Fall through to URI-based hash
+  }
+  return undefined;
+}
+
+/**
+ * Get root path from URI
+ */
+function getRootPathFromUri(uri: string): string | undefined {
+  try {
+    const url = new URL(uri);
+    if (url.protocol === 'file:') {
+      const rootPath = fileURLToPath(url);
+      try {
+        return fs.realpathSync(rootPath);
+      } catch {
+        return rootPath;
+      }
+    }
+  } catch {
+    // Ignore
+  }
+  return undefined;
 }
 
 /**
@@ -144,10 +207,14 @@ export async function resolveRoots(
   if (rootsResult && rootsResult.roots.length > 0) {
     const rootsUris = rootsResult.roots.map(r => r.uri);
     const projectName = extractProjectName(rootsResult.roots);
-    const profileKey = generateProfileKey(rootsUris, clientName, clientVersion, projectName);
+
+    // Get stable identity hash from first root
+    const rootPath = getRootPathFromUri(rootsUris[0]);
+    const stableHash = rootPath ? getStableIdentityHash(rootPath) : undefined;
+    const profileKey = generateProfileKey(rootsUris, clientName, clientVersion, projectName, stableHash);
 
     console.error(
-      `[roots] Resolved via roots/list: key=${profileKey}, project=${projectName}, client=${clientName}`,
+      `[roots] Resolved via roots/list: key=${profileKey}, project=${projectName}, client=${clientName}, stableId=${stableHash || 'none'}`,
     );
 
     return {
@@ -164,10 +231,13 @@ export async function resolveRoots(
   if (fallbackOptions.cliProjectRoot) {
     const uri = pathToFileUri(fallbackOptions.cliProjectRoot);
     const projectName = extractProjectName([{uri}]);
-    const profileKey = generateProfileKey([uri], clientName, clientVersion, projectName);
+
+    // Get stable identity hash
+    const stableHash = getStableIdentityHash(fallbackOptions.cliProjectRoot);
+    const profileKey = generateProfileKey([uri], clientName, clientVersion, projectName, stableHash);
 
     console.error(
-      `[roots] Resolved via --project-root: key=${profileKey}, project=${projectName}`,
+      `[roots] Resolved via --project-root: key=${profileKey}, project=${projectName}, stableId=${stableHash || 'none'}`,
     );
 
     return {
@@ -184,10 +254,13 @@ export async function resolveRoots(
   if (fallbackOptions.envProjectRoot) {
     const uri = pathToFileUri(fallbackOptions.envProjectRoot);
     const projectName = extractProjectName([{uri}]);
-    const profileKey = generateProfileKey([uri], clientName, clientVersion, projectName);
+
+    // Get stable identity hash
+    const stableHash = getStableIdentityHash(fallbackOptions.envProjectRoot);
+    const profileKey = generateProfileKey([uri], clientName, clientVersion, projectName, stableHash);
 
     console.error(
-      `[roots] Resolved via MCP_PROJECT_ROOT: key=${profileKey}, project=${projectName}`,
+      `[roots] Resolved via MCP_PROJECT_ROOT: key=${profileKey}, project=${projectName}, stableId=${stableHash || 'none'}`,
     );
 
     return {
@@ -204,10 +277,13 @@ export async function resolveRoots(
   if (fallbackOptions.autoCwd) {
     const uri = pathToFileUri(fallbackOptions.autoCwd);
     const projectName = extractProjectName([{uri}]);
-    const profileKey = generateProfileKey([uri], clientName, clientVersion, projectName);
+
+    // Get stable identity hash
+    const stableHash = getStableIdentityHash(fallbackOptions.autoCwd);
+    const profileKey = generateProfileKey([uri], clientName, clientVersion, projectName, stableHash);
 
     console.error(
-      `[roots] Resolved via AUTO (cwd): key=${profileKey}, project=${projectName}`,
+      `[roots] Resolved via AUTO (cwd): key=${profileKey}, project=${projectName}, stableId=${stableHash || 'none'}`,
     );
 
     return {

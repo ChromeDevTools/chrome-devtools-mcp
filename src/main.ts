@@ -161,12 +161,6 @@ async function getContext(): Promise<McpContext> {
     rootFromRoots ||
     process.cwd();
 
-  // Debug: Log the source of project root
-  logger(`[project-root] DEBUG: args.projectRoot=${args.projectRoot}`);
-  logger(`[project-root] DEBUG: env.MCP_PROJECT_ROOT=${process.env.MCP_PROJECT_ROOT}`);
-  logger(`[project-root] DEBUG: rootFromRoots=${rootFromRoots}`);
-  logger(`[project-root] DEBUG: process.cwd()=${process.cwd()}`);
-
   setProjectRoot(projectRootToSet);
   logger(`[project-root] Initialized: ${projectRootToSet}`);
 
