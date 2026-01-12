@@ -15,6 +15,7 @@ import {loadIssueDescriptions} from './issue-descriptions.js';
 import {logger, saveLogsToFile} from './logger.js';
 import {McpContext} from './McpContext.js';
 import {McpResponse} from './McpResponse.js';
+import {ClearcutLogger} from './telemetry/clearcut-logger.js';
 import {Mutex} from './Mutex.js';
 import {
   McpServer,
@@ -34,6 +35,10 @@ const VERSION = '0.12.1';
 export const args = parseArguments(VERSION);
 
 const logFile = args.logFile ? saveLogsToFile(args.logFile) : undefined;
+let clearcutLogger: ClearcutLogger | undefined;
+if (args.usageStatistics) {
+  clearcutLogger = new ClearcutLogger();
+}
 
 process.on('unhandledRejection', (reason, promise) => {
   logger('Unhandled promise rejection', promise, reason);
@@ -148,6 +153,8 @@ function registerTool(tool: ToolDefinition): void {
     },
     async (params): Promise<CallToolResult> => {
       const guard = await toolMutex.acquire();
+      const startTime = Date.now();
+      let success = false;
       try {
         logger(`${tool.name} request: ${JSON.stringify(params, null, '  ')}`);
         const context = await getContext();
@@ -170,6 +177,7 @@ function registerTool(tool: ToolDefinition): void {
         } = {
           content,
         };
+        success = true;
         if (args.experimentalStructuredContent) {
           result.structuredContent = structuredContent as Record<
             string,
@@ -193,6 +201,11 @@ function registerTool(tool: ToolDefinition): void {
           isError: true,
         };
       } finally {
+        void clearcutLogger?.logToolInvocation({
+          toolName: tool.name,
+          success,
+          latencyMs: Date.now() - startTime,
+        });
         guard.dispose();
       }
     },
@@ -207,4 +220,11 @@ await loadIssueDescriptions();
 const transport = new StdioServerTransport();
 await server.connect(transport);
 logger('Chrome DevTools MCP Server connected');
+void clearcutLogger?.logServerStart({
+  browser_url_present: !!args.browserUrl,
+  headless: args.headless,
+  executable_path_present: !!args.executablePath,
+  isolated: args.isolated,
+  log_file_present: !!args.logFile,
+});
 logDisclaimers();
