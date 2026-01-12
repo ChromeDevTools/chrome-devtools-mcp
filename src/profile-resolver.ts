@@ -18,6 +18,12 @@ import { detectProjectName, detectProjectRoot } from './project-detector.js';
 import { detectClientType } from './client-detector.js';
 import type { RootsInfo } from './roots-manager.js';
 import { getProjectRoot } from './project-root-state.js';
+import {
+  resolveStableIdentity,
+  type StableIdentity,
+  type StableIdentitySource,
+} from './stable-identity.js';
+import { checkAndMigrateLegacyProfile } from './profile-migration.js';
 
 export interface ResolvedProfile {
   path: string;
@@ -27,6 +33,7 @@ export interface ResolvedProfile {
   hash: string; // e.g., "1a2b3c4d"
   clientId: string; // e.g., "claude-code" | "codex" | "default"
   channel: string; // "stable" | "canary" | "beta" | "dev"
+  identitySource?: StableIdentitySource; // v0.25.0: Track how stable identity was resolved
 }
 
 type ResolveOpts = {
@@ -200,22 +207,42 @@ export function resolveUserDataDir(opts: ResolveOpts): ResolvedProfile {
     try {
       const name = detectProjectName(projectRoot);
       console.error(`[profiles] MCP_PROJECT_ROOT name="${name}"`);
-      const realRoot = realpathSafe(projectRoot);
-      const hash = shortHash(realRoot);
-      const key = `${sanitize(name)}_${hash}`;
+
+      // v0.25.0: Use stable identity instead of realpath hash
+      const identity = resolveStableIdentity(projectRoot, opts.env);
+      console.error(
+        `[profiles] Stable identity: ${identity.source} (${identity.confidence}) raw="${identity.raw}"`,
+      );
+
+      const key = `${sanitize(name)}_${identity.id}`;
       const p = projectProfilePath(key, clientId, channel);
+
+      // Check for legacy profile migration
+      const migration = checkAndMigrateLegacyProfile(
+        projectRoot,
+        identity,
+        sanitize(name),
+        clientId,
+        channel,
+      );
+      if (migration.migrated) {
+        console.error(
+          `[profiles] ✅ Legacy profile migrated: ${migration.from} -> ${migration.to}`,
+        );
+      }
 
       const result: ResolvedProfile = {
         path: p,
         reason: 'MCP_PROJECT_ROOT',
         projectKey: key,
         projectName: sanitize(name),
-        hash,
+        hash: identity.id,
         clientId,
         channel,
+        identitySource: identity.source,
       };
       console.error(
-        `[profiles] resolved(MCP_PROJECT_ROOT): ${result.path} (root=${projectRoot}, name=${name}, hash=${hash}, client=${clientId})`,
+        `[profiles] resolved(MCP_PROJECT_ROOT): ${result.path} (root=${projectRoot}, name=${name}, identity=${identity.source}, client=${clientId})`,
       );
       return result;
     } catch (e) {
@@ -231,22 +258,42 @@ export function resolveUserDataDir(opts: ResolveOpts): ResolvedProfile {
     try {
       const name = detectProjectName(initializedRoot);
       console.error(`[profiles] Initialized root name="${name}"`);
-      const realRoot = realpathSafe(initializedRoot);
-      const hash = shortHash(realRoot);
-      const key = `${sanitize(name)}_${hash}`;
+
+      // v0.25.0: Use stable identity instead of realpath hash
+      const identity = resolveStableIdentity(initializedRoot, opts.env);
+      console.error(
+        `[profiles] Stable identity: ${identity.source} (${identity.confidence}) raw="${identity.raw}"`,
+      );
+
+      const key = `${sanitize(name)}_${identity.id}`;
       const p = projectProfilePath(key, clientId, channel);
+
+      // Check for legacy profile migration
+      const migration = checkAndMigrateLegacyProfile(
+        initializedRoot,
+        identity,
+        sanitize(name),
+        clientId,
+        channel,
+      );
+      if (migration.migrated) {
+        console.error(
+          `[profiles] ✅ Legacy profile migrated: ${migration.from} -> ${migration.to}`,
+        );
+      }
 
       const result: ResolvedProfile = {
         path: p,
         reason: 'AUTO',
         projectKey: key,
         projectName: sanitize(name),
-        hash,
+        hash: identity.id,
         clientId,
         channel,
+        identitySource: identity.source,
       };
       console.error(
-        `[profiles] resolved(INITIALIZED_ROOT): ${result.path} (root=${initializedRoot}, name=${name}, hash=${hash}, client=${clientId})`,
+        `[profiles] resolved(INITIALIZED_ROOT): ${result.path} (root=${initializedRoot}, name=${name}, identity=${identity.source}, client=${clientId})`,
       );
       return result;
     } catch (e) {
@@ -262,22 +309,42 @@ export function resolveUserDataDir(opts: ResolveOpts): ResolvedProfile {
     console.error(`[profiles] AUTO detection: root="${root}"`);
     const name = detectProjectName(root);
     console.error(`[profiles] AUTO detection: name="${name}"`);
-    const realRoot = realpathSafe(root);
-    const hash = shortHash(realRoot);
-    const key = `${sanitize(name)}_${hash}`; // v0.17.0: clientId removed from projectKey
+
+    // v0.25.0: Use stable identity instead of realpath hash
+    const identity = resolveStableIdentity(root, opts.env);
+    console.error(
+      `[profiles] Stable identity: ${identity.source} (${identity.confidence}) raw="${identity.raw}"`,
+    );
+
+    const key = `${sanitize(name)}_${identity.id}`;
     const p = projectProfilePath(key, clientId, channel);
+
+    // Check for legacy profile migration
+    const migration = checkAndMigrateLegacyProfile(
+      root,
+      identity,
+      sanitize(name),
+      clientId,
+      channel,
+    );
+    if (migration.migrated) {
+      console.error(
+        `[profiles] ✅ Legacy profile migrated: ${migration.from} -> ${migration.to}`,
+      );
+    }
 
     const result: ResolvedProfile = {
       path: p,
       reason: 'AUTO',
       projectKey: key,
       projectName: sanitize(name),
-      hash,
+      hash: identity.id,
       clientId,
       channel,
+      identitySource: identity.source,
     };
     console.error(
-      `[profiles] resolved(AUTO): ${result.path} (root=${root}, name=${name}, hash=${hash}, client=${clientId})`,
+      `[profiles] resolved(AUTO): ${result.path} (root=${root}, name=${name}, identity=${identity.source}, client=${clientId})`,
     );
     return result;
   } catch (e) {
