@@ -102,7 +102,9 @@ describe('e2e', () => {
               continue;
             }
             if (
-              maybeTool.annotations?.conditions?.includes('experimentalInteropTools')
+              maybeTool.annotations?.conditions?.includes(
+                'experimentalInteropTools',
+              )
             ) {
               continue;
             }
@@ -125,7 +127,6 @@ describe('e2e', () => {
       ['--experimental-vision'],
     );
   });
-
 
   it('has experimental interop tools', async () => {
     await withClient(

@@ -57,9 +57,14 @@ export class McpResponse implements Response {
     includePreservedMessages?: boolean;
   };
   #devToolsData?: DevToolsData;
+  #tabId?: string;
 
   attachDevToolsData(data: DevToolsData): void {
     this.#devToolsData = data;
+  }
+
+  setTabId(tabId: string): void {
+    this.#tabId = tabId;
   }
 
   setIncludePages(value: boolean): void {
@@ -398,7 +403,12 @@ Call ${handleDialog.name} to handle it before continuing.`);
     const structuredContent: {
       snapshot?: object;
       snapshotFilePath?: string;
+      tabId?: string;
     } = {};
+
+    if (this.#tabId) {
+      structuredContent.tabId = this.#tabId;
+    }
 
     if (data.snapshot) {
       if (typeof data.snapshot === 'string') {

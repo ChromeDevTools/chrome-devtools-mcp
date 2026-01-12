@@ -329,9 +329,14 @@ describe('pages', () => {
       await withMcpContext(async (response, context) => {
         const page = context.getSelectedPage();
         // @ts-expect-error _tabId is internal.
+        assert.ok(typeof page._tabId === 'string');
+        // @ts-expect-error _tabId is internal.
         page._tabId = 'test-tab-id';
         await getTabId.handler({params: {pageId: 1}}, response, context);
-        assert.ok(response.responseLines.includes('test-tab-id'));
+        const result = await response.handle('get_tab_id', context);
+        // @ts-expect-error _tabId is internal.
+        assert.strictEqual(result.structuredContent.tabId, 'test-tab-id');
+        assert.deepStrictEqual(response.responseLines, []);
       });
     });
   });

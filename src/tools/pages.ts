@@ -289,6 +289,6 @@ export const getTabId = defineTool({
     const page = context.getPageById(request.params.pageId);
     // @ts-expect-error _tabId is internal.
     const tabId = page._tabId;
-    response.appendResponseLine(tabId);
+    response.setTabId(tabId);
   },
 });
