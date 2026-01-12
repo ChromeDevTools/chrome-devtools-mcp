@@ -102,6 +102,14 @@ const logDisclaimers = () => {
 debug, and modify any data in the browser or DevTools.
 Avoid sharing sensitive or personal information that you do not want to share with MCP clients.`,
   );
+
+  if (args.usageStatistics) {
+    console.error(
+      `
+Google collects usage statistics to improve Chrome DevTools MCP. To opt-out, run with --no-usage-statistics.
+For more details, visit: https://github.com/ChromeDevTools/chrome-devtools-mcp#usage-statistics`,
+    );
+  }
 };
 
 const toolMutex = new Mutex();
@@ -131,6 +139,12 @@ function registerTool(tool: ToolDefinition): void {
   ) {
     return;
   }
+  if (
+    tool.annotations.conditions?.includes('experimentalInteropTools') &&
+    !args.experimentalInteropTools
+  ) {
+    return;
+  }
   server.registerTool(
     tool.name,
     {
@@ -153,10 +167,22 @@ function registerTool(tool: ToolDefinition): void {
           response,
           context,
         );
-        const content = await response.handle(tool.name, context);
-        return {
+        const {content, structuredContent} = await response.handle(
+          tool.name,
+          context,
+        );
+        const result: CallToolResult & {
+          structuredContent?: Record<string, unknown>;
+        } = {
           content,
         };
+        if (args.experimentalStructuredContent) {
+          result.structuredContent = structuredContent as Record<
+            string,
+            unknown
+          >;
+        }
+        return result;
       } catch (err) {
         logger(`${tool.name} error:`, err, err?.stack);
         let errorText = err && 'message' in err ? err.message : String(err);

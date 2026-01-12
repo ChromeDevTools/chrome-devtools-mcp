@@ -17,7 +17,7 @@ import {
   getShortDescriptionForRequest,
   getStatusFromRequest,
 } from './formatters/networkFormatter.js';
-import {formatSnapshotNode} from './formatters/snapshotFormatter.js';
+import {SnapshotFormatter} from './formatters/SnapshotFormatter.js';
 import type {McpContext} from './McpContext.js';
 import {DevTools} from './third_party/index.js';
 import type {
@@ -57,9 +57,14 @@ export class McpResponse implements Response {
     includePreservedMessages?: boolean;
   };
   #devToolsData?: DevToolsData;
+  #tabId?: string;
 
   attachDevToolsData(data: DevToolsData): void {
     this.#devToolsData = data;
+  }
+
+  setTabId(tabId: string): void {
+    this.#tabId = tabId;
   }
 
   setIncludePages(value: boolean): void {
@@ -181,29 +186,31 @@ export class McpResponse implements Response {
   async handle(
     toolName: string,
     context: McpContext,
-  ): Promise<Array<TextContent | ImageContent>> {
+  ): Promise<{
+    content: Array<TextContent | ImageContent>;
+    structuredContent: object;
+  }> {
     if (this.#includePages) {
       await context.createPagesSnapshot();
     }
 
-    let formattedSnapshot: string | undefined;
+    let snapshot: SnapshotFormatter | string | undefined;
     if (this.#snapshotParams) {
       await context.createTextSnapshot(
         this.#snapshotParams.verbose,
         this.#devToolsData,
       );
-      const snapshot = context.getTextSnapshot();
-      if (snapshot) {
+      const textSnapshot = context.getTextSnapshot();
+      if (textSnapshot) {
+        const formatter = new SnapshotFormatter(textSnapshot);
         if (this.#snapshotParams.filePath) {
           await context.saveFile(
-            new TextEncoder().encode(
-              formatSnapshotNode(snapshot.root, snapshot),
-            ),
+            new TextEncoder().encode(formatter.toString()),
             this.#snapshotParams.filePath,
           );
-          formattedSnapshot = `Saved snapshot to ${this.#snapshotParams.filePath}.`;
+          snapshot = this.#snapshotParams.filePath;
         } else {
-          formattedSnapshot = formatSnapshotNode(snapshot.root, snapshot);
+          snapshot = formatter;
         }
       }
     }
@@ -335,7 +342,7 @@ export class McpResponse implements Response {
       bodies,
       consoleData,
       consoleListData,
-      formattedSnapshot,
+      snapshot,
     });
   }
 
@@ -349,9 +356,9 @@ export class McpResponse implements Response {
       };
       consoleData: ConsoleMessageData | undefined;
       consoleListData: ConsoleMessageData[] | undefined;
-      formattedSnapshot: string | undefined;
+      snapshot: SnapshotFormatter | string | undefined;
     },
-  ): Array<TextContent | ImageContent> {
+  ): {content: Array<TextContent | ImageContent>; structuredContent: object} {
     const response = [`# ${toolName} response`];
     for (const line of this.#textResponseLines) {
       response.push(line);
@@ -393,9 +400,25 @@ Call ${handleDialog.name} to handle it before continuing.`);
       response.push(...parts);
     }
 
-    if (data.formattedSnapshot) {
-      response.push('## Latest page snapshot');
-      response.push(data.formattedSnapshot);
+    const structuredContent: {
+      snapshot?: object;
+      snapshotFilePath?: string;
+      tabId?: string;
+    } = {};
+
+    if (this.#tabId) {
+      structuredContent.tabId = this.#tabId;
+    }
+
+    if (data.snapshot) {
+      if (typeof data.snapshot === 'string') {
+        response.push(`Saved snapshot to ${data.snapshot}.`);
+        structuredContent.snapshotFilePath = data.snapshot;
+      } else {
+        response.push('## Latest page snapshot');
+        response.push(data.snapshot.toString());
+        structuredContent.snapshot = data.snapshot.toJSON();
+      }
     }
 
     response.push(...this.#formatNetworkRequestData(context, data.bodies));
@@ -468,7 +491,10 @@ Call ${handleDialog.name} to handle it before continuing.`);
       } as const;
     });
 
-    return [text, ...images];
+    return {
+      content: [text, ...images],
+      structuredContent,
+    };
   }
 
   #dataWithPagination<T>(data: T[], pagination?: PaginationOptions) {
