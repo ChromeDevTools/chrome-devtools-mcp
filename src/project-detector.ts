@@ -1,3 +1,9 @@
+
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
 // src/project-detector.ts
 // Phase 1 (v0.15.0)
 // - detectProjectRoot: git root → nearest package.json → cwd
@@ -5,9 +11,9 @@
 // - Use spawnSync with 500ms timeout to avoid blocking long
 // - Realpath normalization
 
+import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
 
 export function detectProjectRoot(cwd: string): string {
   const realCwd = realpathSafe(cwd);

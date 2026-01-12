@@ -5,6 +5,7 @@
  */
 
 import type { Browser, Page } from 'puppeteer-core';
+
 import {CHATGPT_CONFIG} from './config.js';
 import {isLoginRequired} from './login-helper.js';
 

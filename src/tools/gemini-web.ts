@@ -7,14 +7,15 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-import z from 'zod';
 import type { Page } from 'puppeteer-core';
+import z from 'zod';
+
+import { GEMINI_CONFIG } from '../config.js';
+import { getLoginStatus, waitForLoginStatus, LoginStatus } from '../login-helper.js';
+import { loadGeminiSelectors, getGeminiSelector } from '../selectors/loader.js';
 
 import { ToolCategories } from './categories.js';
 import { defineTool, type Context } from './ToolDefinition.js';
-import { loadGeminiSelectors, getGeminiSelector } from '../selectors/loader.js';
-import { GEMINI_CONFIG } from '../config.js';
-import { getLoginStatus, waitForLoginStatus, LoginStatus } from '../login-helper.js';
 
 /**
  * Navigate with retry logic for handling ERR_ABORTED and other network errors
@@ -92,9 +93,7 @@ interface ChatSession {
     conversationCount?: number;
 }
 
-interface ChatSessions {
-    [projectName: string]: ChatSession[];
-}
+type ChatSessions = Record<string, ChatSession[]>;
 
 /**
  * Load chat sessions from JSON file

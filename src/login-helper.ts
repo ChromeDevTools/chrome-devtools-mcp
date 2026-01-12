@@ -220,7 +220,7 @@ export async function getLoginStatus(
 export async function waitForLoginStatus(
   page: Page,
   provider: 'chatgpt' | 'gemini',
-  timeoutMs: number = 120000,
+  timeoutMs = 120000,
   onStatusUpdate?: (message: string) => void
 ): Promise<LoginStatus> {
   const log = onStatusUpdate || console.error;

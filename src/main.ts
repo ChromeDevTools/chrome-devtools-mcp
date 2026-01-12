@@ -43,20 +43,19 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { SetLevelRequestSchema, RootsListChangedNotificationSchema } from '@modelcontextprotocol/sdk/types.js';
-
 import type { Browser } from 'puppeteer-core';
 
 import type { Channel } from './browser.js';
 import { resolveBrowser } from './browser.js';
 import { parseArguments } from './cli.js';
+import { setupGraceful } from './graceful.js';
 import { logger, saveLogsToFile } from './logger.js';
 import { McpContext } from './McpContext.js';
 import { McpResponse } from './McpResponse.js';
 import { Mutex } from './Mutex.js';
+import { setProjectRoot } from './project-root-state.js';
 import { resolveRoots, type RootsInfo } from './roots-manager.js';
 import { runStartupCheck } from './startup-check.js';
-import { setProjectRoot } from './project-root-state.js';
-import { setupGraceful } from './graceful.js';
 import * as chatgptWebTools from './tools/chatgpt-web.js';
 import * as consoleTools from './tools/console.js';
 import * as emulationTools from './tools/emulation.js';
@@ -114,7 +113,7 @@ server.server.setNotificationHandler(RootsListChangedNotificationSchema, async (
 });
 
 let context: McpContext;
-let uiHealthCheckRun = false; // Track if UI health check has been run
+const uiHealthCheckRun = false; // Track if UI health check has been run
 let cachedRootsInfo: RootsInfo | null = null; // Cache roots info
 let initializationComplete = false; // Track if MCP initialization is complete
 

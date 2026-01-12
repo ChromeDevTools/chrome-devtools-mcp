@@ -5,9 +5,10 @@
  */
 import assert from 'node:assert';
 import {describe, it, beforeEach} from 'node:test';
-import sinon from 'sinon';
+
 import type {Browser} from 'puppeteer';
 import {ProtocolError, TimeoutError} from 'puppeteer';
+import sinon from 'sinon';
 
 import {
   BrowserConnectionManager,

@@ -1,3 +1,9 @@
+
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
 // src/profile-migration.ts
 // Legacy profile migration utilities
 // Creates symlinks from new stable paths to existing legacy paths
@@ -5,6 +11,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+
 import type { StableIdentity } from './stable-identity.js';
 import { getLegacyIdentityHash } from './stable-identity.js';
 

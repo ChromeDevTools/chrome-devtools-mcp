@@ -4,13 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
+ 
 
 import z from 'zod';
 
 import {ToolCategories} from './categories.js';
-import {defineTool} from './ToolDefinition.js';
 import * as iframePopupTools from './iframe-popup-tools.js';
+import {defineTool} from './ToolDefinition.js';
 
 /**
  * Consolidated extension popup tool.

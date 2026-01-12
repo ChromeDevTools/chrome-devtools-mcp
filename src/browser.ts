@@ -18,6 +18,9 @@ import type {
 } from 'puppeteer-core';
 import puppeteer from 'puppeteer-core';
 
+import { resolveUserDataDir } from './profile-resolver.js';
+import { isProjectRootInitialized, getProjectRoot } from './project-root-state.js';
+import type { RootsInfo } from './roots-manager.js';
 import {
   detectSystemChromeProfile,
   detectAnySystemChromeProfile,
@@ -25,9 +28,6 @@ import {
   logSystemProfileInfo,
   type SystemChromeProfile,
 } from './system-profile.js';
-import { resolveUserDataDir } from './profile-resolver.js';
-import type { RootsInfo } from './roots-manager.js';
-import { isProjectRootInitialized, getProjectRoot } from './project-root-state.js';
 
 let browser: Browser | undefined;
 
@@ -349,7 +349,7 @@ function getChromeExtensionsDirectory(channel?: Channel): string {
   const platform = os.platform();
 
   let chromeDataPath: string;
-  let profileName = 'Default';
+  const profileName = 'Default';
 
   if (platform === 'darwin') {
     // macOS
@@ -579,8 +579,8 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
     console.error(`           Root: ${process.cwd()}`);
   }
 
-  let usingSystemProfile = false;
-  let profileDirectory = 'Default';
+  const usingSystemProfile = false;
+  const profileDirectory = 'Default';
 
   const args: LaunchOptions['args'] = [
     '--hide-crash-restore-bubble',

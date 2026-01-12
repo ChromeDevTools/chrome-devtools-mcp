@@ -1,8 +1,15 @@
+
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
 // tests/stable-identity.test.ts
 // Tests for stable project identity resolution
 
-import { describe, it } from 'node:test';
 import assert from 'node:assert';
+import { describe, it } from 'node:test';
+
 import { normalizeGitUrl } from '../src/stable-identity.js';
 
 describe('normalizeGitUrl', () => {

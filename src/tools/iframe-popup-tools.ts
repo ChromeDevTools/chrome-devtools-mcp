@@ -1,3 +1,9 @@
+
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
 // src/tools/iframe-popup-tools.ts
 // Tools for inspecting & editing in-page iframe popups via CDP.
 // These tools enable direct access to iframe-embedded extension popups.
@@ -5,21 +11,22 @@
 
 import fs from 'node:fs/promises';
 import path from 'node:path';
+
 import type {CDPSession} from 'puppeteer';
 
-export type InspectResult = {
+export interface InspectResult {
   frameId: string | null;
   frameUrl: string;
   html: string;
   screenshotBase64?: string;
   consoleLogs?: string[];
-};
+}
 
-export type ChildTarget = {
+export interface ChildTarget {
   sessionId: string;
   targetId: string;
   url: string;
-};
+}
 
 export async function findExtensionIdViaTargets(
   cdp: CDPSession,

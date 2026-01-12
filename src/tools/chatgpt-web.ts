@@ -7,14 +7,14 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-import z from 'zod';
 import type { Page } from 'puppeteer-core';
+import z from 'zod';
 
-import {ToolCategories} from './categories.js';
-import {defineTool} from './ToolDefinition.js';
 import {CHATGPT_CONFIG} from '../config.js';
 import {getLoginStatus, waitForLoginStatus, LoginStatus} from '../login-helper.js';
 
+import {ToolCategories} from './categories.js';
+import {defineTool} from './ToolDefinition.js';
 import type {Context} from './ToolDefinition.js';
 
 /**
@@ -95,9 +95,7 @@ interface ChatSession {
   conversationCount?: number;
 }
 
-interface ChatSessions {
-  [projectName: string]: ChatSession[];
-}
+type ChatSessions = Record<string, ChatSession[]>;
 
 /**
  * Load chat sessions from JSON file with backward compatibility

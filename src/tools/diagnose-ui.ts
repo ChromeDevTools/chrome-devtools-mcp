@@ -6,12 +6,14 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+
 import z from 'zod';
+
+import {CHATGPT_CONFIG} from '../config.js';
+import {isLoginRequired} from '../login-helper.js';
 
 import {ToolCategories} from './categories.js';
 import {defineTool} from './ToolDefinition.js';
-import {CHATGPT_CONFIG} from '../config.js';
-import {isLoginRequired} from '../login-helper.js';
 
 /**
  * ChatGPT UI Diagnostic Tool

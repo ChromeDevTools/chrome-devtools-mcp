@@ -129,7 +129,7 @@ function groupExtensions(
       // Find sibling nodes that belong to this extension
       const siblings: TextSnapshotNode[] = [];
       let version = '';
-      let enabled = true;
+      const enabled = true;
       let location = '';
       const errors: string[] = [];
 

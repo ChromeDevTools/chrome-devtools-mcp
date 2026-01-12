@@ -5,11 +5,13 @@
  */
 import assert from 'node:assert';
 import {describe, it, beforeEach} from 'node:test';
-import sinon from 'sinon';
+
+import logger from 'debug';
 import type {Browser, Page} from 'puppeteer';
+import sinon from 'sinon';
 
 import {McpContext} from '../src/McpContext.js';
-import logger from 'debug';
+
 
 // Helper type for mock objects with any properties
 type MockBrowser = sinon.SinonStubbedInstance<Browser> & Record<string, any>;

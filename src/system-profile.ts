@@ -83,7 +83,7 @@ function validateChromeProfile(profilePath: string): boolean {
  * Detect system Chrome profile for the specified channel
  */
 export function detectSystemChromeProfile(
-  channel: string = 'stable'
+  channel = 'stable'
 ): SystemChromeProfile | null {
   const platform = os.platform();
   const chromePaths = getChromeUserDataPaths();

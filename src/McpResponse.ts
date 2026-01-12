@@ -9,15 +9,15 @@ import type {
 } from '@modelcontextprotocol/sdk/types.js';
 import type {ResourceType} from 'puppeteer-core';
 
+import {getDevelopmentExtensionPaths} from './browser.js';
 import {formatConsoleEvent} from './formatters/consoleFormatter.js';
+import {formatExtensionsPage} from './formatters/extensionsPageFormatter.js';
 import {
   getFormattedHeaderValue,
   getShortDescriptionForRequest,
   getStatusFromRequest,
 } from './formatters/networkFormatter.js';
 import {formatA11ySnapshot} from './formatters/snapshotFormatter.js';
-import {formatExtensionsPage} from './formatters/extensionsPageFormatter.js';
-import {getDevelopmentExtensionPaths} from './browser.js';
 import type {McpContext} from './McpContext.js';
 import type {ImageContentData, Response} from './tools/ToolDefinition.js';
 import {paginate, type PaginationOptions} from './utils/pagination.js';

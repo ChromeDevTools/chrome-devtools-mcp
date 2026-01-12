@@ -6,9 +6,10 @@
 
 import {z} from 'zod';
 
+import {CHATGPT_CONFIG} from '../config.js';
+
 import {ToolCategories} from './categories.js';
 import {defineTool} from './ToolDefinition.js';
-import {CHATGPT_CONFIG} from '../config.js';
 
 // Default development bookmarks
 function getDefaultBookmarks(): Record<string, string> {

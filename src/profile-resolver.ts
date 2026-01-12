@@ -1,3 +1,9 @@
+
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
 // src/profile-resolver.ts
 // Phase 1 (v0.15.0) + v0.15.1 (MCP_CLIENT_ID support) + v0.17.0 (Hierarchical profiles)
 // - Hybrid priority (CLI > MCP_USER_DATA_DIR > MCP_PROJECT_ID > AUTO > DEFAULT)
@@ -10,14 +16,15 @@
 // - Hierarchical structure: {project}/{client}/{channel} (v0.17.0)
 // - Minimal console.error() logging of decision
 
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import crypto from 'node:crypto';
-import { detectProjectName, detectProjectRoot } from './project-detector.js';
+
 import { detectClientType } from './client-detector.js';
-import type { RootsInfo } from './roots-manager.js';
+import { detectProjectName, detectProjectRoot } from './project-detector.js';
 import { getProjectRoot } from './project-root-state.js';
+import type { RootsInfo } from './roots-manager.js';
 import {
   resolveStableIdentity,
   type StableIdentitySource,
@@ -34,13 +41,13 @@ export interface ResolvedProfile {
   identitySource?: StableIdentitySource; // v0.25.0: Track how stable identity was resolved
 }
 
-type ResolveOpts = {
+interface ResolveOpts {
   cliUserDataDir?: string;
   env: NodeJS.ProcessEnv;
   cwd: string;
   channel: 'stable' | 'canary' | 'beta' | 'dev';
   rootsInfo?: RootsInfo; // v0.18.0: Roots-based profile resolution
-};
+}
 
 const CACHE_ROOT = path.join(os.homedir(), '.cache', 'chrome-devtools-mcp');
 
@@ -60,8 +67,8 @@ export function resolveUserDataDir(opts: ResolveOpts): ResolvedProfile {
     );
     const normalized = pathNormalize(stableProfilePath);
 
-    // v0.25.5: Migration from directory-based profile to stable identity profile
-    // Check if directory-based profile exists (for projects that added git later)
+    // v0.25.6: Migration from legacy profile formats to stable identity profile
+    // Supports: (1) v0.25.4以前のURI+clientベースハッシュ, (2) ディレクトリパスベースハッシュ
     if (!fs.existsSync(stableProfilePath) && opts.rootsInfo.rootsUris.length > 0) {
       try {
         const firstUri = opts.rootsInfo.rootsUris[0];
@@ -69,33 +76,53 @@ export function resolveUserDataDir(opts: ResolveOpts): ResolvedProfile {
         if (url.protocol === 'file:') {
           const rootPath = url.pathname;
           const realRoot = realpathSafe(rootPath);
-          const dirHash = shortHash(realRoot);
-          const dirBasedKey = `${opts.rootsInfo.projectName}_${dirHash}`;
-          const dirBasedPath = path.join(
-            CACHE_ROOT,
-            'profiles',
-            dirBasedKey,
-            opts.rootsInfo.clientName,
-            channel,
-          );
 
-          // If directory-based profile exists, create symlink for migration
-          if (fs.existsSync(dirBasedPath)) {
-            console.error(`[profiles] Migration: Found directory-based profile: ${dirBasedPath}`);
-            console.error(`[profiles] Migration: Creating symlink to stable profile: ${stableProfilePath}`);
-            try {
-              // Create parent directories
-              fs.mkdirSync(path.dirname(stableProfilePath), {recursive: true});
-              // Create symlink: stable -> directory-based
-              fs.symlinkSync(dirBasedPath, stableProfilePath, 'dir');
-              console.error(`[profiles] Migration: ✅ Symlink created successfully`);
-            } catch (e) {
-              console.error(`[profiles] Migration: ⚠️ Failed to create symlink: ${e}`);
+          // Try multiple legacy hash formats
+          const legacyHashFormats = [
+            // Format 1: v0.25.4以前 roots-manager.ts (URI + client JSON hash)
+            {
+              name: 'uri+client',
+              hash: (() => {
+                const sortedUris = [firstUri].sort();
+                const keyMaterial = JSON.stringify({
+                  roots: sortedUris,
+                  client: opts.rootsInfo.clientName,
+                });
+                return crypto.createHash('sha256').update(keyMaterial).digest('hex').slice(0, 8);
+              })(),
+            },
+            // Format 2: Directory path hash (shortHash)
+            {
+              name: 'directory-path',
+              hash: shortHash(realRoot),
+            },
+          ];
+
+          for (const format of legacyHashFormats) {
+            const legacyKey = `${opts.rootsInfo.projectName}_${format.hash}`;
+            const legacyPath = path.join(
+              CACHE_ROOT,
+              'profiles',
+              legacyKey,
+              opts.rootsInfo.clientName,
+              channel,
+            );
+
+            if (fs.existsSync(legacyPath)) {
+              console.error(`[profiles] Migration: Found legacy profile (${format.name}): ${legacyPath}`);
+              console.error(`[profiles] Migration: Creating symlink to stable profile: ${stableProfilePath}`);
+              try {
+                fs.mkdirSync(path.dirname(stableProfilePath), {recursive: true});
+                fs.symlinkSync(legacyPath, stableProfilePath, 'dir');
+                console.error(`[profiles] Migration: ✅ Symlink created successfully`);
+                break; // Stop after first successful migration
+              } catch (e) {
+                console.error(`[profiles] Migration: ⚠️ Failed to create symlink: ${e}`);
+              }
             }
           }
         }
       } catch (e) {
-        // Ignore migration errors, continue with normal flow
         console.error(`[profiles] Migration check failed: ${e}`);
       }
     }

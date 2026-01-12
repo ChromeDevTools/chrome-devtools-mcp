@@ -14,7 +14,9 @@
 import {createHash} from 'node:crypto';
 import fs from 'node:fs';
 import {fileURLToPath} from 'node:url';
+
 import type {Server} from '@modelcontextprotocol/sdk/server/index.js';
+
 import {detectProjectName} from './project-detector.js';
 import {resolveStableIdentity} from './stable-identity.js';
 

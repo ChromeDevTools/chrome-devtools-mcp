@@ -82,7 +82,7 @@ export function getSelector(elementName: string): SelectorDef {
  */
 export function generateTextMatcher(
   selector: SelectorDef,
-  tagName: string = 'button',
+  tagName = 'button',
 ): string {
   const textPatterns = Array.isArray(selector.text)
     ? selector.text
@@ -101,7 +101,7 @@ export function generateTextMatcher(
  */
 export function generateAxMatcher(
   selector: SelectorDef,
-  tagName: string = 'button',
+  tagName = 'button',
 ): string {
   if (!selector.ax) {
     throw new Error('Accessibility selector not defined');

@@ -20,16 +20,16 @@ import type {
   PredefinedNetworkConditions,
 } from 'puppeteer-core';
 
+import {
+  BrowserConnectionManager,
+  type ConnectionManagerOptions,
+} from './browser-connection-manager.js';
 import {NetworkCollector, PageCollector} from './PageCollector.js';
 import {pages} from './tools/pages.js';
 import {CLOSE_PAGE_ERROR} from './tools/ToolDefinition.js';
 import type {Context} from './tools/ToolDefinition.js';
 import type {TraceResult} from './trace-processing/parse.js';
 import {WaitForHelper} from './WaitForHelper.js';
-import {
-  BrowserConnectionManager,
-  type ConnectionManagerOptions,
-} from './browser-connection-manager.js';
 
 export interface TextSnapshotNode extends SerializedAXNode {
   id: string;

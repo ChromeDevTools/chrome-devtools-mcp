@@ -1,11 +1,17 @@
+
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
 // src/stable-identity.ts
 // Stable project identity detection for profile persistence across directory moves
 // Priority: MCP_PROFILE_ID > git remote origin > git first commit > package.json name > directory fallback
 
+import { spawnSync } from 'node:child_process';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import crypto from 'node:crypto';
-import { spawnSync } from 'node:child_process';
 
 export type StableIdentitySource =
   | 'MCP_PROFILE_ID' // Explicit env var (highest priority)
@@ -99,7 +105,7 @@ export function getLegacyIdentityHash(projectRoot: string): string {
  * Get git remote origin URL.
  * Returns null if not a git repo or no remote configured.
  */
-function getGitRemoteOrigin(cwd: string, remoteName: string = 'origin'): string | null {
+function getGitRemoteOrigin(cwd: string, remoteName = 'origin'): string | null {
   try {
     const result = spawnSync('git', ['remote', 'get-url', remoteName], {
       cwd,
