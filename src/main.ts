@@ -56,17 +56,9 @@ import { Mutex } from './Mutex.js';
 import { setProjectRoot } from './project-root-state.js';
 import { resolveRoots, type RootsInfo } from './roots-manager.js';
 import { runStartupCheck } from './startup-check.js';
-import * as chatgptWebTools from './tools/chatgpt-web.js';
-import * as consoleTools from './tools/console.js';
-import * as emulationTools from './tools/emulation.js';
-import * as geminiWebTools from './tools/gemini-web.js';
-import { click, fill, fillForm } from './tools/input.js';
-import * as networkTools from './tools/network.js';
-import { pages, navigate } from './tools/pages.js';
-import * as performanceTools from './tools/performance.js';
-import * as screenshotTools from './tools/screenshot.js';
-import * as scriptTools from './tools/script.js';
-import * as snapshotTools from './tools/snapshot.js';
+import { ToolRegistry, PluginLoader } from './plugin-api.js';
+import { registerCoreTools, getCoreToolCount } from './tools/core-tools.js';
+import { registerOptionalTools, getOptionalToolCount, WEB_LLM_TOOLS_INFO } from './tools/optional-tools.js';
 import type { ToolDefinition } from './tools/ToolDefinition.js';
 
 
@@ -288,25 +280,37 @@ function registerTool(tool: ToolDefinition): void {
   );
 }
 
-const tools = [
-  ...Object.values(chatgptWebTools),
-  ...Object.values(geminiWebTools),
-  ...Object.values(consoleTools),
-  ...Object.values(emulationTools),
-  click,
-  fill,
-  fillForm,
-  ...Object.values(networkTools),
-  pages,
-  navigate,
-  ...Object.values(performanceTools),
-  ...Object.values(screenshotTools),
-  ...Object.values(scriptTools),
-  ...Object.values(snapshotTools),
-];
-for (const tool of tools) {
+// v0.26.0: Use ToolRegistry for plugin architecture
+const toolRegistry = new ToolRegistry();
+
+// Register core tools (stable, site-independent)
+registerCoreTools(toolRegistry);
+logger(`[tools] Registered ${getCoreToolCount()} core tools`);
+
+// Register optional tools (web-llm, site-dependent)
+const optionalCount = registerOptionalTools(toolRegistry);
+if (optionalCount > 0) {
+  logger(`[tools] ${WEB_LLM_TOOLS_INFO.disclaimer}`);
+}
+
+// Load external plugins from MCP_PLUGINS environment variable
+const pluginList = process.env.MCP_PLUGINS;
+if (pluginList) {
+  const pluginLoader = new PluginLoader(toolRegistry, logger);
+  const { loaded, failed } = await pluginLoader.loadFromList(pluginList);
+  if (loaded.length > 0) {
+    logger(`[plugins] Successfully loaded: ${loaded.join(', ')}`);
+  }
+  if (failed.length > 0) {
+    logger(`[plugins] Failed to load: ${failed.join(', ')}`);
+  }
+}
+
+// Register all tools with MCP server
+for (const tool of toolRegistry.getAll()) {
   registerTool(tool as unknown as ToolDefinition);
 }
+logger(`[tools] Total registered: ${toolRegistry.size} tools`);
 
 // Set initialization callback
 server.server.oninitialized = () => {
