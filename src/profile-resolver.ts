@@ -213,8 +213,25 @@ export function resolveUserDataDir(opts: ResolveOpts): ResolvedProfile {
       const legacyKey = `${sanitize(name)}_${legacyHash}`;
       const legacyPath = projectProfilePath(legacyKey, clientId, channel);
 
+      // Pre-calculate stable identity
+      const identity = resolveStableIdentity(projectRoot, opts.env);
+      const stableKey = `${sanitize(name)}_${identity.id}`;
+      const stablePath = projectProfilePath(stableKey, clientId, channel);
+
       if (fs.existsSync(legacyPath)) {
         console.error(`[profiles] Legacy profile exists, using it: ${legacyPath}`);
+
+        // Create stable identity symlink for future moves
+        if (legacyPath !== stablePath && !fs.existsSync(stablePath)) {
+          try {
+            fs.mkdirSync(path.dirname(stablePath), { recursive: true });
+            fs.symlinkSync(legacyPath, stablePath, 'dir');
+            console.error(`[profiles] ✅ Created stable identity link: ${stablePath} -> ${legacyPath}`);
+          } catch (e) {
+            console.error(`[profiles] ⚠️ Failed to create stable identity link: ${e}`);
+          }
+        }
+
         const result: ResolvedProfile = {
           path: legacyPath,
           reason: 'MCP_PROJECT_ROOT',
@@ -229,9 +246,6 @@ export function resolveUserDataDir(opts: ResolveOpts): ResolvedProfile {
       }
 
       // 2. Check stable identity profile
-      const identity = resolveStableIdentity(projectRoot, opts.env);
-      const stableKey = `${sanitize(name)}_${identity.id}`;
-      const stablePath = projectProfilePath(stableKey, clientId, channel);
 
       if (fs.existsSync(stablePath)) {
         console.error(`[profiles] Stable identity profile exists: ${stablePath}`);
@@ -282,8 +296,25 @@ export function resolveUserDataDir(opts: ResolveOpts): ResolvedProfile {
       const legacyKey = `${sanitize(name)}_${legacyHash}`;
       const legacyPath = projectProfilePath(legacyKey, clientId, channel);
 
+      // Pre-calculate stable identity
+      const identity = resolveStableIdentity(initializedRoot, opts.env);
+      const stableKey = `${sanitize(name)}_${identity.id}`;
+      const stablePath = projectProfilePath(stableKey, clientId, channel);
+
       if (fs.existsSync(legacyPath)) {
         console.error(`[profiles] Legacy profile exists, using it: ${legacyPath}`);
+
+        // Create stable identity symlink for future moves
+        if (legacyPath !== stablePath && !fs.existsSync(stablePath)) {
+          try {
+            fs.mkdirSync(path.dirname(stablePath), { recursive: true });
+            fs.symlinkSync(legacyPath, stablePath, 'dir');
+            console.error(`[profiles] ✅ Created stable identity link: ${stablePath} -> ${legacyPath}`);
+          } catch (e) {
+            console.error(`[profiles] ⚠️ Failed to create stable identity link: ${e}`);
+          }
+        }
+
         const result: ResolvedProfile = {
           path: legacyPath,
           reason: 'AUTO',
@@ -298,9 +329,6 @@ export function resolveUserDataDir(opts: ResolveOpts): ResolvedProfile {
       }
 
       // 2. Check stable identity profile
-      const identity = resolveStableIdentity(initializedRoot, opts.env);
-      const stableKey = `${sanitize(name)}_${identity.id}`;
-      const stablePath = projectProfilePath(stableKey, clientId, channel);
 
       if (fs.existsSync(stablePath)) {
         console.error(`[profiles] Stable identity profile exists: ${stablePath}`);
@@ -355,8 +383,27 @@ export function resolveUserDataDir(opts: ResolveOpts): ResolvedProfile {
     const legacyKey = `${sanitize(name)}_${legacyHash}`;
     const legacyPath = projectProfilePath(legacyKey, clientId, channel);
 
+    // Pre-calculate stable identity for potential symlink creation
+    const identity = resolveStableIdentity(root, opts.env);
+    const stableKey = `${sanitize(name)}_${identity.id}`;
+    const stablePath = projectProfilePath(stableKey, clientId, channel);
+
     if (fs.existsSync(legacyPath)) {
       console.error(`[profiles] Legacy profile exists, using it: ${legacyPath}`);
+
+      // Also create stable identity symlink for future moves (if different and not exists)
+      if (legacyPath !== stablePath && !fs.existsSync(stablePath)) {
+        try {
+          fs.mkdirSync(path.dirname(stablePath), { recursive: true });
+          fs.symlinkSync(legacyPath, stablePath, 'dir');
+          console.error(
+            `[profiles] ✅ Created stable identity link for future moves: ${stablePath} -> ${legacyPath}`,
+          );
+        } catch (e) {
+          console.error(`[profiles] ⚠️ Failed to create stable identity link: ${e}`);
+        }
+      }
+
       const result: ResolvedProfile = {
         path: legacyPath,
         reason: 'AUTO',
@@ -374,9 +421,6 @@ export function resolveUserDataDir(opts: ResolveOpts): ResolvedProfile {
     }
 
     // 2. Check stable identity profile (for moved projects)
-    const identity = resolveStableIdentity(root, opts.env);
-    const stableKey = `${sanitize(name)}_${identity.id}`;
-    const stablePath = projectProfilePath(stableKey, clientId, channel);
 
     if (fs.existsSync(stablePath)) {
       console.error(
