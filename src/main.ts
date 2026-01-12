@@ -98,6 +98,14 @@ const logDisclaimers = () => {
 debug, and modify any data in the browser or DevTools.
 Avoid sharing sensitive or personal information that you do not want to share with MCP clients.`,
   );
+
+  if (args.usageStatistics) {
+    console.error(
+      `
+Google collects usage statistics to improve Chrome DevTools MCP. To opt-out, run with --no-usage-statistics.
+For more details, visit: https://github.com/ChromeDevTools/chrome-devtools-mcp#usage-statistics`,
+    );
+  }
 };
 
 const toolMutex = new Mutex();

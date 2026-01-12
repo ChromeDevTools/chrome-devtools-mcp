@@ -19,6 +19,8 @@ describe('cli args parsing', () => {
     categoryNetwork: true,
     'auto-connect': undefined,
     autoConnect: undefined,
+    'usage-statistics': false,
+    usageStatistics: false,
   };
 
   it('parses with default args', async () => {
@@ -221,5 +223,27 @@ describe('cli args parsing', () => {
       'auto-connect': true,
       autoConnect: true,
     });
+  });
+
+  it('parses usage statistics flag', async () => {
+    // Test default (should be false)
+    const defaultArgs = parseArguments('1.0.0', ['node', 'main.js']);
+    assert.strictEqual(defaultArgs.usageStatistics, false);
+
+    // Test enabling it
+    const enabledArgs = parseArguments('1.0.0', [
+      'node',
+      'main.js',
+      '--usage-statistics',
+    ]);
+    assert.strictEqual(enabledArgs.usageStatistics, true);
+
+    // Test disabling it
+    const disabledArgs = parseArguments('1.0.0', [
+      'node',
+      'main.js',
+      '--no-usage-statistics',
+    ]);
+    assert.strictEqual(disabledArgs.usageStatistics, false);
   });
 });

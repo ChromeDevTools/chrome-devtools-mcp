@@ -178,6 +178,14 @@ export const cliOptions = {
     default: true,
     describe: 'Set to false to exclude tools related to network.',
   },
+  usageStatistics: {
+    type: 'boolean',
+    // Marked as `false` until the feature is ready to be enabled by default.
+    default: false,
+    hidden: true,
+    describe:
+      'Set to false to opt-out of usage statistics collection.',
+  },
 } satisfies Record<string, YargsOptions>;
 
 export function parseArguments(version: string, argv = process.argv) {
