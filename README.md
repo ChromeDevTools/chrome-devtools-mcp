@@ -169,9 +169,12 @@ vim src/tools/extensions.ts
 chrome-devtools-mcp/
 ├── src/
 │   ├── tools/              # MCP tool definitions
-│   │   ├── extensions.ts   # Extension management (list, reload, debug)
+│   │   ├── core-tools.ts   # Core tool exports (v0.26.0)
+│   │   ├── optional-tools.ts # Web-LLM tool exports (v0.26.0)
 │   │   ├── chatgpt-web.ts  # ChatGPT automation
+│   │   ├── gemini-web.ts   # Gemini automation
 │   │   └── ...
+│   ├── plugin-api.ts       # Plugin architecture (v0.26.0)
 │   ├── browser.ts          # Browser/profile management
 │   ├── main.ts             # MCP server entry point
 │   └── graceful.ts         # Graceful shutdown
@@ -264,7 +267,8 @@ git push && git push --tags
 - 🔧 **Browser Testing**: Test extensions in real user environments
 - 🐛 **Advanced Debugging**: Service worker inspection, console monitoring
 - 📸 **Screenshot Generation**: Auto-create store listing images
-- 🤖 **ChatGPT Integration**: Automated ChatGPT interactions for research
+- 🤖 **ChatGPT/Gemini Integration**: Automated AI interactions for research
+- 🔌 **Plugin Architecture** (v0.26.0): Extensible tool system with external plugins
 
 ---
 
@@ -376,6 +380,85 @@ pkill -f mcp-wrapper
 
 ---
 
+## 🔌 Plugin Architecture (v0.26.0)
+
+### Tool Categories
+
+**Core Tools (18)** - Stable, site-independent:
+- Input: click, hover, fill, drag, fill_form, upload_file
+- Navigation: pages, navigate, resize_page, handle_dialog
+- Debugging: list_console_messages, take_screenshot, evaluate_script, take_snapshot, wait_for
+- Analysis: emulate, network, performance
+
+**Optional Tools (2)** - Web-LLM, site-dependent (may break with UI changes):
+- `ask_chatgpt_web` - ChatGPT browser automation
+- `ask_gemini_web` - Gemini browser automation
+
+### Disable Web-LLM Tools
+
+If you don't need ChatGPT/Gemini integration:
+
+```json
+{
+  "mcpServers": {
+    "chrome-devtools-extension": {
+      "command": "npx",
+      "args": ["chrome-devtools-mcp-for-extension@latest"],
+      "env": {
+        "MCP_DISABLE_WEB_LLM": "true"
+      }
+    }
+  }
+}
+```
+
+### External Plugins
+
+Load custom plugins at startup:
+
+```json
+{
+  "mcpServers": {
+    "chrome-devtools-extension": {
+      "command": "npx",
+      "args": ["chrome-devtools-mcp-for-extension@latest"],
+      "env": {
+        "MCP_PLUGINS": "./my-plugin.js,@org/another-plugin"
+      }
+    }
+  }
+}
+```
+
+**Plugin Interface:**
+```typescript
+// my-plugin.js
+export default {
+  id: 'my-plugin',
+  name: 'My Custom Plugin',
+  version: '1.0.0',
+
+  async register(ctx) {
+    ctx.registry.register({
+      name: 'my_custom_tool',
+      description: 'Does something useful',
+      schema: { /* zod schema */ },
+      annotations: { category: 'automation' },
+      async handler(input, response, context) {
+        // Tool implementation
+      }
+    });
+    ctx.log('Plugin registered!');
+  },
+
+  async unload() {
+    // Cleanup if needed
+  }
+};
+```
+
+---
+
 ## 🙏 Credits
 
 This project is a fork of [Chrome DevTools MCP](https://github.com/ChromeDevTools/chrome-devtools-mcp) by Google LLC.
@@ -393,5 +476,5 @@ This project is a fork of [Chrome DevTools MCP](https://github.com/ChromeDevTool
 
 Apache-2.0
 
-**Version**: 0.18.0
+**Version**: 0.26.0
 **Repository**: https://github.com/usedhonda/chrome-devtools-mcp
