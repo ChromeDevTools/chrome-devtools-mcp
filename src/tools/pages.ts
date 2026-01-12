@@ -211,17 +211,21 @@ export const resizePage = defineTool({
   handler: async (request, response, context) => {
     const page = context.getSelectedPage();
 
-    const browser = page.browser();
-    const windowId = await page.windowId();
+    try {
+      const browser = page.browser();
+      const windowId = await page.windowId();
 
-    const bounds = await browser.getWindowBounds(windowId);
+      const bounds = await browser.getWindowBounds(windowId);
 
-    if (bounds.windowState === 'fullscreen') {
-      // have to call this twice when window is in fullscreen mode
-      await browser.setWindowBounds(windowId, {windowState: 'normal'});
-      await browser.setWindowBounds(windowId, {windowState: 'normal'});
-    } else if (bounds.windowState !== 'normal') {
-      await browser.setWindowBounds(windowId, {windowState: 'normal'});
+      if (bounds.windowState === 'fullscreen') {
+        // have to call this twice when window is in fullscreen mode
+        await browser.setWindowBounds(windowId, {windowState: 'normal'});
+        await browser.setWindowBounds(windowId, {windowState: 'normal'});
+      } else if (bounds.windowState !== 'normal') {
+        await browser.setWindowBounds(windowId, {windowState: 'normal'});
+      }
+    } catch {
+      // Window APIs are not supported on all platforms
     }
     await page.resize({
       contentWidth: request.params.width,
