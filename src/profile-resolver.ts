@@ -20,6 +20,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { detectClientType } from './client-detector.js';
 import { detectProjectName, detectProjectRoot } from './project-detector.js';
@@ -67,57 +68,98 @@ export function resolveUserDataDir(opts: ResolveOpts): ResolvedProfile {
     );
     const normalized = pathNormalize(stableProfilePath);
 
-    // v0.25.6: Migration from legacy profile formats to stable identity profile
-    // Supports: (1) v0.25.4以前のURI+clientベースハッシュ, (2) ディレクトリパスベースハッシュ
+    // v0.25.8: Comprehensive migration from legacy profile formats to stable identity profile
+    // Handles:
+    // - v0.18.x: URI+client+version hash, directory name as project name
+    // - v0.19.0-v0.25.4: URI+client hash (no version), directory name as project name
+    // - v0.25.5+: stable identity hash, package.json name as project name
     if (!fs.existsSync(stableProfilePath) && opts.rootsInfo.rootsUris.length > 0) {
       try {
         const firstUri = opts.rootsInfo.rootsUris[0];
         const url = new URL(firstUri);
         if (url.protocol === 'file:') {
-          const rootPath = url.pathname;
+          // Extract directory name for OLD project name (v0.25.4以前)
+          const rootPath = fileURLToPath(url);
           const realRoot = realpathSafe(rootPath);
+          const dirName = path.basename(realRoot);
+          const oldProjectName = sanitize(dirName); // e.g., "adlogger" from "adLogger"
+          const newProjectName = opts.rootsInfo.projectName; // e.g., "adblocker" from package.json
 
-          // Try multiple legacy hash formats
+          // Try both old and new project names
+          const projectNamesToTry = [oldProjectName];
+          if (newProjectName !== oldProjectName) {
+            projectNamesToTry.push(newProjectName);
+          }
+
+          // Legacy hash formats to try
+          const sortedUris = [...opts.rootsInfo.rootsUris].sort();
+          const clientName = opts.rootsInfo.clientName;
+          const clientVersion = opts.rootsInfo.clientVersion;
           const legacyHashFormats = [
-            // Format 1: v0.25.4以前 roots-manager.ts (URI + client JSON hash)
+            // Format 1: v0.19.0-v0.25.4 (URI+client, no version)
             {
               name: 'uri+client',
-              hash: (() => {
-                const sortedUris = [firstUri].sort();
-                const keyMaterial = JSON.stringify({
-                  roots: sortedUris,
-                  client: opts.rootsInfo.clientName,
-                });
-                return crypto.createHash('sha256').update(keyMaterial).digest('hex').slice(0, 8);
-              })(),
+              hash: crypto
+                .createHash('sha256')
+                .update(
+                  JSON.stringify({
+                    roots: sortedUris,
+                    client: clientName,
+                  }),
+                )
+                .digest('hex')
+                .slice(0, 8),
             },
-            // Format 2: Directory path hash (shortHash)
+            // Format 2: v0.18.x (URI+client+version) - try common version strings
+            ...['1.0.0', '0.1.0', clientVersion].map((version) => ({
+              name: `uri+client+version(${version})`,
+              hash: crypto
+                .createHash('sha256')
+                .update(
+                  JSON.stringify({
+                    roots: sortedUris,
+                    client: clientName,
+                    version,
+                  }),
+                )
+                .digest('hex')
+                .slice(0, 8),
+            })),
+            // Format 3: Directory path hash
             {
               name: 'directory-path',
               hash: shortHash(realRoot),
             },
           ];
 
-          for (const format of legacyHashFormats) {
-            const legacyKey = `${opts.rootsInfo.projectName}_${format.hash}`;
-            const legacyPath = path.join(
-              CACHE_ROOT,
-              'profiles',
-              legacyKey,
-              opts.rootsInfo.clientName,
-              channel,
-            );
+          // Try all combinations of project name × hash format
+          let migrated = false;
+          for (const projName of projectNamesToTry) {
+            if (migrated) break;
+            for (const format of legacyHashFormats) {
+              const legacyKey = `${projName}_${format.hash}`;
+              const legacyPath = path.join(
+                CACHE_ROOT,
+                'profiles',
+                legacyKey,
+                opts.rootsInfo.clientName,
+                channel,
+              );
 
-            if (fs.existsSync(legacyPath)) {
-              console.error(`[profiles] Migration: Found legacy profile (${format.name}): ${legacyPath}`);
-              console.error(`[profiles] Migration: Creating symlink to stable profile: ${stableProfilePath}`);
-              try {
-                fs.mkdirSync(path.dirname(stableProfilePath), {recursive: true});
-                fs.symlinkSync(legacyPath, stableProfilePath, 'dir');
-                console.error(`[profiles] Migration: ✅ Symlink created successfully`);
-                break; // Stop after first successful migration
-              } catch (e) {
-                console.error(`[profiles] Migration: ⚠️ Failed to create symlink: ${e}`);
+              if (fs.existsSync(legacyPath)) {
+                console.error(
+                  `[profiles] Migration: Found legacy profile (${format.name}, project=${projName}): ${legacyPath}`,
+                );
+                console.error(`[profiles] Migration: Creating symlink to stable profile: ${stableProfilePath}`);
+                try {
+                  fs.mkdirSync(path.dirname(stableProfilePath), { recursive: true });
+                  fs.symlinkSync(legacyPath, stableProfilePath, 'dir');
+                  console.error(`[profiles] Migration: ✅ Symlink created successfully`);
+                  migrated = true;
+                  break;
+                } catch (e) {
+                  console.error(`[profiles] Migration: ⚠️ Failed to create symlink: ${e}`);
+                }
               }
             }
           }
