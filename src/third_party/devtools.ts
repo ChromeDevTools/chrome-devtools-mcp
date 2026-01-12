@@ -24,11 +24,9 @@ export {
   ProtocolClient,
   Common,
   I18n,
+  CrUXManager,
   IssueAggregatorEvents,
   IssuesManagerEvents,
   createIssuesFromProtocolIssue,
   IssueAggregator,
 } from '../../node_modules/chrome-devtools-frontend/mcp/mcp.js';
-/* eslint-disable no-restricted-imports */
-export * as CrUXManager from '../../node_modules/chrome-devtools-frontend/front_end/models/crux-manager/crux-manager.js';
-/* eslint-enable no-restricted-imports */
