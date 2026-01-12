@@ -168,6 +168,11 @@ export const cliOptions = {
       'Whether to include all kinds of pages such as webviews or background pages as pages.',
     hidden: true,
   },
+  experimentalInteropTools: {
+    type: 'boolean',
+    describe: 'Whether to enable interoperability tools',
+    hidden: true,
+  },
   chromeArg: {
     type: 'array',
     describe:

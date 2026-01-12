@@ -17,6 +17,7 @@ import {
   navigatePage,
   resizePage,
   handleDialog,
+  getTabId,
 } from '../../src/tools/pages.js';
 import {withMcpContext} from '../utils.js';
 
@@ -319,6 +320,18 @@ describe('pages', () => {
           response.responseLines[0],
           'Successfully dismissed the dialog',
         );
+      });
+    });
+  });
+
+  describe('get_tab_id', () => {
+    it('returns the tab id', async () => {
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedPage();
+        // @ts-expect-error _tabId is internal.
+        page._tabId = 'test-tab-id';
+        await getTabId.handler({params: {pageId: 1}}, response, context);
+        assert.ok(response.responseLines.includes('test-tab-id'));
       });
     });
   });

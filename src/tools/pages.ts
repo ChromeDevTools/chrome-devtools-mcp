@@ -269,3 +269,26 @@ export const handleDialog = defineTool({
     response.setIncludePages(true);
   },
 });
+
+export const getTabId = defineTool({
+  name: 'get_tab_id',
+  description: `Get the tab ID of the page`,
+  annotations: {
+    category: ToolCategory.NAVIGATION,
+    readOnlyHint: true,
+    conditions: ['experimentalInteropTools'],
+  },
+  schema: {
+    pageId: zod
+      .number()
+      .describe(
+        `The ID of the page to get the tab ID for. Call ${listPages.name} to get available pages.`,
+      ),
+  },
+  handler: async (request, response, context) => {
+    const page = context.getPageById(request.params.pageId);
+    // @ts-expect-error _tabId is internal.
+    const tabId = page._tabId;
+    response.appendResponseLine(tabId);
+  },
+});
