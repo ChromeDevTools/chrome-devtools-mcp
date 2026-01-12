@@ -286,6 +286,20 @@ export function resolveUserDataDir(opts: ResolveOpts): ResolvedProfile {
   if (initializedRoot) {
     console.error(`[profiles] Using initialized project root: "${initializedRoot}"`);
     try {
+      // Debug: Check package.json existence
+      const pjPath = path.join(initializedRoot, 'package.json');
+      const pjExists = fs.existsSync(pjPath);
+      console.error(`[profiles] DEBUG: package.json at ${pjPath} exists=${pjExists}`);
+      if (pjExists) {
+        try {
+          const pkg = JSON.parse(fs.readFileSync(pjPath, 'utf8'));
+          console.error(`[profiles] DEBUG: package.json name="${pkg?.name}"`);
+        } catch (e) {
+          console.error(`[profiles] DEBUG: package.json parse error: ${e}`);
+        }
+      }
+      console.error(`[profiles] DEBUG: basename="${path.basename(initializedRoot)}"`);
+
       const name = detectProjectName(initializedRoot);
       console.error(`[profiles] Initialized root name="${name}"`);
 
