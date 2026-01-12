@@ -183,8 +183,7 @@ export const cliOptions = {
     // Marked as `false` until the feature is ready to be enabled by default.
     default: false,
     hidden: true,
-    describe:
-      'Set to false to opt-out of usage statistics collection.',
+    describe: 'Set to false to opt-out of usage statistics collection.',
   },
 } satisfies Record<string, YargsOptions>;
 
