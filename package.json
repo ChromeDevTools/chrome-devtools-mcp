@@ -5,6 +5,10 @@
   "type": "module",
   "bin": "./scripts/cli.mjs",
   "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./plugin-api": "./build/src/plugin-api.js"
+  },
   "scripts": {
     "build": "tsc && node --experimental-strip-types --no-warnings=ExperimentalWarning scripts/post-build.ts",
     "dev": "MCP_ENV=development node scripts/mcp-wrapper.mjs",
