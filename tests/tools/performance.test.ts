@@ -6,6 +6,7 @@
 
 import assert from 'node:assert';
 import {describe, it, afterEach} from 'node:test';
+import zlib from 'node:zlib';
 
 import sinon from 'sinon';
 
@@ -136,6 +137,49 @@ describe('performance', () => {
             .join('\n')
             .match(/a performance trace is already running/),
         );
+      });
+    });
+
+    it.only('supports filePath', async () => {
+      const rawData = loadTraceAsBuffer('basic-trace.json.gz');
+      // rawData is the decompressed buffer (based on loadTraceAsBuffer implementation).
+      // We want to simulate saving it as a .gz file, so the tool should compress it.
+      const expectedCompressedData = zlib.gzipSync(rawData);
+
+      await withMcpContext(async (response, context) => {
+        const filePath = 'test-trace.json.gz';
+        const selectedPage = context.getSelectedPage();
+        sinon.stub(selectedPage, 'url').callsFake(() => 'https://www.test.com');
+        sinon.stub(selectedPage, 'goto').callsFake(() => Promise.resolve(null));
+        sinon.stub(selectedPage.tracing, 'start');
+        sinon.stub(selectedPage.tracing, 'stop').resolves(rawData);
+        const saveFileStub = sinon
+          .stub(context, 'saveFile')
+          .resolves({filename: filePath});
+
+        const handlerPromise = startTrace.handler(
+          {params: {reload: true, autoStop: true, filePath}},
+          response,
+          context,
+        );
+        // In the handler we wait 5 seconds after the page load event (which is
+        // what DevTools does), hence we now fake-progress time to allow
+        // the handler to complete. We allow extra time because the Trace
+        // Engine also uses some timers to yield updates and we need those to
+        // execute.
+        await handlerPromise;
+
+        assert.ok(
+          response.responseLines.includes(
+            `The raw trace data was saved to ${filePath}.`,
+          ),
+        );
+        sinon.assert.calledOnce(saveFileStub);
+        const [savedData, savedPath] = saveFileStub.firstCall.args;
+        assert.strictEqual(savedPath, filePath);
+        // Compare the saved data with expected compressed data
+        // We can't compare buffers directly with strictEqual easily if they are different instances, but deepStrictEqual works for Buffers.
+        assert.deepStrictEqual(savedData, expectedCompressedData);
       });
     });
   });
@@ -273,6 +317,32 @@ describe('performance', () => {
         });
         await stopTrace.handler({params: {}}, response, context);
         t.assert.snapshot?.(response.responseLines.join('\n'));
+      });
+    });
+
+    it('supports filePath', async () => {
+      const rawData = loadTraceAsBuffer('basic-trace.json.gz');
+      await withMcpContext(async (response, context) => {
+        const filePath = 'test-trace.json';
+        context.setIsRunningPerformanceTrace(true);
+        const selectedPage = context.getSelectedPage();
+        const stopTracingStub = sinon
+          .stub(selectedPage.tracing, 'stop')
+          .resolves(rawData);
+        const saveFileStub = sinon
+          .stub(context, 'saveFile')
+          .resolves({filename: filePath});
+
+        await stopTrace.handler({params: {filePath}}, response, context);
+
+        sinon.assert.calledOnce(stopTracingStub);
+        sinon.assert.calledOnce(saveFileStub);
+        sinon.assert.calledWith(saveFileStub, rawData, filePath);
+        assert.ok(
+          response.responseLines.includes(
+            `The raw trace data was saved to ${filePath}.`,
+          ),
+        );
       });
     });
   });

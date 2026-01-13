@@ -145,6 +145,12 @@ function registerTool(tool: ToolDefinition): void {
   ) {
     return;
   }
+  if (
+    tool.annotations.conditions?.includes('experimentalInteropTools') &&
+    !args.experimentalInteropTools
+  ) {
+    return;
+  }
   server.registerTool(
     tool.name,
     {

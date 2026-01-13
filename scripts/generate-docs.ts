@@ -213,15 +213,23 @@ function getZodTypeInfo(schema: ZodSchema): TypeInfo {
       defaultValue = def.defaultValue();
     }
     const next = def.innerType || def.schema;
-    if (!next) break;
+    if (!next) {
+      break;
+    }
     schema = next;
     def = schema._def;
-    if (!description && schema.description) description = schema.description;
+    if (!description && schema.description) {
+      description = schema.description;
+    }
   }
 
   const result: TypeInfo = {type: 'unknown'};
-  if (description) result.description = description;
-  if (defaultValue !== undefined) result.default = defaultValue;
+  if (description) {
+    result.description = description;
+  }
+  if (defaultValue !== undefined) {
+    result.default = defaultValue;
+  }
 
   switch (def.typeName) {
     case 'ZodString':
@@ -254,7 +262,9 @@ function getZodTypeInfo(schema: ZodSchema): TypeInfo {
 function isRequired(schema: ZodSchema): boolean {
   let def = schema._def;
   while (def.typeName === 'ZodEffects') {
-    if (!def.schema) break;
+    if (!def.schema) {
+      break;
+    }
     schema = def.schema;
     def = schema._def;
   }
@@ -325,9 +335,15 @@ async function generateToolDocumentation(): Promise<void> {
       const aIndex = categoryOrder.indexOf(a);
       const bIndex = categoryOrder.indexOf(b);
       // Put known categories first, unknown categories last
-      if (aIndex === -1 && bIndex === -1) return a.localeCompare(b);
-      if (aIndex === -1) return 1;
-      if (bIndex === -1) return -1;
+      if (aIndex === -1 && bIndex === -1) {
+        return a.localeCompare(b);
+      }
+      if (aIndex === -1) {
+        return 1;
+      }
+      if (bIndex === -1) {
+        return -1;
+      }
       return aIndex - bIndex;
     });
 
@@ -386,8 +402,12 @@ async function generateToolDocumentation(): Promise<void> {
           const propertyNames = Object.keys(properties).sort((a, b) => {
             const aRequired = required.includes(a);
             const bRequired = required.includes(b);
-            if (aRequired && !bRequired) return -1;
-            if (!aRequired && bRequired) return 1;
+            if (aRequired && !bRequired) {
+              return -1;
+            }
+            if (!aRequired && bRequired) {
+              return 1;
+            }
             return a.localeCompare(b);
           });
           for (const propName of propertyNames) {

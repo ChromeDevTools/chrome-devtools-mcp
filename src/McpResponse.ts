@@ -57,9 +57,14 @@ export class McpResponse implements Response {
     includePreservedMessages?: boolean;
   };
   #devToolsData?: DevToolsData;
+  #tabId?: string;
 
   attachDevToolsData(data: DevToolsData): void {
     this.#devToolsData = data;
+  }
+
+  setTabId(tabId: string): void {
+    this.#tabId = tabId;
   }
 
   setIncludePages(value: boolean): void {
@@ -254,10 +259,11 @@ export class McpResponse implements Response {
         };
       } else if (message instanceof DevTools.AggregatedIssue) {
         const mappedIssueMessage = mapIssueToMessageObject(message);
-        if (!mappedIssueMessage)
+        if (!mappedIssueMessage) {
           throw new Error(
             "Can't provide detals for the msgid " + consoleMessageStableId,
           );
+        }
         consoleData = {
           consoleMessageStableId,
           ...mappedIssueMessage,
@@ -316,7 +322,9 @@ export class McpResponse implements Response {
             }
             if (item instanceof DevTools.AggregatedIssue) {
               const mappedIssueMessage = mapIssueToMessageObject(item);
-              if (!mappedIssueMessage) return null;
+              if (!mappedIssueMessage) {
+                return null;
+              }
               return {
                 consoleMessageStableId,
                 ...mappedIssueMessage,
@@ -398,7 +406,12 @@ Call ${handleDialog.name} to handle it before continuing.`);
     const structuredContent: {
       snapshot?: object;
       snapshotFilePath?: string;
+      tabId?: string;
     } = {};
+
+    if (this.#tabId) {
+      structuredContent.tabId = this.#tabId;
+    }
 
     if (data.snapshot) {
       if (typeof data.snapshot === 'string') {

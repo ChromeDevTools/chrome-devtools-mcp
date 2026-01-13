@@ -101,6 +101,13 @@ describe('e2e', () => {
             if (maybeTool.annotations?.conditions?.includes('computerVision')) {
               continue;
             }
+            if (
+              maybeTool.annotations?.conditions?.includes(
+                'experimentalInteropTools',
+              )
+            ) {
+              continue;
+            }
             definedNames.push(maybeTool.name);
           }
         }
@@ -118,6 +125,17 @@ describe('e2e', () => {
         assert.ok(clickAt);
       },
       ['--experimental-vision'],
+    );
+  });
+
+  it('has experimental interop tools', async () => {
+    await withClient(
+      async client => {
+        const {tools} = await client.listTools();
+        const getTabId = tools.find(t => t.name === 'get_tab_id');
+        assert.ok(getTabId);
+      },
+      ['--experimental-interop-tools'],
     );
   });
 });

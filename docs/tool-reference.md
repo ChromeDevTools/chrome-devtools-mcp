@@ -234,6 +234,7 @@
 
 - **autoStop** (boolean) **(required)**: Determines if the trace recording should be automatically stopped.
 - **reload** (boolean) **(required)**: Determines if, once tracing has started, the page should be automatically reloaded.
+- **filePath** (string) _(optional)_: The absolute file path, or a file path relative to the current working directory, to save the raw trace data. For example, trace.json.gz (compressed) or trace.json (uncompressed).
 
 ---
 
@@ -241,7 +242,9 @@
 
 **Description:** Stops the active performance trace recording on the selected page.
 
-**Parameters:** None
+**Parameters:**
+
+- **filePath** (string) _(optional)_: The absolute file path, or a file path relative to the current working directory, to save the raw trace data. For example, trace.json.gz (compressed) or trace.json (uncompressed).
 
 ---
 

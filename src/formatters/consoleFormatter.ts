@@ -84,7 +84,9 @@ export function formatIssue(
   if (processedMarkdown?.startsWith('# ')) {
     processedMarkdown = processedMarkdown.substring(2).trimStart();
   }
-  if (processedMarkdown) result.push(processedMarkdown);
+  if (processedMarkdown) {
+    result.push(processedMarkdown);
+  }
 
   const links = issue.getDescription()?.links;
   if (links && links.length > 0) {
@@ -102,7 +104,9 @@ export function formatIssue(
   }> = [];
   for (const singleIssue of issues) {
     const details = singleIssue.details();
-    if (!details) continue;
+    if (!details) {
+      continue;
+    }
 
     // We send the remaining details as untyped JSON because the DevTools
     // frontend code is currently not re-usable.
@@ -152,17 +156,23 @@ export function formatIssue(
   result.push(
     ...affectedResources.map(item => {
       const details = [];
-      if (item.uid) details.push(`uid=${item.uid}`);
+      if (item.uid) {
+        details.push(`uid=${item.uid}`);
+      }
       if (item.request) {
         details.push(
           (typeof item.request === 'number' ? `reqid=` : 'url=') + item.request,
         );
       }
-      if (item.data) details.push(`data=${JSON.stringify(item.data)}`);
+      if (item.data) {
+        details.push(`data=${JSON.stringify(item.data)}`);
+      }
       return details.join(' ');
     }),
   );
-  if (result.length === 0) return 'No affected resources found';
+  if (result.length === 0) {
+    return 'No affected resources found';
+  }
   return result.join('\n');
 }
 
