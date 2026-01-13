@@ -57,15 +57,10 @@ jobs:
         shell: bash
         run: echo 0 | sudo tee /proc/sys/kernel/apparmor_restrict_unprivileged_userns
 
-      - name: Run tests (node20)
-        if: ${{ matrix.node == '20' }}
-        shell: bash
-        run: npm run test:node20
-
       - name: Run tests
         shell: bash
-        if: ${{ matrix.node != '20' }}
-        run: npm run test:no-build
+        # Retry tests if they fail in the merge queue.
+        run: npm run test:no-build -- ${{ github.event_name == 'merge_group' && '--retry' || '' }}
 
   # Gating job for branch protection.
   test-success:

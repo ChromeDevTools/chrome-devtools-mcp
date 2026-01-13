@@ -259,10 +259,11 @@ export class McpResponse implements Response {
         };
       } else if (message instanceof DevTools.AggregatedIssue) {
         const mappedIssueMessage = mapIssueToMessageObject(message);
-        if (!mappedIssueMessage)
+        if (!mappedIssueMessage) {
           throw new Error(
             "Can't provide detals for the msgid " + consoleMessageStableId,
           );
+        }
         consoleData = {
           consoleMessageStableId,
           ...mappedIssueMessage,
@@ -321,7 +322,9 @@ export class McpResponse implements Response {
             }
             if (item instanceof DevTools.AggregatedIssue) {
               const mappedIssueMessage = mapIssueToMessageObject(item);
-              if (!mappedIssueMessage) return null;
+              if (!mappedIssueMessage) {
+                return null;
+              }
               return {
                 consoleMessageStableId,
                 ...mappedIssueMessage,

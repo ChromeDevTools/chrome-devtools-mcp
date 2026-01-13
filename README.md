@@ -99,7 +99,7 @@ Chrome DevTools MCP will not start the browser instance automatically using this
     Use the Claude Code CLI to add the Chrome DevTools MCP server (<a href="https://code.claude.com/docs/en/mcp">guide</a>):
 
 ```bash
-claude mcp add chrome-devtools npx chrome-devtools-mcp@latest
+claude mcp add chrome-devtools --scope user npx chrome-devtools-mcp@latest
 ```
 
 </details>
