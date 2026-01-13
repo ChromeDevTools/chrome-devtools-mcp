@@ -5,6 +5,7 @@
  */
 import * as consoleTools from './console.js';
 import * as emulationTools from './emulation.js';
+import * as extensionTools from './extension.js';
 import * as inputTools from './input.js';
 import * as networkTools from './network.js';
 import * as pagesTools from './pages.js';
@@ -17,6 +18,7 @@ import type {ToolDefinition} from './ToolDefinition.js';
 const tools = [
   ...Object.values(consoleTools),
   ...Object.values(emulationTools),
+  ...Object.values(extensionTools),
   ...Object.values(inputTools),
   ...Object.values(networkTools),
   ...Object.values(pagesTools),

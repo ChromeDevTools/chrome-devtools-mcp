@@ -64,6 +64,9 @@ async function getContext(): Promise<McpContext> {
   const ignoreDefaultChromeArgs: string[] = (
     args.ignoreDefaultChromeArg ?? []
   ).map(String);
+  if (args.categoryExtension) {
+    chromeArgs.push('--enable-unsafe-extension-debugging');
+  }
   if (args.proxyServer) {
     chromeArgs.push(`--proxy-server=${args.proxyServer}`);
   }
@@ -71,27 +74,27 @@ async function getContext(): Promise<McpContext> {
   const browser =
     args.browserUrl || args.wsEndpoint || args.autoConnect
       ? await ensureBrowserConnected({
-          browserURL: args.browserUrl,
-          wsEndpoint: args.wsEndpoint,
-          wsHeaders: args.wsHeaders,
-          // Important: only pass channel, if autoConnect is true.
-          channel: args.autoConnect ? (args.channel as Channel) : undefined,
-          userDataDir: args.userDataDir,
-          devtools,
-        })
+        browserURL: args.browserUrl,
+        wsEndpoint: args.wsEndpoint,
+        wsHeaders: args.wsHeaders,
+        // Important: only pass channel, if autoConnect is true.
+        channel: args.autoConnect ? (args.channel as Channel) : undefined,
+        userDataDir: args.userDataDir,
+        devtools,
+      })
       : await ensureBrowserLaunched({
-          headless: args.headless,
-          executablePath: args.executablePath,
-          channel: args.channel as Channel,
-          isolated: args.isolated ?? false,
-          userDataDir: args.userDataDir,
-          logFile,
-          viewport: args.viewport,
-          chromeArgs,
-          ignoreDefaultChromeArgs,
-          acceptInsecureCerts: args.acceptInsecureCerts,
-          devtools,
-        });
+        headless: args.headless,
+        executablePath: args.executablePath,
+        channel: args.channel as Channel,
+        isolated: args.isolated ?? false,
+        userDataDir: args.userDataDir,
+        logFile,
+        viewport: args.viewport,
+        chromeArgs,
+        ignoreDefaultChromeArgs,
+        acceptInsecureCerts: args.acceptInsecureCerts,
+        devtools,
+      });
 
   if (context?.browser !== browser) {
     context = await McpContext.from(browser, logger, {
@@ -136,6 +139,12 @@ function registerTool(tool: ToolDefinition): void {
   if (
     tool.annotations.category === ToolCategory.NETWORK &&
     args.categoryNetwork === false
+  ) {
+    return;
+  }
+  if (
+    tool.annotations.category === ToolCategory.EXTENSION &&
+    args.categoryExtension === false
   ) {
     return;
   }
