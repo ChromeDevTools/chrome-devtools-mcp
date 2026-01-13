@@ -186,7 +186,7 @@ export const cliOptions = {
   profileDirectory: {
     type: 'string',
     description:
-      'Specify which Chrome profile to use by its directory name (e.g., "Profile 1", "Default"). Only works with --autoConnect or when launching Chrome.',
+      'Specify which Chrome profile to use by specifying its directory name (e.g., "Profile 1", "Default") inside a chrome user data directory. Only works with --autoConnect or when launching Chrome via the Chrome DevTools MCP server.',
     alias: 'profile-dir',
     conflicts: ['browserUrl', 'wsEndpoint'],
   },
