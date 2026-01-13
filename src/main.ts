@@ -72,6 +72,7 @@ async function getContext(): Promise<McpContext> {
           channel: args.autoConnect ? (args.channel as Channel) : undefined,
           userDataDir: args.userDataDir,
           devtools,
+          profileDirectory: args.profileDirectory,
         })
       : await ensureBrowserLaunched({
           headless: args.headless,

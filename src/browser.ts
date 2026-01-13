@@ -43,6 +43,13 @@ function makeTargetFilter() {
   };
 }
 
+//Extracts the profile directory name from a user data dir path. 
+function getProfileNameFromUserDataDir(userDataDir: string): string {
+  const normalized = userDataDir.replace(/\\/g, '/');
+  const parts = normalized.split('/');
+  return parts[parts.length - 1] || 'Default';
+}
+
 export async function ensureBrowserConnected(options: {
   browserURL?: string;
   wsEndpoint?: string;
@@ -50,6 +57,7 @@ export async function ensureBrowserConnected(options: {
   devtools: boolean;
   channel?: Channel;
   userDataDir?: string;
+  profileDirectory?: string;
 }) {
   const {channel} = options;
   if (browser?.connected) {
@@ -125,6 +133,36 @@ export async function ensureBrowserConnected(options: {
         cause: err,
       },
     );
+  }
+
+  if (options.profileDirectory && options.userDataDir) {
+    try {
+      const portPath = path.join(options.userDataDir, 'DevToolsActivatePort');
+      const fileContent = await fs.promises.readFile(portPath, 'utf8');
+      const lines = fileContent.split('\n').map(line => line.trim()).filter(line => line);
+
+      if (lines.length >= 2) {
+        const browserPath = lines[1];
+        const actualProfile = getProfileNameFromUserDataDir(browserPath);
+        const requestedProfile = options.profileDirectory;
+
+        if (actualProfile !== requestedProfile) {
+          await browser.disconnect();
+          throw new Error(
+            `Profile mismatch: Requested profile "${requestedProfile}" but Chrome is running with profile "${actualProfile}". ` +
+            `Please close Chrome and restart with the correct profile, or remove the --profile-directory flag.`
+          );
+        }
+
+        logger(`Successfully validated profile: ${actualProfile}`);
+      }
+    } catch (error) {
+      if ((error as Error).message.includes('Profile mismatch')) {
+        throw error;
+      }
+
+      logger('Could not validate profile directory: ', error);
+    }
   }
   logger('Connected Puppeteer');
   return browser;
