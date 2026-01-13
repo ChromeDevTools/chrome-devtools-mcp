@@ -17,6 +17,7 @@ import {
   navigatePage,
   resizePage,
   handleDialog,
+  getTabId,
 } from '../../src/tools/pages.js';
 import {withMcpContext} from '../utils.js';
 
@@ -32,13 +33,13 @@ describe('pages', () => {
   describe('new_page', () => {
     it('create a page', async () => {
       await withMcpContext(async (response, context) => {
-        assert.strictEqual(context.getPageByIdx(0), context.getSelectedPage());
+        assert.strictEqual(context.getPageById(1), context.getSelectedPage());
         await newPage.handler(
           {params: {url: 'about:blank'}},
           response,
           context,
         );
-        assert.strictEqual(context.getPageByIdx(1), context.getSelectedPage());
+        assert.strictEqual(context.getPageById(2), context.getSelectedPage());
         assert.ok(response.includePages);
       });
     });
@@ -47,9 +48,9 @@ describe('pages', () => {
     it('closes a page', async () => {
       await withMcpContext(async (response, context) => {
         const page = await context.newPage();
-        assert.strictEqual(context.getPageByIdx(1), context.getSelectedPage());
-        assert.strictEqual(context.getPageByIdx(1), page);
-        await closePage.handler({params: {pageIdx: 1}}, response, context);
+        assert.strictEqual(context.getPageById(2), context.getSelectedPage());
+        assert.strictEqual(context.getPageById(2), page);
+        await closePage.handler({params: {pageId: 2}}, response, context);
         assert.ok(page.isClosed());
         assert.ok(response.includePages);
       });
@@ -57,7 +58,7 @@ describe('pages', () => {
     it('cannot close the last page', async () => {
       await withMcpContext(async (response, context) => {
         const page = context.getSelectedPage();
-        await closePage.handler({params: {pageIdx: 0}}, response, context);
+        await closePage.handler({params: {pageId: 1}}, response, context);
         assert.deepStrictEqual(
           response.responseLines[0],
           `The last open page cannot be closed. It is fine to keep it open.`,
@@ -71,24 +72,24 @@ describe('pages', () => {
     it('selects a page', async () => {
       await withMcpContext(async (response, context) => {
         await context.newPage();
-        assert.strictEqual(context.getPageByIdx(1), context.getSelectedPage());
-        await selectPage.handler({params: {pageIdx: 0}}, response, context);
-        assert.strictEqual(context.getPageByIdx(0), context.getSelectedPage());
+        assert.strictEqual(context.getPageById(2), context.getSelectedPage());
+        await selectPage.handler({params: {pageId: 1}}, response, context);
+        assert.strictEqual(context.getPageById(1), context.getSelectedPage());
         assert.ok(response.includePages);
       });
     });
     it('selects a page and keeps it focused in the background', async () => {
       await withMcpContext(async (response, context) => {
         await context.newPage();
-        assert.strictEqual(context.getPageByIdx(1), context.getSelectedPage());
+        assert.strictEqual(context.getPageById(2), context.getSelectedPage());
         assert.strictEqual(
-          await context.getPageByIdx(0).evaluate(() => document.hasFocus()),
+          await context.getPageById(1).evaluate(() => document.hasFocus()),
           false,
         );
-        await selectPage.handler({params: {pageIdx: 0}}, response, context);
-        assert.strictEqual(context.getPageByIdx(0), context.getSelectedPage());
+        await selectPage.handler({params: {pageId: 1}}, response, context);
+        assert.strictEqual(context.getPageById(1), context.getSelectedPage());
         assert.strictEqual(
-          await context.getPageByIdx(0).evaluate(() => document.hasFocus()),
+          await context.getPageById(1).evaluate(() => document.hasFocus()),
           true,
         );
         assert.ok(response.includePages);
@@ -115,8 +116,8 @@ describe('pages', () => {
     it('throws an error if the page was closed not by the MCP server', async () => {
       await withMcpContext(async (response, context) => {
         const page = await context.newPage();
-        assert.strictEqual(context.getPageByIdx(1), context.getSelectedPage());
-        assert.strictEqual(context.getPageByIdx(1), page);
+        assert.strictEqual(context.getPageById(2), context.getSelectedPage());
+        assert.strictEqual(context.getPageById(2), page);
 
         await page.close();
 
@@ -319,6 +320,23 @@ describe('pages', () => {
           response.responseLines[0],
           'Successfully dismissed the dialog',
         );
+      });
+    });
+  });
+
+  describe('get_tab_id', () => {
+    it('returns the tab id', async () => {
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedPage();
+        // @ts-expect-error _tabId is internal.
+        assert.ok(typeof page._tabId === 'string');
+        // @ts-expect-error _tabId is internal.
+        page._tabId = 'test-tab-id';
+        await getTabId.handler({params: {pageId: 1}}, response, context);
+        const result = await response.handle('get_tab_id', context);
+        // @ts-expect-error _tabId is internal.
+        assert.strictEqual(result.structuredContent.tabId, 'test-tab-id');
+        assert.deepStrictEqual(response.responseLines, []);
       });
     });
   });

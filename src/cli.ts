@@ -152,16 +152,36 @@ export const cliOptions = {
     describe: 'Whether to enable automation over DevTools targets',
     hidden: true,
   },
+  experimentalVision: {
+    type: 'boolean',
+    describe: 'Whether to enable vision tools',
+    hidden: true,
+  },
+  experimentalStructuredContent: {
+    type: 'boolean',
+    describe: 'Whether to output structured formatted content.',
+    hidden: true,
+  },
   experimentalIncludeAllPages: {
     type: 'boolean',
     describe:
       'Whether to include all kinds of pages such as webviews or background pages as pages.',
     hidden: true,
   },
+  experimentalInteropTools: {
+    type: 'boolean',
+    describe: 'Whether to enable interoperability tools',
+    hidden: true,
+  },
   chromeArg: {
     type: 'array',
     describe:
       'Additional arguments for Chrome. Only applies when Chrome is launched by chrome-devtools-mcp.',
+  },
+  ignoreDefaultChromeArg: {
+    type: 'array',
+    describe:
+      'Explicitly disable default arguments for Chrome. Only applies when Chrome is launched by chrome-devtools-mcp.',
   },
   categoryEmulation: {
     type: 'boolean',
@@ -177,6 +197,13 @@ export const cliOptions = {
     type: 'boolean',
     default: true,
     describe: 'Set to false to exclude tools related to network.',
+  },
+  usageStatistics: {
+    type: 'boolean',
+    // Marked as `false` until the feature is ready to be enabled by default.
+    default: false,
+    hidden: true,
+    describe: 'Set to false to opt-out of usage statistics collection.',
   },
 } satisfies Record<string, YargsOptions>;
 
@@ -223,6 +250,10 @@ export function parseArguments(version: string, argv = process.argv) {
       [
         `$0 --chrome-arg='--no-sandbox' --chrome-arg='--disable-setuid-sandbox'`,
         'Launch Chrome without sandboxes. Use with caution.',
+      ],
+      [
+        `$0 --ignore-default-chrome-arg='--disable-extensions'`,
+        'Disable the default arguments provided by Puppeteer. Use with caution.',
       ],
       ['$0 --no-category-emulation', 'Disable tools in the emulation category'],
       [

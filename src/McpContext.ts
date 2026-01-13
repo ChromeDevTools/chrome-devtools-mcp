@@ -115,6 +115,9 @@ export class McpContext implements Context {
   #geolocationMap = new WeakMap<Page, GeolocationOptions>();
   #dialog?: Dialog;
 
+  #pageIdMap = new WeakMap<Page, number>();
+  #nextPageId = 1;
+
   #nextSnapshotId = 1;
   #traceResults: TraceResult[] = [];
   #universeManager: UniverseManager;
@@ -254,11 +257,11 @@ export class McpContext implements Context {
     this.#consoleCollector.addPage(page);
     return page;
   }
-  async closePage(pageIdx: number): Promise<void> {
+  async closePage(pageId: number): Promise<void> {
     if (this.#pages.length === 1) {
       throw new Error(CLOSE_PAGE_ERROR);
     }
-    const page = this.getPageByIdx(pageIdx);
+    const page = this.getPageById(pageId);
     await page.close({runBeforeUnload: false});
   }
 
@@ -335,13 +338,16 @@ export class McpContext implements Context {
     return page;
   }
 
-  getPageByIdx(idx: number): Page {
-    const pages = this.#pages;
-    const page = pages[idx];
+  getPageById(pageId: number): Page {
+    const page = this.#pages.find(p => this.#pageIdMap.get(p) === pageId);
     if (!page) {
       throw new Error('No page found');
     }
     return page;
+  }
+
+  getPageId(page: Page): number | undefined {
+    return this.#pageIdMap.get(page);
   }
 
   #dialogHandler = (dialog: Dialog): void => {
@@ -424,6 +430,12 @@ export class McpContext implements Context {
     const allPages = await this.browser.pages(
       this.#options.experimentalIncludeAllPages,
     );
+
+    for (const page of allPages) {
+      if (!this.#pageIdMap.has(page)) {
+        this.#pageIdMap.set(page, this.#nextPageId++);
+      }
+    }
 
     this.#pages = allPages.filter(page => {
       // If we allow debugging DevTools windows, return all pages.

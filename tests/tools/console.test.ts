@@ -37,7 +37,7 @@ describe('console', () => {
         );
         await listConsoleMessages.handler({params: {}}, response, context);
         const formattedResponse = await response.handle('test', context);
-        const textContent = getTextContent(formattedResponse[0]);
+        const textContent = getTextContent(formattedResponse.content[0]);
         assert.ok(textContent.includes('msgid=1 [error] This is an error'));
       });
     });
@@ -48,7 +48,7 @@ describe('console', () => {
         await page.setContent('<script>throw undefined;</script>');
         await listConsoleMessages.handler({params: {}}, response, context);
         const formattedResponse = await response.handle('test', context);
-        const textContent = getTextContent(formattedResponse[0]);
+        const textContent = getTextContent(formattedResponse.content[0]);
         assert.ok(textContent.includes('msgid=1 [error] undefined (0 args)'));
       });
     });
@@ -66,7 +66,7 @@ describe('console', () => {
           await issuePromise;
           await listConsoleMessages.handler({params: {}}, response, context);
           const formattedResponse = await response.handle('test', context);
-          const textContent = getTextContent(formattedResponse[0]);
+          const textContent = getTextContent(formattedResponse.content[0]);
           assert.ok(
             textContent.includes(
               `msgid=1 [issue] An element doesn't have an autocomplete attribute (count: 1)`,
@@ -89,7 +89,7 @@ describe('console', () => {
           await listConsoleMessages.handler({params: {}}, response, context);
           {
             const formattedResponse = await response.handle('test', context);
-            const textContent = getTextContent(formattedResponse[0]);
+            const textContent = getTextContent(formattedResponse.content[0]);
             assert.ok(
               textContent.includes(
                 `msgid=1 [issue] An element doesn't have an autocomplete attribute (count: 1)`,
@@ -107,7 +107,7 @@ describe('console', () => {
           await anotherIssuePromise;
           {
             const formattedResponse = await response.handle('test', context);
-            const textContent = getTextContent(formattedResponse[0]);
+            const textContent = getTextContent(formattedResponse.content[0]);
             assert.ok(
               textContent.includes(
                 `msgid=2 [issue] An element doesn't have an autocomplete attribute (count: 1)`,
@@ -134,7 +134,7 @@ describe('console', () => {
           context,
         );
         const formattedResponse = await response.handle('test', context);
-        const textContent = getTextContent(formattedResponse[0]);
+        const textContent = getTextContent(formattedResponse.content[0]);
         assert.ok(
           textContent.includes('msgid=1 [error] This is an error'),
           'Should contain console message body',
@@ -164,7 +164,7 @@ describe('console', () => {
             context,
           );
           const formattedResponse = await response2.handle('test', context);
-          t.assert.snapshot?.(getTextContent(formattedResponse[0]));
+          t.assert.snapshot?.(getTextContent(formattedResponse.content[0]));
         });
       });
       it('gets issue details with request id parsing', async t => {
@@ -219,7 +219,7 @@ describe('console', () => {
             context,
           );
           const formattedResponse = await response2.handle('test', context);
-          const rawText = getTextContent(formattedResponse[0]);
+          const rawText = getTextContent(formattedResponse.content[0]);
           const sanitizedText = rawText
             .replaceAll(/ID: \d+/g, 'ID: <ID>')
             .replaceAll(/reqid=\d+/g, 'reqid=<reqid>')

@@ -15,6 +15,7 @@ export interface ConsoleMessageData {
   count?: number;
   description?: string;
   args?: string[];
+  stackTrace?: DevTools.StackTrace.StackTrace.StackTrace;
 }
 
 // The short format for a console message, based on a previous format.
@@ -46,6 +47,7 @@ export function formatConsoleEventVerbose(
     `ID: ${msg.consoleMessageStableId}`,
     `Message: ${msg.type}> ${aggregatedIssue ? formatIssue(aggregatedIssue, msg.description, context) : msg.message}`,
     aggregatedIssue ? undefined : formatArgs(msg),
+    formatStackTrace(msg.stackTrace),
   ].filter(line => !!line);
   return result.join('\n');
 }
@@ -162,4 +164,43 @@ export function formatIssue(
   );
   if (result.length === 0) return 'No affected resources found';
   return result.join('\n');
+}
+
+function formatStackTrace(
+  stackTrace: DevTools.StackTrace.StackTrace.StackTrace | undefined,
+): string {
+  if (!stackTrace) {
+    return '';
+  }
+
+  return [
+    '### Stack trace',
+    formatFragment(stackTrace.syncFragment),
+    ...stackTrace.asyncFragments.map(formatAsyncFragment),
+  ].join('\n');
+}
+
+function formatFragment(
+  fragment: DevTools.StackTrace.StackTrace.Fragment,
+): string {
+  return fragment.frames.map(formatFrame).join('\n');
+}
+
+function formatAsyncFragment(
+  fragment: DevTools.StackTrace.StackTrace.AsyncFragment,
+): string {
+  const separatorLineLength = 40;
+  const prefix = `--- ${fragment.description || 'async'} `;
+  const separator = prefix + '-'.repeat(separatorLineLength - prefix.length);
+  return separator + '\n' + formatFragment(fragment);
+}
+
+function formatFrame(frame: DevTools.StackTrace.StackTrace.Frame): string {
+  let result = `at ${frame.name ?? '<anonymous>'}`;
+  if (frame.uiSourceCode) {
+    result += ` (${frame.uiSourceCode.displayName()}:${frame.line}:${frame.column})`;
+  } else if (frame.url) {
+    result += ` (${frame.url}:${frame.line}:${frame.column})`;
+  }
+  return result;
 }

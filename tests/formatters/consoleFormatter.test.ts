@@ -11,6 +11,7 @@ import {
   formatConsoleEventShort,
   formatConsoleEventVerbose,
 } from '../../src/formatters/consoleFormatter.js';
+import type {DevTools} from '../../src/third_party/index.js';
 import {getMockAggregatedIssue} from '../utils.js';
 
 describe('consoleFormatter', () => {
@@ -88,6 +89,48 @@ describe('consoleFormatter', () => {
         consoleMessageStableId: 4,
         type: 'error',
         message: 'Something went wrong',
+      };
+      const result = formatConsoleEventVerbose(message);
+      t.assert.snapshot?.(result);
+    });
+
+    it('formats a console message with a stack trace', t => {
+      const message: ConsoleMessageData = {
+        consoleMessageStableId: 5,
+        type: 'log',
+        message: 'Hello stack trace!',
+        args: [],
+        stackTrace: {
+          syncFragment: {
+            frames: [
+              {
+                line: 10,
+                column: 2,
+                url: 'foo.ts',
+                name: 'foo',
+              },
+              {
+                line: 20,
+                column: 2,
+                url: 'foo.ts',
+                name: 'bar',
+              },
+            ],
+          },
+          asyncFragments: [
+            {
+              description: 'setTimeout',
+              frames: [
+                {
+                  line: 5,
+                  column: 2,
+                  url: 'util.ts',
+                  name: 'schedule',
+                },
+              ],
+            },
+          ],
+        } as unknown as DevTools.StackTrace.StackTrace.StackTrace,
       };
       const result = formatConsoleEventVerbose(message);
       t.assert.snapshot?.(result);
