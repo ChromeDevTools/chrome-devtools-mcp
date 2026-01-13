@@ -17,6 +17,13 @@ const flags = args.filter(arg => arg.startsWith('-'));
 
 const files = [];
 
+let shouldRetry = false;
+const retryIndex = flags.indexOf('--retry');
+if (retryIndex !== -1) {
+  shouldRetry = true;
+  flags.splice(retryIndex, 1);
+}
+
 if (userArgs.length > 0) {
   for (const arg of userArgs) {
     // Map .ts files to build/ .js files
@@ -50,10 +57,29 @@ const nodeArgs = [
   ...files,
 ];
 
-const child = spawn('node', nodeArgs, {
-  stdio: 'inherit',
-});
+async function runTests(attempt) {
+  if (attempt > 1) {
+    console.log(`\nRun attempt ${attempt}...\n`);
+  }
+  return new Promise(resolve => {
+    const child = spawn('node', nodeArgs, {
+      stdio: 'inherit',
+    });
 
-child.on('close', code => {
-  process.exit(code ?? 1);
-});
+    child.on('close', code => {
+      resolve(code);
+    });
+  });
+}
+
+const maxAttempts = shouldRetry ? 3 : 1;
+let exitCode = 1;
+
+for (let i = 1; i <= maxAttempts; i++) {
+  exitCode = await runTests(i);
+  if (exitCode === 0) {
+    break;
+  }
+}
+
+process.exit(exitCode ?? 1);

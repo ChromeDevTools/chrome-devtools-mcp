@@ -16,7 +16,7 @@
     "docs:generate": "node --experimental-strip-types scripts/generate-docs.ts",
     "start": "npm run build && node build/src/index.js",
     "start-debug": "DEBUG=mcp:* DEBUG_COLORS=false npm run build && node build/src/index.js",
-    "test": "npm run build && npm run test:no-build",
+    "test": "npm run build && node scripts/test.mjs",
     "test:no-build": "node scripts/test.mjs",
     "test:only": "npm run build && node scripts/test.mjs --test-only",
     "test:update-snapshots": "npm run build && node scripts/test.mjs --test-update-snapshots",

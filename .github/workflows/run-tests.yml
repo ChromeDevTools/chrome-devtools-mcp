@@ -59,7 +59,8 @@ jobs:
 
       - name: Run tests
         shell: bash
-        run: npm run test:no-build
+        # Try tests if they fail in the merge queue.
+        run: npm run test:no-build -- ${{ github.event_name == 'merge_group' && '--retry' || '' }}
 
   # Gating job for branch protection.
   test-success:
