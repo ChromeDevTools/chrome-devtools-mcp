@@ -63,6 +63,53 @@ async function getBrowserContextForProfile(
     const contexts = browser.browserContexts();
     logger(`Found ${contexts.length} browser context(s)`);
 
+    for (const context of contexts) {
+      let page;
+      try {
+        page = await context.newPage();
+
+        await page.goto('chrome://version', {
+          waitUntil: 'domcontentloaded',
+          timeout: 3_000,
+        });
+
+        const profilePath: string | null = await page.evaluate(() => {
+          const body = document.querySelector('body');
+          if (!body) return null;
+          const text = (body.innerText || '');
+          const match = text.match(/Profile Path:\s*(.+)/i);
+          return match ? match[1].trim() : null;
+        });
+
+        try {
+          await page.close();
+        } catch {
+          //ignore close errors
+        }
+
+        if (!profilePath) {
+          continue;
+        }
+
+        const actualProfile = getProfileNameFromUserDataDir(profilePath);
+        logger(`Probed context: profilePath=${profilePath} => profileName=${actualProfile}`);
+
+        if (actualProfile === profileDirectory) {
+          logger(`Matched profile directory "${profileDirectory}" to a browser context`);
+          return context;
+        }
+      } catch (error) {
+        logger('Error probing a browser context for profile: ', error);
+        try {
+          if (page && !page.isClosed()) {
+            await page.close();
+          }
+        } catch {
+          // ignore
+        }
+      }
+    }
+
     logger(
       `Profile directory "${profileDirectory}" specified. ` +
         `Using default browser context. Full profile support will be added in a future update.`,
