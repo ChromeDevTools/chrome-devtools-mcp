@@ -10,13 +10,14 @@ import process from 'node:process';
 
 import type {Channel} from './browser.js';
 import {ensureBrowserConnected, ensureBrowserLaunched} from './browser.js';
-import {parseArguments} from './cli.js';
+import {cliOptions, parseArguments} from './cli.js';
 import {loadIssueDescriptions} from './issue-descriptions.js';
 import {logger, saveLogsToFile} from './logger.js';
 import {McpContext} from './McpContext.js';
 import {McpResponse} from './McpResponse.js';
 import {Mutex} from './Mutex.js';
 import {ClearcutLogger} from './telemetry/clearcut-logger.js';
+import {computeFlagUsage} from './telemetry/flag-utils.js';
 import {
   McpServer,
   StdioServerTransport,
@@ -220,11 +221,5 @@ await loadIssueDescriptions();
 const transport = new StdioServerTransport();
 await server.connect(transport);
 logger('Chrome DevTools MCP Server connected');
-void clearcutLogger?.logServerStart({
-  browser_url_present: !!args.browserUrl,
-  headless: args.headless,
-  executable_path_present: !!args.executablePath,
-  isolated: args.isolated,
-  log_file_present: !!args.logFile,
-});
 logDisclaimers();
+void clearcutLogger?.logServerStart(computeFlagUsage(args, cliOptions));

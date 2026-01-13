@@ -32,14 +32,7 @@ export interface DailyActive {
 
 export type FirstTimeInstallation = Record<string, never>;
 
-export interface FlagUsage {
-  browser_url_present?: boolean;
-  headless?: boolean;
-  executable_path_present?: boolean;
-  isolated?: boolean;
-  channel?: ChromeChannel;
-  log_file_present?: boolean;
-}
+export type FlagUsage = Record<string, boolean | string | number | undefined>;
 
 // Clearcut API interfaces
 export interface LogRequest {

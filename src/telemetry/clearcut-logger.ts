@@ -5,9 +5,7 @@
  */
 
 import {ClearcutSender} from './clearcut-sender.js';
-import type {
-  FlagUsage,
-} from './types.js';
+import type {FlagUsage} from './types.js';
 
 export class ClearcutLogger {
   #sender: ClearcutSender;
