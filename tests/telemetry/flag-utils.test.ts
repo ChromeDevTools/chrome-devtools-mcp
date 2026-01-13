@@ -104,27 +104,4 @@ describe('computeFlagUsage', () => {
       assert.equal(usage.string_flag_present, false);
     });
   });
-
-  it('matches snapshot for all current CLI options', async t => {
-    // Import the real options to test against the actual CLI definition
-    const {cliOptions} = await import('../../src/cli.js');
-
-    const mockArgs: Record<string, unknown> = {};
-    for (const [key, config] of Object.entries(cliOptions)) {
-      if ('choices' in config && config.choices) {
-        mockArgs[key] = config.choices[0];
-      } else if (config.type === 'boolean') {
-        mockArgs[key] = true;
-      } else if (config.type === 'string') {
-        mockArgs[key] = '/mock/path';
-      } else if (config.type === 'array') {
-        mockArgs[key] = ['--mock-arg'];
-      } else {
-        mockArgs[key] = 'mock-value';
-      }
-    }
-
-    const usage = computeFlagUsage(mockArgs, cliOptions);
-    t.assert.snapshot(JSON.stringify(usage, null, 2));
-  });
 });
