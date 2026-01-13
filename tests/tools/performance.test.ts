@@ -293,6 +293,8 @@ describe('performance', () => {
 });
 
 function cruxResponseFixture() {
+  // Ideally we could use `mockResponse` from 'chrome-devtools-frontend/front_end/models/crux-manager/CrUXManager.test.ts'
+  // But test files are not published in the cdtf npm package.
   return {
     record: {
       key: {
