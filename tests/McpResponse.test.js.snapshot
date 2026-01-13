@@ -104,7 +104,7 @@ uid=1_0 RootWebArea "My test page" url="about:blank"
 
 `;
 
-exports[`McpResponse > returns verbose snapshot 1`] = `
+exports[`McpResponse > returns verbose snapshot and structured content 1`] = `
 # test response
 ## Latest page snapshot
 uid=1_0 RootWebArea "My test page" url="about:blank"
@@ -116,13 +116,61 @@ uid=1_0 RootWebArea "My test page" url="about:blank"
 
 `;
 
-exports[`McpResponse > saves snapshot to file 1`] = `
+exports[`McpResponse > returns verbose snapshot and structured content 2`] = `
+{
+  "snapshot": {
+    "id": "1_0",
+    "role": "RootWebArea",
+    "name": "My test page",
+    "url": "about:blank",
+    "children": [
+      {
+        "id": "1_1",
+        "role": "none",
+        "children": [
+          {
+            "id": "1_2",
+            "role": "none",
+            "children": [
+              {
+                "id": "1_3",
+                "role": "complementary",
+                "children": [
+                  {
+                    "id": "1_4",
+                    "role": "StaticText",
+                    "name": "test",
+                    "children": [
+                      {
+                        "id": "1_5",
+                        "role": "InlineTextBox",
+                        "name": "test"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}
+`;
+
+exports[`McpResponse > saves snapshot to file and returns structured content 1`] = `
 # test response
-## Latest page snapshot
 Saved snapshot to <file>
 `;
 
-exports[`McpResponse > saves snapshot to file 2`] = `
+exports[`McpResponse > saves snapshot to file and returns structured content 2`] = `
+{
+  "snapshotFilePath": "<file>"
+}
+`;
+
+exports[`McpResponse > saves snapshot to file and returns structured content 3`] = `
 uid=1_0 RootWebArea "My test page" url="about:blank"
   uid=1_1 ignored
     uid=1_2 ignored

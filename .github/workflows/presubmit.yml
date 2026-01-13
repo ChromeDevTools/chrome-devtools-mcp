@@ -3,6 +3,7 @@ name: Check code before submitting
 permissions: read-all
 
 on:
+  merge_group:
   push:
     branches:
       - main

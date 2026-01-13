@@ -3,6 +3,7 @@ name: Compile and run tests
 permissions: read-all
 
 on:
+  merge_group:
   push:
     branches:
       - main

@@ -19,6 +19,8 @@ describe('cli args parsing', () => {
     categoryNetwork: true,
     'auto-connect': undefined,
     autoConnect: undefined,
+    'usage-statistics': false,
+    usageStatistics: false,
   };
 
   it('parses with default args', async () => {
@@ -143,6 +145,30 @@ describe('cli args parsing', () => {
     });
   });
 
+  it('parses ignore chrome args', async () => {
+    const args = parseArguments('1.0.0', [
+      'node',
+      'main.js',
+      `--ignore-default-chrome-arg='--disable-extensions'`,
+      `--ignore-default-chrome-arg='--disable-cancel-all-touches'`,
+    ]);
+    assert.deepStrictEqual(args, {
+      ...defaultArgs,
+      _: [],
+      headless: false,
+      $0: 'npx chrome-devtools-mcp@latest',
+      channel: 'stable',
+      'ignore-default-chrome-arg': [
+        '--disable-extensions',
+        '--disable-cancel-all-touches',
+      ],
+      ignoreDefaultChromeArg: [
+        '--disable-extensions',
+        '--disable-cancel-all-touches',
+      ],
+    });
+  });
+
   it('parses wsEndpoint with ws:// protocol', async () => {
     const args = parseArguments('1.0.0', [
       'node',
@@ -221,5 +247,27 @@ describe('cli args parsing', () => {
       'auto-connect': true,
       autoConnect: true,
     });
+  });
+
+  it('parses usage statistics flag', async () => {
+    // Test default (should be false)
+    const defaultArgs = parseArguments('1.0.0', ['node', 'main.js']);
+    assert.strictEqual(defaultArgs.usageStatistics, false);
+
+    // Test enabling it
+    const enabledArgs = parseArguments('1.0.0', [
+      'node',
+      'main.js',
+      '--usage-statistics',
+    ]);
+    assert.strictEqual(enabledArgs.usageStatistics, true);
+
+    // Test disabling it
+    const disabledArgs = parseArguments('1.0.0', [
+      'node',
+      'main.js',
+      '--no-usage-statistics',
+    ]);
+    assert.strictEqual(disabledArgs.usageStatistics, false);
   });
 });
