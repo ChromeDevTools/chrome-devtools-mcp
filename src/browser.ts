@@ -43,7 +43,7 @@ function makeTargetFilter() {
   };
 }
 
-//Extracts the profile directory name from a user data dir path. 
+//Extracts the profile directory name from a user data dir path.
 function getProfileNameFromUserDataDir(userDataDir: string): string {
   const normalized = userDataDir.replace(/\\/g, '/');
   const parts = normalized.split('/');
@@ -139,7 +139,10 @@ export async function ensureBrowserConnected(options: {
     try {
       const portPath = path.join(options.userDataDir, 'DevToolsActivatePort');
       const fileContent = await fs.promises.readFile(portPath, 'utf8');
-      const lines = fileContent.split('\n').map(line => line.trim()).filter(line => line);
+      const lines = fileContent
+        .split('\n')
+        .map(line => line.trim())
+        .filter(line => line);
 
       if (lines.length >= 2) {
         const browserPath = lines[1];
@@ -150,7 +153,7 @@ export async function ensureBrowserConnected(options: {
           await browser.disconnect();
           throw new Error(
             `Profile mismatch: Requested profile "${requestedProfile}" but Chrome is running with profile "${actualProfile}". ` +
-            `Please close Chrome and restart with the correct profile, or remove the --profile-directory flag.`
+              `Please close Chrome and restart with the correct profile, or remove the --profile-directory flag.`,
           );
         }
 

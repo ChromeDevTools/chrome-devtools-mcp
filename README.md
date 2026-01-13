@@ -448,7 +448,7 @@ The Chrome DevTools MCP server supports the following configuration option:
   - **Default:** `true`
 
 - **`--profileDirectory`/ `--profile-directory`, `-profile-dir`**
-  Specify which Chrome profile to use by its directory name (e.g., "Profile 1", "Default"). Only works with --autoConnect or when launching Chrome.
+  Specify which Chrome profile to use by specifying its directory name (e.g., "Profile 1", "Default") inside a chrome user data directory. Only works with --autoConnect or when launching Chrome via the Chrome DevTools MCP server.
   - **Type:** string
 
 <!-- END AUTO GENERATED OPTIONS -->
