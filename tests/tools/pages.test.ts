@@ -228,6 +228,9 @@ describe('pages', () => {
           context,
         );
         await resizePromise;
+        await page.waitForFunction(
+          () => window.innerWidth === 700 && window.innerHeight === 500,
+        );
         const dimensions = await page.evaluate(() => {
           return [window.innerWidth, window.innerHeight];
         });
@@ -256,6 +259,9 @@ describe('pages', () => {
           context,
         );
         await resizePromise;
+        await page.waitForFunction(
+          () => window.innerWidth === 650 && window.innerHeight === 450,
+        );
         const dimensions = await page.evaluate(() => {
           return [window.innerWidth, window.innerHeight];
         });
@@ -284,6 +290,9 @@ describe('pages', () => {
           context,
         );
         await resizePromise;
+        await page.waitForFunction(
+          () => window.innerWidth === 750 && window.innerHeight === 550,
+        );
         const dimensions = await page.evaluate(() => {
           return [window.innerWidth, window.innerHeight];
         });
@@ -312,6 +321,9 @@ describe('pages', () => {
           context,
         );
         await resizePromise;
+        await page.waitForFunction(
+          () => window.innerWidth === 725 && window.innerHeight === 525,
+        );
         const dimensions = await page.evaluate(() => {
           return [window.innerWidth, window.innerHeight];
         });
@@ -340,6 +352,9 @@ describe('pages', () => {
           context,
         );
         await resizePromise;
+        await page.waitForFunction(
+          () => window.innerWidth === 850 && window.innerHeight === 650,
+        );
         const dimensions = await page.evaluate(() => {
           return [window.innerWidth, window.innerHeight];
         });
