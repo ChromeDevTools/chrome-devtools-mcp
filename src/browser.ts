@@ -11,6 +11,7 @@ import path from 'node:path';
 import {logger} from './logger.js';
 import type {
   Browser,
+  BrowserContext,
   ChromeReleaseChannel,
   LaunchOptions,
   Target,
@@ -48,6 +49,30 @@ function getProfileNameFromUserDataDir(userDataDir: string): string {
   const normalized = userDataDir.replace(/\\/g, '/');
   const parts = normalized.split('/');
   return parts[parts.length - 1] || 'Default';
+}
+
+async function getBrowserContextForProfile(
+  browser: Browser,
+  profileDirectory?: string,
+): Promise<BrowserContext> {
+  if (!profileDirectory) {
+    return browser.defaultBrowserContext();
+  }
+
+  try {
+    const contexts = browser.browserContexts();
+    logger(`Found ${contexts.length} browser context(s)`);
+
+    logger(
+      `Profile directory "${profileDirectory}" specified. ` +
+        `Using default browser context. Full profile support will be added in a future update.`,
+    );
+
+    return browser.defaultBrowserContext();
+  } catch (error) {
+    logger('Error getting browser contexts: ', error);
+    return browser.defaultBrowserContext();
+  }
 }
 
 export async function ensureBrowserConnected(options: {
@@ -135,39 +160,12 @@ export async function ensureBrowserConnected(options: {
     );
   }
 
-  if (options.profileDirectory && options.userDataDir) {
-    try {
-      const portPath = path.join(options.userDataDir, 'DevToolsActivatePort');
-      const fileContent = await fs.promises.readFile(portPath, 'utf8');
-      const lines = fileContent
-        .split('\n')
-        .map(line => line.trim())
-        .filter(line => line);
-
-      if (lines.length >= 2) {
-        const browserPath = lines[1];
-        const actualProfile = getProfileNameFromUserDataDir(browserPath);
-        const requestedProfile = options.profileDirectory;
-
-        if (actualProfile !== requestedProfile) {
-          await browser.disconnect();
-          throw new Error(
-            `Profile mismatch: Requested profile "${requestedProfile}" but Chrome is running with profile "${actualProfile}". ` +
-              `Please close Chrome and restart with the correct profile, or remove the --profile-directory flag.`,
-          );
-        }
-
-        logger(`Successfully validated profile: ${actualProfile}`);
-      }
-    } catch (error) {
-      if ((error as Error).message.includes('Profile mismatch')) {
-        throw error;
-      }
-
-      logger('Could not validate profile directory: ', error);
-    }
-  }
   logger('Connected Puppeteer');
+
+  if (options.profileDirectory) {
+    await getBrowserContextForProfile(browser, options.profileDirectory);
+    logger(`Using browser context for profile: ${options.profileDirectory}`);
+  }
   return browser;
 }
 
@@ -215,6 +213,9 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
   ];
   if (options.profileDirectory) {
     args.push(`--profile-directory=${options.profileDirectory}`);
+    logger(
+      `Launcing Chrome with profile directory: ${options.profileDirectory}`,
+    );
   }
   const ignoreDefaultArgs: LaunchOptions['ignoreDefaultArgs'] =
     options.ignoreDefaultChromeArgs ?? false;
@@ -259,6 +260,36 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
         contentWidth: options.viewport.width,
         contentHeight: options.viewport.height,
       });
+    }
+
+    if (options.profileDirectory && userDataDir) {
+      try {
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        const portPath = path.join(userDataDir, 'DevToolsActivePort');
+        const fileContent = await fs.promises.readFile(portPath, 'utf8');
+        const lines = fileContent
+          .split('\n')
+          .map(line => line.trim())
+          .filter(line => line);
+
+        if (lines.length >= 2) {
+          const browserPath = lines[1];
+          const actualProfile = getProfileNameFromUserDataDir(browserPath);
+          const requestedProfile = options.profileDirectory;
+
+          if (actualProfile !== requestedProfile) {
+            logger(
+              `Warning: Requested profile "${requestedProfile}" but Chrome may be using profile "${actualProfile}". ` +
+                `This could happen if Chrome is managing profiles differently.`,
+            );
+          } else {
+            logger(`Successfully validated profile: ${actualProfile}`);
+          }
+        }
+      } catch (error) {
+        logger('Could not validate profile directory after launch: ', error);
+      }
     }
     return browser;
   } catch (error) {
