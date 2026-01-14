@@ -21,7 +21,8 @@
     "test:only": "npm run build && node scripts/test.mjs --test-only",
     "test:update-snapshots": "npm run build && node scripts/test.mjs --test-update-snapshots",
     "prepare": "node --experimental-strip-types scripts/prepare.ts",
-    "verify-server-json-version": "node --experimental-strip-types scripts/verify-server-json-version.ts"
+    "verify-server-json-version": "node --experimental-strip-types scripts/verify-server-json-version.ts",
+    "eval": "npm run build && node --experimental-strip-types --test scripts/eval_gemini.ts"
   },
   "files": [
     "build/src",
@@ -39,6 +40,7 @@
   "mcpName": "io.github.ChromeDevTools/chrome-devtools-mcp",
   "devDependencies": {
     "@eslint/js": "^9.35.0",
+    "@google/generative-ai": "^0.24.1",
     "@modelcontextprotocol/sdk": "1.25.2",
     "@rollup/plugin-commonjs": "^29.0.0",
     "@rollup/plugin-json": "^6.1.0",
