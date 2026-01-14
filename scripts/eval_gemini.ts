@@ -6,7 +6,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import {describe, test} from 'node:test';
+import {describe, test, before, after, afterEach} from 'node:test';
 
 import {
   GoogleGenerativeAI,
@@ -18,6 +18,7 @@ import {StdioClientTransport} from '@modelcontextprotocol/sdk/client/stdio.js';
 
 const ROOT_DIR = path.resolve(import.meta.dirname, '..');
 const SCENARIOS_DIR = path.join(import.meta.dirname, 'eval_scenarios');
+import {TestServer} from '../build/tests/server.js';
 
 // Define schema for our test scenarios
 export interface CapturedFunctionCall {
@@ -29,6 +30,10 @@ export interface TestScenario {
   prompt: string;
   maxTurns: number;
   expectations: (calls: CapturedFunctionCall[]) => void;
+  htmlRoute?: {
+    path: string;
+    htmlContent: string;
+  };
 }
 
 async function loadScenario(scenarioPath: string): Promise<TestScenario> {
@@ -78,6 +83,7 @@ const cleanSchemaRecursive = (schema: unknown): unknown => {
 async function runSingleScenario(
   scenarioPath: string,
   apiKey: string,
+  server: TestServer,
 ): Promise<void> {
   const absolutePath = path.resolve(scenarioPath);
   console.log(`\n### Running Scenario: ${absolutePath} ###`);
@@ -87,6 +93,17 @@ async function runSingleScenario(
 
   try {
     const scenario = await loadScenario(absolutePath);
+
+    if (scenario.htmlRoute) {
+      server.addHtmlRoute(
+        scenario.htmlRoute.path,
+        scenario.htmlRoute.htmlContent,
+      );
+      scenario.prompt = scenario.prompt.replace(
+        '<TEST_URL>',
+        server.getRoute(scenario.htmlRoute.path),
+      );
+    }
 
     // Path to the compiled MCP server
     const serverPath = path.join(ROOT_DIR, 'build/src/index.js');
@@ -148,7 +165,7 @@ async function runSingleScenario(
 
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({
-      model: 'gemini-3-pro-preview',
+      model: 'gemini-2.5-flash',
       tools: [{functionDeclarations}],
     });
 
@@ -167,7 +184,9 @@ async function runSingleScenario(
     console.log(`\n--- Turn 1 (User) ---`);
     console.log(scenario.prompt);
 
-    let result = await chat.sendMessage(scenario.prompt);
+    let result = await chat.sendMessage(scenario.prompt, {
+      timeout: 5000,
+    });
     let response = result.response;
 
     while (turnCount < scenario.maxTurns) {
@@ -256,13 +275,27 @@ if (!apiKey) {
 }
 
 void describe('Gemini Eval Scenarios', () => {
+  const server = new TestServer(TestServer.randomPort());
+
+  before(async () => {
+    await server.start();
+  });
+
+  after(async () => {
+    await server.stop();
+  });
+
+  afterEach(() => {
+    server.restore();
+  });
+
   const files = fs.readdirSync(SCENARIOS_DIR).filter(file => {
     return file.endsWith('.ts') || file.endsWith('.js');
   });
 
   for (const file of files) {
-    void test(file, async () => {
-      await runSingleScenario(path.join(SCENARIOS_DIR, file), apiKey);
+    void test(file, {timeout: 60_000}, async () => {
+      await runSingleScenario(path.join(SCENARIOS_DIR, file), apiKey, server);
     });
   }
 });
