@@ -4,17 +4,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { logger } from '../logger.js';
-import { zod } from '../third_party/index.js';
+import {logger} from '../logger.js';
+import {zod} from '../third_party/index.js';
 
-import { ToolCategory } from './categories.js';
-import { defineTool } from './ToolDefinition.js';
+import {ToolCategory} from './categories.js';
+import {defineTool} from './ToolDefinition.js';
 
 export const installExtension = defineTool({
   name: 'install_extension',
   description: 'Installs a Chrome extension from the given path.',
   annotations: {
-    category: ToolCategory.EXTENSION,
+    category: ToolCategory.EXTENSIONS,
     readOnlyHint: false,
   },
   schema: {
@@ -23,10 +23,10 @@ export const installExtension = defineTool({
       .describe('Absolute path to the unpacked extension folder.'),
   },
   handler: async (request, response, context) => {
-    const { path } = request.params;
+    const {path} = request.params;
     try {
       const id = await context.installExtension(path);
-      response.appendResponseLine(`Extension installed: ${id}`);
+      response.appendResponseLine(`Extension installed. Id: ${id}`);
     } catch (error) {
       logger('Extension installation error: ', error);
       throw error;

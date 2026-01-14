@@ -201,6 +201,7 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
       ignoreDefaultArgs: ignoreDefaultArgs,
       acceptInsecureCerts: options.acceptInsecureCerts,
       handleDevToolsAsPage: true,
+      enableExtensions: true,
     });
     if (options.logFile) {
       // FIXME: we are probably subscribing too late to catch startup logs. We

@@ -108,6 +108,9 @@ describe('e2e', () => {
             ) {
               continue;
             }
+            if (maybeTool.name === 'install_extension') {
+              continue;
+            }
             definedNames.push(maybeTool.name);
           }
         }
@@ -115,6 +118,17 @@ describe('e2e', () => {
       definedNames.sort();
       assert.deepStrictEqual(exposedNames, definedNames);
     });
+  });
+
+  it('has experimental extensions tools', async () => {
+    await withClient(
+      async client => {
+        const {tools} = await client.listTools();
+        const clickAt = tools.find(t => t.name === 'install_extension');
+        assert.ok(clickAt);
+      },
+      ['--category-extensions'],
+    );
   });
 
   it('has experimental vision tools', async () => {

@@ -198,9 +198,9 @@ export const cliOptions = {
     default: true,
     describe: 'Set to false to exclude tools related to network.',
   },
-  categoryExtension: {
+  categoryExtensions: {
     type: 'boolean',
-    default: true,
+    default: false,
     hidden: true,
     describe: 'Set to false to exclude tools related to extensions.',
   },
@@ -267,7 +267,6 @@ export function parseArguments(version: string, argv = process.argv) {
         'Disable tools in the performance category',
       ],
       ['$0 --no-category-network', 'Disable tools in the network category'],
-      ['$0 --no-category-extension', 'Disable tools in the extension category'],
       [
         '$0 --user-data-dir=/tmp/user-data-dir',
         'Use a custom user data directory',

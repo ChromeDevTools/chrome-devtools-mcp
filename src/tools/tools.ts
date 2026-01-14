@@ -5,7 +5,7 @@
  */
 import * as consoleTools from './console.js';
 import * as emulationTools from './emulation.js';
-import * as extensionTools from './extension.js';
+import * as extensionTools from './extensions.js';
 import * as inputTools from './input.js';
 import * as networkTools from './network.js';
 import * as pagesTools from './pages.js';

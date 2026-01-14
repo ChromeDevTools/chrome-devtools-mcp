@@ -34,6 +34,8 @@
   - [`list_console_messages`](#list_console_messages)
   - [`take_screenshot`](#take_screenshot)
   - [`take_snapshot`](#take_snapshot)
+- **[Extensions](#extensions)** (1 tools)
+  - [`install_extension`](#install_extension)
 
 ## Input automation
 
@@ -343,5 +345,17 @@ in the DevTools Elements panel (if any).
 
 - **filePath** (string) _(optional)_: The absolute path, or a path relative to the current working directory, to save the snapshot to instead of attaching it to the response.
 - **verbose** (boolean) _(optional)_: Whether to include all possible information available in the full a11y tree. Default is false.
+
+---
+
+## Extensions
+
+### `install_extension`
+
+**Description:** Installs a Chrome extension from the given path.
+
+**Parameters:**
+
+- **path** (string) **(required)**: Absolute path to the unpacked extension folder.
 
 ---

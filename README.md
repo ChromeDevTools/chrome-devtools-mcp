@@ -360,6 +360,8 @@ If you run into any issues, checkout our [troubleshooting guide](./docs/troubles
   - [`list_console_messages`](docs/tool-reference.md#list_console_messages)
   - [`take_screenshot`](docs/tool-reference.md#take_screenshot)
   - [`take_snapshot`](docs/tool-reference.md#take_snapshot)
+- **Extensions** (1 tools)
+  - [`install_extension`](docs/tool-reference.md#install_extension)
 
 <!-- END AUTO GENERATED TOOLS -->
 
