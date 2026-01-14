@@ -237,7 +237,7 @@ async function stopTracingAndAppendOutput(
 /** We tell CrUXManager to fetch data so it's available when DevTools.PerformanceTraceFormatter is invoked */
 async function populateCruxData(result: TraceResult): Promise<void> {
   logger('populateCruxData called');
-  const cruxManager = DevTools.CrUXManager.CrUXManager.instance();
+  const cruxManager = DevTools.CrUXManager.instance();
   // go/jtfbx
   cruxManager.setEndpointForTesting(
     'https://chromeuxreport.googleapis.com/v1/records:queryRecord?key=AIzaSyBn5gimNjhiEyA_euicSKko6IlD3HdgUfk',
