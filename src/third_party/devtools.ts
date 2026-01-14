@@ -29,4 +29,5 @@ export {
   IssuesManagerEvents,
   createIssuesFromProtocolIssue,
   IssueAggregator,
+  DebuggerWorkspaceBinding,
 } from '../../node_modules/chrome-devtools-frontend/mcp/mcp.js';

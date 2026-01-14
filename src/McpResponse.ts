@@ -242,6 +242,26 @@ export class McpResponse implements Response {
       const consoleMessageStableId = this.#attachedConsoleMessageId;
       if ('args' in message) {
         const consoleMessage = message as ConsoleMessage;
+
+        let stackTrace = undefined;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const rawStackTrace = (consoleMessage as any)._rawStackTrace();
+        if (rawStackTrace) {
+          const devTools = context.getDevToolsUniverse();
+          if (devTools) {
+            // TODO: We use the default page target at the moment but really puppeteer should attach the target ID to the
+            //       console message and we resolve that via the universes' TargetManager.
+            const {universe, target} = devTools;
+            const binding = universe.context.get(
+              DevTools.DebuggerWorkspaceBinding,
+            );
+            stackTrace = await binding.createStackTraceFromProtocolRuntime(
+              rawStackTrace,
+              target,
+            );
+          }
+        }
+
         consoleData = {
           consoleMessageStableId,
           type: consoleMessage.type(),
@@ -256,6 +276,7 @@ export class McpResponse implements Response {
                 : String(stringArg);
             }),
           ),
+          stackTrace,
         };
       } else if (message instanceof DevTools.AggregatedIssue) {
         const mappedIssueMessage = mapIssueToMessageObject(message);
@@ -304,6 +325,26 @@ export class McpResponse implements Response {
               context.getConsoleMessageStableId(item);
             if ('args' in item) {
               const consoleMessage = item as ConsoleMessage;
+
+              let stackTrace = undefined;
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const rawStackTrace = (consoleMessage as any)._rawStackTrace();
+              if (rawStackTrace) {
+                const devTools = context.getDevToolsUniverse();
+                if (devTools) {
+                  // TODO: We use the default page target at the moment but really puppeteer should attach the target ID to the
+                  //       console message and we resolve that via the universes' TargetManager.
+                  const {universe, target} = devTools;
+                  const binding = universe.context.get(
+                    DevTools.DebuggerWorkspaceBinding,
+                  );
+                  stackTrace =
+                    await binding.createStackTraceFromProtocolRuntime(
+                      rawStackTrace,
+                      target,
+                    );
+                }
+              }
               return {
                 consoleMessageStableId,
                 type: consoleMessage.type(),
@@ -318,6 +359,7 @@ export class McpResponse implements Response {
                       : String(stringArg);
                   }),
                 ),
+                stackTrace,
               };
             }
             if (item instanceof DevTools.AggregatedIssue) {
