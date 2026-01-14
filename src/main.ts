@@ -10,12 +10,14 @@ import process from 'node:process';
 
 import type {Channel} from './browser.js';
 import {ensureBrowserConnected, ensureBrowserLaunched} from './browser.js';
-import {parseArguments} from './cli.js';
+import {cliOptions, parseArguments} from './cli.js';
 import {loadIssueDescriptions} from './issue-descriptions.js';
 import {logger, saveLogsToFile} from './logger.js';
 import {McpContext} from './McpContext.js';
 import {McpResponse} from './McpResponse.js';
 import {Mutex} from './Mutex.js';
+import {ClearcutLogger} from './telemetry/clearcut-logger.js';
+import {computeFlagUsage} from './telemetry/flag-utils.js';
 import {
   McpServer,
   StdioServerTransport,
@@ -34,6 +36,10 @@ const VERSION = '0.12.1';
 export const args = parseArguments(VERSION);
 
 const logFile = args.logFile ? saveLogsToFile(args.logFile) : undefined;
+let clearcutLogger: ClearcutLogger | undefined;
+if (args.usageStatistics) {
+  clearcutLogger = new ClearcutLogger();
+}
 
 process.on('unhandledRejection', (reason, promise) => {
   logger('Unhandled promise rejection', promise, reason);
@@ -155,6 +161,8 @@ function registerTool(tool: ToolDefinition): void {
     },
     async (params): Promise<CallToolResult> => {
       const guard = await toolMutex.acquire();
+      const startTime = Date.now();
+      let success = false;
       try {
         logger(`${tool.name} request: ${JSON.stringify(params, null, '  ')}`);
         const context = await getContext();
@@ -177,6 +185,7 @@ function registerTool(tool: ToolDefinition): void {
         } = {
           content,
         };
+        success = true;
         if (args.experimentalStructuredContent) {
           result.structuredContent = structuredContent as Record<
             string,
@@ -200,6 +209,11 @@ function registerTool(tool: ToolDefinition): void {
           isError: true,
         };
       } finally {
+        void clearcutLogger?.logToolInvocation({
+          toolName: tool.name,
+          success,
+          latencyMs: Date.now() - startTime,
+        });
         guard.dispose();
       }
     },
@@ -215,3 +229,4 @@ const transport = new StdioServerTransport();
 await server.connect(transport);
 logger('Chrome DevTools MCP Server connected');
 logDisclaimers();
+void clearcutLogger?.logServerStart(computeFlagUsage(args, cliOptions));
