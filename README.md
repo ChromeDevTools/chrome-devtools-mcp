@@ -66,9 +66,9 @@ amp mcp add chrome-devtools -- npx chrome-devtools-mcp@latest
 <details>
   <summary>Antigravity</summary>
 
-To use the Chrome DevTools MCP server follow the instructions from <a href="https://antigravity.google/docs/mcp">Antigravity's docs<a/> to install a custom MCP server. Add the following config to the MCP servers config:
+To use the Chrome DevTools MCP server follow the instructions from <a href="https://antigravity.google/docs/mcp">Antigravity's docs</a> to install a custom MCP server. Add the following config to the MCP servers config:
 
-```bash
+```json
 {
   "mcpServers": {
     "chrome-devtools": {
@@ -85,7 +85,7 @@ To use the Chrome DevTools MCP server follow the instructions from <a href="http
 
 This will make the Chrome DevTools MCP server automatically connect to the browser that Antigravity is using. If you are not using port 9222, make sure to adjust accordingly.
 
-Chrome DevTools MCP will not start the browser instance automatically using this approach as as the Chrome DevTools MCP server runs in Antigravity's built-in browser. If the browser is not already running, you have to start it first by clicking the Chrome icon at the top right corner.
+Chrome DevTools MCP will not start the browser instance automatically using this approach as the Chrome DevTools MCP server runs in Antigravity's built-in browser. If the browser is not already running, you have to start it first by clicking the Chrome icon at the top right corner.
 
 </details>
 
