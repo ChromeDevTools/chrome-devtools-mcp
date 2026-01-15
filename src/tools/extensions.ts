@@ -22,7 +22,7 @@ export const installExtension = defineTool({
       .describe('Absolute path to the unpacked extension folder.'),
   },
   handler: async (request, response, context) => {
-    const { path } = request.params;
+    const {path} = request.params;
     const id = await context.installExtension(path);
     response.appendResponseLine(`Extension installed. Id: ${id}`);
   },

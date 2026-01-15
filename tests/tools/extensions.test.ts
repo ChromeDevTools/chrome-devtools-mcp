@@ -6,18 +6,21 @@
 
 import assert from 'node:assert';
 import path from 'node:path';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import { installExtension } from '../../src/tools/extensions.js';
-import { withMcpContext } from '../utils.js';
+import {installExtension} from '../../src/tools/extensions.js';
+import {withMcpContext} from '../utils.js';
 
-const EXTENSION_PATH = path.join(import.meta.dirname, '../../../tests/tools/fixtures/extension');
+const EXTENSION_PATH = path.join(
+  import.meta.dirname,
+  '../../../tests/tools/fixtures/extension',
+);
 
 describe('extension', () => {
   it('installs an extension and verifies it is listed in chrome://extensions', async () => {
     await withMcpContext(async (response, context) => {
       await installExtension.handler(
-        { params: { path: EXTENSION_PATH } },
+        {params: {path: EXTENSION_PATH}},
         response,
         context,
       );
