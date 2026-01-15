@@ -31,4 +31,26 @@ export function saveLogsToFile(fileName: string): fs.WriteStream {
   return logFile;
 }
 
+export function saveLogsToFileSync(fileName: string): void {
+  debug.enable(namespacesToEnable.join(','));
+
+  let fd: number | undefined;
+  try {
+    fd = fs.openSync(fileName, 'a+');
+  } catch (error) {
+    console.error(`Error when opening log file: ${error.message}`);
+    process.exit(1);
+  }
+
+  debug.log = function (...chunks: any[]) {
+    if (fd !== undefined) {
+      try {
+        fs.writeSync(fd, `${chunks.join(' ')}\n`);
+      } catch (error) {
+        console.error(`Error when writing to log file: ${error.message}`);
+      }
+    }
+  };
+}
+
 export const logger = debug(mcpDebugNamespace);
