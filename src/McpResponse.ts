@@ -10,13 +10,7 @@ import {
   formatConsoleEventShort,
   formatConsoleEventVerbose,
 } from './formatters/consoleFormatter.js';
-import {
-  getFormattedHeaderValue,
-  getFormattedResponseBody,
-  getFormattedRequestBody,
-  getShortDescriptionForRequest,
-  getStatusFromRequest,
-} from './formatters/networkFormatter.js';
+import {NetworkFormatter} from './formatters/NetworkFormatter.js';
 import {SnapshotFormatter} from './formatters/SnapshotFormatter.js';
 import type {McpContext} from './McpContext.js';
 import {DevTools} from './third_party/index.js';
@@ -215,22 +209,17 @@ export class McpResponse implements Response {
       }
     }
 
-    const bodies: {
-      requestBody?: string;
-      responseBody?: string;
-    } = {};
-
+    let detailedNetworkRequest: NetworkFormatter | undefined;
     if (this.#attachedNetworkRequestId) {
       const request = context.getNetworkRequestById(
         this.#attachedNetworkRequestId,
       );
-
-      bodies.requestBody = await getFormattedRequestBody(request);
-
-      const response = request.response();
-      if (response) {
-        bodies.responseBody = await getFormattedResponseBody(response);
-      }
+      const formatter = await NetworkFormatter.from(request, {
+        requestId: this.#attachedNetworkRequestId,
+        requestIdResolver: req => context.getNetworkRequestStableId(req),
+        fetchData: true,
+      });
+      detailedNetworkRequest = formatter;
     }
 
     let consoleData: ConsoleMessageData | undefined;
@@ -341,11 +330,49 @@ export class McpResponse implements Response {
       ).filter(item => item !== null);
     }
 
+    let networkRequests: NetworkFormatter[] | undefined;
+    if (this.#networkRequestsOptions?.include) {
+      let requests = context.getNetworkRequests(
+        this.#networkRequestsOptions?.includePreservedRequests,
+      );
+
+      // Apply resource type filtering if specified
+      if (this.#networkRequestsOptions.resourceTypes?.length) {
+        const normalizedTypes = new Set(
+          this.#networkRequestsOptions.resourceTypes,
+        );
+        requests = requests.filter(request => {
+          const type = request.resourceType();
+          return normalizedTypes.has(type);
+        });
+      }
+
+      if (requests.length) {
+        const data = this.#dataWithPagination(
+          requests,
+          this.#networkRequestsOptions.pagination,
+        );
+
+        networkRequests = await Promise.all(
+          data.items.map(request =>
+            NetworkFormatter.from(request, {
+              requestId: context.getNetworkRequestStableId(request),
+              selectedInDevToolsUI:
+                context.getNetworkRequestStableId(request) ===
+                this.#networkRequestsOptions?.networkRequestIdInDevToolsUI,
+              fetchData: false,
+            }),
+          ),
+        );
+      }
+    }
+
     return this.format(toolName, context, {
-      bodies,
       consoleData,
       consoleListData,
       snapshot,
+      detailedNetworkRequest,
+      networkRequests,
     });
   }
 
@@ -353,13 +380,11 @@ export class McpResponse implements Response {
     toolName: string,
     context: McpContext,
     data: {
-      bodies: {
-        requestBody?: string;
-        responseBody?: string;
-      };
       consoleData: ConsoleMessageData | undefined;
       consoleListData: ConsoleMessageData[] | undefined;
       snapshot: SnapshotFormatter | string | undefined;
+      detailedNetworkRequest?: NetworkFormatter;
+      networkRequests?: NetworkFormatter[];
     },
   ): {content: Array<TextContent | ImageContent>; structuredContent: object} {
     const response = [`# ${toolName} response`];
@@ -407,6 +432,8 @@ Call ${handleDialog.name} to handle it before continuing.`);
       snapshot?: object;
       snapshotFilePath?: string;
       tabId?: string;
+      networkRequest?: object;
+      networkRequests?: object[];
     } = {};
 
     if (this.#tabId) {
@@ -424,7 +451,11 @@ Call ${handleDialog.name} to handle it before continuing.`);
       }
     }
 
-    response.push(...this.#formatNetworkRequestData(context, data.bodies));
+    if (data.detailedNetworkRequest) {
+      response.push(data.detailedNetworkRequest.toStringDetailed());
+      structuredContent.networkRequest =
+        data.detailedNetworkRequest.toJSONDetailed();
+    }
     response.push(...this.#formatConsoleData(context, data.consoleData));
 
     if (this.#networkRequestsOptions?.include) {
@@ -445,20 +476,17 @@ Call ${handleDialog.name} to handle it before continuing.`);
 
       response.push('## Network requests');
       if (requests.length) {
-        const data = this.#dataWithPagination(
+        const paginationData = this.#dataWithPagination(
           requests,
           this.#networkRequestsOptions.pagination,
         );
-        response.push(...data.info);
-        for (const request of data.items) {
-          response.push(
-            getShortDescriptionForRequest(
-              request,
-              context.getNetworkRequestStableId(request),
-              context.getNetworkRequestStableId(request) ===
-                this.#networkRequestsOptions?.networkRequestIdInDevToolsUI,
-            ),
-          );
+        response.push(...paginationData.info);
+        if (data.networkRequests) {
+          structuredContent.networkRequests = [];
+          for (const formatter of data.networkRequests) {
+            response.push(formatter.toString());
+            structuredContent.networkRequests.push(formatter.toJSON());
+          }
         }
       } else {
         response.push('No requests found.');
@@ -536,65 +564,6 @@ Call ${handleDialog.name} to handle it before continuing.`);
     }
 
     response.push(formatConsoleEventVerbose(data, context));
-    return response;
-  }
-
-  #formatNetworkRequestData(
-    context: McpContext,
-    data: {
-      requestBody?: string;
-      responseBody?: string;
-    },
-  ): string[] {
-    const response: string[] = [];
-    const id = this.#attachedNetworkRequestId;
-    if (!id) {
-      return response;
-    }
-
-    const httpRequest = context.getNetworkRequestById(id);
-    response.push(`## Request ${httpRequest.url()}`);
-    response.push(`Status:  ${getStatusFromRequest(httpRequest)}`);
-    response.push(`### Request Headers`);
-    for (const line of getFormattedHeaderValue(httpRequest.headers())) {
-      response.push(line);
-    }
-
-    if (data.requestBody) {
-      response.push(`### Request Body`);
-      response.push(data.requestBody);
-    }
-
-    const httpResponse = httpRequest.response();
-    if (httpResponse) {
-      response.push(`### Response Headers`);
-      for (const line of getFormattedHeaderValue(httpResponse.headers())) {
-        response.push(line);
-      }
-    }
-
-    if (data.responseBody) {
-      response.push(`### Response Body`);
-      response.push(data.responseBody);
-    }
-
-    const httpFailure = httpRequest.failure();
-    if (httpFailure) {
-      response.push(`### Request failed with`);
-      response.push(httpFailure.errorText);
-    }
-
-    const redirectChain = httpRequest.redirectChain();
-    if (redirectChain.length) {
-      response.push(`### Redirect chain`);
-      let indent = 0;
-      for (const request of redirectChain.reverse()) {
-        response.push(
-          `${'  '.repeat(indent)}${getShortDescriptionForRequest(request, context.getNetworkRequestStableId(request))}`,
-        );
-        indent++;
-      }
-    }
     return response;
   }
 
