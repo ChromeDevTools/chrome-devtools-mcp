@@ -25,6 +25,7 @@ export {
   ProtocolClient,
   Common,
   I18n,
+  CrUXManager,
   IssueAggregatorEvents,
   IssuesManagerEvents,
   createIssuesFromProtocolIssue,
