@@ -281,6 +281,12 @@ async function generateToolDocumentation(): Promise<void> {
         if (!tool.annotations.conditions) {
           return true;
         }
+
+        // Filter out extension tools
+        if (tool.name === 'install_extension') {
+          return false;
+        }
+        
         // Only include unconditional tools.
         return tool.annotations.conditions.length === 0;
       })
