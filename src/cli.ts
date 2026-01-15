@@ -11,7 +11,7 @@ export const cliOptions = {
   autoConnect: {
     type: 'boolean',
     description:
-      'If specified, automatically connects to a browser (Chrome 145+) running in the user data directory identified by the channel param. Requires remote debugging being enabled in Chrome here: chrome://inspect/#remote-debugging.',
+      'If specified, automatically connects to a browser (Chrome 144+) running in the user data directory identified by the channel param. Requires the remoted debugging server to be started in the Chrome instance via chrome://inspect/#remote-debugging.',
     conflicts: ['isolated', 'executablePath'],
     default: false,
     coerce: (value: boolean | undefined) => {
@@ -267,11 +267,11 @@ export function parseArguments(version: string, argv = process.argv) {
       ],
       [
         '$0 --auto-connect',
-        'Connect to a stable Chrome instance (Chrome 145+) running instead of launching a new instance',
+        'Connect to a stable Chrome instance (Chrome 144+) running instead of launching a new instance',
       ],
       [
         '$0 --auto-connect --channel=canary',
-        'Connect to a canary Chrome instance (Chrome 145+) running instead of launching a new instance',
+        'Connect to a canary Chrome instance (Chrome 144+) running instead of launching a new instance',
       ],
     ]);
 
