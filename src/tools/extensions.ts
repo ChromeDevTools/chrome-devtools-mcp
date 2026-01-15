@@ -1,10 +1,9 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {logger} from '../logger.js';
 import {zod} from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
@@ -23,13 +22,8 @@ export const installExtension = defineTool({
       .describe('Absolute path to the unpacked extension folder.'),
   },
   handler: async (request, response, context) => {
-    const {path} = request.params;
-    try {
-      const id = await context.installExtension(path);
-      response.appendResponseLine(`Extension installed. Id: ${id}`);
-    } catch (error) {
-      logger('Extension installation error: ', error);
-      throw error;
-    }
+    const { path } = request.params;
+    const id = await context.installExtension(path);
+    response.appendResponseLine(`Extension installed. Id: ${id}`);
   },
 });
