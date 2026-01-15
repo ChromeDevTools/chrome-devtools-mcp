@@ -62,13 +62,13 @@ export class FilePersistence implements Persistence {
   }
 
   async saveState(state: LocalState): Promise<void> {
+    const filePath = path.join(this.#dataFolder, STATE_FILE_NAME);
     try {
       await fs.mkdir(this.#dataFolder, {recursive: true});
-      const filePath = path.join(this.#dataFolder, STATE_FILE_NAME);
       await fs.writeFile(filePath, JSON.stringify(state, null, 2), 'utf-8');
     } catch (error) {
       // Ignore errors during state saving to avoid crashing the server
-      logger('Failed to save telemetry state:', error);
+      logger(`Failed to save telemetry state to ${filePath}:`, error);
     }
   }
 }
