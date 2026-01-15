@@ -8,7 +8,7 @@ import assert from 'node:assert';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { describe, it, after } from 'node:test';
+import {describe, it, after} from 'node:test';
 
 import {installExtension} from '../../src/tools/extensions.js';
 import {withMcpContext} from '../utils.js';
@@ -36,7 +36,7 @@ describe('extension', () => {
 
     await withMcpContext(async (response, context) => {
       await installExtension.handler(
-        { params: { path: tmpDir } },
+        {params: {path: tmpDir}},
         response,
         context,
       );
@@ -62,7 +62,7 @@ describe('extension', () => {
 
   after(() => {
     if (tmpDir) {
-      fs.rmSync(tmpDir, { recursive: true, force: true });
+      fs.rmSync(tmpDir, {recursive: true, force: true});
     }
   });
 });
