@@ -38,7 +38,10 @@ export const args = parseArguments(VERSION);
 const logFile = args.logFile ? saveLogsToFile(args.logFile) : undefined;
 let clearcutLogger: ClearcutLogger | undefined;
 if (args.usageStatistics) {
-  clearcutLogger = new ClearcutLogger();
+  clearcutLogger = new ClearcutLogger({
+    logFile: args.logFile,
+    appVersion: VERSION,
+  });
 }
 
 process.on('unhandledRejection', (reason, promise) => {
