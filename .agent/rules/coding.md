@@ -1,3 +1,7 @@
+---
+trigger: always_on
+---
+
 # Instructions
 
 - Use only scripts from `package.json` to run commands.
