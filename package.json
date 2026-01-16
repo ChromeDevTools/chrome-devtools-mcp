@@ -7,7 +7,7 @@
   "main": "index.js",
   "scripts": {
     "clean": "node -e \"require('fs').rmSync('build', {recursive: true, force: true})\"",
-    "bundle": "npm run clean && npm run build && rollup -c rollup.config.mjs && node -e \"require('fs').rmSync('build/node_modules', {recursive: true, force: true})\"",
+    "bundle": "npm run clean && npm run build && rollup -c rollup.config.mjs && node -e \"['build/node_modules', 'build/src/third_party/devtools.js', 'build/src/third_party/devtools.js.map'].forEach(p => require('fs').rmSync(p, {recursive: true, force: true}))\"",
     "build": "tsc && node --experimental-strip-types --no-warnings=ExperimentalWarning scripts/post-build.ts",
     "typecheck": "tsc --noEmit",
     "format": "eslint --cache --fix . && prettier --write --cache .",
