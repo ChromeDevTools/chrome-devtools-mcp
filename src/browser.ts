@@ -11,6 +11,7 @@ import path from 'node:path';
 import {logger} from './logger.js';
 import type {
   Browser,
+  BrowserContext,
   ChromeReleaseChannel,
   LaunchOptions,
   Target,
@@ -43,6 +44,84 @@ function makeTargetFilter() {
   };
 }
 
+//Extracts the profile directory name from a user data dir path.
+function getProfileNameFromUserDataDir(userDataDir: string): string {
+  const normalized = userDataDir.replace(/\\/g, '/');
+  const parts = normalized.split('/');
+  return parts[parts.length - 1] || 'Default';
+}
+
+async function getBrowserContextForProfile(
+  browser: Browser,
+  profileDirectory?: string,
+): Promise<BrowserContext> {
+  if (!profileDirectory) {
+    return browser.defaultBrowserContext();
+  }
+
+  try {
+    const contexts = browser.browserContexts();
+    logger(`Found ${contexts.length} browser context(s)`);
+
+    for (const context of contexts) {
+      let page;
+      try {
+        page = await context.newPage();
+
+        await page.goto('chrome://version', {
+          waitUntil: 'domcontentloaded',
+          timeout: 3_000,
+        });
+
+        const profilePath: string | null = await page.evaluate(() => {
+          const body = document.querySelector('body');
+          if (!body) return null;
+          const text = (body.innerText || '');
+          const match = text.match(/Profile Path:\s*(.+)/i);
+          return match ? match[1].trim() : null;
+        });
+
+        try {
+          await page.close();
+        } catch {
+          //ignore close errors
+        }
+
+        if (!profilePath) {
+          continue;
+        }
+
+        const actualProfile = getProfileNameFromUserDataDir(profilePath);
+        logger(`Probed context: profilePath=${profilePath} => profileName=${actualProfile}`);
+
+        if (actualProfile === profileDirectory) {
+          logger(`Matched profile directory "${profileDirectory}" to a browser context`);
+          return context;
+        }
+      } catch (error) {
+        logger('Error probing a browser context for profile: ', error);
+        try {
+          if (page && !page.isClosed()) {
+            await page.close();
+          }
+        } catch {
+          // ignore
+        }
+      }
+    }
+
+    logger(
+      `Profile directory "${profileDirectory}" specified. ` +
+        `Using default browser context. Full profile support will be added in a future update.`,
+    );
+
+    return browser.defaultBrowserContext();
+  } catch (error) {
+    logger('Error getting browser contexts: ', error);
+    return browser.defaultBrowserContext();
+  }
+}
+
 export async function ensureBrowserConnected(options: {
   browserURL?: string;
   wsEndpoint?: string;
@@ -50,6 +129,7 @@ export async function ensureBrowserConnected(options: {
   devtools: boolean;
   channel?: Channel;
   userDataDir?: string;
+  profileDirectory?: string;
 }) {
   const {channel} = options;
   if (browser?.connected) {
@@ -126,7 +206,13 @@ export async function ensureBrowserConnected(options: {
       },
     );
   }
+
   logger('Connected Puppeteer');
+
+  if (options.profileDirectory) {
+    await getBrowserContextForProfile(browser, options.profileDirectory);
+    logger(`Using browser context for profile: ${options.profileDirectory}`);
+  }
   return browser;
 }
 
@@ -145,6 +231,7 @@ interface McpLaunchOptions {
   chromeArgs?: string[];
   ignoreDefaultChromeArgs?: string[];
   devtools: boolean;
+  profileDirectory?: string;
 }
 
 export async function launch(options: McpLaunchOptions): Promise<Browser> {
@@ -171,6 +258,12 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
     ...(options.chromeArgs ?? []),
     '--hide-crash-restore-bubble',
   ];
+  if (options.profileDirectory) {
+    args.push(`--profile-directory=${options.profileDirectory}`);
+    logger(
+      `Launcing Chrome with profile directory: ${options.profileDirectory}`,
+    );
+  }
   const ignoreDefaultArgs: LaunchOptions['ignoreDefaultArgs'] =
     options.ignoreDefaultChromeArgs ?? false;
 
@@ -214,6 +307,36 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
         contentWidth: options.viewport.width,
         contentHeight: options.viewport.height,
       });
+    }
+
+    if (options.profileDirectory && userDataDir) {
+      try {
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        const portPath = path.join(userDataDir, 'DevToolsActivePort');
+        const fileContent = await fs.promises.readFile(portPath, 'utf8');
+        const lines = fileContent
+          .split('\n')
+          .map(line => line.trim())
+          .filter(line => line);
+
+        if (lines.length >= 2) {
+          const browserPath = lines[1];
+          const actualProfile = getProfileNameFromUserDataDir(browserPath);
+          const requestedProfile = options.profileDirectory;
+
+          if (actualProfile !== requestedProfile) {
+            logger(
+              `Warning: Requested profile "${requestedProfile}" but Chrome may be using profile "${actualProfile}". ` +
+                `This could happen if Chrome is managing profiles differently.`,
+            );
+          } else {
+            logger(`Successfully validated profile: ${actualProfile}`);
+          }
+        }
+      } catch (error) {
+        logger('Could not validate profile directory after launch: ', error);
+      }
     }
     return browser;
   } catch (error) {

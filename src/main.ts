@@ -78,6 +78,7 @@ async function getContext(): Promise<McpContext> {
           channel: args.autoConnect ? (args.channel as Channel) : undefined,
           userDataDir: args.userDataDir,
           devtools,
+          profileDirectory: args.profileDirectory,
         })
       : await ensureBrowserLaunched({
           headless: args.headless,
@@ -91,6 +92,7 @@ async function getContext(): Promise<McpContext> {
           ignoreDefaultChromeArgs,
           acceptInsecureCerts: args.acceptInsecureCerts,
           devtools,
+          profileDirectory: args.profileDirectory,
         });
 
   if (context?.browser !== browser) {
