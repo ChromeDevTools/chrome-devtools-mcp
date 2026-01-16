@@ -22,7 +22,7 @@
     "test:update-snapshots": "npm run build && node scripts/test.mjs --test-update-snapshots",
     "prepare": "node --experimental-strip-types scripts/prepare.ts",
     "verify-server-json-version": "node --experimental-strip-types scripts/verify-server-json-version.ts",
-    "eval": "npm run build && node --experimental-strip-types --test scripts/eval_gemini.ts"
+    "eval": "npm run build && node --experimental-strip-types scripts/eval_gemini.ts"
   },
   "files": [
     "build/src",
