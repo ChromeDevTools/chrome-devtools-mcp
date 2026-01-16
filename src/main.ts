@@ -91,6 +91,7 @@ async function getContext(): Promise<McpContext> {
           ignoreDefaultChromeArgs,
           acceptInsecureCerts: args.acceptInsecureCerts,
           devtools,
+          enableExtensions: args.categoryExtensions,
         });
 
   if (context?.browser !== browser) {
