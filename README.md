@@ -631,6 +631,10 @@ If you hit VM-to-host port forwarding issues, see the “Remote debugging betwee
 
 For more details on remote debugging, see the [Chrome DevTools documentation](https://developer.chrome.com/docs/devtools/remote-debugging/).
 
+### Debugging Chrome on Android
+
+Please consult [these instructions](./docs/debugging-android.md).
+
 ## Known limitations
 
 ### Operating system sandboxes
