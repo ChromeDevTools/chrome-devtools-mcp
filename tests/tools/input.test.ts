@@ -301,6 +301,38 @@ describe('input', () => {
         assert.strictEqual(selectedValue, 'v2');
       });
     });
+
+    it('fills out a textarea with long text', async () => {
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedPage();
+        await page.setContent(html`<textarea />`);
+        await page.focus('textarea');
+        await context.createTextSnapshot();
+        await page.setDefaultTimeout(1000);
+        await fill.handler(
+          {
+            params: {
+              uid: '1_1',
+              value: '1'.repeat(3000),
+            },
+          },
+          response,
+          context,
+        );
+        assert.strictEqual(
+          response.responseLines[0],
+          'Successfully filled out the element',
+        );
+        assert.ok(response.includeSnapshot);
+        assert.ok(
+          await page.evaluate(() => {
+            return (
+              document.body.querySelector('textarea')?.value.length === 3_000
+            );
+          }),
+        );
+      });
+    });
   });
 
   describe('drags', () => {

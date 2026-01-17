@@ -159,7 +159,13 @@ async function fillFormElement(
     if (aXNode && aXNode.role === 'combobox') {
       await selectOption(handle, aXNode, value);
     } else {
-      await handle.asLocator().fill(value);
+      // Increase timeout for longer input values.
+      const textLengthIn1kChars = Math.floor(value.length / 1_000);
+      const timeoutPer1kChars = 5_000; // ms
+      const fillTimeout =
+        context.getSelectedPage().getDefaultTimeout() +
+        textLengthIn1kChars * timeoutPer1kChars;
+      await handle.asLocator().setTimeout(fillTimeout).fill(value);
     }
   } finally {
     void handle.dispose();
@@ -183,6 +189,7 @@ export const fill = defineTool({
   },
   handler: async (request, response, context) => {
     await context.waitForEventsAfterAction(async () => {
+      await context.getSelectedPage().keyboard.type(request.params.value);
       await fillFormElement(
         request.params.uid,
         request.params.value,
