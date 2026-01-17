@@ -53,6 +53,7 @@ const nodeArgs = [
   'spec',
   '--test-force-exit',
   '--test',
+  '--test-timeout=30000',
   ...flags,
   ...files,
 ];

@@ -148,6 +148,7 @@
 
 **Parameters:**
 
+- **handleBeforeUnload** (enum: "accept", "decline") _(optional)_: Whether to auto accept, decline or ignore potential before unload dialogs triggered by this navigation.
 - **ignoreCache** (boolean) _(optional)_: Whether to ignore cache on reload.
 - **timeout** (integer) _(optional)_: Maximum wait time in milliseconds. If set to 0, the default timeout will be used.
 - **type** (enum: "url", "back", "forward", "reload") _(optional)_: Navigate the page by URL, back or forward in history, or reload.
