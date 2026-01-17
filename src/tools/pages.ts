@@ -5,6 +5,7 @@
  */
 
 import {logger} from '../logger.js';
+import type {Dialog} from '../third_party/index.js';
 import {zod} from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
@@ -120,6 +121,12 @@ export const navigatePage = defineTool({
       .boolean()
       .optional()
       .describe('Whether to ignore cache on reload.'),
+    handleBeforeUnload: zod
+      .enum(['accept', 'decline'])
+      .optional()
+      .describe(
+        'Whether to auto accept, decline or ignore potential before unload dialogs triggered by this navigation.',
+      ),
     ...timeoutSchema,
   },
   handler: async (request, response, context) => {
@@ -136,62 +143,82 @@ export const navigatePage = defineTool({
       request.params.type = 'url';
     }
 
-    await context.waitForEventsAfterAction(async () => {
-      switch (request.params.type) {
-        case 'url':
-          if (!request.params.url) {
-            throw new Error('A URL is required for navigation of type=url.');
-          }
-          try {
-            await page.goto(request.params.url, options);
-            response.appendResponseLine(
-              `Successfully navigated to ${request.params.url}.`,
-            );
-          } catch (error) {
-            response.appendResponseLine(
-              `Unable to navigate in the  selected page: ${error.message}.`,
-            );
-          }
-          break;
-        case 'back':
-          try {
-            await page.goBack(options);
-            response.appendResponseLine(
-              `Successfully navigated back to ${page.url()}.`,
-            );
-          } catch (error) {
-            response.appendResponseLine(
-              `Unable to navigate back in the selected page: ${error.message}.`,
-            );
-          }
-          break;
-        case 'forward':
-          try {
-            await page.goForward(options);
-            response.appendResponseLine(
-              `Successfully navigated forward to ${page.url()}.`,
-            );
-          } catch (error) {
-            response.appendResponseLine(
-              `Unable to navigate forward in the selected page: ${error.message}.`,
-            );
-          }
-          break;
-        case 'reload':
-          try {
-            await page.reload({
-              ...options,
-              ignoreCache: request.params.ignoreCache,
-            });
-            response.appendResponseLine(`Successfully reloaded the page.`);
-          } catch (error) {
-            response.appendResponseLine(
-              `Unable to reload the selected page: ${error.message}.`,
-            );
-          }
-          break;
+    const handleBeforeUnload = request.params.handleBeforeUnload ?? 'accept';
+    const dialogHandler = (dialog: Dialog) => {
+      if (dialog.type() === 'beforeunload') {
+        if (handleBeforeUnload === 'accept') {
+          response.appendResponseLine(`Accepted a beforeunload dialog.`);
+          void dialog.accept();
+        } else {
+          response.appendResponseLine(`Declined a beforeunload dialog.`);
+          void dialog.dismiss();
+        }
+        // We are not going to report the dialog like regular dialogs.
+        context.clearDialog();
       }
-    });
+    };
+    page.on('dialog', dialogHandler);
+
+    try {
+      await context.waitForEventsAfterAction(async () => {
+        switch (request.params.type) {
+          case 'url':
+            if (!request.params.url) {
+              throw new Error('A URL is required for navigation of type=url.');
+            }
+            try {
+              await page.goto(request.params.url, options);
+              response.appendResponseLine(
+                `Successfully navigated to ${request.params.url}.`,
+              );
+            } catch (error) {
+              response.appendResponseLine(
+                `Unable to navigate in the  selected page: ${error.message}.`,
+              );
+            }
+            break;
+          case 'back':
+            try {
+              await page.goBack(options);
+              response.appendResponseLine(
+                `Successfully navigated back to ${page.url()}.`,
+              );
+            } catch (error) {
+              response.appendResponseLine(
+                `Unable to navigate back in the selected page: ${error.message}.`,
+              );
+            }
+            break;
+          case 'forward':
+            try {
+              await page.goForward(options);
+              response.appendResponseLine(
+                `Successfully navigated forward to ${page.url()}.`,
+              );
+            } catch (error) {
+              response.appendResponseLine(
+                `Unable to navigate forward in the selected page: ${error.message}.`,
+              );
+            }
+            break;
+          case 'reload':
+            try {
+              await page.reload({
+                ...options,
+                ignoreCache: request.params.ignoreCache,
+              });
+              response.appendResponseLine(`Successfully reloaded the page.`);
+            } catch (error) {
+              response.appendResponseLine(
+                `Unable to reload the selected page: ${error.message}.`,
+              );
+            }
+            break;
+        }
+      });
+    } finally {
+      page.off('dialog', dialogHandler);
+    }
 
     response.setIncludePages(true);
   },

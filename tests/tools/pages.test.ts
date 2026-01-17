@@ -19,7 +19,7 @@ import {
   handleDialog,
   getTabId,
 } from '../../src/tools/pages.js';
-import {withMcpContext} from '../utils.js';
+import {html, withMcpContext} from '../utils.js';
 
 describe('pages', () => {
   describe('list_pages', () => {
@@ -184,6 +184,67 @@ describe('pages', () => {
         assert.ok(response.includePages);
       });
     });
+
+    it('reload with accpeting the beforeunload dialog', async () => {
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedPage();
+        await page.setContent(
+          html` <script>
+            window.addEventListener('beforeunload', e => {
+              e.preventDefault();
+              e.returnValue = '';
+            });
+          </script>`,
+        );
+
+        await navigatePage.handler(
+          {params: {type: 'reload'}},
+          response,
+          context,
+        );
+
+        assert.strictEqual(context.getDialog(), undefined);
+        assert.ok(response.includePages);
+        assert.strictEqual(
+          response.responseLines.join('\n'),
+          'Accepted a beforeunload dialog.\nSuccessfully reloaded the page.',
+        );
+      });
+    });
+
+    it('reload with declining the beforeunload dialog', async () => {
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedPage();
+        await page.setContent(
+          html` <script>
+            window.addEventListener('beforeunload', e => {
+              e.preventDefault();
+              e.returnValue = '';
+            });
+          </script>`,
+        );
+
+        await navigatePage.handler(
+          {
+            params: {
+              type: 'reload',
+              handleBeforeUnload: 'decline',
+              timeout: 500,
+            },
+          },
+          response,
+          context,
+        );
+
+        assert.strictEqual(context.getDialog(), undefined);
+        assert.ok(response.includePages);
+        assert.strictEqual(
+          response.responseLines.join('\n'),
+          'Declined a beforeunload dialog.\nUnable to reload the selected page: Navigation timeout of 500 ms exceeded.',
+        );
+      });
+    });
+
     it('go forward with error', async () => {
       await withMcpContext(async (response, context) => {
         await navigatePage.handler(
