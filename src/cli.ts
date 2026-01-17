@@ -198,6 +198,12 @@ export const cliOptions = {
     default: true,
     describe: 'Set to false to exclude tools related to network.',
   },
+  categoryExtensions: {
+    type: 'boolean',
+    default: false,
+    hidden: true,
+    describe: 'Set to false to exclude tools related to extensions.',
+  },
   usageStatistics: {
     type: 'boolean',
     // Marked as `false` until the feature is ready to be enabled by default.

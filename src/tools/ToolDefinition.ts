@@ -121,6 +121,7 @@ export type Context = Readonly<{
    * Returns a reqid for a cdpRequestId.
    */
   resolveCdpElementId(cdpBackendNodeId: number): string | undefined;
+  installExtension(path: string): Promise<string>;
 }>;
 
 export function defineTool<Schema extends zod.ZodRawShape>(

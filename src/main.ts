@@ -91,6 +91,7 @@ async function getContext(): Promise<McpContext> {
           ignoreDefaultChromeArgs,
           acceptInsecureCerts: args.acceptInsecureCerts,
           devtools,
+          enableExtensions: args.categoryExtensions,
         });
 
   if (context?.browser !== browser) {
@@ -136,6 +137,12 @@ function registerTool(tool: ToolDefinition): void {
   if (
     tool.annotations.category === ToolCategory.NETWORK &&
     args.categoryNetwork === false
+  ) {
+    return;
+  }
+  if (
+    tool.annotations.category === ToolCategory.EXTENSIONS &&
+    args.categoryExtensions === false
   ) {
     return;
   }

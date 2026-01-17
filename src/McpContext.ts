@@ -690,4 +690,8 @@ export class McpContext implements Context {
     });
     await this.#networkCollector.init(await this.browser.pages());
   }
+
+  async installExtension(path: string): Promise<string> {
+    return this.browser.installExtension(path);
+  }
 }
