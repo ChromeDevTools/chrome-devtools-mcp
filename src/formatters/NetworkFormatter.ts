@@ -171,17 +171,24 @@ export class NetworkFormatter {
     const httpResponse = request.response();
     const failure = request.failure();
     let status: string;
-    if (httpResponse) {
-      const responseStatus = httpResponse.status();
-      status =
-        responseStatus >= 200 && responseStatus <= 299
-          ? `[success - ${responseStatus}]`
-          : `[failed - ${responseStatus}]`;
-    } else if (failure) {
+    if (failure) {
       status = `[failed - ${failure.errorText}]`;
+    } else if (httpResponse) {
+      const responseStatus = httpResponse.status();
+
+      if (responseStatus >= 100 && responseStatus <= 199) {
+        status = `[info - ${responseStatus}]`;
+      } else if (responseStatus >= 200 && responseStatus <= 299) {
+        status = `[success - ${responseStatus}]`;
+      } else if (responseStatus >= 300 && responseStatus <= 399) {
+        status = `[redirect - ${responseStatus}]`;
+      } else {
+        status = `[failed - ${responseStatus}]`;
+      }
     } else {
       status = '[pending]';
     }
+
     return status;
   }
 

@@ -49,7 +49,7 @@ describe('NetworkFormatter', () => {
 
       assert.equal(
         formatter.toString(),
-        'reqid=1 GET http://example.com [failed - 199]',
+        'reqid=1 GET http://example.com [info - 199]',
       );
     });
     it('shows correct status for request with response code above 200', async () => {
@@ -61,7 +61,7 @@ describe('NetworkFormatter', () => {
 
       assert.equal(
         formatter.toString(),
-        'reqid=1 GET http://example.com [failed - 300]',
+        'reqid=1 GET http://example.com [redirect - 300]',
       );
     });
     it('shows correct status for request that failed', async () => {
