@@ -15,7 +15,11 @@
  */
 
 import type {ToolCategories} from './tools/categories.js';
-import type {Context, Response, ToolDefinition} from './tools/ToolDefinition.js';
+import type {
+  Context,
+  Response,
+  ToolDefinition,
+} from './tools/ToolDefinition.js';
 
 // Use a broader type for storing tools with any schema
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -70,7 +74,7 @@ export class ToolRegistry {
     const names = this.categories.get(category);
     if (!names) return [];
     return Array.from(names)
-      .map((name) => this.tools.get(name)!)
+      .map(name => this.tools.get(name)!)
       .filter(Boolean);
   }
 
@@ -229,7 +233,9 @@ export class PluginLoader {
       const plugin: McpPlugin = module.default || module.plugin || module;
 
       if (!plugin.id || !plugin.register) {
-        this.log(`[plugins] Invalid plugin (missing id or register): ${moduleId}`);
+        this.log(
+          `[plugins] Invalid plugin (missing id or register): ${moduleId}`,
+        );
         return false;
       }
 
@@ -241,7 +247,7 @@ export class PluginLoader {
       // Create plugin context
       const ctx: PluginContext = {
         registry: this.registry,
-        log: (msg) => this.log(`[${plugin.id}] ${msg}`),
+        log: msg => this.log(`[${plugin.id}] ${msg}`),
         config: this.config,
       };
 
@@ -249,7 +255,9 @@ export class PluginLoader {
       await plugin.register(ctx);
 
       this.plugins.set(plugin.id, plugin);
-      this.log(`[plugins] Loaded: ${plugin.name} v${plugin.version} (${plugin.id})`);
+      this.log(
+        `[plugins] Loaded: ${plugin.name} v${plugin.version} (${plugin.id})`,
+      );
       return true;
     } catch (error) {
       this.log(
@@ -263,10 +271,12 @@ export class PluginLoader {
    * Load multiple plugins from environment variable or config.
    * @param pluginIds - Comma-separated list of plugin module IDs
    */
-  async loadFromList(pluginIds: string): Promise<{ loaded: string[]; failed: string[] }> {
+  async loadFromList(
+    pluginIds: string,
+  ): Promise<{loaded: string[]; failed: string[]}> {
     const ids = pluginIds
       .split(',')
-      .map((id) => id.trim())
+      .map(id => id.trim())
       .filter(Boolean);
 
     const loaded: string[] = [];
@@ -281,7 +291,7 @@ export class PluginLoader {
       }
     }
 
-    return { loaded, failed };
+    return {loaded, failed};
   }
 
   /**
@@ -315,4 +325,4 @@ export class PluginLoader {
 }
 
 // Re-export types for plugin authors
-export type { ToolDefinition, Context, Response, ToolCategories };
+export type {ToolDefinition, Context, Response, ToolCategories};

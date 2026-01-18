@@ -7,12 +7,14 @@ Web-LLM tools for chrome-devtools-mcp (ChatGPT/Gemini browser automation).
 This package is planned for future extraction from the main chrome-devtools-mcp-for-extension package.
 
 Currently, the web-llm tools are included in the main package and can be:
+
 - **Disabled** via `MCP_DISABLE_WEB_LLM=true` environment variable
 - **Loaded as plugins** via the plugin architecture (v0.26.0+)
 
 ## Current Location
 
 The web-llm tools are currently located in the main package:
+
 - `src/tools/chatgpt-web.ts` - ChatGPT browser automation
 - `src/tools/gemini-web.ts` - Gemini browser automation
 - `src/selectors/chatgpt.json` - ChatGPT UI selectors
@@ -33,21 +35,23 @@ MCP_PLUGINS=@chrome-devtools-mcp/web-llm npx chrome-devtools-mcp-for-extension
 ## Why Separate?
 
 Web-LLM tools are:
+
 - **Site-dependent**: They rely on specific website UIs (ChatGPT, Gemini)
 - **Unstable**: May break when those UIs change
 - **Optional**: Not all users need AI chat integration
 
 Separating them allows:
+
 - Core package to remain stable
 - Faster iteration on web-llm selectors
 - Optional installation for users who don't need AI integration
 
 ## Tools
 
-| Tool | Description |
-|------|-------------|
+| Tool              | Description                           |
+| ----------------- | ------------------------------------- |
 | `ask_chatgpt_web` | Send questions to ChatGPT via browser |
-| `ask_gemini_web` | Send questions to Gemini via browser |
+| `ask_gemini_web`  | Send questions to Gemini via browser  |
 
 ## Disclaimer
 

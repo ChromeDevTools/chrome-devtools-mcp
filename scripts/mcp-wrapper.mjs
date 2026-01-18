@@ -14,25 +14,25 @@
  *   - Cleans up orphaned Chrome processes
  */
 
-import { spawn } from "node:child_process";
-import os from "node:os";
-import fs from "node:fs/promises";
-import path from "node:path";
-import process from "node:process";
-import chokidar from "chokidar";
+import {spawn} from 'node:child_process';
+import os from 'node:os';
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import process from 'node:process';
+import chokidar from 'chokidar';
 
 // ==== Configuration ====
 const argv = new Set(process.argv.slice(2));
-const isDev = argv.has("--dev") || process.env.MCP_ENV === "development";
+const isDev = argv.has('--dev') || process.env.MCP_ENV === 'development';
 
-const JS_ENTRY = process.env.MCP_JS_ENTRY || "build/src/main.js";
-const TS_PROJECT = process.env.MCP_TS_PROJECT || "tsconfig.json";
-const BUILD_GLOB = process.env.MCP_BUILD_GLOB || "build/**/*.{js,mjs,cjs,map}";
+const JS_ENTRY = process.env.MCP_JS_ENTRY || 'build/src/main.js';
+const TS_PROJECT = process.env.MCP_TS_PROJECT || 'tsconfig.json';
+const BUILD_GLOB = process.env.MCP_BUILD_GLOB || 'build/**/*.{js,mjs,cjs,map}';
 const KILL_TIMEOUT_MS = Number(process.env.MCP_KILL_TIMEOUT_MS || 4000);
 
 // Production: restart control
-const BACKOFF_START = Number(process.env.MCP_BACKOFF_START || 300);   // ms
-const BACKOFF_MAX   = Number(process.env.MCP_BACKOFF_MAX   || 30_000);
+const BACKOFF_START = Number(process.env.MCP_BACKOFF_START || 300); // ms
+const BACKOFF_MAX = Number(process.env.MCP_BACKOFF_MAX || 30_000);
 const MAX_RESTARTS_PER_MIN = Number(process.env.MCP_MAX_RPM || 8);
 
 // PID file for Chrome process cleanup
@@ -47,8 +47,12 @@ let backoff = BACKOFF_START;
 let restartTimestamps = [];
 
 // ==== Utilities ====
-function now() { return Date.now(); }
-function sleep(ms){ return new Promise(r=>setTimeout(r, ms)); }
+function now() {
+  return Date.now();
+}
+function sleep(ms) {
+  return new Promise(r => setTimeout(r, ms));
+}
 
 /**
  * Stop child process gracefully (SIGTERM → timeout → SIGKILL)
@@ -56,23 +60,23 @@ function sleep(ms){ return new Promise(r=>setTimeout(r, ms)); }
 async function stopChild() {
   if (!child || child.killed) return;
 
-  const done = new Promise((res) => child.once("exit", res));
+  const done = new Promise(res => child.once('exit', res));
 
   try {
-    child.kill("SIGTERM");
-    console.error("[mcp-wrapper] Sent SIGTERM to child");
+    child.kill('SIGTERM');
+    console.error('[mcp-wrapper] Sent SIGTERM to child');
   } catch (err) {
-    console.error("[mcp-wrapper] Failed to send SIGTERM:", err.message);
+    console.error('[mcp-wrapper] Failed to send SIGTERM:', err.message);
   }
 
   await Promise.race([done, sleep(KILL_TIMEOUT_MS)]);
 
   if (child && !child.killed) {
     try {
-      child.kill("SIGKILL");
-      console.error("[mcp-wrapper] Sent SIGKILL to child (timeout)");
+      child.kill('SIGKILL');
+      console.error('[mcp-wrapper] Sent SIGKILL to child (timeout)');
     } catch (err) {
-      console.error("[mcp-wrapper] Failed to send SIGKILL:", err.message);
+      console.error('[mcp-wrapper] Failed to send SIGKILL:', err.message);
     }
   }
 }
@@ -84,24 +88,26 @@ function spawnChild() {
   const env = {
     ...process.env,
     MCP_BROWSER_PID_FILE: PID_FILE,
-    NODE_ENV: isDev ? "development" : (process.env.NODE_ENV || "production"),
+    NODE_ENV: isDev ? 'development' : process.env.NODE_ENV || 'production',
   };
 
   console.error(`[mcp-wrapper] Starting child: node ${JS_ENTRY}`);
 
-  child = spawn("node", [JS_ENTRY], {
-    stdio: ["inherit", "inherit", "inherit"], // stdout → parent (JSON-RPC)
+  child = spawn('node', [JS_ENTRY], {
+    stdio: ['inherit', 'inherit', 'inherit'], // stdout → parent (JSON-RPC)
     env,
   });
 
-  child.on("exit", async (code, sig) => {
+  child.on('exit', async (code, sig) => {
     console.error(`[mcp-wrapper] Child exited: code=${code} sig=${sig}`);
 
     if (isDev) {
       // In dev mode, don't auto-restart (prevents infinite loop)
       // Restart is triggered by file change detection
       if (!restarting) {
-        console.error("[mcp-wrapper] Dev mode: child exited, waiting for restart trigger");
+        console.error(
+          '[mcp-wrapper] Dev mode: child exited, waiting for restart trigger',
+        );
         // Don't exit wrapper - keep it alive for hot-reload
       }
       return;
@@ -113,7 +119,9 @@ function spawnChild() {
     restartTimestamps = restartTimestamps.filter(t => t >= cutoff);
 
     if (restartTimestamps.length > MAX_RESTARTS_PER_MIN) {
-      console.error(`[mcp-wrapper] ERROR: Too many restarts (${restartTimestamps.length}/min) → stopping`);
+      console.error(
+        `[mcp-wrapper] ERROR: Too many restarts (${restartTimestamps.length}/min) → stopping`,
+      );
       await killChromeFromPidFile();
       process.exit(1);
     }
@@ -129,7 +137,7 @@ function spawnChild() {
   // Reset backoff after successful run
   setTimeout(() => {
     backoff = BACKOFF_START;
-    console.error("[mcp-wrapper] Backoff reset to", BACKOFF_START);
+    console.error('[mcp-wrapper] Backoff reset to', BACKOFF_START);
   }, 30_000).unref();
 }
 
@@ -143,7 +151,7 @@ async function restartChild() {
   }
 
   restarting = true;
-  console.error("[mcp-wrapper] Restarting child...");
+  console.error('[mcp-wrapper] Restarting child...');
 
   await stopChild();
   await killChromeFromPidFile();
@@ -162,7 +170,7 @@ async function restartChild() {
  */
 async function killChromeFromPidFile() {
   try {
-    const txt = await fs.readFile(PID_FILE, "utf8").catch(() => "");
+    const txt = await fs.readFile(PID_FILE, 'utf8').catch(() => '');
     const pid = Number(txt.trim());
 
     if (pid > 0) {
@@ -170,14 +178,14 @@ async function killChromeFromPidFile() {
         // Check if process exists
         process.kill(pid, 0);
         // Process exists, kill it
-        process.kill(pid, "SIGKILL");
+        process.kill(pid, 'SIGKILL');
         console.error(`[mcp-wrapper] Killed orphaned Chrome process: ${pid}`);
       } catch (err) {
         // Process doesn't exist (already dead)
       }
     }
 
-    await fs.rm(PID_FILE, { force: true });
+    await fs.rm(PID_FILE, {force: true});
   } catch (err) {
     // Ignore errors (file might not exist)
   }
@@ -187,31 +195,31 @@ async function killChromeFromPidFile() {
  * Development Mode: tsc -w + build directory watcher
  */
 async function startDev() {
-  console.error("[mcp-wrapper] ========================================");
-  console.error("[mcp-wrapper] DEVELOPMENT MODE");
-  console.error("[mcp-wrapper] ========================================");
-  console.error("[mcp-wrapper] - tsc -w for auto-compilation");
-  console.error("[mcp-wrapper] - Watching:", BUILD_GLOB);
-  console.error("[mcp-wrapper] - Hot-reload: ON");
-  console.error("[mcp-wrapper] ========================================");
+  console.error('[mcp-wrapper] ========================================');
+  console.error('[mcp-wrapper] DEVELOPMENT MODE');
+  console.error('[mcp-wrapper] ========================================');
+  console.error('[mcp-wrapper] - tsc -w for auto-compilation');
+  console.error('[mcp-wrapper] - Watching:', BUILD_GLOB);
+  console.error('[mcp-wrapper] - Hot-reload: ON');
+  console.error('[mcp-wrapper] ========================================');
 
   // Start tsc -w (TypeScript watch mode)
-  tscProc = spawn("npx", ["tsc", "-w", "-p", TS_PROJECT], {
-    stdio: ["ignore", "pipe", "inherit"], // stdout → pipe (redirect to stderr)
+  tscProc = spawn('npx', ['tsc', '-w', '-p', TS_PROJECT], {
+    stdio: ['ignore', 'pipe', 'inherit'], // stdout → pipe (redirect to stderr)
     env: process.env,
   });
 
   // Redirect tsc output to stderr (keep stdout clean for JSON-RPC)
-  tscProc.stdout.on("data", (buf) => {
+  tscProc.stdout.on('data', buf => {
     process.stderr.write(Buffer.from(`[tsc] ${buf.toString()}`));
   });
 
-  tscProc.on("exit", (code) => {
+  tscProc.on('exit', code => {
     console.error(`[mcp-wrapper] tsc -w exited: ${code}`);
   });
 
   // Wait for initial build (5 seconds)
-  console.error("[mcp-wrapper] Waiting for initial build...");
+  console.error('[mcp-wrapper] Waiting for initial build...');
   await sleep(5000);
 
   // Start child process
@@ -222,28 +230,34 @@ async function startDev() {
     ignoreInitial: true,
     awaitWriteFinish: {
       stabilityThreshold: 120,
-      pollInterval: 20
-    }
+      pollInterval: 20,
+    },
   });
 
-  watcher.on("all", async (event, file) => {
+  watcher.on('all', async (event, file) => {
     console.error(`[mcp-wrapper] Build changed: ${event} ${file}`);
     await restartChild();
   });
 
-  console.error("[mcp-wrapper] Hot-reload active! Edit TypeScript files to see changes.");
+  console.error(
+    '[mcp-wrapper] Hot-reload active! Edit TypeScript files to see changes.',
+  );
 }
 
 /**
  * Production Mode: single child + auto-restart on crash
  */
 async function startProd() {
-  console.error("[mcp-wrapper] ========================================");
-  console.error("[mcp-wrapper] PRODUCTION MODE");
-  console.error("[mcp-wrapper] ========================================");
-  console.error("[mcp-wrapper] - Auto-restart: ON");
-  console.error("[mcp-wrapper] - Rate limit:", MAX_RESTARTS_PER_MIN, "restarts/min");
-  console.error("[mcp-wrapper] ========================================");
+  console.error('[mcp-wrapper] ========================================');
+  console.error('[mcp-wrapper] PRODUCTION MODE');
+  console.error('[mcp-wrapper] ========================================');
+  console.error('[mcp-wrapper] - Auto-restart: ON');
+  console.error(
+    '[mcp-wrapper] - Rate limit:',
+    MAX_RESTARTS_PER_MIN,
+    'restarts/min',
+  );
+  console.error('[mcp-wrapper] ========================================');
 
   spawnChild();
 }
@@ -252,15 +266,15 @@ async function startProd() {
  * Shutdown handler
  */
 async function shutdown() {
-  console.error("[mcp-wrapper] Shutting down...");
+  console.error('[mcp-wrapper] Shutting down...');
 
   await stopChild();
   await killChromeFromPidFile();
 
   if (tscProc && !tscProc.killed) {
     try {
-      tscProc.kill("SIGTERM");
-      console.error("[mcp-wrapper] Killed tsc -w");
+      tscProc.kill('SIGTERM');
+      console.error('[mcp-wrapper] Killed tsc -w');
     } catch {}
   }
 
@@ -268,10 +282,10 @@ async function shutdown() {
 }
 
 // ==== Signal Handling ====
-process.on("SIGINT", shutdown);
-process.on("SIGTERM", shutdown);
-process.on("uncaughtException", async (err) => {
-  console.error("[mcp-wrapper] Uncaught exception:", err);
+process.on('SIGINT', shutdown);
+process.on('SIGTERM', shutdown);
+process.on('uncaughtException', async err => {
+  console.error('[mcp-wrapper] Uncaught exception:', err);
   await shutdown();
 });
 

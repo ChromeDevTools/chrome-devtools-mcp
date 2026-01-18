@@ -28,8 +28,16 @@ export const emulate = defineTool({
   },
   schema: {
     target: z.enum(['cpu', 'network']).describe('Emulation target'),
-    throttlingRate: z.number().min(1).max(20).optional().describe('CPU rate 1-20x'),
-    throttlingOption: z.enum(throttlingOptions).optional().describe('Network option'),
+    throttlingRate: z
+      .number()
+      .min(1)
+      .max(20)
+      .optional()
+      .describe('CPU rate 1-20x'),
+    throttlingOption: z
+      .enum(throttlingOptions)
+      .optional()
+      .describe('Network option'),
   },
   handler: async (request, response, context) => {
     const {target, throttlingRate, throttlingOption} = request.params;

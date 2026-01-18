@@ -36,12 +36,14 @@ Add to the **root level** of your MCP client configuration file:
 ```
 
 **Benefits of global configuration:**
+
 - ✅ Applies to all projects automatically
 - ✅ Single source of truth for MCP settings
 - ✅ Easy to maintain and update
 - ✅ No need to configure per-project
 
 **Configuration file locations:**
+
 - **Claude Code**: `~/.claude.json` (global mcpServers section)
 - **Cursor**: `~/.cursor/extensions_config.json`
 - **VS Code Copilot**: `.vscode/settings.json` or global settings
@@ -108,6 +110,7 @@ You can add various options to customize the behavior in your global configurati
 All examples below use **global configuration** in `~/.claude.json`. These configurations apply to all your projects.
 
 ### Basic Setup (Zero Configuration)
+
 ```json
 {
   "mcpServers": {
@@ -118,9 +121,11 @@ All examples below use **global configuration** in `~/.claude.json`. These confi
   }
 }
 ```
+
 This will automatically detect and use your system Chrome profile with all installed extensions.
 
 ### For Extension Development
+
 ```json
 {
   "mcpServers": {
@@ -137,6 +142,7 @@ This will automatically detect and use your system Chrome profile with all insta
 ```
 
 ### Load Multiple Extensions from Directory
+
 ```json
 {
   "mcpServers": {
@@ -152,15 +158,13 @@ This will automatically detect and use your system Chrome profile with all insta
 ```
 
 ### Isolated Testing Environment
+
 ```json
 {
   "mcpServers": {
     "chrome-devtools-extension": {
       "command": "npx",
-      "args": [
-        "chrome-devtools-mcp-for-extension@latest",
-        "--isolated"
-      ]
+      "args": ["chrome-devtools-mcp-for-extension@latest", "--isolated"]
     }
   }
 }
@@ -184,6 +188,7 @@ This will automatically detect and use your system Chrome profile with all insta
 ```
 
 **When to use:**
+
 - ✅ You want the same MCP configuration for all projects
 - ✅ You want to simplify maintenance (single place to update)
 - ✅ You're developing multiple extensions that share the same setup
@@ -218,6 +223,7 @@ This will automatically detect and use your system Chrome profile with all insta
 ```
 
 **When to use:**
+
 - You need different extension configurations for different projects
 - Project-A needs `--isolated` mode, but Project-B needs system extensions
 - You want to override global settings for specific projects
@@ -265,15 +271,18 @@ jq --arg project "/path/to/your/project" '
 Once configured, you can use these tools:
 
 ### Essential Extension Tools
+
 - `list_extensions` - List all installed Chrome extensions
 - `reload_extension` - Reload an extension after making changes
 - `inspect_service_worker` - Debug extension's background scripts
 
 ### Web Store Submission Tools
+
 - `submit_to_webstore` - Automatically prepare and submit extension to Chrome Web Store
 - `generate_extension_screenshots` - Generate screenshots for store listing
 
 ### Browser Control Tools
+
 - `navigate_page` - Navigate to any URL
 - `take_screenshot` - Capture screenshots
 - `click`, `fill`, `fill_form` - Interact with web pages
@@ -293,16 +302,19 @@ Once configured, you can say things like:
 ## 🐛 Troubleshooting
 
 ### MCP not showing in client
+
 1. **For Claude Code**: Use `claude mcp list` to verify installation
 2. Make sure the configuration is valid
 3. Restart your MCP client completely
 
 ### Chrome launches but extensions don't load
+
 1. Use `--headless=false` to see what's happening
 2. Make sure extension paths are absolute, not relative
 3. Check that manifest.json is valid
 
 ### Permission errors
+
 1. Make sure Chrome is not already running with the same profile
 2. Try using `--isolated` flag for a clean profile
 3. Check file permissions on extension directories

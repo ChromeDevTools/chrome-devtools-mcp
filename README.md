@@ -11,13 +11,16 @@ Built for: Claude Code, Cursor, VS Code Copilot, Cline, and other MCP-compatible
 ## 📦 For Users: Quick Start
 
 ### Installation
+
 /
 **Option 1: Direct execution (recommended)**
+
 ```bash
 npx chrome-devtools-mcp-for-extension@latest
 ```
 
 **Option 2: Global installation**
+
 ```bash
 npm install -g chrome-devtools-mcp-for-extension
 chrome-devtools-mcp-for-extension
@@ -28,6 +31,7 @@ chrome-devtools-mcp-for-extension
 Add to your MCP client configuration file:
 
 **For Claude Code** (`~/.claude.json`):
+
 ```json
 {
   "mcpServers": {
@@ -40,6 +44,7 @@ Add to your MCP client configuration file:
 ```
 
 **For other MCP clients** (Cursor, VS Code Copilot, Cline):
+
 - Refer to your client's MCP configuration documentation
 - Use the same `command` and `args` as above
 
@@ -68,6 +73,7 @@ To test your own extensions under development:
 ```
 
 **Directory structure:**
+
 ```
 /path/to/your/extensions/
 ├── extension-1/
@@ -83,6 +89,7 @@ To test your own extensions under development:
 ### Local Development Setup
 
 **1. Clone and install:**
+
 ```bash
 git clone https://github.com/usedhonda/chrome-devtools-mcp.git
 cd chrome-devtools-mcp
@@ -93,6 +100,7 @@ npm run build
 **2. Configure MCP client to use local version:**
 
 Update `~/.claude.json`:
+
 ```json
 {
   "mcpServers": {
@@ -112,6 +120,7 @@ Update `~/.claude.json`:
 ### Development Workflow
 
 **Standard workflow (manual rebuild):**
+
 ```bash
 # 1. Edit TypeScript files
 vim src/tools/extensions.ts
@@ -127,6 +136,7 @@ npm run build
 ```
 
 **Hot-reload workflow (automatic rebuild):**
+
 ```bash
 # 1. Update MCP configuration to use wrapper
 # Edit ~/.claude.json:
@@ -156,6 +166,7 @@ vim src/tools/extensions.ts
 ```
 
 **Hot-reload benefits:**
+
 - ✅ Automatic TypeScript compilation (`tsc -w`)
 - ✅ Automatic server restart on file changes
 - ✅ No VSCode Reload Window needed
@@ -189,6 +200,7 @@ chrome-devtools-mcp/
 ### Internal Architecture
 
 **For users (production):**
+
 ```
 npx chrome-devtools-mcp-for-extension@latest
   ↓
@@ -200,6 +212,7 @@ MCP Server (single process, simple)
 ```
 
 **For developers (hot-reload):**
+
 ```
 node scripts/mcp-wrapper.mjs (MCP_ENV=development)
   ↓
@@ -213,12 +226,14 @@ MCP Server (development mode, 2-5s reload)
 ```
 
 **Key files:**
+
 - `scripts/cli.mjs`: Simple wrapper for production (loads browser-globals-mock)
 - `scripts/mcp-wrapper.mjs`: Development wrapper (hot-reload with tsc -w)
 - `scripts/browser-globals-mock.mjs`: Polyfills for chrome-devtools-frontend in Node.js
 - `src/main.ts`: Main MCP server (includes fallback browser globals)
 
 **Why browser-globals-mock?**
+
 - chrome-devtools-frontend expects browser globals (`location`, `self`, `localStorage`)
 - Node.js doesn't have these globals
 - `--import` flag loads the mock BEFORE any chrome-devtools-frontend modules
@@ -275,6 +290,7 @@ git push && git push --tags
 ## 📚 Common Workflows
 
 ### Create & Test Extension
+
 ```
 1. "Create a Chrome extension that blocks ads"
 2. "List extensions to verify it loaded"
@@ -283,6 +299,7 @@ git push && git push --tags
 ```
 
 ### Debug Extension Issues
+
 ```
 1. "List extensions and show any errors"
 2. "Inspect service worker for my-ad-blocker"
@@ -291,6 +308,7 @@ git push && git push --tags
 ```
 
 ### Publish to Web Store
+
 ```
 1. "Generate screenshots for my extension"
 2. "Validate manifest for Web Store compliance"
@@ -301,14 +319,14 @@ git push && git push --tags
 
 ## 🛠️ Core Tools
 
-| Tool | Purpose | Example |
-|------|---------|---------|
-| `open_extension_popup` | Select popup window | "Open my extension popup" |
-| `reload_iframe_extension` | Hot-reload via CDP | "Reload extension" |
-| `patch_iframe_popup` | Edit & reload | "Patch popup.html" |
-| `ask_chatgpt_web` | ChatGPT research | "Ask ChatGPT about..." |
-| `take_snapshot` | Page analysis | "Snapshot current page" |
-| `list_pages` | Browser tabs | "List open pages" |
+| Tool                      | Purpose             | Example                   |
+| ------------------------- | ------------------- | ------------------------- |
+| `open_extension_popup`    | Select popup window | "Open my extension popup" |
+| `reload_iframe_extension` | Hot-reload via CDP  | "Reload extension"        |
+| `patch_iframe_popup`      | Edit & reload       | "Patch popup.html"        |
+| `ask_chatgpt_web`         | ChatGPT research    | "Ask ChatGPT about..."    |
+| `take_snapshot`           | Page analysis       | "Snapshot current page"   |
+| `list_pages`              | Browser tabs        | "List open pages"         |
 
 **Note:** Extension tools use CDP (Chrome DevTools Protocol) for reliable operation.
 Shadow DOM-based tools (`list_extensions`, `reload_extension`, etc.) were removed in v0.19.0
@@ -327,6 +345,7 @@ due to Chrome security restrictions.
 ```
 
 **Common fixes:**
+
 - Verify manifest.json is at root of extension directory
 - Check extension path in `--loadExtensionsDir`
 - Ensure manifest is valid Manifest V3
@@ -334,11 +353,13 @@ due to Chrome security restrictions.
 ### MCP Server Not Starting
 
 **Check version:**
+
 ```bash
 npx chrome-devtools-mcp-for-extension@latest --version
 ```
 
 **Clear npx cache:**
+
 ```bash
 npx clear-npx-cache
 # or
@@ -346,6 +367,7 @@ rm -rf ~/.npm/_npx
 ```
 
 **Check MCP configuration:**
+
 ```bash
 cat ~/.claude.json | jq '.mcpServers'
 ```
@@ -353,16 +375,19 @@ cat ~/.claude.json | jq '.mcpServers'
 ### Hot-Reload Not Working (Developers)
 
 **Verify development mode:**
+
 ```bash
 ps aux | grep mcp-wrapper | grep MCP_ENV=development
 ```
 
 **Check tsc -w is running:**
+
 ```bash
 ps aux | grep 'tsc -w'
 ```
 
 **Manually restart wrapper:**
+
 ```bash
 pkill -f mcp-wrapper
 # Then restart AI client (Cmd+R)
@@ -385,12 +410,14 @@ pkill -f mcp-wrapper
 ### Tool Categories
 
 **Core Tools (18)** - Stable, site-independent:
+
 - Input: click, hover, fill, drag, fill_form, upload_file
 - Navigation: pages, navigate, resize_page, handle_dialog
 - Debugging: list_console_messages, take_screenshot, evaluate_script, take_snapshot, wait_for
 - Analysis: emulate, network, performance
 
 **Optional Tools (2)** - Web-LLM, site-dependent (may break with UI changes):
+
 - `ask_chatgpt_web` - ChatGPT browser automation
 - `ask_gemini_web` - Gemini browser automation
 
@@ -431,6 +458,7 @@ Load custom plugins at startup:
 ```
 
 **Plugin Interface:**
+
 ```typescript
 // my-plugin.js
 export default {
@@ -442,18 +470,20 @@ export default {
     ctx.registry.register({
       name: 'my_custom_tool',
       description: 'Does something useful',
-      schema: { /* zod schema */ },
-      annotations: { category: 'automation' },
+      schema: {
+        /* zod schema */
+      },
+      annotations: {category: 'automation'},
       async handler(input, response, context) {
         // Tool implementation
-      }
+      },
     });
     ctx.log('Plugin registered!');
   },
 
   async unload() {
     // Cleanup if needed
-  }
+  },
 };
 ```
 
@@ -464,6 +494,7 @@ export default {
 This project is a fork of [Chrome DevTools MCP](https://github.com/ChromeDevTools/chrome-devtools-mcp) by Google LLC.
 
 **Major additions:**
+
 - Chrome extension development tools
 - Web Store automation
 - ChatGPT integration

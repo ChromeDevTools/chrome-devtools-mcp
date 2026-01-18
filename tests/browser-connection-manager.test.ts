@@ -51,19 +51,13 @@ describe('BrowserConnectionManager', () => {
       manager.setBrowser(mockBrowser as unknown as Browser, slowFactory);
 
       // Simulate concurrent CDP errors
-      const operation1 = manager.executeWithRetry(
-        async () => {
-          throw new ProtocolError('Target closed');
-        },
-        'operation1',
-      );
+      const operation1 = manager.executeWithRetry(async () => {
+        throw new ProtocolError('Target closed');
+      }, 'operation1');
 
-      const operation2 = manager.executeWithRetry(
-        async () => {
-          throw new ProtocolError('Target closed');
-        },
-        'operation2',
-      );
+      const operation2 = manager.executeWithRetry(async () => {
+        throw new ProtocolError('Target closed');
+      }, 'operation2');
 
       // Both should fail but factory should only be called once per retry attempt
       await Promise.allSettled([operation1, operation2]);
@@ -89,12 +83,14 @@ describe('BrowserConnectionManager', () => {
     it('should transition to CLOSED on browser disconnected event', async () => {
       let disconnectedHandler: (() => void) | null = null;
 
-      (mockBrowser as any).on = sinon.stub().callsFake((event: string, handler: any) => {
-        if (event === 'disconnected') {
-          disconnectedHandler = handler;
-        }
-        return mockBrowser;
-      });
+      (mockBrowser as any).on = sinon
+        .stub()
+        .callsFake((event: string, handler: any) => {
+          if (event === 'disconnected') {
+            disconnectedHandler = handler;
+          }
+          return mockBrowser;
+        });
 
       manager.setBrowser(mockBrowser as unknown as Browser, browserFactory);
       assert.strictEqual(manager.isConnected(), true);
@@ -138,7 +134,10 @@ describe('BrowserConnectionManager', () => {
         return mockBrowser;
       });
 
-      manager.setBrowser(mockBrowser as unknown as Browser, failingBrowserFactory);
+      manager.setBrowser(
+        mockBrowser as unknown as Browser,
+        failingBrowserFactory,
+      );
 
       const failingOperation = async () => {
         throw new ProtocolError('Target closed');
@@ -179,8 +178,13 @@ describe('BrowserConnectionManager', () => {
       };
 
       // Make browserFactory always fail to trigger all retry attempts
-      const failingBrowserFactory = sinon.stub().rejects(new Error('Connection failed'));
-      manager.setBrowser(mockBrowser as unknown as Browser, failingBrowserFactory);
+      const failingBrowserFactory = sinon
+        .stub()
+        .rejects(new Error('Connection failed'));
+      manager.setBrowser(
+        mockBrowser as unknown as Browser,
+        failingBrowserFactory,
+      );
 
       const failingOperation = async () => {
         throw new ProtocolError('Target closed');
@@ -208,18 +212,24 @@ describe('BrowserConnectionManager', () => {
       manager.setBrowser(mockBrowser as unknown as Browser, browserFactory);
 
       // Verify that 'on' was called with 'disconnected' event
-      sinon.assert.calledWith(mockBrowser.on as sinon.SinonStub, 'disconnected', sinon.match.func);
+      sinon.assert.calledWith(
+        mockBrowser.on as sinon.SinonStub,
+        'disconnected',
+        sinon.match.func,
+      );
     });
 
     it('should trigger reconnection on disconnected event', async () => {
       let disconnectedHandler: (() => void) | null = null;
 
-      (mockBrowser as any).on = sinon.stub().callsFake((event: string, handler: any) => {
-        if (event === 'disconnected') {
-          disconnectedHandler = handler;
-        }
-        return mockBrowser;
-      });
+      (mockBrowser as any).on = sinon
+        .stub()
+        .callsFake((event: string, handler: any) => {
+          if (event === 'disconnected') {
+            disconnectedHandler = handler;
+          }
+          return mockBrowser;
+        });
 
       manager.setBrowser(mockBrowser as unknown as Browser, browserFactory);
 
@@ -241,17 +251,14 @@ describe('BrowserConnectionManager', () => {
 
       // Next operation that fails with CDP error should trigger reconnection
       let operationCallCount = 0;
-      const result = await manager.executeWithRetry(
-        async () => {
-          operationCallCount++;
-          if (operationCallCount === 1) {
-            // First call fails with CDP error, triggering reconnection
-            throw new ProtocolError('Target closed');
-          }
-          return 'success';
-        },
-        'test-operation',
-      );
+      const result = await manager.executeWithRetry(async () => {
+        operationCallCount++;
+        if (operationCallCount === 1) {
+          // First call fails with CDP error, triggering reconnection
+          throw new ProtocolError('Target closed');
+        }
+        return 'success';
+      }, 'test-operation');
 
       assert.strictEqual(result, 'success');
       sinon.assert.called(browserFactory);
@@ -261,7 +268,9 @@ describe('BrowserConnectionManager', () => {
   describe('CDP error detection', () => {
     it('should detect ProtocolError as CDP connection error', async () => {
       // Make reconnection always fail to trigger CDPReconnectionError
-      const failingFactory = sinon.stub().rejects(new Error('Connection failed'));
+      const failingFactory = sinon
+        .stub()
+        .rejects(new Error('Connection failed'));
       manager.setBrowser(mockBrowser as unknown as Browser, failingFactory);
 
       const error = new ProtocolError('Target closed');
@@ -280,7 +289,9 @@ describe('BrowserConnectionManager', () => {
 
     it('should detect TimeoutError as CDP connection error', async () => {
       // Make reconnection always fail to trigger CDPReconnectionError
-      const failingFactory = sinon.stub().rejects(new Error('Connection failed'));
+      const failingFactory = sinon
+        .stub()
+        .rejects(new Error('Connection failed'));
       manager.setBrowser(mockBrowser as unknown as Browser, failingFactory);
 
       const error = new TimeoutError('Navigation timeout');
@@ -308,9 +319,16 @@ describe('BrowserConnectionManager', () => {
       for (const errorMessage of testCases) {
         // Create fresh manager and failing factory for each test case
         resetConnectionManager();
-        const testManager = new BrowserConnectionManager({enableLogging: false});
-        const failingFactory = sinon.stub().rejects(new Error('Connection failed'));
-        testManager.setBrowser(mockBrowser as unknown as Browser, failingFactory);
+        const testManager = new BrowserConnectionManager({
+          enableLogging: false,
+        });
+        const failingFactory = sinon
+          .stub()
+          .rejects(new Error('Connection failed'));
+        testManager.setBrowser(
+          mockBrowser as unknown as Browser,
+          failingFactory,
+        );
 
         const error = new Error(errorMessage);
         const operation = async () => {
@@ -424,7 +442,9 @@ describe('BrowserConnectionManager', () => {
       });
 
       // Make reconnection always fail to test max attempts
-      const failingFactory = sinon.stub().rejects(new Error('Connection failed'));
+      const failingFactory = sinon
+        .stub()
+        .rejects(new Error('Connection failed'));
       manager.setBrowser(mockBrowser as unknown as Browser, failingFactory);
 
       const operation = async () => {
@@ -445,7 +465,9 @@ describe('BrowserConnectionManager', () => {
 
     it('should throw CDPReconnectionError after max attempts', async () => {
       // Make reconnection always fail to trigger CDPReconnectionError
-      const failingFactory = sinon.stub().rejects(new Error('Connection failed'));
+      const failingFactory = sinon
+        .stub()
+        .rejects(new Error('Connection failed'));
       manager.setBrowser(mockBrowser as unknown as Browser, failingFactory);
 
       const operation = async () => {
@@ -467,7 +489,9 @@ describe('BrowserConnectionManager', () => {
   describe('Utility methods', () => {
     it('should track reconnection attempts', async () => {
       // Make reconnection always fail to test attempt tracking
-      const failingFactory = sinon.stub().rejects(new Error('Connection failed'));
+      const failingFactory = sinon
+        .stub()
+        .rejects(new Error('Connection failed'));
       manager.setBrowser(mockBrowser as unknown as Browser, failingFactory);
 
       assert.strictEqual(manager.getReconnectAttempts(), 0);
@@ -486,7 +510,9 @@ describe('BrowserConnectionManager', () => {
 
     it('should reset reconnection attempt counter', async () => {
       // Make reconnection always fail to test attempt tracking and reset
-      const failingFactory = sinon.stub().rejects(new Error('Connection failed'));
+      const failingFactory = sinon
+        .stub()
+        .rejects(new Error('Connection failed'));
       manager.setBrowser(mockBrowser as unknown as Browser, failingFactory);
 
       const operation = async () => {

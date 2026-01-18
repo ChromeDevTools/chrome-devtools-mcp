@@ -36,10 +36,7 @@ describe('snapshot', () => {
           context,
         );
 
-        assert.equal(
-          response.responseLines[0],
-          'Found: "Hello"',
-        );
+        assert.equal(response.responseLines[0], 'Found: "Hello"');
         assert.ok(response.includeSnapshot);
       });
     });
@@ -63,10 +60,7 @@ describe('snapshot', () => {
 
         await handlePromise;
 
-        assert.equal(
-          response.responseLines[0],
-          'Found: "Hello World"',
-        );
+        assert.equal(response.responseLines[0], 'Found: "Hello World"');
         assert.ok(response.includeSnapshot);
       });
     });
@@ -88,10 +82,7 @@ describe('snapshot', () => {
           context,
         );
 
-        assert.equal(
-          response.responseLines[0],
-          'Found: "Header"',
-        );
+        assert.equal(response.responseLines[0], 'Found: "Header"');
         assert.ok(response.includeSnapshot);
       });
     });

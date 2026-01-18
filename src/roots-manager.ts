@@ -160,7 +160,10 @@ function getStableIdentityHash(rootPath: string): string | undefined {
   try {
     const identity = resolveStableIdentity(rootPath);
     // Only use stable identity for high-confidence sources (git-based)
-    if (identity.confidence === 'high' || identity.source === 'MCP_PROFILE_ID') {
+    if (
+      identity.confidence === 'high' ||
+      identity.source === 'MCP_PROFILE_ID'
+    ) {
       return identity.id;
     }
   } catch {
@@ -213,7 +216,13 @@ export async function resolveRoots(
     // Get stable identity hash from first root
     const rootPath = getRootPathFromUri(rootsUris[0]);
     const stableHash = rootPath ? getStableIdentityHash(rootPath) : undefined;
-    const profileKey = generateProfileKey(rootsUris, clientName, clientVersion, projectName, stableHash);
+    const profileKey = generateProfileKey(
+      rootsUris,
+      clientName,
+      clientVersion,
+      projectName,
+      stableHash,
+    );
 
     console.error(
       `[roots] Resolved via roots/list: key=${profileKey}, project=${projectName}, client=${clientName}, stableId=${stableHash || 'none'}`,
@@ -236,7 +245,13 @@ export async function resolveRoots(
 
     // Get stable identity hash
     const stableHash = getStableIdentityHash(fallbackOptions.cliProjectRoot);
-    const profileKey = generateProfileKey([uri], clientName, clientVersion, projectName, stableHash);
+    const profileKey = generateProfileKey(
+      [uri],
+      clientName,
+      clientVersion,
+      projectName,
+      stableHash,
+    );
 
     console.error(
       `[roots] Resolved via --project-root: key=${profileKey}, project=${projectName}, stableId=${stableHash || 'none'}`,
@@ -259,7 +274,13 @@ export async function resolveRoots(
 
     // Get stable identity hash
     const stableHash = getStableIdentityHash(fallbackOptions.envProjectRoot);
-    const profileKey = generateProfileKey([uri], clientName, clientVersion, projectName, stableHash);
+    const profileKey = generateProfileKey(
+      [uri],
+      clientName,
+      clientVersion,
+      projectName,
+      stableHash,
+    );
 
     console.error(
       `[roots] Resolved via MCP_PROJECT_ROOT: key=${profileKey}, project=${projectName}, stableId=${stableHash || 'none'}`,
@@ -282,7 +303,13 @@ export async function resolveRoots(
 
     // Get stable identity hash
     const stableHash = getStableIdentityHash(fallbackOptions.autoCwd);
-    const profileKey = generateProfileKey([uri], clientName, clientVersion, projectName, stableHash);
+    const profileKey = generateProfileKey(
+      [uri],
+      clientName,
+      clientVersion,
+      projectName,
+      stableHash,
+    );
 
     console.error(
       `[roots] Resolved via AUTO (cwd): key=${profileKey}, project=${projectName}, stableId=${stableHash || 'none'}`,
@@ -301,7 +328,12 @@ export async function resolveRoots(
   // Absolute fallback
   const fallbackUri = 'file:///unknown';
   const fallbackProjectName = 'unknown';
-  const profileKey = generateProfileKey([fallbackUri], clientName, clientVersion, fallbackProjectName);
+  const profileKey = generateProfileKey(
+    [fallbackUri],
+    clientName,
+    clientVersion,
+    fallbackProjectName,
+  );
 
   console.error('[roots] WARNING: No roots available, using fallback');
 

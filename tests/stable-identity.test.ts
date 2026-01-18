@@ -1,4 +1,3 @@
-
 /**
  * @license
  * Copyright 2026 Google LLC
@@ -8,9 +7,9 @@
 // Tests for stable project identity resolution
 
 import assert from 'node:assert';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import { normalizeGitUrl } from '../src/stable-identity.js';
+import {normalizeGitUrl} from '../src/stable-identity.js';
 
 describe('normalizeGitUrl', () => {
   it('should normalize SSH URLs', () => {

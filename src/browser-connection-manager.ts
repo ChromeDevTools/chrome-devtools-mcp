@@ -118,7 +118,9 @@ export class BrowserConnectionManager {
       return await operation();
     } catch (error) {
       if (this.isCDPConnectionError(error)) {
-        this.log(`CDP connection error in ${operationName}, attempting reconnect...`);
+        this.log(
+          `CDP connection error in ${operationName}, attempting reconnect...`,
+        );
         return await this.retryWithReconnect(operation, operationName);
       }
       throw error;
@@ -152,11 +154,12 @@ export class BrowserConnectionManager {
     }, overallTimeout);
 
     // Start reconnection sequence
-    this.reconnectSequenceInFlight = this._runReconnectionSequence(abortController.signal)
-      .finally(() => {
-        clearTimeout(timeoutId);
-        this.reconnectSequenceInFlight = null;
-      });
+    this.reconnectSequenceInFlight = this._runReconnectionSequence(
+      abortController.signal,
+    ).finally(() => {
+      clearTimeout(timeoutId);
+      this.reconnectSequenceInFlight = null;
+    });
 
     return this.reconnectSequenceInFlight;
   }
@@ -205,10 +208,7 @@ export class BrowserConnectionManager {
       this.log(`Reconnect attempt ${attemptNum}/${maxAttempts}...`);
 
       // Exponential backoff with max delay
-      const baseDelay = Math.min(
-        initialDelay * Math.pow(2, attempt),
-        maxDelay,
-      );
+      const baseDelay = Math.min(initialDelay * Math.pow(2, attempt), maxDelay);
 
       // Add jitter: ±20% randomness to prevent thundering herd
       const jitter = baseDelay * 0.2 * (random() * 2 - 1);
@@ -257,7 +257,11 @@ export class BrowserConnectionManager {
     const method = error?.method?.toString?.().toLowerCase?.() ?? '';
 
     // Message hints
-    if (/connection closed|session closed|target closed|websocket is not open/.test(msg)) {
+    if (
+      /connection closed|session closed|target closed|websocket is not open/.test(
+        msg,
+      )
+    ) {
       return true;
     }
 
@@ -337,7 +341,10 @@ export class BrowserConnectionManager {
   /**
    * Create user-friendly error for reconnection failure
    */
-  private createReconnectionFailedError(attempts: number, lastError: any): Error {
+  private createReconnectionFailedError(
+    attempts: number,
+    lastError: any,
+  ): Error {
     const message = `
 ❌ Chrome DevTools接続エラー
 
@@ -386,7 +393,7 @@ ${lastError?.message || 'Unknown error'}
    * Sleep for specified milliseconds
    */
   private sleep(ms: number): Promise<void> {
-    return new Promise((resolve) => setTimeout(resolve, ms));
+    return new Promise(resolve => setTimeout(resolve, ms));
   }
 
   /**

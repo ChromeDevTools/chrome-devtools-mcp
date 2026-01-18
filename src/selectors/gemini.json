@@ -1,24 +1,24 @@
 {
-    "version": "1.0.0",
-    "lastUpdated": "2025-11-27",
-    "description": "Selectors for Gemini web interface",
-    "elements": {
-        "editor": {
-            "css": "div[contenteditable='true']",
-            "description": "Main input editor"
-        },
-        "sendButton": {
-            "ax": {
-                "ariaLabel": "送信"
-            },
-            "description": "Send message button"
-        },
-        "response": {
-            "css": "model-response",
-            "description": "Response container"
-        }
+  "version": "1.0.0",
+  "lastUpdated": "2025-11-27",
+  "description": "Selectors for Gemini web interface",
+  "elements": {
+    "editor": {
+      "css": "div[contenteditable='true']",
+      "description": "Main input editor"
     },
-    "placeholders": {
-        "normalMode": "プロンプトを入力"
+    "sendButton": {
+      "ax": {
+        "ariaLabel": "送信"
+      },
+      "description": "Send message button"
+    },
+    "response": {
+      "css": "model-response",
+      "description": "Response container"
     }
+  },
+  "placeholders": {
+    "normalMode": "プロンプトを入力"
+  }
 }

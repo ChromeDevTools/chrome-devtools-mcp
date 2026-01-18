@@ -143,7 +143,12 @@ export class McpContext implements Context {
     browserFactory?: () => Promise<Browser>,
     connectionOptions?: ConnectionManagerOptions,
   ) {
-    const context = new McpContext(browser, logger, browserFactory, connectionOptions);
+    const context = new McpContext(
+      browser,
+      logger,
+      browserFactory,
+      connectionOptions,
+    );
     await context.#init();
     return context;
   }
@@ -154,7 +159,7 @@ export class McpContext implements Context {
   async #disposeSessions(): Promise<void> {
     await Promise.allSettled([
       this.#browserSession?.detach(),
-      ...[...this.#pageSessions.values()].map(s => s.detach())
+      ...[...this.#pageSessions.values()].map(s => s.detach()),
     ]);
     this.#browserSession = undefined;
     this.#pageSessions.clear();
@@ -175,7 +180,9 @@ export class McpContext implements Context {
 
       // 3. Enable Target discovery and auto-attach
       try {
-        await this.#browserSession.send('Target.setDiscoverTargets', { discover: true });
+        await this.#browserSession.send('Target.setDiscoverTargets', {
+          discover: true,
+        });
         this.logger('CDP: Target discovery enabled');
       } catch (err) {
         this.logger('Warning: Failed to enable target discovery:', err);
@@ -185,7 +192,7 @@ export class McpContext implements Context {
         await this.#browserSession.send('Target.setAutoAttach', {
           autoAttach: true,
           waitForDebuggerOnStart: false,
-          flatten: true
+          flatten: true,
         });
         this.logger('CDP: Auto-attach configured');
       } catch (err) {
@@ -212,7 +219,10 @@ export class McpContext implements Context {
             this.#pageSessions.set(page, session);
             this.logger(`CDP domains enabled for ${type}: ${page.url()}`);
           } catch (err) {
-            this.logger(`Warning: Failed to enable CDP domains for ${type} ${page.url()}:`, err);
+            this.logger(
+              `Warning: Failed to enable CDP domains for ${type} ${page.url()}:`,
+              err,
+            );
           }
         }
 

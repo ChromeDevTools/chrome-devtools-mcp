@@ -48,7 +48,10 @@ export const network = defineTool({
     url: z.string().optional().describe('Request URL (for get)'),
     pageSize: z.number().int().positive().optional().describe('Max results'),
     pageIdx: z.number().int().min(0).optional().describe('Page number'),
-    resourceTypes: z.array(z.enum(FILTERABLE_RESOURCE_TYPES)).optional().describe('Filter types'),
+    resourceTypes: z
+      .array(z.enum(FILTERABLE_RESOURCE_TYPES))
+      .optional()
+      .describe('Filter types'),
   },
   handler: async (request, response) => {
     const {op, url, pageSize, pageIdx, resourceTypes} = request.params;

@@ -5,7 +5,7 @@
  */
 
 import fs from 'node:fs';
-import { promises as fsPromises } from 'node:fs';
+import {promises as fsPromises} from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
@@ -18,9 +18,12 @@ import type {
 } from 'puppeteer-core';
 import puppeteer from 'puppeteer-core';
 
-import { resolveUserDataDir } from './profile-resolver.js';
-import { isProjectRootInitialized, getProjectRoot } from './project-root-state.js';
-import type { RootsInfo } from './roots-manager.js';
+import {resolveUserDataDir} from './profile-resolver.js';
+import {
+  isProjectRootInitialized,
+  getProjectRoot,
+} from './project-root-state.js';
+import type {RootsInfo} from './roots-manager.js';
 import {
   detectSystemChromeProfile,
   detectAnySystemChromeProfile,
@@ -30,7 +33,6 @@ import {
 } from './system-profile.js';
 
 let browser: Browser | undefined;
-
 
 const ignoredPrefixes = new Set([
   'chrome://',
@@ -111,7 +113,10 @@ function scanExtensionsDirectory(extensionsDir: string): string[] {
 
             if (fs.existsSync(subManifestPath)) {
               try {
-                const manifestContent = fs.readFileSync(subManifestPath, 'utf-8');
+                const manifestContent = fs.readFileSync(
+                  subManifestPath,
+                  'utf-8',
+                );
                 const manifest = JSON.parse(manifestContent);
 
                 if (manifest.manifest_version) {
@@ -163,19 +168,50 @@ function getSystemChromeExecutable(channel?: Channel): string {
   } else if (platform === 'win32') {
     // Windows
     const programFiles = process.env['ProgramFiles'] || 'C:\\Program Files';
-    const programFilesX86 = process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)';
+    const programFilesX86 =
+      process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)';
 
     if (channel === 'canary') {
-      return path.join(process.env.LOCALAPPDATA || '', 'Google', 'Chrome SxS', 'Application', 'chrome.exe');
+      return path.join(
+        process.env.LOCALAPPDATA || '',
+        'Google',
+        'Chrome SxS',
+        'Application',
+        'chrome.exe',
+      );
     } else if (channel === 'beta') {
-      return path.join(programFiles, 'Google', 'Chrome Beta', 'Application', 'chrome.exe');
+      return path.join(
+        programFiles,
+        'Google',
+        'Chrome Beta',
+        'Application',
+        'chrome.exe',
+      );
     } else if (channel === 'dev') {
-      return path.join(programFiles, 'Google', 'Chrome Dev', 'Application', 'chrome.exe');
+      return path.join(
+        programFiles,
+        'Google',
+        'Chrome Dev',
+        'Application',
+        'chrome.exe',
+      );
     }
 
     // Try both Program Files locations
-    const path1 = path.join(programFiles, 'Google', 'Chrome', 'Application', 'chrome.exe');
-    const path2 = path.join(programFilesX86, 'Google', 'Chrome', 'Application', 'chrome.exe');
+    const path1 = path.join(
+      programFiles,
+      'Google',
+      'Chrome',
+      'Application',
+      'chrome.exe',
+    );
+    const path2 = path.join(
+      programFilesX86,
+      'Google',
+      'Chrome',
+      'Application',
+      'chrome.exe',
+    );
 
     if (fs.existsSync(path1)) return path1;
     if (fs.existsSync(path2)) return path2;
@@ -205,24 +241,76 @@ function getSystemChromeUserDataDir(channel?: Channel): string {
 
   if (platform === 'darwin') {
     // macOS
-    let chromeDataPath = path.join(homeDir, 'Library', 'Application Support', 'Google', 'Chrome');
+    let chromeDataPath = path.join(
+      homeDir,
+      'Library',
+      'Application Support',
+      'Google',
+      'Chrome',
+    );
     if (channel === 'canary') {
-      chromeDataPath = path.join(homeDir, 'Library', 'Application Support', 'Google', 'Chrome Canary');
+      chromeDataPath = path.join(
+        homeDir,
+        'Library',
+        'Application Support',
+        'Google',
+        'Chrome Canary',
+      );
     } else if (channel === 'beta') {
-      chromeDataPath = path.join(homeDir, 'Library', 'Application Support', 'Google', 'Chrome Beta');
+      chromeDataPath = path.join(
+        homeDir,
+        'Library',
+        'Application Support',
+        'Google',
+        'Chrome Beta',
+      );
     } else if (channel === 'dev') {
-      chromeDataPath = path.join(homeDir, 'Library', 'Application Support', 'Google', 'Chrome Dev');
+      chromeDataPath = path.join(
+        homeDir,
+        'Library',
+        'Application Support',
+        'Google',
+        'Chrome Dev',
+      );
     }
     return chromeDataPath;
   } else if (platform === 'win32') {
     // Windows
-    let chromeDataPath = path.join(homeDir, 'AppData', 'Local', 'Google', 'Chrome', 'User Data');
+    let chromeDataPath = path.join(
+      homeDir,
+      'AppData',
+      'Local',
+      'Google',
+      'Chrome',
+      'User Data',
+    );
     if (channel === 'canary') {
-      chromeDataPath = path.join(homeDir, 'AppData', 'Local', 'Google', 'Chrome SxS', 'User Data');
+      chromeDataPath = path.join(
+        homeDir,
+        'AppData',
+        'Local',
+        'Google',
+        'Chrome SxS',
+        'User Data',
+      );
     } else if (channel === 'beta') {
-      chromeDataPath = path.join(homeDir, 'AppData', 'Local', 'Google', 'Chrome Beta', 'User Data');
+      chromeDataPath = path.join(
+        homeDir,
+        'AppData',
+        'Local',
+        'Google',
+        'Chrome Beta',
+        'User Data',
+      );
     } else if (channel === 'dev') {
-      chromeDataPath = path.join(homeDir, 'AppData', 'Local', 'Google', 'Chrome Dev', 'User Data');
+      chromeDataPath = path.join(
+        homeDir,
+        'AppData',
+        'Local',
+        'Google',
+        'Chrome Dev',
+        'User Data',
+      );
     }
     return chromeDataPath;
   } else {
@@ -265,10 +353,12 @@ function readLocalState(userDataDir: string): {
     const lastUsed = json?.profile?.last_used;
 
     if (typeof lastUsed === 'string') {
-      return { lastUsed };
+      return {lastUsed};
     }
   } catch (error) {
-    console.warn(`Failed to read Local State: ${error instanceof Error ? error.message : String(error)}`);
+    console.warn(
+      `Failed to read Local State: ${error instanceof Error ? error.message : String(error)}`,
+    );
   }
 
   return {};
@@ -280,7 +370,10 @@ function readLocalState(userDataDir: string): {
 function compareVersion(a: string, b: string): number {
   // Normalize: "2.3.2_0" → [2, 3, 2]
   const normalize = (v: string) =>
-    v.split('_')[0].split('.').map(x => parseInt(x, 10) || 0);
+    v
+      .split('_')[0]
+      .split('.')
+      .map(x => parseInt(x, 10) || 0);
 
   const aParts = normalize(a);
   const bParts = normalize(b);
@@ -306,7 +399,7 @@ function scanExtensionsInProfile(profileDir: string): string[] {
   }
 
   try {
-    const extensionIds = fs.readdirSync(extensionsDir, { withFileTypes: true });
+    const extensionIds = fs.readdirSync(extensionsDir, {withFileTypes: true});
 
     for (const extensionEntry of extensionIds) {
       if (!extensionEntry.isDirectory()) continue;
@@ -314,7 +407,8 @@ function scanExtensionsInProfile(profileDir: string): string[] {
       const extensionIdPath = path.join(extensionsDir, extensionEntry.name);
 
       try {
-        const versions = fs.readdirSync(extensionIdPath, { withFileTypes: true })
+        const versions = fs
+          .readdirSync(extensionIdPath, {withFileTypes: true})
           .filter(e => e.isDirectory())
           .map(e => e.name);
 
@@ -328,14 +422,20 @@ function scanExtensionsInProfile(profileDir: string): string[] {
         const manifest = validateExtensionManifest(manifestPath);
         if (manifest) {
           extensionPaths.push(versionPath);
-          console.error(`  ✅ ${manifest.name} v${manifest.version} (MV${manifest.manifest_version})`);
+          console.error(
+            `  ✅ ${manifest.name} v${manifest.version} (MV${manifest.manifest_version})`,
+          );
         }
       } catch (error) {
-        console.warn(`Error processing extension ${extensionEntry.name}: ${error instanceof Error ? error.message : String(error)}`);
+        console.warn(
+          `Error processing extension ${extensionEntry.name}: ${error instanceof Error ? error.message : String(error)}`,
+        );
       }
     }
   } catch (error) {
-    console.error(`Error scanning extensions in ${extensionsDir}: ${error instanceof Error ? error.message : String(error)}`);
+    console.error(
+      `Error scanning extensions in ${extensionsDir}: ${error instanceof Error ? error.message : String(error)}`,
+    );
   }
 
   return extensionPaths;
@@ -353,23 +453,75 @@ function getChromeExtensionsDirectory(channel?: Channel): string {
 
   if (platform === 'darwin') {
     // macOS
-    chromeDataPath = path.join(homeDir, 'Library', 'Application Support', 'Google', 'Chrome');
+    chromeDataPath = path.join(
+      homeDir,
+      'Library',
+      'Application Support',
+      'Google',
+      'Chrome',
+    );
     if (channel === 'canary') {
-      chromeDataPath = path.join(homeDir, 'Library', 'Application Support', 'Google', 'Chrome Canary');
+      chromeDataPath = path.join(
+        homeDir,
+        'Library',
+        'Application Support',
+        'Google',
+        'Chrome Canary',
+      );
     } else if (channel === 'beta') {
-      chromeDataPath = path.join(homeDir, 'Library', 'Application Support', 'Google', 'Chrome Beta');
+      chromeDataPath = path.join(
+        homeDir,
+        'Library',
+        'Application Support',
+        'Google',
+        'Chrome Beta',
+      );
     } else if (channel === 'dev') {
-      chromeDataPath = path.join(homeDir, 'Library', 'Application Support', 'Google', 'Chrome Dev');
+      chromeDataPath = path.join(
+        homeDir,
+        'Library',
+        'Application Support',
+        'Google',
+        'Chrome Dev',
+      );
     }
   } else if (platform === 'win32') {
     // Windows
-    chromeDataPath = path.join(homeDir, 'AppData', 'Local', 'Google', 'Chrome', 'User Data');
+    chromeDataPath = path.join(
+      homeDir,
+      'AppData',
+      'Local',
+      'Google',
+      'Chrome',
+      'User Data',
+    );
     if (channel === 'canary') {
-      chromeDataPath = path.join(homeDir, 'AppData', 'Local', 'Google', 'Chrome SxS', 'User Data');
+      chromeDataPath = path.join(
+        homeDir,
+        'AppData',
+        'Local',
+        'Google',
+        'Chrome SxS',
+        'User Data',
+      );
     } else if (channel === 'beta') {
-      chromeDataPath = path.join(homeDir, 'AppData', 'Local', 'Google', 'Chrome Beta', 'User Data');
+      chromeDataPath = path.join(
+        homeDir,
+        'AppData',
+        'Local',
+        'Google',
+        'Chrome Beta',
+        'User Data',
+      );
     } else if (channel === 'dev') {
-      chromeDataPath = path.join(homeDir, 'AppData', 'Local', 'Google', 'Chrome Dev', 'User Data');
+      chromeDataPath = path.join(
+        homeDir,
+        'AppData',
+        'Local',
+        'Google',
+        'Chrome Dev',
+        'User Data',
+      );
     }
   } else {
     // Linux
@@ -409,7 +561,9 @@ interface ExtensionManifest {
   }>;
 }
 
-function validateExtensionManifest(manifestPath: string): ExtensionManifest | null {
+function validateExtensionManifest(
+  manifestPath: string,
+): ExtensionManifest | null {
   try {
     if (!fs.existsSync(manifestPath)) {
       return null;
@@ -430,7 +584,9 @@ function validateExtensionManifest(manifestPath: string): ExtensionManifest | nu
 
     return manifest;
   } catch (error) {
-    console.warn(`Invalid manifest.json at ${manifestPath}: ${error instanceof Error ? error.message : String(error)}`);
+    console.warn(
+      `Invalid manifest.json at ${manifestPath}: ${error instanceof Error ? error.message : String(error)}`,
+    );
     return null;
   }
 }
@@ -439,7 +595,10 @@ function validateExtensionManifest(manifestPath: string): ExtensionManifest | nu
  * Discover Chrome extensions installed in the system
  * Uses Local State to determine the active profile, or uses specified profile
  */
-function discoverSystemExtensions(channel?: Channel, chromeProfile?: string): string[] {
+function discoverSystemExtensions(
+  channel?: Channel,
+  chromeProfile?: string,
+): string[] {
   console.error(`🔍 Discovering system Chrome extensions...`);
 
   const userDataDir = getSystemChromeUserDataDir(channel);
@@ -454,11 +613,13 @@ function discoverSystemExtensions(channel?: Channel, chromeProfile?: string): st
     console.error(`🎯 Using CLI-specified profile: ${targetProfile}`);
   } else {
     // Read Local State to get last used profile
-    const { lastUsed } = readLocalState(userDataDir);
+    const {lastUsed} = readLocalState(userDataDir);
     targetProfile = lastUsed || 'Default';
 
     if (lastUsed) {
-      console.error(`🎯 Using last-used profile from Local State: ${targetProfile}`);
+      console.error(
+        `🎯 Using last-used profile from Local State: ${targetProfile}`,
+      );
     } else {
       console.error(`🎯 Local State not found, using Default profile`);
     }
@@ -476,20 +637,28 @@ function discoverSystemExtensions(channel?: Channel, chromeProfile?: string): st
       const defaultProfileDir = path.join(userDataDir, targetProfile);
 
       if (!fs.existsSync(defaultProfileDir)) {
-        console.error(`❌ Default profile also not found. No extensions will be loaded.`);
+        console.error(
+          `❌ Default profile also not found. No extensions will be loaded.`,
+        );
         return [];
       }
     } else {
-      console.error(`❌ Default profile not found. No extensions will be loaded.`);
+      console.error(
+        `❌ Default profile not found. No extensions will be loaded.`,
+      );
       return [];
     }
   }
 
   // Scan the target profile
   console.error(`📂 Scanning profile: ${targetProfile}`);
-  const extensionPaths = scanExtensionsInProfile(path.join(userDataDir, targetProfile));
+  const extensionPaths = scanExtensionsInProfile(
+    path.join(userDataDir, targetProfile),
+  );
 
-  console.error(`📦 Total: ${extensionPaths.length} extension(s) found in profile "${targetProfile}"`);
+  console.error(
+    `📦 Total: ${extensionPaths.length} extension(s) found in profile "${targetProfile}"`,
+  );
 
   return extensionPaths;
 }
@@ -542,7 +711,7 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
   });
 
   const userDataDir = resolved.path;
-  await fs.promises.mkdir(userDataDir, { recursive: true });
+  await fs.promises.mkdir(userDataDir, {recursive: true});
 
   // Legacy profile warning (shown if legacy path exists)
   try {
@@ -573,7 +742,9 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
   // Profile resolution logs
   console.error(`[profiles] Using: ${userDataDir}`);
   console.error(`           Reason: ${resolved.reason}`);
-  console.error(`           Project: ${resolved.projectName} (${resolved.hash})`);
+  console.error(
+    `           Project: ${resolved.projectName} (${resolved.hash})`,
+  );
   console.error(`           Client:  ${resolved.clientId}`);
   if (resolved.reason === 'AUTO') {
     console.error(`           Root: ${process.cwd()}`);
@@ -605,13 +776,19 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
             developmentExtensionPaths.push(loadExtension); // Track as development extension
             console.error(`✅ Single extension validated: ${loadExtension}`);
           } else {
-            console.error(`❌ Invalid manifest.json in ${loadExtension}: missing manifest_version`);
+            console.error(
+              `❌ Invalid manifest.json in ${loadExtension}: missing manifest_version`,
+            );
           }
         } catch (error) {
-          console.error(`❌ Invalid manifest.json in ${loadExtension}: ${error instanceof Error ? error.message : String(error)}`);
+          console.error(
+            `❌ Invalid manifest.json in ${loadExtension}: ${error instanceof Error ? error.message : String(error)}`,
+          );
         }
       } else {
-        console.error(`❌ Extension path missing manifest.json: ${loadExtension}`);
+        console.error(
+          `❌ Extension path missing manifest.json: ${loadExtension}`,
+        );
       }
     } else {
       console.error(`❌ Extension path does not exist: ${loadExtension}`);
@@ -630,7 +807,9 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
     const systemExtensions = discoverSystemExtensions(channel, chromeProfile);
     if (systemExtensions.length > 0) {
       extensionPaths.push(...systemExtensions);
-      console.error(`✅ Loaded ${systemExtensions.length} system Chrome extension(s)`);
+      console.error(
+        `✅ Loaded ${systemExtensions.length} system Chrome extension(s)`,
+      );
     } else {
       console.warn(`⚠️  No system extensions found or accessible`);
     }
@@ -645,13 +824,17 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
     extensionPaths.forEach((path, index) => {
       console.error(`  ${index + 1}. ${path}`);
     });
-    console.error(`Chrome args will include: --load-extension=${extensionPaths.join(',')}`);
+    console.error(
+      `Chrome args will include: --load-extension=${extensionPaths.join(',')}`,
+    );
     console.error('Applied Chrome 137+ extension loading fix');
   }
 
   // Add Google login automation detection bypass
   args.push('--disable-blink-features=AutomationControlled');
-  console.error('Added Google login bypass: --disable-blink-features=AutomationControlled');
+  console.error(
+    'Added Google login bypass: --disable-blink-features=AutomationControlled',
+  );
 
   // Use system Chrome instead of Chrome for Testing when loading extensions
   let puppeterChannel: ChromeReleaseChannel | undefined;
@@ -662,7 +845,9 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
     effectiveExecutablePath = getSystemChromeExecutable(channel);
     console.error(`🔍 Auto-detected system Chrome: ${effectiveExecutablePath}`);
     console.error(`💡 Using system Chrome binary with isolated MCP profile`);
-    console.error(`📝 Extensions will be loaded from: ${extensionPaths.join(', ')}`);
+    console.error(
+      `📝 Extensions will be loaded from: ${extensionPaths.join(', ')}`,
+    );
   } else if (!executablePath) {
     // No extensions, use Chrome for Testing via channel
     puppeterChannel =
@@ -677,10 +862,14 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
   console.error(`  Executable: ${effectiveExecutablePath || 'auto-detected'}`);
   console.error(`  User Data Dir: ${userDataDir || 'temporary'}`);
   console.error(`  Profile Directory: ${profileDirectory}`);
-  console.error(`  Profile Type: ${usingSystemProfile ? 'System Profile (auto-detected)' : 'Custom Profile'}`);
+  console.error(
+    `  Profile Type: ${usingSystemProfile ? 'System Profile (auto-detected)' : 'Custom Profile'}`,
+  );
   console.error(`  Headless: ${headless}`);
   console.error(`  Args: ${JSON.stringify(args, null, 2)}`);
-  console.error(`  Ignored Default Args: ["--disable-extensions", "--enable-automation"]`);
+  console.error(
+    `  Ignored Default Args: ["--disable-extensions", "--enable-automation"]`,
+  );
 
   // IMPORTANT: Chrome extensions (especially MV3 content scripts and service workers)
   // DO NOT work in headless mode. Always use headless:false when loading extensions.
@@ -688,7 +877,9 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
   const effectiveHeadless = extensionPaths.length > 0 ? false : headless;
 
   if (extensionPaths.length > 0 && headless) {
-    console.warn('⚠️  WARNING: Extensions require headful mode. Forcing headless:false');
+    console.warn(
+      '⚠️  WARNING: Extensions require headful mode. Forcing headless:false',
+    );
   }
 
   let browser: Browser;
@@ -726,16 +917,18 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
         sessionId,
         channel || 'stable',
       );
-      await fs.promises.mkdir(tempPath, { recursive: true });
+      await fs.promises.mkdir(tempPath, {recursive: true});
 
       console.error(`⚠️  Profile locked: ${userDataDir}`);
       console.error(`📁 Falling back to ephemeral session: ${tempPath}`);
-      console.error(`💡 To avoid this, set MCP_CLIENT_ID (e.g., "claude-code", "codex")`);
+      console.error(
+        `💡 To avoid this, set MCP_CLIENT_ID (e.g., "claude-code", "codex")`,
+      );
 
       // Clean up on exit
       process.on('exit', () => {
         try {
-          fs.rmSync(tempPath, { recursive: true, force: true });
+          fs.rmSync(tempPath, {recursive: true, force: true});
         } catch {
           /* ignore */
         }
@@ -761,7 +954,6 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
   }
 
   try {
-
     // Log actual spawn args for debugging
     const spawnArgs = browser.process()?.spawnargs;
     if (spawnArgs) {
@@ -776,7 +968,7 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
     }
 
     // Apply Google login automation detection bypass to all pages
-    browser.on('targetcreated', async (target) => {
+    browser.on('targetcreated', async target => {
       if (target.type() === 'page') {
         try {
           const page = await target.page();
@@ -784,7 +976,7 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
             await page.evaluateOnNewDocument(() => {
               Object.defineProperty(window.navigator, 'webdriver', {
                 get: () => undefined,
-                configurable: true
+                configurable: true,
               });
             });
             console.error('Applied navigator.webdriver bypass to new page');
@@ -801,7 +993,7 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
       await page.evaluateOnNewDocument(() => {
         Object.defineProperty(window.navigator, 'webdriver', {
           get: () => undefined,
-          configurable: true
+          configurable: true,
         });
       });
       console.error('Applied navigator.webdriver bypass to existing page');
@@ -813,14 +1005,18 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
     console.error(`❌ Failed to launch Chrome`);
     console.error(`   User Data Dir: ${userDataDir}`);
     console.error(`   Profile Directory: ${profileDirectory}`);
-    console.error(`   Error: ${error instanceof Error ? error.message : String(error)}`);
+    console.error(
+      `   Error: ${error instanceof Error ? error.message : String(error)}`,
+    );
 
     if (usingSystemProfile) {
       console.error('');
       console.error('💡 Troubleshooting:');
       console.error('   1. Close all Chrome windows and try again');
       console.error('   2. Use --isolated flag to use temporary profile');
-      console.error('   3. Use --userDataDir to specify custom profile location');
+      console.error(
+        '   3. Use --userDataDir to specify custom profile location',
+      );
     }
 
     throw error;
@@ -830,7 +1026,9 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
 async function ensureBrowserLaunched(
   options: McpLaunchOptions,
 ): Promise<Browser> {
-  console.error(`[ensureBrowserLaunched] browser exists: ${!!browser}, connected: ${browser?.connected}`);
+  console.error(
+    `[ensureBrowserLaunched] browser exists: ${!!browser}, connected: ${browser?.connected}`,
+  );
 
   if (browser?.connected) {
     console.error(`[ensureBrowserLaunched] Reusing existing browser`);
@@ -859,7 +1057,11 @@ export async function resolveBrowser(options: {
 }) {
   // CRITICAL: Project root must be initialized before launching Chrome
   // This ensures proper profile isolation for multi-project environments
-  if (!isProjectRootInitialized() && !options.browserUrl && !options.userDataDir) {
+  if (
+    !isProjectRootInitialized() &&
+    !options.browserUrl &&
+    !options.userDataDir
+  ) {
     const errorMsg = [
       '❌ CRITICAL ERROR: Project root not initialized',
       '',
@@ -876,7 +1078,9 @@ export async function resolveBrowser(options: {
     ].join('\n');
 
     console.error(errorMsg);
-    throw new Error('Project root not initialized - cannot launch Chrome without profile isolation');
+    throw new Error(
+      'Project root not initialized - cannot launch Chrome without profile isolation',
+    );
   }
 
   const resolvedBrowser = options.browserUrl
@@ -890,7 +1094,7 @@ export {
   scanExtensionsDirectory,
   discoverSystemExtensions,
   getChromeExtensionsDirectory,
-  validateExtensionManifest
+  validateExtensionManifest,
 };
 export type Channel = 'stable' | 'canary' | 'beta' | 'dev';
-export type { ExtensionManifest };
+export type {ExtensionManifest};

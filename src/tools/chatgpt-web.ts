@@ -7,11 +7,15 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-import type { Page } from 'puppeteer-core';
+import type {Page} from 'puppeteer-core';
 import z from 'zod';
 
 import {CHATGPT_CONFIG} from '../config.js';
-import {getLoginStatus, waitForLoginStatus, LoginStatus} from '../login-helper.js';
+import {
+  getLoginStatus,
+  waitForLoginStatus,
+  LoginStatus,
+} from '../login-helper.js';
 
 import {ToolCategories} from './categories.js';
 import {defineTool} from './ToolDefinition.js';
@@ -21,36 +25,39 @@ import type {Context} from './ToolDefinition.js';
  * Navigate with retry logic for handling ERR_ABORTED and other network errors
  */
 async function navigateWithRetry(
-    page: Page,
-    url: string,
-    options: { waitUntil: 'networkidle2' | 'domcontentloaded' | 'load'; maxRetries?: number } = { waitUntil: 'networkidle2', maxRetries: 3 }
+  page: Page,
+  url: string,
+  options: {
+    waitUntil: 'networkidle2' | 'domcontentloaded' | 'load';
+    maxRetries?: number;
+  } = {waitUntil: 'networkidle2', maxRetries: 3},
 ): Promise<void> {
-    const { waitUntil, maxRetries = 3 } = options;
-    let lastError: Error | null = null;
+  const {waitUntil, maxRetries = 3} = options;
+  let lastError: Error | null = null;
 
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-        try {
-            await page.goto(url, { waitUntil, timeout: 30000 });
-            return; // Success
-        } catch (error) {
-            lastError = error instanceof Error ? error : new Error(String(error));
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      await page.goto(url, {waitUntil, timeout: 30000});
+      return; // Success
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
 
-            // Check if it's a retryable error
-            const isRetryable =
-                lastError.message.includes('ERR_ABORTED') ||
-                lastError.message.includes('ERR_CONNECTION_RESET') ||
-                lastError.message.includes('net::ERR_');
+      // Check if it's a retryable error
+      const isRetryable =
+        lastError.message.includes('ERR_ABORTED') ||
+        lastError.message.includes('ERR_CONNECTION_RESET') ||
+        lastError.message.includes('net::ERR_');
 
-            if (!isRetryable || attempt === maxRetries) {
-                throw lastError;
-            }
+      if (!isRetryable || attempt === maxRetries) {
+        throw lastError;
+      }
 
-            // Wait before retry (exponential backoff)
-            await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
-        }
+      // Wait before retry (exponential backoff)
+      await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
     }
+  }
 
-    throw lastError;
+  throw lastError;
 }
 
 /**
@@ -58,24 +65,26 @@ async function navigateWithRetry(
  * Returns existing ChatGPT tab if found, otherwise creates a new one
  * Also returns whether navigation is needed
  */
-async function getOrCreateChatGPTPage(context: Context): Promise<{ page: Page; needsNavigation: boolean }> {
-    // Refresh pages list
-    await context.createPagesSnapshot();
-    const pages = context.getPages();
+async function getOrCreateChatGPTPage(
+  context: Context,
+): Promise<{page: Page; needsNavigation: boolean}> {
+  // Refresh pages list
+  await context.createPagesSnapshot();
+  const pages = context.getPages();
 
-    // Look for existing ChatGPT tab
-    for (const page of pages) {
-        const url = page.url();
-        if (url.includes('chatgpt.com') || url.includes('chat.openai.com')) {
-            // Already on ChatGPT - bring to front and no navigation needed
-            await page.bringToFront();
-            return { page, needsNavigation: false };
-        }
+  // Look for existing ChatGPT tab
+  for (const page of pages) {
+    const url = page.url();
+    if (url.includes('chatgpt.com') || url.includes('chat.openai.com')) {
+      // Already on ChatGPT - bring to front and no navigation needed
+      await page.bringToFront();
+      return {page, needsNavigation: false};
     }
+  }
 
-    // No ChatGPT tab found, create a new one
-    const newPage = await context.newPage();
-    return { page: newPage, needsNavigation: true };
+  // No ChatGPT tab found, create a new one
+  const newPage = await context.newPage();
+  return {page: newPage, needsNavigation: true};
 }
 
 /**
@@ -114,14 +123,16 @@ async function loadChatSessions(): Promise<ChatSessions> {
       } else {
         // Old format - convert to array
         const oldSession = value as any;
-        migrated[projectName] = [{
-          chatId: oldSession.chatId,
-          url: oldSession.url,
-          lastUsed: oldSession.lastUsed,
-          title: oldSession.title,
-          createdAt: oldSession.lastUsed, // Use lastUsed as createdAt for old sessions
-          conversationCount: 1,
-        }];
+        migrated[projectName] = [
+          {
+            chatId: oldSession.chatId,
+            url: oldSession.url,
+            lastUsed: oldSession.lastUsed,
+            title: oldSession.title,
+            createdAt: oldSession.lastUsed, // Use lastUsed as createdAt for old sessions
+            conversationCount: 1,
+          },
+        ];
       }
     }
 
@@ -147,7 +158,7 @@ async function saveChatSession(
 
   // Check if session with same chatId already exists
   const existingIndex = sessions[projectName].findIndex(
-    s => s.chatId === session.chatId
+    s => s.chatId === session.chatId,
   );
 
   if (existingIndex >= 0) {
@@ -232,13 +243,18 @@ async function saveConversationLog(
   // If chatId is provided, save in chat-specific folder
   let logPath: string;
   if (metadata.chatId) {
-    const conversationNum = String(metadata.conversationNumber || 1).padStart(3, '0');
+    const conversationNum = String(metadata.conversationNumber || 1).padStart(
+      3,
+      '0',
+    );
     const filename = `${conversationNum}-${timestamp}-${topicSlug}.md`;
     const logDir = path.join('docs/ask/chatgpt', metadata.chatId);
     logPath = path.join(process.cwd(), logDir, filename);
 
     // Ensure chat directory exists
-    await fs.promises.mkdir(path.join(process.cwd(), logDir), {recursive: true});
+    await fs.promises.mkdir(path.join(process.cwd(), logDir), {
+      recursive: true,
+    });
   } else {
     // Fallback to old format (flat structure)
     const filename = `${timestamp}-${projectName}-${topicSlug}.md`;
@@ -284,23 +300,20 @@ export const askChatGPTWeb = defineTool({
       .string()
       .describe(
         'Detailed question to ask. Structure with: ' +
-        '(1) Context (tech stack, versions, constraints), ' +
-        '(2) Current State (exact error/logs/behavior), ' +
-        '(3) Goal (expected outcome), ' +
-        '(4) Attempts (what was tried, why it failed), ' +
-        '(5) Format (steps/code/table). ' +
-        "IMPORTANT: Do not mention you are an AI/MCP. No secrets/PII. Don't guess missing facts."
+          '(1) Context (tech stack, versions, constraints), ' +
+          '(2) Current State (exact error/logs/behavior), ' +
+          '(3) Goal (expected outcome), ' +
+          '(4) Attempts (what was tried, why it failed), ' +
+          '(5) Format (steps/code/table). ' +
+          "IMPORTANT: Do not mention you are an AI/MCP. No secrets/PII. Don't guess missing facts.",
       ),
-    projectName: z
-      .string()
-      .optional()
-      .describe('Project name (default: cwd)'),
+    projectName: z.string().optional().describe('Project name (default: cwd)'),
     createNewChat: z
       .boolean()
       .optional()
       .describe(
         'Force new chat. Only use true when user explicitly requests "新規で" or "new chat". ' +
-        'Default false = always continue existing project chat.'
+          'Default false = always continue existing project chat.',
       ),
   },
   handler: async (request, response, context) => {
@@ -314,15 +327,17 @@ export const askChatGPTWeb = defineTool({
       projectName || path.basename(process.cwd()) || 'unknown-project';
 
     // Get or create a dedicated ChatGPT tab
-    const { page, needsNavigation } = await getOrCreateChatGPTPage(context);
+    const {page, needsNavigation} = await getOrCreateChatGPTPage(context);
 
     try {
       // Step 1: Navigate to ChatGPT (only if not already there)
       response.appendResponseLine('ChatGPTに接続中...');
       if (needsNavigation) {
-        await navigateWithRetry(page, CHATGPT_CONFIG.DEFAULT_URL, {waitUntil: 'networkidle2'});
+        await navigateWithRetry(page, CHATGPT_CONFIG.DEFAULT_URL, {
+          waitUntil: 'networkidle2',
+        });
         // Wait for page to fully render (ChatGPT takes time to load UI)
-        await new Promise((resolve) => setTimeout(resolve, 2000));
+        await new Promise(resolve => setTimeout(resolve, 2000));
       } else {
         response.appendResponseLine('✅ 既存のChatGPTタブを再利用');
       }
@@ -333,9 +348,15 @@ export const askChatGPTWeb = defineTool({
       if (loginStatus === LoginStatus.NEEDS_LOGIN) {
         response.appendResponseLine('\n❌ ChatGPTへのログインが必要です');
         response.appendResponseLine('');
-        response.appendResponseLine('📱 ブラウザウィンドウでChatGPTにログインしてください：');
-        response.appendResponseLine('   1. ブラウザウィンドウの「ログイン」ボタンをクリック');
-        response.appendResponseLine('   2. メールアドレスまたはGoogleアカウントでログイン');
+        response.appendResponseLine(
+          '📱 ブラウザウィンドウでChatGPTにログインしてください：',
+        );
+        response.appendResponseLine(
+          '   1. ブラウザウィンドウの「ログイン」ボタンをクリック',
+        );
+        response.appendResponseLine(
+          '   2. メールアドレスまたはGoogleアカウントでログイン',
+        );
         response.appendResponseLine('');
 
         // Auto-poll for login completion (max 2 minutes)
@@ -343,11 +364,13 @@ export const askChatGPTWeb = defineTool({
           page,
           'chatgpt',
           120000,
-          (msg) => response.appendResponseLine(msg)
+          msg => response.appendResponseLine(msg),
         );
 
         if (finalStatus !== LoginStatus.LOGGED_IN) {
-          response.appendResponseLine('❌ ログインがタイムアウトしました。再度お試しください。');
+          response.appendResponseLine(
+            '❌ ログインがタイムアウトしました。再度お試しください。',
+          );
           return;
         }
       } else if (loginStatus === LoginStatus.IN_PROGRESS) {
@@ -355,7 +378,9 @@ export const askChatGPTWeb = defineTool({
         await new Promise(r => setTimeout(r, 2000));
         const retryStatus = await getLoginStatus(page, 'chatgpt');
         if (retryStatus !== LoginStatus.LOGGED_IN) {
-          response.appendResponseLine('⚠️ ログイン状態を確認できませんでした。再試行してください。');
+          response.appendResponseLine(
+            '⚠️ ログイン状態を確認できませんでした。再試行してください。',
+          );
           return;
         }
       }
@@ -374,16 +399,19 @@ export const askChatGPTWeb = defineTool({
         if (projectSessions.length > 0) {
           // Get the most recently used session
           const sortedSessions = [...projectSessions].sort(
-            (a, b) => new Date(b.lastUsed).getTime() - new Date(a.lastUsed).getTime()
+            (a, b) =>
+              new Date(b.lastUsed).getTime() - new Date(a.lastUsed).getTime(),
           );
           const latestSession = sortedSessions[0];
 
           response.appendResponseLine(
             `既存のプロジェクトチャットを使用: ${latestSession.url}`,
           );
-          await navigateWithRetry(page, latestSession.url, {waitUntil: 'networkidle2'});
+          await navigateWithRetry(page, latestSession.url, {
+            waitUntil: 'networkidle2',
+          });
           sessionChatId = latestSession.chatId;
-          await new Promise((resolve) => setTimeout(resolve, 2000));
+          await new Promise(resolve => setTimeout(resolve, 2000));
         } else {
           response.appendResponseLine(
             '既存チャットが見つかりませんでした。新規作成します。',
@@ -406,12 +434,12 @@ export const askChatGPTWeb = defineTool({
           }
         });
 
-        await new Promise((resolve) => setTimeout(resolve, 1000));
+        await new Promise(resolve => setTimeout(resolve, 1000));
 
         // Turn off temporary chat
         const tempChatDisabled = await page.evaluate(() => {
           const buttons = Array.from(document.querySelectorAll('button'));
-          const btn = buttons.find((b) => {
+          const btn = buttons.find(b => {
             const label = b.getAttribute('aria-label') || '';
             return label.includes('一時チャットをオフにする');
           });
@@ -424,14 +452,14 @@ export const askChatGPTWeb = defineTool({
 
         if (tempChatDisabled) {
           response.appendResponseLine('✅ 一時チャットを無効化');
-          await new Promise((resolve) => setTimeout(resolve, 500));
+          await new Promise(resolve => setTimeout(resolve, 500));
         }
       }
 
       // Step 4: Send question
       response.appendResponseLine('質問を送信中...');
 
-      const questionSent = await page.evaluate((questionText) => {
+      const questionSent = await page.evaluate(questionText => {
         const prosemirror = document.querySelector(
           '.ProseMirror[contenteditable="true"]',
         ) as HTMLElement;
@@ -451,7 +479,7 @@ export const askChatGPTWeb = defineTool({
         return;
       }
 
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      await new Promise(resolve => setTimeout(resolve, 500));
 
       // Click send button
       const sent = await page.evaluate(() => {
@@ -492,12 +520,14 @@ export const askChatGPTWeb = defineTool({
       let lastText = '';
 
       while (true) {
-        await new Promise((resolve) => setTimeout(resolve, 2000));
+        await new Promise(resolve => setTimeout(resolve, 2000));
 
         const status = await page.evaluate(() => {
           // Streaming detection - check for stop button by data-testid
           // When ChatGPT is generating, send-button becomes stop-button
-          const stopButton = document.querySelector('button[data-testid="stop-button"]');
+          const stopButton = document.querySelector(
+            'button[data-testid="stop-button"]',
+          );
           const isStreaming = !!stopButton;
 
           if (!isStreaming) {
@@ -529,8 +559,7 @@ export const askChatGPTWeb = defineTool({
           const assistantMessages = document.querySelectorAll(
             '[data-message-author-role="assistant"]',
           );
-          const latestMessage =
-            assistantMessages[assistantMessages.length - 1];
+          const latestMessage = assistantMessages[assistantMessages.length - 1];
           const currentText = latestMessage
             ? latestMessage.textContent?.substring(0, 200)
             : '';
@@ -587,15 +616,19 @@ export const askChatGPTWeb = defineTool({
               const chatUrl = page.url();
               const sessions = await loadChatSessions();
               const projectSessions = sessions[project] || [];
-              const existingSession = projectSessions.find(s => s.chatId === sessionChatId);
+              const existingSession = projectSessions.find(
+                s => s.chatId === sessionChatId,
+              );
 
               await saveChatSession(project, {
                 chatId: sessionChatId,
                 url: chatUrl,
                 lastUsed: new Date().toISOString(),
-                createdAt: existingSession?.createdAt || new Date().toISOString(),
+                createdAt:
+                  existingSession?.createdAt || new Date().toISOString(),
                 title: existingSession?.title || `[Project: ${project}]`,
-                conversationCount: (existingSession?.conversationCount || 0) + 1,
+                conversationCount:
+                  (existingSession?.conversationCount || 0) + 1,
               });
             }
           }
@@ -607,7 +640,9 @@ export const askChatGPTWeb = defineTool({
           // Get current conversation count
           const sessions = await loadChatSessions();
           const projectSessions = sessions[project] || [];
-          const currentSession = projectSessions.find(s => s.chatId === sessionChatId);
+          const currentSession = projectSessions.find(
+            s => s.chatId === sessionChatId,
+          );
           const conversationNum = currentSession?.conversationCount || 1;
 
           const logPath = await saveConversationLog(
@@ -642,7 +677,8 @@ export const askChatGPTWeb = defineTool({
         }
       }
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
       response.appendResponseLine(`❌ エラー: ${errorMessage}`);
     }
   },

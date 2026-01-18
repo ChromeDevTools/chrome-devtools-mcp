@@ -43,7 +43,11 @@ describe('pages', () => {
         const page = await context.newPage();
         assert.strictEqual(context.getSelectedPageIdx(), 1);
         assert.strictEqual(context.getPageByIdx(1), page);
-        await pages.handler({params: {op: 'close', pageIdx: 1}}, response, context);
+        await pages.handler(
+          {params: {op: 'close', pageIdx: 1}},
+          response,
+          context,
+        );
         assert.ok(page.isClosed());
         assert.ok(response.includePages);
       });
@@ -51,7 +55,11 @@ describe('pages', () => {
     it('cannot close the last page', async () => {
       await withBrowser(async (response, context) => {
         const page = context.getSelectedPage();
-        await pages.handler({params: {op: 'close', pageIdx: 0}}, response, context);
+        await pages.handler(
+          {params: {op: 'close', pageIdx: 0}},
+          response,
+          context,
+        );
         assert.deepStrictEqual(
           response.responseLines[0],
           `The last open page cannot be closed. It is fine to keep it open.`,
@@ -66,7 +74,11 @@ describe('pages', () => {
       await withBrowser(async (response, context) => {
         await context.newPage();
         assert.strictEqual(context.getSelectedPageIdx(), 1);
-        await pages.handler({params: {op: 'select', pageIdx: 0}}, response, context);
+        await pages.handler(
+          {params: {op: 'select', pageIdx: 0}},
+          response,
+          context,
+        );
         assert.strictEqual(context.getSelectedPageIdx(), 0);
         assert.ok(response.includePages);
       });
@@ -118,11 +130,7 @@ describe('pages', () => {
       await withBrowser(async (response, context) => {
         const page = context.getSelectedPage();
         await page.goto('data:text/html,<div>Hello MCP</div>');
-        await navigate.handler(
-          {params: {op: 'back'}},
-          response,
-          context,
-        );
+        await navigate.handler({params: {op: 'back'}}, response, context);
 
         assert.equal(
           await page.evaluate(() => document.location.href),
@@ -136,11 +144,7 @@ describe('pages', () => {
         const page = context.getSelectedPage();
         await page.goto('data:text/html,<div>Hello MCP</div>');
         await page.goBack();
-        await navigate.handler(
-          {params: {op: 'forward'}},
-          response,
-          context,
-        );
+        await navigate.handler({params: {op: 'forward'}}, response, context);
 
         assert.equal(
           await page.evaluate(() => document.querySelector('div')?.textContent),
@@ -151,11 +155,7 @@ describe('pages', () => {
     });
     it('go forward with error', async () => {
       await withBrowser(async (response, context) => {
-        await navigate.handler(
-          {params: {op: 'forward'}},
-          response,
-          context,
-        );
+        await navigate.handler({params: {op: 'forward'}}, response, context);
 
         assert.equal(
           response.responseLines.at(0),
@@ -166,11 +166,7 @@ describe('pages', () => {
     });
     it('go back with error', async () => {
       await withBrowser(async (response, context) => {
-        await navigate.handler(
-          {params: {op: 'back'}},
-          response,
-          context,
-        );
+        await navigate.handler({params: {op: 'back'}}, response, context);
 
         assert.equal(
           response.responseLines.at(0),

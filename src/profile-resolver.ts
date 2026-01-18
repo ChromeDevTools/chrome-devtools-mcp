@@ -1,4 +1,3 @@
-
 /**
  * @license
  * Copyright 2026 Google LLC
@@ -20,12 +19,12 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import {fileURLToPath} from 'node:url';
 
-import { detectClientType } from './client-detector.js';
-import { detectProjectName, detectProjectRoot } from './project-detector.js';
-import { getProjectRoot } from './project-root-state.js';
-import type { RootsInfo } from './roots-manager.js';
+import {detectClientType} from './client-detector.js';
+import {detectProjectName, detectProjectRoot} from './project-detector.js';
+import {getProjectRoot} from './project-root-state.js';
+import type {RootsInfo} from './roots-manager.js';
 import {
   resolveStableIdentity,
   type StableIdentitySource,
@@ -33,7 +32,15 @@ import {
 
 export interface ResolvedProfile {
   path: string;
-  reason: 'CLI' | 'MCP_USER_DATA_DIR' | 'MCP_PROJECT_ID' | 'AUTO' | 'DEFAULT' | 'roots/list' | 'MCP_PROJECT_ROOT' | '--project-root';
+  reason:
+    | 'CLI'
+    | 'MCP_USER_DATA_DIR'
+    | 'MCP_PROJECT_ID'
+    | 'AUTO'
+    | 'DEFAULT'
+    | 'roots/list'
+    | 'MCP_PROJECT_ROOT'
+    | '--project-root';
   projectKey: string; // e.g., "my-ext-app_1a2b3c4d" (v0.17.0: clientId removed)
   projectName: string; // e.g., "my-ext-app"
   hash: string; // e.g., "1a2b3c4d"
@@ -73,7 +80,10 @@ export function resolveUserDataDir(opts: ResolveOpts): ResolvedProfile {
     // - v0.18.x: URI+client+version hash, directory name as project name
     // - v0.19.0-v0.25.4: URI+client hash (no version), directory name as project name
     // - v0.25.5+: stable identity hash, package.json name as project name
-    if (!fs.existsSync(stableProfilePath) && opts.rootsInfo.rootsUris.length > 0) {
+    if (
+      !fs.existsSync(stableProfilePath) &&
+      opts.rootsInfo.rootsUris.length > 0
+    ) {
       try {
         const firstUri = opts.rootsInfo.rootsUris[0];
         const url = new URL(firstUri);
@@ -111,7 +121,7 @@ export function resolveUserDataDir(opts: ResolveOpts): ResolvedProfile {
                 .slice(0, 8),
             },
             // Format 2: v0.18.x (URI+client+version) - try common version strings
-            ...['1.0.0', '0.1.0', clientVersion].map((version) => ({
+            ...['1.0.0', '0.1.0', clientVersion].map(version => ({
               name: `uri+client+version(${version})`,
               hash: crypto
                 .createHash('sha256')
@@ -150,15 +160,23 @@ export function resolveUserDataDir(opts: ResolveOpts): ResolvedProfile {
                 console.error(
                   `[profiles] Migration: Found legacy profile (${format.name}, project=${projName}): ${legacyPath}`,
                 );
-                console.error(`[profiles] Migration: Creating symlink to stable profile: ${stableProfilePath}`);
+                console.error(
+                  `[profiles] Migration: Creating symlink to stable profile: ${stableProfilePath}`,
+                );
                 try {
-                  fs.mkdirSync(path.dirname(stableProfilePath), { recursive: true });
+                  fs.mkdirSync(path.dirname(stableProfilePath), {
+                    recursive: true,
+                  });
                   fs.symlinkSync(legacyPath, stableProfilePath, 'dir');
-                  console.error(`[profiles] Migration: ✅ Symlink created successfully`);
+                  console.error(
+                    `[profiles] Migration: ✅ Symlink created successfully`,
+                  );
                   migrated = true;
                   break;
                 } catch (e) {
-                  console.error(`[profiles] Migration: ⚠️ Failed to create symlink: ${e}`);
+                  console.error(
+                    `[profiles] Migration: ⚠️ Failed to create symlink: ${e}`,
+                  );
                 }
               }
             }
@@ -195,7 +213,9 @@ export function resolveUserDataDir(opts: ResolveOpts): ResolvedProfile {
   } else {
     const detected = detectClientType();
     clientId = sanitize(detected);
-    console.error(`[profiles] Auto-detected client from parent process: ${clientId}`);
+    console.error(
+      `[profiles] Auto-detected client from parent process: ${clientId}`,
+    );
   }
 
   // 0a) MCP_SHARED_PROFILE → shared profile across all projects
@@ -232,7 +252,7 @@ export function resolveUserDataDir(opts: ResolveOpts): ResolvedProfile {
     // best-effort cleanup on exit
     process.on('exit', () => {
       try {
-        fs.rmSync(tempPath, { recursive: true, force: true });
+        fs.rmSync(tempPath, {recursive: true, force: true});
       } catch {
         /* ignore */
       }
@@ -267,7 +287,9 @@ export function resolveUserDataDir(opts: ResolveOpts): ResolvedProfile {
       clientId,
       channel,
     };
-    console.error(`[profiles] resolved(CLI): ${result.path} (client=${clientId})`);
+    console.error(
+      `[profiles] resolved(CLI): ${result.path} (client=${clientId})`,
+    );
     return result;
   }
 
@@ -284,7 +306,9 @@ export function resolveUserDataDir(opts: ResolveOpts): ResolvedProfile {
       clientId,
       channel,
     };
-    console.error(`[profiles] resolved(MCP_USER_DATA_DIR): ${result.path} (client=${clientId})`);
+    console.error(
+      `[profiles] resolved(MCP_USER_DATA_DIR): ${result.path} (client=${clientId})`,
+    );
     return result;
   }
 
@@ -329,16 +353,22 @@ export function resolveUserDataDir(opts: ResolveOpts): ResolvedProfile {
       const stablePath = projectProfilePath(stableKey, clientId, channel);
 
       if (fs.existsSync(legacyPath)) {
-        console.error(`[profiles] Legacy profile exists, using it: ${legacyPath}`);
+        console.error(
+          `[profiles] Legacy profile exists, using it: ${legacyPath}`,
+        );
 
         // Create stable identity symlink for future moves
         if (legacyPath !== stablePath && !fs.existsSync(stablePath)) {
           try {
-            fs.mkdirSync(path.dirname(stablePath), { recursive: true });
+            fs.mkdirSync(path.dirname(stablePath), {recursive: true});
             fs.symlinkSync(legacyPath, stablePath, 'dir');
-            console.error(`[profiles] ✅ Created stable identity link: ${stablePath} -> ${legacyPath}`);
+            console.error(
+              `[profiles] ✅ Created stable identity link: ${stablePath} -> ${legacyPath}`,
+            );
           } catch (e) {
-            console.error(`[profiles] ⚠️ Failed to create stable identity link: ${e}`);
+            console.error(
+              `[profiles] ⚠️ Failed to create stable identity link: ${e}`,
+            );
           }
         }
 
@@ -358,7 +388,9 @@ export function resolveUserDataDir(opts: ResolveOpts): ResolvedProfile {
       // 2. Check stable identity profile
 
       if (fs.existsSync(stablePath)) {
-        console.error(`[profiles] Stable identity profile exists: ${stablePath}`);
+        console.error(
+          `[profiles] Stable identity profile exists: ${stablePath}`,
+        );
         const result: ResolvedProfile = {
           path: stablePath,
           reason: 'MCP_PROJECT_ROOT',
@@ -373,7 +405,9 @@ export function resolveUserDataDir(opts: ResolveOpts): ResolvedProfile {
       }
 
       // 3. Create new with stable identity
-      console.error(`[profiles] Creating new profile with stable identity: ${identity.source}`);
+      console.error(
+        `[profiles] Creating new profile with stable identity: ${identity.source}`,
+      );
       const result: ResolvedProfile = {
         path: stablePath,
         reason: 'MCP_PROJECT_ROOT',
@@ -394,7 +428,9 @@ export function resolveUserDataDir(opts: ResolveOpts): ResolvedProfile {
   // 4) INITIALIZED_PROJECT_ROOT: Use globally initialized project root (highest priority for AUTO mode)
   const initializedRoot = getProjectRoot();
   if (initializedRoot) {
-    console.error(`[profiles] Using initialized project root: "${initializedRoot}"`);
+    console.error(
+      `[profiles] Using initialized project root: "${initializedRoot}"`,
+    );
     try {
       const name = detectProjectName(initializedRoot);
       console.error(`[profiles] Initialized root name="${name}"`);
@@ -412,16 +448,22 @@ export function resolveUserDataDir(opts: ResolveOpts): ResolvedProfile {
       const stablePath = projectProfilePath(stableKey, clientId, channel);
 
       if (fs.existsSync(legacyPath)) {
-        console.error(`[profiles] Legacy profile exists, using it: ${legacyPath}`);
+        console.error(
+          `[profiles] Legacy profile exists, using it: ${legacyPath}`,
+        );
 
         // Create stable identity symlink for future moves
         if (legacyPath !== stablePath && !fs.existsSync(stablePath)) {
           try {
-            fs.mkdirSync(path.dirname(stablePath), { recursive: true });
+            fs.mkdirSync(path.dirname(stablePath), {recursive: true});
             fs.symlinkSync(legacyPath, stablePath, 'dir');
-            console.error(`[profiles] ✅ Created stable identity link: ${stablePath} -> ${legacyPath}`);
+            console.error(
+              `[profiles] ✅ Created stable identity link: ${stablePath} -> ${legacyPath}`,
+            );
           } catch (e) {
-            console.error(`[profiles] ⚠️ Failed to create stable identity link: ${e}`);
+            console.error(
+              `[profiles] ⚠️ Failed to create stable identity link: ${e}`,
+            );
           }
         }
 
@@ -441,7 +483,9 @@ export function resolveUserDataDir(opts: ResolveOpts): ResolvedProfile {
       // 2. Check stable identity profile
 
       if (fs.existsSync(stablePath)) {
-        console.error(`[profiles] Stable identity profile exists: ${stablePath}`);
+        console.error(
+          `[profiles] Stable identity profile exists: ${stablePath}`,
+        );
         const result: ResolvedProfile = {
           path: stablePath,
           reason: 'AUTO',
@@ -456,7 +500,9 @@ export function resolveUserDataDir(opts: ResolveOpts): ResolvedProfile {
       }
 
       // 3. Create new with stable identity
-      console.error(`[profiles] Creating new profile with stable identity: ${identity.source}`);
+      console.error(
+        `[profiles] Creating new profile with stable identity: ${identity.source}`,
+      );
       const result: ResolvedProfile = {
         path: stablePath,
         reason: 'AUTO',
@@ -476,7 +522,9 @@ export function resolveUserDataDir(opts: ResolveOpts): ResolvedProfile {
 
   // 5) AUTO: detect by root -> name -> hash (fallback if no initialized root)
   try {
-    console.error(`[profiles] AUTO detection (cwd fallback): cwd="${opts.cwd}"`);
+    console.error(
+      `[profiles] AUTO detection (cwd fallback): cwd="${opts.cwd}"`,
+    );
     const root = detectProjectRoot(opts.cwd);
     console.error(`[profiles] AUTO detection: root="${root}"`);
     const name = detectProjectName(root);
@@ -499,18 +547,22 @@ export function resolveUserDataDir(opts: ResolveOpts): ResolvedProfile {
     const stablePath = projectProfilePath(stableKey, clientId, channel);
 
     if (fs.existsSync(legacyPath)) {
-      console.error(`[profiles] Legacy profile exists, using it: ${legacyPath}`);
+      console.error(
+        `[profiles] Legacy profile exists, using it: ${legacyPath}`,
+      );
 
       // Also create stable identity symlink for future moves (if different and not exists)
       if (legacyPath !== stablePath && !fs.existsSync(stablePath)) {
         try {
-          fs.mkdirSync(path.dirname(stablePath), { recursive: true });
+          fs.mkdirSync(path.dirname(stablePath), {recursive: true});
           fs.symlinkSync(legacyPath, stablePath, 'dir');
           console.error(
             `[profiles] ✅ Created stable identity link for future moves: ${stablePath} -> ${legacyPath}`,
           );
         } catch (e) {
-          console.error(`[profiles] ⚠️ Failed to create stable identity link: ${e}`);
+          console.error(
+            `[profiles] ⚠️ Failed to create stable identity link: ${e}`,
+          );
         }
       }
 
@@ -599,7 +651,11 @@ function isCI(env: NodeJS.ProcessEnv): boolean {
   return env.CI === 'true' || env.GITHUB_ACTIONS === 'true';
 }
 
-function projectProfilePath(projectKey: string, clientId: string, channel: string): string {
+function projectProfilePath(
+  projectKey: string,
+  clientId: string,
+  channel: string,
+): string {
   // v0.17.0: Hierarchical structure - {project}/{client}/{channel}
   const base = path.join(CACHE_ROOT, 'profiles', projectKey, clientId, channel);
   return pathNormalize(base);

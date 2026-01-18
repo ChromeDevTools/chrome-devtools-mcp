@@ -16,7 +16,9 @@
 import fs from 'node:fs/promises';
 import process from 'node:process';
 
-interface Closeable { close: () => Promise<void> | void }
+interface Closeable {
+  close: () => Promise<void> | void;
+}
 
 export interface GracefulOptions {
   /**
@@ -76,7 +78,7 @@ export function setupGraceful(options: GracefulOptions) {
         }
       }
 
-      await fs.rm(pidFile, { force: true });
+      await fs.rm(pidFile, {force: true});
     } catch (err) {
       console.error(`[graceful] Error killing Chrome from PID file:`, err);
     }
@@ -92,7 +94,9 @@ export function setupGraceful(options: GracefulOptions) {
     }
 
     isShuttingDown = true;
-    console.error(`[graceful] Shutting down... (signal: ${signal || 'unknown'})`);
+    console.error(
+      `[graceful] Shutting down... (signal: ${signal || 'unknown'})`,
+    );
 
     try {
       // Step 1: onBeforeExit callback
@@ -140,12 +144,12 @@ export function setupGraceful(options: GracefulOptions) {
   process.on('SIGINT', () => gracefulExit('SIGINT'));
   process.on('disconnect', () => gracefulExit('disconnect')); // Parent died
 
-  process.on('uncaughtException', async (err) => {
+  process.on('uncaughtException', async err => {
     console.error('[graceful] Uncaught exception:', err);
     await gracefulExit('uncaughtException');
   });
 
-  process.on('unhandledRejection', async (err) => {
+  process.on('unhandledRejection', async err => {
     console.error('[graceful] Unhandled rejection:', err);
     await gracefulExit('unhandledRejection');
   });

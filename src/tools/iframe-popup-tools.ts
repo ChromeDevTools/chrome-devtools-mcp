@@ -1,4 +1,3 @@
-
 /**
  * @license
  * Copyright 2026 Google LLC
@@ -33,8 +32,7 @@ export async function findExtensionIdViaTargets(
 ): Promise<string> {
   const {targetInfos} = await cdp.send('Target.getTargets');
   const ext = targetInfos.find(
-    (t) =>
-      t.type === 'service_worker' && t.url.startsWith('chrome-extension://'),
+    t => t.type === 'service_worker' && t.url.startsWith('chrome-extension://'),
   );
   if (!ext) throw new Error('Extension service worker not found');
   return new URL(ext.url).host;
@@ -124,8 +122,8 @@ export async function inspectIframe(
     // due to Same-Origin Policy and Chrome extension isolation
     throw new Error(
       'EXTENSION_FRAME_UNREADABLE: Chrome extension iframes are isolated by ' +
-      'Same-Origin Policy and extension security model. The iframe exists but ' +
-      'cannot be read from the page context. This is expected Chrome behavior.',
+        'Same-Origin Policy and extension security model. The iframe exists but ' +
+        'cannot be read from the page context. This is expected Chrome behavior.',
     );
   } catch (error: any) {
     // If DOMSnapshot fails or iframe not found, provide clear explanation
@@ -135,7 +133,7 @@ export async function inspectIframe(
 
     throw new Error(
       `Failed to capture DOM snapshot: ${error.message}. ` +
-      'Note: Chrome extension iframes are typically unreadable due to security policies.',
+        'Note: Chrome extension iframes are typically unreadable due to security policies.',
     );
   } finally {
     await cdp.send('DOMSnapshot.disable');
@@ -216,7 +214,9 @@ async function sendToChildSession(
   return await new Promise((resolve, reject) => {
     const timeout = setTimeout(() => {
       cleanup();
-      reject(new Error(`Timeout waiting for response from child session: ${method}`));
+      reject(
+        new Error(`Timeout waiting for response from child session: ${method}`),
+      );
     }, 5000);
 
     const onMessage = (e: any) => {
@@ -264,11 +264,9 @@ export async function patchAndReload(
 export async function reloadExtension(cdp: CDPSession) {
   const {targetInfos} = await cdp.send('Target.getTargets');
   const sw = targetInfos.find(
-    (t) =>
-      t.type === 'service_worker' && t.url.startsWith('chrome-extension://'),
+    t => t.type === 'service_worker' && t.url.startsWith('chrome-extension://'),
   );
-  if (!sw)
-    throw new Error('Extension service worker not found for reload');
+  if (!sw) throw new Error('Extension service worker not found for reload');
 
   // Attach to the service worker and execute chrome.runtime.reload()
   const {sessionId} = await cdp.send('Target.attachToTarget', {

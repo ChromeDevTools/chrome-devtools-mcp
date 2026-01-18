@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Page } from 'puppeteer-core';
+import type {Page} from 'puppeteer-core';
 
 /**
  * Login status enum for state machine
@@ -61,14 +61,19 @@ export async function probeChatGPTSession(page: Page): Promise<LoginStatus> {
 
         // Handle non-JSON responses (WAF/interstitial pages)
         if (!isJson) {
-          return { ok: false, status: r.status, isHtml: true, error: 'Non-JSON response' };
+          return {
+            ok: false,
+            status: r.status,
+            isHtml: true,
+            error: 'Non-JSON response',
+          };
         }
 
         const j = await r.json().catch(() => ({}));
-        return { ok: r.ok, status: r.status, json: j };
+        return {ok: r.ok, status: r.status, json: j};
       } catch (e) {
         const isAbort = e instanceof Error && e.name === 'AbortError';
-        return { ok: false, error: String(e), isTimeout: isAbort };
+        return {ok: false, error: String(e), isTimeout: isAbort};
       }
     });
 
@@ -80,7 +85,9 @@ export async function probeChatGPTSession(page: Page): Promise<LoginStatus> {
 
     // Handle HTML response (WAF/blocked)
     if (result?.isHtml) {
-      console.error('[login-helper] Session probe returned HTML (possibly blocked)');
+      console.error(
+        '[login-helper] Session probe returned HTML (possibly blocked)',
+      );
       return LoginStatus.BLOCKED;
     }
 
@@ -106,7 +113,7 @@ export async function probeChatGPTSession(page: Page): Promise<LoginStatus> {
     const loggedIn = !!(hasUser || hasToken);
 
     console.error(
-      `[login-helper] ChatGPT session probe: ${loggedIn ? 'LOGGED_IN' : 'NEEDS_LOGIN'} (user: ${!!hasUser}, token: ${!!hasToken})`
+      `[login-helper] ChatGPT session probe: ${loggedIn ? 'LOGGED_IN' : 'NEEDS_LOGIN'} (user: ${!!hasUser}, token: ${!!hasToken})`,
     );
     return loggedIn ? LoginStatus.LOGGED_IN : LoginStatus.NEEDS_LOGIN;
   } catch (error) {
@@ -133,18 +140,25 @@ export async function getGeminiStatus(page: Page): Promise<LoginStatus> {
     const result = await page.evaluate((patterns: string[]) => {
       // FAIL-FAST: Check for Sign In link (Gemini recommendation)
       // This is language-agnostic and very reliable
-      const signInLink = document.querySelector('a[href*="accounts.google.com/ServiceLogin"]');
+      const signInLink = document.querySelector(
+        'a[href*="accounts.google.com/ServiceLogin"]',
+      );
       if (signInLink) {
-        return { signInPresent: true, profileFound: false };
+        return {signInPresent: true, profileFound: false};
       }
 
       // Check for Terms of Service / dialog blocking the UI (Gemini recommendation)
-      const hasBlockingDialog = document.querySelector('[role="dialog"]') !== null;
+      const hasBlockingDialog =
+        document.querySelector('[role="dialog"]') !== null;
 
       // Method 1: Check aria-label attribute
       for (const pattern of patterns) {
         if (document.querySelector(`button[aria-label*="${pattern}"]`)) {
-          return { signInPresent: false, profileFound: true, hasDialog: hasBlockingDialog };
+          return {
+            signInPresent: false,
+            profileFound: true,
+            hasDialog: hasBlockingDialog,
+          };
         }
       }
 
@@ -153,21 +167,37 @@ export async function getGeminiStatus(page: Page): Promise<LoginStatus> {
       for (const pattern of patterns) {
         const found = buttons.some(btn => btn.textContent?.includes(pattern));
         if (found) {
-          return { signInPresent: false, profileFound: true, hasDialog: hasBlockingDialog };
+          return {
+            signInPresent: false,
+            profileFound: true,
+            hasDialog: hasBlockingDialog,
+          };
         }
       }
 
       // Fallback: check for nav with chat history (logged-in indicator)
       if (document.querySelector('nav[aria-label*="Recent"]')) {
-        return { signInPresent: false, profileFound: true, hasDialog: hasBlockingDialog };
+        return {
+          signInPresent: false,
+          profileFound: true,
+          hasDialog: hasBlockingDialog,
+        };
       }
 
       // Fallback: check for textbox (user is on main chat page)
       if (document.querySelector('[role="textbox"]')) {
-        return { signInPresent: false, profileFound: true, hasDialog: hasBlockingDialog };
+        return {
+          signInPresent: false,
+          profileFound: true,
+          hasDialog: hasBlockingDialog,
+        };
       }
 
-      return { signInPresent: false, profileFound: false, hasDialog: hasBlockingDialog };
+      return {
+        signInPresent: false,
+        profileFound: false,
+        hasDialog: hasBlockingDialog,
+      };
     }, GEMINI_PROFILE_PATTERNS);
 
     // Fail-fast: Sign In link present means not logged in
@@ -178,14 +208,18 @@ export async function getGeminiStatus(page: Page): Promise<LoginStatus> {
 
     // Logged in but dialog blocking
     if (result.profileFound && result.hasDialog) {
-      console.error('[login-helper] Gemini: Logged in but dialog present (Terms of Service?)');
+      console.error(
+        '[login-helper] Gemini: Logged in but dialog present (Terms of Service?)',
+      );
       return LoginStatus.IN_PROGRESS;
     }
 
     console.error(
-      `[login-helper] Gemini check: ${result.profileFound ? 'LOGGED_IN' : 'NEEDS_LOGIN'}`
+      `[login-helper] Gemini check: ${result.profileFound ? 'LOGGED_IN' : 'NEEDS_LOGIN'}`,
     );
-    return result.profileFound ? LoginStatus.LOGGED_IN : LoginStatus.NEEDS_LOGIN;
+    return result.profileFound
+      ? LoginStatus.LOGGED_IN
+      : LoginStatus.NEEDS_LOGIN;
   } catch (error) {
     console.error(`[login-helper] Error checking Gemini status: ${error}`);
     return LoginStatus.IN_PROGRESS;
@@ -197,7 +231,7 @@ export async function getGeminiStatus(page: Page): Promise<LoginStatus> {
  */
 export async function getLoginStatus(
   page: Page,
-  provider: 'chatgpt' | 'gemini'
+  provider: 'chatgpt' | 'gemini',
 ): Promise<LoginStatus> {
   if (provider === 'chatgpt') {
     // Try session probe first (most reliable)
@@ -221,7 +255,7 @@ export async function waitForLoginStatus(
   page: Page,
   provider: 'chatgpt' | 'gemini',
   timeoutMs = 120000,
-  onStatusUpdate?: (message: string) => void
+  onStatusUpdate?: (message: string) => void,
 ): Promise<LoginStatus> {
   const log = onStatusUpdate || console.error;
   const start = Date.now();
@@ -241,7 +275,7 @@ export async function waitForLoginStatus(
       log(`⏳ まだ待機中... (${elapsed}秒経過)`);
     }
 
-    await new Promise((r) => setTimeout(r, delay));
+    await new Promise(r => setTimeout(r, delay));
     // Backoff with jitter (ChatGPT recommendation: ±10-20% randomization)
     const jitter = 0.9 + Math.random() * 0.2; // 0.9 to 1.1
     delay = Math.min(3000, Math.floor(delay * 1.5 * jitter));
@@ -266,7 +300,9 @@ export async function isLoginRequired(page: Page): Promise<boolean> {
     currentUrl.includes('login') ||
     currentUrl.includes('signin')
   ) {
-    console.error('[login-helper] ✅ Login required (URL contains auth/login/signin)');
+    console.error(
+      '[login-helper] ✅ Login required (URL contains auth/login/signin)',
+    );
     return true;
   }
 
@@ -276,7 +312,8 @@ export async function isLoginRequired(page: Page): Promise<boolean> {
       const geminiContent = await page.evaluate(() => {
         const bodyText = document.body.innerText.toLowerCase();
         // Check for common login page text
-        const hasLoginText = bodyText.includes('sign in') ||
+        const hasLoginText =
+          bodyText.includes('sign in') ||
           bodyText.includes('login') ||
           bodyText.includes('google account');
 
@@ -286,17 +323,23 @@ export async function isLoginRequired(page: Page): Promise<boolean> {
           document.querySelector('textarea')
         );
 
-        return { hasLoginText, hasComposer };
+        return {hasLoginText, hasComposer};
       });
 
-      console.error(`[login-helper] Gemini check: ${JSON.stringify(geminiContent)}`);
+      console.error(
+        `[login-helper] Gemini check: ${JSON.stringify(geminiContent)}`,
+      );
 
       if (geminiContent.hasComposer) {
-        console.error('[login-helper] ❌ Login NOT required (Gemini composer detected)');
+        console.error(
+          '[login-helper] ❌ Login NOT required (Gemini composer detected)',
+        );
         return false;
       }
 
-      console.error('[login-helper] ✅ Login required (Gemini composer missing)');
+      console.error(
+        '[login-helper] ✅ Login required (Gemini composer missing)',
+      );
       return true;
     } catch (error) {
       console.error(`[login-helper] Error checking Gemini login: ${error}`);
@@ -311,7 +354,8 @@ export async function isLoginRequired(page: Page): Promise<boolean> {
       const bodyText = document.body.innerText.toLowerCase();
 
       // ChatGPT-specific login indicators
-      const hasLoginText = bodyText.includes('log in') ||
+      const hasLoginText =
+        bodyText.includes('log in') ||
         bodyText.includes('sign in') ||
         bodyText.includes('welcome to chatgpt');
 
@@ -320,9 +364,10 @@ export async function isLoginRequired(page: Page): Promise<boolean> {
         document.querySelector('[data-testid*="login"]') ||
         document.querySelector('[class*="login-button"]') ||
         // Check for text content in buttons
-        Array.from(document.querySelectorAll('button')).some(btn =>
-          btn.textContent?.toLowerCase().includes('log in') ||
-          btn.textContent?.toLowerCase().includes('sign in')
+        Array.from(document.querySelectorAll('button')).some(
+          btn =>
+            btn.textContent?.toLowerCase().includes('log in') ||
+            btn.textContent?.toLowerCase().includes('sign in'),
         )
       );
 
@@ -339,10 +384,14 @@ export async function isLoginRequired(page: Page): Promise<boolean> {
         const isDisabled = mainTextarea.disabled;
 
         if (!isFallback && !isDisabled) {
-          console.error('[login-helper] Found valid #prompt-textarea (not fallback)');
+          console.error(
+            '[login-helper] Found valid #prompt-textarea (not fallback)',
+          );
           hasComposer = true;
         } else {
-          console.error('[login-helper] Found #prompt-textarea but it appears to be a fallback/disabled textarea');
+          console.error(
+            '[login-helper] Found #prompt-textarea but it appears to be a fallback/disabled textarea',
+          );
         }
       }
 
@@ -351,8 +400,11 @@ export async function isLoginRequired(page: Page): Promise<boolean> {
         const shadowHosts = Array.from(document.querySelectorAll('*'));
         for (const host of shadowHosts) {
           if (host.shadowRoot) {
-            const shadowTextarea = host.shadowRoot.querySelector('#prompt-textarea');
-            const shadowComposer = host.shadowRoot.querySelector('[data-testid="composer-textarea"]');
+            const shadowTextarea =
+              host.shadowRoot.querySelector('#prompt-textarea');
+            const shadowComposer = host.shadowRoot.querySelector(
+              '[data-testid="composer-textarea"]',
+            );
             if (shadowTextarea || shadowComposer) {
               console.error('[login-helper] Found composer in Shadow DOM');
               hasComposer = true;
@@ -364,10 +416,14 @@ export async function isLoginRequired(page: Page): Promise<boolean> {
 
       // Method 3: Check for ChatGPT-specific ProseMirror editor (only if it's in main content area)
       if (!hasComposer) {
-        const proseMirror = document.querySelector('.ProseMirror[contenteditable="true"]');
+        const proseMirror = document.querySelector(
+          '.ProseMirror[contenteditable="true"]',
+        );
         // Verify it's actually ChatGPT's main composer, not just any ProseMirror
         if (proseMirror) {
-          const parent = proseMirror.closest('[class*="composer"], [class*="prompt"], [class*="input-area"]');
+          const parent = proseMirror.closest(
+            '[class*="composer"], [class*="prompt"], [class*="input-area"]',
+          );
           if (parent) {
             console.error('[login-helper] Found ChatGPT ProseMirror composer');
             hasComposer = true;
@@ -379,16 +435,23 @@ export async function isLoginRequired(page: Page): Promise<boolean> {
         hasLoginText,
         hasLoginButton,
         hasComposer,
-        bodySnippet: bodyText.substring(0, 200)
+        bodySnippet: bodyText.substring(0, 200),
       };
     });
 
-    console.error(`[login-helper] Page analysis: ${JSON.stringify(pageContent, null, 2)}`);
+    console.error(
+      `[login-helper] Page analysis: ${JSON.stringify(pageContent, null, 2)}`,
+    );
 
     // Decision point 1: PRIORITY - Login button present = needs login (even if fallback composer exists)
     if (pageContent.hasLoginButton) {
-      console.error('[login-helper] 🔍 Decision: Login button detected (highest priority)');
-      console.error('[login-helper]    hasLoginButton:', pageContent.hasLoginButton);
+      console.error(
+        '[login-helper] 🔍 Decision: Login button detected (highest priority)',
+      );
+      console.error(
+        '[login-helper]    hasLoginButton:',
+        pageContent.hasLoginButton,
+      );
       console.error('[login-helper]    hasComposer:', pageContent.hasComposer);
       console.error('[login-helper] ✅ Login required (login button detected)');
       return true;
@@ -396,30 +459,45 @@ export async function isLoginRequired(page: Page): Promise<boolean> {
 
     // Decision point 2: Login text present + NO valid composer = needs login
     if (pageContent.hasLoginText && !pageContent.hasComposer) {
-      console.error('[login-helper] 🔍 Decision: Login text detected + No valid composer');
-      console.error('[login-helper]    hasLoginText:', pageContent.hasLoginText);
+      console.error(
+        '[login-helper] 🔍 Decision: Login text detected + No valid composer',
+      );
+      console.error(
+        '[login-helper]    hasLoginText:',
+        pageContent.hasLoginText,
+      );
       console.error('[login-helper]    hasComposer:', pageContent.hasComposer);
-      console.error('[login-helper] ✅ Login required (login UI detected, no composer)');
+      console.error(
+        '[login-helper] ✅ Login required (login UI detected, no composer)',
+      );
       return true;
     }
 
     // Decision point 3: Valid composer present = logged in
     if (pageContent.hasComposer) {
-      console.error('[login-helper] 🔍 Decision: Valid composer found (user is logged in)');
+      console.error(
+        '[login-helper] 🔍 Decision: Valid composer found (user is logged in)',
+      );
       console.error('[login-helper]    hasComposer:', pageContent.hasComposer);
       console.error('[login-helper] ❌ Login NOT required (composer detected)');
       return false;
     }
 
     // Decision point 3: Ambiguous state - safe default is to assume login required
-    console.error('[login-helper] 🔍 Decision: Unclear state (no login UI, no composer)');
+    console.error(
+      '[login-helper] 🔍 Decision: Unclear state (no login UI, no composer)',
+    );
     console.error('[login-helper]    hasLoginText:', pageContent.hasLoginText);
-    console.error('[login-helper]    hasLoginButton:', pageContent.hasLoginButton);
+    console.error(
+      '[login-helper]    hasLoginButton:',
+      pageContent.hasLoginButton,
+    );
     console.error('[login-helper]    hasComposer:', pageContent.hasComposer);
     console.error('[login-helper]    bodySnippet:', pageContent.bodySnippet);
-    console.error('[login-helper] ⚠️ Unclear state - assuming login required for safety');
+    console.error(
+      '[login-helper] ⚠️ Unclear state - assuming login required for safety',
+    );
     return true;
-
   } catch (error) {
     console.error(`[login-helper] Error during page content check: ${error}`);
     // On error, assume login required for safety
@@ -467,7 +545,7 @@ export async function waitForLogin(
     }
 
     // Wait before next poll
-    await new Promise((resolve) => setTimeout(resolve, pollInterval));
+    await new Promise(resolve => setTimeout(resolve, pollInterval));
   }
 
   // Timeout

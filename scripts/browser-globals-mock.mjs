@@ -32,4 +32,6 @@ globalThis.localStorage = {
   length: 0,
 };
 
-console.error('[browser-globals-mock] Initialized browser globals (location, self, localStorage) for Node.js');
+console.error(
+  '[browser-globals-mock] Initialized browser globals (location, self, localStorage) for Node.js',
+);

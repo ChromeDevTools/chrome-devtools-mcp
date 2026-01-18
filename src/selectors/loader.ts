@@ -57,9 +57,7 @@ export function loadSelectors(): ChatGPTSelectors {
     cachedSelectors = JSON.parse(data) as ChatGPTSelectors;
     return cachedSelectors;
   } catch (error) {
-    throw new Error(
-      `Failed to load selectors from ${selectorsPath}: ${error}`,
-    );
+    throw new Error(`Failed to load selectors from ${selectorsPath}: ${error}`);
   }
 }
 
@@ -91,7 +89,7 @@ export function generateTextMatcher(
   return `
     Array.from(document.querySelectorAll('${tagName}')).find(el => {
       const text = el.textContent || '';
-      return ${textPatterns.map((t) => `text.includes('${t}')`).join(' || ')};
+      return ${textPatterns.map(t => `text.includes('${t}')`).join(' || ')};
     })
   `;
 }
@@ -114,7 +112,7 @@ export function generateAxMatcher(
       ? selector.ax.ariaLabel
       : [selector.ax.ariaLabel];
     conditions.push(
-      labels.map((label) => `aria.includes('${label}')`).join(' || '),
+      labels.map(label => `aria.includes('${label}')`).join(' || '),
     );
   }
 
@@ -184,9 +182,7 @@ export function loadGeminiSelectors(): GeminiSelectors {
     cachedGeminiSelectors = JSON.parse(data) as GeminiSelectors;
     return cachedGeminiSelectors;
   } catch (error) {
-    throw new Error(
-      `Failed to load selectors from ${selectorsPath}: ${error}`,
-    );
+    throw new Error(`Failed to load selectors from ${selectorsPath}: ${error}`);
   }
 }
 

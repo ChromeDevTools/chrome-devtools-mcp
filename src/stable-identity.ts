@@ -1,4 +1,3 @@
-
 /**
  * @license
  * Copyright 2026 Google LLC
@@ -8,7 +7,7 @@
 // Stable project identity detection for profile persistence across directory moves
 // Priority: MCP_PROFILE_ID > git remote origin > git first commit > package.json name > directory fallback
 
-import { spawnSync } from 'node:child_process';
+import {spawnSync} from 'node:child_process';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';

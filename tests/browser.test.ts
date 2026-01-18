@@ -36,8 +36,8 @@ describe('browser', () => {
         // Puppeteer throws this error when profile is already in use
         assert.ok(
           err.message.includes('The browser is already running for') ||
-          err.message.includes('Chrome is already using this profile'),
-          `Expected profile lock error, got: ${err.message}`
+            err.message.includes('Chrome is already using this profile'),
+          `Expected profile lock error, got: ${err.message}`,
         );
       }
     } finally {

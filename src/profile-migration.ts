@@ -1,4 +1,3 @@
-
 /**
  * @license
  * Copyright 2026 Google LLC
@@ -12,8 +11,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import type { StableIdentity } from './stable-identity.js';
-import { getLegacyIdentityHash } from './stable-identity.js';
+import type {StableIdentity} from './stable-identity.js';
+import {getLegacyIdentityHash} from './stable-identity.js';
 
 const CACHE_ROOT = path.join(os.homedir(), '.cache', 'chrome-devtools-mcp');
 
@@ -44,18 +43,24 @@ export function checkAndMigrateLegacyProfile(
 ): MigrationResult {
   // Skip migration if disabled
   if (process.env.MCP_DISABLE_MIGRATION === 'true') {
-    return { migrated: false, method: 'none', reason: 'MCP_DISABLE_MIGRATION' };
+    return {migrated: false, method: 'none', reason: 'MCP_DISABLE_MIGRATION'};
   }
 
   // Skip migration if using directory-fallback (same as legacy)
   if (newIdentity.source === 'directory-fallback') {
-    return { migrated: false, method: 'none', reason: 'same-as-legacy' };
+    return {migrated: false, method: 'none', reason: 'same-as-legacy'};
   }
 
   // Calculate legacy path (realpath-based)
   const legacyHash = getLegacyIdentityHash(projectRoot);
   const legacyKey = `${projectName}_${legacyHash}`;
-  const legacyPath = path.join(CACHE_ROOT, 'profiles', legacyKey, clientId, channel);
+  const legacyPath = path.join(
+    CACHE_ROOT,
+    'profiles',
+    legacyKey,
+    clientId,
+    channel,
+  );
 
   // Calculate new path (stable identity)
   const newKey = `${projectName}_${newIdentity.id}`;
@@ -63,31 +68,35 @@ export function checkAndMigrateLegacyProfile(
 
   // If paths are the same, no migration needed
   if (legacyPath === newPath) {
-    return { migrated: false, method: 'none', reason: 'paths-identical' };
+    return {migrated: false, method: 'none', reason: 'paths-identical'};
   }
 
   // If new path already exists, no migration needed
   if (fs.existsSync(newPath)) {
-    return { migrated: false, method: 'none', reason: 'new-path-exists' };
+    return {migrated: false, method: 'none', reason: 'new-path-exists'};
   }
 
   // If legacy path doesn't exist, no migration needed
   if (!fs.existsSync(legacyPath)) {
-    return { migrated: false, method: 'none', reason: 'no-legacy-profile' };
+    return {migrated: false, method: 'none', reason: 'no-legacy-profile'};
   }
 
   // Legacy exists, new doesn't - create symlink
   try {
     console.error(`[migration] Legacy profile detected: ${legacyPath}`);
-    console.error(`[migration] Creating symlink for stable identity: ${newPath}`);
+    console.error(
+      `[migration] Creating symlink for stable identity: ${newPath}`,
+    );
 
     // Create parent directories
-    fs.mkdirSync(path.dirname(newPath), { recursive: true });
+    fs.mkdirSync(path.dirname(newPath), {recursive: true});
 
     // Create symlink (new -> legacy)
     fs.symlinkSync(legacyPath, newPath, 'dir');
 
-    console.error(`[migration] ✅ Migration complete: ${newPath} -> ${legacyPath}`);
+    console.error(
+      `[migration] ✅ Migration complete: ${newPath} -> ${legacyPath}`,
+    );
 
     return {
       migrated: true,

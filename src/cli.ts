@@ -76,7 +76,8 @@ export const cliOptions = {
   },
   userDataDir: {
     type: 'string' as const,
-    description: 'Specify a custom user data directory for Chrome to use instead of the default. Auto-detected if not specified.',
+    description:
+      'Specify a custom user data directory for Chrome to use instead of the default. Auto-detected if not specified.',
     conflicts: 'browserUrl',
   },
   logFile: {
@@ -105,10 +106,7 @@ export function parseArguments(version: string, argv = process.argv) {
       return true;
     })
     .example([
-      [
-        '$0',
-        'Zero-config startup: auto-detects profile and bookmarks',
-      ],
+      ['$0', 'Zero-config startup: auto-detects profile and bookmarks'],
       [
         '$0 --browserUrl http://127.0.0.1:9222',
         'Connect to an existing browser instance',
@@ -117,8 +115,14 @@ export function parseArguments(version: string, argv = process.argv) {
       ['$0 --channel canary', 'Use Chrome Canary installed on this system'],
       ['$0 --channel dev', 'Use Chrome Dev installed on this system'],
       ['$0 --channel stable', 'Use stable Chrome installed on this system'],
-      ['$0 --loadSystemExtensions', 'Auto-discover and load system Chrome extensions'],
-      ['$0 --loadExtensionsDir ./extensions --loadSystemExtensions', 'Load both development and system extensions'],
+      [
+        '$0 --loadSystemExtensions',
+        'Auto-discover and load system Chrome extensions',
+      ],
+      [
+        '$0 --loadExtensionsDir ./extensions --loadSystemExtensions',
+        'Load both development and system extensions',
+      ],
       ['$0 --logFile /tmp/log.txt', 'Save logs to a file'],
       ['$0 --help', 'Print CLI options'],
     ]);

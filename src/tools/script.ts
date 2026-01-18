@@ -19,7 +19,7 @@ export const evaluateScript = defineTool({
   schema: {
     function: z.string().describe('JS function string'),
     args: z
-      .array(z.object({ uid: z.string().describe('Element uid') }))
+      .array(z.object({uid: z.string().describe('Element uid')}))
       .optional()
       .describe('Element arguments'),
   },

@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Browser, Page } from 'puppeteer-core';
+import type {Browser, Page} from 'puppeteer-core';
 
 import {CHATGPT_CONFIG} from './config.js';
 import {isLoginRequired} from './login-helper.js';
@@ -38,11 +38,11 @@ const UI_ELEMENTS: UIElement[] = [
  */
 async function checkElementExists(
   page: Page,
-  element: UIElement
+  element: UIElement,
 ): Promise<boolean> {
   try {
     // First try direct DOM query
-    const domCheck = await page.evaluate((selector) => {
+    const domCheck = await page.evaluate(selector => {
       return document.querySelector(selector) !== null;
     }, element.selector);
 
@@ -99,7 +99,7 @@ export async function verifyUIHealth(browser: Browser): Promise<void> {
     });
 
     // Wait for page to be ready
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+    await new Promise(resolve => setTimeout(resolve, 2000));
 
     // Check login status (but don't wait for login to avoid timeout)
     console.error('   Checking login status...');
@@ -115,11 +115,11 @@ export async function verifyUIHealth(browser: Browser): Promise<void> {
     console.error('✅ Already logged in');
 
     // Check each UI element
-    const results: Array<{ element: UIElement; found: boolean }> = [];
+    const results: Array<{element: UIElement; found: boolean}> = [];
 
     for (const element of UI_ELEMENTS) {
       const found = await checkElementExists(page, element);
-      results.push({ element, found });
+      results.push({element, found});
 
       if (found) {
         console.error(`✅ ${element.name}: Found`);
@@ -130,12 +130,16 @@ export async function verifyUIHealth(browser: Browser): Promise<void> {
     }
 
     // Summary
-    const missingElements = results.filter((r) => !r.found && !r.element.optional);
+    const missingElements = results.filter(
+      r => !r.found && !r.element.optional,
+    );
     if (missingElements.length > 0) {
       console.error('\n⚠️  UI Health Check Warning:');
-      console.error('   Some UI elements were not found. ChatGPT UI may have changed.');
+      console.error(
+        '   Some UI elements were not found. ChatGPT UI may have changed.',
+      );
       console.error('   Missing elements:');
-      missingElements.forEach((r) => {
+      missingElements.forEach(r => {
         console.error(`     - ${r.element.name}`);
       });
       console.error('\n💡 Suggestion: Run diagnostics to investigate:');
@@ -146,7 +150,9 @@ export async function verifyUIHealth(browser: Browser): Promise<void> {
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     console.error(`\n❌ UI Health Check Failed: ${errorMessage}`);
-    console.error('   This is a warning only - MCP server will continue to start');
+    console.error(
+      '   This is a warning only - MCP server will continue to start',
+    );
     console.error('   ChatGPT functionality may be limited');
   } finally {
     // Don't close the page - let the server reuse it
@@ -166,8 +172,8 @@ export async function runStartupCheck(browser: Browser): Promise<void> {
       new Promise<void>((_, reject) =>
         setTimeout(
           () => reject(new Error('UI health check timeout')),
-          timeoutMs
-        )
+          timeoutMs,
+        ),
       ),
     ]);
   } catch (error) {

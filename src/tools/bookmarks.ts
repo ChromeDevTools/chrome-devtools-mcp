@@ -14,18 +14,19 @@ import {defineTool} from './ToolDefinition.js';
 // Default development bookmarks
 function getDefaultBookmarks(): Record<string, string> {
   return {
-    'dashboard': 'https://chrome.google.com/webstore/devconsole',
-    'new_item': 'https://chrome.google.com/webstore/devconsole/register',
-    'analytics': 'https://chrome.google.com/webstore/devconsole/analytics',
-    'payments': 'https://chrome.google.com/webstore/devconsole/payments',
-    'support': 'https://support.google.com/chrome_webstore/contact/developer_support',
-    'extensions': 'chrome://extensions/',
-    'extensions_dev': 'chrome://extensions/?id=',
-    'policy': 'https://developer.chrome.com/docs/webstore/program-policies/',
-    'docs': 'https://developer.chrome.com/docs/extensions/',
-    'localhost': 'http://localhost:3000',
-    'localhost8080': 'http://localhost:8080',
-    'chatgpt': CHATGPT_CONFIG.DEFAULT_URL
+    dashboard: 'https://chrome.google.com/webstore/devconsole',
+    new_item: 'https://chrome.google.com/webstore/devconsole/register',
+    analytics: 'https://chrome.google.com/webstore/devconsole/analytics',
+    payments: 'https://chrome.google.com/webstore/devconsole/payments',
+    support:
+      'https://support.google.com/chrome_webstore/contact/developer_support',
+    extensions: 'chrome://extensions/',
+    extensions_dev: 'chrome://extensions/?id=',
+    policy: 'https://developer.chrome.com/docs/webstore/program-policies/',
+    docs: 'https://developer.chrome.com/docs/extensions/',
+    localhost: 'http://localhost:3000',
+    localhost8080: 'http://localhost:8080',
+    chatgpt: CHATGPT_CONFIG.DEFAULT_URL,
   };
 }
 
@@ -68,7 +69,9 @@ export const bookmarks = defineTool({
 
     if (!allBookmarks[name]) {
       response.appendResponseLine(`Bookmark "${name}" not found.`);
-      response.appendResponseLine('Available: ' + Object.keys(allBookmarks).join(', '));
+      response.appendResponseLine(
+        'Available: ' + Object.keys(allBookmarks).join(', '),
+      );
       return;
     }
 
@@ -94,20 +97,26 @@ export const openExtensionById = defineTool({
   },
   schema: {
     extensionId: z.string().describe('Extension ID'),
-    page: z.enum(['details', 'options']).default('details').describe('Page type'),
+    page: z
+      .enum(['details', 'options'])
+      .default('details')
+      .describe('Page type'),
   },
   handler: async (request, response, context) => {
     const {extensionId, page: extensionPage} = request.params;
     const pageContext = context.getSelectedPage();
 
-    const url = extensionPage === 'details'
-      ? `chrome://extensions/?id=${extensionId}`
-      : `chrome-extension://${extensionId}/options.html`;
+    const url =
+      extensionPage === 'details'
+        ? `chrome://extensions/?id=${extensionId}`
+        : `chrome-extension://${extensionId}/options.html`;
 
     await context.waitForEventsAfterAction(async () => {
       try {
         await pageContext.goto(url, {waitUntil: 'networkidle0'});
-        response.appendResponseLine(`Opened ${extensionPage} for ${extensionId}`);
+        response.appendResponseLine(
+          `Opened ${extensionPage} for ${extensionId}`,
+        );
       } catch (error) {
         response.appendResponseLine(
           `Failed: ${error instanceof Error ? error.message : String(error)}`,
@@ -151,7 +160,14 @@ export const openExtensionDocs = defineTool({
   },
   schema: {
     section: z
-      .enum(['overview', 'getting-started', 'api', 'manifest', 'examples', 'best-practices'])
+      .enum([
+        'overview',
+        'getting-started',
+        'api',
+        'manifest',
+        'examples',
+        'best-practices',
+      ])
       .optional()
       .describe('Doc section'),
   },
@@ -161,14 +177,19 @@ export const openExtensionDocs = defineTool({
 
     const sectionUrls: Record<string, string> = {
       overview: 'https://developer.chrome.com/docs/extensions/',
-      'getting-started': 'https://developer.chrome.com/docs/extensions/get-started/',
+      'getting-started':
+        'https://developer.chrome.com/docs/extensions/get-started/',
       api: 'https://developer.chrome.com/docs/extensions/reference/',
-      manifest: 'https://developer.chrome.com/docs/extensions/reference/manifest',
+      manifest:
+        'https://developer.chrome.com/docs/extensions/reference/manifest',
       examples: 'https://github.com/GoogleChrome/chrome-extensions-samples',
-      'best-practices': 'https://developer.chrome.com/docs/extensions/develop/migrate',
+      'best-practices':
+        'https://developer.chrome.com/docs/extensions/develop/migrate',
     };
 
-    const url = section ? sectionUrls[section] : 'https://developer.chrome.com/docs/extensions/';
+    const url = section
+      ? sectionUrls[section]
+      : 'https://developer.chrome.com/docs/extensions/';
 
     await context.waitForEventsAfterAction(async () => {
       await page.goto(url, {waitUntil: 'networkidle0'});

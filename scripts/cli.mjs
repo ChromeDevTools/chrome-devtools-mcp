@@ -12,27 +12,32 @@
  * - Simple execution: no wrapper, no hot-reload
  */
 
-import { spawn } from "node:child_process";
-import process from "node:process";
-import { fileURLToPath } from "node:url";
-import path from "node:path";
+import {spawn} from 'node:child_process';
+import process from 'node:process';
+import {fileURLToPath} from 'node:url';
+import path from 'node:path';
 
 // Resolve paths
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const mockPath = path.join(__dirname, "browser-globals-mock.mjs");
-const mainPath = path.join(__dirname, "..", "build", "src", "main.js");
+const mockPath = path.join(__dirname, 'browser-globals-mock.mjs');
+const mainPath = path.join(__dirname, '..', 'build', 'src', 'main.js');
 
 // Launch MCP server with --import flag
-const child = spawn(process.execPath, [
-  "--import", mockPath,
-  mainPath,
-  ...process.argv.slice(2) // Forward CLI arguments
-], {
-  stdio: "inherit",
-  env: process.env,
-});
+const child = spawn(
+  process.execPath,
+  [
+    '--import',
+    mockPath,
+    mainPath,
+    ...process.argv.slice(2), // Forward CLI arguments
+  ],
+  {
+    stdio: 'inherit',
+    env: process.env,
+  },
+);
 
-child.on("exit", (code, signal) => {
+child.on('exit', (code, signal) => {
   if (signal) {
     process.exit(1);
   }
@@ -40,5 +45,5 @@ child.on("exit", (code, signal) => {
 });
 
 // Forward signals
-process.on("SIGTERM", () => child?.kill("SIGTERM"));
-process.on("SIGINT", () => child?.kill("SIGINT"));
+process.on('SIGTERM', () => child?.kill('SIGTERM'));
+process.on('SIGINT', () => child?.kill('SIGINT'));

@@ -57,33 +57,37 @@ const KNOWN_ELEMENTS = [
   {
     name: 'Deep Research Toggle',
     checks: [
-      { type: 'css', selector: '[role="menuitemradio"][aria-label*="Deep"]' },
-      { type: 'xpath', selector: '//div[@role="menuitemradio" and contains(text(), "Deep research")]' },
-      { type: 'text', contains: 'Deep research' },
+      {type: 'css', selector: '[role="menuitemradio"][aria-label*="Deep"]'},
+      {
+        type: 'xpath',
+        selector:
+          '//div[@role="menuitemradio" and contains(text(), "Deep research")]',
+      },
+      {type: 'text', contains: 'Deep research'},
     ],
   },
   {
     name: 'Composer Textarea',
     checks: [
-      { type: 'css', selector: 'textarea[placeholder*="Message"]' },
-      { type: 'css', selector: '[contenteditable="true"]' },
-      { type: 'css', selector: '#prompt-textarea' },
+      {type: 'css', selector: 'textarea[placeholder*="Message"]'},
+      {type: 'css', selector: '[contenteditable="true"]'},
+      {type: 'css', selector: '#prompt-textarea'},
     ],
   },
   {
     name: 'Send Button',
     checks: [
-      { type: 'css', selector: 'button[data-testid="send-button"]' },
-      { type: 'css', selector: 'button[aria-label*="Send"]' },
-      { type: 'xpath', selector: '//button[contains(@aria-label, "Send")]' },
+      {type: 'css', selector: 'button[data-testid="send-button"]'},
+      {type: 'css', selector: 'button[aria-label*="Send"]'},
+      {type: 'xpath', selector: '//button[contains(@aria-label, "Send")]'},
     ],
   },
   {
     name: 'Model Selector',
     checks: [
-      { type: 'css', selector: 'button[aria-label*="model"]' },
-      { type: 'css', selector: '[role="combobox"]' },
-      { type: 'text', contains: 'ChatGPT' },
+      {type: 'css', selector: 'button[aria-label*="model"]'},
+      {type: 'css', selector: '[role="combobox"]'},
+      {type: 'text', contains: 'ChatGPT'},
     ],
   },
 ];
@@ -93,7 +97,7 @@ const KNOWN_ELEMENTS = [
  */
 async function ensureSnapshotDir(): Promise<string> {
   const snapshotDir = path.join(process.cwd(), 'docs/ui-snapshots');
-  await fs.promises.mkdir(snapshotDir, { recursive: true });
+  await fs.promises.mkdir(snapshotDir, {recursive: true});
   return snapshotDir;
 }
 
@@ -102,7 +106,8 @@ async function ensureSnapshotDir(): Promise<string> {
  */
 function generateFilename(extension: string): string {
   const now = new Date();
-  const timestamp = now.toISOString()
+  const timestamp = now
+    .toISOString()
     .replace(/:/g, '')
     .replace(/\..+/, '')
     .replace('T', '-')
@@ -113,7 +118,10 @@ function generateFilename(extension: string): string {
 /**
  * Detect element using multiple strategies
  */
-async function detectElement(page: any, elementDef: typeof KNOWN_ELEMENTS[0]): Promise<ElementInfo> {
+async function detectElement(
+  page: any,
+  elementDef: (typeof KNOWN_ELEMENTS)[0],
+): Promise<ElementInfo> {
   const result: ElementInfo = {
     name: elementDef.name,
     status: 'not_found',
@@ -171,11 +179,13 @@ async function detectElement(page: any, elementDef: typeof KNOWN_ELEMENTS[0]): P
     }
 
     // If we found some selectors but not all expected ones, mark as structure_changed
-    if (result.status === 'found' && Object.keys(result.selectors!).length < elementDef.checks.length) {
+    if (
+      result.status === 'found' &&
+      Object.keys(result.selectors!).length < elementDef.checks.length
+    ) {
       result.status = 'structure_changed';
       result.details = 'Some selectors work, but structure may have changed';
     }
-
   } catch (error) {
     result.details = `Error during detection: ${error instanceof Error ? error.message : String(error)}`;
   }
@@ -199,9 +209,11 @@ function generateReport(result: DiagnosticResult): string {
 
   for (const element of result.elements) {
     const statusEmoji =
-      element.status === 'found' ? '✅' :
-      element.status === 'structure_changed' ? '⚠️' :
-      '❌';
+      element.status === 'found'
+        ? '✅'
+        : element.status === 'structure_changed'
+          ? '⚠️'
+          : '❌';
 
     lines.push(`### ${statusEmoji} ${element.name}`);
     lines.push(`- **Status**: ${element.status.replace(/_/g, ' ')}`);
@@ -258,11 +270,14 @@ export const diagnoseChatgptUi = defineTool({
     readOnlyHint: true,
   },
   schema: {
-    url: z.string().default(CHATGPT_CONFIG.DEFAULT_URL).describe('URL to diagnose'),
+    url: z
+      .string()
+      .default(CHATGPT_CONFIG.DEFAULT_URL)
+      .describe('URL to diagnose'),
     waitForLoad: z.number().default(5000).describe('Wait time ms'),
   },
   handler: async (request, response, context) => {
-    const { url, waitForLoad } = request.params;
+    const {url, waitForLoad} = request.params;
     const page = context.getSelectedPage();
 
     try {
@@ -271,19 +286,23 @@ export const diagnoseChatgptUi = defineTool({
 
       // Navigate to ChatGPT
       response.appendResponseLine(`📡 Navigating to ${url}...`);
-      await page.goto(url, { waitUntil: 'networkidle0', timeout: 30000 });
+      await page.goto(url, {waitUntil: 'networkidle0', timeout: 30000});
 
       // Check if login is required
       const needsLogin = await isLoginRequired(page);
       if (needsLogin) {
         response.appendResponseLine('\n❌ ChatGPTへのログインが必要です');
-        response.appendResponseLine('📱 ブラウザウィンドウでログインしてから再実行してください');
+        response.appendResponseLine(
+          '📱 ブラウザウィンドウでログインしてから再実行してください',
+        );
         return;
       }
       response.appendResponseLine('✅ Login check passed');
 
       // Wait for page to stabilize
-      response.appendResponseLine(`⏳ Waiting ${waitForLoad}ms for page to stabilize...`);
+      response.appendResponseLine(
+        `⏳ Waiting ${waitForLoad}ms for page to stabilize...`,
+      );
       await new Promise(resolve => setTimeout(resolve, waitForLoad));
 
       // Ensure snapshot directory exists
@@ -315,9 +334,15 @@ export const diagnoseChatgptUi = defineTool({
 
       // Capture full AX tree
       response.appendResponseLine('🌳 Capturing accessibility tree...');
-      const snapshot = await page.accessibility.snapshot({ interestingOnly: false });
+      const snapshot = await page.accessibility.snapshot({
+        interestingOnly: false,
+      });
       const axPath = path.join(snapshotDir, axFilename);
-      await fs.promises.writeFile(axPath, JSON.stringify(snapshot, null, 2), 'utf-8');
+      await fs.promises.writeFile(
+        axPath,
+        JSON.stringify(snapshot, null, 2),
+        'utf-8',
+      );
       response.appendResponseLine(`✅ AX tree saved: ${axFilename}`);
 
       // Detect known elements
@@ -330,10 +355,14 @@ export const diagnoseChatgptUi = defineTool({
         elementResults.push(result);
 
         const emoji =
-          result.status === 'found' ? '✅' :
-          result.status === 'structure_changed' ? '⚠️' :
-          '❌';
-        response.appendResponseLine(`${emoji} ${result.name}: ${result.status}`);
+          result.status === 'found'
+            ? '✅'
+            : result.status === 'structure_changed'
+              ? '⚠️'
+              : '❌';
+        response.appendResponseLine(
+          `${emoji} ${result.name}: ${result.status}`,
+        );
       }
 
       // Generate diagnostic result
@@ -364,9 +393,15 @@ export const diagnoseChatgptUi = defineTool({
       response.appendResponseLine('📁 All files saved to: docs/ui-snapshots/');
       response.appendResponseLine('');
       response.appendResponseLine('Summary:');
-      const foundCount = elementResults.filter(e => e.status === 'found').length;
-      const changedCount = elementResults.filter(e => e.status === 'structure_changed').length;
-      const notFoundCount = elementResults.filter(e => e.status === 'not_found').length;
+      const foundCount = elementResults.filter(
+        e => e.status === 'found',
+      ).length;
+      const changedCount = elementResults.filter(
+        e => e.status === 'structure_changed',
+      ).length;
+      const notFoundCount = elementResults.filter(
+        e => e.status === 'not_found',
+      ).length;
       response.appendResponseLine(`- ✅ Found: ${foundCount}`);
       response.appendResponseLine(`- ⚠️  Changed: ${changedCount}`);
       response.appendResponseLine(`- ❌ Not Found: ${notFoundCount}`);
@@ -376,10 +411,11 @@ export const diagnoseChatgptUi = defineTool({
         data: Buffer.from(screenshotBuffer).toString('base64'),
         mimeType: 'image/png',
       });
-
     } catch (error) {
       response.appendResponseLine('❌ Diagnosis failed:');
-      response.appendResponseLine(error instanceof Error ? error.message : String(error));
+      response.appendResponseLine(
+        error instanceof Error ? error.message : String(error),
+      );
 
       if (error instanceof Error && error.stack) {
         response.appendResponseLine('');

@@ -12,7 +12,6 @@ import sinon from 'sinon';
 
 import {McpContext} from '../src/McpContext.js';
 
-
 // Helper type for mock objects with any properties
 type MockBrowser = sinon.SinonStubbedInstance<Browser> & Record<string, any>;
 type MockPage = sinon.SinonStubbedInstance<Page> & Record<string, any>;
@@ -57,7 +56,9 @@ describe('McpContext - Reconnection Integration', () => {
     mockBrowser = createMockBrowser();
     mockPage = createMockPage();
 
-    mockBrowser.pages = sinon.stub().resolves([mockPage as unknown as Page]) as any;
+    mockBrowser.pages = sinon
+      .stub()
+      .resolves([mockPage as unknown as Page]) as any;
 
     const browserFactory = async () => mockBrowser as unknown as Browser;
 
@@ -73,19 +74,20 @@ describe('McpContext - Reconnection Integration', () => {
   describe('updateBrowser() flow', () => {
     it('should update browser instance', async () => {
       const newMockBrowser: MockBrowser = createMockBrowser();
-      newMockBrowser.pages = sinon.stub().resolves([mockPage as unknown as Page]) as any;
+      newMockBrowser.pages = sinon
+        .stub()
+        .resolves([mockPage as unknown as Page]) as any;
 
       await context.updateBrowser(newMockBrowser as unknown as Browser);
 
-      assert.strictEqual(
-        context.browser,
-        newMockBrowser as unknown as Browser,
-      );
+      assert.strictEqual(context.browser, newMockBrowser as unknown as Browser);
     });
 
     it('should reinitialize collectors after browser update', async () => {
       const newMockBrowser: MockBrowser = createMockBrowser();
-      newMockBrowser.pages = sinon.stub().resolves([mockPage as unknown as Page]) as any;
+      newMockBrowser.pages = sinon
+        .stub()
+        .resolves([mockPage as unknown as Page]) as any;
 
       // Spy on collector initialization
       const networkCollector = (context as any)['#networkCollector'];
@@ -118,7 +120,9 @@ describe('McpContext - Reconnection Integration', () => {
 
     it('should reset selected page index to 0', async () => {
       const newMockBrowser: MockBrowser = createMockBrowser();
-      newMockBrowser.pages = sinon.stub().resolves([mockPage as unknown as Page]) as any;
+      newMockBrowser.pages = sinon
+        .stub()
+        .resolves([mockPage as unknown as Page]) as any;
 
       // Set selected page to something other than 0
       context.setSelectedPageIdx(0);
@@ -216,7 +220,9 @@ describe('McpContext - Reconnection Integration', () => {
       };
 
       newMockBrowser._client = sinon.stub().resolves(mockCDPClient) as any;
-      newMockBrowser.pages = sinon.stub().resolves([mockPage as unknown as Page]) as any;
+      newMockBrowser.pages = sinon
+        .stub()
+        .resolves([mockPage as unknown as Page]) as any;
 
       // Should not throw even if CDP reinitialization fails
       await assert.doesNotReject(
@@ -224,17 +230,16 @@ describe('McpContext - Reconnection Integration', () => {
       );
 
       // Browser should still be updated
-      assert.strictEqual(
-        context.browser,
-        newMockBrowser as unknown as Browser,
-      );
+      assert.strictEqual(context.browser, newMockBrowser as unknown as Browser);
     });
   });
 
   describe('NetworkCollector reinitialization', () => {
     it('should reinitialize NetworkCollector with new browser', async () => {
       const newMockBrowser: MockBrowser = createMockBrowser();
-      newMockBrowser.pages = sinon.stub().resolves([mockPage as unknown as Page]) as any;
+      newMockBrowser.pages = sinon
+        .stub()
+        .resolves([mockPage as unknown as Page]) as any;
 
       const networkCollector = (context as any)['#networkCollector'];
       const initSpy = sinon.spy(networkCollector, 'init');
@@ -246,7 +251,9 @@ describe('McpContext - Reconnection Integration', () => {
 
     it('should clear old network requests after reconnection', async () => {
       const newMockBrowser: MockBrowser = createMockBrowser();
-      newMockBrowser.pages = sinon.stub().resolves([mockPage as unknown as Page]) as any;
+      newMockBrowser.pages = sinon
+        .stub()
+        .resolves([mockPage as unknown as Page]) as any;
 
       // Get network requests before reconnection
       const requestsBefore = context.getNetworkRequests();
@@ -265,7 +272,9 @@ describe('McpContext - Reconnection Integration', () => {
   describe('ConsoleCollector reinitialization', () => {
     it('should reinitialize ConsoleCollector with new browser', async () => {
       const newMockBrowser: MockBrowser = createMockBrowser();
-      newMockBrowser.pages = sinon.stub().resolves([mockPage as unknown as Page]) as any;
+      newMockBrowser.pages = sinon
+        .stub()
+        .resolves([mockPage as unknown as Page]) as any;
 
       const consoleCollector = (context as any)['#consoleCollector'];
       const initSpy = sinon.spy(consoleCollector, 'init');
@@ -277,7 +286,9 @@ describe('McpContext - Reconnection Integration', () => {
 
     it('should clear old console data after reconnection', async () => {
       const newMockBrowser: MockBrowser = createMockBrowser();
-      newMockBrowser.pages = sinon.stub().resolves([mockPage as unknown as Page]) as any;
+      newMockBrowser.pages = sinon
+        .stub()
+        .resolves([mockPage as unknown as Page]) as any;
 
       // Get console data before reconnection
       const consoleDataBefore = context.getConsoleData();
@@ -296,7 +307,9 @@ describe('McpContext - Reconnection Integration', () => {
   describe('Connection manager integration', () => {
     it('should update connection manager with new browser', async () => {
       const newMockBrowser: MockBrowser = createMockBrowser();
-      newMockBrowser.pages = sinon.stub().resolves([mockPage as unknown as Page]) as any;
+      newMockBrowser.pages = sinon
+        .stub()
+        .resolves([mockPage as unknown as Page]) as any;
 
       const setBrowserSpy = sinon.spy(context.connectionManager, 'setBrowser');
 
@@ -310,10 +323,13 @@ describe('McpContext - Reconnection Integration', () => {
     });
 
     it('should maintain connection manager state across updates', async () => {
-      const initialReconnectAttempts = context.connectionManager.getReconnectAttempts();
+      const initialReconnectAttempts =
+        context.connectionManager.getReconnectAttempts();
 
       const newMockBrowser: MockBrowser = createMockBrowser();
-      newMockBrowser.pages = sinon.stub().resolves([mockPage as unknown as Page]) as any;
+      newMockBrowser.pages = sinon
+        .stub()
+        .resolves([mockPage as unknown as Page]) as any;
 
       await context.updateBrowser(newMockBrowser as unknown as Browser);
 
@@ -328,7 +344,9 @@ describe('McpContext - Reconnection Integration', () => {
   describe('Error recovery scenarios', () => {
     it('should recover from pages() failure during update', async () => {
       const newMockBrowser: MockBrowser = createMockBrowser();
-      newMockBrowser.pages = sinon.stub().rejects(new Error('Pages fetch failed')) as any;
+      newMockBrowser.pages = sinon
+        .stub()
+        .rejects(new Error('Pages fetch failed')) as any;
 
       // Should throw error
       await assert.rejects(
@@ -339,7 +357,9 @@ describe('McpContext - Reconnection Integration', () => {
 
     it('should handle collector initialization failures', async () => {
       const newMockBrowser: MockBrowser = createMockBrowser();
-      newMockBrowser.pages = sinon.stub().resolves([mockPage as unknown as Page]) as any;
+      newMockBrowser.pages = sinon
+        .stub()
+        .resolves([mockPage as unknown as Page]) as any;
 
       const networkCollector = (context as any)['#networkCollector'];
       sinon.stub(networkCollector, 'init').rejects(new Error('Init failed'));

@@ -24,16 +24,68 @@ function getChromeUserDataPaths(): Record<string, string> {
 
   const platformPaths: Record<string, Record<string, string>> = {
     darwin: {
-      stable: path.join(homeDir, 'Library', 'Application Support', 'Google', 'Chrome'),
-      canary: path.join(homeDir, 'Library', 'Application Support', 'Google', 'Chrome Canary'),
-      beta: path.join(homeDir, 'Library', 'Application Support', 'Google', 'Chrome Beta'),
-      dev: path.join(homeDir, 'Library', 'Application Support', 'Google', 'Chrome Dev'),
+      stable: path.join(
+        homeDir,
+        'Library',
+        'Application Support',
+        'Google',
+        'Chrome',
+      ),
+      canary: path.join(
+        homeDir,
+        'Library',
+        'Application Support',
+        'Google',
+        'Chrome Canary',
+      ),
+      beta: path.join(
+        homeDir,
+        'Library',
+        'Application Support',
+        'Google',
+        'Chrome Beta',
+      ),
+      dev: path.join(
+        homeDir,
+        'Library',
+        'Application Support',
+        'Google',
+        'Chrome Dev',
+      ),
     },
     win32: {
-      stable: path.join(homeDir, 'AppData', 'Local', 'Google', 'Chrome', 'User Data'),
-      canary: path.join(homeDir, 'AppData', 'Local', 'Google', 'Chrome SxS', 'User Data'),
-      beta: path.join(homeDir, 'AppData', 'Local', 'Google', 'Chrome Beta', 'User Data'),
-      dev: path.join(homeDir, 'AppData', 'Local', 'Google', 'Chrome Dev', 'User Data'),
+      stable: path.join(
+        homeDir,
+        'AppData',
+        'Local',
+        'Google',
+        'Chrome',
+        'User Data',
+      ),
+      canary: path.join(
+        homeDir,
+        'AppData',
+        'Local',
+        'Google',
+        'Chrome SxS',
+        'User Data',
+      ),
+      beta: path.join(
+        homeDir,
+        'AppData',
+        'Local',
+        'Google',
+        'Chrome Beta',
+        'User Data',
+      ),
+      dev: path.join(
+        homeDir,
+        'AppData',
+        'Local',
+        'Google',
+        'Chrome Dev',
+        'User Data',
+      ),
     },
     linux: {
       stable: path.join(homeDir, '.config', 'google-chrome'),
@@ -83,7 +135,7 @@ function validateChromeProfile(profilePath: string): boolean {
  * Detect system Chrome profile for the specified channel
  */
 export function detectSystemChromeProfile(
-  channel = 'stable'
+  channel = 'stable',
 ): SystemChromeProfile | null {
   const platform = os.platform();
   const chromePaths = getChromeUserDataPaths();
@@ -212,7 +264,9 @@ export function logSystemProfileInfo(): void {
     console.error(`    None detected`);
   } else {
     profiles.forEach((profile, index) => {
-      console.error(`    ${index + 1}. ${profile.channel}: ${profile.path} (${profile.exists ? 'exists' : 'not found'})`);
+      console.error(
+        `    ${index + 1}. ${profile.channel}: ${profile.path} (${profile.exists ? 'exists' : 'not found'})`,
+      );
     });
   }
 }

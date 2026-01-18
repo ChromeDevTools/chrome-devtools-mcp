@@ -4,8 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
- 
-
 import z from 'zod';
 
 import {ToolCategories} from './categories.js';
@@ -68,8 +66,8 @@ export const extensionPopup = defineTool({
         // Check for iframe-embedded popup
         const iframePopups = await page.evaluate(() => {
           return Array.from(document.querySelectorAll('iframe'))
-            .filter((iframe) => iframe.src.startsWith('chrome-extension://'))
-            .map((iframe) => ({src: iframe.src}));
+            .filter(iframe => iframe.src.startsWith('chrome-extension://'))
+            .map(iframe => ({src: iframe.src}));
         });
 
         if (iframePopups.length > 0) {
@@ -90,7 +88,9 @@ export const extensionPopup = defineTool({
           }
         }
 
-        response.appendResponseLine('No popup found. Click extension icon to open.');
+        response.appendResponseLine(
+          'No popup found. Click extension icon to open.',
+        );
         return;
       }
 
@@ -100,8 +100,10 @@ export const extensionPopup = defineTool({
       const pages = await browser.pages();
       for (let i = 0; i < pages.length; i++) {
         const url = pages[i].url();
-        if (url.startsWith('chrome-extension://') &&
-            url.toLowerCase().includes(extensionName.toLowerCase())) {
+        if (
+          url.startsWith('chrome-extension://') &&
+          url.toLowerCase().includes(extensionName.toLowerCase())
+        ) {
           context.setSelectedPageIdx(i);
           response.appendResponseLine('Matching popup selected');
           response.appendResponseLine(`URL: ${url}`);
@@ -139,14 +141,20 @@ export const iframePopup = defineTool({
     op: z.enum(['inspect', 'patch', 'reload']).describe('Operation'),
     urlPattern: z.string().optional().describe('URL regex (for inspect)'),
     waitMs: z.number().optional().describe('Wait timeout ms'),
-    extensionPath: z.string().optional().describe('Extension dir path (for patch)'),
-    patches: z.array(
-      z.object({
-        file: z.string().describe('File path'),
-        find: z.string().describe('Regex pattern'),
-        replace: z.string().describe('Replacement'),
-      }),
-    ).optional().describe('Patches array (for patch)'),
+    extensionPath: z
+      .string()
+      .optional()
+      .describe('Extension dir path (for patch)'),
+    patches: z
+      .array(
+        z.object({
+          file: z.string().describe('File path'),
+          find: z.string().describe('Regex pattern'),
+          replace: z.string().describe('Replacement'),
+        }),
+      )
+      .optional()
+      .describe('Patches array (for patch)'),
   },
   handler: async (request, response, context) => {
     const page = context.getSelectedPage();
@@ -184,11 +192,15 @@ export const iframePopup = defineTool({
             if (!extensionPath || !patches) {
               throw new Error('extensionPath and patches required for patch');
             }
-            response.appendResponseLine(`Applying ${patches.length} patch(es)...`);
+            response.appendResponseLine(
+              `Applying ${patches.length} patch(es)...`,
+            );
             await iframePopupTools.patchAndReload(cdp, extensionPath, patches);
             response.appendResponseLine('Patches applied, extension reloaded');
             for (const p of patches) {
-              response.appendResponseLine(`  ${p.file}: "${p.find}" -> "${p.replace}"`);
+              response.appendResponseLine(
+                `  ${p.file}: "${p.find}" -> "${p.replace}"`,
+              );
             }
             break;
           }

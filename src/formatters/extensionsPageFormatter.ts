@@ -205,8 +205,7 @@ function findButton(
 ): TextSnapshotNode | null {
   for (const node of nodes) {
     if (node.role === 'button') {
-      const text =
-        node.name || node.description || node.roledescription || '';
+      const text = node.name || node.description || node.roledescription || '';
       for (const keyword of keywords) {
         if (text.toLowerCase().includes(keyword.toLowerCase())) {
           return node;
@@ -223,8 +222,7 @@ function findSwitch(
 ): TextSnapshotNode | null {
   for (const node of nodes) {
     if (node.role === 'switch') {
-      const text =
-        node.name || node.description || node.roledescription || '';
+      const text = node.name || node.description || node.roledescription || '';
       for (const keyword of keywords) {
         if (text.toLowerCase().includes(keyword.toLowerCase())) {
           return node;
@@ -235,11 +233,12 @@ function findSwitch(
   return null;
 }
 
-function findDeveloperModeSwitch(root: TextSnapshotNode): TextSnapshotNode | null {
+function findDeveloperModeSwitch(
+  root: TextSnapshotNode,
+): TextSnapshotNode | null {
   const search = (node: TextSnapshotNode): TextSnapshotNode | null => {
     if (node.role === 'switch') {
-      const text =
-        node.name || node.description || node.roledescription || '';
+      const text = node.name || node.description || node.roledescription || '';
       if (text.toLowerCase().includes('developer')) {
         return node;
       }
