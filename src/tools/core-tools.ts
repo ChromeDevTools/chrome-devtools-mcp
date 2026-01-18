@@ -27,19 +27,19 @@
 import type { ToolRegistry } from '../plugin-api.js';
 
 // Input tools
-import { click, hover, fill, drag, fillForm, uploadFile } from './input.js';
 
 // Navigation tools
-import { pages, navigate, resizePage, handleDialog } from './pages.js';
 
 // Console tools
 import * as consoleTools from './console.js';
 
 // Emulation tools
 import * as emulationTools from './emulation.js';
+import { click, hover, fill, drag, fillForm, uploadFile } from './input.js';
 
 // Network tools
 import * as networkTools from './network.js';
+import { pages, navigate, resizePage, handleDialog } from './pages.js';
 
 // Performance tools
 import * as performanceTools from './performance.js';

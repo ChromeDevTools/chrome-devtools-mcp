@@ -14,9 +14,8 @@
  * v0.26.0: Initial plugin architecture
  */
 
-import type { ToolDefinition, Context, Response } from './tools/ToolDefinition.js';
-import type { ToolCategories } from './tools/categories.js';
-import type z from 'zod';
+import type {ToolCategories} from './tools/categories.js';
+import type {ToolDefinition} from './tools/ToolDefinition.js';
 
 // Use a broader type for storing tools with any schema
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -27,8 +26,8 @@ type AnyToolDefinition = ToolDefinition<any>;
  * Allows dynamic registration and querying of tools.
  */
 export class ToolRegistry {
-  private tools: Map<string, AnyToolDefinition> = new Map();
-  private categories: Map<ToolCategories, Set<string>> = new Map();
+  private tools = new Map<string, AnyToolDefinition>();
+  private categories = new Map<ToolCategories, Set<string>>();
 
   /**
    * Register a single tool.
@@ -202,7 +201,7 @@ export interface McpPlugin {
  * Plugin loader for dynamically loading plugins.
  */
 export class PluginLoader {
-  private plugins: Map<string, McpPlugin> = new Map();
+  private plugins = new Map<string, McpPlugin>();
   private registry: ToolRegistry;
   private log: (message: string) => void;
   private config: PluginConfig;
