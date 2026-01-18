@@ -2,33 +2,21 @@
 
 [![npm chrome-devtools-mcp-for-extension package](https://img.shields.io/npm/v/chrome-devtools-mcp-for-extension.svg)](https://npmjs.org/package/chrome-devtools-mcp-for-extension)
 
-**AI-powered Chrome extension development with automated testing, debugging, and Web Store submission**
+> AI-powered Chrome extension development via MCP
 
 Built for: Claude Code, Cursor, VS Code Copilot, Cline, and other MCP-compatible AI tools
 
 ---
 
-## 📦 For Users: Quick Start
+## Quick Start (5 minutes)
 
-### Installation
-
-/
-**Option 1: Direct execution (recommended)**
+### 1. Run the server
 
 ```bash
 npx chrome-devtools-mcp-for-extension@latest
 ```
 
-**Option 2: Global installation**
-
-```bash
-npm install -g chrome-devtools-mcp-for-extension
-chrome-devtools-mcp-for-extension
-```
-
-### MCP Configuration
-
-Add to your MCP client configuration file:
+### 2. Configure your MCP client
 
 **For Claude Code** (`~/.claude.json`):
 
@@ -43,20 +31,11 @@ Add to your MCP client configuration file:
 }
 ```
 
-**For other MCP clients** (Cursor, VS Code Copilot, Cline):
+### 3. Verify it works
 
-- Refer to your client's MCP configuration documentation
-- Use the same `command` and `args` as above
+Restart your AI client and ask: `"List all my Chrome extensions"`
 
-### Test It
-
-1. Restart your AI client
-2. Ask: `"List all my Chrome extensions"`
-3. ✅ You should see your installed Chrome extensions
-
-### Load Development Extensions (Optional)
-
-To test your own extensions under development:
+### Load development extensions (optional)
 
 ```json
 {
@@ -72,440 +51,202 @@ To test your own extensions under development:
 }
 ```
 
-**Directory structure:**
+---
 
-```
-/path/to/your/extensions/
-├── extension-1/
-│   └── manifest.json
-├── extension-2/
-│   └── manifest.json
-```
+## What You Can Do
+
+- **Extension Development**: Load, debug, and hot-reload Chrome extensions
+- **Browser Automation**: Navigate, click, fill forms, take screenshots
+- **Performance Analysis**: Trace recording and insight extraction
+- **AI Research**: Automated ChatGPT/Gemini interactions
+- **Web Store Submission**: Automated screenshot generation and submission
 
 ---
 
-## 👨‍💻 For Developers: Contributing
+## Tools Reference
 
-### Local Development Setup
+### Core Tools (18)
 
-**1. Clone and install:**
+| Tool | Description | Key Parameters |
+|------|-------------|----------------|
+| `take_snapshot` | Get page structure with element UIDs | - |
+| `take_screenshot` | Capture page or element image | `fullPage`, `uid` |
+| `click` | Click element by UID | `uid`, `dblClick` |
+| `fill` | Fill input/textarea/select | `uid`, `value` |
+| `fill_form` | Fill multiple form elements | `elements[]` |
+| `hover` | Hover over element | `uid` |
+| `drag` | Drag element to another | `from_uid`, `to_uid` |
+| `upload_file` | Upload file through input | `uid`, `filePath` |
+| `navigate` | Go to URL, back, forward | `op`, `url` |
+| `pages` | List, select, close tabs | `op`, `pageIdx` |
+| `wait_for` | Wait for text to appear | `text`, `timeout` |
+| `handle_dialog` | Accept/dismiss dialogs | `action` |
+| `resize_page` | Change viewport size | `width`, `height` |
+| `emulate` | CPU/network throttling | `target`, `throttlingRate` |
+| `network` | List/get network requests | `op`, `url` |
+| `performance` | Start/stop/analyze traces | `op`, `insightName` |
+| `evaluate_script` | Run JavaScript in page | `function` |
+| `list_console_messages` | Get console output | - |
 
-```bash
-git clone https://github.com/usedhonda/chrome-devtools-mcp.git
-cd chrome-devtools-mcp
-npm install
-npm run build
-```
+### Optional Tools (2) - Web-LLM
 
-**2. Configure MCP client to use local version:**
+| Tool | Description | Key Parameters |
+|------|-------------|----------------|
+| `ask_chatgpt_web` | Ask ChatGPT via browser | `question`, `createNewChat` |
+| `ask_gemini_web` | Ask Gemini via browser | `question`, `createNewChat` |
 
-Update `~/.claude.json`:
+**Full documentation:** [docs/reference/tools.md](docs/reference/tools.md)
+
+---
+
+## Plugin Architecture (v0.26.0)
+
+### Disable Web-LLM tools
 
 ```json
 {
-  "mcpServers": {
-    "chrome-devtools-extension": {
-      "command": "node",
-      "args": [
-        "/absolute/path/to/chrome-devtools-mcp/scripts/cli.mjs",
-        "--loadExtensionsDir=/path/to/your/test/extensions"
-      ]
-    }
+  "env": {
+    "MCP_DISABLE_WEB_LLM": "true"
   }
 }
 ```
 
-**3. Restart your AI client**
-
-### Development Workflow
-
-**Standard workflow (manual rebuild):**
-
-```bash
-# 1. Edit TypeScript files
-vim src/tools/extensions.ts
-
-# 2. Build
-npm run build
-
-# 3. Restart AI client
-# Cmd+R in VS Code (or restart your MCP client)
-
-# 4. Test changes
-# Ask AI to use the modified tool
-```
-
-**Hot-reload workflow (automatic rebuild):**
-
-```bash
-# 1. Update MCP configuration to use wrapper
-# Edit ~/.claude.json:
-{
-  "mcpServers": {
-    "chrome-devtools-extension": {
-      "command": "node",
-      "args": [
-        "/absolute/path/to/chrome-devtools-mcp/scripts/mcp-wrapper.mjs"
-      ],
-      "cwd": "/absolute/path/to/chrome-devtools-mcp",
-      "env": {
-        "MCP_ENV": "development"
-      }
-    }
-  }
-}
-
-# 2. Restart AI client ONCE (Cmd+R)
-
-# 3. Edit TypeScript files
-vim src/tools/extensions.ts
-
-# 4. Changes automatically rebuild and reload
-# No need to restart AI client!
-# Just test your changes immediately
-```
-
-**Hot-reload benefits:**
-
-- ✅ Automatic TypeScript compilation (`tsc -w`)
-- ✅ Automatic server restart on file changes
-- ✅ No VSCode Reload Window needed
-- ✅ 2-5 second feedback loop (vs 20-30 seconds)
-
-**See also:** [Hot-Reload Setup Guide](docs/hot-reload-setup-guide.md)
-
-### Project Structure
-
-```
-chrome-devtools-mcp/
-├── src/
-│   ├── tools/              # MCP tool definitions
-│   │   ├── core-tools.ts   # Core tool exports (v0.26.0)
-│   │   ├── optional-tools.ts # Web-LLM tool exports (v0.26.0)
-│   │   ├── chatgpt-web.ts  # ChatGPT automation
-│   │   ├── gemini-web.ts   # Gemini automation
-│   │   └── ...
-│   ├── plugin-api.ts       # Plugin architecture (v0.26.0)
-│   ├── browser.ts          # Browser/profile management
-│   ├── main.ts             # MCP server entry point
-│   └── graceful.ts         # Graceful shutdown
-├── scripts/
-│   ├── cli.mjs                    # Production entry (users)
-│   ├── mcp-wrapper.mjs            # Development wrapper (hot-reload)
-│   └── browser-globals-mock.mjs   # Node.js browser globals
-├── build/                  # Compiled JavaScript (gitignored)
-└── docs/                   # Documentation
-```
-
-### Internal Architecture
-
-**For users (production):**
-
-```
-npx chrome-devtools-mcp-for-extension@latest
-  ↓
-scripts/cli.mjs
-  ↓
-node --import browser-globals-mock.mjs build/src/main.js
-  ↓
-MCP Server (single process, simple)
-```
-
-**For developers (hot-reload):**
-
-```
-node scripts/mcp-wrapper.mjs (MCP_ENV=development)
-  ↓
-tsc -w (automatic compilation)
-  ↓
-chokidar (file watcher)
-  ↓
-Auto-restart build/src/main.js on changes
-  ↓
-MCP Server (development mode, 2-5s reload)
-```
-
-**Key files:**
-
-- `scripts/cli.mjs`: Simple wrapper for production (loads browser-globals-mock)
-- `scripts/mcp-wrapper.mjs`: Development wrapper (hot-reload with tsc -w)
-- `scripts/browser-globals-mock.mjs`: Polyfills for chrome-devtools-frontend in Node.js
-- `src/main.ts`: Main MCP server (includes fallback browser globals)
-
-**Why browser-globals-mock?**
-
-- chrome-devtools-frontend expects browser globals (`location`, `self`, `localStorage`)
-- Node.js doesn't have these globals
-- `--import` flag loads the mock BEFORE any chrome-devtools-frontend modules
-
-### Testing
-
-```bash
-# Build
-npm run build
-
-# Type check
-npm run typecheck
-
-# Run tests
-npm test
-
-# Format code
-npm run format
-```
-
-### Publishing (Maintainers Only)
-
-```bash
-# 1. Update version in package.json
-npm version patch  # or minor, major
-
-# 2. Build
-npm run build
-
-# 3. Test locally
-npx .
-
-# 4. Publish to npm
-npm publish
-
-# 5. Push to GitHub
-git push && git push --tags
-```
-
----
-
-## ✨ Features
-
-- 🧩 **Extension Development**: Load, debug, and reload Chrome extensions
-- 🏪 **Web Store Automation**: Automated submission with screenshots
-- 🔧 **Browser Testing**: Test extensions in real user environments
-- 🐛 **Advanced Debugging**: Service worker inspection, console monitoring
-- 📸 **Screenshot Generation**: Auto-create store listing images
-- 🤖 **ChatGPT/Gemini Integration**: Automated AI interactions for research
-- 🔌 **Plugin Architecture** (v0.26.0): Extensible tool system with external plugins
-
----
-
-## 📚 Common Workflows
-
-### Create & Test Extension
-
-```
-1. "Create a Chrome extension that blocks ads"
-2. "List extensions to verify it loaded"
-3. "Test the extension on youtube.com"
-4. "Show any errors from the extension"
-```
-
-### Debug Extension Issues
-
-```
-1. "List extensions and show any errors"
-2. "Inspect service worker for my-ad-blocker"
-3. "Show console messages"
-4. "Reload the extension with latest changes"
-```
-
-### Publish to Web Store
-
-```
-1. "Generate screenshots for my extension"
-2. "Validate manifest for Web Store compliance"
-3. "Submit to Chrome Web Store"
-```
-
----
-
-## 🛠️ Core Tools
-
-| Tool                      | Purpose             | Example                   |
-| ------------------------- | ------------------- | ------------------------- |
-| `open_extension_popup`    | Select popup window | "Open my extension popup" |
-| `reload_iframe_extension` | Hot-reload via CDP  | "Reload extension"        |
-| `patch_iframe_popup`      | Edit & reload       | "Patch popup.html"        |
-| `ask_chatgpt_web`         | ChatGPT research    | "Ask ChatGPT about..."    |
-| `take_snapshot`           | Page analysis       | "Snapshot current page"   |
-| `list_pages`              | Browser tabs        | "List open pages"         |
-
-**Note:** Extension tools use CDP (Chrome DevTools Protocol) for reliable operation.
-Shadow DOM-based tools (`list_extensions`, `reload_extension`, etc.) were removed in v0.19.0
-due to Chrome security restrictions.
-
-**See also:** [Full Tool Documentation](docs/tools-reference.md)
-
----
-
-## 🔍 Troubleshooting
-
-### Extension Not Loading
-
-```
-"Check extension popup for errors"
-```
-
-**Common fixes:**
-
-- Verify manifest.json is at root of extension directory
-- Check extension path in `--loadExtensionsDir`
-- Ensure manifest is valid Manifest V3
-
-### MCP Server Not Starting
-
-**Check version:**
-
-```bash
-npx chrome-devtools-mcp-for-extension@latest --version
-```
-
-**Clear npx cache:**
-
-```bash
-npx clear-npx-cache
-# or
-rm -rf ~/.npm/_npx
-```
-
-**Check MCP configuration:**
-
-```bash
-cat ~/.claude.json | jq '.mcpServers'
-```
-
-### Hot-Reload Not Working (Developers)
-
-**Verify development mode:**
-
-```bash
-ps aux | grep mcp-wrapper | grep MCP_ENV=development
-```
-
-**Check tsc -w is running:**
-
-```bash
-ps aux | grep 'tsc -w'
-```
-
-**Manually restart wrapper:**
-
-```bash
-pkill -f mcp-wrapper
-# Then restart AI client (Cmd+R)
-```
-
----
-
-## 📖 Documentation
-
-- [MCP Configuration Guide](docs/mcp-configuration-guide.md)
-- [Hot-Reload Setup Guide](docs/hot-reload-setup-guide.md) (Developers)
-- [Tools Reference](docs/tools-reference.md)
-- [ChatGPT Integration](docs/chatgpt-integration.md)
-- [Web Store Automation](docs/webstore-automation.md)
-
----
-
-## 🔌 Plugin Architecture (v0.26.0)
-
-### Tool Categories
-
-**Core Tools (18)** - Stable, site-independent:
-
-- Input: click, hover, fill, drag, fill_form, upload_file
-- Navigation: pages, navigate, resize_page, handle_dialog
-- Debugging: list_console_messages, take_screenshot, evaluate_script, take_snapshot, wait_for
-- Analysis: emulate, network, performance
-
-**Optional Tools (2)** - Web-LLM, site-dependent (may break with UI changes):
-
-- `ask_chatgpt_web` - ChatGPT browser automation
-- `ask_gemini_web` - Gemini browser automation
-
-### Disable Web-LLM Tools
-
-If you don't need ChatGPT/Gemini integration:
+### Load external plugins
 
 ```json
 {
-  "mcpServers": {
-    "chrome-devtools-extension": {
-      "command": "npx",
-      "args": ["chrome-devtools-mcp-for-extension@latest"],
-      "env": {
-        "MCP_DISABLE_WEB_LLM": "true"
-      }
-    }
+  "env": {
+    "MCP_PLUGINS": "./my-plugin.js,@org/another-plugin"
   }
 }
 ```
 
-### External Plugins
-
-Load custom plugins at startup:
-
-```json
-{
-  "mcpServers": {
-    "chrome-devtools-extension": {
-      "command": "npx",
-      "args": ["chrome-devtools-mcp-for-extension@latest"],
-      "env": {
-        "MCP_PLUGINS": "./my-plugin.js,@org/another-plugin"
-      }
-    }
-  }
-}
-```
-
-**Plugin Interface:**
+**Plugin interface:**
 
 ```typescript
-// my-plugin.js
 export default {
   id: 'my-plugin',
   name: 'My Custom Plugin',
   version: '1.0.0',
-
   async register(ctx) {
     ctx.registry.register({
-      name: 'my_custom_tool',
+      name: 'my_tool',
       description: 'Does something useful',
-      schema: {
-        /* zod schema */
-      },
-      annotations: {category: 'automation'},
-      async handler(input, response, context) {
-        // Tool implementation
-      },
+      schema: { /* zod schema */ },
+      async handler(input, response, context) { /* implementation */ },
     });
-    ctx.log('Plugin registered!');
-  },
-
-  async unload() {
-    // Cleanup if needed
   },
 };
 ```
 
 ---
 
-## 🙏 Credits
+## For Developers
 
-This project is a fork of [Chrome DevTools MCP](https://github.com/ChromeDevTools/chrome-devtools-mcp) by Google LLC.
+### Local development setup
 
-**Major additions:**
+```bash
+git clone https://github.com/usedhonda/chrome-devtools-mcp.git
+cd chrome-devtools-mcp
+npm install && npm run build
+```
 
-- Chrome extension development tools
-- Web Store automation
-- ChatGPT integration
-- Hot-reload development workflow
-- System profile management
+Configure `~/.claude.json` to use local version:
+
+```json
+{
+  "mcpServers": {
+    "chrome-devtools-extension": {
+      "command": "node",
+      "args": ["/absolute/path/to/chrome-devtools-mcp/scripts/cli.mjs"]
+    }
+  }
+}
+```
+
+### Hot-reload development
+
+```json
+{
+  "mcpServers": {
+    "chrome-devtools-extension": {
+      "command": "node",
+      "args": ["/absolute/path/to/chrome-devtools-mcp/scripts/mcp-wrapper.mjs"],
+      "cwd": "/absolute/path/to/chrome-devtools-mcp",
+      "env": { "MCP_ENV": "development" }
+    }
+  }
+}
+```
+
+**Benefits:** Auto-rebuild on file changes, 2-5 second feedback loop.
+
+**See also:** [docs/dev/hot-reload.md](docs/dev/hot-reload.md)
+
+### Commands
+
+```bash
+npm run build      # Build TypeScript
+npm run typecheck  # Type check
+npm test           # Run tests
+npm run format     # Format code
+```
+
+### Project structure
+
+```
+chrome-devtools-mcp/
+├── src/
+│   ├── tools/           # MCP tool definitions
+│   ├── plugin-api.ts    # Plugin architecture
+│   ├── browser.ts       # Browser management
+│   └── main.ts          # Entry point
+├── scripts/
+│   ├── cli.mjs          # Production entry
+│   └── mcp-wrapper.mjs  # Development wrapper
+└── docs/                # Documentation
+```
 
 ---
 
-## 📄 License
+## Documentation
+
+| Guide | Description |
+|-------|-------------|
+| [Setup Guide](docs/user/setup.md) | Detailed MCP configuration |
+| [Workflows](docs/user/workflows.md) | Common usage patterns |
+| [Troubleshooting](docs/user/troubleshooting.md) | Problem solving |
+| [Tools Reference](docs/reference/tools.md) | Full tool documentation |
+| [Hot-Reload Setup](docs/dev/hot-reload.md) | Developer workflow |
+
+---
+
+## Troubleshooting
+
+### Extension not loading
+- Verify `manifest.json` is at extension root
+- Use absolute paths in `--loadExtensionsDir`
+
+### MCP server issues
+```bash
+npx clear-npx-cache && npx chrome-devtools-mcp-for-extension@latest
+```
+
+**More:** [docs/user/troubleshooting.md](docs/user/troubleshooting.md)
+
+---
+
+## Credits
+
+Fork of [Chrome DevTools MCP](https://github.com/ChromeDevTools/chrome-devtools-mcp) by Google LLC.
+
+**Additions:** Extension development tools, Web Store automation, ChatGPT/Gemini integration, hot-reload workflow.
+
+---
+
+## License
 
 Apache-2.0
 
-**Version**: 0.26.0
+**Version**: 0.26.1
 **Repository**: https://github.com/usedhonda/chrome-devtools-mcp

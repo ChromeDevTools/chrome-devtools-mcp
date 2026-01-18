@@ -1,0 +1,62 @@
+{
+  "version": "1.0.0",
+  "lastUpdated": "2025-10-03T10:00:00.000Z",
+  "description": "DeepResearch ON/OFF切り替え手順（Shadow DOM不要）",
+  "steps": {
+    "enable": [
+      {
+        "action": "click",
+        "selector": "button[aria-label*=\"ファイルの追加\"]",
+        "method": "puppeteer",
+        "description": "+ボタンをPuppeteerでクリック"
+      },
+      {
+        "action": "wait",
+        "waitMs": 500,
+        "description": "メニュー表示待機"
+      },
+      {
+        "action": "click",
+        "selector": "[role=\"menuitemradio\"]",
+        "textContent": "Deep Research",
+        "method": "puppeteer",
+        "description": "Deep Research menuitemradio をPuppeteerでクリック"
+      },
+      {
+        "action": "wait",
+        "waitMs": 1000,
+        "description": "DeepResearch有効化完了待機"
+      },
+      {
+        "action": "verify",
+        "selector": "button.__composer-pill[aria-label*=\"リサーチ\"]",
+        "description": "リサーチpillボタンの存在確認"
+      }
+    ],
+    "disable": [
+      {
+        "action": "click",
+        "selector": "button[aria-label*=\"リサーチ：クリックして削除\"]",
+        "method": "puppeteer",
+        "description": "リサーチpillボタンをクリックして無効化"
+      },
+      {
+        "action": "wait",
+        "waitMs": 500,
+        "description": "無効化完了待機"
+      }
+    ],
+    "verify": [
+      {
+        "action": "check",
+        "selector": "button.__composer-pill[aria-label*=\"リサーチ\"]",
+        "description": "リサーチpillボタンの有無で状態確認"
+      }
+    ]
+  },
+  "notes": {
+    "shadowDOM": "ChatGPTサイトではShadow DOMを使用していません。通常のDOM操作で全て可能です。",
+    "reliability": "JavaScriptのclickではなく、Puppeteerのclickを使用することで確実性が向上します。",
+    "detection": "composer-pill（リサーチボタン）の存在が最も信頼性の高い検出方法です。"
+  }
+}
