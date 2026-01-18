@@ -407,11 +407,15 @@ export const askChatGPTWeb = defineTool({
           response.appendResponseLine(
             `既存のプロジェクトチャットを使用: ${latestSession.url}`,
           );
-          await navigateWithRetry(page, latestSession.url, {
-            waitUntil: 'networkidle2',
-          });
           sessionChatId = latestSession.chatId;
-          await new Promise(resolve => setTimeout(resolve, 2000));
+
+          // Skip navigation if already on the same chat
+          const currentUrl = page.url();
+          if (!currentUrl.includes(latestSession.chatId)) {
+            await navigateWithRetry(page, latestSession.url, {
+              waitUntil: 'domcontentloaded',
+            });
+          }
         } else {
           response.appendResponseLine(
             '既存チャットが見つかりませんでした。新規作成します。',
@@ -434,7 +438,7 @@ export const askChatGPTWeb = defineTool({
           }
         });
 
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        await new Promise(resolve => setTimeout(resolve, 300));
 
         // Turn off temporary chat
         const tempChatDisabled = await page.evaluate(() => {
@@ -452,7 +456,7 @@ export const askChatGPTWeb = defineTool({
 
         if (tempChatDisabled) {
           response.appendResponseLine('✅ 一時チャットを無効化');
-          await new Promise(resolve => setTimeout(resolve, 500));
+          await new Promise(resolve => setTimeout(resolve, 200));
         }
       }
 
@@ -479,7 +483,7 @@ export const askChatGPTWeb = defineTool({
         return;
       }
 
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise(resolve => setTimeout(resolve, 100));
 
       // Click send button
       const sent = await page.evaluate(() => {
@@ -518,9 +522,14 @@ export const askChatGPTWeb = defineTool({
 
       const startTime = Date.now();
       let lastText = '';
+      let isFirstCheck = true;
 
       while (true) {
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        // First check is immediate, then poll every 500ms
+        if (!isFirstCheck) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+        isFirstCheck = false;
 
         const status = await page.evaluate(() => {
           // Streaming detection - check for stop button by data-testid

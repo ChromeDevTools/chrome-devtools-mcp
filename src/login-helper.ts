@@ -47,7 +47,7 @@ export async function probeChatGPTSession(page: Page): Promise<LoginStatus> {
       try {
         // Use AbortController for timeout (ChatGPT recommendation)
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000);
+        const timeoutId = setTimeout(() => controller.abort(), 1500);
 
         const r = await fetch('/api/auth/session', {
           credentials: 'include',
