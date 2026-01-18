@@ -15,7 +15,7 @@
  */
 
 import type {ToolCategories} from './tools/categories.js';
-import type {ToolDefinition} from './tools/ToolDefinition.js';
+import type {Context, Response, ToolDefinition} from './tools/ToolDefinition.js';
 
 // Use a broader type for storing tools with any schema
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
