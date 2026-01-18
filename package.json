@@ -1,6 +1,6 @@
 {
   "name": "chrome-devtools-mcp-for-extension",
-  "version": "0.26.2",
+  "version": "0.26.3",
   "description": "MCP server for Chrome extension development with Web Store automation. Fork of chrome-devtools-mcp with extension-specific tools.",
   "type": "module",
   "bin": "./scripts/cli.mjs",
