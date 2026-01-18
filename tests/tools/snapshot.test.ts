@@ -38,7 +38,7 @@ describe('snapshot', () => {
 
         assert.equal(
           response.responseLines[0],
-          'Element with text "Hello" found.',
+          'Found: "Hello"',
         );
         assert.ok(response.includeSnapshot);
       });
@@ -65,7 +65,7 @@ describe('snapshot', () => {
 
         assert.equal(
           response.responseLines[0],
-          'Element with text "Hello World" found.',
+          'Found: "Hello World"',
         );
         assert.ok(response.includeSnapshot);
       });
@@ -90,7 +90,7 @@ describe('snapshot', () => {
 
         assert.equal(
           response.responseLines[0],
-          'Element with text "Header" found.',
+          'Found: "Header"',
         );
         assert.ok(response.includeSnapshot);
       });

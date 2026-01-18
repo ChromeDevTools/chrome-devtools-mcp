@@ -5,6 +5,7 @@
  */
 
 import fs from 'node:fs';
+import path from 'node:path';
 
 import {Client} from '@modelcontextprotocol/sdk/client/index.js';
 import {StdioClientTransport} from '@modelcontextprotocol/sdk/client/stdio.js';
@@ -306,7 +307,11 @@ async function generateToolDocumentation(): Promise<void> {
       }
     }
 
-    // Write the documentation to file
+    // Write the documentation to file (create directory if needed)
+    const outputDir = path.dirname(OUTPUT_PATH);
+    if (!fs.existsSync(outputDir)) {
+      fs.mkdirSync(outputDir, {recursive: true});
+    }
     fs.writeFileSync(OUTPUT_PATH, markdown.trim() + '\n');
 
     console.log(
