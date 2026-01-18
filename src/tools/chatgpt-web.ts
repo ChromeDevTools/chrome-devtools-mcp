@@ -416,6 +416,15 @@ export const askChatGPTWeb = defineTool({
               waitUntil: 'domcontentloaded',
             });
           }
+
+          // Wait for input field to be ready (even when skipping navigation)
+          await page
+            .waitForSelector('.ProseMirror[contenteditable="true"]', {
+              timeout: 5000,
+            })
+            .catch(() => {
+              // Ignore timeout, will be handled later
+            });
         } else {
           response.appendResponseLine(
             '既存チャットが見つかりませんでした。新規作成します。',
@@ -479,7 +488,7 @@ export const askChatGPTWeb = defineTool({
       }, sanitizedQuestion);
 
       if (!questionSent) {
-        response.appendResponseLine('❌ エディタが見つかりません');
+        response.appendResponseLine('❌ 入力欄が見つかりません（ページ読み込み中の可能性）');
         return;
       }
 
