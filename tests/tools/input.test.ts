@@ -302,84 +302,15 @@ describe('input', () => {
       const testFilePath = path.join(process.cwd(), 'test.txt');
       await fs.writeFile(testFilePath, 'test file content');
 
-      await withBrowser(async (response, context) => {
-        const page = context.getSelectedPage();
-        await page.setContent(`<!DOCTYPE html>
+      try {
+        await withBrowser(async (response, context) => {
+          const page = context.getSelectedPage();
+          await page.setContent(`<!DOCTYPE html>
 <form>
   <input type="file" id="file-input">
 </form>`);
-        await context.createTextSnapshot();
-        await uploadFile.handler(
-          {
-            params: {
-              uid: '1_1',
-              filePath: testFilePath,
-            },
-          },
-          response,
-          context,
-        );
-        assert.ok(response.includeSnapshot);
-        assert.strictEqual(
-          response.responseLines[0],
-          `File uploaded from ${testFilePath}.`,
-        );
-      });
-
-      await fs.unlink(testFilePath);
-    });
-
-    it('uploads a file when clicking an element opens a file uploader', async () => {
-      const testFilePath = path.join(process.cwd(), 'test.txt');
-      await fs.writeFile(testFilePath, 'test file content');
-
-      await withBrowser(async (response, context) => {
-        const page = context.getSelectedPage();
-        await page.setContent(`<!DOCTYPE html>
-<button id="file-chooser-button">Upload file</button>
-<input type="file" id="file-input" style="display: none;">
-<script>
-  document.getElementById('file-chooser-button').addEventListener('click', () => {
-    document.getElementById('file-input').click();
-  });
-</script>`);
-        await context.createTextSnapshot();
-        await uploadFile.handler(
-          {
-            params: {
-              uid: '1_1',
-              filePath: testFilePath,
-            },
-          },
-          response,
-          context,
-        );
-        assert.ok(response.includeSnapshot);
-        assert.strictEqual(
-          response.responseLines[0],
-          `File uploaded from ${testFilePath}.`,
-        );
-        const uploadedFileName = await page.$eval('#file-input', el => {
-          const input = el as HTMLInputElement;
-          return input.files?.[0]?.name;
-        });
-        assert.strictEqual(uploadedFileName, 'test.txt');
-
-        await fs.unlink(testFilePath);
-      });
-    });
-
-    it('throws an error if the element is not a file input and does not open a file chooser', async () => {
-      const testFilePath = path.join(process.cwd(), 'test.txt');
-      await fs.writeFile(testFilePath, 'test file content');
-
-      await withBrowser(async (response, context) => {
-        const page = context.getSelectedPage();
-        await page.setContent(`<!DOCTYPE html><div>Not a file input</div>`);
-        await context.createTextSnapshot();
-
-        await assert.rejects(
-          uploadFile.handler(
+          await context.createTextSnapshot();
+          await uploadFile.handler(
             {
               params: {
                 uid: '1_1',
@@ -388,18 +319,93 @@ describe('input', () => {
             },
             response,
             context,
-          ),
-          {
-            message:
-              'Failed to upload file. The element could not accept the file directly, and clicking it did not trigger a file chooser.',
-          },
-        );
+          );
+          assert.ok(response.includeSnapshot);
+          assert.strictEqual(
+            response.responseLines[0],
+            `File uploaded from ${testFilePath}.`,
+          );
+        });
+      } finally {
+        await fs.unlink(testFilePath).catch(() => {});
+      }
+    });
 
-        assert.strictEqual(response.responseLines.length, 0);
-        assert.strictEqual(response.includeSnapshot, false);
+    it('uploads a file when clicking an element opens a file uploader', async () => {
+      const testFilePath = path.join(process.cwd(), 'test.txt');
+      await fs.writeFile(testFilePath, 'test file content');
 
-        await fs.unlink(testFilePath);
-      });
+      try {
+        await withBrowser(async (response, context) => {
+          const page = context.getSelectedPage();
+          await page.setContent(`<!DOCTYPE html>
+<button id="file-chooser-button">Upload file</button>
+<input type="file" id="file-input" style="display: none;">
+<script>
+  document.getElementById('file-chooser-button').addEventListener('click', () => {
+    document.getElementById('file-input').click();
+  });
+</script>`);
+          await context.createTextSnapshot();
+          await uploadFile.handler(
+            {
+              params: {
+                uid: '1_1',
+                filePath: testFilePath,
+              },
+            },
+            response,
+            context,
+          );
+          assert.ok(response.includeSnapshot);
+          assert.strictEqual(
+            response.responseLines[0],
+            `File uploaded from ${testFilePath}.`,
+          );
+          const uploadedFileName = await page.$eval('#file-input', el => {
+            const input = el as HTMLInputElement;
+            return input.files?.[0]?.name;
+          });
+          assert.strictEqual(uploadedFileName, 'test.txt');
+        });
+      } finally {
+        await fs.unlink(testFilePath).catch(() => {});
+      }
+    });
+
+    it('throws an error if the element is not a file input and does not open a file chooser', async () => {
+      const testFilePath = path.join(process.cwd(), 'test.txt');
+      await fs.writeFile(testFilePath, 'test file content');
+
+      try {
+        await withBrowser(async (response, context) => {
+          const page = context.getSelectedPage();
+          await page.setContent(`<!DOCTYPE html><div>Not a file input</div>`);
+          await context.createTextSnapshot();
+
+          await assert.rejects(
+            uploadFile.handler(
+              {
+                params: {
+                  uid: '1_1',
+                  filePath: testFilePath,
+                },
+              },
+              response,
+              context,
+            ),
+            {
+              message:
+                'Failed to upload file. The element could not accept the file directly, and clicking it did not trigger a file chooser.',
+            },
+          );
+
+          assert.strictEqual(response.responseLines.length, 0);
+          assert.strictEqual(response.includeSnapshot, false);
+        });
+      } finally {
+        await fs.unlink(testFilePath).catch(() => {});
+      }
     });
   });
 });

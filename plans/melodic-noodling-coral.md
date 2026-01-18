@@ -1,79 +1,74 @@
-# Chrome自動再起動の挙動修正
+# test.txt 残留問題の修正
 
 ## 問題
 
-ユーザーがChromeを閉じると、自動的にChromeが再起動される。
-この挙動はユーザーの意図に反する。
+`npm test` 実行後に `test.txt` がプロジェクトルートに残留する。
+これがgitに誤ってコミットされる原因になっている。
 
 ## 原因
 
-`BrowserConnectionManager` クラスが `disconnected` イベントを検出すると、
-自動的に再接続（＝Chrome再起動）を試みる設計になっている。
+`tests/tools/input.test.ts` の `uploadFile` テストで一時ファイルを作成しているが、
+テスト失敗時にクリーンアップされない。
 
 ### 該当コード
 
-**`src/browser-connection-manager.ts:76-82`**
+**ファイル**: `tests/tools/input.test.ts`
+
 ```typescript
-private onDisconnected = () => {
-  this.log('Browser disconnected');
-  this.setState(ConnectionState.RECONNECTING);
-  void this.triggerReconnect('event:disconnected');  // ← これが自動再起動の原因
-};
+// テスト1 (301-330行)
+const testFilePath = path.join(process.cwd(), 'test.txt');
+await fs.writeFile(testFilePath, 'test file content');  // 作成
+// ... テスト実行 ...
+await fs.unlink(testFilePath);  // テスト成功時のみ削除
+
+// テスト2 (332-370行) - 同様のパターン
+// テスト3 (372-403行) - 同様のパターン
 ```
 
-**`src/browser-connection-manager.ts:94-108`**
-```typescript
-setBrowser(browser: Browser, factory: () => Promise<Browser>): void {
-  // ...
-  this.browser.on('disconnected', this.onDisconnected);  // ← イベントハンドラ登録
-}
-```
+**問題**: テストが失敗すると `fs.unlink()` に到達せず、ファイルが残る。
 
 ---
 
 ## 修正方針
 
-### `disconnected` イベント時の自動再接続を無効化
-
-**変更箇所**: `src/browser-connection-manager.ts:76-82`
+### try-finally でクリーンアップを保証
 
 ```typescript
 // Before
-private onDisconnected = () => {
-  this.log('Browser disconnected');
-  this.setState(ConnectionState.RECONNECTING);
-  void this.triggerReconnect('event:disconnected');
-};
+const testFilePath = path.join(process.cwd(), 'test.txt');
+await fs.writeFile(testFilePath, 'test file content');
+await withBrowser(async (response, context) => {
+  // ... test ...
+});
+await fs.unlink(testFilePath);
 
 // After
-private onDisconnected = () => {
-  this.log('Browser disconnected');
-  this.setState(ConnectionState.DISCONNECTED);
-  // 自動再接続は無効化 - MCP操作時に必要なら再接続する
-};
+const testFilePath = path.join(process.cwd(), 'test.txt');
+await fs.writeFile(testFilePath, 'test file content');
+try {
+  await withBrowser(async (response, context) => {
+    // ... test ...
+  });
+} finally {
+  await fs.unlink(testFilePath).catch(() => {});
+}
 ```
-
-**理由**:
-1. ユーザーが意図的にChromeを閉じた場合、再起動は望まれない
-2. 操作中のCDP接続エラーは `executeWithRetry` で別途対応される
-3. MCP側からのリクエスト時にのみ再接続を試みる方が自然
 
 ---
 
-## 修正対象ファイル
+## 修正対象
 
-| ファイル | 変更内容 |
-|---------|---------|
-| `src/browser-connection-manager.ts` | `onDisconnected` の挙動変更（1箇所） |
+| ファイル | 行番号 | 変更内容 |
+|---------|--------|---------|
+| `tests/tools/input.test.ts` | 301-330 | try-finally 追加 |
+| `tests/tools/input.test.ts` | 332-370 | try-finally 追加 |
+| `tests/tools/input.test.ts` | 372-403 | try-finally 追加 |
 
 ---
 
 ## 検証方法
 
-1. `npm run build` - ビルド成功
-2. `npm test` - テスト通過
-3. MCPサーバー起動、Chromeが立ち上がることを確認
-4. **Chromeを手動で閉じる**
-5. **期待**: Chromeが自動再起動しない ✓
-6. MCPツール（例: `take_snapshot`）を実行
-7. **期待**: 新しいChromeが起動して動作する ✓
+1. `npm run build`
+2. `npm test` を実行
+3. テスト完了後、`ls test.txt` で確認 → ファイルが存在しないこと
+4. 意図的にテストを失敗させても `test.txt` が残らないことを確認
