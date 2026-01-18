@@ -23,12 +23,9 @@
  * @chrome-devtools-mcp-for-extension/web-llm
  */
 
-import type { ToolRegistry } from '../plugin-api.js';
+import type {ToolRegistry} from '../plugin-api.js';
 
-// ChatGPT web tools
 import * as chatgptWebTools from './chatgpt-web.js';
-
-// Gemini web tools
 import * as geminiWebTools from './gemini-web.js';
 
 /**
@@ -61,7 +58,12 @@ export function registerOptionalTools(registry: ToolRegistry): number {
   let count = 0;
   for (const tool of optionalTools) {
     // Skip non-tool exports (like constants)
-    if (tool && typeof tool === 'object' && 'name' in tool && 'handler' in tool) {
+    if (
+      tool &&
+      typeof tool === 'object' &&
+      'name' in tool &&
+      'handler' in tool
+    ) {
       try {
         registry.register(tool);
         count++;
@@ -75,7 +77,9 @@ export function registerOptionalTools(registry: ToolRegistry): number {
   }
 
   if (count > 0) {
-    console.error(`[tools] Loaded ${count} optional web-llm tools (experimental, may break)`);
+    console.error(
+      `[tools] Loaded ${count} optional web-llm tools (experimental, may break)`,
+    );
   }
 
   return count;
@@ -86,7 +90,8 @@ export function registerOptionalTools(registry: ToolRegistry): number {
  */
 export function getOptionalToolCount(): number {
   return optionalTools.filter(
-    (tool) => tool && typeof tool === 'object' && 'name' in tool && 'handler' in tool,
+    tool =>
+      tool && typeof tool === 'object' && 'name' in tool && 'handler' in tool,
   ).length;
 }
 

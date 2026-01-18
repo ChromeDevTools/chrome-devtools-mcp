@@ -24,33 +24,16 @@
  * - gemini-web (site-dependent, may break)
  */
 
-import type { ToolRegistry } from '../plugin-api.js';
+import type {ToolRegistry} from '../plugin-api.js';
 
-// Input tools
-
-// Navigation tools
-
-// Console tools
 import * as consoleTools from './console.js';
-
-// Emulation tools
 import * as emulationTools from './emulation.js';
-import { click, hover, fill, drag, fillForm, uploadFile } from './input.js';
-
-// Network tools
+import {click, drag, fill, fillForm, hover, uploadFile} from './input.js';
 import * as networkTools from './network.js';
-import { pages, navigate, resizePage, handleDialog } from './pages.js';
-
-// Performance tools
+import {handleDialog, navigate, pages, resizePage} from './pages.js';
 import * as performanceTools from './performance.js';
-
-// Screenshot tools
 import * as screenshotTools from './screenshot.js';
-
-// Script tools
 import * as scriptTools from './script.js';
-
-// Snapshot tools
 import * as snapshotTools from './snapshot.js';
 
 /**
@@ -99,7 +82,12 @@ export const coreTools = [
 export function registerCoreTools(registry: ToolRegistry): void {
   for (const tool of coreTools) {
     // Skip non-tool exports (like constants)
-    if (tool && typeof tool === 'object' && 'name' in tool && 'handler' in tool) {
+    if (
+      tool &&
+      typeof tool === 'object' &&
+      'name' in tool &&
+      'handler' in tool
+    ) {
       registry.register(tool);
     }
   }
@@ -110,6 +98,7 @@ export function registerCoreTools(registry: ToolRegistry): void {
  */
 export function getCoreToolCount(): number {
   return coreTools.filter(
-    (tool) => tool && typeof tool === 'object' && 'name' in tool && 'handler' in tool,
+    tool =>
+      tool && typeof tool === 'object' && 'name' in tool && 'handler' in tool,
   ).length;
 }

@@ -27,9 +27,9 @@ if (typeof globalThis.self === 'undefined') {
 if (typeof globalThis.localStorage === 'undefined') {
   (globalThis as any).localStorage = {
     getItem: () => null,
-    setItem: () => { },
-    removeItem: () => { },
-    clear: () => { },
+    setItem: () => {},
+    removeItem: () => {},
+    clear: () => {},
     key: () => null,
     length: 0,
   };
@@ -39,30 +39,36 @@ import assert from 'node:assert';
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
-import { SetLevelRequestSchema, RootsListChangedNotificationSchema } from '@modelcontextprotocol/sdk/types.js';
-import type { Browser } from 'puppeteer-core';
+import {McpServer} from '@modelcontextprotocol/sdk/server/mcp.js';
+import {StdioServerTransport} from '@modelcontextprotocol/sdk/server/stdio.js';
+import type {CallToolResult} from '@modelcontextprotocol/sdk/types.js';
+import {
+  SetLevelRequestSchema,
+  RootsListChangedNotificationSchema,
+} from '@modelcontextprotocol/sdk/types.js';
+import type {Browser} from 'puppeteer-core';
 
-import type { Channel } from './browser.js';
-import { resolveBrowser } from './browser.js';
-import { parseArguments } from './cli.js';
-import { setupGraceful } from './graceful.js';
-import { logger, saveLogsToFile } from './logger.js';
-import { McpContext } from './McpContext.js';
-import { McpResponse } from './McpResponse.js';
-import { Mutex } from './Mutex.js';
-import { ToolRegistry, PluginLoader } from './plugin-api.js';
-import { setProjectRoot } from './project-root-state.js';
-import { resolveRoots, type RootsInfo } from './roots-manager.js';
-import { runStartupCheck } from './startup-check.js';
-import { registerCoreTools, getCoreToolCount } from './tools/core-tools.js';
-import { registerOptionalTools, getOptionalToolCount, WEB_LLM_TOOLS_INFO } from './tools/optional-tools.js';
-import type { ToolDefinition } from './tools/ToolDefinition.js';
+import type {Channel} from './browser.js';
+import {resolveBrowser} from './browser.js';
+import {parseArguments} from './cli.js';
+import {setupGraceful} from './graceful.js';
+import {logger, saveLogsToFile} from './logger.js';
+import {McpContext} from './McpContext.js';
+import {McpResponse} from './McpResponse.js';
+import {Mutex} from './Mutex.js';
+import {ToolRegistry, PluginLoader} from './plugin-api.js';
+import {setProjectRoot} from './project-root-state.js';
+import {resolveRoots, type RootsInfo} from './roots-manager.js';
+import {runStartupCheck} from './startup-check.js';
+import {registerCoreTools, getCoreToolCount} from './tools/core-tools.js';
+import {
+  registerOptionalTools,
+  getOptionalToolCount,
+  WEB_LLM_TOOLS_INFO,
+} from './tools/optional-tools.js';
+import type {ToolDefinition} from './tools/ToolDefinition.js';
 
-
-function readPackageJson(): { version?: string } {
+function readPackageJson(): {version?: string} {
   const currentDir = import.meta.dirname;
   const packageJsonPath = path.join(currentDir, '..', '..', 'package.json');
   if (!fs.existsSync(packageJsonPath)) {
@@ -90,19 +96,26 @@ const server = new McpServer(
     title: 'Chrome DevTools MCP for Extension Development',
     version,
   },
-  { capabilities: { logging: {} } },
+  {capabilities: {logging: {}}},
 );
 server.server.setRequestHandler(SetLevelRequestSchema, () => {
   return {};
 });
 
 // Handle roots/list_changed notification
-server.server.setNotificationHandler(RootsListChangedNotificationSchema, async () => {
-  logger('[roots] Received roots/list_changed notification - roots have changed');
-  // Invalidate cached roots info
-  cachedRootsInfo = null;
-  logger('[roots] Cached roots cleared - will re-fetch on next browser launch');
-});
+server.server.setNotificationHandler(
+  RootsListChangedNotificationSchema,
+  async () => {
+    logger(
+      '[roots] Received roots/list_changed notification - roots have changed',
+    );
+    // Invalidate cached roots info
+    cachedRootsInfo = null;
+    logger(
+      '[roots] Cached roots cleared - will re-fetch on next browser launch',
+    );
+  },
+);
 
 let context: McpContext;
 const uiHealthCheckRun = false; // Track if UI health check has been run
@@ -127,7 +140,9 @@ async function getContext(): Promise<McpContext> {
     logger('[roots] Waiting for MCP initialization to complete...');
     await new Promise(resolve => setTimeout(resolve, 100)); // Brief wait
     if (!initializationComplete) {
-      logger('[roots] WARNING: MCP not yet initialized, proceeding without roots');
+      logger(
+        '[roots] WARNING: MCP not yet initialized, proceeding without roots',
+      );
     }
   }
 
@@ -195,7 +210,12 @@ async function getContext(): Promise<McpContext> {
       },
     };
 
-    context = await McpContext.from(browser, logger, browserFactory, connectionOptions);
+    context = await McpContext.from(
+      browser,
+      logger,
+      browserFactory,
+      connectionOptions,
+    );
 
     // UI health check disabled - causes duplicate ChatGPT tabs
     // TODO: Re-enable after fixing tab management
@@ -251,7 +271,10 @@ function registerTool(tool: ToolDefinition): void {
             error instanceof Error ? error.message : String(error);
 
           // Detect browser closed error and provide helpful message
-          if (errorText.includes('Target closed') || errorText.includes('Session closed')) {
+          if (
+            errorText.includes('Target closed') ||
+            errorText.includes('Session closed')
+          ) {
             return {
               content: [
                 {
@@ -297,7 +320,7 @@ if (optionalCount > 0) {
 const pluginList = process.env.MCP_PLUGINS;
 if (pluginList) {
   const pluginLoader = new PluginLoader(toolRegistry, logger);
-  const { loaded, failed } = await pluginLoader.loadFromList(pluginList);
+  const {loaded, failed} = await pluginLoader.loadFromList(pluginList);
   if (loaded.length > 0) {
     logger(`[plugins] Successfully loaded: ${loaded.join(', ')}`);
   }
