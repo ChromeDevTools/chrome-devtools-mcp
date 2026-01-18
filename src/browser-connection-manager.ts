@@ -76,9 +76,8 @@ export class BrowserConnectionManager {
   /** Disconnected event handler (arrow function to preserve 'this') */
   private onDisconnected = () => {
     this.log('Browser disconnected');
-    this.setState(ConnectionState.RECONNECTING);
-    // Trigger immediate reconnection (single-flight prevents duplicates)
-    void this.triggerReconnect('event:disconnected');
+    this.setState(ConnectionState.CLOSED);
+    // Auto-reconnection disabled: reconnect only when MCP operation requires it
   };
 
   constructor(options: ConnectionManagerOptions = {}) {
