@@ -52,7 +52,7 @@ export function computeFlagUsage(
       // For enums, log the value as uppercase
       // We're going to have an enum for such flags with choices represented
       // as an `enum` where the keys of the enum will map to the uppercase `choice`.
-      usage[snakeCaseName] = value.toUpperCase();
+      usage[snakeCaseName] = `${snakeCaseName}_${value}`.toUpperCase();
     }
   }
 

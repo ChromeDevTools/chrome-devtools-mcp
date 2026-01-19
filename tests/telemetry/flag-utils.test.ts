@@ -44,10 +44,10 @@ describe('computeFlagUsage', () => {
     assert.equal(usage.bool_flag, false);
   });
 
-  it('logs enum flags as uppercase', () => {
+  it('logs enum flags as uppercase strings prefixed by snake case flag name', () => {
     const args = {enumFlag: 'a'};
     const usage = computeFlagUsage(args, mockOptions);
-    assert.equal(usage.enum_flag, 'A');
+    assert.equal(usage.enum_flag, 'ENUM_FLAG_A');
   });
 
   it('logs other flags as present with snake_case keys', () => {
