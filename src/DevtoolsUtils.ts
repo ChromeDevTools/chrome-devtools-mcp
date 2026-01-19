@@ -146,7 +146,7 @@ DevTools.Formatter.FormatterWorkerPool.FormatterWorkerPool.instance({
 
 export interface TargetUniverse {
   /** The DevTools target corresponding to the puppeteer Page */
-  target: DevTools.SDKTarget;
+  target: DevTools.Target;
   universe: DevTools.Foundation.Universe.Universe;
 }
 export type TargetUniverseFactoryFn = (page: Page) => Promise<TargetUniverse>;
