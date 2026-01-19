@@ -1,14 +1,29 @@
-# Chrome DevTools MCP for Extension Development
+# chrome-ai-bridge
 
-[![npm chrome-ai-bridge package](https://img.shields.io/npm/v/chrome-ai-bridge.svg)](https://npmjs.org/package/chrome-ai-bridge)
+[![npm](https://img.shields.io/npm/v/chrome-ai-bridge.svg)](https://npmjs.org/package/chrome-ai-bridge)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 
-> AI-powered Chrome extension development via MCP
+> Bridge between AI and Chrome Browser
 
-Built for: Claude Code, Cursor, VS Code Copilot, Cline, and other MCP-compatible AI tools
+MCP server enabling AI assistants to control Chrome, consult other AIs, and develop extensions.
+
+**Compatible with:** Claude Code, Cursor, VS Code Copilot, Cline, and other MCP clients
 
 ---
 
-## Quick Start (5 minutes)
+## What is this?
+
+chrome-ai-bridge is a [Model Context Protocol](https://modelcontextprotocol.io/) server that gives AI assistants:
+
+- **Eyes**: See what's on web pages (screenshots, DOM snapshots)
+- **Hands**: Interact with pages (click, type, navigate)
+- **Voice**: Consult other AIs (ChatGPT, Gemini) via browser
+
+Think of it as the bridge that connects your AI coding assistant to the browser world.
+
+---
+
+## Quick Start
 
 ### 1. Run the server
 
@@ -33,85 +48,59 @@ npx chrome-ai-bridge@latest
 
 ### 3. Verify it works
 
-Restart your AI client and ask: `"List all my Chrome extensions"`
+Restart your AI client and try: `"Take a screenshot of google.com"`
 
-### Load development extensions (optional)
+---
+
+## Key Features
+
+### Multi-AI Consultation
+
+Ask ChatGPT or Gemini questions directly from your AI assistant:
+
+```
+"Ask ChatGPT how to implement OAuth in Node.js"
+"Ask Gemini to review this architecture decision"
+```
+
+| Feature | Description |
+|---------|-------------|
+| **Session persistence** | Conversations continue across tool calls |
+| **Auto-logging** | All Q&A saved to `docs/ask/chatgpt/` and `docs/ask/gemini/` |
+| **12 languages** | Login detection works in EN, JA, FR, DE, ES, IT, KO, ZH, PT, RU, AR |
+
+### Browser Automation
+
+Full browser control with 20+ tools:
+
+| Category | Tools |
+|----------|-------|
+| **Snapshot** | `take_snapshot`, `take_screenshot` |
+| **Input** | `click`, `fill`, `fill_form`, `hover`, `drag`, `upload_file` |
+| **Navigation** | `navigate`, `pages`, `wait_for`, `handle_dialog` |
+| **Inspection** | `network`, `list_console_messages`, `evaluate_script` |
+| **Performance** | `performance` (start/stop/analyze traces) |
+| **Emulation** | `emulate` (CPU/network throttling), `resize_page` |
+
+### Chrome Extension Development
+
+Build and debug Chrome extensions with AI assistance:
 
 ```json
 {
-  "mcpServers": {
-    "chrome-ai-bridge": {
-      "command": "npx",
-      "args": [
-        "chrome-ai-bridge@latest",
-        "--loadExtensionsDir=/path/to/your/extensions"
-      ]
-    }
-  }
+  "args": ["chrome-ai-bridge@latest", "--loadExtensionsDir=/path/to/extensions"]
 }
 ```
 
----
+| Tool | Description |
+|------|-------------|
+| `extension_popup` | Open/close extension popups |
+| `iframe_popup` | Inspect, patch, reload iframe-embedded popups |
+| `bookmarks` | Quick access to chrome://extensions, Web Store dashboard |
 
-## What You Can Do
+### Plugin Architecture
 
-- **Extension Development**: Load, debug, and hot-reload Chrome extensions
-- **Browser Automation**: Navigate, click, fill forms, take screenshots
-- **Performance Analysis**: Trace recording and insight extraction
-- **AI Research**: Automated ChatGPT/Gemini interactions
-- **Web Store Submission**: Automated screenshot generation and submission
-
----
-
-## Tools Reference
-
-### Core Tools (18)
-
-| Tool | Description | Key Parameters |
-|------|-------------|----------------|
-| `take_snapshot` | Get page structure with element UIDs | - |
-| `take_screenshot` | Capture page or element image | `fullPage`, `uid` |
-| `click` | Click element by UID | `uid`, `dblClick` |
-| `fill` | Fill input/textarea/select | `uid`, `value` |
-| `fill_form` | Fill multiple form elements | `elements[]` |
-| `hover` | Hover over element | `uid` |
-| `drag` | Drag element to another | `from_uid`, `to_uid` |
-| `upload_file` | Upload file through input | `uid`, `filePath` |
-| `navigate` | Go to URL, back, forward | `op`, `url` |
-| `pages` | List, select, close tabs | `op`, `pageIdx` |
-| `wait_for` | Wait for text to appear | `text`, `timeout` |
-| `handle_dialog` | Accept/dismiss dialogs | `action` |
-| `resize_page` | Change viewport size | `width`, `height` |
-| `emulate` | CPU/network throttling | `target`, `throttlingRate` |
-| `network` | List/get network requests | `op`, `url` |
-| `performance` | Start/stop/analyze traces | `op`, `insightName` |
-| `evaluate_script` | Run JavaScript in page | `function` |
-| `list_console_messages` | Get console output | - |
-
-### Optional Tools (2) - Web-LLM
-
-| Tool | Description | Key Parameters |
-|------|-------------|----------------|
-| `ask_chatgpt_web` | Ask ChatGPT via browser | `question`, `createNewChat` |
-| `ask_gemini_web` | Ask Gemini via browser | `question`, `createNewChat` |
-
-**Full documentation:** [docs/reference/tools.md](docs/reference/tools.md)
-
----
-
-## Plugin Architecture (v0.26.0)
-
-### Disable Web-LLM tools
-
-```json
-{
-  "env": {
-    "MCP_DISABLE_WEB_LLM": "true"
-  }
-}
-```
-
-### Load external plugins
+Extend with custom tools:
 
 ```json
 {
@@ -121,19 +110,18 @@ Restart your AI client and ask: `"List all my Chrome extensions"`
 }
 ```
 
-**Plugin interface:**
-
 ```typescript
+// my-plugin.js
 export default {
   id: 'my-plugin',
-  name: 'My Custom Plugin',
+  name: 'My Plugin',
   version: '1.0.0',
   async register(ctx) {
     ctx.registry.register({
       name: 'my_tool',
       description: 'Does something useful',
       schema: { /* zod schema */ },
-      async handler(input, response, context) { /* implementation */ },
+      async handler(input, response, context) { /* ... */ },
     });
   },
 };
@@ -141,9 +129,65 @@ export default {
 
 ---
 
+## Configuration
+
+### Environment Variables
+
+| Variable | Description |
+|----------|-------------|
+| `MCP_DISABLE_WEB_LLM` | Set `true` to disable ChatGPT/Gemini tools |
+| `MCP_PLUGINS` | Comma-separated list of plugin paths |
+| `MCP_ENV` | Set `development` for hot-reload mode |
+
+### CLI Options
+
+| Option | Description |
+|--------|-------------|
+| `--loadExtensionsDir` | Load Chrome extensions from directory |
+| `--headless` | Run in headless mode |
+| `--channel` | Chrome channel (stable/canary) |
+
+---
+
+## Tools Reference
+
+### Core Tools (18)
+
+| Tool | Description |
+|------|-------------|
+| `take_snapshot` | Get page structure with element UIDs |
+| `take_screenshot` | Capture page or element image |
+| `click` | Click element by UID |
+| `fill` | Fill input/textarea/select |
+| `fill_form` | Fill multiple form elements |
+| `hover` | Hover over element |
+| `drag` | Drag element to another |
+| `upload_file` | Upload file through input |
+| `navigate` | Go to URL, back, forward |
+| `pages` | List, select, close tabs |
+| `wait_for` | Wait for text to appear |
+| `handle_dialog` | Accept/dismiss dialogs |
+| `resize_page` | Change viewport size |
+| `emulate` | CPU/network throttling |
+| `network` | List/get network requests |
+| `performance` | Start/stop/analyze traces |
+| `evaluate_script` | Run JavaScript in page |
+| `list_console_messages` | Get console output |
+
+### Web-LLM Tools (2)
+
+| Tool | Description |
+|------|-------------|
+| `ask_chatgpt_web` | Ask ChatGPT via browser |
+| `ask_gemini_web` | Ask Gemini via browser |
+
+**Full documentation:** [docs/reference/tools.md](docs/reference/tools.md)
+
+---
+
 ## For Developers
 
-### Local development setup
+### Local Development
 
 ```bash
 git clone https://github.com/usedhonda/chrome-ai-bridge.git
@@ -151,37 +195,35 @@ cd chrome-ai-bridge
 npm install && npm run build
 ```
 
-Configure `~/.claude.json` to use local version:
+Configure `~/.claude.json`:
 
 ```json
 {
   "mcpServers": {
     "chrome-ai-bridge": {
       "command": "node",
-      "args": ["/absolute/path/to/chrome-ai-bridge/scripts/cli.mjs"]
+      "args": ["/path/to/chrome-ai-bridge/scripts/cli.mjs"]
     }
   }
 }
 ```
 
-### Hot-reload development
+### Hot-Reload Development
 
 ```json
 {
   "mcpServers": {
     "chrome-ai-bridge": {
       "command": "node",
-      "args": ["/absolute/path/to/chrome-ai-bridge/scripts/mcp-wrapper.mjs"],
-      "cwd": "/absolute/path/to/chrome-ai-bridge",
+      "args": ["/path/to/chrome-ai-bridge/scripts/mcp-wrapper.mjs"],
+      "cwd": "/path/to/chrome-ai-bridge",
       "env": { "MCP_ENV": "development" }
     }
   }
 }
 ```
 
-**Benefits:** Auto-rebuild on file changes, 2-5 second feedback loop.
-
-**See also:** [docs/dev/hot-reload.md](docs/dev/hot-reload.md)
+Auto-rebuild on file changes with 2-5 second feedback loop.
 
 ### Commands
 
@@ -192,7 +234,7 @@ npm test           # Run tests
 npm run format     # Format code
 ```
 
-### Project structure
+### Project Structure
 
 ```
 chrome-ai-bridge/
@@ -223,14 +265,21 @@ chrome-ai-bridge/
 
 ## Troubleshooting
 
-### Extension not loading
-- Verify `manifest.json` is at extension root
-- Use absolute paths in `--loadExtensionsDir`
+### MCP server not responding
 
-### MCP server issues
 ```bash
 npx clear-npx-cache && npx chrome-ai-bridge@latest
 ```
+
+### Extension not loading
+
+- Verify `manifest.json` exists at extension root
+- Use absolute paths in `--loadExtensionsDir`
+
+### ChatGPT/Gemini login issues
+
+- Check browser window for login prompts
+- Login detection supports 12 languages
 
 **More:** [docs/user/troubleshooting.md](docs/user/troubleshooting.md)
 
@@ -238,15 +287,10 @@ npx clear-npx-cache && npx chrome-ai-bridge@latest
 
 ## Credits
 
-Fork of [Chrome DevTools MCP](https://github.com/ChromeDevTools/chrome-ai-bridge) by Google LLC.
-
-**Additions:** Extension development tools, Web Store automation, ChatGPT/Gemini integration, hot-reload workflow.
+Built on [Chrome DevTools MCP](https://github.com/anthropics/anthropic-quickstarts/tree/main/mcp-devtools) by Google LLC, with extensions for multi-AI consultation and Chrome extension development.
 
 ---
 
 ## License
 
 Apache-2.0
-
-**Version**: 0.26.1
-**Repository**: https://github.com/usedhonda/chrome-ai-bridge
