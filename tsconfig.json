@@ -32,6 +32,8 @@
     "node_modules/chrome-devtools-frontend/front_end/models/text_utils",
     "node_modules/chrome-devtools-frontend/front_end/models/network_time_calculator",
     "node_modules/chrome-devtools-frontend/front_end/models/crux-manager",
+    "node_modules/chrome-devtools-frontend/front_end/models/annotations",
+    "node_modules/chrome-devtools-frontend/front_end/models/greendev",
     "node_modules/chrome-devtools-frontend/front_end/models/ai_assistance/data_formatters/PerformanceInsightFormatter.ts",
     "node_modules/chrome-devtools-frontend/front_end/models/ai_assistance/data_formatters/PerformanceTraceFormatter.ts",
     "node_modules/chrome-devtools-frontend/front_end/models/ai_assistance/data_formatters/NetworkRequestFormatter.ts",
