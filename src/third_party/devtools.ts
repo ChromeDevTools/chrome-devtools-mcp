@@ -18,6 +18,7 @@ export {
   Issue,
   Target as SDKTarget,
   DebuggerModel,
+  Formatter,
   Foundation,
   TargetManager,
   MarkdownIssueDescription,

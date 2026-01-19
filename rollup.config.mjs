@@ -185,4 +185,11 @@ export default [
       return false;
     },
   ),
+  bundleDependency(
+    './build/src/third_party/devtools-formatter-worker.js',
+    {
+      inlineDynamicImports: true,
+    },
+    (_source, _importer, _isResolved) => false,
+  ),
 ];
