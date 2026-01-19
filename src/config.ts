@@ -5,7 +5,7 @@
  */
 
 /**
- * Global configuration for chrome-devtools-mcp-for-extension
+ * Global configuration for chrome-ai-bridge
  */
 
 /**

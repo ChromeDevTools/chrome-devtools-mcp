@@ -56,16 +56,16 @@ function getDedicatedProfilePath(channel: string = 'stable'): string {
   return path.join(
     os.homedir(),
     '.cache',
-    'chrome-devtools-mcp',
+    'chrome-ai-bridge',
     `chrome-profile-${channel}`
   );
 }
 ```
 
 **Profile Paths by Platform:**
-- **macOS**: `~/.cache/chrome-devtools-mcp/chrome-profile-stable/`
-- **Linux**: `~/.cache/chrome-devtools-mcp/chrome-profile-stable/`
-- **Windows**: `%USERPROFILE%\.cache\chrome-devtools-mcp\chrome-profile-stable\`
+- **macOS**: `~/.cache/chrome-ai-bridge/chrome-profile-stable/`
+- **Linux**: `~/.cache/chrome-ai-bridge/chrome-profile-stable/`
+- **Windows**: `%USERPROFILE%\.cache\chrome-ai-bridge\chrome-profile-stable\`
 
 ### Profile Initialization Process
 
@@ -360,7 +360,7 @@ export async function launchBrowser(options: LaunchOptions) {
 ### Profile Structure
 
 ```
-~/.cache/chrome-devtools-mcp/chrome-profile-stable/
+~/.cache/chrome-ai-bridge/chrome-profile-stable/
 ├── Default/
 │   ├── Bookmarks                 # Injected from system
 │   ├── Preferences              # Clean preferences

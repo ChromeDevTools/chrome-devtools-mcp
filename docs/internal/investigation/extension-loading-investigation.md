@@ -10,7 +10,7 @@ Chrome extensions specified via `--load-extension` flag are not being loaded whe
 - **Chrome Version**: 140.0.7339.208 (Official Build) (arm64)
 - **OS**: macOS Version 26.0 (Build 25A354)
 - **Node.js**: Current version used by MCP
-- **Puppeteer**: Latest version in chrome-devtools-mcp
+- **Puppeteer**: Latest version in chrome-ai-bridge
 - **JavaScript Engine**: V8 14.0.365.10
 
 ### System Architecture
@@ -26,7 +26,7 @@ Chrome extensions specified via `--load-extension` flag are not being loaded whe
     "chrome-devtools": {
       "command": "node",
       "args": [
-        "/Users/usedhonda/projects/chrome-devtools-mcp/build/src/main.js",
+        "/Users/usedhonda/projects/chrome-ai-bridge/build/src/main.js",
         "--loadExtensionsDir",
         "/Users/usedhonda/projects/Chrome-Extension",
         "--userDataDir",
@@ -377,8 +377,8 @@ function getExtensionPaths(options: LaunchOptions): string[] {
 - **Use Case**: Automated testing and interaction with web applications using extensions
 
 ### GitHub Repository Information
-- **Original Repository**: https://github.com/ChromeDevTools/chrome-devtools-mcp
-- **Forked Repository**: https://github.com/usedhonda/chrome-devtools-mcp (with extension loading features)
+- **Original Repository**: https://github.com/ChromeDevTools/chrome-ai-bridge
+- **Forked Repository**: https://github.com/usedhonda/chrome-ai-bridge (with extension loading features)
 - **Current Branch**: `feature/load-extension-support`
 - **Key Added Features**:
   - `--loadExtension` flag support

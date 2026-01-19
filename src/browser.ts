@@ -718,7 +718,7 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
     const legacy = path.join(
       os.homedir(),
       '.cache',
-      'chrome-devtools-mcp',
+      'chrome-ai-bridge',
       'chrome-profile',
     );
     if (fs.existsSync(legacy)) {
@@ -727,7 +727,7 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
           `ℹ️  New profile location: ${path.join(
             os.homedir(),
             '.cache',
-            'chrome-devtools-mcp',
+            'chrome-ai-bridge',
             'profiles',
             'project-default',
             'stable',
@@ -912,7 +912,7 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
       const tempPath = path.join(
         os.homedir(),
         '.cache',
-        'chrome-devtools-mcp',
+        'chrome-ai-bridge',
         'sessions',
         sessionId,
         channel || 'stable',

@@ -14,7 +14,7 @@ import path from 'node:path';
 import type {StableIdentity} from './stable-identity.js';
 import {getLegacyIdentityHash} from './stable-identity.js';
 
-const CACHE_ROOT = path.join(os.homedir(), '.cache', 'chrome-devtools-mcp');
+const CACHE_ROOT = path.join(os.homedir(), '.cache', 'chrome-ai-bridge');
 
 export interface MigrationResult {
   migrated: boolean;

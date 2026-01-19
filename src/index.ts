@@ -12,7 +12,7 @@ const [major, minor] = version.substring(1).split('.').map(Number);
 
 if (major < 22 || (major === 22 && minor < 12)) {
   console.error(
-    `ERROR: \`chrome-devtools-mcp\` does not support Node ${process.version}. Please upgrade to Node 22.12.0 or newer.`,
+    `ERROR: \`chrome-ai-bridge\` does not support Node ${process.version}. Please upgrade to Node 22.12.0 or newer.`,
   );
   process.exit(1);
 }

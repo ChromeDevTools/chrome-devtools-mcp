@@ -95,7 +95,7 @@ export const cliOptions = {
 
 export function parseArguments(version: string, argv = process.argv) {
   const yargsInstance = yargs(hideBin(argv))
-    .scriptName('npx chrome-devtools-mcp@latest')
+    .scriptName('npx chrome-ai-bridge@latest')
     .options(cliOptions)
     .check(args => {
       // Auto-configuration for zero-config setup

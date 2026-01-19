@@ -17,10 +17,10 @@
 
 ```typescript
 // 基本的な使い方
-await use_mcp_tool("chrome-devtools-extension", "diagnose_chatgpt_ui", {});
+await use_mcp_tool("chrome-ai-bridge", "diagnose_chatgpt_ui", {});
 
 // カスタムURL指定
-await use_mcp_tool("chrome-devtools-extension", "diagnose_chatgpt_ui", {
+await use_mcp_tool("chrome-ai-bridge", "diagnose_chatgpt_ui", {
   url: "https://chatgpt.com/c/abc123",
   waitForLoad: 8000  // ページ読み込み待機時間（ミリ秒）
 });
@@ -179,7 +179,7 @@ Error: Target closed
 
 **解決方法**:
 ```typescript
-await use_mcp_tool("chrome-devtools-extension", "diagnose_chatgpt_ui", {
+await use_mcp_tool("chrome-ai-bridge", "diagnose_chatgpt_ui", {
   waitForLoad: 10000  // 待機時間を増やす
 });
 ```
@@ -349,7 +349,7 @@ jobs:
 ## 📞 サポート
 
 ### 問題報告
-GitHub Issues: https://github.com/usedhonda/chrome-devtools-mcp/issues
+GitHub Issues: https://github.com/usedhonda/chrome-ai-bridge/issues
 
 ### 機能リクエスト
 新しい検出要素や機能の追加リクエストを歓迎します。

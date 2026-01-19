@@ -20,7 +20,7 @@ Each diagnosis creates 4 files:
 Run the diagnosis tool via MCP:
 
 ```typescript
-await use_mcp_tool("chrome-devtools-extension", "diagnose_chatgpt_ui", {
+await use_mcp_tool("chrome-ai-bridge", "diagnose_chatgpt_ui", {
   url: "https://chatgpt.com/",
   waitForLoad: 5000
 });

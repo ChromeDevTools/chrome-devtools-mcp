@@ -1,6 +1,6 @@
 # Chrome DevTools MCP for Extension Development
 
-[![npm chrome-devtools-mcp-for-extension package](https://img.shields.io/npm/v/chrome-devtools-mcp-for-extension.svg)](https://npmjs.org/package/chrome-devtools-mcp-for-extension)
+[![npm chrome-ai-bridge package](https://img.shields.io/npm/v/chrome-ai-bridge.svg)](https://npmjs.org/package/chrome-ai-bridge)
 
 > AI-powered Chrome extension development via MCP
 
@@ -13,7 +13,7 @@ Built for: Claude Code, Cursor, VS Code Copilot, Cline, and other MCP-compatible
 ### 1. Run the server
 
 ```bash
-npx chrome-devtools-mcp-for-extension@latest
+npx chrome-ai-bridge@latest
 ```
 
 ### 2. Configure your MCP client
@@ -23,9 +23,9 @@ npx chrome-devtools-mcp-for-extension@latest
 ```json
 {
   "mcpServers": {
-    "chrome-devtools-extension": {
+    "chrome-ai-bridge": {
       "command": "npx",
-      "args": ["chrome-devtools-mcp-for-extension@latest"]
+      "args": ["chrome-ai-bridge@latest"]
     }
   }
 }
@@ -40,10 +40,10 @@ Restart your AI client and ask: `"List all my Chrome extensions"`
 ```json
 {
   "mcpServers": {
-    "chrome-devtools-extension": {
+    "chrome-ai-bridge": {
       "command": "npx",
       "args": [
-        "chrome-devtools-mcp-for-extension@latest",
+        "chrome-ai-bridge@latest",
         "--loadExtensionsDir=/path/to/your/extensions"
       ]
     }
@@ -146,8 +146,8 @@ export default {
 ### Local development setup
 
 ```bash
-git clone https://github.com/usedhonda/chrome-devtools-mcp.git
-cd chrome-devtools-mcp
+git clone https://github.com/usedhonda/chrome-ai-bridge.git
+cd chrome-ai-bridge
 npm install && npm run build
 ```
 
@@ -156,9 +156,9 @@ Configure `~/.claude.json` to use local version:
 ```json
 {
   "mcpServers": {
-    "chrome-devtools-extension": {
+    "chrome-ai-bridge": {
       "command": "node",
-      "args": ["/absolute/path/to/chrome-devtools-mcp/scripts/cli.mjs"]
+      "args": ["/absolute/path/to/chrome-ai-bridge/scripts/cli.mjs"]
     }
   }
 }
@@ -169,10 +169,10 @@ Configure `~/.claude.json` to use local version:
 ```json
 {
   "mcpServers": {
-    "chrome-devtools-extension": {
+    "chrome-ai-bridge": {
       "command": "node",
-      "args": ["/absolute/path/to/chrome-devtools-mcp/scripts/mcp-wrapper.mjs"],
-      "cwd": "/absolute/path/to/chrome-devtools-mcp",
+      "args": ["/absolute/path/to/chrome-ai-bridge/scripts/mcp-wrapper.mjs"],
+      "cwd": "/absolute/path/to/chrome-ai-bridge",
       "env": { "MCP_ENV": "development" }
     }
   }
@@ -195,7 +195,7 @@ npm run format     # Format code
 ### Project structure
 
 ```
-chrome-devtools-mcp/
+chrome-ai-bridge/
 ├── src/
 │   ├── tools/           # MCP tool definitions
 │   ├── plugin-api.ts    # Plugin architecture
@@ -229,7 +229,7 @@ chrome-devtools-mcp/
 
 ### MCP server issues
 ```bash
-npx clear-npx-cache && npx chrome-devtools-mcp-for-extension@latest
+npx clear-npx-cache && npx chrome-ai-bridge@latest
 ```
 
 **More:** [docs/user/troubleshooting.md](docs/user/troubleshooting.md)
@@ -238,7 +238,7 @@ npx clear-npx-cache && npx chrome-devtools-mcp-for-extension@latest
 
 ## Credits
 
-Fork of [Chrome DevTools MCP](https://github.com/ChromeDevTools/chrome-devtools-mcp) by Google LLC.
+Fork of [Chrome DevTools MCP](https://github.com/ChromeDevTools/chrome-ai-bridge) by Google LLC.
 
 **Additions:** Extension development tools, Web Store automation, ChatGPT/Gemini integration, hot-reload workflow.
 
@@ -249,4 +249,4 @@ Fork of [Chrome DevTools MCP](https://github.com/ChromeDevTools/chrome-devtools-
 Apache-2.0
 
 **Version**: 0.26.1
-**Repository**: https://github.com/usedhonda/chrome-devtools-mcp
+**Repository**: https://github.com/usedhonda/chrome-ai-bridge

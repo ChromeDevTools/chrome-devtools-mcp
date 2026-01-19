@@ -1,7 +1,7 @@
 {
-  "name": "chrome-devtools-mcp-for-extension",
-  "version": "0.26.3",
-  "description": "MCP server for Chrome extension development with Web Store automation. Fork of chrome-devtools-mcp with extension-specific tools.",
+  "name": "chrome-ai-bridge",
+  "version": "1.0.0",
+  "description": "MCP server bridging Chrome browser and AI assistants (ChatGPT, Gemini). Browser automation + AI consultation.",
   "type": "module",
   "bin": "./scripts/cli.mjs",
   "main": "index.js",
@@ -37,7 +37,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/usedhonda/chrome-devtools-mcp.git"
+    "url": "https://github.com/usedhonda/chrome-ai-bridge.git"
   },
   "author": "usedhonda (forked from Google LLC)",
   "license": "Apache-2.0",
@@ -45,7 +45,7 @@
     "url": "https://github.com/usedhonda/chrome-devtools-mcp/issues"
   },
   "homepage": "https://github.com/usedhonda/chrome-devtools-mcp#readme",
-  "mcpName": "chrome-devtools-extension",
+  "mcpName": "chrome-ai-bridge",
   "keywords": [
     "mcp",
     "chrome",

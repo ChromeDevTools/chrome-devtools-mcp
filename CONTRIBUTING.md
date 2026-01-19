@@ -2,7 +2,7 @@
 
 We'd love to accept your patches and contributions to this project.
 
-This is a fork of [chrome-devtools-mcp](https://github.com/ChromeDevTools/chrome-devtools-mcp) by Google, enhanced with Chrome extension development features.
+This is a fork of [chrome-ai-bridge](https://github.com/ChromeDevTools/chrome-ai-bridge) by Google, enhanced with Chrome extension development features.
 
 ## Before you begin
 
@@ -31,8 +31,8 @@ for PR and commit titles.
 ## Installation
 
 ```sh
-git clone https://github.com/usedhonda/chrome-devtools-mcp.git
-cd chrome-devtools-mcp
+git clone https://github.com/usedhonda/chrome-ai-bridge.git
+cd chrome-ai-bridge
 npm ci
 npm run build
 ```
@@ -50,9 +50,9 @@ Add the MCP server to your global MCP configuration at `~/.claude.json`:
 ```json
 {
   "mcpServers": {
-    "chrome-devtools-extension": {
+    "chrome-ai-bridge": {
       "command": "node",
-      "args": ["/absolute/path/to/chrome-devtools-mcp/build/src/index.js"]
+      "args": ["/absolute/path/to/chrome-ai-bridge/build/src/index.js"]
     }
   }
 }

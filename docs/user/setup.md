@@ -1,11 +1,11 @@
-# MCP Setup Guide for chrome-devtools-mcp-for-extension
+# MCP Setup Guide for chrome-ai-bridge
 
 ## 📦 Installation
 
 First, install the package globally (optional):
 
 ```bash
-npm install -g chrome-devtools-mcp-for-extension
+npm install -g chrome-ai-bridge
 ```
 
 ## 🔧 MCP Configuration
@@ -13,7 +13,7 @@ npm install -g chrome-devtools-mcp-for-extension
 ### For Claude Code (Recommended)
 
 ```bash
-claude mcp add chrome-devtools-extension npx chrome-devtools-mcp-for-extension@latest
+claude mcp add chrome-ai-bridge npx chrome-ai-bridge@latest
 ```
 
 This automatically creates the configuration and handles everything for you.
@@ -27,9 +27,9 @@ Add to the **root level** of your MCP client configuration file:
 ```json
 {
   "mcpServers": {
-    "chrome-devtools-extension": {
+    "chrome-ai-bridge": {
       "command": "npx",
-      "args": ["chrome-devtools-mcp-for-extension@latest"]
+      "args": ["chrome-ai-bridge@latest"]
     }
   }
 }
@@ -56,17 +56,17 @@ For Claude Code, you can also add project-specific configuration, but it's gener
 ```json
 {
   "mcpServers": {
-    "chrome-devtools-extension": {
+    "chrome-ai-bridge": {
       "command": "npx",
-      "args": ["chrome-devtools-mcp-for-extension@latest"]
+      "args": ["chrome-ai-bridge@latest"]
     }
   },
   "projects": {
     "/path/to/your/project": {
       "mcpServers": {
-        "chrome-devtools-extension": {
+        "chrome-ai-bridge": {
           "command": "npx",
-          "args": ["chrome-devtools-mcp-for-extension@latest"]
+          "args": ["chrome-ai-bridge@latest"]
         }
       }
     }
@@ -83,10 +83,10 @@ You can add various options to customize the behavior in your global configurati
 ```json
 {
   "mcpServers": {
-    "chrome-devtools-extension": {
+    "chrome-ai-bridge": {
       "command": "npx",
       "args": [
-        "chrome-devtools-mcp-for-extension@latest",
+        "chrome-ai-bridge@latest",
         "--headless=false",
         "--loadExtension=/path/to/your/extension"
       ]
@@ -114,9 +114,9 @@ All examples below use **global configuration** in `~/.claude.json`. These confi
 ```json
 {
   "mcpServers": {
-    "chrome-devtools-extension": {
+    "chrome-ai-bridge": {
       "command": "npx",
-      "args": ["chrome-devtools-mcp-for-extension@latest"]
+      "args": ["chrome-ai-bridge@latest"]
     }
   }
 }
@@ -129,10 +129,10 @@ This will automatically detect and use your system Chrome profile with all insta
 ```json
 {
   "mcpServers": {
-    "chrome-devtools-extension": {
+    "chrome-ai-bridge": {
       "command": "npx",
       "args": [
-        "chrome-devtools-mcp-for-extension@latest",
+        "chrome-ai-bridge@latest",
         "--headless=false",
         "--loadExtension=/Users/yourname/my-extension"
       ]
@@ -146,10 +146,10 @@ This will automatically detect and use your system Chrome profile with all insta
 ```json
 {
   "mcpServers": {
-    "chrome-devtools-extension": {
+    "chrome-ai-bridge": {
       "command": "npx",
       "args": [
-        "chrome-devtools-mcp-for-extension@latest",
+        "chrome-ai-bridge@latest",
         "--loadExtensionsDir=/Users/yourname/projects/Chrome-Extension"
       ]
     }
@@ -162,9 +162,9 @@ This will automatically detect and use your system Chrome profile with all insta
 ```json
 {
   "mcpServers": {
-    "chrome-devtools-extension": {
+    "chrome-ai-bridge": {
       "command": "npx",
-      "args": ["chrome-devtools-mcp-for-extension@latest", "--isolated"]
+      "args": ["chrome-ai-bridge@latest", "--isolated"]
     }
   }
 }
@@ -179,9 +179,9 @@ This will automatically detect and use your system Chrome profile with all insta
 ```json
 {
   "mcpServers": {
-    "chrome-devtools-extension": {
+    "chrome-ai-bridge": {
       "command": "npx",
-      "args": ["chrome-devtools-mcp-for-extension@latest"]
+      "args": ["chrome-ai-bridge@latest"]
     }
   }
 }
@@ -201,18 +201,18 @@ This will automatically detect and use your system Chrome profile with all insta
 ```json
 {
   "mcpServers": {
-    "chrome-devtools-extension": {
+    "chrome-ai-bridge": {
       "command": "npx",
-      "args": ["chrome-devtools-mcp-for-extension@latest"]
+      "args": ["chrome-ai-bridge@latest"]
     }
   },
   "projects": {
     "/Users/yourname/project-a": {
       "mcpServers": {
-        "chrome-devtools-extension": {
+        "chrome-ai-bridge": {
           "command": "npx",
           "args": [
-            "chrome-devtools-mcp-for-extension@latest",
+            "chrome-ai-bridge@latest",
             "--loadExtension=/Users/yourname/project-a/extension"
           ]
         }
@@ -239,8 +239,8 @@ This will automatically detect and use your system Chrome profile with all insta
 cp ~/.claude.json ~/.claude.json.backup
 
 # Update using jq
-jq '.mcpServers."chrome-devtools-extension".args = [
-  "chrome-devtools-mcp-for-extension@latest",
+jq '.mcpServers."chrome-ai-bridge".args = [
+  "chrome-ai-bridge@latest",
   "--loadExtensionsDir=/path/to/extensions"
 ]' ~/.claude.json > ~/.claude.json.tmp && mv ~/.claude.json.tmp ~/.claude.json
 ```
@@ -253,8 +253,8 @@ cp ~/.claude.json ~/.claude.json.backup
 
 # Update using jq
 jq --arg project "/path/to/your/project" '
-  .projects[$project].mcpServers."chrome-devtools-extension".args = [
-    "chrome-devtools-mcp-for-extension@latest",
+  .projects[$project].mcpServers."chrome-ai-bridge".args = [
+    "chrome-ai-bridge@latest",
     "--loadExtension=/path/to/extension"
   ]
 ' ~/.claude.json > ~/.claude.json.tmp && mv ~/.claude.json.tmp ~/.claude.json
@@ -264,7 +264,7 @@ jq --arg project "/path/to/your/project" '
 
 1. **Restart your MCP client** (Claude Code, Cursor, etc.) to load the new configuration
 2. Look for the MCP tools in your client's interface
-3. You should see "chrome-devtools-extension" tools available
+3. You should see "chrome-ai-bridge" tools available
 
 ## 📝 Available Tools
 
@@ -321,5 +321,5 @@ Once configured, you can say things like:
 
 ## 📚 More Information
 
-- **This Fork**: [GitHub](https://github.com/usedhonda/chrome-devtools-mcp) | [npm](https://www.npmjs.com/package/chrome-devtools-mcp-for-extension)
-- **Original Project**: [GitHub](https://github.com/ChromeDevTools/chrome-devtools-mcp)
+- **This Fork**: [GitHub](https://github.com/usedhonda/chrome-ai-bridge) | [npm](https://www.npmjs.com/package/chrome-ai-bridge)
+- **Original Project**: [GitHub](https://github.com/ChromeDevTools/chrome-ai-bridge)

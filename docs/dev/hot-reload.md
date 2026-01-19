@@ -32,9 +32,9 @@ VSCodeのMCP設定ファイルを編集します。
 ```json
 {
   "mcpServers": {
-    "chrome-devtools-mcp": {
+    "chrome-ai-bridge": {
       "command": "node",
-      "args": ["/Users/usedhonda/projects/chrome-devtools-mcp/build/src/index.js"],
+      "args": ["/Users/usedhonda/projects/chrome-ai-bridge/build/src/index.js"],
       "env": {}
     }
   }
@@ -45,13 +45,13 @@ VSCodeのMCP設定ファイルを編集します。
 ```json
 {
   "mcpServers": {
-    "chrome-devtools-mcp": {
+    "chrome-ai-bridge": {
       "command": "node",
       "args": [
-        "/Users/usedhonda/projects/chrome-devtools-mcp/scripts/mcp-wrapper.mjs",
+        "/Users/usedhonda/projects/chrome-ai-bridge/scripts/mcp-wrapper.mjs",
         "--dev"
       ],
-      "cwd": "/Users/usedhonda/projects/chrome-devtools-mcp",
+      "cwd": "/Users/usedhonda/projects/chrome-ai-bridge",
       "env": {}
     }
   }
@@ -150,7 +150,7 @@ VSCodeの出力パネル（Output → Claude Code）で以下のようなログ�
 
 ```bash
 # 1. VSCode起動（MCPは自動起動）
-code /Users/usedhonda/projects/chrome-devtools-mcp
+code /Users/usedhonda/projects/chrome-ai-bridge
 
 # 2. TypeScript編集
 # src/**/*.ts を自由に編集
@@ -225,7 +225,7 @@ VSCode MCP設定の`env`で以下を設定可能：
 ```json
 {
   "mcpServers": {
-    "chrome-devtools-mcp": {
+    "chrome-ai-bridge": {
       "command": "node",
       "args": ["scripts/mcp-wrapper.mjs", "--dev"],
       "env": {
@@ -249,7 +249,7 @@ VSCode MCP設定の`env`で以下を設定可能：
 ```json
 {
   "mcpServers": {
-    "chrome-devtools-mcp": {
+    "chrome-ai-bridge": {
       "command": "node",
       "args": ["scripts/mcp-wrapper.mjs", "--dev"],
       "env": {

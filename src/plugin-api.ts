@@ -5,7 +5,7 @@
  */
 
 /**
- * Plugin API for chrome-devtools-mcp-for-extension
+ * Plugin API for chrome-ai-bridge
  *
  * This module provides the interfaces for creating plugins that extend
  * the MCP server with additional tools. Plugins can register tools

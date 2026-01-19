@@ -12,13 +12,13 @@ MCPサーバーがクライアントのプロジェクトディレクトリを�
 I'm developing an MCP (Model Context Protocol) server that needs to create isolated Chrome profiles for each project that uses it.
 
 **Current Problem:**
-- MCP server is installed globally via npm: `chrome-devtools-mcp-for-extension`
+- MCP server is installed globally via npm: `chrome-ai-bridge`
 - When Claude Code (MCP client) launches the server, the server's `process.cwd()` is always the MCP server's own installation directory
 - We need to detect which **project directory** the MCP client is running in, not the MCP server's directory
 
 **Current Architecture:**
 ```typescript
-// MCP server installed at: /Users/username/projects/chrome-devtools-mcp/
+// MCP server installed at: /Users/username/projects/chrome-ai-bridge/
 // But we need to detect: /Users/username/projects/my-actual-project/
 
 function resolveProfile(opts: {
@@ -48,22 +48,22 @@ If there's no standard, what's the recommended approach for project detection in
 
 - `src/profile-resolver.ts` でプロファイルパスを決定
 - `opts.cwd` を使用しているが、これはMCPサーバー自身のディレクトリ
-- 結果: どのプロジェクトから起動しても `chrome-devtools-mcp-for-extension` という同じプロファイル名になる
+- 結果: どのプロジェクトから起動しても `chrome-ai-bridge` という同じプロファイル名になる
 
 ### 期待する動作
 
-- プロジェクトA: `~/.cache/chrome-devtools-mcp/profiles/projectA_hash123/claude-code/stable`
-- プロジェクトB: `~/.cache/chrome-devtools-mcp/profiles/projectB_hash456/claude-code/stable`
+- プロジェクトA: `~/.cache/chrome-ai-bridge/profiles/projectA_hash123/claude-code/stable`
+- プロジェクトB: `~/.cache/chrome-ai-bridge/profiles/projectB_hash456/claude-code/stable`
 
 ### 確認済みの事実
 
 ```bash
 # MCPサーバーのcwdを確認
 lsof -p 84101 | grep cwd
-# → /Users/usedhonda/projects/chrome-devtools-mcp
+# → /Users/usedhonda/projects/chrome-ai-bridge
 
 # 実際のClaude Codeプロジェクト
-# → /Users/usedhonda/projects/chrome-devtools-mcp (同じ)
+# → /Users/usedhonda/projects/chrome-ai-bridge (同じ)
 ```
 
 ### 環境変数の確認が必要

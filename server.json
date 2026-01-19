@@ -1,19 +1,19 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-09-16/server.schema.json",
-  "name": "io.github.ChromeDevTools/chrome-devtools-mcp",
-  "description": "MCP server for Chrome DevTools",
+  "name": "io.github.usedhonda/chrome-ai-bridge",
+  "description": "MCP server bridging Chrome browser and AI assistants (ChatGPT, Gemini). Browser automation + AI consultation.",
   "status": "active",
   "repository": {
-    "url": "https://github.com/ChromeDevTools/chrome-devtools-mcp",
+    "url": "https://github.com/usedhonda/chrome-ai-bridge",
     "source": "github"
   },
-  "version": "0.25.8",
+  "version": "1.0.0",
   "packages": [
     {
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
-      "identifier": "chrome-devtools-mcp",
-      "version": "0.25.8",
+      "identifier": "chrome-ai-bridge",
+      "version": "1.0.0",
       "transport": {
         "type": "stdio"
       },

@@ -76,7 +76,7 @@ function readPackageJson(): {version?: string} {
   }
   try {
     const json = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8'));
-    assert.strict(json['name'], 'chrome-devtools-mcp-for-extension');
+    assert.strict(json['name'], 'chrome-ai-bridge');
     return json;
   } catch {
     return {};
@@ -92,7 +92,7 @@ const logFile = args.logFile ? saveLogsToFile(args.logFile) : undefined;
 logger(`Starting Chrome DevTools MCP for Extension Development v${version}`);
 const server = new McpServer(
   {
-    name: 'chrome-devtools-extension',
+    name: 'chrome-ai-bridge',
     title: 'Chrome DevTools MCP for Extension Development',
     version,
   },
@@ -232,7 +232,7 @@ async function getContext(): Promise<McpContext> {
 
 const logDisclaimers = () => {
   console.error(
-    `chrome-devtools-mcp exposes content of the browser instance to the MCP clients allowing them to inspect,
+    `chrome-ai-bridge exposes content of the browser instance to the MCP clients allowing them to inspect,
 debug, and modify any data in the browser or DevTools.
 Avoid sharing sensitive or personal information that you do not want to share with MCP clients.`,
   );

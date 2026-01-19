@@ -35,7 +35,7 @@
 
 ### Check version
 ```bash
-npx chrome-devtools-mcp-for-extension@latest --version
+npx chrome-ai-bridge@latest --version
 ```
 
 ### Clear npx cache
@@ -130,7 +130,7 @@ Ensure `~/.claude.json` has:
 
 Enable verbose logging:
 ```bash
-DEBUG=mcp:* npx chrome-devtools-mcp-for-extension@latest
+DEBUG=mcp:* npx chrome-ai-bridge@latest
 ```
 
 Or in configuration:
@@ -144,7 +144,7 @@ Or in configuration:
 
 ## Still Having Issues?
 
-1. Check [GitHub Issues](https://github.com/usedhonda/chrome-devtools-mcp/issues)
+1. Check [GitHub Issues](https://github.com/usedhonda/chrome-ai-bridge/issues)
 2. Search existing discussions
 3. Create a new issue with:
    - Error message

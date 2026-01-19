@@ -10,7 +10,7 @@ Chrome DevTools MCPプロジェクトで、以下の自動検出機能を実装�
 3. **拡張機能自動ロード**: プロジェクト内の`extensions/`ディレクトリを自動検出
 
 ### 実際の動作
-1. **プロファイル**: デフォルトの`~/.cache/chrome-devtools-mcp/chrome-profile`を使用（システムプロファイル未使用）
+1. **プロファイル**: デフォルトの`~/.cache/chrome-ai-bridge/chrome-profile`を使用（システムプロファイル未使用）
 2. **ブックマーク**: ハードコードされた13個のみ（Chrome読み込み未動作）
 3. **拡張機能**: プロジェクト内`extensions/`は読み込まれるが、自動検出ではなく元から存在するもの
 
@@ -66,7 +66,7 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
       console.error(`✅ Using system Chrome profile: ${systemProfile.channel}`);
     } else {
       // フォールバック
-      userDataDir = path.join(os.homedir(), '.cache', 'chrome-devtools-mcp', profileDirName);
+      userDataDir = path.join(os.homedir(), '.cache', 'chrome-ai-bridge', profileDirName);
     }
   }
   // ...
@@ -84,7 +84,7 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
 .check(args => {
   // Auto-detect user data directory
   if (!args.userDataDir && !args.browserUrl && !args.isolated) {
-    args.userDataDir = '/Users/usedhonda/.cache/chrome-devtools-mcp/chrome-profile';
+    args.userDataDir = '/Users/usedhonda/.cache/chrome-ai-bridge/chrome-profile';
     console.error(`🔧 Auto-detected user data directory: ${args.userDataDir}`);
   }
 

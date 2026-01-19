@@ -1,262 +1,179 @@
-# パフォーマンス最適化計画
+# プロジェクト名変更計画: chrome-ai-bridge
 
-## 概要
+## 決定事項
 
-ChatGPTへの質問投入までの待ち時間を重点的に削減する。
-
-**ユーザー報告**: 「ブラウザを起動して、ChatGPTを出したのに、質問を投げるまでが時間がかかっている」
-
----
-
-## 🎯 最優先: ChatGPT質問フローの高速化
-
-### 現状の遅延（既存ChatGPTタブがある場合）
-
-| ステップ | 処理 | 遅延 | 問題 |
-|---------|------|------|------|
-| セッションナビゲーション | 同じURLに再ナビゲーション | 3000ms | **不要** |
-| ログイン確認 | Shadow DOM全検索 | 1500-3000ms | 重すぎる |
-| 固定待機 | setTimeout(2000) 複数 | 2000ms+ | **不要** |
-| ポーリング開始 | 最初の2秒待機 | 2000ms | 短縮可能 |
-
-**合計: 7-15秒** → **目標: 3-4秒**
+- **新しい名前**: `chrome-ai-bridge`
+- **Core機能**: 全て維持（名前だけ変更）
+- **npmパッケージ**: `chrome-ai-bridge`（空き確認済み）
 
 ---
 
-### 改善1: 同一URL時のナビゲーションスキップ（最重要）
+## 変更箇所一覧
 
-**ファイル**: `src/tools/chatgpt-web.ts:406-414`
-
-```typescript
-// Before: 常にナビゲーション実行
-await navigateWithRetry(page, latestSession.url, {
-  waitUntil: 'networkidle2',
-});
-await new Promise(resolve => setTimeout(resolve, 2000));
-
-// After: 同一URLならスキップ
-const currentUrl = page.url();
-if (!currentUrl.includes(latestSession.chatId)) {
-  await navigateWithRetry(page, latestSession.url, {
-    waitUntil: 'domcontentloaded',  // networkidle2 → domcontentloaded
-  });
-}
-// 固定2秒待機を削除
-```
-
-**効果**: 3-5秒短縮
-
----
-
-### 改善2: ポーリング開始の即座化
-
-**ファイル**: `src/tools/chatgpt-web.ts:523`
-
-```typescript
-// Before: 最初に2秒待機
-while (true) {
-  await new Promise(resolve => setTimeout(resolve, 2000));
-  // ...
-}
-
-// After: 初回は即座に確認、2回目から500ms間隔
-let isFirstCheck = true;
-while (true) {
-  if (!isFirstCheck) {
-    await new Promise(resolve => setTimeout(resolve, 500));
-  }
-  isFirstCheck = false;
-  // ...
-}
-```
-
-**効果**: 1.5-2秒短縮
-
----
-
-### 改善3: 不要な固定待機の削除
-
-**ファイル**: `src/tools/chatgpt-web.ts`
-
-| 行 | 現在 | 変更後 | 効果 |
-|----|------|--------|------|
-| 340 | `setTimeout(2000)` | 削除 | 2秒 |
-| 482 | `setTimeout(500)` | 削除 | 0.5秒 |
-| 437 | `setTimeout(1000)` | `setTimeout(300)` | 0.7秒 |
-
-**効果**: 合計3秒短縮
-
----
-
-### 改善4: ログイン確認の効率化
-
-**ファイル**: `src/tools/login-helper.ts`
-
-```typescript
-// probeChatGPTSession のタイムアウト短縮
-// Before
-setTimeout(() => controller.abort(), 5000);
-
-// After
-setTimeout(() => controller.abort(), 1500);
-```
-
-**効果**: タイムアウト時3.5秒短縮
-
----
-
-## Phase 1: 即効性のある改善（1行変更）
-
-### 1.1 wait_for デフォルトタイムアウト短縮
-
-**ファイル**: `src/tools/snapshot.ts:39`
-
-```typescript
-// Before
-const timeout = request.params.timeout ?? 30000;
-
-// After
-const timeout = request.params.timeout ?? 10000;
-```
-
-**効果**: タイムアウト時の待機が 30秒 → 10秒（20秒短縮）
-**リスク**: 極低（明示的指定で従来動作可能）
-
----
-
-### 1.2 DOM安定化タイムアウト短縮
-
-**ファイル**: `src/WaitForHelper.ts:24-27`
-
-```typescript
-// Before
-this.#stableDomTimeout = 3000 * cpuTimeoutMultiplier;
-this.#stableDomFor = 500 * cpuTimeoutMultiplier;
-this.#expectNavigationIn = 100 * cpuTimeoutMultiplier;
-
-// After
-this.#stableDomTimeout = 1500 * cpuTimeoutMultiplier;
-this.#stableDomFor = 300 * cpuTimeoutMultiplier;
-this.#expectNavigationIn = 50 * cpuTimeoutMultiplier;
-```
-
-**効果**: 各操作（click, fill, hover）で最大1.7秒短縮
-**リスク**: 低（CPUスロットリング時は自動調整）
-
----
-
-### 1.3 再接続の初期遅延短縮
-
-**ファイル**: `src/browser-connection-manager.ts:36`
-
-```typescript
-// Before
-initialRetryDelay: 1000,
-
-// After
-initialRetryDelay: 300,
-```
-
-**効果**: 再接続時の初期遅延 1秒 → 0.3秒（0.7秒短縮）
-**リスク**: 極低（指数バックオフで自動調整）
-
----
-
-## Phase 2: 構造的改善
-
-### 2.1 fillForm のDOM安定化待ちを1回に
-
-**ファイル**: `src/tools/input.ts:137-150`
-
-```typescript
-// Before: 各要素ごとにDOM安定化待ち
-for (const element of request.params.elements) {
-  await context.waitForEventsAfterAction(async () => {
-    await handle.asLocator().fill(element.value);
-  });
-}
-
-// After: 入力は順序実行、DOM安定化は最後に1回
-for (const element of request.params.elements) {
-  const handle = await context.getElementByUid(element.uid);
-  try {
-    await handle.asLocator().fill(element.value);
-  } finally {
-    void handle.dispose();
+### 1. package.json
+```json
+{
+  "name": "chrome-ai-bridge",
+  "description": "MCP server bridging Chrome browser and AI assistants (ChatGPT, Gemini). Browser automation + AI consultation.",
+  "mcpName": "chrome-ai-bridge",
+  "repository": {
+    "url": "https://github.com/usedhonda/chrome-ai-bridge.git"
   }
 }
-await context.waitForEventsAfterAction(async () => {});
 ```
 
-**効果**: 5フィールドのフォーム: 17.5秒 → 2秒（約88%短縮）
-**リスク**: 中（フィールド間でバリデーションが走る場合に注意）
+### 2. src/ 内のコード（15箇所）
 
----
+| ファイル | 行 | 変更内容 |
+|---------|-----|---------|
+| `src/main.ts` | 79 | `chrome-devtools-mcp-for-extension` → `chrome-ai-bridge` |
+| `src/main.ts` | 95 | `chrome-devtools-extension` → `chrome-ai-bridge` |
+| `src/main.ts` | 235 | エラーメッセージ内のプロジェクト名 |
+| `src/cli.ts` | 98 | `npx chrome-devtools-mcp@latest` → `npx chrome-ai-bridge` |
+| `src/index.ts` | 15 | エラーメッセージ内のプロジェクト名 |
+| `src/profile-migration.ts` | 17 | `.cache/chrome-devtools-mcp` → `.cache/chrome-ai-bridge` |
+| `src/profile-resolver.ts` | 60 | `.cache/chrome-devtools-mcp` → `.cache/chrome-ai-bridge` |
+| `src/McpContext.ts` | 497 | `chrome-devtools-mcp-` → `chrome-ai-bridge-` (tmpdir) |
+| `src/browser.ts` | 721, 730, 915 | プロファイルパス内のプロジェクト名 |
+| `src/config.ts` | 8 | コメント内のプロジェクト名 |
+| `src/plugin-api.ts` | 8 | コメント内のプロジェクト名 |
+| `src/tools/optional-tools.ts` | 23 | コメント内のプロジェクト名 |
 
-### 2.2 リモートツールのタイムアウト短縮
+### 3. ドキュメント（19ファイル）
 
-**ファイル**: `src/tools/gemini-web.ts`, `src/tools/chatgpt-web.ts`
+**主要ドキュメント**:
+- `README.md` - タイトル、説明、コマンド例
+- `CLAUDE.md` - プロジェクト説明、コマンド例
+- `CHANGELOG.md` - プロジェクト名
+- `CONTRIBUTING.md` - プロジェクト名
 
-```typescript
-// Before
-{timeout: 10000}
+**ユーザードキュメント**:
+- `docs/user/setup.md` - MCP設定例
+- `docs/user/troubleshooting.md`
 
-// After
-{timeout: 5000}
+**開発ドキュメント**:
+- `docs/dev/hot-reload.md`
+
+**内部ドキュメント**:
+- `docs/internal/design/*.md` (3ファイル)
+- `docs/internal/investigation/*.md` (6ファイル)
+- `docs/issues/*.md`
+- `docs/ui-snapshots/README.md`
+- `docs/answer/*.md`
+
+### 4. GitHubリポジトリ
+```
+現在: usedhonda/chrome-devtools-mcp
+新規: usedhonda/chrome-ai-bridge
 ```
 
-**効果**: UI検出タイムアウト時に5秒短縮
-**リスク**: 低（遅いネットワークで影響あり）
+### 5. CI/CD
+- `.github/workflows/publish.yml` - 必要なら更新
+- npm Trusted Publishing - 新パッケージ用に設定
+
+### 6. MCPツール名（変更なし）
+以下のツール名は**そのまま維持**:
+- `ask_chatgpt_web`
+- `ask_gemini_web`
+- `diagnose_chatgpt_ui`
+- その他Core 18ツール
 
 ---
 
-## 修正対象ファイル一覧
+## 作業手順
 
-### ChatGPT高速化（最優先）
+### Step 1: src/ 内のコード更新
+```bash
+# 一括置換
+sed -i '' 's/chrome-devtools-mcp-for-extension/chrome-ai-bridge/g' src/*.ts src/**/*.ts
+sed -i '' 's/chrome-devtools-extension/chrome-ai-bridge/g' src/*.ts src/**/*.ts
+sed -i '' 's/chrome-devtools-mcp/chrome-ai-bridge/g' src/*.ts src/**/*.ts
+```
 
-| ファイル | 行番号 | 変更内容 |
-|---------|--------|---------|
-| `src/tools/chatgpt-web.ts` | 406-414 | 同一URLスキップ |
-| `src/tools/chatgpt-web.ts` | 523 | ポーリング初回即座化 |
-| `src/tools/chatgpt-web.ts` | 340, 437, 482 | 固定待機削除/短縮 |
-| `src/tools/login-helper.ts` | 44-50 | タイムアウト5s→1.5s |
+### Step 2: package.json更新
+- name, description, mcpName, repository.url を変更
+- version を `1.0.0` にリセット
 
-### 汎用改善
+### Step 3: ドキュメント一括更新
+```bash
+# 主要ドキュメント
+sed -i '' 's/chrome-devtools-mcp-for-extension/chrome-ai-bridge/g' README.md CLAUDE.md CHANGELOG.md CONTRIBUTING.md
+sed -i '' 's/chrome-devtools-mcp/chrome-ai-bridge/g' README.md CLAUDE.md docs/**/*.md
+```
 
-| ファイル | 行番号 | 変更内容 |
-|---------|--------|---------|
-| `src/tools/snapshot.ts` | 39 | デフォルト30s→10s |
-| `src/WaitForHelper.ts` | 24-27 | DOM安定化短縮 |
-| `src/browser-connection-manager.ts` | 36 | 初期遅延1s→0.3s |
+### Step 4: ビルド・テスト
+```bash
+npm run build
+npm test
+```
 
----
+### Step 5: GitHubリポジトリ名変更（手動）
+1. GitHub → Settings → General → Repository name
+2. `chrome-devtools-mcp` → `chrome-ai-bridge`
+3. 自動リダイレクト有効
 
-## 期待効果
+### Step 6: npm Trusted Publishing設定（手動）
+1. npm → Settings → Publishing → Add new publishing config
+2. Repository: `usedhonda/chrome-ai-bridge`
+3. Workflow: `.github/workflows/publish.yml`
 
-| 操作 | Before | After | 短縮 |
-|------|--------|-------|------|
-| **ChatGPT質問（既存タブ）** | 7-15秒 | 3-4秒 | **60-70%** |
-| ChatGPT質問（新規タブ） | 11-15秒 | 6-7秒 | 45-55% |
-| click/fill/hover | 最大3.6秒 | 最大1.9秒 | 47% |
-| 5フィールドフォーム | 17.5秒 | 2秒 | 88% |
+### Step 7: Git commit & push & tag
+```bash
+git add -A
+git commit -m "chore: rename project to chrome-ai-bridge v1.0.0"
+git push
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+### Step 8: 旧パッケージをdeprecate
+```bash
+npm deprecate chrome-devtools-mcp-for-extension "Moved to chrome-ai-bridge. Run: npx chrome-ai-bridge"
+```
+
+### Step 9: ユーザー向け移行案内
+
+**~/.claude.json 更新**:
+```json
+{
+  "mcpServers": {
+    "chrome-ai-bridge": {
+      "command": "npx",
+      "args": ["chrome-ai-bridge@latest"]
+    }
+  }
+}
+```
 
 ---
 
 ## 検証方法
 
-1. `npm run build && npm test` - テスト通過
-2. MCPサーバー起動、ChatGPTタブを開く
-3. **`ask_chatgpt_web` で質問を投げる**
-   - 既存タブでの質問投入が3-4秒以内か確認
-4. Chromeを閉じて再起動後も動作確認
+1. `npx chrome-ai-bridge` で起動確認
+2. MCPサーバーとして正常に登録・動作
+3. `ask_chatgpt_web` / `ask_gemini_web` が動作
+4. Core機能（click, fill, screenshot等）が動作
+5. 旧パッケージ名でdeprecation警告が表示
+6. プロファイルパスが `~/.cache/chrome-ai-bridge/` に変更されている
 
 ---
 
-## 実装順序
+## 注意点
 
-1. **ChatGPT高速化を最優先で実装**
-   - 同一URLスキップ
-   - 固定待機削除
-   - ポーリング即座化
-2. テスト実行
-3. 汎用改善（Phase 1, 2）を順次実装
+- **バージョン**: v1.0.0 にリセット（新パッケージなので）
+- **プロファイル移行**: 旧パス `~/.cache/chrome-devtools-mcp/` から新パスへの自動移行は**しない**（クリーンスタート）
+- **GitHub Actions**: リポジトリ名変更後、Trusted Publishingの再設定が必要
+- **既存ユーザー**: 旧パッケージは動作するがdeprecation警告を表示
+
+---
+
+## 影響範囲
+
+| 項目 | 影響 |
+|------|------|
+| npmパッケージ名 | 新規作成 |
+| GitHubリポジトリ | リネーム（リダイレクト有効） |
+| MCP登録名 | `chrome-ai-bridge` に変更 |
+| プロファイルパス | `~/.cache/chrome-ai-bridge/` に変更 |
+| ツール名 | **変更なし** |
+| 機能 | **変更なし** |

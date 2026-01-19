@@ -16,7 +16,7 @@ Chrome DevTools MCPプロジェクトにおいて、Puppeteer経由で起動し�
 ### ソフトウェア情報
 - **Chrome Version**: 140.0.7339.208 (Official Build) (arm64)
 - **OS**: macOS Version 26.0 (Build 25A354)
-- **Puppeteer**: 最新版（chrome-devtools-mcp内）
+- **Puppeteer**: 最新版（chrome-ai-bridge内）
 - **Node.js**: 現在のMCPプロジェクト使用版
 - **JavaScript Engine**: V8 14.0.365.10
 
@@ -119,8 +119,8 @@ const browser = await puppeteer.launch({
 ## 📊 GitHub Repository Information
 
 ### プロジェクト情報
-- **Original Repository**: https://github.com/ChromeDevTools/chrome-devtools-mcp
-- **Forked Repository**: https://github.com/usedhonda/chrome-devtools-mcp
+- **Original Repository**: https://github.com/ChromeDevTools/chrome-ai-bridge
+- **Forked Repository**: https://github.com/usedhonda/chrome-ai-bridge
 - **Current Branch**: `feature/load-extension-support`
 - **Recent Success**: 拡張機能ローディング問題を解決済み
 

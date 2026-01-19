@@ -60,7 +60,7 @@ MCPクライアント（Claude Code拡張）
 ## 📁 ファイル構成
 
 ```
-chrome-devtools-mcp/
+chrome-ai-bridge/
 ├── scripts/
 │   ├── mcp-wrapper.mjs        # 統合ラッパー（開発・本番両対応）
 │   ├── cli.mjs                # bin エントリーポイント
@@ -123,7 +123,7 @@ chrome-devtools-mcp/
 ### 3. scripts/cli.mjs（bin エントリー）
 
 **責務**:
-- ユーザーが `npx chrome-devtools-mcp-for-extension` で起動時のエントリー
+- ユーザーが `npx chrome-ai-bridge` で起動時のエントリー
 - 本番モード固定で `mcp-wrapper.mjs` を起動
 
 ```javascript
@@ -144,7 +144,7 @@ child.on("exit", (c) => process.exit(c ?? 0));
 {
   "type": "module",
   "bin": {
-    "chrome-devtools-mcp-for-extension": "scripts/cli.mjs"
+    "chrome-ai-bridge": "scripts/cli.mjs"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
@@ -231,10 +231,10 @@ npm run dev
 ```json
 {
   "mcpServers": {
-    "chrome-devtools-mcp": {
+    "chrome-ai-bridge": {
       "command": "node",
       "args": ["scripts/mcp-wrapper.mjs", "--dev"],
-      "cwd": "/Users/usedhonda/projects/chrome-devtools-mcp"
+      "cwd": "/Users/usedhonda/projects/chrome-ai-bridge"
     }
   }
 }
@@ -244,21 +244,21 @@ npm run dev
 
 ```bash
 # グローバルインストール
-npm install -g chrome-devtools-mcp-for-extension
+npm install -g chrome-ai-bridge
 
 # 起動（auto-restart有効）
-chrome-devtools-mcp-for-extension
+chrome-ai-bridge
 
 # または npx
-npx chrome-devtools-mcp-for-extension
+npx chrome-ai-bridge
 ```
 
 **VSCode MCP設定**（本番）:
 ```json
 {
   "mcpServers": {
-    "chrome-devtools-mcp": {
-      "command": "chrome-devtools-mcp-for-extension"
+    "chrome-ai-bridge": {
+      "command": "chrome-ai-bridge"
     }
   }
 }
@@ -335,7 +335,7 @@ npx chrome-devtools-mcp-for-extension
 - [ ] 無限ループで停止する
 
 ### ユーザー体験
-- [ ] `npx chrome-devtools-mcp-for-extension` で即起動
+- [ ] `npx chrome-ai-bridge` で即起動
 - [ ] VSCode MCP設定が簡潔（1行）
 
 ## 🎯 次のステップ

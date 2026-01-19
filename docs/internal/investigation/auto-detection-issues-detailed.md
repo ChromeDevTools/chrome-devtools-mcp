@@ -46,8 +46,8 @@ claude mcp add chrome-devtools -- node ./build/src/main.js
 **具体的な証拠：**
 ```bash
 # 実行時の出力
-🔧 Auto-detected user data directory: /Users/usedhonda/.cache/chrome-devtools-mcp/chrome-profile
-🔧 Auto-detected extensions directory: /Users/usedhonda/projects/chrome-devtools-mcp/extensions
+🔧 Auto-detected user data directory: /Users/usedhonda/.cache/chrome-ai-bridge/chrome-profile
+🔧 Auto-detected extensions directory: /Users/usedhonda/projects/chrome-ai-bridge/extensions
 
 # 期待される出力（しかし表示されない）
 ✅ Using system Chrome profile: stable (/Users/usedhonda/Library/Application Support/Google/Chrome)
@@ -135,7 +135,7 @@ if (!isolated && !userDataDir) {
     console.error(`✅ Using system Chrome profile: ${systemProfile.channel}`);
   } else {
     // フォールバック
-    userDataDir = path.join(os.homedir(), '.cache', 'chrome-devtools-mcp', profileDirName);
+    userDataDir = path.join(os.homedir(), '.cache', 'chrome-ai-bridge', profileDirName);
     console.error(`📁 Using custom profile directory: ${userDataDir}`);
   }
 }
@@ -154,7 +154,7 @@ if (!isolated && !userDataDir) {
   // Auto-detect user data directory if not specified
   if (!args.userDataDir && !args.browserUrl && !args.isolated) {
     // ハードコードされたパスを設定（これが問題！）
-    args.userDataDir = '/Users/usedhonda/.cache/chrome-devtools-mcp/chrome-profile';
+    args.userDataDir = '/Users/usedhonda/.cache/chrome-ai-bridge/chrome-profile';
     console.error(`🔧 Auto-detected user data directory: ${args.userDataDir}`);
   }
 
@@ -226,8 +226,8 @@ $ cat ~/Library/Application\ Support/Google/Chrome/Default/Bookmarks | jq '.root
 ### テスト3：実行時の出力
 ```bash
 $ node build/src/index.js
-🔧 Auto-detected user data directory: /Users/usedhonda/.cache/chrome-devtools-mcp/chrome-profile
-🔧 Auto-detected extensions directory: /Users/usedhonda/projects/chrome-devtools-mcp/extensions
+🔧 Auto-detected user data directory: /Users/usedhonda/.cache/chrome-ai-bridge/chrome-profile
+🔧 Auto-detected extensions directory: /Users/usedhonda/projects/chrome-ai-bridge/extensions
 ```
 ❌ システムプロファイルが使われていない
 
@@ -274,7 +274,7 @@ if (!userDataDir) {  // !isolatedチェックを削除
     userDataDir = chromePath;
     console.error(`✅ Using system Chrome profile: ${chromePath}`);
   } else {
-    userDataDir = path.join(os.homedir(), '.cache/chrome-devtools-mcp/chrome-profile');
+    userDataDir = path.join(os.homedir(), '.cache/chrome-ai-bridge/chrome-profile');
     console.error(`📁 Using default profile: ${userDataDir}`);
   }
 }
@@ -329,5 +329,5 @@ $ node build/src/index.js
 
 **配布時のメリット：**
 - npmパッケージ公開後、ユーザーは引数指定不要
-- `npx @usedhonda/chrome-devtools-mcp` だけで完全動作
+- `npx @usedhonda/chrome-ai-bridge` だけで完全動作
 - 導入障壁を限りなくゼロに近づける

@@ -20,7 +20,7 @@
  * - --no-web-llm CLI flag (future)
  *
  * In the future, these may be moved to a separate npm package:
- * @chrome-devtools-mcp-for-extension/web-llm
+ * @chrome-ai-bridge/web-llm
  */
 
 import type {ToolRegistry} from '../plugin-api.js';

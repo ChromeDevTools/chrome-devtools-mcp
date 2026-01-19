@@ -682,7 +682,7 @@ GitHub Issues に以下の情報を添えて報告してください:
 1. **環境情報**:
    - OS/バージョン
    - Chrome バージョン
-   - chrome-devtools-mcp バージョン
+   - chrome-ai-bridge バージョン
    - Node.js バージョン
 
 2. **エラーログ**:

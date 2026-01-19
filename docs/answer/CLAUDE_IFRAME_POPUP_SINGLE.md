@@ -1,6 +1,6 @@
 # CLAUDE_IFRAME_POPUP_SINGLE.md — Claude Code にこの1枚を読ませて実装する用
 
-**対象**: https://github.com/usedhonda/chrome-devtools-mcp  
+**対象**: https://github.com/usedhonda/chrome-ai-bridge  
 **目的**: 「ページ内 iFrame 型ポップアップ」（例: `chrome.runtime.getURL('popup.html')` を `iframe` で注入）を、MCP経由で **検出 → アタッチ → DOM取得 → ローカル拡張にパッチ → `chrome.runtime.reload()` → 再検証** まで自動化。
 
 ---

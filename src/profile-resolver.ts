@@ -57,7 +57,7 @@ interface ResolveOpts {
   rootsInfo?: RootsInfo; // v0.18.0: Roots-based profile resolution
 }
 
-const CACHE_ROOT = path.join(os.homedir(), '.cache', 'chrome-devtools-mcp');
+const CACHE_ROOT = path.join(os.homedir(), '.cache', 'chrome-ai-bridge');
 
 // --- Public API ---
 
