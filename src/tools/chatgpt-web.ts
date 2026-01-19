@@ -330,19 +330,57 @@ export const askChatGPTWeb = defineTool({
     const {page, needsNavigation} = await getOrCreateChatGPTPage(context);
 
     try {
-      // Step 1: Navigate to ChatGPT (only if not already there)
+      // Step 1: Determine target URL (existing session or top page)
       response.appendResponseLine('ChatGPTに接続中...');
-      if (needsNavigation) {
-        await navigateWithRetry(page, CHATGPT_CONFIG.DEFAULT_URL, {
+
+      let isNewChat = false;
+      let sessionChatId: string | undefined;
+      let targetUrl: string = CHATGPT_CONFIG.DEFAULT_URL;
+
+      if (!createNewChat) {
+        // Check for existing session first
+        const sessions = await loadChatSessions();
+        const projectSessions = sessions[project] || [];
+
+        if (projectSessions.length > 0) {
+          // Get the most recently used session
+          const sortedSessions = [...projectSessions].sort(
+            (a, b) =>
+              new Date(b.lastUsed).getTime() - new Date(a.lastUsed).getTime(),
+          );
+          const latestSession = sortedSessions[0];
+          sessionChatId = latestSession.chatId;
+          targetUrl = latestSession.url;
+          response.appendResponseLine(
+            `既存のプロジェクトチャットを使用: ${latestSession.url}`,
+          );
+        } else {
+          response.appendResponseLine(
+            '既存チャットが見つかりませんでした。新規作成します。',
+          );
+          isNewChat = true;
+        }
+      } else {
+        isNewChat = true;
+      }
+
+      // Step 2: Navigate to target URL (skip if already there)
+      const currentUrl = page.url();
+      const isAlreadyOnTarget = sessionChatId
+        ? currentUrl.includes(sessionChatId)
+        : currentUrl.includes('chatgpt.com') && !needsNavigation;
+
+      if (!isAlreadyOnTarget) {
+        await navigateWithRetry(page, targetUrl, {
           waitUntil: 'networkidle2',
         });
-        // Wait for page to fully render (ChatGPT takes time to load UI)
+        // Wait for page to fully render
         await new Promise(resolve => setTimeout(resolve, 2000));
       } else {
         response.appendResponseLine('✅ 既存のChatGPTタブを再利用');
       }
 
-      // Step 2: Check login status using session probe (most reliable)
+      // Step 3: Check login status
       const loginStatus = await getLoginStatus(page, 'chatgpt');
 
       if (loginStatus === LoginStatus.NEEDS_LOGIN) {
@@ -400,71 +438,34 @@ export const askChatGPTWeb = defineTool({
 
       response.appendResponseLine('✅ ログイン確認完了');
 
-      // Step 2: Load existing session or create new chat
-      let isNewChat = false;
-      let sessionChatId: string | undefined;
-
-      if (!createNewChat) {
-        // Try to load existing session for this project
-        const sessions = await loadChatSessions();
-        const projectSessions = sessions[project] || [];
-
-        if (projectSessions.length > 0) {
-          // Get the most recently used session
-          const sortedSessions = [...projectSessions].sort(
-            (a, b) =>
-              new Date(b.lastUsed).getTime() - new Date(a.lastUsed).getTime(),
-          );
-          const latestSession = sortedSessions[0];
-
-          response.appendResponseLine(
-            `既存のプロジェクトチャットを使用: ${latestSession.url}`,
-          );
-          sessionChatId = latestSession.chatId;
-
-          // Skip navigation if already on the same chat
-          const currentUrl = page.url();
-          if (!currentUrl.includes(latestSession.chatId)) {
-            await navigateWithRetry(page, latestSession.url, {
-              waitUntil: 'networkidle2', // Wait for JS to finish loading
-            });
-          }
-
-          // Wait for input field to be ready with retry
-          let inputFieldReady = false;
-          for (let attempt = 0; attempt < 3; attempt++) {
-            try {
-              await page.waitForSelector(
-                '.ProseMirror[contenteditable="true"]',
-                { timeout: 5000 },
+      // Step 4: Wait for input field (for existing sessions)
+      if (sessionChatId) {
+        let inputFieldReady = false;
+        for (let attempt = 0; attempt < 3; attempt++) {
+          try {
+            await page.waitForSelector(
+              '.ProseMirror[contenteditable="true"]',
+              {timeout: 5000},
+            );
+            inputFieldReady = true;
+            break;
+          } catch {
+            if (attempt < 2) {
+              response.appendResponseLine(
+                `⏳ 入力欄を待機中... (${attempt + 1}/3)`,
               );
-              inputFieldReady = true;
-              break;
-            } catch {
-              if (attempt < 2) {
-                response.appendResponseLine(
-                  `⏳ 入力欄を待機中... (${attempt + 1}/3)`,
-                );
-                await new Promise(r => setTimeout(r, 2000));
-              }
+              await new Promise(r => setTimeout(r, 2000));
             }
           }
-          if (!inputFieldReady) {
-            response.appendResponseLine(
-              '⚠️ 入力欄の準備に時間がかかっています。続行を試みます...',
-            );
-          }
-        } else {
-          response.appendResponseLine(
-            '既存チャットが見つかりませんでした。新規作成します。',
-          );
-          isNewChat = true;
         }
-      } else {
-        isNewChat = true;
+        if (!inputFieldReady) {
+          response.appendResponseLine(
+            '⚠️ 入力欄の準備に時間がかかっています。続行を試みます...',
+          );
+        }
       }
 
-      // Step 3: Create new chat if needed
+      // Step 5: Create new chat if needed
       if (isNewChat) {
         response.appendResponseLine('新規チャットを作成中...');
 
