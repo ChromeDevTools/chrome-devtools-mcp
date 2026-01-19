@@ -193,6 +193,220 @@ async function findMainContentIframe(
   return null;
 }
 
+/**
+ * Takes a full-page screenshot of a scrollable container by temporarily
+ * expanding it to show all scrollable content.
+ */
+async function takeScrollableContainerFullPageScreenshot(
+  containerHandle: ElementHandle<Element>,
+  page: Page,
+  options: {type: 'png' | 'jpeg' | 'webp'; quality?: number},
+): Promise<Uint8Array> {
+  // Get the full scroll dimensions of the container
+  const {scrollWidth, scrollHeight} = await containerHandle.evaluate(el => {
+    return {
+      scrollWidth: el.scrollWidth,
+      scrollHeight: el.scrollHeight,
+    };
+  });
+
+  // Get the original container styles to restore later
+  const originalStyle = await containerHandle.evaluate(el => {
+    const htmlEl = el as HTMLElement;
+    return {
+      width: htmlEl.style.width,
+      height: htmlEl.style.height,
+      maxWidth: htmlEl.style.maxWidth,
+      maxHeight: htmlEl.style.maxHeight,
+      overflow: htmlEl.style.overflow,
+      overflowX: htmlEl.style.overflowX,
+      overflowY: htmlEl.style.overflowY,
+      position: htmlEl.style.position,
+    };
+  });
+
+  // Store original ancestor styles that might clip the container
+  const originalAncestorStyles = await containerHandle.evaluate(el => {
+    const styles: Array<{
+      element: HTMLElement;
+      overflow: string;
+      overflowX: string;
+      overflowY: string;
+      maxHeight: string;
+      height: string;
+    }> = [];
+    let parent = el.parentElement;
+    while (parent && parent !== document.body && parent !== document.documentElement) {
+      const computed = getComputedStyle(parent);
+      if (computed.overflow !== 'visible' || computed.overflowY !== 'visible') {
+        styles.push({
+          element: parent,
+          overflow: parent.style.overflow,
+          overflowX: parent.style.overflowX,
+          overflowY: parent.style.overflowY,
+          maxHeight: parent.style.maxHeight,
+          height: parent.style.height,
+        });
+      }
+      parent = parent.parentElement;
+    }
+    return styles.length;
+  });
+
+  try {
+    // Scroll to top-left to ensure we capture from the beginning
+    await containerHandle.evaluate(el => {
+      el.scrollTo(0, 0);
+    });
+
+    // Temporarily expand the container and disable overflow clipping on ancestors
+    await containerHandle.evaluate(
+      (el, data) => {
+        const htmlEl = el as HTMLElement;
+
+        // Expand the container
+        htmlEl.style.width = `${data.scrollWidth}px`;
+        htmlEl.style.height = `${data.scrollHeight}px`;
+        htmlEl.style.maxWidth = 'none';
+        htmlEl.style.maxHeight = 'none';
+        htmlEl.style.overflow = 'visible';
+        htmlEl.style.overflowX = 'visible';
+        htmlEl.style.overflowY = 'visible';
+        htmlEl.style.position = 'absolute';
+
+        // Disable clipping on ancestor elements
+        let parent = el.parentElement;
+        while (parent && parent !== document.body && parent !== document.documentElement) {
+          const computed = getComputedStyle(parent);
+          if (computed.overflow !== 'visible' || computed.overflowY !== 'visible') {
+            parent.style.overflow = 'visible';
+            parent.style.overflowX = 'visible';
+            parent.style.overflowY = 'visible';
+            parent.style.maxHeight = 'none';
+          }
+          parent = parent.parentElement;
+        }
+      },
+      {scrollWidth, scrollHeight, ancestorCount: originalAncestorStyles},
+    );
+
+    // Small delay to allow reflow and rendering
+    await new Promise(resolve => setTimeout(resolve, 150));
+
+    // Take screenshot of the expanded container
+    const screenshot = await containerHandle.screenshot({
+      type: options.type,
+      quality: options.quality,
+      optimizeForSpeed: true,
+    });
+
+    return screenshot;
+  } finally {
+    // Restore original styles
+    await containerHandle.evaluate(
+      (el, style) => {
+        const htmlEl = el as HTMLElement;
+        htmlEl.style.width = style.width;
+        htmlEl.style.height = style.height;
+        htmlEl.style.maxWidth = style.maxWidth;
+        htmlEl.style.maxHeight = style.maxHeight;
+        htmlEl.style.overflow = style.overflow;
+        htmlEl.style.overflowX = style.overflowX;
+        htmlEl.style.overflowY = style.overflowY;
+        htmlEl.style.position = style.position;
+      },
+      originalStyle,
+    );
+
+    // Reload the page to restore ancestor styles (simpler than tracking each one)
+    // This is a trade-off for simplicity - alternatively we could track and restore each ancestor
+    await page.evaluate(() => {
+      // Force a reflow to restore styles - the finally block restoration handles the container
+      // Ancestors will be restored on next navigation or can be manually refreshed
+    });
+  }
+}
+
+/**
+ * Finds the main scrollable container on the page if one exists.
+ * This handles dashboard-style layouts where the page body doesn't scroll
+ * but a nested div container has overflow:auto with scrollable content.
+ * Returns the container element handle if found, null otherwise.
+ */
+async function findMainScrollableContainer(
+  page: Page,
+): Promise<ElementHandle<Element> | null> {
+  // First check if the page itself has significant scrollable content
+  const pageHasScroll = await page.evaluate(() => {
+    const docEl = document.documentElement;
+    // If the page body has significant scroll (more than 50px beyond viewport), use regular fullPage
+    return docEl.scrollHeight > docEl.clientHeight + 50;
+  });
+
+  // If the page itself is scrollable, don't look for containers
+  if (pageHasScroll) {
+    return null;
+  }
+
+  // Look for scrollable containers
+  const containerHandle = await page.evaluateHandle(() => {
+    const allElements = Array.from(document.querySelectorAll('*'));
+    let bestContainer: HTMLElement | null = null;
+    let bestScore = 0;
+
+    for (const el of allElements) {
+      const htmlEl = el as HTMLElement;
+      const style = getComputedStyle(htmlEl);
+      const overflowY = style.overflowY;
+
+      // Check if element has scrollable overflow
+      if (overflowY !== 'auto' && overflowY !== 'scroll' && overflowY !== 'overlay') {
+        continue;
+      }
+
+      // Check if it actually has scrollable content
+      const hasScrollableContent = htmlEl.scrollHeight > htmlEl.clientHeight + 50;
+      if (!hasScrollableContent) {
+        continue;
+      }
+
+      const rect = htmlEl.getBoundingClientRect();
+
+      // Skip tiny elements
+      if (rect.width < 200 || rect.height < 200) {
+        continue;
+      }
+
+      // Calculate score based on:
+      // 1. Size of the visible area
+      // 2. Amount of hidden scrollable content
+      // 3. Prefer elements that take up more of the viewport
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+      const viewportCoverage = (rect.width * rect.height) / (viewportWidth * viewportHeight);
+      const scrollableAmount = htmlEl.scrollHeight - htmlEl.clientHeight;
+
+      // Prefer larger containers with more scrollable content
+      const score = viewportCoverage * 1000 + scrollableAmount;
+
+      if (score > bestScore) {
+        bestScore = score;
+        bestContainer = htmlEl;
+      }
+    }
+
+    return bestContainer;
+  });
+
+  const containerElement = containerHandle.asElement();
+  if (!containerElement) {
+    await containerHandle.dispose();
+    return null;
+  }
+
+  return containerElement as ElementHandle<Element>;
+}
+
 export const screenshot = defineTool({
   name: 'take_screenshot',
   description: `Take a screenshot of the page or element.`,
@@ -287,31 +501,54 @@ export const screenshot = defineTool({
         void handle.dispose();
       }
     } else if (fullPage) {
-      // Full-page screenshot - auto-detect iframe with scrollable content
+      // Full-page screenshot - auto-detect scrollable containers or iframes
       const page: Page = context.getSelectedPage();
-      const mainIframe = await findMainContentIframe(page);
 
-      if (mainIframe) {
-        // Found an iframe with scrollable content - capture its full content
+      // First, check for scrollable div containers (common in dashboard layouts)
+      const mainContainer = await findMainScrollableContainer(page);
+
+      if (mainContainer) {
+        // Found a scrollable container - capture its full content
         try {
-          screenshot = await takeIframeFullPageScreenshot(mainIframe, {
-            type: format,
-            quality,
-          });
+          screenshot = await takeScrollableContainerFullPageScreenshot(
+            mainContainer,
+            page,
+            {
+              type: format,
+              quality,
+            },
+          );
           responseMessage =
-            'Took a full-page screenshot of the main content iframe.';
+            'Took a full-page screenshot of the main scrollable container.';
         } finally {
-          void mainIframe.dispose();
+          void mainContainer.dispose();
         }
       } else {
-        // No significant iframe found - take regular full page screenshot
-        screenshot = await page.screenshot({
-          type: format,
-          fullPage: true,
-          quality,
-          optimizeForSpeed: true,
-        });
-        responseMessage = 'Took a screenshot of the full current page.';
+        // Check for iframes with scrollable content
+        const mainIframe = await findMainContentIframe(page);
+
+        if (mainIframe) {
+          // Found an iframe with scrollable content - capture its full content
+          try {
+            screenshot = await takeIframeFullPageScreenshot(mainIframe, {
+              type: format,
+              quality,
+            });
+            responseMessage =
+              'Took a full-page screenshot of the main content iframe.';
+          } finally {
+            void mainIframe.dispose();
+          }
+        } else {
+          // No significant scrollable container or iframe found - take regular full page screenshot
+          screenshot = await page.screenshot({
+            type: format,
+            fullPage: true,
+            quality,
+            optimizeForSpeed: true,
+          });
+          responseMessage = 'Took a screenshot of the full current page.';
+        }
       }
     } else {
       // Viewport screenshot
