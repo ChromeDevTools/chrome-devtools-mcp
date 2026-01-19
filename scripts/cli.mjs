@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 /**
- * CLI Entry Point for chrome-devtools-mcp-for-extension
+ * CLI Entry Point for chrome-ai-bridge
  *
  * This is the entry point when users run:
- *   npx chrome-devtools-mcp-for-extension
- *   chrome-devtools-mcp-for-extension (if globally installed)
+ *   npx chrome-ai-bridge
+ *   chrome-ai-bridge (if globally installed)
  *
  * Launches the MCP server with browser globals mock:
  * - Loads browser-globals-mock.mjs BEFORE main.js

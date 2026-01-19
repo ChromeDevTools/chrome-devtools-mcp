@@ -1,15 +1,15 @@
 #!/bin/bash
-# Restart chrome-devtools-mcp-for-extension MCP server
+# Restart chrome-ai-bridge MCP server
 # Kills only this project's MCP processes
 
-echo "🔍 Looking for chrome-devtools-mcp-for-extension processes..."
+echo "🔍 Looking for chrome-ai-bridge processes..."
 
 # Find PIDs for node processes running this project's index.js
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 PIDS=$(ps aux | grep "node.*${PROJECT_DIR}/build/src/index.js" | grep -v grep | awk '{print $2}')
 
 if [ -z "$PIDS" ]; then
-  echo "⚠️  No chrome-devtools-mcp-for-extension processes found"
+  echo "⚠️  No chrome-ai-bridge processes found"
   echo "💡 VSCode might need a Reload Window first"
   exit 0
 fi
