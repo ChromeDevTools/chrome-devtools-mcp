@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 /**
  * @fileoverview take from {@link https://github.com/GoogleChromeLabs/chromium-bidi/blob/main/rollup.config.mjs | chromium-bidi}
  * and modified to specific requirement.
@@ -183,5 +184,12 @@ export default [
 
       return false;
     },
+  ),
+  bundleDependency(
+    './build/src/third_party/devtools-formatter-worker.js',
+    {
+      inlineDynamicImports: true,
+    },
+    (_source, _importer, _isResolved) => false,
   ),
 ];

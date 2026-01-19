@@ -33,6 +33,7 @@
     "node_modules/chrome-devtools-frontend/front_end/core/protocol_client",
     "node_modules/chrome-devtools-frontend/front_end/core/root",
     "node_modules/chrome-devtools-frontend/front_end/core/sdk",
+    "node_modules/chrome-devtools-frontend/front_end/entrypoints/formatter_worker",
     "node_modules/chrome-devtools-frontend/front_end/foundation/foundation.ts",
     "node_modules/chrome-devtools-frontend/front_end/foundation/Universe.ts",
     "node_modules/chrome-devtools-frontend/front_end/generated",
@@ -43,6 +44,7 @@
     "node_modules/chrome-devtools-frontend/front_end/models/ai_assistance/data_formatters/PerformanceTraceFormatter.ts",
     "node_modules/chrome-devtools-frontend/front_end/models/ai_assistance/data_formatters/UnitFormatters.ts",
     "node_modules/chrome-devtools-frontend/front_end/models/ai_assistance/performance",
+    "node_modules/chrome-devtools-frontend/front_end/models/greendev",
     "node_modules/chrome-devtools-frontend/front_end/models/bindings",
     "node_modules/chrome-devtools-frontend/front_end/models/cpu_profile",
     "node_modules/chrome-devtools-frontend/front_end/models/crux-manager",
@@ -59,6 +61,8 @@
     "node_modules/chrome-devtools-frontend/front_end/models/trace",
     "node_modules/chrome-devtools-frontend/front_end/models/workspace",
     "node_modules/chrome-devtools-frontend/front_end/panels/issues/IssueAggregator.ts",
+    "node_modules/chrome-devtools-frontend/front_end/third_party/acorn",
+    "node_modules/chrome-devtools-frontend/front_end/third_party/codemirror",
     "node_modules/chrome-devtools-frontend/front_end/third_party/i18n",
     "node_modules/chrome-devtools-frontend/front_end/third_party/intl-messageformat",
     "node_modules/chrome-devtools-frontend/front_end/third_party/legacy-javascript",
@@ -67,5 +71,8 @@
     "node_modules/chrome-devtools-frontend/front_end/third_party/third-party-web",
     "node_modules/chrome-devtools-frontend/mcp"
   ],
-  "exclude": ["node_modules/chrome-devtools-frontend/**/*.test.ts"]
+  "exclude": ["node_modules/chrome-devtools-frontend/**/*.test.ts"],
+  "files": [
+    "node_modules/chrome-devtools-frontend/front_end/third_party/acorn/package/dist/acorn.mjs"
+  ]
 }

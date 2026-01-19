@@ -5,6 +5,7 @@
  */
 
 import {logger} from '../logger.js';
+import type {Dialog} from '../third_party/index.js';
 import {zod} from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
@@ -31,10 +32,10 @@ export const selectPage = defineTool({
     readOnlyHint: true,
   },
   schema: {
-    pageIdx: zod
+    pageId: zod
       .number()
       .describe(
-        `The index of the page to select. Call ${listPages.name} to get available pages.`,
+        `The ID of the page to select. Call ${listPages.name} to get available pages.`,
       ),
     bringToFront: zod
       .boolean()
@@ -42,7 +43,7 @@ export const selectPage = defineTool({
       .describe('Whether to focus the page and bring it to the top.'),
   },
   handler: async (request, response, context) => {
-    const page = context.getPageByIdx(request.params.pageIdx);
+    const page = context.getPageById(request.params.pageId);
     context.selectPage(page);
     response.setIncludePages(true);
     if (request.params.bringToFront) {
@@ -59,15 +60,13 @@ export const closePage = defineTool({
     readOnlyHint: false,
   },
   schema: {
-    pageIdx: zod
+    pageId: zod
       .number()
-      .describe(
-        'The index of the page to close. Call list_pages to list pages.',
-      ),
+      .describe('The ID of the page to close. Call list_pages to list pages.'),
   },
   handler: async (request, response, context) => {
     try {
-      await context.closePage(request.params.pageIdx);
+      await context.closePage(request.params.pageId);
     } catch (err) {
       if (err.message === CLOSE_PAGE_ERROR) {
         response.appendResponseLine(err.message);
@@ -122,6 +121,12 @@ export const navigatePage = defineTool({
       .boolean()
       .optional()
       .describe('Whether to ignore cache on reload.'),
+    handleBeforeUnload: zod
+      .enum(['accept', 'decline'])
+      .optional()
+      .describe(
+        'Whether to auto accept or beforeunload dialogs triggered by this navigation. Default is accept.',
+      ),
     ...timeoutSchema,
   },
   handler: async (request, response, context) => {
@@ -138,62 +143,82 @@ export const navigatePage = defineTool({
       request.params.type = 'url';
     }
 
-    await context.waitForEventsAfterAction(async () => {
-      switch (request.params.type) {
-        case 'url':
-          if (!request.params.url) {
-            throw new Error('A URL is required for navigation of type=url.');
-          }
-          try {
-            await page.goto(request.params.url, options);
-            response.appendResponseLine(
-              `Successfully navigated to ${request.params.url}.`,
-            );
-          } catch (error) {
-            response.appendResponseLine(
-              `Unable to navigate in the  selected page: ${error.message}.`,
-            );
-          }
-          break;
-        case 'back':
-          try {
-            await page.goBack(options);
-            response.appendResponseLine(
-              `Successfully navigated back to ${page.url()}.`,
-            );
-          } catch (error) {
-            response.appendResponseLine(
-              `Unable to navigate back in the selected page: ${error.message}.`,
-            );
-          }
-          break;
-        case 'forward':
-          try {
-            await page.goForward(options);
-            response.appendResponseLine(
-              `Successfully navigated forward to ${page.url()}.`,
-            );
-          } catch (error) {
-            response.appendResponseLine(
-              `Unable to navigate forward in the selected page: ${error.message}.`,
-            );
-          }
-          break;
-        case 'reload':
-          try {
-            await page.reload({
-              ...options,
-              ignoreCache: request.params.ignoreCache,
-            });
-            response.appendResponseLine(`Successfully reloaded the page.`);
-          } catch (error) {
-            response.appendResponseLine(
-              `Unable to reload the selected page: ${error.message}.`,
-            );
-          }
-          break;
+    const handleBeforeUnload = request.params.handleBeforeUnload ?? 'accept';
+    const dialogHandler = (dialog: Dialog) => {
+      if (dialog.type() === 'beforeunload') {
+        if (handleBeforeUnload === 'accept') {
+          response.appendResponseLine(`Accepted a beforeunload dialog.`);
+          void dialog.accept();
+        } else {
+          response.appendResponseLine(`Declined a beforeunload dialog.`);
+          void dialog.dismiss();
+        }
+        // We are not going to report the dialog like regular dialogs.
+        context.clearDialog();
       }
-    });
+    };
+    page.on('dialog', dialogHandler);
+
+    try {
+      await context.waitForEventsAfterAction(async () => {
+        switch (request.params.type) {
+          case 'url':
+            if (!request.params.url) {
+              throw new Error('A URL is required for navigation of type=url.');
+            }
+            try {
+              await page.goto(request.params.url, options);
+              response.appendResponseLine(
+                `Successfully navigated to ${request.params.url}.`,
+              );
+            } catch (error) {
+              response.appendResponseLine(
+                `Unable to navigate in the  selected page: ${error.message}.`,
+              );
+            }
+            break;
+          case 'back':
+            try {
+              await page.goBack(options);
+              response.appendResponseLine(
+                `Successfully navigated back to ${page.url()}.`,
+              );
+            } catch (error) {
+              response.appendResponseLine(
+                `Unable to navigate back in the selected page: ${error.message}.`,
+              );
+            }
+            break;
+          case 'forward':
+            try {
+              await page.goForward(options);
+              response.appendResponseLine(
+                `Successfully navigated forward to ${page.url()}.`,
+              );
+            } catch (error) {
+              response.appendResponseLine(
+                `Unable to navigate forward in the selected page: ${error.message}.`,
+              );
+            }
+            break;
+          case 'reload':
+            try {
+              await page.reload({
+                ...options,
+                ignoreCache: request.params.ignoreCache,
+              });
+              response.appendResponseLine(`Successfully reloaded the page.`);
+            } catch (error) {
+              response.appendResponseLine(
+                `Unable to reload the selected page: ${error.message}.`,
+              );
+            }
+            break;
+        }
+      });
+    } finally {
+      page.off('dialog', dialogHandler);
+    }
 
     response.setIncludePages(true);
   },
@@ -213,7 +238,22 @@ export const resizePage = defineTool({
   handler: async (request, response, context) => {
     const page = context.getSelectedPage();
 
-    // @ts-expect-error internal API for now.
+    try {
+      const browser = page.browser();
+      const windowId = await page.windowId();
+
+      const bounds = await browser.getWindowBounds(windowId);
+
+      if (bounds.windowState === 'fullscreen') {
+        // Have to call this twice on Ubuntu when the window is in fullscreen mode.
+        await browser.setWindowBounds(windowId, {windowState: 'normal'});
+        await browser.setWindowBounds(windowId, {windowState: 'normal'});
+      } else if (bounds.windowState !== 'normal') {
+        await browser.setWindowBounds(windowId, {windowState: 'normal'});
+      }
+    } catch {
+      // Window APIs are not supported on all platforms
+    }
     await page.resize({
       contentWidth: request.params.width,
       contentHeight: request.params.height,
@@ -270,5 +310,28 @@ export const handleDialog = defineTool({
 
     context.clearDialog();
     response.setIncludePages(true);
+  },
+});
+
+export const getTabId = defineTool({
+  name: 'get_tab_id',
+  description: `Get the tab ID of the page`,
+  annotations: {
+    category: ToolCategory.NAVIGATION,
+    readOnlyHint: true,
+    conditions: ['experimentalInteropTools'],
+  },
+  schema: {
+    pageId: zod
+      .number()
+      .describe(
+        `The ID of the page to get the tab ID for. Call ${listPages.name} to get available pages.`,
+      ),
+  },
+  handler: async (request, response, context) => {
+    const page = context.getPageById(request.params.pageId);
+    // @ts-expect-error _tabId is internal.
+    const tabId = page._tabId;
+    response.setTabId(tabId);
   },
 });

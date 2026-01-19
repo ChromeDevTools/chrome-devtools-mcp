@@ -60,6 +60,7 @@ export default defineConfig([
     name: 'TypeScript rules',
     rules: {
       '@local/check-license': 'error',
+      curly: ['error', 'all'],
 
       'no-undef': 'off',
       'no-unused-vars': 'off',

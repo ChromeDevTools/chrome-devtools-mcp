@@ -130,7 +130,7 @@
 
 **Parameters:**
 
-- **pageIdx** (number) **(required)**: The index of the page to close. Call [`list_pages`](#list_pages) to list pages.
+- **pageId** (number) **(required)**: The ID of the page to close. Call [`list_pages`](#list_pages) to list pages.
 
 ---
 
@@ -148,6 +148,7 @@
 
 **Parameters:**
 
+- **handleBeforeUnload** (enum: "accept", "decline") _(optional)_: Whether to auto accept or beforeunload dialogs triggered by this navigation. Default is accept.
 - **ignoreCache** (boolean) _(optional)_: Whether to ignore cache on reload.
 - **timeout** (integer) _(optional)_: Maximum wait time in milliseconds. If set to 0, the default timeout will be used.
 - **type** (enum: "url", "back", "forward", "reload") _(optional)_: Navigate the page by URL, back or forward in history, or reload.
@@ -172,7 +173,7 @@
 
 **Parameters:**
 
-- **pageIdx** (number) **(required)**: The index of the page to select. Call [`list_pages`](#list_pages) to get available pages.
+- **pageId** (number) **(required)**: The ID of the page to select. Call [`list_pages`](#list_pages) to get available pages.
 - **bringToFront** (boolean) _(optional)_: Whether to focus the page and bring it to the top.
 
 ---
@@ -234,6 +235,7 @@
 
 - **autoStop** (boolean) **(required)**: Determines if the trace recording should be automatically stopped.
 - **reload** (boolean) **(required)**: Determines if, once tracing has started, the page should be automatically reloaded.
+- **filePath** (string) _(optional)_: The absolute file path, or a file path relative to the current working directory, to save the raw trace data. For example, trace.json.gz (compressed) or trace.json (uncompressed).
 
 ---
 
@@ -241,7 +243,9 @@
 
 **Description:** Stops the active performance trace recording on the selected page.
 
-**Parameters:** None
+**Parameters:**
+
+- **filePath** (string) _(optional)_: The absolute file path, or a file path relative to the current working directory, to save the raw trace data. For example, trace.json.gz (compressed) or trace.json (uncompressed).
 
 ---
 

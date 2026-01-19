@@ -15,6 +15,7 @@ export interface ConsoleMessageData {
   count?: number;
   description?: string;
   args?: string[];
+  stackTrace?: DevTools.StackTrace.StackTrace.StackTrace;
 }
 
 // The short format for a console message, based on a previous format.
@@ -46,6 +47,7 @@ export function formatConsoleEventVerbose(
     `ID: ${msg.consoleMessageStableId}`,
     `Message: ${msg.type}> ${aggregatedIssue ? formatIssue(aggregatedIssue, msg.description, context) : msg.message}`,
     aggregatedIssue ? undefined : formatArgs(msg),
+    formatStackTrace(msg.stackTrace),
   ].filter(line => !!line);
   return result.join('\n');
 }
@@ -82,7 +84,9 @@ export function formatIssue(
   if (processedMarkdown?.startsWith('# ')) {
     processedMarkdown = processedMarkdown.substring(2).trimStart();
   }
-  if (processedMarkdown) result.push(processedMarkdown);
+  if (processedMarkdown) {
+    result.push(processedMarkdown);
+  }
 
   const links = issue.getDescription()?.links;
   if (links && links.length > 0) {
@@ -100,7 +104,9 @@ export function formatIssue(
   }> = [];
   for (const singleIssue of issues) {
     const details = singleIssue.details();
-    if (!details) continue;
+    if (!details) {
+      continue;
+    }
 
     // We send the remaining details as untyped JSON because the DevTools
     // frontend code is currently not re-usable.
@@ -150,16 +156,61 @@ export function formatIssue(
   result.push(
     ...affectedResources.map(item => {
       const details = [];
-      if (item.uid) details.push(`uid=${item.uid}`);
+      if (item.uid) {
+        details.push(`uid=${item.uid}`);
+      }
       if (item.request) {
         details.push(
           (typeof item.request === 'number' ? `reqid=` : 'url=') + item.request,
         );
       }
-      if (item.data) details.push(`data=${JSON.stringify(item.data)}`);
+      if (item.data) {
+        details.push(`data=${JSON.stringify(item.data)}`);
+      }
       return details.join(' ');
     }),
   );
-  if (result.length === 0) return 'No affected resources found';
+  if (result.length === 0) {
+    return 'No affected resources found';
+  }
   return result.join('\n');
+}
+
+function formatStackTrace(
+  stackTrace: DevTools.StackTrace.StackTrace.StackTrace | undefined,
+): string {
+  if (!stackTrace) {
+    return '';
+  }
+
+  return [
+    '### Stack trace',
+    formatFragment(stackTrace.syncFragment),
+    ...stackTrace.asyncFragments.map(formatAsyncFragment),
+  ].join('\n');
+}
+
+function formatFragment(
+  fragment: DevTools.StackTrace.StackTrace.Fragment,
+): string {
+  return fragment.frames.map(formatFrame).join('\n');
+}
+
+function formatAsyncFragment(
+  fragment: DevTools.StackTrace.StackTrace.AsyncFragment,
+): string {
+  const separatorLineLength = 40;
+  const prefix = `--- ${fragment.description || 'async'} `;
+  const separator = prefix + '-'.repeat(separatorLineLength - prefix.length);
+  return separator + '\n' + formatFragment(fragment);
+}
+
+function formatFrame(frame: DevTools.StackTrace.StackTrace.Frame): string {
+  let result = `at ${frame.name ?? '<anonymous>'}`;
+  if (frame.uiSourceCode) {
+    result += ` (${frame.uiSourceCode.displayName()}:${frame.line}:${frame.column})`;
+  } else if (frame.url) {
+    result += ` (${frame.url}:${frame.line}:${frame.column})`;
+  }
+  return result;
 }

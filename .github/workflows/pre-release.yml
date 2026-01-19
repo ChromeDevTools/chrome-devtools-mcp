@@ -3,6 +3,7 @@ name: Pre-release
 permissions: read-all
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - release-please-*
@@ -18,15 +19,10 @@ jobs:
           fetch-depth: 2
 
       - name: Set up Node.js
-        uses: actions/setup-node@395ad3262231945c25e8478fd5baf05154b1d79f # v6.1.0
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
         with:
           cache: npm
           node-version-file: '.nvmrc'
-
-      - name: Install MCP Publisher
-        run: |
-          export OS=$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')
-          curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_${OS}.tar.gz" | tar xz mcp-publisher
 
       - name: Verify server.json
         run: npm run verify-server-json-version

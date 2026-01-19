@@ -91,10 +91,10 @@ Chrome DevTools MCP will not start the browser instance automatically using this
 
 <details>
   <summary>Claude Code</summary>
-    Use the Claude Code CLI to add the Chrome DevTools MCP server (<a href="https://docs.anthropic.com/en/docs/claude-code/mcp">guide</a>):
+    Use the Claude Code CLI to add the Chrome DevTools MCP server (<a href="https://code.claude.com/docs/en/mcp">guide</a>):
 
 ```bash
-claude mcp add chrome-devtools npx chrome-devtools-mcp@latest
+claude mcp add chrome-devtools --scope user npx chrome-devtools-mcp@latest
 ```
 
 </details>
@@ -242,6 +242,25 @@ Or, from the IDE **Activity Bar** > `Kiro` > `MCP Servers` > `Click Open MCP Con
 </details>
 
 <details>
+  <summary>OpenCode</summary>
+
+Add the following configuration to your `opencode.json` file. If you don't have one, create it at `~/.config/opencode/opencode.json` (<a href="https://opencode.ai/docs/mcp-servers">guide</a>):
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "chrome-devtools": {
+      "type": "local",
+      "command": ["npx", "-y", "chrome-devtools-mcp@latest"]
+    }
+  }
+}
+```
+
+</details>
+
+<details>
   <summary>Qoder</summary>
 
 In **Qoder Settings**, go to `MCP Server` > `+ Add` > Use the configuration snippet provided above.
@@ -351,7 +370,7 @@ The Chrome DevTools MCP server supports the following configuration option:
 <!-- BEGIN AUTO GENERATED OPTIONS -->
 
 - **`--autoConnect`/ `--auto-connect`**
-  If specified, automatically connects to a browser (Chrome 145+) running in the user data directory identified by the channel param. Requires remote debugging being enabled in Chrome here: chrome://inspect/#remote-debugging.
+  If specified, automatically connects to a browser (Chrome 144+) running in the user data directory identified by the channel param. Requires the remoted debugging server to be started in the Chrome instance via chrome://inspect/#remote-debugging.
   - **Type:** boolean
   - **Default:** `false`
 
@@ -407,6 +426,10 @@ The Chrome DevTools MCP server supports the following configuration option:
 
 - **`--chromeArg`/ `--chrome-arg`**
   Additional arguments for Chrome. Only applies when Chrome is launched by chrome-devtools-mcp.
+  - **Type:** array
+
+- **`--ignoreDefaultChromeArg`/ `--ignore-default-chrome-arg`**
+  Explicitly disable default arguments for Chrome. Only applies when Chrome is launched by chrome-devtools-mcp.
   - **Type:** array
 
 - **`--categoryEmulation`/ `--category-emulation`**
@@ -533,7 +556,8 @@ Make sure your browser is running. Open gemini-cli and run the following prompt:
 Check the performance of https://developers.chrome.com
 ```
 
-Note: The <code>autoConnect</code> option requires the user to start Chrome.
+> [!NOTE]  
+> The <code>autoConnect</code> option requires the user to start Chrome. If the user has multiple active profiles, the MCP server will connect to the default profile (as determined by Chrome). The MCP server has access to all open windows for the selected profile.
 
 The Chrome DevTools MCP server will try to connect to your running Chrome
 instance. It shows a dialog asking for user permission.
@@ -606,6 +630,10 @@ Your MCP client should connect to the running Chrome instance and receive a perf
 If you hit VM-to-host port forwarding issues, see the “Remote debugging between virtual machine (VM) and host fails” section in [`docs/troubleshooting.md`](./docs/troubleshooting.md#remote-debugging-between-virtual-machine-vm-and-host-fails).
 
 For more details on remote debugging, see the [Chrome DevTools documentation](https://developer.chrome.com/docs/devtools/remote-debugging/).
+
+### Debugging Chrome on Android
+
+Please consult [these instructions](./docs/debugging-android.md).
 
 ## Known limitations
 

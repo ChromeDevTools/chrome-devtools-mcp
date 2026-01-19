@@ -7,6 +7,7 @@
 export type {
   IssuesManagerEventTypes,
   CDPConnection,
+  StackTrace,
 } from '../../node_modules/chrome-devtools-frontend/mcp/mcp.js';
 export {
   AgentFocus,
@@ -17,6 +18,7 @@ export {
   Issue,
   Target as SDKTarget,
   DebuggerModel,
+  Formatter,
   Foundation,
   TargetManager,
   MarkdownIssueDescription,

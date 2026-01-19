@@ -3,6 +3,7 @@ name: Compile and run tests
 permissions: read-all
 
 on:
+  merge_group:
   push:
     branches:
       - main
@@ -31,7 +32,7 @@ jobs:
           fetch-depth: 2
 
       - name: Set up Node.js
-        uses: actions/setup-node@395ad3262231945c25e8478fd5baf05154b1d79f # v6.1.0
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
         with:
           cache: npm
           node-version: 22 # build works only with 22+.
@@ -46,7 +47,7 @@ jobs:
           NODE_OPTIONS: '--max_old_space_size=4096'
 
       - name: Set up Node.js
-        uses: actions/setup-node@395ad3262231945c25e8478fd5baf05154b1d79f # v6.1.0
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
         with:
           cache: npm
           node-version: ${{ matrix.node }}
@@ -56,15 +57,10 @@ jobs:
         shell: bash
         run: echo 0 | sudo tee /proc/sys/kernel/apparmor_restrict_unprivileged_userns
 
-      - name: Run tests (node20)
-        if: ${{ matrix.node == '20' }}
-        shell: bash
-        run: npm run test:node20
-
       - name: Run tests
         shell: bash
-        if: ${{ matrix.node != '20' }}
-        run: npm run test:no-build
+        # Retry tests if they fail in the merge queue.
+        run: npm run test:no-build -- ${{ github.event_name == 'merge_group' && '--retry' || '' }}
 
   # Gating job for branch protection.
   test-success:

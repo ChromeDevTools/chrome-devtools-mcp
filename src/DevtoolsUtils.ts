@@ -138,6 +138,12 @@ DevTools.I18n.DevToolsLocale.DevToolsLocale.instance({
 });
 DevTools.I18n.i18n.registerLocaleDataForTest('en-US', {});
 
+DevTools.Formatter.FormatterWorkerPool.FormatterWorkerPool.instance({
+  forceNew: true,
+  entrypointURL: import.meta
+    .resolve('./third_party/devtools-formatter-worker.js'),
+});
+
 export interface TargetUniverse {
   /** The DevTools target corresponding to the puppeteer Page */
   target: DevTools.SDKTarget;

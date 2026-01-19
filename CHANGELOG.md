@@ -1,5 +1,35 @@
 # Changelog
 
+## [0.13.0](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.12.1...chrome-devtools-mcp-v0.13.0) (2026-01-14)
+
+
+### 🎉 Features
+
+* Allow opting out of default Chrome launch arguments ([#729](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/729)) ([9a51af2](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/9a51af219fc9216cd463bef9363716283f41f36a))
+* support filePath in performance tools ([#686](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/686)) ([68ae2f8](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/68ae2f8253e2ba5c34436e25df114874c537f6df))
+
+
+### 🛠️ Fixes
+
+* support resize_page when browser window is maximized/fullscreenwindow state ([#748](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/748)) ([4d9ac22](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/4d9ac227ddff6fc4aec44e46673f6e44a8168db9))
+* use relative path for plugin source in marketplace ([#724](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/724)) ([5c1ecf8](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/5c1ecf835ac8aad4947d0a8f82c899acd4115b64))
+
+
+### 📄 Documentation
+
+* add experimental chrome on android guide ([#691](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/691)) ([4a87702](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/4a87702ca6913ed62987f71e080f3d481d13b8d8))
+* autoConnect - clarify how the mcp server selects a profile ([#693](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/693)) ([28b8ff8](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/28b8ff816461760c82e9b19b70f288bc7fa2fa38))
+* claude code broken link ([#707](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/707)) ([1f532b8](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/1f532b8fafa0fa60aaf94c302bad663fab1c12ea))
+* enhance cli docs + sort required vs opt params ([#674](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/674)) ([81cbd99](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/81cbd99f52d013d07bdcf21a0840f61a16bacd33))
+* update auto connect docs to mention min Chrome version ([#681](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/681)) ([ab2340f](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/ab2340f40127dcdabde6887a411163ce9d130394))
+* Update Claude Code instructions in README.md ([#711](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/711)) ([f81cd2d](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/f81cd2d8dfc35da8c718b227e0ee4c4d7c5daca8))
+* update readme to include OpenCode example ([#560](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/560)) ([fbba3c9](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/fbba3c9461cec8113216fa4569e879c85312ea29))
+
+
+### ♻️ Chores
+
+* change pageIdx to page ids ([#741](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/741)) ([a23c6ba](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/a23c6ba8c9e1da90c885e68946635a8cc536a11e))
+
 ## [0.12.1](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.12.0...chrome-devtools-mcp-v0.12.1) (2025-12-12)
 
 

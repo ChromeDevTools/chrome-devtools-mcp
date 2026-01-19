@@ -17,6 +17,7 @@ import {
   fillForm,
   uploadFile,
   pressKey,
+  clickAt,
 } from '../../src/tools/input.js';
 import {parseKey} from '../../src/utils/keyboard.js';
 import {serverHooks} from '../server.js';
@@ -179,6 +180,67 @@ describe('input', () => {
         );
         assert.ok(response.includeSnapshot);
         assert.ok(await page.$('text/hovered'));
+      });
+    });
+  });
+
+  describe('click_at', () => {
+    it('clicks at coordinates', async () => {
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedPage();
+        await page.setContent(
+          html`<div
+            style="width: 100px; height: 100px; background: red;"
+            onclick="this.innerText = 'clicked'"
+          ></div>`,
+        );
+        await context.createTextSnapshot();
+        await clickAt.handler(
+          {
+            params: {
+              x: 50,
+              y: 50,
+            },
+          },
+          response,
+          context,
+        );
+        assert.strictEqual(
+          response.responseLines[0],
+          'Successfully clicked at the coordinates',
+        );
+        assert.ok(response.includeSnapshot);
+        assert.ok(await page.$('text/clicked'));
+      });
+    });
+
+    it('double clicks at coordinates', async () => {
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedPage();
+        await page.setContent(
+          html`<div
+            style="width: 100px; height: 100px; background: red;"
+            ondblclick="this.innerText = 'dblclicked'"
+          ></div>`,
+        );
+        await context.createTextSnapshot();
+        await clickAt.handler(
+          {
+            params: {
+              x: 50,
+              y: 50,
+              dblClick: true,
+            },
+          },
+          response,
+          context,
+        );
+        assert.strictEqual(
+          response.responseLines[0],
+          'Successfully double clicked at the coordinates',
+        );
+        assert.ok(response.includeSnapshot);
+        assert.ok(await page.$('text/dblclicked'));
       });
     });
   });

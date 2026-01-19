@@ -11,7 +11,7 @@ import sinon from 'sinon';
 
 import type {TraceResult} from '../src/trace-processing/parse.js';
 
-import {html, withMcpContext} from './utils.js';
+import {getMockRequest, html, withMcpContext} from './utils.js';
 
 describe('McpContext', () => {
   it('list pages', async () => {
@@ -100,5 +100,38 @@ describe('McpContext', () => {
         autoOpenDevTools: true,
       },
     );
+  });
+  it('should include network requests in structured content', async t => {
+    await withMcpContext(async (response, context) => {
+      const mockRequest = getMockRequest({
+        url: 'http://example.com/api',
+        stableId: 123,
+      });
+
+      sinon.stub(context, 'getNetworkRequests').returns([mockRequest]);
+      sinon.stub(context, 'getNetworkRequestStableId').returns(123);
+
+      response.setIncludeNetworkRequests(true);
+      const result = await response.handle('test', context);
+
+      t.assert.snapshot?.(JSON.stringify(result.structuredContent, null, 2));
+    });
+  });
+
+  it('should include detailed network request in structured content', async t => {
+    await withMcpContext(async (response, context) => {
+      const mockRequest = getMockRequest({
+        url: 'http://example.com/detail',
+        stableId: 456,
+      });
+
+      sinon.stub(context, 'getNetworkRequestById').returns(mockRequest);
+      sinon.stub(context, 'getNetworkRequestStableId').returns(456);
+
+      response.attachNetworkRequest(456);
+      const result = await response.handle('test', context);
+
+      t.assert.snapshot?.(JSON.stringify(result.structuredContent, null, 2));
+    });
   });
 });

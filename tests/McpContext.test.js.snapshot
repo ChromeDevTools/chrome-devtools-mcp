@@ -1,0 +1,27 @@
+exports[`McpContext > should include detailed network request in structured content 1`] = `
+{
+  "networkRequest": {
+    "requestId": 456,
+    "method": "GET",
+    "url": "http://example.com/detail",
+    "status": "[pending]",
+    "requestHeaders": {
+      "content-size": "10"
+    }
+  }
+}
+`;
+
+exports[`McpContext > should include network requests in structured content 1`] = `
+{
+  "networkRequests": [
+    {
+      "requestId": 123,
+      "method": "GET",
+      "url": "http://example.com/api",
+      "status": "[pending]",
+      "selectedInDevToolsUI": false
+    }
+  ]
+}
+`;
