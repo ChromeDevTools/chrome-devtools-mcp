@@ -498,6 +498,23 @@ export const askChatGPTWeb = defineTool({
         }
       }
 
+      // Capture initial message counts BEFORE sending
+      // This is critical to detect if our message was actually sent
+      const initialCounts = await page.evaluate(() => {
+        const userMessages = document.querySelectorAll(
+          '[data-message-author-role="user"]',
+        );
+        const assistantMessages = document.querySelectorAll(
+          '[data-message-author-role="assistant"]',
+        );
+        return {
+          userCount: userMessages.length,
+          assistantCount: assistantMessages.length,
+        };
+      });
+      const initialUserMsgCount = initialCounts.userCount;
+      const initialAssistantMsgCount = initialCounts.assistantCount;
+
       // Step 4: Send question with retry
       response.appendResponseLine('質問を送信中...');
 
@@ -554,15 +571,17 @@ export const askChatGPTWeb = defineTool({
         return;
       }
 
-      // Wait for message to actually be sent (user message appears in DOM)
+      // Wait for message to actually be sent (user message count INCREASED)
+      // This ensures we detect our NEW message, not existing ones
       await page.waitForFunction(
-        () => {
+        initialCount => {
           const messages = document.querySelectorAll(
             '[data-message-author-role="user"]',
           );
-          return messages.length > 0;
+          return messages.length > initialCount;
         },
         {timeout: 10000},
+        initialUserMsgCount,
       );
 
       response.appendResponseLine('✅ 質問送信完了');
@@ -583,7 +602,7 @@ export const askChatGPTWeb = defineTool({
         }
         isFirstCheck = false;
 
-        const status = await page.evaluate(() => {
+        const status = await page.evaluate(initialAssistantCount => {
           // Streaming detection - check for stop button by data-testid
           // When ChatGPT is generating, send-button becomes stop-button
           const stopButton = document.querySelector(
@@ -592,15 +611,18 @@ export const askChatGPTWeb = defineTool({
           const isStreaming = !!stopButton;
 
           if (!isStreaming) {
-            // Get final response
+            // Get final response - only look at NEW messages
             const assistantMessages = document.querySelectorAll(
               '[data-message-author-role="assistant"]',
             );
-            if (assistantMessages.length === 0) return {completed: false};
+            // Check if we have a NEW assistant message (not old ones)
+            if (assistantMessages.length <= initialAssistantCount) {
+              return {completed: false};
+            }
 
-            const latestMessage =
-              assistantMessages[assistantMessages.length - 1];
-            const thinkingButton = latestMessage.querySelector(
+            // Get the NEW message (first one after initial count)
+            const newMessage = assistantMessages[initialAssistantCount];
+            const thinkingButton = newMessage.querySelector(
               'button[aria-label*="思考時間"]',
             );
             const thinkingTime = thinkingButton
@@ -611,18 +633,22 @@ export const askChatGPTWeb = defineTool({
 
             return {
               completed: true,
-              text: latestMessage.textContent || '',
+              text: newMessage.textContent || '',
               thinkingTime,
             };
           }
 
-          // Get current text
+          // Get current text from NEW message during streaming
           const assistantMessages = document.querySelectorAll(
             '[data-message-author-role="assistant"]',
           );
-          const latestMessage = assistantMessages[assistantMessages.length - 1];
-          const currentText = latestMessage
-            ? latestMessage.textContent?.substring(0, 200)
+          // Only check new messages
+          const newMessage =
+            assistantMessages.length > initialAssistantCount
+              ? assistantMessages[initialAssistantCount]
+              : null;
+          const currentText = newMessage
+            ? newMessage.textContent?.substring(0, 200)
             : '';
 
           return {
@@ -630,7 +656,7 @@ export const askChatGPTWeb = defineTool({
             streaming: true,
             currentText,
           };
-        });
+        }, initialAssistantMsgCount);
 
         if (status.completed) {
           response.appendResponseLine(

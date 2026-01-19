@@ -1,179 +1,282 @@
-# プロジェクト名変更計画: chrome-ai-bridge
+# 残存する古い名前の修正計画
 
-## 決定事項
+## 概要
 
-- **新しい名前**: `chrome-ai-bridge`
-- **Core機能**: 全て維持（名前だけ変更）
-- **npmパッケージ**: `chrome-ai-bridge`（空き確認済み）
+`chrome-devtools-mcp-for-extension` → `chrome-ai-bridge` への名前変更後、まだ古い名前が残っている箇所を全て修正する。
+
+**完了済み**: npm公開、GitHub リポジトリ名変更、src/コード、package.json、README.md
 
 ---
 
-## 変更箇所一覧
+## 修正対象ファイル一覧
 
-### 1. package.json
+### カテゴリA: プロジェクト内ファイル（高優先度）
+
+#### 1. テストファイル
+**`tests/cli.test.ts`** - 3箇所
+```
+Line 18: $0: 'npx chrome-devtools-mcp@latest'
+Line 34: $0: 'npx chrome-devtools-mcp@latest'
+Line 52: $0: 'npx chrome-devtools-mcp@latest'
+```
+→ `npx chrome-ai-bridge@latest` に変更
+
+#### 2. スクリプト
+**`scripts/cli.mjs`** - 3箇所（コメント）
+```
+Line 3: CLI Entry Point for chrome-devtools-mcp-for-extension
+Line 6-7: コメント
+```
+→ `chrome-ai-bridge` に変更
+
+**`scripts/restart-mcp.sh`** - 3箇所
+```
+Line 2: Restart chrome-devtools-mcp-for-extension MCP server
+Line 5: Looking for chrome-devtools-mcp-for-extension processes...
+Line 12: No chrome-devtools-mcp-for-extension processes found
+```
+→ `chrome-ai-bridge` に変更
+
+#### 3. ローカル設定
+**`.claude/settings.local.json`** - 26+ 箇所
+- Line 29: `Bash(npx chrome-devtools-mcp-for-extension@latest:*)`
+- Lines 27-102: `mcp__chrome-devtools-extension__*` ツール名（18+箇所）
+- Lines 131-141: `~/.cache/chrome-devtools-mcp/` パス（6箇所）
+- Line 149: `disabledMcpjsonServers: ["chrome-devtools"]`
+
+#### 4. エージェント定義
+**`.claude/agents/chatgpt-gemini-discussion/AGENT.md`** - 3箇所
+```
+Line 47: projectName: 'chrome-devtools-mcp'
+Line 66: projectName: 'chrome-devtools-mcp'
+Line 80: projectName: 'chrome-devtools-mcp'
+```
+→ `chrome-ai-bridge` に変更
+
+---
+
+### カテゴリB: ユーザーホーム設定（高優先度）
+
+#### 1. MCP サーバー設定
+**`~/.claude.json`**
 ```json
-{
-  "name": "chrome-ai-bridge",
-  "description": "MCP server bridging Chrome browser and AI assistants (ChatGPT, Gemini). Browser automation + AI consultation.",
-  "mcpName": "chrome-ai-bridge",
-  "repository": {
-    "url": "https://github.com/usedhonda/chrome-ai-bridge.git"
-  }
+"chrome-devtools-extension": {
+  "command": "node",
+  "args": [".../chrome-devtools-mcp/scripts/cli.mjs", ...]
 }
 ```
+→ キー名を `chrome-ai-bridge` に、パスも更新
 
-### 2. src/ 内のコード（15箇所）
-
-| ファイル | 行 | 変更内容 |
-|---------|-----|---------|
-| `src/main.ts` | 79 | `chrome-devtools-mcp-for-extension` → `chrome-ai-bridge` |
-| `src/main.ts` | 95 | `chrome-devtools-extension` → `chrome-ai-bridge` |
-| `src/main.ts` | 235 | エラーメッセージ内のプロジェクト名 |
-| `src/cli.ts` | 98 | `npx chrome-devtools-mcp@latest` → `npx chrome-ai-bridge` |
-| `src/index.ts` | 15 | エラーメッセージ内のプロジェクト名 |
-| `src/profile-migration.ts` | 17 | `.cache/chrome-devtools-mcp` → `.cache/chrome-ai-bridge` |
-| `src/profile-resolver.ts` | 60 | `.cache/chrome-devtools-mcp` → `.cache/chrome-ai-bridge` |
-| `src/McpContext.ts` | 497 | `chrome-devtools-mcp-` → `chrome-ai-bridge-` (tmpdir) |
-| `src/browser.ts` | 721, 730, 915 | プロファイルパス内のプロジェクト名 |
-| `src/config.ts` | 8 | コメント内のプロジェクト名 |
-| `src/plugin-api.ts` | 8 | コメント内のプロジェクト名 |
-| `src/tools/optional-tools.ts` | 23 | コメント内のプロジェクト名 |
-
-### 3. ドキュメント（19ファイル）
-
-**主要ドキュメント**:
-- `README.md` - タイトル、説明、コマンド例
-- `CLAUDE.md` - プロジェクト説明、コマンド例
-- `CHANGELOG.md` - プロジェクト名
-- `CONTRIBUTING.md` - プロジェクト名
-
-**ユーザードキュメント**:
-- `docs/user/setup.md` - MCP設定例
-- `docs/user/troubleshooting.md`
-
-**開発ドキュメント**:
-- `docs/dev/hot-reload.md`
-
-**内部ドキュメント**:
-- `docs/internal/design/*.md` (3ファイル)
-- `docs/internal/investigation/*.md` (6ファイル)
-- `docs/issues/*.md`
-- `docs/ui-snapshots/README.md`
-- `docs/answer/*.md`
-
-### 4. GitHubリポジトリ
+#### 2. グローバル許可設定
+**`~/.claude/settings.json`** - 5箇所
 ```
-現在: usedhonda/chrome-devtools-mcp
-新規: usedhonda/chrome-ai-bridge
+mcp__chrome-devtools-extension__ask_chatgpt_web
+mcp__chrome-devtools-extension__ask_gemini_web
+mcp__chrome-devtools-extension__list_pages
+mcp__chrome-devtools-extension__navigate_page
+mcp__chrome-devtools-extension__take_screenshot
 ```
+→ `mcp__chrome-ai-bridge__*` に変更
 
-### 5. CI/CD
-- `.github/workflows/publish.yml` - 必要なら更新
-- npm Trusted Publishing - 新パッケージ用に設定
+#### 3. スキル定義
+**`~/.claude/skills/browser-navigator/SKILL.md`** - 複数箇所
+```
+Lines 14-16, 22-30, 53-57: chrome-devtools-extension
+```
+→ `chrome-ai-bridge` に変更
 
-### 6. MCPツール名（変更なし）
-以下のツール名は**そのまま維持**:
-- `ask_chatgpt_web`
-- `ask_gemini_web`
-- `diagnose_chatgpt_ui`
-- その他Core 18ツール
+#### 4. Cursor MCP 設定
+**`~/.cursor/mcp.json`** - Line 14-18
+```json
+"chrome-devtools-extension": {
+  "command": "node",
+  "args": [".../chrome-devtools-mcp/scripts/cli.mjs"]
+}
+```
+→ `chrome-ai-bridge` に変更
+
+#### 5. バックアップ設定
+**`~/.claude/mcp-backup-chrome-context7.json`**
+→ `chrome-ai-bridge` に変更（任意）
+
+---
+
+### カテゴリC: 履歴・メタデータ（低優先度）
+
+以下は履歴的な情報のため、変更は任意：
+
+- `docs/ask/chatgpt/.chat-sessions.json` - プロジェクト名メタデータ
+- `docs/ask/gemini/.chat-sessions.json` - プロジェクト名メタデータ
+- `CHANGELOG.md` - git タグの比較リンク（履歴）
 
 ---
 
 ## 作業手順
 
-### Step 1: src/ 内のコード更新
+### Step 1: プロジェクト内ファイル修正
+
 ```bash
-# 一括置換
-sed -i '' 's/chrome-devtools-mcp-for-extension/chrome-ai-bridge/g' src/*.ts src/**/*.ts
-sed -i '' 's/chrome-devtools-extension/chrome-ai-bridge/g' src/*.ts src/**/*.ts
-sed -i '' 's/chrome-devtools-mcp/chrome-ai-bridge/g' src/*.ts src/**/*.ts
+# tests/cli.test.ts
+sed -i '' 's/chrome-devtools-mcp@latest/chrome-ai-bridge@latest/g' tests/cli.test.ts
+
+# scripts/cli.mjs
+sed -i '' 's/chrome-devtools-mcp-for-extension/chrome-ai-bridge/g' scripts/cli.mjs
+
+# scripts/restart-mcp.sh
+sed -i '' 's/chrome-devtools-mcp-for-extension/chrome-ai-bridge/g' scripts/restart-mcp.sh
 ```
 
-### Step 2: package.json更新
-- name, description, mcpName, repository.url を変更
-- version を `1.0.0` にリセット
+### Step 2: .claude/settings.local.json 修正
 
-### Step 3: ドキュメント一括更新
 ```bash
-# 主要ドキュメント
-sed -i '' 's/chrome-devtools-mcp-for-extension/chrome-ai-bridge/g' README.md CLAUDE.md CHANGELOG.md CONTRIBUTING.md
-sed -i '' 's/chrome-devtools-mcp/chrome-ai-bridge/g' README.md CLAUDE.md docs/**/*.md
+# ツール名プレフィックス
+sed -i '' 's/mcp__chrome-devtools-extension__/mcp__chrome-ai-bridge__/g' .claude/settings.local.json
+
+# npx コマンド
+sed -i '' 's/chrome-devtools-mcp-for-extension/chrome-ai-bridge/g' .claude/settings.local.json
+
+# キャッシュパス
+sed -i '' 's/chrome-devtools-mcp/chrome-ai-bridge/g' .claude/settings.local.json
+
+# disabledMcpjsonServers
+sed -i '' 's/"chrome-devtools"/"chrome-ai-bridge"/g' .claude/settings.local.json
 ```
 
-### Step 4: ビルド・テスト
+### Step 3: エージェント定義修正
+
+```bash
+sed -i '' "s/projectName: 'chrome-devtools-mcp'/projectName: 'chrome-ai-bridge'/g" .claude/agents/chatgpt-gemini-discussion/AGENT.md
+```
+
+### Step 4: ユーザーホーム設定修正（手動）
+
+**~/.claude.json**:
+- キー `chrome-devtools-extension` → `chrome-ai-bridge`
+- パス内の `chrome-devtools-mcp` → `chrome-ai-bridge`
+
+**~/.claude/settings.json**:
+- `mcp__chrome-devtools-extension__*` → `mcp__chrome-ai-bridge__*`
+
+**~/.claude/skills/browser-navigator/SKILL.md**:
+- `chrome-devtools-extension` → `chrome-ai-bridge`
+
+**~/.cursor/mcp.json**:
+- キー `chrome-devtools-extension` → `chrome-ai-bridge`
+- パス内の `chrome-devtools-mcp` → `chrome-ai-bridge`
+
+### Step 5: ビルド・テスト
+
 ```bash
 npm run build
 npm test
 ```
 
-### Step 5: GitHubリポジトリ名変更（手動）
-1. GitHub → Settings → General → Repository name
-2. `chrome-devtools-mcp` → `chrome-ai-bridge`
-3. 自動リダイレクト有効
+### Step 6: Git コミット & タグ
 
-### Step 6: npm Trusted Publishing設定（手動）
-1. npm → Settings → Publishing → Add new publishing config
-2. Repository: `usedhonda/chrome-ai-bridge`
-3. Workflow: `.github/workflows/publish.yml`
-
-### Step 7: Git commit & push & tag
 ```bash
 git add -A
-git commit -m "chore: rename project to chrome-ai-bridge v1.0.0"
+git commit -m "chore: fix remaining old name references"
 git push
-git tag v1.0.0
-git push origin v1.0.0
-```
-
-### Step 8: 旧パッケージをdeprecate
-```bash
-npm deprecate chrome-devtools-mcp-for-extension "Moved to chrome-ai-bridge. Run: npx chrome-ai-bridge"
-```
-
-### Step 9: ユーザー向け移行案内
-
-**~/.claude.json 更新**:
-```json
-{
-  "mcpServers": {
-    "chrome-ai-bridge": {
-      "command": "npx",
-      "args": ["chrome-ai-bridge@latest"]
-    }
-  }
-}
+git tag v1.0.2
+git push origin v1.0.2
 ```
 
 ---
 
 ## 検証方法
 
-1. `npx chrome-ai-bridge` で起動確認
-2. MCPサーバーとして正常に登録・動作
-3. `ask_chatgpt_web` / `ask_gemini_web` が動作
-4. Core機能（click, fill, screenshot等）が動作
-5. 旧パッケージ名でdeprecation警告が表示
-6. プロファイルパスが `~/.cache/chrome-ai-bridge/` に変更されている
+1. `npm test` - テストが新しい名前で通る
+2. `npx chrome-ai-bridge@latest` - 起動確認
+3. Claude Code 再起動 - MCP ツールが `mcp__chrome-ai-bridge__*` で認識される
+4. `ask_chatgpt_web` / `ask_gemini_web` が動作
+5. `scripts/restart-mcp.sh` が正しいプロセスを検索する
 
 ---
 
-## 注意点
+---
 
-- **バージョン**: v1.0.0 にリセット（新パッケージなので）
-- **プロファイル移行**: 旧パス `~/.cache/chrome-devtools-mcp/` から新パスへの自動移行は**しない**（クリーンスタート）
-- **GitHub Actions**: リポジトリ名変更後、Trusted Publishingの再設定が必要
-- **既存ユーザー**: 旧パッケージは動作するがdeprecation警告を表示
+### カテゴリD: 他プロジェクトの設定（中優先度）
+
+`~/projects/` 内の他プロジェクトにも古い参照が残っている：
+
+#### 1. Chrome-Extension/sunoprompt
+**`.claude/settings.local.json`** - 36+箇所
+- `mcp__chrome-devtools__*` (古い形式) - 28個
+- `mcp__chrome-devtools-extension__*` - 8個
+- Chrome DevTools MCP 公式リポジトリURL参照
+- `Bash(npx chrome-devtools-mcp:*)`
+
+#### 2. GAS/slide_gen
+**`.claude/settings.local.json`** - 22箇所
+- `mcp__chrome-devtools-extension__*` ツール
+
+**`CLAUDE.md`** - MCP使用フロー記載
+
+#### 3. GAS/bellman
+**`.claude/settings.local.json`** - 12箇所
+- `mcp__chrome-devtools-extension__*` ツール
+
+#### 4. Chrome-Extension/adLogger
+**`.claude/settings.local.json`** - 10箇所
+**`CLAUDE.md`** - 推奨ツール記載
+
+#### 5. claude/agentskills/browser-navigator
+**`.claude/skills/browser-navigator/SKILL.md`** - 複数箇所
+**`CLAUDE.md`** - MCP選択ガイド
+
+#### 6. その他プロジェクト（各1-3箇所）
+- `temp/test2.1.1/.claude/settings.local.json`
+- `GPTs/scenario/.claude/settings.local.json`
+- `GPTs/notebooklm_designer/.claude/settings.local.json`
+- `claude/agentskills/claude-skills/.claude/settings.local.json`
+- `r1/.claude/settings.local.json`
 
 ---
 
-## 影響範囲
+## 変更ファイル数
 
-| 項目 | 影響 |
-|------|------|
-| npmパッケージ名 | 新規作成 |
-| GitHubリポジトリ | リネーム（リダイレクト有効） |
-| MCP登録名 | `chrome-ai-bridge` に変更 |
-| プロファイルパス | `~/.cache/chrome-ai-bridge/` に変更 |
-| ツール名 | **変更なし** |
-| 機能 | **変更なし** |
+| カテゴリ | ファイル数 | 変更箇所 |
+|---------|-----------|----------|
+| プロジェクト内 | 5 | ~35箇所 |
+| ユーザーホーム | 4 | ~15箇所 |
+| 他プロジェクト | 12+ | ~100箇所 |
+| **合計** | **21+** | **~150箇所** |
+
+---
+
+## 実行順序
+
+### Phase 1: chrome-ai-bridge プロジェクト内
+1. `tests/cli.test.ts`
+2. `scripts/cli.mjs`
+3. `scripts/restart-mcp.sh`
+4. `.claude/settings.local.json`
+5. `.claude/agents/chatgpt-gemini-discussion/AGENT.md`
+6. ビルド・テスト
+7. Git コミット & タグ v1.0.2
+
+### Phase 2: ユーザーホーム設定
+1. `~/.claude.json` - MCPサーバー設定
+2. `~/.claude/settings.json` - グローバル許可
+3. `~/.claude/skills/browser-navigator/SKILL.md`
+4. `~/.cursor/mcp.json`
+
+### Phase 3: 他プロジェクト（一括）
+```bash
+# 全プロジェクトの settings.local.json を一括更新
+find ~/projects -name "settings.local.json" -path "*/.claude/*" -exec \
+  sed -i '' 's/mcp__chrome-devtools-extension__/mcp__chrome-ai-bridge__/g' {} \;
+
+find ~/projects -name "settings.local.json" -path "*/.claude/*" -exec \
+  sed -i '' 's/mcp__chrome-devtools__/mcp__chrome-ai-bridge__/g' {} \;
+
+# CLAUDE.md も更新
+find ~/projects -name "CLAUDE.md" -exec \
+  sed -i '' 's/chrome-devtools-extension/chrome-ai-bridge/g' {} \;
+```
+
+### Phase 4: Claude Code 再起動
+
+```bash
+# Claude Code を再起動して新しい設定を読み込む
+```
