@@ -36,4 +36,4 @@ export {
   type ChromeReleaseChannel as BrowsersChromeReleaseChannel,
 } from '@puppeteer/browsers';
 
-export * as DevTools from './devtools.js';
+export * as DevTools from '../../node_modules/chrome-devtools-frontend/mcp/mcp.js';
