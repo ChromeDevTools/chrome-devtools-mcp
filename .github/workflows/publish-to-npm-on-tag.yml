@@ -3,7 +3,7 @@ name: publish-on-tag
 on:
   push:
     tags:
-      - 'chrome-devtools-mcp-v*'
+      - 'v*'
 
 permissions:
   id-token: write # Required for OIDC

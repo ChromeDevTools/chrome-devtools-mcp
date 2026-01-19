@@ -764,9 +764,30 @@ export const askChatGPTWeb = defineTool({
         }
       }
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      response.appendResponseLine(`❌ エラー: ${errorMessage}`);
+      const msg = error instanceof Error ? error.message : String(error);
+
+      // ケース分類：致命的エラーには明確なメッセージを表示
+      if (msg.includes('No page selected') || msg.includes('page is null')) {
+        response.appendResponseLine('❌ ブラウザタブがありません');
+        response.appendResponseLine(
+          '→ MCPサーバーを再起動してブラウザを開いてください',
+        );
+      } else if (
+        msg.includes('Target closed') ||
+        msg.includes('Session closed') ||
+        msg.includes('Connection closed')
+      ) {
+        response.appendResponseLine('❌ ブラウザ接続が切れました');
+        response.appendResponseLine('→ MCPサーバーを再起動してください');
+      } else if (
+        msg.includes('Protocol error') ||
+        msg.includes('Browser disconnected')
+      ) {
+        response.appendResponseLine('❌ ブラウザとの通信エラー');
+        response.appendResponseLine('→ MCPサーバーを再起動してください');
+      } else {
+        response.appendResponseLine(`❌ エラー: ${msg}`);
+      }
     }
   },
 });

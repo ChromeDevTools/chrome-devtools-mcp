@@ -652,31 +652,63 @@ export const askGeminiWeb = defineTool({
 
       response.appendResponseLine(`📝 会話ログ保存: ${logPath}`);
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      response.appendResponseLine(`❌ エラー: ${errorMessage}`);
+      const msg = error instanceof Error ? error.message : String(error);
 
-      // Error snapshot
-      try {
-        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-        const debugDir = path.join(process.cwd(), 'docs/ask/gemini/debug');
-        await fs.promises.mkdir(debugDir, {recursive: true});
+      // ケース分類：致命的エラーには明確なメッセージを表示
+      const isFatalError =
+        msg.includes('No page selected') ||
+        msg.includes('page is null') ||
+        msg.includes('Target closed') ||
+        msg.includes('Session closed') ||
+        msg.includes('Connection closed') ||
+        msg.includes('Protocol error') ||
+        msg.includes('Browser disconnected');
 
-        const screenshotPath = path.join(
-          debugDir,
-          `error-${timestamp}.png`,
-        ) as `${string}.png`;
-        await page.screenshot({path: screenshotPath});
+      if (msg.includes('No page selected') || msg.includes('page is null')) {
+        response.appendResponseLine('❌ ブラウザタブがありません');
         response.appendResponseLine(
-          `📸 エラー時のスクリーンショット: ${screenshotPath}`,
+          '→ MCPサーバーを再起動してブラウザを開いてください',
         );
+      } else if (
+        msg.includes('Target closed') ||
+        msg.includes('Session closed') ||
+        msg.includes('Connection closed')
+      ) {
+        response.appendResponseLine('❌ ブラウザ接続が切れました');
+        response.appendResponseLine('→ MCPサーバーを再起動してください');
+      } else if (
+        msg.includes('Protocol error') ||
+        msg.includes('Browser disconnected')
+      ) {
+        response.appendResponseLine('❌ ブラウザとの通信エラー');
+        response.appendResponseLine('→ MCPサーバーを再起動してください');
+      } else {
+        response.appendResponseLine(`❌ エラー: ${msg}`);
+      }
 
-        const htmlPath = path.join(debugDir, `error-${timestamp}.html`);
-        const html = await page.content();
-        await fs.promises.writeFile(htmlPath, html, 'utf-8');
-        response.appendResponseLine(`📄 エラー時のHTML: ${htmlPath}`);
-      } catch (snapshotError) {
-        console.error('Failed to capture error snapshot:', snapshotError);
+      // Error snapshot（致命的エラーの場合はスキップ）
+      if (!isFatalError) {
+        try {
+          const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+          const debugDir = path.join(process.cwd(), 'docs/ask/gemini/debug');
+          await fs.promises.mkdir(debugDir, {recursive: true});
+
+          const screenshotPath = path.join(
+            debugDir,
+            `error-${timestamp}.png`,
+          ) as `${string}.png`;
+          await page.screenshot({path: screenshotPath});
+          response.appendResponseLine(
+            `📸 エラー時のスクリーンショット: ${screenshotPath}`,
+          );
+
+          const htmlPath = path.join(debugDir, `error-${timestamp}.html`);
+          const html = await page.content();
+          await fs.promises.writeFile(htmlPath, html, 'utf-8');
+          response.appendResponseLine(`📄 エラー時のHTML: ${htmlPath}`);
+        } catch (snapshotError) {
+          console.error('Failed to capture error snapshot:', snapshotError);
+        }
       }
     }
   },
