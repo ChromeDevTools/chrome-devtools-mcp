@@ -374,9 +374,22 @@ export const askChatGPTWeb = defineTool({
           return;
         }
       } else if (loginStatus === LoginStatus.IN_PROGRESS) {
-        // Wait a bit and retry
-        await new Promise(r => setTimeout(r, 2000));
-        const retryStatus = await getLoginStatus(page, 'chatgpt');
+        // Wait and retry with exponential backoff (login may still be processing)
+        let retryStatus = LoginStatus.IN_PROGRESS;
+        const maxRetries = 3;
+        for (let i = 0; i < maxRetries; i++) {
+          const waitTime = 3000 + i * 2000; // 3s, 5s, 7s
+          await new Promise(r => setTimeout(r, waitTime));
+          retryStatus = await getLoginStatus(page, 'chatgpt');
+          if (retryStatus === LoginStatus.LOGGED_IN) {
+            break;
+          }
+          if (i < maxRetries - 1) {
+            response.appendResponseLine(
+              `⏳ ログイン処理中... (${i + 1}/${maxRetries})`,
+            );
+          }
+        }
         if (retryStatus !== LoginStatus.LOGGED_IN) {
           response.appendResponseLine(
             '⚠️ ログイン状態を確認できませんでした。再試行してください。',
@@ -413,18 +426,34 @@ export const askChatGPTWeb = defineTool({
           const currentUrl = page.url();
           if (!currentUrl.includes(latestSession.chatId)) {
             await navigateWithRetry(page, latestSession.url, {
-              waitUntil: 'domcontentloaded',
+              waitUntil: 'networkidle2', // Wait for JS to finish loading
             });
           }
 
-          // Wait for input field to be ready (even when skipping navigation)
-          await page
-            .waitForSelector('.ProseMirror[contenteditable="true"]', {
-              timeout: 5000,
-            })
-            .catch(() => {
-              // Ignore timeout, will be handled later
-            });
+          // Wait for input field to be ready with retry
+          let inputFieldReady = false;
+          for (let attempt = 0; attempt < 3; attempt++) {
+            try {
+              await page.waitForSelector(
+                '.ProseMirror[contenteditable="true"]',
+                { timeout: 5000 },
+              );
+              inputFieldReady = true;
+              break;
+            } catch {
+              if (attempt < 2) {
+                response.appendResponseLine(
+                  `⏳ 入力欄を待機中... (${attempt + 1}/3)`,
+                );
+                await new Promise(r => setTimeout(r, 2000));
+              }
+            }
+          }
+          if (!inputFieldReady) {
+            response.appendResponseLine(
+              '⚠️ 入力欄の準備に時間がかかっています。続行を試みます...',
+            );
+          }
         } else {
           response.appendResponseLine(
             '既存チャットが見つかりませんでした。新規作成します。',
@@ -469,26 +498,40 @@ export const askChatGPTWeb = defineTool({
         }
       }
 
-      // Step 4: Send question
+      // Step 4: Send question with retry
       response.appendResponseLine('質問を送信中...');
 
-      const questionSent = await page.evaluate(questionText => {
-        const prosemirror = document.querySelector(
-          '.ProseMirror[contenteditable="true"]',
-        ) as HTMLElement;
-        if (!prosemirror) return false;
+      let questionSent = false;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        questionSent = await page.evaluate(questionText => {
+          const prosemirror = document.querySelector(
+            '.ProseMirror[contenteditable="true"]',
+          ) as HTMLElement;
+          if (!prosemirror) return false;
 
-        prosemirror.innerHTML = '';
-        const p = document.createElement('p');
-        p.textContent = questionText;
-        prosemirror.appendChild(p);
-        prosemirror.dispatchEvent(new Event('input', {bubbles: true}));
+          prosemirror.innerHTML = '';
+          const p = document.createElement('p');
+          p.textContent = questionText;
+          prosemirror.appendChild(p);
+          prosemirror.dispatchEvent(new Event('input', {bubbles: true}));
 
-        return true;
-      }, sanitizedQuestion);
+          return true;
+        }, sanitizedQuestion);
+
+        if (questionSent) break;
+
+        if (attempt < 2) {
+          response.appendResponseLine(
+            `⏳ 入力欄が見つかりません。再試行中... (${attempt + 1}/3)`,
+          );
+          await new Promise(r => setTimeout(r, 2000));
+        }
+      }
 
       if (!questionSent) {
-        response.appendResponseLine('❌ 入力欄が見つかりません（ページ読み込み中の可能性）');
+        response.appendResponseLine(
+          '❌ 入力欄が見つかりません（ページ読み込み中の可能性）',
+        );
         return;
       }
 
