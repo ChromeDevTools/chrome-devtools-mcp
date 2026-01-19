@@ -5,11 +5,11 @@
  */
 
 import assert from 'node:assert';
-import {execFile, spawn, type ChildProcess} from 'node:child_process';
+import {spawn, type ChildProcess, type SpawnOptions} from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {describe, it, type TestContext as NodeTestContext} from 'node:test';
+import {describe, it} from 'node:test';
 
 const SERVER_PATH = path.resolve('build/src/main.js');
 const WATCHDOG_START_PATTERN = /Watchdog started[\s\S]*?"pid":\s*(\d+)/;
@@ -99,126 +99,16 @@ function cleanupTest(ctx: TestContext): void {
 }
 
 describe('Telemetry E2E', () => {
-  async function runSignalTest(signal: NodeJS.Signals): Promise<void> {
+  async function runTelemetryTest(
+    killFn: (ctx: TestContext) => void,
+    testName: string,
+    spawnOptions?: SpawnOptions,
+  ): Promise<void> {
     const ctx: TestContext = {
-      logFile: createLogFilePath(signal),
+      logFile: createLogFilePath(testName),
     };
 
     try {
-      ctx.process = spawn(
-        process.execPath,
-        [
-          SERVER_PATH,
-          `--log-file=${ctx.logFile}`,
-          '--usage-statistics',
-          '--headless',
-        ],
-        {stdio: ['pipe', 'pipe', 'pipe']},
-      );
-
-      const match = await waitForLogPattern(
-        ctx.logFile,
-        WATCHDOG_START_PATTERN,
-      );
-      assert.ok(match, 'Watchdog start log not found');
-      ctx.watchdogPid = parseInt(match[1], 10);
-      assert.ok(ctx.watchdogPid > 0, 'Invalid watchdog PID');
-
-      ctx.process.kill(signal);
-      await waitForProcessExit(ctx.watchdogPid);
-
-      const shutdownMatch = await waitForLogPattern(
-        ctx.logFile,
-        SHUTDOWN_PATTERN,
-        2000,
-      );
-      assert.ok(shutdownMatch, 'server_shutdown not logged');
-
-      const deathMatch = await waitForLogPattern(
-        ctx.logFile,
-        PARENT_DEATH_PATTERN,
-        2000,
-      );
-      assert.ok(deathMatch, 'Parent death not detected');
-    } finally {
-      cleanupTest(ctx);
-    }
-  }
-
-  async function runWindowsTaskkillTest(t: NodeTestContext): Promise<void> {
-    if (process.platform !== 'win32') {
-      t.skip('Windows only test');
-      return;
-    }
-    const ctx: TestContext = {
-      logFile: createLogFilePath('taskkill'),
-    };
-
-    try {
-      ctx.process = spawn(
-        process.execPath,
-        [
-          SERVER_PATH,
-          `--log-file=${ctx.logFile}`,
-          '--usage-statistics',
-          '--headless',
-        ],
-        {stdio: ['pipe', 'pipe', 'pipe']},
-      );
-
-      const match = await waitForLogPattern(
-        ctx.logFile,
-        WATCHDOG_START_PATTERN,
-      );
-      assert.ok(match, 'Watchdog start log not found');
-      ctx.watchdogPid = parseInt(match[1], 10);
-      assert.ok(ctx.watchdogPid > 0, 'Invalid watchdog PID');
-
-      await new Promise<void>((resolve, reject) => {
-        execFile(
-          'taskkill',
-          ['/PID', ctx.process!.pid!.toString(), '/T', '/F'],
-          (error: unknown) => {
-            if (error) {
-              reject(error);
-            } else {
-              resolve();
-            }
-          },
-        );
-      });
-
-      await waitForProcessExit(ctx.watchdogPid);
-
-      const shutdownMatch = await waitForLogPattern(
-        ctx.logFile,
-        SHUTDOWN_PATTERN,
-        2000,
-      );
-      assert.ok(shutdownMatch, 'server_shutdown not logged');
-
-      const deathMatch = await waitForLogPattern(
-        ctx.logFile,
-        PARENT_DEATH_PATTERN,
-        2000,
-      );
-      assert.ok(deathMatch, 'Parent death not detected');
-    } finally {
-      cleanupTest(ctx);
-    }
-  }
-
-  async function runPosixGroupKillTest(t: NodeTestContext): Promise<void> {
-    if (process.platform === 'win32') {
-      t.skip('POSIX only test');
-      return;
-    }
-    const ctx: TestContext = {
-      logFile: createLogFilePath('sigterm-group'),
-    };
-
-    try {
-      // Spawn detached to create a new process group
       ctx.process = spawn(
         process.execPath,
         [
@@ -229,7 +119,7 @@ describe('Telemetry E2E', () => {
         ],
         {
           stdio: ['pipe', 'pipe', 'pipe'],
-          detached: true,
+          ...spawnOptions,
         },
       );
 
@@ -241,8 +131,7 @@ describe('Telemetry E2E', () => {
       ctx.watchdogPid = parseInt(match[1], 10);
       assert.ok(ctx.watchdogPid > 0, 'Invalid watchdog PID');
 
-      // Kill the process group
-      process.kill(-ctx.process.pid!, 'SIGTERM');
+      killFn(ctx);
       await waitForProcessExit(ctx.watchdogPid);
 
       const shutdownMatch = await waitForLogPattern(
@@ -263,8 +152,26 @@ describe('Telemetry E2E', () => {
     }
   }
 
-  it('handles SIGKILL', () => runSignalTest('SIGKILL'));
-  it('handles SIGTERM', () => runSignalTest('SIGTERM'));
-  it('handles Windows taskkill /T /F', t => runWindowsTaskkillTest(t));
-  it('handles POSIX process group SIGTERM', t => runPosixGroupKillTest(t));
+  it('handles SIGKILL', () =>
+    runTelemetryTest(ctx => {
+      ctx.process!.kill('SIGKILL');
+    }, 'SIGKILL'));
+
+  it('handles SIGTERM', () =>
+    runTelemetryTest(ctx => {
+      ctx.process!.kill('SIGTERM');
+    }, 'SIGTERM'));
+
+  it(
+    'handles POSIX process group SIGTERM',
+    {skip: process.platform === 'win32'},
+    () =>
+      runTelemetryTest(
+        ctx => {
+          process.kill(-ctx.process!.pid!, 'SIGTERM');
+        },
+        'sigterm-group',
+        {detached: true},
+      ),
+  );
 });
