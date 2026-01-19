@@ -694,4 +694,8 @@ export class McpContext implements Context {
   async installExtension(path: string): Promise<string> {
     return this.browser.installExtension(path);
   }
+
+  async uninstallExtension(id: string): Promise<void> {
+    return this.browser.uninstallExtension(id);
+  }
 }

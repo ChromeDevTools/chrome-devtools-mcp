@@ -98,17 +98,7 @@ describe('e2e', () => {
         const fileTools = await import(`../src/tools/${file}`);
         for (const maybeTool of Object.values<ToolDefinition>(fileTools)) {
           if ('name' in maybeTool) {
-            if (maybeTool.annotations?.conditions?.includes('computerVision')) {
-              continue;
-            }
-            if (
-              maybeTool.annotations?.conditions?.includes(
-                'experimentalInteropTools',
-              )
-            ) {
-              continue;
-            }
-            if (maybeTool.name === 'install_extension') {
+            if (maybeTool.annotations?.conditions) {
               continue;
             }
             definedNames.push(maybeTool.name);

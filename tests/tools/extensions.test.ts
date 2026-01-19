@@ -8,7 +8,10 @@ import assert from 'node:assert';
 import path from 'node:path';
 import {describe, it} from 'node:test';
 
-import {installExtension} from '../../src/tools/extensions.js';
+import {
+  installExtension,
+  uninstallExtension,
+} from '../../src/tools/extensions.js';
 import {withMcpContext} from '../utils.js';
 
 const EXTENSION_PATH = path.join(
@@ -17,8 +20,9 @@ const EXTENSION_PATH = path.join(
 );
 
 describe('extension', () => {
-  it('installs an extension and verifies it is listed in chrome://extensions', async () => {
+  it('installs and uninstalls an extension and verifies it in chrome://extensions', async () => {
     await withMcpContext(async (response, context) => {
+      // Install the extension
       await installExtension.handler(
         {params: {path: EXTENSION_PATH}},
         response,
@@ -40,6 +44,30 @@ describe('extension', () => {
       assert.ok(
         element,
         `Extension with ID "${extensionId}" should be visible on chrome://extensions`,
+      );
+
+      // Uninstall the extension
+      await uninstallExtension.handler(
+        {params: {id: extensionId!}},
+        response,
+        context,
+      );
+
+      const uninstallResponseLine = response.responseLines[1];
+      assert.ok(
+        uninstallResponseLine.includes('Extension uninstalled'),
+        'Response should indicate uninstallation',
+      );
+
+      await page.waitForSelector('extensions-manager');
+
+      const elementAfterUninstall = await page.$(
+        `extensions-manager >>> extensions-item[id="${extensionId}"]`,
+      );
+      assert.strictEqual(
+        elementAfterUninstall,
+        null,
+        `Extension with ID "${extensionId}" should NOT be visible on chrome://extensions`,
       );
     });
   });
