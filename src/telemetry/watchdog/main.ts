@@ -4,11 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type {WriteStream} from 'node:fs';
 import process from 'node:process';
 import readline from 'node:readline';
 import {parseArgs} from 'node:util';
 
-import {logger, saveLogsToFileSync} from '../../logger.js';
+import {logger, flushLogs, saveLogsToFile} from '../../logger.js';
 import type {OsType} from '../types.js';
 import {WatchdogMessageType} from '../types.js';
 
@@ -29,16 +30,28 @@ function main() {
   const appVersion = values['app-version'];
   const osType = parseInt(values['os-type'] ?? '', 10);
   const logFile = values['log-file'];
+  let logStream: WriteStream | undefined;
   if (logFile) {
-    saveLogsToFileSync(logFile);
+    logStream = saveLogsToFile(logFile);
   }
+
+  const exit = (code: number) => {
+    if (!logStream) {
+      process.exit(code);
+    }
+
+    void flushLogs(logStream).finally(() => {
+      process.exit(code);
+    });
+  };
 
   if (isNaN(parentPid) || !appVersion || isNaN(osType)) {
     logger(
       'Invalid arguments provided for watchdog process: ',
       JSON.stringify({parentPid, appVersion, osType}),
     );
-    process.exit(1);
+    exit(1);
+    return;
   }
 
   logger(
@@ -69,11 +82,11 @@ function main() {
       .sendShutdownEvent()
       .then(() => {
         logger('Shutdown event sent. Exiting.');
-        process.exit(0);
+        exit(0);
       })
       .catch(err => {
         logger('Failed to send shutdown event', err);
-        process.exit(1);
+        exit(1);
       });
   }
 
