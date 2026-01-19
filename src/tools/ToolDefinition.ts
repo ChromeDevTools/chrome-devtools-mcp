@@ -33,6 +33,7 @@ export interface ToolDefinition<
     conditions?: string[];
   };
   schema: Schema;
+  _meta?: Record<string, unknown>;
   handler: (
     request: Request<Schema>,
     response: Response,

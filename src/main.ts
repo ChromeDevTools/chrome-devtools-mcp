@@ -8,6 +8,11 @@ import './polyfill.js';
 
 import process from 'node:process';
 
+import {
+  ReadResourceRequestSchema,
+  ListResourcesRequestSchema,
+} from "@modelcontextprotocol/sdk/types.js";
+
 import type {Channel} from './browser.js';
 import {ensureBrowserConnected, ensureBrowserLaunched} from './browser.js';
 import {cliOptions, parseArguments} from './cli.js';
@@ -26,6 +31,7 @@ import {
   SetLevelRequestSchema,
 } from './third_party/index.js';
 import {ToolCategory} from './tools/categories.js';
+import {EMULATION_UI_CONTENT} from './tools/emulation_ui.js';
 import type {ToolDefinition} from './tools/ToolDefinition.js';
 import {tools} from './tools/tools.js';
 
@@ -188,6 +194,8 @@ function registerTool(tool: ToolDefinition): void {
       description: tool.description,
       inputSchema: tool.schema,
       annotations: tool.annotations,
+      // Pass _meta if present (crucial for UI tools)
+      _meta: tool._meta,
     },
     async (params): Promise<CallToolResult> => {
       const guard = await toolMutex.acquire();
@@ -249,6 +257,33 @@ function registerTool(tool: ToolDefinition): void {
     },
   );
 }
+
+
+// Register UI Resource handlers.
+// Only throttling UI for now, but all resources should be registered here.
+server.server.setRequestHandler(ListResourcesRequestSchema, async () => ({
+  resources: [
+    {
+      uri: "ui://emulation/throttling",
+      name: "Throttling Selection",
+      mimeType: "text/html;profile=mcp-app",
+    },
+  ],
+}));
+
+// Specific resource handler for UI resources.
+server.server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
+  if (request.params.uri === "ui://emulation/throttling") {
+    return {
+      contents: [{
+        uri: "ui://emulation/throttling",
+        mimeType: "text/html;profile=mcp-app",
+        text: EMULATION_UI_CONTENT,
+      }],
+    };
+  }
+  throw new Error("Resource not found");
+});
 
 for (const tool of tools) {
   registerTool(tool);

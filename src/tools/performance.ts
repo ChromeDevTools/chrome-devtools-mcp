@@ -28,7 +28,8 @@ const filePathSchema = zod
 
 export const startTrace = defineTool({
   name: 'performance_start_trace',
-  description: `Starts a performance trace recording on the selected page. This can be used to look for performance problems and insights to improve the performance of the page. It will also report Core Web Vital (CWV) scores for the page.`,
+  description:
+    'Starts a performance trace recording on the selected page. This can be used to look for performance problems and insights to improve the performance of the page. It will also report Core Web Vital (CWV) scores for the page.\n\nCRITICAL: To record with custom network or CPU throttling, call `pick_emulation_settings` and THIS TOOL in the SAME EXECUTION TURN. DO NOT respond to the user, DO NOT pause for interaction, and DO NOT wait for user confirmation. The emulation module remains active in the background.',
   annotations: {
     category: ToolCategory.PERFORMANCE,
     readOnlyHint: false,
