@@ -125,7 +125,7 @@ export const navigatePage = defineTool({
       .enum(['accept', 'decline'])
       .optional()
       .describe(
-        'Whether to auto accept, decline or ignore potential before unload dialogs triggered by this navigation.',
+        'Whether to auto accept or beforeunload dialogs triggered by this navigation. Default is accept.',
       ),
     ...timeoutSchema,
   },
