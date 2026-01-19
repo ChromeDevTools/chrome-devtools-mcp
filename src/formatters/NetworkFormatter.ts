@@ -15,6 +15,12 @@ export interface NetworkFormatterOptions {
   selectedInDevToolsUI?: boolean;
   requestIdResolver?: (request: HTTPRequest) => number | string;
   fetchData?: boolean;
+  requestFilePath?: string;
+  responseFilePath?: string;
+  saveFile?: (
+    data: Uint8Array<ArrayBufferLike>,
+    filename: string,
+  ) => Promise<{filename: string}>;
 }
 
 export class NetworkFormatter {
@@ -22,18 +28,17 @@ export class NetworkFormatter {
   #options: NetworkFormatterOptions;
   #requestBody?: string;
   #responseBody?: string;
+  #requestBodyFilePath?: string;
+  #responseBodyFilePath?: string;
 
-  private constructor(
-    request: HTTPRequest,
-    options: NetworkFormatterOptions = {},
-  ) {
+  private constructor(request: HTTPRequest, options: NetworkFormatterOptions) {
     this.#request = request;
     this.#options = options;
   }
 
   static async from(
     request: HTTPRequest,
-    options: NetworkFormatterOptions = {},
+    options: NetworkFormatterOptions,
   ): Promise<NetworkFormatter> {
     const instance = new NetworkFormatter(request, options);
     if (options.fetchData) {
@@ -47,15 +52,40 @@ export class NetworkFormatter {
     if (this.#request.hasPostData()) {
       const data = this.#request.postData();
       if (data) {
-        this.#requestBody = getSizeLimitedString(data, BODY_CONTEXT_SIZE_LIMIT);
+        if (this.#options.requestFilePath) {
+          if (!this.#options.saveFile) {
+            throw new Error('saveFile is not provided');
+          }
+          await this.#options.saveFile(
+            Buffer.from(data),
+            this.#options.requestFilePath,
+          );
+          this.#requestBodyFilePath = this.#options.requestFilePath;
+        } else {
+          this.#requestBody = getSizeLimitedString(
+            data,
+            BODY_CONTEXT_SIZE_LIMIT,
+          );
+        }
       } else {
         try {
           const fetchData = await this.#request.fetchPostData();
           if (fetchData) {
-            this.#requestBody = getSizeLimitedString(
-              fetchData,
-              BODY_CONTEXT_SIZE_LIMIT,
-            );
+            if (this.#options.requestFilePath) {
+              if (!this.#options.saveFile) {
+                throw new Error('saveFile is not provided');
+              }
+              await this.#options.saveFile(
+                Buffer.from(fetchData),
+                this.#options.requestFilePath,
+              );
+              this.#requestBodyFilePath = this.#options.requestFilePath;
+            } else {
+              this.#requestBody = getSizeLimitedString(
+                fetchData,
+                BODY_CONTEXT_SIZE_LIMIT,
+              );
+            }
           }
         } catch {
           this.#requestBody = '<not available anymore>';
@@ -66,10 +96,17 @@ export class NetworkFormatter {
     // Load Response Body
     const response = this.#request.response();
     if (response) {
-      this.#responseBody = await this.#getFormattedResponseBody(
-        response,
-        BODY_CONTEXT_SIZE_LIMIT,
-      );
+      if (this.#options.responseFilePath) {
+        this.#responseBodyFilePath = await this.#saveResponseBodyToFile(
+          response,
+          this.#options.responseFilePath,
+        );
+      } else {
+        this.#responseBody = await this.#getFormattedResponseBody(
+          response,
+          BODY_CONTEXT_SIZE_LIMIT,
+        );
+      }
     }
   }
 
@@ -90,6 +127,9 @@ export class NetworkFormatter {
     if (this.#requestBody) {
       response.push(`### Request Body`);
       response.push(this.#requestBody);
+    } else if (this.#requestBodyFilePath) {
+      response.push(`### Request Body`);
+      response.push(`Saved to ${this.#requestBodyFilePath}.`);
     }
 
     const httpResponse = this.#request.response();
@@ -105,6 +145,9 @@ export class NetworkFormatter {
     if (this.#responseBody) {
       response.push(`### Response Body`);
       response.push(this.#responseBody);
+    } else if (this.#responseBodyFilePath) {
+      response.push(`### Response Body`);
+      response.push(`Saved to ${this.#responseBodyFilePath}.`);
     }
 
     const httpFailure = this.#request.failure();
@@ -124,6 +167,7 @@ export class NetworkFormatter {
         // We create a temporary synchronous instance just for toString
         const formatter = new NetworkFormatter(request, {
           requestId: id,
+          saveFile: this.#options.saveFile,
         });
         response.push(`${'  '.repeat(indent)}${formatter.toString()}`);
         indent++;
@@ -150,6 +194,7 @@ export class NetworkFormatter {
         : undefined;
       const formatter = new NetworkFormatter(request, {
         requestId: id,
+        saveFile: this.#options.saveFile,
       });
       return formatter.toJSON();
     });
@@ -158,8 +203,10 @@ export class NetworkFormatter {
       ...this.toJSON(),
       requestHeaders: this.#request.headers(),
       requestBody: this.#requestBody,
+      requestBodyFilePath: this.#requestBodyFilePath,
       responseHeaders: this.#request.response()?.headers(),
       responseBody: this.#responseBody,
+      responseBodyFilePath: this.#responseBodyFilePath,
       failure: this.#request.failure()?.errorText,
       redirectChain: formattedRedirectChain.length
         ? formattedRedirectChain
@@ -211,6 +258,22 @@ export class NetworkFormatter {
       }
 
       return '<binary data>';
+    } catch {
+      return '<not available anymore>';
+    }
+  }
+
+  async #saveResponseBodyToFile(
+    httpResponse: HTTPResponse,
+    filePath: string,
+  ): Promise<string> {
+    try {
+      const responseBuffer = await httpResponse.buffer();
+      if (!this.#options.saveFile) {
+        throw new Error('saveFile is not provided');
+      }
+      await this.#options.saveFile(responseBuffer, filePath);
+      return filePath;
     } catch {
       return '<not available anymore>';
     }

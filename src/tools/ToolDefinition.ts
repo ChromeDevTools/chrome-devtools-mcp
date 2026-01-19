@@ -73,7 +73,10 @@ export interface Response {
   ): void;
   includeSnapshot(params?: SnapshotParams): void;
   attachImage(value: ImageContentData): void;
-  attachNetworkRequest(reqid: number): void;
+  attachNetworkRequest(
+    reqid: number,
+    options?: {requestFilePath?: string; responseFilePath?: string},
+  ): void;
   attachConsoleMessage(msgid: number): void;
   // Allows re-using DevTools data queried by some tools.
   attachDevToolsData(data: DevToolsData): void;
