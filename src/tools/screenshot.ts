@@ -438,13 +438,7 @@ export const screenshot = defineTool({
       .boolean()
       .optional()
       .describe(
-        'If set to true takes a screenshot of the full page instead of the currently visible viewport. Incompatible with uid unless iframeUid is also provided.',
-      ),
-    iframeUid: zod
-      .string()
-      .optional()
-      .describe(
-        'The uid of an iframe element. When used with fullPage=true, captures the full scrollable content of the iframe by temporarily expanding it.',
+        'If set to true takes a screenshot of the full page instead of the currently visible viewport. When used with uid pointing to an iframe element, captures the full scrollable content of the iframe.',
       ),
     filePath: zod
       .string()
@@ -454,20 +448,7 @@ export const screenshot = defineTool({
       ),
   },
   handler: async (request, response, context) => {
-    const {uid, fullPage, iframeUid} = request.params;
-
-    // Validate parameter combinations
-    if (uid && fullPage && !iframeUid) {
-      throw new Error('Providing both "uid" and "fullPage" is not allowed.');
-    }
-    if (uid && iframeUid) {
-      throw new Error('Providing both "uid" and "iframeUid" is not allowed.');
-    }
-    if (iframeUid && !fullPage) {
-      throw new Error(
-        'iframeUid requires fullPage=true to capture the full iframe content.',
-      );
-    }
+    const {uid, fullPage} = request.params;
 
     const format = request.params.format;
     const quality = format === 'png' ? undefined : request.params.quality;
@@ -475,17 +456,28 @@ export const screenshot = defineTool({
     let screenshot: Uint8Array;
     let responseMessage: string;
 
-    if (iframeUid && fullPage) {
-      // Full-page screenshot of iframe content (explicit iframe specified)
-      const iframeHandle = await context.getElementByUid(iframeUid);
+    if (uid && fullPage) {
+      // Check if uid points to an iframe element
+      const handle = await context.getElementByUid(uid);
       try {
-        screenshot = await takeIframeFullPageScreenshot(iframeHandle, {
-          type: format,
-          quality,
-        });
-        responseMessage = `Took a full-page screenshot of iframe with uid "${iframeUid}".`;
+        const isIframe = await handle.evaluate(
+          el => el.tagName.toLowerCase() === 'iframe',
+        );
+
+        if (isIframe) {
+          // Full-page screenshot of iframe content
+          screenshot = await takeIframeFullPageScreenshot(handle, {
+            type: format,
+            quality,
+          });
+          responseMessage = `Took a full-page screenshot of iframe with uid "${uid}".`;
+        } else {
+          throw new Error(
+            'Providing both "uid" and "fullPage" is only allowed when uid points to an iframe element.',
+          );
+        }
       } finally {
-        void iframeHandle.dispose();
+        void handle.dispose();
       }
     } else if (uid) {
       // Screenshot of a specific element
