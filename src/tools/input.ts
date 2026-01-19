@@ -160,11 +160,10 @@ async function fillFormElement(
       await selectOption(handle, aXNode, value);
     } else {
       // Increase timeout for longer input values.
-      const textLengthIn1kChars = Math.floor(value.length / 1_000);
-      const timeoutPer1kChars = 5_000; // ms
+      const timeoutPerChar = 10; // ms
       const fillTimeout =
         context.getSelectedPage().getDefaultTimeout() +
-        textLengthIn1kChars * timeoutPer1kChars;
+        value.length * timeoutPerChar;
       await handle.asLocator().setTimeout(fillTimeout).fill(value);
     }
   } finally {

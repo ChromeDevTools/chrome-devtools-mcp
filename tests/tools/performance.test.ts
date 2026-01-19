@@ -140,7 +140,7 @@ describe('performance', () => {
       });
     });
 
-    it.only('supports filePath', async () => {
+    it('supports filePath', async () => {
       const rawData = loadTraceAsBuffer('basic-trace.json.gz');
       // rawData is the decompressed buffer (based on loadTraceAsBuffer implementation).
       // We want to simulate saving it as a .gz file, so the tool should compress it.
