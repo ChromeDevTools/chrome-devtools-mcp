@@ -5,16 +5,33 @@
  */
 
 import assert from 'node:assert';
-import {describe, it} from 'node:test';
+import {mkdtemp, readFile, rm, writeFile} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import {afterEach, beforeEach, describe, it} from 'node:test';
 
 import {NetworkFormatter} from '../../src/formatters/NetworkFormatter.js';
+import type {HTTPRequest} from '../../src/third_party/index.js';
 import {getMockRequest, getMockResponse} from '../utils.js';
 
 describe('NetworkFormatter', () => {
+  let tmpDir: string;
+
+  beforeEach(async () => {
+    tmpDir = await mkdtemp(join(tmpdir(), 'network-formatter-test-'));
+  });
+
+  afterEach(async () => {
+    await rm(tmpDir, {recursive: true, force: true});
+  });
+
   describe('toString', () => {
     it('works', async () => {
       const request = getMockRequest();
-      const formatter = await NetworkFormatter.from(request, {requestId: 1});
+      const formatter = await NetworkFormatter.from(request, {
+        requestId: 1,
+        saveFile: async () => ({filename: ''}),
+      });
 
       assert.equal(
         formatter.toString(),
@@ -23,7 +40,10 @@ describe('NetworkFormatter', () => {
     });
     it('shows correct method', async () => {
       const request = getMockRequest({method: 'POST'});
-      const formatter = await NetworkFormatter.from(request, {requestId: 1});
+      const formatter = await NetworkFormatter.from(request, {
+        requestId: 1,
+        saveFile: async () => ({filename: ''}),
+      });
 
       assert.equal(
         formatter.toString(),
@@ -33,7 +53,10 @@ describe('NetworkFormatter', () => {
     it('shows correct status for request with response code in 200', async () => {
       const response = getMockResponse();
       const request = getMockRequest({response});
-      const formatter = await NetworkFormatter.from(request, {requestId: 1});
+      const formatter = await NetworkFormatter.from(request, {
+        requestId: 1,
+        saveFile: async () => ({filename: ''}),
+      });
 
       assert.equal(
         formatter.toString(),
@@ -45,7 +68,10 @@ describe('NetworkFormatter', () => {
         status: 199,
       });
       const request = getMockRequest({response});
-      const formatter = await NetworkFormatter.from(request, {requestId: 1});
+      const formatter = await NetworkFormatter.from(request, {
+        requestId: 1,
+        saveFile: async () => ({filename: ''}),
+      });
 
       assert.equal(
         formatter.toString(),
@@ -57,7 +83,10 @@ describe('NetworkFormatter', () => {
         status: 300,
       });
       const request = getMockRequest({response});
-      const formatter = await NetworkFormatter.from(request, {requestId: 1});
+      const formatter = await NetworkFormatter.from(request, {
+        requestId: 1,
+        saveFile: async () => ({filename: ''}),
+      });
 
       assert.equal(
         formatter.toString(),
@@ -72,7 +101,10 @@ describe('NetworkFormatter', () => {
           };
         },
       });
-      const formatter = await NetworkFormatter.from(request, {requestId: 1});
+      const formatter = await NetworkFormatter.from(request, {
+        requestId: 1,
+        saveFile: async () => ({filename: ''}),
+      });
 
       assert.equal(
         formatter.toString(),
@@ -85,6 +117,7 @@ describe('NetworkFormatter', () => {
       const formatter = await NetworkFormatter.from(request, {
         requestId: 1,
         selectedInDevToolsUI: true,
+        saveFile: async () => ({filename: ''}),
       });
 
       assert.equal(
@@ -104,6 +137,7 @@ describe('NetworkFormatter', () => {
       const formatter = await NetworkFormatter.from(request, {
         requestId: 200,
         fetchData: true,
+        saveFile: async () => ({filename: ''}),
       });
       const result = formatter.toStringDetailed();
       assert.match(result, /test/);
@@ -119,6 +153,7 @@ describe('NetworkFormatter', () => {
       const formatter = await NetworkFormatter.from(request, {
         requestId: 200,
         fetchData: true,
+        saveFile: async () => ({filename: ''}),
       });
       const result = formatter.toStringDetailed();
 
@@ -140,9 +175,90 @@ describe('NetworkFormatter', () => {
       const formatter = await NetworkFormatter.from(request, {
         requestId: 20,
         fetchData: true,
+        saveFile: async () => ({filename: ''}),
       });
       const result = formatter.toStringDetailed();
       assert.match(result, /some text/);
+    });
+
+    it('should save bodies to file when file paths are provided', async () => {
+      const request = {
+        method: () => 'POST',
+        url: () => 'http://example.com',
+        headers: () => ({}),
+        hasPostData: () => true,
+        postData: () => 'request body',
+        response: () => ({
+          status: () => 200,
+          headers: () => ({}),
+          buffer: async () => Buffer.from('response body'),
+        }),
+        failure: () => null,
+        redirectChain: () => [],
+        fetchPostData: async () => undefined,
+      } as unknown as HTTPRequest;
+
+      const reqPath = join(tmpDir, 'test_req_' + Date.now());
+      const resPath = join(tmpDir, 'test_res_' + Date.now());
+
+      const formatter = await NetworkFormatter.from(request, {
+        fetchData: true,
+        requestFilePath: reqPath,
+        responseFilePath: resPath,
+        saveFile: async (data, filename) => {
+          await writeFile(filename, data);
+          return {filename};
+        },
+      });
+
+      const json = formatter.toJSONDetailed() as {
+        requestBody: string;
+        responseBody: string;
+        requestBodyFilePath: string;
+        responseBodyFilePath: string;
+      };
+      assert.strictEqual(json.requestBodyFilePath, reqPath);
+      assert.strictEqual(json.responseBodyFilePath, resPath);
+      assert.strictEqual(json.requestBody, undefined);
+      assert.strictEqual(json.responseBody, undefined);
+    });
+
+    it('should not truncate large bodies when saving to file', async () => {
+      const largeBody = 'a'.repeat(10005);
+      const request = {
+        method: () => 'POST',
+        url: () => 'http://example.com',
+        headers: () => ({}),
+        hasPostData: () => true,
+        postData: () => largeBody,
+        response: () => ({
+          status: () => 200,
+          headers: () => ({}),
+          buffer: async () => Buffer.from(largeBody),
+        }),
+        failure: () => null,
+        redirectChain: () => [],
+        fetchPostData: async () => undefined,
+      } as unknown as HTTPRequest;
+
+      const reqPath = join(tmpDir, 'test_req_large_' + Date.now());
+      const resPath = join(tmpDir, 'test_res_large_' + Date.now());
+
+      await NetworkFormatter.from(request, {
+        fetchData: true,
+        requestFilePath: reqPath,
+        responseFilePath: resPath,
+        saveFile: async (data, filename) => {
+          await writeFile(filename, data);
+          return {filename};
+        },
+      });
+
+      const reqContent = await readFile(reqPath, 'utf8');
+      const resContent = await readFile(resPath, 'utf8');
+
+      assert.strictEqual(reqContent, largeBody);
+      assert.strictEqual(resContent, largeBody);
     });
 
     it('handles response body', async () => {
@@ -155,6 +271,7 @@ describe('NetworkFormatter', () => {
       const formatter = await NetworkFormatter.from(request, {
         requestId: 200,
         fetchData: true,
+        saveFile: async () => ({filename: ''}),
       });
       const result = formatter.toStringDetailed();
 
@@ -171,10 +288,45 @@ describe('NetworkFormatter', () => {
       const formatter = await NetworkFormatter.from(request, {
         requestId: 1,
         requestIdResolver: () => 2,
+        saveFile: async () => ({filename: ''}),
       });
       const result = formatter.toStringDetailed();
       assert.match(result, /Redirect chain/);
       assert.match(result, /reqid=2/);
+    });
+    it('shows saved to file message in toStringDetailed', async () => {
+      const request = {
+        method: () => 'POST',
+        url: () => 'http://example.com',
+        headers: () => ({}),
+        hasPostData: () => true,
+        postData: () => 'request body',
+        response: () => ({
+          status: () => 200,
+          headers: () => ({}),
+          buffer: async () => Buffer.from('response body'),
+        }),
+        failure: () => null,
+        redirectChain: () => [],
+        fetchPostData: async () => undefined,
+      } as unknown as HTTPRequest;
+
+      const reqPath = join(tmpDir, 'req.txt');
+      const resPath = join(tmpDir, 'res.txt');
+
+      const formatter = await NetworkFormatter.from(request, {
+        fetchData: true,
+        requestFilePath: reqPath,
+        responseFilePath: resPath,
+        saveFile: async (data, filename) => {
+          await writeFile(filename, data);
+          return {filename};
+        },
+      });
+
+      const result = formatter.toStringDetailed();
+      assert.ok(result.includes(`Saved to ${reqPath}.`));
+      assert.ok(result.includes(`Saved to ${resPath}.`));
     });
   });
 
@@ -184,6 +336,7 @@ describe('NetworkFormatter', () => {
       const formatter = await NetworkFormatter.from(request, {
         requestId: 1,
         selectedInDevToolsUI: true,
+        saveFile: async () => ({filename: ''}),
       });
       const result = formatter.toJSON();
       assert.deepEqual(result, {
@@ -208,6 +361,7 @@ describe('NetworkFormatter', () => {
       const formatter = await NetworkFormatter.from(request, {
         requestId: 1,
         fetchData: true,
+        saveFile: async () => ({filename: ''}),
       });
       const result = formatter.toJSONDetailed();
       assert.deepEqual(result, {
@@ -220,11 +374,56 @@ describe('NetworkFormatter', () => {
           'content-size': '10',
         },
         requestBody: 'request',
+        requestBodyFilePath: undefined,
         responseHeaders: {},
         responseBody: 'response',
+        responseBodyFilePath: undefined,
         failure: undefined,
         redirectChain: undefined,
       });
+    });
+
+    it('returns file paths in structured detailed data', async () => {
+      const request = {
+        method: () => 'POST',
+        url: () => 'http://example.com',
+        headers: () => ({}),
+        hasPostData: () => true,
+        postData: () => 'request body',
+        response: () => ({
+          status: () => 200,
+          headers: () => ({}),
+          buffer: async () => Buffer.from('response body'),
+        }),
+        failure: () => null,
+        redirectChain: () => [],
+        fetchPostData: async () => undefined,
+      } as unknown as HTTPRequest;
+
+      const reqPath = join(tmpDir, 'req_json.txt');
+      const resPath = join(tmpDir, 'res_json.txt');
+
+      const formatter = await NetworkFormatter.from(request, {
+        fetchData: true,
+        requestFilePath: reqPath,
+        responseFilePath: resPath,
+        saveFile: async (data, filename) => {
+          await writeFile(filename, data);
+          return {filename};
+        },
+      });
+
+      const result = formatter.toJSONDetailed() as {
+        requestBodyFilePath: string;
+        responseBodyFilePath: string;
+        requestBody?: string;
+        responseBody?: string;
+      };
+
+      assert.strictEqual(result.requestBodyFilePath, reqPath);
+      assert.strictEqual(result.responseBodyFilePath, resPath);
+      assert.strictEqual(result.requestBody, undefined);
+      assert.strictEqual(result.responseBody, undefined);
     });
   });
 });

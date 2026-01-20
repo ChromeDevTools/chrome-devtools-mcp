@@ -12,6 +12,15 @@ exports[`McpContext > should include detailed network request in structured cont
 }
 `;
 
+exports[`McpContext > should include file paths in structured content when saving to file 1`] = `
+{
+  "networkRequest": {
+    "requestBody": "/tmp/req.txt",
+    "responseBody": "/tmp/res.txt"
+  }
+}
+`;
+
 exports[`McpContext > should include network requests in structured content 1`] = `
 {
   "networkRequests": [

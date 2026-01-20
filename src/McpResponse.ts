@@ -34,6 +34,10 @@ export class McpResponse implements Response {
   #includePages = false;
   #snapshotParams?: SnapshotParams;
   #attachedNetworkRequestId?: number;
+  #attachedNetworkRequestOptions?: {
+    requestFilePath?: string;
+    responseFilePath?: string;
+  };
   #attachedConsoleMessageId?: number;
   #textResponseLines: string[] = [];
   #images: ImageContentData[] = [];
@@ -125,8 +129,12 @@ export class McpResponse implements Response {
     };
   }
 
-  attachNetworkRequest(reqid: number): void {
+  attachNetworkRequest(
+    reqid: number,
+    options?: {requestFilePath?: string; responseFilePath?: string},
+  ): void {
     this.#attachedNetworkRequestId = reqid;
+    this.#attachedNetworkRequestOptions = options;
   }
 
   attachConsoleMessage(msgid: number): void {
@@ -218,6 +226,9 @@ export class McpResponse implements Response {
         requestId: this.#attachedNetworkRequestId,
         requestIdResolver: req => context.getNetworkRequestStableId(req),
         fetchData: true,
+        requestFilePath: this.#attachedNetworkRequestOptions?.requestFilePath,
+        responseFilePath: this.#attachedNetworkRequestOptions?.responseFilePath,
+        saveFile: (data, filename) => context.saveFile(data, filename),
       });
       detailedNetworkRequest = formatter;
     }
@@ -361,6 +372,7 @@ export class McpResponse implements Response {
                 context.getNetworkRequestStableId(request) ===
                 this.#networkRequestsOptions?.networkRequestIdInDevToolsUI,
               fetchData: false,
+              saveFile: (data, filename) => context.saveFile(data, filename),
             }),
           ),
         );
