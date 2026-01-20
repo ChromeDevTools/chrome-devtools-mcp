@@ -107,9 +107,7 @@ function main() {
 
       const msg = JSON.parse(line);
       if (msg.type === WatchdogMessageType.LOG_EVENT && msg.payload) {
-        sender.send(msg.payload).catch(err => {
-          logger('Error sending event', err);
-        });
+        sender.enqueueEvent(msg.payload);
       }
     } catch (err) {
       logger('Failed to parse IPC message', err);
