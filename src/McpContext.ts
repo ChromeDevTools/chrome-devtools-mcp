@@ -28,6 +28,7 @@ import type {
   Page,
   SerializedAXNode,
   PredefinedNetworkConditions,
+  Viewport,
 } from './third_party/index.js';
 import {listPages} from './tools/pages.js';
 import {takeSnapshot} from './tools/snapshot.js';
@@ -115,6 +116,8 @@ export class McpContext implements Context {
   #networkConditionsMap = new WeakMap<Page, string>();
   #cpuThrottlingRateMap = new WeakMap<Page, number>();
   #geolocationMap = new WeakMap<Page, GeolocationOptions>();
+  #viewportMap = new WeakMap<Page, Viewport>();
+  #userAgentMap = new WeakMap<Page, string>();
   #dialog?: Dialog;
 
   #pageIdMap = new WeakMap<Page, number>();
@@ -312,6 +315,34 @@ export class McpContext implements Context {
   getGeolocation(): GeolocationOptions | null {
     const page = this.getSelectedPage();
     return this.#geolocationMap.get(page) ?? null;
+  }
+
+  setViewport(viewport: Viewport | null): void {
+    const page = this.getSelectedPage();
+    if (viewport === null) {
+      this.#viewportMap.delete(page);
+    } else {
+      this.#viewportMap.set(page, viewport);
+    }
+  }
+
+  getViewport(): Viewport | null {
+    const page = this.getSelectedPage();
+    return this.#viewportMap.get(page) ?? null;
+  }
+
+  setUserAgent(userAgent: string | null): void {
+    const page = this.getSelectedPage();
+    if (userAgent === null) {
+      this.#userAgentMap.delete(page);
+    } else {
+      this.#userAgentMap.set(page, userAgent);
+    }
+  }
+
+  getUserAgent(): string | null {
+    const page = this.getSelectedPage();
+    return this.#userAgentMap.get(page) ?? null;
   }
 
   setIsRunningPerformanceTrace(x: boolean): void {

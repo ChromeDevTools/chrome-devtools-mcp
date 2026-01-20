@@ -432,6 +432,18 @@ export class McpResponse implements Response {
       );
     }
 
+    const viewport = context.getViewport();
+    if (viewport) {
+      response.push(`## Viewport emulation`);
+      response.push(`Emulating viewport: ${JSON.stringify(viewport)}`);
+    }
+
+    const userAgent = context.getUserAgent();
+    if (userAgent) {
+      response.push(`## UserAgent emulation`);
+      response.push(`Emulating userAgent: ${userAgent}`);
+    }
+
     const cpuThrottlingRate = context.getCpuThrottlingRate();
     if (cpuThrottlingRate > 1) {
       response.push(`## CPU emulation`);

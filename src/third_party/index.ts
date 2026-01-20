@@ -25,6 +25,7 @@ export {z as zod} from 'zod';
 export {
   Locator,
   PredefinedNetworkConditions,
+  KnownDevices,
   CDPSessionEvent,
 } from 'puppeteer-core';
 export {default as puppeteer} from 'puppeteer-core';

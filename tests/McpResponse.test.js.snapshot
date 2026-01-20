@@ -74,6 +74,18 @@ Emulating: Slow 3G
 Default navigation timeout set to 100000 ms
 `;
 
+exports[`McpResponse > adds userAgent emulation setting when it is set 1`] = `
+# test response
+## UserAgent emulation
+Emulating userAgent: MyUA
+`;
+
+exports[`McpResponse > adds viewport emulation setting when it is set 1`] = `
+# test response
+## Viewport emulation
+Emulating viewport: {"width":400,"height":400,"deviceScaleFactor":1}
+`;
+
 exports[`McpResponse > allows response text lines to be added 1`] = `
 # test response
 Testing 1

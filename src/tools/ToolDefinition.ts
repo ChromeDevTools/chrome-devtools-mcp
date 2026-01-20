@@ -6,7 +6,12 @@
 
 import type {TextSnapshotNode, GeolocationOptions} from '../McpContext.js';
 import {zod} from '../third_party/index.js';
-import type {Dialog, ElementHandle, Page} from '../third_party/index.js';
+import type {
+  Dialog,
+  ElementHandle,
+  Page,
+  Viewport,
+} from '../third_party/index.js';
 import type {TraceResult} from '../trace-processing/parse.js';
 import type {PaginationOptions} from '../utils/types.js';
 
@@ -105,6 +110,10 @@ export type Context = Readonly<{
   setNetworkConditions(conditions: string | null): void;
   setCpuThrottlingRate(rate: number): void;
   setGeolocation(geolocation: GeolocationOptions | null): void;
+  setViewport(viewport: Viewport | null): void;
+  getViewport(): Viewport | null;
+  setUserAgent(userAgent: string | null): void;
+  getUserAgent(): string | null;
   saveTemporaryFile(
     data: Uint8Array<ArrayBufferLike>,
     mimeType: 'image/png' | 'image/jpeg' | 'image/webp',
