@@ -5,8 +5,6 @@
  */
 
 import {PuppeteerDevToolsConnection} from './DevToolsConnectionAdapter.js';
-import {ISSUE_UTILS} from './issue-descriptions.js';
-import {logger} from './logger.js';
 import {Mutex} from './Mutex.js';
 import {DevTools} from './third_party/index.js';
 import type {
@@ -79,50 +77,6 @@ export class FakeIssuesManager extends DevTools.Common.ObjectWrapper
   issues(): DevTools.Issue[] {
     return [];
   }
-}
-
-export function mapIssueToMessageObject(issue: DevTools.AggregatedIssue) {
-  const count = issue.getAggregatedIssuesCount();
-  const markdownDescription = issue.getDescription();
-  const filename = markdownDescription?.file;
-  if (!markdownDescription) {
-    logger(`no description found for issue:` + issue.code);
-    return null;
-  }
-  const rawMarkdown = filename
-    ? ISSUE_UTILS.getIssueDescription(filename)
-    : null;
-  if (!rawMarkdown) {
-    logger(`no markdown ${filename} found for issue:` + issue.code);
-    return null;
-  }
-  let processedMarkdown: string;
-  let title: string | null;
-
-  try {
-    processedMarkdown =
-      DevTools.MarkdownIssueDescription.substitutePlaceholders(
-        rawMarkdown,
-        markdownDescription.substitutions,
-      );
-    const markdownAst = DevTools.Marked.Marked.lexer(processedMarkdown);
-    title =
-      DevTools.MarkdownIssueDescription.findTitleFromMarkdownAst(markdownAst);
-  } catch {
-    logger('error parsing markdown for issue ' + issue.code());
-    return null;
-  }
-  if (!title) {
-    logger('cannot read issue title from ' + filename);
-    return null;
-  }
-  return {
-    type: 'issue',
-    item: issue,
-    message: title,
-    count,
-    description: processedMarkdown,
-  };
 }
 
 // DevTools CDP errors can get noisy.
