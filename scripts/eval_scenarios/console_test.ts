@@ -21,12 +21,15 @@ export const scenario: TestScenario = {
     `,
   },
   expectations: calls => {
-    const navigate = calls.find(
-      c => c.name === 'navigate_page' || c.name === 'new_page',
+    assert.strictEqual(calls.length, 2);
+    assert.ok(
+      calls[0].name === 'navigate_page' || calls[0].name === 'new_page',
+      'First call should be navigation',
     );
-    const listMessages = calls.find(c => c.name === 'list_console_messages');
-
-    assert.ok(navigate, 'Should navigate to the page');
-    assert.ok(listMessages, 'Should list console messages');
+    assert.strictEqual(
+      calls[1].name,
+      'list_console_messages',
+      'Second call should be list_console_messages',
+    );
   },
 };

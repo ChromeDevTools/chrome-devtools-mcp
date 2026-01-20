@@ -234,7 +234,7 @@
 **Parameters:**
 
 - **autoStop** (boolean) **(required)**: Determines if the trace recording should be automatically stopped.
-- **reload** (boolean) **(required)**: Determines if, once tracing has started, the page should be automatically reloaded.
+- **reload** (boolean) **(required)**: Determines if, once tracing has started, the current selected page should be automatically reloaded. Navigate the page to the right URL using the [`navigate_page`](#navigate_page) tool BEFORE starting the trace if reload or autoStop is set to true.
 - **filePath** (string) _(optional)_: The absolute file path, or a file path relative to the current working directory, to save the raw trace data. For example, trace.json.gz (compressed) or trace.json (uncompressed).
 
 ---

@@ -12,8 +12,8 @@ export const scenario: TestScenario = {
   prompt: 'Emulate offline network conditions.',
   maxTurns: 2,
   expectations: calls => {
-    const emulate = calls.find(c => c.name === 'emulate');
-    assert.ok(emulate, 'Should call emulate tool');
-    assert.strictEqual(emulate.args.networkConditions, 'Offline');
+    assert.strictEqual(calls.length, 1);
+    assert.strictEqual(calls[0].name, 'emulate');
+    assert.strictEqual(calls[0].args.networkConditions, 'Offline');
   },
 };
