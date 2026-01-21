@@ -14,13 +14,18 @@ import type {
   OsType,
 } from '../types.js';
 
-const INCLUDE_PID_HEADER = process.env.INCLUDE_PID_HEADER === 'true';
-const MAX_BUFFER_SIZE = parseInt(process.env.MAX_BUFFER_SIZE ?? '', 10) || 1000;
-const FLUSH_INTERVAL_MS =
-  parseInt(process.env.FORCE_FLUSH_INTERVAL ?? '', 10) || 15 * 60 * 1000;
-const CLEARCUT_ENDPOINT =
-  process.env.CLEARCUT_ENDPOINT ??
+export interface ClearcutSenderConfig {
+  appVersion: string;
+  osType: OsType;
+  clearcutEndpoint?: string;
+  forceFlushIntervalMs?: number;
+  includePidHeader?: boolean;
+}
+
+const MAX_BUFFER_SIZE = 1000;
+const DEFAULT_CLEARCUT_ENDPOINT =
   'https://play.googleapis.com/log?format=json_proto';
+const DEFAULT_FLUSH_INTERVAL_MS = 15 * 60 * 1000;
 
 const LOG_SOURCE = 2839;
 const CLIENT_TYPE = 47;
@@ -37,6 +42,9 @@ interface BufferedEvent {
 export class ClearcutSender {
   #appVersion: string;
   #osType: OsType;
+  #clearcutEndpoint: string;
+  #flushIntervalMs: number;
+  #includePidHeader: boolean;
   #sessionId: string;
   #sessionCreated: number;
   #buffer: BufferedEvent[] = [];
@@ -44,9 +52,14 @@ export class ClearcutSender {
   #isFlushing = false;
   #timerStarted = false;
 
-  constructor(appVersion: string, osType: OsType) {
-    this.#appVersion = appVersion;
-    this.#osType = osType;
+  constructor(config: ClearcutSenderConfig) {
+    this.#appVersion = config.appVersion;
+    this.#osType = config.osType;
+    this.#clearcutEndpoint =
+      config.clearcutEndpoint ?? DEFAULT_CLEARCUT_ENDPOINT;
+    this.#flushIntervalMs =
+      config.forceFlushIntervalMs ?? DEFAULT_FLUSH_INTERVAL_MS;
+    this.#includePidHeader = config.includePidHeader ?? false;
     this.#sessionId = crypto.randomUUID();
     this.#sessionCreated = Date.now();
   }
@@ -66,7 +79,7 @@ export class ClearcutSender {
 
     if (!this.#timerStarted) {
       this.#timerStarted = true;
-      this.#scheduleFlush(FLUSH_INTERVAL_MS);
+      this.#scheduleFlush(this.#flushIntervalMs);
     }
   }
 
@@ -97,12 +110,12 @@ export class ClearcutSender {
     }
 
     if (this.#buffer.length === 0) {
-      this.#scheduleFlush(FLUSH_INTERVAL_MS);
+      this.#scheduleFlush(this.#flushIntervalMs);
       return;
     }
 
     this.#isFlushing = true;
-    let nextDelayMs = FLUSH_INTERVAL_MS;
+    let nextDelayMs = this.#flushIntervalMs;
 
     // Optimistically remove events from buffer before sending.
     // This prevents race conditions where a simultaneous #finalFlush would include these same events.
@@ -182,12 +195,12 @@ export class ClearcutSender {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
     try {
-      const response = await fetch(CLEARCUT_ENDPOINT, {
+      const response = await fetch(this.#clearcutEndpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           // Used in E2E tests to confirm that the watchdog process is killed
-          ...(INCLUDE_PID_HEADER ? {'X-Watchdog-Pid': process.pid.toString()} : {}),
+          ...(this.#includePidHeader ? {'X-Watchdog-Pid': process.pid.toString()} : {}),
         },
         body: JSON.stringify(requestBody),
         signal: controller.signal,

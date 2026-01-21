@@ -42,6 +42,9 @@ if (args.usageStatistics) {
   clearcutLogger = new ClearcutLogger({
     logFile: args.logFile,
     appVersion: VERSION,
+    clearcutEndpoint: args.clearcutEndpoint,
+    clearcutForceFlushIntervalMs: args.clearcutForceFlushIntervalMs,
+    clearcutIncludePidHeader: args.clearcutIncludePidHeader,
   });
 }
 

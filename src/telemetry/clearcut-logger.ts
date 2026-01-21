@@ -37,6 +37,9 @@ export class ClearcutLogger {
     logFile?: string;
     persistence?: Persistence;
     watchdogClient?: WatchdogClient;
+    clearcutEndpoint?: string;
+    clearcutForceFlushIntervalMs?: number;
+    clearcutIncludePidHeader?: boolean;
   }) {
     this.#persistence = options.persistence ?? new FilePersistence();
     this.#watchdog =
@@ -46,6 +49,9 @@ export class ClearcutLogger {
         appVersion: options.appVersion,
         osType: detectOsType(),
         logFile: options.logFile,
+        clearcutEndpoint: options.clearcutEndpoint,
+        clearcutForceFlushIntervalMs: options.clearcutForceFlushIntervalMs,
+        clearcutIncludePidHeader: options.clearcutIncludePidHeader,
       });
   }
 

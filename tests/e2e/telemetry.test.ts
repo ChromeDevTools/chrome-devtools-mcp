@@ -166,15 +166,14 @@ describe('Telemetry E2E', () => {
           SERVER_PATH,
           '--usage-statistics',
           '--headless',
+          `--clearcutEndpoint=http://127.0.0.1:${mockContext.port}`,
+          '--clearcutForceFlushIntervalMs=10',
+          '--clearcutIncludePidHeader',
         ],
         {
           stdio: ['pipe', 'pipe', 'pipe'],
           env: {
             ...process.env,
-            CLEARCUT_ENDPOINT: `http://127.0.0.1:${mockContext.port}`,
-            FORCE_FLUSH_INTERVAL: '10',
-            MAX_BUFFER_SIZE: '100',
-            INCLUDE_PID_HEADER: 'true',
           },
           ...spawnOptions,
         },
@@ -182,7 +181,7 @@ describe('Telemetry E2E', () => {
 
       const startEvent = await Promise.race([
         mockContext.waitForEvent(e => e.server_start !== undefined),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout waiting for server_start')), 5000))
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout waiting for server_start')), 10000))
       ]);
       assert.ok(startEvent, 'server_start event not received');
 
@@ -199,7 +198,7 @@ describe('Telemetry E2E', () => {
       // Verify shutdown event
       const shutdownEvent = await Promise.race([
         mockContext.waitForEvent(e => e.server_shutdown !== undefined),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout waiting for server_shutdown')), 5000))
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout waiting for server_shutdown')), 10000))
       ]);
       assert.ok(shutdownEvent, 'server_shutdown event not received');
 

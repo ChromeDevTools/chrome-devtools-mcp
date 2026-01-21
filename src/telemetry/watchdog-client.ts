@@ -20,6 +20,9 @@ export class WatchdogClient {
       appVersion: string;
       osType: OsType;
       logFile?: string;
+      clearcutEndpoint?: string;
+      clearcutForceFlushIntervalMs?: number;
+      clearcutIncludePidHeader?: boolean;
     },
     options?: {spawn?: typeof spawn},
   ) {
@@ -36,6 +39,17 @@ export class WatchdogClient {
 
     if (config.logFile) {
       args.push(`--log-file=${config.logFile}`);
+    }
+    if (config.clearcutEndpoint) {
+      args.push(`--clearcut-endpoint=${config.clearcutEndpoint}`);
+    }
+    if (config.clearcutForceFlushIntervalMs) {
+      args.push(
+        `--clearcut-force-flush-interval-ms=${config.clearcutForceFlushIntervalMs}`,
+      );
+    }
+    if (config.clearcutIncludePidHeader) {
+      args.push('--clearcut-include-pid-header');
     }
 
     const spawner = options?.spawn ?? spawn;

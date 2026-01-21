@@ -211,6 +211,21 @@ export const cliOptions = {
     hidden: true,
     describe: 'Set to false to opt-out of usage statistics collection.',
   },
+  clearcutEndpoint: {
+    type: 'string',
+    hidden: true,
+    describe: 'Endpoint for Clearcut telemetry.',
+  },
+  clearcutForceFlushIntervalMs: {
+    type: 'number',
+    hidden: true,
+    describe: 'Force flush interval in milliseconds (for testing).',
+  },
+  clearcutIncludePidHeader: {
+    type: 'boolean',
+    hidden: true,
+    describe: 'Include watchdog PID in Clearcut request headers (for testing).',
+  },
 } satisfies Record<string, YargsOptions>;
 
 export function parseArguments(version: string, argv = process.argv) {
