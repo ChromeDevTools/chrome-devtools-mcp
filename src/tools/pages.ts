@@ -129,7 +129,7 @@ export const navigatePage = defineTool({
     headers: zod
       .record(zod.string())
       .optional()
-      .describe('Optional headers to send with the navigation request.'),
+      .describe('Optional headers to send with the all request.'),
     ignoreCache: zod
       .boolean()
       .optional()
