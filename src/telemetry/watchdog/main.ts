@@ -28,7 +28,7 @@ interface WatchdogArgs {
 }
 
 function parseWatchdogArgs(): WatchdogArgs {
-    const {values} = parseArgs({
+  const {values} = parseArgs({
     options: {
       'parent-pid': {type: 'string'},
       'app-version': {type: 'string'},
@@ -46,8 +46,8 @@ function parseWatchdogArgs(): WatchdogArgs {
   const osType = parseInt(values['os-type'] ?? '', 10);
   if (isNaN(parentPid) || !appVersion || isNaN(osType)) {
     console.error(
-      'Invalid arguments provided for watchdog process: ', 
-      JSON.stringify({parentPid, appVersion, osType})
+      'Invalid arguments provided for watchdog process: ',
+      JSON.stringify({parentPid, appVersion, osType}),
     );
     process.exit(1);
   }
@@ -56,7 +56,7 @@ function parseWatchdogArgs(): WatchdogArgs {
   const logFile = values['log-file'];
   const clearcutEndpoint = values['clearcut-endpoint'];
   const clearcutIncludePidHeader = values['clearcut-include-pid-header'];
-  let clearcutForceFlushIntervalMs: number|undefined;
+  let clearcutForceFlushIntervalMs: number | undefined;
   if (values['clearcut-force-flush-interval-ms']) {
     const parsed = parseInt(values['clearcut-force-flush-interval-ms'], 10);
     if (!isNaN(parsed)) {

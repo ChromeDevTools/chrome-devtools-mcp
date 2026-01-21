@@ -11,7 +11,7 @@ import type {AddressInfo} from 'node:net';
 import path from 'node:path';
 import {describe, it} from 'node:test';
 
-import type { ChromeDevToolsMcpExtension } from '../../src/telemetry/types';
+import type {ChromeDevToolsMcpExtension} from '../../src/telemetry/types';
 
 const SERVER_PATH = path.resolve('build/src/main.js');
 
@@ -20,7 +20,9 @@ interface MockServerContext {
   port: number;
   events: ChromeDevToolsMcpExtension[];
   watchdogPid?: number;
-  waitForEvent: (predicate: (event: ChromeDevToolsMcpExtension) => boolean) => Promise<ChromeDevToolsMcpExtension>;
+  waitForEvent: (
+    predicate: (event: ChromeDevToolsMcpExtension) => boolean,
+  ) => Promise<ChromeDevToolsMcpExtension>;
 }
 
 async function startMockServer(): Promise<MockServerContext> {
@@ -49,17 +51,21 @@ async function startMockServer(): Promise<MockServerContext> {
           if (parsed.log_event) {
             for (const logEvent of parsed.log_event) {
               if (logEvent.source_extension_json) {
-                const ext = JSON.parse(logEvent.source_extension_json) as ChromeDevToolsMcpExtension;
+                const ext = JSON.parse(
+                  logEvent.source_extension_json,
+                ) as ChromeDevToolsMcpExtension;
                 events.push(ext);
-                
+
                 // Check if any waiters are satisfied
-                waitingResolvers = waitingResolvers.filter(({predicate, resolve}) => {
-                  if (predicate(ext)) {
-                    resolve(ext);
-                    return false;
-                  }
-                  return true;
-                });
+                waitingResolvers = waitingResolvers.filter(
+                  ({predicate, resolve}) => {
+                    if (predicate(ext)) {
+                      resolve(ext);
+                      return false;
+                    }
+                    return true;
+                  },
+                );
               }
             }
           }
@@ -84,8 +90,10 @@ async function startMockServer(): Promise<MockServerContext> {
     server,
     port: address.port,
     events,
-    get watchdogPid() { return watchdogPid; },
-    waitForEvent: (predicate) => {
+    get watchdogPid() {
+      return watchdogPid;
+    },
+    waitForEvent: predicate => {
       const existing = events.find(predicate);
       if (existing) {
         return Promise.resolve(existing);
@@ -181,16 +189,25 @@ describe('Telemetry E2E', () => {
 
       const startEvent = await Promise.race([
         mockContext.waitForEvent(e => e.server_start !== undefined),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout waiting for server_start')), 10000))
+        new Promise((_, reject) =>
+          setTimeout(
+            () => reject(new Error('Timeout waiting for server_start')),
+            10000,
+          ),
+        ),
       ]);
       assert.ok(startEvent, 'server_start event not received');
 
       // Now that we received an event, we should have the Watchdog PID
       const watchdogPid = mockContext.watchdogPid;
       assert.ok(watchdogPid, 'Watchdog PID not captured from headers');
-      
+
       // Assert Watchdog is actually running
-      assert.strictEqual(isProcessAlive(watchdogPid), true, 'Watchdog process should be running');
+      assert.strictEqual(
+        isProcessAlive(watchdogPid),
+        true,
+        'Watchdog process should be running',
+      );
 
       // Trigger shutdown
       killFn(ctx);
@@ -198,7 +215,12 @@ describe('Telemetry E2E', () => {
       // Verify shutdown event
       const shutdownEvent = await Promise.race([
         mockContext.waitForEvent(e => e.server_shutdown !== undefined),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout waiting for server_shutdown')), 10000))
+        new Promise((_, reject) =>
+          setTimeout(
+            () => reject(new Error('Timeout waiting for server_shutdown')),
+            10000,
+          ),
+        ),
       ]);
       assert.ok(shutdownEvent, 'server_shutdown event not received');
 

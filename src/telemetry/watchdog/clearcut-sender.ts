@@ -200,7 +200,9 @@ export class ClearcutSender {
         headers: {
           'Content-Type': 'application/json',
           // Used in E2E tests to confirm that the watchdog process is killed
-          ...(this.#includePidHeader ? {'X-Watchdog-Pid': process.pid.toString()} : {}),
+          ...(this.#includePidHeader
+            ? {'X-Watchdog-Pid': process.pid.toString()}
+            : {}),
         },
         body: JSON.stringify(requestBody),
         signal: controller.signal,
