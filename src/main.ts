@@ -32,6 +32,7 @@ import {
 } from './third_party/index.js';
 import {ToolCategory} from './tools/categories.js';
 import {EMULATION_UI_CONTENT} from './tools/emulation_ui.js';
+import {LCP_UI_CONTENT} from './tools/lcp_breakdown_ui.js';
 import type {ToolDefinition} from './tools/ToolDefinition.js';
 import {tools} from './tools/tools.js';
 
@@ -268,6 +269,11 @@ server.server.setRequestHandler(ListResourcesRequestSchema, async () => ({
       name: "Throttling Selection",
       mimeType: "text/html;profile=mcp-app",
     },
+    {
+      uri: "ui://performance/lcp-breakdown",
+      name: "LCP Breakdown",
+      mimeType: "text/html;profile=mcp-app",
+    },
   ],
 }));
 
@@ -279,6 +285,15 @@ server.server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
         uri: "ui://emulation/throttling",
         mimeType: "text/html;profile=mcp-app",
         text: EMULATION_UI_CONTENT,
+      }],
+    };
+  }
+  if (request.params.uri === "ui://performance/lcp-breakdown") {
+    return {
+      contents: [{
+        uri: "ui://performance/lcp-breakdown",
+        mimeType: "text/html;profile=mcp-app",
+        text: LCP_UI_CONTENT,
       }],
     };
   }

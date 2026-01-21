@@ -8,9 +8,10 @@ import zlib from 'node:zlib';
 
 import {logger} from '../logger.js';
 import {zod, DevTools} from '../third_party/index.js';
-import type {Page} from '../third_party/index.js';
+import type {Page, SerializedAXNode} from '../third_party/index.js';
 import type {InsightName, TraceResult} from '../trace-processing/parse.js';
 import {
+  getLCPBreakdownData,
   parseRawTraceBuffer,
   traceResultIsSuccess,
 } from '../trace-processing/parse.js';
@@ -174,6 +175,127 @@ export const analyzeInsight = defineTool({
     );
   },
 });
+
+export const showLCPBreakdown = defineTool({
+  name: 'performance_show_lcp_breakdown',
+  description:
+    'Displays a visual breakdown of the Largest Contentful Paint (LCP) phases and highlights the LCP element. Use this tool when you want to provide a rich graphical representation of LCP insights.',
+  annotations: {
+    category: ToolCategory.PERFORMANCE,
+    readOnlyHint: true,
+  },
+  _meta: {
+    ui: {
+      resourceUri: 'ui://performance/lcp-breakdown',
+      visibility: ['model', 'app'],
+    },
+  },
+  schema: {},
+  handler: async (_request, response, context) => {
+    const lastRecording = context.recordedTraces().at(-1);
+    if (!lastRecording) {
+      response.appendResponseLine(
+        'No recorded traces found. Record a performance trace so you have Insights to analyze.',
+      );
+      return;
+    }
+
+    const lcpDataWithScreenshot = await getLCPDataWithScreenshot(
+      context,
+      lastRecording,
+    );
+
+    if (!lcpDataWithScreenshot) {
+      response.appendResponseLine(
+        'No LCP data found in the current recording.',
+      );
+      return;
+    }
+
+    response.appendResponseLine('LCP Breakdown UI opened.');
+    response.appendResponseLine('```json');
+    response.appendResponseLine(
+      JSON.stringify({lcpData: lcpDataWithScreenshot}, null, 2),
+    );
+    response.appendResponseLine('```');
+  },
+});
+
+async function getLCPDataWithScreenshot(
+  context: Context,
+  lastRecording: TraceResult,
+) {
+  let finalInsightSetId: string | undefined;
+  if (lastRecording.insights) {
+    // Find the last insight set that has LCP data
+    const ids = Array.from(lastRecording.insights.keys());
+    for (let i = ids.length - 1; i >= 0; i--) {
+      const id = ids[i];
+      const lcpData = getLCPBreakdownData(lastRecording, id);
+      if (lcpData && lcpData.lcpMs > 0) {
+        finalInsightSetId = id;
+        break;
+      }
+    }
+  }
+
+  if (!finalInsightSetId) {
+    return null;
+  }
+
+  const lcpData = getLCPBreakdownData(lastRecording, finalInsightSetId);
+  if (!lcpData) {
+    return null;
+  }
+
+  let screenshot: string | undefined;
+  if (lcpData.backendNodeId) {
+    const page = context.getSelectedPage();
+    try {
+      const root = await page.accessibility.snapshot({includeIframes: true});
+      if (root) {
+        const node = findAXNode(root, lcpData.backendNodeId);
+        if (node) {
+          const handle = await node.elementHandle();
+          if (handle) {
+            const screenshotBuffer = await handle.screenshot({
+              type: 'png',
+              optimizeForSpeed: true,
+            });
+            screenshot = Buffer.from(screenshotBuffer).toString('base64');
+            await handle.dispose();
+          }
+        }
+      }
+    } catch (e) {
+      logger(`Error highlighting/screenshotting LCP element: ${e}`);
+    }
+  }
+
+  return {
+    ...lcpData,
+    screenshot,
+  };
+}
+
+function findAXNode(
+  node: SerializedAXNode,
+  backendNodeId: number,
+): SerializedAXNode | null {
+  // @ts-expect-error backendNodeId is not in standard types but present at runtime
+  if (node.backendNodeId === backendNodeId) {
+    return node;
+  }
+  if (node.children) {
+    for (const child of node.children) {
+      const found = findAXNode(child, backendNodeId);
+      if (found) {
+        return found;
+      }
+    }
+  }
+  return null;
+}
 
 async function stopTracingAndAppendOutput(
   page: Page,

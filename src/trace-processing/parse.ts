@@ -124,3 +124,63 @@ export function getInsightOutput(
   );
   return {output: formatter.formatInsight()};
 }
+
+export interface LCPPhase {
+  name: string;
+  durationMs: number;
+}
+
+export interface LCPBreakdownData {
+  lcpMs: number;
+  backendNodeId?: number;
+  phases: LCPPhase[];
+}
+
+export function getLCPBreakdownData(
+  result: TraceResult,
+  insightSetId: string,
+): LCPBreakdownData | null {
+  if (!result.insights) {
+    return null;
+  }
+
+  const insightSet = result.insights.get(insightSetId);
+  if (!insightSet) {
+    return null;
+  }
+
+  const lcpInsight = insightSet.model.LCPBreakdown;
+  if (!lcpInsight) {
+    return null;
+  }
+
+  // Extract backendNodeId from the LCP event if available
+  const lcpEvent = lcpInsight.lcpEvent;
+  const backendNodeId = lcpEvent?.args?.data?.nodeId;
+
+  // Extract phases from subparts
+  const phases: LCPPhase[] = [];
+  if (lcpInsight.subparts) {
+    const s = lcpInsight.subparts;
+    const toMs = (micro: number) => micro / 1000;
+
+    if (s.ttfb) {
+      phases.push({name: 'TTFB', durationMs: toMs(s.ttfb.range)});
+    }
+    if (s.loadDelay) {
+      phases.push({name: 'Load Delay', durationMs: toMs(s.loadDelay.range)});
+    }
+    if (s.loadDuration) {
+      phases.push({name: 'Load Duration', durationMs: toMs(s.loadDuration.range)});
+    }
+    if (s.renderDelay) {
+      phases.push({name: 'Render Delay', durationMs: toMs(s.renderDelay.range)});
+    }
+  }
+
+  return {
+    lcpMs: lcpInsight.lcpMs ?? 0,
+    backendNodeId,
+    phases,
+  };
+}
