@@ -425,6 +425,11 @@ export const askGeminiWeb = defineTool({
 
       await new Promise(resolve => setTimeout(resolve, 500));
 
+      // 質問送信前に model-response 要素数を記録（ChatGPTと同じカウント方式）
+      const initialModelResponseCount = await page.evaluate(() => {
+        return document.querySelectorAll('model-response').length;
+      });
+
       // Click send button - look for "プロンプトを送信" or similar
       const sent = await page.evaluate(() => {
         const buttons = Array.from(document.querySelectorAll('button'));
@@ -566,9 +571,18 @@ export const askGeminiWeb = defineTool({
           return !!stopButton;
         });
 
-        // Stop button/icon disappeared = generation complete
+        // Stop button/icon disappeared = check if new message appeared
         if (!hasStopIndicator) {
-          break;
+          // 追加: model-response 要素数が増えたか確認（ChatGPTと同じ方式）
+          const currentModelResponseCount = await page.evaluate(() => {
+            return document.querySelectorAll('model-response').length;
+          });
+
+          if (currentModelResponseCount > initialModelResponseCount) {
+            // ストップボタン消滅 AND 新規メッセージ出現で完了
+            break;
+          }
+          // メッセージ数が増えていなければ、まだ待機続行
         }
 
         if (Date.now() - startTime > 180000) {
@@ -578,14 +592,20 @@ export const askGeminiWeb = defineTool({
         }
       }
 
-      // Get the final response content
-      const responseText = await page.evaluate(() => {
+      // Get the final response content (新規に追加された model-response のみを取得)
+      const responseText = await page.evaluate(initialCount => {
         // Get content from model-response elements
         const modelResponses = Array.from(
           document.querySelectorAll('model-response'),
         );
+        if (modelResponses.length > initialCount) {
+          // 新規に追加された model-response を取得（ChatGPTと同じ方式）
+          const newResponse = modelResponses[initialCount];
+          return newResponse.textContent?.trim() || '';
+        }
+
+        // Fallback: get the last model response if any
         if (modelResponses.length > 0) {
-          // Get the last model response
           const lastResponse = modelResponses[modelResponses.length - 1];
           return lastResponse.textContent?.trim() || '';
         }
@@ -593,7 +613,7 @@ export const askGeminiWeb = defineTool({
         // Fallback: get text from main area
         const main = document.querySelector('main');
         return main?.innerText.slice(-5000) || '';
-      });
+      }, initialModelResponseCount);
 
       response.appendResponseLine('✅ 回答完了');
 

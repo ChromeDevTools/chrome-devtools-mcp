@@ -1,84 +1,105 @@
-# ask_chatgpt_web / ask_gemini_web のケース分類改善プラン
+# Gemini 回答取得失敗の修正プラン
 
 ## 問題
 
-`ask_chatgpt_web` と `ask_gemini_web` ツールで、**エラーケースの分類が不十分で、リトライすべきでないケースでもリトライを繰り返してしまう**。
+`ask_gemini_web` で「✅ ログイン確認完了」が表示された後、回答が正しく取得できない。
 
-具体例：「No page selected」エラーが発生しても、入力欄リトライなどの無意味なリトライが繰り返される。
+**症状:**
+- ログイン検出は成功（「✅ ログイン確認完了」が表示される）
+- 質問は送信されている
+- しかし、回答待機中にタイムアウト、または空の回答を取得
 
-## 調査結果
+**注意:** これはログイン検出の問題ではなく、**回答完了検出**の問題。
 
-### 既存のリトライロジック
-1. **navigateWithRetry** (27-61行目) - ネットワークエラー時に3回リトライ
-2. **入力欄リトライ** (522-546行目) - 入力欄が見つからない場合に3回リトライ
-3. **ログイン状態リトライ** (378-399行目) - ログイン処理中に3回リトライ
+## 根本原因
 
-### 問題点
-これらのリトライは「一時的なエラー」を想定しているが、**致命的なエラー**（ページなし、ブラウザ接続切れ）でも同じようにリトライしてしまう。
+**ChatGPTとGeminiの回答完了検出ロジックの違い：**
 
-### 分類すべきケース
+| 項目 | ChatGPT | Gemini | 問題点 |
+|------|---------|--------|-------|
+| 初期状態の記録 | `initialAssistantCount`を記録 | 記録なし | 新規メッセージ検出不可 |
+| 完了判定 | ストップボタン消滅 **AND** メッセージ数増加 | ストップボタン消滅**のみ** | 誤判定リスク |
+| 回答抽出 | 新規メッセージのみ | 最後の`model-response` | 古い応答を取得する可能性 |
 
-| ケース | リトライ可否 | 現状 |
-|--------|------------|------|
-| ネットワークエラー | ✅ リトライ | OK |
-| UI遅延（入力欄待ち） | ✅ リトライ | OK |
-| ログイン処理中 | ✅ リトライ | OK |
-| **ページなし** | ❌ 即座にエラー | ⚠️ リトライしてしまう |
-| **ブラウザ接続切れ** | ❌ 即座にエラー | ⚠️ リトライしてしまう |
-| **セレクター変更** | ❌ 即座にエラー | ⚠️ リトライしてしまう |
+**具体的な問題：**
+1. Geminiはストップボタンが**一時的に消滅**することがある
+2. その時に「完了」と誤判定してループを抜ける
+3. 実際には回答がまだ生成されていない
 
-## 修正方針（段階的アプローチ）
+## 修正方針
 
-### Step 1: 最小限の変更（まずこれだけ）
+ChatGPTと同じ「カウント方式」に変更：
 
-既存コードはそのまま、**catchブロックにケース分類を追加するだけ**：
-
-**chatgpt-web.ts:766-770** の既存catch:
-```typescript
-// 現状
-} catch (error) {
-  const errorMessage = error instanceof Error ? error.message : String(error);
-  response.appendResponseLine(`❌ エラー: ${errorMessage}`);
-}
-```
-
-**変更後**:
-```typescript
-} catch (error) {
-  const msg = error instanceof Error ? error.message : String(error);
-
-  // ケース分類（エラーメッセージを改善するだけ）
-  if (msg.includes('No page selected')) {
-    response.appendResponseLine('❌ ブラウザタブがありません');
-    response.appendResponseLine('→ MCPサーバーを再起動してブラウザを開いてください');
-  } else if (msg.includes('Target closed') || msg.includes('Session closed')) {
-    response.appendResponseLine('❌ ブラウザ接続が切れました');
-    response.appendResponseLine('→ MCPサーバーを再起動してください');
-  } else {
-    response.appendResponseLine(`❌ エラー: ${msg}`);
-  }
-}
-```
-
-**変更量**: 約10行、既存ロジック変更なし
-
-### Step 2: 動作確認後（オプション）
-
-Step 1で問題なければ、リトライ箇所の最適化を検討。
+1. 質問送信**前**に `model-response` 要素数を記録
+2. ストップボタン消滅 **かつ** `model-response` 要素数増加で完了判定
+3. 新規の `model-response` 要素からテキスト抽出
 
 ## 変更ファイル
 
-**Step 1のみ**:
-- `src/tools/chatgpt-web.ts` - catchブロックのメッセージ改善（10行程度）
-- `src/tools/gemini-web.ts` - 同様（10行程度）
+- `src/tools/gemini-web.ts`
+
+## 変更箇所
+
+### 1. 初期状態の記録を追加（質問送信前、約450行目付近）
+
+```typescript
+// 質問送信前に model-response 要素数を記録
+const initialModelResponseCount = await page.evaluate(() => {
+  return document.querySelectorAll('model-response').length;
+});
+```
+
+### 2. 回答完了判定を変更（約548-571行目）
+
+現在：
+```typescript
+if (!hasStopIndicator) {
+  break;  // ストップボタン消滅のみで完了判定
+}
+```
+
+変更後：
+```typescript
+if (!hasStopIndicator) {
+  // 追加: model-response 要素数が増えたか確認
+  const currentModelResponseCount = await page.evaluate(() => {
+    return document.querySelectorAll('model-response').length;
+  });
+
+  if (currentModelResponseCount > initialModelResponseCount) {
+    break;  // ストップボタン消滅 AND 新規メッセージ出現で完了
+  }
+  // メッセージ数が増えていなければ、まだ待機続行
+}
+```
+
+### 3. 回答テキスト抽出を改善（約581-596行目）
+
+現在：
+```typescript
+const lastResponse = modelResponses[modelResponses.length - 1];
+```
+
+変更後：
+```typescript
+// 新規に追加された model-response のみを取得
+const newResponse = modelResponses[initialModelResponseCount];
+```
 
 ## 検証方法
 
 ```bash
+# ビルド
 npm run build
-npm test
+
+# MCPサーバー再起動後、テスト
+# 1. ask_gemini_web で質問を送信
+# 2. 「ログイン確認完了」後にタイムアウトしないことを確認
+# 3. 回答が正しく取得されることを確認
 ```
 
 ## ロールバック
 
-問題があれば `git checkout src/tools/chatgpt-web.ts src/tools/gemini-web.ts`
+```bash
+git checkout src/tools/gemini-web.ts
+```
