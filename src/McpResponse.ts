@@ -4,12 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {createStackTraceForConsoleMessage} from './DevtoolsUtils.js';
-import type {ConsoleMessageData} from './formatters/consoleFormatter.js';
-import {
-  formatConsoleEventShort,
-  formatConsoleEventVerbose,
-} from './formatters/consoleFormatter.js';
+import {ConsoleFormatter} from './formatters/ConsoleFormatter.js';
 import {IssueFormatter} from './formatters/IssueFormatter.js';
 import {NetworkFormatter} from './formatters/NetworkFormatter.js';
 import {SnapshotFormatter} from './formatters/SnapshotFormatter.js';
@@ -234,7 +229,7 @@ export class McpResponse implements Response {
       detailedNetworkRequest = formatter;
     }
 
-    let consoleData: ConsoleMessageData | IssueFormatter | undefined;
+    let consoleData: ConsoleFormatter | IssueFormatter | undefined;
 
     if (this.#attachedConsoleMessageId) {
       const message = context.getConsoleMessageById(
@@ -244,26 +239,11 @@ export class McpResponse implements Response {
       if ('args' in message) {
         const consoleMessage = message as ConsoleMessage;
         const devTools = context.getDevToolsUniverse();
-        const stackTrace = devTools
-          ? await createStackTraceForConsoleMessage(devTools, consoleMessage)
-          : undefined;
-
-        consoleData = {
-          consoleMessageStableId,
-          type: consoleMessage.type(),
-          message: consoleMessage.text(),
-          args: await Promise.all(
-            consoleMessage.args().map(async arg => {
-              const stringArg = await arg.jsonValue().catch(() => {
-                // Ignore errors.
-              });
-              return typeof stringArg === 'object'
-                ? JSON.stringify(stringArg)
-                : String(stringArg);
-            }),
-          ),
-          stackTrace,
-        };
+        consoleData = await ConsoleFormatter.from(consoleMessage, {
+          id: consoleMessageStableId,
+          fetchDetailedData: true,
+          devTools: devTools ?? undefined,
+        });
       } else if (message instanceof DevTools.AggregatedIssue) {
         const formatter = new IssueFormatter(message, {
           id: consoleMessageStableId,
@@ -277,16 +257,13 @@ export class McpResponse implements Response {
         }
         consoleData = formatter;
       } else {
-        consoleData = {
-          consoleMessageStableId,
-          type: 'error',
-          message: (message as Error).message,
-          args: [],
-        };
+        consoleData = await ConsoleFormatter.from(message as Error, {
+          id: consoleMessageStableId,
+        });
       }
     }
 
-    let consoleListData: Array<ConsoleMessageData | IssueFormatter> | undefined;
+    let consoleListData: Array<ConsoleFormatter | IssueFormatter> | undefined;
     if (this.#consoleDataOptions?.include) {
       let messages = context.getConsoleData(
         this.#consoleDataOptions.includePreservedMessages,
@@ -308,36 +285,17 @@ export class McpResponse implements Response {
       consoleListData = (
         await Promise.all(
           messages.map(
-            async (
-              item,
-            ): Promise<ConsoleMessageData | IssueFormatter | null> => {
+            async (item): Promise<ConsoleFormatter | IssueFormatter | null> => {
               const consoleMessageStableId =
                 context.getConsoleMessageStableId(item);
               if ('args' in item) {
                 const consoleMessage = item as ConsoleMessage;
                 const devTools = context.getDevToolsUniverse();
-                const stackTrace = devTools
-                  ? await createStackTraceForConsoleMessage(
-                      devTools,
-                      consoleMessage,
-                    )
-                  : undefined;
-                return {
-                  consoleMessageStableId,
-                  type: consoleMessage.type(),
-                  message: consoleMessage.text(),
-                  args: await Promise.all(
-                    consoleMessage.args().map(async arg => {
-                      const stringArg = await arg.jsonValue().catch(() => {
-                        // Ignore errors.
-                      });
-                      return typeof stringArg === 'object'
-                        ? JSON.stringify(stringArg)
-                        : String(stringArg);
-                    }),
-                  ),
-                  stackTrace,
-                };
+                return await ConsoleFormatter.from(consoleMessage, {
+                  id: consoleMessageStableId,
+                  fetchDetailedData: true,
+                  devTools: devTools ?? undefined,
+                });
               }
               if (item instanceof DevTools.AggregatedIssue) {
                 const formatter = new IssueFormatter(item, {
@@ -348,12 +306,9 @@ export class McpResponse implements Response {
                 }
                 return formatter;
               }
-              return {
-                consoleMessageStableId,
-                type: 'error',
-                message: (item as Error).message,
-                args: [],
-              };
+              return await ConsoleFormatter.from(item as Error, {
+                id: consoleMessageStableId,
+              });
             },
           ),
         )
@@ -411,8 +366,8 @@ export class McpResponse implements Response {
     toolName: string,
     context: McpContext,
     data: {
-      consoleData: ConsoleMessageData | IssueFormatter | undefined;
-      consoleListData: Array<ConsoleMessageData | IssueFormatter> | undefined;
+      consoleData: ConsoleFormatter | IssueFormatter | undefined;
+      consoleListData: Array<ConsoleFormatter | IssueFormatter> | undefined;
       snapshot: SnapshotFormatter | string | undefined;
       detailedNetworkRequest?: NetworkFormatter;
       networkRequests?: NetworkFormatter[];
@@ -551,7 +506,7 @@ Call ${handleDialog.name} to handle it before continuing.`);
             if (message instanceof IssueFormatter) {
               return message.toString();
             }
-            return formatConsoleEventShort(message);
+            return message.toString();
           }),
         );
       } else {
@@ -604,7 +559,7 @@ Call ${handleDialog.name} to handle it before continuing.`);
 
   #formatConsoleData(
     context: McpContext,
-    data: ConsoleMessageData | IssueFormatter | undefined,
+    data: ConsoleFormatter | IssueFormatter | undefined,
   ): string[] {
     const response: string[] = [];
     if (!data) {
@@ -614,7 +569,7 @@ Call ${handleDialog.name} to handle it before continuing.`);
     if (data instanceof IssueFormatter) {
       response.push(data.toStringDetailed());
     } else {
-      response.push(formatConsoleEventVerbose(data, context));
+      response.push(data.toStringDetailed());
     }
     return response;
   }
