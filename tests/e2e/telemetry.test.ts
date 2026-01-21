@@ -7,9 +7,11 @@
 import assert from 'node:assert';
 import {spawn, type ChildProcess, type SpawnOptions} from 'node:child_process';
 import http from 'node:http';
+import type {AddressInfo} from 'node:net';
 import path from 'node:path';
 import {describe, it} from 'node:test';
-import { ChromeDevToolsMcpExtension } from '../../src/telemetry/types';
+
+import type { ChromeDevToolsMcpExtension } from '../../src/telemetry/types';
 
 const SERVER_PATH = path.resolve('build/src/main.js');
 
@@ -77,7 +79,7 @@ async function startMockServer(): Promise<MockServerContext> {
     server.listen(0, '127.0.0.1', () => resolve());
   });
 
-  const address = server.address() as import('net').AddressInfo;
+  const address = server.address() as AddressInfo;
   return {
     server,
     port: address.port,

@@ -194,15 +194,12 @@ describe('ClearcutSender', () => {
     });
     let resolveRequest: (value: Response) => void;
     
-    // We want the flush to start and hang
     fetchStub.onFirstCall().returns(new Promise<Response>(resolve => {
       resolveRequest = resolve;
     }));
 
-    // Start flush via timer synchronously
     clock.tick(FLUSH_INTERVAL_MS);
 
-    // Enqueue more events triggering overflow logic
     for (let i = 0; i < 1100; i++) {
       sender.enqueueEvent({
         tool_invocation: {
@@ -233,13 +230,10 @@ describe('ClearcutSender', () => {
       resolveFirstRequest = resolve;
     }));
 
-    // Start flush via timer synchronously
     clock.tick(FLUSH_INTERVAL_MS);
 
-    // Call shutdown while flush is pending
     const shutdownPromise = sender.sendShutdownEvent();
 
-    // Resolve first request to allow flush to complete
     resolveFirstRequest!(new Response(JSON.stringify({}), {status: 200}));
     await shutdownPromise;
     
@@ -254,11 +248,9 @@ describe('ClearcutSender', () => {
       JSON.parse(e.source_extension_json),
     );
 
-    // First flush should have the event
     assert.strictEqual(firstEvents.length, 1);
     assert.strictEqual(firstEvents[0].tool_invocation?.tool_name, 'test-event');
 
-    // Shutdown flush (second) should NOT duplicate it
     assert.strictEqual(
       secondEvents.length,
       1,
@@ -287,14 +279,11 @@ describe('ClearcutSender', () => {
     const firstSessionId = firstEvent.session_id;
 
     const SESSION_ROTATION_INTERVAL_MS = 24 * 60 * 60 * 1000;
-    // Advance time past rotation interval
-    // We already moved FLUSH_INTERVAL_MS. Move the rest + buffer.
     await clock.tickAsync(SESSION_ROTATION_INTERVAL_MS - FLUSH_INTERVAL_MS + 1000);
 
     sender.enqueueEvent({
       tool_invocation: {tool_name: 'test2', success: true, latency_ms: 10},
     });
-    // Trigger second flush
     await clock.tickAsync(FLUSH_INTERVAL_MS);
 
     const secondCallBody = JSON.parse(
@@ -311,26 +300,20 @@ describe('ClearcutSender', () => {
   it('respects next_request_wait_millis from server', async () => {
     const sender = new ClearcutSender('1.0.0', OsType.OS_TYPE_MACOS);
 
-    // Configure server to request 45s wait
     fetchStub.resolves(new Response(JSON.stringify({
       next_request_wait_millis: 45000,
     }), {status: 200}));
 
     sender.enqueueEvent({});
-    // Initial flush
     await clock.tickAsync(FLUSH_INTERVAL_MS);
 
-    // Reset stub history to track next calls
     fetchStub.resetHistory();
 
-    // Enqueue another event
     sender.enqueueEvent({});
 
-    // Advance time by 44s - should NOT flush yet
     await clock.tickAsync(44000);
     assert.strictEqual(fetchStub.callCount, 0, 'Should not flush before wait time');
 
-    // Advance time by 1s (total 45s) - SHOULD flush now
     await clock.tickAsync(1000);
     assert.strictEqual(fetchStub.callCount, 1, 'Should flush after wait time');
 
@@ -344,15 +327,14 @@ describe('ClearcutSender', () => {
     let fetchSignal: AbortSignal | undefined;
     fetchStub.callsFake((_url, options) => {
       fetchSignal = options.signal;
-      return new Promise(() => {}); // Never resolves
+      return new Promise(() => {
+        // Hangs forever
+      });
     });
 
     sender.enqueueEvent({});
 
-    // Trigger flush
     await clock.tickAsync(FLUSH_INTERVAL_MS);
-
-    // Advance time for timeout
     await clock.tickAsync(REQUEST_TIMEOUT_MS);
 
     assert.ok(fetchSignal, 'Fetch should have been called with a signal');
@@ -363,14 +345,14 @@ describe('ClearcutSender', () => {
 
   it('resolves sendShutdownEvent after timeout if flush hangs', async () => {
     const sender = new ClearcutSender('1.0.0', OsType.OS_TYPE_MACOS);
-    fetchStub.returns(new Promise(() => {})); // Hangs forever
+    fetchStub.returns(new Promise(() => {
+      // Hangs forever
+    }));
 
     const shutdownPromise = sender.sendShutdownEvent();
 
-    // Advance time by 5000ms (SHUTDOWN_TIMEOUT_MS)
     await clock.tickAsync(5000);
 
-    // The promise should resolve now
     await shutdownPromise;
   });
 });
