@@ -182,6 +182,22 @@ describe('McpResponse', () => {
     });
   });
 
+  it('adds viewport emulation setting when it is set', async t => {
+    await withMcpContext(async (response, context) => {
+      context.setViewport({width: 400, height: 400, deviceScaleFactor: 1});
+      const {content} = await response.handle('test', context);
+      t.assert.snapshot?.(getTextContent(content[0]));
+    });
+  });
+
+  it('adds userAgent emulation setting when it is set', async t => {
+    await withMcpContext(async (response, context) => {
+      context.setUserAgent('MyUA');
+      const {content} = await response.handle('test', context);
+      t.assert.snapshot?.(getTextContent(content[0]));
+    });
+  });
+
   it('adds a prompt dialog', async t => {
     await withMcpContext(async (response, context) => {
       const page = context.getSelectedPage();

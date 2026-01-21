@@ -4,12 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {mapIssueToMessageObject} from './DevtoolsUtils.js';
+import {createStackTraceForConsoleMessage} from './DevtoolsUtils.js';
 import type {ConsoleMessageData} from './formatters/consoleFormatter.js';
 import {
   formatConsoleEventShort,
   formatConsoleEventVerbose,
 } from './formatters/consoleFormatter.js';
+import {IssueFormatter} from './formatters/IssueFormatter.js';
 import {NetworkFormatter} from './formatters/NetworkFormatter.js';
 import {SnapshotFormatter} from './formatters/SnapshotFormatter.js';
 import type {McpContext} from './McpContext.js';
@@ -233,7 +234,7 @@ export class McpResponse implements Response {
       detailedNetworkRequest = formatter;
     }
 
-    let consoleData: ConsoleMessageData | undefined;
+    let consoleData: ConsoleMessageData | IssueFormatter | undefined;
 
     if (this.#attachedConsoleMessageId) {
       const message = context.getConsoleMessageById(
@@ -242,6 +243,11 @@ export class McpResponse implements Response {
       const consoleMessageStableId = this.#attachedConsoleMessageId;
       if ('args' in message) {
         const consoleMessage = message as ConsoleMessage;
+        const devTools = context.getDevToolsUniverse();
+        const stackTrace = devTools
+          ? await createStackTraceForConsoleMessage(devTools, consoleMessage)
+          : undefined;
+
         consoleData = {
           consoleMessageStableId,
           type: consoleMessage.type(),
@@ -256,18 +262,20 @@ export class McpResponse implements Response {
                 : String(stringArg);
             }),
           ),
+          stackTrace,
         };
       } else if (message instanceof DevTools.AggregatedIssue) {
-        const mappedIssueMessage = mapIssueToMessageObject(message);
-        if (!mappedIssueMessage) {
+        const formatter = new IssueFormatter(message, {
+          id: consoleMessageStableId,
+          requestIdResolver: context.resolveCdpRequestId.bind(context),
+          elementIdResolver: context.resolveCdpElementId.bind(context),
+        });
+        if (!formatter.isValid()) {
           throw new Error(
             "Can't provide detals for the msgid " + consoleMessageStableId,
           );
         }
-        consoleData = {
-          consoleMessageStableId,
-          ...mappedIssueMessage,
-        };
+        consoleData = formatter;
       } else {
         consoleData = {
           consoleMessageStableId,
@@ -278,7 +286,7 @@ export class McpResponse implements Response {
       }
     }
 
-    let consoleListData: ConsoleMessageData[] | undefined;
+    let consoleListData: Array<ConsoleMessageData | IssueFormatter> | undefined;
     if (this.#consoleDataOptions?.include) {
       let messages = context.getConsoleData(
         this.#consoleDataOptions.includePreservedMessages,
@@ -299,44 +307,55 @@ export class McpResponse implements Response {
 
       consoleListData = (
         await Promise.all(
-          messages.map(async (item): Promise<ConsoleMessageData | null> => {
-            const consoleMessageStableId =
-              context.getConsoleMessageStableId(item);
-            if ('args' in item) {
-              const consoleMessage = item as ConsoleMessage;
-              return {
-                consoleMessageStableId,
-                type: consoleMessage.type(),
-                message: consoleMessage.text(),
-                args: await Promise.all(
-                  consoleMessage.args().map(async arg => {
-                    const stringArg = await arg.jsonValue().catch(() => {
-                      // Ignore errors.
-                    });
-                    return typeof stringArg === 'object'
-                      ? JSON.stringify(stringArg)
-                      : String(stringArg);
-                  }),
-                ),
-              };
-            }
-            if (item instanceof DevTools.AggregatedIssue) {
-              const mappedIssueMessage = mapIssueToMessageObject(item);
-              if (!mappedIssueMessage) {
-                return null;
+          messages.map(
+            async (
+              item,
+            ): Promise<ConsoleMessageData | IssueFormatter | null> => {
+              const consoleMessageStableId =
+                context.getConsoleMessageStableId(item);
+              if ('args' in item) {
+                const consoleMessage = item as ConsoleMessage;
+                const devTools = context.getDevToolsUniverse();
+                const stackTrace = devTools
+                  ? await createStackTraceForConsoleMessage(
+                      devTools,
+                      consoleMessage,
+                    )
+                  : undefined;
+                return {
+                  consoleMessageStableId,
+                  type: consoleMessage.type(),
+                  message: consoleMessage.text(),
+                  args: await Promise.all(
+                    consoleMessage.args().map(async arg => {
+                      const stringArg = await arg.jsonValue().catch(() => {
+                        // Ignore errors.
+                      });
+                      return typeof stringArg === 'object'
+                        ? JSON.stringify(stringArg)
+                        : String(stringArg);
+                    }),
+                  ),
+                  stackTrace,
+                };
+              }
+              if (item instanceof DevTools.AggregatedIssue) {
+                const formatter = new IssueFormatter(item, {
+                  id: consoleMessageStableId,
+                });
+                if (!formatter.isValid()) {
+                  return null;
+                }
+                return formatter;
               }
               return {
                 consoleMessageStableId,
-                ...mappedIssueMessage,
+                type: 'error',
+                message: (item as Error).message,
+                args: [],
               };
-            }
-            return {
-              consoleMessageStableId,
-              type: 'error',
-              message: (item as Error).message,
-              args: [],
-            };
-          }),
+            },
+          ),
         )
       ).filter(item => item !== null);
     }
@@ -392,8 +411,8 @@ export class McpResponse implements Response {
     toolName: string,
     context: McpContext,
     data: {
-      consoleData: ConsoleMessageData | undefined;
-      consoleListData: ConsoleMessageData[] | undefined;
+      consoleData: ConsoleMessageData | IssueFormatter | undefined;
+      consoleListData: Array<ConsoleMessageData | IssueFormatter> | undefined;
       snapshot: SnapshotFormatter | string | undefined;
       detailedNetworkRequest?: NetworkFormatter;
       networkRequests?: NetworkFormatter[];
@@ -411,6 +430,18 @@ export class McpResponse implements Response {
       response.push(
         `Default navigation timeout set to ${context.getNavigationTimeout()} ms`,
       );
+    }
+
+    const viewport = context.getViewport();
+    if (viewport) {
+      response.push(`## Viewport emulation`);
+      response.push(`Emulating viewport: ${JSON.stringify(viewport)}`);
+    }
+
+    const userAgent = context.getUserAgent();
+    if (userAgent) {
+      response.push(`## UserAgent emulation`);
+      response.push(`Emulating userAgent: ${userAgent}`);
     }
 
     const cpuThrottlingRate = context.getCpuThrottlingRate();
@@ -516,7 +547,12 @@ Call ${handleDialog.name} to handle it before continuing.`);
         );
         response.push(...data.info);
         response.push(
-          ...data.items.map(message => formatConsoleEventShort(message)),
+          ...data.items.map(message => {
+            if (message instanceof IssueFormatter) {
+              return message.toString();
+            }
+            return formatConsoleEventShort(message);
+          }),
         );
       } else {
         response.push('<no console messages found>');
@@ -568,14 +604,18 @@ Call ${handleDialog.name} to handle it before continuing.`);
 
   #formatConsoleData(
     context: McpContext,
-    data: ConsoleMessageData | undefined,
+    data: ConsoleMessageData | IssueFormatter | undefined,
   ): string[] {
     const response: string[] = [];
     if (!data) {
       return response;
     }
 
-    response.push(formatConsoleEventVerbose(data, context));
+    if (data instanceof IssueFormatter) {
+      response.push(data.toStringDetailed());
+    } else {
+      response.push(formatConsoleEventVerbose(data, context));
+    }
     return response;
   }
 

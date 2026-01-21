@@ -8,7 +8,12 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
-import {extractUrlLikeFromDevToolsTitle, urlsEqual} from './DevtoolsUtils.js';
+import type {TargetUniverse} from './DevtoolsUtils.js';
+import {
+  extractUrlLikeFromDevToolsTitle,
+  UniverseManager,
+  urlsEqual,
+} from './DevtoolsUtils.js';
 import type {ListenerMap} from './PageCollector.js';
 import {NetworkCollector, ConsoleCollector} from './PageCollector.js';
 import {Locator} from './third_party/index.js';
@@ -23,6 +28,7 @@ import type {
   Page,
   SerializedAXNode,
   PredefinedNetworkConditions,
+  Viewport,
 } from './third_party/index.js';
 import {listPages} from './tools/pages.js';
 import {takeSnapshot} from './tools/snapshot.js';
@@ -104,11 +110,14 @@ export class McpContext implements Context {
   #textSnapshot: TextSnapshot | null = null;
   #networkCollector: NetworkCollector;
   #consoleCollector: ConsoleCollector;
+  #devtoolsUniverseManager: UniverseManager;
 
   #isRunningTrace = false;
   #networkConditionsMap = new WeakMap<Page, string>();
   #cpuThrottlingRateMap = new WeakMap<Page, number>();
   #geolocationMap = new WeakMap<Page, GeolocationOptions>();
+  #viewportMap = new WeakMap<Page, Viewport>();
+  #userAgentMap = new WeakMap<Page, string>();
   #dialog?: Dialog;
 
   #pageIdMap = new WeakMap<Page, number>();
@@ -152,17 +161,20 @@ export class McpContext implements Context {
         },
       } as ListenerMap;
     });
+    this.#devtoolsUniverseManager = new UniverseManager(this.browser);
   }
 
   async #init() {
     const pages = await this.createPagesSnapshot();
     await this.#networkCollector.init(pages);
     await this.#consoleCollector.init(pages);
+    await this.#devtoolsUniverseManager.init(pages);
   }
 
   dispose() {
     this.#networkCollector.dispose();
     this.#consoleCollector.dispose();
+    this.#devtoolsUniverseManager.dispose();
   }
 
   static async from(
@@ -227,6 +239,10 @@ export class McpContext implements Context {
   ): Array<ConsoleMessage | Error | DevTools.AggregatedIssue> {
     const page = this.getSelectedPage();
     return this.#consoleCollector.getData(page, includePreservedMessages);
+  }
+
+  getDevToolsUniverse(): TargetUniverse | null {
+    return this.#devtoolsUniverseManager.get(this.getSelectedPage());
   }
 
   getConsoleMessageStableId(
@@ -299,6 +315,34 @@ export class McpContext implements Context {
   getGeolocation(): GeolocationOptions | null {
     const page = this.getSelectedPage();
     return this.#geolocationMap.get(page) ?? null;
+  }
+
+  setViewport(viewport: Viewport | null): void {
+    const page = this.getSelectedPage();
+    if (viewport === null) {
+      this.#viewportMap.delete(page);
+    } else {
+      this.#viewportMap.set(page, viewport);
+    }
+  }
+
+  getViewport(): Viewport | null {
+    const page = this.getSelectedPage();
+    return this.#viewportMap.get(page) ?? null;
+  }
+
+  setUserAgent(userAgent: string | null): void {
+    const page = this.getSelectedPage();
+    if (userAgent === null) {
+      this.#userAgentMap.delete(page);
+    } else {
+      this.#userAgentMap.set(page, userAgent);
+    }
+  }
+
+  getUserAgent(): string | null {
+    const page = this.getSelectedPage();
+    return this.#userAgentMap.get(page) ?? null;
   }
 
   setIsRunningPerformanceTrace(x: boolean): void {
@@ -693,5 +737,9 @@ export class McpContext implements Context {
 
   async installExtension(path: string): Promise<string> {
     return this.browser.installExtension(path);
+  }
+
+  async uninstallExtension(id: string): Promise<void> {
+    return this.browser.uninstallExtension(id);
   }
 }

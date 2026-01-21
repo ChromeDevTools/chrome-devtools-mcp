@@ -5,6 +5,7 @@
  */
 
 import 'core-js/modules/es.promise.with-resolvers.js';
+import 'core-js/modules/es.set.union.v2.js';
 import 'core-js/proposals/iterator-helpers.js';
 
 export type {Options as YargsOptions} from 'yargs';
@@ -24,6 +25,7 @@ export {z as zod} from 'zod';
 export {
   Locator,
   PredefinedNetworkConditions,
+  KnownDevices,
   CDPSessionEvent,
 } from 'puppeteer-core';
 export {default as puppeteer} from 'puppeteer-core';
