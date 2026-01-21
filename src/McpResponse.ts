@@ -229,7 +229,7 @@ export class McpResponse implements Response {
       detailedNetworkRequest = formatter;
     }
 
-    let consoleData: ConsoleFormatter | IssueFormatter | undefined;
+    let detailedConsoleMessage: ConsoleFormatter | IssueFormatter | undefined;
 
     if (this.#attachedConsoleMessageId) {
       const message = context.getConsoleMessageById(
@@ -239,7 +239,7 @@ export class McpResponse implements Response {
       if ('args' in message) {
         const consoleMessage = message as ConsoleMessage;
         const devTools = context.getDevToolsUniverse();
-        consoleData = await ConsoleFormatter.from(consoleMessage, {
+        detailedConsoleMessage = await ConsoleFormatter.from(consoleMessage, {
           id: consoleMessageStableId,
           fetchDetailedData: true,
           devTools: devTools ?? undefined,
@@ -255,15 +255,15 @@ export class McpResponse implements Response {
             "Can't provide detals for the msgid " + consoleMessageStableId,
           );
         }
-        consoleData = formatter;
+        detailedConsoleMessage = formatter;
       } else {
-        consoleData = await ConsoleFormatter.from(message as Error, {
+        detailedConsoleMessage = await ConsoleFormatter.from(message as Error, {
           id: consoleMessageStableId,
         });
       }
     }
 
-    let consoleListData: Array<ConsoleFormatter | IssueFormatter> | undefined;
+    let consoleMessages: Array<ConsoleFormatter | IssueFormatter> | undefined;
     if (this.#consoleDataOptions?.include) {
       let messages = context.getConsoleData(
         this.#consoleDataOptions.includePreservedMessages,
@@ -282,7 +282,7 @@ export class McpResponse implements Response {
         });
       }
 
-      consoleListData = (
+      consoleMessages = (
         await Promise.all(
           messages.map(
             async (item): Promise<ConsoleFormatter | IssueFormatter | null> => {
@@ -354,8 +354,8 @@ export class McpResponse implements Response {
     }
 
     return this.format(toolName, context, {
-      consoleData,
-      consoleListData,
+      detailedConsoleMessage,
+      consoleMessages,
       snapshot,
       detailedNetworkRequest,
       networkRequests,
@@ -366,8 +366,8 @@ export class McpResponse implements Response {
     toolName: string,
     context: McpContext,
     data: {
-      consoleData: ConsoleFormatter | IssueFormatter | undefined;
-      consoleListData: Array<ConsoleFormatter | IssueFormatter> | undefined;
+      detailedConsoleMessage: ConsoleFormatter | IssueFormatter | undefined;
+      consoleMessages: Array<ConsoleFormatter | IssueFormatter> | undefined;
       snapshot: SnapshotFormatter | string | undefined;
       detailedNetworkRequest?: NetworkFormatter;
       networkRequests?: NetworkFormatter[];
@@ -454,7 +454,9 @@ Call ${handleDialog.name} to handle it before continuing.`);
       structuredContent.networkRequest =
         data.detailedNetworkRequest.toJSONDetailed();
     }
-    response.push(...this.#formatConsoleData(context, data.consoleData));
+    response.push(
+      ...this.#formatConsoleData(context, data.detailedConsoleMessage),
+    );
 
     if (this.#networkRequestsOptions?.include) {
       let requests = context.getNetworkRequests(
@@ -492,7 +494,7 @@ Call ${handleDialog.name} to handle it before continuing.`);
     }
 
     if (this.#consoleDataOptions?.include) {
-      const messages = data.consoleListData ?? [];
+      const messages = data.consoleMessages ?? [];
 
       response.push('## Console messages');
       if (messages.length) {
