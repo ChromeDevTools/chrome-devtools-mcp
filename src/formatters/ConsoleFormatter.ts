@@ -171,4 +171,27 @@ export class ConsoleFormatter {
     }
     return result;
   }
+  toJSON(): object {
+    return {
+      type: this.#getType(),
+      text: this.#getText(),
+      argsCount:
+        this.#msg instanceof Error
+          ? 0
+          : this.#resolvedArgs.length || this.#msg.args().length,
+      id: this.#id,
+    };
+  }
+
+  toJSONDetailed(): object {
+    return {
+      id: this.#id,
+      type: this.#getType(),
+      text: this.#getText(),
+      args: this.#getArgs().map(arg =>
+        typeof arg === 'object' ? arg : String(arg),
+      ),
+      stackTrace: this.#resolvedStackTrace,
+    };
+  }
 }

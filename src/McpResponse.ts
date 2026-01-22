@@ -432,6 +432,8 @@ Call ${handleDialog.name} to handle it before continuing.`);
       tabId?: string;
       networkRequest?: object;
       networkRequests?: object[];
+      consoleMessage?: object;
+      consoleMessages?: object[];
     } = {};
 
     if (this.#tabId) {
@@ -454,9 +456,12 @@ Call ${handleDialog.name} to handle it before continuing.`);
       structuredContent.networkRequest =
         data.detailedNetworkRequest.toJSONDetailed();
     }
-    response.push(
-      ...this.#formatConsoleData(context, data.detailedConsoleMessage),
-    );
+
+    if (data.detailedConsoleMessage) {
+      response.push(data.detailedConsoleMessage.toStringDetailed());
+      structuredContent.consoleMessage =
+        data.detailedConsoleMessage.toJSONDetailed();
+    }
 
     if (this.#networkRequestsOptions?.include) {
       let requests = context.getNetworkRequests(
@@ -503,13 +508,9 @@ Call ${handleDialog.name} to handle it before continuing.`);
           this.#consoleDataOptions.pagination,
         );
         response.push(...data.info);
-        response.push(
-          ...data.items.map(message => {
-            if (message instanceof IssueFormatter) {
-              return message.toString();
-            }
-            return message.toString();
-          }),
+        response.push(...data.items.map(message => message.toString()));
+        structuredContent.consoleMessages = data.items.map(message =>
+          message.toJSON(),
         );
       } else {
         response.push('<no console messages found>');
@@ -557,23 +558,6 @@ Call ${handleDialog.name} to handle it before continuing.`);
       info: response,
       items: paginationResult.items,
     };
-  }
-
-  #formatConsoleData(
-    context: McpContext,
-    data: ConsoleFormatter | IssueFormatter | undefined,
-  ): string[] {
-    const response: string[] = [];
-    if (!data) {
-      return response;
-    }
-
-    if (data instanceof IssueFormatter) {
-      response.push(data.toStringDetailed());
-    } else {
-      response.push(data.toStringDetailed());
-    }
-    return response;
   }
 
   resetResponseLineForTesting() {

@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
 import {ConsoleFormatter} from '../../src/formatters/ConsoleFormatter.js';
@@ -161,6 +162,79 @@ describe('ConsoleFormatter', () => {
         })
       ).toStringDetailed();
       t.assert.snapshot?.(result);
+    });
+  });
+  describe('toJSON', () => {
+    it('formats a console.log message', async () => {
+      const message = createMockMessage({
+        type: () => 'log',
+        text: () => 'Hello, world!',
+      });
+      const result = (await ConsoleFormatter.from(message, {id: 1})).toJSON();
+      assert.deepStrictEqual(result, {
+        type: 'log',
+        text: 'Hello, world!',
+        argsCount: 0,
+        id: 1,
+      });
+    });
+
+    it('formats a console.log message with args', async () => {
+      const message = createMockMessage({
+        type: () => 'log',
+        text: () => 'Processing file:',
+        args: () => [
+          {jsonValue: async () => 'file.txt'},
+          {jsonValue: async () => 'another file'},
+        ],
+      });
+      const result = (await ConsoleFormatter.from(message, {id: 1})).toJSON();
+      assert.deepStrictEqual(result, {
+        type: 'log',
+        text: 'Processing file:',
+        argsCount: 2,
+        id: 1,
+      });
+    });
+  });
+
+  describe('toJSONDetailed', () => {
+    it('formats a console.log message', async () => {
+      const message = createMockMessage({
+        type: () => 'log',
+        text: () => 'Hello, world!',
+      });
+      const result = (
+        await ConsoleFormatter.from(message, {id: 1})
+      ).toJSONDetailed();
+      assert.deepStrictEqual(result, {
+        id: 1,
+        type: 'log',
+        text: 'Hello, world!',
+        args: [],
+        stackTrace: undefined,
+      });
+    });
+
+    it('formats a console.log message with args', async () => {
+      const message = createMockMessage({
+        type: () => 'log',
+        text: () => 'Processing file:',
+        args: () => [
+          {jsonValue: async () => 'file.txt'},
+          {jsonValue: async () => 'another file'},
+        ],
+      });
+      const result = (
+        await ConsoleFormatter.from(message, {id: 2, fetchDetailedData: true})
+      ).toJSONDetailed();
+      assert.deepStrictEqual(result, {
+        id: 2,
+        type: 'log',
+        text: 'Processing file:',
+        args: ['file.txt', 'another file'],
+        stackTrace: undefined,
+      });
     });
   });
 });
