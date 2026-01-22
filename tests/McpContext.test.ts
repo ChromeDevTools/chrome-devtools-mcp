@@ -41,7 +41,7 @@ describe('McpContext', () => {
     });
   });
 
-  it('can store and retrieve performance traces', async () => {
+  it('can store and retrieve the latest performance trace', async () => {
     await withMcpContext(async (_response, context) => {
       const fakeTrace1 = {} as unknown as TraceResult;
       const fakeTrace2 = {} as unknown as TraceResult;
