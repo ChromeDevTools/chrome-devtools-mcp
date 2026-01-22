@@ -16,6 +16,7 @@ import {
   traceResultIsSuccess,
 } from '../src/trace-processing/parse.js';
 
+import {serverHooks} from './server.js';
 import {loadTraceAsBuffer} from './trace-processing/fixtures/load.js';
 import {
   getImageContent,
@@ -63,8 +64,8 @@ describe('McpResponse', () => {
     await withMcpContext(async (response, context) => {
       const page = context.getSelectedPage();
       await page.setContent(
-        html`<button>Click me</button
-          ><input
+        html`<button>Click me</button>
+          <input
             type="text"
             value="Input"
           />`,
@@ -143,6 +144,111 @@ describe('McpResponse', () => {
     } finally {
       await rm(filePath, {force: true});
     }
+  });
+
+  it('preserves mapping ids across multiple snapshots', async () => {
+    await withMcpContext(async (response, context) => {
+      const page = context.getSelectedPage();
+      await page.setContent(html`
+        <div>
+          <button id="btn1">Button 1</button>
+          <span id="span1">Span 1</span>
+        </div>
+      `);
+      response.includeSnapshot();
+      // First snapshot
+      const res1 = await response.handle('test', context);
+      const text1 = getTextContent(res1.content[0]);
+      const btn1IdMatch = text1.match(/uid=(\S+) .*Button 1/);
+      const span1IdMatch = text1.match(/uid=(\S+) .*Span 1/);
+
+      assert.ok(btn1IdMatch, 'Button 1 ID not found in first snapshot');
+      assert.ok(span1IdMatch, 'Span 1 ID not found in first snapshot');
+
+      const btn1Id = btn1IdMatch[1];
+      const span1Id = span1IdMatch[1];
+
+      // Modify page: add a new element before the others to potentially shift indices if not stable
+      await page.evaluate(() => {
+        const newBtn = document.createElement('button');
+        newBtn.textContent = 'Button 2';
+        document.body.prepend(newBtn);
+      });
+
+      // Second snapshot
+      const res2 = await response.handle('test', context);
+      const text2 = getTextContent(res2.content[0]);
+
+      const btn1IdMatch2 = text2.match(/uid=(\S+) .*Button 1/);
+      const span1IdMatch2 = text2.match(/uid=(\S+) .*Span 1/);
+      const btn2IdMatch = text2.match(/uid=(\S+) .*Button 2/);
+
+      assert.ok(btn1IdMatch2, 'Button 1 ID not found in second snapshot');
+      assert.ok(span1IdMatch2, 'Span 1 ID not found in second snapshot');
+      assert.ok(btn2IdMatch, 'Button 2 ID not found in second snapshot');
+
+      assert.strictEqual(
+        btn1IdMatch2[1],
+        btn1Id,
+        'Button 1 ID changed between snapshots',
+      );
+      assert.strictEqual(
+        span1IdMatch2[1],
+        span1Id,
+        'Span 1 ID changed between snapshots',
+      );
+      assert.notStrictEqual(
+        btn2IdMatch[1],
+        btn1Id,
+        'Button 2 ID collides with Button 1',
+      );
+      assert.notStrictEqual(
+        btn2IdMatch[1],
+        btn1Id,
+        'Button 2 ID collides with Button 1',
+      );
+    });
+  });
+
+  describe('navigation', () => {
+    const server = serverHooks();
+
+    it('resets ids after navigation', async () => {
+      await withMcpContext(async (response, context) => {
+        server.addHtmlRoute(
+          '/page.html',
+          html`
+            <div>
+              <button id="btn1">Button 1</button>
+            </div>
+          `,
+        );
+        const page = context.getSelectedPage();
+        await page.goto(server.getRoute('/page.html'));
+
+        response.includeSnapshot();
+        const res1 = await response.handle('test', context);
+        const text1 = getTextContent(res1.content[0]);
+        const btn1IdMatch = text1.match(/uid=(\S+) .*Button 1/);
+        assert.ok(btn1IdMatch, 'Button 1 ID not found in first snapshot');
+        const btn1Id = btn1IdMatch[1];
+
+        // Navigate to the same page again (or meaningful navigation)
+        await page.goto(server.getRoute('/page.html'));
+
+        const res2 = await response.handle('test', context);
+        const text2 = getTextContent(res2.content[0]);
+        const btn1IdMatch2 = text2.match(/uid=(\S+) .*Button 1/);
+        assert.ok(btn1IdMatch2, 'Button 1 ID not found in second snapshot');
+        const btn1Id2 = btn1IdMatch2[1];
+
+        assert.notStrictEqual(
+          btn1Id2,
+          btn1Id,
+          'ID should reset after navigation',
+        );
+      });
+    });
   });
 
   it('adds throttling setting when it is not null', async t => {

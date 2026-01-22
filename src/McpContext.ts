@@ -586,24 +586,26 @@ export class McpContext implements Context {
     const idToNode = new Map<string, TextSnapshotNode>();
     const seenUniqueIds = new Set<string>();
     const assignIds = (node: SerializedAXNode): TextSnapshotNode => {
+      let id = '';
+      // @ts-expect-error untyped loaderId & backendNodeId.
+      const uniqueBackendId = `${node.loaderId}_${node.backendNodeId}`;
+      if (this.#uniqueBackendNodeIdToMcpId.has(uniqueBackendId)) {
+        // Re-use MCP exposed ID if the uniqueId is the same.
+        id = this.#uniqueBackendNodeIdToMcpId.get(uniqueBackendId)!;
+      } else {
+        // Only generate a new ID if we have not seen the node before.
+        id = `${snapshotId}_${idCounter++}`;
+        this.#uniqueBackendNodeIdToMcpId.set(uniqueBackendId, id);
+      }
+      seenUniqueIds.add(uniqueBackendId);
+
       const nodeWithId: TextSnapshotNode = {
         ...node,
-        id: '', // placeholder to be set below.
+        id,
         children: node.children
           ? node.children.map(child => assignIds(child))
           : [],
       };
-
-      const uniqueBackendId = `${nodeWithId.loaderId}_${nodeWithId.backendNodeId}`;
-      if (this.#uniqueBackendNodeIdToMcpId.has(uniqueBackendId)) {
-        // Re-use MCP exposed ID if the uniqueId is the same.
-        nodeWithId.id = this.#uniqueBackendNodeIdToMcpId.get(uniqueBackendId)!;
-      } else {
-        // Only generate a new ID if we have not seen the node before.
-        nodeWithId.id = `${snapshotId}_${idCounter++}`;
-        this.#uniqueBackendNodeIdToMcpId.set(uniqueBackendId, nodeWithId.id);
-      }
-      seenUniqueIds.add(uniqueBackendId);
 
       // The AXNode for an option doesn't contain its `value`.
       // Therefore, set text content of the option as value.
