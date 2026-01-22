@@ -667,6 +667,8 @@ export class McpContext implements Context {
   }
 
   storeTraceRecording(result: TraceResult): void {
+    // Clear the trace results because we only consume the latest trace currently.
+    this.#traceResults = [];
     this.#traceResults.push(result);
   }
 

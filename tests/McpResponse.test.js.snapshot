@@ -192,6 +192,252 @@ uid=1_0 RootWebArea "My test page" url="about:blank"
 
 `;
 
+exports[`McpResponse network pagination > trace insights > includes error if insight not found 1`] = `
+# test response
+No Performance Insights for the given insight set id. Only use ids given in the "Available insight sets" list.
+`;
+
+exports[`McpResponse network pagination > trace insights > includes the trace insight output 1`] = `
+# test response
+## Insight Title: LCP breakdown
+
+## Insight Summary:
+This insight is used to analyze the time spent that contributed to the final LCP time and identify which of the 4 phases (or 2 if there was no LCP resource) are contributing most to the delay in rendering the LCP element.
+
+## Detailed analysis:
+The Largest Contentful Paint (LCP) time for this navigation was 129 ms.
+The LCP element is an image fetched from https://web-dev.imgix.net/image/kheDArv5csY6rvQUJDbWRscckLr1/4i7JstVZvgTFk9dxCe4a.svg (eventKey: s-1314, ts: 122411037986).
+## LCP resource network request: https://web-dev.imgix.net/image/kheDArv5csY6rvQUJDbWRscckLr1/4i7JstVZvgTFk9dxCe4a.svg
+eventKey: s-1314
+Timings:
+- Queued at: 41 ms
+- Request sent at: 47 ms
+- Download complete at: 56 ms
+- Main thread processing completed at: 58 ms
+Durations:
+- Download time: 0.3 ms
+- Main thread processing time: 2 ms
+- Total duration: 17 ms
+Redirects: no redirects
+Status code: 200
+MIME Type: image/svg+xml
+Protocol: unknown
+Priority: VeryHigh
+Render blocking: No
+From a service worker: No
+Initiators (root request to the request that directly loaded this one): none
+
+
+We can break this time down into the 4 phases that combine to make the LCP time:
+
+- Time to first byte: 8 ms (6.1% of total LCP time)
+- Resource load delay: 33 ms (25.7% of total LCP time)
+- Resource load duration: 15 ms (11.4% of total LCP time)
+- Element render delay: 73 ms (56.8% of total LCP time)
+
+## Estimated savings: none
+
+## External resources:
+- https://developer.chrome.com/docs/performance/insights/lcp-breakdown
+- https://web.dev/articles/lcp
+- https://web.dev/articles/optimize-lcp
+`;
+
+exports[`McpResponse network pagination > trace summaries > includes the trace summary text and structured data 1`] = `
+# test response
+## Summary of Performance trace findings:
+URL: https://web.dev/
+Trace bounds: {min: 122410994891, max: 122416385853}
+CPU throttling: none
+Network throttling: none
+
+# Available insight sets
+
+The following is a list of insight sets. An insight set covers a specific part of the trace, split by navigations. The insights within each insight set are specific to that part of the trace. Be sure to consider the insight set id and bounds when calling functions. If no specific insight set or navigation is mentioned, assume the user is referring to the first one.
+
+## insight set id: NAVIGATION_0
+
+URL: https://web.dev/
+Bounds: {min: 122410996889, max: 122416385853}
+Metrics (lab / observed):
+  - LCP: 129 ms, event: (eventKey: r-6063, ts: 122411126100), nodeId: 7
+  - LCP breakdown:
+    - TTFB: 8 ms, bounds: {min: 122410996889, max: 122411004828}
+    - Load delay: 33 ms, bounds: {min: 122411004828, max: 122411037986}
+    - Load duration: 15 ms, bounds: {min: 122411037986, max: 122411052690}
+    - Render delay: 73 ms, bounds: {min: 122411052690, max: 122411126100}
+  - CLS: 0.00
+Metrics (field / real users): n/a – no data for this page in CrUX
+Available insights:
+  - insight name: LCPBreakdown
+    description: Each [subpart has specific improvement strategies](https://developer.chrome.com/docs/performance/insights/lcp-breakdown). Ideally, most of the LCP time should be spent on loading the resources, not within delays.
+    relevant trace bounds: {min: 122410996889, max: 122411126100}
+    example question: Help me optimize my LCP score
+    example question: Which LCP phase was most problematic?
+    example question: What can I do to reduce the LCP time for this page load?
+  - insight name: LCPDiscovery
+    description: [Optimize LCP](https://developer.chrome.com/docs/performance/insights/lcp-discovery) by making the LCP image discoverable from the HTML immediately, and avoiding lazy-loading
+    relevant trace bounds: {min: 122411004828, max: 122411055039}
+    example question: Suggest fixes to reduce my LCP
+    example question: What can I do to reduce my LCP discovery time?
+    example question: Why is LCP discovery time important?
+  - insight name: RenderBlocking
+    description: Requests are blocking the page's initial render, which may delay LCP. [Deferring or inlining](https://developer.chrome.com/docs/performance/insights/render-blocking) can move these network requests out of the critical path.
+    relevant trace bounds: {min: 122411037528, max: 122411053852}
+    example question: Show me the most impactful render blocking requests that I should focus on
+    example question: How can I reduce the number of render blocking requests?
+  - insight name: DocumentLatency
+    description: Your first network request is the most important. [Reduce its latency](https://developer.chrome.com/docs/performance/insights/document-latency) by avoiding redirects, ensuring a fast server response, and enabling text compression.
+    relevant trace bounds: {min: 122410998910, max: 122411043781}
+    estimated metric savings: FCP 0 ms, LCP 0 ms
+    estimated wasted bytes: 77.1 kB
+    example question: How do I decrease the initial loading time of my page?
+    example question: Did anything slow down the request for this document?
+  - insight name: ThirdParties
+    description: 3rd party code can significantly impact load performance. [Reduce and defer loading of 3rd party code](https://developer.chrome.com/docs/performance/insights/third-parties) to prioritize your page's content.
+    relevant trace bounds: {min: 122411037881, max: 122416229595}
+    example question: Which third parties are having the largest impact on my page performance?
+
+## Details on call tree & network request formats:
+Information on performance traces may contain main thread activity represented as call frames and network requests.
+
+Each call frame is presented in the following format:
+
+'id;eventKey;name;duration;selfTime;urlIndex;childRange;[line];[column];[S]'
+
+Key definitions:
+
+* id: A unique numerical identifier for the call frame. Never mention this id in the output to the user.
+* eventKey: String that uniquely identifies this event in the flame chart.
+* name: A concise string describing the call frame (e.g., 'Evaluate Script', 'render', 'fetchData').
+* duration: The total execution time of the call frame, including its children.
+* selfTime: The time spent directly within the call frame, excluding its children's execution.
+* urlIndex: Index referencing the "All URLs" list. Empty if no specific script URL is associated.
+* childRange: Specifies the direct children of this node using their IDs. If empty ('' or 'S' at the end), the node has no children. If a single number (e.g., '4'), the node has one child with that ID. If in the format 'firstId-lastId' (e.g., '4-5'), it indicates a consecutive range of child IDs from 'firstId' to 'lastId', inclusive.
+* line: An optional field for a call frame's line number. This is where the function is defined.
+* column: An optional field for a call frame's column number. This is where the function is defined.
+* S: _Optional_. The letter 'S' terminates the line if that call frame was selected by the user.
+
+Example Call Tree:
+
+1;r-123;main;500;100;0;1;;
+2;r-124;update;200;50;;3;0;1;
+3;p-49575-15428179-2834-374;animate;150;20;0;4-5;0;1;S
+4;p-49575-15428179-3505-1162;calculatePosition;80;80;0;1;;
+5;p-49575-15428179-5391-2767;applyStyles;50;50;0;1;;
+
+
+Network requests are formatted like this:
+\`urlIndex;eventKey;queuedTime;requestSentTime;downloadCompleteTime;processingCompleteTime;totalDuration;downloadDuration;mainThreadProcessingDuration;statusCode;mimeType;priority;initialPriority;finalPriority;renderBlocking;protocol;fromServiceWorker;initiators;redirects:[[redirectUrlIndex|startTime|duration]];responseHeaders:[header1Value|header2Value|...]\`
+
+- \`urlIndex\`: Numerical index for the request's URL, referencing the "All URLs" list.
+- \`eventKey\`: String that uniquely identifies this request's trace event.
+Timings (all in milliseconds, relative to navigation start):
+- \`queuedTime\`: When the request was queued.
+- \`requestSentTime\`: When the request was sent.
+- \`downloadCompleteTime\`: When the download completed.
+- \`processingCompleteTime\`: When main thread processing finished.
+Durations (all in milliseconds):
+- \`totalDuration\`: Total time from the request being queued until its main thread processing completed.
+- \`downloadDuration\`: Time spent actively downloading the resource.
+- \`mainThreadProcessingDuration\`: Time spent on the main thread after the download completed.
+- \`statusCode\`: The HTTP status code of the response (e.g., 200, 404).
+- \`mimeType\`: The MIME type of the resource (e.g., "text/html", "application/javascript").
+- \`priority\`: The final network request priority (e.g., "VeryHigh", "Low").
+- \`initialPriority\`: The initial network request priority.
+- \`finalPriority\`: The final network request priority (redundant if \`priority\` is always final, but kept for clarity if \`initialPriority\` and \`priority\` differ).
+- \`renderBlocking\`: 't' if the request was render-blocking, 'f' otherwise.
+- \`protocol\`: The network protocol used (e.g., "h2", "http/1.1").
+- \`fromServiceWorker\`: 't' if the request was served from a service worker, 'f' otherwise.
+- \`initiators\`: A list (separated by ,) of URL indices for the initiator chain of this request. Listed in order starting from the root request to the request that directly loaded this one. This represents the network dependencies necessary to load this request. If there is no initiator, this is empty.
+- \`redirects\`: A comma-separated list of redirects, enclosed in square brackets. Each redirect is formatted as
+\`[redirectUrlIndex|startTime|duration]\`, where: \`redirectUrlIndex\`: Numerical index for the redirect's URL. \`startTime\`: The start time of the redirect in milliseconds, relative to navigation start. \`duration\`: The duration of the redirect in milliseconds.
+- \`responseHeaders\`: A list (separated by '|') of values for specific, pre-defined response headers, enclosed in square brackets.
+The order of headers corresponds to an internal fixed list. If a header is not present, its value will be empty.
+
+`;
+
+exports[`McpResponse network pagination > trace summaries > includes the trace summary text and structured data 2`] = `
+"## Summary of Performance trace findings:\\nURL: https://web.dev/\\nTrace bounds: {min: 122410994891, max: 122416385853}\\nCPU throttling: none\\nNetwork throttling: none\\n\\n# Available insight sets\\n\\nThe following is a list of insight sets. An insight set covers a specific part of the trace, split by navigations. The insights within each insight set are specific to that part of the trace. Be sure to consider the insight set id and bounds when calling functions. If no specific insight set or navigation is mentioned, assume the user is referring to the first one.\\n\\n## insight set id: NAVIGATION_0\\n\\nURL: https://web.dev/\\nBounds: {min: 122410996889, max: 122416385853}\\nMetrics (lab / observed):\\n  - LCP: 129 ms, event: (eventKey: r-6063, ts: 122411126100), nodeId: 7\\n  - LCP breakdown:\\n    - TTFB: 8 ms, bounds: {min: 122410996889, max: 122411004828}\\n    - Load delay: 33 ms, bounds: {min: 122411004828, max: 122411037986}\\n    - Load duration: 15 ms, bounds: {min: 122411037986, max: 122411052690}\\n    - Render delay: 73 ms, bounds: {min: 122411052690, max: 122411126100}\\n  - CLS: 0.00\\nMetrics (field / real users): n/a – no data for this page in CrUX\\nAvailable insights:\\n  - insight name: LCPBreakdown\\n    description: Each [subpart has specific improvement strategies](https://developer.chrome.com/docs/performance/insights/lcp-breakdown). Ideally, most of the LCP time should be spent on loading the resources, not within delays.\\n    relevant trace bounds: {min: 122410996889, max: 122411126100}\\n    example question: Help me optimize my LCP score\\n    example question: Which LCP phase was most problematic?\\n    example question: What can I do to reduce the LCP time for this page load?\\n  - insight name: LCPDiscovery\\n    description: [Optimize LCP](https://developer.chrome.com/docs/performance/insights/lcp-discovery) by making the LCP image discoverable from the HTML immediately, and avoiding lazy-loading\\n    relevant trace bounds: {min: 122411004828, max: 122411055039}\\n    example question: Suggest fixes to reduce my LCP\\n    example question: What can I do to reduce my LCP discovery time?\\n    example question: Why is LCP discovery time important?\\n  - insight name: RenderBlocking\\n    description: Requests are blocking the page's initial render, which may delay LCP. [Deferring or inlining](https://developer.chrome.com/docs/performance/insights/render-blocking) can move these network requests out of the critical path.\\n    relevant trace bounds: {min: 122411037528, max: 122411053852}\\n    example question: Show me the most impactful render blocking requests that I should focus on\\n    example question: How can I reduce the number of render blocking requests?\\n  - insight name: DocumentLatency\\n    description: Your first network request is the most important. [Reduce its latency](https://developer.chrome.com/docs/performance/insights/document-latency) by avoiding redirects, ensuring a fast server response, and enabling text compression.\\n    relevant trace bounds: {min: 122410998910, max: 122411043781}\\n    estimated metric savings: FCP 0 ms, LCP 0 ms\\n    estimated wasted bytes: 77.1 kB\\n    example question: How do I decrease the initial loading time of my page?\\n    example question: Did anything slow down the request for this document?\\n  - insight name: ThirdParties\\n    description: 3rd party code can significantly impact load performance. [Reduce and defer loading of 3rd party code](https://developer.chrome.com/docs/performance/insights/third-parties) to prioritize your page's content.\\n    relevant trace bounds: {min: 122411037881, max: 122416229595}\\n    example question: Which third parties are having the largest impact on my page performance?\\n\\n## Details on call tree & network request formats:\\nInformation on performance traces may contain main thread activity represented as call frames and network requests.\\n\\nEach call frame is presented in the following format:\\n\\n'id;eventKey;name;duration;selfTime;urlIndex;childRange;[line];[column];[S]'\\n\\nKey definitions:\\n\\n* id: A unique numerical identifier for the call frame. Never mention this id in the output to the user.\\n* eventKey: String that uniquely identifies this event in the flame chart.\\n* name: A concise string describing the call frame (e.g., 'Evaluate Script', 'render', 'fetchData').\\n* duration: The total execution time of the call frame, including its children.\\n* selfTime: The time spent directly within the call frame, excluding its children's execution.\\n* urlIndex: Index referencing the \\"All URLs\\" list. Empty if no specific script URL is associated.\\n* childRange: Specifies the direct children of this node using their IDs. If empty ('' or 'S' at the end), the node has no children. If a single number (e.g., '4'), the node has one child with that ID. If in the format 'firstId-lastId' (e.g., '4-5'), it indicates a consecutive range of child IDs from 'firstId' to 'lastId', inclusive.\\n* line: An optional field for a call frame's line number. This is where the function is defined.\\n* column: An optional field for a call frame's column number. This is where the function is defined.\\n* S: _Optional_. The letter 'S' terminates the line if that call frame was selected by the user.\\n\\nExample Call Tree:\\n\\n1;r-123;main;500;100;0;1;;\\n2;r-124;update;200;50;;3;0;1;\\n3;p-49575-15428179-2834-374;animate;150;20;0;4-5;0;1;S\\n4;p-49575-15428179-3505-1162;calculatePosition;80;80;0;1;;\\n5;p-49575-15428179-5391-2767;applyStyles;50;50;0;1;;\\n\\n\\nNetwork requests are formatted like this:\\n\`urlIndex;eventKey;queuedTime;requestSentTime;downloadCompleteTime;processingCompleteTime;totalDuration;downloadDuration;mainThreadProcessingDuration;statusCode;mimeType;priority;initialPriority;finalPriority;renderBlocking;protocol;fromServiceWorker;initiators;redirects:[[redirectUrlIndex|startTime|duration]];responseHeaders:[header1Value|header2Value|...]\`\\n\\n- \`urlIndex\`: Numerical index for the request's URL, referencing the \\"All URLs\\" list.\\n- \`eventKey\`: String that uniquely identifies this request's trace event.\\nTimings (all in milliseconds, relative to navigation start):\\n- \`queuedTime\`: When the request was queued.\\n- \`requestSentTime\`: When the request was sent.\\n- \`downloadCompleteTime\`: When the download completed.\\n- \`processingCompleteTime\`: When main thread processing finished.\\nDurations (all in milliseconds):\\n- \`totalDuration\`: Total time from the request being queued until its main thread processing completed.\\n- \`downloadDuration\`: Time spent actively downloading the resource.\\n- \`mainThreadProcessingDuration\`: Time spent on the main thread after the download completed.\\n- \`statusCode\`: The HTTP status code of the response (e.g., 200, 404).\\n- \`mimeType\`: The MIME type of the resource (e.g., \\"text/html\\", \\"application/javascript\\").\\n- \`priority\`: The final network request priority (e.g., \\"VeryHigh\\", \\"Low\\").\\n- \`initialPriority\`: The initial network request priority.\\n- \`finalPriority\`: The final network request priority (redundant if \`priority\` is always final, but kept for clarity if \`initialPriority\` and \`priority\` differ).\\n- \`renderBlocking\`: 't' if the request was render-blocking, 'f' otherwise.\\n- \`protocol\`: The network protocol used (e.g., \\"h2\\", \\"http/1.1\\").\\n- \`fromServiceWorker\`: 't' if the request was served from a service worker, 'f' otherwise.\\n- \`initiators\`: A list (separated by ,) of URL indices for the initiator chain of this request. Listed in order starting from the root request to the request that directly loaded this one. This represents the network dependencies necessary to load this request. If there is no initiator, this is empty.\\n- \`redirects\`: A comma-separated list of redirects, enclosed in square brackets. Each redirect is formatted as\\n\`[redirectUrlIndex|startTime|duration]\`, where: \`redirectUrlIndex\`: Numerical index for the redirect's URL. \`startTime\`: The start time of the redirect in milliseconds, relative to navigation start. \`duration\`: The duration of the redirect in milliseconds.\\n- \`responseHeaders\`: A list (separated by '|') of values for specific, pre-defined response headers, enclosed in square brackets.\\nThe order of headers corresponds to an internal fixed list. If a header is not present, its value will be empty.\\n"
+`;
+
+exports[`McpResponse network pagination > trace summaries > includes the trace summary text and structured data 3`] = `
+[
+  {
+    "insightName": "INPBreakdown",
+    "insightKey": "INPBreakdown"
+  },
+  {
+    "insightName": "LCPBreakdown",
+    "insightKey": "LCPBreakdown"
+  },
+  {
+    "insightName": "LCPDiscovery",
+    "insightKey": "LCPDiscovery"
+  },
+  {
+    "insightName": "CLSCulprits",
+    "insightKey": "CLSCulprits"
+  },
+  {
+    "insightName": "RenderBlocking",
+    "insightKey": "RenderBlocking"
+  },
+  {
+    "insightName": "NetworkDependencyTree",
+    "insightKey": "NetworkDependencyTree"
+  },
+  {
+    "insightName": "ImageDelivery",
+    "insightKey": "ImageDelivery"
+  },
+  {
+    "insightName": "DocumentLatency",
+    "insightKey": "DocumentLatency"
+  },
+  {
+    "insightName": "FontDisplay",
+    "insightKey": "FontDisplay"
+  },
+  {
+    "insightName": "Viewport",
+    "insightKey": "Viewport"
+  },
+  {
+    "insightName": "DOMSize",
+    "insightKey": "DOMSize"
+  },
+  {
+    "insightName": "ThirdParties",
+    "insightKey": "ThirdParties"
+  },
+  {
+    "insightName": "DuplicatedJavaScript",
+    "insightKey": "DuplicatedJavaScript"
+  },
+  {
+    "insightName": "SlowCSSSelector",
+    "insightKey": "SlowCSSSelector"
+  },
+  {
+    "insightName": "ForcedReflow",
+    "insightKey": "ForcedReflow"
+  },
+  {
+    "insightName": "Cache",
+    "insightKey": "Cache"
+  },
+  {
+    "insightName": "ModernHTTP",
+    "insightKey": "ModernHTTP"
+  },
+  {
+    "insightName": "LegacyJavaScript",
+    "insightKey": "LegacyJavaScript"
+  }
+]
+`;
+
 exports[`McpResponse network request filtering > filters network requests by resource type 1`] = `
 # test response
 ## Network requests

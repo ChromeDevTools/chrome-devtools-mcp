@@ -47,7 +47,7 @@ describe('McpContext', () => {
       const fakeTrace2 = {} as unknown as TraceResult;
       context.storeTraceRecording(fakeTrace1);
       context.storeTraceRecording(fakeTrace2);
-      assert.deepEqual(context.recordedTraces(), [fakeTrace1, fakeTrace2]);
+      assert.deepEqual(context.recordedTraces(), [fakeTrace2]);
     });
   });
 

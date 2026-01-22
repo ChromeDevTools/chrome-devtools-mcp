@@ -6,13 +6,10 @@
 
 import zlib from 'node:zlib';
 
-import {logger} from '../logger.js';
 import {zod} from '../third_party/index.js';
 import type {Page} from '../third_party/index.js';
 import type {InsightName} from '../trace-processing/parse.js';
 import {
-  getInsightOutput,
-  getTraceSummary,
   parseRawTraceBuffer,
   traceResultIsSuccess,
 } from '../trace-processing/parse.js';
@@ -168,17 +165,11 @@ export const analyzeInsight = defineTool({
       return;
     }
 
-    const insightOutput = getInsightOutput(
+    response.attachTraceInsight(
       lastRecording,
       request.params.insightSetId,
       request.params.insightName as InsightName,
     );
-    if ('error' in insightOutput) {
-      response.appendResponseLine(insightOutput.error);
-      return;
-    }
-
-    response.appendResponseLine(insightOutput.output);
   },
 });
 
@@ -212,21 +203,12 @@ async function stopTracingAndAppendOutput(
     response.appendResponseLine('The performance trace has been stopped.');
     if (traceResultIsSuccess(result)) {
       context.storeTraceRecording(result);
-      const traceSummaryText = getTraceSummary(result);
-      response.appendResponseLine(traceSummaryText);
+      response.attachTraceSummary(result);
     } else {
-      response.appendResponseLine(
-        'There was an unexpected error parsing the trace:',
+      throw new Error(
+        `There was an unexpected error parsing the trace: ${result.error}`,
       );
-      response.appendResponseLine(result.error);
     }
-  } catch (e) {
-    const errorText = e instanceof Error ? e.message : JSON.stringify(e);
-    logger(`Error stopping performance trace: ${errorText}`);
-    response.appendResponseLine(
-      'An error occurred generating the response for this trace:',
-    );
-    response.appendResponseLine(errorText);
   } finally {
     context.setIsRunningPerformanceTrace(false);
   }

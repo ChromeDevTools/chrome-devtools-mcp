@@ -12,7 +12,7 @@ import type {
   Page,
   Viewport,
 } from '../third_party/index.js';
-import type {TraceResult} from '../trace-processing/parse.js';
+import type {InsightName, TraceResult} from '../trace-processing/parse.js';
 import type {PaginationOptions} from '../utils/types.js';
 
 import type {ToolCategory} from './categories.js';
@@ -86,6 +86,12 @@ export interface Response {
   // Allows re-using DevTools data queried by some tools.
   attachDevToolsData(data: DevToolsData): void;
   setTabId(tabId: string): void;
+  attachTraceSummary(trace: TraceResult): void;
+  attachTraceInsight(
+    trace: TraceResult,
+    insightSetId: string,
+    insightName: InsightName,
+  ): void;
 }
 
 /**
