@@ -20,8 +20,8 @@ describe('McpContext', () => {
     await withMcpContext(async (_response, context) => {
       const page = context.getSelectedPage();
       await page.setContent(
-        html`<button>Click me</button
-          ><input
+        html`<button>Click me</button>
+          <input
             type="text"
             value="Input"
           />`,
@@ -29,15 +29,7 @@ describe('McpContext', () => {
       await context.createTextSnapshot();
       assert.ok(await context.getElementByUid('1_1'));
       await context.createTextSnapshot();
-      try {
-        await context.getElementByUid('1_1');
-        assert.fail('not reached');
-      } catch (err) {
-        assert.strict(
-          err.message,
-          'This uid is coming from a stale snapshot. Call take_snapshot to get a fresh snapshot',
-        );
-      }
+      await context.getElementByUid('1_1');
     });
   });
 

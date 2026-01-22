@@ -40,6 +40,7 @@ import {WaitForHelper} from './WaitForHelper.js';
 export interface TextSnapshotNode extends SerializedAXNode {
   id: string;
   backendNodeId?: number;
+  loaderId?: string;
   children: TextSnapshotNode[];
 }
 
@@ -128,6 +129,8 @@ export class McpContext implements Context {
 
   #locatorClass: typeof Locator;
   #options: McpContextOptions;
+
+  #uniqueBackendNodeIdToMcpId = new Map<string, string>();
 
   private constructor(
     browser: Browser,
@@ -440,14 +443,6 @@ export class McpContext implements Context {
         `No snapshot found. Use ${takeSnapshot.name} to capture one.`,
       );
     }
-    const [snapshotId] = uid.split('_');
-
-    if (this.#textSnapshot.snapshotId !== snapshotId) {
-      throw new Error(
-        'This uid is coming from a stale snapshot. Call take_snapshot to get a fresh snapshot.',
-      );
-    }
-
     const node = this.#textSnapshot?.idToNode.get(uid);
     if (!node) {
       throw new Error('No such element found in the snapshot');
@@ -589,14 +584,26 @@ export class McpContext implements Context {
     // will be used for the tree serialization and mapping ids back to nodes.
     let idCounter = 0;
     const idToNode = new Map<string, TextSnapshotNode>();
+    const seenUniqueIds = new Set<string>();
     const assignIds = (node: SerializedAXNode): TextSnapshotNode => {
       const nodeWithId: TextSnapshotNode = {
         ...node,
-        id: `${snapshotId}_${idCounter++}`,
+        id: '', // placeholder to be set below.
         children: node.children
           ? node.children.map(child => assignIds(child))
           : [],
       };
+
+      const uniqueBackendId = `${nodeWithId.loaderId}_${nodeWithId.backendNodeId}`;
+      if (this.#uniqueBackendNodeIdToMcpId.has(uniqueBackendId)) {
+        // Re-use MCP exposed ID if the uniqueId is the same.
+        nodeWithId.id = this.#uniqueBackendNodeIdToMcpId.get(uniqueBackendId)!;
+      } else {
+        // Only generate a new ID if we have not seen the node before.
+        nodeWithId.id = `${snapshotId}_${idCounter++}`;
+        this.#uniqueBackendNodeIdToMcpId.set(uniqueBackendId, nodeWithId.id);
+      }
+      seenUniqueIds.add(uniqueBackendId);
 
       // The AXNode for an option doesn't contain its `value`.
       // Therefore, set text content of the option as value.
@@ -625,6 +632,13 @@ export class McpContext implements Context {
       this.#textSnapshot.selectedElementUid = this.resolveCdpElementId(
         data?.cdpBackendNodeId,
       );
+    }
+
+    // Clean up unique IDs that we did not see anymore.
+    for (const key of this.#uniqueBackendNodeIdToMcpId.keys()) {
+      if (!seenUniqueIds.has(key)) {
+        this.#uniqueBackendNodeIdToMcpId.delete(key);
+      }
     }
   }
 
