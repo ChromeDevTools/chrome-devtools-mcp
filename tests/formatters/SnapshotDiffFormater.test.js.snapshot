@@ -1,0 +1,288 @@
+exports[`SnapshotDiffFormatter > toJSON > detects added nodes 1`] = `
+{
+  "type": "modified",
+  "oldAttributes": {
+    "id": "1",
+    "role": "generic",
+    "children": [
+      {
+        "id": "2",
+        "role": "generic"
+      }
+    ]
+  },
+  "newAttributes": {
+    "id": "1",
+    "role": "generic",
+    "children": [
+      {
+        "id": "2",
+        "role": "generic"
+      },
+      {
+        "id": "3",
+        "role": "generic"
+      }
+    ]
+  },
+  "children": [
+    {
+      "type": "added",
+      "node": {
+        "id": "3",
+        "role": "generic"
+      }
+    }
+  ]
+}
+`;
+
+exports[`SnapshotDiffFormatter > toJSON > detects added nodes with children 1`] = `
+{
+  "type": "modified",
+  "oldAttributes": {
+    "id": "1",
+    "role": "generic",
+    "children": [
+      {
+        "id": "2",
+        "role": "generic"
+      }
+    ]
+  },
+  "newAttributes": {
+    "id": "1",
+    "role": "generic",
+    "children": [
+      {
+        "id": "2",
+        "role": "generic"
+      },
+      {
+        "id": "3",
+        "role": "generic",
+        "children": [
+          {
+            "id": "4",
+            "role": "generic"
+          }
+        ]
+      }
+    ]
+  },
+  "children": [
+    {
+      "type": "added",
+      "node": {
+        "id": "3",
+        "role": "generic",
+        "children": [
+          {
+            "id": "4",
+            "role": "generic"
+          }
+        ]
+      }
+    }
+  ]
+}
+`;
+
+exports[`SnapshotDiffFormatter > toJSON > detects modified nodes (attributes) 1`] = `
+{
+  "type": "modified",
+  "oldAttributes": {
+    "id": "1",
+    "role": "generic",
+    "children": [
+      {
+        "id": "2",
+        "role": "generic",
+        "name": "old"
+      }
+    ]
+  },
+  "newAttributes": {
+    "id": "1",
+    "role": "generic",
+    "children": [
+      {
+        "id": "2",
+        "role": "generic",
+        "name": "new"
+      }
+    ]
+  },
+  "children": [
+    {
+      "type": "modified",
+      "oldAttributes": {
+        "id": "2",
+        "role": "generic",
+        "name": "old"
+      },
+      "newAttributes": {
+        "id": "2",
+        "role": "generic",
+        "name": "new"
+      }
+    }
+  ]
+}
+`;
+
+exports[`SnapshotDiffFormatter > toJSON > detects removed nodes 1`] = `
+{
+  "type": "modified",
+  "oldAttributes": {
+    "id": "1",
+    "role": "generic",
+    "children": [
+      {
+        "id": "2",
+        "role": "generic"
+      },
+      {
+        "id": "3",
+        "role": "generic"
+      }
+    ]
+  },
+  "newAttributes": {
+    "id": "1",
+    "role": "generic",
+    "children": [
+      {
+        "id": "2",
+        "role": "generic"
+      }
+    ]
+  },
+  "children": [
+    {
+      "type": "removed",
+      "node": {
+        "id": "3",
+        "role": "generic"
+      }
+    }
+  ]
+}
+`;
+
+exports[`SnapshotDiffFormatter > toJSON > detects removed nodes with children 1`] = `
+{
+  "type": "modified",
+  "oldAttributes": {
+    "id": "1",
+    "role": "generic",
+    "children": [
+      {
+        "id": "2",
+        "role": "generic"
+      },
+      {
+        "id": "3",
+        "role": "generic",
+        "children": [
+          {
+            "id": "4",
+            "role": "generic"
+          }
+        ]
+      }
+    ]
+  },
+  "newAttributes": {
+    "id": "1",
+    "role": "generic",
+    "children": [
+      {
+        "id": "2",
+        "role": "generic"
+      }
+    ]
+  },
+  "children": [
+    {
+      "type": "removed",
+      "node": {
+        "id": "3",
+        "role": "generic",
+        "children": [
+          {
+            "id": "4",
+            "role": "generic"
+          }
+        ]
+      }
+    }
+  ]
+}
+`;
+
+exports[`SnapshotDiffFormatter > toJSON > detects reordering (as remove + add) 1`] = `
+{
+  "type": "modified",
+  "oldAttributes": {
+    "id": "1",
+    "role": "generic",
+    "children": [
+      {
+        "id": "2",
+        "role": "generic"
+      },
+      {
+        "id": "3",
+        "role": "generic"
+      }
+    ]
+  },
+  "newAttributes": {
+    "id": "1",
+    "role": "generic",
+    "children": [
+      {
+        "id": "3",
+        "role": "generic"
+      },
+      {
+        "id": "2",
+        "role": "generic"
+      }
+    ]
+  }
+}
+`;
+
+exports[`SnapshotDiffFormatter > toJSON > shows no changes for identical snapshots 1`] = `
+{}
+`;
+
+exports[`SnapshotDiffFormatter > toString > detects added nodes 1`] = `
+" uid=1 generic [selected in the DevTools Elements panel]\\n   uid=2 generic\\n+   uid=3 generic"
+`;
+
+exports[`SnapshotDiffFormatter > toString > detects added nodes with children 1`] = `
+" uid=1 generic [selected in the DevTools Elements panel]\\n   uid=2 generic\\n+   uid=3 generic\\n+     uid=4 generic"
+`;
+
+exports[`SnapshotDiffFormatter > toString > detects modified nodes (attributes) 1`] = `
+" uid=1 generic [selected in the DevTools Elements panel]\\n-   uid=2 generic \\"old\\"\\n+   uid=2 generic \\"new\\""
+`;
+
+exports[`SnapshotDiffFormatter > toString > detects removed nodes 1`] = `
+" uid=1 generic [selected in the DevTools Elements panel]\\n   uid=2 generic\\n-   uid=3 generic"
+`;
+
+exports[`SnapshotDiffFormatter > toString > detects removed nodes with children 1`] = `
+" uid=1 generic [selected in the DevTools Elements panel]\\n   uid=2 generic\\n-   uid=3 generic\\n-     uid=4 generic"
+`;
+
+exports[`SnapshotDiffFormatter > toString > detects reordering (as remove + add) 1`] = `
+""
+`;
+
+exports[`SnapshotDiffFormatter > toString > shows no changes for identical snapshots 1`] = `
+""
+`;
