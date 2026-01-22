@@ -162,4 +162,5 @@ const excludedAttributes = new Set([
   'elementHandle',
   'children',
   'backendNodeId',
+  'loaderId',
 ]);
