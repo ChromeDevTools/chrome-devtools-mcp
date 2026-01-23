@@ -123,36 +123,58 @@ async function cropWatermark(
 
 /**
  * Wait for download to complete and return the file path
+ * Looks for new image files (png, jpg, jpeg) in the download directory
  */
 async function waitForDownload(
   downloadDir: string,
   timeoutMs: number = 60000,
 ): Promise<string> {
   const startTime = Date.now();
-  const checkInterval = 500;
+  const checkInterval = 1000; // Check every second
 
-  // Get initial files
-  const initialFiles = new Set(await fs.promises.readdir(downloadDir));
+  // Get initial files with their mtimes
+  const initialFiles = new Map<string, number>();
+  try {
+    const files = await fs.promises.readdir(downloadDir);
+    for (const f of files) {
+      if (/\.(png|jpg|jpeg)$/i.test(f)) {
+        const stat = await fs.promises.stat(path.join(downloadDir, f));
+        initialFiles.set(f, stat.mtime.getTime());
+      }
+    }
+  } catch {
+    // Directory might not exist, continue
+  }
 
   while (Date.now() - startTime < timeoutMs) {
     await new Promise(resolve => setTimeout(resolve, checkInterval));
 
-    const currentFiles = await fs.promises.readdir(downloadDir);
-    const newFiles = currentFiles.filter(
-      f =>
-        !initialFiles.has(f) &&
-        !f.endsWith('.crdownload') &&
-        !f.endsWith('.tmp'),
-    );
+    try {
+      const currentFiles = await fs.promises.readdir(downloadDir);
 
-    if (newFiles.length > 0) {
-      // Return the newest file (by modification time)
-      const filePaths = newFiles.map(f => path.join(downloadDir, f));
-      const stats = await Promise.all(
-        filePaths.map(async p => ({path: p, mtime: (await fs.promises.stat(p)).mtime})),
-      );
-      stats.sort((a, b) => b.mtime.getTime() - a.mtime.getTime());
-      return stats[0].path;
+      for (const f of currentFiles) {
+        // Only check image files
+        if (!/\.(png|jpg|jpeg)$/i.test(f)) continue;
+        // Skip incomplete downloads
+        if (f.endsWith('.crdownload') || f.endsWith('.tmp')) continue;
+
+        const filePath = path.join(downloadDir, f);
+        const stat = await fs.promises.stat(filePath);
+        const mtime = stat.mtime.getTime();
+
+        // Check if this is a new file or modified after we started
+        const initialMtime = initialFiles.get(f);
+        if (!initialMtime || mtime > initialMtime) {
+          // Verify file is complete (size > 0 and not growing)
+          await new Promise(resolve => setTimeout(resolve, 500));
+          const stat2 = await fs.promises.stat(filePath);
+          if (stat2.size > 0 && stat2.size === stat.size) {
+            return filePath;
+          }
+        }
+      }
+    } catch {
+      // Continue on error
     }
   }
 
@@ -204,17 +226,6 @@ export const askGeminiImage = defineTool({
     } = request.params;
 
     const page = await getOrCreateGeminiPage(context);
-
-    // Set up download directory
-    const downloadDir = path.join(os.tmpdir(), 'gemini-image-downloads');
-    await fs.promises.mkdir(downloadDir, {recursive: true});
-
-    // Configure download behavior
-    const client = await page.createCDPSession();
-    await client.send('Page.setDownloadBehavior', {
-      behavior: 'allow',
-      downloadPath: downloadDir,
-    });
 
     try {
       response.appendResponseLine('Geminiに接続中...');
@@ -367,66 +378,55 @@ export const askGeminiImage = defineTool({
       // Try to download the image
       response.appendResponseLine('📥 画像をダウンロード中...');
 
-      // Method 1: Click download button
+      // Click download button - Gemini uses "フルサイズの画像をダウンロード" button
       const downloadClicked = await page.evaluate(() => {
-        // Look for three-dot menu or download button on the image
-        const buttons = Array.from(document.querySelectorAll('button, [role="menuitem"]'));
+        const buttons = Array.from(document.querySelectorAll('button'));
 
-        // First try direct download button
-        let downloadBtn = buttons.find(
-          b =>
-            b.textContent?.includes('ダウンロード') ||
-            b.textContent?.includes('Download'),
-        );
+        // Look for "フルサイズの画像をダウンロード" or "フルサイズでダウンロード" button
+        const downloadBtn = buttons.find(b => {
+          const text = b.textContent || '';
+          const ariaLabel = b.getAttribute('aria-label') || '';
+          const description = b.getAttribute('aria-describedby')
+            ? document.getElementById(b.getAttribute('aria-describedby')!)?.textContent || ''
+            : '';
+
+          return (
+            text.includes('フルサイズ') ||
+            text.includes('ダウンロード') ||
+            ariaLabel.includes('ダウンロード') ||
+            ariaLabel.includes('download') ||
+            description.includes('フルサイズ') ||
+            description.includes('ダウンロード')
+          );
+        });
 
         if (downloadBtn) {
           (downloadBtn as HTMLElement).click();
-          return 'direct';
+          return true;
         }
-
-        // Try three-dot menu on generated images
-        const moreButtons = buttons.filter(
-          b =>
-            b.getAttribute('aria-label')?.includes('more') ||
-            b.getAttribute('aria-label')?.includes('その他') ||
-            b.querySelector('mat-icon[data-mat-icon-name="more_vert"]'),
-        );
-
-        if (moreButtons.length > 0) {
-          // Click the last one (likely the image menu)
-          (moreButtons[moreButtons.length - 1] as HTMLElement).click();
-          return 'menu-opened';
-        }
-
-        return null;
+        return false;
       });
 
-      if (downloadClicked === 'menu-opened') {
-        // Wait for menu to open and click download
-        await new Promise(resolve => setTimeout(resolve, 500));
-
-        await page.evaluate(() => {
-          const menuItems = Array.from(document.querySelectorAll('[role="menuitem"], button'));
-          const downloadItem = menuItems.find(
-            item =>
-              item.textContent?.includes('ダウンロード') ||
-              item.textContent?.includes('Download'),
-          );
-          if (downloadItem) {
-            (downloadItem as HTMLElement).click();
-          }
-        });
+      if (!downloadClicked) {
+        response.appendResponseLine('⚠️ ダウンロードボタンが見つかりません');
+        response.appendResponseLine('ヒント: ブラウザで画像を右クリックして保存してください');
+        return;
       }
 
-      // Wait for download to complete
+      // Wait for download to start (Gemini shows progress bar)
+      response.appendResponseLine('⏳ ダウンロード処理を待機中...');
+      await new Promise(resolve => setTimeout(resolve, 3000));
+
+      // Wait for download to complete - check user's Downloads folder
+      const userDownloadsDir = path.join(os.homedir(), 'Downloads');
       let downloadedPath: string;
       try {
-        downloadedPath = await waitForDownload(downloadDir, 30000);
+        downloadedPath = await waitForDownload(userDownloadsDir, 60000); // 60 seconds
         response.appendResponseLine(`✅ ダウンロード完了: ${path.basename(downloadedPath)}`);
       } catch (error) {
-        response.appendResponseLine('❌ ダウンロード待機タイムアウト');
+        response.appendResponseLine('❌ ダウンロード待機タイムアウト (60秒)');
         response.appendResponseLine(
-          'ヒント: ブラウザで手動でダウンロードしてください',
+          'ヒント: ブラウザで画像を右クリックして「画像を保存」してください',
         );
         return;
       }
