@@ -18,6 +18,7 @@ import {McpResponse} from './McpResponse.js';
 import {Mutex} from './Mutex.js';
 import {ClearcutLogger} from './telemetry/clearcut-logger.js';
 import {computeFlagUsage} from './telemetry/flag-utils.js';
+import {bucketizeLatency} from './telemetry/metric-utils.js';
 import {
   McpServer,
   StdioServerTransport,
@@ -221,7 +222,7 @@ function registerTool(tool: ToolDefinition): void {
         void clearcutLogger?.logToolInvocation({
           toolName: tool.name,
           success,
-          latencyMs: Date.now() - startTime,
+          latencyMs: bucketizeLatency(Date.now() - startTime),
         });
         guard.dispose();
       }
