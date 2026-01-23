@@ -18,7 +18,10 @@ export interface InstalledExtension {
 export class ExtensionRegistry {
   #extensions = new Map<string, InstalledExtension>();
 
-  async registerExtension(id: string, extensionPath: string): Promise<InstalledExtension> {
+  async registerExtension(
+    id: string,
+    extensionPath: string,
+  ): Promise<InstalledExtension> {
     const manifestPath = path.join(extensionPath, 'manifest.json');
     const manifestContent = await fs.readFile(manifestPath, 'utf-8');
     const manifest = JSON.parse(manifestContent);
@@ -48,4 +51,3 @@ export class ExtensionRegistry {
     return this.#extensions.get(id);
   }
 }
-

@@ -77,8 +77,11 @@ describe('extension', () => {
   it('lists installed extensions', async () => {
     await withMcpContext(async (response, context) => {
       const setListExtensionsSpy = sinon.spy(response, 'setListExtensions');
-      await listExtensions.handler({ params: {} }, response, context);
-      assert.ok(setListExtensionsSpy.calledOnce, 'setListExtensions should be called');
+      await listExtensions.handler({params: {}}, response, context);
+      assert.ok(
+        setListExtensionsSpy.calledOnce,
+        'setListExtensions should be called',
+      );
     });
   });
 });

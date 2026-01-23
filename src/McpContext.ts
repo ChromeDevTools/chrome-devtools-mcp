@@ -35,7 +35,10 @@ import {takeSnapshot} from './tools/snapshot.js';
 import {CLOSE_PAGE_ERROR} from './tools/ToolDefinition.js';
 import type {Context, DevToolsData} from './tools/ToolDefinition.js';
 import type {TraceResult} from './trace-processing/parse.js';
-import { ExtensionRegistry, type InstalledExtension } from './utils/ExtensionRegistry.js';
+import {
+  ExtensionRegistry,
+  type InstalledExtension,
+} from './utils/ExtensionRegistry.js';
 import {WaitForHelper} from './WaitForHelper.js';
 
 export interface TextSnapshotNode extends SerializedAXNode {
@@ -770,4 +773,3 @@ export class McpContext implements Context {
     return this.#extensionRegistry.list();
   }
 }
-

@@ -13,7 +13,7 @@ import type {
   Viewport,
 } from '../third_party/index.js';
 import type {InsightName, TraceResult} from '../trace-processing/parse.js';
-import type { InstalledExtension } from '../utils/ExtensionRegistry.js';
+import type {InstalledExtension} from '../utils/ExtensionRegistry.js';
 import type {PaginationOptions} from '../utils/types.js';
 
 import type {ToolCategory} from './categories.js';

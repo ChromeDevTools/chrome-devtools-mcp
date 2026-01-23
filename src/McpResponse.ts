@@ -105,9 +105,9 @@ export class McpResponse implements Response {
       pagination:
         options?.pageSize || options?.pageIdx
           ? {
-            pageSize: options.pageSize,
-            pageIdx: options.pageIdx,
-          }
+              pageSize: options.pageSize,
+              pageIdx: options.pageIdx,
+            }
           : undefined,
       resourceTypes: options?.resourceTypes,
       includePreservedRequests: options?.includePreservedRequests,
@@ -132,9 +132,9 @@ export class McpResponse implements Response {
       pagination:
         options?.pageSize || options?.pageIdx
           ? {
-            pageSize: options.pageSize,
-            pageIdx: options.pageIdx,
-          }
+              pageSize: options.pageSize,
+              pageIdx: options.pageIdx,
+            }
           : undefined,
       types: options?.types,
       includePreservedMessages: options?.includePreservedMessages,
@@ -553,12 +553,14 @@ Call ${handleDialog.name} to handle it before continuing.`);
       } else {
         const parts = [];
         for (const extension of data.extensions) {
-          parts.push([
-            `Name: ${extension.name}`,
-            `ID: ${extension.id}`,
-            `Version: ${extension.version}`,
-            `Status: ${extension.isEnabled ? 'Enabled' : 'Disabled'}`,
-          ].join('\n'));
+          parts.push(
+            [
+              `Name: ${extension.name}`,
+              `ID: ${extension.id}`,
+              `Version: ${extension.version}`,
+              `Status: ${extension.isEnabled ? 'Enabled' : 'Disabled'}`,
+            ].join('\n'),
+          );
         }
         response.push(parts.join('\n\n'));
       }

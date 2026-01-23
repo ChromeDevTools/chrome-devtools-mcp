@@ -734,7 +734,7 @@ describe('extensions', () => {
         },
       ];
       response.setListExtensions();
-      const { content, structuredContent } = await response.handle(
+      const {content, structuredContent} = await response.handle(
         'test',
         context,
       );
@@ -744,4 +744,3 @@ describe('extensions', () => {
     });
   });
 });
-
