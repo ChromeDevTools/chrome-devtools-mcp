@@ -59,6 +59,7 @@
     "@modelcontextprotocol/sdk": "1.18.1",
     "archiver": "^7.0.1",
     "debug": "4.4.3",
+    "jimp": "^1.6.0",
     "puppeteer": "^24.31.0",
     "yargs": "18.0.0"
   },

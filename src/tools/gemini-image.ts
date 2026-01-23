@@ -1,0 +1,483 @@
+/**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import fs from 'node:fs';
+import path from 'node:path';
+import os from 'node:os';
+
+import {Jimp} from 'jimp';
+import type {Page} from 'puppeteer-core';
+import z from 'zod';
+
+import {GEMINI_CONFIG} from '../config.js';
+import {
+  getLoginStatus,
+  waitForLoginStatus,
+  LoginStatus,
+} from '../login-helper.js';
+
+import {ToolCategories} from './categories.js';
+import {defineTool, type Context} from './ToolDefinition.js';
+
+/**
+ * Default crop margin in pixels (will be adjusted based on actual watermark size)
+ */
+const DEFAULT_CROP_MARGIN = 80;
+
+/**
+ * Navigate with retry logic
+ */
+async function navigateWithRetry(
+  page: Page,
+  url: string,
+  options: {
+    waitUntil: 'networkidle2' | 'domcontentloaded' | 'load';
+    maxRetries?: number;
+  } = {waitUntil: 'networkidle2', maxRetries: 3},
+): Promise<void> {
+  const {waitUntil, maxRetries = 3} = options;
+  let lastError: Error | null = null;
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      await page.goto(url, {waitUntil, timeout: 30000});
+      return;
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+      const isRetryable =
+        lastError.message.includes('ERR_ABORTED') ||
+        lastError.message.includes('net::ERR_');
+
+      if (!isRetryable || attempt === maxRetries) {
+        throw lastError;
+      }
+      await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+    }
+  }
+  throw lastError;
+}
+
+/**
+ * Find or create a dedicated Gemini tab
+ */
+async function getOrCreateGeminiPage(context: Context): Promise<Page> {
+  await context.createPagesSnapshot();
+  const pages = context.getPages();
+
+  for (const page of pages) {
+    const url = page.url();
+    if (url.includes('gemini.google.com')) {
+      await page.bringToFront();
+      return page;
+    }
+  }
+
+  const newPage = await context.newPage();
+  return newPage;
+}
+
+/**
+ * Enhance prompt for better watermark cropping
+ * Adds composition requirements to center the subject and use solid background
+ */
+function enhancePromptForCropping(prompt: string): string {
+  const compositionRequirements = `
+
+Composition requirements:
+- Center the main subject with generous padding on all sides (at least 15% margin from edges)
+- Use a clean, solid background color
+- Ensure no important elements touch the image edges, especially the bottom-right corner`;
+
+  return prompt + compositionRequirements;
+}
+
+/**
+ * Crop image to remove watermark (uniform crop from all sides)
+ */
+async function cropWatermark(
+  inputPath: string,
+  outputPath: string,
+  margin: number = DEFAULT_CROP_MARGIN,
+): Promise<{width: number; height: number}> {
+  const image = await Jimp.read(inputPath);
+  const {width, height} = image;
+
+  // Crop from all sides
+  const newWidth = width - margin * 2;
+  const newHeight = height - margin * 2;
+
+  if (newWidth <= 0 || newHeight <= 0) {
+    throw new Error(
+      `Image too small to crop: ${width}x${height} with margin ${margin}`,
+    );
+  }
+
+  image.crop({x: margin, y: margin, w: newWidth, h: newHeight});
+  await image.write(outputPath as `${string}.${string}`);
+
+  return {width: newWidth, height: newHeight};
+}
+
+/**
+ * Wait for download to complete and return the file path
+ */
+async function waitForDownload(
+  downloadDir: string,
+  timeoutMs: number = 60000,
+): Promise<string> {
+  const startTime = Date.now();
+  const checkInterval = 500;
+
+  // Get initial files
+  const initialFiles = new Set(await fs.promises.readdir(downloadDir));
+
+  while (Date.now() - startTime < timeoutMs) {
+    await new Promise(resolve => setTimeout(resolve, checkInterval));
+
+    const currentFiles = await fs.promises.readdir(downloadDir);
+    const newFiles = currentFiles.filter(
+      f =>
+        !initialFiles.has(f) &&
+        !f.endsWith('.crdownload') &&
+        !f.endsWith('.tmp'),
+    );
+
+    if (newFiles.length > 0) {
+      // Return the newest file (by modification time)
+      const filePaths = newFiles.map(f => path.join(downloadDir, f));
+      const stats = await Promise.all(
+        filePaths.map(async p => ({path: p, mtime: (await fs.promises.stat(p)).mtime})),
+      );
+      stats.sort((a, b) => b.mtime.getTime() - a.mtime.getTime());
+      return stats[0].path;
+    }
+  }
+
+  throw new Error(`Download timeout after ${timeoutMs}ms`);
+}
+
+export const askGeminiImage = defineTool({
+  name: 'ask_gemini_image',
+  description:
+    'Generate image using Gemini (Nano Banana / 3 Preview) via browser. ' +
+    'Automatically crops watermark from edges. ' +
+    'Rate limit: ~2 images/day for free users.',
+  annotations: {
+    category: ToolCategories.NAVIGATION_AUTOMATION,
+    readOnlyHint: false,
+  },
+  schema: {
+    prompt: z
+      .string()
+      .describe(
+        'Image generation prompt. Use natural language descriptions. ' +
+          'Structure: [Subject + Adjectives] doing [Action] in [Location/Context]. ' +
+          '[Composition/Camera Angle]. [Lighting/Atmosphere]. [Style/Media]. ' +
+          'HEX color codes like "#9F2B68" are supported.',
+      ),
+    outputPath: z
+      .string()
+      .describe(
+        'Output file path for the generated image. ' +
+          'Will be cropped to remove watermark. Example: /tmp/generated-image.png',
+      ),
+    cropMargin: z
+      .number()
+      .optional()
+      .describe(
+        `Pixels to crop from each edge to remove watermark. Default: ${DEFAULT_CROP_MARGIN}`,
+      ),
+    skipCrop: z
+      .boolean()
+      .optional()
+      .describe('Skip watermark cropping (keep original image). Default: false'),
+  },
+  handler: async (request, response, context) => {
+    const {
+      prompt,
+      outputPath,
+      cropMargin = DEFAULT_CROP_MARGIN,
+      skipCrop = false,
+    } = request.params;
+
+    const page = await getOrCreateGeminiPage(context);
+
+    // Set up download directory
+    const downloadDir = path.join(os.tmpdir(), 'gemini-image-downloads');
+    await fs.promises.mkdir(downloadDir, {recursive: true});
+
+    // Configure download behavior
+    const client = await page.createCDPSession();
+    await client.send('Page.setDownloadBehavior', {
+      behavior: 'allow',
+      downloadPath: downloadDir,
+    });
+
+    try {
+      response.appendResponseLine('Geminiに接続中...');
+
+      // Navigate to Gemini
+      await navigateWithRetry(page, GEMINI_CONFIG.BASE_URL + 'app', {
+        waitUntil: 'networkidle2',
+      });
+
+      // Wait for UI to stabilize
+      try {
+        await Promise.race([
+          page.waitForSelector(
+            'button[aria-label*="Account"], button[aria-label*="アカウント"]',
+            {timeout: 10000},
+          ),
+          page.waitForSelector('[role="textbox"]', {timeout: 10000}),
+        ]);
+      } catch {
+        response.appendResponseLine('⚠️ UI安定化待機タイムアウト（続行）');
+      }
+
+      // Check login
+      const loginStatus = await getLoginStatus(page, 'gemini');
+
+      if (loginStatus === LoginStatus.NEEDS_LOGIN) {
+        response.appendResponseLine('\n❌ Geminiへのログインが必要です');
+        response.appendResponseLine('📱 ブラウザでGoogleアカウントにログインしてください');
+
+        const finalStatus = await waitForLoginStatus(page, 'gemini', 120000, msg =>
+          response.appendResponseLine(msg),
+        );
+
+        if (finalStatus !== LoginStatus.LOGGED_IN) {
+          response.appendResponseLine('❌ ログインタイムアウト');
+          return;
+        }
+      }
+
+      response.appendResponseLine('✅ ログイン確認完了');
+
+      // Enhance prompt for better cropping
+      const enhancedPrompt = enhancePromptForCropping(prompt);
+      response.appendResponseLine('プロンプトを送信中...');
+
+      // Input enhanced prompt
+      const questionSent = await page.evaluate(promptText => {
+        const clearElement = (el: HTMLElement) => {
+          while (el.firstChild) {
+            el.removeChild(el.firstChild);
+          }
+        };
+
+        const textbox = document.querySelector('[role="textbox"]') as HTMLElement;
+        if (textbox) {
+          textbox.focus();
+          clearElement(textbox);
+          textbox.textContent = promptText;
+          textbox.dispatchEvent(new Event('input', {bubbles: true}));
+          return true;
+        }
+        return false;
+      }, enhancedPrompt);
+
+      if (!questionSent) {
+        response.appendResponseLine('❌ 入力欄が見つかりません');
+        return;
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // Click send button
+      const sent = await page.evaluate(() => {
+        const buttons = Array.from(document.querySelectorAll('button'));
+        const sendButton = buttons.find(
+          b =>
+            b.textContent?.includes('プロンプトを送信') ||
+            b.textContent?.includes('送信') ||
+            b.getAttribute('aria-label')?.includes('送信') ||
+            b.getAttribute('aria-label')?.includes('Send'),
+        );
+
+        if (sendButton && !sendButton.disabled) {
+          (sendButton as HTMLElement).click();
+          return true;
+        }
+        return false;
+      });
+
+      if (!sent) {
+        await page.keyboard.press('Enter');
+        response.appendResponseLine('⚠️ 送信ボタンが見つかりません (Enterキーを試行)');
+      }
+
+      response.appendResponseLine('🎨 画像生成中... (1-2分かかることがあります)');
+
+      // Wait for image generation to complete
+      // Look for generated image or download button
+      const startTime = Date.now();
+      const maxWaitTime = 180000; // 3 minutes
+
+      let imageFound = false;
+      while (Date.now() - startTime < maxWaitTime) {
+        await new Promise(resolve => setTimeout(resolve, 2000));
+
+        const status = await page.evaluate(() => {
+          // Check for generated image
+          const images = document.querySelectorAll('img[src*="blob:"], img[src*="generated"]');
+
+          // Check for download button or menu
+          const downloadButtons = Array.from(document.querySelectorAll('button, [role="menuitem"]'));
+          const hasDownload = downloadButtons.some(
+            b =>
+              b.textContent?.includes('ダウンロード') ||
+              b.textContent?.includes('Download') ||
+              b.getAttribute('aria-label')?.includes('download') ||
+              b.getAttribute('aria-label')?.includes('ダウンロード'),
+          );
+
+          // Check if still generating
+          const isGenerating =
+            document.body.innerText.includes('生成中') ||
+            document.body.innerText.includes('Generating') ||
+            document.querySelector('[role="progressbar"]') !== null;
+
+          return {
+            imageCount: images.length,
+            hasDownload,
+            isGenerating,
+          };
+        });
+
+        if (status.imageCount > 0 || status.hasDownload) {
+          imageFound = true;
+          response.appendResponseLine(`✅ 画像生成完了 (${Math.floor((Date.now() - startTime) / 1000)}秒)`);
+          break;
+        }
+
+        if (!status.isGenerating && Date.now() - startTime > 30000) {
+          // Not generating and no image after 30s - might have failed
+          response.appendResponseLine('⚠️ 生成中インジケータが消えました...');
+        }
+      }
+
+      if (!imageFound) {
+        response.appendResponseLine('❌ 画像生成タイムアウト (3分)');
+        return;
+      }
+
+      // Try to download the image
+      response.appendResponseLine('📥 画像をダウンロード中...');
+
+      // Method 1: Click download button
+      const downloadClicked = await page.evaluate(() => {
+        // Look for three-dot menu or download button on the image
+        const buttons = Array.from(document.querySelectorAll('button, [role="menuitem"]'));
+
+        // First try direct download button
+        let downloadBtn = buttons.find(
+          b =>
+            b.textContent?.includes('ダウンロード') ||
+            b.textContent?.includes('Download'),
+        );
+
+        if (downloadBtn) {
+          (downloadBtn as HTMLElement).click();
+          return 'direct';
+        }
+
+        // Try three-dot menu on generated images
+        const moreButtons = buttons.filter(
+          b =>
+            b.getAttribute('aria-label')?.includes('more') ||
+            b.getAttribute('aria-label')?.includes('その他') ||
+            b.querySelector('mat-icon[data-mat-icon-name="more_vert"]'),
+        );
+
+        if (moreButtons.length > 0) {
+          // Click the last one (likely the image menu)
+          (moreButtons[moreButtons.length - 1] as HTMLElement).click();
+          return 'menu-opened';
+        }
+
+        return null;
+      });
+
+      if (downloadClicked === 'menu-opened') {
+        // Wait for menu to open and click download
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        await page.evaluate(() => {
+          const menuItems = Array.from(document.querySelectorAll('[role="menuitem"], button'));
+          const downloadItem = menuItems.find(
+            item =>
+              item.textContent?.includes('ダウンロード') ||
+              item.textContent?.includes('Download'),
+          );
+          if (downloadItem) {
+            (downloadItem as HTMLElement).click();
+          }
+        });
+      }
+
+      // Wait for download to complete
+      let downloadedPath: string;
+      try {
+        downloadedPath = await waitForDownload(downloadDir, 30000);
+        response.appendResponseLine(`✅ ダウンロード完了: ${path.basename(downloadedPath)}`);
+      } catch (error) {
+        response.appendResponseLine('❌ ダウンロード待機タイムアウト');
+        response.appendResponseLine(
+          'ヒント: ブラウザで手動でダウンロードしてください',
+        );
+        return;
+      }
+
+      // Ensure output directory exists
+      const outputDir = path.dirname(outputPath);
+      await fs.promises.mkdir(outputDir, {recursive: true});
+
+      // Crop watermark or copy directly
+      if (skipCrop) {
+        await fs.promises.copyFile(downloadedPath, outputPath);
+        response.appendResponseLine(`📄 画像保存（クロップなし）: ${outputPath}`);
+      } else {
+        response.appendResponseLine(`✂️ ウォーターマークをクロップ中 (margin: ${cropMargin}px)...`);
+
+        try {
+          const {width, height} = await cropWatermark(
+            downloadedPath,
+            outputPath,
+            cropMargin,
+          );
+          response.appendResponseLine(
+            `✅ クロップ完了: ${width}x${height}px → ${outputPath}`,
+          );
+        } catch (error) {
+          const msg = error instanceof Error ? error.message : String(error);
+          response.appendResponseLine(`⚠️ クロップ失敗: ${msg}`);
+          response.appendResponseLine('元の画像をそのまま保存します...');
+          await fs.promises.copyFile(downloadedPath, outputPath);
+        }
+      }
+
+      // Cleanup temp file
+      try {
+        await fs.promises.unlink(downloadedPath);
+      } catch {
+        // Ignore cleanup errors
+      }
+
+      response.appendResponseLine('\n🎉 画像生成完了!');
+      response.appendResponseLine(`📁 出力: ${outputPath}`);
+
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+
+      if (msg.includes('Target closed') || msg.includes('Session closed')) {
+        response.appendResponseLine('❌ ブラウザ接続が切れました');
+        response.appendResponseLine('→ MCPサーバーを再起動してください');
+      } else {
+        response.appendResponseLine(`❌ エラー: ${msg}`);
+      }
+    }
+  },
+});
