@@ -93,6 +93,7 @@ export interface Response {
     insightSetId: string,
     insightName: InsightName,
   ): void;
+  setListExtensions(): void;
 }
 
 /**

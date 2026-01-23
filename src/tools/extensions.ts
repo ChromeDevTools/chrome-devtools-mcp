@@ -60,18 +60,7 @@ export const listExtensions = defineTool({
     conditions: [EXTENSIONS_CONDITION],
   },
   schema: {},
-  handler: async (request, response, context) => {
-    const extensions = context.listExtensions();
-    if (extensions.length === 0) {
-      response.appendResponseLine('No extensions installed.');
-      return;
-    }
-    const table = extensions.map(ext => ({
-      Name: ext.name,
-      ID: ext.id,
-      Version: ext.version,
-      Enabled: ext.isEnabled ? 'Yes' : 'No',
-    }));
-    response.appendResponseLine(JSON.stringify(table, null, 2));
+  handler: async (_request, response, _context) => {
+    response.setListExtensions();
   },
 });

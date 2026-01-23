@@ -25,6 +25,7 @@ import type {
 } from './tools/ToolDefinition.js';
 import type {InsightName, TraceResult} from './trace-processing/parse.js';
 import {getInsightOutput, getTraceSummary} from './trace-processing/parse.js';
+import type {InstalledExtension} from './utils/ExtensionRegistry.js';
 import {paginate} from './utils/pagination.js';
 import type {PaginationOptions} from './utils/types.js';
 
@@ -60,6 +61,7 @@ export class McpResponse implements Response {
     types?: string[];
     includePreservedMessages?: boolean;
   };
+  #listExtensions?: boolean;
   #devToolsData?: DevToolsData;
   #tabId?: string;
 
@@ -81,6 +83,10 @@ export class McpResponse implements Response {
     };
   }
 
+  setListExtensions(): void {
+    this.#listExtensions = true;
+  }
+
   setIncludeNetworkRequests(
     value: boolean,
     options?: PaginationOptions & {
@@ -99,9 +105,9 @@ export class McpResponse implements Response {
       pagination:
         options?.pageSize || options?.pageIdx
           ? {
-              pageSize: options.pageSize,
-              pageIdx: options.pageIdx,
-            }
+            pageSize: options.pageSize,
+            pageIdx: options.pageIdx,
+          }
           : undefined,
       resourceTypes: options?.resourceTypes,
       includePreservedRequests: options?.includePreservedRequests,
@@ -126,9 +132,9 @@ export class McpResponse implements Response {
       pagination:
         options?.pageSize || options?.pageIdx
           ? {
-              pageSize: options.pageSize,
-              pageIdx: options.pageIdx,
-            }
+            pageSize: options.pageSize,
+            pageIdx: options.pageIdx,
+          }
           : undefined,
       types: options?.types,
       includePreservedMessages: options?.includePreservedMessages,
@@ -297,6 +303,11 @@ export class McpResponse implements Response {
       }
     }
 
+    let extensions: InstalledExtension[] | undefined;
+    if (this.#listExtensions) {
+      extensions = context.listExtensions();
+    }
+
     let consoleMessages: Array<ConsoleFormatter | IssueFormatter> | undefined;
     if (this.#consoleDataOptions?.include) {
       let messages = context.getConsoleData(
@@ -395,6 +406,7 @@ export class McpResponse implements Response {
       networkRequests,
       traceInsight: this.#attachedTraceInsight,
       traceSummary: this.#attachedTraceSummary,
+      extensions,
     });
   }
 
@@ -409,6 +421,7 @@ export class McpResponse implements Response {
       networkRequests?: NetworkFormatter[];
       traceSummary?: TraceResult;
       traceInsight?: TraceInsightData;
+      extensions?: InstalledExtension[];
     },
   ): {content: Array<TextContent | ImageContent>; structuredContent: object} {
     const response = [`# ${toolName} response`];
@@ -474,6 +487,7 @@ Call ${handleDialog.name} to handle it before continuing.`);
       consoleMessages?: object[];
       traceSummary?: string;
       traceInsights?: Array<{insightName: string; insightKey: string}>;
+      extensions?: object[];
     } = {};
 
     if (this.#tabId) {
@@ -529,6 +543,25 @@ Call ${handleDialog.name} to handle it before continuing.`);
       response.push(data.detailedConsoleMessage.toStringDetailed());
       structuredContent.consoleMessage =
         data.detailedConsoleMessage.toJSONDetailed();
+    }
+
+    if (data.extensions) {
+      structuredContent.extensions = data.extensions;
+      response.push('## Extensions');
+      if (data.extensions.length === 0) {
+        response.push('No extensions installed.');
+      } else {
+        const parts = [];
+        for (const extension of data.extensions) {
+          parts.push([
+            `Name: ${extension.name}`,
+            `ID: ${extension.id}`,
+            `Version: ${extension.version}`,
+            `Status: ${extension.isEnabled ? 'Enabled' : 'Disabled'}`,
+          ].join('\n'));
+        }
+        response.push(parts.join('\n\n'));
+      }
     }
 
     if (this.#networkRequestsOptions?.include) {

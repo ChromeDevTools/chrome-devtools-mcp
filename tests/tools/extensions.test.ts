@@ -8,6 +8,8 @@ import assert from 'node:assert';
 import path from 'node:path';
 import {describe, it} from 'node:test';
 
+import sinon from 'sinon';
+
 import {
   installExtension,
   uninstallExtension,
@@ -74,34 +76,9 @@ describe('extension', () => {
   });
   it('lists installed extensions', async () => {
     await withMcpContext(async (response, context) => {
-      await installExtension.handler(
-        { params: { path: EXTENSION_PATH } },
-        response,
-        context,
-      );
-
+      const setListExtensionsSpy = sinon.spy(response, 'setListExtensions');
       await listExtensions.handler({ params: {} }, response, context);
-
-      const listResponseLine = response.responseLines[1];
-      assert.ok(listResponseLine, 'Response should not be empty');
-      const extensions = JSON.parse(listResponseLine);
-      assert.strictEqual(extensions.length, 1);
-      assert.strictEqual(extensions[0].Name, 'Test Extension');
-      assert.strictEqual(extensions[0].Version, '1.0');
-      assert.strictEqual(extensions[0].Enabled, 'Yes');
-
-      const extensionId = extensions[0].ID;
-      await uninstallExtension.handler(
-        { params: { id: extensionId } },
-        response,
-        context,
-      );
-
-      response.resetResponseLineForTesting();
-      await listExtensions.handler({ params: {} }, response, context);
-
-      const emptyListResponse = response.responseLines[0];
-      assert.strictEqual(emptyListResponse, 'No extensions installed.');
+      assert.ok(setListExtensionsSpy.calledOnce, 'setListExtensions should be called');
     });
   });
 });

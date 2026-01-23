@@ -713,3 +713,35 @@ describe('McpResponse network pagination', () => {
     });
   });
 });
+
+describe('extensions', () => {
+  it('lists extensions', async t => {
+    await withMcpContext(async (response, context) => {
+      context.listExtensions = () => [
+        {
+          id: 'id1',
+          name: 'Extension 1',
+          version: '1.0',
+          isEnabled: true,
+          path: '/path/to/ext1',
+        },
+        {
+          id: 'id2',
+          name: 'Extension 2',
+          version: '2.0',
+          isEnabled: false,
+          path: '/path/to/ext2',
+        },
+      ];
+      response.setListExtensions();
+      const { content, structuredContent } = await response.handle(
+        'test',
+        context,
+      );
+
+      t.assert.snapshot?.(getTextContent(content[0]));
+      t.assert.snapshot?.(JSON.stringify(structuredContent, null, 2));
+    });
+  });
+});
+

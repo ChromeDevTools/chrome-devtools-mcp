@@ -25,19 +25,15 @@ export class ExtensionRegistry {
     const name = manifest.name ?? 'Unknown';
     const version = manifest.version ?? 'Unknown';
 
-    const extension: InstalledExtension = {
+    const extension = {
       id,
       name,
       version,
       isEnabled: true,
       path: extensionPath,
     };
-    this.add(extension);
-    return extension;
-  }
-
-  add(extension: InstalledExtension): void {
     this.#extensions.set(extension.id, extension);
+    return extension;
   }
 
   remove(id: string): void {
