@@ -45,6 +45,7 @@
 
 - **uid** (string) **(required)**: The uid of an element on the page from the page content snapshot
 - **dblClick** (boolean) _(optional)_: Set to true for double clicks. Default is false.
+- **includeSnapshot** (boolean) _(optional)_: Whether to include a snapshot in the response. Default is false.
 
 ---
 
@@ -56,6 +57,7 @@
 
 - **from_uid** (string) **(required)**: The uid of the element to [`drag`](#drag)
 - **to_uid** (string) **(required)**: The uid of the element to drop into
+- **includeSnapshot** (boolean) _(optional)_: Whether to include a snapshot in the response. Default is false.
 
 ---
 
@@ -67,6 +69,7 @@
 
 - **uid** (string) **(required)**: The uid of an element on the page from the page content snapshot
 - **value** (string) **(required)**: The value to [`fill`](#fill) in
+- **includeSnapshot** (boolean) _(optional)_: Whether to include a snapshot in the response. Default is false.
 
 ---
 
@@ -77,6 +80,7 @@
 **Parameters:**
 
 - **elements** (array) **(required)**: Elements from snapshot to [`fill`](#fill) out.
+- **includeSnapshot** (boolean) _(optional)_: Whether to include a snapshot in the response. Default is false.
 
 ---
 
@@ -98,6 +102,7 @@
 **Parameters:**
 
 - **uid** (string) **(required)**: The uid of an element on the page from the page content snapshot
+- **includeSnapshot** (boolean) _(optional)_: Whether to include a snapshot in the response. Default is false.
 
 ---
 
@@ -108,6 +113,7 @@
 **Parameters:**
 
 - **key** (string) **(required)**: A key or a combination (e.g., "Enter", "Control+A", "Control++", "Control+Shift+R"). Modifiers: Control, Shift, Alt, Meta
+- **includeSnapshot** (boolean) _(optional)_: Whether to include a snapshot in the response. Default is false.
 
 ---
 
@@ -119,6 +125,7 @@
 
 - **filePath** (string) **(required)**: The local path of the file to upload
 - **uid** (string) **(required)**: The uid of the file input element or an element that will open file chooser on the page from the page content snapshot
+- **includeSnapshot** (boolean) _(optional)_: Whether to include a snapshot in the response. Default is false.
 
 ---
 
