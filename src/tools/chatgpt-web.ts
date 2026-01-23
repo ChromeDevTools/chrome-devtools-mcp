@@ -355,9 +355,7 @@ export const askChatGPTWeb = defineTool({
             `既存のプロジェクトチャットを使用: ${latestSession.url}`,
           );
         } else {
-          response.appendResponseLine(
-            '既存チャットが見つかりませんでした。新規作成します。',
-          );
+          response.appendResponseLine('📝 新規チャットを作成します');
           isNewChat = true;
         }
       } else {
