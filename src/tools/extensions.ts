@@ -22,6 +22,7 @@ export const installExtension = defineTool({
   schema: {
     path: zod
       .string()
+      .trim()
       .describe('Absolute path to the unpacked extension folder.'),
   },
   handler: async (request, response, context) => {
@@ -46,5 +47,31 @@ export const uninstallExtension = defineTool({
     const {id} = request.params;
     await context.uninstallExtension(id);
     response.appendResponseLine(`Extension uninstalled. Id: ${id}`);
+  },
+});
+
+export const listExtensions = defineTool({
+  name: 'list_extensions',
+  description:
+    'Lists all installed extensions, including their name, ID, version, and enabled status.',
+  annotations: {
+    category: ToolCategory.EXTENSIONS,
+    readOnlyHint: true,
+    conditions: [EXTENSIONS_CONDITION],
+  },
+  schema: {},
+  handler: async (request, response, context) => {
+    const extensions = context.listExtensions();
+    if (extensions.length === 0) {
+      response.appendResponseLine('No extensions installed.');
+      return;
+    }
+    const table = extensions.map(ext => ({
+      Name: ext.name,
+      ID: ext.id,
+      Version: ext.version,
+      Enabled: ext.isEnabled ? 'Yes' : 'No',
+    }));
+    response.appendResponseLine(JSON.stringify(table, null, 2));
   },
 });
