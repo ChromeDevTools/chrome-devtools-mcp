@@ -13,6 +13,7 @@ import type {Page} from 'puppeteer-core';
 import z from 'zod';
 
 import {GEMINI_CONFIG} from '../config.js';
+import {DownloadManager} from '../download-manager.js';
 import {
   getLoginStatus,
   waitForLoginStatus,
@@ -121,65 +122,6 @@ async function cropWatermark(
   return {width: newWidth, height: newHeight};
 }
 
-/**
- * Wait for download to complete and return the file path
- * Looks for new image files (png, jpg, jpeg) in the download directory
- */
-async function waitForDownload(
-  downloadDir: string,
-  timeoutMs: number = 60000,
-): Promise<string> {
-  const startTime = Date.now();
-  const checkInterval = 1000; // Check every second
-
-  // Get initial files with their mtimes
-  const initialFiles = new Map<string, number>();
-  try {
-    const files = await fs.promises.readdir(downloadDir);
-    for (const f of files) {
-      if (/\.(png|jpg|jpeg)$/i.test(f)) {
-        const stat = await fs.promises.stat(path.join(downloadDir, f));
-        initialFiles.set(f, stat.mtime.getTime());
-      }
-    }
-  } catch {
-    // Directory might not exist, continue
-  }
-
-  while (Date.now() - startTime < timeoutMs) {
-    await new Promise(resolve => setTimeout(resolve, checkInterval));
-
-    try {
-      const currentFiles = await fs.promises.readdir(downloadDir);
-
-      for (const f of currentFiles) {
-        // Only check image files
-        if (!/\.(png|jpg|jpeg)$/i.test(f)) continue;
-        // Skip incomplete downloads
-        if (f.endsWith('.crdownload') || f.endsWith('.tmp')) continue;
-
-        const filePath = path.join(downloadDir, f);
-        const stat = await fs.promises.stat(filePath);
-        const mtime = stat.mtime.getTime();
-
-        // Check if this is a new file or modified after we started
-        const initialMtime = initialFiles.get(f);
-        if (!initialMtime || mtime > initialMtime) {
-          // Verify file is complete (size > 0 and not growing)
-          await new Promise(resolve => setTimeout(resolve, 500));
-          const stat2 = await fs.promises.stat(filePath);
-          if (stat2.size > 0 && stat2.size === stat.size) {
-            return filePath;
-          }
-        }
-      }
-    } catch {
-      // Continue on error
-    }
-  }
-
-  throw new Error(`Download timeout after ${timeoutMs}ms`);
-}
 
 export const askGeminiImage = defineTool({
   name: 'ask_gemini_image',
@@ -375,99 +317,144 @@ export const askGeminiImage = defineTool({
         return;
       }
 
-      // Try to download the image
+      // Try to download the image using CDP-based download manager
       response.appendResponseLine('📥 画像をダウンロード中...');
 
-      // Click download button - Gemini uses "フルサイズの画像をダウンロード" button
-      const downloadClicked = await page.evaluate(() => {
-        const buttons = Array.from(document.querySelectorAll('button'));
+      // Set up download manager with CDP events
+      const userDownloadsDir = path.join(os.homedir(), 'Downloads');
+      const downloadManager = new DownloadManager(page, userDownloadsDir);
 
-        // Look for "フルサイズの画像をダウンロード" or "フルサイズでダウンロード" button
-        const downloadBtn = buttons.find(b => {
-          const text = b.textContent || '';
-          const ariaLabel = b.getAttribute('aria-label') || '';
-          const description = b.getAttribute('aria-describedby')
-            ? document.getElementById(b.getAttribute('aria-describedby')!)?.textContent || ''
-            : '';
+      try {
+        await downloadManager.startMonitoring();
 
-          return (
-            text.includes('フルサイズ') ||
-            text.includes('ダウンロード') ||
-            ariaLabel.includes('ダウンロード') ||
-            ariaLabel.includes('download') ||
-            description.includes('フルサイズ') ||
-            description.includes('ダウンロード')
-          );
+        // Listen for progress updates
+        downloadManager.on('progress', (percent: number, filename: string) => {
+          if (percent % 25 === 0) {
+            response.appendResponseLine(`📥 ダウンロード中... ${percent}% (${filename})`);
+          }
         });
 
-        if (downloadBtn) {
-          (downloadBtn as HTMLElement).click();
-          return true;
+        downloadManager.on('started', (filename: string) => {
+          response.appendResponseLine(`📥 ダウンロード開始: ${filename}`);
+        });
+
+        // Click download button - Gemini uses "フルサイズの画像をダウンロード" button
+        // Improved selector: prioritize aria-describedby for more reliable detection
+        const downloadClicked = await page.evaluate(() => {
+          const buttons = Array.from(document.querySelectorAll('button'));
+
+          // First, try to find button with aria-describedby pointing to "フルサイズ"
+          let downloadBtn = buttons.find(b => {
+            const describedBy = b.getAttribute('aria-describedby');
+            if (describedBy) {
+              const descEl = document.getElementById(describedBy);
+              const desc = descEl?.textContent || '';
+              return desc.includes('フルサイズ') || desc.includes('ダウンロード');
+            }
+            return false;
+          });
+
+          // Fallback: look for text/aria-label containing download keywords
+          if (!downloadBtn) {
+            downloadBtn = buttons.find(b => {
+              const text = b.textContent || '';
+              const ariaLabel = b.getAttribute('aria-label') || '';
+
+              // Avoid "Cancel download" buttons
+              const lowerText = text.toLowerCase();
+              const lowerLabel = ariaLabel.toLowerCase();
+              if (lowerText.includes('cancel') || lowerLabel.includes('cancel') ||
+                  lowerText.includes('キャンセル') || lowerLabel.includes('キャンセル')) {
+                return false;
+              }
+
+              return (
+                text.includes('フルサイズ') ||
+                text.includes('ダウンロード') ||
+                ariaLabel.includes('ダウンロード') ||
+                ariaLabel.includes('download')
+              );
+            });
+          }
+
+          if (downloadBtn) {
+            (downloadBtn as HTMLElement).click();
+            return true;
+          }
+          return false;
+        });
+
+        if (!downloadClicked) {
+          response.appendResponseLine('⚠️ ダウンロードボタンが見つかりません');
+          response.appendResponseLine('ヒント: ブラウザで画像を右クリックして保存してください');
+          return;
         }
-        return false;
-      });
 
-      if (!downloadClicked) {
-        response.appendResponseLine('⚠️ ダウンロードボタンが見つかりません');
-        response.appendResponseLine('ヒント: ブラウザで画像を右クリックして保存してください');
-        return;
-      }
+        // Wait for download to complete using CDP events (more reliable than file polling)
+        response.appendResponseLine('⏳ CDP経由でダウンロード完了を待機中...');
 
-      // Wait for download to start (Gemini shows progress bar)
-      response.appendResponseLine('⏳ ダウンロード処理を待機中...');
-      await new Promise(resolve => setTimeout(resolve, 3000));
-
-      // Wait for download to complete - check user's Downloads folder
-      const userDownloadsDir = path.join(os.homedir(), 'Downloads');
-      let downloadedPath: string;
-      try {
-        downloadedPath = await waitForDownload(userDownloadsDir, 60000); // 60 seconds
-        response.appendResponseLine(`✅ ダウンロード完了: ${path.basename(downloadedPath)}`);
-      } catch (error) {
-        response.appendResponseLine('❌ ダウンロード待機タイムアウト (60秒)');
-        response.appendResponseLine(
-          'ヒント: ブラウザで画像を右クリックして「画像を保存」してください',
-        );
-        return;
-      }
-
-      // Ensure output directory exists
-      const outputDir = path.dirname(outputPath);
-      await fs.promises.mkdir(outputDir, {recursive: true});
-
-      // Crop watermark or copy directly
-      if (skipCrop) {
-        await fs.promises.copyFile(downloadedPath, outputPath);
-        response.appendResponseLine(`📄 画像保存（クロップなし）: ${outputPath}`);
-      } else {
-        response.appendResponseLine(`✂️ ウォーターマークをクロップ中 (margin: ${cropMargin}px)...`);
-
+        let downloadedPath: string;
         try {
-          const {width, height} = await cropWatermark(
-            downloadedPath,
-            outputPath,
-            cropMargin,
-          );
-          response.appendResponseLine(
-            `✅ クロップ完了: ${width}x${height}px → ${outputPath}`,
-          );
-        } catch (error) {
-          const msg = error instanceof Error ? error.message : String(error);
-          response.appendResponseLine(`⚠️ クロップ失敗: ${msg}`);
-          response.appendResponseLine('元の画像をそのまま保存します...');
-          await fs.promises.copyFile(downloadedPath, outputPath);
+          downloadedPath = await downloadManager.waitForDownload(60000); // 60 seconds
+          response.appendResponseLine(`✅ ダウンロード完了: ${path.basename(downloadedPath)}`);
+        } catch (downloadError) {
+          const errMsg = downloadError instanceof Error ? downloadError.message : String(downloadError);
+
+          if (errMsg.includes('timeout')) {
+            response.appendResponseLine('❌ ダウンロードタイムアウト (60秒)');
+            response.appendResponseLine(
+              '💡 ヒント: ブラウザで画像を右クリックして「画像を保存」してください',
+            );
+          } else if (errMsg.includes('canceled')) {
+            response.appendResponseLine('❌ ダウンロードがキャンセルされました');
+          } else {
+            response.appendResponseLine(`❌ ダウンロードエラー: ${errMsg}`);
+          }
+          return;
         }
-      }
 
-      // Cleanup temp file
-      try {
-        await fs.promises.unlink(downloadedPath);
-      } catch {
-        // Ignore cleanup errors
-      }
+        // Ensure output directory exists
+        const outputDir = path.dirname(outputPath);
+        await fs.promises.mkdir(outputDir, {recursive: true});
 
-      response.appendResponseLine('\n🎉 画像生成完了!');
-      response.appendResponseLine(`📁 出力: ${outputPath}`);
+        // Crop watermark or copy directly
+        if (skipCrop) {
+          await fs.promises.copyFile(downloadedPath, outputPath);
+          response.appendResponseLine(`📄 画像保存（クロップなし）: ${outputPath}`);
+        } else {
+          response.appendResponseLine(`✂️ ウォーターマークをクロップ中 (margin: ${cropMargin}px)...`);
+
+          try {
+            const {width, height} = await cropWatermark(
+              downloadedPath,
+              outputPath,
+              cropMargin,
+            );
+            response.appendResponseLine(
+              `✅ クロップ完了: ${width}x${height}px → ${outputPath}`,
+            );
+          } catch (cropError) {
+            const msg = cropError instanceof Error ? cropError.message : String(cropError);
+            response.appendResponseLine(`⚠️ クロップ失敗: ${msg}`);
+            response.appendResponseLine('元の画像をそのまま保存します...');
+            await fs.promises.copyFile(downloadedPath, outputPath);
+          }
+        }
+
+        // Cleanup temp file
+        try {
+          await fs.promises.unlink(downloadedPath);
+        } catch {
+          // Ignore cleanup errors
+        }
+
+        response.appendResponseLine('\n🎉 画像生成完了!');
+        response.appendResponseLine(`📁 出力: ${outputPath}`);
+
+      } finally {
+        // Ensure download manager is always disposed
+        await downloadManager.dispose();
+      }
 
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
