@@ -1,6 +1,6 @@
 {
   "name": "chrome-ai-bridge",
-  "version": "1.0.12",
+  "version": "1.0.13",
   "description": "MCP server bridging Chrome browser and AI assistants (ChatGPT, Gemini). Browser automation + AI consultation.",
   "type": "module",
   "bin": "./scripts/cli.mjs",

@@ -280,6 +280,9 @@ export async function waitForLoginStatus(
     // Ignore errors (page might be closed)
   }
 
+  // 監視開始を即座に通知（最初の進捗表示まで15秒待たせない）
+  log('👀 ログインを監視中... 検出でき次第すぐにお知らせします');
+
   while (Date.now() - start < timeoutMs) {
     const status = await getLoginStatus(page, provider);
     if (status === LoginStatus.LOGGED_IN) {
