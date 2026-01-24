@@ -18,9 +18,16 @@
   - [`new_page`](#new_page)
   - [`select_page`](#select_page)
   - [`wait_for`](#wait_for)
-- **[Emulation](#emulation)** (2 tools)
+- **[Emulation](#emulation)** (9 tools)
   - [`emulate`](#emulate)
   - [`resize_page`](#resize_page)
+  - [`webauthn_add_authenticator`](#webauthn_add_authenticator)
+  - [`webauthn_add_credential`](#webauthn_add_credential)
+  - [`webauthn_clear_credentials`](#webauthn_clear_credentials)
+  - [`webauthn_enable`](#webauthn_enable)
+  - [`webauthn_get_credentials`](#webauthn_get_credentials)
+  - [`webauthn_remove_authenticator`](#webauthn_remove_authenticator)
+  - [`webauthn_set_user_verified`](#webauthn_set_user_verified)
 - **[Performance](#performance)** (3 tools)
   - [`performance_analyze_insight`](#performance_analyze_insight)
   - [`performance_start_trace`](#performance_start_trace)
@@ -220,6 +227,85 @@
 
 - **height** (number) **(required)**: Page height
 - **width** (number) **(required)**: Page width
+
+---
+
+### `webauthn_add_authenticator`
+
+**Description:** Add a virtual WebAuthn authenticator.
+
+**Parameters:**
+
+- **protocol** (enum: "u2f", "ctap2") **(required)**: The protocol the virtual authenticator speaks.
+- **transport** (enum: "usb", "nfc", "ble", "internal") **(required)**: The transport for the authenticator.
+- **hasResidentKey** (boolean) _(optional)_: Whether the authenticator supports resident keys (passkeys).
+- **hasUserVerification** (boolean) _(optional)_: Whether the authenticator supports user verification.
+- **isUserVerified** (boolean) _(optional)_: Whether user verification is currently enabled/verified.
+
+---
+
+### `webauthn_add_credential`
+
+**Description:** Add a credential to a virtual authenticator.
+
+**Parameters:**
+
+- **authenticatorId** (string) **(required)**: The ID of the authenticator to add the credential to.
+- **credentialId** (string) **(required)**: The credential ID (base64 encoded).
+- **isResidentCredential** (boolean) **(required)**: Whether this is a resident (discoverable) credential.
+- **privateKey** (string) **(required)**: The private key in PKCS#8 format (base64 encoded).
+- **rpId** (string) **(required)**: The relying party ID.
+- **signCount** (integer) _(optional)_: The signature counter.
+- **userHandle** (string) _(optional)_: The user handle (base64 encoded).
+
+---
+
+### `webauthn_clear_credentials`
+
+**Description:** Clear all credentials from a virtual authenticator.
+
+**Parameters:**
+
+- **authenticatorId** (string) **(required)**: The ID of the authenticator to clear credentials from.
+
+---
+
+### `webauthn_enable`
+
+**Description:** Enable the WebAuthn virtual authenticator environment for the selected page.
+
+**Parameters:** None
+
+---
+
+### `webauthn_get_credentials`
+
+**Description:** Get all credentials registered with a virtual authenticator.
+
+**Parameters:**
+
+- **authenticatorId** (string) **(required)**: The ID of the authenticator to get credentials from.
+
+---
+
+### `webauthn_remove_authenticator`
+
+**Description:** Remove a virtual WebAuthn authenticator.
+
+**Parameters:**
+
+- **authenticatorId** (string) **(required)**: The ID of the authenticator to remove.
+
+---
+
+### `webauthn_set_user_verified`
+
+**Description:** Set whether user verification succeeds or fails for a virtual authenticator.
+
+**Parameters:**
+
+- **authenticatorId** (string) **(required)**: The ID of the authenticator.
+- **isUserVerified** (boolean) **(required)**: Whether user verification should succeed.
 
 ---
 
