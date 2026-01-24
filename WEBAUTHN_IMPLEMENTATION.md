@@ -10,6 +10,7 @@ Adding WebAuthn CDP domain support to chrome-devtools-mcp using strict outside-i
 ## Goal (Definition of Done)
 
 A user can:
+
 1. Enable WebAuthn virtual authenticator environment via MCP tool
 2. Add a virtual authenticator (CTAP2/U2F, internal/USB/BLE/NFC)
 3. Use WebAuthn on a webpage (e.g., webauthn.io) with the virtual authenticator responding
@@ -69,29 +70,36 @@ describe('webauthn', () => {
 ### Phase 1: Minimal Vertical Slice
 
 #### Step 1.1: Observe Missing Functionality
+
 - [x] Verify no `webauthn_*` tools exist in MCP
 - [x] Navigate to webauthn.io, confirm we can't do WebAuthn without virtual authenticator
 
 #### Step 1.2: Failing Test - Tool Exists
+
 Create `tests/tools/webauthn.test.ts`:
+
 ```typescript
-it('webauthn_enable tool can be called')
+it('webauthn_enable tool can be called');
 ```
+
 Run: `npm run test -- --test-name-pattern="webauthn"`
 Expected: FAIL (module not found)
 
 #### Step 1.3: Implement - Minimal Tool Skeleton
+
 - Create `src/tools/webauthn.ts` with `enableWebAuthn` tool (no-op handler)
 - Export from `src/tools/tools.ts`
 - Run test: Should PASS
 - Commit: `feat(webauthn): add webauthn_enable tool skeleton`
 
 #### Step 1.4: Verify Tool Appears in MCP
+
 - Rebuild: `npm run build`
 - Check if MCP picks up changes (may need restart)
 - Verify tool appears
 
 #### Step 1.5: Failing Test - Enable Actually Works
+
 ```typescript
 it('enables WebAuthn so addVirtualAuthenticator succeeds', async () => {
   await withMcpContext(async (response, context) => {
@@ -99,38 +107,47 @@ it('enables WebAuthn so addVirtualAuthenticator succeeds', async () => {
     const session = context.getSelectedPage()._client();
     // This should succeed only if WebAuthn.enable was called
     const result = await session.send('WebAuthn.addVirtualAuthenticator', {
-      options: { protocol: 'ctap2', transport: 'internal' }
+      options: {protocol: 'ctap2', transport: 'internal'},
     });
     assert.ok(result.authenticatorId);
   });
 });
 ```
+
 Run: FAIL (WebAuthn not enabled)
 
 #### Step 1.6: Implement - CDP Call
+
 Add to handler:
+
 ```typescript
 await context.getSelectedPage()._client().send('WebAuthn.enable');
 ```
+
 Run test: PASS
 Commit: `feat(webauthn): implement WebAuthn.enable CDP call`
 
 #### Step 1.7: Verify via MCP
+
 - Call `webauthn_enable` tool
 - Confirm no error
 
 #### Step 1.8: Failing Test - Add Authenticator Tool
+
 ```typescript
-it('adds virtual authenticator and returns ID')
+it('adds virtual authenticator and returns ID');
 ```
+
 Run: FAIL (tool doesn't exist)
 
 #### Step 1.9: Implement - Add Authenticator
+
 - Add `addVirtualAuthenticator` tool with params: protocol, transport, hasResidentKey, hasUserVerification, isUserVerified
 - Run test: PASS
 - Commit: `feat(webauthn): add webauthn_add_authenticator tool`
 
 #### Step 1.10: E2E Verification
+
 1. Navigate to webauthn.io
 2. Call `webauthn_enable`
 3. Call `webauthn_add_authenticator` with ctap2/internal/userVerified
@@ -142,6 +159,7 @@ Commit: `test(webauthn): verify e2e with webauthn.io`
 ### Phase 2: Expand Coverage
 
 After vertical slice works:
+
 - `webauthn_disable`
 - `webauthn_remove_authenticator`
 - `webauthn_get_credentials`
@@ -151,6 +169,7 @@ After vertical slice works:
 - `webauthn_set_user_verified`
 
 ### Phase 3: Polish
+
 - Error handling tests
 - Run `npm run docs` to update documentation
 - Run `npm run check-format` and fix any issues
@@ -191,6 +210,7 @@ npm run check-format
 ## Reference: Emulation Tool Pattern
 
 From `src/tools/emulation.ts`:
+
 ```typescript
 export const emulate = defineTool({
   name: 'emulate',
@@ -238,13 +258,27 @@ describe('myTool', () => {
 
 Track each step completion here:
 
-- [ ] Step 1.1: Observe missing functionality
-- [ ] Step 1.2: Failing test - tool exists
-- [ ] Step 1.3: Implement tool skeleton
-- [ ] Step 1.4: Verify tool appears in MCP
-- [ ] Step 1.5: Failing test - enable works
-- [ ] Step 1.6: Implement CDP call
-- [ ] Step 1.7: Verify via MCP
-- [ ] Step 1.8: Failing test - add authenticator
-- [ ] Step 1.9: Implement add authenticator
-- [ ] Step 1.10: E2E verification
+- [x] Step 1.1: Observe missing functionality
+- [x] Step 1.2: Failing test - tool exists
+- [x] Step 1.3: Implement tool skeleton
+- [x] Step 1.4: Verify tool appears in MCP
+- [x] Step 1.5: Failing test - enable works
+- [x] Step 1.6: Implement CDP call
+- [x] Step 1.7: Verify via MCP
+- [x] Step 1.8: Failing test - add authenticator
+- [x] Step 1.9: Implement add authenticator
+- [x] Step 1.10: E2E verification
+
+**Phase 1 COMPLETE** - Minimal vertical slice working!
+
+### Commits:
+
+- `5f35101` feat(webauthn): add webauthn_enable tool skeleton
+- `ce3a0ed` feat(webauthn): implement WebAuthn.enable CDP call
+- `300e963` feat(webauthn): add webauthn_add_authenticator tool
+
+### E2E Verified:
+
+- webauthn.io registration + authentication works automatically
+- No user interaction required (Touch ID bypassed)
+- Virtual authenticator responds to both registration and authentication

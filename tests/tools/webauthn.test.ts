@@ -63,7 +63,10 @@ describe('webauthn', () => {
         const hasAuthenticatorId = response.responseLines.some(line =>
           line.includes('authenticatorId'),
         );
-        assert.ok(hasAuthenticatorId, 'Should include authenticator ID in response');
+        assert.ok(
+          hasAuthenticatorId,
+          'Should include authenticator ID in response',
+        );
       });
     });
   });

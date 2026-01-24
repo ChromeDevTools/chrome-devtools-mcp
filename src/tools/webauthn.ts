@@ -12,7 +12,8 @@ import {defineTool} from './ToolDefinition.js';
 
 export const enableWebAuthn = defineTool({
   name: 'webauthn_enable',
-  description: 'Enable the WebAuthn virtual authenticator environment for the selected page.',
+  description:
+    'Enable the WebAuthn virtual authenticator environment for the selected page.',
   annotations: {
     category: ToolCategory.EMULATION,
     readOnlyHint: false,
@@ -23,7 +24,9 @@ export const enableWebAuthn = defineTool({
     // @ts-expect-error _client is internal Puppeteer API
     const session = page._client() as CDPSession;
     await session.send('WebAuthn.enable');
-    response.appendResponseLine('WebAuthn virtual authenticator environment enabled.');
+    response.appendResponseLine(
+      'WebAuthn virtual authenticator environment enabled.',
+    );
   },
 });
 
@@ -59,8 +62,13 @@ export const addVirtualAuthenticator = defineTool({
     // @ts-expect-error _client is internal Puppeteer API
     const session = page._client() as CDPSession;
 
-    const {protocol, transport, hasResidentKey, hasUserVerification, isUserVerified} =
-      request.params;
+    const {
+      protocol,
+      transport,
+      hasResidentKey,
+      hasUserVerification,
+      isUserVerified,
+    } = request.params;
 
     const result = await session.send('WebAuthn.addVirtualAuthenticator', {
       options: {
