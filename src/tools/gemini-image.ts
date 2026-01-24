@@ -385,6 +385,12 @@ export const askGeminiImage = defineTool({
           response.appendResponseLine(`📥 ダウンロード開始: ${filename}`);
         });
 
+        // Get existing Gemini images BEFORE clicking download button
+        const existingFiles = await fs.promises.readdir(userDownloadsDir);
+        const existingGeminiImages = new Set(
+          existingFiles.filter(f => f.startsWith('Gemini_Generated_Image_') && f.endsWith('.png'))
+        );
+
         // Click download button - Gemini uses "フルサイズの画像をダウンロード" button
         // Improved selector: prioritize aria-describedby for more reliable detection
         const downloadClicked = await page.evaluate(() => {
@@ -441,12 +447,6 @@ export const askGeminiImage = defineTool({
         // 1. Try CDP events first (reliable for standard downloads)
         // 2. Fall back to filesystem monitoring (for blob/JS downloads like Gemini)
         response.appendResponseLine('⏳ ダウンロード完了を待機中...');
-
-        // Get existing Gemini images before download
-        const existingFiles = await fs.promises.readdir(userDownloadsDir);
-        const existingGeminiImages = new Set(
-          existingFiles.filter(f => f.startsWith('Gemini_Generated_Image_') && f.endsWith('.png'))
-        );
 
         let downloadedPath: string | null = null;
         const downloadStartTime = Date.now();
