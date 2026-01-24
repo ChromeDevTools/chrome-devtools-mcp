@@ -58,6 +58,14 @@ await mcp.webauthn_remove_authenticator({authenticatorId});
 - `src/tools/tools.ts` - Export webauthn tools
 - `tests/tools/webauthn.test.ts` - Tests (new)
 
+## Error Handling
+
+User-friendly error messages for common failure modes:
+- "WebAuthn virtual authenticator environment not enabled. Call webauthn_enable first."
+- "Invalid or unknown authenticator ID. Use webauthn_add_authenticator to create one."
+- "Resident credentials require a userHandle. Provide userHandle parameter."
+- "Failed to create credential. Ensure privateKey is a valid PKCS#8 EC P-256 key (base64 encoded)."
+
 ## Commits
 
 - `5f35101` feat(webauthn): add webauthn_enable tool skeleton
@@ -65,3 +73,5 @@ await mcp.webauthn_remove_authenticator({authenticatorId});
 - `300e963` feat(webauthn): add webauthn_add_authenticator tool
 - `248f408` style: fix import order and formatting
 - `d5f5a0d` feat(webauthn): add remaining WebAuthn tools (Phase 2)
+- `5b6939e` docs: update tool reference and implementation notes
+- `c822495` refactor(webauthn): improve error handling and reduce code duplication
