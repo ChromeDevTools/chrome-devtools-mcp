@@ -1,6 +1,6 @@
 {
-  "version": "1.0.0",
-  "lastUpdated": "2025-11-27",
+  "version": "1.1.0",
+  "lastUpdated": "2025-01-24",
   "description": "Selectors for Gemini web interface",
   "elements": {
     "editor": {
@@ -16,6 +16,17 @@
     "response": {
       "css": "model-response",
       "description": "Response container"
+    },
+    "downloadButton": {
+      "ax": {
+        "ariaDescribedByContains": ["フルサイズ", "ダウンロード", "Download"]
+      },
+      "text": ["フルサイズの画像をダウンロード", "Download full-size image"],
+      "description": "Download button for generated images"
+    },
+    "generatedImage": {
+      "css": "img[src*='blob:'], img[src*='generated']",
+      "description": "Generated image element"
     }
   },
   "placeholders": {

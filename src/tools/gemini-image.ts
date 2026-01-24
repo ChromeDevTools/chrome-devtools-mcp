@@ -264,58 +264,86 @@ export const askGeminiImage = defineTool({
 
       response.appendResponseLine('🎨 画像生成中... (1-2分かかることがあります)');
 
-      // Wait for image generation to complete
-      // Look for generated image or download button
+      // Wait for image generation using MutationObserver for instant detection
       const startTime = Date.now();
       const maxWaitTime = 180000; // 3 minutes
 
-      let imageFound = false;
-      while (Date.now() - startTime < maxWaitTime) {
-        await new Promise(resolve => setTimeout(resolve, 2000));
+      const imageFound = await page.evaluate((maxWait: number) => {
+        return new Promise<boolean>(resolve => {
+          // Check if image already exists (immediate return)
+          const checkCompletion = (): boolean => {
+            // Check for generated image
+            const images = document.querySelectorAll(
+              'img[src*="blob:"], img[src*="generated"]',
+            );
 
-        const status = await page.evaluate(() => {
-          // Check for generated image
-          const images = document.querySelectorAll('img[src*="blob:"], img[src*="generated"]');
+            // Check for download button with various detection methods
+            const buttons = Array.from(
+              document.querySelectorAll('button, [role="menuitem"]'),
+            );
+            const hasDownload = buttons.some(b => {
+              const text = b.textContent || '';
+              const ariaLabel = b.getAttribute('aria-label') || '';
+              const describedBy = b.getAttribute('aria-describedby');
+              let desc = '';
+              if (describedBy) {
+                const descEl = document.getElementById(describedBy);
+                desc = descEl?.textContent || '';
+              }
+              return (
+                text.includes('ダウンロード') ||
+                text.includes('Download') ||
+                text.includes('フルサイズ') ||
+                ariaLabel.toLowerCase().includes('download') ||
+                desc.includes('フルサイズ') ||
+                desc.includes('ダウンロード')
+              );
+            });
 
-          // Check for download button or menu
-          const downloadButtons = Array.from(document.querySelectorAll('button, [role="menuitem"]'));
-          const hasDownload = downloadButtons.some(
-            b =>
-              b.textContent?.includes('ダウンロード') ||
-              b.textContent?.includes('Download') ||
-              b.getAttribute('aria-label')?.includes('download') ||
-              b.getAttribute('aria-label')?.includes('ダウンロード'),
-          );
-
-          // Check if still generating
-          const isGenerating =
-            document.body.innerText.includes('生成中') ||
-            document.body.innerText.includes('Generating') ||
-            document.querySelector('[role="progressbar"]') !== null;
-
-          return {
-            imageCount: images.length,
-            hasDownload,
-            isGenerating,
+            if (images.length > 0 || hasDownload) {
+              return true;
+            }
+            return false;
           };
+
+          // Initial check
+          if (checkCompletion()) {
+            resolve(true);
+            return;
+          }
+
+          // Set up MutationObserver for instant detection
+          const observer = new MutationObserver(() => {
+            if (checkCompletion()) {
+              observer.disconnect();
+              clearTimeout(timeoutId);
+              resolve(true);
+            }
+          });
+
+          observer.observe(document.body, {
+            childList: true,
+            subtree: true,
+            attributes: true,
+            attributeFilter: ['src', 'aria-label', 'aria-describedby'],
+          });
+
+          // Timeout fallback
+          const timeoutId = setTimeout(() => {
+            observer.disconnect();
+            resolve(false);
+          }, maxWait);
         });
-
-        if (status.imageCount > 0 || status.hasDownload) {
-          imageFound = true;
-          response.appendResponseLine(`✅ 画像生成完了 (${Math.floor((Date.now() - startTime) / 1000)}秒)`);
-          break;
-        }
-
-        if (!status.isGenerating && Date.now() - startTime > 30000) {
-          // Not generating and no image after 30s - might have failed
-          response.appendResponseLine('⚠️ 生成中インジケータが消えました...');
-        }
-      }
+      }, maxWaitTime);
 
       if (!imageFound) {
         response.appendResponseLine('❌ 画像生成タイムアウト (3分)');
         return;
       }
+
+      response.appendResponseLine(
+        `✅ 画像生成完了 (${Math.floor((Date.now() - startTime) / 1000)}秒)`,
+      );
 
       // Try to download the image using CDP-based download manager
       response.appendResponseLine('📥 画像をダウンロード中...');
@@ -327,10 +355,21 @@ export const askGeminiImage = defineTool({
       try {
         await downloadManager.startMonitoring();
 
-        // Listen for progress updates
+        // Track reported progress to ensure threshold-based reporting
+        let lastReportedThreshold = 0;
+
+        // Listen for progress updates with threshold-based reporting
+        // This ensures 25%, 50%, 75%, 100% are always reported even if progress jumps
         downloadManager.on('progress', (percent: number, filename: string) => {
-          if (percent % 25 === 0) {
-            response.appendResponseLine(`📥 ダウンロード中... ${percent}% (${filename})`);
+          // Calculate the next threshold to report (25, 50, 75, 100)
+          const thresholds = [25, 50, 75, 100];
+          for (const threshold of thresholds) {
+            if (percent >= threshold && lastReportedThreshold < threshold) {
+              response.appendResponseLine(
+                `📥 ダウンロード中... ${threshold}% (${filename})`,
+              );
+              lastReportedThreshold = threshold;
+            }
           }
         });
 

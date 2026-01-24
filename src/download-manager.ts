@@ -47,7 +47,73 @@ export class DownloadManager extends EventEmitter {
   }
 
   /**
+   * Handle downloadWillBegin event
+   */
+  private handleDownloadWillBegin = (
+    event: Protocol.Browser.DownloadWillBeginEvent,
+  ): void => {
+    const info: DownloadInfo = {
+      guid: event.guid,
+      url: event.url,
+      suggestedFilename: event.suggestedFilename,
+      state: 'inProgress',
+      receivedBytes: 0,
+      totalBytes: 0,
+    };
+    this.pendingDownloads.set(event.guid, info);
+    this.emit('started', event.suggestedFilename);
+  };
+
+  /**
+   * Handle downloadProgress event
+   */
+  private handleDownloadProgress = (
+    event: Protocol.Browser.DownloadProgressEvent,
+  ): void => {
+    const info = this.pendingDownloads.get(event.guid);
+    if (!info) return;
+
+    info.receivedBytes = event.receivedBytes;
+    info.totalBytes = event.totalBytes;
+    info.state = event.state as DownloadInfo['state'];
+
+    // Emit progress
+    if (event.totalBytes > 0) {
+      const percent = Math.round(
+        (event.receivedBytes / event.totalBytes) * 100,
+      );
+      this.emit('progress', percent, info.suggestedFilename);
+    }
+
+    // Handle completion
+    if (event.state === 'completed') {
+      // Construct the final path
+      const finalPath = `${this.downloadDir}/${info.suggestedFilename}`;
+      info.resolvedPath = finalPath;
+
+      this.emit('completed', finalPath);
+
+      // Resolve any waiting promises
+      const resolver = this.downloadPromiseResolvers.get(event.guid);
+      if (resolver) {
+        resolver.resolve(finalPath);
+        this.downloadPromiseResolvers.delete(event.guid);
+      }
+    } else if (event.state === 'canceled') {
+      this.emit('canceled', info.suggestedFilename);
+
+      const resolver = this.downloadPromiseResolvers.get(event.guid);
+      if (resolver) {
+        resolver.reject(new Error('Download canceled'));
+        this.downloadPromiseResolvers.delete(event.guid);
+      }
+    }
+  };
+
+  /**
    * Start monitoring downloads using CDP events
+   * Event handlers are registered immediately after CDP session creation
+   * to prevent race conditions
    */
   async startMonitoring(): Promise<void> {
     if (this.isMonitoring) {
@@ -57,73 +123,17 @@ export class DownloadManager extends EventEmitter {
     // Create CDP session
     this.cdpSession = await this.page.createCDPSession();
 
+    // Register event handlers IMMEDIATELY after CDP session creation
+    // This prevents race condition where events could be missed
+    this.cdpSession.on('Browser.downloadWillBegin', this.handleDownloadWillBegin);
+    this.cdpSession.on('Browser.downloadProgress', this.handleDownloadProgress);
+
     // Enable download events
     await this.cdpSession.send('Browser.setDownloadBehavior', {
       behavior: 'allowAndName',
       downloadPath: this.downloadDir,
       eventsEnabled: true,
     });
-
-    // Listen for download events
-    this.cdpSession.on(
-      'Browser.downloadWillBegin',
-      (event: Protocol.Browser.DownloadWillBeginEvent) => {
-        const info: DownloadInfo = {
-          guid: event.guid,
-          url: event.url,
-          suggestedFilename: event.suggestedFilename,
-          state: 'inProgress',
-          receivedBytes: 0,
-          totalBytes: 0,
-        };
-        this.pendingDownloads.set(event.guid, info);
-        this.emit('started', event.suggestedFilename);
-      },
-    );
-
-    this.cdpSession.on(
-      'Browser.downloadProgress',
-      (event: Protocol.Browser.DownloadProgressEvent) => {
-        const info = this.pendingDownloads.get(event.guid);
-        if (!info) return;
-
-        info.receivedBytes = event.receivedBytes;
-        info.totalBytes = event.totalBytes;
-        info.state = event.state as DownloadInfo['state'];
-
-        // Emit progress
-        if (event.totalBytes > 0) {
-          const percent = Math.round(
-            (event.receivedBytes / event.totalBytes) * 100,
-          );
-          this.emit('progress', percent, info.suggestedFilename);
-        }
-
-        // Handle completion
-        if (event.state === 'completed') {
-          // Construct the final path
-          const finalPath = `${this.downloadDir}/${info.suggestedFilename}`;
-          info.resolvedPath = finalPath;
-
-          this.emit('completed', finalPath);
-
-          // Resolve any waiting promises
-          const resolver = this.downloadPromiseResolvers.get(event.guid);
-          if (resolver) {
-            resolver.resolve(finalPath);
-            this.downloadPromiseResolvers.delete(event.guid);
-          }
-        } else if (event.state === 'canceled') {
-          this.emit('canceled', info.suggestedFilename);
-
-          const resolver = this.downloadPromiseResolvers.get(event.guid);
-          if (resolver) {
-            resolver.reject(new Error('Download canceled'));
-            this.downloadPromiseResolvers.delete(event.guid);
-          }
-        }
-      },
-    );
 
     this.isMonitoring = true;
   }
