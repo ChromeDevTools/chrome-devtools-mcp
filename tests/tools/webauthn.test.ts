@@ -7,7 +7,10 @@
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
-import {enableWebAuthn} from '../../src/tools/webauthn.js';
+import {
+  addVirtualAuthenticator,
+  enableWebAuthn,
+} from '../../src/tools/webauthn.js';
 import {withMcpContext} from '../utils.js';
 
 describe('webauthn', () => {
@@ -31,6 +34,36 @@ describe('webauthn', () => {
           },
         });
         assert.ok(result.authenticatorId, 'Should return authenticator ID');
+      });
+    });
+  });
+
+  describe('webauthn_add_authenticator', () => {
+    it('adds a virtual authenticator and returns its ID', async () => {
+      await withMcpContext(async (response, context) => {
+        // First enable WebAuthn
+        await enableWebAuthn.handler({params: {}}, response, context);
+
+        // Then add authenticator via tool
+        await addVirtualAuthenticator.handler(
+          {
+            params: {
+              protocol: 'ctap2',
+              transport: 'internal',
+              hasResidentKey: true,
+              hasUserVerification: true,
+              isUserVerified: true,
+            },
+          },
+          response,
+          context,
+        );
+
+        // Response should contain the authenticator ID
+        const hasAuthenticatorId = response.responseLines.some(line =>
+          line.includes('authenticatorId'),
+        );
+        assert.ok(hasAuthenticatorId, 'Should include authenticator ID in response');
       });
     });
   });
