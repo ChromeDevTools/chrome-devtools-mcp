@@ -437,26 +437,61 @@ export const askGeminiImage = defineTool({
           return;
         }
 
-        // Wait for download to complete using CDP events (more reliable than file polling)
-        response.appendResponseLine('⏳ CDP経由でダウンロード完了を待機中...');
+        // Wait for download to complete using hybrid approach:
+        // 1. Try CDP events first (reliable for standard downloads)
+        // 2. Fall back to filesystem monitoring (for blob/JS downloads like Gemini)
+        response.appendResponseLine('⏳ ダウンロード完了を待機中...');
 
-        let downloadedPath: string;
-        try {
-          downloadedPath = await downloadManager.waitForDownload(60000); // 60 seconds
-          response.appendResponseLine(`✅ ダウンロード完了: ${path.basename(downloadedPath)}`);
-        } catch (downloadError) {
-          const errMsg = downloadError instanceof Error ? downloadError.message : String(downloadError);
+        // Get existing Gemini images before download
+        const existingFiles = await fs.promises.readdir(userDownloadsDir);
+        const existingGeminiImages = new Set(
+          existingFiles.filter(f => f.startsWith('Gemini_Generated_Image_') && f.endsWith('.png'))
+        );
 
-          if (errMsg.includes('timeout')) {
-            response.appendResponseLine('❌ ダウンロードタイムアウト (60秒)');
-            response.appendResponseLine(
-              '💡 ヒント: ブラウザで画像を右クリックして「画像を保存」してください',
-            );
-          } else if (errMsg.includes('canceled')) {
-            response.appendResponseLine('❌ ダウンロードがキャンセルされました');
-          } else {
-            response.appendResponseLine(`❌ ダウンロードエラー: ${errMsg}`);
+        let downloadedPath: string | null = null;
+        const downloadStartTime = Date.now();
+        const downloadTimeout = 60000; // 60 seconds
+
+        // Try CDP-based detection with filesystem fallback
+        while (Date.now() - downloadStartTime < downloadTimeout) {
+          // Check for new Gemini image files (filesystem fallback)
+          const currentFiles = await fs.promises.readdir(userDownloadsDir);
+          const newGeminiImages = currentFiles.filter(
+            f => f.startsWith('Gemini_Generated_Image_') &&
+                 f.endsWith('.png') &&
+                 !existingGeminiImages.has(f)
+          );
+
+          if (newGeminiImages.length > 0) {
+            // Found new image file
+            const newestImage = newGeminiImages.sort().pop()!;
+            downloadedPath = path.join(userDownloadsDir, newestImage);
+
+            // Wait a bit for file to be fully written
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            response.appendResponseLine(`✅ ダウンロード完了: ${newestImage}`);
+            break;
           }
+
+          // Also check CDP events (for standard downloads)
+          const completedDownloads = Array.from(downloadManager.getPendingDownloads()).filter(
+            (d: {state: string}) => d.state === 'completed'
+          );
+          if (completedDownloads.length > 0) {
+            // CDP detected completion - but Gemini uses blob downloads so this rarely fires
+            break;
+          }
+
+          // Short wait before next check
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+
+        if (!downloadedPath) {
+          response.appendResponseLine('❌ ダウンロードタイムアウト (60秒)');
+          response.appendResponseLine(
+            '💡 ヒント: ブラウザで画像を右クリックして「画像を保存」してください',
+          );
           return;
         }
 
