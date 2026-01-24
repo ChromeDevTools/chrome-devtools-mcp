@@ -12,11 +12,25 @@ import {withMcpContext} from '../utils.js';
 
 describe('webauthn', () => {
   describe('webauthn_enable', () => {
-    it('can be called without error', async () => {
+    it('enables WebAuthn so virtual authenticators can be added', async () => {
       await withMcpContext(async (response, context) => {
         await enableWebAuthn.handler({params: {}}, response, context);
-        // If we get here without error, the tool exists and can be called
-        assert.ok(true);
+
+        // Verify WebAuthn is enabled by successfully adding a virtual authenticator
+        // This will fail if WebAuthn.enable wasn't called
+        const page = context.getSelectedPage();
+        // @ts-expect-error _client is internal Puppeteer API
+        const session = page._client();
+        const result = await session.send('WebAuthn.addVirtualAuthenticator', {
+          options: {
+            protocol: 'ctap2',
+            transport: 'internal',
+            hasResidentKey: true,
+            hasUserVerification: true,
+            isUserVerified: true,
+          },
+        });
+        assert.ok(result.authenticatorId, 'Should return authenticator ID');
       });
     });
   });

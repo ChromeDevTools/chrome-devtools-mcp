@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type {CDPSession} from '../third_party/index.js';
+
 import {ToolCategory} from './categories.js';
 import {defineTool} from './ToolDefinition.js';
 
@@ -15,8 +17,11 @@ export const enableWebAuthn = defineTool({
     readOnlyHint: false,
   },
   schema: {},
-  handler: async (_request, response, _context) => {
-    // Skeleton - does nothing yet
-    response.appendResponseLine('WebAuthn enabled');
+  handler: async (_request, response, context) => {
+    const page = context.getSelectedPage();
+    // @ts-expect-error _client is internal Puppeteer API
+    const session = page._client() as CDPSession;
+    await session.send('WebAuthn.enable');
+    response.appendResponseLine('WebAuthn virtual authenticator environment enabled.');
   },
 });
