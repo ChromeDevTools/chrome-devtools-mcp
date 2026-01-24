@@ -248,31 +248,54 @@ export async function getLoginStatus(
 }
 
 /**
+ * Default login timeout: 5 minutes (for 2FA, SMS auth, Authenticator apps)
+ */
+const LOGIN_TIMEOUT_MS = 300000;
+
+/**
  * Wait for login with auto-polling and backoff
  * Returns when user logs in or timeout occurs
+ *
+ * Improvements (v0.x.x):
+ * - Extended timeout: 5 minutes (2FA/SMS/Authenticator support)
+ * - Browser brought to front for visibility
+ * - Progress updates with remaining time (every 15 seconds)
+ * - Clear success feedback on login detection
  */
 export async function waitForLoginStatus(
   page: Page,
   provider: 'chatgpt' | 'gemini',
-  timeoutMs = 120000,
+  timeoutMs = LOGIN_TIMEOUT_MS,
   onStatusUpdate?: (message: string) => void,
 ): Promise<LoginStatus> {
   const log = onStatusUpdate || console.error;
   const start = Date.now();
   let delay = 500;
+  let lastProgressReport = 0;
 
-  log(`⏳ ログイン待機中（最大${Math.floor(timeoutMs / 1000)}秒）...`);
+  // Bring browser to front so user can see login page
+  try {
+    await page.bringToFront();
+  } catch {
+    // Ignore errors (page might be closed)
+  }
 
   while (Date.now() - start < timeoutMs) {
     const status = await getLoginStatus(page, provider);
     if (status === LoginStatus.LOGGED_IN) {
-      log('✅ ログイン検出！続行します...');
+      log('✅ ログイン検出！処理を続行します');
       return status;
     }
 
-    const elapsed = Math.floor((Date.now() - start) / 1000);
-    if (elapsed % 10 === 0 && elapsed > 0) {
-      log(`⏳ まだ待機中... (${elapsed}秒経過)`);
+    // Progress update every 15 seconds with remaining time (minutes:seconds format)
+    const elapsed = Date.now() - start;
+    if (elapsed - lastProgressReport >= 15000) {
+      const remainingMs = timeoutMs - elapsed;
+      const mins = Math.floor(remainingMs / 60000);
+      const secs = Math.ceil((remainingMs % 60000) / 1000);
+      const timeStr = mins > 0 ? `${mins}分${secs}秒` : `${secs}秒`;
+      log(`⏳ ログイン待機中... 残り ${timeStr}`);
+      lastProgressReport = elapsed;
     }
 
     await new Promise(r => setTimeout(r, delay));
@@ -281,7 +304,7 @@ export async function waitForLoginStatus(
     delay = Math.min(3000, Math.floor(delay * 1.5 * jitter));
   }
 
-  log('❌ タイムアウト: 再度お試しください');
+  log('❌ ログインタイムアウト（5分）');
   return LoginStatus.NEEDS_LOGIN;
 }
 

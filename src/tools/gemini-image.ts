@@ -194,15 +194,24 @@ export const askGeminiImage = defineTool({
       const loginStatus = await getLoginStatus(page, 'gemini');
 
       if (loginStatus === LoginStatus.NEEDS_LOGIN) {
-        response.appendResponseLine('\n❌ Geminiへのログインが必要です');
-        response.appendResponseLine('📱 ブラウザでGoogleアカウントにログインしてください');
+        response.appendResponseLine('\n🔐 ログインが必要です');
+        response.appendResponseLine(
+          '📱 ブラウザウィンドウを開きました。Googleアカウントでログインしてください',
+        );
+        response.appendResponseLine(
+          '⏳ ログイン完了を自動検出します（最大5分待機）',
+        );
+        response.appendResponseLine(
+          '💡 二段階認証もゆっくり対応できます',
+        );
 
-        const finalStatus = await waitForLoginStatus(page, 'gemini', 120000, msg =>
+        // Auto-poll for login completion (max 5 minutes for 2FA support)
+        const finalStatus = await waitForLoginStatus(page, 'gemini', 300000, msg =>
           response.appendResponseLine(msg),
         );
 
         if (finalStatus !== LoginStatus.LOGGED_IN) {
-          response.appendResponseLine('❌ ログインタイムアウト');
+          response.appendResponseLine('❌ ログインタイムアウト（5分）');
           return;
         }
       }

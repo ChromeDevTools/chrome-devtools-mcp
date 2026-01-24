@@ -338,22 +338,23 @@ export const askGeminiWeb = defineTool({
       const loginStatus = await getLoginStatus(page, 'gemini');
 
       if (loginStatus === LoginStatus.NEEDS_LOGIN) {
-        response.appendResponseLine('\n❌ Geminiへのログインが必要です');
-        response.appendResponseLine('');
+        response.appendResponseLine('\n🔐 ログインが必要です');
         response.appendResponseLine(
-          '📱 ブラウザウィンドウでGeminiにログインしてください：',
+          '📱 ブラウザウィンドウを開きました。Googleアカウントでログインしてください',
         );
         response.appendResponseLine(
-          '   1. ブラウザウィンドウでGoogleアカウントを選択',
+          '⏳ ログイン完了を自動検出します（最大5分待機）',
         );
-        response.appendResponseLine('   2. パスワードを入力してログイン');
+        response.appendResponseLine(
+          '💡 二段階認証もゆっくり対応できます',
+        );
         response.appendResponseLine('');
 
-        // Auto-poll for login completion (max 2 minutes)
+        // Auto-poll for login completion (max 5 minutes for 2FA support)
         const finalStatus = await waitForLoginStatus(
           page,
           'gemini',
-          120000,
+          300000,
           msg => response.appendResponseLine(msg),
         );
 
