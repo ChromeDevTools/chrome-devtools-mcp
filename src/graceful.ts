@@ -142,7 +142,14 @@ export function setupGraceful(options: GracefulOptions) {
   // Register signal handlers
   process.on('SIGTERM', () => gracefulExit('SIGTERM'));
   process.on('SIGINT', () => gracefulExit('SIGINT'));
-  process.on('disconnect', () => gracefulExit('disconnect')); // Parent died
+  // Note: 'disconnect' is intentionally NOT triggering gracefulExit
+  // Claude Code sends disconnect when user presses Esc to cancel a task,
+  // but the MCP server should continue running for subsequent tool calls
+  process.on('disconnect', () => {
+    console.error(
+      '[graceful] Parent process disconnected (ignored - MCP server continues)',
+    );
+  });
 
   process.on('uncaughtException', async err => {
     console.error('[graceful] Uncaught exception:', err);
