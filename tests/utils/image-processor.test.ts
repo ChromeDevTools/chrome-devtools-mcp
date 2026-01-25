@@ -5,7 +5,7 @@
  */
 
 import assert from 'node:assert';
-import {describe, it, before} from 'node:test';
+import {describe, it} from 'node:test';
 
 import sharp from 'sharp';
 
@@ -44,7 +44,10 @@ describe('image-processor', () => {
       assert.strictEqual(result.mimeType, 'image/png');
       assert.strictEqual(result.compressionRatio, 1.0);
       assert.strictEqual(result.originalSize.width, result.processedSize.width);
-      assert.strictEqual(result.originalSize.height, result.processedSize.height);
+      assert.strictEqual(
+        result.originalSize.height,
+        result.processedSize.height,
+      );
     });
 
     it('returns original image when empty options provided', async () => {

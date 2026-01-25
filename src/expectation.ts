@@ -18,7 +18,9 @@ export const snapshotOptionsSchema = zod
     selector: zod
       .string()
       .optional()
-      .describe('CSS selector to limit snapshot scope (e.g., ".main-content", "form")'),
+      .describe(
+        'CSS selector to limit snapshot scope (e.g., ".main-content", "form")',
+      ),
     maxLength: zod
       .number()
       .optional()
@@ -61,30 +63,34 @@ export const imageOptionsSchema = zod
  * Schema for expectation configuration that controls response content.
  * All options default to false for maximum token efficiency.
  */
-export const expectationSchema = zod.object({
-  includeSnapshot: zod
-    .boolean()
-    .optional()
-    .default(false)
-    .describe('Include accessibility tree snapshot (false saves ~40% tokens)'),
-  includeConsole: zod
-    .boolean()
-    .optional()
-    .default(false)
-    .describe('Include console messages'),
-  includeNetwork: zod
-    .boolean()
-    .optional()
-    .default(false)
-    .describe('Include network requests'),
-  includeTabs: zod
-    .boolean()
-    .optional()
-    .default(false)
-    .describe('Include tab/page information'),
-  snapshotOptions: snapshotOptionsSchema,
-  imageOptions: imageOptionsSchema,
-}).optional();
+export const expectationSchema = zod
+  .object({
+    includeSnapshot: zod
+      .boolean()
+      .optional()
+      .default(false)
+      .describe(
+        'Include accessibility tree snapshot (false saves ~40% tokens)',
+      ),
+    includeConsole: zod
+      .boolean()
+      .optional()
+      .default(false)
+      .describe('Include console messages'),
+    includeNetwork: zod
+      .boolean()
+      .optional()
+      .default(false)
+      .describe('Include network requests'),
+    includeTabs: zod
+      .boolean()
+      .optional()
+      .default(false)
+      .describe('Include tab/page information'),
+    snapshotOptions: snapshotOptionsSchema,
+    imageOptions: imageOptionsSchema,
+  })
+  .optional();
 
 export type ExpectationOptions = zod.infer<typeof expectationSchema>;
 export type SnapshotOptions = zod.infer<typeof snapshotOptionsSchema>;
@@ -328,7 +334,8 @@ export function mergeExpectations(
     return defaults;
   }
   return {
-    includeSnapshot: userExpectation.includeSnapshot ?? defaults.includeSnapshot,
+    includeSnapshot:
+      userExpectation.includeSnapshot ?? defaults.includeSnapshot,
     includeConsole: userExpectation.includeConsole ?? defaults.includeConsole,
     includeNetwork: userExpectation.includeNetwork ?? defaults.includeNetwork,
     includeTabs: userExpectation.includeTabs ?? defaults.includeTabs,

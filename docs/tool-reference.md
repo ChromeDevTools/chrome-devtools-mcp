@@ -340,6 +340,8 @@ so returned values have to JSON-serializable.
 - **filePath** (string) _(optional)_: The absolute path, or a path relative to the current working directory, to save the screenshot to instead of attaching it to the response.
 - **format** (enum: "png", "jpeg", "webp") _(optional)_: Type of format to save the screenshot as. Default is "png"
 - **fullPage** (boolean) _(optional)_: If set to true takes a screenshot of the full page instead of the currently visible viewport. Incompatible with uid.
+- **maxHeight** (number) _(optional)_: Maximum height in pixels. Image will be resized (maintaining aspect ratio) if larger. Useful for token efficiency.
+- **maxWidth** (number) _(optional)_: Maximum width in pixels. Image will be resized (maintaining aspect ratio) if larger. Useful for token efficiency.
 - **quality** (number) _(optional)_: Compression quality for JPEG and WebP formats (0-100). Higher values mean better quality but larger file sizes. Ignored for PNG format.
 - **uid** (string) _(optional)_: The uid of an element on the page from the page content snapshot. If omitted takes a pages screenshot.
 
@@ -354,6 +356,8 @@ in the DevTools Elements panel (if any).
 **Parameters:**
 
 - **filePath** (string) _(optional)_: The absolute path, or a path relative to the current working directory, to save the snapshot to instead of attaching it to the response.
+- **maxLength** (number) _(optional)_: Maximum characters for snapshot output. If exceeded, output is truncated with a notice. Useful for token efficiency.
+- **selector** (string) _(optional)_: CSS selector to limit snapshot scope. Only the subtree rooted at the matching element will be included. Useful for focusing on specific page sections.
 - **verbose** (boolean) _(optional)_: Whether to include all possible information available in the full a11y tree. Default is false.
 
 ---

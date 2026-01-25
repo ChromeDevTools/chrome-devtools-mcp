@@ -61,7 +61,11 @@ export async function processImage(
     // Apply format and quality options
     let outputMimeType = mimeType;
     if (options.format) {
-      const result = applyFormatConversion(image, options.format, options.quality);
+      const result = applyFormatConversion(
+        image,
+        options.format,
+        options.quality,
+      );
       image = result.image;
       outputMimeType = result.mimeType;
     } else if (options.quality) {

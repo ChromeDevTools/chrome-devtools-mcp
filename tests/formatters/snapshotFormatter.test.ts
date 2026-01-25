@@ -318,10 +318,9 @@ describe('snapshotFormatter', () => {
         elementHandle: async () => null,
       };
 
-      const formatter = new SnapshotFormatter(
-        {root: node} as TextSnapshot,
-        {maxLength: 50},
-      );
+      const formatter = new SnapshotFormatter({root: node} as TextSnapshot, {
+        maxLength: 50,
+      });
       const formatted = formatter.toString();
 
       assert.ok(formatted.length <= 50);
@@ -337,10 +336,9 @@ describe('snapshotFormatter', () => {
         elementHandle: async () => null,
       };
 
-      const formatter = new SnapshotFormatter(
-        {root: node} as TextSnapshot,
-        {maxLength: 1000},
-      );
+      const formatter = new SnapshotFormatter({root: node} as TextSnapshot, {
+        maxLength: 1000,
+      });
       const formatted = formatter.toString();
 
       assert.ok(!formatted.includes('[truncated'));

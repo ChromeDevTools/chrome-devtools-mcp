@@ -120,7 +120,10 @@ export const screenshot = defineTool({
     }
 
     if (request.params.filePath) {
-      const file = await context.saveFile(screenshotData, request.params.filePath);
+      const file = await context.saveFile(
+        screenshotData,
+        request.params.filePath,
+      );
       response.appendResponseLine(`Saved screenshot to ${file.filename}.`);
     } else if (screenshotData.length >= 2_000_000) {
       const {filename} = await context.saveTemporaryFile(

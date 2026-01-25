@@ -335,11 +335,13 @@ This fork includes token optimization features inspired by [fast-playwright-mcp]
 Use the following parameters with `take_snapshot` to reduce token usage:
 
 **Truncation** - Limit output to a maximum number of characters:
+
 ```
 Take a snapshot with maxLength of 5000 characters
 ```
 
 **CSS Selector Filtering** - Focus on a specific part of the page:
+
 ```
 Take a snapshot with selector "#main-content"
 ```
@@ -358,15 +360,15 @@ Images are resized maintaining aspect ratio (using sharp library). This reduces 
 
 ### Additional Parameters
 
-| Tool | Parameter | Description |
-|------|-----------|-------------|
-| `take_snapshot` | `maxLength` | Maximum characters (truncates with notice) |
-| `take_snapshot` | `selector` | CSS selector to limit scope |
-| `take_snapshot` | `verbose` | Include all a11y tree info (default: false) |
-| `take_screenshot` | `maxWidth` | Maximum width in pixels |
-| `take_screenshot` | `maxHeight` | Maximum height in pixels |
-| `take_screenshot` | `quality` | JPEG/WebP quality 0-100 |
-| `take_screenshot` | `format` | png, jpeg, or webp |
+| Tool              | Parameter   | Description                                 |
+| ----------------- | ----------- | ------------------------------------------- |
+| `take_snapshot`   | `maxLength` | Maximum characters (truncates with notice)  |
+| `take_snapshot`   | `selector`  | CSS selector to limit scope                 |
+| `take_snapshot`   | `verbose`   | Include all a11y tree info (default: false) |
+| `take_screenshot` | `maxWidth`  | Maximum width in pixels                     |
+| `take_screenshot` | `maxHeight` | Maximum height in pixels                    |
+| `take_screenshot` | `quality`   | JPEG/WebP quality 0-100                     |
+| `take_screenshot` | `format`    | png, jpeg, or webp                          |
 
 See `src/expectation.ts` for the full expectation schema and tool defaults.
 
