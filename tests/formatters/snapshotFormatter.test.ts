@@ -292,4 +292,74 @@ describe('snapshotFormatter', () => {
       ],
     });
   });
+
+  describe('maxLength truncation', () => {
+    it('truncates output when exceeding maxLength', () => {
+      const node: TextSnapshotNode = {
+        id: '1_1',
+        role: 'root',
+        name: 'root',
+        children: [
+          {
+            id: '1_2',
+            role: 'button',
+            name: 'This is a very long button name that will cause the output to exceed the maxLength limit',
+            children: [],
+            elementHandle: async () => null,
+          },
+          {
+            id: '1_3',
+            role: 'textbox',
+            name: 'Another element with a long name',
+            children: [],
+            elementHandle: async () => null,
+          },
+        ],
+        elementHandle: async () => null,
+      };
+
+      const formatter = new SnapshotFormatter(
+        {root: node} as TextSnapshot,
+        {maxLength: 50},
+      );
+      const formatted = formatter.toString();
+
+      assert.ok(formatted.length <= 50);
+      assert.ok(formatted.includes('[truncated'));
+    });
+
+    it('does not truncate when under maxLength', () => {
+      const node: TextSnapshotNode = {
+        id: '1_1',
+        role: 'button',
+        name: 'btn',
+        children: [],
+        elementHandle: async () => null,
+      };
+
+      const formatter = new SnapshotFormatter(
+        {root: node} as TextSnapshot,
+        {maxLength: 1000},
+      );
+      const formatted = formatter.toString();
+
+      assert.ok(!formatted.includes('[truncated'));
+    });
+
+    it('works without maxLength option', () => {
+      const node: TextSnapshotNode = {
+        id: '1_1',
+        role: 'button',
+        name: 'button',
+        children: [],
+        elementHandle: async () => null,
+      };
+
+      const formatter = new SnapshotFormatter({root: node} as TextSnapshot);
+      const formatted = formatter.toString();
+
+      assert.ok(formatted.includes('button'));
+      assert.ok(!formatted.includes('[truncated'));
+    });
+  });
 });
