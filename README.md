@@ -19,6 +19,9 @@ Chrome DevTools for reliable automation, in-depth debugging, and performance ana
 - **Reliable automation**. Uses
   [puppeteer](https://github.com/puppeteer/puppeteer) to automate actions in
   Chrome and automatically wait for action results.
+- **Token-efficient responses** (fork enhancement): Minimize token usage with
+  snapshot truncation via `maxLength` parameter. Inspired by
+  [fast-playwright-mcp](https://github.com/nicobailon/fast-playwright-mcp).
 
 ## Disclaimers
 
@@ -319,8 +322,32 @@ Check the performance of https://developers.chrome.com
 
 Your MCP client should open the browser and record a performance trace.
 
-> [!NOTE]  
+> [!NOTE]
 > The MCP server will start the browser automatically once the MCP client uses a tool that requires a running browser instance. Connecting to the Chrome DevTools MCP server on its own will not automatically start the browser.
+
+## Token Optimization (Fork Enhancement)
+
+This fork includes token optimization features inspired by [fast-playwright-mcp](https://github.com/nicobailon/fast-playwright-mcp).
+
+### Snapshot Truncation
+
+Use the `maxLength` parameter with `take_snapshot` to limit output size:
+
+```
+Take a snapshot with maxLength of 5000 characters
+```
+
+The snapshot will be truncated with a notice if it exceeds the limit. This is useful for large pages where you only need a summary.
+
+### Future Enhancements
+
+The infrastructure for more token optimization features is in place:
+
+- **expectation schema**: Control which content to include in responses (snapshot, console, network, tabs)
+- **snapshotOptions**: Limit snapshot scope by CSS selector or max length
+- **imageOptions**: Control screenshot format, quality, and dimensions
+
+See `src/expectation.ts` for the full schema and tool defaults.
 
 ## Tools
 
