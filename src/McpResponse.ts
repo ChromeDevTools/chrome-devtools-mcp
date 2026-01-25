@@ -234,7 +234,9 @@ export class McpResponse implements Response {
       );
       const textSnapshot = context.getTextSnapshot();
       if (textSnapshot) {
-        const formatter = new SnapshotFormatter(textSnapshot);
+        const formatter = new SnapshotFormatter(textSnapshot, {
+          maxLength: this.#snapshotParams.maxLength,
+        });
         if (this.#snapshotParams.filePath) {
           await context.saveFile(
             new TextEncoder().encode(formatter.toString()),

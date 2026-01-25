@@ -32,11 +32,18 @@ in the DevTools Elements panel (if any).`,
       .describe(
         'The absolute path, or a path relative to the current working directory, to save the snapshot to instead of attaching it to the response.',
       ),
+    maxLength: zod
+      .number()
+      .optional()
+      .describe(
+        'Maximum characters for snapshot output. If exceeded, output is truncated with a notice. Useful for token efficiency.',
+      ),
   },
   handler: async (request, response) => {
     response.includeSnapshot({
       verbose: request.params.verbose ?? false,
       filePath: request.params.filePath,
+      maxLength: request.params.maxLength,
     });
   },
 });

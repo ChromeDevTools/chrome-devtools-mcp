@@ -51,6 +51,11 @@ export interface ImageContentData {
 export interface SnapshotParams {
   verbose?: boolean;
   filePath?: string;
+  /**
+   * Maximum length of the snapshot string.
+   * If exceeded, output will be truncated with a notice.
+   */
+  maxLength?: number;
 }
 
 export interface DevToolsData {

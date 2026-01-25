@@ -6,11 +6,21 @@
 
 import type {TextSnapshot, TextSnapshotNode} from '../McpContext.js';
 
+export interface SnapshotFormatterOptions {
+  /**
+   * Maximum length of the formatted snapshot string.
+   * If exceeded, the output will be truncated with a notice.
+   */
+  maxLength?: number;
+}
+
 export class SnapshotFormatter {
   #snapshot: TextSnapshot;
+  #options: SnapshotFormatterOptions;
 
-  constructor(snapshot: TextSnapshot) {
+  constructor(snapshot: TextSnapshot, options?: SnapshotFormatterOptions) {
     this.#snapshot = snapshot;
+    this.#options = options ?? {};
   }
 
   toString(): string {
@@ -28,7 +38,17 @@ Get a verbose snapshot to include all elements if you are interested in the sele
     }
 
     chunks.push(this.#formatNode(root, 0));
-    return chunks.join('');
+    let result = chunks.join('');
+
+    // Apply maxLength truncation if specified
+    if (this.#options.maxLength && result.length > this.#options.maxLength) {
+      const truncateNotice = '\n\n... [truncated due to maxLength limit]';
+      result =
+        result.slice(0, this.#options.maxLength - truncateNotice.length) +
+        truncateNotice;
+    }
+
+    return result;
   }
 
   toJSON(): object {
