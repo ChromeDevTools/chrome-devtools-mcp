@@ -8,6 +8,7 @@ import * as consoleTools from './console.js';
 import * as emulationTools from './emulation.js';
 import * as extensionTools from './extensions.js';
 import * as inputTools from './input.js';
+import * as lighthouseTools from './lighthouse.js';
 import * as networkTools from './network.js';
 import * as pagesTools from './pages.js';
 import * as performanceTools from './performance.js';
@@ -21,6 +22,7 @@ const tools = [
   ...Object.values(emulationTools),
   ...Object.values(extensionTools),
   ...Object.values(inputTools),
+  ...Object.values(lighthouseTools),
   ...Object.values(networkTools),
   ...Object.values(pagesTools),
   ...Object.values(performanceTools),
