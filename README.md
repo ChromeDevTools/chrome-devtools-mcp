@@ -20,7 +20,8 @@ Chrome DevTools for reliable automation, in-depth debugging, and performance ana
   [puppeteer](https://github.com/puppeteer/puppeteer) to automate actions in
   Chrome and automatically wait for action results.
 - **Token-efficient responses** (fork enhancement): Minimize token usage with
-  snapshot truncation via `maxLength` parameter. Inspired by
+  snapshot truncation (`maxLength`), CSS selector filtering (`selector`), and
+  image resizing (`maxWidth`/`maxHeight`). Inspired by
   [fast-playwright-mcp](https://github.com/nicobailon/fast-playwright-mcp).
 
 ## Disclaimers
@@ -329,25 +330,45 @@ Your MCP client should open the browser and record a performance trace.
 
 This fork includes token optimization features inspired by [fast-playwright-mcp](https://github.com/nicobailon/fast-playwright-mcp).
 
-### Snapshot Truncation
+### Snapshot Optimization
 
-Use the `maxLength` parameter with `take_snapshot` to limit output size:
+Use the following parameters with `take_snapshot` to reduce token usage:
 
+**Truncation** - Limit output to a maximum number of characters:
 ```
 Take a snapshot with maxLength of 5000 characters
 ```
 
-The snapshot will be truncated with a notice if it exceeds the limit. This is useful for large pages where you only need a summary.
+**CSS Selector Filtering** - Focus on a specific part of the page:
+```
+Take a snapshot with selector "#main-content"
+```
 
-### Future Enhancements
+The `selector` parameter limits the snapshot to only the subtree rooted at the matching element. This dramatically reduces output size when you only need to inspect a specific component.
 
-The infrastructure for more token optimization features is in place:
+### Screenshot Optimization
 
-- **expectation schema**: Control which content to include in responses (snapshot, console, network, tabs)
-- **snapshotOptions**: Limit snapshot scope by CSS selector or max length
-- **imageOptions**: Control screenshot format, quality, and dimensions
+Use `maxWidth` and `maxHeight` with `take_screenshot` to resize images:
 
-See `src/expectation.ts` for the full schema and tool defaults.
+```
+Take a screenshot with maxWidth 800 and maxHeight 600
+```
+
+Images are resized maintaining aspect ratio (using sharp library). This reduces the base64 payload size significantly, saving tokens when including screenshots in context.
+
+### Additional Parameters
+
+| Tool | Parameter | Description |
+|------|-----------|-------------|
+| `take_snapshot` | `maxLength` | Maximum characters (truncates with notice) |
+| `take_snapshot` | `selector` | CSS selector to limit scope |
+| `take_snapshot` | `verbose` | Include all a11y tree info (default: false) |
+| `take_screenshot` | `maxWidth` | Maximum width in pixels |
+| `take_screenshot` | `maxHeight` | Maximum height in pixels |
+| `take_screenshot` | `quality` | JPEG/WebP quality 0-100 |
+| `take_screenshot` | `format` | png, jpeg, or webp |
+
+See `src/expectation.ts` for the full expectation schema and tool defaults.
 
 ## Tools
 

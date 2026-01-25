@@ -8,7 +8,7 @@ import {ConsoleFormatter} from './formatters/ConsoleFormatter.js';
 import {IssueFormatter} from './formatters/IssueFormatter.js';
 import {NetworkFormatter} from './formatters/NetworkFormatter.js';
 import {SnapshotFormatter} from './formatters/SnapshotFormatter.js';
-import type {McpContext} from './McpContext.js';
+import type {McpContext, TextSnapshot, TextSnapshotNode} from './McpContext.js';
 import {DevTools} from './third_party/index.js';
 import type {
   ConsoleMessage,
@@ -232,7 +232,25 @@ export class McpResponse implements Response {
         this.#snapshotParams.verbose,
         this.#devToolsData,
       );
-      const textSnapshot = context.getTextSnapshot();
+      let textSnapshot = context.getTextSnapshot();
+
+      // Apply selector filtering if specified
+      if (textSnapshot && this.#snapshotParams.selector) {
+        const filteredSnapshot = await this.#filterSnapshotBySelector(
+          context,
+          textSnapshot,
+          this.#snapshotParams.selector,
+        );
+        if (filteredSnapshot) {
+          textSnapshot = filteredSnapshot;
+        } else {
+          // Selector didn't match any element in the snapshot
+          this.#textResponseLines.push(
+            `Warning: No element found matching selector "${this.#snapshotParams.selector}". Returning full snapshot.`,
+          );
+        }
+      }
+
       if (textSnapshot) {
         const formatter = new SnapshotFormatter(textSnapshot, {
           maxLength: this.#snapshotParams.maxLength,
@@ -632,5 +650,75 @@ Call ${handleDialog.name} to handle it before continuing.`);
 
   resetResponseLineForTesting() {
     this.#textResponseLines = [];
+  }
+
+  /**
+   * Filters a snapshot to only include the subtree rooted at the element
+   * matching the given CSS selector.
+   */
+  async #filterSnapshotBySelector(
+    context: McpContext,
+    textSnapshot: TextSnapshot,
+    selector: string,
+  ): Promise<TextSnapshot | null> {
+    const page = context.getSelectedPage();
+
+    // Find the element matching the selector
+    const element = await page.$(selector);
+    if (!element) {
+      return null;
+    }
+
+    // Get the backendNodeId via CDP
+    // @ts-expect-error - accessing internal _client() method
+    const client = element._client();
+    // @ts-expect-error - accessing internal _remoteObject property
+    const remoteObjectId = element._remoteObject.objectId;
+
+    const {node} = await client.send('DOM.describeNode', {
+      objectId: remoteObjectId,
+    });
+    const backendNodeId = node.backendNodeId as number;
+
+    // Find the node in our snapshot tree by backendNodeId
+    const findNodeByBackendId = (
+      node: TextSnapshotNode,
+    ): TextSnapshotNode | null => {
+      if (node.backendNodeId === backendNodeId) {
+        return node;
+      }
+      for (const child of node.children) {
+        const found = findNodeByBackendId(child);
+        if (found) {
+          return found;
+        }
+      }
+      return null;
+    };
+
+    const subtreeRoot = findNodeByBackendId(textSnapshot.root);
+    if (!subtreeRoot) {
+      return null;
+    }
+
+    // Create a new idToNode map for just the subtree
+    const newIdToNode = new Map<string, TextSnapshotNode>();
+    const buildIdMap = (node: TextSnapshotNode) => {
+      newIdToNode.set(node.id, node);
+      for (const child of node.children) {
+        buildIdMap(child);
+      }
+    };
+    buildIdMap(subtreeRoot);
+
+    // Return a filtered snapshot
+    return {
+      root: subtreeRoot,
+      idToNode: newIdToNode,
+      snapshotId: textSnapshot.snapshotId,
+      selectedElementUid: textSnapshot.selectedElementUid,
+      hasSelectedElement: textSnapshot.hasSelectedElement,
+      verbose: textSnapshot.verbose,
+    };
   }
 }

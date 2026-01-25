@@ -38,12 +38,19 @@ in the DevTools Elements panel (if any).`,
       .describe(
         'Maximum characters for snapshot output. If exceeded, output is truncated with a notice. Useful for token efficiency.',
       ),
+    selector: zod
+      .string()
+      .optional()
+      .describe(
+        'CSS selector to limit snapshot scope. Only the subtree rooted at the matching element will be included. Useful for focusing on specific page sections.',
+      ),
   },
   handler: async (request, response) => {
     response.includeSnapshot({
       verbose: request.params.verbose ?? false,
       filePath: request.params.filePath,
       maxLength: request.params.maxLength,
+      selector: request.params.selector,
     });
   },
 });

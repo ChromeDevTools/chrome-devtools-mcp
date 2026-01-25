@@ -6,6 +6,7 @@
 
 import {zod} from '../third_party/index.js';
 import type {ElementHandle, Page} from '../third_party/index.js';
+import {processImage} from '../utils/image-processor.js';
 
 import {ToolCategory} from './categories.js';
 import {defineTool} from './ToolDefinition.js';
@@ -30,6 +31,18 @@ export const screenshot = defineTool({
       .optional()
       .describe(
         'Compression quality for JPEG and WebP formats (0-100). Higher values mean better quality but larger file sizes. Ignored for PNG format.',
+      ),
+    maxWidth: zod
+      .number()
+      .optional()
+      .describe(
+        'Maximum width in pixels. Image will be resized (maintaining aspect ratio) if larger. Useful for token efficiency.',
+      ),
+    maxHeight: zod
+      .number()
+      .optional()
+      .describe(
+        'Maximum height in pixels. Image will be resized (maintaining aspect ratio) if larger. Useful for token efficiency.',
       ),
     uid: zod
       .string()
@@ -65,12 +78,32 @@ export const screenshot = defineTool({
     const format = request.params.format;
     const quality = format === 'png' ? undefined : request.params.quality;
 
-    const screenshot = await pageOrHandle.screenshot({
+    let screenshotData = await pageOrHandle.screenshot({
       type: format,
       fullPage: request.params.fullPage,
       quality,
       optimizeForSpeed: true, // Bonus: optimize encoding for speed
     });
+
+    let mimeType = `image/${format}`;
+
+    // Apply image processing if resize options are specified
+    if (request.params.maxWidth || request.params.maxHeight) {
+      const processed = await processImage(screenshotData, mimeType, {
+        maxWidth: request.params.maxWidth,
+        maxHeight: request.params.maxHeight,
+        format: format,
+        quality: quality,
+      });
+      screenshotData = processed.data;
+      mimeType = processed.mimeType;
+
+      if (processed.compressionRatio < 1) {
+        response.appendResponseLine(
+          `Resized from ${processed.originalSize.width}x${processed.originalSize.height} to ${processed.processedSize.width}x${processed.processedSize.height} (${Math.round(processed.compressionRatio * 100)}% of original size).`,
+        );
+      }
+    }
 
     if (request.params.uid) {
       response.appendResponseLine(
@@ -87,18 +120,18 @@ export const screenshot = defineTool({
     }
 
     if (request.params.filePath) {
-      const file = await context.saveFile(screenshot, request.params.filePath);
+      const file = await context.saveFile(screenshotData, request.params.filePath);
       response.appendResponseLine(`Saved screenshot to ${file.filename}.`);
-    } else if (screenshot.length >= 2_000_000) {
+    } else if (screenshotData.length >= 2_000_000) {
       const {filename} = await context.saveTemporaryFile(
-        screenshot,
-        `image/${request.params.format}`,
+        screenshotData,
+        mimeType as 'image/png' | 'image/jpeg' | 'image/webp',
       );
       response.appendResponseLine(`Saved screenshot to ${filename}.`);
     } else {
       response.attachImage({
-        mimeType: `image/${request.params.format}`,
-        data: Buffer.from(screenshot).toString('base64'),
+        mimeType,
+        data: Buffer.from(screenshotData).toString('base64'),
       });
     }
   },

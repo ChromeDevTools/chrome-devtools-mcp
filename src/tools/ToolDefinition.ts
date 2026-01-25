@@ -56,6 +56,11 @@ export interface SnapshotParams {
    * If exceeded, output will be truncated with a notice.
    */
   maxLength?: number;
+  /**
+   * CSS selector to limit snapshot scope.
+   * Only the subtree rooted at the matching element will be included.
+   */
+  selector?: string;
 }
 
 export interface DevToolsData {
