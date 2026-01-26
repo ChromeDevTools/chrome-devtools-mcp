@@ -395,7 +395,18 @@ export const askGeminiWeb = defineTool({
       await page.keyboard.press('Backspace'); // Clear selection
 
       // Type the question using real keyboard events (essential for Angular)
-      await page.keyboard.type(sanitizedQuestion, {delay: 5});
+      // IMPORTANT: Split by newlines and use Shift+Enter for line breaks
+      // (Enter alone triggers send in Gemini)
+      const lines = sanitizedQuestion.split('\n');
+      for (let i = 0; i < lines.length; i++) {
+        if (i > 0) {
+          // Shift+Enter for newline (Enter alone sends the message)
+          await page.keyboard.down('Shift');
+          await page.keyboard.press('Enter');
+          await page.keyboard.up('Shift');
+        }
+        await page.keyboard.type(lines[i], {delay: 2});
+      }
 
       // Wait for Angular to process the input and show send button
       await new Promise(resolve => setTimeout(resolve, 500));
