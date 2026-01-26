@@ -265,8 +265,8 @@ export class McpContext implements Context {
     return this.#consoleCollector.getById(this.getSelectedPage(), id);
   }
 
-  async newPage(): Promise<Page> {
-    const page = await this.browser.newPage();
+  async newPage(background?: boolean): Promise<Page> {
+    const page = await this.browser.newPage({background});
     await this.createPagesSnapshot();
     this.selectPage(page);
     this.#networkCollector.addPage(page);

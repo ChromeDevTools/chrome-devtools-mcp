@@ -170,6 +170,7 @@
 **Parameters:**
 
 - **url** (string) **(required)**: URL to load in a new page.
+- **background** (boolean) _(optional)_: Whether to open the page in the background without bringing it to the front.
 - **timeout** (integer) _(optional)_: Maximum wait time in milliseconds. If set to 0, the default timeout will be used.
 
 ---

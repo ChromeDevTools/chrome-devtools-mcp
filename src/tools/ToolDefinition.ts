@@ -110,7 +110,7 @@ export type Context = Readonly<{
   getPageById(pageId: number): Page;
   getPageId(page: Page): number | undefined;
   isPageSelected(page: Page): boolean;
-  newPage(): Promise<Page>;
+  newPage(background?: boolean): Promise<Page>;
   closePage(pageId: number): Promise<void>;
   selectPage(page: Page): void;
   getElementByUid(uid: string): Promise<ElementHandle<Element>>;
