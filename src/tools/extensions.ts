@@ -22,7 +22,6 @@ export const installExtension = defineTool({
   schema: {
     path: zod
       .string()
-      .trim()
       .describe('Absolute path to the unpacked extension folder.'),
   },
   handler: async (request, response, context) => {

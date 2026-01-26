@@ -551,18 +551,10 @@ Call ${handleDialog.name} to handle it before continuing.`);
       if (data.extensions.length === 0) {
         response.push('No extensions installed.');
       } else {
-        const parts = [];
-        for (const extension of data.extensions) {
-          parts.push(
-            [
-              `Name: ${extension.name}`,
-              `ID: ${extension.id}`,
-              `Version: ${extension.version}`,
-              `Status: ${extension.isEnabled ? 'Enabled' : 'Disabled'}`,
-            ].join('\n'),
-          );
-        }
-        response.push(parts.join('\n\n'));
+        const extensionsMessage = data.extensions.map(extension => {
+          return `id=${extension.id} "${extension.name}" v${extension.version} ${extension.isEnabled ? 'Enabled' : 'Disabled'}`;
+        }).join('\n');
+        response.push(extensionsMessage);
       }
     }
 

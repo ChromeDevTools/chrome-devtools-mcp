@@ -484,15 +484,8 @@ No requests found.
 exports[`extensions > lists extensions 1`] = `
 # test response
 ## Extensions
-Name: Extension 1
-ID: id1
-Version: 1.0
-Status: Enabled
-
-Name: Extension 2
-ID: id2
-Version: 2.0
-Status: Disabled
+id=id1 "Extension 1" v1.0 Enabled
+id=id2 "Extension 2" v2.0 Disabled
 `;
 
 exports[`extensions > lists extensions 2`] = `

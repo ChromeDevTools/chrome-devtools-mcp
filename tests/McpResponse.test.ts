@@ -717,6 +717,14 @@ describe('McpResponse network pagination', () => {
 describe('extensions', () => {
   it('lists extensions', async t => {
     await withMcpContext(async (response, context) => {
+      response.setListExtensions();
+      // Empty state testing 
+      const emptyResult = await response.handle('test', context);
+      const emptyText = getTextContent(emptyResult.content[0]);
+      assert.ok(emptyText.includes('No extensions installed.'), 'Should show message for ampty extensions');
+
+      response.resetResponseLineForTesting();
+      // Testing with extensions
       context.listExtensions = () => [
         {
           id: 'id1',
