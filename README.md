@@ -205,7 +205,10 @@ Install the Chrome DevTools MCP server using the Gemini CLI.
 **Project wide:**
 
 ```bash
+# Either MCP only:
 gemini mcp add chrome-devtools npx chrome-devtools-mcp@latest
+# Or as Gemini extension (MCP+Skills):
+gemini extensions install --auto-update https://github.com/ChromeDevTools/chrome-devtools-mcp
 ```
 
 **Globally:**
