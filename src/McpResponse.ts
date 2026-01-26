@@ -307,7 +307,6 @@ export class McpResponse implements Response {
     if (this.#listExtensions) {
       extensions = context.listExtensions();
     }
-
     let consoleMessages: Array<ConsoleFormatter | IssueFormatter> | undefined;
     if (this.#consoleDataOptions?.include) {
       let messages = context.getConsoleData(
@@ -378,13 +377,8 @@ export class McpResponse implements Response {
       }
 
       if (requests.length) {
-        const data = this.#dataWithPagination(
-          requests,
-          this.#networkRequestsOptions.pagination,
-        );
-
         networkRequests = await Promise.all(
-          data.items.map(request =>
+          requests.map(request =>
             NetworkFormatter.from(request, {
               requestId: context.getNetworkRequestStableId(request),
               selectedInDevToolsUI:
@@ -424,59 +418,6 @@ export class McpResponse implements Response {
       extensions?: InstalledExtension[];
     },
   ): {content: Array<TextContent | ImageContent>; structuredContent: object} {
-    const response = [`# ${toolName} response`];
-    for (const line of this.#textResponseLines) {
-      response.push(line);
-    }
-
-    const networkConditions = context.getNetworkConditions();
-    if (networkConditions) {
-      response.push(`## Network emulation`);
-      response.push(`Emulating: ${networkConditions}`);
-      response.push(
-        `Default navigation timeout set to ${context.getNavigationTimeout()} ms`,
-      );
-    }
-
-    const viewport = context.getViewport();
-    if (viewport) {
-      response.push(`## Viewport emulation`);
-      response.push(`Emulating viewport: ${JSON.stringify(viewport)}`);
-    }
-
-    const userAgent = context.getUserAgent();
-    if (userAgent) {
-      response.push(`## UserAgent emulation`);
-      response.push(`Emulating userAgent: ${userAgent}`);
-    }
-
-    const cpuThrottlingRate = context.getCpuThrottlingRate();
-    if (cpuThrottlingRate > 1) {
-      response.push(`## CPU emulation`);
-      response.push(`Emulating: ${cpuThrottlingRate}x slowdown`);
-    }
-
-    const dialog = context.getDialog();
-    if (dialog) {
-      const defaultValueIfNeeded =
-        dialog.type() === 'prompt'
-          ? ` (default value: "${dialog.defaultValue()}")`
-          : '';
-      response.push(`# Open dialog
-${dialog.type()}: ${dialog.message()}${defaultValueIfNeeded}.
-Call ${handleDialog.name} to handle it before continuing.`);
-    }
-
-    if (this.#includePages) {
-      const parts = [`## Pages`];
-      for (const page of context.getPages()) {
-        parts.push(
-          `${context.getPageId(page)}: ${page.url()}${context.isPageSelected(page) ? ' [selected]' : ''}`,
-        );
-      }
-      response.push(...parts);
-    }
-
     const structuredContent: {
       snapshot?: object;
       snapshotFilePath?: string;
@@ -488,7 +429,91 @@ Call ${handleDialog.name} to handle it before continuing.`);
       traceSummary?: string;
       traceInsights?: Array<{insightName: string; insightKey: string}>;
       extensions?: object[];
+      message?: string;
+      networkConditions?: string;
+      navigationTimeout?: number;
+      viewport?: object;
+      userAgent?: string;
+      cpuThrottlingRate?: number;
+      dialog?: {
+        type: string;
+        message: string;
+        defaultValue?: string;
+      };
+      pages?: object[];
+      pagination?: object;
     } = {};
+
+    const response = [`# ${toolName} response`];
+    if (this.#textResponseLines.length) {
+      structuredContent.message = this.#textResponseLines.join('\n');
+      response.push(...this.#textResponseLines);
+    }
+
+    const networkConditions = context.getNetworkConditions();
+    if (networkConditions) {
+      response.push(`## Network emulation`);
+      response.push(`Emulating: ${networkConditions}`);
+      response.push(
+        `Default navigation timeout set to ${context.getNavigationTimeout()} ms`,
+      );
+      structuredContent.networkConditions = networkConditions;
+      structuredContent.navigationTimeout = context.getNavigationTimeout();
+    }
+
+    const viewport = context.getViewport();
+    if (viewport) {
+      response.push(`## Viewport emulation`);
+      response.push(`Emulating viewport: ${JSON.stringify(viewport)}`);
+      structuredContent.viewport = viewport;
+    }
+
+    const userAgent = context.getUserAgent();
+    if (userAgent) {
+      response.push(`## UserAgent emulation`);
+      response.push(`Emulating userAgent: ${userAgent}`);
+      structuredContent.userAgent = userAgent;
+    }
+
+    const cpuThrottlingRate = context.getCpuThrottlingRate();
+    if (cpuThrottlingRate > 1) {
+      response.push(`## CPU emulation`);
+      response.push(`Emulating: ${cpuThrottlingRate}x slowdown`);
+      structuredContent.cpuThrottlingRate = cpuThrottlingRate;
+    }
+
+    const dialog = context.getDialog();
+    if (dialog) {
+      const defaultValueIfNeeded =
+        dialog.type() === 'prompt'
+          ? ` (default value: "${dialog.defaultValue()}")`
+          : '';
+      response.push(`# Open dialog
+${dialog.type()}: ${dialog.message()}${defaultValueIfNeeded}.
+Call ${handleDialog.name} to handle it before continuing.`);
+      structuredContent.dialog = {
+        type: dialog.type(),
+        message: dialog.message(),
+        defaultValue: dialog.defaultValue(),
+      };
+    }
+
+    if (this.#includePages) {
+      const parts = [`## Pages`];
+      for (const page of context.getPages()) {
+        parts.push(
+          `${context.getPageId(page)}: ${page.url()}${context.isPageSelected(page) ? ' [selected]' : ''}`,
+        );
+      }
+      response.push(...parts);
+      structuredContent.pages = context.getPages().map(page => {
+        return {
+          id: context.getPageId(page),
+          url: page.url(),
+          selected: context.isPageSelected(page),
+        };
+      });
+    }
 
     if (this.#tabId) {
       structuredContent.tabId = this.#tabId;
@@ -582,6 +607,7 @@ Call ${handleDialog.name} to handle it before continuing.`);
           requests,
           this.#networkRequestsOptions.pagination,
         );
+        structuredContent.pagination = paginationData.pagination;
         response.push(...paginationData.info);
         if (data.networkRequests) {
           structuredContent.networkRequests = [];
@@ -600,13 +626,16 @@ Call ${handleDialog.name} to handle it before continuing.`);
 
       response.push('## Console messages');
       if (messages.length) {
-        const data = this.#dataWithPagination(
+        const paginationData = this.#dataWithPagination(
           messages,
           this.#consoleDataOptions.pagination,
         );
-        response.push(...data.info);
-        response.push(...data.items.map(message => message.toString()));
-        structuredContent.consoleMessages = data.items.map(message =>
+        structuredContent.pagination = paginationData.pagination;
+        response.push(...paginationData.info);
+        response.push(
+          ...paginationData.items.map(message => message.toString()),
+        );
+        structuredContent.consoleMessages = paginationData.items.map(message =>
           message.toJSON(),
         );
       } else {
@@ -654,6 +683,15 @@ Call ${handleDialog.name} to handle it before continuing.`);
     return {
       info: response,
       items: paginationResult.items,
+      pagination: {
+        currentPage: paginationResult.currentPage,
+        totalPages: paginationResult.totalPages,
+        hasNextPage: paginationResult.hasNextPage,
+        hasPreviousPage: paginationResult.hasPreviousPage,
+        startIndex: paginationResult.startIndex,
+        endIndex: paginationResult.endIndex,
+        invalidPage: paginationResult.invalidPage,
+      },
     };
   }
 
