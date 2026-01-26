@@ -380,50 +380,24 @@ export const askGeminiWeb = defineTool({
 
       response.appendResponseLine('質問を送信中...');
 
-      // Input text using the textbox element
-      // Gemini uses a textbox with role="textbox" or a div with contenteditable
-      // NOTE: Gemini has Trusted Types CSP, so we cannot use innerHTML directly
-      const questionSent = await page.evaluate(questionText => {
-        // Helper to clear element content without innerHTML (CSP-safe)
-        const clearElement = (el: HTMLElement) => {
-          while (el.firstChild) {
-            el.removeChild(el.firstChild);
-          }
-        };
+      // Input text using Puppeteer's type() for proper Angular state updates
+      // Gemini uses Angular and requires real keyboard events to update internal state
+      const textboxSelector = '[role="textbox"]';
+      const textbox = await page.$(textboxSelector);
 
-        // Try textbox first (Gemini's current implementation)
-        const textbox = document.querySelector(
-          '[role="textbox"]',
-        ) as HTMLElement;
-        if (textbox) {
-          textbox.focus();
-          // Clear existing content (CSP-safe)
-          clearElement(textbox);
-          // Insert text using textContent (CSP-safe)
-          textbox.textContent = questionText;
-          textbox.dispatchEvent(new Event('input', {bubbles: true}));
-          return true;
-        }
-
-        // Fallback to contenteditable
-        const editor = document.querySelector(
-          'div[contenteditable="true"]',
-        ) as HTMLElement;
-        if (editor) {
-          clearElement(editor);
-          editor.textContent = questionText;
-          editor.dispatchEvent(new Event('input', {bubbles: true}));
-          return true;
-        }
-
-        return false;
-      }, sanitizedQuestion);
-
-      if (!questionSent) {
+      if (!textbox) {
         response.appendResponseLine('❌ 入力欄が見つかりません');
         return;
       }
 
+      // Click to focus and clear existing content
+      await textbox.click({clickCount: 3}); // Triple-click to select all
+      await page.keyboard.press('Backspace'); // Clear selection
+
+      // Type the question using real keyboard events (essential for Angular)
+      await page.keyboard.type(sanitizedQuestion, {delay: 5});
+
+      // Wait for Angular to process the input and show send button
       await new Promise(resolve => setTimeout(resolve, 500));
 
       // 質問送信前に model-response 要素数を記録（ChatGPTと同じカウント方式）
