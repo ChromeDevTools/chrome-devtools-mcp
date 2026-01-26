@@ -380,8 +380,8 @@ export const askGeminiWeb = defineTool({
 
       response.appendResponseLine('質問を送信中...');
 
-      // Input text using Puppeteer's type() for proper Angular state updates
-      // Gemini uses Angular and requires real keyboard events to update internal state
+      // Input text using innerText + event dispatch for proper Angular state updates
+      // This is more reliable than keyboard.type() which can cause sync issues with Angular
       const textboxSelector = '[role="textbox"]';
       const textbox = await page.$(textboxSelector);
 
@@ -390,26 +390,21 @@ export const askGeminiWeb = defineTool({
         return;
       }
 
-      // Click to focus and clear existing content
-      await textbox.click({clickCount: 3}); // Triple-click to select all
-      await page.keyboard.press('Backspace'); // Clear selection
+      // Click to focus
+      await textbox.click();
 
-      // Type the question using real keyboard events (essential for Angular)
-      // IMPORTANT: Split by newlines and use Shift+Enter for line breaks
-      // (Enter alone triggers send in Gemini)
-      const lines = sanitizedQuestion.split('\n');
-      for (let i = 0; i < lines.length; i++) {
-        if (i > 0) {
-          // Shift+Enter for newline (Enter alone sends the message)
-          await page.keyboard.down('Shift');
-          await page.keyboard.press('Enter');
-          await page.keyboard.up('Shift');
-        }
-        await page.keyboard.type(lines[i], {delay: 2});
-      }
+      // Use innerText + input event dispatch for proper Angular state updates
+      // This approach is more reliable than keyboard.type() which can cause sync issues
+      await textbox.evaluate((el, text) => {
+        // Clear and set content
+        (el as HTMLElement).innerText = text;
+        // Dispatch input event to notify Angular of the change
+        el.dispatchEvent(new Event('input', {bubbles: true}));
+        el.dispatchEvent(new Event('change', {bubbles: true}));
+      }, sanitizedQuestion);
 
       // Wait for Angular to process the input and show send button
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise(resolve => setTimeout(resolve, 300));
 
       // 質問送信前に model-response 要素数を記録（ChatGPTと同じカウント方式）
       const initialModelResponseCount = await page.evaluate(() => {
