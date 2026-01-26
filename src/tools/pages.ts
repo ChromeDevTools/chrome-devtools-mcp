@@ -91,7 +91,7 @@ export const newPage = defineTool({
       .boolean()
       .optional()
       .describe(
-        'Whether to open the page in the background without bringing it to the front.',
+        'Whether to open the page in the background without bringing it to the front. Default is false (foreground).',
       ),
     ...timeoutSchema,
   },
