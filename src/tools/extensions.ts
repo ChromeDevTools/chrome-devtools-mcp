@@ -52,7 +52,7 @@ export const uninstallExtension = defineTool({
 export const listExtensions = defineTool({
   name: 'list_extensions',
   description:
-    'Lists all installed extensions, including their name, ID, version, and enabled status.',
+    'Lists all extensions via this server, including their name, ID, version, and enabled status.',
   annotations: {
     category: ToolCategory.EXTENSIONS,
     readOnlyHint: true,
