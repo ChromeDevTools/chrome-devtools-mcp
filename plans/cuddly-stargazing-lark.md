@@ -1,104 +1,179 @@
-# Chromeウィンドウ フォーカス制御
+# Chromeバックグラウンド起動の段階的改善プラン
 
-## 問題
-chrome-ai-bridgeがChromeを操作する時、ウィンドウが前面に出てきて作業の邪魔になる。
+## 現状の問題
 
-## 調査結果
+**v1.0.18で実装した方式が機能していない**
+- 「起動前にアプリ記憶 → 起動後に戻す」方式
+- 結果：Chromeが一瞬でも前面に出てしまう
+- 原因：Chromeの起動時にOSがウィンドウを最前面に持ってくる挙動
 
-### プラットフォーム別の制限
+## AI の回答まとめ
 
-| OS | 方法 | 効果 |
-|----|------|------|
-| **macOS** | `--start-minimized` | ❌ 無効（無視される） |
-| **macOS** | Apple Script / `open -g` | ✅ 有効 |
-| **Windows/Linux** | `--start-minimized` | ✅ 有効 |
+### ChatGPT の推奨順位
+1. **headless: 'new'** - 最強（ウィンドウを表示しない）
+2. **open -gj + connect** - 次善（`-j`で隠して起動）
+3. **--no-startup-window** - 簡単な改善（起動時にウィンドウを開かない）
 
-**結論**: macOSではPuppeteerの起動引数だけでは不可能。Apple Script が必要。
+### Gemini の推奨順位
+1. **open -g + connect** - 最も確実（`-g`でバックグラウンド起動）
+2. **ウィンドウを画面外に配置**:
+   - `--window-position=-2000,-2000`
+   - `--window-size=400,400`
+3. **AppleScriptで隠す**:
+   ```applescript
+   set visible of process "Google Chrome" to false
+   ```
 
 ---
 
-## 実装方針
+## 段階的改善プラン
 
-### 方法A: 起動後に Apple Script でバックグラウンド化（推奨）
+### Phase 1: `--no-startup-window` 追加（最も簡単）
 
-```typescript
-if (os.platform() === 'darwin') {
-  execSync(`osascript -e 'tell application "System Events" to set visible of process "Google Chrome" to false'`);
-}
-```
-
-**メリット**: 既存のPuppeteer起動フローを変更しない
-**デメリット**: 一瞬フォーカスを奪う（起動直後に非表示化）
-
-### 方法B: Windows/Linux は `--start-minimized`
+**変更箇所**: `src/browser.ts:905付近`
 
 ```typescript
-if (os.platform() !== 'darwin') {
+// Windows/Linux: Add --start-minimized for background mode
+if (!focus && !effectiveHeadless && os.platform() !== 'darwin') {
   args.push('--start-minimized');
+  console.error('📋 Added --start-minimized for background mode');
+}
+
+// All platforms: Add --no-startup-window for background mode
+if (!focus && !effectiveHeadless) {
+  args.push('--no-startup-window');
+  console.error('📋 Added --no-startup-window for background mode');
 }
 ```
 
+**検証方法**:
+1. v1.0.19としてビルド・npm publish
+2. `npx chrome-ai-bridge@latest` で起動
+3. `ask_gemini_web` でテスト → Chromeが前面に出ないか確認
+
+**期待される効果**:
+- Chrome起動時に自動的にウィンドウを開かない
+- ユーザーが `browser.newPage()` するまでウィンドウが表示されない
+
 ---
 
-## 実装方針（確定）
+### Phase 2: ウィンドウ位置を画面外に配置（Phase 1で効果なしの場合）
 
-**デフォルトでバックグラウンド起動**
+**変更箇所**: `src/browser.ts:905付近`
 
-- 通常: Chromeはバックグラウンドで起動（フォーカスを奪わない）
-- `--focus` オプション: 明示的に指定した場合のみ前面表示
+```typescript
+if (!focus && !effectiveHeadless) {
+  args.push('--no-startup-window');
+  args.push('--window-position=-2000,-2000'); // 画面外
+  args.push('--window-size=400,400'); // 最小限のサイズ
+  console.error('📋 Added background mode flags');
+}
+```
+
+**検証方法**: Phase 1と同じ
+
+**期待される効果**:
+- たとえウィンドウが表示されても、画面外なので見えない
+
+---
+
+### Phase 3: AppleScriptでプロセスを隠す（Phase 2で効果なしの場合）
+
+**変更箇所**: `src/browser.ts:1002付近`（起動直後）
+
+```typescript
+// Hide Chrome process on macOS (background mode)
+if (!focus && !effectiveHeadless && os.platform() === 'darwin') {
+  try {
+    const hideScript = `
+      tell application "System Events"
+        repeat 10 times
+          if exists process "Google Chrome" then
+            set visible of process "Google Chrome" to false
+            exit repeat
+          end if
+          delay 0.2
+        end repeat
+      end tell
+    `;
+    execSync(`osascript -e '${hideScript}'`, {timeout: 5000});
+    console.error('✅ Chrome process hidden via AppleScript');
+  } catch (error) {
+    console.warn('⚠️  Could not hide Chrome process');
+  }
+}
+```
+
+**検証方法**: Phase 1と同じ
+
+**期待される効果**:
+- Chromeプロセス全体が非表示になる
+- Dockにも表示されない
+
+---
+
+### Phase 4: `open -g` + `puppeteer.connect()` 方式（最終手段）
+
+**大規模なアーキテクチャ変更が必要**
+
+**変更箇所**: `src/browser.ts:launch()` 関数全体
+
+```typescript
+// macOSでは open -g を使って起動
+if (os.platform() === 'darwin' && !focus) {
+  const port = 9222;
+  const chromeArgs = [
+    `--remote-debugging-port=${port}`,
+    `--user-data-dir=${userDataDir}`,
+    '--no-first-run',
+    '--no-default-browser-check',
+    ...args,
+  ].join(' ');
+
+  await execAsync(`open -g -a "${effectiveExecutablePath}" --args ${chromeArgs}`);
+
+  // ポート待機＆接続
+  browser = await puppeteer.connect({
+    browserURL: `http://127.0.0.1:${port}`,
+    defaultViewport: null,
+  });
+} else {
+  // 通常のlaunch方式（Windows/Linux）
+  browser = await puppeteer.launch({ ... });
+}
+```
+
+**影響範囲**:
+- `pipe: true` が使えなくなる → remote debugging portに変更
+- プロセス管理が変わる（disconnectで終了しない）
+- セキュリティ考慮（localhostに閉じる必要）
+
+**検証方法**:
+- 既存のすべてのMCPツールが動作するか確認
+- プロセス終了処理が正しいか確認
+
+---
+
+## 実装順序の方針
+
+1. **Phase 1から順番に試す**
+2. **各Phaseで効果を確認してから次へ**
+3. **Phase 3までで解決することを期待**
+4. **Phase 4は最後の手段**（大きな変更のため）
 
 ---
 
 ## 対象ファイル
 
-| ファイル | 変更内容 |
-|---------|---------|
-| `src/cli.ts` | `--focus` オプション追加（デフォルト false） |
-| `src/browser.ts:893付近` | 起動後のフォーカス制御ロジック追加 |
-| `src/main.ts` | オプションを browser に渡す |
+| Phase | ファイル | 変更内容 |
+|-------|---------|---------|
+| 1 | `src/browser.ts:905` | `--no-startup-window` 追加 |
+| 2 | `src/browser.ts:905` | ウィンドウ位置フラグ追加 |
+| 3 | `src/browser.ts:1002` | AppleScript hide処理追加 |
+| 4 | `src/browser.ts:launch()` | 全体的な構造変更 |
 
 ---
 
-## 実装詳細
+## 次のステップ
 
-### 1. src/cli.ts
-```typescript
-focus: {
-  type: 'boolean',
-  description: 'Bring Chrome window to foreground (default: background)',
-  default: false,
-}
-```
-
-### 2. src/browser.ts（起動後処理）
-```typescript
-// Chrome起動前に現在のフォアグラウンドアプリを記憶
-let previousApp: string | null = null;
-if (!options.focus && os.platform() === 'darwin') {
-  try {
-    previousApp = execSync(
-      `osascript -e 'tell application "System Events" to get name of first application process whose frontmost is true'`,
-      {encoding: 'utf-8'}
-    ).trim();
-  } catch {}
-}
-
-// ... Puppeteer起動 ...
-
-// Chrome起動後、フォーカスを元のアプリに戻す
-if (!options.focus) {
-  if (os.platform() === 'darwin' && previousApp) {
-    // macOS: 元のアプリをアクティブに戻す
-    execSync(`osascript -e 'tell application "${previousApp}" to activate'`);
-  }
-  // Windows/Linux: --start-minimized は起動引数で設定済み
-}
-```
-
----
-
-## 検証方法
-
-1. `npx chrome-ai-bridge` で起動 → Chromeがバックグラウンドで起動
-2. `npx chrome-ai-bridge --focus` で起動 → Chromeが前面に表示
-3. `ask_gemini_web` / `ask_chatgpt_web` が正常動作することを確認
+**Phase 1（`--no-startup-window`）の実装から開始します。**
