@@ -4,7 +4,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import os from 'node:os';
+
 import type {Page} from 'puppeteer-core';
+
+import {
+  bringChromeToFront,
+  getFrontmostAppName,
+  hideChrome,
+  activateApp,
+} from './applescript-helper.js';
 
 /**
  * Login status enum for state machine
@@ -272,12 +281,27 @@ export async function waitForLoginStatus(
   const start = Date.now();
   let delay = 500;
   let lastProgressReport = 0;
+  let previousApp: string | undefined;
 
   // Bring browser to front so user can see login page
-  try {
-    await page.bringToFront();
-  } catch {
-    // Ignore errors (page might be closed)
+  // On macOS, use AppleScript to unhide and activate Chrome
+  if (os.platform() === 'darwin') {
+    try {
+      previousApp = await getFrontmostAppName();
+      await bringChromeToFront();
+      await page.bringToFront();
+      log('📱 Chromeを前面に出しました');
+    } catch (error) {
+      log(
+        `⚠️  Chromeの前面化に失敗: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  } else {
+    try {
+      await page.bringToFront();
+    } catch {
+      // Ignore errors (page might be closed)
+    }
   }
 
   // 監視開始を即座に通知（最初の進捗表示まで15秒待たせない）
@@ -287,6 +311,21 @@ export async function waitForLoginStatus(
     const status = await getLoginStatus(page, provider);
     if (status === LoginStatus.LOGGED_IN) {
       log('✅ ログイン検出！処理を続行します');
+
+      // On macOS, hide Chrome and restore focus to previous app
+      if (os.platform() === 'darwin' && previousApp) {
+        try {
+          await new Promise((r) => setTimeout(r, 500)); // Small delay for better UX
+          await hideChrome();
+          await activateApp(previousApp);
+          log(`✅ ${previousApp} に戻しました`);
+        } catch (error) {
+          log(
+            `⚠️  アプリの復帰に失敗: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        }
+      }
+
       return status;
     }
 

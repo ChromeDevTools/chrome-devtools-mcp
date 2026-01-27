@@ -144,6 +144,12 @@ function killProcessHard(pid: number): void {
   } catch {}
 }
 
+function toAppBundlePath(p: string): string {
+  // .../Google Chrome.app/Contents/MacOS/Google Chrome -> .../Google Chrome.app
+  const m = p.match(/^(.*?\.app)\/Contents\/MacOS\/.+$/);
+  return m ? m[1] : p;
+}
+
 const connectOptions: ConnectOptions = {
   targetFilter,
   // We do not expect any single CDP command to take more than 10sec.
@@ -1020,13 +1026,18 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
         '--no-default-browser-check',
       ];
 
-      // Launch Chrome with open -g (background)
-      const chromeApp =
-        effectiveExecutablePath || '/Applications/Google Chrome.app';
-      spawn('open', ['-g', '-n', '-a', chromeApp, '--args', ...chromeArgs], {
-        stdio: 'ignore',
-        detached: true,
-      }).unref();
+      // Launch Chrome with open -gjF (background + hidden + fresh)
+      const chromeApp = toAppBundlePath(
+        effectiveExecutablePath || '/Applications/Google Chrome.app',
+      );
+      spawn(
+        'open',
+        ['-n', '-g', '-j', '-F', '-a', chromeApp, '--args', ...chromeArgs],
+        {
+          stdio: 'ignore',
+          detached: true,
+        },
+      ).unref();
 
       console.error(`📋 Launching Chrome in background (port ${port})...`);
 
