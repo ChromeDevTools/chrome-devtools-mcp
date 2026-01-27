@@ -44,3 +44,10 @@ Message: log> Processing file:
 ### Arguments
 Arg #0: file.txt
 `;
+
+exports[`ConsoleFormatter > toStringDetailed > handles \"Execution context is not available\" error in args 1`] = `
+ID: 6
+Message: log> Processing file:
+### Arguments
+Arg #0: <error: Argument 0 is no longer available>
+`;

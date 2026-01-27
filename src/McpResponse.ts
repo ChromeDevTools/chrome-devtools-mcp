@@ -337,7 +337,7 @@ export class McpResponse implements Response {
                 const devTools = context.getDevToolsUniverse();
                 return await ConsoleFormatter.from(consoleMessage, {
                   id: consoleMessageStableId,
-                  fetchDetailedData: true,
+                  fetchDetailedData: false,
                   devTools: devTools ?? undefined,
                 });
               }

@@ -163,6 +163,27 @@ describe('ConsoleFormatter', () => {
       ).toStringDetailed();
       t.assert.snapshot?.(result);
     });
+
+    it('handles "Execution context is not available" error in args', async t => {
+      const message = createMockMessage({
+        type: () => 'log',
+        text: () => 'Processing file:',
+        args: () => [
+          {
+            jsonValue: async () => {
+              throw new Error('Execution context is not available');
+            },
+          },
+        ],
+      });
+      const formatter = await ConsoleFormatter.from(message, {
+        id: 6,
+        fetchDetailedData: true,
+      });
+      const result = formatter.toStringDetailed();
+      t.assert.snapshot?.(result);
+      assert.ok(result.includes('<error: Argument 0 is no longer available>'));
+    });
   });
   describe('toJSON', () => {
     it('formats a console.log message', async () => {

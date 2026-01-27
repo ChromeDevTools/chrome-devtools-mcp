@@ -50,14 +50,24 @@ export class ConsoleFormatter {
     }
 
     this.#resolvedArgs = await Promise.all(
-      this.#msg.args().map(arg => arg.jsonValue()),
+      this.#msg.args().map(async (arg, i) => {
+        try {
+          return await arg.jsonValue();
+        } catch {
+          return `<error: Argument ${i} is no longer available>`;
+        }
+      }),
     );
 
     if (devTools) {
-      this.#resolvedStackTrace = await createStackTraceForConsoleMessage(
-        devTools,
-        this.#msg,
-      );
+      try {
+        this.#resolvedStackTrace = await createStackTraceForConsoleMessage(
+          devTools,
+          this.#msg,
+        );
+      } catch {
+        // ignore
+      }
     }
   }
 
