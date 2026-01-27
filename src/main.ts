@@ -184,6 +184,7 @@ async function getContext(): Promise<McpContext> {
     userDataDir: args.userDataDir as string | undefined,
     logFile,
     rootsInfo: cachedRootsInfo, // Pass roots info to browser
+    focus: args.focus as boolean | undefined, // v1.0.18: Background mode control
   };
 
   const browser = await resolveBrowser(browserOptions);

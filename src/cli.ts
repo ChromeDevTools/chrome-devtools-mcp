@@ -91,6 +91,12 @@ export const cliOptions = {
       'Explicitly specify the project root directory for profile isolation. Overrides MCP roots/list. Useful when roots/list is not available.',
     conflicts: 'browserUrl',
   },
+  focus: {
+    type: 'boolean' as const,
+    description:
+      'Bring Chrome window to foreground on launch. By default, Chrome launches in the background to avoid interrupting your work.',
+    default: false,
+  },
 };
 
 export function parseArguments(version: string, argv = process.argv) {

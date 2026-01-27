@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {execSync} from 'node:child_process';
 import fs from 'node:fs';
 import {promises as fsPromises} from 'node:fs';
 import os from 'node:os';
@@ -676,6 +677,7 @@ interface McpLaunchOptions {
   chromeProfile?: string;
   logFile?: fs.WriteStream;
   rootsInfo?: RootsInfo; // v0.18.0: Roots-based profile resolution
+  focus?: boolean; // v1.0.18: Bring Chrome window to foreground (default: false)
 }
 
 // Store development extension paths globally for later retrieval
@@ -696,6 +698,7 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
     loadExtensionsDir,
     loadSystemExtensions,
     chromeProfile,
+    focus = false,
   } = options;
 
   // Reset development extension paths
@@ -885,6 +888,28 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
   let browser: Browser;
   let finalUserDataDir = userDataDir;
 
+  // Remember current foreground app before Chrome launch (for background mode)
+  let previousApp: string | null = null;
+  if (!focus && !effectiveHeadless && os.platform() === 'darwin') {
+    try {
+      previousApp = execSync(
+        `osascript -e 'tell application "System Events" to get name of first application process whose frontmost is true'`,
+        {encoding: 'utf-8', timeout: 5000},
+      ).trim();
+      console.error(`📋 Current foreground app: ${previousApp}`);
+    } catch (error) {
+      console.warn(
+        `⚠️  Could not detect foreground app: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  // Windows/Linux: Add --start-minimized for background mode
+  if (!focus && !effectiveHeadless && os.platform() !== 'darwin') {
+    args.push('--start-minimized');
+    console.error('📋 Added --start-minimized for background mode');
+  }
+
   try {
     browser = await puppeteer.launch({
       ...connectOptions,
@@ -997,6 +1022,23 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
         });
       });
       console.error('Applied navigator.webdriver bypass to existing page');
+    }
+
+    // Restore focus to previous app (background mode on macOS)
+    if (!focus && !effectiveHeadless && previousApp && os.platform() === 'darwin') {
+      try {
+        // Small delay to ensure Chrome window is fully rendered
+        await new Promise(resolve => setTimeout(resolve, 500));
+        execSync(
+          `osascript -e 'tell application "${previousApp}" to activate'`,
+          {timeout: 5000},
+        );
+        console.error(`✅ Restored focus to: ${previousApp}`);
+      } catch (error) {
+        console.warn(
+          `⚠️  Could not restore focus: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
     }
 
     return browser;
