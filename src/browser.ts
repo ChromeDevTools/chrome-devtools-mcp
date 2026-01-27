@@ -910,12 +910,6 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
     console.error('📋 Added --start-minimized for background mode');
   }
 
-  // All platforms: Add --no-startup-window for background mode
-  if (!focus && !effectiveHeadless) {
-    args.push('--no-startup-window');
-    console.error('📋 Added --no-startup-window for background mode');
-  }
-
   try {
     browser = await puppeteer.launch({
       ...connectOptions,
