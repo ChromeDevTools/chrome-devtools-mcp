@@ -4,9 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {execSync} from 'node:child_process';
+import {execSync, spawn} from 'node:child_process';
 import fs from 'node:fs';
 import {promises as fsPromises} from 'node:fs';
+import http from 'node:http';
+import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 
@@ -33,7 +35,18 @@ import {
   type SystemChromeProfile,
 } from './system-profile.js';
 
+// Phase 4: open -g + puppeteer.connect() types
+type LaunchMethod = 'launch' | 'connect';
+
+interface BrowserHandle {
+  browser: Browser;
+  method: LaunchMethod;
+  debugPort?: number;
+  chromePid?: number | null;
+}
+
 let browser: Browser | undefined;
+let browserHandle: BrowserHandle | undefined;
 
 const ignoredPrefixes = new Set([
   'chrome://',
@@ -52,6 +65,83 @@ function targetFilter(target: Target): boolean {
     }
   }
   return true;
+}
+
+// Phase 4: Helper functions for open -g + connect
+async function findFreePort(start = 9222, count = 50): Promise<number> {
+  for (let p = start; p < start + count; p++) {
+    const ok = await new Promise<boolean>((resolve) => {
+      const srv = net.createServer();
+      srv.once('error', () => resolve(false));
+      srv.listen(p, '127.0.0.1', () => srv.close(() => resolve(true)));
+    });
+    if (ok) return p;
+  }
+  throw new Error('No free port in range 9222-9272');
+}
+
+async function waitForChromeDebug(
+  port: number,
+  timeoutMs = 15000,
+): Promise<void> {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    const ok = await new Promise<boolean>((resolve) => {
+      const req = http.get(
+        `http://127.0.0.1:${port}/json/version`,
+        (res) => {
+          res.resume();
+          resolve(res.statusCode === 200);
+        },
+      );
+      req.on('error', () => resolve(false));
+      req.setTimeout(1000, () => {
+        req.destroy();
+        resolve(false);
+      });
+    });
+    if (ok) return;
+    await new Promise((r) => setTimeout(r, 200));
+  }
+  throw new Error(`Chrome debug port not ready: ${port}`);
+}
+
+function findChromePidByPortAndProfile(
+  port: number,
+  userDataDir: string,
+): number | null {
+  try {
+    const out = execSync('ps -ax -o pid=,command=', {encoding: 'utf-8'});
+    const lines = out
+      .split('\n')
+      .map((l) => l.trim())
+      .filter(Boolean);
+
+    for (const line of lines) {
+      if (
+        line.includes(`--remote-debugging-port=${port}`) &&
+        line.includes(`--user-data-dir=${userDataDir}`) &&
+        (line.includes('Google Chrome.app') || line.includes('Google Chrome'))
+      ) {
+        const pidStr = line.split(/\s+/, 1)[0];
+        const pid = Number(pidStr);
+        if (Number.isFinite(pid)) return pid;
+      }
+    }
+  } catch {}
+  return null;
+}
+
+function killProcess(pid: number): void {
+  try {
+    process.kill(pid, 'SIGTERM');
+  } catch {}
+}
+
+function killProcessHard(pid: number): void {
+  try {
+    process.kill(pid, 'SIGKILL');
+  } catch {}
 }
 
 const connectOptions: ConnectOptions = {
@@ -704,6 +794,10 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
   // Reset development extension paths
   developmentExtensionPaths = [];
 
+  // Local browser variable for this launch
+  let localBrowser: Browser | undefined;
+  let localBrowserHandle: BrowserHandle | undefined;
+
   // Resolve user data directory using new profile resolver (v0.15.0+)
   const resolved = resolveUserDataDir({
     cliUserDataDir: options.userDataDir,
@@ -910,19 +1004,75 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
     console.error('📋 Added --start-minimized for background mode');
   }
 
-  try {
-    browser = await puppeteer.launch({
-      ...connectOptions,
-      channel: puppeterChannel,
-      executablePath: effectiveExecutablePath,
-      defaultViewport: null,
-      userDataDir,
-      pipe: true,
-      headless: effectiveHeadless,
-      args,
-      ignoreDefaultArgs: ['--disable-extensions', '--enable-automation'],
-    });
-  } catch (e: any) {
+  // Phase 4: Try open -g + connect for macOS background mode
+  const useOpenConnect =
+    os.platform() === 'darwin' && !focus && !effectiveHeadless;
+
+  if (useOpenConnect) {
+    try {
+      const port = await findFreePort(9222, 50);
+      const chromeArgs = [
+        ...args,
+        `--remote-debugging-port=${port}`,
+        `--remote-debugging-address=127.0.0.1`,
+        `--user-data-dir=${userDataDir}`,
+        '--no-first-run',
+        '--no-default-browser-check',
+      ];
+
+      // Launch Chrome with open -g (background)
+      const chromeApp =
+        effectiveExecutablePath || '/Applications/Google Chrome.app';
+      spawn('open', ['-g', '-n', '-a', chromeApp, '--args', ...chromeArgs], {
+        stdio: 'ignore',
+        detached: true,
+      }).unref();
+
+      console.error(`📋 Launching Chrome in background (port ${port})...`);
+
+      // Wait for Chrome to be ready
+      await waitForChromeDebug(port, 15000);
+
+      // Connect to Chrome
+      localBrowser = await puppeteer.connect({
+        browserURL: `http://127.0.0.1:${port}`,
+        defaultViewport: null,
+      });
+
+      // Track PID for cleanup
+      const chromePid = findChromePidByPortAndProfile(port, userDataDir);
+      localBrowserHandle = {
+        browser: localBrowser,
+        method: 'connect',
+        debugPort: port,
+        chromePid,
+      };
+
+      console.error('✅ Connected to Chrome in background mode');
+    } catch (openError: any) {
+      console.warn(
+        `⚠️  Background launch failed: ${openError.message}, falling back to normal launch`,
+      );
+      // Fall through to normal launch
+    }
+  }
+
+  // Normal launch (or fallback from open-connect)
+  if (!localBrowser) {
+    try {
+      localBrowser = await puppeteer.launch({
+        ...connectOptions,
+        channel: puppeterChannel,
+        executablePath: effectiveExecutablePath,
+        defaultViewport: null,
+        userDataDir,
+        pipe: true,
+        headless: effectiveHeadless,
+        args,
+        ignoreDefaultArgs: ['--disable-extensions', '--enable-automation'],
+      });
+      localBrowserHandle = {browser: localBrowser, method: 'launch'};
+    } catch (e: any) {
     // Profile lock collision fallback (v0.15.1)
     const errorMsg = String(e.message || '').toLowerCase();
     const isProfileLocked =
@@ -962,7 +1112,7 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
       finalUserDataDir = tempPath;
 
       // Retry with ephemeral profile
-      browser = await puppeteer.launch({
+      localBrowser = await puppeteer.launch({
         ...connectOptions,
         channel: puppeterChannel,
         executablePath: effectiveExecutablePath,
@@ -973,27 +1123,31 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
         args,
         ignoreDefaultArgs: ['--disable-extensions', '--enable-automation'],
       });
+      localBrowserHandle = {browser: localBrowser, method: 'launch'};
     } else {
       throw e;
     }
   }
+  }
 
   try {
-    // Log actual spawn args for debugging
-    const spawnArgs = browser.process()?.spawnargs;
-    if (spawnArgs) {
-      console.error(`Actual spawn args: ${spawnArgs.join(' ')}`);
-    }
+    // Log actual spawn args for debugging (only for launch method)
+    if (localBrowserHandle?.method === 'launch') {
+      const spawnArgs = localBrowser.process()?.spawnargs;
+      if (spawnArgs) {
+        console.error(`Actual spawn args: ${spawnArgs.join(' ')}`);
+      }
 
-    if (options.logFile) {
-      // FIXME: we are probably subscribing too late to catch startup logs. We
-      // should expose the process earlier or expose the getRecentLogs() getter.
-      browser.process()?.stderr?.pipe(options.logFile);
-      browser.process()?.stdout?.pipe(options.logFile);
+      if (options.logFile) {
+        // FIXME: we are probably subscribing too late to catch startup logs. We
+        // should expose the process earlier or expose the getRecentLogs() getter.
+        localBrowser.process()?.stderr?.pipe(options.logFile);
+        localBrowser.process()?.stdout?.pipe(options.logFile);
+      }
     }
 
     // Apply Google login automation detection bypass to all pages
-    browser.on('targetcreated', async target => {
+    localBrowser.on('targetcreated', async target => {
       if (target.type() === 'page') {
         try {
           const page = await target.page();
@@ -1013,7 +1167,7 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
     });
 
     // Apply bypass to existing pages
-    const initialPages = await browser.pages();
+    const initialPages = await localBrowser.pages();
     for (const page of initialPages) {
       await page.evaluateOnNewDocument(() => {
         Object.defineProperty(window.navigator, 'webdriver', {
@@ -1041,7 +1195,11 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
       }
     }
 
-    return browser;
+    // Set global variables
+    browser = localBrowser;
+    browserHandle = localBrowserHandle;
+
+    return localBrowser;
   } catch (error) {
     // Fail fast with clear error message - no silent fallback
     console.error(`❌ Failed to launch Chrome`);
