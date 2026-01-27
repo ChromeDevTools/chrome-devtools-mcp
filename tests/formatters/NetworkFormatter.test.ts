@@ -328,6 +328,48 @@ describe('NetworkFormatter', () => {
       assert.ok(result.includes(`Saved to ${reqPath}.`));
       assert.ok(result.includes(`Saved to ${resPath}.`));
     });
+
+    it('handles missing bodies with filepath', async () => {
+      const request = {
+        method: () => 'POST',
+        url: () => 'http://example.com',
+        headers: () => ({}),
+        hasPostData: () => true, // Claim we have data
+        postData: () => null, // But returns null
+        response: () => ({
+          status: () => 200,
+          headers: () => ({}),
+          buffer: async () => {
+            throw new Error('Body not available');
+          },
+        }),
+        failure: () => null,
+        redirectChain: () => [],
+        fetchPostData: async () => {
+          throw new Error('Body not available');
+        },
+      } as unknown as HTTPRequest;
+
+      const reqPath = join(tmpDir, 'req_missing.txt');
+      const resPath = join(tmpDir, 'res_missing.txt');
+
+      const formatter = await NetworkFormatter.from(request, {
+        fetchData: true,
+        requestFilePath: reqPath,
+        responseFilePath: resPath,
+        saveFile: async (data, filename) => {
+          await writeFile(filename, data);
+          return {filename};
+        },
+      });
+
+      const result = formatter.toStringDetailed();
+      assert.ok(
+        result.includes(
+          `### Response Body\n<Response body not available anymore>`,
+        ),
+      );
+    });
   });
 
   describe('toJSON', () => {
