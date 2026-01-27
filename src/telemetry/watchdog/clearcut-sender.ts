@@ -70,6 +70,8 @@ export class ClearcutSender {
       this.#sessionCreated = Date.now();
     }
 
+    logger('Enqueing telemetry event', JSON.stringify(event, null, 2));
+
     this.#addToBuffer({
       ...event,
       session_id: this.#sessionId,
@@ -99,6 +101,7 @@ export class ClearcutSender {
         this.#finalFlush(),
         new Promise(resolve => setTimeout(resolve, SHUTDOWN_TIMEOUT_MS)),
       ]);
+      logger('Final flush completed');
     } catch (error) {
       logger('Final flush failed:', error);
     }
