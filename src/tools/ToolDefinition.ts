@@ -12,7 +12,8 @@ import type {
   Page,
   Viewport,
 } from '../third_party/index.js';
-import type {TraceResult} from '../trace-processing/parse.js';
+import type {InsightName, TraceResult} from '../trace-processing/parse.js';
+import type {InstalledExtension} from '../utils/ExtensionRegistry.js';
 import type {PaginationOptions} from '../utils/types.js';
 
 import type {ToolCategory} from './categories.js';
@@ -86,6 +87,13 @@ export interface Response {
   // Allows re-using DevTools data queried by some tools.
   attachDevToolsData(data: DevToolsData): void;
   setTabId(tabId: string): void;
+  attachTraceSummary(trace: TraceResult): void;
+  attachTraceInsight(
+    trace: TraceResult,
+    insightSetId: string,
+    insightName: InsightName,
+  ): void;
+  setListExtensions(): void;
 }
 
 /**
@@ -102,7 +110,7 @@ export type Context = Readonly<{
   getPageById(pageId: number): Page;
   getPageId(page: Page): number | undefined;
   isPageSelected(page: Page): boolean;
-  newPage(): Promise<Page>;
+  newPage(background?: boolean): Promise<Page>;
   closePage(pageId: number): Promise<void>;
   selectPage(page: Page): void;
   getElementByUid(uid: string): Promise<ElementHandle<Element>>;
@@ -135,6 +143,7 @@ export type Context = Readonly<{
   resolveCdpElementId(cdpBackendNodeId: number): string | undefined;
   installExtension(path: string): Promise<string>;
   uninstallExtension(id: string): Promise<void>;
+  listExtensions(): InstalledExtension[];
 }>;
 
 export function defineTool<Schema extends zod.ZodRawShape>(

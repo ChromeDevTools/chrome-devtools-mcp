@@ -4,12 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {createStackTraceForConsoleMessage} from './DevtoolsUtils.js';
-import type {ConsoleMessageData} from './formatters/consoleFormatter.js';
-import {
-  formatConsoleEventShort,
-  formatConsoleEventVerbose,
-} from './formatters/consoleFormatter.js';
+import {ConsoleFormatter} from './formatters/ConsoleFormatter.js';
 import {IssueFormatter} from './formatters/IssueFormatter.js';
 import {NetworkFormatter} from './formatters/NetworkFormatter.js';
 import {SnapshotFormatter} from './formatters/SnapshotFormatter.js';
@@ -28,8 +23,17 @@ import type {
   Response,
   SnapshotParams,
 } from './tools/ToolDefinition.js';
+import type {InsightName, TraceResult} from './trace-processing/parse.js';
+import {getInsightOutput, getTraceSummary} from './trace-processing/parse.js';
+import type {InstalledExtension} from './utils/ExtensionRegistry.js';
 import {paginate} from './utils/pagination.js';
 import type {PaginationOptions} from './utils/types.js';
+
+interface TraceInsightData {
+  trace: TraceResult;
+  insightSetId: string;
+  insightName: InsightName;
+}
 
 export class McpResponse implements Response {
   #includePages = false;
@@ -40,6 +44,8 @@ export class McpResponse implements Response {
     responseFilePath?: string;
   };
   #attachedConsoleMessageId?: number;
+  #attachedTraceSummary?: TraceResult;
+  #attachedTraceInsight?: TraceInsightData;
   #textResponseLines: string[] = [];
   #images: ImageContentData[] = [];
   #networkRequestsOptions?: {
@@ -55,6 +61,7 @@ export class McpResponse implements Response {
     types?: string[];
     includePreservedMessages?: boolean;
   };
+  #listExtensions?: boolean;
   #devToolsData?: DevToolsData;
   #tabId?: string;
 
@@ -74,6 +81,10 @@ export class McpResponse implements Response {
     this.#snapshotParams = params ?? {
       verbose: false,
     };
+  }
+
+  setListExtensions(): void {
+    this.#listExtensions = true;
   }
 
   setIncludeNetworkRequests(
@@ -142,8 +153,32 @@ export class McpResponse implements Response {
     this.#attachedConsoleMessageId = msgid;
   }
 
+  attachTraceSummary(result: TraceResult): void {
+    this.#attachedTraceSummary = result;
+  }
+
+  attachTraceInsight(
+    trace: TraceResult,
+    insightSetId: string,
+    insightName: InsightName,
+  ): void {
+    this.#attachedTraceInsight = {
+      trace,
+      insightSetId,
+      insightName,
+    };
+  }
+
   get includePages(): boolean {
     return this.#includePages;
+  }
+
+  get attachedTraceSummary(): TraceResult | undefined {
+    return this.#attachedTraceSummary;
+  }
+
+  get attachedTracedInsight(): TraceInsightData | undefined {
+    return this.#attachedTraceInsight;
   }
 
   get includeNetworkRequests(): boolean {
@@ -234,7 +269,7 @@ export class McpResponse implements Response {
       detailedNetworkRequest = formatter;
     }
 
-    let consoleData: ConsoleMessageData | IssueFormatter | undefined;
+    let detailedConsoleMessage: ConsoleFormatter | IssueFormatter | undefined;
 
     if (this.#attachedConsoleMessageId) {
       const message = context.getConsoleMessageById(
@@ -244,26 +279,11 @@ export class McpResponse implements Response {
       if ('args' in message) {
         const consoleMessage = message as ConsoleMessage;
         const devTools = context.getDevToolsUniverse();
-        const stackTrace = devTools
-          ? await createStackTraceForConsoleMessage(devTools, consoleMessage)
-          : undefined;
-
-        consoleData = {
-          consoleMessageStableId,
-          type: consoleMessage.type(),
-          message: consoleMessage.text(),
-          args: await Promise.all(
-            consoleMessage.args().map(async arg => {
-              const stringArg = await arg.jsonValue().catch(() => {
-                // Ignore errors.
-              });
-              return typeof stringArg === 'object'
-                ? JSON.stringify(stringArg)
-                : String(stringArg);
-            }),
-          ),
-          stackTrace,
-        };
+        detailedConsoleMessage = await ConsoleFormatter.from(consoleMessage, {
+          id: consoleMessageStableId,
+          fetchDetailedData: true,
+          devTools: devTools ?? undefined,
+        });
       } else if (message instanceof DevTools.AggregatedIssue) {
         const formatter = new IssueFormatter(message, {
           id: consoleMessageStableId,
@@ -275,18 +295,19 @@ export class McpResponse implements Response {
             "Can't provide detals for the msgid " + consoleMessageStableId,
           );
         }
-        consoleData = formatter;
+        detailedConsoleMessage = formatter;
       } else {
-        consoleData = {
-          consoleMessageStableId,
-          type: 'error',
-          message: (message as Error).message,
-          args: [],
-        };
+        detailedConsoleMessage = await ConsoleFormatter.from(message as Error, {
+          id: consoleMessageStableId,
+        });
       }
     }
 
-    let consoleListData: Array<ConsoleMessageData | IssueFormatter> | undefined;
+    let extensions: InstalledExtension[] | undefined;
+    if (this.#listExtensions) {
+      extensions = context.listExtensions();
+    }
+    let consoleMessages: Array<ConsoleFormatter | IssueFormatter> | undefined;
     if (this.#consoleDataOptions?.include) {
       let messages = context.getConsoleData(
         this.#consoleDataOptions.includePreservedMessages,
@@ -305,39 +326,20 @@ export class McpResponse implements Response {
         });
       }
 
-      consoleListData = (
+      consoleMessages = (
         await Promise.all(
           messages.map(
-            async (
-              item,
-            ): Promise<ConsoleMessageData | IssueFormatter | null> => {
+            async (item): Promise<ConsoleFormatter | IssueFormatter | null> => {
               const consoleMessageStableId =
                 context.getConsoleMessageStableId(item);
               if ('args' in item) {
                 const consoleMessage = item as ConsoleMessage;
                 const devTools = context.getDevToolsUniverse();
-                const stackTrace = devTools
-                  ? await createStackTraceForConsoleMessage(
-                      devTools,
-                      consoleMessage,
-                    )
-                  : undefined;
-                return {
-                  consoleMessageStableId,
-                  type: consoleMessage.type(),
-                  message: consoleMessage.text(),
-                  args: await Promise.all(
-                    consoleMessage.args().map(async arg => {
-                      const stringArg = await arg.jsonValue().catch(() => {
-                        // Ignore errors.
-                      });
-                      return typeof stringArg === 'object'
-                        ? JSON.stringify(stringArg)
-                        : String(stringArg);
-                    }),
-                  ),
-                  stackTrace,
-                };
+                return await ConsoleFormatter.from(consoleMessage, {
+                  id: consoleMessageStableId,
+                  fetchDetailedData: true,
+                  devTools: devTools ?? undefined,
+                });
               }
               if (item instanceof DevTools.AggregatedIssue) {
                 const formatter = new IssueFormatter(item, {
@@ -348,12 +350,9 @@ export class McpResponse implements Response {
                 }
                 return formatter;
               }
-              return {
-                consoleMessageStableId,
-                type: 'error',
-                message: (item as Error).message,
-                args: [],
-              };
+              return await ConsoleFormatter.from(item as Error, {
+                id: consoleMessageStableId,
+              });
             },
           ),
         )
@@ -378,13 +377,8 @@ export class McpResponse implements Response {
       }
 
       if (requests.length) {
-        const data = this.#dataWithPagination(
-          requests,
-          this.#networkRequestsOptions.pagination,
-        );
-
         networkRequests = await Promise.all(
-          data.items.map(request =>
+          requests.map(request =>
             NetworkFormatter.from(request, {
               requestId: context.getNetworkRequestStableId(request),
               selectedInDevToolsUI:
@@ -399,11 +393,14 @@ export class McpResponse implements Response {
     }
 
     return this.format(toolName, context, {
-      consoleData,
-      consoleListData,
+      detailedConsoleMessage,
+      consoleMessages,
       snapshot,
       detailedNetworkRequest,
       networkRequests,
+      traceInsight: this.#attachedTraceInsight,
+      traceSummary: this.#attachedTraceSummary,
+      extensions,
     });
   }
 
@@ -411,16 +408,46 @@ export class McpResponse implements Response {
     toolName: string,
     context: McpContext,
     data: {
-      consoleData: ConsoleMessageData | IssueFormatter | undefined;
-      consoleListData: Array<ConsoleMessageData | IssueFormatter> | undefined;
+      detailedConsoleMessage: ConsoleFormatter | IssueFormatter | undefined;
+      consoleMessages: Array<ConsoleFormatter | IssueFormatter> | undefined;
       snapshot: SnapshotFormatter | string | undefined;
       detailedNetworkRequest?: NetworkFormatter;
       networkRequests?: NetworkFormatter[];
+      traceSummary?: TraceResult;
+      traceInsight?: TraceInsightData;
+      extensions?: InstalledExtension[];
     },
   ): {content: Array<TextContent | ImageContent>; structuredContent: object} {
+    const structuredContent: {
+      snapshot?: object;
+      snapshotFilePath?: string;
+      tabId?: string;
+      networkRequest?: object;
+      networkRequests?: object[];
+      consoleMessage?: object;
+      consoleMessages?: object[];
+      traceSummary?: string;
+      traceInsights?: Array<{insightName: string; insightKey: string}>;
+      extensions?: object[];
+      message?: string;
+      networkConditions?: string;
+      navigationTimeout?: number;
+      viewport?: object;
+      userAgent?: string;
+      cpuThrottlingRate?: number;
+      dialog?: {
+        type: string;
+        message: string;
+        defaultValue?: string;
+      };
+      pages?: object[];
+      pagination?: object;
+    } = {};
+
     const response = [`# ${toolName} response`];
-    for (const line of this.#textResponseLines) {
-      response.push(line);
+    if (this.#textResponseLines.length) {
+      structuredContent.message = this.#textResponseLines.join('\n');
+      response.push(...this.#textResponseLines);
     }
 
     const networkConditions = context.getNetworkConditions();
@@ -430,24 +457,29 @@ export class McpResponse implements Response {
       response.push(
         `Default navigation timeout set to ${context.getNavigationTimeout()} ms`,
       );
+      structuredContent.networkConditions = networkConditions;
+      structuredContent.navigationTimeout = context.getNavigationTimeout();
     }
 
     const viewport = context.getViewport();
     if (viewport) {
       response.push(`## Viewport emulation`);
       response.push(`Emulating viewport: ${JSON.stringify(viewport)}`);
+      structuredContent.viewport = viewport;
     }
 
     const userAgent = context.getUserAgent();
     if (userAgent) {
       response.push(`## UserAgent emulation`);
       response.push(`Emulating userAgent: ${userAgent}`);
+      structuredContent.userAgent = userAgent;
     }
 
     const cpuThrottlingRate = context.getCpuThrottlingRate();
     if (cpuThrottlingRate > 1) {
       response.push(`## CPU emulation`);
       response.push(`Emulating: ${cpuThrottlingRate}x slowdown`);
+      structuredContent.cpuThrottlingRate = cpuThrottlingRate;
     }
 
     const dialog = context.getDialog();
@@ -459,6 +491,11 @@ export class McpResponse implements Response {
       response.push(`# Open dialog
 ${dialog.type()}: ${dialog.message()}${defaultValueIfNeeded}.
 Call ${handleDialog.name} to handle it before continuing.`);
+      structuredContent.dialog = {
+        type: dialog.type(),
+        message: dialog.message(),
+        defaultValue: dialog.defaultValue(),
+      };
     }
 
     if (this.#includePages) {
@@ -469,18 +506,45 @@ Call ${handleDialog.name} to handle it before continuing.`);
         );
       }
       response.push(...parts);
+      structuredContent.pages = context.getPages().map(page => {
+        return {
+          id: context.getPageId(page),
+          url: page.url(),
+          selected: context.isPageSelected(page),
+        };
+      });
     }
-
-    const structuredContent: {
-      snapshot?: object;
-      snapshotFilePath?: string;
-      tabId?: string;
-      networkRequest?: object;
-      networkRequests?: object[];
-    } = {};
 
     if (this.#tabId) {
       structuredContent.tabId = this.#tabId;
+    }
+
+    if (data.traceSummary) {
+      const summary = getTraceSummary(data.traceSummary);
+      response.push(summary);
+      structuredContent.traceSummary = summary;
+      structuredContent.traceInsights = [];
+      for (const insightSet of data.traceSummary.insights?.values() ?? []) {
+        for (const [insightName, model] of Object.entries(insightSet.model)) {
+          structuredContent.traceInsights.push({
+            insightName,
+            insightKey: model.insightKey,
+          });
+        }
+      }
+    }
+
+    if (data.traceInsight) {
+      const insightOutput = getInsightOutput(
+        data.traceInsight.trace,
+        data.traceInsight.insightSetId,
+        data.traceInsight.insightName,
+      );
+      if ('error' in insightOutput) {
+        response.push(insightOutput.error);
+      } else {
+        response.push(insightOutput.output);
+      }
     }
 
     if (data.snapshot) {
@@ -499,7 +563,27 @@ Call ${handleDialog.name} to handle it before continuing.`);
       structuredContent.networkRequest =
         data.detailedNetworkRequest.toJSONDetailed();
     }
-    response.push(...this.#formatConsoleData(context, data.consoleData));
+
+    if (data.detailedConsoleMessage) {
+      response.push(data.detailedConsoleMessage.toStringDetailed());
+      structuredContent.consoleMessage =
+        data.detailedConsoleMessage.toJSONDetailed();
+    }
+
+    if (data.extensions) {
+      structuredContent.extensions = data.extensions;
+      response.push('## Extensions');
+      if (data.extensions.length === 0) {
+        response.push('No extensions installed.');
+      } else {
+        const extensionsMessage = data.extensions
+          .map(extension => {
+            return `id=${extension.id} "${extension.name}" v${extension.version} ${extension.isEnabled ? 'Enabled' : 'Disabled'}`;
+          })
+          .join('\n');
+        response.push(extensionsMessage);
+      }
+    }
 
     if (this.#networkRequestsOptions?.include) {
       let requests = context.getNetworkRequests(
@@ -523,6 +607,7 @@ Call ${handleDialog.name} to handle it before continuing.`);
           requests,
           this.#networkRequestsOptions.pagination,
         );
+        structuredContent.pagination = paginationData.pagination;
         response.push(...paginationData.info);
         if (data.networkRequests) {
           structuredContent.networkRequests = [];
@@ -537,22 +622,21 @@ Call ${handleDialog.name} to handle it before continuing.`);
     }
 
     if (this.#consoleDataOptions?.include) {
-      const messages = data.consoleListData ?? [];
+      const messages = data.consoleMessages ?? [];
 
       response.push('## Console messages');
       if (messages.length) {
-        const data = this.#dataWithPagination(
+        const paginationData = this.#dataWithPagination(
           messages,
           this.#consoleDataOptions.pagination,
         );
-        response.push(...data.info);
+        structuredContent.pagination = paginationData.pagination;
+        response.push(...paginationData.info);
         response.push(
-          ...data.items.map(message => {
-            if (message instanceof IssueFormatter) {
-              return message.toString();
-            }
-            return formatConsoleEventShort(message);
-          }),
+          ...paginationData.items.map(message => message.toString()),
+        );
+        structuredContent.consoleMessages = paginationData.items.map(message =>
+          message.toJSON(),
         );
       } else {
         response.push('<no console messages found>');
@@ -599,24 +683,16 @@ Call ${handleDialog.name} to handle it before continuing.`);
     return {
       info: response,
       items: paginationResult.items,
+      pagination: {
+        currentPage: paginationResult.currentPage,
+        totalPages: paginationResult.totalPages,
+        hasNextPage: paginationResult.hasNextPage,
+        hasPreviousPage: paginationResult.hasPreviousPage,
+        startIndex: paginationResult.startIndex,
+        endIndex: paginationResult.endIndex,
+        invalidPage: paginationResult.invalidPage,
+      },
     };
-  }
-
-  #formatConsoleData(
-    context: McpContext,
-    data: ConsoleMessageData | IssueFormatter | undefined,
-  ): string[] {
-    const response: string[] = [];
-    if (!data) {
-      return response;
-    }
-
-    if (data instanceof IssueFormatter) {
-      response.push(data.toStringDetailed());
-    } else {
-      response.push(formatConsoleEventVerbose(data, context));
-    }
-    return response;
   }
 
   resetResponseLineForTesting() {

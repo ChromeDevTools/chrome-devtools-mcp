@@ -8,9 +8,12 @@ import assert from 'node:assert';
 import path from 'node:path';
 import {describe, it} from 'node:test';
 
+import sinon from 'sinon';
+
 import {
   installExtension,
   uninstallExtension,
+  listExtensions,
 } from '../../src/tools/extensions.js';
 import {withMcpContext} from '../utils.js';
 
@@ -68,6 +71,16 @@ describe('extension', () => {
         elementAfterUninstall,
         null,
         `Extension with ID "${extensionId}" should NOT be visible on chrome://extensions`,
+      );
+    });
+  });
+  it('lists installed extensions', async () => {
+    await withMcpContext(async (response, context) => {
+      const setListExtensionsSpy = sinon.spy(response, 'setListExtensions');
+      await listExtensions.handler({params: {}}, response, context);
+      assert.ok(
+        setListExtensionsSpy.calledOnce,
+        'setListExtensions should be called',
       );
     });
   });

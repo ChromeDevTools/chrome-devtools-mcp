@@ -43,6 +43,30 @@ describe('pages', () => {
         assert.ok(response.includePages);
       });
     });
+    it('create a page in the background', async () => {
+      await withMcpContext(async (response, context) => {
+        const originalPage = context.getPageById(1);
+        assert.strictEqual(originalPage, context.getSelectedPage());
+        // Ensure original page has focus
+        await originalPage.bringToFront();
+        assert.strictEqual(
+          await originalPage.evaluate(() => document.hasFocus()),
+          true,
+        );
+        await newPage.handler(
+          {params: {url: 'about:blank', background: true}},
+          response,
+          context,
+        );
+        // New page should be selected but original should retain focus
+        assert.strictEqual(context.getPageById(2), context.getSelectedPage());
+        assert.strictEqual(
+          await originalPage.evaluate(() => document.hasFocus()),
+          true,
+        );
+        assert.ok(response.includePages);
+      });
+    });
   });
   describe('close_page', () => {
     it('closes a page', async () => {

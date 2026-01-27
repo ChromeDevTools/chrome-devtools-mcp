@@ -17,6 +17,11 @@ const dblClickSchema = zod
   .optional()
   .describe('Set to true for double clicks. Default is false.');
 
+const includeSnapshotSchema = zod
+  .boolean()
+  .optional()
+  .describe('Whether to include a snapshot in the response. Default is false.');
+
 export const click = defineTool({
   name: 'click',
   description: `Clicks on the provided element`,
@@ -31,6 +36,7 @@ export const click = defineTool({
         'The uid of an element on the page from the page content snapshot',
       ),
     dblClick: dblClickSchema,
+    includeSnapshot: includeSnapshotSchema,
   },
   handler: async (request, response, context) => {
     const uid = request.params.uid;
@@ -46,7 +52,9 @@ export const click = defineTool({
           ? `Successfully double clicked on the element`
           : `Successfully clicked on the element`,
       );
-      response.includeSnapshot();
+      if (request.params.includeSnapshot) {
+        response.includeSnapshot();
+      }
     } finally {
       void handle.dispose();
     }
@@ -65,6 +73,7 @@ export const clickAt = defineTool({
     x: zod.number().describe('The x coordinate'),
     y: zod.number().describe('The y coordinate'),
     dblClick: dblClickSchema,
+    includeSnapshot: includeSnapshotSchema,
   },
   handler: async (request, response, context) => {
     const page = context.getSelectedPage();
@@ -78,7 +87,9 @@ export const clickAt = defineTool({
         ? `Successfully double clicked at the coordinates`
         : `Successfully clicked at the coordinates`,
     );
-    response.includeSnapshot();
+    if (request.params.includeSnapshot) {
+      response.includeSnapshot();
+    }
   },
 });
 
@@ -95,6 +106,7 @@ export const hover = defineTool({
       .describe(
         'The uid of an element on the page from the page content snapshot',
       ),
+    includeSnapshot: includeSnapshotSchema,
   },
   handler: async (request, response, context) => {
     const uid = request.params.uid;
@@ -104,7 +116,9 @@ export const hover = defineTool({
         await handle.asLocator().hover();
       });
       response.appendResponseLine(`Successfully hovered over the element`);
-      response.includeSnapshot();
+      if (request.params.includeSnapshot) {
+        response.includeSnapshot();
+      }
     } finally {
       void handle.dispose();
     }
@@ -185,6 +199,7 @@ export const fill = defineTool({
         'The uid of an element on the page from the page content snapshot',
       ),
     value: zod.string().describe('The value to fill in'),
+    includeSnapshot: includeSnapshotSchema,
   },
   handler: async (request, response, context) => {
     await context.waitForEventsAfterAction(async () => {
@@ -196,7 +211,9 @@ export const fill = defineTool({
       );
     });
     response.appendResponseLine(`Successfully filled out the element`);
-    response.includeSnapshot();
+    if (request.params.includeSnapshot) {
+      response.includeSnapshot();
+    }
   },
 });
 
@@ -210,6 +227,7 @@ export const drag = defineTool({
   schema: {
     from_uid: zod.string().describe('The uid of the element to drag'),
     to_uid: zod.string().describe('The uid of the element to drop into'),
+    includeSnapshot: includeSnapshotSchema,
   },
   handler: async (request, response, context) => {
     const fromHandle = await context.getElementByUid(request.params.from_uid);
@@ -221,7 +239,9 @@ export const drag = defineTool({
         await toHandle.drop(fromHandle);
       });
       response.appendResponseLine(`Successfully dragged an element`);
-      response.includeSnapshot();
+      if (request.params.includeSnapshot) {
+        response.includeSnapshot();
+      }
     } finally {
       void fromHandle.dispose();
       void toHandle.dispose();
@@ -245,6 +265,7 @@ export const fillForm = defineTool({
         }),
       )
       .describe('Elements from snapshot to fill out.'),
+    includeSnapshot: includeSnapshotSchema,
   },
   handler: async (request, response, context) => {
     for (const element of request.params.elements) {
@@ -257,7 +278,9 @@ export const fillForm = defineTool({
       });
     }
     response.appendResponseLine(`Successfully filled out the form`);
-    response.includeSnapshot();
+    if (request.params.includeSnapshot) {
+      response.includeSnapshot();
+    }
   },
 });
 
@@ -275,6 +298,7 @@ export const uploadFile = defineTool({
         'The uid of the file input element or an element that will open file chooser on the page from the page content snapshot',
       ),
     filePath: zod.string().describe('The local path of the file to upload'),
+    includeSnapshot: includeSnapshotSchema,
   },
   handler: async (request, response, context) => {
     const {uid, filePath} = request.params;
@@ -301,7 +325,9 @@ export const uploadFile = defineTool({
           );
         }
       }
-      response.includeSnapshot();
+      if (request.params.includeSnapshot) {
+        response.includeSnapshot();
+      }
       response.appendResponseLine(`File uploaded from ${filePath}.`);
     } finally {
       void handle.dispose();
@@ -322,6 +348,7 @@ export const pressKey = defineTool({
       .describe(
         'A key or a combination (e.g., "Enter", "Control+A", "Control++", "Control+Shift+R"). Modifiers: Control, Shift, Alt, Meta',
       ),
+    includeSnapshot: includeSnapshotSchema,
   },
   handler: async (request, response, context) => {
     const page = context.getSelectedPage();
@@ -341,6 +368,8 @@ export const pressKey = defineTool({
     response.appendResponseLine(
       `Successfully pressed key: ${request.params.key}`,
     );
-    response.includeSnapshot();
+    if (request.params.includeSnapshot) {
+      response.includeSnapshot();
+    }
   },
 });

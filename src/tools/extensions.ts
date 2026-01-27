@@ -48,3 +48,18 @@ export const uninstallExtension = defineTool({
     response.appendResponseLine(`Extension uninstalled. Id: ${id}`);
   },
 });
+
+export const listExtensions = defineTool({
+  name: 'list_extensions',
+  description:
+    'Lists all extensions via this server, including their name, ID, version, and enabled status.',
+  annotations: {
+    category: ToolCategory.EXTENSIONS,
+    readOnlyHint: true,
+    conditions: [EXTENSIONS_CONDITION],
+  },
+  schema: {},
+  handler: async (_request, response, _context) => {
+    response.setListExtensions();
+  },
+});

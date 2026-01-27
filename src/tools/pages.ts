@@ -87,10 +87,16 @@ export const newPage = defineTool({
   },
   schema: {
     url: zod.string().describe('URL to load in a new page.'),
+    background: zod
+      .boolean()
+      .optional()
+      .describe(
+        'Whether to open the page in the background without bringing it to the front. Default is false (foreground).',
+      ),
     ...timeoutSchema,
   },
   handler: async (request, response, context) => {
-    const page = await context.newPage();
+    const page = await context.newPage(request.params.background);
 
     await context.waitForEventsAfterAction(async () => {
       await page.goto(request.params.url, {

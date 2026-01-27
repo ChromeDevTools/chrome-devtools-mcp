@@ -14,6 +14,12 @@ export interface IssueFormatterOptions {
   id?: number;
 }
 
+export interface AffectedResource {
+  uid?: string;
+  data?: unknown;
+  request?: string | number;
+}
+
 export class IssueFormatter {
   #issue: DevTools.AggregatedIssue;
   #options: IssueFormatterOptions;
@@ -59,6 +65,55 @@ export class IssueFormatter {
       }
     }
 
+    const affectedResources = this.#getAffectedResources();
+    if (affectedResources.length) {
+      bodyParts.push('### Affected resources');
+      bodyParts.push(
+        ...affectedResources.map(item => {
+          const details = [];
+          if (item.uid) {
+            details.push(`uid=${item.uid}`);
+          }
+          if (item.request) {
+            details.push(
+              (typeof item.request === 'number' ? `reqid=` : 'url=') +
+                item.request,
+            );
+          }
+          if (item.data) {
+            details.push(`data=${JSON.stringify(item.data)}`);
+          }
+          return details.join(' ');
+        }),
+      );
+    }
+
+    result.push(`Message: issue> ${bodyParts.join('\n')}`);
+
+    return result.join('\n');
+  }
+
+  toJSON(): object {
+    return {
+      type: 'issue',
+      title: this.#getTitle(),
+      count: this.#issue.getAggregatedIssuesCount(),
+      id: this.#options.id,
+    };
+  }
+
+  toJSONDetailed(): object {
+    return {
+      id: this.#options.id,
+      type: 'issue',
+      title: this.#getTitle(),
+      description: this.#getDescription(),
+      links: this.#issue.getDescription()?.links,
+      affectedResources: this.#getAffectedResources(),
+    };
+  }
+
+  #getAffectedResources(): AffectedResource[] {
     const issues = this.#issue.getAllIssues();
     const affectedResources: Array<{
       uid?: string;
@@ -73,8 +128,10 @@ export class IssueFormatter {
 
       // We send the remaining details as untyped JSON because the DevTools
       // frontend code is currently not re-usable.
-      // eslint-disable-next-line
-      const data = structuredClone(details) as any;
+      const data = structuredClone(details) as unknown as Record<
+        string,
+        unknown
+      >;
 
       let uid;
       let request: number | string | undefined;
@@ -111,7 +168,8 @@ export class IssueFormatter {
           );
           if (resolvedId) {
             request = resolvedId;
-            delete data.request.requestId;
+            const requestData = data.request as Record<string, unknown>;
+            delete requestData.requestId;
           }
         }
       }
@@ -125,31 +183,7 @@ export class IssueFormatter {
         request,
       });
     }
-    if (affectedResources.length) {
-      bodyParts.push('### Affected resources');
-      bodyParts.push(
-        ...affectedResources.map(item => {
-          const details = [];
-          if (item.uid) {
-            details.push(`uid=${item.uid}`);
-          }
-          if (item.request) {
-            details.push(
-              (typeof item.request === 'number' ? `reqid=` : 'url=') +
-                item.request,
-            );
-          }
-          if (item.data) {
-            details.push(`data=${JSON.stringify(item.data)}`);
-          }
-          return details.join(' ');
-        }),
-      );
-    }
-
-    result.push(`Message: issue> ${bodyParts.join('\n')}`);
-
-    return result.join('\n');
+    return affectedResources;
   }
 
   isValid(): boolean {

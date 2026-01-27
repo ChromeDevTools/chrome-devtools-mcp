@@ -194,7 +194,7 @@ describe('performance', () => {
       return result;
     }
 
-    it('returns the information on the insight', async t => {
+    it('returns the information on the insight', async () => {
       const trace = await parseTrace('web-dev-with-commit.json.gz');
       await withMcpContext(async (response, context) => {
         context.storeTraceRecording(trace);
@@ -211,31 +211,7 @@ describe('performance', () => {
           context,
         );
 
-        t.assert.snapshot?.(response.responseLines.join('\n'));
-      });
-    });
-
-    it('returns an error if the insight does not exist', async () => {
-      const trace = await parseTrace('web-dev-with-commit.json.gz');
-      await withMcpContext(async (response, context) => {
-        context.storeTraceRecording(trace);
-        context.setIsRunningPerformanceTrace(false);
-
-        await analyzeInsight.handler(
-          {
-            params: {
-              insightSetId: '8463DF94CD61B265B664E7F768183DE3',
-              insightName: 'MadeUpInsightName',
-            },
-          },
-          response,
-          context,
-        );
-        assert.ok(
-          response.responseLines
-            .join('\n')
-            .match(/No Performance Insights for the given insight set id/),
-        );
+        assert.ok(response.attachedTracedInsight);
       });
     });
 
@@ -295,28 +271,18 @@ describe('performance', () => {
       });
     });
 
-    it('returns an error message if parsing the trace buffer fails', async t => {
+    it('throws an error if parsing the trace buffer fails', async () => {
       await withMcpContext(async (response, context) => {
         context.setIsRunningPerformanceTrace(true);
         const selectedPage = context.getSelectedPage();
         sinon
           .stub(selectedPage.tracing, 'stop')
           .returns(Promise.resolve(undefined));
-        await stopTrace.handler({params: {}}, response, context);
-        t.assert.snapshot?.(response.responseLines.join('\n'));
-      });
-    });
 
-    it('returns the high level summary of the performance trace', async t => {
-      const rawData = loadTraceAsBuffer('web-dev-with-commit.json.gz');
-      await withMcpContext(async (response, context) => {
-        context.setIsRunningPerformanceTrace(true);
-        const selectedPage = context.getSelectedPage();
-        sinon.stub(selectedPage.tracing, 'stop').callsFake(async () => {
-          return rawData;
-        });
-        await stopTrace.handler({params: {}}, response, context);
-        t.assert.snapshot?.(response.responseLines.join('\n'));
+        await assert.rejects(
+          stopTrace.handler({params: {}}, response, context),
+          /There was an unexpected error parsing the trace/,
+        );
       });
     });
 

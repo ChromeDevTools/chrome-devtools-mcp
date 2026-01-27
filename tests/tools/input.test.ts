@@ -155,6 +155,55 @@ describe('input', () => {
         assert(handlerResolveTime > buttonChangeTime, 'Waited for navigation');
       });
     });
+
+    it('does not include snapshot by default', async () => {
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedPage();
+        await page.setContent(
+          html`<button onclick="this.innerText = 'clicked';">test</button>`,
+        );
+        await context.createTextSnapshot();
+        await click.handler(
+          {
+            params: {
+              uid: '1_1',
+            },
+          },
+          response,
+          context,
+        );
+        assert.strictEqual(
+          response.responseLines[0],
+          'Successfully clicked on the element',
+        );
+        assert.strictEqual(response.snapshotParams, undefined);
+      });
+    });
+
+    it('includes snapshot if includeSnapshot is true', async () => {
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedPage();
+        await page.setContent(
+          html`<button onclick="this.innerText = 'clicked';">test</button>`,
+        );
+        await context.createTextSnapshot();
+        await click.handler(
+          {
+            params: {
+              uid: '1_1',
+              includeSnapshot: true,
+            },
+          },
+          response,
+          context,
+        );
+        assert.strictEqual(
+          response.responseLines[0],
+          'Successfully clicked on the element',
+        );
+        assert.notStrictEqual(response.snapshotParams, undefined);
+      });
+    });
   });
 
   describe('hover', () => {

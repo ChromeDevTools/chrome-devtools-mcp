@@ -23,6 +23,15 @@ exports[`McpContext > should include file paths in structured content when savin
 
 exports[`McpContext > should include network requests in structured content 1`] = `
 {
+  "pagination": {
+    "currentPage": 0,
+    "totalPages": 1,
+    "hasNextPage": false,
+    "hasPreviousPage": false,
+    "startIndex": 0,
+    "endIndex": 1,
+    "invalidPage": false
+  },
   "networkRequests": [
     {
       "requestId": 123,
