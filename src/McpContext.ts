@@ -450,13 +450,20 @@ export class McpContext implements Context {
     }
     const node = this.#textSnapshot?.idToNode.get(uid);
     if (!node) {
-      throw new Error('No such element found in the snapshot');
+      throw new Error('No such element found in the snapshot.');
     }
-    const handle = await node.elementHandle();
-    if (!handle) {
-      throw new Error('No such element found in the snapshot');
+    const message = `Element with uid ${uid} no longer exists on the page.`;
+    try {
+      const handle = await node.elementHandle();
+      if (!handle) {
+        throw new Error(message);
+      }
+      return handle;
+    } catch (error) {
+      throw new Error(message, {
+        cause: error,
+      });
     }
-    return handle;
   }
 
   /**

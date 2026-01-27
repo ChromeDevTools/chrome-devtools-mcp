@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {logger} from '../logger.js';
 import type {McpContext, TextSnapshotNode} from '../McpContext.js';
 import {zod} from '../third_party/index.js';
 import type {ElementHandle} from '../third_party/index.js';
@@ -21,6 +22,16 @@ const includeSnapshotSchema = zod
   .boolean()
   .optional()
   .describe('Whether to include a snapshot in the response. Default is false.');
+
+function handleActionError(error: unknown, uid: string) {
+  logger('failed to act using a locator', error);
+  throw new Error(
+    `Failed to interact with the element with uid ${uid}. The element did not become interactive within the configured timeout.`,
+    {
+      cause: error,
+    },
+  );
+}
 
 export const click = defineTool({
   name: 'click',
@@ -55,6 +66,8 @@ export const click = defineTool({
       if (request.params.includeSnapshot) {
         response.includeSnapshot();
       }
+    } catch (error) {
+      handleActionError(error, uid);
     } finally {
       void handle.dispose();
     }
@@ -119,6 +132,8 @@ export const hover = defineTool({
       if (request.params.includeSnapshot) {
         response.includeSnapshot();
       }
+    } catch (error) {
+      handleActionError(error, uid);
     } finally {
       void handle.dispose();
     }
@@ -180,6 +195,8 @@ async function fillFormElement(
         value.length * timeoutPerChar;
       await handle.asLocator().setTimeout(fillTimeout).fill(value);
     }
+  } catch (error) {
+    handleActionError(error, uid);
   } finally {
     void handle.dispose();
   }
