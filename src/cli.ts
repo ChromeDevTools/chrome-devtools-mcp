@@ -209,7 +209,8 @@ export const cliOptions = {
     // Marked as `false` until the feature is ready to be enabled by default.
     default: false,
     hidden: true,
-    describe: 'Set to false to opt-out of usage statistics collection. Google collects usage data to improve the tool, handled under the Google Privacy Policy (https://policies.google.com/privacy). This is independent from Chrome browser metrics.',
+    describe:
+      'Set to false to opt-out of usage statistics collection. Google collects usage data to improve the tool, handled under the Google Privacy Policy (https://policies.google.com/privacy). This is independent from Chrome browser metrics.',
   },
   clearcutEndpoint: {
     type: 'string',
