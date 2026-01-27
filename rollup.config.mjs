@@ -41,6 +41,8 @@ const allowedLicenses = [
   '0BSD',
 ];
 
+const seenDependencies = new Map();
+
 /**
  * @param {string} wrapperIndexPath
  * @param {import('rollup').OutputOptions} [extraOutputOptions={}]
@@ -81,7 +83,14 @@ const bundleDependency = (
             'THIRD_PARTY_NOTICES',
           ),
           template(dependencies) {
-            const stringifiedDependencies = dependencies.map(dependency => {
+            for (const dependency of dependencies) {
+              const key = `${dependency.name}:${dependency.version}`;
+              seenDependencies.set(key, dependency);
+            }
+
+            const stringifiedDependencies = Array.from(
+              seenDependencies.values(),
+            ).map(dependency => {
               let arr = [];
               arr.push(`Name: ${dependency.name ?? 'N/A'}`);
               let url = dependency.homepage ?? dependency.repository;
