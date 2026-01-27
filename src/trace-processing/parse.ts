@@ -184,3 +184,55 @@ export function getLCPBreakdownData(
     phases,
   };
 }
+
+export interface LayoutShiftImages {
+  before?: string;
+  after?: string;
+}
+
+export interface LayoutShiftData {
+  ts: number;
+  score: number;
+  images: LayoutShiftImages;
+}
+
+export function getLayoutShifts(
+  result: TraceResult,
+): LayoutShiftData[] {
+  const layoutShifts: LayoutShiftData[] = [];
+  
+  // The LayoutShifts handler provides clusters and synthetic layout shift events.
+  const clusters = result.parsedTrace.data.LayoutShifts.clusters;
+  
+  for (const cluster of clusters) {
+    for (const event of cluster.events) {
+      const images: LayoutShiftImages = {};
+      
+      if (event.parsedData.screenshots.before) {
+        const beforeArgs = event.parsedData.screenshots.before.args;
+        images.before = 'snapshot' in beforeArgs ? beforeArgs.snapshot : beforeArgs.dataUri;
+      }
+      if (event.parsedData.screenshots.after) {
+        const afterArgs = event.parsedData.screenshots.after.args;
+        images.after = 'snapshot' in afterArgs ? afterArgs.snapshot : afterArgs.dataUri;
+      }
+
+      layoutShifts.push({
+        ts: event.ts,
+        score: event.args.data?.weighted_score_delta ?? 0,
+        images,
+      });
+    }
+  }
+
+  return layoutShifts;
+}
+
+export function getLayoutShiftImages(
+  result: TraceResult,
+  timestamp: number,
+): LayoutShiftImages | null {
+  const shifts = getLayoutShifts(result);
+  const match = shifts.find(s => s.ts === timestamp);
+  return match ? match.images : null;
+}

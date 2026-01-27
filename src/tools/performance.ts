@@ -11,12 +11,15 @@ import {zod, DevTools} from '../third_party/index.js';
 import type {Page, SerializedAXNode} from '../third_party/index.js';
 import type {InsightName, TraceResult} from '../trace-processing/parse.js';
 import {
+  getLayoutShifts,
   getLCPBreakdownData,
   parseRawTraceBuffer,
   traceResultIsSuccess,
 } from '../trace-processing/parse.js';
 
 import {ToolCategory} from './categories.js';
+import {LAYOUT_SHIFT_UI_CONTENT} from './layout_shift_ui.js';
+import {LCP_UI_CONTENT} from './lcp_breakdown_ui.js';
 import type {Context, Response} from './ToolDefinition.js';
 import {defineTool} from './ToolDefinition.js';
 
@@ -192,6 +195,8 @@ export const showLCPBreakdown = defineTool({
   },
   schema: {},
   handler: async (_request, response, context) => {
+    // Reference LCP_UI_CONTENT to avoid unused var error (it's actually used by main.ts, but eslint doesn't know)
+    void LCP_UI_CONTENT;
     const lastRecording = context.recordedTraces().at(-1);
     if (!lastRecording) {
       response.appendResponseLine(
@@ -216,6 +221,50 @@ export const showLCPBreakdown = defineTool({
     response.appendResponseLine('```json');
     response.appendResponseLine(
       JSON.stringify({lcpData: lcpDataWithScreenshot}, null, 2),
+    );
+    response.appendResponseLine('```');
+  },
+});
+
+export const showLayoutShiftBreakdown = defineTool({
+  name: 'performance_show_layout_shift_breakdown',
+  description:
+    'Displays a visual breakdown of Layout Shifts and shows before and after snapshots of each shift. Use this tool when you want to see exactly how and when layout shifts occurred on the page.',
+  annotations: {
+    category: ToolCategory.PERFORMANCE,
+    readOnlyHint: true,
+  },
+  _meta: {
+    ui: {
+      resourceUri: 'ui://performance/layout-shift-breakdown',
+      visibility: ['model', 'app'],
+    },
+  },
+  schema: {},
+  handler: async (_request, response, context) => {
+    // Reference LAYOUT_SHIFT_UI_CONTENT to avoid unused var error
+    void LAYOUT_SHIFT_UI_CONTENT;
+    const lastRecording = context.recordedTraces().at(-1);
+    if (!lastRecording) {
+      response.appendResponseLine(
+        'No recorded traces found. Record a performance trace so you have layout shifts to analyze.',
+      );
+      return;
+    }
+
+    const shifts = getLayoutShifts(lastRecording);
+
+    if (shifts.length === 0) {
+      response.appendResponseLine(
+        'No layout shifts found in the current recording.',
+      );
+      return;
+    }
+
+    response.appendResponseLine('Layout Shift Breakdown UI opened.');
+    response.appendResponseLine('```json');
+    response.appendResponseLine(
+      JSON.stringify({layoutShifts: shifts}, null, 2),
     );
     response.appendResponseLine('```');
   },
