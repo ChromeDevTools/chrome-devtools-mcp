@@ -63,3 +63,25 @@ export const listExtensions = defineTool({
     response.setListExtensions();
   },
 });
+
+export const reloadExtension = defineTool({
+  name: 'reload_extension',
+  description: 'Reloads an unpacked Chrome extension by its ID.',
+  annotations: {
+    category: ToolCategory.EXTENSIONS,
+    readOnlyHint: false,
+    conditions: [EXTENSIONS_CONDITION],
+  },
+  schema: {
+    id: zod.string().describe('ID of the extension to reload.'),
+  },
+  handler: async (request, response, context) => {
+    const {id} = request.params;
+    const extension = context.getExtension(id);
+    if (!extension) {
+      throw new Error(`Extension with ID ${id} not found.`);
+    }
+    await context.installExtension(extension.path);
+    response.appendResponseLine('Extension reloaded.');
+  },
+});

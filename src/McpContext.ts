@@ -772,4 +772,8 @@ export class McpContext implements Context {
   listExtensions(): InstalledExtension[] {
     return this.#extensionRegistry.list();
   }
+
+  getExtension(id: string): InstalledExtension | undefined {
+    return this.#extensionRegistry.getById(id);
+  }
 }

@@ -144,6 +144,7 @@ export type Context = Readonly<{
   installExtension(path: string): Promise<string>;
   uninstallExtension(id: string): Promise<void>;
   listExtensions(): InstalledExtension[];
+  getExtension(id: string): InstalledExtension | undefined;
 }>;
 
 export function defineTool<Schema extends zod.ZodRawShape>(
