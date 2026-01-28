@@ -637,14 +637,14 @@ SOFTWARE.
 
 Name: puppeteer-core
 URL: https://github.com/puppeteer/puppeteer/tree/main/packages/puppeteer-core
-Version: 24.36.0
+Version: 24.36.1
 License: Apache-2.0
 
 -------------------- DEPENDENCY DIVIDER --------------------
 
 Name: @puppeteer/browsers
 URL: https://github.com/puppeteer/puppeteer/tree/main/packages/browsers
-Version: 2.11.1
+Version: 2.11.2
 License: Apache-2.0
 
 -------------------- DEPENDENCY DIVIDER --------------------

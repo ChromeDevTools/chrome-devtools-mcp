@@ -62,7 +62,7 @@
     "eslint-plugin-import": "^2.32.0",
     "globals": "^17.0.0",
     "prettier": "^3.6.2",
-    "puppeteer": "24.36.0",
+    "puppeteer": "24.36.1",
     "rollup": "4.57.0",
     "rollup-plugin-cleanup": "^3.2.1",
     "rollup-plugin-license": "^3.6.0",
