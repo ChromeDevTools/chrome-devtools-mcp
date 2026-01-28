@@ -13,19 +13,14 @@
 
 以下のタブを開いてください：
 
-- **Tab 101**: https://chatgpt.com
-- **Tab 102**: https://gemini.google.com
+- **ChatGPT**: https://chatgpt.com/
+- **Gemini**: https://gemini.google.com/app
 
-**タブIDの確認方法:**
-1. `chrome://inspect/#pages` を開く
-2. 各タブの「inspect」リンクのURLにタブIDが含まれる
-   - 例: `devtools://devtools/bundled/inspector.html?ws=127.0.0.1:9222/devtools/page/101`
+**重要**: タブIDの手動設定は不要です。拡張機能がURLパターンで自動的にタブを検索して接続します。
 
-**注意**: タブIDは動的に割り当てられるため、上記の101/102と異なる場合があります。実際のタブIDを `.mcp.json` に反映してください。
+### 3. MCPサーバー設定の確認
 
-### 3. MCPサーバー設定の更新
-
-`.mcp.json` を実際のタブIDで更新:
+`.mcp.json` は既にURLベースで設定されています：
 
 ```json
 {
@@ -34,19 +29,24 @@
       "command": "node",
       "args": [
         "/Users/usedhonda/projects/mcp/chrome-ai-bridge/scripts/cli.mjs",
-        "--attachTab=<実際のChatGPTタブID>"
+        "--attachTabUrl=https://chatgpt.com/"
       ]
     },
     "chrome-ai-bridge-gemini": {
       "command": "node",
       "args": [
         "/Users/usedhonda/projects/mcp/chrome-ai-bridge/scripts/cli.mjs",
-        "--attachTab=<実際のGeminiタブID>"
+        "--attachTabUrl=https://gemini.google.com/app"
       ]
     }
   }
 }
 ```
+
+**動作仕組み:**
+- MCPサーバー起動時に`--attachTabUrl`で指定されたURLパターン
+- 拡張機能が`chrome.tabs.query()`でマッチするタブを自動検索
+- 見つかったタブに自動接続（タブID不要）
 
 ### 4. VSCode Reload Window（重要）
 
@@ -164,16 +164,18 @@ Claude Code内で:
 1. Claude Codeのログで実際のURLとトークンを確認
 2. 接続UIに正しいURLを入力
 
-### 問題: タブIDが見つからない
+### 問題: タブが見つからない
 
 **原因:**
-- 指定したタブIDのタブが存在しない
-- タブIDが変わった（Chrome再起動後など）
+- 指定したURLのタブが開かれていない
+- URLパターンがマッチしない
 
 **解決方法:**
-1. `chrome://inspect/#pages` でタブIDを再確認
-2. `.mcp.json` を更新
-3. Claude Codeを再起動
+1. ブラウザで対象のタブが開いているか確認
+   - ChatGPT: https://chatgpt.com/
+   - Gemini: https://gemini.google.com/app
+2. URLが完全に一致していることを確認
+3. タブを開いた後、VSCodeを再起動（Cmd+R）
 
 ### 問題: MCPツールが動作しない
 
