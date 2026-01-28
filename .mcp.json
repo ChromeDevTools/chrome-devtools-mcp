@@ -1,0 +1,18 @@
+{
+  "mcpServers": {
+    "chrome-ai-bridge-chatgpt": {
+      "command": "node",
+      "args": [
+        "/Users/usedhonda/projects/mcp/chrome-ai-bridge/scripts/cli.mjs",
+        "--attachTab=101"
+      ]
+    },
+    "chrome-ai-bridge-gemini": {
+      "command": "node",
+      "args": [
+        "/Users/usedhonda/projects/mcp/chrome-ai-bridge/scripts/cli.mjs",
+        "--attachTab=102"
+      ]
+    }
+  }
+}
