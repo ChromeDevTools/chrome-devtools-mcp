@@ -767,7 +767,7 @@ interface McpLaunchOptions {
   channel?: Channel;
   userDataDir?: string;
   headless?: boolean;
-  isolated: boolean;
+  isolated?: boolean;
   loadExtension?: string;
   loadExtensionsDir?: string;
   loadSystemExtensions?: boolean;
@@ -790,7 +790,7 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
     executablePath,
     customDevTools,
     headless,
-    isolated,
+    isolated = false,
     loadExtension,
     loadExtensionsDir,
     loadSystemExtensions,
@@ -1262,7 +1262,7 @@ export async function resolveBrowser(options: {
   customDevTools?: string;
   channel?: Channel;
   headless?: boolean;
-  isolated: boolean;
+  isolated?: boolean;
   loadExtension?: string;
   loadExtensionsDir?: string;
   loadSystemExtensions?: boolean;

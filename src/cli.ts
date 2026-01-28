@@ -34,7 +34,8 @@ export const cliOptions = {
     type: 'boolean' as const,
     description:
       'If specified, creates a temporary user-data-dir that is automatically cleaned up after the browser is closed.',
-    default: false,
+    // NOTE: No default value to avoid conflicts with attachTabUrl
+    // When not specified, defaults to false in resolveBrowser()
   },
   customDevtools: {
     type: 'string' as const,
