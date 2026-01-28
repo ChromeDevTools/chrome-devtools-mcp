@@ -298,7 +298,7 @@ describe('pages', () => {
       });
     });
     it('navigates to correct page with initScript', async () => {
-      await withBrowser(async (response, context) => {
+      await withMcpContext(async (response, context) => {
         await navigatePage.handler(
           {
             params: {

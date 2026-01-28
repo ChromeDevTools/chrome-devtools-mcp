@@ -133,14 +133,11 @@ export const navigatePage = defineTool({
       .describe(
         'Whether to auto accept or beforeunload dialogs triggered by this navigation. Default is accept.',
       ),
-    initScript: zod.string().optional().describe(
-      `(optional) A JavaScript function to be executed by the tool on new document for every page load before any other scripts.
-      `),
     initScript: zod
       .string()
       .optional()
       .describe(
-        '(optional) A JavaScript function to be executed by the tool on new document for every page load before any other scripts.',
+        'A JavaScript script to be executed on each new document before any other scripts for the next navigation.',
       ),
     ...timeoutSchema,
   },
@@ -170,70 +167,17 @@ export const navigatePage = defineTool({
         }
         // We are not going to report the dialog like regular dialogs.
         context.clearDialog();
-    if (request.params.initScript) {
-      await page.evaluateOnNewDocument(request.params.initScript);
-    }
-
-    await context.waitForEventsAfterAction(async () => {
-      switch (request.params.type) {
-        case 'url':
-          if (!request.params.url) {
-            throw new Error('A URL is required for navigation of type=url.');
-          }
-          try {
-            await page.goto(request.params.url, options);
-            response.appendResponseLine(
-              `Successfully navigated to ${request.params.url}.`,
-            );
-          } catch (error) {
-            response.appendResponseLine(
-              `Unable to navigate in the  selected page: ${error.message}.`,
-            );
-          }
-          break;
-        case 'back':
-          try {
-            await page.goBack(options);
-            response.appendResponseLine(
-              `Successfully navigated back to ${page.url()}.`,
-            );
-          } catch (error) {
-            response.appendResponseLine(
-              `Unable to navigate back in the selected page: ${error.message}.`,
-            );
-          }
-          break;
-        case 'forward':
-          try {
-            await page.goForward(options);
-            response.appendResponseLine(
-              `Successfully navigated forward to ${page.url()}.`,
-            );
-          } catch (error) {
-            response.appendResponseLine(
-              `Unable to navigate forward in the selected page: ${error.message}.`,
-            );
-          }
-          break;
-        case 'reload':
-          try {
-            await page.reload({
-              ...options,
-              ignoreCache: request.params.ignoreCache,
-            });
-            response.appendResponseLine(`Successfully reloaded the page.`);
-          } catch (error) {
-            response.appendResponseLine(
-              `Unable to reload the selected page: ${error.message}.`,
-            );
-          }
-          break;
       }
-    });
+    };
 
+    let initScriptId: string | undefined;
     if (request.params.initScript) {
-      await page.evaluateOnNewDocument(request.params.initScript);
+      const {identifier} = await page.evaluateOnNewDocument(
+        request.params.initScript,
+      );
+      initScriptId = identifier;
     }
+
     page.on('dialog', dialogHandler);
 
     try {
@@ -295,6 +239,13 @@ export const navigatePage = defineTool({
       });
     } finally {
       page.off('dialog', dialogHandler);
+      if (initScriptId) {
+        await page
+          .removeScriptToEvaluateOnNewDocument(initScriptId)
+          .catch(error => {
+            logger(`Failed to remove init script`, error);
+          });
+      }
     }
 
     response.setIncludePages(true);
