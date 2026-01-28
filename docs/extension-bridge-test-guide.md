@@ -48,7 +48,19 @@
 }
 ```
 
-### 4. Claude Code起動
+### 4. VSCode Reload Window（重要）
+
+**`.mcp.json`を作成・更新したら、必ずVSCodeを再起動してください:**
+
+```
+macOS: Cmd+R（Reload Window）
+または
+Cmd+Shift+P → "Developer: Reload Window"
+```
+
+**理由**: プロジェクトローカルの`.mcp.json`は、Claude Code起動時に読み込まれます。設定ファイルを変更した後は、再起動しないと新しい設定が反映されません。
+
+### 5. Claude Code起動確認
 
 ```bash
 cd /Users/usedhonda/projects/mcp/chrome-ai-bridge
@@ -131,6 +143,15 @@ Claude Code内で:
 - ✅ 結果の統合が正しく行われる
 
 ## トラブルシューティング
+
+### 問題: MCPサーバーが表示されない
+
+**原因:**
+- `.mcp.json`を作成・更新した後、VSCodeを再起動していない
+
+**解決方法:**
+1. **Cmd+R（Reload Window）でVSCodeを再起動**
+2. Claude Codeのログで2つのMCPサーバーが起動していることを確認
 
 ### 問題: 拡張機能が接続できない
 
