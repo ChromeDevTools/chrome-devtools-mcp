@@ -185,7 +185,8 @@ async function getContext(): Promise<McpContext> {
     logFile,
     rootsInfo: cachedRootsInfo, // Pass roots info to browser
     focus: args.focus as boolean | undefined, // v1.0.18: Background mode control
-    attachTab: args.attachTab as number | undefined, // Extension Bridge mode
+    attachTab: args.attachTab as number | undefined, // Extension Bridge mode (by tab ID)
+    attachTabUrl: args.attachTabUrl as string | undefined, // Extension Bridge mode (by URL)
     extensionRelayPort: args.extensionRelayPort as number | undefined, // Extension Bridge relay port
   };
 

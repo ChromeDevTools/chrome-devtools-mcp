@@ -4,14 +4,14 @@
       "command": "node",
       "args": [
         "/Users/usedhonda/projects/mcp/chrome-ai-bridge/scripts/cli.mjs",
-        "--attachTab=101"
+        "--attachTabUrl=https://chatgpt.com/"
       ]
     },
     "chrome-ai-bridge-gemini": {
       "command": "node",
       "args": [
         "/Users/usedhonda/projects/mcp/chrome-ai-bridge/scripts/cli.mjs",
-        "--attachTab=102"
+        "--attachTabUrl=https://gemini.google.com/app"
       ]
     }
   }

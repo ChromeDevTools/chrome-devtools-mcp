@@ -30,6 +30,7 @@ class ConnectUI {
       this.mcpRelayUrl = params.get('mcpRelayUrl');
       this.token = params.get('token');
       const autoConnectTabId = params.get('tabId');
+      const autoConnectTabUrl = params.get('tabUrl');
 
       // Validate parameters
       if (!this.mcpRelayUrl) {
@@ -54,11 +55,48 @@ class ConnectUI {
         }
       }
 
+      // If tabUrl is provided, find matching tab and auto-connect
+      if (autoConnectTabUrl) {
+        const matchedTab = await this.findTabByUrl(autoConnectTabUrl);
+        if (matchedTab) {
+          this.selectedTabId = matchedTab.id;
+          this.showStatus(`Auto-connecting to: ${matchedTab.title}`, 'info');
+          await this.connect();
+          return;
+        } else {
+          this.showError(`No tab found matching URL: ${autoConnectTabUrl}`);
+          return;
+        }
+      }
+
       // Otherwise, show tab selection UI
       await this.loadTabs();
 
     } catch (error) {
       this.showError(`Initialization failed: ${error.message}`);
+    }
+  }
+
+  async findTabByUrl(urlPattern) {
+    try {
+      // Query tabs with URL pattern
+      // Convert user input like "https://chatgpt.com/" to a pattern like "*://chatgpt.com/*"
+      const urlObj = new URL(urlPattern);
+      const pattern = `*://${urlObj.hostname}${urlObj.pathname}*`;
+
+      const tabs = await chrome.tabs.query({ url: pattern });
+
+      if (tabs.length === 0) {
+        return null;
+      }
+
+      // If multiple tabs match, prefer the first active one, or just return the first
+      const activeTab = tabs.find(tab => tab.active);
+      return activeTab || tabs[0];
+
+    } catch (error) {
+      console.error('Failed to find tab by URL:', error);
+      return null;
     }
   }
 

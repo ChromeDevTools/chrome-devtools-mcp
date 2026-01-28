@@ -100,8 +100,14 @@ export const cliOptions = {
   attachTab: {
     type: 'number' as const,
     description:
-      'Attach to an existing Chrome tab via Extension Bridge. Requires chrome-ai-bridge extension to be installed and running. Mutually exclusive with browser launch options.',
-    conflicts: ['browserUrl', 'headless', 'executablePath', 'isolated', 'channel', 'loadExtension', 'loadExtensionsDir', 'loadSystemExtensions'],
+      'Attach to an existing Chrome tab via Extension Bridge using tab ID. Requires chrome-ai-bridge extension to be installed and running. Mutually exclusive with browser launch options.',
+    conflicts: ['browserUrl', 'headless', 'executablePath', 'isolated', 'channel', 'loadExtension', 'loadExtensionsDir', 'loadSystemExtensions', 'attachTabUrl'],
+  },
+  attachTabUrl: {
+    type: 'string' as const,
+    description:
+      'Attach to an existing Chrome tab via Extension Bridge using URL pattern (e.g., https://chatgpt.com/). The extension will automatically find and connect to a matching tab. Mutually exclusive with browser launch options and attachTab.',
+    conflicts: ['browserUrl', 'headless', 'executablePath', 'isolated', 'channel', 'loadExtension', 'loadExtensionsDir', 'loadSystemExtensions', 'attachTab'],
   },
   extensionRelayPort: {
     type: 'number' as const,

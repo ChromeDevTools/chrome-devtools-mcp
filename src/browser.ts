@@ -1270,16 +1270,28 @@ export async function resolveBrowser(options: {
   userDataDir?: string;
   logFile?: fs.WriteStream;
   rootsInfo?: RootsInfo;
-  attachTab?: number; // Extension Bridge mode
+  attachTab?: number; // Extension Bridge mode (by tab ID)
+  attachTabUrl?: string; // Extension Bridge mode (by URL)
   extensionRelayPort?: number; // Extension Bridge relay port
 }) {
-  // Extension Bridge mode - connect to existing tab
+  // Extension Bridge mode - connect to existing tab by ID
   if (options.attachTab !== undefined) {
     logger(
       `[Extension Bridge] Connecting to tab ${options.attachTab} via Extension`,
     );
     return await connectViaExtension({
       tabId: options.attachTab,
+      relayPort: options.extensionRelayPort,
+    });
+  }
+
+  // Extension Bridge mode - connect to existing tab by URL
+  if (options.attachTabUrl !== undefined) {
+    logger(
+      `[Extension Bridge] Connecting to tab with URL ${options.attachTabUrl} via Extension`,
+    );
+    return await connectViaExtension({
+      tabUrl: options.attachTabUrl,
       relayPort: options.extensionRelayPort,
     });
   }
@@ -1323,10 +1335,26 @@ export async function resolveBrowser(options: {
  * Connect to an existing Chrome tab via Extension Bridge
  */
 export async function connectViaExtension(options: {
-  tabId: number;
+  tabId?: number;
+  tabUrl?: string;
   relayPort?: number;
 }): Promise<Browser> {
-  logger('[Extension Bridge] Starting connection to tab', options.tabId);
+  // Validate: either tabId or tabUrl must be provided
+  if (options.tabId === undefined && options.tabUrl === undefined) {
+    throw new Error(
+      '[Extension Bridge] Either tabId or tabUrl must be provided',
+    );
+  }
+  if (options.tabId !== undefined && options.tabUrl !== undefined) {
+    throw new Error(
+      '[Extension Bridge] Cannot specify both tabId and tabUrl',
+    );
+  }
+
+  const target = options.tabId !== undefined
+    ? `tab ${options.tabId}`
+    : `tab with URL ${options.tabUrl}`;
+  logger(`[Extension Bridge] Starting connection to ${target}`);
 
   // Import Extension Bridge components
   const {RelayServer} = await import('./extension/relay-server.js');
@@ -1346,8 +1374,20 @@ export async function connectViaExtension(options: {
 
   logger(`[Extension Bridge] RelayServer started on port ${port}`);
   logger(`[Extension Bridge] Connection URL: ${wsUrl}`);
+
+  // Generate extension UI URL with appropriate parameters
+  const uiParams = new URLSearchParams({
+    mcpRelayUrl: wsUrl,
+  });
+  if (options.tabId !== undefined) {
+    uiParams.set('tabId', options.tabId.toString());
+  }
+  if (options.tabUrl !== undefined) {
+    uiParams.set('tabUrl', options.tabUrl);
+  }
+
   logger(
-    `[Extension Bridge] Open extension UI: chrome-extension://[EXTENSION_ID]/ui/connect.html?mcpRelayUrl=${encodeURIComponent(wsUrl)}&tabId=${options.tabId}`,
+    `[Extension Bridge] Open extension UI: chrome-extension://[EXTENSION_ID]/ui/connect.html?${uiParams.toString()}`,
   );
 
   // Wait for Extension to connect
