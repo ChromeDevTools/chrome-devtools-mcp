@@ -1014,6 +1014,10 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
   const useOpenConnect =
     os.platform() === 'darwin' && !focus && !effectiveHeadless;
 
+  console.error(
+    `🔍 Phase 4 check: platform=${os.platform()}, focus=${focus}, headless=${effectiveHeadless}, useOpenConnect=${useOpenConnect}`,
+  );
+
   if (useOpenConnect) {
     try {
       const port = await findFreePort(9222, 50);
