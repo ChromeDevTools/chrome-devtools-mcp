@@ -206,9 +206,7 @@ export const cliOptions = {
   },
   usageStatistics: {
     type: 'boolean',
-    // Marked as `false` until the feature is ready to be enabled by default.
-    default: false,
-    hidden: true,
+    default: true,
     describe:
       'Set to false to opt-out of usage statistics collection. Google collects usage data to improve the tool, handled under the Google Privacy Policy (https://policies.google.com/privacy). This is independent from Chrome browser metrics.',
   },
@@ -294,6 +292,10 @@ export function parseArguments(version: string, argv = process.argv) {
       [
         '$0 --auto-connect --channel=canary',
         'Connect to a canary Chrome instance (Chrome 144+) running instead of launching a new instance',
+      ],
+      [
+        '$0 --no-usage-statistics',
+        'Do not send usage statistics https://github.com/ChromeDevTools/chrome-devtools-mcp#usage-statistics.',
       ],
     ]);
 

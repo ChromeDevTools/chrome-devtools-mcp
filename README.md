@@ -27,6 +27,20 @@ allowing them to inspect, debug, and modify any data in the browser or DevTools.
 Avoid sharing sensitive or personal information that you don't want to share with
 MCP clients.
 
+## **Usage statistics**
+
+Google collects usage statistics (such as tool invocation success rates, latency, and environment information) to improve the reliability and performance of Chrome DevTools MCP.
+
+Data collection is **enabled by default**. You can opt-out by passing the `--no-usage-statistics` flag when starting the server:
+
+```json
+"args": ["-y", "chrome-devtools-mcp@latest", "--no-usage-statistics"]
+```
+
+Google handles this data in accordance with the [Google Privacy Policy](https://policies.google.com/privacy).
+
+Google's collection of usage statistics for Chrome DevTools MCP is independent from the Chrome browser's usage statistics. Opting out of Chrome metrics does not automatically opt you out of this tool, and vice-versa.
+
 ## Requirements
 
 - [Node.js](https://nodejs.org/) v20.19 or a newer [latest maintenance LTS](https://github.com/nodejs/Release#release-schedule) version.
@@ -447,6 +461,11 @@ The Chrome DevTools MCP server supports the following configuration option:
 
 - **`--categoryNetwork`/ `--category-network`**
   Set to false to exclude tools related to network.
+  - **Type:** boolean
+  - **Default:** `true`
+
+- **`--usageStatistics`/ `--usage-statistics`**
+  Set to false to opt-out of usage statistics collection. Google collects usage data to improve the tool, handled under the Google Privacy Policy (https://policies.google.com/privacy). This is independent from Chrome browser metrics.
   - **Type:** boolean
   - **Default:** `true`
 
