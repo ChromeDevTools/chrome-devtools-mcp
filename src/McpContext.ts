@@ -124,6 +124,7 @@ export class McpContext implements Context {
   #geolocationMap = new WeakMap<Page, GeolocationOptions>();
   #viewportMap = new WeakMap<Page, Viewport>();
   #userAgentMap = new WeakMap<Page, string>();
+  #colorSchemeMap = new WeakMap<Page, 'dark' | 'light'>();
   #dialog?: Dialog;
 
   #pageIdMap = new WeakMap<Page, number>();
@@ -351,6 +352,20 @@ export class McpContext implements Context {
   getUserAgent(): string | null {
     const page = this.getSelectedPage();
     return this.#userAgentMap.get(page) ?? null;
+  }
+
+  setColorScheme(scheme: 'dark' | 'light' | null): void {
+    const page = this.getSelectedPage();
+    if (scheme === null) {
+      this.#colorSchemeMap.delete(page);
+    } else {
+      this.#colorSchemeMap.set(page, scheme);
+    }
+  }
+
+  getColorScheme(): 'dark' | 'light' | null {
+    const page = this.getSelectedPage();
+    return this.#colorSchemeMap.get(page) ?? null;
   }
 
   setIsRunningPerformanceTrace(x: boolean): void {

@@ -122,6 +122,7 @@ export type Context = Readonly<{
   getViewport(): Viewport | null;
   setUserAgent(userAgent: string | null): void;
   getUserAgent(): string | null;
+  setColorScheme(scheme: 'dark' | 'light' | null): void;
   saveTemporaryFile(
     data: Uint8Array<ArrayBufferLike>,
     mimeType: 'image/png' | 'image/jpeg' | 'image/webp',

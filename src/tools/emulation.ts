@@ -63,6 +63,12 @@ export const emulate = defineTool({
       .describe(
         'User agent to emulate. Set to null to clear the user agent override.',
       ),
+    colorScheme: zod
+      .enum(['dark', 'light', 'auto'])
+      .optional()
+      .describe(
+        'Emulate the dark or the light mode. Set to "auto" to reset to the default.',
+      ),
     viewport: zod
       .object({
         width: zod.number().int().min(0).describe('Page width in pixels.'),
@@ -155,6 +161,23 @@ export const emulate = defineTool({
           userAgent,
         });
         context.setUserAgent(userAgent);
+      }
+    }
+
+    if (request.params.colorScheme) {
+      if (request.params.colorScheme === 'auto') {
+        await page.emulateMediaFeatures([
+          {name: 'prefers-color-scheme', value: ''},
+        ]);
+        context.setColorScheme(null);
+      } else {
+        await page.emulateMediaFeatures([
+          {
+            name: 'prefers-color-scheme',
+            value: request.params.colorScheme,
+          },
+        ]);
+        context.setColorScheme(request.params.colorScheme);
       }
     }
 

@@ -435,6 +435,7 @@ export class McpResponse implements Response {
       viewport?: object;
       userAgent?: string;
       cpuThrottlingRate?: number;
+      colorScheme?: string;
       dialog?: {
         type: string;
         message: string;
@@ -480,6 +481,13 @@ export class McpResponse implements Response {
       response.push(`## CPU emulation`);
       response.push(`Emulating: ${cpuThrottlingRate}x slowdown`);
       structuredContent.cpuThrottlingRate = cpuThrottlingRate;
+    }
+
+    const colorScheme = context.getColorScheme();
+    if (colorScheme) {
+      response.push(`## Color Scheme emulation`);
+      response.push(`Emulating: ${colorScheme}`);
+      structuredContent.colorScheme = colorScheme;
     }
 
     const dialog = context.getDialog();

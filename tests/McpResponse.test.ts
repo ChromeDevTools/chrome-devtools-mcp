@@ -383,6 +383,20 @@ describe('McpResponse', () => {
     });
   });
 
+  it('adds color scheme emulation setting when it is set', async t => {
+    await withMcpContext(async (response, context) => {
+      context.setColorScheme('dark');
+      const {content, structuredContent} = await response.handle(
+        'test',
+        context,
+      );
+      t.assert.snapshot?.(getTextContent(content[0]));
+      t.assert.snapshot?.(
+        JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
+      );
+    });
+  });
+
   it('adds a prompt dialog', async t => {
     await withMcpContext(async (response, context) => {
       const page = context.getSelectedPage();

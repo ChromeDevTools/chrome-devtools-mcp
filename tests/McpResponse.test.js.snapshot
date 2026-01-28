@@ -177,6 +177,18 @@ exports[`McpResponse > adds an alert dialog 2`] = `
 }
 `;
 
+exports[`McpResponse > adds color scheme emulation setting when it is set 1`] = `
+# test response
+## Color Scheme emulation
+Emulating: dark
+`;
+
+exports[`McpResponse > adds color scheme emulation setting when it is set 2`] = `
+{
+  "colorScheme": "dark"
+}
+`;
+
 exports[`McpResponse > adds console messages when the setting is true 1`] = `
 # test response
 ## Console messages
