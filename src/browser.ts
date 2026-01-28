@@ -766,7 +766,7 @@ interface McpLaunchOptions {
   customDevTools?: string;
   channel?: Channel;
   userDataDir?: string;
-  headless: boolean;
+  headless?: boolean;
   isolated: boolean;
   loadExtension?: string;
   loadExtensionsDir?: string;
@@ -978,7 +978,7 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
   // IMPORTANT: Chrome extensions (especially MV3 content scripts and service workers)
   // DO NOT work in headless mode. Always use headless:false when loading extensions.
   // Reference: https://groups.google.com/a/chromium.org/g/headless-dev/c/nEoeUkoNI0o/m/9KZ4Os46AQAJ
-  const effectiveHeadless = extensionPaths.length > 0 ? false : headless;
+  const effectiveHeadless = extensionPaths.length > 0 ? false : (headless ?? false);
 
   if (extensionPaths.length > 0 && headless) {
     console.warn(
@@ -1261,7 +1261,7 @@ export async function resolveBrowser(options: {
   executablePath?: string;
   customDevTools?: string;
   channel?: Channel;
-  headless: boolean;
+  headless?: boolean;
   isolated: boolean;
   loadExtension?: string;
   loadExtensionsDir?: string;

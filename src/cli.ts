@@ -21,7 +21,8 @@ export const cliOptions = {
   headless: {
     type: 'boolean' as const,
     description: 'Whether to run in headless (no UI) mode.',
-    default: false,
+    // NOTE: No default value to avoid conflicts with attachTabUrl
+    // When not specified, defaults to false in resolveBrowser()
   },
   executablePath: {
     type: 'string' as const,
