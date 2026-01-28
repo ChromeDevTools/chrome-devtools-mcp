@@ -6,9 +6,9 @@
 class ConnectUI {
   constructor() {
     this.selectedTabId = null;
-    this.ws = null;
     this.mcpRelayUrl = null;
-    this.token = null;
+    this.autoConnectTabUrl = null;
+    this.forceNewTab = false;
 
     // DOM elements
     this.statusEl = document.getElementById('status');
@@ -28,9 +28,9 @@ class ConnectUI {
       // Parse URL parameters
       const params = new URLSearchParams(window.location.search);
       this.mcpRelayUrl = params.get('mcpRelayUrl');
-      this.token = params.get('token');
       const autoConnectTabId = params.get('tabId');
-      const autoConnectTabUrl = params.get('tabUrl');
+      this.autoConnectTabUrl = params.get('tabUrl');
+      this.forceNewTab = params.get('newTab') === 'true';
 
       // Validate parameters
       if (!this.mcpRelayUrl) {
@@ -56,17 +56,10 @@ class ConnectUI {
       }
 
       // If tabUrl is provided, find matching tab and auto-connect
-      if (autoConnectTabUrl) {
-        const matchedTab = await this.findTabByUrl(autoConnectTabUrl);
-        if (matchedTab) {
-          this.selectedTabId = matchedTab.id;
-          this.showStatus(`Auto-connecting to: ${matchedTab.title}`, 'info');
-          await this.connect();
-          return;
-        } else {
-          this.showError(`No tab found matching URL: ${autoConnectTabUrl}`);
-          return;
-        }
+      if (this.autoConnectTabUrl) {
+        this.showStatus(`Auto-connecting to: ${this.autoConnectTabUrl}`, 'info');
+        await this.connect();
+        return;
       }
 
       // Otherwise, show tab selection UI
@@ -74,29 +67,6 @@ class ConnectUI {
 
     } catch (error) {
       this.showError(`Initialization failed: ${error.message}`);
-    }
-  }
-
-  async findTabByUrl(urlPattern) {
-    try {
-      // Query tabs with URL pattern
-      // Convert user input like "https://chatgpt.com/" to a pattern like "*://chatgpt.com/*"
-      const urlObj = new URL(urlPattern);
-      const pattern = `*://${urlObj.hostname}${urlObj.pathname}*`;
-
-      const tabs = await chrome.tabs.query({ url: pattern });
-
-      if (tabs.length === 0) {
-        return null;
-      }
-
-      // If multiple tabs match, prefer the first active one, or just return the first
-      const activeTab = tabs.find(tab => tab.active);
-      return activeTab || tabs[0];
-
-    } catch (error) {
-      console.error('Failed to find tab by URL:', error);
-      return null;
     }
   }
 
@@ -161,7 +131,7 @@ class ConnectUI {
   }
 
   async connect() {
-    if (!this.selectedTabId) {
+    if (!this.selectedTabId && !this.autoConnectTabUrl) {
       this.showError('No tab selected');
       return;
     }
@@ -169,54 +139,31 @@ class ConnectUI {
     try {
       this.showStatus('Connecting to MCP server...', 'info');
 
-      // Create WebSocket connection
-      let wsUrl = this.mcpRelayUrl;
-      if (this.token) {
-        wsUrl += `?token=${encodeURIComponent(this.token)}`;
+      const response = await chrome.runtime.sendMessage({
+        type: 'connectToRelay',
+        mcpRelayUrl: this.mcpRelayUrl,
+        tabId: this.selectedTabId,
+        tabUrl: this.autoConnectTabUrl,
+        newTab: this.forceNewTab
+      });
+
+      if (!response || !response.success) {
+        throw new Error((response && response.error) || 'Connection failed');
       }
 
-      this.ws = new WebSocket(wsUrl);
-
-      this.ws.addEventListener('open', () => {
-        console.log('[ConnectUI] WebSocket connected');
-
-        // Send connection request
-        this.ws.send(JSON.stringify({
-          type: 'connect',
-          tabId: this.selectedTabId
-        }));
-      });
-
-      this.ws.addEventListener('message', (event) => {
-        this.handleMessage(event.data);
-      });
-
-      this.ws.addEventListener('close', (event) => {
-        console.log('[ConnectUI] WebSocket closed:', event.code, event.reason);
-        this.showError(`Connection closed: ${event.reason || 'Unknown reason'}`);
-        this.reset();
-      });
-
-      this.ws.addEventListener('error', (error) => {
-        console.error('[ConnectUI] WebSocket error:', error);
-        this.showError('WebSocket connection error');
-      });
-
-      // Request background service worker to handle the connection
-      const tab = await chrome.tabs.get(this.selectedTabId);
-
-      // Send to background via chrome.runtime
-      chrome.runtime.sendMessage({
-        type: 'attachTab',
-        tabId: this.selectedTabId,
-        ws: this.ws
-      });
+      const connectedTabId = response.tabId || this.selectedTabId;
+      if (connectedTabId) {
+        this.selectedTabId = connectedTabId;
+      }
+      const tab = connectedTabId
+        ? await chrome.tabs.get(connectedTabId).catch(() => null)
+        : null;
 
       // Show connected view
       this.tabSelectionEl.classList.add('hidden');
       this.connectedViewEl.classList.remove('hidden');
-      this.connectedTabTitleEl.textContent = tab.title || 'Untitled';
-      this.connectedTabIdEl.textContent = this.selectedTabId;
+      this.connectedTabTitleEl.textContent = tab?.title || 'Untitled';
+      this.connectedTabIdEl.textContent = connectedTabId || 'Unknown';
       this.showStatus('Connected', 'success');
 
       // Set up disconnect button
@@ -229,23 +176,12 @@ class ConnectUI {
     }
   }
 
-  handleMessage(data) {
-    try {
-      const message = JSON.parse(data);
-
-      if (message.type === 'ready') {
-        console.log('[ConnectUI] Connection ready for tab', message.tabId);
-      }
-
-    } catch (error) {
-      console.error('[ConnectUI] Failed to parse message:', error);
-    }
-  }
-
   disconnect() {
-    if (this.ws) {
-      this.ws.close();
-      this.ws = null;
+    if (this.selectedTabId) {
+      chrome.runtime.sendMessage({
+        type: 'disconnectTab',
+        tabId: this.selectedTabId
+      });
     }
     this.reset();
   }

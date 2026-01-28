@@ -187,6 +187,7 @@ async function getContext(): Promise<McpContext> {
     focus: args.focus as boolean | undefined, // v1.0.18: Background mode control
     attachTab: args.attachTab as number | undefined, // Extension Bridge mode (by tab ID)
     attachTabUrl: args.attachTabUrl as string | undefined, // Extension Bridge mode (by URL)
+    attachTabNew: args.attachTabNew as boolean | undefined, // Extension Bridge mode (force new tab)
     extensionRelayPort: args.extensionRelayPort as number | undefined, // Extension Bridge relay port
   };
 

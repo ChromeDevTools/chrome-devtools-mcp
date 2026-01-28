@@ -82,11 +82,33 @@ npm run build
 1. 拡張機能のアイコンをクリック、または直接URLを開く:
 
 ```
-chrome-extension://[EXTENSION_ID]/ui/connect.html?mcpRelayUrl=ws://127.0.0.1:12345&token=xxx&tabId=101
+chrome-extension://[EXTENSION_ID]/ui/connect.html?mcpRelayUrl=ws://127.0.0.1:12345&tabId=101
 ```
 
 2. タブ選択UIで接続したいタブを選択
 3. 「Connect to Selected Tab」をクリック
+
+### URL指定で自動接続（推奨）
+
+`--attachTabUrl` を使うと、拡張機能が URL に一致するタブを自動接続します。
+一致タブがない場合に新規タブを開きたい場合は `--attachTabNew` を追加します。
+
+例:
+
+```json
+{
+  "mcpServers": {
+    "chrome-ai-bridge-chatgpt": {
+      "command": "node",
+      "args": [
+        "/path/to/chrome-ai-bridge/scripts/cli.mjs",
+        "--attachTabUrl=https://chatgpt.com/",
+        "--attachTabNew"
+      ]
+    }
+  }
+}
+```
 
 ### 接続確認
 

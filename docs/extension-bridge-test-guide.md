@@ -29,14 +29,16 @@
       "command": "node",
       "args": [
         "/Users/usedhonda/projects/mcp/chrome-ai-bridge/scripts/cli.mjs",
-        "--attachTabUrl=https://chatgpt.com/"
+        "--attachTabUrl=https://chatgpt.com/",
+        "--attachTabNew"
       ]
     },
     "chrome-ai-bridge-gemini": {
       "command": "node",
       "args": [
         "/Users/usedhonda/projects/mcp/chrome-ai-bridge/scripts/cli.mjs",
-        "--attachTabUrl=https://gemini.google.com/app"
+        "--attachTabUrl=https://gemini.google.com/app",
+        "--attachTabNew"
       ]
     }
   }
@@ -44,8 +46,9 @@
 ```
 
 **動作仕組み:**
-- MCPサーバー起動時に`--attachTabUrl`で指定されたURLパターン
+- MCPサーバー起動時に`--attachTabUrl`で指定されたURLパターンを渡す
 - 拡張機能が`chrome.tabs.query()`でマッチするタブを自動検索
+- 見つからない場合は新規タブを開く（`--attachTabNew`）
 - 見つかったタブに自動接続（タブID不要）
 
 ### 4. VSCode Reload Window（重要）
@@ -82,9 +85,8 @@ claude
 **手順:**
 
 1. 拡張機能のアイコンをクリック
-2. 表示されるURLをコピー（`ws://127.0.0.1:12345?token=xxxxx`）
-3. ChatGPTのタブを選択
-4. 接続UIでタブを選択し「Connect to Selected Tab」をクリック
+2. 接続UIが開いたら自動接続を待つ（`--attachTabUrl`指定時は自動でタブ検索/作成）
+3. 必要に応じて手動でタブを選択し「Connect」をクリック
 
 **検証項目:**
 - ✅ WebSocket接続が成功する
@@ -175,7 +177,8 @@ Claude Code内で:
    - ChatGPT: https://chatgpt.com/
    - Gemini: https://gemini.google.com/app
 2. URLが完全に一致していることを確認
-3. タブを開いた後、VSCodeを再起動（Cmd+R）
+3. `--attachTabNew` を指定して新規タブを開かせる
+4. タブを開いた後、VSCodeを再起動（Cmd+R）
 
 ### 問題: MCPツールが動作しない
 

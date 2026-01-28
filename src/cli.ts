@@ -109,6 +109,12 @@ export const cliOptions = {
       'Attach to an existing Chrome tab via Extension Bridge using URL pattern (e.g., https://chatgpt.com/). The extension will automatically find and connect to a matching tab. Mutually exclusive with browser launch options and attachTab.',
     conflicts: ['browserUrl', 'headless', 'executablePath', 'isolated', 'channel', 'loadExtension', 'loadExtensionsDir', 'loadSystemExtensions', 'attachTab'],
   },
+  attachTabNew: {
+    type: 'boolean' as const,
+    description:
+      'Always open a new tab when using --attachTabUrl. Useful for running multiple projects in separate tabs.',
+    default: false,
+  },
   extensionRelayPort: {
     type: 'number' as const,
     description:
@@ -123,7 +129,13 @@ export function parseArguments(version: string, argv = process.argv) {
     .options(cliOptions)
     .check(args => {
       // Auto-configuration for zero-config setup
-      if (!args.channel && !args.browserUrl && !args.executablePath) {
+      if (
+        !args.channel &&
+        !args.browserUrl &&
+        !args.executablePath &&
+        !args.attachTab &&
+        !args.attachTabUrl
+      ) {
         args.channel = 'stable';
       }
 

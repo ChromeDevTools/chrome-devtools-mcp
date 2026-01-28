@@ -208,6 +208,16 @@ class TabShareExtension {
     }
   }
 
+  async disconnectTab(tabId) {
+    for (const [ws, connection] of this._connections.entries()) {
+      if (connection.tabId === tabId) {
+        ws.close(1000, 'User disconnected');
+        return true;
+      }
+    }
+    return false;
+  }
+
   async cleanup() {
     console.log('[TabShareExtension] Cleaning up all connections...');
 
@@ -227,6 +237,79 @@ class TabShareExtension {
 // Global instance
 const tabShareExtension = new TabShareExtension();
 
+async function findTabByUrl(urlPattern) {
+  try {
+    const urlObj = new URL(urlPattern);
+    const pattern = `*://${urlObj.hostname}${urlObj.pathname}*`;
+    const tabs = await chrome.tabs.query({ url: pattern });
+    if (!tabs.length) return null;
+    const activeTab = tabs.find(tab => tab.active);
+    return activeTab || tabs[0];
+  } catch (error) {
+    console.error('[chrome-ai-bridge] Failed to match tab by URL:', error);
+    return null;
+  }
+}
+
+async function resolveTabId({ tabId, tabUrl, newTab }) {
+  if (typeof tabId === 'number') {
+    return tabId;
+  }
+
+  if (!tabUrl) {
+    return null;
+  }
+
+  if (!newTab) {
+    const matched = await findTabByUrl(tabUrl);
+    if (matched && typeof matched.id === 'number') {
+      return matched.id;
+    }
+  }
+
+  const created = await chrome.tabs.create({ url: tabUrl, active: true });
+  return created.id ?? null;
+}
+
+async function connectToRelay({ mcpRelayUrl, tabId, tabUrl, newTab }) {
+  if (!mcpRelayUrl) {
+    throw new Error('Missing mcpRelayUrl');
+  }
+
+  const relayUrl = new URL(mcpRelayUrl);
+  if (!['127.0.0.1', 'localhost', '::1'].includes(relayUrl.hostname)) {
+    throw new Error('Invalid relay URL: must be loopback address');
+  }
+
+  const resolvedTabId = await resolveTabId({ tabId, tabUrl, newTab });
+  if (!resolvedTabId) {
+    throw new Error('Target tab not found');
+  }
+
+  return await new Promise((resolve, reject) => {
+    const ws = new WebSocket(mcpRelayUrl);
+
+    ws.addEventListener('open', async () => {
+      try {
+        await tabShareExtension.handleConnection(ws, resolvedTabId);
+        resolve({ tabId: resolvedTabId });
+      } catch (error) {
+        reject(error);
+      }
+    });
+
+    ws.addEventListener('error', () => {
+      reject(new Error('WebSocket connection error'));
+    });
+
+    ws.addEventListener('close', (event) => {
+      if (event && event.code !== 1000) {
+        console.warn('[chrome-ai-bridge] Relay connection closed:', event.reason);
+      }
+    });
+  });
+}
+
 // Service worker lifecycle
 chrome.runtime.onInstalled.addListener(() => {
   console.log('[chrome-ai-bridge] Extension installed');
@@ -235,6 +318,33 @@ chrome.runtime.onInstalled.addListener(() => {
 chrome.runtime.onSuspend.addListener(async () => {
   console.log('[chrome-ai-bridge] Extension suspending, cleaning up...');
   await tabShareExtension.cleanup();
+});
+
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (!message || !message.type) return false;
+
+  if (message.type === 'connectToRelay') {
+    connectToRelay({
+      mcpRelayUrl: message.mcpRelayUrl,
+      tabId: message.tabId,
+      tabUrl: message.tabUrl,
+      newTab: message.newTab,
+    })
+      .then(result => sendResponse({ success: true, tabId: result.tabId }))
+      .catch(error =>
+        sendResponse({ success: false, error: error.message || String(error) }),
+      );
+    return true;
+  }
+
+  if (message.type === 'disconnectTab') {
+    tabShareExtension.disconnectTab(message.tabId).then(success => {
+      sendResponse({ success });
+    });
+    return true;
+  }
+
+  return false;
 });
 
 // Export for connect.html

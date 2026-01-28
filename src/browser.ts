@@ -1272,6 +1272,7 @@ export async function resolveBrowser(options: {
   rootsInfo?: RootsInfo;
   attachTab?: number; // Extension Bridge mode (by tab ID)
   attachTabUrl?: string; // Extension Bridge mode (by URL)
+  attachTabNew?: boolean; // Extension Bridge mode (force new tab)
   extensionRelayPort?: number; // Extension Bridge relay port
 }) {
   // Extension Bridge mode - connect to existing tab by ID
@@ -1281,6 +1282,7 @@ export async function resolveBrowser(options: {
     );
     return await connectViaExtension({
       tabId: options.attachTab,
+      newTab: options.attachTabNew,
       relayPort: options.extensionRelayPort,
     });
   }
@@ -1292,6 +1294,7 @@ export async function resolveBrowser(options: {
     );
     return await connectViaExtension({
       tabUrl: options.attachTabUrl,
+      newTab: options.attachTabNew,
       relayPort: options.extensionRelayPort,
     });
   }
@@ -1337,6 +1340,7 @@ export async function resolveBrowser(options: {
 export async function connectViaExtension(options: {
   tabId?: number;
   tabUrl?: string;
+  newTab?: boolean;
   relayPort?: number;
 }): Promise<Browser> {
   // Validate: either tabId or tabUrl must be provided
@@ -1384,6 +1388,9 @@ export async function connectViaExtension(options: {
   }
   if (options.tabUrl !== undefined) {
     uiParams.set('tabUrl', options.tabUrl);
+  }
+  if (options.newTab) {
+    uiParams.set('newTab', 'true');
   }
 
   logger(
