@@ -200,6 +200,48 @@ export const hostConfig = {};
       console.warn(`⚠️  ${selector} not found, skipping copy`);
     }
   }
+
+  // Copy Extension files
+  const extensionSourceDir = path.join(process.cwd(), 'src', 'extension');
+  const extensionDestDir = path.join(BUILD_DIR, 'extension');
+
+  if (fs.existsSync(extensionSourceDir)) {
+    // Create extension directory in build
+    fs.mkdirSync(extensionDestDir, {recursive: true});
+
+    // Copy manifest.json
+    const manifestSource = path.join(extensionSourceDir, 'manifest.json');
+    const manifestDest = path.join(extensionDestDir, 'manifest.json');
+    if (fs.existsSync(manifestSource)) {
+      fs.copyFileSync(manifestSource, manifestDest);
+      console.log('✅ Copied extension manifest.json to build directory');
+    }
+
+    // Copy background.mjs
+    const backgroundSource = path.join(extensionSourceDir, 'background.mjs');
+    const backgroundDest = path.join(extensionDestDir, 'background.mjs');
+    if (fs.existsSync(backgroundSource)) {
+      fs.copyFileSync(backgroundSource, backgroundDest);
+      console.log('✅ Copied extension background.mjs to build directory');
+    }
+
+    // Copy ui directory
+    const uiSourceDir = path.join(extensionSourceDir, 'ui');
+    const uiDestDir = path.join(extensionDestDir, 'ui');
+    if (fs.existsSync(uiSourceDir)) {
+      fs.mkdirSync(uiDestDir, {recursive: true});
+
+      const uiFiles = ['connect.html', 'connect.js'];
+      for (const file of uiFiles) {
+        const source = path.join(uiSourceDir, file);
+        const dest = path.join(uiDestDir, file);
+        if (fs.existsSync(source)) {
+          fs.copyFileSync(source, dest);
+          console.log(`✅ Copied extension ui/${file} to build directory`);
+        }
+      }
+    }
+  }
 }
 
 main();

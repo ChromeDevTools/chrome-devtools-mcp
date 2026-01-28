@@ -21,6 +21,7 @@ import type {
 } from 'puppeteer-core';
 import puppeteer from 'puppeteer-core';
 
+import {logger} from './logger.js';
 import {resolveUserDataDir} from './profile-resolver.js';
 import {
   isProjectRootInitialized,
@@ -1269,7 +1270,20 @@ export async function resolveBrowser(options: {
   userDataDir?: string;
   logFile?: fs.WriteStream;
   rootsInfo?: RootsInfo;
+  attachTab?: number; // Extension Bridge mode
+  extensionRelayPort?: number; // Extension Bridge relay port
 }) {
+  // Extension Bridge mode - connect to existing tab
+  if (options.attachTab !== undefined) {
+    logger(
+      `[Extension Bridge] Connecting to tab ${options.attachTab} via Extension`,
+    );
+    return await connectViaExtension({
+      tabId: options.attachTab,
+      relayPort: options.extensionRelayPort,
+    });
+  }
+
   // CRITICAL: Project root must be initialized before launching Chrome
   // This ensures proper profile isolation for multi-project environments
   if (
@@ -1303,6 +1317,73 @@ export async function resolveBrowser(options: {
     : await ensureBrowserLaunched(options);
 
   return resolvedBrowser;
+}
+
+/**
+ * Connect to an existing Chrome tab via Extension Bridge
+ */
+export async function connectViaExtension(options: {
+  tabId: number;
+  relayPort?: number;
+}): Promise<Browser> {
+  logger('[Extension Bridge] Starting connection to tab', options.tabId);
+
+  // Import Extension Bridge components
+  const {RelayServer} = await import('./extension/relay-server.js');
+  const {ExtensionTransport} = await import(
+    './extension/extension-transport.js'
+  );
+  const puppeteer = await import('puppeteer-core');
+
+  // Start RelayServer
+  const relay = new RelayServer({
+    port: options.relayPort || 0,
+  });
+
+  const port = await relay.start();
+  const token = relay.getToken();
+  const wsUrl = relay.getConnectionURL();
+
+  logger(`[Extension Bridge] RelayServer started on port ${port}`);
+  logger(`[Extension Bridge] Connection URL: ${wsUrl}`);
+  logger(
+    `[Extension Bridge] Open extension UI: chrome-extension://[EXTENSION_ID]/ui/connect.html?mcpRelayUrl=${encodeURIComponent(wsUrl)}&tabId=${options.tabId}`,
+  );
+
+  // Wait for Extension to connect
+  logger('[Extension Bridge] Waiting for Extension connection...');
+
+  await new Promise<void>((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      reject(
+        new Error('Extension connection timeout (30s) - please install and activate chrome-ai-bridge extension'),
+      );
+    }, 30000);
+
+    relay.once('ready', (tabId: number) => {
+      clearTimeout(timeout);
+      logger(`[Extension Bridge] Extension connected to tab ${tabId}`);
+      resolve();
+    });
+
+    relay.once('disconnected', () => {
+      clearTimeout(timeout);
+      reject(new Error('Extension disconnected before ready'));
+    });
+  });
+
+  // Create Puppeteer transport
+  const transport = new ExtensionTransport(relay);
+
+  // Connect Puppeteer to Extension
+  const browser = await puppeteer.connect({
+    transport,
+    defaultViewport: null,
+  });
+
+  logger('[Extension Bridge] Puppeteer connected to Extension');
+
+  return browser;
 }
 
 export {

@@ -61,6 +61,7 @@
     "debug": "4.4.3",
     "jimp": "^1.6.0",
     "puppeteer": "^24.31.0",
+    "ws": "^8.19.0",
     "yargs": "18.0.0"
   },
   "devDependencies": {
@@ -71,6 +72,7 @@
     "@types/filesystem": "^0.0.36",
     "@types/node": "^24.3.3",
     "@types/sinon": "^17.0.4",
+    "@types/ws": "^8.18.1",
     "@types/yargs": "^17.0.33",
     "@typescript-eslint/eslint-plugin": "^8.43.0",
     "@typescript-eslint/parser": "^8.43.0",

@@ -97,6 +97,18 @@ export const cliOptions = {
       'Bring Chrome window to foreground on launch. By default, Chrome launches in the background to avoid interrupting your work.',
     default: false,
   },
+  attachTab: {
+    type: 'number' as const,
+    description:
+      'Attach to an existing Chrome tab via Extension Bridge. Requires chrome-ai-bridge extension to be installed and running. Mutually exclusive with browser launch options.',
+    conflicts: ['browserUrl', 'headless', 'executablePath', 'isolated', 'channel', 'loadExtension', 'loadExtensionsDir', 'loadSystemExtensions'],
+  },
+  extensionRelayPort: {
+    type: 'number' as const,
+    description:
+      'Port for Extension Bridge WebSocket relay server. Default: 0 (auto-assign).',
+    default: 0,
+  },
 };
 
 export function parseArguments(version: string, argv = process.argv) {

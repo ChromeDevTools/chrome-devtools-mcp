@@ -1,0 +1,15 @@
+{
+  "manifest_version": 3,
+  "name": "chrome-ai-bridge Extension",
+  "version": "1.0.0",
+  "description": "Bridge between Chrome tabs and chrome-ai-bridge MCP server",
+  "permissions": ["debugger", "activeTab", "tabs", "storage"],
+  "host_permissions": ["<all_urls>"],
+  "background": {
+    "service_worker": "background.mjs",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "chrome-ai-bridge"
+  }
+}
