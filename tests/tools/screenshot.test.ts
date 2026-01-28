@@ -260,5 +260,141 @@ describe('screenshot', () => {
         );
       });
     });
+
+    describe('scrollable container', () => {
+      it('detects and captures full content of scrollable container', async () => {
+        await withMcpContext(async (response, context) => {
+          const fixture = screenshots.scrollableContainer;
+          const page = context.getSelectedPage();
+          await page.setContent(fixture.html);
+
+          await screenshot.handler(
+            {params: {format: 'png', fullPage: true}},
+            response,
+            context,
+          );
+
+          assert.equal(response.images.length, 1);
+          assert.equal(response.images[0].mimeType, 'image/png');
+          assert.equal(
+            response.responseLines.at(0),
+            'Took a full-page screenshot of the main scrollable container.',
+          );
+        });
+      });
+    });
+
+    describe('local iframe', () => {
+      it('auto-detects iframe from uid with fullPage', async () => {
+        await withMcpContext(async (response, context) => {
+          const fixture = screenshots.localIframe;
+          const page = context.getSelectedPage();
+          await page.setContent(fixture.html);
+
+          // Wait for iframe to load
+          await page.waitForSelector('iframe');
+          await new Promise(resolve => setTimeout(resolve, 100));
+
+          await context.createTextSnapshot();
+          // Get the iframe uid from the snapshot
+          const iframeUid = await page.evaluate(() => {
+            const iframe = document.querySelector('iframe');
+            return iframe?.getAttribute('data-elements-snapshot-uid') || '1_1';
+          });
+
+          await screenshot.handler(
+            {
+              params: {
+                format: 'png',
+                fullPage: true,
+                uid: iframeUid,
+              },
+            },
+            response,
+            context,
+          );
+
+          assert.equal(response.images.length, 1);
+          assert.equal(response.images[0].mimeType, 'image/png');
+          assert.ok(
+            response.responseLines.at(0)?.includes('full-page screenshot of iframe'),
+          );
+        });
+      });
+
+      it('captures full iframe content when auto-detected', async () => {
+        await withMcpContext(async (response, context) => {
+          const fixture = screenshots.localIframe;
+          const page = context.getSelectedPage();
+          await page.setContent(fixture.html);
+
+          // Wait for iframe to load
+          await page.waitForSelector('iframe');
+          await new Promise(resolve => setTimeout(resolve, 100));
+
+          await screenshot.handler(
+            {params: {format: 'png', fullPage: true}},
+            response,
+            context,
+          );
+
+          assert.equal(response.images.length, 1);
+          assert.equal(response.images[0].mimeType, 'image/png');
+          assert.equal(
+            response.responseLines.at(0),
+            'Took a full-page screenshot of the main content iframe.',
+          );
+        });
+      });
+
+      it('rejects uid + fullPage for non-iframe elements', async () => {
+        await withMcpContext(async (response, context) => {
+          const fixture = screenshots.button;
+          const page = context.getSelectedPage();
+          await page.setContent(fixture.html);
+          await context.createTextSnapshot();
+
+          await assert.rejects(
+            screenshot.handler(
+              {
+                params: {
+                  format: 'png',
+                  fullPage: true,
+                  uid: '1_1', // Points to button, not iframe
+                },
+              },
+              response,
+              context,
+            ),
+            /only allowed when uid points to an iframe element/,
+          );
+        });
+      });
+    });
+
+    describe('cross-origin iframe', () => {
+      it('falls back to regular screenshot when iframe is not accessible', async () => {
+        await withMcpContext(async (response, context) => {
+          const fixture = screenshots.crossOriginIframe;
+          const page = context.getSelectedPage();
+          await page.setContent(fixture.html);
+
+          // Cross-origin iframes cannot be accessed, so fullPage should fall back
+          await screenshot.handler(
+            {params: {format: 'png', fullPage: true}},
+            response,
+            context,
+          );
+
+          assert.equal(response.images.length, 1);
+          assert.equal(response.images[0].mimeType, 'image/png');
+          // Should fall back to regular full page screenshot
+          assert.equal(
+            response.responseLines.at(0),
+            'Took a screenshot of the full current page.',
+          );
+        });
+      });
+    });
   });
 });
