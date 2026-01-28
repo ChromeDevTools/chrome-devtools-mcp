@@ -52,6 +52,16 @@ export interface ImageContentData {
 export interface SnapshotParams {
   verbose?: boolean;
   filePath?: string;
+  /**
+   * Maximum length of the snapshot string.
+   * If exceeded, output will be truncated with a notice.
+   */
+  maxLength?: number;
+  /**
+   * CSS selector to limit snapshot scope.
+   * Only the subtree rooted at the matching element will be included.
+   */
+  selector?: string;
 }
 
 export interface DevToolsData {
