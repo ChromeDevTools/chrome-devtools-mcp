@@ -43,7 +43,7 @@ const allowedLicenses = [
 
 const thirdPartyDir = './build/src/third_party';
 
-const { devDependencies = {} } = JSON.parse(
+const {devDependencies = {}} = JSON.parse(
   fs.readFileSync(path.join(process.cwd(), 'package.json'), 'utf-8'),
 );
 
@@ -56,7 +56,8 @@ const aggregatedStats = {
   bundledPackages: new Set(),
 };
 
-const projectNodeModulesPath = path.join(process.cwd(), 'node_modules') + path.sep;
+const projectNodeModulesPath =
+  path.join(process.cwd(), 'node_modules') + path.sep;
 
 function getPackageName(modulePath) {
   // Handle rollup's virtual module paths (paths starting with 0x00)
@@ -65,7 +66,9 @@ function getPackageName(modulePath) {
     return null;
   }
 
-  const relativePath = modulePath.slice(projectNodeModulesPath.length + absolutePathStart);
+  const relativePath = modulePath.slice(
+    projectNodeModulesPath.length + absolutePathStart,
+  );
   const segments = relativePath.split(path.sep);
 
   // handle scoped packages
@@ -101,16 +104,16 @@ function listBundledDeps() {
         const outputPath = path.join(thirdPartyDir, 'bundled-packages.json');
 
         const bundledDevDeps = Object.fromEntries(
-          Object.entries(devDependencies)
-            .filter(([name]) => aggregatedStats.bundledPackages.has(name) || name === 'chrome-devtools-frontend')
+          Object.entries(devDependencies).filter(
+            ([name]) =>
+              aggregatedStats.bundledPackages.has(name) ||
+              name === 'chrome-devtools-frontend',
+          ),
         );
 
-        fs.writeFileSync(
-          outputPath,
-          JSON.stringify(bundledDevDeps, null, 2)
-        );
+        fs.writeFileSync(outputPath, JSON.stringify(bundledDevDeps, null, 2));
       }
-    }
+    },
   };
 }
 
@@ -151,10 +154,7 @@ const bundleDependency = (
           failOnViolation: true,
         },
         output: {
-          file: path.join(
-            thirdPartyDir,
-            'THIRD_PARTY_NOTICES',
-          ),
+          file: path.join(thirdPartyDir, 'THIRD_PARTY_NOTICES'),
           template(dependencies) {
             for (const dependency of dependencies) {
               const key = `${dependency.name}:${dependency.version}`;
