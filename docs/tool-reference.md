@@ -21,7 +21,8 @@
 - **[Emulation](#emulation)** (2 tools)
   - [`emulate`](#emulate)
   - [`resize_page`](#resize_page)
-- **[Performance](#performance)** (3 tools)
+- **[Performance](#performance)** (4 tools)
+  - [`lighthouse_audit`](#lighthouse_audit)
   - [`performance_analyze_insight`](#performance_analyze_insight)
   - [`performance_start_trace`](#performance_start_trace)
   - [`performance_stop_trace`](#performance_stop_trace)
@@ -224,6 +225,14 @@
 ---
 
 ## Performance
+
+### `lighthouse_audit`
+
+**Description:** Runs a Lighthouse accessibility audit on the currently selected page. This tool analyzes the page for accessibility issues and provides a detailed report with scores and recommendations.
+
+**Parameters:** None
+
+---
 
 ### `performance_analyze_insight`
 
