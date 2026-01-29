@@ -13,7 +13,7 @@ import {defineTool} from './ToolDefinition.js';
 export const askChatGptGeminiWeb = defineTool({
   name: 'ask_chatgpt_gemini_web',
   description:
-    'Ask ChatGPT and Gemini in parallel via browser (fast CDP path).',
+    '[RECOMMENDED] Ask ChatGPT and Gemini in parallel via browser (fast CDP path). Use this by default unless user explicitly specifies single AI.',
   annotations: {
     category: ToolCategories.NAVIGATION_AUTOMATION,
     readOnlyHint: false,

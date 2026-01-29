@@ -1430,12 +1430,18 @@ export async function connectViaExtension(options: {
   const port = await relay.start();
   const token = relay.getToken();
   const wsUrl = relay.getConnectionURL();
-  await relay.startDiscoveryServer(wsUrl, {
+
+  // Start discovery server for extension to find relay URL
+  const discoveryPort = await relay.startDiscoveryServer({
     tabUrl: options.tabUrl,
     newTab: options.newTab,
   });
 
   logger(`[Extension Bridge] RelayServer started on port ${port}`);
+  if (discoveryPort) {
+    logger(`[Extension Bridge] Discovery server on port ${discoveryPort}`);
+    console.error(`[Extension Bridge] Discovery available at http://127.0.0.1:${discoveryPort}/relay-info`);
+  }
   logger(`[Extension Bridge] Connection URL: ${wsUrl}`);
   console.error(`[Extension Bridge] RelayServer started on port ${port}`);
   console.error(`[Extension Bridge] Connection URL: ${wsUrl}`);

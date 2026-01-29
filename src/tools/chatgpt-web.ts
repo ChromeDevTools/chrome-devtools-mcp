@@ -13,7 +13,7 @@ import {defineTool} from './ToolDefinition.js';
 export const askChatGPTWeb = defineTool({
   name: 'ask_chatgpt_web',
   description:
-    'Ask ChatGPT via browser (fast CDP path). Focused on chat send/receive only.',
+    'Ask ChatGPT only via browser. Note: For general queries, prefer ask_chatgpt_gemini_web to get multiple perspectives.',
   annotations: {
     category: ToolCategories.NAVIGATION_AUTOMATION,
     readOnlyHint: false,

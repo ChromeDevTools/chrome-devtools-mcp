@@ -13,7 +13,7 @@ import {defineTool} from './ToolDefinition.js';
 export const askGeminiWeb = defineTool({
   name: 'ask_gemini_web',
   description:
-    'Ask Gemini via browser (fast CDP path). Focused on chat send/receive only.',
+    'Ask Gemini only via browser. Note: For general queries, prefer ask_chatgpt_gemini_web to get multiple perspectives.',
   annotations: {
     category: ToolCategories.NAVIGATION_AUTOMATION,
     readOnlyHint: false,
