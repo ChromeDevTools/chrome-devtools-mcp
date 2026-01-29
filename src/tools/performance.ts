@@ -6,6 +6,7 @@
 
 import zlib from 'node:zlib';
 
+import {logger} from '../logger.js';
 import {zod, DevTools} from '../third_party/index.js';
 import type {Page} from '../third_party/index.js';
 import type {InsightName, TraceResult} from '../trace-processing/parse.js';
@@ -219,7 +220,7 @@ async function stopTracingAndAppendOutput(
 async function populateCruxData(result: TraceResult): Promise<void> {
   logger('populateCruxData called');
   const cruxManager = DevTools.CrUXManager.instance();
-  // go/jtfbx
+  // go/jtfbx. Yes, we're aware this API key is public. ;)
   cruxManager.setEndpointForTesting(
     'https://chromeuxreport.googleapis.com/v1/records:queryRecord?key=AIzaSyBn5gimNjhiEyA_euicSKko6IlD3HdgUfk',
   );
