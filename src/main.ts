@@ -128,6 +128,8 @@ For more details, visit: https://github.com/ChromeDevTools/chrome-devtools-mcp#u
 
 const toolMutex = new Mutex();
 
+const toolNames = new Set<string>(tools.map(t => t.name));
+
 function registerTool(tool: ToolDefinition): void {
   if (
     tool.annotations.category === ToolCategory.EMULATION &&
@@ -222,11 +224,15 @@ function registerTool(tool: ToolDefinition): void {
           isError: true,
         };
       } finally {
-        void clearcutLogger?.logToolInvocation({
-          toolName: tool.name,
-          success,
-          latencyMs: bucketizeLatency(Date.now() - startTime),
-        });
+        if (toolNames.has(tool.name)) {
+          void clearcutLogger?.logToolInvocation({
+            toolName: tool.name,
+            success,
+            latencyMs: bucketizeLatency(Date.now() - startTime),
+          });
+        } else {
+          // TODO: unsupported tools?
+        }
         guard.dispose();
       }
     },

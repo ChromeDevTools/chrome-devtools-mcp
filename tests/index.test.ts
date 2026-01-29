@@ -85,6 +85,24 @@ describe('e2e', () => {
     });
   });
 
+  it('reports errors for unknown tools', async () => {
+    await withClient(async client => {
+      const result = await client.callTool({
+        name: 'unknown_tool',
+        arguments: {},
+      });
+      assert.deepStrictEqual(result, {
+        content: [
+          {
+            type: 'text',
+            text: 'MCP error -32602: Tool unknown_tool not found',
+          },
+        ],
+        isError: true,
+      });
+    });
+  });
+
   it('has all tools', async () => {
     await withClient(async client => {
       const {tools} = await client.listTools();
