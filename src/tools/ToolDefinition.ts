@@ -102,6 +102,7 @@ export interface Response {
 export type Context = Readonly<{
   isRunningPerformanceTrace(): boolean;
   setIsRunningPerformanceTrace(x: boolean): void;
+  isCruxEnabled(): boolean;
   recordedTraces(): TraceResult[];
   storeTraceRecording(result: TraceResult): void;
   getSelectedPage(): Page;

@@ -27,6 +27,12 @@ allowing them to inspect, debug, and modify any data in the browser or DevTools.
 Avoid sharing sensitive or personal information that you don't want to share with
 MCP clients.
 
+Performance tools may send trace URLs to the Google CrUX API to fetch real-user
+experience data. This helps provide a holistic performance picture by
+presenting field data alongside lab data. This data is collected by the [Chrome
+User Experience Report (CrUX)](https://developer.chrome.com/docs/crux). To disable
+this, run with the `--no-performance-crux` flag.
+
 ## **Usage statistics**
 
 Google collects usage statistics (such as tool invocation success rates, latency, and environment information) to improve the reliability and performance of Chrome DevTools MCP.
@@ -461,6 +467,11 @@ The Chrome DevTools MCP server supports the following configuration option:
 
 - **`--categoryNetwork`/ `--category-network`**
   Set to false to exclude tools related to network.
+  - **Type:** boolean
+  - **Default:** `true`
+
+- **`--performanceCrux`/ `--performance-crux`**
+  Set to false to disable CrUX (field data) integration in performance tools.
   - **Type:** boolean
   - **Default:** `true`
 

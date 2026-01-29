@@ -204,6 +204,12 @@ export const cliOptions = {
     hidden: true,
     describe: 'Set to false to exclude tools related to extensions.',
   },
+  performanceCrux: {
+    type: 'boolean',
+    default: true,
+    describe:
+      'Set to false to disable CrUX (field data) integration in performance tools.',
+  },
   usageStatistics: {
     type: 'boolean',
     default: true,
@@ -296,6 +302,10 @@ export function parseArguments(version: string, argv = process.argv) {
       [
         '$0 --no-usage-statistics',
         'Do not send usage statistics https://github.com/ChromeDevTools/chrome-devtools-mcp#usage-statistics.',
+      ],
+      [
+        '$0 --no-performance-crux',
+        'Disable CrUX (field data) integration in performance tools.',
       ],
     ]);
 
