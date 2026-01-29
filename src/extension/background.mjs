@@ -446,13 +446,98 @@ class TabShareExtension {
   }
 }
 
-new TabShareExtension();
+const extension = new TabShareExtension();
 
-// Extension2 style: connect.html is opened directly by the MCP server with URL parameters.
-// No discovery polling needed - the MCP server opens:
-//   chrome-extension://{EXTENSION_ID}/ui/connect.html?mcpRelayUrl=ws://...
-//
-// The extension icon click opens status page (like Extension2)
+// ============================================================
+// Discovery Polling - Automatically detect MCP relay server
+// ============================================================
+const DISCOVERY_PORTS = [8765, 8766, 8767, 8768, 8769, 8770, 8771, 8772, 8773, 8774, 8775];
+const DISCOVERY_INTERVAL_MS = 500;
+let discoveryIntervalId = null;
+let lastDiscoveredRelay = null;
+
+async function fetchRelayInfo(port) {
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 300);
+    const response = await fetch(`http://127.0.0.1:${port}/relay-info`, {
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+    if (!response.ok) return null;
+    return await response.json();
+  } catch {
+    return null;
+  }
+}
+
+async function discoverRelay() {
+  for (const port of DISCOVERY_PORTS) {
+    const info = await fetchRelayInfo(port);
+    if (info?.wsUrl) {
+      return { port, ...info };
+    }
+  }
+  return null;
+}
+
+async function onRelayDiscovered(relayInfo) {
+  debugLogger.log('relay', 'Relay discovered', relayInfo);
+
+  // Avoid duplicate opens
+  if (lastDiscoveredRelay === relayInfo.wsUrl) {
+    return;
+  }
+  lastDiscoveredRelay = relayInfo.wsUrl;
+
+  // Open connect.html with relay URL parameters
+  const connectUrl = new URL(chrome.runtime.getURL('ui/connect.html'));
+  connectUrl.searchParams.set('mcpRelayUrl', relayInfo.wsUrl);
+  if (relayInfo.tabUrl) connectUrl.searchParams.set('tabUrl', relayInfo.tabUrl);
+  if (relayInfo.newTab) connectUrl.searchParams.set('newTab', 'true');
+
+  debugLogger.log('relay', 'Opening connect.html', { url: connectUrl.toString() });
+  await chrome.tabs.create({ url: connectUrl.toString(), active: true });
+}
+
+async function discoveryLoop() {
+  const relayInfo = await discoverRelay();
+  if (relayInfo) {
+    await onRelayDiscovered(relayInfo);
+  }
+}
+
+function startDiscoveryPolling() {
+  if (discoveryIntervalId) return;
+  debugLogger.log('relay', 'Starting discovery polling');
+  discoveryIntervalId = setInterval(discoveryLoop, DISCOVERY_INTERVAL_MS);
+  // Run immediately
+  discoveryLoop();
+}
+
+function stopDiscoveryPolling() {
+  if (discoveryIntervalId) {
+    clearInterval(discoveryIntervalId);
+    discoveryIntervalId = null;
+    debugLogger.log('relay', 'Stopped discovery polling');
+  }
+}
+
+// Reset lastDiscoveredRelay when relay disconnects (to allow reconnect)
+extension._activeConnections = new Proxy(extension._activeConnections, {
+  deleteProperty(target, prop) {
+    const result = delete target[prop];
+    if (target.size === 0) {
+      lastDiscoveredRelay = null;
+    }
+    return result;
+  }
+});
+
+// Start discovery polling on extension load
+startDiscoveryPolling();
+
+// Extension icon click opens connect.html manually
 chrome.action.onClicked.addListener(async () => {
   const statusUrl = chrome.runtime.getURL('ui/connect.html');
   await chrome.tabs.create({url: statusUrl, active: true});
