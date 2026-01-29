@@ -6,7 +6,7 @@
 
 import z from 'zod';
 
-import {askChatGPTFast, askGeminiFast} from '../fast-cdp/fast-chat.js';
+import {askChatGPTFast, askGeminiFast, getClient} from '../fast-cdp/fast-chat.js';
 import {ToolCategories} from './categories.js';
 import {defineTool} from './ToolDefinition.js';
 
@@ -27,6 +27,29 @@ export const askChatGptGeminiWeb = defineTool({
   },
   handler: async (request, response) => {
     const {question} = request.params;
+
+    // 接続確立はシーケンシャル（安定性重視）
+    // 並列で接続すると拡張機能側で競合が発生する可能性があるため
+    console.error('[ask_chatgpt_gemini_web] Establishing connections sequentially...');
+
+    try {
+      await getClient('chatgpt');
+      console.error('[ask_chatgpt_gemini_web] ChatGPT connection ready');
+    } catch (error) {
+      console.error('[ask_chatgpt_gemini_web] ChatGPT pre-connection failed:', error);
+    }
+
+    try {
+      await getClient('gemini');
+      console.error('[ask_chatgpt_gemini_web] Gemini connection ready');
+    } catch (error) {
+      console.error('[ask_chatgpt_gemini_web] Gemini pre-connection failed:', error);
+    }
+
+    console.error('[ask_chatgpt_gemini_web] Sending questions in parallel...');
+
+    // クエリ送信は並列（速度重視）
+    // 接続は既にキャッシュされているので、ここでは純粋にクエリ送信のみ
     const [chatgpt, gemini] = await Promise.all([
       askChatGPTFast(question).catch(error =>
         `❌ ChatGPT接続に失敗しました: ${error instanceof Error ? error.message : String(error)}`,

@@ -264,7 +264,7 @@ Avoid sharing sensitive or personal information that you do not want to share wi
 };
 
 const toolMutex = new Mutex();
-const FAST_TOOLS = new Set(['ask_chatgpt_web', 'ask_gemini_web']);
+const FAST_TOOLS = new Set(['ask_chatgpt_web', 'ask_gemini_web', 'ask_chatgpt_gemini_web']);
 
 function registerTool(tool: ToolDefinition): void {
   server.registerTool(

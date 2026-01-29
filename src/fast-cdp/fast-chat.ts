@@ -11,6 +11,24 @@ function nowMs(): number {
   return Date.now();
 }
 
+/**
+ * 接続の健全性を確認する
+ * 軽量なevaluateコマンドで接続が生きているかチェック
+ */
+async function isConnectionHealthy(client: CdpClient): Promise<boolean> {
+  try {
+    // 2秒タイムアウトで簡単なコマンドを実行
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('Health check timeout')), 2000)
+    );
+    await Promise.race([client.evaluate('1'), timeoutPromise]);
+    return true;
+  } catch (error) {
+    console.error('[fast-cdp] Connection health check failed:', error);
+    return false;
+  }
+}
+
 type SessionStore = {
   projects: Record<
     string,
@@ -126,48 +144,107 @@ function isSuspiciousAnswer(answer: string, question: string): boolean {
   return false;
 }
 
-async function getClient(kind: 'chatgpt' | 'gemini'): Promise<CdpClient> {
-  const existing = kind === 'chatgpt' ? chatgptClient : geminiClient;
-  if (existing) return existing;
-
+/**
+ * 新しい接続を作成する（リトライ機構付き）
+ * 戦略:
+ * - ChatGPT: 常に新規タブ（URLが /c/xxx に変わるため再利用困難）
+ * - Gemini: 既存タブを再利用、失敗したら新規タブ
+ */
+async function createConnection(kind: 'chatgpt' | 'gemini'): Promise<CdpClient> {
   const preferred = await getPreferredUrl(kind);
-  const tabUrl =
-    preferred ||
-    (kind === 'chatgpt' ? 'https://chatgpt.com/' : 'https://gemini.google.com/');
+  const defaultUrl = kind === 'chatgpt'
+    ? 'https://chatgpt.com/'
+    : 'https://gemini.google.com/';
 
-  // 既存タブを再利用（preferredがある場合はnewTab: false）
-  const shouldReuseTab = !!preferred;
-  console.error(`[fast-cdp] ${shouldReuseTab ? 'Reusing existing tab' : 'Creating new tab'} for ${kind}: ${tabUrl}`);
-
-  let relayResult;
-  let lastError: unknown;
-  for (let attempt = 0; attempt < 2; attempt += 1) {
+  // ChatGPT: 常に新規タブを作成（URLが変わるため既存タブ再利用は不安定）
+  // Gemini: 既存タブを再利用、失敗したら新規タブ
+  if (kind === 'gemini' && preferred) {
+    console.error(`[fast-cdp] Trying to reuse existing ${kind} tab: ${preferred} (3s timeout)`);
     try {
-      relayResult = await connectViaExtensionRaw({
-        tabUrl,
-        newTab: !shouldReuseTab,
+      const relayResult = await connectViaExtensionRaw({
+        tabUrl: preferred,
+        newTab: false,
+        timeoutMs: 3000,  // 短いタイムアウト
       });
-      lastError = undefined;
-      break;
+
+      const client = new CdpClient(relayResult.relay);
+      await client.send('Runtime.enable');
+      await client.send('DOM.enable');
+      await client.send('Page.enable');
+
+      geminiClient = client;
+      console.error(`[fast-cdp] ${kind} reused existing tab successfully`);
+      return client;
     } catch (error) {
-      lastError = error;
-      await new Promise(resolve => setTimeout(resolve, 500));
+      console.error(`[fast-cdp] ${kind} existing tab not found, will create new tab`);
     }
   }
-  if (!relayResult) {
-    throw lastError instanceof Error ? lastError : new Error(String(lastError));
-  }
-  const client = new CdpClient(relayResult.relay);
-  await client.send('Runtime.enable');
-  await client.send('DOM.enable');
-  await client.send('Page.enable');
 
-  if (kind === 'chatgpt') {
-    chatgptClient = client;
-  } else {
-    geminiClient = client;
+  // 新しいタブを作成
+  console.error(`[fast-cdp] Creating new ${kind} tab: ${defaultUrl}`);
+  let lastError: Error | null = null;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const relayResult = await connectViaExtensionRaw({
+        tabUrl: defaultUrl,
+        newTab: true,
+        timeoutMs: 5000,  // 5秒タイムアウト
+      });
+
+      const client = new CdpClient(relayResult.relay);
+      await client.send('Runtime.enable');
+      await client.send('DOM.enable');
+      await client.send('Page.enable');
+
+      if (kind === 'chatgpt') {
+        chatgptClient = client;
+      } else {
+        geminiClient = client;
+      }
+
+      console.error(`[fast-cdp] ${kind} new tab created successfully (attempt ${attempt + 1})`);
+      return client;
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+      console.error(`[fast-cdp] ${kind} new tab attempt ${attempt + 1} failed:`, lastError.message);
+
+      if (attempt < 1) {
+        console.error(`[fast-cdp] Retrying in 1s...`);
+        await new Promise(r => setTimeout(r, 1000));
+      }
+    }
   }
-  return client;
+
+  throw lastError || new Error(`Failed to connect to ${kind}`);
+}
+
+/**
+ * クライアントを取得する（健全性チェック付き）
+ * 既存の接続が切れている場合は自動的に再接続する
+ * @public 外部から接続を事前確立するためにエクスポート
+ */
+export async function getClient(kind: 'chatgpt' | 'gemini'): Promise<CdpClient> {
+  const existing = kind === 'chatgpt' ? chatgptClient : geminiClient;
+
+  // 既存接続がある場合、健全性をチェック
+  if (existing) {
+    const healthy = await isConnectionHealthy(existing);
+    if (healthy) {
+      console.error(`[fast-cdp] Reusing healthy ${kind} connection`);
+      return existing;
+    }
+
+    // 接続が切れている → キャッシュをクリア
+    console.error(`[fast-cdp] ${kind} connection lost, reconnecting...`);
+    if (kind === 'chatgpt') {
+      chatgptClient = null;
+    } else {
+      geminiClient = null;
+    }
+  }
+
+  // 新しい接続を作成
+  return await createConnection(kind);
 }
 
 async function navigate(client: CdpClient, url: string) {

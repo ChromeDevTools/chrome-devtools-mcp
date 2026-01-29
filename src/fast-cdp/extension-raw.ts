@@ -106,6 +106,7 @@ export async function connectViaExtensionRaw(options: {
   tabUrl?: string;
   newTab?: boolean;
   relayPort?: number;
+  timeoutMs?: number;
 }): Promise<RawExtensionConnection> {
   if (options.tabId === undefined && options.tabUrl === undefined) {
     throw new Error('Either tabId or tabUrl must be provided');
@@ -140,10 +141,10 @@ export async function connectViaExtensionRaw(options: {
 
   try {
     await new Promise<void>((resolve, reject) => {
-      const timeoutMs = 30000;
+      const actualTimeout = options.timeoutMs ?? 10000;
       const timeout = setTimeout(() => {
-        reject(new Error('Extension connection timeout (30s). Make sure the chrome-ai-bridge extension is installed and Chrome is open.'));
-      }, timeoutMs);
+        reject(new Error(`Extension connection timeout (${actualTimeout / 1000}s). Make sure the chrome-ai-bridge extension is installed and Chrome is open.`));
+      }, actualTimeout);
 
       relay.once('ready', () => {
         clearTimeout(timeout);
