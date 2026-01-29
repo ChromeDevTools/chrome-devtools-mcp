@@ -115,6 +115,34 @@
     .hidden {
       display: none;
     }
+
+    .field {
+      margin-bottom: 12px;
+    }
+
+    .field label {
+      display: block;
+      font-size: 12px;
+      color: #555;
+      margin-bottom: 6px;
+    }
+
+    .field input[type="text"] {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 8px 10px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+
+    .checkbox-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: #333;
+    }
   </style>
 </head>
 <body>
@@ -123,6 +151,31 @@
 
     <div id="status" class="status info">
       Initializing...
+    </div>
+
+    <div id="relay-config" class="hidden">
+      <p style="margin: 0 0 12px 0; color: #444; font-size: 13px;">
+        1) MCPサーバを起動 → 2) 出力された Relay URL を貼り付け → 3) 接続
+      </p>
+      <div class="field">
+        <label for="relay-url">MCP Relay URL</label>
+        <input id="relay-url" type="text" placeholder="ws://127.0.0.1:12345?token=...">
+      </div>
+      <div class="field">
+        <button id="paste-relay-btn" type="button">Paste from Clipboard</button>
+      </div>
+      <div class="field">
+        <label for="tab-url">Auto-connect Tab URL (optional)</label>
+        <input id="tab-url" type="text" placeholder="https://chatgpt.com/">
+      </div>
+      <div class="field checkbox-row">
+        <input id="new-tab" type="checkbox">
+        <label for="new-tab">Open new tab if not found</label>
+      </div>
+      <div class="field">
+        <button id="open-tab-btn" type="button">Open Tab</button>
+      </div>
+      <button id="use-relay-btn">Use Relay URL</button>
     </div>
 
     <div id="tab-selection" class="hidden">

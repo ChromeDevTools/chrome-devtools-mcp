@@ -1,353 +1,567 @@
 /**
  * chrome-ai-bridge Extension Background Service Worker
- * Based on Playwright extension2 architecture
+ * Playwright extension2-style flow:
+ * - connectToRelay -> establishes WS only
+ * - connectToTab -> binds a tab to that relay
+ * - attachToTab / forwardCDPCommand for CDP passthrough
  */
 
-/**
- * RelayConnection - Manages connection to a single tab
- */
+function debugLog(...args) {
+  console.log('[Extension]', ...args);
+}
+
 class RelayConnection {
-  constructor(tabId, ws, debuggeeId) {
-    this._tabId = tabId;
+  constructor(ws) {
+    this._debuggee = {};
     this._ws = ws;
-    this._debuggeeId = debuggeeId;
-    this._eventListeners = new Map();
-    this._callbacks = new Map();
-    this._nextId = 0;
-    this._attached = false;
+    this._closed = false;
+    this._tabPromise = new Promise(resolve => (this._tabPromiseResolve = resolve));
+    this._eventListener = this._onDebuggerEvent.bind(this);
+    this._detachListener = this._onDebuggerDetach.bind(this);
+    this._ws.onmessage = this._onMessage.bind(this);
+    this._ws.onclose = () => this._onClose();
+    chrome.debugger.onEvent.addListener(this._eventListener);
+    chrome.debugger.onDetach.addListener(this._detachListener);
   }
 
-  async attach() {
-    if (this._attached) return;
-
-    try {
-      await new Promise((resolve, reject) => {
-        chrome.debugger.attach(this._debuggeeId, '1.3', () => {
-          if (chrome.runtime.lastError) {
-            reject(new Error(chrome.runtime.lastError.message));
-          } else {
-            this._attached = true;
-            resolve();
-          }
-        });
-      });
-
-      // Set up CDP event forwarding
-      chrome.debugger.onEvent.addListener(this._onDebuggerEvent.bind(this));
-      chrome.debugger.onDetach.addListener(this._onDebuggerDetach.bind(this));
-
-      console.log(`[RelayConnection] Attached to tab ${this._tabId}`);
-    } catch (error) {
-      console.error(`[RelayConnection] Failed to attach to tab ${this._tabId}:`, error);
-      throw error;
-    }
+  setTabId(tabId) {
+    this._debuggee = {tabId};
+    this._tabPromiseResolve();
   }
 
-  async detach() {
-    if (!this._attached) return;
-
-    try {
-      await new Promise((resolve) => {
-        chrome.debugger.detach(this._debuggeeId, () => {
-          this._attached = false;
-          resolve();
-        });
-      });
-      console.log(`[RelayConnection] Detached from tab ${this._tabId}`);
-    } catch (error) {
-      console.error(`[RelayConnection] Failed to detach from tab ${this._tabId}:`, error);
-    }
-  }
-
-  sendCDPCommand(method, params = {}) {
-    return new Promise((resolve, reject) => {
-      const id = this._nextId++;
-      this._callbacks.set(id, { resolve, reject });
-
-      chrome.debugger.sendCommand(this._debuggeeId, method, params, (result) => {
-        const callback = this._callbacks.get(id);
-        this._callbacks.delete(id);
-
-        if (chrome.runtime.lastError) {
-          callback.reject(new Error(chrome.runtime.lastError.message));
-        } else {
-          callback.resolve(result);
-        }
-      });
+  sendReady(tabId) {
+    this._sendMessage({
+      type: 'ready',
+      tabId,
     });
   }
 
-  _onDebuggerEvent(source, method, params) {
-    if (source.tabId !== this._tabId) return;
+  close(message) {
+    if (
+      this._ws.readyState === WebSocket.OPEN ||
+      this._ws.readyState === WebSocket.CONNECTING
+    ) {
+      this._ws.close(1000, message);
+    }
+    this._onClose();
+  }
 
-    // Forward CDP event to MCP server
-    this._sendToMCP({
-      type: 'forwardCDPEvent',
-      tabId: this._tabId,
-      method,
-      params
+  _onClose() {
+    if (this._closed) return;
+    this._closed = true;
+    chrome.debugger.onEvent.removeListener(this._eventListener);
+    chrome.debugger.onDetach.removeListener(this._detachListener);
+    chrome.debugger.detach(this._debuggee).catch(() => {});
+    if (this.onclose) this.onclose();
+  }
+
+  _onDebuggerEvent(source, method, params) {
+    if (source.tabId !== this._debuggee.tabId) return;
+    const sessionId = source.sessionId;
+    this._sendMessage({
+      method: 'forwardCDPEvent',
+      params: {
+        sessionId,
+        method,
+        params,
+      },
     });
   }
 
   _onDebuggerDetach(source, reason) {
-    if (source.tabId !== this._tabId) return;
-
-    console.log(`[RelayConnection] Debugger detached from tab ${this._tabId}, reason: ${reason}`);
-    this._attached = false;
-
-    // Notify MCP server
-    this._sendToMCP({
-      type: 'detached',
-      tabId: this._tabId,
-      reason
-    });
+    if (source.tabId !== this._debuggee.tabId) return;
+    this.close(`Debugger detached: ${reason}`);
+    this._debuggee = {};
   }
 
-  _sendToMCP(message) {
-    if (this._ws && this._ws.readyState === WebSocket.OPEN) {
+  _onMessage(event) {
+    this._onMessageAsync(event).catch(err =>
+      debugLog('Error handling message:', err),
+    );
+  }
+
+  async _onMessageAsync(event) {
+    let message;
+    try {
+      message = JSON.parse(event.data);
+    } catch (error) {
+      this._sendMessage({
+        error: {code: -32700, message: `Error parsing message: ${error.message}`},
+      });
+      return;
+    }
+
+    const response = {id: message.id};
+    try {
+      response.result = await this._handleCommand(message);
+    } catch (error) {
+      response.error = error.message;
+    }
+    this._sendMessage(response);
+  }
+
+  async _handleCommand(message) {
+    if (message.method === 'attachToTab') {
+      await this._tabPromise;
+      debugLog('Attaching debugger to tab:', this._debuggee);
+      await chrome.debugger.attach(this._debuggee, '1.3');
+      const result = await chrome.debugger.sendCommand(
+        this._debuggee,
+        'Target.getTargetInfo',
+      );
+      return {targetInfo: result?.targetInfo};
+    }
+    if (!this._debuggee.tabId) {
+      throw new Error(
+        'No tab is connected. Please select a tab in the extension UI.',
+      );
+    }
+    if (message.method === 'forwardCDPCommand') {
+      const {sessionId, method, params} = message.params;
+      const debuggerSession = {...this._debuggee, sessionId};
+      return await chrome.debugger.sendCommand(
+        debuggerSession,
+        method,
+        params,
+      );
+    }
+    return {};
+  }
+
+  _sendMessage(message) {
+    if (this._ws.readyState === WebSocket.OPEN) {
       this._ws.send(JSON.stringify(message));
     }
   }
-
-  async handleMCPMessage(message) {
-    if (message.type === 'forwardCDPCommand') {
-      try {
-        const result = await this.sendCDPCommand(message.method, message.params);
-        this._sendToMCP({
-          type: 'forwardCDPResult',
-          id: message.id,
-          result
-        });
-      } catch (error) {
-        this._sendToMCP({
-          type: 'forwardCDPError',
-          id: message.id,
-          error: error.message
-        });
-      }
-    }
-  }
-
-  get tabId() {
-    return this._tabId;
-  }
-
-  get attached() {
-    return this._attached;
-  }
 }
 
-/**
- * TabShareExtension - Manages multiple relay connections
- */
 class TabShareExtension {
   constructor() {
-    this._connections = new Map(); // ws -> RelayConnection
-    this._activeConnections = new Set(); // Set of active WebSocket connections
+    this._activeConnections = new Map();
+    this._pendingTabSelection = new Map();
+    chrome.tabs.onRemoved.addListener(this._onTabRemoved.bind(this));
+    chrome.tabs.onActivated.addListener(this._onTabActivated.bind(this));
+    chrome.tabs.onUpdated.addListener(this._onTabUpdated.bind(this));
+    chrome.runtime.onMessage.addListener(this._onMessage.bind(this));
   }
 
-  async handleConnection(ws, tabId) {
-    console.log(`[TabShareExtension] New connection request for tab ${tabId}`);
-
-    // Validate tabId
-    if (!tabId || typeof tabId !== 'number') {
-      ws.close(1008, 'Invalid tabId');
-      return;
-    }
-
-    // Check if tab exists
-    try {
-      const tab = await chrome.tabs.get(tabId);
-      if (!tab) {
-        ws.close(1008, 'Tab not found');
-        return;
-      }
-    } catch (error) {
-      ws.close(1008, `Tab not found: ${error.message}`);
-      return;
-    }
-
-    // Create relay connection
-    const debuggeeId = { tabId };
-    const connection = new RelayConnection(tabId, ws, debuggeeId);
-
-    try {
-      await connection.attach();
-      this._connections.set(ws, connection);
-      this._activeConnections.add(ws);
-
-      console.log(`[TabShareExtension] Connected to tab ${tabId}, total connections: ${this._activeConnections.size}`);
-
-      // Set up WebSocket message handler
-      ws.addEventListener('message', async (event) => {
-        try {
-          const message = JSON.parse(event.data);
-          await connection.handleMCPMessage(message);
-        } catch (error) {
-          console.error('[TabShareExtension] Error handling message:', error);
-        }
-      });
-
-      // Set up WebSocket close handler
-      ws.addEventListener('close', async () => {
-        console.log(`[TabShareExtension] WebSocket closed for tab ${tabId}`);
-        await connection.detach();
-        this._connections.delete(ws);
-        this._activeConnections.delete(ws);
-      });
-
-      // Send ready message
-      ws.send(JSON.stringify({
-        type: 'ready',
-        tabId
-      }));
-
-    } catch (error) {
-      console.error(`[TabShareExtension] Failed to connect to tab ${tabId}:`, error);
-      ws.close(1011, `Failed to attach: ${error.message}`);
-    }
-  }
-
-  async disconnectTab(tabId) {
-    for (const [ws, connection] of this._connections.entries()) {
-      if (connection.tabId === tabId) {
-        ws.close(1000, 'User disconnected');
+  _onMessage(message, sender, sendResponse) {
+    switch (message.type) {
+      case 'connectToRelay':
+        this._connectToRelay(sender.tab?.id, message.mcpRelayUrl).then(
+          () => sendResponse({success: true}),
+          error => sendResponse({success: false, error: error.message}),
+        );
         return true;
-      }
+      case 'getTabs':
+        this._getTabs().then(
+          tabs =>
+            sendResponse({
+              success: true,
+              tabs,
+              currentTabId: sender.tab?.id,
+            }),
+          error => sendResponse({success: false, error: error.message}),
+        );
+        return true;
+      case 'connectToTab':
+        this._connectTab(
+          sender.tab?.id,
+          message.tabId || sender.tab?.id,
+          message.windowId || sender.tab?.windowId,
+          message.mcpRelayUrl,
+          message.tabUrl,
+          message.newTab,
+        ).then(
+          () => sendResponse({success: true}),
+          error => sendResponse({success: false, error: error.message}),
+        );
+        return true;
+      case 'disconnect':
+        this._disconnect(message.tabId).then(
+          () => sendResponse({success: true}),
+          error => sendResponse({success: false, error: error.message}),
+        );
+        return true;
     }
     return false;
   }
 
-  async cleanup() {
-    console.log('[TabShareExtension] Cleaning up all connections...');
-
-    for (const ws of this._activeConnections) {
-      const connection = this._connections.get(ws);
-      if (connection) {
-        await connection.detach();
+  async _connectToRelay(selectorTabId, mcpRelayUrl) {
+    if (!mcpRelayUrl) throw new Error('Missing relay URL');
+    const openSocket = async () => {
+      const socket = new WebSocket(mcpRelayUrl);
+      await new Promise((resolve, reject) => {
+        const timeoutId = setTimeout(() => {
+          reject(new Error('Connection timeout'));
+        }, 5000);
+        socket.onopen = () => {
+          clearTimeout(timeoutId);
+          resolve();
+        };
+        socket.onerror = () => {
+          clearTimeout(timeoutId);
+          reject(new Error('WebSocket error'));
+        };
+      });
+      return socket;
+    };
+    let socket;
+    let lastError;
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+      try {
+        socket = await openSocket();
+        break;
+      } catch (error) {
+        lastError = error;
+        await new Promise(resolve => setTimeout(resolve, 400));
       }
-      ws.close();
+    }
+    if (!socket) {
+      throw lastError || new Error('WebSocket error');
+    }
+    const connection = new RelayConnection(socket);
+    connection.onclose = () => {
+      this._pendingTabSelection.delete(selectorTabId);
+    };
+    this._pendingTabSelection.set(selectorTabId, {connection});
+  }
+
+  async _connectTab(
+    selectorTabId,
+    tabId,
+    windowId,
+    mcpRelayUrl,
+    tabUrl,
+    newTab,
+  ) {
+    if (!tabId && tabUrl) {
+      tabId = await this._resolveTabId(tabUrl, newTab);
+    }
+    if (!tabId) throw new Error('No tab selected');
+
+    const existingConnection = this._activeConnections.get(tabId);
+    if (existingConnection) {
+      existingConnection.close('Connection replaced for the same tab');
+      this._activeConnections.delete(tabId);
+      await this._setConnectedTab(tabId, false);
     }
 
-    this._connections.clear();
+    const pending = this._pendingTabSelection.get(selectorTabId);
+    if (!pending) {
+      // If no pending connection, create one now.
+      await this._connectToRelay(selectorTabId, mcpRelayUrl);
+    }
+    const newPending = this._pendingTabSelection.get(selectorTabId);
+    if (!newPending) throw new Error('No active MCP relay connection');
+
+    this._pendingTabSelection.delete(selectorTabId);
+    const connection = newPending.connection;
+    connection.setTabId(tabId);
+    connection.sendReady(tabId);
+    connection.onclose = () => {
+      this._activeConnections.delete(tabId);
+      void this._setConnectedTab(tabId, false);
+    };
+    this._activeConnections.set(tabId, connection);
+    await Promise.all([
+      this._setConnectedTab(tabId, true),
+      windowId ? chrome.windows.update(windowId, {focused: true}) : undefined,
+      chrome.tabs.update(tabId, {active: true}),
+    ]);
+  }
+
+  async _resolveTabId(tabUrl, newTab) {
+    try {
+      const urlObj = new URL(tabUrl);
+      const pattern = `*://${urlObj.hostname}${urlObj.pathname}*`;
+      const tabs = await chrome.tabs.query({url: pattern});
+      if (tabs.length && !newTab) {
+        const activeTab = tabs.find(tab => tab.active);
+        return (activeTab || tabs[0]).id;
+      }
+    } catch {
+      // ignore
+    }
+    if (!tabUrl) return undefined;
+    const created = await chrome.tabs.create({url: tabUrl, active: true});
+    return created.id;
+  }
+
+  async _getTabs() {
+    const tabs = await chrome.tabs.query({});
+    return tabs.filter(
+      tab =>
+        tab.url &&
+        !['chrome:', 'edge:', 'devtools:'].some(scheme =>
+          tab.url.startsWith(scheme),
+        ),
+    );
+  }
+
+  async _setConnectedTab(tabId, connected) {
+    if (!tabId) return;
+    if (connected) {
+      await chrome.action.setBadgeText({tabId, text: '✓'});
+      await chrome.action.setBadgeBackgroundColor({
+        tabId,
+        color: '#4CAF50',
+      });
+    } else {
+      await chrome.action.setBadgeText({tabId, text: ''});
+    }
+  }
+
+  async _disconnect(tabId) {
+    if (tabId) {
+      const connection = this._activeConnections.get(tabId);
+      if (connection) connection.close('User disconnected');
+      this._activeConnections.delete(tabId);
+      await this._setConnectedTab(tabId, false);
+      return;
+    }
+    for (const [connectedTabId, connection] of this._activeConnections) {
+      connection.close('User disconnected');
+      await this._setConnectedTab(connectedTabId, false);
+    }
     this._activeConnections.clear();
   }
-}
 
-// Global instance
-const tabShareExtension = new TabShareExtension();
-
-async function findTabByUrl(urlPattern) {
-  try {
-    const urlObj = new URL(urlPattern);
-    const pattern = `*://${urlObj.hostname}${urlObj.pathname}*`;
-    const tabs = await chrome.tabs.query({ url: pattern });
-    if (!tabs.length) return null;
-    const activeTab = tabs.find(tab => tab.active);
-    return activeTab || tabs[0];
-  } catch (error) {
-    console.error('[chrome-ai-bridge] Failed to match tab by URL:', error);
-    return null;
-  }
-}
-
-async function resolveTabId({ tabId, tabUrl, newTab }) {
-  if (typeof tabId === 'number') {
-    return tabId;
+  _onTabRemoved(tabId) {
+    const pending = this._pendingTabSelection.get(tabId);
+    if (pending) {
+      this._pendingTabSelection.delete(tabId);
+      pending.connection.close('Browser tab closed');
+      return;
+    }
+    const active = this._activeConnections.get(tabId);
+    if (!active) return;
+    active.close('Browser tab closed');
+    this._activeConnections.delete(tabId);
   }
 
-  if (!tabUrl) {
-    return null;
-  }
-
-  if (!newTab) {
-    const matched = await findTabByUrl(tabUrl);
-    if (matched && typeof matched.id === 'number') {
-      return matched.id;
+  _onTabActivated(activeInfo) {
+    for (const [tabId, pending] of this._pendingTabSelection) {
+      if (tabId === activeInfo.tabId) continue;
+      if (!pending.timerId) {
+        pending.timerId = setTimeout(() => {
+          const existed = this._pendingTabSelection.delete(tabId);
+          if (existed) {
+            pending.connection.close('Tab inactive for 30 seconds');
+            chrome.tabs.sendMessage(tabId, {type: 'connectionTimeout'});
+          }
+        }, 30000);
+      }
     }
   }
 
-  const created = await chrome.tabs.create({ url: tabUrl, active: true });
-  return created.id ?? null;
+  _onTabUpdated(tabId) {
+    if (this._activeConnections.has(tabId)) {
+      void this._setConnectedTab(tabId, true);
+    }
+  }
 }
 
-async function connectToRelay({ mcpRelayUrl, tabId, tabUrl, newTab }) {
-  if (!mcpRelayUrl) {
-    throw new Error('Missing mcpRelayUrl');
-  }
+const tabShareExtension = new TabShareExtension();
 
-  const relayUrl = new URL(mcpRelayUrl);
-  if (!['127.0.0.1', 'localhost', '::1'].includes(relayUrl.hostname)) {
-    throw new Error('Invalid relay URL: must be loopback address');
-  }
+const DISCOVERY_ALARM = 'mcp-relay-discovery';
+const DISCOVERY_PORTS = [8765, 8766, 8767, 8768, 8769, 8770, 8771, 8772, 8773, 8774, 8775];
+const lastRelayByPort = new Map();
 
-  const resolvedTabId = await resolveTabId({ tabId, tabUrl, newTab });
-  if (!resolvedTabId) {
-    throw new Error('Target tab not found');
-  }
-
-  return await new Promise((resolve, reject) => {
-    const ws = new WebSocket(mcpRelayUrl);
-
-    ws.addEventListener('open', async () => {
-      try {
-        await tabShareExtension.handleConnection(ws, resolvedTabId);
-        resolve({ tabId: resolvedTabId });
-      } catch (error) {
-        reject(error);
-      }
-    });
-
-    ws.addEventListener('error', () => {
-      reject(new Error('WebSocket connection error'));
-    });
-
-    ws.addEventListener('close', (event) => {
-      if (event && event.code !== 1000) {
-        console.warn('[chrome-ai-bridge] Relay connection closed:', event.reason);
-      }
-    });
-  });
+function buildConnectUrl(wsUrl, tabUrl, newTab, autoMode = false) {
+  const params = new URLSearchParams({mcpRelayUrl: wsUrl});
+  if (tabUrl) params.set('tabUrl', tabUrl);
+  if (newTab) params.set('newTab', 'true');
+  if (autoMode) params.set('auto', 'true');
+  return chrome.runtime.getURL(`ui/connect.html?${params.toString()}`);
 }
 
-// Service worker lifecycle
-chrome.runtime.onInstalled.addListener(() => {
-  console.log('[chrome-ai-bridge] Extension installed');
-});
+async function focusTab(tabId, windowId) {
+  try {
+    if (windowId) {
+      await chrome.windows.update(windowId, {focused: true});
+    }
+    await chrome.tabs.update(tabId, {active: true});
+  } catch {
+    // Ignore transient tab editing errors (e.g. user dragging tabs).
+  }
+}
 
-chrome.runtime.onSuspend.addListener(async () => {
-  console.log('[chrome-ai-bridge] Extension suspending, cleaning up...');
-  await tabShareExtension.cleanup();
-});
+async function getExistingConnectTab() {
+  const connectBase = chrome.runtime.getURL('ui/connect.html');
+  const tabs = await chrome.tabs.query({url: `${connectBase}*`});
+  if (!tabs.length) return false;
+  const tab = tabs[0];
+  if (!tab?.id) return false;
+  return tab;
+}
 
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (!message || !message.type) return false;
+async function ensureConnectUiTab(wsUrl, tabUrl, newTab, autoMode = false) {
+  const existing = await getExistingConnectTab();
+  if (existing?.id) {
+    await focusTab(existing.id, existing.windowId);
+    return existing;
+  }
+  const url = buildConnectUrl(wsUrl, tabUrl, newTab, autoMode);
+  const created = await chrome.tabs.create({url, active: true});
+  if (created?.id) {
+    await focusTab(created.id, created.windowId);
+  }
+  return created;
+}
 
-  if (message.type === 'connectToRelay') {
-    connectToRelay({
-      mcpRelayUrl: message.mcpRelayUrl,
-      tabId: message.tabId,
-      tabUrl: message.tabUrl,
-      newTab: message.newTab,
-    })
-      .then(result => sendResponse({ success: true, tabId: result.tabId }))
-      .catch(error =>
-        sendResponse({ success: false, error: error.message || String(error) }),
+async function fetchRelayInfo(port) {
+  const discoveryUrl = `http://127.0.0.1:${port}/relay-info`;
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 800);
+    const res = await fetch(discoveryUrl, {signal: controller.signal});
+    clearTimeout(timer);
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (!data?.wsUrl) return null;
+    return data;
+  } catch {
+    return null;
+  }
+}
+
+async function autoConnectRelay(best) {
+  const tabUrl = best?.data?.tabUrl;
+  if (!tabUrl) return;
+  if (best?.port) {
+    const refreshed = await fetchRelayInfo(best.port);
+    if (refreshed?.wsUrl) {
+      best.data = refreshed;
+    }
+  }
+  const selectorTab = await ensureConnectUiTab(
+    best.data.wsUrl,
+    tabUrl,
+    Boolean(best.data.newTab),
+    true,
+  );
+  if (!selectorTab?.id) return;
+
+  let targetTabId;
+  try {
+    targetTabId = await tabShareExtension._resolveTabId(
+      tabUrl,
+      Boolean(best.data.newTab),
+    );
+  } catch {
+    return;
+  }
+  if (!targetTabId) return;
+  if (tabShareExtension._activeConnections?.has(targetTabId)) return;
+
+  const targetTab = await chrome.tabs.get(targetTabId).catch(() => null);
+  try {
+    await tabShareExtension._connectToRelay(selectorTab.id, best.data.wsUrl);
+    await tabShareExtension._connectTab(
+      selectorTab.id,
+      targetTabId,
+      targetTab?.windowId,
+      best.data.wsUrl,
+      tabUrl,
+      Boolean(best.data.newTab),
+    );
+  } catch {
+    if (best?.port) {
+      lastRelayByPort.delete(best.port);
+    }
+    return false;
+  }
+  return true;
+}
+
+async function autoOpenConnectUi() {
+  let best = null;
+  for (const port of DISCOVERY_PORTS) {
+    const discoveryUrl = `http://127.0.0.1:${port}/relay-info`;
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 800);
+      const res = await fetch(discoveryUrl, {signal: controller.signal});
+      clearTimeout(timer);
+      if (!res.ok) continue;
+      const data = await res.json();
+      if (!data?.wsUrl) continue;
+      const last = lastRelayByPort.get(port);
+      const startedAt = data.startedAt || 0;
+      const instanceId = data.instanceId || '';
+      if (
+        last &&
+        last.wsUrl === data.wsUrl &&
+        last.startedAt === startedAt &&
+        last.instanceId === instanceId
+      ) {
+        continue;
+      }
+      lastRelayByPort.set(port, {
+        wsUrl: data.wsUrl,
+        startedAt,
+        instanceId,
+      });
+      if (
+        !best ||
+        (data.startedAt && data.startedAt > best.startedAt)
+      ) {
+        best = {port, data};
+      }
+    } catch {
+      // ignore
+    }
+  }
+  if (best) {
+    let ok = false;
+    try {
+      ok = await autoConnectRelay(best);
+    } catch {
+      ok = false;
+    }
+    if (!ok) {
+      await ensureConnectUiTab(
+        best.data.wsUrl,
+        best.data.tabUrl || undefined,
+        Boolean(best.data.newTab),
+        false,
       );
-    return true;
+    }
   }
+}
 
-  if (message.type === 'disconnectTab') {
-    tabShareExtension.disconnectTab(message.tabId).then(success => {
-      sendResponse({ success });
-    });
-    return true;
-  }
+function scheduleDiscovery() {
+  chrome.alarms.create(DISCOVERY_ALARM, {
+    delayInMinutes: 0.05,
+    periodInMinutes: 1,
+  });
+  autoOpenConnectUi();
+  // Fast polling window to catch new relay within 60s.
+  let attempts = 0;
+  const maxAttempts = 120; // 60s @ 500ms
+  const burst = async () => {
+    attempts += 1;
+    await autoOpenConnectUi();
+    if (attempts < maxAttempts) {
+      setTimeout(burst, 500);
+    }
+  };
+  setTimeout(burst, 200);
+}
 
-  return false;
+chrome.runtime.onInstalled.addListener(() => {
+  scheduleDiscovery();
 });
 
-// Export for connect.html
-globalThis.tabShareExtension = tabShareExtension;
+chrome.runtime.onStartup.addListener(() => {
+  scheduleDiscovery();
+});
 
-console.log('[chrome-ai-bridge] Background service worker loaded');
+chrome.alarms.onAlarm.addListener(alarm => {
+  if (alarm?.name === DISCOVERY_ALARM) {
+    autoOpenConnectUi();
+  }
+});
+
+scheduleDiscovery();

@@ -39,10 +39,14 @@ import assert from 'node:assert';
 import fs from 'node:fs';
 import path from 'node:path';
 
+import {randomUUID} from 'node:crypto';
+import http from 'node:http';
 import {McpServer} from '@modelcontextprotocol/sdk/server/mcp.js';
+import {StreamableHTTPServerTransport} from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import {StdioServerTransport} from '@modelcontextprotocol/sdk/server/stdio.js';
 import type {CallToolResult} from '@modelcontextprotocol/sdk/types.js';
 import {
+  isInitializeRequest,
   SetLevelRequestSchema,
   RootsListChangedNotificationSchema,
 } from '@modelcontextprotocol/sdk/types.js';
@@ -90,6 +94,22 @@ export const args = parseArguments(version);
 const logFile = args.logFile ? saveLogsToFile(args.logFile) : undefined;
 
 logger(`Starting Chrome DevTools MCP for Extension Development v${version}`);
+logger(
+  `[startup] argv attachTab=${String(args.attachTab)} attachTabUrl=${String(
+    args.attachTabUrl,
+  )} attachTabNew=${String(args.attachTabNew)} extensionRelayPort=${String(
+    args.extensionRelayPort,
+  )}`,
+);
+if (args.attachTab || args.attachTabUrl || process.env.MCP_DEBUG_EXTENSION) {
+  console.error(
+    `[startup-debug] attachTab=${String(
+      args.attachTab,
+    )} attachTabUrl=${String(args.attachTabUrl)} attachTabNew=${String(
+      args.attachTabNew,
+    )} extensionRelayPort=${String(args.extensionRelayPort)}`,
+  );
+}
 const server = new McpServer(
   {
     name: 'chrome-ai-bridge',
@@ -244,6 +264,7 @@ Avoid sharing sensitive or personal information that you do not want to share wi
 };
 
 const toolMutex = new Mutex();
+const FAST_TOOLS = new Set(['ask_chatgpt_web', 'ask_gemini_web']);
 
 function registerTool(tool: ToolDefinition): void {
   server.registerTool(
@@ -257,7 +278,9 @@ function registerTool(tool: ToolDefinition): void {
       const guard = await toolMutex.acquire();
       try {
         logger(`${tool.name} request: ${JSON.stringify(params, null, '  ')}`);
-        const context = await getContext();
+        const context = FAST_TOOLS.has(tool.name)
+          ? ((await import('./fast-cdp/fast-context.js')).getFastContext() as unknown as McpContext)
+          : await getContext();
         const response = new McpResponse();
         await tool.handler(
           {
@@ -350,3 +373,143 @@ const transport = new StdioServerTransport();
 await server.connect(transport);
 logger('Chrome DevTools MCP Server connected');
 logDisclaimers();
+
+const httpPortRaw = process.env.MCP_HTTP_PORT;
+if (httpPortRaw) {
+  const httpPort = Number(httpPortRaw);
+  if (!Number.isFinite(httpPort) || httpPort <= 0) {
+    console.error(`[http] Invalid MCP_HTTP_PORT: ${httpPortRaw}`);
+  } else {
+    const httpHost = process.env.MCP_HTTP_HOST || '127.0.0.1';
+    const transports: Record<string, StreamableHTTPServerTransport> = {};
+
+    const serverHttp = http.createServer(async (req, res) => {
+      if (!req.url || !req.method) {
+        res.writeHead(400).end();
+        return;
+      }
+
+      // Basic CORS for local usage (Codex / local tools)
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Access-Control-Allow-Headers', 'content-type,mcp-session-id');
+      res.setHeader('Access-Control-Expose-Headers', 'mcp-session-id');
+
+      if (req.method === 'OPTIONS') {
+        res.writeHead(204).end();
+        return;
+      }
+
+      const url = new URL(req.url, `http://${httpHost}:${httpPort}`);
+      if (url.pathname !== '/mcp') {
+        res.writeHead(404).end();
+        return;
+      }
+
+      const sessionId = req.headers['mcp-session-id'] as string | undefined;
+
+      if (req.method === 'POST') {
+        let body = '';
+        req.on('data', chunk => {
+          body += chunk;
+        });
+        req.on('end', async () => {
+          let json: any;
+          try {
+            json = body ? JSON.parse(body) : null;
+          } catch {
+            res.writeHead(400).end(
+              JSON.stringify({
+                jsonrpc: '2.0',
+                error: {code: -32700, message: 'Parse error'},
+                id: null,
+              }),
+            );
+            return;
+          }
+
+          let transport: StreamableHTTPServerTransport | undefined;
+          if (sessionId && transports[sessionId]) {
+            transport = transports[sessionId];
+          } else if (!sessionId && isInitializeRequest(json)) {
+            transport = new StreamableHTTPServerTransport({
+              sessionIdGenerator: () => randomUUID(),
+              onsessioninitialized: newSessionId => {
+                transports[newSessionId] = transport!;
+              },
+            });
+            transport.onclose = () => {
+              if (transport?.sessionId) {
+                delete transports[transport.sessionId];
+              }
+            };
+            await server.connect(transport);
+          } else {
+            res.writeHead(400).end(
+              JSON.stringify({
+                jsonrpc: '2.0',
+                error: {
+                  code: -32000,
+                  message: 'Bad Request: No valid session ID provided',
+                },
+                id: null,
+              }),
+            );
+            return;
+          }
+
+          try {
+            await transport.handleRequest(req, res, json);
+          } catch (error) {
+            if (!res.headersSent) {
+              res.writeHead(500).end(
+                JSON.stringify({
+                  jsonrpc: '2.0',
+                  error: {
+                    code: -32603,
+                    message:
+                      error instanceof Error
+                        ? error.message
+                        : String(error),
+                  },
+                  id: null,
+                }),
+              );
+            }
+          }
+        });
+        return;
+      }
+
+      if (req.method === 'GET' || req.method === 'DELETE') {
+        if (!sessionId || !transports[sessionId]) {
+          res.writeHead(400).end('Invalid or missing session ID');
+          return;
+        }
+        try {
+          await transports[sessionId].handleRequest(req, res);
+        } catch (error) {
+          if (!res.headersSent) {
+            res.writeHead(500).end(
+              JSON.stringify({
+                jsonrpc: '2.0',
+                error: {
+                  code: -32603,
+                  message:
+                    error instanceof Error ? error.message : String(error),
+                },
+                id: null,
+              }),
+            );
+          }
+        }
+        return;
+      }
+
+      res.writeHead(405).end();
+    });
+
+    serverHttp.listen(httpPort, httpHost, () => {
+      console.error(`[http] MCP Streamable HTTP listening on http://${httpHost}:${httpPort}/mcp`);
+    });
+  }
+}

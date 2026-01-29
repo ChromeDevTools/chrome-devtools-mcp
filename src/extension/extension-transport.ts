@@ -8,15 +8,35 @@ import { RelayServer } from './relay-server.js';
 
 export class ExtensionTransport implements ConnectionTransport {
   private relay: RelayServer;
-  private pendingCallbacks: Map<number, { resolve: (result: any) => void; reject: (error: Error) => void }>;
-  private nextId: number = 0;
+  private targetInfo?: {
+    targetId: string;
+    type: string;
+    title: string;
+    url: string;
+    canActivate?: boolean;
+    browserContextId?: string;
+  };
+  private sessionByTargetId: Map<string, string>;
+  private browserTargetId = 'browser';
+  private browserSessionId = 'ext-browser';
 
   onmessage?: (message: string) => void;
   onclose?: () => void;
 
-  constructor(relay: RelayServer) {
+  constructor(
+    relay: RelayServer,
+    _targetInfo?: {
+      targetId: string;
+      type: string;
+      title: string;
+      url: string;
+      canActivate?: boolean;
+      browserContextId?: string;
+    },
+  ) {
     this.relay = relay;
-    this.pendingCallbacks = new Map();
+    this.targetInfo = _targetInfo;
+    this.sessionByTargetId = new Map();
 
     // Set up relay event handlers
     this.relay.on('cdp-result', ({ id, result }) => {
@@ -27,8 +47,8 @@ export class ExtensionTransport implements ConnectionTransport {
       this.handleCDPError(id, error);
     });
 
-    this.relay.on('cdp-event', ({ method, params }) => {
-      this.handleCDPEvent(method, params);
+    this.relay.on('cdp-event', ({ method, params, sessionId }) => {
+      this.handleCDPEvent(method, params, sessionId);
     });
 
     this.relay.on('disconnected', () => {
@@ -37,6 +57,16 @@ export class ExtensionTransport implements ConnectionTransport {
 
     this.relay.on('detached', (reason) => {
       this.handleDetach(reason);
+    });
+
+    // Fast-path: immediately emit a single target to avoid waiting on discovery.
+    queueMicrotask(() => {
+      if (!this.targetInfo) return;
+      this.emitTargetCreated();
+      const info = this.getTargetInfo(undefined, true);
+      if (info) {
+        this.emitAttached(this.getSessionId(this.targetInfo.targetId), info);
+      }
     });
   }
 
@@ -47,8 +77,20 @@ export class ExtensionTransport implements ConnectionTransport {
     try {
       const msg = JSON.parse(message);
 
-      // Send command through relay
-      this.relay.sendCDPCommand(msg.id, msg.method, msg.params);
+      if (typeof msg.method === 'string' && msg.method.startsWith('Target.')) {
+        this.handleTargetCommand(msg);
+        return;
+      }
+
+      this.relay.sendMessage({
+        id: msg.id,
+        method: 'forwardCDPCommand',
+        params: {
+          sessionId: msg.sessionId,
+          method: msg.method,
+          params: msg.params ?? {},
+        },
+      });
 
       // Store callback for later resolution
       // Note: We'll resolve this when we get the result from the extension
@@ -105,12 +147,16 @@ export class ExtensionTransport implements ConnectionTransport {
   /**
    * Handle CDP event from Extension
    */
-  private handleCDPEvent(method: string, params: any): void {
+  private handleCDPEvent(method: string, params: any, sessionId?: string): void {
+    if (method.startsWith('Target.')) {
+      return;
+    }
     // Forward event to Puppeteer via onmessage
     if (this.onmessage) {
       const message = JSON.stringify({
         method,
-        params
+        params,
+        ...(sessionId ? {sessionId} : {}),
       });
       this.onmessage(message);
     }
@@ -134,5 +180,141 @@ export class ExtensionTransport implements ConnectionTransport {
     if (this.onclose) {
       this.onclose();
     }
+  }
+
+  private handleTargetCommand(message: {
+    id: number;
+    method: string;
+    params?: any;
+  }): void {
+    const params = message.params ?? {};
+    switch (message.method) {
+      case 'Target.getBrowserContexts':
+        this.sendResult(message.id, { browserContextIds: ['default'] });
+        return;
+      case 'Target.setDiscoverTargets':
+        this.emitTargetCreated();
+        this.sendResult(message.id, {});
+        return;
+      case 'Target.getTargets':
+        this.sendResult(message.id, { targetInfos: this.getTargetInfos() });
+        return;
+      case 'Target.getTargetInfo':
+        this.sendResult(message.id, {
+          targetInfo: this.getTargetInfo(params.targetId, true),
+        });
+        return;
+      case 'Target.attachToBrowserTarget': {
+        this.emitAttached(this.browserSessionId, this.getBrowserTarget());
+        this.sendResult(message.id, { sessionId: this.browserSessionId });
+        return;
+      }
+      case 'Target.attachToTarget': {
+        const targetId = String(params.targetId ?? this.targetInfo?.targetId ?? '');
+        const sessionId = this.getSessionId(targetId);
+        this.emitAttached(sessionId, this.getTargetInfo(targetId, true));
+        this.sendResult(message.id, { sessionId });
+        return;
+      }
+      case 'Target.setAutoAttach': {
+        this.emitAttached(this.browserSessionId, this.getBrowserTarget());
+        const target = this.getTargetInfo(undefined, true);
+        if (target) {
+          this.emitAttached(this.getSessionId(target.targetId), target);
+        }
+        this.sendResult(message.id, {});
+        return;
+      }
+      case 'Target.activateTarget':
+      case 'Target.closeTarget':
+        this.sendResult(message.id, {});
+        return;
+      case 'Target.detachFromTarget': {
+        const targetId = String(params.targetId ?? '');
+        const sessionId = this.getSessionId(targetId);
+        this.emitEvent('Target.detachedFromTarget', { sessionId, targetId });
+        this.sendResult(message.id, {});
+        return;
+      }
+      default:
+        this.sendResult(message.id, {});
+    }
+  }
+
+  private sendResult(id: number, result: any) {
+    if (!this.onmessage) return;
+    this.onmessage(JSON.stringify({ id, result }));
+  }
+
+  private emitEvent(method: string, params: any) {
+    if (!this.onmessage) return;
+    this.onmessage(JSON.stringify({ method, params }));
+  }
+
+  private emitTargetCreated() {
+    this.emitEvent('Target.targetCreated', {
+      targetInfo: this.getBrowserTarget(),
+    });
+    const target = this.getTargetInfo(undefined, false);
+    if (target) {
+      this.emitEvent('Target.targetCreated', { targetInfo: target });
+    }
+  }
+
+  private emitAttached(sessionId: string, targetInfo: any) {
+    this.emitEvent('Target.attachedToTarget', {
+      sessionId,
+      targetInfo,
+      waitingForDebugger: false,
+    });
+  }
+
+  private getBrowserTarget() {
+    return {
+      targetId: this.browserTargetId,
+      type: 'browser',
+      title: 'Chrome',
+      url: '',
+      attached: true,
+      canActivate: false,
+      browserContextId: 'default',
+    };
+  }
+
+  private getTargetInfo(targetId?: string, attached: boolean = false) {
+    if (targetId === this.browserTargetId) {
+      return this.getBrowserTarget();
+    }
+    if (!this.targetInfo) {
+      return undefined;
+    }
+    if (targetId && targetId !== this.targetInfo.targetId) {
+      return undefined;
+    }
+    return {
+      ...this.targetInfo,
+      attached,
+      canActivate: true,
+      browserContextId: this.targetInfo.browserContextId ?? 'default',
+    };
+  }
+
+  private getTargetInfos() {
+    const targets = [this.getBrowserTarget()];
+    const target = this.getTargetInfo(undefined, false);
+    if (target) {
+      targets.push(target);
+    }
+    return targets;
+  }
+
+  private getSessionId(targetId?: string) {
+    if (!targetId || targetId === this.browserTargetId) {
+      return this.browserSessionId;
+    }
+    if (!this.sessionByTargetId.has(targetId)) {
+      this.sessionByTargetId.set(targetId, `ext-${targetId}`);
+    }
+    return this.sessionByTargetId.get(targetId) ?? `ext-${targetId}`;
   }
 }

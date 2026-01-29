@@ -26,6 +26,7 @@
 import type {ToolRegistry} from '../plugin-api.js';
 
 import * as chatgptWebTools from './chatgpt-web.js';
+import * as chatgptGeminiWebTools from './chatgpt-gemini-web.js';
 import * as geminiImageTools from './gemini-image.js';
 import * as geminiWebTools from './gemini-web.js';
 
@@ -34,6 +35,7 @@ import * as geminiWebTools from './gemini-web.js';
  */
 export const optionalTools = [
   ...Object.values(chatgptWebTools),
+  ...Object.values(chatgptGeminiWebTools),
   ...Object.values(geminiImageTools),
   ...Object.values(geminiWebTools),
 ];
@@ -102,9 +104,14 @@ export function getOptionalToolCount(): number {
  */
 export const WEB_LLM_TOOLS_INFO = {
   disclaimer:
-    'Web-LLM tools (ask_chatgpt_web, ask_gemini_web, ask_gemini_image) are experimental and best-effort. ' +
+    'Web-LLM tools (ask_chatgpt_web, ask_gemini_web, ask_chatgpt_gemini_web, ask_gemini_image) are experimental and best-effort. ' +
     'They depend on specific website UIs and may break when those UIs change. ' +
     'For production use, consider using official APIs instead.',
   disableEnvVar: 'MCP_DISABLE_WEB_LLM',
-  tools: ['ask_chatgpt_web', 'ask_gemini_image', 'ask_gemini_web'],
+  tools: [
+    'ask_chatgpt_web',
+    'ask_gemini_web',
+    'ask_chatgpt_gemini_web',
+    'ask_gemini_image',
+  ],
 };

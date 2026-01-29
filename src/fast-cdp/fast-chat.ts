@@ -1,0 +1,1229 @@
+import fs from 'node:fs/promises';
+import path from 'node:path';
+
+import {connectViaExtensionRaw} from './extension-raw.js';
+import {CdpClient} from './cdp-client.js';
+
+let chatgptClient: CdpClient | null = null;
+let geminiClient: CdpClient | null = null;
+
+function nowMs(): number {
+  return Date.now();
+}
+
+type SessionStore = {
+  projects: Record<
+    string,
+    {
+      chatgpt?: {url: string; lastUsed: string};
+      gemini?: {url: string; lastUsed: string};
+    }
+  >;
+};
+
+function getProjectName(): string {
+  return path.basename(process.cwd()) || 'default';
+}
+
+function getSessionPath(): string {
+  return path.join(process.cwd(), '.local', 'chrome-ai-bridge', 'sessions.json');
+}
+
+function getHistoryPath(): string {
+  return path.join(process.cwd(), '.local', 'chrome-ai-bridge', 'history.jsonl');
+}
+
+async function loadSessions(): Promise<SessionStore> {
+  try {
+    const data = await fs.readFile(getSessionPath(), 'utf-8');
+    const parsed = JSON.parse(data) as SessionStore;
+    if (parsed && typeof parsed === 'object' && parsed.projects) {
+      return parsed;
+    }
+  } catch {
+    // ignore
+  }
+  return {projects: {}};
+}
+
+async function saveSession(kind: 'chatgpt' | 'gemini', url: string): Promise<void> {
+  const project = getProjectName();
+  const sessions = await loadSessions();
+  if (!sessions.projects[project]) {
+    sessions.projects[project] = {};
+  }
+  sessions.projects[project][kind] = {
+    url,
+    lastUsed: new Date().toISOString(),
+  };
+  const targetPath = getSessionPath();
+  await fs.mkdir(path.dirname(targetPath), {recursive: true});
+  await fs.writeFile(targetPath, JSON.stringify(sessions, null, 2), 'utf-8');
+}
+
+async function appendHistory(entry: {
+  provider: 'chatgpt' | 'gemini';
+  question: string;
+  answer: string;
+  url?: string;
+  timings?: Record<string, number>;
+}): Promise<void> {
+  const project = getProjectName();
+  const payload = {
+    ts: new Date().toISOString(),
+    project,
+    ...entry,
+  };
+  const targetPath = getHistoryPath();
+  await fs.mkdir(path.dirname(targetPath), {recursive: true});
+  await fs.appendFile(targetPath, `${JSON.stringify(payload)}\n`, 'utf-8');
+}
+
+async function saveDebug(kind: 'chatgpt' | 'gemini', payload: Record<string, any>) {
+  const targetDir = path.join(process.cwd(), '.local', 'chrome-ai-bridge', 'debug');
+  await fs.mkdir(targetDir, {recursive: true});
+  const file = path.join(targetDir, `${kind}-${Date.now()}.json`);
+  await fs.writeFile(file, JSON.stringify(payload, null, 2), 'utf-8');
+}
+
+async function getPreferredUrl(kind: 'chatgpt' | 'gemini'): Promise<string | null> {
+  const project = getProjectName();
+  const sessions = await loadSessions();
+  const entry = sessions.projects[project]?.[kind];
+  return entry?.url || null;
+}
+
+function normalizeGeminiResponse(text: string, question?: string): string {
+  if (!text) return '';
+  const filtered = text
+    .split('\n')
+    .map(line => line.trim())
+    .filter(
+      line =>
+        line &&
+        !/^思考プロセスを表示/.test(line) &&
+        !/^次へのステップ/.test(line) &&
+        !/^Show thinking/i.test(line) &&
+        !/^Next steps/i.test(line) &&
+        !/^(Gemini|PRO|作成したもの|Gemini との会話|ツール|思考モード|今すぐ回答)$/i.test(line) &&
+        !/^Initiating Connection Check/i.test(line) &&
+        !/^Acknowledging Connection Test/i.test(line) &&
+        !/^Confirming Connection Integrity/i.test(line),
+    );
+  const cleaned = filtered
+    .filter(line => (question ? line !== question.trim() : true))
+    .join('\n')
+    .trim();
+  return cleaned;
+}
+
+function isSuspiciousAnswer(answer: string, question: string): boolean {
+  const trimmed = answer.trim();
+  if (!trimmed) return true;
+  if (question.trim() === 'OK') return false;
+  if (/\d/.test(question) && !/\d/.test(trimmed)) return true;
+  if (/^ok$/i.test(trimmed)) return true;
+  return false;
+}
+
+async function getClient(kind: 'chatgpt' | 'gemini'): Promise<CdpClient> {
+  const existing = kind === 'chatgpt' ? chatgptClient : geminiClient;
+  if (existing) return existing;
+
+  const preferred = await getPreferredUrl(kind);
+  const tabUrl =
+    preferred ||
+    (kind === 'chatgpt' ? 'https://chatgpt.com/' : 'https://gemini.google.com/');
+  let relayResult;
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      relayResult = await connectViaExtensionRaw({
+        tabUrl,
+        newTab: true,
+      });
+      lastError = undefined;
+      break;
+    } catch (error) {
+      lastError = error;
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+  }
+  if (!relayResult) {
+    throw lastError instanceof Error ? lastError : new Error(String(lastError));
+  }
+  const client = new CdpClient(relayResult.relay);
+  await client.send('Runtime.enable');
+  await client.send('DOM.enable');
+  await client.send('Page.enable');
+
+  if (kind === 'chatgpt') {
+    chatgptClient = client;
+  } else {
+    geminiClient = client;
+  }
+  return client;
+}
+
+async function navigate(client: CdpClient, url: string) {
+  await client.send('Page.navigate', {url});
+  await client.waitForFunction(`document.readyState === 'complete'`, 30000);
+}
+
+export async function askChatGPTFast(question: string): Promise<string> {
+  const t0 = nowMs();
+  const timings: Record<string, number> = {};
+  const client = await getClient('chatgpt');
+  timings.connectMs = nowMs() - t0;
+  const normalizedQuestion = question.replace(/\s+/g, '');
+
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const tUrl = nowMs();
+    const currentUrl = await client.evaluate<string>('location.href');
+    const pageTitle = await client.evaluate<string>('document.title');
+    const lastUserText = await client.evaluate<string>(`(() => {
+      const msgs = document.querySelectorAll('[data-message-author-role="user"]');
+      const last = msgs[msgs.length - 1];
+      return last ? (last.textContent || '') : '';
+    })()`);
+    if (attempt === 1) {
+      await navigate(client, 'https://chatgpt.com/');
+    } else if (
+      (pageTitle && pageTitle.includes('接続テスト')) ||
+      (lastUserText && lastUserText.includes('接続テスト'))
+    ) {
+      await navigate(client, 'https://chatgpt.com/');
+    } else if (!currentUrl || !currentUrl.includes('chatgpt.com')) {
+      const preferred = await getPreferredUrl('chatgpt');
+      await navigate(client, preferred || 'https://chatgpt.com/');
+    } else {
+      const preferred = await getPreferredUrl('chatgpt');
+      if (preferred && !currentUrl.startsWith(preferred)) {
+        await navigate(client, preferred);
+      }
+    }
+    timings.navigateMs = nowMs() - tUrl;
+
+    const tWaitInput = nowMs();
+    await client.waitForFunction(
+      `(
+        !!document.querySelector('textarea#prompt-textarea') ||
+        !!document.querySelector('textarea[data-testid="prompt-textarea"]') ||
+        !!document.querySelector('.ProseMirror[contenteditable="true"]')
+      )`,
+      30000,
+    );
+    timings.waitInputMs = nowMs() - tWaitInput;
+
+    const sanitized = JSON.stringify(question);
+    const tInput = nowMs();
+    await client.evaluate(`
+      (() => {
+        const text = ${sanitized};
+        const preferredTextarea =
+          document.querySelector('textarea#prompt-textarea') ||
+          document.querySelector('textarea[data-testid="prompt-textarea"]');
+        const preferredEditable = document.querySelector('.ProseMirror[contenteditable="true"]');
+        const isVisible = (el) => {
+          if (!el) return false;
+          const rects = el.getClientRects();
+          if (!rects || rects.length === 0) return false;
+          const style = window.getComputedStyle(el);
+          return style && style.visibility !== 'hidden' && style.display !== 'none';
+        };
+        if (preferredEditable) {
+          preferredEditable.innerHTML = '';
+          const p = document.createElement('p');
+          p.textContent = text;
+          preferredEditable.appendChild(p);
+          preferredEditable.dispatchEvent(new Event('input', {bubbles: true}));
+          return true;
+        }
+        const preferred = preferredTextarea || preferredEditable;
+        if (preferred) {
+          preferred.focus();
+          if (preferred.tagName === 'TEXTAREA') {
+            preferred.value = text;
+            const inputEvent = typeof InputEvent !== 'undefined'
+              ? new InputEvent('input', {bubbles: true, inputType: 'insertText', data: text})
+              : new Event('input', {bubbles: true});
+            preferred.dispatchEvent(inputEvent);
+            preferred.dispatchEvent(new Event('change', {bubbles: true}));
+            return true;
+          }
+        if (preferred.isContentEditable) {
+          preferred.focus();
+          if (document.execCommand) {
+            const range = document.createRange();
+            range.selectNodeContents(preferred);
+            range.collapse(false);
+            const selection = window.getSelection();
+            if (selection) {
+              selection.removeAllRanges();
+              selection.addRange(range);
+            }
+            document.execCommand('insertText', false, text);
+          } else {
+            preferred.innerHTML = '';
+            const p = document.createElement('p');
+            p.textContent = text;
+            preferred.appendChild(p);
+          }
+          preferred.dispatchEvent(new Event('input', {bubbles: true}));
+          return true;
+        }
+        }
+        const candidates = [
+          ...Array.from(document.querySelectorAll('textarea')),
+          ...Array.from(document.querySelectorAll('div[contenteditable="true"]')),
+        ].filter(isVisible);
+        const pick =
+          candidates.sort((a, b) => {
+            const ra = a.getBoundingClientRect();
+            const rb = b.getBoundingClientRect();
+            return rb.width * rb.height - ra.width * ra.height;
+          })[0] || null;
+        if (!pick) return false;
+        pick.focus();
+        if (pick.tagName === 'TEXTAREA') {
+          pick.value = text;
+          const inputEvent = typeof InputEvent !== 'undefined'
+            ? new InputEvent('input', {bubbles: true, inputType: 'insertText', data: text})
+            : new Event('input', {bubbles: true});
+          pick.dispatchEvent(inputEvent);
+          pick.dispatchEvent(new Event('change', {bubbles: true}));
+          return true;
+        }
+        if (pick.isContentEditable) {
+          pick.focus();
+          if (document.execCommand) {
+            const range = document.createRange();
+            range.selectNodeContents(pick);
+            range.collapse(false);
+            const selection = window.getSelection();
+            if (selection) {
+              selection.removeAllRanges();
+              selection.addRange(range);
+            }
+            document.execCommand('insertText', false, text);
+          } else {
+            pick.innerHTML = '';
+            const p = document.createElement('p');
+            p.textContent = text;
+            pick.appendChild(p);
+          }
+          pick.dispatchEvent(new Event('input', {bubbles: true}));
+          return true;
+        }
+        return false;
+      })()
+    `);
+    timings.inputMs = nowMs() - tInput;
+    let inputMatched = await client.evaluate<boolean>(`
+      (() => {
+        const preferredTextarea =
+          document.querySelector('textarea#prompt-textarea') ||
+          document.querySelector('textarea[data-testid="prompt-textarea"]');
+        const preferredEditable = document.querySelector('.ProseMirror[contenteditable="true"]');
+        const isVisible = (el) => {
+          if (!el) return false;
+          const rects = el.getClientRects();
+          if (!rects || rects.length === 0) return false;
+          const style = window.getComputedStyle(el);
+          return style && style.visibility !== 'hidden' && style.display !== 'none';
+        };
+        if (preferredTextarea) {
+          const text = preferredTextarea.value || '';
+          return text.replace(/\\s+/g, '').includes(${JSON.stringify(normalizedQuestion)});
+        }
+        if (preferredEditable) {
+          const text = preferredEditable.textContent || '';
+          return text.replace(/\\s+/g, '').includes(${JSON.stringify(normalizedQuestion)});
+        }
+        const candidates = [
+          ...Array.from(document.querySelectorAll('textarea')),
+          ...Array.from(document.querySelectorAll('div[contenteditable="true"]')),
+        ].filter(isVisible);
+        const pick =
+          candidates.sort((a, b) => {
+            const ra = a.getBoundingClientRect();
+            const rb = b.getBoundingClientRect();
+            return rb.width * rb.height - ra.width * ra.height;
+          })[0] || null;
+        const text =
+          pick && pick.tagName === 'TEXTAREA'
+            ? pick.value || ''
+            : pick
+              ? pick.textContent || ''
+              : '';
+        return text.replace(/\\s+/g, '').includes(${JSON.stringify(normalizedQuestion)});
+      })()
+    `);
+    if (!inputMatched) {
+      await client.evaluate(`
+        (() => {
+          const target =
+            document.querySelector('#prompt-textarea') ||
+            document.querySelector('.ProseMirror[contenteditable="true"]') ||
+            document.querySelector('textarea');
+          if (target) {
+            target.focus();
+            target.click?.();
+          }
+        })()
+      `);
+      await client.send('Input.insertText', {text: question});
+      inputMatched = await client.evaluate<boolean>(`
+        (() => {
+          const preferredTextarea =
+            document.querySelector('textarea#prompt-textarea') ||
+            document.querySelector('textarea[data-testid="prompt-textarea"]');
+          const preferredEditable = document.querySelector('.ProseMirror[contenteditable="true"]');
+          if (preferredTextarea) {
+            const text = preferredTextarea.value || '';
+            return text.replace(/\\s+/g, '').includes(${JSON.stringify(normalizedQuestion)});
+          }
+          if (preferredEditable) {
+            const text = preferredEditable.textContent || '';
+            return text.replace(/\\s+/g, '').includes(${JSON.stringify(normalizedQuestion)});
+          }
+          return false;
+        })()
+      `);
+      if (!inputMatched) {
+        await client.send('Input.dispatchKeyEvent', {
+          type: 'keyDown',
+          key: 'a',
+          code: 'KeyA',
+          windowsVirtualKeyCode: 65,
+          modifiers: 2,
+        });
+        await client.send('Input.dispatchKeyEvent', {
+          type: 'keyUp',
+          key: 'a',
+          code: 'KeyA',
+          windowsVirtualKeyCode: 65,
+          modifiers: 2,
+        });
+        await client.send('Input.dispatchKeyEvent', {
+          type: 'keyDown',
+          key: 'Backspace',
+          code: 'Backspace',
+          windowsVirtualKeyCode: 8,
+        });
+        await client.send('Input.dispatchKeyEvent', {
+          type: 'keyUp',
+          key: 'Backspace',
+          code: 'Backspace',
+          windowsVirtualKeyCode: 8,
+        });
+        for (const ch of question) {
+          await client.send('Input.dispatchKeyEvent', {type: 'char', text: ch});
+        }
+        inputMatched = await client.evaluate<boolean>(`
+          (() => {
+            const preferredTextarea =
+              document.querySelector('textarea#prompt-textarea') ||
+              document.querySelector('textarea[data-testid="prompt-textarea"]');
+            const preferredEditable = document.querySelector('.ProseMirror[contenteditable="true"]');
+            if (preferredTextarea) {
+              const text = preferredTextarea.value || '';
+              return text.replace(/\\s+/g, '').includes(${JSON.stringify(normalizedQuestion)});
+            }
+            if (preferredEditable) {
+              const text = preferredEditable.textContent || '';
+              return text.replace(/\\s+/g, '').includes(${JSON.stringify(normalizedQuestion)});
+            }
+            return false;
+          })()
+        `);
+      }
+      if (!inputMatched) {
+        throw new Error('ChatGPT input mismatch after typing.');
+      }
+    }
+
+    const initialUserCount = await client.evaluate<number>(
+      `document.querySelectorAll('[data-message-author-role="user"]').length`,
+    );
+    const tSend = nowMs();
+    const sendClicked = await client.evaluate<boolean>(`
+      (() => {
+        const collectDeep = (selectorList) => {
+          const results = [];
+          const seen = new Set();
+          const visit = (root) => {
+            if (!root) return;
+            for (const sel of selectorList) {
+              try {
+                root.querySelectorAll?.(sel)?.forEach(el => {
+                  if (!seen.has(el)) {
+                    seen.add(el);
+                    results.push(el);
+                  }
+                });
+              } catch {
+                // ignore selector errors
+              }
+            }
+            const elements = root.querySelectorAll ? Array.from(root.querySelectorAll('*')) : [];
+            for (const el of elements) {
+              if (el.shadowRoot) visit(el.shadowRoot);
+            }
+          };
+          visit(document);
+          return results;
+        };
+        const isDisabled = (el) =>
+          !el ||
+          el.disabled ||
+          el.getAttribute('disabled') === 'true' ||
+          el.getAttribute('aria-disabled') === 'true';
+        const buttons = collectDeep(['button', '[role="button"]']);
+        const sendButton =
+          buttons.find(b => b.getAttribute('data-testid') === 'send-button') ||
+          buttons.find(b =>
+            (b.getAttribute('aria-label') || '').includes('送信') ||
+            (b.getAttribute('aria-label') || '').includes('Send') ||
+            (b.textContent || '').includes('送信') ||
+            (b.textContent || '').includes('Send') ||
+            b.querySelector('mat-icon[data-mat-icon-name="send"]')
+          );
+        if (sendButton && !isDisabled(sendButton)) {
+          sendButton.click();
+          return true;
+        }
+        const textarea =
+          document.querySelector('textarea#prompt-textarea') ||
+          document.querySelector('textarea[data-testid="prompt-textarea"]') ||
+          document.querySelector('textarea');
+        if (textarea && textarea.form) {
+          if (textarea.form.requestSubmit) {
+            textarea.form.requestSubmit();
+            return true;
+          }
+          if (textarea.form.submit) {
+            textarea.form.submit();
+            return true;
+          }
+        }
+        const editable =
+          document.querySelector('.ProseMirror[contenteditable="true"]') || textarea;
+        if (editable) {
+          const eventInit = {bubbles: true, cancelable: true, key: 'Enter', code: 'Enter', keyCode: 13, which: 13};
+          editable.dispatchEvent(new KeyboardEvent('keydown', eventInit));
+          editable.dispatchEvent(new KeyboardEvent('keyup', eventInit));
+          return true;
+        }
+        return false;
+      })()
+    `);
+    if (!sendClicked) {
+      throw new Error('ChatGPT send button was not clickable.');
+    }
+    try {
+      await client.waitForFunction(
+        `document.querySelectorAll('[data-message-author-role="user"]').length > ${initialUserCount} || location.href.includes('/c/')`,
+        15000,
+      );
+      const urlNow = await client.evaluate<string>('location.href');
+      if (urlNow.includes('/c/')) {
+        await client.waitForFunction(
+          `document.querySelectorAll('[data-message-author-role="user"]').length > 0`,
+          15000,
+        );
+      }
+    } catch (error) {
+      const debugPayload = await client.evaluate<Record<string, any>>(`(() => {
+        const msgs = document.querySelectorAll('[data-message-author-role=\"user\"]');
+        const textarea =
+          document.querySelector('textarea#prompt-textarea') ||
+          document.querySelector('textarea[data-testid=\"prompt-textarea\"]') ||
+          document.querySelector('textarea');
+        const sendButton = document.querySelector('button[data-testid=\"send-button\"]');
+        const iframes = Array.from(document.querySelectorAll('iframe')).map(frame => ({
+          src: frame.getAttribute('src') || '',
+          id: frame.id || '',
+          name: frame.name || '',
+          title: frame.title || ''
+        }));
+        return {
+          url: location.href,
+          title: document.title,
+          userCount: msgs.length,
+          textareaValue: textarea ? textarea.value || '' : '',
+          textareaDisabled: textarea ? textarea.disabled || textarea.getAttribute('aria-disabled') === 'true' : null,
+          textareaHasForm: textarea ? Boolean(textarea.form) : null,
+          formAction: textarea && textarea.form ? textarea.form.action || '' : '',
+          sendButtonDisabled: sendButton ? sendButton.disabled || sendButton.getAttribute('aria-disabled') === 'true' : null,
+          iframeCount: iframes.length,
+          iframes: iframes.slice(0, 5),
+        };
+      })()`);
+      await saveDebug('chatgpt', {
+        reason: 'userMessageTimeout',
+        question,
+        attempt,
+        ...debugPayload,
+      });
+      throw new Error(`ChatGPT send did not create a new user message: ${String(error)}`);
+    }
+    const userMessageMatched = await client.evaluate<boolean>(`
+      (() => {
+        const msgs = document.querySelectorAll('[data-message-author-role="user"]');
+        const last = msgs[msgs.length - 1];
+        if (!last) return false;
+        const text = (last.textContent || '').replace(/\\s+/g, '');
+        return text.includes(${JSON.stringify(normalizedQuestion)});
+      })()
+    `);
+    if (!userMessageMatched) {
+      const debugPayload = await client.evaluate<Record<string, any>>(`(() => {
+        const msgs = document.querySelectorAll('[data-message-author-role=\"user\"]');
+        const last = msgs[msgs.length - 1];
+        const input = document.querySelector('.ProseMirror[contenteditable=\"true\"]');
+        const textarea =
+          document.querySelector('textarea#prompt-textarea') ||
+          document.querySelector('textarea[data-testid=\"prompt-textarea\"]') ||
+          document.querySelector('textarea');
+        const candidates = [
+          ...Array.from(document.querySelectorAll('textarea')),
+          ...Array.from(document.querySelectorAll('div[contenteditable=\"true\"]')),
+        ].slice(0, 5).map(el => ({
+          tag: el.tagName,
+          id: el.id || '',
+          className: el.className || '',
+          dataTestid: el.getAttribute('data-testid') || '',
+          ariaLabel: el.getAttribute('aria-label') || '',
+          contentEditable: el.isContentEditable,
+          value: 'value' in el ? el.value || '' : '',
+          text: (el.textContent || '').slice(0, 120),
+        }));
+        return {
+          url: location.href,
+          title: document.title,
+          userCount: msgs.length,
+          lastUserText: last ? (last.innerText || last.textContent || '') : '',
+          inputText: input ? (input.innerText || input.textContent || '') : '',
+          textareaValue: textarea ? textarea.value || '' : '',
+          inputCandidates: candidates,
+        };
+      })()`);
+      await saveDebug('chatgpt', {
+        reason: 'userMessageMismatch',
+        question,
+        attempt,
+        ...debugPayload,
+      });
+      if (attempt === 0) {
+        continue;
+      }
+      throw new Error('ChatGPT user message did not match the question.');
+    }
+    timings.sendMs = nowMs() - tSend;
+
+    const initialAssistantCount = await client.evaluate<number>(
+      `document.querySelectorAll('[data-message-author-role=\"assistant\"]').length`,
+    );
+
+    const tWaitResp = nowMs();
+    const start = Date.now();
+    while (Date.now() - start < 60000) {
+      const status = await client.evaluate<{
+        completed: boolean;
+        text?: string;
+      }>(`
+        (() => {
+        const stop = document.querySelector('button[data-testid="stop-button"]');
+        const buttons = Array.from(document.querySelectorAll('button'));
+        const textStop = buttons.some(btn =>
+          (btn.textContent || '').includes('ストリーミングの停止') ||
+          (btn.textContent || '').includes('停止')
+        );
+        const streaming = !!stop || textStop;
+          const messages = document.querySelectorAll('[data-message-author-role="assistant"]');
+          if (!streaming && messages.length > ${initialAssistantCount}) {
+            const msg = messages[messages.length - 1];
+            if (!msg) return {completed: true, text: ''};
+            const content =
+              msg.querySelector?.('.markdown, .prose, .markdown.prose, .message-content') || msg;
+            const extractText = (root) => {
+              if (!root) return '';
+              const parts = [];
+              const visit = (node) => {
+                if (!node) return;
+                if (node.nodeType === Node.TEXT_NODE) {
+                  const value = node.textContent;
+                  if (value) parts.push(value);
+                  return;
+                }
+                if (node.shadowRoot) visit(node.shadowRoot);
+                const children = node.childNodes ? Array.from(node.childNodes) : [];
+                for (const child of children) visit(child);
+              };
+              visit(root);
+              return parts.join(' ').replace(/\\s+/g, ' ').trim();
+            };
+            return {completed: true, text: extractText(content)};
+          }
+          return {completed: false};
+        })()
+      `);
+      if (status.completed) {
+        const answer = status.text || '';
+        if (!isSuspiciousAnswer(answer, question) || attempt === 1) {
+          const finalUrl = await client.evaluate<string>('location.href');
+          if (isSuspiciousAnswer(answer, question)) {
+            const debugPayload = await client.evaluate<Record<string, any>>(`(() => {
+              const assistants = document.querySelectorAll('[data-message-author-role=\"assistant\"]');
+              const users = document.querySelectorAll('[data-message-author-role=\"user\"]');
+              const lastAssistant = assistants[assistants.length - 1];
+              const lastUser = users[users.length - 1];
+              return {
+                url: location.href,
+                title: document.title,
+                assistantCount: assistants.length,
+                userCount: users.length,
+                lastAssistantText: lastAssistant ? (lastAssistant.innerText || lastAssistant.textContent || '') : '',
+                lastAssistantHtml: lastAssistant ? (lastAssistant.outerHTML || '').slice(0, 20000) : '',
+                lastUserText: lastUser ? (lastUser.innerText || lastUser.textContent || '') : '',
+              };
+            })()`);
+            await saveDebug('chatgpt', {
+              question,
+              answer,
+              attempt,
+              ...debugPayload,
+            });
+          }
+          if (finalUrl && finalUrl.includes('chatgpt.com')) {
+            await saveSession('chatgpt', finalUrl);
+          }
+          timings.waitResponseMs = nowMs() - tWaitResp;
+          timings.totalMs = nowMs() - t0;
+          await appendHistory({
+            provider: 'chatgpt',
+            question,
+            answer,
+            url: finalUrl || undefined,
+            timings,
+          });
+          return answer;
+        }
+        break;
+      }
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+  }
+
+  throw new Error('Timed out waiting for ChatGPT response');
+}
+
+export async function askGeminiFast(question: string): Promise<string> {
+  const t0 = nowMs();
+  const timings: Record<string, number> = {};
+  const client = await getClient('gemini');
+  timings.connectMs = nowMs() - t0;
+
+  const tUrl = nowMs();
+  const currentUrl = await client.evaluate<string>('location.href');
+  if (!currentUrl || !currentUrl.includes('gemini.google.com')) {
+    const preferred = await getPreferredUrl('gemini');
+    await navigate(client, preferred || 'https://gemini.google.com/');
+  } else {
+    const preferred = await getPreferredUrl('gemini');
+    if (preferred && !currentUrl.startsWith(preferred)) {
+      await navigate(client, preferred);
+    }
+  }
+  timings.navigateMs = nowMs() - tUrl;
+
+  const tWaitInput = nowMs();
+  await client.waitForFunction(
+    `!!document.querySelector('[role="textbox"], div[contenteditable="true"], textarea') || !!document.querySelector('a[href*="accounts.google.com"]')`,
+    15000,
+  );
+  timings.waitInputMs = nowMs() - tWaitInput;
+
+  const sanitized = JSON.stringify(question);
+  const tInput = nowMs();
+  const inputOk = await client.evaluate<boolean>(`
+    (() => {
+      const text = ${sanitized};
+      const collectDeep = (selectorList) => {
+        const results = [];
+        const seen = new Set();
+        const visit = (root) => {
+          if (!root) return;
+          for (const sel of selectorList) {
+            try {
+              root.querySelectorAll?.(sel)?.forEach(el => {
+                if (!seen.has(el)) {
+                  seen.add(el);
+                  results.push(el);
+                }
+              });
+            } catch {
+              // ignore selector errors
+            }
+          }
+          const elements = root.querySelectorAll ? Array.from(root.querySelectorAll('*')) : [];
+          for (const el of elements) {
+            if (el.shadowRoot) {
+              visit(el.shadowRoot);
+            }
+          }
+        };
+        visit(document);
+        return results;
+      };
+      const textbox =
+        collectDeep(['[role="textbox"]', 'div[contenteditable="true"]', 'textarea'])[0];
+      if (!textbox) return false;
+      textbox.focus();
+      if (textbox.isContentEditable) {
+        textbox.innerText = text;
+        textbox.dispatchEvent(new Event('input', {bubbles: true}));
+        textbox.dispatchEvent(new Event('change', {bubbles: true}));
+        return true;
+      }
+      if ('value' in textbox) {
+        textbox.value = text;
+        textbox.dispatchEvent(new Event('input', {bubbles: true}));
+        textbox.dispatchEvent(new Event('change', {bubbles: true}));
+        return true;
+      }
+      return false;
+    })()
+  `);
+  timings.inputMs = nowMs() - tInput;
+  if (!inputOk) {
+    const diagnostics = await client.evaluate(`
+      (() => {
+        const visible = (el) => {
+          if (!el) return false;
+          const rects = el.getClientRects();
+          if (!rects || rects.length === 0) return false;
+          const style = window.getComputedStyle(el);
+          return style && style.visibility !== 'hidden' && style.display !== 'none';
+        };
+        const collectDeep = (selector) => {
+          const results = [];
+          const seen = new Set();
+          const visit = (root) => {
+            if (!root) return;
+            try {
+              root.querySelectorAll?.(selector)?.forEach(el => {
+                if (!seen.has(el)) {
+                  seen.add(el);
+                  results.push(el);
+                }
+              });
+            } catch {
+              // ignore
+            }
+            const elements = root.querySelectorAll ? Array.from(root.querySelectorAll('*')) : [];
+            for (const el of elements) {
+              if (el.shadowRoot) visit(el.shadowRoot);
+            }
+          };
+          visit(document);
+          return results;
+        };
+        const counts = (selector) => {
+          const nodes = collectDeep(selector);
+          const visibleNodes = nodes.filter(visible);
+          return {all: nodes.length, visible: visibleNodes.length};
+        };
+        return {
+          url: location.href,
+          contenteditable: counts('[contenteditable]'),
+          roleTextbox: counts('[role=\"textbox\"]'),
+          textarea: counts('textarea'),
+          inputText: counts('input[type=\"text\"]'),
+        };
+      })()
+    `);
+    throw new Error(`Gemini input box not found: ${JSON.stringify(diagnostics)}`);
+  }
+
+  const normalizedQuestion = question.replace(/\s+/g, '');
+  const geminiInputMatched = await client.evaluate<boolean>(`
+    (() => {
+      const collectDeep = (selectorList) => {
+        const results = [];
+        const seen = new Set();
+        const visit = (root) => {
+          if (!root) return;
+          for (const sel of selectorList) {
+            try {
+              root.querySelectorAll?.(sel)?.forEach(el => {
+                if (!seen.has(el)) {
+                  seen.add(el);
+                  results.push(el);
+                }
+              });
+            } catch {
+              // ignore selector errors
+            }
+          }
+          const elements = root.querySelectorAll ? Array.from(root.querySelectorAll('*')) : [];
+          for (const el of elements) {
+            if (el.shadowRoot) {
+              visit(el.shadowRoot);
+            }
+          }
+        };
+        visit(document);
+        return results;
+      };
+      const textbox =
+        collectDeep(['[role="textbox"]', 'div[contenteditable="true"]', 'textarea'])[0];
+      if (!textbox) return false;
+      const text =
+        (textbox.isContentEditable ? textbox.innerText : textbox.value || textbox.textContent || '')
+          .replace(/\\s+/g, '');
+      return text.includes(${JSON.stringify(normalizedQuestion)});
+    })()
+  `);
+  if (!geminiInputMatched) {
+    throw new Error('Gemini input mismatch after typing.');
+  }
+
+  const geminiUserCountExpr = `(() => {
+    const selectors = ${JSON.stringify([
+      'user-query',
+      '.user-query',
+      '[data-test-id*="user"]',
+      '[data-test-id*="prompt"]',
+      '[data-message-author-role="user"]',
+      'message[author="user"]',
+      '[data-author="user"]',
+    ])};
+    const results = [];
+    const seen = new Set();
+    const collectDeep = (selectorList) => {
+      const visit = (root) => {
+        if (!root) return;
+        for (const sel of selectorList) {
+          try {
+            root.querySelectorAll?.(sel)?.forEach(el => {
+              if (!seen.has(el)) {
+                seen.add(el);
+                results.push(el);
+              }
+            });
+          } catch {
+            // ignore selector errors
+          }
+        }
+        const elements = root.querySelectorAll ? Array.from(root.querySelectorAll('*')) : [];
+        for (const el of elements) {
+          if (el.shadowRoot) visit(el.shadowRoot);
+        }
+      };
+      visit(document);
+    };
+    collectDeep(selectors);
+    return results.length;
+  })()`;
+  const geminiUserTextExpr = `(() => {
+    const selectors = ${JSON.stringify([
+      'user-query',
+      '.user-query',
+      '[data-test-id*="user"]',
+      '[data-test-id*="prompt"]',
+      '[data-message-author-role="user"]',
+      'message[author="user"]',
+      '[data-author="user"]',
+    ])};
+    const results = [];
+    const seen = new Set();
+    const collectDeep = (selectorList) => {
+      const visit = (root) => {
+        if (!root) return;
+        for (const sel of selectorList) {
+          try {
+            root.querySelectorAll?.(sel)?.forEach(el => {
+              if (!seen.has(el)) {
+                seen.add(el);
+                results.push(el);
+              }
+            });
+          } catch {
+            // ignore selector errors
+          }
+        }
+        const elements = root.querySelectorAll ? Array.from(root.querySelectorAll('*')) : [];
+        for (const el of elements) {
+          if (el.shadowRoot) visit(el.shadowRoot);
+        }
+      };
+      visit(document);
+    };
+    collectDeep(selectors);
+    const last = results[results.length - 1];
+    return last ? (last.textContent || '') : '';
+  })()`;
+  const initialGeminiUserCount = await client.evaluate<number>(geminiUserCountExpr);
+  const tSend = nowMs();
+  const sendOk = await client.evaluate(`
+    (() => {
+      const collectDeep = (selectorList) => {
+        const results = [];
+        const seen = new Set();
+        const visit = (root) => {
+          if (!root) return;
+          for (const sel of selectorList) {
+            try {
+              root.querySelectorAll?.(sel)?.forEach(el => {
+                if (!seen.has(el)) {
+                  seen.add(el);
+                  results.push(el);
+                }
+              });
+            } catch {
+              // ignore selector errors
+            }
+          }
+          const elements = root.querySelectorAll ? Array.from(root.querySelectorAll('*')) : [];
+          for (const el of elements) {
+            if (el.shadowRoot) {
+              visit(el.shadowRoot);
+            }
+          }
+        };
+        visit(document);
+        return results;
+      };
+      const isVisible = (el) => {
+        if (!el) return false;
+        const rects = el.getClientRects();
+        if (!rects || rects.length === 0) return false;
+        const style = window.getComputedStyle(el);
+        return style && style.visibility !== 'hidden' && style.display !== 'none';
+      };
+      const isDisabled = (el) => {
+        if (!el) return true;
+        return (
+          el.disabled ||
+          el.getAttribute('aria-disabled') === 'true' ||
+          el.getAttribute('disabled') === 'true'
+        );
+      };
+      const buttons = collectDeep(['button', '[role="button"]'])
+        .filter(isVisible)
+        .filter(el => !isDisabled(el));
+      let sendButton = buttons.find(b =>
+        (b.textContent || '').includes('プロンプトを送信') ||
+        (b.textContent || '').includes('送信') ||
+        (b.getAttribute('aria-label') || '').includes('送信') ||
+        (b.getAttribute('aria-label') || '').includes('Send')
+      );
+      if (!sendButton) {
+        sendButton = buttons.find(
+          b =>
+            b.querySelector('mat-icon[data-mat-icon-name="send"]') ||
+            b.querySelector('[data-icon="send"]')
+        );
+      }
+      if (sendButton && !sendButton.disabled) {
+        sendButton.click();
+        return true;
+      }
+      const editable =
+        document.querySelector('[role="textbox"]') ||
+        document.querySelector('div[contenteditable="true"]') ||
+        document.querySelector('textarea');
+      if (editable) {
+        const eventInit = {bubbles: true, cancelable: true, key: 'Enter', code: 'Enter', keyCode: 13, which: 13};
+        editable.dispatchEvent(new KeyboardEvent('keydown', eventInit));
+        editable.dispatchEvent(new KeyboardEvent('keyup', eventInit));
+        return true;
+      }
+      return false;
+    })()
+  `);
+  timings.sendMs = nowMs() - tSend;
+  if (!sendOk) {
+    const diagnostics = await client.evaluate(`
+      (() => {
+        const isVisible = (el) => {
+          if (!el) return false;
+          const rects = el.getClientRects();
+          if (!rects || rects.length === 0) return false;
+          const style = window.getComputedStyle(el);
+          return style && style.visibility !== 'hidden' && style.display !== 'none';
+        };
+        const isDisabled = (el) => {
+          if (!el) return true;
+          return (
+            el.disabled ||
+            el.getAttribute('aria-disabled') === 'true' ||
+            el.getAttribute('disabled') === 'true'
+          );
+        };
+        const candidates = Array.from(document.querySelectorAll('button,[role="button"]'));
+        const mapped = candidates
+          .filter(isVisible)
+          .map(el => ({
+            tag: el.tagName,
+            aria: el.getAttribute('aria-label') || '',
+            title: el.getAttribute('title') || '',
+            disabled: isDisabled(el),
+            text: (el.textContent || '').trim().slice(0, 40),
+          }));
+        const editable =
+          document.querySelector('[role="textbox"][contenteditable="true"]') ||
+          document.querySelector('div[contenteditable="true"]') ||
+          document.querySelector('textarea') ||
+          document.querySelector('input[type="text"]');
+        const value =
+          editable && 'value' in editable ? editable.value : editable?.textContent || '';
+        return {
+          url: location.href,
+          candidateCount: mapped.length,
+          candidates: mapped.slice(0, 10),
+          inputLength: value ? value.length : 0,
+        };
+      })()
+    `);
+    throw new Error(`Gemini send action failed: ${JSON.stringify(diagnostics)}`);
+  }
+  try {
+    await client.waitForFunction(`${geminiUserCountExpr} > ${initialGeminiUserCount}`, 8000);
+  } catch (error) {
+    throw new Error(`Gemini send did not create a new user message: ${String(error)}`);
+  }
+  const geminiUserText = await client.evaluate<string>(geminiUserTextExpr);
+  if (!geminiUserText.replace(/\\s+/g, '').includes(normalizedQuestion)) {
+    throw new Error('Gemini user message did not match the question.');
+  }
+
+  const initialCount = await client.evaluate<number>(
+    `document.querySelectorAll('model-response, [data-test-id*="response"], .response, .markdown, .model-response, [aria-live="polite"]').length`,
+  );
+  const initialLiveText = await client.evaluate<string>(
+    `(document.querySelector('[aria-live="polite"]')?.textContent || '').trim()`,
+  );
+  const tWaitResp = nowMs();
+  const start = Date.now();
+  const maxWait = 45000;
+  let retriedSend = false;
+  while (Date.now() - start < maxWait) {
+    if (!retriedSend && Date.now() - start > 6000) {
+      retriedSend = true;
+      await client.evaluate(`
+        (() => {
+          const textbox =
+            document.querySelector('[role="textbox"]') ||
+            document.querySelector('div[contenteditable="true"]') ||
+            document.querySelector('textarea');
+          if (textbox) {
+            const eventInit = {bubbles: true, cancelable: true, key: 'Enter', code: 'Enter', keyCode: 13, which: 13};
+            textbox.dispatchEvent(new KeyboardEvent('keydown', eventInit));
+            textbox.dispatchEvent(new KeyboardEvent('keyup', eventInit));
+          }
+          const buttons = Array.from(document.querySelectorAll('button'));
+          const sendButton = buttons.find(b =>
+            (b.textContent || '').includes('送信') ||
+            (b.getAttribute('aria-label') || '').includes('送信') ||
+            (b.getAttribute('aria-label') || '').includes('Send') ||
+            b.querySelector('mat-icon[data-mat-icon-name="send"]')
+          );
+          if (sendButton && !sendButton.disabled) sendButton.click();
+        })()
+      `);
+    }
+    const status = await client.evaluate<{
+      completed: boolean;
+      text?: string;
+    }>(`
+      (() => {
+        const buttons = Array.from(document.querySelectorAll('button'));
+        const streaming = buttons.some(btn =>
+          (btn.textContent || '').includes('停止') ||
+          (btn.getAttribute('aria-label') || '').includes('停止')
+        );
+        if (streaming) {
+          return {completed: false};
+        }
+        const responses = document.querySelectorAll('model-response, [data-test-id*="response"], .response, .markdown, .model-response');
+        if (responses.length > ${initialCount}) {
+          const msg = responses[responses.length - 1];
+          const extractText = (root) => {
+            if (!root) return '';
+            const parts = [];
+            const visit = (node) => {
+              if (!node) return;
+              if (node.nodeType === Node.TEXT_NODE) {
+                const value = node.textContent;
+                if (value) parts.push(value);
+                return;
+              }
+              if (node.shadowRoot) visit(node.shadowRoot);
+              const children = node.childNodes ? Array.from(node.childNodes) : [];
+              for (const child of children) visit(child);
+            };
+            visit(root);
+            return parts.join(' ').replace(/\\s+/g, ' ').trim();
+          };
+          return {completed: true, text: extractText(msg)};
+        }
+        const live = document.querySelector('[aria-live="polite"]');
+        const liveText = live ? (live.textContent || '').trim() : '';
+        if (liveText && liveText.length > ${JSON.stringify(initialLiveText)}.length + 5) {
+          return {completed: true, text: liveText};
+        }
+        return {completed: false};
+      })()
+    `);
+    if (status.completed) {
+      const normalized = normalizeGeminiResponse(status.text || '', question);
+      if (normalized) {
+        const finalUrl = await client.evaluate<string>('location.href');
+        if (finalUrl && finalUrl.includes('gemini.google.com')) {
+          await saveSession('gemini', finalUrl);
+        }
+        timings.waitResponseMs = nowMs() - tWaitResp;
+        timings.totalMs = nowMs() - t0;
+        await appendHistory({
+          provider: 'gemini',
+          question,
+          answer: normalized,
+          url: finalUrl || undefined,
+          timings,
+        });
+        return normalized;
+      }
+    }
+    await new Promise(resolve => setTimeout(resolve, 500));
+  }
+
+  const diagnostics = await client.evaluate(`
+    (() => {
+      const textIncludes = (needle) => document.body && document.body.innerText && document.body.innerText.includes(needle);
+      const counts = (selector) => {
+        const nodes = Array.from(document.querySelectorAll(selector));
+        return {all: nodes.length};
+      };
+      const loginLink = document.querySelector('a[href*="accounts.google.com"]');
+      return {
+        url: location.href,
+        loginLink: Boolean(loginLink),
+        signInText: textIncludes('Sign in') || textIncludes('ログイン') || textIncludes('Sign in to'),
+        responseCounts: {
+          modelResponse: counts('model-response'),
+          dataResponse: counts('[data-test-id*="response"]'),
+          markdown: counts('.markdown'),
+          ariaLive: counts('[aria-live="polite"]'),
+          status: counts('[role="status"]'),
+          alert: counts('[role="alert"]'),
+        },
+      };
+    })()
+  `);
+  throw new Error(
+    `Timed out waiting for Gemini response (45s): ${JSON.stringify(diagnostics)}`,
+  );
+}

@@ -6,7 +6,10 @@
         "/Users/usedhonda/projects/mcp/chrome-ai-bridge/scripts/cli.mjs",
         "--attachTabUrl=https://chatgpt.com/",
         "--attachTabNew"
-      ]
+      ],
+      "env": {
+        "DEBUG": "mcp:log"
+      }
     },
     "chrome-ai-bridge-gemini": {
       "command": "node",
@@ -14,7 +17,10 @@
         "/Users/usedhonda/projects/mcp/chrome-ai-bridge/scripts/cli.mjs",
         "--attachTabUrl=https://gemini.google.com/app",
         "--attachTabNew"
-      ]
+      ],
+      "env": {
+        "DEBUG": "mcp:log"
+      }
     }
   }
 }

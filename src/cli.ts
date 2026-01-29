@@ -67,7 +67,8 @@ export const cliOptions = {
     type: 'boolean' as const,
     description:
       'Automatically discover and load extensions installed in the system Chrome profile. This includes extensions from Chrome Web Store and sideloaded extensions.',
-    default: false,
+    // NOTE: No default value to avoid conflicts with attachTabUrl
+    // When not specified, defaults to false in launch()
     conflicts: 'browserUrl',
   },
   chromeProfile: {

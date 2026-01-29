@@ -150,19 +150,22 @@ export class McpResponse implements Response {
       response.push(line);
     }
 
-    const networkConditions = context.getNetworkConditions();
-    if (networkConditions) {
-      response.push(`## Network emulation`);
-      response.push(`Emulating: ${networkConditions}`);
-      response.push(
-        `Navigation timeout set to ${context.getNavigationTimeout()} ms`,
-      );
-    }
+    const hasPages = context.getPages().length > 0;
+    if (hasPages) {
+      const networkConditions = context.getNetworkConditions();
+      if (networkConditions) {
+        response.push(`## Network emulation`);
+        response.push(`Emulating: ${networkConditions}`);
+        response.push(
+          `Navigation timeout set to ${context.getNavigationTimeout()} ms`,
+        );
+      }
 
-    const cpuThrottlingRate = context.getCpuThrottlingRate();
-    if (cpuThrottlingRate > 1) {
-      response.push(`## CPU emulation`);
-      response.push(`Emulating: ${cpuThrottlingRate}x slowdown`);
+      const cpuThrottlingRate = context.getCpuThrottlingRate();
+      if (cpuThrottlingRate > 1) {
+        response.push(`## CPU emulation`);
+        response.push(`Emulating: ${cpuThrottlingRate}x slowdown`);
+      }
     }
 
     const dialog = context.getDialog();

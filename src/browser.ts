@@ -789,11 +789,11 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
     channel,
     executablePath,
     customDevTools,
-    headless,
+    headless = false,
     isolated = false,
     loadExtension,
     loadExtensionsDir,
-    loadSystemExtensions,
+    loadSystemExtensions = false,
     chromeProfile,
     focus = false,
   } = options;
@@ -1275,28 +1275,69 @@ export async function resolveBrowser(options: {
   attachTabNew?: boolean; // Extension Bridge mode (force new tab)
   extensionRelayPort?: number; // Extension Bridge relay port
 }) {
+  logger(
+    `[resolveBrowser] attachTab=${String(
+      options.attachTab,
+    )} attachTabUrl=${String(options.attachTabUrl)} attachTabNew=${String(
+      options.attachTabNew,
+    )} extensionRelayPort=${String(options.extensionRelayPort)}`,
+  );
+  if (
+    options.attachTab !== undefined ||
+    options.attachTabUrl !== undefined ||
+    process.env.MCP_DEBUG_EXTENSION
+  ) {
+    console.error(
+      `[resolveBrowser-debug] attachTab=${String(
+        options.attachTab,
+      )} attachTabUrl=${String(options.attachTabUrl)} attachTabNew=${String(
+        options.attachTabNew,
+      )} extensionRelayPort=${String(options.extensionRelayPort)}`,
+    );
+  }
   // Extension Bridge mode - connect to existing tab by ID
   if (options.attachTab !== undefined) {
+    if (browser?.connected) {
+      logger('[Extension Bridge] Reusing existing browser connection');
+      return browser;
+    }
     logger(
       `[Extension Bridge] Connecting to tab ${options.attachTab} via Extension`,
     );
-    return await connectViaExtension({
+    const connected = await connectViaExtension({
       tabId: options.attachTab,
       newTab: options.attachTabNew,
       relayPort: options.extensionRelayPort,
     });
+    browser = connected;
+    browserHandle = {browser: connected, method: 'connect'};
+    return connected;
   }
 
   // Extension Bridge mode - connect to existing tab by URL
   if (options.attachTabUrl !== undefined) {
+    if (browser?.connected) {
+      logger('[Extension Bridge] Reusing existing browser connection');
+      return browser;
+    }
     logger(
       `[Extension Bridge] Connecting to tab with URL ${options.attachTabUrl} via Extension`,
     );
-    return await connectViaExtension({
-      tabUrl: options.attachTabUrl,
-      newTab: options.attachTabNew,
-      relayPort: options.extensionRelayPort,
-    });
+    try {
+      const connected = await connectViaExtension({
+        tabUrl: options.attachTabUrl,
+        newTab: options.attachTabNew,
+        relayPort: options.extensionRelayPort,
+      });
+      browser = connected;
+      browserHandle = {browser: connected, method: 'connect'};
+      return connected;
+    } catch (error) {
+      logger(
+        `[Extension Bridge] connectViaExtension failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      throw error;
+    }
   }
 
   // CRITICAL: Project root must be initialized before launching Chrome
@@ -1343,6 +1384,20 @@ export async function connectViaExtension(options: {
   newTab?: boolean;
   relayPort?: number;
 }): Promise<Browser> {
+  logger(
+    `[Extension Bridge] connectViaExtension start tabId=${String(
+      options.tabId,
+    )} tabUrl=${String(options.tabUrl)} newTab=${String(
+      options.newTab,
+    )} relayPort=${String(options.relayPort)}`,
+  );
+  console.error(
+    `[Extension Bridge] connectViaExtension start tabId=${String(
+      options.tabId,
+    )} tabUrl=${String(options.tabUrl)} newTab=${String(
+      options.newTab,
+    )} relayPort=${String(options.relayPort)}`,
+  );
   // Validate: either tabId or tabUrl must be provided
   if (options.tabId === undefined && options.tabUrl === undefined) {
     throw new Error(
@@ -1375,9 +1430,15 @@ export async function connectViaExtension(options: {
   const port = await relay.start();
   const token = relay.getToken();
   const wsUrl = relay.getConnectionURL();
+  await relay.startDiscoveryServer(wsUrl, {
+    tabUrl: options.tabUrl,
+    newTab: options.newTab,
+  });
 
   logger(`[Extension Bridge] RelayServer started on port ${port}`);
   logger(`[Extension Bridge] Connection URL: ${wsUrl}`);
+  console.error(`[Extension Bridge] RelayServer started on port ${port}`);
+  console.error(`[Extension Bridge] Connection URL: ${wsUrl}`);
 
   // Generate extension UI URL with appropriate parameters
   const uiParams = new URLSearchParams({
@@ -1396,19 +1457,26 @@ export async function connectViaExtension(options: {
   logger(
     `[Extension Bridge] Open extension UI: chrome-extension://[EXTENSION_ID]/ui/connect.html?${uiParams.toString()}`,
   );
+  console.error(
+    `[Extension Bridge] Open extension UI: chrome-extension://[EXTENSION_ID]/ui/connect.html?${uiParams.toString()}`,
+  );
 
   // Wait for Extension to connect
   logger('[Extension Bridge] Waiting for Extension connection...');
+  console.error('[Extension Bridge] Waiting for Extension connection...');
 
+  let connectedTabId: number | undefined;
   await new Promise<void>((resolve, reject) => {
+    const timeoutMs = 120000;
     const timeout = setTimeout(() => {
       reject(
-        new Error('Extension connection timeout (30s) - please install and activate chrome-ai-bridge extension'),
+        new Error('Extension connection timeout (120s) - please install and activate chrome-ai-bridge extension'),
       );
-    }, 30000);
+    }, timeoutMs);
 
     relay.once('ready', (tabId: number) => {
       clearTimeout(timeout);
+      connectedTabId = tabId;
       logger(`[Extension Bridge] Extension connected to tab ${tabId}`);
       resolve();
     });
@@ -1419,8 +1487,41 @@ export async function connectViaExtension(options: {
     });
   });
 
+  let targetInfo:
+    | {
+        targetId: string;
+        type: string;
+        title: string;
+        url: string;
+        attached?: boolean;
+        canActivate?: boolean;
+        browserContextId?: string;
+      }
+    | undefined;
+  try {
+    const attachResult = await relay.sendRequest('attachToTab');
+    if (attachResult?.targetInfo) {
+      targetInfo = attachResult.targetInfo;
+    }
+  } catch (error) {
+    logger(
+      `[Extension Bridge] attachToTab failed: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+
   // Create Puppeteer transport
-  const transport = new ExtensionTransport(relay);
+  if (!targetInfo && connectedTabId !== undefined) {
+    targetInfo = {
+      targetId: String(connectedTabId),
+      type: 'page',
+      title: '',
+      url: options.tabUrl ?? '',
+      attached: false,
+      canActivate: true,
+      browserContextId: 'default',
+    };
+  }
+  const transport = new ExtensionTransport(relay, targetInfo);
 
   // Connect Puppeteer to Extension
   const browser = await puppeteer.connect({
@@ -1429,6 +1530,21 @@ export async function connectViaExtension(options: {
   });
 
   logger('[Extension Bridge] Puppeteer connected to Extension');
+
+  // Proactively trigger target discovery so browser.pages() can resolve.
+  try {
+    const session = await browser.target().createCDPSession();
+    await session.send('Target.setDiscoverTargets', {discover: true});
+    await session.send('Target.setAutoAttach', {
+      autoAttach: true,
+      waitForDebuggerOnStart: false,
+      flatten: true,
+    });
+  } catch (error) {
+    logger(
+      `[Extension Bridge] Target discovery bootstrap failed: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
 
   return browser;
 }

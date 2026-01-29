@@ -132,7 +132,9 @@ export class McpContext implements Context {
 
   async #init() {
     await this.createPagesSnapshot();
-    this.setSelectedPageIdx(0);
+    if (this.#pages.length > 0) {
+      this.setSelectedPageIdx(0);
+    }
     await this.#networkCollector.init();
     await this.#consoleCollector.init();
   }
@@ -348,7 +350,7 @@ export class McpContext implements Context {
   }
 
   getSelectedPage(): Page {
-    const page = this.#pages[this.#selectedPageIdx];
+    let page = this.#pages[this.#selectedPageIdx];
     if (!page) {
       throw new Error('No page selected');
     }
@@ -441,7 +443,34 @@ export class McpContext implements Context {
    * Creates a snapshot of the pages.
    */
   async createPagesSnapshot(): Promise<Page[]> {
-    this.#pages = await this.browser.pages();
+    const timeoutMs = 1500;
+    this.logger(`[pages] createPagesSnapshot fast start (timeout ${timeoutMs}ms)`);
+
+    const targets = this.browser.targets().filter(t => t.type() === 'page');
+    const pages: Page[] = [];
+    for (const target of targets) {
+      try {
+        const page = await Promise.race([
+          target.page(),
+          new Promise<never>((_, reject) => {
+            const timer = setTimeout(() => {
+              clearTimeout(timer);
+              reject(new Error('Timed out in target.page()'));
+            }, timeoutMs);
+          }),
+        ]);
+        if (page && !page.isClosed()) {
+          pages.push(page);
+        }
+      } catch (err) {
+        this.logger(
+          `[pages] target.page() failed: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+    }
+
+    this.#pages = pages;
+    this.logger(`[pages] createPagesSnapshot fast done (count=${pages.length})`);
     return this.#pages;
   }
 
