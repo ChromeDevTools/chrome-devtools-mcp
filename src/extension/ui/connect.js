@@ -1,50 +1,54 @@
 /**
  * chrome-ai-bridge Connect UI
- * Handles tab selection and WebSocket connection to MCP server
+ * Extension2-style simple flow:
+ * 1. MCP server opens connect.html?mcpRelayUrl=ws://...
+ * 2. Tab list is displayed
+ * 3. User selects tab -> Click "Connect"
+ * 4. Done
  */
 
 class ConnectUI {
   constructor() {
-    this.selectedTabId = null;
     this.mcpRelayUrl = null;
-    this.autoConnectTabUrl = null;
-    this.forceNewTab = false;
-    this.autoMode = false;
+    this.debugPanelVisible = false;
+    this.autoRefreshInterval = null;
 
     // DOM elements
     this.statusEl = document.getElementById('status');
-    this.relayConfigEl = document.getElementById('relay-config');
-    this.relayUrlInputEl = document.getElementById('relay-url');
-    this.tabUrlInputEl = document.getElementById('tab-url');
-    this.newTabInputEl = document.getElementById('new-tab');
-    this.useRelayBtnEl = document.getElementById('use-relay-btn');
-    this.pasteRelayBtnEl = document.getElementById('paste-relay-btn');
-    this.openTabBtnEl = document.getElementById('open-tab-btn');
+    this.statusTextEl = document.getElementById('status-text');
+    this.statusIconEl = this.statusEl.querySelector('.status-icon');
     this.tabSelectionEl = document.getElementById('tab-selection');
     this.tabsListEl = document.getElementById('tabs-list');
-    this.connectBtnEl = document.getElementById('connect-btn');
     this.connectedViewEl = document.getElementById('connected-view');
     this.connectedTabTitleEl = document.getElementById('connected-tab-title');
     this.connectedTabIdEl = document.getElementById('connected-tab-id');
     this.disconnectBtnEl = document.getElementById('disconnect-btn');
+    this.errorViewEl = document.getElementById('error-view');
+    this.errorMessageEl = document.getElementById('error-message');
+
+    // Debug panel elements
+    this.debugToggleEl = document.getElementById('debug-toggle');
+    this.debugPanelEl = document.getElementById('debug-panel');
+    this.logFilterEl = document.getElementById('log-filter');
+    this.refreshLogsEl = document.getElementById('refresh-logs');
+    this.clearLogsEl = document.getElementById('clear-logs');
+    this.exportLogsEl = document.getElementById('export-logs');
+    this.debugStatsEl = document.getElementById('debug-stats');
+    this.logOutputEl = document.getElementById('log-output');
 
     this.init();
+    this.initDebugPanel();
   }
 
   async init() {
     try {
-      // Parse URL parameters
+      // Parse URL parameters (Extension2 style: parameters are always provided)
       const params = new URLSearchParams(window.location.search);
       this.mcpRelayUrl = params.get('mcpRelayUrl');
-      const autoConnectTabId = params.get('tabId');
-      this.autoConnectTabUrl = params.get('tabUrl');
-      this.forceNewTab = params.get('newTab') === 'true';
-      this.autoMode = params.get('auto') === 'true';
 
-      // Validate parameters
+      // Validate relay URL
       if (!this.mcpRelayUrl) {
-        this.showStatus('Paste Relay URL to continue', 'info');
-        await this.showRelayConfig();
+        this.showError('Missing mcpRelayUrl parameter. Make sure the MCP server is running.');
         return;
       }
 
@@ -52,101 +56,12 @@ class ConnectUI {
         return;
       }
 
-      if (this.autoMode) {
-        this.showStatus('Auto-connecting…', 'info');
-        this.tabSelectionEl.classList.add('hidden');
-        return;
-      }
-
-      // If tabId is provided, auto-connect
-      if (autoConnectTabId) {
-        const tabId = parseInt(autoConnectTabId, 10);
-        if (!isNaN(tabId)) {
-          this.selectedTabId = tabId;
-          await this.connect();
-          return;
-        }
-      }
-
-      // If tabUrl is provided, find matching tab and auto-connect
-      if (this.autoConnectTabUrl) {
-        this.showStatus(`Auto-connecting to: ${this.autoConnectTabUrl}`, 'info');
-        const ok = await this.connect();
-        if (ok) return;
-      }
-
-      // Otherwise, show tab selection UI
+      // Show tab selection UI
       await this.loadTabs();
 
     } catch (error) {
       this.showError(`Initialization failed: ${error.message}`);
     }
-  }
-
-  async showRelayConfig() {
-    this.relayConfigEl.classList.remove('hidden');
-    this.tabSelectionEl.classList.add('hidden');
-    this.connectedViewEl.classList.add('hidden');
-
-    const stored = await chrome.storage.local.get([
-      'lastRelayUrl',
-      'lastTabUrl',
-      'lastNewTab',
-    ]);
-    if (stored.lastRelayUrl && !this.relayUrlInputEl.value) {
-      this.relayUrlInputEl.value = stored.lastRelayUrl;
-    }
-    if (stored.lastTabUrl && !this.tabUrlInputEl.value) {
-      this.tabUrlInputEl.value = stored.lastTabUrl;
-    }
-    if (typeof stored.lastNewTab === 'boolean') {
-      this.newTabInputEl.checked = stored.lastNewTab;
-    }
-
-    this.useRelayBtnEl.addEventListener('click', () => {
-      this.applyRelayConfig();
-    });
-    this.pasteRelayBtnEl.addEventListener('click', async () => {
-      try {
-        const text = await navigator.clipboard.readText();
-        if (text) {
-          this.relayUrlInputEl.value = text.trim();
-        }
-      } catch (error) {
-        this.showError(`Clipboard read failed: ${error.message || error}`);
-      }
-    });
-    this.openTabBtnEl.addEventListener('click', async () => {
-      const url = this.tabUrlInputEl.value.trim() || 'https://chatgpt.com/';
-      await chrome.tabs.create({url});
-    });
-
-    await this.tryAutoDetectRelay();
-  }
-
-  applyRelayConfig() {
-    const relayUrl = this.relayUrlInputEl.value.trim();
-    if (!relayUrl) {
-      this.showError('Relay URL is required');
-      return;
-    }
-
-    this.mcpRelayUrl = relayUrl;
-    this.autoConnectTabUrl = this.tabUrlInputEl.value.trim() || null;
-    this.forceNewTab = Boolean(this.newTabInputEl.checked);
-
-    chrome.storage.local.set({
-      lastRelayUrl: this.mcpRelayUrl,
-      lastTabUrl: this.autoConnectTabUrl || '',
-      lastNewTab: this.forceNewTab,
-    });
-
-    if (!this.validateRelayUrl()) {
-      return;
-    }
-
-    this.relayConfigEl.classList.add('hidden');
-    this.continueAfterRelayConfig();
   }
 
   validateRelayUrl() {
@@ -163,66 +78,26 @@ class ConnectUI {
     }
   }
 
-  async continueAfterRelayConfig() {
-    if (this.autoConnectTabUrl) {
-      this.showStatus(`Auto-connecting to: ${this.autoConnectTabUrl}`, 'info');
-      const ok = await this.connect();
-      if (ok) return;
-    }
-    await this.loadTabs();
-  }
-
-  async detectRelayInfo() {
-    const ports = [
-      8765, 8766, 8767, 8768, 8769, 8770, 8771, 8772, 8773, 8774, 8775,
-    ];
-    for (const port of ports) {
-      const url = `http://127.0.0.1:${port}/relay-info`;
-      try {
-        const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), 800);
-        const res = await fetch(url, {signal: controller.signal});
-        clearTimeout(timer);
-        if (!res.ok) continue;
-        const data = await res.json();
-        if (data && data.wsUrl) {
-          return data;
-        }
-      } catch {
-        // ignore
-      }
-    }
-    return null;
-  }
-
-  async tryAutoDetectRelay() {
-    try {
-      const data = await this.detectRelayInfo();
-      if (data && data.wsUrl) {
-        this.relayUrlInputEl.value = data.wsUrl;
-        if (data.tabUrl && !this.tabUrlInputEl.value) {
-          this.tabUrlInputEl.value = data.tabUrl;
-        }
-        this.newTabInputEl.checked = Boolean(data.newTab);
-        this.showStatus('Relay URL detected. Connecting...', 'info');
-        this.applyRelayConfig();
-      }
-    } catch {
-      // ignore auto-detect errors
-    }
-  }
-
   async loadTabs() {
     try {
       const tabs = await chrome.tabs.query({});
 
-      if (tabs.length === 0) {
-        this.showError('No tabs found');
+      // Filter out extension pages and chrome:// URLs
+      const filteredTabs = tabs.filter(tab => {
+        if (!tab.url) return false;
+        if (tab.url.startsWith('chrome://')) return false;
+        if (tab.url.startsWith('chrome-extension://')) return false;
+        if (tab.url.startsWith('devtools://')) return false;
+        return true;
+      });
+
+      if (filteredTabs.length === 0) {
+        this.showError('No tabs available. Open a web page first.');
         return;
       }
 
-      this.renderTabs(tabs);
-      this.showStatus('Select a tab to connect', 'info');
+      this.renderTabs(filteredTabs);
+      this.showStatus('Select a tab to connect', 'info', '📋');
       this.tabSelectionEl.classList.remove('hidden');
 
     } catch (error) {
@@ -233,146 +108,303 @@ class ConnectUI {
   renderTabs(tabs) {
     this.tabsListEl.innerHTML = '';
 
-    tabs.forEach(tab => {
+    // Sort tabs: active tab first, then by window/tab order
+    const sortedTabs = [...tabs].sort((a, b) => {
+      if (a.active && !b.active) return -1;
+      if (!a.active && b.active) return 1;
+      if (a.windowId !== b.windowId) return a.windowId - b.windowId;
+      return a.index - b.index;
+    });
+
+    sortedTabs.forEach(tab => {
       const tabItem = document.createElement('div');
-      tabItem.className = 'tab-item';
+      tabItem.className = `tab-item${tab.active ? ' active' : ''}`;
       tabItem.dataset.tabId = tab.id;
 
-      tabItem.innerHTML = `
-        <div class="tab-title">${this.escapeHtml(tab.title || 'Untitled')}</div>
-        <div class="tab-url">${this.escapeHtml(tab.url || '')}</div>
-        <div class="tab-id">Tab ID: ${tab.id}</div>
-      `;
+      // Favicon
+      const faviconEl = document.createElement('div');
+      faviconEl.className = 'tab-favicon';
+      if (tab.favIconUrl && !tab.favIconUrl.startsWith('chrome://')) {
+        const img = document.createElement('img');
+        img.src = tab.favIconUrl;
+        img.onerror = () => { faviconEl.textContent = '🌐'; };
+        faviconEl.appendChild(img);
+      } else {
+        faviconEl.textContent = '🌐';
+      }
 
+      // Tab info
+      const infoEl = document.createElement('div');
+      infoEl.className = 'tab-info';
+
+      const titleRow = document.createElement('div');
+      titleRow.className = 'tab-title-row';
+
+      const titleEl = document.createElement('span');
+      titleEl.className = 'tab-title';
+      titleEl.textContent = tab.title || 'Untitled';
+      titleRow.appendChild(titleEl);
+
+      if (tab.active) {
+        const badge = document.createElement('span');
+        badge.className = 'tab-active-badge';
+        badge.textContent = 'Active';
+        titleRow.appendChild(badge);
+      }
+
+      const urlEl = document.createElement('div');
+      urlEl.className = 'tab-url';
+      urlEl.textContent = tab.url || '';
+
+      const idEl = document.createElement('div');
+      idEl.className = 'tab-id';
+      idEl.textContent = `Tab ID: ${tab.id}`;
+
+      infoEl.appendChild(titleRow);
+      infoEl.appendChild(urlEl);
+      infoEl.appendChild(idEl);
+
+      // Connect button
+      const connectBtn = document.createElement('button');
+      connectBtn.className = 'tab-connect-btn';
+      connectBtn.textContent = 'Connect';
+      connectBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.connectToTab(tab);
+      });
+
+      tabItem.appendChild(faviconEl);
+      tabItem.appendChild(infoEl);
+      tabItem.appendChild(connectBtn);
+
+      // Also connect on row click
       tabItem.addEventListener('click', () => {
-        this.selectTab(tab.id);
+        this.connectToTab(tab);
       });
 
       this.tabsListEl.appendChild(tabItem);
     });
-
-    // Set up connect button
-    this.connectBtnEl.addEventListener('click', () => {
-      this.connect();
-    });
   }
 
-  selectTab(tabId) {
-    // Remove previous selection
-    document.querySelectorAll('.tab-item').forEach(item => {
-      item.classList.remove('selected');
-    });
-
-    // Add selection
-    const selectedItem = document.querySelector(`.tab-item[data-tab-id="${tabId}"]`);
-    if (selectedItem) {
-      selectedItem.classList.add('selected');
-      this.selectedTabId = tabId;
-      this.connectBtnEl.disabled = false;
-    }
-  }
-
-  async connect() {
-    if (!this.selectedTabId && !this.autoConnectTabUrl) {
-      this.showError('No tab selected');
-      return false;
-    }
-
+  async connectToTab(tab) {
     try {
-      this.showStatus('Connecting to MCP server...', 'info');
+      this.showStatus(`Connecting to "${tab.title}"...`, 'info', '⏳');
 
-      let relayResponse = null;
-      for (let attempt = 0; attempt < 3; attempt += 1) {
-        relayResponse = await chrome.runtime.sendMessage({
-          type: 'connectToRelay',
-          mcpRelayUrl: this.mcpRelayUrl
-        });
-        if (relayResponse && relayResponse.success) break;
-
-        const detected = await this.detectRelayInfo();
-        if (detected?.wsUrl) {
-          this.mcpRelayUrl = detected.wsUrl;
-        }
-        await new Promise(resolve => setTimeout(resolve, 400));
-      }
+      // Step 1: Connect to relay
+      const relayResponse = await chrome.runtime.sendMessage({
+        type: 'connectToRelay',
+        mcpRelayUrl: this.mcpRelayUrl
+      });
 
       if (!relayResponse || !relayResponse.success) {
-        throw new Error(
-          (relayResponse && relayResponse.error) || 'Relay connection failed',
-        );
+        throw new Error(relayResponse?.error || 'Relay connection failed');
       }
 
+      // Step 2: Connect to tab
       const connectResponse = await chrome.runtime.sendMessage({
         type: 'connectToTab',
         mcpRelayUrl: this.mcpRelayUrl,
-        tabId: this.selectedTabId,
-        tabUrl: this.autoConnectTabUrl,
-        newTab: this.forceNewTab
+        tabId: tab.id,
+        windowId: tab.windowId
       });
 
       if (!connectResponse || !connectResponse.success) {
-        throw new Error(
-          (connectResponse && connectResponse.error) || 'Tab connection failed',
-        );
+        throw new Error(connectResponse?.error || 'Tab connection failed');
       }
-
-      const connectedTabId = this.selectedTabId;
-      if (connectedTabId) {
-        this.selectedTabId = connectedTabId;
-      }
-      const tab = connectedTabId
-        ? await chrome.tabs.get(connectedTabId).catch(() => null)
-        : null;
 
       // Show connected view
       this.tabSelectionEl.classList.add('hidden');
       this.connectedViewEl.classList.remove('hidden');
-      this.connectedTabTitleEl.textContent = tab?.title || 'Untitled';
-      this.connectedTabIdEl.textContent = connectedTabId || 'Unknown';
-      this.showStatus('Connected', 'success');
+      this.connectedTabTitleEl.textContent = tab.title || 'Untitled';
+      this.connectedTabIdEl.textContent = tab.id;
+      this.showStatus('Connected', 'success', '✅');
 
       // Set up disconnect button
-      this.disconnectBtnEl.addEventListener('click', () => {
-        this.disconnect();
-      });
+      this.disconnectBtnEl.onclick = () => this.disconnect(tab.id);
 
-      return true;
     } catch (error) {
       this.showError(`Connection failed: ${error.message}`);
-      return false;
     }
   }
 
-  disconnect() {
-    if (this.selectedTabId) {
-      chrome.runtime.sendMessage({
-        type: 'disconnectTab',
-        tabId: this.selectedTabId
+  async disconnect(tabId) {
+    try {
+      await chrome.runtime.sendMessage({
+        type: 'disconnect',
+        tabId: tabId
       });
+    } catch {
+      // Ignore disconnect errors
     }
     this.reset();
   }
 
   reset() {
-    this.selectedTabId = null;
     this.connectedViewEl.classList.add('hidden');
-    this.tabSelectionEl.classList.remove('hidden');
+    this.errorViewEl.classList.add('hidden');
     this.loadTabs();
   }
 
-  showStatus(message, type = 'info') {
-    this.statusEl.textContent = message;
+  showStatus(message, type = 'info', icon = '⏳') {
+    this.statusTextEl.textContent = message;
+    this.statusIconEl.textContent = icon;
     this.statusEl.className = `status ${type}`;
+    this.statusEl.classList.remove('hidden');
+    this.errorViewEl.classList.add('hidden');
   }
 
   showError(message) {
-    this.showStatus(message, 'error');
+    this.showStatus(message, 'error', '❌');
+    this.tabSelectionEl.classList.add('hidden');
+    this.connectedViewEl.classList.add('hidden');
+    this.errorViewEl.classList.remove('hidden');
+    this.errorMessageEl.textContent = message;
   }
 
   escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+  }
+
+  // ========== Debug Panel Methods ==========
+
+  initDebugPanel() {
+    this.debugToggleEl.addEventListener('click', () => {
+      this.toggleDebugPanel();
+    });
+
+    this.logFilterEl.addEventListener('change', () => {
+      this.refreshLogs();
+    });
+
+    this.refreshLogsEl.addEventListener('click', () => {
+      this.refreshLogs();
+    });
+
+    this.clearLogsEl.addEventListener('click', () => {
+      this.clearLogs();
+    });
+
+    this.exportLogsEl.addEventListener('click', () => {
+      this.exportLogs();
+    });
+  }
+
+  toggleDebugPanel() {
+    this.debugPanelVisible = !this.debugPanelVisible;
+    if (this.debugPanelVisible) {
+      this.debugPanelEl.classList.remove('hidden');
+      this.debugToggleEl.textContent = 'Hide Debug Logs';
+      this.refreshLogs();
+      this.autoRefreshInterval = setInterval(() => this.refreshLogs(), 2000);
+    } else {
+      this.debugPanelEl.classList.add('hidden');
+      this.debugToggleEl.textContent = 'Show Debug Logs';
+      if (this.autoRefreshInterval) {
+        clearInterval(this.autoRefreshInterval);
+        this.autoRefreshInterval = null;
+      }
+    }
+  }
+
+  async refreshLogs() {
+    try {
+      const filter = this.logFilterEl.value || null;
+      const response = await chrome.runtime.sendMessage({
+        type: 'getDebugLogs',
+        filter: filter,
+        limit: 100
+      });
+
+      if (!response || !response.success) {
+        this.logOutputEl.textContent = 'Failed to fetch logs';
+        return;
+      }
+
+      // Update stats
+      const stats = response.stats;
+      const state = response.state;
+      this.debugStatsEl.innerHTML = `
+        <strong>Total Logs:</strong> ${stats.total} |
+        <strong>Active Connections:</strong> ${state.activeConnections?.length || 0} |
+        <strong>Pending:</strong> ${state.pendingTabSelection?.length || 0}
+        <br>
+        <strong>By Category:</strong>
+        ${Object.entries(stats.byCategory || {}).map(([cat, count]) => `${cat}: ${count}`).join(', ') || 'none'}
+      `;
+
+      // Render logs
+      const logs = response.logs || [];
+      if (logs.length === 0) {
+        this.logOutputEl.innerHTML = '<span style="color: #888;">No logs yet</span>';
+        return;
+      }
+
+      const html = logs.map(log => this.formatLogEntry(log)).join('');
+      this.logOutputEl.innerHTML = html;
+
+      // Scroll to bottom
+      this.logOutputEl.scrollTop = this.logOutputEl.scrollHeight;
+    } catch (error) {
+      this.logOutputEl.textContent = `Error: ${error.message}`;
+    }
+  }
+
+  formatLogEntry(log) {
+    const ts = log.ts ? log.ts.split('T')[1].split('.')[0] : '';
+    const cat = log.category || 'unknown';
+    const catClass = `cat-${cat}`;
+    const msg = this.escapeHtml(log.message || '');
+    const data = log.data ? this.escapeHtml(JSON.stringify(log.data)) : '';
+
+    return `<div class="log-entry">` +
+      `<span class="ts">${ts}</span> ` +
+      `<span class="${catClass}">[${cat.toUpperCase()}]</span> ` +
+      `<span class="msg">${msg}</span>` +
+      (data ? `<span class="data">${data}</span>` : '') +
+      `</div>`;
+  }
+
+  async clearLogs() {
+    try {
+      await chrome.runtime.sendMessage({ type: 'clearDebugLogs' });
+      this.refreshLogs();
+    } catch (error) {
+      this.showError(`Failed to clear logs: ${error.message}`);
+    }
+  }
+
+  async exportLogs() {
+    try {
+      const response = await chrome.runtime.sendMessage({
+        type: 'getDebugLogs',
+        filter: null,
+        limit: 500
+      });
+
+      if (!response || !response.success) {
+        this.showError('Failed to export logs');
+        return;
+      }
+
+      const exportData = {
+        timestamp: new Date().toISOString(),
+        stats: response.stats,
+        state: response.state,
+        logs: response.logs
+      };
+
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `chrome-ai-bridge-debug-${Date.now()}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      this.showError(`Failed to export logs: ${error.message}`);
+    }
   }
 }
 

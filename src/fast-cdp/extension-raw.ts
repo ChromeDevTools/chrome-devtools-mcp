@@ -1,4 +1,26 @@
+import {spawn} from 'node:child_process';
+import os from 'node:os';
 import {RelayServer} from '../extension/relay-server.js';
+
+// Stable extension ID (from manifest.json key)
+const EXTENSION_ID = 'ibjplbopgmcacpmfpnaeoloepdhenlbm';
+
+/**
+ * Get Chrome executable path for the current platform
+ */
+function getChromeExecutable(): string {
+  const platform = os.platform();
+
+  if (platform === 'darwin') {
+    return '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+  } else if (platform === 'win32') {
+    const programFiles = process.env['ProgramFiles'] || 'C:\\Program Files';
+    return `${programFiles}\\Google\\Chrome\\Application\\chrome.exe`;
+  } else {
+    // Linux
+    return '/usr/bin/google-chrome';
+  }
+}
 
 export interface RawExtensionConnection {
   relay: RelayServer;
@@ -18,7 +40,6 @@ export async function connectViaExtensionRaw(options: {
   tabUrl?: string;
   newTab?: boolean;
   relayPort?: number;
-  discoveryPort?: number;
 }): Promise<RawExtensionConnection> {
   if (options.tabId === undefined && options.tabUrl === undefined) {
     throw new Error('Either tabId or tabUrl must be provided');
@@ -33,41 +54,35 @@ export async function connectViaExtensionRaw(options: {
   await relay.start();
   const wsUrl = relay.getConnectionURL();
   console.error(`[fast-cdp] Relay URL: ${wsUrl}`);
-  const previousDiscoveryPort = process.env.MCP_EXTENSION_DISCOVERY_PORT;
-  const previousDiscoveryRange = process.env.MCP_EXTENSION_DISCOVERY_PORT_RANGE;
-  if (options.discoveryPort) {
-    process.env.MCP_EXTENSION_DISCOVERY_PORT = String(options.discoveryPort);
-  } else if (!process.env.MCP_EXTENSION_DISCOVERY_PORT_RANGE) {
-    // Prefer a free port within a safe range to avoid collisions.
-    process.env.MCP_EXTENSION_DISCOVERY_PORT_RANGE = '8765-8775';
-  }
+
+  // Build the extension connect.html URL with parameters (Extension2 style)
+  const connectParams = new URLSearchParams({mcpRelayUrl: wsUrl});
+  if (options.tabUrl) connectParams.set('tabUrl', options.tabUrl);
+  if (options.newTab) connectParams.set('newTab', 'true');
+  const connectUrl = `chrome-extension://${EXTENSION_ID}/ui/connect.html?${connectParams.toString()}`;
+
+  console.error(`[fast-cdp] Opening extension UI: ${connectUrl}`);
+
+  // Open the connect.html in Chrome by spawning Chrome directly
+  // Note: `open -a "Google Chrome" "chrome-extension://..."` does not work
+  // Instead, we spawn Chrome directly with the extension URL as an argument
   try {
-    if (options.discoveryPort) {
-      console.error(`[fast-cdp] Discovery port: ${options.discoveryPort}`);
-    } else if (process.env.MCP_EXTENSION_DISCOVERY_PORT_RANGE) {
-      console.error(
-        `[fast-cdp] Discovery port range: ${process.env.MCP_EXTENSION_DISCOVERY_PORT_RANGE}`,
-      );
-    }
-    await relay.startDiscoveryServer(wsUrl, {
-      tabUrl: options.tabUrl,
-      newTab: options.newTab,
+    const chromeExe = getChromeExecutable();
+    console.error(`[fast-cdp] Chrome executable: ${chromeExe}`);
+
+    // Spawn Chrome with the connect.html URL
+    // This will open a new tab in an existing Chrome instance (or start a new one)
+    const chromeProcess = spawn(chromeExe, [connectUrl], {
+      detached: true,
+      stdio: 'ignore',
     });
-  } finally {
-    if (options.discoveryPort) {
-      if (previousDiscoveryPort === undefined) {
-        delete process.env.MCP_EXTENSION_DISCOVERY_PORT;
-      } else {
-        process.env.MCP_EXTENSION_DISCOVERY_PORT = previousDiscoveryPort;
-      }
-    }
-    if (!options.discoveryPort) {
-      if (previousDiscoveryRange === undefined) {
-        delete process.env.MCP_EXTENSION_DISCOVERY_PORT_RANGE;
-      } else {
-        process.env.MCP_EXTENSION_DISCOVERY_PORT_RANGE = previousDiscoveryRange;
-      }
-    }
+    chromeProcess.unref();
+
+    console.error('[fast-cdp] Extension UI opened in Chrome');
+  } catch (error) {
+    console.error(`[fast-cdp] Failed to open Chrome: ${error instanceof Error ? error.message : String(error)}`);
+    console.error('[fast-cdp] Please manually open in Chrome:');
+    console.error(`[fast-cdp]   ${connectUrl}`);
   }
 
   await new Promise<void>((resolve, reject) => {

@@ -2,191 +2,425 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>chrome-ai-bridge - Connect to Tab</title>
+  <title>chrome-ai-bridge - Select Tab</title>
   <style>
+    :root {
+      --bg-primary: #ffffff;
+      --bg-secondary: #f6f8fa;
+      --bg-hover: #f3f4f6;
+      --text-primary: #24292f;
+      --text-secondary: #57606a;
+      --text-muted: #8b949e;
+      --border-color: #d0d7de;
+      --border-hover: #1f6feb;
+      --accent-color: #1f6feb;
+      --success-bg: #dafbe1;
+      --success-text: #1a7f37;
+      --error-bg: #ffebe9;
+      --error-text: #cf222e;
+      --info-bg: #ddf4ff;
+      --info-text: #0969da;
+      --active-bg: #fff8c5;
+      --active-border: #d4a72c;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif;
       margin: 0;
       padding: 20px;
-      background: #f5f5f5;
-      min-width: 400px;
+      background: var(--bg-secondary);
+      min-width: 500px;
+      color: var(--text-primary);
     }
 
     .container {
-      background: white;
-      border-radius: 8px;
-      padding: 20px;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      background: var(--bg-primary);
+      border-radius: 12px;
+      padding: 24px;
+      box-shadow: 0 1px 3px rgba(27, 31, 35, 0.12), 0 8px 24px rgba(66, 74, 83, 0.12);
+      max-width: 640px;
+      margin: 0 auto;
     }
 
-    h1 {
-      margin: 0 0 20px 0;
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 20px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .header-icon {
+      font-size: 28px;
+    }
+
+    .header-title {
+      margin: 0;
       font-size: 20px;
-      color: #333;
+      font-weight: 600;
+      color: var(--text-primary);
     }
 
     .status {
-      padding: 12px;
-      border-radius: 4px;
+      padding: 12px 16px;
+      border-radius: 6px;
       margin-bottom: 16px;
       font-size: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
     }
 
     .status.info {
-      background: #e3f2fd;
-      color: #1976d2;
+      background: var(--info-bg);
+      color: var(--info-text);
     }
 
     .status.success {
-      background: #e8f5e9;
-      color: #388e3c;
+      background: var(--success-bg);
+      color: var(--success-text);
     }
 
     .status.error {
-      background: #ffebee;
-      color: #c62828;
+      background: var(--error-bg);
+      color: var(--error-text);
+    }
+
+    .status-icon {
+      font-size: 16px;
+    }
+
+    .section-label {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      margin-bottom: 12px;
     }
 
     .tabs-list {
-      max-height: 400px;
+      max-height: 450px;
       overflow-y: auto;
-      margin-bottom: 16px;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
     }
 
     .tab-item {
-      padding: 12px;
-      border: 1px solid #e0e0e0;
-      border-radius: 4px;
-      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border-color);
       cursor: pointer;
-      transition: all 0.2s;
+      transition: background 0.15s ease;
+      gap: 12px;
+    }
+
+    .tab-item:last-child {
+      border-bottom: none;
     }
 
     .tab-item:hover {
-      background: #f5f5f5;
-      border-color: #1976d2;
+      background: var(--bg-hover);
     }
 
-    .tab-item.selected {
-      background: #e3f2fd;
-      border-color: #1976d2;
+    .tab-item.active {
+      background: var(--active-bg);
+      border-left: 3px solid var(--active-border);
+      padding-left: 13px;
+    }
+
+    .tab-favicon {
+      width: 20px;
+      height: 20px;
+      border-radius: 4px;
+      flex-shrink: 0;
+      background: var(--bg-secondary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+    }
+
+    .tab-favicon img {
+      width: 16px;
+      height: 16px;
+    }
+
+    .tab-info {
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+    }
+
+    .tab-title-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
     }
 
     .tab-title {
       font-weight: 500;
-      color: #333;
-      margin-bottom: 4px;
+      color: var(--text-primary);
+      font-size: 14px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .tab-active-badge {
+      font-size: 11px;
+      padding: 2px 6px;
+      background: var(--active-border);
+      color: white;
+      border-radius: 10px;
+      flex-shrink: 0;
     }
 
     .tab-url {
       font-size: 12px;
-      color: #666;
+      color: var(--text-secondary);
+      margin-top: 2px;
+      white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      white-space: nowrap;
     }
 
     .tab-id {
       font-size: 11px;
-      color: #999;
-      margin-top: 4px;
+      color: var(--text-muted);
+      margin-top: 2px;
     }
 
-    button {
-      background: #1976d2;
-      color: white;
-      border: none;
-      padding: 10px 20px;
-      border-radius: 4px;
+    .tab-connect-btn {
+      padding: 6px 14px;
+      font-size: 13px;
+      font-weight: 500;
+      border-radius: 6px;
+      border: 1px solid var(--border-color);
+      background: var(--bg-secondary);
+      color: var(--text-primary);
       cursor: pointer;
-      font-size: 14px;
-      width: 100%;
+      transition: all 0.15s ease;
+      flex-shrink: 0;
     }
 
-    button:hover {
-      background: #1565c0;
+    .tab-connect-btn:hover {
+      background: var(--accent-color);
+      color: white;
+      border-color: var(--accent-color);
     }
 
-    button:disabled {
-      background: #ccc;
+    .tab-connect-btn:disabled {
+      background: var(--bg-secondary);
+      color: var(--text-muted);
       cursor: not-allowed;
+      border-color: var(--border-color);
     }
 
     .hidden {
-      display: none;
+      display: none !important;
     }
 
-    .field {
-      margin-bottom: 12px;
+    .connected-view {
+      text-align: center;
+      padding: 24px;
     }
 
-    .field label {
-      display: block;
-      font-size: 12px;
-      color: #555;
-      margin-bottom: 6px;
+    .connected-icon {
+      font-size: 48px;
+      margin-bottom: 16px;
     }
 
-    .field input[type="text"] {
-      width: 100%;
-      box-sizing: border-box;
-      padding: 8px 10px;
-      border: 1px solid #ddd;
-      border-radius: 4px;
-      font-size: 14px;
+    .connected-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 8px;
     }
 
-    .checkbox-row {
-      display: flex;
-      align-items: center;
-      gap: 8px;
+    .connected-details {
       font-size: 13px;
-      color: #333;
+      color: var(--text-secondary);
+      margin-bottom: 20px;
+    }
+
+    .disconnect-btn {
+      padding: 8px 20px;
+      font-size: 14px;
+      font-weight: 500;
+      border-radius: 6px;
+      border: 1px solid var(--error-text);
+      background: var(--bg-primary);
+      color: var(--error-text);
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .disconnect-btn:hover {
+      background: var(--error-text);
+      color: white;
+    }
+
+    /* Debug Panel Styles */
+    #debug-toggle {
+      margin-top: 20px;
+      padding: 8px 16px;
+      font-size: 12px;
+      font-weight: 500;
+      border-radius: 6px;
+      border: 1px solid var(--border-color);
+      background: var(--bg-secondary);
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    #debug-toggle:hover {
+      background: var(--bg-hover);
+    }
+
+    #debug-panel {
+      margin-top: 20px;
+      border-top: 1px solid var(--border-color);
+      padding-top: 16px;
+    }
+
+    #debug-panel h3 {
+      margin: 0 0 12px 0;
+      font-size: 14px;
+      color: var(--text-secondary);
+    }
+
+    .debug-controls {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+    }
+
+    .debug-controls select {
+      padding: 6px 10px;
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      font-size: 13px;
+      background: white;
+    }
+
+    .debug-controls button {
+      padding: 6px 12px;
+      font-size: 13px;
+      border-radius: 4px;
+      border: 1px solid var(--border-color);
+      background: var(--bg-secondary);
+      cursor: pointer;
+    }
+
+    .debug-controls button.danger {
+      background: var(--error-bg);
+      color: var(--error-text);
+      border-color: var(--error-text);
+    }
+
+    #debug-stats {
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-bottom: 8px;
+      padding: 8px;
+      background: var(--bg-secondary);
+      border-radius: 4px;
+    }
+
+    #log-output {
+      font-family: 'SF Mono', 'Menlo', 'Monaco', monospace;
+      font-size: 11px;
+      line-height: 1.4;
+      background: #1e1e1e;
+      color: #d4d4d4;
+      padding: 12px;
+      border-radius: 6px;
+      max-height: 300px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+
+    .log-entry .ts { color: #6a9955; }
+    .log-entry .cat-ws { color: #569cd6; }
+    .log-entry .cat-cdp { color: #ce9178; }
+    .log-entry .cat-tab { color: #dcdcaa; }
+    .log-entry .cat-relay { color: #c586c0; }
+    .log-entry .cat-error { color: #f44747; }
+    .log-entry .msg { color: #d4d4d4; }
+    .log-entry .data { color: #9cdcfe; margin-left: 4px; }
+
+    .empty-state {
+      padding: 40px 20px;
+      text-align: center;
+      color: var(--text-secondary);
+    }
+
+    .empty-state-icon {
+      font-size: 32px;
+      margin-bottom: 12px;
     }
   </style>
 </head>
 <body>
   <div class="container">
-    <h1>chrome-ai-bridge - Connect to Tab</h1>
-
-    <div id="status" class="status info">
-      Initializing...
+    <div class="header">
+      <span class="header-icon">🎭</span>
+      <h1 class="header-title">chrome-ai-bridge - Select Tab</h1>
     </div>
 
-    <div id="relay-config" class="hidden">
-      <p style="margin: 0 0 12px 0; color: #444; font-size: 13px;">
-        1) MCPサーバを起動 → 2) 出力された Relay URL を貼り付け → 3) 接続
-      </p>
-      <div class="field">
-        <label for="relay-url">MCP Relay URL</label>
-        <input id="relay-url" type="text" placeholder="ws://127.0.0.1:12345?token=...">
-      </div>
-      <div class="field">
-        <button id="paste-relay-btn" type="button">Paste from Clipboard</button>
-      </div>
-      <div class="field">
-        <label for="tab-url">Auto-connect Tab URL (optional)</label>
-        <input id="tab-url" type="text" placeholder="https://chatgpt.com/">
-      </div>
-      <div class="field checkbox-row">
-        <input id="new-tab" type="checkbox">
-        <label for="new-tab">Open new tab if not found</label>
-      </div>
-      <div class="field">
-        <button id="open-tab-btn" type="button">Open Tab</button>
-      </div>
-      <button id="use-relay-btn">Use Relay URL</button>
+    <div id="status" class="status info">
+      <span class="status-icon">⏳</span>
+      <span id="status-text">Initializing...</span>
     </div>
 
     <div id="tab-selection" class="hidden">
+      <div class="section-label">Select page to expose to MCP server:</div>
       <div class="tabs-list" id="tabs-list"></div>
-      <button id="connect-btn" disabled>Connect to Selected Tab</button>
     </div>
 
-    <div id="connected-view" class="hidden">
-      <p>Connected to tab: <strong id="connected-tab-title"></strong></p>
-      <p>Tab ID: <strong id="connected-tab-id"></strong></p>
-      <button id="disconnect-btn">Disconnect</button>
+    <div id="connected-view" class="hidden connected-view">
+      <div class="connected-icon">✅</div>
+      <div class="connected-title">Connected to <span id="connected-tab-title"></span></div>
+      <div class="connected-details">
+        Tab ID: <span id="connected-tab-id"></span>
+      </div>
+      <button id="disconnect-btn" class="disconnect-btn">Disconnect</button>
+    </div>
+
+    <div id="error-view" class="hidden">
+      <div class="empty-state">
+        <div class="empty-state-icon">❌</div>
+        <div id="error-message">An error occurred</div>
+      </div>
+    </div>
+
+    <button id="debug-toggle">Show Debug Logs</button>
+
+    <div id="debug-panel" class="hidden">
+      <h3>Debug Logs</h3>
+      <div class="debug-controls">
+        <select id="log-filter">
+          <option value="">All Categories</option>
+          <option value="ws">WebSocket</option>
+          <option value="cdp">CDP</option>
+          <option value="tab">Tab</option>
+          <option value="relay">Relay</option>
+          <option value="error">Error</option>
+        </select>
+        <button id="refresh-logs">Refresh</button>
+        <button id="clear-logs" class="danger">Clear</button>
+        <button id="export-logs">Export</button>
+      </div>
+      <div id="debug-stats"></div>
+      <div id="log-output"></div>
     </div>
   </div>
 

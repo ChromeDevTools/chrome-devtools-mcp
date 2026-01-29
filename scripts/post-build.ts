@@ -225,6 +225,14 @@ export const hostConfig = {};
       console.log('✅ Copied extension background.mjs to build directory');
     }
 
+    // Copy debug-logger.mjs
+    const debugLoggerSource = path.join(extensionSourceDir, 'debug-logger.mjs');
+    const debugLoggerDest = path.join(extensionDestDir, 'debug-logger.mjs');
+    if (fs.existsSync(debugLoggerSource)) {
+      fs.copyFileSync(debugLoggerSource, debugLoggerDest);
+      console.log('✅ Copied extension debug-logger.mjs to build directory');
+    }
+
     // Copy ui directory
     const uiSourceDir = path.join(extensionSourceDir, 'ui');
     const uiDestDir = path.join(extensionDestDir, 'ui');

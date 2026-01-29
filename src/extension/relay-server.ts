@@ -6,17 +6,15 @@ import WebSocket, { WebSocketServer } from 'ws';
 import { EventEmitter } from 'events';
 import crypto from 'crypto';
 import http from 'http';
+import fs from 'fs';
 
-let sharedDiscoveryServer: http.Server | null = null;
-let sharedDiscoveryHost: string | null = null;
-let sharedDiscoveryPort: number | null = null;
-let sharedDiscoveryState: {
-  wsUrl: string;
-  tabUrl?: string;
-  newTab?: boolean;
-  startedAt?: number;
-  instanceId?: string;
-} | null = null;
+// デバッグログをファイルに出力
+const DEBUG_LOG_PATH = '/tmp/relay-server-debug.log';
+function debugLog(...args: any[]) {
+  const timestamp = new Date().toISOString();
+  const message = `[${timestamp}] ${args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ')}\n`;
+  fs.appendFileSync(DEBUG_LOG_PATH, message);
+}
 
 export interface RelayServerOptions {
   port?: number; // 0 for auto-assign
@@ -43,11 +41,10 @@ export class RelayServer extends EventEmitter {
   private token: string;
   private tabId: number | null = null;
   private ready: boolean = false;
-  private discoveryServer: http.Server | null = null;
-  private discoveryPort: number | null = null;
   private nextId = 1;
   private pending = new Map<number, {resolve: (value: any) => void; reject: (err: Error) => void}>();
-  private instanceId = crypto.randomBytes(8).toString('hex');
+  private discoveryServer: http.Server | null = null;
+  private discoveryPort: number | null = null;
 
   constructor(options: RelayServerOptions = {}) {
     super();
@@ -69,12 +66,12 @@ export class RelayServer extends EventEmitter {
       this.wss.on('listening', () => {
         const address = this.wss!.address() as WebSocket.AddressInfo;
         this.port = address.port;
-        console.log(`[RelayServer] Listening on ws://${this.host}:${this.port}`);
+        debugLog(`[RelayServer] Listening on ws://${this.host}:${this.port}`);
         resolve(this.port);
       });
 
       this.wss.on('error', (error) => {
-        console.error('[RelayServer] Server error:', error);
+        debugLog('[RelayServer] Server error:', error);
         reject(error);
       });
 
@@ -85,118 +82,24 @@ export class RelayServer extends EventEmitter {
   }
 
   /**
-   * Start discovery server for extension UI auto-detect.
-   */
-  async startDiscoveryServer(
-    wsUrl: string,
-    options: {tabUrl?: string; newTab?: boolean} = {},
-  ): Promise<void> {
-    if (process.env.MCP_EXTENSION_DISCOVERY_DISABLED === '1') {
-      return;
-    }
-    const envPort = process.env.MCP_EXTENSION_DISCOVERY_PORT;
-    const envRange = process.env.MCP_EXTENSION_DISCOVERY_PORT_RANGE;
-    let ports: number[] = [];
-    if (envPort) {
-      const port = Number(envPort);
-      if (!port || Number.isNaN(port)) {
-        return;
-      }
-      ports = [port];
-    } else if (envRange) {
-      const [startStr, endStr] = envRange.split('-');
-      const start = Number(startStr);
-      const end = Number(endStr);
-      if (!start || !end || Number.isNaN(start) || Number.isNaN(end)) {
-        return;
-      }
-      for (let p = start; p <= end; p++) ports.push(p);
-    } else {
-      // Default safe range to avoid EADDRINUSE collisions
-      ports = [8765, 8766, 8767, 8768, 8769, 8770, 8771, 8772, 8773, 8774, 8775];
-    }
-
-    sharedDiscoveryState = {
-      wsUrl,
-      tabUrl: options.tabUrl,
-      newTab: options.newTab,
-      startedAt: Date.now(),
-      instanceId: this.instanceId,
-    };
-
-    for (const port of ports) {
-      if (
-        sharedDiscoveryServer &&
-        sharedDiscoveryHost === this.host &&
-        sharedDiscoveryPort === port
-      ) {
-        return;
-      }
-
-      const started = await new Promise<boolean>((resolve) => {
-        const server = http.createServer((req, res) => {
-          if (req.method !== 'GET' || req.url !== '/relay-info') {
-            res.statusCode = 404;
-            res.end('Not Found');
-            return;
-          }
-          res.setHeader('Content-Type', 'application/json');
-          res.end(
-          JSON.stringify({
-            wsUrl: sharedDiscoveryState?.wsUrl ?? wsUrl,
-            tabUrl: sharedDiscoveryState?.tabUrl ?? options.tabUrl ?? null,
-            newTab: Boolean(
-              sharedDiscoveryState?.newTab ?? options.newTab,
-            ),
-            startedAt: sharedDiscoveryState?.startedAt ?? Date.now(),
-            instanceId: sharedDiscoveryState?.instanceId ?? this.instanceId,
-          }),
-        );
-      });
-
-        server.on('error', (error: any) => {
-          if (error?.code === 'EADDRINUSE') {
-            resolve(false);
-            return;
-          }
-          console.error('[RelayServer] Discovery server error:', error);
-          resolve(false);
-        });
-
-        server.listen(port, this.host, () => {
-          this.discoveryServer = server;
-          this.discoveryPort = port;
-          sharedDiscoveryServer = server;
-          sharedDiscoveryHost = this.host;
-          sharedDiscoveryPort = port;
-          console.log(`[RelayServer] Discovery available on http://${this.host}:${port}/relay-info`);
-          resolve(true);
-        });
-      });
-
-      if (started) return;
-    }
-  }
-
-  /**
    * Handle WebSocket connection from Extension
    */
   private handleConnection(ws: WebSocket, req: any) {
-    console.log('[RelayServer] New connection from Extension');
+    debugLog('[RelayServer] New connection from Extension');
 
     // Validate token
     const url = new URL(req.url || '', `ws://${this.host}`);
     const clientToken = url.searchParams.get('token');
 
     if (clientToken !== this.token) {
-      console.error('[RelayServer] Invalid token');
+      debugLog('[RelayServer] Invalid token');
       ws.close(1008, 'Invalid token');
       return;
     }
 
     // Only allow one connection
     if (this.ws) {
-      console.error('[RelayServer] Connection already exists');
+      debugLog('[RelayServer] Connection already exists');
       ws.close(1008, 'Connection already exists');
       return;
     }
@@ -208,17 +111,17 @@ export class RelayServer extends EventEmitter {
     });
 
     ws.on('close', () => {
-      console.log('[RelayServer] Extension disconnected');
+      debugLog('[RelayServer] Extension disconnected');
       this.ws = null;
       this.ready = false;
       this.emit('disconnected');
     });
 
     ws.on('error', (error) => {
-      console.error('[RelayServer] WebSocket error:', error);
+      debugLog('[RelayServer] WebSocket error:', error);
     });
 
-    console.log('[RelayServer] Extension connected');
+    debugLog('[RelayServer] Extension connected');
   }
 
   /**
@@ -269,7 +172,7 @@ export class RelayServer extends EventEmitter {
         case 'ready':
           this.tabId = message.tabId;
           this.ready = true;
-          console.log(`[RelayServer] Connection ready for tab ${this.tabId}`);
+          debugLog(`[RelayServer] Connection ready for tab ${this.tabId}`);
           this.emit('ready', this.tabId);
           break;
 
@@ -289,15 +192,15 @@ export class RelayServer extends EventEmitter {
           break;
 
         case 'detached':
-          console.log(`[RelayServer] Tab ${message.tabId} detached: ${message.reason}`);
+          debugLog(`[RelayServer] Tab ${message.tabId} detached: ${message.reason}`);
           this.emit('detached', message.reason);
           break;
 
         default:
-          console.warn('[RelayServer] Unknown message type:', message.type);
+          debugLog('[RelayServer] Unknown message type:', message.type);
       }
     } catch (error) {
-      console.error('[RelayServer] Failed to parse message:', error);
+      debugLog('[RelayServer] Failed to parse message:', error);
     }
   }
 
@@ -321,34 +224,93 @@ export class RelayServer extends EventEmitter {
     if (!this.ws || !this.ready) {
       throw new Error('Extension not connected or not ready');
     }
+    if (this.ws.readyState !== WebSocket.OPEN) {
+      throw new Error('WebSocket not open');
+    }
     this.ws.send(JSON.stringify(message));
   }
 
-  async sendRequest(method: string, params?: any): Promise<any> {
+  async sendRequest(method: string, params?: any, timeoutMs = 30000): Promise<any> {
     if (!this.ws || !this.ready) {
       throw new Error('Extension not connected or not ready');
+    }
+    if (this.ws.readyState !== WebSocket.OPEN) {
+      throw new Error('WebSocket not open');
     }
     const id = this.nextId++;
     const payload = {id, method, params};
     const response = new Promise<any>((resolve, reject) => {
-      this.pending.set(id, {resolve, reject});
+      const timeoutId = setTimeout(() => {
+        this.pending.delete(id);
+        reject(new Error(`Request timeout: ${method}`));
+      }, timeoutMs);
+      this.pending.set(id, {
+        resolve: (value: any) => {
+          clearTimeout(timeoutId);
+          resolve(value);
+        },
+        reject: (err: Error) => {
+          clearTimeout(timeoutId);
+          reject(err);
+        },
+      });
     });
     this.ws.send(JSON.stringify(payload));
     return response;
   }
 
   /**
-   * Request Extension to connect to specific tab
+   * Start simple discovery HTTP server for extension to find relay URL.
+   * Extension polls this endpoint when user clicks the extension icon.
    */
-  requestTabConnection(tabId: number): void {
-    if (!this.ws) {
-      throw new Error('Extension not connected');
+  async startDiscoveryServer(options: {
+    tabUrl?: string;
+    newTab?: boolean;
+  } = {}): Promise<number | null> {
+    const ports = [8765, 8766, 8767, 8768, 8769, 8770, 8771, 8772, 8773, 8774, 8775];
+    const wsUrl = this.getConnectionURL();
+
+    for (const port of ports) {
+      const started = await new Promise<boolean>((resolve) => {
+        const server = http.createServer((req, res) => {
+          if (req.method !== 'GET' || req.url !== '/relay-info') {
+            res.statusCode = 404;
+            res.end('Not Found');
+            return;
+          }
+          res.setHeader('Content-Type', 'application/json');
+          res.setHeader('Access-Control-Allow-Origin', '*');
+          res.end(JSON.stringify({
+            wsUrl,
+            tabUrl: options.tabUrl || null,
+            newTab: Boolean(options.newTab),
+          }));
+        });
+
+        server.on('error', (error: any) => {
+          if (error?.code === 'EADDRINUSE') {
+            resolve(false);
+            return;
+          }
+          debugLog('[RelayServer] Discovery server error:', error);
+          resolve(false);
+        });
+
+        server.listen(port, this.host, () => {
+          this.discoveryServer = server;
+          this.discoveryPort = port;
+          debugLog(`[RelayServer] Discovery available on http://${this.host}:${port}/relay-info`);
+          resolve(true);
+        });
+      });
+
+      if (started) {
+        return port;
+      }
     }
 
-    this.ws.send(JSON.stringify({
-      type: 'connect',
-      tabId
-    }));
+    debugLog('[RelayServer] Could not start discovery server on any port');
+    return null;
   }
 
   /**
@@ -369,7 +331,7 @@ export class RelayServer extends EventEmitter {
     if (this.wss) {
       return new Promise((resolve) => {
         this.wss!.close(() => {
-          console.log('[RelayServer] Server stopped');
+          debugLog('[RelayServer] Server stopped');
           resolve();
         });
       });
