@@ -24,6 +24,7 @@ export default {
     schema: [],
     messages: {
       licenseRule: 'Add license header.',
+      emptyLine: 'Add empty line after license header.',
     },
   },
   defaultOptions: [],
@@ -64,6 +65,22 @@ export default {
             header.value.includes('License') ||
             header.value.includes('Copyright'))
         ) {
+          const nextToken = sourceCode.getTokenAfter(header, {
+            includeComments: true,
+          });
+          if (
+            nextToken &&
+            nextToken.loc.start.line === header.loc.end.line + 1
+          ) {
+            context.report({
+              node: node,
+              loc: header.loc,
+              messageId: 'emptyLine',
+              fix(fixer) {
+                return fixer.insertTextAfter(header, '\n');
+              },
+            });
+          }
           return;
         }
 

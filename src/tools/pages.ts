@@ -5,6 +5,7 @@
  */
 
 import {logger} from '../logger.js';
+import type {Dialog} from '../third_party/index.js';
 import {zod} from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
@@ -86,10 +87,16 @@ export const newPage = defineTool({
   },
   schema: {
     url: zod.string().describe('URL to load in a new page.'),
+    background: zod
+      .boolean()
+      .optional()
+      .describe(
+        'Whether to open the page in the background without bringing it to the front. Default is false (foreground).',
+      ),
     ...timeoutSchema,
   },
   handler: async (request, response, context) => {
-    const page = await context.newPage();
+    const page = await context.newPage(request.params.background);
 
     await context.waitForEventsAfterAction(async () => {
       await page.goto(request.params.url, {
@@ -120,6 +127,18 @@ export const navigatePage = defineTool({
       .boolean()
       .optional()
       .describe('Whether to ignore cache on reload.'),
+    handleBeforeUnload: zod
+      .enum(['accept', 'decline'])
+      .optional()
+      .describe(
+        'Whether to auto accept or beforeunload dialogs triggered by this navigation. Default is accept.',
+      ),
+    initScript: zod
+      .string()
+      .optional()
+      .describe(
+        'A JavaScript script to be executed on each new document before any other scripts for the next navigation.',
+      ),
     ...timeoutSchema,
   },
   handler: async (request, response, context) => {
@@ -136,62 +155,98 @@ export const navigatePage = defineTool({
       request.params.type = 'url';
     }
 
-    await context.waitForEventsAfterAction(async () => {
-      switch (request.params.type) {
-        case 'url':
-          if (!request.params.url) {
-            throw new Error('A URL is required for navigation of type=url.');
-          }
-          try {
-            await page.goto(request.params.url, options);
-            response.appendResponseLine(
-              `Successfully navigated to ${request.params.url}.`,
-            );
-          } catch (error) {
-            response.appendResponseLine(
-              `Unable to navigate in the  selected page: ${error.message}.`,
-            );
-          }
-          break;
-        case 'back':
-          try {
-            await page.goBack(options);
-            response.appendResponseLine(
-              `Successfully navigated back to ${page.url()}.`,
-            );
-          } catch (error) {
-            response.appendResponseLine(
-              `Unable to navigate back in the selected page: ${error.message}.`,
-            );
-          }
-          break;
-        case 'forward':
-          try {
-            await page.goForward(options);
-            response.appendResponseLine(
-              `Successfully navigated forward to ${page.url()}.`,
-            );
-          } catch (error) {
-            response.appendResponseLine(
-              `Unable to navigate forward in the selected page: ${error.message}.`,
-            );
-          }
-          break;
-        case 'reload':
-          try {
-            await page.reload({
-              ...options,
-              ignoreCache: request.params.ignoreCache,
-            });
-            response.appendResponseLine(`Successfully reloaded the page.`);
-          } catch (error) {
-            response.appendResponseLine(
-              `Unable to reload the selected page: ${error.message}.`,
-            );
-          }
-          break;
+    const handleBeforeUnload = request.params.handleBeforeUnload ?? 'accept';
+    const dialogHandler = (dialog: Dialog) => {
+      if (dialog.type() === 'beforeunload') {
+        if (handleBeforeUnload === 'accept') {
+          response.appendResponseLine(`Accepted a beforeunload dialog.`);
+          void dialog.accept();
+        } else {
+          response.appendResponseLine(`Declined a beforeunload dialog.`);
+          void dialog.dismiss();
+        }
+        // We are not going to report the dialog like regular dialogs.
+        context.clearDialog();
       }
-    });
+    };
+
+    let initScriptId: string | undefined;
+    if (request.params.initScript) {
+      const {identifier} = await page.evaluateOnNewDocument(
+        request.params.initScript,
+      );
+      initScriptId = identifier;
+    }
+
+    page.on('dialog', dialogHandler);
+
+    try {
+      await context.waitForEventsAfterAction(async () => {
+        switch (request.params.type) {
+          case 'url':
+            if (!request.params.url) {
+              throw new Error('A URL is required for navigation of type=url.');
+            }
+            try {
+              await page.goto(request.params.url, options);
+              response.appendResponseLine(
+                `Successfully navigated to ${request.params.url}.`,
+              );
+            } catch (error) {
+              response.appendResponseLine(
+                `Unable to navigate in the  selected page: ${error.message}.`,
+              );
+            }
+            break;
+          case 'back':
+            try {
+              await page.goBack(options);
+              response.appendResponseLine(
+                `Successfully navigated back to ${page.url()}.`,
+              );
+            } catch (error) {
+              response.appendResponseLine(
+                `Unable to navigate back in the selected page: ${error.message}.`,
+              );
+            }
+            break;
+          case 'forward':
+            try {
+              await page.goForward(options);
+              response.appendResponseLine(
+                `Successfully navigated forward to ${page.url()}.`,
+              );
+            } catch (error) {
+              response.appendResponseLine(
+                `Unable to navigate forward in the selected page: ${error.message}.`,
+              );
+            }
+            break;
+          case 'reload':
+            try {
+              await page.reload({
+                ...options,
+                ignoreCache: request.params.ignoreCache,
+              });
+              response.appendResponseLine(`Successfully reloaded the page.`);
+            } catch (error) {
+              response.appendResponseLine(
+                `Unable to reload the selected page: ${error.message}.`,
+              );
+            }
+            break;
+        }
+      });
+    } finally {
+      page.off('dialog', dialogHandler);
+      if (initScriptId) {
+        await page
+          .removeScriptToEvaluateOnNewDocument(initScriptId)
+          .catch(error => {
+            logger(`Failed to remove init script`, error);
+          });
+      }
+    }
 
     response.setIncludePages(true);
   },
@@ -211,6 +266,22 @@ export const resizePage = defineTool({
   handler: async (request, response, context) => {
     const page = context.getSelectedPage();
 
+    try {
+      const browser = page.browser();
+      const windowId = await page.windowId();
+
+      const bounds = await browser.getWindowBounds(windowId);
+
+      if (bounds.windowState === 'fullscreen') {
+        // Have to call this twice on Ubuntu when the window is in fullscreen mode.
+        await browser.setWindowBounds(windowId, {windowState: 'normal'});
+        await browser.setWindowBounds(windowId, {windowState: 'normal'});
+      } else if (bounds.windowState !== 'normal') {
+        await browser.setWindowBounds(windowId, {windowState: 'normal'});
+      }
+    } catch {
+      // Window APIs are not supported on all platforms
+    }
     await page.resize({
       contentWidth: request.params.width,
       contentHeight: request.params.height,

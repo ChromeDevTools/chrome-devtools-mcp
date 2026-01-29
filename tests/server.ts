@@ -13,7 +13,7 @@ import {before, after, afterEach} from 'node:test';
 
 import {html} from './utils.js';
 
-class TestServer {
+export class TestServer {
   #port: number;
   #server: Server;
 

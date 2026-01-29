@@ -5,13 +5,13 @@
  */
 
 import {PuppeteerDevToolsConnection} from './DevToolsConnectionAdapter.js';
-import {ISSUE_UTILS} from './issue-descriptions.js';
-import {logger} from './logger.js';
 import {Mutex} from './Mutex.js';
 import {DevTools} from './third_party/index.js';
 import type {
   Browser,
+  ConsoleMessage,
   Page,
+  Protocol,
   Target as PuppeteerTarget,
 } from './third_party/index.js';
 
@@ -81,50 +81,6 @@ export class FakeIssuesManager extends DevTools.Common.ObjectWrapper
   }
 }
 
-export function mapIssueToMessageObject(issue: DevTools.AggregatedIssue) {
-  const count = issue.getAggregatedIssuesCount();
-  const markdownDescription = issue.getDescription();
-  const filename = markdownDescription?.file;
-  if (!markdownDescription) {
-    logger(`no description found for issue:` + issue.code);
-    return null;
-  }
-  const rawMarkdown = filename
-    ? ISSUE_UTILS.getIssueDescription(filename)
-    : null;
-  if (!rawMarkdown) {
-    logger(`no markdown ${filename} found for issue:` + issue.code);
-    return null;
-  }
-  let processedMarkdown: string;
-  let title: string | null;
-
-  try {
-    processedMarkdown =
-      DevTools.MarkdownIssueDescription.substitutePlaceholders(
-        rawMarkdown,
-        markdownDescription.substitutions,
-      );
-    const markdownAst = DevTools.Marked.Marked.lexer(processedMarkdown);
-    title =
-      DevTools.MarkdownIssueDescription.findTitleFromMarkdownAst(markdownAst);
-  } catch {
-    logger('error parsing markdown for issue ' + issue.code());
-    return null;
-  }
-  if (!title) {
-    logger('cannot read issue title from ' + filename);
-    return null;
-  }
-  return {
-    type: 'issue',
-    item: issue,
-    message: title,
-    count,
-    description: processedMarkdown,
-  };
-}
-
 // DevTools CDP errors can get noisy.
 DevTools.ProtocolClient.InspectorBackend.test.suppressRequestErrors = true;
 
@@ -138,9 +94,15 @@ DevTools.I18n.DevToolsLocale.DevToolsLocale.instance({
 });
 DevTools.I18n.i18n.registerLocaleDataForTest('en-US', {});
 
+DevTools.Formatter.FormatterWorkerPool.FormatterWorkerPool.instance({
+  forceNew: true,
+  entrypointURL: import.meta
+    .resolve('./third_party/devtools-formatter-worker.js'),
+});
+
 export interface TargetUniverse {
   /** The DevTools target corresponding to the puppeteer Page */
-  target: DevTools.SDKTarget;
+  target: DevTools.Target;
   universe: DevTools.Foundation.Universe.Universe;
 }
 export type TargetUniverseFactoryFn = (page: Page) => Promise<TargetUniverse>;
@@ -264,3 +226,94 @@ const SKIP_ALL_PAUSES = {
     // Do nothing.
   },
 };
+
+export async function createStackTraceForConsoleMessage(
+  devTools: TargetUniverse,
+  consoleMessage: ConsoleMessage,
+): Promise<DevTools.StackTrace.StackTrace.StackTrace | undefined> {
+  const message = consoleMessage as ConsoleMessage & {
+    _rawStackTrace(): Protocol.Runtime.StackTrace | undefined;
+    _targetId(): string | undefined;
+  };
+  const rawStackTrace = message._rawStackTrace();
+  if (!rawStackTrace) {
+    return undefined;
+  }
+
+  const targetManager = devTools.universe.context.get(DevTools.TargetManager);
+  const messageTargetId = message._targetId();
+  const target = messageTargetId
+    ? targetManager.targetById(messageTargetId) || devTools.target
+    : devTools.target;
+  const model = target.model(DevTools.DebuggerModel) as DevTools.DebuggerModel;
+
+  // DevTools doesn't wait for source maps to attach before building a stack trace, rather it'll send
+  // an update event once a source map was attached and the stack trace retranslated. This doesn't
+  // work in the MCP case, so we'll collect all script IDs upfront and wait for any pending source map
+  // loads before creating the stack trace. We might also have to wait for Debugger.ScriptParsed events if
+  // the stack trace is created particularly early.
+  const scriptIds = new Set<Protocol.Runtime.ScriptId>();
+  for (const frame of rawStackTrace.callFrames) {
+    scriptIds.add(frame.scriptId);
+  }
+  for (
+    let asyncStack = rawStackTrace.parent;
+    asyncStack;
+    asyncStack = asyncStack.parent
+  ) {
+    for (const frame of asyncStack.callFrames) {
+      scriptIds.add(frame.scriptId);
+    }
+  }
+
+  const signal = AbortSignal.timeout(1_000);
+  await Promise.all(
+    [...scriptIds].map(id =>
+      waitForScript(model, id, signal)
+        .then(script =>
+          model.sourceMapManager().sourceMapForClientPromise(script),
+        )
+        .catch(),
+    ),
+  );
+
+  const binding = devTools.universe.context.get(
+    DevTools.DebuggerWorkspaceBinding,
+  );
+  // DevTools uses branded types for ScriptId and others. Casting the puppeteer protocol type to the DevTools protocol type is safe.
+  return binding.createStackTraceFromProtocolRuntime(
+    rawStackTrace as Parameters<
+      DevTools.DebuggerWorkspaceBinding['createStackTraceFromProtocolRuntime']
+    >[0],
+    target,
+  );
+}
+
+// Waits indefinitely for the script so pair it with Promise.race.
+async function waitForScript(
+  model: DevTools.DebuggerModel,
+  scriptId: Protocol.Runtime.ScriptId,
+  signal: AbortSignal,
+) {
+  while (true) {
+    if (signal.aborted) {
+      throw signal.reason;
+    }
+
+    const script = model.scriptForId(scriptId);
+    if (script) {
+      return script;
+    }
+
+    await new Promise((resolve, reject) => {
+      signal.addEventListener('abort', () => reject(signal.reason), {
+        once: true,
+      });
+      void model
+        .once(
+          'ParsedScriptSource' as Parameters<DevTools.DebuggerModel['once']>[0],
+        )
+        .then(resolve);
+    });
+  }
+}

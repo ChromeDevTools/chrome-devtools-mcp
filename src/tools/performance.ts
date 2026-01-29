@@ -6,13 +6,10 @@
 
 import zlib from 'node:zlib';
 
-import {logger} from '../logger.js';
 import {zod, DevTools} from '../third_party/index.js';
 import type {Page} from '../third_party/index.js';
 import type {InsightName, TraceResult} from '../trace-processing/parse.js';
 import {
-  getInsightOutput,
-  getTraceSummary,
   parseRawTraceBuffer,
   traceResultIsSuccess,
 } from '../trace-processing/parse.js';
@@ -30,8 +27,7 @@ const filePathSchema = zod
 
 export const startTrace = defineTool({
   name: 'performance_start_trace',
-  description:
-    'Starts a performance trace recording on the selected page. This can be used to look for performance problems and insights to improve the performance of the page. It will also report Core Web Vital (CWV) scores for the page.',
+  description: `Starts a performance trace recording on the selected page. This can be used to look for performance problems and insights to improve the performance of the page. It will also report Core Web Vital (CWV) scores for the page.`,
   annotations: {
     category: ToolCategory.PERFORMANCE,
     readOnlyHint: false,
@@ -40,7 +36,7 @@ export const startTrace = defineTool({
     reload: zod
       .boolean()
       .describe(
-        'Determines if, once tracing has started, the page should be automatically reloaded.',
+        'Determines if, once tracing has started, the current selected page should be automatically reloaded. Navigate the page to the right URL using the navigate_page tool BEFORE starting the trace if reload or autoStop is set to true.',
       ),
     autoStop: zod
       .boolean()
@@ -169,17 +165,11 @@ export const analyzeInsight = defineTool({
       return;
     }
 
-    const insightOutput = getInsightOutput(
+    response.attachTraceInsight(
       lastRecording,
       request.params.insightSetId,
       request.params.insightName as InsightName,
     );
-    if ('error' in insightOutput) {
-      response.appendResponseLine(insightOutput.error);
-      return;
-    }
-
-    response.appendResponseLine(insightOutput.output);
   },
 });
 
@@ -214,21 +204,12 @@ async function stopTracingAndAppendOutput(
     if (traceResultIsSuccess(result)) {
       await populateCruxData(result);
       context.storeTraceRecording(result);
-      const traceSummaryText = getTraceSummary(result);
-      response.appendResponseLine(traceSummaryText);
+      response.attachTraceSummary(result);
     } else {
-      response.appendResponseLine(
-        'There was an unexpected error parsing the trace:',
+      throw new Error(
+        `There was an unexpected error parsing the trace: ${result.error}`,
       );
-      response.appendResponseLine(result.error);
     }
-  } catch (e) {
-    const errorText = e instanceof Error ? e.message : JSON.stringify(e);
-    logger(`Error stopping performance trace: ${errorText}`);
-    response.appendResponseLine(
-      'An error occurred generating the response for this trace:',
-    );
-    response.appendResponseLine(errorText);
   } finally {
     context.setIsRunningPerformanceTrace(false);
   }

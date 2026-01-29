@@ -10,12 +10,15 @@ import process from 'node:process';
 
 import type {Channel} from './browser.js';
 import {ensureBrowserConnected, ensureBrowserLaunched} from './browser.js';
-import {parseArguments} from './cli.js';
+import {cliOptions, parseArguments} from './cli.js';
 import {loadIssueDescriptions} from './issue-descriptions.js';
 import {logger, saveLogsToFile} from './logger.js';
 import {McpContext} from './McpContext.js';
 import {McpResponse} from './McpResponse.js';
 import {Mutex} from './Mutex.js';
+import {ClearcutLogger} from './telemetry/clearcut-logger.js';
+import {computeFlagUsage} from './telemetry/flag-utils.js';
+import {bucketizeLatency} from './telemetry/metric-utils.js';
 import {
   McpServer,
   StdioServerTransport,
@@ -28,12 +31,22 @@ import {tools} from './tools/tools.js';
 
 // If moved update release-please config
 // x-release-please-start-version
-const VERSION = '0.12.1';
+const VERSION = '0.14.0';
 // x-release-please-end
 
 export const args = parseArguments(VERSION);
 
 const logFile = args.logFile ? saveLogsToFile(args.logFile) : undefined;
+let clearcutLogger: ClearcutLogger | undefined;
+if (args.usageStatistics) {
+  clearcutLogger = new ClearcutLogger({
+    logFile: args.logFile,
+    appVersion: VERSION,
+    clearcutEndpoint: args.clearcutEndpoint,
+    clearcutForceFlushIntervalMs: args.clearcutForceFlushIntervalMs,
+    clearcutIncludePidHeader: args.clearcutIncludePidHeader,
+  });
+}
 
 process.on('unhandledRejection', (reason, promise) => {
   logger('Unhandled promise rejection', promise, reason);
@@ -85,6 +98,7 @@ async function getContext(): Promise<McpContext> {
           ignoreDefaultChromeArgs,
           acceptInsecureCerts: args.acceptInsecureCerts,
           devtools,
+          enableExtensions: args.categoryExtensions,
         });
 
   if (context?.browser !== browser) {
@@ -135,6 +149,12 @@ function registerTool(tool: ToolDefinition): void {
     return;
   }
   if (
+    tool.annotations.category === ToolCategory.EXTENSIONS &&
+    args.categoryExtensions === false
+  ) {
+    return;
+  }
+  if (
     tool.annotations.conditions?.includes('computerVision') &&
     !args.experimentalVision
   ) {
@@ -155,6 +175,8 @@ function registerTool(tool: ToolDefinition): void {
     },
     async (params): Promise<CallToolResult> => {
       const guard = await toolMutex.acquire();
+      const startTime = Date.now();
+      let success = false;
       try {
         logger(`${tool.name} request: ${JSON.stringify(params, null, '  ')}`);
         const context = await getContext();
@@ -177,6 +199,7 @@ function registerTool(tool: ToolDefinition): void {
         } = {
           content,
         };
+        success = true;
         if (args.experimentalStructuredContent) {
           result.structuredContent = structuredContent as Record<
             string,
@@ -200,6 +223,11 @@ function registerTool(tool: ToolDefinition): void {
           isError: true,
         };
       } finally {
+        void clearcutLogger?.logToolInvocation({
+          toolName: tool.name,
+          success,
+          latencyMs: bucketizeLatency(Date.now() - startTime),
+        });
         guard.dispose();
       }
     },
@@ -215,3 +243,5 @@ const transport = new StdioServerTransport();
 await server.connect(transport);
 logger('Chrome DevTools MCP Server connected');
 logDisclaimers();
+void clearcutLogger?.logDailyActiveIfNeeded();
+void clearcutLogger?.logServerStart(computeFlagUsage(args, cliOptions));

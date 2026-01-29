@@ -1,0 +1,53 @@
+exports[`ConsoleFormatter > toString > formats a console.log message 1`] = `
+msgid=1 [log] Hello, world! (0 args)
+`;
+
+exports[`ConsoleFormatter > toString > formats a console.log message with multiple arguments 1`] = `
+msgid=3 [log] Processing file: (2 args)
+`;
+
+exports[`ConsoleFormatter > toString > formats a console.log message with one argument 1`] = `
+msgid=2 [log] Processing file: (1 args)
+`;
+
+exports[`ConsoleFormatter > toStringDetailed > formats a console message with a stack trace 1`] = `
+ID: 5
+Message: log> Hello stack trace!
+### Stack trace
+at foo (foo.ts:10:2)
+at bar (foo.ts:20:2)
+--- setTimeout -------------------------
+at schedule (util.ts:5:2)
+`;
+
+exports[`ConsoleFormatter > toStringDetailed > formats a console.error message 1`] = `
+ID: 4
+Message: error> Something went wrong
+`;
+
+exports[`ConsoleFormatter > toStringDetailed > formats a console.log message 1`] = `
+ID: 1
+Message: log> Hello, world!
+`;
+
+exports[`ConsoleFormatter > toStringDetailed > formats a console.log message with multiple arguments 1`] = `
+ID: 3
+Message: log> Processing file:
+### Arguments
+Arg #0: file.txt
+Arg #1: another file
+`;
+
+exports[`ConsoleFormatter > toStringDetailed > formats a console.log message with one argument 1`] = `
+ID: 2
+Message: log> Processing file:
+### Arguments
+Arg #0: file.txt
+`;
+
+exports[`ConsoleFormatter > toStringDetailed > handles \"Execution context is not available\" error in args 1`] = `
+ID: 6
+Message: log> Processing file:
+### Arguments
+Arg #0: <error: Argument 0 is no longer available>
+`;

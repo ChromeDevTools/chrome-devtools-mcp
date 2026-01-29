@@ -98,14 +98,7 @@ describe('e2e', () => {
         const fileTools = await import(`../src/tools/${file}`);
         for (const maybeTool of Object.values<ToolDefinition>(fileTools)) {
           if ('name' in maybeTool) {
-            if (maybeTool.annotations?.conditions?.includes('computerVision')) {
-              continue;
-            }
-            if (
-              maybeTool.annotations?.conditions?.includes(
-                'experimentalInteropTools',
-              )
-            ) {
+            if (maybeTool.annotations?.conditions) {
               continue;
             }
             definedNames.push(maybeTool.name);
@@ -115,6 +108,17 @@ describe('e2e', () => {
       definedNames.sort();
       assert.deepStrictEqual(exposedNames, definedNames);
     });
+  });
+
+  it('has experimental extensions tools', async () => {
+    await withClient(
+      async client => {
+        const {tools} = await client.listTools();
+        const clickAt = tools.find(t => t.name === 'install_extension');
+        assert.ok(clickAt);
+      },
+      ['--category-extensions'],
+    );
   });
 
   it('has experimental vision tools', async () => {

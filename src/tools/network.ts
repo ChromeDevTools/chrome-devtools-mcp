@@ -91,7 +91,7 @@ export const getNetworkRequest = defineTool({
   description: `Gets a network request by an optional reqid, if omitted returns the currently selected request in the DevTools Network panel.`,
   annotations: {
     category: ToolCategory.NETWORK,
-    readOnlyHint: true,
+    readOnlyHint: false,
   },
   schema: {
     reqid: zod
@@ -100,10 +100,25 @@ export const getNetworkRequest = defineTool({
       .describe(
         'The reqid of the network request. If omitted returns the currently selected request in the DevTools Network panel.',
       ),
+    requestFilePath: zod
+      .string()
+      .optional()
+      .describe(
+        'The absolute or relative path to save the request body to. If omitted, the body is returned inline.',
+      ),
+    responseFilePath: zod
+      .string()
+      .optional()
+      .describe(
+        'The absolute or relative path to save the response body to. If omitted, the body is returned inline.',
+      ),
   },
   handler: async (request, response, context) => {
     if (request.params.reqid) {
-      response.attachNetworkRequest(request.params.reqid);
+      response.attachNetworkRequest(request.params.reqid, {
+        requestFilePath: request.params.requestFilePath,
+        responseFilePath: request.params.responseFilePath,
+      });
     } else {
       const data = await context.getDevToolsData();
       response.attachDevToolsData(data);
@@ -111,7 +126,10 @@ export const getNetworkRequest = defineTool({
         ? context.resolveCdpRequestId(data.cdpRequestId)
         : undefined;
       if (reqid) {
-        response.attachNetworkRequest(reqid);
+        response.attachNetworkRequest(reqid, {
+          requestFilePath: request.params.requestFilePath,
+          responseFilePath: request.params.responseFilePath,
+        });
       } else {
         response.appendResponseLine(
           `Nothing is currently selected in the DevTools Network panel.`,

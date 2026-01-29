@@ -19,7 +19,7 @@ import {
   handleDialog,
   getTabId,
 } from '../../src/tools/pages.js';
-import {withMcpContext} from '../utils.js';
+import {html, withMcpContext} from '../utils.js';
 
 describe('pages', () => {
   describe('list_pages', () => {
@@ -40,6 +40,30 @@ describe('pages', () => {
           context,
         );
         assert.strictEqual(context.getPageById(2), context.getSelectedPage());
+        assert.ok(response.includePages);
+      });
+    });
+    it('create a page in the background', async () => {
+      await withMcpContext(async (response, context) => {
+        const originalPage = context.getPageById(1);
+        assert.strictEqual(originalPage, context.getSelectedPage());
+        // Ensure original page has focus
+        await originalPage.bringToFront();
+        assert.strictEqual(
+          await originalPage.evaluate(() => document.hasFocus()),
+          true,
+        );
+        await newPage.handler(
+          {params: {url: 'about:blank', background: true}},
+          response,
+          context,
+        );
+        // New page should be selected but original should retain focus
+        assert.strictEqual(context.getPageById(2), context.getSelectedPage());
+        assert.strictEqual(
+          await originalPage.evaluate(() => document.hasFocus()),
+          true,
+        );
         assert.ok(response.includePages);
       });
     });
@@ -184,6 +208,67 @@ describe('pages', () => {
         assert.ok(response.includePages);
       });
     });
+
+    it('reload with accpeting the beforeunload dialog', async () => {
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedPage();
+        await page.setContent(
+          html` <script>
+            window.addEventListener('beforeunload', e => {
+              e.preventDefault();
+              e.returnValue = '';
+            });
+          </script>`,
+        );
+
+        await navigatePage.handler(
+          {params: {type: 'reload'}},
+          response,
+          context,
+        );
+
+        assert.strictEqual(context.getDialog(), undefined);
+        assert.ok(response.includePages);
+        assert.strictEqual(
+          response.responseLines.join('\n'),
+          'Accepted a beforeunload dialog.\nSuccessfully reloaded the page.',
+        );
+      });
+    });
+
+    it('reload with declining the beforeunload dialog', async () => {
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedPage();
+        await page.setContent(
+          html` <script>
+            window.addEventListener('beforeunload', e => {
+              e.preventDefault();
+              e.returnValue = '';
+            });
+          </script>`,
+        );
+
+        await navigatePage.handler(
+          {
+            params: {
+              type: 'reload',
+              handleBeforeUnload: 'decline',
+              timeout: 500,
+            },
+          },
+          response,
+          context,
+        );
+
+        assert.strictEqual(context.getDialog(), undefined);
+        assert.ok(response.includePages);
+        assert.strictEqual(
+          response.responseLines.join('\n'),
+          'Declined a beforeunload dialog.\nUnable to reload the selected page: Navigation timeout of 500 ms exceeded.',
+        );
+      });
+    });
+
     it('go forward with error', async () => {
       await withMcpContext(async (response, context) => {
         await navigatePage.handler(
@@ -212,9 +297,31 @@ describe('pages', () => {
         assert.ok(response.includePages);
       });
     });
+    it('navigates to correct page with initScript', async () => {
+      await withMcpContext(async (response, context) => {
+        await navigatePage.handler(
+          {
+            params: {
+              url: 'data:text/html,<div>Hello MCP</div>',
+              initScript: 'window.initScript = "completed"',
+            },
+          },
+          response,
+          context,
+        );
+        const page = context.getSelectedPage();
+
+        // wait for up to 1s for the global variable to set by the initScript to exist
+        await page.waitForFunction("window.initScript==='completed'", {
+          timeout: 1000,
+        });
+
+        assert.ok(response.includePages);
+      });
+    });
   });
   describe('resize', () => {
-    it('create a page', async () => {
+    it('resize the page', async () => {
       await withMcpContext(async (response, context) => {
         const page = context.getSelectedPage();
         const resizePromise = page.evaluate(() => {
@@ -228,10 +335,137 @@ describe('pages', () => {
           context,
         );
         await resizePromise;
+        await page.waitForFunction(
+          () => window.innerWidth === 700 && window.innerHeight === 500,
+        );
         const dimensions = await page.evaluate(() => {
           return [window.innerWidth, window.innerHeight];
         });
         assert.deepStrictEqual(dimensions, [700, 500]);
+      });
+    });
+
+    it('resize when window state is normal', async () => {
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedPage();
+        const browser = page.browser();
+        const windowId = await page.windowId();
+        await browser.setWindowBounds(windowId, {windowState: 'normal'});
+
+        const {windowState} = await browser.getWindowBounds(windowId);
+        assert.strictEqual(windowState, 'normal');
+
+        const resizePromise = page.evaluate(() => {
+          return new Promise(resolve => {
+            window.addEventListener('resize', resolve, {once: true});
+          });
+        });
+        await resizePage.handler(
+          {params: {width: 650, height: 450}},
+          response,
+          context,
+        );
+        await resizePromise;
+        await page.waitForFunction(
+          () => window.innerWidth === 650 && window.innerHeight === 450,
+        );
+        const dimensions = await page.evaluate(() => {
+          return [window.innerWidth, window.innerHeight];
+        });
+        assert.deepStrictEqual(dimensions, [650, 450]);
+      });
+    });
+
+    it('resize when window state is minimized', async () => {
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedPage();
+        const browser = page.browser();
+        const windowId = await page.windowId();
+        await browser.setWindowBounds(windowId, {windowState: 'minimized'});
+
+        const {windowState} = await browser.getWindowBounds(windowId);
+        assert.strictEqual(windowState, 'minimized');
+
+        const resizePromise = page.evaluate(() => {
+          return new Promise(resolve => {
+            window.addEventListener('resize', resolve, {once: true});
+          });
+        });
+        await resizePage.handler(
+          {params: {width: 750, height: 550}},
+          response,
+          context,
+        );
+        await resizePromise;
+        await page.waitForFunction(
+          () => window.innerWidth === 750 && window.innerHeight === 550,
+        );
+        const dimensions = await page.evaluate(() => {
+          return [window.innerWidth, window.innerHeight];
+        });
+        assert.deepStrictEqual(dimensions, [750, 550]);
+      });
+    });
+
+    it('resize when window state is maximized', async () => {
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedPage();
+        const browser = page.browser();
+        const windowId = await page.windowId();
+        await browser.setWindowBounds(windowId, {windowState: 'maximized'});
+
+        const {windowState} = await browser.getWindowBounds(windowId);
+        assert.strictEqual(windowState, 'maximized');
+
+        const resizePromise = page.evaluate(() => {
+          return new Promise(resolve => {
+            window.addEventListener('resize', resolve, {once: true});
+          });
+        });
+        await resizePage.handler(
+          {params: {width: 725, height: 525}},
+          response,
+          context,
+        );
+        await resizePromise;
+        await page.waitForFunction(
+          () => window.innerWidth === 725 && window.innerHeight === 525,
+        );
+        const dimensions = await page.evaluate(() => {
+          return [window.innerWidth, window.innerHeight];
+        });
+        assert.deepStrictEqual(dimensions, [725, 525]);
+      });
+    });
+
+    it('resize when window state is fullscreen', async () => {
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedPage();
+        const browser = page.browser();
+        const windowId = await page.windowId();
+        await browser.setWindowBounds(windowId, {windowState: 'fullscreen'});
+
+        const {windowState} = await browser.getWindowBounds(windowId);
+        assert.strictEqual(windowState, 'fullscreen');
+
+        const resizePromise = page.evaluate(() => {
+          return new Promise(resolve => {
+            window.addEventListener('resize', resolve, {once: true});
+          });
+        });
+        await resizePage.handler(
+          {params: {width: 850, height: 650}},
+          response,
+          context,
+        );
+        await resizePromise;
+        await page.waitForFunction(
+          () => window.innerWidth === 850 && window.innerHeight === 650,
+        );
+        const dimensions = await page.evaluate(() => {
+          return [window.innerWidth, window.innerHeight];
+        });
+        assert.deepStrictEqual(dimensions, [850, 650]);
       });
     });
   });

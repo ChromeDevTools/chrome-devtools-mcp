@@ -281,6 +281,7 @@ async function generateToolDocumentation(): Promise<void> {
         if (!tool.annotations.conditions) {
           return true;
         }
+
         // Only include unconditional tools.
         return tool.annotations.conditions.length === 0;
       })

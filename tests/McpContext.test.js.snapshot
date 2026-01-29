@@ -1,0 +1,45 @@
+exports[`McpContext > should include detailed network request in structured content 1`] = `
+{
+  "networkRequest": {
+    "requestId": 456,
+    "method": "GET",
+    "url": "http://example.com/detail",
+    "status": "[pending]",
+    "requestHeaders": {
+      "content-size": "10"
+    }
+  }
+}
+`;
+
+exports[`McpContext > should include file paths in structured content when saving to file 1`] = `
+{
+  "networkRequest": {
+    "requestBody": "/tmp/req.txt",
+    "responseBody": "/tmp/res.txt"
+  }
+}
+`;
+
+exports[`McpContext > should include network requests in structured content 1`] = `
+{
+  "pagination": {
+    "currentPage": 0,
+    "totalPages": 1,
+    "hasNextPage": false,
+    "hasPreviousPage": false,
+    "startIndex": 0,
+    "endIndex": 1,
+    "invalidPage": false
+  },
+  "networkRequests": [
+    {
+      "requestId": 123,
+      "method": "GET",
+      "url": "http://example.com/api",
+      "status": "[pending]",
+      "selectedInDevToolsUI": false
+    }
+  ]
+}
+`;

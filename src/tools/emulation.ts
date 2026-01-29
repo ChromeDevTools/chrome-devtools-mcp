@@ -2,6 +2,7 @@
  * @license
  * Copyright 2025 Google LLC
  * SPDX-License-Identifier: Apache-2.0
+ *
  */
 
 import {zod, PredefinedNetworkConditions} from '../third_party/index.js';
@@ -55,10 +56,62 @@ export const emulate = defineTool({
       .describe(
         'Geolocation to emulate. Set to null to clear the geolocation override.',
       ),
+    userAgent: zod
+      .string()
+      .nullable()
+      .optional()
+      .describe(
+        'User agent to emulate. Set to null to clear the user agent override.',
+      ),
+    colorScheme: zod
+      .enum(['dark', 'light', 'auto'])
+      .optional()
+      .describe(
+        'Emulate the dark or the light mode. Set to "auto" to reset to the default.',
+      ),
+    viewport: zod
+      .object({
+        width: zod.number().int().min(0).describe('Page width in pixels.'),
+        height: zod.number().int().min(0).describe('Page height in pixels.'),
+        deviceScaleFactor: zod
+          .number()
+          .min(0)
+          .optional()
+          .describe('Specify device scale factor (can be thought of as dpr).'),
+        isMobile: zod
+          .boolean()
+          .optional()
+          .describe(
+            'Whether the meta viewport tag is taken into account. Defaults to false.',
+          ),
+        hasTouch: zod
+          .boolean()
+          .optional()
+          .describe(
+            'Specifies if viewport supports touch events. This should be set to true for mobile devices.',
+          ),
+        isLandscape: zod
+          .boolean()
+          .optional()
+          .describe(
+            'Specifies if viewport is in landscape mode. Defaults to false.',
+          ),
+      })
+      .nullable()
+      .optional()
+      .describe(
+        'Viewport to emulate. Set to null to reset to the default viewport.',
+      ),
   },
   handler: async (request, _response, context) => {
     const page = context.getSelectedPage();
-    const {networkConditions, cpuThrottlingRate, geolocation} = request.params;
+    const {
+      networkConditions,
+      cpuThrottlingRate,
+      geolocation,
+      userAgent,
+      viewport,
+    } = request.params;
 
     if (networkConditions) {
       if (networkConditions === 'No emulation') {
@@ -94,6 +147,53 @@ export const emulate = defineTool({
       } else {
         await page.setGeolocation(geolocation);
         context.setGeolocation(geolocation);
+      }
+    }
+
+    if (userAgent !== undefined) {
+      if (userAgent === null) {
+        await page.setUserAgent({
+          userAgent: undefined,
+        });
+        context.setUserAgent(null);
+      } else {
+        await page.setUserAgent({
+          userAgent,
+        });
+        context.setUserAgent(userAgent);
+      }
+    }
+
+    if (request.params.colorScheme) {
+      if (request.params.colorScheme === 'auto') {
+        await page.emulateMediaFeatures([
+          {name: 'prefers-color-scheme', value: ''},
+        ]);
+        context.setColorScheme(null);
+      } else {
+        await page.emulateMediaFeatures([
+          {
+            name: 'prefers-color-scheme',
+            value: request.params.colorScheme,
+          },
+        ]);
+        context.setColorScheme(request.params.colorScheme);
+      }
+    }
+
+    if (viewport !== undefined) {
+      if (viewport === null) {
+        await page.setViewport(null);
+        context.setViewport(null);
+      } else {
+        const defaults = {
+          deviceScaleFactor: 1,
+          isMobile: false,
+          hasTouch: false,
+          isLandscape: false,
+        };
+        await page.setViewport({...defaults, ...viewport});
+        context.setViewport({...defaults, ...viewport});
       }
     }
   },

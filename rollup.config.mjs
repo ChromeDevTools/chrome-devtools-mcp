@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 /**
  * @fileoverview take from {@link https://github.com/GoogleChromeLabs/chromium-bidi/blob/main/rollup.config.mjs | chromium-bidi}
  * and modified to specific requirement.
@@ -39,6 +40,8 @@ const allowedLicenses = [
   'ISC',
   '0BSD',
 ];
+
+const seenDependencies = new Map();
 
 /**
  * @param {string} wrapperIndexPath
@@ -80,7 +83,14 @@ const bundleDependency = (
             'THIRD_PARTY_NOTICES',
           ),
           template(dependencies) {
-            const stringifiedDependencies = dependencies.map(dependency => {
+            for (const dependency of dependencies) {
+              const key = `${dependency.name}:${dependency.version}`;
+              seenDependencies.set(key, dependency);
+            }
+
+            const stringifiedDependencies = Array.from(
+              seenDependencies.values(),
+            ).map(dependency => {
               let arr = [];
               arr.push(`Name: ${dependency.name ?? 'N/A'}`);
               let url = dependency.homepage ?? dependency.repository;
@@ -183,5 +193,12 @@ export default [
 
       return false;
     },
+  ),
+  bundleDependency(
+    './build/src/third_party/devtools-formatter-worker.js',
+    {
+      inlineDynamicImports: true,
+    },
+    (_source, _importer, _isResolved) => false,
   ),
 ];
