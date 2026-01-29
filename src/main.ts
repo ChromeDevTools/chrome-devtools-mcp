@@ -105,6 +105,7 @@ async function getContext(): Promise<McpContext> {
     context = await McpContext.from(browser, logger, {
       experimentalDevToolsDebugging: devtools,
       experimentalIncludeAllPages: args.experimentalIncludeAllPages,
+      performanceCrux: args.performanceCrux,
     });
   }
   return context;
@@ -115,7 +116,7 @@ const logDisclaimers = () => {
     `chrome-devtools-mcp exposes content of the browser instance to the MCP clients allowing them to inspect,
 debug, and modify any data in the browser or DevTools.
 Avoid sharing sensitive or personal information that you do not want to share with MCP clients.
-Performance tools may send trace URLs to the Google CrUX API to fetch real-user experience data.`,
+Performance tools may send trace URLs to the Google CrUX API to fetch real-user experience data. To disable, run with --no-performance-crux.`,
   );
 
   if (args.usageStatistics) {

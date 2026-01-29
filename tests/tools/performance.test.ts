@@ -325,6 +325,31 @@ describe('performance', () => {
         );
       });
     });
+
+    it('does not fetch CrUX data if performanceCrux is false', async () => {
+      const rawData = loadTraceAsBuffer('basic-trace.json.gz');
+      await withMcpContext(
+        async (response, context) => {
+          context.setIsRunningPerformanceTrace(true);
+          const selectedPage = context.getSelectedPage();
+          sinon.stub(selectedPage.tracing, 'stop').resolves(rawData);
+
+          await stopTrace.handler({params: {}}, response, context);
+
+          const cruxEndpoint =
+            'https://chromeuxreport.googleapis.com/v1/records:queryRecord';
+          const cruxCall = (globalThis.fetch as sinon.SinonStub)
+            .getCalls()
+            .find(call => call.args[0].toString().startsWith(cruxEndpoint));
+          assert.strictEqual(
+            cruxCall,
+            undefined,
+            'CrUX fetch should not have been called',
+          );
+        },
+        {performanceCrux: false},
+      );
+    });
   });
 });
 
