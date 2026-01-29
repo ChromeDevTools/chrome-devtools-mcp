@@ -132,7 +132,6 @@ export class McpContext implements Context {
 
   #nextSnapshotId = 1;
   #traceResults: TraceResult[] = [];
-  #universeManager: UniverseManager;
 
   #locatorClass: typeof Locator;
   #options: McpContextOptions;
@@ -149,7 +148,6 @@ export class McpContext implements Context {
     this.logger = logger;
     this.#locatorClass = locatorClass;
     this.#options = options;
-    this.#universeManager = new UniverseManager(this.browser);
 
     this.#networkCollector = new NetworkCollector(this.browser);
 
@@ -177,14 +175,12 @@ export class McpContext implements Context {
 
   async #init() {
     const pages = await this.createPagesSnapshot();
-    await this.#universeManager.init(pages);
     await this.#networkCollector.init(pages);
     await this.#consoleCollector.init(pages);
     await this.#devtoolsUniverseManager.init(pages);
   }
 
   dispose() {
-    this.#universeManager.dispose();
     this.#networkCollector.dispose();
     this.#consoleCollector.dispose();
     this.#devtoolsUniverseManager.dispose();
