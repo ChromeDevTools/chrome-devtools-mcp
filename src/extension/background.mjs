@@ -524,18 +524,27 @@ function stopDiscoveryPolling() {
 }
 
 // Reset lastDiscoveredRelay when relay disconnects (to allow reconnect)
-extension._activeConnections = new Proxy(extension._activeConnections, {
-  deleteProperty(target, prop) {
-    const result = delete target[prop];
-    if (target.size === 0) {
-      lastDiscoveredRelay = null;
-    }
-    return result;
+// Wrap Map.delete() to detect when all connections are closed
+const originalActiveConnections = extension._activeConnections;
+const originalDelete = originalActiveConnections.delete.bind(originalActiveConnections);
+originalActiveConnections.delete = function(key) {
+  const result = originalDelete(key);
+  if (this.size === 0) {
+    lastDiscoveredRelay = null;
   }
-});
+  return result;
+};
+const originalClear = originalActiveConnections.clear.bind(originalActiveConnections);
+originalActiveConnections.clear = function() {
+  originalClear();
+  lastDiscoveredRelay = null;
+};
 
-// Start discovery polling on extension load
-startDiscoveryPolling();
+// Start discovery polling after a delay (avoid opening connect.html on extension reload)
+// The delay allows old relay servers to be cleaned up before we start polling
+setTimeout(() => {
+  startDiscoveryPolling();
+}, 3000); // 3 second delay
 
 // Extension icon click opens connect.html manually
 chrome.action.onClicked.addListener(async () => {
