@@ -190,34 +190,7 @@ function normalizeGeminiResponse(text: string, question?: string): string {
   return cleaned;
 }
 
-function isSuspiciousAnswer(answer: string, question: string): boolean {
-  const trimmed = answer.trim();
-  if (!trimmed) return true;
-  if (question.trim() === 'OK') return false;
-  if (/\d/.test(question) && !/\d/.test(trimmed)) return true;
-  if (/^ok$/i.test(trimmed)) return true;
-
-  // キーワード関連性チェック: 質問に含まれる重要キーワードが回答にも含まれるか
-  // 質問から2文字以上の単語を抽出
-  const questionWords = question
-    .toLowerCase()
-    .replace(/[^\w\u3040-\u30ff\u4e00-\u9faf]/g, ' ')  // 記号を空白に
-    .split(/\s+/)
-    .filter(w => w.length >= 2);
-  const answerLower = answer.toLowerCase();
-
-  // 質問の主要キーワードが回答に1つも含まれない場合は怪しい
-  // ただし、短い質問（キーワード2つ以下）は除外
-  if (questionWords.length >= 3) {
-    const matchedKeywords = questionWords.filter(w => answerLower.includes(w));
-    if (matchedKeywords.length === 0) {
-      console.error(`[isSuspiciousAnswer] No keyword match: question keywords=${JSON.stringify(questionWords)}, answer preview="${answer.slice(0, 50)}..."`);
-      return true;
-    }
-  }
-
-  return false;
-}
+// isSuspiciousAnswer 関数は削除済み（2回送信バグの原因）
 
 /**
  * 新しい接続を作成する（リトライ機構付き）
@@ -403,16 +376,15 @@ async function askChatGPTFastInternal(question: string): Promise<ChatResult> {
   timings.waitInputMs = nowMs() - tWaitInput;
   logInfo('chatgpt', 'Input field found', {waitInputMs: timings.waitInputMs});
 
-  // 初期ユーザーメッセージカウントを**ループ外**で取得（送信成功判定に使用）
-  const initialUserCountBeforeLoop = await client.evaluate<number>(
+  // 初期ユーザーメッセージカウントを取得（送信成功判定に使用）
+  const initialUserCount = await client.evaluate<number>(
     `document.querySelectorAll('[data-message-author-role="user"]').length`,
   );
-  console.error(`[ChatGPT] Initial user count BEFORE loop: ${initialUserCountBeforeLoop}`);
+  console.error(`[ChatGPT] Initial user count: ${initialUserCount}`);
 
-  for (let attempt = 0; attempt < 2; attempt += 1) {
-    // createConnection で正しいURL (https://chatgpt.com/) に接続済み
+  // createConnection で正しいURL (https://chatgpt.com/) に接続済み
 
-    const sanitized = JSON.stringify(question);
+  const sanitized = JSON.stringify(question);
     const tInput = nowMs();
     await client.evaluate(`
       (() => {
@@ -639,9 +611,6 @@ async function askChatGPTFastInternal(question: string): Promise<ChatResult> {
         throw new Error('ChatGPT input mismatch after typing.');
       }
     }
-
-    // ループ外で取得した初期カウントを使用
-    const initialUserCount = initialUserCountBeforeLoop;
 
     logInfo('chatgpt', 'Input completed, preparing to send', {initialUserCount});
 
@@ -903,7 +872,6 @@ async function askChatGPTFastInternal(question: string): Promise<ChatResult> {
         await saveDebug('chatgpt', {
           reason: 'userMessageTimeout',
           question,
-          attempt,
           ...debugPayload,
         });
         throw new Error(`ChatGPT send did not create a new user message: ${String(error)}, fallback also failed: ${String(fallbackError)}`);
@@ -1077,57 +1045,29 @@ async function askChatGPTFastInternal(question: string): Promise<ChatResult> {
 
     console.error(`[ChatGPT] Response extracted: ${answer.slice(0, 100)}...`);
 
-    if (!isSuspiciousAnswer(answer, question) || attempt === 1) {
-      const finalUrl = await client.evaluate<string>('location.href');
-      if (isSuspiciousAnswer(answer, question)) {
-        const debugPayload = await client.evaluate<Record<string, any>>(`(() => {
-          const assistants = document.querySelectorAll('[data-message-author-role=\"assistant\"]');
-          const users = document.querySelectorAll('[data-message-author-role=\"user\"]');
-          const lastAssistant = assistants[assistants.length - 1];
-          const lastUser = users[users.length - 1];
-          return {
-            url: location.href,
-            title: document.title,
-            assistantCount: assistants.length,
-            userCount: users.length,
-            lastAssistantText: lastAssistant ? (lastAssistant.innerText || lastAssistant.textContent || '') : '',
-            lastAssistantHtml: lastAssistant ? (lastAssistant.outerHTML || '').slice(0, 20000) : '',
-            lastUserText: lastUser ? (lastUser.innerText || lastUser.textContent || '') : '',
-          };
-        })()`);
-        await saveDebug('chatgpt', {
-          question,
-          answer,
-          attempt,
-          ...debugPayload,
-        });
-      }
-      if (finalUrl && finalUrl.includes('chatgpt.com')) {
-        await saveSession('chatgpt', finalUrl);
-      }
-      timings.waitResponseMs = nowMs() - tWaitResp;
-      timings.totalMs = nowMs() - t0;
-      await appendHistory({
-        provider: 'chatgpt',
-        question,
-        answer,
-        url: finalUrl || undefined,
-        timings,
-      });
-      // 全てのタイミングフィールドが設定されていることを保証
-      const fullTimings: ChatTimings = {
-        connectMs: timings.connectMs ?? 0,
-        waitInputMs: timings.waitInputMs ?? 0,
-        inputMs: timings.inputMs ?? 0,
-        sendMs: timings.sendMs ?? 0,
-        waitResponseMs: timings.waitResponseMs ?? 0,
-        totalMs: timings.totalMs ?? 0,
-      };
-      return {answer, timings: fullTimings};
+    const finalUrl = await client.evaluate<string>('location.href');
+    if (finalUrl && finalUrl.includes('chatgpt.com')) {
+      await saveSession('chatgpt', finalUrl);
     }
-  }
-
-  throw new Error('ChatGPT response was suspicious after all attempts');
+    timings.waitResponseMs = nowMs() - tWaitResp;
+    timings.totalMs = nowMs() - t0;
+    await appendHistory({
+      provider: 'chatgpt',
+      question,
+      answer,
+      url: finalUrl || undefined,
+      timings,
+    });
+    // 全てのタイミングフィールドが設定されていることを保証
+    const fullTimings: ChatTimings = {
+      connectMs: timings.connectMs ?? 0,
+      waitInputMs: timings.waitInputMs ?? 0,
+      inputMs: timings.inputMs ?? 0,
+      sendMs: timings.sendMs ?? 0,
+      waitResponseMs: timings.waitResponseMs ?? 0,
+      totalMs: timings.totalMs ?? 0,
+    };
+    return {answer, timings: fullTimings};
 }
 
 /**
@@ -1956,10 +1896,9 @@ async function askGeminiFastInternal(question: string): Promise<ChatResult> {
     throw new Error(`Timed out waiting for Gemini response (send button not enabled after 8min): ${JSON.stringify(diagnostics)}`);
   }
 
-  // 新しいレスポンスのみを取得（initialModelResponseCount 以降）
+  // 最後のレスポンスを取得（シンプルにinnerTextを使用）
   const rawText = await client.evaluate<string>(`
     (() => {
-      const initialCount = ${initialModelResponseCount};
       const collectDeep = (selectorList) => {
         const results = [];
         const seen = new Set();
@@ -1984,61 +1923,23 @@ async function askGeminiFastInternal(question: string): Promise<ChatResult> {
         return results;
       };
 
-      const allResponses = collectDeep(['model-response', '[data-test-id*="response"]', '.response', '.markdown', '.model-response']);
+      // Shadow DOM内のmodel-responseを収集
+      const allResponses = collectDeep(['model-response', '[data-test-id*="response"]', '.response', '.model-response']);
 
-      // initialModelResponseCount 以降の新しいレスポンスのみを対象とする
-      const newResponses = allResponses.slice(initialCount);
-
-      if (newResponses.length === 0) {
-        console.warn('[Gemini] No new responses after initialCount=' + initialCount + ', total=' + allResponses.length);
-        // フォールバック: 最新のレスポンスを使用（カウントが信頼できない場合）
-        if (allResponses.length > 0) {
-          const msg = allResponses[allResponses.length - 1];
-          const extractText = (root) => {
-            if (!root) return '';
-            const parts = [];
-            const visit = (node) => {
-              if (!node) return;
-              if (node.nodeType === Node.TEXT_NODE) {
-                const value = node.textContent;
-                if (value) parts.push(value);
-                return;
-              }
-              if (node.shadowRoot) visit(node.shadowRoot);
-              const children = node.childNodes ? Array.from(node.childNodes) : [];
-              for (const child of children) visit(child);
-            };
-            visit(root);
-            return parts.join(' ').replace(/\\s+/g, ' ').trim();
-          };
-          return extractText(msg);
-        }
+      if (allResponses.length === 0) {
         // フォールバック: aria-live="polite"
         const live = document.querySelector('[aria-live="polite"]');
-        return live ? (live.textContent || '').trim() : '';
+        return live ? (live.innerText || live.textContent || '').trim() : '';
       }
 
-      // 最新の新しいレスポンスを取得
-      const msg = newResponses[newResponses.length - 1];
-      const extractText = (root) => {
-        if (!root) return '';
-        const parts = [];
-        const visit = (node) => {
-          if (!node) return;
-          if (node.nodeType === Node.TEXT_NODE) {
-            const value = node.textContent;
-            if (value) parts.push(value);
-            return;
-          }
-          if (node.shadowRoot) visit(node.shadowRoot);
-          const children = node.childNodes ? Array.from(node.childNodes) : [];
-          for (const child of children) visit(child);
-        };
-        visit(root);
-        return parts.join(' ').replace(/\\s+/g, ' ').trim();
-      };
+      // 最後のレスポンス要素を直接取得（シンプルにinnerTextを使用）
+      const lastMsg = allResponses[allResponses.length - 1];
 
-      return extractText(msg);
+      // マークダウンコンテンツを優先、なければ要素全体
+      const content = lastMsg.querySelector?.('.markdown') || lastMsg;
+
+      // innerTextが最もシンプルで確実
+      return (content.innerText || content.textContent || '').trim();
     })()
   `);
 
