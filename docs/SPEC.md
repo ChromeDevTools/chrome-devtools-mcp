@@ -827,7 +827,7 @@ src/
 │   ├── cdp-client.ts     # CDP コマンド送信クライアント
 │   ├── extension-raw.ts  # 拡張機能接続処理
 │   └── mcp-logger.ts     # ロギング
-├── extension/
+├── src/extension/
 │   ├── background.mjs    # 拡張機能 Service Worker
 │   ├── relay-server.ts   # Discovery/Relay サーバー
 │   ├── manifest.json     # 拡張機能マニフェスト

@@ -23,20 +23,38 @@ chrome-ai-bridge is a [Model Context Protocol](https://modelcontextprotocol.io/)
 
 ---
 
+## Prerequisites
+
+> **⚠️ Chrome Extension Required**
+>
+> This MCP server **requires** a Chrome extension to communicate with ChatGPT/Gemini.
+> The extension bridges the MCP server and your browser tabs via WebSocket + CDP.
+
+---
+
 ## Quick Start
 
-### 1. Install the Chrome Extension
+### 1. Install the Chrome Extension (Required)
 
-1. Download the latest release from [Releases](https://github.com/anthropics/anthropic-quickstarts/releases)
-2. Or build from source:
-   ```bash
-   git clone https://github.com/anthropics/anthropic-quickstarts.git
-   cd anthropic-quickstarts/mcp-devtools
-   npm install && npm run build
-   ```
-3. Open `chrome://extensions/` in Chrome
-4. Enable "Developer mode"
-5. Click "Load unpacked" and select `build/extension/`
+Build and install the extension from this repository:
+
+```bash
+# Clone the repository
+git clone https://github.com/usedhonda/chrome-ai-bridge.git
+cd chrome-ai-bridge
+
+# Install dependencies and build
+npm install && npm run build
+```
+
+Then load the extension in Chrome:
+
+1. Open `chrome://extensions/` in Chrome
+2. Enable **"Developer mode"** (toggle in top-right)
+3. Click **"Load unpacked"**
+4. Select the `build/extension/` folder from this repository
+
+You should see "Chrome AI Bridge" appear in your extensions list.
 
 ### 2. Configure your MCP client
 
@@ -139,12 +157,12 @@ User: "Ask ChatGPT specifically about this"
 ### Local Development
 
 ```bash
-git clone https://github.com/anthropics/anthropic-quickstarts.git
-cd anthropic-quickstarts/mcp-devtools
+git clone https://github.com/usedhonda/chrome-ai-bridge.git
+cd chrome-ai-bridge
 npm install && npm run build
 ```
 
-Configure `~/.claude.json`:
+Configure `~/.claude.json` to use local build:
 
 ```json
 {
@@ -260,6 +278,8 @@ npx clear-npx-cache && npx chrome-ai-bridge@latest
 ## Credits
 
 Originally forked from [Chrome DevTools MCP](https://github.com/anthropics/anthropic-quickstarts/tree/main/mcp-devtools) by Google LLC. This fork focuses on multi-AI consultation capabilities via Chrome extension.
+
+The extension source code is located at `src/extension/` and is built to `build/extension/`.
 
 ---
 
