@@ -208,7 +208,7 @@ export const cliOptions = {
     type: 'boolean',
     default: true,
     describe:
-      'Set to false to disable CrUX (field data) integration in performance tools.',
+      'Set to false to disable sending URLs from performance traces to CrUX API to get field performance data.',
   },
   usageStatistics: {
     type: 'boolean',
