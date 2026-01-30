@@ -10,7 +10,7 @@
     "./plugin-api": "./build/src/plugin-api.js"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && cp -R src/extension build/",
     "dev": "MCP_ENV=development node scripts/mcp-wrapper.mjs",
     "typecheck": "tsc --noEmit",
     "format": "eslint --cache --fix . && prettier --write --cache .",
