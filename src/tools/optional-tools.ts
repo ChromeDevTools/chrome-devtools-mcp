@@ -5,22 +5,21 @@
  */
 
 /**
- * Optional Tools Registration
+ * Optional Tools Registration - Extension-only mode (v2.0.0)
  *
  * This module exports optional (site-dependent, potentially unstable) tools.
  * These tools depend on specific website UIs and may break when those UIs change.
  *
+ * All tools use WebSocket relay via Chrome extension (no Puppeteer).
+ *
  * Optional tools include:
- * - chatgpt-web: Interact with ChatGPT via browser
- * - gemini-web: Interact with Gemini via browser
+ * - chatgpt-web: Interact with ChatGPT via extension
+ * - gemini-web: Interact with Gemini via extension
+ * - cdp-snapshot: Debug page state via CDP
  *
  * These tools are marked as "experimental" and "best-effort".
  * They are loaded by default but can be disabled via:
  * - MCP_DISABLE_WEB_LLM=true environment variable
- * - --no-web-llm CLI flag (future)
- *
- * In the future, these may be moved to a separate npm package:
- * @chrome-ai-bridge/web-llm
  */
 
 import type {ToolRegistry} from '../plugin-api.js';
@@ -28,7 +27,6 @@ import type {ToolRegistry} from '../plugin-api.js';
 import * as cdpSnapshotTools from './cdp-snapshot.js';
 import * as chatgptWebTools from './chatgpt-web.js';
 import * as chatgptGeminiWebTools from './chatgpt-gemini-web.js';
-import * as geminiImageTools from './gemini-image.js';
 import * as geminiWebTools from './gemini-web.js';
 
 /**
@@ -38,7 +36,6 @@ export const optionalTools = [
   ...Object.values(cdpSnapshotTools),
   ...Object.values(chatgptWebTools),
   ...Object.values(chatgptGeminiWebTools),
-  ...Object.values(geminiImageTools),
   ...Object.values(geminiWebTools),
 ];
 
@@ -106,7 +103,7 @@ export function getOptionalToolCount(): number {
  */
 export const WEB_LLM_TOOLS_INFO = {
   disclaimer:
-    'Web-LLM tools (ask_chatgpt_web, ask_gemini_web, ask_chatgpt_gemini_web, ask_gemini_image, take_cdp_snapshot) are experimental and best-effort. ' +
+    'Web-LLM tools (ask_chatgpt_web, ask_gemini_web, ask_chatgpt_gemini_web, take_cdp_snapshot, get_page_dom) are experimental and best-effort. ' +
     'They depend on specific website UIs and may break when those UIs change. ' +
     'For production use, consider using official APIs instead.',
   disableEnvVar: 'MCP_DISABLE_WEB_LLM',
@@ -114,7 +111,6 @@ export const WEB_LLM_TOOLS_INFO = {
     'ask_chatgpt_web',
     'ask_gemini_web',
     'ask_chatgpt_gemini_web',
-    'ask_gemini_image',
     'take_cdp_snapshot',
     'get_page_dom',
   ],

@@ -4,36 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-// Mock browser globals for chrome-devtools-frontend (Node.js environment)
-// NOTE: chrome-devtools-frontend expects browser globals (location, self, localStorage)
-// These are only needed for trace-processing modules, not for core MCP functionality
-if (typeof globalThis.location === 'undefined') {
-  (globalThis as any).location = {
-    search: '',
-    href: '',
-    protocol: 'file:',
-    host: '',
-    hostname: '',
-    port: '',
-    pathname: '',
-    hash: '',
-  };
-}
-
-if (typeof globalThis.self === 'undefined') {
-  (globalThis as any).self = globalThis;
-}
-
-if (typeof globalThis.localStorage === 'undefined') {
-  (globalThis as any).localStorage = {
-    getItem: () => null,
-    setItem: () => {},
-    removeItem: () => {},
-    clear: () => {},
-    key: () => null,
-    length: 0,
-  };
-}
+/**
+ * Chrome AI Bridge - Extension-only Mode (v2.0.0)
+ *
+ * This MCP server provides ChatGPT/Gemini integration via Chrome extension.
+ * Puppeteer has been removed - all browser interaction is via WebSocket relay.
+ */
 
 import assert from 'node:assert';
 import fs from 'node:fs';
@@ -48,29 +24,20 @@ import type {CallToolResult} from '@modelcontextprotocol/sdk/types.js';
 import {
   isInitializeRequest,
   SetLevelRequestSchema,
-  RootsListChangedNotificationSchema,
 } from '@modelcontextprotocol/sdk/types.js';
-import type {Browser} from 'puppeteer-core';
 
-import type {Channel} from './browser.js';
-import {resolveBrowser} from './browser.js';
 import {parseArguments} from './cli.js';
-import {setupGraceful} from './graceful.js';
 import {logger, saveLogsToFile} from './logger.js';
-import {McpContext} from './McpContext.js';
 import {McpResponse} from './McpResponse.js';
 import {Mutex} from './Mutex.js';
 import {ToolRegistry, PluginLoader} from './plugin-api.js';
-import {setProjectRoot} from './project-root-state.js';
-import {resolveRoots, type RootsInfo} from './roots-manager.js';
-import {runStartupCheck} from './startup-check.js';
-import {registerCoreTools, getCoreToolCount} from './tools/core-tools.js';
 import {
   registerOptionalTools,
-  getOptionalToolCount,
   WEB_LLM_TOOLS_INFO,
 } from './tools/optional-tools.js';
 import type {ToolDefinition} from './tools/ToolDefinition.js';
+import type {Context} from './tools/ToolDefinition.js';
+import {getFastContext} from './fast-cdp/fast-context.js';
 
 function readPackageJson(): {version?: string} {
   const currentDir = import.meta.dirname;
@@ -93,178 +60,30 @@ export const args = parseArguments(version);
 
 const logFile = args.logFile ? saveLogsToFile(args.logFile) : undefined;
 
-logger(`Starting Chrome DevTools MCP for Extension Development v${version}`);
-logger(
-  `[startup] argv attachTab=${String(args.attachTab)} attachTabUrl=${String(
-    args.attachTabUrl,
-  )} attachTabNew=${String(args.attachTabNew)} extensionRelayPort=${String(
-    args.extensionRelayPort,
-  )}`,
-);
-if (args.attachTab || args.attachTabUrl || process.env.MCP_DEBUG_EXTENSION) {
-  console.error(
-    `[startup-debug] attachTab=${String(
-      args.attachTab,
-    )} attachTabUrl=${String(args.attachTabUrl)} attachTabNew=${String(
-      args.attachTabNew,
-    )} extensionRelayPort=${String(args.extensionRelayPort)}`,
-  );
-}
+logger(`Starting Chrome AI Bridge v${version} (Extension-only mode)`);
+
 const server = new McpServer(
   {
     name: 'chrome-ai-bridge',
-    title: 'Chrome DevTools MCP for Extension Development',
+    title: 'Chrome AI Bridge - ChatGPT/Gemini via Extension',
     version,
   },
   {capabilities: {logging: {}}},
 );
+
 server.server.setRequestHandler(SetLevelRequestSchema, () => {
   return {};
 });
 
-// Handle roots/list_changed notification
-server.server.setNotificationHandler(
-  RootsListChangedNotificationSchema,
-  async () => {
-    logger(
-      '[roots] Received roots/list_changed notification - roots have changed',
-    );
-    // Invalidate cached roots info
-    cachedRootsInfo = null;
-    logger(
-      '[roots] Cached roots cleared - will re-fetch on next browser launch',
-    );
-  },
-);
-
-let context: McpContext;
-const uiHealthCheckRun = false; // Track if UI health check has been run
-let cachedRootsInfo: RootsInfo | null = null; // Cache roots info
-let initializationComplete = false; // Track if MCP initialization is complete
-
-// Setup graceful shutdown
-const graceful = setupGraceful({
-  getBrowser: () => context?.browser,
-  onBeforeExit: async () => {
-    logger('[graceful] Running pre-exit cleanup...');
-    // Close log file if exists
-    if (logFile) {
-      logFile.close();
-    }
-  },
-});
-
-async function getContext(): Promise<McpContext> {
-  // Wait for initialization to complete before resolving roots
-  if (!initializationComplete) {
-    logger('[roots] Waiting for MCP initialization to complete...');
-    await new Promise(resolve => setTimeout(resolve, 100)); // Brief wait
-    if (!initializationComplete) {
-      logger(
-        '[roots] WARNING: MCP not yet initialized, proceeding without roots',
-      );
-    }
-  }
-
-  // Resolve roots info (cached or fresh)
-  if (!cachedRootsInfo) {
-    cachedRootsInfo = await resolveRoots(server.server, {
-      cliProjectRoot: args.projectRoot as string | undefined,
-      envProjectRoot: process.env.MCP_PROJECT_ROOT,
-      autoCwd: process.cwd(),
-    });
-  }
-
-  // Initialize project root for profile isolation
-  // Priority: CLI flag > MCP_PROJECT_ROOT env > Roots protocol > cwd
-  const rootFromRoots = cachedRootsInfo?.rootsUris?.[0]
-    ? cachedRootsInfo.rootsUris[0].replace('file://', '')
-    : undefined;
-
-  const projectRootToSet =
-    (args.projectRoot as string | undefined) ||
-    process.env.MCP_PROJECT_ROOT ||
-    rootFromRoots ||
-    process.cwd();
-
-  setProjectRoot(projectRootToSet);
-  logger(`[project-root] Initialized: ${projectRootToSet}`);
-
-  const browserOptions = {
-    browserUrl: args.browserUrl,
-    headless: args.headless,
-    executablePath: args.executablePath,
-    customDevTools: args.customDevtools,
-    channel: args.channel as Channel,
-    isolated: args.isolated,
-    loadExtension: args.loadExtension as string | undefined,
-    loadExtensionsDir: args.loadExtensionsDir as string | undefined,
-    loadSystemExtensions: args.loadSystemExtensions as boolean | undefined,
-    chromeProfile: args.chromeProfile as string | undefined,
-    userDataDir: args.userDataDir as string | undefined,
-    logFile,
-    rootsInfo: cachedRootsInfo, // Pass roots info to browser
-    focus: args.focus as boolean | undefined, // v1.0.18: Background mode control
-    attachTab: args.attachTab as number | undefined, // Extension Bridge mode (by tab ID)
-    attachTabUrl: args.attachTabUrl as string | undefined, // Extension Bridge mode (by URL)
-    attachTabNew: args.attachTabNew as boolean | undefined, // Extension Bridge mode (force new tab)
-    extensionRelayPort: args.extensionRelayPort as number | undefined, // Extension Bridge relay port
-  };
-
-  const browser = await resolveBrowser(browserOptions);
-
-  // Announce browser PID for graceful shutdown
-  const browserPid = browser.process()?.pid;
-  if (browserPid) {
-    await graceful.announceBrowserPid(browserPid);
-  }
-
-  // Browser factory function for reconnection
-  const browserFactory = async () => {
-    logger('Reconnecting browser...');
-    return await resolveBrowser(browserOptions);
-  };
-
-  // Always recreate context if browser reference changed or context doesn't exist
-  if (!context || context.browser !== browser) {
-    // Connection manager options with reconnect callback
-    const connectionOptions = {
-      onReconnect: async (newBrowser: Browser) => {
-        logger('Updating context with reconnected browser...');
-        await context.updateBrowser(newBrowser);
-      },
-    };
-
-    context = await McpContext.from(
-      browser,
-      logger,
-      browserFactory,
-      connectionOptions,
-    );
-
-    // UI health check disabled - causes duplicate ChatGPT tabs
-    // TODO: Re-enable after fixing tab management
-    // if (!uiHealthCheckRun) {
-    //   uiHealthCheckRun = true;
-    //   runStartupCheck(browser).catch(err => {
-    //     logger(`Startup check failed: ${err}`);
-    //   });
-    // }
-  }
-
-  return context;
-}
-
 const logDisclaimers = () => {
   console.error(
-    `chrome-ai-bridge exposes content of the browser instance to the MCP clients allowing them to inspect,
-debug, and modify any data in the browser or DevTools.
-Avoid sharing sensitive or personal information that you do not want to share with MCP clients.`,
+    `chrome-ai-bridge connects to ChatGPT/Gemini via Chrome extension.
+Make sure the chrome-ai-bridge extension is installed and Chrome is running.
+Available tools: ask_chatgpt_web, ask_gemini_web, ask_chatgpt_gemini_web, take_cdp_snapshot, get_page_dom, ask_gemini_image`,
   );
 };
 
 const toolMutex = new Mutex();
-const FAST_TOOLS = new Set(['ask_chatgpt_web', 'ask_gemini_web', 'ask_chatgpt_gemini_web', 'take_cdp_snapshot']);
 
 function registerTool(tool: ToolDefinition): void {
   server.registerTool(
@@ -278,9 +97,8 @@ function registerTool(tool: ToolDefinition): void {
       const guard = await toolMutex.acquire();
       try {
         logger(`${tool.name} request: ${JSON.stringify(params, null, '  ')}`);
-        const context = FAST_TOOLS.has(tool.name)
-          ? ((await import('./fast-cdp/fast-context.js')).getFastContext() as unknown as McpContext)
-          : await getContext();
+        // All tools use FastContext (extension-based, no Puppeteer)
+        const context = getFastContext() as unknown as Context;
         const response = new McpResponse();
         await tool.handler(
           {
@@ -298,16 +116,17 @@ function registerTool(tool: ToolDefinition): void {
           const errorText =
             error instanceof Error ? error.message : String(error);
 
-          // Detect browser closed error and provide helpful message
+          // Detect extension connection error
           if (
-            errorText.includes('Target closed') ||
-            errorText.includes('Session closed')
+            errorText.includes('Extension connection') ||
+            errorText.includes('timeout') ||
+            errorText.includes('disconnected')
           ) {
             return {
               content: [
                 {
                   type: 'text',
-                  text: `Browser connection lost. The Chrome instance was closed or disconnected.\n\nPlease restart the MCP server to reconnect.`,
+                  text: `Extension connection lost or not available.\n\nMake sure:\n1. Chrome is running\n2. The chrome-ai-bridge extension is installed\n3. The extension is enabled\n\nError: ${errorText}`,
                 },
               ],
               isError: true,
@@ -331,14 +150,11 @@ function registerTool(tool: ToolDefinition): void {
   );
 }
 
-// v0.26.0: Use ToolRegistry for plugin architecture
+// Use ToolRegistry for plugin architecture
 const toolRegistry = new ToolRegistry();
 
-// Register core tools (stable, site-independent)
-registerCoreTools(toolRegistry);
-logger(`[tools] Registered ${getCoreToolCount()} core tools`);
-
-// Register optional tools (web-llm, site-dependent)
+// Register optional tools (ChatGPT/Gemini via extension)
+// Note: Core tools (Puppeteer-based) are no longer available in v2.0
 const optionalCount = registerOptionalTools(toolRegistry);
 if (optionalCount > 0) {
   logger(`[tools] ${WEB_LLM_TOOLS_INFO.disclaimer}`);
@@ -363,16 +179,17 @@ for (const tool of toolRegistry.getAll()) {
 }
 logger(`[tools] Total registered: ${toolRegistry.size} tools`);
 
-// Set initialization callback
-server.server.oninitialized = () => {
-  initializationComplete = true;
-  logger('[roots] MCP initialization complete');
-};
-
 const transport = new StdioServerTransport();
 await server.connect(transport);
-logger('Chrome DevTools MCP Server connected');
+logger('Chrome AI Bridge MCP Server connected');
 logDisclaimers();
+
+// Close log file on exit
+process.on('beforeExit', () => {
+  if (logFile) {
+    logFile.close();
+  }
+});
 
 const httpPortRaw = process.env.MCP_HTTP_PORT;
 if (httpPortRaw) {

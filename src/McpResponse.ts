@@ -3,97 +3,51 @@
  * Copyright 2025 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
+
+/**
+ * McpResponse - Simplified for Extension-only mode (v2.0.0)
+ *
+ * This class handles response formatting for MCP tools.
+ * Puppeteer-based features (pages, snapshots, network requests) are no longer supported.
+ */
+
 import type {
   ImageContent,
   TextContent,
 } from '@modelcontextprotocol/sdk/types.js';
-import type {ResourceType} from 'puppeteer-core';
 
-import {getDevelopmentExtensionPaths} from './browser.js';
-import {formatConsoleEvent} from './formatters/consoleFormatter.js';
-import {formatExtensionsPage} from './formatters/extensionsPageFormatter.js';
-import {
-  getFormattedHeaderValue,
-  getShortDescriptionForRequest,
-  getStatusFromRequest,
-} from './formatters/networkFormatter.js';
-import {formatA11ySnapshot} from './formatters/snapshotFormatter.js';
-import type {McpContext} from './McpContext.js';
-import type {ImageContentData, Response} from './tools/ToolDefinition.js';
-import {paginate, type PaginationOptions} from './utils/pagination.js';
+import type {Context, ImageContentData, Response} from './tools/ToolDefinition.js';
 
 export class McpResponse implements Response {
-  #includePages = false;
-  #includeSnapshot = false;
-  #attachedNetworkRequestUrl?: string;
-  #includeConsoleData = false;
   #textResponseLines: string[] = [];
-  #formattedConsoleData?: string[];
   #images: ImageContentData[] = [];
-  #networkRequestsOptions?: {
-    include: boolean;
-    pagination?: PaginationOptions;
-    resourceTypes?: ResourceType[];
-  };
 
-  setIncludePages(value: boolean): void {
-    this.#includePages = value;
+  // Stub methods for interface compatibility (not supported in extension mode)
+  setIncludePages(_value: boolean): void {
+    // Not supported in extension-only mode
   }
 
-  setIncludeSnapshot(value: boolean): void {
-    this.#includeSnapshot = value;
+  setIncludeSnapshot(_value: boolean): void {
+    // Not supported in extension-only mode
   }
 
   setIncludeNetworkRequests(
-    value: boolean,
-    options?: {
+    _value: boolean,
+    _options?: {
       pageSize?: number;
       pageIdx?: number;
-      resourceTypes?: ResourceType[];
+      resourceTypes?: string[];
     },
   ): void {
-    if (!value) {
-      this.#networkRequestsOptions = undefined;
-      return;
-    }
-
-    this.#networkRequestsOptions = {
-      include: value,
-      pagination:
-        options?.pageSize || options?.pageIdx
-          ? {
-              pageSize: options.pageSize,
-              pageIdx: options.pageIdx,
-            }
-          : undefined,
-      resourceTypes: options?.resourceTypes,
-    };
+    // Not supported in extension-only mode
   }
 
-  setIncludeConsoleData(value: boolean): void {
-    this.#includeConsoleData = value;
+  setIncludeConsoleData(_value: boolean): void {
+    // Not supported in extension-only mode
   }
 
-  attachNetworkRequest(url: string): void {
-    this.#attachedNetworkRequestUrl = url;
-  }
-
-  get includePages(): boolean {
-    return this.#includePages;
-  }
-
-  get includeNetworkRequests(): boolean {
-    return this.#networkRequestsOptions?.include ?? false;
-  }
-
-  get includeConsoleData(): boolean {
-    return this.#includeConsoleData;
-  }
-  get attachedNetworkRequestUrl(): string | undefined {
-    return this.#attachedNetworkRequestUrl;
-  }
-  get networkRequestsPageIdx(): number | undefined {
-    return this.#networkRequestsOptions?.pagination?.pageIdx;
+  attachNetworkRequest(_url: string): void {
+    // Not supported in extension-only mode
   }
 
   appendResponseLine(value: string): void {
@@ -112,167 +66,24 @@ export class McpResponse implements Response {
     return this.#images;
   }
 
-  get includeSnapshot(): boolean {
-    return this.#includeSnapshot;
-  }
-
   async handle(
     toolName: string,
-    context: McpContext,
+    _context: Context,
   ): Promise<Array<TextContent | ImageContent>> {
-    if (this.#includePages) {
-      await context.createPagesSnapshot();
-    }
-    if (this.#includeSnapshot) {
-      await context.createTextSnapshot();
-    }
-
-    let formattedConsoleMessages: string[];
-    if (this.#includeConsoleData) {
-      const consoleMessages = context.getConsoleData();
-      if (consoleMessages) {
-        formattedConsoleMessages = await Promise.all(
-          consoleMessages.map(message => formatConsoleEvent(message)),
-        );
-        this.#formattedConsoleData = formattedConsoleMessages;
-      }
-    }
-
-    return this.format(toolName, context);
+    return this.format(toolName);
   }
 
-  format(
-    toolName: string,
-    context: McpContext,
-  ): Array<TextContent | ImageContent> {
+  format(toolName: string): Array<TextContent | ImageContent> {
     const response = [`# ${toolName} response`];
     for (const line of this.#textResponseLines) {
       response.push(line);
-    }
-
-    const hasPages = context.getPages().length > 0;
-    if (hasPages) {
-      const networkConditions = context.getNetworkConditions();
-      if (networkConditions) {
-        response.push(`## Network emulation`);
-        response.push(`Emulating: ${networkConditions}`);
-        response.push(
-          `Navigation timeout set to ${context.getNavigationTimeout()} ms`,
-        );
-      }
-
-      const cpuThrottlingRate = context.getCpuThrottlingRate();
-      if (cpuThrottlingRate > 1) {
-        response.push(`## CPU emulation`);
-        response.push(`Emulating: ${cpuThrottlingRate}x slowdown`);
-      }
-    }
-
-    const dialog = context.getDialog();
-    if (dialog) {
-      response.push(`# Open dialog
-${dialog.type()}: ${dialog.message()} (default value: ${dialog.message()}).
-Call browser_handle_dialog to handle it before continuing.`);
-    }
-
-    if (this.#includePages) {
-      const parts = [`## Pages`];
-      let idx = 0;
-      for (const page of context.getPages()) {
-        parts.push(
-          `${idx}: ${page.url()}${idx === context.getSelectedPageIdx() ? ' [selected]' : ''}`,
-        );
-        idx++;
-      }
-      response.push(...parts);
-    }
-
-    if (this.#includeSnapshot) {
-      const snapshot = context.getTextSnapshot();
-      if (snapshot) {
-        const pageUrl = context.getSelectedPage().url();
-        const isExtensionsPage = pageUrl.startsWith('chrome://extensions');
-
-        let formattedSnapshot: string;
-        if (isExtensionsPage) {
-          // Use structured extensions page formatter
-          const developmentPaths = getDevelopmentExtensionPaths();
-          formattedSnapshot = formatExtensionsPage(
-            snapshot.root,
-            developmentPaths,
-          );
-          response.push(formattedSnapshot);
-        } else {
-          // Use standard accessibility tree formatter
-          formattedSnapshot = formatA11ySnapshot(snapshot.root);
-          response.push('## Page content');
-          response.push(formattedSnapshot);
-        }
-      }
-    }
-
-    response.push(...this.#getIncludeNetworkRequestsData(context));
-
-    if (this.#networkRequestsOptions?.include) {
-      let requests = context.getNetworkRequests();
-
-      // Apply resource type filtering if specified
-      if (this.#networkRequestsOptions.resourceTypes?.length) {
-        const normalizedTypes = new Set(
-          this.#networkRequestsOptions.resourceTypes,
-        );
-        requests = requests.filter(request => {
-          const type = request.resourceType();
-          return normalizedTypes.has(type);
-        });
-      }
-
-      response.push('## Network requests');
-      if (requests.length) {
-        const paginationResult = paginate(
-          requests,
-          this.#networkRequestsOptions.pagination,
-        );
-        if (paginationResult.invalidPage) {
-          response.push('Invalid page number provided. Showing first page.');
-        }
-
-        const {startIndex, endIndex, currentPage, totalPages} =
-          paginationResult;
-        response.push(
-          `Showing ${startIndex + 1}-${endIndex} of ${requests.length} (Page ${currentPage + 1} of ${totalPages}).`,
-        );
-
-        if (this.#networkRequestsOptions.pagination) {
-          if (paginationResult.hasNextPage) {
-            response.push(`Next page: ${currentPage + 1}`);
-          }
-          if (paginationResult.hasPreviousPage) {
-            response.push(`Previous page: ${currentPage - 1}`);
-          }
-        }
-
-        for (const request of paginationResult.items) {
-          response.push(getShortDescriptionForRequest(request));
-        }
-      } else {
-        response.push('No requests found.');
-      }
-    }
-
-    if (this.#includeConsoleData && this.#formattedConsoleData) {
-      response.push('## Console messages');
-      if (this.#formattedConsoleData.length) {
-        response.push(...this.#formattedConsoleData);
-      } else {
-        response.push('<no console messages found>');
-      }
     }
 
     const text: TextContent = {
       type: 'text',
       text: response.join('\n'),
     };
+
     const images: ImageContent[] = this.#images.map(imageData => {
       return {
         type: 'image',
@@ -281,48 +92,6 @@ Call browser_handle_dialog to handle it before continuing.`);
     });
 
     return [text, ...images];
-  }
-
-  #getIncludeNetworkRequestsData(context: McpContext): string[] {
-    const response: string[] = [];
-    const url = this.#attachedNetworkRequestUrl;
-    if (!url) {
-      return response;
-    }
-    const httpRequest = context.getNetworkRequestByUrl(url);
-    response.push(`## Request ${httpRequest.url()}`);
-    response.push(`Status:  ${getStatusFromRequest(httpRequest)}`);
-    response.push(`### Request Headers`);
-    for (const line of getFormattedHeaderValue(httpRequest.headers())) {
-      response.push(line);
-    }
-
-    const httpResponse = httpRequest.response();
-    if (httpResponse) {
-      response.push(`### Response Headers`);
-      for (const line of getFormattedHeaderValue(httpResponse.headers())) {
-        response.push(line);
-      }
-    }
-
-    const httpFailure = httpRequest.failure();
-    if (httpFailure) {
-      response.push(`### Request failed with`);
-      response.push(httpFailure.errorText);
-    }
-
-    const redirectChain = httpRequest.redirectChain();
-    if (redirectChain.length) {
-      response.push(`### Redirect chain`);
-      let indent = 0;
-      for (const request of redirectChain.reverse()) {
-        response.push(
-          `${'  '.repeat(indent)}${getShortDescriptionForRequest(request)}`,
-        );
-        indent++;
-      }
-    }
-    return response;
   }
 
   resetResponseLineForTesting() {
