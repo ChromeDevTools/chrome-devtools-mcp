@@ -8,6 +8,24 @@ import {logConnectionState, logInfo, logError, logWarn} from './mcp-logger.js';
 let chatgptClient: CdpClient | null = null;
 let geminiClient: CdpClient | null = null;
 
+/**
+ * チャット結果の型（タイミング情報付き）
+ */
+export interface ChatTimings {
+  connectMs: number;
+  waitInputMs: number;
+  inputMs: number;
+  sendMs: number;
+  waitResponseMs: number;
+  totalMs: number;
+  navigateMs?: number;  // Gemini only
+}
+
+export interface ChatResult {
+  answer: string;
+  timings: ChatTimings;
+}
+
 function nowMs(): number {
   return Date.now();
 }
@@ -178,6 +196,26 @@ function isSuspiciousAnswer(answer: string, question: string): boolean {
   if (question.trim() === 'OK') return false;
   if (/\d/.test(question) && !/\d/.test(trimmed)) return true;
   if (/^ok$/i.test(trimmed)) return true;
+
+  // キーワード関連性チェック: 質問に含まれる重要キーワードが回答にも含まれるか
+  // 質問から2文字以上の単語を抽出
+  const questionWords = question
+    .toLowerCase()
+    .replace(/[^\w\u3040-\u30ff\u4e00-\u9faf]/g, ' ')  // 記号を空白に
+    .split(/\s+/)
+    .filter(w => w.length >= 2);
+  const answerLower = answer.toLowerCase();
+
+  // 質問の主要キーワードが回答に1つも含まれない場合は怪しい
+  // ただし、短い質問（キーワード2つ以下）は除外
+  if (questionWords.length >= 3) {
+    const matchedKeywords = questionWords.filter(w => answerLower.includes(w));
+    if (matchedKeywords.length === 0) {
+      console.error(`[isSuspiciousAnswer] No keyword match: question keywords=${JSON.stringify(questionWords)}, answer preview="${answer.slice(0, 50)}..."`);
+      return true;
+    }
+  }
+
   return false;
 }
 
@@ -229,11 +267,12 @@ async function createConnection(kind: 'chatgpt' | 'gemini'): Promise<CdpClient> 
       console.error(`[fast-cdp] DEBUG: targetInfo URL = ${relayResult.targetInfo?.url}`);
 
       // ページが読み込まれるまで待機（about:blank でなくなるまで）
+      // タイムアウトは3秒で十分（通常は数百ms以内に完了）
       if (debugUrl === 'about:blank') {
         console.error(`[fast-cdp] WARNING: evaluate returns about:blank, waiting for navigation...`);
         await client.waitForFunction(
           `location.href !== 'about:blank' && document.readyState === 'complete'`,
-          10000,
+          3000,
         );
       }
 
@@ -338,9 +377,9 @@ async function navigate(client: CdpClient, url: string) {
   await client.waitForFunction(`document.readyState === 'complete'`, 30000);
 }
 
-export async function askChatGPTFast(question: string): Promise<string> {
+async function askChatGPTFastInternal(question: string): Promise<ChatResult> {
   const t0 = nowMs();
-  const timings: Record<string, number> = {};
+  const timings: Partial<ChatTimings> = {};
   logInfo('chatgpt', 'askChatGPTFast started', {questionLength: question.length});
 
   const client = await getClient('chatgpt');
@@ -349,21 +388,32 @@ export async function askChatGPTFast(question: string): Promise<string> {
 
   const normalizedQuestion = question.replace(/\s+/g, '');
 
+  // ループ前に初期カウントを取得（既存チャット再利用時に重要）
+  // 入力欄が表示されるまで待機してから取得
+  const tWaitInput = nowMs();
+  logInfo('chatgpt', 'Waiting for input field');
+  await client.waitForFunction(
+    `(
+      !!document.querySelector('textarea#prompt-textarea') ||
+      !!document.querySelector('textarea[data-testid="prompt-textarea"]') ||
+      !!document.querySelector('.ProseMirror[contenteditable="true"]')
+    )`,
+    30000,
+  );
+  timings.waitInputMs = nowMs() - tWaitInput;
+  logInfo('chatgpt', 'Input field found', {waitInputMs: timings.waitInputMs});
+
+  // 初期メッセージカウントを**ループ外**で取得（これが重要）
+  const initialUserCountBeforeLoop = await client.evaluate<number>(
+    `document.querySelectorAll('[data-message-author-role="user"]').length`,
+  );
+  const initialAssistantCountBeforeLoop = await client.evaluate<number>(
+    `document.querySelectorAll('[data-message-author-role="assistant"]').length`,
+  );
+  console.error(`[ChatGPT] Initial counts BEFORE loop: user=${initialUserCountBeforeLoop}, assistant=${initialAssistantCountBeforeLoop}`);
+
   for (let attempt = 0; attempt < 2; attempt += 1) {
     // createConnection で正しいURL (https://chatgpt.com/) に接続済み
-    // ナビゲーションロジック削除: いきなり入力欄を待つ
-    const tWaitInput = nowMs();
-    logInfo('chatgpt', 'Waiting for input field');
-    await client.waitForFunction(
-      `(
-        !!document.querySelector('textarea#prompt-textarea') ||
-        !!document.querySelector('textarea[data-testid="prompt-textarea"]') ||
-        !!document.querySelector('.ProseMirror[contenteditable="true"]')
-      )`,
-      30000,
-    );
-    timings.waitInputMs = nowMs() - tWaitInput;
-    logInfo('chatgpt', 'Input field found', {waitInputMs: timings.waitInputMs});
 
     const sanitized = JSON.stringify(question);
     const tInput = nowMs();
@@ -593,9 +643,8 @@ export async function askChatGPTFast(question: string): Promise<string> {
       }
     }
 
-    const initialUserCount = await client.evaluate<number>(
-      `document.querySelectorAll('[data-message-author-role="user"]').length`,
-    );
+    // ループ外で取得した初期カウントを使用
+    const initialUserCount = initialUserCountBeforeLoop;
 
     logInfo('chatgpt', 'Input completed, preparing to send', {initialUserCount});
 
@@ -847,16 +896,15 @@ export async function askChatGPTFast(question: string): Promise<string> {
     console.error('[ChatGPT] Message sent successfully (count increased)');
     timings.sendMs = nowMs() - tSend;
 
-    // 送信前のアシスタントメッセージ数を記録
-    const initialAssistantCount = await client.evaluate<number>(
-      `document.querySelectorAll('[data-message-author-role="assistant"]').length`
-    );
+    // ループ外で取得した初期カウントを使用
+    const initialAssistantCount = initialAssistantCountBeforeLoop;
 
     const tWaitResp = nowMs();
-    console.error(`[ChatGPT] Waiting for response (initial assistant count: ${initialAssistantCount})...`);
+    console.error(`[ChatGPT] Waiting for response (initial assistant count from BEFORE loop: ${initialAssistantCount})...`);
 
     // 新方式: ポーリングで状態を監視（診断ログ付き）
-    const maxWaitMs = 60000;
+    // 長い応答に対応するため8分（480秒）に設定
+    const maxWaitMs = 480000;
     const pollIntervalMs = 1000;
     const startWait = Date.now();
     let lastLoggedState = '';
@@ -985,16 +1033,28 @@ export async function askChatGPTFast(question: string): Promise<string> {
         })()
       `);
       console.error(`[ChatGPT] Timeout - final state: ${JSON.stringify(finalState)}`);
-      throw new Error(`Timed out waiting for ChatGPT response (send button not enabled after 60s). Final state: ${JSON.stringify(finalState)}`);
+      throw new Error(`Timed out waiting for ChatGPT response (send button not enabled after 8min). Final state: ${JSON.stringify(finalState)}`);
     }
 
-    // 最後のアシスタントメッセージを取得
+    // 新しいアシスタントメッセージのみを取得（initialAssistantCount 以降）
     const answer = await client.evaluate<string>(`
       (() => {
+        const initialCount = ${initialAssistantCount};
         const messages = document.querySelectorAll('[data-message-author-role="assistant"]');
         if (messages.length === 0) return '';
 
-        const msg = messages[messages.length - 1];
+        // initialAssistantCount 以降の新しいメッセージのみを対象とする
+        const allMessages = Array.from(messages);
+        const newMessages = allMessages.slice(initialCount);
+
+        // 新しいメッセージがない場合は空文字を返す
+        if (newMessages.length === 0) {
+          console.warn('[ChatGPT] No new messages after initialCount=' + initialCount + ', total=' + allMessages.length);
+          return '';
+        }
+
+        // 最新の新しいメッセージを取得
+        const msg = newMessages[newMessages.length - 1];
         const content = msg.querySelector?.('.markdown, .prose, .markdown.prose, .message-content') || msg;
 
         const extractText = (root) => {
@@ -1058,16 +1118,40 @@ export async function askChatGPTFast(question: string): Promise<string> {
         url: finalUrl || undefined,
         timings,
       });
-      return answer;
+      // 全てのタイミングフィールドが設定されていることを保証
+      const fullTimings: ChatTimings = {
+        connectMs: timings.connectMs ?? 0,
+        waitInputMs: timings.waitInputMs ?? 0,
+        inputMs: timings.inputMs ?? 0,
+        sendMs: timings.sendMs ?? 0,
+        waitResponseMs: timings.waitResponseMs ?? 0,
+        totalMs: timings.totalMs ?? 0,
+      };
+      return {answer, timings: fullTimings};
     }
   }
 
   throw new Error('ChatGPT response was suspicious after all attempts');
 }
 
-export async function askGeminiFast(question: string): Promise<string> {
+/**
+ * ChatGPTに質問して回答を取得（後方互換用）
+ */
+export async function askChatGPTFast(question: string): Promise<string> {
+  const result = await askChatGPTFastInternal(question);
+  return result.answer;
+}
+
+/**
+ * ChatGPTに質問して回答とタイミング情報を取得
+ */
+export async function askChatGPTFastWithTimings(question: string): Promise<ChatResult> {
+  return askChatGPTFastInternal(question);
+}
+
+async function askGeminiFastInternal(question: string): Promise<ChatResult> {
   const t0 = nowMs();
-  const timings: Record<string, number> = {};
+  const timings: Partial<ChatTimings> = {};
   const client = await getClient('gemini');
   timings.connectMs = nowMs() - t0;
 
@@ -1091,9 +1175,81 @@ export async function askGeminiFast(question: string): Promise<string> {
   );
   timings.waitInputMs = nowMs() - tWaitInput;
 
+  // ★ 初期カウント取得: テキスト入力前に既存メッセージ数を記録
+  const geminiUserCountExpr = `(() => {
+    const selectors = ${JSON.stringify([
+      'user-query',
+      '.user-query',
+      '[data-test-id*="user"]',
+      '[data-test-id*="prompt"]',
+      '[data-message-author-role="user"]',
+      'message[author="user"]',
+      '[data-author="user"]',
+    ])};
+    const results = [];
+    const seen = new Set();
+    const collectDeep = (selectorList) => {
+      const visit = (root) => {
+        if (!root) return;
+        for (const sel of selectorList) {
+          try {
+            root.querySelectorAll?.(sel)?.forEach(el => {
+              if (!seen.has(el)) {
+                seen.add(el);
+                results.push(el);
+              }
+            });
+          } catch {
+            // ignore selector errors
+          }
+        }
+        const elements = root.querySelectorAll ? Array.from(root.querySelectorAll('*')) : [];
+        for (const el of elements) {
+          if (el.shadowRoot) visit(el.shadowRoot);
+        }
+      };
+      visit(document);
+    };
+    collectDeep(selectors);
+    return results.length;
+  })()`;
+
+  const initialGeminiUserCount = await client.evaluate<number>(geminiUserCountExpr);
+  const initialModelResponseCount = await client.evaluate<number>(`
+    (() => {
+      const collectDeep = (selectorList) => {
+        const results = [];
+        const seen = new Set();
+        const visit = (root) => {
+          if (!root) return;
+          for (const sel of selectorList) {
+            try {
+              root.querySelectorAll?.(sel)?.forEach(el => {
+                if (!seen.has(el)) {
+                  seen.add(el);
+                  results.push(el);
+                }
+              });
+            } catch {}
+          }
+          const elements = root.querySelectorAll ? Array.from(root.querySelectorAll('*')) : [];
+          for (const el of elements) {
+            if (el.shadowRoot) visit(el.shadowRoot);
+          }
+        };
+        visit(document);
+        return results;
+      };
+      return collectDeep(['model-response', '.model-response', '[data-test-id*="response"]']).length;
+    })()
+  `);
+  console.error(`[Gemini] Initial counts BEFORE input: user=${initialGeminiUserCount}, modelResponse=${initialModelResponseCount}`);
+
   const sanitized = JSON.stringify(question);
   const tInput = nowMs();
-  const inputOk = await client.evaluate<boolean>(`
+
+  // Phase 1: 最初の入力試行
+  const inputResult = await client.evaluate<{ok: boolean; actualText: string}>(`
     (() => {
       const text = ${sanitized};
       const collectDeep = (selectorList) => {
@@ -1125,23 +1281,123 @@ export async function askGeminiFast(question: string): Promise<string> {
       };
       const textbox =
         collectDeep(['[role="textbox"]', 'div[contenteditable="true"]', 'textarea'])[0];
-      if (!textbox) return false;
+      if (!textbox) return {ok: false, actualText: ''};
       textbox.focus();
       if (textbox.isContentEditable) {
+        // テキストをクリアしてから設定
+        textbox.innerText = '';
         textbox.innerText = text;
         textbox.dispatchEvent(new Event('input', {bubbles: true}));
         textbox.dispatchEvent(new Event('change', {bubbles: true}));
-        return true;
+        // 実際に設定されたテキストを取得して返す
+        const actualText = (textbox.innerText || textbox.textContent || '').trim();
+        return {ok: true, actualText};
       }
       if ('value' in textbox) {
         textbox.value = text;
         textbox.dispatchEvent(new Event('input', {bubbles: true}));
         textbox.dispatchEvent(new Event('change', {bubbles: true}));
-        return true;
+        const actualText = (textbox.value || '').trim();
+        return {ok: true, actualText};
       }
-      return false;
+      return {ok: false, actualText: ''};
     })()
   `);
+
+  // 入力検証: 質問の先頭20文字が含まれているか確認
+  const questionPrefix = question.slice(0, 20).replace(/\s+/g, '');
+  let inputOk = inputResult.ok && inputResult.actualText.replace(/\s+/g, '').includes(questionPrefix);
+
+  if (!inputOk && inputResult.ok) {
+    // Phase 2: innerTextで失敗した場合、Input.insertText でリトライ
+    console.error('[Gemini] Input verification failed, retrying with Input.insertText...');
+    console.error(`[Gemini] Expected prefix: "${questionPrefix}", actual: "${inputResult.actualText.slice(0, 30)}..."`);
+
+    // テキストボックスをクリアしてフォーカス
+    await client.evaluate(`
+      (() => {
+        const collectDeep = (selectorList) => {
+          const results = [];
+          const seen = new Set();
+          const visit = (root) => {
+            if (!root) return;
+            for (const sel of selectorList) {
+              try {
+                root.querySelectorAll?.(sel)?.forEach(el => {
+                  if (!seen.has(el)) {
+                    seen.add(el);
+                    results.push(el);
+                  }
+                });
+              } catch {}
+            }
+            const elements = root.querySelectorAll ? Array.from(root.querySelectorAll('*')) : [];
+            for (const el of elements) {
+              if (el.shadowRoot) visit(el.shadowRoot);
+            }
+          };
+          visit(document);
+          return results;
+        };
+        const textbox =
+          collectDeep(['[role="textbox"]', 'div[contenteditable="true"]', 'textarea'])[0];
+        if (textbox) {
+          textbox.focus();
+          if (textbox.isContentEditable) {
+            textbox.innerText = '';
+          } else if ('value' in textbox) {
+            textbox.value = '';
+          }
+          // 全選択してから削除（より確実にクリア）
+          document.execCommand('selectAll', false, null);
+          document.execCommand('delete', false, null);
+        }
+      })()
+    `);
+
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    // Input.insertText でテキストを挿入
+    await client.send('Input.insertText', {text: question});
+
+    await new Promise(resolve => setTimeout(resolve, 200));
+
+    // 再検証
+    const retryResult = await client.evaluate<string>(`
+      (() => {
+        const collectDeep = (selectorList) => {
+          const results = [];
+          const seen = new Set();
+          const visit = (root) => {
+            if (!root) return;
+            for (const sel of selectorList) {
+              try {
+                root.querySelectorAll?.(sel)?.forEach(el => {
+                  if (!seen.has(el)) {
+                    seen.add(el);
+                    results.push(el);
+                  }
+                });
+              } catch {}
+            }
+            const elements = root.querySelectorAll ? Array.from(root.querySelectorAll('*')) : [];
+            for (const el of elements) {
+              if (el.shadowRoot) visit(el.shadowRoot);
+            }
+          };
+          visit(document);
+          return results;
+        };
+        const textbox =
+          collectDeep(['[role="textbox"]', 'div[contenteditable="true"]', 'textarea'])[0];
+        if (!textbox) return '';
+        return (textbox.isContentEditable ? (textbox.innerText || textbox.textContent) : textbox.value) || '';
+      })()
+    `);
+
+    inputOk = retryResult.replace(/\s+/g, '').includes(questionPrefix);
+    console.error(`[Gemini] Retry result: inputOk=${inputOk}, text="${retryResult.slice(0, 30)}..."`);
+  }
   timings.inputMs = nowMs() - tInput;
   if (!inputOk) {
     const diagnostics = await client.evaluate(`
@@ -1236,43 +1492,7 @@ export async function askGeminiFast(question: string): Promise<string> {
     throw new Error('Gemini input mismatch after typing.');
   }
 
-  const geminiUserCountExpr = `(() => {
-    const selectors = ${JSON.stringify([
-      'user-query',
-      '.user-query',
-      '[data-test-id*="user"]',
-      '[data-test-id*="prompt"]',
-      '[data-message-author-role="user"]',
-      'message[author="user"]',
-      '[data-author="user"]',
-    ])};
-    const results = [];
-    const seen = new Set();
-    const collectDeep = (selectorList) => {
-      const visit = (root) => {
-        if (!root) return;
-        for (const sel of selectorList) {
-          try {
-            root.querySelectorAll?.(sel)?.forEach(el => {
-              if (!seen.has(el)) {
-                seen.add(el);
-                results.push(el);
-              }
-            });
-          } catch {
-            // ignore selector errors
-          }
-        }
-        const elements = root.querySelectorAll ? Array.from(root.querySelectorAll('*')) : [];
-        for (const el of elements) {
-          if (el.shadowRoot) visit(el.shadowRoot);
-        }
-      };
-      visit(document);
-    };
-    collectDeep(selectors);
-    return results.length;
-  })()`;
+  // geminiUserTextExpr: 最後のユーザーメッセージのテキストを取得
   const geminiUserTextExpr = `(() => {
     const selectors = ${JSON.stringify([
       'user-query',
@@ -1311,15 +1531,56 @@ export async function askGeminiFast(question: string): Promise<string> {
     const last = results[results.length - 1];
     return last ? (last.textContent || '').trim() : '';
   })()`;
-  const initialGeminiUserCount = await client.evaluate<number>(geminiUserCountExpr);
-
-  // デバッグ: 送信前のメッセージカウント
-  const userCountBefore = await client.evaluate<number>(geminiUserCountExpr);
-  console.error(`[Gemini] User message count before send: ${userCountBefore}`);
 
   // 入力完了後の待機（内部状態更新を待つ）
   await new Promise(resolve => setTimeout(resolve, 200));
   console.error('[Gemini] Waited 200ms after input for state update');
+
+  // Phase 2: 送信前テキスト確認 - 入力フィールドに正しいテキストがあるか最終確認
+  const preSendCheck = await client.evaluate<{hasText: boolean; textLength: number; textPreview: string}>(`
+    (() => {
+      const collectDeep = (selectorList) => {
+        const results = [];
+        const seen = new Set();
+        const visit = (root) => {
+          if (!root) return;
+          for (const sel of selectorList) {
+            try {
+              root.querySelectorAll?.(sel)?.forEach(el => {
+                if (!seen.has(el)) {
+                  seen.add(el);
+                  results.push(el);
+                }
+              });
+            } catch {}
+          }
+          const elements = root.querySelectorAll ? Array.from(root.querySelectorAll('*')) : [];
+          for (const el of elements) {
+            if (el.shadowRoot) visit(el.shadowRoot);
+          }
+        };
+        visit(document);
+        return results;
+      };
+      const textbox =
+        collectDeep(['[role="textbox"]', 'div[contenteditable="true"]', 'textarea'])[0];
+      if (!textbox) return {hasText: false, textLength: 0, textPreview: ''};
+      const text = (textbox.isContentEditable
+        ? (textbox.innerText || textbox.textContent)
+        : textbox.value) || '';
+      return {
+        hasText: text.trim().length > 0,
+        textLength: text.trim().length,
+        textPreview: text.trim().slice(0, 50)
+      };
+    })()
+  `);
+
+  console.error(`[Gemini] Pre-send check: hasText=${preSendCheck.hasText}, length=${preSendCheck.textLength}, preview="${preSendCheck.textPreview}..."`);
+
+  if (!preSendCheck.hasText || preSendCheck.textLength < 5) {
+    throw new Error(`[Gemini] Input field empty or too short before send. Expected question but got: "${preSendCheck.textPreview}"`);
+  }
 
   const tSend = nowMs();
 
@@ -1552,9 +1813,12 @@ export async function askGeminiFast(question: string): Promise<string> {
   console.error('[Gemini] Message sent successfully (count increased)');
 
   const tWaitResp = nowMs();
-  console.error('[Gemini] Waiting for response via send button monitoring...');
+  console.error('[Gemini] Waiting for response completion (mic button OR send button enabled)...');
 
-  // 新方式: 送信ボタンが有効になるまで待つ = 応答完了
+  // 応答完了判定:
+  // - 停止ボタンがない AND (マイクボタンが表示 OR 送信ボタンが有効)
+  // マイクボタン = 入力欄が空（応答後の状態）
+  // 送信ボタン有効 = テキスト入力中でも送信可能（次の質問を入力済み）
   try {
     await client.waitForFunction(`
       (() => {
@@ -1599,7 +1863,7 @@ export async function askGeminiFast(question: string): Promise<string> {
 
         const buttons = collectDeep(['button', '[role="button"]']).filter(isVisible);
 
-        // 停止ボタンがある場合はまだ生成中
+        // 停止ボタンがある場合はまだ生成中（これが最優先）
         const hasStopButton = buttons.some(b => {
           const text = (b.textContent || '').trim();
           const label = (b.getAttribute('aria-label') || '').trim();
@@ -1608,7 +1872,17 @@ export async function askGeminiFast(question: string): Promise<string> {
         });
         if (hasStopButton) return false;
 
-        // 送信ボタンを探す
+        // 条件1: マイクボタンが表示（入力欄が空 = 応答完了後の状態）
+        const micButton = document.querySelector('[data-node-type="speech_dictation_mic_button"]') ||
+                          buttons.find(b => {
+                            const label = (b.getAttribute('aria-label') || '').toLowerCase();
+                            return label.includes('マイク') || label.includes('mic');
+                          });
+        if (micButton && isVisible(micButton)) {
+          return true;
+        }
+
+        // 条件2: 送信ボタンが有効（テキスト入力済みで送信可能）
         const sendBtn = buttons.find(b =>
           (b.textContent || '').includes('プロンプトを送信') ||
           (b.textContent || '').includes('送信') ||
@@ -1617,15 +1891,16 @@ export async function askGeminiFast(question: string): Promise<string> {
           b.querySelector('mat-icon[data-mat-icon-name="send"]') ||
           b.querySelector('[data-icon="send"]')
         );
+        if (sendBtn && !isDisabled(sendBtn)) {
+          return true;
+        }
 
-        if (!sendBtn) return false;
-
-        return !isDisabled(sendBtn);
+        return false;
       })()
-    `, 60000);
-    console.error('[Gemini] Send button became enabled - response complete');
+    `, 480000);  // 8分（長い応答に対応）
+    console.error('[Gemini] Response complete (mic button or send button ready)');
   } catch (waitError) {
-    console.error('[Gemini] Timeout waiting for send button to become enabled');
+    console.error('[Gemini] Timeout waiting for response completion');
     const diagnostics = await client.evaluate(`
       (() => {
         const textIncludes = (needle) => document.body && document.body.innerText && document.body.innerText.includes(needle);
@@ -1647,12 +1922,13 @@ export async function askGeminiFast(question: string): Promise<string> {
         };
       })()
     `);
-    throw new Error(`Timed out waiting for Gemini response (send button not enabled after 60s): ${JSON.stringify(diagnostics)}`);
+    throw new Error(`Timed out waiting for Gemini response (send button not enabled after 8min): ${JSON.stringify(diagnostics)}`);
   }
 
-  // 最後のレスポンスを取得
+  // 新しいレスポンスのみを取得（initialModelResponseCount 以降）
   const rawText = await client.evaluate<string>(`
     (() => {
+      const initialCount = ${initialModelResponseCount};
       const collectDeep = (selectorList) => {
         const results = [];
         const seen = new Set();
@@ -1677,14 +1953,42 @@ export async function askGeminiFast(question: string): Promise<string> {
         return results;
       };
 
-      const responses = collectDeep(['model-response', '[data-test-id*="response"]', '.response', '.markdown', '.model-response']);
-      if (responses.length === 0) {
+      const allResponses = collectDeep(['model-response', '[data-test-id*="response"]', '.response', '.markdown', '.model-response']);
+
+      // initialModelResponseCount 以降の新しいレスポンスのみを対象とする
+      const newResponses = allResponses.slice(initialCount);
+
+      if (newResponses.length === 0) {
+        console.warn('[Gemini] No new responses after initialCount=' + initialCount + ', total=' + allResponses.length);
+        // フォールバック: 最新のレスポンスを使用（カウントが信頼できない場合）
+        if (allResponses.length > 0) {
+          const msg = allResponses[allResponses.length - 1];
+          const extractText = (root) => {
+            if (!root) return '';
+            const parts = [];
+            const visit = (node) => {
+              if (!node) return;
+              if (node.nodeType === Node.TEXT_NODE) {
+                const value = node.textContent;
+                if (value) parts.push(value);
+                return;
+              }
+              if (node.shadowRoot) visit(node.shadowRoot);
+              const children = node.childNodes ? Array.from(node.childNodes) : [];
+              for (const child of children) visit(child);
+            };
+            visit(root);
+            return parts.join(' ').replace(/\\s+/g, ' ').trim();
+          };
+          return extractText(msg);
+        }
         // フォールバック: aria-live="polite"
         const live = document.querySelector('[aria-live="polite"]');
         return live ? (live.textContent || '').trim() : '';
       }
 
-      const msg = responses[responses.length - 1];
+      // 最新の新しいレスポンスを取得
+      const msg = newResponses[newResponses.length - 1];
       const extractText = (root) => {
         if (!root) return '';
         const parts = [];
@@ -1723,7 +2027,32 @@ export async function askGeminiFast(question: string): Promise<string> {
     url: finalUrl || undefined,
     timings,
   });
-  return normalized;
+  // 全てのタイミングフィールドが設定されていることを保証
+  const fullTimings: ChatTimings = {
+    connectMs: timings.connectMs ?? 0,
+    waitInputMs: timings.waitInputMs ?? 0,
+    inputMs: timings.inputMs ?? 0,
+    sendMs: timings.sendMs ?? 0,
+    waitResponseMs: timings.waitResponseMs ?? 0,
+    totalMs: timings.totalMs ?? 0,
+    navigateMs: timings.navigateMs,  // Gemini のみ
+  };
+  return {answer: normalized, timings: fullTimings};
+}
+
+/**
+ * Geminiに質問して回答を取得（後方互換用）
+ */
+export async function askGeminiFast(question: string): Promise<string> {
+  const result = await askGeminiFastInternal(question);
+  return result.answer;
+}
+
+/**
+ * Geminiに質問して回答とタイミング情報を取得
+ */
+export async function askGeminiFastWithTimings(question: string): Promise<ChatResult> {
+  return askGeminiFastInternal(question);
 }
 
 /**

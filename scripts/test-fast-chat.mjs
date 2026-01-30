@@ -17,34 +17,307 @@
  *   npm run test:both
  */
 
-import {askChatGPTFast, askGeminiFast, getClient, getPageDom} from '../build/src/fast-cdp/fast-chat.js';
+import {
+  askChatGPTFast,
+  askGeminiFast,
+  askChatGPTFastWithTimings,
+  askGeminiFastWithTimings,
+  getClient,
+  getPageDom
+} from '../build/src/fast-cdp/fast-chat.js';
 
 const target = process.argv[2] || 'chatgpt';
-const question = process.argv[3];
+const questionArg = process.argv[3];
 const dumpDom = process.argv.includes('--dump-dom');
+const skipRelevanceCheck = process.argv.includes('--skip-relevance');
 
-// 質問が指定されていない場合（--dump-dom以外）はエラー
-if (!question && !dumpDom) {
+/**
+ * ユニークな質問を生成する
+ * キャッシュ回避のため、タイムスタンプと乱数を質問に埋め込む
+ */
+function generateUniqueQuestion() {
+  const now = new Date();
+  const timestamp = now.toLocaleString('ja-JP', {
+    month: 'numeric',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit'
+  });
+  const randomId = Math.random().toString(36).slice(2, 8).toUpperCase();
+
+  // 質問テンプレート（技術的で自然なもの）
+  const templates = [
+    `ID:${randomId}の識別子を使って、JavaScriptで配列をシャッフルする関数を書いて。結果は1行で。`,
+    `${timestamp}時点での回答として、Pythonのリスト内包表記の利点を1文で説明して。`,
+    `セッション${randomId}: TypeScriptのOptional Chainingの使い方を20文字以内で。`,
+    `テストID-${randomId}: Goのdeferの動作を1文で説明して。`,
+    `${timestamp}の質問: Rustの所有権システムの目的を30字以内で。`,
+    `クエリ${randomId}: Node.jsのイベントループを1文で説明して。`,
+    `${randomId}番: ReactのuseEffectのクリーンアップ関数の役割は？20字以内で。`,
+    `リクエスト${randomId}: SQLのINDEXが高速化する理由を1文で。`,
+    `${timestamp}発: Dockerコンテナと仮想マシンの違いを1文で。`,
+    `ID${randomId}: Gitのrebaseとmergeの違いを20字以内で説明して。`,
+  ];
+
+  const index = Math.floor(Math.random() * templates.length);
+  return templates[index];
+}
+
+// 質問が指定されていなければ自動生成
+const question = questionArg || (dumpDom ? null : generateUniqueQuestion());
+
+/**
+ * 質問からキーワードを抽出する
+ * @param {string} question - 質問文
+ * @returns {string[]} - キーワードの配列
+ */
+function extractKeywords(question) {
+  const keywords = [];
+
+  // 1. 英語の技術用語を抽出（大文字小文字を保持）
+  const englishTerms = question.match(/[A-Za-z][A-Za-z0-9]*(?:\.[A-Za-z0-9]+)*/g) || [];
+  for (const term of englishTerms) {
+    if (term.length >= 2) {
+      keywords.push(term.toLowerCase());
+    }
+  }
+
+  // 2. カタカナ語を抽出（技術用語に多い）
+  const katakanaTerms = question.match(/[ァ-ヶー]+/g) || [];
+  for (const term of katakanaTerms) {
+    if (term.length >= 2) {
+      keywords.push(term);
+    }
+  }
+
+  // 3. 日本語の重要そうな単語（助詞で区切る）
+  const japaneseWords = question
+    .replace(/[A-Za-z0-9ァ-ヶー]+/g, ' ')  // 英語・カタカナを除去
+    .split(/[はをのがにでとからまでよりへやかもなだですますしたするしてされるということようについてにおいてとしてというためのことものところときようためほうほか何どうどのこのそのあのどんな教えて説明簡潔詳しく具体的例方法1つ一つひとつ]+/)
+    .filter(w => w.length >= 2);
+
+  for (const word of japaneseWords) {
+    if (word.length >= 2) {
+      keywords.push(word);
+    }
+  }
+
+  // 重複を除去
+  return [...new Set(keywords)];
+}
+
+/**
+ * 回答が質問に関連しているかチェック
+ * @param {string} question - 質問文
+ * @param {string} answer - 回答文
+ * @returns {{relevant: boolean, matchedKeywords: string[], totalKeywords: number, matchRate: number}}
+ */
+function checkRelevance(question, answer) {
+  const keywords = extractKeywords(question);
+  const answerLower = answer.toLowerCase();
+
+  const matchedKeywords = keywords.filter(kw =>
+    answerLower.includes(kw.toLowerCase())
+  );
+
+  const matchRate = keywords.length > 0 ? matchedKeywords.length / keywords.length : 0;
+
+  // 最低1つのキーワードがマッチするか、マッチ率が20%以上
+  const relevant = matchedKeywords.length >= 1 || matchRate >= 0.2;
+
+  return {
+    relevant,
+    matchedKeywords,
+    totalKeywords: keywords.length,
+    matchRate: Math.round(matchRate * 100)
+  };
+}
+
+/**
+ * 数値をカンマ区切りでフォーマット
+ * @param {number} num - 数値
+ * @returns {string} - フォーマットされた文字列
+ */
+function formatNumber(num) {
+  return num.toLocaleString('en-US');
+}
+
+/**
+ * バーグラフを生成
+ * @param {number} percentage - パーセンテージ (0-100)
+ * @param {number} width - バーの幅 (デフォルト20)
+ * @returns {string} - バーグラフ文字列
+ */
+function createBar(percentage, width = 20) {
+  const filled = Math.round((percentage / 100) * width);
+  const empty = width - filled;
+  return '█'.repeat(filled) + '░'.repeat(empty);
+}
+
+/**
+ * ボトルネック分析の閾値
+ */
+const THRESHOLDS = {
+  connectMs: {expected: 2000, warning: 5000, improvable: true, label: '接続'},
+  waitInputMs: {expected: 1000, warning: 3000, improvable: true, label: '入力欄待機'},
+  inputMs: {expected: 500, warning: 2000, improvable: true, label: 'テキスト入力'},
+  sendMs: {expected: 2000, warning: 10000, improvable: true, label: '送信ボタン待機'},
+  waitResponseMs: {expected: -1, warning: -1, improvable: false, label: '回答待機'},
+  navigateMs: {expected: 1000, warning: 3000, improvable: true, label: 'ナビゲーション'},
+};
+
+/**
+ * タイミングレポートを出力
+ * @param {string} provider - 'ChatGPT' or 'Gemini'
+ * @param {string} questionText - 質問文
+ * @param {object} timings - タイミングデータ
+ */
+function printTimingReport(provider, questionText, timings) {
+  const phases = [
+    {name: '接続確立', key: 'connectMs'},
+    {name: '入力欄待機', key: 'waitInputMs'},
+    {name: 'テキスト入力', key: 'inputMs'},
+    {name: '送信ボタン待機', key: 'sendMs'},
+    {name: '回答待機', key: 'waitResponseMs'},
+  ];
+
+  // Gemini の場合はナビゲーションを追加
+  if (timings.navigateMs !== undefined) {
+    phases.splice(1, 0, {name: 'ナビゲーション', key: 'navigateMs'});
+  }
+
+  const total = timings.totalMs || 0;
+
+  // 最大値を持つフェーズを特定
+  let maxPhase = phases[0];
+  for (const phase of phases) {
+    const ms = timings[phase.key] || 0;
+    if (ms > (timings[maxPhase.key] || 0)) {
+      maxPhase = phase;
+    }
+  }
+
   console.error('');
-  console.error('エラー: 質問を引数で指定してください');
+  console.error('========================================');
+  console.error(`=== ${provider} パフォーマンスレポート ===`);
+  console.error('========================================');
+  console.error(`質問: "${questionText.slice(0, 60)}${questionText.length > 60 ? '...' : ''}"`);
+
+  // タイミング詳細
+  console.error('');
+  console.error('## タイミング詳細');
+  console.error('');
+
+  for (const phase of phases) {
+    const ms = timings[phase.key] || 0;
+    const pct = total > 0 ? (ms / total * 100) : 0;
+    const bar = createBar(pct);
+    const marker = phase.key === maxPhase.key ? ' ← 最大' : '';
+    const msStr = formatNumber(ms).padStart(6);
+    const pctStr = pct.toFixed(1).padStart(5);
+    console.error(`  ${phase.name.padEnd(14)}: ${msStr} ms (${pctStr}%) ${bar}${marker}`);
+  }
+
+  console.error(`  ${'─'.repeat(37)}`);
+  const totalStr = formatNumber(total).padStart(6);
+  console.error(`  ${'合計'.padEnd(14)}: ${totalStr} ms (100.0%)`);
+
+  // ボトルネック分析
+  console.error('');
+  console.error('## ボトルネック分析');
+  console.error('');
+
+  const bottlenecks = [];
+  for (const phase of phases) {
+    const ms = timings[phase.key] || 0;
+    const pct = total > 0 ? (ms / total * 100) : 0;
+    const threshold = THRESHOLDS[phase.key];
+    if (!threshold) continue;
+
+    let severity = '🟢';
+    let reason = '正常範囲';
+
+    if (!threshold.improvable) {
+      severity = '🔵';
+      reason = 'AI応答速度（改善不可）';
+    } else if (threshold.warning > 0 && ms > threshold.warning) {
+      severity = '🔴';
+      reason = `${threshold.expected}ms 期待 / ${threshold.warning}ms 警告閾値超過`;
+    } else if (threshold.expected > 0 && ms > threshold.expected) {
+      severity = '🟡';
+      reason = '改善の余地あり';
+    }
+
+    bottlenecks.push({
+      severity,
+      name: phase.name,
+      ms,
+      pct,
+      reason,
+      improvable: threshold.improvable,
+    });
+  }
+
+  // 重要度順にソート
+  bottlenecks.sort((a, b) => {
+    const order = {'🔴': 0, '🟡': 1, '🔵': 2, '🟢': 3};
+    return (order[a.severity] ?? 4) - (order[b.severity] ?? 4);
+  });
+
+  for (const b of bottlenecks.slice(0, 4)) {
+    console.error(`  ${b.severity} ${b.name}: ${formatNumber(b.ms)}ms (${b.pct.toFixed(1)}%) - ${b.reason}`);
+  }
+
+  // 改善提案
+  console.error('');
+  console.error('## 改善提案');
+  console.error('');
+
+  const suggestions = [];
+
+  if ((timings.connectMs || 0) > 3000) {
+    suggestions.push('• 接続: 既存タブ再利用が機能しているか確認');
+  }
+  if ((timings.sendMs || 0) > 5000) {
+    suggestions.push('• 送信ボタン: 前回応答が完了してから新規質問を送信');
+  }
+  if ((timings.waitInputMs || 0) > 2000) {
+    suggestions.push('• 入力欄: ページの初期ロード完了を待つ');
+  }
+  if ((timings.navigateMs || 0) > 2000) {
+    suggestions.push('• ナビゲーション: 既存タブを再利用してナビゲーション回避');
+  }
+
+  if (suggestions.length === 0) {
+    suggestions.push('• 特になし（パフォーマンスは良好です）');
+  }
+
+  for (const s of suggestions) {
+    console.error(`  ${s}`);
+  }
+
+  console.error('');
+  console.error('========================================');
+}
+
+// ヘルプ表示
+if (process.argv.includes('--help') || process.argv.includes('-h')) {
   console.error('');
   console.error('使い方:');
-  console.error('  npm run test:chatgpt -- "質問文"');
-  console.error('  npm run test:gemini -- "質問文"');
-  console.error('  npm run test:both -- "質問文"');
+  console.error('  npm run test:chatgpt              # ユニークな質問を自動生成');
+  console.error('  npm run test:gemini               # ユニークな質問を自動生成');
+  console.error('  npm run test:both                 # 両方テスト');
+  console.error('  npm run test:chatgpt -- "質問文"  # 指定した質問を使用');
   console.error('');
-  console.error('DOM取得オプション:');
-  console.error('  node --import ./scripts/browser-globals-mock.mjs scripts/test-fast-chat.mjs chatgpt --dump-dom');
-  console.error('  node --import ./scripts/browser-globals-mock.mjs scripts/test-fast-chat.mjs gemini --dump-dom');
+  console.error('オプション:');
+  console.error('  --dump-dom         DOMスナップショットを取得');
+  console.error('  --skip-relevance   関連性チェックをスキップ');
   console.error('');
-  console.error('例:');
-  console.error('  npm run test:chatgpt -- "Pythonでデコレータを使う場面は？"');
-  console.error('  npm run test:gemini -- "Goのインターフェースの使い方を教えて"');
-  console.error('  npm run test:both -- "TypeScriptのconditional typesの実用例を1つ見せて"');
+  console.error('質問を省略すると、タイムスタンプと乱数を含むユニークな質問が自動生成されます。');
+  console.error('これにより、キャッシュされた回答ではなく新しい応答であることを確認できます。');
   console.error('');
-  console.error('注意: BAN回避のため、毎回異なる自然な技術的質問を使用してください');
-  console.error('');
-  process.exit(1);
+  process.exit(0);
 }
 
 async function testChatGPT(q) {
@@ -61,10 +334,14 @@ async function testChatGPT(q) {
     const client = await getClient('chatgpt');
     console.error(`[Phase 1] 接続完了 (${Date.now() - startTime}ms)`);
 
-    // 質問送信フェーズ
+    // 質問送信フェーズ（タイミング情報付き）
     console.error('[Phase 2] 質問送信中...');
-    const answer = await askChatGPTFast(q);
-    const elapsed = Date.now() - startTime;
+    const result = await askChatGPTFastWithTimings(q);
+    const {answer, timings} = result;
+    const elapsed = timings.totalMs;
+
+    // 関連性チェック
+    const relevance = checkRelevance(q, answer);
 
     console.error('');
     console.error('========================================');
@@ -72,9 +349,26 @@ async function testChatGPT(q) {
     console.error('========================================');
     console.error(`回答: ${answer}`);
     console.error(`所要時間: ${elapsed}ms`);
+    console.error('');
+    console.error('--- 関連性チェック ---');
+    console.error(`キーワード: ${extractKeywords(q).join(', ')}`);
+    console.error(`マッチ: ${relevance.matchedKeywords.join(', ') || '(なし)'}`);
+    console.error(`マッチ率: ${relevance.matchRate}% (${relevance.matchedKeywords.length}/${relevance.totalKeywords})`);
+    console.error(`関連性: ${relevance.relevant ? '✅ あり' : '❌ なし（前の会話の可能性）'}`);
     console.error('========================================');
 
-    return {success: true, answer, elapsed};
+    // パフォーマンスレポート出力
+    printTimingReport('ChatGPT', q, timings);
+
+    // 関連性がない場合は警告
+    if (!relevance.relevant && !skipRelevanceCheck) {
+      console.error('');
+      console.error('⚠️  警告: 回答が質問と関連していない可能性があります');
+      console.error('    前の会話の続きが返ってきた可能性があります');
+      return {success: false, answer, elapsed, timings, error: 'Response not relevant to question', relevance};
+    }
+
+    return {success: true, answer, elapsed, timings, relevance};
   } catch (err) {
     const elapsed = Date.now() - startTime;
     console.error('');
@@ -104,10 +398,14 @@ async function testGemini(q) {
     const client = await getClient('gemini');
     console.error(`[Phase 1] 接続完了 (${Date.now() - startTime}ms)`);
 
-    // 質問送信フェーズ
+    // 質問送信フェーズ（タイミング情報付き）
     console.error('[Phase 2] 質問送信中...');
-    const answer = await askGeminiFast(q);
-    const elapsed = Date.now() - startTime;
+    const result = await askGeminiFastWithTimings(q);
+    const {answer, timings} = result;
+    const elapsed = timings.totalMs;
+
+    // 関連性チェック
+    const relevance = checkRelevance(q, answer);
 
     console.error('');
     console.error('========================================');
@@ -115,9 +413,26 @@ async function testGemini(q) {
     console.error('========================================');
     console.error(`回答: ${answer}`);
     console.error(`所要時間: ${elapsed}ms`);
+    console.error('');
+    console.error('--- 関連性チェック ---');
+    console.error(`キーワード: ${extractKeywords(q).join(', ')}`);
+    console.error(`マッチ: ${relevance.matchedKeywords.join(', ') || '(なし)'}`);
+    console.error(`マッチ率: ${relevance.matchRate}% (${relevance.matchedKeywords.length}/${relevance.totalKeywords})`);
+    console.error(`関連性: ${relevance.relevant ? '✅ あり' : '❌ なし（前の会話の可能性）'}`);
     console.error('========================================');
 
-    return {success: true, answer, elapsed};
+    // パフォーマンスレポート出力
+    printTimingReport('Gemini', q, timings);
+
+    // 関連性がない場合は警告
+    if (!relevance.relevant && !skipRelevanceCheck) {
+      console.error('');
+      console.error('⚠️  警告: 回答が質問と関連していない可能性があります');
+      console.error('    前の会話の続きが返ってきた可能性があります');
+      return {success: false, answer, elapsed, timings, error: 'Response not relevant to question', relevance};
+    }
+
+    return {success: true, answer, elapsed, timings, relevance};
   } catch (err) {
     const elapsed = Date.now() - startTime;
     console.error('');
@@ -220,7 +535,15 @@ async function main() {
   console.error('╚════════════════════════════════════════╝');
   console.error('');
   console.error(`ターゲット: ${target}`);
-  console.error(`質問: "${question || '(なし)'}"`);
+  if (question) {
+    const autoGenerated = !questionArg;
+    console.error(`質問: "${question}"`);
+    if (autoGenerated) {
+      console.error('      ↑ 自動生成（タイムスタンプ/乱数でユニーク化）');
+    }
+  } else {
+    console.error('質問: (なし)');
+  }
   console.error(`--dump-dom: ${dumpDom}`);
   console.error('');
 
@@ -255,20 +578,37 @@ async function main() {
 
   if (results.chatgpt) {
     const r = results.chatgpt;
-    console.error(`ChatGPT: ${r.success ? '✅ 成功' : '❌ 失敗'} (${r.elapsed}ms)`);
-    if (r.success) {
+    console.error(`ChatGPT: ${r.success ? '✅ 成功' : '❌ 失敗'} (${formatNumber(r.elapsed)}ms)`);
+    if (r.answer) {
       console.error(`  回答: ${r.answer.slice(0, 80)}${r.answer.length > 80 ? '...' : ''}`);
-    } else {
+    }
+    if (r.relevance) {
+      console.error(`  関連性: ${r.relevance.matchRate}% (${r.relevance.matchedKeywords.join(', ') || 'なし'})`);
+    }
+    if (r.timings) {
+      const t = r.timings;
+      console.error(`  内訳: 接続=${formatNumber(t.connectMs)}ms, 入力=${formatNumber(t.waitInputMs + t.inputMs)}ms, 送信待機=${formatNumber(t.sendMs)}ms, 応答=${formatNumber(t.waitResponseMs)}ms`);
+    }
+    if (!r.success && r.error) {
       console.error(`  エラー: ${r.error}`);
     }
   }
 
   if (results.gemini) {
     const r = results.gemini;
-    console.error(`Gemini:  ${r.success ? '✅ 成功' : '❌ 失敗'} (${r.elapsed}ms)`);
-    if (r.success) {
+    console.error(`Gemini:  ${r.success ? '✅ 成功' : '❌ 失敗'} (${formatNumber(r.elapsed)}ms)`);
+    if (r.answer) {
       console.error(`  回答: ${r.answer.slice(0, 80)}${r.answer.length > 80 ? '...' : ''}`);
-    } else {
+    }
+    if (r.relevance) {
+      console.error(`  関連性: ${r.relevance.matchRate}% (${r.relevance.matchedKeywords.join(', ') || 'なし'})`);
+    }
+    if (r.timings) {
+      const t = r.timings;
+      const navPart = t.navigateMs ? `, ナビ=${formatNumber(t.navigateMs)}ms` : '';
+      console.error(`  内訳: 接続=${formatNumber(t.connectMs)}ms${navPart}, 入力=${formatNumber(t.waitInputMs + t.inputMs)}ms, 送信待機=${formatNumber(t.sendMs)}ms, 応答=${formatNumber(t.waitResponseMs)}ms`);
+    }
+    if (!r.success && r.error) {
       console.error(`  エラー: ${r.error}`);
     }
   }
