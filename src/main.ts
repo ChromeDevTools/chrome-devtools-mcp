@@ -125,9 +125,14 @@ const logDisclaimers = () => {
   console.error(
     `chrome-devtools-mcp exposes content of the browser instance to the MCP clients allowing them to inspect,
 debug, and modify any data in the browser or DevTools.
-Avoid sharing sensitive or personal information that you do not want to share with MCP clients.
-Performance tools may send trace URLs to the Google CrUX API to fetch real-user experience data. To disable, run with --no-performance-crux.`,
+Avoid sharing sensitive or personal information that you do not want to share with MCP clients.`,
   );
+
+  if (args.performanceCrux) {
+    console.error(
+      `Performance tools may send trace URLs to the Google CrUX API to fetch real-user experience data. To disable, run with --no-performance-crux.`,
+    );
+  }
 
   if (args.usageStatistics) {
     console.error(
