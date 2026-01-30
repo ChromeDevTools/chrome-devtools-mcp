@@ -1,3 +1,21 @@
+#!/usr/bin/env node
+/**
+ * @deprecated This script is no longer maintained.
+ * Use instead:
+ *   - npm run test:chatgpt -- "質問"
+ *   - npm run test:gemini -- "質問"
+ *   - npm run cdp:chatgpt
+ */
+console.error('');
+console.error('⚠️  DEPRECATED: このスクリプトは非推奨です。');
+console.error('   現在は以下を使用してください:');
+console.error('   - npm run test:chatgpt -- "質問"');
+console.error('   - npm run test:gemini -- "質問"');
+console.error('   - npm run cdp:chatgpt');
+console.error('');
+process.exit(1);
+
+// Original code below (kept for reference, but never executed)
 import {Client} from '@modelcontextprotocol/sdk/client/index.js';
 import {StdioClientTransport} from '@modelcontextprotocol/sdk/client/stdio.js';
 
