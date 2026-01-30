@@ -618,7 +618,6 @@ async function autoConnectRelay(best) {
 }
 
 async function autoOpenConnectUi() {
-  logDebug('discovery', 'autoOpenConnectUi called');
   // 複数の relay を同時にサポート（ChatGPT + Gemini）
   const newRelays = [];
   for (const port of DISCOVERY_PORTS) {
