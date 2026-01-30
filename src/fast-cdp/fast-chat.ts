@@ -944,9 +944,18 @@ async function askChatGPTFastInternal(question: string): Promise<ChatResult> {
             return results;
           };
 
-          const stopBtn = document.querySelector('button[data-testid="stop-button"]');
+          // 停止ボタン検出（フォールバックセレクター付き）
+          const stopBtn = document.querySelector('button[data-testid="stop-button"]') ||
+                          document.querySelector('button[aria-label*="停止"]') ||
+                          document.querySelector('button[aria-label*="Stop"]');
           const buttons = collectDeep(['button', '[role="button"]']);
-          const sendBtn = buttons.find(b => b.getAttribute('data-testid') === 'send-button');
+          // 送信ボタン検出（フォールバックセレクター付き）
+          // 注意: 応答完了後は音声ボタンに置き換わり、送信ボタンがDOMから消える
+          const sendBtn = buttons.find(b =>
+            b.getAttribute('data-testid') === 'send-button' ||
+            b.getAttribute('aria-label')?.includes('送信') ||
+            b.getAttribute('aria-label')?.includes('Send')
+          );
           const assistantMsgs = document.querySelectorAll('[data-message-author-role="assistant"]');
 
           // 入力欄の状態確認
@@ -985,19 +994,26 @@ async function askChatGPTFastInternal(question: string): Promise<ChatResult> {
 
       const newAssistantCount = state.assistantMsgCount - initialAssistantCount;
 
-      // 応答完了条件1: stopボタンなし AND 送信ボタンあり AND 送信ボタン有効 AND 新しいアシスタントメッセージがある
+      // 応答完了条件1（優先）: stopボタンなし AND 入力欄空 AND 新しいアシスタントメッセージがある
+      // 送信ボタンの存在に依存しない（応答完了後は音声ボタンに置き換わりsendButtonが消えるため）
+      if (!state.hasStopButton && !state.inputBoxHasText && newAssistantCount > 0) {
+        console.error(`[ChatGPT] Response complete - no stop button, input empty, new message (+${newAssistantCount})`);
+        break;
+      }
+
+      // 応答完了条件2: stopボタンなし AND 送信ボタンあり AND 送信ボタン有効 AND 新しいアシスタントメッセージがある
       if (!state.hasStopButton && state.sendButtonFound && !state.sendButtonDisabled && newAssistantCount > 0) {
         console.error(`[ChatGPT] Response complete - send button enabled, new assistant message (+${newAssistantCount})`);
         break;
       }
 
-      // 応答完了条件2: stopボタンを見た後に消えた AND 新しいアシスタントメッセージがある AND 入力欄が空
+      // 応答完了条件3: stopボタンを見た後に消えた AND 新しいアシスタントメッセージがある AND 入力欄が空
       if (sawStopButton && !state.hasStopButton && newAssistantCount > 0 && !state.inputBoxHasText) {
         console.error(`[ChatGPT] Response complete - stop button disappeared, new assistant message (+${newAssistantCount})`);
         break;
       }
 
-      // 応答完了条件3: 15秒以上待って、stopボタンなし、入力欄空
+      // 応答完了条件4: 15秒以上待って、stopボタンなし、入力欄空
       // （メッセージカウントが増えない場合のフォールバック - セレクターが変わった可能性）
       const elapsed = Date.now() - startWait;
       if (elapsed > 15000 && !state.hasStopButton && !state.inputBoxHasText) {
@@ -1005,7 +1021,7 @@ async function askChatGPTFastInternal(question: string): Promise<ChatResult> {
         break;
       }
 
-      // 応答完了条件4: stopボタンを見た後に消え、送信ボタンが有効、入力欄空
+      // 応答完了条件5: stopボタンを見た後に消え、送信ボタンが有効、入力欄空
       // （メッセージカウントに頼らない安全な判定）
       if (sawStopButton && !state.hasStopButton && state.sendButtonFound && !state.sendButtonDisabled && !state.inputBoxHasText) {
         console.error(`[ChatGPT] Response complete - stop button gone, send enabled, input empty`);
@@ -1019,21 +1035,34 @@ async function askChatGPTFastInternal(question: string): Promise<ChatResult> {
     if (Date.now() - startWait >= maxWaitMs) {
       const finalState = await client.evaluate<Record<string, unknown>>(`
         (() => {
-          const stopBtn = document.querySelector('button[data-testid="stop-button"]');
-          const sendBtn = document.querySelector('button[data-testid="send-button"]');
+          // フォールバックセレクター付きの検出
+          const stopBtn = document.querySelector('button[data-testid="stop-button"]') ||
+                          document.querySelector('button[aria-label*="停止"]') ||
+                          document.querySelector('button[aria-label*="Stop"]');
+          const allButtons = Array.from(document.querySelectorAll('button'));
+          const sendBtn = allButtons.find(b =>
+            b.getAttribute('data-testid') === 'send-button' ||
+            b.getAttribute('aria-label')?.includes('送信') ||
+            b.getAttribute('aria-label')?.includes('Send')
+          );
           const assistantMsgs = document.querySelectorAll('[data-message-author-role="assistant"]');
+          const inputBox = document.querySelector('.ProseMirror[contenteditable="true"]') ||
+                          document.querySelector('textarea#prompt-textarea');
+          const inputText = inputBox ?
+            (inputBox.tagName === 'TEXTAREA' ? inputBox.value : inputBox.textContent) || '' : '';
           return {
             hasStopButton: Boolean(stopBtn),
             sendButtonFound: Boolean(sendBtn),
             sendButtonDisabled: sendBtn ? sendBtn.disabled : null,
             sendButtonAriaDisabled: sendBtn ? sendBtn.getAttribute('aria-disabled') : null,
             assistantMsgCount: assistantMsgs.length,
+            inputBoxHasText: inputText.trim().length > 0,
             url: location.href,
           };
         })()
       `);
       console.error(`[ChatGPT] Timeout - final state: ${JSON.stringify(finalState)}`);
-      throw new Error(`Timed out waiting for ChatGPT response (send button not enabled after 8min). Final state: ${JSON.stringify(finalState)}`);
+      throw new Error(`Timed out waiting for ChatGPT response (8min). Final state: ${JSON.stringify(finalState)}`);
     }
 
     // 新しいアシスタントメッセージのみを取得（initialAssistantCount 以降）
