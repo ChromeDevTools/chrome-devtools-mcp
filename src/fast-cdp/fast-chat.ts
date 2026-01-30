@@ -403,14 +403,11 @@ async function askChatGPTFastInternal(question: string): Promise<ChatResult> {
   timings.waitInputMs = nowMs() - tWaitInput;
   logInfo('chatgpt', 'Input field found', {waitInputMs: timings.waitInputMs});
 
-  // 初期メッセージカウントを**ループ外**で取得（これが重要）
+  // 初期ユーザーメッセージカウントを**ループ外**で取得（送信成功判定に使用）
   const initialUserCountBeforeLoop = await client.evaluate<number>(
     `document.querySelectorAll('[data-message-author-role="user"]').length`,
   );
-  const initialAssistantCountBeforeLoop = await client.evaluate<number>(
-    `document.querySelectorAll('[data-message-author-role="assistant"]').length`,
-  );
-  console.error(`[ChatGPT] Initial counts BEFORE loop: user=${initialUserCountBeforeLoop}, assistant=${initialAssistantCountBeforeLoop}`);
+  console.error(`[ChatGPT] Initial user count BEFORE loop: ${initialUserCountBeforeLoop}`);
 
   for (let attempt = 0; attempt < 2; attempt += 1) {
     // createConnection で正しいURL (https://chatgpt.com/) に接続済み
@@ -917,16 +914,8 @@ async function askChatGPTFastInternal(question: string): Promise<ChatResult> {
     console.error('[ChatGPT] Message sent successfully (count increased)');
     timings.sendMs = nowMs() - tSend;
 
-    // 送信成功直後にアシスタントカウントを取得（フォールバック後でも正確な値を使用）
-    // 注: ループ外の値ではなく、送信成功後の最新値を使用することで、
-    //     フォールバック後にカウントがズレる問題を防ぐ
-    const initialAssistantCount = await client.evaluate<number>(
-      `document.querySelectorAll('[data-message-author-role="assistant"]').length`,
-    );
-    console.error(`[ChatGPT] Assistant count at send success: ${initialAssistantCount}`);
-
     const tWaitResp = nowMs();
-    console.error(`[ChatGPT] Waiting for response (initial assistant count from BEFORE loop: ${initialAssistantCount})...`);
+    console.error('[ChatGPT] Waiting for response (using stop button detection)...');
 
     // 新方式: ポーリングで状態を監視（診断ログ付き）
     // 長い応答に対応するため8分（480秒）に設定
@@ -1014,43 +1003,23 @@ async function askChatGPTFastInternal(question: string): Promise<ChatResult> {
       const currentState = JSON.stringify(state);
       if (currentState !== lastLoggedState) {
         const elapsed = Math.round((Date.now() - startWait) / 1000);
-        console.error(`[ChatGPT] State @${elapsed}s: stop=${state.hasStopButton}, send=${state.sendButtonFound}(disabled=${state.sendButtonDisabled}), assistant=${state.assistantMsgCount}(+${state.assistantMsgCount - initialAssistantCount}), inputHasText=${state.inputBoxHasText}`);
+        console.error(`[ChatGPT] State @${elapsed}s: stop=${state.hasStopButton}, send=${state.sendButtonFound}(disabled=${state.sendButtonDisabled}), assistant=${state.assistantMsgCount}, inputHasText=${state.inputBoxHasText}, sawStop=${sawStopButton}`);
         lastLoggedState = currentState;
       }
 
-      const newAssistantCount = state.assistantMsgCount - initialAssistantCount;
-
-      // 応答完了条件1（優先）: stopボタンなし AND 入力欄空 AND 新しいアシスタントメッセージがある
-      // 送信ボタンの存在に依存しない（応答完了後は音声ボタンに置き換わりsendButtonが消えるため）
-      if (!state.hasStopButton && !state.inputBoxHasText && newAssistantCount > 0) {
-        console.error(`[ChatGPT] Response complete - no stop button, input empty, new message (+${newAssistantCount})`);
+      // 応答完了条件（シンプル版）:
+      // 停止ボタンを一度でも見た後に消えた AND 入力欄が空 AND アシスタントメッセージが存在
+      // カウント比較は不安定なため廃止、最後のメッセージを直接取得する方式に変更
+      if (sawStopButton && !state.hasStopButton && !state.inputBoxHasText && state.assistantMsgCount > 0) {
+        console.error(`[ChatGPT] Response complete - stop button disappeared, input empty, has ${state.assistantMsgCount} assistant message(s)`);
         break;
       }
 
-      // 応答完了条件2: stopボタンなし AND 送信ボタンあり AND 送信ボタン有効 AND 新しいアシスタントメッセージがある
-      if (!state.hasStopButton && state.sendButtonFound && !state.sendButtonDisabled && newAssistantCount > 0) {
-        console.error(`[ChatGPT] Response complete - send button enabled, new assistant message (+${newAssistantCount})`);
-        break;
-      }
-
-      // 応答完了条件3: stopボタンを見た後に消えた AND 新しいアシスタントメッセージがある AND 入力欄が空
-      if (sawStopButton && !state.hasStopButton && newAssistantCount > 0 && !state.inputBoxHasText) {
-        console.error(`[ChatGPT] Response complete - stop button disappeared, new assistant message (+${newAssistantCount})`);
-        break;
-      }
-
-      // 応答完了条件4: 15秒以上待って、stopボタンなし、入力欄空
-      // （メッセージカウントが増えない場合のフォールバック - セレクターが変わった可能性）
+      // フォールバック: 5秒以上待って、stopボタンなし、入力欄空、アシスタントメッセージが存在
+      // （stopボタンを見逃した場合の救済）
       const elapsed = Date.now() - startWait;
-      if (elapsed > 15000 && !state.hasStopButton && !state.inputBoxHasText) {
-        console.error(`[ChatGPT] Response complete - fallback after 15s (no stop button, input empty)`);
-        break;
-      }
-
-      // 応答完了条件5: stopボタンを見た後に消え、送信ボタンが有効、入力欄空
-      // （メッセージカウントに頼らない安全な判定）
-      if (sawStopButton && !state.hasStopButton && state.sendButtonFound && !state.sendButtonDisabled && !state.inputBoxHasText) {
-        console.error(`[ChatGPT] Response complete - stop button gone, send enabled, input empty`);
+      if (elapsed > 5000 && !state.hasStopButton && !state.inputBoxHasText && state.assistantMsgCount > 0) {
+        console.error(`[ChatGPT] Response complete - fallback after 5s (no stop button, input empty, has ${state.assistantMsgCount} assistant message(s))`);
         break;
       }
 
@@ -1091,46 +1060,18 @@ async function askChatGPTFastInternal(question: string): Promise<ChatResult> {
       throw new Error(`Timed out waiting for ChatGPT response (8min). Final state: ${JSON.stringify(finalState)}`);
     }
 
-    // 新しいアシスタントメッセージのみを取得（initialAssistantCount 以降）
+    // 最後のアシスタントメッセージを直接取得（シンプルにinnerTextを使用）
     const answer = await client.evaluate<string>(`
       (() => {
-        const initialCount = ${initialAssistantCount};
         const messages = document.querySelectorAll('[data-message-author-role="assistant"]');
         if (messages.length === 0) return '';
+        const lastMsg = messages[messages.length - 1];
 
-        // initialAssistantCount 以降の新しいメッセージのみを対象とする
-        const allMessages = Array.from(messages);
-        const newMessages = allMessages.slice(initialCount);
+        // マークダウンコンテンツを優先、なければ要素全体
+        const content = lastMsg.querySelector('.markdown') || lastMsg;
 
-        // 新しいメッセージがない場合は空文字を返す
-        if (newMessages.length === 0) {
-          console.warn('[ChatGPT] No new messages after initialCount=' + initialCount + ', total=' + allMessages.length);
-          return '';
-        }
-
-        // 最新の新しいメッセージを取得
-        const msg = newMessages[newMessages.length - 1];
-        const content = msg.querySelector?.('.markdown, .prose, .markdown.prose, .message-content') || msg;
-
-        const extractText = (root) => {
-          if (!root) return '';
-          const parts = [];
-          const visit = (node) => {
-            if (!node) return;
-            if (node.nodeType === Node.TEXT_NODE) {
-              const value = node.textContent;
-              if (value) parts.push(value);
-              return;
-            }
-            if (node.shadowRoot) visit(node.shadowRoot);
-            const children = node.childNodes ? Array.from(node.childNodes) : [];
-            for (const child of children) visit(child);
-          };
-          visit(root);
-          return parts.join(' ').replace(/\\s+/g, ' ').trim();
-        };
-
-        return extractText(content);
+        // innerTextが最もシンプルで確実
+        return (content.innerText || content.textContent || '').trim();
       })()
     `);
 
