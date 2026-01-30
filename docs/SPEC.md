@@ -1,13 +1,254 @@
-# chrome-ai-bridge 技術仕様書
+# chrome-ai-bridge Technical Specification
 
-**バージョン**: v2.0.0
-**最終更新**: 2026-01-30
+**Version**: v2.0.0
+**Last Updated**: 2026-01-31
 
 ---
 
-## 1. アーキテクチャ概要
+## Project Overview
 
-chrome-ai-bridge は、MCP (Model Context Protocol) を使用して AI コーディングアシスタント（Claude Code 等）から ChatGPT / Gemini の Web UI を自動操作するツールです。
+**chrome-ai-bridge** is a fork of the original Chrome DevTools MCP, adding powerful features for Chrome extension developers.
+
+### Package Information
+
+- **npm package**: `chrome-ai-bridge`
+- **Forked from**: [Chrome DevTools MCP](https://github.com/ChromeDevTools/chrome-ai-bridge) by Google LLC
+
+### Original Features
+
+- **Performance Analysis**: Trace recording and actionable insights via Chrome DevTools
+- **Browser Automation**: Reliable Chrome automation with Puppeteer
+- **Debug Tools**: Network request analysis, screenshots, console inspection
+- **Emulation**: CPU, network, and window size emulation
+
+### Features Added in This Fork
+
+- **Dedicated Profile Architecture**: Isolated Chrome profile for safe extension testing
+- **Bookmark Injection System**: Preserves user context while ensuring safety
+- **Chrome Extension Loading**: Dynamically load extensions under development
+- **Web Store Auto-Submit**: `submit_to_webstore` tool for automated form submission
+- **Screenshot Generation**: `generate_extension_screenshots` for Store-ready images
+
+### Why This Fork?
+
+The original Chrome DevTools MCP is excellent but doesn't support Chrome extension testing/development. This fork enables AI-assisted extension development, testing, and debugging.
+
+---
+
+## Installation & Usage
+
+### npm Package
+
+```bash
+# Global install
+npm install -g chrome-ai-bridge
+
+# Local install
+npm install chrome-ai-bridge
+
+# Direct execution
+npx chrome-ai-bridge
+```
+
+### Launch Options
+
+**Standard options (same as original):**
+```bash
+npx chrome-ai-bridge@latest              # Basic
+npx chrome-ai-bridge@latest --headless   # Headless mode
+npx chrome-ai-bridge@latest --channel=canary  # Canary channel
+npx chrome-ai-bridge@latest --isolated   # Isolated mode (temp profile)
+```
+
+**Extension support options (added in this fork):**
+```bash
+# Load Chrome extension
+npx chrome-ai-bridge@latest --loadExtension=/path/to/extension
+
+# Load multiple extensions
+npx chrome-ai-bridge@latest --loadExtension=/path/to/ext1,/path/to/ext2
+
+# Extension with headed mode (some extensions don't work headless)
+npx chrome-ai-bridge@latest --loadExtension=/path/to/extension --headless=false
+```
+
+---
+
+## Security Considerations
+
+- Browser instance contents are exposed to MCP client
+- Handle personal/confidential information with care
+- **Dedicated Profile**: Stored in `~/.cache/chrome-ai-bridge/chrome-profile-$CHANNEL`
+- **Bookmarks Only**: Only bookmarks are read from system profile (no passwords or history)
+- `--isolated` option uses temporary profile
+- **Extension Safety**: Ensure loaded extension code is trustworthy
+
+### Known Limitations
+
+**Original limitations:**
+- Restrictions in macOS Seatbelt and Linux container sandbox environments
+- `--connect-url` recommended for external Chrome instance in sandbox
+
+**Extension support limitations:**
+- Some extensions may not work correctly in headless mode
+- Only development extensions supported (not Chrome Web Store installed)
+- Extension manifest.json must be valid
+
+---
+
+## Use Cases
+
+### For Chrome Extension Developers
+
+- Automated testing of extensions under development
+- Content script and web page interaction testing
+- Extension performance analysis
+- AI-assisted extension debugging
+
+### For QA Engineers
+
+- E2E tests including extensions
+- Performance tests considering extension impact
+- Integration tests between extensions and web apps
+
+---
+
+## Development Workflow
+
+### Tech Stack
+
+- **Language**: TypeScript
+- **Runtime**: Node.js 22.12.0+
+- **Build Tool**: TypeScript Compiler (tsc)
+- **Key Dependencies**:
+  - `@modelcontextprotocol/sdk`: MCP SDK
+  - `puppeteer-core`: Chrome automation (with extension support)
+  - `chrome-devtools-frontend`: DevTools integration
+  - `yargs`: CLI argument parsing
+
+### Distribution vs Development Entry Points
+
+This project uses different entry points for **user distribution** and **developer hot-reload**.
+
+#### User Distribution - Simple
+
+```bash
+npx chrome-ai-bridge@latest
+```
+
+**Internal flow:**
+```
+scripts/cli.mjs
+  ↓
+node --import browser-globals-mock.mjs build/src/main.js
+  ↓
+MCP server starts (single process)
+```
+
+**Features:**
+- `--import` flag used internally (transparent to user)
+- `browser-globals-mock.mjs` ensures chrome-devtools-frontend Node.js compatibility
+- Simple and fast
+
+#### Developer Hot-Reload - Efficient
+
+```bash
+npm run dev
+```
+
+**Internal flow:**
+```
+scripts/mcp-wrapper.mjs (MCP_ENV=development)
+  ↓
+tsc -w (TypeScript auto-compile)
+  ↓
+chokidar (build/ directory watch)
+  ↓
+File change detected → build/src/main.js auto-restart
+```
+
+**Features:**
+- TypeScript edit → 2-5 seconds to reflect
+- No VSCode Reload Window needed
+- 3-7x development speed improvement
+
+### Build & Development Commands
+
+```bash
+npm run build        # Build
+npm run dev          # Development mode (hot-reload)
+npm run typecheck    # Type check
+npm run format       # Format
+npm test            # Run tests
+npm run restart-mcp  # Restart MCP server
+```
+
+### browser-globals-mock Explained
+
+**Problem:**
+- chrome-devtools-frontend expects browser globals: `location`, `self`, `localStorage`
+- Node.js environment lacks these
+- Import error: `ReferenceError: location is not defined`
+
+**Solution:**
+- `scripts/browser-globals-mock.mjs` mocks browser globals
+- `node --import browser-globals-mock.mjs` loads before main.js
+- chrome-devtools-frontend import succeeds
+
+**File:**
+```javascript
+// scripts/browser-globals-mock.mjs
+globalThis.location = { search: '', href: '', ... };
+globalThis.self = globalThis;
+globalThis.localStorage = { getItem: () => null, ... };
+```
+
+**Integration:**
+- Distribution: `scripts/cli.mjs` auto-invokes with `--import`
+- Development: `scripts/mcp-wrapper.mjs` not needed (fallback built into build/src/main.js)
+- Transparent to users
+
+### Code Style
+
+- **Linter**: ESLint + @typescript-eslint
+- **Formatter**: Prettier
+- **Indent**: 2 spaces
+- **Semicolon**: Required
+- **Quotes**: Single quotes preferred
+
+### Testing Strategy
+
+- Uses Node.js built-in test runner
+- Test files: `build/tests/**/*.test.js`
+- Snapshot testing supported
+- `npm run test:only` for specific tests
+- Extension loading test cases planned
+
+### Contributing Guidelines
+
+1. **Commit Convention**: Conventional Commits format
+   - `feat:` New feature
+   - `fix:` Bug fix
+   - `chore:` Other changes
+   - `docs:` Documentation update
+   - `test:` Test additions/fixes
+
+2. **Pull Requests**:
+   - Create PRs to main branch
+   - Tests, type check, format check required
+   - Clear description of changes
+   - Detailed explanation for extension-related changes
+
+3. **Debugging**:
+   - `DEBUG=mcp:*` environment variable enables debug logs
+   - `--logFile` option for log file output
+   - Extension logs visible in DevTools console
+
+---
+
+## 1. Architecture Overview
+
+chrome-ai-bridge is a tool that uses MCP (Model Context Protocol) to automate ChatGPT / Gemini Web UI from AI coding assistants (Claude Code, etc.).
 
 ### コンポーネント構成
 

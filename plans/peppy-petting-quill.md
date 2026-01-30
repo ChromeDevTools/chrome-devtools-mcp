@@ -1,91 +1,68 @@
-# Chrome拡張機能 接続切断問題の改善
+# CLAUDE.md 整理とSPEC.md への移行
 
-## 問題
+## 目的
 
-Chrome拡張機能（chrome-ai-bridge）との接続が頻繁に切れ、手動リロードが必要になる。
+CLAUDE.mdが1265行と肥大化している。ルール以外の内容をSPEC.mdに英語で移行し、CLAUDE.mdを簡潔にする。
 
-## 原因
+## 現状分析
 
-Chrome Manifest V3のService Workerは、**約5分間の非アクティブ後に自動停止**される。
-WebSocket接続にハートビート/ping-pongがないため、Service Workerが停止すると接続が切れる。
+### CLAUDE.md（1265行）の内容分類
+
+| カテゴリ | 行範囲 | 内容 | 判定 |
+|---------|--------|------|------|
+| セッション開始タスク | 1-86 | プロファイルクリーンアップ、作業状態確認、ログ記録 | **残す** |
+| MCP使用制限 | 89-133 | 使用可能/禁止ツール | **残す** |
+| 拡張機能バージョン | 136-156 | バージョン管理ルール | **残す** |
+| 開発フロー | 159-240 | npm publish手順など | **残す（簡略化）** |
+| デバッグルール | 243-356 | テスト方法、BAN回避 | **残す（簡略化）** |
+| AI質問デフォルト | 403-440 | 並列クエリルール | **残す** |
+| プロジェクト概要 | 442-476 | フォーク説明、機能一覧 | **SPEC.mdへ移動** |
+| 技術スタック | 477-509 | TypeScript, Node.js等 | **SPEC.mdへ移動** |
+| 開発ワークフロー詳細 | 511-688 | ホットリロード、browser-globals-mock | **SPEC.mdへ移動** |
+| テスト戦略 | 689-696 | Node.jsテストランナー | **SPEC.mdへ移動** |
+| MCPツール構成 | 698-706 | ツールカテゴリ一覧 | **削除（古い情報）** |
+| インストール | 708-750 | npx実行方法、オプション | **SPEC.mdへ移動** |
+| セキュリティ | 752-770 | 考慮事項 | **SPEC.mdへ移動** |
+| MCPサーバー反映ルール | 814-882 | npm publish必須 | **残す（重複削除）** |
+| ユースケース | 884-896 | 拡張機能開発者向け | **SPEC.mdへ移動** |
+| Claude 4.5最適化 | 913-1265 | 作業ログ、並列処理など | **削除（冗長）** |
 
 ## 実装タスク
 
-### ✅ 完了済み
+### 1. CLAUDE.md を簡潔化（日本語のまま）
 
-- `manifest.json` に `alarms` 権限追加済み
+残す内容:
+- セッション開始タスク（プロファイルクリーンアップ、作業状態確認、ログ記録）
+- MCP使用制限
+- 拡張機能バージョン管理
+- 開発フロー（npm publish手順のみ）
+- テスト質問BAN回避
+- AI質問のデフォルト動作
 
-### 📋 実装予定
+削除する内容:
+- プロジェクト概要・技術スタック（SPEC.mdへ）
+- 開発ワークフロー詳細（SPEC.mdへ）
+- MCPツール構成（古い情報）
+- Claude 4.5最適化ルール（冗長）
 
-#### 1. Keep-Alive実装（relay-server.ts）
+### 2. SPEC.md に追記（英語）
 
-サーバー側から30秒ごとにpingを送信し、Service Workerを維持する。
-
-```typescript
-// relay-server.ts に追加
-private keepAliveTimer: ReturnType<typeof setInterval> | null = null;
-
-private startKeepAlive() {
-  this.keepAliveTimer = setInterval(() => {
-    if (this.ws?.readyState === WebSocket.OPEN) {
-      this.ws.send(JSON.stringify({ type: 'ping' }));
-    }
-  }, 30000);
-}
-
-private stopKeepAlive() {
-  if (this.keepAliveTimer) {
-    clearInterval(this.keepAliveTimer);
-    this.keepAliveTimer = null;
-  }
-}
-```
-
-#### 2. Ping/Pong応答（background.mjs）
-
-拡張機能側でpingを受け取り、pongを返す。
-
-```javascript
-// RelayConnection._onMessageAsync() に追加
-if (message.type === 'ping') {
-  this._sendMessage({ type: 'pong' });
-  return;
-}
-```
-
-#### 3. chrome.alarms によるバックアップ（background.mjs）
-
-1分ごとにService Workerをウェイクアップし、接続状態をチェック。
-
-```javascript
-// background.mjs に追加
-const KEEPALIVE_ALARM = 'keepAlive';
-
-chrome.alarms.create(KEEPALIVE_ALARM, { periodInMinutes: 1 });
-
-chrome.alarms.onAlarm.addListener((alarm) => {
-  if (alarm.name === KEEPALIVE_ALARM) {
-    logDebug('keepalive', 'Alarm triggered, checking connections');
-    // アクティブな接続があればログを出力（接続維持のため）
-    const activeCount = tabShareExtension._activeConnections.size;
-    if (activeCount > 0) {
-      logInfo('keepalive', `Active connections: ${activeCount}`);
-    }
-  }
-});
-```
+追加するセクション:
+- Project Overview（フォーク説明）
+- Installation & Usage
+- Development Workflow（ホットリロード、browser-globals-mock）
+- Security Considerations
+- Use Cases
 
 ## 変更対象ファイル
 
 | ファイル | 変更内容 |
 |----------|----------|
-| `src/extension/manifest.json` | バージョンアップのみ（alarms権限は追加済み） |
-| `src/extension/background.mjs` | ping応答、alarmハンドラー追加 |
-| `src/extension/relay-server.ts` | Keep-Alive送信ロジック追加 |
+| `CLAUDE.md` | 1265行 → 約300行に簡潔化 |
+| `docs/SPEC.md` | 開発ワークフロー等を追記 |
 
 ## 検証方法
 
-1. `npm run build`
-2. Chrome拡張機能をリロード
-3. 5分以上放置してから`ask_gemini_web`を実行
-4. 接続が維持されていることを確認
+1. CLAUDE.mdが300行以下になっていること
+2. SPEC.mdに移行した内容が正しく反映されていること
+3. 重要なルール（npm publish手順等）が残っていること
