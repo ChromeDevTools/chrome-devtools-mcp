@@ -6,7 +6,63 @@
  * - attachToTab / forwardCDPCommand for CDP passthrough
  */
 
+// ============================================
+// Logging System
+// ============================================
+const LOG_LEVEL = {DEBUG: 0, INFO: 1, WARN: 2, ERROR: 3};
+let currentLogLevel = LOG_LEVEL.DEBUG;
+
+/**
+ * Enhanced logger with level, category, and Storage persistence
+ */
+function log(level, category, message, data = {}) {
+  const timestamp = new Date().toISOString();
+  const levelName = Object.keys(LOG_LEVEL).find(k => LOG_LEVEL[k] === level) || 'INFO';
+  const entry = {timestamp, level: levelName, category, message, data};
+
+  // Console output
+  const prefix = `[${timestamp}] [${levelName}] [${category}]`;
+  if (level >= currentLogLevel) {
+    const dataStr = Object.keys(data).length > 0 ? JSON.stringify(data) : '';
+    console.log(prefix, message, dataStr);
+  }
+
+  // Save to Storage (async, fire-and-forget)
+  saveLogEntry(entry);
+}
+
+async function saveLogEntry(entry) {
+  try {
+    const result = await chrome.storage.local.get('logs');
+    const logs = result.logs || [];
+    logs.push(entry);
+    // Keep only last 100 entries
+    while (logs.length > 100) {
+      logs.shift();
+    }
+    await chrome.storage.local.set({logs});
+  } catch {
+    // Ignore storage errors
+  }
+}
+
+// Convenience functions
+function logDebug(category, message, data) {
+  log(LOG_LEVEL.DEBUG, category, message, data);
+}
+function logInfo(category, message, data) {
+  log(LOG_LEVEL.INFO, category, message, data);
+}
+function logWarn(category, message, data) {
+  log(LOG_LEVEL.WARN, category, message, data);
+}
+function logError(category, message, data) {
+  log(LOG_LEVEL.ERROR, category, message, data);
+}
+
+// Legacy debug log (for compatibility)
 function debugLog(...args) {
+  logDebug('general', args.join(' '));
   console.log('[Extension]', ...args);
 }
 
@@ -188,7 +244,12 @@ class TabShareExtension {
   }
 
   async _connectToRelay(selectorTabId, mcpRelayUrl) {
-    if (!mcpRelayUrl) throw new Error('Missing relay URL');
+    if (!mcpRelayUrl) {
+      logError('relay', 'Missing relay URL');
+      throw new Error('Missing relay URL');
+    }
+    logInfo('relay', 'Connecting to relay', {mcpRelayUrl, selectorTabId});
+
     const openSocket = async () => {
       const socket = new WebSocket(mcpRelayUrl);
       await new Promise((resolve, reject) => {
@@ -209,22 +270,28 @@ class TabShareExtension {
     let socket;
     let lastError;
     for (let attempt = 0; attempt < 4; attempt += 1) {
+      logDebug('relay', `WebSocket attempt ${attempt + 1}/4`, {mcpRelayUrl});
       try {
         socket = await openSocket();
+        logInfo('relay', 'WebSocket connected', {attempt: attempt + 1});
         break;
       } catch (error) {
         lastError = error;
+        logWarn('relay', `WebSocket attempt ${attempt + 1} failed`, {error: error.message});
         await new Promise(resolve => setTimeout(resolve, 400));
       }
     }
     if (!socket) {
+      logError('relay', 'All WebSocket attempts failed', {lastError: lastError?.message});
       throw lastError || new Error('WebSocket error');
     }
     const connection = new RelayConnection(socket);
     connection.onclose = () => {
+      logInfo('relay', 'Connection closed', {selectorTabId});
       this._pendingTabSelection.delete(selectorTabId);
     };
     this._pendingTabSelection.set(selectorTabId, {connection});
+    logInfo('relay', 'Relay connection established', {selectorTabId});
   }
 
   async _connectTab(
@@ -235,13 +302,20 @@ class TabShareExtension {
     tabUrl,
     newTab,
   ) {
+    logInfo('connect', '_connectTab called', {selectorTabId, tabId, tabUrl, newTab});
+
     if (!tabId && tabUrl) {
+      logDebug('connect', 'Resolving tabId from URL', {tabUrl, newTab});
       tabId = await this._resolveTabId(tabUrl, newTab);
     }
-    if (!tabId) throw new Error('No tab selected');
+    if (!tabId) {
+      logError('connect', 'No tab selected');
+      throw new Error('No tab selected');
+    }
 
     const existingConnection = this._activeConnections.get(tabId);
     if (existingConnection) {
+      logInfo('connect', 'Replacing existing connection', {tabId});
       existingConnection.close('Connection replaced for the same tab');
       this._activeConnections.delete(tabId);
       await this._setConnectedTab(tabId, false);
@@ -249,21 +323,27 @@ class TabShareExtension {
 
     const pending = this._pendingTabSelection.get(selectorTabId);
     if (!pending) {
+      logDebug('connect', 'No pending connection, creating relay', {selectorTabId, mcpRelayUrl});
       // If no pending connection, create one now.
       await this._connectToRelay(selectorTabId, mcpRelayUrl);
     }
     const newPending = this._pendingTabSelection.get(selectorTabId);
-    if (!newPending) throw new Error('No active MCP relay connection');
+    if (!newPending) {
+      logError('connect', 'No active MCP relay connection');
+      throw new Error('No active MCP relay connection');
+    }
 
     this._pendingTabSelection.delete(selectorTabId);
     const connection = newPending.connection;
     connection.setTabId(tabId);
     connection.sendReady(tabId);
     connection.onclose = () => {
+      logInfo('connect', 'Tab connection closed', {tabId});
       this._activeConnections.delete(tabId);
       void this._setConnectedTab(tabId, false);
     };
     this._activeConnections.set(tabId, connection);
+    logInfo('connect', 'Tab connected successfully', {tabId, windowId});
     await Promise.all([
       this._setConnectedTab(tabId, true),
       windowId ? chrome.windows.update(windowId, {focused: true}) : undefined,
@@ -272,19 +352,29 @@ class TabShareExtension {
   }
 
   async _resolveTabId(tabUrl, newTab) {
+    logDebug('resolve', '_resolveTabId called', {tabUrl, newTab});
     try {
       const urlObj = new URL(tabUrl);
       const pattern = `*://${urlObj.hostname}${urlObj.pathname}*`;
       const tabs = await chrome.tabs.query({url: pattern});
+      logDebug('resolve', `Found ${tabs.length} matching tabs`, {pattern, tabCount: tabs.length});
       if (tabs.length && !newTab) {
         const activeTab = tabs.find(tab => tab.active);
-        return (activeTab || tabs[0]).id;
+        const selectedTab = activeTab || tabs[0];
+        logInfo('resolve', 'Reusing existing tab', {tabId: selectedTab.id, url: selectedTab.url});
+        return selectedTab.id;
       }
-    } catch {
+    } catch (error) {
+      logWarn('resolve', 'Error querying tabs', {error: error.message});
       // ignore
     }
-    if (!tabUrl) return undefined;
+    if (!tabUrl) {
+      logWarn('resolve', 'No tabUrl provided');
+      return undefined;
+    }
+    logInfo('resolve', 'Creating new tab', {url: tabUrl});
     const created = await chrome.tabs.create({url: tabUrl, active: true});
+    logInfo('resolve', 'New tab created', {tabId: created.id});
     return created.id;
   }
 
@@ -301,14 +391,18 @@ class TabShareExtension {
 
   async _setConnectedTab(tabId, connected) {
     if (!tabId) return;
-    if (connected) {
-      await chrome.action.setBadgeText({tabId, text: '✓'});
-      await chrome.action.setBadgeBackgroundColor({
-        tabId,
-        color: '#4CAF50',
-      });
-    } else {
-      await chrome.action.setBadgeText({tabId, text: ''});
+    try {
+      if (connected) {
+        await chrome.action.setBadgeText({tabId, text: '✓'});
+        await chrome.action.setBadgeBackgroundColor({
+          tabId,
+          color: '#4CAF50',
+        });
+      } else {
+        await chrome.action.setBadgeText({tabId, text: ''});
+      }
+    } catch {
+      // Tab no longer exists, ignore
     }
   }
 
@@ -367,6 +461,7 @@ const tabShareExtension = new TabShareExtension();
 const DISCOVERY_ALARM = 'mcp-relay-discovery';
 const DISCOVERY_PORTS = [8765, 8766, 8767, 8768, 8769, 8770, 8771, 8772, 8773, 8774, 8775];
 const lastRelayByPort = new Map();
+
 
 function buildConnectUrl(wsUrl, tabUrl, newTab, autoMode = false) {
   const params = new URLSearchParams({mcpRelayUrl: wsUrl});
@@ -428,45 +523,61 @@ async function fetchRelayInfo(port) {
 
 async function autoConnectRelay(best) {
   const tabUrl = best?.data?.tabUrl;
-  if (!tabUrl) return;
+  logDebug('auto-connect', 'autoConnectRelay called', {port: best?.port, tabUrl, newTab: best?.data?.newTab});
+
+  if (!tabUrl) {
+    logDebug('auto-connect', 'No tabUrl, skipping');
+    return false;  // tabUrl がなければ失敗
+  }
+
   if (best?.port) {
     const refreshed = await fetchRelayInfo(best.port);
     if (refreshed?.wsUrl) {
       best.data = refreshed;
+      logDebug('auto-connect', 'Refreshed relay info', {wsUrl: refreshed.wsUrl});
     }
   }
-  const selectorTab = await ensureConnectUiTab(
-    best.data.wsUrl,
-    tabUrl,
-    Boolean(best.data.newTab),
-    true,
-  );
-  if (!selectorTab?.id) return;
 
+  // tabUrl があれば、connect.html を開かずに直接接続
   let targetTabId;
   try {
     targetTabId = await tabShareExtension._resolveTabId(
       tabUrl,
       Boolean(best.data.newTab),
     );
-  } catch {
-    return;
+  } catch (error) {
+    logError('auto-connect', 'Failed to resolve tab', {tabUrl, error: error.message});
+    return false;
   }
-  if (!targetTabId) return;
-  if (tabShareExtension._activeConnections?.has(targetTabId)) return;
+  if (!targetTabId) {
+    logWarn('auto-connect', 'No targetTabId resolved');
+    return false;
+  }
+  if (tabShareExtension._activeConnections?.has(targetTabId)) {
+    logInfo('auto-connect', 'Tab already connected', {targetTabId});
+    return true; // 既に接続済み
+  }
 
   const targetTab = await chrome.tabs.get(targetTabId).catch(() => null);
+
+  // selectorId として wsUrl ベースのユニークIDを使用（connect.html 不要）
+  const selectorId = `auto:${best.data.wsUrl}`;
+  logInfo('auto-connect', 'Attempting auto-connect', {selectorId, targetTabId, wsUrl: best.data.wsUrl});
+
   try {
-    await tabShareExtension._connectToRelay(selectorTab.id, best.data.wsUrl);
+    await tabShareExtension._connectToRelay(selectorId, best.data.wsUrl);
     await tabShareExtension._connectTab(
-      selectorTab.id,
+      selectorId,
       targetTabId,
       targetTab?.windowId,
       best.data.wsUrl,
       tabUrl,
       Boolean(best.data.newTab),
     );
-  } catch {
+    logInfo('auto-connect', 'Auto-connect successful', {targetTabId, tabUrl});
+  } catch (err) {
+    logError('auto-connect', 'autoConnectRelay failed', {error: err.message, tabUrl});
+    debugLog('autoConnectRelay failed:', err);
     if (best?.port) {
       lastRelayByPort.delete(best.port);
     }
@@ -476,7 +587,8 @@ async function autoConnectRelay(best) {
 }
 
 async function autoOpenConnectUi() {
-  let best = null;
+  // 複数の relay を同時にサポート（ChatGPT + Gemini）
+  const newRelays = [];
   for (const port of DISCOVERY_PORTS) {
     const discoveryUrl = `http://127.0.0.1:${port}/relay-info`;
     try {
@@ -498,33 +610,40 @@ async function autoOpenConnectUi() {
       ) {
         continue;
       }
+      logInfo('discovery', 'New relay detected', {port, tabUrl: data.tabUrl, wsUrl: data.wsUrl});
       lastRelayByPort.set(port, {
         wsUrl: data.wsUrl,
         startedAt,
         instanceId,
       });
-      if (
-        !best ||
-        (data.startedAt && data.startedAt > best.startedAt)
-      ) {
-        best = {port, data};
-      }
+      newRelays.push({port, data});
     } catch {
       // ignore
     }
   }
-  if (best) {
+
+  if (newRelays.length > 0) {
+    logInfo('discovery', `Processing ${newRelays.length} new relay(s)`);
+  }
+
+  // 全ての新しい relay を処理（並列ではなく順次）
+  for (const relay of newRelays) {
+    logInfo('discovery', 'Processing relay', {port: relay.port, tabUrl: relay.data.tabUrl});
+    debugLog('Processing new relay:', relay.port, relay.data.tabUrl);
     let ok = false;
     try {
-      ok = await autoConnectRelay(best);
-    } catch {
+      ok = await autoConnectRelay(relay);
+    } catch (err) {
+      logError('discovery', 'autoConnectRelay error', {error: err.message, port: relay.port});
+      debugLog('autoConnectRelay error:', err);
       ok = false;
     }
     if (!ok) {
+      logInfo('discovery', 'Falling back to connect UI', {port: relay.port});
       await ensureConnectUiTab(
-        best.data.wsUrl,
-        best.data.tabUrl || undefined,
-        Boolean(best.data.newTab),
+        relay.data.wsUrl,
+        relay.data.tabUrl || undefined,
+        Boolean(relay.data.newTab),
         false,
       );
     }
@@ -537,7 +656,6 @@ function scheduleDiscovery() {
     periodInMinutes: 1,
   });
   autoOpenConnectUi();
-  // Fast polling window to catch new relay within 60s.
   let attempts = 0;
   const maxAttempts = 120; // 60s @ 500ms
   const burst = async () => {
