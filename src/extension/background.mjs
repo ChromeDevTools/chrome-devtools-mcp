@@ -147,6 +147,13 @@ class RelayConnection {
       return;
     }
 
+    // Handle keep-alive ping from relay server
+    if (message.type === 'ping') {
+      this._sendMessage({ type: 'pong' });
+      logDebug('keepalive', 'Received ping, sent pong');
+      return;
+    }
+
     const response = {id: message.id};
     try {
       response.result = await this._handleCommand(message);
@@ -747,6 +754,21 @@ chrome.alarms.clear(DISCOVERY_ALARM).then(() => {
   logInfo('background', 'Cleared existing discovery alarm (if any)');
 }).catch(() => {
   // Ignore errors - alarm may not exist
+});
+
+// Keep-alive alarm to prevent Service Worker from sleeping
+const KEEPALIVE_ALARM = 'keepAlive';
+
+chrome.alarms.create(KEEPALIVE_ALARM, { periodInMinutes: 1 });
+
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name === KEEPALIVE_ALARM) {
+    const activeCount = tabShareExtension._activeConnections.size;
+    const pendingCount = tabShareExtension._pendingTabSelection.size;
+    if (activeCount > 0 || pendingCount > 0) {
+      logDebug('keepalive', 'Alarm triggered', { activeCount, pendingCount });
+    }
+  }
 });
 
 // Note: We no longer register an onAlarm listener for DISCOVERY_ALARM

@@ -45,6 +45,7 @@ export class RelayServer extends EventEmitter {
   private pending = new Map<number, {resolve: (value: any) => void; reject: (err: Error) => void}>();
   private discoveryServer: http.Server | null = null;
   private discoveryPort: number | null = null;
+  private keepAliveTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor(options: RelayServerOptions = {}) {
     super();
@@ -105,6 +106,7 @@ export class RelayServer extends EventEmitter {
     }
 
     this.ws = ws;
+    this.startKeepAlive();
 
     ws.on('message', (data) => {
       this.handleMessage(data.toString());
@@ -112,6 +114,7 @@ export class RelayServer extends EventEmitter {
 
     ws.on('close', () => {
       debugLog('[RelayServer] Extension disconnected');
+      this.stopKeepAlive();
       this.ws = null;
       this.ready = false;
       this.emit('disconnected');
@@ -337,6 +340,31 @@ export class RelayServer extends EventEmitter {
           resolve();
         });
       });
+    }
+  }
+
+  /**
+   * Start keep-alive ping to prevent Service Worker from sleeping
+   */
+  private startKeepAlive(): void {
+    this.stopKeepAlive();
+    this.keepAliveTimer = setInterval(() => {
+      if (this.ws?.readyState === WebSocket.OPEN) {
+        this.ws.send(JSON.stringify({ type: 'ping' }));
+        debugLog('[RelayServer] Sent keep-alive ping');
+      }
+    }, 30000); // 30 seconds
+    debugLog('[RelayServer] Keep-alive started');
+  }
+
+  /**
+   * Stop keep-alive ping
+   */
+  private stopKeepAlive(): void {
+    if (this.keepAliveTimer) {
+      clearInterval(this.keepAliveTimer);
+      this.keepAliveTimer = null;
+      debugLog('[RelayServer] Keep-alive stopped');
     }
   }
 
