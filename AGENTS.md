@@ -7,7 +7,7 @@
 ## Default Assumptions
 - Use the **already running** Chrome instance unless explicitly instructed otherwise.
 - Do **not** launch a new Chrome profile unless the user asks.
-- When loading the extension for local testing, default to `src/extension`.
+- When loading the extension for local testing, default to `build/extension`.
 - For Codex-driven checks, **assume** we should proceed without re-asking these basics.
 - Only ask when blocked (missing config, missing tool, permission/GUI restriction, or conflicting explicit user instruction).
 

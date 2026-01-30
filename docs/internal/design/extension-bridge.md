@@ -89,7 +89,7 @@ npm run build
 1. Chromeで `chrome://extensions/` を開く
 2. デベロッパーモードを有効化
 3. 「パッケージ化されていない拡張機能を読み込む」
-4. `src/extension/` を選択
+4. `build/extension/` を選択
 
 ### 3. Claude Code設定
 
