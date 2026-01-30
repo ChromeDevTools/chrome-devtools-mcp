@@ -160,11 +160,27 @@ class RelayConnection {
     if (message.method === 'attachToTab') {
       await this._tabPromise;
       debugLog('Attaching debugger to tab:', this._debuggee);
+
+      // デバッグ: アタッチ前にタブの状態を確認
+      try {
+        const tabInfo = await chrome.tabs.get(this._debuggee.tabId);
+        logInfo('attach', 'Tab info before attach', {
+          tabId: tabInfo.id,
+          url: tabInfo.url,
+          title: tabInfo.title,
+          status: tabInfo.status,
+          active: tabInfo.active,
+        });
+      } catch (e) {
+        logError('attach', 'Failed to get tab info', {error: e.message});
+      }
+
       await chrome.debugger.attach(this._debuggee, '1.3');
       const result = await chrome.debugger.sendCommand(
         this._debuggee,
         'Target.getTargetInfo',
       );
+      logInfo('attach', 'Target info after attach', {targetInfo: result?.targetInfo});
       return {targetInfo: result?.targetInfo};
     }
     if (!this._debuggee.tabId) {
@@ -175,11 +191,32 @@ class RelayConnection {
     if (message.method === 'forwardCDPCommand') {
       const {sessionId, method, params} = message.params;
       const debuggerSession = {...this._debuggee, sessionId};
-      return await chrome.debugger.sendCommand(
+
+      // デバッグ: CDPコマンドのログ（Runtime.evaluateのみ詳細）
+      if (method === 'Runtime.evaluate') {
+        logDebug('cdp', `Sending ${method}`, {
+          tabId: this._debuggee.tabId,
+          sessionId,
+          expression: params?.expression?.slice(0, 100),
+        });
+      }
+
+      const result = await chrome.debugger.sendCommand(
         debuggerSession,
         method,
         params,
       );
+
+      // デバッグ: Runtime.evaluateの結果
+      if (method === 'Runtime.evaluate') {
+        logDebug('cdp', `Result of ${method}`, {
+          value: result?.result?.value,
+          type: result?.result?.type,
+          subtype: result?.result?.subtype,
+        });
+      }
+
+      return result;
     }
     return {};
   }
@@ -353,6 +390,11 @@ class TabShareExtension {
 
   async _resolveTabId(tabUrl, tabId, newTab) {
     logDebug('resolve', '_resolveTabId called', {tabUrl, tabId, newTab});
+
+    // デバッグ: 全タブの一覧を取得
+    const allTabs = await chrome.tabs.query({});
+    const tabSummary = allTabs.map(t => ({id: t.id, url: t.url?.slice(0, 60), active: t.active}));
+    logInfo('resolve', 'All tabs', {count: allTabs.length, tabs: tabSummary.slice(0, 10)});
 
     // Priority 1: If tabId is provided, try to use it directly
     if (tabId && !newTab) {
