@@ -116,5 +116,6 @@ export const WEB_LLM_TOOLS_INFO = {
     'ask_chatgpt_gemini_web',
     'ask_gemini_image',
     'take_cdp_snapshot',
+    'get_page_dom',
   ],
 };

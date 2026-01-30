@@ -6,7 +6,7 @@
 
 import z from 'zod';
 
-import {takeCdpSnapshot} from '../fast-cdp/fast-chat.js';
+import {takeCdpSnapshot, getPageDom} from '../fast-cdp/fast-chat.js';
 import {ToolCategories} from './categories.js';
 import {defineTool} from './ToolDefinition.js';
 
@@ -109,6 +109,116 @@ export const cdpSnapshot = defineTool({
     } catch (error) {
       response.appendResponseLine(
         `❌ Failed to take snapshot: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  },
+});
+
+export const getPageDomTool = defineTool({
+  name: 'get_page_dom',
+  description:
+    'Get DOM elements from the connected ChatGPT/Gemini page using CSS selectors. ' +
+    'Use this to debug selector issues or find correct element patterns when the UI changes. ' +
+    'Returns element counts, attributes, text content, and outer HTML for each selector.',
+  annotations: {
+    category: ToolCategories.NAVIGATION_AUTOMATION,
+    readOnlyHint: true,
+  },
+  schema: {
+    target: z
+      .enum(['chatgpt', 'gemini'])
+      .describe('Which AI to get DOM from'),
+    selectors: z
+      .array(z.string())
+      .optional()
+      .default([])
+      .describe('CSS selectors to query. If empty, uses default selectors for the target.'),
+  },
+  handler: async (request, response) => {
+    const {target, selectors} = request.params;
+
+    try {
+      const snapshot = await getPageDom(target, selectors ?? []);
+
+      response.appendResponseLine(`# DOM Snapshot: ${target}`);
+      response.appendResponseLine(`Timestamp: ${snapshot.timestamp}`);
+      response.appendResponseLine(`URL: ${snapshot.url}`);
+      response.appendResponseLine(`Title: ${snapshot.title}`);
+      response.appendResponseLine('');
+
+      if (!snapshot.connected) {
+        response.appendResponseLine(`❌ Not connected: ${snapshot.error || 'Unknown error'}`);
+        return;
+      }
+
+      // Selector results
+      response.appendResponseLine('## Selector Results');
+      for (const [selector, result] of Object.entries(snapshot.selectors)) {
+        response.appendResponseLine('');
+        response.appendResponseLine(`### \`${selector}\` (${result.count} elements)`);
+
+        if (result.elements.length === 0) {
+          response.appendResponseLine('No elements found.');
+        } else {
+          for (let i = 0; i < result.elements.length; i++) {
+            const el = result.elements[i];
+            response.appendResponseLine('');
+            response.appendResponseLine(`**Element ${i + 1}:** \`<${el.tagName}>\``);
+
+            // Attributes
+            const attrEntries = Object.entries(el.attributes);
+            if (attrEntries.length > 0) {
+              response.appendResponseLine('Attributes:');
+              for (const [name, value] of attrEntries.slice(0, 10)) {
+                const displayValue = value.length > 50 ? value.slice(0, 50) + '...' : value;
+                response.appendResponseLine(`  - ${name}="${displayValue}"`);
+              }
+              if (attrEntries.length > 10) {
+                response.appendResponseLine(`  ... and ${attrEntries.length - 10} more`);
+              }
+            }
+
+            // Text content
+            if (el.textContent) {
+              response.appendResponseLine(`Text: "${el.textContent.slice(0, 100)}${el.textContent.length > 100 ? '...' : ''}"`);
+            }
+          }
+        }
+      }
+
+      // Messages
+      if (snapshot.messages && snapshot.messages.length > 0) {
+        response.appendResponseLine('');
+        response.appendResponseLine('## Detected Messages');
+        response.appendResponseLine(`Total: ${snapshot.messages.length}`);
+
+        const userMsgs = snapshot.messages.filter(m => m.role === 'user');
+        const assistantMsgs = snapshot.messages.filter(m => m.role === 'assistant');
+
+        response.appendResponseLine(`- User messages: ${userMsgs.length}`);
+        response.appendResponseLine(`- Assistant messages: ${assistantMsgs.length}`);
+
+        // Show last few messages
+        const recentMessages = snapshot.messages.slice(-4);
+        if (recentMessages.length > 0) {
+          response.appendResponseLine('');
+          response.appendResponseLine('### Recent Messages');
+          for (const msg of recentMessages) {
+            const role = msg.role === 'user' ? '👤 User' : msg.role === 'assistant' ? '🤖 Assistant' : '❓ Unknown';
+            const text = msg.text.slice(0, 150) + (msg.text.length > 150 ? '...' : '');
+            response.appendResponseLine(`${role}: "${text}"`);
+          }
+        }
+      }
+
+      if (snapshot.error) {
+        response.appendResponseLine('');
+        response.appendResponseLine(`⚠️ Partial error: ${snapshot.error}`);
+      }
+
+    } catch (error) {
+      response.appendResponseLine(
+        `❌ Failed to get DOM: ${error instanceof Error ? error.message : String(error)}`,
       );
     }
   },

@@ -1982,3 +1982,231 @@ export async function takeCdpSnapshot(
 
   return result;
 }
+
+/**
+ * DOM取得用インターフェース
+ */
+export interface DomSnapshot {
+  kind: 'chatgpt' | 'gemini';
+  url: string;
+  title: string;
+  timestamp: string;
+  connected: boolean;
+  error?: string;
+  selectors: {
+    [selector: string]: {
+      count: number;
+      elements: Array<{
+        tagName: string;
+        attributes: Record<string, string>;
+        textContent: string;
+        outerHTML: string;
+      }>;
+    };
+  };
+  messages?: Array<{
+    role: 'user' | 'assistant' | 'unknown';
+    text: string;
+    attributes: Record<string, string>;
+  }>;
+}
+
+/**
+ * 指定したセレクターでDOM要素を取得
+ * デバッグ用：UIが変わった時にセレクターを特定するために使用
+ */
+export async function getPageDom(
+  kind: 'chatgpt' | 'gemini',
+  selectors: string[] = [],
+): Promise<DomSnapshot> {
+  const result: DomSnapshot = {
+    kind,
+    url: '',
+    title: '',
+    timestamp: new Date().toISOString(),
+    connected: false,
+    selectors: {},
+  };
+
+  const existing = kind === 'chatgpt' ? chatgptClient : geminiClient;
+
+  if (!existing) {
+    result.error = `No ${kind} connection exists. Use ask_${kind}_web first to establish a connection.`;
+    return result;
+  }
+
+  // 接続の健全性チェック
+  const healthy = await isConnectionHealthy(existing, kind);
+  if (!healthy) {
+    result.error = `${kind} connection is not healthy (disconnected or unresponsive).`;
+    return result;
+  }
+
+  result.connected = true;
+
+  try {
+    // 基本情報取得
+    const basicInfo = await existing.evaluate<{url: string; title: string}>(`
+      ({url: location.href, title: document.title})
+    `);
+    result.url = basicInfo.url;
+    result.title = basicInfo.title;
+
+    // デフォルトセレクター（指定がない場合）
+    const defaultSelectors = kind === 'chatgpt'
+      ? [
+          '[data-message-author-role]',
+          '[data-testid]',
+          '.ProseMirror',
+          'textarea',
+          'button[data-testid="send-button"]',
+          'button[data-testid="stop-button"]',
+        ]
+      : [
+          'model-response',
+          'user-query',
+          '[role="textbox"]',
+          'div[contenteditable="true"]',
+          'button[aria-label*="Send"]',
+          'button[aria-label*="送信"]',
+        ];
+
+    const targetSelectors = selectors.length > 0 ? selectors : defaultSelectors;
+
+    // 各セレクターで要素を取得
+    for (const selector of targetSelectors) {
+      const selectorResult = await existing.evaluate<{
+        count: number;
+        elements: Array<{
+          tagName: string;
+          attributes: Record<string, string>;
+          textContent: string;
+          outerHTML: string;
+        }>;
+      }>(`
+        (() => {
+          const collectDeep = (sel) => {
+            const results = [];
+            const seen = new Set();
+            const visit = (root) => {
+              if (!root) return;
+              try {
+                root.querySelectorAll?.(sel)?.forEach(el => {
+                  if (!seen.has(el)) {
+                    seen.add(el);
+                    results.push(el);
+                  }
+                });
+              } catch {}
+              const elements = root.querySelectorAll ? Array.from(root.querySelectorAll('*')) : [];
+              for (const el of elements) {
+                if (el.shadowRoot) visit(el.shadowRoot);
+              }
+            };
+            visit(document);
+            return results;
+          };
+
+          const elements = collectDeep(${JSON.stringify(selector)});
+          return {
+            count: elements.length,
+            elements: elements.slice(0, 10).map(el => {
+              const attrs = {};
+              for (const attr of el.attributes) {
+                attrs[attr.name] = attr.value;
+              }
+              return {
+                tagName: el.tagName.toLowerCase(),
+                attributes: attrs,
+                textContent: (el.textContent || '').slice(0, 200),
+                outerHTML: (el.outerHTML || '').slice(0, 500),
+              };
+            }),
+          };
+        })()
+      `);
+
+      result.selectors[selector] = selectorResult;
+    }
+
+    // メッセージ要素を特別に取得
+    const messageSelectors = kind === 'chatgpt'
+      ? {
+          user: '[data-message-author-role="user"]',
+          assistant: '[data-message-author-role="assistant"]',
+        }
+      : {
+          user: 'user-query, .user-query, [data-message-author-role="user"]',
+          assistant: 'model-response, .model-response, [data-message-author-role="assistant"]',
+        };
+
+    const messages = await existing.evaluate<Array<{
+      role: 'user' | 'assistant' | 'unknown';
+      text: string;
+      attributes: Record<string, string>;
+    }>>(`
+      (() => {
+        const collectDeep = (sel) => {
+          const results = [];
+          const seen = new Set();
+          const visit = (root) => {
+            if (!root) return;
+            try {
+              root.querySelectorAll?.(sel)?.forEach(el => {
+                if (!seen.has(el)) {
+                  seen.add(el);
+                  results.push(el);
+                }
+              });
+            } catch {}
+            const elements = root.querySelectorAll ? Array.from(root.querySelectorAll('*')) : [];
+            for (const el of elements) {
+              if (el.shadowRoot) visit(el.shadowRoot);
+            }
+          };
+          visit(document);
+          return results;
+        };
+
+        const messages = [];
+
+        // User messages
+        const userEls = collectDeep(${JSON.stringify(messageSelectors.user)});
+        for (const el of userEls) {
+          const attrs = {};
+          for (const attr of el.attributes) {
+            attrs[attr.name] = attr.value;
+          }
+          messages.push({
+            role: 'user',
+            text: (el.textContent || '').slice(0, 500),
+            attributes: attrs,
+          });
+        }
+
+        // Assistant messages
+        const assistantEls = collectDeep(${JSON.stringify(messageSelectors.assistant)});
+        for (const el of assistantEls) {
+          const attrs = {};
+          for (const attr of el.attributes) {
+            attrs[attr.name] = attr.value;
+          }
+          messages.push({
+            role: 'assistant',
+            text: (el.textContent || '').slice(0, 500),
+            attributes: attrs,
+          });
+        }
+
+        return messages;
+      })()
+    `);
+
+    result.messages = messages;
+
+  } catch (error) {
+    result.error = `Failed to get DOM: ${error instanceof Error ? error.message : String(error)}`;
+  }
+
+  return result;
+}

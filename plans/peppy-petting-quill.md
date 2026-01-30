@@ -1,77 +1,69 @@
-# 拡張機能修正プラン（v1.1.21）
+# v1.1.24 テスト＆非推奨スクリプト整理プラン
 
-## 🔴 緊急修正: Discovery機構が動作しない
-
-### 問題の症状
-- MCPサーバーからの接続リクエストが10秒でタイムアウト
-- 拡張機能は「passive mode - no auto-discovery」で起動
-- `scheduleDiscovery()` がどこからも呼ばれていない
-
-### 根本原因
-```
-MCPサーバー: Discovery HTTPサーバーを起動 (8765-8775)
-       ↓
-       待機...（Extensionが接続してくるのを待つ）
-       ↓
-Extension: passive mode。ポーリングなし。誰も呼んでない。
-       ↓
-MCPサーバー: 10秒後タイムアウト
-```
-
-以前（コミット 3e11086）は `startDiscoveryPolling()` が常時ポーリングしていたが、
-自動タブオープン問題修正時に削除され、代替のトリガー機構がない。
+## 概要
+1. 古いスクリプトに警告を追加（うっかり使用防止）
+2. 新しいツール（getPageDom等）のMCPなしテスト
 
 ---
 
-## 修正対象
+## Phase 1: 非推奨スクリプトの整理
 
-### 1. Discovery機構の復活（🔴 緊急）
-- **現在の状態**: `scheduleDiscovery()` は存在するが呼ばれない
-- **修正方針**: Extension起動時にポーリングを開始
+### 対象ファイル
+| スクリプト | 状態 | 理由 |
+|-----------|------|------|
+| `scripts/start-mcp-from-json.mjs` | 非推奨 | 古いMCP起動方式 |
+| `scripts/configure-codex-mcp.mjs` | 非推奨 | Codex専用、使用頻度なし |
+| `scripts/codex-mcp-test.mjs` | 非推奨 | Codex専用、使用頻度なし |
 
-### 2. タブID選択の厳密化（✅ v1.1.20で実装済み）
-- tabId保存機能は実装完了
-- Discovery問題が解決すれば動作確認可能
+### 対策: スクリプト先頭に警告＆即終了
+
+各スクリプトの先頭に追加:
+```javascript
+console.error('');
+console.error('⚠️  DEPRECATED: このスクリプトは非推奨です。');
+console.error('   現在は以下を使用してください:');
+console.error('   - npm run test:chatgpt -- "質問"');
+console.error('   - npm run cdp:chatgpt');
+console.error('');
+process.exit(1);
+```
+
+### CLAUDE.mdに追記
+```markdown
+### 使用禁止スクリプト（非推奨）
+以下は古いスクリプトで、使用しないでください:
+- `start-mcp-from-json.mjs`
+- `configure-codex-mcp.mjs`
+- `codex-mcp-test.mjs`
+```
 
 ---
 
-## 修正プラン
+## Phase 2: MCPなしテスト
 
-### Phase 1: Discovery ポーリングの復活
+### 現役ツール一覧
+| 関数 | スクリプト | コマンド |
+|------|-----------|---------|
+| `askChatGPTFast` | test-fast-chat.mjs | `npm run test:chatgpt -- "質問"` |
+| `askGeminiFast` | test-fast-chat.mjs | `npm run test:gemini -- "質問"` |
+| `getPageDom` | test-fast-chat.mjs | `--dump-dom` オプション |
+| `takeCdpSnapshot` | cdp-snapshot.mjs | `npm run cdp:chatgpt` |
 
-**ファイル**: `src/extension/background.mjs`
+### テスト手順
 
-**変更内容**: Extension起動時に `scheduleDiscovery()` を呼び出す
+```bash
+# 1. ビルド
+npm run build
 
-現在コメントアウトされている以下を復活:
-```javascript
-// 行 715-718
-chrome.runtime.onInstalled.addListener(() => { scheduleDiscovery(); });
-chrome.runtime.onStartup.addListener(() => { scheduleDiscovery(); });
-scheduleDiscovery();  // 即座に開始
+# 2. DOM取得テスト（新機能）
+node --import ./scripts/browser-globals-mock.mjs scripts/test-fast-chat.mjs chatgpt --dump-dom
+
+# 3. CDPスナップショット
+npm run cdp:chatgpt
+
+# 4. 質問送信テスト
+npm run test:chatgpt -- "JavaScriptでPromiseの基本を教えて"
 ```
-
-**自動タブオープン問題への対策**:
-- `autoConnectRelay()` は `tabUrl` がある場合のみタブを作成
-- `tabUrl` がない relay-info は無視される
-- 既存の実装で問題なし
-
-### Phase 2: ログ強化（デバッグ用）
-
-**変更内容**: Discovery ループの状態をログに出力
-
-```javascript
-function scheduleDiscovery() {
-  logInfo('discovery', 'scheduleDiscovery called');  // 追加
-  autoOpenConnectUi();
-  // ...
-}
-```
-
-### Phase 3: バージョン更新
-
-**ファイル**: `src/extension/manifest.json`
-- バージョン: 1.1.20 → 1.1.21
 
 ---
 
@@ -79,66 +71,25 @@ function scheduleDiscovery() {
 
 | ファイル | 変更内容 |
 |---------|---------|
-| `src/extension/background.mjs` | scheduleDiscovery()呼び出し復活、ログ追加 |
-| `src/extension/manifest.json` | バージョン: 1.1.20 → 1.1.21 |
+| `scripts/start-mcp-from-json.mjs` | 警告＆即終了追加 |
+| `scripts/configure-codex-mcp.mjs` | 警告＆即終了追加 |
+| `scripts/codex-mcp-test.mjs` | 警告＆即終了追加 |
+| `CLAUDE.md` | 使用禁止スクリプトの明記 |
 
 ---
 
-## テスト手順
+## 検証
 
-### Step 1: ビルド & 拡張機能更新
+### Phase 1 検証
 ```bash
-npm run build
-# chrome://extensions/ で更新、v1.1.21を確認
+# 非推奨スクリプトを実行 → 警告が出て終了することを確認
+node scripts/start-mcp-from-json.mjs
+# → "⚠️ DEPRECATED" と表示され exit 1
 ```
 
-### Step 2: Service Worker ログ確認
-1. chrome://extensions/ → Service Worker クリック
-2. コンソールに以下が表示されることを確認:
-   - `scheduleDiscovery called`
-   - `Extension loaded` (passive mode ではなくなる)
-
-### Step 3: ChatGPT 接続テスト
+### Phase 2 検証
 ```bash
-node --import ./scripts/browser-globals-mock.mjs scripts/test-fast-chat.mjs chatgpt "TypeScriptの型ガードの書き方を1行で説明して"
-```
-
-### Step 4: Gemini 接続テスト
-```bash
-node --import ./scripts/browser-globals-mock.mjs scripts/test-fast-chat.mjs gemini "JavaScriptのPromiseを1行で説明して"
-```
-
-### Step 5: 自動タブオープン問題の非発生確認
-- テスト後、数分放置
-- ChatGPT/Geminiタブが自動で開かないことを確認
-
----
-
-## 検証チェックリスト
-
-- [ ] `npm run build` 成功
-- [ ] 拡張機能バージョン 1.1.21
-- [ ] Service Worker ログに `scheduleDiscovery called` 表示
-- [ ] ChatGPT 接続テスト成功
-- [ ] Gemini 接続テスト成功
-- [ ] 数分後も自動タブオープンなし
-
----
-
-## トラブルシューティング
-
-### 接続タイムアウト
-```
-Error: Extension connection timeout (5s)
-```
-
-**対処**:
-1. Service Worker ログを確認
-2. `New relay detected` が出ているか確認
-3. 出ていなければポーリングが動いていない
-
-### ポート競合
-```bash
-lsof -i :8765-8775 | grep LISTEN
-kill -9 <PID>
+# getPageDom のテスト
+node --import ./scripts/browser-globals-mock.mjs scripts/test-fast-chat.mjs chatgpt --dump-dom
+# → DOM情報が出力されること
 ```
