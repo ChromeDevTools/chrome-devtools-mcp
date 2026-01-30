@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "chrome-ai-bridge Extension",
-  "version": "2.0.7",
+  "version": "2.0.8",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAqDLiSB+b/gbnQ4zWRP65jnd27KmzpjJyR1JAQIjCD/dNORzTgk6+G0TjYEDZLIDceKHzGJudqnwq4q9g3T1eJ0SECZNXnaoE00WkgXfAUSQn6cmmXR3aQGFky/zbCmxnkRa0vYupxszlhw0yrlSZrIJd/weWF75Byh0zJfZ84kqDDhaj7TlB5laHICnoSLmPTif4mQcUW9oOKmAJPriPw4CWATKZsrQ4X46djxefSmfbqYfb9rttAqJVst40gO0Gsl6GOGxMHMds5Cl9GELc0dI3Gpobw07hQldZb8TeyilI/SnOaeS3HPtrp+KyEgRu8SgRdlrvuq6DeEZsP+kK7wIDAQAB",
   "description": "Bridge between Chrome tabs and chrome-ai-bridge MCP server",
   "permissions": ["debugger", "activeTab", "tabs", "storage", "alarms"],
@@ -10,8 +10,19 @@
     "service_worker": "background.mjs",
     "type": "module"
   },
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
   "action": {
-    "default_title": "chrome-ai-bridge"
+    "default_title": "chrome-ai-bridge",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "32": "icons/icon-32.png",
+      "48": "icons/icon-48.png"
+    }
   },
   "options_page": "ui/connect.html"
 }
