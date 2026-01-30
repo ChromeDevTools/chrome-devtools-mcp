@@ -381,15 +381,12 @@ class TabShareExtension {
     };
     this._activeConnections.set(tabId, connection);
     logInfo('connect', 'Tab connected successfully', {tabId, windowId});
-    await Promise.all([
-      this._setConnectedTab(tabId, true),
-      windowId ? chrome.windows.update(windowId, {focused: true}) : undefined,
-      chrome.tabs.update(tabId, {active: true}),
-    ]);
+    // バッジのみ設定（フォーカスはMCPサーバー側が必要に応じて制御）
+    await this._setConnectedTab(tabId, true);
   }
 
-  async _resolveTabId(tabUrl, tabId, newTab) {
-    logDebug('resolve', '_resolveTabId called', {tabUrl, tabId, newTab});
+  async _resolveTabId(tabUrl, tabId, newTab, active = true) {
+    logDebug('resolve', '_resolveTabId called', {tabUrl, tabId, newTab, active});
 
     // デバッグ: 全タブの一覧を取得
     const allTabs = await chrome.tabs.query({});
@@ -442,9 +439,9 @@ class TabShareExtension {
       logWarn('resolve', 'No tabUrl provided');
       return undefined;
     }
-    logInfo('resolve', 'Creating new tab', {url: tabUrl});
-    const created = await chrome.tabs.create({url: tabUrl, active: true});
-    logInfo('resolve', 'New tab created', {tabId: created.id});
+    logInfo('resolve', 'Creating new tab', {url: tabUrl, active});
+    const created = await chrome.tabs.create({url: tabUrl, active});
+    logInfo('resolve', 'New tab created', {tabId: created.id, active});
     return created.id;
   }
 
@@ -532,6 +529,13 @@ const DISCOVERY_ALARM = 'mcp-relay-discovery';
 const DISCOVERY_PORTS = [8765, 8766, 8767, 8768, 8769, 8770, 8771, 8772, 8773, 8774, 8775];
 const lastRelayByPort = new Map();
 
+// Interval管理: 重複防止
+let discoveryIntervalId = null;
+
+// リロード時クールダウン: 5秒間は「新しいrelay」検出をスキップ
+const extensionStartTime = Date.now();
+const COOLDOWN_MS = 5000;
+
 
 function buildConnectUrl(wsUrl, tabUrl, newTab, autoMode = false) {
   const params = new URLSearchParams({mcpRelayUrl: wsUrl});
@@ -613,10 +617,13 @@ async function autoConnectRelay(best) {
   // preferredTabId があれば優先的に使用
   let targetTabId;
   try {
+    // autoConnectRelay経由の場合はフォーカスしない（active: false）
+    // リロード時に勝手にタブがフォーカスされる問題を防ぐ
     targetTabId = await tabShareExtension._resolveTabId(
       tabUrl,
       preferredTabId,
       Boolean(best.data.newTab),
+      false,  // active: false - 自動接続時はタブをフォーカスしない
     );
   } catch (error) {
     logError('auto-connect', 'Failed to resolve tab', {tabUrl, tabId: preferredTabId, error: error.message});
@@ -660,6 +667,13 @@ async function autoConnectRelay(best) {
 }
 
 async function autoOpenConnectUi() {
+  // リロード直後はタブを開かない（既存MCPサーバーとの再接続を防ぐ）
+  const elapsed = Date.now() - extensionStartTime;
+  if (elapsed < COOLDOWN_MS) {
+    logDebug('discovery', `Cooldown active (${elapsed}ms < ${COOLDOWN_MS}ms), skipping`);
+    return;
+  }
+
   // 複数の relay を同時にサポート（ChatGPT + Gemini）
   const newRelays = [];
   for (const port of DISCOVERY_PORTS) {
@@ -739,20 +753,20 @@ chrome.alarms.clear(DISCOVERY_ALARM).then(() => {
 // The scheduleDiscovery function is only called on explicit MCP requests
 
 // scheduleDiscovery is called only when MCP server explicitly requests connection
-// Note: No longer creates periodic alarms - uses burst mode only for immediate connection
+// Note: Infinite polling while extension is alive - no timeout limit
 function scheduleDiscovery() {
-  logInfo('discovery', 'scheduleDiscovery called');
+  // 重複防止: 既にintervalが動いていれば何もしない
+  if (discoveryIntervalId !== null) {
+    logInfo('discovery', 'Discovery already running, skipping duplicate call');
+    return;
+  }
+
+  logInfo('discovery', 'scheduleDiscovery called - starting infinite polling');
   autoOpenConnectUi();
-  let attempts = 0;
-  const maxAttempts = 120; // 60s @ 500ms
-  const burst = async () => {
-    attempts += 1;
+  // 無制限ポーリング（拡張機能が生きている限り継続）
+  discoveryIntervalId = setInterval(async () => {
     await autoOpenConnectUi();
-    if (attempts < maxAttempts) {
-      setTimeout(burst, 500);
-    }
-  };
-  setTimeout(burst, 200);
+  }, 500);
 }
 
 // Discovery on install/startup - restored for MCP server connection
