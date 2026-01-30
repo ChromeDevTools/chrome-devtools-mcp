@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.15.1](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.15.0...chrome-devtools-mcp-v0.15.1) (2026-01-30)
+
+
+### 🛠️ Fixes
+
+* disable usage statistics when CI or CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS env is set ([#862](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/862)) ([c0435a2](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/c0435a2d53eb51b7500fc5cce50344520ea164e7))
+* respect custom timeouts in navigate tools ([#865](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/865)) ([a0aeb97](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/a0aeb97693fd5ca641f45ebcd4ce3b4b08ce21b8))
+
 ## [0.15.0](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.14.0...chrome-devtools-mcp-v0.15.0) (2026-01-28)
 
 
