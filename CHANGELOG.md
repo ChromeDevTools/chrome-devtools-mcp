@@ -1,121 +1,154 @@
 # Changelog
 
-## [0.4.0](https://github.com/ChromeDevTools/chrome-ai-bridge/compare/chrome-devtools-mcp-v0.3.0...chrome-devtools-mcp-v0.4.0) (2025-09-26)
+All notable changes to this project will be documented in this file.
 
+This project is a fork of [Chrome DevTools MCP](https://github.com/ChromeDevTools/chrome-ai-bridge) by Google LLC, focusing on multi-AI consultation capabilities.
 
-### Features
+## [2.0.1] - 2026-01-30
 
-* add network request filtering by resource type ([#162](https://github.com/ChromeDevTools/chrome-ai-bridge/issues/162)) ([59d81a3](https://github.com/ChromeDevTools/chrome-ai-bridge/commit/59d81a33258a199a3f993c9e02a415f62ef05ce4))
+### Added
+- Detailed debug logging to extension for troubleshooting
 
+### Fixed
+- Prefer existing tabs for ChatGPT connections
+- Add page load wait and debug output
+- Auto-copy `src/extension` to `build/extension` on build
+- **ChatGPT/Gemini send button**: Use JavaScript `button.click()` instead of CDP coordinate-based click (more reliable)
+- **Message count detection**: Get assistant count after send success instead of before loop (fixes empty response issue)
+- **Gemini mic button detection**: Add multilingual support (マイク, mic, microphone, voice)
 
-### Bug Fixes
+## [2.0.0] - 2026-01-29
 
-* add core web vitals to performance_start_trace description ([#168](https://github.com/ChromeDevTools/chrome-ai-bridge/issues/168)) ([6cfc977](https://github.com/ChromeDevTools/chrome-ai-bridge/commit/6cfc9774f4ec7944c70842999506b2bc2018a667))
-* add data format information to trace summary ([#166](https://github.com/ChromeDevTools/chrome-ai-bridge/issues/166)) ([869dd42](https://github.com/ChromeDevTools/chrome-ai-bridge/commit/869dd4273e42309c1bb57d44e0e5a6a9506ffad7))
-* expose --debug-file argument ([#164](https://github.com/ChromeDevTools/chrome-ai-bridge/issues/164)) ([22ec7ee](https://github.com/ChromeDevTools/chrome-ai-bridge/commit/22ec7ee45cc04892000cf6dc32f3fe58d33855c1))
-* typo in the disclaimers ([#156](https://github.com/ChromeDevTools/chrome-ai-bridge/issues/156)) ([90f686e](https://github.com/ChromeDevTools/chrome-ai-bridge/commit/90f686e5df3d880c35ec566c837ee5a98824be28))
+### Breaking Changes
+- **Removed Puppeteer dependency**: The server no longer launches Chrome directly
+- **Extension-only mode**: All browser communication now goes through Chrome extension
+- **CLI options removed**: `--headless`, `--loadExtensionsDir`, `--channel`, etc. are no longer supported
+- **Tools reduced from 20+ to 5**: Focus on AI consultation, debugging tools only
 
-## [0.3.0](https://github.com/ChromeDevTools/chrome-ai-bridge/compare/chrome-devtools-mcp-v0.2.7...chrome-devtools-mcp-v0.3.0) (2025-09-25)
+### Changed
+- Architecture switched from Puppeteer to Chrome Extension + CDP
+- Connection flow now uses Discovery Server (port 8766) and WebSocket relay
 
+### Added
+- `ask_chatgpt_gemini_web` - Query both AIs in parallel (recommended)
+- `take_cdp_snapshot` - Debug tool for inspecting page state
+- `get_page_dom` - Debug tool for querying DOM elements
 
-### Features
+## [1.1.24] - 2026-01-28
 
-* Add pagination list_network_requests ([#145](https://github.com/ChromeDevTools/chrome-ai-bridge/issues/145)) ([4c909bb](https://github.com/ChromeDevTools/chrome-ai-bridge/commit/4c909bb8d7c4a420cb8e3219ec98abf28f5cc664))
+### Added
+- `get_page_dom` tool for querying DOM elements with CSS selectors
 
+## [1.1.23] - 2026-01-27
 
-### Bug Fixes
+### Fixed
+- Remove noisy polling log from extension
 
-* avoid reporting page close errors as errors ([#127](https://github.com/ChromeDevTools/chrome-ai-bridge/issues/127)) ([44cfc8f](https://github.com/ChromeDevTools/chrome-ai-bridge/commit/44cfc8f945edf9370efe26247f322a59a4a4a7be))
-* clarify the node version message ([#135](https://github.com/ChromeDevTools/chrome-ai-bridge/issues/135)) ([0cc907a](https://github.com/ChromeDevTools/chrome-ai-bridge/commit/0cc907a9ad79289a6785e9690c3c6940f0a5de52))
-* do not set channel if executablePath is provided ([#150](https://github.com/ChromeDevTools/chrome-ai-bridge/issues/150)) ([03b59f0](https://github.com/ChromeDevTools/chrome-ai-bridge/commit/03b59f0bca024173ad45d7a617994e919d9cbbad))
-* **performance:** ImageDelivery insight errors ([#144](https://github.com/ChromeDevTools/chrome-ai-bridge/issues/144)) ([d64ba0d](https://github.com/ChromeDevTools/chrome-ai-bridge/commit/d64ba0d9027540eb707381e2577ae3c1fe014346))
-* roll latest DevTools to handle Insight errors ([#149](https://github.com/ChromeDevTools/chrome-ai-bridge/issues/149)) ([b2e1e39](https://github.com/ChromeDevTools/chrome-ai-bridge/commit/b2e1e3944c7fa170584ce36c7b8923b0e6d6c6cb))
+## [1.1.22] - 2026-01-27
 
-## [0.2.7](https://github.com/ChromeDevTools/chrome-ai-bridge/compare/chrome-devtools-mcp-v0.2.6...chrome-devtools-mcp-v0.2.7) (2025-09-24)
+### Fixed
+- Restore discovery polling on extension startup
 
+## [1.1.21] - 2026-01-26
 
-### Bug Fixes
+### Added
+- `take_cdp_snapshot` tool for debugging CDP page state
 
-* validate and report incompatible Node versions ([#113](https://github.com/ChromeDevTools/chrome-ai-bridge/issues/113)) ([adfcecf](https://github.com/ChromeDevTools/chrome-ai-bridge/commit/adfcecf9871938b1ad5d1460e0050b849fb2aa49))
+### Fixed
+- Simplify background.mjs and add `ask_chatgpt_gemini_web` to FAST_TOOLS
+- Clean up relay servers on timeout
+- Fix Map proxy error
 
-## [0.2.6](https://github.com/ChromeDevTools/chrome-ai-bridge/compare/chrome-devtools-mcp-v0.2.5...chrome-devtools-mcp-v0.2.6) (2025-09-24)
+## [1.1.x] - 2026-01-20 to 2026-01-25
 
+### Added
+- Fast CDP architecture for ChatGPT/Gemini web automation
+- CDP mouse events for improved send button reliability
+- Tab reuse support for Gemini
 
-### Bug Fixes
+### Fixed
+- ChatGPT send button stability improvements
+- Gemini send button reliability
 
-* manually bump server.json versions based on package.json ([#105](https://github.com/ChromeDevTools/chrome-ai-bridge/issues/105)) ([cae1cf1](https://github.com/ChromeDevTools/chrome-ai-bridge/commit/cae1cf13d5a97add3b96f20c425f720a1ceabf94))
+## [1.0.22] - 2026-01-15
 
-## [0.2.5](https://github.com/ChromeDevTools/chrome-ai-bridge/compare/chrome-devtools-mcp-v0.2.4...chrome-devtools-mcp-v0.2.5) (2025-09-24)
+### Added
+- Auto bring Chrome to front on login detection
 
+## [1.0.21] - 2026-01-14
 
-### Bug Fixes
+### Added
+- Phase 4: `open -g` + `puppeteer.connect()` for macOS background launch
 
-* add mcpName to package.json ([#103](https://github.com/ChromeDevTools/chrome-ai-bridge/issues/103)) ([bd0351f](https://github.com/ChromeDevTools/chrome-ai-bridge/commit/bd0351fd36ae35e41e613f0d15df40aeca17ba94))
+## [1.0.18] - 2026-01-12
 
-## [0.2.4](https://github.com/ChromeDevTools/chrome-ai-bridge/compare/chrome-devtools-mcp-v0.2.3...chrome-devtools-mcp-v0.2.4) (2025-09-24)
+### Added
+- `--focus` option for Chrome window focus control
 
+## [1.0.17] - 2026-01-11
 
-### Bug Fixes
+### Fixed
+- Use innerText + event dispatch for Gemini input
 
-* forbid closing the last page ([#90](https://github.com/ChromeDevTools/chrome-ai-bridge/issues/90)) ([0ca2434](https://github.com/ChromeDevTools/chrome-ai-bridge/commit/0ca2434a29eb4bc6e570a4ebe21a135d85f4c0f3))
+## [1.0.16] - 2026-01-10
 
-## [0.2.3](https://github.com/ChromeDevTools/chrome-ai-bridge/compare/chrome-devtools-mcp-v0.2.2...chrome-devtools-mcp-v0.2.3) (2025-09-24)
+### Fixed
+- Use Shift+Enter for newlines in Gemini to prevent auto-send
 
+## [1.0.15] - 2026-01-09
 
-### Bug Fixes
+### Fixed
+- Use Puppeteer keyboard.type() for Gemini text input
 
-* add a message indicating that no console messages exist ([#91](https://github.com/ChromeDevTools/chrome-ai-bridge/issues/91)) ([1a4ba4d](https://github.com/ChromeDevTools/chrome-ai-bridge/commit/1a4ba4d3e05f51a85747816f8638f31230881437))
-* clean up pending promises on action errors ([#84](https://github.com/ChromeDevTools/chrome-ai-bridge/issues/84)) ([4e7001a](https://github.com/ChromeDevTools/chrome-ai-bridge/commit/4e7001ac375ec51f55b29e9faf68aff0dd09fa0f))
+## [1.0.14] - 2026-01-08
 
-## [0.2.2](https://github.com/ChromeDevTools/chrome-ai-bridge/compare/chrome-devtools-mcp-v0.2.1...chrome-devtools-mcp-v0.2.2) (2025-09-23)
+### Fixed
+- Prevent MCP server shutdown on Esc cancel
 
+## [1.0.13] - 2026-01-07
 
-### Bug Fixes
+### Added
+- Immediate monitoring feedback on login wait start
+- 5-minute timeout with progress display for login wait
 
-* cli version being reported as unknown ([#74](https://github.com/ChromeDevTools/chrome-ai-bridge/issues/74)) ([d6bab91](https://github.com/ChromeDevTools/chrome-ai-bridge/commit/d6bab912df55dc2e96a8d7893d1906f1fc608d0a))
-* remove unnecessary waiting for navigation ([#83](https://github.com/ChromeDevTools/chrome-ai-bridge/issues/83)) ([924c042](https://github.com/ChromeDevTools/chrome-ai-bridge/commit/924c042492222a555074063841ce765342e3b5b9))
-* rework performance parsing & error handling ([#75](https://github.com/ChromeDevTools/chrome-ai-bridge/issues/75)) ([e8fb30c](https://github.com/ChromeDevTools/chrome-ai-bridge/commit/e8fb30c1bfdc2b4ea8c2daf74b24aa82210f99be))
+## [1.0.x] - 2026-01-01 to 2026-01-06
 
-## [0.2.1](https://github.com/ChromeDevTools/chrome-ai-bridge/compare/chrome-devtools-mcp-v0.2.0...chrome-devtools-mcp-v0.2.1) (2025-09-23)
+### Added
+- Extension Bridge for connecting to existing Chrome tabs
+- URL-based tab connection with `--attachTabUrl`
+- Multi-language login detection (12 languages)
+- Session persistence across tool calls
+- Auto-logging to `.local/chrome-ai-bridge/history.jsonl`
 
+### Fixed
+- Various Gemini input and response detection improvements
+- ChatGPT response extraction reliability
 
-### Bug Fixes
+## [0.7.0] - 2025-12-15
 
-* add 'on the selected page' to performance tools ([#69](https://github.com/ChromeDevTools/chrome-ai-bridge/issues/69)) ([b877f7a](https://github.com/ChromeDevTools/chrome-ai-bridge/commit/b877f7a3053d0cdf2aad1fefc26cf7b913eb95ce))
-* **emulation:** correctly report info for selected page ([#63](https://github.com/ChromeDevTools/chrome-ai-bridge/issues/63)) ([1e8662f](https://github.com/ChromeDevTools/chrome-ai-bridge/commit/1e8662f06860aecb5c01ed4ff1515ceb9dac26e4))
-* expose timeout when Emulation is enabled ([#73](https://github.com/ChromeDevTools/chrome-ai-bridge/issues/73)) ([0208bfd](https://github.com/ChromeDevTools/chrome-ai-bridge/commit/0208bfdcf6924953879408c18f4c20da544bf4ff))
-* fix browserUrl not working ([#53](https://github.com/ChromeDevTools/chrome-ai-bridge/issues/53)) ([a6923b8](https://github.com/ChromeDevTools/chrome-ai-bridge/commit/a6923b8d9397d12ee0f9fe67dd62b10088ec6e87))
-* increase timeouts in case of Emulation ([#71](https://github.com/ChromeDevTools/chrome-ai-bridge/issues/71)) ([c509c64](https://github.com/ChromeDevTools/chrome-ai-bridge/commit/c509c64576e1be1ddc283653004ef08a117907a2))
-* **windows:** work around Chrome not reporting reasons for crash ([#64](https://github.com/ChromeDevTools/chrome-ai-bridge/issues/64)) ([d545741](https://github.com/ChromeDevTools/chrome-ai-bridge/commit/d5457412a4a76726547190fb3a46bb78c9d6645c))
+### Added
+- Dedicated profile architecture
+- Bookmark injection system
+- `--loadExtension` CLI flag for Chrome extension loading
 
-## [0.2.0](https://github.com/ChromeDevTools/chrome-ai-bridge/compare/chrome-devtools-mcp-v0.1.0...chrome-devtools-mcp-v0.2.0) (2025-09-17)
+## [0.6.x] - 2025-12-01 to 2025-12-14
 
+### Added
+- Hot-reload development mode (`MCP_ENV=development`)
+- Plugin architecture with `MCP_PLUGINS` environment variable
 
-### Features
+### Changed
+- Simplified extension tools (list, reload, debug)
 
-* add performance_analyze_insight tool. ([#42](https://github.com/ChromeDevTools/chrome-ai-bridge/issues/42)) ([21e175b](https://github.com/ChromeDevTools/chrome-ai-bridge/commit/21e175b862c624d7a2d07802141187edf2d2e489))
-* support script evaluate arguments ([#40](https://github.com/ChromeDevTools/chrome-ai-bridge/issues/40)) ([c663f4d](https://github.com/ChromeDevTools/chrome-ai-bridge/commit/c663f4d7f9c0b868e8b4750f6441525939bfe920))
-* use Performance Trace Formatter in trace output ([#36](https://github.com/ChromeDevTools/chrome-ai-bridge/issues/36)) ([0cb6147](https://github.com/ChromeDevTools/chrome-ai-bridge/commit/0cb6147b870e17bc3a624e9c6396d963a3e16b44))
-* validate uids ([#37](https://github.com/ChromeDevTools/chrome-ai-bridge/issues/37)) ([014a8bc](https://github.com/ChromeDevTools/chrome-ai-bridge/commit/014a8bc52ecc58080cedeb8023d44f4a55055a05))
+## [0.5.x] - 2025-11-15 to 2025-11-30
 
+### Added
+- Initial fork from Chrome DevTools MCP
+- `ask_chatgpt_web` and `ask_gemini_web` tools
+- Chrome extension development support
 
-### Bug Fixes
+---
 
-* change profile folder name to browser-profile ([#39](https://github.com/ChromeDevTools/chrome-ai-bridge/issues/39)) ([36115d7](https://github.com/ChromeDevTools/chrome-ai-bridge/commit/36115d757abbae0502ffee814f55368d2ca59b9e))
-* refresh context based on the browser instance ([#44](https://github.com/ChromeDevTools/chrome-ai-bridge/issues/44)) ([93f4579](https://github.com/ChromeDevTools/chrome-ai-bridge/commit/93f4579dd9aca3beef2bd9f2930ddfcc4069c0e3))
-* update puppeteer to fix a11y snapshot issues ([#43](https://github.com/ChromeDevTools/chrome-ai-bridge/issues/43)) ([b58f787](https://github.com/ChromeDevTools/chrome-ai-bridge/commit/b58f787234a34d5fcb01b336f5fb14e1c55ecdd5))
+## Pre-fork History
 
-## [0.1.0](https://github.com/ChromeDevTools/chrome-ai-bridge/compare/chrome-devtools-mcp-v0.0.2...chrome-devtools-mcp-v0.1.0) (2025-09-16)
-
-
-### Features
-
-* improve tools with awaiting common events ([#10](https://github.com/ChromeDevTools/chrome-ai-bridge/issues/10)) ([dba8b3c](https://github.com/ChromeDevTools/chrome-ai-bridge/commit/dba8b3c5fad0d1bca26aaf172751c51188799927))
-* initial version ([31a0bdc](https://github.com/ChromeDevTools/chrome-ai-bridge/commit/31a0bdce266a33eaca9a7daae4611abb78ff5a25))
-
-
-### Bug Fixes
-
-* define tracing categories ([#21](https://github.com/ChromeDevTools/chrome-ai-bridge/issues/21)) ([c939456](https://github.com/ChromeDevTools/chrome-ai-bridge/commit/c93945657cc96ac7ba213730a750c16e9ab87526))
-* detect multiple instances and throw ([#12](https://github.com/ChromeDevTools/chrome-ai-bridge/issues/12)) ([732267d](https://github.com/ChromeDevTools/chrome-ai-bridge/commit/732267db5fea0048ed1fcc530bcdd074df4126be))
-* make sure tool calls are processed sequentially ([#22](https://github.com/ChromeDevTools/chrome-ai-bridge/issues/22)) ([a76b23d](https://github.com/ChromeDevTools/chrome-ai-bridge/commit/a76b23dccf074a13304b0341178665465a2c3399))
+For changes before this fork, see the [original Chrome DevTools MCP changelog](https://github.com/ChromeDevTools/chrome-ai-bridge/blob/main/CHANGELOG.md).

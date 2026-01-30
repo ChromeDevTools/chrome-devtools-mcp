@@ -773,26 +773,47 @@ async function askChatGPTFastInternal(question: string): Promise<ChatResult> {
       throw new Error('ChatGPT send button is disabled after 60 seconds (previous response still generating).');
     }
 
-    // CDP Input.dispatchMouseEventでクリック
-    await client.send('Input.dispatchMouseEvent', {
-      type: 'mousePressed',
-      x: buttonInfo.x,
-      y: buttonInfo.y,
-      button: 'left',
-      clickCount: 1
-    });
+    // JavaScript click() で直接クリック（CDP座標クリックは不安定なため）
+    const clickResult = await client.evaluate<{clicked: boolean; selector: string | null}>(`
+      (() => {
+        const selectors = [
+          'button[data-testid="send-button"]',
+          '#composer-submit-button',
+          'button[aria-label*="送信"]',
+          'button[aria-label*="Send"]'
+        ];
+        for (const sel of selectors) {
+          const btn = document.querySelector(sel);
+          if (btn && !btn.disabled && btn.getAttribute('aria-disabled') !== 'true') {
+            btn.click();
+            return {clicked: true, selector: sel};
+          }
+        }
+        return {clicked: false, selector: null};
+      })()
+    `);
 
-    await new Promise(resolve => setTimeout(resolve, 50));
+    if (!clickResult.clicked) {
+      logWarn('chatgpt', 'JavaScript click failed, falling back to CDP click');
+      // フォールバック: CDP座標クリック
+      await client.send('Input.dispatchMouseEvent', {
+        type: 'mousePressed',
+        x: buttonInfo.x,
+        y: buttonInfo.y,
+        button: 'left',
+        clickCount: 1
+      });
+      await new Promise(resolve => setTimeout(resolve, 50));
+      await client.send('Input.dispatchMouseEvent', {
+        type: 'mouseReleased',
+        x: buttonInfo.x,
+        y: buttonInfo.y,
+        button: 'left',
+        clickCount: 1
+      });
+    }
 
-    await client.send('Input.dispatchMouseEvent', {
-      type: 'mouseReleased',
-      x: buttonInfo.x,
-      y: buttonInfo.y,
-      button: 'left',
-      clickCount: 1
-    });
-
-    logInfo('chatgpt', 'Send button clicked', {x: buttonInfo.x, y: buttonInfo.y, selector: buttonInfo.selector});
+    logInfo('chatgpt', 'Send button clicked', {method: clickResult.clicked ? 'js-click' : 'cdp', selector: clickResult.selector || buttonInfo.selector});
     timings.sendMs = nowMs() - tSend;
     // 既存チャットかどうかを事前に判定
     const urlBefore = await client.evaluate<string>('location.href');
@@ -896,8 +917,13 @@ async function askChatGPTFastInternal(question: string): Promise<ChatResult> {
     console.error('[ChatGPT] Message sent successfully (count increased)');
     timings.sendMs = nowMs() - tSend;
 
-    // ループ外で取得した初期カウントを使用
-    const initialAssistantCount = initialAssistantCountBeforeLoop;
+    // 送信成功直後にアシスタントカウントを取得（フォールバック後でも正確な値を使用）
+    // 注: ループ外の値ではなく、送信成功後の最新値を使用することで、
+    //     フォールバック後にカウントがズレる問題を防ぐ
+    const initialAssistantCount = await client.evaluate<number>(
+      `document.querySelectorAll('[data-message-author-role="assistant"]').length`,
+    );
+    console.error(`[ChatGPT] Assistant count at send success: ${initialAssistantCount}`);
 
     const tWaitResp = nowMs();
     console.error(`[ChatGPT] Waiting for response (initial assistant count from BEFORE loop: ${initialAssistantCount})...`);
@@ -1740,26 +1766,57 @@ async function askGeminiFastInternal(question: string): Promise<ChatResult> {
     throw new Error('Gemini send button is disabled after 60 seconds (previous response still generating).');
   }
 
-  // CDP Input.dispatchMouseEventでクリック
-  await client.send('Input.dispatchMouseEvent', {
-    type: 'mousePressed',
-    x: buttonInfo.x,
-    y: buttonInfo.y,
-    button: 'left',
-    clickCount: 1
-  });
+  // JavaScript click() で直接クリック（CDP座標クリックは不安定なため）
+  const clickResult = await client.evaluate<{clicked: boolean; selector: string | null}>(`
+    (() => {
+      // Gemini送信ボタンのセレクター（優先順）
+      const selectors = [
+        'button[data-node-type="send_button"]',
+        'button mat-icon[data-mat-icon-name="send"]',
+        'button[aria-label*="送信"]',
+        'button[aria-label*="Send"]'
+      ];
+      // mat-icon を含むボタンを探す
+      const matIconBtn = document.querySelector('mat-icon[data-mat-icon-name="send"]');
+      if (matIconBtn) {
+        const btn = matIconBtn.closest('button');
+        if (btn && !btn.disabled && btn.getAttribute('aria-disabled') !== 'true') {
+          btn.click();
+          return {clicked: true, selector: 'mat-icon[data-mat-icon-name="send"] parent button'};
+        }
+      }
+      for (const sel of selectors) {
+        const btn = document.querySelector(sel);
+        if (btn && !btn.disabled && btn.getAttribute('aria-disabled') !== 'true') {
+          btn.click();
+          return {clicked: true, selector: sel};
+        }
+      }
+      return {clicked: false, selector: null};
+    })()
+  `);
 
-  await new Promise(resolve => setTimeout(resolve, 50));
+  if (!clickResult.clicked) {
+    console.error('[Gemini] JavaScript click failed, falling back to CDP click');
+    // フォールバック: CDP座標クリック
+    await client.send('Input.dispatchMouseEvent', {
+      type: 'mousePressed',
+      x: buttonInfo.x,
+      y: buttonInfo.y,
+      button: 'left',
+      clickCount: 1
+    });
+    await new Promise(resolve => setTimeout(resolve, 50));
+    await client.send('Input.dispatchMouseEvent', {
+      type: 'mouseReleased',
+      x: buttonInfo.x,
+      y: buttonInfo.y,
+      button: 'left',
+      clickCount: 1
+    });
+  }
 
-  await client.send('Input.dispatchMouseEvent', {
-    type: 'mouseReleased',
-    x: buttonInfo.x,
-    y: buttonInfo.y,
-    button: 'left',
-    clickCount: 1
-  });
-
-  console.error('[Gemini] Mouse click dispatched via CDP');
+  console.error(`[Gemini] Send button clicked (method: ${clickResult.clicked ? 'js-click' : 'cdp'}, selector: ${clickResult.selector || 'cdp-coords'})`);
   timings.sendMs = nowMs() - tSend;
 
   // 送信成功確認用のダミー変数
@@ -1902,10 +1959,14 @@ async function askGeminiFastInternal(question: string): Promise<ChatResult> {
         if (hasStopButton) return false;
 
         // 条件1: マイクボタンが表示（入力欄が空 = 応答完了後の状態）
+        // 多言語対応: マイク(日本語), mic, microphone, voice(英語)
         const micButton = document.querySelector('[data-node-type="speech_dictation_mic_button"]') ||
                           buttons.find(b => {
                             const label = (b.getAttribute('aria-label') || '').toLowerCase();
-                            return label.includes('マイク') || label.includes('mic');
+                            return label.includes('マイク') ||
+                                   label.includes('mic') ||
+                                   label.includes('microphone') ||
+                                   label.includes('voice');
                           });
         if (micButton && isVisible(micButton)) {
           return true;

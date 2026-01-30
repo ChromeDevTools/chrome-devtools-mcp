@@ -1,11 +1,18 @@
 # Claude Code
 CLAUDE.md
 .claude/
+
+# Codex
+AGENTS.md
+.codex/
+
+.github/
+.local/
 data/
-# docs/ は公開するため、gitignoreから除外
-# ただしAI会話ログと作業ログは除外
 docs/ask/
 docs/log/
+
+
 
 # Logs
 logs

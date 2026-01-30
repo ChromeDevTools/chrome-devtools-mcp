@@ -3,9 +3,9 @@
 [![npm](https://img.shields.io/npm/v/chrome-ai-bridge.svg)](https://npmjs.org/package/chrome-ai-bridge)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 
-> Bridge between AI and Chrome Browser
+> Bridge between AI coding assistants and ChatGPT/Gemini via Chrome Extension
 
-MCP server enabling AI assistants to control Chrome, consult other AIs, and develop extensions.
+MCP server that enables AI assistants to consult ChatGPT and Gemini through a Chrome extension.
 
 **Compatible with:** Claude Code, Cursor, VS Code Copilot, Cline, and other MCP clients
 
@@ -13,23 +13,30 @@ MCP server enabling AI assistants to control Chrome, consult other AIs, and deve
 
 ## What is this?
 
-chrome-ai-bridge is a [Model Context Protocol](https://modelcontextprotocol.io/) server that gives AI assistants:
+chrome-ai-bridge is a [Model Context Protocol](https://modelcontextprotocol.io/) server that gives AI assistants the ability to:
 
-- **Eyes**: See what's on web pages (screenshots, DOM snapshots)
-- **Hands**: Interact with pages (click, type, navigate)
-- **Voice**: Consult other AIs (ChatGPT, Gemini) via browser
+- **Consult other AIs**: Ask ChatGPT and Gemini questions via browser
+- **Get multiple perspectives**: Query both AIs in parallel for second opinions
+- **Debug connections**: Inspect page state via CDP snapshots
 
-Think of it as the bridge that connects your AI coding assistant to the browser world.
+> **v2.0.0 Breaking Change**: This version uses a Chrome extension for browser communication instead of Puppeteer. Previous CLI options (`--headless`, `--loadExtensionsDir`, etc.) are no longer supported.
 
 ---
 
 ## Quick Start
 
-### 1. Run the server
+### 1. Install the Chrome Extension
 
-```bash
-npx chrome-ai-bridge@latest
-```
+1. Download the latest release from [Releases](https://github.com/anthropics/anthropic-quickstarts/releases)
+2. Or build from source:
+   ```bash
+   git clone https://github.com/anthropics/anthropic-quickstarts.git
+   cd anthropic-quickstarts/mcp-devtools
+   npm install && npm run build
+   ```
+3. Open `chrome://extensions/` in Chrome
+4. Enable "Developer mode"
+5. Click "Load unpacked" and select `build/extension/`
 
 ### 2. Configure your MCP client
 
@@ -46,13 +53,19 @@ npx chrome-ai-bridge@latest
 }
 ```
 
-### 3. Verify it works
+### 3. Connect the Extension
 
-Restart your AI client and try: `"Take a screenshot of google.com"`
+1. Open ChatGPT (https://chatgpt.com) or Gemini (https://gemini.google.com) in Chrome
+2. Log in to both services
+3. The extension will automatically connect when the MCP server starts
+
+### 4. Verify it works
+
+Restart your AI client and try: `"Ask ChatGPT how to implement OAuth in Node.js"`
 
 ---
 
-## Key Features
+## Features
 
 ### Multi-AI Consultation
 
@@ -61,70 +74,52 @@ Ask ChatGPT or Gemini questions directly from your AI assistant:
 ```
 "Ask ChatGPT how to implement OAuth in Node.js"
 "Ask Gemini to review this architecture decision"
+"Ask both AIs for their opinions on this approach"
 ```
 
 | Feature | Description |
 |---------|-------------|
+| **Parallel queries** | Ask both AIs simultaneously with `ask_chatgpt_gemini_web` |
 | **Session persistence** | Conversations continue across tool calls |
-| **Auto-logging** | All Q&A saved to `docs/ask/chatgpt/` and `docs/ask/gemini/` |
-| **12 languages** | Login detection works in EN, JA, FR, DE, ES, IT, KO, ZH, PT, RU, AR |
+| **Auto-logging** | All Q&A saved to `.local/chrome-ai-bridge/history.jsonl` |
 
-### Browser Automation
+### Debugging Tools
 
-Full browser control with 20+ tools:
-
-| Category | Tools |
-|----------|-------|
-| **Snapshot** | `take_snapshot`, `take_screenshot` |
-| **Input** | `click`, `fill`, `fill_form`, `hover`, `drag`, `upload_file` |
-| **Navigation** | `navigate`, `pages`, `wait_for`, `handle_dialog` |
-| **Inspection** | `network`, `list_console_messages`, `evaluate_script` |
-| **Performance** | `performance` (start/stop/analyze traces) |
-| **Emulation** | `emulate` (CPU/network throttling), `resize_page` |
-
-### Chrome Extension Development
-
-Build and debug Chrome extensions with AI assistance:
-
-```json
-{
-  "args": ["chrome-ai-bridge@latest", "--loadExtensionsDir=/path/to/extensions"]
-}
-```
+Inspect the connection state and page content:
 
 | Tool | Description |
 |------|-------------|
-| `extension_popup` | Open/close extension popups |
-| `iframe_popup` | Inspect, patch, reload iframe-embedded popups |
-| `bookmarks` | Quick access to chrome://extensions, Web Store dashboard |
+| `take_cdp_snapshot` | Get page state (URL, title, input/button status) |
+| `get_page_dom` | Query DOM elements with CSS selectors |
 
-### Plugin Architecture
+---
 
-Extend with custom tools:
+## Tools Reference
 
-```json
-{
-  "env": {
-    "MCP_PLUGINS": "./my-plugin.js,@org/another-plugin"
-  }
-}
+### Available Tools (5)
+
+| Tool | Description |
+|------|-------------|
+| `ask_chatgpt_web` | Ask ChatGPT via browser |
+| `ask_gemini_web` | Ask Gemini via browser |
+| `ask_chatgpt_gemini_web` | Ask both AIs in parallel (recommended) |
+| `take_cdp_snapshot` | Debug: Get CDP page state |
+| `get_page_dom` | Debug: Query DOM elements |
+
+### Recommended Usage
+
+For general queries, use `ask_chatgpt_gemini_web` to get multiple perspectives:
+
+```
+User: "Ask AI about React best practices"
+→ Claude uses ask_chatgpt_gemini_web (queries both in parallel)
 ```
 
-```typescript
-// my-plugin.js
-export default {
-  id: 'my-plugin',
-  name: 'My Plugin',
-  version: '1.0.0',
-  async register(ctx) {
-    ctx.registry.register({
-      name: 'my_tool',
-      description: 'Does something useful',
-      schema: { /* zod schema */ },
-      async handler(input, response, context) { /* ... */ },
-    });
-  },
-};
+Only use individual tools when explicitly requested:
+
+```
+User: "Ask ChatGPT specifically about this"
+→ Claude uses ask_chatgpt_web
 ```
 
 ---
@@ -136,52 +131,6 @@ export default {
 | Variable | Description |
 |----------|-------------|
 | `MCP_DISABLE_WEB_LLM` | Set `true` to disable ChatGPT/Gemini tools |
-| `MCP_PLUGINS` | Comma-separated list of plugin paths |
-| `MCP_ENV` | Set `development` for hot-reload mode |
-
-### CLI Options
-
-| Option | Description |
-|--------|-------------|
-| `--loadExtensionsDir` | Load Chrome extensions from directory |
-| `--headless` | Run in headless mode |
-| `--channel` | Chrome channel (stable/canary) |
-
----
-
-## Tools Reference
-
-### Core Tools (18)
-
-| Tool | Description |
-|------|-------------|
-| `take_snapshot` | Get page structure with element UIDs |
-| `take_screenshot` | Capture page or element image |
-| `click` | Click element by UID |
-| `fill` | Fill input/textarea/select |
-| `fill_form` | Fill multiple form elements |
-| `hover` | Hover over element |
-| `drag` | Drag element to another |
-| `upload_file` | Upload file through input |
-| `navigate` | Go to URL, back, forward |
-| `pages` | List, select, close tabs |
-| `wait_for` | Wait for text to appear |
-| `handle_dialog` | Accept/dismiss dialogs |
-| `resize_page` | Change viewport size |
-| `emulate` | CPU/network throttling |
-| `network` | List/get network requests |
-| `performance` | Start/stop/analyze traces |
-| `evaluate_script` | Run JavaScript in page |
-| `list_console_messages` | Get console output |
-
-### Web-LLM Tools (2)
-
-| Tool | Description |
-|------|-------------|
-| `ask_chatgpt_web` | Ask ChatGPT via browser |
-| `ask_gemini_web` | Ask Gemini via browser |
-
-**Full documentation:** [docs/reference/tools.md](docs/reference/tools.md)
 
 ---
 
@@ -190,8 +139,8 @@ export default {
 ### Local Development
 
 ```bash
-git clone https://github.com/usedhonda/chrome-ai-bridge.git
-cd chrome-ai-bridge
+git clone https://github.com/anthropics/anthropic-quickstarts.git
+cd anthropic-quickstarts/mcp-devtools
 npm install && npm run build
 ```
 
@@ -208,23 +157,6 @@ Configure `~/.claude.json`:
 }
 ```
 
-### Hot-Reload Development
-
-```json
-{
-  "mcpServers": {
-    "chrome-ai-bridge": {
-      "command": "node",
-      "args": ["/path/to/chrome-ai-bridge/scripts/mcp-wrapper.mjs"],
-      "cwd": "/path/to/chrome-ai-bridge",
-      "env": { "MCP_ENV": "development" }
-    }
-  }
-}
-```
-
-Auto-rebuild on file changes with 2-5 second feedback loop.
-
 ### Commands
 
 ```bash
@@ -239,14 +171,30 @@ npm run format     # Format code
 ```
 chrome-ai-bridge/
 ├── src/
-│   ├── tools/           # MCP tool definitions
-│   ├── plugin-api.ts    # Plugin architecture
-│   ├── browser.ts       # Browser management
-│   └── main.ts          # Entry point
+│   ├── fast-cdp/        # CDP client and AI chat logic
+│   ├── extension/       # Chrome extension source
+│   ├── main.ts          # MCP server entry point
+│   └── index.ts         # Main exports
 ├── scripts/
-│   ├── cli.mjs          # Production entry
-│   └── mcp-wrapper.mjs  # Development wrapper
+│   └── cli.mjs          # CLI entry point
 └── docs/                # Documentation
+```
+
+### Testing
+
+```bash
+# Test ChatGPT connection
+npm run test:chatgpt -- "TypeScript generics explanation"
+
+# Test Gemini connection
+npm run test:gemini -- "Python async file reading"
+
+# Test both
+npm run test:both
+
+# CDP snapshot for debugging
+npm run cdp:chatgpt
+npm run cdp:gemini
 ```
 
 ---
@@ -255,15 +203,20 @@ chrome-ai-bridge/
 
 | Guide | Description |
 |-------|-------------|
+| [Technical Spec](docs/SPEC.md) | Detailed architecture and implementation |
 | [Setup Guide](docs/user/setup.md) | Detailed MCP configuration |
-| [Workflows](docs/user/workflows.md) | Common usage patterns |
 | [Troubleshooting](docs/user/troubleshooting.md) | Problem solving |
-| [Tools Reference](docs/reference/tools.md) | Full tool documentation |
-| [Hot-Reload Setup](docs/dev/hot-reload.md) | Developer workflow |
+| [Extension Bridge Design](docs/internal/design/extension-bridge.md) | Extension architecture |
 
 ---
 
 ## Troubleshooting
+
+### Extension not connecting
+
+1. Check that the extension is installed and enabled in `chrome://extensions/`
+2. Verify ChatGPT/Gemini tabs are open and logged in
+3. Check the extension popup for connection status
 
 ### MCP server not responding
 
@@ -271,23 +224,42 @@ chrome-ai-bridge/
 npx clear-npx-cache && npx chrome-ai-bridge@latest
 ```
 
-### Extension not loading
+### ChatGPT/Gemini not responding
 
-- Verify `manifest.json` exists at extension root
-- Use absolute paths in `--loadExtensionsDir`
-
-### ChatGPT/Gemini login issues
-
-- Check browser window for login prompts
-- Login detection supports 12 languages
+- Ensure you're logged in to both services
+- Try refreshing the ChatGPT/Gemini tab
+- Check for rate limiting or service issues
 
 **More:** [docs/user/troubleshooting.md](docs/user/troubleshooting.md)
 
 ---
 
+## Architecture (v2.0.0)
+
+```
+┌─────────────────┐         MCP         ┌──────────────────┐
+│  Claude Code    │ ◀──────────────────▶│   MCP Server     │
+│  (MCP Client)   │                     │  (Node.js)       │
+└─────────────────┘                     └────────┬─────────┘
+                                                 │
+                                                 ▼
+                                      ┌──────────────────┐
+                                      │ Chrome Extension │
+                                      │ (CDP via WebSocket)│
+                                      └────────┬─────────┘
+                                               │
+                               ┌───────────────┴───────────────┐
+                               ▼                               ▼
+                    ┌─────────────────┐             ┌─────────────────┐
+                    │  ChatGPT Tab    │             │  Gemini Tab     │
+                    └─────────────────┘             └─────────────────┘
+```
+
+---
+
 ## Credits
 
-Built on [Chrome DevTools MCP](https://github.com/anthropics/anthropic-quickstarts/tree/main/mcp-devtools) by Google LLC, with extensions for multi-AI consultation and Chrome extension development.
+Originally forked from [Chrome DevTools MCP](https://github.com/anthropics/anthropic-quickstarts/tree/main/mcp-devtools) by Google LLC. This fork focuses on multi-AI consultation capabilities via Chrome extension.
 
 ---
 

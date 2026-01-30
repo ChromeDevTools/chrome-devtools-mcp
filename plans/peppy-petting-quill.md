@@ -1,183 +1,80 @@
-# Puppeteer完全削除プラン
+# fast-chat 応答検出の再設計
 
-## 概要
+## 目標
 
-**目的**: chrome-ai-bridgeからPuppeteerを完全に削除し、拡張機能経由のChatGPT/Gemini質問機能のみを残す。
+**「fast」の意味**: 無駄な待ち時間なく、スムーズに会話できること
 
-**理由**: 別プロファイルの問題（MCPツール呼び出し時にPuppeteerが新しいChromeプロファイルを起動してしまう）を根本解決。
+## 現在の問題
 
-## 現状の問題
-
-```
-[現状のMCPツール呼び出し]
-ask_chatgpt_web 呼び出し
-  ↓
-main.ts: getContext() または fast-context
-  ↓
-resolveBrowser() ← ここでPuppeteerがChromeを起動（別プロファイル）
-  ↓
-別のChromeウィンドウが開く（ユーザーの既存Chromeではない）
-```
-
-## 削除方針
-
-### 保持するもの（拡張機能経由）
-| ツール | 用途 |
-|--------|------|
-| `ask_chatgpt_web` | ChatGPTに質問 |
-| `ask_gemini_web` | Geminiに質問 |
-| `ask_chatgpt_gemini_web` | 両方に並列質問 |
-| `take_cdp_snapshot` | ページ状態デバッグ |
-| `get_page_dom` | DOM構造調査 |
-| `ask_gemini_image` | Gemini画像生成 |
-
-### 削除するもの（Puppeteer依存）
-- ブラウザ操作系ツール（click, fill, navigate, screenshot等 約15個）
-- browser.ts（Puppeteer起動ロジック）
-- McpContext.ts（Browser/Page管理）
-- 関連ユーティリティ（WaitForHelper, PageCollector等）
+| 問題 | 影響 |
+|------|------|
+| 応答が空で返る | 会話が成立しない |
+| カウント検出がタイミング依存 | 不安定 |
+| 15秒タイムアウト待ち | 遅い |
 
 ---
 
-## 実装計画
+## シンプルな解決策
 
-### Phase 1: main.tsの修正（ブラウザ起動スキップ）
+**カウント比較は不要。ボタン状態で判断:**
 
-**ファイル**: `src/main.ts`
+```
+【シンプルなフロー】
 
-**変更内容**:
-1. `resolveBrowser()` 呼び出しを削除
-2. `McpContext` の代わりに `FastContext` を使用
-3. FAST_TOOLS以外のツールは登録しない（または呼び出し時にエラー）
+1. 送信前: 停止ボタンがないことを確認
+   - あれば待つ（前の応答完了待ち）
+
+2. 質問を送る
+   - 入力 → 送信ボタンクリック
+
+3. 送信成功確認（応答待ち中にDOMを見る）
+   - [data-message-author-role="user"]:last-of-type に自分の質問の先頭部分があるか
+   - 長文は途切れる可能性あるので、先頭N文字の一致でOK
+   - 改行は正規化して比較（\n, \r\n, <br> → 統一）
+
+4. 応答完了を待つ
+   - 停止ボタン消失
+
+5. 最後の回答を返す
+   - [data-message-author-role="assistant"]:last-of-type のテキスト
+```
+
+**ボタン状態の意味:**
+| ボタン | 状態 |
+|--------|------|
+| 停止ボタンあり | 応答生成中（待て） |
+| 停止ボタンなし + 送信ボタンなし | アイドル（送信可能） |
+| 停止ボタンなし + 送信ボタンあり | テキスト入力済み（送信可能） |
+
+---
+
+## 修正内容
+
+### ファイル: `src/fast-cdp/fast-chat.ts`
+
+**応答取得を単純化:**
 
 ```typescript
-// Before
-const browser = await resolveBrowser(browserOptions);
-const context = await McpContext.from(browser, ...);
+// Before: カウント比較して「新しいメッセージ」を探す
+const initialCount = getAssistantCount();
+await waitForResponse();
+const newMessages = allMessages.slice(initialCount);
+return newMessages[0] || '';  // ← ここで空になる
 
-// After
-// Puppeteer起動なし - 拡張機能モードのみ
-const context = null; // または FastContext のスタブ
+// After: 最後の回答を直接取得
+await waitForStopButtonDisappear();
+const lastMessage = document.querySelector(
+  '[data-message-author-role="assistant"]:last-of-type'
+);
+return lastMessage?.textContent || '';
 ```
-
-### Phase 2: ツール登録の整理
-
-**ファイル**: `src/tools/optional-tools.ts`, `src/tools/core-tools.ts`
-
-**変更内容**:
-1. ChatGPT/Gemini関連ツールのみ登録
-2. Puppeteer依存ツールの登録をスキップ
-
-**保持するツール**:
-```typescript
-const EXTENSION_ONLY_TOOLS = [
-  'ask_chatgpt_web',
-  'ask_gemini_web',
-  'ask_chatgpt_gemini_web',
-  'take_cdp_snapshot',
-  'get_page_dom',
-  'ask_gemini_image',
-];
-```
-
-### Phase 3: 不要ファイルの削除
-
-**削除対象ファイル**:
-```
-src/browser.ts                    # Puppeteer起動
-src/McpContext.ts                 # Browser/Page管理
-src/browser-connection-manager.ts # 接続管理
-src/PageCollector.ts              # Page監視
-src/WaitForHelper.ts              # Page待機
-src/login-helper.ts               # ブラウザログイン
-src/download-manager.ts           # ダウンロード管理
-src/startup-check.ts              # Chrome起動確認
-src/formatters/networkFormatter.ts
-src/formatters/consoleFormatter.ts
-src/tools/emulation.ts
-src/tools/performance.ts
-src/tools/screenshot.ts
-src/tools/snapshot.ts
-src/tools/network.ts
-src/tools/script.ts
-src/tools/input.ts
-src/tools/console.ts
-src/tools/pages.ts
-src/tools/iframe-popup-tools.ts
-```
-
-### Phase 4: package.json更新
-
-```json
-// 削除する依存
-"puppeteer-core": "削除",
-
-// 保持する依存
-"ws": "^8.19.0",  // 拡張機能通信用
-"@anthropic-ai/sdk": "保持",
-"@modelcontextprotocol/sdk": "保持"
-```
-
-### Phase 5: 型定義の整理
-
-**ファイル**: `src/tools/ToolDefinition.ts`
-
-`Context` インターフェースを簡略化（Browser/Page関連メソッド削除）
 
 ---
 
-## 修正ファイル一覧
+## 検証方法
 
-| Phase | ファイル | 変更内容 |
-|-------|---------|---------|
-| 1 | `src/main.ts` | resolveBrowser削除、ツール登録絞り込み |
-| 2 | `src/tools/optional-tools.ts` | 不要ツール登録削除 |
-| 2 | `src/tools/core-tools.ts` | 不要ツール登録削除 |
-| 3 | 上記削除対象ファイル | 削除 |
-| 4 | `package.json` | puppeteer-core削除 |
-| 5 | `src/tools/ToolDefinition.ts` | Context簡略化 |
-
----
-
-## 検証手順
-
-### ビルド確認
 ```bash
-npm run build
-# TypeScriptエラーなしでビルド完了
+npm run build && npm run test:chatgpt -- "1+1は？"
 ```
 
-### 機能テスト
-```bash
-# ChatGPT質問テスト
-npm run test:chatgpt -- "TypeScriptの型ガードを説明して"
-
-# Gemini質問テスト
-npm run test:gemini -- "Pythonのリスト内包表記の例"
-
-# CDPスナップショット
-npm run cdp:chatgpt
-```
-
-### MCPツール確認
-```bash
-# Claude Code再起動後
-# MCPツール呼び出しで別Chromeが起動しないことを確認
-```
-
----
-
-## リスク
-
-| リスク | 対策 |
-|--------|------|
-| 既存ユーザーがブラウザ操作ツールを使っている | CHANGELOG/READMEで明記、メジャーバージョンアップ |
-| テストが壊れる | 不要テストも削除 |
-| 拡張機能モードのバグが露呈 | 今回のテストで検出・修正 |
-
----
-
-## バージョン
-
-- 現在: v1.1.24
-- 変更後: v2.0.0（破壊的変更のためメジャーバージョンアップ）
+期待結果: 「2」などの回答が返る（空でない）
