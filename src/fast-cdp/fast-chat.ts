@@ -202,12 +202,12 @@ async function createConnection(kind: 'chatgpt' | 'gemini'): Promise<CdpClient> 
     preferred,
     preferredTabId,
     defaultUrl,
-    strategy: kind === 'gemini' && preferred ? 'reuse-existing' : 'new-tab',
+    strategy: preferred ? 'reuse-existing' : 'new-tab',
   });
 
-  // ChatGPT: 常に新規タブを作成（URLが変わるため既存タブ再利用は不安定）
-  // Gemini: 既存タブを再利用、失敗したら新規タブ
-  if (kind === 'gemini' && preferred) {
+  // まず既存タブを探す（ChatGPT/Gemini共通）
+  // 既存タブがあればそれを使う、なければ新規作成
+  if (preferred) {
     logInfo('fast-chat', `Trying to reuse existing ${kind} tab`, {url: preferred, tabId: preferredTabId, timeoutMs: 3000});
     console.error(`[fast-cdp] Trying to reuse existing ${kind} tab: ${preferred} (tabId: ${preferredTabId}, 3s timeout)`);
     try {
@@ -223,7 +223,25 @@ async function createConnection(kind: 'chatgpt' | 'gemini'): Promise<CdpClient> 
       await client.send('DOM.enable');
       await client.send('Page.enable');
 
-      geminiClient = client;
+      // デバッグ: 接続直後のURLを確認
+      const debugUrl = await client.evaluate<string>('location.href');
+      console.error(`[fast-cdp] DEBUG: Connected tab URL = ${debugUrl}`);
+      console.error(`[fast-cdp] DEBUG: targetInfo URL = ${relayResult.targetInfo?.url}`);
+
+      // ページが読み込まれるまで待機（about:blank でなくなるまで）
+      if (debugUrl === 'about:blank') {
+        console.error(`[fast-cdp] WARNING: evaluate returns about:blank, waiting for navigation...`);
+        await client.waitForFunction(
+          `location.href !== 'about:blank' && document.readyState === 'complete'`,
+          10000,
+        );
+      }
+
+      if (kind === 'chatgpt') {
+        chatgptClient = client;
+      } else {
+        geminiClient = client;
+      }
       const elapsed = Date.now() - startTime;
       logConnectionState(kind, 'connected', {elapsed, reused: true});
       console.error(`[fast-cdp] ${kind} reused existing tab successfully`);
@@ -931,11 +949,18 @@ export async function askChatGPTFast(question: string): Promise<string> {
         break;
       }
 
-      // 応答完了条件3: 15秒以上待って、新しいアシスタントメッセージがあり、stopボタンなし、入力欄空
-      // （stopボタンが見えなかった場合のフォールバック - 高速応答時）
+      // 応答完了条件3: 15秒以上待って、stopボタンなし、入力欄空
+      // （メッセージカウントが増えない場合のフォールバック - セレクターが変わった可能性）
       const elapsed = Date.now() - startWait;
-      if (elapsed > 15000 && !state.hasStopButton && newAssistantCount > 0 && !state.inputBoxHasText) {
-        console.error(`[ChatGPT] Response complete - fallback after 15s, new assistant message (+${newAssistantCount})`);
+      if (elapsed > 15000 && !state.hasStopButton && !state.inputBoxHasText) {
+        console.error(`[ChatGPT] Response complete - fallback after 15s (no stop button, input empty)`);
+        break;
+      }
+
+      // 応答完了条件4: stopボタンを見た後に消え、送信ボタンが有効、入力欄空
+      // （メッセージカウントに頼らない安全な判定）
+      if (sawStopButton && !state.hasStopButton && state.sendButtonFound && !state.sendButtonDisabled && !state.inputBoxHasText) {
+        console.error(`[ChatGPT] Response complete - stop button gone, send enabled, input empty`);
         break;
       }
 
