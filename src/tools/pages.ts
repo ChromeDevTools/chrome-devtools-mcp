@@ -98,11 +98,14 @@ export const newPage = defineTool({
   handler: async (request, response, context) => {
     const page = await context.newPage(request.params.background);
 
-    await context.waitForEventsAfterAction(async () => {
-      await page.goto(request.params.url, {
-        timeout: request.params.timeout,
-      });
-    });
+    await context.waitForEventsAfterAction(
+      async () => {
+        await page.goto(request.params.url, {
+          timeout: request.params.timeout,
+        });
+      },
+      {timeout: request.params.timeout},
+    );
 
     response.setIncludePages(true);
   },
@@ -181,62 +184,67 @@ export const navigatePage = defineTool({
     page.on('dialog', dialogHandler);
 
     try {
-      await context.waitForEventsAfterAction(async () => {
-        switch (request.params.type) {
-          case 'url':
-            if (!request.params.url) {
-              throw new Error('A URL is required for navigation of type=url.');
-            }
-            try {
-              await page.goto(request.params.url, options);
-              response.appendResponseLine(
-                `Successfully navigated to ${request.params.url}.`,
-              );
-            } catch (error) {
-              response.appendResponseLine(
-                `Unable to navigate in the  selected page: ${error.message}.`,
-              );
-            }
-            break;
-          case 'back':
-            try {
-              await page.goBack(options);
-              response.appendResponseLine(
-                `Successfully navigated back to ${page.url()}.`,
-              );
-            } catch (error) {
-              response.appendResponseLine(
-                `Unable to navigate back in the selected page: ${error.message}.`,
-              );
-            }
-            break;
-          case 'forward':
-            try {
-              await page.goForward(options);
-              response.appendResponseLine(
-                `Successfully navigated forward to ${page.url()}.`,
-              );
-            } catch (error) {
-              response.appendResponseLine(
-                `Unable to navigate forward in the selected page: ${error.message}.`,
-              );
-            }
-            break;
-          case 'reload':
-            try {
-              await page.reload({
-                ...options,
-                ignoreCache: request.params.ignoreCache,
-              });
-              response.appendResponseLine(`Successfully reloaded the page.`);
-            } catch (error) {
-              response.appendResponseLine(
-                `Unable to reload the selected page: ${error.message}.`,
-              );
-            }
-            break;
-        }
-      });
+      await context.waitForEventsAfterAction(
+        async () => {
+          switch (request.params.type) {
+            case 'url':
+              if (!request.params.url) {
+                throw new Error(
+                  'A URL is required for navigation of type=url.',
+                );
+              }
+              try {
+                await page.goto(request.params.url, options);
+                response.appendResponseLine(
+                  `Successfully navigated to ${request.params.url}.`,
+                );
+              } catch (error) {
+                response.appendResponseLine(
+                  `Unable to navigate in the  selected page: ${error.message}.`,
+                );
+              }
+              break;
+            case 'back':
+              try {
+                await page.goBack(options);
+                response.appendResponseLine(
+                  `Successfully navigated back to ${page.url()}.`,
+                );
+              } catch (error) {
+                response.appendResponseLine(
+                  `Unable to navigate back in the selected page: ${error.message}.`,
+                );
+              }
+              break;
+            case 'forward':
+              try {
+                await page.goForward(options);
+                response.appendResponseLine(
+                  `Successfully navigated forward to ${page.url()}.`,
+                );
+              } catch (error) {
+                response.appendResponseLine(
+                  `Unable to navigate forward in the selected page: ${error.message}.`,
+                );
+              }
+              break;
+            case 'reload':
+              try {
+                await page.reload({
+                  ...options,
+                  ignoreCache: request.params.ignoreCache,
+                });
+                response.appendResponseLine(`Successfully reloaded the page.`);
+              } catch (error) {
+                response.appendResponseLine(
+                  `Unable to reload the selected page: ${error.message}.`,
+                );
+              }
+              break;
+          }
+        },
+        {timeout: request.params.timeout},
+      );
     } finally {
       page.off('dialog', dialogHandler);
       if (initScriptId) {

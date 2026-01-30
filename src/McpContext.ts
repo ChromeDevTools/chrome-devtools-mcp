@@ -727,7 +727,10 @@ export class McpContext implements Context {
     return new WaitForHelper(page, cpuMultiplier, networkMultiplier);
   }
 
-  waitForEventsAfterAction(action: () => Promise<unknown>): Promise<void> {
+  waitForEventsAfterAction(
+    action: () => Promise<unknown>,
+    options?: {timeout?: number},
+  ): Promise<void> {
     const page = this.getSelectedPage();
     const cpuMultiplier = this.getCpuThrottlingRate();
     const networkMultiplier = getNetworkMultiplierFromString(
@@ -738,7 +741,7 @@ export class McpContext implements Context {
       cpuMultiplier,
       networkMultiplier,
     );
-    return waitForHelper.waitForEventsAfterAction(action);
+    return waitForHelper.waitForEventsAfterAction(action, options);
   }
 
   getNetworkRequestStableId(request: HTTPRequest): number {
