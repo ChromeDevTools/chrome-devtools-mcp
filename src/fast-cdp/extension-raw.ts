@@ -2,6 +2,7 @@ import {spawn} from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import {RelayServer} from '../extension/relay-server.js';
+import {logRelay, logExtension, logInfo, logError} from './mcp-logger.js';
 
 // Stable extension ID (from manifest.json key)
 const EXTENSION_ID = 'ibjplbopgmcacpmfpnaeoloepdhenlbm';
@@ -108,70 +109,107 @@ export async function connectViaExtensionRaw(options: {
   relayPort?: number;
   timeoutMs?: number;
 }): Promise<RawExtensionConnection> {
-  if (options.tabId === undefined && options.tabUrl === undefined) {
-    throw new Error('Either tabId or tabUrl must be provided');
-  }
-  if (options.tabId !== undefined && options.tabUrl !== undefined) {
-    throw new Error('Cannot specify both tabId and tabUrl');
+  const startTime = Date.now();
+  logInfo('extension-raw', 'connectViaExtensionRaw called', {
+    tabUrl: options.tabUrl,
+    tabId: options.tabId,
+    newTab: options.newTab,
+    timeoutMs: options.timeoutMs,
+  });
+
+  // tabUrl is now required; tabId is optional (used for tab selection hint)
+  if (options.tabUrl === undefined) {
+    logError('extension-raw', 'Validation failed: tabUrl required');
+    throw new Error('tabUrl must be provided');
   }
 
+  logRelay('starting', {port: options.relayPort || 'auto'});
   const relay = new RelayServer({
     port: options.relayPort || 0,
   });
   await relay.start();
   const wsUrl = relay.getConnectionURL();
+  logRelay('started', {wsUrl});
   console.error(`[fast-cdp] Relay URL: ${wsUrl}`);
 
   // Start discovery server - extension will detect this and open connect.html
   // Note: Chrome spawn doesn't work for chrome-extension:// URLs, so we rely on discovery polling
+  logInfo('extension-raw', 'Starting discovery server', {tabUrl: options.tabUrl, tabId: options.tabId, newTab: options.newTab});
   const discoveryPort = await relay.startDiscoveryServer({
     tabUrl: options.tabUrl,
+    tabId: options.tabId,
     newTab: options.newTab,
   });
 
   if (discoveryPort) {
+    logInfo('extension-raw', 'Discovery server started', {discoveryPort});
     console.error(`[fast-cdp] Discovery server on port ${discoveryPort}`);
     console.error(`[fast-cdp] Extension will auto-detect and open connect.html`);
   } else {
     // Fallback: show manual URL
     const connectUrl = `chrome-extension://${EXTENSION_ID}/ui/connect.html?mcpRelayUrl=${encodeURIComponent(wsUrl)}`;
+    logError('extension-raw', 'Discovery server failed', {connectUrl});
     console.error(`[fast-cdp] Discovery server failed. Please open manually:`);
     console.error(`[fast-cdp]   ${connectUrl}`);
   }
 
   try {
+    const actualTimeout = options.timeoutMs ?? 10000;
+    logExtension('waiting', {timeoutMs: actualTimeout});
+
     await new Promise<void>((resolve, reject) => {
-      const actualTimeout = options.timeoutMs ?? 10000;
       const timeout = setTimeout(() => {
+        logExtension('timeout', {elapsed: actualTimeout});
         reject(new Error(`Extension connection timeout (${actualTimeout / 1000}s). Make sure the chrome-ai-bridge extension is installed and Chrome is open.`));
       }, actualTimeout);
 
       relay.once('ready', () => {
         clearTimeout(timeout);
+        const elapsed = Date.now() - startTime;
+        logExtension('connected', {elapsed});
         console.error('[fast-cdp] Extension connected');
         resolve();
       });
       relay.once('disconnected', () => {
         clearTimeout(timeout);
+        logExtension('disconnected', {reason: 'disconnected before ready'});
         reject(new Error('Extension disconnected before ready'));
       });
     });
   } catch (error) {
     // Clean up on failure - stop relay and discovery servers
+    const elapsed = Date.now() - startTime;
+    logError('extension-raw', 'Connection failed, cleaning up', {
+      elapsed,
+      error: error instanceof Error ? error.message : String(error),
+    });
     console.error('[fast-cdp] Connection failed, cleaning up relay server');
+    logRelay('stopped', {reason: 'connection failed'});
     await relay.stop().catch(() => {});
     throw error;
   }
 
   let targetInfo: RawExtensionConnection['targetInfo'];
   try {
+    logInfo('extension-raw', 'Attaching to tab');
     const attachResult = await relay.sendRequest('attachToTab');
     if (attachResult?.targetInfo) {
       targetInfo = attachResult.targetInfo;
+      logInfo('extension-raw', 'Tab attached successfully', {
+        targetId: targetInfo?.targetId,
+        type: targetInfo?.type,
+        url: targetInfo?.url,
+      });
     }
-  } catch {
+  } catch (attachError) {
     // best-effort; targetInfo is optional
+    logError('extension-raw', 'Failed to attach to tab (non-fatal)', {
+      error: attachError instanceof Error ? attachError.message : String(attachError),
+    });
   }
+
+  const totalElapsed = Date.now() - startTime;
+  logInfo('extension-raw', 'connectViaExtensionRaw completed', {totalElapsed});
 
   return {relay, targetInfo};
 }

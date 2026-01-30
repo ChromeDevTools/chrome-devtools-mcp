@@ -42,12 +42,18 @@ async function isConnectionHealthy(client: CdpClient, kind?: 'chatgpt' | 'gemini
   }
 }
 
+type SessionEntry = {
+  url: string;
+  tabId?: number;
+  lastUsed: string;
+};
+
 type SessionStore = {
   projects: Record<
     string,
     {
-      chatgpt?: {url: string; lastUsed: string};
-      gemini?: {url: string; lastUsed: string};
+      chatgpt?: SessionEntry;
+      gemini?: SessionEntry;
     }
   >;
 };
@@ -77,16 +83,20 @@ async function loadSessions(): Promise<SessionStore> {
   return {projects: {}};
 }
 
-async function saveSession(kind: 'chatgpt' | 'gemini', url: string): Promise<void> {
+async function saveSession(kind: 'chatgpt' | 'gemini', url: string, tabId?: number): Promise<void> {
   const project = getProjectName();
   const sessions = await loadSessions();
   if (!sessions.projects[project]) {
     sessions.projects[project] = {};
   }
-  sessions.projects[project][kind] = {
+  const entry: SessionEntry = {
     url,
     lastUsed: new Date().toISOString(),
   };
+  if (tabId !== undefined) {
+    entry.tabId = tabId;
+  }
+  sessions.projects[project][kind] = entry;
   const targetPath = getSessionPath();
   await fs.mkdir(path.dirname(targetPath), {recursive: true});
   await fs.writeFile(targetPath, JSON.stringify(sessions, null, 2), 'utf-8');
@@ -117,11 +127,25 @@ async function saveDebug(kind: 'chatgpt' | 'gemini', payload: Record<string, any
   await fs.writeFile(file, JSON.stringify(payload, null, 2), 'utf-8');
 }
 
-async function getPreferredUrl(kind: 'chatgpt' | 'gemini'): Promise<string | null> {
+interface PreferredSession {
+  url: string | null;
+  tabId?: number;
+}
+
+async function getPreferredSession(kind: 'chatgpt' | 'gemini'): Promise<PreferredSession> {
   const project = getProjectName();
   const sessions = await loadSessions();
   const entry = sessions.projects[project]?.[kind];
-  return entry?.url || null;
+  return {
+    url: entry?.url || null,
+    tabId: entry?.tabId,
+  };
+}
+
+// Keep for backward compatibility
+async function getPreferredUrl(kind: 'chatgpt' | 'gemini'): Promise<string | null> {
+  const session = await getPreferredSession(kind);
+  return session.url;
 }
 
 function normalizeGeminiResponse(text: string, question?: string): string {
@@ -167,13 +191,16 @@ async function createConnection(kind: 'chatgpt' | 'gemini'): Promise<CdpClient> 
   const startTime = Date.now();
   logConnectionState(kind, 'connecting');
 
-  const preferred = await getPreferredUrl(kind);
+  const preferredSession = await getPreferredSession(kind);
+  const preferred = preferredSession.url;
+  const preferredTabId = preferredSession.tabId;
   const defaultUrl = kind === 'chatgpt'
     ? 'https://chatgpt.com/'
     : 'https://gemini.google.com/';
 
   logInfo('fast-chat', `createConnection: ${kind}`, {
     preferred,
+    preferredTabId,
     defaultUrl,
     strategy: kind === 'gemini' && preferred ? 'reuse-existing' : 'new-tab',
   });
@@ -181,11 +208,12 @@ async function createConnection(kind: 'chatgpt' | 'gemini'): Promise<CdpClient> 
   // ChatGPT: 常に新規タブを作成（URLが変わるため既存タブ再利用は不安定）
   // Gemini: 既存タブを再利用、失敗したら新規タブ
   if (kind === 'gemini' && preferred) {
-    logInfo('fast-chat', `Trying to reuse existing ${kind} tab`, {url: preferred, timeoutMs: 3000});
-    console.error(`[fast-cdp] Trying to reuse existing ${kind} tab: ${preferred} (3s timeout)`);
+    logInfo('fast-chat', `Trying to reuse existing ${kind} tab`, {url: preferred, tabId: preferredTabId, timeoutMs: 3000});
+    console.error(`[fast-cdp] Trying to reuse existing ${kind} tab: ${preferred} (tabId: ${preferredTabId}, 3s timeout)`);
     try {
       const relayResult = await connectViaExtensionRaw({
         tabUrl: preferred,
+        tabId: preferredTabId,
         newTab: false,
         timeoutMs: 3000,  // 短いタイムアウト
       });
@@ -304,33 +332,8 @@ export async function askChatGPTFast(question: string): Promise<string> {
   const normalizedQuestion = question.replace(/\s+/g, '');
 
   for (let attempt = 0; attempt < 2; attempt += 1) {
-    const tUrl = nowMs();
-    const currentUrl = await client.evaluate<string>('location.href');
-    const pageTitle = await client.evaluate<string>('document.title');
-    const lastUserText = await client.evaluate<string>(`(() => {
-      const msgs = document.querySelectorAll('[data-message-author-role="user"]');
-      const last = msgs[msgs.length - 1];
-      return last ? (last.textContent || '') : '';
-    })()`);
-    if (attempt === 1) {
-      await navigate(client, 'https://chatgpt.com/');
-    } else if (
-      (pageTitle && pageTitle.includes('接続テスト')) ||
-      (lastUserText && lastUserText.includes('接続テスト'))
-    ) {
-      await navigate(client, 'https://chatgpt.com/');
-    } else if (!currentUrl || !currentUrl.includes('chatgpt.com')) {
-      const preferred = await getPreferredUrl('chatgpt');
-      await navigate(client, preferred || 'https://chatgpt.com/');
-    } else {
-      const preferred = await getPreferredUrl('chatgpt');
-      if (preferred && !currentUrl.startsWith(preferred)) {
-        await navigate(client, preferred);
-      }
-    }
-    timings.navigateMs = nowMs() - tUrl;
-    logInfo('chatgpt', 'Navigation/URL check completed', {navigateMs: timings.navigateMs, attempt});
-
+    // createConnection で正しいURL (https://chatgpt.com/) に接続済み
+    // ナビゲーションロジック削除: いきなり入力欄を待つ
     const tWaitInput = nowMs();
     logInfo('chatgpt', 'Waiting for input field');
     await client.waitForFunction(

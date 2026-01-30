@@ -1,0 +1,21 @@
+固定アクティブタブ方式（pages.list を捨てる）に切り替える案についての不安点をまとめました。これで「ChatGPT/Geminiとのやりとりに特化」する上で本当に安定するか、懸念点があれば教えてください。
+
+状況:
+- Extension Bridge 経由の接続で pages.list がハングする
+- Target.* の shim を追加しても browser.pages() が詰まる
+- 目的は ChatGPT/Gemini のタブとやりとりすることに特化
+
+検討中の方針:
+- pages.list を使わず「接続済みタブ=選択済み」と扱う
+- 固定タブ（アクティブ or attachTabUrl）で操作する
+- タブ一覧や複数ターゲット管理は捨てる
+
+不安要素:
+1) pages.list を捨てた場合、Puppeteer の内部前提（target discovery）に影響しないか
+2) take_snapshot / click / fill などが正常動作するか
+3) タブがリロード/URL変更した時に破綻しないか
+4) Extension経由 CDP の制限が残ったままでも運用可能か
+5) 安定運用のために最低限入れておくべきガードや監視は何か
+
+目的:
+- 既存Chromeプロファイルを使いつつ、ChatGPT/Geminiの送受信を確実にしたい

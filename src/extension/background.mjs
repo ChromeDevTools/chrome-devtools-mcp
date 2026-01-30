@@ -306,7 +306,7 @@ class TabShareExtension {
 
     if (!tabId && tabUrl) {
       logDebug('connect', 'Resolving tabId from URL', {tabUrl, newTab});
-      tabId = await this._resolveTabId(tabUrl, newTab);
+      tabId = await this._resolveTabId(tabUrl, undefined, newTab);
     }
     if (!tabId) {
       logError('connect', 'No tab selected');
@@ -351,23 +351,51 @@ class TabShareExtension {
     ]);
   }
 
-  async _resolveTabId(tabUrl, newTab) {
-    logDebug('resolve', '_resolveTabId called', {tabUrl, newTab});
+  async _resolveTabId(tabUrl, tabId, newTab) {
+    logDebug('resolve', '_resolveTabId called', {tabUrl, tabId, newTab});
+
+    // Priority 1: If tabId is provided, try to use it directly
+    if (tabId && !newTab) {
+      try {
+        const tab = await chrome.tabs.get(tabId);
+        if (tab && tabUrl) {
+          const urlObj = new URL(tabUrl);
+          // Check if the tab's URL matches the expected hostname
+          if (tab.url && tab.url.includes(urlObj.hostname)) {
+            logInfo('resolve', 'Reusing tab by tabId', {tabId, url: tab.url});
+            return tabId;
+          }
+          logDebug('resolve', 'Tab URL mismatch, continuing search', {
+            tabId,
+            expectedHost: urlObj.hostname,
+            actualUrl: tab.url
+          });
+        }
+      } catch (error) {
+        logDebug('resolve', 'Tab not found by tabId (may be closed)', {tabId, error: error.message});
+        // Tab may have been closed, continue with URL-based search
+      }
+    }
+
+    // Priority 2: Search by URL pattern
     try {
       const urlObj = new URL(tabUrl);
       const pattern = `*://${urlObj.hostname}${urlObj.pathname}*`;
       const tabs = await chrome.tabs.query({url: pattern});
       logDebug('resolve', `Found ${tabs.length} matching tabs`, {pattern, tabCount: tabs.length});
       if (tabs.length && !newTab) {
+        // Prefer active tab, then the most recently accessed
         const activeTab = tabs.find(tab => tab.active);
         const selectedTab = activeTab || tabs[0];
-        logInfo('resolve', 'Reusing existing tab', {tabId: selectedTab.id, url: selectedTab.url});
+        logInfo('resolve', 'Reusing existing tab by URL', {tabId: selectedTab.id, url: selectedTab.url});
         return selectedTab.id;
       }
     } catch (error) {
       logWarn('resolve', 'Error querying tabs', {error: error.message});
       // ignore
     }
+
+    // Priority 3: Create new tab
     if (!tabUrl) {
       logWarn('resolve', 'No tabUrl provided');
       return undefined;
@@ -523,7 +551,8 @@ async function fetchRelayInfo(port) {
 
 async function autoConnectRelay(best) {
   const tabUrl = best?.data?.tabUrl;
-  logDebug('auto-connect', 'autoConnectRelay called', {port: best?.port, tabUrl, newTab: best?.data?.newTab});
+  const preferredTabId = best?.data?.tabId;
+  logDebug('auto-connect', 'autoConnectRelay called', {port: best?.port, tabUrl, tabId: preferredTabId, newTab: best?.data?.newTab});
 
   if (!tabUrl) {
     logDebug('auto-connect', 'No tabUrl, skipping');
@@ -534,19 +563,21 @@ async function autoConnectRelay(best) {
     const refreshed = await fetchRelayInfo(best.port);
     if (refreshed?.wsUrl) {
       best.data = refreshed;
-      logDebug('auto-connect', 'Refreshed relay info', {wsUrl: refreshed.wsUrl});
+      logDebug('auto-connect', 'Refreshed relay info', {wsUrl: refreshed.wsUrl, tabId: refreshed.tabId});
     }
   }
 
   // tabUrl があれば、connect.html を開かずに直接接続
+  // preferredTabId があれば優先的に使用
   let targetTabId;
   try {
     targetTabId = await tabShareExtension._resolveTabId(
       tabUrl,
+      preferredTabId,
       Boolean(best.data.newTab),
     );
   } catch (error) {
-    logError('auto-connect', 'Failed to resolve tab', {tabUrl, error: error.message});
+    logError('auto-connect', 'Failed to resolve tab', {tabUrl, tabId: preferredTabId, error: error.message});
     return false;
   }
   if (!targetTabId) {
@@ -587,6 +618,7 @@ async function autoConnectRelay(best) {
 }
 
 async function autoOpenConnectUi() {
+  logDebug('discovery', 'autoOpenConnectUi called');
   // 複数の relay を同時にサポート（ChatGPT + Gemini）
   const newRelays = [];
   for (const port of DISCOVERY_PORTS) {
@@ -650,11 +682,25 @@ async function autoOpenConnectUi() {
   }
 }
 
+// Discovery is now passive - only triggered by MCP server requests
+// The extension no longer auto-opens tabs on install/startup
+// MCPサーバーからの明示的な接続要求時のみ動作する
+
+// Clear any existing discovery alarms from previous sessions
+// This prevents leftover alarms from auto-opening tabs
+chrome.alarms.clear(DISCOVERY_ALARM).then(() => {
+  logInfo('background', 'Cleared existing discovery alarm (if any)');
+}).catch(() => {
+  // Ignore errors - alarm may not exist
+});
+
+// Note: We no longer register an onAlarm listener for DISCOVERY_ALARM
+// The scheduleDiscovery function is only called on explicit MCP requests
+
+// scheduleDiscovery is called only when MCP server explicitly requests connection
+// Note: No longer creates periodic alarms - uses burst mode only for immediate connection
 function scheduleDiscovery() {
-  chrome.alarms.create(DISCOVERY_ALARM, {
-    delayInMinutes: 0.05,
-    periodInMinutes: 1,
-  });
+  logInfo('discovery', 'scheduleDiscovery called');
   autoOpenConnectUi();
   let attempts = 0;
   const maxAttempts = 120; // 60s @ 500ms
@@ -668,18 +714,9 @@ function scheduleDiscovery() {
   setTimeout(burst, 200);
 }
 
-chrome.runtime.onInstalled.addListener(() => {
-  scheduleDiscovery();
-});
+// Discovery on install/startup - restored for MCP server connection
+chrome.runtime.onInstalled.addListener(() => { scheduleDiscovery(); });
+chrome.runtime.onStartup.addListener(() => { scheduleDiscovery(); });
+scheduleDiscovery();  // Start discovery immediately
 
-chrome.runtime.onStartup.addListener(() => {
-  scheduleDiscovery();
-});
-
-chrome.alarms.onAlarm.addListener(alarm => {
-  if (alarm?.name === DISCOVERY_ALARM) {
-    autoOpenConnectUi();
-  }
-});
-
-scheduleDiscovery();
+logInfo('background', 'Extension loaded (discovery mode active)');

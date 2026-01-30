@@ -265,6 +265,7 @@ export class RelayServer extends EventEmitter {
    */
   async startDiscoveryServer(options: {
     tabUrl?: string;
+    tabId?: number;
     newTab?: boolean;
   } = {}): Promise<number | null> {
     const ports = [8765, 8766, 8767, 8768, 8769, 8770, 8771, 8772, 8773, 8774, 8775];
@@ -283,6 +284,7 @@ export class RelayServer extends EventEmitter {
           res.end(JSON.stringify({
             wsUrl,
             tabUrl: options.tabUrl || null,
+            tabId: options.tabId ?? null,
             newTab: Boolean(options.newTab),
           }));
         });

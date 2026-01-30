@@ -1,0 +1,11 @@
+{
+  "reason": "userMessageMismatch",
+  "question": "ちょっと計算を手伝ってください。32 + 62 はいくつですか？数字だけで答えてください。（2026-01-29T07:17:58.432Z）",
+  "attempt": 0,
+  "inputText": "",
+  "lastUserText": "接続テストです。OK とだけ返してください。（2026-01-29T05:11:24.602Z）",
+  "textareaValue": "ちょっと計算を手伝ってください。32 + 62 はいくつですか？数字だけで答えてください。（2026-01-29T07:17:58.432Z）",
+  "title": "接続テスト",
+  "url": "https://chatgpt.com/c/697aebff-6f50-8321-a9a8-2684de130a0d",
+  "userCount": 1
+}

@@ -1,0 +1,14 @@
+{
+  "projects": {
+    "chrome-ai-bridge": {
+      "chatgpt": {
+        "url": "https://chatgpt.com/c/697c159d-5090-839b-89b5-84b47f5e7f60",
+        "lastUsed": "2026-01-30T02:21:24.132Z"
+      },
+      "gemini": {
+        "url": "https://gemini.google.com/app/4a184d03644e7bdc",
+        "lastUsed": "2026-01-29T23:32:09.712Z"
+      }
+    }
+  }
+}
