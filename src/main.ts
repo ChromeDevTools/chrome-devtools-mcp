@@ -37,6 +37,16 @@ const VERSION = '0.15.0';
 export const args = parseArguments(VERSION);
 
 const logFile = args.logFile ? saveLogsToFile(args.logFile) : undefined;
+if (
+  process.env['CI'] ||
+  process.env['CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS']
+) {
+  console.error(
+    "turning off usage statistics. process.env['CI'] || process.env['CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS'] is set.",
+  );
+  args.usageStatistics = false;
+}
+
 let clearcutLogger: ClearcutLogger | undefined;
 if (args.usageStatistics) {
   clearcutLogger = new ClearcutLogger({

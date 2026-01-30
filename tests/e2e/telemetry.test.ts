@@ -182,6 +182,8 @@ describe('Telemetry E2E', () => {
           stdio: ['pipe', 'pipe', 'pipe'],
           env: {
             ...process.env,
+            CI: undefined,
+            CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: undefined,
           },
           ...spawnOptions,
         },

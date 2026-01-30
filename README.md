@@ -41,6 +41,8 @@ Google handles this data in accordance with the [Google Privacy Policy](https://
 
 Google's collection of usage statistics for Chrome DevTools MCP is independent from the Chrome browser's usage statistics. Opting out of Chrome metrics does not automatically opt you out of this tool, and vice-versa.
 
+Collection is disabled if CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS or CI env variables are set.
+
 ## Requirements
 
 - [Node.js](https://nodejs.org/) v20.19 or a newer [latest maintenance LTS](https://github.com/nodejs/Release#release-schedule) version.
@@ -465,7 +467,7 @@ The Chrome DevTools MCP server supports the following configuration option:
   - **Default:** `true`
 
 - **`--usageStatistics`/ `--usage-statistics`**
-  Set to false to opt-out of usage statistics collection. Google collects usage data to improve the tool, handled under the Google Privacy Policy (https://policies.google.com/privacy). This is independent from Chrome browser metrics.
+  Set to false to opt-out of usage statistics collection. Google collects usage data to improve the tool, handled under the Google Privacy Policy (https://policies.google.com/privacy). This is independent from Chrome browser metrics. Disabled if CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS or CI env variables are set.
   - **Type:** boolean
   - **Default:** `true`
 
