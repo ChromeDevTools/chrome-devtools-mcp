@@ -33,7 +33,7 @@ npm run build
 2. `chrome://extensions/` にアクセス
 3. 「デベロッパーモード」を有効化
 4. 「パッケージ化されていない拡張機能を読み込む」をクリック
-5. `build/extension/` ディレクトリを選択
+5. `src/extension/` ディレクトリを選択
 
 ### 3. 拡張機能IDを確認
 

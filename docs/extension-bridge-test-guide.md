@@ -7,7 +7,7 @@
 1. Chrome で `chrome://extensions/` を開く
 2. 「デベロッパーモード」を有効化（右上のトグル）
 3. 「パッケージ化されていない拡張機能を読み込む」をクリック
-4. `/Users/usedhonda/projects/mcp/chrome-ai-bridge/build/extension/` ディレクトリを選択
+4. `/Users/usedhonda/projects/mcp/chrome-ai-bridge/src/extension/` ディレクトリを選択
 
 ### 2. テスト用Chromeタブの準備
 
