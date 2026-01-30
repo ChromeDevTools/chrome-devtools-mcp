@@ -132,7 +132,10 @@ export type Context = Readonly<{
     data: Uint8Array<ArrayBufferLike>,
     filename: string,
   ): Promise<{filename: string}>;
-  waitForEventsAfterAction(action: () => Promise<unknown>): Promise<void>;
+  waitForEventsAfterAction(
+    action: () => Promise<unknown>,
+    options?: {timeout?: number},
+  ): Promise<void>;
   waitForTextOnPage(text: string, timeout?: number): Promise<Element>;
   getDevToolsData(): Promise<DevToolsData>;
   /**

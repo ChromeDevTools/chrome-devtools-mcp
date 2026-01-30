@@ -8,6 +8,7 @@ import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
 import type {Dialog} from 'puppeteer-core';
+import sinon from 'sinon';
 
 import {
   listPages,
@@ -158,6 +159,34 @@ describe('pages', () => {
             'The selected page has been closed. Call list_pages to see open pages.',
           );
         }
+      });
+    });
+
+    it('respects the timeout parameter', async () => {
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedPage();
+        const stub = sinon.stub(page, 'waitForNavigation').resolves(null);
+
+        try {
+          await navigatePage.handler(
+            {
+              params: {
+                url: 'about:blank',
+                timeout: 12345,
+              },
+            },
+            response,
+            context,
+          );
+        } finally {
+          stub.restore();
+        }
+
+        assert.strictEqual(
+          stub.firstCall.args[0]?.timeout,
+          12345,
+          'The timeout parameter should be passed to waitForNavigation',
+        );
       });
     });
     it('go back', async () => {

@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.15.1](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.15.0...chrome-devtools-mcp-v0.15.1) (2026-01-30)
+
+
+### 🛠️ Fixes
+
+* disable usage statistics when CI or CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS env is set ([#862](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/862)) ([c0435a2](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/c0435a2d53eb51b7500fc5cce50344520ea164e7))
+* respect custom timeouts in navigate tools ([#865](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/865)) ([a0aeb97](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/a0aeb97693fd5ca641f45ebcd4ce3b4b08ce21b8))
+
+## [0.15.0](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.14.0...chrome-devtools-mcp-v0.15.0) (2026-01-28)
+
+
+### 🎉 Features
+
+* Add ability to inject script to run on page load ([#568](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/568)) ([d845ad4](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/d845ad48584a49aa57b11de308beeb17ed0b2e10))
+* enable usage statistics by default with opt-out ([#855](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/855)) ([7e279f1](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/7e279f1b67c5cfd4ad033a4147c51fe20a7833f7))
+* support testing light and dark mode ([#858](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/858)) ([5a23a8c](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/5a23a8c201d30d40395e283f4434d933826333fa))
+
 ## [0.14.0](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.13.0...chrome-devtools-mcp-v0.14.0) (2026-01-27)
 
 

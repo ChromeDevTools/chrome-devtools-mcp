@@ -31,12 +31,22 @@ import {tools} from './tools/tools.js';
 
 // If moved update release-please config
 // x-release-please-start-version
-const VERSION = '0.14.0';
+const VERSION = '0.15.1';
 // x-release-please-end
 
 export const args = parseArguments(VERSION);
 
 const logFile = args.logFile ? saveLogsToFile(args.logFile) : undefined;
+if (
+  process.env['CI'] ||
+  process.env['CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS']
+) {
+  console.error(
+    "turning off usage statistics. process.env['CI'] || process.env['CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS'] is set.",
+  );
+  args.usageStatistics = false;
+}
+
 let clearcutLogger: ClearcutLogger | undefined;
 if (args.usageStatistics) {
   clearcutLogger = new ClearcutLogger({
