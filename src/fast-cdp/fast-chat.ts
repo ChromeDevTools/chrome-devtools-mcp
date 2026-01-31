@@ -1,12 +1,17 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
-import {connectViaExtensionRaw} from './extension-raw.js';
+import {connectViaExtensionRaw, RawExtensionConnection} from './extension-raw.js';
 import {CdpClient} from './cdp-client.js';
+import {RelayServer} from '../extension/relay-server.js';
 import {logConnectionState, logInfo, logError, logWarn} from './mcp-logger.js';
 
 let chatgptClient: CdpClient | null = null;
 let geminiClient: CdpClient | null = null;
+
+// RelayServer参照を保持（接続失敗時のクリーンアップ用）
+let chatgptRelay: RelayServer | null = null;
+let geminiRelay: RelayServer | null = null;
 
 /**
  * チャット結果の型（タイミング情報付き）
@@ -37,9 +42,9 @@ function nowMs(): number {
 async function isConnectionHealthy(client: CdpClient, kind?: 'chatgpt' | 'gemini'): Promise<boolean> {
   const startTime = Date.now();
   try {
-    // 2秒タイムアウトで簡単なコマンドを実行
+    // 4秒タイムアウトで簡単なコマンドを実行（2秒では不十分な場合があった）
     const timeoutPromise = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error('Health check timeout')), 2000)
+      setTimeout(() => reject(new Error('Health check timeout')), 4000)
     );
     await Promise.race([client.evaluate('1'), timeoutPromise]);
     const elapsed = Date.now() - startTime;
@@ -249,10 +254,13 @@ async function createConnection(kind: 'chatgpt' | 'gemini'): Promise<CdpClient> 
         );
       }
 
+      // クライアントとRelay参照を保存
       if (kind === 'chatgpt') {
         chatgptClient = client;
+        chatgptRelay = relayResult.relay;
       } else {
         geminiClient = client;
+        geminiRelay = relayResult.relay;
       }
       const elapsed = Date.now() - startTime;
       logConnectionState(kind, 'connected', {elapsed, reused: true});
@@ -284,10 +292,13 @@ async function createConnection(kind: 'chatgpt' | 'gemini'): Promise<CdpClient> 
       await client.send('DOM.enable');
       await client.send('Page.enable');
 
+      // クライアントとRelay参照を保存
       if (kind === 'chatgpt') {
         chatgptClient = client;
+        chatgptRelay = relayResult.relay;
       } else {
         geminiClient = client;
+        geminiRelay = relayResult.relay;
       }
 
       const elapsed = Date.now() - startTime;
@@ -331,13 +342,29 @@ export async function getClient(kind: 'chatgpt' | 'gemini'): Promise<CdpClient> 
       return existing;
     }
 
-    // 接続が切れている → キャッシュをクリア
+    // 接続が切れている → 古いRelayServerをクリーンアップ
     logConnectionState(kind, 'reconnecting');
     console.error(`[fast-cdp] ${kind} connection lost, reconnecting...`);
+
+    // 古いRelayServerを停止
+    const oldRelay = kind === 'chatgpt' ? chatgptRelay : geminiRelay;
+    if (oldRelay) {
+      logInfo('fast-chat', `Stopping stale ${kind} RelayServer`);
+      console.error(`[fast-cdp] Stopping stale ${kind} RelayServer`);
+      await oldRelay.stop().catch((err) => {
+        logWarn('fast-chat', `Failed to stop stale ${kind} RelayServer`, {
+          error: err instanceof Error ? err.message : String(err),
+        });
+      });
+    }
+
+    // キャッシュをクリア
     if (kind === 'chatgpt') {
       chatgptClient = null;
+      chatgptRelay = null;
     } else {
       geminiClient = null;
+      geminiRelay = null;
     }
   }
 
@@ -1780,14 +1807,27 @@ async function askGeminiFastInternal(question: string): Promise<ChatResult> {
   console.error('[Gemini] Message sent successfully (count increased)');
 
   const tWaitResp = nowMs();
-  console.error('[Gemini] Waiting for response completion (mic button OR send button enabled)...');
+  console.error('[Gemini] Waiting for response completion (polling with diagnostics)...');
 
-  // 応答完了判定:
-  // - 停止ボタンがない AND (マイクボタンが表示 OR 送信ボタンが有効)
-  // マイクボタン = 入力欄が空（応答後の状態）
-  // 送信ボタン有効 = テキスト入力中でも送信可能（次の質問を入力済み）
-  try {
-    await client.waitForFunction(`
+  // ChatGPT側と同様のポーリングループで応答完了を検出
+  // 長い応答に対応するため8分（480秒）に設定
+  const maxWaitMs = 480000;
+  const pollIntervalMs = 1000;
+  const startWait = Date.now();
+  let lastLoggedState = '';
+  let sawStopButton = false;  // 停止ボタンを見たかどうか（生成が始まった証拠）
+  let lastTextLength = 0;
+  let textStableCount = 0;  // テキスト長が変わらなかった回数
+
+  while (Date.now() - startWait < maxWaitMs) {
+    const state = await client.evaluate<{
+      hasStopButton: boolean;
+      hasMicButton: boolean;
+      sendButtonEnabled: boolean;
+      modelResponseCount: number;
+      lastResponseTextLength: number;
+      inputBoxEmpty: boolean;
+    }>(`
       (() => {
         const collectDeep = (selectorList) => {
           const results = [];
@@ -1830,17 +1870,15 @@ async function askGeminiFastInternal(question: string): Promise<ChatResult> {
 
         const buttons = collectDeep(['button', '[role="button"]']).filter(isVisible);
 
-        // 停止ボタンがある場合はまだ生成中（これが最優先）
+        // 停止ボタン検出（複数セレクター）
         const hasStopButton = buttons.some(b => {
           const text = (b.textContent || '').trim();
           const label = (b.getAttribute('aria-label') || '').trim();
           return text.includes('停止') || label.includes('停止') ||
                  text.includes('Stop') || label.includes('Stop');
         });
-        if (hasStopButton) return false;
 
-        // 条件1: マイクボタンが表示（入力欄が空 = 応答完了後の状態）
-        // 多言語対応: マイク(日本語), mic, microphone, voice(英語)
+        // マイクボタン検出（入力欄が空の状態で表示）
         const micButton = document.querySelector('[data-node-type="speech_dictation_mic_button"]') ||
                           buttons.find(b => {
                             const label = (b.getAttribute('aria-label') || '').toLowerCase();
@@ -1849,11 +1887,8 @@ async function askGeminiFastInternal(question: string): Promise<ChatResult> {
                                    label.includes('microphone') ||
                                    label.includes('voice');
                           });
-        if (micButton && isVisible(micButton)) {
-          return true;
-        }
 
-        // 条件2: 送信ボタンが有効（テキスト入力済みで送信可能）
+        // 送信ボタン検出
         const sendBtn = buttons.find(b =>
           (b.textContent || '').includes('プロンプトを送信') ||
           (b.textContent || '').includes('送信') ||
@@ -1862,23 +1897,101 @@ async function askGeminiFastInternal(question: string): Promise<ChatResult> {
           b.querySelector('mat-icon[data-mat-icon-name="send"]') ||
           b.querySelector('[data-icon="send"]')
         );
-        if (sendBtn && !isDisabled(sendBtn)) {
-          return true;
+
+        // モデルレスポンス収集（Shadow DOM対応）
+        const allResponses = collectDeep(['model-response', '[data-test-id*="response"]', '.response', '.model-response']);
+        const lastResponse = allResponses[allResponses.length - 1];
+        const lastResponseTextLength = lastResponse ? (lastResponse.innerText || lastResponse.textContent || '').length : 0;
+
+        // 入力欄の状態確認
+        const inputSelectors = ['rich-textarea textarea', '.ql-editor', '[contenteditable="true"]', 'textarea'];
+        let inputBoxEmpty = true;
+        for (const sel of inputSelectors) {
+          const el = document.querySelector(sel);
+          if (el) {
+            const text = el.tagName === 'TEXTAREA' ? el.value : (el.textContent || '');
+            if (text.trim().length > 0) {
+              inputBoxEmpty = false;
+              break;
+            }
+          }
         }
 
-        return false;
+        return {
+          hasStopButton,
+          hasMicButton: Boolean(micButton && isVisible(micButton)),
+          sendButtonEnabled: Boolean(sendBtn && !isDisabled(sendBtn)),
+          modelResponseCount: allResponses.length,
+          lastResponseTextLength,
+          inputBoxEmpty,
+        };
       })()
-    `, 480000);  // 8分（長い応答に対応）
-    console.error('[Gemini] Response complete (mic button or send button ready)');
-  } catch (waitError) {
-    console.error('[Gemini] Timeout waiting for response completion');
-    const diagnostics = await client.evaluate(`
+    `);
+
+    // 停止ボタンを検出したらフラグを立てる（生成が始まった証拠）
+    if (state.hasStopButton) {
+      sawStopButton = true;
+    }
+
+    // テキスト長安定化検出
+    if (state.lastResponseTextLength === lastTextLength && state.lastResponseTextLength > 0) {
+      textStableCount++;
+    } else {
+      textStableCount = 0;
+      lastTextLength = state.lastResponseTextLength;
+    }
+
+    // 状態が変化した場合のみログ出力
+    const currentState = JSON.stringify(state);
+    if (currentState !== lastLoggedState) {
+      const elapsed = Math.round((Date.now() - startWait) / 1000);
+      console.error(`[Gemini] State @${elapsed}s: stop=${state.hasStopButton}, mic=${state.hasMicButton}, send=${state.sendButtonEnabled}, responses=${state.modelResponseCount}, textLen=${state.lastResponseTextLength}, inputEmpty=${state.inputBoxEmpty}, sawStop=${sawStopButton}, textStable=${textStableCount}`);
+      lastLoggedState = currentState;
+    }
+
+    // 応答完了条件1: 停止ボタンを見た後に消えた AND マイクボタン表示
+    if (sawStopButton && !state.hasStopButton && state.hasMicButton) {
+      console.error('[Gemini] Response complete - stop button disappeared, mic button visible');
+      break;
+    }
+
+    // 応答完了条件2: 停止ボタンを見た後に消えた AND 送信ボタン有効 AND 入力欄空
+    if (sawStopButton && !state.hasStopButton && state.sendButtonEnabled && state.inputBoxEmpty) {
+      console.error('[Gemini] Response complete - stop button disappeared, send button enabled, input empty');
+      break;
+    }
+
+    // 応答完了条件3: テキスト長が5秒間安定 AND レスポンスが存在
+    if (textStableCount >= 5 && state.modelResponseCount > 0 && !state.hasStopButton) {
+      console.error(`[Gemini] Response complete - text stable for ${textStableCount}s, ${state.modelResponseCount} response(s)`);
+      break;
+    }
+
+    // フォールバック: 10秒以上経過 + 停止ボタンを見ていない + レスポンス存在 + 停止ボタンなし
+    const elapsed = Date.now() - startWait;
+    if (elapsed > 10000 && !sawStopButton && state.modelResponseCount > 0 && !state.hasStopButton && (state.hasMicButton || state.inputBoxEmpty)) {
+      console.error(`[Gemini] Response complete - fallback after 10s (no stop button seen, ${state.modelResponseCount} response(s), mic=${state.hasMicButton})`);
+      break;
+    }
+
+    await new Promise(r => setTimeout(r, pollIntervalMs));
+  }
+
+  // タイムアウトチェック
+  if (Date.now() - startWait >= maxWaitMs) {
+    const finalState = await client.evaluate<Record<string, unknown>>(`
       (() => {
         const textIncludes = (needle) => document.body && document.body.innerText && document.body.innerText.includes(needle);
         const counts = (selector) => {
           const nodes = Array.from(document.querySelectorAll(selector));
-          return {all: nodes.length};
+          return {count: nodes.length};
         };
+        const allButtons = Array.from(document.querySelectorAll('button'));
+        const buttonSummary = allButtons.slice(0, 10).map(b => ({
+          text: (b.textContent || '').trim().substring(0, 30),
+          label: b.getAttribute('aria-label'),
+          disabled: b.disabled,
+        }));
         const loginLink = document.querySelector('a[href*="accounts.google.com"]');
         return {
           url: location.href,
@@ -1890,10 +2003,12 @@ async function askGeminiFastInternal(question: string): Promise<ChatResult> {
             markdown: counts('.markdown'),
             ariaLive: counts('[aria-live="polite"]'),
           },
+          buttonSummary,
         };
       })()
     `);
-    throw new Error(`Timed out waiting for Gemini response (send button not enabled after 8min): ${JSON.stringify(diagnostics)}`);
+    console.error(`[Gemini] Timeout - final state: ${JSON.stringify(finalState)}`);
+    throw new Error(`Timed out waiting for Gemini response (8min). sawStopButton=${sawStopButton}, textStableCount=${textStableCount}. Final state: ${JSON.stringify(finalState)}`);
   }
 
   // 最後のレスポンスを取得（シンプルにinnerTextを使用）
