@@ -1241,19 +1241,53 @@ async function askChatGPTFastInternal(question: string): Promise<ChatResult> {
             if (text.length > 0) return text;
           }
 
-          // テキスト抽出: p要素を結合
+          // Thinkingモード対応: button以外のコンテンツコンテナからテキストを抽出
+          // DOM構造: article > div > div (generic) > button/"思考時間" + div (generic) > p/回答
+          const contentDivs = lastAssistantArticle.querySelectorAll(':scope > div > div');
+          for (const div of contentDivs) {
+            // buttonはスキップ（「思考中」「今すぐ回答」「思考時間: Xs」）
+            if (div.tagName === 'BUTTON') continue;
+
+            // div内のparagraphを探す
+            const paragraphs = div.querySelectorAll('p');
+            if (paragraphs.length > 0) {
+              const text = Array.from(paragraphs)
+                .map(p => (p.innerText || p.textContent || '').trim())
+                .filter(t => t.length > 0)
+                .join('\\n\\n');
+              if (text.length > 0) return text;
+            }
+          }
+
+          // テキスト抽出: p要素を結合（button内のpは除外）
           const paragraphs = lastAssistantArticle.querySelectorAll('p');
           if (paragraphs.length > 0) {
             const text = Array.from(paragraphs)
+              .filter(p => !p.closest('button'))  // button内のpは除外
               .map(p => (p.innerText || p.textContent || '').trim())
               .filter(t => t.length > 0)
               .join('\\n\\n');
             if (text.length > 0) return text;
           }
 
-          // フォールバック: article全体のテキスト（ヘッダー除去）
+          // フォールバック: article全体のテキスト（ヘッダー・ボタンテキスト除去）
           const fullText = (lastAssistantArticle.innerText || lastAssistantArticle.textContent || '').trim();
-          return fullText.replace(/^ChatGPT:\\s*/i, '').trim();
+          // ボタンテキストパターンを除去
+          const cleaned = fullText
+            .replace(/^ChatGPT:\\s*/i, '')
+            .split('\\n')
+            .filter(line => {
+              const trimmed = line.trim();
+              // Thinking関連のボタンテキストを除外
+              if (/^思考時間:\\s*\\d+s?$/.test(trimmed)) return false;
+              if (trimmed === '思考中') return false;
+              if (trimmed === '今すぐ回答') return false;
+              if (trimmed === 'Skip thinking') return false;
+              return true;
+            })
+            .join('\\n')
+            .trim();
+          return cleaned;
         })()
       `);
 

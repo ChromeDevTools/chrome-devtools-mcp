@@ -1,6 +1,6 @@
 {
   "name": "chrome-ai-bridge",
-  "version": "2.0.4",
+  "version": "2.0.9",
   "description": "MCP server bridging Chrome extension and AI assistants (ChatGPT, Gemini). Extension-only mode - no Puppeteer.",
   "type": "module",
   "bin": "./scripts/cli.mjs",

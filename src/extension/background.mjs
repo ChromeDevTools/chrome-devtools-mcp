@@ -759,7 +759,8 @@ chrome.alarms.clear(DISCOVERY_ALARM).then(() => {
 // Keep-alive alarm to prevent Service Worker from sleeping
 const KEEPALIVE_ALARM = 'keepAlive';
 
-chrome.alarms.create(KEEPALIVE_ALARM, { periodInMinutes: 1 });
+// 30秒間隔（periodInMinutesの最小値は0.5 = 30秒）
+chrome.alarms.create(KEEPALIVE_ALARM, { periodInMinutes: 0.5 });
 
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === KEEPALIVE_ALARM) {
@@ -767,6 +768,13 @@ chrome.alarms.onAlarm.addListener((alarm) => {
     const pendingCount = tabShareExtension._pendingTabSelection.size;
     if (activeCount > 0 || pendingCount > 0) {
       logDebug('keepalive', 'Alarm triggered', { activeCount, pendingCount });
+    }
+
+    // Discovery pollingが停止していたら再開
+    // Service Workerがスリープから復帰した場合に対応
+    if (discoveryIntervalId === null) {
+      logInfo('keepalive', 'Discovery was stopped, restarting...');
+      scheduleDiscovery();
     }
   }
 });
