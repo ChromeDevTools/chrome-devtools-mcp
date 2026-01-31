@@ -65,6 +65,46 @@ async function isConnectionHealthy(client: CdpClient, kind?: 'chatgpt' | 'gemini
   }
 }
 
+/**
+ * メッセージカウントが安定するまで待機
+ * ページ読み込み完了を確認するため、カウントが2回連続で同じ値になるまで待機
+ * @param client CDPクライアント
+ * @param countExpr カウントを取得するJavaScript式
+ * @param maxWaitMs 最大待機時間（デフォルト3000ms）
+ * @param pollIntervalMs ポーリング間隔（デフォルト300ms）
+ * @returns 安定したカウント値
+ */
+async function waitForStableCount(
+  client: CdpClient,
+  countExpr: string,
+  maxWaitMs: number = 3000,
+  pollIntervalMs: number = 300,
+): Promise<number> {
+  const startTime = Date.now();
+  let lastCount = -1;
+  let stableCount = 0;
+
+  while (Date.now() - startTime < maxWaitMs) {
+    const currentCount = await client.evaluate<number>(countExpr);
+
+    if (currentCount === lastCount) {
+      stableCount++;
+      if (stableCount >= 2) {
+        // 2回連続で同じ値なら安定したとみなす
+        return currentCount;
+      }
+    } else {
+      stableCount = 0;
+      lastCount = currentCount;
+    }
+
+    await new Promise(r => setTimeout(r, pollIntervalMs));
+  }
+
+  // タイムアウト時は最後のカウントを返す
+  return lastCount >= 0 ? lastCount : 0;
+}
+
 type SessionEntry = {
   url: string;
   tabId?: number;
@@ -455,11 +495,14 @@ async function askChatGPTFastInternal(question: string): Promise<ChatResult> {
   timings.waitInputMs = nowMs() - tWaitInput;
   logInfo('chatgpt', 'Input field found', {waitInputMs: timings.waitInputMs});
 
-  // 初期ユーザーメッセージカウントを取得（送信成功判定に使用）
-  const initialUserCount = await client.evaluate<number>(
-    `document.querySelectorAll('[data-message-author-role="user"]').length`,
-  );
-  console.error(`[ChatGPT] Initial user count: ${initialUserCount}`);
+  // 初期メッセージカウントを取得（ページ読み込み完了を待ってから）
+  // ページが完全に読み込まれるまでカウントが安定しないため、安定するまで待機
+  const userCountExpr = `document.querySelectorAll('[data-message-author-role="user"]').length`;
+  const assistantCountExpr = `document.querySelectorAll('[data-message-author-role="assistant"]').length`;
+
+  const initialUserCount = await waitForStableCount(client, userCountExpr);
+  const initialAssistantCount = await waitForStableCount(client, assistantCountExpr);
+  console.error(`[ChatGPT] Initial counts (stable): user=${initialUserCount}, assistant=${initialAssistantCount}`);
 
   // createConnection で正しいURL (https://chatgpt.com/) に接続済み
 
@@ -1056,10 +1099,10 @@ async function askChatGPTFastInternal(question: string): Promise<ChatResult> {
       }
 
       // 応答完了条件（シンプル版）:
-      // 停止ボタンを一度でも見た後に消えた AND 入力欄が空 AND アシスタントメッセージが存在
-      // カウント比較は不安定なため廃止、最後のメッセージを直接取得する方式に変更
-      if (sawStopButton && !state.hasStopButton && !state.inputBoxHasText && state.assistantMsgCount > 0) {
-        console.error(`[ChatGPT] Response complete - stop button disappeared, input empty, has ${state.assistantMsgCount} assistant message(s)`);
+      // 停止ボタンを一度でも見た後に消えた AND 入力欄が空 AND 新しいアシスタントメッセージが増えた
+      // initialAssistantCountとの比較で、既存の回答を新しい回答と誤判断しない
+      if (sawStopButton && !state.hasStopButton && !state.inputBoxHasText && state.assistantMsgCount > initialAssistantCount) {
+        console.error(`[ChatGPT] Response complete - stop button disappeared, input empty, assistant count increased (${initialAssistantCount} -> ${state.assistantMsgCount})`);
         // ChatGPT 5.2 Thinking: 完了直後にストリーミング中のテキストをキャプチャ
         // （完了後は折りたたまれてしまうため、この時点で取得）
         streamingText = await client.evaluate<string>(`
@@ -1084,11 +1127,11 @@ async function askChatGPTFastInternal(question: string): Promise<ChatResult> {
         break;
       }
 
-      // フォールバック: 5秒以上待って、stopボタンなし、入力欄空、アシスタントメッセージが存在
+      // フォールバック: 5秒以上待って、stopボタンなし、入力欄空、新しいアシスタントメッセージが増えた
       // （stopボタンを見逃した場合の救済）
       const elapsed = Date.now() - startWait;
-      if (elapsed > 5000 && !state.hasStopButton && !state.inputBoxHasText && state.assistantMsgCount > 0) {
-        console.error(`[ChatGPT] Response complete - fallback after 5s (no stop button, input empty, has ${state.assistantMsgCount} assistant message(s))`);
+      if (elapsed > 5000 && !state.hasStopButton && !state.inputBoxHasText && state.assistantMsgCount > initialAssistantCount) {
+        console.error(`[ChatGPT] Response complete - fallback after 5s (no stop button, input empty, assistant count increased ${initialAssistantCount} -> ${state.assistantMsgCount})`);
         break;
       }
 
@@ -1366,8 +1409,7 @@ async function askGeminiFastInternal(question: string): Promise<ChatResult> {
     return results.length;
   })()`;
 
-  const initialGeminiUserCount = await client.evaluate<number>(geminiUserCountExpr);
-  const initialModelResponseCount = await client.evaluate<number>(`
+  const geminiModelResponseCountExpr = `
     (() => {
       const collectDeep = (selectorList) => {
         const results = [];
@@ -1394,8 +1436,13 @@ async function askGeminiFastInternal(question: string): Promise<ChatResult> {
       };
       return collectDeep(['model-response', '.model-response', '[data-test-id*="response"]']).length;
     })()
-  `);
-  console.error(`[Gemini] Initial counts BEFORE input: user=${initialGeminiUserCount}, modelResponse=${initialModelResponseCount}`);
+  `;
+
+  // ページ読み込み完了を待ってから初期カウントを取得
+  // カウントが安定するまでポーリング（2回連続で同じ値になるまで）
+  const initialGeminiUserCount = await waitForStableCount(client, geminiUserCountExpr);
+  const initialModelResponseCount = await waitForStableCount(client, geminiModelResponseCountExpr);
+  console.error(`[Gemini] Initial counts (stable): user=${initialGeminiUserCount}, modelResponse=${initialModelResponseCount}`);
 
   const sanitized = JSON.stringify(question);
   const tInput = nowMs();
@@ -2193,34 +2240,34 @@ async function askGeminiFastInternal(question: string): Promise<ChatResult> {
       lastLoggedState = currentState;
     }
 
-    // 応答完了条件0: 停止ボタンを見た後に消えた AND フィードバックボタン表示（最も確実）
-    if (sawStopButton && !state.hasStopButton && state.hasFeedbackButtons) {
-      console.error('[Gemini] Response complete - stop button disappeared, feedback buttons visible');
+    // 応答完了条件0: 停止ボタンを見た後に消えた AND フィードバックボタン表示 AND 新しい回答が増えた
+    if (sawStopButton && !state.hasStopButton && state.hasFeedbackButtons && state.modelResponseCount > initialModelResponseCount) {
+      console.error(`[Gemini] Response complete - stop button disappeared, feedback buttons visible, response count increased (${initialModelResponseCount} -> ${state.modelResponseCount})`);
       break;
     }
 
-    // 応答完了条件1: 停止ボタンを見た後に消えた AND マイクボタン表示
-    if (sawStopButton && !state.hasStopButton && state.hasMicButton) {
-      console.error('[Gemini] Response complete - stop button disappeared, mic button visible');
+    // 応答完了条件1: 停止ボタンを見た後に消えた AND マイクボタン表示 AND 新しい回答が増えた
+    if (sawStopButton && !state.hasStopButton && state.hasMicButton && state.modelResponseCount > initialModelResponseCount) {
+      console.error(`[Gemini] Response complete - stop button disappeared, mic button visible, response count increased (${initialModelResponseCount} -> ${state.modelResponseCount})`);
       break;
     }
 
-    // 応答完了条件2: 停止ボタンを見た後に消えた AND 送信ボタン有効 AND 入力欄空
-    if (sawStopButton && !state.hasStopButton && state.sendButtonEnabled && state.inputBoxEmpty) {
-      console.error('[Gemini] Response complete - stop button disappeared, send button enabled, input empty');
+    // 応答完了条件2: 停止ボタンを見た後に消えた AND 送信ボタン有効 AND 入力欄空 AND 新しい回答が増えた
+    if (sawStopButton && !state.hasStopButton && state.sendButtonEnabled && state.inputBoxEmpty && state.modelResponseCount > initialModelResponseCount) {
+      console.error(`[Gemini] Response complete - stop button disappeared, send button enabled, input empty, response count increased (${initialModelResponseCount} -> ${state.modelResponseCount})`);
       break;
     }
 
-    // 応答完了条件3: テキスト長が5秒間安定 AND レスポンスが存在
-    if (textStableCount >= 5 && state.modelResponseCount > 0 && !state.hasStopButton) {
-      console.error(`[Gemini] Response complete - text stable for ${textStableCount}s, ${state.modelResponseCount} response(s)`);
+    // 応答完了条件3: テキスト長が5秒間安定 AND 新しいレスポンスが増えた
+    if (textStableCount >= 5 && state.modelResponseCount > initialModelResponseCount && !state.hasStopButton) {
+      console.error(`[Gemini] Response complete - text stable for ${textStableCount}s, response count increased (${initialModelResponseCount} -> ${state.modelResponseCount})`);
       break;
     }
 
-    // フォールバック: 10秒以上経過 + 停止ボタンを見ていない + レスポンス存在 + 停止ボタンなし
+    // フォールバック: 10秒以上経過 + 停止ボタンを見ていない + 新しいレスポンスが増えた + 停止ボタンなし
     const elapsed = Date.now() - startWait;
-    if (elapsed > 10000 && !sawStopButton && state.modelResponseCount > 0 && !state.hasStopButton && (state.hasMicButton || state.inputBoxEmpty)) {
-      console.error(`[Gemini] Response complete - fallback after 10s (no stop button seen, ${state.modelResponseCount} response(s), mic=${state.hasMicButton})`);
+    if (elapsed > 10000 && !sawStopButton && state.modelResponseCount > initialModelResponseCount && !state.hasStopButton && (state.hasMicButton || state.inputBoxEmpty)) {
+      console.error(`[Gemini] Response complete - fallback after 10s (no stop button seen, response count increased ${initialModelResponseCount} -> ${state.modelResponseCount}, mic=${state.hasMicButton})`);
       break;
     }
 
