@@ -1,150 +1,189 @@
-# Gemini応答抽出の安定化
+# 同時接続の設計見直し計画
 
-## 問題
+## 絶対ルール
 
-Geminiは応答を表示しているが、chrome-ai-bridgeが取得できずタイムアウトする。
+**単独接続（askChatGPTFast, askGeminiFast）に影響を与えない**
+
+- 単独接続のコードは一切変更しない
+- テストは必ず単独接続から先に実行し、問題がないことを確認
+- 並列接続の変更は ai-helpers.ts / chatgpt-gemini-web.ts のみに限定
+- 問題発生時は即座に中止
+
+## 背景
+
+commit `0440614` で単独接続（askChatGPTFast, askGeminiFast）に `waitForStableCount()` と初期カウント追跡を導入した。同時接続（ask_chatgpt_gemini_web）でも同じ安定した関数を共有し、設計を見直す。
+
+## 現状分析
+
+### 呼び出し構造
 
 ```
-Timed out waiting for Gemini response (8min).
-sawStopButton=true, textStableCount=461
+ask_chatgpt_gemini_web (chatgpt-gemini-web.ts)
+  ├─ connectAI('chatgpt') ──→ getClient('chatgpt')
+  ├─ connectAI('gemini') ───→ getClient('gemini')
+  │
+  └─ Promise.all([
+       askAI('chatgpt', q) ──→ askChatGPTFast()  ← 単独実装をそのまま使用
+       askAI('gemini', q) ───→ askGeminiFast()   ← 単独実装をそのまま使用
+     ])
 ```
 
-## 調査結果（2026-01-31）
+### 現状の問題点
 
-### Playwrightで確認した実際のDOM構造
+1. **接続と質問が分離**: `connectAI()` で接続後、`askAI()` で再度接続（getClient内部で）
+2. **ai-helpers.ts の薄いラッパー**: `askAI()` は単に try-catch でラップしているだけ
+3. **冗長性**: 並列接続で特別な最適化がない
 
-```yaml
-# 応答コンテナ
-generic [ref=e107]:
-  generic [ref=e108]:
-    generic [ref=e115]:
-      button "思考プロセスを表示" [ref=e122]   # ← 応答の目印
-      generic [ref=e132]:                      # ← 応答本文
-        paragraph: "日本の政治の現状について..."
-        heading: "1. 高市早苗首相について"
-        paragraph: "高市早苗氏は..."
-        list: [listitem, listitem, ...]
-        table: [...]
-  generic [ref=e203]:
-    button "良い回答"    # ← 応答完了の目印
-    button "悪い回答"
-    button "やり直す"
-    button "コピー"
+### 良い点（維持すべき）
 
-# マイクボタン（正確な構造）
-button "マイク" [ref=e274]:
-  img [alt="mic"]
+1. 単独接続の実装（`askChatGPTFastInternal`, `askGeminiFastInternal`）は安定
+2. `waitForStableCount()` は既に共通関数として抽出済み
+3. 初期カウント追跡も各実装に組み込み済み
 
-# 入力欄
-textbox "ここにプロンプトを入力してください" [ref=e241]
-```
+## 設計方針
 
-### 根本原因
+### 結論: 現状維持 + 軽微な改善
 
-1. **セレクター不一致**: `model-response`, `.response` は**存在しない**
-2. **マイクボタン検出**: `[data-node-type="speech_dictation_mic_button"]` は存在しない。実際は `button` + `img[alt="mic"]`
-3. **応答要素**: 特定のクラス名がなく、`generic` 要素のネスト構造
+調査の結果、**現在の設計は適切**であり、大幅な変更は不要と判断。
 
-## 修正方針
+理由:
+- 並列接続は内部で `askChatGPTFast()` / `askGeminiFast()` を呼び出しており、commit `0440614` の改善は**自動的に適用**される
+- 接続の再利用は `getClient()` 内部で既にキャッシュされている
+- 過度な共通化は可読性・保守性を損なう
 
-### 方針1: マイクボタン検出の修正
-現在のセレクターを実際のDOM構造に合わせる
+### 改善候補（オプション）
 
-### 方針2: 応答完了判定の改善
-「良い回答」「悪い回答」ボタンの存在を応答完了の証拠として使用
+| 改善 | 効果 | 優先度 |
+|------|------|--------|
+| `connectAI()` の削除 | 冗長コード削減 | 低 |
+| `ai-helpers.ts` の簡略化 | ファイル数削減 | 低 |
+| `collectDeep()` の共通関数化 | コード重複削減 | 中 |
+| タイミング情報の統一 | 並列クエリのタイミング可視化 | 中 |
 
-### 方針3: 応答テキスト抽出の改善
-フィードバックボタンの前にある要素からテキストを取得
+## 提案: 3つの選択肢
 
-## 修正内容
+### 選択肢A: 現状維持（推奨）
 
-**ファイル**: `src/fast-cdp/fast-chat.ts`
+変更なし。現在の設計は十分に機能している。
 
-### 変更1: マイクボタン検出の修正（line 2019-2026付近）
+**理由**:
+- 並列接続は既に単独接続の安定した実装を内部で使用
+- `waitForStableCount()` と初期カウント追跡は自動的に適用済み
+- 不要な変更はリスクを増やすだけ
 
-**言語非依存**: `img[alt="mic"]` を使用
+### 選択肢B: 軽微なリファクタリング
 
-```typescript
-// 現状（動作しない）
-const micButton = document.querySelector('[data-node-type="speech_dictation_mic_button"]') || ...
+1. `ai-helpers.ts` の `connectAI()` を削除
+2. `askAI()` を `chatgpt-gemini-web.ts` にインライン化
+3. ファイル構造をシンプルに
 
-// 修正後（言語非依存）
-const micButton = (() => {
-  // img[alt="mic"] を含むボタンを探す（アイコン名は言語非依存）
-  const micImg = document.querySelector('img[alt="mic"]');
-  if (micImg) return micImg.closest('button');
-  return null;
-})();
-```
+**変更ファイル**:
+- `src/tools/ai-helpers.ts` - 削除または縮小
+- `src/tools/chatgpt-gemini-web.ts` - ロジック統合
 
-### 変更2: 応答完了判定の追加条件（line 2090付近）
+### 選択肢C: 共通関数の抽出
 
-**言語非依存**: `img[alt="thumb_up"]`, `img[alt="thumb_down"]` を使用
+1. `collectDeep()` を `src/fast-cdp/dom-helpers.ts` に抽出
+2. 重複コード（約20箇所）を共通関数呼び出しに置き換え
 
-```typescript
-// フィードバックボタンの存在を確認（言語非依存）
-const hasFeedbackButtons = !!document.querySelector('img[alt="thumb_up"], img[alt="thumb_down"]');
+**新規ファイル**:
+- `src/fast-cdp/dom-helpers.ts`
 
-// 条件追加: フィードバックボタンが表示されていれば応答完了
-if (sawStopButton && !state.hasStopButton && hasFeedbackButtons) {
-  console.error('[Gemini] Response complete - feedback buttons visible');
-  break;
-}
-```
+**変更ファイル**:
+- `src/fast-cdp/fast-chat.ts` - 共通関数を使用
 
-### 変更3: 応答テキスト抽出の改善（line 2179付近）
+## 決定: 現状維持 + テスト検証
 
-**言語非依存**: `img[alt="thumb_up"]` を基準に応答要素を特定
+## テスト計画
 
-```typescript
-// フィードバックボタンを基準に応答を探す（言語非依存）
-const answer = await client.evaluate<string>(`
-  (() => {
-    // thumb_upアイコンを探す（言語非依存）
-    const thumbUpImg = document.querySelector('img[alt="thumb_up"]');
-    if (!thumbUpImg) return '';
+### 1. 単独接続の動作確認（最優先）
 
-    // ボタンの親コンテナを遡る
-    let container = thumbUpImg.closest('button')?.parentElement;
-    if (!container) return '';
-
-    // さらに親を遡って応答テキストを含む要素を探す
-    // フィードバックボタン群の前の兄弟要素に応答がある
-    const parent = container.parentElement;
-    if (!parent) return '';
-
-    // paragraph, heading, list などのテキスト要素を収集
-    const textElements = parent.querySelectorAll('p, h1, h2, h3, li, td');
-    const texts = Array.from(textElements)
-      .map(el => (el.innerText || el.textContent || '').trim())
-      .filter(t => t.length > 0);
-
-    if (texts.length > 0) return texts.join('\\n\\n');
-
-    // フォールバック: 親要素全体からテキスト取得（ボタンを除外）
-    const clone = parent.cloneNode(true);
-    clone.querySelectorAll('button, img').forEach(el => el.remove());
-    return (clone.innerText || clone.textContent || '').trim();
-  })()
-`);
-```
-
-## 修正箇所
-
-| ファイル | 行 | 内容 |
-|----------|-----|------|
-| `src/fast-cdp/fast-chat.ts` | 2019-2026 | マイクボタン検出の修正 |
-| `src/fast-cdp/fast-chat.ts` | 2090付近 | フィードバックボタンによる完了判定 |
-| `src/fast-cdp/fast-chat.ts` | 2179付近 | テキスト抽出の改善 |
-
-## 検証
+**目的**: 単独接続が正常に動作することを先に確認
 
 ```bash
-npm run build
-npm run test:gemini -- "JavaScriptでオブジェクトをディープコピーする方法を教えてください。コード例も含めて。"
+# ChatGPT単独
+npm run test:chatgpt -- "TypeScriptでジェネリック型を使う簡単な例を1つ示して"
+
+# Gemini単独
+npm run test:gemini -- "TypeScriptでジェネリック型を使う簡単な例を1つ示して"
 ```
 
-成功条件:
-- 回答に `structuredClone` または `JSON.parse` などの方法が含まれる
-- タイムアウトせずに応答を取得（60秒以内）
-- 応答テキストが正しく抽出される（空でない）
+**確認ポイント**:
+- 両方とも正常に応答が返ってくるか
+- commit `0440614` の改善が正しく動作しているか
+
+**重要**: ここで問題があれば、並列接続のテストには進まない。
+
+### 2. 並列接続の基本動作テスト
+
+**目的**: 単独接続が正常な状態で、並列接続も動作することを確認
+
+```bash
+npm run test:both
+```
+
+**確認ポイント**:
+- 両方から応答が返ってくるか
+- 単独接続と同じ品質の応答か
+
+### 3. 応答検出の正確性テスト（最重要）
+
+**目的**: commit `0440614` の修正が並列接続でも機能することを確認
+
+**シナリオ**: 既存のチャットセッションに対して新しい質問を送信
+
+```bash
+# 1. まず単独で質問（チャット履歴を作る）
+npm run test:chatgpt -- "1+1は？"
+
+# 2. 続けて別の質問（古い回答を返さないことを確認）
+npm run test:chatgpt -- "2+2は？"
+# → 期待: "4" を含む回答（"2" ではない）
+
+# 3. 並列接続でも同様のテスト
+npm run test:both
+# → 期待: 新しい質問に対する回答が返る
+```
+
+**確認ポイント**:
+- `initialAssistantCount` / `initialModelResponseCount` が正しく追跡されているか
+- 古い回答ではなく新しい回答が返ってくるか
+
+### 3. エラーハンドリングテスト
+
+**目的**: 片方が失敗しても他方が動作することを確認
+
+**シナリオ**: 意図的にログアウト状態を作る（手動）
+
+1. Geminiからログアウト
+2. `npm run test:both` 実行
+3. ChatGPTのみ成功し、Geminiはエラーメッセージが返る
+
+### 4. タイミング情報の確認
+
+**目的**: 応答時間の計測が正しく動作することを確認
+
+```bash
+npm run test:both
+```
+
+**確認ポイント**:
+- 履歴ファイル `.local/chrome-ai-bridge/history.jsonl` にタイミング情報が記録されているか
+- `connectMs`, `waitResponseMs`, `totalMs` が妥当な値か
+
+### テスト結果の記録
+
+テスト後、結果を `docs/log/claude/` に記録する。
+
+## 検証コマンド
+
+```bash
+# 基本動作テスト
+npm run test:both
+
+# 履歴確認
+tail -5 .local/chrome-ai-bridge/history.jsonl | jq .
+
+# デバッグログ確認（問題発生時）
+tail -f .local/mcp-debug.log
+```

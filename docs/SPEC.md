@@ -1,7 +1,7 @@
 # chrome-ai-bridge Technical Specification
 
-**Version**: v2.0.0
-**Last Updated**: 2026-01-31
+**Version**: v2.0.1
+**Last Updated**: 2026-02-01
 
 ---
 
@@ -308,7 +308,7 @@ chrome-ai-bridge is a tool that uses MCP (Model Context Protocol) to automate Ch
 
 ### 2.2 getClient() / createConnection()
 
-**ファイル**: `src/fast-cdp/fast-chat.ts:309-335`
+**関数**: `getClient()` in `src/fast-cdp/fast-chat.ts`
 
 ```typescript
 export async function getClient(kind: 'chatgpt' | 'gemini'): Promise<CdpClient> {
@@ -327,7 +327,7 @@ export async function getClient(kind: 'chatgpt' | 'gemini'): Promise<CdpClient> 
 
 ### 2.3 createConnection() の戦略
 
-**ファイル**: `src/fast-cdp/fast-chat.ts:190-302`
+**関数**: `createConnection()` in `src/fast-cdp/fast-chat.ts`
 
 ```
 ChatGPT/Gemini共通:
@@ -370,43 +370,53 @@ ChatGPT/Gemini共通:
 
 ### 3.1 askChatGPTFast() の全ステップ
 
-**ファイル**: `src/fast-cdp/fast-chat.ts:342-1067`
+**関数**: `askChatGPTFastInternal()` in `src/fast-cdp/fast-chat.ts`
 
 ```
-1. getClient('chatgpt') で接続取得
-2. 入力欄の出現を待機（waitForFunction, 30秒）
-3. テキスト入力（3段階フォールバック）
-4. 入力検証（normalizedQuestion が含まれるか）
-5. 送信ボタンの検索・待機（60秒、500ms間隔）
-6. CDP Input.dispatchMouseEvent でクリック
-7. ユーザーメッセージ送信確認
-8. 回答完了検出（ポーリング方式、60秒）
-9. 最後のアシスタントメッセージを抽出
-10. セッション保存・履歴記録
+1. getClient('chatgpt') で接続取得/再利用
+2. 入力欄の出現を待機（30秒）
+3. ページ読み込み安定待機（waitForStableCount: 2回連続で同じ値なら安定と判定）
+4. 初期メッセージカウント取得（user + assistant）
+5. テキスト入力（3段階フォールバック）
+   - Phase 1: JavaScript evaluate (textarea.value / innerHTML)
+   - Phase 2: CDP Input.insertText
+   - Phase 3: CDP Input.dispatchKeyEvent (1文字ずつ)
+6. 入力検証（normalizedQuestion が含まれるか）
+7. 送信ボタンの検索・待機（60秒、500ms間隔）
+8. JavaScript btn.click() でクリック（CDPフォールバック有）
+9. ユーザーメッセージカウント増加確認
+10. 回答完了検出（ポーリング方式、**8分**、1秒間隔）
+11. 最後のアシスタントメッセージを抽出
+12. セッション保存・履歴記録
 ```
 
 ### 3.2 ChatGPT セレクター一覧
 
-| 用途 | セレクター | 優先度 |
-|------|----------|--------|
-| 入力欄（textarea） | `textarea#prompt-textarea` | 1 |
-| 入力欄（textarea） | `textarea[data-testid="prompt-textarea"]` | 2 |
-| 入力欄（contenteditable） | `.ProseMirror[contenteditable="true"]` | 3 |
-| 送信ボタン | `button[data-testid="send-button"]` | 1 |
-| 送信ボタン | `[aria-label*="送信"]`, `[aria-label*="Send"]` | 2 |
-| 停止ボタン | `button[data-testid="stop-button"]` | - |
+| 用途 | セレクター | 備考 |
+|------|----------|------|
+| 入力欄 | `textarea#prompt-textarea` | 優先 |
+| 入力欄 | `textarea[data-testid="prompt-textarea"]` | フォールバック |
+| 入力欄 | `.ProseMirror[contenteditable="true"]` | contenteditable版 |
+| 送信ボタン | `button[data-testid="send-button"]` | 優先 |
+| 送信ボタン | `button[aria-label*="送信"]` | 日本語UI |
+| 送信ボタン | `button[aria-label*="Send"]` | 英語UI |
+| 停止ボタン | text/aria-label に "Stop generating" or "生成を停止" | - |
 | ユーザーメッセージ | `[data-message-author-role="user"]` | - |
 | アシスタントメッセージ | `[data-message-author-role="assistant"]` | - |
 | 回答コンテンツ | `.markdown`, `.prose`, `.markdown.prose` | - |
 
-### 3.3 タイムアウト設定
+### 3.3 ChatGPT 回答完了検出
 
-| 操作 | タイムアウト |
-|------|------------|
-| 入力欄待機 | 30秒 |
-| 送信ボタン待機 | 60秒（500ms × 120回） |
-| メッセージ送信確認 | 15秒 |
-| 回答完了待機 | 60秒（1秒間隔ポーリング） |
+**方式**: ポーリング（1秒間隔、最大**8分**）
+
+**完了条件（いずれかが true）**:
+
+1. stopボタンなし AND 送信ボタンあり AND 送信ボタン有効 AND assistantCount > initialAssistantCount
+2. stopボタンを見た後に消えた AND assistantCount > initialAssistantCount AND 入力欄空
+3. 15秒経過 AND stopボタンなし AND 入力欄空（フォールバック）
+4. stopボタンを見た後に消えた AND 送信ボタン有効 AND 入力欄空
+
+**重要**: `initialAssistantCount` は質問送信前に取得した初期カウント。これにより、既存の回答を新しい回答と誤認することを防止。
 
 ---
 
@@ -414,43 +424,86 @@ ChatGPT/Gemini共通:
 
 ### 4.1 askGeminiFast() の全ステップ
 
-**ファイル**: `src/fast-cdp/fast-chat.ts:1069-1876`
+**関数**: `askGeminiFastInternal()` in `src/fast-cdp/fast-chat.ts`
 
 ```
-1. getClient('gemini') で接続取得
-2. 必要に応じてナビゲーション
+1. getClient('gemini') で接続取得/再利用
+2. 必要に応じてナビゲーション（navigateMs計測）
 3. 入力欄の出現を待機（15秒）
-4. テキスト入力（2段階フォールバック）
-5. 入力検証（questionPrefix が含まれるか）
-6. 送信前テキスト確認
-7. 送信ボタンの検索・待機（60秒、500ms間隔）
-8. CDP Input.dispatchMouseEvent でクリック
-9. ユーザーメッセージカウント増加確認
-10. 回答完了検出（送信ボタン有効化待機、60秒）
-11. 最後のレスポンスを抽出
-12. normalizeGeminiResponse() で正規化
-13. セッション保存・履歴記録
+4. ページ読み込み安定待機（waitForStableCount: 2回連続で同じ値なら安定と判定）
+5. 初期カウント取得（user-query, model-response）← initialModelResponseCount を記録
+6. テキスト入力（2段階フォールバック）
+   - Phase 1: JavaScript evaluate (innerText設定)
+   - Phase 2: CDP Input.insertText
+7. 入力検証（questionPrefix 20文字が含まれるか）
+8. 送信前テキスト確認
+9. 送信ボタンの検索・待機（60秒、500ms間隔）
+10. JavaScript click() でクリック（CDPフォールバック有）
+11. ユーザーメッセージカウント増加確認
+12. 回答完了検出（ポーリング方式、**8分**、1秒間隔）
+13. フィードバックボタン基準でテキスト抽出
+14. normalizeGeminiResponse() で正規化
+15. セッション保存・履歴記録
 ```
 
-### 4.2 Gemini セレクター一覧
+### 4.2 Gemini セレクター一覧（言語非依存版）
 
-| 用途 | セレクター | 優先度 |
-|------|----------|--------|
-| 入力欄 | `[role="textbox"]` | 1 |
-| 入力欄 | `div[contenteditable="true"]` | 2 |
-| 入力欄 | `textarea` | 3 |
-| 送信ボタン | `[aria-label*="送信"]`, `[aria-label*="Send"]` | 1 |
-| 送信ボタン | `[textContent*="プロンプトを送信"]` | 2 |
-| 送信ボタン | `mat-icon[data-mat-icon-name="send"]` | 3 |
-| 停止ボタン | `[textContent*="停止"]`, `[aria-label*="Stop"]` | - |
-| ユーザーメッセージ | `user-query`, `.user-query` | 1 |
-| ユーザーメッセージ | `[data-message-author-role="user"]` | 2 |
-| レスポンス | `model-response` | 1 |
-| レスポンス | `[data-test-id*="response"]`, `.markdown` | 2 |
+| 用途 | セレクター | 備考 |
+|------|----------|------|
+| 入力欄 | `[role="textbox"]` | 優先 |
+| 入力欄 | `div[contenteditable="true"]` | フォールバック |
+| 入力欄 | `textarea` | フォールバック |
+| 送信ボタン | `mat-icon[data-mat-icon-name="send"]` parent button | 優先 |
+| 送信ボタン | text に "プロンプトを送信" / "送信" | 日本語UI |
+| 送信ボタン | aria-label に "送信" / "Send" | - |
+| 停止ボタン | text/aria-label に "停止" / "Stop" | - |
+| **マイクボタン** | `img[alt="mic"]` closest button | **言語非依存** |
+| **フィードバック** | `img[alt="thumb_up"]`, `img[alt="thumb_down"]` | **言語非依存・最重要** |
+| ユーザーメッセージ | `user-query`, `.user-query` | Shadow DOM内 |
+| レスポンス | `model-response` | Shadow DOM内（直接DOMには存在しない） |
 
-### 4.3 入力検証の仕組み
+### 4.3 Gemini 回答完了検出（5条件 + フォールバック）
 
-**ファイル**: `src/fast-cdp/fast-chat.ts:1154-1157`
+**方式**: ポーリング（1秒間隔、最大**8分**）
+
+**状態フィールド**:
+- `hasStopButton`: 停止ボタンの有無
+- `hasMicButton`: マイクボタンの有無
+- `hasFeedbackButtons`: フィードバックボタン（thumb_up/down）の有無
+- `sendButtonEnabled`: 送信ボタンが有効か
+- `modelResponseCount`: レスポンス要素数
+- `lastResponseTextLength`: 最後のレスポンスのテキスト長
+- `inputBoxEmpty`: 入力欄が空か
+
+**完了条件（優先順）**:
+
+| 条件 | 説明 | 信頼度 |
+|------|------|--------|
+| 0 | sawStopButton AND !hasStopButton AND hasFeedbackButtons AND modelResponseCount > initialModelResponseCount | ★★★ 最も確実 |
+| 1 | sawStopButton AND !hasStopButton AND hasMicButton AND modelResponseCount > initialModelResponseCount | ★★☆ |
+| 2 | sawStopButton AND !hasStopButton AND sendButtonEnabled AND inputBoxEmpty AND modelResponseCount > initialModelResponseCount | ★★☆ |
+| 3 | textStableCount >= 5 AND modelResponseCount > initialModelResponseCount AND !hasStopButton | ★☆☆ |
+| FB | elapsed > 10s AND !sawStopButton AND modelResponseCount > initialModelResponseCount AND !hasStopButton | フォールバック |
+
+**重要**: `initialModelResponseCount` は質問送信前に取得した初期カウント。これにより、既存の回答を新しい回答と誤認することを防止。
+
+### 4.4 Gemini テキスト抽出
+
+**優先順位**:
+
+1. **フィードバックボタン基準**（推奨）
+   - `img[alt="thumb_up"]` を探す
+   - `closest('button')` → `parentElement` → `parentElement` で応答コンテナを特定
+   - p, h1-h6, li, td, th, pre, code 要素からテキスト収集
+
+2. **セレクターベース**（フォールバック）
+   - `collectDeep(['model-response', ...])` で Shadow DOM 内を探索
+   - 最後のレスポンス要素の innerText を取得
+
+3. **aria-live**（最終手段）
+   - `[aria-live="polite"]` からテキスト取得
+
+### 4.5 入力検証の仕組み
 
 ```typescript
 // 質問の先頭20文字が入力欄に含まれているか確認
@@ -469,7 +522,7 @@ let inputOk = inputResult.ok &&
 
 ### 5.1 3段階フォールバック（ChatGPT）
 
-**ファイル**: `src/fast-cdp/fast-chat.ts:369-594`
+**関数**: `askChatGPTFastInternal()` 内
 
 ```
 Phase 1: JavaScript evaluate
@@ -486,7 +539,7 @@ Phase 3: CDP Input.dispatchKeyEvent（Phase 2 失敗時）
 
 ### 5.2 2段階フォールバック（Gemini）
 
-**ファイル**: `src/fast-cdp/fast-chat.ts:1098-1247`
+**関数**: `askGeminiFastInternal()` 内
 
 ```
 Phase 1: JavaScript evaluate
@@ -497,9 +550,18 @@ Phase 2: CDP Input.insertText（Phase 1 の検証失敗時）
   - await client.send('Input.insertText', {text: question});
 ```
 
-### 5.3 Shadow DOM 対応
+---
 
-**collectDeep() 関数**: `src/fast-cdp/fast-chat.ts:619-643`
+## 5.3 Shadow DOM 対応
+
+### 背景
+
+GeminiはWebコンポーネント（Shadow DOM）を多用している。
+通常の `document.querySelector` では内部要素にアクセスできない。
+
+### collectDeep() 関数
+
+再帰的に Shadow DOM 内を探索する:
 
 ```javascript
 const collectDeep = (selectorList) => {
@@ -515,8 +577,7 @@ const collectDeep = (selectorList) => {
         }
       });
     }
-    // Shadow DOM を再帰的に探索
-    const elements = root.querySelectorAll ? Array.from(root.querySelectorAll('*')) : [];
+    const elements = Array.from(root.querySelectorAll('*') || []);
     for (const el of elements) {
       if (el.shadowRoot) visit(el.shadowRoot);
     }
@@ -526,18 +587,48 @@ const collectDeep = (selectorList) => {
 };
 ```
 
-この関数は以下の場面で使用:
-- 送信ボタンの検索
-- 入力欄の検索（Gemini）
-- レスポンス要素の検索
+### 使用箇所
+
+- 送信ボタン検索
+- 入力欄検索
+- レスポンス要素検索
+- ユーザーメッセージカウント
+
+---
+
+## 5.4 言語非依存セレクター設計
+
+### 背景
+
+GeminiのUIはユーザーの言語設定に応じて変化する:
+- 日本語: "良い回答", "悪い回答", "マイク"
+- 英語: "Good response", "Bad response", "Microphone"
+
+`aria-label` や `textContent` に依存すると、言語ごとに分岐が必要になる。
+
+### 解決策: img alt属性
+
+Geminiのアイコンは img 要素で実装されており、alt 属性は言語に依存しない:
+- `img[alt="mic"]` - マイクアイコン
+- `img[alt="thumb_up"]` - 良い回答アイコン
+- `img[alt="thumb_down"]` - 悪い回答アイコン
+
+### 実装パターン
+
+```javascript
+// マイクボタン検出
+const micImg = document.querySelector('img[alt="mic"]');
+const micButton = micImg?.closest('button');
+
+// フィードバックボタン検出
+const hasFeedback = !!document.querySelector('img[alt="thumb_up"], img[alt="thumb_down"]');
+```
 
 ---
 
 ## 6. 送信ボタン検出
 
 ### 6.1 検索ロジック
-
-**ファイル**: `src/fast-cdp/fast-chat.ts:617-700`（ChatGPT）、`1486-1574`（Gemini）
 
 ```javascript
 // 1. collectDeep で全ボタンを収集（Shadow DOM 含む）
@@ -559,7 +650,9 @@ let sendButton =
 
 ### 6.2 クリック実行
 
-**CDP Input.dispatchMouseEvent を使用**:
+**優先**: JavaScript `btn.click()` で直接クリック
+
+**フォールバック**: CDP Input.dispatchMouseEvent
 
 ```typescript
 // mousePressed
@@ -585,50 +678,31 @@ await client.send('Input.dispatchMouseEvent', {
 
 ---
 
-## 7. 回答完了検出
+## 7. 回答完了検出（詳細）
 
-### 7.1 ChatGPT: ポーリング方式
+ChatGPT と Gemini の回答完了検出の詳細は各セクション（3.3、4.3）を参照。
 
-**ファイル**: `src/fast-cdp/fast-chat.ts:859-990`
+**共通の設計方針**:
+- ポーリング方式（1秒間隔）を採用
+- 最大待機時間: **8分**（480秒）- 長文・複雑な回答に対応
+- 複数の完了条件を優先順に評価
+- `sawStopButton` フラグで「生成が始まったかどうか」を追跡
 
-```
-ポーリング間隔: 1秒
-最大待機時間: 60秒
+---
 
-完了条件（いずれかが true）:
+## 7.1 ChatGPT vs Gemini 実装比較
 
-条件1: stopボタンなし AND 送信ボタンあり AND 送信ボタン有効 AND 新アシスタントメッセージ
-条件2: stopボタンを見た後に消えた AND 新アシスタントメッセージ AND 入力欄空
-条件3: 15秒経過 AND stopボタンなし AND 入力欄空（フォールバック）
-条件4: stopボタンを見た後に消えた AND 送信ボタン有効 AND 入力欄空
-```
-
-### 7.2 Gemini: waitForFunction
-
-**ファイル**: `src/fast-cdp/fast-chat.ts:1707-1774`
-
-```javascript
-await client.waitForFunction(`
-  (() => {
-    // 停止ボタンがある場合はまだ生成中
-    const hasStopButton = buttons.some(b =>
-      b.textContent.includes('停止') || b.getAttribute('aria-label').includes('Stop')
-    );
-    if (hasStopButton) return false;
-
-    // 送信ボタンを探す
-    const sendBtn = buttons.find(b =>
-      b.textContent.includes('送信') ||
-      b.getAttribute('aria-label').includes('Send')
-    );
-
-    if (!sendBtn) return false;
-
-    // 送信ボタンが有効 = 応答完了
-    return !isDisabled(sendBtn);
-  })()
-`, 60000);
-```
+| 項目 | ChatGPT | Gemini |
+|------|---------|--------|
+| 入力欄待機 | 30秒 | 15秒 |
+| 応答待機 | **8分** | **8分** |
+| ポーリング間隔 | 1秒 | 1秒 |
+| Shadow DOM | 不要 | **必須**（collectDeep使用） |
+| 完了検出の主要指標 | **カウント増加検出** + stopボタン消失 | **カウント増加検出** + フィードバックボタン表示 |
+| カウント追跡方式 | `assistantCount > initialAssistantCount` | `modelResponseCount > initialModelResponseCount` |
+| テキスト抽出基準 | `data-message-author-role` | **`img[alt="thumb_up"]`** |
+| ナビゲーション | 不要（接続時に解決） | 必要時あり（navigateMs計測） |
+| 言語対応 | aria-label分岐 | **img alt属性（言語非依存）** |
 
 ---
 
@@ -667,7 +741,7 @@ await client.waitForFunction(`
 
 ### 8.3 セッション再利用ロジック
 
-**ファイル**: `src/fast-cdp/fast-chat.ts:135-143`
+**関数**: `getPreferredSession()` in `src/fast-cdp/fast-chat.ts`
 
 ```typescript
 async function getPreferredSession(kind: 'chatgpt' | 'gemini'): Promise<PreferredSession> {
@@ -687,24 +761,27 @@ async function getPreferredSession(kind: 'chatgpt' | 'gemini'): Promise<Preferre
 
 ### 9.1 タイムアウト一覧
 
-| 操作 | タイムアウト | 備考 |
-|------|------------|------|
-| 既存タブ再利用 | 3秒 | 失敗時は新規タブ作成 |
-| 新規タブ作成 | 5秒 | 最大2回リトライ |
-| 拡張機能接続 | 10秒（デフォルト） | - |
-| 入力欄待機（ChatGPT） | 30秒 | - |
-| 入力欄待機（Gemini） | 15秒 | - |
-| 送信ボタン待機 | 60秒 | 500ms間隔 |
-| メッセージ送信確認 | 8-15秒 | - |
-| 回答完了待機 | 60秒 | - |
-| 健全性チェック | 2秒 | - |
+**凡例**:
+- **最大**: 成功すれば即座に次へ進む。タイムアウトは失敗判定のしきい値
+- **固定**: 常にこの時間待つ
+
+| 操作 | ChatGPT | Gemini | 種類 | 説明 |
+|------|---------|--------|------|------|
+| 既存タブ再利用 | 3秒 | 3秒 | 最大 | sessions.jsonのタブIDで接続試行。応答があれば即座に再利用、なければ新規タブ作成へ |
+| 新規タブ作成 | 5秒 | 5秒 | 最大 | 拡張機能経由でタブ作成+CDP確立。成功すれば即座に次へ。失敗時は1秒後に再試行（最大2回） |
+| 拡張機能接続 | 10秒 | 10秒 | 最大 | Discovery Server (port 8766) が拡張機能からの接続を待つ。通常2-3秒で接続される |
+| 入力欄待機 | 30秒 | 15秒 | 最大 | 入力欄（textarea/contenteditable）が出現するまで。ChatGPTはProseMirror初期化が遅いため長め |
+| 送信ボタン待機 | 60秒 | 60秒 | 最大 | 送信ボタンが有効になるまで500ms間隔でポーリング。生成中（stopボタン表示中）は無効状態 |
+| メッセージ送信確認 | 15秒 | 8秒 | 最大 | クリック後、ユーザーメッセージ要素が画面に出現するまで。出なければ送信失敗 |
+| **回答完了待機** | **8分** | **8分** | 最大 | 応答完了を検出するまで1秒間隔でポーリング。長文や複雑な回答に対応 |
+| 健全性チェック | 4秒 | 4秒 | 最大 | 既存接続を再利用する前に `client.evaluate('1')` で生存確認 |
 
 ### 9.2 リトライロジック
 
-**接続リトライ**: `src/fast-cdp/fast-chat.ts:261-299`
+**接続リトライ** (`createConnection()`):
 - 新規タブ作成: 最大2回（1秒間隔）
 
-**送信リトライ**: `src/fast-cdp/fast-chat.ts:787-845`
+**送信リトライ**:
 - Enter キーフォールバック（マウスクリック失敗時）
 
 ### 9.3 デバッグファイル
@@ -742,7 +819,7 @@ npm run cdp:gemini
 
 ### 10.2 関連性チェック機能
 
-**ファイル**: `src/fast-cdp/fast-chat.ts:175-182`
+**関数**: `isSuspiciousAnswer()` in `src/fast-cdp/fast-chat.ts`
 
 ```typescript
 function isSuspiciousAnswer(answer: string, question: string): boolean {
@@ -818,7 +895,81 @@ function isSuspiciousAnswer(answer: string, question: string): boolean {
 
 ---
 
-## 付録: ファイル構成
+## 13. トラブルシューティング
+
+### 問題1: Gemini応答がタイムアウトする
+
+**症状**:
+```
+Timed out waiting for Gemini response (8min). sawStopButton=true, textStableCount=XXX
+```
+
+**原因**: フィードバックボタンが検出されていない
+
+**確認方法**:
+```bash
+npm run cdp:gemini  # スナップショット取得
+```
+
+**解決策**:
+1. `img[alt="thumb_up"]` セレクターが正しいか確認
+2. DOM構造が変わっていないか Playwright で確認
+
+### 問題2: ChatGPT入力が反映されない
+
+**症状**: 送信後に空の応答が返る
+
+**原因**: ProseMirror contenteditable への入力失敗
+
+**確認方法**:
+ログで "Input verification: OK" が出ているか確認
+
+**解決策**:
+1. Input.insertText フォールバックが動作しているか確認
+2. フォーカス設定（element.focus()）が実行されているか確認
+
+### 問題3: セッション再利用が失敗する
+
+**症状**: 毎回新しいタブが開く
+
+**原因**: 健全性チェック失敗（4秒タイムアウト）
+
+**確認方法**:
+`.local/chrome-ai-bridge/sessions.json` の tabId を確認
+
+**解決策**:
+1. タブがまだ存在するか確認
+2. 拡張機能が正常に動作しているか確認
+
+### 問題4: "Login required" エラー
+
+**症状**: ログインが必要というエラー
+
+**原因**: セッションが切れている
+
+**解決策**:
+1. ブラウザで手動ログイン
+2. 新しいセッションが sessions.json に保存されることを確認
+
+### 問題5: 拡張機能が接続されない
+
+**症状**: "Extension not connected" エラー
+
+**原因**: Discovery Server と拡張機能の通信問題
+
+**確認方法**:
+```bash
+curl http://127.0.0.1:8766/mcp-discovery
+```
+
+**解決策**:
+1. Chrome で拡張機能が有効か確認
+2. ポート 8766 が他のプロセスに使われていないか確認
+3. Chrome を再起動して拡張機能を再読み込み
+
+---
+
+## 付録A: ファイル構成
 
 ```
 src/
@@ -827,7 +978,7 @@ src/
 │   ├── cdp-client.ts     # CDP コマンド送信クライアント
 │   ├── extension-raw.ts  # 拡張機能接続処理
 │   └── mcp-logger.ts     # ロギング
-├── src/extension/
+├── extension/
 │   ├── background.mjs    # 拡張機能 Service Worker
 │   ├── relay-server.ts   # Discovery/Relay サーバー
 │   ├── manifest.json     # 拡張機能マニフェスト
