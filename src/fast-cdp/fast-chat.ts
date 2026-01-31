@@ -93,6 +93,55 @@ function getHistoryPath(): string {
   return path.join(process.cwd(), '.local', 'chrome-ai-bridge', 'history.jsonl');
 }
 
+function getLocalTimestamp(): string {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const d = String(now.getDate()).padStart(2, '0');
+  const h = String(now.getHours()).padStart(2, '0');
+  const min = String(now.getMinutes()).padStart(2, '0');
+  const s = String(now.getSeconds()).padStart(2, '0');
+  return `${y}-${m}-${d} ${h}:${min}:${s}`;
+}
+
+async function rotateHistoryIfNeeded(): Promise<void> {
+  const historyPath = getHistoryPath();
+
+  try {
+    const content = await fs.readFile(historyPath, 'utf-8');
+    const lines = content.trim().split('\n').filter(Boolean);
+
+    // 1000件以下なら何もしない
+    if (lines.length <= 1000) return;
+
+    const now = Date.now();
+    const thirtyDaysAgo = now - 30 * 24 * 60 * 60 * 1000;
+
+    // 30日以上古いエントリを除外
+    const filtered = lines.filter(line => {
+      try {
+        const entry = JSON.parse(line);
+        // ローカル時刻形式 "2026-02-01 00:36:02" または ISO形式 "2026-01-31T15:36:02.273Z" 両対応
+        const ts = new Date(entry.ts).getTime();
+        return ts > thirtyDaysAgo; // 30日以内は保持
+      } catch {
+        return true; // パース失敗は保持
+      }
+    });
+
+    // 削除対象があれば書き換え
+    if (filtered.length < lines.length) {
+      await fs.writeFile(historyPath, filtered.join('\n') + '\n', 'utf-8');
+      console.error(`[history] Rotated: ${lines.length} -> ${filtered.length} entries`);
+    }
+  } catch (err) {
+    // ファイルがない場合は無視
+    if ((err as NodeJS.ErrnoException).code !== 'ENOENT') {
+      console.error('[history] Rotation error:', err);
+    }
+  }
+}
+
 async function loadSessions(): Promise<SessionStore> {
   try {
     const data = await fs.readFile(getSessionPath(), 'utf-8');
@@ -134,13 +183,16 @@ async function appendHistory(entry: {
 }): Promise<void> {
   const project = getProjectName();
   const payload = {
-    ts: new Date().toISOString(),
+    ts: getLocalTimestamp(),
     project,
     ...entry,
   };
   const targetPath = getHistoryPath();
   await fs.mkdir(path.dirname(targetPath), {recursive: true});
   await fs.appendFile(targetPath, `${JSON.stringify(payload)}\n`, 'utf-8');
+
+  // ローテーション実行（非同期、エラーは無視）
+  rotateHistoryIfNeeded().catch(() => {});
 }
 
 async function saveDebug(kind: 'chatgpt' | 'gemini', payload: Record<string, any>) {
