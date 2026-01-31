@@ -1743,12 +1743,31 @@ async function askGeminiFastInternal(question: string): Promise<ChatResult> {
         .filter(el => !isDisabled(el));
 
       // 「停止」ボタンがあるかチェック（応答生成中）
-      const hasStopButton = buttons.some(b => {
-        const text = (b.textContent || '').trim();
-        const label = (b.getAttribute('aria-label') || '').trim();
-        return text.includes('停止') || label.includes('停止') ||
-               text.includes('Stop') || label.includes('Stop');
-      });
+      const hasStopButton = (() => {
+        // 方法1: aria-labelベースの検索（最も信頼性が高い）
+        const stopByLabel = buttons.some(b => {
+          const label = (b.getAttribute('aria-label') || '').trim();
+          return label.includes('回答を停止') || label.includes('Stop generating') ||
+                 label.includes('Stop streaming') || label === 'Stop';
+        });
+        if (stopByLabel) return true;
+
+        // 方法2: mat-icon要素での検出（Gemini用）
+        const stopIcon = document.querySelector('mat-icon[data-mat-icon-name="stop"]');
+        if (stopIcon) {
+          const btn = stopIcon.closest('button');
+          if (btn && isVisible(btn)) return true;
+        }
+
+        // 方法3: img[alt="stop"] での検出（ChatGPT用）
+        const stopImg = document.querySelector('img[alt="stop"]');
+        if (stopImg) {
+          const btn = stopImg.closest('button');
+          if (btn && isVisible(btn)) return true;
+        }
+
+        return false;
+      })();
 
       // 応答生成中の場合、送信ボタンはdisabled扱い
       if (hasStopButton) {
@@ -2008,13 +2027,32 @@ async function askGeminiFastInternal(question: string): Promise<ChatResult> {
 
         const buttons = collectDeep(['button', '[role="button"]']).filter(isVisible);
 
-        // 停止ボタン検出（複数セレクター）
-        const hasStopButton = buttons.some(b => {
-          const text = (b.textContent || '').trim();
-          const label = (b.getAttribute('aria-label') || '').trim();
-          return text.includes('停止') || label.includes('停止') ||
-                 text.includes('Stop') || label.includes('Stop');
-        });
+        // 停止ボタン検出（応答生成中かどうか）
+        const hasStopButton = (() => {
+          // 方法1: aria-labelベースの検索（最も信頼性が高い）
+          const stopByLabel = buttons.some(b => {
+            const label = (b.getAttribute('aria-label') || '').trim();
+            return label.includes('回答を停止') || label.includes('Stop generating') ||
+                   label.includes('Stop streaming') || label === 'Stop';
+          });
+          if (stopByLabel) return true;
+
+          // 方法2: mat-icon要素での検出（Gemini用）
+          const stopIcon = document.querySelector('mat-icon[data-mat-icon-name="stop"]');
+          if (stopIcon) {
+            const btn = stopIcon.closest('button');
+            if (btn && isVisible(btn)) return true;
+          }
+
+          // 方法3: img[alt="stop"] での検出（ChatGPT用）
+          const stopImg = document.querySelector('img[alt="stop"]');
+          if (stopImg) {
+            const btn = stopImg.closest('button');
+            if (btn && isVisible(btn)) return true;
+          }
+
+          return false;
+        })();
 
         // マイクボタン検出（言語非依存: img[alt="mic"]を使用）
         const micButton = (() => {
