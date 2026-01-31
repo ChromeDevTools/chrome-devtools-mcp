@@ -69,9 +69,9 @@ Before `EnterPlanMode -> ExitPlanMode`:
 **This MCP server is for ChatGPT/Gemini queries only.**
 
 **Allowed tools:**
-- `ask_chatgpt_web` - Ask ChatGPT
+- `ask_chatgpt_web` - Ask ChatGPT (default for simple questions)
 - `ask_gemini_web` - Ask Gemini
-- `ask_chatgpt_gemini_web` - Parallel query to both (recommended)
+- `ask_chatgpt_gemini_web` - Parallel query (for 三者議論 only)
 
 **Forbidden tools:**
 - `take_snapshot`, `take_screenshot` - Don't work
@@ -240,19 +240,21 @@ Don't use: `TZ='Asia/Tokyo' date '...'` (no timezone forcing)
 
 ### AI Query Default Behavior
 
-**Rule:** When user says "ask AI", always use `ask_chatgpt_gemini_web` for parallel queries.
+**Rule:** When user says "ask AI", use `ask_chatgpt_web` (single AI).
 
-**Trigger patterns:**
+**Trigger patterns for single AI (ChatGPT):**
 - "ask AI about..."
 - "consult AI..."
 - "get AI's opinion on..."
 
-**Exceptions (individual tools):**
-- Only when user explicitly specifies "ChatGPT only" or "Gemini only"
+**Trigger patterns for multi-AI (三者議論):**
+- "三者議論して"
+- "深掘りして"
+- "複数のAIに聞いて"
 
 **Forbidden:**
 - Asking "Which AI should I ask?"
-- Choosing one AI without explicit instruction
+- Using parallel query for simple questions
 
 ---
 
