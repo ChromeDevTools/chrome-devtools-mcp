@@ -771,9 +771,9 @@ chrome.alarms.onAlarm.addListener((alarm) => {
     }
 
     // Discovery pollingが停止していたら再開
-    // Service Workerがスリープから復帰した場合に対応
-    if (discoveryIntervalId === null) {
-      logInfo('keepalive', 'Discovery was stopped, restarting...');
+    // ただし、アクティブな接続がある場合のみ（Chrome起動時の不要な再開を防ぐ）
+    if (discoveryIntervalId === null && (activeCount > 0 || pendingCount > 0)) {
+      logInfo('keepalive', 'Discovery was stopped but has active connections, restarting...');
       scheduleDiscovery();
     }
   }
@@ -799,9 +799,18 @@ function scheduleDiscovery() {
   }, 500);
 }
 
-// Discovery on install/startup - restored for MCP server connection
-chrome.runtime.onInstalled.addListener(() => { scheduleDiscovery(); });
-chrome.runtime.onStartup.addListener(() => { scheduleDiscovery(); });
-scheduleDiscovery();  // Start discovery immediately
+// Discovery is now PASSIVE - does NOT auto-start on Chrome startup
+// This prevents the issue where Chrome restart opens many connect.html tabs
+// Discovery is started only when:
+// 1. User clicks the extension icon
+// 2. Keep-alive alarm detects an active connection needs re-discovery
+//
+// Removed: onInstalled, onStartup, and immediate scheduleDiscovery() calls
 
-logInfo('background', 'Extension loaded (discovery mode active)');
+// Start discovery when user clicks extension icon
+chrome.action.onClicked.addListener(() => {
+  logInfo('action', 'Extension icon clicked - starting discovery');
+  scheduleDiscovery();
+});
+
+logInfo('background', 'Extension loaded (passive mode - click icon to start discovery)');
