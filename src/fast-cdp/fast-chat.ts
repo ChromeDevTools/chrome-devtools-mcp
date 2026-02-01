@@ -481,6 +481,14 @@ async function askChatGPTFastInternal(question: string): Promise<ChatResult> {
   const normalizedQuestion = question.replace(/\s+/g, '');
 
   // ループ前に初期カウントを取得（既存チャット再利用時に重要）
+  // まずページロード完了を明示的に待つ
+  await client.waitForFunction(`document.readyState === 'complete'`, 30000);
+  console.error('[ChatGPT] Page load complete (readyState)');
+
+  // SPA描画安定化のため追加待機
+  await new Promise(r => setTimeout(r, 500));
+  console.error('[ChatGPT] Waited 500ms for SPA rendering');
+
   // 入力欄が表示されるまで待機してから取得
   const tWaitInput = nowMs();
   logInfo('chatgpt', 'Waiting for input field');
@@ -1004,6 +1012,14 @@ async function askChatGPTFastInternal(question: string): Promise<ChatResult> {
     console.error('[ChatGPT] Message sent successfully (count increased)');
     timings.sendMs = nowMs() - tSend;
 
+    // 新しいアシスタントメッセージが追加されるまで待つ（既存メッセージとの誤認防止）
+    try {
+      await client.waitForFunction(`${assistantCountExpr} > ${initialAssistantCount}`, 30000);
+      console.error('[ChatGPT] New assistant message element detected');
+    } catch {
+      console.error('[ChatGPT] Timeout waiting for new assistant message, continuing...');
+    }
+
     const tWaitResp = nowMs();
     console.error('[ChatGPT] Waiting for response (using stop button detection)...');
 
@@ -1396,6 +1412,14 @@ async function askGeminiFastInternal(question: string): Promise<ChatResult> {
     }
   }
   timings.navigateMs = nowMs() - tUrl;
+
+  // ページロード完了を明示的に待つ
+  await client.waitForFunction(`document.readyState === 'complete'`, 30000);
+  console.error('[Gemini] Page load complete (readyState)');
+
+  // SPA描画安定化のため追加待機
+  await new Promise(r => setTimeout(r, 500));
+  console.error('[Gemini] Waited 500ms for SPA rendering');
 
   const tWaitInput = nowMs();
   await client.waitForFunction(
@@ -2094,6 +2118,14 @@ async function askGeminiFastInternal(question: string): Promise<ChatResult> {
   // メッセージカウント増加を確認済みなので、テキストマッチングは不要
   // （Gemini UIの構造により、textContentが取得できない場合があるため）
   console.error('[Gemini] Message sent successfully (count increased)');
+
+  // 新しいモデル応答が追加されるまで待つ（既存メッセージとの誤認防止）
+  try {
+    await client.waitForFunction(`${geminiModelResponseCountExpr} > ${initialModelResponseCount}`, 30000);
+    console.error('[Gemini] New model response element detected');
+  } catch {
+    console.error('[Gemini] Timeout waiting for new model response, continuing...');
+  }
 
   const tWaitResp = nowMs();
   console.error('[Gemini] Waiting for response completion (polling with diagnostics)...');
