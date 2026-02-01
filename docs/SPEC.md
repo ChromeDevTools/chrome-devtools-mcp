@@ -1,6 +1,6 @@
 # chrome-ai-bridge Technical Specification
 
-**Version**: v2.0.11
+**Version**: v2.0.9
 **Last Updated**: 2026-02-02
 
 ---
@@ -1047,7 +1047,34 @@ async function getPreferredSession(kind: 'chatgpt' | 'gemini'): Promise<Preferre
 **送信リトライ**:
 - Enter キーフォールバック（マウスクリック失敗時）
 
-### 9.3 デバッグファイル
+**Gemini Stuck State リトライ** (`src/tools/chatgpt-gemini-web.ts`, `src/tools/gemini-web.ts`):
+- 最大2回リトライ
+- `GEMINI_STUCK_*` エラー検出時に自動リトライ
+- リトライ前に `clearGeminiClient()` でキャッシュクリア
+
+### 9.3 Gemini Stuck State 検出
+
+**背景**: Geminiが応答生成中に停止し、UI更新が止まる現象。前のセッションがハングした場合に発生。
+
+**検出方法** (`checkGeminiStuckState()`):
+```typescript
+// 最大5秒間、500ms間隔でポーリング
+// 停止ボタンが消えるか確認
+// 5秒経過後も停止ボタンが消えない → スタック状態
+```
+
+**検出されるエラー**:
+- `GEMINI_STUCK_STOP_BUTTON`: 停止ボタンが消えない
+- `GEMINI_STUCK_NO_RESPONSE`: 応答が開始されない
+
+**対応フロー**:
+1. `askGeminiFast()` でスタック状態検出
+2. `GEMINI_STUCK_*` エラーをスロー
+3. 呼び出し元（`askAI()` or MCPツール）でキャッチ
+4. `clearGeminiClient()` で接続キャッシュクリア
+5. 再度 `askGeminiFast()` を呼び出し（最大2回）
+
+### 9.4 デバッグファイル
 
 **パス**: `.local/chrome-ai-bridge/debug/`
 
@@ -1059,7 +1086,7 @@ async function getPreferredSession(kind: 'chatgpt' | 'gemini'): Promise<Preferre
 - ユーザーメッセージ送信タイムアウト
 - 疑わしい回答（`isSuspiciousAnswer()` が true）
 
-### 9.4 主要デバッグフィールド
+### 9.5 主要デバッグフィールド
 
 回答完了検出ループで取得される状態フィールド:
 
@@ -1103,21 +1130,36 @@ npm run test:suite -- --debug      # デバッグ情報付き
 npm run test:suite -- --help       # ヘルプ表示
 ```
 
-### 10.2 テストスイートのタグ一覧
+### 10.2 テストシナリオ一覧
+
+| ID | 名前 | タグ | 説明 |
+|----|------|------|------|
+| `chatgpt-new-chat` | ChatGPT 新規チャット | smoke, chatgpt | 新規チャットでの基本動作確認 |
+| `chatgpt-existing-chat` | ChatGPT 既存チャット再接続 | regression, chatgpt | 既存チャットに再接続して質問 |
+| `chatgpt-thinking-mode` | ChatGPT Thinkingモード | regression, chatgpt, thinking | 複雑な質問でThinking動作確認 |
+| `chatgpt-code-block` | ChatGPT コードブロック応答 | smoke, chatgpt, code | コード生成の応答抽出確認 |
+| `chatgpt-long-response` | ChatGPT 長い応答 | chatgpt | 長い応答のタイムアウト確認 |
+| `gemini-new-chat` | Gemini 新規チャット | smoke, gemini | 新規チャットでの基本動作確認 |
+| `gemini-existing-chat` | Gemini 既存チャット再接続 | regression, gemini | Stuck State検出とリトライ |
+| `gemini-code-block` | Gemini コードブロック応答 | smoke, gemini, code | コード生成の応答抽出確認 |
+| `parallel-query` | 並列クエリ | smoke, parallel | ChatGPT+Gemini 同時クエリ |
+
+### 10.3 テストスイートのタグ一覧
 
 | タグ | 説明 | 使用例 |
 |------|------|--------|
-| `smoke` | 基本動作確認（新規チャット、並列クエリ） | `--tag=smoke` |
+| `smoke` | 基本動作確認（新規チャット、並列クエリ、コードブロック） | `--tag=smoke` |
 | `regression` | 過去問題の再発確認（既存チャット再接続、Thinkingモード） | `--tag=regression` |
 | `chatgpt` | ChatGPT関連のみ | `--tag=chatgpt` |
 | `gemini` | Gemini関連のみ | `--tag=gemini` |
 | `thinking` | Thinkingモード関連 | `--tag=thinking` |
 | `parallel` | 並列クエリ関連 | `--tag=parallel` |
+| `code` | コードブロック応答関連 | `--tag=code` |
 
 **シナリオ定義**: `scripts/test-scenarios.json`
 **レポート保存先**: `.local/chrome-ai-bridge/test-reports/`
 
-### 10.3 アサーション検証機能
+### 10.4 アサーション検証機能
 
 `test-scenarios.json` で使用可能なアサーション:
 
@@ -1130,7 +1172,7 @@ npm run test:suite -- --help       # ヘルプ表示
 | `noFallback` | フォールバック未使用 | `"noFallback": true` |
 | `noEmptyMarkdown` | 空Markdownチェック | `"noEmptyMarkdown": true` |
 
-### 10.4 関連性チェック機能
+### 10.5 関連性チェック機能
 
 **関数**: `isSuspiciousAnswer()` in `src/fast-cdp/fast-chat.ts`
 
@@ -1147,7 +1189,7 @@ function isSuspiciousAnswer(answer: string, question: string): boolean {
 }
 ```
 
-### 10.5 テスト質問の推奨事項
+### 10.6 テスト質問の推奨事項
 
 **禁止**（AI検出・BAN対象）:
 - `1+1は？`
