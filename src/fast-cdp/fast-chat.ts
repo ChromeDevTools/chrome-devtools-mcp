@@ -1012,12 +1012,30 @@ async function askChatGPTFastInternal(question: string): Promise<ChatResult> {
     console.error('[ChatGPT] Message sent successfully (count increased)');
     timings.sendMs = nowMs() - tSend;
 
-    // 新しいアシスタントメッセージが追加されるまで待つ（既存メッセージとの誤認防止）
+    // 新しいアシスタントメッセージが追加される、または既存メッセージのテキストが変化するまで待つ
+    // 既存チャット再接続時: 新しいDOM要素が追加されず、既存の最後の要素にストリーミング追記される場合がある
+    const initialLastTextLength = await client.evaluate<number>(`
+      (() => {
+        const msgs = document.querySelectorAll('[data-message-author-role="assistant"]');
+        if (msgs.length === 0) return 0;
+        return (msgs[msgs.length - 1].textContent || '').length;
+      })()
+    `);
+    console.error(`[ChatGPT] Initial state: assistantCount=${initialAssistantCount}, lastTextLength=${initialLastTextLength}`);
+
     try {
-      await client.waitForFunction(`${assistantCountExpr} > ${initialAssistantCount}`, 30000);
-      console.error('[ChatGPT] New assistant message element detected');
+      await client.waitForFunction(`
+        (() => {
+          const msgs = document.querySelectorAll('[data-message-author-role="assistant"]');
+          if (msgs.length === 0) return false;
+          const lastText = msgs[msgs.length - 1].textContent || '';
+          // カウント増加 OR テキスト長変化（10文字以上の変化で検出）
+          return msgs.length > ${initialAssistantCount} || lastText.length > ${initialLastTextLength} + 10;
+        })()
+      `, 30000);
+      console.error('[ChatGPT] New response detected (count or text change)');
     } catch {
-      console.error('[ChatGPT] Timeout waiting for new assistant message, continuing...');
+      console.error('[ChatGPT] Timeout waiting for response change, continuing with stop button detection...');
     }
 
     const tWaitResp = nowMs();
