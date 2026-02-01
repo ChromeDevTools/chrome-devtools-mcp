@@ -44,31 +44,26 @@ npm run test:smoke # 3. 基本動作確認（推奨）
 
 ## Project Overview
 
-**chrome-ai-bridge** is a fork of the original Chrome DevTools MCP, adding powerful features for Chrome extension developers.
+**chrome-ai-bridge** は、Claude Code などの AI コーディングアシスタントから ChatGPT / Gemini Web UI を操作するための MCP サーバーです。
 
 ### Package Information
 
 - **npm package**: `chrome-ai-bridge`
-- **Forked from**: [Chrome DevTools MCP](https://github.com/ChromeDevTools/chrome-ai-bridge) by Google LLC
+- **Based on**: [Chrome DevTools MCP](https://github.com/anthropics/anthropic-quickstarts) concepts
 
-### Original Features
+### 主要機能
 
-- **Performance Analysis**: Trace recording and actionable insights via Chrome DevTools
-- **Browser Automation**: Reliable Chrome automation with Puppeteer
-- **Debug Tools**: Network request analysis, screenshots, console inspection
-- **Emulation**: CPU, network, and window size emulation
+- **ChatGPT/Gemini 操作**: Web UI 経由で質問を送信し、回答を取得
+- **並列クエリ**: ChatGPT と Gemini に同時に質問（三者議論用）
+- **セッション管理**: プロジェクトごとにチャットセッションを維持
+- **自動リトライ**: Stuck State 検出と自動リカバリー
+- **Chrome 拡張機能**: CDP (Chrome DevTools Protocol) 経由でブラウザを操作
 
-### Features Added in This Fork
+### アーキテクチャの特徴
 
-- **Dedicated Profile Architecture**: Isolated Chrome profile for safe extension testing
-- **Bookmark Injection System**: Preserves user context while ensuring safety
-- **Chrome Extension Loading**: Dynamically load extensions under development
-- **Web Store Auto-Submit**: `submit_to_webstore` tool for automated form submission
-- **Screenshot Generation**: `generate_extension_screenshots` for Store-ready images
-
-### Why This Fork?
-
-The original Chrome DevTools MCP is excellent but doesn't support Chrome extension testing/development. This fork enables AI-assisted extension development, testing, and debugging.
+- **Extension-only モード**: Puppeteer 不要、Chrome 拡張機能のみで動作
+- **CDP 直接通信**: 拡張機能経由で高速な DOM 操作
+- **Shadow DOM 対応**: Gemini の Web Components に対応
 
 ---
 
@@ -1047,16 +1042,16 @@ async function getPreferredSession(kind: 'chatgpt' | 'gemini'): Promise<Preferre
 **送信リトライ**:
 - Enter キーフォールバック（マウスクリック失敗時）
 
-**Gemini Stuck State リトライ** (`src/tools/chatgpt-gemini-web.ts`, `src/tools/gemini-web.ts`):
-- 最大2回リトライ
+**Gemini Stuck State リトライ**:
+- MCPツール（`src/tools/gemini-web.ts`, `src/tools/chatgpt-gemini-web.ts`）で最大2回リトライ
 - `GEMINI_STUCK_*` エラー検出時に自動リトライ
-- リトライ前に `clearGeminiClient()` でキャッシュクリア
+- `fast-chat.ts` 内部で `clearGeminiClient()` によりキャッシュクリア
 
 ### 9.3 Gemini Stuck State 検出
 
 **背景**: Geminiが応答生成中に停止し、UI更新が止まる現象。前のセッションがハングした場合に発生。
 
-**検出方法** (`checkGeminiStuckState()`):
+**検出方法** (`checkGeminiStuckState()` in `src/fast-cdp/fast-chat.ts`):
 ```typescript
 // 最大5秒間、500ms間隔でポーリング
 // 停止ボタンが消えるか確認
@@ -1068,10 +1063,10 @@ async function getPreferredSession(kind: 'chatgpt' | 'gemini'): Promise<Preferre
 - `GEMINI_STUCK_NO_RESPONSE`: 応答が開始されない
 
 **対応フロー**:
-1. `askGeminiFast()` でスタック状態検出
-2. `GEMINI_STUCK_*` エラーをスロー
-3. 呼び出し元（`askAI()` or MCPツール）でキャッチ
-4. `clearGeminiClient()` で接続キャッシュクリア
+1. `askGeminiFast()` 内でスタック状態検出
+2. `clearGeminiClient()` で接続キャッシュクリア（`fast-chat.ts` 内）
+3. `GEMINI_STUCK_*` エラーをスロー
+4. MCPツール（`gemini-web.ts`, `chatgpt-gemini-web.ts`）でキャッチ
 5. 再度 `askGeminiFast()` を呼び出し（最大2回）
 
 ### 9.4 デバッグファイル
@@ -1345,7 +1340,7 @@ npm run cdp:gemini  # スナップショット取得
 1. タブがまだ存在するか確認
 2. 拡張機能が正常に動作しているか確認
 
-### 問題5: ChatGPT応答テキストが空になる（バックグラウンドタブ問題）
+### 問題4: ChatGPT応答テキストが空になる（バックグラウンドタブ問題）
 
 **症状**:
 - ChatGPTの応答生成は完了する（停止ボタンが消える）
@@ -1386,7 +1381,7 @@ Page.bringToFront ← ここ
 
 **発見日**: 2026-02-02
 
-### 問題4: "Login required" エラー
+### 問題5: "Login required" エラー
 
 **症状**: ログインが必要というエラー
 
@@ -1396,7 +1391,7 @@ Page.bringToFront ← ここ
 1. ブラウザで手動ログイン
 2. 新しいセッションが sessions.json に保存されることを確認
 
-### 問題5: 拡張機能が接続されない
+### 問題6: 拡張機能が接続されない
 
 **症状**: "Extension not connected" エラー
 
@@ -1423,6 +1418,12 @@ src/
 │   ├── cdp-client.ts     # CDP コマンド送信クライアント
 │   ├── extension-raw.ts  # 拡張機能接続処理
 │   └── mcp-logger.ts     # ロギング
+├── tools/
+│   ├── chatgpt-web.ts         # ask_chatgpt_web ツール
+│   ├── gemini-web.ts          # ask_gemini_web ツール
+│   ├── chatgpt-gemini-web.ts  # ask_chatgpt_gemini_web ツール（並列クエリ）
+│   ├── cdp-snapshot.ts        # take_cdp_snapshot ツール
+│   └── page-dom.ts            # get_page_dom ツール
 ├── extension/
 │   ├── background.mjs    # 拡張機能 Service Worker
 │   ├── relay-server.ts   # Discovery/Relay サーバー
