@@ -733,13 +733,18 @@ async function autoOpenConnectUi() {
       ok = false;
     }
     if (!ok) {
-      logInfo('discovery', 'Falling back to connect UI', {port: relay.port});
-      await ensureConnectUiTab(
-        relay.data.wsUrl,
-        relay.data.tabUrl || undefined,
-        Boolean(relay.data.newTab),
-        false,
-      );
+      // Only open connect.html if user explicitly clicked the extension icon
+      if (allowAutoOpenConnectUi) {
+        logInfo('discovery', 'Falling back to connect UI', {port: relay.port});
+        await ensureConnectUiTab(
+          relay.data.wsUrl,
+          relay.data.tabUrl || undefined,
+          Boolean(relay.data.newTab),
+          false,
+        );
+      } else {
+        logDebug('discovery', 'Auto-connect failed, but connect UI disabled (silent mode)', {port: relay.port});
+      }
     }
   }
 }
@@ -771,9 +776,9 @@ chrome.alarms.onAlarm.addListener((alarm) => {
     }
 
     // Discovery pollingが停止していたら再開
-    // ただし、アクティブな接続がある場合のみ（Chrome起動時の不要な再開を防ぐ）
-    if (discoveryIntervalId === null && (activeCount > 0 || pendingCount > 0)) {
-      logInfo('keepalive', 'Discovery was stopped but has active connections, restarting...');
+    // Service Workerがスリープから復帰した場合に対応
+    if (discoveryIntervalId === null) {
+      logInfo('keepalive', 'Discovery was stopped, restarting...');
       scheduleDiscovery();
     }
   }
@@ -799,18 +804,29 @@ function scheduleDiscovery() {
   }, 500);
 }
 
-// Discovery is now PASSIVE - does NOT auto-start on Chrome startup
+// Discovery auto-starts on Chrome startup, but connect.html tabs are NOT auto-opened
 // This prevents the issue where Chrome restart opens many connect.html tabs
-// Discovery is started only when:
-// 1. User clicks the extension icon
-// 2. Keep-alive alarm detects an active connection needs re-discovery
-//
-// Removed: onInstalled, onStartup, and immediate scheduleDiscovery() calls
+// while still allowing automatic connection to MCP servers
 
-// Start discovery when user clicks extension icon
+// Flag to control whether to open connect.html on autoConnect failure
+let allowAutoOpenConnectUi = false;
+
+// Start discovery when user clicks extension icon (allows connect.html to open)
 chrome.action.onClicked.addListener(() => {
-  logInfo('action', 'Extension icon clicked - starting discovery');
+  logInfo('action', 'Extension icon clicked - enabling connect UI and starting discovery');
+  allowAutoOpenConnectUi = true;
   scheduleDiscovery();
 });
 
-logInfo('background', 'Extension loaded (passive mode - click icon to start discovery)');
+// Auto-start discovery on install/startup (but don't auto-open connect.html)
+chrome.runtime.onInstalled.addListener(() => {
+  logInfo('background', 'Extension installed - starting discovery (silent mode)');
+  scheduleDiscovery();
+});
+chrome.runtime.onStartup.addListener(() => {
+  logInfo('background', 'Chrome started - starting discovery (silent mode)');
+  scheduleDiscovery();
+});
+scheduleDiscovery();  // Start immediately
+
+logInfo('background', 'Extension loaded (discovery active, connect UI on demand)');
