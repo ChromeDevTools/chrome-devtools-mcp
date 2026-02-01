@@ -72,6 +72,61 @@
         "bothMustSucceed": true,
         "minAnswerLength": 10
       }
+    },
+    {
+      "id": "gemini-existing-chat",
+      "name": "Gemini 既存チャット再接続",
+      "provider": "gemini",
+      "tags": ["regression", "gemini"],
+      "setup": {
+        "requireExistingTab": true,
+        "instruction": "Geminiで会話を開いた状態で実行"
+      },
+      "question": {
+        "template": "Pythonのデコレータを1文で。ID:{{timestamp}}"
+      },
+      "assertions": {
+        "minAnswerLength": 20,
+        "relevanceThreshold": 0.2
+      }
+    },
+    {
+      "id": "chatgpt-code-block",
+      "name": "ChatGPT コードブロック応答",
+      "provider": "chatgpt",
+      "tags": ["smoke", "chatgpt", "code"],
+      "question": {
+        "template": "JavaScriptで文字列を反転する関数を書いて。ID:{{timestamp}}"
+      },
+      "assertions": {
+        "minAnswerLength": 30
+      }
+    },
+    {
+      "id": "gemini-code-block",
+      "name": "Gemini コードブロック応答",
+      "provider": "gemini",
+      "tags": ["smoke", "gemini", "code"],
+      "question": {
+        "template": "TypeScriptでasync/awaitの基本例を書いて。ID:{{timestamp}}"
+      },
+      "assertions": {
+        "minAnswerLength": 50,
+        "relevanceThreshold": 0.15
+      }
+    },
+    {
+      "id": "chatgpt-long-response",
+      "name": "ChatGPT 長い応答",
+      "provider": "chatgpt",
+      "tags": ["chatgpt"],
+      "question": {
+        "template": "オブジェクト指向プログラミングの3原則（カプセル化、継承、ポリモーフィズム）を簡潔に説明して。ID:{{timestamp}}"
+      },
+      "assertions": {
+        "minAnswerLength": 100,
+        "maxTotalMs": 90000
+      }
     }
   ]
 }
