@@ -1222,17 +1222,26 @@ async function askChatGPTFastInternal(question: string): Promise<ChatResult> {
 
     // ChatGPT 5.2 Thinking モデル対応:
     // 回答が「思考」として折りたたまれている場合は展開してからテキストを取得
-    // 「思考の拡張」ボタンをページ全体から探してクリック
+    // 重要: 回答内（article内）のボタンのみを対象にする
+    // 入力欄横の「思考の拡張」ボタンを誤クリックしないよう厳密に検出
     const clickedExpand = await client.evaluate<boolean>(`
       (() => {
-        // ページ全体から「思考の拡張」「Expand thinking」ボタンを探す
-        const allButtons = document.querySelectorAll('button');
-        for (const btn of allButtons) {
-          const text = (btn.innerText || '').toLowerCase();
-          if (text.includes('思考') || text.includes('thinking') || text.includes('expand')) {
-            if (btn.getAttribute('aria-expanded') === 'false') {
-              btn.click();
-              return true;
+        // ChatGPTの回答article内のボタンのみを探す
+        const articles = document.querySelectorAll('article');
+        for (const article of articles) {
+          const heading = article.querySelector('h6, h5, [role="heading"]');
+          if (heading && (heading.textContent || '').includes('ChatGPT')) {
+            // この回答内のボタンを探す
+            const buttons = article.querySelectorAll('button');
+            for (const btn of buttons) {
+              const text = (btn.innerText || '').toLowerCase();
+              // 「思考時間」「X seconds」を含むボタンで、展開可能なもの
+              // 入力欄横の「思考の拡張」は article 外にあるので対象外
+              if ((text.includes('思考時間') || text.includes('second') || text.includes('秒')) &&
+                  btn.getAttribute('aria-expanded') === 'false') {
+                btn.click();
+                return true;
+              }
             }
           }
         }
@@ -1245,14 +1254,188 @@ async function askChatGPTFastInternal(question: string): Promise<ChatResult> {
       console.error('[ChatGPT] Expanded thinking content');
     }
 
+    // 回答完了後、DOM安定化のための追加待機
+    // ChatGPT Thinkingモードでは、停止ボタン消失後も最終回答がレンダリングされるまで遅延がある
+    // 回答テキストが存在するまでポーリングで待機
+    const maxWaitForText = 10000;  // 最大10秒（Thinkingモード対応）
+    const pollInterval = 200;
+    const waitStart = Date.now();
+    let hasResponseText = false;
+
+    while (Date.now() - waitStart < maxWaitForText) {
+      const checkResult = await client.evaluate<{ hasText: boolean; textLength: number; articleIndex: number; markdownClass: string }>(`
+        (() => {
+          const articles = document.querySelectorAll('article');
+          // 最後のChatGPT articleを探す
+          let lastChatGPTArticle = null;
+          let lastIndex = -1;
+          for (let i = 0; i < articles.length; i++) {
+            const heading = articles[i].querySelector('h6, h5, [role="heading"]');
+            if (heading && (heading.textContent || '').includes('ChatGPT')) {
+              lastChatGPTArticle = articles[i];
+              lastIndex = i;
+            }
+          }
+
+          if (!lastChatGPTArticle) return { hasText: false, textLength: 0, articleIndex: -1, markdownClass: '' };
+
+          // 最後のarticle内で .result-thinking ではない .markdown を探す
+          const markdowns = lastChatGPTArticle.querySelectorAll('.markdown');
+          for (const md of markdowns) {
+            if (md.classList.contains('result-thinking')) continue;
+            const text = (md.innerText || '').trim();
+            if (text.length > 0) return { hasText: true, textLength: text.length, articleIndex: lastIndex, markdownClass: md.className };
+          }
+
+          // フォールバック: article内の p 要素を探す
+          const paragraphs = lastChatGPTArticle.querySelectorAll('p');
+          for (const p of paragraphs) {
+            if (p.closest('button')) continue;  // button内のpは除外
+            const text = (p.innerText || '').trim();
+            if (text.length > 0) return { hasText: true, textLength: text.length, articleIndex: lastIndex, markdownClass: 'p-element' };
+          }
+
+          return { hasText: false, textLength: 0, articleIndex: lastIndex, markdownClass: '' };
+        })()
+      `);
+
+      if (checkResult.hasText) {
+        hasResponseText = true;
+        console.error(`[ChatGPT] Response text ready (${checkResult.textLength} chars) in article[${checkResult.articleIndex}] (${checkResult.markdownClass}) after ${Date.now() - waitStart}ms`);
+        break;
+      }
+      // 定期的にデバッグログを出力
+      const elapsed = Date.now() - waitStart;
+      if (elapsed > 0 && elapsed % 2000 < pollInterval) {
+        console.error(`[ChatGPT] Still waiting for response text... (${elapsed}ms, articleIndex=${checkResult.articleIndex})`);
+      }
+      await new Promise(r => setTimeout(r, pollInterval));
+    }
+
+    if (!hasResponseText) {
+      console.error(`[ChatGPT] Warning: Response text not detected after ${maxWaitForText}ms, proceeding with extraction...`);
+    }
+
+    // CDPセッション確認用デバッグログ
+    const cdpDebug = await client.evaluate<{
+      url: string;
+      documentTitle: string;
+      articleCount: number;
+      markdownCount: number;
+      bodyTextLength: number;
+    }>(`
+      (() => {
+        return {
+          url: window.location.href,
+          documentTitle: document.title,
+          articleCount: document.querySelectorAll('article').length,
+          markdownCount: document.querySelectorAll('.markdown').length,
+          bodyTextLength: (document.body.innerText || '').length
+        };
+      })()
+    `);
+    console.error('[ChatGPT] CDP debug:', JSON.stringify(cdpDebug));
+
     // 最後のアシスタントメッセージを直接取得
     // ChatGPT 5.2 Thinking: .result-thinking または .markdown 内のテキスト
     // リトライロジック: CDPがReactレンダリング完了前に実行される問題に対応
+
+    // 重要: 最後のarticleにスクロールしてからテキストを抽出
+    // CDPでは、ビューポート外の要素のinnerTextが空になる場合がある
+    await client.evaluate<void>(`
+      (() => {
+        const articles = document.querySelectorAll('article');
+        if (articles.length > 0) {
+          articles[articles.length - 1].scrollIntoView({ block: 'end', behavior: 'instant' });
+        }
+      })()
+    `);
+    // スクロール後のレンダリング待機
+    await new Promise(resolve => setTimeout(resolve, 300));
+
     let answer = '';
-    const extractMaxRetries = 5;
-    const extractRetryIntervalMs = 500;
+    const extractMaxRetries = 2;  // リトライを2回に削減（body.innerTextフォールバックがあるため）
+    const extractBaseIntervalMs = 500;  // 段階的増加の基本間隔
 
     for (let retry = 0; retry < extractMaxRetries; retry++) {
+      // 2回目以降は段階的に待機時間を増加（500ms, 750ms, 1000ms, 1250ms）
+      if (retry > 0) {
+        const waitMs = extractBaseIntervalMs + (retry - 1) * 250;
+        console.error(`[ChatGPT] Waiting ${waitMs}ms before retry ${retry}...`);
+        await new Promise(r => setTimeout(r, waitMs));
+      }
+      // デバッグ: 抽出前のDOM状態を確認（最新articleの詳細）
+      const debugInfo = await client.evaluate<{
+        articles: number,
+        chatgptArticles: number,
+        lastArticleDebug: {
+          index: number,
+          markdownCount: number,
+          markdowns: Array<{ className: string, innerTextLength: number, isResultThinking: boolean }>,
+          paragraphCount: number,
+          paragraphs: Array<{ innerTextLength: number, preview: string, inButton: boolean }>,
+          articleInnerTextLength: number,
+          articleInnerTextPreview: string
+        } | null
+      }>(`
+        (() => {
+          const articles = Array.from(document.querySelectorAll('article'));
+          let chatgptCount = 0;
+          let lastChatGPT = null;
+          let lastIndex = -1;
+
+          for (let i = 0; i < articles.length; i++) {
+            const heading = articles[i].querySelector('h6, h5, [role="heading"]');
+            if (heading && (heading.textContent || '').includes('ChatGPT')) {
+              chatgptCount++;
+              lastChatGPT = articles[i];
+              lastIndex = i;
+            }
+          }
+
+          if (!lastChatGPT) return { articles: articles.length, chatgptArticles: chatgptCount, lastArticleDebug: null };
+
+          // 最新articleの詳細
+          const markdowns = lastChatGPT.querySelectorAll('.markdown');
+          const mdInfos = [];
+          for (const md of markdowns) {
+            mdInfos.push({
+              className: md.className,
+              innerTextLength: (md.innerText || '').length,
+              isResultThinking: md.classList.contains('result-thinking')
+            });
+          }
+
+          const paragraphs = lastChatGPT.querySelectorAll('p');
+          const pInfos = [];
+          for (let i = 0; i < Math.min(paragraphs.length, 5); i++) {
+            const p = paragraphs[i];
+            pInfos.push({
+              innerTextLength: (p.innerText || '').length,
+              preview: (p.innerText || '').substring(0, 30),
+              inButton: !!p.closest('button')
+            });
+          }
+
+          return {
+            articles: articles.length,
+            chatgptArticles: chatgptCount,
+            lastArticleDebug: {
+              index: lastIndex,
+              markdownCount: markdowns.length,
+              markdowns: mdInfos,
+              paragraphCount: paragraphs.length,
+              paragraphs: pInfos,
+              articleInnerTextLength: (lastChatGPT.innerText || '').length,
+              articleInnerTextPreview: (lastChatGPT.innerText || '').substring(0, 100)
+            }
+          };
+        })()
+      `);
+      if (retry === 0) {
+        console.error('[ChatGPT] Extract debug:', JSON.stringify(debugInfo.lastArticleDebug));
+      }
+
       answer = await client.evaluate<string>(`
         (() => {
           const articles = document.querySelectorAll('article');
@@ -1274,19 +1457,38 @@ async function askChatGPTFastInternal(question: string): Promise<ChatResult> {
 
           if (!lastAssistantArticle) return '';
 
-          // ChatGPT 5.2 Thinking: 展開された思考コンテンツを取得
-          // .result-thinking.markdown 内のテキストを優先
+          // ChatGPT 5.2 Thinking 対応:
+          // 1. 通常の .markdown を先に探す（.result-thinking ではないもの）
+          // 2. .result-thinking.markdown は空のプレースホルダーの場合があるので後回し
+
+          // Step 1: .result-thinking クラスを持たない .markdown を探す
+          const allMarkdowns = lastAssistantArticle.querySelectorAll('.markdown');
+          for (const md of allMarkdowns) {
+            // .result-thinking クラスを持つものはスキップ
+            if (md.classList.contains('result-thinking')) continue;
+            const text = (md.innerText || md.textContent || '').trim();
+            if (text.length > 0) return text;
+          }
+
+          // Step 2: .result-thinking.markdown からテキストを取得（フォールバック）
           const thinking = lastAssistantArticle.querySelector('.result-thinking.markdown, .result-thinking');
           if (thinking) {
             const text = (thinking.innerText || thinking.textContent || '').trim();
             if (text.length > 0) return text;
           }
 
-          // 通常のmarkdownコンテンツ
-          const markdown = lastAssistantArticle.querySelector('.markdown');
-          if (markdown) {
-            const text = (markdown.innerText || markdown.textContent || '').trim();
-            if (text.length > 0) return text;
+          // Step 3: その他のフォールバックセレクター
+          const fallbackSelectors = [
+            '.prose:not(.result-thinking)',
+            '[class*="markdown"]:not(.result-thinking)',
+            '.whitespace-pre-wrap'
+          ];
+          for (const sel of fallbackSelectors) {
+            const elem = lastAssistantArticle.querySelector(sel);
+            if (elem) {
+              const text = (elem.innerText || elem.textContent || '').trim();
+              if (text.length > 0) return text;
+            }
           }
 
           // Thinkingモード対応: button以外のコンテンツコンテナからテキストを抽出
@@ -1347,10 +1549,9 @@ async function askChatGPTFastInternal(question: string): Promise<ChatResult> {
         break;
       }
 
-      // リトライ待機
+      // リトライ（待機はループ先頭で実行）
       if (retry < extractMaxRetries - 1) {
-        console.error(`[ChatGPT] Response empty, retrying (${retry + 1}/${extractMaxRetries})...`);
-        await new Promise(r => setTimeout(r, extractRetryIntervalMs));
+        console.error(`[ChatGPT] Response empty, will retry (${retry + 1}/${extractMaxRetries})...`);
       }
     }
 
