@@ -489,6 +489,20 @@ async function askChatGPTFastInternal(question: string): Promise<ChatResult> {
   await new Promise(r => setTimeout(r, 500));
   console.error('[ChatGPT] Waited 500ms for SPA rendering');
 
+  // 既存チャット（/c/を含むURL）の場合、メッセージが描画されるまで待機
+  const currentUrl = await client.evaluate<string>('location.href');
+  if (currentUrl.includes('/c/')) {
+    try {
+      await client.waitForFunction(
+        `document.querySelectorAll('[data-message-author-role="assistant"]').length > 0`,
+        5000
+      );
+      console.error('[ChatGPT] Existing chat messages loaded');
+    } catch {
+      console.error('[ChatGPT] No existing messages found, continuing as new chat');
+    }
+  }
+
   // 入力欄が表示されるまで待機してから取得
   const tWaitInput = nowMs();
   logInfo('chatgpt', 'Waiting for input field');
@@ -1438,6 +1452,22 @@ async function askGeminiFastInternal(question: string): Promise<ChatResult> {
   // SPA描画安定化のため追加待機
   await new Promise(r => setTimeout(r, 500));
   console.error('[Gemini] Waited 500ms for SPA rendering');
+
+  // 既存チャット（URLにチャットIDが含まれる）の場合、メッセージが描画されるまで待機
+  const geminiCurrentUrl = await client.evaluate<string>('location.href');
+  // 既存チャットのURLパターン: /app/xxxxx (チャットID)
+  const isExistingGeminiChat = /\/app\/[a-zA-Z0-9]+/.test(geminiCurrentUrl);
+  if (isExistingGeminiChat) {
+    try {
+      await client.waitForFunction(
+        `document.querySelectorAll('model-response, .model-response').length > 0`,
+        5000
+      );
+      console.error('[Gemini] Existing chat messages loaded');
+    } catch {
+      console.error('[Gemini] No existing messages found, continuing as new chat');
+    }
+  }
 
   const tWaitInput = nowMs();
   await client.waitForFunction(
