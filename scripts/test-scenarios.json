@@ -1,0 +1,77 @@
+{
+  "version": "1.0.0",
+  "scenarios": [
+    {
+      "id": "chatgpt-new-chat",
+      "name": "ChatGPT 新規チャット",
+      "provider": "chatgpt",
+      "tags": ["smoke", "chatgpt"],
+      "question": {
+        "template": "JavaScriptのconstとletの違いを1文で。ID:{{timestamp}}"
+      },
+      "assertions": {
+        "minAnswerLength": 20,
+        "relevanceThreshold": 0.2,
+        "maxTotalMs": 60000
+      }
+    },
+    {
+      "id": "chatgpt-existing-chat",
+      "name": "ChatGPT 既存チャット再接続",
+      "provider": "chatgpt",
+      "tags": ["regression", "chatgpt"],
+      "setup": {
+        "requireExistingTab": true,
+        "instruction": "ChatGPTで会話を開いた状態で実行"
+      },
+      "question": {
+        "template": "Pythonのリスト内包表記を1文で。ID:{{timestamp}}"
+      },
+      "assertions": {
+        "minAnswerLength": 20,
+        "relevanceThreshold": 0.2,
+        "noFallback": true
+      }
+    },
+    {
+      "id": "chatgpt-thinking-mode",
+      "name": "ChatGPT Thinkingモード",
+      "provider": "chatgpt",
+      "tags": ["regression", "chatgpt", "thinking"],
+      "question": {
+        "template": "このコードのバグを見つけて: function f(x) { if(x = 5) return true; } ID:{{timestamp}}"
+      },
+      "assertions": {
+        "minAnswerLength": 50,
+        "relevanceThreshold": 0.15,
+        "noEmptyMarkdown": true
+      }
+    },
+    {
+      "id": "gemini-new-chat",
+      "name": "Gemini 新規チャット",
+      "provider": "gemini",
+      "tags": ["smoke", "gemini"],
+      "question": {
+        "template": "TypeScriptのジェネリクスを1文で。ID:{{timestamp}}"
+      },
+      "assertions": {
+        "minAnswerLength": 20,
+        "relevanceThreshold": 0.2
+      }
+    },
+    {
+      "id": "parallel-query",
+      "name": "ChatGPT+Gemini 並列クエリ",
+      "provider": "both",
+      "tags": ["smoke", "parallel"],
+      "question": {
+        "template": "HTTPステータスコード404の意味を1文で。ID:{{timestamp}}"
+      },
+      "assertions": {
+        "bothMustSucceed": true,
+        "minAnswerLength": 10
+      }
+    }
+  ]
+}

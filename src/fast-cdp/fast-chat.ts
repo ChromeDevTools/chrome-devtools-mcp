@@ -26,9 +26,43 @@ export interface ChatTimings {
   navigateMs?: number;  // Gemini only
 }
 
+/**
+ * デバッグ情報: DOM構造、抽出試行、タイミング等
+ */
+export interface ChatDebugInfo {
+  // DOM構造
+  dom: {
+    articleCount: number;
+    markdowns: Array<{
+      className: string;
+      innerTextLength: number;
+      innerText: string;
+      isResultThinking: boolean;
+    }>;
+    lastArticleHtml: string;
+    lastArticleInnerText: string;
+  };
+  // 抽出試行
+  extraction: {
+    selectorsTried: Array<{
+      selector: string;
+      found: boolean;
+      textLength: number;
+    }>;
+    finalSelector?: string;
+    fallbackUsed?: string;
+  };
+  // タイミング
+  timings: ChatTimings;
+  // URL・タイトル
+  url: string;
+  documentTitle: string;
+}
+
 export interface ChatResult {
   answer: string;
   timings: ChatTimings;
+  debug?: ChatDebugInfo;
 }
 
 function nowMs(): number {
@@ -214,6 +248,118 @@ async function saveSession(kind: 'chatgpt' | 'gemini', url: string, tabId?: numb
   await fs.writeFile(targetPath, JSON.stringify(sessions, null, 2), 'utf-8');
 }
 
+async function clearGeminiSession(): Promise<void> {
+  const project = getProjectName();
+  const sessions = await loadSessions();
+  if (sessions.projects[project]?.gemini) {
+    delete sessions.projects[project].gemini;
+    const targetPath = getSessionPath();
+    await fs.mkdir(path.dirname(targetPath), {recursive: true});
+    await fs.writeFile(targetPath, JSON.stringify(sessions, null, 2), 'utf-8');
+    console.error(`[Gemini] Session cleared for project: ${project}`);
+  }
+}
+
+/**
+ * キャッシュされたGeminiクライアントをクリア（リトライ用）
+ */
+export function clearGeminiClient(): void {
+  if (geminiClient) {
+    geminiClient = null;
+    console.error('[Gemini] Cached client cleared');
+  }
+  if (geminiRelay) {
+    try {
+      geminiRelay.stop();
+    } catch {
+      // ignore stop errors
+    }
+    geminiRelay = null;
+  }
+}
+
+/**
+ * 既存Geminiチャットがスタック状態（停止ボタンが消えない）かチェック
+ * 最大5秒間待機して停止ボタンが消えるか確認
+ */
+async function checkGeminiStuckState(client: CdpClient): Promise<{isStuck: boolean; waitedMs: number}> {
+  const maxWaitMs = 5000;
+  const pollIntervalMs = 500;
+  const startTime = Date.now();
+
+  while (Date.now() - startTime < maxWaitMs) {
+    const hasStopButton = await client.evaluate<boolean>(`
+      (() => {
+        const collectDeep = (selectorList) => {
+          const results = [];
+          const seen = new Set();
+          const visit = (root) => {
+            if (!root) return;
+            for (const sel of selectorList) {
+              try {
+                root.querySelectorAll?.(sel)?.forEach(el => {
+                  if (!seen.has(el)) {
+                    seen.add(el);
+                    results.push(el);
+                  }
+                });
+              } catch {}
+            }
+            const elements = root.querySelectorAll ? Array.from(root.querySelectorAll('*')) : [];
+            for (const el of elements) {
+              if (el.shadowRoot) visit(el.shadowRoot);
+            }
+          };
+          visit(document);
+          return results;
+        };
+
+        const isVisible = (el) => {
+          if (!el) return false;
+          const rects = el.getClientRects();
+          if (!rects || rects.length === 0) return false;
+          const style = window.getComputedStyle(el);
+          return style && style.visibility !== 'hidden' && style.display !== 'none';
+        };
+
+        const isDisabled = (el) => {
+          if (!el) return true;
+          return el.disabled || el.getAttribute('aria-disabled') === 'true' || el.getAttribute('disabled') === 'true';
+        };
+
+        const buttons = collectDeep(['button', '[role="button"]']).filter(isVisible).filter(el => !isDisabled(el));
+
+        // 方法1: aria-labelベースの検索
+        const stopByLabel = buttons.some(b => {
+          const label = (b.getAttribute('aria-label') || '').trim();
+          return label.includes('回答を停止') || label.includes('Stop generating') ||
+                 label.includes('Stop streaming') || label === 'Stop';
+        });
+        if (stopByLabel) return true;
+
+        // 方法2: mat-icon要素での検出
+        const stopIcons = collectDeep(['mat-icon[data-mat-icon-name="stop"]']);
+        for (const stopIcon of stopIcons) {
+          const btn = stopIcon.closest('button');
+          if (btn && isVisible(btn) && !isDisabled(btn)) return true;
+        }
+
+        return false;
+      })()
+    `);
+
+    if (!hasStopButton) {
+      // 停止ボタンが消えた - スタックしていない
+      return {isStuck: false, waitedMs: Date.now() - startTime};
+    }
+
+    await new Promise(resolve => setTimeout(resolve, pollIntervalMs));
+  }
+
+  // 5秒間停止ボタンが消えなかった - スタック状態
+  return {isStuck: true, waitedMs: Date.now() - startTime};
+}
+
 async function appendHistory(entry: {
   provider: 'chatgpt' | 'gemini';
   question: string;
@@ -393,6 +539,17 @@ async function createConnection(kind: 'chatgpt' | 'gemini'): Promise<CdpClient> 
         geminiRelay = relayResult.relay;
       }
 
+      // 新規タブ作成後、ページが読み込まれるまで待機（about:blank でなくなるまで）
+      const debugUrl = await client.evaluate<string>('location.href');
+      if (debugUrl === 'about:blank') {
+        console.error(`[fast-cdp] Waiting for new tab to navigate from about:blank...`);
+        await client.waitForFunction(
+          `location.href !== 'about:blank' && document.readyState === 'complete'`,
+          10000,  // 新規タブは読み込みに時間がかかる可能性があるので10秒
+        );
+        console.error(`[fast-cdp] New tab navigation complete`);
+      }
+
       const elapsed = Date.now() - startTime;
       logConnectionState(kind, 'connected', {elapsed, attempt: attempt + 1, reused: false});
       console.error(`[fast-cdp] ${kind} new tab created successfully (attempt ${attempt + 1})`);
@@ -469,7 +626,7 @@ async function navigate(client: CdpClient, url: string) {
   await client.waitForFunction(`document.readyState === 'complete'`, 30000);
 }
 
-async function askChatGPTFastInternal(question: string): Promise<ChatResult> {
+async function askChatGPTFastInternal(question: string, debug?: boolean): Promise<ChatResult> {
   const t0 = nowMs();
   const timings: Partial<ChatTimings> = {};
   logInfo('chatgpt', 'askChatGPTFast started', {questionLength: question.length});
@@ -1072,6 +1229,27 @@ async function askChatGPTFastInternal(question: string): Promise<ChatResult> {
         sendButtonTestId: string | null;
         assistantMsgCount: number;
         inputBoxHasText: boolean;
+        isStillGenerating: boolean;
+        hasResponseText: boolean;
+        hasSkipThinkingButton: boolean;
+        // デバッグ情報
+        debug_assistantMsgsCount: number;
+        debug_chatgptArticlesCount: number;
+        debug_markdownsInLast: number;
+        debug_lastAssistantInnerTextLen: number;
+        debug_markdownInfo: string;
+        debug_childInfo: string;
+        debug_fullText: string;
+        debug_articleTexts: string;
+        debug_bodySnippet: string;
+        debug_bodyLen: number;
+        debug_pageUrl: string;
+        debug_pageTitle: string;
+        debug_iframeCount: number;
+        debug_allMarkdownsInfo: string;
+        debug_outerHtml: string;
+        debug_mainContent: string;
+        debug_presentationText: string;
       }>(`
         (() => {
           const collectDeep = (selectorList) => {
@@ -1112,11 +1290,209 @@ async function askChatGPTFastInternal(question: string): Promise<ChatResult> {
           );
           const assistantMsgs = document.querySelectorAll('[data-message-author-role="assistant"]');
 
+          // 新UI対応: articleからChatGPTのメッセージを探す
+          const chatgptArticles = [];
+          for (const article of document.querySelectorAll('article')) {
+            const heading = article.querySelector('h6, h5, [role="heading"]');
+            if (heading && (heading.textContent || '').includes('ChatGPT')) {
+              chatgptArticles.push(article);
+            }
+          }
+
           // 入力欄の状態確認
           const inputBox = document.querySelector('.ProseMirror[contenteditable="true"]') ||
                           document.querySelector('textarea#prompt-textarea');
           const inputText = inputBox ?
             (inputBox.tagName === 'TEXTAREA' ? inputBox.value : inputBox.textContent) || '' : '';
+
+          // Thinkingモード: 「回答を生成しています」テキストが表示されている間は生成中
+          // ただし「思考時間: Xs」が表示されていれば完了とみなす
+          const bodyText = document.body?.innerText || '';
+          const hasGeneratingText = bodyText.includes('回答を生成しています') ||
+                                   bodyText.includes('is still generating') ||
+                                   bodyText.includes('generating a response');
+          // 「思考時間」マーカーがあれば完了（Thinkingモード終了のサイン）
+          const hasThinkingComplete = /思考時間[：:]\s*\d+s?/.test(bodyText) ||
+                                      /Thinking.*\d+s?/.test(bodyText);
+          // 「今すぐ回答」「Skip thinking」ボタンがある場合はThinking進行中
+          const hasSkipThinkingButton = bodyText.includes('今すぐ回答') ||
+                                        bodyText.includes('Skip thinking');
+          const isStillGenerating = (hasGeneratingText && !hasThinkingComplete) || hasSkipThinkingButton;
+
+          // 最後のアシスタントメッセージに実際のテキストがあるかチェック
+          // 旧UIセレクター + 新UI(article)の両方を試す
+          const lastAssistant = assistantMsgs[assistantMsgs.length - 1] ||
+                               chatgptArticles[chatgptArticles.length - 1];
+          let hasResponseText = false;
+          if (lastAssistant) {
+            // .markdown 内のテキストを確認（.result-thinking は空のプレースホルダーの可能性）
+            const markdowns = lastAssistant.querySelectorAll('.markdown');
+            for (const md of markdowns) {
+              // result-thinking 以外の .markdown をチェック
+              if (!md.classList.contains('result-thinking')) {
+                // innerText が空でも textContent を試す
+                const text = (md.innerText || md.textContent || '').trim();
+                if (text.length > 0) {
+                  hasResponseText = true;
+                  break;
+                }
+              }
+            }
+            // result-thinking 内もチェック（テキストがあれば有効）
+            if (!hasResponseText) {
+              const rt = lastAssistant.querySelector('.result-thinking');
+              if (rt) {
+                const text = (rt.innerText || rt.textContent || '').trim();
+                hasResponseText = text.length > 0;
+              }
+            }
+            // 追加: .prose, [class*="markdown"], p要素 からもテキストを探す
+            if (!hasResponseText) {
+              const additionalSelectors = [
+                '.prose:not(.result-thinking)',
+                '[class*="markdown"]:not(.result-thinking)',
+              ];
+              for (const sel of additionalSelectors) {
+                const elem = lastAssistant.querySelector(sel);
+                if (elem) {
+                  const text = (elem.innerText || elem.textContent || '').trim();
+                  if (text.length > 0) {
+                    hasResponseText = true;
+                    break;
+                  }
+                }
+              }
+            }
+            // 追加: button以外のp要素からテキストを探す
+            if (!hasResponseText) {
+              const paragraphs = lastAssistant.querySelectorAll('p');
+              for (const p of paragraphs) {
+                if (p.closest('button')) continue;
+                const text = (p.innerText || p.textContent || '').trim();
+                if (text.length > 0) {
+                  hasResponseText = true;
+                  break;
+                }
+              }
+            }
+          }
+          // 追加: <main>要素から「ChatGPT:」以降のテキストを探す（Thinkingモード対応）
+          if (!hasResponseText) {
+            const mainEl = document.querySelector('main');
+            if (mainEl) {
+              const mainText = mainEl.innerText || '';
+              // 「ChatGPT:」以降を取得し、終端マーカーで切る
+              const idx = mainText.lastIndexOf('ChatGPT:');
+              if (idx >= 0) {
+                let afterChatGPT = mainText.slice(idx + 8).trim();
+                // 終端マーカーで切る
+                const endMarkers = ['あなた:', 'You:', '思考の拡張', 'ChatGPT の回答'];
+                for (const m of endMarkers) {
+                  const endIdx = afterChatGPT.indexOf(m);
+                  if (endIdx > 0) afterChatGPT = afterChatGPT.slice(0, endIdx).trim();
+                }
+                // UIテキストではない実際の回答があるか
+                if (afterChatGPT.length > 5 &&
+                    !afterChatGPT.startsWith('思考の拡張') &&
+                    !afterChatGPT.includes('cookie の設定')) {
+                  hasResponseText = true;
+                }
+              }
+            }
+          }
+
+          // assistantMsgCount: 旧UIセレクター + 新UI(article)の両方をカウント
+          const assistantCount = Math.max(assistantMsgs.length, chatgptArticles.length);
+
+          // デバッグ情報の収集
+          const markdownsInLast = lastAssistant ? lastAssistant.querySelectorAll('.markdown').length : 0;
+          const lastAssistantText = lastAssistant ? (lastAssistant.innerText || '').trim() : '';
+          // 追加デバッグ: .markdown の内容と className
+          let debug_markdownInfo = '';
+          if (lastAssistant) {
+            const mds = lastAssistant.querySelectorAll('.markdown');
+            for (let i = 0; i < Math.min(mds.length, 3); i++) {
+              const md = mds[i];
+              const cls = md.className || '';
+              const innerTxt = (md.innerText || '').trim().slice(0, 50);
+              const textContent = (md.textContent || '').trim().slice(0, 50);
+              // p要素のテキストも確認
+              const pElements = md.querySelectorAll('p');
+              let pTexts = '';
+              for (let j = 0; j < Math.min(pElements.length, 3); j++) {
+                const pTxt = (pElements[j].innerText || pElements[j].textContent || '').trim().slice(0, 30);
+                pTexts += 'p[' + j + ']="' + pTxt + '" ';
+              }
+              debug_markdownInfo += 'md[' + i + ']: cls="' + cls.slice(0, 30) + '", innerT=' + innerTxt.length + ', textC=' + textContent.length + ', ' + pTexts + '| ';
+            }
+          }
+          // lastAssistantの直接の子要素を調査
+          let debug_childInfo = '';
+          if (lastAssistant) {
+            const children = lastAssistant.children || [];
+            for (let i = 0; i < Math.min(children.length, 5); i++) {
+              const ch = children[i];
+              const tag = ch.tagName || '';
+              const cls = (ch.className || '').slice(0, 30);
+              const txt = (ch.innerText || ch.textContent || '').trim().slice(0, 30);
+              debug_childInfo += tag + '.' + cls + '="' + txt + '" | ';
+            }
+          }
+          // lastAssistant全体のinnerTextを調査（longer preview）
+          let debug_fullText = '';
+          if (lastAssistant) {
+            debug_fullText = (lastAssistant.innerText || '').trim().slice(0, 200);
+          }
+          // lastAssistantのouterHTMLの一部を取得（DOM構造確認用）
+          let debug_outerHtml = '';
+          if (lastAssistant) {
+            debug_outerHtml = (lastAssistant.outerHTML || '').slice(0, 500);
+          }
+          // 追加: メインコンテンツエリアの全テキストを取得
+          let debug_mainContent = '';
+          const mainEl = document.querySelector('main');
+          if (mainEl) {
+            debug_mainContent = (mainEl.innerText || '').slice(0, 300);
+          }
+          // 追加: role=presentation の要素内テキスト（ChatGPTのメッセージ表示エリア）
+          let debug_presentationText = '';
+          const presentationEl = document.querySelector('[role="presentation"]');
+          if (presentationEl) {
+            debug_presentationText = (presentationEl.innerText || '').slice(0, 300);
+          }
+          // 全articleのinnerTextをチェック
+          let debug_articleTexts = '';
+          for (let i = 0; i < chatgptArticles.length; i++) {
+            const art = chatgptArticles[i];
+            const txt = (art.innerText || '').trim().slice(0, 50);
+            debug_articleTexts += 'art[' + i + ']="' + txt + '" | ';
+          }
+          // body全体のinnerTextから回答らしき部分を探す
+          const bodyInnerText = (document.body?.innerText || '');
+          // bodyの長さ
+          const debug_bodyLen = bodyInnerText.length;
+          // ページURLとタイトル
+          const debug_pageUrl = location.href;
+          const debug_pageTitle = document.title;
+          // iframeの数
+          const debug_iframeCount = document.querySelectorAll('iframe').length;
+          // body text snippet
+          const debug_bodySnippet = bodyInnerText.slice(0, 100);
+          // 追加デバッグ: document全体の.markdown要素数と最初の3つの情報
+          const allMarkdowns = document.querySelectorAll('.markdown');
+          let debug_allMarkdownsInfo = 'total=' + allMarkdowns.length + ' | ';
+          for (let i = 0; i < Math.min(allMarkdowns.length, 3); i++) {
+            const md = allMarkdowns[i];
+            const rect = md.getBoundingClientRect();
+            const visible = rect.width > 0 && rect.height > 0;
+            const cls = (md.className || '').slice(0, 40);
+            const txtLen = (md.innerText || '').length;
+            debug_allMarkdownsInfo += 'md[' + i + ']: visible=' + visible + ', cls="' + cls + '", len=' + txtLen + ' | ';
+          }
+          // lastAssistantをスクロールして可視化（テスト）
+          if (lastAssistant) {
+            try { lastAssistant.scrollIntoView({ block: 'center' }); } catch {}
+          }
 
           return {
             hasStopButton: Boolean(stopBtn),
@@ -1127,8 +1503,29 @@ async function askChatGPTFastInternal(question: string): Promise<ChatResult> {
               sendBtn.getAttribute('disabled') === 'true'
             ) : null,
             sendButtonTestId: sendBtn ? sendBtn.getAttribute('data-testid') : null,
-            assistantMsgCount: assistantMsgs.length,
+            assistantMsgCount: assistantCount,
             inputBoxHasText: inputText.trim().length > 0,
+            isStillGenerating,
+            hasResponseText,
+            hasSkipThinkingButton,
+            // デバッグ情報
+            debug_assistantMsgsCount: assistantMsgs.length,
+            debug_chatgptArticlesCount: chatgptArticles.length,
+            debug_markdownsInLast: markdownsInLast,
+            debug_lastAssistantInnerTextLen: lastAssistantText.length,
+            debug_markdownInfo: debug_markdownInfo,
+            debug_childInfo: debug_childInfo,
+            debug_fullText: debug_fullText,
+            debug_articleTexts: debug_articleTexts,
+            debug_bodySnippet: debug_bodySnippet,
+            debug_bodyLen: debug_bodyLen,
+            debug_pageUrl: debug_pageUrl,
+            debug_pageTitle: debug_pageTitle,
+            debug_iframeCount: debug_iframeCount,
+            debug_allMarkdownsInfo: debug_allMarkdownsInfo,
+            debug_outerHtml: debug_outerHtml,
+            debug_mainContent: debug_mainContent,
+            debug_presentationText: debug_presentationText,
           };
         })()
       `);
@@ -1142,14 +1539,17 @@ async function askChatGPTFastInternal(question: string): Promise<ChatResult> {
       const currentState = JSON.stringify(state);
       if (currentState !== lastLoggedState) {
         const elapsed = Math.round((Date.now() - startWait) / 1000);
-        console.error(`[ChatGPT] State @${elapsed}s: stop=${state.hasStopButton}, send=${state.sendButtonFound}(disabled=${state.sendButtonDisabled}), assistant=${state.assistantMsgCount}, inputHasText=${state.inputBoxHasText}, sawStop=${sawStopButton}`);
+        console.error(`[ChatGPT] State @${elapsed}s: stop=${state.hasStopButton}, send=${state.sendButtonFound}(disabled=${state.sendButtonDisabled}), assistant=${state.assistantMsgCount}, inputHasText=${state.inputBoxHasText}, sawStop=${sawStopButton}, generating=${state.isStillGenerating}, skipThink=${state.hasSkipThinkingButton}, hasText=${state.hasResponseText}`);
         lastLoggedState = currentState;
       }
 
-      // 応答完了条件（シンプル版）:
-      // 停止ボタンを一度でも見た後に消えた AND 入力欄が空 AND 新しいアシスタントメッセージが増えた
-      // initialAssistantCountとの比較で、既存の回答を新しい回答と誤判断しない
-      if (sawStopButton && !state.hasStopButton && !state.inputBoxHasText && state.assistantMsgCount > initialAssistantCount) {
+      // 応答完了条件（Thinkingモード対応版）:
+      // 1. 停止ボタンを一度でも見た後に消えた
+      // 2. AND 入力欄が空
+      // 3. AND 新しいアシスタントメッセージが増えた
+      // 注: hasResponseText は CDP でテキスト取得できない場合があるため必須条件から外す
+      if (sawStopButton && !state.hasStopButton && !state.inputBoxHasText &&
+          state.assistantMsgCount > initialAssistantCount) {
         console.error(`[ChatGPT] Response complete - stop button disappeared, input empty, assistant count increased (${initialAssistantCount} -> ${state.assistantMsgCount})`);
         // ChatGPT 5.2 Thinking: 完了直後にストリーミング中のテキストをキャプチャ
         // （完了後は折りたたまれてしまうため、この時点で取得）
@@ -1178,8 +1578,17 @@ async function askChatGPTFastInternal(question: string): Promise<ChatResult> {
       // フォールバック: 5秒以上待って、stopボタンなし、入力欄空、新しいアシスタントメッセージが増えた
       // （stopボタンを見逃した場合の救済）
       const elapsed = Date.now() - startWait;
-      if (elapsed > 5000 && !state.hasStopButton && !state.inputBoxHasText && state.assistantMsgCount > initialAssistantCount) {
+      if (elapsed > 5000 && !state.hasStopButton && !state.inputBoxHasText &&
+          state.assistantMsgCount > initialAssistantCount && !state.isStillGenerating) {
         console.error(`[ChatGPT] Response complete - fallback after 5s (no stop button, input empty, assistant count increased ${initialAssistantCount} -> ${state.assistantMsgCount})`);
+        break;
+      }
+
+      // Thinkingモード専用フォールバック: stopボタンなしでも、生成完了していれば完了
+      // 重要: 「今すぐ回答」ボタンがある間は、まだThinking中なので待機を継続
+      if (elapsed > 10000 && !state.isStillGenerating && !state.hasSkipThinkingButton &&
+          state.assistantMsgCount > initialAssistantCount && !state.inputBoxHasText) {
+        console.error(`[ChatGPT] Response complete - Thinking mode fallback after 10s (generating complete, no skip button)`);
         break;
       }
 
@@ -1257,49 +1666,147 @@ async function askChatGPTFastInternal(question: string): Promise<ChatResult> {
     // 回答完了後、DOM安定化のための追加待機
     // ChatGPT Thinkingモードでは、停止ボタン消失後も最終回答がレンダリングされるまで遅延がある
     // 回答テキストが存在するまでポーリングで待機
-    const maxWaitForText = 10000;  // 最大10秒（Thinkingモード対応）
+    const maxWaitForText = 120000;  // 最大120秒（Thinkingモード対応：長い思考の後の回答レンダリングを待機）
     const pollInterval = 200;
     const waitStart = Date.now();
     let hasResponseText = false;
 
+    // 重要: タブをフォアグラウンドに持ってくる
+    // ChatGPTはバックグラウンドタブではテキストをレンダリングしない（パフォーマンス最適化）
+    // Page.bringToFrontでタブをアクティブにすると、Reactがテキストをレンダリングする
+    try {
+      await client.send('Page.enable');
+      await client.send('Page.bringToFront');
+      // タブがフォアグラウンドになった後、Reactがレンダリングを完了するまで待機
+      await new Promise(r => setTimeout(r, 500));
+    } catch {
+      // Page.bringToFrontが失敗しても続行（一部の環境では利用できない場合がある）
+      console.error('[ChatGPT] Page.bringToFront failed, continuing anyway');
+    }
+
     while (Date.now() - waitStart < maxWaitForText) {
-      const checkResult = await client.evaluate<{ hasText: boolean; textLength: number; articleIndex: number; markdownClass: string }>(`
+      // Step 1: 最後のChatGPT articleを見つけてスクロール
+      await client.evaluate<void>(`
         (() => {
           const articles = document.querySelectorAll('article');
-          // 最後のChatGPT articleを探す
+          for (let i = articles.length - 1; i >= 0; i--) {
+            const heading = articles[i].querySelector('h6, h5, [role="heading"]');
+            if (heading && (heading.textContent || '').includes('ChatGPT')) {
+              articles[i].scrollIntoView({ block: 'center', behavior: 'instant' });
+              break;
+            }
+          }
+        })()
+      `);
+
+      // Step 2: スクロール後、DOMの更新を待つ
+      await new Promise(r => setTimeout(r, 100));
+
+      // Step 3: テキストをチェック
+      const checkResult = await client.evaluate<{ hasText: boolean; textLength: number; articleIndex: number; markdownClass: string; hasSkipButton: boolean; isStreaming: boolean; debug?: string }>(`
+        (() => {
+          const articles = document.querySelectorAll('article');
+          // 最後のChatGPT articleを探す（テキストを持つものを優先）
           let lastChatGPTArticle = null;
+          let lastChatGPTWithText = null;
           let lastIndex = -1;
+          let lastIndexWithText = -1;
           for (let i = 0; i < articles.length; i++) {
             const heading = articles[i].querySelector('h6, h5, [role="heading"]');
             if (heading && (heading.textContent || '').includes('ChatGPT')) {
               lastChatGPTArticle = articles[i];
               lastIndex = i;
+              // .markdown内にテキストがあるか確認
+              const md = articles[i].querySelector('.markdown:not(.result-thinking)');
+              if (md && (md.innerText || '').trim().length > 0) {
+                lastChatGPTWithText = articles[i];
+                lastIndexWithText = i;
+              }
             }
           }
+          // テキストを持つarticleを優先
+          if (lastChatGPTWithText) {
+            lastChatGPTArticle = lastChatGPTWithText;
+            lastIndex = lastIndexWithText;
+          }
 
-          if (!lastChatGPTArticle) return { hasText: false, textLength: 0, articleIndex: -1, markdownClass: '' };
+          // 「今すぐ回答」「Skip thinking」ボタンがあるかチェック（Thinking進行中のサイン）
+          const bodyText = document.body?.innerText || '';
+          const hasSkipButton = bodyText.includes('今すぐ回答') || bodyText.includes('Skip thinking');
 
-          // 最後のarticle内で .result-thinking ではない .markdown を探す
+          if (!lastChatGPTArticle) return { hasText: false, textLength: 0, articleIndex: -1, markdownClass: '', hasSkipButton, isStreaming: false, debug: 'no article' };
+
+          // 最後のarticle内で .markdown を探す
+          // 注意: CDPでは .result-thinking クラスが付いていても、それが唯一の .markdown の場合がある
           const markdowns = lastChatGPTArticle.querySelectorAll('.markdown');
+          const debugMd = Array.from(markdowns).map(md => ({
+            cls: md.className.slice(0, 50),
+            rt: md.classList.contains('result-thinking'),
+            itLen: (md.innerText || '').length,
+            tcLen: (md.textContent || '').length,
+            html: (md.innerHTML || '').slice(0, 100)
+          }));
+
+          // まず .result-thinking ではない .markdown を試す
           for (const md of markdowns) {
             if (md.classList.contains('result-thinking')) continue;
-            const text = (md.innerText || '').trim();
-            if (text.length > 0) return { hasText: true, textLength: text.length, articleIndex: lastIndex, markdownClass: md.className };
+            const isStreaming = md.classList.contains('streaming-animation');
+            const text = (md.innerText || md.textContent || '').trim();
+            if (text.length > 0) return { hasText: true, textLength: text.length, articleIndex: lastIndex, markdownClass: md.className, hasSkipButton, isStreaming, debug: JSON.stringify(debugMd) };
+          }
+
+          // フォールバック: .result-thinking でもテキストがあれば使う
+          for (const md of markdowns) {
+            const text = (md.innerText || md.textContent || '').trim();
+            if (text.length > 0) return { hasText: true, textLength: text.length, articleIndex: lastIndex, markdownClass: md.className, hasSkipButton, isStreaming: false, debug: JSON.stringify(debugMd) };
           }
 
           // フォールバック: article内の p 要素を探す
           const paragraphs = lastChatGPTArticle.querySelectorAll('p');
           for (const p of paragraphs) {
             if (p.closest('button')) continue;  // button内のpは除外
-            const text = (p.innerText || '').trim();
-            if (text.length > 0) return { hasText: true, textLength: text.length, articleIndex: lastIndex, markdownClass: 'p-element' };
+            // CDPではinnerTextが空を返すことがあるため、textContentも試す
+            const text = (p.innerText || p.textContent || '').trim();
+            if (text.length > 0) return { hasText: true, textLength: text.length, articleIndex: lastIndex, markdownClass: 'p-element', hasSkipButton, isStreaming: false };
           }
 
-          return { hasText: false, textLength: 0, articleIndex: lastIndex, markdownClass: '' };
+          // 最終フォールバック: article全体のinnerText（ヘッダー除外）
+          const articleText = (lastChatGPTArticle.innerText || '').trim();
+          // "ChatGPT:" と "思考時間" を除外した実際のコンテンツがあるか
+          const cleanedText = articleText
+            .replace(/^ChatGPT:?\\s*/i, '')
+            .replace(/思考時間[：:]\\s*\\d+s?/g, '')
+            .replace(/今すぐ回答/g, '')
+            .replace(/Skip thinking/g, '')
+            .trim();
+          if (cleanedText.length > 10) {
+            return { hasText: true, textLength: cleanedText.length, articleIndex: lastIndex, markdownClass: 'article-fallback', hasSkipButton, isStreaming: false, debug: JSON.stringify(debugMd) };
+          }
+
+          return { hasText: false, textLength: 0, articleIndex: lastIndex, markdownClass: '', hasSkipButton, isStreaming: false, debug: JSON.stringify(debugMd) };
         })()
       `);
 
+      // 「今すぐ回答」ボタンがある間はThinking中なので待機を継続
+      if (checkResult.hasSkipButton) {
+        const elapsed = Date.now() - waitStart;
+        if (elapsed > 0 && elapsed % 3000 < pollInterval) {
+          console.error(`[ChatGPT] Thinking in progress (skip button visible)... (${elapsed}ms)`);
+        }
+        await new Promise(r => setTimeout(r, pollInterval));
+        continue;
+      }
+
       if (checkResult.hasText) {
+        // ストリーミング中はまだ完了していないので待機を継続
+        if (checkResult.isStreaming) {
+          const elapsed = Date.now() - waitStart;
+          if (elapsed > 0 && elapsed % 3000 < pollInterval) {
+            console.error(`[ChatGPT] Response streaming... (${checkResult.textLength} chars, ${elapsed}ms)`);
+          }
+          await new Promise(r => setTimeout(r, pollInterval));
+          continue;
+        }
         hasResponseText = true;
         console.error(`[ChatGPT] Response text ready (${checkResult.textLength} chars) in article[${checkResult.articleIndex}] (${checkResult.markdownClass}) after ${Date.now() - waitStart}ms`);
         break;
@@ -1307,7 +1814,7 @@ async function askChatGPTFastInternal(question: string): Promise<ChatResult> {
       // 定期的にデバッグログを出力
       const elapsed = Date.now() - waitStart;
       if (elapsed > 0 && elapsed % 2000 < pollInterval) {
-        console.error(`[ChatGPT] Still waiting for response text... (${elapsed}ms, articleIndex=${checkResult.articleIndex})`);
+        console.error(`[ChatGPT] Still waiting for response text... (${elapsed}ms, articleIndex=${checkResult.articleIndex}, debug=${checkResult.debug || 'none'})`);
       }
       await new Promise(r => setTimeout(r, pollInterval));
     }
@@ -1440,14 +1947,24 @@ async function askChatGPTFastInternal(question: string): Promise<ChatResult> {
         (() => {
           const articles = document.querySelectorAll('article');
           let lastAssistantArticle = null;
+          let lastAssistantWithText = null;
 
           // 新UI: article内のh6/h5/[role="heading"]に"ChatGPT"を含むものを探す
+          // 仮想スクロール対策: テキストを持つ最後のarticleを優先
           for (const article of articles) {
             const heading = article.querySelector('h6, h5, [role="heading"]');
             if (heading && (heading.textContent || '').includes('ChatGPT')) {
               lastAssistantArticle = article;
+              // .markdown内にテキストがあるか確認
+              const md = article.querySelector('.markdown:not(.result-thinking)');
+              if (md && (md.innerText || '').trim().length > 0) {
+                lastAssistantWithText = article;
+              }
             }
           }
+
+          // テキストを持つarticleを優先、なければ最後のarticle
+          lastAssistantArticle = lastAssistantWithText || lastAssistantArticle;
 
           // フォールバック: 旧セレクター
           if (!lastAssistantArticle) {
@@ -1555,9 +2072,151 @@ async function askChatGPTFastInternal(question: string): Promise<ChatResult> {
       }
     }
 
-    // リトライでも取得できない場合、body.innerTextから抽出（最終フォールバック）
+    // リトライでも取得できない場合、<main>要素から抽出（Thinkingモード対応）
+    if (!answer || answer.length === 0) {
+      console.error('[ChatGPT] Trying main element fallback...');
+      answer = await client.evaluate<string>(`
+        (() => {
+          const mainEl = document.querySelector('main');
+          if (!mainEl) return '';
+          const mainText = mainEl.innerText || '';
+          // 最後の"ChatGPT:"以降のテキストを抽出
+          const parts = mainText.split('ChatGPT:');
+          if (parts.length < 2) return '';
+          const lastPart = parts[parts.length - 1];
+          // 終端マーカーまでを取得（UIテキストを除外）
+          const endMarkers = ['あなた:', 'You:', 'cookie', 'ChatGPT の回答は必ずしも'];
+          // UIテキストが先頭にある場合は無効とするマーカー
+          const invalidStartMarkers = ['思考の拡張', '質問してみましょう', 'ChatGPT の回答'];
+          let endIndex = lastPart.length;
+          for (const marker of endMarkers) {
+            const idx = lastPart.indexOf(marker);
+            if (idx > 10 && idx < endIndex) endIndex = idx;
+          }
+          let result = lastPart.slice(0, endIndex).trim();
+          // UIテキストで始まる場合は無効
+          for (const invalid of invalidStartMarkers) {
+            if (result.startsWith(invalid)) return '';
+          }
+          // 空や改行のみの場合は無効
+          if (!result || result === '\\n' || result.length < 2) return '';
+          return result;
+        })()
+      `);
+      if (answer && answer.length > 0) {
+        console.error(`[ChatGPT] Got response from main element fallback`);
+      }
+    }
+
+    // さらにフォールバック: body.innerTextから抽出
     if (!answer || answer.length === 0) {
       console.error('[ChatGPT] Trying body.innerText fallback...');
+      const bodyDebug = await client.evaluate<{bodyLen: number; chatgptCount: number; lastPartLen: number; lastPartPreview: string; afterTrim: string}>(`
+        (() => {
+          const bodyText = document.body.innerText || '';
+          const parts = bodyText.split('ChatGPT:');
+          const lastPart = parts.length >= 2 ? parts[parts.length - 1] : '';
+          // 終端マーカー適用後
+          const endMarkers = ['あなた:', 'You:', '思考の拡張', 'cookie', 'ChatGPT は間違えることがあります'];
+          let endIndex = lastPart.length;
+          for (const m of endMarkers) {
+            const idx = lastPart.indexOf(m);
+            if (idx > 10 && idx < endIndex) endIndex = idx;
+          }
+          const afterTrim = lastPart.slice(0, endIndex).trim();
+          return {
+            bodyLen: bodyText.length,
+            chatgptCount: parts.length,
+            lastPartLen: lastPart.length,
+            lastPartPreview: lastPart.slice(0, 100).replace(/\\n/g, '\\\\n'),
+            afterTrim: afterTrim.slice(0, 100)
+          };
+        })()
+      `);
+      console.error(`[ChatGPT] body.innerText debug: bodyLen=${bodyDebug.bodyLen}, chatgptCount=${bodyDebug.chatgptCount}, lastPartLen=${bodyDebug.lastPartLen}`);
+      console.error(`[ChatGPT] body.innerText lastPartPreview: "${bodyDebug.lastPartPreview}"`);
+      console.error(`[ChatGPT] body.innerText afterTrim: "${bodyDebug.afterTrim}"`);
+      // 回答テキストを含む可能性のある要素を広範囲に調査
+      const domDebug = await client.evaluate<{
+        markdownCount: number;
+        proseCount: number;
+        pCount: number;
+        textMessageCount: number;
+        longestP: {len: number; preview: string};
+        longestTextMessage: {len: number; preview: string};
+      }>(`
+        (() => {
+          const markdowns = document.querySelectorAll('.markdown');
+          const proses = document.querySelectorAll('.prose');
+          const ps = document.querySelectorAll('p');
+          const textMessages = document.querySelectorAll('.text-message');
+
+          // 最長の p 要素を探す
+          let longestP = {len: 0, preview: ''};
+          for (const p of ps) {
+            const text = (p.innerText || '').trim();
+            if (text.length > longestP.len && !p.closest('button') && !p.closest('nav')) {
+              longestP = {len: text.length, preview: text.slice(0, 100)};
+            }
+          }
+
+          // 最長の .text-message を探す
+          let longestTextMessage = {len: 0, preview: ''};
+          for (const tm of textMessages) {
+            const text = (tm.innerText || '').trim();
+            if (text.length > longestTextMessage.len) {
+              longestTextMessage = {len: text.length, preview: text.slice(0, 100)};
+            }
+          }
+
+          return {
+            markdownCount: markdowns.length,
+            proseCount: proses.length,
+            pCount: ps.length,
+            textMessageCount: textMessages.length,
+            longestP,
+            longestTextMessage
+          };
+        })()
+      `);
+      console.error(`[ChatGPT] DOM: markdown=${domDebug.markdownCount}, prose=${domDebug.proseCount}, p=${domDebug.pCount}, textMessage=${domDebug.textMessageCount}`);
+
+      // 最後のアシスタントメッセージの詳細な構造
+      const assistantDebug = await client.evaluate<{
+        count: number;
+        lastHtml: string;
+        lastChildren: Array<{tag: string; cls: string; len: number}>;
+      }>(`
+        (() => {
+          const assistants = document.querySelectorAll('[data-message-author-role="assistant"]');
+          if (assistants.length === 0) return {count: 0, lastHtml: '', lastChildren: []};
+          const last = assistants[assistants.length - 1];
+          const children = [];
+          const walk = (el, depth) => {
+            if (depth > 3) return;
+            for (const ch of el.children || []) {
+              children.push({
+                tag: ch.tagName,
+                cls: (ch.className || '').slice(0, 30),
+                len: (ch.innerText || '').length
+              });
+              walk(ch, depth + 1);
+            }
+          };
+          walk(last, 0);
+          return {
+            count: assistants.length,
+            lastHtml: (last.outerHTML || '').slice(0, 500),
+            lastChildren: children.slice(0, 15)
+          };
+        })()
+      `);
+      console.error(`[ChatGPT] Assistant messages: ${assistantDebug.count}`);
+      console.error(`[ChatGPT] Last assistant children:`);
+      assistantDebug.lastChildren.forEach((c, i) => {
+        console.error(`  [${i}] <${c.tag}> cls="${c.cls}" len=${c.len}`);
+      });
+
       answer = await client.evaluate<string>(`
         (() => {
           const bodyText = document.body.innerText || '';
@@ -1565,14 +2224,21 @@ async function askChatGPTFastInternal(question: string): Promise<ChatResult> {
           const parts = bodyText.split('ChatGPT:');
           if (parts.length < 2) return '';
           const lastPart = parts[parts.length - 1];
-          // 終端マーカーまでを取得
-          const endMarkers = ['あなた:', 'You:', '思考の拡張', 'cookie', 'ChatGPT は間違えることがあります'];
+          // 終端マーカーまでを取得（UIテキストを除外）
+          const endMarkers = ['あなた:', 'You:', 'cookie', 'ChatGPT は間違えることがあります'];
+          // UIテキストが先頭にある場合は無効とするマーカー
+          const invalidStartMarkers = ['思考の拡張', '質問してみましょう', 'ChatGPT の回答'];
           let endIndex = lastPart.length;
           for (const marker of endMarkers) {
             const idx = lastPart.indexOf(marker);
-            if (idx > 0 && idx < endIndex) endIndex = idx;
+            if (idx > 10 && idx < endIndex) endIndex = idx;
           }
-          return lastPart.slice(0, endIndex).trim();
+          const result = lastPart.slice(0, endIndex).trim();
+          // UIテキストで始まる場合は無効
+          for (const invalid of invalidStartMarkers) {
+            if (result.startsWith(invalid)) return '';
+          }
+          return result;
         })()
       `);
       if (answer && answer.length > 0) {
@@ -1582,7 +2248,7 @@ async function askChatGPTFastInternal(question: string): Promise<ChatResult> {
 
     // streamingTextが有効な場合はそれを優先（ChatGPT 5.2 Thinking対応）
     // DOMから取得したテキストが空または見出しのみ（"ChatGPT:"など）の場合はstreamingTextを使用
-    const finalAnswer = (answer && answer.length > 20 && !answer.startsWith('ChatGPT:'))
+    const finalAnswer = (answer && answer.length > 0 && !answer.startsWith('ChatGPT:'))
       ? answer
       : (streamingText || answer);
     console.error(`[ChatGPT] Response extracted: ${finalAnswer.slice(0, 100)}...`);
@@ -1609,25 +2275,100 @@ async function askChatGPTFastInternal(question: string): Promise<ChatResult> {
       waitResponseMs: timings.waitResponseMs ?? 0,
       totalMs: timings.totalMs ?? 0,
     };
-    return {answer: finalAnswer, timings: fullTimings};
+
+    // デバッグ情報を収集（debugフラグがtrueの場合のみ）
+    let debugInfo: ChatDebugInfo | undefined;
+    if (debug) {
+      const domDebug = await client.evaluate<{
+        articleCount: number;
+        markdowns: Array<{
+          className: string;
+          innerTextLength: number;
+          innerText: string;
+          isResultThinking: boolean;
+        }>;
+        lastArticleHtml: string;
+        lastArticleInnerText: string;
+        url: string;
+        documentTitle: string;
+      }>(`
+        (() => {
+          const articles = document.querySelectorAll('article');
+          let lastChatGPTArticle = null;
+
+          for (const article of articles) {
+            const heading = article.querySelector('h6, h5, [role="heading"]');
+            if (heading && (heading.textContent || '').includes('ChatGPT')) {
+              lastChatGPTArticle = article;
+            }
+          }
+
+          if (!lastChatGPTArticle) {
+            const old = document.querySelectorAll('[data-message-author-role="assistant"]');
+            if (old.length > 0) lastChatGPTArticle = old[old.length - 1];
+          }
+
+          const markdowns = lastChatGPTArticle
+            ? Array.from(lastChatGPTArticle.querySelectorAll('.markdown'))
+            : [];
+
+          return {
+            articleCount: articles.length,
+            markdowns: markdowns.map(md => ({
+              className: md.className,
+              innerTextLength: (md.innerText || '').length,
+              innerText: md.innerText || '',
+              isResultThinking: md.classList.contains('result-thinking')
+            })),
+            lastArticleHtml: lastChatGPTArticle ? lastChatGPTArticle.innerHTML : '',
+            lastArticleInnerText: lastChatGPTArticle ? (lastChatGPTArticle.innerText || '') : '',
+            url: window.location.href,
+            documentTitle: document.title
+          };
+        })()
+      `);
+
+      debugInfo = {
+        dom: {
+          articleCount: domDebug.articleCount,
+          markdowns: domDebug.markdowns,
+          lastArticleHtml: domDebug.lastArticleHtml,
+          lastArticleInnerText: domDebug.lastArticleInnerText,
+        },
+        extraction: {
+          selectorsTried: [
+            {selector: '.markdown:not(.result-thinking)', found: domDebug.markdowns.some(m => !m.isResultThinking && m.innerTextLength > 0), textLength: domDebug.markdowns.filter(m => !m.isResultThinking).reduce((sum, m) => sum + m.innerTextLength, 0)},
+            {selector: '.result-thinking.markdown', found: domDebug.markdowns.some(m => m.isResultThinking && m.innerTextLength > 0), textLength: domDebug.markdowns.filter(m => m.isResultThinking).reduce((sum, m) => sum + m.innerTextLength, 0)},
+            {selector: 'article p', found: domDebug.lastArticleInnerText.length > 0, textLength: domDebug.lastArticleInnerText.length},
+          ],
+          finalSelector: finalAnswer ? (domDebug.markdowns.some(m => !m.isResultThinking && m.innerTextLength > 0) ? '.markdown:not(.result-thinking)' : 'fallback') : undefined,
+          fallbackUsed: (!answer || answer.length === 0) ? 'body.innerText' : undefined,
+        },
+        timings: fullTimings,
+        url: domDebug.url,
+        documentTitle: domDebug.documentTitle,
+      };
+    }
+
+    return {answer: finalAnswer, timings: fullTimings, debug: debugInfo};
 }
 
 /**
  * ChatGPTに質問して回答を取得（後方互換用）
  */
-export async function askChatGPTFast(question: string): Promise<string> {
-  const result = await askChatGPTFastInternal(question);
+export async function askChatGPTFast(question: string, debug?: boolean): Promise<string> {
+  const result = await askChatGPTFastInternal(question, debug);
   return result.answer;
 }
 
 /**
  * ChatGPTに質問して回答とタイミング情報を取得
  */
-export async function askChatGPTFastWithTimings(question: string): Promise<ChatResult> {
-  return askChatGPTFastInternal(question);
+export async function askChatGPTFastWithTimings(question: string, debug?: boolean): Promise<ChatResult> {
+  return askChatGPTFastInternal(question, debug);
 }
 
-async function askGeminiFastInternal(question: string): Promise<ChatResult> {
+async function askGeminiFastInternal(question: string, debug?: boolean): Promise<ChatResult> {
   const t0 = nowMs();
   const timings: Partial<ChatTimings> = {};
   const client = await getClient('gemini');
@@ -1665,7 +2406,24 @@ async function askGeminiFastInternal(question: string): Promise<ChatResult> {
         5000
       );
       console.error('[Gemini] Existing chat messages loaded');
-    } catch {
+
+      // 既存チャットの状態をチェック（停止ボタンがスタックしていないか）
+      const stuckCheckResult = await checkGeminiStuckState(client);
+      if (stuckCheckResult.isStuck) {
+        console.error(`[Gemini] Existing chat appears stuck (stop button detected for ${stuckCheckResult.waitedMs}ms). Clearing session and retrying.`);
+
+        // セッションとクライアントをクリア
+        await clearGeminiSession();
+        clearGeminiClient();
+
+        // エラーを投げて、呼び出し元でリトライを促す
+        throw new Error('GEMINI_STUCK_EXISTING_CHAT: Previous chat appears stuck (stop button visible). Session cleared, please retry.');
+      }
+    } catch (error) {
+      // GEMINI_STUCK_* エラーは再スロー（リトライ用）
+      if (error instanceof Error && error.message.includes('GEMINI_STUCK_')) {
+        throw error;
+      }
       console.error('[Gemini] No existing messages found, continuing as new chat');
     }
   }
@@ -2093,6 +2851,9 @@ async function askGeminiFastInternal(question: string): Promise<ChatResult> {
   // 送信ボタンが有効になるまで待機（応答生成完了まで）
   let buttonInfo: {found: boolean; disabled: boolean; x: number; y: number; selector: string} | null = null;
   const maxRetries = 120; // 60秒（500ms × 120回）
+  const forceNewChatThreshold = 60; // 30秒経過で新規チャットへの切り替えを検討（500ms × 60回）
+  let stopButtonConsecutiveCount = 0;
+
   for (let i = 0; i < maxRetries; i++) {
     buttonInfo = await client.evaluate<{
     found: boolean;
@@ -2149,6 +2910,7 @@ async function askGeminiFastInternal(question: string): Promise<ChatResult> {
         .filter(el => !isDisabled(el));
 
       // 「停止」ボタンがあるかチェック（応答生成中）
+      // Shadow DOM対応: collectDeepを使用して全てのボタン内から検索
       const hasStopButton = (() => {
         // 方法1: aria-labelベースの検索（最も信頼性が高い）
         const stopByLabel = buttons.some(b => {
@@ -2158,18 +2920,18 @@ async function askGeminiFastInternal(question: string): Promise<ChatResult> {
         });
         if (stopByLabel) return true;
 
-        // 方法2: mat-icon要素での検出（Gemini用）
-        const stopIcon = document.querySelector('mat-icon[data-mat-icon-name="stop"]');
-        if (stopIcon) {
+        // 方法2: mat-icon要素での検出（Gemini用 - Shadow DOM対応）
+        const stopIcons = collectDeep(['mat-icon[data-mat-icon-name="stop"]']);
+        for (const stopIcon of stopIcons) {
           const btn = stopIcon.closest('button');
-          if (btn && isVisible(btn)) return true;
+          if (btn && isVisible(btn) && !isDisabled(btn)) return true;
         }
 
-        // 方法3: img[alt="stop"] での検出（ChatGPT用）
-        const stopImg = document.querySelector('img[alt="stop"]');
-        if (stopImg) {
+        // 方法3: img[alt="stop"] での検出（ChatGPT用 - Shadow DOM対応）
+        const stopImgs = collectDeep(['img[alt="stop"]']);
+        for (const stopImg of stopImgs) {
           const btn = stopImg.closest('button');
-          if (btn && isVisible(btn)) return true;
+          if (btn && isVisible(btn) && !isDisabled(btn)) return true;
         }
 
         return false;
@@ -2215,11 +2977,30 @@ async function askGeminiFastInternal(question: string): Promise<ChatResult> {
       break;
     }
 
+    // 停止ボタンが検出され続けているかカウント
+    if (buttonInfo.selector === 'stop-button-present') {
+      stopButtonConsecutiveCount++;
+    } else {
+      stopButtonConsecutiveCount = 0;
+    }
+
+    // 30秒以上停止ボタンが検出され続けている場合、セッションをクリアして新規チャットに切り替え
+    if (stopButtonConsecutiveCount >= forceNewChatThreshold) {
+      console.error(`[Gemini] Stop button detected for ${forceNewChatThreshold * 0.5}s - clearing session and forcing new chat`);
+
+      // セッションとクライアントをクリアして新規チャットを強制
+      await clearGeminiSession();
+      clearGeminiClient();
+
+      // エラーを投げて再試行を促す
+      throw new Error('GEMINI_STUCK_STOP_BUTTON: Previous response appears stuck. Session cleared, please retry.');
+    }
+
     if (i < maxRetries - 1) {
       const reason = !buttonInfo.found
         ? 'not found'
         : buttonInfo.disabled
-          ? 'disabled (still generating)'
+          ? `disabled (still generating, stop button count: ${stopButtonConsecutiveCount}/${forceNewChatThreshold})`
           : 'unknown';
       console.error(`[Gemini] Send button not ready (${reason}) - attempt ${i + 1}/${maxRetries}, waiting 500ms...`);
       await new Promise(resolve => setTimeout(resolve, 500));
@@ -2233,7 +3014,7 @@ async function askGeminiFastInternal(question: string): Promise<ChatResult> {
     throw new Error('Gemini send button not found after 60 seconds (page may not be fully loaded).');
   }
   if (buttonInfo.disabled) {
-    throw new Error('Gemini send button is disabled after 60 seconds (previous response still generating).');
+    throw new Error('Gemini send button is disabled after 60 seconds (previous response still generating). Try clearing the chat history or opening a new chat.');
   }
 
   // JavaScript click() で直接クリック（CDP座標クリックは不安定なため）
@@ -2441,7 +3222,7 @@ async function askGeminiFastInternal(question: string): Promise<ChatResult> {
 
         const buttons = collectDeep(['button', '[role="button"]']).filter(isVisible);
 
-        // 停止ボタン検出（応答生成中かどうか）
+        // 停止ボタン検出（応答生成中かどうか）- Shadow DOM対応
         const hasStopButton = (() => {
           // 方法1: aria-labelベースの検索（最も信頼性が高い）
           const stopByLabel = buttons.some(b => {
@@ -2451,16 +3232,16 @@ async function askGeminiFastInternal(question: string): Promise<ChatResult> {
           });
           if (stopByLabel) return true;
 
-          // 方法2: mat-icon要素での検出（Gemini用）
-          const stopIcon = document.querySelector('mat-icon[data-mat-icon-name="stop"]');
-          if (stopIcon) {
+          // 方法2: mat-icon要素での検出（Gemini用 - Shadow DOM対応）
+          const stopIcons = collectDeep(['mat-icon[data-mat-icon-name="stop"]']);
+          for (const stopIcon of stopIcons) {
             const btn = stopIcon.closest('button');
             if (btn && isVisible(btn)) return true;
           }
 
-          // 方法3: img[alt="stop"] での検出（ChatGPT用）
-          const stopImg = document.querySelector('img[alt="stop"]');
-          if (stopImg) {
+          // 方法3: img[alt="stop"] での検出（ChatGPT用 - Shadow DOM対応）
+          const stopImgs = collectDeep(['img[alt="stop"]']);
+          for (const stopImg of stopImgs) {
             const btn = stopImg.closest('button');
             if (btn && isVisible(btn)) return true;
           }
@@ -2468,11 +3249,11 @@ async function askGeminiFastInternal(question: string): Promise<ChatResult> {
           return false;
         })();
 
-        // マイクボタン検出（言語非依存: img[alt="mic"]を使用）
+        // マイクボタン検出（言語非依存 - Shadow DOM対応）
         const micButton = (() => {
-          // img[alt="mic"] を含むボタンを探す（アイコン名は言語非依存）
-          const micImg = document.querySelector('img[alt="mic"]');
-          if (micImg) {
+          // img[alt="mic"] を含むボタンを探す（アイコン名は言語非依存 - Shadow DOM対応）
+          const micImgs = collectDeep(['img[alt="mic"]']);
+          for (const micImg of micImgs) {
             const btn = micImg.closest('button');
             if (btn && isVisible(btn)) return btn;
           }
@@ -2497,11 +3278,14 @@ async function askGeminiFastInternal(question: string): Promise<ChatResult> {
         );
 
         // フィードバックボタン検出（言語非依存: thumb_up/thumb_downアイコン）
-        const hasFeedbackButtons = !!(
-          document.querySelector('img[alt="thumb_up"], img[alt="thumb_down"]') ||
-          document.querySelector('button[aria-label*="良い回答"], button[aria-label*="悪い回答"]') ||
-          document.querySelector('button[aria-label*="Good"], button[aria-label*="Bad"]')
-        );
+        // Shadow DOM対応: collectDeepを使用
+        const feedbackImgs = collectDeep(['img[alt="thumb_up"]', 'img[alt="thumb_down"]']);
+        const hasFeedbackButtons = feedbackImgs.length > 0 ||
+          buttons.some(b => {
+            const label = (b.getAttribute('aria-label') || '').toLowerCase();
+            return label.includes('良い回答') || label.includes('悪い回答') ||
+                   label.includes('good') || label.includes('bad');
+          });
 
         // モデルレスポンス収集（Shadow DOM対応）
         const allResponses = collectDeep(['model-response', '[data-test-id*="response"]', '.response', '.model-response']);
@@ -2579,6 +3363,18 @@ async function askGeminiFastInternal(question: string): Promise<ChatResult> {
       break;
     }
 
+    // 応答完了条件3b: テキスト長が10秒間安定 AND レスポンスがある AND 停止ボタンなし（既存チャット再接続時の救済）
+    if (textStableCount >= 10 && state.modelResponseCount > 0 && !state.hasStopButton) {
+      console.error(`[Gemini] Response complete - text stable for ${textStableCount}s, response exists (count=${state.modelResponseCount}), no stop button (existing chat recovery)`);
+      break;
+    }
+
+    // 応答完了条件3c: テキスト長が30秒間安定 AND レスポンスがある（強制完了 - stopボタン検出失敗の救済）
+    if (textStableCount >= 30 && state.modelResponseCount > 0) {
+      console.error(`[Gemini] Response complete - FORCED: text stable for ${textStableCount}s, response exists (count=${state.modelResponseCount})`);
+      break;
+    }
+
     // フォールバック: 10秒以上経過 + 停止ボタンを見ていない + 新しいレスポンスが増えた + 停止ボタンなし
     const elapsed = Date.now() - startWait;
     if (elapsed > 10000 && !sawStopButton && state.modelResponseCount > initialModelResponseCount && !state.hasStopButton && (state.hasMicButton || state.inputBoxEmpty)) {
@@ -2626,8 +3422,35 @@ async function askGeminiFastInternal(question: string): Promise<ChatResult> {
   // 最後のレスポンスを取得（フィードバックボタン基準 + フォールバック）
   const rawText = await client.evaluate<string>(`
     (() => {
+      // Shadow DOM対応のcollectDeep関数
+      const collectDeep = (selectorList) => {
+        const results = [];
+        const seen = new Set();
+        const visit = (root) => {
+          if (!root) return;
+          for (const sel of selectorList) {
+            try {
+              root.querySelectorAll?.(sel)?.forEach(el => {
+                if (!seen.has(el)) {
+                  seen.add(el);
+                  results.push(el);
+                }
+              });
+            } catch {}
+          }
+          const elements = root.querySelectorAll ? Array.from(root.querySelectorAll('*')) : [];
+          for (const el of elements) {
+            if (el.shadowRoot) visit(el.shadowRoot);
+          }
+        };
+        visit(document);
+        return results;
+      };
+
       // 方法1: フィードバックボタン（thumb_up）を基準に応答を探す（言語非依存・最も確実）
-      const thumbUpImg = document.querySelector('img[alt="thumb_up"]');
+      // Shadow DOM対応: collectDeepを使用
+      const feedbackImgs = collectDeep(['img[alt="thumb_up"]', 'img[alt="thumb_down"]']);
+      const thumbUpImg = feedbackImgs.find(img => img.alt === 'thumb_up') || feedbackImgs[0];
       if (thumbUpImg) {
         // ボタンの親コンテナを遡る
         let container = thumbUpImg.closest('button')?.parentElement;
@@ -2656,31 +3479,7 @@ async function askGeminiFastInternal(question: string): Promise<ChatResult> {
         }
       }
 
-      // 方法2: 従来のセレクターベース（Shadow DOM対応）
-      const collectDeep = (selectorList) => {
-        const results = [];
-        const seen = new Set();
-        const visit = (root) => {
-          if (!root) return;
-          for (const sel of selectorList) {
-            try {
-              root.querySelectorAll?.(sel)?.forEach(el => {
-                if (!seen.has(el)) {
-                  seen.add(el);
-                  results.push(el);
-                }
-              });
-            } catch {}
-          }
-          const elements = root.querySelectorAll ? Array.from(root.querySelectorAll('*')) : [];
-          for (const el of elements) {
-            if (el.shadowRoot) visit(el.shadowRoot);
-          }
-        };
-        visit(document);
-        return results;
-      };
-
+      // 方法2: 従来のセレクターベース（Shadow DOM対応 - collectDeepは上で定義済み）
       const allResponses = collectDeep(['model-response', '[data-test-id*="response"]', '.response', '.model-response']);
 
       if (allResponses.length === 0) {
@@ -2726,22 +3525,107 @@ async function askGeminiFastInternal(question: string): Promise<ChatResult> {
     totalMs: timings.totalMs ?? 0,
     navigateMs: timings.navigateMs,  // Gemini のみ
   };
-  return {answer: normalized, timings: fullTimings};
+
+  // デバッグ情報を収集（debugフラグがtrueの場合のみ）
+  let debugInfo: ChatDebugInfo | undefined;
+  if (debug) {
+    const domDebug = await client.evaluate<{
+      articleCount: number;
+      markdowns: Array<{
+        className: string;
+        innerTextLength: number;
+        innerText: string;
+        isResultThinking: boolean;
+      }>;
+      lastArticleHtml: string;
+      lastArticleInnerText: string;
+      url: string;
+      documentTitle: string;
+    }>(`
+      (() => {
+        const collectDeep = (selectorList) => {
+          const results = [];
+          const seen = new Set();
+          const visit = (root) => {
+            if (!root) return;
+            for (const sel of selectorList) {
+              try {
+                root.querySelectorAll?.(sel)?.forEach(el => {
+                  if (!seen.has(el)) {
+                    seen.add(el);
+                    results.push(el);
+                  }
+                });
+              } catch {}
+            }
+            const elements = root.querySelectorAll ? Array.from(root.querySelectorAll('*')) : [];
+            for (const el of elements) {
+              if (el.shadowRoot) visit(el.shadowRoot);
+            }
+          };
+          visit(document);
+          return results;
+        };
+
+        const allResponses = collectDeep(['model-response', '[data-test-id*="response"]', '.response', '.model-response']);
+        const lastResponse = allResponses.length > 0 ? allResponses[allResponses.length - 1] : null;
+
+        const markdownElements = lastResponse ? Array.from(lastResponse.querySelectorAll('.markdown')) : [];
+
+        return {
+          articleCount: allResponses.length,
+          markdowns: markdownElements.map(md => ({
+            className: md.className,
+            innerTextLength: (md.innerText || '').length,
+            innerText: md.innerText || '',
+            isResultThinking: false  // Gemini doesn't have this concept
+          })),
+          lastArticleHtml: lastResponse ? lastResponse.innerHTML : '',
+          lastArticleInnerText: lastResponse ? (lastResponse.innerText || '') : '',
+          url: window.location.href,
+          documentTitle: document.title
+        };
+      })()
+    `);
+
+    debugInfo = {
+      dom: {
+        articleCount: domDebug.articleCount,
+        markdowns: domDebug.markdowns,
+        lastArticleHtml: domDebug.lastArticleHtml,
+        lastArticleInnerText: domDebug.lastArticleInnerText,
+      },
+      extraction: {
+        selectorsTried: [
+          {selector: 'model-response', found: domDebug.articleCount > 0, textLength: domDebug.lastArticleInnerText.length},
+          {selector: '.markdown', found: domDebug.markdowns.length > 0, textLength: domDebug.markdowns.reduce((sum, m) => sum + m.innerTextLength, 0)},
+          {selector: 'img[alt="thumb_up"] parent', found: !!rawText, textLength: rawText.length},
+        ],
+        finalSelector: normalized ? 'model-response or thumb_up parent' : undefined,
+        fallbackUsed: undefined,
+      },
+      timings: fullTimings,
+      url: domDebug.url,
+      documentTitle: domDebug.documentTitle,
+    };
+  }
+
+  return {answer: normalized, timings: fullTimings, debug: debugInfo};
 }
 
 /**
  * Geminiに質問して回答を取得（後方互換用）
  */
-export async function askGeminiFast(question: string): Promise<string> {
-  const result = await askGeminiFastInternal(question);
+export async function askGeminiFast(question: string, debug?: boolean): Promise<string> {
+  const result = await askGeminiFastInternal(question, debug);
   return result.answer;
 }
 
 /**
  * Geminiに質問して回答とタイミング情報を取得
  */
-export async function askGeminiFastWithTimings(question: string): Promise<ChatResult> {
-  return askGeminiFastInternal(question);
+export async function askGeminiFastWithTimings(question: string, debug?: boolean): Promise<ChatResult> {
+  return askGeminiFastInternal(question, debug);
 }
 
 /**
