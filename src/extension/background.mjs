@@ -543,6 +543,10 @@ let discoveryIntervalId = null;
 const extensionStartTime = Date.now();
 const COOLDOWN_MS = 5000;
 
+// ユーザー操作によるDiscoveryかどうかのフラグ
+// Chrome起動時やService Worker再起動時はfalse、アイコンクリック時のみtrue
+let userTriggeredDiscovery = false;
+
 
 function buildConnectUrl(wsUrl, tabUrl, newTab, autoMode = false) {
   const params = new URLSearchParams({mcpRelayUrl: wsUrl});
@@ -733,9 +737,21 @@ async function autoOpenConnectUi() {
       ok = false;
     }
     if (!ok) {
-      // Only open connect.html if user explicitly clicked the extension icon
-      if (allowAutoOpenConnectUi) {
-        logInfo('discovery', 'Falling back to connect UI', {port: relay.port});
+      // Open connect.html when:
+      // 1. User explicitly clicked the extension icon, OR
+      // 2. This is a NEW MCP server (started after extension loaded)
+      // This prevents tab spam on Chrome restart while preserving normal UX
+      const serverStartedAt = relay.data.startedAt || 0;
+      const isNewServer = serverStartedAt >= extensionStartTime;
+
+      if (userTriggeredDiscovery || isNewServer) {
+        logInfo('discovery', 'Opening connect UI', {
+          port: relay.port,
+          tabUrl: relay.data.tabUrl,
+          reason: userTriggeredDiscovery ? 'user-triggered' : 'new-server',
+          serverStartedAt,
+          extensionStartTime
+        });
         await ensureConnectUiTab(
           relay.data.wsUrl,
           relay.data.tabUrl || undefined,
@@ -743,7 +759,12 @@ async function autoOpenConnectUi() {
           false,
         );
       } else {
-        logDebug('discovery', 'Auto-connect failed, but connect UI disabled (silent mode)', {port: relay.port});
+        logDebug('discovery', 'Skipping connect UI (existing MCP server on Chrome startup)', {
+          port: relay.port,
+          tabUrl: relay.data.tabUrl,
+          serverStartedAt,
+          extensionStartTime
+        });
       }
     }
   }
@@ -804,29 +825,26 @@ function scheduleDiscovery() {
   }, 500);
 }
 
-// Discovery auto-starts on Chrome startup, but connect.html tabs are NOT auto-opened
-// This prevents the issue where Chrome restart opens many connect.html tabs
-// while still allowing automatic connection to MCP servers
+// Discovery auto-starts on Chrome startup
+// connect.html only opens for NEW MCP server instances (startedAt >= extensionStartTime)
+// This prevents tab spam from existing MCP servers on Chrome restart
 
-// Flag to control whether to open connect.html on autoConnect failure
-let allowAutoOpenConnectUi = false;
-
-// Start discovery when user clicks extension icon (allows connect.html to open)
+// Start discovery when user clicks extension icon
 chrome.action.onClicked.addListener(() => {
-  logInfo('action', 'Extension icon clicked - enabling connect UI and starting discovery');
-  allowAutoOpenConnectUi = true;
+  logInfo('action', 'Extension icon clicked - starting discovery');
+  userTriggeredDiscovery = true;  // ユーザーが明示的にトリガー
   scheduleDiscovery();
 });
 
-// Auto-start discovery on install/startup (but don't auto-open connect.html)
+// Auto-start discovery on install/startup
 chrome.runtime.onInstalled.addListener(() => {
-  logInfo('background', 'Extension installed - starting discovery (silent mode)');
+  logInfo('background', 'Extension installed - starting discovery');
   scheduleDiscovery();
 });
 chrome.runtime.onStartup.addListener(() => {
-  logInfo('background', 'Chrome started - starting discovery (silent mode)');
+  logInfo('background', 'Chrome started - starting discovery');
   scheduleDiscovery();
 });
 scheduleDiscovery();  // Start immediately
 
-logInfo('background', 'Extension loaded (discovery active, connect UI on demand)');
+logInfo('background', 'Extension loaded (discovery active)');
