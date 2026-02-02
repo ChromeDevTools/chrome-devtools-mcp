@@ -401,7 +401,8 @@ class TabShareExtension {
     logInfo('resolve', 'All tabs', {count: allTabs.length, tabs: tabSummary.slice(0, 10)});
 
     // Priority 1: If tabId is provided, try to use it directly
-    if (tabId && !newTab) {
+    // Note: newTab flag is ignored - always prefer existing tabs to prevent tab spam
+    if (tabId) {
       try {
         const tab = await chrome.tabs.get(tabId);
         if (tab && tabUrl) {
@@ -429,7 +430,8 @@ class TabShareExtension {
       const pattern = `*://${urlObj.hostname}${urlObj.pathname}*`;
       const tabs = await chrome.tabs.query({url: pattern});
       logDebug('resolve', `Found ${tabs.length} matching tabs`, {pattern, tabCount: tabs.length});
-      if (tabs.length && !newTab) {
+      // Note: newTab flag is ignored - always prefer existing tabs to prevent tab spam
+      if (tabs.length) {
         // Prefer active tab, then the most recently accessed
         const activeTab = tabs.find(tab => tab.active);
         const selectedTab = activeTab || tabs[0];
@@ -633,10 +635,11 @@ async function autoConnectRelay(best) {
   try {
     // autoConnectRelay経由の場合はフォーカスしない（active: false）
     // リロード時に勝手にタブがフォーカスされる問題を防ぐ
+    // newTab: false に固定 - 自動接続では既存タブを優先してタブスパムを防止
     targetTabId = await tabShareExtension._resolveTabId(
       tabUrl,
       preferredTabId,
-      Boolean(best.data.newTab),
+      false,  // newTab: false - always prefer existing tabs in auto-connect
       false,  // active: false - 自動接続時はタブをフォーカスしない
     );
   } catch (error) {
