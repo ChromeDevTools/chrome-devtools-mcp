@@ -1216,7 +1216,47 @@ function isSuspiciousAnswer(answer: string, question: string): boolean {
 // エンドポイント: http://127.0.0.1:8766/mcp-discovery
 ```
 
-### 11.3 Service Worker Keep-Alive
+### 11.3 connect.html タブ制御
+
+**ファイル**: `src/extension/background.mjs`
+
+connect.html（接続UI）が開くタイミングを制御し、タブの大量発生を防止する。
+
+#### 開く条件
+
+| 条件 | connect.html |
+|------|--------------|
+| ユーザーが拡張アイコンをクリック | 開く |
+| **新しい**MCPサーバー検出（`startedAt >= extensionStartTime`）| 開く |
+| Chrome起動時の**既存**MCPサーバー | 開かない |
+
+#### 実装
+
+```javascript
+// ユーザー操作フラグ
+let userTriggeredDiscovery = false;
+
+// アイコンクリック時のみtrue
+chrome.action.onClicked.addListener(() => {
+  userTriggeredDiscovery = true;
+  scheduleDiscovery();
+});
+
+// 自動接続失敗時の判定
+if (!ok) {
+  const isNewServer = serverStartedAt >= extensionStartTime;
+  if (userTriggeredDiscovery || isNewServer) {
+    await ensureConnectUiTab(...);  // 開く
+  }
+  // 既存サーバーは開かない
+}
+```
+
+#### 背景
+
+Chrome再起動時に複数のMCPサーバーが検出されると、それぞれに対してconnect.htmlタブが開いてしまう問題があった。`startedAt`（MCPサーバー起動時刻）と`extensionStartTime`（拡張機能読み込み時刻）を比較することで、既存サーバーと新規サーバーを区別する。
+
+### 11.4 Service Worker Keep-Alive
 
 **問題**: Chrome Manifest V3のService Workerは30秒〜5分で自動スリープする。
 
@@ -1230,7 +1270,7 @@ function isSuspiciousAnswer(answer: string, question: string): boolean {
 
 **ファイル**: `src/extension/background.mjs`
 
-### 11.4 バージョン管理
+### 11.5 バージョン管理
 
 `src/extension/manifest.json` の `version` を変更するたびに更新:
 - 拡張機能ファイル変更時は必ずバージョンを上げる
