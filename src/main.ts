@@ -38,6 +38,7 @@ import {
 import type {ToolDefinition} from './tools/ToolDefinition.js';
 import type {Context} from './tools/ToolDefinition.js';
 import {getFastContext} from './fast-cdp/fast-context.js';
+import {cleanupAllConnections} from './fast-cdp/fast-chat.js';
 
 function readPackageJson(): {version?: string} {
   const currentDir = import.meta.dirname;
@@ -184,7 +185,62 @@ await server.connect(transport);
 logger('Chrome AI Bridge MCP Server connected');
 logDisclaimers();
 
-// Close log file on exit
+// Graceful shutdown handler with timeout
+// Based on review: タイムアウト必須、強制終了タイマー必要
+let isShuttingDown = false;
+
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error(`${label} timed out after ${ms}ms`));
+    }, ms);
+    // unref() prevents this timer from keeping the process alive
+    timer.unref();
+    promise.then(
+      (value) => { clearTimeout(timer); resolve(value); },
+      (error) => { clearTimeout(timer); reject(error); }
+    );
+  });
+}
+
+async function shutdown(reason: string): Promise<void> {
+  if (isShuttingDown) return;
+  isShuttingDown = true;
+
+  logger(`Shutting down: ${reason}`);
+
+  // Force exit timer (5 seconds) - prevents zombie if cleanup hangs
+  const forceExitTimer = setTimeout(() => {
+    logger('Graceful shutdown timed out. Forcing exit.');
+    process.exit(1);
+  }, 5000);
+  forceExitTimer.unref();
+
+  // Cleanup relay connections with 3 second timeout
+  try {
+    await withTimeout(cleanupAllConnections(), 3000, 'cleanupAllConnections');
+  } catch (error) {
+    logger(`Cleanup error: ${error instanceof Error ? error.message : String(error)}`);
+  }
+
+  // Close log file
+  if (logFile) {
+    logFile.close();
+  }
+
+  clearTimeout(forceExitTimer);
+  process.exit(0);
+}
+
+// stdin close = Claude Code disconnected (most reliable on Windows too)
+process.stdin.on('end', () => shutdown('stdin ended'));
+process.stdin.on('close', () => shutdown('stdin closed'));
+
+// Signal handlers
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
+
+// Keep beforeExit for edge cases where stdin doesn't close
 process.on('beforeExit', () => {
   if (logFile) {
     logFile.close();

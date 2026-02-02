@@ -1,69 +1,69 @@
 # chrome-ai-bridge Technical Specification
 
-**Version**: v2.0.9
-**Last Updated**: 2026-02-02
+**Version**: v2.0.10
+**Last Updated**: 2026-02-03
 
 ---
 
-## Quick Start - これを読む前に
+## Quick Start
 
-### 開発を始める前に
+### Before Starting Development
 
-1. **このドキュメントを読む**（必須）- アーキテクチャ、フロー、セレクターを理解
-2. `npm run build` でビルド確認
-3. Chrome拡張機能をインストール（`src/extension/` から）
+1. **Read this document** (mandatory) - Understand architecture, flows, and selectors
+2. Verify build with `npm run build`
+3. Install Chrome extension (from `src/extension/`)
 
-### 問題が発生したら
+### When Problems Occur
 
-1. [Section 13「トラブルシューティング」](#13-トラブルシューティング)を確認
-2. `npm run cdp:chatgpt` / `npm run cdp:gemini` でスナップショット取得
-3. `.local/chrome-ai-bridge/debug/` のログを確認
+1. Check [Section 13 "Troubleshooting"](#13-troubleshooting)
+2. Get snapshots with `npm run cdp:chatgpt` / `npm run cdp:gemini`
+3. Check logs in `.local/chrome-ai-bridge/debug/`
 
-### コード変更時のフロー
+### Code Change Flow
 
 ```bash
-npm run build      # 1. ビルド
-npm run typecheck  # 2. 型チェック
-npm run test:smoke # 3. 基本動作確認（推奨）
+npm run build      # 1. Build
+npm run typecheck  # 2. Type check
+npm run test:smoke # 3. Basic operation check (recommended)
 ```
 
-**拡張機能変更時**: `src/extension/manifest.json` のバージョンを必ず更新
+**When changing extension**: Always update version in `src/extension/manifest.json`
 
-### ドキュメント構成
+### Document Structure
 
-| セクション | 内容 | いつ読むか |
-|-----------|------|-----------|
-| 1. Architecture | コンポーネント構成 | 最初に一読 |
-| 2. 接続フロー | getClient/createConnection | 接続問題時 |
-| 3. ChatGPT操作 | セレクター、完了検出、Thinkingモード | ChatGPT関連実装時 |
-| 4. Gemini操作 | セレクター、完了検出、Shadow DOM | Gemini関連実装時 |
-| 10. テスト | テストコマンド、シナリオ | テスト実行時 |
-| 13. トラブルシューティング | 問題と解決策 | 問題発生時 |
+| Section | Content | When to Read |
+|---------|---------|--------------|
+| 1. Architecture | Component structure | First read |
+| 2. Connection Flow | getClient/createConnection | Connection issues |
+| 3. ChatGPT Operation | Selectors, completion detection, Thinking mode | ChatGPT implementation |
+| 4. Gemini Operation | Selectors, completion detection, Shadow DOM | Gemini implementation |
+| 10. Testing | Test commands, scenarios | Test execution |
+| 13. Troubleshooting | Problems and solutions | When issues occur |
 
 ---
 
 ## Project Overview
 
-**chrome-ai-bridge** は、Claude Code などの AI コーディングアシスタントから ChatGPT / Gemini Web UI を操作するための MCP サーバーです。
+**chrome-ai-bridge** is an MCP server for controlling ChatGPT / Gemini Web UI from AI coding assistants like Claude Code.
 
 ### Package Information
 
 - **npm package**: `chrome-ai-bridge`
 - **Based on**: [Chrome DevTools MCP](https://github.com/anthropics/anthropic-quickstarts) concepts
 
-### 主要機能
+### Key Features
 
-- **ChatGPT/Gemini 操作**: Web UI 経由で質問を送信し、回答を取得
-- **並列クエリ**: ChatGPT と Gemini に同時に質問（三者議論用）
-- **セッション管理**: プロジェクトごとにチャットセッションを維持
-- **自動リトライ**: Stuck State 検出と自動リカバリー
-- **Chrome 拡張機能**: CDP (Chrome DevTools Protocol) 経由でブラウザを操作
+- **ChatGPT/Gemini Operation**: Send questions and retrieve answers via Web UI
+- **Parallel Query**: Query ChatGPT and Gemini simultaneously (for multi-AI discussions)
+- **Session Management**: Maintain chat sessions per project
+- **Auto Retry**: Stuck state detection and automatic recovery
+- **Chrome Extension**: Browser control via CDP (Chrome DevTools Protocol)
 
-### アーキテクチャの特徴
+### Architecture Highlights
 
-- **Extension-only モード**: Puppeteer 不要、Chrome 拡張機能のみで動作
-- **CDP 直接通信**: 拡張機能経由で高速な DOM 操作
-- **Shadow DOM 対応**: Gemini の Web Components に対応
+- **Extension-only Mode**: Works with Chrome extension only, no Puppeteer required
+- **Direct CDP Communication**: Fast DOM operations via extension
+- **Shadow DOM Support**: Compatible with Gemini's Web Components
 
 ---
 
@@ -253,7 +253,7 @@ globalThis.localStorage = { getItem: () => null, ... };
 - Uses Node.js built-in test runner
 - Test files: `build/tests/**/*.test.js`
 - Snapshot testing supported
-- テストスイート: `npm run test:suite` で実行
+- Test suite: Run with `npm run test:suite`
 - Extension loading test cases planned
 
 ### Contributing Guidelines
@@ -282,7 +282,7 @@ globalThis.localStorage = { getItem: () => null, ... };
 
 chrome-ai-bridge is a tool that uses MCP (Model Context Protocol) to automate ChatGPT / Gemini Web UI from AI coding assistants (Claude Code, etc.).
 
-### コンポーネント構成
+### Component Structure
 
 ```
 ┌─────────────────┐         MCP         ┌──────────────────┐
@@ -314,95 +314,95 @@ chrome-ai-bridge is a tool that uses MCP (Model Context Protocol) to automate Ch
                     └─────────────────┘         └─────────────────┘
 ```
 
-### 主要コンポーネント
+### Main Components
 
-| コンポーネント | ファイル | 役割 |
-|---------------|---------|------|
-| MCP Server | `src/main.ts` | MCP プロトコルを実装、ツール呼び出しを処理 |
-| Discovery Server | `src/extension/relay-server.ts` | 拡張機能に接続情報を通知（ポート8766） |
-| Relay Server | `src/extension/relay-server.ts` | 拡張機能との WebSocket 通信を仲介 |
-| CDP Client | `src/fast-cdp/cdp-client.ts` | Chrome DevTools Protocol コマンドを送信 |
-| Fast Chat | `src/fast-cdp/fast-chat.ts` | ChatGPT/Gemini 操作ロジック |
-| Chrome Extension | `src/extension/background.mjs` | ブラウザ内で CDP コマンドを実行 |
+| Component | File | Role |
+|-----------|------|------|
+| MCP Server | `src/main.ts` | Implements MCP protocol, handles tool calls |
+| Discovery Server | `src/extension/relay-server.ts` | Notifies extension of connection info (port 8766) |
+| Relay Server | `src/extension/relay-server.ts` | Mediates WebSocket communication with extension |
+| CDP Client | `src/fast-cdp/cdp-client.ts` | Sends Chrome DevTools Protocol commands |
+| Fast Chat | `src/fast-cdp/fast-chat.ts` | ChatGPT/Gemini operation logic |
+| Chrome Extension | `src/extension/background.mjs` | Executes CDP commands in browser |
 
 ---
 
-## 2. 接続フロー
+## 2. Connection Flow
 
-**関連セクション**: [トラブルシューティング - 問題3](#問題3-セッション再利用が失敗する), [問題5 - 拡張機能が接続されない](#問題5-拡張機能が接続されない)
+**Related sections**: [Troubleshooting - Problem 3](#problem-3-session-reuse-fails), [Problem 6 - Extension not connected](#problem-6-extension-not-connected)
 
-### 2.1 概要
+### 2.1 Overview
 
-接続は以下の流れで確立されます:
+Connection is established in the following flow:
 
-1. MCP サーバーが Discovery Server を起動（ポート 8766）
-2. Chrome 拡張機能が Discovery Server をポーリングで検出
-3. 拡張機能が Relay Server に WebSocket 接続
-4. CDP セッションが確立され、タブ操作が可能に
+1. MCP server starts Discovery Server (port 8766)
+2. Chrome extension detects Discovery Server via polling
+3. Extension establishes WebSocket connection to Relay Server
+4. CDP session is established, enabling tab operations
 
 ### 2.2 getClient() / createConnection()
 
-**関数**: `getClient()` in `src/fast-cdp/fast-chat.ts`
+**Function**: `getClient()` in `src/fast-cdp/fast-chat.ts`
 
 ```typescript
 export async function getClient(kind: 'chatgpt' | 'gemini'): Promise<CdpClient> {
-  // 1. 既存接続があれば健全性をチェック
+  // 1. Check health if existing connection exists
   const existing = kind === 'chatgpt' ? chatgptClient : geminiClient;
   if (existing) {
     const healthy = await isConnectionHealthy(existing, kind);
-    if (healthy) return existing;  // 再利用
-    // 切れていればクリア
+    if (healthy) return existing;  // Reuse
+    // Clear if disconnected
   }
 
-  // 2. 新しい接続を作成
+  // 2. Create new connection
   return await createConnection(kind);
 }
 ```
 
-### 2.3 createConnection() の戦略
+### 2.3 createConnection() Strategy
 
-**関数**: `createConnection()` in `src/fast-cdp/fast-chat.ts`
+**Function**: `createConnection()` in `src/fast-cdp/fast-chat.ts`
 
 ```
-ChatGPT/Gemini共通:
-1. セッションファイルから preferredUrl, preferredTabId を取得
-2. 既存タブの再利用を試行（3秒タイムアウト）
-3. 失敗した場合、新規タブを作成（5秒タイムアウト、最大2回リトライ）
+Common to ChatGPT/Gemini:
+1. Get preferredUrl, preferredTabId from session file
+2. Attempt to reuse existing tab (3s timeout)
+3. If failed, create new tab (5s timeout, max 2 retries)
 ```
 
-### 2.4 接続フロー図
+### 2.4 Connection Flow Diagram
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│ getClient() 呼び出し                                             │
+│ getClient() call                                                │
 └─────────────────┬───────────────────────────────────────────────┘
                   ▼
         ┌─────────────────┐     Yes    ┌─────────────────┐
-        │ 既存接続あり？   │ ─────────▶ │ 健全性チェック   │
-        └────────┬────────┘            │ (4秒タイムアウト) │
+        │ Existing conn?  │ ─────────▶ │ Health check    │
+        └────────┬────────┘            │ (4s timeout)    │
                  │ No                   └────────┬────────┘
                  ▼                               │
         ┌─────────────────┐                      │ OK
-        │ 新規接続作成     │ ◀────────────────────┘ NG
+        │ Create new conn │ ◀────────────────────┘ NG
         └────────┬────────┘
                  ▼
-        ┌─────────────────┐     失敗    ┌─────────────────┐
-        │ 既存タブ再利用   │ ─────────▶ │ 新規タブ作成     │
-        │ (3秒タイムアウト) │            │ (5秒、最大2回)   │
+        ┌─────────────────┐     Fail   ┌─────────────────┐
+        │ Reuse existing  │ ─────────▶ │ Create new tab  │
+        │ tab (3s timeout)│            │ (5s, max 2x)    │
         └─────────────────┘            └─────────────────┘
 ```
 
 ### 2.5 Discovery Server
 
-**ファイル**: `src/extension/relay-server.ts`
+**File**: `src/extension/relay-server.ts`
 
-| 項目 | 値 |
-|------|-----|
-| ポート | 8766（固定） |
-| エンドポイント | `GET /mcp-discovery` |
-| 役割 | 拡張機能に WebSocket URL と接続先タブ情報を通知 |
+| Item | Value |
+|------|-------|
+| Port | 8766 (fixed) |
+| Endpoint | `GET /mcp-discovery` |
+| Role | Notifies extension of WebSocket URL and target tab info |
 
-**レスポンス例**:
+**Response example**:
 ```json
 {
   "wsUrl": "ws://127.0.0.1:52431",
@@ -414,141 +414,141 @@ ChatGPT/Gemini共通:
 
 ### 2.6 Relay Server
 
-**ファイル**: `src/extension/relay-server.ts`
+**File**: `src/extension/relay-server.ts`
 
-- WebSocket サーバー（動的ポート）
-- 拡張機能との双方向通信を仲介
-- CDP コマンドの送受信
+- WebSocket server (dynamic port)
+- Mediates bidirectional communication with extension
+- Sends/receives CDP commands
 
 ---
 
-## 3. ChatGPT 操作フロー
+## 3. ChatGPT Operation Flow
 
-**関連セクション**:
-- [セレクター一覧](#32-chatgpt-セレクター一覧)
-- [回答完了検出](#33-chatgpt-回答完了検出)
-- [Thinkingモード詳細](#36-chatgpt-thinkingモード詳細)
-- [トラブルシューティング - 入力が反映されない](#問題2-chatgpt入力が反映されない)
-- [トラブルシューティング - バックグラウンドタブ問題](#問題5-chatgpt応答テキストが空になるバックグラウンドタブ問題)
+**Related sections**:
+- [Selector List](#32-chatgpt-selector-list)
+- [Response Completion Detection](#33-chatgpt-response-completion-detection)
+- [Thinking Mode Details](#36-chatgpt-thinking-mode-details)
+- [Troubleshooting - Input not reflected](#problem-2-chatgpt-input-not-reflected)
+- [Troubleshooting - Background tab issue](#problem-4-chatgpt-response-text-becomes-empty-background-tab-issue)
 
-### 3.1 askChatGPTFast() の全ステップ
+### 3.1 askChatGPTFast() All Steps
 
-**関数**: `askChatGPTFastInternal()` in `src/fast-cdp/fast-chat.ts`
+**Function**: `askChatGPTFastInternal()` in `src/fast-cdp/fast-chat.ts`
 
 ```
-1. getClient('chatgpt') で接続取得/再利用
-2. ページロード完了を待機（readyState === 'complete'、30秒）
-3. SPA描画安定化待機（500ms固定）
-4. 入力欄の出現を待機（30秒）
-5. ページ読み込み安定待機（waitForStableCount: 2回連続で同じ値なら安定と判定）
-6. 初期メッセージカウント取得（user + assistant）
-7. テキスト入力（3段階フォールバック）
+1. Get/reuse connection via getClient('chatgpt')
+2. Wait for page load complete (readyState === 'complete', 30s)
+3. Wait for SPA rendering stabilization (500ms fixed)
+4. Wait for input field to appear (30s)
+5. Wait for page load stability (waitForStableCount: stable if same value 2x)
+6. Get initial message count (user + assistant)
+7. Text input (3-phase fallback)
    - Phase 1: JavaScript evaluate (textarea.value / innerHTML)
    - Phase 2: CDP Input.insertText
-   - Phase 3: CDP Input.dispatchKeyEvent (1文字ずつ)
-8. 入力検証（normalizedQuestion が含まれるか）
-9. 送信ボタンの検索・待機（60秒、500ms間隔）
-10. JavaScript btn.click() でクリック（CDPフォールバック有）
-11. 送信ボタンクリック → ユーザーメッセージカウント増加確認
-12. 新しいアシスタントメッセージDOM追加待機（30秒）
-13. 回答完了検出（ポーリング方式、**8分**、1秒間隔）
-14. 最後のアシスタントメッセージを抽出
-15. セッション保存・履歴記録
+   - Phase 3: CDP Input.dispatchKeyEvent (char by char)
+8. Input verification (check if normalizedQuestion is included)
+9. Search/wait for send button (60s, 500ms interval)
+10. Click via JavaScript btn.click() (CDP fallback available)
+11. Send button click → verify user message count increase
+12. Wait for new assistant message DOM addition (30s)
+13. Response completion detection (polling, **8min**, 1s interval)
+14. Extract last assistant message
+15. Save session and record history
 ```
 
-**既存チャット再接続時の誤認防止**（v2.0.10で追加）:
-- ステップ2-3により、既存チャットに再接続した際に既存の回答を新しい回答と誤認することを防止
-- `initialAssistantCount` を正確に取得した後にのみ応答検出を開始
+**Preventing misidentification on existing chat reconnection** (added in v2.0.10):
+- Steps 2-3 prevent misidentifying existing responses as new responses when reconnecting to existing chats
+- Response detection starts only after accurately obtaining `initialAssistantCount`
 
-### 3.2 ChatGPT セレクター一覧
+### 3.2 ChatGPT Selector List
 
-| 用途 | セレクター | 備考 |
-|------|----------|------|
-| 入力欄 | `textarea#prompt-textarea` | 優先 |
-| 入力欄 | `textarea[data-testid="prompt-textarea"]` | フォールバック |
-| 入力欄 | `.ProseMirror[contenteditable="true"]` | contenteditable版 |
-| 送信ボタン | `button[data-testid="send-button"]` | 優先 |
-| 送信ボタン | `button[aria-label*="送信"]` | 日本語UI |
-| 送信ボタン | `button[aria-label*="Send"]` | 英語UI |
-| 停止ボタン | text/aria-label に "Stop generating" or "生成を停止" | - |
-| ユーザーメッセージ | `[data-message-author-role="user"]` | - |
-| アシスタントメッセージ | `[data-message-author-role="assistant"]` | - |
-| 回答コンテンツ | `.markdown`, `.prose`, `.markdown.prose` | - |
+| Purpose | Selector | Notes |
+|---------|----------|-------|
+| Input field | `textarea#prompt-textarea` | Primary |
+| Input field | `textarea[data-testid="prompt-textarea"]` | Fallback |
+| Input field | `.ProseMirror[contenteditable="true"]` | contenteditable version |
+| Send button | `button[data-testid="send-button"]` | Primary |
+| Send button | `button[aria-label*="送信"]` | Japanese UI |
+| Send button | `button[aria-label*="Send"]` | English UI |
+| Stop button | text/aria-label contains "Stop generating" or "生成を停止" | - |
+| User message | `[data-message-author-role="user"]` | - |
+| Assistant message | `[data-message-author-role="assistant"]` | - |
+| Response content | `.markdown`, `.prose`, `.markdown.prose` | - |
 
-### 3.3 ChatGPT 回答完了検出
+### 3.3 ChatGPT Response Completion Detection
 
-**方式**: ポーリング（1秒間隔、最大**8分**）
+**Method**: Polling (1s interval, max **8min**)
 
-**完了条件（いずれかが true）**:
+**Completion conditions (any true)**:
 
-1. stopボタンなし AND 送信ボタンあり AND 送信ボタン有効 AND assistantCount > initialAssistantCount
-2. stopボタンを見た後に消えた AND assistantCount > initialAssistantCount AND 入力欄空
-3. **5秒**経過 AND stopボタンなし AND 入力欄空 AND !isStillGenerating AND assistantCount > initialAssistantCount（フォールバック）
-4. **10秒**経過 AND !isStillGenerating AND !hasSkipThinkingButton AND assistantCount > initialAssistantCount AND 入力欄空（Thinkingモード専用フォールバック）
+1. No stop button AND send button exists AND send button enabled AND assistantCount > initialAssistantCount
+2. Stop button was seen then disappeared AND assistantCount > initialAssistantCount AND input empty
+3. **5s** elapsed AND no stop button AND input empty AND !isStillGenerating AND assistantCount > initialAssistantCount (fallback)
+4. **10s** elapsed AND !isStillGenerating AND !hasSkipThinkingButton AND assistantCount > initialAssistantCount AND input empty (Thinking mode fallback)
 
-**重要**: `initialAssistantCount` は質問送信前に取得した初期カウント。これにより、既存の回答を新しい回答と誤認することを防止。
+**Important**: `initialAssistantCount` is the initial count obtained before sending the question. This prevents misidentifying existing responses as new ones.
 
-### 3.4 ChatGPT 回答テキストフィルタリング
+### 3.4 ChatGPT Response Text Filtering
 
-**背景**: ChatGPT Thinkingモードでは、回答にボタンテキスト（「思考時間 XX秒」等）が混入する可能性がある。
+**Background**: In ChatGPT Thinking mode, button text ("Thinking time XX seconds", etc.) may be mixed into the response.
 
-**フィルタリング対象**:
-- `<button>` 要素内のテキスト
-- 「思考時間」「秒」を含むパターン
+**Filtering targets**:
+- Text within `<button>` elements
+- Patterns containing "思考時間", "秒" (Japanese time markers)
 
-**実装**: `src/fast-cdp/fast-chat.ts` の `extractChatGPTResponse()` 関数
+**Implementation**: `extractChatGPTResponse()` function in `src/fast-cdp/fast-chat.ts`
 
-### 3.5 ChatGPT 回答抽出ロジック
+### 3.5 ChatGPT Response Extraction Logic
 
-> ⚠️ **削除禁止**: このセクションに記載されているロジックは、ChatGPTのThinkingモード対応に必須です。削除すると回答抽出が失敗します。
+> ⚠️ **DO NOT DELETE**: The logic described in this section is essential for ChatGPT Thinking mode support. Deleting it will cause response extraction to fail.
 
-#### DOM構造（2026-02更新）
+#### DOM Structure (Updated 2026-02)
 
-ChatGPT 5.2以降、DOM構造が変更されました。Thinkingモードの有無に関わらず、回答は単一の `.markdown` 要素に格納されます。
+Since ChatGPT 5.2, the DOM structure has changed. Regardless of Thinking mode, responses are stored in a single `.markdown` element.
 
-**共通構造**:
+**Common structure**:
 ```
 article[data-turn="assistant"]
   └── div[data-message-author-role="assistant"]
-        ├── button "思考時間: Xs" (Thinkingモード時のみ表示)
+        ├── button "Thinking time: Xs" (only shown in Thinking mode)
         └── div.markdown.prose
-              └── p, h1-h6, li, pre, code... (回答テキスト)
+              └── p, h1-h6, li, pre, code... (response text)
 ```
 
-> ⚠️ **重要な変更点**:
-> - `data-message-author-role` は `article` ではなく内部の `div` 要素に付与
-> - `.result-thinking` クラスは現在のUIでは使用されていない
-> - Thinkingモードでも `.markdown` は1つのみ（回答テキストを含む）
+> ⚠️ **Important changes**:
+> - `data-message-author-role` is on the inner `div` element, not `article`
+> - `.result-thinking` class is not used in current UI
+> - Even in Thinking mode, there is only one `.markdown` (containing response text)
 
-#### 抽出優先順位
+#### Extraction Priority
 
-**関数**: `extractChatGPTResponse()` in `src/fast-cdp/fast-chat.ts`
+**Function**: `extractChatGPTResponse()` in `src/fast-cdp/fast-chat.ts`
 
-| 優先度 | ステップ | セレクター/方法 | 理由 |
-|--------|----------|-----------------|------|
-| 1 | `.markdown` | `article .markdown` | メインの回答テキスト |
-| 2 | `.prose`, `[class*="markdown"]` | 汎用マークダウンセレクター | UI変更時のフォールバック |
-| 3 | `p` 要素 | `article p` | マークダウンクラスがない場合 |
-| 4 | `article.innerText` | 要素全体のテキスト | DOM構造変更時のフォールバック |
-| 5 | `main` + `body.innerText` | ページ全体のテキスト | 最終フォールバック |
+| Priority | Step | Selector/Method | Reason |
+|----------|------|-----------------|--------|
+| 1 | `.markdown` | `article .markdown` | Main response text |
+| 2 | `.prose`, `[class*="markdown"]` | Generic markdown selectors | Fallback for UI changes |
+| 3 | `p` elements | `article p` | When markdown class is missing |
+| 4 | `article.innerText` | Full element text | Fallback for DOM structure changes |
+| 5 | `main` + `body.innerText` | Full page text | Final fallback |
 
-> ⚠️ **body.innerText フォールバックの注意**: 終端マーカー（「あなた:」「You:」等）で切り詰める際、先頭10文字以内のマッチは無視する（`idx > 10`条件）。これにより、回答テキストが先頭で誤って切り詰められることを防止。
+> ⚠️ **body.innerText fallback note**: When truncating by end markers ("あなた:", "You:", etc.), ignore matches within first 10 characters (`idx > 10` condition). This prevents response text from being erroneously truncated at the beginning.
 
-#### テキストレンダリング待機
+#### Text Rendering Wait
 
-**問題**: 停止ボタンが消失しても、Reactの非同期レンダリングにより回答テキストがDOMに反映されていないことがある。特にThinkingモードでは、長い思考の後に回答がレンダリングされるまで大幅な遅延が発生する。
+**Problem**: Even after the stop button disappears, response text may not be reflected in the DOM due to React's async rendering. Especially in Thinking mode, significant delays occur before the response is rendered after long thinking.
 
-**解決策**: 停止ボタン消失後も最大**120秒**（2分）間ポーリングでテキスト出現を待機。
+**Solution**: Poll for text appearance for up to **120 seconds** (2 min) after stop button disappears.
 
 ```typescript
-// extractChatGPTResponse() 内
-const maxWaitForText = 120000;  // 120秒（Thinkingモード対応）
-const pollInterval = 200;       // 200ms間隔
+// Inside extractChatGPTResponse()
+const maxWaitForText = 120000;  // 120s (Thinking mode support)
+const pollInterval = 200;       // 200ms interval
 
 while (Date.now() - waitStart < maxWaitForText) {
   const checkResult = await checkForResponseText();
   if (checkResult.hasSkipButton) {
-    // 「今すぐ回答」ボタンがある間はThinking中なので待機継続
+    // "Skip thinking" button exists = still thinking, continue waiting
     await sleep(pollInterval);
     continue;
   }
@@ -559,95 +559,95 @@ while (Date.now() - waitStart < maxWaitForText) {
 }
 ```
 
-> ⚠️ **削除すると**: 停止ボタン消失直後に空の回答を返す問題が再発します。
+> ⚠️ **If deleted**: The issue of returning empty responses immediately after stop button disappears will recur.
 
-### 3.6 ChatGPT Thinkingモード詳細
+### 3.6 ChatGPT Thinking Mode Details
 
-#### Thinkingモードの発動条件
+#### Thinking Mode Activation Conditions
 
-> ⚠️ **重要**: Thinkingモードは**複雑な質問**を与えないと発動しません。
+> ⚠️ **Important**: Thinking mode only activates with **complex questions**.
 
-| 質問タイプ | 発動 | 例 |
-|-----------|------|-----|
-| 単純な質問 | ❌ | 「2+2は？」「3つの原色は？」 |
-| 複雑な質問 | ✅ | 「グラフの最短経路アルゴリズムを設計して」「再帰の仕組みを詳細に説明して」 |
+| Question Type | Activates | Example |
+|---------------|-----------|---------|
+| Simple questions | ❌ | "What's 2+2?", "What are the three primary colors?" |
+| Complex questions | ✅ | "Design a shortest path algorithm for a graph", "Explain recursion in detail" |
 
-**テスト時の注意**: 単純な質問ではThinkingモードが発動しないため、DOM構造が異なります。Thinkingモード関連のテストを行う場合は、必ず複雑な質問を使用してください。
+**Testing note**: DOM structure differs when Thinking mode doesn't activate with simple questions. Always use complex questions when testing Thinking mode related features.
 
-#### Thinkingモードの特徴
+#### Thinking Mode Characteristics
 
-| 項目 | 説明 |
-|------|------|
-| 表示 | 「思考時間: Xm Xs」ボタンが表示される |
-| 思考内容 | ボタンをクリックで展開可能（通常は折りたたまれている） |
-| DOM構造 | 通常モードと同じ（`.markdown` 1つのみ） |
-| 回答位置 | `.markdown.prose` 要素に格納 |
+| Item | Description |
+|------|-------------|
+| Display | "Thinking time: Xm Xs" button is shown |
+| Thinking content | Expandable by clicking button (collapsed by default) |
+| DOM structure | Same as normal mode (only one `.markdown`) |
+| Response location | Stored in `.markdown.prose` element |
 
-#### DOM構造図（2026-02更新）
+#### DOM Structure Diagram (Updated 2026-02)
 
 ```
-【Non-Thinkingモード】
+【Non-Thinking Mode】
 <article data-turn="assistant">
   <div data-message-author-role="assistant">
     <div class="markdown prose">
-      <p>回答テキスト...</p>
+      <p>Response text...</p>
     </div>
   </div>
 </article>
 
-【Thinkingモード】
+【Thinking Mode】
 <article data-turn="assistant">
   <div data-message-author-role="assistant">
-    <button>思考時間: 17s</button>  ← クリックで思考内容を展開
+    <button>Thinking time: 17s</button>  ← Click to expand thinking content
     <div class="markdown prose">
-      <p>回答テキスト...</p>  ← ここから抽出
+      <p>Response text...</p>  ← Extract from here
     </div>
   </div>
 </article>
 ```
 
-> ⚠️ **`.result-thinking` は廃止**: 以前のドキュメントで言及されていた `.result-thinking` クラスは、現在のChatGPT UIでは使用されていません。
+> ⚠️ **`.result-thinking` is deprecated**: The `.result-thinking` class mentioned in previous documentation is not used in the current ChatGPT UI.
 
-#### Thinkingモードの進行中検出
+#### Thinking Mode In-Progress Detection
 
-**問題**: Thinkingモードでは、stopボタンが表示されない場合でも思考が進行中のことがある。
+**Problem**: In Thinking mode, thinking may be in progress even when the stop button is not displayed.
 
-**検出方法** (`isStillGenerating` フラグ):
+**Detection method** (`isStillGenerating` flag):
 
 ```typescript
-// body.innerTextから検出
+// Detect from body.innerText
 const hasGeneratingText = bodyText.includes('回答を生成しています') ||
                          bodyText.includes('is still generating') ||
                          bodyText.includes('generating a response');
 
-// 「思考時間: Xs」マーカーがあれば完了
+// Complete if "Thinking time: Xs" marker exists
 const hasThinkingComplete = /思考時間[：:]\s*\d+s?/.test(bodyText) ||
                             /Thinking.*\d+s?/.test(bodyText);
 
-// 「今すぐ回答」「Skip thinking」ボタンがあればThinking進行中
+// Thinking in progress if "Skip thinking" button exists
 const hasSkipThinkingButton = bodyText.includes('今すぐ回答') ||
                               bodyText.includes('Skip thinking');
 
 const isStillGenerating = (hasGeneratingText && !hasThinkingComplete) || hasSkipThinkingButton;
 ```
 
-**処理フロー**:
-1. `hasSkipThinkingButton` が true → Thinking進行中、待機継続
-2. `isStillGenerating` が true → 回答生成中、待機継続
-3. 両方 false AND `hasThinkingComplete` → 完了、テキスト抽出へ
+**Processing flow**:
+1. `hasSkipThinkingButton` is true → Thinking in progress, continue waiting
+2. `isStillGenerating` is true → Response generating, continue waiting
+3. Both false AND `hasThinkingComplete` → Complete, proceed to text extraction
 
-> ⚠️ **重要**: `hasSkipThinkingButton` がある間は完了判定をスキップすること。早期に完了と判定すると、Thinking中の中間状態を取得してしまう。
+> ⚠️ **Important**: Skip completion check while `hasSkipThinkingButton` exists. Early completion detection would capture intermediate thinking state.
 
-#### 思考展開ボタンのクリック
+#### Thinking Expansion Button Click
 
-**注意点**: 思考展開ボタンは入力欄横にも「思考の拡張」として存在する場合がある。
+**Caution**: The thinking expansion button may also exist next to the input field as "Expand thinking".
 
-**正しい対象**:
-- `article[data-message-author-role="assistant"]` 内のボタンのみを対象
-- `aria-expanded="false"` のボタンを検出してクリック
+**Correct target**:
+- Only buttons inside `article[data-message-author-role="assistant"]`
+- Detect and click buttons with `aria-expanded="false"`
 
 ```javascript
-// 思考展開ボタンの検出（article内限定）
+// Detect thinking expansion button (limited to inside article)
 const article = document.querySelector('article[data-message-author-role="assistant"]:last-of-type');
 const expandButton = article?.querySelector('button[aria-expanded="false"]');
 if (expandButton) {
@@ -655,166 +655,166 @@ if (expandButton) {
 }
 ```
 
-> ⚠️ **誤クリック防止**: `article` 外のボタンをクリックすると、入力モードが変わるなど予期しない動作を引き起こします。
+> ⚠️ **Prevent misclick**: Clicking buttons outside `article` causes unexpected behavior like changing input mode.
 
 ---
 
-## 4. Gemini 操作フロー
+## 4. Gemini Operation Flow
 
-**関連セクション**:
-- [セレクター一覧（言語非依存版）](#42-gemini-セレクター一覧言語非依存版)
-- [回答完了検出](#43-gemini-回答完了検出5条件--フォールバック)
-- [Shadow DOM対応](#53-shadow-dom-対応)
-- [言語非依存セレクター設計](#54-言語非依存セレクター設計)
-- [トラブルシューティング - 応答がタイムアウト](#問題1-gemini応答がタイムアウトする)
+**Related sections**:
+- [Selector List (Language-independent)](#42-gemini-selector-list-language-independent)
+- [Response Completion Detection](#43-gemini-response-completion-detection-5-conditions--fallback)
+- [Shadow DOM Support](#53-shadow-dom-support)
+- [Language-independent Selector Design](#54-language-independent-selector-design)
+- [Troubleshooting - Response times out](#problem-1-gemini-response-times-out)
 
-### 4.1 askGeminiFast() の全ステップ
+### 4.1 askGeminiFast() All Steps
 
-**関数**: `askGeminiFastInternal()` in `src/fast-cdp/fast-chat.ts`
+**Function**: `askGeminiFastInternal()` in `src/fast-cdp/fast-chat.ts`
 
 ```
-1. getClient('gemini') で接続取得/再利用
-2. 必要に応じてナビゲーション（navigateMs計測）
-3. ページロード完了を待機（readyState === 'complete'、30秒）
-4. SPA描画安定化待機（500ms固定）
-5. 入力欄の出現を待機（15秒）
-6. ページ読み込み安定待機（waitForStableCount: 2回連続で同じ値なら安定と判定）
-7. 初期カウント取得（user-query, model-response）← initialModelResponseCount を記録
-8. テキスト入力（2段階フォールバック）
-   - Phase 1: JavaScript evaluate (innerText設定)
+1. Get/reuse connection via getClient('gemini')
+2. Navigate if necessary (measure navigateMs)
+3. Wait for page load complete (readyState === 'complete', 30s)
+4. Wait for SPA rendering stabilization (500ms fixed)
+5. Wait for input field to appear (15s)
+6. Wait for page load stability (waitForStableCount: stable if same value 2x)
+7. Get initial count (user-query, model-response) ← record initialModelResponseCount
+8. Text input (2-phase fallback)
+   - Phase 1: JavaScript evaluate (set innerText)
    - Phase 2: CDP Input.insertText
-9. 入力検証（questionPrefix 20文字が含まれるか）
-10. 送信前テキスト確認
-11. 送信ボタンの検索・待機（60秒、500ms間隔）
-12. JavaScript click() でクリック（CDPフォールバック有）
-13. ユーザーメッセージカウント増加確認
-14. 新しいモデル応答DOM追加待機（30秒）
-15. 回答完了検出（ポーリング方式、**8分**、1秒間隔）
-16. フィードバックボタン基準でテキスト抽出
-17. normalizeGeminiResponse() で正規化
-18. セッション保存・履歴記録
+9. Input verification (check if questionPrefix 20 chars is included)
+10. Verify text before sending
+11. Search/wait for send button (60s, 500ms interval)
+12. Click via JavaScript click() (CDP fallback available)
+13. Verify user message count increase
+14. Wait for new model response DOM addition (30s)
+15. Response completion detection (polling, **8min**, 1s interval)
+16. Extract text based on feedback button
+17. Normalize via normalizeGeminiResponse()
+18. Save session and record history
 ```
 
-**既存チャット再接続時の誤認防止**（v2.0.10で追加）:
-- ステップ3-4により、既存チャットに再接続した際に既存の回答を新しい回答と誤認することを防止
-- `initialModelResponseCount` を正確に取得した後にのみ応答検出を開始
+**Preventing misidentification on existing chat reconnection** (added in v2.0.10):
+- Steps 3-4 prevent misidentifying existing responses as new responses when reconnecting to existing chats
+- Response detection starts only after accurately obtaining `initialModelResponseCount`
 
-### 4.2 Gemini セレクター一覧（言語非依存版）
+### 4.2 Gemini Selector List (Language-independent)
 
-| 用途 | セレクター | 備考 |
-|------|----------|------|
-| 入力欄 | `[role="textbox"]` | 優先 |
-| 入力欄 | `div[contenteditable="true"]` | フォールバック |
-| 入力欄 | `textarea` | フォールバック |
-| 送信ボタン | `mat-icon[data-mat-icon-name="send"]` parent button | 優先 |
-| 送信ボタン | text に "プロンプトを送信" / "送信" | 日本語UI |
-| 送信ボタン | aria-label に "送信" / "Send" | - |
-| 停止ボタン | text/aria-label に "停止" / "Stop" | - |
-| **マイクボタン** | `img[alt="mic"]` closest button | **言語非依存** |
-| **フィードバック** | `img[alt="thumb_up"]`, `img[alt="thumb_down"]` | **言語非依存・最重要** |
-| ユーザーメッセージ | `user-query`, `.user-query` | Shadow DOM内 |
-| レスポンス | `model-response` | Shadow DOM内（直接DOMには存在しない） |
+| Purpose | Selector | Notes |
+|---------|----------|-------|
+| Input field | `[role="textbox"]` | Primary |
+| Input field | `div[contenteditable="true"]` | Fallback |
+| Input field | `textarea` | Fallback |
+| Send button | `mat-icon[data-mat-icon-name="send"]` parent button | Primary |
+| Send button | text contains "プロンプトを送信" / "送信" | Japanese UI |
+| Send button | aria-label contains "送信" / "Send" | - |
+| Stop button | text/aria-label contains "停止" / "Stop" | - |
+| **Mic button** | `img[alt="mic"]` closest button | **Language-independent** |
+| **Feedback** | `img[alt="thumb_up"]`, `img[alt="thumb_down"]` | **Language-independent, most important** |
+| User message | `user-query`, `.user-query` | Inside Shadow DOM |
+| Response | `model-response` | Inside Shadow DOM (not in direct DOM) |
 
-### 4.3 Gemini 回答完了検出（5条件 + フォールバック）
+### 4.3 Gemini Response Completion Detection (5 conditions + fallback)
 
-**方式**: ポーリング（1秒間隔、最大**8分**）
+**Method**: Polling (1s interval, max **8min**)
 
-**状態フィールド**:
-- `hasStopButton`: 停止ボタンの有無
-- `hasMicButton`: マイクボタンの有無
-- `hasFeedbackButtons`: フィードバックボタン（thumb_up/down）の有無
-- `sendButtonEnabled`: 送信ボタンが有効か
-- `modelResponseCount`: レスポンス要素数
-- `lastResponseTextLength`: 最後のレスポンスのテキスト長
-- `inputBoxEmpty`: 入力欄が空か
+**State fields**:
+- `hasStopButton`: Presence of stop button
+- `hasMicButton`: Presence of mic button
+- `hasFeedbackButtons`: Presence of feedback buttons (thumb_up/down)
+- `sendButtonEnabled`: Whether send button is enabled
+- `modelResponseCount`: Number of response elements
+- `lastResponseTextLength`: Text length of last response
+- `inputBoxEmpty`: Whether input field is empty
 
-**完了条件（優先順）**:
+**Completion conditions (by priority)**:
 
-| 条件 | 説明 | 信頼度 |
-|------|------|--------|
-| 0 | sawStopButton AND !hasStopButton AND hasFeedbackButtons AND modelResponseCount > initialModelResponseCount | ★★★ 最も確実 |
+| Condition | Description | Reliability |
+|-----------|-------------|-------------|
+| 0 | sawStopButton AND !hasStopButton AND hasFeedbackButtons AND modelResponseCount > initialModelResponseCount | ★★★ Most reliable |
 | 1 | sawStopButton AND !hasStopButton AND hasMicButton AND modelResponseCount > initialModelResponseCount | ★★☆ |
 | 2 | sawStopButton AND !hasStopButton AND sendButtonEnabled AND inputBoxEmpty AND modelResponseCount > initialModelResponseCount | ★★☆ |
 | 3 | textStableCount >= 5 AND modelResponseCount > initialModelResponseCount AND !hasStopButton | ★☆☆ |
-| FB | elapsed > 10s AND !sawStopButton AND modelResponseCount > initialModelResponseCount AND !hasStopButton | フォールバック |
+| FB | elapsed > 10s AND !sawStopButton AND modelResponseCount > initialModelResponseCount AND !hasStopButton | Fallback |
 
-**重要**: `initialModelResponseCount` は質問送信前に取得した初期カウント。これにより、既存の回答を新しい回答と誤認することを防止。
+**Important**: `initialModelResponseCount` is the initial count obtained before sending the question. This prevents misidentifying existing responses as new ones.
 
-### 4.4 Gemini テキスト抽出
+### 4.4 Gemini Text Extraction
 
-**優先順位**:
+**Priority**:
 
-1. **フィードバックボタン基準**（推奨）
-   - `img[alt="thumb_up"]` を探す
-   - `closest('button')` → `parentElement` → `parentElement` で応答コンテナを特定
-   - p, h1-h6, li, td, th, pre, code 要素からテキスト収集
+1. **Feedback button based** (recommended)
+   - Find `img[alt="thumb_up"]`
+   - Locate response container via `closest('button')` → `parentElement` → `parentElement`
+   - Collect text from p, h1-h6, li, td, th, pre, code elements
 
-2. **セレクターベース**（フォールバック）
-   - `collectDeep(['model-response', ...])` で Shadow DOM 内を探索
-   - 最後のレスポンス要素の innerText を取得
+2. **Selector based** (fallback)
+   - Search Shadow DOM with `collectDeep(['model-response', ...])`
+   - Get innerText of last response element
 
-3. **aria-live**（最終手段）
-   - `[aria-live="polite"]` からテキスト取得
+3. **aria-live** (last resort)
+   - Get text from `[aria-live="polite"]`
 
-### 4.5 入力検証の仕組み
+### 4.5 Input Verification Mechanism
 
 ```typescript
-// 質問の先頭20文字が入力欄に含まれているか確認
+// Check if first 20 characters of question are included in input field
 const questionPrefix = question.slice(0, 20).replace(/\s+/g, '');
 let inputOk = inputResult.ok &&
   inputResult.actualText.replace(/\s+/g, '').includes(questionPrefix);
 ```
 
-失敗した場合:
-1. `Input.insertText` でリトライ
-2. 再検証
+If failed:
+1. Retry with `Input.insertText`
+2. Re-verify
 
 ---
 
-## 5. テキスト入力の実装
+## 5. Text Input Implementation
 
-### 5.1 3段階フォールバック（ChatGPT）
+### 5.1 3-Phase Fallback (ChatGPT)
 
-**関数**: `askChatGPTFastInternal()` 内
+**Function**: Inside `askChatGPTFastInternal()`
 
 ```
 Phase 1: JavaScript evaluate
   - textarea.value = text + dispatchEvent('input')
-  - contenteditable: innerHTML 設定 または execCommand('insertText')
+  - contenteditable: set innerHTML or execCommand('insertText')
 
-Phase 2: CDP Input.insertText（Phase 1 失敗時）
+Phase 2: CDP Input.insertText (when Phase 1 fails)
   - await client.send('Input.insertText', {text: question});
 
-Phase 3: CDP Input.dispatchKeyEvent（Phase 2 失敗時）
-  - Ctrl+A, Backspace で全選択削除
-  - 1文字ずつ keyDown イベントを送信
+Phase 3: CDP Input.dispatchKeyEvent (when Phase 2 fails)
+  - Ctrl+A, Backspace to select all and delete
+  - Send keyDown events character by character
 ```
 
-### 5.2 2段階フォールバック（Gemini）
+### 5.2 2-Phase Fallback (Gemini)
 
-**関数**: `askGeminiFastInternal()` 内
+**Function**: Inside `askGeminiFastInternal()`
 
 ```
 Phase 1: JavaScript evaluate
-  - innerText 設定 + dispatchEvent('input', 'change')
+  - Set innerText + dispatchEvent('input', 'change')
 
-Phase 2: CDP Input.insertText（Phase 1 の検証失敗時）
+Phase 2: CDP Input.insertText (when Phase 1 verification fails)
   - execCommand('selectAll'), execCommand('delete')
   - await client.send('Input.insertText', {text: question});
 ```
 
 ---
 
-## 5.3 Shadow DOM 対応
+## 5.3 Shadow DOM Support
 
-### 背景
+### Background
 
-GeminiはWebコンポーネント（Shadow DOM）を多用している。
-通常の `document.querySelector` では内部要素にアクセスできない。
+Gemini heavily uses Web Components (Shadow DOM).
+Standard `document.querySelector` cannot access internal elements.
 
-### collectDeep() 関数
+### collectDeep() Function
 
-再帰的に Shadow DOM 内を探索する:
+Recursively searches inside Shadow DOM:
 
 ```javascript
 const collectDeep = (selectorList) => {
@@ -840,72 +840,72 @@ const collectDeep = (selectorList) => {
 };
 ```
 
-### 使用箇所
+### Usage Locations
 
-- 送信ボタン検索
-- 入力欄検索
-- レスポンス要素検索
-- ユーザーメッセージカウント
+- Send button search
+- Input field search
+- Response element search
+- User message count
 
 ---
 
-## 5.4 言語非依存セレクター設計
+## 5.4 Language-independent Selector Design
 
-### 背景
+### Background
 
-GeminiのUIはユーザーの言語設定に応じて変化する:
-- 日本語: "良い回答", "悪い回答", "マイク"
-- 英語: "Good response", "Bad response", "Microphone"
+Gemini's UI changes based on user's language setting:
+- Japanese: "良い回答", "悪い回答", "マイク"
+- English: "Good response", "Bad response", "Microphone"
 
-`aria-label` や `textContent` に依存すると、言語ごとに分岐が必要になる。
+Depending on `aria-label` or `textContent` requires language-specific branching.
 
-### 解決策: img alt属性
+### Solution: img alt Attribute
 
-Geminiのアイコンは img 要素で実装されており、alt 属性は言語に依存しない:
-- `img[alt="mic"]` - マイクアイコン
-- `img[alt="thumb_up"]` - 良い回答アイコン
-- `img[alt="thumb_down"]` - 悪い回答アイコン
+Gemini's icons are implemented as img elements, and alt attributes are language-independent:
+- `img[alt="mic"]` - Mic icon
+- `img[alt="thumb_up"]` - Good response icon
+- `img[alt="thumb_down"]` - Bad response icon
 
-### 実装パターン
+### Implementation Pattern
 
 ```javascript
-// マイクボタン検出
+// Detect mic button
 const micImg = document.querySelector('img[alt="mic"]');
 const micButton = micImg?.closest('button');
 
-// フィードバックボタン検出
+// Detect feedback button
 const hasFeedback = !!document.querySelector('img[alt="thumb_up"], img[alt="thumb_down"]');
 ```
 
 ---
 
-## 6. 送信ボタン検出
+## 6. Send Button Detection
 
-### 6.1 検索ロジック
+### 6.1 Search Logic
 
 ```javascript
-// 1. collectDeep で全ボタンを収集（Shadow DOM 含む）
+// 1. Collect all buttons with collectDeep (including Shadow DOM)
 const buttons = collectDeep(['button', '[role="button"]'])
   .filter(isVisible)
   .filter(el => !isDisabled(el));
 
-// 2. 停止ボタンがあれば「生成中」として disabled 扱い
+// 2. If stop button exists, treat as "generating" (disabled)
 const hasStopButton = buttons.some(b =>
   b.textContent.includes('Stop generating') ||
   b.getAttribute('aria-label').includes('停止')
 );
 
-// 3. 送信ボタンを優先度順に検索
+// 3. Search for send button by priority
 let sendButton =
   buttons.find(b => b.getAttribute('data-testid') === 'send-button') ||
   buttons.find(b => b.getAttribute('aria-label')?.includes('送信'));
 ```
 
-### 6.2 クリック実行
+### 6.2 Click Execution
 
-**優先**: JavaScript `btn.click()` で直接クリック
+**Primary**: Direct click via JavaScript `btn.click()`
 
-**フォールバック**: CDP Input.dispatchMouseEvent
+**Fallback**: CDP Input.dispatchMouseEvent
 
 ```typescript
 // mousePressed
@@ -931,39 +931,39 @@ await client.send('Input.dispatchMouseEvent', {
 
 ---
 
-## 7. 回答完了検出（詳細）
+## 7. Response Completion Detection (Details)
 
-ChatGPT と Gemini の回答完了検出の詳細は各セクション（3.3、4.3）を参照。
+For detailed response completion detection for ChatGPT and Gemini, see sections 3.3 and 4.3.
 
-**共通の設計方針**:
-- ポーリング方式（1秒間隔）を採用
-- 最大待機時間: **8分**（480秒）- 長文・複雑な回答に対応
-- 複数の完了条件を優先順に評価
-- `sawStopButton` フラグで「生成が始まったかどうか」を追跡
+**Common design principles**:
+- Polling method (1s interval)
+- Max wait time: **8min** (480s) - supports long/complex responses
+- Evaluate multiple completion conditions by priority
+- Track "whether generation has started" with `sawStopButton` flag
 
 ---
 
-## 7.1 ChatGPT vs Gemini 実装比較
+## 7.1 ChatGPT vs Gemini Implementation Comparison
 
-| 項目 | ChatGPT | Gemini |
+| Item | ChatGPT | Gemini |
 |------|---------|--------|
-| 入力欄待機 | 30秒 | 15秒 |
-| 応答待機 | **8分** | **8分** |
-| ポーリング間隔 | 1秒 | 1秒 |
-| Shadow DOM | 不要 | **必須**（collectDeep使用） |
-| 完了検出の主要指標 | **カウント増加検出** + stopボタン消失 | **カウント増加検出** + フィードバックボタン表示 |
-| カウント追跡方式 | `assistantCount > initialAssistantCount` | `modelResponseCount > initialModelResponseCount` |
-| テキスト抽出基準 | `data-message-author-role` | **`img[alt="thumb_up"]`** |
-| ナビゲーション | 不要（接続時に解決） | 必要時あり（navigateMs計測） |
-| 言語対応 | aria-label分岐 | **img alt属性（言語非依存）** |
+| Input field wait | 30s | 15s |
+| Response wait | **8min** | **8min** |
+| Polling interval | 1s | 1s |
+| Shadow DOM | Not needed | **Required** (uses collectDeep) |
+| Main completion indicator | **Count increase detection** + stop button disappears | **Count increase detection** + feedback button appears |
+| Count tracking method | `assistantCount > initialAssistantCount` | `modelResponseCount > initialModelResponseCount` |
+| Text extraction basis | `data-message-author-role` | **`img[alt="thumb_up"]`** |
+| Navigation | Not needed (resolved at connection) | Sometimes needed (measure navigateMs) |
+| Language support | aria-label branching | **img alt attribute (language-independent)** |
 
 ---
 
-## 8. セッション管理
+## 8. Session Management
 
-### 8.1 sessions.json の構造
+### 8.1 sessions.json Structure
 
-**パス**: `.local/chrome-ai-bridge/sessions.json`
+**Path**: `.local/chrome-ai-bridge/sessions.json`
 
 ```json
 {
@@ -984,17 +984,17 @@ ChatGPT と Gemini の回答完了検出の詳細は各セクション（3.3、4
 }
 ```
 
-### 8.2 履歴記録 (history.jsonl)
+### 8.2 History Recording (history.jsonl)
 
-**パス**: `.local/chrome-ai-bridge/history.jsonl`
+**Path**: `.local/chrome-ai-bridge/history.jsonl`
 
 ```jsonl
 {"ts":"2026-01-30T10:30:00.000Z","project":"chrome-ai-bridge","provider":"chatgpt","question":"...","answer":"...","url":"https://chatgpt.com/c/xxx","timings":{"connectMs":120,"waitInputMs":500,"inputMs":50,"sendMs":100,"waitResponseMs":5000,"totalMs":5770}}
 ```
 
-### 8.3 セッション再利用ロジック
+### 8.3 Session Reuse Logic
 
-**関数**: `getPreferredSession()` in `src/fast-cdp/fast-chat.ts`
+**Function**: `getPreferredSession()` in `src/fast-cdp/fast-chat.ts`
 
 ```typescript
 async function getPreferredSession(kind: 'chatgpt' | 'gemini'): Promise<PreferredSession> {
@@ -1010,467 +1010,566 @@ async function getPreferredSession(kind: 'chatgpt' | 'gemini'): Promise<Preferre
 
 ---
 
-## 9. エラーハンドリング
+## 9. Error Handling
 
-### 9.1 タイムアウト一覧
+### 9.1 Timeout List
 
-**凡例**:
-- **最大**: 成功すれば即座に次へ進む。タイムアウトは失敗判定のしきい値
-- **固定**: 常にこの時間待つ
+**Legend**:
+- **Max**: Proceeds immediately on success. Timeout is the failure threshold
+- **Fixed**: Always waits this duration
 
-| 操作 | ChatGPT | Gemini | 種類 | 説明 |
-|------|---------|--------|------|------|
-| 既存タブ再利用 | 3秒 | 3秒 | 最大 | sessions.jsonのタブIDで接続試行。応答があれば即座に再利用、なければ新規タブ作成へ |
-| 新規タブ作成 | 5秒 | 5秒 | 最大 | 拡張機能経由でタブ作成+CDP確立。成功すれば即座に次へ。失敗時は1秒後に再試行（最大2回） |
-| 拡張機能接続 | 10秒 | 10秒 | 最大 | Discovery Server (port 8766) が拡張機能からの接続を待つ。通常2-3秒で接続される |
-| **ページロード完了** | 30秒 | 30秒 | 最大 | `readyState === 'complete'` になるまで待機。既存チャット再接続時の誤認防止に重要 |
-| **SPA描画安定化** | 500ms | 500ms | **固定** | SPA非同期描画の安定化待機。初期カウント取得前に必須 |
-| 入力欄待機 | 30秒 | 15秒 | 最大 | 入力欄（textarea/contenteditable）が出現するまで。ChatGPTはProseMirror初期化が遅いため長め |
-| **入力後待機** | 200ms | 200ms | **固定** | 入力完了後、内部状態更新を待機。送信前に必須 |
-| 送信ボタン待機 | 60秒 | 60秒 | 最大 | 送信ボタンが有効になるまで500ms間隔でポーリング。生成中（stopボタン表示中）は無効状態 |
-| メッセージ送信確認 | 15秒 | 8秒 | 最大 | クリック後、ユーザーメッセージ要素が画面に出現するまで。出なければ送信失敗 |
-| **新規応答DOM追加** | 30秒 | 30秒 | 最大 | 送信後、新しいアシスタント/モデル応答要素が追加されるまで。既存回答との区別に使用 |
-| **回答完了待機** | **8分** | **8分** | 最大 | 応答完了を検出するまで1秒間隔でポーリング。長文や複雑な回答に対応 |
-| **テキスト抽出待機** | **120秒** | - | 最大 | 回答完了後、テキストがDOMにレンダリングされるまで200ms間隔でポーリング。Thinkingモード対応 |
-| 健全性チェック | 4秒 | 4秒 | 最大 | 既存接続を再利用する前に `client.evaluate('1')` で生存確認 |
+| Operation | ChatGPT | Gemini | Type | Description |
+|-----------|---------|--------|------|-------------|
+| Existing tab reuse | 3s | 3s | Max | Attempt connection with tabId from sessions.json. Reuse immediately if responsive, otherwise create new tab |
+| New tab creation | 5s | 5s | Max | Create tab + establish CDP via extension. Proceed immediately on success. Retry after 1s on failure (max 2x) |
+| Extension connection | 10s | 10s | Max | Discovery Server (port 8766) waits for extension connection. Usually connects in 2-3s |
+| **Page load complete** | 30s | 30s | Max | Wait until `readyState === 'complete'`. Important for preventing misidentification on existing chat reconnection |
+| **SPA rendering stabilization** | 500ms | 500ms | **Fixed** | Wait for SPA async rendering stabilization. Required before getting initial count |
+| Input field wait | 30s | 15s | Max | Wait for input field (textarea/contenteditable) to appear. Longer for ChatGPT due to slow ProseMirror init |
+| **Post-input wait** | 200ms | 200ms | **Fixed** | Wait for internal state update after input. Required before sending |
+| Send button wait | 60s | 60s | Max | Poll at 500ms intervals until send button is enabled. Disabled while generating (stop button shown) |
+| Message send confirmation | 15s | 8s | Max | Wait for user message element to appear after click. Send failed if not |
+| **New response DOM addition** | 30s | 30s | Max | Wait for new assistant/model response element after sending. Used to distinguish from existing responses |
+| **Response completion wait** | **8min** | **8min** | Max | Poll at 1s intervals until response completion detected. Supports long/complex responses |
+| **Text extraction wait** | **120s** | - | Max | Poll at 200ms intervals until text is rendered in DOM after completion. Thinking mode support |
+| Health check | 4s | 4s | Max | Verify existence with `client.evaluate('1')` before reusing existing connection |
 
-### 9.2 リトライロジック
+### 9.2 Retry Logic
 
-**接続リトライ** (`createConnection()`):
-- 新規タブ作成: 最大2回（1秒間隔）
+**Connection retry** (`createConnection()`):
+- New tab creation: max 2x (1s interval)
 
-**送信リトライ**:
-- Enter キーフォールバック（マウスクリック失敗時）
+**Send retry**:
+- Enter key fallback (when mouse click fails)
 
-**Gemini Stuck State リトライ**:
-- MCPツール（`src/tools/gemini-web.ts`, `src/tools/chatgpt-gemini-web.ts`）で最大2回リトライ
-- `GEMINI_STUCK_*` エラー検出時に自動リトライ
-- `fast-chat.ts` 内部で `clearGeminiClient()` によりキャッシュクリア
+**Gemini Stuck State retry**:
+- Max 2 retries in MCP tools (`src/tools/gemini-web.ts`, `src/tools/chatgpt-gemini-web.ts`)
+- Auto retry on `GEMINI_STUCK_*` error detection
+- Cache cleared via `clearGeminiClient()` inside `fast-chat.ts`
 
-### 9.3 Gemini Stuck State 検出
+### 9.3 Gemini Stuck State Detection
 
-**背景**: Geminiが応答生成中に停止し、UI更新が止まる現象。前のセッションがハングした場合に発生。
+**Background**: Phenomenon where Gemini stops during response generation and UI updates halt. Occurs when previous session hangs.
 
-**検出方法** (`checkGeminiStuckState()` in `src/fast-cdp/fast-chat.ts`):
+**Detection method** (`checkGeminiStuckState()` in `src/fast-cdp/fast-chat.ts`):
 ```typescript
-// 最大5秒間、500ms間隔でポーリング
-// 停止ボタンが消えるか確認
-// 5秒経過後も停止ボタンが消えない → スタック状態
+// Poll at 500ms intervals for max 5 seconds
+// Check if stop button disappears
+// Stop button still present after 5s → stuck state
 ```
 
-**検出されるエラー**:
-- `GEMINI_STUCK_STOP_BUTTON`: 停止ボタンが消えない
-- `GEMINI_STUCK_NO_RESPONSE`: 応答が開始されない
+**Detected errors**:
+- `GEMINI_STUCK_STOP_BUTTON`: Stop button doesn't disappear
+- `GEMINI_STUCK_NO_RESPONSE`: Response doesn't start
 
-**対応フロー**:
-1. `askGeminiFast()` 内でスタック状態検出
-2. `clearGeminiClient()` で接続キャッシュクリア（`fast-chat.ts` 内）
-3. `GEMINI_STUCK_*` エラーをスロー
-4. MCPツール（`gemini-web.ts`, `chatgpt-gemini-web.ts`）でキャッチ
-5. 再度 `askGeminiFast()` を呼び出し（最大2回）
+**Handling flow**:
+1. Detect stuck state in `askGeminiFast()`
+2. Clear connection cache with `clearGeminiClient()` (in `fast-chat.ts`)
+3. Throw `GEMINI_STUCK_*` error
+4. Catch in MCP tools (`gemini-web.ts`, `chatgpt-gemini-web.ts`)
+5. Call `askGeminiFast()` again (max 2x)
 
-### 9.4 デバッグファイル
+### 9.4 Debug Files
 
-**パス**: `.local/chrome-ai-bridge/debug/`
+**Path**: `.local/chrome-ai-bridge/debug/`
 
-異常時に自動保存:
+Auto-saved on anomalies:
 - `chatgpt-{timestamp}.json`
 - `gemini-{timestamp}.json`
 
-**保存されるケース**:
-- ユーザーメッセージ送信タイムアウト
-- 疑わしい回答（`isSuspiciousAnswer()` が true）
+**Saved cases**:
+- User message send timeout
+- Suspicious answer (`isSuspiciousAnswer()` returns true)
 
-### 9.5 主要デバッグフィールド
+### 9.5 Main Debug Fields
 
-回答完了検出ループで取得される状態フィールド:
+State fields obtained in response completion detection loop:
 
-| フィールド | 説明 | 用途 |
-|-----------|------|------|
-| `debug_assistantMsgsCount` | アシスタントメッセージ数 | 新規回答の検出 |
-| `debug_chatgptArticlesCount` | ChatGPT articleの数 | 新UIでの回答検出 |
-| `debug_markdownsInLast` | 最後のarticle内の.markdown数 | テキスト抽出位置の特定 |
-| `debug_lastAssistantInnerTextLen` | テキスト長 | 回答が取得できたかの確認 |
-| `debug_bodySnippet` | body.innerTextの先頭200文字 | ページ状態の概要 |
-| `debug_bodyLen` | body.innerTextの長さ | コンテンツ量の確認 |
-| `debug_pageUrl` | 現在のURL | 正しいページか確認 |
-| `debug_pageTitle` | ページタイトル | ログイン状態の確認 |
+| Field | Description | Purpose |
+|-------|-------------|---------|
+| `debug_assistantMsgsCount` | Assistant message count | Detect new responses |
+| `debug_chatgptArticlesCount` | ChatGPT article count | Detect responses in new UI |
+| `debug_markdownsInLast` | .markdown count in last article | Locate text extraction point |
+| `debug_lastAssistantInnerTextLen` | Text length | Confirm response was obtained |
+| `debug_bodySnippet` | First 200 chars of body.innerText | Page state overview |
+| `debug_bodyLen` | Length of body.innerText | Confirm content amount |
+| `debug_pageUrl` | Current URL | Verify correct page |
+| `debug_pageTitle` | Page title | Verify login status |
 
 ---
 
-## 10. テスト
+## 10. Testing
 
-### 10.1 テストコマンド
+### 10.1 Test Commands
 
 ```bash
-# 個別テスト
-npm run test:chatgpt -- "質問文"
-npm run test:gemini -- "質問文"
+# Individual tests
+npm run test:chatgpt -- "question"
+npm run test:gemini -- "question"
 npm run test:both
 
-# CDP スナップショット（デバッグ用）
+# CDP snapshots (for debugging)
 npm run cdp:chatgpt
 npm run cdp:gemini
 
-# テストスイート
-npm run test:smoke       # 基本動作確認
-npm run test:regression  # 過去問題の再発確認
-npm run test:suite       # 全シナリオ実行
+# Test suite
+npm run test:smoke       # Basic operation check
+npm run test:regression  # Check for past issue recurrence
+npm run test:suite       # Run all scenarios
 
-# テストスイートオプション
-npm run test:suite -- --list       # シナリオ一覧表示
-npm run test:suite -- --id=chatgpt-thinking-mode  # 特定シナリオのみ
-npm run test:suite -- --tag=chatgpt  # タグでフィルタ
-npm run test:suite -- --debug      # デバッグ情報付き
-npm run test:suite -- --help       # ヘルプ表示
+# Test suite options
+npm run test:suite -- --list       # List scenarios
+npm run test:suite -- --id=chatgpt-thinking-mode  # Specific scenario only
+npm run test:suite -- --tag=chatgpt  # Filter by tag
+npm run test:suite -- --debug      # With debug info
+npm run test:suite -- --help       # Show help
 ```
 
-### 10.2 テストシナリオ一覧
+### 10.2 Test Scenario List
 
-| ID | 名前 | タグ | 説明 |
-|----|------|------|------|
-| `chatgpt-new-chat` | ChatGPT 新規チャット | smoke, chatgpt | 新規チャットでの基本動作確認 |
-| `chatgpt-existing-chat` | ChatGPT 既存チャット再接続 | regression, chatgpt | 既存チャットに再接続して質問 |
-| `chatgpt-thinking-mode` | ChatGPT Thinkingモード | regression, chatgpt, thinking | 複雑な質問でThinking動作確認 |
-| `chatgpt-code-block` | ChatGPT コードブロック応答 | smoke, chatgpt, code | コード生成の応答抽出確認 |
-| `chatgpt-long-response` | ChatGPT 長い応答 | chatgpt | 長い応答のタイムアウト確認 |
-| `gemini-new-chat` | Gemini 新規チャット | smoke, gemini | 新規チャットでの基本動作確認 |
-| `gemini-existing-chat` | Gemini 既存チャット再接続 | regression, gemini | Stuck State検出とリトライ |
-| `gemini-code-block` | Gemini コードブロック応答 | smoke, gemini, code | コード生成の応答抽出確認 |
-| `parallel-query` | 並列クエリ | smoke, parallel | ChatGPT+Gemini 同時クエリ |
+| ID | Name | Tags | Description |
+|----|------|------|-------------|
+| `chatgpt-new-chat` | ChatGPT New Chat | smoke, chatgpt | Basic operation check with new chat |
+| `chatgpt-existing-chat` | ChatGPT Existing Chat Reconnection | regression, chatgpt | Reconnect to existing chat and ask question |
+| `chatgpt-thinking-mode` | ChatGPT Thinking Mode | regression, chatgpt, thinking | Verify Thinking behavior with complex question |
+| `chatgpt-code-block` | ChatGPT Code Block Response | smoke, chatgpt, code | Verify code generation response extraction |
+| `chatgpt-long-response` | ChatGPT Long Response | chatgpt | Verify timeout with long response |
+| `gemini-new-chat` | Gemini New Chat | smoke, gemini | Basic operation check with new chat |
+| `gemini-existing-chat` | Gemini Existing Chat Reconnection | regression, gemini | Stuck State detection and retry |
+| `gemini-code-block` | Gemini Code Block Response | smoke, gemini, code | Verify code generation response extraction |
+| `parallel-query` | Parallel Query | smoke, parallel | ChatGPT+Gemini simultaneous query |
 
-### 10.3 テストスイートのタグ一覧
+### 10.3 Test Suite Tag List
 
-| タグ | 説明 | 使用例 |
-|------|------|--------|
-| `smoke` | 基本動作確認（新規チャット、並列クエリ、コードブロック） | `--tag=smoke` |
-| `regression` | 過去問題の再発確認（既存チャット再接続、Thinkingモード） | `--tag=regression` |
-| `chatgpt` | ChatGPT関連のみ | `--tag=chatgpt` |
-| `gemini` | Gemini関連のみ | `--tag=gemini` |
-| `thinking` | Thinkingモード関連 | `--tag=thinking` |
-| `parallel` | 並列クエリ関連 | `--tag=parallel` |
-| `code` | コードブロック応答関連 | `--tag=code` |
+| Tag | Description | Usage |
+|-----|-------------|-------|
+| `smoke` | Basic operation check (new chat, parallel query, code block) | `--tag=smoke` |
+| `regression` | Check for past issue recurrence (existing chat reconnection, Thinking mode) | `--tag=regression` |
+| `chatgpt` | ChatGPT related only | `--tag=chatgpt` |
+| `gemini` | Gemini related only | `--tag=gemini` |
+| `thinking` | Thinking mode related | `--tag=thinking` |
+| `parallel` | Parallel query related | `--tag=parallel` |
+| `code` | Code block response related | `--tag=code` |
 
-**シナリオ定義**: `scripts/test-scenarios.json`
-**レポート保存先**: `.local/chrome-ai-bridge/test-reports/`
+**Scenario definition**: `scripts/test-scenarios.json`
+**Report location**: `.local/chrome-ai-bridge/test-reports/`
 
-### 10.4 アサーション検証機能
+### 10.4 Assertion Verification Features
 
-`test-scenarios.json` で使用可能なアサーション:
+Assertions available in `test-scenarios.json`:
 
-| アサーション | 説明 | 例 |
-|-------------|------|-----|
-| `bothMustSucceed` | 並列クエリ時、両方成功必須 | `"bothMustSucceed": true` |
-| `minAnswerLength` | 最小回答文字数 | `"minAnswerLength": 50` |
-| `relevanceThreshold` | 関連性スコア閾値（0-1） | `"relevanceThreshold": 0.5` |
-| `maxTotalMs` | 最大実行時間（ms） | `"maxTotalMs": 60000` |
-| `noFallback` | フォールバック未使用 | `"noFallback": true` |
-| `noEmptyMarkdown` | 空Markdownチェック | `"noEmptyMarkdown": true` |
+| Assertion | Description | Example |
+|-----------|-------------|---------|
+| `bothMustSucceed` | Both must succeed in parallel query | `"bothMustSucceed": true` |
+| `minAnswerLength` | Minimum answer character count | `"minAnswerLength": 50` |
+| `relevanceThreshold` | Relevance score threshold (0-1) | `"relevanceThreshold": 0.5` |
+| `maxTotalMs` | Maximum execution time (ms) | `"maxTotalMs": 60000` |
+| `noFallback` | No fallback used | `"noFallback": true` |
+| `noEmptyMarkdown` | Empty markdown check | `"noEmptyMarkdown": true` |
 
-### 10.5 関連性チェック機能
+### 10.5 Relevance Check Feature
 
-**関数**: `isSuspiciousAnswer()` in `src/fast-cdp/fast-chat.ts`
+**Function**: `isSuspiciousAnswer()` in `src/fast-cdp/fast-chat.ts`
 
 ```typescript
 function isSuspiciousAnswer(answer: string, question: string): boolean {
   const trimmed = answer.trim();
   if (!trimmed) return true;
   if (question.trim() === 'OK') return false;
-  // 質問に数字があるのに回答にない
+  // Question has numbers but answer doesn't
   if (/\d/.test(question) && !/\d/.test(trimmed)) return true;
-  // 回答が "ok" のみ
+  // Answer is just "ok"
   if (/^ok$/i.test(trimmed)) return true;
   return false;
 }
 ```
 
-### 10.6 テスト質問の推奨事項
+### 10.6 Test Question Recommendations
 
-**禁止**（AI検出・BAN対象）:
-- `1+1は？`
-- `接続テスト`
+**Forbidden** (AI detection/BAN targets):
+- `What's 1+1?`
+- `Connection test`
 - `Hello` / `OK`
 
-**推奨**（自然な技術質問）:
-- `JavaScriptでオブジェクトをディープコピーする方法を1つ教えて。コード例付きで。`
-- `Pythonでファイルを非同期で読み込む方法は？`
-- `TypeScriptでジェネリック型の使い方を簡潔に説明して。`
+**Recommended** (natural technical questions):
+- `Tell me one way to deep copy an object in JavaScript. Include a code example.`
+- `How do I read files asynchronously in Python?`
+- `Explain how to use generic types in TypeScript briefly.`
 
 ---
 
-## 11. Chrome 拡張機能
+## 11. Chrome Extension
 
-### 11.1 拡張機能 ID
+### 11.1 Extension ID
 
-**固定値**: `ibjplbopgmcacpmfpnaeoloepdhenlbm`
+**Fixed value**: `ibjplbopgmcacpmfpnaeoloepdhenlbm`
 
-`manifest.json` の `key` から生成される固定 ID。
+Fixed ID generated from `key` in `manifest.json`.
 
-### 11.2 Discovery ポーリング
+### 11.2 Discovery Polling
 
-**ファイル**: `src/extension/background.mjs`
+**File**: `src/extension/background.mjs`
 
 ```javascript
-// ポーリング間隔: 3秒
-// ポート: 8766（固定）
-// エンドポイント: http://127.0.0.1:8766/mcp-discovery
+// Polling interval: 3 seconds
+// Port: 8766 (fixed)
+// Endpoint: http://127.0.0.1:8766/mcp-discovery
 ```
 
-### 11.3 connect.html タブ制御
+### 11.3 connect.html Tab Control
 
-**ファイル**: `src/extension/background.mjs`
+**File**: `src/extension/background.mjs`
 
-connect.html（接続UI）が開くタイミングを制御し、タブの大量発生を防止する。
+Controls when connect.html (connection UI) opens to prevent tab spam.
 
-#### 開く条件
+#### Opening Conditions
 
-| 条件 | connect.html |
-|------|--------------|
-| ユーザーが拡張アイコンをクリック | 開く |
-| **新しい**MCPサーバー検出（`startedAt >= extensionStartTime`）| 開く |
-| Chrome起動時の**既存**MCPサーバー | 開かない |
+| Condition | connect.html |
+|-----------|--------------|
+| User clicks extension icon | Opens |
+| **New** MCP server detected (`startedAt >= extensionStartTime`) | Opens |
+| **Existing** MCP server on Chrome startup | Doesn't open |
 
-#### 実装
+#### Implementation
 
 ```javascript
-// ユーザー操作フラグ
+// User action flag
 let userTriggeredDiscovery = false;
 
-// アイコンクリック時のみtrue
+// true only on icon click
 chrome.action.onClicked.addListener(() => {
   userTriggeredDiscovery = true;
   scheduleDiscovery();
 });
 
-// 自動接続失敗時の判定
+// Decision on auto-connect failure
 if (!ok) {
   const isNewServer = serverStartedAt >= extensionStartTime;
   if (userTriggeredDiscovery || isNewServer) {
-    await ensureConnectUiTab(...);  // 開く
+    await ensureConnectUiTab(...);  // Opens
   }
-  // 既存サーバーは開かない
+  // Existing servers don't open
 }
 ```
 
-#### 背景
+#### Background
 
-Chrome再起動時に複数のMCPサーバーが検出されると、それぞれに対してconnect.htmlタブが開いてしまう問題があった。`startedAt`（MCPサーバー起動時刻）と`extensionStartTime`（拡張機能読み込み時刻）を比較することで、既存サーバーと新規サーバーを区別する。
+When multiple MCP servers were detected on Chrome restart, connect.html tabs would open for each. By comparing `startedAt` (MCP server start time) with `extensionStartTime` (extension load time), we distinguish existing servers from new ones.
 
 ### 11.4 Service Worker Keep-Alive
 
-**問題**: Chrome Manifest V3のService Workerは30秒〜5分で自動スリープする。
+**Problem**: Chrome Manifest V3 Service Workers auto-sleep after 30s-5min.
 
-**解決策**: Chrome Alarms APIで定期的にwake up。
+**Solution**: Periodic wake-up via Chrome Alarms API.
 
-| 項目 | 値 |
-|------|-----|
-| Alarm間隔 | 30秒 |
-| Alarm名 | `keepalive` |
-| 追加処理 | Alarm発火時にDiscovery pollingが停止していたら自動再開 |
+| Item | Value |
+|------|-------|
+| Alarm interval | 30 seconds |
+| Alarm name | `keepalive` |
+| Additional handling | Auto-restart Discovery polling if stopped when alarm fires |
 
-**ファイル**: `src/extension/background.mjs`
+**File**: `src/extension/background.mjs`
 
-### 11.5 バージョン管理
+### 11.5 Version Management
 
-`src/extension/manifest.json` の `version` を変更するたびに更新:
-- 拡張機能ファイル変更時は必ずバージョンを上げる
-- 例: `2.0.0` → `2.0.1`
+Update version in `src/extension/manifest.json` with every change:
+- Always increment version when extension files change
+- Example: `2.0.0` → `2.0.1`
 
 ---
 
-## 12. MCP ツール
+## 12. MCP Tools
 
-### 12.1 提供ツール（MCP）
+### 12.1 Provided Tools (MCP)
 
-| ツール名 | 説明 |
-|---------|------|
-| `ask_chatgpt_web` | ChatGPT に質問を送信 |
-| `ask_gemini_web` | Gemini に質問を送信 |
-| `ask_chatgpt_gemini_web` | 両方に並列で質問を送信（推奨） |
-| `take_cdp_snapshot` | CDP が見ているページのスナップショット |
-| `get_page_dom` | ページの DOM 要素を取得 |
+| Tool Name | Description |
+|-----------|-------------|
+| `ask_chatgpt_web` | Send question to ChatGPT |
+| `ask_gemini_web` | Send question to Gemini |
+| `ask_chatgpt_gemini_web` | Send question to both in parallel (recommended) |
+| `take_cdp_snapshot` | Snapshot of page CDP is viewing |
+| `get_page_dom` | Get page DOM elements |
 
-### 12.2 内部関数（テスト・デバッグ用）
+### 12.2 Internal Functions (for testing/debugging)
 
-直接インポートして使用可能な関数:
+Functions available for direct import:
 
 ```typescript
-// src/fast-cdp/fast-chat.ts からエクスポート
+// Exported from src/fast-cdp/fast-chat.ts
 
-// 通常の関数
+// Standard functions
 askChatGPTFast(question: string): Promise<ChatResult>
 askGeminiFast(question: string): Promise<ChatResult>
 
-// タイミング情報付き（テスト・計測用）
+// With timing info (for testing/measurement)
 askChatGPTFastWithTimings(question: string): Promise<ChatResultWithTimings>
 askGeminiFastWithTimings(question: string): Promise<ChatResultWithTimings>
 
-// CDPスナップショット取得
+// CDP snapshot
 takeCdpSnapshot(target: 'chatgpt' | 'gemini'): Promise<CdpSnapshot>
 ```
 
-**ChatResultWithTimings の構造**:
+**ChatResultWithTimings structure**:
 ```typescript
 interface ChatResultWithTimings {
   answer: string;
   url: string;
   timings: {
-    connectMs: number;      // 接続確立時間
-    waitInputMs: number;    // 入力欄待機時間
-    inputMs: number;        // 入力処理時間
-    sendMs: number;         // 送信処理時間
-    waitResponseMs: number; // 応答待機時間
-    totalMs: number;        // 合計時間
+    connectMs: number;      // Connection establishment time
+    waitInputMs: number;    // Input field wait time
+    inputMs: number;        // Input processing time
+    sendMs: number;         // Send processing time
+    waitResponseMs: number; // Response wait time
+    totalMs: number;        // Total time
   };
 }
 ```
 
-### 12.3 推奨使用方法
+### 12.3 Recommended Usage
 
 ```
-デフォルト: ask_chatgpt_gemini_web（両方に並列クエリ）
-個別指定時のみ: ask_chatgpt_web または ask_gemini_web
+Default: ask_chatgpt_gemini_web (parallel query to both)
+For specific AI only: ask_chatgpt_web or ask_gemini_web
 ```
 
 ---
 
-## 13. トラブルシューティング
+## 13. Troubleshooting
 
-### 問題1: Gemini応答がタイムアウトする
+### Problem 1: Gemini Response Times Out
 
-**症状**:
+**Symptom**:
 ```
 Timed out waiting for Gemini response (8min). sawStopButton=true, textStableCount=XXX
 ```
 
-**原因**: フィードバックボタンが検出されていない
+**Cause**: Feedback button not detected
 
-**確認方法**:
+**Verification**:
 ```bash
-npm run cdp:gemini  # スナップショット取得
+npm run cdp:gemini  # Get snapshot
 ```
 
-**解決策**:
-1. `img[alt="thumb_up"]` セレクターが正しいか確認
-2. DOM構造が変わっていないか Playwright で確認
+**Solution**:
+1. Verify `img[alt="thumb_up"]` selector is correct
+2. Check if DOM structure has changed with Playwright
 
-### 問題2: ChatGPT入力が反映されない
+### Problem 2: ChatGPT Input Not Reflected
 
-**症状**: 送信後に空の応答が返る
+**Symptom**: Empty response returned after sending
 
-**原因**: ProseMirror contenteditable への入力失敗
+**Cause**: Input to ProseMirror contenteditable failed
 
-**確認方法**:
-ログで "Input verification: OK" が出ているか確認
+**Verification**:
+Check if "Input verification: OK" appears in logs
 
-**解決策**:
-1. Input.insertText フォールバックが動作しているか確認
-2. フォーカス設定（element.focus()）が実行されているか確認
+**Solution**:
+1. Verify Input.insertText fallback is working
+2. Verify focus setting (element.focus()) is executed
 
-### 問題3: セッション再利用が失敗する
+### Problem 3: Session Reuse Fails
 
-**症状**: 毎回新しいタブが開く
+**Symptom**: New tab opens every time
 
-**原因**: 健全性チェック失敗（4秒タイムアウト）
+**Cause**: Health check failure (4s timeout)
 
-**確認方法**:
-`.local/chrome-ai-bridge/sessions.json` の tabId を確認
+**Verification**:
+Check tabId in `.local/chrome-ai-bridge/sessions.json`
 
-**解決策**:
-1. タブがまだ存在するか確認
-2. 拡張機能が正常に動作しているか確認
+**Solution**:
+1. Verify tab still exists
+2. Verify extension is working properly
 
-### 問題4: ChatGPT応答テキストが空になる（バックグラウンドタブ問題）
+### Problem 4: ChatGPT Response Text Becomes Empty (Background Tab Issue)
 
-**症状**:
-- ChatGPTの応答生成は完了する（停止ボタンが消える）
-- しかし `innerText` / `textContent` が空を返す
-- `innerHTML` には `<p>` タグがあるが中身が空
-- デバッグ出力: `itLen:0, tcLen:0, html:"<p data-start=\"0\" data-end=\"X\"></p>"`
+**Symptom**:
+- ChatGPT response generation completes (stop button disappears)
+- But `innerText` / `textContent` returns empty
+- `innerHTML` has `<p>` tags but content is empty
+- Debug output: `itLen:0, tcLen:0, html:"<p data-start=\"0\" data-end=\"X\"></p>"`
 
-**原因**:
-ChatGPTのReactアプリは**バックグラウンドタブではテキストをレンダリングしない**（パフォーマンス最適化）。
-CDP経由で接続したタブがバックグラウンドにある場合、DOMノードは存在するが、テキストノードがレンダリングされない。
+**Cause**:
+ChatGPT's React app **doesn't render text in background tabs** (performance optimization).
+When tab connected via CDP is in background, DOM nodes exist but text nodes are not rendered.
 
-**技術的詳細**:
-- `data-start="0" data-end="X"` はテキスト範囲を示すが、実際のテキストノードは存在しない
-- Reactの仮想DOMには存在するが、実DOMにはレンダリングされていない
-- Playwrightで同じページを見ると正常にテキストが表示される（Playwrightはフォアグラウンドで動作するため）
+**Technical details**:
+- `data-start="0" data-end="X"` indicates text range, but actual text node doesn't exist
+- Exists in React's virtual DOM but not rendered in actual DOM
+- Viewing the same page with Playwright shows text normally (Playwright operates in foreground)
 
-**解決策**:
-`Page.bringToFront` CDPコマンドでタブをフォアグラウンドに持ってくる：
+**Solution**:
+Bring tab to foreground with `Page.bringToFront` CDP command:
 ```javascript
 await client.send('Page.enable');
 await client.send('Page.bringToFront');
-await new Promise(r => setTimeout(r, 500)); // Reactがレンダリングを完了するまで待機
+await new Promise(r => setTimeout(r, 500)); // Wait for React to complete rendering
 ```
 
-**実装場所**: `src/fast-cdp/fast-chat.ts` の `extractChatGPTResponse()` 関数内
+**Implementation location**: Inside `extractChatGPTResponse()` function in `src/fast-cdp/fast-chat.ts`
 
-**タイミング**: 8分の応答完了待機ループ**完了直後**、テキスト抽出ループ（`maxWaitForText = 120000`）の**開始前**
+**Timing**: **Immediately after** 8-min response completion wait loop completes, **before** text extraction loop (`maxWaitForText = 120000`) starts
 
 ```
-応答完了検出 (8分ポーリング)
+Response completion detection (8min polling)
   ↓
-Page.bringToFront ← ここ
+Page.bringToFront ← here
   ↓
-テキスト抽出ループ (120秒)
+Text extraction loop (120s)
   ↓
-回答テキスト返却
+Return response text
 ```
 
-**発見日**: 2026-02-02
+**Discovered**: 2026-02-02
 
-### 問題5: "Login required" エラー
+### Problem 5: "Login required" Error
 
-**症状**: ログインが必要というエラー
+**Symptom**: Error saying login is required
 
-**原因**: セッションが切れている
+**Cause**: Session has expired
 
-**解決策**:
-1. ブラウザで手動ログイン
-2. 新しいセッションが sessions.json に保存されることを確認
+**Solution**:
+1. Manually log in via browser
+2. Verify new session is saved to sessions.json
 
-### 問題6: 拡張機能が接続されない
+### Problem 6: Extension Not Connected
 
-**症状**: "Extension not connected" エラー
+**Symptom**: "Extension not connected" error
 
-**原因**: Discovery Server と拡張機能の通信問題
+**Cause**: Communication issue between Discovery Server and extension
 
-**確認方法**:
+**Verification**:
 ```bash
 curl http://127.0.0.1:8766/mcp-discovery
 ```
 
-**解決策**:
-1. Chrome で拡張機能が有効か確認
-2. ポート 8766 が他のプロセスに使われていないか確認
-3. Chrome を再起動して拡張機能を再読み込み
+**Solution**:
+1. Verify extension is enabled in Chrome
+2. Check if port 8766 is used by another process
+3. Restart Chrome to reload extension
 
 ---
 
-## 付録A: ファイル構成
+## Appendix A: File Structure
 
 ```
 src/
 ├── fast-cdp/
-│   ├── fast-chat.ts      # ChatGPT/Gemini 操作ロジック（メイン）
-│   ├── cdp-client.ts     # CDP コマンド送信クライアント
-│   ├── extension-raw.ts  # 拡張機能接続処理
-│   └── mcp-logger.ts     # ロギング
+│   ├── fast-chat.ts      # ChatGPT/Gemini operation logic (main)
+│   ├── cdp-client.ts     # CDP command sending client
+│   ├── extension-raw.ts  # Extension connection handling
+│   └── mcp-logger.ts     # Logging
 ├── tools/
-│   ├── chatgpt-web.ts         # ask_chatgpt_web ツール
-│   ├── gemini-web.ts          # ask_gemini_web ツール
-│   ├── chatgpt-gemini-web.ts  # ask_chatgpt_gemini_web ツール（並列クエリ）
-│   ├── cdp-snapshot.ts        # take_cdp_snapshot ツール
-│   └── page-dom.ts            # get_page_dom ツール
+│   ├── chatgpt-web.ts         # ask_chatgpt_web tool
+│   ├── gemini-web.ts          # ask_gemini_web tool
+│   ├── chatgpt-gemini-web.ts  # ask_chatgpt_gemini_web tool (parallel query)
+│   ├── cdp-snapshot.ts        # take_cdp_snapshot tool
+│   └── page-dom.ts            # get_page_dom tool
 ├── extension/
-│   ├── background.mjs    # 拡張機能 Service Worker
-│   ├── relay-server.ts   # Discovery/Relay サーバー
-│   ├── manifest.json     # 拡張機能マニフェスト
+│   ├── background.mjs    # Extension Service Worker
+│   ├── relay-server.ts   # Discovery/Relay server
+│   ├── manifest.json     # Extension manifest
 │   └── ui/
-│       ├── connect.html  # 接続 UI
-│       └── connect.js    # 接続 UI ロジック
-├── main.ts              # エントリーポイント
-└── index.ts             # MCP サーバー
+│       ├── connect.html  # Connection UI
+│       └── connect.js    # Connection UI logic
+├── main.ts              # Entry point
+└── index.ts             # MCP server
+```
+
+---
+
+## 14. Process Lifecycle Management
+
+### 14.1 Graceful Shutdown (added in v2.0.10)
+
+**Problem**: MCP server processes remained as zombies after Claude Code sessions ended.
+
+**Cause**: Missing cleanup for:
+- stdin close/end events (most reliable on Windows)
+- SIGTERM/SIGINT signals
+- RelayServer connections
+
+### 14.2 Shutdown Implementation
+
+**File**: `src/main.ts`
+
+```typescript
+let isShuttingDown = false;
+
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error(`${label} timed out after ${ms}ms`));
+    }, ms);
+    timer.unref();  // Don't keep process alive
+    promise.then(
+      (value) => { clearTimeout(timer); resolve(value); },
+      (error) => { clearTimeout(timer); reject(error); }
+    );
+  });
+}
+
+async function shutdown(reason: string): Promise<void> {
+  if (isShuttingDown) return;
+  isShuttingDown = true;
+
+  // Force exit timer (5s) - prevents zombie if cleanup hangs
+  const forceExitTimer = setTimeout(() => {
+    process.exit(1);
+  }, 5000);
+  forceExitTimer.unref();
+
+  // Cleanup with 3s timeout
+  await withTimeout(cleanupAllConnections(), 3000, 'cleanupAllConnections');
+
+  clearTimeout(forceExitTimer);
+  process.exit(0);
+}
+
+// Event handlers
+process.stdin.on('end', () => shutdown('stdin ended'));
+process.stdin.on('close', () => shutdown('stdin closed'));
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
+```
+
+### 14.3 Connection Cleanup
+
+**File**: `src/fast-cdp/fast-chat.ts`
+
+```typescript
+export async function cleanupAllConnections(): Promise<void> {
+  // ChatGPT
+  if (chatgptRelay) {
+    try { await chatgptRelay.stop(); } catch {}
+    chatgptRelay = null;
+  }
+  chatgptClient = null;
+
+  // Gemini
+  if (geminiRelay) {
+    try { await geminiRelay.stop(); } catch {}
+    geminiRelay = null;
+  }
+  geminiClient = null;
+}
+```
+
+### 14.4 Key Design Decisions
+
+| Decision | Reason |
+|----------|--------|
+| `timer.unref()` | Prevents timers from keeping process alive |
+| Force exit after 5s | Ensures process dies even if cleanup hangs |
+| Cleanup timeout 3s | Gives enough time for graceful close, but not too long |
+| stdin events primary | Most reliable on Windows (SIGTERM may not be sent) |
+| Double-call prevention | `isShuttingDown` flag prevents race conditions |
+
+### 14.5 Verification
+
+```bash
+# Check running processes
+ps aux | grep chrome-ai-bridge
+lsof -i :8765-8774 | grep LISTEN
+
+# After /exit, processes should disappear within 5 seconds
 ```

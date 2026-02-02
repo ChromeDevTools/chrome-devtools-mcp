@@ -279,6 +279,36 @@ export function clearGeminiClient(): void {
 }
 
 /**
+ * 全接続をクリーンアップ（プロセス終了時用）
+ * MCPサーバー終了時にゾンビプロセスを防ぐために使用
+ */
+export async function cleanupAllConnections(): Promise<void> {
+  // ChatGPT
+  if (chatgptRelay) {
+    try {
+      await chatgptRelay.stop();
+    } catch {
+      // ignore stop errors
+    }
+    chatgptRelay = null;
+  }
+  chatgptClient = null;
+
+  // Gemini
+  if (geminiRelay) {
+    try {
+      await geminiRelay.stop();
+    } catch {
+      // ignore stop errors
+    }
+    geminiRelay = null;
+  }
+  geminiClient = null;
+
+  console.error('[fast-cdp] All connections cleaned up');
+}
+
+/**
  * 既存Geminiチャットがスタック状態（停止ボタンが消えない）かチェック
  * 最大5秒間待機して停止ボタンが消えるか確認
  */
