@@ -2,6 +2,23 @@
 
 ## Session Startup Tasks
 
+### Read SPEC.md First - Mandatory
+
+**Execute at session start (before any work):**
+
+```bash
+cat docs/SPEC.md
+```
+
+This project has complex architecture (CDP, Chrome Extension, MCP). SPEC.md contains:
+- Architecture overview and component relationships
+- ChatGPT/Gemini operation flows and selectors
+- Response extraction logic (especially Thinking mode)
+- Timeout values and retry logic
+- Troubleshooting guide
+
+**Always read SPEC.md before investigating issues or making changes.**
+
 ### Chrome Profile Cleanup Check
 
 **Execute at session start:**
@@ -199,6 +216,44 @@ npm run test:both
 ```bash
 tail -f .local/mcp-debug.log
 ```
+
+---
+
+### Test Suite - Regression Prevention
+
+**継続的テストスイート** - 過去の問題再発を防ぐ。
+
+```bash
+# 基本動作確認（smoke）
+npm run test:smoke
+
+# 過去の問題再発確認（regression）
+npm run test:regression
+
+# 全シナリオ実行
+npm run test:suite
+
+# 特定シナリオのみ
+npm run test:suite -- --id=chatgpt-thinking-mode
+
+# デバッグ情報付き
+npm run test:suite -- --debug
+```
+
+**シナリオ定義**: `scripts/test-scenarios.json`
+**レポート保存先**: `.local/chrome-ai-bridge/test-reports/`
+
+**タグ一覧:**
+| タグ | 説明 |
+|------|------|
+| `smoke` | 基本動作確認（新規チャット、並列クエリ） |
+| `regression` | 過去の問題再発確認（既存チャット再接続、Thinkingモード） |
+| `chatgpt` | ChatGPT関連のみ |
+| `gemini` | Gemini関連のみ |
+
+**新しい失敗パターンが見つかったら:**
+1. `scripts/test-scenarios.json` にシナリオ追加
+2. `npm run test:suite -- --id=<新シナリオID>` で動作確認
 
 ---
 

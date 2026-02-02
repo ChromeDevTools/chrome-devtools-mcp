@@ -1,151 +1,125 @@
-# Gemini テスト失敗の調査と修正計画
+# Chrome拡張 connect.htmlタブ大量発生問題
 
-## ステータス: 完了 (2026-02-02)
-
-スモークテスト全3シナリオが成功：
-- ChatGPT 新規チャット: ✅
-- Gemini 新規チャット: ✅
-- ChatGPT+Gemini 並列クエリ: ✅
-
-追加修正: リトライロジック実装（詳細は `docs/log/claude/260202_052829-gemini-retry-logic.md`）
+## 状態: 設計完了・実装待ち
 
 ---
 
-## 問題の概要
+## 問題
 
-フルテストスイートでGemini関連のテストが失敗:
-- `gemini-new-chat`: 8分タイムアウト
-- `parallel-query`: 送信ボタン60秒無効
+Chrome再起動時に、過去に接続したMCPサーバーごとにconnect.htmlタブが大量に開く。
 
-スモークテストでは成功していた → セッション状態の問題が疑われる
+## 根本原因
 
----
-
-## 調査結果
-
-### エラーログ分析
-
-```
-sawStopButton=true, textStableCount=472
-responseCounts: { modelResponse: {count: 3} }
-```
-
-- `textStableCount=472`: 472秒間テキストが安定 → ポーリングは動作している
-- しかし完了条件を満たさずタイムアウト
-
-### 根本原因
-
-#### 原因1: フィードバックボタン検出がShadow DOM非対応
-
-**問題箇所**: `src/fast-cdp/fast-chat.ts:3129-3133`
-
-```javascript
-const hasFeedbackButtons = !!(
-  document.querySelector('img[alt="thumb_up"], img[alt="thumb_down"]') ||  // ← Shadow DOM内を検索しない
-  ...
-);
-```
-
-`document.querySelector()` はShadow DOM内を検索しない。GeminiはWebコンポーネント（Shadow DOM）を多用しているため、フィードバックボタンがShadow DOM内にある場合、検出に失敗する。
-
-**対照**: 同じファイル内で `collectDeep()` が定義されている（行3032-3054）が、フィードバックボタン検出には使用されていない。
-
-#### 原因2: 応答完了条件3の `!state.hasStopButton` が常にtrue
-
-**問題箇所**: `src/fast-cdp/fast-chat.ts:3206`
-
-```javascript
-if (textStableCount >= 5 && state.modelResponseCount > initialModelResponseCount && !state.hasStopButton) {
-```
-
-ログ `textStableCount=472` なのにこの条件で完了しない理由:
-- `!state.hasStopButton` が false（停止ボタンが検出され続けている）
-- または `modelResponseCount > initialModelResponseCount` が false
-
-#### 原因3: 既存チャット再接続時の初期カウント問題
-
-スモークテストで成功 → フルテストで失敗のパターンは、ChatGPTで発生した「既存チャット再接続時の誤認」と同じ。
-
-- フルテストでは前のテストのセッションを再利用
-- `initialModelResponseCount` が既に高い値（例: 3）
-- 新しい応答が追加されても、DOM検出のタイミングで増加を検出できない
+1. **Chrome起動時にDiscoveryが自動開始** - `onStartup`リスナー + 即時`scheduleDiscovery()`呼び出し
+2. **タイムスタンプ比較が不安定** - Service Worker再起動で`extensionStartTime`がリセット、`lastRelayByPort`もクリア
+3. **失敗即UI起動** - 自動接続失敗で即座にconnect.htmlを開く
 
 ---
 
-## 修正計画
+## 解決策：Chrome起動時はconnect.html開かない
 
-### 修正1: フィードバックボタン検出をShadow DOM対応
+**シンプルな変更:**
+- Chrome起動時（`onStartup`, `onInstalled`, 即時実行）はDiscoveryを開始するが、connect.htmlは開かない
+- ユーザーが拡張アイコンをクリックした時のみconnect.htmlを開く
 
-**ファイル**: `src/fast-cdp/fast-chat.ts`
-**行**: 3128-3133
+### 実装方法
 
 ```javascript
-// 修正前
-const hasFeedbackButtons = !!(
-  document.querySelector('img[alt="thumb_up"], img[alt="thumb_down"]') ||
-  ...
-);
+// 状態フラグ追加
+let userTriggeredDiscovery = false;
 
-// 修正後
-const feedbackImgs = collectDeep(['img[alt="thumb_up"]', 'img[alt="thumb_down"]']);
-const hasFeedbackButtons = feedbackImgs.length > 0 ||
-  buttons.some(b => {
-    const label = (b.getAttribute('aria-label') || '').toLowerCase();
-    return label.includes('良い回答') || label.includes('悪い回答') ||
-           label.includes('good') || label.includes('bad');
+// アイコンクリック時のみフラグをtrue
+chrome.action.onClicked.addListener(() => {
+  userTriggeredDiscovery = true;  // ユーザーが明示的にトリガー
+  scheduleDiscovery();
+});
+
+// 自動起動時はフラグをfalseのまま
+chrome.runtime.onStartup.addListener(() => {
+  // userTriggeredDiscovery = false のまま
+  scheduleDiscovery();
+});
+
+// autoOpenConnectUi内でフラグをチェック
+if (!ok) {
+  if (userTriggeredDiscovery) {
+    await ensureConnectUiTab(...);
+  } else {
+    logDebug('Skipping connect UI (auto-startup mode)');
+  }
+}
+```
+
+---
+
+## 動作フロー
+
+### Chrome起動時
+1. `onStartup` → `scheduleDiscovery()`
+2. Discovery実行、MCPサーバー検出
+3. `autoConnectRelay` 試行
+4. 成功 → 接続完了、connect.html不要
+5. 失敗 → **connect.html開かない**（`userTriggeredDiscovery = false`）
+
+### ユーザーがアイコンクリック時
+1. `userTriggeredDiscovery = true`
+2. `scheduleDiscovery()`
+3. Discovery実行、MCPサーバー検出
+4. `autoConnectRelay` 試行
+5. 失敗 → connect.html開く（ユーザーが明示的にトリガー）
+
+---
+
+## 修正対象ファイル
+
+| ファイル | 変更内容 |
+|----------|----------|
+| `src/extension/background.mjs` | `userTriggeredDiscovery`フラグ追加、条件分岐 |
+
+---
+
+## 変更点（差分）
+
+```diff
++ let userTriggeredDiscovery = false;
+
+  chrome.action.onClicked.addListener(() => {
++   userTriggeredDiscovery = true;
+    scheduleDiscovery();
   });
-```
 
-### 修正2: テキスト抽出のフィードバックボタン検出も同様に修正
-
-**ファイル**: `src/fast-cdp/fast-chat.ts`
-**行**: 3259
-
-```javascript
-// 修正前
-const thumbUpImg = document.querySelector('img[alt="thumb_up"]');
-
-// 修正後（collectDeepを使用）
-const feedbackImgs = collectDeep(['img[alt="thumb_up"]', 'img[alt="thumb_down"]']);
-const thumbUpImg = feedbackImgs.find(img => img.alt === 'thumb_up');
-```
-
-### 修正3: 応答完了条件の堅牢化
-
-**ファイル**: `src/fast-cdp/fast-chat.ts`
-**行**: 3205-3209
-
-応答完了条件3を緩和:
-```javascript
-// 修正前
-if (textStableCount >= 5 && state.modelResponseCount > initialModelResponseCount && !state.hasStopButton) {
-
-// 修正後: textStableCountが十分大きければ完了とみなす（stopボタン検出失敗の救済）
-if (textStableCount >= 10 && state.modelResponseCount > 0 && !state.hasStopButton) {
-  // 10秒以上安定 + レスポンスがある + 停止ボタンなし → 完了
-}
-// さらにフォールバック追加
-if (textStableCount >= 30 && state.modelResponseCount > 0) {
-  // 30秒以上安定 + レスポンスがある → 強制完了（stopボタン検出関係なく）
-}
+  // autoOpenConnectUi内
+  if (!ok) {
+-   const serverStartedAt = relay.data.startedAt || 0;
+-   const isNewServer = serverStartedAt >= (extensionStartTime - 2000);
+-   if (isNewServer) {
++   if (userTriggeredDiscovery) {
+      await ensureConnectUiTab(...);
+    }
+  }
 ```
 
 ---
 
 ## 検証方法
 
-1. `npm run build` でビルド
-2. `npm run test:gemini` で単体テスト
-3. `npm run test:suite` でフルテスト
-4. 特に以下を確認:
-   - 既存チャットへの再接続後の応答検出
-   - フィードバックボタン検出ログ（`feedback=true/false`）
+1. 変更を適用しビルド: `npm run build`
+2. Chrome拡張を再読み込み
+3. **テスト1: Chrome再起動**
+   - 複数のMCPサーバーを起動
+   - Chromeを完全終了・再起動
+   - → connect.htmlタブが**0個**であることを確認
+   - → 自動接続が成功していればMCPサーバーは使える
+4. **テスト2: 手動トリガー**
+   - 拡張アイコンをクリック
+   - → 接続失敗時のみconnect.htmlが1個開く
 
 ---
 
-## 修正対象ファイル
+## 期待される結果
 
-- `src/fast-cdp/fast-chat.ts`
-  - 行3128-3133: フィードバックボタン検出
-  - 行3205-3216: 応答完了条件
-  - 行3259: テキスト抽出のフィードバックボタン検出
+| シナリオ | 現在 | 修正後 |
+|----------|------|--------|
+| Chrome起動時、複数MCP検出 | 複数タブ開く | **0タブ** |
+| アイコンクリック後 | 1タブ | 1タブ |
+| 自動接続成功時 | 0タブ | 0タブ |

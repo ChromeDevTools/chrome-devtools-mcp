@@ -21,6 +21,9 @@
     "test:chatgpt": "npm run build && node scripts/test-fast-chat.mjs chatgpt",
     "test:gemini": "npm run build && node scripts/test-fast-chat.mjs gemini",
     "test:both": "npm run build && node scripts/test-fast-chat.mjs both",
+    "test:suite": "npm run build && node scripts/test-suite.mjs",
+    "test:smoke": "npm run build && node scripts/test-suite.mjs --smoke",
+    "test:regression": "npm run build && node scripts/test-suite.mjs --regression",
     "cdp:chatgpt": "npm run build && node scripts/cdp-snapshot.mjs chatgpt",
     "cdp:gemini": "npm run build && node scripts/cdp-snapshot.mjs gemini"
   },
@@ -52,6 +55,7 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.18.1",
     "debug": "4.4.3",
+    "playwright": "^1.58.1",
     "ws": "^8.19.0",
     "yargs": "18.0.0"
   },

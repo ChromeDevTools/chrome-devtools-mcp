@@ -23,6 +23,10 @@ export class CdpClient {
       awaitPromise: true,
       returnByValue: true,
     });
+    // デバッグ: 例外がある場合はログに出力
+    if (result?.exceptionDetails) {
+      console.error('[CDP] evaluate exception:', JSON.stringify(result.exceptionDetails));
+    }
     return result?.result?.value as T;
   }
 
