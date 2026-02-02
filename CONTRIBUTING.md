@@ -39,13 +39,19 @@ for PR and commit titles.
 
 ## Installation
 
-Check that you are using node version specified in .nvmrc, then run following commands:
+Check that you are using the Node.js version specified in `.nvmrc`, then run the following commands:
 
 ```sh
 git clone https://github.com/ChromeDevTools/chrome-devtools-mcp.git
 cd chrome-devtools-mcp
 npm ci
 npm run build
+```
+
+If you're using [nvm](https://github.com/nvm-sh/nvm) (Node Version Manager), you can automatically use the correct version:
+
+```sh
+nvm use
 ```
 
 ### Testing with @modelcontextprotocol/inspector
