@@ -539,6 +539,9 @@ const lastRelayByPort = new Map();
 // Interval管理: 重複防止
 let discoveryIntervalId = null;
 
+// 並列実行防止: autoOpenConnectUiが実行中かどうか
+let isDiscoveryRunning = false;
+
 // リロード時クールダウン: 5秒間は「新しいrelay」検出をスキップ
 const extensionStartTime = Date.now();
 const COOLDOWN_MS = 5000;
@@ -737,20 +740,12 @@ async function autoOpenConnectUi() {
       ok = false;
     }
     if (!ok) {
-      // Open connect.html when:
-      // 1. User explicitly clicked the extension icon, OR
-      // 2. This is a NEW MCP server (started after extension loaded)
-      // This prevents tab spam on Chrome restart while preserving normal UX
-      const serverStartedAt = relay.data.startedAt || 0;
-      const isNewServer = serverStartedAt >= extensionStartTime;
-
-      if (userTriggeredDiscovery || isNewServer) {
+      // Only open connect.html when user explicitly clicked the extension icon
+      // This prevents tab spam on Chrome restart, Service Worker restart, etc.
+      if (userTriggeredDiscovery) {
         logInfo('discovery', 'Opening connect UI', {
           port: relay.port,
-          tabUrl: relay.data.tabUrl,
-          reason: userTriggeredDiscovery ? 'user-triggered' : 'new-server',
-          serverStartedAt,
-          extensionStartTime
+          tabUrl: relay.data.tabUrl
         });
         await ensureConnectUiTab(
           relay.data.wsUrl,
@@ -758,12 +753,11 @@ async function autoOpenConnectUi() {
           Boolean(relay.data.newTab),
           false,
         );
+        userTriggeredDiscovery = false;  // Reset after opening
       } else {
-        logDebug('discovery', 'Skipping connect UI (existing MCP server on Chrome startup)', {
+        logDebug('discovery', 'Skipping connect UI (auto mode)', {
           port: relay.port,
-          tabUrl: relay.data.tabUrl,
-          serverStartedAt,
-          extensionStartTime
+          tabUrl: relay.data.tabUrl
         });
       }
     }
@@ -820,14 +814,21 @@ function scheduleDiscovery() {
   logInfo('discovery', 'scheduleDiscovery called - starting infinite polling');
   autoOpenConnectUi();
   // 無制限ポーリング（拡張機能が生きている限り継続）
+  // 並列実行防止: 前の実行が完了するまで次の実行をスキップ
   discoveryIntervalId = setInterval(async () => {
-    await autoOpenConnectUi();
+    if (isDiscoveryRunning) return;  // Skip if previous run is still in progress
+    isDiscoveryRunning = true;
+    try {
+      await autoOpenConnectUi();
+    } finally {
+      isDiscoveryRunning = false;
+    }
   }, 500);
 }
 
 // Discovery auto-starts on Chrome startup
-// connect.html only opens for NEW MCP server instances (startedAt >= extensionStartTime)
-// This prevents tab spam from existing MCP servers on Chrome restart
+// connect.html only opens when user clicks the extension icon
+// This prevents tab spam on Chrome restart and Service Worker restart
 
 // Start discovery when user clicks extension icon
 chrome.action.onClicked.addListener(() => {
