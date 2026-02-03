@@ -232,12 +232,12 @@ export class PageCollector<T> {
 export class ConsoleCollector extends PageCollector<
   ConsoleMessage | Error | DevTools.AggregatedIssue
 > {
-  #subscribedPages = new WeakMap<Page, PageIssueSubscriber>();
+  #subscribedPages = new WeakMap<Page, PageEventSubscriber>();
 
   override addPage(page: Page): void {
     super.addPage(page);
     if (!this.#subscribedPages.has(page)) {
-      const subscriber = new PageIssueSubscriber(page);
+      const subscriber = new PageEventSubscriber(page);
       this.#subscribedPages.set(page, subscriber);
       void subscriber.subscribe();
     }
@@ -250,7 +250,7 @@ export class ConsoleCollector extends PageCollector<
   }
 }
 
-class PageIssueSubscriber {
+class PageEventSubscriber {
   #issueManager = new FakeIssuesManager();
   #issueAggregator = new DevTools.IssueAggregator(this.#issueManager);
   #seenKeys = new Set<string>();
