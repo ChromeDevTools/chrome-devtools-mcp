@@ -236,14 +236,20 @@ export async function createStackTraceForConsoleMessage(
     _targetId(): string | undefined;
   };
   const rawStackTrace = message._rawStackTrace();
-  if (!rawStackTrace) {
-    return undefined;
+  if (rawStackTrace) {
+    return createStackTrace(devTools, rawStackTrace, message._targetId());
   }
+  return undefined;
+}
 
+export async function createStackTrace(
+  devTools: TargetUniverse,
+  rawStackTrace: Protocol.Runtime.StackTrace,
+  targetId: string | undefined,
+): Promise<DevTools.StackTrace.StackTrace.StackTrace> {
   const targetManager = devTools.universe.context.get(DevTools.TargetManager);
-  const messageTargetId = message._targetId();
-  const target = messageTargetId
-    ? targetManager.targetById(messageTargetId) || devTools.target
+  const target = targetId
+    ? targetManager.targetById(targetId) || devTools.target
     : devTools.target;
   const model = target.model(DevTools.DebuggerModel) as DevTools.DebuggerModel;
 
