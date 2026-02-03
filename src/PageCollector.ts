@@ -25,10 +25,16 @@ import {
 export class UncaughtError {
   readonly message: string;
   readonly stackTrace?: Protocol.Runtime.StackTrace;
+  readonly targetId: string;
 
-  constructor(message: string, stackTrace?: Protocol.Runtime.StackTrace) {
+  constructor(
+    message: string,
+    stackTrace: Protocol.Runtime.StackTrace | undefined,
+    targetId: string,
+  ) {
     this.message = message;
     this.stackTrace = stackTrace;
+    this.targetId = targetId;
   }
 }
 
@@ -257,11 +263,14 @@ class PageEventSubscriber {
   #seenIssues = new Set<DevTools.AggregatedIssue>();
   #page: Page;
   #session: CDPSession;
+  #targetId: string;
 
   constructor(page: Page) {
     this.#page = page;
     // @ts-expect-error use existing CDP client (internal Puppeteer API).
     this.#session = this.#page._client() as CDPSession;
+    // @ts-expect-error use internal Puppeteer API to get target ID
+    this.#targetId = this.#session.target()._targetId;
   }
 
   #resetIssueAggregator() {
@@ -323,7 +332,10 @@ class PageEventSubscriber {
     const messageWithRest = exception?.description?.split('\n    at ', 2) ?? [];
     const message = text + ' ' + (messageWithRest[0] ?? '');
 
-    this.#page.emit('uncaughtError', new UncaughtError(message, stackTrace));
+    this.#page.emit(
+      'uncaughtError',
+      new UncaughtError(message, stackTrace, this.#targetId),
+    );
   };
 
   // On navigation, we reset issue aggregation.
