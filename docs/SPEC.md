@@ -1098,6 +1098,10 @@ npm run test:smoke       # Basic operation check
 npm run test:regression  # Check for past issue recurrence
 npm run test:suite       # Run all scenarios
 
+# Performance measurement
+npm run measure:chatgpt  # Measure ChatGPT timings (5 runs)
+npm run measure:gemini   # Measure Gemini timings (5 runs)
+
 # Test suite options
 npm run test:suite -- --list       # List scenarios
 npm run test:suite -- --id=chatgpt-thinking-mode  # Specific scenario only

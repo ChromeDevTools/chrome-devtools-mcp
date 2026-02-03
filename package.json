@@ -27,7 +27,9 @@
     "test:smoke": "npm run build && node scripts/test-suite.mjs --smoke",
     "test:regression": "npm run build && node scripts/test-suite.mjs --regression",
     "cdp:chatgpt": "npm run build && node scripts/cdp-snapshot.mjs chatgpt",
-    "cdp:gemini": "npm run build && node scripts/cdp-snapshot.mjs gemini"
+    "cdp:gemini": "npm run build && node scripts/cdp-snapshot.mjs gemini",
+    "measure:chatgpt": "npm run build && node scripts/measure-timings.mjs chatgpt",
+    "measure:gemini": "npm run build && node scripts/measure-timings.mjs gemini"
   },
   "files": [
     "build/src",
