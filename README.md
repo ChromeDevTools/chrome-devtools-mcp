@@ -179,8 +179,8 @@ Configure `~/.claude.json` to use local build:
 
 ```bash
 npm run build      # Build TypeScript
-npm run typecheck  # Type check
-npm test           # Run tests
+npm run typecheck  # Type check only
+npm run test:smoke # Basic operation check
 npm run format     # Format code
 ```
 
@@ -224,7 +224,7 @@ npm run cdp:gemini
 | [Technical Spec](docs/SPEC.md) | Detailed architecture and implementation |
 | [Setup Guide](docs/user/setup.md) | Detailed MCP configuration |
 | [Troubleshooting](docs/user/troubleshooting.md) | Problem solving |
-| [Extension Bridge Design](docs/internal/design/extension-bridge.md) | Extension architecture |
+| [Technical Spec - Architecture](docs/SPEC.md#1-architecture-overview) | Extension architecture |
 
 ---
 

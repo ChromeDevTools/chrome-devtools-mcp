@@ -276,20 +276,39 @@ export class RelayServer extends EventEmitter {
 
     for (const port of ports) {
       const started = await new Promise<boolean>((resolve) => {
-        const server = http.createServer((req, res) => {
-          if (req.method !== 'GET' || req.url !== '/relay-info') {
-            res.statusCode = 404;
-            res.end('Not Found');
+        const server = http.createServer(async (req, res) => {
+          res.setHeader('Access-Control-Allow-Origin', '*');
+
+          if (req.method === 'GET' && req.url === '/relay-info') {
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({
+              wsUrl,
+              tabUrl: options.tabUrl || null,
+              tabId: options.tabId ?? null,
+              newTab: Boolean(options.newTab),
+            }));
             return;
           }
-          res.setHeader('Content-Type', 'application/json');
-          res.setHeader('Access-Control-Allow-Origin', '*');
-          res.end(JSON.stringify({
-            wsUrl,
-            tabUrl: options.tabUrl || null,
-            tabId: options.tabId ?? null,
-            newTab: Boolean(options.newTab),
-          }));
+
+          if (req.method === 'POST' && req.url === '/reload-extension') {
+            res.setHeader('Content-Type', 'application/json');
+            if (!this.ws || !this.ready) {
+              res.statusCode = 503;
+              res.end(JSON.stringify({ error: 'Extension not connected' }));
+              return;
+            }
+            try {
+              await this.sendRequest('reloadExtension');
+              res.end(JSON.stringify({ success: true }));
+            } catch (err: any) {
+              // Extension reloads and drops connection - this is expected
+              res.end(JSON.stringify({ success: true, note: 'Extension reloading' }));
+            }
+            return;
+          }
+
+          res.statusCode = 404;
+          res.end('Not Found');
         });
 
         server.on('error', (error: any) => {

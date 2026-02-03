@@ -76,34 +76,15 @@ For Claude Code, you can also add project-specific configuration, but it's gener
 
 **Note:** Project-specific settings override global settings. Use this only if you need different configurations for different projects
 
-### With Options (Global Configuration)
+### Configuration Note (v2.0.0+)
 
-You can add various options to customize the behavior in your global configuration:
-
-```json
-{
-  "mcpServers": {
-    "chrome-ai-bridge": {
-      "command": "npx",
-      "args": [
-        "chrome-ai-bridge@latest",
-        "--headless=false",
-        "--loadExtension=/path/to/your/extension"
-      ]
-    }
-  }
-}
-```
-
-### Available Options
-
-- `--headless`: Run Chrome in headless mode (default: false)
-- `--channel`: Chrome channel to use (stable, beta, canary, dev)
-- `--loadExtension`: Path to extension directory to load
-- `--loadExtensionsDir`: Path to directory containing multiple extensions
-- `--loadSystemExtensions`: Load extensions from system Chrome profile
-- `--isolated`: Use temporary profile instead of system profile
-- `--userDataDir`: Custom Chrome profile directory
+> **⚠️ v2.0.0 Breaking Change**
+>
+> v2.0.0 switched to Chrome extension mode. The following CLI options from v1.x are **no longer supported**:
+> - `--headless`, `--channel`, `--loadExtension`, `--loadExtensionsDir`
+> - `--loadSystemExtensions`, `--isolated`, `--userDataDir`
+>
+> See [README.md](../../README.md) for the new setup process using the Chrome extension.
 
 ## 🚀 Usage Examples (Global Configuration)
 
@@ -124,142 +105,6 @@ All examples below use **global configuration** in `~/.claude.json`. These confi
 
 This will automatically detect and use your system Chrome profile with all installed extensions.
 
-### For Extension Development
-
-```json
-{
-  "mcpServers": {
-    "chrome-ai-bridge": {
-      "command": "npx",
-      "args": [
-        "chrome-ai-bridge@latest",
-        "--headless=false",
-        "--loadExtension=/Users/yourname/my-extension"
-      ]
-    }
-  }
-}
-```
-
-### Load Multiple Extensions from Directory
-
-```json
-{
-  "mcpServers": {
-    "chrome-ai-bridge": {
-      "command": "npx",
-      "args": [
-        "chrome-ai-bridge@latest",
-        "--loadExtensionsDir=/Users/yourname/projects/Chrome-Extension"
-      ]
-    }
-  }
-}
-```
-
-### Isolated Testing Environment
-
-```json
-{
-  "mcpServers": {
-    "chrome-ai-bridge": {
-      "command": "npx",
-      "args": ["chrome-ai-bridge@latest", "--isolated"]
-    }
-  }
-}
-```
-
-## 📋 Configuration Scope: Global vs Project-Specific
-
-### Global Configuration (Recommended)
-
-**Location:** Root level of `~/.claude.json`
-
-```json
-{
-  "mcpServers": {
-    "chrome-ai-bridge": {
-      "command": "npx",
-      "args": ["chrome-ai-bridge@latest"]
-    }
-  }
-}
-```
-
-**When to use:**
-
-- ✅ You want the same MCP configuration for all projects
-- ✅ You want to simplify maintenance (single place to update)
-- ✅ You're developing multiple extensions that share the same setup
-- ✅ Most common use case - **recommended for most users**
-
-### Project-Specific Configuration (Advanced)
-
-**Location:** Inside `projects` section of `~/.claude.json`
-
-```json
-{
-  "mcpServers": {
-    "chrome-ai-bridge": {
-      "command": "npx",
-      "args": ["chrome-ai-bridge@latest"]
-    }
-  },
-  "projects": {
-    "/Users/yourname/project-a": {
-      "mcpServers": {
-        "chrome-ai-bridge": {
-          "command": "npx",
-          "args": [
-            "chrome-ai-bridge@latest",
-            "--loadExtension=/Users/yourname/project-a/extension"
-          ]
-        }
-      }
-    }
-  }
-}
-```
-
-**When to use:**
-
-- You need different extension configurations for different projects
-- Project-A needs `--isolated` mode, but Project-B needs system extensions
-- You want to override global settings for specific projects
-
-**Note:** Project-specific settings **override** global settings when working in that project.
-
-### Updating Configuration
-
-#### Update Global Configuration (Recommended)
-
-```bash
-# Backup first
-cp ~/.claude.json ~/.claude.json.backup
-
-# Update using jq
-jq '.mcpServers."chrome-ai-bridge".args = [
-  "chrome-ai-bridge@latest",
-  "--loadExtensionsDir=/path/to/extensions"
-]' ~/.claude.json > ~/.claude.json.tmp && mv ~/.claude.json.tmp ~/.claude.json
-```
-
-#### Update Project-Specific Configuration (Advanced)
-
-```bash
-# Backup first
-cp ~/.claude.json ~/.claude.json.backup
-
-# Update using jq
-jq --arg project "/path/to/your/project" '
-  .projects[$project].mcpServers."chrome-ai-bridge".args = [
-    "chrome-ai-bridge@latest",
-    "--loadExtension=/path/to/extension"
-  ]
-' ~/.claude.json > ~/.claude.json.tmp && mv ~/.claude.json.tmp ~/.claude.json
-```
-
 ## 🔄 After Configuration
 
 1. **Restart your MCP client** (Claude Code, Cursor, etc.) to load the new configuration
@@ -270,34 +115,25 @@ jq --arg project "/path/to/your/project" '
 
 Once configured, you can use these tools:
 
-### Essential Extension Tools
+### AI Consultation Tools
 
-- `list_extensions` - List all installed Chrome extensions
-- `reload_extension` - Reload an extension after making changes
-- `inspect_service_worker` - Debug extension's background scripts
+- `ask_chatgpt_web` - Ask ChatGPT via browser
+- `ask_gemini_web` - Ask Gemini via browser
+- `ask_chatgpt_gemini_web` - Ask both AIs in parallel (recommended)
 
-### Web Store Submission Tools
+### Debug Tools
 
-- `submit_to_webstore` - Automatically prepare and submit extension to Chrome Web Store
-- `generate_extension_screenshots` - Generate screenshots for store listing
-
-### Browser Control Tools
-
-- `navigate_page` - Navigate to any URL
-- `take_screenshot` - Capture screenshots
-- `click`, `fill`, `fill_form` - Interact with web pages
-- And 30+ more tools...
+- `take_cdp_snapshot` - Get CDP page state for debugging
+- `get_page_dom` - Query DOM elements with CSS selectors
 
 ## 💡 Example Commands
 
 Once configured, you can say things like:
 
-- "List all my Chrome extensions"
-- "Reload my extension named 'MyExtension'"
-- "Debug the service worker for my extension"
-- "Prepare my extension for Chrome Web Store submission"
-- "Generate screenshots for my extension"
-- "Navigate to google.com and take a screenshot"
+- "Ask ChatGPT how to implement OAuth in Node.js"
+- "Ask Gemini to review this architecture"
+- "Ask both AIs for their opinions on this approach"
+- "Take a CDP snapshot of ChatGPT page"
 
 ## 🐛 Troubleshooting
 
@@ -307,17 +143,17 @@ Once configured, you can say things like:
 2. Make sure the configuration is valid
 3. Restart your MCP client completely
 
-### Chrome launches but extensions don't load
+### Extension not connecting
 
-1. Use `--headless=false` to see what's happening
-2. Make sure extension paths are absolute, not relative
-3. Check that manifest.json is valid
+1. Verify the Chrome extension is installed in `chrome://extensions/`
+2. Check that ChatGPT/Gemini tabs are open and logged in
+3. Click the extension icon to check connection status
 
-### Permission errors
+### ChatGPT/Gemini not responding
 
-1. Make sure Chrome is not already running with the same profile
-2. Try using `--isolated` flag for a clean profile
-3. Check file permissions on extension directories
+1. Ensure you're logged in to both services
+2. Try refreshing the ChatGPT/Gemini tab
+3. Check for rate limiting or service issues
 
 ## 📚 More Information
 

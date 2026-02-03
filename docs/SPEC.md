@@ -1,6 +1,6 @@
 # chrome-ai-bridge Technical Specification
 
-**Version**: v2.0.10
+**Version**: v2.0.18
 **Last Updated**: 2026-02-03
 
 ---
@@ -82,27 +82,16 @@ npm install chrome-ai-bridge
 npx chrome-ai-bridge
 ```
 
-### Launch Options
+### v2.0 Setup (Extension Mode)
 
-**Standard options (same as original):**
-```bash
-npx chrome-ai-bridge@latest              # Basic
-npx chrome-ai-bridge@latest --headless   # Headless mode
-npx chrome-ai-bridge@latest --channel=canary  # Canary channel
-npx chrome-ai-bridge@latest --isolated   # Isolated mode (temp profile)
-```
+> **⚠️ v2.0.0 Breaking Change**
+>
+> v2.0.0 switched to Chrome extension mode. CLI options from v1.x (`--headless`, `--loadExtension`, etc.) are **no longer supported**.
 
-**Extension support options (added in this fork):**
-```bash
-# Load Chrome extension
-npx chrome-ai-bridge@latest --loadExtension=/path/to/extension
-
-# Load multiple extensions
-npx chrome-ai-bridge@latest --loadExtension=/path/to/ext1,/path/to/ext2
-
-# Extension with headed mode (some extensions don't work headless)
-npx chrome-ai-bridge@latest --loadExtension=/path/to/extension --headless=false
-```
+**Setup steps:**
+1. Build and load the extension from `build/extension/` in Chrome
+2. Open ChatGPT/Gemini tabs and log in
+3. Configure MCP client (see README.md)
 
 ---
 
@@ -110,32 +99,24 @@ npx chrome-ai-bridge@latest --loadExtension=/path/to/extension --headless=false
 
 - Browser instance contents are exposed to MCP client
 - Handle personal/confidential information with care
-- **Dedicated Profile**: Stored in `~/.cache/chrome-ai-bridge/chrome-profile-$CHANNEL`
-- **Bookmarks Only**: Only bookmarks are read from system profile (no passwords or history)
-- `--isolated` option uses temporary profile
-- **Extension Safety**: Ensure loaded extension code is trustworthy
+- **Session files**: Stored in `.local/chrome-ai-bridge/`
+- **Extension communication**: Via localhost WebSocket (port 8766)
 
 ### Known Limitations
 
-**Original limitations:**
-- Restrictions in macOS Seatbelt and Linux container sandbox environments
-- `--connect-url` recommended for external Chrome instance in sandbox
-
-**Extension support limitations:**
-- Some extensions may not work correctly in headless mode
-- Only development extensions supported (not Chrome Web Store installed)
-- Extension manifest.json must be valid
+- Requires manual Chrome extension installation
+- ChatGPT/Gemini must be logged in via browser
+- Extension must be running for MCP tools to work
 
 ---
 
 ## Use Cases
 
-### For Chrome Extension Developers
+### For AI Coding Assistants
 
-- Automated testing of extensions under development
-- Content script and web page interaction testing
-- Extension performance analysis
-- AI-assisted extension debugging
+- Consult ChatGPT/Gemini for second opinions
+- Multi-AI discussions for architectural decisions
+- Debug complex problems with multiple perspectives
 
 ### For QA Engineers
 
@@ -1276,6 +1257,30 @@ Update version in `src/extension/manifest.json` with every change:
 - Always increment version when extension files change
 - Example: `2.0.0` → `2.0.1`
 
+### 11.6 Extension Version Query
+
+**File**: `src/extension/background.mjs`
+
+The extension supports a `getVersion` command via WebSocket relay.
+
+**Request**:
+```json
+{"method": "getVersion", "id": 1}
+```
+
+**Response**:
+```json
+{"id": 1, "result": {"version": "2.0.15", "name": "chrome-ai-bridge Extension"}}
+```
+
+**Auto-logging on connection**:
+When CDP connection is established, the MCP server automatically queries and logs the extension version:
+```
+[fast-cdp] Extension version: 2.0.15
+```
+
+**Implementation**: `src/fast-cdp/extension-raw.ts` (after `attachToTab`)
+
 ---
 
 ## 12. MCP Tools
@@ -1289,6 +1294,13 @@ Update version in `src/extension/manifest.json` with every change:
 | `ask_chatgpt_gemini_web` | Send question to both in parallel (recommended) |
 | `take_cdp_snapshot` | Snapshot of page CDP is viewing |
 | `get_page_dom` | Get page DOM elements |
+
+**Common Parameters for AI Tools**:
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `question` | string | Yes | Question to ask |
+| `debug` | boolean | No | Return detailed debug info (DOM structure, extraction attempts, timings) |
 
 ### 12.2 Internal Functions (for testing/debugging)
 

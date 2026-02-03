@@ -164,6 +164,19 @@ class RelayConnection {
   }
 
   async _handleCommand(message) {
+    if (message.method === 'getVersion') {
+      const manifest = chrome.runtime.getManifest();
+      return { version: manifest.version, name: manifest.name };
+    }
+    if (message.method === 'reloadExtension') {
+      logInfo('reload', 'reloadExtension command received');
+      // Delay reload to allow response to be sent first
+      setTimeout(() => {
+        logInfo('reload', 'Calling chrome.runtime.reload()');
+        chrome.runtime.reload();
+      }, 100);
+      return { success: true, message: 'Extension reload initiated' };
+    }
     if (message.method === 'attachToTab') {
       await this._tabPromise;
       debugLog('Attaching debugger to tab:', this._debuggee);

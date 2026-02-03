@@ -132,6 +132,9 @@ export async function connectViaExtensionRaw(options: {
   logRelay('started', {wsUrl});
   console.error(`[fast-cdp] Relay URL: ${wsUrl}`);
 
+  // Save relay info for reload-extension.mjs (after discovery server starts)
+  const relayInfoPath = '/tmp/chrome-ai-bridge-relay.json';
+
   // Start discovery server - extension will detect this and open connect.html
   // Note: Chrome spawn doesn't work for chrome-extension:// URLs, so we rely on discovery polling
   logInfo('extension-raw', 'Starting discovery server', {tabUrl: options.tabUrl, tabId: options.tabId, newTab: options.newTab});
@@ -145,6 +148,14 @@ export async function connectViaExtensionRaw(options: {
     logInfo('extension-raw', 'Discovery server started', {discoveryPort});
     console.error(`[fast-cdp] Discovery server on port ${discoveryPort}`);
     console.error(`[fast-cdp] Extension will auto-detect and open connect.html`);
+
+    // Save relay info for reload-extension.mjs
+    try {
+      fs.writeFileSync(relayInfoPath, JSON.stringify({ discoveryPort, timestamp: Date.now() }));
+      logInfo('extension-raw', 'Saved relay info', { path: relayInfoPath, discoveryPort });
+    } catch (err) {
+      logError('extension-raw', 'Failed to save relay info', { error: err instanceof Error ? err.message : String(err) });
+    }
   } else {
     // Fallback: show manual URL
     const connectUrl = `chrome-extension://${EXTENSION_ID}/ui/connect.html?mcpRelayUrl=${encodeURIComponent(wsUrl)}`;
@@ -206,6 +217,17 @@ export async function connectViaExtensionRaw(options: {
     logError('extension-raw', 'Failed to attach to tab (non-fatal)', {
       error: attachError instanceof Error ? attachError.message : String(attachError),
     });
+  }
+
+  // Get extension version for logging
+  try {
+    const versionResult = await relay.sendRequest('getVersion');
+    if (versionResult?.version) {
+      logInfo('extension-raw', 'Extension version', {version: versionResult.version});
+      console.error(`[fast-cdp] Extension version: ${versionResult.version}`);
+    }
+  } catch {
+    // best-effort; version info is optional
   }
 
   const totalElapsed = Date.now() - startTime;

@@ -14,14 +14,6 @@ let chatgptRelay: RelayServer | null = null;
 let geminiRelay: RelayServer | null = null;
 
 /**
- * 既存のRelay接続を取得する（新規作成しない）
- * Extension自動リロードスクリプト等で使用
- */
-export function getExistingRelay(kind: 'chatgpt' | 'gemini'): RelayServer | null {
-  return kind === 'chatgpt' ? chatgptRelay : geminiRelay;
-}
-
-/**
  * チャット結果の型（タイミング情報付き）
  */
 export interface ChatTimings {
