@@ -236,7 +236,7 @@ export class PageCollector<T> {
 }
 
 export class ConsoleCollector extends PageCollector<
-  ConsoleMessage | Error | DevTools.AggregatedIssue
+  ConsoleMessage | Error | DevTools.AggregatedIssue | UncaughtError
 > {
   #subscribedPages = new WeakMap<Page, PageEventSubscriber>();
 

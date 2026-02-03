@@ -11,6 +11,17 @@ at Iife (main.js:10:2)
 at <anonymous> (main.js:9:0)
 `;
 
+exports[`console > get_console_message > applies source maps to stack traces of uncaught exceptions 1`] = `
+# test response
+ID: 1
+Message: error> Uncaught Error: b00m!
+### Stack trace
+at bar (main.js:2:8)
+at foo (main.js:6:2)
+at Iife (main.js:10:2)
+at <anonymous> (main.js:9:0)
+`;
+
 exports[`console > get_console_message > issues type > gets issue details with node id parsing 1`] = `
 # test response
 ID: 1
