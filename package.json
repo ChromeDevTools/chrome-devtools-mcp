@@ -42,7 +42,7 @@
   "devDependencies": {
     "@eslint/js": "^9.35.0",
     "@google/genai": "^1.37.0",
-    "@modelcontextprotocol/sdk": "1.25.3",
+    "@modelcontextprotocol/sdk": "1.26.0",
     "@rollup/plugin-commonjs": "^29.0.0",
     "@rollup/plugin-json": "^6.1.0",
     "@rollup/plugin-node-resolve": "^16.0.3",
