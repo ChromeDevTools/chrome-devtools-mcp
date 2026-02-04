@@ -1,0 +1,22 @@
+{
+  "$schema": "./manifest.schema.json",
+  "version": "1.0.0",
+  "description": "URL pattern to driver mapping for chrome-ai-bridge",
+  "drivers": [
+    {
+      "name": "chatgpt",
+      "match": [
+        "https://chatgpt.com/*",
+        "https://chat.openai.com/*"
+      ],
+      "description": "ChatGPT by OpenAI"
+    },
+    {
+      "name": "gemini",
+      "match": [
+        "https://gemini.google.com/*"
+      ],
+      "description": "Gemini by Google"
+    }
+  ]
+}
