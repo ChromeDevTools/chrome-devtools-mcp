@@ -33,7 +33,7 @@ export const LCP_UI_CONTENT = `
       background: var(--bg);
       font-size: 14px;
       line-height: 1.5;
-      overflow: hidden;
+      overflow-y: auto;
     }
     .container { 
       display: flex; 
@@ -139,6 +139,7 @@ export const LCP_UI_CONTENT = `
   </style>
 </head>
 <body>
+  <iframe src="http://localhost:5002/" style="width: 100%; height: 500px; border: none; margin-bottom: 24px;"></iframe>
   <div class="container">
     <div class="header">
       <div class="title">LCP Breakdown</div>

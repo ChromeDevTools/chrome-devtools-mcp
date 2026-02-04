@@ -274,6 +274,14 @@ server.server.setRequestHandler(ListResourcesRequestSchema, async () => ({
       uri: "ui://performance/lcp-breakdown",
       name: "LCP Breakdown",
       mimeType: "text/html;profile=mcp-app",
+      _meta: {
+        ui: {
+          csp: {
+            // temporarily localhost to test hosting dt ui components
+            frameDomains: ["http://localhost:5002/"],
+          },
+        },
+      },
     },
     {
       uri: "ui://performance/layout-shift-breakdown",
@@ -300,6 +308,13 @@ server.server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
         uri: "ui://performance/lcp-breakdown",
         mimeType: "text/html;profile=mcp-app",
         text: LCP_UI_CONTENT,
+        _meta: {
+          ui: {
+            csp: {
+              frameDomains: ["http://localhost:5002/"],
+            },
+          },
+        },
       }],
     };
   }
