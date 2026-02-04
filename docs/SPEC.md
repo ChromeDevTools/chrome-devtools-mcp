@@ -1,7 +1,7 @@
 # chrome-ai-bridge Technical Specification
 
 **Version**: v2.0.18
-**Last Updated**: 2026-02-03
+**Last Updated**: 2026-02-04
 
 ---
 
@@ -400,6 +400,85 @@ Common to ChatGPT/Gemini:
 - WebSocket server (dynamic port)
 - Mediates bidirectional communication with extension
 - Sends/receives CDP commands
+
+### 2.7 Focus Emulation
+
+**Problem**: Chrome throttles DOM updates in background tabs. When users switch to another tab during AI response generation, the response extraction may fail or return incomplete/empty text.
+
+**Root cause analysis**:
+- Chrome's Page Visibility API marks background tabs as `hidden`
+- `document.visibilityState === 'hidden'` triggers throttling
+- `requestAnimationFrame` callbacks are paused
+- DOM mutations may be batched or delayed
+
+#### Approaches Considered
+
+| Approach | Description | Verdict |
+|----------|-------------|---------|
+| `Emulation.setFocusEmulationEnabled` | CDP command to emulate focused page | **Adopted** |
+| `Page.bringToFront` | Bring tab to foreground before extraction | Kept as fallback |
+| JS injection (visibilityState override) | Override `document.visibilityState` via `defineProperty` | Rejected |
+| JS injection (rAF polyfill) | Replace `requestAnimationFrame` with `setTimeout` | Rejected |
+
+#### Decision Rationale (from ChatGPT/Gemini/Claude discussion)
+
+**Summary**:
+
+| Topic | ChatGPT | Gemini | Adopted |
+|-------|---------|--------|---------|
+| setFocusEmulationEnabled effect | Fixes visibilityState to visible (documented in DevTools) | No effect (incorrect) | ChatGPT |
+| JS injection | High risk, not recommended | Recommended | ChatGPT |
+| Final recommendation | Layered fallback approach | JS injection | ChatGPT |
+
+**Key evidence**:
+1. **Chrome DevTools documentation** explicitly states: "When Emulate a focused page is enabled, `document.visibilityState` is set to `visible`"
+2. JS injection replacing rAF with setTimeout is ineffective because **setTimeout itself is throttled** in background tabs (max 1 call/second)
+3. `document.visibilityState` is read-only; `defineProperty` may fail
+
+#### Implementation
+
+**File**: `src/fast-cdp/fast-chat.ts` (in `createConnection()`)
+
+```typescript
+// After Runtime.enable, DOM.enable, Page.enable
+try {
+  await client.send('Emulation.setFocusEmulationEnabled', { enabled: true });
+  logInfo('fast-chat', 'Focus emulation enabled');
+} catch (e) {
+  logWarn('fast-chat', 'setFocusEmulationEnabled failed (non-critical)', { error: String(e) });
+}
+```
+
+**Locations**:
+- Existing tab reuse path (line ~480)
+- New tab creation path (line ~540)
+
+#### Rejected Approaches
+
+**1. JS injection - visibilityState override**
+```javascript
+// REJECTED: visibilityState is read-only, defineProperty may fail
+Object.defineProperty(document, 'visibilityState', { value: 'visible' });
+```
+
+**2. JS injection - rAF polyfill**
+```javascript
+// REJECTED: setTimeout is also throttled in background (max 1/sec)
+window.requestAnimationFrame = (cb) => window.setTimeout(() => cb(performance.now()), 16);
+```
+
+**Rejection reasons**:
+1. `document.visibilityState` is a read-only property on the Document prototype
+2. `setTimeout` in background tabs is throttled to max 1 call per second by Chrome
+3. Modifying global APIs (rAF) may break React or other framework internals
+
+#### Fallback Strategy
+
+Even with focus emulation enabled, `Page.bringToFront` is called before text extraction as a defense-in-depth measure.
+
+**Technical basis**:
+- From Chrome DevTools Protocol documentation: "Emulation.setFocusEmulationEnabled - Enables or disables simulating a focused and active page."
+- Reference: https://chromedevtools.github.io/devtools-protocol/tot/Emulation/#method-setFocusEmulationEnabled
 
 ---
 
@@ -1588,4 +1667,109 @@ ps aux | grep chrome-ai-bridge
 lsof -i :8765-8774 | grep LISTEN
 
 # After /exit, processes should disappear within 5 seconds
+```
+
+---
+
+## 15. Background Tab Verification
+
+### 15.1 Purpose
+
+Verify that DOM updates continue in background tabs. This is critical for response detection when users switch to other tabs during AI response generation.
+
+**Hypothesis A**: Once `Page.bringToFront` is called at send time, DOM updates continue even when the tab goes to background.
+
+**Hypothesis B**: Background tabs stop DOM updates (Chrome performance optimization).
+
+### 15.2 Test Commands
+
+```bash
+# Gemini background test (default)
+npm run test:bg
+
+# Foreground comparison (baseline)
+npm run test:bg -- --skip-background
+
+# ChatGPT test
+npm run test:bg -- --target=chatgpt
+
+# Extended monitoring duration (20 seconds)
+npm run test:bg -- --duration=20
+
+# Combine options
+npm run test:bg -- --target=chatgpt --skip-background --duration=30
+```
+
+### 15.3 Test Flow
+
+1. Connect to target page via CDP
+2. Call `Page.bringToFront` to ensure foreground
+3. Send a question
+4. Create new tab via `Target.createTarget` (tab becomes background)
+5. Monitor DOM state at 1-second intervals
+6. Record `textLen` changes and `visibilityState`
+7. Determine result based on data
+
+### 15.4 Result Interpretation
+
+| Result | Condition | Conclusion |
+|--------|-----------|------------|
+| ✅ Hypothesis A correct | `hidden` state detected AND `textLen` increased 3+ times | Current implementation OK |
+| ❌ Hypothesis B | `hidden` state detected AND `textLen` change < 3 times | Countermeasure needed |
+| ⚠️ Inconclusive | `hidden` state not detected | Manual test required |
+
+### 15.5 Implementation Details
+
+**Background tab creation method**:
+
+| Method | Reliability | Notes |
+|--------|-------------|-------|
+| `Target.createTarget` | High | CDP-level, bypasses popup blocker |
+| `window.open` | Medium | May be blocked by popup blocker |
+
+**Early exit**: Monitoring stops 2 samples after completion detection (feedback buttons appear).
+
+**Script location**: `scripts/test-background-tab.mjs`
+
+### 15.6 Test Results (2026-02-04)
+
+**Environment**: Gemini (gemini.google.com)
+
+**Test scenario**: Complex question (BST/AVL/Red-Black/B-Tree tutorial), delay=5s
+
+| Phase | textLen | Notes |
+|-------|---------|-------|
+| Before background | 1009 | Growing normally in foreground |
+| Background @15s | 349 | **Decreased** (-660) |
+| After bringToFront | 1852 | **Jumped** (+1503) |
+
+**Key Findings**:
+
+1. **Generation continues in background**: The +1503 jump after focus recovery proves that generation continued during background state
+2. **DOM updates stop**: textLen decreases or freezes when tab is in background
+3. **Instant recovery**: `Page.bringToFront` immediately reflects accumulated content
+
+**Conclusion**: **Hypothesis B confirmed with nuance** - Background tabs stop DOM **updates**, but generation continues. Content accumulates and is reflected when focus returns.
+
+**Implications**:
+- Calling `Page.bringToFront` at send time is NOT sufficient
+- However, calling it before text extraction IS sufficient
+- Generation runs independently of DOM visibility
+
+**Recommendation**: No code changes needed. The existing implementation in `extractChatGPTResponse()` and `extractGeminiResponse()` already calls `Page.bringToFront` before polling for text, which correctly handles this behavior.
+
+### 15.7 Extended Test Commands
+
+```bash
+# Long response (complex question)
+npm run test:bg -- --long
+
+# Delay before background (test timing hypothesis)
+npm run test:bg -- --long --delay=5 --duration=60
+
+# Wait for textLen threshold before background
+npm run test:bg -- --long --min-textlen=2000 --duration=60
+
+# Combine options
+npm run test:bg -- --long --delay=10 --min-textlen=1000 --duration=90
 ```
