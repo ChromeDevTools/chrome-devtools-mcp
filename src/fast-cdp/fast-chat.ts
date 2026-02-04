@@ -6,6 +6,7 @@ import {CdpClient} from './cdp-client.js';
 import {RelayServer} from '../extension/relay-server.js';
 import {logConnectionState, logInfo, logError, logWarn} from './mcp-logger.js';
 import {DOM_UTILS_CODE} from './utils/index.js';
+import {getDriver, type SiteDriver} from './drivers/index.js';
 
 let chatgptClient: CdpClient | null = null;
 let geminiClient: CdpClient | null = null;
@@ -2288,9 +2289,182 @@ async function askChatGPTFastInternal(question: string, debug?: boolean): Promis
 }
 
 /**
+ * Driver経由でChatGPTに質問（実験的）
+ * 環境変数 CAI_USE_DRIVERS=1 で有効化
+ */
+async function askChatGPTViaDriver(question: string, debug?: boolean): Promise<ChatResult> {
+  const t0 = nowMs();
+  const timings: Partial<ChatTimings> = {};
+
+  // 接続
+  const client = await getClient('chatgpt');
+  timings.connectMs = nowMs() - t0;
+  logInfo('chatgpt', '[Driver] getClient completed', {connectMs: timings.connectMs});
+
+  // Driver取得・設定
+  const driver = getDriver('chatgpt');
+  if (!driver) {
+    throw new Error('ChatGPT driver not found');
+  }
+  driver.setClient(client);
+
+  // 入力欄待機
+  const tWaitInput = nowMs();
+  await client.waitForFunction(
+    `!!document.querySelector('textarea#prompt-textarea') ||
+     !!document.querySelector('.ProseMirror[contenteditable="true"]')`,
+    30000
+  );
+  timings.waitInputMs = nowMs() - tWaitInput;
+
+  // 送信
+  const tInput = nowMs();
+  const sendResult = await driver.sendPrompt(question);
+  if (!sendResult.success) {
+    throw new Error(`Failed to send prompt: ${sendResult.error}`);
+  }
+  timings.inputMs = nowMs() - tInput;
+
+  const tSend = nowMs();
+  timings.sendMs = nowMs() - tSend;
+
+  // 応答待機
+  const tWaitResp = nowMs();
+  await driver.waitForResponse({maxWaitMs: 480000});
+  timings.waitResponseMs = nowMs() - tWaitResp;
+
+  // 応答抽出
+  const extractResult = await driver.extractResponse({debug});
+  const answer = extractResult.text;
+  logInfo('chatgpt', '[Driver] Response extracted', {
+    length: answer.length,
+    evidence: extractResult.evidence,
+    confidence: extractResult.confidence,
+  });
+
+  // セッション保存
+  const finalUrl = await driver.getCurrentUrl();
+  if (finalUrl.includes('chatgpt.com')) {
+    await saveSession('chatgpt', finalUrl);
+  }
+
+  timings.totalMs = nowMs() - t0;
+
+  // 履歴保存
+  await appendHistory({
+    provider: 'chatgpt',
+    question,
+    answer,
+    url: finalUrl,
+    timings,
+  });
+
+  const fullTimings: ChatTimings = {
+    connectMs: timings.connectMs ?? 0,
+    waitInputMs: timings.waitInputMs ?? 0,
+    inputMs: timings.inputMs ?? 0,
+    sendMs: timings.sendMs ?? 0,
+    waitResponseMs: timings.waitResponseMs ?? 0,
+    totalMs: timings.totalMs ?? 0,
+  };
+
+  return {answer, timings: fullTimings};
+}
+
+/**
+ * Driver経由でGeminiに質問（実験的）
+ */
+async function askGeminiViaDriver(question: string, debug?: boolean): Promise<ChatResult> {
+  const t0 = nowMs();
+  const timings: Partial<ChatTimings> = {};
+
+  // 接続
+  const client = await getClient('gemini');
+  timings.connectMs = nowMs() - t0;
+  logInfo('gemini', '[Driver] getClient completed', {connectMs: timings.connectMs});
+
+  // Driver取得・設定
+  const driver = getDriver('gemini');
+  if (!driver) {
+    throw new Error('Gemini driver not found');
+  }
+  driver.setClient(client);
+
+  // 入力欄待機
+  const tWaitInput = nowMs();
+  await client.waitForFunction(
+    `!!document.querySelector('[role="textbox"]') ||
+     !!document.querySelector('div[contenteditable="true"]') ||
+     !!document.querySelector('textarea')`,
+    15000
+  );
+  timings.waitInputMs = nowMs() - tWaitInput;
+
+  // 送信
+  const tInput = nowMs();
+  const sendResult = await driver.sendPrompt(question);
+  if (!sendResult.success) {
+    throw new Error(`Failed to send prompt: ${sendResult.error}`);
+  }
+  timings.inputMs = nowMs() - tInput;
+
+  const tSend = nowMs();
+  timings.sendMs = nowMs() - tSend;
+
+  // 応答待機
+  const tWaitResp = nowMs();
+  await driver.waitForResponse({maxWaitMs: 480000});
+  timings.waitResponseMs = nowMs() - tWaitResp;
+
+  // 応答抽出
+  const extractResult = await driver.extractResponse({debug});
+  const answer = normalizeGeminiResponse(extractResult.text, question);
+  logInfo('gemini', '[Driver] Response extracted', {
+    length: answer.length,
+    evidence: extractResult.evidence,
+    confidence: extractResult.confidence,
+  });
+
+  // セッション保存
+  const finalUrl = await driver.getCurrentUrl();
+  if (finalUrl.includes('gemini.google.com')) {
+    await saveSession('gemini', finalUrl);
+  }
+
+  timings.totalMs = nowMs() - t0;
+
+  // 履歴保存
+  await appendHistory({
+    provider: 'gemini',
+    question,
+    answer,
+    url: finalUrl,
+    timings,
+  });
+
+  const fullTimings: ChatTimings = {
+    connectMs: timings.connectMs ?? 0,
+    waitInputMs: timings.waitInputMs ?? 0,
+    inputMs: timings.inputMs ?? 0,
+    sendMs: timings.sendMs ?? 0,
+    waitResponseMs: timings.waitResponseMs ?? 0,
+    totalMs: timings.totalMs ?? 0,
+  };
+
+  return {answer, timings: fullTimings};
+}
+
+// Driver統合モードの判定
+const USE_DRIVERS = process.env.CAI_USE_DRIVERS === '1';
+
+/**
  * ChatGPTに質問して回答を取得（後方互換用）
  */
 export async function askChatGPTFast(question: string, debug?: boolean): Promise<string> {
+  if (USE_DRIVERS) {
+    const result = await askChatGPTViaDriver(question, debug);
+    return result.answer;
+  }
   const result = await askChatGPTFastInternal(question, debug);
   return result.answer;
 }
@@ -2299,6 +2473,9 @@ export async function askChatGPTFast(question: string, debug?: boolean): Promise
  * ChatGPTに質問して回答とタイミング情報を取得
  */
 export async function askChatGPTFastWithTimings(question: string, debug?: boolean): Promise<ChatResult> {
+  if (USE_DRIVERS) {
+    return askChatGPTViaDriver(question, debug);
+  }
   return askChatGPTFastInternal(question, debug);
 }
 
@@ -3198,6 +3375,10 @@ async function askGeminiFastInternal(question: string, debug?: boolean): Promise
  * Geminiに質問して回答を取得（後方互換用）
  */
 export async function askGeminiFast(question: string, debug?: boolean): Promise<string> {
+  if (USE_DRIVERS) {
+    const result = await askGeminiViaDriver(question, debug);
+    return result.answer;
+  }
   const result = await askGeminiFastInternal(question, debug);
   return result.answer;
 }
@@ -3206,6 +3387,9 @@ export async function askGeminiFast(question: string, debug?: boolean): Promise<
  * Geminiに質問して回答とタイミング情報を取得
  */
 export async function askGeminiFastWithTimings(question: string, debug?: boolean): Promise<ChatResult> {
+  if (USE_DRIVERS) {
+    return askGeminiViaDriver(question, debug);
+  }
   return askGeminiFastInternal(question, debug);
 }
 
