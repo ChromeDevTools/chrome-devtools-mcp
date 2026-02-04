@@ -177,6 +177,7 @@ export class ConsoleFormatter {
       '### Stack trace',
       this.#formatFragment(stackTrace.syncFragment),
       ...stackTrace.asyncFragments.map(this.#formatAsyncFragment.bind(this)),
+      'Note: line and column numbers use 1-based indexing',
     ].join('\n');
   }
 
@@ -198,7 +199,8 @@ export class ConsoleFormatter {
   #formatFrame(frame: DevTools.DevTools.StackTrace.StackTrace.Frame): string {
     let result = `at ${frame.name ?? '<anonymous>'}`;
     if (frame.uiSourceCode) {
-      result += ` (${frame.uiSourceCode.displayName()}:${frame.line}:${frame.column})`;
+      const location = frame.uiSourceCode.uiLocation(frame.line, frame.column);
+      result += ` (${location.linkText(/* skipTrim */ false, /* showColumnNumber */ true)})`;
     } else if (frame.url) {
       result += ` (${frame.url}:${frame.line}:${frame.column})`;
     }

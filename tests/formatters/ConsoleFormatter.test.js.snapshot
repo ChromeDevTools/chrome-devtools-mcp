@@ -22,6 +22,7 @@ at foo (foo.ts:10:2)
 at bar (foo.ts:20:2)
 --- setTimeout -------------------------
 at schedule (util.ts:5:2)
+Note: line and column numbers use 1-based indexing
 `;
 
 exports[`ConsoleFormatter > toStringDetailed > formats a console.error message 1`] = `
@@ -57,6 +58,7 @@ at foo (foo.ts:10:2)
 at bar (foo.ts:20:2)
 --- setTimeout -------------------------
 at schedule (util.ts:5:2)
+Note: line and column numbers use 1-based indexing
 `;
 
 exports[`ConsoleFormatter > toStringDetailed > handles \"Execution context is not available\" error in args 1`] = `
