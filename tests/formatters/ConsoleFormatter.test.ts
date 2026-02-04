@@ -132,10 +132,6 @@ describe('ConsoleFormatter', () => {
     });
 
     it('formats a console message with a stack trace', async t => {
-      const message = createMockMessage({
-        type: () => 'log',
-        text: () => 'Hello stack trace!',
-      });
       const stackTrace = {
         syncFragment: {
           frames: [
@@ -168,12 +164,13 @@ describe('ConsoleFormatter', () => {
         ],
       } as unknown as DevTools.StackTrace.StackTrace.StackTrace;
 
-      const result = (
-        await ConsoleFormatter.from(message, {
-          id: 5,
-          resolvedStackTraceForTesting: stackTrace,
-        })
-      ).toStringDetailed();
+      const result = new ConsoleFormatter(5, {
+        type: 'log',
+        text: 'Hello stack trace!',
+        argsCount: 0,
+        args: [],
+        stackTrace,
+      }).toStringDetailed();
       t.assert.snapshot?.(result);
     });
 
@@ -230,18 +227,14 @@ describe('ConsoleFormatter', () => {
           },
         ],
       } as unknown as DevTools.StackTrace.StackTrace.StackTrace;
-      const error = new UncaughtError(
-        'Uncaught TypeError: Cannot read properties of undefined',
-        undefined,
-        '<mock target ID>',
-      );
 
-      const result = (
-        await ConsoleFormatter.from(error, {
-          id: 7,
-          resolvedStackTraceForTesting: stackTrace,
-        })
-      ).toStringDetailed();
+      const result = new ConsoleFormatter(7, {
+        type: 'error',
+        text: 'Uncaught TypeError: Cannot read properties of undefined',
+        argsCount: 0,
+        args: [],
+        stackTrace,
+      }).toStringDetailed();
       t.assert.snapshot?.(result);
     });
   });

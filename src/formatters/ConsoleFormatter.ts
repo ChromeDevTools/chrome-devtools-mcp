@@ -15,86 +15,92 @@ import type {ConsoleMessage} from '../third_party/index.js';
 
 export interface ConsoleFormatterOptions {
   fetchDetailedData?: boolean;
-  id?: number;
+  id: number;
   devTools?: TargetUniverse;
   resolvedStackTraceForTesting?: DevTools.DevTools.StackTrace.StackTrace.StackTrace;
 }
 
-export class ConsoleFormatter {
-  #msg: ConsoleMessage | Error | UncaughtError;
-  #resolvedArgs: unknown[] = [];
-  #resolvedStackTrace?: DevTools.DevTools.StackTrace.StackTrace.StackTrace;
-  #id?: number;
+export interface FormattableMessage {
+  type: string;
+  text: string;
+  argsCount: number;
 
-  private constructor(
-    msg: ConsoleMessage | Error | UncaughtError,
-    options?: ConsoleFormatterOptions,
-  ) {
+  // Present when details are fetched.
+  args: unknown[];
+  stackTrace?: DevTools.DevTools.StackTrace.StackTrace.StackTrace;
+}
+
+export class ConsoleFormatter {
+  readonly #id: number;
+  readonly #msg: FormattableMessage;
+
+  constructor(id: number, msg: FormattableMessage) {
+    this.#id = id;
     this.#msg = msg;
-    this.#id = options?.id;
-    this.#resolvedStackTrace = options?.resolvedStackTraceForTesting;
   }
 
   static async from(
-    msg: ConsoleMessage | Error | UncaughtError,
-    options?: ConsoleFormatterOptions,
+    message: ConsoleMessage | Error | UncaughtError,
+    options: ConsoleFormatterOptions,
   ): Promise<ConsoleFormatter> {
-    const formatter = new ConsoleFormatter(msg, options);
-    if (options?.fetchDetailedData) {
-      await formatter.#loadDetailedData(options?.devTools);
+    if (ConsoleFormatter.#isConsoleMessage(message)) {
+      const msg: FormattableMessage = {
+        type: message.type(),
+        text: message.text(),
+        argsCount: message.args().length,
+        args: [],
+      };
+      if (options.fetchDetailedData) {
+        msg.args = await Promise.all(
+          message.args().map(async (arg, i) => {
+            try {
+              return await arg.jsonValue();
+            } catch {
+              return `<error: Argument ${i} is no longer available>`;
+            }
+          }),
+        );
+        if (options.devTools) {
+          msg.stackTrace = await createStackTraceForConsoleMessage(
+            options.devTools,
+            message,
+          );
+        }
+      }
+      return new ConsoleFormatter(options.id, msg);
     }
-    return formatter;
+
+    const msg: FormattableMessage = {
+      type: 'error',
+      text: message.message,
+      argsCount: 0,
+      args: [],
+    };
+    if (
+      options.fetchDetailedData &&
+      options.devTools &&
+      'stackTrace' in message &&
+      message.stackTrace
+    ) {
+      msg.stackTrace = await createStackTrace(
+        options.devTools,
+        message.stackTrace,
+        message.targetId,
+      );
+    }
+    return new ConsoleFormatter(options.id, msg);
   }
 
-  #isConsoleMessage(
+  static #isConsoleMessage(
     msg: ConsoleMessage | Error | UncaughtError,
   ): msg is ConsoleMessage {
     // No `instanceof` as tests mock `ConsoleMessage`.
     return 'args' in msg && typeof msg.args === 'function';
   }
 
-  async #loadDetailedData(devTools?: TargetUniverse): Promise<void> {
-    if (this.#msg instanceof Error) {
-      return;
-    }
-
-    if (this.#isConsoleMessage(this.#msg)) {
-      this.#resolvedArgs = await Promise.all(
-        this.#msg.args().map(async (arg, i) => {
-          try {
-            return await arg.jsonValue();
-          } catch {
-            return `<error: Argument ${i} is no longer available>`;
-          }
-        }),
-      );
-    }
-
-    if (devTools) {
-      try {
-        if (this.#isConsoleMessage(this.#msg)) {
-          this.#resolvedStackTrace = await createStackTraceForConsoleMessage(
-            devTools,
-            this.#msg,
-          );
-        } else if (this.#msg.stackTrace) {
-          this.#resolvedStackTrace = await createStackTrace(
-            devTools,
-            this.#msg.stackTrace,
-            this.#msg.targetId,
-          );
-        }
-      } catch {
-        // ignore
-      }
-    }
-  }
-
   // The short format for a console message.
   toString(): string {
-    const type = this.#getType();
-    const text = this.#getText();
-    const argsCount = this.#getArgsCount();
+    const {type, text, argsCount} = this.#msg;
     const idPart = this.#id !== undefined ? `msgid=${this.#id} ` : '';
     return `${idPart}[${type}] ${text} (${argsCount} args)`;
   }
@@ -103,47 +109,23 @@ export class ConsoleFormatter {
   toStringDetailed(): string {
     const result = [
       this.#id !== undefined ? `ID: ${this.#id}` : '',
-      `Message: ${this.#getType()}> ${this.#getText()}`,
+      `Message: ${this.#msg.type}> ${this.#msg.text}`,
       this.#formatArgs(),
-      this.#formatStackTrace(this.#resolvedStackTrace),
+      this.#formatStackTrace(this.#msg.stackTrace),
     ].filter(line => !!line);
     return result.join('\n');
   }
 
-  #getType(): string {
-    if (!this.#isConsoleMessage(this.#msg)) {
-      return 'error';
-    }
-    return this.#msg.type();
-  }
-
-  #getText(): string {
-    if (!this.#isConsoleMessage(this.#msg)) {
-      return this.#msg.message;
-    }
-    return this.#msg.text();
-  }
-
   #getArgs(): unknown[] {
-    if (!this.#isConsoleMessage(this.#msg)) {
-      return [];
-    }
-    if (this.#resolvedArgs.length > 0) {
-      const args = [...this.#resolvedArgs];
+    if (this.#msg.args.length > 0) {
+      const args = [...this.#msg.args];
       // If there is no text, the first argument serves as text (see formatMessage).
-      if (!this.#msg.text()) {
+      if (!this.#msg.text) {
         args.shift();
       }
       return args;
     }
     return [];
-  }
-
-  #getArgsCount(): number {
-    if (!this.#isConsoleMessage(this.#msg)) {
-      return 0;
-    }
-    return this.#resolvedArgs.length || this.#msg.args().length;
   }
 
   #formatArg(arg: unknown) {
@@ -208,9 +190,9 @@ export class ConsoleFormatter {
   }
   toJSON(): object {
     return {
-      type: this.#getType(),
-      text: this.#getText(),
-      argsCount: this.#getArgsCount(),
+      type: this.#msg.type,
+      text: this.#msg.text,
+      argsCount: this.#msg.argsCount,
       id: this.#id,
     };
   }
@@ -218,12 +200,12 @@ export class ConsoleFormatter {
   toJSONDetailed(): object {
     return {
       id: this.#id,
-      type: this.#getType(),
-      text: this.#getText(),
+      type: this.#msg.type,
+      text: this.#msg.text,
       args: this.#getArgs().map(arg =>
         typeof arg === 'object' ? arg : String(arg),
       ),
-      stackTrace: this.#resolvedStackTrace,
+      stackTrace: this.#msg.stackTrace,
     };
   }
 }
