@@ -1,24 +1,8 @@
 # Brave DevTools MCP
 
-`brave-devtools-mcp` lets your coding agent (such as Gemini, Claude, Cursor or Copilot)
-control and inspect a live Brave browser. It acts as a Model-Context-Protocol
-(MCP) server, giving your AI coding assistant access to the full power of
-DevTools for reliable automation, in-depth debugging, and performance analysis.
+Modified version of `chrome-devtools-mcp` without telemetry data and adapted to work with brave. Plug and play as it is just a Chromium browser.
 
 Fork of [chrome-devtools-mcp](https://github.com/ChromeDevTools/chrome-devtools-mcp), adapted for Brave Browser.
-
-## [Tool reference](./docs/tool-reference.md) | [Changelog](./CHANGELOG.md) | [Contributing](./CONTRIBUTING.md) | [Troubleshooting](./docs/troubleshooting.md) | [Design Principles](./docs/design-principles.md)
-
-## Key features
-
-- **Get performance insights**: Uses [Chrome
-  DevTools](https://github.com/381sm016/brave-devtools-mcp) to record
-  traces and extract actionable performance insights.
-- **Advanced browser debugging**: Analyze network requests, take screenshots and
-  check browser console messages (with source-mapped stack traces).
-- **Reliable automation**. Uses
-  [puppeteer](https://github.com/puppeteer/puppeteer) to automate actions in
-  Brave and automatically wait for action results.
 
 ## Disclaimers
 
