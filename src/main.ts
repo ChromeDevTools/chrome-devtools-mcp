@@ -77,7 +77,7 @@ const server = new McpServer(
     title: 'Chrome DevTools MCP server',
     version: VERSION,
   },
-  {capabilities: {logging: {}}},
+  {capabilities: {logging: {}, resources: {}, tools: {}}},
 );
 server.server.setRequestHandler(SetLevelRequestSchema, () => {
   return {};
