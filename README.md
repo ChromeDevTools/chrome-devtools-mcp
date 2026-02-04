@@ -563,14 +563,11 @@ The following code snippet is an example configuration for gemini-cli:
   "mcpServers": {
     "chrome-devtools": {
       "command": "npx",
-      "args": ["chrome-devtools-mcp@latest", "--autoConnect", "--channel=beta"]
+      "args": ["chrome-devtools-mcp@latest", "--autoConnect"]
     }
   }
 }
 ```
-
-Note: you have to specify `--channel=beta` until Chrome M144 has reached the
-stable channel.
 
 **Step 3:** Test your setup
 
