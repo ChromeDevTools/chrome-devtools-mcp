@@ -5,6 +5,7 @@ import {connectViaExtensionRaw, RawExtensionConnection} from './extension-raw.js
 import {CdpClient} from './cdp-client.js';
 import {RelayServer} from '../extension/relay-server.js';
 import {logConnectionState, logInfo, logError, logWarn} from './mcp-logger.js';
+import {DOM_UTILS_CODE} from './utils/index.js';
 
 let chatgptClient: CdpClient | null = null;
 let geminiClient: CdpClient | null = null;
@@ -320,44 +321,8 @@ async function checkGeminiStuckState(client: CdpClient): Promise<{isStuck: boole
   while (Date.now() - startTime < maxWaitMs) {
     const hasStopButton = await client.evaluate<boolean>(`
       (() => {
-        const collectDeep = (selectorList) => {
-          const results = [];
-          const seen = new Set();
-          const visit = (root) => {
-            if (!root) return;
-            for (const sel of selectorList) {
-              try {
-                root.querySelectorAll?.(sel)?.forEach(el => {
-                  if (!seen.has(el)) {
-                    seen.add(el);
-                    results.push(el);
-                  }
-                });
-              } catch {}
-            }
-            const elements = root.querySelectorAll ? Array.from(root.querySelectorAll('*')) : [];
-            for (const el of elements) {
-              if (el.shadowRoot) visit(el.shadowRoot);
-            }
-          };
-          visit(document);
-          return results;
-        };
-
-        const isVisible = (el) => {
-          if (!el) return false;
-          const rects = el.getClientRects();
-          if (!rects || rects.length === 0) return false;
-          const style = window.getComputedStyle(el);
-          return style && style.visibility !== 'hidden' && style.display !== 'none';
-        };
-
-        const isDisabled = (el) => {
-          if (!el) return true;
-          return el.disabled || el.getAttribute('aria-disabled') === 'true' || el.getAttribute('disabled') === 'true';
-        };
-
-        const buttons = collectDeep(['button', '[role="button"]']).filter(isVisible).filter(el => !isDisabled(el));
+        ${DOM_UTILS_CODE}
+        const buttons = __collectDeep(['button', '[role="button"]']).nodes.filter(__isVisible).filter(el => !__isDisabled(el));
 
         // 方法1: aria-labelベースの検索
         const stopByLabel = buttons.some(b => {
@@ -368,10 +333,10 @@ async function checkGeminiStuckState(client: CdpClient): Promise<{isStuck: boole
         if (stopByLabel) return true;
 
         // 方法2: mat-icon要素での検出
-        const stopIcons = collectDeep(['mat-icon[data-mat-icon-name="stop"]']);
+        const stopIcons = __collectDeep(['mat-icon[data-mat-icon-name="stop"]']).nodes;
         for (const stopIcon of stopIcons) {
           const btn = stopIcon.closest('button');
-          if (btn && isVisible(btn) && !isDisabled(btn)) return true;
+          if (btn && __isVisible(btn) && !__isDisabled(btn)) return true;
         }
 
         return false;
@@ -961,49 +926,10 @@ async function askChatGPTFastInternal(question: string, debug?: boolean): Promis
         selector: string;
       }>(`
         (() => {
-          const collectDeep = (selectorList) => {
-            const results = [];
-            const seen = new Set();
-            const visit = (root) => {
-              if (!root) return;
-              for (const sel of selectorList) {
-                try {
-                  root.querySelectorAll?.(sel)?.forEach(el => {
-                    if (!seen.has(el)) {
-                      seen.add(el);
-                      results.push(el);
-                    }
-                  });
-                } catch {
-                  // ignore selector errors
-                }
-              }
-              const elements = root.querySelectorAll ? Array.from(root.querySelectorAll('*')) : [];
-              for (const el of elements) {
-                if (el.shadowRoot) visit(el.shadowRoot);
-              }
-            };
-            visit(document);
-            return results;
-          };
-          const isVisible = (el) => {
-            if (!el) return false;
-            const rects = el.getClientRects();
-            if (!rects || rects.length === 0) return false;
-            const style = window.getComputedStyle(el);
-            return style && style.visibility !== 'hidden' && style.display !== 'none';
-          };
-          const isDisabled = (el) => {
-            if (!el) return true;
-            return (
-              el.disabled ||
-              el.getAttribute('aria-disabled') === 'true' ||
-              el.getAttribute('disabled') === 'true'
-            );
-          };
-          const buttons = collectDeep(['button', '[role="button"]'])
-            .filter(isVisible)
-            .filter(el => !isDisabled(el));
+          ${DOM_UTILS_CODE}
+          const buttons = __collectDeep(['button', '[role="button"]']).nodes
+            .filter(__isVisible)
+            .filter(el => !__isDisabled(el));
 
           // 「Stop generating」ボタンがあるかチェック（応答生成中）
           const hasStopButton = buttons.some(b => {
@@ -1036,7 +962,7 @@ async function askChatGPTFastInternal(question: string, debug?: boolean): Promis
           const rect = sendButton.getBoundingClientRect();
           return {
             found: true,
-            disabled: isDisabled(sendButton),
+            disabled: __isDisabled(sendButton),
             x: rect.left + rect.width / 2,
             y: rect.top + rect.height / 2,
             selector: sendButton.getAttribute('data-testid') || sendButton.getAttribute('aria-label') || sendButton.textContent?.trim().slice(0, 20) || 'send-button'
@@ -1282,35 +1208,13 @@ async function askChatGPTFastInternal(question: string, debug?: boolean): Promis
         debug_presentationText: string;
       }>(`
         (() => {
-          const collectDeep = (selectorList) => {
-            const results = [];
-            const seen = new Set();
-            const visit = (root) => {
-              if (!root) return;
-              for (const sel of selectorList) {
-                try {
-                  root.querySelectorAll?.(sel)?.forEach(el => {
-                    if (!seen.has(el)) {
-                      seen.add(el);
-                      results.push(el);
-                    }
-                  });
-                } catch {}
-              }
-              const elements = root.querySelectorAll ? Array.from(root.querySelectorAll('*')) : [];
-              for (const el of elements) {
-                if (el.shadowRoot) visit(el.shadowRoot);
-              }
-            };
-            visit(document);
-            return results;
-          };
+          ${DOM_UTILS_CODE}
 
           // 停止ボタン検出（フォールバックセレクター付き）
           const stopBtn = document.querySelector('button[data-testid="stop-button"]') ||
                           document.querySelector('button[aria-label*="停止"]') ||
                           document.querySelector('button[aria-label*="Stop"]');
-          const buttons = collectDeep(['button', '[role="button"]']);
+          const buttons = __collectDeep(['button', '[role="button"]']).nodes;
           // 送信ボタン検出（フォールバックセレクター付き）
           // 注意: 応答完了後は音声ボタンに置き換わり、送信ボタンがDOMから消える
           const sendBtn = buttons.find(b =>
@@ -2466,70 +2370,24 @@ async function askGeminiFastInternal(question: string, debug?: boolean): Promise
   timings.waitInputMs = nowMs() - tWaitInput;
 
   // ★ 初期カウント取得: テキスト入力前に既存メッセージ数を記録
+  const geminiUserSelectors = [
+    'user-query',
+    '.user-query',
+    '[data-test-id*="user"]',
+    '[data-test-id*="prompt"]',
+    '[data-message-author-role="user"]',
+    'message[author="user"]',
+    '[data-author="user"]',
+  ];
   const geminiUserCountExpr = `(() => {
-    const selectors = ${JSON.stringify([
-      'user-query',
-      '.user-query',
-      '[data-test-id*="user"]',
-      '[data-test-id*="prompt"]',
-      '[data-message-author-role="user"]',
-      'message[author="user"]',
-      '[data-author="user"]',
-    ])};
-    const results = [];
-    const seen = new Set();
-    const collectDeep = (selectorList) => {
-      const visit = (root) => {
-        if (!root) return;
-        for (const sel of selectorList) {
-          try {
-            root.querySelectorAll?.(sel)?.forEach(el => {
-              if (!seen.has(el)) {
-                seen.add(el);
-                results.push(el);
-              }
-            });
-          } catch {
-            // ignore selector errors
-          }
-        }
-        const elements = root.querySelectorAll ? Array.from(root.querySelectorAll('*')) : [];
-        for (const el of elements) {
-          if (el.shadowRoot) visit(el.shadowRoot);
-        }
-      };
-      visit(document);
-    };
-    collectDeep(selectors);
-    return results.length;
+    ${DOM_UTILS_CODE}
+    return __collectDeep(${JSON.stringify(geminiUserSelectors)}).nodes.length;
   })()`;
 
   const geminiModelResponseCountExpr = `
     (() => {
-      const collectDeep = (selectorList) => {
-        const results = [];
-        const seen = new Set();
-        const visit = (root) => {
-          if (!root) return;
-          for (const sel of selectorList) {
-            try {
-              root.querySelectorAll?.(sel)?.forEach(el => {
-                if (!seen.has(el)) {
-                  seen.add(el);
-                  results.push(el);
-                }
-              });
-            } catch {}
-          }
-          const elements = root.querySelectorAll ? Array.from(root.querySelectorAll('*')) : [];
-          for (const el of elements) {
-            if (el.shadowRoot) visit(el.shadowRoot);
-          }
-        };
-        visit(document);
-        return results;
-      };
-      return collectDeep(['model-response', '.model-response', '[data-test-id*="response"]']).length;
+      ${DOM_UTILS_CODE}
+      return __collectDeep(['model-response', '.model-response', '[data-test-id*="response"]']).nodes.length;
     })()
   `;
 
@@ -2545,36 +2403,9 @@ async function askGeminiFastInternal(question: string, debug?: boolean): Promise
   // Phase 1: 最初の入力試行
   const inputResult = await client.evaluate<{ok: boolean; actualText: string}>(`
     (() => {
+      ${DOM_UTILS_CODE}
       const text = ${sanitized};
-      const collectDeep = (selectorList) => {
-        const results = [];
-        const seen = new Set();
-        const visit = (root) => {
-          if (!root) return;
-          for (const sel of selectorList) {
-            try {
-              root.querySelectorAll?.(sel)?.forEach(el => {
-                if (!seen.has(el)) {
-                  seen.add(el);
-                  results.push(el);
-                }
-              });
-            } catch {
-              // ignore selector errors
-            }
-          }
-          const elements = root.querySelectorAll ? Array.from(root.querySelectorAll('*')) : [];
-          for (const el of elements) {
-            if (el.shadowRoot) {
-              visit(el.shadowRoot);
-            }
-          }
-        };
-        visit(document);
-        return results;
-      };
-      const textbox =
-        collectDeep(['[role="textbox"]', 'div[contenteditable="true"]', 'textarea'])[0];
+      const textbox = __collectDeep(['[role="textbox"]', 'div[contenteditable="true"]', 'textarea']).nodes[0];
       if (!textbox) return {ok: false, actualText: ''};
       textbox.focus();
       if (textbox.isContentEditable) {
@@ -2610,31 +2441,8 @@ async function askGeminiFastInternal(question: string, debug?: boolean): Promise
     // テキストボックスをクリアしてフォーカス
     await client.evaluate(`
       (() => {
-        const collectDeep = (selectorList) => {
-          const results = [];
-          const seen = new Set();
-          const visit = (root) => {
-            if (!root) return;
-            for (const sel of selectorList) {
-              try {
-                root.querySelectorAll?.(sel)?.forEach(el => {
-                  if (!seen.has(el)) {
-                    seen.add(el);
-                    results.push(el);
-                  }
-                });
-              } catch {}
-            }
-            const elements = root.querySelectorAll ? Array.from(root.querySelectorAll('*')) : [];
-            for (const el of elements) {
-              if (el.shadowRoot) visit(el.shadowRoot);
-            }
-          };
-          visit(document);
-          return results;
-        };
-        const textbox =
-          collectDeep(['[role="textbox"]', 'div[contenteditable="true"]', 'textarea'])[0];
+        ${DOM_UTILS_CODE}
+        const textbox = __collectDeep(['[role="textbox"]', 'div[contenteditable="true"]', 'textarea']).nodes[0];
         if (textbox) {
           textbox.focus();
           if (textbox.isContentEditable) {
@@ -2659,31 +2467,8 @@ async function askGeminiFastInternal(question: string, debug?: boolean): Promise
     // 再検証
     const retryResult = await client.evaluate<string>(`
       (() => {
-        const collectDeep = (selectorList) => {
-          const results = [];
-          const seen = new Set();
-          const visit = (root) => {
-            if (!root) return;
-            for (const sel of selectorList) {
-              try {
-                root.querySelectorAll?.(sel)?.forEach(el => {
-                  if (!seen.has(el)) {
-                    seen.add(el);
-                    results.push(el);
-                  }
-                });
-              } catch {}
-            }
-            const elements = root.querySelectorAll ? Array.from(root.querySelectorAll('*')) : [];
-            for (const el of elements) {
-              if (el.shadowRoot) visit(el.shadowRoot);
-            }
-          };
-          visit(document);
-          return results;
-        };
-        const textbox =
-          collectDeep(['[role="textbox"]', 'div[contenteditable="true"]', 'textarea'])[0];
+        ${DOM_UTILS_CODE}
+        const textbox = __collectDeep(['[role="textbox"]', 'div[contenteditable="true"]', 'textarea']).nodes[0];
         if (!textbox) return '';
         return (textbox.isContentEditable ? (textbox.innerText || textbox.textContent) : textbox.value) || '';
       })()
@@ -2696,39 +2481,10 @@ async function askGeminiFastInternal(question: string, debug?: boolean): Promise
   if (!inputOk) {
     const diagnostics = await client.evaluate(`
       (() => {
-        const visible = (el) => {
-          if (!el) return false;
-          const rects = el.getClientRects();
-          if (!rects || rects.length === 0) return false;
-          const style = window.getComputedStyle(el);
-          return style && style.visibility !== 'hidden' && style.display !== 'none';
-        };
-        const collectDeep = (selector) => {
-          const results = [];
-          const seen = new Set();
-          const visit = (root) => {
-            if (!root) return;
-            try {
-              root.querySelectorAll?.(selector)?.forEach(el => {
-                if (!seen.has(el)) {
-                  seen.add(el);
-                  results.push(el);
-                }
-              });
-            } catch {
-              // ignore
-            }
-            const elements = root.querySelectorAll ? Array.from(root.querySelectorAll('*')) : [];
-            for (const el of elements) {
-              if (el.shadowRoot) visit(el.shadowRoot);
-            }
-          };
-          visit(document);
-          return results;
-        };
+        ${DOM_UTILS_CODE}
         const counts = (selector) => {
-          const nodes = collectDeep(selector);
-          const visibleNodes = nodes.filter(visible);
+          const nodes = __collectDeep([selector]).nodes;
+          const visibleNodes = nodes.filter(__isVisible);
           return {all: nodes.length, visible: visibleNodes.length};
         };
         return {
@@ -2746,35 +2502,8 @@ async function askGeminiFastInternal(question: string, debug?: boolean): Promise
   const normalizedQuestion = question.replace(/\s+/g, '');
   const geminiInputMatched = await client.evaluate<boolean>(`
     (() => {
-      const collectDeep = (selectorList) => {
-        const results = [];
-        const seen = new Set();
-        const visit = (root) => {
-          if (!root) return;
-          for (const sel of selectorList) {
-            try {
-              root.querySelectorAll?.(sel)?.forEach(el => {
-                if (!seen.has(el)) {
-                  seen.add(el);
-                  results.push(el);
-                }
-              });
-            } catch {
-              // ignore selector errors
-            }
-          }
-          const elements = root.querySelectorAll ? Array.from(root.querySelectorAll('*')) : [];
-          for (const el of elements) {
-            if (el.shadowRoot) {
-              visit(el.shadowRoot);
-            }
-          }
-        };
-        visit(document);
-        return results;
-      };
-      const textbox =
-        collectDeep(['[role="textbox"]', 'div[contenteditable="true"]', 'textarea'])[0];
+      ${DOM_UTILS_CODE}
+      const textbox = __collectDeep(['[role="textbox"]', 'div[contenteditable="true"]', 'textarea']).nodes[0];
       if (!textbox) return false;
       const text =
         (textbox.isContentEditable ? textbox.innerText : textbox.value || textbox.textContent || '')
@@ -2788,40 +2517,8 @@ async function askGeminiFastInternal(question: string, debug?: boolean): Promise
 
   // geminiUserTextExpr: 最後のユーザーメッセージのテキストを取得
   const geminiUserTextExpr = `(() => {
-    const selectors = ${JSON.stringify([
-      'user-query',
-      '.user-query',
-      '[data-test-id*="user"]',
-      '[data-test-id*="prompt"]',
-      '[data-message-author-role="user"]',
-      'message[author="user"]',
-      '[data-author="user"]',
-    ])};
-    const results = [];
-    const seen = new Set();
-    const collectDeep = (selectorList) => {
-      const visit = (root) => {
-        if (!root) return;
-        for (const sel of selectorList) {
-          try {
-            root.querySelectorAll?.(sel)?.forEach(el => {
-              if (!seen.has(el)) {
-                seen.add(el);
-                results.push(el);
-              }
-            });
-          } catch {
-            // ignore selector errors
-          }
-        }
-        const elements = root.querySelectorAll ? Array.from(root.querySelectorAll('*')) : [];
-        for (const el of elements) {
-          if (el.shadowRoot) visit(el.shadowRoot);
-        }
-      };
-      visit(document);
-    };
-    collectDeep(selectors);
+    ${DOM_UTILS_CODE}
+    const results = __collectDeep(${JSON.stringify(geminiUserSelectors)}).nodes;
     const last = results[results.length - 1];
     return last ? (last.textContent || '').trim() : '';
   })()`;
@@ -2833,31 +2530,8 @@ async function askGeminiFastInternal(question: string, debug?: boolean): Promise
   // Phase 2: 送信前テキスト確認 - 入力フィールドに正しいテキストがあるか最終確認
   const preSendCheck = await client.evaluate<{hasText: boolean; textLength: number; textPreview: string}>(`
     (() => {
-      const collectDeep = (selectorList) => {
-        const results = [];
-        const seen = new Set();
-        const visit = (root) => {
-          if (!root) return;
-          for (const sel of selectorList) {
-            try {
-              root.querySelectorAll?.(sel)?.forEach(el => {
-                if (!seen.has(el)) {
-                  seen.add(el);
-                  results.push(el);
-                }
-              });
-            } catch {}
-          }
-          const elements = root.querySelectorAll ? Array.from(root.querySelectorAll('*')) : [];
-          for (const el of elements) {
-            if (el.shadowRoot) visit(el.shadowRoot);
-          }
-        };
-        visit(document);
-        return results;
-      };
-      const textbox =
-        collectDeep(['[role="textbox"]', 'div[contenteditable="true"]', 'textarea'])[0];
+      ${DOM_UTILS_CODE}
+      const textbox = __collectDeep(['[role="textbox"]', 'div[contenteditable="true"]', 'textarea']).nodes[0];
       if (!textbox) return {hasText: false, textLength: 0, textPreview: ''};
       const text = (textbox.isContentEditable
         ? (textbox.innerText || textbox.textContent)
@@ -2893,54 +2567,13 @@ async function askGeminiFastInternal(question: string, debug?: boolean): Promise
     selector: string;
   }>(`
     (() => {
-      const collectDeep = (selectorList) => {
-        const results = [];
-        const seen = new Set();
-        const visit = (root) => {
-          if (!root) return;
-          for (const sel of selectorList) {
-            try {
-              root.querySelectorAll?.(sel)?.forEach(el => {
-                if (!seen.has(el)) {
-                  seen.add(el);
-                  results.push(el);
-                }
-              });
-            } catch {
-              // ignore selector errors
-            }
-          }
-          const elements = root.querySelectorAll ? Array.from(root.querySelectorAll('*')) : [];
-          for (const el of elements) {
-            if (el.shadowRoot) {
-              visit(el.shadowRoot);
-            }
-          }
-        };
-        visit(document);
-        return results;
-      };
-      const isVisible = (el) => {
-        if (!el) return false;
-        const rects = el.getClientRects();
-        if (!rects || rects.length === 0) return false;
-        const style = window.getComputedStyle(el);
-        return style && style.visibility !== 'hidden' && style.display !== 'none';
-      };
-      const isDisabled = (el) => {
-        if (!el) return true;
-        return (
-          el.disabled ||
-          el.getAttribute('aria-disabled') === 'true' ||
-          el.getAttribute('disabled') === 'true'
-        );
-      };
-      const buttons = collectDeep(['button', '[role="button"]'])
-        .filter(isVisible)
-        .filter(el => !isDisabled(el));
+      ${DOM_UTILS_CODE}
+      const buttons = __collectDeep(['button', '[role="button"]']).nodes
+        .filter(__isVisible)
+        .filter(el => !__isDisabled(el));
 
       // 「停止」ボタンがあるかチェック（応答生成中）
-      // Shadow DOM対応: collectDeepを使用して全てのボタン内から検索
+      // Shadow DOM対応: __collectDeepを使用して全てのボタン内から検索
       const hasStopButton = (() => {
         // 方法1: aria-labelベースの検索（最も信頼性が高い）
         const stopByLabel = buttons.some(b => {
@@ -2951,17 +2584,17 @@ async function askGeminiFastInternal(question: string, debug?: boolean): Promise
         if (stopByLabel) return true;
 
         // 方法2: mat-icon要素での検出（Gemini用 - Shadow DOM対応）
-        const stopIcons = collectDeep(['mat-icon[data-mat-icon-name="stop"]']);
+        const stopIcons = __collectDeep(['mat-icon[data-mat-icon-name="stop"]']).nodes;
         for (const stopIcon of stopIcons) {
           const btn = stopIcon.closest('button');
-          if (btn && isVisible(btn) && !isDisabled(btn)) return true;
+          if (btn && __isVisible(btn) && !__isDisabled(btn)) return true;
         }
 
         // 方法3: img[alt="stop"] での検出（ChatGPT用 - Shadow DOM対応）
-        const stopImgs = collectDeep(['img[alt="stop"]']);
+        const stopImgs = __collectDeep(['img[alt="stop"]']).nodes;
         for (const stopImg of stopImgs) {
           const btn = stopImg.closest('button');
-          if (btn && isVisible(btn) && !isDisabled(btn)) return true;
+          if (btn && __isVisible(btn) && !__isDisabled(btn)) return true;
         }
 
         return false;
@@ -2994,7 +2627,7 @@ async function askGeminiFastInternal(question: string, debug?: boolean): Promise
       const rect = sendButton.getBoundingClientRect();
       return {
         found: true,
-        disabled: isDisabled(sendButton),
+        disabled: __isDisabled(sendButton),
         x: rect.left + rect.width / 2,
         y: rect.top + rect.height / 2,
         selector: sendButton.getAttribute('aria-label') || sendButton.textContent?.trim().slice(0, 20) || 'send-button'
@@ -3211,46 +2844,9 @@ async function askGeminiFastInternal(question: string, debug?: boolean): Promise
       inputBoxEmpty: boolean;
     }>(`
       (() => {
-        const collectDeep = (selectorList) => {
-          const results = [];
-          const seen = new Set();
-          const visit = (root) => {
-            if (!root) return;
-            for (const sel of selectorList) {
-              try {
-                root.querySelectorAll?.(sel)?.forEach(el => {
-                  if (!seen.has(el)) {
-                    seen.add(el);
-                    results.push(el);
-                  }
-                });
-              } catch {}
-            }
-            const elements = root.querySelectorAll ? Array.from(root.querySelectorAll('*')) : [];
-            for (const el of elements) {
-              if (el.shadowRoot) visit(el.shadowRoot);
-            }
-          };
-          visit(document);
-          return results;
-        };
+        ${DOM_UTILS_CODE}
 
-        const isVisible = (el) => {
-          if (!el) return false;
-          const rects = el.getClientRects();
-          if (!rects || rects.length === 0) return false;
-          const style = window.getComputedStyle(el);
-          return style && style.visibility !== 'hidden' && style.display !== 'none';
-        };
-
-        const isDisabled = (el) => {
-          if (!el) return true;
-          return el.disabled ||
-            el.getAttribute('aria-disabled') === 'true' ||
-            el.getAttribute('disabled') === 'true';
-        };
-
-        const buttons = collectDeep(['button', '[role="button"]']).filter(isVisible);
+        const buttons = __collectDeep(['button', '[role="button"]']).nodes.filter(__isVisible);
 
         // 停止ボタン検出（応答生成中かどうか）- Shadow DOM対応
         const hasStopButton = (() => {
@@ -3263,17 +2859,17 @@ async function askGeminiFastInternal(question: string, debug?: boolean): Promise
           if (stopByLabel) return true;
 
           // 方法2: mat-icon要素での検出（Gemini用 - Shadow DOM対応）
-          const stopIcons = collectDeep(['mat-icon[data-mat-icon-name="stop"]']);
+          const stopIcons = __collectDeep(['mat-icon[data-mat-icon-name="stop"]']).nodes;
           for (const stopIcon of stopIcons) {
             const btn = stopIcon.closest('button');
-            if (btn && isVisible(btn)) return true;
+            if (btn && __isVisible(btn)) return true;
           }
 
           // 方法3: img[alt="stop"] での検出（ChatGPT用 - Shadow DOM対応）
-          const stopImgs = collectDeep(['img[alt="stop"]']);
+          const stopImgs = __collectDeep(['img[alt="stop"]']).nodes;
           for (const stopImg of stopImgs) {
             const btn = stopImg.closest('button');
-            if (btn && isVisible(btn)) return true;
+            if (btn && __isVisible(btn)) return true;
           }
 
           return false;
@@ -3282,10 +2878,10 @@ async function askGeminiFastInternal(question: string, debug?: boolean): Promise
         // マイクボタン検出（言語非依存 - Shadow DOM対応）
         const micButton = (() => {
           // img[alt="mic"] を含むボタンを探す（アイコン名は言語非依存 - Shadow DOM対応）
-          const micImgs = collectDeep(['img[alt="mic"]']);
+          const micImgs = __collectDeep(['img[alt="mic"]']).nodes;
           for (const micImg of micImgs) {
             const btn = micImg.closest('button');
-            if (btn && isVisible(btn)) return btn;
+            if (btn && __isVisible(btn)) return btn;
           }
           // フォールバック: aria-labelベースの検索
           return buttons.find(b => {
@@ -3308,8 +2904,8 @@ async function askGeminiFastInternal(question: string, debug?: boolean): Promise
         );
 
         // フィードバックボタン検出（言語非依存: thumb_up/thumb_downアイコン）
-        // Shadow DOM対応: collectDeepを使用
-        const feedbackImgs = collectDeep(['img[alt="thumb_up"]', 'img[alt="thumb_down"]']);
+        // Shadow DOM対応: __collectDeepを使用
+        const feedbackImgs = __collectDeep(['img[alt="thumb_up"]', 'img[alt="thumb_down"]']).nodes;
         const hasFeedbackButtons = feedbackImgs.length > 0 ||
           buttons.some(b => {
             const label = (b.getAttribute('aria-label') || '').toLowerCase();
@@ -3318,7 +2914,7 @@ async function askGeminiFastInternal(question: string, debug?: boolean): Promise
           });
 
         // モデルレスポンス収集（Shadow DOM対応）
-        const allResponses = collectDeep(['model-response', '[data-test-id*="response"]', '.response', '.model-response']);
+        const allResponses = __collectDeep(['model-response', '[data-test-id*="response"]', '.response', '.model-response']).nodes;
         const lastResponse = allResponses[allResponses.length - 1];
         const lastResponseTextLength = lastResponse ? (lastResponse.innerText || lastResponse.textContent || '').length : 0;
 
@@ -3338,9 +2934,9 @@ async function askGeminiFastInternal(question: string, debug?: boolean): Promise
 
         return {
           hasStopButton,
-          hasMicButton: Boolean(micButton && isVisible(micButton)),
+          hasMicButton: Boolean(micButton && __isVisible(micButton)),
           hasFeedbackButtons,
-          sendButtonEnabled: Boolean(sendBtn && !isDisabled(sendBtn)),
+          sendButtonEnabled: Boolean(sendBtn && !__isDisabled(sendBtn)),
           modelResponseCount: allResponses.length,
           lastResponseTextLength,
           inputBoxEmpty,
@@ -3452,34 +3048,11 @@ async function askGeminiFastInternal(question: string, debug?: boolean): Promise
   // 最後のレスポンスを取得（フィードバックボタン基準 + フォールバック）
   const rawText = await client.evaluate<string>(`
     (() => {
-      // Shadow DOM対応のcollectDeep関数
-      const collectDeep = (selectorList) => {
-        const results = [];
-        const seen = new Set();
-        const visit = (root) => {
-          if (!root) return;
-          for (const sel of selectorList) {
-            try {
-              root.querySelectorAll?.(sel)?.forEach(el => {
-                if (!seen.has(el)) {
-                  seen.add(el);
-                  results.push(el);
-                }
-              });
-            } catch {}
-          }
-          const elements = root.querySelectorAll ? Array.from(root.querySelectorAll('*')) : [];
-          for (const el of elements) {
-            if (el.shadowRoot) visit(el.shadowRoot);
-          }
-        };
-        visit(document);
-        return results;
-      };
+      ${DOM_UTILS_CODE}
 
       // 方法1: フィードバックボタン（thumb_up）を基準に応答を探す（言語非依存・最も確実）
-      // Shadow DOM対応: collectDeepを使用
-      const feedbackImgs = collectDeep(['img[alt="thumb_up"]', 'img[alt="thumb_down"]']);
+      // Shadow DOM対応: __collectDeepを使用
+      const feedbackImgs = __collectDeep(['img[alt="thumb_up"]', 'img[alt="thumb_down"]']).nodes;
       const thumbUpImg = feedbackImgs.find(img => img.alt === 'thumb_up') || feedbackImgs[0];
       if (thumbUpImg) {
         // ボタンの親コンテナを遡る
@@ -3509,8 +3082,8 @@ async function askGeminiFastInternal(question: string, debug?: boolean): Promise
         }
       }
 
-      // 方法2: 従来のセレクターベース（Shadow DOM対応 - collectDeepは上で定義済み）
-      const allResponses = collectDeep(['model-response', '[data-test-id*="response"]', '.response', '.model-response']);
+      // 方法2: 従来のセレクターベース（Shadow DOM対応 - __collectDeepは上で定義済み）
+      const allResponses = __collectDeep(['model-response', '[data-test-id*="response"]', '.response', '.model-response']).nodes;
 
       if (allResponses.length === 0) {
         // 方法3: aria-live="polite"
@@ -3573,31 +3146,9 @@ async function askGeminiFastInternal(question: string, debug?: boolean): Promise
       documentTitle: string;
     }>(`
       (() => {
-        const collectDeep = (selectorList) => {
-          const results = [];
-          const seen = new Set();
-          const visit = (root) => {
-            if (!root) return;
-            for (const sel of selectorList) {
-              try {
-                root.querySelectorAll?.(sel)?.forEach(el => {
-                  if (!seen.has(el)) {
-                    seen.add(el);
-                    results.push(el);
-                  }
-                });
-              } catch {}
-            }
-            const elements = root.querySelectorAll ? Array.from(root.querySelectorAll('*')) : [];
-            for (const el of elements) {
-              if (el.shadowRoot) visit(el.shadowRoot);
-            }
-          };
-          visit(document);
-          return results;
-        };
+        ${DOM_UTILS_CODE}
 
-        const allResponses = collectDeep(['model-response', '[data-test-id*="response"]', '.response', '.model-response']);
+        const allResponses = __collectDeep(['model-response', '[data-test-id*="response"]', '.response', '.model-response']).nodes;
         const lastResponse = allResponses.length > 0 ? allResponses[allResponses.length - 1] : null;
 
         const markdownElements = lastResponse ? Array.from(lastResponse.querySelectorAll('.markdown')) : [];
@@ -3848,45 +3399,23 @@ export async function takeCdpSnapshot(
         dialogs: string[];
       }>(`
         (() => {
-          const collectDeep = (selectorList) => {
-            const results = [];
-            const seen = new Set();
-            const visit = (root) => {
-              if (!root) return;
-              for (const sel of selectorList) {
-                try {
-                  root.querySelectorAll?.(sel)?.forEach(el => {
-                    if (!seen.has(el)) {
-                      seen.add(el);
-                      results.push(el);
-                    }
-                  });
-                } catch {}
-              }
-              const elements = root.querySelectorAll ? Array.from(root.querySelectorAll('*')) : [];
-              for (const el of elements) {
-                if (el.shadowRoot) visit(el.shadowRoot);
-              }
-            };
-            visit(document);
-            return results;
-          };
+          ${DOM_UTILS_CODE}
 
           // 入力欄
-          const textbox = collectDeep(['[role="textbox"]', 'div[contenteditable="true"]', 'textarea'])[0];
+          const textbox = __collectDeep(['[role="textbox"]', 'div[contenteditable="true"]', 'textarea']).nodes[0];
           const inputFound = !!textbox;
           const inputValue = textbox ?
             (textbox.isContentEditable ? textbox.innerText : (textbox.value || textbox.textContent || '')) : '';
 
           // 送信ボタン
-          const buttons = collectDeep(['button[aria-label*="Send"]', 'button[aria-label*="送信"]', 'button.send-button', '[data-test-id*="send"]']);
+          const buttons = __collectDeep(['button[aria-label*="Send"]', 'button[aria-label*="送信"]', 'button.send-button', '[data-test-id*="send"]']).nodes;
           const sendButtonFound = buttons.length > 0;
 
           // メッセージカウント
           const userSelectors = ['user-query', '.user-query', '[data-message-author-role="user"]', 'message[author="user"]'];
-          const userMsgs = collectDeep(userSelectors);
+          const userMsgs = __collectDeep(userSelectors).nodes;
           const assistantSelectors = ['model-response', '.model-response', '[data-message-author-role="assistant"]', 'message[author="model"]'];
-          const assistantMsgs = collectDeep(assistantSelectors);
+          const assistantMsgs = __collectDeep(assistantSelectors).nodes;
 
           // ログインプロンプト
           const hasLoginPrompt = document.body?.innerText?.includes('Sign in') ||
@@ -4042,29 +3571,9 @@ export async function getPageDom(
         }>;
       }>(`
         (() => {
-          const collectDeep = (sel) => {
-            const results = [];
-            const seen = new Set();
-            const visit = (root) => {
-              if (!root) return;
-              try {
-                root.querySelectorAll?.(sel)?.forEach(el => {
-                  if (!seen.has(el)) {
-                    seen.add(el);
-                    results.push(el);
-                  }
-                });
-              } catch {}
-              const elements = root.querySelectorAll ? Array.from(root.querySelectorAll('*')) : [];
-              for (const el of elements) {
-                if (el.shadowRoot) visit(el.shadowRoot);
-              }
-            };
-            visit(document);
-            return results;
-          };
+          ${DOM_UTILS_CODE}
 
-          const elements = collectDeep(${JSON.stringify(selector)});
+          const elements = __collectDeep([${JSON.stringify(selector)}]).nodes;
           return {
             count: elements.length,
             elements: elements.slice(0, 10).map(el => {
@@ -4103,32 +3612,12 @@ export async function getPageDom(
       attributes: Record<string, string>;
     }>>(`
       (() => {
-        const collectDeep = (sel) => {
-          const results = [];
-          const seen = new Set();
-          const visit = (root) => {
-            if (!root) return;
-            try {
-              root.querySelectorAll?.(sel)?.forEach(el => {
-                if (!seen.has(el)) {
-                  seen.add(el);
-                  results.push(el);
-                }
-              });
-            } catch {}
-            const elements = root.querySelectorAll ? Array.from(root.querySelectorAll('*')) : [];
-            for (const el of elements) {
-              if (el.shadowRoot) visit(el.shadowRoot);
-            }
-          };
-          visit(document);
-          return results;
-        };
+        ${DOM_UTILS_CODE}
 
         const messages = [];
 
         // User messages
-        const userEls = collectDeep(${JSON.stringify(messageSelectors.user)});
+        const userEls = __collectDeep([${JSON.stringify(messageSelectors.user)}]).nodes;
         for (const el of userEls) {
           const attrs = {};
           for (const attr of el.attributes) {
@@ -4142,7 +3631,7 @@ export async function getPageDom(
         }
 
         // Assistant messages
-        const assistantEls = collectDeep(${JSON.stringify(messageSelectors.assistant)});
+        const assistantEls = __collectDeep([${JSON.stringify(messageSelectors.assistant)}]).nodes;
         for (const el of assistantEls) {
           const attrs = {};
           for (const attr of el.attributes) {
