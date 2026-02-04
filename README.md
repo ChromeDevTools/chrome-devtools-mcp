@@ -15,7 +15,7 @@ Chrome DevTools for reliable automation, in-depth debugging, and performance ana
   DevTools](https://github.com/ChromeDevTools/devtools-frontend) to record
   traces and extract actionable performance insights.
 - **Advanced browser debugging**: Analyze network requests, take screenshots and
-  check the browser console.
+  check browser console messages (with source-mapped stack traces).
 - **Reliable automation**. Uses
   [puppeteer](https://github.com/puppeteer/puppeteer) to automate actions in
   Chrome and automatically wait for action results.
