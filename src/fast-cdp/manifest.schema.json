@@ -1,0 +1,54 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Chrome AI Bridge Driver Manifest",
+  "description": "Schema for the driver manifest file",
+  "type": "object",
+  "required": ["version", "drivers"],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "JSON Schema reference"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Manifest version (semver)"
+    },
+    "description": {
+      "type": "string",
+      "description": "Human-readable description of the manifest"
+    },
+    "drivers": {
+      "type": "array",
+      "description": "List of driver configurations",
+      "items": {
+        "type": "object",
+        "required": ["name", "match"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]*$",
+            "description": "Driver identifier (lowercase, alphanumeric with hyphens)"
+          },
+          "match": {
+            "type": "array",
+            "description": "URL patterns that this driver handles (glob syntax)",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1
+          },
+          "description": {
+            "type": "string",
+            "description": "Human-readable description of the driver"
+          },
+          "enabled": {
+            "type": "boolean",
+            "default": true,
+            "description": "Whether this driver is enabled"
+          }
+        }
+      }
+    }
+  }
+}
