@@ -82,7 +82,7 @@ describe('browser', () => {
       userDataDir: folderPath,
       executablePath: executablePath(),
       devtools: false,
-      chromeArgs: ['--remote-debugging-port=0'],
+      braveArgs: ['--remote-debugging-port=0'],
     });
     try {
       const connectedBrowser = await ensureBrowserConnected({

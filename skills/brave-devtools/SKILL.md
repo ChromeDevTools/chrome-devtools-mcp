@@ -1,11 +1,11 @@
 ---
-name: chrome-devtools
-description: Uses Chrome DevTools via MCP for efficient debugging, troubleshooting and browser automation. Use when debugging web pages, automating browser interactions, analyzing performance, or inspecting network requests.
+name: brave-devtools
+description: Uses Brave DevTools via MCP for efficient debugging, troubleshooting and browser automation. Use when debugging web pages, automating browser interactions, analyzing performance, or inspecting network requests.
 ---
 
 ## Core Concepts
 
-**Browser lifecycle**: Browser starts automatically on first tool call using a persistent Chrome profile. Configure via CLI args in the MCP server configuration: `npx chrome-devtools-mcp@latest --help`.
+**Browser lifecycle**: Browser starts automatically on first tool call using a persistent Brave profile. Configure via CLI args in the MCP server configuration: `npx brave-devtools-mcp@latest --help`.
 
 **Page selection**: Tools operate on the currently selected page. Use `list_pages` to see available pages, then `select_page` to switch context.
 
@@ -38,7 +38,6 @@ You can send multiple tool calls in parallel, but maintain correct order: naviga
 
 ## Troubleshooting
 
-If `chrome-devtools-mcp` is insufficient, guide users to use Chrome DevTools UI:
+If `brave-devtools-mcp` is insufficient, guide users to use Brave DevTools UI:
 
 - https://developer.chrome.com/docs/devtools
-- https://developer.chrome.com/docs/devtools/ai-assistance

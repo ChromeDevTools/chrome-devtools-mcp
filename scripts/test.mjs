@@ -67,7 +67,6 @@ async function runTests(attempt) {
       stdio: 'inherit',
       env: {
         ...process.env,
-        CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: true,
       },
     });
 

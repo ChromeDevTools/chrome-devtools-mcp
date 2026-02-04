@@ -1,16 +1,16 @@
 {
-  "name": "chrome-devtools-plugins",
+  "name": "brave-devtools-plugins",
   "version": "1.0.0",
-  "description": "Bundled plugins for actuating and debugging the Chrome browser.",
+  "description": "Bundled plugins for actuating and debugging the Brave browser.",
   "owner": {
-    "name": "Chrome DevTools Team",
-    "email": "devtools-dev@chromium.org"
+    "name": "381sm016",
+    "email": ""
   },
   "plugins": [
     {
-      "name": "chrome-devtools-mcp",
+      "name": "brave-devtools-mcp",
       "source": "./",
-      "description": "Reliable automation, in-depth debugging, and performance analysis in Chrome using Chrome DevTools and Puppeteer"
+      "description": "Reliable automation, in-depth debugging, and performance analysis in Brave using DevTools and Puppeteer"
     }
   ]
 }

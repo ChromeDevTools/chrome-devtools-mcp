@@ -675,7 +675,7 @@ export class McpContext implements Context {
   ): Promise<{filename: string}> {
     try {
       const dir = await fs.mkdtemp(
-        path.join(os.tmpdir(), 'chrome-devtools-mcp-'),
+        path.join(os.tmpdir(), 'brave-devtools-mcp-'),
       );
 
       const filename = path.join(

@@ -1,7 +1,7 @@
 {
-  "name": "chrome-devtools-mcp",
+  "name": "brave-devtools-mcp",
   "version": "0.15.1",
-  "description": "MCP server for Chrome DevTools",
+  "description": "MCP server for Brave DevTools",
   "type": "module",
   "bin": "./build/src/index.js",
   "main": "index.js",
@@ -22,7 +22,7 @@
     "test:update-snapshots": "npm run build && node scripts/test.mjs --test-update-snapshots",
     "prepare": "node --experimental-strip-types scripts/prepare.ts",
     "verify-server-json-version": "node --experimental-strip-types scripts/verify-server-json-version.ts",
-    "eval": "npm run build && CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS=true node --experimental-strip-types scripts/eval_gemini.ts",
+    "eval": "npm run build && node --experimental-strip-types scripts/eval_gemini.ts",
     "count-tokens": "node --experimental-strip-types scripts/count_tokens.ts"
   },
   "files": [
@@ -31,14 +31,14 @@
     "LICENSE",
     "!*.tsbuildinfo"
   ],
-  "repository": "ChromeDevTools/chrome-devtools-mcp",
-  "author": "Google LLC",
+  "repository": "381sm016/brave-devtools-mcp",
+  "author": "381sm016",
   "license": "Apache-2.0",
   "bugs": {
-    "url": "https://github.com/ChromeDevTools/chrome-devtools-mcp/issues"
+    "url": "https://github.com/381sm016/brave-devtools-mcp/issues"
   },
-  "homepage": "https://github.com/ChromeDevTools/chrome-devtools-mcp#readme",
-  "mcpName": "io.github.ChromeDevTools/chrome-devtools-mcp",
+  "homepage": "https://github.com/381sm016/brave-devtools-mcp#readme",
+  "mcpName": "io.github.381sm016/brave-devtools-mcp",
   "devDependencies": {
     "@eslint/js": "^9.35.0",
     "@google/genai": "^1.37.0",

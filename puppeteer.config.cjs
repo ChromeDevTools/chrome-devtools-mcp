@@ -9,7 +9,7 @@
  */
 module.exports = {
   chrome: {
-    skipDownload: false,
+    skipDownload: true,
   },
   ['chrome-headless-shell']: {
     skipDownload: true,
