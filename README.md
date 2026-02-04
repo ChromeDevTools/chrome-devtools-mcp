@@ -3,11 +3,23 @@
 [![npm](https://img.shields.io/npm/v/chrome-ai-bridge.svg)](https://npmjs.org/package/chrome-ai-bridge)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 
-> Bridge between AI coding assistants and ChatGPT/Gemini via Chrome Extension
+> **⚠️ Requires Chrome Extension** — This MCP server controls ChatGPT/Gemini tabs via a browser extension.
 
-MCP server that enables AI assistants to consult ChatGPT and Gemini through a Chrome extension.
+Let your AI assistant (Claude Code, Cursor, etc.) consult ChatGPT and Gemini for second opinions.
 
-**Compatible with:** Claude Code, Cursor, VS Code Copilot, Cline, and other MCP clients
+---
+
+## How it works
+
+```
+Your AI Assistant → MCP Server → Chrome Extension → ChatGPT/Gemini tabs
+```
+
+1. **Chrome Extension** (you install) bridges MCP server and browser
+2. **MCP Server** (npm package) receives requests from your AI assistant
+3. **Extension** controls ChatGPT/Gemini tabs via CDP (Chrome DevTools Protocol)
+
+**Why an extension?** ChatGPT and Gemini don't have public APIs. The extension automates the web UI while you stay logged in.
 
 ---
 
@@ -23,18 +35,11 @@ chrome-ai-bridge is a [Model Context Protocol](https://modelcontextprotocol.io/)
 
 ---
 
-## Prerequisites
-
-> **⚠️ Chrome Extension Required**
->
-> This MCP server **requires** a Chrome extension to communicate with ChatGPT/Gemini.
-> The extension bridges the MCP server and your browser tabs via WebSocket + CDP.
-
----
-
 ## Quick Start
 
-### 1. Install the Chrome Extension (Required)
+> **⚠️ Both steps are required** — The extension and MCP server work together.
+
+### Step 1: Install Chrome Extension
 
 Build and install the extension from this repository:
 
@@ -56,7 +61,7 @@ Then load the extension in Chrome:
 
 You should see "Chrome AI Bridge" appear in your extensions list.
 
-### 2. Configure your MCP client
+### Step 2: Configure your MCP client
 
 **For Claude Code** (`~/.claude.json`):
 
@@ -71,13 +76,13 @@ You should see "Chrome AI Bridge" appear in your extensions list.
 }
 ```
 
-### 3. Connect the Extension
+### Step 3: Connect the Extension
 
 1. Open ChatGPT (https://chatgpt.com) or Gemini (https://gemini.google.com) in Chrome
 2. Log in to both services
 3. The extension will automatically connect when the MCP server starts
 
-### 4. Verify it works
+### Step 4: Verify it works
 
 Restart your AI client and try: `"Ask ChatGPT how to implement OAuth in Node.js"`
 
