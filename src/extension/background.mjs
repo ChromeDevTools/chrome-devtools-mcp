@@ -212,12 +212,13 @@ class RelayConnection {
       const {sessionId, method, params} = message.params;
       const debuggerSession = {...this._debuggee, sessionId};
 
-      // デバッグ: CDPコマンドのログ（Runtime.evaluateのみ詳細）
+      logDebug('cdp', `Sending ${method}`, {
+        tabId: this._debuggee.tabId,
+        sessionId,
+      });
       if (method === 'Runtime.evaluate') {
-        logDebug('cdp', `Sending ${method}`, {
-          tabId: this._debuggee.tabId,
-          sessionId,
-          expression: params?.expression?.slice(0, 100),
+        logDebug('cdp', `Runtime.evaluate expression`, {
+          expression: params?.expression?.slice(0, 120),
         });
       }
 
@@ -227,9 +228,11 @@ class RelayConnection {
         params,
       );
 
-      // デバッグ: Runtime.evaluateの結果
+      logDebug('cdp', `Result of ${method}`, {
+        hasResult: result !== undefined,
+      });
       if (method === 'Runtime.evaluate') {
-        logDebug('cdp', `Result of ${method}`, {
+        logDebug('cdp', 'Runtime.evaluate value', {
           value: result?.result?.value,
           type: result?.result?.type,
           subtype: result?.result?.subtype,
@@ -252,6 +255,7 @@ class TabShareExtension {
   constructor() {
     this._activeConnections = new Map();
     this._pendingTabSelection = new Map();
+    this._tabSessionOwners = new Map();
     chrome.tabs.onRemoved.addListener(this._onTabRemoved.bind(this));
     chrome.tabs.onActivated.addListener(this._onTabActivated.bind(this));
     chrome.tabs.onUpdated.addListener(this._onTabUpdated.bind(this));
@@ -261,7 +265,11 @@ class TabShareExtension {
   _onMessage(message, sender, sendResponse) {
     switch (message.type) {
       case 'connectToRelay':
-        this._connectToRelay(sender.tab?.id, message.mcpRelayUrl).then(
+        this._connectToRelay(
+          sender.tab?.id,
+          message.mcpRelayUrl,
+          message.sessionId,
+        ).then(
           () => sendResponse({success: true}),
           error => sendResponse({success: false, error: error.message}),
         );
@@ -285,6 +293,8 @@ class TabShareExtension {
           message.mcpRelayUrl,
           message.tabUrl,
           message.newTab,
+          message.sessionId,
+          Boolean(message.allowTabTakeover),
         ).then(
           () => sendResponse({success: true}),
           error => sendResponse({success: false, error: error.message}),
@@ -296,22 +306,53 @@ class TabShareExtension {
           error => sendResponse({success: false, error: error.message}),
         );
         return true;
+      case 'getDebugLogs':
+        this._getDebugLogs(message.filter, message.limit || 100).then(
+          payload => sendResponse({success: true, ...payload}),
+          error => sendResponse({success: false, error: error.message}),
+        );
+        return true;
+      case 'clearDebugLogs':
+        this._clearDebugLogs().then(
+          () => sendResponse({success: true}),
+          error => sendResponse({success: false, error: error.message}),
+        );
+        return true;
     }
     return false;
   }
 
-  async _connectToRelay(selectorTabId, mcpRelayUrl) {
+  _getPendingKey(selectorTabId, sessionId) {
+    if (sessionId) {
+      return `session:${sessionId}`;
+    }
+    return `selector:${selectorTabId}`;
+  }
+
+  async _connectToRelay(selectorTabId, mcpRelayUrl, sessionId) {
     if (!mcpRelayUrl) {
       logError('relay', 'Missing relay URL');
       throw new Error('Missing relay URL');
     }
-    logInfo('relay', 'Connecting to relay', {mcpRelayUrl, selectorTabId});
+    const pendingKey = this._getPendingKey(selectorTabId, sessionId);
+    const existingPending = this._pendingTabSelection.get(pendingKey);
+    if (existingPending?.connection) {
+      logInfo('relay', 'Replacing stale pending connection', {pendingKey, sessionId, selectorTabId});
+      existingPending.connection.close('Pending connection replaced');
+      this._pendingTabSelection.delete(pendingKey);
+    }
+    logInfo('relay', 'Connecting to relay', {mcpRelayUrl, selectorTabId, sessionId, pendingKey});
 
     const openSocket = async () => {
       const socket = new WebSocket(mcpRelayUrl);
       await new Promise((resolve, reject) => {
         const timeoutId = setTimeout(() => {
-          reject(new Error('Connection timeout'));
+          try {
+            socket.close();
+          } catch {
+            // ignore
+          }
+          reject(new Error('WS_OPEN_TIMEOUT: Connection timeout'));
         }, 5000);
         socket.onopen = () => {
           clearTimeout(timeoutId);
@@ -319,7 +360,12 @@ class TabShareExtension {
         };
         socket.onerror = () => {
           clearTimeout(timeoutId);
-          reject(new Error('WebSocket error'));
+          try {
+            socket.close();
+          } catch {
+            // ignore
+          }
+          reject(new Error('WS_OPEN_ERROR: WebSocket error'));
         };
       });
       return socket;
@@ -344,11 +390,11 @@ class TabShareExtension {
     }
     const connection = new RelayConnection(socket);
     connection.onclose = () => {
-      logInfo('relay', 'Connection closed', {selectorTabId});
-      this._pendingTabSelection.delete(selectorTabId);
+      logInfo('relay', 'Connection closed', {selectorTabId, sessionId, pendingKey});
+      this._pendingTabSelection.delete(pendingKey);
     };
-    this._pendingTabSelection.set(selectorTabId, {connection});
-    logInfo('relay', 'Relay connection established', {selectorTabId});
+    this._pendingTabSelection.set(pendingKey, {connection, sessionId, selectorTabId});
+    logInfo('relay', 'Relay connection established', {selectorTabId, sessionId, pendingKey});
   }
 
   async _connectTab(
@@ -358,8 +404,19 @@ class TabShareExtension {
     mcpRelayUrl,
     tabUrl,
     newTab,
+    sessionId,
+    allowTabTakeover = false,
   ) {
-    logInfo('connect', '_connectTab called', {selectorTabId, tabId, tabUrl, newTab});
+    const pendingKey = this._getPendingKey(selectorTabId, sessionId);
+    logInfo('connect', '_connectTab called', {
+      selectorTabId,
+      tabId,
+      tabUrl,
+      newTab,
+      sessionId,
+      allowTabTakeover,
+      pendingKey,
+    });
 
     if (!tabId && tabUrl) {
       logDebug('connect', 'Resolving tabId from URL', {tabUrl, newTab});
@@ -370,37 +427,70 @@ class TabShareExtension {
       throw new Error('No tab selected');
     }
 
+    const ownerSessionId = this._tabSessionOwners.get(tabId);
+    if (
+      ownerSessionId &&
+      sessionId &&
+      ownerSessionId !== sessionId &&
+      !allowTabTakeover
+    ) {
+      logWarn('connect', 'Tab already owned by another session', {
+        tabId,
+        ownerSessionId,
+        requestedSessionId: sessionId,
+      });
+      throw new Error(
+        `TAB_LOCKED_BY_OTHER_SESSION: tabId=${tabId} ownerSessionId=${ownerSessionId}`,
+      );
+    }
+
     const existingConnection = this._activeConnections.get(tabId);
     if (existingConnection) {
-      logInfo('connect', 'Replacing existing connection', {tabId});
+      logInfo('connect', 'Replacing existing connection', {tabId, sessionId});
       existingConnection.close('Connection replaced for the same tab');
       this._activeConnections.delete(tabId);
+      this._tabSessionOwners.delete(tabId);
       await this._setConnectedTab(tabId, false);
     }
 
-    const pending = this._pendingTabSelection.get(selectorTabId);
+    const pending = this._pendingTabSelection.get(pendingKey);
     if (!pending) {
-      logDebug('connect', 'No pending connection, creating relay', {selectorTabId, mcpRelayUrl});
+      logDebug('connect', 'No pending connection, creating relay', {selectorTabId, sessionId, mcpRelayUrl});
       // If no pending connection, create one now.
-      await this._connectToRelay(selectorTabId, mcpRelayUrl);
+      await this._connectToRelay(selectorTabId, mcpRelayUrl, sessionId);
     }
-    const newPending = this._pendingTabSelection.get(selectorTabId);
+    const newPending = this._pendingTabSelection.get(pendingKey);
     if (!newPending) {
       logError('connect', 'No active MCP relay connection');
       throw new Error('No active MCP relay connection');
     }
 
-    this._pendingTabSelection.delete(selectorTabId);
+    if (
+      sessionId &&
+      newPending.sessionId &&
+      newPending.sessionId !== sessionId
+    ) {
+      throw new Error(
+        `SESSION_MISMATCH_RELAY: expected=${sessionId} actual=${newPending.sessionId}`,
+      );
+    }
+
+    this._pendingTabSelection.delete(pendingKey);
     const connection = newPending.connection;
     connection.setTabId(tabId);
     connection.sendReady(tabId);
     connection.onclose = () => {
-      logInfo('connect', 'Tab connection closed', {tabId});
+      logInfo('connect', 'Tab connection closed', {tabId, sessionId});
       this._activeConnections.delete(tabId);
+      const owner = this._tabSessionOwners.get(tabId);
+      if (!owner || owner === sessionId) {
+        this._tabSessionOwners.delete(tabId);
+      }
       void this._setConnectedTab(tabId, false);
     };
     this._activeConnections.set(tabId, connection);
-    logInfo('connect', 'Tab connected successfully', {tabId, windowId});
+    this._tabSessionOwners.set(tabId, sessionId || `selector:${selectorTabId}`);
+    logInfo('connect', 'Tab connected successfully', {tabId, windowId, sessionId});
     // バッジのみ設定（フォーカスはMCPサーバー側が必要に応じて制御）
     await this._setConnectedTab(tabId, true);
   }
@@ -478,6 +568,45 @@ class TabShareExtension {
     );
   }
 
+  async _getDebugLogs(filter, limit) {
+    const result = await chrome.storage.local.get('logs');
+    const rawLogs = Array.isArray(result.logs) ? result.logs : [];
+    const normalized = rawLogs.map(logEntry => ({
+      ts: logEntry.timestamp || logEntry.ts || new Date().toISOString(),
+      category: logEntry.category || 'unknown',
+      message: logEntry.message || '',
+      data: logEntry.data ?? null,
+      level: logEntry.level || 'INFO',
+    }));
+
+    const filtered = filter
+      ? normalized.filter(logEntry => logEntry.category === filter)
+      : normalized;
+
+    const byCategory = {};
+    for (const logEntry of normalized) {
+      byCategory[logEntry.category] = (byCategory[logEntry.category] || 0) + 1;
+    }
+
+    return {
+      logs: filtered.slice(-limit),
+      stats: {
+        total: normalized.length,
+        byCategory,
+      },
+      state: {
+        activeConnections: Array.from(this._activeConnections.keys()),
+        pendingTabSelection: Array.from(this._pendingTabSelection.keys()),
+        tabSessionOwners: Object.fromEntries(this._tabSessionOwners.entries()),
+      },
+    };
+  }
+
+  async _clearDebugLogs() {
+    await chrome.storage.local.set({logs: []});
+    logInfo('debug', 'Debug logs cleared');
+  }
+
   async _setConnectedTab(tabId, connected) {
     if (!tabId) return;
     try {
@@ -500,38 +629,45 @@ class TabShareExtension {
       const connection = this._activeConnections.get(tabId);
       if (connection) connection.close('User disconnected');
       this._activeConnections.delete(tabId);
+      this._tabSessionOwners.delete(tabId);
       await this._setConnectedTab(tabId, false);
       return;
     }
     for (const [connectedTabId, connection] of this._activeConnections) {
       connection.close('User disconnected');
       await this._setConnectedTab(connectedTabId, false);
+      this._tabSessionOwners.delete(connectedTabId);
     }
     this._activeConnections.clear();
+    this._pendingTabSelection.clear();
+    this._tabSessionOwners.clear();
   }
 
   _onTabRemoved(tabId) {
-    const pending = this._pendingTabSelection.get(tabId);
-    if (pending) {
-      this._pendingTabSelection.delete(tabId);
-      pending.connection.close('Browser tab closed');
-      return;
+    for (const [pendingKey, pending] of this._pendingTabSelection) {
+      if (pending.selectorTabId === tabId) {
+        this._pendingTabSelection.delete(pendingKey);
+        pending.connection.close('Browser tab closed');
+      }
     }
     const active = this._activeConnections.get(tabId);
-    if (!active) return;
-    active.close('Browser tab closed');
-    this._activeConnections.delete(tabId);
+    if (active) {
+      active.close('Browser tab closed');
+      this._activeConnections.delete(tabId);
+    }
+    this._tabSessionOwners.delete(tabId);
   }
 
   _onTabActivated(activeInfo) {
-    for (const [tabId, pending] of this._pendingTabSelection) {
-      if (tabId === activeInfo.tabId) continue;
+    for (const [pendingKey, pending] of this._pendingTabSelection) {
+      if (typeof pending.selectorTabId !== 'number') continue;
+      if (pending.selectorTabId === activeInfo.tabId) continue;
       if (!pending.timerId) {
         pending.timerId = setTimeout(() => {
-          const existed = this._pendingTabSelection.delete(tabId);
+          const existed = this._pendingTabSelection.delete(pendingKey);
           if (existed) {
             pending.connection.close('Tab inactive for 30 seconds');
-            chrome.tabs.sendMessage(tabId, {type: 'connectionTimeout'});
+            chrome.tabs.sendMessage(pending.selectorTabId, {type: 'connectionTimeout'});
           }
         }, 30000);
       }
@@ -566,11 +702,20 @@ const COOLDOWN_MS = 5000;
 let userTriggeredDiscovery = false;
 
 
-function buildConnectUrl(wsUrl, tabUrl, newTab, autoMode = false) {
+function buildConnectUrl(
+  wsUrl,
+  tabUrl,
+  newTab,
+  autoMode = false,
+  sessionId,
+  allowTabTakeover = false,
+) {
   const params = new URLSearchParams({mcpRelayUrl: wsUrl});
   if (tabUrl) params.set('tabUrl', tabUrl);
   if (newTab) params.set('newTab', 'true');
   if (autoMode) params.set('auto', 'true');
+  if (sessionId) params.set('sessionId', sessionId);
+  if (allowTabTakeover) params.set('allowTabTakeover', 'true');
   return chrome.runtime.getURL(`ui/connect.html?${params.toString()}`);
 }
 
@@ -594,13 +739,27 @@ async function getExistingConnectTab() {
   return tab;
 }
 
-async function ensureConnectUiTab(wsUrl, tabUrl, newTab, autoMode = false) {
+async function ensureConnectUiTab(
+  wsUrl,
+  tabUrl,
+  newTab,
+  autoMode = false,
+  sessionId,
+  allowTabTakeover = false,
+) {
   const existing = await getExistingConnectTab();
   if (existing?.id) {
     await focusTab(existing.id, existing.windowId);
     return existing;
   }
-  const url = buildConnectUrl(wsUrl, tabUrl, newTab, autoMode);
+  const url = buildConnectUrl(
+    wsUrl,
+    tabUrl,
+    newTab,
+    autoMode,
+    sessionId,
+    allowTabTakeover,
+  );
   const created = await chrome.tabs.create({url, active: true});
   if (created?.id) {
     await focusTab(created.id, created.windowId);
@@ -670,12 +829,18 @@ async function autoConnectRelay(best) {
 
   const targetTab = await chrome.tabs.get(targetTabId).catch(() => null);
 
-  // selectorId として wsUrl ベースのユニークIDを使用（connect.html 不要）
+  const sessionId = best?.data?.sessionId || null;
+  // selectorId は後方互換のため保持。sessionId がある場合は session 軸を優先する。
   const selectorId = `auto:${best.data.wsUrl}`;
-  logInfo('auto-connect', 'Attempting auto-connect', {selectorId, targetTabId, wsUrl: best.data.wsUrl});
+  logInfo('auto-connect', 'Attempting auto-connect', {
+    selectorId,
+    sessionId,
+    targetTabId,
+    wsUrl: best.data.wsUrl,
+  });
 
   try {
-    await tabShareExtension._connectToRelay(selectorId, best.data.wsUrl);
+    await tabShareExtension._connectToRelay(selectorId, best.data.wsUrl, sessionId);
     await tabShareExtension._connectTab(
       selectorId,
       targetTabId,
@@ -683,6 +848,8 @@ async function autoConnectRelay(best) {
       best.data.wsUrl,
       tabUrl,
       Boolean(best.data.newTab),
+      sessionId,
+      Boolean(best.data.allowTabTakeover),
     );
     logInfo('auto-connect', 'Auto-connect successful', {targetTabId, tabUrl});
   } catch (err) {
@@ -768,6 +935,8 @@ async function autoOpenConnectUi() {
           relay.data.tabUrl || undefined,
           Boolean(relay.data.newTab),
           false,
+          relay.data.sessionId || undefined,
+          Boolean(relay.data.allowTabTakeover),
         );
         userTriggeredDiscovery = false;  // Reset after opening
       } else {
@@ -806,12 +975,13 @@ chrome.alarms.onAlarm.addListener((alarm) => {
       logDebug('keepalive', 'Alarm triggered', { activeCount, pendingCount });
     }
 
-    // Discovery pollingが停止していたら再開
-    // Service Workerがスリープから復帰した場合に対応
-    if (discoveryIntervalId === null) {
-      logInfo('keepalive', 'Discovery was stopped, restarting...');
-      scheduleDiscovery();
+    // Service Worker復帰時: discoveryIntervalIdは値を保持するが
+    // setIntervalは停止している。intervalをリセットして再スケジュール
+    if (discoveryIntervalId !== null) {
+      logInfo('keepalive', 'Resetting discovery interval after SW wake');
+      discoveryIntervalId = null;  // クリアして再スケジュール可能に
     }
+    scheduleDiscovery();
   }
 });
 

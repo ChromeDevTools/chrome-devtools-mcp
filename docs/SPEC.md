@@ -1773,3 +1773,194 @@ npm run test:bg -- --long --min-textlen=2000 --duration=60
 # Combine options
 npm run test:bg -- --long --delay=10 --min-textlen=1000 --duration=90
 ```
+
+---
+
+## 16. FAQ - Frequently Asked Questions
+
+### 16.1 Background Tab Issues
+
+#### Q: Why does my response come back empty when I switch tabs during generation?
+
+**A**: Chrome throttles DOM updates in background tabs. The AI generation continues, but the DOM doesn't reflect the new content until the tab is brought to foreground.
+
+**Current behavior**:
+- Generation continues in background (server-side)
+- DOM updates are paused or batched
+- Content appears instantly when tab regains focus
+
+**How chrome-ai-bridge handles this**:
+- `Page.bringToFront` is called before text extraction
+- This forces Chrome to render all accumulated content
+- No user action required - handled automatically
+
+**If you still see empty responses**:
+1. Check if the tab was closed during generation
+2. Verify extension is running (`chrome://extensions`)
+3. Run `npm run cdp:chatgpt` or `npm run cdp:gemini` to debug
+
+---
+
+### 16.2 Selector Stability
+
+#### Q: Which selectors break most often?
+
+**A**: UI updates from ChatGPT/Gemini can break selectors. Here's a stability ranking:
+
+| Stability | ChatGPT Selectors | Notes |
+|-----------|-------------------|-------|
+| High | `[data-message-author-role]` | Semantic, rarely changes |
+| High | `textarea#prompt-textarea` | ID-based, stable |
+| Medium | `.markdown`, `.prose` | Class-based, may change |
+| Medium | `button[data-testid="send-button"]` | Test ID, semi-stable |
+| Low | `button[aria-label*="送信"]` | Language-dependent |
+
+| Stability | Gemini Selectors | Notes |
+|-----------|------------------|-------|
+| High | `img[alt="thumb_up"]` | Image alt, language-independent |
+| High | `img[alt="mic"]` | Image alt, language-independent |
+| High | `[role="textbox"]` | ARIA role, stable |
+| Medium | `model-response` | Custom element, may change |
+| Low | Text-based selectors | Language-dependent |
+
+**Best practices**:
+1. Prefer `data-*` attributes and ARIA roles
+2. Use `img[alt="..."]` for Gemini (language-independent)
+3. Avoid text content matching when possible
+4. Check SPEC.md Section 3.2 and 4.2 for current selectors
+
+---
+
+### 16.3 Diagnostic Procedures
+
+#### Q: How do I diagnose connection issues?
+
+**Step 1: Check extension status**
+```bash
+# Verify Discovery Server is running
+curl http://127.0.0.1:8766/mcp-discovery
+```
+
+Expected response:
+```json
+{"wsUrl": "ws://127.0.0.1:XXXXX", ...}
+```
+
+**Step 2: Get CDP snapshot**
+```bash
+npm run cdp:chatgpt  # or npm run cdp:gemini
+```
+
+This saves a snapshot to `.local/chrome-ai-bridge/debug/`
+
+**Step 3: Check session state**
+```bash
+cat .local/chrome-ai-bridge/sessions.json
+```
+
+Verify `tabId` exists and matches an open tab.
+
+**Step 4: Run smoke test**
+```bash
+npm run test:smoke
+```
+
+#### Q: How do I diagnose response extraction issues?
+
+**Step 1: Enable debug mode**
+```typescript
+// In MCP tool call
+{ "question": "...", "debug": true }
+```
+
+**Step 2: Check debug output**
+Look for:
+- `debug_assistantMsgsCount` / `debug_modelResponseCount`
+- `debug_lastAssistantInnerTextLen`
+- `debug_markdownsInLast`
+
+**Step 3: Manual DOM inspection**
+1. Open DevTools in the ChatGPT/Gemini tab
+2. Run: `document.querySelectorAll('[data-message-author-role="assistant"]')`
+3. Check if elements exist and have content
+
+---
+
+### 16.4 Common Error Messages
+
+| Error | Cause | Solution |
+|-------|-------|----------|
+| `Extension not connected` | Extension not running or port blocked | Check `chrome://extensions`, restart Chrome |
+| `Timed out waiting for response` | Response took > 8 minutes | Increase timeout or simplify question |
+| `GEMINI_STUCK_*` | Gemini session hung | Auto-retry (up to 2x), or clear session |
+| `Input verification failed` | Text not entered correctly | Auto-fallback to `Input.insertText` |
+| `Login required` | Session expired | Log in manually via browser |
+
+---
+
+### 16.5 Performance Tips
+
+#### Q: How can I speed up responses?
+
+1. **Reuse existing tabs**: Sessions are stored per project. Reusing tabs skips navigation.
+
+2. **Use parallel queries wisely**: `ask_chatgpt_gemini_web` runs both in parallel, but doubles resource usage.
+
+3. **Keep questions focused**: Shorter questions = faster responses = less chance of timeout.
+
+4. **Check extension version**: Run `npm run cdp:chatgpt` and look for "Extension version" in output. Update if needed.
+
+---
+
+## 17. Selector Change Log
+
+Track selector changes for debugging regressions.
+
+### 17.1 ChatGPT
+
+| Date | Selector | Change | Notes |
+|------|----------|--------|-------|
+| 2026-02 | `.result-thinking` | Deprecated | No longer used in Thinking mode |
+| 2026-02 | `article[data-turn]` | Added | New article structure |
+| 2026-01 | `.ProseMirror` | Added | contenteditable input variant |
+
+### 17.2 Gemini
+
+| Date | Selector | Change | Notes |
+|------|----------|--------|-------|
+| 2026-01 | `img[alt="thumb_up"]` | Adopted | Language-independent feedback detection |
+| 2026-01 | `img[alt="mic"]` | Adopted | Language-independent mic button |
+
+---
+
+## 18. Test Scenario Tags Reference
+
+Quick reference for test filtering:
+
+| Tag | Description | Command |
+|-----|-------------|---------|
+| `smoke` | Basic operation (new chat, parallel) | `npm run test:suite -- --tag=smoke` |
+| `regression` | Past issue prevention | `npm run test:suite -- --tag=regression` |
+| `chatgpt` | ChatGPT only | `npm run test:suite -- --tag=chatgpt` |
+| `gemini` | Gemini only | `npm run test:suite -- --tag=gemini` |
+| `thinking` | Thinking mode | `npm run test:suite -- --tag=thinking` |
+| `parallel` | Both AI parallel | `npm run test:suite -- --tag=parallel` |
+| `code` | Code generation | `npm run test:suite -- --tag=code` |
+| `sequential` | Consecutive prompts | `npm run test:suite -- --tag=sequential` |
+| `extraction` | Text extraction | `npm run test:suite -- --tag=extraction` |
+
+**Recommended test sequences**:
+
+```bash
+# Before release
+npm run test:smoke && npm run test:regression
+
+# After selector changes
+npm run test:suite -- --tag=extraction
+
+# After timeout changes
+npm run test:suite -- --tag=thinking
+
+# Full validation
+npm run test:suite
+```

@@ -1,5 +1,6 @@
 {
-  "version": "1.0.0",
+  "version": "1.1.0",
+  "description": "Test scenarios for chrome-ai-bridge regression and smoke testing",
   "scenarios": [
     {
       "id": "chatgpt-new-chat",
@@ -127,6 +128,99 @@
         "minAnswerLength": 100,
         "maxTotalMs": 90000
       }
+    },
+    {
+      "id": "chatgpt-sequential",
+      "name": "ChatGPT 連続プロンプト",
+      "provider": "chatgpt",
+      "tags": ["regression", "chatgpt", "sequential"],
+      "setup": {
+        "requireExistingTab": true,
+        "instruction": "ChatGPTで会話を開いた状態で実行（連続質問テスト）"
+      },
+      "question": {
+        "template": "前の回答に関連して、その概念を1行コードで示して。ID:{{timestamp}}"
+      },
+      "assertions": {
+        "minAnswerLength": 10,
+        "relevanceThreshold": 0.1
+      },
+      "notes": "連続プロンプトによるセッション状態とレート制限の確認"
+    },
+    {
+      "id": "gemini-sequential",
+      "name": "Gemini 連続プロンプト",
+      "provider": "gemini",
+      "tags": ["regression", "gemini", "sequential"],
+      "setup": {
+        "requireExistingTab": true,
+        "instruction": "Geminiで会話を開いた状態で実行（連続質問テスト）"
+      },
+      "question": {
+        "template": "前の回答をより短く要約して。ID:{{timestamp}}"
+      },
+      "assertions": {
+        "minAnswerLength": 10,
+        "relevanceThreshold": 0.1
+      },
+      "notes": "連続プロンプトによるStuck State発生の確認"
+    },
+    {
+      "id": "chatgpt-markdown-extraction",
+      "name": "ChatGPT マークダウン抽出",
+      "provider": "chatgpt",
+      "tags": ["regression", "chatgpt", "extraction"],
+      "question": {
+        "template": "以下の形式で回答して:\\n1. 見出し（##）\\n2. 箇条書き（- ）\\n3. コードブロック（```）\\n内容: Gitの基本コマンド3つ。ID:{{timestamp}}"
+      },
+      "assertions": {
+        "minAnswerLength": 50,
+        "noEmptyMarkdown": true
+      },
+      "notes": "マークダウン要素の抽出が正しく行われることを確認"
+    },
+    {
+      "id": "gemini-long-response",
+      "name": "Gemini 長い応答",
+      "provider": "gemini",
+      "tags": ["gemini"],
+      "question": {
+        "template": "RESTful APIの設計原則を5つ、それぞれ2文で説明して。ID:{{timestamp}}"
+      },
+      "assertions": {
+        "minAnswerLength": 200,
+        "maxTotalMs": 120000
+      },
+      "notes": "長い応答の完了検出とテキスト抽出の確認"
+    },
+    {
+      "id": "chatgpt-thinking-complex",
+      "name": "ChatGPT Thinking 複雑な問題",
+      "provider": "chatgpt",
+      "tags": ["regression", "chatgpt", "thinking"],
+      "question": {
+        "template": "この再帰関数のバグと修正方法を説明して: function fib(n) { return fib(n-1) + fib(n-2); } ID:{{timestamp}}"
+      },
+      "assertions": {
+        "minAnswerLength": 80,
+        "noEmptyMarkdown": true,
+        "maxTotalMs": 180000
+      },
+      "notes": "Thinkingモードが発動する複雑な問題での応答抽出確認"
+    },
+    {
+      "id": "parallel-code-generation",
+      "name": "並列 コード生成比較",
+      "provider": "both",
+      "tags": ["parallel", "code"],
+      "question": {
+        "template": "TypeScriptでシンプルなスタック（push/pop）を実装して。ID:{{timestamp}}"
+      },
+      "assertions": {
+        "bothMustSucceed": true,
+        "minAnswerLength": 50
+      },
+      "notes": "両AIのコード生成応答を比較確認"
     }
   ]
 }

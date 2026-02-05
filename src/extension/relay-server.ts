@@ -20,6 +20,7 @@ export interface RelayServerOptions {
   port?: number; // 0 for auto-assign
   host?: string;
   token?: string; // Authentication token
+  sessionId?: string;
 }
 
 export interface CDPCommand {
@@ -39,10 +40,18 @@ export class RelayServer extends EventEmitter {
   private port: number = 0;
   private host: string;
   private token: string;
+  private sessionId: string;
+  private instanceId: string;
+  private startedAt: number;
   private tabId: number | null = null;
   private ready: boolean = false;
   private nextId = 1;
-  private pending = new Map<number, {resolve: (value: any) => void; reject: (err: Error) => void}>();
+  private pending = new Map<number, {
+    resolve: (value: any) => void;
+    reject: (err: Error) => void;
+    method: string;
+    startedAt: number;
+  }>();
   private discoveryServer: http.Server | null = null;
   private discoveryPort: number | null = null;
   private keepAliveTimer: ReturnType<typeof setInterval> | null = null;
@@ -51,6 +60,9 @@ export class RelayServer extends EventEmitter {
     super();
     this.host = options.host || '127.0.0.1';
     this.token = options.token || this.generateToken();
+    this.sessionId = options.sessionId || this.generateSessionId();
+    this.instanceId = crypto.randomUUID();
+    this.startedAt = Date.now();
     this.port = options.port || 0;
   }
 
@@ -91,10 +103,16 @@ export class RelayServer extends EventEmitter {
     // Validate token
     const url = new URL(req.url || '', `ws://${this.host}`);
     const clientToken = url.searchParams.get('token');
+    const clientSessionId = url.searchParams.get('sid');
 
     if (clientToken !== this.token) {
       debugLog('[RelayServer] Invalid token');
       ws.close(1008, 'Invalid token');
+      return;
+    }
+    if (clientSessionId && clientSessionId !== this.sessionId) {
+      debugLog('[RelayServer] Invalid session id', {expected: this.sessionId, received: clientSessionId});
+      ws.close(1008, 'Invalid session id');
       return;
     }
 
@@ -115,6 +133,9 @@ export class RelayServer extends EventEmitter {
     ws.on('close', () => {
       debugLog('[RelayServer] Extension disconnected');
       this.stopKeepAlive();
+      this.rejectPendingRequests(
+        new Error('RELAY_DISCONNECTED: Extension socket closed before request completion'),
+      );
       this.ws = null;
       this.ready = false;
       this.emit('disconnected');
@@ -125,6 +146,21 @@ export class RelayServer extends EventEmitter {
     });
 
     debugLog('[RelayServer] Extension connected');
+  }
+
+  private rejectPendingRequests(error: Error): void {
+    if (this.pending.size === 0) return;
+    const pendingEntries = Array.from(this.pending.entries());
+    this.pending.clear();
+    for (const [id, pending] of pendingEntries) {
+      debugLog('[RelayServer] Rejecting pending request', {
+        id,
+        method: pending.method,
+        startedAt: pending.startedAt,
+        reason: error.message,
+      });
+      pending.reject(error);
+    }
   }
 
   /**
@@ -178,6 +214,9 @@ export class RelayServer extends EventEmitter {
           debugLog(`[RelayServer] Connection ready for tab ${this.tabId}`);
           this.emit('ready', this.tabId);
           break;
+        case 'pong':
+          debugLog('[RelayServer] Received keep-alive pong');
+          break;
 
         case 'forwardCDPResult':
           this.emit('cdp-result', { id: message.id, result: message.result });
@@ -225,7 +264,9 @@ export class RelayServer extends EventEmitter {
 
   sendMessage(message: any): void {
     if (!this.ws || !this.ready) {
-      throw new Error('Extension not connected or not ready');
+      throw new Error(
+        `Extension not connected or not ready (connected=${Boolean(this.ws)}, ready=${this.ready})`,
+      );
     }
     if (this.ws.readyState !== WebSocket.OPEN) {
       throw new Error('WebSocket not open');
@@ -235,30 +276,44 @@ export class RelayServer extends EventEmitter {
 
   async sendRequest(method: string, params?: any, timeoutMs = 30000): Promise<any> {
     if (!this.ws || !this.ready) {
-      throw new Error('Extension not connected or not ready');
+      throw new Error(
+        `Extension not connected or not ready (method=${method}, connected=${Boolean(this.ws)}, ready=${this.ready})`,
+      );
     }
     if (this.ws.readyState !== WebSocket.OPEN) {
       throw new Error('WebSocket not open');
     }
     const id = this.nextId++;
     const payload = {id, method, params};
+    const startedAt = Date.now();
     const response = new Promise<any>((resolve, reject) => {
       const timeoutId = setTimeout(() => {
         this.pending.delete(id);
-        reject(new Error(`Request timeout: ${method}`));
+        reject(new Error(`RELAY_REQUEST_TIMEOUT: method=${method} timeoutMs=${timeoutMs}`));
       }, timeoutMs);
+      timeoutId.unref();
       this.pending.set(id, {
         resolve: (value: any) => {
           clearTimeout(timeoutId);
+          debugLog(`[RelayServer] Request success: ${method}`, {id, elapsedMs: Date.now() - startedAt});
           resolve(value);
         },
         reject: (err: Error) => {
           clearTimeout(timeoutId);
+          debugLog(`[RelayServer] Request failed: ${method}`, {id, elapsedMs: Date.now() - startedAt, error: err.message});
           reject(err);
         },
+        method,
+        startedAt,
       });
     });
-    this.ws.send(JSON.stringify(payload));
+    try {
+      this.ws.send(JSON.stringify(payload));
+      debugLog(`[RelayServer] Request sent: ${method}`, {id});
+    } catch (error) {
+      this.pending.delete(id);
+      throw error;
+    }
     return response;
   }
 
@@ -270,6 +325,7 @@ export class RelayServer extends EventEmitter {
     tabUrl?: string;
     tabId?: number;
     newTab?: boolean;
+    allowTabTakeover?: boolean;
   } = {}): Promise<number | null> {
     const ports = [8765, 8766, 8767, 8768, 8769, 8770, 8771, 8772, 8773, 8774, 8775];
     const wsUrl = this.getConnectionURL();
@@ -286,6 +342,11 @@ export class RelayServer extends EventEmitter {
               tabUrl: options.tabUrl || null,
               tabId: options.tabId ?? null,
               newTab: Boolean(options.newTab),
+              allowTabTakeover: Boolean(options.allowTabTakeover),
+              sessionId: this.sessionId,
+              startedAt: this.startedAt,
+              instanceId: this.instanceId,
+              expiresAt: Date.now() + 60000,
             }));
             return;
           }
@@ -345,6 +406,9 @@ export class RelayServer extends EventEmitter {
       this.ws.close();
       this.ws = null;
     }
+    this.rejectPendingRequests(
+      new Error('RELAY_STOPPED: Relay stopped before request completion'),
+    );
 
     if (this.discoveryServer) {
       this.discoveryServer.close();
@@ -411,6 +475,14 @@ export class RelayServer extends EventEmitter {
   }
 
   getConnectionURL(): string {
-    return `ws://${this.host}:${this.port}?token=${this.token}`;
+    return `ws://${this.host}:${this.port}?token=${this.token}&sid=${encodeURIComponent(this.sessionId)}`;
+  }
+
+  getSessionId(): string {
+    return this.sessionId;
+  }
+
+  private generateSessionId(): string {
+    return crypto.randomBytes(16).toString('hex');
   }
 }
