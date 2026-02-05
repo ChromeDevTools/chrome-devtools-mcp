@@ -12,6 +12,7 @@
  *   npm run test:network -- chatgpt --raw   # Full raw frame dump
  */
 
+import {writeFileSync} from 'node:fs';
 import {
   getClient,
   askChatGPTFastWithTimings,
@@ -57,15 +58,15 @@ async function runTest(kind) {
     domResult = await askFn(question);
   } catch (error) {
     console.error(`[3/5] ERROR: ${error.message}`);
-    interceptor.stopCapture();
+    await interceptor.stopCaptureAndWait(3000);
     // Still show captured data even on error
     printResults(interceptor, null, kind);
     process.exit(1);
   }
 
-  // Step 4: Stop capture
-  console.error(`[4/5] Stopping capture...`);
-  interceptor.stopCapture();
+  // Step 4: Stop capture (wait for pending response body fetches)
+  console.error(`[4/5] Stopping capture (waiting for pending body fetches)...`);
+  await interceptor.stopCaptureAndWait(5000);
 
   // Step 5: Analyze and display results
   console.error(`[5/5] Analyzing captured data...\n`);
@@ -91,6 +92,34 @@ function printResults(interceptor, domResult, kind) {
     typeCount[f.type] = (typeCount[f.type] || 0) + 1;
   }
   console.error(`Frame types: ${JSON.stringify(typeCount)}`);
+
+  // Tracked requests (all URLs seen during capture)
+  const tracked = interceptor.getTrackedRequests();
+  const apiRequests = tracked.filter(r => {
+    const u = r.url;
+    return u.includes('/backend-api/') || u.includes('/backend-anon/') ||
+           u.includes('/api/conversation') || u.includes('/generate_content') ||
+           u.includes('/_/BardChatUi') || u.includes('/stream_generate') ||
+           u.includes('/v1beta/models') || u.includes('/BatchExecute');
+  });
+  console.error(`\nTracked requests: ${tracked.length} total, ${apiRequests.length} API-matching`);
+  if (apiRequests.length > 0) {
+    console.error('API-matching requests:');
+    for (const r of apiRequests) {
+      console.error(`  [${r.type}] ${r.contentType.slice(0, 40)} ${r.url.slice(0, 120)}`);
+    }
+  } else if (tracked.length > 0) {
+    // Show top 10 most interesting URLs for debugging
+    console.error('No API-matching requests found. Top tracked URLs:');
+    const sorted = tracked
+      .filter(r => !r.url.includes('.js') && !r.url.includes('.css') &&
+                   !r.url.includes('.png') && !r.url.includes('.svg') &&
+                   !r.url.includes('.woff'))
+      .slice(0, 15);
+    for (const r of sorted) {
+      console.error(`  [${r.type}] ${r.url.slice(0, 120)}`);
+    }
+  }
 
   // Unique URLs
   const urls = [...new Set(frames.map(f => f.url).filter(Boolean))];
@@ -152,6 +181,20 @@ function printResults(interceptor, domResult, kind) {
       const overlap = [...networkWords].filter(w => domWords.has(w)).length;
       const similarity = overlap / Math.max(networkWords.size, domWords.size);
       console.error(`Word overlap similarity: ${(similarity * 100).toFixed(1)}%`);
+    }
+  }
+
+  // Dump large fetch-body frames to files for analysis
+  const fetchBodies = frames.filter(f => f.type === 'fetch-body' && f.data.length > 500);
+  if (fetchBodies.length > 0) {
+    console.error(`\n${'='.repeat(70)}`);
+    console.error(`DUMP: ${fetchBodies.length} large fetch-body frame(s) saved to /tmp/`);
+    console.error('='.repeat(70));
+    for (let i = 0; i < fetchBodies.length; i++) {
+      const f = fetchBodies[i];
+      const filename = `/tmp/network-frame-${kind}-${i}.txt`;
+      writeFileSync(filename, f.data);
+      console.error(`  ${filename} (${f.data.length} bytes) ${(f.url || 'unknown').slice(0, 100)}`);
     }
   }
 

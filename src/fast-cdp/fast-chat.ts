@@ -2326,8 +2326,8 @@ async function askChatGPTFastInternal(question: string, debug?: boolean): Promis
       };
     }
 
-    // Network interceptor: stop capture and compare results
-    interceptor.stopCapture();
+    // Network interceptor: stop capture and wait for pending response body fetches
+    await interceptor.stopCaptureAndWait();
     const networkResult = interceptor.getResult();
     logInfo('chatgpt', 'Network capture result', {
       frames: networkResult.frames.length,
@@ -3451,8 +3451,8 @@ async function askGeminiFastInternal(question: string, debug?: boolean): Promise
     };
   }
 
-  // Network interceptor: stop capture and compare results
-  interceptor.stopCapture();
+  // Network interceptor: stop capture and wait for pending response body fetches
+  await interceptor.stopCaptureAndWait();
   const networkResult = interceptor.getResult();
   logInfo('gemini', 'Network capture result', {
     frames: networkResult.frames.length,
