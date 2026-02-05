@@ -23,17 +23,11 @@ import {
 } from './third_party/index.js';
 
 export class UncaughtError {
-  readonly message: string;
-  readonly stackTrace?: Protocol.Runtime.StackTrace;
+  readonly details: Protocol.Runtime.ExceptionDetails;
   readonly targetId: string;
 
-  constructor(
-    message: string,
-    stackTrace: Protocol.Runtime.StackTrace | undefined,
-    targetId: string,
-  ) {
-    this.message = message;
-    this.stackTrace = stackTrace;
+  constructor(details: Protocol.Runtime.ExceptionDetails, targetId: string) {
+    this.details = details;
     this.targetId = targetId;
   }
 }
@@ -328,13 +322,9 @@ class PageEventSubscriber {
   };
 
   #onExceptionThrown = (event: Protocol.Runtime.ExceptionThrownEvent) => {
-    const {exception, text, stackTrace} = event.exceptionDetails;
-    const messageWithRest = exception?.description?.split('\n    at ', 2) ?? [];
-    const message = text + ' ' + (messageWithRest[0] ?? '');
-
     this.#page.emit(
       'uncaughtError',
-      new UncaughtError(message, stackTrace, this.#targetId),
+      new UncaughtError(event.exceptionDetails, this.#targetId),
     );
   };
 

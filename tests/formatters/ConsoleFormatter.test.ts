@@ -70,8 +70,16 @@ describe('ConsoleFormatter', () => {
 
     it('formats an UncaughtError', async t => {
       const error = new UncaughtError(
-        'Uncaught TypeError: Cannot read properties of undefined',
-        undefined,
+        {
+          exceptionId: 1,
+          lineNumber: 0,
+          columnNumber: 5,
+          exception: {
+            type: 'object',
+            description: 'TypeError: Cannot read properties of undefined',
+          },
+          text: 'Uncaught',
+        },
         '<mock target ID>',
       );
       const result = (
@@ -231,8 +239,16 @@ describe('ConsoleFormatter', () => {
         ],
       } as unknown as DevTools.StackTrace.StackTrace.StackTrace;
       const error = new UncaughtError(
-        'Uncaught TypeError: Cannot read properties of undefined',
-        undefined,
+        {
+          exceptionId: 1,
+          lineNumber: 0,
+          columnNumber: 5,
+          exception: {
+            type: 'object',
+            description: 'TypeError: Cannot read properties of undefined',
+          },
+          text: 'Uncaught',
+        },
         '<mock target ID>',
       );
 

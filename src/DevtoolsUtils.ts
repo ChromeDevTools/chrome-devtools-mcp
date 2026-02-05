@@ -227,6 +227,73 @@ const SKIP_ALL_PAUSES = {
   },
 };
 
+/**
+ * Constructed from Runtime.ExceptionDetails of an uncaught error.
+ *
+ * TODO: Also construct from a RemoteObject of subtype 'error'.
+ *
+ * Consists of the message, a fully resolved stack trace and a fully resolved 'cause' chain.
+ */
+export class SymbolizedError {
+  readonly message: string;
+  readonly stackTrace?: DevTools.StackTrace.StackTrace.StackTrace;
+  readonly cause?: SymbolizedError;
+
+  private constructor(
+    message: string,
+    stackTrace?: DevTools.StackTrace.StackTrace.StackTrace,
+    cause?: SymbolizedError,
+  ) {
+    this.message = message;
+    this.stackTrace = stackTrace;
+    this.cause = cause;
+  }
+
+  static async fromDetails(opts: {
+    devTools?: TargetUniverse;
+    details: Protocol.Runtime.ExceptionDetails;
+    targetId: string;
+    includeStackAndCause?: boolean;
+    resolvedStackTraceForTesting?: DevTools.StackTrace.StackTrace.StackTrace;
+  }): Promise<SymbolizedError> {
+    const message = SymbolizedError.#getMessage(opts.details);
+    if (!opts.includeStackAndCause || !opts.devTools) {
+      return new SymbolizedError(message, opts.resolvedStackTraceForTesting);
+    }
+
+    let stackTrace: DevTools.StackTrace.StackTrace.StackTrace | undefined;
+    if (opts.resolvedStackTraceForTesting) {
+      stackTrace = opts.resolvedStackTraceForTesting;
+    } else if (opts.details.stackTrace) {
+      try {
+        stackTrace = await createStackTrace(
+          opts.devTools,
+          opts.details.stackTrace,
+          opts.targetId,
+        );
+      } catch {
+        // ignore
+      }
+    }
+
+    // TODO: Turn opts.details.exception into a JSHandle and retrieve the 'cause' property.
+    //       If its an Error, recursively create a SymbolizedError.
+    return new SymbolizedError(message, stackTrace);
+  }
+
+  static #getMessage(details: Protocol.Runtime.ExceptionDetails): string {
+    // For Runtime.exceptionThrown with a present exception object, `details.text` will be "Uncaught" and
+    // we have to manually parse out the error text from the exception description.
+    // In the case of Runtime.getExceptionDetails, `details.text` has the Error.message.
+    if (details.text === 'Uncaught') {
+      const messageWithRest =
+        details.exception?.description?.split('\n    at ', 2) ?? [];
+      return 'Uncaught ' + (messageWithRest[0] ?? '');
+    }
+    return details.text;
+  }
+}
+
 export async function createStackTraceForConsoleMessage(
   devTools: TargetUniverse,
   consoleMessage: ConsoleMessage,

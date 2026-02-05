@@ -408,8 +408,9 @@ describe('ConsoleCollector', () => {
       onUncaughtErrorListener,
       sinon.match(e => {
         return (
-          e.message === 'Uncaught SyntaxError: Expected {' &&
-          e.stackTrace.callFrames.length === 0
+          e.details.exception.description === 'SyntaxError: Expected {',
+          e.details.text === 'Uncaught',
+          e.details.stackTrace.callFrames.length === 0
         );
       }),
     );

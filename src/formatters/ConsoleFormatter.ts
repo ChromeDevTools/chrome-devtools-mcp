@@ -6,10 +6,10 @@
 
 import {
   createStackTraceForConsoleMessage,
-  createStackTrace,
   type TargetUniverse,
+  SymbolizedError,
 } from '../DevtoolsUtils.js';
-import type {UncaughtError} from '../PageCollector.js';
+import {UncaughtError} from '../PageCollector.js';
 import type * as DevTools from '../third_party/index.js';
 import type {ConsoleMessage} from '../third_party/index.js';
 
@@ -21,13 +21,13 @@ export interface ConsoleFormatterOptions {
 }
 
 export class ConsoleFormatter {
-  #msg: ConsoleMessage | Error | UncaughtError;
+  #msg: ConsoleMessage | Error | SymbolizedError;
   #resolvedArgs: unknown[] = [];
   #resolvedStackTrace?: DevTools.DevTools.StackTrace.StackTrace.StackTrace;
   #id?: number;
 
   private constructor(
-    msg: ConsoleMessage | Error | UncaughtError,
+    msg: ConsoleMessage | Error | SymbolizedError,
     options?: ConsoleFormatterOptions,
   ) {
     this.#msg = msg;
@@ -39,6 +39,19 @@ export class ConsoleFormatter {
     msg: ConsoleMessage | Error | UncaughtError,
     options?: ConsoleFormatterOptions,
   ): Promise<ConsoleFormatter> {
+    if (msg instanceof UncaughtError) {
+      return new ConsoleFormatter(
+        await SymbolizedError.fromDetails({
+          devTools: options?.devTools,
+          details: msg.details,
+          targetId: msg.targetId,
+          includeStackAndCause: options?.fetchDetailedData,
+          resolvedStackTraceForTesting: options?.resolvedStackTraceForTesting,
+        }),
+        options,
+      );
+    }
+
     const formatter = new ConsoleFormatter(msg, options);
     if (options?.fetchDetailedData) {
       await formatter.#loadDetailedData(options?.devTools);
@@ -47,7 +60,7 @@ export class ConsoleFormatter {
   }
 
   #isConsoleMessage(
-    msg: ConsoleMessage | Error | UncaughtError,
+    msg: ConsoleMessage | Error | SymbolizedError,
   ): msg is ConsoleMessage {
     // No `instanceof` as tests mock `ConsoleMessage`.
     return 'args' in msg && typeof msg.args === 'function';
@@ -77,12 +90,6 @@ export class ConsoleFormatter {
             devTools,
             this.#msg,
           );
-        } else if (this.#msg.stackTrace) {
-          this.#resolvedStackTrace = await createStackTrace(
-            devTools,
-            this.#msg.stackTrace,
-            this.#msg.targetId,
-          );
         }
       } catch {
         // ignore
@@ -105,7 +112,11 @@ export class ConsoleFormatter {
       this.#id !== undefined ? `ID: ${this.#id}` : '',
       `Message: ${this.#getType()}> ${this.#getText()}`,
       this.#formatArgs(),
-      this.#formatStackTrace(this.#resolvedStackTrace),
+      this.#formatStackTrace(
+        this.#msg instanceof SymbolizedError
+          ? this.#msg.stackTrace
+          : this.#resolvedStackTrace,
+      ),
     ].filter(line => !!line);
     return result.join('\n');
   }
