@@ -23,7 +23,10 @@ export interface CapturedFrame {
 
 export interface CaptureResult {
   frames: CapturedFrame[];
+  /** Plain text (Markdown/LaTeX stripped) */
   text: string;
+  /** Raw text with original formatting (Markdown, LaTeX) */
+  rawText: string;
   rawDataSize: number;
   captureTimeMs: number;
 }
@@ -53,6 +56,36 @@ function isResponseUrl(url: string): boolean {
     if (url.includes(p)) return true;
   }
   return false;
+}
+
+/**
+ * Strip Markdown/LaTeX formatting to produce plain text.
+ * - **bold** / __bold__ -> bold
+ * - *italic* / _italic_ -> italic
+ * - $O(\log n)$ / $$...$$ -> O(\log n)  (keep inner text)
+ * - [Image of ...] -> (removed)
+ * - \\log, \\sum etc -> log, sum
+ */
+function stripFormatting(text: string): string {
+  if (!text) return text;
+  return text
+    // Remove image references: [Image of ...]
+    .replace(/\[Image of [^\]]*\]/g, '')
+    // LaTeX display math: $$...$$
+    .replace(/\$\$(.*?)\$\$/g, '$1')
+    // LaTeX inline math: $...$
+    .replace(/\$(.*?)\$/g, '$1')
+    // LaTeX commands: \log -> log, \sum -> sum
+    .replace(/\\([a-zA-Z]+)/g, '$1')
+    // Markdown bold: **text** or __text__
+    .replace(/\*\*(.*?)\*\*/g, '$1')
+    .replace(/__(.*?)__/g, '$1')
+    // Markdown italic: *text* or _text_ (but not inside words)
+    .replace(/(?<!\w)\*([^*]+)\*(?!\w)/g, '$1')
+    .replace(/(?<!\w)_([^_]+)_(?!\w)/g, '$1')
+    // Collapse multiple newlines
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
 }
 
 export class NetworkInterceptor {
@@ -228,12 +261,14 @@ export class NetworkInterceptor {
 
   getResult(): CaptureResult {
     const elapsed = Date.now() - this.captureStart;
-    const text = this.extractText();
+    const rawText = this.extractText();
+    const text = stripFormatting(rawText);
     const rawDataSize = this.frames.reduce((sum, f) => sum + f.data.length, 0);
 
     return {
       frames: [...this.frames],
       text,
+      rawText,
       rawDataSize,
       captureTimeMs: elapsed,
     };

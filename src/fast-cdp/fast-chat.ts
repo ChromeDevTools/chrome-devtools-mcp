@@ -2337,19 +2337,18 @@ async function askChatGPTFastInternal(question: string, debug?: boolean): Promis
       summary: interceptor.getSummary(),
     });
 
-    // Hybrid: prefer network text if substantial, fallback to DOM
+    // Hybrid: prefer network text (primary), DOM as fallback
     let hybridAnswer = finalAnswer;
+    let answerSource = 'dom';
     if (networkResult.text.length > 50) {
-      logInfo('chatgpt', 'Network text available', {
-        networkLen: networkResult.text.length,
-        domLen: finalAnswer.length,
-      });
-      // Use network text if DOM extraction failed or returned short text
-      if (!finalAnswer || finalAnswer.length < 20) {
-        hybridAnswer = networkResult.text;
-        logInfo('chatgpt', 'Using network text (DOM extraction failed/short)');
-      }
+      hybridAnswer = networkResult.text;
+      answerSource = 'network';
     }
+    logInfo('chatgpt', 'Answer source selected', {
+      source: answerSource,
+      networkLen: networkResult.text.length,
+      domLen: finalAnswer.length,
+    });
 
     return {answer: hybridAnswer, timings: fullTimings, debug: debugInfo};
 }
@@ -3462,18 +3461,20 @@ async function askGeminiFastInternal(question: string, debug?: boolean): Promise
     summary: interceptor.getSummary(),
   });
 
-  // Hybrid: prefer network text if substantial, fallback to DOM
+  // Hybrid: prefer network text (primary), DOM as fallback
+  // Normalize network text with same Gemini-specific cleanup as DOM text
+  const networkNormalized = normalizeGeminiResponse(networkResult.text, question);
   let hybridAnswer = normalized;
-  if (networkResult.text.length > 50) {
-    logInfo('gemini', 'Network text available', {
-      networkLen: networkResult.text.length,
-      domLen: normalized.length,
-    });
-    if (!normalized || normalized.length < 20) {
-      hybridAnswer = networkResult.text;
-      logInfo('gemini', 'Using network text (DOM extraction failed/short)');
-    }
+  let answerSource = 'dom';
+  if (networkNormalized.length > 50) {
+    hybridAnswer = networkNormalized;
+    answerSource = 'network';
   }
+  logInfo('gemini', 'Answer source selected', {
+    source: answerSource,
+    networkLen: networkNormalized.length,
+    domLen: normalized.length,
+  });
 
   return {answer: hybridAnswer, timings: fullTimings, debug: debugInfo};
 }
