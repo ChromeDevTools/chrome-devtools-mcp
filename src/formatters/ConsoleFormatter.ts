@@ -15,61 +15,68 @@ import type {ConsoleMessage} from '../third_party/index.js';
 
 export interface ConsoleFormatterOptions {
   fetchDetailedData?: boolean;
-  id?: number;
+  id: number;
   devTools?: TargetUniverse;
+  resolvedArgsForTesting?: unknown[];
   resolvedStackTraceForTesting?: DevTools.DevTools.StackTrace.StackTrace.StackTrace;
 }
 
 export class ConsoleFormatter {
-  #msg: ConsoleMessage | SymbolizedError;
-  #resolvedArgs: unknown[] = [];
-  #resolvedStackTrace?: DevTools.DevTools.StackTrace.StackTrace.StackTrace;
-  #id?: number;
+  readonly #id: number;
+  readonly #type: string;
+  readonly #text: string;
 
-  private constructor(
-    msg: ConsoleMessage | SymbolizedError,
-    options?: ConsoleFormatterOptions,
-  ) {
-    this.#msg = msg;
-    this.#id = options?.id;
-    this.#resolvedStackTrace = options?.resolvedStackTraceForTesting;
+  readonly #argCount: number;
+  readonly #resolvedArgs: unknown[];
+
+  readonly #stack?: DevTools.DevTools.StackTrace.StackTrace.StackTrace;
+  readonly #cause?: SymbolizedError; // eslint-disable-line no-unused-private-class-members
+
+  private constructor(params: {
+    id: number;
+    type: string;
+    text: string;
+    argCount?: number;
+    resolvedArgs?: unknown[];
+    stack?: DevTools.DevTools.StackTrace.StackTrace.StackTrace;
+    cause?: SymbolizedError;
+  }) {
+    this.#id = params.id;
+    this.#type = params.type;
+    this.#text = params.text;
+    this.#argCount = params.argCount ?? 0;
+    this.#resolvedArgs = params.resolvedArgs ?? [];
+    this.#stack = params.stack;
+    this.#cause = params.cause;
   }
 
   static async from(
     msg: ConsoleMessage | UncaughtError,
-    options?: ConsoleFormatterOptions,
+    options: ConsoleFormatterOptions,
   ): Promise<ConsoleFormatter> {
     if (msg instanceof UncaughtError) {
-      return new ConsoleFormatter(
-        await SymbolizedError.fromDetails({
-          devTools: options?.devTools,
-          details: msg.details,
-          targetId: msg.targetId,
-          includeStackAndCause: options?.fetchDetailedData,
-          resolvedStackTraceForTesting: options?.resolvedStackTraceForTesting,
-        }),
-        options,
-      );
+      const error = await SymbolizedError.fromDetails({
+        devTools: options?.devTools,
+        details: msg.details,
+        targetId: msg.targetId,
+        includeStackAndCause: options?.fetchDetailedData,
+        resolvedStackTraceForTesting: options?.resolvedStackTraceForTesting,
+      });
+      return new ConsoleFormatter({
+        id: options.id,
+        type: 'error',
+        text: error.message,
+        stack: error.stackTrace,
+        cause: error.cause,
+      });
     }
 
-    const formatter = new ConsoleFormatter(msg, options);
-    if (options?.fetchDetailedData) {
-      await formatter.#loadDetailedData(options?.devTools);
-    }
-    return formatter;
-  }
-
-  #isConsoleMessage(
-    msg: ConsoleMessage | SymbolizedError,
-  ): msg is ConsoleMessage {
-    // No `instanceof` as tests mock `ConsoleMessage`.
-    return 'args' in msg && typeof msg.args === 'function';
-  }
-
-  async #loadDetailedData(devTools?: TargetUniverse): Promise<void> {
-    if (this.#isConsoleMessage(this.#msg)) {
-      this.#resolvedArgs = await Promise.all(
-        this.#msg.args().map(async (arg, i) => {
+    let resolvedArgs: unknown[] = [];
+    if (options.resolvedArgsForTesting) {
+      resolvedArgs = options.resolvedArgsForTesting;
+    } else if (options.fetchDetailedData) {
+      resolvedArgs = await Promise.all(
+        msg.args().map(async (arg, i) => {
           try {
             return await arg.jsonValue();
           } catch {
@@ -79,78 +86,53 @@ export class ConsoleFormatter {
       );
     }
 
-    if (devTools) {
+    let stack: DevTools.DevTools.StackTrace.StackTrace.StackTrace | undefined;
+    if (options.resolvedStackTraceForTesting) {
+      stack = options.resolvedStackTraceForTesting;
+    } else if (options.fetchDetailedData && options.devTools) {
       try {
-        if (this.#isConsoleMessage(this.#msg)) {
-          this.#resolvedStackTrace = await createStackTraceForConsoleMessage(
-            devTools,
-            this.#msg,
-          );
-        }
+        stack = await createStackTraceForConsoleMessage(options.devTools, msg);
       } catch {
         // ignore
       }
     }
+
+    return new ConsoleFormatter({
+      id: options.id,
+      type: msg.type(),
+      text: msg.text(),
+      argCount: resolvedArgs.length || msg.args().length,
+      resolvedArgs,
+      stack,
+    });
   }
 
   // The short format for a console message.
   toString(): string {
-    const type = this.#getType();
-    const text = this.#getText();
-    const argsCount = this.#getArgsCount();
-    const idPart = this.#id !== undefined ? `msgid=${this.#id} ` : '';
-    return `${idPart}[${type}] ${text} (${argsCount} args)`;
+    return `msgid=${this.#id} [${this.#type}] ${this.#text} (${this.#argCount} args)`;
   }
 
   // The verbose format for a console message, including all details.
   toStringDetailed(): string {
     const result = [
-      this.#id !== undefined ? `ID: ${this.#id}` : '',
-      `Message: ${this.#getType()}> ${this.#getText()}`,
+      `ID: ${this.#id}`,
+      `Message: ${this.#type}> ${this.#text}`,
       this.#formatArgs(),
-      this.#formatStackTrace(
-        this.#msg instanceof SymbolizedError
-          ? this.#msg.stackTrace
-          : this.#resolvedStackTrace,
-      ),
+      this.#formatStackTrace(this.#stack),
     ].filter(line => !!line);
     return result.join('\n');
   }
 
-  #getType(): string {
-    if (!this.#isConsoleMessage(this.#msg)) {
-      return 'error';
-    }
-    return this.#msg.type();
-  }
-
-  #getText(): string {
-    if (!this.#isConsoleMessage(this.#msg)) {
-      return this.#msg.message;
-    }
-    return this.#msg.text();
-  }
-
   #getArgs(): unknown[] {
-    if (!this.#isConsoleMessage(this.#msg)) {
-      return [];
-    }
     if (this.#resolvedArgs.length > 0) {
       const args = [...this.#resolvedArgs];
       // If there is no text, the first argument serves as text (see formatMessage).
-      if (!this.#msg.text()) {
+      if (!this.#text) {
         args.shift();
       }
       return args;
     }
     return [];
-  }
-
-  #getArgsCount(): number {
-    if (!this.#isConsoleMessage(this.#msg)) {
-      return 0;
-    }
-    return this.#resolvedArgs.length || this.#msg.args().length;
   }
 
   #formatArg(arg: unknown) {
@@ -215,9 +197,9 @@ export class ConsoleFormatter {
   }
   toJSON(): object {
     return {
-      type: this.#getType(),
-      text: this.#getText(),
-      argsCount: this.#getArgsCount(),
+      type: this.#type,
+      text: this.#text,
+      argsCount: this.#argCount,
       id: this.#id,
     };
   }
@@ -225,12 +207,12 @@ export class ConsoleFormatter {
   toJSONDetailed(): object {
     return {
       id: this.#id,
-      type: this.#getType(),
-      text: this.#getText(),
+      type: this.#type,
+      text: this.#text,
       args: this.#getArgs().map(arg =>
         typeof arg === 'object' ? arg : String(arg),
       ),
-      stackTrace: this.#resolvedStackTrace,
+      stackTrace: this.#stack,
     };
   }
 }
