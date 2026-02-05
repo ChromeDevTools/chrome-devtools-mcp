@@ -15,6 +15,13 @@ let geminiClient: CdpClient | null = null;
 let chatgptRelay: RelayServer | null = null;
 let geminiRelay: RelayServer | null = null;
 
+const CONNECT_REUSE_TIMEOUT_MS = Number(
+  process.env.MCP_CONNECT_REUSE_TIMEOUT_MS || '7000',
+);
+const CONNECT_NEWTAB_TIMEOUT_MS = Number(
+  process.env.MCP_CONNECT_NEWTAB_TIMEOUT_MS || '12000',
+);
+
 /**
  * チャット結果の型（タイミング情報付き）
  */
@@ -458,20 +465,34 @@ async function createConnection(kind: 'chatgpt' | 'gemini'): Promise<CdpClient> 
   // まず既存タブを探す（ChatGPT/Gemini共通）
   // 既存タブがあればそれを使う、なければ新規作成
   if (preferred) {
-    logInfo('fast-chat', `Trying to reuse existing ${kind} tab`, {url: preferred, tabId: preferredTabId, timeoutMs: 3000});
-    console.error(`[fast-cdp] Trying to reuse existing ${kind} tab: ${preferred} (tabId: ${preferredTabId}, 3s timeout)`);
+    logInfo('fast-chat', `Trying to reuse existing ${kind} tab`, {url: preferred, tabId: preferredTabId, timeoutMs: CONNECT_REUSE_TIMEOUT_MS});
+    console.error(`[fast-cdp] Trying to reuse existing ${kind} tab: ${preferred} (tabId: ${preferredTabId}, ${CONNECT_REUSE_TIMEOUT_MS}ms timeout)`);
     try {
       const relayResult = await connectViaExtensionRaw({
         tabUrl: preferred,
         tabId: preferredTabId,
         newTab: false,
-        timeoutMs: 3000,  // 短いタイムアウト
+        allowTabTakeover: true,
+        timeoutMs: CONNECT_REUSE_TIMEOUT_MS,
       });
 
       const client = new CdpClient(relayResult.relay);
-      await client.send('Runtime.enable');
-      await client.send('DOM.enable');
-      await client.send('Page.enable');
+      await Promise.all([
+        client.send('Runtime.enable'),
+        client.send('DOM.enable'),
+        client.send('Page.enable'),
+      ]);
+
+      // フォーカスエミュレーション有効化（バックグラウンドタブ対策）
+      // Chrome DevTools: "Emulate a focused page" と同等
+      // visibilityState を 'visible' に固定し、DOM更新の継続を促す
+      try {
+        await client.send('Emulation.setFocusEmulationEnabled', {enabled: true});
+        console.error(`[fast-cdp] ${kind} focus emulation enabled`);
+      } catch (e) {
+        // 非クリティカル: 失敗しても続行
+        console.error(`[fast-cdp] ${kind} setFocusEmulationEnabled failed (non-critical):`, e instanceof Error ? e.message : String(e));
+      }
 
       // デバッグ: 接続直後のURLを確認
       const debugUrl = await client.evaluate<string>('location.href');
@@ -518,13 +539,26 @@ async function createConnection(kind: 'chatgpt' | 'gemini'): Promise<CdpClient> 
       const relayResult = await connectViaExtensionRaw({
         tabUrl: defaultUrl,
         newTab: true,
-        timeoutMs: 5000,  // 5秒タイムアウト
+        timeoutMs: CONNECT_NEWTAB_TIMEOUT_MS,
       });
 
       const client = new CdpClient(relayResult.relay);
-      await client.send('Runtime.enable');
-      await client.send('DOM.enable');
-      await client.send('Page.enable');
+      await Promise.all([
+        client.send('Runtime.enable'),
+        client.send('DOM.enable'),
+        client.send('Page.enable'),
+      ]);
+
+      // フォーカスエミュレーション有効化（バックグラウンドタブ対策）
+      // Chrome DevTools: "Emulate a focused page" と同等
+      // visibilityState を 'visible' に固定し、DOM更新の継続を促す
+      try {
+        await client.send('Emulation.setFocusEmulationEnabled', {enabled: true});
+        console.error(`[fast-cdp] ${kind} focus emulation enabled (new tab)`);
+      } catch (e) {
+        // 非クリティカル: 失敗しても続行
+        console.error(`[fast-cdp] ${kind} setFocusEmulationEnabled failed (non-critical):`, e instanceof Error ? e.message : String(e));
+      }
 
       // クライアントとRelay参照を保存
       if (kind === 'chatgpt') {
@@ -3220,6 +3254,19 @@ async function askGeminiFastInternal(question: string, debug?: boolean): Promise
     `);
     console.error(`[Gemini] Timeout - final state: ${JSON.stringify(finalState)}`);
     throw new Error(`Timed out waiting for Gemini response (8min). sawStopButton=${sawStopButton}, textStableCount=${textStableCount}. Final state: ${JSON.stringify(finalState)}`);
+  }
+
+  // 重要: タブをフォアグラウンドに持ってくる（バックグラウンドタブ対策）
+  // GeminiもChatGPTと同様、バックグラウンドタブではDOMの状態が正しく取得できない
+  // Page.bringToFrontでタブをアクティブにすると、DOMが最新状態に更新される
+  try {
+    await client.send('Page.bringToFront');
+    // タブがフォアグラウンドになった後、DOM更新を待機
+    await new Promise(r => setTimeout(r, 300));
+    console.error('[Gemini] Page.bringToFront executed before text extraction');
+  } catch {
+    // Page.bringToFrontが失敗しても続行（一部の環境では利用できない場合がある）
+    console.error('[Gemini] Page.bringToFront failed, continuing anyway');
   }
 
   // 最後のレスポンスを取得（フィードバックボタン基準 + フォールバック）

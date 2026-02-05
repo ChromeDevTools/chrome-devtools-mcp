@@ -108,7 +108,7 @@ const tagFilters = args
  * @param {string} question - 質問文
  * @returns {string[]} - キーワードの配列
  */
-function extractKeywords(question) {
+export function extractKeywords(question) {
   const keywords = [];
 
   // 英語の技術用語を抽出
@@ -136,7 +136,7 @@ function extractKeywords(question) {
  * @param {string} answer - 回答文
  * @returns {number} - マッチ率 (0-1)
  */
-function calculateRelevance(question, answer) {
+export function calculateRelevance(question, answer) {
   const keywords = extractKeywords(question);
   if (keywords.length === 0) return 1;
 
@@ -155,7 +155,7 @@ function calculateRelevance(question, answer) {
  * @param {string} question - 質問文
  * @returns {object} - 検証結果
  */
-async function validateAssertions(assertions, response, question) {
+export async function validateAssertions(assertions, response, question) {
   const results = { allPassed: true, checks: [] };
 
   // 並列クエリの場合
@@ -490,7 +490,13 @@ async function main() {
   }
 }
 
-main().catch(err => {
-  console.error('Fatal error:', err);
-  process.exit(1);
-});
+// Only run main() when executed directly (not when imported as a module)
+const isDirectRun = process.argv[1] &&
+  path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url));
+
+if (isDirectRun) {
+  main().catch(err => {
+    console.error('Fatal error:', err);
+    process.exit(1);
+  });
+}

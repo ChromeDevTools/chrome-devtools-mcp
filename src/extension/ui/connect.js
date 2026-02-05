@@ -10,6 +10,8 @@
 class ConnectUI {
   constructor() {
     this.mcpRelayUrl = null;
+    this.sessionId = null;
+    this.allowTabTakeover = false;
     this.debugPanelVisible = false;
     this.autoRefreshInterval = null;
 
@@ -45,6 +47,8 @@ class ConnectUI {
       // Parse URL parameters (Extension2 style: parameters are always provided)
       const params = new URLSearchParams(window.location.search);
       this.mcpRelayUrl = params.get('mcpRelayUrl');
+      this.sessionId = params.get('sessionId');
+      this.allowTabTakeover = params.get('allowTabTakeover') === 'true';
 
       // Validate relay URL
       if (!this.mcpRelayUrl) {
@@ -193,7 +197,8 @@ class ConnectUI {
       // Step 1: Connect to relay
       const relayResponse = await chrome.runtime.sendMessage({
         type: 'connectToRelay',
-        mcpRelayUrl: this.mcpRelayUrl
+        mcpRelayUrl: this.mcpRelayUrl,
+        sessionId: this.sessionId,
       });
 
       if (!relayResponse || !relayResponse.success) {
@@ -205,7 +210,9 @@ class ConnectUI {
         type: 'connectToTab',
         mcpRelayUrl: this.mcpRelayUrl,
         tabId: tab.id,
-        windowId: tab.windowId
+        windowId: tab.windowId,
+        sessionId: this.sessionId,
+        allowTabTakeover: this.allowTabTakeover,
       });
 
       if (!connectResponse || !connectResponse.success) {

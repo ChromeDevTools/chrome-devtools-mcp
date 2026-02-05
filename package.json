@@ -29,7 +29,11 @@
     "cdp:chatgpt": "npm run build && node scripts/cdp-snapshot.mjs chatgpt",
     "cdp:gemini": "npm run build && node scripts/cdp-snapshot.mjs gemini",
     "measure:chatgpt": "npm run build && node scripts/measure-timings.mjs chatgpt",
-    "measure:gemini": "npm run build && node scripts/measure-timings.mjs gemini"
+    "measure:gemini": "npm run build && node scripts/measure-timings.mjs gemini",
+    "test:mcp": "npm run build && node scripts/test-mcp.mjs",
+    "test:mcp:chatgpt": "npm run build && node scripts/test-mcp.mjs --chatgpt",
+    "test:mcp:gemini": "npm run build && node scripts/test-mcp.mjs --gemini",
+    "test:mcp:parallel": "npm run build && node scripts/test-mcp.mjs --parallel"
   },
   "files": [
     "build/src",

@@ -106,6 +106,7 @@ export async function connectViaExtensionRaw(options: {
   tabId?: number;
   tabUrl?: string;
   newTab?: boolean;
+  allowTabTakeover?: boolean;
   relayPort?: number;
   timeoutMs?: number;
 }): Promise<RawExtensionConnection> {
@@ -114,13 +115,14 @@ export async function connectViaExtensionRaw(options: {
     tabUrl: options.tabUrl,
     tabId: options.tabId,
     newTab: options.newTab,
+    allowTabTakeover: options.allowTabTakeover,
     timeoutMs: options.timeoutMs,
   });
 
   // tabUrl is now required; tabId is optional (used for tab selection hint)
   if (options.tabUrl === undefined) {
     logError('extension-raw', 'Validation failed: tabUrl required');
-    throw new Error('tabUrl must be provided');
+    throw new Error('EXT_INVALID_ARG: tabUrl must be provided');
   }
 
   logRelay('starting', {port: options.relayPort || 'auto'});
@@ -129,8 +131,9 @@ export async function connectViaExtensionRaw(options: {
   });
   await relay.start();
   const wsUrl = relay.getConnectionURL();
+  const sessionId = relay.getSessionId();
   logRelay('started', {wsUrl});
-  console.error(`[fast-cdp] Relay URL: ${wsUrl}`);
+  console.error(`[fast-cdp] Relay URL: ${wsUrl} (session=${sessionId})`);
 
   // Save relay info for reload-extension.mjs (after discovery server starts)
   const relayInfoPath = '/tmp/chrome-ai-bridge-relay.json';
@@ -142,6 +145,7 @@ export async function connectViaExtensionRaw(options: {
     tabUrl: options.tabUrl,
     tabId: options.tabId,
     newTab: options.newTab,
+    allowTabTakeover: options.allowTabTakeover,
   });
 
   if (discoveryPort) {
@@ -151,14 +155,17 @@ export async function connectViaExtensionRaw(options: {
 
     // Save relay info for reload-extension.mjs
     try {
-      fs.writeFileSync(relayInfoPath, JSON.stringify({ discoveryPort, timestamp: Date.now() }));
-      logInfo('extension-raw', 'Saved relay info', { path: relayInfoPath, discoveryPort });
+      fs.writeFileSync(
+        relayInfoPath,
+        JSON.stringify({ discoveryPort, sessionId, timestamp: Date.now() }),
+      );
+      logInfo('extension-raw', 'Saved relay info', { path: relayInfoPath, discoveryPort, sessionId });
     } catch (err) {
       logError('extension-raw', 'Failed to save relay info', { error: err instanceof Error ? err.message : String(err) });
     }
   } else {
     // Fallback: show manual URL
-    const connectUrl = `chrome-extension://${EXTENSION_ID}/ui/connect.html?mcpRelayUrl=${encodeURIComponent(wsUrl)}`;
+    const connectUrl = `chrome-extension://${EXTENSION_ID}/ui/connect.html?mcpRelayUrl=${encodeURIComponent(wsUrl)}&sessionId=${encodeURIComponent(sessionId)}`;
     logError('extension-raw', 'Discovery server failed', {connectUrl});
     console.error(`[fast-cdp] Discovery server failed. Please open manually:`);
     console.error(`[fast-cdp]   ${connectUrl}`);
@@ -166,25 +173,40 @@ export async function connectViaExtensionRaw(options: {
 
   try {
     const actualTimeout = options.timeoutMs ?? 10000;
+    const softTimeout = Math.min(5000, Math.floor(actualTimeout * 0.5));
     logExtension('waiting', {timeoutMs: actualTimeout});
 
     await new Promise<void>((resolve, reject) => {
+      let softTimedOut = false;
+      const softTimer = setTimeout(() => {
+        softTimedOut = true;
+        logInfo('extension-raw', 'Still waiting for extension ready', {
+          waitedMs: softTimeout,
+          timeoutMs: actualTimeout,
+        });
+      }, softTimeout);
+      softTimer.unref();
+
       const timeout = setTimeout(() => {
+        clearTimeout(softTimer);
         logExtension('timeout', {elapsed: actualTimeout});
-        reject(new Error(`Extension connection timeout (${actualTimeout / 1000}s). Make sure the chrome-ai-bridge extension is installed and Chrome is open.`));
+        reject(new Error(`EXT_READY_TIMEOUT: timeoutMs=${actualTimeout} waitedMs=${actualTimeout}`));
       }, actualTimeout);
+      timeout.unref();
 
       relay.once('ready', () => {
+        clearTimeout(softTimer);
         clearTimeout(timeout);
         const elapsed = Date.now() - startTime;
-        logExtension('connected', {elapsed});
+        logExtension('connected', {elapsed, softTimedOut});
         console.error('[fast-cdp] Extension connected');
         resolve();
       });
       relay.once('disconnected', () => {
+        clearTimeout(softTimer);
         clearTimeout(timeout);
         logExtension('disconnected', {reason: 'disconnected before ready'});
-        reject(new Error('Extension disconnected before ready'));
+        reject(new Error('EXT_DISCONNECTED_BEFORE_READY: Extension disconnected before ready'));
       });
     });
   } catch (error) {
