@@ -297,10 +297,6 @@ export class McpResponse implements Response {
           );
         }
         detailedConsoleMessage = formatter;
-      } else {
-        detailedConsoleMessage = await ConsoleFormatter.from(message as Error, {
-          id: consoleMessageStableId,
-        });
       }
     }
 
@@ -351,9 +347,7 @@ export class McpResponse implements Response {
                 }
                 return formatter;
               }
-              return await ConsoleFormatter.from(item as Error, {
-                id: consoleMessageStableId,
-              });
+              return null;
             },
           ),
         )

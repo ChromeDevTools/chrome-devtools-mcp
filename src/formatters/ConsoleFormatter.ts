@@ -21,13 +21,13 @@ export interface ConsoleFormatterOptions {
 }
 
 export class ConsoleFormatter {
-  #msg: ConsoleMessage | Error | SymbolizedError;
+  #msg: ConsoleMessage | SymbolizedError;
   #resolvedArgs: unknown[] = [];
   #resolvedStackTrace?: DevTools.DevTools.StackTrace.StackTrace.StackTrace;
   #id?: number;
 
   private constructor(
-    msg: ConsoleMessage | Error | SymbolizedError,
+    msg: ConsoleMessage | SymbolizedError,
     options?: ConsoleFormatterOptions,
   ) {
     this.#msg = msg;
@@ -36,7 +36,7 @@ export class ConsoleFormatter {
   }
 
   static async from(
-    msg: ConsoleMessage | Error | UncaughtError,
+    msg: ConsoleMessage | UncaughtError,
     options?: ConsoleFormatterOptions,
   ): Promise<ConsoleFormatter> {
     if (msg instanceof UncaughtError) {
@@ -60,17 +60,13 @@ export class ConsoleFormatter {
   }
 
   #isConsoleMessage(
-    msg: ConsoleMessage | Error | SymbolizedError,
+    msg: ConsoleMessage | SymbolizedError,
   ): msg is ConsoleMessage {
     // No `instanceof` as tests mock `ConsoleMessage`.
     return 'args' in msg && typeof msg.args === 'function';
   }
 
   async #loadDetailedData(devTools?: TargetUniverse): Promise<void> {
-    if (this.#msg instanceof Error) {
-      return;
-    }
-
     if (this.#isConsoleMessage(this.#msg)) {
       this.#resolvedArgs = await Promise.all(
         this.#msg.args().map(async (arg, i) => {
