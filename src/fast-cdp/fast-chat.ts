@@ -7,6 +7,7 @@ import {RelayServer} from '../extension/relay-server.js';
 import {logConnectionState, logInfo, logError, logWarn} from './mcp-logger.js';
 import {DOM_UTILS_CODE} from './utils/index.js';
 import {getDriver, type SiteDriver} from './drivers/index.js';
+import {NetworkInterceptor} from './network-interceptor.js';
 
 let chatgptClient: CdpClient | null = null;
 let geminiClient: CdpClient | null = null;
@@ -481,6 +482,7 @@ async function createConnection(kind: 'chatgpt' | 'gemini'): Promise<CdpClient> 
         client.send('Runtime.enable'),
         client.send('DOM.enable'),
         client.send('Page.enable'),
+        client.send('Network.enable', {}),
       ]);
 
       // フォーカスエミュレーション有効化（バックグラウンドタブ対策）
@@ -547,6 +549,7 @@ async function createConnection(kind: 'chatgpt' | 'gemini'): Promise<CdpClient> 
         client.send('Runtime.enable'),
         client.send('DOM.enable'),
         client.send('Page.enable'),
+        client.send('Network.enable', {}),
       ]);
 
       // フォーカスエミュレーション有効化（バックグラウンドタブ対策）
@@ -664,6 +667,10 @@ async function askChatGPTFastInternal(question: string, debug?: boolean): Promis
   const client = await getClient('chatgpt');
   timings.connectMs = nowMs() - t0;
   logInfo('chatgpt', 'getClient completed', {connectMs: timings.connectMs});
+
+  // Network interceptor: parallel capture path (Phase 1)
+  const interceptor = new NetworkInterceptor(client);
+  interceptor.startCapture();
 
   const normalizedQuestion = question.replace(/\s+/g, '');
 
@@ -2319,7 +2326,32 @@ async function askChatGPTFastInternal(question: string, debug?: boolean): Promis
       };
     }
 
-    return {answer: finalAnswer, timings: fullTimings, debug: debugInfo};
+    // Network interceptor: stop capture and compare results
+    interceptor.stopCapture();
+    const networkResult = interceptor.getResult();
+    logInfo('chatgpt', 'Network capture result', {
+      frames: networkResult.frames.length,
+      textLength: networkResult.text.length,
+      rawDataSize: networkResult.rawDataSize,
+      captureTimeMs: networkResult.captureTimeMs,
+      summary: interceptor.getSummary(),
+    });
+
+    // Hybrid: prefer network text if substantial, fallback to DOM
+    let hybridAnswer = finalAnswer;
+    if (networkResult.text.length > 50) {
+      logInfo('chatgpt', 'Network text available', {
+        networkLen: networkResult.text.length,
+        domLen: finalAnswer.length,
+      });
+      // Use network text if DOM extraction failed or returned short text
+      if (!finalAnswer || finalAnswer.length < 20) {
+        hybridAnswer = networkResult.text;
+        logInfo('chatgpt', 'Using network text (DOM extraction failed/short)');
+      }
+    }
+
+    return {answer: hybridAnswer, timings: fullTimings, debug: debugInfo};
 }
 
 /**
@@ -2518,6 +2550,10 @@ async function askGeminiFastInternal(question: string, debug?: boolean): Promise
   const timings: Partial<ChatTimings> = {};
   const client = await getClient('gemini');
   timings.connectMs = nowMs() - t0;
+
+  // Network interceptor: parallel capture path (Phase 1)
+  const interceptor = new NetworkInterceptor(client);
+  interceptor.startCapture();
 
   const tUrl = nowMs();
   const currentUrl = await client.evaluate<string>('location.href');
@@ -3415,7 +3451,31 @@ async function askGeminiFastInternal(question: string, debug?: boolean): Promise
     };
   }
 
-  return {answer: normalized, timings: fullTimings, debug: debugInfo};
+  // Network interceptor: stop capture and compare results
+  interceptor.stopCapture();
+  const networkResult = interceptor.getResult();
+  logInfo('gemini', 'Network capture result', {
+    frames: networkResult.frames.length,
+    textLength: networkResult.text.length,
+    rawDataSize: networkResult.rawDataSize,
+    captureTimeMs: networkResult.captureTimeMs,
+    summary: interceptor.getSummary(),
+  });
+
+  // Hybrid: prefer network text if substantial, fallback to DOM
+  let hybridAnswer = normalized;
+  if (networkResult.text.length > 50) {
+    logInfo('gemini', 'Network text available', {
+      networkLen: networkResult.text.length,
+      domLen: normalized.length,
+    });
+    if (!normalized || normalized.length < 20) {
+      hybridAnswer = networkResult.text;
+      logInfo('gemini', 'Using network text (DOM extraction failed/short)');
+    }
+  }
+
+  return {answer: hybridAnswer, timings: fullTimings, debug: debugInfo};
 }
 
 /**

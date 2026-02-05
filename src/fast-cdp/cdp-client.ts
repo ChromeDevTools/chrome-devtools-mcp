@@ -1,8 +1,15 @@
 import type {RelayServer} from '../extension/relay-server.js';
 
+export interface CdpEvent {
+  method: string;
+  params: any;
+  sessionId?: string;
+}
+
 export class CdpClient {
   private relay: RelayServer;
   private sessionId?: string;
+  private eventHandlers = new Map<string, Map<(params: any) => void, (event: CdpEvent) => void>>();
 
   constructor(relay: RelayServer, sessionId?: string) {
     this.relay = relay;
@@ -15,6 +22,49 @@ export class CdpClient {
       method,
       params: params ?? {},
     });
+  }
+
+  /**
+   * Subscribe to a specific CDP event method (e.g. 'Network.webSocketFrameReceived').
+   * Filters RelayServer 'cdp-event' emissions by method name.
+   */
+  on(eventMethod: string, callback: (params: any) => void): void {
+    const handler = (event: CdpEvent) => {
+      if (event.method === eventMethod) callback(event.params);
+    };
+    if (!this.eventHandlers.has(eventMethod)) {
+      this.eventHandlers.set(eventMethod, new Map());
+    }
+    this.eventHandlers.get(eventMethod)!.set(callback, handler);
+    this.relay.on('cdp-event', handler);
+  }
+
+  /**
+   * Unsubscribe from a specific CDP event method.
+   */
+  off(eventMethod: string, callback: (params: any) => void): void {
+    const methodMap = this.eventHandlers.get(eventMethod);
+    if (!methodMap) return;
+    const handler = methodMap.get(callback);
+    if (handler) {
+      this.relay.off('cdp-event', handler);
+      methodMap.delete(callback);
+    }
+    if (methodMap.size === 0) {
+      this.eventHandlers.delete(eventMethod);
+    }
+  }
+
+  /**
+   * Remove all CDP event listeners registered through this client.
+   */
+  removeAllCdpListeners(): void {
+    for (const [, methodMap] of this.eventHandlers) {
+      for (const [, handler] of methodMap) {
+        this.relay.off('cdp-event', handler);
+      }
+    }
+    this.eventHandlers.clear();
   }
 
   async evaluate<T = any>(expression: string): Promise<T> {
