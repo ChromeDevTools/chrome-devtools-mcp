@@ -35,6 +35,40 @@ chrome-ai-bridge is a [Model Context Protocol](https://modelcontextprotocol.io/)
 
 ---
 
+## What's New in v2.1 — Network-Native Stream
+
+**UI changes? No problem. Responses won't break anymore.**
+
+v2.1 introduces a fundamentally new approach to response extraction. Instead of reading text from the page (DOM), chrome-ai-bridge now intercepts the actual network communication between your browser and ChatGPT/Gemini.
+
+### Before vs After
+
+| | v2.0 (DOM extraction) | v2.1 (Network interception) |
+|---|---|---|
+| **How it works** | Read HTML elements via CSS selectors | Intercept API responses directly |
+| **When UI changes** | Breaks (selectors become invalid) | Unaffected |
+| **Output format** | Plain text only | Markdown, LaTeX, structured content |
+| **Thinking mode** | Complex filtering needed | Naturally separated by protocol |
+| **Reliability** | Depends on page rendering | Depends on API protocol (stable) |
+
+### Architecture
+
+```
+v2.0:  CDP → DOM querySelector → innerText
+v2.1:  CDP → Network.loadingFinished → getResponseBody → Protocol Parser
+                                                              │
+                                          ┌───────────────────┴────────────────┐
+                                          ▼                                    ▼
+                                ChatGPT SSE Parser              Gemini Chunked Parser
+                              (delta_encoding v1)             (StreamGenerate format)
+```
+
+Network extraction is the primary path. DOM extraction remains as an automatic fallback — no configuration needed.
+
+> **Privacy**: All data stays local. Network interception happens within your browser via CDP. No data is sent to external servers.
+
+---
+
 ## Quick Start
 
 > **⚠️ Both steps are required** — The extension and MCP server work together.

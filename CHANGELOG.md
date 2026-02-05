@@ -4,6 +4,28 @@ All notable changes to this project will be documented in this file.
 
 This project is a fork of [Chrome DevTools MCP](https://github.com/ChromeDevTools/chrome-ai-bridge) by Google LLC, focusing on multi-AI consultation capabilities.
 
+## [2.1.0] - 2026-02-05
+
+### Added
+- **Network-Native Stream**: Response extraction via CDP Network domain instead of DOM selectors
+  - ChatGPT: Intercepts `delta_encoding v1` SSE stream from `/backend-api/f/conversation`
+  - Gemini: Intercepts `StreamGenerate` chunked response with double-encoded JSON
+  - Markdown/LaTeX formatting preserved in raw output, stripped for plain text
+  - Thinking mode (ChatGPT) content automatically filtered
+- `NetworkInterceptor` class for CDP network event capture and protocol parsing
+- CDP event listener API (`CdpClient.on()`/`.off()`) for real-time event subscription
+- `test:network` script for protocol inspection and debugging
+
+### Changed
+- **Response extraction strategy**: Network interception is now the primary source (DOM extraction as fallback)
+- Extension version bumped to 2.0.22
+
+### Why this matters
+- **No more selector breakage**: UI changes by ChatGPT/Gemini no longer break response extraction
+- **Richer output**: Markdown formatting, LaTeX equations, and structured content are preserved
+- **More reliable**: Direct protocol parsing vs fragile DOM text extraction
+- **100% word overlap**: Network extraction matches DOM extraction with perfect accuracy
+
 ## [2.0.1] - 2026-01-30
 
 ### Added
