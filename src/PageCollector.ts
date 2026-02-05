@@ -22,8 +22,25 @@ import {
   type PageEvents as PuppeteerPageEvents,
 } from './third_party/index.js';
 
+export class UncaughtError {
+  readonly message: string;
+  readonly stackTrace?: Protocol.Runtime.StackTrace;
+  readonly targetId: string;
+
+  constructor(
+    message: string,
+    stackTrace: Protocol.Runtime.StackTrace | undefined,
+    targetId: string,
+  ) {
+    this.message = message;
+    this.stackTrace = stackTrace;
+    this.targetId = targetId;
+  }
+}
+
 interface PageEvents extends PuppeteerPageEvents {
   issue: DevTools.AggregatedIssue;
+  uncaughtError: UncaughtError;
 }
 
 export type ListenerMap<EventMap extends PageEvents = PageEvents> = {
@@ -219,14 +236,14 @@ export class PageCollector<T> {
 }
 
 export class ConsoleCollector extends PageCollector<
-  ConsoleMessage | Error | DevTools.AggregatedIssue
+  ConsoleMessage | Error | DevTools.AggregatedIssue | UncaughtError
 > {
-  #subscribedPages = new WeakMap<Page, PageIssueSubscriber>();
+  #subscribedPages = new WeakMap<Page, PageEventSubscriber>();
 
   override addPage(page: Page): void {
     super.addPage(page);
     if (!this.#subscribedPages.has(page)) {
-      const subscriber = new PageIssueSubscriber(page);
+      const subscriber = new PageEventSubscriber(page);
       this.#subscribedPages.set(page, subscriber);
       void subscriber.subscribe();
     }
@@ -239,18 +256,21 @@ export class ConsoleCollector extends PageCollector<
   }
 }
 
-class PageIssueSubscriber {
+class PageEventSubscriber {
   #issueManager = new FakeIssuesManager();
   #issueAggregator = new DevTools.IssueAggregator(this.#issueManager);
   #seenKeys = new Set<string>();
   #seenIssues = new Set<DevTools.AggregatedIssue>();
   #page: Page;
   #session: CDPSession;
+  #targetId: string;
 
   constructor(page: Page) {
     this.#page = page;
     // @ts-expect-error use existing CDP client (internal Puppeteer API).
     this.#session = this.#page._client() as CDPSession;
+    // @ts-expect-error use internal Puppeteer API to get target ID
+    this.#targetId = this.#session.target()._targetId;
   }
 
   #resetIssueAggregator() {
@@ -272,6 +292,7 @@ class PageIssueSubscriber {
     this.#resetIssueAggregator();
     this.#page.on('framenavigated', this.#onFrameNavigated);
     this.#session.on('Audits.issueAdded', this.#onIssueAdded);
+    this.#session.on('Runtime.exceptionThrown', this.#onExceptionThrown);
     try {
       await this.#session.send('Audits.enable');
     } catch (error) {
@@ -284,6 +305,7 @@ class PageIssueSubscriber {
     this.#seenIssues.clear();
     this.#page.off('framenavigated', this.#onFrameNavigated);
     this.#session.off('Audits.issueAdded', this.#onIssueAdded);
+    this.#session.off('Runtime.exceptionThrown', this.#onExceptionThrown);
     if (this.#issueAggregator) {
       this.#issueAggregator.removeEventListener(
         DevTools.IssueAggregatorEvents.AGGREGATED_ISSUE_UPDATED,
@@ -303,6 +325,17 @@ class PageIssueSubscriber {
     }
     this.#seenIssues.add(event.data);
     this.#page.emit('issue', event.data);
+  };
+
+  #onExceptionThrown = (event: Protocol.Runtime.ExceptionThrownEvent) => {
+    const {exception, text, stackTrace} = event.exceptionDetails;
+    const messageWithRest = exception?.description?.split('\n    at ', 2) ?? [];
+    const message = text + ' ' + (messageWithRest[0] ?? '');
+
+    this.#page.emit(
+      'uncaughtError',
+      new UncaughtError(message, stackTrace, this.#targetId),
+    );
   };
 
   // On navigation, we reset issue aggregation.

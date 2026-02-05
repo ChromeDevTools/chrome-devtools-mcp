@@ -9,6 +9,7 @@ import {IssueFormatter} from './formatters/IssueFormatter.js';
 import {NetworkFormatter} from './formatters/NetworkFormatter.js';
 import {SnapshotFormatter} from './formatters/SnapshotFormatter.js';
 import type {McpContext} from './McpContext.js';
+import {UncaughtError} from './PageCollector.js';
 import {DevTools} from './third_party/index.js';
 import type {
   ConsoleMessage,
@@ -276,8 +277,8 @@ export class McpResponse implements Response {
         this.#attachedConsoleMessageId,
       );
       const consoleMessageStableId = this.#attachedConsoleMessageId;
-      if ('args' in message) {
-        const consoleMessage = message as ConsoleMessage;
+      if ('args' in message || message instanceof UncaughtError) {
+        const consoleMessage = message as ConsoleMessage | UncaughtError;
         const devTools = context.getDevToolsUniverse();
         detailedConsoleMessage = await ConsoleFormatter.from(consoleMessage, {
           id: consoleMessageStableId,
@@ -332,8 +333,8 @@ export class McpResponse implements Response {
             async (item): Promise<ConsoleFormatter | IssueFormatter | null> => {
               const consoleMessageStableId =
                 context.getConsoleMessageStableId(item);
-              if ('args' in item) {
-                const consoleMessage = item as ConsoleMessage;
+              if ('args' in item || item instanceof UncaughtError) {
+                const consoleMessage = item as ConsoleMessage | UncaughtError;
                 const devTools = context.getDevToolsUniverse();
                 return await ConsoleFormatter.from(consoleMessage, {
                   id: consoleMessageStableId,

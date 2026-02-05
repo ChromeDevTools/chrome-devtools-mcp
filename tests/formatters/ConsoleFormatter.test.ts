@@ -8,6 +8,7 @@ import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
 import {ConsoleFormatter} from '../../src/formatters/ConsoleFormatter.js';
+import {UncaughtError} from '../../src/PageCollector.js';
 import type {ConsoleMessage} from '../../src/third_party/index.js';
 import type {DevTools} from '../../src/third_party/index.js';
 
@@ -63,6 +64,18 @@ describe('ConsoleFormatter', () => {
       });
       const result = (
         await ConsoleFormatter.from(message, {id: 3, fetchDetailedData: true})
+      ).toString();
+      t.assert.snapshot?.(result);
+    });
+
+    it('formats an UncaughtError', async t => {
+      const error = new UncaughtError(
+        'Uncaught TypeError: Cannot read properties of undefined',
+        undefined,
+        '<mock target ID>',
+      );
+      const result = (
+        await ConsoleFormatter.from(error, {id: 4, fetchDetailedData: true})
       ).toString();
       t.assert.snapshot?.(result);
     });
@@ -183,6 +196,53 @@ describe('ConsoleFormatter', () => {
       const result = formatter.toStringDetailed();
       t.assert.snapshot?.(result);
       assert.ok(result.includes('<error: Argument 0 is no longer available>'));
+    });
+
+    it('formats an UncaughtError with a stack trace', async t => {
+      const stackTrace = {
+        syncFragment: {
+          frames: [
+            {
+              line: 10,
+              column: 2,
+              url: 'foo.ts',
+              name: 'foo',
+            },
+            {
+              line: 20,
+              column: 2,
+              url: 'foo.ts',
+              name: 'bar',
+            },
+          ],
+        },
+        asyncFragments: [
+          {
+            description: 'setTimeout',
+            frames: [
+              {
+                line: 5,
+                column: 2,
+                url: 'util.ts',
+                name: 'schedule',
+              },
+            ],
+          },
+        ],
+      } as unknown as DevTools.StackTrace.StackTrace.StackTrace;
+      const error = new UncaughtError(
+        'Uncaught TypeError: Cannot read properties of undefined',
+        undefined,
+        '<mock target ID>',
+      );
+
+      const result = (
+        await ConsoleFormatter.from(error, {
+          id: 7,
+          resolvedStackTraceForTesting: stackTrace,
+        })
+      ).toStringDetailed();
+      t.assert.snapshot?.(result);
     });
   });
   describe('toJSON', () => {

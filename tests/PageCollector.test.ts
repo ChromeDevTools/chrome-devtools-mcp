@@ -382,4 +382,36 @@ describe('ConsoleCollector', () => {
     assert.equal(collectedIssue.code(), 'MixedContentIssue');
     assert.equal(collectedIssue.getAggregatedIssuesCount(), 1);
   });
+
+  it('emits UncaughtErrors for Runtime.exceptionThrown CDP events', async () => {
+    const browser = getMockBrowser();
+    const page = (await browser.pages())[0];
+    // @ts-expect-error internal API.
+    const cdpSession = page._client();
+    const onUncaughtErrorListener = sinon.spy();
+    const collector = new ConsoleCollector(browser, () => {
+      return {
+        uncaughtError: onUncaughtErrorListener,
+      } as ListenerMap;
+    });
+    await collector.init([page]);
+
+    cdpSession.emit('Runtime.exceptionThrown', {
+      exceptionDetails: {
+        exception: {description: 'SyntaxError: Expected {'},
+        text: 'Uncaught',
+        stackTrace: {callFrames: []},
+      },
+    });
+
+    sinon.assert.calledOnceWithMatch(
+      onUncaughtErrorListener,
+      sinon.match(e => {
+        return (
+          e.message === 'Uncaught SyntaxError: Expected {' &&
+          e.stackTrace.callFrames.length === 0
+        );
+      }),
+    );
+  });
 });

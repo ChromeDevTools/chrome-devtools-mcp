@@ -15,7 +15,7 @@ Chrome DevTools for reliable automation, in-depth debugging, and performance ana
   DevTools](https://github.com/ChromeDevTools/devtools-frontend) to record
   traces and extract actionable performance insights.
 - **Advanced browser debugging**: Analyze network requests, take screenshots and
-  check the browser console.
+  check browser console messages (with source-mapped stack traces).
 - **Reliable automation**. Uses
   [puppeteer](https://github.com/puppeteer/puppeteer) to automate actions in
   Chrome and automatically wait for action results.
@@ -574,14 +574,11 @@ The following code snippet is an example configuration for gemini-cli:
   "mcpServers": {
     "chrome-devtools": {
       "command": "npx",
-      "args": ["chrome-devtools-mcp@latest", "--autoConnect", "--channel=beta"]
+      "args": ["chrome-devtools-mcp@latest", "--autoConnect"]
     }
   }
 }
 ```
-
-Note: you have to specify `--channel=beta` until Chrome M144 has reached the
-stable channel.
 
 **Step 3:** Test your setup
 

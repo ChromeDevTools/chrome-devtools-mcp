@@ -220,7 +220,6 @@ export const fill = defineTool({
   },
   handler: async (request, response, context) => {
     await context.waitForEventsAfterAction(async () => {
-      await context.getSelectedPage().keyboard.type(request.params.value);
       await fillFormElement(
         request.params.uid,
         request.params.value,

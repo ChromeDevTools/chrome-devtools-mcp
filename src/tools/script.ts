@@ -12,8 +12,8 @@ import {defineTool} from './ToolDefinition.js';
 
 export const evaluateScript = defineTool({
   name: 'evaluate_script',
-  description: `Evaluate a JavaScript function inside the currently selected page. Returns the response as JSON
-so returned values have to JSON-serializable.`,
+  description: `Evaluate a JavaScript function inside the currently selected page. Returns the response as JSON,
+so returned values have to be JSON-serializable.`,
   annotations: {
     category: ToolCategory.DEBUGGING,
     readOnlyHint: false,

@@ -423,7 +423,7 @@ SOFTWARE.
 
 Name: @modelcontextprotocol/sdk
 URL: https://modelcontextprotocol.io
-Version: 1.25.3
+Version: 1.26.0
 License: MIT
 
 MIT License
@@ -453,7 +453,7 @@ SOFTWARE.
 
 Name: zod-to-json-schema
 URL: https://github.com/StefanTerdell/zod-to-json-schema
-Version: 3.25.0
+Version: 3.25.1
 License: ISC
 
 ISC License

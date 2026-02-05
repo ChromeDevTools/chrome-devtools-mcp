@@ -292,8 +292,8 @@
 
 ### `evaluate_script`
 
-**Description:** Evaluate a JavaScript function inside the currently selected page. Returns the response as JSON
-so returned values have to JSON-serializable.
+**Description:** Evaluate a JavaScript function inside the currently selected page. Returns the response as JSON,
+so returned values have to be JSON-serializable.
 
 **Parameters:**
 

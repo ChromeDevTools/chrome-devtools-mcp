@@ -14,7 +14,7 @@ import {
   UniverseManager,
   urlsEqual,
 } from './DevtoolsUtils.js';
-import type {ListenerMap} from './PageCollector.js';
+import type {ListenerMap, UncaughtError} from './PageCollector.js';
 import {NetworkCollector, ConsoleCollector} from './PageCollector.js';
 import {Locator} from './third_party/index.js';
 import type {DevTools} from './third_party/index.js';
@@ -158,14 +158,8 @@ export class McpContext implements Context {
         console: event => {
           collect(event);
         },
-        pageerror: event => {
-          if (event instanceof Error) {
-            collect(event);
-          } else {
-            const error = new Error(`${event}`);
-            error.stack = undefined;
-            collect(error);
-          }
+        uncaughtError: event => {
+          collect(event);
         },
         issue: event => {
           collect(event);
@@ -247,7 +241,7 @@ export class McpContext implements Context {
 
   getConsoleData(
     includePreservedMessages?: boolean,
-  ): Array<ConsoleMessage | Error | DevTools.AggregatedIssue> {
+  ): Array<ConsoleMessage | Error | DevTools.AggregatedIssue | UncaughtError> {
     const page = this.getSelectedPage();
     return this.#consoleCollector.getData(page, includePreservedMessages);
   }
@@ -257,14 +251,14 @@ export class McpContext implements Context {
   }
 
   getConsoleMessageStableId(
-    message: ConsoleMessage | Error | DevTools.AggregatedIssue,
+    message: ConsoleMessage | Error | DevTools.AggregatedIssue | UncaughtError,
   ): number {
     return this.#consoleCollector.getIdForResource(message);
   }
 
   getConsoleMessageById(
     id: number,
-  ): ConsoleMessage | Error | DevTools.AggregatedIssue {
+  ): ConsoleMessage | Error | DevTools.AggregatedIssue | UncaughtError {
     return this.#consoleCollector.getById(this.getSelectedPage(), id);
   }
 

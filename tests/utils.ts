@@ -287,6 +287,7 @@ export function getMockPage(): Page {
     send: () => {
       // no-op
     },
+    target: () => ({_targetId: '<mock target ID>'}),
   };
   return {
     mainFrame() {

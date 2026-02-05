@@ -10,6 +10,10 @@ exports[`ConsoleFormatter > toString > formats a console.log message with one ar
 msgid=2 [log] Processing file: (1 args)
 `;
 
+exports[`ConsoleFormatter > toString > formats an UncaughtError 1`] = `
+msgid=4 [error] Uncaught TypeError: Cannot read properties of undefined (0 args)
+`;
+
 exports[`ConsoleFormatter > toStringDetailed > formats a console message with a stack trace 1`] = `
 ID: 5
 Message: log> Hello stack trace!
@@ -18,6 +22,7 @@ at foo (foo.ts:10:2)
 at bar (foo.ts:20:2)
 --- setTimeout -------------------------
 at schedule (util.ts:5:2)
+Note: line and column numbers use 1-based indexing
 `;
 
 exports[`ConsoleFormatter > toStringDetailed > formats a console.error message 1`] = `
@@ -43,6 +48,17 @@ ID: 2
 Message: log> Processing file:
 ### Arguments
 Arg #0: file.txt
+`;
+
+exports[`ConsoleFormatter > toStringDetailed > formats an UncaughtError with a stack trace 1`] = `
+ID: 7
+Message: error> Uncaught TypeError: Cannot read properties of undefined
+### Stack trace
+at foo (foo.ts:10:2)
+at bar (foo.ts:20:2)
+--- setTimeout -------------------------
+at schedule (util.ts:5:2)
+Note: line and column numbers use 1-based indexing
 `;
 
 exports[`ConsoleFormatter > toStringDetailed > handles \"Execution context is not available\" error in args 1`] = `

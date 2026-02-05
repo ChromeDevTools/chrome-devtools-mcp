@@ -49,7 +49,7 @@ describe('console', () => {
         await listConsoleMessages.handler({params: {}}, response, context);
         const formattedResponse = await response.handle('test', context);
         const textContent = getTextContent(formattedResponse.content[0]);
-        assert.ok(textContent.includes('msgid=1 [error] undefined (0 args)'));
+        assert.ok(textContent.includes('msgid=1 [error] Uncaught  (0 args)'));
       });
     });
 
@@ -236,6 +236,35 @@ describe('console', () => {
         res.end(`function n(){console.warn("hello world")}function o(){n()}(function n(){o()})();
           //# sourceMappingURL=data:application/json;charset=utf-8;base64,eyJ2ZXJzaW9uIjozLCJuYW1lcyI6WyJiYXIiLCJjb25zb2xlIiwid2FybiIsImZvbyIsIklpZmUiXSwic291cmNlcyI6WyIuL21haW4uanMiXSwic291cmNlc0NvbnRlbnQiOlsiXG5mdW5jdGlvbiBiYXIoKSB7XG4gIGNvbnNvbGUud2FybignaGVsbG8gd29ybGQnKTtcbn1cblxuZnVuY3Rpb24gZm9vKCkge1xuICBiYXIoKTtcbn1cblxuKGZ1bmN0aW9uIElpZmUoKSB7XG4gIGZvbygpO1xufSkoKTtcblxuIl0sIm1hcHBpbmdzIjoiQUFDQSxTQUFTQSxJQUNQQyxRQUFRQyxLQUFLLGNBQ2YsQ0FFQSxTQUFTQyxJQUNQSCxHQUNGLEVBRUEsU0FBVUksSUFDUkQsR0FDRCxFQUZEIiwiaWdub3JlTGlzdCI6W119
           `);
+      });
+      server.addHtmlRoute(
+        '/index.html',
+        `<script src="${server.getRoute('/main.min.js')}"></script>`,
+      );
+
+      await withMcpContext(async (response, context) => {
+        const page = await context.newPage();
+        await page.goto(server.getRoute('/index.html'));
+
+        await getConsoleMessage.handler(
+          {params: {msgid: 1}},
+          response,
+          context,
+        );
+        const formattedResponse = await response.handle('test', context);
+        const rawText = getTextContent(formattedResponse.content[0]);
+
+        t.assert.snapshot?.(rawText);
+      });
+    });
+
+    it('applies source maps to stack traces of uncaught exceptions', async t => {
+      server.addRoute('/main.min.js', (_req, res) => {
+        res.setHeader('Content-Type', 'text/javascript');
+        res.statusCode = 200;
+        res.end(`function n(){throw new Error("b00m!")}function o(){n()}(function n(){o()})();
+          //# sourceMappingURL=data:application/json;charset=utf-8;base64,eyJ2ZXJzaW9uIjozLCJuYW1lcyI6WyJiYXIiLCJFcnJvciIsImZvbyIsIklpZmUiXSwic291cmNlcyI6WyIuL21haW4uanMiXSwic291cmNlc0NvbnRlbnQiOlsiXG5mdW5jdGlvbiBiYXIoKSB7XG4gIHRocm93IG5ldyBFcnJvcignYjAwbSEnKTtcbn1cblxuZnVuY3Rpb24gZm9vKCkge1xuICBiYXIoKTtcbn1cblxuKGZ1bmN0aW9uIElpZmUoKSB7XG4gIGZvbygpO1xufSkoKTtcblxuIl0sIm1hcHBpbmdzIjoiQUFDQSxTQUFTQSxJQUNQLE1BQU0sSUFBSUMsTUFBTSxRQUNsQixDQUVBLFNBQVNDLElBQ1BGLEdBQ0YsRUFFQSxTQUFVRyxJQUNSRCxHQUNELEVBRkQiLCJpZ25vcmVMaXN0IjpbXX0=
+        `);
       });
       server.addHtmlRoute(
         '/index.html',
