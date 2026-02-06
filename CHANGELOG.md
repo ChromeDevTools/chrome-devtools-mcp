@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.17.0](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.16.0...chrome-devtools-mcp-v0.17.0) (2026-02-06)
+
+
+### 🎉 Features
+
+* include Error.cause chain for uncaught errors and logged Errors ([#906](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/906)) ([05b01ec](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/05b01ecaba47cf1ce38564636663222c9cab46de))
+* Integrate CrUX data into performance trace summaries ([#733](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/733)) ([b747f9d](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/b747f9d74a12d2119b6531476b2f88ab66be0ff8))
+* show message and stack trace in details when console.log'ging Error objects ([#902](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/902)) ([ffa00da](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/ffa00dab1b65b2eac8db215e0289317b8ed9b725))
+
 ## [0.16.0](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.15.1...chrome-devtools-mcp-v0.16.0) (2026-02-04)
 
 
