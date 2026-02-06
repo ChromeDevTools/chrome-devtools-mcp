@@ -42,6 +42,19 @@ describe('console', () => {
       });
     });
 
+    it('lists error objects', async t => {
+      await withMcpContext(async (response, context) => {
+        const page = await context.newPage();
+        await page.setContent(
+          '<script>console.error(new Error("This is an error"))</script>',
+        );
+        await listConsoleMessages.handler({params: {}}, response, context);
+        const formattedResponse = await response.handle('test', context);
+        const textContent = getTextContent(formattedResponse.content[0]);
+        t.assert.snapshot?.(textContent);
+      });
+    });
+
     it('work with primitive unhandled errors', async () => {
       await withMcpContext(async (response, context) => {
         const page = await context.newPage();

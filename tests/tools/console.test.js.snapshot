@@ -112,3 +112,10 @@ Learn more:
 ### Affected resources
 reqid=<reqid> data={"corsErrorStatus":{"corsError":"PreflightMissingAllowOriginHeader","failedParameter":""},"isWarning":false,"request":{"url":"http://hostname:port/data.json"},"initiatorOrigin":"","clientSecurityState":{"initiatorIsSecureContext":false,"initiatorIPAddressSpace":"Loopback","privateNetworkRequestPolicy":"BlockFromInsecureToMorePrivate"}}
 `;
+
+exports[`console > list_console_messages > lists error objects 1`] = `
+# test response
+## Console messages
+Showing 1-1 of 1 (Page 1 of 1).
+msgid=1 [error] JSHandle@error (1 args)
+`;
