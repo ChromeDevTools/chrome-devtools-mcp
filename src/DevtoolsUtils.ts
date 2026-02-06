@@ -286,6 +286,23 @@ export class SymbolizedError {
     let cause: SymbolizedError | undefined;
     if (opts.resolvedCauseForTesting) {
       cause = opts.resolvedCauseForTesting;
+    } else if (opts.details.exception) {
+      try {
+        const causeRemoteObj = await SymbolizedError.#lookupCause(
+          opts.devTools,
+          opts.details.exception,
+          opts.targetId,
+        );
+        if (causeRemoteObj) {
+          cause = await SymbolizedError.fromError({
+            devTools: opts.devTools,
+            error: causeRemoteObj,
+            targetId: opts.targetId,
+          });
+        }
+      } catch {
+        // Ignore
+      }
     }
     return new SymbolizedError(message, stackTrace, cause);
   }
@@ -353,6 +370,30 @@ export class SymbolizedError {
         error.objectId as DevTools.Protocol.Runtime.RemoteObjectId,
       )) ?? null
     );
+  }
+
+  static async #lookupCause(
+    devTools: TargetUniverse | undefined,
+    error: Protocol.Runtime.RemoteObject,
+    targetId: string,
+  ): Promise<Protocol.Runtime.RemoteObject | null> {
+    if (!devTools || (error.type !== 'object' && error.subtype !== 'error')) {
+      return null;
+    }
+
+    const targetManager = devTools.universe.context.get(DevTools.TargetManager);
+    const target = targetId
+      ? targetManager.targetById(targetId) || devTools.target
+      : devTools.target;
+
+    const properties = await target.runtimeAgent().invoke_getProperties({
+      objectId: error.objectId as DevTools.Protocol.Runtime.RemoteObjectId,
+    });
+    if (properties.getError()) {
+      return null;
+    }
+
+    return properties.result.find(prop => prop.name === 'cause')?.value ?? null;
   }
 
   static createForTesting(
