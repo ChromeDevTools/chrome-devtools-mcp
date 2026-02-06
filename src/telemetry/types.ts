@@ -63,14 +63,6 @@ export enum OsType {
   OS_TYPE_LINUX = 3,
 }
 
-export enum ChromeChannel {
-  CHROME_CHANNEL_UNSPECIFIED = 0,
-  CHROME_CHANNEL_CANARY = 1,
-  CHROME_CHANNEL_DEV = 2,
-  CHROME_CHANNEL_BETA = 3,
-  CHROME_CHANNEL_STABLE = 4,
-}
-
 export enum McpClient {
   MCP_CLIENT_UNSPECIFIED = 0,
   MCP_CLIENT_CLAUDE_CODE = 1,
