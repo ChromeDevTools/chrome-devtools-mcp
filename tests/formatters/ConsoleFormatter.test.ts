@@ -10,13 +10,16 @@ import {describe, it} from 'node:test';
 import {SymbolizedError} from '../../src/DevtoolsUtils.js';
 import {ConsoleFormatter} from '../../src/formatters/ConsoleFormatter.js';
 import {UncaughtError} from '../../src/PageCollector.js';
-import type {ConsoleMessage} from '../../src/third_party/index.js';
+import type {ConsoleMessage, Protocol} from '../../src/third_party/index.js';
 import type {DevTools} from '../../src/third_party/index.js';
 
 interface MockConsoleMessage {
   type: () => string;
   text: () => string;
-  args: () => Array<{jsonValue: () => Promise<unknown>}>;
+  args: () => Array<{
+    jsonValue: () => Promise<unknown>;
+    remoteObject: () => Protocol.Runtime.RemoteObject;
+  }>;
   stackTrace?: DevTools.StackTrace.StackTrace.StackTrace;
 }
 
@@ -31,7 +34,7 @@ const createMockMessage = (
   } as unknown as ConsoleMessage;
 };
 
-describe('ConsoleFormatter', () => {
+describe.only('ConsoleFormatter', () => {
   describe('toString', () => {
     it('formats a console.log message', async t => {
       const message = createMockMessage({
@@ -46,7 +49,12 @@ describe('ConsoleFormatter', () => {
       const message = createMockMessage({
         type: () => 'log',
         text: () => 'Processing file:',
-        args: () => [{jsonValue: async () => 'file.txt'}],
+        args: () => [
+          {
+            jsonValue: async () => 'file.txt',
+            remoteObject: () => ({type: 'string'}),
+          },
+        ],
       });
       const result = (
         await ConsoleFormatter.from(message, {id: 2, fetchDetailedData: true})
@@ -59,8 +67,14 @@ describe('ConsoleFormatter', () => {
         type: () => 'log',
         text: () => 'Processing file:',
         args: () => [
-          {jsonValue: async () => 'file.txt'},
-          {jsonValue: async () => 'another file'},
+          {
+            jsonValue: async () => 'file.txt',
+            remoteObject: () => ({type: 'string'}),
+          },
+          {
+            jsonValue: async () => 'another file',
+            remoteObject: () => ({type: 'string'}),
+          },
         ],
       });
       const result = (
@@ -106,7 +120,12 @@ describe('ConsoleFormatter', () => {
       const message = createMockMessage({
         type: () => 'log',
         text: () => 'Processing file:',
-        args: () => [{jsonValue: async () => 'file.txt'}],
+        args: () => [
+          {
+            jsonValue: async () => 'file.txt',
+            remoteObject: () => ({type: 'string'}),
+          },
+        ],
       });
       const result = (
         await ConsoleFormatter.from(message, {id: 2, fetchDetailedData: true})
@@ -119,8 +138,14 @@ describe('ConsoleFormatter', () => {
         type: () => 'log',
         text: () => 'Processing file:',
         args: () => [
-          {jsonValue: async () => 'file.txt'},
-          {jsonValue: async () => 'another file'},
+          {
+            jsonValue: async () => 'file.txt',
+            remoteObject: () => ({type: 'string'}),
+          },
+          {
+            jsonValue: async () => 'another file',
+            remoteObject: () => ({type: 'string'}),
+          },
         ],
       });
       const result = (
@@ -195,6 +220,7 @@ describe('ConsoleFormatter', () => {
             jsonValue: async () => {
               throw new Error('Execution context is not available');
             },
+            remoteObject: () => ({type: 'string'}),
           },
         ],
       });
@@ -320,8 +346,14 @@ describe('ConsoleFormatter', () => {
         type: () => 'log',
         text: () => 'Processing file:',
         args: () => [
-          {jsonValue: async () => 'file.txt'},
-          {jsonValue: async () => 'another file'},
+          {
+            jsonValue: async () => 'file.txt',
+            remoteObject: () => ({type: 'string'}),
+          },
+          {
+            jsonValue: async () => 'another file',
+            remoteObject: () => ({type: 'string'}),
+          },
         ],
       });
       const result = (await ConsoleFormatter.from(message, {id: 1})).toJSON();
@@ -357,8 +389,14 @@ describe('ConsoleFormatter', () => {
         type: () => 'log',
         text: () => 'Processing file:',
         args: () => [
-          {jsonValue: async () => 'file.txt'},
-          {jsonValue: async () => 'another file'},
+          {
+            jsonValue: async () => 'file.txt',
+            remoteObject: () => ({type: 'string'}),
+          },
+          {
+            jsonValue: async () => 'another file',
+            remoteObject: () => ({type: 'string'}),
+          },
         ],
       });
       const result = (

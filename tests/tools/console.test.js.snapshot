@@ -1,3 +1,21 @@
+exports[`console > get_console_message > applies source maps to stack traces of Error object console.log arguments 1`] = `
+# test response
+ID: 1
+Message: log> An error happened: JSHandle@error
+### Arguments
+Arg #0: An error happened:
+Arg #1: Error: b00m!
+at bar (main.js:3:9)
+at foo (main.js:7:3)
+at Iife (main.js:12:5)
+at <anonymous> (main.js:10:1)
+Note: line and column numbers use 1-based indexing
+### Stack trace
+at Iife (main.js:14:13)
+at <anonymous> (main.js:10:1)
+Note: line and column numbers use 1-based indexing
+`;
+
 exports[`console > get_console_message > applies source maps to stack traces of console messages 1`] = `
 # test response
 ID: 1

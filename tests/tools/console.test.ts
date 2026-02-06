@@ -286,5 +286,34 @@ describe('console', () => {
         t.assert.snapshot?.(rawText);
       });
     });
+
+    it('applies source maps to stack traces of Error object console.log arguments', async t => {
+      server.addRoute('/main.min.js', (_req, res) => {
+        res.setHeader('Content-Type', 'text/javascript');
+        res.statusCode = 200;
+        res.end(`function n(){throw new Error("b00m!")}function o(){n()}(function n(){try{o()}catch(n){console.log("An error happened:",n)}})();
+          //# sourceMappingURL=data:application/json;charset=utf-8;base64,eyJ2ZXJzaW9uIjozLCJuYW1lcyI6WyJiYXIiLCJFcnJvciIsImZvbyIsIklpZmUiLCJlIiwiY29uc29sZSIsImxvZyJdLCJzb3VyY2VzIjpbIi4vbWFpbi5qcyJdLCJzb3VyY2VzQ29udGVudCI6WyJcbmZ1bmN0aW9uIGJhcigpIHtcbiAgdGhyb3cgbmV3IEVycm9yKCdiMDBtIScpO1xufVxuXG5mdW5jdGlvbiBmb28oKSB7XG4gIGJhcigpO1xufVxuXG4oZnVuY3Rpb24gSWlmZSgpIHtcbiAgdHJ5IHtcbiAgICBmb28oKTtcbiAgfSBjYXRjaCAoZSkge1xuICAgIGNvbnNvbGUubG9nKCdBbiBlcnJvciBoYXBwZW5lZDonLCBlKTtcbiAgfVxufSkoKTtcblxuIl0sIm1hcHBpbmdzIjoiQUFDQSxTQUFTQSxJQUNQLE1BQU0sSUFBSUMsTUFBTSxRQUNsQixDQUVBLFNBQVNDLElBQ1BGLEdBQ0YsRUFFQSxTQUFVRyxJQUNSLElBQ0VELEdBQ0YsQ0FBRSxNQUFPRSxHQUNQQyxRQUFRQyxJQUFJLHFCQUFzQkYsRUFDcEMsQ0FDRCxFQU5EIiwiaWdub3JlTGlzdCI6W119
+        `);
+      });
+      server.addHtmlRoute(
+        '/index.html',
+        `<script src="${server.getRoute('/main.min.js')}"></script>`,
+      );
+
+      await withMcpContext(async (response, context) => {
+        const page = await context.newPage();
+        await page.goto(server.getRoute('/index.html'));
+
+        await getConsoleMessage.handler(
+          {params: {msgid: 1}},
+          response,
+          context,
+        );
+        const formattedResponse = await response.handle('test', context);
+        const rawText = getTextContent(formattedResponse.content[0]);
+
+        t.assert.snapshot?.(rawText);
+      });
+    });
   });
 });

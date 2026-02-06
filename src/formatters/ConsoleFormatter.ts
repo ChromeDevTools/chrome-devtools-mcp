@@ -78,6 +78,18 @@ export class ConsoleFormatter {
       resolvedArgs = await Promise.all(
         msg.args().map(async (arg, i) => {
           try {
+            const remoteObject = arg.remoteObject();
+            if (
+              remoteObject.type === 'object' &&
+              remoteObject.subtype === 'error'
+            ) {
+              return await SymbolizedError.fromError({
+                devTools: options.devTools,
+                error: remoteObject,
+                // @ts-expect-error Internal ConsoleMessage API
+                targetId: msg._targetId(),
+              });
+            }
             return await arg.jsonValue();
           } catch {
             return `<error: Argument ${i} is no longer available>`;

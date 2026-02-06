@@ -281,16 +281,69 @@ export class SymbolizedError {
     return new SymbolizedError(message, stackTrace);
   }
 
+  static async fromError(opts: {
+    devTools?: TargetUniverse;
+    error: Protocol.Runtime.RemoteObject;
+    targetId: string;
+  }): Promise<SymbolizedError> {
+    const details = await SymbolizedError.#getExceptionDetails(
+      opts.devTools,
+      opts.error,
+      opts.targetId,
+    );
+    if (details) {
+      return SymbolizedError.fromDetails({
+        details,
+        devTools: opts.devTools,
+        targetId: opts.targetId,
+        includeStackAndCause: true,
+      });
+    }
+
+    return new SymbolizedError(
+      SymbolizedError.#getMessageFromException(opts.error),
+    );
+  }
+
   static #getMessage(details: Protocol.Runtime.ExceptionDetails): string {
     // For Runtime.exceptionThrown with a present exception object, `details.text` will be "Uncaught" and
     // we have to manually parse out the error text from the exception description.
     // In the case of Runtime.getExceptionDetails, `details.text` has the Error.message.
-    if (details.text === 'Uncaught') {
-      const messageWithRest =
-        details.exception?.description?.split('\n    at ', 2) ?? [];
-      return 'Uncaught ' + (messageWithRest[0] ?? '');
+    if (details.text === 'Uncaught' && details.exception) {
+      return (
+        'Uncaught ' +
+        SymbolizedError.#getMessageFromException(details.exception)
+      );
     }
     return details.text;
+  }
+
+  static #getMessageFromException(
+    error: Protocol.Runtime.RemoteObject,
+  ): string {
+    const messageWithRest = error.description?.split('\n    at ', 2) ?? [];
+    return messageWithRest[0] ?? '';
+  }
+
+  static async #getExceptionDetails(
+    devTools: TargetUniverse | undefined,
+    error: Protocol.Runtime.RemoteObject,
+    targetId: string,
+  ): Promise<Protocol.Runtime.ExceptionDetails | null> {
+    if (!devTools || (error.type !== 'object' && error.subtype !== 'error')) {
+      return null;
+    }
+
+    const targetManager = devTools.universe.context.get(DevTools.TargetManager);
+    const target = targetId
+      ? targetManager.targetById(targetId) || devTools.target
+      : devTools.target;
+    const model = target.model(DevTools.RuntimeModel) as DevTools.RuntimeModel;
+    return (
+      (await model.getExceptionDetails(
+        error.objectId as DevTools.Protocol.Runtime.RemoteObjectId,
+      )) ?? null
+    );
   }
 
   static createForTesting(
