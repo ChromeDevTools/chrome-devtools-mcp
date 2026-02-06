@@ -19,6 +19,7 @@ export interface ConsoleFormatterOptions {
   devTools?: TargetUniverse;
   resolvedArgsForTesting?: unknown[];
   resolvedStackTraceForTesting?: DevTools.DevTools.StackTrace.StackTrace.StackTrace;
+  resolvedCauseForTesting?: SymbolizedError;
 }
 
 export class ConsoleFormatter {
@@ -30,7 +31,7 @@ export class ConsoleFormatter {
   readonly #resolvedArgs: unknown[];
 
   readonly #stack?: DevTools.DevTools.StackTrace.StackTrace.StackTrace;
-  readonly #cause?: SymbolizedError; // eslint-disable-line no-unused-private-class-members
+  readonly #cause?: SymbolizedError;
 
   private constructor(params: {
     id: number;
@@ -61,6 +62,7 @@ export class ConsoleFormatter {
         targetId: msg.targetId,
         includeStackAndCause: options?.fetchDetailedData,
         resolvedStackTraceForTesting: options?.resolvedStackTraceForTesting,
+        resolvedCauseForTesting: options?.resolvedCauseForTesting,
       });
       return new ConsoleFormatter({
         id: options.id,
@@ -130,7 +132,10 @@ export class ConsoleFormatter {
       `ID: ${this.#id}`,
       `Message: ${this.#type}> ${this.#text}`,
       this.#formatArgs(),
-      this.#formatStackTrace(this.#stack),
+      this.#formatStackTrace(this.#stack, this.#cause, {
+        includeHeading: true,
+        includeNote: true,
+      }),
     ].filter(line => !!line);
     return result.join('\n');
   }
@@ -151,7 +156,10 @@ export class ConsoleFormatter {
     if (arg instanceof SymbolizedError) {
       return [
         arg.message,
-        this.#formatStackTrace(arg.stackTrace, /* includeHeading */ false),
+        this.#formatStackTrace(arg.stackTrace, arg.cause, {
+          includeHeading: false,
+          includeNote: true,
+        }),
       ]
         .filter(line => !!line)
         .join('\n');
@@ -177,19 +185,24 @@ export class ConsoleFormatter {
 
   #formatStackTrace(
     stackTrace: DevTools.DevTools.StackTrace.StackTrace.StackTrace | undefined,
-    includeHeading = true,
+    cause: SymbolizedError | undefined,
+    opts: {includeHeading: boolean; includeNote: boolean},
   ): string {
     if (!stackTrace) {
       return '';
     }
 
-    const heading = includeHeading ? ['### Stack trace'] : [];
     return [
-      ...heading,
+      opts.includeHeading ? '### Stack trace' : '',
       this.#formatFragment(stackTrace.syncFragment),
       ...stackTrace.asyncFragments.map(this.#formatAsyncFragment.bind(this)),
-      'Note: line and column numbers use 1-based indexing',
-    ].join('\n');
+      this.#formatCause(cause),
+      opts.includeNote
+        ? 'Note: line and column numbers use 1-based indexing'
+        : '',
+    ]
+      .filter(line => !!line)
+      .join('\n');
   }
 
   #formatFragment(
@@ -217,6 +230,23 @@ export class ConsoleFormatter {
     }
     return result;
   }
+
+  #formatCause(cause: SymbolizedError | undefined): string {
+    if (!cause) {
+      return '';
+    }
+
+    return [
+      `Caused by: ${cause.message}`,
+      this.#formatStackTrace(cause.stackTrace, cause.cause, {
+        includeHeading: false,
+        includeNote: false,
+      }),
+    ]
+      .filter(line => !!line)
+      .join('\n');
+  }
+
   toJSON(): object {
     return {
       type: this.#type,

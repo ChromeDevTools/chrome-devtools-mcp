@@ -325,6 +325,132 @@ describe('ConsoleFormatter', () => {
       ).toStringDetailed();
       t.assert.snapshot?.(result);
     });
+
+    it('formats a console message with an Error object with cause', async t => {
+      const message = createMockMessage({
+        type: () => 'log',
+        text: () => 'JSHandle@error',
+      });
+      const stackTrace = {
+        syncFragment: {
+          frames: [
+            {
+              line: 10,
+              column: 2,
+              url: 'foo.ts',
+              name: 'foo',
+            },
+            {
+              line: 20,
+              column: 2,
+              url: 'foo.ts',
+              name: 'bar',
+            },
+          ],
+        },
+        asyncFragments: [],
+      } as unknown as DevTools.StackTrace.StackTrace.StackTrace;
+      const error = SymbolizedError.createForTesting(
+        'AppError: Compute failed',
+        stackTrace,
+        SymbolizedError.createForTesting(
+          'TypeError: Cannot read properties of undefined',
+          {
+            syncFragment: {
+              frames: [
+                {
+                  line: 5,
+                  column: 10,
+                  url: 'library.js',
+                  name: 'compute',
+                },
+              ],
+            },
+            asyncFragments: [],
+          } as unknown as DevTools.StackTrace.StackTrace.StackTrace,
+        ),
+      );
+
+      const result = (
+        await ConsoleFormatter.from(message, {
+          id: 9,
+          resolvedArgsForTesting: [error],
+        })
+      ).toStringDetailed();
+      t.assert.snapshot?.(result);
+    });
+
+    it('formats an UncaughtError with a stack trace and a cause', async t => {
+      const stackTrace = {
+        syncFragment: {
+          frames: [
+            {
+              line: 10,
+              column: 2,
+              url: 'foo.ts',
+              name: 'foo',
+            },
+            {
+              line: 20,
+              column: 2,
+              url: 'foo.ts',
+              name: 'bar',
+            },
+          ],
+        },
+        asyncFragments: [
+          {
+            description: 'setTimeout',
+            frames: [
+              {
+                line: 5,
+                column: 2,
+                url: 'util.ts',
+                name: 'schedule',
+              },
+            ],
+          },
+        ],
+      } as unknown as DevTools.StackTrace.StackTrace.StackTrace;
+      const error = new UncaughtError(
+        {
+          exceptionId: 1,
+          lineNumber: 0,
+          columnNumber: 5,
+          exception: {
+            type: 'object',
+            description: 'TypeError: Cannot read properties of undefined',
+          },
+          text: 'Uncaught',
+        },
+        '<mock target ID>',
+      );
+      const cause = SymbolizedError.createForTesting(
+        'TypeError: Cannot read properties of undefined',
+        {
+          syncFragment: {
+            frames: [
+              {
+                line: 5,
+                column: 8,
+                url: 'library.js',
+                name: 'compute',
+              },
+            ],
+          },
+          asyncFragments: [],
+        } as unknown as DevTools.StackTrace.StackTrace.StackTrace,
+      );
+
+      const result = (
+        await ConsoleFormatter.from(error, {
+          id: 10,
+          resolvedStackTraceForTesting: stackTrace,
+          resolvedCauseForTesting: cause,
+        })
+      ).toStringDetailed();
+      t.assert.snapshot?.(result);
+    });
   });
   describe('toJSON', () => {
     it('formats a console.log message', async () => {

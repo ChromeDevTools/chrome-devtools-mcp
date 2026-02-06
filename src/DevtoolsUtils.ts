@@ -255,10 +255,15 @@ export class SymbolizedError {
     targetId: string;
     includeStackAndCause?: boolean;
     resolvedStackTraceForTesting?: DevTools.StackTrace.StackTrace.StackTrace;
+    resolvedCauseForTesting?: SymbolizedError;
   }): Promise<SymbolizedError> {
     const message = SymbolizedError.#getMessage(opts.details);
     if (!opts.includeStackAndCause || !opts.devTools) {
-      return new SymbolizedError(message, opts.resolvedStackTraceForTesting);
+      return new SymbolizedError(
+        message,
+        opts.resolvedStackTraceForTesting,
+        opts.resolvedCauseForTesting,
+      );
     }
 
     let stackTrace: DevTools.StackTrace.StackTrace.StackTrace | undefined;
@@ -278,7 +283,11 @@ export class SymbolizedError {
 
     // TODO: Turn opts.details.exception into a JSHandle and retrieve the 'cause' property.
     //       If its an Error, recursively create a SymbolizedError.
-    return new SymbolizedError(message, stackTrace);
+    let cause: SymbolizedError | undefined;
+    if (opts.resolvedCauseForTesting) {
+      cause = opts.resolvedCauseForTesting;
+    }
+    return new SymbolizedError(message, stackTrace, cause);
   }
 
   static async fromError(opts: {
