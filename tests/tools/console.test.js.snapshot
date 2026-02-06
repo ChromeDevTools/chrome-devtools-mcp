@@ -1,7 +1,7 @@
 exports[`console > get_console_message > applies source maps to stack traces of Error object (with cause) console.log arguments 1`] = `
 # test response
 ID: 1
-Message: log> foo failed JSHandle@error
+Message: log> foo failed Error: bar failed
 ### Arguments
 Arg #0: foo failed
 Arg #1: Error: bar failed
@@ -23,7 +23,7 @@ Note: line and column numbers use 1-based indexing
 exports[`console > get_console_message > applies source maps to stack traces of Error object console.log arguments 1`] = `
 # test response
 ID: 1
-Message: log> An error happened: JSHandle@error
+Message: log> An error happened: Error: b00m!
 ### Arguments
 Arg #0: An error happened:
 Arg #1: Error: b00m!
@@ -117,5 +117,5 @@ exports[`console > list_console_messages > lists error objects 1`] = `
 # test response
 ## Console messages
 Showing 1-1 of 1 (Page 1 of 1).
-msgid=1 [error] JSHandle@error (1 args)
+msgid=1 [error] Error: This is an error (1 args)
 `;
