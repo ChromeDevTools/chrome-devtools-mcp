@@ -5,6 +5,7 @@
  */
 
 export enum ToolCategory {
+  SESSION = 'session',
   INPUT = 'input',
   NAVIGATION = 'navigation',
   EMULATION = 'emulation',
@@ -15,6 +16,7 @@ export enum ToolCategory {
 }
 
 export const labels = {
+  [ToolCategory.SESSION]: 'Session management',
   [ToolCategory.INPUT]: 'Input automation',
   [ToolCategory.NAVIGATION]: 'Navigation automation',
   [ToolCategory.EMULATION]: 'Emulation',

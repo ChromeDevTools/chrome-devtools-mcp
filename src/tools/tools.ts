@@ -13,10 +13,16 @@ import * as pagesTools from './pages.js';
 import * as performanceTools from './performance.js';
 import * as screenshotTools from './screenshot.js';
 import * as scriptTools from './script.js';
+import * as sessionTools from './session.js';
 import * as snapshotTools from './snapshot.js';
 import type {ToolDefinition} from './ToolDefinition.js';
 
+const sessionToolNames = new Set(
+  Object.values(sessionTools).map(t => t.name),
+);
+
 const tools = [
+  ...Object.values(sessionTools),
   ...Object.values(consoleTools),
   ...Object.values(emulationTools),
   ...Object.values(extensionTools),
@@ -33,4 +39,4 @@ tools.sort((a, b) => {
   return a.name.localeCompare(b.name);
 });
 
-export {tools};
+export {tools, sessionToolNames};
