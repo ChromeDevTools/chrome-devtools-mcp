@@ -34,7 +34,7 @@ const createMockMessage = (
   } as unknown as ConsoleMessage;
 };
 
-describe.only('ConsoleFormatter', () => {
+describe('ConsoleFormatter', () => {
   describe('toString', () => {
     it('formats a console.log message', async t => {
       const message = createMockMessage({
