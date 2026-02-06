@@ -136,6 +136,14 @@ export class ConsoleFormatter {
   }
 
   #formatArg(arg: unknown) {
+    if (arg instanceof SymbolizedError) {
+      return [
+        arg.message,
+        this.#formatStackTrace(arg.stackTrace, /* includeHeading */ false),
+      ]
+        .filter(line => !!line)
+        .join('\n');
+    }
     return typeof arg === 'object' ? JSON.stringify(arg) : String(arg);
   }
 
@@ -157,13 +165,15 @@ export class ConsoleFormatter {
 
   #formatStackTrace(
     stackTrace: DevTools.DevTools.StackTrace.StackTrace.StackTrace | undefined,
+    includeHeading = true,
   ): string {
     if (!stackTrace) {
       return '';
     }
 
+    const heading = includeHeading ? ['### Stack trace'] : [];
     return [
-      '### Stack trace',
+      ...heading,
       this.#formatFragment(stackTrace.syncFragment),
       ...stackTrace.asyncFragments.map(this.#formatAsyncFragment.bind(this)),
       'Note: line and column numbers use 1-based indexing',

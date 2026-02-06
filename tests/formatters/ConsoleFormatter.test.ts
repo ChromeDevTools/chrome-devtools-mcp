@@ -7,6 +7,7 @@
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
+import {SymbolizedError} from '../../src/DevtoolsUtils.js';
 import {ConsoleFormatter} from '../../src/formatters/ConsoleFormatter.js';
 import {UncaughtError} from '../../src/PageCollector.js';
 import type {ConsoleMessage} from '../../src/third_party/index.js';
@@ -256,6 +257,44 @@ describe('ConsoleFormatter', () => {
         await ConsoleFormatter.from(error, {
           id: 7,
           resolvedStackTraceForTesting: stackTrace,
+        })
+      ).toStringDetailed();
+      t.assert.snapshot?.(result);
+    });
+
+    it('formats a console message with an Error object argument', async t => {
+      const message = createMockMessage({
+        type: () => 'log',
+        text: () => 'JSHandle@error',
+      });
+      const stackTrace = {
+        syncFragment: {
+          frames: [
+            {
+              line: 10,
+              column: 2,
+              url: 'foo.ts',
+              name: 'foo',
+            },
+            {
+              line: 20,
+              column: 2,
+              url: 'foo.ts',
+              name: 'bar',
+            },
+          ],
+        },
+        asyncFragments: [],
+      } as unknown as DevTools.StackTrace.StackTrace.StackTrace;
+      const error = SymbolizedError.createForTesting(
+        'TypeError: Cannot read properties of undefined',
+        stackTrace,
+      );
+
+      const result = (
+        await ConsoleFormatter.from(message, {
+          id: 8,
+          resolvedArgsForTesting: [error],
         })
       ).toStringDetailed();
       t.assert.snapshot?.(result);

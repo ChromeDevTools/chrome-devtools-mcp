@@ -292,6 +292,14 @@ export class SymbolizedError {
     }
     return details.text;
   }
+
+  static createForTesting(
+    message: string,
+    stackTrace?: DevTools.StackTrace.StackTrace.StackTrace,
+    cause?: SymbolizedError,
+  ) {
+    return new SymbolizedError(message, stackTrace, cause);
+  }
 }
 
 export async function createStackTraceForConsoleMessage(
