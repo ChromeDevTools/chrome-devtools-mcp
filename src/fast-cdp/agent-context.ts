@@ -136,16 +136,6 @@ export function getAllAgentConnections(): Map<string, AgentConnection> {
 }
 
 /**
- * Remove an agent's connection state.
- *
- * @param agentId Agent ID to remove
- */
-export function removeAgentConnection(agentId: string): void {
-  agentConnections.delete(agentId);
-  console.error(`[agent-context] Removed connection for agent: ${agentId}`);
-}
-
-/**
  * Clear all agent connections.
  * Used during shutdown.
  */

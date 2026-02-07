@@ -103,7 +103,17 @@ All examples below use **global configuration** in `~/.claude.json`. These confi
 }
 ```
 
-This will automatically detect and use your system Chrome profile with all installed extensions.
+## 🔌 Chrome Extension Setup
+
+Before using chrome-ai-bridge, install the Chrome extension:
+
+1. Build the extension: `npm run build`
+2. Open `chrome://extensions/` in Chrome
+3. Enable "Developer mode" (toggle in top-right)
+4. Click "Load unpacked" and select the `build/extension/` directory
+5. Open ChatGPT and/or Gemini tabs and log in
+
+> **v2.1 Note**: Network-native response extraction is enabled automatically. No additional configuration is needed — responses are captured at the network protocol level for improved reliability.
 
 ## 🔄 After Configuration
 

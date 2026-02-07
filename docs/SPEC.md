@@ -1153,11 +1153,11 @@ Agent IDs are generated using a hybrid strategy:
 
 **Environment Variables**:
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `CAI_SESSION_TTL_MINUTES` | 30 | Session expiration time |
-| `CAI_MAX_AGENTS` | 10 | Maximum concurrent agents |
-| `CAI_CLEANUP_INTERVAL_MINUTES` | 5 | Stale session cleanup interval |
+| Variable | Default | Validation | Description |
+|----------|---------|------------|-------------|
+| `CAI_SESSION_TTL_MINUTES` | 30 | `> 0` or fallback to default | Session expiration time |
+| `CAI_MAX_AGENTS` | 10 | `> 0` or fallback to default | Maximum concurrent agents |
+| `CAI_CLEANUP_INTERVAL_MINUTES` | 5 | `> 0` or fallback to default | Stale session cleanup interval |
 
 ### 8.4 History Recording (history.jsonl)
 
@@ -1167,21 +1167,38 @@ Agent IDs are generated using a hybrid strategy:
 {"ts":"2026-01-30T10:30:00.000Z","project":"chrome-ai-bridge","provider":"chatgpt","question":"...","answer":"...","url":"https://chatgpt.com/c/xxx","timings":{"connectMs":120,"waitInputMs":500,"inputMs":50,"sendMs":100,"waitResponseMs":5000,"totalMs":5770}}
 ```
 
-### 8.5 Session Reuse Logic
+### 8.5 Session Reuse Logic (V2)
 
-**Function**: `getPreferredSession()` in `src/fast-cdp/fast-chat.ts`
+**Function**: `getPreferredSessionV2()` in `src/fast-cdp/session-manager.ts`
 
 ```typescript
-async function getPreferredSession(kind: 'chatgpt' | 'gemini'): Promise<PreferredSession> {
-  const project = getProjectName();  // path.basename(process.cwd())
-  const sessions = await loadSessions();
-  const entry = sessions.projects[project]?.[kind];
-  return {
-    url: entry?.url || null,
-    tabId: entry?.tabId,
-  };
+// Get preferred session for current agent
+const {url, tabId} = await getPreferredSessionV2('chatgpt');
+
+// Save session after successful connection
+await saveAgentSession('chatgpt', url, tabId);
+
+// Clear session on connection failure
+await clearAgentSession('chatgpt');
+```
+
+Agent sessions are stored in V2 format (`sessions.json`):
+
+```json
+{
+  "version": 2,
+  "agents": {
+    "claude-code-12345": {
+      "lastAccess": "2026-02-07T10:00:00.000Z",
+      "chatgpt": { "url": "https://chatgpt.com/c/xxx", "tabId": 123 },
+      "gemini": null
+    }
+  },
+  "config": { "sessionTtlMinutes": 30, "maxAgents": 10 }
 }
 ```
+
+V1 sessions (project-based) are automatically migrated to V2 on first load.
 
 ---
 

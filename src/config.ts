@@ -59,9 +59,14 @@ export interface SessionConfig {
  * Get session configuration from environment variables or defaults.
  */
 export function getSessionConfig(): SessionConfig {
+  const raw = {
+    ttl: Number(process.env.CAI_SESSION_TTL_MINUTES),
+    max: Number(process.env.CAI_MAX_AGENTS),
+    interval: Number(process.env.CAI_CLEANUP_INTERVAL_MINUTES),
+  };
   return {
-    sessionTtlMinutes: Number(process.env.CAI_SESSION_TTL_MINUTES) || 30,
-    maxAgents: Number(process.env.CAI_MAX_AGENTS) || 10,
-    cleanupIntervalMinutes: Number(process.env.CAI_CLEANUP_INTERVAL_MINUTES) || 5,
+    sessionTtlMinutes: raw.ttl > 0 ? raw.ttl : 30,
+    maxAgents: raw.max > 0 ? Math.floor(raw.max) : 10,
+    cleanupIntervalMinutes: raw.interval > 0 ? raw.interval : 5,
   };
 }

@@ -15,6 +15,7 @@ import {
   hasAgentId,
   type AgentConnection,
 } from './agent-context.js';
+import {saveAgentSession, getPreferredSessionV2, clearAgentSession} from './session-manager.js';
 
 /**
  * Get current agent's client for the specified kind.
@@ -196,28 +197,8 @@ async function waitForStableCount(
   return lastCount >= 0 ? lastCount : 0;
 }
 
-type SessionEntry = {
-  url: string;
-  tabId?: number;
-  lastUsed: string;
-};
-
-type SessionStore = {
-  projects: Record<
-    string,
-    {
-      chatgpt?: SessionEntry;
-      gemini?: SessionEntry;
-    }
-  >;
-};
-
 function getProjectName(): string {
   return path.basename(process.cwd()) || 'default';
-}
-
-function getSessionPath(): string {
-  return path.join(process.cwd(), '.local', 'chrome-ai-bridge', 'sessions.json');
 }
 
 function getHistoryPath(): string {
@@ -270,50 +251,6 @@ async function rotateHistoryIfNeeded(): Promise<void> {
     if ((err as NodeJS.ErrnoException).code !== 'ENOENT') {
       console.error('[history] Rotation error:', err);
     }
-  }
-}
-
-async function loadSessions(): Promise<SessionStore> {
-  try {
-    const data = await fs.readFile(getSessionPath(), 'utf-8');
-    const parsed = JSON.parse(data) as SessionStore;
-    if (parsed && typeof parsed === 'object' && parsed.projects) {
-      return parsed;
-    }
-  } catch {
-    // ignore
-  }
-  return {projects: {}};
-}
-
-async function saveSession(kind: 'chatgpt' | 'gemini', url: string, tabId?: number): Promise<void> {
-  const project = getProjectName();
-  const sessions = await loadSessions();
-  if (!sessions.projects[project]) {
-    sessions.projects[project] = {};
-  }
-  const entry: SessionEntry = {
-    url,
-    lastUsed: new Date().toISOString(),
-  };
-  if (tabId !== undefined) {
-    entry.tabId = tabId;
-  }
-  sessions.projects[project][kind] = entry;
-  const targetPath = getSessionPath();
-  await fs.mkdir(path.dirname(targetPath), {recursive: true});
-  await fs.writeFile(targetPath, JSON.stringify(sessions, null, 2), 'utf-8');
-}
-
-async function clearGeminiSession(): Promise<void> {
-  const project = getProjectName();
-  const sessions = await loadSessions();
-  if (sessions.projects[project]?.gemini) {
-    delete sessions.projects[project].gemini;
-    const targetPath = getSessionPath();
-    await fs.mkdir(path.dirname(targetPath), {recursive: true});
-    await fs.writeFile(targetPath, JSON.stringify(sessions, null, 2), 'utf-8');
-    console.error(`[Gemini] Session cleared for project: ${project}`);
   }
 }
 
@@ -442,27 +379,6 @@ async function saveDebug(kind: 'chatgpt' | 'gemini', payload: Record<string, any
   await fs.writeFile(file, JSON.stringify(payload, null, 2), 'utf-8');
 }
 
-interface PreferredSession {
-  url: string | null;
-  tabId?: number;
-}
-
-async function getPreferredSession(kind: 'chatgpt' | 'gemini'): Promise<PreferredSession> {
-  const project = getProjectName();
-  const sessions = await loadSessions();
-  const entry = sessions.projects[project]?.[kind];
-  return {
-    url: entry?.url || null,
-    tabId: entry?.tabId,
-  };
-}
-
-// Keep for backward compatibility
-async function getPreferredUrl(kind: 'chatgpt' | 'gemini'): Promise<string | null> {
-  const session = await getPreferredSession(kind);
-  return session.url;
-}
-
 function normalizeGeminiResponse(text: string, question?: string): string {
   if (!text) return '';
   const filtered = text
@@ -499,7 +415,7 @@ async function createConnection(kind: 'chatgpt' | 'gemini'): Promise<CdpClient> 
   const startTime = Date.now();
   logConnectionState(kind, 'connecting');
 
-  const preferredSession = await getPreferredSession(kind);
+  const preferredSession = await getPreferredSessionV2(kind);
   const preferred = preferredSession.url;
   const preferredTabId = preferredSession.tabId;
   const defaultUrl = kind === 'chatgpt'
@@ -2263,7 +2179,7 @@ async function askChatGPTFastInternal(question: string, debug?: boolean): Promis
 
     const finalUrl = await client.evaluate<string>('location.href');
     if (finalUrl && finalUrl.includes('chatgpt.com')) {
-      await saveSession('chatgpt', finalUrl);
+      await saveAgentSession('chatgpt', finalUrl);
     }
     timings.waitResponseMs = nowMs() - tWaitResp;
     timings.totalMs = nowMs() - t0;
@@ -2442,7 +2358,7 @@ async function askChatGPTViaDriver(question: string, debug?: boolean): Promise<C
   // セッション保存
   const finalUrl = await driver.getCurrentUrl();
   if (finalUrl.includes('chatgpt.com')) {
-    await saveSession('chatgpt', finalUrl);
+    await saveAgentSession('chatgpt', finalUrl);
   }
 
   timings.totalMs = nowMs() - t0;
@@ -2525,7 +2441,7 @@ async function askGeminiViaDriver(question: string, debug?: boolean): Promise<Ch
   // セッション保存
   const finalUrl = await driver.getCurrentUrl();
   if (finalUrl.includes('gemini.google.com')) {
-    await saveSession('gemini', finalUrl);
+    await saveAgentSession('gemini', finalUrl);
   }
 
   timings.totalMs = nowMs() - t0;
@@ -2589,10 +2505,10 @@ async function askGeminiFastInternal(question: string, debug?: boolean): Promise
   const tUrl = nowMs();
   const currentUrl = await client.evaluate<string>('location.href');
   if (!currentUrl || !currentUrl.includes('gemini.google.com')) {
-    const preferred = await getPreferredUrl('gemini');
+    const preferred = (await getPreferredSessionV2('gemini')).url;
     await navigate(client, preferred || 'https://gemini.google.com/');
   } else {
-    const preferred = await getPreferredUrl('gemini');
+    const preferred = (await getPreferredSessionV2('gemini')).url;
     if (preferred && !currentUrl.startsWith(preferred)) {
       await navigate(client, preferred);
     }
@@ -2625,7 +2541,7 @@ async function askGeminiFastInternal(question: string, debug?: boolean): Promise
         console.error(`[Gemini] Existing chat appears stuck (stop button detected for ${stuckCheckResult.waitedMs}ms). Clearing session and retrying.`);
 
         // セッションとクライアントをクリア
-        await clearGeminiSession();
+        await clearAgentSession('gemini');
         clearGeminiClient();
 
         // エラーを投げて、呼び出し元でリトライを促す
@@ -2930,7 +2846,7 @@ async function askGeminiFastInternal(question: string, debug?: boolean): Promise
       console.error(`[Gemini] Stop button detected for ${forceNewChatThreshold * 0.5}s - clearing session and forcing new chat`);
 
       // セッションとクライアントをクリアして新規チャットを強制
-      await clearGeminiSession();
+      await clearAgentSession('gemini');
       clearGeminiClient();
 
       // エラーを投げて再試行を促す
@@ -3398,7 +3314,7 @@ async function askGeminiFastInternal(question: string, debug?: boolean): Promise
 
   const finalUrl = await client.evaluate<string>('location.href');
   if (finalUrl && finalUrl.includes('gemini.google.com')) {
-    await saveSession('gemini', finalUrl);
+    await saveAgentSession('gemini', finalUrl);
   }
   timings.waitResponseMs = nowMs() - tWaitResp;
   timings.totalMs = nowMs() - t0;
