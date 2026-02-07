@@ -47,7 +47,7 @@ exports[`network > network_list_requests > list requests from previous navigatio
 # list_request response
 ## Network requests
 Showing 1-3 of 3 (Page 1 of 1).
-reqid=1 GET http://localhost:<port>/redirect [failed - 302]
+reqid=1 GET http://localhost:<port>/redirect [redirect - 302]
 reqid=2 GET http://localhost:<port>/redirected [success - 200]
 reqid=3 GET http://localhost:<port>/redirected-page [success - 200]
 `;
