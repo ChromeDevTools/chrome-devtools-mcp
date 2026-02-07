@@ -25,6 +25,11 @@ import {
   getClient,
   getPageDom
 } from '../build/src/fast-cdp/fast-chat.js';
+import {generateAgentId, setAgentId} from '../build/src/fast-cdp/agent-context.js';
+
+// Initialize agent ID for Agent Teams support
+const agentId = generateAgentId('test-script');
+setAgentId(agentId);
 
 const target = process.argv[2] || 'chatgpt';
 const questionArg = process.argv[3];

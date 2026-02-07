@@ -42,3 +42,31 @@ export const GEMINI_CONFIG = {
    */
   BASE_URL: 'https://gemini.google.com/',
 } as const;
+
+/**
+ * Session configuration for Agent Teams support
+ */
+export interface SessionConfig {
+  /** Session TTL in minutes (default: 30) */
+  sessionTtlMinutes: number;
+  /** Maximum number of concurrent agents (default: 10) */
+  maxAgents: number;
+  /** Cleanup interval in minutes (default: 5) */
+  cleanupIntervalMinutes: number;
+}
+
+/**
+ * Get session configuration from environment variables or defaults.
+ */
+export function getSessionConfig(): SessionConfig {
+  const raw = {
+    ttl: Number(process.env.CAI_SESSION_TTL_MINUTES),
+    max: Number(process.env.CAI_MAX_AGENTS),
+    interval: Number(process.env.CAI_CLEANUP_INTERVAL_MINUTES),
+  };
+  return {
+    sessionTtlMinutes: raw.ttl > 0 ? raw.ttl : 30,
+    maxAgents: raw.max > 0 ? Math.floor(raw.max) : 10,
+    cleanupIntervalMinutes: raw.interval > 0 ? raw.interval : 5,
+  };
+}

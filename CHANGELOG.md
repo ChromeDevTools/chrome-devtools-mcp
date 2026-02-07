@@ -4,6 +4,24 @@ All notable changes to this project will be documented in this file.
 
 This project is a fork of [Chrome DevTools MCP](https://github.com/ChromeDevTools/chrome-ai-bridge) by Google LLC, focusing on multi-AI consultation capabilities.
 
+## [2.2.0] - 2026-02-07
+
+### Added
+- **Agent Session Isolation**: Per-agent session management for Agent Teams support
+  - New `session-manager.ts`: V2 session format with agent-based isolation
+  - New `agent-context.ts`: Agent ID generation and connection state management
+  - Automatic V1→V2 migration (legacy projects become `legacy-{name}` agents)
+  - TTL-based cleanup of stale agent sessions
+  - Configurable via `CAI_SESSION_TTL_MINUTES`, `CAI_MAX_AGENTS`, `CAI_CLEANUP_INTERVAL_MINUTES`
+
+### Changed
+- Session file format upgraded from V1 (project-based) to V2 (agent-based)
+- `getSessionConfig()` now validates environment variables (rejects negative/zero values)
+
+### Removed
+- V1 session functions from `fast-chat.ts` (`saveSession`, `loadSessions`, `getPreferredSession`, `clearGeminiSession`)
+- Unused `removeAgentConnection()` from `agent-context.ts`
+
 ## [2.1.0] - 2026-02-05
 
 ### Added
