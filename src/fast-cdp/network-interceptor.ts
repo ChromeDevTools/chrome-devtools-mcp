@@ -201,9 +201,17 @@ export class NetworkInterceptor {
     try {
       const result = await this.client.send('Network.getResponseBody', {requestId});
       if (result?.body) {
-        const data = result.base64Encoded
-          ? Buffer.from(result.body, 'base64').toString('utf-8')
-          : result.body;
+        let data: string;
+        if (result.base64Encoded) {
+          try {
+            data = Buffer.from(result.body, 'base64').toString('utf-8');
+          } catch (decodeErr) {
+            console.error(`[NetworkInterceptor] Base64 decode failed for ${url.slice(0, 80)}: ${decodeErr instanceof Error ? decodeErr.message : String(decodeErr)}`);
+            return;
+          }
+        } else {
+          data = result.body;
+        }
 
         this.frames.push({
           timestamp: Date.now() / 1000,
@@ -247,6 +255,11 @@ export class NetworkInterceptor {
     const deadline = Date.now() + timeoutMs;
     while (this.pendingBodies.size > 0 && Date.now() < deadline) {
       await new Promise(r => setTimeout(r, 100));
+    }
+
+    // Warn if pending bodies remain after timeout
+    if (this.pendingBodies.size > 0) {
+      console.warn(`[NetworkInterceptor] Timeout: ${this.pendingBodies.size} pending bodies abandoned (requestIds: ${[...this.pendingBodies].slice(0, 3).join(', ')}${this.pendingBodies.size > 3 ? '...' : ''})`);
     }
 
     // Remove handlers
@@ -449,8 +462,11 @@ export class NetworkInterceptor {
   private extractDeltaText(data: any): string {
     if (!data || typeof data !== 'object') return '';
 
-    // Skip non-delta message types
-    if (data.type && typeof data.type === 'string') return '';
+    // Skip non-delta message types (debug log for future format analysis)
+    if (data.type && typeof data.type === 'string') {
+      // Uncomment for debugging: console.error(`[NetworkInterceptor] Skipping type-tagged delta: type=${data.type}`);
+      return '';
+    }
 
     // Shorthand delta: {"v": "text"} (no "p" or "o" keys)
     if (typeof data.v === 'string' && !data.p && !data.o) {
@@ -555,7 +571,7 @@ export class NetworkInterceptor {
    * The text is at [4][0][1][0] in the parsed array.
    */
   private extractGeminiText(inner: any): string | null {
-    if (!Array.isArray(inner)) return null;
+    if (!Array.isArray(inner) || inner.length < 5) return null;
 
     // Primary path: inner[4][0][1][0]
     const responseContent = inner[4];
