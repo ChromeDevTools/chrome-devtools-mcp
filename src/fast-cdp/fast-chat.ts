@@ -8,13 +8,60 @@ import {logConnectionState, logInfo, logError, logWarn} from './mcp-logger.js';
 import {DOM_UTILS_CODE} from './utils/index.js';
 import {getDriver, type SiteDriver} from './drivers/index.js';
 import {NetworkInterceptor} from './network-interceptor.js';
+import {
+  getAgentConnection,
+  getAllAgentConnections,
+  removeAgentConnection,
+  hasAgentId,
+  type AgentConnection,
+} from './agent-context.js';
 
-let chatgptClient: CdpClient | null = null;
-let geminiClient: CdpClient | null = null;
+/**
+ * Get current agent's client for the specified kind.
+ * Returns null if not connected.
+ */
+function getClientFromAgent(kind: 'chatgpt' | 'gemini'): CdpClient | null {
+  if (!hasAgentId()) {
+    // Fallback for backward compatibility (no agent ID set)
+    return null;
+  }
+  const conn = getAgentConnection();
+  return kind === 'chatgpt' ? conn.chatgptClient : conn.geminiClient;
+}
 
-// RelayServer参照を保持（接続失敗時のクリーンアップ用）
-let chatgptRelay: RelayServer | null = null;
-let geminiRelay: RelayServer | null = null;
+/**
+ * Get current agent's relay for the specified kind.
+ * Returns null if not connected.
+ */
+function getRelayFromAgent(kind: 'chatgpt' | 'gemini'): RelayServer | null {
+  if (!hasAgentId()) {
+    return null;
+  }
+  const conn = getAgentConnection();
+  return kind === 'chatgpt' ? conn.chatgptRelay : conn.geminiRelay;
+}
+
+/**
+ * Set client and relay for the current agent.
+ */
+function setClientForAgent(
+  kind: 'chatgpt' | 'gemini',
+  client: CdpClient | null,
+  relay: RelayServer | null,
+): void {
+  if (!hasAgentId()) {
+    console.error('[fast-chat] Warning: setClientForAgent called without agent ID');
+    return;
+  }
+  const conn = getAgentConnection();
+  if (kind === 'chatgpt') {
+    conn.chatgptClient = client;
+    conn.chatgptRelay = relay;
+  } else {
+    conn.geminiClient = client;
+    conn.geminiRelay = relay;
+  }
+}
 
 const CONNECT_REUSE_TIMEOUT_MS = Number(
   process.env.MCP_CONNECT_REUSE_TIMEOUT_MS || '7000',
@@ -274,18 +321,20 @@ async function clearGeminiSession(): Promise<void> {
  * キャッシュされたGeminiクライアントをクリア（リトライ用）
  */
 export function clearGeminiClient(): void {
-  if (geminiClient) {
-    geminiClient = null;
+  const client = getClientFromAgent('gemini');
+  const relay = getRelayFromAgent('gemini');
+
+  if (client) {
     console.error('[Gemini] Cached client cleared');
   }
-  if (geminiRelay) {
+  if (relay) {
     try {
-      geminiRelay.stop();
+      relay.stop();
     } catch {
       // ignore stop errors
     }
-    geminiRelay = null;
   }
+  setClientForAgent('gemini', null, null);
 }
 
 /**
@@ -293,27 +342,30 @@ export function clearGeminiClient(): void {
  * MCPサーバー終了時にゾンビプロセスを防ぐために使用
  */
 export async function cleanupAllConnections(): Promise<void> {
-  // ChatGPT
-  if (chatgptRelay) {
-    try {
-      await chatgptRelay.stop();
-    } catch {
-      // ignore stop errors
-    }
-    chatgptRelay = null;
-  }
-  chatgptClient = null;
+  // Clean up all agent connections
+  const allConnections = getAllAgentConnections();
 
-  // Gemini
-  if (geminiRelay) {
-    try {
-      await geminiRelay.stop();
-    } catch {
-      // ignore stop errors
+  for (const [agentId, conn] of allConnections) {
+    // ChatGPT
+    if (conn.chatgptRelay) {
+      try {
+        await conn.chatgptRelay.stop();
+      } catch {
+        // ignore stop errors
+      }
     }
-    geminiRelay = null;
+
+    // Gemini
+    if (conn.geminiRelay) {
+      try {
+        await conn.geminiRelay.stop();
+      } catch {
+        // ignore stop errors
+      }
+    }
+
+    removeAgentConnection(agentId);
   }
-  geminiClient = null;
 
   console.error('[fast-cdp] All connections cleaned up');
 }
@@ -512,13 +564,7 @@ async function createConnection(kind: 'chatgpt' | 'gemini'): Promise<CdpClient> 
       }
 
       // クライアントとRelay参照を保存
-      if (kind === 'chatgpt') {
-        chatgptClient = client;
-        chatgptRelay = relayResult.relay;
-      } else {
-        geminiClient = client;
-        geminiRelay = relayResult.relay;
-      }
+      setClientForAgent(kind, client, relayResult.relay);
       const elapsed = Date.now() - startTime;
       logConnectionState(kind, 'connected', {elapsed, reused: true});
       console.error(`[fast-cdp] ${kind} reused existing tab successfully`);
@@ -564,13 +610,7 @@ async function createConnection(kind: 'chatgpt' | 'gemini'): Promise<CdpClient> 
       }
 
       // クライアントとRelay参照を保存
-      if (kind === 'chatgpt') {
-        chatgptClient = client;
-        chatgptRelay = relayResult.relay;
-      } else {
-        geminiClient = client;
-        geminiRelay = relayResult.relay;
-      }
+      setClientForAgent(kind, client, relayResult.relay);
 
       // 新規タブ作成後、ページが読み込まれるまで待機（about:blank でなくなるまで）
       const debugUrl = await client.evaluate<string>('location.href');
@@ -611,8 +651,8 @@ async function createConnection(kind: 'chatgpt' | 'gemini'): Promise<CdpClient> 
  * @public 外部から接続を事前確立するためにエクスポート
  */
 export async function getClient(kind: 'chatgpt' | 'gemini'): Promise<CdpClient> {
-  logInfo('fast-chat', `getClient called`, {kind, hasExisting: kind === 'chatgpt' ? !!chatgptClient : !!geminiClient});
-  const existing = kind === 'chatgpt' ? chatgptClient : geminiClient;
+  const existing = getClientFromAgent(kind);
+  logInfo('fast-chat', `getClient called`, {kind, hasExisting: !!existing});
 
   // 既存接続がある場合、健全性をチェック
   if (existing) {
@@ -629,7 +669,7 @@ export async function getClient(kind: 'chatgpt' | 'gemini'): Promise<CdpClient> 
     console.error(`[fast-cdp] ${kind} connection lost, reconnecting...`);
 
     // 古いRelayServerを停止
-    const oldRelay = kind === 'chatgpt' ? chatgptRelay : geminiRelay;
+    const oldRelay = getRelayFromAgent(kind);
     if (oldRelay) {
       logInfo('fast-chat', `Stopping stale ${kind} RelayServer`);
       console.error(`[fast-cdp] Stopping stale ${kind} RelayServer`);
@@ -641,13 +681,7 @@ export async function getClient(kind: 'chatgpt' | 'gemini'): Promise<CdpClient> 
     }
 
     // キャッシュをクリア
-    if (kind === 'chatgpt') {
-      chatgptClient = null;
-      chatgptRelay = null;
-    } else {
-      geminiClient = null;
-      geminiRelay = null;
-    }
+    setClientForAgent(kind, null, null);
   }
 
   // 新しい接続を作成
@@ -3551,7 +3585,7 @@ export async function takeCdpSnapshot(
     timestamp: new Date().toISOString(),
   };
 
-  const existing = kind === 'chatgpt' ? chatgptClient : geminiClient;
+  const existing = getClientFromAgent(kind);
 
   if (!existing) {
     result.error = `No ${kind} connection exists. Use ask_${kind}_web first to establish a connection.`;
@@ -3806,7 +3840,7 @@ export async function getPageDom(
     selectors: {},
   };
 
-  const existing = kind === 'chatgpt' ? chatgptClient : geminiClient;
+  const existing = getClientFromAgent(kind);
 
   if (!existing) {
     result.error = `No ${kind} connection exists. Use ask_${kind}_web first to establish a connection.`;

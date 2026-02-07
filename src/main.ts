@@ -39,6 +39,9 @@ import type {ToolDefinition} from './tools/ToolDefinition.js';
 import type {Context} from './tools/ToolDefinition.js';
 import {getFastContext} from './fast-cdp/fast-context.js';
 import {cleanupAllConnections} from './fast-cdp/fast-chat.js';
+import {generateAgentId, setAgentId} from './fast-cdp/agent-context.js';
+import {cleanupStaleSessions} from './fast-cdp/session-manager.js';
+import {getSessionConfig} from './config.js';
 
 function readPackageJson(): {version?: string} {
   const currentDir = import.meta.dirname;
@@ -62,6 +65,24 @@ export const args = parseArguments(version);
 const logFile = args.logFile ? saveLogsToFile(args.logFile) : undefined;
 
 logger(`Starting Chrome AI Bridge v${version} (Extension-only mode)`);
+
+// Initialize agent ID for Agent Teams support
+const agentId = generateAgentId();
+setAgentId(agentId);
+
+// Start session cleanup timer
+const sessionConfig = getSessionConfig();
+const cleanupTimer = setInterval(async () => {
+  try {
+    const removed = await cleanupStaleSessions();
+    if (removed > 0) {
+      logger(`[session] Cleaned up ${removed} stale sessions`);
+    }
+  } catch (error) {
+    logger(`[session] Cleanup error: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}, sessionConfig.cleanupIntervalMinutes * 60 * 1000);
+cleanupTimer.unref();  // Don't keep process alive for cleanup
 
 const server = new McpServer(
   {

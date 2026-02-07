@@ -1,7 +1,7 @@
 # chrome-ai-bridge Technical Specification
 
-**Version**: v2.0.18
-**Last Updated**: 2026-02-04
+**Version**: v2.1.0
+**Last Updated**: 2026-02-05
 
 ---
 
@@ -54,6 +54,7 @@ npm run test:smoke # 3. Basic operation check (recommended)
 ### Key Features
 
 - **ChatGPT/Gemini Operation**: Send questions and retrieve answers via Web UI
+- **Network-Native Response Extraction**: Primary response capture via CDP Network domain (UI-change resistant)
 - **Parallel Query**: Query ChatGPT and Gemini simultaneously (for multi-AI discussions)
 - **Session Management**: Maintain chat sessions per project
 - **Auto Retry**: Stuck state detection and automatic recovery
@@ -62,7 +63,8 @@ npm run test:smoke # 3. Basic operation check (recommended)
 ### Architecture Highlights
 
 - **Extension-only Mode**: Works with Chrome extension only, no Puppeteer required
-- **Direct CDP Communication**: Fast DOM operations via extension
+- **Direct CDP Communication**: Fast DOM and Network operations via extension
+- **Network Interception**: Response extraction via CDP Network domain (UI-change resistant)
 - **Shadow DOM Support**: Compatible with Gemini's Web Components
 
 ---
@@ -135,9 +137,6 @@ npx chrome-ai-bridge
 - **Build Tool**: TypeScript Compiler (tsc)
 - **Key Dependencies**:
   - `@modelcontextprotocol/sdk`: MCP SDK
-  - `puppeteer-core`: Chrome automation (with extension support)
-  - `chrome-devtools-frontend`: DevTools integration
-  - `yargs`: CLI argument parsing
 
 ### Distribution vs Development Entry Points
 
@@ -304,6 +303,7 @@ chrome-ai-bridge is a tool that uses MCP (Model Context Protocol) to automate Ch
 | Relay Server | `src/extension/relay-server.ts` | Mediates WebSocket communication with extension |
 | CDP Client | `src/fast-cdp/cdp-client.ts` | Sends Chrome DevTools Protocol commands |
 | Fast Chat | `src/fast-cdp/fast-chat.ts` | ChatGPT/Gemini operation logic |
+| NetworkInterceptor | `src/fast-cdp/network-interceptor.ts` | Network response capture and protocol parsing |
 | Chrome Extension | `src/extension/background.mjs` | Executes CDP commands in browser |
 
 ---
@@ -474,7 +474,9 @@ window.requestAnimationFrame = (cb) => window.setTimeout(() => cb(performance.no
 
 #### Fallback Strategy
 
-Even with focus emulation enabled, `Page.bringToFront` is called before text extraction as a defense-in-depth measure.
+**Note**: With v2.1 network extraction, background tab DOM throttling is largely bypassed since responses are captured at the network level. The focus emulation and `bringToFront` are only needed for the DOM fallback path.
+
+Even with focus emulation enabled, `Page.bringToFront` is called before DOM-based text extraction as a defense-in-depth measure.
 
 **Technical basis**:
 - From Chrome DevTools Protocol documentation: "Emulation.setFocusEmulationEnabled - Enables or disables simulating a focused and active page."
@@ -497,23 +499,25 @@ Even with focus emulation enabled, `Page.bringToFront` is called before text ext
 
 ```
 1. Get/reuse connection via getClient('chatgpt')
-2. Wait for page load complete (readyState === 'complete', 30s)
-3. Wait for SPA rendering stabilization (500ms fixed)
-4. Wait for input field to appear (30s)
-5. Wait for page load stability (waitForStableCount: stable if same value 2x)
-6. Get initial message count (user + assistant)
-7. Text input (3-phase fallback)
+2. Start network capture: interceptor.startCapture()
+3. Wait for page load complete (readyState === 'complete', 30s)
+4. Wait for SPA rendering stabilization (500ms fixed)
+5. Wait for input field to appear (30s)
+6. Wait for page load stability (waitForStableCount: stable if same value 2x)
+7. Get initial message count (user + assistant)
+8. Text input (3-phase fallback)
    - Phase 1: JavaScript evaluate (textarea.value / innerHTML)
    - Phase 2: CDP Input.insertText
    - Phase 3: CDP Input.dispatchKeyEvent (char by char)
-8. Input verification (check if normalizedQuestion is included)
-9. Search/wait for send button (60s, 500ms interval)
-10. Click via JavaScript btn.click() (CDP fallback available)
-11. Send button click → verify user message count increase
-12. Wait for new assistant message DOM addition (30s)
-13. Response completion detection (polling, **8min**, 1s interval)
-14. Extract last assistant message
-15. Save session and record history
+9. Input verification (check if normalizedQuestion is included)
+10. Search/wait for send button (60s, 500ms interval)
+11. Click via JavaScript btn.click() (CDP fallback available)
+12. Send button click → verify user message count increase
+13. Wait for new assistant message DOM addition (30s)
+14. Response completion detection (polling, **8min**, 1s interval)
+15. Stop network capture: interceptor.stopCaptureAndWait()
+16. Hybrid text selection: network text (primary) vs DOM text (fallback)
+17. Save session and record history
 ```
 
 **Preventing misidentification on existing chat reconnection** (added in v2.0.10):
@@ -558,7 +562,42 @@ Even with focus emulation enabled, `Page.bringToFront` is called before text ext
 
 **Implementation**: `extractChatGPTResponse()` function in `src/fast-cdp/fast-chat.ts`
 
-### 3.5 ChatGPT Response Extraction Logic
+### 3.5 ChatGPT Network-based Extraction (Primary)
+
+**Source**: `NetworkInterceptor` in `src/fast-cdp/network-interceptor.ts`
+
+v2.1 introduces network-level response extraction as the primary path. This captures the raw SSE stream from ChatGPT's API, independent of DOM rendering.
+
+**Protocol**: ChatGPT Web uses `delta_encoding v1` SSE format via `/backend-api/f/conversation` endpoint.
+
+**SSE format**:
+```
+event: delta_encoding
+data: "v1"
+
+event: delta
+data: {"p": "/message/content/parts/0", "o": "append", "v": "Hello"}
+
+event: delta
+data: {"v": " world"}
+
+data: [DONE]
+```
+
+**Delta operations** (`extractDeltaText()`):
+| Format | Meaning | Example |
+|--------|---------|---------|
+| `{"p": "/message/content/parts/0", "o": "append", "v": "text"}` | Append text to content | Standard text delta |
+| `{"v": "text"}` | Shorthand append (no path/operation) | Most common in streaming |
+| `{"p": "", "o": "patch", "v": [...]}` | Batch operations | Multiple appends in one message |
+
+**Thinking mode handling**: Thinking content uses `content_type: "thoughts"` which has a different JSON path than `/content/parts/`. The `extractDeltaText()` function naturally filters this by only matching paths containing `/content/parts/`.
+
+**Post-processing**: `stripFormatting()` removes Markdown formatting (`**bold**`, `*italic*`), LaTeX (`$...$`, `$$...$$`), and image references (`[Image of ...]`) to produce plain text.
+
+**Hybrid selection**: After capture, the system compares network-extracted text with DOM-extracted text and selects the longer/more complete result. Network text is preferred when available.
+
+### 3.6 ChatGPT DOM-based Extraction (Fallback)
 
 > ⚠️ **DO NOT DELETE**: The logic described in this section is essential for ChatGPT Thinking mode support. Deleting it will cause response extraction to fail.
 
@@ -621,7 +660,7 @@ while (Date.now() - waitStart < maxWaitForText) {
 
 > ⚠️ **If deleted**: The issue of returning empty responses immediately after stop button disappears will recur.
 
-### 3.6 ChatGPT Thinking Mode Details
+### 3.7 ChatGPT Thinking Mode Details
 
 #### Thinking Mode Activation Conditions
 
@@ -734,25 +773,27 @@ if (expandButton) {
 
 ```
 1. Get/reuse connection via getClient('gemini')
-2. Navigate if necessary (measure navigateMs)
-3. Wait for page load complete (readyState === 'complete', 30s)
-4. Wait for SPA rendering stabilization (500ms fixed)
-5. Wait for input field to appear (15s)
-6. Wait for page load stability (waitForStableCount: stable if same value 2x)
-7. Get initial count (user-query, model-response) ← record initialModelResponseCount
-8. Text input (2-phase fallback)
+2. Start network capture: interceptor.startCapture()
+3. Navigate if necessary (measure navigateMs)
+4. Wait for page load complete (readyState === 'complete', 30s)
+5. Wait for SPA rendering stabilization (500ms fixed)
+6. Wait for input field to appear (15s)
+7. Wait for page load stability (waitForStableCount: stable if same value 2x)
+8. Get initial count (user-query, model-response) ← record initialModelResponseCount
+9. Text input (2-phase fallback)
    - Phase 1: JavaScript evaluate (set innerText)
    - Phase 2: CDP Input.insertText
-9. Input verification (check if questionPrefix 20 chars is included)
-10. Verify text before sending
-11. Search/wait for send button (60s, 500ms interval)
-12. Click via JavaScript click() (CDP fallback available)
-13. Verify user message count increase
-14. Wait for new model response DOM addition (30s)
-15. Response completion detection (polling, **8min**, 1s interval)
-16. Extract text based on feedback button
-17. Normalize via normalizeGeminiResponse()
-18. Save session and record history
+10. Input verification (check if questionPrefix 20 chars is included)
+11. Verify text before sending
+12. Search/wait for send button (60s, 500ms interval)
+13. Click via JavaScript click() (CDP fallback available)
+14. Verify user message count increase
+15. Wait for new model response DOM addition (30s)
+16. Response completion detection (polling, **8min**, 1s interval)
+17. Stop network capture: interceptor.stopCaptureAndWait()
+18. Hybrid text selection: network text (primary) vs DOM text (fallback)
+19. Normalize via normalizeGeminiResponse()
+20. Save session and record history
 ```
 
 **Preventing misidentification on existing chat reconnection** (added in v2.0.10):
@@ -800,7 +841,40 @@ if (expandButton) {
 
 **Important**: `initialModelResponseCount` is the initial count obtained before sending the question. This prevents misidentifying existing responses as new ones.
 
-### 4.4 Gemini Text Extraction
+### 4.4 Gemini Network-based Extraction (Primary)
+
+**Source**: `NetworkInterceptor` in `src/fast-cdp/network-interceptor.ts`
+
+v2.1 introduces network-level response extraction as the primary path for Gemini, capturing the raw streaming response independent of Shadow DOM rendering.
+
+**Protocol**: Gemini Web uses StreamGenerate chunked format via `/_/BardChatUi/data/assistant.lamda.BardFrontendService/StreamGenerate` endpoint.
+
+**Response format**:
+```
+)]}'
+
+<byte_count>
+[["wrb.fr",null,"<inner_json_string>"]]
+
+<byte_count>
+[["wrb.fr",null,"<inner_json_string>"]]
+```
+
+**Parsing flow** (`parseGeminiStreamBody()`):
+1. Strip `)]}'` prefix
+2. Skip byte count lines (lines matching `/^\d+$/`)
+3. Parse outer JSON array: `outer[0][2]` is a JSON string
+4. Parse inner JSON: `inner[4][0][1][0]` contains accumulated text
+
+**Key characteristic**: Each streaming chunk contains the **full accumulated text** (not deltas). The parser keeps the longest text found across all chunks.
+
+**Post-processing**:
+- `stripFormatting()` removes LaTeX math notation, image references (`[Image of ...]`), and Markdown formatting
+- `normalizeGeminiResponse()` is applied to the final text for consistency with DOM-extracted text
+
+**Hybrid selection**: After capture, the system compares network-extracted text with DOM-extracted text and selects the longer/more complete result. Network text is preferred when available.
+
+### 4.5 Gemini DOM-based Text Extraction (Fallback)
 
 **Priority**:
 
@@ -816,7 +890,7 @@ if (expandButton) {
 3. **aria-live** (last resort)
    - Get text from `[aria-live="polite"]`
 
-### 4.5 Input Verification Mechanism
+### 4.6 Input Verification Mechanism
 
 ```typescript
 // Check if first 20 characters of question are included in input field
@@ -1013,7 +1087,9 @@ For detailed response completion detection for ChatGPT and Gemini, see sections 
 | Shadow DOM | Not needed | **Required** (uses collectDeep) |
 | Main completion indicator | **Count increase detection** + stop button disappears | **Count increase detection** + feedback button appears |
 | Count tracking method | `assistantCount > initialAssistantCount` | `modelResponseCount > initialModelResponseCount` |
-| Text extraction basis | `data-message-author-role` | **`img[alt="thumb_up"]`** |
+| Text extraction method | Network (SSE delta parser) primary, DOM fallback | Network (chunked parser) primary, DOM fallback |
+| Network protocol | delta_encoding v1 SSE | StreamGenerate chunked |
+| DOM text extraction basis | `data-message-author-role` | **`img[alt="thumb_up"]`** |
 | Navigation | Not needed (resolved at connection) | Sometimes needed (measure navigateMs) |
 | Language support | aria-label branching | **img alt attribute (language-independent)** |
 
@@ -1021,30 +1097,69 @@ For detailed response completion detection for ChatGPT and Gemini, see sections 
 
 ## 8. Session Management
 
-### 8.1 sessions.json Structure
+### 8.1 sessions.json Structure (V2 - Agent-based)
 
 **Path**: `.local/chrome-ai-bridge/sessions.json`
 
+V2 format introduces agent-based session isolation for Agent Teams support.
+
 ```json
 {
-  "projects": {
-    "chrome-ai-bridge": {
+  "version": 2,
+  "agents": {
+    "agent-abc123": {
+      "lastAccess": "2026-02-07T12:34:56.789Z",
       "chatgpt": {
         "url": "https://chatgpt.com/c/xxx-xxx",
         "tabId": 123,
-        "lastUsed": "2026-01-30T10:30:00.000Z"
+        "lastUsed": "2026-02-07T12:34:56.789Z"
+      },
+      "gemini": null
+    },
+    "legacy-chrome-ai-bridge": {
+      "lastAccess": "2026-02-07T12:30:00.000Z",
+      "chatgpt": {
+        "url": "https://chatgpt.com/c/yyy-yyy",
+        "tabId": 456
       },
       "gemini": {
         "url": "https://gemini.google.com/app/xxx",
-        "tabId": 456,
-        "lastUsed": "2026-01-30T10:25:00.000Z"
+        "tabId": 789
       }
     }
+  },
+  "config": {
+    "sessionTtlMinutes": 30,
+    "maxAgents": 10
   }
 }
 ```
 
-### 8.2 History Recording (history.jsonl)
+**Migration**: V1 (project-based) format is automatically migrated to V2 on first access. Projects are converted to `legacy-{projectName}` agents.
+
+### 8.2 Agent ID Generation
+
+**File**: `src/fast-cdp/agent-context.ts`
+
+Agent IDs are generated using a hybrid strategy:
+
+| Source | Example | Priority |
+|--------|---------|----------|
+| `CAI_AGENT_ID` environment variable | `my-agent-12345` | 1 (highest) |
+| MCP client name | `claude-code-12345` | 2 |
+| Auto-generated | `agent-12345-1707123456789` | 3 (fallback) |
+
+### 8.3 Session Configuration
+
+**Environment Variables**:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `CAI_SESSION_TTL_MINUTES` | 30 | Session expiration time |
+| `CAI_MAX_AGENTS` | 10 | Maximum concurrent agents |
+| `CAI_CLEANUP_INTERVAL_MINUTES` | 5 | Stale session cleanup interval |
+
+### 8.4 History Recording (history.jsonl)
 
 **Path**: `.local/chrome-ai-bridge/history.jsonl`
 
@@ -1052,7 +1167,7 @@ For detailed response completion detection for ChatGPT and Gemini, see sections 
 {"ts":"2026-01-30T10:30:00.000Z","project":"chrome-ai-bridge","provider":"chatgpt","question":"...","answer":"...","url":"https://chatgpt.com/c/xxx","timings":{"connectMs":120,"waitInputMs":500,"inputMs":50,"sendMs":100,"waitResponseMs":5000,"totalMs":5770}}
 ```
 
-### 8.3 Session Reuse Logic
+### 8.5 Session Reuse Logic
 
 **Function**: `getPreferredSession()` in `src/fast-cdp/fast-chat.ts`
 
@@ -1168,6 +1283,10 @@ npm run test:chatgpt -- "question"
 npm run test:gemini -- "question"
 npm run test:both
 
+# Network intercept test
+npm run test:network -- chatgpt    # Network intercept test (ChatGPT)
+npm run test:network -- gemini     # Network intercept test (Gemini)
+
 # CDP snapshots (for debugging)
 npm run cdp:chatgpt
 npm run cdp:gemini
@@ -1201,6 +1320,7 @@ npm run test:suite -- --help       # Show help
 | `gemini-new-chat` | Gemini New Chat | smoke, gemini | Basic operation check with new chat |
 | `gemini-existing-chat` | Gemini Existing Chat Reconnection | regression, gemini | Stuck State detection and retry |
 | `gemini-code-block` | Gemini Code Block Response | smoke, gemini, code | Verify code generation response extraction |
+| `network-extraction` | Network Extraction | network, chatgpt, gemini | Verify network vs DOM text overlap |
 | `parallel-query` | Parallel Query | smoke, parallel | ChatGPT+Gemini simultaneous query |
 
 ### 10.3 Test Suite Tag List
@@ -1214,6 +1334,7 @@ npm run test:suite -- --help       # Show help
 | `thinking` | Thinking mode related | `--tag=thinking` |
 | `parallel` | Parallel query related | `--tag=parallel` |
 | `code` | Code block response related | `--tag=code` |
+| `network` | Network extraction related | `--tag=network` |
 
 **Scenario definition**: `scripts/test-scenarios.json`
 **Report location**: `.local/chrome-ai-bridge/test-reports/`
@@ -1477,6 +1598,8 @@ Check tabId in `.local/chrome-ai-bridge/sessions.json`
 
 ### Problem 4: ChatGPT Response Text Becomes Empty (Background Tab Issue)
 
+> **Note**: With v2.1 network extraction, this issue is largely mitigated. Network extraction captures responses at the protocol level, unaffected by DOM throttling in background tabs. The issue below only affects the DOM fallback extraction path.
+
 **Symptom**:
 - ChatGPT response generation completes (stop button disappears)
 - But `innerText` / `textContent` returns empty
@@ -1542,6 +1665,27 @@ curl http://127.0.0.1:8766/mcp-discovery
 2. Check if port 8766 is used by another process
 3. Restart Chrome to reload extension
 
+### Problem 7: Network Extraction Returns Empty
+
+**Symptom**: Network interceptor captures frames but extracted text is empty, causing fallback to DOM extraction.
+
+**Cause**: `Network.enable` was not called before capture started, or the API endpoint URL pattern has changed.
+
+**Verification**:
+```bash
+npm run test:network -- chatgpt   # Check tracked requests and text extraction
+npm run test:network -- gemini
+```
+
+Look for:
+- `Tracked requests` section: verify API URLs are being captured
+- `Extracted text` section: verify text is non-empty
+
+**Solution**:
+1. Ensure `Network.enable` is called in both tab reuse and new tab paths in `fast-chat.ts`
+2. Check URL patterns in `network-interceptor.ts` (`CHATGPT_API_PATTERNS`, `GEMINI_API_PATTERNS`)
+3. If ChatGPT endpoint changed from `/backend-api/f/conversation`, update the pattern
+
 ---
 
 ## Appendix A: File Structure
@@ -1551,6 +1695,7 @@ src/
 ├── fast-cdp/
 │   ├── fast-chat.ts      # ChatGPT/Gemini operation logic (main)
 │   ├── cdp-client.ts     # CDP command sending client
+│   ├── network-interceptor.ts  # Network response capture and protocol parsing
 │   ├── extension-raw.ts  # Extension connection handling
 │   └── mcp-logger.ts     # Logging
 ├── tools/
@@ -1568,6 +1713,9 @@ src/
 │       └── connect.js    # Connection UI logic
 ├── main.ts              # Entry point
 └── index.ts             # MCP server
+
+scripts/
+├── test-network-intercept.mjs  # Network extraction test
 ```
 
 ---
@@ -1790,8 +1938,8 @@ npm run test:bg -- --long --delay=10 --min-textlen=1000 --duration=90
 - Content appears instantly when tab regains focus
 
 **How chrome-ai-bridge handles this**:
-- `Page.bringToFront` is called before text extraction
-- This forces Chrome to render all accumulated content
+- **v2.1 network extraction**: Responses are captured at the network level, independent of DOM rendering. Background tab issues are largely mitigated.
+- **DOM fallback**: `Page.bringToFront` is called before text extraction, forcing Chrome to render all accumulated content.
 - No user action required - handled automatically
 
 **If you still see empty responses**:
@@ -1822,6 +1970,8 @@ npm run test:bg -- --long --delay=10 --min-textlen=1000 --duration=90
 | High | `[role="textbox"]` | ARIA role, stable |
 | Medium | `model-response` | Custom element, may change |
 | Low | Text-based selectors | Language-dependent |
+
+**v2.1 impact**: With network extraction as the primary path, selector breakage is less impactful. Selectors are only used for input field interaction, send button detection, and as a fallback for response extraction. Network extraction does not depend on selectors at all.
 
 **Best practices**:
 1. Prefer `data-*` attributes and ARIA roles
@@ -1918,16 +2068,18 @@ Track selector changes for debugging regressions.
 
 ### 17.1 ChatGPT
 
-| Date | Selector | Change | Notes |
+| Date | Selector / Feature | Change | Notes |
 |------|----------|--------|-------|
+| 2026-02 | Network interception | Added | Primary response extraction via CDP Network domain |
 | 2026-02 | `.result-thinking` | Deprecated | No longer used in Thinking mode |
 | 2026-02 | `article[data-turn]` | Added | New article structure |
 | 2026-01 | `.ProseMirror` | Added | contenteditable input variant |
 
 ### 17.2 Gemini
 
-| Date | Selector | Change | Notes |
+| Date | Selector / Feature | Change | Notes |
 |------|----------|--------|-------|
+| 2026-02 | Network interception | Added | Primary response extraction via CDP Network domain |
 | 2026-01 | `img[alt="thumb_up"]` | Adopted | Language-independent feedback detection |
 | 2026-01 | `img[alt="mic"]` | Adopted | Language-independent mic button |
 
@@ -1948,6 +2100,7 @@ Quick reference for test filtering:
 | `code` | Code generation | `npm run test:suite -- --tag=code` |
 | `sequential` | Consecutive prompts | `npm run test:suite -- --tag=sequential` |
 | `extraction` | Text extraction | `npm run test:suite -- --tag=extraction` |
+| `network` | Network extraction | `npm run test:suite -- --tag=network` |
 
 **Recommended test sequences**:
 
