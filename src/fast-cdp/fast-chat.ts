@@ -11,7 +11,7 @@ import {NetworkInterceptor} from './network-interceptor.js';
 import {
   getAgentConnection,
   getAllAgentConnections,
-  removeAgentConnection,
+  clearAllAgentConnections,
   hasAgentId,
   type AgentConnection,
 } from './agent-context.js';
@@ -342,11 +342,10 @@ export function clearGeminiClient(): void {
  * MCPサーバー終了時にゾンビプロセスを防ぐために使用
  */
 export async function cleanupAllConnections(): Promise<void> {
-  // Clean up all agent connections
-  const allConnections = getAllAgentConnections();
+  // Snapshot entries before clearing to avoid mutation during iteration
+  const entries = Array.from(getAllAgentConnections().entries());
 
-  for (const [agentId, conn] of allConnections) {
-    // ChatGPT
+  for (const [, conn] of entries) {
     if (conn.chatgptRelay) {
       try {
         await conn.chatgptRelay.stop();
@@ -355,7 +354,6 @@ export async function cleanupAllConnections(): Promise<void> {
       }
     }
 
-    // Gemini
     if (conn.geminiRelay) {
       try {
         await conn.geminiRelay.stop();
@@ -363,10 +361,10 @@ export async function cleanupAllConnections(): Promise<void> {
         // ignore stop errors
       }
     }
-
-    removeAgentConnection(agentId);
   }
 
+  // Clear all at once after iteration
+  clearAllAgentConnections();
   console.error('[fast-cdp] All connections cleaned up');
 }
 

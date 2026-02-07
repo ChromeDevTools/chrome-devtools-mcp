@@ -70,11 +70,16 @@ function getSessionPath(): string {
  * Load raw sessions from file (any version).
  */
 async function loadRawSessions(): Promise<SessionStoreV1 | SessionStoreV2> {
+  const sessionPath = getSessionPath();
   try {
-    const data = await fs.readFile(getSessionPath(), 'utf-8');
+    const data = await fs.readFile(sessionPath, 'utf-8');
     return JSON.parse(data);
-  } catch {
-    // File doesn't exist or parse error
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code !== 'ENOENT') {
+      // File exists but is corrupted or unreadable
+      console.error(`[session-manager] Failed to load ${sessionPath}: ${err instanceof Error ? err.message : String(err)}`);
+    }
     return {projects: {}};
   }
 }
@@ -113,7 +118,9 @@ async function migrateToV2(v1: SessionStoreV1): Promise<SessionStoreV2> {
 
   // Migrate each project as a legacy agent
   for (const [projectName, projectSessions] of Object.entries(v1.projects)) {
-    const agentId = `legacy-${projectName}`;
+    // Sanitize project name for use as agent ID key
+    const safeName = projectName.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 64);
+    const agentId = `legacy-${safeName}`;
     v2.agents[agentId] = {
       lastAccess: new Date().toISOString(),
       chatgpt: projectSessions.chatgpt || null,
@@ -143,10 +150,12 @@ export async function loadSessions(): Promise<SessionStoreV2> {
 
 /**
  * Get or create session for the current agent.
+ * Always updates lastAccess to keep session alive for TTL.
  */
 export async function getAgentSession(): Promise<AgentSession> {
   const agentId = hasAgentId() ? getAgentId() : 'default';
   const sessions = await loadSessions();
+  let needsSave = false;
 
   if (!sessions.agents[agentId]) {
     sessions.agents[agentId] = {
@@ -154,6 +163,15 @@ export async function getAgentSession(): Promise<AgentSession> {
       chatgpt: null,
       gemini: null,
     };
+    needsSave = true;
+  } else {
+    // Update lastAccess for existing sessions (keeps TTL alive)
+    sessions.agents[agentId].lastAccess = new Date().toISOString();
+    needsSave = true;
+  }
+
+  if (needsSave) {
+    await saveRawSessions(sessions);
   }
 
   return sessions.agents[agentId];
@@ -263,10 +281,10 @@ export async function getPreferredSessionV2(
   const session = await getAgentSession();
   const entry = session[kind];
 
-  if (entry) {
+  if (entry && typeof entry.url === 'string' && entry.url.length > 0) {
     return {
       url: entry.url,
-      tabId: entry.tabId,
+      tabId: typeof entry.tabId === 'number' ? entry.tabId : undefined,
     };
   }
 
