@@ -38,4 +38,6 @@ export {
   type ChromeReleaseChannel as BrowsersChromeReleaseChannel,
 } from '@puppeteer/browsers';
 
+export {snapshot} from './lighthouse-devtools-mcp-bundle.js';
+
 export * as DevTools from '../../node_modules/chrome-devtools-frontend/mcp/mcp.js';
