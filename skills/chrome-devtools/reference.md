@@ -30,7 +30,7 @@ Use this alongside [SKILL.md](./SKILL.md). Full parameter details: [docs/tool-re
 
 ### Performance (3)
 - **performance_start_trace** – `reload`, `autoStop`; optional `filePath` for trace file
-- **performance_stop_trace** – Optional `filePath`
+- **performance_stop_trace** – Optional `filePath`. Now includes **CrUX field data** (LCP with breakdown, INP, CLS) from real users alongside lab metrics. Disable with `--no-performance-crux`.
 - **performance_analyze_insight** – `insightSetId`, `insightName` (from trace results)
 
 ### Network (2)
@@ -43,7 +43,7 @@ Use this alongside [SKILL.md](./SKILL.md). Full parameter details: [docs/tool-re
 - **take_screenshot** – Optional `uid`, `fullPage`, `format`, `quality`, `filePath`
 - **evaluate_script** – `function` (JS function as string), optional `args` (array of `{uid}`). Return value must be JSON-serializable.
 - **list_console_messages** – Optional `pageSize`, `pageIdx`, `types`, `includePreservedMessages`
-- **get_console_message** – `msgid`
+- **get_console_message** – `msgid`. Error objects show source-mapped stacks (1-based line/column) and Error.cause chains.
 
 ## Formatters (internal)
 
@@ -51,7 +51,7 @@ Use this alongside [SKILL.md](./SKILL.md). Full parameter details: [docs/tool-re
 |-----------|----------|--------|
 | SnapshotFormatter | `take_snapshot` output | Text snapshot with `uid`s; `verbose` adds more a11y data |
 | NetworkFormatter | `list_network_requests`, `get_network_request` | URL, status, headers, body (truncated or saved to file) |
-| ConsoleFormatter | `list_console_messages`, `get_console_message` | Level, text, stack, resolved args |
+| ConsoleFormatter | `list_console_messages`, `get_console_message` | Level, text, source-mapped stack, resolved args, Error.cause chains |
 | IssueFormatter | DevTools issues in responses | Deprecations, violations, etc. |
 
 ## Telemetry

@@ -74,7 +74,7 @@ The server does not inject code into the page; it uses DevTools network data. Yo
 | List HTTP/WebSocket requests | `list_network_requests` (optional `resourceTypes: ['websocket']`) |
 | Inspect one request/response | `get_network_request` (reqid, optional file paths for bodies) |
 | Console errors/warnings | `list_console_messages` (optional `types`), `get_console_message` |
-| Performance / CWV | `performance_start_trace`, `performance_stop_trace`, `performance_analyze_insight` |
+| Performance / CWV | `performance_start_trace`, `performance_stop_trace`, `performance_analyze_insight` (includes CrUX field data) |
 | Emulation | `emulate` (viewport, userAgent, networkConditions, etc.), `resize_page` |
 
 See [Tool reference](../../docs/tool-reference.md) for full parameters.
@@ -85,10 +85,23 @@ Tool responses are shaped by internal formatters. You don’t call them directly
 
 - **SnapshotFormatter**: Turns the a11y tree into the text snapshot with `uid`s and optional “selected in DevTools” hint. Use `verbose: true` on `take_snapshot` for more detail.
 - **NetworkFormatter**: Formats request/response (URL, status, headers, body). Large bodies can be truncated or written to `requestFilePath`/`responseFilePath`.
-- **ConsoleFormatter**: Formats console messages (level, text, stack, resolved arguments when detailed data is requested).
-- **IssueFormatter**: Formats DevTools “issues” (e.g. deprecations, violations) when included in responses.
+- **ConsoleFormatter**: Formats console messages (level, text, stack, resolved arguments when detailed data is requested). Error objects logged via `console.log(new Error(...))` now include the full message, source-mapped stack trace (1-based line/column), and `Error.cause` chain (shown as nested "Caused by:" sections).
+- **IssueFormatter**: Formats DevTools "issues" (e.g. deprecations, violations) when included in responses.
 
 A full **Network & Console breakdown** (data flow, collectors, filter options, what you see in responses) is in [network-and-console-breakdown.md](./network-and-console-breakdown.md).
+
+## Performance traces and CrUX field data
+
+Performance traces now include **CrUX (Chrome User Experience Report)** real-user field metrics alongside lab data:
+
+- **Metrics shown**: LCP (with breakdown: TTFB, load delay, load duration, render delay), INP, CLS
+- **Scope**: Data may be for the specific URL or the entire origin, indicated in the output
+- **Privacy**: URLs from traces are sent to Google's CrUX API to fetch field data
+- **Disable**: Start the server with `--no-performance-crux` to opt out of CrUX data
+
+## Error debugging improvements
+
+Stack traces for uncaught errors and `console.log(Error)` are now **source-mapped** (showing original file paths and 1-based line/column numbers instead of minified bundles). Error objects also display their full **Error.cause** chain as nested "Caused by:" sections with their own stack traces.
 
 ## Telemetry
 

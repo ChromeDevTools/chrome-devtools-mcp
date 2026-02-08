@@ -118,13 +118,35 @@ Example: only errors and issues → `types: ['error', 'issue']`.
 - **Single message (detailed)** from `get_console_message`:
   - **Console message**: ID, type, message text, **Arguments** (resolved values), **Stack trace** (with file:line when available).
   - **Issue**: ID, description (markdown), “Learn more” links, **Affected resources** (e.g. request reqid, element uid).
-  - **Uncaught error**: ID, message, stack.
+  - **Uncaught error**: ID, message, **source-mapped stack trace** (1-based line/column), and **Error.cause chain** (nested "Caused by:" sections, each with its own message and stack).
+
+### Error object formatting (v0.16.0+)
+
+When an Error object is logged via `console.log(new Error(...))` or thrown as an uncaught exception, the ConsoleFormatter now extracts:
+
+- **Message**: The error message string.
+- **Source-mapped stack trace**: Stack frames are resolved through source maps, showing original file paths and 1-based line/column numbers instead of minified/compiled references.
+- **Error.cause chain**: If the error has a `.cause`, it's shown as a "Caused by:" section with its own message and stack. Chains are followed recursively.
+
+Example detailed output for an uncaught error with a cause chain:
+```
+Message: error> Uncaught Error: foo failed
+### Stack trace
+at Iife (main.js:18:11)
+at <anonymous> (main.js:14:1)
+Caused by: Error: bar failed
+at foo (main.js:10:11)
+...
+Caused by: Error: b00m!
+at bar (main.js:3:9)
+...
+```
 
 ### Formatters (internal)
 
 - **ConsoleFormatter** (`formatters/ConsoleFormatter.ts`):
   - **Summary**: `toString()` → `msgid=X [type] text (N args)`.
-  - **Detailed**: `toStringDetailed()` → ID, message, Arguments, Stack trace. For detailed, it can resolve `args` via `jsonValue()` and resolve stack via DevTools (when available).
+  - **Detailed**: `toStringDetailed()` → ID, message, Arguments, Stack trace. For detailed, it can resolve `args` via `jsonValue()` and resolve stack via DevTools (when available). Error-subtype arguments are expanded with message, stack, and cause chain.
 - **IssueFormatter** (`formatters/IssueFormatter.ts`):
   - **Summary**: `toString()` → `msgid=X [issue] title (count: N)`.
   - **Detailed**: `toStringDetailed()` → ID, description, links, affected resources (request id, element uid, etc.).
