@@ -113,6 +113,12 @@ Chrome DevTools MCP will not start the browser instance automatically using this
 claude mcp add chrome-devtools --scope user npx chrome-devtools-mcp@latest
 ```
 
+**Don’t start automatically, preserve context, and defer tool use:** The Chrome DevTools MCP server does not start the browser until the first tool that needs it runs. To avoid loading all MCP tool definitions up front and to preserve context, use **MCP Tool Search** in Claude Code so tools are loaded on demand:
+
+- Claude Code turns on **Tool Search** automatically when your MCP tools would use more than 10% of the context window (see <a href="https://code.claude.com/docs/en/mcp#scale-with-mcp-tool-search">Scale with MCP Tool Search</a>). When that happens, tools are deferred and Claude uses a search tool to load only the tools it needs.
+- To rely on this behavior, no extra config is required. To force it on (or adjust the threshold), use **Configure tool search** in Claude Code (e.g. run `/config` and check MCP / tool search options, or set <code>enable_tool_search</code> in your Claude Code settings as documented in the <a href="https://code.claude.com/docs/en/mcp#configure-tool-search">MCP docs</a>).
+- Optionally add <code>serverInstructions</code> to your MCP server config so Tool Search can discover Chrome DevTools tools more reliably (e.g. describe browser automation, debugging, network inspection, performance traces).
+
 </details>
 
 <details>
