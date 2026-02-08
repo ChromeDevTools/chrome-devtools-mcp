@@ -236,3 +236,29 @@ export function getLayoutShiftImages(
   const match = shifts.find(s => s.ts === timestamp);
   return match ? match.images : null;
 }
+
+export interface RenderBlockingRequest {
+  url: string;
+  durationMs: number;
+  mimeType: string;
+}
+
+export function getRenderBlockingRequests(
+  result: TraceResult,
+): RenderBlockingRequest[] {
+  const requests: RenderBlockingRequest[] = [];
+  const networkRequests = result.parsedTrace.data.NetworkRequests.byTime;
+
+  for (const req of networkRequests) {
+    if (req.args.data.renderBlocking === 'blocking') {
+      requests.push({
+        url: req.args.data.url,
+        durationMs: (req.dur || 0) / 1000, // Convert microseconds to milliseconds
+        mimeType: req.args.data.mimeType,
+      });
+    }
+  }
+
+  // Sort by duration descending
+  return requests.sort((a, b) => b.durationMs - a.durationMs);
+}

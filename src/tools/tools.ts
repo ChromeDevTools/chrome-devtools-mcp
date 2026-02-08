@@ -11,6 +11,7 @@ import * as inputTools from './input.js';
 import * as networkTools from './network.js';
 import * as pagesTools from './pages.js';
 import * as performanceTools from './performance.js';
+import * as renderBlockingTools from './render_blocking.js';
 import * as screenshotTools from './screenshot.js';
 import * as scriptTools from './script.js';
 import * as snapshotTools from './snapshot.js';
@@ -24,6 +25,7 @@ const tools = [
   ...Object.values(networkTools),
   ...Object.values(pagesTools),
   ...Object.values(performanceTools),
+  ...Object.values(renderBlockingTools),
   ...Object.values(screenshotTools),
   ...Object.values(scriptTools),
   ...Object.values(snapshotTools),

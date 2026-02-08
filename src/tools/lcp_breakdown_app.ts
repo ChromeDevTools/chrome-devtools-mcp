@@ -94,6 +94,31 @@ function LCPApp() {
       screenshotImg.src = 'data:image/png;base64,' + lcpData.screenshot;
       screenshotBox.style.display = 'block';
     }
+
+    // // Send data to the iframe
+    // const phases = lcpData.phases.reduce((acc, phase) => {
+    //   if (phase.name === 'TTFB') {
+    //     acc.ttfb = phase.durationMs;
+    //   }
+    //   if (phase.name === 'Load Delay') {
+    //     acc.loadDelay = phase.durationMs;
+    //   }
+    //   if (phase.name === 'Load Duration') {
+    //     acc.loadDuration = phase.durationMs;
+    //   }
+    //   if (phase.name === 'Render Delay') {
+    //     acc.renderDelay = phase.durationMs;
+    //   }
+    //   return acc;
+    // }, {} as Record<string, number>);
+
+    // const iframe = document.querySelector('iframe');
+    // if (iframe && iframe.contentWindow) {
+    //   iframe.contentWindow.postMessage({
+    //     type: 'renderInsights',
+    //     data: phases
+    //   }, '*');
+    // }
   }
 }
 

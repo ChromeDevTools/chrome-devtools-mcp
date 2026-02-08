@@ -34,6 +34,7 @@ import {ToolCategory} from './tools/categories.js';
 import {EMULATION_UI_CONTENT} from './tools/emulation_ui.js';
 import {LAYOUT_SHIFT_UI_CONTENT} from './tools/layout_shift_ui.js';
 import {LCP_UI_CONTENT} from './tools/lcp_breakdown_ui.js';
+import {RENDER_BLOCKING_UI_CONTENT} from './tools/render_blocking_ui.js';
 import type {ToolDefinition} from './tools/ToolDefinition.js';
 import {tools} from './tools/tools.js';
 
@@ -284,6 +285,11 @@ server.server.setRequestHandler(ListResourcesRequestSchema, async () => ({
       },
     },
     {
+      uri: "ui://performance/render-blocking",
+      name: "Render Blocking Requests List",
+      mimeType: "text/html;profile=mcp-app",
+    },
+    {
       uri: "ui://performance/layout-shift-breakdown",
       name: "Layout Shift Breakdown",
       mimeType: "text/html;profile=mcp-app",
@@ -315,6 +321,15 @@ server.server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
             },
           },
         },
+      }],
+    };
+  }
+  if (request.params.uri === "ui://performance/render-blocking") {
+    return {
+      contents: [{
+        uri: "ui://performance/render-blocking",
+        mimeType: "text/html;profile=mcp-app",
+        text: RENDER_BLOCKING_UI_CONTENT,
       }],
     };
   }
