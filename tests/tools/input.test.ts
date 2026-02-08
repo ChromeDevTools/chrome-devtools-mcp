@@ -9,6 +9,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import {describe, it} from 'node:test';
 
+import {McpResponse} from '../../src/McpResponse.js';
 import {
   click,
   hover,
@@ -379,6 +380,79 @@ describe('input', () => {
               document.body.querySelector('textarea')?.value.length === 3_000
             );
           }),
+        );
+      });
+    });
+
+    it('reproduction: fill isolation', async () => {
+      await withMcpContext(async (_response, context) => {
+        const page = context.getSelectedPage();
+        await page.setContent(
+          html`<form>
+            <input
+              id="email"
+              value="user@test.com"
+            />
+            <input
+              id="password"
+              type="password"
+            />
+          </form>`,
+        );
+        await context.createTextSnapshot();
+
+        // Fill email
+        const response1 = new McpResponse();
+        await fill.handler(
+          {
+            params: {
+              uid: '1_1', // email input
+              value: 'new@test.com',
+            },
+          },
+          response1,
+          context,
+        );
+        assert.strictEqual(
+          response1.responseLines[0],
+          'Successfully filled out the element',
+        );
+
+        // Fill password
+        const response2 = new McpResponse();
+        await fill.handler(
+          {
+            params: {
+              uid: '1_2', // password input
+              value: 'secret',
+            },
+          },
+          response2,
+          context,
+        );
+        assert.strictEqual(
+          response2.responseLines[0],
+          'Successfully filled out the element',
+        );
+
+        // Verify values
+        const values = await page.evaluate(() => {
+          return {
+            email: (document.getElementById('email') as HTMLInputElement).value,
+            password: (document.getElementById('password') as HTMLInputElement)
+              .value,
+          };
+        });
+
+        assert.strictEqual(
+          values.email,
+          'new@test.com',
+          'Email should be updated correctly',
+        );
+        assert.strictEqual(
+          values.password,
+          'secret',
+          'Password should be updated correctly',
         );
       });
     });

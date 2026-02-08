@@ -7,14 +7,19 @@
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
+import {SymbolizedError} from '../../src/DevtoolsUtils.js';
 import {ConsoleFormatter} from '../../src/formatters/ConsoleFormatter.js';
-import type {ConsoleMessage} from '../../src/third_party/index.js';
+import {UncaughtError} from '../../src/PageCollector.js';
+import type {ConsoleMessage, Protocol} from '../../src/third_party/index.js';
 import type {DevTools} from '../../src/third_party/index.js';
 
 interface MockConsoleMessage {
   type: () => string;
   text: () => string;
-  args: () => Array<{jsonValue: () => Promise<unknown>}>;
+  args: () => Array<{
+    jsonValue: () => Promise<unknown>;
+    remoteObject: () => Protocol.Runtime.RemoteObject;
+  }>;
   stackTrace?: DevTools.StackTrace.StackTrace.StackTrace;
 }
 
@@ -44,7 +49,12 @@ describe('ConsoleFormatter', () => {
       const message = createMockMessage({
         type: () => 'log',
         text: () => 'Processing file:',
-        args: () => [{jsonValue: async () => 'file.txt'}],
+        args: () => [
+          {
+            jsonValue: async () => 'file.txt',
+            remoteObject: () => ({type: 'string'}),
+          },
+        ],
       });
       const result = (
         await ConsoleFormatter.from(message, {id: 2, fetchDetailedData: true})
@@ -57,12 +67,38 @@ describe('ConsoleFormatter', () => {
         type: () => 'log',
         text: () => 'Processing file:',
         args: () => [
-          {jsonValue: async () => 'file.txt'},
-          {jsonValue: async () => 'another file'},
+          {
+            jsonValue: async () => 'file.txt',
+            remoteObject: () => ({type: 'string'}),
+          },
+          {
+            jsonValue: async () => 'another file',
+            remoteObject: () => ({type: 'string'}),
+          },
         ],
       });
       const result = (
         await ConsoleFormatter.from(message, {id: 3, fetchDetailedData: true})
+      ).toString();
+      t.assert.snapshot?.(result);
+    });
+
+    it('formats an UncaughtError', async t => {
+      const error = new UncaughtError(
+        {
+          exceptionId: 1,
+          lineNumber: 0,
+          columnNumber: 5,
+          exception: {
+            type: 'object',
+            description: 'TypeError: Cannot read properties of undefined',
+          },
+          text: 'Uncaught',
+        },
+        '<mock target ID>',
+      );
+      const result = (
+        await ConsoleFormatter.from(error, {id: 4, fetchDetailedData: true})
       ).toString();
       t.assert.snapshot?.(result);
     });
@@ -84,7 +120,12 @@ describe('ConsoleFormatter', () => {
       const message = createMockMessage({
         type: () => 'log',
         text: () => 'Processing file:',
-        args: () => [{jsonValue: async () => 'file.txt'}],
+        args: () => [
+          {
+            jsonValue: async () => 'file.txt',
+            remoteObject: () => ({type: 'string'}),
+          },
+        ],
       });
       const result = (
         await ConsoleFormatter.from(message, {id: 2, fetchDetailedData: true})
@@ -97,8 +138,14 @@ describe('ConsoleFormatter', () => {
         type: () => 'log',
         text: () => 'Processing file:',
         args: () => [
-          {jsonValue: async () => 'file.txt'},
-          {jsonValue: async () => 'another file'},
+          {
+            jsonValue: async () => 'file.txt',
+            remoteObject: () => ({type: 'string'}),
+          },
+          {
+            jsonValue: async () => 'another file',
+            remoteObject: () => ({type: 'string'}),
+          },
         ],
       });
       const result = (
@@ -173,6 +220,7 @@ describe('ConsoleFormatter', () => {
             jsonValue: async () => {
               throw new Error('Execution context is not available');
             },
+            remoteObject: () => ({type: 'string'}),
           },
         ],
       });
@@ -183,6 +231,225 @@ describe('ConsoleFormatter', () => {
       const result = formatter.toStringDetailed();
       t.assert.snapshot?.(result);
       assert.ok(result.includes('<error: Argument 0 is no longer available>'));
+    });
+
+    it('formats an UncaughtError with a stack trace', async t => {
+      const stackTrace = {
+        syncFragment: {
+          frames: [
+            {
+              line: 10,
+              column: 2,
+              url: 'foo.ts',
+              name: 'foo',
+            },
+            {
+              line: 20,
+              column: 2,
+              url: 'foo.ts',
+              name: 'bar',
+            },
+          ],
+        },
+        asyncFragments: [
+          {
+            description: 'setTimeout',
+            frames: [
+              {
+                line: 5,
+                column: 2,
+                url: 'util.ts',
+                name: 'schedule',
+              },
+            ],
+          },
+        ],
+      } as unknown as DevTools.StackTrace.StackTrace.StackTrace;
+      const error = new UncaughtError(
+        {
+          exceptionId: 1,
+          lineNumber: 0,
+          columnNumber: 5,
+          exception: {
+            type: 'object',
+            description: 'TypeError: Cannot read properties of undefined',
+          },
+          text: 'Uncaught',
+        },
+        '<mock target ID>',
+      );
+
+      const result = (
+        await ConsoleFormatter.from(error, {
+          id: 7,
+          resolvedStackTraceForTesting: stackTrace,
+        })
+      ).toStringDetailed();
+      t.assert.snapshot?.(result);
+    });
+
+    it('formats a console message with an Error object argument', async t => {
+      const message = createMockMessage({
+        type: () => 'log',
+        text: () => 'JSHandle@error',
+      });
+      const stackTrace = {
+        syncFragment: {
+          frames: [
+            {
+              line: 10,
+              column: 2,
+              url: 'foo.ts',
+              name: 'foo',
+            },
+            {
+              line: 20,
+              column: 2,
+              url: 'foo.ts',
+              name: 'bar',
+            },
+          ],
+        },
+        asyncFragments: [],
+      } as unknown as DevTools.StackTrace.StackTrace.StackTrace;
+      const error = SymbolizedError.createForTesting(
+        'TypeError: Cannot read properties of undefined',
+        stackTrace,
+      );
+
+      const result = (
+        await ConsoleFormatter.from(message, {
+          id: 8,
+          resolvedArgsForTesting: [error],
+        })
+      ).toStringDetailed();
+      t.assert.snapshot?.(result);
+    });
+
+    it('formats a console message with an Error object with cause', async t => {
+      const message = createMockMessage({
+        type: () => 'log',
+        text: () => 'JSHandle@error',
+      });
+      const stackTrace = {
+        syncFragment: {
+          frames: [
+            {
+              line: 10,
+              column: 2,
+              url: 'foo.ts',
+              name: 'foo',
+            },
+            {
+              line: 20,
+              column: 2,
+              url: 'foo.ts',
+              name: 'bar',
+            },
+          ],
+        },
+        asyncFragments: [],
+      } as unknown as DevTools.StackTrace.StackTrace.StackTrace;
+      const error = SymbolizedError.createForTesting(
+        'AppError: Compute failed',
+        stackTrace,
+        SymbolizedError.createForTesting(
+          'TypeError: Cannot read properties of undefined',
+          {
+            syncFragment: {
+              frames: [
+                {
+                  line: 5,
+                  column: 10,
+                  url: 'library.js',
+                  name: 'compute',
+                },
+              ],
+            },
+            asyncFragments: [],
+          } as unknown as DevTools.StackTrace.StackTrace.StackTrace,
+        ),
+      );
+
+      const result = (
+        await ConsoleFormatter.from(message, {
+          id: 9,
+          resolvedArgsForTesting: [error],
+        })
+      ).toStringDetailed();
+      t.assert.snapshot?.(result);
+    });
+
+    it('formats an UncaughtError with a stack trace and a cause', async t => {
+      const stackTrace = {
+        syncFragment: {
+          frames: [
+            {
+              line: 10,
+              column: 2,
+              url: 'foo.ts',
+              name: 'foo',
+            },
+            {
+              line: 20,
+              column: 2,
+              url: 'foo.ts',
+              name: 'bar',
+            },
+          ],
+        },
+        asyncFragments: [
+          {
+            description: 'setTimeout',
+            frames: [
+              {
+                line: 5,
+                column: 2,
+                url: 'util.ts',
+                name: 'schedule',
+              },
+            ],
+          },
+        ],
+      } as unknown as DevTools.StackTrace.StackTrace.StackTrace;
+      const error = new UncaughtError(
+        {
+          exceptionId: 1,
+          lineNumber: 0,
+          columnNumber: 5,
+          exception: {
+            type: 'object',
+            description: 'TypeError: Cannot read properties of undefined',
+          },
+          text: 'Uncaught',
+        },
+        '<mock target ID>',
+      );
+      const cause = SymbolizedError.createForTesting(
+        'TypeError: Cannot read properties of undefined',
+        {
+          syncFragment: {
+            frames: [
+              {
+                line: 5,
+                column: 8,
+                url: 'library.js',
+                name: 'compute',
+              },
+            ],
+          },
+          asyncFragments: [],
+        } as unknown as DevTools.StackTrace.StackTrace.StackTrace,
+      );
+
+      const result = (
+        await ConsoleFormatter.from(error, {
+          id: 10,
+          resolvedStackTraceForTesting: stackTrace,
+          resolvedCauseForTesting: cause,
+        })
+      ).toStringDetailed();
+      t.assert.snapshot?.(result);
     });
   });
   describe('toJSON', () => {
@@ -205,8 +472,14 @@ describe('ConsoleFormatter', () => {
         type: () => 'log',
         text: () => 'Processing file:',
         args: () => [
-          {jsonValue: async () => 'file.txt'},
-          {jsonValue: async () => 'another file'},
+          {
+            jsonValue: async () => 'file.txt',
+            remoteObject: () => ({type: 'string'}),
+          },
+          {
+            jsonValue: async () => 'another file',
+            remoteObject: () => ({type: 'string'}),
+          },
         ],
       });
       const result = (await ConsoleFormatter.from(message, {id: 1})).toJSON();
@@ -242,8 +515,14 @@ describe('ConsoleFormatter', () => {
         type: () => 'log',
         text: () => 'Processing file:',
         args: () => [
-          {jsonValue: async () => 'file.txt'},
-          {jsonValue: async () => 'another file'},
+          {
+            jsonValue: async () => 'file.txt',
+            remoteObject: () => ({type: 'string'}),
+          },
+          {
+            jsonValue: async () => 'another file',
+            remoteObject: () => ({type: 'string'}),
+          },
         ],
       });
       const result = (

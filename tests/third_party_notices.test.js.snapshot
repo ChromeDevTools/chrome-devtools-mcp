@@ -1,7 +1,7 @@
 exports[`THIRD_PARTY_NOTICES > matches snapshot if exists 1`] = `
 Name: core-js
 URL: https://core-js.io
-Version: 3.48.0
+Version: <VERSION>
 License: MIT
 
 Copyright (c) 2013–2025 Denis Pushkarev (zloirock.ru)
@@ -30,7 +30,7 @@ THE SOFTWARE.
 
 Name: cliui
 URL: yargs/cliui
-Version: 9.0.1
+Version: <VERSION>
 License: ISC
 
 Copyright (c) 2015, Contributors
@@ -53,7 +53,7 @@ ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 Name: ansi-regex
 URL: chalk/ansi-regex
-Version: 6.2.2
+Version: <VERSION>
 License: MIT
 
 MIT License
@@ -71,7 +71,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 Name: strip-ansi
 URL: chalk/strip-ansi
-Version: 7.1.2
+Version: <VERSION>
 License: MIT
 
 MIT License
@@ -89,7 +89,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 Name: get-east-asian-width
 URL: sindresorhus/get-east-asian-width
-Version: 1.4.0
+Version: <VERSION>
 License: MIT
 
 MIT License
@@ -107,7 +107,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 Name: emoji-regex
 URL: https://mths.be/emoji-regex
-Version: 10.6.0
+Version: <VERSION>
 License: MIT
 
 Copyright Mathias Bynens <https://mathiasbynens.be/>
@@ -136,7 +136,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 Name: string-width
 URL: sindresorhus/string-width
-Version: 7.2.0
+Version: <VERSION>
 License: MIT
 
 MIT License
@@ -154,7 +154,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 Name: ansi-styles
 URL: chalk/ansi-styles
-Version: 6.2.3
+Version: <VERSION>
 License: MIT
 
 MIT License
@@ -172,7 +172,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 Name: wrap-ansi
 URL: chalk/wrap-ansi
-Version: 9.0.2
+Version: <VERSION>
 License: MIT
 
 MIT License
@@ -190,7 +190,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 Name: escalade
 URL: lukeed/escalade
-Version: 3.2.0
+Version: <VERSION>
 License: MIT
 
 MIT License
@@ -208,7 +208,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 Name: yargs-parser
 URL: https://github.com/yargs/yargs-parser.git
-Version: 22.0.0
+Version: <VERSION>
 License: ISC
 
 Copyright (c) 2016, Contributors
@@ -231,7 +231,7 @@ ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 Name: yargs
 URL: https://yargs.js.org/
-Version: 18.0.0
+Version: <VERSION>
 License: MIT
 
 MIT License
@@ -261,7 +261,7 @@ THE SOFTWARE.
 
 Name: y18n
 URL: https://github.com/yargs/y18n
-Version: 5.0.8
+Version: <VERSION>
 License: ISC
 
 Copyright (c) 2015, Contributors
@@ -283,7 +283,7 @@ THIS SOFTWARE.
 
 Name: get-caller-file
 URL: https://github.com/stefanpenner/get-caller-file#readme
-Version: 2.0.5
+Version: <VERSION>
 License: ISC
 
 ISC License (ISC)
@@ -298,7 +298,7 @@ THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH RE
 
 Name: debug
 URL: git://github.com/debug-js/debug.git
-Version: 4.4.3
+Version: <VERSION>
 License: MIT
 
 (The MIT License)
@@ -327,7 +327,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 Name: ms
 URL: vercel/ms
-Version: 2.1.3
+Version: <VERSION>
 License: MIT
 
 The MIT License (MIT)
@@ -357,7 +357,7 @@ SOFTWARE.
 
 Name: has-flag
 URL: sindresorhus/has-flag
-Version: 4.0.0
+Version: <VERSION>
 License: MIT
 
 MIT License
@@ -375,7 +375,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 Name: supports-color
 URL: chalk/supports-color
-Version: 7.2.0
+Version: <VERSION>
 License: MIT
 
 MIT License
@@ -393,7 +393,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 Name: zod
 URL: https://zod.dev
-Version: 3.25.76
+Version: <VERSION>
 License: MIT
 
 MIT License
@@ -423,7 +423,7 @@ SOFTWARE.
 
 Name: @modelcontextprotocol/sdk
 URL: https://modelcontextprotocol.io
-Version: 1.25.3
+Version: <VERSION>
 License: MIT
 
 MIT License
@@ -453,7 +453,7 @@ SOFTWARE.
 
 Name: zod-to-json-schema
 URL: https://github.com/StefanTerdell/zod-to-json-schema
-Version: 3.25.0
+Version: <VERSION>
 License: ISC
 
 ISC License
@@ -476,7 +476,7 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 Name: ajv
 URL: https://ajv.js.org
-Version: 8.17.1
+Version: <VERSION>
 License: MIT
 
 The MIT License (MIT)
@@ -507,7 +507,7 @@ SOFTWARE.
 
 Name: fast-deep-equal
 URL: https://github.com/epoberezkin/fast-deep-equal#readme
-Version: 3.1.3
+Version: <VERSION>
 License: MIT
 
 MIT License
@@ -537,7 +537,7 @@ SOFTWARE.
 
 Name: json-schema-traverse
 URL: https://github.com/epoberezkin/json-schema-traverse#readme
-Version: 1.0.0
+Version: <VERSION>
 License: MIT
 
 MIT License
@@ -567,7 +567,7 @@ SOFTWARE.
 
 Name: fast-uri
 URL: https://github.com/fastify/fast-uri
-Version: 3.1.0
+Version: <VERSION>
 License: BSD-3-Clause
 
 Copyright (c) 2011-2021, Gary Court until https://github.com/garycourt/uri-js/commit/a1acf730b4bba3f1097c9f52e7d9d3aba8cdcaae
@@ -607,7 +607,7 @@ The complete list of contributors can be found at:
 
 Name: ajv-formats
 URL: https://github.com/ajv-validator/ajv-formats#readme
-Version: 3.0.1
+Version: <VERSION>
 License: MIT
 
 MIT License
@@ -637,21 +637,21 @@ SOFTWARE.
 
 Name: puppeteer-core
 URL: https://github.com/puppeteer/puppeteer/tree/main/packages/puppeteer-core
-Version: 24.36.1
+Version: <VERSION>
 License: Apache-2.0
 
 -------------------- DEPENDENCY DIVIDER --------------------
 
 Name: @puppeteer/browsers
 URL: https://github.com/puppeteer/puppeteer/tree/main/packages/browsers
-Version: 2.11.2
+Version: <VERSION>
 License: Apache-2.0
 
 -------------------- DEPENDENCY DIVIDER --------------------
 
 Name: semver
 URL: git+https://github.com/npm/node-semver.git
-Version: 7.7.3
+Version: <VERSION>
 License: ISC
 
 The ISC License
@@ -675,7 +675,7 @@ IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 Name: proxy-agent
 URL: https://github.com/TooTallNate/proxy-agents.git
-Version: 6.5.0
+Version: <VERSION>
 License: MIT
 
 (The MIT License)
@@ -705,7 +705,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 Name: lru-cache
 URL: git://github.com/isaacs/node-lru-cache.git
-Version: 7.18.3
+Version: <VERSION>
 License: ISC
 
 The ISC License
@@ -729,7 +729,7 @@ IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 Name: agent-base
 URL: https://github.com/TooTallNate/proxy-agents.git
-Version: 7.1.4
+Version: <VERSION>
 License: MIT
 
 (The MIT License)
@@ -759,7 +759,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 Name: proxy-from-env
 URL: https://github.com/Rob--W/proxy-from-env#readme
-Version: 1.1.0
+Version: <VERSION>
 License: MIT
 
 The MIT License
@@ -788,7 +788,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 Name: http-proxy-agent
 URL: https://github.com/TooTallNate/proxy-agents.git
-Version: 7.0.2
+Version: <VERSION>
 License: MIT
 
 (The MIT License)
@@ -819,7 +819,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 Name: https-proxy-agent
 URL: https://github.com/TooTallNate/proxy-agents.git
-Version: 7.0.6
+Version: <VERSION>
 License: MIT
 
 (The MIT License)
@@ -849,7 +849,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 Name: socks-proxy-agent
 URL: https://github.com/TooTallNate/proxy-agents.git
-Version: 8.0.5
+Version: <VERSION>
 License: MIT
 
 (The MIT License)
@@ -879,7 +879,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 Name: socks
 URL: https://github.com/JoshGlazebrook/socks/
-Version: 2.8.7
+Version: <VERSION>
 License: MIT
 
 The MIT License (MIT)
@@ -908,7 +908,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 Name: smart-buffer
 URL: https://github.com/JoshGlazebrook/smart-buffer/
-Version: 4.2.0
+Version: <VERSION>
 License: MIT
 
 The MIT License (MIT)
@@ -937,7 +937,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 Name: ip-address
 URL: git://github.com/beaugunderson/ip-address.git
-Version: 10.1.0
+Version: <VERSION>
 License: MIT
 
 Copyright (C) 2011 by Beau Gunderson
@@ -965,7 +965,7 @@ THE SOFTWARE.
 
 Name: pac-proxy-agent
 URL: https://github.com/TooTallNate/proxy-agents.git
-Version: 7.2.0
+Version: <VERSION>
 License: MIT
 
 (The MIT License)
@@ -996,7 +996,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 Name: get-uri
 URL: https://github.com/TooTallNate/proxy-agents.git
-Version: 6.0.5
+Version: <VERSION>
 License: MIT
 
 (The MIT License)
@@ -1026,7 +1026,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 Name: data-uri-to-buffer
 URL: https://github.com/TooTallNate/proxy-agents.git
-Version: 6.0.2
+Version: <VERSION>
 License: MIT
 
 (The MIT License)
@@ -1056,7 +1056,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 Name: basic-ftp
 URL: https://github.com/patrickjuchli/basic-ftp.git
-Version: 5.1.0
+Version: <VERSION>
 License: MIT
 
 Copyright (c) 2019 Patrick Juchli
@@ -1083,7 +1083,7 @@ SOFTWARE.
 
 Name: pac-resolver
 URL: https://github.com/TooTallNate/proxy-agents.git
-Version: 7.0.1
+Version: <VERSION>
 License: MIT
 
 (The MIT License)
@@ -1113,14 +1113,14 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 Name: degenerator
 URL: https://github.com/TooTallNate/proxy-agents.git
-Version: 5.0.1
+Version: <VERSION>
 License: MIT
 
 -------------------- DEPENDENCY DIVIDER --------------------
 
 Name: escodegen
 URL: http://github.com/estools/escodegen
-Version: 2.1.0
+Version: <VERSION>
 License: BSD-2-Clause
 
 Copyright (C) 2012 Yusuke Suzuki (twitter: @Constellation) and other contributors.
@@ -1150,7 +1150,7 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 Name: estraverse
 URL: https://github.com/estools/estraverse
-Version: 5.3.0
+Version: <VERSION>
 License: BSD-2-Clause
 
 Redistribution and use in source and binary forms, with or without
@@ -1178,7 +1178,7 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 Name: esutils
 URL: https://github.com/estools/esutils
-Version: 2.0.3
+Version: <VERSION>
 License: BSD-2-Clause
 
 Redistribution and use in source and binary forms, with or without
@@ -1206,7 +1206,7 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 Name: source-map
 URL: https://github.com/mozilla/source-map
-Version: 0.6.1
+Version: <VERSION>
 License: BSD-3-Clause
 
 
@@ -1243,7 +1243,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 Name: esprima
 URL: http://esprima.org
-Version: 4.0.1
+Version: <VERSION>
 License: BSD-2-Clause
 
 Copyright JS Foundation and other contributors, https://js.foundation/
@@ -1273,7 +1273,7 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 Name: ast-types
 URL: http://github.com/benjamn/ast-types
-Version: 0.13.4
+Version: <VERSION>
 License: MIT
 
 Copyright (c) 2013 Ben Newman <bn@cs.stanford.edu>
@@ -1302,7 +1302,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 Name: tslib
 URL: https://www.typescriptlang.org/
-Version: 2.8.1
+Version: <VERSION>
 License: 0BSD
 
 Copyright (c) Microsoft Corporation.
@@ -1322,14 +1322,14 @@ PERFORMANCE OF THIS SOFTWARE.
 
 Name: netmask
 URL: https://github.com/rs/node-netmask
-Version: 2.0.2
+Version: <VERSION>
 License: MIT
 
 -------------------- DEPENDENCY DIVIDER --------------------
 
 Name: @tootallnate/quickjs-emscripten
 URL: https://github.com/justjake/quickjs-emscripten
-Version: 0.23.0
+Version: <VERSION>
 License: MIT
 
 MIT License
@@ -1359,7 +1359,7 @@ SOFTWARE.
 
 Name: progress
 URL: git://github.com/visionmedia/node-progress
-Version: 2.0.3
+Version: <VERSION>
 License: MIT
 
 (The MIT License)
@@ -1390,7 +1390,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 Name: ws
 URL: https://github.com/websockets/ws
-Version: 8.19.0
+Version: <VERSION>
 License: MIT
 
 Copyright (c) 2011 Einar Otto Stangvik <einaros@gmail.com>

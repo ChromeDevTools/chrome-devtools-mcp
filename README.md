@@ -15,7 +15,7 @@ Chrome DevTools for reliable automation, in-depth debugging, and performance ana
   DevTools](https://github.com/ChromeDevTools/devtools-frontend) to record
   traces and extract actionable performance insights.
 - **Advanced browser debugging**: Analyze network requests, take screenshots and
-  check the browser console.
+  check browser console messages (with source-mapped stack traces).
 - **Reliable automation**. Uses
   [puppeteer](https://github.com/puppeteer/puppeteer) to automate actions in
   Chrome and automatically wait for action results.
@@ -26,6 +26,12 @@ Chrome DevTools for reliable automation, in-depth debugging, and performance ana
 allowing them to inspect, debug, and modify any data in the browser or DevTools.
 Avoid sharing sensitive or personal information that you don't want to share with
 MCP clients.
+
+Performance tools may send trace URLs to the Google CrUX API to fetch real-user
+experience data. This helps provide a holistic performance picture by
+presenting field data alongside lab data. This data is collected by the [Chrome
+User Experience Report (CrUX)](https://developer.chrome.com/docs/crux). To disable
+this, run with the `--no-performance-crux` flag.
 
 ## **Usage statistics**
 
@@ -472,6 +478,11 @@ The Chrome DevTools MCP server supports the following configuration option:
   - **Type:** boolean
   - **Default:** `true`
 
+- **`--performanceCrux`/ `--performance-crux`**
+  Set to false to disable sending URLs from performance traces to CrUX API to get field performance data.
+  - **Type:** boolean
+  - **Default:** `true`
+
 - **`--usageStatistics`/ `--usage-statistics`**
   Set to false to opt-out of usage statistics collection. Google collects usage data to improve the tool, handled under the Google Privacy Policy (https://policies.google.com/privacy). This is independent from Chrome browser metrics. Disabled if CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS or CI env variables are set.
   - **Type:** boolean
@@ -569,14 +580,11 @@ The following code snippet is an example configuration for gemini-cli:
   "mcpServers": {
     "chrome-devtools": {
       "command": "npx",
-      "args": ["chrome-devtools-mcp@latest", "--autoConnect", "--channel=beta"]
+      "args": ["chrome-devtools-mcp@latest", "--autoConnect"]
     }
   }
 }
 ```
-
-Note: you have to specify `--channel=beta` until Chrome M144 has reached the
-stable channel.
 
 **Step 3:** Test your setup
 
