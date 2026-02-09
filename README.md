@@ -11,6 +11,9 @@ Chrome DevTools for reliable automation, in-depth debugging, and performance ana
 
 ## Key features
 
+- **Multi-session support**: Run multiple isolated Chrome instances simultaneously,
+  each identified by a unique `sessionId`. Perfect for parallel testing, A/B
+  comparisons, and multi-account workflows.
 - **Get performance insights**: Uses [Chrome
   DevTools](https://github.com/ChromeDevTools/devtools-frontend) to record
   traces and extract actionable performance insights.
@@ -344,8 +347,11 @@ Check the performance of https://developers.chrome.com
 
 Your MCP client should open the browser and record a performance trace.
 
+> [!IMPORTANT]  
+> All tools require a `sessionId` parameter. You must call `create_session` first to obtain one. The returned `sessionId` must be passed to every subsequent tool call.
+
 > [!NOTE]  
-> The MCP server will start the browser automatically once the MCP client uses a tool that requires a running browser instance. Connecting to the Chrome DevTools MCP server on its own will not automatically start the browser.
+> Each session launches an isolated Chrome instance. Multiple sessions can run simultaneously for parallel testing. Use `list_sessions` to see active sessions and `close_session` to clean up when done.
 
 ## Tools
 
@@ -353,6 +359,10 @@ If you run into any issues, checkout our [troubleshooting guide](./docs/troubles
 
 <!-- BEGIN AUTO GENERATED TOOLS -->
 
+- **Session management** (3 tools)
+  - [`create_session`](docs/tool-reference.md#create_session)
+  - [`list_sessions`](docs/tool-reference.md#list_sessions)
+  - [`close_session`](docs/tool-reference.md#close_session)
 - **Input automation** (8 tools)
   - [`click`](docs/tool-reference.md#click)
   - [`drag`](docs/tool-reference.md#drag)
@@ -527,10 +537,51 @@ You can also run `npx chrome-devtools-mcp@latest --help` to see all available co
 
 ## Concepts
 
+### Multi-session support
+
+The Chrome DevTools MCP server supports running multiple Chrome browser sessions simultaneously. Each session is an isolated Chrome instance with its own pages, cookies, and state.
+
+#### Workflow
+
+1. **Create a session** — call `create_session` to launch a new Chrome instance. You receive a unique `sessionId`.
+2. **Use tools** — pass the `sessionId` to every tool call (`click`, `navigate_page`, `take_screenshot`, etc.).
+3. **Close the session** — call `close_session` when done to shut down the Chrome instance and free resources.
+
+```
+# Step 1: Create two sessions
+create_session(label="desktop", viewport="1920x1080")  → sessionId: "a1b2c3d4"
+create_session(label="mobile", viewport="375x812", headless=true)  → sessionId: "e5f6g7h8"
+
+# Step 2: Use tools with the session ID
+navigate_page(sessionId="a1b2c3d4", url="https://example.com")
+navigate_page(sessionId="e5f6g7h8", url="https://example.com")
+take_screenshot(sessionId="a1b2c3d4")
+take_screenshot(sessionId="e5f6g7h8")
+
+# Step 3: Clean up
+close_session(sessionId="a1b2c3d4")
+close_session(sessionId="e5f6g7h8")
+```
+
+#### Session parameters
+
+| Parameter  | Type    | Description                                                |
+| ---------- | ------- | ---------------------------------------------------------- |
+| `headless` | boolean | Run in headless (no UI) mode. Default: `false`.            |
+| `viewport` | string  | Initial viewport size, e.g. `"1280x720"`.                  |
+| `label`    | string  | Human-readable label, e.g. `"login-test"`.                 |
+| `url`      | string  | URL to navigate to after creation. Default: `about:blank`. |
+
+#### Session isolation
+
+- Each session uses a temporary user data directory that is automatically cleaned up when the session closes.
+- Sessions do not share cookies, localStorage, or any browser state.
+- Operations within a session are serialized (mutex-protected), but different sessions run in parallel.
+- If a browser disconnects unexpectedly, the session is automatically purged.
+
 ### User data directory
 
-`chrome-devtools-mcp` starts a Chrome's stable channel instance using the following user
-data directory:
+When connecting to a running Chrome instance (via `--browser-url` or `--autoConnect`), Chrome uses the following user data directory:
 
 - Linux / macOS: `$HOME/.cache/chrome-devtools-mcp/chrome-profile-$CHANNEL`
 - Windows: `%HOMEPATH%/.cache/chrome-devtools-mcp/chrome-profile-$CHANNEL`
