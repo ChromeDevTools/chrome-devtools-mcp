@@ -33,7 +33,7 @@ import {
   bridgeExec,
   bridgeAttachDebugger,
 } from './bridge-client.js';
-import {initCdpEventSubscriptions} from './cdp-events.js';
+import {initCdpEventSubscriptions, clearAllData} from './cdp-events.js';
 import {logger} from './logger.js';
 import type {Browser, ConnectionTransport} from './third_party/index.js';
 import {puppeteer} from './third_party/index.js';
@@ -459,6 +459,8 @@ async function waitForWorkbenchReady(
       const state = JSON.parse(result.result.value);
       if (state.hasMonaco && state.readyState === 'complete') {
         logger('Workbench ready');
+        // Now wait for Extension Host to finish initializing
+        await waitForExtensionHostReady(ws, Math.max(10_000, timeout - (Date.now() - start)));
         return;
       }
       logger(
@@ -470,6 +472,81 @@ async function waitForWorkbenchReady(
     await new Promise(r => setTimeout(r, 1000));
   }
   logger('Warning: timed out waiting for workbench — proceeding anyway');
+}
+
+/**
+ * Wait for Extension Host to finish initializing.
+ * Checks for:
+ * 1. No active progress indicators in the status bar
+ * 2. No "Activating Extensions" window state
+ * 3. Stable UI (no rapid DOM changes)
+ */
+async function waitForExtensionHostReady(
+  ws: WebSocket,
+  timeout = 8_000,
+): Promise<void> {
+  logger('Waiting for Extension Host to finish initializing...');
+  const start = Date.now();
+  let stableCount = 0;
+  const requiredStableChecks = 2; // Need 2 consecutive stable checks (reduced for speed)
+
+  while (Date.now() - start < timeout) {
+    try {
+      const result = await sendCdp(
+        'Runtime.evaluate',
+        {
+          expression: `(() => {
+            // Check for loading/progress indicators (excluding notification center)
+            const progressContainers = document.querySelectorAll('.monaco-progress-container:not(.done)');
+            // Filter out progress bars in notification center
+            let hasProgress = false;
+            for (const p of progressContainers) {
+              if (!p.closest('.notifications-center, .notifications-toasts')) {
+                hasProgress = true;
+                break;
+              }
+            }
+            
+            // Check for spinning icons (loading state)
+            const hasSpinner = !!document.querySelector('.codicon-loading, .codicon-sync-spin');
+            
+            // Check if status bar shows "activating" state
+            const statusBar = document.querySelector('.statusbar');
+            const statusText = statusBar?.textContent || '';
+            const isActivating = statusText.toLowerCase().includes('activating');
+            
+            return JSON.stringify({
+              hasProgress,
+              hasSpinner,
+              isActivating,
+            });
+          })()`,
+          returnByValue: true,
+        },
+        ws,
+      );
+      const state = JSON.parse(result.result.value);
+      const isStable = !state.hasProgress && !state.hasSpinner && !state.isActivating;
+      
+      if (isStable) {
+        stableCount++;
+        logger(`Extension Host appears stable (${stableCount}/${requiredStableChecks})`);
+        if (stableCount >= requiredStableChecks) {
+          logger('Extension Host ready');
+          return;
+        }
+      } else {
+        stableCount = 0;
+        logger(
+          `Extension Host still initializing: progress=${state.hasProgress}, spinner=${state.hasSpinner}, activating=${state.isActivating}`,
+        );
+      }
+    } catch {
+      stableCount = 0;
+    }
+    await new Promise(r => setTimeout(r, 300));
+  }
+  logger('Extension Host initialization timeout — proceeding anyway');
 }
 
 // ── Dev Host Bridge Discovery ───────────────────────────
@@ -826,6 +903,7 @@ async function doConnect(options: VSCodeLaunchOptions): Promise<WebSocket> {
   // Monitor for unexpected disconnects
   cdpWs.on('close', () => {
     logger('CDP WebSocket closed unexpectedly');
+    clearAllData(); // Clear all stored console/network/trace data
     cdpWs = undefined;
     puppeteerBrowser = undefined;
   });
@@ -842,6 +920,9 @@ async function doConnect(options: VSCodeLaunchOptions): Promise<WebSocket> {
  */
 export async function stopDebugWindow(): Promise<void> {
   puppeteerBrowser = undefined;
+
+  // Clear all stored console/network/trace data
+  clearAllData();
 
   try {
     cdpWs?.close();

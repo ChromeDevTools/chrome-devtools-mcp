@@ -61,6 +61,10 @@ export interface TraceData {
 }
 
 // ── Storage ─────────────────────────────────────────────
+// Data is stored per-session and cleared automatically on:
+// - Connection reconnect (new generation)
+// - Server exit (SIGINT, SIGTERM, uncaughtException)
+// - WebSocket close
 
 let consoleMessages: ConsoleMessage[] = [];
 let networkRequests: Map<string, NetworkRequest> = new Map();
@@ -410,3 +414,43 @@ export async function stopTrace(): Promise<unknown[]> {
 export function getTraceData(): TraceData {
   return traceData;
 }
+
+// ── Process Exit Cleanup ────────────────────────────────
+// Ensure data is cleared when the server exits for any reason
+
+function cleanupOnExit(): void {
+  clearAllData();
+  if (eventListenerCleanup) {
+    eventListenerCleanup();
+    eventListenerCleanup = undefined;
+  }
+}
+
+// Clean exit
+process.on('exit', cleanupOnExit);
+
+// SIGINT (Ctrl+C)
+process.on('SIGINT', () => {
+  cleanupOnExit();
+  process.exit(0);
+});
+
+// SIGTERM (kill command)
+process.on('SIGTERM', () => {
+  cleanupOnExit();
+  process.exit(0);
+});
+
+// Uncaught exceptions - cleanup before crash
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught exception:', err);
+  cleanupOnExit();
+  process.exit(1);
+});
+
+// Unhandled promise rejections
+process.on('unhandledRejection', (reason) => {
+  console.error('Unhandled rejection:', reason);
+  cleanupOnExit();
+  process.exit(1);
+});

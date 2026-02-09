@@ -15,7 +15,7 @@ import {defineTool} from './ToolDefinition.js';
 export const screenshot = defineTool({
   name: 'take_screenshot',
   description: `Take a screenshot of the page or element.`,
-  timeoutMs: 10000,
+  timeoutMs: 45000, // Allow time for VS Code Extension Host to fully initialize
   annotations: {
     category: ToolCategory.DEBUGGING,
     readOnlyHint: false,
