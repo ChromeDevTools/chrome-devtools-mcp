@@ -8,6 +8,7 @@ import {
   clickAtCoords,
   clickElement,
   dragElement,
+  executeWithDiff,
   fetchAXTree,
   fillElement,
   hoverElement,
@@ -29,15 +30,29 @@ const includeSnapshotSchema = zod
   .optional()
   .describe('Whether to include a snapshot in the response. Default is false.');
 
-async function maybeSnapshot(
+/**
+ * Execute an action and show either the diff or full snapshot.
+ * Always shows diff by default; if includeSnapshot is true, shows full snapshot instead.
+ */
+async function executeWithChanges<T>(
+  action: () => Promise<T>,
   includeSnapshot: boolean | undefined,
   response: {appendResponseLine(v: string): void},
-): Promise<void> {
+): Promise<T> {
   if (includeSnapshot) {
+    // User explicitly wants full snapshot — skip diff, just execute and show snapshot
+    const result = await action();
     const {formatted} = await fetchAXTree(false);
     response.appendResponseLine('## Latest page snapshot');
     response.appendResponseLine(formatted);
+    return result;
   }
+
+  // Default: show diff
+  const {result, summary} = await executeWithDiff(action, 1500);
+  response.appendResponseLine('## Changes detected');
+  response.appendResponseLine(summary);
+  return result;
 }
 
 export const click = defineTool({
@@ -59,14 +74,17 @@ export const click = defineTool({
     includeSnapshot: includeSnapshotSchema,
   },
   handler: async (request, response) => {
-    const {uid, dblClick} = request.params;
-    await clickElement(uid, dblClick ? 2 : 1);
+    const {uid, dblClick, includeSnapshot} = request.params;
+    await executeWithChanges(
+      async () => clickElement(uid, dblClick ? 2 : 1),
+      includeSnapshot,
+      response,
+    );
     response.appendResponseLine(
       dblClick
-        ? 'Successfully double clicked on the element'
-        : 'Successfully clicked on the element',
+        ? 'Double clicked on the element'
+        : 'Clicked on the element',
     );
-    await maybeSnapshot(request.params.includeSnapshot, response);
   },
 });
 
@@ -86,14 +104,17 @@ export const clickAt = defineTool({
     includeSnapshot: includeSnapshotSchema,
   },
   handler: async (request, response) => {
-    const {x, y, dblClick} = request.params;
-    await clickAtCoords(x, y, dblClick ? 2 : 1);
+    const {x, y, dblClick, includeSnapshot} = request.params;
+    await executeWithChanges(
+      async () => clickAtCoords(x, y, dblClick ? 2 : 1),
+      includeSnapshot,
+      response,
+    );
     response.appendResponseLine(
       dblClick
-        ? 'Successfully double clicked at the coordinates'
-        : 'Successfully clicked at the coordinates',
+        ? 'Double clicked at the coordinates'
+        : 'Clicked at the coordinates',
     );
-    await maybeSnapshot(request.params.includeSnapshot, response);
   },
 });
 
@@ -115,9 +136,13 @@ export const hover = defineTool({
     includeSnapshot: includeSnapshotSchema,
   },
   handler: async (request, response) => {
-    await hoverElement(request.params.uid);
-    response.appendResponseLine('Successfully hovered over the element');
-    await maybeSnapshot(request.params.includeSnapshot, response);
+    const {uid, includeSnapshot} = request.params;
+    await executeWithChanges(
+      async () => hoverElement(uid),
+      includeSnapshot,
+      response,
+    );
+    response.appendResponseLine('Hovered over the element');
   },
 });
 
@@ -140,9 +165,13 @@ export const fill = defineTool({
     includeSnapshot: includeSnapshotSchema,
   },
   handler: async (request, response) => {
-    await fillElement(request.params.uid, request.params.value);
-    response.appendResponseLine('Successfully filled out the element');
-    await maybeSnapshot(request.params.includeSnapshot, response);
+    const {uid, value, includeSnapshot} = request.params;
+    await executeWithChanges(
+      async () => fillElement(uid, value),
+      includeSnapshot,
+      response,
+    );
+    response.appendResponseLine('Filled out the element');
   },
 });
 
@@ -161,9 +190,13 @@ export const drag = defineTool({
     includeSnapshot: includeSnapshotSchema,
   },
   handler: async (request, response) => {
-    await dragElement(request.params.from_uid, request.params.to_uid);
-    response.appendResponseLine('Successfully dragged an element');
-    await maybeSnapshot(request.params.includeSnapshot, response);
+    const {from_uid, to_uid, includeSnapshot} = request.params;
+    await executeWithChanges(
+      async () => dragElement(from_uid, to_uid),
+      includeSnapshot,
+      response,
+    );
+    response.appendResponseLine('Dragged the element');
   },
 });
 
@@ -188,11 +221,17 @@ export const fillForm = defineTool({
     includeSnapshot: includeSnapshotSchema,
   },
   handler: async (request, response) => {
-    for (const element of request.params.elements) {
-      await fillElement(element.uid, element.value);
-    }
-    response.appendResponseLine('Successfully filled out the form');
-    await maybeSnapshot(request.params.includeSnapshot, response);
+    const {elements, includeSnapshot} = request.params;
+    await executeWithChanges(
+      async () => {
+        for (const element of elements) {
+          await fillElement(element.uid, element.value);
+        }
+      },
+      includeSnapshot,
+      response,
+    );
+    response.appendResponseLine('Filled out the form');
   },
 });
 
@@ -215,16 +254,21 @@ export const uploadFile = defineTool({
     includeSnapshot: includeSnapshotSchema,
   },
   handler: async (request, response) => {
-    const {uid, filePath} = request.params;
-    // Use DOM.setFileInputFiles for file input elements
-    const backendNodeId = (await import('../ax-tree.js')).getBackendNodeId(uid);
-    await sendCdp('DOM.enable');
-    await sendCdp('DOM.setFileInputFiles', {
-      files: [filePath],
-      backendNodeId,
-    });
+    const {uid, filePath, includeSnapshot} = request.params;
+    await executeWithChanges(
+      async () => {
+        // Use DOM.setFileInputFiles for file input elements
+        const backendNodeId = (await import('../ax-tree.js')).getBackendNodeId(uid);
+        await sendCdp('DOM.enable');
+        await sendCdp('DOM.setFileInputFiles', {
+          files: [filePath],
+          backendNodeId,
+        });
+      },
+      includeSnapshot,
+      response,
+    );
     response.appendResponseLine(`File uploaded from ${filePath}.`);
-    await maybeSnapshot(request.params.includeSnapshot, response);
   },
 });
 
@@ -246,10 +290,12 @@ export const pressKeyTool = defineTool({
     includeSnapshot: includeSnapshotSchema,
   },
   handler: async (request, response) => {
-    await pressKey(request.params.key);
-    response.appendResponseLine(
-      `Successfully pressed key: ${request.params.key}`,
+    const {key, includeSnapshot} = request.params;
+    await executeWithChanges(
+      async () => pressKey(key),
+      includeSnapshot,
+      response,
     );
-    await maybeSnapshot(request.params.includeSnapshot, response);
+    response.appendResponseLine(`Pressed key: ${key}`);
   },
 });

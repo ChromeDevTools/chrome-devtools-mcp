@@ -625,3 +625,304 @@ export async function captureScreenshot(options: {
   const result = await sendCdp('Page.captureScreenshot', params);
   return Buffer.from(result.data, 'base64');
 }
+
+// ── Snapshot Diff ──
+
+/**
+ * Represents a node for comparison purposes.
+ * Uses backendDOMNodeId as the stable identifier.
+ */
+export interface NodeSignature {
+  backendDOMNodeId: number;
+  role: string;
+  name: string;
+  value: string;
+  focused: boolean;
+  expanded: boolean;
+  selected: boolean;
+}
+
+/**
+ * Create a signature string for comparison.
+ */
+function getNodeSignature(node: AXNode): NodeSignature | null {
+  if (node.backendDOMNodeId === undefined) return null;
+  const props = node.properties ?? [];
+  return {
+    backendDOMNodeId: node.backendDOMNodeId,
+    role: String(node.role?.value ?? ''),
+    name: String(node.name?.value ?? ''),
+    value: String(node.value?.value ?? ''),
+    focused: props.some(p => p.name === 'focused' && p.value.value === true),
+    expanded: props.some(p => p.name === 'expanded' && p.value.value === true),
+    selected: props.some(p => p.name === 'selected' && p.value.value === true),
+  };
+}
+
+/**
+ * Format a node as a single-line summary.
+ */
+function formatNodeOneLiner(node: AXNode, uid: string): string {
+  const parts: string[] = [`uid=${uid}`];
+  const role = node.role?.value;
+  if (role && role !== 'none') parts.push(String(role));
+  if (node.name?.value) parts.push(`"${node.name.value}"`);
+  const props = node.properties ?? [];
+  if (props.some(p => p.name === 'focused' && p.value.value)) parts.push('focused');
+  if (props.some(p => p.name === 'expanded' && p.value.value)) parts.push('expanded');
+  if (props.some(p => p.name === 'selected' && p.value.value)) parts.push('selected');
+  if (node.value?.value) parts.push(`value="${node.value.value}"`);
+  return parts.join(' ');
+}
+
+export interface SnapshotDiff {
+  /** Nodes that appeared in the after snapshot. */
+  added: string[];
+  /** Nodes that disappeared in the after snapshot. */
+  removed: string[];
+  /** Nodes whose properties changed (with before→after). */
+  changed: string[];
+  /** True if there were any changes. */
+  hasChanges: boolean;
+}
+
+/**
+ * Compare two AX tree snapshots and return the diff.
+ * Both snapshots should be captured with fetchAXTreeForDiff.
+ */
+export function diffSnapshots(
+  before: Map<number, {node: AXNode; sig: NodeSignature}>,
+  after: Map<number, {node: AXNode; sig: NodeSignature; uid: string}>,
+): SnapshotDiff {
+  const added: string[] = [];
+  const removed: string[] = [];
+  const changed: string[] = [];
+
+  // Check for additions and changes
+  for (const [domId, afterData] of after) {
+    const beforeData = before.get(domId);
+    if (!beforeData) {
+      // New node
+      added.push(formatNodeOneLiner(afterData.node, afterData.uid));
+    } else {
+      // Check for changes in key properties
+      const bSig = beforeData.sig;
+      const aSig = afterData.sig;
+      const changes: string[] = [];
+
+      if (bSig.name !== aSig.name) {
+        changes.push(`name: "${bSig.name}" → "${aSig.name}"`);
+      }
+      if (bSig.value !== aSig.value) {
+        changes.push(`value: "${bSig.value}" → "${aSig.value}"`);
+      }
+      if (bSig.focused !== aSig.focused) {
+        changes.push(aSig.focused ? '+focused' : '-focused');
+      }
+      if (bSig.expanded !== aSig.expanded) {
+        changes.push(aSig.expanded ? '+expanded' : '-expanded');
+      }
+      if (bSig.selected !== aSig.selected) {
+        changes.push(aSig.selected ? '+selected' : '-selected');
+      }
+
+      if (changes.length > 0) {
+        const base = formatNodeOneLiner(afterData.node, afterData.uid);
+        changed.push(`${base} (${changes.join(', ')})`);
+      }
+    }
+  }
+
+  // Check for removals (in before but not in after)
+  for (const [domId, beforeData] of before) {
+    if (!after.has(domId)) {
+      // Pick a placeholder UID for removed nodes
+      const role = String(beforeData.node.role?.value ?? '');
+      const name = beforeData.node.name?.value ? ` "${beforeData.node.name.value}"` : '';
+      removed.push(`${role}${name} [removed]`);
+    }
+  }
+
+  return {
+    added,
+    removed,
+    changed,
+    hasChanges: added.length > 0 || removed.length > 0 || changed.length > 0,
+  };
+}
+
+/**
+ * Fetch AX tree for diffing — returns a map keyed by backendDOMNodeId.
+ * Does NOT update the global UID mapping.
+ * Only includes "interesting" nodes (same filter as the formatted output).
+ */
+export async function fetchAXTreeForDiff(): Promise<Map<number, {node: AXNode; sig: NodeSignature}>> {
+  await sendCdp('Accessibility.enable');
+  const result = await sendCdp('Accessibility.getFullAXTree');
+  const nodes: AXNode[] = result.nodes ?? [];
+
+  const map = new Map<number, {node: AXNode; sig: NodeSignature}>();
+  for (const node of nodes) {
+    if (node.ignored) continue;
+    if (!isInteresting(node)) continue;
+    const sig = getNodeSignature(node);
+    if (sig) {
+      map.set(sig.backendDOMNodeId, {node, sig});
+    }
+  }
+  return map;
+}
+
+/**
+ * Capture AX tree after an action, with UIDs assigned.
+ * Updates global UID mapping and returns a map for diffing.
+ */
+export async function fetchAXTreeForDiffWithUids(): Promise<{
+  map: Map<number, {node: AXNode; sig: NodeSignature; uid: string}>;
+  formatted: string;
+}> {
+  await sendCdp('Accessibility.enable');
+  const result = await sendCdp('Accessibility.getFullAXTree');
+  const nodes: AXNode[] = result.nodes ?? [];
+
+  // Build CDP node map
+  const cdpMap = new Map<string, AXNode>();
+  for (const node of nodes) {
+    cdpMap.set(node.nodeId, node);
+  }
+
+  // Assign UIDs and build diff map
+  const newUidMap = new Map<string, AXNode>();
+  const diffMap = new Map<number, {node: AXNode; sig: NodeSignature; uid: string}>();
+  let uidCounter = 0;
+
+  const roots = nodes.filter(n => !n.parentId);
+
+  function visit(node: AXNode): void {
+    if (!node.ignored && isInteresting(node)) {
+      const uid = `s0_${uidCounter++}`;
+      newUidMap.set(uid, node);
+      const sig = getNodeSignature(node);
+      if (sig) {
+        diffMap.set(sig.backendDOMNodeId, {node, sig, uid});
+      }
+    }
+    for (const childId of node.childIds ?? []) {
+      const child = cdpMap.get(childId);
+      if (child) visit(child);
+    }
+  }
+
+  for (const root of roots) {
+    visit(root);
+  }
+
+  // Update global state
+  uidToAXNode = newUidMap;
+  cdpNodeMap = cdpMap;
+
+  // Build formatted output (reuse the logic but simpler)
+  let formatted = '';
+  uidCounter = 0;
+  function formatVisit(node: AXNode, depth: number): void {
+    if (!node.ignored && isInteresting(node)) {
+      const uid = `s0_${uidCounter++}`;
+      const indent = ' '.repeat(depth * 2);
+      formatted += `${indent}${formatNodeOneLiner(node, uid)}\n`;
+    }
+    const childDepth = !node.ignored && isInteresting(node) ? depth + 1 : depth;
+    for (const childId of node.childIds ?? []) {
+      const child = cdpMap.get(childId);
+      if (child) formatVisit(child, childDepth);
+    }
+  }
+  for (const root of roots) {
+    formatVisit(root, 0);
+  }
+
+  return {map: diffMap, formatted};
+}
+
+/**
+ * Poll for changes after an action, up to the specified timeout.
+ * Returns the diff between before and after states.
+ */
+export async function waitForChanges(
+  beforeMap: Map<number, {node: AXNode; sig: NodeSignature}>,
+  timeoutMs = 1500,
+  pollIntervalMs = 100,
+): Promise<{diff: SnapshotDiff; formatted: string}> {
+  const start = Date.now();
+
+  while (Date.now() - start < timeoutMs) {
+    const {map: afterMap, formatted} = await fetchAXTreeForDiffWithUids();
+    const diff = diffSnapshots(beforeMap, afterMap);
+
+    if (diff.hasChanges) {
+      return {diff, formatted};
+    }
+
+    await new Promise(r => setTimeout(r, pollIntervalMs));
+  }
+
+  // Final check after timeout
+  const {map: afterMap, formatted} = await fetchAXTreeForDiffWithUids();
+  const diff = diffSnapshots(beforeMap, afterMap);
+  return {diff, formatted};
+}
+
+/**
+ * Execute an action and return the UI diff.
+ * This is the main helper for interactive tools.
+ */
+export async function executeWithDiff<T>(
+  action: () => Promise<T>,
+  timeoutMs = 1500,
+): Promise<{result: T; diff: SnapshotDiff; summary: string}> {
+  // Capture before state
+  const beforeMap = await fetchAXTreeForDiff();
+
+  // Execute the action
+  const result = await action();
+
+  // Wait for changes
+  const {diff} = await waitForChanges(beforeMap, timeoutMs);
+
+  // Build summary
+  let summary = '';
+  if (!diff.hasChanges) {
+    summary = 'No visible changes detected.';
+  } else {
+    const lines: string[] = [];
+    if (diff.added.length > 0) {
+      lines.push(`Added (${diff.added.length}):`);
+      for (const item of diff.added.slice(0, 10)) {
+        lines.push(`  + ${item}`);
+      }
+      if (diff.added.length > 10) {
+        lines.push(`  ... and ${diff.added.length - 10} more`);
+      }
+    }
+    if (diff.removed.length > 0) {
+      lines.push(`Removed (${diff.removed.length}):`);
+      for (const item of diff.removed.slice(0, 10)) {
+        lines.push(`  - ${item}`);
+      }
+      if (diff.removed.length > 10) {
+        lines.push(`  ... and ${diff.removed.length - 10} more`);
+      }
+    }
+    if (diff.changed.length > 0) {
+      lines.push(`Changed (${diff.changed.length}):`);
+      for (const item of diff.changed.slice(0, 10)) {
+        lines.push(`  ~ ${item}`);
+      }
+      if (diff.changed.length > 10) {
+        lines.push(`  ... and ${diff.changed.length - 10} more`);
+      }
+    }
+    summary = lines.join('\n');
+  }
+
+  return {result, diff, summary};
+}

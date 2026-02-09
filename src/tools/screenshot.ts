@@ -88,12 +88,13 @@ export const screenshot = defineTool({
     } else if (data.length >= 2_000_000) {
       const tmpPath = `screenshot-${Date.now()}.${format}`;
       writeFileSync(tmpPath, data);
-      response.appendResponseLine(`Saved screenshot to ${tmpPath}.`);
+      response.appendResponseLine(`Screenshot too large for inline (${(data.length / 1024 / 1024).toFixed(1)}MB). Saved to ${tmpPath}.`);
     } else {
       response.attachImage({
         mimeType: `image/${format}`,
         data: data.toString('base64'),
       });
+      response.appendResponseLine('Screenshot attached inline.');
     }
   },
 });
