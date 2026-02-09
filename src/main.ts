@@ -13,6 +13,7 @@ import process from 'node:process';
 import {fileURLToPath} from 'node:url';
 
 import {ensureVSCodeConnected, getConnectionGeneration, getPuppeteerBrowser, teardownSync} from './browser.js';
+import {checkForBlockingUI} from './notification-gate.js';
 import {parseArguments} from './cli.js';
 import {loadIssueDescriptions} from './issue-descriptions.js';
 import {logger, saveLogsToFile} from './logger.js';
@@ -258,6 +259,29 @@ function registerTool(tool: ToolDefinition): void {
           // Always ensure VS Code connection (CDP + bridge)
           await ensureConnection();
 
+          // Check for blocking modals/notifications before tool execution
+          // BLOCKING modals (e.g., "Save file?") → STOP tool, return modal info
+          // NON-BLOCKING notifications (toasts) → Prepend banner, let tool proceed
+          //
+          // EXCEPTION: Input tools (press_key, click, click_at, hover, drag) BYPASS the gate
+          // when there's a blocking UI. This allows the user to dismiss the dialog.
+          // Without this, there would be no way to interact with blocking dialogs via MCP.
+          const inputTools = ['press_key', 'click', 'click_at', 'hover', 'drag', 'fill'];
+          const isInputTool = inputTools.includes(tool.name);
+          
+          const uiCheck = await checkForBlockingUI();
+          if (uiCheck.blocked && !isInputTool) {
+            // Blocked and NOT an input tool - return blocking message
+            const content: Array<{type: string; text?: string}> = [];
+            if (uiCheck.notificationBanner) {
+              content.push({type: 'text', text: uiCheck.notificationBanner});
+            }
+            content.push({type: 'text', text: uiCheck.blockingMessage!});
+            return {content};
+          }
+          // For input tools when blocked: still prepend banner but let tool execute
+          const notificationBanner = uiCheck.notificationBanner;
+
           // Diagnostic and directCdp tools bypass McpContext — they use sendCdp/bridgeExec directly.
           // Non-diagnostic tools need full McpContext (Phase B will refactor this).
           const isDiagnostic = tool.annotations.conditions?.includes('devDiagnostic');
@@ -278,6 +302,10 @@ function registerTool(tool: ToolDefinition): void {
           // Diagnostic/directCdp tools return content directly without McpResponse.handle()
           if (bypassContext) {
             const content: Array<{type: string; text?: string; data?: string; mimeType?: string}> = [];
+            // Prepend notification banner if present
+            if (notificationBanner) {
+              content.push({type: 'text', text: notificationBanner});
+            }
             for (const line of response.responseLines) {
               content.push({type: 'text', text: line});
             }
@@ -294,6 +322,10 @@ function registerTool(tool: ToolDefinition): void {
             tool.name,
             ctx,
           );
+          // Prepend notification banner for non-bypass tools
+          if (notificationBanner) {
+            (content as Array<{type: string; text?: string}>).unshift({type: 'text', text: notificationBanner});
+          }
           return {content, structuredContent};
         };
 

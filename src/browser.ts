@@ -703,6 +703,9 @@ async function doConnect(options: VSCodeLaunchOptions): Promise<WebSocket> {
       'update.showReleaseNotes': false,
       'extensions.ignoreRecommendations': true,
       'telemetry.telemetryLevel': 'off',
+      // Use DOM-based dialogs instead of native OS dialogs
+      // This allows CDP to interact with Save/Confirm dialogs
+      'window.dialogStyle': 'custom',
     }, null, 2),
   );
 
