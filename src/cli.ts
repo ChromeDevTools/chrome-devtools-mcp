@@ -63,6 +63,13 @@ export const cliOptions = {
     default: true,
     describe: 'Set to false to exclude tools related to network.',
   },
+  dev: {
+    type: 'boolean',
+    describe:
+      'Dev mode: run from TypeScript source via tsx with automatic file-watching and self-restart on changes.',
+    default: false,
+    hidden: true,
+  },
 } satisfies Record<string, YargsOptions>;
 
 export function parseArguments(version: string, argv = process.argv) {

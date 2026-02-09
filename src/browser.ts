@@ -34,6 +34,8 @@ import {
   bridgeAttachDebugger,
 } from './bridge-client.js';
 import {logger} from './logger.js';
+import type {Browser, ConnectionTransport} from './third_party/index.js';
+import {puppeteer} from './third_party/index.js';
 
 // ── CDP Target Types ────────────────────────────────────
 
@@ -99,6 +101,165 @@ export function sendCdp(
     socket.addEventListener('message', handler);
     socket.send(JSON.stringify({id, method, params}));
   });
+}
+
+// ── Puppeteer ElectronTransport ─────────────────────────
+
+/**
+ * Custom ConnectionTransport that bridges a raw CDP WebSocket to Puppeteer.
+ *
+ * Electron's DevTools protocol doesn't support several browser-management
+ * commands that Puppeteer calls during connect (Target.getBrowserContexts,
+ * Target.setDiscoverTargets, Target.setAutoAttach, Browser.getVersion).
+ * This transport intercepts those calls and returns mock responses, while
+ * forwarding all other CDP commands to the real WebSocket.
+ *
+ * Modeled after Puppeteer's own ExtensionTransport which solves the same
+ * problem for Chrome extensions.
+ */
+class ElectronTransport implements ConnectionTransport {
+  onmessage?: (message: string) => void;
+  onclose?: () => void;
+
+  #ws: WebSocket;
+  #targetId: string;
+  #targetUrl: string;
+  #targetTitle: string;
+  #versionInfo: CdpVersionInfo;
+
+  constructor(ws: WebSocket, target: CdpTarget, versionInfo: CdpVersionInfo) {
+    this.#ws = ws;
+    this.#targetId = target.id;
+    this.#targetUrl = target.url;
+    this.#targetTitle = target.title;
+    this.#versionInfo = versionInfo;
+
+    // Forward real CDP events from the WebSocket to Puppeteer
+    this.#ws.addEventListener('message', (evt: WebSocket.MessageEvent) => {
+      const raw = typeof evt.data === 'string' ? evt.data : evt.data.toString();
+      const parsed = JSON.parse(raw);
+
+      // Inject sessionId into events so Puppeteer routes to the right page
+      if (!parsed.id && !parsed.sessionId) {
+        parsed.sessionId = 'pageTargetSessionId';
+      }
+
+      this.onmessage?.(JSON.stringify(parsed));
+    });
+
+    this.#ws.addEventListener('close', () => {
+      this.onclose?.();
+    });
+  }
+
+  #dispatchResponse(message: object): void {
+    setTimeout(() => {
+      this.onmessage?.(JSON.stringify(message));
+    }, 0);
+  }
+
+  send(message: string): void {
+    const parsed = JSON.parse(message);
+
+    switch (parsed.method) {
+      case 'Browser.getVersion': {
+        this.#dispatchResponse({
+          id: parsed.id,
+          sessionId: parsed.sessionId,
+          method: parsed.method,
+          result: {
+            protocolVersion: '1.3',
+            product: this.#versionInfo.Browser ?? 'Electron',
+            revision: 'unknown',
+            userAgent: (this.#versionInfo['User-Agent'] as string) ?? 'Electron',
+            jsVersion: 'unknown',
+          },
+        });
+        return;
+      }
+      case 'Target.getBrowserContexts': {
+        this.#dispatchResponse({
+          id: parsed.id,
+          sessionId: parsed.sessionId,
+          method: parsed.method,
+          result: {
+            browserContextIds: [],
+          },
+        });
+        return;
+      }
+      case 'Target.setDiscoverTargets': {
+        // Emit a single "page" target representing the VS Code workbench
+        this.#dispatchResponse({
+          method: 'Target.targetCreated',
+          params: {
+            targetInfo: {
+              targetId: this.#targetId,
+              type: 'page',
+              title: this.#targetTitle,
+              url: this.#targetUrl,
+              attached: false,
+              canAccessOpener: false,
+            },
+          },
+        });
+        this.#dispatchResponse({
+          id: parsed.id,
+          sessionId: parsed.sessionId,
+          method: parsed.method,
+          result: {},
+        });
+        return;
+      }
+      case 'Target.setAutoAttach': {
+        // Emit attachedToTarget so Puppeteer creates a CDPSession for the page
+        this.#dispatchResponse({
+          method: 'Target.attachedToTarget',
+          params: {
+            targetInfo: {
+              targetId: this.#targetId,
+              type: 'page',
+              title: this.#targetTitle,
+              url: this.#targetUrl,
+              attached: true,
+              canAccessOpener: false,
+            },
+            sessionId: 'pageTargetSessionId',
+          },
+        });
+        this.#dispatchResponse({
+          id: parsed.id,
+          sessionId: parsed.sessionId,
+          method: parsed.method,
+          result: {},
+        });
+        return;
+      }
+    }
+
+    // Strip the synthetic sessionId before forwarding to the real WebSocket.
+    // Our page-level WS doesn't use sessions — Puppeteer adds them for routing.
+    if (parsed.sessionId === 'pageTargetSessionId') {
+      delete parsed.sessionId;
+    }
+
+    // Forward all other commands to the real CDP WebSocket
+    if (this.#ws.readyState === WebSocket.OPEN) {
+      this.#ws.send(JSON.stringify(parsed));
+    }
+  }
+
+  close(): void {
+    // WebSocket lifecycle is managed externally — don't close it here
+  }
+}
+
+// ── Puppeteer Browser (singleton) ───────────────────────
+
+let puppeteerBrowser: Browser | undefined;
+
+export function getPuppeteerBrowser(): Browser | undefined {
+  return puppeteerBrowser;
 }
 
 // ── Public Getters ──────────────────────────────────────
@@ -377,6 +538,9 @@ function forceKillChildSync(): void {
  * Synchronous except for the WS close (best-effort).
  */
 function teardownSync(): void {
+  // Disconnect Puppeteer before closing the WebSocket
+  puppeteerBrowser = undefined;
+
   try {
     cdpWs?.close();
   } catch {
@@ -510,6 +674,23 @@ async function doConnect(options: VSCodeLaunchOptions): Promise<WebSocket> {
   fs.mkdirSync(userDataDir, {recursive: true});
   logger(`User data dir: ${userDataDir}`);
 
+  // Pre-write settings to suppress first-run modals.
+  // Fresh user-data-dir has no persisted state, so the workspace trust dialog
+  // ("Do you trust the authors?") appears every time and blocks all interaction.
+  const settingsDir = path.join(userDataDir, 'User');
+  fs.mkdirSync(settingsDir, {recursive: true});
+  fs.writeFileSync(
+    path.join(settingsDir, 'settings.json'),
+    JSON.stringify({
+      'security.workspace.trust.enabled': false,
+      'workbench.startupEditor': 'none',
+      'workbench.tips.enabled': false,
+      'update.showReleaseNotes': false,
+      'extensions.ignoreRecommendations': true,
+      'telemetry.telemetryLevel': 'off',
+    }, null, 2),
+  );
+
   // 5. Spawn Extension Development Host
   //    `detached: true` is REQUIRED on Windows because Code.exe is a launcher
   //    stub that forks the real Electron binary and immediately exits (code 9).
@@ -595,6 +776,21 @@ async function doConnect(options: VSCodeLaunchOptions): Promise<WebSocket> {
   await sendCdp('Page.enable', {}, cdpWs);
   await waitForWorkbenchReady(cdpWs);
 
+  // 9b. Create Puppeteer Browser via ElectronTransport.
+  //     puppeteer.connect({ browserWSEndpoint }) fails on Electron because
+  //     Target.getBrowserContexts is not allowed. ElectronTransport intercepts
+  //     those calls and returns mock responses, while forwarding real CDP.
+  try {
+    const transport = new ElectronTransport(cdpWs, workbench, versionInfo);
+    puppeteerBrowser = await puppeteer.connect({
+      transport,
+      defaultViewport: null,
+    });
+    logger('Puppeteer Browser created via ElectronTransport');
+  } catch (err) {
+    logger(`Warning: Puppeteer connect failed: ${(err as Error).message}. Tools requiring Puppeteer will not work.`);
+  }
+
   // 10. Discover Dev Host bridge (for VS Code API calls in the target window)
   devhostBridgePath = (await waitForDevHostBridge(targetFolder)) ?? undefined;
 
@@ -615,6 +811,8 @@ async function doConnect(options: VSCodeLaunchOptions): Promise<WebSocket> {
  * since the process was spawned externally, not via VS Code's launch lifecycle.
  */
 export async function stopDebugWindow(): Promise<void> {
+  puppeteerBrowser = undefined;
+
   try {
     cdpWs?.close();
   } catch {

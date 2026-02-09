@@ -8,7 +8,7 @@ import './polyfill.js';
 
 import process from 'node:process';
 
-import {ensureVSCodeConnected} from './browser.js';
+import {ensureVSCodeConnected, getPuppeteerBrowser} from './browser.js';
 import {parseArguments} from './cli.js';
 import {loadIssueDescriptions} from './issue-descriptions.js';
 import {logger, saveLogsToFile} from './logger.js';
@@ -71,11 +71,16 @@ async function ensureConnection(): Promise<void> {
 /**
  * Get or create the McpContext (Puppeteer page model).
  * Only needed for non-diagnostic tools that interact via Puppeteer.
- * Phase B will refactor this to work without a Puppeteer Browser.
  */
 async function getContext(): Promise<McpContext> {
   if (!context) {
-    context = await McpContext.from(undefined as never, logger, {
+    const browser = getPuppeteerBrowser();
+    if (!browser) {
+      throw new Error(
+        'Puppeteer Browser not available. The ElectronTransport may have failed during connection.',
+      );
+    }
+    context = await McpContext.from(browser, logger, {
       experimentalDevToolsDebugging: false,
       performanceCrux: false,
     });
