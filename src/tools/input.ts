@@ -4,11 +4,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {logger} from '../logger.js';
-import type {McpContext, TextSnapshotNode} from '../McpContext.js';
+import {
+  clickAtCoords,
+  clickElement,
+  dragElement,
+  fetchAXTree,
+  fillElement,
+  hoverElement,
+  pressKey,
+} from '../ax-tree.js';
+import {sendCdp} from '../browser.js';
 import {zod} from '../third_party/index.js';
-import type {ElementHandle} from '../third_party/index.js';
-import {parseKey} from '../utils/keyboard.js';
 
 import {ToolCategory} from './categories.js';
 import {defineTool} from './ToolDefinition.js';
@@ -23,14 +29,15 @@ const includeSnapshotSchema = zod
   .optional()
   .describe('Whether to include a snapshot in the response. Default is false.');
 
-function handleActionError(error: unknown, uid: string) {
-  logger('failed to act using a locator', error);
-  throw new Error(
-    `Failed to interact with the element with uid ${uid}. The element did not become interactive within the configured timeout.`,
-    {
-      cause: error,
-    },
-  );
+async function maybeSnapshot(
+  includeSnapshot: boolean | undefined,
+  response: {appendResponseLine(v: string): void},
+): Promise<void> {
+  if (includeSnapshot) {
+    const {formatted} = await fetchAXTree(false);
+    response.appendResponseLine('## Latest page snapshot');
+    response.appendResponseLine(formatted);
+  }
 }
 
 export const click = defineTool({
@@ -40,6 +47,7 @@ export const click = defineTool({
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
+    conditions: ['directCdp'],
   },
   schema: {
     uid: zod
@@ -50,61 +58,42 @@ export const click = defineTool({
     dblClick: dblClickSchema,
     includeSnapshot: includeSnapshotSchema,
   },
-  handler: async (request, response, context) => {
-    const uid = request.params.uid;
-    const handle = await context.getElementByUid(uid);
-    try {
-      await context.waitForEventsAfterAction(async () => {
-        await handle.asLocator().click({
-          count: request.params.dblClick ? 2 : 1,
-        });
-      });
-      response.appendResponseLine(
-        request.params.dblClick
-          ? `Successfully double clicked on the element`
-          : `Successfully clicked on the element`,
-      );
-      if (request.params.includeSnapshot) {
-        response.includeSnapshot();
-      }
-    } catch (error) {
-      handleActionError(error, uid);
-    } finally {
-      void handle.dispose();
-    }
+  handler: async (request, response) => {
+    const {uid, dblClick} = request.params;
+    await clickElement(uid, dblClick ? 2 : 1);
+    response.appendResponseLine(
+      dblClick
+        ? 'Successfully double clicked on the element'
+        : 'Successfully clicked on the element',
+    );
+    await maybeSnapshot(request.params.includeSnapshot, response);
   },
 });
 
 export const clickAt = defineTool({
   name: 'click_at',
-  description: `Clicks at the provided coordinates`,
+  description: `Clicks at the specified coordinates on the page`,
   timeoutMs: 10000,
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
-    conditions: ['computerVision'],
+    conditions: ['directCdp'],
   },
   schema: {
-    x: zod.number().describe('The x coordinate'),
-    y: zod.number().describe('The y coordinate'),
+    x: zod.number().describe('The x coordinate to click at'),
+    y: zod.number().describe('The y coordinate to click at'),
     dblClick: dblClickSchema,
     includeSnapshot: includeSnapshotSchema,
   },
-  handler: async (request, response, context) => {
-    const page = context.getSelectedPage();
-    await context.waitForEventsAfterAction(async () => {
-      await page.mouse.click(request.params.x, request.params.y, {
-        clickCount: request.params.dblClick ? 2 : 1,
-      });
-    });
+  handler: async (request, response) => {
+    const {x, y, dblClick} = request.params;
+    await clickAtCoords(x, y, dblClick ? 2 : 1);
     response.appendResponseLine(
-      request.params.dblClick
-        ? `Successfully double clicked at the coordinates`
-        : `Successfully clicked at the coordinates`,
+      dblClick
+        ? 'Successfully double clicked at the coordinates'
+        : 'Successfully clicked at the coordinates',
     );
-    if (request.params.includeSnapshot) {
-      response.includeSnapshot();
-    }
+    await maybeSnapshot(request.params.includeSnapshot, response);
   },
 });
 
@@ -115,6 +104,7 @@ export const hover = defineTool({
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
+    conditions: ['directCdp'],
   },
   schema: {
     uid: zod
@@ -124,86 +114,12 @@ export const hover = defineTool({
       ),
     includeSnapshot: includeSnapshotSchema,
   },
-  handler: async (request, response, context) => {
-    const uid = request.params.uid;
-    const handle = await context.getElementByUid(uid);
-    try {
-      await context.waitForEventsAfterAction(async () => {
-        await handle.asLocator().hover();
-      });
-      response.appendResponseLine(`Successfully hovered over the element`);
-      if (request.params.includeSnapshot) {
-        response.includeSnapshot();
-      }
-    } catch (error) {
-      handleActionError(error, uid);
-    } finally {
-      void handle.dispose();
-    }
+  handler: async (request, response) => {
+    await hoverElement(request.params.uid);
+    response.appendResponseLine('Successfully hovered over the element');
+    await maybeSnapshot(request.params.includeSnapshot, response);
   },
 });
-
-// The AXNode for an option doesn't contain its `value`. We set text content of the option as value.
-// If the form is a combobox, we need to find the correct option by its text value.
-// To do that, loop through the children while checking which child's text matches the requested value (requested value is actually the text content).
-// When the correct option is found, use the element handle to get the real value.
-async function selectOption(
-  handle: ElementHandle,
-  aXNode: TextSnapshotNode,
-  value: string,
-) {
-  let optionFound = false;
-  for (const child of aXNode.children) {
-    if (child.role === 'option' && child.name === value && child.value) {
-      optionFound = true;
-      const childHandle = await child.elementHandle();
-      if (childHandle) {
-        try {
-          const childValueHandle = await childHandle.getProperty('value');
-          try {
-            const childValue = await childValueHandle.jsonValue();
-            if (childValue) {
-              await handle.asLocator().fill(childValue.toString());
-            }
-          } finally {
-            void childValueHandle.dispose();
-          }
-          break;
-        } finally {
-          void childHandle.dispose();
-        }
-      }
-    }
-  }
-  if (!optionFound) {
-    throw new Error(`Could not find option with text "${value}"`);
-  }
-}
-
-async function fillFormElement(
-  uid: string,
-  value: string,
-  context: McpContext,
-) {
-  const handle = await context.getElementByUid(uid);
-  try {
-    const aXNode = context.getAXNodeByUid(uid);
-    if (aXNode && aXNode.role === 'combobox') {
-      await selectOption(handle, aXNode, value);
-    } else {
-      // Increase timeout for longer input values.
-      const timeoutPerChar = 10; // ms
-      const fillTimeout =
-        context.getSelectedPage().getDefaultTimeout() +
-        value.length * timeoutPerChar;
-      await handle.asLocator().setTimeout(fillTimeout).fill(value);
-    }
-  } catch (error) {
-    handleActionError(error, uid);
-  } finally {
-    void handle.dispose();
-  }
-}
 
 export const fill = defineTool({
   name: 'fill',
@@ -212,6 +128,7 @@ export const fill = defineTool({
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
+    conditions: ['directCdp'],
   },
   schema: {
     uid: zod
@@ -222,18 +139,10 @@ export const fill = defineTool({
     value: zod.string().describe('The value to fill in'),
     includeSnapshot: includeSnapshotSchema,
   },
-  handler: async (request, response, context) => {
-    await context.waitForEventsAfterAction(async () => {
-      await fillFormElement(
-        request.params.uid,
-        request.params.value,
-        context as McpContext,
-      );
-    });
-    response.appendResponseLine(`Successfully filled out the element`);
-    if (request.params.includeSnapshot) {
-      response.includeSnapshot();
-    }
+  handler: async (request, response) => {
+    await fillElement(request.params.uid, request.params.value);
+    response.appendResponseLine('Successfully filled out the element');
+    await maybeSnapshot(request.params.includeSnapshot, response);
   },
 });
 
@@ -244,29 +153,17 @@ export const drag = defineTool({
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
+    conditions: ['directCdp'],
   },
   schema: {
     from_uid: zod.string().describe('The uid of the element to drag'),
     to_uid: zod.string().describe('The uid of the element to drop into'),
     includeSnapshot: includeSnapshotSchema,
   },
-  handler: async (request, response, context) => {
-    const fromHandle = await context.getElementByUid(request.params.from_uid);
-    const toHandle = await context.getElementByUid(request.params.to_uid);
-    try {
-      await context.waitForEventsAfterAction(async () => {
-        await fromHandle.drag(toHandle);
-        await new Promise(resolve => setTimeout(resolve, 50));
-        await toHandle.drop(fromHandle);
-      });
-      response.appendResponseLine(`Successfully dragged an element`);
-      if (request.params.includeSnapshot) {
-        response.includeSnapshot();
-      }
-    } finally {
-      void fromHandle.dispose();
-      void toHandle.dispose();
-    }
+  handler: async (request, response) => {
+    await dragElement(request.params.from_uid, request.params.to_uid);
+    response.appendResponseLine('Successfully dragged an element');
+    await maybeSnapshot(request.params.includeSnapshot, response);
   },
 });
 
@@ -277,6 +174,7 @@ export const fillForm = defineTool({
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
+    conditions: ['directCdp'],
   },
   schema: {
     elements: zod
@@ -289,20 +187,12 @@ export const fillForm = defineTool({
       .describe('Elements from snapshot to fill out.'),
     includeSnapshot: includeSnapshotSchema,
   },
-  handler: async (request, response, context) => {
+  handler: async (request, response) => {
     for (const element of request.params.elements) {
-      await context.waitForEventsAfterAction(async () => {
-        await fillFormElement(
-          element.uid,
-          element.value,
-          context as McpContext,
-        );
-      });
+      await fillElement(element.uid, element.value);
     }
-    response.appendResponseLine(`Successfully filled out the form`);
-    if (request.params.includeSnapshot) {
-      response.includeSnapshot();
-    }
+    response.appendResponseLine('Successfully filled out the form');
+    await maybeSnapshot(request.params.includeSnapshot, response);
   },
 });
 
@@ -313,6 +203,7 @@ export const uploadFile = defineTool({
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
+    conditions: ['directCdp'],
   },
   schema: {
     uid: zod
@@ -323,48 +214,28 @@ export const uploadFile = defineTool({
     filePath: zod.string().describe('The local path of the file to upload'),
     includeSnapshot: includeSnapshotSchema,
   },
-  handler: async (request, response, context) => {
+  handler: async (request, response) => {
     const {uid, filePath} = request.params;
-    const handle = (await context.getElementByUid(
-      uid,
-    )) as ElementHandle<HTMLInputElement>;
-    try {
-      try {
-        await handle.uploadFile(filePath);
-      } catch {
-        // Some sites use a proxy element to trigger file upload instead of
-        // a type=file element. In this case, we want to default to
-        // Page.waitForFileChooser() and upload the file this way.
-        try {
-          const page = context.getSelectedPage();
-          const [fileChooser] = await Promise.all([
-            page.waitForFileChooser({timeout: 3000}),
-            handle.asLocator().click(),
-          ]);
-          await fileChooser.accept([filePath]);
-        } catch {
-          throw new Error(
-            `Failed to upload file. The element could not accept the file directly, and clicking it did not trigger a file chooser.`,
-          );
-        }
-      }
-      if (request.params.includeSnapshot) {
-        response.includeSnapshot();
-      }
-      response.appendResponseLine(`File uploaded from ${filePath}.`);
-    } finally {
-      void handle.dispose();
-    }
+    // Use DOM.setFileInputFiles for file input elements
+    const backendNodeId = (await import('../ax-tree.js')).getBackendNodeId(uid);
+    await sendCdp('DOM.enable');
+    await sendCdp('DOM.setFileInputFiles', {
+      files: [filePath],
+      backendNodeId,
+    });
+    response.appendResponseLine(`File uploaded from ${filePath}.`);
+    await maybeSnapshot(request.params.includeSnapshot, response);
   },
 });
 
-export const pressKey = defineTool({
+export const pressKeyTool = defineTool({
   name: 'press_key',
   description: `Press a key or key combination. Use this when other input methods like fill() cannot be used (e.g., keyboard shortcuts, navigation keys, or special key combinations).`,
   timeoutMs: 10000,
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
+    conditions: ['directCdp'],
   },
   schema: {
     key: zod
@@ -374,26 +245,11 @@ export const pressKey = defineTool({
       ),
     includeSnapshot: includeSnapshotSchema,
   },
-  handler: async (request, response, context) => {
-    const page = context.getSelectedPage();
-    const tokens = parseKey(request.params.key);
-    const [key, ...modifiers] = tokens;
-
-    await context.waitForEventsAfterAction(async () => {
-      for (const modifier of modifiers) {
-        await page.keyboard.down(modifier);
-      }
-      await page.keyboard.press(key);
-      for (const modifier of modifiers.toReversed()) {
-        await page.keyboard.up(modifier);
-      }
-    });
-
+  handler: async (request, response) => {
+    await pressKey(request.params.key);
     response.appendResponseLine(
       `Successfully pressed key: ${request.params.key}`,
     );
-    if (request.params.includeSnapshot) {
-      response.includeSnapshot();
-    }
+    await maybeSnapshot(request.params.includeSnapshot, response);
   },
 });

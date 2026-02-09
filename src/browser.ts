@@ -715,11 +715,17 @@ async function doConnect(options: VSCodeLaunchOptions): Promise<WebSocket> {
   const args = [
     `--remote-debugging-port=${cPort}`,
     `--inspect-extensions=${iPort}`,
+    // Load extension-bridge and vsctk as development extensions
     `--extensionDevelopmentPath=${options.extensionBridgePath}`,
+    `--extensionDevelopmentPath=${options.workspaceFolder}`,
     `--user-data-dir=${userDataDir}`,
     '--new-window',
     '--skip-release-notes',
     '--skip-welcome',
+    // Disable all extensions except explicitly enabled ones
+    '--disable-extensions',
+    '--enable-extension=vscode.typescript-language-features',
+    '--enable-extension=github.copilot-chat',
     targetFolder,
   ];
 

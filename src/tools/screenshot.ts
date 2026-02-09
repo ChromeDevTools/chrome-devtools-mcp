@@ -4,8 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {writeFileSync} from 'fs';
+
+import {captureScreenshot} from '../ax-tree.js';
 import {zod} from '../third_party/index.js';
-import type {ElementHandle, Page} from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
 import {defineTool} from './ToolDefinition.js';
@@ -16,8 +18,8 @@ export const screenshot = defineTool({
   timeoutMs: 10000,
   annotations: {
     category: ToolCategory.DEBUGGING,
-    // Not read-only due to filePath param.
     readOnlyHint: false,
+    conditions: ['directCdp'],
   },
   schema: {
     format: zod
@@ -51,26 +53,19 @@ export const screenshot = defineTool({
         'The absolute path, or a path relative to the current working directory, to save the screenshot to instead of attaching it to the response.',
       ),
   },
-  handler: async (request, response, context) => {
+  handler: async (request, response) => {
     if (request.params.uid && request.params.fullPage) {
       throw new Error('Providing both "uid" and "fullPage" is not allowed.');
-    }
-
-    let pageOrHandle: Page | ElementHandle;
-    if (request.params.uid) {
-      pageOrHandle = await context.getElementByUid(request.params.uid);
-    } else {
-      pageOrHandle = context.getSelectedPage();
     }
 
     const format = request.params.format;
     const quality = format === 'png' ? undefined : request.params.quality;
 
-    const screenshot = await pageOrHandle.screenshot({
-      type: format,
-      fullPage: request.params.fullPage,
+    const data = await captureScreenshot({
+      format,
       quality,
-      optimizeForSpeed: true, // Bonus: optimize encoding for speed
+      uid: request.params.uid,
+      fullPage: request.params.fullPage,
     });
 
     if (request.params.uid) {
@@ -88,18 +83,16 @@ export const screenshot = defineTool({
     }
 
     if (request.params.filePath) {
-      const file = await context.saveFile(screenshot, request.params.filePath);
-      response.appendResponseLine(`Saved screenshot to ${file.filename}.`);
-    } else if (screenshot.length >= 2_000_000) {
-      const {filename} = await context.saveTemporaryFile(
-        screenshot,
-        `image/${request.params.format}`,
-      );
-      response.appendResponseLine(`Saved screenshot to ${filename}.`);
+      writeFileSync(request.params.filePath, data);
+      response.appendResponseLine(`Saved screenshot to ${request.params.filePath}.`);
+    } else if (data.length >= 2_000_000) {
+      const tmpPath = `screenshot-${Date.now()}.${format}`;
+      writeFileSync(tmpPath, data);
+      response.appendResponseLine(`Saved screenshot to ${tmpPath}.`);
     } else {
       response.attachImage({
-        mimeType: `image/${request.params.format}`,
-        data: Buffer.from(screenshot).toString('base64'),
+        mimeType: `image/${format}`,
+        data: data.toString('base64'),
       });
     }
   },

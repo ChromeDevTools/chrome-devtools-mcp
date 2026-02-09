@@ -12,13 +12,13 @@ import {describe, it} from 'node:test';
 import {McpResponse} from '../../src/McpResponse.js';
 import {
   click,
+  clickAt,
   hover,
   fill,
   drag,
   fillForm,
   uploadFile,
-  pressKey,
-  clickAt,
+  pressKeyTool,
 } from '../../src/tools/input.js';
 import {parseKey} from '../../src/utils/keyboard.js';
 import {serverHooks} from '../server.js';
@@ -234,6 +234,7 @@ describe('input', () => {
     });
   });
 
+  // clickAt tests use Puppeteer context — will need directCdp equivalents
   describe('click_at', () => {
     it('clicks at coordinates', async () => {
       await withMcpContext(async (response, context) => {
@@ -730,7 +731,7 @@ describe('input', () => {
         );
         await context.createTextSnapshot();
 
-        await pressKey.handler(
+        await pressKeyTool.handler(
           {
             params: {
               key: 'Control+Shift+C',

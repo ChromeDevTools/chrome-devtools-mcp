@@ -277,14 +277,17 @@ function registerTool(tool: ToolDefinition): void {
 
           // Diagnostic/directCdp tools return content directly without McpResponse.handle()
           if (bypassContext) {
-            const textContent: Array<{type: 'text'; text: string}> = [];
+            const content: Array<{type: string; text?: string; data?: string; mimeType?: string}> = [];
             for (const line of response.responseLines) {
-              textContent.push({type: 'text', text: line});
+              content.push({type: 'text', text: line});
             }
-            if (textContent.length === 0) {
-              textContent.push({type: 'text', text: '(no output)'});
+            for (const img of response.images) {
+              content.push({type: 'image', data: img.data, mimeType: img.mimeType});
             }
-            return {content: textContent};
+            if (content.length === 0) {
+              content.push({type: 'text', text: '(no output)'});
+            }
+            return {content};
           }
 
           const {content, structuredContent} = await response.handle(
