@@ -17,7 +17,6 @@ import type {
   ResourceType,
   TextContent,
 } from './third_party/index.js';
-import {handleDialog} from './tools/pages.js';
 import type {
   DevToolsData,
   ImageContentData,
@@ -493,7 +492,7 @@ export class McpResponse implements Response {
           : '';
       response.push(`# Open dialog
 ${dialog.type()}: ${dialog.message()}${defaultValueIfNeeded}.
-Call ${handleDialog.name} to handle it before continuing.`);
+Call handle_dialog to handle it before continuing.`);
       structuredContent.dialog = {
         type: dialog.type(),
         message: dialog.message(),

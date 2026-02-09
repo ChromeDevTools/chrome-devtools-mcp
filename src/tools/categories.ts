@@ -7,19 +7,21 @@
 export enum ToolCategory {
   INPUT = 'input',
   NAVIGATION = 'navigation',
-  EMULATION = 'emulation',
   PERFORMANCE = 'performance',
   NETWORK = 'network',
   DEBUGGING = 'debugging',
-  EXTENSIONS = 'extensions',
+  EDITOR_TABS = 'editor_tabs',
+  UI_CONTEXT = 'ui_context',
+  DEV_DIAGNOSTICS = 'dev_diagnostics',
 }
 
 export const labels = {
   [ToolCategory.INPUT]: 'Input automation',
   [ToolCategory.NAVIGATION]: 'Navigation automation',
-  [ToolCategory.EMULATION]: 'Emulation',
   [ToolCategory.PERFORMANCE]: 'Performance',
   [ToolCategory.NETWORK]: 'Network',
   [ToolCategory.DEBUGGING]: 'Debugging',
-  [ToolCategory.EXTENSIONS]: 'Extensions',
+  [ToolCategory.EDITOR_TABS]: 'Editor tabs',
+  [ToolCategory.UI_CONTEXT]: 'UI context',
+  [ToolCategory.DEV_DIAGNOSTICS]: 'Development diagnostics',
 };

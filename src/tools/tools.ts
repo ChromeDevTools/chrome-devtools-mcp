@@ -5,11 +5,10 @@
  */
 
 import * as consoleTools from './console.js';
-import * as emulationTools from './emulation.js';
-import * as extensionTools from './extensions.js';
+import * as debugBridgeExecTools from './debug-bridge-exec.js';
+import * as debugEvaluateTools from './debug-evaluate.js';
 import * as inputTools from './input.js';
 import * as networkTools from './network.js';
-import * as pagesTools from './pages.js';
 import * as performanceTools from './performance.js';
 import * as screenshotTools from './screenshot.js';
 import * as scriptTools from './script.js';
@@ -18,11 +17,10 @@ import type {ToolDefinition} from './ToolDefinition.js';
 
 const tools = [
   ...Object.values(consoleTools),
-  ...Object.values(emulationTools),
-  ...Object.values(extensionTools),
+  ...Object.values(debugBridgeExecTools),
+  ...Object.values(debugEvaluateTools),
   ...Object.values(inputTools),
   ...Object.values(networkTools),
-  ...Object.values(pagesTools),
   ...Object.values(performanceTools),
   ...Object.values(screenshotTools),
   ...Object.values(scriptTools),

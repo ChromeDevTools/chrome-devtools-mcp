@@ -8,153 +8,37 @@ import type {YargsOptions} from './third_party/index.js';
 import {yargs, hideBin} from './third_party/index.js';
 
 export const cliOptions = {
-  autoConnect: {
-    type: 'boolean',
-    description:
-      'If specified, automatically connects to a browser (Chrome 144+) running in the user data directory identified by the channel param. Requires the remoted debugging server to be started in the Chrome instance via chrome://inspect/#remote-debugging.',
-    conflicts: ['isolated', 'executablePath'],
-    default: false,
-    coerce: (value: boolean | undefined) => {
-      if (!value) {
-        return;
-      }
-      return value;
-    },
-  },
-  browserUrl: {
+  folder: {
     type: 'string',
     description:
-      'Connect to a running, debuggable Chrome instance (e.g. `http://127.0.0.1:9222`). For more details see: https://github.com/ChromeDevTools/chrome-devtools-mcp#connecting-to-a-running-chrome-instance.',
-    alias: 'u',
-    conflicts: 'wsEndpoint',
-    coerce: (url: string | undefined) => {
-      if (!url) {
-        return;
-      }
-      try {
-        new URL(url);
-      } catch {
-        throw new Error(`Provided browserUrl ${url} is not valid URL.`);
-      }
-      return url;
-    },
+      'Path to workspace folder to open in VS Code. The MCP server will spawn a VS Code Extension Development Host window targeting this folder.',
+    alias: 'f',
   },
-  wsEndpoint: {
+  extensionBridgePath: {
     type: 'string',
     description:
-      'WebSocket endpoint to connect to a running Chrome instance (e.g., ws://127.0.0.1:9222/devtools/browser/<id>). Alternative to --browserUrl.',
-    alias: 'w',
-    conflicts: 'browserUrl',
-    coerce: (url: string | undefined) => {
-      if (!url) {
-        return;
-      }
-      try {
-        const parsed = new URL(url);
-        if (parsed.protocol !== 'ws:' && parsed.protocol !== 'wss:') {
-          throw new Error(
-            `Provided wsEndpoint ${url} must use ws:// or wss:// protocol.`,
-          );
-        }
-        return url;
-      } catch (error) {
-        if ((error as Error).message.includes('ws://')) {
-          throw error;
-        }
-        throw new Error(`Provided wsEndpoint ${url} is not valid URL.`);
-      }
-    },
+      'Path to the extension-bridge extension directory. Defaults to the extension-bridge folder adjacent to the vscode-devtools-mcp package.',
+    alias: 'b',
   },
-  wsHeaders: {
+  targetFolder: {
     type: 'string',
     description:
-      'Custom headers for WebSocket connection in JSON format (e.g., \'{"Authorization":"Bearer token"}\'). Only works with --wsEndpoint.',
-    implies: 'wsEndpoint',
-    coerce: (val: string | undefined) => {
-      if (!val) {
-        return;
-      }
-      try {
-        const parsed = JSON.parse(val);
-        if (typeof parsed !== 'object' || Array.isArray(parsed)) {
-          throw new Error('Headers must be a JSON object');
-        }
-        return parsed as Record<string, string>;
-      } catch (error) {
-        throw new Error(
-          `Invalid JSON for wsHeaders: ${(error as Error).message}`,
-        );
-      }
-    },
+      'Path to a folder to open in the Extension Development Host. If not specified, the workspace folder is used.',
+    alias: 't',
   },
   headless: {
     type: 'boolean',
-    description: 'Whether to run in headless (no UI) mode.',
+    description: 'Run VS Code headless (requires xvfb on Linux).',
     default: false,
-  },
-  executablePath: {
-    type: 'string',
-    description: 'Path to custom Chrome executable.',
-    conflicts: ['browserUrl', 'wsEndpoint'],
-    alias: 'e',
-  },
-  isolated: {
-    type: 'boolean',
-    description:
-      'If specified, creates a temporary user-data-dir that is automatically cleaned up after the browser is closed. Defaults to false.',
-  },
-  userDataDir: {
-    type: 'string',
-    description:
-      'Path to the user data directory for Chrome. Default is $HOME/.cache/chrome-devtools-mcp/chrome-profile$CHANNEL_SUFFIX_IF_NON_STABLE',
-    conflicts: ['browserUrl', 'wsEndpoint', 'isolated'],
-  },
-  channel: {
-    type: 'string',
-    description:
-      'Specify a different Chrome channel that should be used. The default is the stable channel version.',
-    choices: ['stable', 'canary', 'beta', 'dev'] as const,
-    conflicts: ['browserUrl', 'wsEndpoint', 'executablePath'],
   },
   logFile: {
     type: 'string',
     describe:
-      'Path to a file to write debug logs to. Set the env variable `DEBUG` to `*` to enable verbose logs. Useful for submitting bug reports.',
-  },
-  viewport: {
-    type: 'string',
-    describe:
-      'Initial viewport size for the Chrome instances started by the server. For example, `1280x720`. In headless mode, max size is 3840x2160px.',
-    coerce: (arg: string | undefined) => {
-      if (arg === undefined) {
-        return;
-      }
-      const [width, height] = arg.split('x').map(Number);
-      if (!width || !height || Number.isNaN(width) || Number.isNaN(height)) {
-        throw new Error('Invalid viewport. Expected format is `1280x720`.');
-      }
-      return {
-        width,
-        height,
-      };
-    },
-  },
-  proxyServer: {
-    type: 'string',
-    description: `Proxy server configuration for Chrome passed as --proxy-server when launching the browser. See https://www.chromium.org/developers/design-documents/network-settings/ for details.`,
-  },
-  acceptInsecureCerts: {
-    type: 'boolean',
-    description: `If enabled, ignores errors relative to self-signed and expired certificates. Use with caution.`,
-  },
-  experimentalDevtools: {
-    type: 'boolean',
-    describe: 'Whether to enable automation over DevTools targets',
-    hidden: true,
+      'Path to a file to write debug logs to. Set the env variable `DEBUG` to `*` to enable verbose logs.',
   },
   experimentalVision: {
     type: 'boolean',
-    describe: 'Whether to enable vision tools',
+    describe: 'Whether to enable vision tools.',
     hidden: true,
   },
   experimentalStructuredContent: {
@@ -162,31 +46,12 @@ export const cliOptions = {
     describe: 'Whether to output structured formatted content.',
     hidden: true,
   },
-  experimentalIncludeAllPages: {
+  devDiagnostic: {
     type: 'boolean',
     describe:
-      'Whether to include all kinds of pages such as webviews or background pages as pages.',
+      'Enable diagnostic development tools (debug_evaluate, debug_bridge_exec). Hidden in production.',
+    default: false,
     hidden: true,
-  },
-  experimentalInteropTools: {
-    type: 'boolean',
-    describe: 'Whether to enable interoperability tools',
-    hidden: true,
-  },
-  chromeArg: {
-    type: 'array',
-    describe:
-      'Additional arguments for Chrome. Only applies when Chrome is launched by chrome-devtools-mcp.',
-  },
-  ignoreDefaultChromeArg: {
-    type: 'array',
-    describe:
-      'Explicitly disable default arguments for Chrome. Only applies when Chrome is launched by chrome-devtools-mcp.',
-  },
-  categoryEmulation: {
-    type: 'boolean',
-    default: true,
-    describe: 'Set to false to exclude tools related to emulation.',
   },
   categoryPerformance: {
     type: 'boolean',
@@ -198,114 +63,30 @@ export const cliOptions = {
     default: true,
     describe: 'Set to false to exclude tools related to network.',
   },
-  categoryExtensions: {
-    type: 'boolean',
-    default: false,
-    hidden: true,
-    describe: 'Set to false to exclude tools related to extensions.',
-  },
-  performanceCrux: {
-    type: 'boolean',
-    default: true,
-    describe:
-      'Set to false to disable sending URLs from performance traces to CrUX API to get field performance data.',
-  },
-  usageStatistics: {
-    type: 'boolean',
-    default: true,
-    describe:
-      'Set to false to opt-out of usage statistics collection. Google collects usage data to improve the tool, handled under the Google Privacy Policy (https://policies.google.com/privacy). This is independent from Chrome browser metrics. Disabled if CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS or CI env variables are set.',
-  },
-  clearcutEndpoint: {
-    type: 'string',
-    hidden: true,
-    describe: 'Endpoint for Clearcut telemetry.',
-  },
-  clearcutForceFlushIntervalMs: {
-    type: 'number',
-    hidden: true,
-    describe: 'Force flush interval in milliseconds (for testing).',
-  },
-  clearcutIncludePidHeader: {
-    type: 'boolean',
-    hidden: true,
-    describe: 'Include watchdog PID in Clearcut request headers (for testing).',
-  },
 } satisfies Record<string, YargsOptions>;
 
 export function parseArguments(version: string, argv = process.argv) {
   const yargsInstance = yargs(hideBin(argv))
-    .scriptName('npx chrome-devtools-mcp@latest')
+    .scriptName('npx vscode-devtools-mcp@latest')
     .options(cliOptions)
-    .check(args => {
-      // We can't set default in the options else
-      // Yargs will complain
-      if (
-        !args.channel &&
-        !args.browserUrl &&
-        !args.wsEndpoint &&
-        !args.executablePath
-      ) {
-        args.channel = 'stable';
-      }
-      return true;
-    })
     .example([
       [
-        '$0 --browserUrl http://127.0.0.1:9222',
-        'Connect to an existing browser instance via HTTP',
+        '$0 --folder /path/to/project',
+        'Spawn a VS Code debug window for the project folder',
       ],
-      [
-        '$0 --wsEndpoint ws://127.0.0.1:9222/devtools/browser/abc123',
-        'Connect to an existing browser instance via WebSocket',
-      ],
-      [
-        `$0 --wsEndpoint ws://127.0.0.1:9222/devtools/browser/abc123 --wsHeaders '{"Authorization":"Bearer token"}'`,
-        'Connect via WebSocket with custom headers',
-      ],
-      ['$0 --channel beta', 'Use Chrome Beta installed on this system'],
-      ['$0 --channel canary', 'Use Chrome Canary installed on this system'],
-      ['$0 --channel dev', 'Use Chrome Dev installed on this system'],
-      ['$0 --channel stable', 'Use stable Chrome installed on this system'],
+      ['$0 --headless', 'Run VS Code in headless mode (Linux only)'],
       ['$0 --logFile /tmp/log.txt', 'Save logs to a file'],
-      ['$0 --help', 'Print CLI options'],
       [
-        '$0 --viewport 1280x720',
-        'Launch Chrome with the initial viewport size of 1280x720px',
+        '$0 --dev-diagnostic',
+        'Enable diagnostic tools for development debugging',
       ],
-      [
-        `$0 --chrome-arg='--no-sandbox' --chrome-arg='--disable-setuid-sandbox'`,
-        'Launch Chrome without sandboxes. Use with caution.',
-      ],
-      [
-        `$0 --ignore-default-chrome-arg='--disable-extensions'`,
-        'Disable the default arguments provided by Puppeteer. Use with caution.',
-      ],
-      ['$0 --no-category-emulation', 'Disable tools in the emulation category'],
       [
         '$0 --no-category-performance',
         'Disable tools in the performance category',
       ],
-      ['$0 --no-category-network', 'Disable tools in the network category'],
       [
-        '$0 --user-data-dir=/tmp/user-data-dir',
-        'Use a custom user data directory',
-      ],
-      [
-        '$0 --auto-connect',
-        'Connect to a stable Chrome instance (Chrome 144+) running instead of launching a new instance',
-      ],
-      [
-        '$0 --auto-connect --channel=canary',
-        'Connect to a canary Chrome instance (Chrome 144+) running instead of launching a new instance',
-      ],
-      [
-        '$0 --no-usage-statistics',
-        'Do not send usage statistics https://github.com/ChromeDevTools/chrome-devtools-mcp#usage-statistics.',
-      ],
-      [
-        '$0 --no-performance-crux',
-        'Disable CrUX (field data) integration in performance tools.',
+        '$0 --no-category-network',
+        'Disable tools in the network category',
       ],
     ]);
 

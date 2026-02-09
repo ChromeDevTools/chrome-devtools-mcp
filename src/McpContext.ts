@@ -30,15 +30,11 @@ import type {
   PredefinedNetworkConditions,
   Viewport,
 } from './third_party/index.js';
-import {listPages} from './tools/pages.js';
 import {takeSnapshot} from './tools/snapshot.js';
 import {CLOSE_PAGE_ERROR} from './tools/ToolDefinition.js';
 import type {Context, DevToolsData} from './tools/ToolDefinition.js';
 import type {TraceResult} from './trace-processing/parse.js';
-import {
-  ExtensionRegistry,
-  type InstalledExtension,
-} from './utils/ExtensionRegistry.js';
+import type {InstalledExtension} from './utils/ExtensionRegistry.js';
 import {WaitForHelper} from './WaitForHelper.js';
 
 export interface TextSnapshotNode extends SerializedAXNode {
@@ -118,7 +114,7 @@ export class McpContext implements Context {
   #networkCollector: NetworkCollector;
   #consoleCollector: ConsoleCollector;
   #devtoolsUniverseManager: UniverseManager;
-  #extensionRegistry = new ExtensionRegistry();
+  // Extension registry removed — VS Code extensions are managed natively
 
   #isRunningTrace = false;
   #networkConditionsMap = new WeakMap<Page, string>();
@@ -391,7 +387,7 @@ export class McpContext implements Context {
     }
     if (page.isClosed()) {
       throw new Error(
-        `The selected page has been closed. Call ${listPages.name} to see open pages.`,
+        'The selected page has been closed. Call list_editor_tabs to see open pages.',
       );
     }
     return page;
@@ -783,22 +779,20 @@ export class McpContext implements Context {
     await this.#networkCollector.init(await this.browser.pages());
   }
 
-  async installExtension(extensionPath: string): Promise<string> {
-    const id = await this.browser.installExtension(extensionPath);
-    await this.#extensionRegistry.registerExtension(id, extensionPath);
-    return id;
+  // Extension management removed — VS Code extensions are managed natively via bridge
+  async installExtension(_extensionPath: string): Promise<string> {
+    throw new Error('Extension management is not supported in VS Code DevTools MCP. Use VS Code native extension management.');
   }
 
-  async uninstallExtension(id: string): Promise<void> {
-    await this.browser.uninstallExtension(id);
-    this.#extensionRegistry.remove(id);
+  async uninstallExtension(_id: string): Promise<void> {
+    throw new Error('Extension management is not supported in VS Code DevTools MCP. Use VS Code native extension management.');
   }
 
   listExtensions(): InstalledExtension[] {
-    return this.#extensionRegistry.list();
+    return [];
   }
 
-  getExtension(id: string): InstalledExtension | undefined {
-    return this.#extensionRegistry.getById(id);
+  getExtension(_id: string): InstalledExtension | undefined {
+    return undefined;
   }
 }

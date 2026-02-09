@@ -1,7 +1,7 @@
 {
-  "name": "chrome-devtools-mcp",
+  "name": "vscode-devtools-mcp",
   "version": "0.16.0",
-  "description": "MCP server for Chrome DevTools",
+  "description": "MCP server for VS Code DevTools",
   "type": "module",
   "bin": "./build/src/index.js",
   "main": "index.js",
@@ -51,6 +51,7 @@
     "@types/filesystem": "^0.0.36",
     "@types/node": "^25.0.0",
     "@types/sinon": "^21.0.0",
+    "@types/ws": "^8.18.1",
     "@types/yargs": "^17.0.33",
     "@typescript-eslint/eslint-plugin": "^8.43.0",
     "@typescript-eslint/parser": "^8.43.0",
@@ -73,5 +74,9 @@
   },
   "engines": {
     "node": "^20.19.0 || ^22.12.0 || >=23"
+  },
+  "dependencies": {
+    "get-port": "^7.1.0",
+    "ws": "^8.19.0"
   }
 }
