@@ -42,6 +42,7 @@ import {cleanupAllConnections} from './fast-cdp/fast-chat.js';
 import {generateAgentId, setAgentId} from './fast-cdp/agent-context.js';
 import {cleanupStaleSessions} from './fast-cdp/session-manager.js';
 import {getSessionConfig} from './config.js';
+import {cleanupStaleProcess, writePidFile, removePidFile, installOrphanWatchdog} from './process-lock.js';
 
 function readPackageJson(): {version?: string} {
   const currentDir = import.meta.dirname;
@@ -69,6 +70,11 @@ logger(`Starting Chrome AI Bridge v${version} (Extension-only mode)`);
 // Initialize agent ID for Agent Teams support
 const agentId = generateAgentId();
 setAgentId(agentId);
+
+// Clean up stale MCP processes and write PID file
+await cleanupStaleProcess();
+writePidFile();
+installOrphanWatchdog(() => shutdown('orphaned (ppid changed)'));
 
 // Start session cleanup timer
 const sessionConfig = getSessionConfig();
@@ -230,6 +236,9 @@ async function shutdown(reason: string): Promise<void> {
 
   logger(`Shutting down: ${reason}`);
 
+  // Remove PID file early so a new instance can start immediately
+  removePidFile();
+
   // Force exit timer (5 seconds) - prevents zombie if cleanup hangs
   const forceExitTimer = setTimeout(() => {
     logger('Graceful shutdown timed out. Forcing exit.');
@@ -263,6 +272,7 @@ process.on('SIGINT', () => shutdown('SIGINT'));
 
 // Keep beforeExit for edge cases where stdin doesn't close
 process.on('beforeExit', () => {
+  removePidFile();
   if (logFile) {
     logFile.close();
   }
