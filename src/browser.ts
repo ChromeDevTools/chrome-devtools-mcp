@@ -33,6 +33,7 @@ import {
   bridgeExec,
   bridgeAttachDebugger,
 } from './bridge-client.js';
+import {initCdpEventSubscriptions} from './cdp-events.js';
 import {logger} from './logger.js';
 import type {Browser, ConnectionTransport} from './third_party/index.js';
 import {puppeteer} from './third_party/index.js';
@@ -798,6 +799,10 @@ async function doConnect(options: VSCodeLaunchOptions): Promise<WebSocket> {
   // 9. Enable CDP domains and wait for readiness
   await sendCdp('Runtime.enable', {}, cdpWs);
   await sendCdp('Page.enable', {}, cdpWs);
+
+  // 9a. Initialize CDP event subscriptions for console/network tracking
+  await initCdpEventSubscriptions();
+
   await waitForWorkbenchReady(cdpWs);
 
   // 9b. Create Puppeteer Browser via ElectronTransport.

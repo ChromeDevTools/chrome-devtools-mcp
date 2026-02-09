@@ -72,37 +72,11 @@ export async function checkPendingNotifications(): Promise<NotificationCheckResu
           nativeDialog: null,
         };
 
-        // 0. Check for native OS dialogs by detecting focus loss
-        // When a native dialog opens, the VS Code window loses focus
-        // Note: This heuristic may have false positives if user clicks away
-        if (!document.hasFocus()) {
-          // Additional check: look for blockModalDialogRunning flag (internal VS Code state)
-          // This is set when VS Code is waiting for a native dialog response
-          try {
-            const windowService = window.require && window.require('vs/base/browser/dom').getActiveWindow();
-            // If we can't get the window service, check if any input is disabled
-            const inputs = document.querySelectorAll('input:not([disabled]), button:not([disabled])');
-            const allDisabled = inputs.length === 0;
-            if (allDisabled || !document.hasFocus()) {
-              result.nativeDialog = {
-                type: 'modal',
-                severity: 'blocking',
-                message: 'Native OS dialog is open (Save/Confirm dialog). Please respond to the dialog in the VS Code window.',
-                buttons: [],
-                isBlocking: true,
-              };
-            }
-          } catch (e) {
-            // Fall back to just focus check
-            result.nativeDialog = {
-              type: 'modal',
-              severity: 'blocking',
-              message: 'A native OS dialog may be open (the VS Code window does not have focus). Check for Save/Confirm dialogs in the VS Code window.',
-              buttons: [],
-              isBlocking: true,
-            };
-          }
-        }
+        // 0. Native OS dialog detection
+        // REMOVED: The !document.hasFocus() check caused too many false positives
+        // (e.g., user simply clicked outside VS Code). Native dialogs are now only
+        // detected by the presence of Monaco blocking dialogs that require user action.
+        // If a native Save dialog is open, VS Code typically shows a Monaco overlay.
 
         // 1. Check for Monaco dialogs (blocking modals)
         // These are used for "Save file?", confirmations, etc.
@@ -159,7 +133,7 @@ export async function checkPendingNotifications(): Promise<NotificationCheckResu
             severity: 'info',
             message: title || placeholder || 'Quick input is open',
             buttons: [{ label: 'Escape to close', index: 0 }],
-            isBlocking: true,  // Blocks keyboard input
+            isBlocking: false,  // Non-blocking: command palette shouldn't prevent MCP tools
           };
         }
 
@@ -251,9 +225,9 @@ export async function checkPendingNotifications(): Promise<NotificationCheckResu
         result.blocking.push(modal as PendingUIElement);
       }
 
-      // Process quick input (blocking)
+      // Process quick input (non-blocking - just informational)
       if (detected.quickInput) {
-        result.blocking.push(detected.quickInput as PendingUIElement);
+        result.nonBlocking.push(detected.quickInput as PendingUIElement);
       }
 
       // Process non-blocking notifications

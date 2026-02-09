@@ -4,21 +4,18 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {getConsoleMessages, getConsoleMessageById} from '../cdp-events.js';
 import {zod} from '../third_party/index.js';
-import type {ConsoleMessageType} from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
 import {defineTool} from './ToolDefinition.js';
-type ConsoleResponseType = ConsoleMessageType | 'issue';
 
-const FILTERABLE_MESSAGE_TYPES: [
-  ConsoleResponseType,
-  ...ConsoleResponseType[],
-] = [
+const FILTERABLE_MESSAGE_TYPES: [string, ...string[]] = [
   'log',
   'debug',
   'info',
   'error',
+  'warning',
   'warn',
   'dir',
   'dirxml',
@@ -34,7 +31,6 @@ const FILTERABLE_MESSAGE_TYPES: [
   'count',
   'timeEnd',
   'verbose',
-  'issue',
 ];
 
 export const listConsoleMessages = defineTool({
@@ -45,6 +41,7 @@ export const listConsoleMessages = defineTool({
   annotations: {
     category: ToolCategory.DEBUGGING,
     readOnlyHint: true,
+    conditions: ['directCdp'],
   },
   schema: {
     pageSize: zod
@@ -53,7 +50,7 @@ export const listConsoleMessages = defineTool({
       .positive()
       .optional()
       .describe(
-        'Maximum number of messages to return. When omitted, returns all requests.',
+        'Maximum number of messages to return. When omitted, returns all messages.',
       ),
     pageIdx: zod
       .number()
@@ -78,12 +75,27 @@ export const listConsoleMessages = defineTool({
       ),
   },
   handler: async (request, response) => {
-    response.setIncludeConsoleData(true, {
+    const {messages, total} = getConsoleMessages({
+      types: request.params.types,
       pageSize: request.params.pageSize,
       pageIdx: request.params.pageIdx,
-      types: request.params.types,
-      includePreservedMessages: request.params.includePreservedMessages,
     });
+
+    if (messages.length === 0) {
+      response.appendResponseLine('No console messages found.');
+      return;
+    }
+
+    response.appendResponseLine(`Console messages (${messages.length} of ${total} total):\n`);
+
+    for (const msg of messages) {
+      const typeTag = `[${msg.type.toUpperCase()}]`;
+      response.appendResponseLine(`msgid=${msg.id} ${typeTag} ${msg.text}`);
+      if (msg.stackTrace?.length) {
+        const first = msg.stackTrace[0];
+        response.appendResponseLine(`  at ${first.functionName || '(anonymous)'} (${first.url}:${first.lineNumber + 1}:${first.columnNumber + 1})`);
+      }
+    }
   },
 });
 
@@ -94,6 +106,7 @@ export const getConsoleMessage = defineTool({
   annotations: {
     category: ToolCategory.DEBUGGING,
     readOnlyHint: true,
+    conditions: ['directCdp'],
   },
   schema: {
     msgid: zod
@@ -103,6 +116,36 @@ export const getConsoleMessage = defineTool({
       ),
   },
   handler: async (request, response) => {
-    response.attachConsoleMessage(request.params.msgid);
+    const msg = getConsoleMessageById(request.params.msgid);
+
+    if (!msg) {
+      response.appendResponseLine(`Console message with id ${request.params.msgid} not found.`);
+      return;
+    }
+
+    response.appendResponseLine(`msgid=${msg.id}`);
+    response.appendResponseLine(`type=${msg.type}`);
+    response.appendResponseLine(`text=${msg.text}`);
+    response.appendResponseLine(`timestamp=${new Date(msg.timestamp).toISOString()}`);
+
+    if (msg.args.length > 0) {
+      response.appendResponseLine('\nArguments:');
+      for (const arg of msg.args) {
+        if (arg.value !== undefined) {
+          response.appendResponseLine(`  [${arg.type}] ${JSON.stringify(arg.value)}`);
+        } else if (arg.description) {
+          response.appendResponseLine(`  [${arg.type}] ${arg.description}`);
+        } else {
+          response.appendResponseLine(`  [${arg.type}]`);
+        }
+      }
+    }
+
+    if (msg.stackTrace?.length) {
+      response.appendResponseLine('\nStack trace:');
+      for (const frame of msg.stackTrace) {
+        response.appendResponseLine(`  at ${frame.functionName || '(anonymous)'} (${frame.url}:${frame.lineNumber + 1}:${frame.columnNumber + 1})`);
+      }
+    }
   },
 });

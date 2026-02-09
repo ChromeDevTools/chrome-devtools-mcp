@@ -4,11 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import fs from 'node:fs';
+import path from 'node:path';
 import zlib from 'node:zlib';
 
+import {sendCdp} from '../browser.js';
+import {startTrace as cdpStartTrace, stopTrace as cdpStopTrace, getTraceData} from '../cdp-events.js';
 import {logger} from '../logger.js';
 import {zod, DevTools} from '../third_party/index.js';
-import type {Page} from '../third_party/index.js';
 import type {InsightName, TraceResult} from '../trace-processing/parse.js';
 import {
   parseRawTraceBuffer,
@@ -18,6 +21,9 @@ import {
 import {ToolCategory} from './categories.js';
 import type {Context, Response} from './ToolDefinition.js';
 import {defineTool} from './ToolDefinition.js';
+
+// Module-level state for tracking trace status
+let isRunningTrace = false;
 
 const filePathSchema = zod
   .string()
@@ -33,6 +39,7 @@ export const startTrace = defineTool({
   annotations: {
     category: ToolCategory.PERFORMANCE,
     readOnlyHint: false,
+    conditions: ['directCdp'],
   },
   schema: {
     reload: zod
@@ -48,67 +55,76 @@ export const startTrace = defineTool({
     filePath: filePathSchema,
   },
   handler: async (request, response, context) => {
-    if (context.isRunningPerformanceTrace()) {
+    if (isRunningTrace) {
       response.appendResponseLine(
         'Error: a performance trace is already running. Use performance_stop_trace to stop it. Only one trace can be running at any given time.',
       );
       return;
     }
-    context.setIsRunningPerformanceTrace(true);
+    isRunningTrace = true;
 
-    const page = context.getSelectedPage();
-    const pageUrlForTracing = page.url();
+    try {
+      // Get current URL if we need to reload
+      let pageUrl: string | undefined;
+      if (request.params.reload) {
+        try {
+          const result = await sendCdp('Runtime.evaluate', {
+            expression: 'window.location.href',
+            returnByValue: true,
+          });
+          pageUrl = result.result.value;
 
-    if (request.params.reload) {
-      // Before starting the recording, navigate to about:blank to clear out any state.
-      await page.goto('about:blank', {
-        waitUntil: ['networkidle0'],
-      });
-    }
+          // Navigate to about:blank first to clear state
+          await sendCdp('Page.navigate', {url: 'about:blank'});
+          await new Promise(r => setTimeout(r, 1000));
+        } catch (err) {
+          logger('Error getting page URL:', err);
+        }
+      }
 
-    // Keep in sync with the categories arrays in:
-    // https://source.chromium.org/chromium/chromium/src/+/main:third_party/devtools-frontend/src/front_end/panels/timeline/TimelineController.ts
-    // https://github.com/GoogleChrome/lighthouse/blob/master/lighthouse-core/gather/gatherers/trace.js
-    const categories = [
-      '-*',
-      'blink.console',
-      'blink.user_timing',
-      'devtools.timeline',
-      'disabled-by-default-devtools.screenshot',
-      'disabled-by-default-devtools.timeline',
-      'disabled-by-default-devtools.timeline.invalidationTracking',
-      'disabled-by-default-devtools.timeline.frame',
-      'disabled-by-default-devtools.timeline.stack',
-      'disabled-by-default-v8.cpu_profiler',
-      'disabled-by-default-v8.cpu_profiler.hires',
-      'latencyInfo',
-      'loading',
-      'disabled-by-default-lighthouse',
-      'v8.execute',
-      'v8',
-    ];
-    await page.tracing.start({
-      categories,
-    });
+      // Start tracing with CDP
+      const categories = [
+        '-*',
+        'blink.console',
+        'blink.user_timing',
+        'devtools.timeline',
+        'disabled-by-default-devtools.screenshot',
+        'disabled-by-default-devtools.timeline',
+        'disabled-by-default-devtools.timeline.invalidationTracking',
+        'disabled-by-default-devtools.timeline.frame',
+        'disabled-by-default-devtools.timeline.stack',
+        'disabled-by-default-v8.cpu_profiler',
+        'disabled-by-default-v8.cpu_profiler.hires',
+        'latencyInfo',
+        'loading',
+        'disabled-by-default-lighthouse',
+        'v8.execute',
+        'v8',
+      ];
 
-    if (request.params.reload) {
-      await page.goto(pageUrlForTracing, {
-        waitUntil: ['load'],
-      });
-    }
+      await cdpStartTrace({categories});
 
-    if (request.params.autoStop) {
-      await new Promise(resolve => setTimeout(resolve, 5_000));
-      await stopTracingAndAppendOutput(
-        page,
-        response,
-        context,
-        request.params.filePath,
-      );
-    } else {
-      response.appendResponseLine(
-        `The performance trace is being recorded. Use performance_stop_trace to stop it.`,
-      );
+      if (request.params.reload && pageUrl) {
+        await sendCdp('Page.navigate', {url: pageUrl});
+        // Wait for load
+        await new Promise(r => setTimeout(r, 3000));
+      }
+
+      if (request.params.autoStop) {
+        await new Promise(resolve => setTimeout(resolve, 5_000));
+        await stopTracingAndAppendOutput(
+          response,
+          context,
+          request.params.filePath,
+        );
+      } else {
+        response.appendResponseLine(
+          `The performance trace is being recorded. Use performance_stop_trace to stop it.`,
+        );
+      }
+    } catch (err) {
+      isRunningTrace = false;
+      throw err;
     }
   },
 });
@@ -121,17 +137,17 @@ export const stopTrace = defineTool({
   annotations: {
     category: ToolCategory.PERFORMANCE,
     readOnlyHint: false,
+    conditions: ['directCdp'],
   },
   schema: {
     filePath: filePathSchema,
   },
   handler: async (request, response, context) => {
-    if (!context.isRunningPerformanceTrace()) {
+    if (!isRunningTrace) {
+      response.appendResponseLine('No performance trace is currently running.');
       return;
     }
-    const page = context.getSelectedPage();
     await stopTracingAndAppendOutput(
-      page,
       response,
       context,
       request.params.filePath,
@@ -147,6 +163,7 @@ export const analyzeInsight = defineTool({
   annotations: {
     category: ToolCategory.PERFORMANCE,
     readOnlyHint: true,
+    conditions: ['directCdp'],
   },
   schema: {
     insightSetId: zod
@@ -178,14 +195,19 @@ export const analyzeInsight = defineTool({
 });
 
 async function stopTracingAndAppendOutput(
-  page: Page,
   response: Response,
   context: Context,
   filePath?: string,
 ): Promise<void> {
   try {
-    const traceEventsBuffer = await page.tracing.stop();
-    if (filePath && traceEventsBuffer) {
+    const traceEvents = await cdpStopTrace();
+
+    // Convert trace events to JSON buffer
+    const traceData = {traceEvents};
+    const traceJson = JSON.stringify(traceData);
+    const traceEventsBuffer = Buffer.from(traceJson, 'utf-8');
+
+    if (filePath) {
       let dataToWrite: Uint8Array = traceEventsBuffer;
       if (filePath.endsWith('.gz')) {
         dataToWrite = await new Promise((resolve, reject) => {
@@ -198,13 +220,20 @@ async function stopTracingAndAppendOutput(
           });
         });
       }
-      const file = await context.saveFile(dataToWrite, filePath);
+
+      // Write file directly since context.saveFile may not work
+      const fullPath = path.isAbsolute(filePath)
+        ? filePath
+        : path.join(process.cwd(), filePath);
+      fs.writeFileSync(fullPath, dataToWrite);
       response.appendResponseLine(
-        `The raw trace data was saved to ${file.filename}.`,
+        `The raw trace data was saved to ${fullPath}.`,
       );
     }
+
     const result = await parseRawTraceBuffer(traceEventsBuffer);
     response.appendResponseLine('The performance trace has been stopped.');
+
     if (traceResultIsSuccess(result)) {
       if (context.isCruxEnabled()) {
         await populateCruxData(result);
@@ -217,7 +246,7 @@ async function stopTracingAndAppendOutput(
       );
     }
   } finally {
-    context.setIsRunningPerformanceTrace(false);
+    isRunningTrace = false;
   }
 }
 
