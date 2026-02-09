@@ -5,7 +5,6 @@
  */
 
 import * as consoleTools from './console.js';
-import * as debugBridgeExecTools from './debug-bridge-exec.js';
 import * as debugEvaluateTools from './debug-evaluate.js';
 import * as inputTools from './input.js';
 import * as networkTools from './network.js';
@@ -17,7 +16,6 @@ import type {ToolDefinition} from './ToolDefinition.js';
 
 const tools = [
   ...Object.values(consoleTools),
-  ...Object.values(debugBridgeExecTools),
   ...Object.values(debugEvaluateTools),
   ...Object.values(inputTools),
   ...Object.values(networkTools),

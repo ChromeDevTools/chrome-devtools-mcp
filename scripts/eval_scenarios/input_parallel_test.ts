@@ -25,7 +25,7 @@ export const scenario: TestScenario = {
       calls[0].name === 'navigate_page' || calls[0].name === 'new_page',
     );
     assert.ok(calls[1].name === 'take_snapshot');
-    assert.ok(calls[2].name === 'fill');
+    assert.ok(calls[2].name === 'type');
     for (let i = 3; i < 8; i++) {
       assert.ok(calls[i].name === 'click');
       assert.strictEqual(Boolean(calls[i].args.includeSnapshot), false);

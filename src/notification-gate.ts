@@ -267,7 +267,7 @@ export function formatBlockingModal(modal: PendingUIElement): string {
       lines.push(`  - "${btn.label}"`);
     }
     lines.push('');
-    lines.push('Use `click` on one of the dialog buttons, or `press_key` with "Escape" to dismiss.');
+    lines.push('Use `click` on one of the dialog buttons, or `hotkey` with "Escape" to dismiss.');
   } else {
     lines.push('Press Escape or click outside to dismiss this dialog.');
   }

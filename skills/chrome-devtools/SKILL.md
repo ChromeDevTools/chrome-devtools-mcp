@@ -16,9 +16,8 @@ description: Uses Chrome DevTools via MCP for efficient debugging, troubleshooti
 ### Before interacting with a page
 
 1. Navigate: `navigate_page` or `new_page`
-2. Wait: `wait_for` to ensure content is loaded if you know what you look for.
-3. Snapshot: `take_snapshot` to understand page structure
-4. Interact: Use element `uid`s from snapshot for `click`, `fill`, etc.
+2. Snapshot: `take_snapshot` to understand page structure
+3. Interact: Use element `uid`s from snapshot for `click`, `type`, etc.
 
 ### Efficient data retrieval
 

@@ -263,10 +263,10 @@ function registerTool(tool: ToolDefinition): void {
           // BLOCKING modals (e.g., "Save file?") → STOP tool, return modal info
           // NON-BLOCKING notifications (toasts) → Prepend banner, let tool proceed
           //
-          // EXCEPTION: Input tools (press_key, click, click_at, hover, drag) BYPASS the gate
+          // EXCEPTION: Input tools (hotkey, click, hover, drag) BYPASS the gate
           // when there's a blocking UI. This allows the user to dismiss the dialog.
           // Without this, there would be no way to interact with blocking dialogs via MCP.
-          const inputTools = ['press_key', 'click', 'click_at', 'hover', 'drag', 'fill'];
+          const inputTools = ['hotkey', 'click', 'hover', 'drag', 'type', 'scroll'];
           const isInputTool = inputTools.includes(tool.name);
           
           const uiCheck = await checkForBlockingUI();

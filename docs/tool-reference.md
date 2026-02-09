@@ -2,22 +2,20 @@
 
 # Chrome DevTools MCP Tool Reference
 
-- **[Input automation](#input-automation)** (8 tools)
+- **[Input automation](#input-automation)** (5 tools)
   - [`click`](#click)
   - [`drag`](#drag)
-  - [`fill`](#fill)
-  - [`fill_form`](#fill_form)
+  - [`type`](#type)
   - [`handle_dialog`](#handle_dialog)
   - [`hover`](#hover)
-  - [`press_key`](#press_key)
-  - [`upload_file`](#upload_file)
-- **[Navigation automation](#navigation-automation)** (6 tools)
+  - [`hotkey`](#hotkey)
+  - [`scroll`](#scroll)
+- **[Navigation automation](#navigation-automation)** (5 tools)
   - [`close_page`](#close_page)
   - [`list_pages`](#list_pages)
   - [`navigate_page`](#navigate_page)
   - [`new_page`](#new_page)
   - [`select_page`](#select_page)
-  - [`wait_for`](#wait_for)
 - **[Emulation](#emulation)** (2 tools)
   - [`emulate`](#emulate)
   - [`resize_page`](#resize_page)
@@ -61,25 +59,14 @@
 
 ---
 
-### `fill`
+### `type`
 
 **Description:** Type text into a input, text area or select an option from a &lt;select&gt; element.
 
 **Parameters:**
 
 - **uid** (string) **(required)**: The uid of an element on the page from the page content snapshot
-- **value** (string) **(required)**: The value to [`fill`](#fill) in
-- **includeSnapshot** (boolean) _(optional)_: Whether to include a snapshot in the response. Default is false.
-
----
-
-### `fill_form`
-
-**Description:** [`Fill`](#fill) out multiple form elements at once
-
-**Parameters:**
-
-- **elements** (array) **(required)**: Elements from snapshot to [`fill`](#fill) out.
+- **value** (string) **(required)**: The value to type in
 - **includeSnapshot** (boolean) _(optional)_: Whether to include a snapshot in the response. Default is false.
 
 ---
@@ -106,9 +93,9 @@
 
 ---
 
-### `press_key`
+### `hotkey`
 
-**Description:** Press a key or key combination. Use this when other input methods like [`fill`](#fill)() cannot be used (e.g., keyboard shortcuts, navigation keys, or special key combinations).
+**Description:** Press a key or key combination. Use this when other input methods like [`type`](#type)() cannot be used (e.g., keyboard shortcuts, navigation keys, or special key combinations).
 
 **Parameters:**
 
@@ -117,14 +104,15 @@
 
 ---
 
-### `upload_file`
+### `scroll`
 
-**Description:** Upload a file through a provided element.
+**Description:** Scroll an element into view, or scroll within a scrollable element in a given direction. If no direction is provided, the element is simply scrolled into the viewport.
 
 **Parameters:**
 
-- **filePath** (string) **(required)**: The local path of the file to upload
-- **uid** (string) **(required)**: The uid of the file input element or an element that will open file chooser on the page from the page content snapshot
+- **uid** (string) **(required)**: The uid of an element on the page from the page content snapshot
+- **direction** (enum: "up", "down", "left", "right") _(optional)_: Direction to scroll within the element. If omitted, the element is scrolled into view without additional scrolling.
+- **amount** (number) _(optional)_: Scroll distance in pixels. Default is 300.
 - **includeSnapshot** (boolean) _(optional)_: Whether to include a snapshot in the response. Default is false.
 
 ---
@@ -184,17 +172,6 @@
 
 - **pageId** (number) **(required)**: The ID of the page to select. Call [`list_pages`](#list_pages) to get available pages.
 - **bringToFront** (boolean) _(optional)_: Whether to focus the page and bring it to the top.
-
----
-
-### `wait_for`
-
-**Description:** Wait for the specified text to appear on the selected page.
-
-**Parameters:**
-
-- **text** (string) **(required)**: Text to appear on the page
-- **timeout** (integer) _(optional)_: Maximum wait time in milliseconds. If set to 0, the default timeout will be used.
 
 ---
 

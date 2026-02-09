@@ -5,7 +5,6 @@
  */
 
 import {
-  clickAtCoords,
   clickElement,
   dragElement,
   executeWithDiff,
@@ -13,8 +12,8 @@ import {
   fillElement,
   hoverElement,
   pressKey,
+  scrollElement,
 } from '../ax-tree.js';
-import {sendCdp} from '../browser.js';
 import {zod} from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
@@ -88,36 +87,6 @@ export const click = defineTool({
   },
 });
 
-export const clickAt = defineTool({
-  name: 'click_at',
-  description: `Clicks at the specified coordinates on the page`,
-  timeoutMs: 10000,
-  annotations: {
-    category: ToolCategory.INPUT,
-    readOnlyHint: false,
-    conditions: ['directCdp'],
-  },
-  schema: {
-    x: zod.number().describe('The x coordinate to click at'),
-    y: zod.number().describe('The y coordinate to click at'),
-    dblClick: dblClickSchema,
-    includeSnapshot: includeSnapshotSchema,
-  },
-  handler: async (request, response) => {
-    const {x, y, dblClick, includeSnapshot} = request.params;
-    await executeWithChanges(
-      async () => clickAtCoords(x, y, dblClick ? 2 : 1),
-      includeSnapshot,
-      response,
-    );
-    response.appendResponseLine(
-      dblClick
-        ? 'Double clicked at the coordinates'
-        : 'Clicked at the coordinates',
-    );
-  },
-});
-
 export const hover = defineTool({
   name: 'hover',
   description: `Hover over the provided element`,
@@ -146,8 +115,8 @@ export const hover = defineTool({
   },
 });
 
-export const fill = defineTool({
-  name: 'fill',
+export const type = defineTool({
+  name: 'type',
   description: `Type text into a input, text area or select an option from a <select> element.`,
   timeoutMs: 10000,
   annotations: {
@@ -200,81 +169,9 @@ export const drag = defineTool({
   },
 });
 
-export const fillForm = defineTool({
-  name: 'fill_form',
-  description: `Fill out multiple form elements at once`,
-  timeoutMs: 15000,
-  annotations: {
-    category: ToolCategory.INPUT,
-    readOnlyHint: false,
-    conditions: ['directCdp'],
-  },
-  schema: {
-    elements: zod
-      .array(
-        zod.object({
-          uid: zod.string().describe('The uid of the element to fill out'),
-          value: zod.string().describe('Value for the element'),
-        }),
-      )
-      .describe('Elements from snapshot to fill out.'),
-    includeSnapshot: includeSnapshotSchema,
-  },
-  handler: async (request, response) => {
-    const {elements, includeSnapshot} = request.params;
-    await executeWithChanges(
-      async () => {
-        for (const element of elements) {
-          await fillElement(element.uid, element.value);
-        }
-      },
-      includeSnapshot,
-      response,
-    );
-    response.appendResponseLine('Filled out the form');
-  },
-});
-
-export const uploadFile = defineTool({
-  name: 'upload_file',
-  description: 'Upload a file through a provided element.',
-  timeoutMs: 30000,
-  annotations: {
-    category: ToolCategory.INPUT,
-    readOnlyHint: false,
-    conditions: ['directCdp'],
-  },
-  schema: {
-    uid: zod
-      .string()
-      .describe(
-        'The uid of the file input element or an element that will open file chooser on the page from the page content snapshot',
-      ),
-    filePath: zod.string().describe('The local path of the file to upload'),
-    includeSnapshot: includeSnapshotSchema,
-  },
-  handler: async (request, response) => {
-    const {uid, filePath, includeSnapshot} = request.params;
-    await executeWithChanges(
-      async () => {
-        // Use DOM.setFileInputFiles for file input elements
-        const backendNodeId = (await import('../ax-tree.js')).getBackendNodeId(uid);
-        await sendCdp('DOM.enable');
-        await sendCdp('DOM.setFileInputFiles', {
-          files: [filePath],
-          backendNodeId,
-        });
-      },
-      includeSnapshot,
-      response,
-    );
-    response.appendResponseLine(`File uploaded from ${filePath}.`);
-  },
-});
-
-export const pressKeyTool = defineTool({
-  name: 'press_key',
-  description: `Press a key or key combination. Use this when other input methods like fill() cannot be used (e.g., keyboard shortcuts, navigation keys, or special key combinations).`,
+export const hotkeyTool = defineTool({
+  name: 'hotkey',
+  description: `Press a key or key combination. Use this when other input methods like type() cannot be used (e.g., keyboard shortcuts, navigation keys, or special key combinations).`,
   timeoutMs: 10000,
   annotations: {
     category: ToolCategory.INPUT,
@@ -297,5 +194,49 @@ export const pressKeyTool = defineTool({
       response,
     );
     response.appendResponseLine(`Pressed key: ${key}`);
+  },
+});
+
+export const scroll = defineTool({
+  name: 'scroll',
+  description: `Scroll an element into view, or scroll within a scrollable element in a given direction. If no direction is provided, the element is simply scrolled into the viewport.`,
+  timeoutMs: 10000,
+  annotations: {
+    category: ToolCategory.INPUT,
+    readOnlyHint: true,
+    conditions: ['directCdp'],
+  },
+  schema: {
+    uid: zod
+      .string()
+      .describe(
+        'The uid of an element on the page from the page content snapshot',
+      ),
+    direction: zod
+      .enum(['up', 'down', 'left', 'right'])
+      .optional()
+      .describe(
+        'Direction to scroll within the element. If omitted, the element is scrolled into view without additional scrolling.',
+      ),
+    amount: zod
+      .number()
+      .optional()
+      .describe(
+        'Scroll distance in pixels. Default is 300.',
+      ),
+    includeSnapshot: includeSnapshotSchema,
+  },
+  handler: async (request, response) => {
+    const {uid, direction, amount, includeSnapshot} = request.params;
+    await executeWithChanges(
+      async () => scrollElement(uid, direction, amount),
+      includeSnapshot,
+      response,
+    );
+    if (direction) {
+      response.appendResponseLine(`Scrolled ${direction} by ${amount ?? 300}px within the element`);
+    } else {
+      response.appendResponseLine('Scrolled element into view');
+    }
   },
 });

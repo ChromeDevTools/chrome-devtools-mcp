@@ -5,20 +5,16 @@
  */
 
 import assert from 'node:assert';
-import fs from 'node:fs/promises';
-import path from 'node:path';
 import {describe, it} from 'node:test';
 
 import {McpResponse} from '../../src/McpResponse.js';
 import {
   click,
-  clickAt,
   hover,
-  fill,
+  type,
   drag,
-  fillForm,
-  uploadFile,
-  pressKeyTool,
+  hotkeyTool,
+  scroll,
 } from '../../src/tools/input.js';
 import {parseKey} from '../../src/utils/keyboard.js';
 import {serverHooks} from '../server.js';
@@ -234,75 +230,13 @@ describe('input', () => {
     });
   });
 
-  // clickAt tests use Puppeteer context — will need directCdp equivalents
-  describe('click_at', () => {
-    it('clicks at coordinates', async () => {
-      await withMcpContext(async (response, context) => {
-        const page = context.getSelectedPage();
-        await page.setContent(
-          html`<div
-            style="width: 100px; height: 100px; background: red;"
-            onclick="this.innerText = 'clicked'"
-          ></div>`,
-        );
-        await context.createTextSnapshot();
-        await clickAt.handler(
-          {
-            params: {
-              x: 50,
-              y: 50,
-            },
-          },
-          response,
-          context,
-        );
-        assert.strictEqual(
-          response.responseLines[0],
-          'Successfully clicked at the coordinates',
-        );
-        assert.ok(response.includeSnapshot);
-        assert.ok(await page.$('text/clicked'));
-      });
-    });
-
-    it('double clicks at coordinates', async () => {
-      await withMcpContext(async (response, context) => {
-        const page = context.getSelectedPage();
-        await page.setContent(
-          html`<div
-            style="width: 100px; height: 100px; background: red;"
-            ondblclick="this.innerText = 'dblclicked'"
-          ></div>`,
-        );
-        await context.createTextSnapshot();
-        await clickAt.handler(
-          {
-            params: {
-              x: 50,
-              y: 50,
-              dblClick: true,
-            },
-          },
-          response,
-          context,
-        );
-        assert.strictEqual(
-          response.responseLines[0],
-          'Successfully double clicked at the coordinates',
-        );
-        assert.ok(response.includeSnapshot);
-        assert.ok(await page.$('text/dblclicked'));
-      });
-    });
-  });
-
-  describe('fill', () => {
+  describe('type', () => {
     it('fills out an input', async () => {
       await withMcpContext(async (response, context) => {
         const page = context.getSelectedPage();
         await page.setContent(html`<input />`);
         await context.createTextSnapshot();
-        await fill.handler(
+        await type.handler(
           {
             params: {
               uid: '1_1',
@@ -331,7 +265,7 @@ describe('input', () => {
           >`,
         );
         await context.createTextSnapshot();
-        await fill.handler(
+        await type.handler(
           {
             params: {
               uid: '1_1',
@@ -360,7 +294,7 @@ describe('input', () => {
         await page.focus('textarea');
         await context.createTextSnapshot();
         await page.setDefaultTimeout(1000);
-        await fill.handler(
+        await type.handler(
           {
             params: {
               uid: '1_1',
@@ -385,7 +319,7 @@ describe('input', () => {
       });
     });
 
-    it('reproduction: fill isolation', async () => {
+    it('reproduction: type isolation', async () => {
       await withMcpContext(async (_response, context) => {
         const page = context.getSelectedPage();
         await page.setContent(
@@ -404,7 +338,7 @@ describe('input', () => {
 
         // Fill email
         const response1 = new McpResponse();
-        await fill.handler(
+        await type.handler(
           {
             params: {
               uid: '1_1', // email input
@@ -421,7 +355,7 @@ describe('input', () => {
 
         // Fill password
         const response2 = new McpResponse();
-        await fill.handler(
+        await type.handler(
           {
             params: {
               uid: '1_2', // password input
@@ -513,185 +447,7 @@ describe('input', () => {
     });
   });
 
-  describe('fill form', () => {
-    it('successfully fills out the form', async () => {
-      await withMcpContext(async (response, context) => {
-        const page = context.getSelectedPage();
-        await page.setContent(
-          html`<form>
-            <label
-              >username<input
-                name="username"
-                type="text"
-            /></label>
-            <label
-              >email<input
-                name="email"
-                type="text"
-            /></label>
-            <input
-              type="submit"
-              value="Submit"
-            />
-          </form>`,
-        );
-        await context.createTextSnapshot();
-        await fillForm.handler(
-          {
-            params: {
-              elements: [
-                {
-                  uid: '1_2',
-                  value: 'test',
-                },
-                {
-                  uid: '1_4',
-                  value: 'test2',
-                },
-              ],
-            },
-          },
-          response,
-          context,
-        );
-        assert.ok(response.includeSnapshot);
-        assert.strictEqual(
-          response.responseLines[0],
-          'Successfully filled out the form',
-        );
-        assert.deepStrictEqual(
-          await page.evaluate(() => {
-            return [
-              // @ts-expect-error missing types
-              document.querySelector('input[name=username]').value,
-              // @ts-expect-error missing types
-              document.querySelector('input[name=email]').value,
-            ];
-          }),
-          ['test', 'test2'],
-        );
-      });
-    });
-  });
-
-  describe('uploadFile', () => {
-    it('uploads a file to a file input', async () => {
-      const testFilePath = path.join(process.cwd(), 'test.txt');
-      await fs.writeFile(testFilePath, 'test file content');
-
-      await withMcpContext(async (response, context) => {
-        const page = context.getSelectedPage();
-        await page.setContent(
-          html`<form>
-            <input
-              type="file"
-              id="file-input"
-            />
-          </form>`,
-        );
-        await context.createTextSnapshot();
-        await uploadFile.handler(
-          {
-            params: {
-              uid: '1_1',
-              filePath: testFilePath,
-            },
-          },
-          response,
-          context,
-        );
-        assert.ok(response.includeSnapshot);
-        assert.strictEqual(
-          response.responseLines[0],
-          `File uploaded from ${testFilePath}.`,
-        );
-      });
-
-      await fs.unlink(testFilePath);
-    });
-
-    it('uploads a file when clicking an element opens a file uploader', async () => {
-      const testFilePath = path.join(process.cwd(), 'test.txt');
-      await fs.writeFile(testFilePath, 'test file content');
-
-      await withMcpContext(async (response, context) => {
-        const page = context.getSelectedPage();
-        await page.setContent(
-          html`<button id="file-chooser-button">Upload file</button>
-            <input
-              type="file"
-              id="file-input"
-              style="display: none;"
-            />
-            <script>
-              document
-                .getElementById('file-chooser-button')
-                .addEventListener('click', () => {
-                  document.getElementById('file-input').click();
-                });
-            </script>`,
-        );
-        await context.createTextSnapshot();
-        await uploadFile.handler(
-          {
-            params: {
-              uid: '1_1',
-              filePath: testFilePath,
-            },
-          },
-          response,
-          context,
-        );
-        assert.ok(response.includeSnapshot);
-        assert.strictEqual(
-          response.responseLines[0],
-          `File uploaded from ${testFilePath}.`,
-        );
-        const uploadedFileName = await page.$eval('#file-input', el => {
-          const input = el as HTMLInputElement;
-          return input.files?.[0]?.name;
-        });
-        assert.strictEqual(uploadedFileName, 'test.txt');
-
-        await fs.unlink(testFilePath);
-      });
-    });
-
-    it('throws an error if the element is not a file input and does not open a file chooser', async () => {
-      const testFilePath = path.join(process.cwd(), 'test.txt');
-      await fs.writeFile(testFilePath, 'test file content');
-
-      await withMcpContext(async (response, context) => {
-        const page = context.getSelectedPage();
-        await page.setContent(html`<div>Not a file input</div>`);
-        await context.createTextSnapshot();
-
-        await assert.rejects(
-          uploadFile.handler(
-            {
-              params: {
-                uid: '1_1',
-                filePath: testFilePath,
-              },
-            },
-            response,
-            context,
-          ),
-          {
-            message:
-              'Failed to upload file. The element could not accept the file directly, and clicking it did not trigger a file chooser.',
-          },
-        );
-
-        assert.strictEqual(response.responseLines.length, 0);
-        assert.strictEqual(response.snapshotParams, undefined);
-
-        await fs.unlink(testFilePath);
-      });
-    });
-  });
-
-  describe('press_key', () => {
+  describe('hotkey', () => {
     it('parses keys', () => {
       assert.deepStrictEqual(parseKey('Shift+A'), ['A', 'Shift']);
       assert.deepStrictEqual(parseKey('Shift++'), ['+', 'Shift']);
@@ -719,7 +475,7 @@ describe('input', () => {
       });
     });
 
-    it('processes press_key', async () => {
+    it('processes hotkey', async () => {
       await withMcpContext(async (response, context) => {
         const page = context.getSelectedPage();
         await page.setContent(
@@ -731,7 +487,7 @@ describe('input', () => {
         );
         await context.createTextSnapshot();
 
-        await pressKeyTool.handler(
+        await hotkeyTool.handler(
           {
             params: {
               key: 'Control+Shift+C',
@@ -749,6 +505,62 @@ describe('input', () => {
           'uShift',
           'uControl',
         ]);
+      });
+    });
+  });
+
+  describe('scroll', () => {
+    it('scrolls element into view', async () => {
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedPage();
+        await page.setContent(
+          html`<div style="height: 2000px">spacer</div>
+            <button id="target">target</button>`,
+        );
+        await context.createTextSnapshot();
+        await scroll.handler(
+          {
+            params: {
+              uid: '1_2',
+            },
+          },
+          response,
+          context,
+        );
+        assert.strictEqual(
+          response.responseLines[response.responseLines.length - 1],
+          'Scrolled element into view',
+        );
+      });
+    });
+
+    it('scrolls down within a scrollable element', async () => {
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedPage();
+        await page.setContent(
+          html`<div
+            id="scroller"
+            style="height: 200px; overflow: auto;"
+          >
+            <div style="height: 1000px">tall content</div>
+          </div>`,
+        );
+        await context.createTextSnapshot();
+        await scroll.handler(
+          {
+            params: {
+              uid: '1_1',
+              direction: 'down',
+              amount: 200,
+            },
+          },
+          response,
+          context,
+        );
+        assert.strictEqual(
+          response.responseLines[response.responseLines.length - 1],
+          'Scrolled down by 200px within the element',
+        );
       });
     });
   });

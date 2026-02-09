@@ -25,7 +25,7 @@ export const scenario: TestScenario = {
       calls[0].name === 'navigate_page' || calls[0].name === 'new_page',
     );
     assert.ok(calls[1].name === 'take_snapshot');
-    assert.ok(calls[2].name === 'fill');
+    assert.ok(calls[2].name === 'type');
     assert.ok(calls[3].name === 'click');
   },
 };

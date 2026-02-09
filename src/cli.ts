@@ -49,7 +49,7 @@ export const cliOptions = {
   devDiagnostic: {
     type: 'boolean',
     describe:
-      'Enable diagnostic development tools (debug_evaluate, debug_bridge_exec). Hidden in production.',
+      'Enable diagnostic development tools (debug_evaluate). Hidden in production.',
     default: false,
     hidden: true,
   },

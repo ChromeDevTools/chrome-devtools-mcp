@@ -270,6 +270,35 @@ export async function scrollIntoView(uid: string): Promise<void> {
   await sendCdp('DOM.scrollIntoViewIfNeeded', {backendNodeId});
 }
 
+/**
+ * Scroll an element into view, then optionally dispatch a mouse wheel event
+ * at its center to scroll within the element in a given direction.
+ */
+export async function scrollElement(
+  uid: string,
+  direction?: 'up' | 'down' | 'left' | 'right',
+  amount = 300,
+): Promise<void> {
+  await scrollIntoView(uid);
+
+  if (!direction) return;
+
+  const {x, y} = await getElementCenter(uid);
+  const deltaX = direction === 'left' ? -amount : direction === 'right' ? amount : 0;
+  const deltaY = direction === 'up' ? -amount : direction === 'down' ? amount : 0;
+
+  logger(`Scrolling uid=${uid} at (${x}, ${y}), deltaX=${deltaX}, deltaY=${deltaY}`);
+  await sendCdp('Input.dispatchMouseEvent', {
+    type: 'mouseWheel',
+    x,
+    y,
+    deltaX,
+    deltaY,
+  });
+  // Allow layout to settle after scroll
+  await new Promise(r => setTimeout(r, 100));
+}
+
 // ── Input Helpers ──
 
 /**

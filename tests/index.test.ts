@@ -121,17 +121,6 @@ describe('e2e', () => {
     );
   });
 
-  it('has experimental vision tools', async () => {
-    await withClient(
-      async client => {
-        const {tools} = await client.listTools();
-        const clickAt = tools.find(t => t.name === 'click_at');
-        assert.ok(clickAt);
-      },
-      ['--experimental-vision'],
-    );
-  });
-
   it('has experimental interop tools', async () => {
     await withClient(
       async client => {
