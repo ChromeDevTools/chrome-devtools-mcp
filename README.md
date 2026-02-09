@@ -267,6 +267,30 @@ Or, from the IDE **Activity Bar** > `Kiro` > `MCP Servers` > `Click Open MCP Con
 </details>
 
 <details>
+  <summary>Katalon Studio</summary>
+
+The Chrome DevTools MCP server can be used with <a href="https://docs.katalon.com/katalon-studio/studioassist/mcp-servers/setting-up-chrome-devtools-mcp-server-for-studioassist">Katalon StudioAssist</a> via an MCP proxy.
+
+**Step 1:** Install the MCP proxy by following the <a href="https://docs.katalon.com/katalon-studio/studioassist/mcp-servers/setting-up-mcp-proxy-for-stdio-mcp-servers">MCP proxy setup guide</a>.
+
+**Step 2:** Start the Chrome DevTools MCP server with the proxy:
+
+```bash
+mcp-proxy --transport streamablehttp --port 8080 -- npx -y chrome-devtools-mcp@latest
+```
+
+**Note:** You may need to pick another port if 8080 is already in use.
+
+**Step 3:** In Katalon Studio, add the server to StudioAssist with the following settings:
+
+- **Connection URL:** `http://127.0.0.1:8080/mcp`
+- **Transport type:** `HTTP`
+
+Once connected, the Chrome DevTools MCP tools will be available in StudioAssist.
+
+</details>
+
+<details>
   <summary>OpenCode</summary>
 
 Add the following configuration to your `opencode.json` file. If you don't have one, create it at `~/.config/opencode/opencode.json` (<a href="https://opencode.ai/docs/mcp-servers">guide</a>):
