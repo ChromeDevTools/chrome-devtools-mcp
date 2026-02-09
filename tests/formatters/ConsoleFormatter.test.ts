@@ -451,6 +451,34 @@ describe('ConsoleFormatter', () => {
       ).toStringDetailed();
       t.assert.snapshot?.(result);
     });
+
+    it('limits the number lines for a stack trace', async t => {
+      const message = createMockMessage({
+        type: () => 'log',
+        text: () => 'Hello stack trace!',
+      });
+      const frames: DevTools.StackTrace.StackTrace.Frame[] = [];
+      for (let i = 0; i < 100; ++i) {
+        frames.push({
+          line: i,
+          column: i,
+          url: 'main.js',
+          name: `fn${i}`,
+        });
+      }
+      const stackTrace = {
+        syncFragment: {frames},
+        asyncFragments: [],
+      } as unknown as DevTools.StackTrace.StackTrace.StackTrace;
+
+      const result = (
+        await ConsoleFormatter.from(message, {
+          id: 11,
+          resolvedStackTraceForTesting: stackTrace,
+        })
+      ).toStringDetailed();
+      t.assert.snapshot?.(result);
+    });
   });
   describe('toJSON', () => {
     it('formats a console.log message', async () => {

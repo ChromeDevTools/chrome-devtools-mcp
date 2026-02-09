@@ -23,6 +23,8 @@ export interface ConsoleFormatterOptions {
 }
 
 export class ConsoleFormatter {
+  static readonly #STACK_TRACE_MAX_LINES = 50;
+
   readonly #id: number;
   readonly #type: string;
   readonly #text: string;
@@ -134,7 +136,6 @@ export class ConsoleFormatter {
       this.#formatArgs(),
       this.#formatStackTrace(this.#stack, this.#cause, {
         includeHeading: true,
-        includeNote: true,
       }),
     ].filter(line => !!line);
     return result.join('\n');
@@ -158,7 +159,6 @@ export class ConsoleFormatter {
         arg.message,
         this.#formatStackTrace(arg.stackTrace, arg.cause, {
           includeHeading: false,
-          includeNote: true,
         }),
       ]
         .filter(line => !!line)
@@ -186,38 +186,59 @@ export class ConsoleFormatter {
   #formatStackTrace(
     stackTrace: DevTools.DevTools.StackTrace.StackTrace.StackTrace | undefined,
     cause: SymbolizedError | undefined,
-    opts: {includeHeading: boolean; includeNote: boolean},
+    opts: {includeHeading: boolean},
   ): string {
     if (!stackTrace) {
       return '';
     }
 
+    const lines = this.#formatStackTraceInner(stackTrace, cause);
+    const includedLines = lines.slice(
+      0,
+      ConsoleFormatter.#STACK_TRACE_MAX_LINES,
+    );
+    const reminderCount = lines.length - includedLines.length;
+
     return [
       opts.includeHeading ? '### Stack trace' : '',
-      this.#formatFragment(stackTrace.syncFragment),
-      ...stackTrace.asyncFragments.map(this.#formatAsyncFragment.bind(this)),
-      this.#formatCause(cause),
-      opts.includeNote
-        ? 'Note: line and column numbers use 1-based indexing'
-        : '',
+      ...includedLines,
+      reminderCount > 0 ? `... and ${reminderCount} more frames` : '',
+      'Note: line and column numbers use 1-based indexing',
     ]
       .filter(line => !!line)
       .join('\n');
   }
 
+  #formatStackTraceInner(
+    stackTrace: DevTools.DevTools.StackTrace.StackTrace.StackTrace | undefined,
+    cause: SymbolizedError | undefined,
+  ): string[] {
+    if (!stackTrace) {
+      return [];
+    }
+
+    return [
+      ...this.#formatFragment(stackTrace.syncFragment),
+      ...stackTrace.asyncFragments
+        .map(this.#formatAsyncFragment.bind(this))
+        .flat(),
+      ...this.#formatCause(cause),
+    ];
+  }
+
   #formatFragment(
     fragment: DevTools.DevTools.StackTrace.StackTrace.Fragment,
-  ): string {
-    return fragment.frames.map(this.#formatFrame.bind(this)).join('\n');
+  ): string[] {
+    return fragment.frames.map(this.#formatFrame.bind(this));
   }
 
   #formatAsyncFragment(
     fragment: DevTools.DevTools.StackTrace.StackTrace.AsyncFragment,
-  ): string {
+  ): string[] {
     const separatorLineLength = 40;
     const prefix = `--- ${fragment.description || 'async'} `;
     const separator = prefix + '-'.repeat(separatorLineLength - prefix.length);
-    return separator + '\n' + this.#formatFragment(fragment);
+    return [separator, ...this.#formatFragment(fragment)];
   }
 
   #formatFrame(frame: DevTools.DevTools.StackTrace.StackTrace.Frame): string {
@@ -231,20 +252,15 @@ export class ConsoleFormatter {
     return result;
   }
 
-  #formatCause(cause: SymbolizedError | undefined): string {
+  #formatCause(cause: SymbolizedError | undefined): string[] {
     if (!cause) {
-      return '';
+      return [];
     }
 
     return [
       `Caused by: ${cause.message}`,
-      this.#formatStackTrace(cause.stackTrace, cause.cause, {
-        includeHeading: false,
-        includeNote: false,
-      }),
-    ]
-      .filter(line => !!line)
-      .join('\n');
+      ...this.#formatStackTraceInner(cause.stackTrace, cause.cause),
+    ];
   }
 
   toJSON(): object {
