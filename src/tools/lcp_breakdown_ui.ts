@@ -139,7 +139,8 @@ export const LCP_UI_CONTENT = `
   </style>
 </head>
 <body>
-  <iframe src="http://localhost:5002/" style="width: 100%; height: 500px; border: none; margin-bottom: 24px;"></iframe>
+  <!-- WIP: trying to pass data through iframe -->
+  <!-- <iframe src="http://localhost:5002/" style="width: 100%; height: 500px; border: none; margin-bottom: 24px;"></iframe> -->
   <div class="container">
     <div class="header">
       <div class="title">LCP Breakdown</div>

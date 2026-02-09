@@ -58,8 +58,8 @@ function LayoutShiftApp() {
       return;
     }
 
-    // Sort by score descending to show biggest shifts first
-    const sortedShifts = [...layoutShifts].sort((a, b) => b.score - a.score);
+    // Sort by timestamp ascending to show shifts in order of occurrence
+    const sortedShifts = [...layoutShifts].sort((a, b) => a.ts - b.ts);
 
     sortedShifts.forEach((shift, index) => {
       const card = document.createElement('div');

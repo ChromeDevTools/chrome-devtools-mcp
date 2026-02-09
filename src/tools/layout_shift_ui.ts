@@ -26,7 +26,7 @@ export const LAYOUT_SHIFT_UI_CONTENT = `
     }
     body { 
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
-      padding: 24px; 
+      padding: 12px; 
       margin: 0;
       color: var(--text);
       background: var(--bg);
@@ -36,32 +36,33 @@ export const LAYOUT_SHIFT_UI_CONTENT = `
     .container { 
       display: flex; 
       flex-direction: column; 
-      gap: 24px; 
-      max-width: 800px;
-      margin: auto;
+      gap: 16px; 
+      width: 100%;
+      max-width: 100%;
+      margin: 0;
     }
     .header {
       border-bottom: 1px solid var(--border);
-      padding-bottom: 12px;
+      padding-bottom: 8px;
     }
     .title {
-      font-size: 24px;
+      font-size: 20px;
       font-weight: 700;
       color: var(--primary);
     }
     .subtitle {
-      font-size: 14px;
+      font-size: 13px;
       color: var(--text-dim);
-      margin-top: 4px;
+      margin-top: 2px;
     }
     .shift-card {
       background: var(--card-bg);
       border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 16px;
+      border-radius: 8px;
+      padding: 12px;
       display: flex;
       flex-direction: column;
-      gap: 16px;
+      gap: 12px;
       box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
     }
     .shift-header {
@@ -72,25 +73,25 @@ export const LAYOUT_SHIFT_UI_CONTENT = `
     .shift-info {
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 8px;
     }
     .shift-rank {
-      font-size: 18px;
+      font-size: 16px;
       font-weight: 800;
       color: var(--primary);
       opacity: 0.5;
     }
     .shift-ts {
       font-family: var(--font-mono);
-      font-size: 13px;
+      font-size: 12px;
       color: var(--text-dim);
     }
     .shift-score {
       font-weight: 700;
       font-family: var(--font-mono);
-      padding: 4px 12px;
+      padding: 2px 8px;
       border-radius: 9999px;
-      font-size: 13px;
+      font-size: 12px;
       border: 1px solid currentColor;
     }
     .score-bad { color: var(--score-bad); }
@@ -100,26 +101,28 @@ export const LAYOUT_SHIFT_UI_CONTENT = `
     .snapshots-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 16px;
+      gap: 12px;
     }
     .snapshot-item {
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      gap: 4px;
     }
     .snapshot-label {
-      font-size: 11px;
+      font-size: 10px;
       font-weight: 600;
       text-transform: uppercase;
       letter-spacing: 0.05em;
       color: var(--text-dim);
     }
     .snapshot-img-container {
-      border-radius: 8px;
+      border-radius: 6px;
       overflow: hidden;
-      border: 2px solid var(--border);
+      border: 1px solid var(--border);
       background: #000;
-      aspect-ratio: 16/9;
+      /* Removed fixed aspect-ratio so image can take more space naturally if needed, 
+         but keeping it for layout stability might be good. Let's make it taller if possible or rely on img size. */
+      aspect-ratio: 16/10; 
       position: relative;
     }
     .snapshot-img-container img {
@@ -129,19 +132,19 @@ export const LAYOUT_SHIFT_UI_CONTENT = `
     }
     .empty-state {
       text-align: center;
-      padding: 48px;
+      padding: 32px;
       color: var(--text-dim);
       background: var(--card-bg);
-      border-radius: 12px;
+      border-radius: 8px;
       border: 2px dashed var(--border);
     }
     .no-snapshots {
-      padding: 12px;
+      padding: 8px;
       text-align: center;
-      font-size: 12px;
+      font-size: 11px;
       color: var(--text-dim);
       background: rgba(15, 23, 42, 0.3);
-      border-radius: 6px;
+      border-radius: 4px;
     }
   </style>
 </head>
