@@ -14,6 +14,25 @@ exports[`ConsoleFormatter > toString > formats an UncaughtError 1`] = `
 msgid=4 [error] Uncaught TypeError: Cannot read properties of undefined (0 args)
 `;
 
+exports[`ConsoleFormatter > toStringDetailed > does not show call frames with ignore listed scripts 1`] = `
+ID: 12
+Message: log> Hello stack trace!
+### Stack trace
+at foo (foo.ts:10:2)
+at bar (foo.ts:20:2)
+Note: line and column numbers use 1-based indexing
+`;
+
+exports[`ConsoleFormatter > toStringDetailed > does not show fragments where all frames are ignore listed 1`] = `
+ID: 13
+Message: log> Hello stack trace!
+### Stack trace
+at foo (foo.ts:10:2)
+--- await ------------------------------
+at bar (foo.ts:20:2)
+Note: line and column numbers use 1-based indexing
+`;
+
 exports[`ConsoleFormatter > toStringDetailed > formats a console message with a stack trace 1`] = `
 ID: 5
 Message: log> Hello stack trace!

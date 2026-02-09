@@ -10,7 +10,7 @@ import {
   SymbolizedError,
 } from '../DevtoolsUtils.js';
 import {UncaughtError} from '../PageCollector.js';
-import type * as DevTools from '../third_party/index.js';
+import * as DevTools from '../third_party/index.js';
 import type {ConsoleMessage} from '../third_party/index.js';
 
 export interface ConsoleFormatterOptions {
@@ -20,7 +20,12 @@ export interface ConsoleFormatterOptions {
   resolvedArgsForTesting?: unknown[];
   resolvedStackTraceForTesting?: DevTools.DevTools.StackTrace.StackTrace.StackTrace;
   resolvedCauseForTesting?: SymbolizedError;
+  isIgnoredForTesting?: IgnoreCheck;
 }
+
+export type IgnoreCheck = (
+  frame: DevTools.DevTools.StackTrace.StackTrace.Frame,
+) => boolean;
 
 export class ConsoleFormatter {
   static readonly #STACK_TRACE_MAX_LINES = 50;
@@ -35,6 +40,8 @@ export class ConsoleFormatter {
   readonly #stack?: DevTools.DevTools.StackTrace.StackTrace.StackTrace;
   readonly #cause?: SymbolizedError;
 
+  readonly #isIgnored: IgnoreCheck;
+
   private constructor(params: {
     id: number;
     type: string;
@@ -43,6 +50,7 @@ export class ConsoleFormatter {
     resolvedArgs?: unknown[];
     stack?: DevTools.DevTools.StackTrace.StackTrace.StackTrace;
     cause?: SymbolizedError;
+    isIgnored: IgnoreCheck;
   }) {
     this.#id = params.id;
     this.#type = params.type;
@@ -51,12 +59,37 @@ export class ConsoleFormatter {
     this.#resolvedArgs = params.resolvedArgs ?? [];
     this.#stack = params.stack;
     this.#cause = params.cause;
+    this.#isIgnored = params.isIgnored;
   }
 
   static async from(
     msg: ConsoleMessage | UncaughtError,
     options: ConsoleFormatterOptions,
   ): Promise<ConsoleFormatter> {
+    const ignoreListManager = options?.devTools?.universe.context.get(
+      DevTools.DevTools.IgnoreListManager,
+    );
+    const isIgnored: IgnoreCheck =
+      options.isIgnoredForTesting ||
+      (frame => {
+        if (!ignoreListManager) {
+          return false;
+        }
+        if (frame.uiSourceCode) {
+          return ignoreListManager.isUserOrSourceMapIgnoreListedUISourceCode(
+            frame.uiSourceCode,
+          );
+        }
+        if (frame.url) {
+          return ignoreListManager.isUserIgnoreListedURL(
+            frame.url as Parameters<
+              DevTools.DevTools.IgnoreListManager['isUserIgnoreListedURL']
+            >[0],
+          );
+        }
+        return false;
+      });
+
     if (msg instanceof UncaughtError) {
       const error = await SymbolizedError.fromDetails({
         devTools: options?.devTools,
@@ -72,6 +105,7 @@ export class ConsoleFormatter {
         text: error.message,
         stack: error.stackTrace,
         cause: error.cause,
+        isIgnored,
       });
     }
 
@@ -120,6 +154,7 @@ export class ConsoleFormatter {
       argCount: resolvedArgs.length || msg.args().length,
       resolvedArgs,
       stack,
+      isIgnored,
     });
   }
 
@@ -229,16 +264,22 @@ export class ConsoleFormatter {
   #formatFragment(
     fragment: DevTools.DevTools.StackTrace.StackTrace.Fragment,
   ): string[] {
-    return fragment.frames.map(this.#formatFrame.bind(this));
+    const frames = fragment.frames.filter(frame => !this.#isIgnored(frame));
+    return frames.map(this.#formatFrame.bind(this));
   }
 
   #formatAsyncFragment(
     fragment: DevTools.DevTools.StackTrace.StackTrace.AsyncFragment,
   ): string[] {
+    const formattedFrames = this.#formatFragment(fragment);
+    if (formattedFrames.length === 0) {
+      return [];
+    }
+
     const separatorLineLength = 40;
     const prefix = `--- ${fragment.description || 'async'} `;
     const separator = prefix + '-'.repeat(separatorLineLength - prefix.length);
-    return [separator, ...this.#formatFragment(fragment)];
+    return [separator, ...formattedFrames];
   }
 
   #formatFrame(frame: DevTools.DevTools.StackTrace.StackTrace.Frame): string {

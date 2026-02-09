@@ -386,5 +386,48 @@ describe('console', () => {
         t.assert.snapshot?.(rawText);
       });
     });
+
+    it('ignores frames from ignore listed URLs', async t => {
+      server.addHtmlRoute(
+        '/index.html',
+        `<!DOCTYPE html>
+         <script>
+         function ignoredFn1(cb) {
+          ignoredFn2(cb);
+         }
+
+         function ignoredFn2(cb) {
+          cb();
+         }
+         //# sourceURL=./node_modules/foo.js
+         </script>
+         <script>
+          function callback() {
+            console.log('hello from callback');
+          }
+
+          (function callIt() {
+            ignoredFn1(callback);
+          })();
+         //# sourceURL='main.js'
+         </script>
+        `,
+      );
+
+      await withMcpContext(async (response, context) => {
+        const page = await context.newPage();
+        await page.goto(server.getRoute('/index.html'));
+
+        await getConsoleMessage.handler(
+          {params: {msgid: 1}},
+          response,
+          context,
+        );
+        const formattedResponse = await response.handle('test', context);
+        const rawText = getTextContent(formattedResponse.content[0]);
+
+        t.assert.snapshot?.(rawText);
+      });
+    });
   });
 });
