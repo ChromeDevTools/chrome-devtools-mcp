@@ -131,6 +131,7 @@ class ElectronTransport implements ConnectionTransport {
   #targetUrl: string;
   #targetTitle: string;
   #versionInfo: CdpVersionInfo;
+  #attached = false;
 
   constructor(ws: WebSocket, target: CdpTarget, versionInfo: CdpVersionInfo) {
     this.#ws = ws;
@@ -139,13 +140,15 @@ class ElectronTransport implements ConnectionTransport {
     this.#targetTitle = target.title;
     this.#versionInfo = versionInfo;
 
-    // Forward real CDP events from the WebSocket to Puppeteer
+    // Forward real CDP messages from the WebSocket to Puppeteer.
+    // Every command forwarded to the WS had its sessionId stripped (see send()),
+    // so we must inject it back on ALL messages — both responses (have id) and
+    // events (no id) — so Puppeteer routes them to the correct CDPSession.
     this.#ws.addEventListener('message', (evt: WebSocket.MessageEvent) => {
       const raw = typeof evt.data === 'string' ? evt.data : evt.data.toString();
       const parsed = JSON.parse(raw);
 
-      // Inject sessionId into events so Puppeteer routes to the right page
-      if (!parsed.id && !parsed.sessionId) {
+      if (!parsed.sessionId) {
         parsed.sessionId = 'pageTargetSessionId';
       }
 
@@ -217,21 +220,27 @@ class ElectronTransport implements ConnectionTransport {
         return;
       }
       case 'Target.setAutoAttach': {
-        // Emit attachedToTarget so Puppeteer creates a CDPSession for the page
-        this.#dispatchResponse({
-          method: 'Target.attachedToTarget',
-          params: {
-            targetInfo: {
-              targetId: this.#targetId,
-              type: 'page',
-              title: this.#targetTitle,
-              url: this.#targetUrl,
-              attached: true,
-              canAccessOpener: false,
+        // Only emit attachedToTarget on the FIRST call (browser-level connect).
+        // Subsequent calls come from CDPSessions trying to auto-attach to
+        // sub-targets (iframes, workers). Emitting attachedToTarget again would
+        // create an infinite loop: new CDPSession → setAutoAttach → attachedToTarget → ...
+        if (!this.#attached) {
+          this.#attached = true;
+          this.#dispatchResponse({
+            method: 'Target.attachedToTarget',
+            params: {
+              targetInfo: {
+                targetId: this.#targetId,
+                type: 'page',
+                title: this.#targetTitle,
+                url: this.#targetUrl,
+                attached: true,
+                canAccessOpener: false,
+              },
+              sessionId: 'pageTargetSessionId',
             },
-            sessionId: 'pageTargetSessionId',
-          },
-        });
+          });
+        }
         this.#dispatchResponse({
           id: parsed.id,
           sessionId: parsed.sessionId,

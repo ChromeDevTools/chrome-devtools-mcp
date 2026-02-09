@@ -258,10 +258,12 @@ function registerTool(tool: ToolDefinition): void {
           // Always ensure VS Code connection (CDP + bridge)
           await ensureConnection();
 
-          // Diagnostic tools bypass McpContext — they use sendCdp/bridgeExec directly.
+          // Diagnostic and directCdp tools bypass McpContext — they use sendCdp/bridgeExec directly.
           // Non-diagnostic tools need full McpContext (Phase B will refactor this).
           const isDiagnostic = tool.annotations.conditions?.includes('devDiagnostic');
-          const ctx = isDiagnostic ? (undefined as never) : await getContext();
+          const isDirectCdp = tool.annotations.conditions?.includes('directCdp');
+          const bypassContext = isDiagnostic || isDirectCdp;
+          const ctx = bypassContext ? (undefined as never) : await getContext();
 
           logger(`${tool.name} context: resolved`);
           const response = new McpResponse();
@@ -273,8 +275,8 @@ function registerTool(tool: ToolDefinition): void {
             ctx,
           );
 
-          // Diagnostic tools return content directly without McpResponse.handle()
-          if (isDiagnostic) {
+          // Diagnostic/directCdp tools return content directly without McpResponse.handle()
+          if (bypassContext) {
             const textContent: Array<{type: 'text'; text: string}> = [];
             for (const line of response.responseLines) {
               textContent.push({type: 'text', text: line});
