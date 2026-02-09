@@ -6,9 +6,13 @@
 
 import './polyfill.js';
 
+import {execSync} from 'node:child_process';
+import {readdirSync, statSync, writeFileSync} from 'node:fs';
+import {dirname, join} from 'node:path';
 import process from 'node:process';
+import {fileURLToPath} from 'node:url';
 
-import {ensureVSCodeConnected, getPuppeteerBrowser} from './browser.js';
+import {ensureVSCodeConnected, getConnectionGeneration, getPuppeteerBrowser, teardownSync} from './browser.js';
 import {parseArguments} from './cli.js';
 import {loadIssueDescriptions} from './issue-descriptions.js';
 import {logger, saveLogsToFile} from './logger.js';
@@ -24,6 +28,33 @@ import {
 import {ToolCategory} from './tools/categories.js';
 import type {ToolDefinition} from './tools/ToolDefinition.js';
 import {tools} from './tools/tools.js';
+
+// Default timeout for tools (30 seconds)
+const DEFAULT_TOOL_TIMEOUT_MS = 30_000;
+
+class ToolTimeoutError extends Error {
+  constructor(toolName: string, timeoutMs: number) {
+    super(
+      `Tool "${toolName}" timed out after ${timeoutMs}ms. The operation took too long to complete.`,
+    );
+    this.name = 'ToolTimeoutError';
+  }
+}
+
+function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  toolName: string,
+): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) => {
+      setTimeout(() => {
+        reject(new ToolTimeoutError(toolName, timeoutMs));
+      }, timeoutMs);
+    }),
+  ]);
+}
 
 // If moved update release-please config
 // x-release-please-start-version
@@ -54,11 +85,13 @@ server.server.setRequestHandler(SetLevelRequestSchema, () => {
 });
 
 let context: McpContext | undefined;
+let contextGeneration = -1;
 
 /**
  * Ensure VS Code debug window is connected (CDP + bridge).
  * Required for ALL tools including diagnostic ones.
  */
+
 async function ensureConnection(): Promise<void> {
   await ensureVSCodeConnected({
     workspaceFolder: args.folder as string,
@@ -68,11 +101,90 @@ async function ensureConnection(): Promise<void> {
   });
 }
 
+// ── Dev-mode lazy rebuild ──────────────────────────────────
+// Resolves paths once at startup. At build time this file lives at
+// build/src/main.js, so two dirname() calls reach the project root.
+const __filename = fileURLToPath(import.meta.url);
+const projectRoot = dirname(dirname(dirname(__filename)));
+const srcDir = join(projectRoot, 'src');
+// Sentinel file stamped after each successful build — tsc may not update
+// output mtimes when content is unchanged, so we use our own marker.
+const buildSentinel = join(projectRoot, 'build', '.dev-build-stamp');
+
+function getNewestMtime(dir: string, ext: string): number {
+  let newest = 0;
+  for (const entry of readdirSync(dir, {withFileTypes: true, recursive: true})) {
+    if (!entry.isFile() || !entry.name.endsWith(ext)) continue;
+    const fullPath = join(entry.parentPath ?? (entry as any).path ?? dir, entry.name);
+    const mtime = statSync(fullPath).mtimeMs;
+    if (mtime > newest) newest = mtime;
+  }
+  return newest;
+}
+
+class DevRebuildNeeded extends Error {
+  constructor(public detail: string) {
+    super(detail);
+    this.name = 'DevRebuildNeeded';
+  }
+}
+
+/**
+ * In dev mode, checks if any .ts source files are newer than the build output.
+ * If so, recompiles. On success, throws DevRebuildNeeded (the tool wrapper
+ * returns a message and the server exits). On failure, throws with build errors.
+ */
+function devLazyRebuildCheck(): void {
+  if (!args.dev) return;
+
+  let buildMtime: number;
+  try {
+    buildMtime = statSync(buildSentinel).mtimeMs;
+  } catch {
+    // No sentinel yet — force rebuild
+    buildMtime = 0;
+  }
+
+  const srcMtime = getNewestMtime(srcDir, '.ts');
+  if (srcMtime <= buildMtime) return;
+
+  logger('[dev] Source files changed — recompiling...');
+  try {
+    execSync('pnpm run build', {
+      cwd: projectRoot,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      timeout: 30_000,
+    });
+    // Stamp the sentinel so we don't rebuild again until source changes
+    writeFileSync(buildSentinel, new Date().toISOString(), 'utf-8');
+  } catch (err: any) {
+    const stderr = err.stderr?.toString() ?? '';
+    const stdout = err.stdout?.toString() ?? '';
+    const output = [stderr, stdout].filter(Boolean).join('\n');
+    throw new Error(
+      `[dev] Build failed. Fix the errors and try again:\n${output}`,
+    );
+  }
+
+  logger('[dev] Build successful — server must restart to load new code.');
+  throw new DevRebuildNeeded(
+    'Source code was modified and has been rebuilt successfully. ' +
+    'The server will now exit so the new code can be loaded. ' +
+    'Please restart the MCP server and call the tool again.',
+  );
+}
+
 /**
  * Get or create the McpContext (Puppeteer page model).
  * Only needed for non-diagnostic tools that interact via Puppeteer.
  */
 async function getContext(): Promise<McpContext> {
+  const gen = getConnectionGeneration();
+  if (gen !== contextGeneration) {
+    context?.dispose();
+    context = undefined;
+    contextGeneration = gen;
+  }
   if (!context) {
     const browser = getPuppeteerBrowser();
     if (!browser) {
@@ -132,44 +244,60 @@ function registerTool(tool: ToolDefinition): void {
       annotations: tool.annotations,
     },
     async (params): Promise<CallToolResult> => {
-      const guard = await toolMutex.acquire();
+      const timeoutMs = tool.timeoutMs ?? DEFAULT_TOOL_TIMEOUT_MS;
+      let guard: InstanceType<typeof Mutex.Guard> | undefined;
       try {
-        logger(`${tool.name} request: ${JSON.stringify(params, null, '  ')}`);
+        // In dev mode, check if source files changed and rebuild before executing.
+        // This runs OUTSIDE the mutex so it doesn't block on stale locks.
+        devLazyRebuildCheck();
 
-        // Always ensure VS Code connection (CDP + bridge)
-        await ensureConnection();
+        const executeAll = async () => {
+          guard = await toolMutex.acquire();
+          logger(`${tool.name} request: ${JSON.stringify(params, null, '  ')}`);
 
-        // Diagnostic tools bypass McpContext — they use sendCdp/bridgeExec directly.
-        // Non-diagnostic tools need full McpContext (Phase B will refactor this).
-        const isDiagnostic = tool.annotations.conditions?.includes('devDiagnostic');
-        const ctx = isDiagnostic ? (undefined as never) : await getContext();
+          // Always ensure VS Code connection (CDP + bridge)
+          await ensureConnection();
 
-        logger(`${tool.name} context: resolved`);
-        const response = new McpResponse();
-        await tool.handler(
-          {
-            params,
-          },
-          response,
-          ctx,
-        );
+          // Diagnostic tools bypass McpContext — they use sendCdp/bridgeExec directly.
+          // Non-diagnostic tools need full McpContext (Phase B will refactor this).
+          const isDiagnostic = tool.annotations.conditions?.includes('devDiagnostic');
+          const ctx = isDiagnostic ? (undefined as never) : await getContext();
 
-        // Diagnostic tools return content directly without McpResponse.handle()
-        if (isDiagnostic) {
-          const textContent: Array<{type: 'text'; text: string}> = [];
-          for (const line of response.responseLines) {
-            textContent.push({type: 'text', text: line});
+          logger(`${tool.name} context: resolved`);
+          const response = new McpResponse();
+          await tool.handler(
+            {
+              params,
+            },
+            response,
+            ctx,
+          );
+
+          // Diagnostic tools return content directly without McpResponse.handle()
+          if (isDiagnostic) {
+            const textContent: Array<{type: 'text'; text: string}> = [];
+            for (const line of response.responseLines) {
+              textContent.push({type: 'text', text: line});
+            }
+            if (textContent.length === 0) {
+              textContent.push({type: 'text', text: '(no output)'});
+            }
+            return {content: textContent};
           }
-          if (textContent.length === 0) {
-            textContent.push({type: 'text', text: '(no output)'});
-          }
-          return {content: textContent};
-        }
 
-        const {content, structuredContent} = await response.handle(
+          const {content, structuredContent} = await response.handle(
+            tool.name,
+            ctx,
+          );
+          return {content, structuredContent};
+        };
+
+        const {content, structuredContent} = await withTimeout(
+          executeAll(),
+          timeoutMs,
           tool.name,
-          ctx,
-        );
+        ) as {content: CallToolResult['content']; structuredContent?: Record<string, unknown>};
+
         const result: CallToolResult & {
           structuredContent?: Record<string, unknown>;
         } = {
@@ -183,6 +311,19 @@ function registerTool(tool: ToolDefinition): void {
         }
         return result;
       } catch (err) {
+        // Dev rebuild succeeded — return message and exit so new code loads on next start
+        if (err instanceof DevRebuildNeeded) {
+          logger(`${tool.name}: ${err.detail}`);
+          // Schedule exit after response is sent
+          setTimeout(() => {
+            teardownSync();
+            process.exit(0);
+          }, 500);
+          return {
+            content: [{type: 'text', text: err.detail}],
+            isError: false,
+          };
+        }
         logger(`${tool.name} error:`, err, err?.stack);
         let errorText = err && 'message' in err ? err.message : String(err);
         if ('cause' in err && err.cause) {
@@ -198,7 +339,7 @@ function registerTool(tool: ToolDefinition): void {
           isError: true,
         };
       } finally {
-        guard.dispose();
+        guard?.dispose();
       }
     },
   );
@@ -213,3 +354,5 @@ const transport = new StdioServerTransport();
 await server.connect(transport);
 logger('VS Code DevTools MCP Server connected');
 logDisclaimers();
+
+

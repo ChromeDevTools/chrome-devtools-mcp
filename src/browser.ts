@@ -64,6 +64,11 @@ let launcherPid: number | undefined;
 let electronPid: number | undefined;
 let userDataDir: string | undefined;
 let connectInProgress: Promise<WebSocket> | undefined;
+let connectionGeneration = 0;
+
+export function getConnectionGeneration(): number {
+  return connectionGeneration;
+}
 
 // ── Raw CDP Communication ───────────────────────────────
 
@@ -537,7 +542,7 @@ function forceKillChildSync(): void {
  * Kill any existing child, close WS, and clean up temp dir.
  * Synchronous except for the WS close (best-effort).
  */
-function teardownSync(): void {
+export function teardownSync(): void {
   // Disconnect Puppeteer before closing the WebSocket
   puppeteerBrowser = undefined;
 
@@ -649,6 +654,7 @@ export async function ensureVSCodeConnected(
 }
 
 async function doConnect(options: VSCodeLaunchOptions): Promise<WebSocket> {
+  connectionGeneration++;
   // Kill any stale child before spawning a new one — no duplicates
   teardownSync();
 
@@ -798,6 +804,7 @@ async function doConnect(options: VSCodeLaunchOptions): Promise<WebSocket> {
   cdpWs.on('close', () => {
     logger('CDP WebSocket closed unexpectedly');
     cdpWs = undefined;
+    puppeteerBrowser = undefined;
   });
 
   return cdpWs;

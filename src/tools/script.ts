@@ -14,6 +14,7 @@ export const evaluateScript = defineTool({
   name: 'evaluate_script',
   description: `Evaluate a JavaScript function inside the currently selected page. Returns the response as JSON,
 so returned values have to be JSON-serializable.`,
+  timeoutMs: 15000,
   annotations: {
     category: ToolCategory.DEBUGGING,
     readOnlyHint: false,

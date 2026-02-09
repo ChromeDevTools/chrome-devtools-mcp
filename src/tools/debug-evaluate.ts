@@ -30,6 +30,7 @@ Examples:
 - \`document.querySelector('.monaco-workbench')?.className\` — check workbench state
 - \`JSON.stringify(performance.getEntriesByType('navigation'))\` — navigation timing
 - \`Array.from(document.querySelectorAll('.notification-toast')).map(n => n.textContent)\` — list notifications`,
+  timeoutMs: 10000,
   annotations: {
     category: ToolCategory.DEBUGGING,
     readOnlyHint: false,

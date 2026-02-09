@@ -35,6 +35,7 @@ const FILTERABLE_RESOURCE_TYPES: readonly [ResourceType, ...ResourceType[]] = [
 export const listNetworkRequests = defineTool({
   name: 'list_network_requests',
   description: `List all requests for the currently selected page since the last navigation.`,
+  timeoutMs: 15000,
   annotations: {
     category: ToolCategory.NETWORK,
     readOnlyHint: true,
@@ -89,6 +90,7 @@ export const listNetworkRequests = defineTool({
 export const getNetworkRequest = defineTool({
   name: 'get_network_request',
   description: `Gets a network request by an optional reqid, if omitted returns the currently selected request in the DevTools Network panel.`,
+  timeoutMs: 15000,
   annotations: {
     category: ToolCategory.NETWORK,
     readOnlyHint: false,

@@ -23,6 +23,11 @@ export interface ToolDefinition<
 > {
   name: string;
   description: string;
+  /**
+   * Maximum time in milliseconds for this tool to complete.
+   * If not specified, defaults to 30000 (30 seconds).
+   */
+  timeoutMs?: number;
   annotations: {
     title?: string;
     category: ToolCategory;

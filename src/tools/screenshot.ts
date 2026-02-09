@@ -13,6 +13,7 @@ import {defineTool} from './ToolDefinition.js';
 export const screenshot = defineTool({
   name: 'take_screenshot',
   description: `Take a screenshot of the page or element.`,
+  timeoutMs: 10000,
   annotations: {
     category: ToolCategory.DEBUGGING,
     // Not read-only due to filePath param.

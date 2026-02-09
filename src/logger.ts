@@ -45,3 +45,4 @@ export function flushLogs(
 }
 
 export const logger = debug(mcpDebugNamespace);
+

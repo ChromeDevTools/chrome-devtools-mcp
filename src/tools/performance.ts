@@ -29,6 +29,7 @@ const filePathSchema = zod
 export const startTrace = defineTool({
   name: 'performance_start_trace',
   description: `Starts a performance trace recording on the selected page. This can be used to look for performance problems and insights to improve the performance of the page. It will also report Core Web Vital (CWV) scores for the page.`,
+  timeoutMs: 120000,
   annotations: {
     category: ToolCategory.PERFORMANCE,
     readOnlyHint: false,
@@ -116,6 +117,7 @@ export const stopTrace = defineTool({
   name: 'performance_stop_trace',
   description:
     'Stops the active performance trace recording on the selected page.',
+  timeoutMs: 60000,
   annotations: {
     category: ToolCategory.PERFORMANCE,
     readOnlyHint: false,
@@ -141,6 +143,7 @@ export const analyzeInsight = defineTool({
   name: 'performance_analyze_insight',
   description:
     'Provides more detailed information on a specific Performance Insight of an insight set that was highlighted in the results of a trace recording.',
+  timeoutMs: 30000,
   annotations: {
     category: ToolCategory.PERFORMANCE,
     readOnlyHint: true,

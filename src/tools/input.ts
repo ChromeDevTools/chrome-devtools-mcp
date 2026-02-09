@@ -36,6 +36,7 @@ function handleActionError(error: unknown, uid: string) {
 export const click = defineTool({
   name: 'click',
   description: `Clicks on the provided element`,
+  timeoutMs: 10000,
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
@@ -77,6 +78,7 @@ export const click = defineTool({
 export const clickAt = defineTool({
   name: 'click_at',
   description: `Clicks at the provided coordinates`,
+  timeoutMs: 10000,
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
@@ -109,6 +111,7 @@ export const clickAt = defineTool({
 export const hover = defineTool({
   name: 'hover',
   description: `Hover over the provided element`,
+  timeoutMs: 10000,
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
@@ -205,6 +208,7 @@ async function fillFormElement(
 export const fill = defineTool({
   name: 'fill',
   description: `Type text into a input, text area or select an option from a <select> element.`,
+  timeoutMs: 10000,
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
@@ -236,6 +240,7 @@ export const fill = defineTool({
 export const drag = defineTool({
   name: 'drag',
   description: `Drag an element onto another element`,
+  timeoutMs: 10000,
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
@@ -268,6 +273,7 @@ export const drag = defineTool({
 export const fillForm = defineTool({
   name: 'fill_form',
   description: `Fill out multiple form elements at once`,
+  timeoutMs: 15000,
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
@@ -303,6 +309,7 @@ export const fillForm = defineTool({
 export const uploadFile = defineTool({
   name: 'upload_file',
   description: 'Upload a file through a provided element.',
+  timeoutMs: 30000,
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
@@ -354,6 +361,7 @@ export const uploadFile = defineTool({
 export const pressKey = defineTool({
   name: 'press_key',
   description: `Press a key or key combination. Use this when other input methods like fill() cannot be used (e.g., keyboard shortcuts, navigation keys, or special key combinations).`,
+  timeoutMs: 10000,
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,

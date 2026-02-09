@@ -38,6 +38,7 @@ Examples:
 - \`return vscode.window.tabGroups.all.flatMap(g => g.tabs.map(t => ({label: t.label, active: t.isActive})));\` — list editor tabs
 - \`const editor = vscode.window.activeTextEditor; return editor ? { file: editor.document.fileName, line: editor.selection.active.line } : null;\` — get active editor info
 - \`return vscode.extensions.all.filter(e => e.isActive).map(e => e.id);\` — list active extensions`,
+  timeoutMs: 10000,
   annotations: {
     category: ToolCategory.DEBUGGING,
     readOnlyHint: false,
