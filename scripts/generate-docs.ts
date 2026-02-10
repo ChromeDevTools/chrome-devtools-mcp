@@ -314,9 +314,9 @@ async function generateToolDocumentation(): Promise<void> {
     console.log(`Found ${toolsWithAnnotations.length} tools`);
 
     // Generate markdown documentation
-    let markdown = `<!-- AUTO GENERATED DO NOT EDIT - run 'npm run docs' to update-->
+    let markdown = `<!-- AUTO GENERATED DO NOT EDIT - run 'pnpm run docs' to update-->
 
-# Chrome DevTools MCP Tool Reference
+# VS Code DevTools MCP Tool Reference
 
 `;
 

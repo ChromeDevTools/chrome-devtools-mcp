@@ -7,23 +7,20 @@
   "main": "index.js",
   "scripts": {
     "clean": "node -e \"require('fs').rmSync('build', {recursive: true, force: true})\"",
-    "bundle": "npm run clean && npm run build && rollup -c rollup.config.mjs && node -e \"require('fs').rmSync('build/node_modules', {recursive: true, force: true})\"",
+    "bundle": "pnpm run clean && pnpm run build && rollup -c rollup.config.mjs && node -e \"require('fs').rmSync('build/node_modules', {recursive: true, force: true})\"",
     "build": "tsc && node --experimental-strip-types --no-warnings=ExperimentalWarning scripts/post-build.ts",
     "typecheck": "tsc --noEmit",
     "format": "eslint --cache --fix . && prettier --write --cache .",
     "check-format": "eslint --cache . && prettier --check --cache .;",
-    "docs": "npm run build && npm run docs:generate && npm run format",
+    "docs": "pnpm run build && pnpm run docs:generate && pnpm run format",
     "docs:generate": "node --experimental-strip-types scripts/generate-docs.ts",
-    "start": "npm run build && node build/src/index.js",
-    "start-debug": "DEBUG=mcp:* DEBUG_COLORS=false npm run build && node build/src/index.js",
-    "test": "npm run build && node scripts/test.mjs",
+    "start": "pnpm run build && node build/src/index.js",
+    "start-debug": "DEBUG=mcp:* DEBUG_COLORS=false pnpm run build && node build/src/index.js",
+    "test": "pnpm run build && node scripts/test.mjs",
     "test:no-build": "node scripts/test.mjs",
-    "test:only": "npm run build && node scripts/test.mjs --test-only",
-    "test:update-snapshots": "npm run build && node scripts/test.mjs --test-update-snapshots",
-    "prepare": "node --experimental-strip-types scripts/prepare.ts",
-    "verify-server-json-version": "node --experimental-strip-types scripts/verify-server-json-version.ts",
-    "eval": "npm run build && CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS=true node --experimental-strip-types scripts/eval_gemini.ts",
-    "count-tokens": "node --experimental-strip-types scripts/count_tokens.ts"
+    "test:only": "pnpm run build && node scripts/test.mjs --test-only",
+    "test:update-snapshots": "pnpm run build && node scripts/test.mjs --test-update-snapshots",
+    "prepare": "node --experimental-strip-types scripts/prepare.ts"
   },
   "files": [
     "build/src",
@@ -31,17 +28,9 @@
     "LICENSE",
     "!*.tsbuildinfo"
   ],
-  "repository": "ChromeDevTools/chrome-devtools-mcp",
-  "author": "Google LLC",
   "license": "Apache-2.0",
-  "bugs": {
-    "url": "https://github.com/ChromeDevTools/chrome-devtools-mcp/issues"
-  },
-  "homepage": "https://github.com/ChromeDevTools/chrome-devtools-mcp#readme",
-  "mcpName": "io.github.ChromeDevTools/chrome-devtools-mcp",
   "devDependencies": {
     "@eslint/js": "^9.35.0",
-    "@google/genai": "^1.37.0",
     "@modelcontextprotocol/sdk": "1.26.0",
     "@rollup/plugin-commonjs": "^29.0.0",
     "@rollup/plugin-json": "^6.1.0",

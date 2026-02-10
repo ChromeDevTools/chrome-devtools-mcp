@@ -42,10 +42,9 @@ for PR and commit titles.
 Check that you are using node version specified in .nvmrc, then run following commands:
 
 ```sh
-git clone https://github.com/ChromeDevTools/chrome-devtools-mcp.git
-cd chrome-devtools-mcp
-npm ci
-npm run build
+cd vscode-devtools-mcp
+pnpm install
+pnpm run build
 ```
 
 ### Testing with @modelcontextprotocol/inspector
@@ -86,36 +85,6 @@ You can use the `DEBUG` environment variable as usual to control categories that
 
 ### Updating documentation
 
-When adding a new tool or updating a tool name or description, make sure to run `npm run docs` to generate the tool reference documentation.
+When adding a new tool or updating a tool name or description, make sure to run `pnpm run docs` to generate the tool reference documentation.
 
-### Contributing to Evals
 
-We use Gemini to evaluate the MCP server tools in `scripts/eval_scenarios`.
-Each scenario is a TypeScript file that exports a `scenario` object implementing `TestScenario`.
-
-- **prompt**: The prompt to send to the model.
-- **maxTurns**: Maximum number of conversation turns.
-- **expectations**: A function that verifies the tool calls made by the model.
-- **htmlRoute** (Optional): Serve custom HTML content for the test at a specific path.
-
-We look to test that the tools are used correctly without too rigid assertions. Avoid asserting exact argument values if they can vary (e.g., natural language reasoning), but ensure the core parameters (like URLs or selectors) were correct.
-
-Example:
-
-```ts
-import {TestScenario} from '../eval_gemini.js';
-
-export const scenario: TestScenario = {
-  prompt: 'Navigate to example.com',
-  maxTurns: 2,
-  expectations: calls => {
-    // Check that at least one call was 'browse_page'
-    const navigation = calls.find(c => c.name === 'browse_page');
-    if (!navigation) throw new Error('Model did not browse the page');
-    // Verify essential args
-    if (navigation.args.url !== 'http://example.com') {
-      throw new Error(`Wrong URL: ${navigation.args.url}`);
-    }
-  },
-};
-```
