@@ -7,13 +7,13 @@
     "url": "https://github.com/ChromeDevTools/chrome-devtools-mcp",
     "source": "github"
   },
-  "version": "0.16.0",
+  "version": "0.17.0",
   "packages": [
     {
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "chrome-devtools-mcp",
-      "version": "0.16.0",
+      "version": "0.17.0",
       "transport": {
         "type": "stdio"
       },
