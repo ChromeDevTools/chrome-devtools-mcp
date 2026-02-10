@@ -14,16 +14,17 @@
  * Supports two targets:
  * - "renderer" (default): Runs in the Electron renderer process context
  *   (document, window, etc.) via CDP Runtime.evaluate.
- * - "host" / "devhost": Runs VS Code API code via the extension-bridge.
- *   The code runs inside `new Function('vscode', 'payload', ...)` in the
- *   extension host process. `require()` is NOT available.
+ * - "devhost": Runs VS Code API code via the extension-bridge in the
+ *   spawned Extension Development Host. The code runs inside
+ *   `new Function('vscode', 'payload', ...)` in the extension host process.
+ *   `require()` is NOT available.
  */
 
 import {zod} from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
 import {defineTool} from './ToolDefinition.js';
-import {sendCdp, getHostBridgePath, getDevhostBridgePath} from '../browser.js';
+import {sendCdp, getDevhostBridgePath} from '../browser.js';
 import {bridgeExec} from '../bridge-client.js';
 
 export const debugEvaluate = defineTool({
@@ -32,7 +33,7 @@ export const debugEvaluate = defineTool({
 or execute VS Code API code via the extension-bridge.
 
 Use 'renderer' target (default) for DOM/window inspection via CDP.
-Use 'host' or 'devhost' target for VS Code API calls via the extension-bridge.
+Use 'devhost' target for VS Code API calls via the extension-bridge.
 
 Renderer examples:
 - \`document.title\` — get window title
@@ -40,7 +41,7 @@ Renderer examples:
 - \`JSON.stringify(performance.getEntriesByType('navigation'))\` — navigation timing
 - \`Array.from(document.querySelectorAll('.notification-toast')).map(n => n.textContent)\` — list notifications
 
-Bridge examples (target='host' or 'devhost'):
+Bridge examples (target='devhost'):
 - \`return vscode.version;\` — get VS Code version
 - \`return vscode.workspace.workspaceFolders?.map(f => f.uri.fsPath);\` — list workspace folders
 - \`return vscode.window.tabGroups.all.flatMap(g => g.tabs.map(t => ({label: t.label, active: t.isActive})));\` — list editor tabs
@@ -64,13 +65,12 @@ Bridge examples (target='host' or 'devhost'):
           '`vscode` and `payload` are in scope. `require()` is NOT available.',
       ),
     target: zod
-      .enum(['renderer', 'host', 'devhost'])
+      .enum(['renderer', 'devhost'])
       .optional()
       .default('renderer')
       .describe(
         'Which VS Code context to target. ' +
           '"renderer" = CDP Runtime.evaluate in the Electron renderer (DOM, window). ' +
-          '"host" = the controller VS Code with extension-bridge. ' +
           '"devhost" = the spawned Extension Development Host window. ' +
           'Default: "renderer".',
       ),
@@ -91,15 +91,12 @@ Bridge examples (target='host' or 'devhost'):
   handler: async (request, response) => {
     const {expression, target, returnByValue, payload} = request.params;
 
-    if (target === 'host' || target === 'devhost') {
-      const bridgePath =
-        target === 'host' ? getHostBridgePath() : getDevhostBridgePath();
+    if (target === 'devhost') {
+      const bridgePath = getDevhostBridgePath();
 
       if (!bridgePath) {
-        const targetLabel =
-          target === 'host' ? 'Host VS Code' : 'Extension Development Host';
         response.appendResponseLine(
-          `**Error:** ${targetLabel} bridge is not connected.\n` +
+          `**Error:** Extension Development Host bridge is not connected.\n` +
             'Ensure the VS Code debug window has been launched and extension-bridge is active.',
         );
         return;

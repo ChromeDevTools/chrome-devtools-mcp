@@ -17,6 +17,7 @@ export const wait = defineTool({
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: true,
+    conditions: ['standalone'],
   },
   schema: {
     durationMs: zod

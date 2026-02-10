@@ -252,12 +252,33 @@ function registerTool(tool: ToolDefinition): void {
         // This runs OUTSIDE the mutex so it doesn't block on stale locks.
         devLazyRebuildCheck();
 
+        // Standalone tools (e.g., wait) don't need VS Code connection
+        const isStandalone = tool.annotations.conditions?.includes('standalone');
+
+        // Ensure VS Code connection (CDP + bridge) OUTSIDE the timeout.
+        // This allows the first tool call to wait for Extension Host initialization
+        // without eating into the tool's timeout budget.
+        if (!isStandalone) {
+          await ensureConnection();
+        }
+
         const executeAll = async () => {
           guard = await toolMutex.acquire();
           logger(`${tool.name} request: ${JSON.stringify(params, null, '  ')}`);
 
-          // Always ensure VS Code connection (CDP + bridge)
-          await ensureConnection();
+          // Standalone tools don't need VS Code connection or UI checks
+          if (isStandalone) {
+            const response = new McpResponse();
+            await tool.handler({params}, response, undefined as never);
+            const content: Array<{type: string; text?: string}> = [];
+            for (const line of response.responseLines) {
+              content.push({type: 'text', text: line});
+            }
+            if (content.length === 0) {
+              content.push({type: 'text', text: '(no output)'});
+            }
+            return {content};
+          }
 
           // Check for blocking modals/notifications before tool execution
           // BLOCKING modals (e.g., "Save file?") → STOP tool, return modal info
