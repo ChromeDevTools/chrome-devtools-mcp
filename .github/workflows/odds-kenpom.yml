@@ -21,7 +21,7 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         working-directory: odds
-        run: uv run python -m odds_pipeline schema
+        run: uv run python -m odds_pipeline.schema
 
       - name: Collect KenPom ratings
         env:
