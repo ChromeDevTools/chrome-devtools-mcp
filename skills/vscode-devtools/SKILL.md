@@ -25,14 +25,11 @@ Use this skill when:
 - `mouse_scroll` - Scroll within VS Code views
 
 ### Inspection and Debugging
-- `snapshot` - Get the current DOM state of VS Code
-- `read_console` - Read console messages (list all or get specific by ID)
+- `take_snapshot` - Get the current DOM state of VS Code
 - `read_output` - Read VS Code output logs (list channels or read specific channel)
-- `debug-evaluate` - Evaluate JavaScript in the debug context
-- `screenshot` - Capture screenshots of VS Code window
-
-### Script Execution
-- `script` - Execute JavaScript in the VS Code context
+- `invoke_vscode_command` - Execute VS Code commands by ID
+- `invoke_vscode_api` - Query VS Code API (editor, workspace, extensions)
+- `take_screenshot` - Capture screenshots of VS Code window
 
 ### Wait Operations
 - `wait` - Wait for specific conditions or elements

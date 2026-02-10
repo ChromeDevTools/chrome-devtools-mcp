@@ -14,7 +14,6 @@ import {
   responseFormatSchema,
   CHARACTER_LIMIT,
   checkCharacterLimit,
-  createPaginationMetadata,
 } from './ToolDefinition.js';
 
 const FILTERABLE_MESSAGE_TYPES: [string, ...string[]] = [
@@ -40,93 +39,84 @@ const FILTERABLE_MESSAGE_TYPES: [string, ...string[]] = [
   'verbose',
 ];
 
+const AVAILABLE_FIELDS: [string, ...string[]] = [
+  'id',
+  'type', 
+  'text',
+  'timestamp',
+  'stackTrace',
+  'args',
+];
+
 const ConsoleMessageSchema = zod.object({
-  id: zod.number(),
-  type: zod.string(),
-  text: zod.string(),
-  timestamp: zod.number(),
+  id: zod.number().optional(),
+  type: zod.string().optional(),
+  text: zod.string().optional(),
+  timestamp: zod.number().optional(),
   stackTrace: zod.array(zod.object({
     functionName: zod.string().optional(),
     url: zod.string(),
     lineNumber: zod.number(),
     columnNumber: zod.number(),
   })).optional(),
-});
-
-const DetailedConsoleMessageSchema = zod.object({
-  id: zod.number(),
-  type: zod.string(),
-  text: zod.string(),
-  timestamp: zod.string(),
   args: zod.array(zod.object({
     type: zod.string(),
     value: zod.unknown().optional(),
     description: zod.string().optional(),
   })).optional(),
-  stackTrace: zod.array(zod.object({
-    functionName: zod.string().optional(),
-    url: zod.string(),
-    lineNumber: zod.number(),
-    columnNumber: zod.number(),
-  })).optional(),
 });
 
-const ReadConsoleOutputSchema = zod.union([
-  zod.object({
-    total: zod.number(),
-    count: zod.number(),
-    offset: zod.number(),
-    has_more: zod.boolean(),
-    next_offset: zod.number().optional(),
-    messages: zod.array(ConsoleMessageSchema),
-  }),
-  DetailedConsoleMessageSchema,
-]);
+const ReadConsoleOutputSchema = zod.object({
+  total: zod.number(),
+  returned: zod.number(),
+  hasMore: zod.boolean(),
+  oldestId: zod.number().optional(),
+  newestId: zod.number().optional(),
+  messages: zod.array(ConsoleMessageSchema),
+});
 
 export const readConsole = defineTool({
   name: 'read_console',
-  description: `Read console messages from the currently selected page. Can either list all messages with filtering, or get a specific message by ID with full details.
+  description: `Read console messages with full control over filtering and detail level.
 
-**Mode 1: List messages** (when msgid is NOT provided)
-Lists console messages since the last navigation with optional filtering and pagination.
+**FILTERING OPTIONS:**
 
-Args:
-  - pageSize (number): Maximum messages to return. Default: all
-  - pageIdx (number): Page number (0-based) for pagination. Default: 0
-  - types (string[]): Filter by message types (log, error, warning, info, debug, etc.)
-  - textFilter (string): Case-insensitive substring to match in message text
-  - sourceFilter (string): Substring to match in stack trace source URLs
-  - isRegex (boolean): Treat textFilter as regex pattern. Default: false
-  - secondsAgo (number): Only messages from last N seconds
-  - filterLogic ('and'|'or'): How to combine filters. Default: 'and'
-  - response_format ('markdown'|'json'): Output format. Default: 'markdown'
+- \`limit\` (number): Get the N most recent messages. Default: all messages
+- \`types\` (string[]): Filter by log type: 'error', 'warning', 'info', 'debug', 'log', 'trace', etc.
+- \`pattern\` (string): Regex pattern to match against message text
+- \`sourcePattern\` (string): Regex pattern to match against source URLs in stack traces
+- \`afterId\` (number): Only messages after this ID (for incremental reads - avoids re-reading)
+- \`beforeId\` (number): Only messages before this ID
 
-Returns:
-  JSON format: { total, count, offset, has_more, next_offset?, messages: [{id, type, text, timestamp, stackTrace?}] }
-  Markdown format: Formatted list with msgid, type tag, text, and first stack frame
+**DETAIL CONTROL (reduce context size):**
 
-**Mode 2: Get single message** (when msgid IS provided)
-Gets detailed information about a specific console message including arguments.
+- \`fields\` (string[]): Which fields to include. Options: 'id', 'type', 'text', 'timestamp', 'stackTrace', 'args'. Default: ['id', 'type', 'text']
+- \`textLimit\` (number): Max characters per message text (truncates with "..."). Default: unlimited
+- \`stackDepth\` (number): Max stack frames to include per message. Default: 1. Set 0 to exclude.
 
-Args:
-  - msgid (number): The message ID to retrieve
-  - response_format ('markdown'|'json'): Output format. Default: 'markdown'
+**EXAMPLES:**
 
-Returns:
-  JSON format: { id, type, text, timestamp, args?, stackTrace? }
-  Markdown format: Formatted message details with arguments and stack trace
+Minimal error scan (smallest context):
+  { types: ['error'], limit: 20, fields: ['id', 'text'], textLimit: 100 }
 
-Examples:
-  - "Show only errors" -> { types: ['error'] }
-  - "Find fetch failures" -> { textFilter: 'net::ERR', types: ['error'] }
-  - "Recent warnings" -> { types: ['warning'], secondsAgo: 60 }
-  - "Get message 5" -> { msgid: 5 }
-  - "Get message as JSON" -> { msgid: 5, response_format: 'json' }
+Full error details:
+  { types: ['error'], limit: 5, fields: ['id', 'type', 'text', 'args', 'stackTrace'], stackDepth: 5 }
 
-Error Handling:
-  - Returns "No console messages found." if no messages match filters
-  - Returns "Console message with id X not found." if msgid doesn't exist
-  - Returns error with available params if response exceeds ${CHARACTER_LIMIT} chars`,
+Incremental read (only new messages since last read):
+  { afterId: 42 }
+
+Find specific pattern:
+  { pattern: "TypeError|ReferenceError", limit: 10 }
+
+Warnings from specific source:
+  { types: ['warning'], sourcePattern: "extension\\\\.ts" }
+
+**RESPONSE METADATA:**
+
+Returns: { total, returned, hasMore, oldestId?, newestId?, messages: [...] }
+- \`total\`: Total messages matching filters (before limit applied)
+- \`hasMore\`: Whether there are older messages not returned (use limit or afterId to get more)
+- \`oldestId\`/\`newestId\`: ID range in response (use newestId as afterId for next incremental read)`,
   timeoutMs: 15000,
   annotations: {
     category: ToolCategory.DEBUGGING,
@@ -138,79 +128,64 @@ Error Handling:
   },
   schema: {
     response_format: responseFormatSchema,
-    msgid: zod
-      .number()
-      .optional()
-      .describe(
-        'The ID of a specific console message to retrieve with full details. When provided, returns only that message with arguments and stack trace. When omitted, lists all messages.',
-      ),
-    pageSize: zod
+
+    // Filtering
+    limit: zod
       .number()
       .int()
       .positive()
       .optional()
-      .describe(
-        'Maximum number of messages to return. When omitted, returns all messages. Only used when listing messages (msgid not provided).',
-      ),
-    pageIdx: zod
+      .describe('Get the N most recent messages. Omit to get all messages.'),
+    types: zod
+      .array(zod.enum(FILTERABLE_MESSAGE_TYPES))
+      .optional()
+      .describe('Filter by log types: error, warning, info, debug, log, trace, etc.'),
+    pattern: zod
+      .string()
+      .optional()
+      .describe('Regex pattern to match against message text (case-insensitive).'),
+    sourcePattern: zod
+      .string()
+      .optional()
+      .describe('Regex pattern to match against source URLs in stack traces.'),
+    afterId: zod
+      .number()
+      .int()
+      .optional()
+      .describe('Only return messages with ID greater than this (for incremental reads).'),
+    beforeId: zod
+      .number()
+      .int()
+      .optional()
+      .describe('Only return messages with ID less than this.'),
+
+    // Detail control
+    fields: zod
+      .array(zod.enum(AVAILABLE_FIELDS))
+      .optional()
+      .describe('Which fields to include per message. Default: [id, type, text]. Options: id, type, text, timestamp, stackTrace, args'),
+    textLimit: zod
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe('Max characters per message text. Longer messages are truncated with "...".'),
+    stackDepth: zod
       .number()
       .int()
       .min(0)
       .optional()
-      .describe(
-        'Page number to return (0-based). When omitted, returns the first page. Only used when listing messages (msgid not provided).',
-      ),
-    types: zod
-      .array(zod.enum(FILTERABLE_MESSAGE_TYPES))
-      .optional()
-      .describe(
-        'Filter messages to only return messages of the specified resource types. When omitted or empty, returns all messages. Only used when listing messages (msgid not provided).',
-      ),
-    textFilter: zod
-      .string()
-      .optional()
-      .describe(
-        'Case-insensitive substring to match against the message text. Only messages whose text contains this string are returned. Only used when listing messages (msgid not provided).',
-      ),
-    sourceFilter: zod
-      .string()
-      .optional()
-      .describe(
-        'Substring to match against the source URL in the stack trace. Only messages originating from a matching source are returned. Only used when listing messages (msgid not provided).',
-      ),
-    isRegex: zod
-      .boolean()
-      .optional()
-      .default(false)
-      .describe(
-        'If true, treat textFilter as a regular expression pattern. Default is false (substring match). Only used when listing messages (msgid not provided).',
-      ),
-    secondsAgo: zod
+      .describe('Max stack frames to include. Default: 1. Set 0 to exclude stack traces entirely.'),
+
+    // Legacy support (hidden from main docs but still works)
+    msgid: zod
       .number()
-      .int()
-      .positive()
       .optional()
-      .describe(
-        'Only return messages from the last N seconds. Useful for filtering recent activity. Only used when listing messages (msgid not provided).',
-      ),
-    filterLogic: zod
-      .enum(['and', 'or'])
-      .optional()
-      .default('and')
-      .describe(
-        'How to combine multiple filters. "and" = all filters must match (default). "or" = any filter can match. Only used when listing messages (msgid not provided).',
-      ),
-    includePreservedMessages: zod
-      .boolean()
-      .default(false)
-      .optional()
-      .describe(
-        'Set to true to return the preserved messages over the last 3 navigations. Only used when listing messages (msgid not provided).',
-      ),
+      .describe('Get a specific message by ID with full details.'),
   },
   outputSchema: ReadConsoleOutputSchema,
   handler: async (request, response) => {
-    // Mode 2: Get specific message by ID
+    // Mode: Get specific message by ID (legacy support)
     if (request.params.msgid !== undefined) {
       const msg = getConsoleMessageById(request.params.msgid);
 
@@ -273,99 +248,227 @@ Error Handling:
       return;
     }
 
-    // Mode 1: List all messages with filtering
-    const {messages, total} = getConsoleMessages({
-      types: request.params.types,
-      textFilter: request.params.textFilter,
-      sourceFilter: request.params.sourceFilter,
-      isRegex: request.params.isRegex,
-      secondsAgo: request.params.secondsAgo,
-      filterLogic: request.params.filterLogic,
-      pageSize: request.params.pageSize,
-      pageIdx: request.params.pageIdx,
+    // Mode: List messages with filtering
+    const {
+      limit,
+      types,
+      pattern,
+      sourcePattern,
+      afterId,
+      beforeId,
+      fields = ['id', 'type', 'text'],
+      textLimit,
+      stackDepth = 1,
+    } = request.params;
+
+    // Build regex patterns
+    let textRegex: RegExp | null = null;
+    if (pattern) {
+      try {
+        textRegex = new RegExp(pattern, 'i');
+      } catch {
+        response.appendResponseLine(`Invalid regex pattern: ${pattern}`);
+        return;
+      }
+    }
+
+    let sourceRegex: RegExp | null = null;
+    if (sourcePattern) {
+      try {
+        sourceRegex = new RegExp(sourcePattern, 'i');
+      } catch {
+        response.appendResponseLine(`Invalid source pattern: ${sourcePattern}`);
+        return;
+      }
+    }
+
+    // Get all messages and apply filters
+    const {messages: allMessages} = getConsoleMessages({});
+    
+    let filtered = allMessages.filter(m => {
+      // Type filter
+      if (types?.length && !types.includes(m.type)) {
+        return false;
+      }
+
+      // Text pattern filter
+      if (textRegex && !textRegex.test(m.text)) {
+        return false;
+      }
+
+      // Source pattern filter
+      if (sourceRegex) {
+        const hasMatchingSource = m.stackTrace?.some(frame => sourceRegex!.test(frame.url));
+        if (!hasMatchingSource) {
+          return false;
+        }
+      }
+
+      // ID range filters
+      if (afterId !== undefined && m.id <= afterId) {
+        return false;
+      }
+      if (beforeId !== undefined && m.id >= beforeId) {
+        return false;
+      }
+
+      return true;
     });
 
-    const offset = (request.params.pageIdx ?? 0) * (request.params.pageSize ?? messages.length);
-    const pagination = createPaginationMetadata(total, messages.length, offset);
+    const total = filtered.length;
 
-    if (messages.length === 0) {
-      response.appendResponseLine('No console messages found.');
+    // Apply limit (from the end - most recent)
+    if (limit !== undefined && filtered.length > limit) {
+      filtered = filtered.slice(-limit);
+    }
+
+    const returned = filtered.length;
+    const hasMore = total > returned;
+
+    if (filtered.length === 0) {
+      if (request.params.response_format === ResponseFormat.JSON) {
+        response.appendResponseLine(JSON.stringify({
+          total: 0,
+          returned: 0,
+          hasMore: false,
+          messages: [],
+        }, null, 2));
+      } else {
+        response.appendResponseLine('No console messages found matching the specified filters.');
+      }
       return;
     }
 
+    const oldestId = filtered[0]?.id;
+    const newestId = filtered[filtered.length - 1]?.id;
+
+    // Build output with selected fields and detail control
+    const fieldSet = new Set(fields);
+    const includeStackTrace = fieldSet.has('stackTrace') && stackDepth > 0;
+    const includeArgs = fieldSet.has('args');
+
+    const outputMessages = filtered.map(msg => {
+      const out: Record<string, unknown> = {};
+
+      if (fieldSet.has('id')) {
+        out.id = msg.id;
+      }
+      if (fieldSet.has('type')) {
+        out.type = msg.type;
+      }
+      if (fieldSet.has('text')) {
+        let text = msg.text;
+        if (textLimit !== undefined && text.length > textLimit) {
+          text = text.slice(0, textLimit) + '...';
+        }
+        out.text = text;
+      }
+      if (fieldSet.has('timestamp')) {
+        out.timestamp = msg.timestamp;
+      }
+      if (includeStackTrace && msg.stackTrace?.length) {
+        const frames = msg.stackTrace.slice(0, stackDepth);
+        out.stackTrace = frames.map(f => ({
+          functionName: f.functionName,
+          url: f.url,
+          lineNumber: f.lineNumber,
+          columnNumber: f.columnNumber,
+        }));
+      }
+      if (includeArgs && msg.args.length > 0) {
+        out.args = msg.args.map(arg => ({
+          type: arg.type,
+          ...(arg.value !== undefined ? { value: arg.value } : {}),
+          ...(arg.description ? { description: arg.description } : {}),
+        }));
+      }
+
+      return out;
+    });
+
     const structuredOutput = {
-      ...pagination,
-      messages: messages.map(msg => ({
-        id: msg.id,
-        type: msg.type,
-        text: msg.text,
-        timestamp: msg.timestamp,
-        ...(msg.stackTrace?.length ? {
-          stackTrace: msg.stackTrace.map(f => ({
-            functionName: f.functionName,
-            url: f.url,
-            lineNumber: f.lineNumber,
-            columnNumber: f.columnNumber,
-          })),
-        } : {}),
-      })),
+      total,
+      returned,
+      hasMore,
+      ...(oldestId !== undefined ? { oldestId } : {}),
+      ...(newestId !== undefined ? { newestId } : {}),
+      messages: outputMessages,
     };
 
     if (request.params.response_format === ResponseFormat.JSON) {
       const jsonOutput = JSON.stringify(structuredOutput, null, 2);
       checkCharacterLimit(jsonOutput, 'read_console', {
-        pageSize: 'Limit results per page (e.g., 20)',
-        types: 'Filter by specific types (e.g., ["error"])',
-        textFilter: 'Filter by text content',
-        secondsAgo: 'Limit to recent messages',
+        limit: 'Reduce number of messages (e.g., limit: 20)',
+        fields: 'Reduce fields (e.g., fields: ["id", "text"])',
+        textLimit: 'Truncate message text (e.g., textLimit: 100)',
+        stackDepth: 'Reduce stack frames (e.g., stackDepth: 0)',
+        types: 'Filter by specific types (e.g., types: ["error"])',
+        pattern: 'Filter by text pattern',
       });
       response.appendResponseLine(jsonOutput);
       return;
     }
 
+    // Markdown output
     const filterParts: string[] = [];
-    if (request.params.types?.length) {
-      filterParts.push(`types: ${request.params.types.join(', ')}`);
+    if (types?.length) {
+      filterParts.push(`types: ${types.join(', ')}`);
     }
-    if (request.params.textFilter) {
-      filterParts.push(
-        `text${request.params.isRegex ? ' (regex)' : ''}: "${request.params.textFilter}"`,
-      );
+    if (pattern) {
+      filterParts.push(`pattern: /${pattern}/`);
     }
-    if (request.params.sourceFilter) {
-      filterParts.push(`source: "${request.params.sourceFilter}"`);
+    if (sourcePattern) {
+      filterParts.push(`source: /${sourcePattern}/`);
     }
-    if (request.params.secondsAgo) {
-      filterParts.push(`last ${request.params.secondsAgo}s`);
+    if (afterId !== undefined) {
+      filterParts.push(`after: #${afterId}`);
+    }
+    if (limit !== undefined) {
+      filterParts.push(`limit: ${limit}`);
     }
 
     let header = `## Console Messages\n\n`;
-    header += `**Results:** ${messages.length} of ${total} total`;
-    if (pagination.has_more) {
-      header += ` | **Next page:** pageIdx=${pagination.next_offset! / (request.params.pageSize ?? messages.length)}`;
+    header += `**Returned:** ${returned} of ${total} total`;
+    if (hasMore) {
+      header += ` (use \`afterId: ${oldestId! - 1}\` or increase \`limit\` to see more)`;
+    }
+    if (newestId !== undefined) {
+      header += `\n**ID range:** ${oldestId} - ${newestId}`;
     }
     if (filterParts.length > 0) {
-      const logic = request.params.filterLogic === 'or' ? 'OR' : 'AND';
-      header += `\n**Filters (${logic}):** ${filterParts.join(' | ')}`;
+      header += `\n**Filters:** ${filterParts.join(' | ')}`;
     }
     response.appendResponseLine(header + '\n');
 
     const lines: string[] = [];
-    for (const msg of messages) {
-      const typeTag = `[${msg.type}]`;
-      lines.push(`msgid=${msg.id} ${typeTag} ${msg.text}`);
-      if (msg.stackTrace?.length) {
-        const first = msg.stackTrace[0];
-        lines.push(`  at ${first.functionName || '(anonymous)'} (${first.url}:${first.lineNumber + 1}:${first.columnNumber + 1})`);
+    for (const msg of outputMessages) {
+      const parts: string[] = [];
+      if (msg.id !== undefined) {
+        parts.push(`#${msg.id}`);
+      }
+      if (msg.type !== undefined) {
+        parts.push(`[${msg.type}]`);
+      }
+      if (msg.text !== undefined) {
+        parts.push(String(msg.text));
+      }
+      lines.push(parts.join(' '));
+
+      if (msg.stackTrace && Array.isArray(msg.stackTrace)) {
+        for (const frame of msg.stackTrace as Array<{functionName?: string; url: string; lineNumber: number; columnNumber: number}>) {
+          lines.push(`  at ${frame.functionName || '(anonymous)'} (${frame.url}:${frame.lineNumber + 1}:${frame.columnNumber + 1})`);
+        }
       }
     }
 
     const content = lines.join('\n');
     checkCharacterLimit(content, 'read_console', {
-      pageSize: 'Limit results per page (e.g., 20)',
-      types: 'Filter by specific types (e.g., ["error"])',
-      textFilter: 'Filter by text content',
-      secondsAgo: 'Limit to recent messages',
+      limit: 'Reduce number of messages (e.g., limit: 20)',
+      fields: 'Reduce fields (e.g., fields: ["id", "text"])',
+      textLimit: 'Truncate message text (e.g., textLimit: 100)',
+      stackDepth: 'Reduce stack frames (e.g., stackDepth: 0)',
+      types: 'Filter by specific types (e.g., types: ["error"])',
+      pattern: 'Filter by text pattern',
     });
 
     response.appendResponseLine(content);

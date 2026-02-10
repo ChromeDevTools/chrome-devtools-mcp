@@ -10,8 +10,9 @@
   - [`mouse_hover`](#mouse_hover)
   - [`mouse_scroll`](#mouse_scroll)
   - [`wait`](#wait)
-- **[Debugging](#debugging)** (5 tools)
-  - [`evaluate_script`](#evaluate_script)
+- **[Debugging](#debugging)** (6 tools)
+  - [`invoke_vscode_api`](#invoke_vscode_api)
+  - [`invoke_vscode_command`](#invoke_vscode_command)
   - [`read_console`](#read_console)
   - [`read_output`](#read_output)
   - [`take_screenshot`](#take_screenshot)
@@ -198,104 +199,153 @@ Error Handling:
 
 ## Debugging
 
-### `evaluate_script`
+### `invoke_vscode_api`
 
-**Description:** Evaluate a JavaScript function inside the currently selected page. Returns the response as JSON,
-so returned values have to be JSON-serializable.
+**Description:** Execute VS Code API code to query editor state, workspace info, extensions, and more.
+
+The code runs inside an async function body with `vscode` and `payload` in scope.
+Use `return` to return a value. `await` is available. `require()` is NOT available.
 
 Args:
-  - function (string): JavaScript function to execute in page context
-  - args (array): Optional element UIDs to pass as arguments
+  - expression (string): VS Code API code to execute. Must use `return` to return a value
+  - payload (any): Optional JSON-serializable data passed as `payload` parameter
   - response_format ('markdown'|'json'): Output format. Default: 'markdown'
 
 Returns:
-  JSON format: { success: true, result: &lt;serialized return value&gt; }
-  Markdown format: "Script ran on page and returned:" + JSON code block
+  JSON format: { success: true, result: &lt;evaluated value&gt;, type: typeof result }
+  Markdown format: Formatted result in JSON code block
 
 Examples:
-  - "Get page title" -> { function: "() => document.title" }
-  - "Get element text" -> { function: "(el) => el.innerText", args: [{ uid: "abc123" }] }
-  - "Async fetch" -> { function: "async () => await fetch('/api').then(r => r.json())" }
+  - Get VS Code version:
+    { expression: "return vscode.version;" }
+  
+  - List workspace folders:
+    { expression: "return vscode.workspace.workspaceFolders?.map(f => f.uri.fsPath);" }
+  
+  - Get active editor info:
+    { expression: "const e = vscode.window.activeTextEditor; return e ? { file: e.document.fileName, line: e.selection.active.line, text: e.document.getText() } : null;" }
+  
+  - List open tabs:
+    { expression: "return vscode.window.tabGroups.all.flatMap(g => g.tabs.map(t => ({ label: t.label, active: t.isActive })));" }
+  
+  - List active extensions:
+    { expression: "return vscode.extensions.all.filter(e => e.isActive).map(e => e.id);" }
+  
+  - Get diagnostics (linting errors):
+    { expression: "return vscode.languages.getDiagnostics().map(([uri, diags]) => ({ file: uri.fsPath, errors: diags.map(d => ({ line: d.range.start.line, message: d.message })) }));" }
+  
+  - Read workspace setting:
+    { expression: "return vscode.workspace.getConfiguration('editor').get('fontSize');" }
 
 Error Handling:
-  - Throws with "Script error: ..." if execution fails
+  - Throws if Extension Development Host bridge is not connected
+  - Throws if expression execution fails
   - Returns error if response exceeds 25000 chars
 
 **Parameters:**
 
-- **function** (string) **(required)**: A JavaScript function declaration to be executed by the tool in the currently selected page.
-Example without arguments: `() => {
-  return document.title
-}` or `async () => {
-  return await fetch("example.com")
-}`.
-Example with arguments: `(el) => {
-  return el.innerText;
-}`
+- **expression** (string) **(required)**: VS Code API code to execute. Must use `return` to return a value. Runs inside an async function body, so `await` is available. `vscode` and `payload` are in scope. `require()` is NOT available.
+- **payload** (unknown) _(optional)_: Optional JSON-serializable data passed as the `payload` parameter.
+- **response_format** (unknown) _(optional)_: Output format: "markdown" for human-readable or "json" for machine-readable structured data.
 
-- **args** (array) _(optional)_: An optional list of arguments to pass to the function.
+---
+
+### `invoke_vscode_command`
+
+**Description:** Execute a VS Code command by ID.
+
+Args:
+  - command (string): The command ID to execute (e.g., "workbench.action.files.save", "editor.action.formatDocument")
+  - args (array): Optional arguments to pass to the command
+  - response_format ('markdown'|'json'): Output format. Default: 'markdown'
+
+Returns:
+  JSON format: { success: true, command: string, result: &lt;command return value&gt; }
+  Markdown format: Command result in JSON code block
+
+Examples:
+  - Save current file: { command: "workbench.action.files.save" }
+  - Format document: { command: "editor.action.formatDocument" }
+  - Open file: { command: "vscode.open", args: [{ "$uri": "file:///path/to/file.ts" }] }
+  - Go to line: { command: "workbench.action.gotoLine" }
+  - Toggle sidebar: { command: "workbench.action.toggleSidebarVisibility" }
+  - Open settings: { command: "workbench.action.openSettings" }
+  - Run task: { command: "workbench.action.tasks.runTask", args: ["build"] }
+
+Common command categories:
+  - workbench.action.* — UI actions (save, open, toggle panels)
+  - editor.action.* — Editor actions (format, fold, comment)
+  - vscode.* — Core commands (open, diff, executeCommand)
+
+Error Handling:
+  - Throws if Extension Development Host bridge is not connected
+  - Throws if command execution fails
+  - Returns error if response exceeds 25000 chars
+
+**Parameters:**
+
+- **command** (string) **(required)**: The VS Code command ID to execute (e.g., "workbench.action.files.save", "editor.action.formatDocument")
+- **args** (array) _(optional)_: Optional array of arguments to pass to the command. For URI arguments, use { "$uri": "file:///path" }.
 - **response_format** (unknown) _(optional)_: Output format: "markdown" for human-readable or "json" for machine-readable structured data.
 
 ---
 
 ### `read_console`
 
-**Description:** Read console messages from the currently selected page. Can either list all messages with filtering, or get a specific message by ID with full details.
+**Description:** Read console messages with full control over filtering and detail level.
 
-**Mode 1: List messages** (when msgid is NOT provided)
-Lists console messages since the last navigation with optional filtering and pagination.
+**FILTERING OPTIONS:**
 
-Args:
-  - pageSize (number): Maximum messages to return. Default: all
-  - pageIdx (number): Page number (0-based) for pagination. Default: 0
-  - types (string[]): Filter by message types (log, error, warning, info, debug, etc.)
-  - textFilter (string): Case-insensitive substring to match in message text
-  - sourceFilter (string): Substring to match in stack trace source URLs
-  - isRegex (boolean): Treat textFilter as regex pattern. Default: false
-  - secondsAgo (number): Only messages from last N seconds
-  - filterLogic ('and'|'or'): How to combine filters. Default: 'and'
-  - response_format ('markdown'|'json'): Output format. Default: 'markdown'
+- `limit` (number): Get the N most recent messages. Default: all messages
+- `types` (string[]): Filter by log type: 'error', 'warning', 'info', 'debug', 'log', 'trace', etc.
+- `pattern` (string): Regex pattern to match against message text
+- `sourcePattern` (string): Regex pattern to match against source URLs in stack traces
+- `afterId` (number): Only messages after this ID (for incremental reads - avoids re-reading)
+- `beforeId` (number): Only messages before this ID
 
-Returns:
-  JSON format: { total, count, offset, has_more, next_offset?, messages: [{id, type, text, timestamp, stackTrace?}] }
-  Markdown format: Formatted list with msgid, type tag, text, and first stack frame
+**DETAIL CONTROL (reduce context size):**
 
-**Mode 2: Get single message** (when msgid IS provided)
-Gets detailed information about a specific console message including arguments.
+- `fields` (string[]): Which fields to include. Options: 'id', 'type', 'text', 'timestamp', 'stackTrace', 'args'. Default: ['id', 'type', 'text']
+- `textLimit` (number): Max characters per message text (truncates with "..."). Default: unlimited
+- `stackDepth` (number): Max stack frames to include per message. Default: 1. Set 0 to exclude.
 
-Args:
-  - msgid (number): The message ID to retrieve
-  - response_format ('markdown'|'json'): Output format. Default: 'markdown'
+**EXAMPLES:**
 
-Returns:
-  JSON format: { id, type, text, timestamp, args?, stackTrace? }
-  Markdown format: Formatted message details with arguments and stack trace
+Minimal error scan (smallest context):
+  { types: ['error'], limit: 20, fields: ['id', 'text'], textLimit: 100 }
 
-Examples:
-  - "Show only errors" -> { types: ['error'] }
-  - "Find fetch failures" -> { textFilter: 'net::ERR', types: ['error'] }
-  - "Recent warnings" -> { types: ['warning'], secondsAgo: 60 }
-  - "Get message 5" -> { msgid: 5 }
-  - "Get message as JSON" -> { msgid: 5, response_format: 'json' }
+Full error details:
+  { types: ['error'], limit: 5, fields: ['id', 'type', 'text', 'args', 'stackTrace'], stackDepth: 5 }
 
-Error Handling:
-  - Returns "No console messages found." if no messages match filters
-  - Returns "Console message with id X not found." if msgid doesn't exist
-  - Returns error with available params if response exceeds 25000 chars
+Incremental read (only new messages since last read):
+  { afterId: 42 }
+
+Find specific pattern:
+  { pattern: "TypeError|ReferenceError", limit: 10 }
+
+Warnings from specific source:
+  { types: ['warning'], sourcePattern: "extension\\.ts" }
+
+**RESPONSE METADATA:**
+
+Returns: { total, returned, hasMore, oldestId?, newestId?, messages: [...] }
+- `total`: Total messages matching filters (before limit applied)
+- `hasMore`: Whether there are older messages not returned (use limit or afterId to get more)
+- `oldestId`/`newestId`: ID range in response (use newestId as afterId for next incremental read)
 
 **Parameters:**
 
-- **filterLogic** (enum: "and", "or") _(optional)_: How to combine multiple filters. "and" = all filters must match (default). "or" = any filter can match. Only used when listing messages (msgid not provided).
-- **includePreservedMessages** (boolean) _(optional)_: Set to true to return the preserved messages over the last 3 navigations. Only used when listing messages (msgid not provided).
-- **isRegex** (boolean) _(optional)_: If true, treat textFilter as a regular expression pattern. Default is false (substring match). Only used when listing messages (msgid not provided).
-- **msgid** (number) _(optional)_: The ID of a specific console message to retrieve with full details. When provided, returns only that message with arguments and stack trace. When omitted, lists all messages.
-- **pageIdx** (integer) _(optional)_: Page number to return (0-based). When omitted, returns the first page. Only used when listing messages (msgid not provided).
-- **pageSize** (integer) _(optional)_: Maximum number of messages to return. When omitted, returns all messages. Only used when listing messages (msgid not provided).
+- **afterId** (integer) _(optional)_: Only return messages with ID greater than this (for incremental reads).
+- **beforeId** (integer) _(optional)_: Only return messages with ID less than this.
+- **fields** (array) _(optional)_: Which fields to include per message. Default: [id, type, text]. Options: id, type, text, timestamp, stackTrace, args
+- **limit** (integer) _(optional)_: Get the N most recent messages. Omit to get all messages.
+- **msgid** (number) _(optional)_: Get a specific message by ID with full details.
+- **pattern** (string) _(optional)_: Regex pattern to match against message text (case-insensitive).
 - **response_format** (unknown) _(optional)_: Output format: "markdown" for human-readable or "json" for machine-readable structured data.
-- **secondsAgo** (integer) _(optional)_: Only return messages from the last N seconds. Useful for filtering recent activity. Only used when listing messages (msgid not provided).
-- **sourceFilter** (string) _(optional)_: Substring to match against the source URL in the stack trace. Only messages originating from a matching source are returned. Only used when listing messages (msgid not provided).
-- **textFilter** (string) _(optional)_: Case-insensitive substring to match against the message text. Only messages whose text contains this string are returned. Only used when listing messages (msgid not provided).
-- **types** (array) _(optional)_: Filter messages to only return messages of the specified resource types. When omitted or empty, returns all messages. Only used when listing messages (msgid not provided).
+- **sourcePattern** (string) _(optional)_: Regex pattern to match against source URLs in stack traces.
+- **stackDepth** (integer) _(optional)_: Max stack frames to include. Default: 1. Set 0 to exclude stack traces entirely.
+- **textLimit** (integer) _(optional)_: Max characters per message text. Longer messages are truncated with "...".
+- **types** (array) _(optional)_: Filter by log types: error, warning, info, debug, log, trace, etc.
 
 ---
 

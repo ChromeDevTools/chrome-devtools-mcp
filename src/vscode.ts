@@ -483,7 +483,7 @@ function killByUserDataDirSync(dataDir: string): void {
     const escapedPath = dataDir.replace(/\\/g, '\\\\');
     const out = execSync(
       `wmic process where "CommandLine like '%${escapedPath}%'" get ProcessId`,
-      {encoding: 'utf8', timeout: 10000},
+      {encoding: 'utf8', timeout: 10000, stdio: ['pipe', 'pipe', 'ignore']},
     ).trim();
     for (const line of out.split('\n')) {
       const pid = parseInt(line.trim(), 10);
@@ -907,6 +907,7 @@ function buildLaunchArgs(flags: LaunchFlags, ports: InternalLaunchPorts): string
     `--inspect-extensions=${ports.inspectorPort}`,
     `--extensionDevelopmentPath=${ports.extensionBridgePath}`,
     `--user-data-dir=${ports.userDataDir}`,
+    '--disable-updates',
   ];
 
   if (flags.newWindow) {args.push('--new-window');}
@@ -940,11 +941,31 @@ async function doConnect(options: VSCodeLaunchOptions): Promise<WebSocket> {
   // 1. Compute Host bridge path (deterministic from workspace path)
   hostBridgePath = computeBridgePath(options.workspaceFolder);
 
-  // 2. Get Electron executable path from the Host VS Code
-  const electronPath = (await bridgeExec(
-    hostBridgePath,
-    'return process.execPath;',
-  )) as string;
+  // 2. Get Electron executable path — prefer the Host VS Code bridge,
+  //    fall back to process.execPath (available when VS Code spawns the
+  //    MCP server with ELECTRON_RUN_AS_NODE).
+  let electronPath: string;
+  try {
+    electronPath = (await bridgeExec(
+      hostBridgePath,
+      'return process.execPath;',
+    )) as string;
+  } catch (bridgeErr) {
+    if (process.env.ELECTRON_RUN_AS_NODE) {
+      electronPath = process.execPath;
+      logger(
+        `Host bridge unavailable (${(bridgeErr as Error).message}), ` +
+        `falling back to process.execPath: ${electronPath}`,
+      );
+    } else {
+      throw new Error(
+        'Cannot find VS Code Electron executable. ' +
+        'Either the vscode-devtools bridge extension must be active in the ' +
+        'host VS Code, or the MCP server must be launched from within VS Code.\n' +
+        `Bridge error: ${(bridgeErr as Error).message}`,
+      );
+    }
+  }
   logger(`Electron executable: ${electronPath}`);
 
   // 3. Allocate dynamic ports
@@ -1015,11 +1036,31 @@ async function doConnect(options: VSCodeLaunchOptions): Promise<WebSocket> {
   const childEnv = {...process.env};
   delete childEnv.ELECTRON_RUN_AS_NODE;
   delete childEnv.ELECTRON_NO_ASAR;  // Also strip this Electron override
+  // Strip VSCODE_* env vars (IPC hooks, git handles, injection flags, etc.)
+  // that cause the child Code.exe to communicate with the parent instance
+  for (const key of Object.keys(childEnv)) {
+    if (key.startsWith('VSCODE_')) {
+      delete childEnv[key];
+    }
+  }
   const proc = spawn(electronPath, args, {
     detached: true,
-    stdio: 'ignore',
+    stdio: ['ignore', 'ignore', 'pipe'],
     env: childEnv,
   });
+
+  // Capture launcher stderr for diagnostics — Code.exe may log startup failures
+  if (proc.stderr) {
+    let stderrOutput = '';
+    proc.stderr.setEncoding('utf8');
+    proc.stderr.on('data', (chunk: string) => { stderrOutput += chunk; });
+    proc.stderr.on('end', () => {
+      const trimmed = stderrOutput.trim();
+      if (trimmed) {
+        logger(`Launcher stderr: ${trimmed}`);
+      }
+    });
+  }
 
   // Track spawn errors (e.g., file not found, permission denied)
   proc.on('error', (err) => {

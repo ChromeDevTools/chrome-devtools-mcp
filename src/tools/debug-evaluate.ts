@@ -5,7 +5,7 @@
  */
 
 /**
- * Development diagnostic tool: execute VS Code API code via the vscode-devtools bridge
+ * VS Code API tools: execute VS Code commands and API calls via the vscode-devtools bridge
  * in the spawned Extension Development Host.
  *
  * The code runs inside `new Function('vscode', 'payload', ...)` in the extension
@@ -25,22 +25,135 @@ import {
   checkCharacterLimit,
 } from './ToolDefinition.js';
 
-const DebugEvaluateOutputSchema = zod.object({
+function ensureBridgeConnected(): string {
+  const bridgePath = getDevhostBridgePath();
+  if (!bridgePath) {
+    throw new Error(
+      'Extension Development Host bridge is not connected. ' +
+        'Ensure the VS Code debug window has been launched and the vscode-devtools extension is active.',
+    );
+  }
+  return bridgePath;
+}
+
+const InvokeVscodeCommandOutputSchema = zod.object({
+  success: zod.boolean(),
+  command: zod.string(),
+  result: zod.unknown(),
+});
+
+export const invokeVscodeCommand = defineTool({
+  name: 'invoke_vscode_command',
+  description: `Execute a VS Code command by ID.
+
+Args:
+  - command (string): The command ID to execute (e.g., "workbench.action.files.save", "editor.action.formatDocument")
+  - args (array): Optional arguments to pass to the command
+  - response_format ('markdown'|'json'): Output format. Default: 'markdown'
+
+Returns:
+  JSON format: { success: true, command: string, result: <command return value> }
+  Markdown format: Command result in JSON code block
+
+Examples:
+  - Save current file: { command: "workbench.action.files.save" }
+  - Format document: { command: "editor.action.formatDocument" }
+  - Open file: { command: "vscode.open", args: [{ "$uri": "file:///path/to/file.ts" }] }
+  - Go to line: { command: "workbench.action.gotoLine" }
+  - Toggle sidebar: { command: "workbench.action.toggleSidebarVisibility" }
+  - Open settings: { command: "workbench.action.openSettings" }
+  - Run task: { command: "workbench.action.tasks.runTask", args: ["build"] }
+
+Common command categories:
+  - workbench.action.* — UI actions (save, open, toggle panels)
+  - editor.action.* — Editor actions (format, fold, comment)
+  - vscode.* — Core commands (open, diff, executeCommand)
+
+Error Handling:
+  - Throws if Extension Development Host bridge is not connected
+  - Throws if command execution fails
+  - Returns error if response exceeds ${CHARACTER_LIMIT} chars`,
+  timeoutMs: 15000,
+  annotations: {
+    category: ToolCategory.DEBUGGING,
+    readOnlyHint: false,
+    destructiveHint: false,
+    idempotentHint: false,
+    openWorldHint: true,
+    conditions: ['extensionBridge'],
+  },
+  schema: {
+    response_format: responseFormatSchema,
+    command: zod
+      .string()
+      .describe(
+        'The VS Code command ID to execute (e.g., "workbench.action.files.save", "editor.action.formatDocument")',
+      ),
+    args: zod
+      .array(zod.unknown())
+      .optional()
+      .describe(
+        'Optional array of arguments to pass to the command. For URI arguments, use { "$uri": "file:///path" }.',
+      ),
+  },
+  outputSchema: InvokeVscodeCommandOutputSchema,
+  handler: async (request, response) => {
+    const {command, args} = request.params;
+    const bridgePath = ensureBridgeConnected();
+
+    const expression = args?.length
+      ? `return await vscode.commands.executeCommand(payload.command, ...payload.args);`
+      : `return await vscode.commands.executeCommand(payload.command);`;
+
+    const payload = {command, args: args ?? []};
+    const result = await bridgeExec(bridgePath, expression, payload);
+
+    if (request.params.response_format === ResponseFormat.JSON) {
+      const output = {
+        success: true,
+        command,
+        result,
+      };
+      const jsonOutput = JSON.stringify(output, null, 2);
+      checkCharacterLimit(jsonOutput, 'invoke_vscode_command', {
+        command: 'Some commands may return large results',
+      });
+      response.appendResponseLine(jsonOutput);
+      return;
+    }
+
+    response.appendResponseLine(`**Command:** \`${command}\``);
+    if (result !== undefined && result !== null) {
+      const jsonResult = typeof result === 'string' ? result : JSON.stringify(result, null, 2);
+      checkCharacterLimit(jsonResult, 'invoke_vscode_command', {
+        command: 'Some commands may return large results',
+      });
+      response.appendResponseLine('**Result:**');
+      response.appendResponseLine('```json');
+      response.appendResponseLine(jsonResult);
+      response.appendResponseLine('```');
+    } else {
+      response.appendResponseLine('Command executed successfully (no return value)');
+    }
+  },
+});
+
+const InvokeVscodeApiOutputSchema = zod.object({
   success: zod.boolean(),
   result: zod.unknown(),
   type: zod.string().optional(),
 });
 
-export const debugEvaluate = defineTool({
-  name: 'debug_evaluate',
-  description: `[DEV] Execute VS Code API code via the vscode-devtools bridge in the Extension Development Host.
+export const invokeVscodeApi = defineTool({
+  name: 'invoke_vscode_api',
+  description: `Execute VS Code API code to query editor state, workspace info, extensions, and more.
 
 The code runs inside an async function body with \`vscode\` and \`payload\` in scope.
 Use \`return\` to return a value. \`await\` is available. \`require()\` is NOT available.
 
 Args:
   - expression (string): VS Code API code to execute. Must use \`return\` to return a value
-  - payload (any): Optional JSON-serializable payload passed as \`payload\` parameter
+  - payload (any): Optional JSON-serializable data passed as \`payload\` parameter
   - response_format ('markdown'|'json'): Output format. Default: 'markdown'
 
 Returns:
@@ -48,11 +161,26 @@ Returns:
   Markdown format: Formatted result in JSON code block
 
 Examples:
-  - \`return vscode.version;\` — get VS Code version
-  - \`return vscode.workspace.workspaceFolders?.map(f => f.uri.fsPath);\` — list workspace folders
-  - \`return vscode.window.tabGroups.all.flatMap(g => g.tabs.map(t => ({label: t.label, active: t.isActive})));\` — list editor tabs
-  - \`const editor = vscode.window.activeTextEditor; return editor ? { file: editor.document.fileName, line: editor.selection.active.line } : null;\` — get active editor info
-  - \`return vscode.extensions.all.filter(e => e.isActive).map(e => e.id);\` — list active extensions
+  - Get VS Code version:
+    { expression: "return vscode.version;" }
+  
+  - List workspace folders:
+    { expression: "return vscode.workspace.workspaceFolders?.map(f => f.uri.fsPath);" }
+  
+  - Get active editor info:
+    { expression: "const e = vscode.window.activeTextEditor; return e ? { file: e.document.fileName, line: e.selection.active.line, text: e.document.getText() } : null;" }
+  
+  - List open tabs:
+    { expression: "return vscode.window.tabGroups.all.flatMap(g => g.tabs.map(t => ({ label: t.label, active: t.isActive })));" }
+  
+  - List active extensions:
+    { expression: "return vscode.extensions.all.filter(e => e.isActive).map(e => e.id);" }
+  
+  - Get diagnostics (linting errors):
+    { expression: "return vscode.languages.getDiagnostics().map(([uri, diags]) => ({ file: uri.fsPath, errors: diags.map(d => ({ line: d.range.start.line, message: d.message })) }));" }
+  
+  - Read workspace setting:
+    { expression: "return vscode.workspace.getConfiguration('editor').get('fontSize');" }
 
 Error Handling:
   - Throws if Extension Development Host bridge is not connected
@@ -61,11 +189,11 @@ Error Handling:
   timeoutMs: 10000,
   annotations: {
     category: ToolCategory.DEBUGGING,
-    readOnlyHint: false,
+    readOnlyHint: true,
     destructiveHint: false,
-    idempotentHint: false,
+    idempotentHint: true,
     openWorldHint: true,
-    conditions: ['devDiagnostic'],
+    conditions: ['extensionBridge'],
   },
   schema: {
     response_format: responseFormatSchema,
@@ -80,21 +208,13 @@ Error Handling:
       .unknown()
       .optional()
       .describe(
-        'Optional JSON-serializable payload passed as the `payload` parameter.',
+        'Optional JSON-serializable data passed as the `payload` parameter.',
       ),
   },
-  outputSchema: DebugEvaluateOutputSchema,
+  outputSchema: InvokeVscodeApiOutputSchema,
   handler: async (request, response) => {
     const {expression, payload} = request.params;
-
-    const bridgePath = getDevhostBridgePath();
-
-    if (!bridgePath) {
-      throw new Error(
-        'Extension Development Host bridge is not connected. ' +
-          'Ensure the VS Code debug window has been launched and the vscode-devtools extension is active.',
-      );
-    }
+    const bridgePath = ensureBridgeConnected();
 
     const result = await bridgeExec(bridgePath, expression, payload);
 
@@ -105,7 +225,7 @@ Error Handling:
         type: typeof result,
       };
       const jsonOutput = JSON.stringify(output, null, 2);
-      checkCharacterLimit(jsonOutput, 'debug_evaluate', {
+      checkCharacterLimit(jsonOutput, 'invoke_vscode_api', {
         expression: 'Use more selective queries or filters in your expression',
       });
       response.appendResponseLine(jsonOutput);
@@ -113,7 +233,7 @@ Error Handling:
     }
 
     const jsonResult = typeof result === 'string' ? result : JSON.stringify(result, null, 2);
-    checkCharacterLimit(jsonResult, 'debug_evaluate', {
+    checkCharacterLimit(jsonResult, 'invoke_vscode_api', {
       expression: 'Use more selective queries or filters in your expression',
     });
 
@@ -123,3 +243,4 @@ Error Handling:
     response.appendResponseLine('```');
   },
 });
+

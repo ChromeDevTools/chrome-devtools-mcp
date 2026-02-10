@@ -9,7 +9,6 @@ import * as debugEvaluateTools from './debug-evaluate.js';
 import * as inputTools from './input.js';
 import * as outputPanelTools from './output-panel.js';
 import * as screenshotTools from './screenshot.js';
-import * as scriptTools from './script.js';
 import * as snapshotTools from './snapshot.js';
 import type {ToolDefinition} from './ToolDefinition.js';
 import * as waitTools from './wait.js';
@@ -20,7 +19,6 @@ const tools = [
   ...Object.values(inputTools),
   ...Object.values(outputPanelTools),
   ...Object.values(screenshotTools),
-  ...Object.values(scriptTools),
   ...Object.values(snapshotTools),
   ...Object.values(waitTools),
 ] as unknown as ToolDefinition[];

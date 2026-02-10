@@ -251,14 +251,23 @@ const transport = new StdioServerTransport();
 await server.connect(transport);
 logger('VS Code DevTools MCP Server connected');
 
-// Auto-launch VS Code debug window on server start
-logger('Launching VS Code debug window...');
-if (config.explicitExtensionDevelopmentPath) {
-  await runHostShellTaskOrThrow(config.hostWorkspace, 'ext:build', 300_000);
-  saveExtensionSnapshot(config.extensionBridgePath);
+// Best-effort auto-launch: try to start the VS Code debug window now, but
+// don't crash the server if it fails (e.g., host VS Code not running yet).
+// Tools will lazily call ensureConnection() on their first invocation.
+try {
+  logger('Launching VS Code debug window...');
+  if (config.explicitExtensionDevelopmentPath) {
+    await runHostShellTaskOrThrow(config.hostWorkspace, 'ext:build', 300_000);
+    saveExtensionSnapshot(config.extensionBridgePath);
+  }
+  await ensureConnection();
+  logger('VS Code debug window ready');
+} catch (err) {
+  const message = err && typeof err === 'object' && 'message' in err
+    ? (err as Error).message
+    : String(err);
+  logger(`Startup connection failed (will retry on first tool call): ${message}`);
 }
-await ensureConnection();
-logger('VS Code debug window ready');
 
 logDisclaimers();
 
