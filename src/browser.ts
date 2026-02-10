@@ -71,6 +71,10 @@ export function getConnectionGeneration(): number {
   return connectionGeneration;
 }
 
+export function getUserDataDir(): string | undefined {
+  return userDataDir;
+}
+
 // ── Raw CDP Communication ───────────────────────────────
 
 let cdpMessageId = 0;
