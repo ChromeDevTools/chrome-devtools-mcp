@@ -1,0 +1,56 @@
+name: Odds pipeline - collect scores
+
+permissions: read-all
+
+on:
+  workflow_dispatch:
+    inputs:
+      sport:
+        description: Sport key (e.g. basketball_ncaab)
+        required: false
+        default: basketball_ncaab
+      days_from:
+        description: Rolling lookback days for scores
+        required: false
+        default: "5"
+  schedule:
+    - cron: "17 */6 * * *"
+
+jobs:
+  collect-scores:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v3
+
+      - name: Init schema (idempotent)
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        working-directory: odds
+        run: uv run python -m odds_pipeline.schema
+
+      - name: Collect rolling scores
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
+        working-directory: odds
+        run: >
+          uv run python -m odds_pipeline collect-scores
+          --sport "${{ inputs.sport || 'basketball_ncaab' }}"
+          --days-from "${{ inputs.days_from || '5' }}"
+
+      - name: Collect ESPN schedules/scores (supplement)
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        working-directory: odds
+        run: uv run python -m odds_pipeline collect-espn --lookback-days 5
+
+      - name: Collect Action Network odds page (supplement, best-effort)
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        working-directory: odds
+        run: uv run python -m odds_pipeline collect-action-network
+

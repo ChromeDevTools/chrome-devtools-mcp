@@ -1,0 +1,6 @@
+psycopg[binary]>=3.2.0
+requests>=2.32.0
+pydantic>=2.10.0
+kenpompy>=0.3.5
+pandas>=2.2.0
+

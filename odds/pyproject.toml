@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "odds-pipeline"
+version = "0.1.0"
+description = "Odds collection/normalization pipeline for rolling windows"
+requires-python = ">=3.11"
+dependencies = [
+  "psycopg[binary]>=3.2.0",
+  "requests>=2.32.0",
+  "pydantic>=2.10.0",
+  "kenpompy>=0.3.5",
+  "pandas>=2.2.0",
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+

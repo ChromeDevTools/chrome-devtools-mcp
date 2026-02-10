@@ -1,0 +1,59 @@
+name: Odds pipeline - collect odds + normalize
+
+permissions: read-all
+
+on:
+  workflow_dispatch:
+    inputs:
+      sport:
+        description: Sport key (e.g. basketball_ncaab)
+        required: false
+        default: basketball_ncaab
+      regions:
+        description: Regions (comma-separated)
+        required: false
+        default: us
+      markets:
+        description: Markets (comma-separated)
+        required: false
+        default: h2h,spreads,totals
+  schedule:
+    - cron: "*/15 * * * *"
+
+jobs:
+  collect-odds:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v3
+
+      - name: Init schema (idempotent)
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        working-directory: odds
+        run: uv run python -m odds_pipeline.schema
+
+      - name: Collect odds snapshots
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
+        working-directory: odds
+        run: >
+          uv run python -m odds_pipeline collect-odds
+          --sport "${{ inputs.sport || 'basketball_ncaab' }}"
+          --regions "${{ inputs.regions || 'us' }}"
+          --markets "${{ inputs.markets || 'h2h,spreads,totals' }}"
+
+      - name: Normalize (rolling window)
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        working-directory: odds
+        run: uv run python -m odds_pipeline normalize --window-days 5
+
+      - name: Validate invariants (fast)
+        working-directory: odds
+        run: uv run python -m odds_pipeline validate
+

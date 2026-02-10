@@ -1,0 +1,43 @@
+name: Odds pipeline - train (daily)
+
+permissions: read-all
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "25 10 * * *"
+
+jobs:
+  train:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v3
+
+      - name: Init schema (idempotent)
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        working-directory: odds
+        run: uv run python -m odds_pipeline.schema
+
+      - name: Freshness guard (must pass)
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        working-directory: odds
+        run: uv run python -m odds_pipeline freshness-guard --window-days 5
+
+      - name: Train
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        working-directory: odds
+        run: uv run python -m odds_pipeline train --window-days 5
+
+      - name: Upload model artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: odds-model
+          path: odds/artifacts/model.json
+

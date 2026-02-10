@@ -1,0 +1,68 @@
+name: Odds pipeline - predict (hourly)
+
+permissions: read-all
+
+on:
+  workflow_dispatch:
+    inputs:
+      model_version:
+        description: Model version string (if empty, uses last trained timestamp)
+        required: false
+        default: ""
+  schedule:
+    - cron: "5 * * * *"
+
+jobs:
+  predict:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v3
+
+      - name: Init schema (idempotent)
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        working-directory: odds
+        run: uv run python -m odds_pipeline.schema
+
+      - name: Freshness guard (must pass)
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        working-directory: odds
+        run: uv run python -m odds_pipeline freshness-guard --window-days 5
+
+      - name: Train (if needed) and pick model version
+        id: model
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -n "${{ inputs.model_version }}" ]; then
+            echo "model_version=${{ inputs.model_version }}" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          cd odds
+          uv run python -m odds_pipeline train --window-days 5 > /tmp/train.json
+          model_version="$(python - <<'PY'
+import json
+print(json.load(open("artifacts/model.json"))["model_version"])
+PY
+)"
+          echo "model_version=$model_version" >> "$GITHUB_OUTPUT"
+
+      - name: Predict
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        working-directory: odds
+        run: uv run python -m odds_pipeline predict --window-days 5 --model-version "${{ steps.model.outputs.model_version }}"
+
+      - name: Upload predictions artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: odds-predictions
+          path: odds/artifacts/predictions.json
+

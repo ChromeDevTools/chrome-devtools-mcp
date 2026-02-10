@@ -1,0 +1,88 @@
+name: Odds pipeline - freshness guard
+
+permissions:
+  contents: read
+  issues: write
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "35 * * * *"
+
+jobs:
+  freshness-guard:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v3
+
+      - name: Init schema (idempotent)
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        working-directory: odds
+        run: uv run python -m odds_pipeline.schema
+
+      - name: Run freshness guard
+        id: guard
+        continue-on-error: true
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        working-directory: odds
+        run: uv run python -m odds_pipeline freshness-guard --window-days 5
+
+      - name: Bounded backfill + re-check freshness
+        id: backfill
+        if: ${{ steps.guard.outcome != 'success' }}
+        continue-on-error: true
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
+        run: |
+          cd odds
+          uv run python -m odds_pipeline backfill --sport basketball_ncaab --lookback-days 5
+          uv run python -m odds_pipeline freshness-guard --window-days 5
+
+      - name: Open issue if stale
+        if: ${{ steps.guard.outcome != 'success' && steps.backfill.outcome != 'success' }}
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title = "Odds pipeline stale data detected";
+            const body = [
+              "Freshness guard failed in scheduled run.",
+              "",
+              "- Check `DATABASE_URL` connectivity",
+              "- Check collectors (odds + scores) and API quota",
+              "- Run bounded 5-day backfill then re-normalize",
+            ].join("\n");
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: "open",
+              labels: "odds-pipeline,stale-data",
+            }).catch(() => ({ data: [] }));
+            if (issues.length > 0) {
+              core.info("Existing stale-data issue already open; skipping create.");
+              return;
+            }
+            try {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title,
+                body,
+                labels: ["odds-pipeline", "stale-data"],
+              });
+            } catch (e) {
+              core.warning("Issue labels may not exist yet; creating issue without labels.");
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title,
+                body,
+              });
+            }
+
