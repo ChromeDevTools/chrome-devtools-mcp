@@ -136,18 +136,14 @@ export const EMULATION_UI_CONTENT = `
   <div class="container">
     <div class="header">CPU Throttling</div>
     <div class="button-grid" id="cpu-grid">
+      <button data-rate="1" onclick="selectCPUThrottling(1, this)" class="active">No throttling</button>
       <button data-rate="2" onclick="selectCPUThrottling(2, this)">2x slow</button>
       <button data-rate="4" onclick="selectCPUThrottling(4, this)">4x slow</button>
       <button data-rate="6" onclick="selectCPUThrottling(6, this)">6x slow</button>
+      <button data-rate="8" onclick="selectCPUThrottling(8, this)">8x slow</button>
       <button data-rate="20" onclick="selectCPUThrottling(20, this)">20x slow</button>
-      <button data-rate="1" onclick="selectCPUThrottling(1, this)" class="active">No throttling</button>
     </div>
     
-    <div class="input-group">
-      <label class="header" style="font-size: 11px;">Custom slowdown</label>
-      <input type="number" id="customInput" placeholder="Enter rate..." min="1" max="100">
-    </div>
-
     <div class="header">Network Throttling</div>
     <div class="button-grid" id="network-grid">
       <button data-condition="Fast 3G" onclick="selectNetworkThrottling('Fast 3G', this)">Fast 3G</button>
@@ -157,16 +153,46 @@ export const EMULATION_UI_CONTENT = `
     </div>
 
     <div class="header">Geolocation</div>
-    <div class="input-group">
-      <div style="display: flex; gap: 10px;">
-        <input type="number" id="geoLat" placeholder="Latitude" step="any" style="flex: 1;">
-        <input type="number" id="geoLon" placeholder="Longitude" step="any" style="flex: 1;">
-      </div>
+    <div class="input-group" style="position: relative;">
+      <input type="text" id="countrySearch" placeholder="Search country..." autocomplete="off" oninput="filterCountries(this.value)" onfocus="filterCountries(this.value)">
+      <div id="countryDropdown" class="country-dropdown"></div>
       <button onclick="clearGeolocation()" style="margin-top: 5px; width: 100%;">Clear Geolocation</button>
     </div>
 
+    <style>
+      .country-dropdown {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: var(--card-bg);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        max-height: 200px;
+        overflow-y: auto;
+        z-index: 50;
+        display: none;
+        margin-top: 4px;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
+      }
+      .country-item {
+        padding: 8px 12px;
+        cursor: pointer;
+        color: var(--text);
+        font-size: 13px;
+        border-bottom: 1px solid rgba(255,255,255,0.05);
+      }
+      .country-item:last-child {
+        border-bottom: none;
+      }
+      .country-item:hover {
+        background: var(--hover);
+        color: #fff;
+      }
+    </style>
+
     <div class="header">Color Scheme</div>
-    <div class="button-grid" id="color-scheme-grid">
+    <div class="button-grid" id="color-scheme-grid" style="grid-template-columns: repeat(3, 1fr);">
       <button data-color="light" onclick="selectColorScheme('light', this)">Light</button>
       <button data-color="dark" onclick="selectColorScheme('dark', this)">Dark</button>
       <button data-color="auto" onclick="selectColorScheme('auto', this)" class="active">Auto</button>
@@ -214,6 +240,128 @@ export const EMULATION_UI_CONTENT = `
         font-weight: 500;
       }
     </style>
+    <style>
+      .modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(15, 23, 42, 0.8);
+        backdrop-filter: blur(4px);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 100;
+        opacity: 0;
+        transition: opacity 0.2s ease;
+      }
+      .modal-overlay.open {
+        display: flex;
+        opacity: 1;
+      }
+      .modal-content {
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        width: 90%;
+        max-width: 400px;
+        max-height: 80vh;
+        display: flex;
+        flex-direction: column;
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5);
+        transform: scale(0.95);
+        transition: transform 0.2s ease;
+      }
+      .modal-overlay.open .modal-content {
+        transform: scale(1);
+      }
+      .modal-header {
+        padding: 16px;
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .modal-title {
+        font-weight: 600;
+        font-size: 16px;
+        color: var(--text);
+      }
+      .modal-close {
+        background: transparent;
+        border: none;
+        color: var(--text-dim);
+        cursor: pointer;
+        padding: 4px;
+        border-radius: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .modal-close:hover {
+        background: var(--card-bg);
+        color: var(--text);
+      }
+      .modal-body {
+        padding: 8px;
+        overflow-y: auto;
+      }
+      .device-list {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .device-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 12px;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.15s ease;
+        border: 1px solid transparent;
+      }
+      .device-item:hover {
+        background: var(--card-bg);
+        border-color: var(--border);
+      }
+      .device-item.active {
+        background: rgba(56, 189, 248, 0.1);
+        border-color: var(--selected-border);
+      }
+      .device-icon {
+        width: 20px;
+        height: 20px;
+        flex-shrink: 0;
+        color: var(--text-dim);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .device-info {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        flex: 1;
+      }
+      .device-name {
+        font-weight: 500;
+        color: var(--text);
+        font-size: 13px;
+      }
+      .device-specs {
+        font-size: 11px;
+        color: var(--text-dim);
+        font-family: var(--font-mono);
+      }
+      .device-brand-icon {
+        width: 16px;
+        height: 16px;
+        fill: currentColor;
+        opacity: 0.7;
+      }
+    </style>
 
     <div class="header">Viewport</div>
     <div class="viewport-grid" id="viewport-grid">
@@ -255,6 +403,26 @@ export const EMULATION_UI_CONTENT = `
       <div id="status"></div>
     </div>
   </div>
+
+  <div class="modal-overlay" id="deviceModal" onclick="closeDeviceModal(event)">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div class="modal-title" id="modalTitle">Select Device</div>
+        <button class="modal-close" onclick="closeDeviceModal()">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="device-list" id="deviceList">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script>
     ${EMULATION_APP_SCRIPT}
   </script>
