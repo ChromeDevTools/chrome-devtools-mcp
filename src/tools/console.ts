@@ -78,6 +78,28 @@ export const listConsoleMessages = defineTool({
       .describe(
         'Substring to match against the source URL in the stack trace. Only messages originating from a matching source are returned.',
       ),
+    isRegex: zod
+      .boolean()
+      .optional()
+      .default(false)
+      .describe(
+        'If true, treat textFilter as a regular expression pattern. Default is false (substring match).',
+      ),
+    secondsAgo: zod
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe(
+        'Only return messages from the last N seconds. Useful for filtering recent activity.',
+      ),
+    filterLogic: zod
+      .enum(['and', 'or'])
+      .optional()
+      .default('and')
+      .describe(
+        'How to combine multiple filters. "and" = all filters must match (default). "or" = any filter can match.',
+      ),
     includePreservedMessages: zod
       .boolean()
       .default(false)
@@ -91,6 +113,9 @@ export const listConsoleMessages = defineTool({
       types: request.params.types,
       textFilter: request.params.textFilter,
       sourceFilter: request.params.sourceFilter,
+      isRegex: request.params.isRegex,
+      secondsAgo: request.params.secondsAgo,
+      filterLogic: request.params.filterLogic,
       pageSize: request.params.pageSize,
       pageIdx: request.params.pageIdx,
     });
@@ -100,7 +125,28 @@ export const listConsoleMessages = defineTool({
       return;
     }
 
-    response.appendResponseLine(`Console messages (${messages.length} of ${total} total):\n`);
+    const filterParts: string[] = [];
+    if (request.params.types?.length) {
+      filterParts.push(`types: ${request.params.types.join(', ')}`);
+    }
+    if (request.params.textFilter) {
+      filterParts.push(
+        `text${request.params.isRegex ? ' (regex)' : ''}: "${request.params.textFilter}"`,
+      );
+    }
+    if (request.params.sourceFilter) {
+      filterParts.push(`source: "${request.params.sourceFilter}"`);
+    }
+    if (request.params.secondsAgo) {
+      filterParts.push(`last ${request.params.secondsAgo}s`);
+    }
+
+    let header = `Console messages (${messages.length} of ${total} total):`;
+    if (filterParts.length > 0) {
+      const logic = request.params.filterLogic === 'or' ? 'OR' : 'AND';
+      header += `\n_Filters (${logic}): ${filterParts.join(' | ')}_`;
+    }
+    response.appendResponseLine(header + '\n');
 
     for (const msg of messages) {
       const typeTag = `[${msg.type.toUpperCase()}]`;

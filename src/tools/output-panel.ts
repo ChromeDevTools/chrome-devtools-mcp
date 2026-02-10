@@ -154,6 +154,35 @@ export const listOutputChannels = defineTool({
   },
 });
 
+const LOG_LEVELS: [string, ...string[]] = [
+  'error',
+  'warning',
+  'info',
+  'debug',
+  'trace',
+];
+
+/**
+ * Parse timestamp from a VS Code log line.
+ * Format: 2026-02-09 19:31:05.070 [info] ...
+ */
+function parseLogTimestamp(line: string): Date | null {
+  const match = line.match(/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3})/);
+  if (match) {
+    return new Date(match[1].replace(' ', 'T'));
+  }
+  return null;
+}
+
+/**
+ * Extract log level from a VS Code log line.
+ * Format: 2026-02-09 19:31:05.070 [info] ...
+ */
+function parseLogLevel(line: string): string | null {
+  const match = line.match(/\[(error|warning|info|debug|trace)\]/i);
+  return match ? match[1].toLowerCase() : null;
+}
+
 export const getOutputPanelContent = defineTool({
   name: 'get_output_panel_content',
   description:
@@ -193,9 +222,46 @@ export const getOutputPanelContent = defineTool({
       .describe(
         'Case-insensitive substring filter. Only lines containing this text are returned.',
       ),
+    isRegex: zod
+      .boolean()
+      .optional()
+      .default(false)
+      .describe(
+        'If true, treat the filter as a regular expression pattern. Default is false (substring match).',
+      ),
+    levels: zod
+      .array(zod.enum(LOG_LEVELS))
+      .optional()
+      .describe(
+        'Filter by log level(s). Only lines with matching levels are returned. Levels: error, warning, info, debug, trace.',
+      ),
+    secondsAgo: zod
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe(
+        'Only return log lines from the last N seconds. Useful for filtering recent activity.',
+      ),
+    filterLogic: zod
+      .enum(['and', 'or'])
+      .optional()
+      .default('and')
+      .describe(
+        'How to combine multiple filters. "and" = all filters must match (default). "or" = any filter can match.',
+      ),
   },
   handler: async (request, response) => {
-    const {channel, maxLines, tail, filter} = request.params;
+    const {
+      channel,
+      maxLines,
+      tail,
+      filter,
+      isRegex,
+      levels,
+      secondsAgo,
+      filterLogic,
+    } = request.params;
 
     const logsDir = getLatestLogsDir();
 
@@ -257,10 +323,53 @@ export const getOutputPanelContent = defineTool({
 
     let lines = content.split('\n');
 
-    if (filter) {
-      const needle = filter.toLowerCase();
-      lines = lines.filter(line => line.toLowerCase().includes(needle));
+    const now = new Date();
+    const cutoffTime = secondsAgo
+      ? new Date(now.getTime() - secondsAgo * 1000)
+      : null;
+
+    const levelSet = levels?.length ? new Set(levels) : null;
+
+    let filterRegex: RegExp | null = null;
+    if (filter && isRegex) {
+      try {
+        filterRegex = new RegExp(filter, 'i');
+      } catch {
+        response.appendResponseLine(
+          `Invalid regex pattern: "${filter}". Falling back to substring match.`,
+        );
+      }
     }
+
+    const useOr = filterLogic === 'or';
+
+    lines = lines.filter(line => {
+      const checks: boolean[] = [];
+
+      if (filter) {
+        if (filterRegex) {
+          checks.push(filterRegex.test(line));
+        } else {
+          checks.push(line.toLowerCase().includes(filter.toLowerCase()));
+        }
+      }
+
+      if (levelSet) {
+        const lineLevel = parseLogLevel(line);
+        checks.push(lineLevel !== null && levelSet.has(lineLevel));
+      }
+
+      if (cutoffTime) {
+        const lineTime = parseLogTimestamp(line);
+        checks.push(lineTime !== null && lineTime >= cutoffTime);
+      }
+
+      if (checks.length === 0) {
+        return true;
+      }
+
+      return useOr ? checks.some(Boolean) : checks.every(Boolean);
+    });
 
     const effectiveMax = maxLines ?? 200;
     const totalBeforeTrim = lines.length;
@@ -274,8 +383,21 @@ export const getOutputPanelContent = defineTool({
 
     response.appendResponseLine(`## Output: ${targetFile.name}\n`);
 
+    const filterParts: string[] = [];
     if (filter) {
-      response.appendResponseLine(`_Filtered by: "${filter}"_\n`);
+      filterParts.push(`text${isRegex ? ' (regex)' : ''}: "${filter}"`);
+    }
+    if (levelSet) {
+      filterParts.push(`levels: ${[...levelSet].join(', ')}`);
+    }
+    if (secondsAgo) {
+      filterParts.push(`last ${secondsAgo}s`);
+    }
+    if (filterParts.length > 0) {
+      const logic = useOr ? 'OR' : 'AND';
+      response.appendResponseLine(
+        `_Filters (${logic}): ${filterParts.join(' | ')}_\n`,
+      );
     }
 
     if (totalBeforeTrim > effectiveMax) {

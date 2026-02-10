@@ -278,33 +278,70 @@ export function clearAllData(): void {
 }
 
 /**
- * Get all console messages, optionally filtered by type, text content, or source URL.
+ * Get all console messages, optionally filtered by type, text content, source URL, recency, and more.
  */
 export function getConsoleMessages(options?: {
   types?: string[];
   textFilter?: string;
   sourceFilter?: string;
+  isRegex?: boolean;
+  secondsAgo?: number;
+  filterLogic?: 'and' | 'or';
   pageSize?: number;
   pageIdx?: number;
 }): {messages: ConsoleMessage[]; total: number} {
   let filtered = consoleMessages;
 
-  if (options?.types?.length) {
-    const typeSet = new Set(options.types);
-    filtered = filtered.filter(m => typeSet.has(m.type));
+  const useOr = options?.filterLogic === 'or';
+  const now = Date.now();
+  const cutoffTime = options?.secondsAgo
+    ? now - options.secondsAgo * 1000
+    : null;
+
+  let textRegex: RegExp | null = null;
+  if (options?.textFilter && options?.isRegex) {
+    try {
+      textRegex = new RegExp(options.textFilter, 'i');
+    } catch {
+      textRegex = null;
+    }
   }
 
-  if (options?.textFilter) {
-    const needle = options.textFilter.toLowerCase();
-    filtered = filtered.filter(m => m.text.toLowerCase().includes(needle));
-  }
+  filtered = filtered.filter(m => {
+    const checks: boolean[] = [];
 
-  if (options?.sourceFilter) {
-    const needle = options.sourceFilter.toLowerCase();
-    filtered = filtered.filter(m =>
-      m.stackTrace?.some(frame => frame.url.toLowerCase().includes(needle)),
-    );
-  }
+    if (options?.types?.length) {
+      const typeSet = new Set(options.types);
+      checks.push(typeSet.has(m.type));
+    }
+
+    if (options?.textFilter) {
+      if (textRegex) {
+        checks.push(textRegex.test(m.text));
+      } else {
+        const needle = options.textFilter.toLowerCase();
+        checks.push(m.text.toLowerCase().includes(needle));
+      }
+    }
+
+    if (options?.sourceFilter) {
+      const needle = options.sourceFilter.toLowerCase();
+      checks.push(
+        m.stackTrace?.some(frame => frame.url.toLowerCase().includes(needle)) ??
+          false,
+      );
+    }
+
+    if (cutoffTime !== null) {
+      checks.push(m.timestamp >= cutoffTime);
+    }
+
+    if (checks.length === 0) {
+      return true;
+    }
+
+    return useOr ? checks.some(Boolean) : checks.every(Boolean);
+  });
 
   const total = filtered.length;
 

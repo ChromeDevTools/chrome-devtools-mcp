@@ -25,7 +25,6 @@
   },
   "include": [
     "src/**/*.ts",
-    "tests/**/*.ts",
     "node_modules/chrome-devtools-frontend/front_end/core/common",
     "node_modules/chrome-devtools-frontend/front_end/core/host",
     "node_modules/chrome-devtools-frontend/front_end/core/i18n",
