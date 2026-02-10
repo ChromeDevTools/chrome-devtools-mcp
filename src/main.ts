@@ -171,7 +171,7 @@ function devLazyRebuildCheck(): void {
   throw new DevRebuildNeeded(
     'Source code was modified and has been rebuilt successfully. ' +
     'The server will now exit so the new code can be loaded. ' +
-    'Please restart the MCP server and call the tool again.',
+    'Please call the tool again.',
   );
 }
 
