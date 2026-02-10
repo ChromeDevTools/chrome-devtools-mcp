@@ -22,7 +22,7 @@ export const cliOptions = {
   extension: {
     type: 'string',
     description:
-      'Path to the VS Code extension folder to load under development (vsctk bridge). Overrides extensionPath in .devtools/devtools.jsonc.',
+      'Path to the VS Code extension folder to load under development (vscode-devtools bridge). Overrides extensionPath in .devtools/devtools.jsonc.',
     alias: 'e',
   },
 
@@ -48,7 +48,7 @@ export const cliOptions = {
   extensionBridgePath: {
     type: 'string',
     description:
-      '[LEGACY] Override vsctk extension path. Prefer setting extensionPath in .vscode/devtools.json.',
+      '[LEGACY] Override vscode-devtools extension path. Prefer setting extensionPath in .vscode/devtools.json.',
     alias: 'b',
     hidden: true,
   },

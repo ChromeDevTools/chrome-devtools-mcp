@@ -69,7 +69,7 @@ const DEFAULT_CONFIG_TEMPLATE = `// VS Code DevTools MCP configuration (JSONC)
 {
   // NOTE: This file should live at: <workspace>/.devtools/devtools.jsonc
 
-  // Path to the vsctk VS Code extension folder (absolute or relative to this workspace).
+  // Path to the vscode-devtools VS Code extension folder (absolute or relative to this workspace).
   // If omitted, defaults to the repo's "extension/" folder when present.
   // "extensionPath": "extension",
 
@@ -136,7 +136,7 @@ const DEFAULT_CONFIG_TEMPLATE = `// VS Code DevTools MCP configuration (JSONC)
  * path — there's no need for a `bridgeSocketPath` field.
  */
 export interface DevToolsConfig {
-  /** Path to vsctk extension (relative to workspace or absolute). Used for --extensionDevelopmentPath. */
+  /** Path to vscode-devtools extension (relative to workspace or absolute). Used for --extensionDevelopmentPath. */
   extensionPath?: string;
 
   /** Enable diagnostic tools (debug_evaluate) */
@@ -379,7 +379,7 @@ function resolvePath(
 }
 
 /**
- * Get default vsctk extension path (parent of mcp-server package)
+ * Get default vscode-devtools extension path (parent of mcp-server package)
  */
 function getDefaultExtensionPath(): string {
   // Build output is in mcp-server/build/src/

@@ -32,19 +32,20 @@ const IS_WINDOWS = process.platform === 'win32';
  * This uses the same algorithm as extension/bridge.js, so external scripts
  * can connect directly without needing to read a marker file.
  *
- * Windows: \\.\pipe\vsctk-bridge-<8-char-hash-of-lowercase-path>
- * Unix: <workspacePath>/.vscode/vsctk-bridge.sock
+ * Windows: \\.\pipe\vscode-devtools-bridge-<8-char-hash-of-lowercase-path>
+ * Unix: <workspacePath>/.vscode/vscode-devtools-bridge.sock
  */
 export function computeBridgePath(workspacePath: string): string {
   if (IS_WINDOWS) {
+    const resolved = path.resolve(workspacePath);
     const hash = crypto
       .createHash('sha256')
-      .update(workspacePath.toLowerCase())
+      .update(resolved.toLowerCase())
       .digest('hex')
       .slice(0, 8);
-    return `\\\\.\\pipe\\vsctk-bridge-${hash}`;
+    return `\\\\.\\pipe\\vscode-devtools-bridge-${hash}`;
   }
-  return path.join(workspacePath, '.vscode', 'vsctk-bridge.sock');
+  return path.join(workspacePath, '.vscode', 'vscode-devtools-bridge.sock');
 }
 
 /**
@@ -58,7 +59,7 @@ export function discoverBridgePath(workspaceFolder: string): string {
 }
 
 /**
- * Send an 'exec' command to the vsctk bridge and wait for response.
+ * Send an 'exec' command to the vscode-devtools bridge and wait for response.
  * The code runs in a `new Function('vscode', 'payload', ...)` context.
  * `require()` is NOT available — only `vscode` API and `payload`.
  */

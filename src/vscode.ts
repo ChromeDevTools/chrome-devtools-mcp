@@ -397,7 +397,7 @@ async function waitForExtensionHostReady(
 // ── Dev Host Bridge Discovery ───────────────────────────
 
 /**
- * Wait for the vsctk bridge to activate in the Extension Dev Host.
+ * Wait for the vscode-devtools bridge to activate in the Extension Dev Host.
  * The bridge path is computed deterministically from the workspace path.
  * We poll for socket connectivity to know when the bridge is ready.
  */
@@ -877,7 +877,7 @@ export async function runHostShellTaskOrThrow(
  * Steps:
  * 1. Computes Host bridge path from workspace
  * 2. Allocates dynamic ports (CDP + inspector)
- * 3. Spawns Extension Development Host with vsctk extension
+ * 3. Spawns Extension Development Host with vscode-devtools extension
  * 4. Attaches debugger for full debug UI
  * 5. Connects raw CDP WebSocket to workbench page
  * 6. Polls for workbench readiness
