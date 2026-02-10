@@ -10,8 +10,8 @@
  * for interactive tools (click, fill, hover, etc.).
  */
 
-import {sendCdp} from './vscode.js';
 import {logger} from './logger.js';
+import {sendCdp} from './vscode.js';
 
 // ── CDP Accessibility Types ──
 
@@ -66,9 +66,9 @@ const UNINTERESTING_ROLES = new Set([
 ]);
 
 function isInteresting(node: AXNode): boolean {
-  if (node.ignored) return false;
+  if (node.ignored) {return false;}
   const role = String(node.role?.value ?? '');
-  if (UNINTERESTING_ROLES.has(role)) return false;
+  if (UNINTERESTING_ROLES.has(role)) {return false;}
   return true;
 }
 
@@ -124,7 +124,7 @@ export async function fetchAXTree(verbose: boolean): Promise<AXTreeResult> {
           const mapped = BOOLEAN_PROPERTY_MAP[prop.name];
           if (prop.value.type === 'boolean' || prop.value.type === 'booleanOrUndefined') {
             if (prop.value.value) {
-              if (mapped) parts.push(mapped);
+              if (mapped) {parts.push(mapped);}
               parts.push(prop.name);
             }
           } else if (typeof prop.value.value === 'string') {
@@ -281,7 +281,7 @@ export async function scrollElement(
 ): Promise<void> {
   await scrollIntoView(uid);
 
-  if (!direction) return;
+  if (!direction) {return;}
 
   const {x, y} = await getElementCenter(uid);
   const deltaX = direction === 'left' ? -amount : direction === 'right' ? amount : 0;
@@ -488,7 +488,7 @@ export async function dispatchKeyCombo(
   let modifierBits = 0;
   for (const name of modifierNames) {
     const mod = MODIFIER_KEYS[name];
-    if (!mod) throw new Error(`Unknown modifier: "${name}"`);
+    if (!mod) {throw new Error(`Unknown modifier: "${name}"`);}
     modifierBits |= mod.bit;
   }
 
@@ -535,7 +535,7 @@ export async function pressKey(keyInput: string): Promise<void> {
       current += ch;
     }
   }
-  if (current) parts.push(current);
+  if (current) {parts.push(current);}
 
   if (parts.length === 0) {
     throw new Error(`Key "${keyInput}" could not be parsed.`);
@@ -675,7 +675,7 @@ export interface NodeSignature {
  * Create a signature string for comparison.
  */
 function getNodeSignature(node: AXNode): NodeSignature | null {
-  if (node.backendDOMNodeId === undefined) return null;
+  if (node.backendDOMNodeId === undefined) {return null;}
   const props = node.properties ?? [];
   return {
     backendDOMNodeId: node.backendDOMNodeId,
@@ -694,13 +694,13 @@ function getNodeSignature(node: AXNode): NodeSignature | null {
 function formatNodeOneLiner(node: AXNode, uid: string): string {
   const parts: string[] = [`uid=${uid}`];
   const role = node.role?.value;
-  if (role && role !== 'none') parts.push(String(role));
-  if (node.name?.value) parts.push(`"${node.name.value}"`);
+  if (role && role !== 'none') {parts.push(String(role));}
+  if (node.name?.value) {parts.push(`"${node.name.value}"`);}
   const props = node.properties ?? [];
-  if (props.some(p => p.name === 'focused' && p.value.value)) parts.push('focused');
-  if (props.some(p => p.name === 'expanded' && p.value.value)) parts.push('expanded');
-  if (props.some(p => p.name === 'selected' && p.value.value)) parts.push('selected');
-  if (node.value?.value) parts.push(`value="${node.value.value}"`);
+  if (props.some(p => p.name === 'focused' && p.value.value)) {parts.push('focused');}
+  if (props.some(p => p.name === 'expanded' && p.value.value)) {parts.push('expanded');}
+  if (props.some(p => p.name === 'selected' && p.value.value)) {parts.push('selected');}
+  if (node.value?.value) {parts.push(`value="${node.value.value}"`);}
   return parts.join(' ');
 }
 
@@ -792,8 +792,8 @@ export async function fetchAXTreeForDiff(): Promise<Map<number, {node: AXNode; s
 
   const map = new Map<number, {node: AXNode; sig: NodeSignature}>();
   for (const node of nodes) {
-    if (node.ignored) continue;
-    if (!isInteresting(node)) continue;
+    if (node.ignored) {continue;}
+    if (!isInteresting(node)) {continue;}
     const sig = getNodeSignature(node);
     if (sig) {
       map.set(sig.backendDOMNodeId, {node, sig});
@@ -838,7 +838,7 @@ export async function fetchAXTreeForDiffWithUids(): Promise<{
     }
     for (const childId of node.childIds ?? []) {
       const child = cdpMap.get(childId);
-      if (child) visit(child);
+      if (child) {visit(child);}
     }
   }
 
@@ -862,7 +862,7 @@ export async function fetchAXTreeForDiffWithUids(): Promise<{
     const childDepth = !node.ignored && isInteresting(node) ? depth + 1 : depth;
     for (const childId of node.childIds ?? []) {
       const child = cdpMap.get(childId);
-      if (child) formatVisit(child, childDepth);
+      if (child) {formatVisit(child, childDepth);}
     }
   }
   for (const root of roots) {

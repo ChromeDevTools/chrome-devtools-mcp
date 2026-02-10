@@ -276,14 +276,16 @@ async function generateToolDocumentation(): Promise<void> {
     console.log('Generating tool documentation from definitions...');
 
     // Convert ToolDefinitions to ToolWithAnnotations
+    // Exclude experimental/diagnostic tools (devDiagnostic, computerVision)
+    const excludedConditions = new Set(['devDiagnostic', 'computerVision']);
     const toolsWithAnnotations: ToolWithAnnotations[] = tools
       .filter(tool => {
-        if (!tool.annotations.conditions) {
+        const conditions = tool.annotations.conditions;
+        if (!conditions || conditions.length === 0) {
           return true;
         }
-
-        // Only include unconditional tools.
-        return tool.annotations.conditions.length === 0;
+        // Exclude if any condition is in the excluded set
+        return !conditions.some((c: string) => excludedConditions.has(c));
       })
       .map(tool => {
         const properties: Record<string, TypeInfo> = {};

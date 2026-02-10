@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {writeFileSync} from 'fs';
+import {writeFileSync} from 'node:fs';
 
 import {captureScreenshot} from '../ax-tree.js';
 import {zod} from '../third_party/index.js';

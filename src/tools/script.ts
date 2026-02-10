@@ -5,8 +5,8 @@
  */
 
 import {resolveNodeToRemoteObject} from '../ax-tree.js';
-import {sendCdp} from '../vscode.js';
 import {zod} from '../third_party/index.js';
+import {sendCdp} from '../vscode.js';
 
 import {ToolCategory} from './categories.js';
 import {

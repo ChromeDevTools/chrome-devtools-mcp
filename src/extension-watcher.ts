@@ -1,3 +1,10 @@
+
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 /**
  * Extension folder change detection for hot-reload.
  *
@@ -46,10 +53,10 @@ function walkFiles(dir: string, base: string): string[] {
       continue;
     }
     if (stat.isDirectory()) {
-      if (IGNORE_DIRS.has(name)) continue;
+      if (IGNORE_DIRS.has(name)) {continue;}
       results.push(...walkFiles(fullPath, base));
     } else if (stat.isFile()) {
-      if (IGNORE_EXTENSIONS.has(extname(name))) continue;
+      if (IGNORE_EXTENSIONS.has(extname(name))) {continue;}
       results.push(relative(base, fullPath));
     }
   }
@@ -86,7 +93,7 @@ export function saveExtensionSnapshot(extensionDir: string): void {
  * Returns false if no snapshot exists (nothing to compare against).
  */
 export function hasExtensionChanged(extensionDir: string): boolean {
-  if (lastSnapshotHash === undefined) return false;
+  if (lastSnapshotHash === undefined) {return false;}
   const currentHash = computeExtensionHash(extensionDir);
   const changed = currentHash !== lastSnapshotHash;
   if (changed) {

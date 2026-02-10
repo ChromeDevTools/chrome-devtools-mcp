@@ -10,11 +10,11 @@
  * so the Output panel does not need to be open in the GUI.
  */
 
-import * as fs from 'fs';
-import * as path from 'path';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 
-import {getUserDataDir} from '../vscode.js';
 import {zod} from '../third_party/index.js';
+import {getUserDataDir} from '../vscode.js';
 
 import {ToolCategory} from './categories.js';
 import {
@@ -480,9 +480,9 @@ Error Handling:
     const hasMore = totalBeforeTrim > effectiveMax;
 
     const filters: Record<string, unknown> = {};
-    if (filter) filters.text = filter;
-    if (levelSet) filters.levels = [...levelSet];
-    if (secondsAgo) filters.secondsAgo = secondsAgo;
+    if (filter) {filters.text = filter;}
+    if (levelSet) {filters.levels = [...levelSet];}
+    if (secondsAgo) {filters.secondsAgo = secondsAgo;}
     if (Object.keys(filters).length > 0) {
       filters.logic = useOr ? 'or' : 'and';
     }

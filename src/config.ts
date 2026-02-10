@@ -210,34 +210,34 @@ function readOptionalStringArray(
   key: string,
 ): string[] | undefined {
   const value = obj[key];
-  if (!Array.isArray(value)) return undefined;
+  if (!Array.isArray(value)) {return undefined;}
   const strings: string[] = [];
   for (const item of value) {
-    if (typeof item !== 'string') return undefined;
+    if (typeof item !== 'string') {return undefined;}
     strings.push(item);
   }
   return strings;
 }
 
 function coerceDevToolsConfig(value: unknown): DevToolsConfig {
-  if (!isRecord(value)) return {};
+  if (!isRecord(value)) {return {};}
 
   const config: DevToolsConfig = {};
 
   const extensionPath = readOptionalString(value, 'extensionPath');
-  if (extensionPath) config.extensionPath = extensionPath;
+  if (extensionPath) {config.extensionPath = extensionPath;}
 
   const devDiagnostic = readOptionalBoolean(value, 'devDiagnostic');
-  if (typeof devDiagnostic === 'boolean') config.devDiagnostic = devDiagnostic;
+  if (typeof devDiagnostic === 'boolean') {config.devDiagnostic = devDiagnostic;}
 
   const logFile = readOptionalString(value, 'logFile');
-  if (logFile) config.logFile = logFile;
+  if (logFile) {config.logFile = logFile;}
 
   const headless = readOptionalBoolean(value, 'headless');
-  if (typeof headless === 'boolean') config.headless = headless;
+  if (typeof headless === 'boolean') {config.headless = headless;}
 
   const experimentalVision = readOptionalBoolean(value, 'experimentalVision');
-  if (typeof experimentalVision === 'boolean') config.experimentalVision = experimentalVision;
+  if (typeof experimentalVision === 'boolean') {config.experimentalVision = experimentalVision;}
 
   const experimentalStructuredContent = readOptionalBoolean(
     value,
@@ -264,19 +264,19 @@ function coerceDevToolsConfig(value: unknown): DevToolsConfig {
     const launch: Partial<LaunchFlags> = {};
 
     const newWindow = readOptionalBoolean(launchValue, 'newWindow');
-    if (typeof newWindow === 'boolean') launch.newWindow = newWindow;
+    if (typeof newWindow === 'boolean') {launch.newWindow = newWindow;}
 
     const disableExtensions = readOptionalBoolean(launchValue, 'disableExtensions');
-    if (typeof disableExtensions === 'boolean') launch.disableExtensions = disableExtensions;
+    if (typeof disableExtensions === 'boolean') {launch.disableExtensions = disableExtensions;}
 
     const skipReleaseNotes = readOptionalBoolean(launchValue, 'skipReleaseNotes');
-    if (typeof skipReleaseNotes === 'boolean') launch.skipReleaseNotes = skipReleaseNotes;
+    if (typeof skipReleaseNotes === 'boolean') {launch.skipReleaseNotes = skipReleaseNotes;}
 
     const skipWelcome = readOptionalBoolean(launchValue, 'skipWelcome');
-    if (typeof skipWelcome === 'boolean') launch.skipWelcome = skipWelcome;
+    if (typeof skipWelcome === 'boolean') {launch.skipWelcome = skipWelcome;}
 
     const disableGpu = readOptionalBoolean(launchValue, 'disableGpu');
-    if (typeof disableGpu === 'boolean') launch.disableGpu = disableGpu;
+    if (typeof disableGpu === 'boolean') {launch.disableGpu = disableGpu;}
 
     const disableWorkspaceTrust = readOptionalBoolean(launchValue, 'disableWorkspaceTrust');
     if (typeof disableWorkspaceTrust === 'boolean') {
@@ -284,7 +284,7 @@ function coerceDevToolsConfig(value: unknown): DevToolsConfig {
     }
 
     const verbose = readOptionalBoolean(launchValue, 'verbose');
-    if (typeof verbose === 'boolean') launch.verbose = verbose;
+    if (typeof verbose === 'boolean') {launch.verbose = verbose;}
 
     const localeValue = launchValue['locale'];
     if (localeValue === null) {
@@ -294,10 +294,10 @@ function coerceDevToolsConfig(value: unknown): DevToolsConfig {
     }
 
     const enableExtensions = readOptionalStringArray(launchValue, 'enableExtensions');
-    if (enableExtensions) launch.enableExtensions = enableExtensions;
+    if (enableExtensions) {launch.enableExtensions = enableExtensions;}
 
     const extraArgs = readOptionalStringArray(launchValue, 'extraArgs');
-    if (extraArgs) launch.extraArgs = extraArgs;
+    if (extraArgs) {launch.extraArgs = extraArgs;}
 
     config.launch = launch;
   }
@@ -356,7 +356,7 @@ function loadConfigFile(workspaceFolder: string): DevToolsConfig {
 
 /** Merge partial launch flags over defaults. */
 function resolveLaunchFlags(partial?: Partial<LaunchFlags>): LaunchFlags {
-  if (!partial) return {...DEFAULT_LAUNCH_FLAGS};
+  if (!partial) {return {...DEFAULT_LAUNCH_FLAGS};}
   return {
     ...DEFAULT_LAUNCH_FLAGS,
     ...partial,
@@ -373,8 +373,8 @@ function resolvePath(
   basePath: string,
   relativePath: string | undefined,
 ): string | undefined {
-  if (!relativePath) return undefined;
-  if (isAbsolute(relativePath)) return relativePath;
+  if (!relativePath) {return undefined;}
+  if (isAbsolute(relativePath)) {return relativePath;}
   return resolve(basePath, relativePath);
 }
 
@@ -390,11 +390,11 @@ function getDefaultExtensionPath(): string {
   // In this repo, the VS Code extension lives in the "extension" folder.
   const extensionFolder = join(parentDir, 'extension');
   const extensionPackageJson = join(extensionFolder, 'package.json');
-  if (existsSync(extensionPackageJson)) return extensionFolder;
+  if (existsSync(extensionPackageJson)) {return extensionFolder;}
 
   // Fallback for repos where the extension lives at the workspace root.
   const rootPackageJson = join(parentDir, 'package.json');
-  if (existsSync(rootPackageJson)) return parentDir;
+  if (existsSync(rootPackageJson)) {return parentDir;}
 
   return parentDir;
 }

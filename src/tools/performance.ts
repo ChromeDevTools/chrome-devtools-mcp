@@ -8,22 +8,25 @@ import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
 
-import {sendCdp} from '../vscode.js';
 import {startTrace as cdpStartTrace, stopTrace as cdpStopTrace, getTraceData} from '../cdp-events.js';
 import {logger} from '../logger.js';
 import {zod, DevTools} from '../third_party/index.js';
 import type {InsightName, TraceResult} from '../trace-processing/parse.js';
 import {
+  getInsightOutput,
+  getTraceSummary,
   parseRawTraceBuffer,
   traceResultIsSuccess,
 } from '../trace-processing/parse.js';
+import {sendCdp} from '../vscode.js';
 
 import {ToolCategory} from './categories.js';
-import type {Context, Response} from './ToolDefinition.js';
+import type {Response} from './ToolDefinition.js';
 import {defineTool, ResponseFormat, responseFormatSchema} from './ToolDefinition.js';
 
 // Module-level state for tracking trace status
 let isRunningTrace = false;
+const recordedTraces: TraceResult[] = [];
 
 const filePathSchema = zod
   .string()
@@ -74,7 +77,7 @@ Error Handling:
     reload: zod
       .boolean()
       .describe(
-        'Determines if, once tracing has started, the current selected page should be automatically reloaded. Navigate the page to the right URL using the navigate_page tool BEFORE starting the trace if reload or autoStop is set to true.',
+        'Determines if, once tracing has started, the current selected page should be automatically reloaded. Ensure the page is at the correct URL BEFORE starting the trace if reload or autoStop is set to true.',
       ),
     autoStop: zod
       .boolean()
@@ -84,7 +87,7 @@ Error Handling:
     filePath: filePathSchema,
   },
   outputSchema: StartTraceOutputSchema,
-  handler: async (request, response, context) => {
+  handler: async (request, response) => {
     if (isRunningTrace) {
       if (request.params.response_format === ResponseFormat.JSON) {
         response.appendResponseLine(JSON.stringify({
@@ -151,7 +154,6 @@ Error Handling:
         await new Promise(resolve => setTimeout(resolve, 5_000));
         await stopTracingAndAppendOutput(
           response,
-          context,
           request.params.filePath,
         );
       } else {
@@ -204,7 +206,7 @@ Error Handling:
     filePath: filePathSchema,
   },
   outputSchema: StopTraceOutputSchema,
-  handler: async (request, response, context) => {
+  handler: async (request, response) => {
     if (!isRunningTrace) {
       if (request.params.response_format === ResponseFormat.JSON) {
         response.appendResponseLine(JSON.stringify({
@@ -218,7 +220,6 @@ Error Handling:
     }
     await stopTracingAndAppendOutput(
       response,
-      context,
       request.params.filePath,
     );
   },
@@ -271,8 +272,8 @@ Error Handling:
       ),
   },
   outputSchema: AnalyzeInsightOutputSchema,
-  handler: async (request, response, context) => {
-    const lastRecording = context.recordedTraces().at(-1);
+  handler: async (request, response) => {
+    const lastRecording = recordedTraces.at(-1);
     if (!lastRecording) {
       response.appendResponseLine(
         'No recorded traces found. Record a performance trace so you have Insights to analyze.',
@@ -280,17 +281,21 @@ Error Handling:
       return;
     }
 
-    response.attachTraceInsight(
+    const insight = getInsightOutput(
       lastRecording,
       request.params.insightSetId,
       request.params.insightName as InsightName,
     );
+    if ('error' in insight) {
+      response.appendResponseLine(insight.error);
+    } else {
+      response.appendResponseLine(insight.output);
+    }
   },
 });
 
 async function stopTracingAndAppendOutput(
   response: Response,
-  context: Context,
   filePath?: string,
 ): Promise<void> {
   try {
@@ -315,7 +320,6 @@ async function stopTracingAndAppendOutput(
         });
       }
 
-      // Write file directly since context.saveFile may not work
       const fullPath = path.isAbsolute(filePath)
         ? filePath
         : path.join(process.cwd(), filePath);
@@ -329,11 +333,8 @@ async function stopTracingAndAppendOutput(
     response.appendResponseLine('The performance trace has been stopped.');
 
     if (traceResultIsSuccess(result)) {
-      if (context.isCruxEnabled()) {
-        await populateCruxData(result);
-      }
-      context.storeTraceRecording(result);
-      response.attachTraceSummary(result);
+      recordedTraces.push(result);
+      response.appendResponseLine(getTraceSummary(result));
     } else {
       throw new Error(
         `There was an unexpected error parsing the trace: ${result.error}`,
@@ -342,44 +343,4 @@ async function stopTracingAndAppendOutput(
   } finally {
     isRunningTrace = false;
   }
-}
-
-/** We tell CrUXManager to fetch data so it's available when DevTools.PerformanceTraceFormatter is invoked */
-async function populateCruxData(result: TraceResult): Promise<void> {
-  logger('populateCruxData called');
-  const cruxManager = DevTools.CrUXManager.instance();
-  // go/jtfbx. Yes, we're aware this API key is public. ;)
-  cruxManager.setEndpointForTesting(
-    'https://chromeuxreport.googleapis.com/v1/records:queryRecord?key=AIzaSyBn5gimNjhiEyA_euicSKko6IlD3HdgUfk',
-  );
-  const cruxSetting =
-    DevTools.Common.Settings.Settings.instance().createSetting('field-data', {
-      enabled: true,
-    });
-  cruxSetting.set({enabled: true});
-
-  // Gather URLs to fetch CrUX data for
-  const urls = [...(result.parsedTrace.insights?.values() ?? [])].map(c =>
-    c.url.toString(),
-  );
-  urls.push(result.parsedTrace.data.Meta.mainFrameURL);
-  const urlSet = new Set(urls);
-
-  if (urlSet.size === 0) {
-    logger('No URLs found for CrUX data');
-    return;
-  }
-
-  logger(
-    `Fetching CrUX data for ${urlSet.size} URLs: ${Array.from(urlSet).join(', ')}`,
-  );
-  const cruxData = await Promise.all(
-    Array.from(urlSet).map(async url => {
-      const data = await cruxManager.getFieldDataForPage(url);
-      logger(`CrUX data for ${url}: ${data ? 'found' : 'not found'}`);
-      return data;
-    }),
-  );
-
-  result.parsedTrace.metadata.cruxFieldData = cruxData;
 }

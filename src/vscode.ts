@@ -11,7 +11,6 @@
  * 2. Allocates dynamic ports (CDP + Extension Host inspector) via get-port
  * 3. Spawns an Extension Development Host via child_process.spawn()
  * 4. Connects via raw CDP WebSocket to the page-level target
- *    (Puppeteer browser-level connect FAILS on Electron)
  * 5. Polls for workbench readiness (.monaco-workbench + document.readyState)
  * 6. Provides lifecycle management (cleanup on exit/crash)
  *
@@ -24,25 +23,23 @@
  * for any reason (clean, SIGINT, SIGTERM, crash) the child is killed instantly.
  */
 
+import {spawn, execSync, type ChildProcess} from 'node:child_process';
 import fs from 'node:fs';
 import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
-import {spawn, execSync, type ChildProcess} from 'node:child_process';
 
 import getPort from 'get-port';
 import WebSocket from 'ws';
 
-import {DEFAULT_LAUNCH_FLAGS, type LaunchFlags} from './config.js';
 import {
   computeBridgePath,
   bridgeExec,
   bridgeAttachDebugger,
 } from './bridge-client.js';
 import {initCdpEventSubscriptions, clearAllData} from './cdp-events.js';
+import {DEFAULT_LAUNCH_FLAGS, type LaunchFlags} from './config.js';
 import {logger} from './logger.js';
-import type {Browser, ConnectionTransport} from './third_party/index.js';
-import {puppeteer} from './third_party/index.js';
 
 // ── CDP Target Types ────────────────────────────────────
 
@@ -56,12 +53,14 @@ interface CdpTarget {
 
 interface CdpVersionInfo {
   Browser: string;
+  webSocketDebuggerUrl?: string;
   [key: string]: unknown;
 }
 
 // ── Module State (singleton — max one child at a time) ──
 
 let cdpWs: WebSocket | undefined;
+let browserCdpWs: WebSocket | undefined;
 let cdpPort: number | undefined;
 let inspectorPort: number | undefined;
 let hostBridgePath: string | undefined;
@@ -119,174 +118,6 @@ export function sendCdp(
   });
 }
 
-// ── Puppeteer ElectronTransport ─────────────────────────
-
-/**
- * Custom ConnectionTransport that bridges a raw CDP WebSocket to Puppeteer.
- *
- * Electron's DevTools protocol doesn't support several browser-management
- * commands that Puppeteer calls during connect (Target.getBrowserContexts,
- * Target.setDiscoverTargets, Target.setAutoAttach, Browser.getVersion).
- * This transport intercepts those calls and returns mock responses, while
- * forwarding all other CDP commands to the real WebSocket.
- *
- * Modeled after Puppeteer's own ExtensionTransport which solves the same
- * problem for Chrome extensions.
- */
-class ElectronTransport implements ConnectionTransport {
-  onmessage?: (message: string) => void;
-  onclose?: () => void;
-
-  #ws: WebSocket;
-  #targetId: string;
-  #targetUrl: string;
-  #targetTitle: string;
-  #versionInfo: CdpVersionInfo;
-  #attached = false;
-
-  constructor(ws: WebSocket, target: CdpTarget, versionInfo: CdpVersionInfo) {
-    this.#ws = ws;
-    this.#targetId = target.id;
-    this.#targetUrl = target.url;
-    this.#targetTitle = target.title;
-    this.#versionInfo = versionInfo;
-
-    // Forward real CDP messages from the WebSocket to Puppeteer.
-    // Every command forwarded to the WS had its sessionId stripped (see send()),
-    // so we must inject it back on ALL messages — both responses (have id) and
-    // events (no id) — so Puppeteer routes them to the correct CDPSession.
-    this.#ws.addEventListener('message', (evt: WebSocket.MessageEvent) => {
-      const raw = typeof evt.data === 'string' ? evt.data : evt.data.toString();
-      const parsed = JSON.parse(raw);
-
-      if (!parsed.sessionId) {
-        parsed.sessionId = 'pageTargetSessionId';
-      }
-
-      this.onmessage?.(JSON.stringify(parsed));
-    });
-
-    this.#ws.addEventListener('close', () => {
-      this.onclose?.();
-    });
-  }
-
-  #dispatchResponse(message: object): void {
-    setTimeout(() => {
-      this.onmessage?.(JSON.stringify(message));
-    }, 0);
-  }
-
-  send(message: string): void {
-    const parsed = JSON.parse(message);
-
-    switch (parsed.method) {
-      case 'Browser.getVersion': {
-        this.#dispatchResponse({
-          id: parsed.id,
-          sessionId: parsed.sessionId,
-          method: parsed.method,
-          result: {
-            protocolVersion: '1.3',
-            product: this.#versionInfo.Browser ?? 'Electron',
-            revision: 'unknown',
-            userAgent: (this.#versionInfo['User-Agent'] as string) ?? 'Electron',
-            jsVersion: 'unknown',
-          },
-        });
-        return;
-      }
-      case 'Target.getBrowserContexts': {
-        this.#dispatchResponse({
-          id: parsed.id,
-          sessionId: parsed.sessionId,
-          method: parsed.method,
-          result: {
-            browserContextIds: [],
-          },
-        });
-        return;
-      }
-      case 'Target.setDiscoverTargets': {
-        // Emit a single "page" target representing the VS Code workbench
-        this.#dispatchResponse({
-          method: 'Target.targetCreated',
-          params: {
-            targetInfo: {
-              targetId: this.#targetId,
-              type: 'page',
-              title: this.#targetTitle,
-              url: this.#targetUrl,
-              attached: false,
-              canAccessOpener: false,
-            },
-          },
-        });
-        this.#dispatchResponse({
-          id: parsed.id,
-          sessionId: parsed.sessionId,
-          method: parsed.method,
-          result: {},
-        });
-        return;
-      }
-      case 'Target.setAutoAttach': {
-        // Only emit attachedToTarget on the FIRST call (browser-level connect).
-        // Subsequent calls come from CDPSessions trying to auto-attach to
-        // sub-targets (iframes, workers). Emitting attachedToTarget again would
-        // create an infinite loop: new CDPSession → setAutoAttach → attachedToTarget → ...
-        if (!this.#attached) {
-          this.#attached = true;
-          this.#dispatchResponse({
-            method: 'Target.attachedToTarget',
-            params: {
-              targetInfo: {
-                targetId: this.#targetId,
-                type: 'page',
-                title: this.#targetTitle,
-                url: this.#targetUrl,
-                attached: true,
-                canAccessOpener: false,
-              },
-              sessionId: 'pageTargetSessionId',
-            },
-          });
-        }
-        this.#dispatchResponse({
-          id: parsed.id,
-          sessionId: parsed.sessionId,
-          method: parsed.method,
-          result: {},
-        });
-        return;
-      }
-    }
-
-    // Strip the synthetic sessionId before forwarding to the real WebSocket.
-    // Our page-level WS doesn't use sessions — Puppeteer adds them for routing.
-    if (parsed.sessionId === 'pageTargetSessionId') {
-      delete parsed.sessionId;
-    }
-
-    // Forward all other commands to the real CDP WebSocket
-    if (this.#ws.readyState === WebSocket.OPEN) {
-      this.#ws.send(JSON.stringify(parsed));
-    }
-  }
-
-  close(): void {
-    // WebSocket lifecycle is managed externally — don't close it here
-  }
-}
-
-// ── Puppeteer Browser (singleton) ───────────────────────
-
-let puppeteerBrowser: Browser | undefined;
-
-export function getPuppeteerBrowser(): Browser | undefined {
-  return puppeteerBrowser;
-}
-
 // ── Public Getters ──────────────────────────────────────
 
 export function getCdpWebSocket(): WebSocket | undefined {
@@ -307,6 +138,10 @@ export function getDevhostBridgePath(): string | undefined {
 
 export function isConnected(): boolean {
   return cdpWs?.readyState === WebSocket.OPEN;
+}
+
+export function getBrowserCdpWebSocket(): WebSocket | undefined {
+  return browserCdpWs;
 }
 
 // ── Port Polling ────────────────────────────────────────
@@ -381,7 +216,7 @@ async function discoverElectronPid(port: number): Promise<number | null> {
         const parts = line.trim().split(/\s+/);
         if (parts.length >= 5) {
           const pid = parseInt(parts[parts.length - 1], 10);
-          if (pid > 0) return pid;
+          if (pid > 0) {return pid;}
         }
       }
     } else {
@@ -390,7 +225,7 @@ async function discoverElectronPid(port: number): Promise<number | null> {
         timeout: 5000,
       }).trim();
       const pid = parseInt(out.split('\n')[0], 10);
-      if (pid > 0) return pid;
+      if (pid > 0) {return pid;}
     }
   } catch {
     // Command failed — maybe no process or tool not available
@@ -624,7 +459,7 @@ function discoverPidByPortSync(port: number): number | null {
         const parts = line.trim().split(/\s+/);
         if (parts.length >= 5) {
           const pid = parseInt(parts[parts.length - 1], 10);
-          if (pid > 0) return pid;
+          if (pid > 0) {return pid;}
         }
       }
     } else {
@@ -633,7 +468,7 @@ function discoverPidByPortSync(port: number): number | null {
         timeout: 5000,
       }).trim();
       const pid = parseInt(out.split('\n')[0], 10);
-      if (pid > 0) return pid;
+      if (pid > 0) {return pid;}
     }
   } catch {
     // Command failed
@@ -647,7 +482,7 @@ function discoverPidByPortSync(port: number): number | null {
  * PID reference but know the user-data-dir path.
  */
 function killByUserDataDirSync(dataDir: string): void {
-  if (process.platform !== 'win32') return;
+  if (process.platform !== 'win32') {return;}
   try {
     // Escape backslashes for WMIC LIKE pattern
     const escapedPath = dataDir.replace(/\\/g, '\\\\');
@@ -747,7 +582,7 @@ function ensureGitignoreEntry(targetFolder: string): void {
   try {
     if (fs.existsSync(gitignorePath)) {
       const content = fs.readFileSync(gitignorePath, 'utf-8');
-      if (content.includes('.devtools')) return;
+      if (content.includes('.devtools')) {return;}
       fs.appendFileSync(gitignorePath, '\n# VS Code DevTools MCP session data\n.devtools/\n');
     } else {
       fs.writeFileSync(gitignorePath, '# VS Code DevTools MCP session data\n.devtools/\n');
@@ -763,15 +598,19 @@ function ensureGitignoreEntry(targetFolder: string): void {
  * Synchronous except for the WS close (best-effort).
  */
 export function teardownSync(): void {
-  // Disconnect Puppeteer before closing the WebSocket
-  puppeteerBrowser = undefined;
-
   try {
     cdpWs?.close();
   } catch {
     // best-effort
   }
   cdpWs = undefined;
+
+  try {
+    browserCdpWs?.close();
+  } catch {
+    // best-effort
+  }
+  browserCdpWs = undefined;
 
   forceKillChildSync();
 
@@ -857,7 +696,7 @@ function tryReadHostTaskFromTasksJson(
   taskLabel: string,
 ): HostTaskDefinition | null {
   const tasksPath = path.join(workspaceFolder, '.vscode', 'tasks.json');
-  if (!fs.existsSync(tasksPath)) return null;
+  if (!fs.existsSync(tasksPath)) {return null;}
 
   const content = fs.readFileSync(tasksPath, 'utf8');
   let parsed: unknown;
@@ -867,17 +706,17 @@ function tryReadHostTaskFromTasksJson(
     return null;
   }
 
-  if (!isRecord(parsed)) return null;
+  if (!isRecord(parsed)) {return null;}
   const tasksValue = parsed['tasks'];
-  if (!Array.isArray(tasksValue)) return null;
+  if (!Array.isArray(tasksValue)) {return null;}
 
   for (const item of tasksValue) {
-    if (!isRecord(item)) continue;
+    if (!isRecord(item)) {continue;}
     const label = readOptionalString(item, 'label');
-    if (label !== taskLabel) continue;
+    if (label !== taskLabel) {continue;}
 
     const command = readOptionalString(item, 'command');
-    if (!command) return null;
+    if (!command) {return null;}
 
     const optionsValue = item['options'];
     const optionsCwdRaw = isRecord(optionsValue)
@@ -901,8 +740,59 @@ function tryReadHostTaskFromTasksJson(
 export async function runHostShellTaskOrThrow(
   workspaceFolder: string,
   taskLabel: string,
-  inactivityTimeoutMs: number,
+  _inactivityTimeoutMs: number,
 ): Promise<void> {
+  // Prefer using the host bridge to execute the task via VS Code's Tasks API.
+  // This keeps build output in VS Code's terminal panel and uses problem matchers.
+  const bridge = hostBridgePath ?? computeBridgePath(workspaceFolder);
+
+  logger(`Running task "${taskLabel}" via host bridge…`);
+
+  try {
+    await bridgeExec(
+      bridge,
+      `
+      const tasks = await vscode.tasks.fetchTasks();
+      const target = tasks.find(t => t.name === payload.label);
+      if (!target) {
+        throw new Error('Task "' + payload.label + '" not found in host VS Code');
+      }
+
+      const execution = await vscode.tasks.executeTask(target);
+
+      return new Promise((resolve, reject) => {
+        const disposable = vscode.tasks.onDidEndTaskProcess(event => {
+          if (event.execution === execution) {
+            disposable.dispose();
+            if (event.exitCode === 0) {
+              resolve({ success: true, exitCode: 0 });
+            } else {
+              reject(new Error(
+                '"' + payload.label + '" failed with exit code ' + event.exitCode
+              ));
+            }
+          }
+        });
+
+        setTimeout(() => {
+          disposable.dispose();
+          reject(new Error('"' + payload.label + '" timed out after 5 minutes'));
+        }, 300000);
+      });
+      `,
+      {label: taskLabel},
+    );
+
+    logger(`Task "${taskLabel}" completed successfully via bridge`);
+    return;
+  } catch (bridgeErr) {
+    logger(
+      `Bridge task execution failed, falling back to shell: ${(bridgeErr as Error).message}`,
+    );
+  }
+
+  // Fallback: run the command directly if the bridge is unavailable
+  // (e.g., host VS Code not running or bridge not initialized yet).
   const task = tryReadHostTaskFromTasksJson(workspaceFolder, taskLabel);
   if (!task) {
     throw new Error(
@@ -910,7 +800,7 @@ export async function runHostShellTaskOrThrow(
     );
   }
 
-  logger(`Running prelaunch task ${task.label}: ${task.command}`);
+  logger(`Fallback: running "${task.label}" directly: ${task.command}`);
 
   await new Promise<void>((resolve, reject) => {
     const cwd = task.optionsCwd ?? workspaceFolder;
@@ -927,7 +817,7 @@ export async function runHostShellTaskOrThrow(
 
     let inactivityTimer: NodeJS.Timeout | undefined;
     const resetInactivityTimer = () => {
-      if (inactivityTimer) clearTimeout(inactivityTimer);
+      if (inactivityTimer) {clearTimeout(inactivityTimer);}
       inactivityTimer = setTimeout(() => {
         try {
           child.kill();
@@ -936,10 +826,10 @@ export async function runHostShellTaskOrThrow(
         }
         reject(
           new Error(
-            `Prelaunch task "${taskLabel}" produced no output for ${Math.round(inactivityTimeoutMs / 1000)}s and was terminated.\n\n${output}`,
+            `Prelaunch task "${taskLabel}" produced no output for ${Math.round(_inactivityTimeoutMs / 1000)}s and was terminated.\n\n${output}`,
           ),
         );
-      }, inactivityTimeoutMs);
+      }, _inactivityTimeoutMs);
     };
 
     const appendOutput = (chunk: Buffer) => {
@@ -958,12 +848,12 @@ export async function runHostShellTaskOrThrow(
     child.stderr?.on('data', appendOutput);
 
     child.on('error', (err) => {
-      if (inactivityTimer) clearTimeout(inactivityTimer);
+      if (inactivityTimer) {clearTimeout(inactivityTimer);}
       reject(new Error(`Prelaunch task spawn error: ${err.message}\n\n${output}`));
     });
 
     child.on('exit', (code) => {
-      if (inactivityTimer) clearTimeout(inactivityTimer);
+      if (inactivityTimer) {clearTimeout(inactivityTimer);}
       if (code === 0) {
         resolve();
         return;
@@ -1031,14 +921,14 @@ function buildLaunchArgs(flags: LaunchFlags, ports: InternalLaunchPorts): string
     `--user-data-dir=${ports.userDataDir}`,
   ];
 
-  if (flags.newWindow) args.push('--new-window');
-  if (flags.skipReleaseNotes) args.push('--skip-release-notes');
-  if (flags.skipWelcome) args.push('--skip-welcome');
-  if (flags.disableExtensions) args.push('--disable-extensions');
-  if (flags.disableGpu) args.push('--disable-gpu');
-  if (flags.disableWorkspaceTrust) args.push('--disable-workspace-trust');
-  if (flags.verbose) args.push('--verbose');
-  if (flags.locale) args.push(`--locale=${flags.locale}`);
+  if (flags.newWindow) {args.push('--new-window');}
+  if (flags.skipReleaseNotes) {args.push('--skip-release-notes');}
+  if (flags.skipWelcome) {args.push('--skip-welcome');}
+  if (flags.disableExtensions) {args.push('--disable-extensions');}
+  if (flags.disableGpu) {args.push('--disable-gpu');}
+  if (flags.disableWorkspaceTrust) {args.push('--disable-workspace-trust');}
+  if (flags.verbose) {args.push('--verbose');}
+  if (flags.locale) {args.push(`--locale=${flags.locale}`);}
 
   for (const ext of flags.enableExtensions) {
     args.push(`--enable-extension=${ext}`);
@@ -1200,29 +1090,33 @@ async function doConnect(options: VSCodeLaunchOptions): Promise<WebSocket> {
   );
   cdpWs = await connectCdpWebSocket(workbench.webSocketDebuggerUrl);
 
+  // 8b. Connect browser-level CDP WebSocket for Tracing domain
+  //     Tracing is a browser-level CDP domain that requires a connection
+  //     to the browser target, not a page target.
+  if (versionInfo.webSocketDebuggerUrl) {
+    try {
+      browserCdpWs = await connectCdpWebSocket(versionInfo.webSocketDebuggerUrl);
+      logger('Browser-level CDP WebSocket connected (for tracing)');
+
+      browserCdpWs.on('close', () => {
+        logger('Browser CDP WebSocket closed');
+        browserCdpWs = undefined;
+      });
+    } catch (err) {
+      logger(`Warning: could not connect browser-level CDP: ${(err as Error).message}. Tracing will not work.`);
+    }
+  } else {
+    logger('Warning: browser webSocketDebuggerUrl not available — tracing will not work');
+  }
+
   // 9. Enable CDP domains and wait for readiness
   await sendCdp('Runtime.enable', {}, cdpWs);
   await sendCdp('Page.enable', {}, cdpWs);
 
-  // 9a. Initialize CDP event subscriptions for console/network tracking
+  // 9a. Initialize CDP event subscriptions for console/network/tracing
   await initCdpEventSubscriptions();
 
   await waitForWorkbenchReady(cdpWs);
-
-  // 9b. Create Puppeteer Browser via ElectronTransport.
-  //     puppeteer.connect({ browserWSEndpoint }) fails on Electron because
-  //     Target.getBrowserContexts is not allowed. ElectronTransport intercepts
-  //     those calls and returns mock responses, while forwarding real CDP.
-  try {
-    const transport = new ElectronTransport(cdpWs, workbench, versionInfo);
-    puppeteerBrowser = await puppeteer.connect({
-      transport,
-      defaultViewport: null,
-    });
-    logger('Puppeteer Browser created via ElectronTransport');
-  } catch (err) {
-    logger(`Warning: Puppeteer connect failed: ${(err as Error).message}. Tools requiring Puppeteer will not work.`);
-  }
 
   // 10. Discover Dev Host bridge (for VS Code API calls in the target window)
   devhostBridgePath = (await waitForDevHostBridge(targetFolder)) ?? undefined;
@@ -1230,9 +1124,8 @@ async function doConnect(options: VSCodeLaunchOptions): Promise<WebSocket> {
   // Monitor for unexpected disconnects
   cdpWs.on('close', () => {
     logger('CDP WebSocket closed unexpectedly');
-    clearAllData(); // Clear all stored console/network/trace data
+    clearAllData();
     cdpWs = undefined;
-    puppeteerBrowser = undefined;
   });
 
   return cdpWs;
@@ -1246,13 +1139,16 @@ async function doConnect(options: VSCodeLaunchOptions): Promise<WebSocket> {
  * since the process was spawned externally, not via VS Code's launch lifecycle.
  */
 export async function stopDebugWindow(): Promise<void> {
-  puppeteerBrowser = undefined;
-
-  // Clear all stored console/network/trace data
   clearAllData();
 
   try {
     cdpWs?.close();
+  } catch {
+    // best-effort
+  }
+
+  try {
+    browserCdpWs?.close();
   } catch {
     // best-effort
   }
@@ -1271,6 +1167,7 @@ export async function stopDebugWindow(): Promise<void> {
   // The user can manually delete .devtools/ to reset.
 
   cdpWs = undefined;
+  browserCdpWs = undefined;
   cdpPort = undefined;
   inspectorPort = undefined;
   hostBridgePath = undefined;
@@ -1280,3 +1177,4 @@ export async function stopDebugWindow(): Promise<void> {
   electronPid = undefined;
   userDataDir = undefined;
 }
+

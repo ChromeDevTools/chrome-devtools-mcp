@@ -8,16 +8,14 @@ import './polyfill.js';
 
 import process from 'node:process';
 
-import {ensureVSCodeConnected, getConnectionGeneration, getPuppeteerBrowser, stopDebugWindow, runHostShellTaskOrThrow} from './vscode.js';
-import {hasExtensionChanged, saveExtensionSnapshot} from './extension-watcher.js';
-import {checkForBlockingUI} from './notification-gate.js';
 import {parseArguments} from './cli.js';
 import {loadConfig, type ResolvedConfig} from './config.js';
+import {hasExtensionChanged, saveExtensionSnapshot} from './extension-watcher.js';
 import {loadIssueDescriptions} from './issue-descriptions.js';
 import {logger, saveLogsToFile} from './logger.js';
-import {McpContext} from './McpContext.js';
 import {McpResponse} from './McpResponse.js';
 import {Mutex} from './Mutex.js';
+import {checkForBlockingUI} from './notification-gate.js';
 import {
   McpServer,
   StdioServerTransport,
@@ -27,6 +25,7 @@ import {
 import {ToolCategory} from './tools/categories.js';
 import type {ToolDefinition} from './tools/ToolDefinition.js';
 import {tools} from './tools/tools.js';
+import {ensureVSCodeConnected, stopDebugWindow, runHostShellTaskOrThrow} from './vscode.js';
 
 // Default timeout for tools (30 seconds)
 const DEFAULT_TOOL_TIMEOUT_MS = 30_000;
@@ -88,14 +87,9 @@ server.server.setRequestHandler(SetLevelRequestSchema, () => {
   return {};
 });
 
-let context: McpContext | undefined;
-let contextGeneration = -1;
-
 /**
  * Ensure VS Code debug window is connected (CDP + bridge).
- * Required for ALL tools including diagnostic ones.
  */
-
 async function ensureConnection(): Promise<void> {
   await ensureVSCodeConnected({
     workspaceFolder: config.hostWorkspace,
@@ -104,32 +98,6 @@ async function ensureConnection(): Promise<void> {
     headless: config.headless,
     launch: config.launch,
   });
-}
-
-/**
- * Get or create the McpContext (Puppeteer page model).
- * Only needed for non-diagnostic tools that interact via Puppeteer.
- */
-async function getContext(): Promise<McpContext> {
-  const gen = getConnectionGeneration();
-  if (gen !== contextGeneration) {
-    context?.dispose();
-    context = undefined;
-    contextGeneration = gen;
-  }
-  if (!context) {
-    const browser = getPuppeteerBrowser();
-    if (!browser) {
-      throw new Error(
-        'Puppeteer Browser not available. The ElectronTransport may have failed during connection.',
-      );
-    }
-    context = await McpContext.from(browser, logger, {
-      experimentalDevToolsDebugging: false,
-      performanceCrux: false,
-    });
-  }
-  return context;
 }
 
 const logDisclaimers = () => {
@@ -209,8 +177,8 @@ function registerTool(tool: ToolDefinition): void {
           // Standalone tools don't need VS Code connection or UI checks
           if (isStandalone) {
             const response = new McpResponse();
-            await tool.handler({params}, response, undefined as never);
-            const content: Array<{type: string; text?: string}> = [];
+            await tool.handler({params}, response);
+            const content: CallToolResult['content'] = [];
             for (const line of response.responseLines) {
               content.push({type: 'text', text: line});
             }
@@ -220,93 +188,50 @@ function registerTool(tool: ToolDefinition): void {
             return {content};
           }
 
-          // Check for blocking modals/notifications before tool execution
-          // BLOCKING modals (e.g., "Save file?") → STOP tool, return modal info
-          // NON-BLOCKING notifications (toasts) → Prepend banner, let tool proceed
+          // Check for blocking modals/notifications before tool execution.
+          // BLOCKING modals (e.g., "Save file?") → STOP tool, return modal info.
+          // NON-BLOCKING notifications (toasts) → Prepend banner, let tool proceed.
           //
-          // EXCEPTION: Input tools (hotkey, click, hover, drag) BYPASS the gate
-          // when there's a blocking UI. This allows the user to dismiss the dialog.
-          // Without this, there would be no way to interact with blocking dialogs via MCP.
+          // Input tools bypass blocking UI so the user can dismiss dialogs via MCP.
           const inputTools = ['hotkey', 'click', 'hover', 'drag', 'type', 'scroll'];
           const isInputTool = inputTools.includes(tool.name);
           
           const uiCheck = await checkForBlockingUI();
           if (uiCheck.blocked && !isInputTool) {
-            // Blocked and NOT an input tool - return blocking message
-            const content: Array<{type: string; text?: string}> = [];
+            const content: CallToolResult['content'] = [];
             if (uiCheck.notificationBanner) {
               content.push({type: 'text', text: uiCheck.notificationBanner});
             }
             content.push({type: 'text', text: uiCheck.blockingMessage!});
             return {content};
           }
-          // For input tools when blocked: still prepend banner but let tool execute
           const notificationBanner = uiCheck.notificationBanner;
 
-          // Diagnostic and directCdp tools bypass McpContext — they use sendCdp/bridgeExec directly.
-          // Non-diagnostic tools need full McpContext (Phase B will refactor this).
-          const isDiagnostic = tool.annotations.conditions?.includes('devDiagnostic');
-          const isDirectCdp = tool.annotations.conditions?.includes('directCdp');
-          const bypassContext = isDiagnostic || isDirectCdp;
-          const ctx = bypassContext ? (undefined as never) : await getContext();
-
-          logger(`${tool.name} context: resolved`);
           const response = new McpResponse();
-          await tool.handler(
-            {
-              params,
-            },
-            response,
-            ctx,
-          );
+          await tool.handler({params}, response);
 
-          // Diagnostic/directCdp tools return content directly without McpResponse.handle()
-          if (bypassContext) {
-            const content: Array<{type: string; text?: string; data?: string; mimeType?: string}> = [];
-            // Prepend notification banner if present
-            if (notificationBanner) {
-              content.push({type: 'text', text: notificationBanner});
-            }
-            for (const line of response.responseLines) {
-              content.push({type: 'text', text: line});
-            }
-            for (const img of response.images) {
-              content.push({type: 'image', data: img.data, mimeType: img.mimeType});
-            }
-            if (content.length === 0) {
-              content.push({type: 'text', text: '(no output)'});
-            }
-            return {content};
-          }
-
-          const {content, structuredContent} = await response.handle(
-            tool.name,
-            ctx,
-          );
-          // Prepend notification banner for non-bypass tools
+          const content: CallToolResult['content'] = [];
           if (notificationBanner) {
-            (content as Array<{type: string; text?: string}>).unshift({type: 'text', text: notificationBanner});
+            content.push({type: 'text', text: notificationBanner});
           }
-          return {content, structuredContent};
+          for (const line of response.responseLines) {
+            content.push({type: 'text', text: line});
+          }
+          for (const img of response.images) {
+            content.push({type: 'image', data: img.data, mimeType: img.mimeType});
+          }
+          if (content.length === 0) {
+            content.push({type: 'text', text: '(no output)'});
+          }
+          return {content};
         };
 
-        const {content, structuredContent} = await withTimeout(
+        const result = await withTimeout(
           executeAll(),
           timeoutMs,
           tool.name,
-        ) as {content: CallToolResult['content']; structuredContent?: Record<string, unknown>};
+        );
 
-        const result: CallToolResult & {
-          structuredContent?: Record<string, unknown>;
-        } = {
-          content,
-        };
-        if (config.experimentalStructuredContent) {
-          result.structuredContent = structuredContent as Record<
-            string,
-            unknown
-          >;
-        }
         return result;
       } catch (err) {
         logger(`${tool.name} error:`, err, err?.stack);

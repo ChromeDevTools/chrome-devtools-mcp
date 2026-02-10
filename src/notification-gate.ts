@@ -15,8 +15,8 @@
  * while toast notifications are informational and don't prevent work.
  */
 
-import {sendCdp} from './vscode.js';
 import {logger} from './logger.js';
+import {sendCdp} from './vscode.js';
 
 // ── Types ──
 
@@ -278,7 +278,7 @@ export function formatBlockingModal(modal: PendingUIElement): string {
  * Format non-blocking notifications as a banner for tool output.
  */
 export function formatNotificationBanner(notifications: PendingUIElement[]): string {
-  if (notifications.length === 0) return '';
+  if (notifications.length === 0) {return '';}
 
   const lines: string[] = [];
   lines.push('## ℹ️ Pending Notifications');

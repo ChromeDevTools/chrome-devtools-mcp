@@ -60,7 +60,7 @@ Add the MCP server to your client's config.
 ```json
 {
   "mcpServers": {
-    "chrome-devtools": {
+    "vscode-devtools": {
       "command": "node",
       "args": ["/path-to/build/src/index.js"]
     }

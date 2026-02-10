@@ -65,10 +65,7 @@ async function runTests(attempt) {
   return new Promise(resolve => {
     const child = spawn('node', nodeArgs, {
       stdio: 'inherit',
-      env: {
-        ...process.env,
-        CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: true,
-      },
+      env: process.env,
     });
 
     child.on('close', code => {

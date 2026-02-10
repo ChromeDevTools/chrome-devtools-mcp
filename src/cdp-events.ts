@@ -7,9 +7,8 @@
 /**
  * CDP Event Collector — Raw CDP event subscription and storage.
  *
- * This module provides an alternative to PageCollector for environments
- * where we use a raw CDP WebSocket connection (e.g., VS Code Extension Host)
- * instead of Puppeteer's browser-level connection.
+ * This module handles CDP event subscriptions via raw WebSocket connection
+ * to the VS Code Extension Development Host.
  *
  * It subscribes to CDP events for:
  * - Console messages (Runtime.consoleAPICalled)
@@ -18,8 +17,9 @@
  */
 
 import WebSocket from 'ws';
-import {sendCdp, getCdpWebSocket, getConnectionGeneration} from './vscode.js';
+
 import {logger} from './logger.js';
+import {sendCdp, getCdpWebSocket, getBrowserCdpWebSocket, getConnectionGeneration} from './vscode.js';
 
 // ── Types ───────────────────────────────────────────────
 
@@ -67,13 +67,14 @@ export interface TraceData {
 // - WebSocket close
 
 let consoleMessages: ConsoleMessage[] = [];
-let networkRequests: Map<string, NetworkRequest> = new Map();
+let networkRequests = new Map<string, NetworkRequest>();
 let traceData: TraceData = {chunks: [], complete: false};
 
 let consoleIdCounter = 1;
 let networkIdCounter = 1;
 let subscribedGeneration = -1;
 let eventListenerCleanup: (() => void) | undefined;
+let browserEventListenerCleanup: (() => void) | undefined;
 
 // ── Event Handlers ──────────────────────────────────────
 
@@ -184,7 +185,7 @@ function handleTracingComplete(): void {
 // ── CDP Message Router ──────────────────────────────────
 
 function routeCdpEvent(data: {method?: string; params?: unknown}): void {
-  if (!data.method) return;
+  if (!data.method) {return;}
 
   switch (data.method) {
     case 'Runtime.consoleAPICalled':
@@ -235,6 +236,10 @@ export async function initCdpEventSubscriptions(): Promise<void> {
     eventListenerCleanup();
     eventListenerCleanup = undefined;
   }
+  if (browserEventListenerCleanup) {
+    browserEventListenerCleanup();
+    browserEventListenerCleanup = undefined;
+  }
 
   // Clear stored data for new connection
   clearAllData();
@@ -264,6 +269,28 @@ export async function initCdpEventSubscriptions(): Promise<void> {
   }
 
   logger('CDP event subscriptions initialized');
+
+  // Set up browser-level WS listener for Tracing domain events
+  const browserWs = getBrowserCdpWebSocket();
+  if (browserWs && browserWs.readyState === WebSocket.OPEN) {
+    const browserMessageHandler = (evt: WebSocket.MessageEvent) => {
+      try {
+        const raw = typeof evt.data === 'string' ? evt.data : evt.data.toString();
+        const data = JSON.parse(raw);
+        if (data.method === 'Tracing.dataCollected' || data.method === 'Tracing.tracingComplete') {
+          routeCdpEvent(data);
+        }
+      } catch {
+        // Ignore parse errors
+      }
+    };
+
+    browserWs.addEventListener('message', browserMessageHandler);
+    browserEventListenerCleanup = () => browserWs.removeEventListener('message', browserMessageHandler);
+    logger('Browser CDP tracing event listener initialized');
+  } else {
+    logger('Warning: Browser CDP WebSocket not available — tracing events will not be captured');
+  }
 }
 
 /**
@@ -424,6 +451,14 @@ export async function startTrace(options?: {
 }): Promise<void> {
   traceData = {chunks: [], complete: false};
 
+  const browserWs = getBrowserCdpWebSocket();
+  if (!browserWs || browserWs.readyState !== WebSocket.OPEN) {
+    throw new Error(
+      'Browser-level CDP WebSocket is not connected. ' +
+      'Tracing requires a browser-level connection.',
+    );
+  }
+
   const categories = options?.categories ?? [
     '-*',
     'devtools.timeline',
@@ -437,17 +472,25 @@ export async function startTrace(options?: {
 
   await sendCdp('Tracing.start', {
     categories: categories.join(','),
-    transferMode: 'ReturnAsStream',
-  });
+    transferMode: 'ReportEvents',
+  }, browserWs);
 
-  logger('Tracing started');
+  logger('Tracing started (via browser-level CDP)');
 }
 
 /**
  * Stop the performance trace and return the collected data.
+ * Enriches trace with frame data from Page.getFrameTree() since
+ * Electron's browser-level tracing doesn't populate frame info
+ * in TracingStartedInBrowser events.
  */
 export async function stopTrace(): Promise<unknown[]> {
-  await sendCdp('Tracing.end', {});
+  const browserWs = getBrowserCdpWebSocket();
+  if (!browserWs || browserWs.readyState !== WebSocket.OPEN) {
+    throw new Error('Browser-level CDP WebSocket is not connected.');
+  }
+
+  await sendCdp('Tracing.end', {}, browserWs);
 
   // Wait for tracingComplete event or timeout
   const startTime = Date.now();
@@ -456,7 +499,105 @@ export async function stopTrace(): Promise<unknown[]> {
   }
 
   logger(`Tracing stopped, collected ${traceData.chunks.length} chunks`);
-  return traceData.chunks;
+
+  // Enrich trace with frame data — Electron's browser-level tracing
+  // doesn't populate TracingStartedInBrowser.args with frame info,
+  // which the DevTools TraceEngine requires for parsing.
+  return enrichTraceWithFrameData(traceData.chunks);
+}
+
+// ── Trace Frame Data Enrichment ──────────────────────────
+
+interface TraceEvent {
+  name?: string;
+  cat?: string;
+  ph?: string;
+  pid?: number;
+  tid?: number;
+  ts?: number;
+  s?: string;
+  args?: Record<string, unknown>;
+}
+
+/**
+ * Electron's browser-level CDP tracing emits TracingStartedInBrowser with
+ * empty args — no frame-to-process mapping. The DevTools TraceEngine needs
+ * this mapping to identify the main frame and renderer process.
+ *
+ * This function patches the trace by:
+ * 1. Getting the frame tree from Page.getFrameTree() (page-level CDP)
+ * 2. Finding the renderer PID from a navigationStart event in the trace
+ * 3. Patching TracingStartedInBrowser.args with frame data
+ * 4. Injecting a FrameCommittedInBrowser event
+ */
+async function enrichTraceWithFrameData(chunks: unknown[]): Promise<unknown[]> {
+  try {
+    const frameTreeResult = await sendCdp('Page.getFrameTree', {});
+    const mainFrame = frameTreeResult?.frameTree?.frame;
+    if (!mainFrame?.id) {
+      logger('Warning: Could not get frame tree — trace may not parse correctly');
+      return chunks;
+    }
+
+    const events = chunks as TraceEvent[];
+
+    const tsib = events.find(e => e.name === 'TracingStartedInBrowser');
+    if (!tsib) {
+      logger('Warning: No TracingStartedInBrowser event found in trace');
+      return chunks;
+    }
+
+    const navStart = events.find(e => e.name === 'navigationStart');
+    const rendererPid = navStart?.pid;
+    if (!rendererPid) {
+      logger('Warning: Could not determine renderer PID from trace');
+      return chunks;
+    }
+
+    const browserPid = tsib.pid;
+    const browserTid = tsib.tid;
+    const traceTs = tsib.ts ?? 0;
+
+    tsib.args = {
+      data: {
+        frameTreeNodeId: 1,
+        persistentIds: true,
+        frames: [{
+          frame: mainFrame.id,
+          url: mainFrame.url ?? '',
+          name: mainFrame.name ?? '',
+          processId: rendererPid,
+        }],
+      },
+    };
+
+    const frameCommitted: TraceEvent = {
+      name: 'FrameCommittedInBrowser',
+      cat: 'disabled-by-default-devtools.timeline',
+      ph: 'I',
+      pid: browserPid,
+      tid: browserTid,
+      ts: traceTs,
+      s: 't',
+      args: {
+        data: {
+          frame: mainFrame.id,
+          url: mainFrame.url ?? '',
+          name: mainFrame.name ?? '',
+          processId: rendererPid,
+        },
+      },
+    };
+
+    const tsibIndex = events.indexOf(tsib);
+    events.splice(tsibIndex + 1, 0, frameCommitted);
+
+    logger(`Enriched trace with frame data: frame=${mainFrame.id}, rendererPid=${rendererPid}`);
+    return events;
+  } catch (err) {
+    logger(`Warning: Failed to enrich trace with frame data: ${(err as Error).message}`);
+    return chunks;
+  }
 }
 
 /**
@@ -474,6 +615,10 @@ function cleanupOnExit(): void {
   if (eventListenerCleanup) {
     eventListenerCleanup();
     eventListenerCleanup = undefined;
+  }
+  if (browserEventListenerCleanup) {
+    browserEventListenerCleanup();
+    browserEventListenerCleanup = undefined;
   }
 }
 

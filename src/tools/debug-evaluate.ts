@@ -12,7 +12,9 @@
  * host process. `require()` is NOT available.
  */
 
+import {bridgeExec} from '../bridge-client.js';
 import {zod} from '../third_party/index.js';
+import {getDevhostBridgePath} from '../vscode.js';
 
 import {ToolCategory} from './categories.js';
 import {
@@ -22,8 +24,6 @@ import {
   CHARACTER_LIMIT,
   checkCharacterLimit,
 } from './ToolDefinition.js';
-import {getDevhostBridgePath} from '../vscode.js';
-import {bridgeExec} from '../bridge-client.js';
 
 const DebugEvaluateOutputSchema = zod.object({
   success: zod.boolean(),

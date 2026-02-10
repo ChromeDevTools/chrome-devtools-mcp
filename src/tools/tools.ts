@@ -13,8 +13,8 @@ import * as performanceTools from './performance.js';
 import * as screenshotTools from './screenshot.js';
 import * as scriptTools from './script.js';
 import * as snapshotTools from './snapshot.js';
-import * as waitTools from './wait.js';
 import type {ToolDefinition} from './ToolDefinition.js';
+import * as waitTools from './wait.js';
 
 const tools = [
   ...Object.values(consoleTools),
