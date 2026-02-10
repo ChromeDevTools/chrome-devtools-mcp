@@ -15,6 +15,7 @@ import {fileURLToPath} from 'node:url';
 import {ensureVSCodeConnected, getConnectionGeneration, getPuppeteerBrowser, teardownSync} from './browser.js';
 import {checkForBlockingUI} from './notification-gate.js';
 import {parseArguments} from './cli.js';
+import {loadConfig, type ResolvedConfig} from './config.js';
 import {loadIssueDescriptions} from './issue-descriptions.js';
 import {logger, saveLogsToFile} from './logger.js';
 import {McpContext} from './McpContext.js';
@@ -62,10 +63,15 @@ function withTimeout<T>(
 const VERSION = '0.16.0';
 // x-release-please-end
 
-export const args = parseArguments(VERSION);
+// Parse CLI args and load config from workspace's .vscode/devtools.json
+const cliArgs = parseArguments(VERSION);
+export const config: ResolvedConfig = loadConfig(cliArgs);
 
-if (args.logFile) {
-  saveLogsToFile(args.logFile);
+// Legacy export for backwards compatibility
+export const args = cliArgs;
+
+if (config.logFile) {
+  saveLogsToFile(config.logFile);
 }
 
 process.on('unhandledRejection', (reason, promise) => {
@@ -95,10 +101,10 @@ let contextGeneration = -1;
 
 async function ensureConnection(): Promise<void> {
   await ensureVSCodeConnected({
-    workspaceFolder: args.folder as string,
-    extensionBridgePath: args.extensionBridgePath as string,
-    targetFolder: args.targetFolder as string | undefined,
-    headless: args.headless,
+    workspaceFolder: config.hostWorkspace,
+    extensionBridgePath: config.extensionBridgePath,
+    targetFolder: config.workspaceFolder,
+    headless: config.headless,
   });
 }
 
@@ -136,7 +142,7 @@ class DevRebuildNeeded extends Error {
  * returns a message and the server exits). On failure, throws with build errors.
  */
 function devLazyRebuildCheck(): void {
-  if (!args.dev) return;
+  if (!config.dev) return;
 
   let buildMtime: number;
   try {
@@ -173,6 +179,44 @@ function devLazyRebuildCheck(): void {
     'The server will now exit so the new code can be loaded. ' +
     'Please call the tool again.',
   );
+}
+
+/**
+ * Check for source changes at startup and rebuild if needed.
+ * Unlike devLazyRebuildCheck, this always runs and fails startup on build error.
+ */
+function startupRebuildCheck(): void {
+  let buildMtime: number;
+  try {
+    buildMtime = statSync(buildSentinel).mtimeMs;
+  } catch {
+    // No sentinel yet — force rebuild
+    buildMtime = 0;
+  }
+
+  const srcMtime = getNewestMtime(srcDir, '.ts');
+  if (srcMtime <= buildMtime) {
+    logger('Source files unchanged — skipping rebuild');
+    return;
+  }
+
+  logger('Source files changed since last build — rebuilding...');
+  try {
+    execSync('pnpm run build', {
+      cwd: projectRoot,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      timeout: 60_000,
+    });
+    writeFileSync(buildSentinel, new Date().toISOString(), 'utf-8');
+    logger('Rebuild successful');
+  } catch (err: any) {
+    const stderr = err.stderr?.toString() ?? '';
+    const stdout = err.stdout?.toString() ?? '';
+    const output = [stderr, stdout].filter(Boolean).join('\n');
+    throw new Error(
+      `Startup rebuild failed. Fix errors and restart:\n${output}`,
+    );
+  }
 }
 
 /**
@@ -214,26 +258,26 @@ const toolMutex = new Mutex();
 function registerTool(tool: ToolDefinition): void {
   if (
     tool.annotations.category === ToolCategory.PERFORMANCE &&
-    args.categoryPerformance === false
+    config.categoryPerformance === false
   ) {
     return;
   }
   if (
     tool.annotations.category === ToolCategory.NETWORK &&
-    args.categoryNetwork === false
+    config.categoryNetwork === false
   ) {
     return;
   }
   if (
     tool.annotations.conditions?.includes('computerVision') &&
-    !args.experimentalVision
+    !config.experimentalVision
   ) {
     return;
   }
   // Hide diagnostic tools in production unless explicitly enabled
   if (
     tool.annotations.conditions?.includes('devDiagnostic') &&
-    !args.devDiagnostic
+    !config.devDiagnostic
   ) {
     return;
   }
@@ -361,7 +405,7 @@ function registerTool(tool: ToolDefinition): void {
         } = {
           content,
         };
-        if (args.experimentalStructuredContent) {
+        if (config.experimentalStructuredContent) {
           result.structuredContent = structuredContent as Record<
             string,
             unknown
@@ -407,10 +451,19 @@ for (const tool of tools) {
   registerTool(tool);
 }
 
+// Check for source changes and rebuild if needed
+startupRebuildCheck();
+
 await loadIssueDescriptions();
 const transport = new StdioServerTransport();
 await server.connect(transport);
 logger('VS Code DevTools MCP Server connected');
+
+// Auto-launch VS Code debug window on server start
+logger('Launching VS Code debug window...');
+await ensureConnection();
+logger('VS Code debug window ready');
+
 logDisclaimers();
 
 

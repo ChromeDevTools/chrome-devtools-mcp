@@ -8,33 +8,45 @@ import type {YargsOptions} from './third_party/index.js';
 import {yargs, hideBin} from './third_party/index.js';
 
 export const cliOptions = {
-  folder: {
+  // Primary arg: workspace folder containing .vscode/devtools.json
+  workspace: {
     type: 'string',
     description:
-      'Path to workspace folder to open in VS Code. The MCP server will spawn a VS Code Extension Development Host window targeting this folder.',
+      'Path to workspace folder. Configuration is loaded from .vscode/devtools.json within this folder.',
+    alias: 'w',
+  },
+
+  // Legacy args (kept for backwards compatibility, hidden from help)
+  folder: {
+    type: 'string',
+    description: '[LEGACY] Use --workspace instead.',
     alias: 'f',
+    hidden: true,
   },
   extensionBridgePath: {
     type: 'string',
     description:
-      'Path to the extension-bridge extension directory. Defaults to the extension-bridge folder adjacent to the vscode-devtools-mcp package.',
+      '[LEGACY] Override extension-bridge path. Prefer setting in .vscode/devtools.json.',
     alias: 'b',
+    hidden: true,
   },
   targetFolder: {
     type: 'string',
     description:
-      'Path to a folder to open in the Extension Development Host. If not specified, the workspace folder is used.',
+      '[LEGACY] Use --workspace to point to the target folder directly.',
     alias: 't',
+    hidden: true,
   },
   headless: {
     type: 'boolean',
-    description: 'Run VS Code headless (requires xvfb on Linux).',
+    description: '[LEGACY] Set headless in .vscode/devtools.json instead.',
     default: false,
+    hidden: true,
   },
   logFile: {
     type: 'string',
-    describe:
-      'Path to a file to write debug logs to. Set the env variable `DEBUG` to `*` to enable verbose logs.',
+    describe: '[LEGACY] Set logFile in .vscode/devtools.json instead.',
+    hidden: true,
   },
   experimentalVision: {
     type: 'boolean',
@@ -48,25 +60,25 @@ export const cliOptions = {
   },
   devDiagnostic: {
     type: 'boolean',
-    describe:
-      'Enable diagnostic development tools (debug_evaluate). Hidden in production.',
+    describe: '[LEGACY] Set devDiagnostic in .vscode/devtools.json instead.',
     default: false,
     hidden: true,
   },
   categoryPerformance: {
     type: 'boolean',
     default: true,
-    describe: 'Set to false to exclude tools related to performance.',
+    describe: '[LEGACY] Set categories.performance in .vscode/devtools.json.',
+    hidden: true,
   },
   categoryNetwork: {
     type: 'boolean',
     default: true,
-    describe: 'Set to false to exclude tools related to network.',
+    describe: '[LEGACY] Set categories.network in .vscode/devtools.json.',
+    hidden: true,
   },
   dev: {
     type: 'boolean',
-    describe:
-      'Dev mode: run from TypeScript source via tsx with automatic file-watching and self-restart on changes.',
+    describe: '[LEGACY] Set dev in .vscode/devtools.json instead.',
     default: false,
     hidden: true,
   },
@@ -78,22 +90,12 @@ export function parseArguments(version: string, argv = process.argv) {
     .options(cliOptions)
     .example([
       [
-        '$0 --folder /path/to/project',
-        'Spawn a VS Code debug window for the project folder',
-      ],
-      ['$0 --headless', 'Run VS Code in headless mode (Linux only)'],
-      ['$0 --logFile /tmp/log.txt', 'Save logs to a file'],
-      [
-        '$0 --dev-diagnostic',
-        'Enable diagnostic tools for development debugging',
+        '$0 --workspace /path/to/project',
+        'Start MCP server for a workspace (config from .vscode/devtools.json)',
       ],
       [
-        '$0 --no-category-performance',
-        'Disable tools in the performance category',
-      ],
-      [
-        '$0 --no-category-network',
-        'Disable tools in the network category',
+        '$0 -w /path/to/project',
+        'Short form of --workspace',
       ],
     ]);
 

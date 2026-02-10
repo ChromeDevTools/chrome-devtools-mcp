@@ -28,28 +28,37 @@ const ATTACH_TIMEOUT_MS = 15_000;
 
 /**
  * Discover the extension-bridge socket path for a given workspace.
- * Reads .vscode/vscode-api-expose.sockpath written by extension-bridge on activation.
+ * Reads bridgeSocketPath from .vscode/devtools.json written by extension-bridge on activation.
  */
 export function discoverBridgePath(workspaceFolder: string): string {
-  const markerPath = path.join(
-    workspaceFolder,
-    '.vscode',
-    'vscode-api-expose.sockpath',
-  );
-  if (!fs.existsSync(markerPath)) {
+  const configPath = path.join(workspaceFolder, '.vscode', 'devtools.json');
+
+  if (!fs.existsSync(configPath)) {
     throw new Error(
-      `Cannot find extension-bridge sockpath at ${markerPath}.\n` +
+      `Cannot find devtools.json at ${configPath}.\n` +
         'Ensure VS Code is running with the extension-bridge extension installed and active.\n' +
         'Install: code --install-extension extension-bridge',
     );
   }
-  const socketPath = fs.readFileSync(markerPath, 'utf8').trim();
+
+  let config: {bridgeSocketPath?: string};
+  try {
+    config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+  } catch (e) {
+    throw new Error(
+      `Failed to parse devtools.json at ${configPath}.\n` +
+        `Error: ${e instanceof Error ? e.message : String(e)}`,
+    );
+  }
+
+  const socketPath = config.bridgeSocketPath;
   if (!socketPath) {
     throw new Error(
-      `Extension-bridge sockpath marker at ${markerPath} is empty.\n` +
+      `No bridgeSocketPath in devtools.json at ${configPath}.\n` +
         'The extension-bridge may have failed to start. Check VS Code output panel.',
     );
   }
+
   logger('Discovered bridge path:', socketPath);
   return socketPath;
 }
