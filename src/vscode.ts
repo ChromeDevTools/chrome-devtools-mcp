@@ -610,6 +610,68 @@ function testSocketConnectivity(socketPath: string): Promise<boolean> {
 // ── Synchronous Child Kill ──────────────────────────────
 
 /**
+ * Synchronously discover the PID listening on a given port.
+ * Used as a fallback during cleanup if electronPid was lost.
+ */
+function discoverPidByPortSync(port: number): number | null {
+  try {
+    if (process.platform === 'win32') {
+      const out = execSync(
+        `netstat -ano | findstr "LISTENING" | findstr ":${port} "`,
+        {encoding: 'utf8', timeout: 5000},
+      ).trim();
+      for (const line of out.split('\n')) {
+        const parts = line.trim().split(/\s+/);
+        if (parts.length >= 5) {
+          const pid = parseInt(parts[parts.length - 1], 10);
+          if (pid > 0) return pid;
+        }
+      }
+    } else {
+      const out = execSync(`lsof -ti :${port}`, {
+        encoding: 'utf8',
+        timeout: 5000,
+      }).trim();
+      const pid = parseInt(out.split('\n')[0], 10);
+      if (pid > 0) return pid;
+    }
+  } catch {
+    // Command failed
+  }
+  return null;
+}
+
+/**
+ * On Windows, find Code.exe processes that have our user-data-dir in their
+ * command line and kill them. This is a last-resort fallback if we lost the
+ * PID reference but know the user-data-dir path.
+ */
+function killByUserDataDirSync(dataDir: string): void {
+  if (process.platform !== 'win32') return;
+  try {
+    // Escape backslashes for WMIC LIKE pattern
+    const escapedPath = dataDir.replace(/\\/g, '\\\\');
+    const out = execSync(
+      `wmic process where "CommandLine like '%${escapedPath}%'" get ProcessId`,
+      {encoding: 'utf8', timeout: 10000},
+    ).trim();
+    for (const line of out.split('\n')) {
+      const pid = parseInt(line.trim(), 10);
+      if (pid > 0) {
+        try {
+          execSync(`taskkill /F /T /PID ${pid}`, {stdio: 'ignore'});
+          logger(`Killed process ${pid} by user-data-dir match`);
+        } catch {
+          // Already dead
+        }
+      }
+    }
+  } catch {
+    // WMIC not available or no match
+  }
+}
+
+/**
  * Force-kill the child process tree synchronously.
  *
  * On Windows: `Code.exe` is a launcher stub that forks the real Electron
@@ -617,11 +679,25 @@ function testSocketConnectivity(socketPath: string): Promise<boolean> {
  * available. We track the REAL Electron PID (discovered from `netstat` after
  * the CDP port opens) and kill its entire process tree with `taskkill /F /T`.
  *
+ * If electronPid is lost (e.g., after a window reload or reconnect), we try:
+ * 1. Re-discover via the CDP port (if still known)
+ * 2. Find by user-data-dir command-line argument (Windows only)
+ *
  * Safe to call multiple times or when no child exists.
  */
 function forceKillChildSync(): void {
+  let ePid = electronPid;
+
+  // Fallback 1: rediscover via CDP port if we lost the PID
+  if (!ePid && cdpPort) {
+    const rediscovered = discoverPidByPortSync(cdpPort);
+    if (rediscovered) {
+      logger(`Rediscovered Electron PID ${rediscovered} from CDP port ${cdpPort}`);
+      ePid = rediscovered;
+    }
+  }
+
   // Kill the real Electron process (the one actually running VS Code)
-  const ePid = electronPid;
   if (ePid) {
     try {
       if (process.platform === 'win32') {
@@ -629,6 +705,7 @@ function forceKillChildSync(): void {
       } else {
         process.kill(ePid, 'SIGKILL');
       }
+      logger(`Killed Electron PID ${ePid}`);
     } catch {
       // Process already exited
     }
@@ -646,6 +723,12 @@ function forceKillChildSync(): void {
     } catch {
       // Process already exited
     }
+  }
+
+  // Fallback 2: kill by user-data-dir if we still have that path
+  // This catches cases where the CDP port changed (e.g., after reload)
+  if (userDataDir) {
+    killByUserDataDirSync(userDataDir);
   }
 
   childProcess = undefined;
@@ -857,6 +940,10 @@ async function doConnect(options: VSCodeLaunchOptions): Promise<WebSocket> {
   fs.mkdirSync(userDataDir, {recursive: true});
   logger(`User data dir: ${userDataDir}`);
 
+  // Pre-flight: kill any zombie VS Code using the same user-data-dir from a crashed session.
+  // This ensures we don't have port conflicts or stale locks.
+  killByUserDataDirSync(userDataDir);
+
   // Ensure .devtools is in the target workspace's .gitignore
   ensureGitignoreEntry(targetFolder);
 
@@ -911,7 +998,14 @@ async function doConnect(options: VSCodeLaunchOptions): Promise<WebSocket> {
     stdio: 'ignore',
     env: childEnv,
   });
-  proc.unref();
+
+  // Track spawn errors (e.g., file not found, permission denied)
+  proc.on('error', (err) => {
+    logger(`Spawn error: ${err.message}`);
+    childProcess = undefined;
+    launcherPid = undefined;
+  });
+
   childProcess = proc;
   launcherPid = proc.pid;
   logger(`Launcher spawned — PID: ${launcherPid} (may exit immediately on Windows)`);
