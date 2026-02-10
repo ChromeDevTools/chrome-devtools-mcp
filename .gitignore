@@ -150,5 +150,7 @@ log.txt
 
 .DS_Store
 
-# Claude Code local config
-.claude/
+# Claude Code config
+# Keep shared Claude Code project config in git, but ignore local-only files.
+.claude/settings.local.json
+.claude/agent-memory-local/

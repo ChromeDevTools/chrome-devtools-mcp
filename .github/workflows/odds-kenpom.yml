@@ -1,0 +1,49 @@
+name: Odds pipeline - KenPom metrics (daily)
+
+permissions: read-all
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "40 9 * * *"
+
+jobs:
+  kenpom:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v3
+
+      - name: Init schema (idempotent)
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        working-directory: odds
+        run: uv run python -m odds_pipeline schema
+
+      - name: Collect KenPom ratings
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          KENPOM_EMAIL: ${{ secrets.KENPOM_EMAIL }}
+          KENPOM_PASSWORD: ${{ secrets.KENPOM_PASSWORD }}
+        working-directory: odds
+        run: uv run python -m odds_pipeline collect-kenpom --season 2026 --metric-type pomeroy_ratings
+
+      - name: Collect KenPom efficiency
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          KENPOM_EMAIL: ${{ secrets.KENPOM_EMAIL }}
+          KENPOM_PASSWORD: ${{ secrets.KENPOM_PASSWORD }}
+        working-directory: odds
+        run: uv run python -m odds_pipeline collect-kenpom --season 2026 --metric-type efficiency
+
+      - name: Collect KenPom four factors
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          KENPOM_EMAIL: ${{ secrets.KENPOM_EMAIL }}
+          KENPOM_PASSWORD: ${{ secrets.KENPOM_PASSWORD }}
+        working-directory: odds
+        run: uv run python -m odds_pipeline collect-kenpom --season 2026 --metric-type four_factors
+
