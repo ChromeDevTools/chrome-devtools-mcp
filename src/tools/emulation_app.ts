@@ -18,6 +18,16 @@ function EmulationApp() {
   const state = {
     cpuThrottlingRate: 1,
     networkConditions: 'No emulation',
+    geolocation: null as {latitude: number, longitude: number} | null,
+    colorScheme: 'auto',
+    viewport: null as {
+      width: number;
+      height: number;
+      deviceScaleFactor: number;
+      isMobile: boolean;
+      hasTouch: boolean;
+      isLandscape: boolean;
+    } | null,
   };
 
   const resizeObserver = new ResizeObserver(() => {
@@ -51,12 +61,27 @@ function EmulationApp() {
     });
   }
 
+  // Color Scheme
+  function selectColorScheme(scheme: string, btn: HTMLElement) {
+    state.colorScheme = scheme;
+    updateActiveButton('color-scheme-grid', btn);
+  }
+
+  // Geolocation
+  function clearGeolocation() {
+    (document.getElementById('geoLat') as HTMLInputElement).value = '';
+    (document.getElementById('geoLon') as HTMLInputElement).value = '';
+  }
+
+
+
   function updateActiveButton(gridId: string, activeBtn: HTMLElement | null) {
     const grid = document.getElementById(gridId);
     if (!grid) {
       return;
     }
-    grid.querySelectorAll('button').forEach((btn) => btn.classList.remove('active'));
+    const selector = gridId === 'viewport-grid' ? '.viewport-option' : 'button';
+    grid.querySelectorAll(selector).forEach((btn) => btn.classList.remove('active'));
     if (activeBtn) {
       activeBtn.classList.add('active');
     }
@@ -71,6 +96,25 @@ function EmulationApp() {
       finalRate = customRate;
     }
 
+    // Geolocation
+    const latStr = (document.getElementById('geoLat') as HTMLInputElement).value;
+    const lonStr = (document.getElementById('geoLon') as HTMLInputElement).value;
+    if (latStr && lonStr) {
+      state.geolocation = {
+        latitude: parseFloat(latStr),
+        longitude: parseFloat(lonStr),
+      };
+    } else {
+      state.geolocation = null;
+    }
+
+    // Viewport
+    if (state.viewport) {
+      // already set by selectViewport
+    } else {
+      // if null, we send null
+    }
+
     updateStatus('Applying emulation settings...');
     
     // Disable button and change text
@@ -83,7 +127,45 @@ function EmulationApp() {
     sendToolsCall({
       cpuThrottlingRate: finalRate,
       networkConditions: state.networkConditions,
+      geolocation: state.geolocation,
+      colorScheme: state.colorScheme,
+      viewport: state.viewport,
     });
+  }
+
+  // Viewport Presets
+  function selectViewport(type: string, btn: HTMLElement) {
+    if (type === 'mobile') {
+      state.viewport = {
+        width: 375,
+        height: 667,
+        deviceScaleFactor: 2,
+        isMobile: true,
+        hasTouch: true,
+        isLandscape: false,
+      };
+    } else if (type === 'tablet') {
+      state.viewport = {
+        width: 768,
+        height: 1024,
+        deviceScaleFactor: 2,
+        isMobile: true,
+        hasTouch: true,
+        isLandscape: false,
+      };
+    } else if (type === 'desktop') {
+      state.viewport = {
+        width: 1440,
+        height: 900,
+        deviceScaleFactor: 1,
+        isMobile: false,
+        hasTouch: false,
+        isLandscape: false,
+      };
+    } else {
+      state.viewport = null;
+    }
+    updateActiveButton('viewport-grid', btn);
   }
 
   function updateStatus(msg: string) {
@@ -104,25 +186,13 @@ function EmulationApp() {
   window.addEventListener('message', (event) => {
     const { method, params, id, result } = event.data;
 
+    // We can handle incoming updates from the tool here if we want the UI to reflect
+    // changes made via the tool directly, but for now we focus on driving from UI.
     if (
       method === 'ui/notifications/tool-input' ||
       method === 'ui/notifications/tool-input-partial'
     ) {
-      const args = (params && params.arguments) || {};
-      if (args.cpuThrottlingRate) {
-        const selector = '[data-rate="' + args.cpuThrottlingRate + '"]';
-        selectCPUThrottling(
-          args.cpuThrottlingRate,
-          document.querySelector(selector) as HTMLElement
-        );
-      }
-      if (args.networkConditions) {
-        const selector = '[data-condition="' + args.networkConditions + '"]';
-        selectNetworkThrottling(
-          args.networkConditions,
-          document.querySelector(selector) as HTMLElement
-        );
-      }
+       // Optional: implement bidirectional sync if needed
     }
 
     if (method === 'ui/notifications/tool-result') {
@@ -147,9 +217,24 @@ function EmulationApp() {
   });
 
   // Export functions to window for onclick handlers
-  (window as unknown as { selectCPUThrottling: typeof selectCPUThrottling }).selectCPUThrottling = selectCPUThrottling;
-  (window as unknown as { selectNetworkThrottling: typeof selectNetworkThrottling }).selectNetworkThrottling = selectNetworkThrottling;
-  (window as unknown as { applySettings: typeof applySettings }).applySettings = applySettings;
+  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+  // @ts-ignore
+  window.selectCPUThrottling = selectCPUThrottling;
+  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+  // @ts-ignore
+  window.selectNetworkThrottling = selectNetworkThrottling;
+  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+  // @ts-ignore
+  window.selectColorScheme = selectColorScheme;
+  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+  // @ts-ignore
+  window.applySettings = applySettings;
+  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+  // @ts-ignore
+  window.clearGeolocation = clearGeolocation;
+  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+  // @ts-ignore
+  window.selectViewport = selectViewport;
 }
 
 export const EMULATION_APP_SCRIPT = `(${EmulationApp.toString()})()`;

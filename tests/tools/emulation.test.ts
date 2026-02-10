@@ -7,6 +7,8 @@
 import assert from 'node:assert';
 import {beforeEach, describe, it} from 'node:test';
 
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-expect-error
 import {emulate} from '../../src/tools/emulation.js';
 import {serverHooks} from '../server.js';
 import {html, withMcpContext} from '../utils.js';

@@ -11,194 +11,196 @@ import {ToolCategory} from './categories.js';
 import type {Context} from './ToolDefinition.js';
 import {defineTool} from './ToolDefinition.js';
 
-const throttlingOptions: [string, ...string[]] = [
-  'No emulation',
-  'Offline',
-  ...Object.keys(PredefinedNetworkConditions),
-];
+// comment out the non ui emulate tool to test the ui one easier
 
-export const emulate = defineTool({
-  name: 'emulate',
-  description: `Emulates various features on the selected page.`,
-  annotations: {
-    category: ToolCategory.EMULATION,
-    readOnlyHint: false,
-  },
-  schema: {
-    networkConditions: zod
-      .enum(throttlingOptions)
-      .optional()
-      .describe(
-        `Throttle network. Set to "No emulation" to disable. If omitted, conditions remain unchanged.`,
-      ),
-    cpuThrottlingRate: zod
-      .number()
-      .min(1)
-      .max(20)
-      .optional()
-      .describe(
-        'Represents the CPU slowdown factor. Set the rate to 1 to disable throttling. If omitted, throttling remains unchanged.',
-      ),
-    geolocation: zod
-      .object({
-        latitude: zod
-          .number()
-          .min(-90)
-          .max(90)
-          .describe('Latitude between -90 and 90.'),
-        longitude: zod
-          .number()
-          .min(-180)
-          .max(180)
-          .describe('Longitude between -180 and 180.'),
-      })
-      .nullable()
-      .optional()
-      .describe(
-        'Geolocation to emulate. Set to null to clear the geolocation override.',
-      ),
-    userAgent: zod
-      .string()
-      .nullable()
-      .optional()
-      .describe(
-        'User agent to emulate. Set to null to clear the user agent override.',
-      ),
-    colorScheme: zod
-      .enum(['dark', 'light', 'auto'])
-      .optional()
-      .describe(
-        'Emulate the dark or the light mode. Set to "auto" to reset to the default.',
-      ),
-    viewport: zod
-      .object({
-        width: zod.number().int().min(0).describe('Page width in pixels.'),
-        height: zod.number().int().min(0).describe('Page height in pixels.'),
-        deviceScaleFactor: zod
-          .number()
-          .min(0)
-          .optional()
-          .describe('Specify device scale factor (can be thought of as dpr).'),
-        isMobile: zod
-          .boolean()
-          .optional()
-          .describe(
-            'Whether the meta viewport tag is taken into account. Defaults to false.',
-          ),
-        hasTouch: zod
-          .boolean()
-          .optional()
-          .describe(
-            'Specifies if viewport supports touch events. This should be set to true for mobile devices.',
-          ),
-        isLandscape: zod
-          .boolean()
-          .optional()
-          .describe(
-            'Specifies if viewport is in landscape mode. Defaults to false.',
-          ),
-      })
-      .nullable()
-      .optional()
-      .describe(
-        'Viewport to emulate. Set to null to reset to the default viewport.',
-      ),
-  },
-  handler: async (request, _response, context) => {
-    const page = context.getSelectedPage();
-    const {
-      networkConditions,
-      cpuThrottlingRate,
-      geolocation,
-      userAgent,
-      viewport,
-    } = request.params;
+// const throttlingOptions: [string, ...string[]] = [
+//   'No emulation',
+//   'Offline',
+//   ...Object.keys(PredefinedNetworkConditions),
+// ];
 
-    if (networkConditions) {
-      if (networkConditions === 'No emulation') {
-        await page.emulateNetworkConditions(null);
-        context.setNetworkConditions(null);
-      } else if (networkConditions === 'Offline') {
-        await page.emulateNetworkConditions({
-          offline: true,
-          download: 0,
-          upload: 0,
-          latency: 0,
-        });
-        context.setNetworkConditions('Offline');
-      } else if (networkConditions in PredefinedNetworkConditions) {
-        const networkCondition =
-          PredefinedNetworkConditions[
-            networkConditions as keyof typeof PredefinedNetworkConditions
-          ];
-        await page.emulateNetworkConditions(networkCondition);
-        context.setNetworkConditions(networkConditions);
-      }
-    }
+// export const emulate = defineTool({
+//   name: 'emulate',
+//   description: `Emulates various features on the selected page. Use this tool when the user provides specific values (e.g. 'throttle cpu by 4x', 'offline mode').`,
+//   annotations: {
+//     category: ToolCategory.EMULATION,
+//     readOnlyHint: false,
+//   },
+//   schema: {
+//     networkConditions: zod
+//       .enum(throttlingOptions)
+//       .optional()
+//       .describe(
+//         `Throttle network. Set to "No emulation" to disable. If omitted, conditions remain unchanged.`,
+//       ),
+//     cpuThrottlingRate: zod
+//       .number()
+//       .min(1)
+//       .max(20)
+//       .optional()
+//       .describe(
+//         'Represents the CPU slowdown factor. Set the rate to 1 to disable throttling. If omitted, throttling remains unchanged.',
+//       ),
+//     geolocation: zod
+//       .object({
+//         latitude: zod
+//           .number()
+//           .min(-90)
+//           .max(90)
+//           .describe('Latitude between -90 and 90.'),
+//         longitude: zod
+//           .number()
+//           .min(-180)
+//           .max(180)
+//           .describe('Longitude between -180 and 180.'),
+//       })
+//       .nullable()
+//       .optional()
+//       .describe(
+//         'Geolocation to emulate. Set to null to clear the geolocation override.',
+//       ),
+//     userAgent: zod
+//       .string()
+//       .nullable()
+//       .optional()
+//       .describe(
+//         'User agent to emulate. Set to null to clear the user agent override.',
+//       ),
+//     colorScheme: zod
+//       .enum(['dark', 'light', 'auto'])
+//       .optional()
+//       .describe(
+//         'Emulate the dark or the light mode. Set to "auto" to reset to the default.',
+//       ),
+//     viewport: zod
+//       .object({
+//         width: zod.number().int().min(0).describe('Page width in pixels.'),
+//         height: zod.number().int().min(0).describe('Page height in pixels.'),
+//         deviceScaleFactor: zod
+//           .number()
+//           .min(0)
+//           .optional()
+//           .describe('Specify device scale factor (can be thought of as dpr).'),
+//         isMobile: zod
+//           .boolean()
+//           .optional()
+//           .describe(
+//             'Whether the meta viewport tag is taken into account. Defaults to false.',
+//           ),
+//         hasTouch: zod
+//           .boolean()
+//           .optional()
+//           .describe(
+//             'Specifies if viewport supports touch events. This should be set to true for mobile devices.',
+//           ),
+//         isLandscape: zod
+//           .boolean()
+//           .optional()
+//           .describe(
+//             'Specifies if viewport is in landscape mode. Defaults to false.',
+//           ),
+//       })
+//       .nullable()
+//       .optional()
+//       .describe(
+//         'Viewport to emulate. Set to null to reset to the default viewport.',
+//       ),
+//   },
+//   handler: async (request, _response, context) => {
+//     const page = context.getSelectedPage();
+//     const {
+//       networkConditions,
+//       cpuThrottlingRate,
+//       geolocation,
+//       userAgent,
+//       viewport,
+//     } = request.params;
 
-    if (cpuThrottlingRate) {
-      await page.emulateCPUThrottling(cpuThrottlingRate);
-      context.setCpuThrottlingRate(cpuThrottlingRate);
-    }
+//     if (networkConditions) {
+//       if (networkConditions === 'No emulation') {
+//         await page.emulateNetworkConditions(null);
+//         context.setNetworkConditions(null);
+//       } else if (networkConditions === 'Offline') {
+//         await page.emulateNetworkConditions({
+//           offline: true,
+//           download: 0,
+//           upload: 0,
+//           latency: 0,
+//         });
+//         context.setNetworkConditions('Offline');
+//       } else if (networkConditions in PredefinedNetworkConditions) {
+//         const networkCondition =
+//           PredefinedNetworkConditions[
+//             networkConditions as keyof typeof PredefinedNetworkConditions
+//           ];
+//         await page.emulateNetworkConditions(networkCondition);
+//         context.setNetworkConditions(networkConditions);
+//       }
+//     }
 
-    if (geolocation !== undefined) {
-      if (geolocation === null) {
-        await page.setGeolocation({latitude: 0, longitude: 0});
-        context.setGeolocation(null);
-      } else {
-        await page.setGeolocation(geolocation);
-        context.setGeolocation(geolocation);
-      }
-    }
+//     if (cpuThrottlingRate) {
+//       await page.emulateCPUThrottling(cpuThrottlingRate);
+//       context.setCpuThrottlingRate(cpuThrottlingRate);
+//     }
 
-    if (userAgent !== undefined) {
-      if (userAgent === null) {
-        await page.setUserAgent({
-          userAgent: undefined,
-        });
-        context.setUserAgent(null);
-      } else {
-        await page.setUserAgent({
-          userAgent,
-        });
-        context.setUserAgent(userAgent);
-      }
-    }
+//     if (geolocation !== undefined) {
+//       if (geolocation === null) {
+//         await page.setGeolocation({latitude: 0, longitude: 0});
+//         context.setGeolocation(null);
+//       } else {
+//         await page.setGeolocation(geolocation);
+//         context.setGeolocation(geolocation);
+//       }
+//     }
 
-    if (request.params.colorScheme) {
-      if (request.params.colorScheme === 'auto') {
-        await page.emulateMediaFeatures([
-          {name: 'prefers-color-scheme', value: ''},
-        ]);
-        context.setColorScheme(null);
-      } else {
-        await page.emulateMediaFeatures([
-          {
-            name: 'prefers-color-scheme',
-            value: request.params.colorScheme,
-          },
-        ]);
-        context.setColorScheme(request.params.colorScheme);
-      }
-    }
+//     if (userAgent !== undefined) {
+//       if (userAgent === null) {
+//         await page.setUserAgent({
+//           userAgent: undefined,
+//         });
+//         context.setUserAgent(null);
+//       } else {
+//         await page.setUserAgent({
+//           userAgent,
+//         });
+//         context.setUserAgent(userAgent);
+//       }
+//     }
 
-    if (viewport !== undefined) {
-      if (viewport === null) {
-        await page.setViewport(null);
-        context.setViewport(null);
-      } else {
-        const defaults = {
-          deviceScaleFactor: 1,
-          isMobile: false,
-          hasTouch: false,
-          isLandscape: false,
-        };
-        await page.setViewport({...defaults, ...viewport});
-        context.setViewport({...defaults, ...viewport});
-      }
-    }
-  },
-});
+//     if (request.params.colorScheme) {
+//       if (request.params.colorScheme === 'auto') {
+//         await page.emulateMediaFeatures([
+//           {name: 'prefers-color-scheme', value: ''},
+//         ]);
+//         context.setColorScheme(null);
+//       } else {
+//         await page.emulateMediaFeatures([
+//           {
+//             name: 'prefers-color-scheme',
+//             value: request.params.colorScheme,
+//           },
+//         ]);
+//         context.setColorScheme(request.params.colorScheme);
+//       }
+//     }
+
+//     if (viewport !== undefined) {
+//       if (viewport === null) {
+//         await page.setViewport(null);
+//         context.setViewport(null);
+//       } else {
+//         const defaults = {
+//           deviceScaleFactor: 1,
+//           isMobile: false,
+//           hasTouch: false,
+//           isLandscape: false,
+//         };
+//         await page.setViewport({...defaults, ...viewport});
+//         context.setViewport({...defaults, ...viewport});
+//       }
+//     }
+//   },
+// });
 
 // For ui settings
 const emulationSchema = {
@@ -210,6 +212,30 @@ const emulationSchema = {
     .number()
     .optional()
     .describe('CPU throttling rate to emulate.'),
+  geolocation: zod
+    .object({
+      latitude: zod.number(),
+      longitude: zod.number(),
+    })
+    .nullable()
+    .optional()
+    .describe('Geolocation to emulate.'),
+  colorScheme: zod
+    .enum(['dark', 'light', 'auto'])
+    .optional()
+    .describe('Color scheme to emulate.'),
+  viewport: zod
+    .object({
+      width: zod.number(),
+      height: zod.number(),
+      deviceScaleFactor: zod.number().optional(),
+      isMobile: zod.boolean().optional(),
+      hasTouch: zod.boolean().optional(),
+      isLandscape: zod.boolean().optional(),
+    })
+    .nullable()
+    .optional()
+    .describe('Viewport to emulate.'),
 };
 
 async function applyEmulation(
@@ -217,7 +243,13 @@ async function applyEmulation(
   context: Context,
 ) {
   const page = context.getSelectedPage();
-  const {networkConditions, cpuThrottlingRate} = params;
+  const {
+    networkConditions,
+    cpuThrottlingRate,
+    geolocation,
+    colorScheme,
+    viewport,
+  } = params;
 
   if (networkConditions) {
     if (networkConditions === 'No emulation') {
@@ -245,6 +277,46 @@ async function applyEmulation(
     await page.emulateCPUThrottling(cpuThrottlingRate);
     context.setCpuThrottlingRate(cpuThrottlingRate);
   }
+
+  if (geolocation !== undefined) {
+    if (geolocation === null) {
+      await page.setGeolocation({latitude: 0, longitude: 0});
+      context.setGeolocation(null);
+    } else {
+      await page.setGeolocation(geolocation);
+      context.setGeolocation(geolocation);
+    }
+  }
+
+  if (colorScheme) {
+    if (colorScheme === 'auto') {
+      await page.emulateMediaFeatures([
+        {name: 'prefers-color-scheme', value: ''},
+      ]);
+      context.setColorScheme(null);
+    } else {
+      await page.emulateMediaFeatures([
+        {name: 'prefers-color-scheme', value: colorScheme},
+      ]);
+      context.setColorScheme(colorScheme);
+    }
+  }
+
+  if (viewport !== undefined) {
+    if (viewport === null) {
+      await page.setViewport(null);
+      context.setViewport(null);
+    } else {
+      const defaults = {
+        deviceScaleFactor: 1,
+        isMobile: false,
+        hasTouch: false,
+        isLandscape: false,
+      };
+      await page.setViewport({...defaults, ...viewport});
+      context.setViewport({...defaults, ...viewport});
+    }
+  }
 }
 
 export const pickEmulationSettings = defineTool({
@@ -252,7 +324,8 @@ export const pickEmulationSettings = defineTool({
   description: `Activates the emulation configuration module for the current session and reveals the control interface.
 Note: This tool is a prerequisite for custom network/CPU throttling during traces.
 CRITICAL: Execution of this tool MUST be followed IMMEDIATELY by the next operational tool (e.g., performance_start_trace or page_navigate) in the same execution turn. 
-DO NOT respond to the user, DO NOT pause for interaction, and DO NOT wait for confirmation. The module remains active in the background.`,
+DO NOT respond to the user, DO NOT pause for interaction, and DO NOT wait for confirmation. The module remains active in the background.
+If the user provides specific values (e.g. 'throttle cpu by 4x', 'offline mode'), DO NOT use this tool. Use the 'emulate' tool instead.`,
   annotations: {
     category: ToolCategory.EMULATION,
     readOnlyHint: false,
