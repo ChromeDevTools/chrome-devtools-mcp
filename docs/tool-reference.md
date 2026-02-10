@@ -10,12 +10,10 @@
   - [`mouse_hover`](#mouse_hover)
   - [`mouse_scroll`](#mouse_scroll)
   - [`wait`](#wait)
-- **[Debugging](#debugging)** (7 tools)
+- **[Debugging](#debugging)** (5 tools)
   - [`evaluate_script`](#evaluate_script)
-  - [`get_console_message`](#get_console_message)
-  - [`get_output_panel_content`](#get_output_panel_content)
-  - [`list_console_messages`](#list_console_messages)
-  - [`list_output_channels`](#list_output_channels)
+  - [`read_console`](#read_console)
+  - [`read_output`](#read_output)
   - [`take_screenshot`](#take_screenshot)
   - [`take_snapshot`](#take_snapshot)
 
@@ -240,78 +238,12 @@ Example with arguments: `(el) => {
 
 ---
 
-### `get_console_message`
+### `read_console`
 
-**Description:** Gets a console message by its ID. You can get all messages by calling [`list_console_messages`](#list_console_messages).
+**Description:** Read console messages from the currently selected page. Can either list all messages with filtering, or get a specific message by ID with full details.
 
-Args:
-  - msgid (number): The message ID from [`list_console_messages`](#list_console_messages) output
-  - response_format ('markdown'|'json'): Output format. Default: 'markdown'
-
-Returns:
-  JSON format: { id, type, text, timestamp, args?, stackTrace? }
-  Markdown format: Formatted message details with arguments and stack trace
-
-Examples:
-  - "Get message 5" -> { msgid: 5 }
-  - "Get message as JSON" -> { msgid: 5, response_format: 'json' }
-
-Error Handling:
-  - Returns "Console message with id X not found." if message doesn't exist
-
-**Parameters:**
-
-- **msgid** (number) **(required)**: The msgid of a console message on the page from the listed console messages
-- **response_format** (unknown) _(optional)_: Output format: "markdown" for human-readable or "json" for machine-readable structured data.
-
----
-
-### `get_output_panel_content`
-
-**Description:** Get the text content from the currently visible VS Code Output panel. Optionally switch to a specific output channel first.
-
-Args:
-  - channel (string): Output channel name (e.g., "Git", "TypeScript", "Extension Host"). Default: exthost or main
-  - maxLines (number): Maximum lines to return. Default: 200
-  - tail (boolean): Return last N lines (true) or first N (false). Default: true
-  - filter (string): Case-insensitive substring filter
-  - isRegex (boolean): Treat filter as regex. Default: false
-  - levels (string[]): Filter by log levels (error, warning, info, debug, trace)
-  - secondsAgo (number): Only lines from last N seconds
-  - filterLogic ('and'|'or'): How to combine filters. Default: 'and'
-  - response_format ('markdown'|'json'): Output format. Default: 'markdown'
-
-Returns:
-  JSON format: { channel, total_lines, returned_lines, has_more, filters?, lines: [...] }
-  Markdown format: Formatted log output with filter summary
-
-Examples:
-  - "Show errors from Extension Host" -> { channel: "exthost", levels: ["error"] }
-  - "Recent TypeScript logs" -> { channel: "TypeScript", secondsAgo: 300 }
-  - "Search for specific error" -> { filter: "ENOENT", isRegex: false }
-  - "Get as JSON" -> { channel: "main", response_format: 'json' }
-
-Error Handling:
-  - Returns "Channel X not found." with available channels if channel doesn't exist
-  - Returns error if response exceeds 25000 chars
-
-**Parameters:**
-
-- **channel** (string) _(optional)_: Name of the output channel to read (e.g., "Git", "TypeScript", "Extension Host"). If omitted, reads the currently visible channel.
-- **filter** (string) _(optional)_: Case-insensitive substring filter. Only lines containing this text are returned.
-- **filterLogic** (enum: "and", "or") _(optional)_: How to combine multiple filters. "and" = all filters must match (default). "or" = any filter can match.
-- **isRegex** (boolean) _(optional)_: If true, treat the filter as a regular expression pattern. Default is false (substring match).
-- **levels** (array) _(optional)_: Filter by log level(s). Only lines with matching levels are returned. Levels: error, warning, info, debug, trace.
-- **maxLines** (integer) _(optional)_: Maximum number of lines to return. Default is 200. Use a smaller value to reduce output size.
-- **response_format** (unknown) _(optional)_: Output format: "markdown" for human-readable or "json" for machine-readable structured data.
-- **secondsAgo** (integer) _(optional)_: Only return log lines from the last N seconds. Useful for filtering recent activity.
-- **tail** (boolean) _(optional)_: If true, returns the last N lines (most recent). If false, returns the first N lines. Default is true.
-
----
-
-### `list_console_messages`
-
-**Description:** List all console messages for the currently selected page since the last navigation.
+**Mode 1: List messages** (when msgid is NOT provided)
+Lists console messages since the last navigation with optional filtering and pagination.
 
 Args:
   - pageSize (number): Maximum messages to return. Default: all
@@ -328,52 +260,74 @@ Returns:
   JSON format: { total, count, offset, has_more, next_offset?, messages: [{id, type, text, timestamp, stackTrace?}] }
   Markdown format: Formatted list with msgid, type tag, text, and first stack frame
 
+**Mode 2: Get single message** (when msgid IS provided)
+Gets detailed information about a specific console message including arguments.
+
+Args:
+  - msgid (number): The message ID to retrieve
+  - response_format ('markdown'|'json'): Output format. Default: 'markdown'
+
+Returns:
+  JSON format: { id, type, text, timestamp, args?, stackTrace? }
+  Markdown format: Formatted message details with arguments and stack trace
+
 Examples:
   - "Show only errors" -> { types: ['error'] }
   - "Find fetch failures" -> { textFilter: 'net::ERR', types: ['error'] }
   - "Recent warnings" -> { types: ['warning'], secondsAgo: 60 }
-  - "Get JSON for processing" -> { response_format: 'json' }
+  - "Get message 5" -> { msgid: 5 }
+  - "Get message as JSON" -> { msgid: 5, response_format: 'json' }
 
 Error Handling:
   - Returns "No console messages found." if no messages match filters
+  - Returns "Console message with id X not found." if msgid doesn't exist
   - Returns error with available params if response exceeds 25000 chars
 
 **Parameters:**
 
-- **filterLogic** (enum: "and", "or") _(optional)_: How to combine multiple filters. "and" = all filters must match (default). "or" = any filter can match.
-- **includePreservedMessages** (boolean) _(optional)_: Set to true to return the preserved messages over the last 3 navigations.
-- **isRegex** (boolean) _(optional)_: If true, treat textFilter as a regular expression pattern. Default is false (substring match).
-- **pageIdx** (integer) _(optional)_: Page number to return (0-based). When omitted, returns the first page.
-- **pageSize** (integer) _(optional)_: Maximum number of messages to return. When omitted, returns all messages.
+- **filterLogic** (enum: "and", "or") _(optional)_: How to combine multiple filters. "and" = all filters must match (default). "or" = any filter can match. Only used when listing messages (msgid not provided).
+- **includePreservedMessages** (boolean) _(optional)_: Set to true to return the preserved messages over the last 3 navigations. Only used when listing messages (msgid not provided).
+- **isRegex** (boolean) _(optional)_: If true, treat textFilter as a regular expression pattern. Default is false (substring match). Only used when listing messages (msgid not provided).
+- **msgid** (number) _(optional)_: The ID of a specific console message to retrieve with full details. When provided, returns only that message with arguments and stack trace. When omitted, lists all messages.
+- **pageIdx** (integer) _(optional)_: Page number to return (0-based). When omitted, returns the first page. Only used when listing messages (msgid not provided).
+- **pageSize** (integer) _(optional)_: Maximum number of messages to return. When omitted, returns all messages. Only used when listing messages (msgid not provided).
 - **response_format** (unknown) _(optional)_: Output format: "markdown" for human-readable or "json" for machine-readable structured data.
-- **secondsAgo** (integer) _(optional)_: Only return messages from the last N seconds. Useful for filtering recent activity.
-- **sourceFilter** (string) _(optional)_: Substring to match against the source URL in the stack trace. Only messages originating from a matching source are returned.
-- **textFilter** (string) _(optional)_: Case-insensitive substring to match against the message text. Only messages whose text contains this string are returned.
-- **types** (array) _(optional)_: Filter messages to only return messages of the specified resource types. When omitted or empty, returns all messages.
+- **secondsAgo** (integer) _(optional)_: Only return messages from the last N seconds. Useful for filtering recent activity. Only used when listing messages (msgid not provided).
+- **sourceFilter** (string) _(optional)_: Substring to match against the source URL in the stack trace. Only messages originating from a matching source are returned. Only used when listing messages (msgid not provided).
+- **textFilter** (string) _(optional)_: Case-insensitive substring to match against the message text. Only messages whose text contains this string are returned. Only used when listing messages (msgid not provided).
+- **types** (array) _(optional)_: Filter messages to only return messages of the specified resource types. When omitted or empty, returns all messages. Only used when listing messages (msgid not provided).
 
 ---
 
-### `list_output_channels`
+### `read_output`
 
-**Description:** List all available output channels in the VS Code Output panel (e.g., "Git", "TypeScript", "ESLint", "Extension Host").
+**Description:** Read VS Code output logs from the workspace session. When called without a channel, lists all available output channels. When called with a channel name, returns the complete log content.
 
 Args:
+  - channel (string): Optional. Output channel name to read (e.g., "exthost", "main", "Git"). If omitted, lists all available channels.
   - response_format ('markdown'|'json'): Output format. Default: 'markdown'
 
 Returns:
-  JSON format: { total, channels: [{name, category, sizeKb}] }
-  Markdown format: Organized list by category (Main Logs, Extension Host, Output Channels, etc.)
+  When channel is omitted (list mode):
+    JSON format: { mode: 'list', total, channels: [{name, category, sizeKb}] }
+    Markdown format: Organized list by category (Main Logs, Extension Host, Output Channels, etc.)
+  
+  When channel is provided (content mode):
+    JSON format: { mode: 'content', channel, total_lines, content }
+    Markdown format: Full log content in a code block
 
 Examples:
   - "List all channels" -> {}
-  - "Get channels as JSON" -> { response_format: 'json' }
+  - "Read extension host logs" -> { channel: "exthost" }
+  - "Read main VS Code logs" -> { channel: "main" }
 
 Error Handling:
   - Returns "No logs directory found." if VS Code debug window isn't running
-  - Returns "No log files found." if logs directory is empty
+  - Returns "Channel X not found." with available channels if channel doesn't exist
 
 **Parameters:**
 
+- **channel** (string) _(optional)_: Name of the output channel to read (e.g., "exthost", "main", "Git"). If omitted, lists all available channels.
 - **response_format** (unknown) _(optional)_: Output format: "markdown" for human-readable or "json" for machine-readable structured data.
 
 ---

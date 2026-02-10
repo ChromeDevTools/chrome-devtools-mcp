@@ -26,12 +26,10 @@ Use this skill when:
 
 ### Inspection and Debugging
 - `snapshot` - Get the current DOM state of VS Code
-- `console` - Read console output from extension host
+- `read_console` - Read console messages (list all or get specific by ID)
+- `read_output` - Read VS Code output logs (list channels or read specific channel)
 - `debug-evaluate` - Evaluate JavaScript in the debug context
 - `screenshot` - Capture screenshots of VS Code window
-
-### Monitoring
-- `output-panel` - Read from VS Code output panels
 
 ### Script Execution
 - `script` - Execute JavaScript in the VS Code context
