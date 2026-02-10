@@ -379,11 +379,11 @@ function resolvePath(
 }
 
 /**
- * Get default vsctk extension path (parent of vscode-devtools-mcp package)
+ * Get default vsctk extension path (parent of mcp-server package)
  */
 function getDefaultExtensionPath(): string {
-  // Build output is in vscode-devtools-mcp/build/src/
-  // Go up to vscode-devtools-mcp, then to parent (workspace root)
+  // Build output is in mcp-server/build/src/
+  // Go up to mcp-server, then to parent (workspace root)
   const packageRoot = dirname(dirname(__dirname));
   const parentDir = dirname(packageRoot);
 
@@ -401,11 +401,11 @@ function getDefaultExtensionPath(): string {
 
 /**
  * Get the host workspace where VS Code is running.
- * This is the parent of the vscode-devtools-mcp package.
+ * This is the parent of the mcp-server package.
  */
 function getHostWorkspace(): string {
-  // Build output is in vscode-devtools-mcp/build/src/
-  // Go up to vscode-devtools-mcp, then to parent (the host workspace)
+  // Build output is in mcp-server/build/src/
+  // Go up to mcp-server, then to parent (the host workspace)
   const packageRoot = dirname(dirname(__dirname));
   return dirname(packageRoot);
 }

@@ -105,6 +105,9 @@ importers:
       yargs:
         specifier: 18.0.0
         version: 18.0.0
+      zod:
+        specifier: ^3.25.76
+        version: 3.25.76
 
 packages:
 

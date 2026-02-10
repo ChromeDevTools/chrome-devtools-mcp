@@ -102,7 +102,7 @@ export const cliOptions = {
 
 export function parseArguments(version: string, argv = process.argv) {
   const yargsInstance = yargs(hideBin(argv))
-    .scriptName('npx vscode-devtools-mcp@latest')
+    .scriptName('npx mcp-server@latest')
     .options(cliOptions)
     .example([
       [

@@ -102,7 +102,7 @@ async function ensureConnection(): Promise<void> {
 
 const logDisclaimers = () => {
   console.error(
-    `vscode-devtools-mcp exposes content of the VS Code debug window to MCP clients,
+    `mcp-server exposes content of the VS Code debug window to MCP clients,
 allowing them to inspect, debug, and modify any data visible in the editor.
 Avoid sharing sensitive or personal information that you do not want to share with MCP clients.`,
   );
