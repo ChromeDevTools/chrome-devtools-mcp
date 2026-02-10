@@ -833,6 +833,150 @@ export interface VSCodeLaunchOptions {
   launch?: LaunchFlags;
 }
 
+interface HostTaskDefinition {
+  label: string;
+  command: string;
+  optionsCwd?: string;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function readOptionalString(obj: Record<string, unknown>, key: string): string | undefined {
+  const value = obj[key];
+  return typeof value === 'string' ? value : undefined;
+}
+
+function expandWorkspaceFolderVars(input: string, workspaceFolder: string): string {
+  return input.replaceAll('${workspaceFolder}', workspaceFolder);
+}
+
+function tryReadHostTaskFromTasksJson(
+  workspaceFolder: string,
+  taskLabel: string,
+): HostTaskDefinition | null {
+  const tasksPath = path.join(workspaceFolder, '.vscode', 'tasks.json');
+  if (!fs.existsSync(tasksPath)) return null;
+
+  const content = fs.readFileSync(tasksPath, 'utf8');
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(content);
+  } catch {
+    return null;
+  }
+
+  if (!isRecord(parsed)) return null;
+  const tasksValue = parsed['tasks'];
+  if (!Array.isArray(tasksValue)) return null;
+
+  for (const item of tasksValue) {
+    if (!isRecord(item)) continue;
+    const label = readOptionalString(item, 'label');
+    if (label !== taskLabel) continue;
+
+    const command = readOptionalString(item, 'command');
+    if (!command) return null;
+
+    const optionsValue = item['options'];
+    const optionsCwdRaw = isRecord(optionsValue)
+      ? readOptionalString(optionsValue, 'cwd')
+      : undefined;
+
+    const optionsCwd = optionsCwdRaw
+      ? expandWorkspaceFolderVars(optionsCwdRaw, workspaceFolder)
+      : undefined;
+
+    return {
+      label,
+      command,
+      optionsCwd,
+    };
+  }
+
+  return null;
+}
+
+export async function runHostShellTaskOrThrow(
+  workspaceFolder: string,
+  taskLabel: string,
+  inactivityTimeoutMs: number,
+): Promise<void> {
+  const task = tryReadHostTaskFromTasksJson(workspaceFolder, taskLabel);
+  if (!task) {
+    throw new Error(
+      `Prelaunch task "${taskLabel}" not found in ${path.join(workspaceFolder, '.vscode', 'tasks.json')}`,
+    );
+  }
+
+  logger(`Running prelaunch task ${task.label}: ${task.command}`);
+
+  await new Promise<void>((resolve, reject) => {
+    const cwd = task.optionsCwd ?? workspaceFolder;
+    const child = spawn(task.command, {
+      cwd,
+      shell: true,
+      windowsHide: true,
+      env: process.env,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+
+    let output = '';
+    const maxOutputChars = 1_000_000;
+
+    let inactivityTimer: NodeJS.Timeout | undefined;
+    const resetInactivityTimer = () => {
+      if (inactivityTimer) clearTimeout(inactivityTimer);
+      inactivityTimer = setTimeout(() => {
+        try {
+          child.kill();
+        } catch {
+          // best-effort
+        }
+        reject(
+          new Error(
+            `Prelaunch task "${taskLabel}" produced no output for ${Math.round(inactivityTimeoutMs / 1000)}s and was terminated.\n\n${output}`,
+          ),
+        );
+      }, inactivityTimeoutMs);
+    };
+
+    const appendOutput = (chunk: Buffer) => {
+      const text = chunk.toString('utf8');
+      logger(text.trimEnd());
+      if (output.length < maxOutputChars) {
+        const remaining = maxOutputChars - output.length;
+        output += text.slice(0, remaining);
+      }
+      resetInactivityTimer();
+    };
+
+    resetInactivityTimer();
+
+    child.stdout?.on('data', appendOutput);
+    child.stderr?.on('data', appendOutput);
+
+    child.on('error', (err) => {
+      if (inactivityTimer) clearTimeout(inactivityTimer);
+      reject(new Error(`Prelaunch task spawn error: ${err.message}\n\n${output}`));
+    });
+
+    child.on('exit', (code) => {
+      if (inactivityTimer) clearTimeout(inactivityTimer);
+      if (code === 0) {
+        resolve();
+        return;
+      }
+      reject(
+        new Error(
+          `Prelaunch task "${taskLabel}" failed with exit code ${code ?? 'unknown'}.\n\n${output}`,
+        ),
+      );
+    });
+  });
+}
+
 /**
  * Ensure the VS Code debug window is spawned and CDP is connected.
  *

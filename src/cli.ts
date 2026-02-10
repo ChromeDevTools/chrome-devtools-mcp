@@ -8,27 +8,40 @@ import type {YargsOptions} from './third_party/index.js';
 import {yargs, hideBin} from './third_party/index.js';
 
 export const cliOptions = {
-  // Primary arg: workspace folder containing .vscode/devtools.json
-  workspace: {
+  // Primary arg: target workspace folder (the extension dev host opens this).
+  // Also used as the base path for loading .devtools/devtools.jsonc.
+  'test-workspace': {
     type: 'string',
     description:
-      'Path to workspace folder. Configuration is loaded from .vscode/devtools.json within this folder.',
+      'Path to the target workspace folder. Configuration is loaded from .devtools/devtools.jsonc within this folder.',
     alias: 'w',
   },
 
-  // VS Code's flag name, but used here to override the dev extension folder.
+  // Path to the dev extension folder.
   // This is forwarded to the spawned VS Code instance as --extensionDevelopmentPath.
-  extensionDevelopmentPath: {
+  extension: {
     type: 'string',
     description:
-      'Path to the VS Code extension folder to load under development (vsctk bridge). Overrides extensionPath in .vscode/devtools.json.',
+      'Path to the VS Code extension folder to load under development (vsctk bridge). Overrides extensionPath in .devtools/devtools.jsonc.',
     alias: 'e',
+  },
+
+  // Backwards-compatibility aliases (hidden from help)
+  workspace: {
+    type: 'string',
+    description: '[LEGACY] Use --test-workspace instead.',
+    hidden: true,
+  },
+  extensionDevelopmentPath: {
+    type: 'string',
+    description: '[LEGACY] Use --extension instead.',
+    hidden: true,
   },
 
   // Legacy args (kept for backwards compatibility, hidden from help)
   folder: {
     type: 'string',
-    description: '[LEGACY] Use --workspace instead.',
+    description: '[LEGACY] Use --test-workspace instead.',
     alias: 'f',
     hidden: true,
   },
@@ -42,7 +55,7 @@ export const cliOptions = {
   targetFolder: {
     type: 'string',
     description:
-      '[LEGACY] Use --workspace to point to the target folder directly.',
+      '[LEGACY] Use --test-workspace to point to the target folder directly.',
     alias: 't',
     hidden: true,
   },
@@ -93,12 +106,12 @@ export function parseArguments(version: string, argv = process.argv) {
     .options(cliOptions)
     .example([
       [
-        '$0 --workspace /path/to/project',
-        'Start MCP server for a workspace (config from .vscode/devtools.json)',
+        '$0 --test-workspace /path/to/project',
+        'Start MCP server for a workspace (config from .devtools/devtools.jsonc)',
       ],
       [
         '$0 -w /path/to/project',
-        'Short form of --workspace',
+        'Short form of --test-workspace',
       ],
     ]);
 

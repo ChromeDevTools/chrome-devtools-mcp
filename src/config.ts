@@ -173,6 +173,8 @@ export interface ResolvedConfig {
   /** The target workspace to open in the debug window */
   workspaceFolder: string;
   extensionBridgePath: string;
+  /** True when the extension dev path was explicitly supplied via CLI args. */
+  explicitExtensionDevelopmentPath: boolean;
   devDiagnostic: boolean;
   logFile?: string;
   headless: boolean;
@@ -413,6 +415,9 @@ function getHostWorkspace(): string {
  * Priority: CLI args > env vars > config file defaults
  */
 export function loadConfig(cliArgs: {
+  testWorkspace?: string;
+  extension?: string;
+  // Backwards-compatibility aliases
   workspace?: string;
   extensionDevelopmentPath?: string;
   // Legacy CLI args for backwards compatibility
@@ -427,13 +432,13 @@ export function loadConfig(cliArgs: {
   categoryPerformance?: boolean;
   categoryNetwork?: boolean;
 }): ResolvedConfig {
-  // Workspace folder priority: CLI --workspace > legacy --folder
+  // Workspace folder priority: CLI --test-workspace > legacy --workspace > legacy --folder
   const workspaceFolder =
-    cliArgs.workspace ?? cliArgs.folder;
+    cliArgs.testWorkspace ?? cliArgs.workspace ?? cliArgs.folder;
 
   if (!workspaceFolder) {
     throw new Error(
-      'Workspace folder is required. Use --workspace /path/to/workspace',
+      'Workspace folder is required. Use --test-workspace /path/to/workspace',
     );
   }
 
@@ -444,9 +449,17 @@ export function loadConfig(cliArgs: {
   // Load config from workspace's .vscode/devtools.json
   const fileConfig = loadConfigFile(absoluteWorkspace);
 
+  const explicitExtensionDevelopmentPath =
+    typeof cliArgs.extension === 'string' ||
+    typeof cliArgs.extensionDevelopmentPath === 'string' ||
+    typeof cliArgs.extensionBridgePath === 'string';
+
   // Resolve extension path with priority: CLI > config > default
   let extensionBridgePath: string;
-  const cliExtensionPath = cliArgs.extensionDevelopmentPath ?? cliArgs.extensionBridgePath;
+  const cliExtensionPath =
+    cliArgs.extension ??
+    cliArgs.extensionDevelopmentPath ??
+    cliArgs.extensionBridgePath;
   if (cliExtensionPath) {
     extensionBridgePath = isAbsolute(cliExtensionPath)
       ? cliExtensionPath
@@ -468,6 +481,7 @@ export function loadConfig(cliArgs: {
     hostWorkspace: getHostWorkspace(),
     workspaceFolder: absoluteWorkspace,
     extensionBridgePath,
+    explicitExtensionDevelopmentPath,
     devDiagnostic: cliArgs.devDiagnostic ?? fileConfig.devDiagnostic ?? false,
     logFile,
     headless: cliArgs.headless ?? fileConfig.headless ?? false,

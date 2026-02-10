@@ -8,7 +8,8 @@ import './polyfill.js';
 
 import process from 'node:process';
 
-import {ensureVSCodeConnected, getConnectionGeneration, getPuppeteerBrowser} from './vscode.js';
+import {ensureVSCodeConnected, getConnectionGeneration, getPuppeteerBrowser, stopDebugWindow, runHostShellTaskOrThrow} from './vscode.js';
+import {hasExtensionChanged, saveExtensionSnapshot} from './extension-watcher.js';
 import {checkForBlockingUI} from './notification-gate.js';
 import {parseArguments} from './cli.js';
 import {loadConfig, type ResolvedConfig} from './config.js';
@@ -181,6 +182,19 @@ function registerTool(tool: ToolDefinition): void {
         // Standalone tools (e.g., wait) don't need VS Code connection
         const isStandalone = tool.annotations.conditions?.includes('standalone');
 
+        // Hot-reload: if the extension source changed since the last snapshot,
+        // tear down the debug window, rebuild, and let ensureConnection()
+        // spawn a fresh one. This all happens OUTSIDE the tool's timeout so
+        // that from Copilot's perspective changes are applied instantly.
+        if (!isStandalone && config.explicitExtensionDevelopmentPath) {
+          if (hasExtensionChanged(config.extensionBridgePath)) {
+            logger('Extension source changed — hot-reloading…');
+            await stopDebugWindow();
+            await runHostShellTaskOrThrow(config.hostWorkspace, 'ext:build', 300_000);
+          }
+          saveExtensionSnapshot(config.extensionBridgePath);
+        }
+
         // Ensure VS Code connection (CDP + bridge) OUTSIDE the timeout.
         // This allows the first tool call to wait for Extension Host initialization
         // without eating into the tool's timeout budget.
@@ -327,6 +341,10 @@ logger('VS Code DevTools MCP Server connected');
 
 // Auto-launch VS Code debug window on server start
 logger('Launching VS Code debug window...');
+if (config.explicitExtensionDevelopmentPath) {
+  await runHostShellTaskOrThrow(config.hostWorkspace, 'ext:build', 300_000);
+  saveExtensionSnapshot(config.extensionBridgePath);
+}
 await ensureConnection();
 logger('VS Code debug window ready');
 
