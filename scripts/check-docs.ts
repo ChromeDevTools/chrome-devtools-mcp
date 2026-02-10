@@ -47,7 +47,17 @@ function checkFile(filePath: string): string[] {
   const lines = content.split(/\r?\n/);
   lines.forEach((line, index) => {
     const lineNumber = index + 1;
-    if (line.includes('<<<<<<<') || line.includes('=======') || line.includes('>>>>>>>')) {
+    const trimmed = line.trim();
+
+    // Detect real git conflict markers only:
+    //   <<<<<<< HEAD
+    //   =======
+    //   >>>>>>> branch-name
+    if (
+      trimmed.startsWith('<<<<<<< ') ||
+      trimmed === '=======' ||
+      trimmed.startsWith('>>>>>>> ')
+    ) {
       errors.push(`unresolved merge marker on line ${lineNumber}`);
     }
   });
