@@ -8,7 +8,7 @@
  * VS Code DevTools MCP — Browser/Connection Layer
  *
  * Replaces Chrome DevTools MCP's browser.ts with VS Code-specific logic:
- * 1. Discovers the Host VS Code's extension-bridge via sockpath marker
+ * 1. Computes the Host VS Code's bridge path deterministically from workspace path
  * 2. Allocates dynamic ports (CDP + Extension Host inspector) via get-port
  * 3. Spawns an Extension Development Host via child_process.spawn()
  * 4. Connects via raw CDP WebSocket to the page-level target
@@ -21,6 +21,7 @@
  */
 
 import fs from 'node:fs';
+import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import {spawn, execSync, type ChildProcess} from 'node:child_process';
@@ -29,7 +30,7 @@ import getPort from 'get-port';
 import WebSocket from 'ws';
 
 import {
-  discoverBridgePath,
+  computeBridgePath,
   bridgeExec,
   bridgeAttachDebugger,
 } from './bridge-client.js';
@@ -556,31 +557,49 @@ async function waitForExtensionHostReady(
 // ── Dev Host Bridge Discovery ───────────────────────────
 
 /**
- * Wait for extension-bridge to activate in the Extension Dev Host.
- * The Dev Host writes its own sockpath marker to the target folder.
+ * Wait for the vsctk bridge to activate in the Extension Dev Host.
+ * The bridge path is computed deterministically from the workspace path.
+ * We poll for socket connectivity to know when the bridge is ready.
  */
 async function waitForDevHostBridge(
   targetFolder: string,
   timeout = 15_000,
 ): Promise<string | null> {
-  const markerPath = path.join(
-    targetFolder,
-    '.vscode',
-    'vscode-api-expose.sockpath',
-  );
+  const bridgePath = computeBridgePath(targetFolder);
   const start = Date.now();
+
   while (Date.now() - start < timeout) {
-    if (fs.existsSync(markerPath)) {
-      const bridgePath = fs.readFileSync(markerPath, 'utf8').trim();
-      if (bridgePath) {
-        logger(`Dev Host bridge discovered: ${bridgePath}`);
-        return bridgePath;
-      }
+    // Test if the socket is connectable
+    const isReady = await testSocketConnectivity(bridgePath);
+    if (isReady) {
+      logger(`Dev Host bridge ready: ${bridgePath}`);
+      return bridgePath;
     }
     await new Promise(r => setTimeout(r, 500));
   }
-  logger('Dev Host bridge not found within timeout');
+  logger('Dev Host bridge not ready within timeout');
   return null;
+}
+
+/**
+ * Test if a socket/pipe is connectable (bridge is running)
+ */
+function testSocketConnectivity(socketPath: string): Promise<boolean> {
+  return new Promise(resolve => {
+    const client = net.createConnection(socketPath);
+    client.on('connect', () => {
+      client.end();
+      resolve(true);
+    });
+    client.on('error', () => {
+      resolve(false);
+    });
+    // Timeout after 1 second
+    setTimeout(() => {
+      client.destroy();
+      resolve(false);
+    }, 1000);
+  });
 }
 
 // ── Synchronous Child Kill ──────────────────────────────
@@ -716,9 +735,9 @@ export interface VSCodeLaunchOptions {
  * Concurrent callers are gated — only one spawn runs at a time.
  *
  * Steps:
- * 1. Discovers Host bridge via sockpath marker
+ * 1. Computes Host bridge path from workspace
  * 2. Allocates dynamic ports (CDP + inspector)
- * 3. Spawns Extension Development Host with extension-bridge
+ * 3. Spawns Extension Development Host with vsctk extension
  * 4. Attaches debugger for full debug UI
  * 5. Connects raw CDP WebSocket to workbench page
  * 6. Polls for workbench readiness
@@ -749,8 +768,8 @@ async function doConnect(options: VSCodeLaunchOptions): Promise<WebSocket> {
   // Kill any stale child before spawning a new one — no duplicates
   teardownSync();
 
-  // 1. Discover Host bridge
-  hostBridgePath = discoverBridgePath(options.workspaceFolder);
+  // 1. Compute Host bridge path (deterministic from workspace path)
+  hostBridgePath = computeBridgePath(options.workspaceFolder);
 
   // 2. Get Electron executable path from the Host VS Code
   const electronPath = (await bridgeExec(
@@ -800,9 +819,8 @@ async function doConnect(options: VSCodeLaunchOptions): Promise<WebSocket> {
   const args = [
     `--remote-debugging-port=${cPort}`,
     `--inspect-extensions=${iPort}`,
-    // Load extension-bridge and vsctk as development extensions
+    // Load vsctk extension as development extension (includes bridge)
     `--extensionDevelopmentPath=${options.extensionBridgePath}`,
-    `--extensionDevelopmentPath=${options.workspaceFolder}`,
     `--user-data-dir=${userDataDir}`,
     '--new-window',
     '--skip-release-notes',

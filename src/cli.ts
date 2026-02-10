@@ -16,6 +16,15 @@ export const cliOptions = {
     alias: 'w',
   },
 
+  // VS Code's flag name, but used here to override the dev extension folder.
+  // This is forwarded to the spawned VS Code instance as --extensionDevelopmentPath.
+  extensionDevelopmentPath: {
+    type: 'string',
+    description:
+      'Path to the VS Code extension folder to load under development (vsctk bridge). Overrides extensionPath in .vscode/devtools.json.',
+    alias: 'e',
+  },
+
   // Legacy args (kept for backwards compatibility, hidden from help)
   folder: {
     type: 'string',
@@ -26,7 +35,7 @@ export const cliOptions = {
   extensionBridgePath: {
     type: 'string',
     description:
-      '[LEGACY] Override extension-bridge path. Prefer setting in .vscode/devtools.json.',
+      '[LEGACY] Override vsctk extension path. Prefer setting extensionPath in .vscode/devtools.json.',
     alias: 'b',
     hidden: true,
   },
@@ -74,12 +83,6 @@ export const cliOptions = {
     type: 'boolean',
     default: true,
     describe: '[LEGACY] Set categories.network in .vscode/devtools.json.',
-    hidden: true,
-  },
-  dev: {
-    type: 'boolean',
-    describe: '[LEGACY] Set dev in .vscode/devtools.json instead.',
-    default: false,
     hidden: true,
   },
 } satisfies Record<string, YargsOptions>;

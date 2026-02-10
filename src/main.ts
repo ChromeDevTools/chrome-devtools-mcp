@@ -6,13 +6,9 @@
 
 import './polyfill.js';
 
-import {execSync} from 'node:child_process';
-import {readdirSync, statSync, writeFileSync} from 'node:fs';
-import {dirname, join} from 'node:path';
 import process from 'node:process';
-import {fileURLToPath} from 'node:url';
 
-import {ensureVSCodeConnected, getConnectionGeneration, getPuppeteerBrowser, teardownSync} from './browser.js';
+import {ensureVSCodeConnected, getConnectionGeneration, getPuppeteerBrowser} from './browser.js';
 import {checkForBlockingUI} from './notification-gate.js';
 import {parseArguments} from './cli.js';
 import {loadConfig, type ResolvedConfig} from './config.js';
@@ -108,117 +104,6 @@ async function ensureConnection(): Promise<void> {
   });
 }
 
-// ── Dev-mode lazy rebuild ──────────────────────────────────
-// Resolves paths once at startup. At build time this file lives at
-// build/src/main.js, so two dirname() calls reach the project root.
-const __filename = fileURLToPath(import.meta.url);
-const projectRoot = dirname(dirname(dirname(__filename)));
-const srcDir = join(projectRoot, 'src');
-// Sentinel file stamped after each successful build — tsc may not update
-// output mtimes when content is unchanged, so we use our own marker.
-const buildSentinel = join(projectRoot, 'build', '.dev-build-stamp');
-
-function getNewestMtime(dir: string, ext: string): number {
-  let newest = 0;
-  for (const entry of readdirSync(dir, {withFileTypes: true, recursive: true})) {
-    if (!entry.isFile() || !entry.name.endsWith(ext)) continue;
-    const fullPath = join(entry.parentPath ?? (entry as any).path ?? dir, entry.name);
-    const mtime = statSync(fullPath).mtimeMs;
-    if (mtime > newest) newest = mtime;
-  }
-  return newest;
-}
-
-class DevRebuildNeeded extends Error {
-  constructor(public detail: string) {
-    super(detail);
-    this.name = 'DevRebuildNeeded';
-  }
-}
-
-/**
- * In dev mode, checks if any .ts source files are newer than the build output.
- * If so, recompiles. On success, throws DevRebuildNeeded (the tool wrapper
- * returns a message and the server exits). On failure, throws with build errors.
- */
-function devLazyRebuildCheck(): void {
-  if (!config.dev) return;
-
-  let buildMtime: number;
-  try {
-    buildMtime = statSync(buildSentinel).mtimeMs;
-  } catch {
-    // No sentinel yet — force rebuild
-    buildMtime = 0;
-  }
-
-  const srcMtime = getNewestMtime(srcDir, '.ts');
-  if (srcMtime <= buildMtime) return;
-
-  logger('[dev] Source files changed — recompiling...');
-  try {
-    execSync('pnpm run build', {
-      cwd: projectRoot,
-      stdio: ['ignore', 'pipe', 'pipe'],
-      timeout: 30_000,
-    });
-    // Stamp the sentinel so we don't rebuild again until source changes
-    writeFileSync(buildSentinel, new Date().toISOString(), 'utf-8');
-  } catch (err: any) {
-    const stderr = err.stderr?.toString() ?? '';
-    const stdout = err.stdout?.toString() ?? '';
-    const output = [stderr, stdout].filter(Boolean).join('\n');
-    throw new Error(
-      `[dev] Build failed. Fix the errors and try again:\n${output}`,
-    );
-  }
-
-  logger('[dev] Build successful — server must restart to load new code.');
-  throw new DevRebuildNeeded(
-    'Source code was modified and has been rebuilt successfully. ' +
-    'The server will now exit so the new code can be loaded. ' +
-    'Please call the tool again.',
-  );
-}
-
-/**
- * Check for source changes at startup and rebuild if needed.
- * Unlike devLazyRebuildCheck, this always runs and fails startup on build error.
- */
-function startupRebuildCheck(): void {
-  let buildMtime: number;
-  try {
-    buildMtime = statSync(buildSentinel).mtimeMs;
-  } catch {
-    // No sentinel yet — force rebuild
-    buildMtime = 0;
-  }
-
-  const srcMtime = getNewestMtime(srcDir, '.ts');
-  if (srcMtime <= buildMtime) {
-    logger('Source files unchanged — skipping rebuild');
-    return;
-  }
-
-  logger('Source files changed since last build — rebuilding...');
-  try {
-    execSync('pnpm run build', {
-      cwd: projectRoot,
-      stdio: ['ignore', 'pipe', 'pipe'],
-      timeout: 60_000,
-    });
-    writeFileSync(buildSentinel, new Date().toISOString(), 'utf-8');
-    logger('Rebuild successful');
-  } catch (err: any) {
-    const stderr = err.stderr?.toString() ?? '';
-    const stdout = err.stdout?.toString() ?? '';
-    const output = [stderr, stdout].filter(Boolean).join('\n');
-    throw new Error(
-      `Startup rebuild failed. Fix errors and restart:\n${output}`,
-    );
-  }
-}
-
 /**
  * Get or create the McpContext (Puppeteer page model).
  * Only needed for non-diagnostic tools that interact via Puppeteer.
@@ -292,10 +177,6 @@ function registerTool(tool: ToolDefinition): void {
       const timeoutMs = tool.timeoutMs ?? DEFAULT_TOOL_TIMEOUT_MS;
       let guard: InstanceType<typeof Mutex.Guard> | undefined;
       try {
-        // In dev mode, check if source files changed and rebuild before executing.
-        // This runs OUTSIDE the mutex so it doesn't block on stale locks.
-        devLazyRebuildCheck();
-
         // Standalone tools (e.g., wait) don't need VS Code connection
         const isStandalone = tool.annotations.conditions?.includes('standalone');
 
@@ -413,19 +294,6 @@ function registerTool(tool: ToolDefinition): void {
         }
         return result;
       } catch (err) {
-        // Dev rebuild succeeded — return message and exit so new code loads on next start
-        if (err instanceof DevRebuildNeeded) {
-          logger(`${tool.name}: ${err.detail}`);
-          // Schedule exit after response is sent
-          setTimeout(() => {
-            teardownSync();
-            process.exit(0);
-          }, 500);
-          return {
-            content: [{type: 'text', text: err.detail}],
-            isError: false,
-          };
-        }
         logger(`${tool.name} error:`, err, err?.stack);
         let errorText = err && 'message' in err ? err.message : String(err);
         if ('cause' in err && err.cause) {
@@ -450,9 +318,6 @@ function registerTool(tool: ToolDefinition): void {
 for (const tool of tools) {
   registerTool(tool);
 }
-
-// Check for source changes and rebuild if needed
-startupRebuildCheck();
 
 await loadIssueDescriptions();
 const transport = new StdioServerTransport();

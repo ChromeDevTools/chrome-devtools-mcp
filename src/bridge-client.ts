@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import crypto from 'node:crypto';
 import net from 'node:net';
-import fs from 'node:fs';
 import path from 'node:path';
 
 import {logger} from './logger.js';
@@ -25,46 +25,40 @@ export interface AttachDebuggerResult {
 
 const BRIDGE_TIMEOUT_MS = 10_000;
 const ATTACH_TIMEOUT_MS = 15_000;
+const IS_WINDOWS = process.platform === 'win32';
 
 /**
- * Discover the extension-bridge socket path for a given workspace.
- * Reads bridgeSocketPath from .vscode/devtools.json written by extension-bridge on activation.
+ * Compute the deterministic bridge socket path for a given workspace.
+ * This uses the same algorithm as extension/bridge.js, so external scripts
+ * can connect directly without needing to read a marker file.
+ *
+ * Windows: \\.\pipe\vsctk-bridge-<8-char-hash-of-lowercase-path>
+ * Unix: <workspacePath>/.vscode/vsctk-bridge.sock
  */
-export function discoverBridgePath(workspaceFolder: string): string {
-  const configPath = path.join(workspaceFolder, '.vscode', 'devtools.json');
-
-  if (!fs.existsSync(configPath)) {
-    throw new Error(
-      `Cannot find devtools.json at ${configPath}.\n` +
-        'Ensure VS Code is running with the extension-bridge extension installed and active.\n' +
-        'Install: code --install-extension extension-bridge',
-    );
+export function computeBridgePath(workspacePath: string): string {
+  if (IS_WINDOWS) {
+    const hash = crypto
+      .createHash('sha256')
+      .update(workspacePath.toLowerCase())
+      .digest('hex')
+      .slice(0, 8);
+    return `\\\\.\\pipe\\vsctk-bridge-${hash}`;
   }
-
-  let config: {bridgeSocketPath?: string};
-  try {
-    config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-  } catch (e) {
-    throw new Error(
-      `Failed to parse devtools.json at ${configPath}.\n` +
-        `Error: ${e instanceof Error ? e.message : String(e)}`,
-    );
-  }
-
-  const socketPath = config.bridgeSocketPath;
-  if (!socketPath) {
-    throw new Error(
-      `No bridgeSocketPath in devtools.json at ${configPath}.\n` +
-        'The extension-bridge may have failed to start. Check VS Code output panel.',
-    );
-  }
-
-  logger('Discovered bridge path:', socketPath);
-  return socketPath;
+  return path.join(workspacePath, '.vscode', 'vsctk-bridge.sock');
 }
 
 /**
- * Send an 'exec' command to extension-bridge and wait for response.
+ * @deprecated Use computeBridgePath instead. This function is kept for backward compatibility.
+ */
+export function discoverBridgePath(workspaceFolder: string): string {
+  logger(
+    'discoverBridgePath is deprecated; use computeBridgePath(workspacePath) instead',
+  );
+  return computeBridgePath(workspaceFolder);
+}
+
+/**
+ * Send an 'exec' command to the vsctk bridge and wait for response.
  * The code runs in a `new Function('vscode', 'payload', ...)` context.
  * `require()` is NOT available — only `vscode` API and `payload`.
  */
@@ -98,7 +92,7 @@ export function bridgeExec(
           } else {
             reject(
               new Error(
-                `extension-bridge exec failed: ${result.error ?? 'Unknown error'}`,
+                `Bridge exec failed: ${result.error ?? 'Unknown error'}`,
               ),
             );
           }

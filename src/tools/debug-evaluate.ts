@@ -5,7 +5,7 @@
  */
 
 /**
- * Development diagnostic tool: execute VS Code API code via the extension-bridge
+ * Development diagnostic tool: execute VS Code API code via the vsctk bridge
  * in the spawned Extension Development Host.
  *
  * The code runs inside `new Function('vscode', 'payload', ...)` in the extension
@@ -33,7 +33,7 @@ const DebugEvaluateOutputSchema = zod.object({
 
 export const debugEvaluate = defineTool({
   name: 'debug_evaluate',
-  description: `[DEV] Execute VS Code API code via the extension-bridge in the Extension Development Host.
+  description: `[DEV] Execute VS Code API code via the vsctk bridge in the Extension Development Host.
 
 The code runs inside an async function body with \`vscode\` and \`payload\` in scope.
 Use \`return\` to return a value. \`await\` is available. \`require()\` is NOT available.
@@ -92,7 +92,7 @@ Error Handling:
     if (!bridgePath) {
       throw new Error(
         'Extension Development Host bridge is not connected. ' +
-          'Ensure the VS Code debug window has been launched and extension-bridge is active.',
+          'Ensure the VS Code debug window has been launched and the vsctk extension is active.',
       );
     }
 

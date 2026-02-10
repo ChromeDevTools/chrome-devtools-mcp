@@ -17,15 +17,12 @@ const __dirname = dirname(__filename);
 /**
  * Configuration schema for .vscode/devtools.json
  * 
- * Note: `bridgeSocketPath` is injected at runtime by extension-bridge
- * when VS Code starts - it's not user-configurable.
+ * Note: The bridge socket path is computed deterministically from the workspace
+ * path — there's no need for a `bridgeSocketPath` field.
  */
 export interface DevToolsConfig {
-  /** Path to extension-bridge extension (relative to workspace or absolute) */
-  extensionBridgePath?: string;
-
-  /** Enable dev mode with file watching and auto-rebuild */
-  dev?: boolean;
+  /** Path to vsctk extension (relative to workspace or absolute). Used for --extensionDevelopmentPath. */
+  extensionPath?: string;
 
   /** Enable diagnostic tools (debug_evaluate) */
   devDiagnostic?: boolean;
@@ -58,7 +55,6 @@ export interface ResolvedConfig {
   /** The target workspace to open in the debug window */
   workspaceFolder: string;
   extensionBridgePath: string;
-  dev: boolean;
   devDiagnostic: boolean;
   logFile?: string;
   headless: boolean;
@@ -103,14 +99,24 @@ function resolvePath(
 }
 
 /**
- * Get default extension-bridge path (adjacent to vscode-devtools-mcp package)
+ * Get default vsctk extension path (parent of vscode-devtools-mcp package)
  */
-function getDefaultExtensionBridgePath(): string {
+function getDefaultExtensionPath(): string {
   // Build output is in vscode-devtools-mcp/build/src/
-  // Go up to vscode-devtools-mcp, then to parent, then to extension-bridge
+  // Go up to vscode-devtools-mcp, then to parent (workspace root)
   const packageRoot = dirname(dirname(__dirname));
   const parentDir = dirname(packageRoot);
-  return join(parentDir, 'extension-bridge');
+
+  // In this repo, the VS Code extension lives in the "extension" folder.
+  const extensionFolder = join(parentDir, 'extension');
+  const extensionPackageJson = join(extensionFolder, 'package.json');
+  if (existsSync(extensionPackageJson)) return extensionFolder;
+
+  // Fallback for repos where the extension lives at the workspace root.
+  const rootPackageJson = join(parentDir, 'package.json');
+  if (existsSync(rootPackageJson)) return parentDir;
+
+  return parentDir;
 }
 
 /**
@@ -130,11 +136,11 @@ function getHostWorkspace(): string {
  */
 export function loadConfig(cliArgs: {
   workspace?: string;
+  extensionDevelopmentPath?: string;
   // Legacy CLI args for backwards compatibility
   folder?: string;
   extensionBridgePath?: string;
   targetFolder?: string;
-  dev?: boolean;
   devDiagnostic?: boolean;
   logFile?: string;
   headless?: boolean;
@@ -143,9 +149,9 @@ export function loadConfig(cliArgs: {
   categoryPerformance?: boolean;
   categoryNetwork?: boolean;
 }): ResolvedConfig {
-  // Workspace folder priority: CLI --workspace > env "workspace" > legacy --folder
+  // Workspace folder priority: CLI --workspace > legacy --folder
   const workspaceFolder =
-    cliArgs.workspace ?? process.env.workspace ?? cliArgs.folder;
+    cliArgs.workspace ?? cliArgs.folder;
 
   if (!workspaceFolder) {
     throw new Error(
@@ -160,18 +166,19 @@ export function loadConfig(cliArgs: {
   // Load config from workspace's .vscode/devtools.json
   const fileConfig = loadConfigFile(absoluteWorkspace);
 
-  // Resolve extension bridge path with priority: CLI > config > default
+  // Resolve extension path with priority: CLI > config > default
   let extensionBridgePath: string;
-  if (cliArgs.extensionBridgePath) {
-    extensionBridgePath = isAbsolute(cliArgs.extensionBridgePath)
-      ? cliArgs.extensionBridgePath
-      : resolve(absoluteWorkspace, cliArgs.extensionBridgePath);
-  } else if (fileConfig.extensionBridgePath) {
+  const cliExtensionPath = cliArgs.extensionDevelopmentPath ?? cliArgs.extensionBridgePath;
+  if (cliExtensionPath) {
+    extensionBridgePath = isAbsolute(cliExtensionPath)
+      ? cliExtensionPath
+      : resolve(absoluteWorkspace, cliExtensionPath);
+  } else if (fileConfig.extensionPath) {
     extensionBridgePath =
-      resolvePath(absoluteWorkspace, fileConfig.extensionBridgePath) ??
-      getDefaultExtensionBridgePath();
+      resolvePath(absoluteWorkspace, fileConfig.extensionPath) ??
+      getDefaultExtensionPath();
   } else {
-    extensionBridgePath = getDefaultExtensionBridgePath();
+    extensionBridgePath = getDefaultExtensionPath();
   }
 
   // Resolve log file path
@@ -183,7 +190,6 @@ export function loadConfig(cliArgs: {
     hostWorkspace: getHostWorkspace(),
     workspaceFolder: absoluteWorkspace,
     extensionBridgePath,
-    dev: cliArgs.dev ?? fileConfig.dev ?? false,
     devDiagnostic: cliArgs.devDiagnostic ?? fileConfig.devDiagnostic ?? false,
     logFile,
     headless: cliArgs.headless ?? fileConfig.headless ?? false,
