@@ -67,6 +67,8 @@ const DEFAULT_CONFIG_TEMPLATE = `// VS Code DevTools MCP configuration (JSONC)
 // Only the keys you set are applied; omitted keys use defaults.
 
 {
+  // NOTE: This file should live at: <workspace>/.devtools/devtools.jsonc
+
   // Path to the vsctk VS Code extension folder (absolute or relative to this workspace).
   // If omitted, defaults to the repo's "extension/" folder when present.
   // "extensionPath": "extension",
@@ -128,7 +130,7 @@ const DEFAULT_CONFIG_TEMPLATE = `// VS Code DevTools MCP configuration (JSONC)
 `;
 
 /**
- * Configuration schema for .vscode/devtools.json
+ * Configuration schema for .devtools/devtools.jsonc
  * 
  * Note: The bridge socket path is computed deterministically from the workspace
  * path — there's no need for a `bridgeSocketPath` field.
@@ -302,27 +304,33 @@ function coerceDevToolsConfig(value: unknown): DevToolsConfig {
 }
 
 /**
- * Load devtools config from workspace's .vscode folder.
+ * Load devtools config from the target workspace.
  *
- * Prefers `.vscode/devtools.jsonc` (JSON-with-comments) but still supports
- * `.vscode/devtools.json` for backwards compatibility.
+ * Prefers `.devtools/devtools.jsonc` (JSON-with-comments) but still supports
+ * `.devtools/devtools.json` and legacy `.vscode/devtools.jsonc|devtools.json`
+ * for backwards compatibility.
  */
 function loadConfigFile(workspaceFolder: string): DevToolsConfig {
-  const configDir = join(workspaceFolder, '.vscode');
-  const configPathJsonc = join(configDir, 'devtools.jsonc');
-  const configPathJson = join(configDir, 'devtools.json');
-  const configPath = existsSync(configPathJsonc)
-    ? configPathJsonc
-    : existsSync(configPathJson)
-      ? configPathJson
-      : undefined;
+  const configDirPreferred = join(workspaceFolder, '.devtools');
+  const configPathJsoncPreferred = join(configDirPreferred, 'devtools.jsonc');
+  const configPathJsonPreferred = join(configDirPreferred, 'devtools.json');
+
+  const configDirLegacy = join(workspaceFolder, '.vscode');
+  const configPathJsoncLegacy = join(configDirLegacy, 'devtools.jsonc');
+  const configPathJsonLegacy = join(configDirLegacy, 'devtools.json');
+
+  const configPath =
+    (existsSync(configPathJsoncPreferred) ? configPathJsoncPreferred : undefined) ??
+    (existsSync(configPathJsonPreferred) ? configPathJsonPreferred : undefined) ??
+    (existsSync(configPathJsoncLegacy) ? configPathJsoncLegacy : undefined) ??
+    (existsSync(configPathJsonLegacy) ? configPathJsonLegacy : undefined);
 
   if (!configPath) {
     logger(
-      `No config file found at ${configPathJsonc} or ${configPathJson}, creating template`,
+      `No config file found, creating template at ${configPathJsoncPreferred}`,
     );
-    mkdirSync(configDir, {recursive: true});
-    writeFileSync(configPathJsonc, DEFAULT_CONFIG_TEMPLATE + '\n');
+    mkdirSync(configDirPreferred, {recursive: true});
+    writeFileSync(configPathJsoncPreferred, DEFAULT_CONFIG_TEMPLATE + '\n');
     return {
       categories: {
         performance: true,
