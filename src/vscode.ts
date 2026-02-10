@@ -33,6 +33,7 @@ import {spawn, execSync, type ChildProcess} from 'node:child_process';
 import getPort from 'get-port';
 import WebSocket from 'ws';
 
+import {DEFAULT_LAUNCH_FLAGS, type LaunchFlags} from './config.js';
 import {
   computeBridgePath,
   bridgeExec,
@@ -746,6 +747,7 @@ export interface VSCodeLaunchOptions {
   extensionBridgePath: string;
   targetFolder?: string;
   headless?: boolean;
+  launch?: LaunchFlags;
 }
 
 /**
@@ -782,6 +784,47 @@ export async function ensureVSCodeConnected(
   } finally {
     connectInProgress = undefined;
   }
+}
+
+interface InternalLaunchPorts {
+  cdpPort: number;
+  inspectorPort: number;
+  extensionBridgePath: string;
+  userDataDir: string;
+  targetFolder: string;
+}
+
+/** Build the CLI args array for the Extension Development Host from resolved LaunchFlags. */
+function buildLaunchArgs(flags: LaunchFlags, ports: InternalLaunchPorts): string[] {
+  const args: string[] = [
+    // Always-present flags — not configurable
+    `--remote-debugging-port=${ports.cdpPort}`,
+    `--inspect-extensions=${ports.inspectorPort}`,
+    `--extensionDevelopmentPath=${ports.extensionBridgePath}`,
+    `--user-data-dir=${ports.userDataDir}`,
+  ];
+
+  if (flags.newWindow) args.push('--new-window');
+  if (flags.skipReleaseNotes) args.push('--skip-release-notes');
+  if (flags.skipWelcome) args.push('--skip-welcome');
+  if (flags.disableExtensions) args.push('--disable-extensions');
+  if (flags.disableGpu) args.push('--disable-gpu');
+  if (flags.disableWorkspaceTrust) args.push('--disable-workspace-trust');
+  if (flags.verbose) args.push('--verbose');
+  if (flags.locale) args.push(`--locale=${flags.locale}`);
+
+  for (const ext of flags.enableExtensions) {
+    args.push(`--enable-extension=${ext}`);
+  }
+
+  for (const extra of flags.extraArgs) {
+    args.push(extra);
+  }
+
+  // Target folder is always last positional arg
+  args.push(ports.targetFolder);
+
+  return args;
 }
 
 async function doConnect(options: VSCodeLaunchOptions): Promise<WebSocket> {
@@ -847,21 +890,14 @@ async function doConnect(options: VSCodeLaunchOptions): Promise<WebSocket> {
   //    stub that forks the real Electron binary and immediately exits (code 9).
   //    Without detached, the forked Electron process would be killed.
   //    We do NOT call unref() — Node keeps a reference so it doesn't exit early.
-  const args = [
-    `--remote-debugging-port=${cPort}`,
-    `--inspect-extensions=${iPort}`,
-    // Load vsctk extension as development extension (includes bridge)
-    `--extensionDevelopmentPath=${options.extensionBridgePath}`,
-    `--user-data-dir=${userDataDir}`,
-    '--new-window',
-    '--skip-release-notes',
-    '--skip-welcome',
-    // Disable all extensions except explicitly enabled ones
-    '--disable-extensions',
-    '--enable-extension=vscode.typescript-language-features',
-    '--enable-extension=github.copilot-chat',
+  const flags = options.launch ?? DEFAULT_LAUNCH_FLAGS;
+  const args = buildLaunchArgs(flags, {
+    cdpPort: cPort,
+    inspectorPort: iPort,
+    extensionBridgePath: options.extensionBridgePath,
+    userDataDir,
     targetFolder,
-  ];
+  });
 
   logger(`Spawning Extension Development Host: ${electronPath} ${args.join(' ')}`);
   // Strip ELECTRON_RUN_AS_NODE from the child's environment.

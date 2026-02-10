@@ -101,6 +101,7 @@ async function ensureConnection(): Promise<void> {
     extensionBridgePath: config.extensionBridgePath,
     targetFolder: config.workspaceFolder,
     headless: config.headless,
+    launch: config.launch,
   });
 }
 

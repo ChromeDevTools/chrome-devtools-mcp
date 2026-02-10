@@ -77,6 +77,7 @@
   },
   "dependencies": {
     "get-port": "^7.1.0",
+    "jsonc-parser": "^3.3.0",
     "ws": "^8.19.0"
   }
 }

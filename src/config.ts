@@ -4,15 +4,128 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {existsSync, readFileSync} from 'node:fs';
+import {existsSync, mkdirSync, readFileSync, writeFileSync} from 'node:fs';
 import {dirname, isAbsolute, join, resolve} from 'node:path';
 import process from 'node:process';
 import {fileURLToPath} from 'node:url';
+
+import {parse} from 'jsonc-parser';
 
 import {logger} from './logger.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+
+/**
+ * VS Code launch flags that control the Extension Development Host window.
+ * Flags marked "always present" are injected by the launcher and cannot be
+ * overridden here (remote-debugging-port, inspect-extensions,
+ * extensionDevelopmentPath, user-data-dir, target folder).
+ */
+export interface LaunchFlags {
+  /** Open in a new window (--new-window). */
+  newWindow: boolean;
+  /** Disable all extensions except those in enableExtensions (--disable-extensions). */
+  disableExtensions: boolean;
+  /** Suppress the release-notes tab (--skip-release-notes). */
+  skipReleaseNotes: boolean;
+  /** Suppress the welcome tab (--skip-welcome). */
+  skipWelcome: boolean;
+  /** Disable GPU hardware acceleration (--disable-gpu). */
+  disableGpu: boolean;
+  /** Disable workspace-trust dialog (--disable-workspace-trust). */
+  disableWorkspaceTrust: boolean;
+  /** Enable verbose logging (--verbose). */
+  verbose: boolean;
+  /** Set the display language, e.g. "en" (--locale). null = OS default. */
+  locale: string | null;
+  /** Extension IDs to keep enabled when disableExtensions is true. */
+  enableExtensions: string[];
+  /** Arbitrary extra CLI flags forwarded verbatim. */
+  extraArgs: string[];
+}
+
+export const DEFAULT_LAUNCH_FLAGS: LaunchFlags = {
+  newWindow: true,
+  disableExtensions: true,
+  skipReleaseNotes: true,
+  skipWelcome: true,
+  disableGpu: false,
+  disableWorkspaceTrust: false,
+  verbose: false,
+  locale: null,
+  enableExtensions: [
+    'vscode.typescript-language-features',
+    'github.copilot-chat',
+  ],
+  extraArgs: [],
+};
+
+const DEFAULT_CONFIG_TEMPLATE = `// VS Code DevTools MCP configuration (JSONC)
+//
+// This file supports comments and trailing commas.
+// Only the keys you set are applied; omitted keys use defaults.
+
+{
+  // Path to the vsctk VS Code extension folder (absolute or relative to this workspace).
+  // If omitted, defaults to the repo's "extension/" folder when present.
+  // "extensionPath": "extension",
+
+  // Enable extra diagnostic tools (debug_evaluate).
+  "devDiagnostic": false,
+
+  // Write logs to a file (absolute or relative path).
+  // "logFile": ".devtools/devtools-mcp.log",
+
+  // Run VS Code headless (Linux only).
+  "headless": false,
+
+  // Enable experimental vision tools.
+  "experimentalVision": false,
+
+  // Enable experimental structured content output.
+  "experimentalStructuredContent": false,
+
+  // Tool category toggles.
+  "categories": {
+    // Enable performance tools.
+    "performance": true,
+    // Enable network tools.
+    "network": true,
+  },
+
+  // VS Code launch flags for the spawned Extension Development Host window.
+  "launch": {
+    // Open the target workspace in a new window.
+    "newWindow": true,
+
+    // Disable all extensions except those explicitly enabled below.
+    "disableExtensions": true,
+
+    // Hide release notes / welcome UI on startup.
+    "skipReleaseNotes": true,
+    "skipWelcome": true,
+
+    // Optional switches.
+    "disableGpu": false,
+    "disableWorkspaceTrust": false,
+    "verbose": false,
+
+    // Force a VS Code UI locale (e.g. "en", "de"). Use null to keep OS default.
+    "locale": null,
+
+    // Extensions to enable when disableExtensions=true.
+    "enableExtensions": [
+      "vscode.typescript-language-features",
+      "github.copilot-chat",
+    ],
+
+    // Extra raw flags forwarded to VS Code as-is.
+    // Example: ["--log=trace", "--disable-updates"]
+    "extraArgs": [],
+  },
+}
+`;
 
 /**
  * Configuration schema for .vscode/devtools.json
@@ -44,6 +157,9 @@ export interface DevToolsConfig {
     performance?: boolean;
     network?: boolean;
   };
+
+  /** VS Code launch flags for the Extension Development Host window */
+  launch?: Partial<LaunchFlags>;
 }
 
 /**
@@ -62,28 +178,182 @@ export interface ResolvedConfig {
   experimentalStructuredContent: boolean;
   categoryPerformance: boolean;
   categoryNetwork: boolean;
+  launch: LaunchFlags;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function readOptionalString(
+  obj: Record<string, unknown>,
+  key: string,
+): string | undefined {
+  const value = obj[key];
+  return typeof value === 'string' ? value : undefined;
+}
+
+function readOptionalBoolean(
+  obj: Record<string, unknown>,
+  key: string,
+): boolean | undefined {
+  const value = obj[key];
+  return typeof value === 'boolean' ? value : undefined;
+}
+
+function readOptionalStringArray(
+  obj: Record<string, unknown>,
+  key: string,
+): string[] | undefined {
+  const value = obj[key];
+  if (!Array.isArray(value)) return undefined;
+  const strings: string[] = [];
+  for (const item of value) {
+    if (typeof item !== 'string') return undefined;
+    strings.push(item);
+  }
+  return strings;
+}
+
+function coerceDevToolsConfig(value: unknown): DevToolsConfig {
+  if (!isRecord(value)) return {};
+
+  const config: DevToolsConfig = {};
+
+  const extensionPath = readOptionalString(value, 'extensionPath');
+  if (extensionPath) config.extensionPath = extensionPath;
+
+  const devDiagnostic = readOptionalBoolean(value, 'devDiagnostic');
+  if (typeof devDiagnostic === 'boolean') config.devDiagnostic = devDiagnostic;
+
+  const logFile = readOptionalString(value, 'logFile');
+  if (logFile) config.logFile = logFile;
+
+  const headless = readOptionalBoolean(value, 'headless');
+  if (typeof headless === 'boolean') config.headless = headless;
+
+  const experimentalVision = readOptionalBoolean(value, 'experimentalVision');
+  if (typeof experimentalVision === 'boolean') config.experimentalVision = experimentalVision;
+
+  const experimentalStructuredContent = readOptionalBoolean(
+    value,
+    'experimentalStructuredContent',
+  );
+  if (typeof experimentalStructuredContent === 'boolean') {
+    config.experimentalStructuredContent = experimentalStructuredContent;
+  }
+
+  const categoriesValue = value['categories'];
+  if (isRecord(categoriesValue)) {
+    const performance = readOptionalBoolean(categoriesValue, 'performance');
+    const network = readOptionalBoolean(categoriesValue, 'network');
+    if (typeof performance === 'boolean' || typeof network === 'boolean') {
+      config.categories = {
+        performance,
+        network,
+      };
+    }
+  }
+
+  const launchValue = value['launch'];
+  if (isRecord(launchValue)) {
+    const launch: Partial<LaunchFlags> = {};
+
+    const newWindow = readOptionalBoolean(launchValue, 'newWindow');
+    if (typeof newWindow === 'boolean') launch.newWindow = newWindow;
+
+    const disableExtensions = readOptionalBoolean(launchValue, 'disableExtensions');
+    if (typeof disableExtensions === 'boolean') launch.disableExtensions = disableExtensions;
+
+    const skipReleaseNotes = readOptionalBoolean(launchValue, 'skipReleaseNotes');
+    if (typeof skipReleaseNotes === 'boolean') launch.skipReleaseNotes = skipReleaseNotes;
+
+    const skipWelcome = readOptionalBoolean(launchValue, 'skipWelcome');
+    if (typeof skipWelcome === 'boolean') launch.skipWelcome = skipWelcome;
+
+    const disableGpu = readOptionalBoolean(launchValue, 'disableGpu');
+    if (typeof disableGpu === 'boolean') launch.disableGpu = disableGpu;
+
+    const disableWorkspaceTrust = readOptionalBoolean(launchValue, 'disableWorkspaceTrust');
+    if (typeof disableWorkspaceTrust === 'boolean') {
+      launch.disableWorkspaceTrust = disableWorkspaceTrust;
+    }
+
+    const verbose = readOptionalBoolean(launchValue, 'verbose');
+    if (typeof verbose === 'boolean') launch.verbose = verbose;
+
+    const localeValue = launchValue['locale'];
+    if (localeValue === null) {
+      launch.locale = null;
+    } else if (typeof localeValue === 'string') {
+      launch.locale = localeValue;
+    }
+
+    const enableExtensions = readOptionalStringArray(launchValue, 'enableExtensions');
+    if (enableExtensions) launch.enableExtensions = enableExtensions;
+
+    const extraArgs = readOptionalStringArray(launchValue, 'extraArgs');
+    if (extraArgs) launch.extraArgs = extraArgs;
+
+    config.launch = launch;
+  }
+
+  return config;
 }
 
 /**
- * Load devtools.json from workspace's .vscode folder
+ * Load devtools config from workspace's .vscode folder.
+ *
+ * Prefers `.vscode/devtools.jsonc` (JSON-with-comments) but still supports
+ * `.vscode/devtools.json` for backwards compatibility.
  */
 function loadConfigFile(workspaceFolder: string): DevToolsConfig {
-  const configPath = join(workspaceFolder, '.vscode', 'devtools.json');
+  const configDir = join(workspaceFolder, '.vscode');
+  const configPathJsonc = join(configDir, 'devtools.jsonc');
+  const configPathJson = join(configDir, 'devtools.json');
+  const configPath = existsSync(configPathJsonc)
+    ? configPathJsonc
+    : existsSync(configPathJson)
+      ? configPathJson
+      : undefined;
 
-  if (!existsSync(configPath)) {
-    logger(`No config file found at ${configPath}, using defaults`);
-    return {};
+  if (!configPath) {
+    logger(
+      `No config file found at ${configPathJsonc} or ${configPathJson}, creating template`,
+    );
+    mkdirSync(configDir, {recursive: true});
+    writeFileSync(configPathJsonc, DEFAULT_CONFIG_TEMPLATE + '\n');
+    return {
+      categories: {
+        performance: true,
+        network: true,
+      },
+      launch: {...DEFAULT_LAUNCH_FLAGS},
+    };
   }
 
   try {
     const content = readFileSync(configPath, 'utf-8');
-    const config = JSON.parse(content) as DevToolsConfig;
+    const parsed: unknown = parse(content);
+    const config = coerceDevToolsConfig(parsed);
     logger(`Loaded config from ${configPath}`);
     return config;
   } catch (error) {
     logger(`Failed to parse config at ${configPath}: ${error}`);
     return {};
   }
+}
+
+/** Merge partial launch flags over defaults. */
+function resolveLaunchFlags(partial?: Partial<LaunchFlags>): LaunchFlags {
+  if (!partial) return {...DEFAULT_LAUNCH_FLAGS};
+  return {
+    ...DEFAULT_LAUNCH_FLAGS,
+    ...partial,
+    // Arrays must be explicitly provided or fall back to defaults
+    enableExtensions: partial.enableExtensions ?? DEFAULT_LAUNCH_FLAGS.enableExtensions,
+    extraArgs: partial.extraArgs ?? DEFAULT_LAUNCH_FLAGS.extraArgs,
+  };
 }
 
 /**
@@ -203,5 +473,6 @@ export function loadConfig(cliArgs: {
       cliArgs.categoryPerformance ?? fileConfig.categories?.performance ?? true,
     categoryNetwork:
       cliArgs.categoryNetwork ?? fileConfig.categories?.network ?? true,
+    launch: resolveLaunchFlags(fileConfig.launch),
   };
 }
