@@ -83,6 +83,19 @@ at <anonymous> (main.js:14:1)
 Note: line and column numbers use 1-based indexing
 `;
 
+exports[`console > get_console_message > ignores frames from ignore listed URLs 1`] = `
+# test response
+ID: 1
+Message: log> hello from callback
+### Arguments
+Arg #0: hello from callback
+### Stack trace
+at callback ('main.js':3:21)
+at callIt ('main.js':7:13)
+at  ('main.js':8:13)
+Note: line and column numbers use 1-based indexing
+`;
+
 exports[`console > get_console_message > issues type > gets issue details with node id parsing 1`] = `
 # test response
 ID: 1

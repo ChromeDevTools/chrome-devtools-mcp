@@ -14,6 +14,25 @@ exports[`ConsoleFormatter > toString > formats an UncaughtError 1`] = `
 msgid=4 [error] Uncaught TypeError: Cannot read properties of undefined (0 args)
 `;
 
+exports[`ConsoleFormatter > toStringDetailed > does not show call frames with ignore listed scripts 1`] = `
+ID: 12
+Message: log> Hello stack trace!
+### Stack trace
+at foo (foo.ts:10:2)
+at bar (foo.ts:20:2)
+Note: line and column numbers use 1-based indexing
+`;
+
+exports[`ConsoleFormatter > toStringDetailed > does not show fragments where all frames are ignore listed 1`] = `
+ID: 13
+Message: log> Hello stack trace!
+### Stack trace
+at foo (foo.ts:10:2)
+--- await ------------------------------
+at bar (foo.ts:20:2)
+Note: line and column numbers use 1-based indexing
+`;
+
 exports[`ConsoleFormatter > toStringDetailed > formats a console message with a stack trace 1`] = `
 ID: 5
 Message: log> Hello stack trace!
@@ -101,4 +120,62 @@ ID: 6
 Message: log> Processing file:
 ### Arguments
 Arg #0: <error: Argument 0 is no longer available>
+`;
+
+exports[`ConsoleFormatter > toStringDetailed > limits the number lines for a stack trace 1`] = `
+ID: 11
+Message: log> Hello stack trace!
+### Stack trace
+at fn0 (main.js:0:0)
+at fn1 (main.js:1:1)
+at fn2 (main.js:2:2)
+at fn3 (main.js:3:3)
+at fn4 (main.js:4:4)
+at fn5 (main.js:5:5)
+at fn6 (main.js:6:6)
+at fn7 (main.js:7:7)
+at fn8 (main.js:8:8)
+at fn9 (main.js:9:9)
+at fn10 (main.js:10:10)
+at fn11 (main.js:11:11)
+at fn12 (main.js:12:12)
+at fn13 (main.js:13:13)
+at fn14 (main.js:14:14)
+at fn15 (main.js:15:15)
+at fn16 (main.js:16:16)
+at fn17 (main.js:17:17)
+at fn18 (main.js:18:18)
+at fn19 (main.js:19:19)
+at fn20 (main.js:20:20)
+at fn21 (main.js:21:21)
+at fn22 (main.js:22:22)
+at fn23 (main.js:23:23)
+at fn24 (main.js:24:24)
+at fn25 (main.js:25:25)
+at fn26 (main.js:26:26)
+at fn27 (main.js:27:27)
+at fn28 (main.js:28:28)
+at fn29 (main.js:29:29)
+at fn30 (main.js:30:30)
+at fn31 (main.js:31:31)
+at fn32 (main.js:32:32)
+at fn33 (main.js:33:33)
+at fn34 (main.js:34:34)
+at fn35 (main.js:35:35)
+at fn36 (main.js:36:36)
+at fn37 (main.js:37:37)
+at fn38 (main.js:38:38)
+at fn39 (main.js:39:39)
+at fn40 (main.js:40:40)
+at fn41 (main.js:41:41)
+at fn42 (main.js:42:42)
+at fn43 (main.js:43:43)
+at fn44 (main.js:44:44)
+at fn45 (main.js:45:45)
+at fn46 (main.js:46:46)
+at fn47 (main.js:47:47)
+at fn48 (main.js:48:48)
+at fn49 (main.js:49:49)
+... and 50 more frames
+Note: line and column numbers use 1-based indexing
 `;
