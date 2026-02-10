@@ -55,6 +55,16 @@ This indicates that the browser could not be started. Make sure that no Chrome
 instances are running or close them. Make sure you have the latest stable Chrome
 installed and that [your system is able to run Chrome](https://support.google.com/chrome/a/answer/7100626?hl=en).
 
+### Chrome crashes on macOS when opening Web Bluetooth
+
+On macOS, Chrome launched by an MCP host app may crash with a macOS privacy
+permission violation (TCC, "Transparency, Consent, and Control") when a native
+Bluetooth chooser opens.
+
+Grant Bluetooth permission to the MCP host app in
+`System Settings > Privacy & Security > Bluetooth`, then restart the MCP host
+app and Chrome MCP session.
+
 ### Remote debugging between virtual machine (VM) and host fails
 
 When connecting DevTools inside a VM to Chrome running on the host, any domain is rejected by Chrome because of host header validation. Tunneling the port over SSH bypasses this restriction. In the VM, run:
