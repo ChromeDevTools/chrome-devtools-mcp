@@ -1,0 +1,129 @@
+# This workflow uses actions that are not certified by GitHub.
+# They are provided by a third-party and are governed by
+# separate terms of service, privacy policy, and support
+# documentation.
+
+################################################################################################################################################
+# Fortify Application Security provides your team with solutions to empower DevSecOps practices, enable cloud transformation, and secure your  #
+# software supply chain. To learn more about Fortify, start a free trial or contact our sales team, visit fortify.com.                         #
+#                                                                                                                                              #
+# Use this starter workflow as a basis for integrating Fortify Application Security Testing into your GitHub workflows. This template          #
+# demonstrates the steps to package the code+dependencies, initiate a scan, and optionally import SAST vulnerabilities into GitHub Security    #
+# Code Scanning Alerts. Additional information is available in the workflow comments and the Fortify AST Action / fcli / Fortify product       #
+# documentation. If you need additional assistance, please contact Fortify support.                                                            #
+################################################################################################################################################
+
+name: Fortify AST Scan
+
+# Customize trigger events based on your DevSecOps process and/or policy
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    # The branches below must be a subset of the branches above
+    branches: [ "main" ]
+  schedule:
+    - cron: '28 13 * * 2'
+  workflow_dispatch:
+
+jobs:
+  Fortify-AST-Scan:
+    # Use the appropriate runner for building your source code. Ensure dev tools required to build your code are present and configured appropriately (MSBuild, Python, etc).
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+      # pull-requests: write     # Required if DO_PR_COMMENT is set to true
+
+    steps:
+      # Check out source code
+      - name: Check Out Source Code
+        uses: actions/checkout@v4
+
+      # Perform SAST and/or SCA scan via Fortify on Demand/Fortify Hosted/ScanCentral SAST/Debricked. Based on
+      # configuration, the Fortify GitHub Action can optionally set up the application version/release, generate
+      # job summaries and Pull Request comments, and/or export SAST results to the GitHub code scanning dashboard.
+      # The Fortify GitHub Action provides many customization capabilities, but in case further customization is
+      # required, you can use sub-actions like fortify/github-action/setup@v1 to set up the various Fortify tools
+      # and run them directly from within your pipeline. It is recommended to review the Fortify GitHub Action
+      # documentation at https://github.com/fortify/github-action#readme for more information on the various
+      # configuration options and available sub-actions.
+      - name: Run Fortify Scan
+        # Specify Fortify GitHub Action version to run. As per GitHub starter workflow requirements, this example
+        # uses the commit id corresponding to version 1.6.2. It is recommended to check whether any later releases
+        # are available at https://github.com/fortify/github-action/releases. Depending on the amount of stability
+        # required, you may want to consider using fortify/github-action@v1 instead to use the latest 1.x.y version
+        # of this action, allowing your workflows to automatically benefit from any new features and bug fixes.
+        uses: fortify/github-action@ef5539bf4bd9c45c0bd971978f635a69eae55297
+        with:
+          sast-scan: true          # Run a SAST scan; if not specified or set to false, no SAST scan will be run
+          debricked-sca-scan: true # For FoD, run an open-source scan as part of the SAST scan (ignored if SAST scan
+                                   # is disabled). For SSC, run a Debricked scan and import results into SSC.
+        env:
+          #############################################################
+          ##### Fortify on Demand configuration
+          ##### Remove this section if you're integrating with Fortify Hosted/Software Security Center (see below)
+          ### Required configuration
+          FOD_URL: https://ams.fortify.com                 # Must be hardcoded or configured through GitHub variable, not secret
+          FOD_TENANT: ${{secrets.FOD_TENANT}}              # Either tenant/user/password or client id/secret are required;
+          FOD_USER: ${{secrets.FOD_USER}}                  # these should be configured through GitHub secrets.
+          FOD_PASSWORD: ${{secrets.FOD_PAT}}
+          # FOD_CLIENT_ID: ${{secrets.FOD_CLIENT_ID}}
+          # FOD_CLIENT_SECRET: ${{secrets.FOD_CLIENT_SECRET}}
+          ### Optional configuration
+          # FOD_LOGIN_EXTRA_OPTS: --socket-timeout=60s     # Extra 'fcli fod session login' options
+          # FOD_RELEASE: MyApp:MyRelease                   # FoD release name, default: <org>/<repo>:<branch>
+          # DO_SETUP: true                                 # Setup FoD application, release & static scan configuration
+          # SETUP_ACTION: <URL or file>                    # Customize setup action
+                                                           # Pass extra options to setup action:
+          # SETUP_EXTRA_OPTS: --copy-from "${{ github.repository }}:${{ github.event.repository.default_branch }}"
+          # PACKAGE_EXTRA_OPTS: -oss -bt mvn               # Extra 'scancentral package' options
+          # FOD_SAST_SCAN_EXTRA_OPTS:                      # Extra 'fcli fod sast-scan start' options
+          # DO_WAIT: true                                  # Wait for successful scan completion (implied if post-scan actions enabled)
+          # DO_POLICY_CHECK: true                          # Fail pipeline if security policy outcome is FAIL
+          # POLICY_CHECK_ACTION: <URL or file>             # Customize security policy checks
+          # POLICY_CHECK_EXTRA_OPTS: --on-unsigned=ignore  # Pass extra options to policy check action
+          # DO_JOB_SUMMARY: true                           # Generate workflow job summary
+          # JOB_SUMMARY_ACTION: <URL or file>              # Customize job summary
+          # JOB_SUMMARY_EXTRA_OPTS: --on-unsigned=ignore   # Pass extra options to job summary action
+          # DO_PR_COMMENT: true                            # Generate PR comments, only used on pull_request triggers
+          # PR_COMMENT_ACTION: <URL or file>               # Customize PR comments
+          # PR_COMMENT_EXTRA_OPTS: --on-unsigned=ignore    # Pass extra options to PR comment action
+          # DO_EXPORT: true                                # Export vulnerability data to GitHub code scanning dashboard
+          # EXPORT_ACTION: <URL or file>                   # Customize export action
+          # EXPORT_EXTRA_OPTS: --on-unsigned=ignore        # Pass extra options to export action
+          # TOOL_DEFINITIONS: <URL>                        # URL from where to retrieve Fortify tool definitions
+
+          #############################################################
+          ##### Fortify Hosted / Software Security Center & ScanCentral
+          ##### Remove this section if you're integrating with Fortify on Demand (see above)
+          ### Required configuration
+          SSC_URL: ${{vars.SSC_URL}}                       # Must be hardcoded or configured through GitHub variable, not secret
+          SSC_TOKEN: ${{secrets.SSC_TOKEN}}                # SSC CIToken; credentials should be configured through GitHub secrets
+          SC_SAST_TOKEN: ${{secrets.SC_CLIENT_AUTH_TOKEN}} # ScanCentral SAST client_auth_token, required if SAST scan is enabled
+          DEBRICKED_TOKEN: ${{secrets.DEBRICKED_TOKEN}}    # Debricked token, required if Debricked scan is enabled
+          SC_SAST_SENSOR_VERSION: 24.4.0                   # Sensor version to use for the scan, required if SAST scan is enabled
+          ### Optional configuration
+          # SSC_LOGIN_EXTRA_OPTS: --socket-timeout=60s     # Extra 'fcli ssc session login' options
+          # SC_SAST_LOGIN_EXTRA_OPTS: --socket-timeout=60s # Extra 'fcli sc-sast session login' options
+          # SSC_APPVERSION: MyApp:MyVersion                # SSC application version name, default: <org>/<repo>:<branch>
+          # DO_SETUP: true                                 # Set up SSC application & version
+          # SETUP_ACTION: <URL or file>                    # Customize setup action
+          # SETUP_EXTRA_OPTS: --on-unsigned=ignore         # Pass extra options to setup action
+          # PACKAGE_EXTRA_OPTS: -bt mvn                    # Extra 'scancentral package' options
+          # EXTRA_SC_SAST_SCAN_OPTS:                       # Extra 'fcli sc-sast scan start' options
+          # DO_WAIT: true                                  # Wait for successful scan completion (implied if post-scan actions enabled)
+          # DO_POLICY_CHECK: true                          # Fail pipeline if security policy outcome is FAIL
+          # POLICY_CHECK_ACTION: <URL or file>             # Customize security policy checks
+          # POLICY_CHECK_EXTRA_OPTS: --on-unsigned=ignore  # Pass extra options to policy check action
+          # DO_JOB_SUMMARY: true                           # Generate workflow job summary
+          # JOB_SUMMARY_ACTION: <URL or file>              # Customize job summary
+          # JOB_SUMMARY_EXTRA_OPTS: --on-unsigned=ignore   # Pass extra options to job summary action
+          # DO_PR_COMMENT: true                            # Generate PR comments, only used on pull_request triggers
+          # PR_COMMENT_ACTION: <URL or file>               # Customize PR comments
+          # PR_COMMENT_EXTRA_OPTS: --on-unsigned=ignore    # Pass extra options to PR comment action
+          # DO_EXPORT: true                                # Export vulnerability data to GitHub code scanning dashboard
+          # EXPORT_ACTION: <URL or file>                   # Customize export action
+          # EXPORT_EXTRA_OPTS: --on-unsigned=ignore        # Pass extra options to export action
+          # TOOL_DEFINITIONS: <URL>                        # URL from where to retrieve Fortify tool definitions
