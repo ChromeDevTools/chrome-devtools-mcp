@@ -351,33 +351,64 @@ Returns: { total, returned, hasMore, oldestId?, newestId?, messages: [...] }
 
 ### `read_output`
 
-**Description:** Read VS Code output logs from the workspace session. When called without a channel, lists all available output channels. When called with a channel name, returns the complete log content.
+**Description:** Read VS Code output logs from the workspace session. When called without a channel, lists all available output channels. When called with a channel name, returns log content with optional filtering.
 
-Args:
-  - channel (string): Optional. Output channel name to read (e.g., "exthost", "main", "Git"). If omitted, lists all available channels.
-  - response_format ('markdown'|'json'): Output format. Default: 'markdown'
+**LISTING CHANNELS (no channel provided):**
 
-Returns:
-  When channel is omitted (list mode):
-    JSON format: { mode: 'list', total, channels: [{name, category, sizeKb}] }
-    Markdown format: Organized list by category (Main Logs, Extension Host, Output Channels, etc.)
-  
-  When channel is provided (content mode):
-    JSON format: { mode: 'content', channel, total_lines, content }
-    Markdown format: Full log content in a code block
+Returns all available output channels organized by category.
 
-Examples:
-  - "List all channels" -> {}
-  - "Read extension host logs" -> { channel: "exthost" }
-  - "Read main VS Code logs" -> { channel: "main" }
+**READING CHANNEL CONTENT (channel provided):**
 
-Error Handling:
-  - Returns "No logs directory found." if VS Code debug window isn't running
-  - Returns "Channel X not found." with available channels if channel doesn't exist
+**FILTERING OPTIONS:**
+
+- `limit` (number): Get the N most recent lines. Default: all lines
+- `pattern` (string): Regex pattern to match against line content (case-insensitive)
+- `afterLine` (number): Only lines after this line number (for incremental reads - avoids re-reading)
+- `beforeLine` (number): Only lines before this line number
+
+**DETAIL CONTROL (reduce context size):**
+
+- `lineLimit` (number): Max characters per line (truncates with "..."). Default: unlimited
+
+**EXAMPLES:**
+
+List all channels:
+  {}
+
+Read extension host logs:
+  { channel: "exthost" }
+
+Get last 50 lines:
+  { channel: "exthost", limit: 50 }
+
+Find errors in logs:
+  { channel: "main", pattern: "error|exception|failed", limit: 100 }
+
+Incremental read (only new lines since last read):
+  { channel: "Git", afterLine: 150 }
+
+Truncate long lines:
+  { channel: "exthost", limit: 30, lineLimit: 200 }
+
+**RESPONSE METADATA (content mode):**
+
+Returns: { mode: 'content', channel, total, returned, hasMore, oldestLine?, newestLine?, lines: [...] }
+- `total`: Total lines matching filters (before limit applied)
+- `hasMore`: Whether there are older lines not returned
+- `oldestLine`/`newestLine`: Line range in response (use newestLine as afterLine for next incremental read)
+
+**ERROR HANDLING:**
+- Returns "No logs directory found." if VS Code debug window isn't running
+- Returns "Channel X not found." with available channels if channel doesn't exist
 
 **Parameters:**
 
+- **afterLine** (integer) _(optional)_: Only return lines with line number greater than this (for incremental reads).
+- **beforeLine** (integer) _(optional)_: Only return lines with line number less than this.
 - **channel** (string) _(optional)_: Name of the output channel to read (e.g., "exthost", "main", "Git"). If omitted, lists all available channels.
+- **limit** (integer) _(optional)_: Get the N most recent lines. Omit to get all lines.
+- **lineLimit** (integer) _(optional)_: Max characters per line. Longer lines are truncated with "...".
+- **pattern** (string) _(optional)_: Regex pattern to match against line content (case-insensitive).
 - **response_format** (unknown) _(optional)_: Output format: "markdown" for human-readable or "json" for machine-readable structured data.
 
 ---

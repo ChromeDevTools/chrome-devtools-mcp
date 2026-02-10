@@ -108,49 +108,87 @@ const categoryLabels: Record<string, string> = {
   output: 'Output Channels',
 };
 
+const ListOutputSchema = zod.object({
+  mode: zod.literal('list'),
+  total: zod.number(),
+  channels: zod.array(zod.object({
+    name: zod.string(),
+    category: zod.string(),
+    sizeKb: zod.number(),
+  })),
+});
+
+const ContentOutputSchema = zod.object({
+  mode: zod.literal('content'),
+  channel: zod.string(),
+  total: zod.number(),
+  returned: zod.number(),
+  hasMore: zod.boolean(),
+  oldestLine: zod.number().optional(),
+  newestLine: zod.number().optional(),
+  filters: zod.string().optional(),
+  lines: zod.array(zod.object({
+    line: zod.number(),
+    text: zod.string(),
+  })),
+});
+
 const ReadOutputOutputSchema = zod.union([
-  zod.object({
-    mode: zod.literal('list'),
-    total: zod.number(),
-    channels: zod.array(zod.object({
-      name: zod.string(),
-      category: zod.string(),
-      sizeKb: zod.number(),
-    })),
-  }),
-  zod.object({
-    mode: zod.literal('content'),
-    channel: zod.string(),
-    total_lines: zod.number(),
-    content: zod.string(),
-  }),
+  ListOutputSchema,
+  ContentOutputSchema,
 ]);
 
 export const readOutput = defineTool({
   name: 'read_output',
-  description: `Read VS Code output logs from the workspace session. When called without a channel, lists all available output channels. When called with a channel name, returns the complete log content.
+  description: `Read VS Code output logs from the workspace session. When called without a channel, lists all available output channels. When called with a channel name, returns log content with optional filtering.
 
-Args:
-  - channel (string): Optional. Output channel name to read (e.g., "exthost", "main", "Git"). If omitted, lists all available channels.
-  - response_format ('markdown'|'json'): Output format. Default: 'markdown'
+**LISTING CHANNELS (no channel provided):**
 
-Returns:
-  When channel is omitted (list mode):
-    JSON format: { mode: 'list', total, channels: [{name, category, sizeKb}] }
-    Markdown format: Organized list by category (Main Logs, Extension Host, Output Channels, etc.)
-  
-  When channel is provided (content mode):
-    JSON format: { mode: 'content', channel, total_lines, content }
-    Markdown format: Full log content in a code block
+Returns all available output channels organized by category.
 
-Examples:
-  - "List all channels" -> {}
-  - "Read extension host logs" -> { channel: "exthost" }
-  - "Read main VS Code logs" -> { channel: "main" }
+**READING CHANNEL CONTENT (channel provided):**
 
-Error Handling:
-  - Returns "No logs directory found." if VS Code debug window isn't running
-  - Returns "Channel X not found." with available channels if channel doesn't exist`,
+**FILTERING OPTIONS:**
+
+- \`limit\` (number): Get the N most recent lines. Default: all lines
+- \`pattern\` (string): Regex pattern to match against line content (case-insensitive)
+- \`afterLine\` (number): Only lines after this line number (for incremental reads - avoids re-reading)
+- \`beforeLine\` (number): Only lines before this line number
+
+**DETAIL CONTROL (reduce context size):**
+
+- \`lineLimit\` (number): Max characters per line (truncates with "..."). Default: unlimited
+
+**EXAMPLES:**
+
+List all channels:
+  {}
+
+Read extension host logs:
+  { channel: "exthost" }
+
+Get last 50 lines:
+  { channel: "exthost", limit: 50 }
+
+Find errors in logs:
+  { channel: "main", pattern: "error|exception|failed", limit: 100 }
+
+Incremental read (only new lines since last read):
+  { channel: "Git", afterLine: 150 }
+
+Truncate long lines:
+  { channel: "exthost", limit: 30, lineLimit: 200 }
+
+**RESPONSE METADATA (content mode):**
+
+Returns: { mode: 'content', channel, total, returned, hasMore, oldestLine?, newestLine?, lines: [...] }
+- \`total\`: Total lines matching filters (before limit applied)
+- \`hasMore\`: Whether there are older lines not returned
+- \`oldestLine\`/\`newestLine\`: Line range in response (use newestLine as afterLine for next incremental read)
+
+**ERROR HANDLING:**
+- Returns "No logs directory found." if VS Code debug window isn't running
+- Returns "Channel X not found." with available channels if channel doesn't exist`,
   timeoutMs: 10000,
   annotations: {
     category: ToolCategory.DEBUGGING,
@@ -168,6 +206,36 @@ Error Handling:
         'Name of the output channel to read (e.g., "exthost", "main", "Git"). If omitted, lists all available channels.',
       ),
     response_format: responseFormatSchema,
+
+    // Filtering
+    limit: zod
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe('Get the N most recent lines. Omit to get all lines.'),
+    pattern: zod
+      .string()
+      .optional()
+      .describe('Regex pattern to match against line content (case-insensitive).'),
+    afterLine: zod
+      .number()
+      .int()
+      .optional()
+      .describe('Only return lines with line number greater than this (for incremental reads).'),
+    beforeLine: zod
+      .number()
+      .int()
+      .optional()
+      .describe('Only return lines with line number less than this.'),
+
+    // Detail control
+    lineLimit: zod
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe('Max characters per line. Longer lines are truncated with "...".'),
   },
   outputSchema: ReadOutputOutputSchema,
   handler: async (request, response) => {
@@ -255,33 +323,120 @@ Error Handling:
       return;
     }
 
-    const lines = content.split('\n');
-    const totalLines = lines.length;
+    const {limit, pattern, afterLine, beforeLine, lineLimit} = request.params;
+
+    // Parse lines with line numbers (1-indexed)
+    const allLines = content.split('\n');
+    interface LineEntry {
+      line: number;
+      text: string;
+    }
+    let indexedLines: LineEntry[] = allLines.map((text, idx) => ({
+      line: idx + 1,
+      text,
+    }));
+
+    // Apply cursor filters (afterLine/beforeLine)
+    if (afterLine !== undefined) {
+      indexedLines = indexedLines.filter(l => l.line > afterLine);
+    }
+    if (beforeLine !== undefined) {
+      indexedLines = indexedLines.filter(l => l.line < beforeLine);
+    }
+
+    // Apply pattern filter
+    if (pattern) {
+      const regex = new RegExp(pattern, 'i');
+      indexedLines = indexedLines.filter(l => regex.test(l.text));
+    }
+
+    const totalMatching = indexedLines.length;
+    let hasMore = false;
+
+    // Apply limit (tail-style: take last N)
+    if (limit !== undefined && indexedLines.length > limit) {
+      hasMore = true;
+      indexedLines = indexedLines.slice(-limit);
+    }
+
+    // Apply lineLimit (truncate long lines)
+    if (lineLimit !== undefined) {
+      indexedLines = indexedLines.map(l => ({
+        line: l.line,
+        text: l.text.length > lineLimit ? l.text.slice(0, lineLimit) + '...' : l.text,
+      }));
+    }
+
+    // Build filter description for output
+    const filterParts: string[] = [];
+    if (pattern) filterParts.push(`pattern: ${pattern}`);
+    if (afterLine !== undefined) filterParts.push(`afterLine: ${afterLine}`);
+    if (beforeLine !== undefined) filterParts.push(`beforeLine: ${beforeLine}`);
+    if (limit !== undefined) filterParts.push(`limit: ${limit}`);
+    if (lineLimit !== undefined) filterParts.push(`lineLimit: ${lineLimit}`);
+    const filtersDesc = filterParts.length > 0 ? filterParts.join(' | ') : undefined;
+
+    const oldestLine = indexedLines.length > 0 ? indexedLines[0].line : undefined;
+    const newestLine = indexedLines.length > 0 ? indexedLines[indexedLines.length - 1].line : undefined;
 
     if (request.params.response_format === ResponseFormat.JSON) {
-      const structuredOutput = {
+      const structuredOutput: {
+        mode: 'content';
+        channel: string;
+        total: number;
+        returned: number;
+        hasMore: boolean;
+        oldestLine?: number;
+        newestLine?: number;
+        filters?: string;
+        lines: LineEntry[];
+      } = {
         mode: 'content',
         channel: targetFile.name,
-        total_lines: totalLines,
-        content,
+        total: totalMatching,
+        returned: indexedLines.length,
+        hasMore,
+        oldestLine,
+        newestLine,
+        filters: filtersDesc,
+        lines: indexedLines,
       };
       const jsonOutput = JSON.stringify(structuredOutput, null, 2);
       checkCharacterLimit(jsonOutput, 'read_output', {
-        channel: 'Try a different channel with less content',
+        limit: 'Use limit parameter to get fewer lines',
+        lineLimit: 'Use lineLimit to truncate long lines',
       });
       response.appendResponseLine(jsonOutput);
       return;
     }
 
+    // Markdown format
     response.appendResponseLine(`## Output: ${targetFile.name}\n`);
-    response.appendResponseLine(`_Total lines: ${totalLines}_\n`);
 
-    if (lines.length === 0 || (lines.length === 1 && lines[0] === '')) {
-      response.appendResponseLine('(no output or log is empty)');
+    let summary = `**Returned:** ${indexedLines.length} of ${totalMatching} total`;
+    if (hasMore) {
+      summary += ` (use \`afterLine: ${oldestLine !== undefined ? oldestLine - 1 : 0}\` or increase \`limit\` to see more)`;
+    }
+    response.appendResponseLine(summary);
+
+    if (oldestLine !== undefined && newestLine !== undefined) {
+      response.appendResponseLine(`**Line range:** ${oldestLine} - ${newestLine}`);
+    }
+
+    if (filtersDesc) {
+      response.appendResponseLine(`**Filters:** ${filtersDesc}`);
+    }
+
+    if (indexedLines.length === 0) {
+      response.appendResponseLine('\n(no matching lines)');
     } else {
-      const formattedContent = '```\n' + content + '\n```';
+      const formattedLines = indexedLines
+        .map(l => `${String(l.line).padStart(5, ' ')} | ${l.text}`)
+        .join('\n');
+      const formattedContent = '\n```\n' + formattedLines + '\n```';
       checkCharacterLimit(formattedContent, 'read_output', {
-        channel: 'Try a different channel with less content',
+        limit: 'Use limit parameter to get fewer lines',
+        lineLimit: 'Use lineLimit to truncate long lines',
       });
       response.appendResponseLine(formattedContent);
     }
