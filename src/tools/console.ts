@@ -8,7 +8,14 @@ import {getConsoleMessages, getConsoleMessageById} from '../cdp-events.js';
 import {zod} from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
-import {defineTool} from './ToolDefinition.js';
+import {
+  defineTool,
+  ResponseFormat,
+  responseFormatSchema,
+  CHARACTER_LIMIT,
+  checkCharacterLimit,
+  createPaginationMetadata,
+} from './ToolDefinition.js';
 
 const FILTERABLE_MESSAGE_TYPES: [string, ...string[]] = [
   'log',
@@ -33,17 +40,67 @@ const FILTERABLE_MESSAGE_TYPES: [string, ...string[]] = [
   'verbose',
 ];
 
+const ConsoleMessageSchema = zod.object({
+  id: zod.number(),
+  type: zod.string(),
+  text: zod.string(),
+  timestamp: zod.number(),
+  stackTrace: zod.array(zod.object({
+    functionName: zod.string().optional(),
+    url: zod.string(),
+    lineNumber: zod.number(),
+    columnNumber: zod.number(),
+  })).optional(),
+});
+
+const ListConsoleMessagesOutputSchema = zod.object({
+  total: zod.number(),
+  count: zod.number(),
+  offset: zod.number(),
+  has_more: zod.boolean(),
+  next_offset: zod.number().optional(),
+  messages: zod.array(ConsoleMessageSchema),
+});
+
 export const listConsoleMessages = defineTool({
   name: 'list_console_messages',
-  description:
-    'List all console messages for the currently selected page since the last navigation.',
+  description: `List all console messages for the currently selected page since the last navigation.
+
+Args:
+  - pageSize (number): Maximum messages to return. Default: all
+  - pageIdx (number): Page number (0-based) for pagination. Default: 0
+  - types (string[]): Filter by message types (log, error, warning, info, debug, etc.)
+  - textFilter (string): Case-insensitive substring to match in message text
+  - sourceFilter (string): Substring to match in stack trace source URLs
+  - isRegex (boolean): Treat textFilter as regex pattern. Default: false
+  - secondsAgo (number): Only messages from last N seconds
+  - filterLogic ('and'|'or'): How to combine filters. Default: 'and'
+  - response_format ('markdown'|'json'): Output format. Default: 'markdown'
+
+Returns:
+  JSON format: { total, count, offset, has_more, next_offset?, messages: [{id, type, text, timestamp, stackTrace?}] }
+  Markdown format: Formatted list with msgid, type tag, text, and first stack frame
+
+Examples:
+  - "Show only errors" -> { types: ['error'] }
+  - "Find fetch failures" -> { textFilter: 'net::ERR', types: ['error'] }
+  - "Recent warnings" -> { types: ['warning'], secondsAgo: 60 }
+  - "Get JSON for processing" -> { response_format: 'json' }
+
+Error Handling:
+  - Returns "No console messages found." if no messages match filters
+  - Returns error with available params if response exceeds ${CHARACTER_LIMIT} chars`,
   timeoutMs: 15000,
   annotations: {
     category: ToolCategory.DEBUGGING,
     readOnlyHint: true,
+    destructiveHint: false,
+    idempotentHint: true,
+    openWorldHint: false,
     conditions: ['directCdp'],
   },
   schema: {
+    response_format: responseFormatSchema,
     pageSize: zod
       .number()
       .int()
@@ -108,6 +165,7 @@ export const listConsoleMessages = defineTool({
         'Set to true to return the preserved messages over the last 3 navigations.',
       ),
   },
+  outputSchema: ListConsoleMessagesOutputSchema,
   handler: async (request, response) => {
     const {messages, total} = getConsoleMessages({
       types: request.params.types,
@@ -120,8 +178,41 @@ export const listConsoleMessages = defineTool({
       pageIdx: request.params.pageIdx,
     });
 
+    const offset = (request.params.pageIdx ?? 0) * (request.params.pageSize ?? messages.length);
+    const pagination = createPaginationMetadata(total, messages.length, offset);
+
     if (messages.length === 0) {
       response.appendResponseLine('No console messages found.');
+      return;
+    }
+
+    const structuredOutput = {
+      ...pagination,
+      messages: messages.map(msg => ({
+        id: msg.id,
+        type: msg.type,
+        text: msg.text,
+        timestamp: msg.timestamp,
+        ...(msg.stackTrace?.length ? {
+          stackTrace: msg.stackTrace.map(f => ({
+            functionName: f.functionName,
+            url: f.url,
+            lineNumber: f.lineNumber,
+            columnNumber: f.columnNumber,
+          })),
+        } : {}),
+      })),
+    };
+
+    if (request.params.response_format === ResponseFormat.JSON) {
+      const jsonOutput = JSON.stringify(structuredOutput, null, 2);
+      checkCharacterLimit(jsonOutput, 'list_console_messages', {
+        pageSize: 'Limit results per page (e.g., 20)',
+        types: 'Filter by specific types (e.g., ["error"])',
+        textFilter: 'Filter by text content',
+        secondsAgo: 'Limit to recent messages',
+      });
+      response.appendResponseLine(jsonOutput);
       return;
     }
 
@@ -141,40 +232,93 @@ export const listConsoleMessages = defineTool({
       filterParts.push(`last ${request.params.secondsAgo}s`);
     }
 
-    let header = `Console messages (${messages.length} of ${total} total):`;
+    let header = `## Console Messages\n\n`;
+    header += `**Results:** ${messages.length} of ${total} total`;
+    if (pagination.has_more) {
+      header += ` | **Next page:** pageIdx=${pagination.next_offset! / (request.params.pageSize ?? messages.length)}`;
+    }
     if (filterParts.length > 0) {
       const logic = request.params.filterLogic === 'or' ? 'OR' : 'AND';
-      header += `\n_Filters (${logic}): ${filterParts.join(' | ')}_`;
+      header += `\n**Filters (${logic}):** ${filterParts.join(' | ')}`;
     }
     response.appendResponseLine(header + '\n');
 
+    const lines: string[] = [];
     for (const msg of messages) {
-      const typeTag = `[${msg.type.toUpperCase()}]`;
-      response.appendResponseLine(`msgid=${msg.id} ${typeTag} ${msg.text}`);
+      const typeTag = `[${msg.type}]`;
+      lines.push(`msgid=${msg.id} ${typeTag} ${msg.text}`);
       if (msg.stackTrace?.length) {
         const first = msg.stackTrace[0];
-        response.appendResponseLine(`  at ${first.functionName || '(anonymous)'} (${first.url}:${first.lineNumber + 1}:${first.columnNumber + 1})`);
+        lines.push(`  at ${first.functionName || '(anonymous)'} (${first.url}:${first.lineNumber + 1}:${first.columnNumber + 1})`);
       }
     }
+
+    const content = lines.join('\n');
+    checkCharacterLimit(content, 'list_console_messages', {
+      pageSize: 'Limit results per page (e.g., 20)',
+      types: 'Filter by specific types (e.g., ["error"])',
+      textFilter: 'Filter by text content',
+      secondsAgo: 'Limit to recent messages',
+    });
+
+    response.appendResponseLine(content);
   },
+});
+
+const GetConsoleMessageOutputSchema = zod.object({
+  id: zod.number(),
+  type: zod.string(),
+  text: zod.string(),
+  timestamp: zod.string(),
+  args: zod.array(zod.object({
+    type: zod.string(),
+    value: zod.unknown().optional(),
+    description: zod.string().optional(),
+  })).optional(),
+  stackTrace: zod.array(zod.object({
+    functionName: zod.string().optional(),
+    url: zod.string(),
+    lineNumber: zod.number(),
+    columnNumber: zod.number(),
+  })).optional(),
 });
 
 export const getConsoleMessage = defineTool({
   name: 'get_console_message',
-  description: `Gets a console message by its ID. You can get all messages by calling ${listConsoleMessages.name}.`,
+  description: `Gets a console message by its ID. You can get all messages by calling list_console_messages.
+
+Args:
+  - msgid (number): The message ID from list_console_messages output
+  - response_format ('markdown'|'json'): Output format. Default: 'markdown'
+
+Returns:
+  JSON format: { id, type, text, timestamp, args?, stackTrace? }
+  Markdown format: Formatted message details with arguments and stack trace
+
+Examples:
+  - "Get message 5" -> { msgid: 5 }
+  - "Get message as JSON" -> { msgid: 5, response_format: 'json' }
+
+Error Handling:
+  - Returns "Console message with id X not found." if message doesn't exist`,
   timeoutMs: 10000,
   annotations: {
     category: ToolCategory.DEBUGGING,
     readOnlyHint: true,
+    destructiveHint: false,
+    idempotentHint: true,
+    openWorldHint: false,
     conditions: ['directCdp'],
   },
   schema: {
+    response_format: responseFormatSchema,
     msgid: zod
       .number()
       .describe(
         'The msgid of a console message on the page from the listed console messages',
       ),
   },
+  outputSchema: GetConsoleMessageOutputSchema,
   handler: async (request, response) => {
     const msg = getConsoleMessageById(request.params.msgid);
 
@@ -183,28 +327,55 @@ export const getConsoleMessage = defineTool({
       return;
     }
 
-    response.appendResponseLine(`msgid=${msg.id}`);
-    response.appendResponseLine(`type=${msg.type}`);
-    response.appendResponseLine(`text=${msg.text}`);
-    response.appendResponseLine(`timestamp=${new Date(msg.timestamp).toISOString()}`);
+    const structuredOutput = {
+      id: msg.id,
+      type: msg.type,
+      text: msg.text,
+      timestamp: new Date(msg.timestamp).toISOString(),
+      ...(msg.args.length > 0 ? {
+        args: msg.args.map(arg => ({
+          type: arg.type,
+          ...(arg.value !== undefined ? { value: arg.value } : {}),
+          ...(arg.description ? { description: arg.description } : {}),
+        })),
+      } : {}),
+      ...(msg.stackTrace?.length ? {
+        stackTrace: msg.stackTrace.map(f => ({
+          functionName: f.functionName,
+          url: f.url,
+          lineNumber: f.lineNumber,
+          columnNumber: f.columnNumber,
+        })),
+      } : {}),
+    };
+
+    if (request.params.response_format === ResponseFormat.JSON) {
+      response.appendResponseLine(JSON.stringify(structuredOutput, null, 2));
+      return;
+    }
+
+    response.appendResponseLine(`## Console Message #${msg.id}\n`);
+    response.appendResponseLine(`**Type:** ${msg.type}`);
+    response.appendResponseLine(`**Text:** ${msg.text}`);
+    response.appendResponseLine(`**Timestamp:** ${structuredOutput.timestamp}`);
 
     if (msg.args.length > 0) {
-      response.appendResponseLine('\nArguments:');
+      response.appendResponseLine('\n### Arguments');
       for (const arg of msg.args) {
         if (arg.value !== undefined) {
-          response.appendResponseLine(`  [${arg.type}] ${JSON.stringify(arg.value)}`);
+          response.appendResponseLine(`- [${arg.type}] ${JSON.stringify(arg.value)}`);
         } else if (arg.description) {
-          response.appendResponseLine(`  [${arg.type}] ${arg.description}`);
+          response.appendResponseLine(`- [${arg.type}] ${arg.description}`);
         } else {
-          response.appendResponseLine(`  [${arg.type}]`);
+          response.appendResponseLine(`- [${arg.type}]`);
         }
       }
     }
 
     if (msg.stackTrace?.length) {
-      response.appendResponseLine('\nStack trace:');
+      response.appendResponseLine('\n### Stack Trace');
       for (const frame of msg.stackTrace) {
-        response.appendResponseLine(`  at ${frame.functionName || '(anonymous)'} (${frame.url}:${frame.lineNumber + 1}:${frame.columnNumber + 1})`);
+        response.appendResponseLine(`- at ${frame.functionName || '(anonymous)'} (${frame.url}:${frame.lineNumber + 1}:${frame.columnNumber + 1})`);
       }
     }
   },

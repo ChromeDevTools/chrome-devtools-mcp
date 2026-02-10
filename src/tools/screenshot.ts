@@ -10,18 +10,53 @@ import {captureScreenshot} from '../ax-tree.js';
 import {zod} from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
-import {defineTool} from './ToolDefinition.js';
+import {defineTool, ResponseFormat, responseFormatSchema} from './ToolDefinition.js';
+
+const ScreenshotOutputSchema = zod.object({
+  success: zod.boolean(),
+  type: zod.enum(['element', 'fullPage', 'viewport']),
+  format: zod.enum(['png', 'jpeg', 'webp']),
+  savedTo: zod.string().optional(),
+  sizeBytes: zod.number().optional(),
+  attached: zod.boolean().optional(),
+});
 
 export const screenshot = defineTool({
   name: 'take_screenshot',
-  description: `Take a screenshot of the page or element.`,
-  timeoutMs: 45000, // Allow time for VS Code Extension Host to fully initialize
+  description: `Take a screenshot of the page or element.
+
+Args:
+  - format ('png'|'jpeg'|'webp'): Image format. Default: 'png'
+  - quality (number): Compression quality for JPEG/WebP (0-100). Ignored for PNG
+  - uid (string): Element uid to screenshot. Omit for full page/viewport
+  - fullPage (boolean): Screenshot full page instead of viewport. Incompatible with uid
+  - filePath (string): Save to file path instead of attaching inline
+  - response_format ('markdown'|'json'): Output format. Default: 'markdown'
+
+Returns:
+  JSON format: { success: true, type, format, savedTo?, sizeBytes?, attached? }
+  Markdown format: Description + inline image or file save confirmation
+
+Examples:
+  - "Screenshot viewport" -> {}
+  - "Screenshot full page" -> { fullPage: true }
+  - "Screenshot element" -> { uid: "abc123" }
+  - "Save as JPEG" -> { format: "jpeg", quality: 80, filePath: "shot.jpg" }
+
+Error Handling:
+  - Throws if both uid and fullPage are provided
+  - Auto-saves to file if image > 2MB`,
+  timeoutMs: 45000,
   annotations: {
     category: ToolCategory.DEBUGGING,
     readOnlyHint: false,
+    destructiveHint: false,
+    idempotentHint: true,
+    openWorldHint: false,
     conditions: ['directCdp'],
   },
   schema: {
+    response_format: responseFormatSchema,
     format: zod
       .enum(['png', 'jpeg', 'webp'])
       .default('png')
@@ -53,6 +88,7 @@ export const screenshot = defineTool({
         'The absolute path, or a path relative to the current working directory, to save the screenshot to instead of attaching it to the response.',
       ),
   },
+  outputSchema: ScreenshotOutputSchema,
   handler: async (request, response) => {
     if (request.params.uid && request.params.fullPage) {
       throw new Error('Providing both "uid" and "fullPage" is not allowed.');
@@ -68,6 +104,38 @@ export const screenshot = defineTool({
       fullPage: request.params.fullPage,
     });
 
+    const type = request.params.uid ? 'element' : (request.params.fullPage ? 'fullPage' : 'viewport');
+    let savedTo: string | undefined;
+    let attached = false;
+
+    if (request.params.filePath) {
+      writeFileSync(request.params.filePath, data);
+      savedTo = request.params.filePath;
+    } else if (data.length >= 2_000_000) {
+      const tmpPath = `screenshot-${Date.now()}.${format}`;
+      writeFileSync(tmpPath, data);
+      savedTo = tmpPath;
+    } else {
+      response.attachImage({
+        mimeType: `image/${format}`,
+        data: data.toString('base64'),
+      });
+      attached = true;
+    }
+
+    if (request.params.response_format === ResponseFormat.JSON) {
+      const output = {
+        success: true,
+        type,
+        format,
+        ...(savedTo ? { savedTo } : {}),
+        sizeBytes: data.length,
+        attached,
+      };
+      response.appendResponseLine(JSON.stringify(output, null, 2));
+      return;
+    }
+
     if (request.params.uid) {
       response.appendResponseLine(
         `Took a screenshot of node with uid "${request.params.uid}".`,
@@ -82,18 +150,13 @@ export const screenshot = defineTool({
       );
     }
 
-    if (request.params.filePath) {
-      writeFileSync(request.params.filePath, data);
-      response.appendResponseLine(`Saved screenshot to ${request.params.filePath}.`);
-    } else if (data.length >= 2_000_000) {
-      const tmpPath = `screenshot-${Date.now()}.${format}`;
-      writeFileSync(tmpPath, data);
-      response.appendResponseLine(`Screenshot too large for inline (${(data.length / 1024 / 1024).toFixed(1)}MB). Saved to ${tmpPath}.`);
+    if (savedTo) {
+      if (savedTo === request.params.filePath) {
+        response.appendResponseLine(`Saved screenshot to ${savedTo}.`);
+      } else {
+        response.appendResponseLine(`Screenshot too large for inline (${(data.length / 1024 / 1024).toFixed(1)}MB). Saved to ${savedTo}.`);
+      }
     } else {
-      response.attachImage({
-        mimeType: `image/${format}`,
-        data: data.toString('base64'),
-      });
       response.appendResponseLine('Screenshot attached inline.');
     }
   },

@@ -27,7 +27,7 @@ const tools = [
   ...Object.values(scriptTools),
   ...Object.values(snapshotTools),
   ...Object.values(waitTools),
-] as ToolDefinition[];
+] as unknown as ToolDefinition[];
 
 tools.sort((a, b) => {
   return a.name.localeCompare(b.name);

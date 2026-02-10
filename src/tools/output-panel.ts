@@ -17,7 +17,14 @@ import {getUserDataDir} from '../browser.js';
 import {zod} from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
-import {defineTool} from './ToolDefinition.js';
+import {
+  defineTool,
+  ResponseFormat,
+  responseFormatSchema,
+  CHARACTER_LIMIT,
+  checkCharacterLimit,
+  createPaginationMetadata,
+} from './ToolDefinition.js';
 
 interface LogFileInfo {
   name: string;
@@ -95,18 +102,54 @@ function getLatestLogsDir(): string | null {
   return path.join(logsDir, sessions[0]);
 }
 
+const LogFileInfoSchema = zod.object({
+  name: zod.string(),
+  path: zod.string(),
+  size: zod.number(),
+  category: zod.string(),
+});
+
+const ListOutputChannelsOutputSchema = zod.object({
+  total: zod.number(),
+  channels: zod.array(zod.object({
+    name: zod.string(),
+    category: zod.string(),
+    sizeKb: zod.number(),
+  })),
+});
+
 export const listOutputChannels = defineTool({
   name: 'list_output_channels',
-  description:
-    'List all available output channels in the VS Code Output panel (e.g., "Git", "TypeScript", "ESLint", "Extension Host").',
+  description: `List all available output channels in the VS Code Output panel (e.g., "Git", "TypeScript", "ESLint", "Extension Host").
+
+Args:
+  - response_format ('markdown'|'json'): Output format. Default: 'markdown'
+
+Returns:
+  JSON format: { total, channels: [{name, category, sizeKb}] }
+  Markdown format: Organized list by category (Main Logs, Extension Host, Output Channels, etc.)
+
+Examples:
+  - "List all channels" -> {}
+  - "Get channels as JSON" -> { response_format: 'json' }
+
+Error Handling:
+  - Returns "No logs directory found." if VS Code debug window isn't running
+  - Returns "No log files found." if logs directory is empty`,
   timeoutMs: 10000,
   annotations: {
     category: ToolCategory.DEBUGGING,
     readOnlyHint: true,
+    destructiveHint: false,
+    idempotentHint: true,
+    openWorldHint: false,
     conditions: ['directCdp'],
   },
-  schema: {},
-  handler: async (_request, response) => {
+  schema: {
+    response_format: responseFormatSchema,
+  },
+  outputSchema: ListOutputChannelsOutputSchema,
+  handler: async (request, response) => {
     const logsDir = getLatestLogsDir();
 
     if (!logsDir) {
@@ -131,8 +174,6 @@ export const listOutputChannels = defineTool({
       byCategory[file.category].push(file);
     }
 
-    response.appendResponseLine('## Available Output Channels\n');
-
     const categoryLabels: Record<string, string> = {
       root: 'Main Logs',
       window: 'Window Logs',
@@ -140,6 +181,18 @@ export const listOutputChannels = defineTool({
       extension: 'Extension Logs',
       output: 'Output Channels',
     };
+
+    if (request.params.response_format === ResponseFormat.JSON) {
+      const channels = logFiles.map(f => ({
+        name: f.name,
+        category: categoryLabels[f.category] || f.category,
+        sizeKb: parseFloat((f.size / 1024).toFixed(1)),
+      }));
+      response.appendResponseLine(JSON.stringify({ total: channels.length, channels }, null, 2));
+      return;
+    }
+
+    response.appendResponseLine('## Available Output Channels\n');
 
     for (const [category, files] of Object.entries(byCategory)) {
       response.appendResponseLine(
@@ -183,17 +236,59 @@ function parseLogLevel(line: string): string | null {
   return match ? match[1].toLowerCase() : null;
 }
 
+const GetOutputPanelContentOutputSchema = zod.object({
+  channel: zod.string(),
+  total_lines: zod.number(),
+  returned_lines: zod.number(),
+  has_more: zod.boolean(),
+  filters: zod.object({
+    text: zod.string().optional(),
+    levels: zod.array(zod.string()).optional(),
+    secondsAgo: zod.number().optional(),
+    logic: zod.enum(['and', 'or']).optional(),
+  }).optional(),
+  lines: zod.array(zod.string()),
+});
+
 export const getOutputPanelContent = defineTool({
   name: 'get_output_panel_content',
-  description:
-    'Get the text content from the currently visible VS Code Output panel. Optionally switch to a specific output channel first.',
+  description: `Get the text content from the currently visible VS Code Output panel. Optionally switch to a specific output channel first.
+
+Args:
+  - channel (string): Output channel name (e.g., "Git", "TypeScript", "Extension Host"). Default: exthost or main
+  - maxLines (number): Maximum lines to return. Default: 200
+  - tail (boolean): Return last N lines (true) or first N (false). Default: true
+  - filter (string): Case-insensitive substring filter
+  - isRegex (boolean): Treat filter as regex. Default: false
+  - levels (string[]): Filter by log levels (error, warning, info, debug, trace)
+  - secondsAgo (number): Only lines from last N seconds
+  - filterLogic ('and'|'or'): How to combine filters. Default: 'and'
+  - response_format ('markdown'|'json'): Output format. Default: 'markdown'
+
+Returns:
+  JSON format: { channel, total_lines, returned_lines, has_more, filters?, lines: [...] }
+  Markdown format: Formatted log output with filter summary
+
+Examples:
+  - "Show errors from Extension Host" -> { channel: "exthost", levels: ["error"] }
+  - "Recent TypeScript logs" -> { channel: "TypeScript", secondsAgo: 300 }
+  - "Search for specific error" -> { filter: "ENOENT", isRegex: false }
+  - "Get as JSON" -> { channel: "main", response_format: 'json' }
+
+Error Handling:
+  - Returns "Channel X not found." with available channels if channel doesn't exist
+  - Returns error if response exceeds ${CHARACTER_LIMIT} chars`,
   timeoutMs: 10000,
   annotations: {
     category: ToolCategory.DEBUGGING,
     readOnlyHint: true,
+    destructiveHint: false,
+    idempotentHint: true,
+    openWorldHint: false,
     conditions: ['directCdp'],
   },
   schema: {
+    response_format: responseFormatSchema,
     channel: zod
       .string()
       .optional()
@@ -251,6 +346,7 @@ export const getOutputPanelContent = defineTool({
         'How to combine multiple filters. "and" = all filters must match (default). "or" = any filter can match.',
       ),
   },
+  outputSchema: GetOutputPanelContentOutputSchema,
   handler: async (request, response) => {
     const {
       channel,
@@ -381,6 +477,36 @@ export const getOutputPanelContent = defineTool({
       }
     }
 
+    const hasMore = totalBeforeTrim > effectiveMax;
+
+    const filters: Record<string, unknown> = {};
+    if (filter) filters.text = filter;
+    if (levelSet) filters.levels = [...levelSet];
+    if (secondsAgo) filters.secondsAgo = secondsAgo;
+    if (Object.keys(filters).length > 0) {
+      filters.logic = useOr ? 'or' : 'and';
+    }
+
+    if (request.params.response_format === ResponseFormat.JSON) {
+      const structuredOutput = {
+        channel: targetFile.name,
+        total_lines: totalBeforeTrim,
+        returned_lines: lines.length,
+        has_more: hasMore,
+        ...(Object.keys(filters).length > 0 ? { filters } : {}),
+        lines,
+      };
+      const jsonOutput = JSON.stringify(structuredOutput, null, 2);
+      checkCharacterLimit(jsonOutput, 'get_output_panel_content', {
+        maxLines: 'Reduce lines per request (e.g., 50)',
+        filter: 'Filter by text to reduce results',
+        levels: 'Filter by specific levels (e.g., ["error"])',
+        secondsAgo: 'Limit to recent logs',
+      });
+      response.appendResponseLine(jsonOutput);
+      return;
+    }
+
     response.appendResponseLine(`## Output: ${targetFile.name}\n`);
 
     const filterParts: string[] = [];
@@ -400,7 +526,7 @@ export const getOutputPanelContent = defineTool({
       );
     }
 
-    if (totalBeforeTrim > effectiveMax) {
+    if (hasMore) {
       const position = tail ? 'last' : 'first';
       response.appendResponseLine(
         `_Showing ${position} ${lines.length} of ${totalBeforeTrim} lines_\n`,
@@ -410,11 +536,14 @@ export const getOutputPanelContent = defineTool({
     if (lines.length === 0 || (lines.length === 1 && lines[0] === '')) {
       response.appendResponseLine('(no output or log is empty)');
     } else {
-      response.appendResponseLine('```');
-      for (const line of lines) {
-        response.appendResponseLine(line);
-      }
-      response.appendResponseLine('```');
+      const content = '```\n' + lines.join('\n') + '\n```';
+      checkCharacterLimit(content, 'get_output_panel_content', {
+        maxLines: 'Reduce lines per request (e.g., 50)',
+        filter: 'Filter by text to reduce results',
+        levels: 'Filter by specific levels (e.g., ["error"])',
+        secondsAgo: 'Limit to recent logs',
+      });
+      response.appendResponseLine(content);
     }
   },
 });

@@ -18,8 +18,33 @@ import type {PaginationOptions} from '../utils/types.js';
 
 import type {ToolCategory} from './categories.js';
 
+/**
+ * Maximum response size in characters to prevent overwhelming context windows.
+ */
+export const CHARACTER_LIMIT = 25000;
+
+/**
+ * Standard response format options.
+ */
+export enum ResponseFormat {
+  MARKDOWN = 'markdown',
+  JSON = 'json',
+}
+
+/**
+ * Standard pagination metadata for list responses.
+ */
+export interface PaginationMetadata {
+  total: number;
+  count: number;
+  offset: number;
+  has_more: boolean;
+  next_offset?: number;
+}
+
 export interface ToolDefinition<
   Schema extends zod.ZodRawShape = zod.ZodRawShape,
+  OutputSchema extends zod.ZodTypeAny = zod.ZodTypeAny,
 > {
   name: string;
   description: string;
@@ -35,9 +60,24 @@ export interface ToolDefinition<
      * If true, the tool does not modify its environment.
      */
     readOnlyHint: boolean;
+    /**
+     * If true, the tool may perform destructive updates.
+     * Default: true (conservative assumption).
+     */
+    destructiveHint?: boolean;
+    /**
+     * If true, repeated calls with same args have no additional effect.
+     */
+    idempotentHint?: boolean;
+    /**
+     * If true, the tool interacts with external entities.
+     * Default: true.
+     */
+    openWorldHint?: boolean;
     conditions?: string[];
   };
   schema: Schema;
+  outputSchema?: OutputSchema;
   handler: (
     request: Request<Schema>,
     response: Response,
@@ -166,6 +206,13 @@ export function defineTool<Schema extends zod.ZodRawShape>(
 export const CLOSE_PAGE_ERROR =
   'The last open page cannot be closed. It is fine to keep it open.';
 
+export const responseFormatSchema = zod.nativeEnum(ResponseFormat)
+  .optional()
+  .default(ResponseFormat.MARKDOWN)
+  .describe(
+    'Output format: "markdown" for human-readable or "json" for machine-readable structured data.',
+  );
+
 export const timeoutSchema = {
   timeout: zod
     .number()
@@ -178,3 +225,40 @@ export const timeoutSchema = {
       return value && value <= 0 ? undefined : value;
     }),
 };
+
+/**
+ * Check if content exceeds CHARACTER_LIMIT and throw an error with available params.
+ */
+export function checkCharacterLimit(
+  content: string,
+  toolName: string,
+  availableParams: Record<string, string>,
+): void {
+  if (content.length > CHARACTER_LIMIT) {
+    const paramList = Object.entries(availableParams)
+      .map(([name, desc]) => `  - ${name}: ${desc}`)
+      .join('\n');
+    throw new Error(
+      `Response too long (${content.length} chars, limit: ${CHARACTER_LIMIT}). ` +
+      `Optimize your request using these parameters:\n${paramList}`,
+    );
+  }
+}
+
+/**
+ * Create standard pagination metadata.
+ */
+export function createPaginationMetadata(
+  total: number,
+  count: number,
+  offset: number,
+): PaginationMetadata {
+  const has_more = total > offset + count;
+  return {
+    total,
+    count,
+    offset,
+    has_more,
+    ...(has_more ? { next_offset: offset + count } : {}),
+  };
+}

@@ -17,7 +17,7 @@ import {
 import {zod} from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
-import {defineTool} from './ToolDefinition.js';
+import {defineTool, ResponseFormat, responseFormatSchema} from './ToolDefinition.js';
 
 const dblClickSchema = zod
   .boolean()
@@ -29,6 +29,12 @@ const includeSnapshotSchema = zod
   .optional()
   .describe('Whether to include a snapshot in the response. Default is false.');
 
+const InputActionOutputSchema = zod.object({
+  action: zod.string(),
+  success: zod.boolean(),
+  changes: zod.string().optional(),
+});
+
 /**
  * Execute an action and show either the diff or full snapshot.
  * Always shows diff by default; if includeSnapshot is true, shows full snapshot instead.
@@ -37,33 +43,54 @@ async function executeWithChanges<T>(
   action: () => Promise<T>,
   includeSnapshot: boolean | undefined,
   response: {appendResponseLine(v: string): void},
-): Promise<T> {
+  responseFormat?: string,
+): Promise<{result: T; changes?: string}> {
   if (includeSnapshot) {
-    // User explicitly wants full snapshot — skip diff, just execute and show snapshot
     const result = await action();
     const {formatted} = await fetchAXTree(false);
-    response.appendResponseLine('## Latest page snapshot');
-    response.appendResponseLine(formatted);
-    return result;
+    if (responseFormat !== ResponseFormat.JSON) {
+      response.appendResponseLine('## Latest page snapshot');
+      response.appendResponseLine(formatted);
+    }
+    return {result, changes: formatted};
   }
 
-  // Default: show diff
   const {result, summary} = await executeWithDiff(action, 1500);
-  response.appendResponseLine('## Changes detected');
-  response.appendResponseLine(summary);
-  return result;
+  if (responseFormat !== ResponseFormat.JSON) {
+    response.appendResponseLine('## Changes detected');
+    response.appendResponseLine(summary);
+  }
+  return {result, changes: summary};
 }
 
 export const click = defineTool({
   name: 'click',
-  description: `Clicks on the provided element`,
+  description: `Clicks on the provided element.
+
+Args:
+  - uid (string): Element uid from page snapshot
+  - dblClick (boolean): Double click. Default: false
+  - includeSnapshot (boolean): Include full snapshot. Default: false
+  - response_format ('markdown'|'json'): Output format. Default: 'markdown'
+
+Returns:
+  JSON format: { action: 'click', success: true, changes?: string }
+  Markdown format: Changes detected + action confirmation
+
+Examples:
+  - "Click button" -> { uid: "abc123" }
+  - "Double click" -> { uid: "abc123", dblClick: true }`,
   timeoutMs: 10000,
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
+    destructiveHint: false,
+    idempotentHint: false,
+    openWorldHint: false,
     conditions: ['directCdp'],
   },
   schema: {
+    response_format: responseFormatSchema,
     uid: zod
       .string()
       .describe(
@@ -72,31 +99,54 @@ export const click = defineTool({
     dblClick: dblClickSchema,
     includeSnapshot: includeSnapshotSchema,
   },
+  outputSchema: InputActionOutputSchema,
   handler: async (request, response) => {
     const {uid, dblClick, includeSnapshot} = request.params;
-    await executeWithChanges(
+    const {changes} = await executeWithChanges(
       async () => clickElement(uid, dblClick ? 2 : 1),
       includeSnapshot,
       response,
+      request.params.response_format,
     );
-    response.appendResponseLine(
-      dblClick
-        ? 'Double clicked on the element'
-        : 'Clicked on the element',
-    );
+
+    const actionText = dblClick ? 'Double clicked on the element' : 'Clicked on the element';
+
+    if (request.params.response_format === ResponseFormat.JSON) {
+      response.appendResponseLine(JSON.stringify({
+        action: dblClick ? 'double_click' : 'click',
+        success: true,
+        ...(changes ? { changes } : {}),
+      }, null, 2));
+      return;
+    }
+
+    response.appendResponseLine(actionText);
   },
 });
 
 export const hover = defineTool({
   name: 'hover',
-  description: `Hover over the provided element`,
+  description: `Hover over the provided element.
+
+Args:
+  - uid (string): Element uid from page snapshot
+  - includeSnapshot (boolean): Include full snapshot. Default: false
+  - response_format ('markdown'|'json'): Output format. Default: 'markdown'
+
+Returns:
+  JSON format: { action: 'hover', success: true, changes?: string }
+  Markdown format: Changes detected + action confirmation`,
   timeoutMs: 10000,
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
+    destructiveHint: false,
+    idempotentHint: true,
+    openWorldHint: false,
     conditions: ['directCdp'],
   },
   schema: {
+    response_format: responseFormatSchema,
     uid: zod
       .string()
       .describe(
@@ -104,27 +154,53 @@ export const hover = defineTool({
       ),
     includeSnapshot: includeSnapshotSchema,
   },
+  outputSchema: InputActionOutputSchema,
   handler: async (request, response) => {
     const {uid, includeSnapshot} = request.params;
-    await executeWithChanges(
+    const {changes} = await executeWithChanges(
       async () => hoverElement(uid),
       includeSnapshot,
       response,
+      request.params.response_format,
     );
+
+    if (request.params.response_format === ResponseFormat.JSON) {
+      response.appendResponseLine(JSON.stringify({
+        action: 'hover',
+        success: true,
+        ...(changes ? { changes } : {}),
+      }, null, 2));
+      return;
+    }
+
     response.appendResponseLine('Hovered over the element');
   },
 });
 
 export const type = defineTool({
   name: 'type',
-  description: `Type text into a input, text area or select an option from a <select> element.`,
+  description: `Type text into a input, text area or select an option from a <select> element.
+
+Args:
+  - uid (string): Element uid from page snapshot
+  - value (string): Text to type or option to select
+  - includeSnapshot (boolean): Include full snapshot. Default: false
+  - response_format ('markdown'|'json'): Output format. Default: 'markdown'
+
+Returns:
+  JSON format: { action: 'type', success: true, changes?: string }
+  Markdown format: Changes detected + action confirmation`,
   timeoutMs: 10000,
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
+    destructiveHint: false,
+    idempotentHint: false,
+    openWorldHint: false,
     conditions: ['directCdp'],
   },
   schema: {
+    response_format: responseFormatSchema,
     uid: zod
       .string()
       .describe(
@@ -133,52 +209,108 @@ export const type = defineTool({
     value: zod.string().describe('The value to fill in'),
     includeSnapshot: includeSnapshotSchema,
   },
+  outputSchema: InputActionOutputSchema,
   handler: async (request, response) => {
     const {uid, value, includeSnapshot} = request.params;
-    await executeWithChanges(
+    const {changes} = await executeWithChanges(
       async () => fillElement(uid, value),
       includeSnapshot,
       response,
+      request.params.response_format,
     );
+
+    if (request.params.response_format === ResponseFormat.JSON) {
+      response.appendResponseLine(JSON.stringify({
+        action: 'type',
+        success: true,
+        ...(changes ? { changes } : {}),
+      }, null, 2));
+      return;
+    }
+
     response.appendResponseLine('Filled out the element');
   },
 });
 
 export const drag = defineTool({
   name: 'drag',
-  description: `Drag an element onto another element`,
+  description: `Drag an element onto another element.
+
+Args:
+  - from_uid (string): Element uid to drag
+  - to_uid (string): Element uid to drop onto
+  - includeSnapshot (boolean): Include full snapshot. Default: false
+  - response_format ('markdown'|'json'): Output format. Default: 'markdown'
+
+Returns:
+  JSON format: { action: 'drag', success: true, changes?: string }
+  Markdown format: Changes detected + action confirmation`,
   timeoutMs: 10000,
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
+    destructiveHint: false,
+    idempotentHint: false,
+    openWorldHint: false,
     conditions: ['directCdp'],
   },
   schema: {
+    response_format: responseFormatSchema,
     from_uid: zod.string().describe('The uid of the element to drag'),
     to_uid: zod.string().describe('The uid of the element to drop into'),
     includeSnapshot: includeSnapshotSchema,
   },
+  outputSchema: InputActionOutputSchema,
   handler: async (request, response) => {
     const {from_uid, to_uid, includeSnapshot} = request.params;
-    await executeWithChanges(
+    const {changes} = await executeWithChanges(
       async () => dragElement(from_uid, to_uid),
       includeSnapshot,
       response,
+      request.params.response_format,
     );
+
+    if (request.params.response_format === ResponseFormat.JSON) {
+      response.appendResponseLine(JSON.stringify({
+        action: 'drag',
+        success: true,
+        ...(changes ? { changes } : {}),
+      }, null, 2));
+      return;
+    }
+
     response.appendResponseLine('Dragged the element');
   },
 });
 
 export const hotkeyTool = defineTool({
   name: 'hotkey',
-  description: `Press a key or key combination. Use this when other input methods like type() cannot be used (e.g., keyboard shortcuts, navigation keys, or special key combinations).`,
+  description: `Press a key or key combination. Use this when other input methods like type() cannot be used (e.g., keyboard shortcuts, navigation keys, or special key combinations).
+
+Args:
+  - key (string): Key or combination (e.g., "Enter", "Control+A", "Control+Shift+R")
+  - includeSnapshot (boolean): Include full snapshot. Default: false
+  - response_format ('markdown'|'json'): Output format. Default: 'markdown'
+
+Returns:
+  JSON format: { action: 'hotkey', key: string, success: true, changes?: string }
+  Markdown format: Changes detected + key pressed confirmation
+
+Examples:
+  - "Press Enter" -> { key: "Enter" }
+  - "Select all" -> { key: "Control+A" }
+  - "Hard refresh" -> { key: "Control+Shift+R" }`,
   timeoutMs: 10000,
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
+    destructiveHint: false,
+    idempotentHint: false,
+    openWorldHint: false,
     conditions: ['directCdp'],
   },
   schema: {
+    response_format: responseFormatSchema,
     key: zod
       .string()
       .describe(
@@ -186,27 +318,64 @@ export const hotkeyTool = defineTool({
       ),
     includeSnapshot: includeSnapshotSchema,
   },
+  outputSchema: zod.object({
+    action: zod.string(),
+    key: zod.string(),
+    success: zod.boolean(),
+    changes: zod.string().optional(),
+  }),
   handler: async (request, response) => {
     const {key, includeSnapshot} = request.params;
-    await executeWithChanges(
+    const {changes} = await executeWithChanges(
       async () => pressKey(key),
       includeSnapshot,
       response,
+      request.params.response_format,
     );
+
+    if (request.params.response_format === ResponseFormat.JSON) {
+      response.appendResponseLine(JSON.stringify({
+        action: 'hotkey',
+        key,
+        success: true,
+        ...(changes ? { changes } : {}),
+      }, null, 2));
+      return;
+    }
+
     response.appendResponseLine(`Pressed key: ${key}`);
   },
 });
 
 export const scroll = defineTool({
   name: 'scroll',
-  description: `Scroll an element into view, or scroll within a scrollable element in a given direction. If no direction is provided, the element is simply scrolled into the viewport.`,
+  description: `Scroll an element into view, or scroll within a scrollable element in a given direction. If no direction is provided, the element is simply scrolled into the viewport.
+
+Args:
+  - uid (string): Element uid from page snapshot
+  - direction ('up'|'down'|'left'|'right'): Scroll direction. Optional
+  - amount (number): Scroll distance in pixels. Default: 300
+  - includeSnapshot (boolean): Include full snapshot. Default: false
+  - response_format ('markdown'|'json'): Output format. Default: 'markdown'
+
+Returns:
+  JSON format: { action: 'scroll', direction?, amount?, success: true, changes?: string }
+  Markdown format: Changes detected + scroll confirmation
+
+Examples:
+  - "Scroll element into view" -> { uid: "abc123" }
+  - "Scroll down 500px" -> { uid: "abc123", direction: "down", amount: 500 }`,
   timeoutMs: 10000,
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: true,
+    destructiveHint: false,
+    idempotentHint: true,
+    openWorldHint: false,
     conditions: ['directCdp'],
   },
   schema: {
+    response_format: responseFormatSchema,
     uid: zod
       .string()
       .describe(
@@ -226,13 +395,33 @@ export const scroll = defineTool({
       ),
     includeSnapshot: includeSnapshotSchema,
   },
+  outputSchema: zod.object({
+    action: zod.string(),
+    direction: zod.string().optional(),
+    amount: zod.number().optional(),
+    success: zod.boolean(),
+    changes: zod.string().optional(),
+  }),
   handler: async (request, response) => {
     const {uid, direction, amount, includeSnapshot} = request.params;
-    await executeWithChanges(
+    const {changes} = await executeWithChanges(
       async () => scrollElement(uid, direction, amount),
       includeSnapshot,
       response,
+      request.params.response_format,
     );
+
+    if (request.params.response_format === ResponseFormat.JSON) {
+      response.appendResponseLine(JSON.stringify({
+        action: 'scroll',
+        ...(direction ? { direction } : {}),
+        ...(amount ? { amount } : {}),
+        success: true,
+        ...(changes ? { changes } : {}),
+      }, null, 2));
+      return;
+    }
+
     if (direction) {
       response.appendResponseLine(`Scrolled ${direction} by ${amount ?? 300}px within the element`);
     } else {

@@ -20,7 +20,7 @@ import {
 
 import {ToolCategory} from './categories.js';
 import type {Context, Response} from './ToolDefinition.js';
-import {defineTool} from './ToolDefinition.js';
+import {defineTool, ResponseFormat, responseFormatSchema} from './ToolDefinition.js';
 
 // Module-level state for tracking trace status
 let isRunningTrace = false;
@@ -32,16 +32,45 @@ const filePathSchema = zod
     'The absolute file path, or a file path relative to the current working directory, to save the raw trace data. For example, trace.json.gz (compressed) or trace.json (uncompressed).',
   );
 
+const StartTraceOutputSchema = zod.object({
+  status: zod.enum(['recording', 'completed']),
+  message: zod.string(),
+  filePath: zod.string().optional(),
+});
+
 export const startTrace = defineTool({
   name: 'performance_start_trace',
-  description: `Starts a performance trace recording on the selected page. This can be used to look for performance problems and insights to improve the performance of the page. It will also report Core Web Vital (CWV) scores for the page.`,
+  description: `Starts a performance trace recording on the selected page. This can be used to look for performance problems and insights to improve the performance of the page. It will also report Core Web Vital (CWV) scores for the page.
+
+Args:
+  - reload (boolean): Reload page after starting trace. Navigate to desired URL BEFORE calling
+  - autoStop (boolean): Auto-stop trace after 5 seconds
+  - filePath (string): Save raw trace to file (e.g., trace.json.gz)
+  - response_format ('markdown'|'json'): Output format. Default: 'markdown'
+
+Returns:
+  JSON format: { status: 'recording'|'completed', message, filePath? }
+  Markdown format: Recording status or trace analysis summary
+
+Examples:
+  - "Record page load" -> { reload: true, autoStop: true }
+  - "Start manual recording" -> { reload: false, autoStop: false }
+  - "Save trace" -> { reload: true, autoStop: true, filePath: "trace.json.gz" }
+
+Error Handling:
+  - Returns error if trace is already running
+  - Only one trace can run at a time`,
   timeoutMs: 120000,
   annotations: {
     category: ToolCategory.PERFORMANCE,
     readOnlyHint: false,
+    destructiveHint: false,
+    idempotentHint: false,
+    openWorldHint: false,
     conditions: ['directCdp'],
   },
   schema: {
+    response_format: responseFormatSchema,
     reload: zod
       .boolean()
       .describe(
@@ -54,8 +83,16 @@ export const startTrace = defineTool({
       ),
     filePath: filePathSchema,
   },
+  outputSchema: StartTraceOutputSchema,
   handler: async (request, response, context) => {
     if (isRunningTrace) {
+      if (request.params.response_format === ResponseFormat.JSON) {
+        response.appendResponseLine(JSON.stringify({
+          status: 'recording',
+          message: 'A performance trace is already running. Use performance_stop_trace to stop it.',
+        }, null, 2));
+        return;
+      }
       response.appendResponseLine(
         'Error: a performance trace is already running. Use performance_stop_trace to stop it. Only one trace can be running at any given time.',
       );
@@ -129,21 +166,53 @@ export const startTrace = defineTool({
   },
 });
 
+const StopTraceOutputSchema = zod.object({
+  status: zod.enum(['stopped', 'not_running']),
+  message: zod.string(),
+  filePath: zod.string().optional(),
+});
+
 export const stopTrace = defineTool({
   name: 'performance_stop_trace',
-  description:
-    'Stops the active performance trace recording on the selected page.',
+  description: `Stops the active performance trace recording on the selected page.
+
+Args:
+  - filePath (string): Save raw trace to file (e.g., trace.json.gz)
+  - response_format ('markdown'|'json'): Output format. Default: 'markdown'
+
+Returns:
+  JSON format: { status: 'stopped'|'not_running', message, filePath? }
+  Markdown format: Trace stopped confirmation + analysis summary
+
+Examples:
+  - "Stop and analyze" -> {}
+  - "Stop and save" -> { filePath: "trace.json.gz" }
+
+Error Handling:
+  - Returns "No performance trace is currently running." if no trace active`,
   timeoutMs: 60000,
   annotations: {
     category: ToolCategory.PERFORMANCE,
     readOnlyHint: false,
+    destructiveHint: false,
+    idempotentHint: false,
+    openWorldHint: false,
     conditions: ['directCdp'],
   },
   schema: {
+    response_format: responseFormatSchema,
     filePath: filePathSchema,
   },
+  outputSchema: StopTraceOutputSchema,
   handler: async (request, response, context) => {
     if (!isRunningTrace) {
+      if (request.params.response_format === ResponseFormat.JSON) {
+        response.appendResponseLine(JSON.stringify({
+          status: 'not_running',
+          message: 'No performance trace is currently running.',
+        }, null, 2));
+        return;
+      }
       response.appendResponseLine('No performance trace is currently running.');
       return;
     }
@@ -155,17 +224,41 @@ export const stopTrace = defineTool({
   },
 });
 
+const AnalyzeInsightOutputSchema = zod.object({
+  insightSetId: zod.string(),
+  insightName: zod.string(),
+  found: zod.boolean(),
+});
+
 export const analyzeInsight = defineTool({
   name: 'performance_analyze_insight',
-  description:
-    'Provides more detailed information on a specific Performance Insight of an insight set that was highlighted in the results of a trace recording.',
+  description: `Provides more detailed information on a specific Performance Insight of an insight set that was highlighted in the results of a trace recording.
+
+Args:
+  - insightSetId (string): Insight set ID from "Available insight sets" list
+  - insightName (string): Insight name (e.g., "DocumentLatency", "LCPBreakdown")
+  - response_format ('markdown'|'json'): Output format. Default: 'markdown'
+
+Returns:
+  Detailed insight analysis with recommendations
+
+Examples:
+  - "Analyze LCP breakdown" -> { insightSetId: "main-frame", insightName: "LCPBreakdown" }
+  - "Check document latency" -> { insightSetId: "main-frame", insightName: "DocumentLatency" }
+
+Error Handling:
+  - Returns "No recorded traces found." if no trace has been recorded`,
   timeoutMs: 30000,
   annotations: {
     category: ToolCategory.PERFORMANCE,
     readOnlyHint: true,
+    destructiveHint: false,
+    idempotentHint: true,
+    openWorldHint: false,
     conditions: ['directCdp'],
   },
   schema: {
+    response_format: responseFormatSchema,
     insightSetId: zod
       .string()
       .describe(
@@ -177,6 +270,7 @@ export const analyzeInsight = defineTool({
         'The name of the Insight you want more information on. For example: "DocumentLatency" or "LCPBreakdown"',
       ),
   },
+  outputSchema: AnalyzeInsightOutputSchema,
   handler: async (request, response, context) => {
     const lastRecording = context.recordedTraces().at(-1);
     if (!lastRecording) {
