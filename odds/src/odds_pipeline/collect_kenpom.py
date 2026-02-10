@@ -70,7 +70,11 @@ def collect_kenpom_team_metrics(*, season: int, metric_type: str) -> int:
     with connect(settings.database_url) as conn:
         with conn.cursor() as cur:
             for r in records:
-                team = str(r.get(team_key) or "__unknown__")
+                if team_key == "__all__":
+                    # Fallback blob: always use literal team label "__all__"
+                    team = "__all__"
+                else:
+                    team = str(r.get(team_key) or "__unknown__")
                 cur.execute(
                     """
                     INSERT INTO raw_kenpom_team_metrics (
@@ -117,6 +121,10 @@ def collect_kenpom_fanmatch(*, game_date: date) -> int:
     with connect(settings.database_url) as conn:
         with conn.cursor() as cur:
             for r in records:
+                # KenPom seasons use the end-year convention for college hoops.
+                # Example: games in Nov/Dec 2025 belong to the 2026 season.
+                season = game_date.year + 1 if game_date.month >= 7 else game_date.year
+
                 # FanMatch rows may have matchup/team columns; store under team='__fanmatch__'
                 cur.execute(
                     """
@@ -128,7 +136,7 @@ def collect_kenpom_fanmatch(*, game_date: date) -> int:
                     ON CONFLICT DO NOTHING
                     """,
                     {
-                        "season": int(game_date.year),
+                        "season": int(season),
                         "team": "__fanmatch__",
                         "metric_type": "fanmatch",
                         "collected_at": collected_at,
