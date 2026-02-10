@@ -41,6 +41,7 @@ def normalize_window(*, window_days: int | None = None) -> dict[str, int]:
                   SELECT
                     sport, event_id, commence_time, bookmaker_key, collected_at,
                     outcome_name AS underdog_team,
+                    ABS(point)::numeric AS spread_magnitude,
                     price AS underdog_price
                   FROM raw_odds_snapshots
                   WHERE market_key = 'spreads'
@@ -62,6 +63,7 @@ def normalize_window(*, window_days: int | None = None) -> dict[str, int]:
                  AND dog.event_id = fav.event_id
                  AND dog.bookmaker_key = fav.bookmaker_key
                  AND dog.collected_at = fav.collected_at
+                 AND dog.spread_magnitude = fav.spread_magnitude
                  AND dog.commence_time IS NOT DISTINCT FROM fav.commence_time
                 ON CONFLICT DO NOTHING
                 """,
