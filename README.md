@@ -9,7 +9,6 @@ MCP server for controlling and inspecting VS Code with extensions through the Ch
 - **Extension Debugging**: Inspect and debug VS Code extensions in real-time
 - **Hot Reload**: Automatically rebuilds extensions when source changes are detected
 - **UI Automation**: Interact with VS Code UI elements programmatically
-- **Performance Analysis**: Profile extension performance using CDP
 
 ## [Tool Reference](./docs/tool-reference.md) | [Changelog](./CHANGELOG.md) | [Contributing](./CONTRIBUTING.md)
 
@@ -66,9 +65,9 @@ The server automatically detects changes to your extension source files. Before 
 
 ### Available Tools
 
-- **Input Automation**: click, drag, type, hover, hotkey, scroll
+- **Input Automation**: click, drag, keyboard_type, hover, keyboard_hotkey, scroll
 - **Inspection**: snapshot, console, debug-evaluate, screenshot
-- **Monitoring**: network, performance, output-panel
+- **Monitoring**: output-panel
 - **Script Execution**: script
 - **Wait Operations**: wait for elements/conditions
 

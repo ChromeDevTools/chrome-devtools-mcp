@@ -86,18 +86,6 @@ export const cliOptions = {
     default: false,
     hidden: true,
   },
-  categoryPerformance: {
-    type: 'boolean',
-    default: true,
-    describe: '[LEGACY] Set categories.performance in .vscode/devtools.json.',
-    hidden: true,
-  },
-  categoryNetwork: {
-    type: 'boolean',
-    default: true,
-    describe: '[LEGACY] Set categories.network in .vscode/devtools.json.',
-    hidden: true,
-  },
 } satisfies Record<string, YargsOptions>;
 
 export function parseArguments(version: string, argv = process.argv) {

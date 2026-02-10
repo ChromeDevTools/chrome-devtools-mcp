@@ -64,7 +64,7 @@ async function executeWithChanges<T>(
 }
 
 export const click = defineTool({
-  name: 'click',
+  name: 'mouse_click',
   description: `Clicks on the provided element.
 
 Args:
@@ -125,7 +125,7 @@ Examples:
 });
 
 export const hover = defineTool({
-  name: 'hover',
+  name: 'mouse_hover',
   description: `Hover over the provided element.
 
 Args:
@@ -177,8 +177,8 @@ Returns:
   },
 });
 
-export const type = defineTool({
-  name: 'type',
+export const keyboardType = defineTool({
+  name: 'keyboard_type',
   description: `Type text into a input, text area or select an option from a <select> element.
 
 Args:
@@ -233,7 +233,7 @@ Returns:
 });
 
 export const drag = defineTool({
-  name: 'drag',
+  name: 'mouse_drag',
   description: `Drag an element onto another element.
 
 Args:
@@ -283,9 +283,9 @@ Returns:
   },
 });
 
-export const hotkeyTool = defineTool({
-  name: 'hotkey',
-  description: `Press a key or key combination. Use this when other input methods like type() cannot be used (e.g., keyboard shortcuts, navigation keys, or special key combinations).
+export const keyboardHotkey = defineTool({
+  name: 'keyboard_hotkey',
+  description: `Press a key or key combination. Use this when other input methods like keyboard_type() cannot be used (e.g., keyboard shortcuts, navigation keys, or special key combinations).
 
 Args:
   - key (string): Key or combination (e.g., "Enter", "Control+A", "Control+Shift+R")
@@ -348,7 +348,7 @@ Examples:
 });
 
 export const scroll = defineTool({
-  name: 'scroll',
+  name: 'mouse_scroll',
   description: `Scroll an element into view, or scroll within a scrollable element in a given direction. If no direction is provided, the element is simply scrolled into the viewport.
 
 Args:

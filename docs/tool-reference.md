@@ -3,20 +3,13 @@
 # VS Code DevTools MCP Tool Reference
 
 - **[Input automation](#input-automation)** (7 tools)
-  - [`click`](#click)
-  - [`drag`](#drag)
-  - [`hotkey`](#hotkey)
-  - [`hover`](#hover)
-  - [`scroll`](#scroll)
-  - [`type`](#type)
+  - [`keyboard_hotkey`](#keyboard_hotkey)
+  - [`keyboard_type`](#keyboard_type)
+  - [`mouse_click`](#mouse_click)
+  - [`mouse_drag`](#mouse_drag)
+  - [`mouse_hover`](#mouse_hover)
+  - [`mouse_scroll`](#mouse_scroll)
   - [`wait`](#wait)
-- **[Performance](#performance)** (3 tools)
-  - [`performance_analyze_insight`](#performance_analyze_insight)
-  - [`performance_start_trace`](#performance_start_trace)
-  - [`performance_stop_trace`](#performance_stop_trace)
-- **[Network](#network)** (2 tools)
-  - [`get_network_request`](#get_network_request)
-  - [`list_network_requests`](#list_network_requests)
 - **[Debugging](#debugging)** (7 tools)
   - [`evaluate_script`](#evaluate_script)
   - [`get_console_message`](#get_console_message)
@@ -28,59 +21,9 @@
 
 ## Input automation
 
-### `click`
+### `keyboard_hotkey`
 
-**Description:** Clicks on the provided element.
-
-Args:
-  - uid (string): Element uid from page snapshot
-  - dblClick (boolean): Double [`click`](#click). Default: false
-  - includeSnapshot (boolean): Include full snapshot. Default: false
-  - response_format ('markdown'|'json'): Output format. Default: 'markdown'
-
-Returns:
-  JSON format: { action: '[`click`](#click)', success: true, changes?: string }
-  Markdown format: Changes detected + action confirmation
-
-Examples:
-  - "[`Click`](#click) button" -> { uid: "abc123" }
-  - "Double [`click`](#click)" -> { uid: "abc123", dblClick: true }
-
-**Parameters:**
-
-- **uid** (string) **(required)**: The uid of an element on the page from the page content snapshot
-- **dblClick** (boolean) _(optional)_: Set to true for double clicks. Default is false.
-- **includeSnapshot** (boolean) _(optional)_: Whether to include a snapshot in the response. Default is false.
-- **response_format** (unknown) _(optional)_: Output format: "markdown" for human-readable or "json" for machine-readable structured data.
-
----
-
-### `drag`
-
-**Description:** [`Drag`](#drag) an element onto another element.
-
-Args:
-  - from_uid (string): Element uid to [`drag`](#drag)
-  - to_uid (string): Element uid to drop onto
-  - includeSnapshot (boolean): Include full snapshot. Default: false
-  - response_format ('markdown'|'json'): Output format. Default: 'markdown'
-
-Returns:
-  JSON format: { action: '[`drag`](#drag)', success: true, changes?: string }
-  Markdown format: Changes detected + action confirmation
-
-**Parameters:**
-
-- **from_uid** (string) **(required)**: The uid of the element to [`drag`](#drag)
-- **to_uid** (string) **(required)**: The uid of the element to drop into
-- **includeSnapshot** (boolean) _(optional)_: Whether to include a snapshot in the response. Default is false.
-- **response_format** (unknown) _(optional)_: Output format: "markdown" for human-readable or "json" for machine-readable structured data.
-
----
-
-### `hotkey`
-
-**Description:** Press a key or key combination. Use this when other input methods like [`type`](#type)() cannot be used (e.g., keyboard shortcuts, navigation keys, or special key combinations).
+**Description:** Press a key or key combination. Use this when other input methods like [`keyboard_type`](#keyboard_type)() cannot be used (e.g., keyboard shortcuts, navigation keys, or special key combinations).
 
 Args:
   - key (string): Key or combination (e.g., "Enter", "Control+A", "Control+Shift+R")
@@ -88,7 +31,7 @@ Args:
   - response_format ('markdown'|'json'): Output format. Default: 'markdown'
 
 Returns:
-  JSON format: { action: '[`hotkey`](#hotkey)', key: string, success: true, changes?: string }
+  JSON format: { action: 'hotkey', key: string, success: true, changes?: string }
   Markdown format: Changes detected + key pressed confirmation
 
 Examples:
@@ -104,74 +47,124 @@ Examples:
 
 ---
 
-### `hover`
+### `keyboard_type`
 
-**Description:** [`Hover`](#hover) over the provided element.
+**Description:** Type text into a input, text area or select an option from a &lt;select&gt; element.
 
 Args:
   - uid (string): Element uid from page snapshot
+  - value (string): Text to type or option to select
   - includeSnapshot (boolean): Include full snapshot. Default: false
   - response_format ('markdown'|'json'): Output format. Default: 'markdown'
 
 Returns:
-  JSON format: { action: '[`hover`](#hover)', success: true, changes?: string }
-  Markdown format: Changes detected + action confirmation
-
-**Parameters:**
-
-- **uid** (string) **(required)**: The uid of an element on the page from the page content snapshot
-- **includeSnapshot** (boolean) _(optional)_: Whether to include a snapshot in the response. Default is false.
-- **response_format** (unknown) _(optional)_: Output format: "markdown" for human-readable or "json" for machine-readable structured data.
-
----
-
-### `scroll`
-
-**Description:** [`Scroll`](#scroll) an element into view, or [`scroll`](#scroll) within a scrollable element in a given direction. If no direction is provided, the element is simply scrolled into the viewport.
-
-Args:
-  - uid (string): Element uid from page snapshot
-  - direction ('up'|'down'|'left'|'right'): [`Scroll`](#scroll) direction. Optional
-  - amount (number): [`Scroll`](#scroll) distance in pixels. Default: 300
-  - includeSnapshot (boolean): Include full snapshot. Default: false
-  - response_format ('markdown'|'json'): Output format. Default: 'markdown'
-
-Returns:
-  JSON format: { action: '[`scroll`](#scroll)', direction?, amount?, success: true, changes?: string }
-  Markdown format: Changes detected + [`scroll`](#scroll) confirmation
-
-Examples:
-  - "[`Scroll`](#scroll) element into view" -> { uid: "abc123" }
-  - "[`Scroll`](#scroll) down 500px" -> { uid: "abc123", direction: "down", amount: 500 }
-
-**Parameters:**
-
-- **uid** (string) **(required)**: The uid of an element on the page from the page content snapshot
-- **amount** (number) _(optional)_: [`Scroll`](#scroll) distance in pixels. Default is 300.
-- **direction** (enum: "up", "down", "left", "right") _(optional)_: Direction to [`scroll`](#scroll) within the element. If omitted, the element is scrolled into view without additional scrolling.
-- **includeSnapshot** (boolean) _(optional)_: Whether to include a snapshot in the response. Default is false.
-- **response_format** (unknown) _(optional)_: Output format: "markdown" for human-readable or "json" for machine-readable structured data.
-
----
-
-### `type`
-
-**Description:** [`Type`](#type) text into a input, text area or select an option from a &lt;select&gt; element.
-
-Args:
-  - uid (string): Element uid from page snapshot
-  - value (string): Text to [`type`](#type) or option to select
-  - includeSnapshot (boolean): Include full snapshot. Default: false
-  - response_format ('markdown'|'json'): Output format. Default: 'markdown'
-
-Returns:
-  JSON format: { action: '[`type`](#type)', success: true, changes?: string }
+  JSON format: { action: 'type', success: true, changes?: string }
   Markdown format: Changes detected + action confirmation
 
 **Parameters:**
 
 - **uid** (string) **(required)**: The uid of an element on the page from the page content snapshot
 - **value** (string) **(required)**: The value to fill in
+- **includeSnapshot** (boolean) _(optional)_: Whether to include a snapshot in the response. Default is false.
+- **response_format** (unknown) _(optional)_: Output format: "markdown" for human-readable or "json" for machine-readable structured data.
+
+---
+
+### `mouse_click`
+
+**Description:** Clicks on the provided element.
+
+Args:
+  - uid (string): Element uid from page snapshot
+  - dblClick (boolean): Double click. Default: false
+  - includeSnapshot (boolean): Include full snapshot. Default: false
+  - response_format ('markdown'|'json'): Output format. Default: 'markdown'
+
+Returns:
+  JSON format: { action: 'click', success: true, changes?: string }
+  Markdown format: Changes detected + action confirmation
+
+Examples:
+  - "Click button" -> { uid: "abc123" }
+  - "Double click" -> { uid: "abc123", dblClick: true }
+
+**Parameters:**
+
+- **uid** (string) **(required)**: The uid of an element on the page from the page content snapshot
+- **dblClick** (boolean) _(optional)_: Set to true for double clicks. Default is false.
+- **includeSnapshot** (boolean) _(optional)_: Whether to include a snapshot in the response. Default is false.
+- **response_format** (unknown) _(optional)_: Output format: "markdown" for human-readable or "json" for machine-readable structured data.
+
+---
+
+### `mouse_drag`
+
+**Description:** Drag an element onto another element.
+
+Args:
+  - from_uid (string): Element uid to drag
+  - to_uid (string): Element uid to drop onto
+  - includeSnapshot (boolean): Include full snapshot. Default: false
+  - response_format ('markdown'|'json'): Output format. Default: 'markdown'
+
+Returns:
+  JSON format: { action: 'drag', success: true, changes?: string }
+  Markdown format: Changes detected + action confirmation
+
+**Parameters:**
+
+- **from_uid** (string) **(required)**: The uid of the element to drag
+- **to_uid** (string) **(required)**: The uid of the element to drop into
+- **includeSnapshot** (boolean) _(optional)_: Whether to include a snapshot in the response. Default is false.
+- **response_format** (unknown) _(optional)_: Output format: "markdown" for human-readable or "json" for machine-readable structured data.
+
+---
+
+### `mouse_hover`
+
+**Description:** Hover over the provided element.
+
+Args:
+  - uid (string): Element uid from page snapshot
+  - includeSnapshot (boolean): Include full snapshot. Default: false
+  - response_format ('markdown'|'json'): Output format. Default: 'markdown'
+
+Returns:
+  JSON format: { action: 'hover', success: true, changes?: string }
+  Markdown format: Changes detected + action confirmation
+
+**Parameters:**
+
+- **uid** (string) **(required)**: The uid of an element on the page from the page content snapshot
+- **includeSnapshot** (boolean) _(optional)_: Whether to include a snapshot in the response. Default is false.
+- **response_format** (unknown) _(optional)_: Output format: "markdown" for human-readable or "json" for machine-readable structured data.
+
+---
+
+### `mouse_scroll`
+
+**Description:** Scroll an element into view, or scroll within a scrollable element in a given direction. If no direction is provided, the element is simply scrolled into the viewport.
+
+Args:
+  - uid (string): Element uid from page snapshot
+  - direction ('up'|'down'|'left'|'right'): Scroll direction. Optional
+  - amount (number): Scroll distance in pixels. Default: 300
+  - includeSnapshot (boolean): Include full snapshot. Default: false
+  - response_format ('markdown'|'json'): Output format. Default: 'markdown'
+
+Returns:
+  JSON format: { action: 'scroll', direction?, amount?, success: true, changes?: string }
+  Markdown format: Changes detected + scroll confirmation
+
+Examples:
+  - "Scroll element into view" -> { uid: "abc123" }
+  - "Scroll down 500px" -> { uid: "abc123", direction: "down", amount: 500 }
+
+**Parameters:**
+
+- **uid** (string) **(required)**: The uid of an element on the page from the page content snapshot
+- **amount** (number) _(optional)_: Scroll distance in pixels. Default is 300.
+- **direction** (enum: "up", "down", "left", "right") _(optional)_: Direction to scroll within the element. If omitted, the element is scrolled into view without additional scrolling.
 - **includeSnapshot** (boolean) _(optional)_: Whether to include a snapshot in the response. Default is false.
 - **response_format** (unknown) _(optional)_: Output format: "markdown" for human-readable or "json" for machine-readable structured data.
 
@@ -201,159 +194,6 @@ Error Handling:
 
 - **durationMs** (integer) **(required)**: Duration to [`wait`](#wait) in milliseconds. Must be between 0 and 30000 (30 seconds).
 - **reason** (string) _(optional)_: Optional reason for waiting (e.g., "waiting for animation to complete"). Included in the response for context.
-- **response_format** (unknown) _(optional)_: Output format: "markdown" for human-readable or "json" for machine-readable structured data.
-
----
-
-## Performance
-
-### `performance_analyze_insight`
-
-**Description:** Provides more detailed information on a specific Performance Insight of an insight set that was highlighted in the results of a trace recording.
-
-Args:
-  - insightSetId (string): Insight set ID from "Available insight sets" list
-  - insightName (string): Insight name (e.g., "DocumentLatency", "LCPBreakdown")
-  - response_format ('markdown'|'json'): Output format. Default: 'markdown'
-
-Returns:
-  Detailed insight analysis with recommendations
-
-Examples:
-  - "Analyze LCP breakdown" -> { insightSetId: "main-frame", insightName: "LCPBreakdown" }
-  - "Check document latency" -> { insightSetId: "main-frame", insightName: "DocumentLatency" }
-
-Error Handling:
-  - Returns "No recorded traces found." if no trace has been recorded
-
-**Parameters:**
-
-- **insightName** (string) **(required)**: The name of the Insight you want more information on. For example: "DocumentLatency" or "LCPBreakdown"
-- **insightSetId** (string) **(required)**: The id for the specific insight set. Only use the ids given in the "Available insight sets" list.
-- **response_format** (unknown) _(optional)_: Output format: "markdown" for human-readable or "json" for machine-readable structured data.
-
----
-
-### `performance_start_trace`
-
-**Description:** Starts a performance trace recording on the selected page. This can be used to look for performance problems and insights to improve the performance of the page. It will also report Core Web Vital (CWV) scores for the page.
-
-Args:
-  - reload (boolean): Reload page after starting trace. Navigate to desired URL BEFORE calling
-  - autoStop (boolean): Auto-stop trace after 5 seconds
-  - filePath (string): Save raw trace to file (e.g., trace.json.gz)
-  - response_format ('markdown'|'json'): Output format. Default: 'markdown'
-
-Returns:
-  JSON format: { status: 'recording'|'completed', message, filePath? }
-  Markdown format: Recording status or trace analysis summary
-
-Examples:
-  - "Record page load" -> { reload: true, autoStop: true }
-  - "Start manual recording" -> { reload: false, autoStop: false }
-  - "Save trace" -> { reload: true, autoStop: true, filePath: "trace.json.gz" }
-
-Error Handling:
-  - Returns error if trace is already running
-  - Only one trace can run at a time
-
-**Parameters:**
-
-- **autoStop** (boolean) **(required)**: Determines if the trace recording should be automatically stopped.
-- **reload** (boolean) **(required)**: Determines if, once tracing has started, the current selected page should be automatically reloaded. Ensure the page is at the correct URL BEFORE starting the trace if reload or autoStop is set to true.
-- **filePath** (string) _(optional)_: The absolute file path, or a file path relative to the current working directory, to save the raw trace data. For example, trace.json.gz (compressed) or trace.json (uncompressed).
-- **response_format** (unknown) _(optional)_: Output format: "markdown" for human-readable or "json" for machine-readable structured data.
-
----
-
-### `performance_stop_trace`
-
-**Description:** Stops the active performance trace recording on the selected page.
-
-Args:
-  - filePath (string): Save raw trace to file (e.g., trace.json.gz)
-  - response_format ('markdown'|'json'): Output format. Default: 'markdown'
-
-Returns:
-  JSON format: { status: 'stopped'|'not_running', message, filePath? }
-  Markdown format: Trace stopped confirmation + analysis summary
-
-Examples:
-  - "Stop and analyze" -> {}
-  - "Stop and save" -> { filePath: "trace.json.gz" }
-
-Error Handling:
-  - Returns "No performance trace is currently running." if no trace active
-
-**Parameters:**
-
-- **filePath** (string) _(optional)_: The absolute file path, or a file path relative to the current working directory, to save the raw trace data. For example, trace.json.gz (compressed) or trace.json (uncompressed).
-- **response_format** (unknown) _(optional)_: Output format: "markdown" for human-readable or "json" for machine-readable structured data.
-
----
-
-## Network
-
-### `get_network_request`
-
-**Description:** Gets a network request by an optional reqid, if omitted returns the currently selected request in the DevTools Network panel.
-
-Args:
-  - reqid (number): Request ID from [`list_network_requests`](#list_network_requests) output
-  - requestFilePath (string): Save request body to file path
-  - responseFilePath (string): Save response body to file path
-  - response_format ('markdown'|'json'): Output format. Default: 'markdown'
-
-Returns:
-  JSON format: { id, url, method, resourceType, status?, headers?, requestBody?, responseBody? }
-  Markdown format: Formatted request details with headers and bodies
-
-Examples:
-  - "Get request 5" -> { reqid: 5 }
-  - "Save response to file" -> { reqid: 5, responseFilePath: "./response.json" }
-
-Error Handling:
-  - Returns "Please provide a reqid" if reqid is not provided
-  - Returns "Network request with id X not found." if request doesn't exist
-
-**Parameters:**
-
-- **reqid** (number) _(optional)_: The reqid of the network request. If omitted returns the currently selected request in the DevTools Network panel.
-- **requestFilePath** (string) _(optional)_: The absolute or relative path to save the request body to. If omitted, the body is returned inline.
-- **response_format** (unknown) _(optional)_: Output format: "markdown" for human-readable or "json" for machine-readable structured data.
-- **responseFilePath** (string) _(optional)_: The absolute or relative path to save the response body to. If omitted, the body is returned inline.
-
----
-
-### `list_network_requests`
-
-**Description:** List all requests for the currently selected page since the last navigation.
-
-Args:
-  - pageSize (number): Maximum requests to return. Default: all
-  - pageIdx (number): Page number (0-based) for pagination. Default: 0
-  - resourceTypes (string[]): Filter by resource types (document, xhr, fetch, script, etc.)
-  - includePreservedRequests (boolean): Include requests from last 3 navigations. Default: false
-  - response_format ('markdown'|'json'): Output format. Default: 'markdown'
-
-Returns:
-  JSON format: { total, count, offset, has_more, next_offset?, requests: [{id, url, method, resourceType, status?, failed?}] }
-  Markdown format: Formatted request list with reqid, method, URL, status
-
-Examples:
-  - "Show XHR and fetch requests" -> { resourceTypes: ['xhr', 'fetch'] }
-  - "Get first 10 requests as JSON" -> { pageSize: 10, response_format: 'json' }
-
-Error Handling:
-  - Returns "No network requests found." if no requests match filters
-  - Returns error if response exceeds 25000 chars
-
-**Parameters:**
-
-- **includePreservedRequests** (boolean) _(optional)_: Set to true to return the preserved requests over the last 3 navigations.
-- **pageIdx** (integer) _(optional)_: Page number to return (0-based). When omitted, returns the first page.
-- **pageSize** (integer) _(optional)_: Maximum number of requests to return. When omitted, returns all requests.
-- **resourceTypes** (array) _(optional)_: Filter requests to only return requests of the specified resource types. When omitted or empty, returns all requests.
 - **response_format** (unknown) _(optional)_: Output format: "markdown" for human-readable or "json" for machine-readable structured data.
 
 ---
@@ -409,7 +249,7 @@ Args:
   - response_format ('markdown'|'json'): Output format. Default: 'markdown'
 
 Returns:
-  JSON format: { id, [`type`](#type), text, timestamp, args?, stackTrace? }
+  JSON format: { id, type, text, timestamp, args?, stackTrace? }
   Markdown format: Formatted message details with arguments and stack trace
 
 Examples:
@@ -485,8 +325,8 @@ Args:
   - response_format ('markdown'|'json'): Output format. Default: 'markdown'
 
 Returns:
-  JSON format: { total, count, offset, has_more, next_offset?, messages: [{id, [`type`](#type), text, timestamp, stackTrace?}] }
-  Markdown format: Formatted list with msgid, [`type`](#type) tag, text, and first stack frame
+  JSON format: { total, count, offset, has_more, next_offset?, messages: [{id, type, text, timestamp, stackTrace?}] }
+  Markdown format: Formatted list with msgid, type tag, text, and first stack frame
 
 Examples:
   - "Show only errors" -> { types: ['error'] }
@@ -551,7 +391,7 @@ Args:
   - response_format ('markdown'|'json'): Output format. Default: 'markdown'
 
 Returns:
-  JSON format: { success: true, [`type`](#type), format, savedTo?, sizeBytes?, attached? }
+  JSON format: { success: true, type, format, savedTo?, sizeBytes?, attached? }
   Markdown format: Description + inline image or file save confirmation
 
 Examples:
@@ -567,7 +407,7 @@ Error Handling:
 **Parameters:**
 
 - **filePath** (string) _(optional)_: The absolute path, or a path relative to the current working directory, to save the screenshot to instead of attaching it to the response.
-- **format** (enum: "png", "jpeg", "webp") _(optional)_: [`Type`](#type) of format to save the screenshot as. Default is "png"
+- **format** (enum: "png", "jpeg", "webp") _(optional)_: Type of format to save the screenshot as. Default is "png"
 - **fullPage** (boolean) _(optional)_: If set to true takes a screenshot of the full page instead of the currently visible viewport. Incompatible with uid.
 - **quality** (number) _(optional)_: Compression quality for JPEG and WebP formats (0-100). Higher values mean better quality but larger file sizes. Ignored for PNG format.
 - **response_format** (unknown) _(optional)_: Output format: "markdown" for human-readable or "json" for machine-readable structured data.

@@ -12,18 +12,17 @@ Use this skill when:
 - Inspecting the DOM/state of VS Code webviews
 - Automating VS Code UI interactions for testing
 - Taking screenshots for documentation or debugging
-- Monitoring network requests in extensions
 - Evaluating JavaScript in the VS Code debug context
 
 ## Available Tool Categories
 
 ### Input Automation
-- `click` - Click on UI elements in VS Code
-- `drag` - Drag elements from one position to another
-- `type` - Type text into input fields
-- `hover` - Hover over elements to trigger tooltips/menus
-- `hotkey` - Send keyboard shortcuts
-- `scroll` - Scroll within VS Code views
+- `mouse_click` - Click on UI elements in VS Code
+- `mouse_drag` - Drag elements from one position to another
+- `keyboard_type` - Type text into input fields
+- `mouse_hover` - Hover over elements to trigger tooltips/menus
+- `keyboard_hotkey` - Send keyboard shortcuts
+- `mouse_scroll` - Scroll within VS Code views
 
 ### Inspection and Debugging
 - `snapshot` - Get the current DOM state of VS Code
@@ -32,8 +31,6 @@ Use this skill when:
 - `screenshot` - Capture screenshots of VS Code window
 
 ### Monitoring
-- `network` - Monitor network requests made by extensions
-- `performance` - Profile extension performance
 - `output-panel` - Read from VS Code output panels
 
 ### Script Execution
@@ -78,7 +75,6 @@ The MCP server accepts these flags:
 
 - Requires VS Code to be running with CDP enabled
 - Some VS Code internals may not be accessible via CDP
-- Performance profiling has overhead
 
 ## Troubleshooting
 

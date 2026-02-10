@@ -22,7 +22,6 @@ import {
   type CallToolResult,
   SetLevelRequestSchema,
 } from './third_party/index.js';
-import {ToolCategory} from './tools/categories.js';
 import type {ToolDefinition} from './tools/ToolDefinition.js';
 import {tools} from './tools/tools.js';
 import {ensureVSCodeConnected, stopDebugWindow, runHostShellTaskOrThrow} from './vscode.js';
@@ -112,18 +111,6 @@ const toolMutex = new Mutex();
 
 function registerTool(tool: ToolDefinition): void {
   if (
-    tool.annotations.category === ToolCategory.PERFORMANCE &&
-    config.categoryPerformance === false
-  ) {
-    return;
-  }
-  if (
-    tool.annotations.category === ToolCategory.NETWORK &&
-    config.categoryNetwork === false
-  ) {
-    return;
-  }
-  if (
     tool.annotations.conditions?.includes('computerVision') &&
     !config.experimentalVision
   ) {
@@ -193,7 +180,7 @@ function registerTool(tool: ToolDefinition): void {
           // NON-BLOCKING notifications (toasts) → Prepend banner, let tool proceed.
           //
           // Input tools bypass blocking UI so the user can dismiss dialogs via MCP.
-          const inputTools = ['hotkey', 'click', 'hover', 'drag', 'type', 'scroll'];
+          const inputTools = ['keyboard_hotkey', 'mouse_click', 'mouse_hover', 'mouse_drag', 'keyboard_type', 'mouse_scroll'];
           const isInputTool = inputTools.includes(tool.name);
           
           const uiCheck = await checkForBlockingUI();

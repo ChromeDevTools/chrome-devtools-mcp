@@ -5,7 +5,6 @@
  */
 
 import {zod} from '../third_party/index.js';
-import type {InsightName, TraceResult} from '../trace-processing/parse.js';
 
 import type {ToolCategory} from './categories.js';
 

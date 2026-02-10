@@ -7,9 +7,7 @@
 import * as consoleTools from './console.js';
 import * as debugEvaluateTools from './debug-evaluate.js';
 import * as inputTools from './input.js';
-import * as networkTools from './network.js';
 import * as outputPanelTools from './output-panel.js';
-import * as performanceTools from './performance.js';
 import * as screenshotTools from './screenshot.js';
 import * as scriptTools from './script.js';
 import * as snapshotTools from './snapshot.js';
@@ -20,9 +18,7 @@ const tools = [
   ...Object.values(consoleTools),
   ...Object.values(debugEvaluateTools),
   ...Object.values(inputTools),
-  ...Object.values(networkTools),
   ...Object.values(outputPanelTools),
-  ...Object.values(performanceTools),
   ...Object.values(screenshotTools),
   ...Object.values(scriptTools),
   ...Object.values(snapshotTools),

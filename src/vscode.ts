@@ -60,7 +60,6 @@ interface CdpVersionInfo {
 // ── Module State (singleton — max one child at a time) ──
 
 let cdpWs: WebSocket | undefined;
-let browserCdpWs: WebSocket | undefined;
 let cdpPort: number | undefined;
 let inspectorPort: number | undefined;
 let hostBridgePath: string | undefined;
@@ -138,10 +137,6 @@ export function getDevhostBridgePath(): string | undefined {
 
 export function isConnected(): boolean {
   return cdpWs?.readyState === WebSocket.OPEN;
-}
-
-export function getBrowserCdpWebSocket(): WebSocket | undefined {
-  return browserCdpWs;
 }
 
 // ── Port Polling ────────────────────────────────────────
@@ -604,13 +599,6 @@ export function teardownSync(): void {
     // best-effort
   }
   cdpWs = undefined;
-
-  try {
-    browserCdpWs?.close();
-  } catch {
-    // best-effort
-  }
-  browserCdpWs = undefined;
 
   forceKillChildSync();
 
@@ -1090,30 +1078,11 @@ async function doConnect(options: VSCodeLaunchOptions): Promise<WebSocket> {
   );
   cdpWs = await connectCdpWebSocket(workbench.webSocketDebuggerUrl);
 
-  // 8b. Connect browser-level CDP WebSocket for Tracing domain
-  //     Tracing is a browser-level CDP domain that requires a connection
-  //     to the browser target, not a page target.
-  if (versionInfo.webSocketDebuggerUrl) {
-    try {
-      browserCdpWs = await connectCdpWebSocket(versionInfo.webSocketDebuggerUrl);
-      logger('Browser-level CDP WebSocket connected (for tracing)');
-
-      browserCdpWs.on('close', () => {
-        logger('Browser CDP WebSocket closed');
-        browserCdpWs = undefined;
-      });
-    } catch (err) {
-      logger(`Warning: could not connect browser-level CDP: ${(err as Error).message}. Tracing will not work.`);
-    }
-  } else {
-    logger('Warning: browser webSocketDebuggerUrl not available — tracing will not work');
-  }
-
   // 9. Enable CDP domains and wait for readiness
   await sendCdp('Runtime.enable', {}, cdpWs);
   await sendCdp('Page.enable', {}, cdpWs);
 
-  // 9a. Initialize CDP event subscriptions for console/network/tracing
+  // 9a. Initialize CDP event subscriptions for console messages
   await initCdpEventSubscriptions();
 
   await waitForWorkbenchReady(cdpWs);
@@ -1147,12 +1116,6 @@ export async function stopDebugWindow(): Promise<void> {
     // best-effort
   }
 
-  try {
-    browserCdpWs?.close();
-  } catch {
-    // best-effort
-  }
-
   if (hostBridgePath) {
     try {
       await bridgeExec(hostBridgePath, 'await vscode.debug.stopDebugging();');
@@ -1167,7 +1130,6 @@ export async function stopDebugWindow(): Promise<void> {
   // The user can manually delete .devtools/ to reset.
 
   cdpWs = undefined;
-  browserCdpWs = undefined;
   cdpPort = undefined;
   inspectorPort = undefined;
   hostBridgePath = undefined;

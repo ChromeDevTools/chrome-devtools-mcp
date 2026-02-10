@@ -88,14 +88,6 @@ const DEFAULT_CONFIG_TEMPLATE = `// VS Code DevTools MCP configuration (JSONC)
   // Enable experimental structured content output.
   "experimentalStructuredContent": false,
 
-  // Tool category toggles.
-  "categories": {
-    // Enable performance tools.
-    "performance": true,
-    // Enable network tools.
-    "network": true,
-  },
-
   // VS Code launch flags for the spawned Extension Development Host window.
   "launch": {
     // Open the target workspace in a new window.
@@ -154,12 +146,6 @@ export interface DevToolsConfig {
   /** Enable experimental structured content output */
   experimentalStructuredContent?: boolean;
 
-  /** Category toggles */
-  categories?: {
-    performance?: boolean;
-    network?: boolean;
-  };
-
   /** VS Code launch flags for the Extension Development Host window */
   launch?: Partial<LaunchFlags>;
 }
@@ -180,8 +166,6 @@ export interface ResolvedConfig {
   headless: boolean;
   experimentalVision: boolean;
   experimentalStructuredContent: boolean;
-  categoryPerformance: boolean;
-  categoryNetwork: boolean;
   launch: LaunchFlags;
 }
 
@@ -245,18 +229,6 @@ function coerceDevToolsConfig(value: unknown): DevToolsConfig {
   );
   if (typeof experimentalStructuredContent === 'boolean') {
     config.experimentalStructuredContent = experimentalStructuredContent;
-  }
-
-  const categoriesValue = value['categories'];
-  if (isRecord(categoriesValue)) {
-    const performance = readOptionalBoolean(categoriesValue, 'performance');
-    const network = readOptionalBoolean(categoriesValue, 'network');
-    if (typeof performance === 'boolean' || typeof network === 'boolean') {
-      config.categories = {
-        performance,
-        network,
-      };
-    }
   }
 
   const launchValue = value['launch'];
@@ -334,10 +306,6 @@ function loadConfigFile(workspaceFolder: string): DevToolsConfig {
     mkdirSync(configDirPreferred, {recursive: true});
     writeFileSync(configPathJsoncPreferred, DEFAULT_CONFIG_TEMPLATE + '\n');
     return {
-      categories: {
-        performance: true,
-        network: true,
-      },
       launch: {...DEFAULT_LAUNCH_FLAGS},
     };
   }
@@ -429,8 +397,6 @@ export function loadConfig(cliArgs: {
   headless?: boolean;
   experimentalVision?: boolean;
   experimentalStructuredContent?: boolean;
-  categoryPerformance?: boolean;
-  categoryNetwork?: boolean;
 }): ResolvedConfig {
   // Workspace folder priority: CLI --test-workspace > legacy --workspace > legacy --folder
   const workspaceFolder =
@@ -491,10 +457,6 @@ export function loadConfig(cliArgs: {
       cliArgs.experimentalStructuredContent ??
       fileConfig.experimentalStructuredContent ??
       false,
-    categoryPerformance:
-      cliArgs.categoryPerformance ?? fileConfig.categories?.performance ?? true,
-    categoryNetwork:
-      cliArgs.categoryNetwork ?? fileConfig.categories?.network ?? true,
     launch: resolveLaunchFlags(fileConfig.launch),
   };
 }
