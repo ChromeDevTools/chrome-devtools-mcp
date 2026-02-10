@@ -278,10 +278,12 @@ export function clearAllData(): void {
 }
 
 /**
- * Get all console messages, optionally filtered by type.
+ * Get all console messages, optionally filtered by type, text content, or source URL.
  */
 export function getConsoleMessages(options?: {
   types?: string[];
+  textFilter?: string;
+  sourceFilter?: string;
   pageSize?: number;
   pageIdx?: number;
 }): {messages: ConsoleMessage[]; total: number} {
@@ -290,6 +292,18 @@ export function getConsoleMessages(options?: {
   if (options?.types?.length) {
     const typeSet = new Set(options.types);
     filtered = filtered.filter(m => typeSet.has(m.type));
+  }
+
+  if (options?.textFilter) {
+    const needle = options.textFilter.toLowerCase();
+    filtered = filtered.filter(m => m.text.toLowerCase().includes(needle));
+  }
+
+  if (options?.sourceFilter) {
+    const needle = options.sourceFilter.toLowerCase();
+    filtered = filtered.filter(m =>
+      m.stackTrace?.some(frame => frame.url.toLowerCase().includes(needle)),
+    );
   }
 
   const total = filtered.length;

@@ -66,6 +66,83 @@ describe('console', () => {
       });
     });
 
+    describe('textFilter', () => {
+      it('returns only messages matching the text substring', async () => {
+        await withMcpContext(async (response, context) => {
+          const page = await context.newPage();
+          await page.setContent(
+            '<script>console.log("hello world"); console.log("goodbye world"); console.error("hello error");</script>',
+          );
+          await listConsoleMessages.handler(
+            {params: {textFilter: 'hello'}},
+            response,
+            context,
+          );
+          const formattedResponse = await response.handle('test', context);
+          const textContent = getTextContent(formattedResponse.content[0]);
+          assert.ok(textContent.includes('hello world'));
+          assert.ok(textContent.includes('hello error'));
+          assert.ok(!textContent.includes('goodbye world'));
+        });
+      });
+
+      it('is case-insensitive', async () => {
+        await withMcpContext(async (response, context) => {
+          const page = await context.newPage();
+          await page.setContent(
+            '<script>console.log("Hello World"); console.log("other message");</script>',
+          );
+          await listConsoleMessages.handler(
+            {params: {textFilter: 'hello'}},
+            response,
+            context,
+          );
+          const formattedResponse = await response.handle('test', context);
+          const textContent = getTextContent(formattedResponse.content[0]);
+          assert.ok(textContent.includes('Hello World'));
+          assert.ok(!textContent.includes('other message'));
+        });
+      });
+
+      it('returns no messages when nothing matches', async () => {
+        await withMcpContext(async (response, context) => {
+          const page = await context.newPage();
+          await page.setContent(
+            '<script>console.log("hello world");</script>',
+          );
+          await listConsoleMessages.handler(
+            {params: {textFilter: 'nonexistent'}},
+            response,
+            context,
+          );
+          const formattedResponse = await response.handle('test', context);
+          const textContent = getTextContent(formattedResponse.content[0]);
+          assert.ok(textContent.includes('No console messages found.'));
+        });
+      });
+    });
+
+    describe('combined filters', () => {
+      it('applies textFilter together with types filter', async () => {
+        await withMcpContext(async (response, context) => {
+          const page = await context.newPage();
+          await page.setContent(
+            '<script>console.log("hello log"); console.error("hello error"); console.log("goodbye log");</script>',
+          );
+          await listConsoleMessages.handler(
+            {params: {types: ['error'], textFilter: 'hello'}},
+            response,
+            context,
+          );
+          const formattedResponse = await response.handle('test', context);
+          const textContent = getTextContent(formattedResponse.content[0]);
+          assert.ok(textContent.includes('hello error'));
+          assert.ok(!textContent.includes('hello log'));
+          assert.ok(!textContent.includes('goodbye log'));
+        });
+      });
+    });
+
     describe('issues', () => {
       it('lists issues', async () => {
         await withMcpContext(async (response, context) => {

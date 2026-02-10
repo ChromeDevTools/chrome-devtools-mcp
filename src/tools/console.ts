@@ -66,6 +66,18 @@ export const listConsoleMessages = defineTool({
       .describe(
         'Filter messages to only return messages of the specified resource types. When omitted or empty, returns all messages.',
       ),
+    textFilter: zod
+      .string()
+      .optional()
+      .describe(
+        'Case-insensitive substring to match against the message text. Only messages whose text contains this string are returned.',
+      ),
+    sourceFilter: zod
+      .string()
+      .optional()
+      .describe(
+        'Substring to match against the source URL in the stack trace. Only messages originating from a matching source are returned.',
+      ),
     includePreservedMessages: zod
       .boolean()
       .default(false)
@@ -77,6 +89,8 @@ export const listConsoleMessages = defineTool({
   handler: async (request, response) => {
     const {messages, total} = getConsoleMessages({
       types: request.params.types,
+      textFilter: request.params.textFilter,
+      sourceFilter: request.params.sourceFilter,
       pageSize: request.params.pageSize,
       pageIdx: request.params.pageIdx,
     });

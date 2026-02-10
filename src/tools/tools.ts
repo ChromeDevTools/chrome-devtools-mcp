@@ -12,6 +12,7 @@ import * as performanceTools from './performance.js';
 import * as screenshotTools from './screenshot.js';
 import * as scriptTools from './script.js';
 import * as snapshotTools from './snapshot.js';
+import * as waitTools from './wait.js';
 import type {ToolDefinition} from './ToolDefinition.js';
 
 const tools = [
@@ -23,6 +24,7 @@ const tools = [
   ...Object.values(screenshotTools),
   ...Object.values(scriptTools),
   ...Object.values(snapshotTools),
+  ...Object.values(waitTools),
 ] as ToolDefinition[];
 
 tools.sort((a, b) => {
