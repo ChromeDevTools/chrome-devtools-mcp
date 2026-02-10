@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
 
-import {sendCdp} from '../browser.js';
+import {sendCdp} from '../vscode.js';
 import {startTrace as cdpStartTrace, stopTrace as cdpStopTrace, getTraceData} from '../cdp-events.js';
 import {logger} from '../logger.js';
 import {zod, DevTools} from '../third_party/index.js';

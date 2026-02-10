@@ -13,7 +13,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
-import {getUserDataDir} from '../browser.js';
+import {getUserDataDir} from '../vscode.js';
 import {zod} from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';

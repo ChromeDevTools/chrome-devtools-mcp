@@ -10,7 +10,7 @@
  * for interactive tools (click, fill, hover, etc.).
  */
 
-import {sendCdp} from './browser.js';
+import {sendCdp} from './vscode.js';
 import {logger} from './logger.js';
 
 // ── CDP Accessibility Types ──

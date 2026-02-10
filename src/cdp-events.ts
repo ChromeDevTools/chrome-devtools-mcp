@@ -18,7 +18,7 @@
  */
 
 import WebSocket from 'ws';
-import {sendCdp, getCdpWebSocket, getConnectionGeneration} from './browser.js';
+import {sendCdp, getCdpWebSocket, getConnectionGeneration} from './vscode.js';
 import {logger} from './logger.js';
 
 // ── Types ───────────────────────────────────────────────

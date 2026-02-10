@@ -22,7 +22,7 @@ import {
   CHARACTER_LIMIT,
   checkCharacterLimit,
 } from './ToolDefinition.js';
-import {getDevhostBridgePath} from '../browser.js';
+import {getDevhostBridgePath} from '../vscode.js';
 import {bridgeExec} from '../bridge-client.js';
 
 const DebugEvaluateOutputSchema = zod.object({

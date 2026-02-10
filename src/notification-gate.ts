@@ -15,7 +15,7 @@
  * while toast notifications are informational and don't prevent work.
  */
 
-import {sendCdp} from './browser.js';
+import {sendCdp} from './vscode.js';
 import {logger} from './logger.js';
 
 // ── Types ──

@@ -8,7 +8,7 @@ import './polyfill.js';
 
 import process from 'node:process';
 
-import {ensureVSCodeConnected, getConnectionGeneration, getPuppeteerBrowser} from './browser.js';
+import {ensureVSCodeConnected, getConnectionGeneration, getPuppeteerBrowser} from './vscode.js';
 import {checkForBlockingUI} from './notification-gate.js';
 import {parseArguments} from './cli.js';
 import {loadConfig, type ResolvedConfig} from './config.js';
