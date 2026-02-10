@@ -17,10 +17,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v3
+        uses: astral-sh/setup-uv@v7
 
       - name: Init schema (idempotent)
         env:
@@ -47,11 +47,7 @@ jobs:
           fi
           cd odds
           uv run python -m odds_pipeline train --window-days 5 > /tmp/train.json
-          model_version="$(python - <<'PY'
-import json
-print(json.load(open("artifacts/model.json"))["model_version"])
-PY
-)"
+          model_version="$(python -c 'import json; print(json.load(open(\"artifacts/model.json\"))[\"model_version\"])')"
           echo "model_version=$model_version" >> "$GITHUB_OUTPUT"
 
       - name: Predict
