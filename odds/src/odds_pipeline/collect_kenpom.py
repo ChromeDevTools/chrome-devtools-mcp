@@ -120,12 +120,23 @@ def collect_kenpom_fanmatch(*, game_date: date) -> int:
 
     with connect(settings.database_url) as conn:
         with conn.cursor() as cur:
-            for r in records:
+            for idx, r in enumerate(records):
                 # KenPom seasons use the end-year convention for college hoops.
                 # Example: games in Nov/Dec 2025 belong to the 2026 season.
                 season = game_date.year + 1 if game_date.month >= 7 else game_date.year
 
-                # FanMatch rows may have matchup/team columns; store under team='__fanmatch__'
+                # FanMatch is conceptually game-level data, but we store it in the
+                # team-metrics table. Use a per-row key so the UNIQUE(season, team,
+                # metric_type, collected_at) constraint does not collapse rows.
+                # Prefer a matchup-like column if present; otherwise fall back to
+                # a synthetic stable row key.
+                matchup_key = None
+                for candidate in ("Matchup", "matchup", "Game", "game"):
+                    if candidate in r and r[candidate]:
+                        matchup_key = str(r[candidate])
+                        break
+                team_key = matchup_key or f"__fanmatch_row_{idx}"
+
                 cur.execute(
                     """
                     INSERT INTO raw_kenpom_team_metrics (
@@ -137,7 +148,7 @@ def collect_kenpom_fanmatch(*, game_date: date) -> int:
                     """,
                     {
                         "season": int(season),
-                        "team": "__fanmatch__",
+                        "team": team_key,
                         "metric_type": "fanmatch",
                         "collected_at": collected_at,
                         "raw": json.dumps(r),
