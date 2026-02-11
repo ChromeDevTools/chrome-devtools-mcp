@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import {describe, it} from 'node:test';
 
 import type {cliOptions} from '../../src/cli.js';
-import {computeFlagUsage} from '../../src/telemetry/flag-utils.js';
+import {computeFlagUsage} from '../../src/telemetry/flagUtils.js';
 
 describe('computeFlagUsage', () => {
   const mockOptions = {

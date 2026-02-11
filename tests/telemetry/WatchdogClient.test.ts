@@ -12,7 +12,7 @@ import {describe, it, afterEach, beforeEach} from 'node:test';
 import sinon from 'sinon';
 
 import {OsType, WatchdogMessageType} from '../../src/telemetry/types.js';
-import {WatchdogClient} from '../../src/telemetry/watchdog-client.js';
+import {WatchdogClient} from '../../src/telemetry/WatchdogClient.js';
 
 describe('WatchdogClient', () => {
   let spawnStub: sinon.SinonStub;

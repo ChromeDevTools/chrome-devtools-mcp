@@ -11,7 +11,7 @@ import {logger} from '../logger.js';
 import type {LocalState, Persistence} from './persistence.js';
 import {FilePersistence} from './persistence.js';
 import {type FlagUsage, WatchdogMessageType, OsType} from './types.js';
-import {WatchdogClient} from './watchdog-client.js';
+import {WatchdogClient} from './WatchdogClient.js';
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 

@@ -12,7 +12,7 @@ import sinon from 'sinon';
 
 import {OsType} from '../../../src/telemetry/types.js';
 import type {LogRequest} from '../../../src/telemetry/types.js';
-import {ClearcutSender} from '../../../src/telemetry/watchdog/clearcut-sender.js';
+import {ClearcutSender} from '../../../src/telemetry/watchdog/ClearcutSender.js';
 
 const FLUSH_INTERVAL_MS = 15 * 1000;
 

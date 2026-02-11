@@ -7,7 +7,7 @@
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
-import {bucketizeLatency} from '../../src/telemetry/metric-utils.js';
+import {bucketizeLatency} from '../../src/telemetry/metricUtils.js';
 
 describe('bucketizeLatency', () => {
   it('should bucketize values correctly', () => {

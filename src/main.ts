@@ -16,9 +16,9 @@ import {logger, saveLogsToFile} from './logger.js';
 import {McpContext} from './McpContext.js';
 import {McpResponse} from './McpResponse.js';
 import {Mutex} from './Mutex.js';
-import {ClearcutLogger} from './telemetry/clearcut-logger.js';
-import {computeFlagUsage} from './telemetry/flag-utils.js';
-import {bucketizeLatency} from './telemetry/metric-utils.js';
+import {ClearcutLogger} from './telemetry/ClearcutLogger.js';
+import {computeFlagUsage} from './telemetry/flagUtils.js';
+import {bucketizeLatency} from './telemetry/metricUtils.js';
 import {
   McpServer,
   StdioServerTransport,
