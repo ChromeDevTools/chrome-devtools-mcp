@@ -439,11 +439,6 @@ function EmulationApp() {
   }
 
   function resetViewportButtons() {
-     // Restore default labels and icons if needed
-     // For now we just reset the text content to default if we want to be strict,
-     // but the requirement says "the mobile button should have device name and logo next to the current mobile logo"
-     // which implies we modify the button content permanently until reset.
-     
      // To implement this cleanly, we can revert innerHTML of buttons to their original state.
      // But since we are inside the app, we might need to store the original state or just rebuild it.
      // Hardcoding original state here for simplicity as we know the structure.
