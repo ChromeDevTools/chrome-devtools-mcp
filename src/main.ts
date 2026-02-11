@@ -263,7 +263,6 @@ function registerTool(tool: ToolDefinition): void {
 
 
 // Register UI Resource handlers.
-// Only throttling UI for now, but all resources should be registered here.
 server.server.setRequestHandler(ListResourcesRequestSchema, async () => ({
   resources: [
     {

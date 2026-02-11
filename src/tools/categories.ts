@@ -5,6 +5,7 @@
  */
 
 export enum ToolCategory {
+  UI = 'UI',
   INPUT = 'input',
   NAVIGATION = 'navigation',
   EMULATION = 'emulation',

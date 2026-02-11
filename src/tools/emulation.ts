@@ -347,7 +347,7 @@ export const emulateSetParameters = defineTool({
   name: 'emulate_set_parameters',
   description: `Sets emulation parameters (network throttling, CPU slowdown) on the selected page without opening a UI.`,
   annotations: {
-    category: 'UI' as unknown as ToolCategory,
+    category: ToolCategory.UI,
     readOnlyHint: false,
   },
   _meta: {

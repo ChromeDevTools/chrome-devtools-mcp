@@ -297,8 +297,6 @@ function EmulationApp() {
   });
   resizeObserver.observe(document.documentElement);
 
-  // ... CPU, Network, Color Scheme functions (same as before) ...
-  // ... CPU, Network, Color Scheme functions (same as before) ...
   function selectCPUThrottling(rate: number, btn: HTMLElement) {
     state.cpuThrottlingRate = rate;
     updateActiveButton('cpu-grid', btn);
@@ -394,9 +392,6 @@ function EmulationApp() {
   }
 
   function applySettings() {
-    // Custom rate is directly in state.cpuThrottlingRate from confirmCustomCPU
-    const finalRate = state.cpuThrottlingRate;
-    
     updateStatus('Applying emulation settings...');
     
     // Disable button and change text
@@ -407,7 +402,7 @@ function EmulationApp() {
     }
 
     sendToolsCall({
-      cpuThrottlingRate: finalRate,
+      cpuThrottlingRate: state.cpuThrottlingRate,
       networkConditions: state.networkConditions,
       geolocation: state.geolocation,
       colorScheme: state.colorScheme,
