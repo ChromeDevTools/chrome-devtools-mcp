@@ -19,6 +19,10 @@ describe('snapshotFormatter', () => {
       role: 'textbox',
       name: 'textbox',
       value: 'value',
+      live: 'polite',
+      relevant: 'additions',
+      errormessage: 'error-id',
+      details: 'details-id',
       children: [
         {
           id: '1_2',
@@ -39,7 +43,7 @@ describe('snapshotFormatter', () => {
     const formatted = formatter.toString();
     assert.strictEqual(
       formatted,
-      `uid=1_1 textbox "textbox" value="value"
+      `uid=1_1 textbox "textbox" details="details-id" errormessage="error-id" live="polite" relevant="additions" value="value"
   uid=1_2 statictext "text"
 `,
     );
@@ -51,6 +55,8 @@ describe('snapshotFormatter', () => {
       role: 'button',
       name: 'button',
       disabled: true,
+      busy: true,
+      atomic: true,
       children: [
         {
           id: '1_2',
@@ -71,7 +77,7 @@ describe('snapshotFormatter', () => {
     const formatted = formatter.toString();
     assert.strictEqual(
       formatted,
-      `uid=1_1 button "button" disableable disabled
+      `uid=1_1 button "button" atomic busy disableable disabled
   uid=1_2 statictext "text"
 `,
     );
@@ -261,6 +267,8 @@ describe('snapshotFormatter', () => {
       id: '1_1',
       role: 'root',
       name: 'root',
+      busy: true,
+      live: 'polite',
       children: [
         {
           id: '1_2',
@@ -281,6 +289,8 @@ describe('snapshotFormatter', () => {
       id: '1_1',
       role: 'root',
       name: 'root',
+      busy: true,
+      live: 'polite',
       children: [
         {
           id: '1_2',
