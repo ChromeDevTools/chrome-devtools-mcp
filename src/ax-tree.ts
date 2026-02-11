@@ -11,7 +11,7 @@
  */
 
 import {logger} from './logger.js';
-import {sendCdp} from './vscode.js';
+import {sendCdp, getAttachedTargets, type AttachedTargetInfo} from './vscode.js';
 
 // ── CDP Accessibility Types ──
 
@@ -45,6 +45,23 @@ let uidToAXNode = new Map<string, AXNode>();
 
 /** All AX nodes from the last snapshot, keyed by CDP nodeId. */
 let cdpNodeMap = new Map<string, AXNode>();
+
+/** Maps UIDs to their frame IDs for cross-frame interaction. */
+let uidToFrameId = new Map<string, string>();
+
+// ── Frame Types ──
+
+interface FrameInfo {
+  id: string;
+  name?: string;
+  url: string;
+  securityOrigin?: string;
+}
+
+interface FrameTreeNode {
+  frame: FrameInfo;
+  childFrames?: FrameTreeNode[];
+}
 
 // ── Formatting Constants ──
 
@@ -82,31 +99,103 @@ export interface AXTreeResult {
 }
 
 /**
- * Fetch the full AX tree via CDP, assign UIDs, store the mapping,
- * and return the formatted text.
+ * Collect all frames from the frame tree recursively.
  */
-export async function fetchAXTree(verbose: boolean): Promise<AXTreeResult> {
-  await sendCdp('Accessibility.enable');
-  const result = await sendCdp('Accessibility.getFullAXTree');
-  const nodes: AXNode[] = result.nodes ?? [];
+function collectFrames(node: FrameTreeNode): FrameInfo[] {
+  const frames: FrameInfo[] = [node.frame];
+  if (node.childFrames) {
+    for (const child of node.childFrames) {
+      frames.push(...collectFrames(child));
+    }
+  }
+  return frames;
+}
 
-  // Rebuild maps
-  const newUidMap = new Map<string, AXNode>();
-  const newCdpMap = new Map<string, AXNode>();
+/**
+ * Determine if a frame is a webview based on its URL or properties.
+ */
+function isWebviewFrame(frame: FrameInfo): boolean {
+  const url = frame.url.toLowerCase();
+  return url.includes('vscode-webview://') ||
+         url.includes('webview-panel') ||
+         url.includes('vscode-webview-resource://') ||
+         (frame.name?.includes('webview') ?? false);
+}
+
+/**
+ * Get a human-readable label for a frame.
+ */
+function getFrameLabel(frame: FrameInfo, isMain: boolean): string {
+  if (isMain) {
+    return 'Main Window';
+  }
+  if (isWebviewFrame(frame)) {
+    const nameMatch = frame.url.match(/vscode-webview:\/\/([^/]+)/);
+    if (nameMatch) {
+      return `Webview: ${nameMatch[1].substring(0, 20)}`;
+    }
+    return frame.name ? `Webview: ${frame.name}` : 'Webview';
+  }
+  return frame.name || `Frame: ${frame.id.substring(0, 8)}`;
+}
+
+/**
+ * Determine if a URL is a webview URL.
+ */
+function isWebviewUrl(url: string): boolean {
+  const lowerUrl = url.toLowerCase();
+  return lowerUrl.includes('vscode-webview://') ||
+         lowerUrl.includes('webview-panel') ||
+         lowerUrl.includes('vscode-webview-resource://');
+}
+
+/**
+ * Get a human-readable label for an OOPIF target.
+ */
+function getOOPIFLabel(target: AttachedTargetInfo): string {
+  if (isWebviewUrl(target.url)) {
+    const nameMatch = target.url.match(/vscode-webview:\/\/([^/]+)/);
+    if (nameMatch) {
+      return `OOPIF Webview: ${nameMatch[1].substring(0, 20)}`;
+    }
+    return target.title ? `OOPIF Webview: ${target.title}` : 'OOPIF Webview';
+  }
+  return target.title ? `OOPIF: ${target.title}` : `OOPIF: ${target.targetId.substring(0, 8)}`;
+}
+
+/**
+ * Format AX nodes from an OOPIF target.
+ */
+function formatOOPIFNodes(
+  nodes: AXNode[],
+  sessionId: string,
+  label: string,
+  baseDepth: number,
+  uidMap: Map<string, AXNode>,
+  cdpMap: Map<string, AXNode>,
+  uidToFrameIdMap: Map<string, string>,
+  verbose: boolean,
+  getNextUid: () => number,
+): string {
+  // Build local CDP map for this OOPIF
+  const localCdpMap = new Map<string, AXNode>();
   for (const node of nodes) {
-    newCdpMap.set(node.nodeId, node);
+    localCdpMap.set(node.nodeId, node);
+    cdpMap.set(`oopif:${sessionId}:${node.nodeId}`, node);
   }
 
   const roots = nodes.filter(n => !n.parentId);
-  let uidCounter = 0;
+  let result = '';
 
   function formatNode(node: AXNode, depth: number): string {
     const include = verbose || isInteresting(node);
 
-    let result = '';
+    let nodeOutput = '';
     if (include) {
-      const uid = `s0_${uidCounter++}`;
-      newUidMap.set(uid, node);
+      const uid = `s${getNextUid()}`;
+      uidMap.set(uid, node);
+      // Use sessionId as frameId for OOPIF interactions
+      uidToFrameIdMap.set(uid, `oopif:${sessionId}`);
 
       const parts: string[] = [`uid=${uid}`];
 
@@ -140,35 +229,316 @@ export async function fetchAXTree(verbose: boolean): Promise<AXTreeResult> {
       }
 
       const indent = ' '.repeat(depth * 2);
-      result += `${indent}${parts.join(' ')}\n`;
+      nodeOutput += `${indent}${parts.join(' ')}\n`;
     }
 
     const childDepth = include ? depth + 1 : depth;
     if (node.childIds) {
       for (const childId of node.childIds) {
-        const child = newCdpMap.get(childId);
+        const child = localCdpMap.get(childId);
         if (child) {
-          result += formatNode(child, childDepth);
+          nodeOutput += formatNode(child, childDepth);
         }
       }
+    }
+
+    return nodeOutput;
+  }
+
+  // Add OOPIF header if there are interesting nodes
+  let frameContent = '';
+  for (const root of roots) {
+    frameContent += formatNode(root, baseDepth + 1);
+  }
+
+  if (frameContent.trim()) {
+    const indent = ' '.repeat(baseDepth * 2);
+    result += `${indent}[${label}]\n`;
+    result += frameContent;
+  }
+
+  return result;
+}
+
+/**
+ * Fetch the full AX tree via CDP, assign UIDs, store the mapping,
+ * and return the formatted text.
+ * 
+ * Automatically traverses all frames including webviews.
+ */
+export async function fetchAXTree(verbose: boolean): Promise<AXTreeResult> {
+  await sendCdp('Accessibility.enable');
+  await sendCdp('Page.enable');
+
+  // Get frame tree to discover all frames including webviews
+  let allFrames: FrameInfo[] = [];
+  let mainFrameId: string | undefined;
+  
+  try {
+    const frameTreeResult = await sendCdp('Page.getFrameTree');
+    if (frameTreeResult.frameTree) {
+      allFrames = collectFrames(frameTreeResult.frameTree);
+      mainFrameId = frameTreeResult.frameTree.frame.id;
+      logger(`[AX Tree] Found ${allFrames.length} frame(s) (${allFrames.filter(isWebviewFrame).length} webviews)`);
+    }
+  } catch (err) {
+    logger(`[AX Tree] Could not get frame tree, using main frame only: ${err}`);
+  }
+
+  // Rebuild maps
+  const newUidMap = new Map<string, AXNode>();
+  const newCdpMap = new Map<string, AXNode>();
+  const newUidToFrameId = new Map<string, string>();
+  
+  let globalUidCounter = 0;
+  let allNodes: AXNode[] = [];
+  let output = '';
+
+  // Format nodes for a single frame
+  function formatFrameNodes(
+    nodes: AXNode[],
+    frameId: string,
+    frameLabel: string,
+    baseDepth: number,
+  ): string {
+    // Build local CDP map for this frame
+    const localCdpMap = new Map<string, AXNode>();
+    for (const node of nodes) {
+      localCdpMap.set(node.nodeId, node);
+      newCdpMap.set(`${frameId}:${node.nodeId}`, node);
+    }
+
+    const roots = nodes.filter(n => !n.parentId);
+    let result = '';
+
+    function formatNode(node: AXNode, depth: number): string {
+      const include = verbose || isInteresting(node);
+
+      let nodeOutput = '';
+      if (include) {
+        const uid = `s${globalUidCounter++}`;
+        newUidMap.set(uid, node);
+        newUidToFrameId.set(uid, frameId);
+
+        const parts: string[] = [`uid=${uid}`];
+
+        const role = node.role?.value;
+        if (role) {
+          parts.push(role === 'none' ? 'ignored' : String(role));
+        }
+
+        if (node.name?.value) {
+          parts.push(`"${node.name.value}"`);
+        }
+
+        if (node.properties) {
+          for (const prop of node.properties) {
+            const mapped = BOOLEAN_PROPERTY_MAP[prop.name];
+            if (prop.value.type === 'boolean' || prop.value.type === 'booleanOrUndefined') {
+              if (prop.value.value) {
+                if (mapped) {parts.push(mapped);}
+                parts.push(prop.name);
+              }
+            } else if (typeof prop.value.value === 'string') {
+              parts.push(`${prop.name}="${prop.value.value}"`);
+            } else if (typeof prop.value.value === 'number') {
+              parts.push(`${prop.name}="${prop.value.value}"`);
+            }
+          }
+        }
+
+        if (node.value?.value !== undefined && node.value.value !== '') {
+          parts.push(`value="${node.value.value}"`);
+        }
+
+        const indent = ' '.repeat(depth * 2);
+        nodeOutput += `${indent}${parts.join(' ')}\n`;
+      }
+
+      const childDepth = include ? depth + 1 : depth;
+      if (node.childIds) {
+        for (const childId of node.childIds) {
+          const child = localCdpMap.get(childId);
+          if (child) {
+            nodeOutput += formatNode(child, childDepth);
+          }
+        }
+      }
+
+      return nodeOutput;
+    }
+
+    // Add frame header if there are interesting nodes
+    let frameContent = '';
+    for (const root of roots) {
+      frameContent += formatNode(root, baseDepth + 1);
+    }
+
+    if (frameContent.trim()) {
+      const indent = ' '.repeat(baseDepth * 2);
+      result += `${indent}[${frameLabel}]\n`;
+      result += frameContent;
     }
 
     return result;
   }
 
-  let output = '';
-  for (const root of roots) {
-    output += formatNode(root, 0);
+  // If we have frames, process each one
+  if (allFrames.length > 0) {
+    for (const frame of allFrames) {
+      try {
+        const result = await sendCdp('Accessibility.getFullAXTree', {frameId: frame.id});
+        const nodes: AXNode[] = result.nodes ?? [];
+        
+        if (nodes.length > 0) {
+          allNodes.push(...nodes);
+          const isMain = frame.id === mainFrameId;
+          const label = getFrameLabel(frame, isMain);
+          output += formatFrameNodes(nodes, frame.id, label, 0);
+        }
+      } catch (err) {
+        logger(`[AX Tree] Could not get AX tree for frame ${frame.id}: ${err}`);
+      }
+    }
+  } else {
+    // Fallback: just get main frame
+    const result = await sendCdp('Accessibility.getFullAXTree');
+    const nodes: AXNode[] = result.nodes ?? [];
+    allNodes = nodes;
+
+    const localCdpMap = new Map<string, AXNode>();
+    for (const node of nodes) {
+      localCdpMap.set(node.nodeId, node);
+      newCdpMap.set(node.nodeId, node);
+    }
+
+    const roots = nodes.filter(n => !n.parentId);
+
+    function formatNode(node: AXNode, depth: number): string {
+      const include = verbose || isInteresting(node);
+
+      let nodeOutput = '';
+      if (include) {
+        const uid = `s${globalUidCounter++}`;
+        newUidMap.set(uid, node);
+
+        const parts: string[] = [`uid=${uid}`];
+
+        const role = node.role?.value;
+        if (role) {
+          parts.push(role === 'none' ? 'ignored' : String(role));
+        }
+
+        if (node.name?.value) {
+          parts.push(`"${node.name.value}"`);
+        }
+
+        if (node.properties) {
+          for (const prop of node.properties) {
+            const mapped = BOOLEAN_PROPERTY_MAP[prop.name];
+            if (prop.value.type === 'boolean' || prop.value.type === 'booleanOrUndefined') {
+              if (prop.value.value) {
+                if (mapped) {parts.push(mapped);}
+                parts.push(prop.name);
+              }
+            } else if (typeof prop.value.value === 'string') {
+              parts.push(`${prop.name}="${prop.value.value}"`);
+            } else if (typeof prop.value.value === 'number') {
+              parts.push(`${prop.name}="${prop.value.value}"`);
+            }
+          }
+        }
+
+        if (node.value?.value !== undefined && node.value.value !== '') {
+          parts.push(`value="${node.value.value}"`);
+        }
+
+        const indent = ' '.repeat(depth * 2);
+        nodeOutput += `${indent}${parts.join(' ')}\n`;
+      }
+
+      const childDepth = include ? depth + 1 : depth;
+      if (node.childIds) {
+        for (const childId of node.childIds) {
+          const child = localCdpMap.get(childId);
+          if (child) {
+            nodeOutput += formatNode(child, childDepth);
+          }
+        }
+      }
+
+      return nodeOutput;
+    }
+
+    for (const root of roots) {
+      output += formatNode(root, 0);
+    }
+  }
+
+  // Process OOPIF targets (out-of-process iframes like webviews)
+  const attachedTargets = getAttachedTargets();
+  const oopifTargets = attachedTargets.filter(t => t.type === 'iframe' || isWebviewUrl(t.url));
+  
+  if (oopifTargets.length > 0) {
+    logger(`[AX Tree] Processing ${oopifTargets.length} OOPIF target(s)`);
+    
+    for (const target of oopifTargets) {
+      try {
+        // Enable accessibility on the target session
+        await sendCdp('Accessibility.enable', {}, {sessionId: target.sessionId});
+        
+        // Fetch AX tree for this OOPIF
+        const result = await sendCdp('Accessibility.getFullAXTree', {}, {sessionId: target.sessionId});
+        const nodes: AXNode[] = (result.nodes ?? []) as AXNode[];
+        
+        if (nodes.length > 0) {
+          allNodes.push(...nodes);
+          const label = getOOPIFLabel(target);
+          output += formatOOPIFNodes(
+            nodes,
+            target.sessionId,
+            label,
+            0,
+            newUidMap,
+            newCdpMap,
+            newUidToFrameId,
+            verbose,
+            () => globalUidCounter++,
+          );
+        }
+      } catch (err) {
+        logger(`[AX Tree] Could not get AX tree for OOPIF "${target.title}": ${err}`);
+      }
+    }
   }
 
   // Commit the new maps
   uidToAXNode = newUidMap;
   cdpNodeMap = newCdpMap;
+  uidToFrameId = newUidToFrameId;
 
   return {
     formatted: output || '(empty accessibility tree)',
-    nodes,
+    nodes: allNodes,
   };
+}
+
+/**
+ * Get the frame ID for a given UID (for cross-frame interactions).
+ */
+export function getFrameIdForUid(uid: string): string | undefined {
+  return uidToFrameId.get(uid);
+}
+
+/**
+ * Check if a UID refers to an OOPIF element and return the session ID if so.
+ */
+export function getSessionIdForUid(uid: string): string | undefined {
+  const frameId = uidToFrameId.get(uid);
+  if (frameId?.startsWith('oopif:')) {
+    return frameId.substring(6); // Remove 'oopif:' prefix
+  }
+  return undefined;
 }
 
 /**
@@ -192,13 +562,21 @@ export function getAXNodeByUid(uid: string): AXNode {
  */
 export function getBackendNodeId(uid: string): number {
   const node = getAXNodeByUid(uid);
+  const frameId = uidToFrameId.get(uid);
+  
   // Walk up if the target node lacks a backendDOMNodeId
   let current: AXNode | undefined = node;
   while (current) {
     if (current.backendDOMNodeId !== undefined) {
       return current.backendDOMNodeId;
     }
-    current = current.parentId ? cdpNodeMap.get(current.parentId) : undefined;
+    if (current.parentId) {
+      // Try frame-prefixed key first, then non-prefixed (for fallback mode)
+      const prefixedKey: string = frameId ? `${frameId}:${current.parentId}` : current.parentId;
+      current = cdpNodeMap.get(prefixedKey) ?? cdpNodeMap.get(current.parentId);
+    } else {
+      current = undefined;
+    }
   }
   throw new Error(
     `Element with uid "${uid}" has no backing DOM node. ` +
@@ -211,8 +589,10 @@ export function getBackendNodeId(uid: string): number {
  */
 export async function resolveNodeToRemoteObject(uid: string): Promise<string> {
   const backendNodeId = getBackendNodeId(uid);
-  await sendCdp('DOM.enable');
-  const result = await sendCdp('DOM.resolveNode', {backendNodeId});
+  const sessionId = getSessionIdForUid(uid);
+  const opts = sessionId ? {sessionId} : undefined;
+  await sendCdp('DOM.enable', {}, opts);
+  const result = await sendCdp('DOM.resolveNode', {backendNodeId}, opts);
   if (!result.object?.objectId) {
     throw new Error(
       `Could not resolve DOM node for uid "${uid}" (backendNodeId=${backendNodeId}).`,
@@ -227,10 +607,12 @@ export async function resolveNodeToRemoteObject(uid: string): Promise<string> {
  */
 export async function getElementCenter(uid: string): Promise<{x: number; y: number}> {
   const backendNodeId = getBackendNodeId(uid);
-  await sendCdp('DOM.enable');
+  const sessionId = getSessionIdForUid(uid);
+  const opts = sessionId ? {sessionId} : undefined;
+  await sendCdp('DOM.enable', {}, opts);
 
   try {
-    const boxModel = await sendCdp('DOM.getBoxModel', {backendNodeId});
+    const boxModel = await sendCdp('DOM.getBoxModel', {backendNodeId}, opts);
     // content quad: [x1,y1, x2,y2, x3,y3, x4,y4]
     const content = boxModel.model.content;
     const x = (content[0] + content[2] + content[4] + content[6]) / 4;
@@ -238,7 +620,7 @@ export async function getElementCenter(uid: string): Promise<{x: number; y: numb
     return {x, y};
   } catch {
     // Fallback: try getContentQuads
-    const quads = await sendCdp('DOM.getContentQuads', {backendNodeId});
+    const quads = await sendCdp('DOM.getContentQuads', {backendNodeId}, opts);
     if (!quads.quads?.length) {
       throw new Error(
         `Element with uid "${uid}" has no visible bounding box. ` +
@@ -257,8 +639,10 @@ export async function getElementCenter(uid: string): Promise<{x: number; y: numb
  */
 export async function focusElement(uid: string): Promise<void> {
   const backendNodeId = getBackendNodeId(uid);
-  await sendCdp('DOM.enable');
-  await sendCdp('DOM.focus', {backendNodeId});
+  const sessionId = getSessionIdForUid(uid);
+  const opts = sessionId ? {sessionId} : undefined;
+  await sendCdp('DOM.enable', {}, opts);
+  await sendCdp('DOM.focus', {backendNodeId}, opts);
 }
 
 /**
@@ -266,8 +650,10 @@ export async function focusElement(uid: string): Promise<void> {
  */
 export async function scrollIntoView(uid: string): Promise<void> {
   const backendNodeId = getBackendNodeId(uid);
-  await sendCdp('DOM.enable');
-  await sendCdp('DOM.scrollIntoViewIfNeeded', {backendNodeId});
+  const sessionId = getSessionIdForUid(uid);
+  const opts = sessionId ? {sessionId} : undefined;
+  await sendCdp('DOM.enable', {}, opts);
+  await sendCdp('DOM.scrollIntoViewIfNeeded', {backendNodeId}, opts);
 }
 
 /**
@@ -626,9 +1012,11 @@ export async function captureScreenshot(options: {
   if (options.uid) {
     // Clip to element bounds
     const backendNodeId = getBackendNodeId(options.uid);
-    await sendCdp('DOM.enable');
-    await sendCdp('DOM.scrollIntoViewIfNeeded', {backendNodeId});
-    const boxModel = await sendCdp('DOM.getBoxModel', {backendNodeId});
+    const sessionId = getSessionIdForUid(options.uid);
+    const opts = sessionId ? {sessionId} : undefined;
+    await sendCdp('DOM.enable', {}, opts);
+    await sendCdp('DOM.scrollIntoViewIfNeeded', {backendNodeId}, opts);
+    const boxModel = await sendCdp('DOM.getBoxModel', {backendNodeId}, opts);
     const content = boxModel.model.content;
     const xs = [content[0], content[2], content[4], content[6]];
     const ys = [content[1], content[3], content[5], content[7]];

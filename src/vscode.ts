@@ -57,6 +57,33 @@ interface CdpVersionInfo {
   [key: string]: unknown;
 }
 
+// ── CDP Target Session Types (for OOPIF support) ──
+
+/**
+ * Information about an attached target, received via Target.attachedToTarget.
+ */
+export interface AttachedTargetInfo {
+  sessionId: string;
+  targetId: string;
+  type: string;
+  title: string;
+  url: string;
+  attached: boolean;
+}
+
+/**
+ * Target info from CDP Target.getTargets.
+ */
+export interface CdpTargetInfo {
+  targetId: string;
+  type: string;
+  title: string;
+  url: string;
+  attached: boolean;
+  canAccessOpener: boolean;
+  browserContextId?: string;
+}
+
 // ── Module State (singleton — max one child at a time) ──
 
 let cdpWs: WebSocket | undefined;
@@ -71,6 +98,9 @@ let userDataDir: string | undefined;
 let connectInProgress: Promise<WebSocket> | undefined;
 let connectionGeneration = 0;
 
+/** Maps sessionId to attached target info for OOPIF support. */
+const attachedTargets = new Map<string, AttachedTargetInfo>();
+
 export function getConnectionGeneration(): number {
   return connectionGeneration;
 }
@@ -84,14 +114,45 @@ export function getUserDataDir(): string | undefined {
 let cdpMessageId = 0;
 
 /**
+ * CDP result type - inherently dynamic JSON from Chrome DevTools Protocol.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type CdpResult = Record<string, any>;
+
+/**
+ * Options for sendCdp command.
+ */
+interface SendCdpOptions {
+  /** Session ID for sending commands to attached targets (OOPIFs). */
+  sessionId?: string;
+  /** Optional WebSocket to use (defaults to main cdpWs). */
+  ws?: WebSocket;
+}
+
+/**
  * Send a CDP command over the raw WebSocket and wait for the matching response.
+ * 
+ * @param method - CDP method name (e.g., 'Runtime.evaluate')
+ * @param params - Parameters for the method
+ * @param optionsOrWs - Either options object with sessionId/ws, or WebSocket for backward compat
  */
 export function sendCdp(
   method: string,
   params: Record<string, unknown> = {},
-  ws?: WebSocket,
-): Promise<any> {
-  const socket = ws ?? cdpWs;
+  optionsOrWs?: SendCdpOptions | WebSocket,
+): Promise<CdpResult> {
+  // Handle backward compatibility: third arg can be WebSocket or options object
+  let sessionId: string | undefined;
+  let socket: WebSocket | undefined;
+  
+  if (optionsOrWs instanceof WebSocket) {
+    socket = optionsOrWs;
+  } else if (optionsOrWs) {
+    sessionId = optionsOrWs.sessionId;
+    socket = optionsOrWs.ws;
+  }
+  
+  socket = socket ?? cdpWs;
   if (!socket || socket.readyState !== WebSocket.OPEN) {
     return Promise.reject(
       new Error('CDP WebSocket is not connected'),
@@ -102,18 +163,25 @@ export function sendCdp(
     const id = ++cdpMessageId;
     const handler = (evt: WebSocket.MessageEvent) => {
       const raw = typeof evt.data === 'string' ? evt.data : evt.data.toString();
-      const data = JSON.parse(raw);
+      const data = JSON.parse(raw) as Record<string, unknown>;
       if (data.id === id) {
         socket.removeEventListener('message', handler);
         if (data.error) {
-          reject(new Error(`CDP ${method}: ${data.error.message}`));
+          const errorObj = data.error as {message: string};
+          reject(new Error(`CDP ${method}: ${errorObj.message}`));
         } else {
-          resolve(data.result);
+          resolve(data.result as CdpResult);
         }
       }
     };
     socket.addEventListener('message', handler);
-    socket.send(JSON.stringify({id, method, params}));
+    
+    // Include sessionId in message if provided (for OOPIF targets)
+    const message: Record<string, unknown> = {id, method, params};
+    if (sessionId) {
+      message.sessionId = sessionId;
+    }
+    socket.send(JSON.stringify(message));
   });
 }
 
@@ -137,6 +205,118 @@ export function getDevhostBridgePath(): string | undefined {
 
 export function isConnected(): boolean {
   return cdpWs?.readyState === WebSocket.OPEN;
+}
+
+// ── Target Management (OOPIF Support) ───────────────────
+
+/**
+ * Get all currently attached targets (for OOPIF/webview access).
+ */
+export function getAttachedTargets(): AttachedTargetInfo[] {
+  return Array.from(attachedTargets.values());
+}
+
+/**
+ * Get attached target by sessionId.
+ */
+export function getAttachedTarget(sessionId: string): AttachedTargetInfo | undefined {
+  return attachedTargets.get(sessionId);
+}
+
+/**
+ * Clear all attached targets (called on disconnect).
+ */
+function clearAttachedTargets(): void {
+  attachedTargets.clear();
+}
+
+/**
+ * Handle CDP events for target attachment/detachment.
+ */
+function setupTargetEventListeners(ws: WebSocket): void {
+  ws.addEventListener('message', (evt: WebSocket.MessageEvent) => {
+    const raw = typeof evt.data === 'string' ? evt.data : evt.data.toString();
+    let data: Record<string, unknown>;
+    try {
+      data = JSON.parse(raw) as Record<string, unknown>;
+    } catch {
+      return;
+    }
+    
+    // Handle Target.attachedToTarget event
+    if (data.method === 'Target.attachedToTarget') {
+      const params = data.params as {
+        sessionId: string;
+        targetInfo: {
+          targetId: string;
+          type: string;
+          title: string;
+          url: string;
+          attached: boolean;
+        };
+      };
+      
+      const info: AttachedTargetInfo = {
+        sessionId: params.sessionId,
+        targetId: params.targetInfo.targetId,
+        type: params.targetInfo.type,
+        title: params.targetInfo.title,
+        url: params.targetInfo.url,
+        attached: true,
+      };
+      
+      attachedTargets.set(params.sessionId, info);
+      logger(`[Target] Attached: ${info.type} "${info.title}" (${info.sessionId.substring(0, 8)}...)`);
+    }
+    
+    // Handle Target.detachedFromTarget event
+    if (data.method === 'Target.detachedFromTarget') {
+      const params = data.params as {sessionId: string};
+      const target = attachedTargets.get(params.sessionId);
+      if (target) {
+        logger(`[Target] Detached: ${target.type} "${target.title}"`);
+        attachedTargets.delete(params.sessionId);
+      }
+    }
+  });
+}
+
+/**
+ * Enable auto-attach to discover OOPIF targets.
+ * Must be called after CDP connection is established.
+ */
+export async function enableTargetAutoAttach(): Promise<void> {
+  if (!cdpWs) {
+    throw new Error('CDP not connected');
+  }
+  
+  // Set up event listeners first
+  setupTargetEventListeners(cdpWs);
+  
+  // Enable Target domain
+  await sendCdp('Target.setDiscoverTargets', {discover: true});
+  
+  // Enable auto-attach to all targets including OOPIFs
+  // flatten: true means we can send commands via sessionId on the same connection
+  await sendCdp('Target.setAutoAttach', {
+    autoAttach: true,
+    waitForDebuggerOnStart: false,
+    flatten: true,
+    filter: [
+      {type: 'iframe'},
+      {type: 'page'},
+    ],
+  });
+  
+  logger('[Target] Auto-attach enabled for OOPIF discovery');
+}
+
+/**
+ * Get list of all targets from CDP (for debugging/listing).
+ */
+export async function getAllTargets(): Promise<CdpTargetInfo[]> {
+  const result = await sendCdp('Target.getTargets');
+  return (result.targetInfos ?? []) as CdpTargetInfo[];
 }
 
 // ── Port Polling ────────────────────────────────────────
@@ -1126,6 +1306,9 @@ async function doConnect(options: VSCodeLaunchOptions): Promise<WebSocket> {
   // 9a. Initialize CDP event subscriptions for console messages
   await initCdpEventSubscriptions();
 
+  // 9b. Enable target auto-attach for OOPIF/webview discovery
+  await enableTargetAutoAttach();
+
   await waitForWorkbenchReady(cdpWs);
 
   // 10. Discover Dev Host bridge (for VS Code API calls in the target window)
@@ -1135,6 +1318,7 @@ async function doConnect(options: VSCodeLaunchOptions): Promise<WebSocket> {
   cdpWs.on('close', () => {
     logger('CDP WebSocket closed unexpectedly');
     clearAllData();
+    clearAttachedTargets();
     cdpWs = undefined;
   });
 
@@ -1150,6 +1334,7 @@ async function doConnect(options: VSCodeLaunchOptions): Promise<WebSocket> {
  */
 export async function stopDebugWindow(): Promise<void> {
   clearAllData();
+  clearAttachedTargets();
 
   try {
     cdpWs?.close();
