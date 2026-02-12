@@ -10,13 +10,6 @@ import path from 'node:path';
 
 import {logger} from './logger.js';
 
-export interface BridgeResponse {
-  id: string;
-  ok: boolean;
-  result?: unknown;
-  error?: string;
-}
-
 export interface AttachDebuggerResult {
   attached: boolean;
   port: number;
@@ -26,6 +19,15 @@ export interface AttachDebuggerResult {
 const BRIDGE_TIMEOUT_MS = 4_000;
 const ATTACH_TIMEOUT_MS = 15_000;
 const IS_WINDOWS = process.platform === 'win32';
+
+// ── JSON-RPC 2.0 Response ──────────────────────────────
+
+interface JsonRpcResponse {
+  jsonrpc: '2.0';
+  id: string | number | null;
+  result?: unknown;
+  error?: {code: number; message: string; data?: unknown};
+}
 
 /**
  * Compute the deterministic bridge socket path for a given workspace.
@@ -58,26 +60,29 @@ export function discoverBridgePath(workspaceFolder: string): string {
   return computeBridgePath(workspaceFolder);
 }
 
+// ── Shared JSON-RPC 2.0 Transport ──────────────────────
+
 /**
- * Send an 'exec' command to the vscode-devtools bridge and wait for response.
- * The code runs in a `new Function('vscode', 'payload', ...)` context.
- * `require()` is NOT available — only `vscode` API and `payload`.
+ * Send a JSON-RPC 2.0 request over a named pipe and wait for the response.
+ * Creates a new connection, sends the request, reads one response line,
+ * and disconnects.
  */
-export function bridgeExec(
+function sendBridgeRequest(
   bridgePath: string,
-  code: string,
-  payload?: unknown,
+  method: string,
+  params: Record<string, unknown>,
+  timeoutMs: number,
 ): Promise<unknown> {
   return new Promise((resolve, reject) => {
     const client = net.createConnection(bridgePath);
-    const reqId = `exec-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const reqId = `${method}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
     let response = '';
     client.setEncoding('utf8');
 
     client.on('connect', () => {
       const request =
-        JSON.stringify({id: reqId, action: 'exec', code, payload}) + '\n';
+        JSON.stringify({jsonrpc: '2.0', id: reqId, method, params}) + '\n';
       client.write(request);
     });
 
@@ -86,16 +91,16 @@ export function bridgeExec(
       const nlIdx = response.indexOf('\n');
       if (nlIdx !== -1) {
         try {
-          const result = JSON.parse(response.slice(0, nlIdx)) as BridgeResponse;
+          const parsed = JSON.parse(response.slice(0, nlIdx)) as JsonRpcResponse;
           client.end();
-          if (result.ok) {
-            resolve(result.result);
-          } else {
+          if (parsed.error) {
             reject(
               new Error(
-                `Bridge exec failed: ${result.error ?? 'Unknown error'}`,
+                `Bridge ${method} failed [${parsed.error.code}]: ${parsed.error.message}`,
               ),
             );
+          } else {
+            resolve(parsed.result);
           }
         } catch (e) {
           client.end();
@@ -114,223 +119,66 @@ export function bridgeExec(
 
     const timeout = setTimeout(() => {
       client.destroy();
-      reject(new Error(`Bridge exec request timed out (${BRIDGE_TIMEOUT_MS}ms)`));
-    }, BRIDGE_TIMEOUT_MS);
+      reject(new Error(`Bridge ${method} request timed out (${timeoutMs}ms)`));
+    }, timeoutMs);
 
     client.on('close', () => {
       clearTimeout(timeout);
     });
   });
+}
+
+// ── Public Bridge Methods ───────────────────────────────
+
+/**
+ * Send an 'exec' command to the vscode-devtools bridge and wait for response.
+ * The code runs in a `new Function('vscode', 'payload', ...)` context.
+ * `require()` is NOT available — only `vscode` API and `payload`.
+ */
+export function bridgeExec(
+  bridgePath: string,
+  code: string,
+  payload?: unknown,
+): Promise<unknown> {
+  return sendBridgeRequest(bridgePath, 'exec', {code, payload}, BRIDGE_TIMEOUT_MS);
 }
 
 /**
  * Tell the Host bridge to programmatically attach the VS Code debugger.
  * Lights up the full debug UI: orange status bar, floating toolbar, call stack.
- *
- * Uses the bridge's 'attach-debugger' action which calls
- * `vscode.debug.startDebugging(undefined, { type, request: 'attach', port })`.
  */
-export function bridgeAttachDebugger(
+export async function bridgeAttachDebugger(
   bridgePath: string,
   port: number,
   name = `Extension Host (port ${port})`,
 ): Promise<AttachDebuggerResult> {
-  return new Promise((resolve, reject) => {
-    const client = net.createConnection(bridgePath);
-    const reqId = `attach-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-
-    let response = '';
-    client.setEncoding('utf8');
-
-    client.on('connect', () => {
-      const request =
-        JSON.stringify({
-          id: reqId,
-          action: 'attach-debugger',
-          port,
-          type: 'node',
-          name,
-        }) + '\n';
-      client.write(request);
-    });
-
-    client.on('data', (chunk: string) => {
-      response += chunk;
-      const nlIdx = response.indexOf('\n');
-      if (nlIdx !== -1) {
-        try {
-          const result = JSON.parse(response.slice(0, nlIdx)) as BridgeResponse;
-          client.end();
-          if (result.ok) {
-            resolve(result.result as AttachDebuggerResult);
-          } else {
-            reject(
-              new Error(
-                `Attach debugger failed: ${result.error ?? 'Unknown error'}`,
-              ),
-            );
-          }
-        } catch (e) {
-          client.end();
-          reject(
-            new Error(
-              `Failed to parse attach response: ${(e as Error).message}`,
-            ),
-          );
-        }
-      }
-    });
-
-    client.on('error', (err: Error) => {
-      reject(new Error(`Bridge connection error: ${err.message}`));
-    });
-
-    const timeout = setTimeout(() => {
-      client.destroy();
-      reject(
-        new Error(
-          `Attach debugger request timed out (${ATTACH_TIMEOUT_MS}ms)`,
-        ),
-      );
-    }, ATTACH_TIMEOUT_MS);
-
-    client.on('close', () => {
-      clearTimeout(timeout);
-    });
-  });
+  const result = await sendBridgeRequest(
+    bridgePath,
+    'attach-debugger',
+    {port, type: 'node', name},
+    ATTACH_TIMEOUT_MS,
+  );
+  return result as AttachDebuggerResult;
 }
 
 /**
  * Register a child process PID with the host bridge for lifecycle management.
  * When the host VS Code shuts down, the bridge kills all registered PIDs.
- * This replaces session-file-based cleanup with direct communication.
  */
-export function bridgeRegisterChildPid(
+export async function bridgeRegisterChildPid(
   bridgePath: string,
   pid: number,
 ): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const client = net.createConnection(bridgePath);
-    const reqId = `reg-pid-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-
-    let response = '';
-    client.setEncoding('utf8');
-
-    client.on('connect', () => {
-      const request =
-        JSON.stringify({id: reqId, action: 'register-child-pid', pid}) + '\n';
-      client.write(request);
-    });
-
-    client.on('data', (chunk: string) => {
-      response += chunk;
-      const nlIdx = response.indexOf('\n');
-      if (nlIdx !== -1) {
-        try {
-          const result = JSON.parse(response.slice(0, nlIdx)) as BridgeResponse;
-          client.end();
-          if (result.ok) {
-            resolve();
-          } else {
-            reject(
-              new Error(
-                `Register child PID failed: ${result.error ?? 'Unknown error'}`,
-              ),
-            );
-          }
-        } catch (e) {
-          client.end();
-          reject(
-            new Error(
-              `Failed to parse register response: ${(e as Error).message}`,
-            ),
-          );
-        }
-      }
-    });
-
-    client.on('error', (err: Error) => {
-      reject(new Error(`Bridge connection error: ${err.message}`));
-    });
-
-    const timeout = setTimeout(() => {
-      client.destroy();
-      reject(
-        new Error(
-          `Register child PID request timed out (${BRIDGE_TIMEOUT_MS}ms)`,
-        ),
-      );
-    }, BRIDGE_TIMEOUT_MS);
-
-    client.on('close', () => {
-      clearTimeout(timeout);
-    });
-  });
+  await sendBridgeRequest(bridgePath, 'register-child-pid', {pid}, BRIDGE_TIMEOUT_MS);
 }
 
 /**
  * Unregister a child PID from the host bridge, e.g. when the MCP server
  * intentionally tears down the debug window itself.
  */
-export function bridgeUnregisterChildPid(
+export async function bridgeUnregisterChildPid(
   bridgePath: string,
   pid: number,
 ): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const client = net.createConnection(bridgePath);
-    const reqId = `unreg-pid-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-
-    let response = '';
-    client.setEncoding('utf8');
-
-    client.on('connect', () => {
-      const request =
-        JSON.stringify({id: reqId, action: 'unregister-child-pid', pid}) + '\n';
-      client.write(request);
-    });
-
-    client.on('data', (chunk: string) => {
-      response += chunk;
-      const nlIdx = response.indexOf('\n');
-      if (nlIdx !== -1) {
-        try {
-          const result = JSON.parse(response.slice(0, nlIdx)) as BridgeResponse;
-          client.end();
-          if (result.ok) {
-            resolve();
-          } else {
-            reject(
-              new Error(
-                `Unregister child PID failed: ${result.error ?? 'Unknown error'}`,
-              ),
-            );
-          }
-        } catch (e) {
-          client.end();
-          reject(
-            new Error(
-              `Failed to parse unregister response: ${(e as Error).message}`,
-            ),
-          );
-        }
-      }
-    });
-
-    client.on('error', (err: Error) => {
-      reject(new Error(`Bridge connection error: ${err.message}`));
-    });
-
-    const timeout = setTimeout(() => {
-      client.destroy();
-      reject(
-        new Error(
-          `Unregister child PID request timed out (${BRIDGE_TIMEOUT_MS}ms)`,
-        ),
-      );
-    }, BRIDGE_TIMEOUT_MS);
-
-    client.on('close', () => {
-      clearTimeout(timeout);
-    });
-  });
+  await sendBridgeRequest(bridgePath, 'unregister-child-pid', {pid}, BRIDGE_TIMEOUT_MS);
 }
