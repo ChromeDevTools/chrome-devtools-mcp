@@ -5,6 +5,7 @@ description: Uses Chrome DevTools via MCP for efficient debugging, troubleshooti
 
 ## Core Concepts
 
+
 **Browser lifecycle**: Browser starts automatically on first tool call using a persistent Chrome profile. Configure via CLI args in the MCP server configuration: `npx chrome-devtools-mcp@latest --help`.
 
 **Page selection**: Tools operate on the currently selected page. Use `list_pages` to see available pages, then `select_page` to switch context.
@@ -12,6 +13,8 @@ description: Uses Chrome DevTools via MCP for efficient debugging, troubleshooti
 **Element interaction**: Use `take_snapshot` to get page structure with element `uid`s. Each element has a unique `uid` for interaction. If an element isn't found, take a fresh snapshot - the element may have been removed or the page changed.
 
 ## Workflow Patterns
+
+When the user prompt is about **frontend**, **web**, **webpage**, or **debugging** (e.g. fix my webpage, debug the page, improve the frontend): **always use this MCP server first.** Do not suggest code changes before inspecting the page.
 
 ### Before interacting with a page
 

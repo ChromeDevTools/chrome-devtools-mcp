@@ -80,7 +80,7 @@ export const closePage = defineTool({
 
 export const newPage = defineTool({
   name: 'new_page',
-  description: `Creates a new page`,
+  description: `Creates a new page and loads a URL.`,
   annotations: {
     category: ToolCategory.NAVIGATION,
     readOnlyHint: false,
