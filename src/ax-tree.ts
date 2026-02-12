@@ -768,6 +768,18 @@ export async function fillElement(uid: string, value: string): Promise<void> {
   await insertText(value);
 }
 
+/**
+ * Type text into a focused element at the current cursor position WITHOUT
+ * clearing existing content. Behaves like a normal keyboard — appends/inserts
+ * at the caret rather than replacing the entire field value.
+ */
+export async function typeIntoElement(uid: string, value: string): Promise<void> {
+  await scrollIntoView(uid);
+  await focusElement(uid);
+  await new Promise(r => setTimeout(r, 50));
+  await insertText(value);
+}
+
 // ── Key dispatch ──
 
 const KEY_DEFINITIONS: Record<string, {keyCode: number; code: string; key: string}> = {
@@ -1053,10 +1065,16 @@ export interface NodeSignature {
   backendDOMNodeId: number;
   role: string;
   name: string;
+  description: string;
   value: string;
   focused: boolean;
   expanded: boolean;
   selected: boolean;
+  disabled: boolean;
+  checked: boolean;
+  pressed: boolean;
+  required: boolean;
+  readonly: boolean;
 }
 
 /**
@@ -1065,14 +1083,21 @@ export interface NodeSignature {
 function getNodeSignature(node: AXNode): NodeSignature | null {
   if (node.backendDOMNodeId === undefined) {return null;}
   const props = node.properties ?? [];
+  const getBool = (name: string) => props.some(p => p.name === name && p.value.value === true);
   return {
     backendDOMNodeId: node.backendDOMNodeId,
     role: String(node.role?.value ?? ''),
     name: String(node.name?.value ?? ''),
+    description: String(node.description?.value ?? ''),
     value: String(node.value?.value ?? ''),
-    focused: props.some(p => p.name === 'focused' && p.value.value === true),
-    expanded: props.some(p => p.name === 'expanded' && p.value.value === true),
-    selected: props.some(p => p.name === 'selected' && p.value.value === true),
+    focused: getBool('focused'),
+    expanded: getBool('expanded'),
+    selected: getBool('selected'),
+    disabled: getBool('disabled'),
+    checked: getBool('checked'),
+    pressed: getBool('pressed'),
+    required: getBool('required'),
+    readonly: getBool('readonly'),
   };
 }
 
@@ -1088,7 +1113,13 @@ function formatNodeOneLiner(node: AXNode, uid: string): string {
   if (props.some(p => p.name === 'focused' && p.value.value)) {parts.push('focused');}
   if (props.some(p => p.name === 'expanded' && p.value.value)) {parts.push('expanded');}
   if (props.some(p => p.name === 'selected' && p.value.value)) {parts.push('selected');}
+  if (props.some(p => p.name === 'disabled' && p.value.value)) {parts.push('disabled');}
+  if (props.some(p => p.name === 'checked' && p.value.value)) {parts.push('checked');}
+  if (props.some(p => p.name === 'pressed' && p.value.value)) {parts.push('pressed');}
+  if (props.some(p => p.name === 'required' && p.value.value)) {parts.push('required');}
+  if (props.some(p => p.name === 'readonly' && p.value.value)) {parts.push('readonly');}
   if (node.value?.value) {parts.push(`value="${node.value.value}"`);}
+  if (node.description?.value) {parts.push(`desc="${node.description.value}"`);}
   return parts.join(' ');
 }
 
@@ -1130,6 +1161,9 @@ export function diffSnapshots(
       if (bSig.name !== aSig.name) {
         changes.push(`name: "${bSig.name}" → "${aSig.name}"`);
       }
+      if (bSig.description !== aSig.description) {
+        changes.push(`desc: "${bSig.description}" → "${aSig.description}"`);
+      }
       if (bSig.value !== aSig.value) {
         changes.push(`value: "${bSig.value}" → "${aSig.value}"`);
       }
@@ -1141,6 +1175,21 @@ export function diffSnapshots(
       }
       if (bSig.selected !== aSig.selected) {
         changes.push(aSig.selected ? '+selected' : '-selected');
+      }
+      if (bSig.disabled !== aSig.disabled) {
+        changes.push(aSig.disabled ? '+disabled' : '-disabled');
+      }
+      if (bSig.checked !== aSig.checked) {
+        changes.push(aSig.checked ? '+checked' : '-checked');
+      }
+      if (bSig.pressed !== aSig.pressed) {
+        changes.push(aSig.pressed ? '+pressed' : '-pressed');
+      }
+      if (bSig.required !== aSig.required) {
+        changes.push(aSig.required ? '+required' : '-required');
+      }
+      if (bSig.readonly !== aSig.readonly) {
+        changes.push(aSig.readonly ? '+readonly' : '-readonly');
       }
 
       if (changes.length > 0) {

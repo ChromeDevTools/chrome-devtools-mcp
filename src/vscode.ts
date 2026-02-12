@@ -98,6 +98,163 @@ let userDataDir: string | undefined;
 let connectInProgress: Promise<WebSocket> | undefined;
 let connectionGeneration = 0;
 
+/**
+ * Flag to distinguish intentional CDP close (MCP restart / hot-reload)
+ * from user-initiated window close.  When false and the CDP WebSocket
+ * closes, the MCP server exits because there is no window to control.
+ */
+let isIntentionalClose = false;
+
+// ── Session Persistence (survives MCP server restarts) ──
+
+interface PersistedSession {
+  cdpPort: number;
+  electronPid: number;
+  inspectorPort: number;
+  hostBridgePath: string;
+  userDataDir: string;
+  debugWindowStartedAt: number;
+  persistedAt: number;
+}
+
+function sessionFilePath(targetFolder: string): string {
+  return path.join(targetFolder, '.devtools', 'session.json');
+}
+
+/**
+ * Persist the current session info to disk so a restarted MCP server
+ * can reconnect to the existing debug window without spawning a new one.
+ */
+function persistSession(targetFolder: string): void {
+  if (
+    !cdpPort ||
+    !electronPid ||
+    !inspectorPort ||
+    !hostBridgePath ||
+    !userDataDir ||
+    !debugWindowStartedAt
+  ) {
+    return;
+  }
+  const session: PersistedSession = {
+    cdpPort,
+    electronPid,
+    inspectorPort,
+    hostBridgePath,
+    userDataDir,
+    debugWindowStartedAt,
+    persistedAt: Date.now(),
+  };
+  const filePath = sessionFilePath(targetFolder);
+  try {
+    fs.mkdirSync(path.dirname(filePath), {recursive: true});
+    fs.writeFileSync(filePath, JSON.stringify(session, null, 2));
+    logger(`Session persisted: CDP=${cdpPort}, Electron PID=${electronPid}`);
+  } catch (err) {
+    logger(`Warning: could not persist session: ${(err as Error).message}`);
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function readRequiredNumber(
+  obj: Record<string, unknown>,
+  key: string,
+): number | null {
+  const value = obj[key];
+  if (typeof value !== 'number' || Number.isNaN(value)) {
+    return null;
+  }
+  return value;
+}
+
+function readRequiredString(
+  obj: Record<string, unknown>,
+  key: string,
+): string | null {
+  const value = obj[key];
+  if (typeof value !== 'string' || !value) {
+    return null;
+  }
+  return value;
+}
+
+function parsePersistedSession(raw: unknown): PersistedSession | null {
+  if (!isRecord(raw)) {
+    return null;
+  }
+  const record = raw;
+
+  const cdpPortValue = readRequiredNumber(record, 'cdpPort');
+  const electronPidValue = readRequiredNumber(record, 'electronPid');
+  const inspectorPortValue = readRequiredNumber(record, 'inspectorPort');
+  const hostBridgePathValue = readRequiredString(record, 'hostBridgePath');
+  const userDataDirValue = readRequiredString(record, 'userDataDir');
+  const debugWindowStartedAtValue = readRequiredNumber(record, 'debugWindowStartedAt');
+  const persistedAtValue = readRequiredNumber(record, 'persistedAt');
+
+  if (
+    cdpPortValue === null ||
+    electronPidValue === null ||
+    inspectorPortValue === null ||
+    hostBridgePathValue === null ||
+    userDataDirValue === null ||
+    debugWindowStartedAtValue === null ||
+    persistedAtValue === null
+  ) {
+    return null;
+  }
+
+  return {
+    cdpPort: cdpPortValue,
+    electronPid: electronPidValue,
+    inspectorPort: inspectorPortValue,
+    hostBridgePath: hostBridgePathValue,
+    userDataDir: userDataDirValue,
+    debugWindowStartedAt: debugWindowStartedAtValue,
+    persistedAt: persistedAtValue,
+  };
+}
+
+/**
+ * Load a previously persisted session (written by a prior MCP server instance).
+ * Returns null if no session file exists or it cannot be parsed.
+ */
+function loadPersistedSession(targetFolder: string): PersistedSession | null {
+  const filePath = sessionFilePath(targetFolder);
+  try {
+    if (!fs.existsSync(filePath)) {return null;}
+    const raw = fs.readFileSync(filePath, 'utf8');
+    const parsed = parsePersistedSession(JSON.parse(raw));
+    if (!parsed) {return null;}
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Remove the persisted session file. Called when the debug window is
+ * intentionally killed (e.g., extension hot-reload via stopDebugWindow).
+ */
+function clearPersistedSession(targetFolder: string): void {
+  const filePath = sessionFilePath(targetFolder);
+  try {
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+      logger('Persisted session cleared');
+    }
+  } catch {
+    // best-effort
+  }
+}
+
+/** The target folder for the current session (needed for session persistence). */
+let currentTargetFolder: string | undefined;
+let debugWindowStartedAt: number | undefined;
+
 /** Maps sessionId to attached target info for OOPIF support. */
 const attachedTargets = new Map<string, AttachedTargetInfo>();
 
@@ -107,6 +264,10 @@ export function getConnectionGeneration(): number {
 
 export function getUserDataDir(): string | undefined {
   return userDataDir;
+}
+
+export function getDebugWindowStartedAt(): number | undefined {
+  return debugWindowStartedAt;
 }
 
 // ── Raw CDP Communication ───────────────────────────────
@@ -769,6 +930,39 @@ function ensureGitignoreEntry(targetFolder: string): void {
 }
 
 /**
+ * Graceful detach: close the CDP WebSocket and clear in-memory state
+ * WITHOUT killing the child process. The debug window stays alive so
+ * a restarted MCP server can reconnect to it.
+ *
+ * The persisted session file is intentionally left on disk.
+ */
+export function detachGracefully(): void {
+  isIntentionalClose = true;
+  clearAllData();
+  clearAttachedTargets();
+
+  try {
+    cdpWs?.close();
+  } catch {
+    // best-effort
+  }
+
+  cdpWs = undefined;
+  cdpPort = undefined;
+  inspectorPort = undefined;
+  hostBridgePath = undefined;
+  devhostBridgePath = undefined;
+  debugWindowStartedAt = undefined;
+  // Do NOT kill the child or clear the persisted session
+  childProcess = undefined;
+  launcherPid = undefined;
+  electronPid = undefined;
+  userDataDir = undefined;
+
+  logger('Detached gracefully — debug window left alive for reconnection');
+}
+
+/**
  * Kill any existing child, close WS, and clean up.
  * Synchronous except for the WS close (best-effort).
  */
@@ -779,6 +973,7 @@ export function teardownSync(): void {
     // best-effort
   }
   cdpWs = undefined;
+  debugWindowStartedAt = undefined;
 
   forceKillChildSync();
 
@@ -790,39 +985,43 @@ export function teardownSync(): void {
 // ── Lifecycle Handlers (registered once) ────────────────
 
 /**
- * Registers process-level handlers that guarantee the child is killed
- * on ANY exit path — clean, signal, or crash.
+ * Registers process-level handlers for MCP server shutdown.
  *
  * On Windows, VS Code kills the MCP server by closing stdin and terminating
- * the process. We listen for 'end' on stdin as the PRIMARY shutdown trigger,
- * PLUS `process.on('exit')` as a synchronous last-resort safety net.
+ * the process. We listen for 'end' on stdin as the PRIMARY shutdown trigger.
+ *
+ * GRACEFUL DETACH: When the MCP server exits (restart or stop), we detach
+ * from the debug window WITHOUT killing it. This allows VS Code's native
+ * MCP watch mode to restart the server and reconnect to the same debug
+ * window — neither harms the other during reloads.
  */
 function registerLifecycleHandlers(): void {
   // Primary: stdin 'end' fires when VS Code disconnects the MCP server.
-  // This is the most reliable signal on Windows.
+  // Detach gracefully so the debug window survives MCP restarts.
   process.stdin.on('end', () => {
-    logger('stdin ended — killing child process');
-    forceKillChildSync();
+    logger('stdin ended — detaching from debug window (leaving it alive)');
+    detachGracefully();
     process.exit(0);
   });
 
-  // Synchronous safety net — guaranteed to fire on any exit path
+  // Synchronous safety net — detach on any exit path.
+  // The debug window survives and can be reconnected by the next MCP instance.
   process.on('exit', () => {
-    forceKillChildSync();
+    detachGracefully();
   });
 
-  // Graceful signal handlers — try async cleanup first, then exit
-  const gracefulShutdown = async () => {
-    await stopDebugWindow();
+  // Signal handlers — detach gracefully, don't kill the debug window
+  const gracefulShutdown = () => {
+    detachGracefully();
     process.exit(0);
   };
 
   process.on('SIGINT', gracefulShutdown);
   process.on('SIGTERM', gracefulShutdown);
 
-  process.on('uncaughtException', async (err) => {
+  process.on('uncaughtException', (err) => {
     logger('Uncaught exception:', err);
-    await stopDebugWindow();
+    detachGracefully();
     process.exit(1);
   });
 }
@@ -844,10 +1043,6 @@ interface HostTaskDefinition {
   label: string;
   command: string;
   optionsCwd?: string;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function readOptionalString(obj: Record<string, unknown>, key: string): string | undefined {
@@ -1113,10 +1308,136 @@ function buildLaunchArgs(flags: LaunchFlags, ports: InternalLaunchPorts): string
   return args;
 }
 
+// ── Reconnect to Existing Debug Window ──────────────────
+
+/**
+ * Attempt to reconnect to a debug window left alive by a previous MCP server
+ * instance. Reads the persisted session file, checks if the CDP port is still
+ * responding, and if so, reconnects the CDP WebSocket and bridge.
+ *
+ * Returns the connected WebSocket on success, or null if reconnection fails
+ * (window closed, port unreachable, etc.).
+ */
+async function tryReconnectToExistingWindow(
+  targetFolder: string,
+  options: VSCodeLaunchOptions,
+): Promise<WebSocket | null> {
+  const session = loadPersistedSession(targetFolder);
+  if (!session) {
+    return null;
+  }
+
+  logger(`Found persisted session: CDP=${session.cdpPort}, PID=${session.electronPid}`);
+
+  // Verify the CDP port is still responding
+  try {
+    const response = await fetch(`http://127.0.0.1:${session.cdpPort}/json/version`);
+    if (!response.ok) {
+      logger('Persisted CDP port not responding — will spawn fresh');
+      clearPersistedSession(targetFolder);
+      return null;
+    }
+    const versionInfo = (await response.json()) as CdpVersionInfo;
+    logger(`Reconnecting to existing window: ${versionInfo.Browser}`);
+  } catch {
+    logger('Persisted CDP port unreachable — will spawn fresh');
+    clearPersistedSession(targetFolder);
+    return null;
+  }
+
+  // Restore module state from persisted session
+  cdpPort = session.cdpPort;
+  electronPid = session.electronPid;
+  inspectorPort = session.inspectorPort;
+  hostBridgePath = session.hostBridgePath;
+  userDataDir = session.userDataDir;
+  debugWindowStartedAt = session.debugWindowStartedAt;
+
+  // Find the workbench target and connect CDP WebSocket
+  try {
+    const workbench = await findWorkbenchTarget(session.cdpPort);
+    logger(`Reconnecting to: "${workbench.title}"`);
+    cdpWs = await connectCdpWebSocket(workbench.webSocketDebuggerUrl);
+  } catch (err) {
+    logger(`Failed to reconnect CDP: ${(err as Error).message} — will spawn fresh`);
+    clearPersistedSession(targetFolder);
+    cdpPort = undefined;
+    electronPid = undefined;
+    inspectorPort = undefined;
+    hostBridgePath = undefined;
+    userDataDir = undefined;
+    debugWindowStartedAt = undefined;
+    return null;
+  }
+
+  // Re-enable CDP domains
+  await sendCdp('Runtime.enable', {}, cdpWs);
+  await sendCdp('Page.enable', {}, cdpWs);
+  await initCdpEventSubscriptions();
+  await enableTargetAutoAttach();
+  await waitForWorkbenchReady(cdpWs);
+
+  // Re-discover Dev Host bridge
+  devhostBridgePath = (await waitForDevHostBridge(targetFolder)) ?? undefined;
+
+  // Re-attach debugger if possible
+  try {
+    if (hostBridgePath && inspectorPort) {
+      await waitForInspectorPort(inspectorPort);
+      await bridgeAttachDebugger(
+        hostBridgePath,
+        inspectorPort,
+        `Extension Host (port ${inspectorPort})`,
+      );
+      logger('Debug session re-attached');
+    }
+  } catch (err) {
+    logger(`Debugger re-attach skipped: ${(err as Error).message}`);
+  }
+
+  // Monitor for unexpected disconnects
+  cdpWs.on('close', () => {
+    if (isIntentionalClose) {
+      isIntentionalClose = false;
+      logger('CDP closed during intentional detach (reconnect path)');
+      clearAllData();
+      clearAttachedTargets();
+      debugWindowStartedAt = undefined;
+      cdpWs = undefined;
+      return;
+    }
+
+    logger('Debug window closed by user — exiting MCP server');
+    clearAllData();
+    clearAttachedTargets();
+    debugWindowStartedAt = undefined;
+    cdpWs = undefined;
+    if (currentTargetFolder) {
+      clearPersistedSession(currentTargetFolder);
+    }
+    process.exit(0);
+  });
+
+  // Update persisted session with fresh timestamp
+  persistSession(targetFolder);
+  logger('Successfully reconnected to existing debug window');
+  return cdpWs;
+}
+
 async function doConnect(options: VSCodeLaunchOptions): Promise<WebSocket> {
   connectionGeneration++;
-  // Kill any stale child before spawning a new one — no duplicates
+  const targetFolder = options.targetFolder ?? options.workspaceFolder;
+  currentTargetFolder = targetFolder;
+
+  // ── Try to reconnect to an existing debug window from a previous session ──
+  const reconnected = await tryReconnectToExistingWindow(targetFolder, options);
+  if (reconnected) {
+    return reconnected;
+  }
+
+  // No existing window available — clean up any stale state and spawn fresh
   teardownSync();
+  debugWindowStartedAt = Date.now();
 
   // 1. Compute Host bridge path (deterministic from workspace path)
   hostBridgePath = computeBridgePath(options.workspaceFolder);
@@ -1158,7 +1479,6 @@ async function doConnect(options: VSCodeLaunchOptions): Promise<WebSocket> {
   // 4. Persistent user-data-dir inside <targetWorkspace>/.devtools/
   //    Survives server restarts/crashes so the debug window restores identically.
   //    To reset, delete the .devtools folder.
-  const targetFolder = options.targetFolder ?? options.workspaceFolder;
   userDataDir = path.join(targetFolder, '.devtools', 'user-data');
   fs.mkdirSync(userDataDir, {recursive: true});
   logger(`User data dir: ${userDataDir}`);
@@ -1316,11 +1636,29 @@ async function doConnect(options: VSCodeLaunchOptions): Promise<WebSocket> {
 
   // Monitor for unexpected disconnects
   cdpWs.on('close', () => {
-    logger('CDP WebSocket closed unexpectedly');
+    if (isIntentionalClose) {
+      isIntentionalClose = false;
+      logger('CDP closed during intentional detach (fresh spawn path)');
+      clearAllData();
+      clearAttachedTargets();
+      debugWindowStartedAt = undefined;
+      cdpWs = undefined;
+      return;
+    }
+
+    logger('Debug window closed by user — exiting MCP server');
     clearAllData();
     clearAttachedTargets();
+    debugWindowStartedAt = undefined;
     cdpWs = undefined;
+    if (currentTargetFolder) {
+      clearPersistedSession(currentTargetFolder);
+    }
+    process.exit(0);
   });
+
+  // 11. Persist session so a restarted MCP server can reconnect
+  persistSession(targetFolder);
 
   return cdpWs;
 }
@@ -1333,6 +1671,7 @@ async function doConnect(options: VSCodeLaunchOptions): Promise<WebSocket> {
  * since the process was spawned externally, not via VS Code's launch lifecycle.
  */
 export async function stopDebugWindow(): Promise<void> {
+  isIntentionalClose = true;
   clearAllData();
   clearAttachedTargets();
 
@@ -1352,6 +1691,11 @@ export async function stopDebugWindow(): Promise<void> {
 
   forceKillChildSync();
 
+  // Clear persisted session so the next MCP instance spawns a fresh window
+  if (currentTargetFolder) {
+    clearPersistedSession(currentTargetFolder);
+  }
+
   // .devtools/user-data is persistent — do NOT delete it on teardown.
   // The user can manually delete .devtools/ to reset.
 
@@ -1360,6 +1704,7 @@ export async function stopDebugWindow(): Promise<void> {
   inspectorPort = undefined;
   hostBridgePath = undefined;
   devhostBridgePath = undefined;
+  debugWindowStartedAt = undefined;
   childProcess = undefined;
   launcherPid = undefined;
   electronPid = undefined;

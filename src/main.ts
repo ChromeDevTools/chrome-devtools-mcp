@@ -10,7 +10,7 @@ import process from 'node:process';
 
 import {parseArguments} from './cli.js';
 import {loadConfig, type ResolvedConfig} from './config.js';
-import {hasExtensionChanged, saveExtensionSnapshot} from './extension-watcher.js';
+import {hasExtensionChangedSince} from './extension-watcher.js';
 import {loadIssueDescriptions} from './issue-descriptions.js';
 import {logger, saveLogsToFile} from './logger.js';
 import {McpResponse} from './McpResponse.js';
@@ -24,7 +24,12 @@ import {
 } from './third_party/index.js';
 import type {ToolDefinition} from './tools/ToolDefinition.js';
 import {tools} from './tools/tools.js';
-import {ensureVSCodeConnected, stopDebugWindow, runHostShellTaskOrThrow} from './vscode.js';
+import {
+  ensureVSCodeConnected,
+  stopDebugWindow,
+  runHostShellTaskOrThrow,
+  getDebugWindowStartedAt,
+} from './vscode.js';
 
 // Default timeout for tools (30 seconds)
 const DEFAULT_TOOL_TIMEOUT_MS = 30_000;
@@ -142,12 +147,15 @@ function registerTool(tool: ToolDefinition): void {
         // spawn a fresh one. This all happens OUTSIDE the tool's timeout so
         // that from Copilot's perspective changes are applied instantly.
         if (!isStandalone && config.explicitExtensionDevelopmentPath) {
-          if (hasExtensionChanged(config.extensionBridgePath)) {
+          const sessionStartedAtMs = getDebugWindowStartedAt();
+          if (
+            sessionStartedAtMs !== undefined &&
+            hasExtensionChangedSince(config.extensionBridgePath, sessionStartedAtMs)
+          ) {
             logger('Extension source changed — hot-reloading…');
             await stopDebugWindow();
             await runHostShellTaskOrThrow(config.hostWorkspace, 'ext:build', 300_000);
           }
-          saveExtensionSnapshot(config.extensionBridgePath);
         }
 
         // Ensure VS Code connection (CDP + bridge) OUTSIDE the timeout.
@@ -258,7 +266,6 @@ try {
   logger('Launching VS Code debug window...');
   if (config.explicitExtensionDevelopmentPath) {
     await runHostShellTaskOrThrow(config.hostWorkspace, 'ext:build', 300_000);
-    saveExtensionSnapshot(config.extensionBridgePath);
   }
   await ensureConnection();
   logger('VS Code debug window ready');

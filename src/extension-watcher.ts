@@ -8,97 +8,204 @@
 /**
  * Extension folder change detection for hot-reload.
  *
- * Computes a SHA-256 content hash of all source files in the extension
- * directory (excluding node_modules, dist, .git, and .vsix artifacts).
- * The hash serves as a fast equality check between snapshots.
+ * Timestamp strategy:
+ * - Read the most recent mtimeMs across all tracked extension files.
+ * - Compare it against the debug window session start time.
+ * - If newest mtimeMs > sessionStartMs, trigger extension hot-reload.
  *
- * Workflow:
- * 1. `saveExtensionSnapshot()` is called at server startup and after each
- *    hot-reload cycle to establish a baseline.
- * 2. Before every MCP tool call, `hasExtensionChanged()` compares the live
- *    directory against the saved baseline — if the hash differs, the caller
- *    triggers a rebuild + reconnect cycle.
+ * Tracked files are filtered by:
+ * 1. Built-in ignore defaults (node_modules, dist, .git, *.vsix)
+ * 2. Optional `<extensionRoot>/.devtoolsignore` patterns
  */
 
-import {createHash} from 'node:crypto';
-import {readdirSync, readFileSync, statSync} from 'node:fs';
-import {extname, join, relative} from 'node:path';
+import {existsSync, readdirSync, readFileSync, statSync} from 'node:fs';
+import path, {extname, join, relative} from 'node:path';
 
 import {logger} from './logger.js';
 
 const IGNORE_DIRS = new Set(['node_modules', 'dist', '.git']);
 const IGNORE_EXTENSIONS = new Set(['.vsix']);
+const DEVTOOLS_IGNORE_FILENAME = '.devtoolsignore';
 
-/** Saved hash from the most recent snapshot. */
-let lastSnapshotHash: string | undefined;
+interface IgnoreRule {
+  pattern: string;
+  negated: boolean;
+}
+
+function normalizeRelativePath(input: string): string {
+  return input.replaceAll('\\', '/');
+}
+
+function escapeRegex(text: string): string {
+  return text.replace(/[|\\{}()[\]^$+?.]/g, '\\$&');
+}
+
+function globToRegex(pattern: string): RegExp {
+  const normalized = normalizeRelativePath(pattern.trim());
+  let source = '';
+  for (let i = 0; i < normalized.length; i++) {
+    const char = normalized[i];
+    const next = normalized[i + 1];
+    if (char === '*' && next === '*') {
+      source += '.*';
+      i++;
+      continue;
+    }
+    if (char === '*') {
+      source += '[^/]*';
+      continue;
+    }
+    source += escapeRegex(char);
+  }
+  return new RegExp(`^${source}$`);
+}
+
+function parseIgnoreRules(extensionDir: string): IgnoreRule[] {
+  const rules: IgnoreRule[] = [];
+  const filePath = join(extensionDir, DEVTOOLS_IGNORE_FILENAME);
+  if (!existsSync(filePath)) {
+    return rules;
+  }
+
+  let raw = '';
+  try {
+    raw = readFileSync(filePath, 'utf8');
+  } catch {
+    return rules;
+  }
+
+  for (const line of raw.split(/\r?\n/u)) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) {
+      continue;
+    }
+    const negated = trimmed.startsWith('!');
+    const pattern = negated ? trimmed.slice(1).trim() : trimmed;
+    if (!pattern) {
+      continue;
+    }
+    rules.push({pattern, negated});
+  }
+
+  return rules;
+}
+
+function applyIgnoreRules(relativePath: string, rules: IgnoreRule[]): boolean {
+  let ignored = false;
+  const normalized = normalizeRelativePath(relativePath);
+  for (const rule of rules) {
+    const raw = normalizeRelativePath(rule.pattern);
+    const directoryPattern = raw.endsWith('/');
+    const candidatePattern = directoryPattern ? `${raw}**` : raw;
+    const matcher = globToRegex(candidatePattern);
+    if (matcher.test(normalized)) {
+      ignored = !rule.negated;
+    }
+  }
+  return ignored;
+}
+
+function shouldIgnorePath(
+  extensionDir: string,
+  fullPath: string,
+  isDirectory: boolean,
+  rules: IgnoreRule[],
+): boolean {
+  const relativePath = normalizeRelativePath(relative(extensionDir, fullPath));
+  if (!relativePath || relativePath === '.') {
+    return false;
+  }
+
+  const basename = path.basename(fullPath);
+  if (isDirectory && IGNORE_DIRS.has(basename)) {
+    return true;
+  }
+  if (!isDirectory && IGNORE_EXTENSIONS.has(extname(basename))) {
+    return true;
+  }
+
+  const matchPath = isDirectory ? `${relativePath}/` : relativePath;
+  return applyIgnoreRules(matchPath, rules);
+}
+
+interface FileMtimeResult {
+  newestMtimeMs: number;
+  trackedFileCount: number;
+}
 
 /**
- * Recursively walk a directory and return sorted relative paths of all files,
- * skipping ignored directories and file extensions.
+ * Recursively scan tracked files and return the newest mtimeMs.
  */
-function walkFiles(dir: string, base: string): string[] {
-  const results: string[] = [];
+function scanNewestMtime(
+  dir: string,
+  extensionDir: string,
+  rules: IgnoreRule[],
+): FileMtimeResult {
+  let newestMtimeMs = 0;
+  let trackedFileCount = 0;
   let entries: string[];
   try {
     entries = readdirSync(dir, {encoding: 'utf8'});
   } catch {
-    return results;
+    return {newestMtimeMs, trackedFileCount};
   }
+
   for (const name of entries) {
     const fullPath = join(dir, name);
-    let stat;
+    let stat: ReturnType<typeof statSync>;
     try {
       stat = statSync(fullPath);
     } catch {
       continue;
     }
+
     if (stat.isDirectory()) {
-      if (IGNORE_DIRS.has(name)) {continue;}
-      results.push(...walkFiles(fullPath, base));
+      if (shouldIgnorePath(extensionDir, fullPath, true, rules)) {
+        continue;
+      }
+      const child = scanNewestMtime(fullPath, extensionDir, rules);
+      if (child.newestMtimeMs > newestMtimeMs) {
+        newestMtimeMs = child.newestMtimeMs;
+      }
+      trackedFileCount += child.trackedFileCount;
     } else if (stat.isFile()) {
-      if (IGNORE_EXTENSIONS.has(extname(name))) {continue;}
-      results.push(relative(base, fullPath));
+      if (shouldIgnorePath(extensionDir, fullPath, false, rules)) {
+        continue;
+      }
+      trackedFileCount++;
+      if (stat.mtimeMs > newestMtimeMs) {
+        newestMtimeMs = stat.mtimeMs;
+      }
     }
   }
-  return results.sort();
+
+  return {newestMtimeMs, trackedFileCount};
 }
 
 /**
- * Compute a SHA-256 hash of all source files in the extension directory.
- * The hash includes file paths (sorted) and their contents so that both
- * content edits and renames are detected.
+ * Returns the newest file change timestamp among tracked extension files.
  */
-export function computeExtensionHash(extensionDir: string): string {
-  const hash = createHash('sha256');
-  const files = walkFiles(extensionDir, extensionDir);
-  for (const file of files) {
-    // Include the relative path so renames are detected
-    hash.update(file);
-    hash.update(readFileSync(join(extensionDir, file)));
-  }
-  return hash.digest('hex');
+export function getNewestTrackedChangeTime(extensionDir: string): number {
+  const rules = parseIgnoreRules(extensionDir);
+  const result = scanNewestMtime(extensionDir, extensionDir, rules);
+  return result.newestMtimeMs;
 }
 
 /**
- * Save the current state of the extension directory as the baseline snapshot.
- * Subsequent calls to `hasExtensionChanged()` compare against this.
+ * Check whether extension files changed after the debug window started.
+ *
+ * @param extensionDir Extension source root
+ * @param sessionStartedAtMs Debug session start timestamp in epoch ms
  */
-export function saveExtensionSnapshot(extensionDir: string): void {
-  lastSnapshotHash = computeExtensionHash(extensionDir);
-  logger(`Extension snapshot saved: ${lastSnapshotHash.slice(0, 12)}…`);
-}
-
-/**
- * Check whether the extension directory has changed since the last snapshot.
- * Returns false if no snapshot exists (nothing to compare against).
- */
-export function hasExtensionChanged(extensionDir: string): boolean {
-  if (lastSnapshotHash === undefined) {return false;}
-  const currentHash = computeExtensionHash(extensionDir);
-  const changed = currentHash !== lastSnapshotHash;
+export function hasExtensionChangedSince(
+  extensionDir: string,
+  sessionStartedAtMs: number,
+): boolean {
+  const newestChangeTime = getNewestTrackedChangeTime(extensionDir);
+  const changed = newestChangeTime > sessionStartedAtMs;
   if (changed) {
     logger(
-      `Extension changed: ${lastSnapshotHash.slice(0, 12)}… → ${currentHash.slice(0, 12)}…`,
+      `Extension changed after session start: newest=${new Date(newestChangeTime).toISOString()}, sessionStart=${new Date(sessionStartedAtMs).toISOString()}`,
     );
   }
   return changed;

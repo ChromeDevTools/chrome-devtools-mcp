@@ -13,6 +13,9 @@
  */
 
 import {bridgeExec} from '../bridge-client.js';
+import {fetchAXTree} from '../ax-tree.js';
+import {checkPendingNotifications} from '../notification-gate.js';
+import {logger} from '../logger.js';
 import {zod} from '../third_party/index.js';
 import {getDevhostBridgePath} from '../vscode.js';
 
@@ -36,6 +39,72 @@ function ensureBridgeConnected(): string {
   return bridgePath;
 }
 
+/**
+ * Capture the current UI state after a bridge timeout. Always returns a
+ * formatted message with the AX tree snapshot, indicating whether
+ * interactive UI was detected or no visual changes occurred.
+ */
+async function captureInteractiveUIOnTimeout(): Promise<string> {
+  try {
+    const [notifications, axTree] = await Promise.all([
+      checkPendingNotifications(),
+      fetchAXTree(false),
+    ]);
+
+    const sections: string[] = [];
+
+    // Blocking modals (e.g. "Save file?" dialogs)
+    if (notifications.blocking.length > 0) {
+      for (const modal of notifications.blocking) {
+        sections.push(`**⛔ Blocking Dialog:** ${modal.message}`);
+        if (modal.buttons.length > 0) {
+          const btnList = modal.buttons.map(b => `"${b.label}"`).join(', ');
+          sections.push(`**Buttons:** ${btnList}`);
+        }
+      }
+    }
+
+    // Quick input widgets (command palette, input box, quick pick)
+    if (notifications.nonBlocking.some(n => n.type === 'dialog')) {
+      for (const dialog of notifications.nonBlocking.filter(n => n.type === 'dialog')) {
+        sections.push(`**📝 Input Dialog:** ${dialog.message}`);
+      }
+    }
+
+    // Build the response with the AX tree snapshot so Copilot can interact
+    const lines: string[] = [];
+
+    if (sections.length > 0 || axTree.formatted.includes('focused')) {
+      lines.push('## ⏳ Command Opened Interactive UI');
+      lines.push('');
+      lines.push('The command did not return a value because it opened an interactive');
+      lines.push('dialog or input that is waiting for user interaction.');
+      lines.push('Use the snapshot below to type into or click on the appropriate elements.');
+    } else {
+      lines.push('## ⏳ Command Timed Out');
+      lines.push('');
+      lines.push('The command did not return a value within the timeout period.');
+      lines.push('No interactive UI was detected. The page snapshot is provided below.');
+    }
+
+    lines.push('');
+    if (sections.length > 0) {
+      for (const s of sections) {
+        lines.push(s);
+      }
+      lines.push('');
+    }
+    lines.push('## Page Snapshot');
+    lines.push('');
+    lines.push(axTree.formatted);
+
+    return lines.join('\n');
+  } catch (err) {
+    logger(`captureInteractiveUIOnTimeout failed: ${err}`);
+    return `## ⏳ Command Timed Out\n\nThe command did not return a value within the timeout period.\nFailed to capture UI state: ${err}`;
+  }
+}
+
 const InvokeVscodeCommandOutputSchema = zod.object({
   success: zod.boolean(),
   command: zod.string(),
@@ -54,6 +123,11 @@ Args:
 Returns:
   JSON format: { success: true, command: string, result: <command return value> }
   Markdown format: Command result in JSON code block
+
+If the command opens an interactive dialog (input box, quick pick, etc.) that blocks
+until user interaction, the tool returns a page snapshot with the interactive UI elements
+and their UIDs so you can type into or click on them using keyboard_type, keyboard_hotkey,
+or mouse_click.
 
 Examples:
   - Save current file: { command: "workbench.action.files.save" }
@@ -106,7 +180,21 @@ Error Handling:
       : `return await vscode.commands.executeCommand(payload.command);`;
 
     const payload = {command, args: args ?? []};
-    const result = await bridgeExec(bridgePath, expression, payload);
+
+    let result: unknown;
+    try {
+      result = await bridgeExec(bridgePath, expression, payload);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (message.includes('timed out')) {
+        const interactiveUI = await captureInteractiveUIOnTimeout();
+        response.appendResponseLine(`**Command:** \`${command}\``);
+        response.appendResponseLine('');
+        response.appendResponseLine(interactiveUI);
+        return;
+      }
+      throw err;
+    }
 
     if (request.params.response_format === ResponseFormat.JSON) {
       const output = {
@@ -160,6 +248,10 @@ Returns:
   JSON format: { success: true, result: <evaluated value>, type: typeof result }
   Markdown format: Formatted result in JSON code block
 
+If the API call opens an interactive dialog (input box, quick pick, etc.) that blocks
+until user interaction, the tool returns a page snapshot with the interactive UI elements
+and their UIDs so you can type into or click on them.
+
 Examples:
   - Get VS Code version:
     { expression: "return vscode.version;" }
@@ -186,7 +278,7 @@ Error Handling:
   - Throws if Extension Development Host bridge is not connected
   - Throws if expression execution fails
   - Returns error if response exceeds ${CHARACTER_LIMIT} chars`,
-  timeoutMs: 10000,
+  timeoutMs: 12000,
   annotations: {
     category: ToolCategory.DEBUGGING,
     readOnlyHint: true,
@@ -216,7 +308,18 @@ Error Handling:
     const {expression, payload} = request.params;
     const bridgePath = ensureBridgeConnected();
 
-    const result = await bridgeExec(bridgePath, expression, payload);
+    let result: unknown;
+    try {
+      result = await bridgeExec(bridgePath, expression, payload);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (message.includes('timed out')) {
+        const interactiveUI = await captureInteractiveUIOnTimeout();
+        response.appendResponseLine(interactiveUI);
+        return;
+      }
+      throw err;
+    }
 
     if (request.params.response_format === ResponseFormat.JSON) {
       const output = {

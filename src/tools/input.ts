@@ -13,6 +13,7 @@ import {
   hoverElement,
   pressKey,
   scrollElement,
+  typeIntoElement,
 } from '../ax-tree.js';
 import {zod} from '../third_party/index.js';
 
@@ -181,9 +182,13 @@ export const keyboardType = defineTool({
   name: 'keyboard_type',
   description: `Type text into a input, text area or select an option from a <select> element.
 
+By default, text is inserted at the current cursor position without clearing existing content,
+just like a normal keyboard. Set \`clear\` to true to replace all existing content first.
+
 Args:
   - uid (string): Element uid from page snapshot
   - value (string): Text to type or option to select
+  - clear (boolean): Clear existing content before typing. Default: false
   - includeSnapshot (boolean): Include full snapshot. Default: false
   - response_format ('markdown'|'json'): Output format. Default: 'markdown'
 
@@ -207,13 +212,21 @@ Returns:
         'The uid of an element on the page from the page content snapshot',
       ),
     value: zod.string().describe('The value to fill in'),
+    clear: zod
+      .boolean()
+      .optional()
+      .describe(
+        'Clear existing content before typing. Default: false. ' +
+        'When false, text is inserted at the current cursor position like a normal keyboard.',
+      ),
     includeSnapshot: includeSnapshotSchema,
   },
   outputSchema: InputActionOutputSchema,
   handler: async (request, response) => {
-    const {uid, value, includeSnapshot} = request.params;
+    const {uid, value, clear, includeSnapshot} = request.params;
+    const typeAction = clear ? fillElement : typeIntoElement;
     const {changes} = await executeWithChanges(
-      async () => fillElement(uid, value),
+      async () => typeAction(uid, value),
       includeSnapshot,
       response,
       request.params.response_format,
@@ -228,7 +241,7 @@ Returns:
       return;
     }
 
-    response.appendResponseLine('Filled out the element');
+    response.appendResponseLine(clear ? 'Replaced content in element' : 'Typed into element');
   },
 });
 
