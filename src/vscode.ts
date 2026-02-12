@@ -42,11 +42,7 @@ import {
 import {initCdpEventSubscriptions, clearAllData} from './cdp-events.js';
 import {DEFAULT_LAUNCH_FLAGS, type LaunchFlags} from './config.js';
 import {logger} from './logger.js';
-import {
-  isWatchRestartPending,
-  clearWatchRestartPending,
-  stopMcpSocketServer,
-} from './mcp-socket-server.js';
+import {stopMcpSocketServer} from './mcp-socket-server.js';
 
 // ── CDP Target Types ────────────────────────────────────
 
@@ -924,21 +920,19 @@ export function teardownSync(): void {
 let exitCleanupDone = false;
 
 /**
- * Shared shutdown logic. Checks the MCP socket server's flag
- * (set by extension via JSON-RPC `detach-gracefully` call).
+ * Shared shutdown logic.
+ *
+ * Always detaches gracefully so the debug window survives MCP server
+ * restarts (both watch-triggered and manual GUI restarts). The host
+ * bridge's killRegisteredChildren() handles final cleanup when the
+ * host VS Code actually closes.
  */
 function handleShutdown(source: string): void {
   if (exitCleanupDone) return;
   exitCleanupDone = true;
 
-  if (isWatchRestartPending()) {
-    logger(`${source} — watch restart detected, detaching gracefully`);
-    clearWatchRestartPending();
-    detachGracefully();
-  } else {
-    logger(`${source} — manual stop, tearing down debug window`);
-    teardownSync();
-  }
+  logger(`${source} — detaching gracefully (debug window preserved)`);
+  detachGracefully();
   stopMcpSocketServer();
   process.exit(0);
 }
@@ -947,8 +941,9 @@ function handleShutdown(source: string): void {
  * Registers process-level handlers for MCP server shutdown.
  *
  * On Windows, VS Code kills the MCP server by closing stdin.
- * Each handler checks the MCP socket server's watchRestartPending flag
- * to decide between graceful detach and full teardown.
+ * All soft shutdown paths (stdin end, SIGINT, SIGTERM) detach gracefully
+ * so the debug window survives restarts. Only uncaughtException triggers
+ * a full teardown for safety.
  */
 function registerLifecycleHandlers(): void {
   process.stdin.on('end', () => handleShutdown('stdin ended'));
@@ -956,7 +951,7 @@ function registerLifecycleHandlers(): void {
   process.on('exit', () => {
     if (exitCleanupDone) return;
     exitCleanupDone = true;
-    teardownSync();
+    detachGracefully();
     stopMcpSocketServer();
   });
 
