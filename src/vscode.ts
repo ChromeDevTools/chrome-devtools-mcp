@@ -11,7 +11,7 @@
  * 2. Allocates dynamic ports (CDP + Extension Host inspector) via get-port
  * 3. Spawns an Extension Development Host via child_process.spawn()
  * 4. Connects via raw CDP WebSocket to the page-level target
- * 5. Polls for workbench readiness (.monaco-workbench + document.readyState)
+ * 5. Waits for Dev Host bridge readiness as the authoritative startup signal
  * 6. Provides lifecycle management (cleanup on exit/crash)
  *
  * Session data is persisted in `<targetWorkspace>/.devtools/user-data/`.
@@ -28,7 +28,6 @@ import fs from 'node:fs';
 import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
-import {fileURLToPath} from 'node:url';
 
 import getPort from 'get-port';
 import WebSocket from 'ws';
@@ -43,6 +42,11 @@ import {
 import {initCdpEventSubscriptions, clearAllData} from './cdp-events.js';
 import {DEFAULT_LAUNCH_FLAGS, type LaunchFlags} from './config.js';
 import {logger} from './logger.js';
+import {
+  isWatchRestartPending,
+  clearWatchRestartPending,
+  stopMcpSocketServer,
+} from './mcp-socket-server.js';
 
 // ── CDP Target Types ────────────────────────────────────
 
@@ -483,6 +487,33 @@ export async function getAllTargets(): Promise<CdpTargetInfo[]> {
   return (result.targetInfos ?? []) as CdpTargetInfo[];
 }
 
+// ── Debugger Attach Helper ───────────────────────────────
+
+/**
+ * Wait for the inspector port then attach the debugger via the host bridge.
+ * Non-fatal — if attachment fails, we log and continue (tools still work,
+ * only the debugger UI in the host VS Code is missing).
+ */
+async function attachDebuggerAsync(
+  bridgePath: string,
+  port: number,
+): Promise<void> {
+  try {
+    await waitForInspectorPort(port);
+    await bridgeAttachDebugger(
+      bridgePath,
+      port,
+      `Extension Host (port ${port})`,
+    );
+    logger('Debug session attached — full debug UI active');
+  } catch (err) {
+    logger(
+      `Warning: debugger attach failed: ${(err as Error).message}. ` +
+        'Continuing without debug UI.',
+    );
+  }
+}
+
 // ── Port Polling ────────────────────────────────────────
 
 async function waitForDebugPort(
@@ -616,121 +647,6 @@ async function connectCdpWebSocket(wsUrl: string): Promise<WebSocket> {
       reject(new Error(`CDP WebSocket error: ${err.message}`));
   });
   return ws;
-}
-
-// ── Workbench Readiness ─────────────────────────────────
-
-async function waitForWorkbenchReady(
-  ws: WebSocket,
-  timeout = 30_000,
-): Promise<void> {
-  logger('Waiting for VS Code workbench to finish loading...');
-  const start = Date.now();
-  while (Date.now() - start < timeout) {
-    try {
-      const result = await sendCdp(
-        'Runtime.evaluate',
-        {
-          expression: `(() => {
-            const hasMonaco = !!document.querySelector('.monaco-workbench');
-            const readyState = document.readyState;
-            return JSON.stringify({ hasMonaco, readyState });
-          })()`,
-          returnByValue: true,
-        },
-        ws,
-      );
-      const state = JSON.parse(result.result.value);
-      if (state.hasMonaco && state.readyState === 'complete') {
-        logger('Workbench ready');
-        // Now wait for Extension Host to finish initializing
-        await waitForExtensionHostReady(ws, Math.max(10_000, timeout - (Date.now() - start)));
-        return;
-      }
-      logger(
-        `Not ready yet: hasMonaco=${state.hasMonaco}, readyState=${state.readyState}`,
-      );
-    } catch {
-      // Page may not be ready for evaluate yet
-    }
-    await new Promise(r => setTimeout(r, 1000));
-  }
-  logger('Warning: timed out waiting for workbench — proceeding anyway');
-}
-
-/**
- * Wait for Extension Host to finish initializing.
- * Checks for:
- * 1. No active progress indicators in the status bar
- * 2. No "Activating Extensions" window state
- * 3. Stable UI (no rapid DOM changes)
- */
-async function waitForExtensionHostReady(
-  ws: WebSocket,
-  timeout = 8_000,
-): Promise<void> {
-  logger('Waiting for Extension Host to finish initializing...');
-  const start = Date.now();
-  let stableCount = 0;
-  const requiredStableChecks = 2; // Need 2 consecutive stable checks (reduced for speed)
-
-  while (Date.now() - start < timeout) {
-    try {
-      const result = await sendCdp(
-        'Runtime.evaluate',
-        {
-          expression: `(() => {
-            // Check for loading/progress indicators (excluding notification center)
-            const progressContainers = document.querySelectorAll('.monaco-progress-container:not(.done)');
-            // Filter out progress bars in notification center
-            let hasProgress = false;
-            for (const p of progressContainers) {
-              if (!p.closest('.notifications-center, .notifications-toasts')) {
-                hasProgress = true;
-                break;
-              }
-            }
-            
-            // Check for spinning icons (loading state)
-            const hasSpinner = !!document.querySelector('.codicon-loading, .codicon-sync-spin');
-            
-            // Check if status bar shows "activating" state
-            const statusBar = document.querySelector('.statusbar');
-            const statusText = statusBar?.textContent || '';
-            const isActivating = statusText.toLowerCase().includes('activating');
-            
-            return JSON.stringify({
-              hasProgress,
-              hasSpinner,
-              isActivating,
-            });
-          })()`,
-          returnByValue: true,
-        },
-        ws,
-      );
-      const state = JSON.parse(result.result.value);
-      const isStable = !state.hasProgress && !state.hasSpinner && !state.isActivating;
-      
-      if (isStable) {
-        stableCount++;
-        logger(`Extension Host appears stable (${stableCount}/${requiredStableChecks})`);
-        if (stableCount >= requiredStableChecks) {
-          logger('Extension Host ready');
-          return;
-        }
-      } else {
-        stableCount = 0;
-        logger(
-          `Extension Host still initializing: progress=${state.hasProgress}, spinner=${state.hasSpinner}, activating=${state.isActivating}`,
-        );
-      }
-    } catch {
-      stableCount = 0;
-    }
-    await new Promise(r => setTimeout(r, 300));
-  }
-  logger('Extension Host initialization timeout — proceeding anyway');
 }
 
 // ── Dev Host Bridge Discovery ───────────────────────────
@@ -1003,101 +919,49 @@ export function teardownSync(): void {
   userDataDir = undefined;
 }
 
-// ── Watch-Restart Detection ─────────────────────────────
-
-// Compiled output lives in build/src/ — derive the TypeScript source directory
-const mcpSourceDir = path.resolve(
-  path.dirname(fileURLToPath(import.meta.url)),
-  '..', '..', 'src'
-);
-
-/**
- * Heuristic: detect if the MCP server is being killed because VS Code's
- * watch mode (dev.watch in mcp.json) saw a source-file change.  If any
- * .ts file in mcp-server/src/ was modified within the last few seconds,
- * the kill is almost certainly a watch restart — so we should detach
- * gracefully and let the debug window survive for reconnection.
- *
- * If no source file was touched recently, it's a manual stop and we
- * should tear the debug window down.
- */
-function isWatchRestart(): boolean {
-  const THRESHOLD_MS = 5_000;
-  const now = Date.now();
-  try {
-    if (!fs.existsSync(mcpSourceDir)) return false;
-    const entries = fs.readdirSync(mcpSourceDir, {recursive: true});
-    for (const entry of entries) {
-      const filePath = path.join(mcpSourceDir, entry.toString());
-      if (!filePath.endsWith('.ts')) continue;
-      try {
-        const stat = fs.statSync(filePath);
-        if (stat.isFile() && now - stat.mtimeMs < THRESHOLD_MS) {
-          logger(`Watch restart detected: ${filePath} modified ${Math.round(now - stat.mtimeMs)}ms ago`);
-          return true;
-        }
-      } catch {
-        continue;
-      }
-    }
-  } catch {
-    // Can't check — default to teardown (safe)
-  }
-  return false;
-}
-
 // ── Lifecycle Handlers (registered once) ────────────────
 
 let exitCleanupDone = false;
 
 /**
+ * Shared shutdown logic. Checks the MCP socket server's flag
+ * (set by extension via JSON-RPC `detach-gracefully` call).
+ */
+function handleShutdown(source: string): void {
+  if (exitCleanupDone) return;
+  exitCleanupDone = true;
+
+  if (isWatchRestartPending()) {
+    logger(`${source} — watch restart detected, detaching gracefully`);
+    clearWatchRestartPending();
+    detachGracefully();
+  } else {
+    logger(`${source} — manual stop, tearing down debug window`);
+    teardownSync();
+  }
+  stopMcpSocketServer();
+  process.exit(0);
+}
+
+/**
  * Registers process-level handlers for MCP server shutdown.
  *
- * On Windows, VS Code kills the MCP server by closing stdin and terminating
- * the process. We listen for 'end' on stdin as the PRIMARY shutdown trigger.
- *
- * WATCH RESTART vs MANUAL STOP:
- * - If a source file was modified in the last few seconds, this is a watch
- *   restart: detach gracefully so the debug window survives reconnection.
- * - Otherwise, this is a manual stop: tear down the debug window and clear
- *   the persisted session to prevent orphaned windows.
+ * On Windows, VS Code kills the MCP server by closing stdin.
+ * Each handler checks the MCP socket server's watchRestartPending flag
+ * to decide between graceful detach and full teardown.
  */
 function registerLifecycleHandlers(): void {
-  process.stdin.on('end', () => {
-    if (exitCleanupDone) return;
-    exitCleanupDone = true;
+  process.stdin.on('end', () => handleShutdown('stdin ended'));
 
-    if (isWatchRestart()) {
-      logger('stdin ended — watch restart detected, detaching gracefully');
-      detachGracefully();
-    } else {
-      logger('stdin ended — manual stop, tearing down debug window');
-      teardownSync();
-    }
-    process.exit(0);
-  });
-
-  // Safety net — only runs if no handler above already cleaned up
   process.on('exit', () => {
     if (exitCleanupDone) return;
     exitCleanupDone = true;
     teardownSync();
+    stopMcpSocketServer();
   });
 
-  const shutdown = () => {
-    if (exitCleanupDone) return;
-    exitCleanupDone = true;
-
-    if (isWatchRestart()) {
-      detachGracefully();
-    } else {
-      teardownSync();
-    }
-    process.exit(0);
-  };
-
-  process.on('SIGINT', shutdown);
-  process.on('SIGTERM', shutdown);
+  process.on('SIGINT', () => handleShutdown('SIGINT'));
+  process.on('SIGTERM', () => handleShutdown('SIGTERM'));
 
   process.on('uncaughtException', (err) => {
     logger('Uncaught exception:', err);
@@ -1198,6 +1062,14 @@ export async function runHostShellTaskOrThrow(
     await bridgeExec(
       bridge,
       `
+      // Terminate any existing executions of this task to prevent "Select instance" dialog
+      const existingExecutions = vscode.tasks.taskExecutions.filter(
+        exec => exec.task.name === payload.label
+      );
+      for (const exec of existingExecutions) {
+        exec.terminate();
+      }
+
       const tasks = await vscode.tasks.fetchTasks();
       const target = tasks.find(t => t.name === payload.label);
       if (!target) {
@@ -1326,7 +1198,7 @@ export async function runHostShellTaskOrThrow(
  * 3. Spawns Extension Development Host with vscode-devtools extension
  * 4. Attaches debugger for full debug UI
  * 5. Connects raw CDP WebSocket to workbench page
- * 6. Polls for workbench readiness
+ * 6. Waits for Dev Host bridge readiness (authoritative signal)
  */
 export async function ensureVSCodeConnected(
   options: VSCodeLaunchOptions,
@@ -1467,25 +1339,17 @@ async function tryReconnectToExistingWindow(
   await sendCdp('Page.enable', {}, cdpWs);
   await initCdpEventSubscriptions();
   await enableTargetAutoAttach();
-  await waitForWorkbenchReady(cdpWs);
 
-  // Re-discover Dev Host bridge
-  devhostBridgePath = (await waitForDevHostBridge(targetFolder)) ?? undefined;
-
-  // Re-attach debugger if possible
-  try {
-    if (hostBridgePath && inspectorPort) {
-      await waitForInspectorPort(inspectorPort);
-      await bridgeAttachDebugger(
-        hostBridgePath,
-        inspectorPort,
-        `Extension Host (port ${inspectorPort})`,
-      );
-      logger('Debug session re-attached');
-    }
-  } catch (err) {
-    logger(`Debugger re-attach skipped: ${(err as Error).message}`);
-  }
+  // Dev Host bridge connectivity is the single readiness signal —
+  // if the bridge is connectable, workbench + extension host + extension are all ready.
+  // Attach debugger in parallel (non-fatal if it fails).
+  const [devBridge] = await Promise.all([
+    waitForDevHostBridge(targetFolder),
+    hostBridgePath && inspectorPort
+      ? attachDebuggerAsync(hostBridgePath, inspectorPort)
+      : Promise.resolve(),
+  ]);
+  devhostBridgePath = devBridge ?? undefined;
 
   // Monitor for unexpected disconnects
   cdpWs.on('close', () => {
@@ -1575,10 +1439,6 @@ async function doConnect(options: VSCodeLaunchOptions): Promise<WebSocket> {
   userDataDir = path.join(targetFolder, '.devtools', 'user-data');
   fs.mkdirSync(userDataDir, {recursive: true});
   logger(`User data dir: ${userDataDir}`);
-
-  // Pre-flight: kill any zombie VS Code using the same user-data-dir from a crashed session.
-  // This ensures we don't have port conflicts or stale locks.
-  killByUserDataDirSync(userDataDir);
 
   // Ensure .devtools is in the target workspace's .gitignore
   ensureGitignoreEntry(targetFolder);
@@ -1698,42 +1558,29 @@ async function doConnect(options: VSCodeLaunchOptions): Promise<WebSocket> {
     logger('Warning: could not discover Electron PID — cleanup may be incomplete');
   }
 
-  // 7. Wait for inspector, then attach debugger for full debug UI
-  try {
-    await waitForInspectorPort(iPort);
-    await bridgeAttachDebugger(
-      hostBridgePath,
-      iPort,
-      `Extension Host (port ${iPort})`,
-    );
-    logger('Debug session attached — full debug UI active');
-  } catch (err) {
-    logger(
-      `Warning: debugger attach failed: ${(err as Error).message}. Continuing without debug UI.`,
-    );
-  }
-
-  // 8. Find workbench page target and connect raw CDP WebSocket
+  // 7. Find workbench page target and connect raw CDP WebSocket.
+  //    This only requires the CDP port to be available, no DOM readiness needed.
   const workbench = await findWorkbenchTarget(cPort);
   logger(
     `Connecting to workbench target: "${workbench.title}" (${workbench.webSocketDebuggerUrl})`,
   );
   cdpWs = await connectCdpWebSocket(workbench.webSocketDebuggerUrl);
 
-  // 9. Enable CDP domains and wait for readiness
+  // 8. Enable CDP domains (fast protocol commands)
   await sendCdp('Runtime.enable', {}, cdpWs);
   await sendCdp('Page.enable', {}, cdpWs);
-
-  // 9a. Initialize CDP event subscriptions for console messages
   await initCdpEventSubscriptions();
-
-  // 9b. Enable target auto-attach for OOPIF/webview discovery
   await enableTargetAutoAttach();
 
-  await waitForWorkbenchReady(cdpWs);
-
-  // 10. Discover Dev Host bridge (for VS Code API calls in the target window)
-  devhostBridgePath = (await waitForDevHostBridge(targetFolder)) ?? undefined;
+  // 9. Wait for the Dev Host bridge + attach debugger IN PARALLEL.
+  //    The Dev Host bridge becoming connectable is the authoritative signal
+  //    that VS Code's workbench, extension host, and our extension are all
+  //    ready — no need to poll DOM elements or CSS spinner classes.
+  const [devBridge] = await Promise.all([
+    waitForDevHostBridge(targetFolder),
+    attachDebuggerAsync(hostBridgePath, iPort),
+  ]);
+  devhostBridgePath = devBridge ?? undefined;
 
   // Monitor for unexpected disconnects
   cdpWs.on('close', () => {

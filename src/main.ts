@@ -14,6 +14,7 @@ import {hasExtensionChangedSince} from './extension-watcher.js';
 import {loadIssueDescriptions} from './issue-descriptions.js';
 import {logger, saveLogsToFile} from './logger.js';
 import {McpResponse} from './McpResponse.js';
+import {startMcpSocketServer} from './mcp-socket-server.js';
 import {Mutex} from './Mutex.js';
 import {checkForBlockingUI} from './notification-gate.js';
 import {
@@ -73,6 +74,9 @@ export const args = cliArgs;
 if (config.logFile) {
   saveLogsToFile(config.logFile);
 }
+
+// Start MCP socket server so the extension can send commands (e.g. detach-gracefully)
+startMcpSocketServer(config.hostWorkspace);
 
 process.on('unhandledRejection', (reason, promise) => {
   logger('Unhandled promise rejection', promise, reason);
@@ -264,9 +268,6 @@ logger('VS Code DevTools MCP Server connected');
 // Tools will lazily call ensureConnection() on their first invocation.
 try {
   logger('Launching VS Code debug window...');
-  if (config.explicitExtensionDevelopmentPath) {
-    await runHostShellTaskOrThrow(config.hostWorkspace, 'ext:build', 300_000);
-  }
   await ensureConnection();
   logger('VS Code debug window ready');
 } catch (err) {
