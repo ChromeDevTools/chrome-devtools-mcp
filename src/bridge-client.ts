@@ -182,3 +182,15 @@ export async function bridgeUnregisterChildPid(
 ): Promise<void> {
   await sendBridgeRequest(bridgePath, 'unregister-child-pid', {pid}, BRIDGE_TIMEOUT_MS);
 }
+
+/**
+ * Set the hot-reload flag on the host bridge.
+ * While active, the extension's debug session terminate handler
+ * will not stop the MCP server (preventing a race during extension rebuilds).
+ */
+export async function bridgeSetHotReload(
+  bridgePath: string,
+  active: boolean,
+): Promise<void> {
+  await sendBridgeRequest(bridgePath, 'set-hot-reload', {active}, BRIDGE_TIMEOUT_MS);
+}

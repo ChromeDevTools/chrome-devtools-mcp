@@ -10,6 +10,7 @@ import process from 'node:process';
 
 import {parseArguments} from './cli.js';
 import {loadConfig, type ResolvedConfig} from './config.js';
+import {bridgeSetHotReload, computeBridgePath} from './bridge-client.js';
 import {hasExtensionChangedSince} from './extension-watcher.js';
 import {loadIssueDescriptions} from './issue-descriptions.js';
 import {logger, saveLogsToFile} from './logger.js';
@@ -150,6 +151,7 @@ function registerTool(tool: ToolDefinition): void {
         // tear down the debug window, rebuild, and let ensureConnection()
         // spawn a fresh one. This all happens OUTSIDE the tool's timeout so
         // that from Copilot's perspective changes are applied instantly.
+        let didHotReload = false;
         if (!isStandalone && config.explicitExtensionDevelopmentPath) {
           const sessionStartedAtMs = getDebugWindowStartedAt();
           if (
@@ -157,8 +159,30 @@ function registerTool(tool: ToolDefinition): void {
             hasExtensionChangedSince(config.extensionBridgePath, sessionStartedAtMs)
           ) {
             logger('Extension source changed — hot-reloading…');
-            await stopDebugWindow();
-            await runHostShellTaskOrThrow(config.hostWorkspace, 'ext:build', 300_000);
+
+            // Tell the host extension a hot-reload is underway so it
+            // doesn't stop the MCP server when the debug session terminates.
+            const bridgePath = computeBridgePath(config.hostWorkspace);
+            try {
+              await bridgeSetHotReload(bridgePath, true);
+            } catch {
+              // Best-effort: bridge may be unavailable
+            }
+
+            try {
+              await stopDebugWindow();
+              await runHostShellTaskOrThrow(config.hostWorkspace, 'ext:build', 300_000);
+              didHotReload = true;
+            } catch (err) {
+              // Clear the flag on failure so future debug session closes
+              // still trigger the normal MCP stop behavior.
+              try {
+                await bridgeSetHotReload(bridgePath, false);
+              } catch {
+                // best-effort
+              }
+              throw err;
+            }
           }
         }
 
@@ -167,6 +191,15 @@ function registerTool(tool: ToolDefinition): void {
         // without eating into the tool's timeout budget.
         if (!isStandalone) {
           await ensureConnection();
+        }
+
+        // Clear the hot-reload flag now that the new debug window is running.
+        if (didHotReload) {
+          try {
+            await bridgeSetHotReload(computeBridgePath(config.hostWorkspace), false);
+          } catch {
+            // best-effort
+          }
         }
 
         const executeAll = async () => {
