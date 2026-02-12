@@ -28,6 +28,7 @@ import fs from 'node:fs';
 import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
+import {fileURLToPath} from 'node:url';
 
 import getPort from 'get-port';
 import WebSocket from 'ws';
@@ -36,6 +37,8 @@ import {
   computeBridgePath,
   bridgeExec,
   bridgeAttachDebugger,
+  bridgeRegisterChildPid,
+  bridgeUnregisterChildPid,
 } from './bridge-client.js';
 import {initCdpEventSubscriptions, clearAllData} from './cdp-events.js';
 import {DEFAULT_LAUNCH_FLAGS, type LaunchFlags} from './config.js';
@@ -929,6 +932,7 @@ function ensureGitignoreEntry(targetFolder: string): void {
   }
 }
 
+
 /**
  * Graceful detach: close the CDP WebSocket and clear in-memory state
  * WITHOUT killing the child process. The debug window stays alive so
@@ -963,10 +967,23 @@ export function detachGracefully(): void {
 }
 
 /**
- * Kill any existing child, close WS, and clean up.
+ * Kill any existing child, close WS, clear persisted session, and clean up.
  * Synchronous except for the WS close (best-effort).
  */
 export function teardownSync(): void {
+  isIntentionalClose = true;
+
+  // Unregister PID from host bridge before killing — prevents double-kill
+  // when host VS Code also shuts down.
+  if (electronPid && hostBridgePath) {
+    try {
+      // Fire-and-forget: bridge may already be gone during shutdown
+      bridgeUnregisterChildPid(hostBridgePath, electronPid).catch(() => {});
+    } catch {
+      // best-effort
+    }
+  }
+
   try {
     cdpWs?.close();
   } catch {
@@ -977,12 +994,61 @@ export function teardownSync(): void {
 
   forceKillChildSync();
 
+  if (currentTargetFolder) {
+    clearPersistedSession(currentTargetFolder);
+  }
+
   // .devtools/user-data is persistent — do NOT delete it on teardown.
   // The user can manually delete .devtools/ to reset.
   userDataDir = undefined;
 }
 
+// ── Watch-Restart Detection ─────────────────────────────
+
+// Compiled output lives in build/src/ — derive the TypeScript source directory
+const mcpSourceDir = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  '..', '..', 'src'
+);
+
+/**
+ * Heuristic: detect if the MCP server is being killed because VS Code's
+ * watch mode (dev.watch in mcp.json) saw a source-file change.  If any
+ * .ts file in mcp-server/src/ was modified within the last few seconds,
+ * the kill is almost certainly a watch restart — so we should detach
+ * gracefully and let the debug window survive for reconnection.
+ *
+ * If no source file was touched recently, it's a manual stop and we
+ * should tear the debug window down.
+ */
+function isWatchRestart(): boolean {
+  const THRESHOLD_MS = 5_000;
+  const now = Date.now();
+  try {
+    if (!fs.existsSync(mcpSourceDir)) return false;
+    const entries = fs.readdirSync(mcpSourceDir, {recursive: true});
+    for (const entry of entries) {
+      const filePath = path.join(mcpSourceDir, entry.toString());
+      if (!filePath.endsWith('.ts')) continue;
+      try {
+        const stat = fs.statSync(filePath);
+        if (stat.isFile() && now - stat.mtimeMs < THRESHOLD_MS) {
+          logger(`Watch restart detected: ${filePath} modified ${Math.round(now - stat.mtimeMs)}ms ago`);
+          return true;
+        }
+      } catch {
+        continue;
+      }
+    }
+  } catch {
+    // Can't check — default to teardown (safe)
+  }
+  return false;
+}
+
 // ── Lifecycle Handlers (registered once) ────────────────
+
+let exitCleanupDone = false;
 
 /**
  * Registers process-level handlers for MCP server shutdown.
@@ -990,38 +1056,55 @@ export function teardownSync(): void {
  * On Windows, VS Code kills the MCP server by closing stdin and terminating
  * the process. We listen for 'end' on stdin as the PRIMARY shutdown trigger.
  *
- * GRACEFUL DETACH: When the MCP server exits (restart or stop), we detach
- * from the debug window WITHOUT killing it. This allows VS Code's native
- * MCP watch mode to restart the server and reconnect to the same debug
- * window — neither harms the other during reloads.
+ * WATCH RESTART vs MANUAL STOP:
+ * - If a source file was modified in the last few seconds, this is a watch
+ *   restart: detach gracefully so the debug window survives reconnection.
+ * - Otherwise, this is a manual stop: tear down the debug window and clear
+ *   the persisted session to prevent orphaned windows.
  */
 function registerLifecycleHandlers(): void {
-  // Primary: stdin 'end' fires when VS Code disconnects the MCP server.
-  // Detach gracefully so the debug window survives MCP restarts.
   process.stdin.on('end', () => {
-    logger('stdin ended — detaching from debug window (leaving it alive)');
-    detachGracefully();
+    if (exitCleanupDone) return;
+    exitCleanupDone = true;
+
+    if (isWatchRestart()) {
+      logger('stdin ended — watch restart detected, detaching gracefully');
+      detachGracefully();
+    } else {
+      logger('stdin ended — manual stop, tearing down debug window');
+      teardownSync();
+    }
     process.exit(0);
   });
 
-  // Synchronous safety net — detach on any exit path.
-  // The debug window survives and can be reconnected by the next MCP instance.
+  // Safety net — only runs if no handler above already cleaned up
   process.on('exit', () => {
-    detachGracefully();
+    if (exitCleanupDone) return;
+    exitCleanupDone = true;
+    teardownSync();
   });
 
-  // Signal handlers — detach gracefully, don't kill the debug window
-  const gracefulShutdown = () => {
-    detachGracefully();
+  const shutdown = () => {
+    if (exitCleanupDone) return;
+    exitCleanupDone = true;
+
+    if (isWatchRestart()) {
+      detachGracefully();
+    } else {
+      teardownSync();
+    }
     process.exit(0);
   };
 
-  process.on('SIGINT', gracefulShutdown);
-  process.on('SIGTERM', gracefulShutdown);
+  process.on('SIGINT', shutdown);
+  process.on('SIGTERM', shutdown);
 
   process.on('uncaughtException', (err) => {
     logger('Uncaught exception:', err);
-    detachGracefully();
+    if (!exitCleanupDone) {
+      exitCleanupDone = true;
+      teardownSync();
+    }
     process.exit(1);
   });
 }
@@ -1353,6 +1436,15 @@ async function tryReconnectToExistingWindow(
   userDataDir = session.userDataDir;
   debugWindowStartedAt = session.debugWindowStartedAt;
 
+  // Re-register with host bridge (previous MCP instance's registration
+  // is gone because it exited — the bridge tracks by connection)
+  try {
+    await bridgeRegisterChildPid(session.hostBridgePath, session.electronPid);
+    logger(`Re-registered Electron PID ${session.electronPid} with host bridge`);
+  } catch (err) {
+    logger(`Warning: bridge PID re-registration failed: ${(err as Error).message}`);
+  }
+
   // Find the workbench target and connect CDP WebSocket
   try {
     const workbench = await findWorkbenchTarget(session.cdpPort);
@@ -1420,6 +1512,7 @@ async function tryReconnectToExistingWindow(
 
   // Update persisted session with fresh timestamp
   persistSession(targetFolder);
+
   logger('Successfully reconnected to existing debug window');
   return cdpWs;
 }
@@ -1593,6 +1686,14 @@ async function doConnect(options: VSCodeLaunchOptions): Promise<WebSocket> {
   if (realPid) {
     electronPid = realPid;
     logger(`Real Electron PID: ${electronPid}`);
+
+    // Register with host bridge so closing the host VS Code kills this window
+    try {
+      await bridgeRegisterChildPid(hostBridgePath, electronPid);
+      logger(`Registered Electron PID ${electronPid} with host bridge`);
+    } catch (err) {
+      logger(`Warning: bridge PID registration failed: ${(err as Error).message}`);
+    }
   } else {
     logger('Warning: could not discover Electron PID — cleanup may be incomplete');
   }

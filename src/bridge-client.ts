@@ -199,3 +199,138 @@ export function bridgeAttachDebugger(
     });
   });
 }
+
+/**
+ * Register a child process PID with the host bridge for lifecycle management.
+ * When the host VS Code shuts down, the bridge kills all registered PIDs.
+ * This replaces session-file-based cleanup with direct communication.
+ */
+export function bridgeRegisterChildPid(
+  bridgePath: string,
+  pid: number,
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const client = net.createConnection(bridgePath);
+    const reqId = `reg-pid-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+    let response = '';
+    client.setEncoding('utf8');
+
+    client.on('connect', () => {
+      const request =
+        JSON.stringify({id: reqId, action: 'register-child-pid', pid}) + '\n';
+      client.write(request);
+    });
+
+    client.on('data', (chunk: string) => {
+      response += chunk;
+      const nlIdx = response.indexOf('\n');
+      if (nlIdx !== -1) {
+        try {
+          const result = JSON.parse(response.slice(0, nlIdx)) as BridgeResponse;
+          client.end();
+          if (result.ok) {
+            resolve();
+          } else {
+            reject(
+              new Error(
+                `Register child PID failed: ${result.error ?? 'Unknown error'}`,
+              ),
+            );
+          }
+        } catch (e) {
+          client.end();
+          reject(
+            new Error(
+              `Failed to parse register response: ${(e as Error).message}`,
+            ),
+          );
+        }
+      }
+    });
+
+    client.on('error', (err: Error) => {
+      reject(new Error(`Bridge connection error: ${err.message}`));
+    });
+
+    const timeout = setTimeout(() => {
+      client.destroy();
+      reject(
+        new Error(
+          `Register child PID request timed out (${BRIDGE_TIMEOUT_MS}ms)`,
+        ),
+      );
+    }, BRIDGE_TIMEOUT_MS);
+
+    client.on('close', () => {
+      clearTimeout(timeout);
+    });
+  });
+}
+
+/**
+ * Unregister a child PID from the host bridge, e.g. when the MCP server
+ * intentionally tears down the debug window itself.
+ */
+export function bridgeUnregisterChildPid(
+  bridgePath: string,
+  pid: number,
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const client = net.createConnection(bridgePath);
+    const reqId = `unreg-pid-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+    let response = '';
+    client.setEncoding('utf8');
+
+    client.on('connect', () => {
+      const request =
+        JSON.stringify({id: reqId, action: 'unregister-child-pid', pid}) + '\n';
+      client.write(request);
+    });
+
+    client.on('data', (chunk: string) => {
+      response += chunk;
+      const nlIdx = response.indexOf('\n');
+      if (nlIdx !== -1) {
+        try {
+          const result = JSON.parse(response.slice(0, nlIdx)) as BridgeResponse;
+          client.end();
+          if (result.ok) {
+            resolve();
+          } else {
+            reject(
+              new Error(
+                `Unregister child PID failed: ${result.error ?? 'Unknown error'}`,
+              ),
+            );
+          }
+        } catch (e) {
+          client.end();
+          reject(
+            new Error(
+              `Failed to parse unregister response: ${(e as Error).message}`,
+            ),
+          );
+        }
+      }
+    });
+
+    client.on('error', (err: Error) => {
+      reject(new Error(`Bridge connection error: ${err.message}`));
+    });
+
+    const timeout = setTimeout(() => {
+      client.destroy();
+      reject(
+        new Error(
+          `Unregister child PID request timed out (${BRIDGE_TIMEOUT_MS}ms)`,
+        ),
+      );
+    }, BRIDGE_TIMEOUT_MS);
+
+    client.on('close', () => {
+      clearTimeout(timeout);
+    });
+  });
+}
