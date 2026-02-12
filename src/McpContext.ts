@@ -26,6 +26,7 @@ import type {
   ElementHandle,
   HTTPRequest,
   Page,
+  ScreenRecorder,
   SerializedAXNode,
   PredefinedNetworkConditions,
   Viewport,
@@ -121,6 +122,8 @@ export class McpContext implements Context {
   #extensionRegistry = new ExtensionRegistry();
 
   #isRunningTrace = false;
+  #screenRecorderData: {recorder: ScreenRecorder; filePath: string} | null =
+    null;
   #networkConditionsMap = new WeakMap<Page, string>();
   #cpuThrottlingRateMap = new WeakMap<Page, number>();
   #geolocationMap = new WeakMap<Page, GeolocationOptions>();
@@ -370,6 +373,16 @@ export class McpContext implements Context {
 
   isRunningPerformanceTrace(): boolean {
     return this.#isRunningTrace;
+  }
+
+  getScreenRecorder(): {recorder: ScreenRecorder; filePath: string} | null {
+    return this.#screenRecorderData;
+  }
+
+  setScreenRecorder(
+    data: {recorder: ScreenRecorder; filePath: string} | null,
+  ): void {
+    this.#screenRecorderData = data;
   }
 
   isCruxEnabled(): boolean {
