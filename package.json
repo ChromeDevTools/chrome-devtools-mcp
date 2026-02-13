@@ -67,6 +67,7 @@
     "rollup-plugin-cleanup": "^3.2.1",
     "rollup-plugin-license": "^3.6.0",
     "sinon": "^21.0.0",
+    "tiktoken": "^1.0.22",
     "typescript": "^5.9.2",
     "typescript-eslint": "^8.43.0",
     "yargs": "18.0.0"

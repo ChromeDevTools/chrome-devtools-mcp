@@ -6,7 +6,10 @@
 
 import fs from 'node:fs';
 
+import {Client} from '@modelcontextprotocol/sdk/client/index.js';
+import {StdioClientTransport} from '@modelcontextprotocol/sdk/client/stdio.js';
 import type {Tool} from '@modelcontextprotocol/sdk/types.js';
+import {get_encoding} from 'tiktoken';
 
 import {cliOptions} from '../build/src/cli.js';
 import {ToolCategory, labels} from '../build/src/tools/categories.js';
@@ -14,6 +17,42 @@ import {tools} from '../build/src/tools/tools.js';
 
 const OUTPUT_PATH = './docs/tool-reference.md';
 const README_PATH = './README.md';
+
+async function measureServer() {
+  // 1. Connect to your actual MCP server
+  const transport = new StdioClientTransport({
+    command: 'node',
+    args: ['./build/src/index.js'], // Point to your built MCP server
+  });
+
+  const client = new Client(
+    {name: 'measurer', version: '1.0.0'},
+    {capabilities: {}},
+  );
+  await client.connect(transport);
+
+  // 2. Fetch all tools
+  const toolsList = await client.listTools();
+
+  // 3. Serialize exactly how an LLM would see it (JSON)
+  const jsonString = JSON.stringify(toolsList.tools, null, 2);
+
+  // 4. Count tokens (using cl100k_base which is standard for GPT-4/Claude-3.5 approximation)
+  const enc = get_encoding('cl100k_base');
+  const tokenCount = enc.encode(jsonString).length;
+
+  console.log(`--- Measurement Results ---`);
+  console.log(`Total Tools: ${toolsList.tools.length}`);
+  console.log(`JSON Character Count: ${jsonString.length}`);
+  console.log(`Estimated Token Count: ~${tokenCount}`);
+
+  // Clean up
+  enc.free();
+  await client.close();
+  return {
+    tokenCount,
+  };
+}
 
 // Extend the MCP Tool type to include our annotations
 interface ToolWithAnnotations extends Tool {
@@ -316,7 +355,7 @@ async function generateToolDocumentation(): Promise<void> {
     // Generate markdown documentation
     let markdown = `<!-- AUTO GENERATED DO NOT EDIT - run 'npm run docs' to update-->
 
-# Chrome DevTools MCP Tool Reference
+# Chrome DevTools MCP Tool Reference (~${(await measureServer()).tokenCount} cl100k_base tokens)
 
 `;
 
