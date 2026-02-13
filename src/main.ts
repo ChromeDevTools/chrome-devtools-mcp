@@ -189,13 +189,25 @@ function registerTool(tool: ToolDefinition): void {
           }
         }
 
-        // Ensure VS Code connection (CDP + bridge) OUTSIDE the timeout.
-        // This allows the first tool call to wait for Extension Host initialization
-        // without eating into the tool's timeout budget.
-        if (!isStandalone) {
-          logger(`[tool:${tool.name}] Ensuring VS Code connection before tool execution...`);
+        // After a hot-reload, spawn a fresh debug window.
+        if (didHotReload) {
+          logger(`[tool:${tool.name}] Hot-reload complete — reconnecting…`);
           await ensureConnection();
-          logger(`[tool:${tool.name}] VS Code connection confirmed`);
+          logger(`[tool:${tool.name}] Reconnected after hot-reload`);
+        }
+
+        // Verify the VS Code connection is alive. Connection is established
+        // at startup — we do NOT reconnect per-tool-call to avoid interfering
+        // with the debug instance lifecycle.
+        if (!isStandalone) {
+          const {isConnected} = await import('./vscode.js');
+          if (!isConnected()) {
+            throw new Error(
+              'VS Code debug window is not connected. ' +
+              'The MCP server establishes the connection at startup. ' +
+              'If the debug window was closed, restart the MCP server.',
+            );
+          }
         }
 
         // Clear the hot-reload flag now that the new debug window is running.
@@ -318,7 +330,7 @@ logger('VS Code DevTools MCP Server connected to stdio transport');
 
 // Best-effort auto-launch: try to start the VS Code debug window now, but
 // don't crash the server if it fails (e.g., host VS Code not running yet).
-// Tools will lazily call ensureConnection() on their first invocation.
+// If this fails, all tool calls will error until the server is restarted.
 try {
   logger('[startup] Auto-launching VS Code debug window...');
   await ensureConnection();

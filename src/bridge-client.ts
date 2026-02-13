@@ -14,6 +14,7 @@ export interface AttachDebuggerResult {
   attached: boolean;
   port: number;
   name: string;
+  skipped?: boolean;
 }
 
 const BRIDGE_TIMEOUT_MS = 4_000;
@@ -79,7 +80,16 @@ function sendBridgeRequest(
     const reqId = `${method}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
     let response = '';
+    let settled = false;
     client.setEncoding('utf8');
+
+    const settle = (fn: typeof resolve | typeof reject, value: unknown) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      try { client.destroy(); } catch { /* best-effort */ }
+      fn(value);
+    };
 
     client.on('connect', () => {
       logger(`[bridge] ${method} connected — sending request (id=${reqId})`);
@@ -89,26 +99,27 @@ function sendBridgeRequest(
     });
 
     client.on('data', (chunk: string) => {
+      if (settled) return;
       response += chunk;
       const nlIdx = response.indexOf('\n');
       if (nlIdx !== -1) {
         try {
           const parsed = JSON.parse(response.slice(0, nlIdx)) as JsonRpcResponse;
-          client.end();
           if (parsed.error) {
             logger(`[bridge] ${method} ✗ error response: [${parsed.error.code}] ${parsed.error.message}`);
-            reject(
+            settle(
+              reject,
               new Error(
                 `Bridge ${method} failed [${parsed.error.code}]: ${parsed.error.message}`,
               ),
             );
           } else {
             logger(`[bridge] ${method} ✓ success`);
-            resolve(parsed.result);
+            settle(resolve, parsed.result);
           }
         } catch (e) {
-          client.end();
-          reject(
+          settle(
+            reject,
             new Error(
               `Failed to parse bridge response: ${(e as Error).message}`,
             ),
@@ -119,18 +130,27 @@ function sendBridgeRequest(
 
     client.on('error', (err: Error) => {
       logger(`[bridge] ${method} ✗ connection error: ${err.message}`);
-      reject(new Error(`Bridge connection error: ${err.message}`));
+      settle(reject, new Error(`Bridge connection error: ${err.message}`));
+    });
+
+    client.on('close', () => {
+      // If the socket closed before we got a response, reject immediately
+      // instead of dangling forever.
+      settle(
+        reject,
+        new Error(
+          `Bridge ${method} socket closed before response was received`,
+        ),
+      );
     });
 
     const timeout = setTimeout(() => {
       logger(`[bridge] ${method} ✗ TIMEOUT after ${timeoutMs}ms`);
-      client.destroy();
-      reject(new Error(`Bridge ${method} request timed out (${timeoutMs}ms)`));
+      settle(
+        reject,
+        new Error(`Bridge ${method} request timed out (${timeoutMs}ms)`),
+      );
     }, timeoutMs);
-
-    client.on('close', () => {
-      clearTimeout(timeout);
-    });
   });
 }
 

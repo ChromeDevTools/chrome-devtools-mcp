@@ -43,6 +43,7 @@ import {initCdpEventSubscriptions, clearAllData} from './cdp-events.js';
 import {DEFAULT_LAUNCH_FLAGS, type LaunchFlags} from './config.js';
 import {logger} from './logger.js';
 import {stopMcpSocketServer} from './mcp-socket-server.js';
+import {Mutex} from './Mutex.js';
 
 // ── CDP Target Types ────────────────────────────────────
 
@@ -100,6 +101,12 @@ let electronPid: number | undefined;
 let userDataDir: string | undefined;
 let connectInProgress: Promise<WebSocket> | undefined;
 let connectionGeneration = 0;
+
+// ── Debug Session Attachment State ──
+// Prevents multiple concurrent or repeated debug attachment attempts
+// which can freeze the extension host.
+let debugSessionAttached = false;
+const debugAttachMutex = new Mutex();
 
 /**
  * Flag to distinguish intentional CDP close (MCP restart / hot-reload)
@@ -490,22 +497,51 @@ export async function getAllTargets(): Promise<CdpTargetInfo[]> {
  * Non-fatal — if attachment fails, we log and continue (tools still work,
  * only the debugger UI in the host VS Code is missing).
  *
- * Uses check-and-skip: if a debug session already exists for the port
- * (e.g. from a previous MCP run or the launch mechanism), we skip
- * to avoid detaching/reattaching which can freeze the extension host.
+ * This shows the orange debug status bar in the Extension Development Host.
+ *
+ * Uses a mutex to prevent concurrent attachment attempts and a flag to
+ * prevent repeated attachments, both of which can freeze the extension host.
  */
 async function attachDebuggerAsync(
-  _bridgePath: string,
+  bridgePath: string,
   port: number,
 ): Promise<void> {
-  // DISABLED: js-debug attachment freezes the extension host when connecting
-  // to the inspector port. The MCP tools work via bridge/CDP and don't need
-  // actual debugger attachment. The orange status bar UI is nice-to-have but
-  // not worth the freeze.
-  //
-  // Future: Implement a mock debug adapter that shows the UI without
-  // connecting to the inspector port.
-  logger(`[attachDebugger] Skipped — debugger attachment disabled (port ${port}). MCP tools use bridge/CDP.`);
+  // Quick check before acquiring mutex — if already attached, skip entirely
+  if (debugSessionAttached) {
+    logger(`[attachDebugger] Debug session already attached — skipping`);
+    return;
+  }
+
+  // Acquire mutex to serialize concurrent attachment attempts
+  const guard = await debugAttachMutex.acquire();
+  try {
+    // Double-check after acquiring mutex (another caller may have attached)
+    if (debugSessionAttached) {
+      logger(`[attachDebugger] Debug session already attached (after mutex) — skipping`);
+      return;
+    }
+
+    // Wait for the inspector port to accept connections before asking
+    // the host bridge to attach. Without this, the attach request
+    // arrives before the Extension Host inspector is listening.
+    logger(`[attachDebugger] Waiting for inspector port ${port}...`);
+    await waitForInspectorPort(port, 15_000);
+
+    logger(`[attachDebugger] Attaching to inspector port ${port} via host bridge...`);
+    const result = await bridgeAttachDebugger(bridgePath, port);
+    if (result.attached) {
+      debugSessionAttached = true;
+      logger(`[attachDebugger] Debug session started: "${result.name}" on port ${result.port}${result.skipped ? ' (already existed)' : ''}`);
+    } else {
+      logger(`[attachDebugger] Debug attachment returned false — session may already exist`);
+    }
+  } catch (err) {
+    // Non-fatal — tools still work via bridge/CDP
+    const msg = err instanceof Error ? err.message : String(err);
+    logger(`[attachDebugger] Failed (non-fatal): ${msg}`);
+  } finally {
+    guard.dispose();
+  }
 }
 
 // ── Port Polling ────────────────────────────────────────
@@ -867,6 +903,7 @@ export function detachGracefully(): void {
   hostBridgePath = undefined;
   devhostBridgePath = undefined;
   debugWindowStartedAt = undefined;
+  debugSessionAttached = false;
   // Do NOT kill the child or clear the persisted session
   childProcess = undefined;
   launcherPid = undefined;
@@ -901,6 +938,7 @@ export function teardownSync(): void {
   }
   cdpWs = undefined;
   debugWindowStartedAt = undefined;
+  debugSessionAttached = false;
 
   forceKillChildSync();
 
@@ -1358,8 +1396,8 @@ async function tryReconnectToExistingWindow(
   devhostBridgePath = devBridge ?? undefined;
 
   if (hostBridgePath && inspectorPort) {
-    // attachDebuggerAsync is idempotent — it stops any stale session with the
-    // same name in a single atomic bridge exec before starting the new one.
+    // Check-and-skip: the bridge handler checks vscode.debug.activeDebugSession
+    // and skips if a session already exists for this port/name.
     await attachDebuggerAsync(hostBridgePath, inspectorPort);
   }
 
@@ -1371,6 +1409,7 @@ async function tryReconnectToExistingWindow(
       clearAllData();
       clearAttachedTargets();
       debugWindowStartedAt = undefined;
+      debugSessionAttached = false;
       cdpWs = undefined;
       return;
     }
@@ -1379,6 +1418,7 @@ async function tryReconnectToExistingWindow(
     clearAllData();
     clearAttachedTargets();
     debugWindowStartedAt = undefined;
+    debugSessionAttached = false;
     cdpWs = undefined;
     if (currentTargetFolder) {
       clearPersistedSession(currentTargetFolder);
@@ -1615,6 +1655,7 @@ async function doConnect(options: VSCodeLaunchOptions): Promise<WebSocket> {
       clearAllData();
       clearAttachedTargets();
       debugWindowStartedAt = undefined;
+      debugSessionAttached = false;
       cdpWs = undefined;
       return;
     }
@@ -1623,6 +1664,7 @@ async function doConnect(options: VSCodeLaunchOptions): Promise<WebSocket> {
     clearAllData();
     clearAttachedTargets();
     debugWindowStartedAt = undefined;
+    debugSessionAttached = false;
     cdpWs = undefined;
     if (currentTargetFolder) {
       clearPersistedSession(currentTargetFolder);
@@ -1678,6 +1720,7 @@ export async function stopDebugWindow(): Promise<void> {
   hostBridgePath = undefined;
   devhostBridgePath = undefined;
   debugWindowStartedAt = undefined;
+  debugSessionAttached = false;
   childProcess = undefined;
   launcherPid = undefined;
   electronPid = undefined;
