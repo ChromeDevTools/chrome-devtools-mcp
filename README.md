@@ -9,6 +9,10 @@ Chrome DevTools for reliable automation, in-depth debugging, and performance ana
 
 ## [Tool reference](./docs/tool-reference.md) | [Changelog](./CHANGELOG.md) | [Contributing](./CONTRIBUTING.md) | [Troubleshooting](./docs/troubleshooting.md) | [Design Principles](./docs/design-principles.md)
 
+## Examples
+
+- Minimal Node client (spawns the server with `npx` and sends an MCP `initialize` request): [`examples/minimal-node-client.mjs`](./examples/minimal-node-client.mjs)
+
 ## Key features
 
 - **Get performance insights**: Uses [Chrome
