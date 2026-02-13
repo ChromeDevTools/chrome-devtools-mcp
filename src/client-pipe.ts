@@ -10,12 +10,11 @@
  * Connects to the Client extension's pipe server (Extension Development Host)
  * to interact with terminal, output channel, and VS Code command APIs.
  *
- * Terminal methods:
- * - terminal.create: Create a tracked terminal
- * - terminal.sendText: Send text/commands to a terminal
- * - terminal.getBuffer: Read terminal output buffer
- * - terminal.list: List tracked terminals
- * - terminal.close: Close a tracked terminal
+ * Terminal methods (single-terminal model):
+ * - terminal.run: Run a command, wait for completion/prompt/timeout
+ * - terminal.input: Send input to a waiting prompt
+ * - terminal.state: Check current terminal state
+ * - terminal.kill: Send Ctrl+C to stop the running process
  * - terminal.listAll: List all terminals (tracked + untracked)
  *
  * Output methods:
@@ -37,7 +36,8 @@ const CLIENT_PIPE_PATH = IS_WINDOWS
   : '/tmp/vscode-devtools-client.sock';
 
 const DEFAULT_TIMEOUT_MS = 10_000;
-const SEND_TEXT_TIMEOUT_MS = 15_000;
+// Terminal operations wait up to 35s so the 30s command timeout finishes first
+const TERMINAL_TIMEOUT_MS = 35_000;
 
 // ── Types ────────────────────────────────────────────────
 
@@ -48,39 +48,18 @@ interface JsonRpcResponse {
   error?: {code: number; message: string; data?: unknown};
 }
 
-export interface TerminalCreateResult {
-  terminalId: string;
-  name: string;
-}
+export type TerminalStatus =
+  | 'idle'
+  | 'running'
+  | 'completed'
+  | 'waiting_for_input';
 
-export interface TerminalSendTextResult {
-  sent: boolean;
-}
-
-export interface TerminalBufferResult {
+export interface TerminalRunResult {
+  status: TerminalStatus;
   output: string;
-  metadata?: {
-    id: string;
-    name: string;
-    shellPath?: string;
-    cwd?: string;
-    createdAt: string;
-    pid?: number;
-    exitCode?: number;
-    isRunning: boolean;
-  };
-  inputHistory: string[];
-}
-
-export interface TrackedTerminalMetadata {
-  id: string;
-  name: string;
-  shellPath?: string;
-  cwd?: string;
-  createdAt: string;
-  pid?: number;
   exitCode?: number;
-  isRunning: boolean;
+  prompt?: string;
+  pid?: number;
 }
 
 export interface AllTerminalInfo {
@@ -105,10 +84,6 @@ export interface TerminalListAllResult {
   total: number;
   activeIndex?: number;
   terminals: AllTerminalInfo[];
-}
-
-export interface TerminalCloseResult {
-  closed: boolean;
 }
 
 export interface OutputChannelsResult {
@@ -220,79 +195,56 @@ function sendClientRequest(
   });
 }
 
-// ── Terminal Methods ─────────────────────────────────────
+// ── Terminal Methods (Single-Terminal Model) ─────────────
 
 /**
- * Create a new tracked terminal in the Client window.
+ * Run a command in the single managed terminal.
+ * Creates terminal if needed, rejects with state if busy.
+ * Waits for completion, prompt detection, or timeout.
  */
-export async function terminalCreate(options?: {
-  name?: string;
-  shellPath?: string;
-  cwd?: string;
-}): Promise<TerminalCreateResult> {
-  const result = await sendClientRequest('terminal.create', {
-    name: options?.name,
-    shellPath: options?.shellPath,
-    cwd: options?.cwd,
-  });
-  return result as TerminalCreateResult;
+export async function terminalRun(
+  command: string,
+  timeout?: number,
+): Promise<TerminalRunResult> {
+  const result = await sendClientRequest(
+    'terminal.run',
+    {command, timeout},
+    TERMINAL_TIMEOUT_MS,
+  );
+  return result as TerminalRunResult;
 }
 
 /**
- * Send text to a tracked terminal.
- * Uses a longer timeout since commands may take time to type.
+ * Send input to a terminal waiting for a prompt.
+ * Waits for the next completion or prompt after sending.
  */
-export async function terminalSendText(
-  terminalId: string,
+export async function terminalInput(
   text: string,
   addNewline?: boolean,
-): Promise<TerminalSendTextResult> {
+  timeout?: number,
+): Promise<TerminalRunResult> {
   const result = await sendClientRequest(
-    'terminal.sendText',
-    {terminalId, text, addNewline},
-    SEND_TEXT_TIMEOUT_MS,
+    'terminal.input',
+    {text, addNewline, timeout},
+    TERMINAL_TIMEOUT_MS,
   );
-  return result as TerminalSendTextResult;
+  return result as TerminalRunResult;
 }
 
 /**
- * Read the output buffer of a tracked terminal.
+ * Get the current terminal state without modifying anything.
  */
-export async function terminalGetBuffer(
-  terminalId: string,
-  options?: {
-    lastN?: number;
-    includeMetadata?: boolean;
-  },
-): Promise<TerminalBufferResult | null> {
-  const result = await sendClientRequest('terminal.getBuffer', {
-    terminalId,
-    lastN: options?.lastN,
-    includeMetadata: options?.includeMetadata,
-  });
-  return result as TerminalBufferResult | null;
+export async function terminalGetState(): Promise<TerminalRunResult> {
+  const result = await sendClientRequest('terminal.state', {});
+  return result as TerminalRunResult;
 }
 
 /**
- * List tracked terminals.
+ * Send Ctrl+C to kill the running process in the terminal.
  */
-export async function terminalList(
-  runningOnly?: boolean,
-): Promise<TrackedTerminalMetadata[]> {
-  const result = await sendClientRequest('terminal.list', {
-    runningOnly: runningOnly ?? false,
-  });
-  return result as TrackedTerminalMetadata[];
-}
-
-/**
- * Close a tracked terminal.
- */
-export async function terminalClose(
-  terminalId: string,
-): Promise<TerminalCloseResult> {
-  const result = await sendClientRequest('terminal.close', {terminalId});
-  return result as TerminalCloseResult;
+export async function terminalKill(): Promise<TerminalRunResult> {
+  const result = await sendClientRequest('terminal.kill', {});
+  return result as TerminalRunResult;
 }
 
 /**

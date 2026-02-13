@@ -12,7 +12,7 @@ import * as screenshotTools from './screenshot.js';
 import * as snapshotTools from './snapshot.js';
 import * as targetsTools from './targets.js';
 import * as terminalsTools from './terminals.js';
-import * as trackedTerminalTools from './tracked-terminal.js';
+import * as terminalTools from './terminal.js';
 import type {ToolDefinition} from './ToolDefinition.js';
 import * as waitTools from './wait.js';
 
@@ -25,7 +25,7 @@ const tools = [
   ...Object.values(snapshotTools),
   ...Object.values(targetsTools),
   ...Object.values(terminalsTools),
-  ...Object.values(trackedTerminalTools),
+  ...Object.values(terminalTools),
   ...Object.values(waitTools),
 ] as unknown as ToolDefinition[];
 
