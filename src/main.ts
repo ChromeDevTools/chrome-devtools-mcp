@@ -32,6 +32,7 @@ import {
   runHostShellTaskOrThrow,
   getDebugWindowStartedAt,
 } from './vscode.js';
+import {fetchAXTree} from './ax-tree.js';
 
 // Default timeout for tools (30 seconds)
 const DEFAULT_TOOL_TIMEOUT_MS = 30_000;
@@ -84,6 +85,8 @@ process.on('unhandledRejection', (reason, promise) => {
 });
 
 logger(`Starting VS Code DevTools MCP Server v${VERSION}`);
+logger(`Config: hostWorkspace=${config.hostWorkspace}, targetFolder=${config.workspaceFolder}`);
+logger(`Config: extensionBridgePath=${config.extensionBridgePath}, headless=${config.headless}, logFile=${config.logFile ?? '(none)'}`);
 const server = new McpServer(
   {
     name: 'vscode_devtools',
@@ -190,7 +193,9 @@ function registerTool(tool: ToolDefinition): void {
         // This allows the first tool call to wait for Extension Host initialization
         // without eating into the tool's timeout budget.
         if (!isStandalone) {
+          logger(`[tool:${tool.name}] Ensuring VS Code connection before tool execution...`);
           await ensureConnection();
+          logger(`[tool:${tool.name}] VS Code connection confirmed`);
         }
 
         // Clear the hot-reload flag now that the new debug window is running.
@@ -266,20 +271,35 @@ function registerTool(tool: ToolDefinition): void {
 
         return result;
       } catch (err) {
-        logger(`${tool.name} error:`, err, err?.stack);
+        logger(`[tool:${tool.name}] ERROR: ${err && 'message' in err ? err.message : String(err)}`);
+        if (err?.stack) {
+          logger(`[tool:${tool.name}] Stack: ${err.stack}`);
+        }
         let errorText = err && 'message' in err ? err.message : String(err);
         if ('cause' in err && err.cause) {
           errorText += `\nCause: ${err.cause.message}`;
         }
-        return {
-          content: [
-            {
+
+        const content: CallToolResult['content'] = [
+          {type: 'text', text: errorText},
+        ];
+
+        // Always attempt a CDP-powered snapshot on errors to give the
+        // caller visual context for diagnosis. CDP is independent of the
+        // bridge, so it can still work when bridge exec hangs.
+        try {
+          const snapshot = await fetchAXTree(false);
+          if (snapshot.formatted) {
+            content.push({
               type: 'text',
-              text: errorText,
-            },
-          ],
-          isError: true,
-        };
+              text: `\n## Latest page snapshot\n${snapshot.formatted}`,
+            });
+          }
+        } catch (snapshotErr) {
+          logger('Failed to capture snapshot on error:', snapshotErr);
+        }
+
+        return {content, isError: true};
       } finally {
         guard?.dispose();
       }
@@ -294,20 +314,20 @@ for (const tool of tools) {
 await loadIssueDescriptions();
 const transport = new StdioServerTransport();
 await server.connect(transport);
-logger('VS Code DevTools MCP Server connected');
+logger('VS Code DevTools MCP Server connected to stdio transport');
 
 // Best-effort auto-launch: try to start the VS Code debug window now, but
 // don't crash the server if it fails (e.g., host VS Code not running yet).
 // Tools will lazily call ensureConnection() on their first invocation.
 try {
-  logger('Launching VS Code debug window...');
+  logger('[startup] Auto-launching VS Code debug window...');
   await ensureConnection();
-  logger('VS Code debug window ready');
+  logger('[startup] ✓ VS Code debug window is ready');
 } catch (err) {
   const message = err && typeof err === 'object' && 'message' in err
     ? (err as Error).message
     : String(err);
-  logger(`Startup connection failed (will retry on first tool call): ${message}`);
+  logger(`[startup] ✗ Startup connection FAILED (will retry on first tool call): ${message}`);
 }
 
 logDisclaimers();

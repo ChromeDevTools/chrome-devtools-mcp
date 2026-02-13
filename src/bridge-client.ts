@@ -74,6 +74,7 @@ function sendBridgeRequest(
   timeoutMs: number,
 ): Promise<unknown> {
   return new Promise((resolve, reject) => {
+    logger(`[bridge] ${method} → ${bridgePath} (timeout=${timeoutMs}ms)`);
     const client = net.createConnection(bridgePath);
     const reqId = `${method}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
@@ -81,6 +82,7 @@ function sendBridgeRequest(
     client.setEncoding('utf8');
 
     client.on('connect', () => {
+      logger(`[bridge] ${method} connected — sending request (id=${reqId})`);
       const request =
         JSON.stringify({jsonrpc: '2.0', id: reqId, method, params}) + '\n';
       client.write(request);
@@ -94,12 +96,14 @@ function sendBridgeRequest(
           const parsed = JSON.parse(response.slice(0, nlIdx)) as JsonRpcResponse;
           client.end();
           if (parsed.error) {
+            logger(`[bridge] ${method} ✗ error response: [${parsed.error.code}] ${parsed.error.message}`);
             reject(
               new Error(
                 `Bridge ${method} failed [${parsed.error.code}]: ${parsed.error.message}`,
               ),
             );
           } else {
+            logger(`[bridge] ${method} ✓ success`);
             resolve(parsed.result);
           }
         } catch (e) {
@@ -114,10 +118,12 @@ function sendBridgeRequest(
     });
 
     client.on('error', (err: Error) => {
+      logger(`[bridge] ${method} ✗ connection error: ${err.message}`);
       reject(new Error(`Bridge connection error: ${err.message}`));
     });
 
     const timeout = setTimeout(() => {
+      logger(`[bridge] ${method} ✗ TIMEOUT after ${timeoutMs}ms`);
       client.destroy();
       reject(new Error(`Bridge ${method} request timed out (${timeoutMs}ms)`));
     }, timeoutMs);
@@ -139,8 +145,9 @@ export function bridgeExec(
   bridgePath: string,
   code: string,
   payload?: unknown,
+  timeoutMs: number = BRIDGE_TIMEOUT_MS,
 ): Promise<unknown> {
-  return sendBridgeRequest(bridgePath, 'exec', {code, payload}, BRIDGE_TIMEOUT_MS);
+  return sendBridgeRequest(bridgePath, 'exec', {code, payload}, timeoutMs);
 }
 
 /**

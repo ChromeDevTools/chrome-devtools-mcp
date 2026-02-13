@@ -495,16 +495,43 @@ async function attachDebuggerAsync(
   port: number,
 ): Promise<void> {
   try {
+    logger(`[attachDebugger] Waiting for inspector port ${port}...`);
     await waitForInspectorPort(port);
-    await bridgeAttachDebugger(
-      bridgePath,
-      port,
-      `Extension Host (port ${port})`,
-    );
-    logger('Debug session attached — full debug UI active');
+    logger(`[attachDebugger] Inspector port ${port} is ready`);
+    const sessionName = `Extension Host (port ${port})`;
+
+    // Stop ALL existing debug sessions that target the same inspector port.
+    // VS Code appends " 2", " 3", etc. to session names to avoid collisions,
+    // so we match by name prefix rather than exact name, and also by port in
+    // the session configuration to catch renamed sessions.
+    //
+    // Uses __debugSessionBridge (exposed by extension.ts via globalThis) which
+    // tracks sessions via onDidStart/onDidTerminate events — more reliable than
+    // vscode.debug.activeDebugSessions which may not exist in all VS Code versions.
+    logger(`[attachDebugger] Dedup: stopping stale sessions matching prefix="${sessionName}" or port=${port}`);
+    try {
+      const stopResult = await bridgeExec(
+        bridgePath,
+        `
+          const bridge = globalThis.__debugSessionBridge;
+          if (!bridge) {
+            return { stopped: [], total: -1, error: '__debugSessionBridge not available' };
+          }
+          return bridge.stopMatchingSessions(payload.name, payload.port);
+        `,
+        {name: sessionName, port},
+      );
+      logger(`[attachDebugger] Dedup result: ${JSON.stringify(stopResult)}`);
+    } catch (dedupErr) {
+      logger(`[attachDebugger] Dedup failed (non-fatal): ${(dedupErr as Error).message}`);
+    }
+
+    logger(`[attachDebugger] Calling bridgeAttachDebugger(port=${port}, name="${sessionName}")...`);
+    await bridgeAttachDebugger(bridgePath, port, sessionName);
+    logger('[attachDebugger] ✓ Debug session attached — full debug UI active');
   } catch (err) {
     logger(
-      `Warning: debugger attach failed: ${(err as Error).message}. ` +
+      `[attachDebugger] ✗ FAILED: ${(err as Error).message}. ` +
         'Continuing without debug UI.',
     );
   }
@@ -928,10 +955,14 @@ let exitCleanupDone = false;
  * host VS Code actually closes.
  */
 function handleShutdown(source: string): void {
-  if (exitCleanupDone) return;
+  if (exitCleanupDone) {
+    logger(`[shutdown] ${source} — already cleaned up, skipping`);
+    return;
+  }
   exitCleanupDone = true;
 
-  logger(`${source} — detaching gracefully (debug window preserved)`);
+  logger(`[shutdown] ${source} — detaching gracefully (debug window preserved)`);
+  logger(`[shutdown] Current state: cdpWs=${cdpWs ? 'OPEN' : 'null'}, electronPid=${electronPid ?? 'null'}, cdpPort=${cdpPort ?? 'null'}`);
   detachGracefully();
   stopMcpSocketServer();
   process.exit(0);
@@ -1200,17 +1231,26 @@ export async function ensureVSCodeConnected(
 ): Promise<WebSocket> {
   // Fast path: healthy connection — reuse it
   if (cdpWs?.readyState === WebSocket.OPEN) {
+    logger('[ensureVSCodeConnected] Fast path — existing CDP connection is OPEN');
     return cdpWs;
   }
 
   // Gate: if another connect is already in-flight, wait for it
   if (connectInProgress) {
+    logger('[ensureVSCodeConnected] Another connection attempt already in-flight — waiting');
     return connectInProgress;
   }
 
+  logger('[ensureVSCodeConnected] No active connection — starting doConnect()');
+  logger(`[ensureVSCodeConnected] Options: hostWorkspace=${options.workspaceFolder}, target=${options.targetFolder ?? '(same)'}, headless=${options.headless ?? false}`);
   connectInProgress = doConnect(options);
   try {
-    return await connectInProgress;
+    const ws = await connectInProgress;
+    logger('[ensureVSCodeConnected] doConnect() completed successfully');
+    return ws;
+  } catch (err) {
+    logger(`[ensureVSCodeConnected] doConnect() FAILED: ${(err as Error).message}`);
+    throw err;
   } finally {
     connectInProgress = undefined;
   }
@@ -1272,25 +1312,28 @@ async function tryReconnectToExistingWindow(
   targetFolder: string,
   options: VSCodeLaunchOptions,
 ): Promise<WebSocket | null> {
+  logger(`[reconnect] Checking for persisted session in ${targetFolder}...`);
   const session = loadPersistedSession(targetFolder);
   if (!session) {
+    logger('[reconnect] No persisted session found — will spawn fresh');
     return null;
   }
 
-  logger(`Found persisted session: CDP=${session.cdpPort}, PID=${session.electronPid}`);
+  logger(`[reconnect] Found persisted session: CDP=${session.cdpPort}, PID=${session.electronPid}, inspector=${session.inspectorPort}`);
 
   // Verify the CDP port is still responding
+  logger(`[reconnect] Probing CDP port ${session.cdpPort}...`);
   try {
     const response = await fetch(`http://127.0.0.1:${session.cdpPort}/json/version`);
     if (!response.ok) {
-      logger('Persisted CDP port not responding — will spawn fresh');
+      logger(`[reconnect] CDP port ${session.cdpPort} returned HTTP ${response.status} — will spawn fresh`);
       clearPersistedSession(targetFolder);
       return null;
     }
     const versionInfo = (await response.json()) as CdpVersionInfo;
-    logger(`Reconnecting to existing window: ${versionInfo.Browser}`);
-  } catch {
-    logger('Persisted CDP port unreachable — will spawn fresh');
+    logger(`[reconnect] CDP port alive — reconnecting to: ${versionInfo.Browser}`);
+  } catch (probeErr) {
+    logger(`[reconnect] CDP port ${session.cdpPort} unreachable: ${(probeErr as Error).message} — will spawn fresh`);
     clearPersistedSession(targetFolder);
     return null;
   }
@@ -1318,7 +1361,10 @@ async function tryReconnectToExistingWindow(
     logger(`Reconnecting to: "${workbench.title}"`);
     cdpWs = await connectCdpWebSocket(workbench.webSocketDebuggerUrl);
   } catch (err) {
-    logger(`Failed to reconnect CDP: ${(err as Error).message} — will spawn fresh`);
+    logger(`Failed to reconnect CDP: ${(err as Error).message} — killing old window and spawning fresh`);
+    // Module state was restored above — kill the old window before clearing
+    // so we don't orphan it and end up with two windows.
+    forceKillChildSync();
     clearPersistedSession(targetFolder);
     cdpPort = undefined;
     electronPid = undefined;
@@ -1337,14 +1383,14 @@ async function tryReconnectToExistingWindow(
 
   // Dev Host bridge connectivity is the single readiness signal —
   // if the bridge is connectable, workbench + extension host + extension are all ready.
-  // Attach debugger in parallel (non-fatal if it fails).
-  const [devBridge] = await Promise.all([
-    waitForDevHostBridge(targetFolder),
-    hostBridgePath && inspectorPort
-      ? attachDebuggerAsync(hostBridgePath, inspectorPort)
-      : Promise.resolve(),
-  ]);
+  const devBridge = await waitForDevHostBridge(targetFolder);
   devhostBridgePath = devBridge ?? undefined;
+
+  if (hostBridgePath && inspectorPort) {
+    // attachDebuggerAsync is idempotent — it stops any stale session with the
+    // same name in a single atomic bridge exec before starting the new one.
+    await attachDebuggerAsync(hostBridgePath, inspectorPort);
+  }
 
   // Monitor for unexpected disconnects
   cdpWs.on('close', () => {
@@ -1372,7 +1418,7 @@ async function tryReconnectToExistingWindow(
   // Update persisted session with fresh timestamp
   persistSession(targetFolder);
 
-  logger('Successfully reconnected to existing debug window');
+  logger('[reconnect] ✓ Successfully reconnected to existing debug window');
   return cdpWs;
 }
 
@@ -1380,14 +1426,36 @@ async function doConnect(options: VSCodeLaunchOptions): Promise<WebSocket> {
   connectionGeneration++;
   const targetFolder = options.targetFolder ?? options.workspaceFolder;
   currentTargetFolder = targetFolder;
+  logger(`[doConnect] ═══ Starting connection (gen=${connectionGeneration}) ═══`);
+  logger(`[doConnect] targetFolder=${targetFolder}`);
+
+  // Snapshot the persisted session BEFORE reconnection attempt clears it.
+  // If reconnection fails, we need the PID/port to kill the orphaned window.
+  const staleSession = loadPersistedSession(targetFolder);
+  if (staleSession) {
+    logger(`[doConnect] Stale session snapshot: CDP=${staleSession.cdpPort}, PID=${staleSession.electronPid}`);
+  } else {
+    logger('[doConnect] No stale session on disk');
+  }
 
   // ── Try to reconnect to an existing debug window from a previous session ──
   const reconnected = await tryReconnectToExistingWindow(targetFolder, options);
   if (reconnected) {
+    logger('[doConnect] Reconnection succeeded — returning existing WS');
     return reconnected;
   }
+  logger('[doConnect] Reconnection failed or no existing window — will spawn fresh');
 
-  // No existing window available — clean up any stale state and spawn fresh
+  // No existing window available — clean up any stale state and spawn fresh.
+  // Restore the stale session's PID/port/userDataDir into module state so
+  // teardownSync → forceKillChildSync can kill the orphaned window instead
+  // of spawning a duplicate.
+  if (staleSession) {
+    logger(`Killing orphaned debug window from stale session: PID=${staleSession.electronPid}`);
+    electronPid = staleSession.electronPid;
+    cdpPort = staleSession.cdpPort;
+    userDataDir = staleSession.userDataDir;
+  }
   teardownSync();
   debugWindowStartedAt = Date.now();
 

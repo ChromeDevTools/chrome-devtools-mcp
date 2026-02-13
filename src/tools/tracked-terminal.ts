@@ -39,6 +39,70 @@ if (!globalThis.__trackedTerminalBridge) {
 }
 `;
 
+// ── Terminal Output Cleaning ─────────────────────────────────────────────────
+
+// CSI sequences: ESC [ <params> <intermediate> <final byte>
+const CSI_RE = /\x1b\[[\x30-\x3f]*[\x20-\x2f]*[\x40-\x7e]/g;
+
+// OSC sequences: ESC ] ... (BEL | ST)
+// ST = ESC \ or \x9c
+const OSC_RE = /\x1b\][\s\S]*?(?:\x07|\x1b\\|\x9c)/g;
+
+// DCS / PM / APC / SOS sequences: ESC (P|^|_|X) ... ST
+const DCS_RE = /\x1b[P^_X][\s\S]*?(?:\x1b\\|\x9c)/g;
+
+// Two-character ESC sequences (e.g., ESC =, ESC >)
+const ESC2_RE = /\x1b[\x20-\x7e]/g;
+
+// Non-printable control characters (except \n and \t)
+const CTRL_RE = /[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g;
+
+/**
+ * Convert raw PTY output into clean, human-readable text.
+ *
+ * Strips ANSI escape sequences (CSI, OSC, DCS, etc.), handles carriage-return
+ * line overwriting (\r without \n), normalises CRLF → LF, and removes
+ * non-printable control characters.
+ */
+function cleanTerminalOutput(raw: string): string {
+  // 1. Strip escape sequences (order matters — longer patterns first)
+  let text = raw
+    .replace(DCS_RE, '')
+    .replace(OSC_RE, '')
+    .replace(CSI_RE, '')
+    .replace(ESC2_RE, '');
+
+  // 2. Normalise CRLF → LF  (must happen before bare-\r handling)
+  text = text.replace(/\r\n/g, '\n');
+
+  // 3. Simulate carriage-return overwriting on each line.
+  //    "abc\rXY" → "XYc"  (XY overwrites a,b from column 0)
+  const lines = text.split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (!line.includes('\r')) continue;
+
+    const segments = line.split('\r');
+    const chars: string[] = [];
+    for (const seg of segments) {
+      if (seg === '') continue;
+      for (let c = 0; c < seg.length; c++) {
+        chars[c] = seg[c];
+      }
+    }
+    lines[i] = chars.join('');
+  }
+  text = lines.join('\n');
+
+  // 4. Strip remaining non-printable control characters
+  text = text.replace(CTRL_RE, '');
+
+  // 5. Collapse runs of 3+ blank lines into 2
+  text = text.replace(/\n{3,}/g, '\n\n');
+
+  return text.trim();
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // list_tracked_terminals
 // ─────────────────────────────────────────────────────────────────────────────
@@ -217,6 +281,7 @@ Options:
 
 The output includes ANSI escape codes for formatting. Use this to check
 command results, build output, server logs, or any terminal content.`,
+  // NOTE: output is cleaned (ANSI stripped) before returning to the caller.
   timeoutMs: 5000,
   annotations: {
     category: ToolCategory.DEV_DIAGNOSTICS,
@@ -278,8 +343,12 @@ command results, build output, server logs, or any terminal content.`,
       inputHistory: string[];
     };
 
+    const cleaned = cleanTerminalOutput(data.output);
+
     if (request.params.response_format === ResponseFormat.JSON) {
-      response.appendResponseLine(JSON.stringify(data, null, 2));
+      response.appendResponseLine(
+        JSON.stringify({...data, output: cleaned}, null, 2),
+      );
       return;
     }
 
@@ -295,7 +364,7 @@ command results, build output, server logs, or any terminal content.`,
 
     response.appendResponseLine('### Output');
     response.appendResponseLine('```');
-    response.appendResponseLine(data.output || '(no output yet)');
+    response.appendResponseLine(cleaned || '(no output yet)');
     response.appendResponseLine('```');
 
     if (data.inputHistory.length > 0) {
@@ -356,6 +425,7 @@ Use get_terminal_buffer afterward to read the command output.`,
         payload.addNewline ?? true,
       );`,
       {terminalId, text, addNewline},
+      10_000,
     );
 
     if (request.params.response_format === ResponseFormat.JSON) {
