@@ -9,6 +9,17 @@ Chrome DevTools for reliable automation, in-depth debugging, and performance ana
 
 ## [Tool reference](./docs/tool-reference.md) | [Changelog](./CHANGELOG.md) | [Contributing](./CONTRIBUTING.md) | [Troubleshooting](./docs/troubleshooting.md) | [Design Principles](./docs/design-principles.md)
 
+## Connecting to a running Chrome instance
+
+If you already have a Chrome instance running with remote debugging enabled (for example started with `--remote-debugging-port=9222`), you can attach `chrome-devtools-mcp` to it instead of launching a new browser.
+
+- HTTP debugging endpoint (recommended): `--browserUrl http://127.0.0.1:9222`
+- WebSocket endpoint (advanced): `--wsEndpoint ws://127.0.0.1:9222/devtools/browser/<id>`
+
+Quick self-check: `http://127.0.0.1:9222/json/version` should return JSON.
+
+See example: [`examples/remote-debugging-9222.mjs`](./examples/remote-debugging-9222.mjs).
+
 ## Key features
 
 - **Get performance insights**: Uses [Chrome
