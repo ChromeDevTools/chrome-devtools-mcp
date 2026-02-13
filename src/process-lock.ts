@@ -1,9 +1,9 @@
 /**
  * Process lock management using exclusive file lock.
  *
- * Uses fs.openSync(path, 'wx') for atomic exclusive lock acquisition.
- * Kill is only performed when a stale process is confirmed alive.
- * Orphan watchdog is removed - stdin EOF (main.ts:266-267) handles this.
+ * Lock file stores JSON: {pid, port, startedAt}
+ * Multi-client mode: alive processes are NOT killed — Secondary
+ * instances connect to the Primary via HTTP proxy instead.
  */
 
 import {execFileSync} from 'node:child_process';
@@ -16,6 +16,17 @@ const LOCK_DIR = path.join(os.homedir(), '.cache', 'chrome-ai-bridge');
 const LOCK_FILE = path.join(LOCK_DIR, 'mcp.lock');
 
 let lockFd: number | null = null;
+
+export interface LockInfo {
+  pid: number;
+  port: number;
+  startedAt: string; // ISO 8601
+}
+
+export interface PrimaryStatus {
+  alive: boolean;
+  port: number;
+}
 
 function isProcessAlive(pid: number): boolean {
   try {
@@ -30,26 +41,69 @@ function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-function readPidFromLock(): number | null {
+/**
+ * Read lock file content. Supports both JSON (new) and plain PID (legacy).
+ */
+function readLockInfo(): LockInfo | null {
   try {
     const content = fs.readFileSync(LOCK_FILE, 'utf-8').trim();
+    if (!content) return null;
+
+    // Try JSON format first
+    if (content.startsWith('{')) {
+      const parsed = JSON.parse(content) as Partial<LockInfo>;
+      if (parsed.pid && parsed.pid > 0) {
+        return {
+          pid: parsed.pid,
+          port: parsed.port ?? 0,
+          startedAt: parsed.startedAt ?? '',
+        };
+      }
+      return null;
+    }
+
+    // Legacy: plain PID number
     const pid = Number(content);
-    return Number.isFinite(pid) && pid > 0 ? pid : null;
+    if (Number.isFinite(pid) && pid > 0) {
+      return {pid, port: 0, startedAt: ''};
+    }
+    return null;
   } catch {
     return null;
   }
 }
 
 /**
- * Try to create lock file exclusively (wx flag).
- * Returns the file descriptor on success, null on EEXIST.
- * Throws on other errors.
+ * Check if an existing Primary is alive and reachable.
+ * Reads the lock file and checks process liveness.
  */
-function tryCreateLock(): number | null {
+export function checkExistingPrimary(): PrimaryStatus | null {
+  const info = readLockInfo();
+  if (!info) return null;
+
+  if (!isProcessAlive(info.pid)) {
+    logger(`[process-lock] Stale lock (pid=${info.pid}, not running).`);
+    return null;
+  }
+
+  return {alive: true, port: info.port};
+}
+
+/**
+ * Try to create lock file exclusively (wx flag).
+ * Writes JSON {pid, port, startedAt}.
+ * Returns the file descriptor on success, null on EEXIST.
+ */
+function tryCreateLock(port: number): number | null {
   try {
     fs.mkdirSync(LOCK_DIR, {recursive: true});
     const fd = fs.openSync(LOCK_FILE, 'wx');
-    fs.writeSync(fd, String(process.pid));
+    const lockInfo: LockInfo = {
+      pid: process.pid,
+      port,
+      startedAt: new Date().toISOString(),
+    };
+    fs.writeSync(fd, JSON.stringify(lockInfo));
     return fd;
   } catch (error: unknown) {
     if (error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'EEXIST') {
@@ -60,83 +114,66 @@ function tryCreateLock(): number | null {
 }
 
 /**
- * Handle an existing lock file: check if the holder is alive and deal with it.
+ * Handle an existing lock file.
+ * In multi-client mode, alive processes are NOT killed.
+ * Only stale (dead process) locks are removed.
  * Returns true if the stale lock was removed and retry is possible.
+ * Returns false if the lock holder is alive (should enter proxy mode).
  */
 async function handleExistingLock(): Promise<boolean> {
-  const pid = readPidFromLock();
+  const info = readLockInfo();
 
-  if (pid === null) {
-    // Corrupted or empty lock file - remove it
+  if (info === null) {
     logger('[process-lock] Corrupted lock file found. Removing.');
     try { fs.unlinkSync(LOCK_FILE); } catch { /* ignore */ }
     return true;
   }
 
-  // Don't kill ourselves
-  if (pid === process.pid) {
+  // Don't conflict with ourselves
+  if (info.pid === process.pid) {
     try { fs.unlinkSync(LOCK_FILE); } catch { /* ignore */ }
     return true;
   }
 
-  if (!isProcessAlive(pid)) {
-    // Dead process - stale lock
-    logger(`[process-lock] Stale lock (pid=${pid}, not running). Removing.`);
+  if (!isProcessAlive(info.pid)) {
+    logger(`[process-lock] Stale lock (pid=${info.pid}, not running). Removing.`);
     try { fs.unlinkSync(LOCK_FILE); } catch { /* ignore */ }
     return true;
   }
 
-  // Process is alive - send SIGTERM and wait
-  logger(`[process-lock] Existing process detected (pid=${pid}). Sending SIGTERM...`);
-  try {
-    process.kill(pid, 'SIGTERM');
-  } catch {
-    // Process disappeared between check and kill
-    try { fs.unlinkSync(LOCK_FILE); } catch { /* ignore */ }
-    return true;
-  }
-
-  await sleep(2000);
-
-  if (isProcessAlive(pid)) {
-    logger(`[process-lock] Process ${pid} still alive. Sending SIGKILL...`);
-    try { process.kill(pid, 'SIGKILL'); } catch { /* ignore */ }
-    await sleep(500);
-  }
-
-  logger('[process-lock] Previous process terminated.');
-  try { fs.unlinkSync(LOCK_FILE); } catch { /* ignore */ }
-  return true;
+  // Process is alive — do NOT kill. Caller should enter proxy mode.
+  logger(`[process-lock] Primary is alive (pid=${info.pid}, port=${info.port}). Cannot acquire lock.`);
+  return false;
 }
 
 /**
- * Acquire an exclusive process lock. Call once at startup.
+ * Acquire an exclusive process lock. Call once at startup for Primary mode.
  *
  * Flow:
  * 1. Try fs.openSync(LOCK_FILE, 'wx') for atomic exclusive creation
- * 2. Success -> write PID, hold FD
- * 3. EEXIST -> check holder, kill only if alive, retry once
+ * 2. Success -> write JSON {pid, port, startedAt}, hold FD
+ * 3. EEXIST -> check holder; remove only if stale, retry once
+ * 4. If holder is alive -> throw (caller should enter proxy mode)
  */
-export async function acquireLock(): Promise<void> {
-  // First attempt
-  const fd = tryCreateLock();
+export async function acquireLock(port: number): Promise<void> {
+  const fd = tryCreateLock(port);
   if (fd !== null) {
     lockFd = fd;
-    logger(`[process-lock] Lock acquired (pid=${process.pid})`);
+    logger(`[process-lock] Lock acquired (pid=${process.pid}, port=${port})`);
     return;
   }
 
   // Lock file exists - handle the existing holder
   const canRetry = await handleExistingLock();
   if (!canRetry) {
-    throw new Error('[process-lock] Failed to acquire lock');
+    throw new Error('[process-lock] Primary is alive. Use proxy mode.');
   }
 
-  // Retry once
-  const fd2 = tryCreateLock();
+  // Retry once after stale removal
+  const fd2 = tryCreateLock(port);
   if (fd2 !== null) {
     lockFd = fd2;
-    logger(`[process-lock] Lock acquired after cleanup (pid=${process.pid})`);
+    logger(`[process-lock] Lock acquired after cleanup (pid=${process.pid}, port=${port})`);
     return;
   }
 

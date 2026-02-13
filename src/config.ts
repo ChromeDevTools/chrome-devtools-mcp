@@ -44,6 +44,18 @@ export const GEMINI_CONFIG = {
 } as const;
 
 /**
+ * IPC configuration for multi-client MCP support.
+ * The Primary instance exposes an HTTP endpoint on this port;
+ * Secondary instances connect as stdio-to-HTTP proxies.
+ */
+export const IPC_CONFIG = {
+  port: Number(process.env.CAI_IPC_PORT) || 9321,
+  host: '127.0.0.1',
+  healthPath: '/health',
+  mcpPath: '/mcp',
+} as const;
+
+/**
  * Session configuration for Agent Teams support
  */
 export interface SessionConfig {

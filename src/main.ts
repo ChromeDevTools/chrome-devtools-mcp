@@ -9,6 +9,9 @@
  *
  * This MCP server provides ChatGPT/Gemini integration via Chrome extension.
  * Puppeteer has been removed - all browser interaction is via WebSocket relay.
+ *
+ * Multi-client: The first instance becomes Primary (stdio + IPC HTTP).
+ * Subsequent instances become Proxies that forward stdio to the Primary via HTTP.
  */
 
 import assert from 'node:assert';
@@ -41,8 +44,9 @@ import {getFastContext} from './fast-cdp/fast-context.js';
 import {cleanupAllConnections} from './fast-cdp/fast-chat.js';
 import {generateAgentId, setAgentId} from './fast-cdp/agent-context.js';
 import {cleanupStaleSessions} from './fast-cdp/session-manager.js';
-import {getSessionConfig} from './config.js';
-import {acquireLock, releaseLock, killSiblings} from './process-lock.js';
+import {getSessionConfig, IPC_CONFIG} from './config.js';
+import {acquireLock, releaseLock, killSiblings, checkExistingPrimary} from './process-lock.js';
+import {checkPrimaryHealth, startProxyMode} from './stdio-http-proxy.js';
 
 function readPackageJson(): {version?: string} {
   const currentDir = import.meta.dirname;
@@ -71,14 +75,29 @@ logger(`Starting Chrome AI Bridge v${version} (Extension-only mode)`);
 const agentId = generateAgentId();
 setAgentId(agentId);
 
+// ─── Multi-client routing ───
+// Check if a Primary instance is already running.
+// If yes and healthy, enter proxy mode (never returns).
+const existingPrimary = checkExistingPrimary();
+if (existingPrimary && existingPrimary.port > 0) {
+  const healthy = await checkPrimaryHealth(existingPrimary.port);
+  if (healthy) {
+    logger(`[main] Primary is healthy (port=${existingPrimary.port}). Entering proxy mode.`);
+    await startProxyMode(existingPrimary.port); // never returns
+  }
+  logger(`[main] Primary (port=${existingPrimary.port}) not healthy. Starting as Primary.`);
+}
+
+// ─── Primary mode ───
+
 // Kill all stale sibling processes first
 const killed = await killSiblings();
 if (killed > 0) {
   logger(`[process-lock] Killed ${killed} stale sibling process(es)`);
 }
 
-// Acquire exclusive process lock
-await acquireLock();
+// Acquire exclusive process lock (writes port to lock file)
+await acquireLock(IPC_CONFIG.port);
 
 // Start session cleanup timer
 const sessionConfig = getSessionConfig();
@@ -216,6 +235,158 @@ await server.connect(transport);
 logger('Chrome AI Bridge MCP Server connected');
 logDisclaimers();
 
+// ─── IPC HTTP server (for proxy clients) ───
+{
+  const ipcTransports: Record<string, StreamableHTTPServerTransport> = {};
+
+  const ipcServer = http.createServer(async (req, res) => {
+    if (!req.url || !req.method) {
+      res.writeHead(400).end();
+      return;
+    }
+
+    const url = new URL(req.url, `http://${IPC_CONFIG.host}:${IPC_CONFIG.port}`);
+
+    // Health endpoint
+    if (url.pathname === IPC_CONFIG.healthPath) {
+      res.writeHead(200, {'Content-Type': 'application/json'}).end(
+        JSON.stringify({status: 'ok', pid: process.pid, version}),
+      );
+      return;
+    }
+
+    // MCP endpoint
+    if (url.pathname !== IPC_CONFIG.mcpPath) {
+      res.writeHead(404).end();
+      return;
+    }
+
+    // CORS for local usage
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Headers', 'content-type,mcp-session-id');
+    res.setHeader('Access-Control-Expose-Headers', 'mcp-session-id');
+
+    if (req.method === 'OPTIONS') {
+      res.writeHead(204).end();
+      return;
+    }
+
+    const sessionId = req.headers['mcp-session-id'] as string | undefined;
+
+    if (req.method === 'POST') {
+      let body = '';
+      req.on('data', chunk => {
+        body += chunk;
+      });
+      req.on('end', async () => {
+        let json: any;
+        try {
+          json = body ? JSON.parse(body) : null;
+        } catch {
+          res.writeHead(400).end(
+            JSON.stringify({
+              jsonrpc: '2.0',
+              error: {code: -32700, message: 'Parse error'},
+              id: null,
+            }),
+          );
+          return;
+        }
+
+        let ipcTransport: StreamableHTTPServerTransport | undefined;
+        if (sessionId && ipcTransports[sessionId]) {
+          ipcTransport = ipcTransports[sessionId];
+        } else if (!sessionId && isInitializeRequest(json)) {
+          ipcTransport = new StreamableHTTPServerTransport({
+            sessionIdGenerator: () => randomUUID(),
+            onsessioninitialized: newSessionId => {
+              ipcTransports[newSessionId] = ipcTransport!;
+            },
+          });
+          ipcTransport.onclose = () => {
+            if (ipcTransport?.sessionId) {
+              delete ipcTransports[ipcTransport.sessionId];
+            }
+          };
+          await server.connect(ipcTransport);
+        } else {
+          res.writeHead(400).end(
+            JSON.stringify({
+              jsonrpc: '2.0',
+              error: {
+                code: -32000,
+                message: 'Bad Request: No valid session ID provided',
+              },
+              id: null,
+            }),
+          );
+          return;
+        }
+
+        try {
+          await ipcTransport.handleRequest(req, res, json);
+        } catch (error) {
+          if (!res.headersSent) {
+            res.writeHead(500).end(
+              JSON.stringify({
+                jsonrpc: '2.0',
+                error: {
+                  code: -32603,
+                  message:
+                    error instanceof Error
+                      ? error.message
+                      : String(error),
+                },
+                id: null,
+              }),
+            );
+          }
+        }
+      });
+      return;
+    }
+
+    if (req.method === 'GET' || req.method === 'DELETE') {
+      if (!sessionId || !ipcTransports[sessionId]) {
+        res.writeHead(400).end('Invalid or missing session ID');
+        return;
+      }
+      try {
+        await ipcTransports[sessionId].handleRequest(req, res);
+      } catch (error) {
+        if (!res.headersSent) {
+          res.writeHead(500).end(
+            JSON.stringify({
+              jsonrpc: '2.0',
+              error: {
+                code: -32603,
+                message:
+                  error instanceof Error ? error.message : String(error),
+              },
+              id: null,
+            }),
+          );
+        }
+      }
+      return;
+    }
+
+    res.writeHead(405).end();
+  });
+
+  ipcServer.listen(IPC_CONFIG.port, IPC_CONFIG.host, () => {
+    logger(`[ipc] IPC HTTP listening on http://${IPC_CONFIG.host}:${IPC_CONFIG.port} (health: ${IPC_CONFIG.healthPath}, mcp: ${IPC_CONFIG.mcpPath})`);
+  });
+
+  ipcServer.on('error', (err: NodeJS.ErrnoException) => {
+    if (err.code === 'EADDRINUSE') {
+      logger(`[ipc] Port ${IPC_CONFIG.port} already in use. IPC server not started (proxy clients will fail).`);
+    } else {
+      logger(`[ipc] IPC server error: ${err.message}`);
+    }
+  });
+}
+
 // Graceful shutdown handler with timeout
 // Based on review: タイムアウト必須、強制終了タイマー必要
 let isShuttingDown = false;
@@ -282,6 +453,7 @@ process.on('beforeExit', () => {
   }
 });
 
+// ─── Optional: User-configured external HTTP server (MCP_HTTP_PORT) ───
 const httpPortRaw = process.env.MCP_HTTP_PORT;
 if (httpPortRaw) {
   const httpPort = Number(httpPortRaw);
