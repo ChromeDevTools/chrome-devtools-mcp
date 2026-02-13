@@ -489,52 +489,23 @@ export async function getAllTargets(): Promise<CdpTargetInfo[]> {
  * Wait for the inspector port then attach the debugger via the host bridge.
  * Non-fatal — if attachment fails, we log and continue (tools still work,
  * only the debugger UI in the host VS Code is missing).
+ *
+ * Uses check-and-skip: if a debug session already exists for the port
+ * (e.g. from a previous MCP run or the launch mechanism), we skip
+ * to avoid detaching/reattaching which can freeze the extension host.
  */
 async function attachDebuggerAsync(
-  bridgePath: string,
+  _bridgePath: string,
   port: number,
 ): Promise<void> {
-  try {
-    logger(`[attachDebugger] Waiting for inspector port ${port}...`);
-    await waitForInspectorPort(port);
-    logger(`[attachDebugger] Inspector port ${port} is ready`);
-    const sessionName = `Extension Host (port ${port})`;
-
-    // Stop ALL existing debug sessions that target the same inspector port.
-    // VS Code appends " 2", " 3", etc. to session names to avoid collisions,
-    // so we match by name prefix rather than exact name, and also by port in
-    // the session configuration to catch renamed sessions.
-    //
-    // Uses __debugSessionBridge (exposed by extension.ts via globalThis) which
-    // tracks sessions via onDidStart/onDidTerminate events — more reliable than
-    // vscode.debug.activeDebugSessions which may not exist in all VS Code versions.
-    logger(`[attachDebugger] Dedup: stopping stale sessions matching prefix="${sessionName}" or port=${port}`);
-    try {
-      const stopResult = await bridgeExec(
-        bridgePath,
-        `
-          const bridge = globalThis.__debugSessionBridge;
-          if (!bridge) {
-            return { stopped: [], total: -1, error: '__debugSessionBridge not available' };
-          }
-          return bridge.stopMatchingSessions(payload.name, payload.port);
-        `,
-        {name: sessionName, port},
-      );
-      logger(`[attachDebugger] Dedup result: ${JSON.stringify(stopResult)}`);
-    } catch (dedupErr) {
-      logger(`[attachDebugger] Dedup failed (non-fatal): ${(dedupErr as Error).message}`);
-    }
-
-    logger(`[attachDebugger] Calling bridgeAttachDebugger(port=${port}, name="${sessionName}")...`);
-    await bridgeAttachDebugger(bridgePath, port, sessionName);
-    logger('[attachDebugger] ✓ Debug session attached — full debug UI active');
-  } catch (err) {
-    logger(
-      `[attachDebugger] ✗ FAILED: ${(err as Error).message}. ` +
-        'Continuing without debug UI.',
-    );
-  }
+  // DISABLED: js-debug attachment freezes the extension host when connecting
+  // to the inspector port. The MCP tools work via bridge/CDP and don't need
+  // actual debugger attachment. The orange status bar UI is nice-to-have but
+  // not worth the freeze.
+  //
+  // Future: Implement a mock debug adapter that shows the UI without
+  // connecting to the inspector port.
+  logger(`[attachDebugger] Skipped — debugger attachment disabled (port ${port}). MCP tools use bridge/CDP.`);
 }
 
 // ── Port Polling ────────────────────────────────────────
@@ -1559,24 +1530,15 @@ async function doConnect(options: VSCodeLaunchOptions): Promise<WebSocket> {
       delete childEnv[key];
     }
   }
+  // stdio: all 'ignore' — the launcher (Code.exe) exits immediately on Windows
+  // (exit code 9) after forking the real Electron process. Any piped streams
+  // would be inherited by the forked process, and when the MCP server restarts
+  // the broken pipe causes an EPIPE crash in Electron's main process.
   const proc = spawn(electronPath, args, {
     detached: true,
-    stdio: ['ignore', 'ignore', 'pipe'],
+    stdio: 'ignore',
     env: childEnv,
   });
-
-  // Capture launcher stderr for diagnostics — Code.exe may log startup failures
-  if (proc.stderr) {
-    let stderrOutput = '';
-    proc.stderr.setEncoding('utf8');
-    proc.stderr.on('data', (chunk: string) => { stderrOutput += chunk; });
-    proc.stderr.on('end', () => {
-      const trimmed = stderrOutput.trim();
-      if (trimmed) {
-        logger(`Launcher stderr: ${trimmed}`);
-      }
-    });
-  }
 
   // Track spawn errors (e.g., file not found, permission denied)
   proc.on('error', (err) => {
