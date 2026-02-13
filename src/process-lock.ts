@@ -1,45 +1,21 @@
 /**
- * Process lock management for stale MCP process cleanup.
+ * Process lock management using exclusive file lock.
  *
- * Two-layer defense:
- * A. PID file management - detect and kill stale processes on startup
- * B. Orphan watchdog - auto-exit if parent process dies (ppid becomes 1)
+ * Uses fs.openSync(path, 'wx') for atomic exclusive lock acquisition.
+ * Kill is only performed when a stale process is confirmed alive.
+ * Orphan watchdog is removed - stdin EOF (main.ts:266-267) handles this.
  */
 
+import {execFileSync} from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {logger} from './logger.js';
 
-interface PidFileData {
-  pid: number;
-  startedAt: string;
-  nonce: string;
-}
+const LOCK_DIR = path.join(os.homedir(), '.cache', 'chrome-ai-bridge');
+const LOCK_FILE = path.join(LOCK_DIR, 'mcp.lock');
 
-// Use a fixed path under ~/.cache so it works regardless of cwd
-const PID_FILE_DIR = path.join(os.homedir(), '.cache', 'chrome-ai-bridge');
-const PID_FILE_PATH = path.join(PID_FILE_DIR, 'mcp.pid');
-
-let currentNonce: string | null = null;
-let watchdogTimer: ReturnType<typeof setInterval> | null = null;
-
-function generateNonce(): string {
-  return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-}
-
-function readPidFile(): PidFileData | null {
-  try {
-    const raw = fs.readFileSync(PID_FILE_PATH, 'utf-8');
-    const data = JSON.parse(raw) as PidFileData;
-    if (typeof data.pid !== 'number' || !data.nonce) {
-      return null;
-    }
-    return data;
-  } catch {
-    return null;
-  }
-}
+let lockFd: number | null = null;
 
 function isProcessAlive(pid: number): boolean {
   try {
@@ -54,124 +30,191 @@ function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+function readPidFromLock(): number | null {
+  try {
+    const content = fs.readFileSync(LOCK_FILE, 'utf-8').trim();
+    const pid = Number(content);
+    return Number.isFinite(pid) && pid > 0 ? pid : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
- * Check for stale PID file and kill the old process if it's still running.
- * SIGTERM -> wait 2s -> SIGKILL if still alive.
+ * Try to create lock file exclusively (wx flag).
+ * Returns the file descriptor on success, null on EEXIST.
+ * Throws on other errors.
  */
-export async function cleanupStaleProcess(): Promise<void> {
-  const pidData = readPidFile();
-  if (!pidData) {
-    return;
+function tryCreateLock(): number | null {
+  try {
+    fs.mkdirSync(LOCK_DIR, {recursive: true});
+    const fd = fs.openSync(LOCK_FILE, 'wx');
+    fs.writeSync(fd, String(process.pid));
+    return fd;
+  } catch (error: unknown) {
+    if (error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'EEXIST') {
+      return null;
+    }
+    throw error;
+  }
+}
+
+/**
+ * Handle an existing lock file: check if the holder is alive and deal with it.
+ * Returns true if the stale lock was removed and retry is possible.
+ */
+async function handleExistingLock(): Promise<boolean> {
+  const pid = readPidFromLock();
+
+  if (pid === null) {
+    // Corrupted or empty lock file - remove it
+    logger('[process-lock] Corrupted lock file found. Removing.');
+    try { fs.unlinkSync(LOCK_FILE); } catch { /* ignore */ }
+    return true;
   }
 
   // Don't kill ourselves
-  if (pidData.pid === process.pid) {
-    return;
+  if (pid === process.pid) {
+    try { fs.unlinkSync(LOCK_FILE); } catch { /* ignore */ }
+    return true;
   }
 
-  if (!isProcessAlive(pidData.pid)) {
-    logger(`[process-lock] Stale PID file found (pid=${pidData.pid}, not running). Removing.`);
-    try {
-      fs.unlinkSync(PID_FILE_PATH);
-    } catch {
-      // ignore
-    }
-    return;
+  if (!isProcessAlive(pid)) {
+    // Dead process - stale lock
+    logger(`[process-lock] Stale lock (pid=${pid}, not running). Removing.`);
+    try { fs.unlinkSync(LOCK_FILE); } catch { /* ignore */ }
+    return true;
   }
 
-  logger(`[process-lock] Stale process detected (pid=${pidData.pid}, started=${pidData.startedAt}). Sending SIGTERM...`);
-
+  // Process is alive - send SIGTERM and wait
+  logger(`[process-lock] Existing process detected (pid=${pid}). Sending SIGTERM...`);
   try {
-    process.kill(pidData.pid, 'SIGTERM');
+    process.kill(pid, 'SIGTERM');
   } catch {
-    // Process already gone
-    return;
+    // Process disappeared between check and kill
+    try { fs.unlinkSync(LOCK_FILE); } catch { /* ignore */ }
+    return true;
   }
 
-  // Wait up to 2 seconds for graceful shutdown
   await sleep(2000);
 
-  if (isProcessAlive(pidData.pid)) {
-    logger(`[process-lock] Process ${pidData.pid} still alive after SIGTERM. Sending SIGKILL...`);
-    try {
-      process.kill(pidData.pid, 'SIGKILL');
-    } catch {
-      // ignore
-    }
+  if (isProcessAlive(pid)) {
+    logger(`[process-lock] Process ${pid} still alive. Sending SIGKILL...`);
+    try { process.kill(pid, 'SIGKILL'); } catch { /* ignore */ }
     await sleep(500);
   }
 
-  logger(`[process-lock] Stale process cleanup complete.`);
+  logger('[process-lock] Previous process terminated.');
+  try { fs.unlinkSync(LOCK_FILE); } catch { /* ignore */ }
+  return true;
+}
+
+/**
+ * Acquire an exclusive process lock. Call once at startup.
+ *
+ * Flow:
+ * 1. Try fs.openSync(LOCK_FILE, 'wx') for atomic exclusive creation
+ * 2. Success -> write PID, hold FD
+ * 3. EEXIST -> check holder, kill only if alive, retry once
+ */
+export async function acquireLock(): Promise<void> {
+  // First attempt
+  const fd = tryCreateLock();
+  if (fd !== null) {
+    lockFd = fd;
+    logger(`[process-lock] Lock acquired (pid=${process.pid})`);
+    return;
+  }
+
+  // Lock file exists - handle the existing holder
+  const canRetry = await handleExistingLock();
+  if (!canRetry) {
+    throw new Error('[process-lock] Failed to acquire lock');
+  }
+
+  // Retry once
+  const fd2 = tryCreateLock();
+  if (fd2 !== null) {
+    lockFd = fd2;
+    logger(`[process-lock] Lock acquired after cleanup (pid=${process.pid})`);
+    return;
+  }
+
+  throw new Error('[process-lock] Failed to acquire lock after retry');
+}
+
+/**
+ * Release the process lock. Call during shutdown.
+ */
+export function releaseLock(): void {
+  if (lockFd !== null) {
+    try { fs.closeSync(lockFd); } catch { /* ignore */ }
+    lockFd = null;
+  }
+  try { fs.unlinkSync(LOCK_FILE); } catch { /* ignore */ }
+  logger('[process-lock] Lock released.');
+}
+
+/**
+ * Kill all sibling chrome-ai-bridge processes (bulk cleanup).
+ *
+ * Uses pgrep to find processes matching 'chrome-ai-bridge/build/src/main.js',
+ * excludes self and parent, then SIGTERM -> wait -> SIGKILL survivors.
+ *
+ * Returns the number of processes killed.
+ * On pgrep failure (e.g. not installed), returns 0 silently.
+ */
+export async function killSiblings(): Promise<number> {
+  let pids: number[];
   try {
-    fs.unlinkSync(PID_FILE_PATH);
+    const output = execFileSync('pgrep', ['-f', 'chrome-ai-bridge/build/src/main.js'], {
+      encoding: 'utf-8',
+      timeout: 5000,
+    });
+    pids = output.trim().split('\n')
+      .map(s => Number(s.trim()))
+      .filter(n => Number.isFinite(n) && n > 0);
   } catch {
-    // ignore
+    // pgrep returns exit code 1 when no matches, or not available
+    return 0;
   }
-}
 
-/**
- * Write current process PID file with nonce for safe removal.
- */
-export function writePidFile(): void {
-  currentNonce = generateNonce();
-  const data: PidFileData = {
-    pid: process.pid,
-    startedAt: new Date().toISOString(),
-    nonce: currentNonce,
-  };
+  // Exclude self and parent (cli.mjs wrapper)
+  const selfPid = process.pid;
+  const parentPid = process.ppid;
+  const targets = pids.filter(pid => pid !== selfPid && pid !== parentPid);
 
-  try {
-    fs.mkdirSync(PID_FILE_DIR, {recursive: true});
-    fs.writeFileSync(PID_FILE_PATH, JSON.stringify(data, null, 2) + '\n');
-    logger(`[process-lock] PID file written (pid=${process.pid})`);
-  } catch (error) {
-    logger(`[process-lock] Failed to write PID file: ${error instanceof Error ? error.message : String(error)}`);
+  if (targets.length === 0) {
+    return 0;
   }
-}
 
-/**
- * Remove PID file only if it belongs to the current process (matching nonce).
- */
-export function removePidFile(): void {
-  if (!currentNonce) return;
+  logger(`[process-lock] Found ${targets.length} stale sibling(s): ${targets.join(', ')}`);
 
-  try {
-    const pidData = readPidFile();
-    if (pidData && pidData.nonce === currentNonce) {
-      fs.unlinkSync(PID_FILE_PATH);
-      logger(`[process-lock] PID file removed.`);
+  // Send SIGTERM to all
+  for (const pid of targets) {
+    try {
+      process.kill(pid, 'SIGTERM');
+    } catch {
+      // Process already gone
     }
-  } catch {
-    // ignore - file may already be deleted
   }
-  currentNonce = null;
-}
 
-/**
- * Install orphan watchdog: monitor ppid every 2 seconds.
- * If parent dies (ppid becomes 1 on Unix), call the shutdown callback.
- */
-export function installOrphanWatchdog(onOrphaned: () => void): void {
-  const initialPpid = process.ppid;
+  // Wait for graceful shutdown
+  await sleep(2000);
 
-  watchdogTimer = setInterval(() => {
-    if (process.ppid !== initialPpid) {
-      logger(`[process-lock] Parent process changed (${initialPpid} -> ${process.ppid}). Orphaned.`);
-      stopOrphanWatchdog();
-      onOrphaned();
+  // SIGKILL survivors
+  let killed = 0;
+  for (const pid of targets) {
+    if (isProcessAlive(pid)) {
+      logger(`[process-lock] Process ${pid} still alive after SIGTERM. Sending SIGKILL...`);
+      try {
+        process.kill(pid, 'SIGKILL');
+      } catch {
+        // ignore
+      }
     }
-  }, 2000);
-
-  // Don't keep the process alive just for the watchdog
-  watchdogTimer.unref();
-}
-
-/**
- * Stop the orphan watchdog timer.
- */
-export function stopOrphanWatchdog(): void {
-  if (watchdogTimer) {
-    clearInterval(watchdogTimer);
-    watchdogTimer = null;
+    killed++;
   }
+
+  return killed;
 }
