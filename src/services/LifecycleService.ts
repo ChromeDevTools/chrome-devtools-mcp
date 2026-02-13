@@ -96,6 +96,13 @@ class LifecycleService {
       throw new Error('[Lifecycle] Not initialized — call init() before handleHotReload()');
     }
 
+    // Disconnect CDP BEFORE telling the Host to rebuild.
+    // Host will kill the Client (which closes the WebSocket), and if we
+    // haven't marked the close as intentional beforehand, the disconnect
+    // handler treats it as "user closed window" and calls process.exit().
+    cdpService.disconnect();
+    clearCdpEventData();
+
     const result = await hotReloadRequired({
       targetWorkspace: this._targetWorkspace,
       extensionPath: this._extensionPath,
@@ -105,8 +112,6 @@ class LifecycleService {
 
     logger(`[Lifecycle] Host rebuilt Client — new CDP port: ${newPort}`);
 
-    cdpService.disconnect();
-    clearCdpEventData();
     await cdpService.connect(newPort);
     await initCdpEventSubscriptions();
 
