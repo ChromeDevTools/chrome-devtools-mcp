@@ -119,6 +119,20 @@ Chrome DevTools MCP will not start the browser instance automatically using this
 claude mcp add chrome-devtools --scope user npx chrome-devtools-mcp@latest
 ```
 
+To install Chrome DevTools MCP + skills, in Claude Code add a marketplace:
+
+```sh
+/plugin marketplace add ChromeDevTools/chrome-devtools-mcp
+```
+
+Then, install the plugin:
+
+```sh
+/plugin install chrome-devtools-mcp
+```
+
+Restart Claude Code to have the MCP server and skills load (check with `/skills`).
+
 </details>
 
 <details>
