@@ -2,6 +2,8 @@
 
 # Chrome DevTools MCP Tool Reference
 
+- **[Audits](#audits)** (1 tools)
+  - [`lighthouse_audit`](#lighthouse_audit)
 - **[Input automation](#input-automation)** (8 tools)
   - [`click`](#click)
   - [`drag`](#drag)
@@ -34,6 +36,22 @@
   - [`list_console_messages`](#list_console_messages)
   - [`take_screenshot`](#take_screenshot)
   - [`take_snapshot`](#take_snapshot)
+
+## Audits
+
+### `lighthouse_audit`
+
+**Description:** Runs a Lighthouse audit on the currently selected page.
+
+**Parameters:**
+
+- **categories** (array) _(optional)_: The categories to audit. Defaults to all available categories.
+- **device** (enum: "desktop", "mobile") _(optional)_: The device to [`emulate`](#emulate). "desktop" is the default. "mobile" emulates a mobile device.
+- **formats** (array) _(optional)_: Report formats to produce.
+- **mode** (enum: "navigation", "snapshot") _(optional)_: The mode to run Lighthouse in. "navigation" is the default and will reload the current page. "snapshot" analyzes the page in its current state.
+- **outputDirPath** (string) _(optional)_: The directory to output the reports to. If not provided, temporary files will be created.
+
+---
 
 ## Input automation
 

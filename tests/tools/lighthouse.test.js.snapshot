@@ -33,8 +33,8 @@ exports[`lighthouse > lighthouse_audit > runs Lighthouse accessibility audit 1`]
                   "top": 0,
                   "bottom": 34,
                   "left": 0,
-                  "right": 412,
-                  "width": 412,
+                  "right": 1200,
+                  "width": 1200,
                   "height": 34
                 },
                 "snippet": "<html lang=\\"en\\">",
