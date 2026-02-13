@@ -396,6 +396,8 @@ If you run into any issues, checkout our [troubleshooting guide](./docs/troubles
 
 <!-- BEGIN AUTO GENERATED TOOLS -->
 
+- **Audits** (1 tools)
+  - [`lighthouse_audit`](docs/tool-reference.md#lighthouse_audit)
 - **Input automation** (8 tools)
   - [`click`](docs/tool-reference.md#click)
   - [`drag`](docs/tool-reference.md#drag)
