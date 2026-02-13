@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import {Client} from '@modelcontextprotocol/sdk/client/index.js';
 import {StdioClientTransport} from '@modelcontextprotocol/sdk/client/stdio.js';
 import type {Tool} from '@modelcontextprotocol/sdk/types.js';
-import {get_encoding} from 'tiktoken'; // npm install tiktoken
+import {get_encoding} from 'tiktoken';
 
 import {cliOptions} from '../build/src/cli.js';
 import {ToolCategory, labels} from '../build/src/tools/categories.js';
@@ -355,7 +355,7 @@ async function generateToolDocumentation(): Promise<void> {
     // Generate markdown documentation
     let markdown = `<!-- AUTO GENERATED DO NOT EDIT - run 'npm run docs' to update-->
 
-# Chrome DevTools MCP Tool Reference (~${(await measureServer()).tokenCount} tokens via js-tiktoken)
+# Chrome DevTools MCP Tool Reference (~${(await measureServer()).tokenCount} cl100k_base tokens)
 
 `;
 
