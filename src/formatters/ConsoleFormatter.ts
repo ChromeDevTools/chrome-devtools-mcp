@@ -159,8 +159,12 @@ export class ConsoleFormatter {
   }
 
   // The short format for a console message.
-  toString(): string {
-    return `msgid=${this.#id} [${this.#type}] ${this.#text} (${this.#argCount} args)`;
+ toString(): string {
+    const topFrame = this.#getTopFrameLocation();
+    const locationStr = topFrame
+      ? ` (${topFrame.url}:${topFrame.lineNumber}:${topFrame.columnNumber})`
+      : '';
+    return `msgid=${this.#id} [${this.#type}] ${this.#text}${locationStr} (${this.#argCount} args)`;
   }
 
   // The verbose format for a console message, including all details.
@@ -305,16 +309,17 @@ export class ConsoleFormatter {
   }
 
   toJSON(): object {
+    const location = this.#getTopFrameLocation();
     return {
       type: this.#type,
       text: this.#text,
       argsCount: this.#argCount,
       id: this.#id,
+      ...(location ? { location } : {}),
     };
   }
 
   toJSONDetailed(): object {
-    const location = this.#getTopFrameLocation();
 
     return {
       id: this.#id,
@@ -324,7 +329,6 @@ export class ConsoleFormatter {
         typeof arg === 'object' ? arg : String(arg),
       ),
       stackTrace: this.#stack,
-      ...(location ? { location } : {}),
     };
   }
 

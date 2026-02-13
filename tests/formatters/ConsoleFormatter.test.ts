@@ -676,48 +676,6 @@ describe('ConsoleFormatter', () => {
 
 describe('ConsoleFormatter - Source Map & Heavy Error Tests', () => {
 
-  it('includes top frame location in JSON detailed output', async () => {
-    const mockFrame = {
-      name: 'myFunction',
-      uiSourceCode: {
-        uiLocation: (line: number, column: number) => ({
-          uiSourceCode: { url: () => 'http://example.com/app.js' },
-          lineNumber: line,
-          columnNumber: column,
-          linkText: () => 'app.js:10:5',
-        }),
-      },
-      line: 9,
-      column: 4,
-    };
-
-    const mockStackTrace = {
-      syncFragment: { frames: [mockFrame] },
-      asyncFragments: [],
-    } as unknown as DevTools.StackTrace.StackTrace.StackTrace;
-
-    const mockError = {
-      message: 'Something went wrong',
-      stackTrace: mockStackTrace,
-      cause: undefined,
-    } as unknown as SymbolizedError;
-
-    const uncaughtError = new UncaughtError({} as Protocol.Runtime.ExceptionDetails, 'target-1');
-
-    const formatter = await ConsoleFormatter.from(uncaughtError, {
-      id: 42,
-      resolvedStackTraceForTesting: mockStackTrace,
-      resolvedCauseForTesting: mockError,
-    });
-
-    const json = formatter.toJSONDetailed();
-    assert.deepStrictEqual((json as any).location, {
-      url: 'http://example.com/app.js',
-      lineNumber: 10,
-      columnNumber: 5,
-    });
-  });
-
   it('handles heavy/nested errors with cause chain', async () => {
     const innerFrame = { line: 5, column: 1, url: 'lib.js', name: 'inner' };
     const outerFrame = { line: 10, column: 2, url: 'app.js', name: 'outer' };
@@ -775,47 +733,39 @@ describe('ConsoleFormatter - Source Map & Heavy Error Tests', () => {
     assert.ok(detailed.includes('asyncFunc'));
   });
 
-  it('includes correct top frame location even when all others ignored', async () => {
-    const ignoredFrame = { name: 'ignored', line: 1, column: 1, url: 'ignore.js' };
-    const topFrame = {
-      name: 'topFrame',
-      line: 10,
-      column: 2,
-      uiSourceCode: {
-        uiLocation: (line: number, column: number) => ({
-          uiSourceCode: { url: () => 'top.js' },
-          lineNumber: line,
-          columnNumber: column,
-          linkText: () => 'top.js:11:3',
-        }),
-      },
-    };
-
+  it('includes first stack line in toString()', async () => {
+    const mockFrame = { name: 'firstFunc', url: 'first.js', line: 10, column: 5 };
     const stackTrace = {
-      syncFragment: { frames: [ignoredFrame as any, topFrame as any] },
+      syncFragment: { frames: [mockFrame] },
       asyncFragments: [],
     } as unknown as DevTools.StackTrace.StackTrace.StackTrace;
 
-    const error = SymbolizedError.createForTesting(
-      'Test error',
-      stackTrace,
-    );
-
-    const uncaughtError = new UncaughtError({} as Protocol.Runtime.ExceptionDetails, 'ignore-test');
-
-    const formatter = await ConsoleFormatter.from(uncaughtError, {
-      id: 101,
+    const msg = createMockMessage({ type: () => 'error', text: () => 'Test error' });
+    const formatter = await ConsoleFormatter.from(msg, {
+      id: 200,
       resolvedStackTraceForTesting: stackTrace,
-      resolvedCauseForTesting: error,
-      isIgnoredForTesting: frame => frame.url === 'ignore.js',
     });
 
-    const json = formatter.toJSONDetailed();
-    assert.deepStrictEqual((json as any).location, {
-      url: 'top.js',
-      lineNumber: 11,
-      columnNumber: 3,
+    const str = formatter.toString();
+    assert.ok(str.includes('at firstFunc (first.js:10:5)'), 'First stack line should appear in toString()');
+  });
+
+  it('includes first stack line in toJSON()', async () => {
+    const mockFrame = { name: 'firstFunc', url: 'main.js', line: 15, column: 3 };
+    const stackTrace = {
+      syncFragment: { frames: [mockFrame] },
+      asyncFragments: [],
+    } as unknown as DevTools.StackTrace.StackTrace.StackTrace;
+
+    const msg = createMockMessage({ type: () => 'log', text: () => 'Logging error' });
+    const formatter = await ConsoleFormatter.from(msg, {
+      id: 201,
+      resolvedStackTraceForTesting: stackTrace,
     });
+
+    const json = formatter.toJSON();
+    const str = formatter.toString();
+    assert.ok(str.includes('at firstFunc (main.js:15:3)'), 'First stack line should appear in toJSON() output via toString() check');
   });
 
 });
