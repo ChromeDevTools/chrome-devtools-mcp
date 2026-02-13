@@ -45,7 +45,7 @@ import {cleanupAllConnections} from './fast-cdp/fast-chat.js';
 import {generateAgentId, setAgentId} from './fast-cdp/agent-context.js';
 import {cleanupStaleSessions} from './fast-cdp/session-manager.js';
 import {getSessionConfig, IPC_CONFIG} from './config.js';
-import {acquireLock, releaseLock, killSiblings, checkExistingPrimary} from './process-lock.js';
+import {acquireLock, releaseLock, killSiblings, checkExistingPrimary, updateLockPort} from './process-lock.js';
 import {checkPrimaryHealth, startProxyMode} from './stdio-http-proxy.js';
 
 function readPackageJson(): {version?: string} {
@@ -96,8 +96,11 @@ if (killed > 0) {
   logger(`[process-lock] Killed ${killed} stale sibling process(es)`);
 }
 
-// Acquire exclusive process lock (writes port to lock file)
-await acquireLock(IPC_CONFIG.port);
+// Generate a unique instance ID (survives PID reuse)
+const instanceId = randomUUID();
+
+// Acquire exclusive process lock (writes port + instanceId to lock file)
+await acquireLock(IPC_CONFIG.port, instanceId);
 
 // Start session cleanup timer
 const sessionConfig = getSessionConfig();
@@ -250,7 +253,7 @@ logDisclaimers();
     // Health endpoint
     if (url.pathname === IPC_CONFIG.healthPath) {
       res.writeHead(200, {'Content-Type': 'application/json'}).end(
-        JSON.stringify({status: 'ok', pid: process.pid, version}),
+        JSON.stringify({status: 'ok', pid: process.pid, version, instanceId}),
       );
       return;
     }
@@ -374,17 +377,26 @@ logDisclaimers();
     res.writeHead(405).end();
   });
 
-  ipcServer.listen(IPC_CONFIG.port, IPC_CONFIG.host, () => {
-    logger(`[ipc] IPC HTTP listening on http://${IPC_CONFIG.host}:${IPC_CONFIG.port} (health: ${IPC_CONFIG.healthPath}, mcp: ${IPC_CONFIG.mcpPath})`);
-  });
+  function onListening(): void {
+    const addr = ipcServer.address();
+    const actualPort = typeof addr === 'object' && addr ? addr.port : IPC_CONFIG.port;
+    if (actualPort !== IPC_CONFIG.port) {
+      logger(`[ipc] Configured port ${IPC_CONFIG.port} was unavailable. Using dynamic port ${actualPort}.`);
+      updateLockPort(actualPort);
+    }
+    logger(`[ipc] IPC HTTP listening on http://${IPC_CONFIG.host}:${actualPort} (health: ${IPC_CONFIG.healthPath}, mcp: ${IPC_CONFIG.mcpPath})`);
+  }
 
   ipcServer.on('error', (err: NodeJS.ErrnoException) => {
     if (err.code === 'EADDRINUSE') {
-      logger(`[ipc] Port ${IPC_CONFIG.port} already in use. IPC server not started (proxy clients will fail).`);
+      logger(`[ipc] Port ${IPC_CONFIG.port} in use. Retrying with dynamic port...`);
+      ipcServer.listen(0, IPC_CONFIG.host, onListening);
     } else {
       logger(`[ipc] IPC server error: ${err.message}`);
     }
   });
+
+  ipcServer.listen(IPC_CONFIG.port, IPC_CONFIG.host, onListening);
 }
 
 // Graceful shutdown handler with timeout

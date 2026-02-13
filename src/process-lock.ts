@@ -21,11 +21,13 @@ export interface LockInfo {
   pid: number;
   port: number;
   startedAt: string; // ISO 8601
+  instanceId: string; // UUID to detect PID reuse
 }
 
 export interface PrimaryStatus {
   alive: boolean;
   port: number;
+  instanceId: string;
 }
 
 function isProcessAlive(pid: number): boolean {
@@ -44,7 +46,7 @@ function sleep(ms: number): Promise<void> {
 /**
  * Read lock file content. Supports both JSON (new) and plain PID (legacy).
  */
-function readLockInfo(): LockInfo | null {
+export function readLockInfo(): LockInfo | null {
   try {
     const content = fs.readFileSync(LOCK_FILE, 'utf-8').trim();
     if (!content) return null;
@@ -57,6 +59,7 @@ function readLockInfo(): LockInfo | null {
           pid: parsed.pid,
           port: parsed.port ?? 0,
           startedAt: parsed.startedAt ?? '',
+          instanceId: parsed.instanceId ?? '',
         };
       }
       return null;
@@ -65,7 +68,7 @@ function readLockInfo(): LockInfo | null {
     // Legacy: plain PID number
     const pid = Number(content);
     if (Number.isFinite(pid) && pid > 0) {
-      return {pid, port: 0, startedAt: ''};
+      return {pid, port: 0, startedAt: '', instanceId: ''};
     }
     return null;
   } catch {
@@ -86,7 +89,7 @@ export function checkExistingPrimary(): PrimaryStatus | null {
     return null;
   }
 
-  return {alive: true, port: info.port};
+  return {alive: true, port: info.port, instanceId: info.instanceId};
 }
 
 /**
@@ -94,7 +97,7 @@ export function checkExistingPrimary(): PrimaryStatus | null {
  * Writes JSON {pid, port, startedAt}.
  * Returns the file descriptor on success, null on EEXIST.
  */
-function tryCreateLock(port: number): number | null {
+function tryCreateLock(port: number, instanceId: string): number | null {
   try {
     fs.mkdirSync(LOCK_DIR, {recursive: true});
     const fd = fs.openSync(LOCK_FILE, 'wx');
@@ -102,6 +105,7 @@ function tryCreateLock(port: number): number | null {
       pid: process.pid,
       port,
       startedAt: new Date().toISOString(),
+      instanceId,
     };
     fs.writeSync(fd, JSON.stringify(lockInfo));
     return fd;
@@ -155,11 +159,11 @@ async function handleExistingLock(): Promise<boolean> {
  * 3. EEXIST -> check holder; remove only if stale, retry once
  * 4. If holder is alive -> throw (caller should enter proxy mode)
  */
-export async function acquireLock(port: number): Promise<void> {
-  const fd = tryCreateLock(port);
+export async function acquireLock(port: number, instanceId: string): Promise<void> {
+  const fd = tryCreateLock(port, instanceId);
   if (fd !== null) {
     lockFd = fd;
-    logger(`[process-lock] Lock acquired (pid=${process.pid}, port=${port})`);
+    logger(`[process-lock] Lock acquired (pid=${process.pid}, port=${port}, instanceId=${instanceId.slice(0, 8)})`);
     return;
   }
 
@@ -170,7 +174,7 @@ export async function acquireLock(port: number): Promise<void> {
   }
 
   // Retry once after stale removal
-  const fd2 = tryCreateLock(port);
+  const fd2 = tryCreateLock(port, instanceId);
   if (fd2 !== null) {
     lockFd = fd2;
     logger(`[process-lock] Lock acquired after cleanup (pid=${process.pid}, port=${port})`);
@@ -178,6 +182,28 @@ export async function acquireLock(port: number): Promise<void> {
   }
 
   throw new Error('[process-lock] Failed to acquire lock after retry');
+}
+
+/**
+ * Update the port in an existing lock file (e.g. after dynamic port fallback).
+ * Rewrites the lock file content while keeping the FD open.
+ */
+export function updateLockPort(newPort: number): void {
+  if (lockFd === null) {
+    logger('[process-lock] Cannot update port: no lock held.');
+    return;
+  }
+  const info = readLockInfo();
+  if (!info) {
+    logger('[process-lock] Cannot update port: lock file unreadable.');
+    return;
+  }
+  info.port = newPort;
+  // Truncate and rewrite
+  fs.ftruncateSync(lockFd);
+  const buf = Buffer.from(JSON.stringify(info));
+  fs.writeSync(lockFd, buf, 0, buf.length, 0);
+  logger(`[process-lock] Lock port updated to ${newPort}`);
 }
 
 /**
