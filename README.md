@@ -669,11 +669,4 @@ Please consult [these instructions](./docs/debugging-android.md).
 
 ## Known limitations
 
-### Operating system sandboxes
-
-Some MCP clients allow sandboxing the MCP server using macOS Seatbelt or Linux
-containers. If sandboxes are enabled, `chrome-devtools-mcp` is not able to start
-Chrome that requires permissions to create its own sandboxes. As a workaround,
-either disable sandboxing for `chrome-devtools-mcp` in your MCP client or use
-`--browser-url` to connect to a Chrome instance that you start manually outside
-of the MCP client sandbox.
+See [Troubleshooting](./docs/troubleshooting.md).
