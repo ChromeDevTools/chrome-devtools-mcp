@@ -71,6 +71,34 @@ ssh -N -L 127.0.0.1:9222:127.0.0.1:9222 <user>@<host-ip>
 
 Point the MCP connection inside the VM to `http://127.0.0.1:9222`. This allows DevTools to reach the host browser without triggering the Host validation error.
 
+### Connecting to a running Chrome instance (remote debugging, 9222)
+
+If you want `chrome-devtools-mcp` to attach to an existing Chrome instance, start Chrome with remote debugging enabled, then pass `--browserUrl`.
+
+1. Start Chrome with a remote debugging port:
+
+   - Linux:
+     ```sh
+     google-chrome --remote-debugging-port=9222
+     ```
+
+   - macOS:
+     ```sh
+     /Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome --remote-debugging-port=9222
+     ```
+
+2. Verify the endpoint is reachable:
+
+   - `http://127.0.0.1:9222/json/version` should return JSON
+
+3. Start the MCP server and point it at the debugging endpoint:
+
+   ```sh
+   npx --yes chrome-devtools-mcp@latest --browserUrl http://127.0.0.1:9222
+   ```
+
+See also: `examples/remote-debugging-9222.mjs`.
+
 ### Operating system sandboxes
 
 Some MCP clients allow sandboxing the MCP server using macOS Seatbelt or Linux
