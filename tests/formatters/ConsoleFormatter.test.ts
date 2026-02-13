@@ -673,3 +673,100 @@ describe('ConsoleFormatter', () => {
     });
   });
 });
+
+describe('ConsoleFormatter - Source Map & Heavy Error Tests', () => {
+
+  it('handles heavy/nested errors with cause chain', async () => {
+    const innerFrame = { line: 5, column: 1, url: 'lib.js', name: 'inner' };
+    const outerFrame = { line: 10, column: 2, url: 'app.js', name: 'outer' };
+
+    const innerError = SymbolizedError.createForTesting(
+      'Inner error',
+      { syncFragment: { frames: [innerFrame] }, asyncFragments: [] } as any,
+    );
+
+    const outerError = SymbolizedError.createForTesting(
+      'Outer error',
+      { syncFragment: { frames: [outerFrame] }, asyncFragments: [] } as any,
+      innerError,
+    );
+
+    const uncaughtError = new UncaughtError({} as Protocol.Runtime.ExceptionDetails, 'heavy-1');
+
+    const formatter = await ConsoleFormatter.from(uncaughtError, {
+      id: 99,
+      resolvedCauseForTesting: outerError,
+      resolvedStackTraceForTesting: outerError.stackTrace as any,
+    });
+
+    const detailed = formatter.toStringDetailed();
+    assert.ok(detailed.includes('Outer error'));
+    assert.ok(detailed.includes('Caused by: Inner error'));
+    assert.ok(detailed.includes('inner'));
+    assert.ok(detailed.includes('outer'));
+  });
+
+  it('handles async fragments correctly', async () => {
+    const syncFrame = { name: 'syncFunc', line: 1, column: 1, url: 'sync.js' };
+    const asyncFrame = { name: 'asyncFunc', line: 5, column: 2, url: 'async.js' };
+
+    const stackTrace = {
+      syncFragment: { frames: [syncFrame] },
+      asyncFragments: [{ description: 'asyncTask', frames: [asyncFrame] }],
+    } as unknown as DevTools.StackTrace.StackTrace.StackTrace;
+
+    const error = SymbolizedError.createForTesting(
+      'Async error',
+      stackTrace,
+    );
+
+    const uncaughtError = new UncaughtError({} as Protocol.Runtime.ExceptionDetails, 'async-1');
+
+    const formatter = await ConsoleFormatter.from(uncaughtError, {
+      id: 100,
+      resolvedCauseForTesting: error,
+      resolvedStackTraceForTesting: stackTrace,
+    });
+
+    const detailed = formatter.toStringDetailed();
+    assert.ok(detailed.includes('--- asyncTask'));
+    assert.ok(detailed.includes('asyncFunc'));
+  });
+
+  it('includes first stack line in toString()', async () => {
+    const mockFrame = { name: 'firstFunc', url: 'first.js', line: 10, column: 5 };
+    const stackTrace = {
+      syncFragment: { frames: [mockFrame] },
+      asyncFragments: [],
+    } as unknown as DevTools.StackTrace.StackTrace.StackTrace;
+
+    const msg = createMockMessage({ type: () => 'error', text: () => 'Test error' });
+    const formatter = await ConsoleFormatter.from(msg, {
+      id: 200,
+      resolvedStackTraceForTesting: stackTrace,
+    });
+
+    const str = formatter.toString();
+    assert.ok(str.includes('at firstFunc (first.js:10:5)'), 'First stack line should appear in toString()');
+  });
+
+  it('includes first stack line in toJSON()', async () => {
+    const mockFrame = { name: 'firstFunc', url: 'main.js', line: 15, column: 3 };
+    const stackTrace = {
+      syncFragment: { frames: [mockFrame] },
+      asyncFragments: [],
+    } as unknown as DevTools.StackTrace.StackTrace.StackTrace;
+
+    const msg = createMockMessage({ type: () => 'log', text: () => 'Logging error' });
+    const formatter = await ConsoleFormatter.from(msg, {
+      id: 201,
+      resolvedStackTraceForTesting: stackTrace,
+    });
+
+    const json = formatter.toJSON();
+    const str = formatter.toString();
+    assert.ok(str.includes('at firstFunc (main.js:15:3)'), 'First stack line should appear in toJSON() output via toString() check');
+  });
+
+});
+
