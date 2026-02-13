@@ -9,4 +9,4 @@ Apply them with nuance.
 - **Self-Healing Errors**: Return actionable errors that include context and potential fixes.
 - **Human-Agent Collaboration**: Output must be readable by machines (structured) AND humans (summaries).
 - **Progressive Complexity**: Tools should be simple by default (high-level actions) but offer advanced optional arguments for power users.
-- **Reference over Value**: for heavy assets (screenshots, traces, videos), return a file path or resource URI, never the raw data stream.
+- **Reference over Value**: for heavy assets (screenshots, traces, videos), return a file path or resource URI, never the raw data stream. Some MCP clients support a built-in handling of heavy assets e.g. directly displaying images. This *could* be an exception.
