@@ -525,6 +525,10 @@ The Chrome DevTools MCP server supports the following configuration option:
   - **Type:** boolean
   - **Default:** `true`
 
+- **`--minimal`, `-min`**
+  Minimal set of tools (only 3).
+  - **Type:** boolean
+
 <!-- END AUTO GENERATED OPTIONS -->
 
 Pass them via the `args` property in the JSON configuration. For example:

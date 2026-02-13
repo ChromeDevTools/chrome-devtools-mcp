@@ -15,6 +15,7 @@ import {loadIssueDescriptions} from './issue-descriptions.js';
 import {logger, saveLogsToFile} from './logger.js';
 import {McpContext} from './McpContext.js';
 import {McpResponse} from './McpResponse.js';
+import {MinimalMcpResponse} from './MinimalMcpResponse.js';
 import {Mutex} from './Mutex.js';
 import {ClearcutLogger} from './telemetry/ClearcutLogger.js';
 import {computeFlagUsage} from './telemetry/flagUtils.js';
@@ -26,6 +27,7 @@ import {
   SetLevelRequestSchema,
 } from './third_party/index.js';
 import {ToolCategory} from './tools/categories.js';
+import {tools as minimalTools} from './tools/minimal/tools.js';
 import type {ToolDefinition} from './tools/ToolDefinition.js';
 import {tools} from './tools/tools.js';
 
@@ -128,13 +130,13 @@ debug, and modify any data in the browser or DevTools.
 Avoid sharing sensitive or personal information that you do not want to share with MCP clients.`,
   );
 
-  if (args.performanceCrux) {
+  if (!args.minimal && args.performanceCrux) {
     console.error(
       `Performance tools may send trace URLs to the Google CrUX API to fetch real-user experience data. To disable, run with --no-performance-crux.`,
     );
   }
 
-  if (args.usageStatistics) {
+  if (!args.minimal && args.usageStatistics) {
     console.error(
       `
 Google collects usage statistics to improve Chrome DevTools MCP. To opt-out, run with --no-usage-statistics.
@@ -198,7 +200,9 @@ function registerTool(tool: ToolDefinition): void {
         const context = await getContext();
         logger(`${tool.name} context: resolved`);
         await context.detectOpenDevToolsWindows();
-        const response = new McpResponse();
+        const response = args.minimal
+          ? new MinimalMcpResponse()
+          : new McpResponse();
         await tool.handler(
           {
             params,
@@ -250,7 +254,7 @@ function registerTool(tool: ToolDefinition): void {
   );
 }
 
-for (const tool of tools) {
+for (const tool of args.minimal ? minimalTools : tools) {
   registerTool(tool);
 }
 

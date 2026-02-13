@@ -231,6 +231,11 @@ export const cliOptions = {
     hidden: true,
     describe: 'Include watchdog PID in Clearcut request headers (for testing).',
   },
+  minimal: {
+    type: 'boolean',
+    describe: 'Minimal set of tools (only 3).',
+    alias: 'min',
+  },
 } satisfies Record<string, YargsOptions>;
 
 export function parseArguments(version: string, argv = process.argv) {
@@ -307,6 +312,7 @@ export function parseArguments(version: string, argv = process.argv) {
         '$0 --no-performance-crux',
         'Disable CrUX (field data) integration in performance tools.',
       ],
+      ['$0 --minimal', 'Only 3 tools: navigation, JavaScript and screenshot'],
     ]);
 
   return yargsInstance
