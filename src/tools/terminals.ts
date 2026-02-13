@@ -6,12 +6,11 @@
 
 /**
  * Tools for reading terminal information from VS Code.
- * Uses the VS Code Extension API via the bridge to access terminal data.
+ * Uses the Client pipe to access terminal data in the Extension Development Host.
  */
 
-import {bridgeExec} from '../bridge-client.js';
+import {terminalListAll, pingClient} from '../client-pipe.js';
 import {zod} from '../third_party/index.js';
-import {getDevhostBridgePath} from '../vscode.js';
 
 import {ToolCategory} from './categories.js';
 import {defineTool, ResponseFormat, responseFormatSchema} from './ToolDefinition.js';
@@ -54,39 +53,6 @@ const ListTerminalsOutputSchema = zod.object({
   terminals: zod.array(TerminalInfoSchema),
 });
 
-const TERMINAL_LIST_CODE = `
-// Get terminals synchronously - processId needs separate async handling
-const terminals = vscode.window.terminals;
-const activeTerminal = vscode.window.activeTerminal;
-
-const terminalInfos = terminals.map((terminal, index) => ({
-  index,
-  name: terminal.name,
-  processId: undefined, // processId is async, skip for now
-  creationOptions: {
-    name: terminal.creationOptions?.name,
-    shellPath: terminal.creationOptions?.shellPath,
-  },
-  exitStatus: terminal.exitStatus ? {
-    code: terminal.exitStatus.code,
-    reason: terminal.exitStatus.reason === 1 ? 'Signal' : 
-            terminal.exitStatus.reason === 2 ? 'Extension' : 'Process',
-  } : undefined,
-  state: {
-    isInteractedWith: terminal.state?.isInteractedWith ?? false,
-  },
-  isActive: terminal === activeTerminal,
-}));
-
-const activeIndex = terminalInfos.findIndex(t => t.isActive);
-
-return {
-  total: terminalInfos.length,
-  activeIndex: activeIndex >= 0 ? activeIndex : undefined,
-  terminals: terminalInfos,
-};
-`;
-
 export const listTerminals = defineTool({
   name: 'list_terminals',
   description: `List all terminals in VS Code with their status and metadata.
@@ -122,25 +88,20 @@ Note:
   },
   outputSchema: ListTerminalsOutputSchema,
   handler: async (request, response) => {
-    const bridgePath = getDevhostBridgePath();
-    if (!bridgePath) {
+    const alive = await pingClient();
+    if (!alive) {
       throw new Error(
-        'Development host bridge not available. ' +
-        'Make sure the VS Code debug window is running.',
+        'Client pipe not available. ' +
+        'Make sure the VS Code Extension Development Host window is running.',
       );
     }
 
-    const rawResult = await bridgeExec(bridgePath, TERMINAL_LIST_CODE);
+    const rawResult = await terminalListAll();
     
-    // Handle null/undefined result
-    const result = (rawResult ?? {
+    const result = rawResult ?? {
       total: 0,
       activeIndex: undefined,
       terminals: [],
-    }) as {
-      total: number;
-      activeIndex?: number;
-      terminals: Array<TerminalInfo & {index: number; isActive: boolean}>;
     };
 
     if (request.params.response_format === ResponseFormat.JSON) {

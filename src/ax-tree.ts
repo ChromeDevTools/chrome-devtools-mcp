@@ -11,7 +11,7 @@
  */
 
 import {logger} from './logger.js';
-import {sendCdp, getAttachedTargets, type AttachedTargetInfo} from './vscode.js';
+import {cdpService, type AttachedTargetInfo} from './services/index.js';
 
 // ── CDP Accessibility Types ──
 
@@ -267,15 +267,15 @@ function formatOOPIFNodes(
  * Automatically traverses all frames including webviews.
  */
 export async function fetchAXTree(verbose: boolean): Promise<AXTreeResult> {
-  await sendCdp('Accessibility.enable');
-  await sendCdp('Page.enable');
+  await cdpService.sendCdp('Accessibility.enable');
+  await cdpService.sendCdp('Page.enable');
 
   // Get frame tree to discover all frames including webviews
   let allFrames: FrameInfo[] = [];
   let mainFrameId: string | undefined;
   
   try {
-    const frameTreeResult = await sendCdp('Page.getFrameTree');
+    const frameTreeResult = await cdpService.sendCdp('Page.getFrameTree');
     if (frameTreeResult.frameTree) {
       allFrames = collectFrames(frameTreeResult.frameTree);
       mainFrameId = frameTreeResult.frameTree.frame.id;
@@ -387,7 +387,7 @@ export async function fetchAXTree(verbose: boolean): Promise<AXTreeResult> {
   if (allFrames.length > 0) {
     for (const frame of allFrames) {
       try {
-        const result = await sendCdp('Accessibility.getFullAXTree', {frameId: frame.id});
+        const result = await cdpService.sendCdp('Accessibility.getFullAXTree', {frameId: frame.id});
         const nodes: AXNode[] = result.nodes ?? [];
         
         if (nodes.length > 0) {
@@ -402,7 +402,7 @@ export async function fetchAXTree(verbose: boolean): Promise<AXTreeResult> {
     }
   } else {
     // Fallback: just get main frame
-    const result = await sendCdp('Accessibility.getFullAXTree');
+    const result = await cdpService.sendCdp('Accessibility.getFullAXTree');
     const nodes: AXNode[] = result.nodes ?? [];
     allNodes = nodes;
 
@@ -476,7 +476,7 @@ export async function fetchAXTree(verbose: boolean): Promise<AXTreeResult> {
   }
 
   // Process OOPIF targets (out-of-process iframes like webviews)
-  const attachedTargets = getAttachedTargets();
+  const attachedTargets = cdpService.getAttachedTargets();
   const oopifTargets = attachedTargets.filter(t => t.type === 'iframe' || isWebviewUrl(t.url));
   
   if (oopifTargets.length > 0) {
@@ -485,10 +485,10 @@ export async function fetchAXTree(verbose: boolean): Promise<AXTreeResult> {
     for (const target of oopifTargets) {
       try {
         // Enable accessibility on the target session
-        await sendCdp('Accessibility.enable', {}, {sessionId: target.sessionId});
+        await cdpService.sendCdp('Accessibility.enable', {}, {sessionId: target.sessionId});
         
         // Fetch AX tree for this OOPIF
-        const result = await sendCdp('Accessibility.getFullAXTree', {}, {sessionId: target.sessionId});
+        const result = await cdpService.sendCdp('Accessibility.getFullAXTree', {}, {sessionId: target.sessionId});
         const nodes: AXNode[] = (result.nodes ?? []) as AXNode[];
         
         if (nodes.length > 0) {
@@ -591,8 +591,8 @@ export async function resolveNodeToRemoteObject(uid: string): Promise<string> {
   const backendNodeId = getBackendNodeId(uid);
   const sessionId = getSessionIdForUid(uid);
   const opts = sessionId ? {sessionId} : undefined;
-  await sendCdp('DOM.enable', {}, opts);
-  const result = await sendCdp('DOM.resolveNode', {backendNodeId}, opts);
+  await cdpService.sendCdp('DOM.enable', {}, opts);
+  const result = await cdpService.sendCdp('DOM.resolveNode', {backendNodeId}, opts);
   if (!result.object?.objectId) {
     throw new Error(
       `Could not resolve DOM node for uid "${uid}" (backendNodeId=${backendNodeId}).`,
@@ -609,10 +609,10 @@ export async function getElementCenter(uid: string): Promise<{x: number; y: numb
   const backendNodeId = getBackendNodeId(uid);
   const sessionId = getSessionIdForUid(uid);
   const opts = sessionId ? {sessionId} : undefined;
-  await sendCdp('DOM.enable', {}, opts);
+  await cdpService.sendCdp('DOM.enable', {}, opts);
 
   try {
-    const boxModel = await sendCdp('DOM.getBoxModel', {backendNodeId}, opts);
+    const boxModel = await cdpService.sendCdp('DOM.getBoxModel', {backendNodeId}, opts);
     // content quad: [x1,y1, x2,y2, x3,y3, x4,y4]
     const content = boxModel.model.content;
     const x = (content[0] + content[2] + content[4] + content[6]) / 4;
@@ -620,7 +620,7 @@ export async function getElementCenter(uid: string): Promise<{x: number; y: numb
     return {x, y};
   } catch {
     // Fallback: try getContentQuads
-    const quads = await sendCdp('DOM.getContentQuads', {backendNodeId}, opts);
+    const quads = await cdpService.sendCdp('DOM.getContentQuads', {backendNodeId}, opts);
     if (!quads.quads?.length) {
       throw new Error(
         `Element with uid "${uid}" has no visible bounding box. ` +
@@ -641,8 +641,8 @@ export async function focusElement(uid: string): Promise<void> {
   const backendNodeId = getBackendNodeId(uid);
   const sessionId = getSessionIdForUid(uid);
   const opts = sessionId ? {sessionId} : undefined;
-  await sendCdp('DOM.enable', {}, opts);
-  await sendCdp('DOM.focus', {backendNodeId}, opts);
+  await cdpService.sendCdp('DOM.enable', {}, opts);
+  await cdpService.sendCdp('DOM.focus', {backendNodeId}, opts);
 }
 
 /**
@@ -652,8 +652,8 @@ export async function scrollIntoView(uid: string): Promise<void> {
   const backendNodeId = getBackendNodeId(uid);
   const sessionId = getSessionIdForUid(uid);
   const opts = sessionId ? {sessionId} : undefined;
-  await sendCdp('DOM.enable', {}, opts);
-  await sendCdp('DOM.scrollIntoViewIfNeeded', {backendNodeId}, opts);
+  await cdpService.sendCdp('DOM.enable', {}, opts);
+  await cdpService.sendCdp('DOM.scrollIntoViewIfNeeded', {backendNodeId}, opts);
 }
 
 /**
@@ -674,7 +674,7 @@ export async function scrollElement(
   const deltaY = direction === 'up' ? -amount : direction === 'down' ? amount : 0;
 
   logger(`Scrolling uid=${uid} at (${x}, ${y}), deltaX=${deltaX}, deltaY=${deltaY}`);
-  await sendCdp('Input.dispatchMouseEvent', {
+  await cdpService.sendCdp('Input.dispatchMouseEvent', {
     type: 'mouseWheel',
     x,
     y,
@@ -695,14 +695,14 @@ export async function clickAtCoords(
   y: number,
   clickCount = 1,
 ): Promise<void> {
-  await sendCdp('Input.dispatchMouseEvent', {
+  await cdpService.sendCdp('Input.dispatchMouseEvent', {
     type: 'mousePressed',
     x,
     y,
     button: 'left',
     clickCount,
   });
-  await sendCdp('Input.dispatchMouseEvent', {
+  await cdpService.sendCdp('Input.dispatchMouseEvent', {
     type: 'mouseReleased',
     x,
     y,
@@ -731,7 +731,7 @@ export async function hoverElement(uid: string): Promise<void> {
   await scrollIntoView(uid);
   const {x, y} = await getElementCenter(uid);
   logger(`Hovering uid=${uid} at (${x}, ${y})`);
-  await sendCdp('Input.dispatchMouseEvent', {
+  await cdpService.sendCdp('Input.dispatchMouseEvent', {
     type: 'mouseMoved',
     x,
     y,
@@ -743,7 +743,7 @@ export async function hoverElement(uid: string): Promise<void> {
  * or use Input.dispatchKeyEvent for individual keys.
  */
 export async function insertText(text: string): Promise<void> {
-  await sendCdp('Input.insertText', {text});
+  await cdpService.sendCdp('Input.insertText', {text});
 }
 
 /**
@@ -832,14 +832,14 @@ const MODIFIER_KEYS: Record<string, {bit: number; keyCode: number; code: string;
 export async function dispatchRawKey(keyName: string, modifiers = 0): Promise<void> {
   const def = KEY_DEFINITIONS[keyName];
   if (def) {
-    await sendCdp('Input.dispatchKeyEvent', {
+    await cdpService.sendCdp('Input.dispatchKeyEvent', {
       type: 'rawKeyDown',
       windowsVirtualKeyCode: def.keyCode,
       code: def.code,
       key: def.key,
       modifiers,
     });
-    await sendCdp('Input.dispatchKeyEvent', {
+    await cdpService.sendCdp('Input.dispatchKeyEvent', {
       type: 'keyUp',
       windowsVirtualKeyCode: def.keyCode,
       code: def.code,
@@ -849,7 +849,7 @@ export async function dispatchRawKey(keyName: string, modifiers = 0): Promise<vo
   } else if (keyName.length === 1) {
     // Single character
     const charCode = keyName.charCodeAt(0);
-    await sendCdp('Input.dispatchKeyEvent', {
+    await cdpService.sendCdp('Input.dispatchKeyEvent', {
       type: 'rawKeyDown',
       windowsVirtualKeyCode: charCode,
       key: keyName,
@@ -857,14 +857,14 @@ export async function dispatchRawKey(keyName: string, modifiers = 0): Promise<vo
     });
     // Only emit char event for printable characters without modifiers that would suppress it
     if (modifiers === 0 || modifiers === 8) {
-      await sendCdp('Input.dispatchKeyEvent', {
+      await cdpService.sendCdp('Input.dispatchKeyEvent', {
         type: 'char',
         text: keyName,
         key: keyName,
         modifiers,
       });
     }
-    await sendCdp('Input.dispatchKeyEvent', {
+    await cdpService.sendCdp('Input.dispatchKeyEvent', {
       type: 'keyUp',
       windowsVirtualKeyCode: charCode,
       key: keyName,
@@ -893,7 +893,7 @@ export async function dispatchKeyCombo(
   // Press modifiers down
   for (const name of modifierNames) {
     const mod = MODIFIER_KEYS[name]!;
-    await sendCdp('Input.dispatchKeyEvent', {
+    await cdpService.sendCdp('Input.dispatchKeyEvent', {
       type: 'rawKeyDown',
       windowsVirtualKeyCode: mod.keyCode,
       code: mod.code,
@@ -908,7 +908,7 @@ export async function dispatchKeyCombo(
   // Release modifiers in reverse
   for (const name of [...modifierNames].reverse()) {
     const mod = MODIFIER_KEYS[name]!;
-    await sendCdp('Input.dispatchKeyEvent', {
+    await cdpService.sendCdp('Input.dispatchKeyEvent', {
       type: 'keyUp',
       windowsVirtualKeyCode: mod.keyCode,
       code: mod.code,
@@ -967,7 +967,7 @@ export async function dragElement(
   logger(`Dragging from uid=${fromUid} (${from.x},${from.y}) to uid=${toUid} (${to.x},${to.y})`);
 
   // Mouse down at source
-  await sendCdp('Input.dispatchMouseEvent', {
+  await cdpService.sendCdp('Input.dispatchMouseEvent', {
     type: 'mousePressed',
     x: from.x,
     y: from.y,
@@ -980,7 +980,7 @@ export async function dragElement(
   for (let i = 1; i <= steps; i++) {
     const x = from.x + (to.x - from.x) * (i / steps);
     const y = from.y + (to.y - from.y) * (i / steps);
-    await sendCdp('Input.dispatchMouseEvent', {
+    await cdpService.sendCdp('Input.dispatchMouseEvent', {
       type: 'mouseMoved',
       x,
       y,
@@ -992,7 +992,7 @@ export async function dragElement(
   await new Promise(r => setTimeout(r, 50));
 
   // Mouse up at target
-  await sendCdp('Input.dispatchMouseEvent', {
+  await cdpService.sendCdp('Input.dispatchMouseEvent', {
     type: 'mouseReleased',
     x: to.x,
     y: to.y,
@@ -1026,9 +1026,9 @@ export async function captureScreenshot(options: {
     const backendNodeId = getBackendNodeId(options.uid);
     const sessionId = getSessionIdForUid(options.uid);
     const opts = sessionId ? {sessionId} : undefined;
-    await sendCdp('DOM.enable', {}, opts);
-    await sendCdp('DOM.scrollIntoViewIfNeeded', {backendNodeId}, opts);
-    const boxModel = await sendCdp('DOM.getBoxModel', {backendNodeId}, opts);
+    await cdpService.sendCdp('DOM.enable', {}, opts);
+    await cdpService.sendCdp('DOM.scrollIntoViewIfNeeded', {backendNodeId}, opts);
+    const boxModel = await cdpService.sendCdp('DOM.getBoxModel', {backendNodeId}, opts);
     const content = boxModel.model.content;
     const xs = [content[0], content[2], content[4], content[6]];
     const ys = [content[1], content[3], content[5], content[7]];
@@ -1041,7 +1041,7 @@ export async function captureScreenshot(options: {
     };
   } else if (options.fullPage) {
     // Get full page dimensions
-    const metrics = await sendCdp('Page.getLayoutMetrics');
+    const metrics = await cdpService.sendCdp('Page.getLayoutMetrics');
     params.clip = {
       x: 0,
       y: 0,
@@ -1051,7 +1051,7 @@ export async function captureScreenshot(options: {
     };
   }
 
-  const result = await sendCdp('Page.captureScreenshot', params);
+  const result = await cdpService.sendCdp('Page.captureScreenshot', params);
   return Buffer.from(result.data, 'base64');
 }
 
@@ -1223,8 +1223,8 @@ export function diffSnapshots(
  * Only includes "interesting" nodes (same filter as the formatted output).
  */
 export async function fetchAXTreeForDiff(): Promise<Map<number, {node: AXNode; sig: NodeSignature}>> {
-  await sendCdp('Accessibility.enable');
-  const result = await sendCdp('Accessibility.getFullAXTree');
+  await cdpService.sendCdp('Accessibility.enable');
+  const result = await cdpService.sendCdp('Accessibility.getFullAXTree');
   const nodes: AXNode[] = result.nodes ?? [];
 
   const map = new Map<number, {node: AXNode; sig: NodeSignature}>();
@@ -1247,8 +1247,8 @@ export async function fetchAXTreeForDiffWithUids(): Promise<{
   map: Map<number, {node: AXNode; sig: NodeSignature; uid: string}>;
   formatted: string;
 }> {
-  await sendCdp('Accessibility.enable');
-  const result = await sendCdp('Accessibility.getFullAXTree');
+  await cdpService.sendCdp('Accessibility.enable');
+  const result = await cdpService.sendCdp('Accessibility.getFullAXTree');
   const nodes: AXNode[] = result.nodes ?? [];
 
   // Build CDP node map

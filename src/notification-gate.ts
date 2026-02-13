@@ -16,7 +16,7 @@
  */
 
 import {logger} from './logger.js';
-import {sendCdp} from './vscode.js';
+import {cdpService} from './services/index.js';
 
 // ── Types ──
 
@@ -63,7 +63,7 @@ export async function checkPendingNotifications(): Promise<NotificationCheckResu
 
   try {
     // Run detection script in the VS Code renderer
-    const evalResult = await sendCdp('Runtime.evaluate', {
+    const evalResult = await cdpService.sendCdp('Runtime.evaluate', {
       expression: `(function() {
         const result = {
           modals: [],
@@ -341,7 +341,7 @@ export async function checkForBlockingUI(): Promise<{
  */
 export async function clickModalButton(buttonLabel: string): Promise<boolean> {
   try {
-    const result = await sendCdp('Runtime.evaluate', {
+    const result = await cdpService.sendCdp('Runtime.evaluate', {
       expression: `(function() {
         const buttons = document.querySelectorAll('.monaco-dialog-box .dialog-buttons .monaco-button');
         for (const btn of buttons) {
@@ -365,7 +365,7 @@ export async function clickModalButton(buttonLabel: string): Promise<boolean> {
  */
 export async function clickNotificationButton(buttonLabel: string): Promise<boolean> {
   try {
-    const result = await sendCdp('Runtime.evaluate', {
+    const result = await cdpService.sendCdp('Runtime.evaluate', {
       expression: `(function() {
         const buttons = document.querySelectorAll('.notification-toast .notification-actions-primary .monaco-button');
         for (const btn of buttons) {
@@ -389,7 +389,7 @@ export async function clickNotificationButton(buttonLabel: string): Promise<bool
  */
 export async function dismissTopNotification(): Promise<boolean> {
   try {
-    const result = await sendCdp('Runtime.evaluate', {
+    const result = await cdpService.sendCdp('Runtime.evaluate', {
       expression: `(function() {
         const closeBtn = document.querySelector('.notification-toast .codicon-notifications-clear');
         if (closeBtn) {

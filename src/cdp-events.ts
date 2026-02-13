@@ -17,7 +17,7 @@
 import WebSocket from 'ws';
 
 import {logger} from './logger.js';
-import {getCdpWebSocket, getConnectionGeneration} from './vscode.js';
+import {cdpService} from './services/index.js';
 
 // ── Types ───────────────────────────────────────────────
 
@@ -105,13 +105,13 @@ function routeCdpEvent(data: {method?: string; params?: unknown}): void {
  * Safe to call multiple times - only subscribes once per connection generation.
  */
 export async function initCdpEventSubscriptions(): Promise<void> {
-  const ws = getCdpWebSocket();
+  const ws = cdpService.webSocket;
   if (!ws || ws.readyState !== WebSocket.OPEN) {
     logger('CDP WebSocket not available for event subscriptions');
     return;
   }
 
-  const currentGeneration = getConnectionGeneration();
+  const currentGeneration = cdpService.generation;
   if (subscribedGeneration === currentGeneration) {
     return;
   }

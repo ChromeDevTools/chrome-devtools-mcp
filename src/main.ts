@@ -10,7 +10,6 @@ import process from 'node:process';
 
 import {parseArguments} from './cli.js';
 import {loadConfig, type ResolvedConfig} from './config.js';
-import {bridgeSetHotReload, computeBridgePath} from './bridge-client.js';
 import {hasExtensionChangedSince} from './extension-watcher.js';
 import {loadIssueDescriptions} from './issue-descriptions.js';
 import {logger, saveLogsToFile} from './logger.js';
@@ -18,6 +17,7 @@ import {McpResponse} from './McpResponse.js';
 import {startMcpSocketServer} from './mcp-socket-server.js';
 import {Mutex} from './Mutex.js';
 import {checkForBlockingUI} from './notification-gate.js';
+import {lifecycleService} from './services/index.js';
 import {
   McpServer,
   StdioServerTransport,
@@ -26,12 +26,6 @@ import {
 } from './third_party/index.js';
 import type {ToolDefinition} from './tools/ToolDefinition.js';
 import {tools} from './tools/tools.js';
-import {
-  ensureVSCodeConnected,
-  stopDebugWindow,
-  runHostShellTaskOrThrow,
-  getDebugWindowStartedAt,
-} from './vscode.js';
 import {fetchAXTree} from './ax-tree.js';
 
 // Default timeout for tools (30 seconds)
@@ -77,8 +71,18 @@ if (config.logFile) {
   saveLogsToFile(config.logFile);
 }
 
+// Initialize lifecycle service with MCP config (target workspace + extension path + launch flags)
+lifecycleService.init({
+  targetWorkspace: config.workspaceFolder,
+  extensionPath: config.extensionBridgePath,
+  launch: {...config.launch},
+});
+
 // Start MCP socket server so the extension can send commands (e.g. detach-gracefully)
 startMcpSocketServer(config.hostWorkspace);
+
+// Register process-level shutdown handlers (stdin end, SIGINT, etc.)
+lifecycleService.registerShutdownHandlers();
 
 process.on('unhandledRejection', (reason, promise) => {
   logger('Unhandled promise rejection', promise, reason);
@@ -100,16 +104,10 @@ server.server.setRequestHandler(SetLevelRequestSchema, () => {
 });
 
 /**
- * Ensure VS Code debug window is connected (CDP + bridge).
+ * Ensure VS Code debug window is connected (Host pipe + CDP).
  */
 async function ensureConnection(): Promise<void> {
-  await ensureVSCodeConnected({
-    workspaceFolder: config.hostWorkspace,
-    extensionBridgePath: config.extensionBridgePath,
-    targetFolder: config.workspaceFolder,
-    headless: config.headless,
-    launch: config.launch,
-  });
+  await lifecycleService.ensureConnection();
 }
 
 const logDisclaimers = () => {
@@ -151,72 +149,27 @@ function registerTool(tool: ToolDefinition): void {
         const isStandalone = tool.annotations.conditions?.includes('standalone');
 
         // Hot-reload: if the extension source changed since the last snapshot,
-        // tear down the debug window, rebuild, and let ensureConnection()
-        // spawn a fresh one. This all happens OUTSIDE the tool's timeout so
-        // that from Copilot's perspective changes are applied instantly.
-        let didHotReload = false;
+        // tell Host to rebuild Client. Host handles stop/build/restart internally.
+        // This runs OUTSIDE the tool's timeout so changes feel instant to Copilot.
         if (!isStandalone && config.explicitExtensionDevelopmentPath) {
-          const sessionStartedAtMs = getDebugWindowStartedAt();
+          const sessionStartedAtMs = lifecycleService.debugWindowStartedAt;
           if (
             sessionStartedAtMs !== undefined &&
             hasExtensionChangedSince(config.extensionBridgePath, sessionStartedAtMs)
           ) {
-            logger('Extension source changed — hot-reloading…');
-
-            // Tell the host extension a hot-reload is underway so it
-            // doesn't stop the MCP server when the debug session terminates.
-            const bridgePath = computeBridgePath(config.hostWorkspace);
-            try {
-              await bridgeSetHotReload(bridgePath, true);
-            } catch {
-              // Best-effort: bridge may be unavailable
-            }
-
-            try {
-              await stopDebugWindow();
-              await runHostShellTaskOrThrow(config.hostWorkspace, 'ext:build', 300_000);
-              didHotReload = true;
-            } catch (err) {
-              // Clear the flag on failure so future debug session closes
-              // still trigger the normal MCP stop behavior.
-              try {
-                await bridgeSetHotReload(bridgePath, false);
-              } catch {
-                // best-effort
-              }
-              throw err;
-            }
+            logger(`[tool:${tool.name}] Extension source changed — hot-reloading…`);
+            await lifecycleService.handleHotReload();
+            logger(`[tool:${tool.name}] Hot-reload complete — reconnected`);
           }
         }
 
-        // After a hot-reload, spawn a fresh debug window.
-        if (didHotReload) {
-          logger(`[tool:${tool.name}] Hot-reload complete — reconnecting…`);
-          await ensureConnection();
-          logger(`[tool:${tool.name}] Reconnected after hot-reload`);
-        }
-
-        // Verify the VS Code connection is alive. Connection is established
-        // at startup — we do NOT reconnect per-tool-call to avoid interfering
-        // with the debug instance lifecycle.
-        if (!isStandalone) {
-          const {isConnected} = await import('./vscode.js');
-          if (!isConnected()) {
-            throw new Error(
-              'VS Code debug window is not connected. ' +
-              'The MCP server establishes the connection at startup. ' +
-              'If the debug window was closed, restart the MCP server.',
-            );
-          }
-        }
-
-        // Clear the hot-reload flag now that the new debug window is running.
-        if (didHotReload) {
-          try {
-            await bridgeSetHotReload(computeBridgePath(config.hostWorkspace), false);
-          } catch {
-            // best-effort
-          }
+        // Verify the VS Code connection is alive.
+        if (!isStandalone && !lifecycleService.isConnected) {
+          throw new Error(
+            'VS Code debug window is not connected. ' +
+            'The MCP server establishes the connection at startup. ' +
+            'If the debug window was closed, restart the MCP server.',
+          );
         }
 
         const executeAll = async () => {

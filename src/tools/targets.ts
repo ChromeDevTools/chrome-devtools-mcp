@@ -8,7 +8,7 @@
  * Tools for discovering and listing CDP targets (pages, iframes, webviews).
  */
 
-import {getAllTargets, getAttachedTargets} from '../vscode.js';
+import {cdpService} from '../services/index.js';
 import {zod} from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
@@ -80,11 +80,11 @@ Use Cases:
     const {type: typeFilter, attachedOnly} = request.params;
 
     // Get all targets from CDP
-    const allTargets = await getAllTargets();
+    const allTargets = await cdpService.getAllTargets();
     
     // Get attached targets for comparison
     const attachedTargetIds = new Set(
-      getAttachedTargets().map(t => t.targetId)
+      cdpService.getAttachedTargets().map(t => t.targetId)
     );
 
     // Filter and transform targets

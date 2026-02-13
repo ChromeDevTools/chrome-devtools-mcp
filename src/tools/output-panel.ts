@@ -14,7 +14,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 
 import {zod} from '../third_party/index.js';
-import {getUserDataDir} from '../vscode.js';
+import {lifecycleService} from '../services/index.js';
 
 import {ToolCategory} from './categories.js';
 import {
@@ -76,7 +76,7 @@ function findLogFiles(dir: string, category = 'root'): LogFileInfo[] {
  * Get the latest session logs directory.
  */
 function getLatestLogsDir(): string | null {
-  const userDataDir = getUserDataDir();
+  const userDataDir = lifecycleService.userDataDir;
   if (!userDataDir) {
     return null;
   }

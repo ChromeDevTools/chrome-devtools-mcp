@@ -11,33 +11,32 @@
  * in the extension's TerminalBufferService, enabling output reading
  * regardless of terminal panel visibility.
  *
- * These tools communicate with the extension via bridge exec, accessing
- * the __trackedTerminalBridge object exposed on globalThis by runtime.ts.
+ * These tools communicate with the Client extension via the Client pipe,
+ * using typed RPC methods (terminal.create, terminal.sendText, etc.).
  */
 
-import {bridgeExec} from '../bridge-client.js';
+import {
+  terminalCreate,
+  terminalSendText,
+  terminalGetBuffer,
+  terminalList,
+  terminalClose,
+  pingClient,
+} from '../client-pipe.js';
 import {zod} from '../third_party/index.js';
-import {getDevhostBridgePath} from '../vscode.js';
 
 import {ToolCategory} from './categories.js';
 import {defineTool, ResponseFormat, responseFormatSchema} from './ToolDefinition.js';
 
-function ensureBridge(): string {
-  const bridgePath = getDevhostBridgePath();
-  if (!bridgePath) {
+async function ensureClientConnection(): Promise<void> {
+  const alive = await pingClient();
+  if (!alive) {
     throw new Error(
-      'Development host bridge not available. ' +
-      'Make sure the VS Code debug window is running.',
+      'Client pipe not available. ' +
+      'Make sure the VS Code Extension Development Host window is running.',
     );
   }
-  return bridgePath;
 }
-
-const BRIDGE_CHECK = `
-if (!globalThis.__trackedTerminalBridge) {
-  throw new Error('Tracked terminal system not initialized. The VS Code DevTools runtime may not be loaded.');
-}
-`;
 
 // ── Terminal Output Cleaning ─────────────────────────────────────────────────
 
@@ -146,19 +145,9 @@ These terminals have full output capture — use get_terminal_buffer to read the
       .describe('Only show running terminals. Default: false.'),
   },
   handler: async (request, response) => {
-    const bridgePath = ensureBridge();
+    await ensureClientConnection();
 
-    const result = await bridgeExec(
-      bridgePath,
-      `${BRIDGE_CHECK}
-      const bridge = globalThis.__trackedTerminalBridge;
-      return payload.runningOnly
-        ? bridge.listRunningTerminals()
-        : bridge.listTerminals();`,
-      {runningOnly: request.params.runningOnly ?? false},
-    );
-
-    const terminals = (result ?? []) as TrackedTerminalMetadata[];
+    const terminals = await terminalList(request.params.runningOnly);
 
     if (request.params.response_format === ResponseFormat.JSON) {
       response.appendResponseLine(JSON.stringify({total: terminals.length, terminals}, null, 2));
@@ -232,22 +221,10 @@ Returns the terminal ID for use with other tracked terminal tools.`,
       .describe('Working directory. Default: workspace root.'),
   },
   handler: async (request, response) => {
-    const bridgePath = ensureBridge();
+    await ensureClientConnection();
     const {name, shellPath, cwd} = request.params;
 
-    const result = await bridgeExec(
-      bridgePath,
-      `${BRIDGE_CHECK}
-      const bridge = globalThis.__trackedTerminalBridge;
-      return bridge.createTerminal({
-        name: payload.name,
-        shellPath: payload.shellPath,
-        cwd: payload.cwd,
-      });`,
-      {name, shellPath, cwd},
-    );
-
-    const created = result as {terminalId: string; name: string};
+    const created = await terminalCreate({name, shellPath, cwd});
 
     if (request.params.response_format === ResponseFormat.JSON) {
       response.appendResponseLine(JSON.stringify(created, null, 2));
@@ -307,28 +284,13 @@ command results, build output, server logs, or any terminal content.`,
       .describe('Include terminal metadata in response. Default: false.'),
   },
   handler: async (request, response) => {
-    const bridgePath = ensureBridge();
+    await ensureClientConnection();
     const {terminalId, lastN, includeMetadata} = request.params;
 
-    const result = await bridgeExec(
-      bridgePath,
-      `${BRIDGE_CHECK}
-      const bridge = globalThis.__trackedTerminalBridge;
-      const buffer = bridge.getBuffer(payload.terminalId);
-      if (!buffer) return null;
-
-      const output = bridge.getOutput(payload.terminalId, {
-        lastN: payload.lastN,
-        asString: true,
-      });
-
-      return {
-        output: output || '',
-        metadata: payload.includeMetadata ? buffer.metadata : undefined,
-        inputHistory: buffer.input,
-      };`,
-      {terminalId, lastN, includeMetadata: includeMetadata ?? false},
-    );
+    const result = await terminalGetBuffer(terminalId, {
+      lastN,
+      includeMetadata: includeMetadata ?? false,
+    });
 
     if (!result) {
       throw new Error(
@@ -412,21 +374,10 @@ Use get_terminal_buffer afterward to read the command output.`,
       .describe('Add newline to execute immediately. Default: true.'),
   },
   handler: async (request, response) => {
-    const bridgePath = ensureBridge();
+    await ensureClientConnection();
     const {terminalId, text, addNewline} = request.params;
 
-    await bridgeExec(
-      bridgePath,
-      `${BRIDGE_CHECK}
-      const bridge = globalThis.__trackedTerminalBridge;
-      return bridge.sendText(
-        payload.terminalId,
-        payload.text,
-        payload.addNewline ?? true,
-      );`,
-      {terminalId, text, addNewline},
-      10_000,
-    );
+    await terminalSendText(terminalId, text, addNewline);
 
     if (request.params.response_format === ResponseFormat.JSON) {
       response.appendResponseLine(
@@ -467,16 +418,10 @@ the output buffer from memory.`,
       .describe('The terminal ID to close.'),
   },
   handler: async (request, response) => {
-    const bridgePath = ensureBridge();
+    await ensureClientConnection();
     const {terminalId} = request.params;
 
-    await bridgeExec(
-      bridgePath,
-      `${BRIDGE_CHECK}
-      const bridge = globalThis.__trackedTerminalBridge;
-      return bridge.closeTerminal(payload.terminalId);`,
-      {terminalId},
-    );
+    await terminalClose(terminalId);
 
     if (request.params.response_format === ResponseFormat.JSON) {
       response.appendResponseLine(
