@@ -314,6 +314,8 @@ export class ConsoleFormatter {
   }
 
   toJSONDetailed(): object {
+    const location = this.#getTopFrameLocation();
+
     return {
       id: this.#id,
       type: this.#type,
@@ -322,6 +324,43 @@ export class ConsoleFormatter {
         typeof arg === 'object' ? arg : String(arg),
       ),
       stackTrace: this.#stack,
+      ...(location ? { location } : {}),
     };
+  }
+
+  #getTopFrameLocation():
+    | { url: string; lineNumber: number; columnNumber: number }
+    | undefined {
+
+    if (!this.#stack) {
+      return undefined;
+    }
+
+    const frame = this.#stack.syncFragment.frames.find(
+      f => !this.#isIgnored(f),
+    );
+
+    if (!frame) {
+      return undefined;
+    }
+
+    if (frame.uiSourceCode) {
+      const location = frame.uiSourceCode.uiLocation(frame.line, frame.column);
+      return {
+        url: location.uiSourceCode.url(),
+        lineNumber: location.lineNumber + 1,
+        columnNumber: location.columnNumber! + 1,
+      };
+    }
+
+    if (frame.url) {
+      return {
+        url: frame.url,
+        lineNumber: frame.line,
+        columnNumber: frame.column,
+      };
+    }
+
+    return undefined;
   }
 }
