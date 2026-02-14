@@ -27,6 +27,7 @@ export const startScreencast = defineTool({
   annotations: {
     category: ToolCategory.DEBUGGING,
     readOnlyHint: false,
+    conditions: ['screencast'],
   },
   schema: {
     filePath: zod
@@ -114,6 +115,7 @@ export const stopScreencast = defineTool({
   annotations: {
     category: ToolCategory.DEBUGGING,
     readOnlyHint: false,
+    conditions: ['screencast'],
   },
   schema: {},
   handler: async (_request, response, context) => {

@@ -173,6 +173,11 @@ export const cliOptions = {
     describe: 'Whether to enable interoperability tools',
     hidden: true,
   },
+  experimentalScreencast: {
+    type: 'boolean',
+    describe: 'Whether to enable screencast tools',
+    hidden: true,
+  },
   chromeArg: {
     type: 'array',
     describe:
