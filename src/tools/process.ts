@@ -191,9 +191,12 @@ export const listProcesses = defineTool({
   description: `List all Copilot-managed processes.
 
 Returns a detailed view of all processes that Copilot is tracking:
-- Active: Currently running in MCP-managed terminals
+- Active: Currently running in MCP-managed terminals (with child process trees)
 - Orphaned: From previous sessions, still running without a terminal
 - Recently Completed: Finished within the current session
+
+Child processes are discovered via Windows CIM/WMI (Get-CimInstance Win32_Process),
+providing full visibility into the process tree spawned by each terminal command.
 
 Note: The process ledger is automatically appended to every tool response,
 so you typically don't need to call this tool explicitly. Use it when you
@@ -203,8 +206,8 @@ Args:
   - response_format ('markdown'|'json'): Output format. Default: 'markdown'
 
 Returns:
-  - active: Array of active process entries
-  - orphaned: Array of orphaned process entries
+  - active: Array of active process entries (with children[])
+  - orphaned: Array of orphaned process entries (with children[])
   - recentlyCompleted: Array of recently completed process entries
   - sessionId: Current session identifier`,
   annotations: {
@@ -244,6 +247,15 @@ Returns:
         lines.push(`  - Command: \`${p.command}\``);
         lines.push(`  - Started: ${p.startedAt}`);
         lines.push(`  - Session: ${p.sessionId}`);
+        if (p.children && p.children.length > 0) {
+          lines.push(`  - Children (${p.children.length}):`);
+          for (const child of p.children) {
+            const cmdLine = child.commandLine
+              ? (child.commandLine.length > 60 ? child.commandLine.slice(0, 57) + '...' : child.commandLine)
+              : child.name;
+            lines.push(`    - PID ${child.pid} — ${child.name} — \`${cmdLine}\``);
+          }
+        }
       }
       lines.push('');
       lines.push('> Use `kill_process` or `kill_orphans` to terminate these.');
@@ -255,10 +267,21 @@ Returns:
       lines.push(`### 🟢 Active Processes (${ledger.active.length})`);
       lines.push('');
       for (const p of ledger.active) {
-        lines.push(`- **${p.terminalName}** (PID ${p.pid ?? 'pending'})`);
+        const childCount = p.children?.length ?? 0;
+        const childLabel = childCount > 0 ? ` [${childCount} child${childCount > 1 ? 'ren' : ''}]` : '';
+        lines.push(`- **${p.terminalName}** (PID ${p.pid ?? 'pending'})${childLabel}`);
         lines.push(`  - Command: \`${p.command}\``);
         lines.push(`  - Status: ${p.status}`);
         lines.push(`  - Started: ${p.startedAt}`);
+        if (p.children && p.children.length > 0) {
+          lines.push(`  - Child Processes:`);
+          for (const child of p.children) {
+            const cmdLine = child.commandLine
+              ? (child.commandLine.length > 60 ? child.commandLine.slice(0, 57) + '...' : child.commandLine)
+              : child.name;
+            lines.push(`    - PID ${child.pid} — ${child.name} — \`${cmdLine}\``);
+          }
+        }
       }
       lines.push('');
     }

@@ -6,14 +6,22 @@
 
 import './polyfill.js';
 
+import {exec} from 'node:child_process';
 import process from 'node:process';
 
 import {parseArguments} from './cli.js';
 import {loadConfig, type ResolvedConfig} from './config.js';
 import {hasExtensionChangedSince} from './extension-watcher.js';
+import {restartMcpServer} from './host-pipe.js';
 import {loadIssueDescriptions} from './issue-descriptions.js';
 import {logger, saveLogsToFile} from './logger.js';
 import {McpResponse} from './McpResponse.js';
+import {
+  consumeHotReloadMarker,
+  getMcpServerRoot,
+  hasMcpServerSourceChanged,
+  writeHotReloadMarker,
+} from './mcp-server-watcher.js';
 import {startMcpSocketServer} from './mcp-socket-server.js';
 import {Mutex} from './Mutex.js';
 import {checkForBlockingUI} from './notification-gate.js';
@@ -27,14 +35,83 @@ import {
 import type {ToolDefinition} from './tools/ToolDefinition.js';
 import {tools} from './tools/tools.js';
 import {fetchAXTree} from './ax-tree.js';
-import {getProcessLedger, type ProcessLedgerSummary} from './client-pipe.js';
+import {getProcessLedger, type ProcessLedgerSummary, type ProcessEntry} from './client-pipe.js';
 
 // Default timeout for tools (30 seconds)
 const DEFAULT_TOOL_TIMEOUT_MS = 30_000;
 
+// ── MCP Server Self Hot-Reload State ─────────────────────
+
+const mcpServerDir = getMcpServerRoot();
+let mcpServerHotReloadInfo: {builtAt: number} | null = null;
+let mcpServerRestartScheduled = false;
+
+/**
+ * Run `pnpm run build` in the mcp-server directory.
+ * Returns stdout/stderr on success, throws on failure.
+ */
+function runMcpServerBuild(): Promise<{stdout: string; stderr: string}> {
+  return new Promise((resolve, reject) => {
+    logger(`[mcp-hot-reload] Running build in ${mcpServerDir}`);
+    exec(
+      'pnpm run build',
+      {cwd: mcpServerDir, timeout: 120_000},
+      (err, stdout, stderr) => {
+        if (err) {
+          reject(new Error(`MCP server build failed: ${err.message}\n${stderr}`));
+        } else {
+          logger('[mcp-hot-reload] Build completed successfully');
+          resolve({stdout, stderr});
+        }
+      },
+    );
+  });
+}
+
+/**
+ * Schedule MCP server restart via Host extension RPC.
+ * Called after the tool response is sent to give stdio time to flush.
+ * Always exits after the RPC so VS Code can respawn the process.
+ */
+function scheduleMcpServerRestart(): void {
+  if (mcpServerRestartScheduled) return;
+  mcpServerRestartScheduled = true;
+  setTimeout(async () => {
+    logger('[mcp-hot-reload] Sending restart RPC to Host extension…');
+    try {
+      await restartMcpServer();
+      logger('[mcp-hot-reload] Restart RPC sent successfully');
+    } catch {
+      logger('[mcp-hot-reload] Restart RPC failed — exiting anyway');
+    }
+    // Always exit — VS Code will respawn the MCP server process.
+    // If the Host RPC succeeded, VS Code already knows to restart.
+    // If it failed, a clean exit lets VS Code detect the crash and respawn.
+    logger('[mcp-hot-reload] Exiting process for restart');
+    process.exit(0);
+  }, 500);
+}
+
+/**
+ * Format child processes as indented tree lines for a parent process.
+ */
+function formatChildProcesses(entry: ProcessEntry): string[] {
+  if (!entry.children || entry.children.length === 0) return [];
+
+  const lines: string[] = [];
+  for (const child of entry.children) {
+    const cmdLine = child.commandLine
+      ? (child.commandLine.length > 60 ? child.commandLine.slice(0, 57) + '...' : child.commandLine)
+      : child.name;
+    lines.push(`\n  ↳ PID ${child.pid} — ${child.name} — \`${cmdLine}\``);
+  }
+  return lines;
+}
+
 /**
  * Format the process ledger summary for inclusion in every MCP response.
- * This provides Copilot constant awareness of all managed processes.
+ * This provides Copilot constant awareness of all managed processes,
+ * including child process trees discovered via PowerShell CIM.
  */
 function formatProcessLedger(ledger: ProcessLedgerSummary): string {
   const parts: string[] = [];
@@ -46,6 +123,7 @@ function formatProcessLedger(ledger: ProcessLedgerSummary): string {
     for (const p of ledger.orphaned) {
       const cmd = p.command.length > 50 ? p.command.slice(0, 47) + '...' : p.command;
       parts.push(`\n• **PID ${p.pid}** (${p.terminalName}) — \`${cmd}\` — from previous session`);
+      parts.push(...formatChildProcesses(p));
     }
   }
 
@@ -55,7 +133,10 @@ function formatProcessLedger(ledger: ProcessLedgerSummary): string {
     parts.push(`\n🟢 **Active Copilot Processes (${ledger.active.length}):**`);
     for (const p of ledger.active) {
       const cmd = p.command.length > 50 ? p.command.slice(0, 47) + '...' : p.command;
-      parts.push(`\n• **${p.terminalName}** (PID ${p.pid ?? 'pending'}) — \`${cmd}\` — ${p.status}`);
+      const childCount = p.children?.length ?? 0;
+      const childLabel = childCount > 0 ? ` [${childCount} child${childCount > 1 ? 'ren' : ''}]` : '';
+      parts.push(`\n• **${p.terminalName}** (PID ${p.pid ?? 'pending'}) — \`${cmd}\` — ${p.status}${childLabel}`);
+      parts.push(...formatChildProcesses(p));
     }
   }
 
@@ -138,6 +219,14 @@ process.on('unhandledRejection', (reason, promise) => {
   logger('Unhandled promise rejection', promise, reason);
 });
 
+// ── MCP Server Hot-Reload Marker (detect post-restart) ───
+const _hotReloadBuildTime = consumeHotReloadMarker(mcpServerDir);
+if (_hotReloadBuildTime !== null) {
+  mcpServerHotReloadInfo = {builtAt: _hotReloadBuildTime};
+  const agoSec = Math.round((Date.now() - _hotReloadBuildTime) / 1000);
+  logger(`[mcp-hot-reload] Post-restart detected — rebuilt ${agoSec}s ago`);
+}
+
 logger(`Starting VS Code DevTools MCP Server v${VERSION}`);
 logger(`Config: hostWorkspace=${config.hostWorkspace}, targetFolder=${config.workspaceFolder}`);
 logger(`Config: extensionBridgePath=${config.extensionBridgePath}, headless=${config.headless}, logFile=${config.logFile ?? '(none)'}`);
@@ -195,6 +284,51 @@ function registerTool(tool: ToolDefinition): void {
       const timeoutMs = tool.timeoutMs ?? DEFAULT_TOOL_TIMEOUT_MS;
       let guard: InstanceType<typeof Mutex.Guard> | undefined;
       try {
+        // ── MCP Server Self Hot-Reload ──────────────────────
+        // Before executing ANY tool, check if this server's own source
+        // has changed since the last build. If so: rebuild → return
+        // "try again" message → schedule restart via Host extension.
+        if (!mcpServerRestartScheduled && hasMcpServerSourceChanged(mcpServerDir)) {
+          logger(`[tool:${tool.name}] MCP server source changed — triggering self rebuild…`);
+
+          try {
+            await runMcpServerBuild();
+            writeHotReloadMarker(mcpServerDir);
+
+            // Schedule restart AFTER this response is sent
+            scheduleMcpServerRestart();
+
+            return {
+              content: [{
+                type: 'text',
+                text: [
+                  '⚡ **MCP server source changed — rebuilt successfully.**',
+                  '',
+                  'The MCP server will now restart to apply the latest changes.',
+                  'Please call the tool again to use the newest version.',
+                ].join('\n'),
+              }],
+            };
+          } catch (buildErr) {
+            const msg = buildErr instanceof Error ? buildErr.message : String(buildErr);
+            logger(`[mcp-hot-reload] Build failed: ${msg}`);
+            return {
+              content: [{type: 'text', text: `❌ **MCP server rebuild failed:**\n\n\`\`\`\n${msg}\n\`\`\``}],
+              isError: true,
+            };
+          }
+        }
+
+        // If a restart is already pending (rare edge case), short-circuit
+        if (mcpServerRestartScheduled) {
+          return {
+            content: [{
+              type: 'text',
+              text: '⏳ MCP server is restarting. Please wait a moment and try again.',
+            }],
+          };
+        }
+
         // Standalone tools (e.g., wait) don't need VS Code connection
         const isStandalone = tool.annotations.conditions?.includes('standalone');
 
@@ -289,6 +423,16 @@ function registerTool(tool: ToolDefinition): void {
           timeoutMs,
           tool.name,
         );
+
+        // Inject "just updated" banner on first tool call after hot-reload restart
+        if (mcpServerHotReloadInfo) {
+          const secondsAgo = Math.round((Date.now() - mcpServerHotReloadInfo.builtAt) / 1000);
+          result.content.unshift({
+            type: 'text',
+            text: `✅ **MCP server was recently updated.** Latest build completed ${secondsAgo}s ago. All tools are now running the newest code.`,
+          });
+          mcpServerHotReloadInfo = null;
+        }
 
         return result;
       } catch (err) {

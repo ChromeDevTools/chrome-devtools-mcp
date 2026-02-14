@@ -223,6 +223,22 @@ export async function requestTakeover(): Promise<TakeoverResult> {
 }
 
 /**
+ * Request the Host extension to restart the MCP server.
+ * Host calls `workbench.mcp.restartServer` which closes stdin,
+ * triggering graceful detach, then respawns the MCP process.
+ *
+ * Fire-and-forget — the response may never arrive since the
+ * MCP process is about to be killed.
+ */
+export async function restartMcpServer(): Promise<void> {
+  try {
+    await sendHostRequest('restartMcpServer', {}, 15_000);
+  } catch {
+    // Expected — the server may be killed before the response arrives
+  }
+}
+
+/**
  * Check if the Host pipe is reachable via a system.ping.
  */
 export async function pingHost(): Promise<boolean> {

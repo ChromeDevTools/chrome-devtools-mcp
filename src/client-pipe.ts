@@ -75,6 +75,13 @@ export interface ActiveProcess {
 
 export type ProcessStatus = 'running' | 'completed' | 'killed' | 'orphaned';
 
+export interface ChildProcessInfo {
+  pid: number;
+  name: string;
+  commandLine: string;
+  parentPid: number;
+}
+
 export interface ProcessEntry {
   pid: number;
   command: string;
@@ -84,6 +91,7 @@ export interface ProcessEntry {
   endedAt?: string;
   exitCode?: number;
   sessionId: string;
+  children?: ChildProcessInfo[];
 }
 
 export interface ProcessLedgerSummary {

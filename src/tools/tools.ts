@@ -10,6 +10,7 @@ import * as inputTools from './input.js';
 import * as outputPanelTools from './output-panel.js';
 import * as processTools from './process.js';
 import * as screenshotTools from './screenshot.js';
+import * as serverStatusTools from './server-status.js';
 import * as snapshotTools from './snapshot.js';
 import * as targetsTools from './targets.js';
 import * as taskTools from './task.js';
@@ -25,6 +26,7 @@ const tools = [
   ...Object.values(outputPanelTools),
   ...Object.values(processTools),
   ...Object.values(screenshotTools),
+  ...Object.values(serverStatusTools),
   ...Object.values(snapshotTools),
   ...Object.values(targetsTools),
   ...Object.values(taskTools),
