@@ -10,7 +10,7 @@
  * Four tools manage one persistent terminal with prompt detection:
  * - terminal_run: Execute a command, wait for completion/prompt/timeout
  * - terminal_input: Send input to a waiting prompt
- * - terminal_state: Check current terminal state
+ * - read_terminal: Read output from any tracked terminal with filtering
  * - terminal_kill: Send Ctrl+C to stop the running process
  *
  * These tools communicate with the Client extension via the Client pipe,
@@ -193,12 +193,12 @@ function formatTerminalResult(
 
   if (result.status === 'running') {
     lines.push('');
-    lines.push('> A process is still running (background mode). Use `terminal_state` to check progress or `terminal_kill` to stop it.');
+    lines.push('> A process is still running (background mode). Use `read_terminal` to check progress or `terminal_kill` to stop it.');
   }
 
   if (result.status === 'timeout') {
     lines.push('');
-    lines.push('> ⚠️ Command timed out before completion. The process may still be running. Use `terminal_state` to check or `terminal_kill` to stop it.');
+    lines.push('> ⚠️ Command timed out before completion. The process may still be running. Use `read_terminal` to check or `terminal_kill` to stop it.');
   }
 
   if (result.output) {
@@ -228,7 +228,7 @@ MUST match the chosen shell — incompatible syntax will be rejected before exec
 
 By default (waitMode: 'completion'), the tool BLOCKS until the command fully completes,
 including a 3-second grace period to catch cascading commands. This means you get the
-complete output in a single call without needing to poll terminal_state.
+complete output in a single call without needing to poll read_terminal.
 
 If the command asks for user input (e.g., [Y/n] prompts), it returns immediately
 with status "waiting_for_input" and the detected prompt. Use terminal_input to respond.
@@ -419,30 +419,41 @@ Examples:
   },
 });
 
-// ── terminal_state ───────────────────────────────────────────────────────────
+// ── read_terminal ────────────────────────────────────────────────────────────
 
-export const state = defineTool({
-  name: 'terminal_state',
-  description: `Check the current state of the terminal without modifying anything.
+export const readTerminal = defineTool({
+  name: 'read_terminal',
+  description: `Read the current output and state of any tracked terminal.
 
 Use this to:
 - Check if a previously started command has finished
-- See the latest output from a running process
+- See the latest output from a running or completed process
 - Determine if the terminal is waiting for input
+- Search terminal output for specific patterns
+- Get just the last N lines of output
 
 Args:
-  - name (string): Terminal name for multi-terminal support. Default: 'default'
+  - name (string): Terminal name. Default: 'default'
+  - limit (number): Return only the last N lines of output
+  - pattern (string): Regex pattern to filter output lines (case-insensitive)
   - response_format ('markdown'|'json'): Output format. Default: 'markdown'
 
 Returns:
   - status: 'idle' (no terminal), 'running', 'completed', or 'waiting_for_input'
-  - output: Current terminal output
+  - output: Terminal output (optionally filtered)
   - exitCode: Process exit code (if completed)
   - prompt: Detected prompt (if waiting for input)
   - pid: Process ID
-  - name: Terminal name`,
+  - name: Terminal name
+
+Examples:
+  - Check default terminal: {}
+  - Check named terminal: { name: "dev-server" }
+  - Last 20 lines: { limit: 20 }
+  - Find errors: { pattern: "error|fail|exception", limit: 50 }
+  - Named terminal + filter: { name: "build", pattern: "warning", limit: 100 }`,
   annotations: {
-    title: 'Check Terminal State',
+    title: 'Read Terminal Output',
     category: ToolCategory.DEV_DIAGNOSTICS,
     readOnlyHint: true,
     destructiveHint: false,
@@ -453,12 +464,38 @@ Returns:
   schema: {
     response_format: responseFormatSchema,
     name: nameSchema,
+    limit: zod
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe('Return only the last N lines of output. Omit to get all output.'),
+    pattern: zod
+      .string()
+      .optional()
+      .describe('Regex pattern to filter output lines (case-insensitive).'),
     logFormat: logFormatSchema,
   },
   handler: async (request, response) => {
     await ensureClientConnection();
 
     const result = await terminalGetState(request.params.name);
+
+    // Apply line-level filtering if limit or pattern is specified
+    if (result.output && (request.params.limit || request.params.pattern)) {
+      let lines = result.output.split('\n');
+
+      if (request.params.pattern) {
+        const regex = new RegExp(request.params.pattern, 'i');
+        lines = lines.filter(line => regex.test(line));
+      }
+
+      if (request.params.limit) {
+        lines = lines.slice(-request.params.limit);
+      }
+
+      result.output = lines.join('\n');
+    }
 
     const formatted = formatTerminalResult(result, request.params.response_format, request.params.logFormat);
     response.appendResponseLine(formatted);
