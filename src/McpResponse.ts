@@ -626,20 +626,23 @@ Call ${handleDialog.name} to handle it before continuing.`);
 
     if (this.#consoleDataOptions?.include) {
       const messages = data.consoleMessages ?? [];
+      const groupedMessages = this.#groupConsoleMessages(messages);
 
       response.push('## Console messages');
-      if (messages.length) {
+      if (groupedMessages.length) {
         const paginationData = this.#dataWithPagination(
-          messages,
+          groupedMessages,
           this.#consoleDataOptions.pagination,
         );
         structuredContent.pagination = paginationData.pagination;
         response.push(...paginationData.info);
         response.push(
-          ...paginationData.items.map(message => message.toString()),
+          ...paginationData.items.map(message =>
+            this.#formatGroupedConsoleMessage(message),
+          ),
         );
         structuredContent.consoleMessages = paginationData.items.map(message =>
-          message.toJSON(),
+          this.#toGroupedConsoleMessageJson(message),
         );
       } else {
         response.push('<no console messages found>');
@@ -661,6 +664,61 @@ Call ${handleDialog.name} to handle it before continuing.`);
       content: [text, ...images],
       structuredContent,
     };
+  }
+
+  #groupConsoleMessages(
+    messages: Array<ConsoleFormatter | IssueFormatter>,
+  ): Array<{
+    key: string;
+    message: ConsoleFormatter | IssueFormatter;
+    count: number;
+  }> {
+    const groupedMessages: Array<{
+      key: string;
+      message: ConsoleFormatter | IssueFormatter;
+      count: number;
+    }> = [];
+
+    for (const message of messages) {
+      const key = message.toString().replace(/^msgid=\d+\s+/, '');
+      const lastGroup = groupedMessages.at(-1);
+      if (lastGroup?.key === key) {
+        lastGroup.count += 1;
+        continue;
+      }
+
+      groupedMessages.push({
+        key,
+        message,
+        count: 1,
+      });
+    }
+
+    return groupedMessages;
+  }
+
+  #formatGroupedConsoleMessage(groupedMessage: {
+    key: string;
+    message: ConsoleFormatter | IssueFormatter;
+    count: number;
+  }): string {
+    const text = groupedMessage.message.toString();
+    if (groupedMessage.count > 1) {
+      return `${text} [${groupedMessage.count} times]`;
+    }
+    return text;
+  }
+
+  #toGroupedConsoleMessageJson(groupedMessage: {
+    key: string;
+    message: ConsoleFormatter | IssueFormatter;
+    count: number;
+  }): object {
+    const json = groupedMessage.message.toJSON() as Record<string, unknown>;
+    if (groupedMessage.count > 1) {
+      json.occurrences = groupedMessage.count;
+    }
+    return json;
   }
 
   #dataWithPagination<T>(data: T[], pagination?: PaginationOptions) {
