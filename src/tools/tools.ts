@@ -13,7 +13,6 @@ import * as screenshotTools from './screenshot.js';
 import * as serverStatusTools from './server-status.js';
 import * as snapshotTools from './snapshot.js';
 import * as targetsTools from './targets.js';
-import * as taskTools from './task.js';
 import * as terminalsTools from './terminals.js';
 import * as terminalTools from './terminal.js';
 import type {ToolDefinition} from './ToolDefinition.js';
@@ -29,7 +28,6 @@ const tools = [
   ...Object.values(serverStatusTools),
   ...Object.values(snapshotTools),
   ...Object.values(targetsTools),
-  ...Object.values(taskTools),
   ...Object.values(terminalsTools),
   ...Object.values(terminalTools),
   ...Object.values(waitTools),
