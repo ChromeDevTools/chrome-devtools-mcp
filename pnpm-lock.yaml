@@ -14,6 +14,9 @@ importers:
       jsonc-parser:
         specifier: ^3.3.0
         version: 3.3.1
+      logpare:
+        specifier: ^0.1.0
+        version: 0.1.0
       ws:
         specifier: ^8.19.0
         version: 8.19.0
@@ -1309,6 +1312,11 @@ packages:
 
   lodash@4.17.23:
     resolution: {integrity: sha512-LgVTMpQtIopCi79SJeDiP0TfWi5CNEc/L/aRdTh3yIvmZXTnheWpKjSZhnvMl8iXbC1tFg9gdHHDMLoV7CnG+w==}
+
+  logpare@0.1.0:
+    resolution: {integrity: sha512-zaxbnNiaiGAnTfHyiCqBgOBh3Z2p4V1qpnM5CXTzf5EJefZXIIJxbM5vFos+Z8au6QD9G6OByhFkA/srehE0cQ==}
+    engines: {node: ^20.0.0 || ^22.0.0 || >=24.0.0}
+    hasBin: true
 
   magic-string@0.25.9:
     resolution: {integrity: sha512-RmF0AsMzgt25qzqqLc1+MbHmhdx0ojF2Fvs4XnOqz2ZOBXzzkEwc/dJQZCYHAn7v1jbVOjAZfK8msRn4BxO4VQ==}
@@ -3105,6 +3113,8 @@ snapshots:
       p-locate: 5.0.0
 
   lodash@4.17.23: {}
+
+  logpare@0.1.0: {}
 
   magic-string@0.25.9:
     dependencies:

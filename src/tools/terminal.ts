@@ -27,8 +27,10 @@ import {
 } from '../client-pipe.js';
 import {zod} from '../third_party/index.js';
 
+import {consolidateOutput, toConsolidatedJson, type LogFormat} from '../log-consolidator.js';
+
 import {ToolCategory} from './categories.js';
-import {defineTool, ResponseFormat, responseFormatSchema} from './ToolDefinition.js';
+import {defineTool, ResponseFormat, responseFormatSchema, logFormatSchema} from './ToolDefinition.js';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -53,8 +55,19 @@ async function ensureClientConnection(): Promise<void> {
 function formatTerminalResult(
   result: TerminalRunResult,
   format: ResponseFormat,
+  logFormat?: LogFormat,
 ): string {
   if (format === ResponseFormat.JSON) {
+    if (result.output) {
+      const consolidated = consolidateOutput(result.output, {format: logFormat, label: 'Terminal'});
+      if (consolidated.hasCompression) {
+        return JSON.stringify({
+          ...result,
+          output: undefined,
+          ...toConsolidatedJson(consolidated),
+        }, null, 2);
+      }
+    }
     return JSON.stringify(result, null, 2);
   }
 
@@ -96,15 +109,17 @@ function formatTerminalResult(
   }
 
   if (result.output) {
-    lines.push('');
-    lines.push('**Output:**');
-    lines.push('```');
-    lines.push(result.output);
-    lines.push('```');
+    const consolidated = consolidateOutput(result.output, {format: logFormat, label: 'Terminal Output'});
+    if (consolidated.hasCompression) {
+      lines.push('');
+      lines.push(consolidated.formatted);
+    } else {
+      lines.push('\n**Output:**');
+      lines.push('```');
+      lines.push(result.output);
+      lines.push('```');
+    }
   }
-
-  // Note: Process ledger is now added globally to all MCP responses in main.ts
-  // This ensures Copilot sees active + orphaned processes after EVERY tool call
 
   return lines.join('\n');
 }
@@ -145,7 +160,8 @@ Examples:
   - Quick command: { command: "echo hello", timeout: 5000 }
   - Interactive install: { command: "npm init" } → returns waiting_for_input
   - Named terminal: { command: "npm run dev", name: "dev-server" }
-  - Dev server (background): { command: "npm run dev", name: "dev", waitMode: "background" }`,
+  - Dev server (background): { command: "npm run dev", name: "dev", waitMode: "background" }
+  - Detailed log compression: { command: "npm test", logFormat: "detailed" }`,
   timeoutMs: 130_000, // Slightly higher than default 120s timeout
   annotations: {
     title: 'Run Terminal Command',
@@ -180,6 +196,7 @@ Examples:
         "Wait mode: 'completion' (default) blocks until command finishes; " +
         "'background' returns immediately for long-running processes like dev servers.",
       ),
+    logFormat: logFormatSchema,
   },
   handler: async (request, response) => {
     await ensureClientConnection();
@@ -191,7 +208,7 @@ Examples:
       request.params.waitMode,
     );
 
-    const formatted = formatTerminalResult(result, request.params.response_format);
+    const formatted = formatTerminalResult(result, request.params.response_format, request.params.logFormat);
     response.appendResponseLine(formatted);
   },
 });
@@ -221,7 +238,8 @@ Examples:
   - Answer yes: { text: "y" }
   - Enter a value: { text: "my-project-name" }
   - Send without Enter: { text: "partial", addNewline: false }
-  - Named terminal: { text: "y", name: "dev-server" }`,
+  - Named terminal: { text: "y", name: "dev-server" }
+  - Detailed log compression: { text: "y", logFormat: "detailed" }`,
   timeoutMs: 40_000,
   annotations: {
     title: 'Send Terminal Input',
@@ -258,6 +276,7 @@ Examples:
         'Maximum wait time in milliseconds after sending input. Default: 30000.',
       ),
     name: nameSchema,
+    logFormat: logFormatSchema,
   },
   handler: async (request, response) => {
     await ensureClientConnection();
@@ -269,7 +288,7 @@ Examples:
       request.params.name,
     );
 
-    const formatted = formatTerminalResult(result, request.params.response_format);
+    const formatted = formatTerminalResult(result, request.params.response_format, request.params.logFormat);
     response.appendResponseLine(formatted);
   },
 });
@@ -308,13 +327,14 @@ Returns:
   schema: {
     response_format: responseFormatSchema,
     name: nameSchema,
+    logFormat: logFormatSchema,
   },
   handler: async (request, response) => {
     await ensureClientConnection();
 
     const result = await terminalGetState(request.params.name);
 
-    const formatted = formatTerminalResult(result, request.params.response_format);
+    const formatted = formatTerminalResult(result, request.params.response_format, request.params.logFormat);
     response.appendResponseLine(formatted);
   },
 });
@@ -353,13 +373,14 @@ Returns:
   schema: {
     response_format: responseFormatSchema,
     name: nameSchema,
+    logFormat: logFormatSchema,
   },
   handler: async (request, response) => {
     await ensureClientConnection();
 
     const result = await terminalKill(request.params.name);
 
-    const formatted = formatTerminalResult(result, request.params.response_format);
+    const formatted = formatTerminalResult(result, request.params.response_format, request.params.logFormat);
     response.appendResponseLine(formatted);
   },
 });

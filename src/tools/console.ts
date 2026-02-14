@@ -7,6 +7,8 @@
 import {getConsoleMessages, getConsoleMessageById} from '../cdp-events.js';
 import {zod} from '../third_party/index.js';
 
+import {consolidateLines} from '../log-consolidator.js';
+
 import {ToolCategory} from './categories.js';
 import {
   defineTool,
@@ -14,6 +16,7 @@ import {
   responseFormatSchema,
   CHARACTER_LIMIT,
   checkCharacterLimit,
+  logFormatSchema,
 } from './ToolDefinition.js';
 
 const FILTERABLE_MESSAGE_TYPES: [string, ...string[]] = [
@@ -182,6 +185,9 @@ Returns: { total, returned, hasMore, oldestId?, newestId?, messages: [...] }
       .number()
       .optional()
       .describe('Get a specific message by ID with full details.'),
+
+    // Log consolidation
+    logFormat: logFormatSchema,
   },
   outputSchema: ReadConsoleOutputSchema,
   handler: async (request, response) => {
@@ -461,16 +467,33 @@ Returns: { total, returned, hasMore, oldestId?, newestId?, messages: [...] }
       }
     }
 
-    const content = lines.join('\n');
-    checkCharacterLimit(content, 'read_console', {
-      limit: 'Reduce number of messages (e.g., limit: 20)',
-      fields: 'Reduce fields (e.g., fields: ["id", "text"])',
-      textLimit: 'Truncate message text (e.g., textLimit: 100)',
-      stackDepth: 'Reduce stack frames (e.g., stackDepth: 0)',
-      types: 'Filter by specific types (e.g., types: ["error"])',
-      pattern: 'Filter by text pattern',
+    // Apply log consolidation to reduce repetitive console output
+    const consolidated = consolidateLines(lines, {
+      format: request.params.logFormat,
+      label: 'Console',
     });
 
-    response.appendResponseLine(content);
+    if (consolidated.hasCompression) {
+      const content = consolidated.formatted;
+      checkCharacterLimit(content, 'read_console', {
+        limit: 'Reduce number of messages (e.g., limit: 20)',
+        logFormat: 'Switch format (e.g., logFormat: "summary")',
+        types: 'Filter by specific types (e.g., types: ["error"])',
+        pattern: 'Filter by text pattern',
+      });
+      response.appendResponseLine(content);
+    } else {
+      // No groups to collapse — use original line output
+      const content = lines.join('\n');
+      checkCharacterLimit(content, 'read_console', {
+        limit: 'Reduce number of messages (e.g., limit: 20)',
+        fields: 'Reduce fields (e.g., fields: ["id", "text"])',
+        textLimit: 'Truncate message text (e.g., textLimit: 100)',
+        stackDepth: 'Reduce stack frames (e.g., stackDepth: 0)',
+        types: 'Filter by specific types (e.g., types: ["error"])',
+        pattern: 'Filter by text pattern',
+      });
+      response.appendResponseLine(content);
+    }
   },
 });

@@ -30,8 +30,10 @@ import {
 } from '../client-pipe.js';
 import {zod} from '../third_party/index.js';
 
+import {consolidateOutput, toConsolidatedJson, type LogFormat} from '../log-consolidator.js';
+
 import {ToolCategory} from './categories.js';
-import {defineTool, ResponseFormat, responseFormatSchema} from './ToolDefinition.js';
+import {defineTool, ResponseFormat, responseFormatSchema, logFormatSchema} from './ToolDefinition.js';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -116,8 +118,19 @@ function formatTaskRunResult(
 function formatTaskOutput(
   result: TaskOutputResult,
   format: ResponseFormat,
+  logFormat?: LogFormat,
 ): string {
   if (format === ResponseFormat.JSON) {
+    if (result.output) {
+      const consolidated = consolidateOutput(result.output, {format: logFormat, label: 'Task'});
+      if (consolidated.hasCompression) {
+        return JSON.stringify({
+          ...result,
+          output: undefined,
+          ...toConsolidatedJson(consolidated),
+        }, null, 2);
+      }
+    }
     return JSON.stringify(result, null, 2);
   }
 
@@ -135,11 +148,16 @@ function formatTaskOutput(
   }
 
   if (result.output) {
-    lines.push('');
-    lines.push('**Output:**');
-    lines.push('```');
-    lines.push(result.output);
-    lines.push('```');
+    const consolidated = consolidateOutput(result.output, {format: logFormat, label: 'Task Output'});
+    if (consolidated.hasCompression) {
+      lines.push('');
+      lines.push(consolidated.formatted);
+    } else {
+      lines.push('\n**Output:**');
+      lines.push('```');
+      lines.push(result.output);
+      lines.push('```');
+    }
   } else {
     lines.push('');
     lines.push('_No output captured yet._');
@@ -285,7 +303,8 @@ Returns:
 
 Examples:
   - Check build output: { id: "shell: ext:build" }
-  - Check as JSON: { id: "npm: dev", response_format: "json" }`,
+  - Check as JSON: { id: "npm: dev", response_format: "json" }
+  - Detailed log compression: { id: "shell: ext:build", logFormat: "detailed" }`,
   timeoutMs: 10_000,
   annotations: {
     title: 'Get Task Output',
@@ -303,12 +322,13 @@ Examples:
       .describe(
         'The task ID in "source:name" format. Must be a task previously started with task_run.',
       ),
+    logFormat: logFormatSchema,
   },
   handler: async (request, response) => {
     await ensureClientConnection();
 
     const result = await taskGetOutput(request.params.id);
-    const formatted = formatTaskOutput(result, request.params.response_format);
+    const formatted = formatTaskOutput(result, request.params.response_format, request.params.logFormat);
     response.appendResponseLine(formatted);
   },
 });

@@ -10,7 +10,7 @@
     "bundle": "pnpm run clean && pnpm run build && rollup -c rollup.config.mjs && node -e \"require('fs').rmSync('build/node_modules', {recursive: true, force: true})\"",
     "build": "node -e \"require('fs').rmSync('build', {recursive: true, force: true})\" && tsc && node --experimental-strip-types --no-warnings=ExperimentalWarning scripts/post-build.ts",
     "typecheck": "tsc --noEmit",
-    "dev": "tsc --watch --preserveWatchOutput",
+    "dev": "pnpm run clean && tsc && node --experimental-strip-types --no-warnings=ExperimentalWarning scripts/post-build.ts && tsc --watch --preserveWatchOutput",
     "format": "eslint --cache --fix . && prettier --write --cache .",
     "check-format": "eslint --cache . && prettier --check --cache .;",
     "docs": "pnpm run build && pnpm run docs:generate && pnpm run format",
@@ -68,6 +68,7 @@
   "dependencies": {
     "get-port": "^7.1.0",
     "jsonc-parser": "^3.3.0",
+    "logpare": "^0.1.0",
     "ws": "^8.19.0"
   }
 }

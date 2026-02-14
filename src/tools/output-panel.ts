@@ -13,6 +13,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
+import {consolidateLines} from '../log-consolidator.js';
 import {zod} from '../third_party/index.js';
 import {lifecycleService} from '../services/index.js';
 
@@ -22,6 +23,7 @@ import {
   ResponseFormat,
   responseFormatSchema,
   checkCharacterLimit,
+  logFormatSchema,
 } from './ToolDefinition.js';
 
 interface LogFileInfo {
@@ -236,6 +238,9 @@ Returns: { mode: 'content', channel, total, returned, hasMore, oldestLine?, newe
       .positive()
       .optional()
       .describe('Max characters per line. Longer lines are truncated with "...".'),
+
+    // Log consolidation
+    logFormat: logFormatSchema,
   },
   outputSchema: ReadOutputOutputSchema,
   handler: async (request, response) => {
@@ -430,15 +435,34 @@ Returns: { mode: 'content', channel, total, returned, hasMore, oldestLine?, newe
     if (indexedLines.length === 0) {
       response.appendResponseLine('\n(no matching lines)');
     } else {
-      const formattedLines = indexedLines
-        .map(l => `${String(l.line).padStart(5, ' ')} | ${l.text}`)
-        .join('\n');
-      const formattedContent = '\n```\n' + formattedLines + '\n```';
-      checkCharacterLimit(formattedContent, 'read_output', {
-        limit: 'Use limit parameter to get fewer lines',
-        lineLimit: 'Use lineLimit to truncate long lines',
-      });
-      response.appendResponseLine(formattedContent);
+      // Apply log consolidation to detect and collapse repetitive patterns
+      const consolidated = consolidateLines(
+        indexedLines.map(l => l.text),
+        {
+          format: request.params.logFormat,
+          label: `Output: ${targetFile.name}`,
+        },
+      );
+
+      if (consolidated.hasCompression) {
+        const content = consolidated.formatted;
+        checkCharacterLimit(content, 'read_output', {
+          limit: 'Use limit parameter to get fewer lines',
+          logFormat: 'Switch format (e.g., logFormat: "summary")',
+          pattern: 'Use pattern to filter specific content',
+        });
+        response.appendResponseLine('\n' + content);
+      } else {
+        const formattedLines = indexedLines
+          .map(l => `${String(l.line).padStart(5, ' ')} | ${l.text}`)
+          .join('\n');
+        const formattedContent = '\n```\n' + formattedLines + '\n```';
+        checkCharacterLimit(formattedContent, 'read_output', {
+          limit: 'Use limit parameter to get fewer lines',
+          lineLimit: 'Use lineLimit to truncate long lines',
+        });
+        response.appendResponseLine(formattedContent);
+      }
     }
   },
 });
