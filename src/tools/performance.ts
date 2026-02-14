@@ -28,7 +28,7 @@ const filePathSchema = zod
 
 export const startTrace = defineTool({
   name: 'performance_start_trace',
-  description: `Starts a performance trace recording on the selected page. This can be used to look for performance problems and insights to improve the performance of the page. It will also report Core Web Vital (CWV) scores for the page.`,
+  description: `Start a performance trace on the selected webpage. Use to find frontend performance issues, Core Web Vitals (LCP, FID, CLS), and improve page load speed.`,
   annotations: {
     category: ToolCategory.PERFORMANCE,
     readOnlyHint: false,
@@ -115,7 +115,7 @@ export const startTrace = defineTool({
 export const stopTrace = defineTool({
   name: 'performance_stop_trace',
   description:
-    'Stops the active performance trace recording on the selected page.',
+    'Stop the active performance trace recording on the selected webpage.',
   annotations: {
     category: ToolCategory.PERFORMANCE,
     readOnlyHint: false,
