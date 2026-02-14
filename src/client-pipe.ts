@@ -114,6 +114,7 @@ export interface KillOrphansResult {
 export interface TerminalRunResult {
   status: TerminalStatus;
   output: string;
+  cwd?: string;
   exitCode?: number;
   prompt?: string;
   pid?: number;
@@ -309,19 +310,21 @@ function sendClientRequest(
  * Waits for completion, prompt detection, or timeout.
  *
  * @param command The shell command to execute
+ * @param cwd Absolute path to working directory for command execution
  * @param timeout Max wait time in milliseconds (default: 120000)
  * @param name Terminal name (default: 'default')
  * @param waitMode 'completion' blocks until done; 'background' returns immediately
  */
 export async function terminalRun(
   command: string,
+  cwd: string,
   timeout?: number,
   name?: string,
   waitMode?: WaitMode,
 ): Promise<TerminalRunResult> {
   const result = await sendClientRequest(
     'terminal.run',
-    {command, timeout, name, waitMode},
+    {command, cwd, timeout, name, waitMode},
     TERMINAL_TIMEOUT_MS,
   );
   return result as TerminalRunResult;

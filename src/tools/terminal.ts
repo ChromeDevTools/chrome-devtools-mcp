@@ -79,6 +79,10 @@ function formatTerminalResult(
 
   lines.push(`**Status:** ${result.status}`);
 
+  if (result.cwd) {
+    lines.push(`**Working Directory:** \`${result.cwd}\``);
+  }
+
   if (result.pid !== undefined) {
     lines.push(`**PID:** ${result.pid}`);
   }
@@ -128,7 +132,10 @@ function formatTerminalResult(
 
 export const run = defineTool({
   name: 'terminal_run',
-  description: `Run a command in the VS Code terminal. Creates the terminal if needed.
+  description: `Run a command in the VS Code terminal from a specific working directory.
+
+**IMPORTANT:** The \`cwd\` parameter is REQUIRED and must be an absolute path. The command
+will always execute from this directory, ensuring deterministic behavior across terminals.
 
 By default (waitMode: 'completion'), the tool BLOCKS until the command fully completes,
 including a 3-second grace period to catch cascading commands. This means you get the
@@ -140,6 +147,7 @@ with status "waiting_for_input" and the detected prompt. Use terminal_input to r
 For long-running dev servers, use waitMode: 'background' to return immediately.
 
 Args:
+  - cwd (string): **REQUIRED.** Absolute path to the working directory for command execution.
   - command (string): The shell command to execute
   - timeout (number): Max wait time in milliseconds. Default: 120000 (2 minutes)
   - name (string): Terminal name for multi-terminal support. Default: 'default'
@@ -149,6 +157,7 @@ Args:
 Returns:
   - status: 'completed' | 'running' | 'waiting_for_input' | 'timeout'
   - output: Terminal output text
+  - cwd: The working directory the command ran from
   - exitCode: Process exit code (when completed)
   - prompt: Detected prompt text (when waiting_for_input)
   - pid: Process ID
@@ -156,12 +165,12 @@ Returns:
   - durationMs: How long the command ran
 
 Examples:
-  - Run a build: { command: "npm run build" }
-  - Quick command: { command: "echo hello", timeout: 5000 }
-  - Interactive install: { command: "npm init" } → returns waiting_for_input
-  - Named terminal: { command: "npm run dev", name: "dev-server" }
-  - Dev server (background): { command: "npm run dev", name: "dev", waitMode: "background" }
-  - Detailed log compression: { command: "npm test", logFormat: "detailed" }`,
+  - Run a build: { cwd: "C:\\\\project", command: "npm run build" }
+  - Quick command: { cwd: "/home/user/app", command: "echo hello", timeout: 5000 }
+  - Interactive install: { cwd: "C:\\\\myapp", command: "npm init" } → returns waiting_for_input
+  - Named terminal: { cwd: "/workspace", command: "npm run dev", name: "dev-server" }
+  - Dev server (background): { cwd: "C:\\\\app", command: "npm run dev", waitMode: "background" }
+  - Detailed log compression: { cwd: "/project", command: "npm test", logFormat: "detailed" }`,
   timeoutMs: 130_000, // Slightly higher than default 120s timeout
   annotations: {
     title: 'Run Terminal Command',
@@ -174,6 +183,21 @@ Examples:
   },
   schema: {
     response_format: responseFormatSchema,
+    cwd: zod
+      .string()
+      .refine(
+        (path) => {
+          // Absolute path check: starts with / (Unix) or drive letter (Windows)
+          return /^(?:[a-zA-Z]:[/\\]|\/)/u.test(path);
+        },
+        {
+          message: 'cwd must be an absolute path (e.g., "C:\\\\project" or "/home/user/app")',
+        },
+      )
+      .describe(
+        '**REQUIRED.** Absolute path to the working directory. ' +
+        'The command will execute from this directory to ensure deterministic behavior.',
+      ),
     command: zod
       .string()
       .describe('The shell command to execute in the terminal.'),
@@ -203,6 +227,7 @@ Examples:
 
     const result = await terminalRun(
       request.params.command,
+      request.params.cwd,
       request.params.timeout,
       request.params.name,
       request.params.waitMode,
