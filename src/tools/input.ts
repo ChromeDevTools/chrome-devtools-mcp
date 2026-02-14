@@ -52,6 +52,12 @@ export const click = defineTool({
   handler: async (request, response, context) => {
     const uid = request.params.uid;
     const handle = await context.getElementByUid(uid);
+    const page = context.getSelectedPage();
+    let popupOpened = false;
+    const popupListener = () => {
+      popupOpened = true;
+    };
+    page.on('popup', popupListener);
     try {
       await context.waitForEventsAfterAction(async () => {
         await handle.asLocator().click({
@@ -63,12 +69,16 @@ export const click = defineTool({
           ? `Successfully double clicked on the element`
           : `Successfully clicked on the element`,
       );
+      if (popupOpened) {
+        response.setIncludePages(true);
+      }
       if (request.params.includeSnapshot) {
         response.includeSnapshot();
       }
     } catch (error) {
       handleActionError(error, uid);
     } finally {
+      page.off('popup', popupListener);
       void handle.dispose();
     }
   },
@@ -90,18 +100,30 @@ export const clickAt = defineTool({
   },
   handler: async (request, response, context) => {
     const page = context.getSelectedPage();
-    await context.waitForEventsAfterAction(async () => {
-      await page.mouse.click(request.params.x, request.params.y, {
-        clickCount: request.params.dblClick ? 2 : 1,
+    let popupOpened = false;
+    const popupListener = () => {
+      popupOpened = true;
+    };
+    page.on('popup', popupListener);
+    try {
+      await context.waitForEventsAfterAction(async () => {
+        await page.mouse.click(request.params.x, request.params.y, {
+          clickCount: request.params.dblClick ? 2 : 1,
+        });
       });
-    });
-    response.appendResponseLine(
-      request.params.dblClick
-        ? `Successfully double clicked at the coordinates`
-        : `Successfully clicked at the coordinates`,
-    );
-    if (request.params.includeSnapshot) {
-      response.includeSnapshot();
+      response.appendResponseLine(
+        request.params.dblClick
+          ? `Successfully double clicked at the coordinates`
+          : `Successfully clicked at the coordinates`,
+      );
+      if (popupOpened) {
+        response.setIncludePages(true);
+      }
+      if (request.params.includeSnapshot) {
+        response.includeSnapshot();
+      }
+    } finally {
+      page.off('popup', popupListener);
     }
   },
 });
