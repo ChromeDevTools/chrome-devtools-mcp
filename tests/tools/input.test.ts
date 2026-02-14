@@ -22,7 +22,7 @@ import {
 } from '../../src/tools/input.js';
 import {parseKey} from '../../src/utils/keyboard.js';
 import {serverHooks} from '../server.js';
-import {html, withMcpContext} from '../utils.js';
+import {getTextContent, html, withMcpContext} from '../utils.js';
 
 describe('input', () => {
   const server = serverHooks();
@@ -205,6 +205,31 @@ describe('input', () => {
         assert.notStrictEqual(response.snapshotParams, undefined);
       });
     });
+
+    it('includes pages if click opens a new tab', async () => {
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedPage();
+        await page.setContent(
+          html`<button onclick="window.open('about:blank', '_blank')"
+            >open</button
+          >`,
+        );
+        await context.createTextSnapshot();
+        await click.handler(
+          {
+            params: {
+              uid: '1_1',
+            },
+          },
+          response,
+          context,
+        );
+        assert.ok(response.includePages);
+        const formattedResponse = await response.handle('test', context);
+        const textContent = getTextContent(formattedResponse.content[0]);
+        assert.ok(textContent.includes('## Pages'));
+      });
+    });
   });
 
   describe('hover', () => {
@@ -291,6 +316,33 @@ describe('input', () => {
         );
         assert.ok(response.includeSnapshot);
         assert.ok(await page.$('text/dblclicked'));
+      });
+    });
+
+    it('includes pages if click at coordinates opens a new tab', async () => {
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedPage();
+        await page.setContent(
+          html`<div
+            style="width: 100px; height: 100px; background: red;"
+            onclick="window.open('about:blank', '_blank')"
+          ></div>`,
+        );
+        await context.createTextSnapshot();
+        await clickAt.handler(
+          {
+            params: {
+              x: 50,
+              y: 50,
+            },
+          },
+          response,
+          context,
+        );
+        assert.ok(response.includePages);
+        const formattedResponse = await response.handle('test', context);
+        const textContent = getTextContent(formattedResponse.content[0]);
+        assert.ok(textContent.includes('## Pages'));
       });
     });
   });
