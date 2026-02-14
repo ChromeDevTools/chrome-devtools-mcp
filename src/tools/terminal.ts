@@ -32,6 +32,14 @@ import {defineTool, ResponseFormat, responseFormatSchema} from './ToolDefinition
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
+const nameSchema = zod
+  .string()
+  .optional()
+  .describe(
+    'Optional terminal name. Each named terminal runs independently with its own state and output history. ' +
+    'Default: "default". Use different names to run multiple commands concurrently.',
+  );
+
 async function ensureClientConnection(): Promise<void> {
   const alive = await pingClient();
   if (!alive) {
@@ -51,6 +59,11 @@ function formatTerminalResult(
   }
 
   const lines: string[] = [];
+
+  if (result.name && result.name !== 'default') {
+    lines.push(`**Terminal:** ${result.name}`);
+  }
+
   lines.push(`**Status:** ${result.status}`);
 
   if (result.pid !== undefined) {
@@ -99,6 +112,7 @@ Use terminal_kill to stop the running process first.
 Args:
   - command (string): The shell command to execute
   - timeout (number): Max wait time in milliseconds. Default: 30000
+  - name (string): Terminal name for multi-terminal support. Default: 'default'
   - response_format ('markdown'|'json'): Output format. Default: 'markdown'
 
 Returns:
@@ -107,11 +121,13 @@ Returns:
   - exitCode: Process exit code (when completed)
   - prompt: Detected prompt text (when waiting_for_input)
   - pid: Process ID
+  - name: Terminal name
 
 Examples:
   - Run a build: { command: "npm run build" }
   - Quick command: { command: "echo hello", timeout: 5000 }
-  - Interactive install: { command: "npm init" } → returns waiting_for_input`,
+  - Interactive install: { command: "npm init" } → returns waiting_for_input
+  - Named terminal: { command: "npm run dev", name: "dev-server" }`,
   timeoutMs: 40_000,
   annotations: {
     title: 'Run Terminal Command',
@@ -137,6 +153,7 @@ Examples:
         'Maximum wait time in milliseconds for the command to complete. Default: 30000 (30 seconds). ' +
         'For long-running commands, increase this value.',
       ),
+    name: nameSchema,
   },
   handler: async (request, response) => {
     await ensureClientConnection();
@@ -144,6 +161,7 @@ Examples:
     const result = await terminalRun(
       request.params.command,
       request.params.timeout,
+      request.params.name,
     );
 
     const formatted = formatTerminalResult(result, request.params.response_format);
@@ -166,15 +184,17 @@ Args:
   - text (string): The text to send to the terminal
   - addNewline (boolean): Whether to press Enter after the text. Default: true
   - timeout (number): Max wait time in milliseconds. Default: 30000
+  - name (string): Terminal name for multi-terminal support. Default: 'default'
   - response_format ('markdown'|'json'): Output format. Default: 'markdown'
 
 Returns:
-  Same as terminal_run — status, output, exitCode, prompt, pid
+  Same as terminal_run — status, output, exitCode, prompt, pid, name
 
 Examples:
   - Answer yes: { text: "y" }
   - Enter a value: { text: "my-project-name" }
-  - Send without Enter: { text: "partial", addNewline: false }`,
+  - Send without Enter: { text: "partial", addNewline: false }
+  - Named terminal: { text: "y", name: "dev-server" }`,
   timeoutMs: 40_000,
   annotations: {
     title: 'Send Terminal Input',
@@ -210,6 +230,7 @@ Examples:
       .describe(
         'Maximum wait time in milliseconds after sending input. Default: 30000.',
       ),
+    name: nameSchema,
   },
   handler: async (request, response) => {
     await ensureClientConnection();
@@ -218,6 +239,7 @@ Examples:
       request.params.text,
       request.params.addNewline,
       request.params.timeout,
+      request.params.name,
     );
 
     const formatted = formatTerminalResult(result, request.params.response_format);
@@ -237,6 +259,7 @@ Use this to:
 - Determine if the terminal is waiting for input
 
 Args:
+  - name (string): Terminal name for multi-terminal support. Default: 'default'
   - response_format ('markdown'|'json'): Output format. Default: 'markdown'
 
 Returns:
@@ -244,7 +267,8 @@ Returns:
   - output: Current terminal output
   - exitCode: Process exit code (if completed)
   - prompt: Detected prompt (if waiting for input)
-  - pid: Process ID`,
+  - pid: Process ID
+  - name: Terminal name`,
   annotations: {
     title: 'Check Terminal State',
     category: ToolCategory.DEV_DIAGNOSTICS,
@@ -256,11 +280,12 @@ Returns:
   },
   schema: {
     response_format: responseFormatSchema,
+    name: nameSchema,
   },
   handler: async (request, response) => {
     await ensureClientConnection();
 
-    const result = await terminalGetState();
+    const result = await terminalGetState(request.params.name);
 
     const formatted = formatTerminalResult(result, request.params.response_format);
     response.appendResponseLine(formatted);
@@ -271,7 +296,7 @@ Returns:
 
 export const kill = defineTool({
   name: 'terminal_kill',
-  description: `Send Ctrl+C to stop the running process in the terminal.
+  description: `Send Ctrl+C to stop the running process in a terminal.
 
 Use this when:
 - A command is taking too long
@@ -281,12 +306,14 @@ Use this when:
 The terminal itself is preserved for reuse — only the running process is interrupted.
 
 Args:
+  - name (string): Terminal name for multi-terminal support. Default: 'default'
   - response_format ('markdown'|'json'): Output format. Default: 'markdown'
 
 Returns:
   - status: 'completed' (after Ctrl+C)
   - output: Final terminal output
-  - pid: Process ID`,
+  - pid: Process ID
+  - name: Terminal name`,
   annotations: {
     title: 'Kill Terminal Process',
     category: ToolCategory.DEV_DIAGNOSTICS,
@@ -298,11 +325,12 @@ Returns:
   },
   schema: {
     response_format: responseFormatSchema,
+    name: nameSchema,
   },
   handler: async (request, response) => {
     await ensureClientConnection();
 
-    const result = await terminalKill();
+    const result = await terminalKill(request.params.name);
 
     const formatted = formatTerminalResult(result, request.params.response_format);
     response.appendResponseLine(formatted);

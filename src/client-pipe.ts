@@ -17,6 +17,12 @@
  * - terminal.kill: Send Ctrl+C to stop the running process
  * - terminal.listAll: List all terminals (tracked + untracked)
  *
+ * Task methods (long-running processes):
+ * - task.list: List all workspace tasks with running status
+ * - task.run: Run a task by ID
+ * - task.output: Get captured output for a task
+ * - task.stop: Stop a running task
+ *
  * Output methods:
  * - output.listChannels: List VS Code output channels
  * - output.read: Read output channel content
@@ -60,6 +66,7 @@ export interface TerminalRunResult {
   exitCode?: number;
   prompt?: string;
   pid?: number;
+  name?: string;
 }
 
 export interface AllTerminalInfo {
@@ -97,6 +104,52 @@ export interface OutputReadResult {
 
 export interface CommandExecuteResult {
   result: unknown;
+}
+
+export type TaskStatus = 'running' | 'completed' | 'failed' | 'stopped';
+
+export interface TaskInfo {
+  id: string;
+  name: string;
+  source: string;
+  isRunning: boolean;
+  detail?: string;
+  group?: string;
+}
+
+export interface TaskListResult {
+  tasks: TaskInfo[];
+}
+
+export interface TaskConflictInfo {
+  pid?: number;
+  startedAt: string;
+  outputPreview: string;
+  message: string;
+}
+
+export interface TaskRunResult {
+  id: string;
+  name: string;
+  status: TaskStatus;
+  alreadyRunning?: boolean;
+  conflictInfo?: TaskConflictInfo;
+}
+
+export interface TaskOutputResult {
+  id: string;
+  name: string;
+  status: TaskStatus;
+  output: string;
+  exitCode?: number;
+  pid?: number;
+  startedAt: string;
+}
+
+export interface TaskStopResult {
+  id: string;
+  name: string;
+  stopped: boolean;
 }
 
 // ── JSON-RPC Transport ───────────────────────────────────
@@ -195,20 +248,25 @@ function sendClientRequest(
   });
 }
 
-// ── Terminal Methods (Single-Terminal Model) ─────────────
+// ── Terminal Methods (Multi-Terminal Model) ─────────────
 
 /**
- * Run a command in the single managed terminal.
+ * Run a command in a named terminal.
  * Creates terminal if needed, rejects with state if busy.
  * Waits for completion, prompt detection, or timeout.
+ *
+ * @param command The shell command to execute
+ * @param timeout Max wait time in milliseconds (default: 30000)
+ * @param name Terminal name (default: 'default')
  */
 export async function terminalRun(
   command: string,
   timeout?: number,
+  name?: string,
 ): Promise<TerminalRunResult> {
   const result = await sendClientRequest(
     'terminal.run',
-    {command, timeout},
+    {command, timeout, name},
     TERMINAL_TIMEOUT_MS,
   );
   return result as TerminalRunResult;
@@ -217,15 +275,21 @@ export async function terminalRun(
 /**
  * Send input to a terminal waiting for a prompt.
  * Waits for the next completion or prompt after sending.
+ *
+ * @param text The text to send
+ * @param addNewline Whether to press Enter after (default: true)
+ * @param timeout Max wait time in milliseconds (default: 30000)
+ * @param name Terminal name (default: 'default')
  */
 export async function terminalInput(
   text: string,
   addNewline?: boolean,
   timeout?: number,
+  name?: string,
 ): Promise<TerminalRunResult> {
   const result = await sendClientRequest(
     'terminal.input',
-    {text, addNewline, timeout},
+    {text, addNewline, timeout, name},
     TERMINAL_TIMEOUT_MS,
   );
   return result as TerminalRunResult;
@@ -233,17 +297,21 @@ export async function terminalInput(
 
 /**
  * Get the current terminal state without modifying anything.
+ *
+ * @param name Terminal name (default: 'default')
  */
-export async function terminalGetState(): Promise<TerminalRunResult> {
-  const result = await sendClientRequest('terminal.state', {});
+export async function terminalGetState(name?: string): Promise<TerminalRunResult> {
+  const result = await sendClientRequest('terminal.state', {name});
   return result as TerminalRunResult;
 }
 
 /**
- * Send Ctrl+C to kill the running process in the terminal.
+ * Send Ctrl+C to kill the running process in a terminal.
+ *
+ * @param name Terminal name (default: 'default')
  */
-export async function terminalKill(): Promise<TerminalRunResult> {
-  const result = await sendClientRequest('terminal.kill', {});
+export async function terminalKill(name?: string): Promise<TerminalRunResult> {
+  const result = await sendClientRequest('terminal.kill', {name});
   return result as TerminalRunResult;
 }
 
@@ -253,6 +321,43 @@ export async function terminalKill(): Promise<TerminalRunResult> {
 export async function terminalListAll(): Promise<TerminalListAllResult> {
   const result = await sendClientRequest('terminal.listAll', {});
   return result as TerminalListAllResult;
+}
+
+// ── Task Methods (Long-Running Processes) ────────────────
+
+/**
+ * List all workspace tasks with their running status.
+ * Includes npm, gulp, and other auto-discovered tasks.
+ */
+export async function taskList(): Promise<TaskListResult> {
+  const result = await sendClientRequest('task.list', {});
+  return result as TaskListResult;
+}
+
+/**
+ * Run a workspace task by its ID (source:name format).
+ * Returns immediately with the task status.
+ */
+export async function taskRun(id: string): Promise<TaskRunResult> {
+  const result = await sendClientRequest('task.run', {id});
+  return result as TaskRunResult;
+}
+
+/**
+ * Get captured output for a task.
+ * Works for both running and completed tasks started via taskRun.
+ */
+export async function taskGetOutput(id: string): Promise<TaskOutputResult> {
+  const result = await sendClientRequest('task.output', {id});
+  return result as TaskOutputResult;
+}
+
+/**
+ * Stop a running task.
+ */
+export async function taskStop(id: string): Promise<TaskStopResult> {
+  const result = await sendClientRequest('task.stop', {id});
+  return result as TaskStopResult;
 }
 
 // ── Output Methods ───────────────────────────────────────
