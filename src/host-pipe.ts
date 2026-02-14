@@ -48,11 +48,13 @@ export interface McpReadyParams {
 export interface McpReadyResult {
   cdpPort: number;
   userDataDir?: string;
+  clientStartedAt?: number;
 }
 
 export interface HotReloadResult {
   cdpPort: number;
   userDataDir?: string;
+  clientStartedAt?: number;
 }
 
 export interface HostStatus {

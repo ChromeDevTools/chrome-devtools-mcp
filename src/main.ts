@@ -148,28 +148,28 @@ function registerTool(tool: ToolDefinition): void {
         // Standalone tools (e.g., wait) don't need VS Code connection
         const isStandalone = tool.annotations.conditions?.includes('standalone');
 
+        // Ensure VS Code connection is alive (retries if startup failed).
+        // ensureConnection() is idempotent — returns immediately if already connected.
+        if (!isStandalone) {
+          await ensureConnection();
+        }
+
         // Hot-reload: if the extension source changed since the last snapshot,
         // tell Host to rebuild Client. Host handles stop/build/restart internally.
         // This runs OUTSIDE the tool's timeout so changes feel instant to Copilot.
         if (!isStandalone && config.explicitExtensionDevelopmentPath) {
           const sessionStartedAtMs = lifecycleService.debugWindowStartedAt;
-          if (
-            sessionStartedAtMs !== undefined &&
-            hasExtensionChangedSince(config.extensionBridgePath, sessionStartedAtMs)
-          ) {
-            logger(`[tool:${tool.name}] Extension source changed — hot-reloading…`);
-            await lifecycleService.handleHotReload();
-            logger(`[tool:${tool.name}] Hot-reload complete — reconnected`);
+          if (sessionStartedAtMs !== undefined) {
+            const changed = hasExtensionChangedSince(config.extensionBridgePath, sessionStartedAtMs);
+            logger(`[hot-reload] check: changed=${changed}, session=${new Date(sessionStartedAtMs).toISOString()}, extDir=${config.extensionBridgePath}`);
+            if (changed) {
+              logger(`[tool:${tool.name}] Extension source changed — hot-reloading…`);
+              await lifecycleService.handleHotReload();
+              logger(`[tool:${tool.name}] Hot-reload complete — reconnected`);
+            }
+          } else {
+            logger('[hot-reload] skipped — debugWindowStartedAt is undefined (connection not established?)');
           }
-        }
-
-        // Verify the VS Code connection is alive.
-        if (!isStandalone && !lifecycleService.isConnected) {
-          throw new Error(
-            'VS Code debug window is not connected. ' +
-            'The MCP server establishes the connection at startup. ' +
-            'If the debug window was closed, restart the MCP server.',
-          );
         }
 
         const executeAll = async () => {
@@ -283,7 +283,7 @@ logger('VS Code DevTools MCP Server connected to stdio transport');
 
 // Best-effort auto-launch: try to start the VS Code debug window now, but
 // don't crash the server if it fails (e.g., host VS Code not running yet).
-// If this fails, all tool calls will error until the server is restarted.
+// If this fails, ensureConnection() will retry on the first tool call.
 try {
   logger('[startup] Auto-launching VS Code debug window...');
   await ensureConnection();
@@ -292,7 +292,7 @@ try {
   const message = err && typeof err === 'object' && 'message' in err
     ? (err as Error).message
     : String(err);
-  logger(`[startup] ✗ Startup connection FAILED (will retry on first tool call): ${message}`);
+  logger(`[startup] ✗ Startup connection failed — will retry on first tool call: ${message}`);
 }
 
 logDisclaimers();

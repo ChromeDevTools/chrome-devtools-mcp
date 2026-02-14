@@ -103,7 +103,53 @@ function formatTerminalResult(
     lines.push('```');
   }
 
+  // Process ledger — always show active Copilot-managed processes
+  if (result.activeProcesses && result.activeProcesses.length > 0) {
+    const running = result.activeProcesses.filter(p => p.status === 'running');
+    const other = result.activeProcesses.filter(p => p.status !== 'running');
+
+    lines.push('');
+    lines.push('---');
+
+    if (running.length > 0) {
+      lines.push(`📋 **Active Copilot Processes (${running.length} running):**`);
+      for (const p of running) {
+        const age = formatAge(p.durationMs);
+        const pidStr = p.pid ? ` (PID ${p.pid})` : '';
+        lines.push(`• **${p.terminalName}**${pidStr} — \`${truncateCommand(p.command)}\` — running for ${age}`);
+      }
+    }
+
+    if (other.length > 0) {
+      const recentlyCompleted = other.filter(p => p.durationMs < 60_000);
+      if (recentlyCompleted.length > 0) {
+        if (running.length > 0) lines.push('');
+        lines.push(`✅ **Recently Completed (${recentlyCompleted.length}):**`);
+        for (const p of recentlyCompleted) {
+          const exitStr = p.exitCode !== undefined ? ` (exit ${p.exitCode})` : '';
+          lines.push(`• **${p.terminalName}** — \`${truncateCommand(p.command)}\` — ${p.status}${exitStr}`);
+        }
+      }
+    }
+
+    if (running.length === 0 && other.length > 0) {
+      lines.push('📋 **No active Copilot processes running.**');
+    }
+  }
+
   return lines.join('\n');
+}
+
+function formatAge(ms: number): string {
+  if (ms < 1_000) return '<1s';
+  if (ms < 60_000) return `${Math.round(ms / 1_000)}s`;
+  if (ms < 3_600_000) return `${Math.round(ms / 60_000)}m`;
+  return `${Math.round(ms / 3_600_000)}h`;
+}
+
+function truncateCommand(cmd: string, maxLen = 60): string {
+  if (cmd.length <= maxLen) return cmd;
+  return cmd.slice(0, maxLen - 3) + '...';
 }
 
 // ── terminal_run ─────────────────────────────────────────────────────────────

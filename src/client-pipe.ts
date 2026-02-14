@@ -63,6 +63,16 @@ export type TerminalStatus =
 
 export type WaitMode = 'completion' | 'background';
 
+export interface ActiveProcess {
+  terminalName: string;
+  pid?: number;
+  command: string;
+  status: TerminalStatus;
+  startedAt: string;
+  durationMs: number;
+  exitCode?: number;
+}
+
 export interface TerminalRunResult {
   status: TerminalStatus;
   output: string;
@@ -71,6 +81,7 @@ export interface TerminalRunResult {
   pid?: number;
   name?: string;
   durationMs?: number;
+  activeProcesses?: ActiveProcess[];
 }
 
 export interface AllTerminalInfo {

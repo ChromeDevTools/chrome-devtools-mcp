@@ -115,8 +115,11 @@ class LifecycleService {
     await cdpService.connect(newPort);
     await initCdpEventSubscriptions();
 
-    this._debugWindowStartedAt = Date.now();
-    logger('[Lifecycle] Hot-reload complete — CDP reconnected');
+    // Use the Client's actual start time (not Date.now()) so the mtime
+    // comparison in hasExtensionChangedSince is accurate even if the Host
+    // took a long time to build + spawn.
+    this._debugWindowStartedAt = result.clientStartedAt ?? Date.now();
+    logger(`[Lifecycle] Hot-reload complete — CDP reconnected, sessionTs=${new Date(this._debugWindowStartedAt).toISOString()}`);
   }
 
   // ── Shutdown ───────────────────────────────────────────
@@ -243,14 +246,18 @@ class LifecycleService {
     await cdpService.connect(cdpPort);
     await initCdpEventSubscriptions();
 
-    this._debugWindowStartedAt = Date.now();
+    // Use the Client's actual start time so the mtime comparison
+    // in hasExtensionChangedSince detects edits between Client spawn
+    // and MCP (re)connection. Falls back to Date.now() for older Hosts
+    // that don't include clientStartedAt.
+    this._debugWindowStartedAt = result.clientStartedAt ?? Date.now();
 
     // userDataDir comes from mcpReady response if Host provides it
     if ('userDataDir' in result && typeof result.userDataDir === 'string') {
       this._userDataDir = result.userDataDir;
     }
 
-    logger('[Lifecycle] Connected — CDP + events ready');
+    logger(`[Lifecycle] Connected — CDP + events ready, sessionTs=${new Date(this._debugWindowStartedAt).toISOString()}`);
   }
 }
 
