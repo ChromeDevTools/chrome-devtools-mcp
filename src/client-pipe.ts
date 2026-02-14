@@ -96,16 +96,6 @@ export interface ProcessLedgerSummary {
   sessionId: string;
 }
 
-export interface KillProcessResult {
-  success: boolean;
-  error?: string;
-}
-
-export interface KillOrphansResult {
-  killed: number[];
-  failed: Array<{ pid: number; error: string }>;
-}
-
 export interface TerminalRunResult {
   status: TerminalStatus;
   output: string;
@@ -127,30 +117,6 @@ export interface TerminalSessionInfo {
   isActive: boolean;
   status: string;
   command?: string;
-}
-
-export interface AllTerminalInfo {
-  index: number;
-  name: string;
-  processId?: number;
-  creationOptions: {
-    name?: string;
-    shellPath?: string;
-  };
-  exitStatus?: {
-    code: number;
-    reason: number;
-  };
-  state: {
-    isInteractedWith: boolean;
-  };
-  isActive: boolean;
-}
-
-export interface TerminalListAllResult {
-  total: number;
-  activeIndex?: number;
-  terminals: AllTerminalInfo[];
 }
 
 export interface OutputChannelsResult {
@@ -335,14 +301,6 @@ export async function terminalKill(name?: string): Promise<TerminalRunResult> {
   return result as TerminalRunResult;
 }
 
-/**
- * List ALL terminals in the Client window (tracked and untracked).
- */
-export async function terminalListAll(): Promise<TerminalListAllResult> {
-  const result = await sendClientRequest('terminal.listAll', {});
-  return result as TerminalListAllResult;
-}
-
 // ── Output Methods ───────────────────────────────────────
 
 /**
@@ -417,20 +375,4 @@ export async function getProcessLedger(): Promise<ProcessLedgerSummary> {
       sessionId: 'unknown',
     };
   }
-}
-
-/**
- * Kill a process by PID. Works for both active and orphaned processes.
- */
-export async function killProcess(pid: number): Promise<KillProcessResult> {
-  const result = await sendClientRequest('process.kill', { pid });
-  return result as KillProcessResult;
-}
-
-/**
- * Kill all orphaned processes from previous sessions.
- */
-export async function killAllOrphans(): Promise<KillOrphansResult> {
-  const result = await sendClientRequest('process.killOrphans', {});
-  return result as KillOrphansResult;
 }
