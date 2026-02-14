@@ -39,16 +39,21 @@ class LifecycleService {
   private _extensionPath: string | undefined;
   /** Launch flags for the Client VS Code window */
   private _launchFlags: Record<string, unknown> | undefined;
+  /** True if this MCP process was just hot-reloaded */
+  private _wasHotReloaded = false;
 
   /**
    * Initialize with config values from the MCP server.
    * Must be called before ensureConnection().
+   * 
+   * @param params.wasHotReloaded - True if MCP server was just hot-reloaded (from marker file in main.ts)
    */
-  init(params: { targetWorkspace: string; extensionPath: string; launch?: Record<string, unknown> }): void {
+  init(params: { targetWorkspace: string; extensionPath: string; launch?: Record<string, unknown>; wasHotReloaded?: boolean }): void {
     this._targetWorkspace = params.targetWorkspace;
     this._extensionPath = params.extensionPath;
     this._launchFlags = params.launch;
-    logger(`[Lifecycle] Initialized — target=${params.targetWorkspace}, ext=${params.extensionPath}`);
+    this._wasHotReloaded = params.wasHotReloaded ?? false;
+    logger(`[Lifecycle] Initialized — target=${params.targetWorkspace}, ext=${params.extensionPath}, wasHotReloaded=${this._wasHotReloaded}`);
   }
 
   // ── Startup ────────────────────────────────────────────
@@ -246,11 +251,20 @@ class LifecycleService {
     await cdpService.connect(cdpPort);
     await initCdpEventSubscriptions();
 
-    // Use the Client's actual start time so the mtime comparison
-    // in hasExtensionChangedSince detects edits between Client spawn
-    // and MCP (re)connection. Falls back to Date.now() for older Hosts
-    // that don't include clientStartedAt.
-    this._debugWindowStartedAt = result.clientStartedAt ?? Date.now();
+    // If this MCP process was hot-reloaded (wasHotReloaded flag set in init()),
+    // use the current time as the baseline for extension change detection,
+    // NOT the original clientStartedAt. This prevents spurious extension
+    // hot-reloads when only MCP server files changed.
+    if (this._wasHotReloaded) {
+      this._debugWindowStartedAt = Date.now();
+      logger(`[Lifecycle] MCP hot-reload detected — using fresh timestamp for extension checks: ${new Date(this._debugWindowStartedAt).toISOString()}`);
+    } else {
+      // Normal startup: use the Client's actual start time so the mtime comparison
+      // in hasExtensionChangedSince detects edits between Client spawn
+      // and MCP (re)connection. Falls back to Date.now() for older Hosts
+      // that don't include clientStartedAt.
+      this._debugWindowStartedAt = result.clientStartedAt ?? Date.now();
+    }
 
     // userDataDir comes from mcpReady response if Host provides it
     if ('userDataDir' in result && typeof result.userDataDir === 'string') {

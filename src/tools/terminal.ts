@@ -32,6 +32,91 @@ import {consolidateOutput, toConsolidatedJson, type LogFormat} from '../log-cons
 import {ToolCategory} from './categories.js';
 import {defineTool, ResponseFormat, responseFormatSchema, logFormatSchema} from './ToolDefinition.js';
 
+// ── Shell Types ──────────────────────────────────────────────────────────────
+
+export type ShellType = 'powershell' | 'bash' | 'cmd';
+
+const shellSchema = zod
+  .enum(['powershell', 'bash', 'cmd'])
+  .describe(
+    '**REQUIRED.** The shell to use for this terminal. ' +
+    'Choose the appropriate shell for your command syntax: ' +
+    "'powershell' for PowerShell cmdlets (Get-ChildItem, Set-Location, etc.), " +
+    "'bash' for Unix commands (ls, grep, chmod, etc.), " +
+    "'cmd' for Windows Command Prompt (dir, type, copy, etc.). " +
+    'The command syntax MUST match the chosen shell.',
+  );
+
+// ── Syntax Validation ────────────────────────────────────────────────────────
+
+// Patterns that are DEFINITIVELY incompatible with a given shell.
+// Only reject when we are 100% certain the syntax will fail.
+
+const POWERSHELL_ONLY_PATTERNS = [
+  /\b(?:Get|Set|New|Remove|Add|Clear|Import|Export|Start|Stop|Restart|Invoke|Test|Out|Write|Read|Select|Where|ForEach|Sort|Group|Measure|Compare|ConvertTo|ConvertFrom|Format|Update|Enter|Exit)-[A-Z]\w+/u,
+  /\$(?:env|PSVersionTable|ErrorActionPreference|PSScriptRoot|PSCommandPath):/u,
+  /\|\s*(?:Where-Object|Select-Object|ForEach-Object|Sort-Object|Group-Object|Measure-Object)\b/u,
+  /-(?:ErrorAction|WarningAction|InformationAction)\s+\w+/u,
+  /\[(?:System\.)?(?:IO|Net|Collections|Text|Math)\./u,
+];
+
+const BASH_ONLY_PATTERNS = [
+  /\bchmod\s+[0-7]{3,4}\b/u,
+  /\bchown\s+\w+:\w+/u,
+  /\b(?:apt-get|yum|dnf|pacman|brew)\s+(?:install|update|remove)/u,
+  /\bsudo\s+/u,
+  /\bsource\s+~?\//u,
+  /\bexport\s+[A-Z_]+=.*/u,
+  /\|\s*(?:grep|awk|sed|cut|tr|wc|tail|head|xargs|tee)\b/u,
+  /\$\([^)]+\)/u,
+  /<<\s*(?:EOF|END|HEREDOC)/u,
+];
+
+const CMD_ONLY_PATTERNS = [
+  /\b(?:dir|type|copy|xcopy|robocopy|del|ren|move|attrib)\s+\/[A-Za-z]/u,
+  /\bset\s+\/[apA-Z]/u,
+  /%[A-Za-z_][A-Za-z0-9_]*%/u,
+  /\bif\s+(?:exist|errorlevel|defined)\b/u,
+  /\bfor\s+\/[fFdDrRlL]\b/u,
+];
+
+/**
+ * Validate that a command's syntax is compatible with the chosen shell.
+ * Returns null if valid, or an error message if DEFINITIVELY incompatible.
+ */
+function validateCommandSyntax(command: string, shell: ShellType): string | null {
+  const checkPatterns = (
+    patterns: RegExp[],
+    wrongShell: string,
+  ): string | null => {
+    for (const pattern of patterns) {
+      const match = pattern.exec(command);
+      if (match) {
+        return (
+          `Command contains ${wrongShell}-specific syntax ("${match[0]}") ` +
+          `but shell is set to "${shell}". ` +
+          `Change the shell parameter to "${wrongShell}" or rewrite the command for ${shell}.`
+        );
+      }
+    }
+    return null;
+  };
+
+  switch (shell) {
+    case 'powershell':
+      return checkPatterns(BASH_ONLY_PATTERNS, 'bash') ??
+             checkPatterns(CMD_ONLY_PATTERNS, 'cmd');
+    case 'bash':
+      return checkPatterns(POWERSHELL_ONLY_PATTERNS, 'powershell') ??
+             checkPatterns(CMD_ONLY_PATTERNS, 'cmd');
+    case 'cmd':
+      return checkPatterns(POWERSHELL_ONLY_PATTERNS, 'powershell') ??
+             checkPatterns(BASH_ONLY_PATTERNS, 'bash');
+    default:
+      return null;
+  }
+}
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 const nameSchema = zod
@@ -78,6 +163,10 @@ function formatTerminalResult(
   }
 
   lines.push(`**Status:** ${result.status}`);
+
+  if (result.shell) {
+    lines.push(`**Shell:** ${result.shell}`);
+  }
 
   if (result.cwd) {
     lines.push(`**Working Directory:** \`${result.cwd}\``);
@@ -134,8 +223,8 @@ export const run = defineTool({
   name: 'terminal_run',
   description: `Run a command in the VS Code terminal from a specific working directory.
 
-**IMPORTANT:** The \`cwd\` parameter is REQUIRED and must be an absolute path. The command
-will always execute from this directory, ensuring deterministic behavior across terminals.
+**IMPORTANT:** Both \`cwd\` (absolute path) and \`shell\` are REQUIRED. The command syntax
+MUST match the chosen shell — incompatible syntax will be rejected before execution.
 
 By default (waitMode: 'completion'), the tool BLOCKS until the command fully completes,
 including a 3-second grace period to catch cascading commands. This means you get the
@@ -146,9 +235,15 @@ with status "waiting_for_input" and the detected prompt. Use terminal_input to r
 
 For long-running dev servers, use waitMode: 'background' to return immediately.
 
+**Response always includes:**
+- The shell type being used (so you never lose track of which CLI you're interacting with)
+- The working directory the command ran from
+- (Via process ledger) A full inventory of all open terminal sessions
+
 Args:
-  - cwd (string): **REQUIRED.** Absolute path to the working directory for command execution.
-  - command (string): The shell command to execute
+  - shell ('powershell'|'bash'|'cmd'): **REQUIRED.** Shell type for the terminal.
+  - cwd (string): **REQUIRED.** Absolute path to the working directory.
+  - command (string): The shell command to execute (must match shell syntax).
   - timeout (number): Max wait time in milliseconds. Default: 120000 (2 minutes)
   - name (string): Terminal name for multi-terminal support. Default: 'default'
   - waitMode ('completion'|'background'): Default 'completion' blocks until done
@@ -156,6 +251,7 @@ Args:
 
 Returns:
   - status: 'completed' | 'running' | 'waiting_for_input' | 'timeout'
+  - shell: The shell type used (powershell, bash, or cmd)
   - output: Terminal output text
   - cwd: The working directory the command ran from
   - exitCode: Process exit code (when completed)
@@ -165,13 +261,11 @@ Returns:
   - durationMs: How long the command ran
 
 Examples:
-  - Run a build: { cwd: "C:\\\\project", command: "npm run build" }
-  - Quick command: { cwd: "/home/user/app", command: "echo hello", timeout: 5000 }
-  - Interactive install: { cwd: "C:\\\\myapp", command: "npm init" } → returns waiting_for_input
-  - Named terminal: { cwd: "/workspace", command: "npm run dev", name: "dev-server" }
-  - Dev server (background): { cwd: "C:\\\\app", command: "npm run dev", waitMode: "background" }
-  - Detailed log compression: { cwd: "/project", command: "npm test", logFormat: "detailed" }`,
-  timeoutMs: 130_000, // Slightly higher than default 120s timeout
+  - PowerShell build: { shell: "powershell", cwd: "C:\\\\project", command: "npm run build" }
+  - Bash command: { shell: "bash", cwd: "/home/user/app", command: "ls -la" }
+  - CMD command: { shell: "cmd", cwd: "C:\\\\project", command: "dir /s" }
+  - Dev server: { shell: "powershell", cwd: "C:\\\\app", command: "npm run dev", waitMode: "background" }`,
+  timeoutMs: 130_000,
   annotations: {
     title: 'Run Terminal Command',
     category: ToolCategory.DEV_DIAGNOSTICS,
@@ -183,11 +277,11 @@ Examples:
   },
   schema: {
     response_format: responseFormatSchema,
+    shell: shellSchema,
     cwd: zod
       .string()
       .refine(
         (path) => {
-          // Absolute path check: starts with / (Unix) or drive letter (Windows)
           return /^(?:[a-zA-Z]:[/\\]|\/)/u.test(path);
         },
         {
@@ -200,7 +294,7 @@ Examples:
       ),
     command: zod
       .string()
-      .describe('The shell command to execute in the terminal.'),
+      .describe('The shell command to execute. Must use syntax compatible with the chosen shell.'),
     timeout: zod
       .number()
       .int()
@@ -225,8 +319,15 @@ Examples:
   handler: async (request, response) => {
     await ensureClientConnection();
 
+    // Validate command syntax matches the chosen shell
+    const syntaxError = validateCommandSyntax(request.params.command, request.params.shell);
+    if (syntaxError) {
+      throw new Error(syntaxError);
+    }
+
     const result = await terminalRun(
       request.params.command,
+      request.params.shell,
       request.params.cwd,
       request.params.timeout,
       request.params.name,

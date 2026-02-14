@@ -58,7 +58,9 @@ function runMcpServerBuild(): Promise<{stdout: string; stderr: string}> {
       {cwd: mcpServerDir, timeout: 120_000},
       (err, stdout, stderr) => {
         if (err) {
-          reject(new Error(`MCP server build failed: ${err.message}\n${stderr}`));
+          // Include both stdout and stderr — TypeScript errors go to stdout
+          const output = [stdout, stderr].filter(Boolean).join('\n').trim();
+          reject(new Error(`MCP server build failed:\n${output}`));
         } else {
           logger('[mcp-hot-reload] Build completed successfully');
           resolve({stdout, stderr});
@@ -95,7 +97,7 @@ function scheduleMcpServerRestart(): void {
 /**
  * Format child processes as indented tree lines for a parent process.
  */
-function formatChildProcesses(entry: ProcessEntry): string[] {
+function formatChildProcesses(entry: ProcessEntry, indent: string): string[] {
   if (!entry.children || entry.children.length === 0) return [];
 
   const lines: string[] = [];
@@ -103,32 +105,83 @@ function formatChildProcesses(entry: ProcessEntry): string[] {
     const cmdLine = child.commandLine
       ? (child.commandLine.length > 60 ? child.commandLine.slice(0, 57) + '...' : child.commandLine)
       : child.name;
-    lines.push(`\n  ↳ PID ${child.pid} — ${child.name} — \`${cmdLine}\``);
+    lines.push(`\n${indent}↳ PID ${child.pid} — ${child.name} — \`${cmdLine}\``);
   }
   return lines;
 }
 
 /**
  * Format the process ledger summary for inclusion in every MCP response.
- * This provides Copilot constant awareness of all managed processes,
- * including child process trees discovered via PowerShell CIM.
+ * Shows terminals as parent nodes with their processes as children,
+ * giving Copilot full visibility into the terminal ↔ process relationship.
  */
 function formatProcessLedger(ledger: ProcessLedgerSummary): string {
   const parts: string[] = [];
+  const sessions = ledger.terminalSessions ?? [];
 
-  // Format orphaned processes (highest priority - from previous sessions)
+  // Orphaned processes (highest priority — from previous sessions, no terminal)
   if (ledger.orphaned.length > 0) {
     parts.push('\n---');
     parts.push(`\n⚠️ **Orphaned Processes (${ledger.orphaned.length}):**`);
     for (const p of ledger.orphaned) {
       const cmd = p.command.length > 50 ? p.command.slice(0, 47) + '...' : p.command;
       parts.push(`\n• **PID ${p.pid}** (${p.terminalName}) — \`${cmd}\` — from previous session`);
-      parts.push(...formatChildProcesses(p));
+      parts.push(...formatChildProcesses(p, '  '));
     }
   }
 
-  // Format active processes
-  if (ledger.active.length > 0) {
+  // Terminal sessions as parent nodes with active processes as children
+  if (sessions.length > 0 || ledger.active.length > 0) {
+    // Track which active processes we've already shown under a terminal
+    const shownPids = new Set<number>();
+
+    parts.push('\n---');
+    parts.push(`\n📺 **Terminal Sessions (${sessions.length}):**`);
+
+    for (const session of sessions) {
+      const shellLabel = session.shell ? ` [${session.shell}]` : '';
+      const pidLabel = session.pid ? ` (PID ${session.pid})` : '';
+      const activeIcon = session.isActive ? '▶️' : '📺';
+
+      // Find the active process running in this terminal
+      const matchedProcess = ledger.active.find(p =>
+        (session.pid && p.pid === session.pid) ||
+        p.terminalName === session.name ||
+        (session.name === 'MCP Terminal' && p.terminalName === 'default') ||
+        (session.name === `MCP: ${p.terminalName}`),
+      );
+
+      if (matchedProcess) {
+        shownPids.add(matchedProcess.pid);
+        const cmd = matchedProcess.command.length > 45 ? matchedProcess.command.slice(0, 42) + '...' : matchedProcess.command;
+        const childCount = matchedProcess.children?.length ?? 0;
+        const childLabel = childCount > 0 ? ` [${childCount} child${childCount > 1 ? 'ren' : ''}]` : '';
+        parts.push(`\n${activeIcon} **${session.name}**${shellLabel}${pidLabel}`);
+        parts.push(`\n  └─ ${matchedProcess.status}: \`${cmd}\`${childLabel}`);
+        parts.push(...formatChildProcesses(matchedProcess, '     '));
+      } else if (session.command) {
+        const cmd = session.command.length > 40 ? session.command.slice(0, 37) + '...' : session.command;
+        parts.push(`\n${activeIcon} **${session.name}**${shellLabel}${pidLabel}`);
+        parts.push(`\n  └─ ${session.status}: \`${cmd}\``);
+      } else {
+        parts.push(`\n${activeIcon} **${session.name}**${shellLabel}${pidLabel} — ${session.status}`);
+      }
+    }
+
+    // Show any active processes not matched to a terminal session
+    const unmatched = ledger.active.filter(p => !shownPids.has(p.pid));
+    if (unmatched.length > 0) {
+      parts.push(`\n\n🟢 **Unmatched Active Processes (${unmatched.length}):**`);
+      for (const p of unmatched) {
+        const cmd = p.command.length > 50 ? p.command.slice(0, 47) + '...' : p.command;
+        const childCount = p.children?.length ?? 0;
+        const childLabel = childCount > 0 ? ` [${childCount} child${childCount > 1 ? 'ren' : ''}]` : '';
+        parts.push(`\n• **${p.terminalName}** (PID ${p.pid ?? 'pending'}) — \`${cmd}\` — ${p.status}${childLabel}`);
+        parts.push(...formatChildProcesses(p, '  '));
+      }
+    }
+  } else if (ledger.active.length > 0) {
+    // Fallback: no terminal sessions data, show processes only
     parts.push('\n---');
     parts.push(`\n🟢 **Active Copilot Processes (${ledger.active.length}):**`);
     for (const p of ledger.active) {
@@ -136,11 +189,11 @@ function formatProcessLedger(ledger: ProcessLedgerSummary): string {
       const childCount = p.children?.length ?? 0;
       const childLabel = childCount > 0 ? ` [${childCount} child${childCount > 1 ? 'ren' : ''}]` : '';
       parts.push(`\n• **${p.terminalName}** (PID ${p.pid ?? 'pending'}) — \`${cmd}\` — ${p.status}${childLabel}`);
-      parts.push(...formatChildProcesses(p));
+      parts.push(...formatChildProcesses(p, '  '));
     }
   }
 
-  // Format recently completed (lower priority)
+  // Recently completed (lower priority)
   const completed = ledger.recentlyCompleted.filter(p => p.status === 'completed' || p.status === 'killed');
   if (completed.length > 0) {
     const shown = completed.slice(0, 3);
@@ -154,7 +207,7 @@ function formatProcessLedger(ledger: ProcessLedgerSummary): string {
   }
 
   // If nothing to report
-  if (ledger.orphaned.length === 0 && ledger.active.length === 0 && completed.length === 0) {
+  if (ledger.orphaned.length === 0 && sessions.length === 0 && ledger.active.length === 0 && completed.length === 0) {
     parts.push('\n---');
     parts.push('\n📋 **No Copilot-managed processes running.**');
   }
@@ -202,11 +255,23 @@ if (config.logFile) {
   saveLogsToFile(config.logFile);
 }
 
+// ── MCP Server Hot-Reload Marker (detect post-restart) ───
+// Check this BEFORE initializing lifecycle service so we can pass the flag
+const _hotReloadBuildTime = consumeHotReloadMarker(mcpServerDir);
+const wasHotReloaded = _hotReloadBuildTime !== null;
+if (wasHotReloaded) {
+  mcpServerHotReloadInfo = {builtAt: _hotReloadBuildTime};
+  const agoSec = Math.round((Date.now() - _hotReloadBuildTime) / 1000);
+  logger(`[mcp-hot-reload] Post-restart detected — rebuilt ${agoSec}s ago`);
+}
+
 // Initialize lifecycle service with MCP config (target workspace + extension path + launch flags)
+// Pass wasHotReloaded so the service uses a fresh timestamp for extension change detection
 lifecycleService.init({
   targetWorkspace: config.workspaceFolder,
   extensionPath: config.extensionBridgePath,
   launch: {...config.launch},
+  wasHotReloaded,
 });
 
 // Start MCP socket server so the extension can send commands (e.g. detach-gracefully)
@@ -218,14 +283,6 @@ lifecycleService.registerShutdownHandlers();
 process.on('unhandledRejection', (reason, promise) => {
   logger('Unhandled promise rejection', promise, reason);
 });
-
-// ── MCP Server Hot-Reload Marker (detect post-restart) ───
-const _hotReloadBuildTime = consumeHotReloadMarker(mcpServerDir);
-if (_hotReloadBuildTime !== null) {
-  mcpServerHotReloadInfo = {builtAt: _hotReloadBuildTime};
-  const agoSec = Math.round((Date.now() - _hotReloadBuildTime) / 1000);
-  logger(`[mcp-hot-reload] Post-restart detected — rebuilt ${agoSec}s ago`);
-}
 
 logger(`Starting VS Code DevTools MCP Server v${VERSION}`);
 logger(`Config: hostWorkspace=${config.hostWorkspace}, targetFolder=${config.workspaceFolder}`);

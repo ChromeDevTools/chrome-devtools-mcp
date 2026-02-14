@@ -98,6 +98,7 @@ export interface ProcessLedgerSummary {
   active: ProcessEntry[];
   orphaned: ProcessEntry[];
   recentlyCompleted: ProcessEntry[];
+  terminalSessions: TerminalSessionInfo[];
   sessionId: string;
 }
 
@@ -114,6 +115,7 @@ export interface KillOrphansResult {
 export interface TerminalRunResult {
   status: TerminalStatus;
   output: string;
+  shell?: string;
   cwd?: string;
   exitCode?: number;
   prompt?: string;
@@ -121,6 +123,16 @@ export interface TerminalRunResult {
   name?: string;
   durationMs?: number;
   activeProcesses?: ActiveProcess[];
+  terminalSessions?: TerminalSessionInfo[];
+}
+
+export interface TerminalSessionInfo {
+  name: string;
+  shell?: string;
+  pid?: number;
+  isActive: boolean;
+  status: string;
+  command?: string;
 }
 
 export interface AllTerminalInfo {
@@ -310,6 +322,7 @@ function sendClientRequest(
  * Waits for completion, prompt detection, or timeout.
  *
  * @param command The shell command to execute
+ * @param shell Shell type: 'powershell', 'bash', or 'cmd'
  * @param cwd Absolute path to working directory for command execution
  * @param timeout Max wait time in milliseconds (default: 120000)
  * @param name Terminal name (default: 'default')
@@ -317,6 +330,7 @@ function sendClientRequest(
  */
 export async function terminalRun(
   command: string,
+  shell: string,
   cwd: string,
   timeout?: number,
   name?: string,
@@ -324,7 +338,7 @@ export async function terminalRun(
 ): Promise<TerminalRunResult> {
   const result = await sendClientRequest(
     'terminal.run',
-    {command, cwd, timeout, name, waitMode},
+    {command, shell, cwd, timeout, name, waitMode},
     TERMINAL_TIMEOUT_MS,
   );
   return result as TerminalRunResult;
@@ -488,6 +502,7 @@ export async function getProcessLedger(): Promise<ProcessLedgerSummary> {
       active: [],
       orphaned: [],
       recentlyCompleted: [],
+      terminalSessions: [],
       sessionId: 'unknown',
     };
   }
