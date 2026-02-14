@@ -58,7 +58,10 @@ export type TerminalStatus =
   | 'idle'
   | 'running'
   | 'completed'
-  | 'waiting_for_input';
+  | 'waiting_for_input'
+  | 'timeout';
+
+export type WaitMode = 'completion' | 'background';
 
 export interface TerminalRunResult {
   status: TerminalStatus;
@@ -67,6 +70,7 @@ export interface TerminalRunResult {
   prompt?: string;
   pid?: number;
   name?: string;
+  durationMs?: number;
 }
 
 export interface AllTerminalInfo {
@@ -256,17 +260,19 @@ function sendClientRequest(
  * Waits for completion, prompt detection, or timeout.
  *
  * @param command The shell command to execute
- * @param timeout Max wait time in milliseconds (default: 30000)
+ * @param timeout Max wait time in milliseconds (default: 120000)
  * @param name Terminal name (default: 'default')
+ * @param waitMode 'completion' blocks until done; 'background' returns immediately
  */
 export async function terminalRun(
   command: string,
   timeout?: number,
   name?: string,
+  waitMode?: WaitMode,
 ): Promise<TerminalRunResult> {
   const result = await sendClientRequest(
     'terminal.run',
-    {command, timeout, name},
+    {command, timeout, name, waitMode},
     TERMINAL_TIMEOUT_MS,
   );
   return result as TerminalRunResult;

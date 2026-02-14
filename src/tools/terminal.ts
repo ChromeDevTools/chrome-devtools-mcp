@@ -74,6 +74,11 @@ function formatTerminalResult(
     lines.push(`**Exit Code:** ${result.exitCode}`);
   }
 
+  if (result.durationMs !== undefined) {
+    const seconds = (result.durationMs / 1000).toFixed(1);
+    lines.push(`**Duration:** ${seconds}s`);
+  }
+
   if (result.prompt) {
     lines.push(`**Detected Prompt:** \`${result.prompt}\``);
     lines.push('');
@@ -82,7 +87,12 @@ function formatTerminalResult(
 
   if (result.status === 'running') {
     lines.push('');
-    lines.push('> A process is still running. Use `terminal_kill` to stop it, or `terminal_state` to check again later.');
+    lines.push('> A process is still running (background mode). Use `terminal_state` to check progress or `terminal_kill` to stop it.');
+  }
+
+  if (result.status === 'timeout') {
+    lines.push('');
+    lines.push('> ⚠️ Command timed out before completion. The process may still be running. Use `terminal_state` to check or `terminal_kill` to stop it.');
   }
 
   if (result.output) {
@@ -102,33 +112,38 @@ export const run = defineTool({
   name: 'terminal_run',
   description: `Run a command in the VS Code terminal. Creates the terminal if needed.
 
-The tool waits for the command to finish and returns the output. If the command
-asks for user input (e.g., [Y/n] prompts, password prompts), it returns immediately
+By default (waitMode: 'completion'), the tool BLOCKS until the command fully completes,
+including a 3-second grace period to catch cascading commands. This means you get the
+complete output in a single call without needing to poll terminal_state.
+
+If the command asks for user input (e.g., [Y/n] prompts), it returns immediately
 with status "waiting_for_input" and the detected prompt. Use terminal_input to respond.
 
-If a command is already running, returns the current state instead of starting a new one.
-Use terminal_kill to stop the running process first.
+For long-running dev servers, use waitMode: 'background' to return immediately.
 
 Args:
   - command (string): The shell command to execute
-  - timeout (number): Max wait time in milliseconds. Default: 30000
+  - timeout (number): Max wait time in milliseconds. Default: 120000 (2 minutes)
   - name (string): Terminal name for multi-terminal support. Default: 'default'
+  - waitMode ('completion'|'background'): Default 'completion' blocks until done
   - response_format ('markdown'|'json'): Output format. Default: 'markdown'
 
 Returns:
-  - status: 'completed' | 'running' | 'waiting_for_input' | 'idle'
+  - status: 'completed' | 'running' | 'waiting_for_input' | 'timeout'
   - output: Terminal output text
   - exitCode: Process exit code (when completed)
   - prompt: Detected prompt text (when waiting_for_input)
   - pid: Process ID
   - name: Terminal name
+  - durationMs: How long the command ran
 
 Examples:
   - Run a build: { command: "npm run build" }
   - Quick command: { command: "echo hello", timeout: 5000 }
   - Interactive install: { command: "npm init" } → returns waiting_for_input
-  - Named terminal: { command: "npm run dev", name: "dev-server" }`,
-  timeoutMs: 40_000,
+  - Named terminal: { command: "npm run dev", name: "dev-server" }
+  - Dev server (background): { command: "npm run dev", name: "dev", waitMode: "background" }`,
+  timeoutMs: 130_000, // Slightly higher than default 120s timeout
   annotations: {
     title: 'Run Terminal Command',
     category: ToolCategory.DEV_DIAGNOSTICS,
@@ -150,10 +165,18 @@ Examples:
       .max(300_000)
       .optional()
       .describe(
-        'Maximum wait time in milliseconds for the command to complete. Default: 30000 (30 seconds). ' +
+        'Maximum wait time in milliseconds for the command to complete. Default: 120000 (2 minutes). ' +
         'For long-running commands, increase this value.',
       ),
     name: nameSchema,
+    waitMode: zod
+      .enum(['completion', 'background'])
+      .optional()
+      .default('completion')
+      .describe(
+        "Wait mode: 'completion' (default) blocks until command finishes; " +
+        "'background' returns immediately for long-running processes like dev servers.",
+      ),
   },
   handler: async (request, response) => {
     await ensureClientConnection();
@@ -162,6 +185,7 @@ Examples:
       request.params.command,
       request.params.timeout,
       request.params.name,
+      request.params.waitMode,
     );
 
     const formatted = formatTerminalResult(result, request.params.response_format);
