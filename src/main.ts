@@ -27,9 +27,59 @@ import {
 import type {ToolDefinition} from './tools/ToolDefinition.js';
 import {tools} from './tools/tools.js';
 import {fetchAXTree} from './ax-tree.js';
+import {getProcessLedger, type ProcessLedgerSummary} from './client-pipe.js';
 
 // Default timeout for tools (30 seconds)
 const DEFAULT_TOOL_TIMEOUT_MS = 30_000;
+
+/**
+ * Format the process ledger summary for inclusion in every MCP response.
+ * This provides Copilot constant awareness of all managed processes.
+ */
+function formatProcessLedger(ledger: ProcessLedgerSummary): string {
+  const parts: string[] = [];
+
+  // Format orphaned processes (highest priority - from previous sessions)
+  if (ledger.orphaned.length > 0) {
+    parts.push('\n---');
+    parts.push(`\n⚠️ **Orphaned Processes (${ledger.orphaned.length}):**`);
+    for (const p of ledger.orphaned) {
+      const cmd = p.command.length > 50 ? p.command.slice(0, 47) + '...' : p.command;
+      parts.push(`\n• **PID ${p.pid}** (${p.terminalName}) — \`${cmd}\` — from previous session`);
+    }
+  }
+
+  // Format active processes
+  if (ledger.active.length > 0) {
+    parts.push('\n---');
+    parts.push(`\n🟢 **Active Copilot Processes (${ledger.active.length}):**`);
+    for (const p of ledger.active) {
+      const cmd = p.command.length > 50 ? p.command.slice(0, 47) + '...' : p.command;
+      parts.push(`\n• **${p.terminalName}** (PID ${p.pid ?? 'pending'}) — \`${cmd}\` — ${p.status}`);
+    }
+  }
+
+  // Format recently completed (lower priority)
+  const completed = ledger.recentlyCompleted.filter(p => p.status === 'completed' || p.status === 'killed');
+  if (completed.length > 0) {
+    const shown = completed.slice(0, 3);
+    parts.push('\n---');
+    parts.push(`\n✅ **Recently Completed (${shown.length}/${completed.length}):**`);
+    for (const p of shown) {
+      const cmd = p.command.length > 40 ? p.command.slice(0, 37) + '...' : p.command;
+      const exitInfo = p.exitCode !== undefined ? `exit ${p.exitCode}` : p.status;
+      parts.push(`\n• **${p.terminalName}** — \`${cmd}\` — ${exitInfo}`);
+    }
+  }
+
+  // If nothing to report
+  if (ledger.orphaned.length === 0 && ledger.active.length === 0 && completed.length === 0) {
+    parts.push('\n---');
+    parts.push('\n📋 **No Copilot-managed processes running.**');
+  }
+
+  return parts.join('');
+}
 
 class ToolTimeoutError extends Error {
   constructor(toolName: string, timeoutMs: number) {
@@ -225,6 +275,12 @@ function registerTool(tool: ToolDefinition): void {
           if (content.length === 0) {
             content.push({type: 'text', text: '(no output)'});
           }
+
+          // Append process ledger summary to EVERY response (Copilot accountability)
+          const ledger = await getProcessLedger();
+          const ledgerText = formatProcessLedger(ledger);
+          content.push({type: 'text', text: ledgerText});
+
           return {content};
         };
 

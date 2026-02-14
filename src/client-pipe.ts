@@ -73,6 +73,36 @@ export interface ActiveProcess {
   exitCode?: number;
 }
 
+export type ProcessStatus = 'running' | 'completed' | 'killed' | 'orphaned';
+
+export interface ProcessEntry {
+  pid: number;
+  command: string;
+  terminalName: string;
+  status: ProcessStatus;
+  startedAt: string;
+  endedAt?: string;
+  exitCode?: number;
+  sessionId: string;
+}
+
+export interface ProcessLedgerSummary {
+  active: ProcessEntry[];
+  orphaned: ProcessEntry[];
+  recentlyCompleted: ProcessEntry[];
+  sessionId: string;
+}
+
+export interface KillProcessResult {
+  success: boolean;
+  error?: string;
+}
+
+export interface KillOrphansResult {
+  killed: number[];
+  failed: Array<{ pid: number; error: string }>;
+}
+
 export interface TerminalRunResult {
   status: TerminalStatus;
   output: string;
@@ -429,4 +459,41 @@ export async function pingClient(): Promise<boolean> {
  */
 export function getClientPipePath(): string {
   return CLIENT_PIPE_PATH;
+}
+
+// ── Process Ledger Methods ─────────────────────────────────────
+
+/**
+ * Get the full process ledger: active, orphaned, and recently completed processes.
+ * This is called before EVERY tool response for Copilot accountability.
+ */
+export async function getProcessLedger(): Promise<ProcessLedgerSummary> {
+  try {
+    const result = await sendClientRequest('system.getProcessLedger', {}, 3_000);
+    return result as ProcessLedgerSummary;
+  } catch {
+    // Return empty ledger if unavailable
+    return {
+      active: [],
+      orphaned: [],
+      recentlyCompleted: [],
+      sessionId: 'unknown',
+    };
+  }
+}
+
+/**
+ * Kill a process by PID. Works for both active and orphaned processes.
+ */
+export async function killProcess(pid: number): Promise<KillProcessResult> {
+  const result = await sendClientRequest('process.kill', { pid });
+  return result as KillProcessResult;
+}
+
+/**
+ * Kill all orphaned processes from previous sessions.
+ */
+export async function killAllOrphans(): Promise<KillOrphansResult> {
+  const result = await sendClientRequest('process.killOrphans', {});
+  return result as KillOrphansResult;
 }

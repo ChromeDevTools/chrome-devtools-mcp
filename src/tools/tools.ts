@@ -8,6 +8,7 @@ import * as consoleTools from './console.js';
 import * as debugEvaluateTools from './debug-evaluate.js';
 import * as inputTools from './input.js';
 import * as outputPanelTools from './output-panel.js';
+import * as processTools from './process.js';
 import * as screenshotTools from './screenshot.js';
 import * as snapshotTools from './snapshot.js';
 import * as targetsTools from './targets.js';
@@ -22,6 +23,7 @@ const tools = [
   ...Object.values(debugEvaluateTools),
   ...Object.values(inputTools),
   ...Object.values(outputPanelTools),
+  ...Object.values(processTools),
   ...Object.values(screenshotTools),
   ...Object.values(snapshotTools),
   ...Object.values(targetsTools),
