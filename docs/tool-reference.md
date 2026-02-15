@@ -2,21 +2,26 @@
 
 # VS Code DevTools MCP Tool Reference
 
-- **[Input automation](#input-automation)** (7 tools)
+- **[Input automation](#input-automation)** (8 tools)
   - [`keyboard_hotkey`](#keyboard_hotkey)
   - [`keyboard_type`](#keyboard_type)
   - [`mouse_click`](#mouse_click)
   - [`mouse_drag`](#mouse_drag)
   - [`mouse_hover`](#mouse_hover)
   - [`mouse_scroll`](#mouse_scroll)
+  - [`terminal_input`](#terminal_input)
   - [`wait`](#wait)
-- **[Debugging](#debugging)** (6 tools)
-  - [`invoke_vscode_api`](#invoke_vscode_api)
-  - [`invoke_vscode_command`](#invoke_vscode_command)
+- **[Debugging](#debugging)** (4 tools)
   - [`read_console`](#read_console)
   - [`read_output`](#read_output)
   - [`take_screenshot`](#take_screenshot)
   - [`take_snapshot`](#take_snapshot)
+- **[Development diagnostics](#development-diagnostics)** (3 tools)
+  - [`read_terminal`](#read_terminal)
+  - [`terminal_kill`](#terminal_kill)
+  - [`terminal_run`](#terminal_run)
+- **[Codebase analysis](#codebase-analysis)** (1 tools)
+  - [`codebase_overview`](#codebase_overview)
 
 ## Input automation
 
@@ -40,9 +45,9 @@ Examples:
 
 **Parameters:**
 
-- **key** (string) **(required)**: A key or a combination (e.g., "Enter", "Control+A", "Control++", "Control+Shift+R"). Modifiers: Control, Shift, Alt, Meta
-- **includeSnapshot** (boolean) _(optional)_: Whether to include a snapshot in the response. Default is false.
-- **response_format** (unknown) _(optional)_: Output format: "markdown" for human-readable or "json" for machine-readable structured data.
+- **includeSnapshot** (unknown) **(required)**: Whether to include a snapshot in the response. Default is false.
+- **key** (unknown) **(required)**: A key or a combination (e.g., "Enter", "Control+A", "Control++", "Control+Shift+R"). Modifiers: Control, Shift, Alt, Meta
+- **response_format** (unknown) **(required)**: Output format: "markdown" for human-readable or "json" for machine-readable structured data.
 
 ---
 
@@ -50,9 +55,13 @@ Examples:
 
 **Description:** Type text into a input, text area or select an option from a &lt;select&gt; element.
 
+By default, text is inserted at the current cursor position without clearing existing content,
+just like a normal keyboard. Set `clear` to true to replace all existing content first.
+
 Args:
   - uid (string): Element uid from page snapshot
   - value (string): Text to type or option to select
+  - clear (boolean): Clear existing content before typing. Default: false
   - includeSnapshot (boolean): Include full snapshot. Default: false
   - response_format ('markdown'|'json'): Output format. Default: 'markdown'
 
@@ -62,10 +71,11 @@ Returns:
 
 **Parameters:**
 
-- **uid** (string) **(required)**: The uid of an element on the page from the page content snapshot
-- **value** (string) **(required)**: The value to fill in
-- **includeSnapshot** (boolean) _(optional)_: Whether to include a snapshot in the response. Default is false.
-- **response_format** (unknown) _(optional)_: Output format: "markdown" for human-readable or "json" for machine-readable structured data.
+- **clear** (unknown) **(required)**: Clear existing content before typing. Default: false. When false, text is inserted at the current cursor position like a normal keyboard.
+- **includeSnapshot** (unknown) **(required)**: Whether to include a snapshot in the response. Default is false.
+- **response_format** (unknown) **(required)**: Output format: "markdown" for human-readable or "json" for machine-readable structured data.
+- **uid** (unknown) **(required)**: The uid of an element on the page from the page content snapshot
+- **value** (unknown) **(required)**: The value to fill in
 
 ---
 
@@ -89,10 +99,10 @@ Examples:
 
 **Parameters:**
 
-- **uid** (string) **(required)**: The uid of an element on the page from the page content snapshot
-- **dblClick** (boolean) _(optional)_: Set to true for double clicks. Default is false.
-- **includeSnapshot** (boolean) _(optional)_: Whether to include a snapshot in the response. Default is false.
-- **response_format** (unknown) _(optional)_: Output format: "markdown" for human-readable or "json" for machine-readable structured data.
+- **dblClick** (unknown) **(required)**: Set to true for double clicks. Default is false.
+- **includeSnapshot** (unknown) **(required)**: Whether to include a snapshot in the response. Default is false.
+- **response_format** (unknown) **(required)**: Output format: "markdown" for human-readable or "json" for machine-readable structured data.
+- **uid** (unknown) **(required)**: The uid of an element on the page from the page content snapshot
 
 ---
 
@@ -112,10 +122,10 @@ Returns:
 
 **Parameters:**
 
-- **from_uid** (string) **(required)**: The uid of the element to drag
-- **to_uid** (string) **(required)**: The uid of the element to drop into
-- **includeSnapshot** (boolean) _(optional)_: Whether to include a snapshot in the response. Default is false.
-- **response_format** (unknown) _(optional)_: Output format: "markdown" for human-readable or "json" for machine-readable structured data.
+- **from_uid** (unknown) **(required)**: The uid of the element to drag
+- **includeSnapshot** (unknown) **(required)**: Whether to include a snapshot in the response. Default is false.
+- **response_format** (unknown) **(required)**: Output format: "markdown" for human-readable or "json" for machine-readable structured data.
+- **to_uid** (unknown) **(required)**: The uid of the element to drop into
 
 ---
 
@@ -134,9 +144,9 @@ Returns:
 
 **Parameters:**
 
-- **uid** (string) **(required)**: The uid of an element on the page from the page content snapshot
-- **includeSnapshot** (boolean) _(optional)_: Whether to include a snapshot in the response. Default is false.
-- **response_format** (unknown) _(optional)_: Output format: "markdown" for human-readable or "json" for machine-readable structured data.
+- **includeSnapshot** (unknown) **(required)**: Whether to include a snapshot in the response. Default is false.
+- **response_format** (unknown) **(required)**: Output format: "markdown" for human-readable or "json" for machine-readable structured data.
+- **uid** (unknown) **(required)**: The uid of an element on the page from the page content snapshot
 
 ---
 
@@ -161,11 +171,48 @@ Examples:
 
 **Parameters:**
 
-- **uid** (string) **(required)**: The uid of an element on the page from the page content snapshot
-- **amount** (number) _(optional)_: Scroll distance in pixels. Default is 300.
-- **direction** (enum: "up", "down", "left", "right") _(optional)_: Direction to scroll within the element. If omitted, the element is scrolled into view without additional scrolling.
-- **includeSnapshot** (boolean) _(optional)_: Whether to include a snapshot in the response. Default is false.
-- **response_format** (unknown) _(optional)_: Output format: "markdown" for human-readable or "json" for machine-readable structured data.
+- **amount** (unknown) **(required)**: Scroll distance in pixels. Default is 300.
+- **direction** (unknown) **(required)**: Direction to scroll within the element. If omitted, the element is scrolled into view without additional scrolling.
+- **includeSnapshot** (unknown) **(required)**: Whether to include a snapshot in the response. Default is false.
+- **response_format** (unknown) **(required)**: Output format: "markdown" for human-readable or "json" for machine-readable structured data.
+- **uid** (unknown) **(required)**: The uid of an element on the page from the page content snapshot
+
+---
+
+### `terminal_input`
+
+**Description:** Send input to a terminal that is waiting for user input.
+
+Use this after [`terminal_run`](#terminal_run) returns status "waiting_for_input" (e.g., answering
+a [Y/n] prompt, entering a password, or providing interactive input).
+
+After sending the input, waits for the next completion or prompt.
+
+Args:
+  - text (string): The text to send to the terminal
+  - addNewline (boolean): Whether to press Enter after the text. Default: true
+  - timeout (number): Max [`wait`](#wait) time in milliseconds. Default: 30000
+  - name (string): Terminal name for multi-terminal support. Default: 'default'
+  - response_format ('markdown'|'json'): Output format. Default: 'markdown'
+
+Returns:
+  Same as [`terminal_run`](#terminal_run) — status, output, exitCode, prompt, pid, name
+
+Examples:
+  - Answer yes: { text: "y" }
+  - Enter a value: { text: "my-project-name" }
+  - Send without Enter: { text: "partial", addNewline: false }
+  - Named terminal: { text: "y", name: "dev-server" }
+  - Detailed log compression: { text: "y", logFormat: "detailed" }
+
+**Parameters:**
+
+- **addNewline** (unknown) **(required)**: Whether to press Enter after the text. Default: true. Set to false for partial input or when Enter should not be sent.
+- **logFormat** (unknown) **(required)**: Log compression format. 'summary' (default): compact overview with top templates + rare events. 'detailed': full template list with sample variables &amp; metadata (URLs, status codes, durations). 'json': machine-readable JSON with complete template data.
+- **name** (unknown) **(required)**: Optional terminal name. Each named terminal runs independently with its own state and output history. Default: "default". Use different names to run multiple commands concurrently.
+- **response_format** (unknown) **(required)**: Output format: "markdown" for human-readable or "json" for machine-readable structured data.
+- **text** (unknown) **(required)**: The text to send to the terminal. For interactive prompts, this is typically "y", "n", a filename, a version number, etc.
+- **timeout** (unknown) **(required)**: Maximum [`wait`](#wait) time in milliseconds after sending input. Default: 30000.
 
 ---
 
@@ -191,104 +238,13 @@ Error Handling:
 
 **Parameters:**
 
-- **durationMs** (integer) **(required)**: Duration to [`wait`](#wait) in milliseconds. Must be between 0 and 30000 (30 seconds).
-- **reason** (string) _(optional)_: Optional reason for waiting (e.g., "waiting for animation to complete"). Included in the response for context.
-- **response_format** (unknown) _(optional)_: Output format: "markdown" for human-readable or "json" for machine-readable structured data.
+- **durationMs** (unknown) **(required)**: Duration to [`wait`](#wait) in milliseconds. Must be between 0 and 30000 (30 seconds).
+- **reason** (unknown) **(required)**: Optional reason for waiting (e.g., "waiting for animation to complete"). Included in the response for context.
+- **response_format** (unknown) **(required)**: Output format: "markdown" for human-readable or "json" for machine-readable structured data.
 
 ---
 
 ## Debugging
-
-### `invoke_vscode_api`
-
-**Description:** Execute VS Code API code to query editor state, workspace info, extensions, and more.
-
-The code runs inside an async function body with `vscode` and `payload` in scope.
-Use `return` to return a value. `await` is available. `require()` is NOT available.
-
-Args:
-  - expression (string): VS Code API code to execute. Must use `return` to return a value
-  - payload (any): Optional JSON-serializable data passed as `payload` parameter
-  - response_format ('markdown'|'json'): Output format. Default: 'markdown'
-
-Returns:
-  JSON format: { success: true, result: &lt;evaluated value&gt;, type: typeof result }
-  Markdown format: Formatted result in JSON code block
-
-Examples:
-  - Get VS Code version:
-    { expression: "return vscode.version;" }
-  
-  - List workspace folders:
-    { expression: "return vscode.workspace.workspaceFolders?.map(f => f.uri.fsPath);" }
-  
-  - Get active editor info:
-    { expression: "const e = vscode.window.activeTextEditor; return e ? { file: e.document.fileName, line: e.selection.active.line, text: e.document.getText() } : null;" }
-  
-  - List open tabs:
-    { expression: "return vscode.window.tabGroups.all.flatMap(g => g.tabs.map(t => ({ label: t.label, active: t.isActive })));" }
-  
-  - List active extensions:
-    { expression: "return vscode.extensions.all.filter(e => e.isActive).map(e => e.id);" }
-  
-  - Get diagnostics (linting errors):
-    { expression: "return vscode.languages.getDiagnostics().map(([uri, diags]) => ({ file: uri.fsPath, errors: diags.map(d => ({ line: d.range.start.line, message: d.message })) }));" }
-  
-  - Read workspace setting:
-    { expression: "return vscode.workspace.getConfiguration('editor').get('fontSize');" }
-
-Error Handling:
-  - Throws if Extension Development Host bridge is not connected
-  - Throws if expression execution fails
-  - Returns error if response exceeds 25000 chars
-
-**Parameters:**
-
-- **expression** (string) **(required)**: VS Code API code to execute. Must use `return` to return a value. Runs inside an async function body, so `await` is available. `vscode` and `payload` are in scope. `require()` is NOT available.
-- **payload** (unknown) _(optional)_: Optional JSON-serializable data passed as the `payload` parameter.
-- **response_format** (unknown) _(optional)_: Output format: "markdown" for human-readable or "json" for machine-readable structured data.
-
----
-
-### `invoke_vscode_command`
-
-**Description:** Execute a VS Code command by ID.
-
-Args:
-  - command (string): The command ID to execute (e.g., "workbench.action.files.save", "editor.action.formatDocument")
-  - args (array): Optional arguments to pass to the command
-  - response_format ('markdown'|'json'): Output format. Default: 'markdown'
-
-Returns:
-  JSON format: { success: true, command: string, result: &lt;command return value&gt; }
-  Markdown format: Command result in JSON code block
-
-Examples:
-  - Save current file: { command: "workbench.action.files.save" }
-  - Format document: { command: "editor.action.formatDocument" }
-  - Open file: { command: "vscode.open", args: [{ "$uri": "file:///path/to/file.ts" }] }
-  - Go to line: { command: "workbench.action.gotoLine" }
-  - Toggle sidebar: { command: "workbench.action.toggleSidebarVisibility" }
-  - Open settings: { command: "workbench.action.openSettings" }
-  - Run task: { command: "workbench.action.tasks.runTask", args: ["build"] }
-
-Common command categories:
-  - workbench.action.* — UI actions (save, open, toggle panels)
-  - editor.action.* — Editor actions (format, fold, comment)
-  - vscode.* — Core commands (open, diff, executeCommand)
-
-Error Handling:
-  - Throws if Extension Development Host bridge is not connected
-  - Throws if command execution fails
-  - Returns error if response exceeds 25000 chars
-
-**Parameters:**
-
-- **command** (string) **(required)**: The VS Code command ID to execute (e.g., "workbench.action.files.save", "editor.action.formatDocument")
-- **args** (array) _(optional)_: Optional array of arguments to pass to the command. For URI arguments, use { "$uri": "file:///path" }.
-- **response_format** (unknown) _(optional)_: Output format: "markdown" for human-readable or "json" for machine-readable structured data.
-
----
 
 ### `read_console`
 
@@ -335,17 +291,18 @@ Returns: { total, returned, hasMore, oldestId?, newestId?, messages: [...] }
 
 **Parameters:**
 
-- **afterId** (integer) _(optional)_: Only return messages with ID greater than this (for incremental reads).
-- **beforeId** (integer) _(optional)_: Only return messages with ID less than this.
-- **fields** (array) _(optional)_: Which fields to include per message. Default: [id, type, text]. Options: id, type, text, timestamp, stackTrace, args
-- **limit** (integer) _(optional)_: Get the N most recent messages. Omit to get all messages.
-- **msgid** (number) _(optional)_: Get a specific message by ID with full details.
-- **pattern** (string) _(optional)_: Regex pattern to match against message text (case-insensitive).
-- **response_format** (unknown) _(optional)_: Output format: "markdown" for human-readable or "json" for machine-readable structured data.
-- **sourcePattern** (string) _(optional)_: Regex pattern to match against source URLs in stack traces.
-- **stackDepth** (integer) _(optional)_: Max stack frames to include. Default: 1. Set 0 to exclude stack traces entirely.
-- **textLimit** (integer) _(optional)_: Max characters per message text. Longer messages are truncated with "...".
-- **types** (array) _(optional)_: Filter by log types: error, warning, info, debug, log, trace, etc.
+- **afterId** (unknown) **(required)**: Only return messages with ID greater than this (for incremental reads).
+- **beforeId** (unknown) **(required)**: Only return messages with ID less than this.
+- **fields** (unknown) **(required)**: Which fields to include per message. Default: [id, type, text]. Options: id, type, text, timestamp, stackTrace, args
+- **limit** (unknown) **(required)**: Get the N most recent messages. Omit to get all messages.
+- **logFormat** (unknown) **(required)**: Log compression format. 'summary' (default): compact overview with top templates + rare events. 'detailed': full template list with sample variables &amp; metadata (URLs, status codes, durations). 'json': machine-readable JSON with complete template data.
+- **msgid** (unknown) **(required)**: Get a specific message by ID with full details.
+- **pattern** (unknown) **(required)**: Regex pattern to match against message text (case-insensitive).
+- **response_format** (unknown) **(required)**: Output format: "markdown" for human-readable or "json" for machine-readable structured data.
+- **sourcePattern** (unknown) **(required)**: Regex pattern to match against source URLs in stack traces.
+- **stackDepth** (unknown) **(required)**: Max stack frames to include. Default: 1. Set 0 to exclude stack traces entirely.
+- **textLimit** (unknown) **(required)**: Max characters per message text. Longer messages are truncated with "...".
+- **types** (unknown) **(required)**: Filter by log types: error, warning, info, debug, log, trace, etc.
 
 ---
 
@@ -403,13 +360,14 @@ Returns: { mode: 'content', channel, total, returned, hasMore, oldestLine?, newe
 
 **Parameters:**
 
-- **afterLine** (integer) _(optional)_: Only return lines with line number greater than this (for incremental reads).
-- **beforeLine** (integer) _(optional)_: Only return lines with line number less than this.
-- **channel** (string) _(optional)_: Name of the output channel to read (e.g., "exthost", "main", "Git"). If omitted, lists all available channels.
-- **limit** (integer) _(optional)_: Get the N most recent lines. Omit to get all lines.
-- **lineLimit** (integer) _(optional)_: Max characters per line. Longer lines are truncated with "...".
-- **pattern** (string) _(optional)_: Regex pattern to match against line content (case-insensitive).
-- **response_format** (unknown) _(optional)_: Output format: "markdown" for human-readable or "json" for machine-readable structured data.
+- **afterLine** (unknown) **(required)**: Only return lines with line number greater than this (for incremental reads).
+- **beforeLine** (unknown) **(required)**: Only return lines with line number less than this.
+- **channel** (unknown) **(required)**: Name of the output channel to read (e.g., "exthost", "main", "Git"). If omitted, lists all available channels.
+- **limit** (unknown) **(required)**: Get the N most recent lines. Omit to get all lines.
+- **lineLimit** (unknown) **(required)**: Max characters per line. Longer lines are truncated with "...".
+- **logFormat** (unknown) **(required)**: Log compression format. 'summary' (default): compact overview with top templates + rare events. 'detailed': full template list with sample variables &amp; metadata (URLs, status codes, durations). 'json': machine-readable JSON with complete template data.
+- **pattern** (unknown) **(required)**: Regex pattern to match against line content (case-insensitive).
+- **response_format** (unknown) **(required)**: Output format: "markdown" for human-readable or "json" for machine-readable structured data.
 
 ---
 
@@ -441,12 +399,12 @@ Error Handling:
 
 **Parameters:**
 
-- **filePath** (string) _(optional)_: The absolute path, or a path relative to the current working directory, to save the screenshot to instead of attaching it to the response.
-- **format** (enum: "png", "jpeg", "webp") _(optional)_: Type of format to save the screenshot as. Default is "png"
-- **fullPage** (boolean) _(optional)_: If set to true takes a screenshot of the full page instead of the currently visible viewport. Incompatible with uid.
-- **quality** (number) _(optional)_: Compression quality for JPEG and WebP formats (0-100). Higher values mean better quality but larger file sizes. Ignored for PNG format.
-- **response_format** (unknown) _(optional)_: Output format: "markdown" for human-readable or "json" for machine-readable structured data.
-- **uid** (string) _(optional)_: The uid of an element on the page from the page content snapshot. If omitted takes a pages screenshot.
+- **filePath** (unknown) **(required)**: The absolute path, or a path relative to the current working directory, to save the screenshot to instead of attaching it to the response.
+- **format** (unknown) **(required)**: Type of format to save the screenshot as. Default is "png"
+- **fullPage** (unknown) **(required)**: If set to true takes a screenshot of the full page instead of the currently visible viewport. Incompatible with uid.
+- **quality** (unknown) **(required)**: Compression quality for JPEG and WebP formats (0-100). Higher values mean better quality but larger file sizes. Ignored for PNG format.
+- **response_format** (unknown) **(required)**: Output format: "markdown" for human-readable or "json" for machine-readable structured data.
+- **uid** (unknown) **(required)**: The uid of an element on the page from the page content snapshot. If omitted takes a pages screenshot.
 
 ---
 
@@ -455,6 +413,9 @@ Error Handling:
 **Description:** Take a text snapshot of the currently selected page based on the a11y tree. The snapshot lists page elements along with a unique
 identifier (uid). Always use the latest snapshot. Prefer taking a snapshot over taking a screenshot. The snapshot indicates the element selected
 in the DevTools Elements panel (if any).
+
+The snapshot also includes a list of all CDP targets (pages, iframes, webviews, service workers)
+available for debugging, so you always know what targets exist.
 
 Args:
   - verbose (boolean): Include full a11y tree details. Default: false
@@ -475,8 +436,170 @@ Error Handling:
 
 **Parameters:**
 
-- **filePath** (string) _(optional)_: The absolute path, or a path relative to the current working directory, to save the snapshot to instead of attaching it to the response.
-- **response_format** (unknown) _(optional)_: Output format: "markdown" for human-readable or "json" for machine-readable structured data.
-- **verbose** (boolean) _(optional)_: Whether to include all possible information available in the full a11y tree. Default is false.
+- **filePath** (unknown) **(required)**: The absolute path, or a path relative to the current working directory, to save the snapshot to instead of attaching it to the response.
+- **response_format** (unknown) **(required)**: Output format: "markdown" for human-readable or "json" for machine-readable structured data.
+- **verbose** (unknown) **(required)**: Whether to include all possible information available in the full a11y tree. Default is false.
+
+---
+
+## Development diagnostics
+
+### `read_terminal`
+
+**Description:** Read the current output and state of any tracked terminal.
+
+Use this to:
+- Check if a previously started command has finished
+- See the latest output from a running or completed process
+- Determine if the terminal is waiting for input
+- Search terminal output for specific patterns
+- Get just the last N lines of output
+
+Args:
+  - name (string): Terminal name. Default: 'default'
+  - limit (number): Return only the last N lines of output
+  - pattern (string): Regex pattern to filter output lines (case-insensitive)
+  - response_format ('markdown'|'json'): Output format. Default: 'markdown'
+
+Returns:
+  - status: 'idle' (no terminal), 'running', 'completed', or 'waiting_for_input'
+  - output: Terminal output (optionally filtered)
+  - exitCode: Process exit code (if completed)
+  - prompt: Detected prompt (if waiting for input)
+  - pid: Process ID
+  - name: Terminal name
+
+Examples:
+  - Check default terminal: {}
+  - Check named terminal: { name: "dev-server" }
+  - Last 20 lines: { limit: 20 }
+  - Find errors: { pattern: "error|fail|exception", limit: 50 }
+  - Named terminal + filter: { name: "build", pattern: "warning", limit: 100 }
+
+**Parameters:**
+
+- **limit** (unknown) **(required)**: Return only the last N lines of output. Omit to get all output.
+- **logFormat** (unknown) **(required)**: Log compression format. 'summary' (default): compact overview with top templates + rare events. 'detailed': full template list with sample variables &amp; metadata (URLs, status codes, durations). 'json': machine-readable JSON with complete template data.
+- **name** (unknown) **(required)**: Optional terminal name. Each named terminal runs independently with its own state and output history. Default: "default". Use different names to run multiple commands concurrently.
+- **pattern** (unknown) **(required)**: Regex pattern to filter output lines (case-insensitive).
+- **response_format** (unknown) **(required)**: Output format: "markdown" for human-readable or "json" for machine-readable structured data.
+
+---
+
+### `terminal_kill`
+
+**Description:** Send Ctrl+C to stop the running process in a terminal.
+
+Use this when:
+- A command is taking too long
+- You need to cancel a running process before starting a new one
+- [`terminal_run`](#terminal_run) returned status "running" (timed out without completing)
+
+The terminal itself is preserved for reuse — only the running process is interrupted.
+
+Args:
+  - name (string): Terminal name for multi-terminal support. Default: 'default'
+  - response_format ('markdown'|'json'): Output format. Default: 'markdown'
+
+Returns:
+  - status: 'completed' (after Ctrl+C)
+  - output: Final terminal output
+  - pid: Process ID
+  - name: Terminal name
+
+**Parameters:**
+
+- **logFormat** (unknown) **(required)**: Log compression format. 'summary' (default): compact overview with top templates + rare events. 'detailed': full template list with sample variables &amp; metadata (URLs, status codes, durations). 'json': machine-readable JSON with complete template data.
+- **name** (unknown) **(required)**: Optional terminal name. Each named terminal runs independently with its own state and output history. Default: "default". Use different names to run multiple commands concurrently.
+- **response_format** (unknown) **(required)**: Output format: "markdown" for human-readable or "json" for machine-readable structured data.
+
+---
+
+### `terminal_run`
+
+**Description:** Run a PowerShell command in the VS Code terminal from a specific working directory.
+
+`cwd` (absolute path) is REQUIRED. All commands run in PowerShell.
+
+By default (waitMode: 'completion'), the tool BLOCKS until the command fully completes,
+including a 3-second grace period to catch cascading commands. This means you get the
+complete output in a single call without needing to poll [`read_terminal`](#read_terminal).
+
+If the command asks for user input (e.g., [Y/n] prompts), it returns immediately
+with status "waiting_for_input" and the detected prompt. Use [`terminal_input`](#terminal_input) to respond.
+
+For long-running dev servers, use waitMode: 'background' to return immediately.
+
+**Response always includes:**
+- The working directory the command ran from
+- (Via process ledger) A full inventory of all open terminal sessions
+
+Args:
+  - cwd (string): **REQUIRED.** Absolute path to the working directory.
+  - command (string): The PowerShell command to execute.
+  - timeout (number): Max [`wait`](#wait) time in milliseconds. Default: 120000 (2 minutes)
+  - name (string): Terminal name for multi-terminal support. Default: 'default'
+  - waitMode ('completion'|'background'): Default 'completion' blocks until done
+  - response_format ('markdown'|'json'): Output format. Default: 'markdown'
+
+Returns:
+  - status: 'completed' | 'running' | 'waiting_for_input' | 'timeout'
+  - shell: Always 'powershell'
+  - output: Terminal output text
+  - cwd: The working directory the command ran from
+  - exitCode: Process exit code (when completed)
+  - prompt: Detected prompt text (when waiting_for_input)
+  - pid: Process ID
+  - name: Terminal name
+  - durationMs: How long the command ran
+
+Examples:
+  - Build: { cwd: "C:\\project", command: "npm run build" }
+  - Dev server: { cwd: "C:\\app", command: "npm run dev", waitMode: "background" }
+
+**Parameters:**
+
+- **command** (unknown) **(required)**: The PowerShell command to execute.
+- **cwd** (unknown) **(required)**: **REQUIRED.** Absolute path to the working directory. The command will execute from this directory to ensure deterministic behavior.
+- **logFormat** (unknown) **(required)**: Log compression format. 'summary' (default): compact overview with top templates + rare events. 'detailed': full template list with sample variables &amp; metadata (URLs, status codes, durations). 'json': machine-readable JSON with complete template data.
+- **name** (unknown) **(required)**: Optional terminal name. Each named terminal runs independently with its own state and output history. Default: "default". Use different names to run multiple commands concurrently.
+- **response_format** (unknown) **(required)**: Output format: "markdown" for human-readable or "json" for machine-readable structured data.
+- **timeout** (unknown) **(required)**: Maximum [`wait`](#wait) time in milliseconds for the command to complete. Default: 120000 (2 minutes). For long-running commands, increase this value.
+- **waitMode** (unknown) **(required)**: [`Wait`](#wait) mode: 'completion' (default) blocks until command finishes; 'background' returns immediately for long-running processes like dev servers.
+
+---
+
+## Codebase analysis
+
+### `codebase_overview`
+
+**Description:** Get a structural overview of the codebase as a file tree with optional symbol nesting.
+
+Shows the project's directory structure with progressively deeper detail controlled by the
+`depth` parameter:
+- `depth: 0` — File tree only (directories and filenames)
+- `depth: 1` — Top-level symbols per file (functions, classes, interfaces, enums, constants)
+- `depth: 2` — Members inside containers (class methods, interface fields, enum members)
+- `depth: 3+` — Deeper nesting (parameters, inner types, nested definitions)
+
+Use this as the FIRST tool call when exploring an unfamiliar codebase. It provides the
+structural orientation needed to know what exists and where before using more targeted
+tools like codebase_trace_symbol or codebase_exports.
+
+**Examples:**
+- Full project map with top-level symbols: `{}`
+- Focus on a subdirectory: `{ filter: "src/tools/**" }`
+- Deep dive into class internals: `{ filter: "src/tools/**", depth: 3 }`
+- Quick file listing: `{ depth: 0 }`
+- With imports and line counts: `{ includeImports: true, includeStats: true }`
+
+**Parameters:**
+
+- **depth** (unknown) **(required)**: Symbol nesting depth per file. 0=files only, 1=top-level symbols, 2=class members, 3+=deeper nesting.
+- **filter** (unknown) **(required)**: Glob pattern to include only matching files (e.g., "src/tools/**").
+- **includeImports** (unknown) **(required)**: Include import module specifiers per file.
+- **includeStats** (unknown) **(required)**: Include line counts per file and diagnostic counts.
+- **response_format** (unknown) **(required)**: Output format: "markdown" for human-readable or "json" for machine-readable structured data.
+- **rootDir** (unknown) **(required)**: Absolute path to the project root. Defaults to the workspace root.
 
 ---

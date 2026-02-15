@@ -27,8 +27,6 @@ Use this skill when:
 ### Inspection and Debugging
 - `take_snapshot` - Get the current DOM state of VS Code
 - `read_output` - Read VS Code output logs (list channels or read specific channel)
-- `invoke_vscode_command` - Execute VS Code commands by ID
-- `invoke_vscode_api` - Query VS Code API (editor, workspace, extensions)
 - `take_screenshot` - Capture screenshots of VS Code window
 
 ### Wait Operations

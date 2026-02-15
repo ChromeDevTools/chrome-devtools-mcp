@@ -66,7 +66,7 @@ The server automatically detects changes to your extension source files. Before 
 ### Available Tools
 
 - **Input Automation**: click, drag, keyboard_type, hover, keyboard_hotkey, scroll
-- **Inspection**: snapshot, console, debug-evaluate, screenshot
+- **Inspection**: snapshot, console, screenshot
 - **Monitoring**: output-panel
 - **Script Execution**: script
 - **Wait Operations**: wait for elements/conditions
