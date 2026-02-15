@@ -380,6 +380,83 @@ export interface CodebaseExportsResult {
   summary: string;
 }
 
+// ── Codebase Trace Symbol Types ──────────────────────────
+
+export interface SymbolLocationInfo {
+  file: string;
+  line: number;
+  column: number;
+  kind?: string;
+  signature?: string;
+}
+
+export interface ReferenceInfo {
+  file: string;
+  line: number;
+  column: number;
+  context: string;
+  kind: 'read' | 'write' | 'call' | 'import' | 'type-ref' | 'unknown';
+}
+
+export interface ReExportInfo {
+  file: string;
+  line: number;
+  originalName: string;
+  exportedAs: string;
+  from: string;
+}
+
+export interface CallChainNode {
+  symbol: string;
+  file: string;
+  line: number;
+  column: number;
+}
+
+export interface CallChainInfo {
+  incomingCalls: CallChainNode[];
+  outgoingCalls: CallChainNode[];
+}
+
+export interface TypeFlowInfo {
+  direction: 'parameter' | 'return' | 'extends' | 'implements' | 'property';
+  type: string;
+  traceTo?: {symbol: string; file: string; line: number};
+}
+
+export interface ImpactDependentInfo {
+  symbol: string;
+  file: string;
+  line: number;
+  kind: string;
+}
+
+export interface ImpactInfo {
+  directDependents: ImpactDependentInfo[];
+  transitiveDependents: ImpactDependentInfo[];
+  impactSummary: {
+    directFiles: number;
+    transitiveFiles: number;
+    totalSymbolsAffected: number;
+    riskLevel: 'low' | 'medium' | 'high';
+  };
+}
+
+export interface CodebaseTraceSymbolResult {
+  symbol: string;
+  definition?: SymbolLocationInfo;
+  references: ReferenceInfo[];
+  reExports: ReExportInfo[];
+  callChain: CallChainInfo;
+  typeFlows: TypeFlowInfo[];
+  summary: {
+    totalReferences: number;
+    totalFiles: number;
+    maxCallDepth: number;
+  };
+  impact?: ImpactInfo;
+}
+
 // ── Codebase Methods ─────────────────────────────────────
 
 /**
@@ -416,6 +493,28 @@ export async function codebaseGetExports(
     30_000,
   );
   return result as CodebaseExportsResult;
+}
+
+/**
+ * Trace a symbol through the codebase: definitions, references, re-exports,
+ * call hierarchy, type flows, and optional impact analysis.
+ */
+export async function codebaseTraceSymbol(
+  symbol: string,
+  rootDir?: string,
+  file?: string,
+  line?: number,
+  column?: number,
+  depth?: number,
+  include?: string[],
+  includeImpact?: boolean,
+): Promise<CodebaseTraceSymbolResult> {
+  const result = await sendClientRequest(
+    'codebase.traceSymbol',
+    {symbol, rootDir, file, line, column, depth, include, includeImpact},
+    60_000,
+  );
+  return result as CodebaseTraceSymbolResult;
 }
 
 // ── Utility ──────────────────────────────────────────────
