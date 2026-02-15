@@ -11,6 +11,7 @@ export enum ToolCategory {
   EDITOR_TABS = 'editor_tabs',
   UI_CONTEXT = 'ui_context',
   DEV_DIAGNOSTICS = 'dev_diagnostics',
+  CODEBASE_ANALYSIS = 'codebase_analysis',
 }
 
 export const labels = {
@@ -20,4 +21,5 @@ export const labels = {
   [ToolCategory.EDITOR_TABS]: 'Editor tabs',
   [ToolCategory.UI_CONTEXT]: 'UI context',
   [ToolCategory.DEV_DIAGNOSTICS]: 'Development diagnostics',
+  [ToolCategory.CODEBASE_ANALYSIS]: 'Codebase analysis',
 };

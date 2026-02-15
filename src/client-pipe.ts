@@ -332,6 +332,56 @@ export async function commandExecute(
   return result as CommandExecuteResult;
 }
 
+// ── Codebase Types ───────────────────────────────────────
+
+export interface CodebaseSymbolNode {
+  name: string;
+  kind: string;
+  detail?: string;
+  range: {start: number; end: number};
+  children?: CodebaseSymbolNode[];
+}
+
+export interface CodebaseTreeNode {
+  name: string;
+  type: 'directory' | 'file';
+  children?: CodebaseTreeNode[];
+  symbols?: CodebaseSymbolNode[];
+  imports?: string[];
+  lines?: number;
+}
+
+export interface CodebaseOverviewResult {
+  projectRoot: string;
+  tree: CodebaseTreeNode[];
+  summary: {
+    totalFiles: number;
+    totalDirectories: number;
+    totalSymbols: number;
+    diagnosticCounts?: {errors: number; warnings: number};
+  };
+}
+
+// ── Codebase Methods ─────────────────────────────────────
+
+/**
+ * Get a structural overview of the codebase as a recursive tree.
+ */
+export async function codebaseGetOverview(
+  rootDir?: string,
+  depth?: number,
+  filter?: string,
+  includeImports?: boolean,
+  includeStats?: boolean,
+): Promise<CodebaseOverviewResult> {
+  const result = await sendClientRequest(
+    'codebase.getOverview',
+    {rootDir, depth, filter, includeImports, includeStats},
+    30_000,
+  );
+  return result as CodebaseOverviewResult;
+}
+
 // ── Utility ──────────────────────────────────────────────
 
 /**
