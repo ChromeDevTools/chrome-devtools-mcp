@@ -59,7 +59,7 @@ export interface GeolocationOptions {
 export interface ExtensionServiceWorker {
   url: string;
   target: Target;
-  id: number;
+  id: string;
 }
 
 export interface TextSnapshot {
@@ -155,7 +155,7 @@ export class McpContext implements Context {
   #pageIdMap = new WeakMap<Page, number>();
   #nextPageId = 1;
 
-  #extensionServiceWorkerMap = new WeakMap<Target, number>();
+  #extensionServiceWorkerMap = new WeakMap<Target, string>();
   #nextExtensionServiceWorkerId = 1;
 
   #nextSnapshotId = 1;
@@ -597,6 +597,9 @@ export class McpContext implements Context {
     }
   }
 
+  /**
+   * Creates a snapshot of the extension service workers.
+   */
   async createExtensionServiceWorkersSnapshot(): Promise<
     ExtensionServiceWorker[]
   > {
@@ -613,7 +616,7 @@ export class McpContext implements Context {
       if (!this.#extensionServiceWorkerMap.has(serviceWorker)) {
         this.#extensionServiceWorkerMap.set(
           serviceWorker,
-          this.#nextExtensionServiceWorkerId++,
+          'sw-' + this.#nextExtensionServiceWorkerId++,
         );
       }
     }
@@ -621,9 +624,9 @@ export class McpContext implements Context {
     this.#extensionServiceWorkers = serviceWorkers.map(serviceWorker => {
       return {
         target: serviceWorker,
-        id: this.#extensionServiceWorkerMap.get(serviceWorker),
+        id: this.#extensionServiceWorkerMap.get(serviceWorker)!,
         url: serviceWorker.url(),
-      } as ExtensionServiceWorker;
+      };
     });
 
     return this.#extensionServiceWorkers;
@@ -736,7 +739,7 @@ export class McpContext implements Context {
 
   getExtensionServiceWorkerId(
     extensionServiceWorker: ExtensionServiceWorker,
-  ): number | undefined {
+  ): string | undefined {
     return this.#extensionServiceWorkerMap.get(extensionServiceWorker.target);
   }
 

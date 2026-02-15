@@ -4,11 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {zod} from '../third_party/index.js';
-import type {Frame, JSHandle, Page} from '../third_party/index.js';
+import { zod } from '../third_party/index.js';
+import type { Frame, JSHandle, Page, WebWorker } from '../third_party/index.js';
 
-import {ToolCategory} from './categories.js';
-import {defineTool} from './ToolDefinition.js';
+import { ToolCategory } from './categories.js';
+import type { Context } from './ToolDefinition.js';
+import { defineTool } from './ToolDefinition.js';
+
+export type Evaluatable = Page | Frame | WebWorker;
 
 export const evaluateScript = defineTool({
   name: 'evaluate_script',
@@ -43,6 +46,10 @@ Example with arguments: \`(el) => {
       )
       .optional()
       .describe(`An optional list of arguments to pass to the function.`),
+    serviceWorkerId: zod
+      .string()
+      .optional()
+      .describe(`An optional service worker id to evaluate the script in.`),
   },
   handler: async (request, response, context) => {
     const args: Array<JSHandle<unknown>> = [];
@@ -51,23 +58,18 @@ Example with arguments: \`(el) => {
       for (const el of request.params.args ?? []) {
         const handle = await context.getElementByUid(el.uid);
         frames.add(handle.frame);
+
         args.push(handle);
       }
-      let pageOrFrame: Page | Frame;
-      // We can't evaluate the element handle across frames
-      if (frames.size > 1) {
-        throw new Error(
-          "Elements from different frames can't be evaluated together.",
-        );
-      } else {
-        pageOrFrame = [...frames.values()][0] ?? context.getSelectedPage();
-      }
-      const fn = await pageOrFrame.evaluateHandle(
+      const evaluatable = await getEvaluatable(context, frames, request.params.serviceWorkerId);
+
+      const fn = await evaluatable.evaluateHandle(
         `(${request.params.function})`,
       );
       args.unshift(fn);
+
       await context.waitForEventsAfterAction(async () => {
-        const result = await pageOrFrame.evaluate(
+        const result = await evaluatable.evaluate(
           async (fn, ...args) => {
             // @ts-expect-error no types.
             return JSON.stringify(await fn(...args));
@@ -84,3 +86,42 @@ Example with arguments: \`(el) => {
     }
   },
 });
+
+const getEvaluatable = async (context: Context, frames: Set<Frame>, serviceWorkerId?: string): Promise<Evaluatable> => {
+  if (serviceWorkerId) {
+    return getWebWorker(context, serviceWorkerId);
+  }
+  return getPageOrFrame(context, frames);
+};
+
+const getPageOrFrame = async (context: Context, frames: Set<Frame>): Promise<Page | Frame> => {
+  let pageOrFrame: Page | Frame;
+  // We can't evaluate the element handle across frames
+  if (frames.size > 1) {
+    throw new Error(
+      "Elements from different frames can't be evaluated together.",
+    );
+  } else {
+    pageOrFrame = [...frames.values()][0] ?? context.getSelectedPage();
+  }
+
+  return pageOrFrame;
+};
+
+const getWebWorker = async (context: Context, serviceWorkerId: string): Promise<WebWorker> => {
+  const serviceWorkers = context.getExtensionServiceWorkers();
+
+  const serviceWorker = serviceWorkers.find(sw => context.getExtensionServiceWorkerId(sw) === serviceWorkerId);
+
+  if (serviceWorker && serviceWorker.target) {
+    const worker = await serviceWorker.target.worker();
+
+    if (!worker) {
+      throw new Error('Service worker target not found.');
+    }
+
+    return worker;
+  } else {
+    throw new Error('Service worker not found.');
+  }
+};
