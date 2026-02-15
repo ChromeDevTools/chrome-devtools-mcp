@@ -231,12 +231,11 @@ function sendClientRequest(
 // ── Terminal Methods (Multi-Terminal Model) ─────────────
 
 /**
- * Run a command in a named terminal.
+ * Run a PowerShell command in a named terminal.
  * Creates terminal if needed, rejects with state if busy.
  * Waits for completion, prompt detection, or timeout.
  *
- * @param command The shell command to execute
- * @param shell Shell type: 'powershell', 'bash', or 'cmd'
+ * @param command The PowerShell command to execute
  * @param cwd Absolute path to working directory for command execution
  * @param timeout Max wait time in milliseconds (default: 120000)
  * @param name Terminal name (default: 'default')
@@ -244,7 +243,6 @@ function sendClientRequest(
  */
 export async function terminalRun(
   command: string,
-  shell: string,
   cwd: string,
   timeout?: number,
   name?: string,
@@ -252,7 +250,7 @@ export async function terminalRun(
 ): Promise<TerminalRunResult> {
   const result = await sendClientRequest(
     'terminal.run',
-    {command, shell, cwd, timeout, name, waitMode},
+    {command, cwd, timeout, name, waitMode},
     TERMINAL_TIMEOUT_MS,
   );
   return result as TerminalRunResult;
