@@ -11,7 +11,7 @@ import process from 'node:process';
 
 import {parseArguments} from './cli.js';
 import {loadConfig, type ResolvedConfig} from './config.js';
-import {hasExtensionChangedSince} from './extension-watcher.js';
+import {isBuildStale} from './extension-watcher.js';
 import {restartMcpServer} from './host-pipe.js';
 import {loadIssueDescriptions} from './issue-descriptions.js';
 import {logger, saveLogsToFile} from './logger.js';
@@ -395,21 +395,16 @@ function registerTool(tool: ToolDefinition): void {
           await ensureConnection();
         }
 
-        // Hot-reload: if the extension source changed since the last snapshot,
+        // Hot-reload: if the source files are newer than the build output,
         // tell Host to rebuild Client. Host handles stop/build/restart internally.
         // This runs OUTSIDE the tool's timeout so changes feel instant to Copilot.
         if (!isStandalone && config.explicitExtensionDevelopmentPath) {
-          const sessionStartedAtMs = lifecycleService.debugWindowStartedAt;
-          if (sessionStartedAtMs !== undefined) {
-            const changed = hasExtensionChangedSince(config.extensionBridgePath, sessionStartedAtMs);
-            logger(`[hot-reload] check: changed=${changed}, session=${new Date(sessionStartedAtMs).toISOString()}, extDir=${config.extensionBridgePath}`);
-            if (changed) {
-              logger(`[tool:${tool.name}] Extension source changed — hot-reloading…`);
-              await lifecycleService.handleHotReload();
-              logger(`[tool:${tool.name}] Hot-reload complete — reconnected`);
-            }
-          } else {
-            logger('[hot-reload] skipped — debugWindowStartedAt is undefined (connection not established?)');
+          const stale = isBuildStale(config.extensionBridgePath);
+          logger(`[hot-reload] check: stale=${stale}, extDir=${config.extensionBridgePath}`);
+          if (stale) {
+            logger(`[tool:${tool.name}] Extension build is stale — hot-reloading…`);
+            await lifecycleService.handleHotReload();
+            logger(`[tool:${tool.name}] Hot-reload complete — reconnected`);
           }
         }
 

@@ -196,6 +196,7 @@ export function getNewestTrackedChangeTime(extensionDir: string): number {
  *
  * @param extensionDir Extension source root
  * @param sessionStartedAtMs Debug session start timestamp in epoch ms
+ * @deprecated Use isBuildStale instead for proper source vs build comparison
  */
 export function hasExtensionChangedSince(
   extensionDir: string,
@@ -209,4 +210,92 @@ export function hasExtensionChangedSince(
     );
   }
   return changed;
+}
+
+/**
+ * Scan a directory recursively (ignoring .git, node_modules) for newest mtime.
+ * Used for scanning build output folders like dist/.
+ */
+function scanBuildFolderMtime(dir: string): number {
+  let newestMtimeMs = 0;
+  let entries: string[];
+  try {
+    entries = readdirSync(dir, {encoding: 'utf8'});
+  } catch {
+    return newestMtimeMs;
+  }
+
+  for (const name of entries) {
+    if (name === '.git' || name === 'node_modules') {
+      continue;
+    }
+    const fullPath = join(dir, name);
+    let stat: ReturnType<typeof statSync>;
+    try {
+      stat = statSync(fullPath);
+    } catch {
+      continue;
+    }
+
+    if (stat.isDirectory()) {
+      const child = scanBuildFolderMtime(fullPath);
+      if (child > newestMtimeMs) {
+        newestMtimeMs = child;
+      }
+    } else if (stat.isFile()) {
+      if (stat.mtimeMs > newestMtimeMs) {
+        newestMtimeMs = stat.mtimeMs;
+      }
+    }
+  }
+
+  return newestMtimeMs;
+}
+
+/**
+ * Get the newest mtime from the build output folder (dist/).
+ *
+ * @param extensionDir Extension root directory
+ * @returns Newest file mtime in dist/, or 0 if dist doesn't exist
+ */
+export function getNewestBuildMtime(extensionDir: string): number {
+  const distDir = join(extensionDir, 'dist');
+  if (!existsSync(distDir)) {
+    return 0;
+  }
+  return scanBuildFolderMtime(distDir);
+}
+
+/**
+ * Check if the extension build is stale (source files newer than build output).
+ *
+ * This compares the newest source file mtime against the newest dist/ file mtime.
+ * If source is newer, the build is stale and needs hot-reload.
+ *
+ * @param extensionDir Extension root directory
+ * @returns true if source files are newer than build output (needs rebuild)
+ */
+export function isBuildStale(extensionDir: string): boolean {
+  const sourceNewest = getNewestTrackedChangeTime(extensionDir);
+  const buildNewest = getNewestBuildMtime(extensionDir);
+
+  // If no build exists, definitely stale
+  if (buildNewest === 0) {
+    logger(`[hot-reload] No build found in dist/ — build is stale`);
+    return true;
+  }
+
+  const stale = sourceNewest > buildNewest;
+
+  if (stale) {
+    logger(
+      `[hot-reload] Build STALE: source=${new Date(sourceNewest).toISOString()} > build=${new Date(buildNewest).toISOString()}`,
+    );
+  } else {
+    logger(
+      `[hot-reload] Build up-to-date: source=${new Date(sourceNewest).toISOString()} <= build=${new Date(buildNewest).toISOString()}`,
+    );
+  }
+
+  return stale;
 }
