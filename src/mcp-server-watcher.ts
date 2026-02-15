@@ -216,6 +216,37 @@ export function hasMcpServerSourceChanged(mcpServerDir: string): boolean {
 }
 
 /**
+ * Check if MCP server build output is newer than the process start time.
+ *
+ * Catches the case where the user manually ran `pnpm run build` in the CLI.
+ * The running MCP server still has the old code loaded, but
+ * `hasMcpServerSourceChanged` would return false (source ≤ build).
+ * This second check detects that the build is newer than the running process.
+ *
+ * @param mcpServerDir Root of the mcp-server package
+ * @param processStartTime Epoch ms when the MCP server process started
+ * @returns true if build output is newer than the process start
+ */
+export function hasBuildChangedSinceProcessStart(
+  mcpServerDir: string,
+  processStartTime: number,
+): boolean {
+  const buildSrcDir = join(mcpServerDir, 'build', 'src');
+  if (!existsSync(buildSrcDir)) return false;
+
+  const rules = parseIgnoreRules(mcpServerDir);
+  const buildMtime = scanNewestMtime(buildSrcDir, buildSrcDir, rules);
+  const changed = buildMtime > processStartTime;
+
+  if (changed) {
+    logger(
+      `[mcp-watcher] Build newer than process start: build=${new Date(buildMtime).toISOString()}, started=${new Date(processStartTime).toISOString()}`,
+    );
+  }
+  return changed;
+}
+
+/**
  * Write a hot-reload marker file after a successful rebuild.
  * The newly spawned MCP server process reads this on startup
  * to display a "just updated" banner.

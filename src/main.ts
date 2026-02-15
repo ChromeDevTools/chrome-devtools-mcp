@@ -11,7 +11,7 @@ import process from 'node:process';
 
 import {parseArguments} from './cli.js';
 import {loadConfig, type ResolvedConfig} from './config.js';
-import {isBuildStale} from './extension-watcher.js';
+import {hasBuildChangedSinceWindowStart, isBuildStale} from './extension-watcher.js';
 import {restartMcpServer} from './host-pipe.js';
 import {loadIssueDescriptions} from './issue-descriptions.js';
 import {logger, saveLogsToFile} from './logger.js';
@@ -19,6 +19,7 @@ import {McpResponse} from './McpResponse.js';
 import {
   consumeHotReloadMarker,
   getMcpServerRoot,
+  hasBuildChangedSinceProcessStart,
   hasMcpServerSourceChanged,
   writeHotReloadMarker,
 } from './mcp-server-watcher.js';
@@ -43,6 +44,7 @@ const DEFAULT_TOOL_TIMEOUT_MS = 30_000;
 // ── MCP Server Self Hot-Reload State ─────────────────────
 
 const mcpServerDir = getMcpServerRoot();
+const mcpProcessStartTime = Date.now();
 let mcpServerHotReloadInfo: {builtAt: number} | null = null;
 let mcpServerRestartScheduled = false;
 
@@ -376,6 +378,26 @@ function registerTool(tool: ToolDefinition): void {
           }
         }
 
+        // Check 2: Build output newer than this process → manual CLI build.
+        // No rebuild needed (already built), just restart to load the new code.
+        if (!mcpServerRestartScheduled && hasBuildChangedSinceProcessStart(mcpServerDir, mcpProcessStartTime)) {
+          logger(`[tool:${tool.name}] MCP server build updated (manual build) — restarting…`);
+          writeHotReloadMarker(mcpServerDir);
+          scheduleMcpServerRestart();
+
+          return {
+            content: [{
+              type: 'text',
+              text: [
+                '⚡ **MCP server build updated — restart required.**',
+                '',
+                'A newer build was detected. The MCP server will restart to load the latest code.',
+                'Please call the tool again after the restart.',
+              ].join('\n'),
+            }],
+          };
+        }
+
         // If a restart is already pending (rare edge case), short-circuit
         if (mcpServerRestartScheduled) {
           return {
@@ -395,14 +417,24 @@ function registerTool(tool: ToolDefinition): void {
           await ensureConnection();
         }
 
-        // Hot-reload: if the source files are newer than the build output,
-        // tell Host to rebuild Client. Host handles stop/build/restart internally.
-        // This runs OUTSIDE the tool's timeout so changes feel instant to Copilot.
+        // Hot-reload: check two conditions for extension staleness:
+        // 1. Source files are newer than build output → needs rebuild + reload
+        // 2. Build output is newer than Client window start → needs reload only
+        // Either condition triggers handleHotReload() which tells Host to
+        // stop Client → build → spawn new Client. If build is already current,
+        // the rebuild step is a fast no-op.
         if (!isStandalone && config.explicitExtensionDevelopmentPath) {
           const stale = isBuildStale(config.extensionBridgePath);
-          logger(`[hot-reload] check: stale=${stale}, extDir=${config.extensionBridgePath}`);
-          if (stale) {
-            logger(`[tool:${tool.name}] Extension build is stale — hot-reloading…`);
+          const windowStartedAt = lifecycleService.debugWindowStartedAt;
+          const buildNewerThanWindow = !stale
+            && windowStartedAt !== undefined
+            && hasBuildChangedSinceWindowStart(config.extensionBridgePath, windowStartedAt);
+
+          logger(`[hot-reload] check: stale=${stale}, buildNewerThanWindow=${buildNewerThanWindow}, extDir=${config.extensionBridgePath}`);
+
+          if (stale || buildNewerThanWindow) {
+            const reason = stale ? 'source stale' : 'manual build detected';
+            logger(`[tool:${tool.name}] Extension needs hot-reload (${reason}) — reloading…`);
             await lifecycleService.handleHotReload();
             logger(`[tool:${tool.name}] Hot-reload complete — reconnected`);
           }

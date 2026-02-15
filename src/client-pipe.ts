@@ -362,6 +362,24 @@ export interface CodebaseOverviewResult {
   };
 }
 
+export interface CodebaseExportInfo {
+  name: string;
+  kind: string;
+  signature?: string;
+  jsdoc?: string;
+  line: number;
+  isDefault: boolean;
+  isReExport: boolean;
+  reExportSource?: string;
+}
+
+export interface CodebaseExportsResult {
+  module: string;
+  exports: CodebaseExportInfo[];
+  reExports: Array<{name: string; from: string}>;
+  summary: string;
+}
+
 // ── Codebase Methods ─────────────────────────────────────
 
 /**
@@ -380,6 +398,24 @@ export async function codebaseGetOverview(
     30_000,
   );
   return result as CodebaseOverviewResult;
+}
+
+/**
+ * Get detailed exports from a module/file/directory.
+ */
+export async function codebaseGetExports(
+  path: string,
+  rootDir?: string,
+  includeTypes?: boolean,
+  includeJSDoc?: boolean,
+  kind?: string,
+): Promise<CodebaseExportsResult> {
+  const result = await sendClientRequest(
+    'codebase.getExports',
+    {path, rootDir, includeTypes, includeJSDoc, kind},
+    30_000,
+  );
+  return result as CodebaseExportsResult;
 }
 
 // ── Utility ──────────────────────────────────────────────

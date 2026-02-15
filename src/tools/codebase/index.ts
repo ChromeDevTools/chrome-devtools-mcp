@@ -5,3 +5,4 @@
  */
 
 export {overview} from './codebase-overview.js';
+export {exports} from './codebase-exports.js';

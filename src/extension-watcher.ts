@@ -299,3 +299,31 @@ export function isBuildStale(extensionDir: string): boolean {
 
   return stale;
 }
+
+/**
+ * Check if extension build (dist/) is newer than the Client window start time.
+ *
+ * Catches the case where the user manually ran `npm run compile` in the CLI.
+ * The Client window still has the old code loaded, but `isBuildStale` would
+ * return false (source ≤ build). This second check detects that the build
+ * is newer than the running Client window.
+ *
+ * @param extensionDir Extension root directory
+ * @param windowStartTime Epoch ms when the Client window started
+ * @returns true if build output is newer than the Client window start
+ */
+export function hasBuildChangedSinceWindowStart(
+  extensionDir: string,
+  windowStartTime: number,
+): boolean {
+  const buildMtime = getNewestBuildMtime(extensionDir);
+  if (buildMtime === 0) return false;
+
+  const changed = buildMtime > windowStartTime;
+  if (changed) {
+    logger(
+      `[hot-reload] Build newer than Client window: build=${new Date(buildMtime).toISOString()}, window=${new Date(windowStartTime).toISOString()}`,
+    );
+  }
+  return changed;
+}
