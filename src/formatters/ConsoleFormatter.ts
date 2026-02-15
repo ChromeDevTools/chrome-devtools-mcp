@@ -12,6 +12,7 @@ import {
 import {UncaughtError} from '../PageCollector.js';
 import * as DevTools from '../third_party/index.js';
 import type {ConsoleMessage} from '../third_party/index.js';
+import {formatConsoleMessage} from '../utils/ConsoleFormat.js';
 
 export interface ConsoleFormatterOptions {
   fetchDetailedData?: boolean;
@@ -36,6 +37,7 @@ export class ConsoleFormatter {
 
   readonly #argCount: number;
   readonly #resolvedArgs: unknown[];
+  readonly #remainingArgs: unknown[];
 
   readonly #stack?: DevTools.DevTools.StackTrace.StackTrace.StackTrace;
   readonly #cause?: SymbolizedError;
@@ -57,6 +59,17 @@ export class ConsoleFormatter {
     this.#text = params.text;
     this.#argCount = params.argCount ?? 0;
     this.#resolvedArgs = params.resolvedArgs ?? [];
+
+    // Calculate remaining arguments after template substitution
+    if (this.#resolvedArgs.length > 0 && this.#text) {
+      const {remainingArgs} = formatConsoleMessage(this.#text, this.#resolvedArgs);
+      this.#remainingArgs = remainingArgs;
+    } else if (!this.#text && this.#resolvedArgs.length > 0) {
+      this.#remainingArgs = this.#resolvedArgs.slice(1);
+    } else {
+      this.#remainingArgs = this.#resolvedArgs;
+    }
+
     this.#stack = params.stack;
     this.#cause = params.cause;
     this.#isIgnored = params.isIgnored;
@@ -112,12 +125,14 @@ export class ConsoleFormatter {
     let resolvedArgs: unknown[] = [];
     if (options.resolvedArgsForTesting) {
       resolvedArgs = options.resolvedArgsForTesting;
-    } else if (options.fetchDetailedData) {
+    } else {
       resolvedArgs = await Promise.all(
         msg.args().map(async (arg, i) => {
           try {
             const remoteObject = arg.remoteObject();
             if (
+              options.fetchDetailedData &&
+              options.devTools &&
               remoteObject.type === 'object' &&
               remoteObject.subtype === 'error'
             ) {
@@ -160,14 +175,14 @@ export class ConsoleFormatter {
 
   // The short format for a console message.
   toString(): string {
-    return `msgid=${this.#id} [${this.#type}] ${this.#text} (${this.#argCount} args)`;
+    return `msgid=${this.#id} [${this.#type}] ${this.#getFormattedText()} (${this.#argCount} args)`;
   }
 
   // The verbose format for a console message, including all details.
   toStringDetailed(): string {
     const result = [
       `ID: ${this.#id}`,
-      `Message: ${this.#type}> ${this.#text}`,
+      `Message: ${this.#type}> ${this.#getFormattedText()}`,
       this.#formatArgs(),
       this.#formatStackTrace(this.#stack, this.#cause, {
         includeHeading: true,
@@ -176,16 +191,22 @@ export class ConsoleFormatter {
     return result.join('\n');
   }
 
-  #getArgs(): unknown[] {
-    if (this.#resolvedArgs.length > 0) {
-      const args = [...this.#resolvedArgs];
-      // If there is no text, the first argument serves as text (see formatMessage).
-      if (!this.#text) {
-        args.shift();
-      }
-      return args;
+  // Gets the formatted message text, applying template string substitutions if arguments are available.
+  #getFormattedText(): string {
+    if (this.#resolvedArgs.length > 0 && this.#text) {
+      // apply template formatting
+      const {formattedText} = formatConsoleMessage(this.#text, this.#resolvedArgs);
+      return formattedText;
+    } else if (!this.#text && this.#resolvedArgs.length > 0) {
+      return this.#formatArg(this.#resolvedArgs[0]);
     }
-    return [];
+    // return the raw text
+    return this.#text;
+  }
+
+  #getArgs(): unknown[] {
+    // Return the remaining arguments after template substitution
+    return this.#remainingArgs;
   }
 
   #formatArg(arg: unknown) {
