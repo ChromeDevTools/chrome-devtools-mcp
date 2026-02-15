@@ -29,7 +29,9 @@ import {logger} from '../logger.js';
 class LifecycleService {
   private _debugWindowStartedAt: number | undefined;
   private _userDataDir: string | undefined;
+  private _cdpPort: number | undefined;
   private connectInProgress: Promise<void> | undefined;
+  private reconnectInProgress: Promise<void> | undefined;
   private exitCleanupDone = false;
   private shutdownHandlersRegistered = false;
 
@@ -70,6 +72,12 @@ class LifecycleService {
   async ensureConnection(): Promise<void> {
     if (cdpService.isConnected) {
       logger('[Lifecycle] Fast path — CDP already connected');
+      return;
+    }
+
+    if (this.reconnectInProgress) {
+      logger('[Lifecycle] Reconnect in-flight — waiting');
+      await this.reconnectInProgress;
       return;
     }
 
@@ -114,6 +122,7 @@ class LifecycleService {
       launch: this._launchFlags,
     });
     const newPort = result.cdpPort;
+    this._cdpPort = newPort;
 
     logger(`[Lifecycle] Host rebuilt Client — new CDP port: ${newPort}`);
 
@@ -205,14 +214,33 @@ class LifecycleService {
     });
 
     // Unexpected CDP close → user closed the debug window → exit
-    cdpService.setDisconnectHandler((intentional) => {
-      if (!intentional) {
-        logger('[Lifecycle] Debug window closed by user — exiting');
+    cdpService.setDisconnectHandler((intentional, lastPort) => {
+      if (intentional) {
+        return;
+      }
+
+      const portToCheck = lastPort ?? this._cdpPort;
+      if (!portToCheck) {
+        logger('[Lifecycle] CDP closed unexpectedly with no known port — exiting');
         clearCdpEventData();
         this._debugWindowStartedAt = undefined;
         this._userDataDir = undefined;
-        handleShutdown('CDP unexpected close');
+        handleShutdown('CDP unexpected close (no port)');
+        return;
       }
+
+      this.reconnectInProgress = this.handleUnexpectedDisconnect(portToCheck)
+        .catch((err) => {
+          const msg = err instanceof Error ? err.message : String(err);
+          logger(`[Lifecycle] Reconnect after disconnect failed: ${msg}`);
+          clearCdpEventData();
+          this._debugWindowStartedAt = undefined;
+          this._userDataDir = undefined;
+          handleShutdown('CDP reconnect failed');
+        })
+        .finally(() => {
+          this.reconnectInProgress = undefined;
+        });
     });
   }
 
@@ -245,6 +273,7 @@ class LifecycleService {
       launch: this._launchFlags,
     });
     const cdpPort = result.cdpPort;
+    this._cdpPort = cdpPort;
 
     logger(`[Lifecycle] Host returned CDP port: ${cdpPort}`);
 
@@ -272,6 +301,41 @@ class LifecycleService {
     }
 
     logger(`[Lifecycle] Connected — CDP + events ready, sessionTs=${new Date(this._debugWindowStartedAt).toISOString()}`);
+  }
+
+  private async handleUnexpectedDisconnect(port: number): Promise<void> {
+    logger(`[Lifecycle] CDP closed unexpectedly — probing port ${port} for reload vs close`);
+
+    const cdpStillAlive = await this.isCdpHttpAlive(port, 4_000);
+    if (!cdpStillAlive) {
+      throw new Error('CDP HTTP endpoint is down; debug window appears closed');
+    }
+
+    logger('[Lifecycle] CDP endpoint still alive — treating as window reload, reconnecting...');
+    clearCdpEventData();
+
+    await cdpService.reconnect(port, 60_000);
+    await initCdpEventSubscriptions();
+
+    this._debugWindowStartedAt = Date.now();
+    logger(
+      `[Lifecycle] Reconnect complete — CDP restored, sessionTs=${new Date(this._debugWindowStartedAt).toISOString()}`,
+    );
+  }
+
+  private async isCdpHttpAlive(port: number, timeoutMs: number): Promise<boolean> {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const response = await fetch(`http://127.0.0.1:${port}/json/version`, {
+        signal: controller.signal,
+      });
+      clearTimeout(timer);
+      return response.ok;
+    } catch {
+      clearTimeout(timer);
+      return false;
+    }
   }
 }
 

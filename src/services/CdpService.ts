@@ -64,7 +64,7 @@ export interface SendCdpOptions {
 
 // ── Disconnect Handler Type ──────────────────────────────
 
-type DisconnectHandler = (intentional: boolean) => void;
+type DisconnectHandler = (intentional: boolean, lastPort?: number) => void;
 
 // ── Service Implementation ───────────────────────────────
 
@@ -74,6 +74,7 @@ class CdpService {
   private messageId = 0;
   private generationCounter = 0;
   private intentionalClose = false;
+  private reconnectInProgress: Promise<void> | undefined;
   private readonly attachedTargets = new Map<string, AttachedTargetInfo>();
   private onDisconnect: DisconnectHandler | undefined;
 
@@ -159,6 +160,53 @@ class CdpService {
     logger(`[CdpService] Connected (gen=${this.generationCounter})`);
   }
 
+  async reconnect(cdpPort: number, timeout = 60_000): Promise<void> {
+    if (this.reconnectInProgress) {
+      return this.reconnectInProgress;
+    }
+
+    this.reconnectInProgress = (async () => {
+      this.intentionalClose = false;
+      this.clearAttachedTargets();
+      this.ws = undefined;
+      this.port = cdpPort;
+
+      const started = Date.now();
+      let lastError: unknown;
+
+      while (Date.now() - started < timeout) {
+        try {
+          await this.waitForDebugPort(cdpPort, 2_000);
+          const workbench = await this.findWorkbenchTarget(cdpPort);
+
+          const ws = await this.connectWebSocket(workbench.webSocketDebuggerUrl);
+          this.ws = ws;
+          this.port = cdpPort;
+
+          await this.sendCdp('Runtime.enable', {}, ws);
+          await this.sendCdp('Page.enable', {}, ws);
+          this.setupTargetEventListeners(ws);
+          await this.enableAutoAttach();
+          ws.on('close', () => this.handleClose());
+
+          this.generationCounter++;
+          logger(`[CdpService] Reconnected to CDP port ${cdpPort} (gen=${this.generationCounter})`);
+          return;
+        } catch (err) {
+          lastError = err;
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+      }
+
+      const detail = lastError instanceof Error ? lastError.message : String(lastError);
+      throw new Error(`Failed to reconnect CDP within ${timeout}ms: ${detail}`);
+    })().finally(() => {
+      this.reconnectInProgress = undefined;
+    });
+
+    return this.reconnectInProgress;
+  }
+
   /**
    * Disconnect the CDP WebSocket intentionally (e.g., for hot-reload or shutdown).
    * Does NOT trigger the "user closed window" exit path.
@@ -198,6 +246,10 @@ class CdpService {
     return this.port;
   }
 
+  get isReconnecting(): boolean {
+    return Boolean(this.reconnectInProgress);
+  }
+
   get generation(): number {
     return this.generationCounter;
   }
@@ -221,9 +273,11 @@ class CdpService {
 
   private handleClose(): void {
     const wasIntentional = this.intentionalClose;
+    const lastPort = this.port;
     this.intentionalClose = false;
     this.clearAttachedTargets();
     this.ws = undefined;
+    this.port = undefined;
 
     if (wasIntentional) {
       logger('[CdpService] CDP closed (intentional)');
@@ -231,7 +285,7 @@ class CdpService {
       logger('[CdpService] CDP closed (unexpected — user closed debug window?)');
     }
 
-    this.onDisconnect?.(wasIntentional);
+    this.onDisconnect?.(wasIntentional, lastPort);
   }
 
   private clearAttachedTargets(): void {

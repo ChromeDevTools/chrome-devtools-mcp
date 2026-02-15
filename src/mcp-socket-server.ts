@@ -173,6 +173,17 @@ function dispatch(req: JsonRpcRequest): JsonRpcResponse {
       logger('MCP socket: detach-gracefully received — next shutdown will detach');
       return {jsonrpc: '2.0', id, result: {ok: true}};
 
+    case 'client-reconnected': {
+      const params = req.params ?? {};
+      const electronPid = params.electronPid;
+      const cdpPort = params.cdpPort;
+      const inspectorPort = params.inspectorPort;
+      logger(
+        `MCP socket: client-reconnected received — pid=${String(electronPid)}, cdp=${String(cdpPort)}, inspector=${String(inspectorPort)}`,
+      );
+      return {jsonrpc: '2.0', id, result: {ok: true}};
+    }
+
     default:
       return {
         jsonrpc: '2.0',
