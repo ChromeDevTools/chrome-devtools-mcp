@@ -38,6 +38,7 @@ interface TraceInsightData {
 
 export class McpResponse implements Response {
   #includePages = false;
+  #includeExtensionServiceWorkers = false;
   #snapshotParams?: SnapshotParams;
   #attachedNetworkRequestId?: number;
   #attachedNetworkRequestOptions?: {
@@ -76,6 +77,10 @@ export class McpResponse implements Response {
 
   setIncludePages(value: boolean): void {
     this.#includePages = value;
+  }
+
+  setIncludeExtensionServiceWorkers(value: boolean): void {
+    this.#includeExtensionServiceWorkers = value;
   }
 
   includeSnapshot(params?: SnapshotParams): void {
@@ -231,6 +236,10 @@ export class McpResponse implements Response {
   }> {
     if (this.#includePages) {
       await context.createPagesSnapshot();
+    }
+
+    if (this.#includeExtensionServiceWorkers) {
+      await context.createExtensionServiceWorkersSnapshot();
     }
 
     let snapshot: SnapshotFormatter | string | undefined;
@@ -437,6 +446,7 @@ export class McpResponse implements Response {
         defaultValue?: string;
       };
       pages?: object[];
+      extensionServiceWorkers?: object[];
       pagination?: object;
     } = {};
 
@@ -530,6 +540,24 @@ Call ${handleDialog.name} to handle it before continuing.`);
         }
         return entry;
       });
+    }
+
+    if (this.#includeExtensionServiceWorkers) {
+      const parts = [`## Extension Service Workers`];
+      for (const extensionServiceWorker of context.getExtensionServiceWorkers()) {
+        parts.push(
+          `${extensionServiceWorker.id}: ${extensionServiceWorker.url}`,
+        );
+      }
+      response.push(...parts);
+      structuredContent.extensionServiceWorkers = context
+        .getExtensionServiceWorkers()
+        .map(extensionServiceWorker => {
+          return {
+            id: extensionServiceWorker.id,
+            url: extensionServiceWorker.url,
+          };
+        });
     }
 
     if (this.#tabId) {

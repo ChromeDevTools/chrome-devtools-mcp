@@ -29,6 +29,7 @@ import type {
   ScreenRecorder,
   SerializedAXNode,
   Viewport,
+  Target,
 } from './third_party/index.js';
 import {Locator} from './third_party/index.js';
 import {PredefinedNetworkConditions} from './third_party/index.js';
@@ -53,6 +54,12 @@ export interface TextSnapshotNode extends SerializedAXNode {
 export interface GeolocationOptions {
   latitude: number;
   longitude: number;
+}
+
+export interface ExtensionServiceWorker {
+  url: string;
+  target: Target;
+  id: number;
 }
 
 export interface TextSnapshot {
@@ -129,6 +136,8 @@ export class McpContext implements Context {
   #nextIsolatedContextId = 1;
 
   #pages: Page[] = [];
+  #extensionServiceWorkers: ExtensionServiceWorker[] = [];
+
   #pageToDevToolsPage = new Map<Page, Page>();
   #selectedPage?: Page;
   #textSnapshot: TextSnapshot | null = null;
@@ -145,6 +154,9 @@ export class McpContext implements Context {
 
   #pageIdMap = new WeakMap<Page, number>();
   #nextPageId = 1;
+
+  #extensionServiceWorkerMap = new WeakMap<Target, number>();
+  #nextExtensionServiceWorkerId = 1;
 
   #nextSnapshotId = 1;
   #traceResults: TraceResult[] = [];
@@ -185,6 +197,7 @@ export class McpContext implements Context {
 
   async #init() {
     const pages = await this.createPagesSnapshot();
+    await this.createExtensionServiceWorkersSnapshot();
     await this.#networkCollector.init(pages);
     await this.#consoleCollector.init(pages);
     await this.#devtoolsUniverseManager.init(pages);
@@ -584,6 +597,38 @@ export class McpContext implements Context {
     }
   }
 
+  async createExtensionServiceWorkersSnapshot(): Promise<
+    ExtensionServiceWorker[]
+  > {
+    const allTargets = await this.browser.targets();
+
+    const serviceWorkers = allTargets.filter(target => {
+      return (
+        target.type() === 'service_worker' &&
+        target.url().includes('chrome-extension://')
+      );
+    });
+
+    for (const serviceWorker of serviceWorkers) {
+      if (!this.#extensionServiceWorkerMap.has(serviceWorker)) {
+        this.#extensionServiceWorkerMap.set(
+          serviceWorker,
+          this.#nextExtensionServiceWorkerId++,
+        );
+      }
+    }
+
+    this.#extensionServiceWorkers = serviceWorkers.map(serviceWorker => {
+      return {
+        target: serviceWorker,
+        id: this.#extensionServiceWorkerMap.get(serviceWorker),
+        url: serviceWorker.url(),
+      } as ExtensionServiceWorker;
+    });
+
+    return this.#extensionServiceWorkers;
+  }
+
   async createPagesSnapshot(): Promise<Page[]> {
     const allPages = await this.#getAllPages();
 
@@ -683,6 +728,16 @@ export class McpContext implements Context {
 
   getIsolatedContextName(page: Page): string | undefined {
     return this.#pageToIsolatedContextName.get(page);
+  }
+
+  getExtensionServiceWorkers(): ExtensionServiceWorker[] {
+    return this.#extensionServiceWorkers;
+  }
+
+  getExtensionServiceWorkerId(
+    extensionServiceWorker: ExtensionServiceWorker,
+  ): number | undefined {
+    return this.#extensionServiceWorkerMap.get(extensionServiceWorker.target);
   }
 
   getDevToolsPage(page: Page): Page | undefined {
