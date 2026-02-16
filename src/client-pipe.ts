@@ -779,6 +779,19 @@ export async function codebaseGetDiagnostics(
   return result;
 }
 
+// ── Recovery Handler ─────────────────────────────────────
+
+let clientRecoveryHandler: (() => Promise<void>) | undefined;
+
+/**
+ * Register a callback that will be invoked when the client pipe
+ * is unreachable. Typically wired to LifecycleService.recoverClientConnection()
+ * so the Host can restart the Client window automatically.
+ */
+export function registerClientRecoveryHandler(handler: () => Promise<void>): void {
+  clientRecoveryHandler = handler;
+}
+
 // ── Utility ──────────────────────────────────────────────
 
 /**
@@ -791,6 +804,51 @@ export async function pingClient(): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+/**
+ * Ensure the Client pipe is reachable, recovering automatically if not.
+ *
+ * 1. Pings the Client pipe.
+ * 2. If unreachable, invokes the registered recovery handler
+ *    (which asks the Host to restart the Client window).
+ * 3. Retries the ping with exponential back-off (up to 3 attempts).
+ * 4. Throws only if all recovery attempts fail.
+ */
+export async function ensureClientAvailable(): Promise<void> {
+  if (await pingClient()) return;
+
+  if (!clientRecoveryHandler) {
+    throw new Error(
+      'Client pipe not available and no recovery handler is registered. ' +
+        'Make sure the VS Code Extension Development Host window is running.',
+    );
+  }
+
+  logger('[client-pipe] Client pipe not responding — triggering recovery…');
+
+  try {
+    await clientRecoveryHandler();
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    logger(`[client-pipe] Recovery handler threw: ${msg}`);
+  }
+
+  // Retry with increasing delays: 2s, 4s, 6s
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    const delayMs = attempt * 2000;
+    await new Promise<void>(resolve => setTimeout(resolve, delayMs));
+    if (await pingClient()) {
+      logger(`[client-pipe] Recovery successful (attempt ${attempt})`);
+      return;
+    }
+    logger(`[client-pipe] Retry ${attempt}/3 — client pipe still not responding`);
+  }
+
+  throw new Error(
+    'Client pipe unavailable after recovery. ' +
+      'The VS Code Extension Development Host may have failed to restart.',
+  );
 }
 
 /**

@@ -43,6 +43,7 @@ export interface McpReadyParams {
   targetWorkspace: string;
   extensionPath: string;
   launch?: Record<string, unknown>;
+  forceRestart?: boolean;
 }
 
 export interface McpReadyResult {

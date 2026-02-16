@@ -302,7 +302,7 @@ class LifecycleService {
 
   // ── Private ────────────────────────────────────────────
 
-  private async doConnect(): Promise<void> {
+  private async doConnect(options?: { forceRestart?: boolean }): Promise<void> {
     logger('[Lifecycle] Connecting — calling mcpReady()…');
 
     if (!this._targetWorkspace || !this._extensionPath) {
@@ -313,6 +313,7 @@ class LifecycleService {
       targetWorkspace: this._targetWorkspace,
       extensionPath: this._extensionPath,
       launch: this._launchFlags,
+      forceRestart: options?.forceRestart,
     });
     const cdpPort = result.cdpPort;
     this._cdpPort = cdpPort;
@@ -428,6 +429,37 @@ class LifecycleService {
       // Last resort: fresh mcpReady() — launches or finds an existing Client
       await this.doConnect();
       logger('[Lifecycle] Recovery via fresh doConnect() succeeded');
+    }
+  }
+
+  /**
+   * Recover the Client pipe connection.
+   *
+   * Called when a tool detects the Client pipe is unreachable.
+   * Forces CDP disconnect (the Client is likely dead), then asks the
+   * Host to spawn/reconnect the Client via the standard startup flow.
+   */
+  async recoverClientConnection(): Promise<void> {
+    logger('[Lifecycle] Client pipe recovery requested — restarting Client…');
+
+    if (!this._targetWorkspace || !this._extensionPath) {
+      throw new Error('[Lifecycle] Not initialized — call init() before recoverClientConnection()');
+    }
+
+    // Client pipe is dead → CDP is almost certainly broken too
+    cdpService.disconnect();
+    clearCdpEventData();
+    this._debugWindowStartedAt = undefined;
+
+    // Ask Host to force-restart the Client window
+    try {
+      await this.doConnect({ forceRestart: true });
+      logger('[Lifecycle] Client recovery via doConnect() succeeded');
+    } catch (connectErr) {
+      const msg = connectErr instanceof Error ? connectErr.message : String(connectErr);
+      logger(`[Lifecycle] doConnect() failed: ${msg} — trying handleHotReload()`);
+      await this.handleHotReload();
+      logger('[Lifecycle] Client recovery via handleHotReload() succeeded');
     }
   }
 

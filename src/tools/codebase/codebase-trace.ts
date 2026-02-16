@@ -15,7 +15,6 @@ import {
   type TypeHierarchyInfo,
   type ImpactInfo,
 } from '../../client-pipe.js';
-import {pingClient} from '../../client-pipe.js';
 import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
 import {
@@ -25,18 +24,6 @@ import {
   checkCharacterLimit,
 } from '../ToolDefinition.js';
 import {appendIgnoreContextMarkdown, buildIgnoreContextJson} from './ignore-context.js';
-
-// ── Connection Check ─────────────────────────────────────
-
-async function ensureClientConnection(): Promise<void> {
-  const alive = await pingClient();
-  if (!alive) {
-    throw new Error(
-      'Client pipe not available. ' +
-        'Make sure the VS Code Extension Development Host window is running.',
-    );
-  }
-}
 
 // ── Reference Kind Icons ─────────────────────────────────
 
@@ -225,8 +212,6 @@ export const trace = defineTool({
       response.appendResponseLine('❌ **Error:** `symbol` parameter is required.');
       return;
     }
-
-    await ensureClientConnection();
 
     const result = await codebaseTraceSymbol(
       request.params.symbol,

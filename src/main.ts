@@ -36,7 +36,7 @@ import {
 import type {ToolDefinition} from './tools/ToolDefinition.js';
 import {tools} from './tools/tools.js';
 import {fetchAXTree} from './ax-tree.js';
-import {getProcessLedger, type ProcessLedgerSummary, type ProcessEntry} from './client-pipe.js';
+import {getProcessLedger, registerClientRecoveryHandler, ensureClientAvailable, type ProcessLedgerSummary, type ProcessEntry} from './client-pipe.js';
 
 // Default timeout for tools (30 seconds)
 const DEFAULT_TOOL_TIMEOUT_MS = 30_000;
@@ -288,6 +288,12 @@ startMcpSocketServer(config.hostWorkspace);
 // Register process-level shutdown handlers (stdin end, SIGINT, etc.)
 lifecycleService.registerShutdownHandlers();
 
+// Wire up auto-recovery: when any tool detects the Client pipe is dead,
+// the recovery handler asks the Host to restart the Client window.
+registerClientRecoveryHandler(async () => {
+  await lifecycleService.recoverClientConnection();
+});
+
 process.on('unhandledRejection', (reason, promise) => {
   logger('Unhandled promise rejection', promise, reason);
 });
@@ -421,6 +427,14 @@ function registerTool(tool: ToolDefinition): void {
         // ensureConnection() is idempotent — returns immediately if already connected.
         if (!isStandalone) {
           await ensureConnection();
+        }
+
+        // Tools that talk directly to the Client pipe need the pipe to
+        // be alive. ensureClientAvailable() auto-recovers via the Host
+        // if the Client window crashed or was closed.
+        const needsClientPipe = tool.annotations.conditions?.includes('client-pipe');
+        if (needsClientPipe) {
+          await ensureClientAvailable();
         }
 
         // Hot-reload: check two conditions for extension staleness:

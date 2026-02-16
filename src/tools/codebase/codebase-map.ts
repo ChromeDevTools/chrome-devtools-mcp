@@ -14,7 +14,6 @@ import {
   type CodebaseExportsResult,
   type ImportGraphResult,
 } from '../../client-pipe.js';
-import {pingClient} from '../../client-pipe.js';
 import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
 import {
@@ -29,17 +28,6 @@ import {appendIgnoreContextMarkdown, buildIgnoreContextJson} from './ignore-cont
 // ~3000 tokens budget — proxy at ~4 chars per token
 const TOKEN_BUDGET = 12_000;
 
-// ── Connection Check ─────────────────────────────────────
-
-async function ensureClientConnection(): Promise<void> {
-  const alive = await pingClient();
-  if (!alive) {
-    throw new Error(
-      'Client pipe not available. ' +
-      'Make sure the VS Code Extension Development Host window is running.',
-    );
-  }
-}
 
 // ── Kind Icons ───────────────────────────────────────────
 
@@ -199,8 +187,6 @@ export const map = defineTool({
       ),
   },
   handler: async (request, response) => {
-    await ensureClientConnection();
-
     const {params} = request;
     const pathType = classifyPath(params.path);
 

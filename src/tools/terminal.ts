@@ -22,7 +22,6 @@ import {
   terminalInput,
   terminalGetState,
   terminalKill,
-  pingClient,
   type TerminalRunResult,
 } from '../client-pipe.js';
 import {zod} from '../third_party/index.js';
@@ -41,16 +40,6 @@ const nameSchema = zod
     'Optional terminal name. Each named terminal runs independently with its own state and output history. ' +
     'Default: "default". Use different names to run multiple commands concurrently.',
   );
-
-async function ensureClientConnection(): Promise<void> {
-  const alive = await pingClient();
-  if (!alive) {
-    throw new Error(
-      'Client pipe not available. ' +
-      'Make sure the VS Code Extension Development Host window is running.',
-    );
-  }
-}
 
 function formatTerminalResult(
   result: TerminalRunResult,
@@ -226,8 +215,6 @@ Examples:
     logFormat: logFormatSchema,
   },
   handler: async (request, response) => {
-    await ensureClientConnection();
-
     const result = await terminalRun(
       request.params.command,
       request.params.cwd,
@@ -307,8 +294,6 @@ Examples:
     logFormat: logFormatSchema,
   },
   handler: async (request, response) => {
-    await ensureClientConnection();
-
     const result = await terminalInput(
       request.params.text,
       request.params.addNewline,
@@ -379,8 +364,6 @@ Examples:
     logFormat: logFormatSchema,
   },
   handler: async (request, response) => {
-    await ensureClientConnection();
-
     const result = await terminalGetState(request.params.name);
 
     // Apply line-level filtering if limit or pattern is specified
@@ -441,8 +424,6 @@ Returns:
     logFormat: logFormatSchema,
   },
   handler: async (request, response) => {
-    await ensureClientConnection();
-
     const result = await terminalKill(request.params.name);
 
     const formatted = formatTerminalResult(result, request.params.response_format, request.params.logFormat);

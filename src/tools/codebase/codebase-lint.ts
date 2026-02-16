@@ -16,7 +16,6 @@ import {
   type ImportGraphResult,
   type CircularChain,
 } from '../../client-pipe.js';
-import {pingClient} from '../../client-pipe.js';
 import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
 import {
@@ -25,18 +24,6 @@ import {
   responseFormatSchema,
 } from '../ToolDefinition.js';
 import {appendIgnoreContextMarkdown, buildIgnoreContextJson} from './ignore-context.js';
-
-// ── Connection Check ─────────────────────────────────────
-
-async function ensureClientConnection(): Promise<void> {
-  const alive = await pingClient();
-  if (!alive) {
-    throw new Error(
-      'Client pipe not available. ' +
-        'Make sure the VS Code Extension Development Host window is running.',
-    );
-  }
-}
 
 // ── Tool Definition ──────────────────────────────────────
 
@@ -158,8 +145,6 @@ export const lint = defineTool({
       ),
   },
   handler: async (request, response) => {
-    await ensureClientConnection();
-
     const {params} = request;
     const checks = params.checks;
     const runAll = checks.includes('all');
