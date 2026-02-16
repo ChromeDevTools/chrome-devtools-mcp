@@ -478,6 +478,24 @@ export interface ImpactInfo {
   };
 }
 
+export interface TypeHierarchyNode {
+  name: string;
+  kind: 'class' | 'interface' | 'type-alias';
+  file: string;
+  line: number;
+  column: number;
+}
+
+export interface TypeHierarchyInfo {
+  supertypes: TypeHierarchyNode[];
+  subtypes: TypeHierarchyNode[];
+  stats: {
+    totalSupertypes: number;
+    totalSubtypes: number;
+    maxDepth: number;
+  };
+}
+
 export interface CodebaseTraceSymbolResult {
   symbol: string;
   definition?: SymbolLocationInfo;
@@ -485,6 +503,7 @@ export interface CodebaseTraceSymbolResult {
   reExports: ReExportInfo[];
   callChain: CallChainInfo;
   typeFlows: TypeFlowInfo[];
+  hierarchy?: TypeHierarchyInfo;
   summary: {
     totalReferences: number;
     totalFiles: number;
@@ -627,6 +646,48 @@ export async function codebaseFindDeadCode(
     60_000,
   );
   assertResult<DeadCodeResult>(result, 'codebase.findDeadCode');
+  return result;
+}
+
+// ── Import Graph Types ───────────────────────────────────
+
+export interface ImportGraphModule {
+  path: string;
+  imports: string[];
+  importedBy: string[];
+}
+
+export interface CircularChain {
+  chain: string[];
+}
+
+export interface ImportGraphResult {
+  modules: Record<string, ImportGraphModule>;
+  circular: CircularChain[];
+  orphans: string[];
+  stats: {
+    totalModules: number;
+    totalEdges: number;
+    circularCount: number;
+    orphanCount: number;
+  };
+  errorMessage?: string;
+}
+
+/**
+ * Get the import graph for a codebase: module dependencies, circular chains, orphans.
+ */
+export async function codebaseGetImportGraph(
+  rootDir?: string,
+  includePatterns?: string[],
+  excludePatterns?: string[],
+): Promise<ImportGraphResult> {
+  const result = await sendClientRequest(
+    'codebase.getImportGraph',
+    {rootDir, includePatterns, excludePatterns},
+    60_000,
+  );
+  assertResult<ImportGraphResult>(result, 'codebase.getImportGraph');
   return result;
 }
 

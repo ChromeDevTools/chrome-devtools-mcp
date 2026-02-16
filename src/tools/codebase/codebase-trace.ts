@@ -12,6 +12,7 @@ import {
   type ReExportInfo,
   type CallChainNode,
   type TypeFlowInfo,
+  type TypeHierarchyInfo,
   type ImpactInfo,
 } from '../../client-pipe.js';
 import {pingClient} from '../../client-pipe.js';
@@ -149,6 +150,7 @@ export const trace = defineTool({
           'reexports',
           'calls',
           'type-flows',
+          'hierarchy',
         ]),
       )
       .optional()
@@ -335,6 +337,12 @@ function formatTraceResult(result: CodebaseTraceSymbolResult): string {
     lines.push('');
   }
 
+  if (result.hierarchy && (result.hierarchy.supertypes.length > 0 || result.hierarchy.subtypes.length > 0)) {
+    lines.push('### 🏗️ Type Hierarchy\n');
+    formatTypeHierarchy(result.hierarchy, lines);
+    lines.push('');
+  }
+
   if (result.impact) {
     lines.push('### 💥 Impact Analysis\n');
     formatImpact(result.impact, lines);
@@ -454,6 +462,35 @@ function formatTypeFlows(flows: TypeFlowInfo[], lines: string[]): void {
       ? ` → \`${flow.traceTo.symbol}\` at \`${shortPath(flow.traceTo.file)}\`:${flow.traceTo.line}`
       : '';
     lines.push(`- ${icon} **${flow.direction}**: \`${flow.type}\`${traceStr}`);
+  }
+}
+
+function formatTypeHierarchy(hierarchy: TypeHierarchyInfo, lines: string[]): void {
+  const {supertypes, subtypes, stats} = hierarchy;
+
+  lines.push(
+    `**${stats.totalSupertypes} supertypes**, ` +
+    `**${stats.totalSubtypes} subtypes**` +
+    (stats.maxDepth > 0 ? ` · depth: ${stats.maxDepth}` : ''),
+  );
+  lines.push('');
+
+  if (supertypes.length > 0) {
+    lines.push('**Supertypes** (extends / implements):');
+    for (const node of supertypes) {
+      const kindIcon = node.kind === 'class' ? '🔷' : node.kind === 'interface' ? '🔶' : '⬡';
+      lines.push(`  ${kindIcon} \`${node.name}\` (${node.kind}) at \`${shortPath(node.file)}\`:${node.line}`);
+    }
+    lines.push('');
+  }
+
+  if (subtypes.length > 0) {
+    lines.push('**Subtypes** (extended by / implemented by):');
+    for (const node of subtypes) {
+      const kindIcon = node.kind === 'class' ? '🔷' : node.kind === 'interface' ? '🔶' : '⬡';
+      lines.push(`  ${kindIcon} \`${node.name}\` (${node.kind}) at \`${shortPath(node.file)}\`:${node.line}`);
+    }
+    lines.push('');
   }
 }
 

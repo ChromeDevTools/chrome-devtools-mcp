@@ -7,10 +7,12 @@
 import {
   codebaseGetOverview,
   codebaseGetExports,
+  codebaseGetImportGraph,
   type CodebaseTreeNode,
   type CodebaseSymbolNode,
   type CodebaseExportInfo,
   type CodebaseExportsResult,
+  type ImportGraphResult,
 } from '../../client-pipe.js';
 import {pingClient} from '../../client-pipe.js';
 import {zod} from '../../third_party/index.js';
@@ -265,38 +267,6 @@ const REDUCE_HINTS: Record<string, string> = {
   includeTypes: 'Set to false to reduce output size',
   includeJSDoc: 'Set to false to reduce output size',
 };
-
-// ── Import Graph Types & RPC ─────────────────────────────
-
-interface ImportGraphModule {
-  imports: string[];
-  importedBy: string[];
-}
-
-interface CircularChain {
-  chain: string[];
-}
-
-interface ImportGraphResult {
-  modules: Record<string, ImportGraphModule>;
-  circular: CircularChain[];
-  orphans: string[];
-  stats: {
-    totalModules: number;
-    totalEdges: number;
-    circularCount: number;
-    orphanCount: number;
-  };
-}
-
-async function codebaseGetImportGraph(
-  _rootDir?: string,
-  _includePatterns?: string[],
-  _excludePatterns?: string[],
-): Promise<ImportGraphResult> {
-  // Phase 2: Will be moved to client-pipe.ts and wired to extension RPC
-  throw new Error('Import graph analysis is not yet implemented. Remove includeGraph to proceed.');
-}
 
 // ── Exports Formatting ───────────────────────────────────
 
