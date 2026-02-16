@@ -10,6 +10,13 @@ import type {HTTPRequest, HTTPResponse} from '../third_party/index.js';
 
 const BODY_CONTEXT_SIZE_LIMIT = 10000;
 
+const SENSITIVE_HEADERS = new Set([
+  'authorization',
+  'cookie',
+  'set-cookie',
+  'proxy-authorization',
+]);
+
 export interface NetworkFormatterOptions {
   requestId?: number | string;
   selectedInDevToolsUI?: boolean;
@@ -204,10 +211,12 @@ export class NetworkFormatter {
 
     return {
       ...this.toJSON(),
-      requestHeaders: this.#request.headers(),
+      requestHeaders: NetworkFormatter.#redactHeaders(this.#request.headers()),
       requestBody: this.#requestBody,
       requestBodyFilePath: this.#requestBodyFilePath,
-      responseHeaders: this.#request.response()?.headers(),
+      responseHeaders: NetworkFormatter.#redactHeaders(
+        this.#request.response()?.headers(),
+      ),
       responseBody: this.#responseBody,
       responseBodyFilePath: this.#responseBodyFilePath,
       failure: this.#request.failure()?.errorText,
@@ -215,6 +224,21 @@ export class NetworkFormatter {
         ? formattedRedirectChain
         : undefined,
     };
+  }
+
+  static #redactHeaders(
+    headers?: Record<string, string>,
+  ): Record<string, string> | undefined {
+    if (!headers) {
+      return undefined;
+    }
+    const redacted: Record<string, string> = {};
+    for (const [name, value] of Object.entries(headers)) {
+      redacted[name] = SENSITIVE_HEADERS.has(name.toLowerCase())
+        ? '<redacted>'
+        : value;
+    }
+    return redacted;
   }
 
   #getStatusFromRequest(request: HTTPRequest): string {
@@ -238,7 +262,10 @@ export class NetworkFormatter {
   #getFormattedHeaderValue(headers: Record<string, string>): string[] {
     const response: string[] = [];
     for (const [name, value] of Object.entries(headers)) {
-      response.push(`- ${name}:${value}`);
+      const displayValue = SENSITIVE_HEADERS.has(name.toLowerCase())
+        ? '<redacted>'
+        : value;
+      response.push(`- ${name}:${displayValue}`);
     }
     return response;
   }
