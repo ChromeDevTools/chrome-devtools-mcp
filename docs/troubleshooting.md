@@ -89,8 +89,8 @@ Point the MCP connection inside the VM to `http://127.0.0.1:9222`. This allows D
 If you want `chrome-devtools-mcp` to attach to an existing Chrome instance, start Chrome with remote debugging enabled, then pass `--browserUrl`.
 
 1. Start Chrome with a remote debugging port:
-
    - Linux:
+
      ```sh
      google-chrome --remote-debugging-port=9222
      ```
@@ -101,7 +101,6 @@ If you want `chrome-devtools-mcp` to attach to an existing Chrome instance, star
      ```
 
 2. Verify the endpoint is reachable:
-
    - `http://127.0.0.1:9222/json/version` should return JSON
 
 3. Start the MCP server and point it at the debugging endpoint:

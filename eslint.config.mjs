@@ -32,6 +32,7 @@ export default defineConfig([
             'puppeteer.config.cjs',
             'eslint.config.mjs',
             'rollup.config.mjs',
+            'examples/remote-debugging-9222.mjs',
           ],
         },
       },
