@@ -41,6 +41,12 @@ import {getProcessLedger, type ProcessLedgerSummary, type ProcessEntry} from './
 // Default timeout for tools (30 seconds)
 const DEFAULT_TOOL_TIMEOUT_MS = 30_000;
 
+// ── Error Snapshot Deduplication ──────────────────────────
+// Track the last snapshot sent on error to avoid dumping identical snapshots
+// repeatedly. Reset when a new CDP session starts (hot-reload, reconnect).
+let lastErrorSnapshotText: string | null = null;
+let lastErrorSnapshotGeneration = -1;
+
 // ── MCP Server Self Hot-Reload State ─────────────────────
 
 const mcpServerDir = getMcpServerRoot();
@@ -533,16 +539,26 @@ function registerTool(tool: ToolDefinition): void {
           {type: 'text', text: errorText},
         ];
 
-        // Always attempt a CDP-powered snapshot on errors to give the
-        // caller visual context for diagnosis. CDP is independent of the
-        // bridge, so it can still work when bridge exec hangs.
+        // Snapshot deduplication: only include a full snapshot on error if
+        // the CDP session changed (new window / hot-reload) OR the snapshot
+        // content differs from the last error snapshot we sent.
         try {
+          const currentGeneration = lifecycleService.cdpGeneration;
           const snapshot = await fetchAXTree(false);
+
           if (snapshot.formatted) {
-            content.push({
-              type: 'text',
-              text: `\n## Latest page snapshot\n${snapshot.formatted}`,
-            });
+            const isNewSession = currentGeneration !== lastErrorSnapshotGeneration;
+            const isDifferent = snapshot.formatted !== lastErrorSnapshotText;
+
+            if (isNewSession || isDifferent) {
+              content.push({
+                type: 'text',
+                text: `\n## Latest page snapshot\n${snapshot.formatted}`,
+              });
+              lastErrorSnapshotText = snapshot.formatted;
+              lastErrorSnapshotGeneration = currentGeneration;
+            }
+            // If same session + same snapshot → skip (already sent)
           }
         } catch (snapshotErr) {
           logger('Failed to capture snapshot on error:', snapshotErr);

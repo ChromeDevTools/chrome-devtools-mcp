@@ -160,6 +160,36 @@ the symbol name and optionally a file path + line/column for disambiguation.
         'Compute blast-radius impact analysis. Shows direct and transitive ' +
           'dependents with risk level assessment. Default: false.',
       ),
+    maxReferences: zod
+      .number()
+      .int()
+      .min(10)
+      .max(5000)
+      .optional()
+      .default(500)
+      .describe(
+        'Maximum number of references to return. Prevents runaway scans on large ' +
+          'codebases. Default: 500.',
+      ),
+    timeout: zod
+      .number()
+      .int()
+      .min(1000)
+      .max(120000)
+      .optional()
+      .default(30000)
+      .describe(
+        'Timeout in milliseconds. Returns partial results if exceeded. ' +
+          'Default: 30000 (30 seconds).',
+      ),
+    forceRefresh: zod
+      .boolean()
+      .optional()
+      .default(false)
+      .describe(
+        'Force invalidate project cache before tracing. Use after adding new files ' +
+          'or when the project structure has changed. Default: false.',
+      ),
   },
   handler: async (request, response) => {
     await ensureClientConnection();
@@ -173,6 +203,9 @@ the symbol name and optionally a file path + line/column for disambiguation.
       request.params.depth,
       request.params.include,
       request.params.includeImpact,
+      request.params.maxReferences,
+      request.params.timeout,
+      request.params.forceRefresh,
     );
 
     if (request.params.response_format === ResponseFormat.JSON) {
@@ -181,6 +214,7 @@ the symbol name and optionally a file path + line/column for disambiguation.
         include: "Filter to specific modes like ['references'] to reduce output",
         depth: 'Reduce depth to limit call hierarchy size',
         includeImpact: 'Set to false to skip impact analysis',
+        maxReferences: 'Reduce maxReferences to limit output size',
       });
       response.appendResponseLine(json);
       return;
@@ -191,6 +225,7 @@ the symbol name and optionally a file path + line/column for disambiguation.
       include: "Filter to specific modes like ['references'] to reduce output",
       depth: 'Reduce depth to limit call hierarchy size',
       includeImpact: 'Set to false to skip impact analysis',
+      maxReferences: 'Reduce maxReferences to limit output size',
     });
     response.appendResponseLine(markdown);
   },
@@ -207,8 +242,32 @@ function formatTraceResult(result: CodebaseTraceSymbolResult): string {
   const {totalReferences, totalFiles, maxCallDepth} = result.summary;
   lines.push(
     `**${totalReferences} references** across **${totalFiles} files** · ` +
-      `call depth: **${maxCallDepth}**\n`,
+      `call depth: **${maxCallDepth}**`,
   );
+  if (result.elapsedMs !== undefined) {
+    lines.push(` · ${result.elapsedMs}ms`);
+  }
+  lines.push('\n');
+
+  // Project diagnostics (file count and calculated timeout)
+  if (result.sourceFileCount !== undefined || result.effectiveTimeout !== undefined) {
+    const parts: string[] = [];
+    if (result.sourceFileCount !== undefined) {
+      parts.push(`${result.sourceFileCount} source files`);
+    }
+    if (result.effectiveTimeout !== undefined) {
+      parts.push(`timeout: ${Math.round(result.effectiveTimeout / 1000)}s`);
+    }
+    lines.push(`*Project: ${parts.join(' · ')}*\n`);
+  }
+
+  // Partial results warning
+  if (result.partial) {
+    const reason = result.partialReason === 'timeout'
+      ? '⚠️ **Partial results** — timeout reached'
+      : '⚠️ **Partial results** — max references limit reached';
+    lines.push(`${reason}\n`);
+  }
 
   // Definition
   if (result.definition) {

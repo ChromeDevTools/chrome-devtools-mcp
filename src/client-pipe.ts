@@ -456,6 +456,16 @@ export interface CodebaseTraceSymbolResult {
     maxCallDepth: number;
   };
   impact?: ImpactInfo;
+  /** True if results were truncated due to timeout or maxReferences limit. */
+  partial?: boolean;
+  /** Reason for partial results. */
+  partialReason?: 'timeout' | 'max-references';
+  /** Elapsed time in milliseconds. */
+  elapsedMs?: number;
+  /** Number of source files in the project. */
+  sourceFileCount?: number;
+  /** Calculated effective timeout in milliseconds. */
+  effectiveTimeout?: number;
 }
 
 // ── Codebase Methods ─────────────────────────────────────
@@ -509,11 +519,14 @@ export async function codebaseTraceSymbol(
   depth?: number,
   include?: string[],
   includeImpact?: boolean,
+  maxReferences?: number,
+  timeout?: number,
+  forceRefresh?: boolean,
 ): Promise<CodebaseTraceSymbolResult> {
   const result = await sendClientRequest(
     'codebase.traceSymbol',
-    {symbol, rootDir, file, line, column, depth, include, includeImpact},
-    60_000,
+    {symbol, rootDir, file, line, column, depth, include, includeImpact, maxReferences, timeout, forceRefresh},
+    Math.max(60_000, (timeout ?? 30_000) + 5_000),
   );
   return result as CodebaseTraceSymbolResult;
 }

@@ -68,10 +68,22 @@ class LifecycleService {
    *
    * On subsequent calls: returns immediately if CDP is already connected.
    * If another connection attempt is in-flight, waits for it.
+   *
+   * After the fast-path, verifies the CDP connection is actually healthy
+   * by sending a lightweight probe. If the probe fails, triggers a full
+   * recovery (kill + relaunch the Client window).
    */
   async ensureConnection(): Promise<void> {
     if (cdpService.isConnected) {
-      logger('[Lifecycle] Fast path — CDP already connected');
+      // Fast path — but verify CDP is actually responsive
+      const healthy = await this.isCdpHealthy();
+      if (healthy) {
+        logger('[Lifecycle] Fast path — CDP already connected and healthy');
+        return;
+      }
+      // CDP WebSocket is "open" but command failed — broken connection
+      logger('[Lifecycle] CDP appears connected but health check failed — recovering…');
+      await this.recoverBrokenConnection();
       return;
     }
 
@@ -283,6 +295,11 @@ class LifecycleService {
     return this._userDataDir;
   }
 
+  /** CDP connection generation — increments on each connect/reconnect. */
+  get cdpGeneration(): number {
+    return cdpService.generation;
+  }
+
   // ── Private ────────────────────────────────────────────
 
   private async doConnect(): Promise<void> {
@@ -346,6 +363,72 @@ class LifecycleService {
     logger(
       `[Lifecycle] Reconnect complete — CDP restored, sessionTs=${new Date(this._debugWindowStartedAt).toISOString()}`,
     );
+  }
+
+  /**
+   * Lightweight CDP health probe: send a fast command to verify the
+   * WebSocket connection is actually functional (not just "open").
+   */
+  private async isCdpHealthy(): Promise<boolean> {
+    try {
+      await cdpService.sendCdp('Runtime.evaluate', {
+        expression: '1',
+        returnByValue: true,
+      });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Handle a broken CDP connection (WebSocket says open but commands fail).
+   * Disconnects the stale CDP, then does a full recovery via handleHotReload()
+   * which kills the broken Client → rebuilds → spawns a fresh Client → reconnects.
+   */
+  private async recoverBrokenConnection(): Promise<void> {
+    logger('[Lifecycle] Recovering broken CDP connection…');
+
+    if (!this._targetWorkspace || !this._extensionPath) {
+      throw new Error('[Lifecycle] Not initialized — call init() before recovery');
+    }
+
+    // Force-disconnect the stale WebSocket
+    cdpService.disconnect();
+    clearCdpEventData();
+    this._debugWindowStartedAt = undefined;
+
+    // Try a lightweight reconnect first: maybe CDP port is still alive
+    // (e.g., window reloaded but didn't close)
+    if (this._cdpPort) {
+      const portAlive = await this.isCdpHttpAlive(this._cdpPort, 3_000);
+      if (portAlive) {
+        logger(`[Lifecycle] CDP HTTP alive on port ${this._cdpPort} — attempting reconnect`);
+        try {
+          await cdpService.connect(this._cdpPort);
+          await initCdpEventSubscriptions();
+          this._debugWindowStartedAt = Date.now();
+          logger('[Lifecycle] Recovery via reconnect succeeded');
+          return;
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          logger(`[Lifecycle] Reconnect failed: ${msg} — falling back to full relaunch`);
+        }
+      }
+    }
+
+    // Full relaunch: tell Host to kill + rebuild + spawn a new Client
+    try {
+      await this.handleHotReload();
+      logger('[Lifecycle] Recovery via hot-reload succeeded');
+    } catch (hotReloadErr) {
+      const msg = hotReloadErr instanceof Error ? hotReloadErr.message : String(hotReloadErr);
+      logger(`[Lifecycle] Hot-reload recovery failed: ${msg} — trying mcpReady() from scratch`);
+
+      // Last resort: fresh mcpReady() — launches or finds an existing Client
+      await this.doConnect();
+      logger('[Lifecycle] Recovery via fresh doConnect() succeeded');
+    }
   }
 
   private async isCdpHttpAlive(port: number, timeoutMs: number): Promise<boolean> {
