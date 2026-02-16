@@ -225,8 +225,11 @@ function registerTool(tool: ToolDefinition): void {
         return result;
       } catch (err) {
         logger(`${tool.name} error:`, err, err?.stack);
-        let errorText = err && 'message' in err ? err.message : String(err);
-        if ('cause' in err && err.cause) {
+        let errorText =
+          err && typeof err === 'object' && 'message' in err
+            ? err.message
+            : String(err);
+        if (err && typeof err === 'object' && 'cause' in err && err.cause) {
           errorText += `\nCause: ${err.cause.message}`;
         }
         return {
