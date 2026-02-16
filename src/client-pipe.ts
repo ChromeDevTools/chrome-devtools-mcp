@@ -583,22 +583,25 @@ export async function codebaseTraceSymbol(
   return result;
 }
 
-// ── Find Unused Symbols Types ────────────────────────────
+// ── Dead Code Detection Types ────────────────────────────
 
-export interface UnusedSymbolInfo {
+export interface DeadCodeItem {
   name: string;
   kind: string;
   file: string;
   line: number;
   exported: boolean;
+  reason: string;
+  confidence: 'high' | 'medium' | 'low';
 }
 
-export interface FindUnusedSymbolsResult {
-  unusedSymbols: UnusedSymbolInfo[];
+export interface DeadCodeResult {
+  deadCode: DeadCodeItem[];
   summary: {
     totalScanned: number;
-    totalUnused: number;
+    totalDead: number;
     scanDurationMs: number;
+    byKind?: Record<string, number>;
   };
   errorMessage?: string;
   resolvedRootDir?: string;
@@ -606,23 +609,24 @@ export interface FindUnusedSymbolsResult {
 }
 
 /**
- * Find symbols with zero references (potential dead code).
+ * Find dead code: unused exports, unreachable functions, dead variables.
  */
-export async function codebaseFindUnusedSymbols(
+export async function codebaseFindDeadCode(
   rootDir?: string,
   pattern?: string,
   exportedOnly?: boolean,
+  excludeTests?: boolean,
   kinds?: string[],
   limit?: number,
   includePatterns?: string[],
   excludePatterns?: string[],
-): Promise<FindUnusedSymbolsResult> {
+): Promise<DeadCodeResult> {
   const result = await sendClientRequest(
-    'codebase.findUnusedSymbols',
-    {rootDir, pattern, exportedOnly, kinds, limit, includePatterns, excludePatterns},
+    'codebase.findDeadCode',
+    {rootDir, pattern, exportedOnly, excludeTests, kinds, limit, includePatterns, excludePatterns},
     60_000,
   );
-  assertResult<FindUnusedSymbolsResult>(result, 'codebase.findUnusedSymbols');
+  assertResult<DeadCodeResult>(result, 'codebase.findDeadCode');
   return result;
 }
 

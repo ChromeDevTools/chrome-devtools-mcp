@@ -5,8 +5,8 @@
  */
 
 import {
-  codebaseFindUnusedSymbols,
-  type FindUnusedSymbolsResult,
+  codebaseFindDeadCode,
+  type DeadCodeResult,
 } from '../../client-pipe.js';
 import {pingClient} from '../../client-pipe.js';
 import {zod} from '../../third_party/index.js';
@@ -28,30 +28,37 @@ async function ensureClientConnection(): Promise<void> {
 }
 
 /**
- * Find symbols with zero references (potential dead code).
+ * Find dead code: unused exports, unreachable functions, and dead variables.
  */
-export const findUnusedSymbols = defineTool({
-  name: 'codebase_find_unused_symbols',
-  description: `Find symbols with zero references (potential dead code).
+export const deadCode = defineTool({
+  name: 'codebase_dead_code',
+  description: `Find dead code: unused exports, unreachable functions, and dead variables.
 
-Scans exported symbols in TypeScript/JavaScript files and identifies those
-with no external references. Useful for:
-- Identifying dead code for cleanup
-- Finding unused exports
-- Code health auditing
+Scans TypeScript/JavaScript files and identifies:
+- **Unused exports:** Exported symbols with zero external references
+- **Unreachable functions:** Non-exported functions with no internal callers
+- **Dead variables:** Variables assigned but never read
+- **Unused types/interfaces/enums:** Non-exported declarations with no usage
+
+Each result includes a \`reason\` explaining why the symbol is dead and a
+\`confidence\` level (high, medium, low).
 
 **PARAMETERS:**
 - \`rootDir\` (string): Project root path. Defaults to workspace root
 - \`exportedOnly\` (boolean): Only check exported symbols. Default: true
+  Set to false to also find unreachable functions, dead variables, etc.
+- \`excludeTests\` (boolean): Skip test files (*.test.*, *.spec.*, __tests__/*). Default: true
 - \`kinds\` (string[]): Symbol kinds: function, class, interface, type, variable, constant, enum
 - \`limit\` (number): Max results to return. Default: 100
 
 **EXAMPLES:**
-- Find all unused exports: {}
-- Only functions: { kinds: ['function'] }`,
+- Find unused exports: {}
+- Full dead code scan: { exportedOnly: false }
+- Only functions: { kinds: ['function'], exportedOnly: false }
+- Include test files: { excludeTests: false }`,
   timeoutMs: 60_000,
   annotations: {
-    title: 'Find Unused Symbols',
+    title: 'Dead Code Detection',
     category: ToolCategory.CODEBASE_ANALYSIS,
     readOnlyHint: true,
     destructiveHint: false,
@@ -69,9 +76,29 @@ with no external references. Useful for:
       .boolean()
       .optional()
       .default(true)
-      .describe('Only check exported symbols. Default: true.'),
+      .describe(
+        'Only check exported symbols. Default: true. ' +
+          'Set to false to also find unreachable functions, dead variables, unused types, etc.',
+      ),
+    excludeTests: zod
+      .boolean()
+      .optional()
+      .default(true)
+      .describe(
+        'Skip test files (*.test.*, *.spec.*, __tests__/*). Default: true.',
+      ),
     kinds: zod
-      .array(zod.enum(['function', 'class', 'interface', 'type', 'variable', 'constant', 'enum']))
+      .array(
+        zod.enum([
+          'function',
+          'class',
+          'interface',
+          'type',
+          'variable',
+          'constant',
+          'enum',
+        ]),
+      )
       .optional()
       .describe('Symbol kinds to check.'),
     limit: zod
@@ -100,10 +127,11 @@ with no external references. Useful for:
   handler: async (request, response) => {
     await ensureClientConnection();
 
-    const result = await codebaseFindUnusedSymbols(
+    const result = await codebaseFindDeadCode(
       request.params.rootDir,
       undefined,
       request.params.exportedOnly,
+      request.params.excludeTests,
       request.params.kinds,
       request.params.limit,
       request.params.includePatterns,
@@ -115,24 +143,24 @@ with no external references. Useful for:
       return;
     }
 
-    const markdown = formatUnusedSymbolsResult(result);
+    const markdown = formatDeadCodeResult(result);
     response.appendResponseLine(markdown);
   },
 });
 
-function formatUnusedSymbolsResult(result: FindUnusedSymbolsResult): string {
+function formatDeadCodeResult(result: DeadCodeResult): string {
   const lines: string[] = [];
 
-  lines.push('## 🔍 Unused Symbols\n');
+  lines.push('## 💀 Dead Code Report\n');
 
   if (result.errorMessage) {
     lines.push(`❌ **Error:** ${result.errorMessage}\n`);
     return lines.join('');
   }
 
-  const {totalScanned, totalUnused, scanDurationMs} = result.summary;
+  const {totalScanned, totalDead, scanDurationMs, byKind} = result.summary;
   lines.push(
-    `**${totalUnused}** unused symbols found (${totalScanned} scanned) · ${scanDurationMs}ms\n`,
+    `**${totalDead}** dead code items found (${totalScanned} scanned) · ${scanDurationMs}ms\n`,
   );
 
   if (result.resolvedRootDir) {
@@ -145,24 +173,35 @@ function formatUnusedSymbolsResult(result: FindUnusedSymbolsResult): string {
     }
   }
 
-  if (result.unusedSymbols.length === 0) {
-    lines.push('✅ No unused symbols found. All exports are referenced.\n');
+  if (byKind && Object.keys(byKind).length > 0) {
+    const parts = Object.entries(byKind)
+      .sort(([, a], [, b]) => b - a)
+      .map(([kind, count]) => `${count} ${kind}${count > 1 ? 's' : ''}`);
+    lines.push(`*Breakdown: ${parts.join(', ')}*\n`);
+  }
+
+  if (result.deadCode.length === 0) {
+    lines.push('✅ No dead code found. All symbols are referenced.\n');
     return lines.join('');
   }
 
   // Group by file
-  const byFile = new Map<string, typeof result.unusedSymbols>();
-  for (const sym of result.unusedSymbols) {
-    const existing = byFile.get(sym.file) ?? [];
-    existing.push(sym);
-    byFile.set(sym.file, existing);
+  const byFile = new Map<string, typeof result.deadCode>();
+  for (const item of result.deadCode) {
+    const existing = byFile.get(item.file) ?? [];
+    existing.push(item);
+    byFile.set(item.file, existing);
   }
 
-  for (const [file, symbols] of byFile) {
+  for (const [file, items] of byFile) {
     lines.push(`### ${file}\n`);
-    for (const sym of symbols) {
-      const badge = sym.exported ? '📤' : '🔒';
-      lines.push(`- ${badge} \`${sym.name}\` (${sym.kind}) at line ${sym.line}`);
+    for (const item of items) {
+      const badge = item.exported ? '📤' : '🔒';
+      const conf = item.confidence === 'high' ? '🔴' : item.confidence === 'medium' ? '🟡' : '🟢';
+      lines.push(
+        `- ${badge} ${conf} \`${item.name}\` (${item.kind}) at line ${item.line}`,
+      );
+      lines.push(`  *${item.reason}*`);
     }
     lines.push('');
   }

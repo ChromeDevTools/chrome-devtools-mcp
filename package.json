@@ -21,9 +21,6 @@
     "test:no-build": "node scripts/test.mjs",
     "test:only": "pnpm run build && node scripts/test.mjs --test-only",
     "test:update-snapshots": "pnpm run build && node scripts/test.mjs --test-update-snapshots",
-    "test:vitest": "pnpm run build && vitest run",
-    "test:vitest:watch": "pnpm run build && vitest",
-    "test:vitest:no-build": "vitest run",
     "prepare": "node --experimental-strip-types scripts/prepare.ts"
   },
   "files": [
@@ -62,7 +59,6 @@
     "sinon": "^21.0.0",
     "typescript": "^5.9.2",
     "typescript-eslint": "^8.43.0",
-    "vitest": "^4.0.18",
     "yargs": "18.0.0",
     "zod": "^4.3.6"
   },
