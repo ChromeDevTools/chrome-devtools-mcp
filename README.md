@@ -162,12 +162,23 @@ Restart Claude Code to have the MCP server and skills load (check with `/skills`
   using the standard config from above. You can also install the Chrome DevTools MCP server using the Codex CLI:
 
 ```bash
-codex mcp add chrome-devtools -- npx chrome-devtools-mcp@latest
+codex mcp add chrome-devtools -- npx -y chrome-devtools-mcp@latest
+```
+
+Verification: run `codex mcp list` and confirm `chrome-devtools` is listed.
+
+If you see `error: unexpected argument 'add' found`, your Codex CLI is too old to support `codex mcp add`.
+Upgrade Codex, or add the server manually by editing `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.chrome-devtools]
+command = "npx"
+args = ["-y", "chrome-devtools-mcp@latest"]
 ```
 
 **On Windows 11**
 
-Configure the Chrome install location and increase the startup timeout by updating `.codex/config.toml` and adding the following `env` and `startup_timeout_ms` parameters:
+Configure the Chrome install location and increase the startup timeout by updating `%USERPROFILE%\.codex\config.toml` (usually `C:\Users\<you>\.codex\config.toml`) and adding the following `env` and `startup_timeout_ms` parameters:
 
 ```
 [mcp_servers.chrome-devtools]

@@ -38,6 +38,19 @@ Using `.mcp.json` to debug while using a client:
 
 ## Specific problems
 
+### Codex: `error: unexpected argument 'add' found`
+
+Some older Codex CLI versions don't include the `codex mcp add`/`list` subcommands.
+
+- Run `codex mcp --help` and check whether it shows `add`.
+- If it does not, upgrade Codex, or add the server manually by editing `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.chrome-devtools]
+command = "npx"
+args = ["-y", "chrome-devtools-mcp@latest"]
+```
+
 ### `Error [ERR_MODULE_NOT_FOUND]: Cannot find module ...`
 
 This usually indicates either a non-supported Node version is in use or that the
