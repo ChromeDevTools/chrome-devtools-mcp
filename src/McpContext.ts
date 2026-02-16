@@ -701,11 +701,17 @@ export class McpContext implements Context {
   ): Promise<{filename: string}> {
     try {
       const filePath = path.resolve(filename);
+      const cwd = process.cwd();
+      if (!filePath.startsWith(cwd + path.sep) && filePath !== cwd) {
+        throw new Error(
+          `File path must be within the current working directory: ${cwd}`,
+        );
+      }
       await fs.writeFile(filePath, data);
       return {filename};
     } catch (err) {
       this.logger(err);
-      throw new Error('Could not save a screenshot to a file', {cause: err});
+      throw new Error('Could not save a file', {cause: err});
     }
   }
 
