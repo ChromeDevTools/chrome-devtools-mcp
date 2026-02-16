@@ -54,6 +54,27 @@ export interface SnapshotParams {
   filePath?: string;
 }
 
+export interface LighthouseData {
+  summary: {
+    mode: string;
+    device: string;
+    url?: string;
+    scores: Array<{
+      id: string;
+      title: string;
+      score: number | null;
+    }>;
+    audits: {
+      failed: number;
+      passed: number;
+    };
+    timing: {
+      total: number;
+    };
+  };
+  reports: string[];
+}
+
 export interface DevToolsData {
   cdpRequestId?: string;
   cdpBackendNodeId?: number;
@@ -94,6 +115,7 @@ export interface Response {
     insightName: InsightName,
   ): void;
   setListExtensions(): void;
+  attachLighthouseResult(result: LighthouseData): void;
 }
 
 /**
@@ -126,8 +148,8 @@ export type Context = Readonly<{
   setColorScheme(scheme: 'dark' | 'light' | null): void;
   saveTemporaryFile(
     data: Uint8Array<ArrayBufferLike>,
-    mimeType: 'image/png' | 'image/jpeg' | 'image/webp',
-  ): Promise<{filename: string}>;
+    filename: string,
+  ): Promise<{filepath: string}>;
   saveFile(
     data: Uint8Array<ArrayBufferLike>,
     filename: string,

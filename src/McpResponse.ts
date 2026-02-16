@@ -21,6 +21,7 @@ import {handleDialog} from './tools/pages.js';
 import type {
   DevToolsData,
   ImageContentData,
+  LighthouseData,
   Response,
   SnapshotParams,
 } from './tools/ToolDefinition.js';
@@ -47,6 +48,7 @@ export class McpResponse implements Response {
   #attachedConsoleMessageId?: number;
   #attachedTraceSummary?: TraceResult;
   #attachedTraceInsight?: TraceInsightData;
+  #attachedLighthouseResult?: LighthouseData;
   #textResponseLines: string[] = [];
   #images: ImageContentData[] = [];
   #networkRequestsOptions?: {
@@ -170,6 +172,10 @@ export class McpResponse implements Response {
     };
   }
 
+  attachLighthouseResult(result: LighthouseData): void {
+    this.#attachedLighthouseResult = result;
+  }
+
   get includePages(): boolean {
     return this.#includePages;
   }
@@ -180,6 +186,10 @@ export class McpResponse implements Response {
 
   get attachedTracedInsight(): TraceInsightData | undefined {
     return this.#attachedTraceInsight;
+  }
+
+  get attachedLighthouseResult(): LighthouseData | undefined {
+    return this.#attachedLighthouseResult;
   }
 
   get includeNetworkRequests(): boolean {
@@ -396,6 +406,7 @@ export class McpResponse implements Response {
       traceInsight: this.#attachedTraceInsight,
       traceSummary: this.#attachedTraceSummary,
       extensions,
+      lighthouseResult: this.#attachedLighthouseResult,
     });
   }
 
@@ -411,6 +422,7 @@ export class McpResponse implements Response {
       traceSummary?: TraceResult;
       traceInsight?: TraceInsightData;
       extensions?: InstalledExtension[];
+      lighthouseResult?: LighthouseData;
     },
   ): {content: Array<TextContent | ImageContent>; structuredContent: object} {
     const structuredContent: {
@@ -423,6 +435,7 @@ export class McpResponse implements Response {
       consoleMessages?: object[];
       traceSummary?: string;
       traceInsights?: Array<{insightName: string; insightKey: string}>;
+      lighthouseResult?: object;
       extensions?: object[];
       message?: string;
       networkConditions?: string;
@@ -547,6 +560,29 @@ Call ${handleDialog.name} to handle it before continuing.`);
         response.push(insightOutput.error);
       } else {
         response.push(insightOutput.output);
+      }
+    }
+
+    if (data.lighthouseResult) {
+      structuredContent.lighthouseResult = data.lighthouseResult;
+      const {summary, reports} = data.lighthouseResult;
+      response.push('## Lighthouse Audit Results');
+      response.push(`Mode: ${summary.mode}`);
+      response.push(`Device: ${summary.device}`);
+      response.push(`URL: ${summary.url}`);
+      response.push('### Category Scores');
+      for (const score of summary.scores) {
+        response.push(
+          `- ${score.title}: ${(score.score ?? 0) * 100} (${score.id})`,
+        );
+      }
+      response.push('### Audit Summary');
+      response.push(`Passed: ${summary.audits.passed}`);
+      response.push(`Failed: ${summary.audits.failed}`);
+      response.push(`Total Timing: ${summary.timing.total}ms`);
+      response.push('### Reports');
+      for (const report of reports) {
+        response.push(`- ${report}`);
       }
     }
 

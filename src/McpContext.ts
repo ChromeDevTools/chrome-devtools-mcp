@@ -93,18 +93,6 @@ function getNetworkMultiplierFromString(condition: string | null): number {
   return 1;
 }
 
-function getExtensionFromMimeType(mimeType: string) {
-  switch (mimeType) {
-    case 'image/png':
-      return 'png';
-    case 'image/jpeg':
-      return 'jpeg';
-    case 'image/webp':
-      return 'webp';
-  }
-  throw new Error(`No mapping for Mime type ${mimeType}.`);
-}
-
 export class McpContext implements Context {
   browser: Browser;
   logger: Debugger;
@@ -677,22 +665,19 @@ export class McpContext implements Context {
 
   async saveTemporaryFile(
     data: Uint8Array<ArrayBufferLike>,
-    mimeType: 'image/png' | 'image/jpeg' | 'image/webp',
-  ): Promise<{filename: string}> {
+    filename: string,
+  ): Promise<{filepath: string}> {
     try {
       const dir = await fs.mkdtemp(
         path.join(os.tmpdir(), 'chrome-devtools-mcp-'),
       );
 
-      const filename = path.join(
-        dir,
-        `screenshot.${getExtensionFromMimeType(mimeType)}`,
-      );
-      await fs.writeFile(filename, data);
-      return {filename};
+      const filepath = path.join(dir, filename);
+      await fs.writeFile(filepath, data);
+      return {filepath};
     } catch (err) {
       this.logger(err);
-      throw new Error('Could not save a screenshot to a file', {cause: err});
+      throw new Error('Could not save a file', {cause: err});
     }
   }
   async saveFile(
@@ -701,11 +686,12 @@ export class McpContext implements Context {
   ): Promise<{filename: string}> {
     try {
       const filePath = path.resolve(filename);
+      await fs.mkdir(path.dirname(filePath), {recursive: true});
       await fs.writeFile(filePath, data);
-      return {filename};
+      return {filename: filePath};
     } catch (err) {
       this.logger(err);
-      throw new Error('Could not save a screenshot to a file', {cause: err});
+      throw new Error('Could not save a file', {cause: err});
     }
   }
 

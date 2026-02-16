@@ -27,7 +27,9 @@ function removeConflictingGlobalDeclaration(): void {
     projectRoot,
     'node_modules/@paulirish/trace_engine/models/trace/ModelImpl.d.ts',
   );
-  console.log('Removing conflicting global declaration from @paulirish/trace_engine...');
+  console.log(
+    'Removing conflicting global declaration from @paulirish/trace_engine...',
+  );
   const content = readFileSync(filePath, 'utf-8');
   // Remove the declare global block using regex
   // Matches: declare global { ... interface HTMLElementEventMap { ... } ... }

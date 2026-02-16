@@ -107,7 +107,8 @@ function listBundledDeps() {
           Object.entries(devDependencies).filter(
             ([name]) =>
               aggregatedStats.bundledPackages.has(name) ||
-              name === 'chrome-devtools-frontend',
+              name === 'chrome-devtools-frontend' ||
+              name === 'lighthouse',
           ),
         );
 
@@ -260,11 +261,15 @@ export default [
         return true;
       }
 
-      const existingExternals = ['./bidi.js', '../bidi/bidi.js'];
+      const existingExternals = [
+        './bidi.js',
+        '../bidi/bidi.js',
+        './lighthouse-devtools-mcp-bundle.js',
+      ];
+
       if (existingExternals.includes(source)) {
         return true;
       }
-
       return false;
     },
   ),
