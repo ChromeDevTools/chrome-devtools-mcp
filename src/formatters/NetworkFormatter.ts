@@ -163,7 +163,7 @@ export class NetworkFormatter {
     if (redirectChain.length) {
       response.push(`### Redirect chain`);
       let indent = 0;
-      for (const request of redirectChain.reverse()) {
+      for (const request of [...redirectChain].reverse()) {
         const id = this.#options.requestIdResolver
           ? this.#options.requestIdResolver(request)
           : undefined;
@@ -191,7 +191,7 @@ export class NetworkFormatter {
 
   toJSONDetailed(): object {
     const redirectChain = this.#request.redirectChain();
-    const formattedRedirectChain = redirectChain.reverse().map(request => {
+    const formattedRedirectChain = [...redirectChain].reverse().map(request => {
       const id = this.#options.requestIdResolver
         ? this.#options.requestIdResolver(request)
         : undefined;
