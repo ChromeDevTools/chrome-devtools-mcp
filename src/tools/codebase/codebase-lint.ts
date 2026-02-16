@@ -6,7 +6,9 @@
 
 import {
   codebaseFindDeadCode,
+  codebaseFindDuplicates,
   type DeadCodeResult,
+  type DuplicateDetectionResult,
 } from '../../client-pipe.js';
 import {pingClient} from '../../client-pipe.js';
 import {zod} from '../../third_party/index.js';
@@ -38,6 +40,7 @@ export const lint = defineTool({
     'to control which analyses to run.\n\n' +
     '**Available checks:**\n' +
     '- `dead-code` — Find unused exports, unreachable functions, dead variables\n' +
+    '- `duplicates` — Find structurally duplicate code using AST hashing\n' +
     '- `all` — Run all available checks\n\n' +
     'Each result includes a `reason` explaining why the symbol is flagged and a\n' +
     '`confidence` level (high, medium, low).\n\n' +
@@ -67,13 +70,13 @@ export const lint = defineTool({
     response_format: responseFormatSchema,
     checks: zod
       .array(
-        zod.enum(['all', 'dead-code']),
+        zod.enum(['all', 'dead-code', 'duplicates']),
       )
       .optional()
       .default(['all'])
       .describe(
         "Which lint checks to run. Default: ['all']. " +
-          "Currently available: 'dead-code'.",
+          "Currently available: 'dead-code', 'duplicates'.",
       ),
     rootDir: zod
       .string()
@@ -138,6 +141,7 @@ export const lint = defineTool({
     const checks = params.checks;
     const runAll = checks.includes('all');
     const runDeadCode = runAll || checks.includes('dead-code');
+    const runDuplicates = runAll || checks.includes('duplicates');
 
     const sections: LintSection[] = [];
 
@@ -153,6 +157,17 @@ export const lint = defineTool({
         params.excludePatterns,
       );
       sections.push({check: 'dead-code', deadCodeResult: result});
+    }
+
+    if (runDuplicates) {
+      const result = await codebaseFindDuplicates(
+        params.rootDir,
+        params.kinds,
+        params.limit,
+        params.includePatterns,
+        params.excludePatterns,
+      );
+      sections.push({check: 'duplicates', duplicatesResult: result});
     }
 
     if (params.response_format === ResponseFormat.JSON) {
@@ -171,11 +186,13 @@ export const lint = defineTool({
 interface LintSection {
   check: string;
   deadCodeResult?: DeadCodeResult;
+  duplicatesResult?: DuplicateDetectionResult;
 }
 
 interface LintJsonResult {
   checks: string[];
   deadCode?: DeadCodeResult;
+  duplicates?: DuplicateDetectionResult;
   summary: {
     totalIssues: number;
     checksRun: string[];
@@ -188,6 +205,7 @@ function buildJsonResult(sections: LintSection[]): LintJsonResult {
   let totalIssues = 0;
   const checksRun: string[] = [];
   let deadCode: DeadCodeResult | undefined;
+  let duplicates: DuplicateDetectionResult | undefined;
 
   for (const section of sections) {
     checksRun.push(section.check);
@@ -195,11 +213,16 @@ function buildJsonResult(sections: LintSection[]): LintJsonResult {
       deadCode = section.deadCodeResult;
       totalIssues += section.deadCodeResult.summary.totalDead;
     }
+    if (section.duplicatesResult) {
+      duplicates = section.duplicatesResult;
+      totalIssues += section.duplicatesResult.summary.totalGroups;
+    }
   }
 
   return {
     checks: checksRun,
     deadCode,
+    duplicates,
     summary: {totalIssues, checksRun},
   };
 }
@@ -216,6 +239,10 @@ function formatLintReport(sections: LintSection[]): string {
     if (section.check === 'dead-code' && section.deadCodeResult) {
       totalIssues += section.deadCodeResult.summary.totalDead;
       formatDeadCodeSection(section.deadCodeResult, lines);
+    }
+    if (section.check === 'duplicates' && section.duplicatesResult) {
+      totalIssues += section.duplicatesResult.summary.totalGroups;
+      formatDuplicatesSection(section.duplicatesResult, lines);
     }
   }
 
@@ -280,6 +307,40 @@ function formatDeadCodeSection(result: DeadCodeResult, lines: string[]): void {
         `- ${badge} ${conf} \`${item.name}\` (${item.kind}) at line ${item.line}`,
       );
       lines.push(`  *${item.reason}*`);
+    }
+    lines.push('');
+  }
+}
+
+function formatDuplicatesSection(result: DuplicateDetectionResult, lines: string[]): void {
+  lines.push('### 🔁 Duplicate Code\n');
+
+  if (result.errorMessage) {
+    lines.push(`❌ **Error:** ${result.errorMessage}\n`);
+    return;
+  }
+
+  const {totalGroups, totalDuplicateInstances, filesWithDuplicates, scanDurationMs} = result.summary;
+  lines.push(
+    `**${totalGroups}** duplicate groups (${totalDuplicateInstances} instances across ${filesWithDuplicates} files) · ${scanDurationMs}ms\n`,
+  );
+
+  if (result.resolvedRootDir) {
+    lines.push(`*Project root: \`${result.resolvedRootDir}\`*\n`);
+  }
+
+  if (result.groups.length === 0) {
+    lines.push('✅ No structural duplicates found.\n');
+    return;
+  }
+
+  for (let i = 0; i < result.groups.length; i++) {
+    const group = result.groups[i];
+    const kindIcon = group.kind === 'function' ? '⚡' : group.kind === 'class' ? '🔷' : group.kind === 'interface' ? '🔶' : '📋';
+    lines.push(`#### ${kindIcon} Group ${i + 1} — ${group.kind} (${group.lineCount} lines, ${group.instances.length} copies)\n`);
+
+    for (const instance of group.instances) {
+      lines.push(`- \`${instance.name}\` in \`${instance.file}\` (lines ${instance.line}–${instance.endLine})`);
     }
     lines.push('');
   }

@@ -691,6 +691,54 @@ export async function codebaseGetImportGraph(
   return result;
 }
 
+// ── Duplicate Detection Types ────────────────────────────
+
+export interface DuplicateInstance {
+  file: string;
+  name: string;
+  line: number;
+  endLine: number;
+}
+
+export interface DuplicateGroup {
+  hash: string;
+  kind: string;
+  lineCount: number;
+  instances: DuplicateInstance[];
+}
+
+export interface DuplicateDetectionResult {
+  groups: DuplicateGroup[];
+  summary: {
+    totalGroups: number;
+    totalDuplicateInstances: number;
+    filesWithDuplicates: number;
+    scanDurationMs: number;
+  };
+  resolvedRootDir?: string;
+  diagnostics?: string[];
+  errorMessage?: string;
+}
+
+/**
+ * Find structurally duplicate code in the codebase using AST hashing.
+ */
+export async function codebaseFindDuplicates(
+  rootDir?: string,
+  kinds?: string[],
+  limit?: number,
+  includePatterns?: string[],
+  excludePatterns?: string[],
+): Promise<DuplicateDetectionResult> {
+  const result = await sendClientRequest(
+    'codebase.findDuplicates',
+    {rootDir, kinds, limit, includePatterns, excludePatterns},
+    60_000,
+  );
+  assertResult<DuplicateDetectionResult>(result, 'codebase.findDuplicates');
+  return result;
+}
+
 // ── Utility ──────────────────────────────────────────────
 
 /**
