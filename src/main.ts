@@ -55,22 +55,27 @@ let mcpServerHotReloadInfo: {builtAt: number} | null = null;
 let mcpServerRestartScheduled = false;
 
 /**
- * Run `pnpm run build` in the mcp-server directory.
- * Returns stdout/stderr on success, throws on failure.
+ * Run an incremental build for hot-reload: `tsc` + `post-build` WITHOUT
+ * `rmSync('build')`. The full `pnpm run build` cleans the build dir first,
+ * but the running MCP server process IS loaded from `build/src/` — on
+ * Windows the running process holds file locks, causing EPERM.
+ *
+ * Incremental tsc overwrites files in-place, which works fine even while
+ * the old code is loaded (Node.js has already read them into memory).
  */
 function runMcpServerBuild(): Promise<{stdout: string; stderr: string}> {
   return new Promise((resolve, reject) => {
-    logger(`[mcp-hot-reload] Running build in ${mcpServerDir}`);
+    logger(`[mcp-hot-reload] Running incremental build in ${mcpServerDir}`);
+    const cmd = 'npx tsc && node --experimental-strip-types --no-warnings=ExperimentalWarning scripts/post-build.ts';
     exec(
-      'pnpm run build',
+      cmd,
       {cwd: mcpServerDir, timeout: 120_000},
       (err, stdout, stderr) => {
         if (err) {
-          // Include both stdout and stderr — TypeScript errors go to stdout
           const output = [stdout, stderr].filter(Boolean).join('\n').trim();
           reject(new Error(`MCP server build failed:\n${output}`));
         } else {
-          logger('[mcp-hot-reload] Build completed successfully');
+          logger('[mcp-hot-reload] Incremental build completed successfully');
           resolve({stdout, stderr});
         }
       },
@@ -330,6 +335,14 @@ Avoid sharing sensitive or personal information that you do not want to share wi
 
 const toolMutex = new Mutex();
 
+// Serializes the hot-reload detection + build so parallel tool calls
+// don't race each other. Only the first caller does the actual check;
+// subsequent callers wait and then re-check the flags.
+const hotReloadMutex = new Mutex();
+
+/** Shared result from the hot-reload check — set by the winner, consumed by waiters. */
+let hotReloadResult: CallToolResult | null = null;
+
 function registerTool(tool: ToolDefinition): void {
   if (
     tool.annotations.conditions?.includes('computerVision') &&
@@ -355,64 +368,72 @@ function registerTool(tool: ToolDefinition): void {
       const timeoutMs = tool.timeoutMs ?? DEFAULT_TOOL_TIMEOUT_MS;
       let guard: InstanceType<typeof Mutex.Guard> | undefined;
       try {
-        // ── MCP Server Self Hot-Reload ──────────────────────
-        // Before executing ANY tool, check if this server's own source
-        // has changed since the last build. If so: rebuild → return
-        // "try again" message → schedule restart via Host extension.
-        if (!mcpServerRestartScheduled && hasMcpServerSourceChanged(mcpServerDir)) {
-          logger(`[tool:${tool.name}] MCP server source changed — triggering self rebuild…`);
-
+        // ── MCP Server Self Hot-Reload (Serialized) ─────────
+        // Serialize the hot-reload check with its own mutex so parallel
+        // tool calls don't race each other. The FIRST caller does the
+        // detection + build; subsequent callers wait, then see the
+        // `mcpServerRestartScheduled` flag and short-circuit.
+        {
+          const hrGuard = await hotReloadMutex.acquire();
           try {
-            await runMcpServerBuild();
-            writeHotReloadMarker(mcpServerDir);
+            // Check 1: Source files newer than build output → needs rebuild.
+            if (!mcpServerRestartScheduled && hasMcpServerSourceChanged(mcpServerDir)) {
+              logger(`[tool:${tool.name}] MCP server source changed — triggering self rebuild…`);
 
-            // Schedule restart AFTER this response is sent
-            scheduleMcpServerRestart();
+              try {
+                await runMcpServerBuild();
+                writeHotReloadMarker(mcpServerDir);
+                scheduleMcpServerRestart();
 
-            return {
-              content: [{
-                type: 'text',
-                text: [
-                  '⚡ **MCP server source changed — rebuilt successfully.**',
-                  '',
-                  'The MCP server will now restart to apply the latest changes.',
-                  'Please call the tool again to use the newest version.',
-                ].join('\n'),
-              }],
-            };
-          } catch (buildErr) {
-            const msg = buildErr instanceof Error ? buildErr.message : String(buildErr);
-            logger(`[mcp-hot-reload] Build failed: ${msg}`);
-            return {
-              content: [{type: 'text', text: `❌ **MCP server rebuild failed:**\n\n\`\`\`\n${msg}\n\`\`\``}],
-              isError: true,
-            };
+                hotReloadResult = {
+                  content: [{
+                    type: 'text',
+                    text: [
+                      '⚡ **MCP server source changed — rebuilt successfully.**',
+                      '',
+                      'The MCP server will now restart to apply the latest changes.',
+                      'Please call the tool again to use the newest version.',
+                    ].join('\n'),
+                  }],
+                };
+                return hotReloadResult;
+              } catch (buildErr) {
+                const msg = buildErr instanceof Error ? buildErr.message : String(buildErr);
+                logger(`[mcp-hot-reload] Build failed: ${msg}`);
+                return {
+                  content: [{type: 'text', text: `❌ **MCP server rebuild failed:**\n\n\`\`\`\n${msg}\n\`\`\``}],
+                  isError: true,
+                };
+              }
+            }
+
+            // Check 2: Build output newer than this process → manual CLI build.
+            if (!mcpServerRestartScheduled && hasBuildChangedSinceProcessStart(mcpServerDir, mcpProcessStartTime)) {
+              logger(`[tool:${tool.name}] MCP server build updated (manual build) — restarting…`);
+              writeHotReloadMarker(mcpServerDir);
+              scheduleMcpServerRestart();
+
+              hotReloadResult = {
+                content: [{
+                  type: 'text',
+                  text: [
+                    '⚡ **MCP server build updated — restart required.**',
+                    '',
+                    'A newer build was detected. The MCP server will restart to load the latest code.',
+                    'Please call the tool again after the restart.',
+                  ].join('\n'),
+                }],
+              };
+              return hotReloadResult;
+            }
+          } finally {
+            hrGuard.dispose();
           }
         }
 
-        // Check 2: Build output newer than this process → manual CLI build.
-        // No rebuild needed (already built), just restart to load the new code.
-        if (!mcpServerRestartScheduled && hasBuildChangedSinceProcessStart(mcpServerDir, mcpProcessStartTime)) {
-          logger(`[tool:${tool.name}] MCP server build updated (manual build) — restarting…`);
-          writeHotReloadMarker(mcpServerDir);
-          scheduleMcpServerRestart();
-
-          return {
-            content: [{
-              type: 'text',
-              text: [
-                '⚡ **MCP server build updated — restart required.**',
-                '',
-                'A newer build was detected. The MCP server will restart to load the latest code.',
-                'Please call the tool again after the restart.',
-              ].join('\n'),
-            }],
-          };
-        }
-
-        // If a restart is already pending (rare edge case), short-circuit
+        // If a restart was scheduled (by first caller), all waiters hit this.
         if (mcpServerRestartScheduled) {
-          return {
+          return hotReloadResult ?? {
             content: [{
               type: 'text',
               text: '⏳ MCP server is restarting. Please wait a moment and try again.',

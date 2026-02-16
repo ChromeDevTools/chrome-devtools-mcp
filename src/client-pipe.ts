@@ -782,6 +782,7 @@ export async function codebaseGetDiagnostics(
 // ── Recovery Handler ─────────────────────────────────────
 
 let clientRecoveryHandler: (() => Promise<void>) | undefined;
+let clientRecoveryInProgress: Promise<void> | undefined;
 
 /**
  * Register a callback that will be invoked when the client pipe
@@ -814,9 +815,28 @@ export async function pingClient(): Promise<boolean> {
  *    (which asks the Host to restart the Client window).
  * 3. Retries the ping with exponential back-off (up to 3 attempts).
  * 4. Throws only if all recovery attempts fail.
+ *
+ * Deduplicated: when multiple parallel tool calls detect a dead Client
+ * simultaneously, only the first triggers recovery — subsequent callers
+ * await the in-flight recovery instead of starting independent attempts.
  */
 export async function ensureClientAvailable(): Promise<void> {
   if (await pingClient()) return;
+
+  // Deduplication: if recovery is already in-flight, wait for it
+  if (clientRecoveryInProgress) {
+    logger('[client-pipe] Recovery already in-flight — waiting for existing attempt…');
+    try {
+      await clientRecoveryInProgress;
+    } catch {
+      // The driving caller's recovery failed — we still check if Client came back
+    }
+    if (await pingClient()) return;
+    throw new Error(
+      'Client pipe unavailable after waiting for concurrent recovery. ' +
+        'The VS Code Extension Development Host may have failed to restart.',
+    );
+  }
 
   if (!clientRecoveryHandler) {
     throw new Error(
@@ -827,28 +847,36 @@ export async function ensureClientAvailable(): Promise<void> {
 
   logger('[client-pipe] Client pipe not responding — triggering recovery…');
 
-  try {
-    await clientRecoveryHandler();
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    logger(`[client-pipe] Recovery handler threw: ${msg}`);
-  }
-
-  // Retry with increasing delays: 2s, 4s, 6s
-  for (let attempt = 1; attempt <= 3; attempt++) {
-    const delayMs = attempt * 2000;
-    await new Promise<void>(resolve => setTimeout(resolve, delayMs));
-    if (await pingClient()) {
-      logger(`[client-pipe] Recovery successful (attempt ${attempt})`);
-      return;
+  clientRecoveryInProgress = (async () => {
+    try {
+      await clientRecoveryHandler!();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      logger(`[client-pipe] Recovery handler threw: ${msg}`);
     }
-    logger(`[client-pipe] Retry ${attempt}/3 — client pipe still not responding`);
-  }
 
-  throw new Error(
-    'Client pipe unavailable after recovery. ' +
-      'The VS Code Extension Development Host may have failed to restart.',
-  );
+    // Retry with increasing delays: 2s, 4s, 6s
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      const delayMs = attempt * 2000;
+      await new Promise<void>(resolve => setTimeout(resolve, delayMs));
+      if (await pingClient()) {
+        logger(`[client-pipe] Recovery successful (attempt ${attempt})`);
+        return;
+      }
+      logger(`[client-pipe] Retry ${attempt}/3 — client pipe still not responding`);
+    }
+
+    throw new Error(
+      'Client pipe unavailable after recovery. ' +
+        'The VS Code Extension Development Host may have failed to restart.',
+    );
+  })();
+
+  try {
+    await clientRecoveryInProgress;
+  } finally {
+    clientRecoveryInProgress = undefined;
+  }
 }
 
 /**

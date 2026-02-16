@@ -32,6 +32,7 @@ class LifecycleService {
   private _cdpPort: number | undefined;
   private connectInProgress: Promise<void> | undefined;
   private reconnectInProgress: Promise<void> | undefined;
+  private recoveryInProgress: Promise<void> | undefined;
   private exitCleanupDone = false;
   private shutdownHandlersRegistered = false;
 
@@ -81,9 +82,10 @@ class LifecycleService {
         logger('[Lifecycle] Fast path — CDP already connected and healthy');
         return;
       }
-      // CDP WebSocket is "open" but command failed — broken connection
-      logger('[Lifecycle] CDP appears connected but health check failed — recovering…');
-      await this.recoverBrokenConnection();
+      // CDP WebSocket is "open" but command failed — broken connection.
+      // Route through recoveryInProgress mutex to prevent concurrent
+      // recovery attempts when multiple tools detect the same failure.
+      await this.withRecoveryDedup(() => this.recoverBrokenConnection());
       return;
     }
 
@@ -383,6 +385,29 @@ class LifecycleService {
   }
 
   /**
+   * Deduplication guard for all recovery paths.
+   *
+   * When multiple parallel tool calls detect an unhealthy Client/CDP
+   * simultaneously, only the FIRST caller drives the recovery; subsequent
+   * callers await the in-flight recovery instead of starting independent
+   * attempts (which would cascade restarts).
+   */
+  private async withRecoveryDedup(fn: () => Promise<void>): Promise<void> {
+    if (this.recoveryInProgress) {
+      logger('[Lifecycle] Recovery already in-flight — waiting for existing attempt…');
+      await this.recoveryInProgress;
+      return;
+    }
+
+    this.recoveryInProgress = fn();
+    try {
+      await this.recoveryInProgress;
+    } finally {
+      this.recoveryInProgress = undefined;
+    }
+  }
+
+  /**
    * Handle a broken CDP connection (WebSocket says open but commands fail).
    * Disconnects the stale CDP, then does a full recovery via handleHotReload()
    * which kills the broken Client → rebuilds → spawns a fresh Client → reconnects.
@@ -436,10 +461,19 @@ class LifecycleService {
    * Recover the Client pipe connection.
    *
    * Called when a tool detects the Client pipe is unreachable.
+   * Uses the shared recovery mutex to prevent concurrent recovery
+   * attempts from multiple parallel tool calls.
+   */
+  async recoverClientConnection(): Promise<void> {
+    await this.withRecoveryDedup(() => this.doRecoverClientConnection());
+  }
+
+  /**
+   * Internal: performs the actual Client pipe recovery.
    * Forces CDP disconnect (the Client is likely dead), then asks the
    * Host to spawn/reconnect the Client via the standard startup flow.
    */
-  async recoverClientConnection(): Promise<void> {
+  private async doRecoverClientConnection(): Promise<void> {
     logger('[Lifecycle] Client pipe recovery requested — restarting Client…');
 
     if (!this._targetWorkspace || !this._extensionPath) {
