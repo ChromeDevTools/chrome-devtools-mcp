@@ -55,39 +55,44 @@ const DIRECTION_ICONS: Record<string, string> = {
   property: '●',
 };
 
+// ── Reduce Hints ─────────────────────────────────────────
+
+const REDUCE_HINTS: Record<string, string> = {
+  include: "Filter to specific modes like ['references'] to reduce output",
+  depth: 'Reduce depth to limit call hierarchy size',
+  includeImpact: 'Set to false to skip impact analysis',
+  maxReferences: 'Reduce maxReferences to limit output size',
+};
+
 // ── Tool Definition ──────────────────────────────────────
 
-export const traceSymbol = defineTool({
-  name: 'codebase_trace_symbol',
-  description: `Trace a symbol through the codebase to understand its full lifecycle.
-
-Finds a symbol's definition, all references, re-export chains, call hierarchy
-(who calls it / what it calls), type flows (parameter types, return types,
-inheritance), and optionally computes blast-radius impact analysis.
-
-Use this after codebase_exports to deep-dive into a specific symbol. Provide
-the symbol name and optionally a file path + line/column for disambiguation.
-
-**PARAMETERS:**
-- \`symbol\` (string, required): Name of the symbol to trace
-- \`file\` (string): File where the symbol is defined (helps disambiguation)
-- \`line\` (number): Line number of the symbol (1-based)
-- \`column\` (number): Column number of the symbol (0-based)
-- \`rootDir\` (string): Absolute path to project root. Defaults to workspace root
-- \`depth\` (number, 1-10): Call hierarchy traversal depth. Default: 3
-- \`include\` (string[]): Which analyses to include. Default: ['all']
-- \`includeImpact\` (boolean): Compute blast-radius impact analysis. Default: false
-- \`response_format\` ('markdown'|'json'): Output format. Default: 'markdown'
-
-**EXAMPLES:**
-- Trace a function: \`{ symbol: "calculateTotal" }\`
-- Trace with file hint: \`{ symbol: "UserService", file: "src/services/user.ts" }\`
-- Only references: \`{ symbol: "config", include: ["references"] }\`
-- Call hierarchy: \`{ symbol: "handleRequest", include: ["calls"], depth: 5 }\`
-- Full impact: \`{ symbol: "BaseEntity", includeImpact: true }\``,
+export const trace = defineTool({
+  name: 'codebase_trace',
+  description: 'Trace a symbol through the codebase to understand its full lifecycle.\n\n' +
+    "Finds a symbol's definition, all references, re-export chains, call hierarchy\n" +
+    '(who calls it / what it calls), type flows (parameter types, return types,\n' +
+    'inheritance), and optionally computes blast-radius impact analysis.\n\n' +
+    'Use this after codebase_map to deep-dive into a specific symbol. Provide\n' +
+    'the symbol name and optionally a file path + line/column for disambiguation.\n\n' +
+    '**PARAMETERS:**\n' +
+    '- `symbol` (string, required): Name of the symbol to trace\n' +
+    '- `file` (string): File where the symbol is defined (helps disambiguation)\n' +
+    '- `line` (number): Line number of the symbol (1-based)\n' +
+    '- `column` (number): Column number of the symbol (0-based)\n' +
+    '- `rootDir` (string): Absolute path to project root. Defaults to workspace root\n' +
+    '- `depth` (number, 1-10): Call hierarchy traversal depth. Default: 3\n' +
+    "- `include` (string[]): Which analyses to include. Default: ['all']\n" +
+    '- `includeImpact` (boolean): Compute blast-radius impact analysis. Default: false\n' +
+    "- `response_format` ('markdown'|'json'): Output format. Default: 'markdown'\n\n" +
+    '**EXAMPLES:**\n' +
+    '- Trace a function: `{ symbol: "calculateTotal" }`\n' +
+    '- Trace with file hint: `{ symbol: "UserService", file: "src/services/user.ts" }`\n' +
+    '- Only references: `{ symbol: "config", include: ["references"] }`\n' +
+    '- Call hierarchy: `{ symbol: "handleRequest", include: ["calls"], depth: 5 }`\n' +
+    '- Full impact: `{ symbol: "BaseEntity", includeImpact: true }`',
   timeoutMs: 60_000,
   annotations: {
-    title: 'Codebase Trace Symbol',
+    title: 'Codebase Trace',
     category: ToolCategory.CODEBASE_ANALYSIS,
     readOnlyHint: true,
     destructiveHint: false,
@@ -228,23 +233,13 @@ the symbol name and optionally a file path + line/column for disambiguation.
 
     if (request.params.response_format === ResponseFormat.JSON) {
       const json = JSON.stringify(result, null, 2);
-      checkCharacterLimit(json, 'codebase_trace_symbol', {
-        include: "Filter to specific modes like ['references'] to reduce output",
-        depth: 'Reduce depth to limit call hierarchy size',
-        includeImpact: 'Set to false to skip impact analysis',
-        maxReferences: 'Reduce maxReferences to limit output size',
-      });
+      checkCharacterLimit(json, 'codebase_trace', REDUCE_HINTS);
       response.appendResponseLine(json);
       return;
     }
 
     const markdown = formatTraceResult(result);
-    checkCharacterLimit(markdown, 'codebase_trace_symbol', {
-      include: "Filter to specific modes like ['references'] to reduce output",
-      depth: 'Reduce depth to limit call hierarchy size',
-      includeImpact: 'Set to false to skip impact analysis',
-      maxReferences: 'Reduce maxReferences to limit output size',
-    });
+    checkCharacterLimit(markdown, 'codebase_trace', REDUCE_HINTS);
     response.appendResponseLine(markdown);
   },
 });
@@ -256,7 +251,6 @@ function formatTraceResult(result: CodebaseTraceSymbolResult): string {
 
   lines.push(`## Symbol Trace: \`${result.symbol}\`\n`);
 
-  // Summary line
   const {totalReferences, totalFiles, maxCallDepth} = result.summary;
   lines.push(
     `**${totalReferences} references** across **${totalFiles} files** · ` +
@@ -267,7 +261,6 @@ function formatTraceResult(result: CodebaseTraceSymbolResult): string {
   }
   lines.push('\n');
 
-  // Project diagnostics (file count, calculated timeout, root dir)
   if (result.sourceFileCount !== undefined || result.effectiveTimeout !== undefined || result.resolvedRootDir) {
     const parts: string[] = [];
     if (result.resolvedRootDir) {
@@ -282,7 +275,6 @@ function formatTraceResult(result: CodebaseTraceSymbolResult): string {
     lines.push(`*Project: ${parts.join(' · ')}*\n`);
   }
 
-  // Partial results warning
   if (result.partial) {
     const reason = result.partialReason === 'timeout'
       ? '⚠️ **Partial results** — timeout reached'
@@ -290,12 +282,10 @@ function formatTraceResult(result: CodebaseTraceSymbolResult): string {
     lines.push(`${reason}\n`);
   }
 
-  // Error message (if any)
   if (result.errorMessage) {
     lines.push(`❌ **Error:** ${result.errorMessage}\n`);
   }
 
-  // Not found hint
   if (result.notFoundReason && !result.definition) {
     const hints: Record<string, string> = {
       'no-project': '💡 No workspace folder found. Open a folder or specify `rootDir`.',
@@ -307,35 +297,30 @@ function formatTraceResult(result: CodebaseTraceSymbolResult): string {
     lines.push(`${hints[result.notFoundReason] ?? ''}\n`);
   }
 
-  // Diagnostics (node_modules warnings, pattern match issues)
   if (result.diagnostics && result.diagnostics.length > 0) {
     for (const diag of result.diagnostics) {
       lines.push(`💡 ${diag}\n`);
     }
   }
 
-  // Definition
   if (result.definition) {
     lines.push('### 📍 Definition\n');
     formatDefinition(result.definition, lines);
     lines.push('');
   }
 
-  // References
   if (result.references.length > 0) {
     lines.push('### 📚 References\n');
     formatReferences(result.references, lines);
     lines.push('');
   }
 
-  // Re-exports
   if (result.reExports.length > 0) {
     lines.push('### 🔄 Re-exports\n');
     formatReExports(result.reExports, lines);
     lines.push('');
   }
 
-  // Call hierarchy
   const hasIncoming = result.callChain.incomingCalls.length > 0;
   const hasOutgoing = result.callChain.outgoingCalls.length > 0;
   if (hasIncoming || hasOutgoing) {
@@ -344,14 +329,12 @@ function formatTraceResult(result: CodebaseTraceSymbolResult): string {
     lines.push('');
   }
 
-  // Type flows
   if (result.typeFlows.length > 0) {
     lines.push('### ⊤ Type Flows\n');
     formatTypeFlows(result.typeFlows, lines);
     lines.push('');
   }
 
-  // Impact analysis
   if (result.impact) {
     lines.push('### 💥 Impact Analysis\n');
     formatImpact(result.impact, lines);
@@ -366,12 +349,11 @@ function formatDefinition(def: SymbolLocationInfo, lines: string[]): void {
   const unresolvedStr = def.unresolved ? ' ⚠️ **unresolved import**' : '';
   lines.push(`**${shortPath(def.file)}:${def.line}:${def.column}**${kindStr}${unresolvedStr}`);
   if (def.signature) {
-    lines.push(`\`\`\`\n${def.signature}\n\`\`\``);
+    lines.push('```\n' + def.signature + '\n```');
   }
 }
 
 function formatReferences(refs: ReferenceInfo[], lines: string[]): void {
-  // Group by file
   const grouped = new Map<string, ReferenceInfo[]>();
   for (const ref of refs) {
     const fileRefs = grouped.get(ref.file) ?? [];
@@ -379,7 +361,6 @@ function formatReferences(refs: ReferenceInfo[], lines: string[]): void {
     grouped.set(ref.file, fileRefs);
   }
 
-  // Show count per kind
   const kindCounts = new Map<string, number>();
   for (const ref of refs) {
     kindCounts.set(ref.kind, (kindCounts.get(ref.kind) ?? 0) + 1);
@@ -390,7 +371,6 @@ function formatReferences(refs: ReferenceInfo[], lines: string[]): void {
     .join(' · ');
   lines.push(`${kindSummary}\n`);
 
-  // Limit displayed references to avoid huge output
   const MAX_REFS_PER_FILE = 10;
   const MAX_FILES = 20;
   let fileCount = 0;
@@ -527,9 +507,7 @@ function formatImpact(impact: ImpactInfo, lines: string[]): void {
 // ── Helpers ──────────────────────────────────────────────
 
 function shortPath(filePath: string): string {
-  // Normalize path separators
   const normalized = filePath.replace(/\\/g, '/');
-  // Try to show only the last 3 segments
   const parts = normalized.split('/');
   if (parts.length <= 3) return normalized;
   return '…/' + parts.slice(-3).join('/');

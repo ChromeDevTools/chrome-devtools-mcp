@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-export {overview} from './codebase-overview.js';
-export {exports} from './codebase-exports.js';
-export {traceSymbol} from './codebase-trace-symbol.js';
-export {deadCode} from './codebase-dead-code.js';
+export {map} from './codebase-map.js';
+export {trace} from './codebase-trace.js';
+export {lint} from './codebase-lint.js';
