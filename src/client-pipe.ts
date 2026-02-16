@@ -739,6 +739,46 @@ export async function codebaseFindDuplicates(
   return result;
 }
 
+// ── Diagnostics Types ────────────────────────────────────
+
+export interface DiagnosticItem {
+  file: string;
+  line: number;
+  column: number;
+  severity: string;
+  code: string;
+  message: string;
+  source: string;
+}
+
+export interface DiagnosticsResult {
+  diagnostics: DiagnosticItem[];
+  summary: {
+    totalErrors: number;
+    totalWarnings: number;
+    totalFiles: number;
+  };
+  errorMessage?: string;
+}
+
+/**
+ * Get live diagnostics (errors/warnings) from VS Code's language services.
+ */
+export async function codebaseGetDiagnostics(
+  severityFilter?: string[],
+  includePatterns?: string[],
+  excludePatterns?: string[],
+  limit?: number,
+): Promise<DiagnosticsResult> {
+  const result = await sendClientRequest(
+    'codebase.getDiagnostics',
+    {severityFilter, includePatterns, excludePatterns, limit},
+    30_000,
+  );
+  assertResult<DiagnosticsResult>(result, 'codebase.getDiagnostics');
+  return result;
+}
+
 // ── Utility ──────────────────────────────────────────────
 
 /**

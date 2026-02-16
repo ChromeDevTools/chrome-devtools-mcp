@@ -24,6 +24,7 @@ import {
   responseFormatSchema,
   checkCharacterLimit,
 } from '../ToolDefinition.js';
+import {appendIgnoreContextMarkdown, buildIgnoreContextJson} from './ignore-context.js';
 
 // ── Connection Check ─────────────────────────────────────
 
@@ -233,14 +234,31 @@ export const trace = defineTool({
       request.params.excludePatterns,
     );
 
+    const isEmpty = result.summary.totalReferences === 0 &&
+      result.references.length === 0 &&
+      result.reExports.length === 0 &&
+      result.callChain.incomingCalls.length === 0 &&
+      result.callChain.outgoingCalls.length === 0 &&
+      result.typeFlows.length === 0 &&
+      !result.definition;
+
+    const effectiveRootDir = result.resolvedRootDir ?? request.params.rootDir;
+
     if (request.params.response_format === ResponseFormat.JSON) {
+      if (isEmpty && effectiveRootDir) {
+        const withIgnore = {...result, ignoredBy: buildIgnoreContextJson(effectiveRootDir)};
+        const json = JSON.stringify(withIgnore, null, 2);
+        checkCharacterLimit(json, 'codebase_trace', REDUCE_HINTS);
+        response.appendResponseLine(json);
+        return;
+      }
       const json = JSON.stringify(result, null, 2);
       checkCharacterLimit(json, 'codebase_trace', REDUCE_HINTS);
       response.appendResponseLine(json);
       return;
     }
 
-    const markdown = formatTraceResult(result);
+    const markdown = formatTraceResult(result, isEmpty, effectiveRootDir);
     checkCharacterLimit(markdown, 'codebase_trace', REDUCE_HINTS);
     response.appendResponseLine(markdown);
   },
@@ -248,7 +266,7 @@ export const trace = defineTool({
 
 // ── Markdown Formatters ──────────────────────────────────
 
-function formatTraceResult(result: CodebaseTraceSymbolResult): string {
+function formatTraceResult(result: CodebaseTraceSymbolResult, isEmpty: boolean, rootDir?: string): string {
   const lines: string[] = [];
 
   lines.push(`## Symbol Trace: \`${result.symbol}\`\n`);
@@ -347,6 +365,10 @@ function formatTraceResult(result: CodebaseTraceSymbolResult): string {
     lines.push('### 💥 Impact Analysis\n');
     formatImpact(result.impact, lines);
     lines.push('');
+  }
+
+  if (isEmpty && rootDir) {
+    appendIgnoreContextMarkdown(lines, rootDir);
   }
 
   return lines.join('\n');

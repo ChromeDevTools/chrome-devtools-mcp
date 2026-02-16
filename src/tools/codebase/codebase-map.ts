@@ -23,6 +23,7 @@ import {
   responseFormatSchema,
   checkCharacterLimit,
 } from '../ToolDefinition.js';
+import {appendIgnoreContextMarkdown, buildIgnoreContextJson} from './ignore-context.js';
 
 // ── Connection Check ─────────────────────────────────────
 
@@ -211,6 +212,13 @@ export const map = defineTool({
       const combined = graphResult
         ? {...overviewResult, graph: graphResult}
         : overviewResult;
+      if (overviewResult.summary.totalFiles === 0) {
+        const withIgnore = {...combined, ignoredBy: buildIgnoreContextJson(overviewResult.projectRoot)};
+        const json = JSON.stringify(withIgnore, null, 2);
+        checkCharacterLimit(json, 'codebase_map', REDUCE_HINTS);
+        response.appendResponseLine(json);
+        return;
+      }
       const json = JSON.stringify(combined, null, 2);
       checkCharacterLimit(json, 'codebase_map', REDUCE_HINTS);
       response.appendResponseLine(json);
@@ -247,9 +255,7 @@ export const map = defineTool({
     }
 
     if (overviewResult.summary.totalFiles === 0) {
-      lines.push('');
-      lines.push('> **Note:** No files found. If this is unexpected, check if a `.devtoolsignore` file');
-      lines.push('> in the workspace root may be excluding files you intended to include.');
+      appendIgnoreContextMarkdown(lines, overviewResult.projectRoot);
     }
 
     const markdown = lines.join('\n');
