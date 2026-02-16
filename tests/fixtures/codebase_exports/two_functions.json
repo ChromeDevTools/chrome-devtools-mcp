@@ -1,0 +1,29 @@
+{
+  "input": {
+    "path": "_fixtures/exports_two_functions.ts"
+  },
+  "output": {
+    "module": "_fixtures/exports_two_functions.ts",
+    "exports": [
+      {
+        "name": "add",
+        "kind": "function",
+        "line": 5,
+        "isDefault": false,
+        "isReExport": false,
+        "signature": "(a: number, b: number) => number",
+        "jsdoc": "Test file: exactly 2 exported functions"
+      },
+      {
+        "name": "multiply",
+        "kind": "function",
+        "line": 9,
+        "isDefault": false,
+        "isReExport": false,
+        "signature": "(a: number, b: number) => number"
+      }
+    ],
+    "reExports": [],
+    "summary": "2 exports (2 functions)"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "input": {
+    "depth": 1,
+    "filter": "_fixtures/**"
+  },
+  "output": {
+    "summary.totalFiles": 7,
+    "summary.totalDirectories": 1,
+    "summary.totalSymbols": 16
+  }
+}

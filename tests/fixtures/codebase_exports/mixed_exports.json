@@ -1,0 +1,42 @@
+{
+  "input": {
+    "path": "_fixtures/exports_mixed.ts"
+  },
+  "output": {
+    "module": "_fixtures/exports_mixed.ts",
+    "exports": [
+      {
+        "name": "Config",
+        "kind": "interface",
+        "line": 7,
+        "isDefault": false,
+        "isReExport": false
+      },
+      {
+        "name": "greet",
+        "kind": "function",
+        "line": 17,
+        "isDefault": false,
+        "isReExport": false,
+        "signature": "(name: string) => string"
+      },
+      {
+        "name": "Logger",
+        "kind": "class",
+        "line": 11,
+        "isDefault": false,
+        "isReExport": false
+      },
+      {
+        "name": "VERSION",
+        "kind": "constant",
+        "line": 5,
+        "isDefault": false,
+        "isReExport": false,
+        "signature": "\"1.0.0\""
+      }
+    ],
+    "reExports": [],
+    "summary": "4 exports (1 interface, 1 function, 1 class, 1 constant)"
+  }
+}

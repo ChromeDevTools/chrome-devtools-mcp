@@ -1,0 +1,24 @@
+{
+  "input": {
+    "includePatterns": ["_fixtures/find_unused_test.ts"],
+    "exportedOnly": true
+  },
+  "output": {
+    "unusedSymbols": [
+      {
+        "name": "unusedFunction",
+        "kind": "function",
+        "file": "_fixtures/find_unused_test.ts",
+        "line": 9,
+        "exported": true
+      },
+      {
+        "name": "UNUSED_CONSTANT",
+        "kind": "variable",
+        "file": "_fixtures/find_unused_test.ts",
+        "line": 15,
+        "exported": true
+      }
+    ]
+  }
+}

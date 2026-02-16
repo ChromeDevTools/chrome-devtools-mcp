@@ -7,3 +7,5 @@
 export * from './types.js';
 export * from './mcp-client.js';
 export * from './assertions.js';
+export * from './fixture-loader.js';
+export * from './field-assertions.js';
