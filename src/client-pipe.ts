@@ -466,6 +466,10 @@ export interface CodebaseTraceSymbolResult {
   sourceFileCount?: number;
   /** Calculated effective timeout in milliseconds. */
   effectiveTimeout?: number;
+  /** Error message if an error occurred during tracing. */
+  errorMessage?: string;
+  /** Reason why symbol was not found. */
+  notFoundReason?: 'no-project' | 'no-matching-files' | 'symbol-not-found' | 'file-not-in-project' | 'parse-error';
 }
 
 // ── Codebase Methods ─────────────────────────────────────
@@ -529,6 +533,44 @@ export async function codebaseTraceSymbol(
     Math.max(60_000, (timeout ?? 30_000) + 5_000),
   );
   return result as CodebaseTraceSymbolResult;
+}
+
+// ── Find Unused Symbols Types ────────────────────────────
+
+export interface UnusedSymbolInfo {
+  name: string;
+  kind: string;
+  file: string;
+  line: number;
+  exported: boolean;
+}
+
+export interface FindUnusedSymbolsResult {
+  unusedSymbols: UnusedSymbolInfo[];
+  summary: {
+    totalScanned: number;
+    totalUnused: number;
+    scanDurationMs: number;
+  };
+  errorMessage?: string;
+}
+
+/**
+ * Find symbols with zero references (potential dead code).
+ */
+export async function codebaseFindUnusedSymbols(
+  rootDir?: string,
+  pattern?: string,
+  exportedOnly?: boolean,
+  kinds?: string[],
+  limit?: number,
+): Promise<FindUnusedSymbolsResult> {
+  const result = await sendClientRequest(
+    'codebase.findUnusedSymbols',
+    {rootDir, pattern, exportedOnly, kinds, limit},
+    60_000,
+  );
+  return result as FindUnusedSymbolsResult;
 }
 
 // ── Utility ──────────────────────────────────────────────

@@ -269,6 +269,23 @@ function formatTraceResult(result: CodebaseTraceSymbolResult): string {
     lines.push(`${reason}\n`);
   }
 
+  // Error message (if any)
+  if (result.errorMessage) {
+    lines.push(`❌ **Error:** ${result.errorMessage}\n`);
+  }
+
+  // Not found hint
+  if (result.notFoundReason && !result.definition) {
+    const hints: Record<string, string> = {
+      'no-project': '💡 No workspace folder found. Open a folder or specify `rootDir`.',
+      'no-matching-files': '💡 No TypeScript files found. Check `tsconfig.json` include patterns.',
+      'symbol-not-found': '💡 Symbol not found. Try specifying `file` to narrow the search.',
+      'file-not-in-project': '💡 File not included in project. Check `tsconfig.json` configuration.',
+      'parse-error': '💡 Parse error. Check for TypeScript syntax errors in the file.',
+    };
+    lines.push(`${hints[result.notFoundReason] ?? ''}\n`);
+  }
+
   // Definition
   if (result.definition) {
     lines.push('### 📍 Definition\n');

@@ -535,6 +535,16 @@ function registerTool(tool: ToolDefinition): void {
           errorText += `\nCause: ${err.cause.message}`;
         }
 
+        // Detect build failures and format them with full logs
+        const buildFailureMatch = errorText.match(/Build failed:\n?([\s\S]*)/);
+        if (buildFailureMatch) {
+          const buildLogs = buildFailureMatch[1].trim();
+          const content: CallToolResult['content'] = [
+            {type: 'text', text: `❌ **Extension build failed.** Full build output:\n\n\`\`\`\n${buildLogs}\n\`\`\``},
+          ];
+          return {content, isError: true};
+        }
+
         const content: CallToolResult['content'] = [
           {type: 'text', text: errorText},
         ];
