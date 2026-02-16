@@ -216,6 +216,16 @@ export const trace = defineTool({
       ),
   },
   handler: async (request, response) => {
+    // Bug #4: Early validation for empty symbol
+    if (!request.params.symbol || request.params.symbol.trim() === '') {
+      if (request.params.response_format === ResponseFormat.JSON) {
+        response.appendResponseLine(JSON.stringify({ error: 'symbol is required' }, null, 2));
+        return;
+      }
+      response.appendResponseLine('❌ **Error:** `symbol` parameter is required.');
+      return;
+    }
+
     await ensureClientConnection();
 
     const result = await codebaseTraceSymbol(
@@ -258,7 +268,7 @@ export const trace = defineTool({
       return;
     }
 
-    const markdown = formatTraceResult(result, isEmpty, effectiveRootDir);
+    const markdown = formatTraceResult(result, isEmpty, effectiveRootDir, request.params.include);
     checkCharacterLimit(markdown, 'codebase_trace', REDUCE_HINTS);
     response.appendResponseLine(markdown);
   },
@@ -266,7 +276,14 @@ export const trace = defineTool({
 
 // ── Markdown Formatters ──────────────────────────────────
 
-function formatTraceResult(result: CodebaseTraceSymbolResult, isEmpty: boolean, rootDir?: string): string {
+type IncludeMode = 'all' | 'definitions' | 'references' | 'reexports' | 'calls' | 'type-flows' | 'hierarchy';
+
+function formatTraceResult(
+  result: CodebaseTraceSymbolResult,
+  isEmpty: boolean,
+  rootDir?: string,
+  include?: IncludeMode[],
+): string {
   const lines: string[] = [];
 
   lines.push(`## Symbol Trace: \`${result.symbol}\`\n`);
@@ -355,9 +372,18 @@ function formatTraceResult(result: CodebaseTraceSymbolResult, isEmpty: boolean, 
     lines.push('');
   }
 
-  if (result.hierarchy && (result.hierarchy.supertypes.length > 0 || result.hierarchy.subtypes.length > 0)) {
+  // Bug #1 fix: Show hierarchy section if requested, even when empty
+  const hierarchyRequested = include?.includes('all') || include?.includes('hierarchy');
+  const hasHierarchy = result.hierarchy && 
+    (result.hierarchy.supertypes.length > 0 || result.hierarchy.subtypes.length > 0);
+  
+  if (hasHierarchy) {
     lines.push('### 🏗️ Type Hierarchy\n');
-    formatTypeHierarchy(result.hierarchy, lines);
+    formatTypeHierarchy(result.hierarchy!, lines);
+    lines.push('');
+  } else if (hierarchyRequested) {
+    lines.push('### 🏗️ Type Hierarchy\n');
+    lines.push('*No inheritance hierarchy found — symbol has no extends/implements.*\n');
     lines.push('');
   }
 
@@ -367,7 +393,8 @@ function formatTraceResult(result: CodebaseTraceSymbolResult, isEmpty: boolean, 
     lines.push('');
   }
 
-  if (isEmpty && rootDir) {
+  // Bug #1 fix: Always append ignore context so Copilot is aware of exclusions
+  if (rootDir) {
     appendIgnoreContextMarkdown(lines, rootDir);
   }
 
