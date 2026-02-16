@@ -21,9 +21,13 @@ import {
   defineTool,
   ResponseFormat,
   responseFormatSchema,
-  checkCharacterLimit,
 } from '../ToolDefinition.js';
 import {appendIgnoreContextMarkdown, buildIgnoreContextJson} from './ignore-context.js';
+
+// ── Constants ────────────────────────────────────────────
+
+// ~3000 tokens budget — proxy at ~4 chars per token
+const TOKEN_BUDGET = 12_000;
 
 // ── Connection Check ─────────────────────────────────────
 
@@ -50,6 +54,44 @@ const KIND_ICONS: Record<string, string> = {
   namespace: '▪',
   unknown: '?',
 };
+
+// ── Path Helpers ─────────────────────────────────────────
+
+/** Normalize backslashes to forward slashes for display */
+function normalizePath(p: string): string {
+  return p.replace(/\\/g, '/');
+}
+
+/** Strip temp namespace from ts-morph type signatures (e.g. `import("/__exports_123")`) */
+function stripTempNamespace(sig: string): string {
+  return sig.replace(/import\("\/[^"]*__exports_[^"]*"\)\./g, '');
+}
+
+/**
+ * Detect whether the given path is a file (has extension), a glob (has wildcards),
+ * or a directory path.
+ */
+function classifyPath(p: string | undefined): 'file' | 'glob' | 'directory' | 'none' {
+  if (!p) return 'none';
+  if (p.includes('*') || p.includes('{') || p.includes('?')) return 'glob';
+  if (/\.\w+$/.test(p)) return 'file';
+  return 'directory';
+}
+
+/**
+ * Count characters a tree branch contributes when rendered.
+ * Used for per-branch token count annotations when adaptive depth reduces output.
+ */
+function measureTreeChars(
+  nodes: CodebaseTreeNode[],
+  includeStats: boolean,
+  includeImports: boolean,
+  kindFilter: string,
+): number {
+  const lines: string[] = [];
+  renderTree(nodes, lines, '', true, includeStats, includeImports, kindFilter);
+  return lines.join('\n').length;
+}
 
 // ── Tool Definition ──────────────────────────────────────
 
@@ -160,45 +202,117 @@ export const map = defineTool({
     await ensureClientConnection();
 
     const {params} = request;
-    const isFileMode = params.path && !params.path.includes('*') && /\.\w+$/.test(params.path);
+    const pathType = classifyPath(params.path);
 
-    if (isFileMode) {
-      // File mode — show detailed exports
-      const result = await codebaseGetExports(
-        params.path!,
-        params.rootDir,
-        params.includeTypes,
-        params.depth >= 3 ? params.includeJSDoc : false,
-        params.kind,
-        params.includePatterns,
-        params.excludePatterns,
-      );
+    // ── File Mode ──────────────────────────────────────
+    if (pathType === 'file') {
+      let result: CodebaseExportsResult;
+      try {
+        result = await codebaseGetExports(
+          params.path!,
+          params.rootDir,
+          params.includeTypes,
+          params.includeJSDoc,
+          params.kind,
+          params.includePatterns,
+          params.excludePatterns,
+        );
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (msg.includes('ENOENT') || msg.includes('FileNotFound') || msg.includes('does not exist')) {
+          const errorObj = {
+            error: 'File not found',
+            path: params.path,
+            suggestions: [
+              'Check the file path for typos',
+              'Use codebase_map with no path to see all files',
+              'Use filter param to search by pattern (e.g., "**/*pipe*")',
+            ],
+          };
+          if (params.response_format === ResponseFormat.JSON) {
+            response.appendResponseLine(JSON.stringify(errorObj, null, 2));
+          } else {
+            response.appendResponseLine(`**Error:** File not found: \`${params.path}\`\n`);
+            response.appendResponseLine('**Suggestions:**');
+            for (const s of errorObj.suggestions) {
+              response.appendResponseLine(`- ${s}`);
+            }
+          }
+          return;
+        }
+        throw err;
+      }
+
+      // Clean signatures before output
+      cleanExportSignatures(result);
 
       if (params.response_format === ResponseFormat.JSON) {
         const json = JSON.stringify(result, null, 2);
-        checkCharacterLimit(json, 'codebase_map', REDUCE_HINTS);
         response.appendResponseLine(json);
         return;
       }
 
       const markdown = formatExportsResult(result, params.includeTypes, params.depth);
-      checkCharacterLimit(markdown, 'codebase_map', REDUCE_HINTS);
       response.appendResponseLine(markdown);
       return;
     }
 
-    // Directory/workspace mode — show file tree with symbols
-    const overviewResult = await codebaseGetOverview(
+    // ── Directory/Workspace Mode ───────────────────────
+    // Convert directory path to filter
+    const effectiveFilter = pathType === 'directory'
+      ? `${params.path!.replace(/\/+$/, '')}/**`
+      : (params.path ?? params.filter);
+
+    // Adaptive depth: try requested depth, reduce if output exceeds budget
+    const requestedDepth = params.depth;
+    let usedDepth = requestedDepth;
+    let overviewResult = await codebaseGetOverview(
       params.rootDir,
-      params.depth,
-      params.path ?? params.filter,
+      usedDepth,
+      effectiveFilter,
       params.includeImports,
       params.includeStats,
       params.includePatterns,
       params.excludePatterns,
     );
 
-    // Import graph (if requested, add via separate RPC)
+    // Estimate output size — try progressively lower depths if too large
+    let wasAutoReduced = false;
+    let outputEstimate = estimateOutputSize(overviewResult, params);
+
+    while (outputEstimate > TOKEN_BUDGET && usedDepth > 0) {
+      usedDepth--;
+      wasAutoReduced = true;
+      overviewResult = await codebaseGetOverview(
+        params.rootDir,
+        usedDepth,
+        effectiveFilter,
+        params.includeImports,
+        params.includeStats,
+        params.includePatterns,
+        params.excludePatterns,
+      );
+      outputEstimate = estimateOutputSize(overviewResult, params);
+    }
+
+    // Even at depth 0, if still too large, return error with context
+    if (outputEstimate > TOKEN_BUDGET) {
+      const errorLines: string[] = [];
+      errorLines.push(
+        `Response too large even at depth 0 (${outputEstimate} chars, budget: ${TOKEN_BUDGET}). ` +
+        'Use `filter` or `includePatterns` to narrow scope.',
+      );
+      errorLines.push('');
+      errorLines.push('**Available parameters to reduce scope:**');
+      for (const [name, desc] of Object.entries(REDUCE_HINTS)) {
+        errorLines.push(`  - \`${name}\`: ${desc}`);
+      }
+      errorLines.push('');
+      appendIgnoreContextMarkdown(errorLines, overviewResult.projectRoot);
+      throw new Error(errorLines.join('\n'));
+    }
+
+    // Import graph (if requested)
     let graphResult: ImportGraphResult | undefined;
     if (params.includeGraph) {
       try {
@@ -208,25 +322,56 @@ export const map = defineTool({
       }
     }
 
+    // ── Build response ─────────────────────────────────
     if (params.response_format === ResponseFormat.JSON) {
       const combined = graphResult
         ? {...overviewResult, graph: graphResult}
         : overviewResult;
+
+      // Normalize projectRoot path
+      if (combined.projectRoot) {
+        combined.projectRoot = normalizePath(combined.projectRoot);
+      }
+
       if (overviewResult.summary.totalFiles === 0) {
         const withIgnore = {...combined, ignoredBy: buildIgnoreContextJson(overviewResult.projectRoot)};
-        const json = JSON.stringify(withIgnore, null, 2);
-        checkCharacterLimit(json, 'codebase_map', REDUCE_HINTS);
-        response.appendResponseLine(json);
+        response.appendResponseLine(JSON.stringify(withIgnore, null, 2));
         return;
       }
-      const json = JSON.stringify(combined, null, 2);
-      checkCharacterLimit(json, 'codebase_map', REDUCE_HINTS);
-      response.appendResponseLine(json);
+
+      // Apply kind filter to tree symbols in JSON mode
+      if (params.kind !== 'all') {
+        filterTreeSymbols(combined.tree, params.kind);
+      }
+
+      if (wasAutoReduced) {
+        const enriched = {
+          ...combined,
+          _autoOptimized: {
+            requestedDepth,
+            usedDepth,
+            reason: `Output exceeded ${TOKEN_BUDGET} char budget at depth ${requestedDepth}`,
+          },
+        };
+        response.appendResponseLine(JSON.stringify(enriched, null, 2));
+      } else {
+        response.appendResponseLine(JSON.stringify(combined, null, 2));
+      }
       return;
     }
 
+    // ── Markdown response ──────────────────────────────
     const lines: string[] = [];
-    lines.push(`## Codebase Map: ${overviewResult.projectRoot}\n`);
+    const displayRoot = normalizePath(overviewResult.projectRoot);
+    lines.push(`## Codebase Map: ${displayRoot}\n`);
+
+    if (wasAutoReduced) {
+      lines.push(
+        `> ⚡ Auto-optimized: depth reduced from ${requestedDepth} → ${usedDepth} ` +
+        `(output exceeded ${TOKEN_BUDGET} char budget)\n`,
+      );
+    }
+
     renderTree(
       overviewResult.tree,
       lines,
@@ -234,7 +379,25 @@ export const map = defineTool({
       true,
       params.includeStats,
       params.includeImports,
+      params.kind,
     );
+
+    // Per-branch token counts when auto-reduced
+    if (wasAutoReduced && overviewResult.tree.length > 0) {
+      lines.push('');
+      lines.push('### 📊 Size by Branch\n');
+      for (const branch of overviewResult.tree) {
+        if (branch.type === 'directory' && branch.children) {
+          const chars = measureTreeChars(
+            [branch], params.includeStats, params.includeImports, params.kind,
+          );
+          const tokens = Math.ceil(chars / 4);
+          lines.push(`- 📁 **${branch.name}/** — ~${tokens} tokens (${chars} chars)`);
+        }
+      }
+      lines.push('');
+      lines.push('*Use `filter: "dirname/**"` to zoom into a specific branch.*');
+    }
 
     lines.push('');
     lines.push('---');
@@ -258,9 +421,7 @@ export const map = defineTool({
       appendIgnoreContextMarkdown(lines, overviewResult.projectRoot);
     }
 
-    const markdown = lines.join('\n');
-    checkCharacterLimit(markdown, 'codebase_map', REDUCE_HINTS);
-    response.appendResponseLine(markdown);
+    response.appendResponseLine(lines.join('\n'));
   },
 });
 
@@ -268,13 +429,52 @@ export const map = defineTool({
 
 const REDUCE_HINTS: Record<string, string> = {
   filter: 'Glob pattern to narrow scope (e.g., "src/tools/**")',
+  path: 'Point to a specific directory (e.g., "src/tools") to scope the map',
   depth: 'Lower number = less detail (0 for file tree only)',
   kind: 'Filter to specific kind (e.g., "functions")',
   includeTypes: 'Set to false to reduce output size',
   includeJSDoc: 'Set to false to reduce output size',
 };
 
+// ── Output Estimation ────────────────────────────────────
+
+interface OutputEstimateParams {
+  includeStats: boolean;
+  includeImports: boolean;
+  kind: string;
+  response_format: string;
+}
+
+/**
+ * Estimate the character count of the final output without fully rendering it.
+ * Uses a lightweight tree traversal.
+ */
+function estimateOutputSize(
+  result: { projectRoot: string; tree: CodebaseTreeNode[]; summary: { totalFiles: number; totalDirectories: number; totalSymbols: number } },
+  params: OutputEstimateParams,
+): number {
+  if (params.response_format === ResponseFormat.JSON) {
+    // JSON estimate — fast serialization
+    return JSON.stringify(result).length;
+  }
+
+  // Markdown estimate — render tree to measure
+  const lines: string[] = [];
+  renderTree(result.tree, lines, '', true, params.includeStats, params.includeImports, params.kind);
+  // Header + summary + padding
+  return lines.join('\n').length + 200;
+}
+
 // ── Exports Formatting ───────────────────────────────────
+
+/** Strip temp namespace from all export signatures in-place */
+function cleanExportSignatures(result: CodebaseExportsResult): void {
+  for (const exp of result.exports) {
+    if (exp.signature) {
+      exp.signature = stripTempNamespace(exp.signature);
+    }
+  }
+}
 
 function formatExportsResult(
   result: CodebaseExportsResult,
@@ -347,6 +547,38 @@ function renderExportsByKind(
 
 // ── Tree Rendering ───────────────────────────────────────
 
+/** Filter symbols by kind in the tree, mutating in place */
+function filterTreeSymbols(tree: CodebaseTreeNode[], kindFilter: string): void {
+  for (const node of tree) {
+    if (node.type === 'directory' && node.children) {
+      filterTreeSymbols(node.children, kindFilter);
+    }
+    if (node.symbols) {
+      node.symbols = filterSymbolsByKind(node.symbols, kindFilter);
+    }
+  }
+}
+
+function filterSymbolsByKind(
+  symbols: CodebaseSymbolNode[],
+  kindFilter: string,
+): CodebaseSymbolNode[] {
+  const targetKinds = resolveKindFilter(kindFilter);
+  return symbols.filter(s => targetKinds.has(s.kind));
+}
+
+function resolveKindFilter(kind: string): Set<string> {
+  switch (kind) {
+    case 'functions': return new Set(['function']);
+    case 'classes': return new Set(['class']);
+    case 'interfaces': return new Set(['interface']);
+    case 'types': return new Set(['type']);
+    case 'constants': return new Set(['constant', 'variable']);
+    case 'enums': return new Set(['enum']);
+    default: return new Set();
+  }
+}
+
 function renderTree(
   nodes: CodebaseTreeNode[],
   lines: string[],
@@ -354,6 +586,7 @@ function renderTree(
   isRoot: boolean,
   includeStats: boolean,
   includeImports: boolean,
+  kindFilter: string,
 ): void {
   for (let i = 0; i < nodes.length; i++) {
     const node = nodes[i];
@@ -371,6 +604,7 @@ function renderTree(
           false,
           includeStats,
           includeImports,
+          kindFilter,
         );
       }
     } else {
@@ -379,7 +613,12 @@ function renderTree(
       lines.push(`${prefix}${connector}📄 ${node.name}${lineInfo}`);
 
       if (node.symbols) {
-        renderSymbols(node.symbols, lines, childPrefix);
+        const symbolsToRender = kindFilter !== 'all'
+          ? filterSymbolsByKind(node.symbols, kindFilter)
+          : node.symbols;
+        if (symbolsToRender.length > 0) {
+          renderSymbols(symbolsToRender, lines, childPrefix);
+        }
       }
 
       if (includeImports && node.imports && node.imports.length > 0) {
