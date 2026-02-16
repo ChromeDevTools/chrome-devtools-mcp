@@ -589,36 +589,21 @@ Call ${handleDialog.name} to handle it before continuing.`);
     }
 
     if (this.#networkRequestsOptions?.include) {
-      let requests = context.getNetworkRequests(
-        this.#networkRequestsOptions?.includePreservedRequests,
-      );
-
-      // Apply resource type filtering if specified
-      if (this.#networkRequestsOptions.resourceTypes?.length) {
-        const normalizedTypes = new Set(
-          this.#networkRequestsOptions.resourceTypes,
-        );
-        requests = requests.filter(request => {
-          const type = request.resourceType();
-          return normalizedTypes.has(type);
-        });
-      }
-
       response.push('## Network requests');
-      if (requests.length) {
+      const networkFormatters = data.networkRequests ?? [];
+      if (networkFormatters.length) {
         const paginationData = this.#dataWithPagination(
-          requests,
+          networkFormatters,
           this.#networkRequestsOptions.pagination,
         );
         structuredContent.pagination = paginationData.pagination;
         response.push(...paginationData.info);
-        if (data.networkRequests) {
-          structuredContent.networkRequests = [];
-          for (const formatter of data.networkRequests) {
-            response.push(formatter.toString());
-            structuredContent.networkRequests.push(formatter.toJSON());
-          }
-        }
+        structuredContent.networkRequests = paginationData.items.map(
+          formatter => formatter.toJSON(),
+        );
+        response.push(
+          ...paginationData.items.map(formatter => formatter.toString()),
+        );
       } else {
         response.push('No requests found.');
       }
