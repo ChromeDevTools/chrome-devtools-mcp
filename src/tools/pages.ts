@@ -11,6 +11,24 @@ import {zod} from '../third_party/index.js';
 import {ToolCategory} from './categories.js';
 import {CLOSE_PAGE_ERROR, defineTool, timeoutSchema} from './ToolDefinition.js';
 
+const ALLOWED_URL_SCHEMES = ['http:', 'https:', 'about:'];
+
+function validateUrlScheme(url: string): void {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    // If it can't be parsed as a URL, let the browser handle it
+    // (e.g. relative paths or malformed input)
+    return;
+  }
+  if (!ALLOWED_URL_SCHEMES.includes(parsed.protocol)) {
+    throw new Error(
+      `URL scheme "${parsed.protocol}" is not allowed. Allowed schemes: ${ALLOWED_URL_SCHEMES.join(', ')}`,
+    );
+  }
+}
+
 export const listPages = defineTool({
   name: 'list_pages',
   description: `Get a list of pages open in the browser.`,
@@ -96,6 +114,7 @@ export const newPage = defineTool({
     ...timeoutSchema,
   },
   handler: async (request, response, context) => {
+    validateUrlScheme(request.params.url);
     const page = await context.newPage(request.params.background);
 
     await context.waitForEventsAfterAction(
@@ -193,6 +212,7 @@ export const navigatePage = defineTool({
                   'A URL is required for navigation of type=url.',
                 );
               }
+              validateUrlScheme(request.params.url);
               try {
                 await page.goto(request.params.url, options);
                 response.appendResponseLine(
