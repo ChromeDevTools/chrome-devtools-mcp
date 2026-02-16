@@ -101,6 +101,10 @@ class LifecycleService {
    *
    * Host internally: stops Client → builds → spawns new Client → returns new CDP port.
    * MCP: disconnects old CDP → connects to new CDP port → re-inits event subscriptions.
+   *
+   * If the Host's `waitForClientReady` times out (Client started but CDP
+   * not yet responding), falls back to `mcpReady()` which detects the
+   * already-running Client and returns its CDP port.
    */
   async handleHotReload(): Promise<void> {
     logger('[Lifecycle] Hot-reload — requesting Host rebuild…');
@@ -116,14 +120,35 @@ class LifecycleService {
     cdpService.disconnect();
     clearCdpEventData();
 
-    const result = await hotReloadRequired({
-      targetWorkspace: this._targetWorkspace,
-      extensionPath: this._extensionPath,
-      launch: this._launchFlags,
-    });
-    const newPort = result.cdpPort;
-    this._cdpPort = newPort;
+    let newPort: number;
+    let clientStartedAt: number | undefined;
 
+    try {
+      const result = await hotReloadRequired({
+        targetWorkspace: this._targetWorkspace,
+        extensionPath: this._extensionPath,
+        launch: this._launchFlags,
+      });
+      newPort = result.cdpPort;
+      clientStartedAt = result.clientStartedAt;
+    } catch (hotReloadErr) {
+      // Hot-reload RPC failed (likely timeout waiting for Client).
+      // The Client may still be starting up. Fall back to mcpReady()
+      // which checks for an existing healthy Client before spawning.
+      const msg = hotReloadErr instanceof Error ? hotReloadErr.message : String(hotReloadErr);
+      logger(`[Lifecycle] Hot-reload RPC failed: ${msg} — retrying via mcpReady()…`);
+
+      const fallbackResult = await mcpReady({
+        targetWorkspace: this._targetWorkspace,
+        extensionPath: this._extensionPath,
+        launch: this._launchFlags,
+      });
+      newPort = fallbackResult.cdpPort;
+      clientStartedAt = fallbackResult.clientStartedAt;
+      logger('[Lifecycle] Fallback mcpReady() succeeded');
+    }
+
+    this._cdpPort = newPort;
     logger(`[Lifecycle] Host rebuilt Client — new CDP port: ${newPort}`);
 
     await cdpService.connect(newPort);
@@ -132,7 +157,7 @@ class LifecycleService {
     // Use the Client's actual start time (not Date.now()) so the mtime
     // comparison in hasExtensionChangedSince is accurate even if the Host
     // took a long time to build + spawn.
-    this._debugWindowStartedAt = result.clientStartedAt ?? Date.now();
+    this._debugWindowStartedAt = clientStartedAt ?? Date.now();
     logger(`[Lifecycle] Hot-reload complete — CDP reconnected, sessionTs=${new Date(this._debugWindowStartedAt).toISOString()}`);
   }
 
