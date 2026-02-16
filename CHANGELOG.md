@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.17.1](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.17.0...chrome-devtools-mcp-v0.17.1) (2026-02-16)
+
+
+### 📄 Documentation
+
+* Add 'Progressive Complexity' and 'Reference over Value' design principles. ([#939](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/939)) ([8d765c0](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/8d765c0aef7bbcd476c7e7fbe9ea63ee26cf4fa6))
+* add Katalon Studio setup instructions to README ([#929](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/929)) ([6cfef24](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/6cfef24ec734ed62221c66bdf03b09ce000f5bfe))
+* add MCP config for Claude plugin + docs ([#944](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/944)) ([a781da4](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/a781da4434c3490901b28017bc7aa40493ef8dcc))
+* estimate tokens using tiktoken  ([#959](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/959)) ([fd0a919](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/fd0a9193b37be4c5cda21dc4904093c7b58d61be))
+* improve Claude Code installation instructions ([#947](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/947)) ([3ec5b7e](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/3ec5b7e7a2d97c9f0165c5af3317c531a9dc058f))
+* Update README with WSL configuration details ([#946](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/946)) ([107c46a](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/107c46a4dbd2ba7c7b9217a75ae2b1871d3c7f0d))
+
+
+### ♻️ Chores
+
+* rename files to have more consistent style ([#935](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/935)) ([9e1f9ac](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/9e1f9ac69667ddc3e2917e2c30e5ee940a03d853))
+
 ## [0.17.0](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.16.0...chrome-devtools-mcp-v0.17.0) (2026-02-10)
 
 
