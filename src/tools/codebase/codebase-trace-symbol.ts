@@ -259,7 +259,8 @@ function formatTraceResult(result: CodebaseTraceSymbolResult): string {
 
 function formatDefinition(def: SymbolLocationInfo, lines: string[]): void {
   const kindStr = def.kind ? ` (${def.kind})` : '';
-  lines.push(`**${shortPath(def.file)}:${def.line}:${def.column}**${kindStr}`);
+  const unresolvedStr = def.unresolved ? ' ⚠️ **unresolved import**' : '';
+  lines.push(`**${shortPath(def.file)}:${def.line}:${def.column}**${kindStr}${unresolvedStr}`);
   if (def.signature) {
     lines.push(`\`\`\`\n${def.signature}\n\`\`\``);
   }

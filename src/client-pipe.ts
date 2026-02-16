@@ -388,6 +388,7 @@ export interface SymbolLocationInfo {
   column: number;
   kind?: string;
   signature?: string;
+  unresolved?: boolean;
 }
 
 export interface ReferenceInfo {
