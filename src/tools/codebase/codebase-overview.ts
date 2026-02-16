@@ -95,6 +95,20 @@ tools like codebase_trace_symbol or codebase_exports.
       .optional()
       .default(false)
       .describe('Include line counts per file and diagnostic counts.'),
+    includePatterns: zod
+      .array(zod.string())
+      .optional()
+      .describe(
+        'Glob patterns to restrict results to matching files only. ' +
+          'excludePatterns further narrow within the included set.',
+      ),
+    excludePatterns: zod
+      .array(zod.string())
+      .optional()
+      .describe(
+        'Glob patterns to exclude files from results. ' +
+          'Applied in addition to .devtoolsignore rules.',
+      ),
   },
   handler: async (request, response) => {
     await ensureClientConnection();
@@ -105,6 +119,8 @@ tools like codebase_trace_symbol or codebase_exports.
       request.params.filter,
       request.params.includeImports,
       request.params.includeStats,
+      request.params.includePatterns,
+      request.params.excludePatterns,
     );
 
     if (request.params.response_format === ResponseFormat.JSON) {

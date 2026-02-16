@@ -190,6 +190,22 @@ the symbol name and optionally a file path + line/column for disambiguation.
         'Force invalidate project cache before tracing. Use after adding new files ' +
           'or when the project structure has changed. Default: false.',
       ),
+    includePatterns: zod
+      .array(zod.string())
+      .optional()
+      .describe(
+        'Glob patterns to restrict analysis to matching files only. ' +
+          'When provided, only files matching at least one pattern are analyzed. ' +
+          'excludePatterns further narrow within the included set.',
+      ),
+    excludePatterns: zod
+      .array(zod.string())
+      .optional()
+      .describe(
+        'Glob patterns to exclude files from analysis. ' +
+          'Applied in addition to .devtoolsignore rules. ' +
+          "Example: ['**/*.test.ts', '**/fixtures/**']",
+      ),
   },
   handler: async (request, response) => {
     await ensureClientConnection();
@@ -206,6 +222,8 @@ the symbol name and optionally a file path + line/column for disambiguation.
       request.params.maxReferences,
       request.params.timeout,
       request.params.forceRefresh,
+      request.params.includePatterns,
+      request.params.excludePatterns,
     );
 
     if (request.params.response_format === ResponseFormat.JSON) {
@@ -249,9 +267,12 @@ function formatTraceResult(result: CodebaseTraceSymbolResult): string {
   }
   lines.push('\n');
 
-  // Project diagnostics (file count and calculated timeout)
-  if (result.sourceFileCount !== undefined || result.effectiveTimeout !== undefined) {
+  // Project diagnostics (file count, calculated timeout, root dir)
+  if (result.sourceFileCount !== undefined || result.effectiveTimeout !== undefined || result.resolvedRootDir) {
     const parts: string[] = [];
+    if (result.resolvedRootDir) {
+      parts.push(`root: \`${result.resolvedRootDir}\``);
+    }
     if (result.sourceFileCount !== undefined) {
       parts.push(`${result.sourceFileCount} source files`);
     }
@@ -284,6 +305,13 @@ function formatTraceResult(result: CodebaseTraceSymbolResult): string {
       'parse-error': '💡 Parse error. Check for TypeScript syntax errors in the file.',
     };
     lines.push(`${hints[result.notFoundReason] ?? ''}\n`);
+  }
+
+  // Diagnostics (node_modules warnings, pattern match issues)
+  if (result.diagnostics && result.diagnostics.length > 0) {
+    for (const diag of result.diagnostics) {
+      lines.push(`💡 ${diag}\n`);
+    }
   }
 
   // Definition
@@ -402,11 +430,12 @@ function formatReExports(reExports: ReExportInfo[], lines: string[]): void {
 }
 
 function formatCallHierarchy(
-  callChain: {incomingCalls: CallChainNode[]; outgoingCalls: CallChainNode[]},
+  callChain: {incomingCalls: CallChainNode[]; outgoingCalls: CallChainNode[]; incomingTruncated?: boolean; outgoingTruncated?: boolean},
   lines: string[],
 ): void {
   if (callChain.incomingCalls.length > 0) {
-    lines.push('**Incoming (callers):**');
+    const truncLabel = callChain.incomingTruncated ? ' *(depth limit reached — increase `depth` for more)*' : '';
+    lines.push(`**Incoming (callers):**${truncLabel}`);
     const display = callChain.incomingCalls.slice(0, 20);
     for (const caller of display) {
       lines.push(
@@ -422,7 +451,8 @@ function formatCallHierarchy(
   }
 
   if (callChain.outgoingCalls.length > 0) {
-    lines.push('**Outgoing (callees):**');
+    const truncLabel = callChain.outgoingTruncated ? ' *(depth limit reached — increase `depth` for more)*' : '';
+    lines.push(`**Outgoing (callees):**${truncLabel}`);
     const display = callChain.outgoingCalls.slice(0, 20);
     for (const callee of display) {
       lines.push(

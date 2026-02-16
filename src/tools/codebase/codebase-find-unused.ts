@@ -82,6 +82,20 @@ with no external references. Useful for:
       .optional()
       .default(100)
       .describe('Max results to return. Default: 100.'),
+    includePatterns: zod
+      .array(zod.string())
+      .optional()
+      .describe(
+        'Glob patterns to restrict analysis to matching files only. ' +
+          'excludePatterns further narrow within the included set.',
+      ),
+    excludePatterns: zod
+      .array(zod.string())
+      .optional()
+      .describe(
+        'Glob patterns to exclude files from analysis. ' +
+          'Applied in addition to .devtoolsignore rules.',
+      ),
   },
   handler: async (request, response) => {
     await ensureClientConnection();
@@ -92,6 +106,8 @@ with no external references. Useful for:
       request.params.exportedOnly,
       request.params.kinds,
       request.params.limit,
+      request.params.includePatterns,
+      request.params.excludePatterns,
     );
 
     if (request.params.response_format === ResponseFormat.JSON) {
@@ -118,6 +134,16 @@ function formatUnusedSymbolsResult(result: FindUnusedSymbolsResult): string {
   lines.push(
     `**${totalUnused}** unused symbols found (${totalScanned} scanned) · ${scanDurationMs}ms\n`,
   );
+
+  if (result.resolvedRootDir) {
+    lines.push(`*Project root: \`${result.resolvedRootDir}\`*\n`);
+  }
+
+  if (result.diagnostics && result.diagnostics.length > 0) {
+    for (const diag of result.diagnostics) {
+      lines.push(`💡 ${diag}\n`);
+    }
+  }
 
   if (result.unusedSymbols.length === 0) {
     lines.push('✅ No unused symbols found. All exports are referenced.\n');

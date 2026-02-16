@@ -105,6 +105,20 @@ explore specific symbols in detail.
       .optional()
       .default('all')
       .describe('Filter exports by kind.'),
+    includePatterns: zod
+      .array(zod.string())
+      .optional()
+      .describe(
+        'Glob patterns to restrict analysis to matching files only (directory mode). ' +
+          'excludePatterns further narrow within the included set.',
+      ),
+    excludePatterns: zod
+      .array(zod.string())
+      .optional()
+      .describe(
+        'Glob patterns to exclude files from analysis (directory mode). ' +
+          'Applied in addition to default exclusions.',
+      ),
   },
   handler: async (request, response) => {
     await ensureClientConnection();
@@ -115,6 +129,8 @@ explore specific symbols in detail.
       request.params.includeTypes,
       request.params.includeJSDoc,
       request.params.kind,
+      request.params.includePatterns,
+      request.params.excludePatterns,
     );
 
     if (request.params.response_format === ResponseFormat.JSON) {

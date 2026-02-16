@@ -48,6 +48,25 @@ interface JsonRpcResponse {
   error?: {code: number; message: string; data?: unknown};
 }
 
+// ── Type-safe result assertion ───────────────────────────
+
+function assertResult<T extends object>(result: unknown, method: string): asserts result is T {
+  if (typeof result !== 'object' || result === null) {
+    throw new Error(
+      `Invalid response from Client ${method}: expected object, got ${typeof result}`,
+    );
+  }
+}
+
+function isJsonRpcResponse(value: unknown): value is JsonRpcResponse {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'jsonrpc' in value &&
+    ('result' in value || 'error' in value)
+  );
+}
+
 export type TerminalStatus =
   | 'idle'
   | 'running'
@@ -176,28 +195,35 @@ function sendClientRequest(
       const nlIdx = response.indexOf('\n');
       if (nlIdx !== -1) {
         try {
-          const parsed = JSON.parse(
+          const rawParsed: unknown = JSON.parse(
             response.slice(0, nlIdx),
-          ) as JsonRpcResponse;
-          if (parsed.error) {
+          );
+          if (!isJsonRpcResponse(rawParsed)) {
+            settle(
+              reject,
+              new Error(`Invalid JSON-RPC response from Client ${method}`),
+            );
+            return;
+          }
+          if (rawParsed.error) {
             logger(
-              `[client-pipe] ${method} ✗ error: [${parsed.error.code}] ${parsed.error.message}`,
+              `[client-pipe] ${method} ✗ error: [${rawParsed.error.code}] ${rawParsed.error.message}`,
             );
             settle(
               reject,
               new Error(
-                `Client ${method} failed [${parsed.error.code}]: ${parsed.error.message}`,
+                `Client ${method} failed [${rawParsed.error.code}]: ${rawParsed.error.message}`,
               ),
             );
           } else {
             logger(`[client-pipe] ${method} ✓ success`);
-            settle(resolve, parsed.result);
+            settle(resolve, rawParsed.result);
           }
-        } catch (e) {
+        } catch (e: unknown) {
           settle(
             reject,
             new Error(
-              `Failed to parse Client response: ${(e as Error).message}`,
+              `Failed to parse Client response: ${e instanceof Error ? e.message : String(e)}`,
             ),
           );
         }
@@ -253,7 +279,8 @@ export async function terminalRun(
     {command, cwd, timeout, name, waitMode},
     TERMINAL_TIMEOUT_MS,
   );
-  return result as TerminalRunResult;
+  assertResult<TerminalRunResult>(result, 'terminal.run');
+  return result;
 }
 
 /**
@@ -276,7 +303,8 @@ export async function terminalInput(
     {text, addNewline, timeout, name},
     TERMINAL_TIMEOUT_MS,
   );
-  return result as TerminalRunResult;
+  assertResult<TerminalRunResult>(result, 'terminal.input');
+  return result;
 }
 
 /**
@@ -286,7 +314,8 @@ export async function terminalInput(
  */
 export async function terminalGetState(name?: string): Promise<TerminalRunResult> {
   const result = await sendClientRequest('terminal.state', {name});
-  return result as TerminalRunResult;
+  assertResult<TerminalRunResult>(result, 'terminal.state');
+  return result;
 }
 
 /**
@@ -296,7 +325,8 @@ export async function terminalGetState(name?: string): Promise<TerminalRunResult
  */
 export async function terminalKill(name?: string): Promise<TerminalRunResult> {
   const result = await sendClientRequest('terminal.kill', {name});
-  return result as TerminalRunResult;
+  assertResult<TerminalRunResult>(result, 'terminal.kill');
+  return result;
 }
 
 // ── Output Methods ───────────────────────────────────────
@@ -306,7 +336,8 @@ export async function terminalKill(name?: string): Promise<TerminalRunResult> {
  */
 export async function outputListChannels(): Promise<OutputChannelsResult> {
   const result = await sendClientRequest('output.listChannels', {});
-  return result as OutputChannelsResult;
+  assertResult<OutputChannelsResult>(result, 'output.listChannels');
+  return result;
 }
 
 /**
@@ -316,7 +347,8 @@ export async function outputRead(
   channel: string,
 ): Promise<OutputReadResult> {
   const result = await sendClientRequest('output.read', {channel});
-  return result as OutputReadResult;
+  assertResult<OutputReadResult>(result, 'output.read');
+  return result;
 }
 
 // ── Command Methods ──────────────────────────────────────
@@ -329,7 +361,8 @@ export async function commandExecute(
   args?: unknown[],
 ): Promise<CommandExecuteResult> {
   const result = await sendClientRequest('command.execute', {command, args});
-  return result as CommandExecuteResult;
+  assertResult<CommandExecuteResult>(result, 'command.execute');
+  return result;
 }
 
 // ── Codebase Types ───────────────────────────────────────
@@ -417,6 +450,8 @@ export interface CallChainNode {
 export interface CallChainInfo {
   incomingCalls: CallChainNode[];
   outgoingCalls: CallChainNode[];
+  incomingTruncated?: boolean;
+  outgoingTruncated?: boolean;
 }
 
 export interface TypeFlowInfo {
@@ -470,6 +505,10 @@ export interface CodebaseTraceSymbolResult {
   errorMessage?: string;
   /** Reason why symbol was not found. */
   notFoundReason?: 'no-project' | 'no-matching-files' | 'symbol-not-found' | 'file-not-in-project' | 'parse-error';
+  /** Resolved absolute path used as the project root. */
+  resolvedRootDir?: string;
+  /** Diagnostic messages (e.g., excessive node_modules references). */
+  diagnostics?: string[];
 }
 
 // ── Codebase Methods ─────────────────────────────────────
@@ -483,13 +522,16 @@ export async function codebaseGetOverview(
   filter?: string,
   includeImports?: boolean,
   includeStats?: boolean,
+  includePatterns?: string[],
+  excludePatterns?: string[],
 ): Promise<CodebaseOverviewResult> {
   const result = await sendClientRequest(
     'codebase.getOverview',
-    {rootDir, depth, filter, includeImports, includeStats},
+    {rootDir, depth, filter, includeImports, includeStats, includePatterns, excludePatterns},
     30_000,
   );
-  return result as CodebaseOverviewResult;
+  assertResult<CodebaseOverviewResult>(result, 'codebase.getOverview');
+  return result;
 }
 
 /**
@@ -501,13 +543,16 @@ export async function codebaseGetExports(
   includeTypes?: boolean,
   includeJSDoc?: boolean,
   kind?: string,
+  includePatterns?: string[],
+  excludePatterns?: string[],
 ): Promise<CodebaseExportsResult> {
   const result = await sendClientRequest(
     'codebase.getExports',
-    {path, rootDir, includeTypes, includeJSDoc, kind},
+    {path, rootDir, includeTypes, includeJSDoc, kind, includePatterns, excludePatterns},
     30_000,
   );
-  return result as CodebaseExportsResult;
+  assertResult<CodebaseExportsResult>(result, 'codebase.getExports');
+  return result;
 }
 
 /**
@@ -526,13 +571,16 @@ export async function codebaseTraceSymbol(
   maxReferences?: number,
   timeout?: number,
   forceRefresh?: boolean,
+  includePatterns?: string[],
+  excludePatterns?: string[],
 ): Promise<CodebaseTraceSymbolResult> {
   const result = await sendClientRequest(
     'codebase.traceSymbol',
-    {symbol, rootDir, file, line, column, depth, include, includeImpact, maxReferences, timeout, forceRefresh},
+    {symbol, rootDir, file, line, column, depth, include, includeImpact, maxReferences, timeout, forceRefresh, includePatterns, excludePatterns},
     Math.max(60_000, (timeout ?? 30_000) + 5_000),
   );
-  return result as CodebaseTraceSymbolResult;
+  assertResult<CodebaseTraceSymbolResult>(result, 'codebase.traceSymbol');
+  return result;
 }
 
 // ── Find Unused Symbols Types ────────────────────────────
@@ -553,6 +601,8 @@ export interface FindUnusedSymbolsResult {
     scanDurationMs: number;
   };
   errorMessage?: string;
+  resolvedRootDir?: string;
+  diagnostics?: string[];
 }
 
 /**
@@ -564,13 +614,16 @@ export async function codebaseFindUnusedSymbols(
   exportedOnly?: boolean,
   kinds?: string[],
   limit?: number,
+  includePatterns?: string[],
+  excludePatterns?: string[],
 ): Promise<FindUnusedSymbolsResult> {
   const result = await sendClientRequest(
     'codebase.findUnusedSymbols',
-    {rootDir, pattern, exportedOnly, kinds, limit},
+    {rootDir, pattern, exportedOnly, kinds, limit, includePatterns, excludePatterns},
     60_000,
   );
-  return result as FindUnusedSymbolsResult;
+  assertResult<FindUnusedSymbolsResult>(result, 'codebase.findUnusedSymbols');
+  return result;
 }
 
 // ── Utility ──────────────────────────────────────────────
@@ -603,7 +656,8 @@ export function getClientPipePath(): string {
 export async function getProcessLedger(): Promise<ProcessLedgerSummary> {
   try {
     const result = await sendClientRequest('system.getProcessLedger', {}, 3_000);
-    return result as ProcessLedgerSummary;
+    assertResult<ProcessLedgerSummary>(result, 'system.getProcessLedger');
+    return result;
   } catch {
     // Return empty ledger if unavailable
     return {
