@@ -158,7 +158,7 @@ export const trace = defineTool({
     maxReferences: zod
       .number()
       .int()
-      .min(10)
+      .min(1)
       .max(5000)
       .optional()
       .default(500)
@@ -240,6 +240,7 @@ export const trace = defineTool({
     const effectiveRootDir = result.resolvedRootDir ?? request.params.rootDir;
 
     if (request.params.response_format === ResponseFormat.JSON) {
+      response.setSkipLedger();
       if (isEmpty && effectiveRootDir) {
         const withIgnore = {...result, ignoredBy: buildIgnoreContextJson(effectiveRootDir)};
         const json = JSON.stringify(withIgnore, null, 2);
@@ -253,7 +254,12 @@ export const trace = defineTool({
       return;
     }
 
-    const markdown = formatTraceResult(result, isEmpty, effectiveRootDir, request.params.include);
+    const hasFilterPatterns = Boolean(
+      (request.params.includePatterns && request.params.includePatterns.length > 0) ||
+      (request.params.excludePatterns && request.params.excludePatterns.length > 0)
+    );
+
+    const markdown = formatTraceResult(result, isEmpty, effectiveRootDir, request.params.include, hasFilterPatterns);
     checkCharacterLimit(markdown, 'codebase_trace', REDUCE_HINTS);
     response.appendResponseLine(markdown);
   },
@@ -268,6 +274,7 @@ function formatTraceResult(
   isEmpty: boolean,
   rootDir?: string,
   include?: IncludeMode[],
+  hasFilterPatterns?: boolean,
 ): string {
   const lines: string[] = [];
 
@@ -378,8 +385,9 @@ function formatTraceResult(
     lines.push('');
   }
 
-  // Bug #1 fix: Always append ignore context so Copilot is aware of exclusions
-  if (rootDir) {
+  // Only show ignore context when relevant: empty results or explicit filter patterns
+  const showIgnoreContext = isEmpty || hasFilterPatterns;
+  if (rootDir && showIgnoreContext) {
     appendIgnoreContextMarkdown(lines, rootDir);
   }
 

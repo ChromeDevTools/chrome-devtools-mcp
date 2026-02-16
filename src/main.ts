@@ -514,10 +514,12 @@ function registerTool(tool: ToolDefinition): void {
             content.push({type: 'text', text: '(no output)'});
           }
 
-          // Append process ledger summary to EVERY response (Copilot accountability)
-          const ledger = await getProcessLedger();
-          const ledgerText = formatProcessLedger(ledger);
-          content.push({type: 'text', text: ledgerText});
+          // Append process ledger summary unless tool opted out (JSON format)
+          if (!response.skipLedger) {
+            const ledger = await getProcessLedger();
+            const ledgerText = formatProcessLedger(ledger);
+            content.push({type: 'text', text: ledgerText});
+          }
 
           return {content};
         };
