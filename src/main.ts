@@ -354,6 +354,11 @@ const codebaseMutex = new Mutex();
 // subsequent callers wait and then re-check the flags.
 const hotReloadMutex = new Mutex();
 
+// Guards extension hot-reload so parallel tool calls can't trigger
+// simultaneous Client rebuilds — only the first caller reloads,
+// subsequent callers wait then see the updated fingerprint/timestamp.
+const extHotReloadMutex = new Mutex();
+
 /** Shared result from the hot-reload check — set by the winner, consumed by waiters. */
 let hotReloadResult: CallToolResult | null = null;
 
@@ -480,22 +485,32 @@ function registerTool(tool: ToolDefinition): void {
         // Either condition triggers handleHotReload() which tells Host to
         // stop Client → build → spawn new Client. If build is already current,
         // the rebuild step is a fast no-op.
+        //
+        // Serialized via extHotReloadMutex so parallel tool calls can't
+        // trigger simultaneous Client rebuilds. The first caller does the
+        // reload; subsequent callers wait, then re-check and see the
+        // updated fingerprint/timestamp.
         if (!isStandalone && config.explicitExtensionDevelopmentPath) {
-          const stale = isBuildStale(config.extensionBridgePath);
-          const windowStartedAt = lifecycleService.debugWindowStartedAt;
-          const buildNewerThanWindow = !stale
-            && windowStartedAt !== undefined
-            && hasBuildChangedSinceWindowStart(config.extensionBridgePath, windowStartedAt);
+          const extHrGuard = await extHotReloadMutex.acquire();
+          try {
+            const stale = isBuildStale(config.extensionBridgePath);
+            const windowStartedAt = lifecycleService.debugWindowStartedAt;
+            const buildNewerThanWindow = !stale
+              && windowStartedAt !== undefined
+              && hasBuildChangedSinceWindowStart(config.extensionBridgePath, windowStartedAt);
 
-          logger(`[hot-reload] check: stale=${stale}, buildNewerThanWindow=${buildNewerThanWindow}, extDir=${config.extensionBridgePath}`);
+            logger(`[hot-reload] check: stale=${stale}, buildNewerThanWindow=${buildNewerThanWindow}, extDir=${config.extensionBridgePath}`);
 
-          if (stale || buildNewerThanWindow) {
-            const reason = stale ? 'source stale' : 'manual build detected';
-            logger(`[tool:${tool.name}] Extension needs hot-reload (${reason}) — reloading…`);
-            await lifecycleService.handleHotReload();
-            writeExtSourceFingerprint(config.extensionBridgePath);
-            extensionHotReloadInfo = {builtAt: Date.now()};
-            logger(`[tool:${tool.name}] Hot-reload complete — reconnected`);
+            if (stale || buildNewerThanWindow) {
+              const reason = stale ? 'source stale' : 'manual build detected';
+              logger(`[tool:${tool.name}] Extension needs hot-reload (${reason}) — reloading…`);
+              await lifecycleService.handleHotReload();
+              writeExtSourceFingerprint(config.extensionBridgePath);
+              extensionHotReloadInfo = {builtAt: Date.now()};
+              logger(`[tool:${tool.name}] Hot-reload complete — reconnected`);
+            }
+          } finally {
+            extHrGuard.dispose();
           }
         }
 
