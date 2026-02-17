@@ -240,6 +240,18 @@ export async function restartMcpServer(): Promise<void> {
 }
 
 /**
+ * Send a notification message to the Host extension for display
+ * in the VS Code window. Fire-and-forget — failures are silently ignored.
+ */
+export async function showHostNotification(message: string): Promise<void> {
+  try {
+    await sendHostRequest('showNotification', {message}, 5_000);
+  } catch {
+    // Non-critical — notification may not be shown
+  }
+}
+
+/**
  * Check if the Host pipe is reachable via a system.ping.
  */
 export async function pingHost(): Promise<boolean> {

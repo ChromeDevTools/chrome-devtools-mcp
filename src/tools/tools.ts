@@ -11,7 +11,6 @@ import * as outputPanelTools from './output-panel.js';
 import * as reloadTools from './reload-mcp-server.js';
 import * as screenshotTools from './screenshot.js';
 import * as snapshotTools from './snapshot.js';
-import * as terminalTools from './terminal.js';
 import type {ToolDefinition} from './ToolDefinition.js';
 import * as waitTools from './wait.js';
 
@@ -23,7 +22,6 @@ const tools = [
   ...Object.values(reloadTools),
   ...Object.values(screenshotTools),
   ...Object.values(snapshotTools),
-  ...Object.values(terminalTools),
   ...Object.values(waitTools),
 ] as unknown as ToolDefinition[];
 

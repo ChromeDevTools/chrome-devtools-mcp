@@ -6,7 +6,7 @@
 
 import process from 'node:process';
 
-import {restartMcpServer} from '../host-pipe.js';
+import {restartMcpServer, showHostNotification} from '../host-pipe.js';
 import {logger} from '../logger.js';
 import {
   getMcpServerRoot,
@@ -64,6 +64,7 @@ Examples:
     logger(`[reload_mcp_server] ${status}`);
 
     writeHotReloadMarker(mcpServerDir);
+    showHostNotification('🔄 MCP Server: Restarting…').catch(() => {});
 
     // Schedule restart after this response is flushed via stdio
     setTimeout(async () => {

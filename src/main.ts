@@ -12,7 +12,7 @@ import process from 'node:process';
 import {parseArguments} from './cli.js';
 import {loadConfig, type ResolvedConfig} from './config.js';
 import {hasBuildChangedSinceWindowStart, isBuildStale} from './extension-watcher.js';
-import {restartMcpServer} from './host-pipe.js';
+import {restartMcpServer, showHostNotification} from './host-pipe.js';
 import {loadIssueDescriptions} from './issue-descriptions.js';
 import {logger, saveLogsToFile} from './logger.js';
 import {McpResponse} from './McpResponse.js';
@@ -53,6 +53,10 @@ const mcpServerDir = getMcpServerRoot();
 const mcpProcessStartTime = Date.now();
 let mcpServerHotReloadInfo: {builtAt: number} | null = null;
 let mcpServerRestartScheduled = false;
+
+// ── Extension Hot-Reload State ──────────────────────────
+
+let extensionHotReloadInfo: {builtAt: number} | null = null;
 
 /**
  * Run an incremental build for hot-reload: `tsc` + `post-build` WITHOUT
@@ -384,6 +388,7 @@ function registerTool(tool: ToolDefinition): void {
             // Check 1: Source files newer than build output → needs rebuild.
             if (!mcpServerRestartScheduled && hasMcpServerSourceChanged(mcpServerDir)) {
               logger(`[tool:${tool.name}] MCP server source changed — triggering self rebuild…`);
+              showHostNotification('🔨 MCP Server: Rebuilding…').catch(() => {});
 
               try {
                 await runMcpServerBuild();
@@ -482,6 +487,7 @@ function registerTool(tool: ToolDefinition): void {
             const reason = stale ? 'source stale' : 'manual build detected';
             logger(`[tool:${tool.name}] Extension needs hot-reload (${reason}) — reloading…`);
             await lifecycleService.handleHotReload();
+            extensionHotReloadInfo = {builtAt: Date.now()};
             logger(`[tool:${tool.name}] Hot-reload complete — reconnected`);
           }
         }
@@ -578,6 +584,16 @@ function registerTool(tool: ToolDefinition): void {
             text: `✅ **MCP server was recently updated.** Latest build completed ${secondsAgo}s ago. All tools are now running the newest code.`,
           });
           mcpServerHotReloadInfo = null;
+        }
+
+        // Inject extension hot-reload banner on first tool call after extension reload
+        if (extensionHotReloadInfo) {
+          const secondsAgo = Math.round((Date.now() - extensionHotReloadInfo.builtAt) / 1000);
+          result.content.unshift({
+            type: 'text',
+            text: `✅ **Extension was recently updated.** Latest build completed ${secondsAgo}s ago. The Extension Development Host is now running the newest code.`,
+          });
+          extensionHotReloadInfo = null;
         }
 
         return result;

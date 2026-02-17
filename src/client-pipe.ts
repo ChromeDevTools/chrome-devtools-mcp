@@ -8,14 +8,7 @@
  * Client Pipe Client
  *
  * Connects to the Client extension's pipe server (Extension Development Host)
- * to interact with terminal, output channel, and VS Code command APIs.
- *
- * Terminal methods (single-terminal model):
- * - terminal.run: Run a command, wait for completion/prompt/timeout
- * - terminal.input: Send input to a waiting prompt
- * - terminal.state: Check current terminal state
- * - terminal.kill: Send Ctrl+C to stop the running process
- * - terminal.listAll: List all terminals (tracked + untracked)
+ * to interact with output channel, and VS Code command APIs.
  *
  * Output methods:
  * - output.listChannels: List VS Code output channels
@@ -36,8 +29,6 @@ const CLIENT_PIPE_PATH = IS_WINDOWS
   : '/tmp/vscode-devtools-client.sock';
 
 const DEFAULT_TIMEOUT_MS = 10_000;
-// Terminal operations wait up to 35s so the 30s command timeout finishes first
-const TERMINAL_TIMEOUT_MS = 35_000;
 
 // ── Types ────────────────────────────────────────────────
 
@@ -67,25 +58,6 @@ function isJsonRpcResponse(value: unknown): value is JsonRpcResponse {
   );
 }
 
-export type TerminalStatus =
-  | 'idle'
-  | 'running'
-  | 'completed'
-  | 'waiting_for_input'
-  | 'timeout';
-
-export type WaitMode = 'completion' | 'background';
-
-export interface ActiveProcess {
-  terminalName: string;
-  pid?: number;
-  command: string;
-  status: TerminalStatus;
-  startedAt: string;
-  durationMs: number;
-  exitCode?: number;
-}
-
 export type ProcessStatus = 'running' | 'completed' | 'killed' | 'orphaned';
 
 export interface ChildProcessInfo {
@@ -113,20 +85,6 @@ export interface ProcessLedgerSummary {
   recentlyCompleted: ProcessEntry[];
   terminalSessions: TerminalSessionInfo[];
   sessionId: string;
-}
-
-export interface TerminalRunResult {
-  status: TerminalStatus;
-  output: string;
-  shell?: string;
-  cwd?: string;
-  exitCode?: number;
-  prompt?: string;
-  pid?: number;
-  name?: string;
-  durationMs?: number;
-  activeProcesses?: ActiveProcess[];
-  terminalSessions?: TerminalSessionInfo[];
 }
 
 export interface TerminalSessionInfo {
@@ -252,81 +210,6 @@ function sendClientRequest(
       );
     }, timeoutMs);
   });
-}
-
-// ── Terminal Methods (Multi-Terminal Model) ─────────────
-
-/**
- * Run a PowerShell command in a named terminal.
- * Creates terminal if needed, rejects with state if busy.
- * Waits for completion, prompt detection, or timeout.
- *
- * @param command The PowerShell command to execute
- * @param cwd Absolute path to working directory for command execution
- * @param timeout Max wait time in milliseconds (default: 120000)
- * @param name Terminal name (default: 'default')
- * @param waitMode 'completion' blocks until done; 'background' returns immediately
- */
-export async function terminalRun(
-  command: string,
-  cwd: string,
-  timeout?: number,
-  name?: string,
-  waitMode?: WaitMode,
-): Promise<TerminalRunResult> {
-  const result = await sendClientRequest(
-    'terminal.run',
-    {command, cwd, timeout, name, waitMode},
-    TERMINAL_TIMEOUT_MS,
-  );
-  assertResult<TerminalRunResult>(result, 'terminal.run');
-  return result;
-}
-
-/**
- * Send input to a terminal waiting for a prompt.
- * Waits for the next completion or prompt after sending.
- *
- * @param text The text to send
- * @param addNewline Whether to press Enter after (default: true)
- * @param timeout Max wait time in milliseconds (default: 30000)
- * @param name Terminal name (default: 'default')
- */
-export async function terminalInput(
-  text: string,
-  addNewline?: boolean,
-  timeout?: number,
-  name?: string,
-): Promise<TerminalRunResult> {
-  const result = await sendClientRequest(
-    'terminal.input',
-    {text, addNewline, timeout, name},
-    TERMINAL_TIMEOUT_MS,
-  );
-  assertResult<TerminalRunResult>(result, 'terminal.input');
-  return result;
-}
-
-/**
- * Get the current terminal state without modifying anything.
- *
- * @param name Terminal name (default: 'default')
- */
-export async function terminalGetState(name?: string): Promise<TerminalRunResult> {
-  const result = await sendClientRequest('terminal.state', {name});
-  assertResult<TerminalRunResult>(result, 'terminal.state');
-  return result;
-}
-
-/**
- * Send Ctrl+C to kill the running process in a terminal.
- *
- * @param name Terminal name (default: 'default')
- */
-export async function terminalKill(name?: string): Promise<TerminalRunResult> {
-  const result = await sendClientRequest('terminal.kill', {name});
-  assertResult<TerminalRunResult>(result, 'terminal.kill');
-  return result;
 }
 
 // ── Output Methods ───────────────────────────────────────
