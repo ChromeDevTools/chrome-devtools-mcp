@@ -15,7 +15,7 @@ import {getHostWorkspace} from '../../config.js';
 import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool} from '../ToolDefinition.js';
-import {buildIgnoreContextJson} from './ignore-context.js';
+import {readIgnoreContext} from './ignore-context.js';
 
 // ── Dynamic Timeout Configuration ────────────────────────
 // Timeout scales with request scope and complexity rather than
@@ -443,11 +443,14 @@ export const map = defineTool({
     );
 
     if (overviewResult.summary.totalFiles === 0) {
-      const ignoredBy = buildIgnoreContextJson(overviewResult.projectRoot);
-      response.appendResponseLine('# Empty Result\n');
+      const ignoreContext = readIgnoreContext(overviewResult.projectRoot);
+      response.appendResponseLine(`Root: ${normalizePath(overviewResult.projectRoot)}\n`);
       response.appendResponseLine('No files found. Check scope patterns or .devtoolsignore.\n');
-      if (ignoredBy) {
-        response.appendResponseLine(`Ignored by: ${JSON.stringify(ignoredBy)}`);
+      if (ignoreContext.activePatterns.length > 0) {
+        response.appendResponseLine('Current .devtoolsignore patterns:\n');
+        for (const pattern of ignoreContext.activePatterns) {
+          response.appendResponseLine(pattern);
+        }
       }
       return;
     }
