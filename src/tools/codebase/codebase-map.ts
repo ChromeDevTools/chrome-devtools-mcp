@@ -6,135 +6,337 @@
 
 import {
   codebaseGetOverview,
-  codebaseGetExports,
   codebaseGetImportGraph,
   type CodebaseTreeNode,
   type CodebaseSymbolNode,
-  type CodebaseExportInfo,
-  type CodebaseExportsResult,
   type ImportGraphResult,
 } from '../../client-pipe.js';
 import {getHostWorkspace} from '../../config.js';
 import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
-import {
-  defineTool,
-} from '../ToolDefinition.js';
+import {defineTool} from '../ToolDefinition.js';
 import {buildIgnoreContextJson} from './ignore-context.js';
 
-// ── Progressive Detail Reduction ─────────────────────────
+// ── Constants ────────────────────────────────────────────
 
 const OUTPUT_TOKEN_LIMIT = 3_000;
 const CHARS_PER_TOKEN = 4;
+const INDENT = '  ';
 
-function estimateTokens(obj: unknown): number {
-  return Math.ceil(JSON.stringify(obj).length / CHARS_PER_TOKEN);
+type DetailLevel = 'minimal' | 'names' | 'signatures' | 'full';
+type FileTypeCategory = 'typescript' | 'css' | 'html' | 'json' | 'yaml' | 'markdown' | 'xml' | 'unknown';
+
+interface FileTypeSymbolConfig {
+  typescript?: string[];
+  css?: string[];
+  html?: string[];
+  json?: string[];
+  yaml?: string[];
+  markdown?: string[];
+  xml?: string[];
 }
 
-// ── Tree Flattening ──────────────────────────────────────
-
-interface CompactFileEntry {
-  path: string;
-  symbols?: CodebaseSymbolNode[];
-  imports?: string[];
-  lines?: number;
+function estimateTokens(text: string): number {
+  return Math.ceil(text.length / CHARS_PER_TOKEN);
 }
 
-/**
- * Flatten deeply nested CodebaseTreeNode[] into a compact
- * list of file entries with relative paths, stripping
- * intermediate directory nesting.
- */
-function flattenTree(nodes: CodebaseTreeNode[], prefix = ''): CompactFileEntry[] {
-  const entries: CompactFileEntry[] = [];
-  for (const node of nodes) {
-    const currentPath = prefix ? `${prefix}/${node.name}` : node.name;
-    if (node.type === 'file') {
-      const entry: CompactFileEntry = {path: currentPath};
-      if (node.symbols && node.symbols.length > 0) entry.symbols = node.symbols;
-      if (node.imports && node.imports.length > 0) entry.imports = node.imports;
-      if (node.lines !== undefined) entry.lines = node.lines;
-      entries.push(entry);
-    } else if (node.children) {
-      entries.push(...flattenTree(node.children, currentPath));
-    }
+// ── File Type Detection ──────────────────────────────────
+
+const EXTENSION_TO_CATEGORY: Record<string, FileTypeCategory> = {
+  ts: 'typescript', tsx: 'typescript', js: 'typescript', jsx: 'typescript', mjs: 'typescript', cjs: 'typescript',
+  css: 'css', scss: 'css', less: 'css',
+  html: 'html', htm: 'html', xhtml: 'html',
+  json: 'json', jsonc: 'json', json5: 'json', jsonl: 'json', webmanifest: 'json', geojson: 'json',
+  yaml: 'yaml', yml: 'yaml', toml: 'yaml',
+  md: 'markdown', markdown: 'markdown', mdx: 'markdown',
+  xml: 'xml', svg: 'xml', xaml: 'xml', plist: 'xml', csproj: 'xml', vbproj: 'xml', fsproj: 'xml',
+  xsl: 'xml', xslt: 'xml', xsd: 'xml', props: 'xml', targets: 'xml', resx: 'xml', config: 'xml',
+};
+
+function getFileCategory(fileName: string): FileTypeCategory {
+  const lastDot = fileName.lastIndexOf('.');
+  if (lastDot < 0) return 'unknown';
+  const ext = fileName.slice(lastDot + 1).toLowerCase();
+  return EXTENSION_TO_CATEGORY[ext] ?? 'unknown';
+}
+
+// ── Per-File-Type Symbol Kind Mapping ────────────────────
+
+const TS_KIND_MAP: Record<string, Set<string>> = {
+  functions: new Set(['function']),
+  classes: new Set(['class']),
+  interfaces: new Set(['interface']),
+  types: new Set(['type']),
+  constants: new Set(['constant', 'variable']),
+  enums: new Set(['enum']),
+  methods: new Set(['method']),
+  properties: new Set(['property']),
+  '*': new Set(['function', 'class', 'interface', 'type', 'constant', 'variable', 'enum', 'method', 'property']),
+};
+
+const CSS_KIND_MAP: Record<string, Set<string>> = {
+  selectors: new Set(['selector']),
+  'at-rules': new Set(['at-rule']),
+  'custom-properties': new Set(['custom-property']),
+  '*': new Set(['selector', 'at-rule', 'custom-property']),
+};
+
+const HTML_KIND_MAP: Record<string, Set<string>> = {
+  'semantic-tags': new Set(['landmark', 'element']),
+  headings: new Set(['heading']),
+  forms: new Set(['form']),
+  tables: new Set(['table']),
+  media: new Set(['media']),
+  scripts: new Set(['resource']),
+  '*': new Set(['heading', 'landmark', 'form', 'table', 'resource', 'metadata', 'interactive', 'media', 'element']),
+};
+
+const JSON_KIND_MAP: Record<string, Set<string>> = {
+  keys: new Set(['string', 'number', 'boolean', 'null', 'object']),
+  arrays: new Set(['array']),
+  '*': new Set(['string', 'number', 'boolean', 'null', 'array', 'object']),
+};
+
+const MD_KIND_MAP: Record<string, Set<string>> = {
+  headings: new Set(['heading']),
+  'code-blocks': new Set(['code']),
+  tables: new Set(['table']),
+  frontmatter: new Set(['frontmatter']),
+  '*': new Set(['heading', 'code', 'table', 'frontmatter', 'key', 'column']),
+};
+
+const XML_KIND_MAP: Record<string, Set<string>> = {
+  elements: new Set(['element', 'empty-element']),
+  '*': new Set(['element', 'empty-element']),
+};
+
+const CATEGORY_KIND_MAPS: Record<FileTypeCategory, Record<string, Set<string>>> = {
+  typescript: TS_KIND_MAP,
+  css: CSS_KIND_MAP,
+  html: HTML_KIND_MAP,
+  json: JSON_KIND_MAP,
+  yaml: JSON_KIND_MAP,
+  markdown: MD_KIND_MAP,
+  xml: XML_KIND_MAP,
+  unknown: TS_KIND_MAP,
+};
+
+function shouldShowSymbol(symbolKind: string, category: FileTypeCategory, allowedKinds: string[]): boolean {
+  const kindMap = CATEGORY_KIND_MAPS[category];
+  for (const allowed of allowedKinds) {
+    const validKinds = kindMap[allowed];
+    if (validKinds?.has(symbolKind)) return true;
   }
-  return entries;
+  return false;
 }
 
-/**
- * Make file paths relative to projectRoot (case-insensitive prefix strip for Windows).
- */
-function makePathsRelative(files: CompactFileEntry[], projectRoot: string): void {
-  const rootPrefix = normalizePath(projectRoot).toLowerCase();
-  for (const file of files) {
-    file.path = normalizePath(file.path);
-    const lower = file.path.toLowerCase();
-    if (lower.startsWith(rootPrefix + '/')) {
-      file.path = file.path.slice(rootPrefix.length + 1);
-    }
-  }
-}
-
-/**
- * Collapse a flat file list into { directory: fileCount } pairs.
- * Much more compact than listing every file path individually.
- */
-function buildDirectorySummary(files: CompactFileEntry[]): Record<string, number> {
-  const dirs: Record<string, number> = {};
-  for (const file of files) {
-    const lastSlash = file.path.lastIndexOf('/');
-    const dir = lastSlash >= 0 ? file.path.slice(0, lastSlash) : '.';
-    dirs[dir] = (dirs[dir] ?? 0) + 1;
-  }
-  return dirs;
+function getSymbolFiltersForFile(fileName: string, config: FileTypeSymbolConfig): string[] | undefined {
+  const category = getFileCategory(fileName);
+  const filters = config[category === 'unknown' ? 'typescript' : category];
+  return filters;
 }
 
 // ── Path Helpers ─────────────────────────────────────────
 
-/** Normalize backslashes to forward slashes for display */
 function normalizePath(p: string): string {
   return p.replace(/\\/g, '/');
 }
 
-/** Strip temp namespace from ts-morph type signatures (e.g. `import("/__exports_123")`) */
 function stripTempNamespace(sig: string): string {
   return sig.replace(/import\("\/[^"]*__exports_[^"]*"\)\./g, '');
 }
 
-/**
- * Detect whether the given path is a file (has extension), a glob (has wildcards),
- * or a directory path.
- */
-function classifyPath(p: string | undefined): 'file' | 'glob' | 'directory' | 'none' {
-  if (!p) return 'none';
-  if (p.includes('*') || p.includes('{') || p.includes('?')) return 'glob';
-  if (/\.\w+$/.test(p)) return 'file';
-  return 'directory';
+// ── Markdown Tree Formatter ──────────────────────────────
+
+interface FormatOptions {
+  showFolders: boolean;
+  showFiles: boolean;
+  symbolConfig: FileTypeSymbolConfig;
+  detail: DetailLevel;
+  includeStats: boolean;
+  hasAnySymbols: boolean;
+}
+
+function formatSymbol(symbol: CodebaseSymbolNode, detail: DetailLevel, depth: number): string {
+  const indent = INDENT.repeat(depth);
+  const sig = symbol.detail ? stripTempNamespace(symbol.detail) : '';
+  const kind = symbol.kind;
+
+  switch (detail) {
+    case 'minimal':
+      return '';
+    case 'names':
+      return `${indent}${kind} ${symbol.name}\n`;
+    case 'signatures':
+      return formatSignature(symbol, indent, sig);
+    case 'full':
+      return formatFullSymbol(symbol, indent, sig);
+  }
+}
+
+function formatSignature(symbol: CodebaseSymbolNode, indent: string, sig: string): string {
+  const kind = symbol.kind;
+  if (kind === 'class') return `${indent}class ${symbol.name}\n`;
+  if (kind === 'interface') return `${indent}interface ${symbol.name}\n`;
+  if (kind === 'enum') return `${indent}enum ${symbol.name}\n`;
+  if (kind === 'type') return `${indent}type ${symbol.name} = ${sig || '...'}\n`;
+  if (kind === 'function') return `${indent}${symbol.name}${sig || '()'}\n`;
+  if (kind === 'method') return `${indent}${symbol.name}${sig || '()'}\n`;
+  if (kind === 'property' || kind === 'variable' || kind === 'constant') {
+    return `${indent}${symbol.name}: ${sig || 'unknown'}\n`;
+  }
+  return `${indent}${symbol.name}\n`;
+}
+
+function formatFullSymbol(symbol: CodebaseSymbolNode, indent: string, sig: string): string {
+  const base = formatSignature(symbol, indent, sig);
+  return base;
+}
+
+function formatSymbols(
+  symbols: CodebaseSymbolNode[],
+  opts: FormatOptions,
+  depth: number,
+  fileName: string,
+): string {
+  if (!opts.hasAnySymbols || opts.detail === 'minimal') return '';
+
+  const allowedKinds = getSymbolFiltersForFile(fileName, opts.symbolConfig);
+  if (!allowedKinds) return '';
+
+  const category = getFileCategory(fileName);
+
+  let output = '';
+  for (const sym of symbols) {
+    const matches = shouldShowSymbol(sym.kind, category, allowedKinds);
+    if (matches) {
+      output += formatSymbol(sym, opts.detail, depth);
+    }
+    if (sym.children && sym.children.length > 0) {
+      output += formatSymbolChildren(sym.children, opts, matches ? depth + 1 : depth, category, allowedKinds);
+    }
+  }
+  return output;
+}
+
+function formatSymbolChildren(
+  symbols: CodebaseSymbolNode[],
+  opts: FormatOptions,
+  depth: number,
+  category: FileTypeCategory,
+  allowedKinds: string[],
+): string {
+  let output = '';
+  for (const sym of symbols) {
+    const matches = shouldShowSymbol(sym.kind, category, allowedKinds);
+    if (matches) {
+      output += formatSymbol(sym, opts.detail, depth);
+    }
+    if (sym.children && sym.children.length > 0) {
+      output += formatSymbolChildren(sym.children, opts, matches ? depth + 1 : depth, category, allowedKinds);
+    }
+  }
+  return output;
+}
+
+function formatTree(
+  nodes: CodebaseTreeNode[],
+  opts: FormatOptions,
+  depth: number = 0,
+  stats?: Map<string, {files: number; lines: number}>,
+): string {
+  let output = '';
+  const indent = INDENT.repeat(depth);
+
+  for (const node of nodes) {
+    if (node.type === 'directory') {
+      if (opts.showFolders) {
+        let line = `${indent}${node.name}/`;
+        if (opts.includeStats && stats) {
+          const s = stats.get(node.name);
+          if (s) line += `  (${s.files} files, ${s.lines} lines)`;
+        }
+        output += line + '\n';
+      }
+      if (node.children) {
+        output += formatTree(node.children, opts, opts.showFolders ? depth + 1 : depth, stats);
+      }
+    } else if (node.type === 'file') {
+      if (opts.showFiles) {
+        output += `${indent}${node.name}\n`;
+        if (node.symbols) {
+          output += formatSymbols(node.symbols, opts, depth + 1, node.name);
+        }
+      }
+    }
+  }
+  return output;
+}
+
+function formatFlatPaths(nodes: CodebaseTreeNode[], prefix = ''): string {
+  let output = '';
+  for (const node of nodes) {
+    const path = prefix ? `${prefix}/${node.name}` : node.name;
+    if (node.type === 'file') {
+      output += path + '\n';
+    } else if (node.children) {
+      output += formatFlatPaths(node.children, path);
+    }
+  }
+  return output;
+}
+
+function formatFolderSummary(nodes: CodebaseTreeNode[], depth = 0): string {
+  let output = '';
+  const indent = INDENT.repeat(depth);
+
+  for (const node of nodes) {
+    if (node.type === 'directory') {
+      const fileCount = countFiles(node);
+      output += `${indent}${node.name}/ (${fileCount} files)\n`;
+      if (node.children) {
+        output += formatFolderSummary(node.children, depth + 1);
+      }
+    }
+  }
+  return output;
+}
+
+function countFiles(node: CodebaseTreeNode): number {
+  if (node.type === 'file') return 1;
+  let count = 0;
+  if (node.children) {
+    for (const child of node.children) {
+      count += countFiles(child);
+    }
+  }
+  return count;
 }
 
 // ── Tool Definition ──────────────────────────────────────
 
 export const map = defineTool({
   name: 'codebase_map',
-  description: 'Get a structural map of the codebase at any granularity — files, symbols, exports, or full API detail.\n\n' +
-    'This is the single tool for understanding what EXISTS in a codebase.\n\n' +
-    '**Mode selection:**\n' +
-    '- **Directory/workspace mode** (path omitted or points to directory): File tree with symbols\n' +
-    '- **File mode** (path points to a single file): Detailed exports with signatures and JSDoc\n\n' +
-    '**Depth controls detail level:**\n' +
-    '- `depth: 0` — File tree only (directories and filenames)\n' +
-    '- `depth: 1` — Top-level symbols per file (functions, classes, interfaces)\n' +
-    '- `depth: 2` — Symbols with type signatures (class members, method params)\n' +
-    '- `depth: 3+` — Full detail including JSDoc documentation\n\n' +
+  description: 'Get a structural map of the codebase at any granularity — folders, files, or symbols.\n\n' +
+    'Returns **Markdown tree output** with folders ending in `/`, files with extensions, and symbols.\n\n' +
+    '**Control what appears:**\n' +
+    '- `scope` — What parts of the codebase to analyze (include/exclude globs)\n' +
+    '- `show` — What entities to show (folders, files, and per-file-type symbols)\n' +
+    '- `detail` — How much info per symbol (minimal, names, signatures, full)\n\n' +
+    '**Symbol arrays by file type:**\n' +
+    '- `show.typescript`: functions, classes, interfaces, types, enums, constants, methods, properties\n' +
+    '- `show.css`: selectors, at-rules, custom-properties\n' +
+    '- `show.html`: semantic-tags, headings, forms, tables, media\n' +
+    '- `show.json`: keys, arrays\n' +
+    '- `show.yaml`: keys, arrays\n' +
+    '- `show.markdown`: headings, code-blocks, tables, frontmatter\n' +
+    '- `show.xml`: elements\n\n' +
     '**EXAMPLES:**\n' +
-    '- Full project map: `{}`\n' +
-    '- Subdirectory only: `{ path: "src/tools" }`\n' +
-    '- File exports: `{ path: "src/client-pipe.ts" }`\n' +
-    '- Functions only: `{ path: "src/tools", kind: "functions" }`\n' +
-    '- File tree only: `{ depth: 0 }`\n' +
-    '- With import graph: `{ includeGraph: true }`\n' +
-    '- Deep dive: `{ path: "src/tools", depth: 3 }`',
+    '- Full project: `{}`\n' +
+    '- TS classes: `{ show: { typescript: ["classes"] }, detail: "signatures" }`\n' +
+    '- CSS selectors: `{ scope: { include: "**/*.css" }, show: { css: ["selectors"] } }`\n' +
+    '- Folders only: `{ show: { folders: true, files: false } }`\n' +
+    '- Mixed: `{ show: { typescript: ["classes"], css: ["selectors"], html: ["*"] } }`',
   timeoutMs: 120_000,
   annotations: {
     title: 'Codebase Map',
@@ -146,254 +348,212 @@ export const map = defineTool({
     conditions: ['client-pipe'],
   },
   schema: {
-    path: zod
-      .string()
-      .optional()
-      .describe(
-        'File, directory, or glob to map. Defaults to entire workspace. ' +
-        'If a file path, shows detailed exports. If a directory, shows file tree with symbols.',
-      ),
-    depth: zod
-      .number()
-      .int()
-      .min(0)
-      .max(6)
-      .optional()
-      .default(1)
-      .describe(
-        'Detail level: 0=files only, 1=top-level symbols, 2=symbols with signatures, ' +
-        '3+=full detail (signatures + JSDoc + re-exports).',
-      ),
-    filter: zod
-      .string()
-      .optional()
-      .describe('Glob pattern to include only matching files (e.g., "src/tools/**").'),
-    kind: zod
-      .enum(['all', 'functions', 'classes', 'interfaces', 'types', 'constants', 'enums'])
-      .optional()
-      .default('all')
-      .describe('Filter symbols/exports by kind.'),
-    includeTypes: zod
-      .boolean()
-      .optional()
-      .default(true)
-      .describe('Include type signatures (depth >= 2).'),
-    includeJSDoc: zod
-      .boolean()
-      .optional()
-      .default(true)
-      .describe('Include JSDoc descriptions (depth >= 3).'),
-    includeImports: zod
-      .boolean()
-      .optional()
-      .default(false)
-      .describe('Include import specifiers per file.'),
-    includeGraph: zod
-      .boolean()
-      .optional()
-      .default(false)
-      .describe('Include module dependency graph with circular dependency detection.'),
-    includeStats: zod
-      .boolean()
-      .optional()
-      .default(false)
-      .describe('Include line counts per file and diagnostic counts.'),
-    includePatterns: zod
-      .array(zod.string())
-      .optional()
-      .describe(
-        'Glob patterns to restrict results to matching files only. ' +
-        'excludePatterns further narrow within the included set.',
-      ),
-    excludePatterns: zod
-      .array(zod.string())
-      .optional()
-      .describe(
-        'Glob patterns to exclude files from results. ' +
-        'Applied in addition to .devtoolsignore rules.',
-      ),
+    // ═══════════════════════════════════════════════════════
+    // SCOPING — What parts of the codebase to analyze
+    // ═══════════════════════════════════════════════════════
+    scope: zod.object({
+      include: zod.union([zod.string(), zod.array(zod.string())])
+        .describe('Glob pattern(s) to include. Examples: "src", "**/*.ts", ["src", "lib"]'),
+      exclude: zod.array(zod.string()).optional()
+        .describe('Glob patterns to exclude. Examples: ["**/*.test.ts", "node_modules"]'),
+    }).optional()
+      .describe('Scope of the map. Defaults to entire workspace.'),
+
+    // ═══════════════════════════════════════════════════════
+    // VISIBILITY — What entities to show in the output
+    // ═══════════════════════════════════════════════════════
+    show: zod.object({
+      folders: zod.boolean().optional()
+        .describe('Include folder structure. If false, returns flat file paths.'),
+      files: zod.boolean().optional()
+        .describe('Include files in output'),
+      typescript: zod.array(
+        zod.enum(['functions', 'classes', 'interfaces', 'types', 'constants', 'enums', 'methods', 'properties', '*'])
+      ).optional()
+        .describe('TS/JS symbol kinds. Omit = no TS symbols.'),
+      css: zod.array(
+        zod.enum(['selectors', 'at-rules', 'custom-properties', '*'])
+      ).optional()
+        .describe('CSS symbol kinds. Omit = no CSS symbols.'),
+      html: zod.array(
+        zod.enum(['semantic-tags', 'headings', 'forms', 'tables', 'media', 'scripts', '*'])
+      ).optional()
+        .describe('HTML symbol kinds. Omit = no HTML symbols.'),
+      json: zod.array(
+        zod.enum(['keys', 'arrays', '*'])
+      ).optional()
+        .describe('JSON symbol kinds. Omit = no JSON symbols.'),
+      yaml: zod.array(
+        zod.enum(['keys', 'arrays', '*'])
+      ).optional()
+        .describe('YAML/TOML symbol kinds. Omit = no YAML symbols.'),
+      markdown: zod.array(
+        zod.enum(['headings', 'code-blocks', 'tables', 'frontmatter', '*'])
+      ).optional()
+        .describe('Markdown symbol kinds. Omit = no MD symbols.'),
+      xml: zod.array(
+        zod.enum(['elements', '*'])
+      ).optional()
+        .describe('XML symbol kinds. Omit = no XML symbols.'),
+    }).optional()
+      .describe('Control what entities appear. Use file type keys to enable symbols for that type.'),
+
+    // ═══════════════════════════════════════════════════════
+    // DETAIL — How much information per symbol
+    // ═══════════════════════════════════════════════════════
+    detail: zod.enum(['minimal', 'names', 'signatures', 'full']).optional()
+      .describe('Detail level: minimal (structure only), names (symbol names), signatures (TypeScript types), full (+ JSDoc)'),
+
+    // ═══════════════════════════════════════════════════════
+    // EXTRAS
+    // ═══════════════════════════════════════════════════════
+    includeImports: zod.boolean().optional()
+      .describe('Include import specifiers per file'),
+    includeGraph: zod.boolean().optional()
+      .describe('Include module dependency graph with circular detection'),
+    includeStats: zod.boolean().optional()
+      .describe('Include line counts per folder'),
   },
   handler: async (request, response) => {
     const {params} = request;
-    const pathType = classifyPath(params.path);
-
     response.setSkipLedger();
 
-    // ── File Mode ──────────────────────────────────────
-    if (pathType === 'file') {
-      let result: CodebaseExportsResult;
-      try {
-        result = await codebaseGetExports(
-          params.path!,
-          getHostWorkspace(),
-          params.includeTypes,
-          params.includeJSDoc,
-          params.kind,
-          params.includePatterns,
-          params.excludePatterns,
-        );
-      } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : String(err);
-        if (msg.includes('ENOENT') || msg.includes('FileNotFound') || msg.includes('does not exist')) {
-          const errorObj = {
-            error: 'File not found',
-            path: params.path,
-            suggestions: [
-              'Check the file path for typos',
-              'Use codebase_map with no path to see all files',
-              'Use filter param to search by pattern (e.g., "**/*pipe*")',
-            ],
-          };
-          response.appendResponseLine(JSON.stringify(errorObj, null, 2));
-          return;
-        }
-        throw err;
-      }
+    // ── Parse Parameters ─────────────────────────────────
+    const scopeInclude = params.scope?.include ?? '**';
+    const scopeExclude = params.scope?.exclude;
+    const showFolders = params.show?.folders ?? true;
+    const showFiles = params.show?.files ?? true;
+    const detail: DetailLevel = params.detail ?? 'names';
+    const includeStats = params.includeStats ?? false;
 
-      cleanExportSignatures(result);
-      response.appendResponseLine(JSON.stringify(result, null, 2));
+    // Build per-file-type symbol config
+    const symbolConfig: FileTypeSymbolConfig = {};
+    if (params.show?.typescript) symbolConfig.typescript = params.show.typescript;
+    if (params.show?.css) symbolConfig.css = params.show.css;
+    if (params.show?.html) symbolConfig.html = params.show.html;
+    if (params.show?.json) symbolConfig.json = params.show.json;
+    if (params.show?.yaml) symbolConfig.yaml = params.show.yaml;
+    if (params.show?.markdown) symbolConfig.markdown = params.show.markdown;
+    if (params.show?.xml) symbolConfig.xml = params.show.xml;
+
+    const hasAnySymbols = Object.keys(symbolConfig).length > 0;
+
+    // Convert scope.include to patterns - ensure directories become globs
+    const rawPatterns = Array.isArray(scopeInclude) ? scopeInclude : [scopeInclude];
+    const includePatterns = rawPatterns.map(p => {
+      // If it looks like a directory (no glob chars, no file extension), add /**
+      const isGlob = p.includes('*') || p.includes('{') || p.includes('?');
+      const hasExtension = /\.\w+$/.test(p);
+      if (!isGlob && !hasExtension) {
+        return `${p.replace(/\/+$/, '')}/**`;
+      }
+      return p;
+    });
+
+    // Depth 0 = skip symbol extraction; otherwise fetch full symbol tree
+    const effectiveDepth = hasAnySymbols ? 10 : 0;
+
+    // ── Fetch Data ───────────────────────────────────────
+    const overviewResult = await codebaseGetOverview(
+      getHostWorkspace(),
+      effectiveDepth,
+      undefined,
+      params.includeImports ?? false,
+      includeStats,
+      includePatterns,
+      scopeExclude,
+    );
+
+    if (overviewResult.summary.totalFiles === 0) {
+      const ignoredBy = buildIgnoreContextJson(overviewResult.projectRoot);
+      response.appendResponseLine('# Empty Result\n');
+      response.appendResponseLine('No files found. Check scope patterns or .devtoolsignore.\n');
+      if (ignoredBy) {
+        response.appendResponseLine(`Ignored by: ${JSON.stringify(ignoredBy)}`);
+      }
       return;
     }
 
-    // ── Directory/Workspace Mode ───────────────────────
-    const effectiveFilter = pathType === 'directory'
-      ? `${params.path!.replace(/\/+$/, '')}/**`
-      : (params.path ?? params.filter);
-
-    const reductionsApplied: string[] = [];
-
-    // Phase 1: Adaptive depth reduction (depth N → depth 0)
-    // Try requested depth, reduce if flattened file list exceeds token budget
-    const requestedDepth = params.depth;
-    let usedDepth = requestedDepth;
-    let overviewResult = await codebaseGetOverview(
-      getHostWorkspace(),
-      usedDepth,
-      effectiveFilter,
-      params.includeImports,
-      params.includeStats,
-      params.includePatterns,
-      params.excludePatterns,
-    );
-
-    let flatFiles = flattenTree(overviewResult.tree);
-    makePathsRelative(flatFiles, overviewResult.projectRoot);
-
-    while (estimateTokens(flatFiles) > OUTPUT_TOKEN_LIMIT && usedDepth > 0) {
-      usedDepth--;
-      reductionsApplied.push(`depth-${usedDepth + 1}-to-${usedDepth}`);
-      overviewResult = await codebaseGetOverview(
-        getHostWorkspace(),
-        usedDepth,
-        effectiveFilter,
-        params.includeImports,
-        params.includeStats,
-        params.includePatterns,
-        params.excludePatterns,
-      );
-      flatFiles = flattenTree(overviewResult.tree);
-      makePathsRelative(flatFiles, overviewResult.projectRoot);
-    }
-
-    // Apply kind filter before further compression
-    if (params.kind !== 'all') {
-      for (const file of flatFiles) {
-        if (file.symbols) {
-          file.symbols = filterSymbolsByKind(file.symbols, params.kind);
-          if (file.symbols.length === 0) delete file.symbols;
-        }
-      }
-    }
-
-    // Phase 2: Format compression (objects → strings → directory summary)
-    // Level A: at depth 0, switch from objects to flat path strings
-    const hasSymbols = flatFiles.some(f => f.symbols && f.symbols.length > 0);
-    let filesOutput: unknown;
-    if (hasSymbols) {
-      filesOutput = flatFiles;
-    } else {
-      filesOutput = flatFiles.map(f => f.path);
-      if (usedDepth < requestedDepth) reductionsApplied.push('flat-paths');
-    }
-
-    // Level B: if file paths still too large, collapse to directory summary
-    if (estimateTokens(filesOutput) > OUTPUT_TOKEN_LIMIT) {
-      const dirSummary = buildDirectorySummary(flatFiles);
-      filesOutput = dirSummary;
-      reductionsApplied.push('directory-summary');
-    }
-
-    // Import graph (if requested and not already compressed)
-    let graphResult: ImportGraphResult | undefined;
-    if (params.includeGraph && estimateTokens(filesOutput) < OUTPUT_TOKEN_LIMIT * 0.5) {
-      try {
-        graphResult = await codebaseGetImportGraph(getHostWorkspace(), params.includePatterns, params.excludePatterns);
-      } catch {
-        // Import graph not yet available — silently skip
-      }
-    }
-
-    // Build final result
-    const compactResult: Record<string, unknown> = {
-      projectRoot: normalizePath(overviewResult.projectRoot),
-      files: filesOutput,
-      summary: overviewResult.summary,
+    // ── Format Options ───────────────────────────────────
+    const formatOpts: FormatOptions = {
+      showFolders,
+      showFiles,
+      symbolConfig,
+      detail,
+      includeStats,
+      hasAnySymbols,
     };
 
-    if (graphResult) compactResult.graph = graphResult;
+    // ── Build Markdown Output ────────────────────────────
+    let output = formatTree(overviewResult.tree, formatOpts, 0);
+    let reductionsApplied: string[] = [];
 
-    if (overviewResult.summary.totalFiles === 0) {
-      compactResult.ignoredBy = buildIgnoreContextJson(overviewResult.projectRoot);
+    // ── Adaptive Compression ─────────────────────────────
+    // Level 1-4: Reduce detail level
+    const detailLevels: DetailLevel[] = ['full', 'signatures', 'names', 'minimal'];
+    let currentDetailIdx = detailLevels.indexOf(detail);
+
+    while (estimateTokens(output) > OUTPUT_TOKEN_LIMIT && currentDetailIdx < detailLevels.length - 1) {
+      currentDetailIdx++;
+      formatOpts.detail = detailLevels[currentDetailIdx];
+      reductionsApplied.push(`detail->${formatOpts.detail}`);
+      output = formatTree(overviewResult.tree, formatOpts, 0);
     }
+
+    // Level 5: Remove symbols
+    if (estimateTokens(output) > OUTPUT_TOKEN_LIMIT && formatOpts.hasAnySymbols) {
+      formatOpts.hasAnySymbols = false;
+      reductionsApplied.push('remove-symbols');
+      output = formatTree(overviewResult.tree, formatOpts, 0);
+    }
+
+    // Level 6: Folders only
+    if (estimateTokens(output) > OUTPUT_TOKEN_LIMIT && formatOpts.showFiles) {
+      formatOpts.showFiles = false;
+      reductionsApplied.push('folders-only');
+      output = formatTree(overviewResult.tree, formatOpts, 0);
+    }
+
+    // Level 7: Flat paths
+    if (estimateTokens(output) > OUTPUT_TOKEN_LIMIT && formatOpts.showFolders) {
+      reductionsApplied.push('flat-paths');
+      output = formatFlatPaths(overviewResult.tree);
+    }
+
+    // Level 8: Folder summary
+    if (estimateTokens(output) > OUTPUT_TOKEN_LIMIT) {
+      reductionsApplied.push('folder-summary');
+      output = formatFolderSummary(overviewResult.tree);
+    }
+
+    // ── Include Import Graph ─────────────────────────────
+    let graphOutput = '';
+    if (params.includeGraph && estimateTokens(output) < OUTPUT_TOKEN_LIMIT * 0.5) {
+      try {
+        const graphResult = await codebaseGetImportGraph(
+          getHostWorkspace(),
+          includePatterns,
+          scopeExclude,
+        );
+        if (graphResult) {
+          graphOutput = '\nImport Graph:\n' + JSON.stringify(graphResult, null, 2);
+        }
+      } catch {
+        // Graph not available
+      }
+    }
+
+    // ── Output ───────────────────────────────────────────
+    response.appendResponseLine(`Root: ${normalizePath(overviewResult.projectRoot)}\n`);
 
     if (reductionsApplied.length > 0) {
-      compactResult.outputScaling = {
-        requestedDepth,
-        effectiveDepth: usedDepth,
-        reductionsApplied,
-        estimatedTokens: estimateTokens(compactResult),
-        tokenLimit: OUTPUT_TOKEN_LIMIT,
-        suggestions: [
-          `Use filter or path to narrow scope for depth ${requestedDepth}`,
-          'Use kind param to reduce symbol count',
-          'Use includePatterns to select specific files',
-        ],
-      };
+      response.appendResponseLine(`Compression: ${reductionsApplied.join(' → ')}\n`);
     }
 
-    response.appendResponseLine(JSON.stringify(compactResult, null, 2));
+    response.appendResponseLine(output.trimEnd());
+
+    if (graphOutput) {
+      response.appendResponseLine(graphOutput);
+    }
   },
 });
-
-// ── Exports Helpers ──────────────────────────────────────
-
-/** Strip temp namespace from all export signatures in-place */
-function cleanExportSignatures(result: CodebaseExportsResult): void {
-  for (const exp of result.exports) {
-    if (exp.signature) {
-      exp.signature = stripTempNamespace(exp.signature);
-    }
-  }
-}
-
-// ── Tree Filtering ───────────────────────────────────────
-
-function filterSymbolsByKind(
-  symbols: CodebaseSymbolNode[],
-  kindFilter: string,
-): CodebaseSymbolNode[] {
-  const targetKinds = resolveKindFilter(kindFilter);
-  return symbols.filter(s => targetKinds.has(s.kind));
-}
-
-function resolveKindFilter(kind: string): Set<string> {
-  switch (kind) {
-    case 'functions': return new Set(['function']);
-    case 'classes': return new Set(['class']);
-    case 'interfaces': return new Set(['interface']);
-    case 'types': return new Set(['type']);
-    case 'constants': return new Set(['constant', 'variable']);
-    case 'enums': return new Set(['enum']);
-    default: return new Set();
-  }
-}
