@@ -123,6 +123,7 @@ claude mcp add chrome-devtools --scope user npx chrome-devtools-mcp@latest
 ```
 
 **Install as a Plugin (MCP + Skills)**
+
 > [!NOTE]  
 > If you already had Chrome DevTools MCP installed previously for Claude Code, make sure to remove it first from your installation and configuration files.
 
