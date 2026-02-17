@@ -149,3 +149,5 @@ build/
 log.txt
 
 .DS_Store
+
+.devtools/
