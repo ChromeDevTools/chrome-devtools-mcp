@@ -232,8 +232,6 @@ export interface CodebaseTreeNode {
   type: 'directory' | 'file';
   children?: CodebaseTreeNode[];
   symbols?: CodebaseSymbolNode[];
-  imports?: string[];
-  lines?: number;
 }
 
 export interface CodebaseOverviewResult {
@@ -388,18 +386,16 @@ export interface CodebaseTraceSymbolResult {
  * Get a structural overview of the codebase as a recursive tree.
  */
 export async function codebaseGetOverview(
-  rootDir?: string,
-  depth?: number,
-  filter?: string,
-  includeImports?: boolean,
-  includeStats?: boolean,
-  includePatterns?: string[],
-  excludePatterns?: string[],
+  rootDir: string,
+  folderPath: string,
+  recursive: boolean,
+  fileTypes: string | string[],
+  symbols: boolean,
   timeout?: number,
 ): Promise<CodebaseOverviewResult> {
   const result = await sendClientRequest(
     'codebase.getOverview',
-    {rootDir, depth, filter, includeImports, includeStats, includePatterns, excludePatterns},
+    {rootDir, folderPath, recursive, fileTypes, symbols},
     timeout ?? 30_000,
   );
   assertResult<CodebaseOverviewResult>(result, 'codebase.getOverview');
