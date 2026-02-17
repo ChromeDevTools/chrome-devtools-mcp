@@ -31,7 +31,7 @@ function formatLogChunks(chunks: unknown[]): string {
 // Always enable the mcp:log namespace so output is visible.
 // By default, write to stderr in a clean timestamped format.
 // stderr output appears in the host VS Code's MCP output channel
-// as "[server stderr]" entries, giving full visibility via read_host_output.
+// as "[server stderr]" entries, giving full visibility via read_output_channels.
 debug.enable(namespacesToEnable.join(','));
 debug.log = function (...chunks: unknown[]) {
   const ts = new Date().toISOString();

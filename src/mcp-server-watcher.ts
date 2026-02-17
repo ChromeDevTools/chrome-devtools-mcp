@@ -7,9 +7,12 @@
 /**
  * MCP server source change detection for self hot-reload.
  *
- * Detects when `src/` files have been modified more recently than `build/src/`
- * files, indicating the TypeScript source needs to be recompiled before the
- * MCP server can use the latest code.
+ * Two-phase detection strategy:
+ * 1. Fast mtime check: compares newest mtime in `src/` against `build/src/`.
+ * 2. Content hash verification: when mtime suggests a change, computes a
+ *    SHA-256 fingerprint of all source file contents and compares against
+ *    the stored fingerprint. This prevents false positives from operations
+ *    that update file metadata without changing content (e.g. `git add`).
  *
  * The `.devtoolsignore` file at the MCP server root is respected,
  * using the same gitignore-style syntax as the extension watcher.
@@ -19,6 +22,7 @@
  * just hot-reloaded and display a banner on the first tool call.
  */
 
+import {createHash} from 'node:crypto';
 import {
   existsSync,
   mkdirSync,
@@ -43,6 +47,7 @@ const IGNORE_EXTENSIONS = new Set(['.vsix', '.map']);
 const DEVTOOLS_IGNORE_FILENAME = '.devtoolsignore';
 const HOT_RELOAD_DIR = '.devtools';
 const HOT_RELOAD_MARKER = 'mcp-hot-reload.json';
+const SOURCE_FINGERPRINT_FILE = 'source-fingerprint.json';
 
 // ── Ignore Rule Types ────────────────────────────────────
 
@@ -172,6 +177,96 @@ function scanNewestMtime(dir: string, rootDir: string, rules: IgnoreRule[]): num
   return newestMtimeMs;
 }
 
+// ── Content Hashing ──────────────────────────────────────
+
+/**
+ * Recursively collect file contents into a hash. Files are processed
+ * in sorted order (by relative path) for deterministic output.
+ * Each file contributes its relative path + contents to the hash.
+ */
+function hashDirectoryContents(
+  dir: string,
+  rootDir: string,
+  rules: IgnoreRule[],
+  hash: ReturnType<typeof createHash>,
+): void {
+  let entries: string[];
+  try {
+    entries = readdirSync(dir, {encoding: 'utf8'});
+  } catch {
+    return;
+  }
+  entries.sort();
+
+  for (const name of entries) {
+    const fullPath = join(dir, name);
+    let stat: ReturnType<typeof statSync>;
+    try {
+      stat = statSync(fullPath);
+    } catch {
+      continue;
+    }
+
+    if (stat.isDirectory()) {
+      if (shouldIgnorePath(rootDir, fullPath, true, rules)) continue;
+      hashDirectoryContents(fullPath, rootDir, rules, hash);
+    } else if (stat.isFile()) {
+      if (shouldIgnorePath(rootDir, fullPath, false, rules)) continue;
+      const rel = normalizeRelativePath(relative(rootDir, fullPath));
+      hash.update(rel);
+      try {
+        hash.update(readFileSync(fullPath));
+      } catch {
+        // skip unreadable files
+      }
+    }
+  }
+}
+
+function computeSourceFingerprint(srcDir: string, rules: IgnoreRule[]): string {
+  const hash = createHash('sha256');
+  hashDirectoryContents(srcDir, srcDir, rules, hash);
+  return hash.digest('hex');
+}
+
+function readStoredFingerprint(mcpServerDir: string): string | null {
+  const fp = join(mcpServerDir, HOT_RELOAD_DIR, SOURCE_FINGERPRINT_FILE);
+  if (!existsSync(fp)) return null;
+  try {
+    const raw = readFileSync(fp, 'utf8');
+    const data: unknown = JSON.parse(raw);
+    if (typeof data === 'object' && data !== null && 'hash' in data) {
+      const hash = (data as Record<string, unknown>).hash;
+      if (typeof hash === 'string') return hash;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Persist the current source fingerprint so future checks can skip
+ * rebuilds when only file metadata (not content) changed.
+ */
+export function writeSourceFingerprint(mcpServerDir: string): void {
+  const srcDir = join(mcpServerDir, 'src');
+  if (!existsSync(srcDir)) return;
+  const rules = parseIgnoreRules(mcpServerDir);
+  const hash = computeSourceFingerprint(srcDir, rules);
+  const dir = join(mcpServerDir, HOT_RELOAD_DIR);
+  try {
+    mkdirSync(dir, {recursive: true});
+    writeFileSync(
+      join(dir, SOURCE_FINGERPRINT_FILE),
+      JSON.stringify({hash, computedAt: Date.now()}),
+    );
+    logger(`[mcp-watcher] Source fingerprint written: ${hash.slice(0, 12)}…`);
+  } catch (err) {
+    logger(`[mcp-watcher] Failed to write fingerprint: ${err}`);
+  }
+}
+
 // ── Public API ───────────────────────────────────────────
 
 /**
@@ -185,12 +280,15 @@ export function getMcpServerRoot(): string {
 /**
  * Check if MCP server source has changed since the last build.
  *
- * Compares the newest mtime in `src/` against the newest mtime in
- * `build/src/`. If source files are newer than build output, a rebuild
- * is needed.
+ * Uses a two-phase approach:
+ * 1. Fast mtime check: if src/ newest mtime ≤ build/ newest mtime, no change.
+ * 2. Content hash verification: if mtime suggests a change, compute a SHA-256
+ *    fingerprint of all source file contents and compare against the stored
+ *    fingerprint. This prevents false positives from metadata-only changes
+ *    (e.g. git staging updates mtime without changing content).
  *
  * @param mcpServerDir Root of the mcp-server package
- * @returns true if source is newer than build output
+ * @returns true if source content has actually changed since last build
  */
 export function hasMcpServerSourceChanged(mcpServerDir: string): boolean {
   const srcDir = join(mcpServerDir, 'src');
@@ -206,13 +304,29 @@ export function hasMcpServerSourceChanged(mcpServerDir: string): boolean {
   const srcMtime = scanNewestMtime(srcDir, srcDir, rules);
   const buildMtime = scanNewestMtime(buildSrcDir, buildSrcDir, rules);
 
-  const changed = srcMtime > buildMtime;
-  if (changed) {
-    logger(
-      `[mcp-watcher] Source changed: src=${new Date(srcMtime).toISOString()}, build=${new Date(buildMtime).toISOString()}`,
-    );
+  if (srcMtime <= buildMtime) {
+    return false;
   }
-  return changed;
+
+  // Mtime says changed — verify with content hash to filter out metadata-only changes
+  logger(
+    `[mcp-watcher] Mtime suggests change: src=${new Date(srcMtime).toISOString()}, build=${new Date(buildMtime).toISOString()} — verifying content…`,
+  );
+
+  const currentHash = computeSourceFingerprint(srcDir, rules);
+  const storedHash = readStoredFingerprint(mcpServerDir);
+
+  if (storedHash && currentHash === storedHash) {
+    logger(
+      `[mcp-watcher] Content unchanged (fingerprint=${currentHash.slice(0, 12)}…) — metadata-only change, skipping rebuild`,
+    );
+    return false;
+  }
+
+  logger(
+    `[mcp-watcher] Content changed: ${storedHash ? `${storedHash.slice(0, 12)}… → ${currentHash.slice(0, 12)}…` : `new fingerprint ${currentHash.slice(0, 12)}…`}`,
+  );
+  return true;
 }
 
 /**

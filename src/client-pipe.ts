@@ -96,15 +96,6 @@ export interface TerminalSessionInfo {
   command?: string;
 }
 
-export interface OutputChannelsResult {
-  channels: string[];
-}
-
-export interface OutputReadResult {
-  lines: string[];
-  warning?: string;
-}
-
 export interface CommandExecuteResult {
   result: unknown;
 }
@@ -210,28 +201,6 @@ function sendClientRequest(
       );
     }, timeoutMs);
   });
-}
-
-// ── Output Methods ───────────────────────────────────────
-
-/**
- * List available output channels.
- */
-export async function outputListChannels(): Promise<OutputChannelsResult> {
-  const result = await sendClientRequest('output.listChannels', {});
-  assertResult<OutputChannelsResult>(result, 'output.listChannels');
-  return result;
-}
-
-/**
- * Read content from an output channel.
- */
-export async function outputRead(
-  channel: string,
-): Promise<OutputReadResult> {
-  const result = await sendClientRequest('output.read', {channel});
-  assertResult<OutputReadResult>(result, 'output.read');
-  return result;
 }
 
 // ── Command Methods ──────────────────────────────────────

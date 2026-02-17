@@ -7,8 +7,6 @@
 import * as codebaseTools from './codebase/index.js';
 import * as consoleTools from './console.js';
 import * as inputTools from './input.js';
-import * as outputPanelTools from './output-panel.js';
-import * as reloadTools from './reload-mcp-server.js';
 import * as screenshotTools from './screenshot.js';
 import * as snapshotTools from './snapshot.js';
 import type {ToolDefinition} from './ToolDefinition.js';
@@ -18,8 +16,6 @@ const tools = [
   ...Object.values(codebaseTools),
   ...Object.values(consoleTools),
   ...Object.values(inputTools),
-  ...Object.values(outputPanelTools),
-  ...Object.values(reloadTools),
   ...Object.values(screenshotTools),
   ...Object.values(snapshotTools),
   ...Object.values(waitTools),

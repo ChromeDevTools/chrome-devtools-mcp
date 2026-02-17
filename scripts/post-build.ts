@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {execSync} from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
@@ -15,10 +16,24 @@ const BUILD_DIR = path.join(process.cwd(), 'build');
  * @param content The content to write.
  */
 function writeFile(filePath: string, content: string): void {
+  fs.mkdirSync(path.dirname(filePath), {recursive: true});
   fs.writeFileSync(filePath, content, 'utf-8');
 }
 
 function main(): void {
+  // chrome-devtools-frontend ships as .ts source — it must be compiled to .js
+  // for runtime. These files never change between pnpm installs, so we compile
+  // them once and preserve build/node_modules/ across rebuilds (clean only
+  // deletes build/src/). If the vendor output is missing, compile it now.
+  const vendorMarker = path.join(
+    BUILD_DIR, 'node_modules', 'chrome-devtools-frontend', 'mcp', 'mcp.js',
+  );
+  if (!fs.existsSync(vendorMarker)) {
+    console.log('Vendor build not found — compiling chrome-devtools-frontend (one-time)…');
+    execSync('tsc --noCheck', {cwd: process.cwd(), stdio: 'inherit'});
+    console.log('Vendor build complete.');
+  }
+
   const devtoolsThirdPartyPath =
     'node_modules/chrome-devtools-frontend/front_end/third_party';
   const devtoolsFrontEndCorePath =

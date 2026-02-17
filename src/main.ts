@@ -7,11 +7,12 @@
 import './polyfill.js';
 
 import {exec} from 'node:child_process';
+import path from 'node:path';
 import process from 'node:process';
 
 import {parseArguments} from './cli.js';
 import {loadConfig, type ResolvedConfig} from './config.js';
-import {hasBuildChangedSinceWindowStart, isBuildStale} from './extension-watcher.js';
+import {hasBuildChangedSinceWindowStart, isBuildStale, writeExtSourceFingerprint} from './extension-watcher.js';
 import {restartMcpServer, showHostNotification} from './host-pipe.js';
 import {loadIssueDescriptions} from './issue-descriptions.js';
 import {logger, saveLogsToFile} from './logger.js';
@@ -22,6 +23,7 @@ import {
   hasBuildChangedSinceProcessStart,
   hasMcpServerSourceChanged,
   writeHotReloadMarker,
+  writeSourceFingerprint,
 } from './mcp-server-watcher.js';
 import {startMcpSocketServer} from './mcp-socket-server.js';
 import {Mutex} from './Mutex.js';
@@ -59,10 +61,12 @@ let mcpServerRestartScheduled = false;
 let extensionHotReloadInfo: {builtAt: number} | null = null;
 
 /**
- * Run an incremental build for hot-reload: `tsc` + `post-build` WITHOUT
- * `rmSync('build')`. The full `pnpm run build` cleans the build dir first,
- * but the running MCP server process IS loaded from `build/src/` — on
- * Windows the running process holds file locks, causing EPERM.
+ * Run an incremental build for hot-reload using the fast tsconfig.build.json
+ * (src-only, noCheck) WITHOUT `rmSync('build')`.
+ *
+ * Uses tsconfig.build.json which only compiles src/ files with noCheck,
+ * skipping the 800+ chrome-devtools-frontend files and type-checking.
+ * This reduces build time from ~18s to ~2s.
  *
  * Incremental tsc overwrites files in-place, which works fine even while
  * the old code is loaded (Node.js has already read them into memory).
@@ -70,10 +74,11 @@ let extensionHotReloadInfo: {builtAt: number} | null = null;
 function runMcpServerBuild(): Promise<{stdout: string; stderr: string}> {
   return new Promise((resolve, reject) => {
     logger(`[mcp-hot-reload] Running incremental build in ${mcpServerDir}`);
-    const cmd = 'npx tsc && node --experimental-strip-types --no-warnings=ExperimentalWarning scripts/post-build.ts';
+    const tscBin = path.join(mcpServerDir, 'node_modules', '.bin', process.platform === 'win32' ? 'tsc.cmd' : 'tsc');
+    const cmd = `"${tscBin}" -p tsconfig.build.json && node --experimental-strip-types --no-warnings=ExperimentalWarning scripts/post-build.ts`;
     exec(
       cmd,
-      {cwd: mcpServerDir, timeout: 120_000},
+      {cwd: mcpServerDir, timeout: 30_000, shell: process.platform === 'win32' ? 'cmd.exe' : '/bin/sh'},
       (err, stdout, stderr) => {
         if (err) {
           const output = [stdout, stderr].filter(Boolean).join('\n').trim();
@@ -392,6 +397,7 @@ function registerTool(tool: ToolDefinition): void {
 
               try {
                 await runMcpServerBuild();
+                writeSourceFingerprint(mcpServerDir);
                 writeHotReloadMarker(mcpServerDir);
                 scheduleMcpServerRestart();
 
@@ -487,6 +493,7 @@ function registerTool(tool: ToolDefinition): void {
             const reason = stale ? 'source stale' : 'manual build detected';
             logger(`[tool:${tool.name}] Extension needs hot-reload (${reason}) — reloading…`);
             await lifecycleService.handleHotReload();
+            writeExtSourceFingerprint(config.extensionBridgePath);
             extensionHotReloadInfo = {builtAt: Date.now()};
             logger(`[tool:${tool.name}] Hot-reload complete — reconnected`);
           }

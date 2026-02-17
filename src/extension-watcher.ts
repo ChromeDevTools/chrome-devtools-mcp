@@ -8,17 +8,20 @@
 /**
  * Extension folder change detection for hot-reload.
  *
- * Timestamp strategy:
- * - Read the most recent mtimeMs across all tracked extension files.
- * - Compare it against the debug window session start time.
- * - If newest mtimeMs > sessionStartMs, trigger extension hot-reload.
+ * Two-phase detection strategy:
+ * 1. Fast mtime check: compares newest source mtime against newest dist/ mtime.
+ * 2. Content hash verification: when mtime suggests staleness, computes a
+ *    SHA-256 fingerprint of all source file contents and compares against
+ *    the stored fingerprint. This prevents false positives from operations
+ *    that update file metadata without changing content (e.g. `git add`).
  *
  * Tracked files are filtered by:
  * 1. Built-in ignore defaults (node_modules, dist, .git, *.vsix)
  * 2. Optional `<extensionRoot>/.devtoolsignore` patterns
  */
 
-import {existsSync, readdirSync, readFileSync, statSync} from 'node:fs';
+import {createHash} from 'node:crypto';
+import {existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync} from 'node:fs';
 import path, {extname, join, relative} from 'node:path';
 
 import {logger} from './logger.js';
@@ -26,6 +29,8 @@ import {logger} from './logger.js';
 const IGNORE_DIRS = new Set(['node_modules', 'dist', '.git']);
 const IGNORE_EXTENSIONS = new Set(['.vsix']);
 const DEVTOOLS_IGNORE_FILENAME = '.devtoolsignore';
+const EXT_FINGERPRINT_DIR = '.devtools';
+const EXT_FINGERPRINT_FILE = 'ext-source-fingerprint.json';
 
 interface IgnoreRule {
   pattern: string;
@@ -191,6 +196,89 @@ export function getNewestTrackedChangeTime(extensionDir: string): number {
   return result.newestMtimeMs;
 }
 
+// ── Content Hashing ──────────────────────────────────────
+
+function hashDirectoryContents(
+  dir: string,
+  rootDir: string,
+  rules: IgnoreRule[],
+  hash: ReturnType<typeof createHash>,
+): void {
+  let entries: string[];
+  try {
+    entries = readdirSync(dir, {encoding: 'utf8'});
+  } catch {
+    return;
+  }
+  entries.sort();
+
+  for (const name of entries) {
+    const fullPath = join(dir, name);
+    let stat: ReturnType<typeof statSync>;
+    try {
+      stat = statSync(fullPath);
+    } catch {
+      continue;
+    }
+
+    if (stat.isDirectory()) {
+      if (shouldIgnorePath(rootDir, fullPath, true, rules)) continue;
+      hashDirectoryContents(fullPath, rootDir, rules, hash);
+    } else if (stat.isFile()) {
+      if (shouldIgnorePath(rootDir, fullPath, false, rules)) continue;
+      const rel = path.posix.normalize(relative(rootDir, fullPath).replaceAll('\\', '/'));
+      hash.update(rel);
+      try {
+        hash.update(readFileSync(fullPath));
+      } catch {
+        // skip unreadable files
+      }
+    }
+  }
+}
+
+function computeExtSourceFingerprint(extensionDir: string, rules: IgnoreRule[]): string {
+  const hash = createHash('sha256');
+  hashDirectoryContents(extensionDir, extensionDir, rules, hash);
+  return hash.digest('hex');
+}
+
+function readExtFingerprint(extensionDir: string): string | null {
+  const fp = join(extensionDir, EXT_FINGERPRINT_DIR, EXT_FINGERPRINT_FILE);
+  if (!existsSync(fp)) return null;
+  try {
+    const raw = readFileSync(fp, 'utf8');
+    const data: unknown = JSON.parse(raw);
+    if (typeof data === 'object' && data !== null && 'hash' in data) {
+      const hash = (data as Record<string, unknown>).hash;
+      if (typeof hash === 'string') return hash;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Persist the current extension source fingerprint so future checks can skip
+ * rebuilds when only file metadata (not content) changed.
+ */
+export function writeExtSourceFingerprint(extensionDir: string): void {
+  const rules = parseIgnoreRules(extensionDir);
+  const hash = computeExtSourceFingerprint(extensionDir, rules);
+  const dir = join(extensionDir, EXT_FINGERPRINT_DIR);
+  try {
+    mkdirSync(dir, {recursive: true});
+    writeFileSync(
+      join(dir, EXT_FINGERPRINT_FILE),
+      JSON.stringify({hash, computedAt: Date.now()}),
+    );
+    logger(`[hot-reload] Extension fingerprint written: ${hash.slice(0, 12)}…`);
+  } catch (err) {
+    logger(`[hot-reload] Failed to write extension fingerprint: ${err}`);
+  }
+}
+
 /**
  * Check whether extension files changed after the debug window started.
  *
@@ -269,35 +357,50 @@ export function getNewestBuildMtime(extensionDir: string): number {
 /**
  * Check if the extension build is stale (source files newer than build output).
  *
- * This compares the newest source file mtime against the newest dist/ file mtime.
- * If source is newer, the build is stale and needs hot-reload.
+ * Uses a two-phase approach:
+ * 1. Fast mtime comparison of source vs dist/ output.
+ * 2. Content hash verification when mtime suggests staleness, to filter
+ *    out metadata-only changes (e.g. git staging).
  *
  * @param extensionDir Extension root directory
- * @returns true if source files are newer than build output (needs rebuild)
+ * @returns true if source content has actually changed since last build
  */
 export function isBuildStale(extensionDir: string): boolean {
   const sourceNewest = getNewestTrackedChangeTime(extensionDir);
   const buildNewest = getNewestBuildMtime(extensionDir);
 
-  // If no build exists, definitely stale
   if (buildNewest === 0) {
     logger(`[hot-reload] No build found in dist/ — build is stale`);
     return true;
   }
 
-  const stale = sourceNewest > buildNewest;
-
-  if (stale) {
-    logger(
-      `[hot-reload] Build STALE: source=${new Date(sourceNewest).toISOString()} > build=${new Date(buildNewest).toISOString()}`,
-    );
-  } else {
+  if (sourceNewest <= buildNewest) {
     logger(
       `[hot-reload] Build up-to-date: source=${new Date(sourceNewest).toISOString()} <= build=${new Date(buildNewest).toISOString()}`,
     );
+    return false;
   }
 
-  return stale;
+  // Mtime says stale — verify with content hash
+  logger(
+    `[hot-reload] Mtime suggests stale: source=${new Date(sourceNewest).toISOString()} > build=${new Date(buildNewest).toISOString()} — verifying content…`,
+  );
+
+  const rules = parseIgnoreRules(extensionDir);
+  const currentHash = computeExtSourceFingerprint(extensionDir, rules);
+  const storedHash = readExtFingerprint(extensionDir);
+
+  if (storedHash && currentHash === storedHash) {
+    logger(
+      `[hot-reload] Content unchanged (fingerprint=${currentHash.slice(0, 12)}…) — metadata-only change, skipping rebuild`,
+    );
+    return false;
+  }
+
+  logger(
+    `[hot-reload] Content changed: ${storedHash ? `${storedHash.slice(0, 12)}… → ${currentHash.slice(0, 12)}…` : `new fingerprint ${currentHash.slice(0, 12)}…`}`,
+  );
+  return true;
 }
 
 /**
