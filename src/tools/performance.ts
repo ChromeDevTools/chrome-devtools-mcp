@@ -28,7 +28,7 @@ const filePathSchema = zod
 
 export const startTrace = defineTool({
   name: 'performance_start_trace',
-  description: `Start a performance trace on the selected webpage. Use to find frontend performance issues, Core Web Vitals (LCP, FID, CLS), and improve page load speed.`,
+  description: `Start a performance trace on the selected webpage. Use to find frontend performance issues, Core Web Vitals (LCP, INP, CLS), and improve page load speed.`,
   annotations: {
     category: ToolCategory.PERFORMANCE,
     readOnlyHint: false,
