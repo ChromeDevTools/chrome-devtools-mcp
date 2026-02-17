@@ -496,27 +496,6 @@ exports[`McpResponse network pagination > handles invalid page number by showing
       "url": "http://example.com",
       "status": "[pending]",
       "selectedInDevToolsUI": false
-    },
-    {
-      "requestId": 1,
-      "method": "GET",
-      "url": "http://example.com",
-      "status": "[pending]",
-      "selectedInDevToolsUI": false
-    },
-    {
-      "requestId": 1,
-      "method": "GET",
-      "url": "http://example.com",
-      "status": "[pending]",
-      "selectedInDevToolsUI": false
-    },
-    {
-      "requestId": 1,
-      "method": "GET",
-      "url": "http://example.com",
-      "status": "[pending]",
-      "selectedInDevToolsUI": false
     }
   ]
 }
@@ -654,146 +633,6 @@ exports[`McpResponse network pagination > returns first page by default 1`] = `
       "url": "http://example.com",
       "status": "[pending]",
       "selectedInDevToolsUI": false
-    },
-    {
-      "requestId": 1,
-      "method": "GET-10",
-      "url": "http://example.com",
-      "status": "[pending]",
-      "selectedInDevToolsUI": false
-    },
-    {
-      "requestId": 1,
-      "method": "GET-11",
-      "url": "http://example.com",
-      "status": "[pending]",
-      "selectedInDevToolsUI": false
-    },
-    {
-      "requestId": 1,
-      "method": "GET-12",
-      "url": "http://example.com",
-      "status": "[pending]",
-      "selectedInDevToolsUI": false
-    },
-    {
-      "requestId": 1,
-      "method": "GET-13",
-      "url": "http://example.com",
-      "status": "[pending]",
-      "selectedInDevToolsUI": false
-    },
-    {
-      "requestId": 1,
-      "method": "GET-14",
-      "url": "http://example.com",
-      "status": "[pending]",
-      "selectedInDevToolsUI": false
-    },
-    {
-      "requestId": 1,
-      "method": "GET-15",
-      "url": "http://example.com",
-      "status": "[pending]",
-      "selectedInDevToolsUI": false
-    },
-    {
-      "requestId": 1,
-      "method": "GET-16",
-      "url": "http://example.com",
-      "status": "[pending]",
-      "selectedInDevToolsUI": false
-    },
-    {
-      "requestId": 1,
-      "method": "GET-17",
-      "url": "http://example.com",
-      "status": "[pending]",
-      "selectedInDevToolsUI": false
-    },
-    {
-      "requestId": 1,
-      "method": "GET-18",
-      "url": "http://example.com",
-      "status": "[pending]",
-      "selectedInDevToolsUI": false
-    },
-    {
-      "requestId": 1,
-      "method": "GET-19",
-      "url": "http://example.com",
-      "status": "[pending]",
-      "selectedInDevToolsUI": false
-    },
-    {
-      "requestId": 1,
-      "method": "GET-20",
-      "url": "http://example.com",
-      "status": "[pending]",
-      "selectedInDevToolsUI": false
-    },
-    {
-      "requestId": 1,
-      "method": "GET-21",
-      "url": "http://example.com",
-      "status": "[pending]",
-      "selectedInDevToolsUI": false
-    },
-    {
-      "requestId": 1,
-      "method": "GET-22",
-      "url": "http://example.com",
-      "status": "[pending]",
-      "selectedInDevToolsUI": false
-    },
-    {
-      "requestId": 1,
-      "method": "GET-23",
-      "url": "http://example.com",
-      "status": "[pending]",
-      "selectedInDevToolsUI": false
-    },
-    {
-      "requestId": 1,
-      "method": "GET-24",
-      "url": "http://example.com",
-      "status": "[pending]",
-      "selectedInDevToolsUI": false
-    },
-    {
-      "requestId": 1,
-      "method": "GET-25",
-      "url": "http://example.com",
-      "status": "[pending]",
-      "selectedInDevToolsUI": false
-    },
-    {
-      "requestId": 1,
-      "method": "GET-26",
-      "url": "http://example.com",
-      "status": "[pending]",
-      "selectedInDevToolsUI": false
-    },
-    {
-      "requestId": 1,
-      "method": "GET-27",
-      "url": "http://example.com",
-      "status": "[pending]",
-      "selectedInDevToolsUI": false
-    },
-    {
-      "requestId": 1,
-      "method": "GET-28",
-      "url": "http://example.com",
-      "status": "[pending]",
-      "selectedInDevToolsUI": false
-    },
-    {
-      "requestId": 1,
-      "method": "GET-29",
-      "url": "http://example.com",
-      "status": "[pending]",
-      "selectedInDevToolsUI": false
     }
   ]
 }
@@ -813,76 +652,6 @@ exports[`McpResponse network pagination > returns subsequent page when pageIdx p
   "networkRequests": [
     {
       "requestId": 1,
-      "method": "GET-0",
-      "url": "http://example.com",
-      "status": "[pending]",
-      "selectedInDevToolsUI": false
-    },
-    {
-      "requestId": 1,
-      "method": "GET-1",
-      "url": "http://example.com",
-      "status": "[pending]",
-      "selectedInDevToolsUI": false
-    },
-    {
-      "requestId": 1,
-      "method": "GET-2",
-      "url": "http://example.com",
-      "status": "[pending]",
-      "selectedInDevToolsUI": false
-    },
-    {
-      "requestId": 1,
-      "method": "GET-3",
-      "url": "http://example.com",
-      "status": "[pending]",
-      "selectedInDevToolsUI": false
-    },
-    {
-      "requestId": 1,
-      "method": "GET-4",
-      "url": "http://example.com",
-      "status": "[pending]",
-      "selectedInDevToolsUI": false
-    },
-    {
-      "requestId": 1,
-      "method": "GET-5",
-      "url": "http://example.com",
-      "status": "[pending]",
-      "selectedInDevToolsUI": false
-    },
-    {
-      "requestId": 1,
-      "method": "GET-6",
-      "url": "http://example.com",
-      "status": "[pending]",
-      "selectedInDevToolsUI": false
-    },
-    {
-      "requestId": 1,
-      "method": "GET-7",
-      "url": "http://example.com",
-      "status": "[pending]",
-      "selectedInDevToolsUI": false
-    },
-    {
-      "requestId": 1,
-      "method": "GET-8",
-      "url": "http://example.com",
-      "status": "[pending]",
-      "selectedInDevToolsUI": false
-    },
-    {
-      "requestId": 1,
-      "method": "GET-9",
-      "url": "http://example.com",
-      "status": "[pending]",
-      "selectedInDevToolsUI": false
-    },
-    {
-      "requestId": 1,
       "method": "GET-10",
       "url": "http://example.com",
       "status": "[pending]",
@@ -947,41 +716,6 @@ exports[`McpResponse network pagination > returns subsequent page when pageIdx p
     {
       "requestId": 1,
       "method": "GET-19",
-      "url": "http://example.com",
-      "status": "[pending]",
-      "selectedInDevToolsUI": false
-    },
-    {
-      "requestId": 1,
-      "method": "GET-20",
-      "url": "http://example.com",
-      "status": "[pending]",
-      "selectedInDevToolsUI": false
-    },
-    {
-      "requestId": 1,
-      "method": "GET-21",
-      "url": "http://example.com",
-      "status": "[pending]",
-      "selectedInDevToolsUI": false
-    },
-    {
-      "requestId": 1,
-      "method": "GET-22",
-      "url": "http://example.com",
-      "status": "[pending]",
-      "selectedInDevToolsUI": false
-    },
-    {
-      "requestId": 1,
-      "method": "GET-23",
-      "url": "http://example.com",
-      "status": "[pending]",
-      "selectedInDevToolsUI": false
-    },
-    {
-      "requestId": 1,
-      "method": "GET-24",
       "url": "http://example.com",
       "status": "[pending]",
       "selectedInDevToolsUI": false
@@ -1438,8 +1172,6 @@ exports[`McpResponse network request filtering > shows all requests when no filt
 
 exports[`McpResponse network request filtering > shows no requests when filter matches nothing 1`] = `
 # test response
-## Network requests
-No requests found.
 `;
 
 exports[`McpResponse network request filtering > shows no requests when filter matches nothing 2`] = `

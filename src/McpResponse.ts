@@ -588,21 +588,8 @@ Call ${handleDialog.name} to handle it before continuing.`);
       }
     }
 
-    if (this.#networkRequestsOptions?.include) {
-      let requests = context.getNetworkRequests(
-        this.#networkRequestsOptions?.includePreservedRequests,
-      );
-
-      // Apply resource type filtering if specified
-      if (this.#networkRequestsOptions.resourceTypes?.length) {
-        const normalizedTypes = new Set(
-          this.#networkRequestsOptions.resourceTypes,
-        );
-        requests = requests.filter(request => {
-          const type = request.resourceType();
-          return normalizedTypes.has(type);
-        });
-      }
+    if (this.#networkRequestsOptions?.include && data.networkRequests) {
+      const requests = data.networkRequests;
 
       response.push('## Network requests');
       if (requests.length) {
@@ -614,7 +601,7 @@ Call ${handleDialog.name} to handle it before continuing.`);
         response.push(...paginationData.info);
         if (data.networkRequests) {
           structuredContent.networkRequests = [];
-          for (const formatter of data.networkRequests) {
+          for (const formatter of paginationData.items) {
             response.push(formatter.toString());
             structuredContent.networkRequests.push(formatter.toJSON());
           }
