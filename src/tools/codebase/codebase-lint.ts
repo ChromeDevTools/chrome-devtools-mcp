@@ -24,6 +24,13 @@ import {
 } from '../ToolDefinition.js';
 import {buildIgnoreContextJson} from './ignore-context.js';
 
+// ── Dynamic Timeout Configuration ────────────────────────
+// Timeout scales with the number of checks being run and scope
+// breadth rather than using a hardcoded ceiling.
+const TIMEOUT_BASE_MS = 10_000;
+const TIMEOUT_PER_CHECK_MS = 15_000;
+const TIMEOUT_BROAD_SCOPE_MS = 30_000;
+
 // ── Tool Definition ──────────────────────────────────────
 
 export const lint = defineTool({
@@ -54,7 +61,6 @@ export const lint = defineTool({
     '- Include test files: `{ excludeTests: false }`\n' +
     '- Check for errors: `{ checks: [\'errors\'] }`\n' +
     '- Check for circular deps: `{ checks: [\'circular-deps\'] }`',
-  timeoutMs: 120_000,
   annotations: {
     title: 'Codebase Lint',
     category: ToolCategory.CODEBASE_ANALYSIS,
@@ -62,7 +68,7 @@ export const lint = defineTool({
     destructiveHint: false,
     idempotentHint: true,
     openWorldHint: false,
-    conditions: ['client-pipe'],
+    conditions: ['client-pipe', 'codebase-sequential'],
   },
   schema: {
     checks: zod
@@ -147,6 +153,16 @@ export const lint = defineTool({
     const runWarnings = runAll || checks.includes('warnings');
     const runCircularDeps = runAll || checks.includes('circular-deps');
 
+    // ── Compute Dynamic Timeout ──────────────────────────
+    // Scales with the number of checks and scope breadth.
+    const checksCount = [runErrors || runWarnings, runDeadCode, runDuplicates, runCircularDeps].filter(Boolean).length;
+    const isBroadScope = !params.includePatterns?.length ||
+      params.includePatterns.some(p => p.includes('**'));
+    const dynamicTimeout =
+      TIMEOUT_BASE_MS +
+      (checksCount * TIMEOUT_PER_CHECK_MS) +
+      (isBroadScope ? TIMEOUT_BROAD_SCOPE_MS : 0);
+
     const sections: LintSection[] = [];
 
     if (runErrors || runWarnings) {
@@ -160,6 +176,7 @@ export const lint = defineTool({
           params.includePatterns,
           params.excludePatterns,
           params.limit,
+          dynamicTimeout,
         );
         sections.push({check: 'diagnostics', diagnosticsResult: result});
       } catch {
@@ -177,6 +194,7 @@ export const lint = defineTool({
         params.limit,
         params.includePatterns,
         params.excludePatterns,
+        dynamicTimeout,
       );
       sections.push({check: 'dead-code', deadCodeResult: result});
     }
@@ -188,6 +206,7 @@ export const lint = defineTool({
         params.limit,
         params.includePatterns,
         params.excludePatterns,
+        dynamicTimeout,
       );
       sections.push({check: 'duplicates', duplicatesResult: result});
     }
@@ -198,6 +217,7 @@ export const lint = defineTool({
           getHostWorkspace(),
           params.includePatterns,
           params.excludePatterns,
+          dynamicTimeout,
         );
         sections.push({check: 'circular-deps', circularDepsResult: result});
       } catch {

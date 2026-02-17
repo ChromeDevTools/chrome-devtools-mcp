@@ -335,6 +335,11 @@ Avoid sharing sensitive or personal information that you do not want to share wi
 
 const toolMutex = new Mutex();
 
+// Serializes codebase tools (codebase_map, codebase_trace, codebase_lint) so they
+// process sequentially. The mutex is acquired BEFORE starting any timeout timer,
+// so queue wait time doesn't count against the tool's execution budget.
+const codebaseMutex = new Mutex();
+
 // Serializes the hot-reload detection + build so parallel tool calls
 // don't race each other. Only the first caller does the actual check;
 // subsequent callers wait and then re-check the flags.
@@ -481,8 +486,8 @@ function registerTool(tool: ToolDefinition): void {
           }
         }
 
-        const executeAll = async () => {
-          guard = await toolMutex.acquire();
+        // Shared tool execution body: UI checks → handler → response formatting
+        const executeBody = async (): Promise<CallToolResult> => {
           logger(`${tool.name} request: ${JSON.stringify(params, null, '  ')}`);
 
           // Standalone tools don't need VS Code connection or UI checks
@@ -545,11 +550,25 @@ function registerTool(tool: ToolDefinition): void {
           return {content};
         };
 
-        const result = await withTimeout(
-          executeAll(),
-          timeoutMs,
-          tool.name,
-        );
+        let result: CallToolResult;
+        const isCodebaseTool = tool.annotations.conditions?.includes('codebase-sequential');
+
+        if (isCodebaseTool) {
+          // Codebase tools (codebase_map, codebase_trace, codebase_lint):
+          // Acquire dedicated mutex FIRST — queue wait doesn't count against
+          // the tool's timeout. Each handler manages its own dynamic timeout
+          // internally based on scope, file count, and request complexity.
+          guard = await codebaseMutex.acquire();
+          result = await executeBody();
+        } else {
+          // Standard tools: acquire toolMutex inside withTimeout so the
+          // outer timeout acts as a hard ceiling on total wait + execution.
+          const executeWithMutex = async () => {
+            guard = await toolMutex.acquire();
+            return executeBody();
+          };
+          result = await withTimeout(executeWithMutex(), timeoutMs, tool.name);
+        }
 
         // Inject "just updated" banner on first tool call after hot-reload restart
         if (mcpServerHotReloadInfo) {

@@ -543,11 +543,12 @@ export async function codebaseGetOverview(
   includeStats?: boolean,
   includePatterns?: string[],
   excludePatterns?: string[],
+  timeout?: number,
 ): Promise<CodebaseOverviewResult> {
   const result = await sendClientRequest(
     'codebase.getOverview',
     {rootDir, depth, filter, includeImports, includeStats, includePatterns, excludePatterns},
-    30_000,
+    timeout ?? 30_000,
   );
   assertResult<CodebaseOverviewResult>(result, 'codebase.getOverview');
   return result;
@@ -639,11 +640,12 @@ export async function codebaseFindDeadCode(
   limit?: number,
   includePatterns?: string[],
   excludePatterns?: string[],
+  timeout?: number,
 ): Promise<DeadCodeResult> {
   const result = await sendClientRequest(
     'codebase.findDeadCode',
     {rootDir, pattern, exportedOnly, excludeTests, kinds, limit, includePatterns, excludePatterns},
-    60_000,
+    timeout ?? 60_000,
   );
   assertResult<DeadCodeResult>(result, 'codebase.findDeadCode');
   return result;
@@ -681,11 +683,12 @@ export async function codebaseGetImportGraph(
   rootDir?: string,
   includePatterns?: string[],
   excludePatterns?: string[],
+  timeout?: number,
 ): Promise<ImportGraphResult> {
   const result = await sendClientRequest(
     'codebase.getImportGraph',
     {rootDir, includePatterns, excludePatterns},
-    60_000,
+    timeout ?? 60_000,
   );
   assertResult<ImportGraphResult>(result, 'codebase.getImportGraph');
   return result;
@@ -729,11 +732,12 @@ export async function codebaseFindDuplicates(
   limit?: number,
   includePatterns?: string[],
   excludePatterns?: string[],
+  timeout?: number,
 ): Promise<DuplicateDetectionResult> {
   const result = await sendClientRequest(
     'codebase.findDuplicates',
     {rootDir, kinds, limit, includePatterns, excludePatterns},
-    60_000,
+    timeout ?? 60_000,
   );
   assertResult<DuplicateDetectionResult>(result, 'codebase.findDuplicates');
   return result;
@@ -769,11 +773,12 @@ export async function codebaseGetDiagnostics(
   includePatterns?: string[],
   excludePatterns?: string[],
   limit?: number,
+  timeout?: number,
 ): Promise<DiagnosticsResult> {
   const result = await sendClientRequest(
     'codebase.getDiagnostics',
     {severityFilter, includePatterns, excludePatterns, limit},
-    30_000,
+    timeout ?? 30_000,
   );
   assertResult<DiagnosticsResult>(result, 'codebase.getDiagnostics');
   return result;

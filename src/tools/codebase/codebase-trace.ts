@@ -156,7 +156,6 @@ export const trace = defineTool({
     '- Only references: `{ symbol: "config", include: ["references"] }`\n' +
     '- Call hierarchy: `{ symbol: "handleRequest", include: ["calls"], depth: 5 }`\n' +
     '- Full impact: `{ symbol: "BaseEntity", includeImpact: true }`',
-  timeoutMs: 120_000,
   annotations: {
     title: 'Codebase Trace',
     category: ToolCategory.CODEBASE_ANALYSIS,
@@ -164,7 +163,7 @@ export const trace = defineTool({
     destructiveHint: false,
     idempotentHint: true,
     openWorldHint: false,
-    conditions: ['client-pipe'],
+    conditions: ['client-pipe', 'codebase-sequential'],
   },
   schema: {
     symbol: zod

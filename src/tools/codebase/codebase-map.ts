@@ -17,6 +17,17 @@ import {ToolCategory} from '../categories.js';
 import {defineTool} from '../ToolDefinition.js';
 import {buildIgnoreContextJson} from './ignore-context.js';
 
+// ── Dynamic Timeout Configuration ────────────────────────
+// Timeout scales with request scope and complexity rather than
+// using a hardcoded ceiling. Broad-scope requests with symbol
+// extraction naturally take longer to process.
+const TIMEOUT_BASE_MS = 15_000;
+const TIMEOUT_BROAD_SCOPE_MS = 45_000;
+const TIMEOUT_SYMBOL_FACTOR_MS = 30_000;
+const TIMEOUT_IMPORT_FACTOR_MS = 15_000;
+const TIMEOUT_STATS_FACTOR_MS = 5_000;
+const TIMEOUT_GRAPH_FACTOR_MS = 30_000;
+
 // ── Constants ────────────────────────────────────────────
 
 const OUTPUT_TOKEN_LIMIT = 3_000;
@@ -299,7 +310,6 @@ export const map = defineTool({
     '- CSS selectors: `{ scope: { include: "**/*.css" }, show: { css: ["selectors"] } }`\n' +
     '- Folders only: `{ show: { folders: true, files: false } }`\n' +
     '- Mixed: `{ show: { typescript: ["classes"], css: ["selectors"], html: ["*"] } }`',
-  timeoutMs: 120_000,
   annotations: {
     title: 'Codebase Map',
     category: ToolCategory.CODEBASE_ANALYSIS,
@@ -307,7 +317,7 @@ export const map = defineTool({
     destructiveHint: false,
     idempotentHint: true,
     openWorldHint: false,
-    conditions: ['client-pipe'],
+    conditions: ['client-pipe', 'codebase-sequential'],
   },
   schema: {
     // ═══════════════════════════════════════════════════════
@@ -408,15 +418,28 @@ export const map = defineTool({
     // Depth 0 = skip symbol extraction; otherwise fetch full symbol tree
     const effectiveDepth = hasAnySymbols ? 10 : 0;
 
+    // ── Compute Dynamic Timeout ──────────────────────────
+    // Scales with scope breadth and requested features rather
+    // than using a hardcoded ceiling.
+    const isBroadScope = includePatterns.some(p => p.includes('**'));
+    const requestImports = params.includeImports ?? false;
+    const dynamicTimeout =
+      TIMEOUT_BASE_MS +
+      (isBroadScope ? TIMEOUT_BROAD_SCOPE_MS : 0) +
+      (hasAnySymbols ? TIMEOUT_SYMBOL_FACTOR_MS : 0) +
+      (requestImports ? TIMEOUT_IMPORT_FACTOR_MS : 0) +
+      (includeStats ? TIMEOUT_STATS_FACTOR_MS : 0);
+
     // ── Fetch Data ───────────────────────────────────────
     const overviewResult = await codebaseGetOverview(
       getHostWorkspace(),
       effectiveDepth,
       undefined,
-      params.includeImports ?? false,
+      requestImports,
       includeStats,
       includePatterns,
       scopeExclude,
+      dynamicTimeout,
     );
 
     if (overviewResult.summary.totalFiles === 0) {
@@ -473,10 +496,12 @@ export const map = defineTool({
     let graphOutput = '';
     if (params.includeGraph && estimateTokens(output) < OUTPUT_TOKEN_LIMIT * 0.5) {
       try {
+        const graphTimeout = dynamicTimeout + TIMEOUT_GRAPH_FACTOR_MS;
         const graphResult = await codebaseGetImportGraph(
           getHostWorkspace(),
           includePatterns,
           scopeExclude,
+          graphTimeout,
         );
         if (graphResult) {
           graphOutput = '\nImport Graph:\n' + JSON.stringify(graphResult, null, 2);
