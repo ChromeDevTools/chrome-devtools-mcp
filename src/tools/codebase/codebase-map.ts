@@ -23,7 +23,6 @@ const OUTPUT_TOKEN_LIMIT = 3_000;
 const CHARS_PER_TOKEN = 4;
 const INDENT = '  ';
 
-type DetailLevel = 'minimal' | 'names' | 'signatures' | 'full';
 type FileTypeCategory = 'typescript' | 'css' | 'html' | 'json' | 'yaml' | 'markdown' | 'xml' | 'unknown';
 
 interface FileTypeSymbolConfig {
@@ -142,55 +141,19 @@ function normalizePath(p: string): string {
   return p.replace(/\\/g, '/');
 }
 
-function stripTempNamespace(sig: string): string {
-  return sig.replace(/import\("\/[^"]*__exports_[^"]*"\)\./g, '');
-}
-
 // ── Markdown Tree Formatter ──────────────────────────────
 
 interface FormatOptions {
   showFolders: boolean;
   showFiles: boolean;
   symbolConfig: FileTypeSymbolConfig;
-  detail: DetailLevel;
   includeStats: boolean;
   hasAnySymbols: boolean;
 }
 
-function formatSymbol(symbol: CodebaseSymbolNode, detail: DetailLevel, depth: number): string {
+function formatSymbol(symbol: CodebaseSymbolNode, depth: number): string {
   const indent = INDENT.repeat(depth);
-  const sig = symbol.detail ? stripTempNamespace(symbol.detail) : '';
-  const kind = symbol.kind;
-
-  switch (detail) {
-    case 'minimal':
-      return '';
-    case 'names':
-      return `${indent}${kind} ${symbol.name}\n`;
-    case 'signatures':
-      return formatSignature(symbol, indent, sig);
-    case 'full':
-      return formatFullSymbol(symbol, indent, sig);
-  }
-}
-
-function formatSignature(symbol: CodebaseSymbolNode, indent: string, sig: string): string {
-  const kind = symbol.kind;
-  if (kind === 'class') return `${indent}class ${symbol.name}\n`;
-  if (kind === 'interface') return `${indent}interface ${symbol.name}\n`;
-  if (kind === 'enum') return `${indent}enum ${symbol.name}\n`;
-  if (kind === 'type') return `${indent}type ${symbol.name} = ${sig || '...'}\n`;
-  if (kind === 'function') return `${indent}${symbol.name}${sig || '()'}\n`;
-  if (kind === 'method') return `${indent}${symbol.name}${sig || '()'}\n`;
-  if (kind === 'property' || kind === 'variable' || kind === 'constant') {
-    return `${indent}${symbol.name}: ${sig || 'unknown'}\n`;
-  }
-  return `${indent}${symbol.name}\n`;
-}
-
-function formatFullSymbol(symbol: CodebaseSymbolNode, indent: string, sig: string): string {
-  const base = formatSignature(symbol, indent, sig);
-  return base;
+  return `${indent}${symbol.kind} ${symbol.name}\n`;
 }
 
 function formatSymbols(
@@ -199,7 +162,7 @@ function formatSymbols(
   depth: number,
   fileName: string,
 ): string {
-  if (!opts.hasAnySymbols || opts.detail === 'minimal') return '';
+  if (!opts.hasAnySymbols) return '';
 
   const allowedKinds = getSymbolFiltersForFile(fileName, opts.symbolConfig);
   if (!allowedKinds) return '';
@@ -210,7 +173,7 @@ function formatSymbols(
   for (const sym of symbols) {
     const matches = shouldShowSymbol(sym.kind, category, allowedKinds);
     if (matches) {
-      output += formatSymbol(sym, opts.detail, depth);
+      output += formatSymbol(sym, depth);
     }
     if (sym.children && sym.children.length > 0) {
       output += formatSymbolChildren(sym.children, opts, matches ? depth + 1 : depth, category, allowedKinds);
@@ -230,7 +193,7 @@ function formatSymbolChildren(
   for (const sym of symbols) {
     const matches = shouldShowSymbol(sym.kind, category, allowedKinds);
     if (matches) {
-      output += formatSymbol(sym, opts.detail, depth);
+      output += formatSymbol(sym, depth);
     }
     if (sym.children && sym.children.length > 0) {
       output += formatSymbolChildren(sym.children, opts, matches ? depth + 1 : depth, category, allowedKinds);
@@ -318,22 +281,21 @@ function countFiles(node: CodebaseTreeNode): number {
 export const map = defineTool({
   name: 'codebase_map',
   description: 'Get a structural map of the codebase at any granularity — folders, files, or symbols.\n\n' +
-    'Returns **Markdown tree output** with folders ending in `/`, files with extensions, and symbols.\n\n' +
+    'Returns a tree with folders ending in `/`, files with extensions, and symbols as `kind name`.\n\n' +
     '**Control what appears:**\n' +
     '- `scope` — What parts of the codebase to analyze (include/exclude globs)\n' +
-    '- `show` — What entities to show (folders, files, and per-file-type symbols)\n' +
-    '- `detail` — How much info per symbol (minimal, names, signatures, full)\n\n' +
+    '- `show` — What entities to show (folders, files, and per-file-type symbols)\n\n' +
     '**Symbol arrays by file type:**\n' +
     '- `show.typescript`: functions, classes, interfaces, types, enums, constants, methods, properties\n' +
     '- `show.css`: selectors, at-rules, custom-properties\n' +
-    '- `show.html`: semantic-tags, headings, forms, tables, media\n' +
+    '- `show.html`: semantic-tags, headings, forms, tables, media, scripts\n' +
     '- `show.json`: keys, arrays\n' +
     '- `show.yaml`: keys, arrays\n' +
     '- `show.markdown`: headings, code-blocks, tables, frontmatter\n' +
     '- `show.xml`: elements\n\n' +
     '**EXAMPLES:**\n' +
     '- Full project: `{}`\n' +
-    '- TS classes: `{ show: { typescript: ["classes"] }, detail: "signatures" }`\n' +
+    '- TS classes: `{ show: { typescript: ["classes"] } }`\n' +
     '- CSS selectors: `{ scope: { include: "**/*.css" }, show: { css: ["selectors"] } }`\n' +
     '- Folders only: `{ show: { folders: true, files: false } }`\n' +
     '- Mixed: `{ show: { typescript: ["classes"], css: ["selectors"], html: ["*"] } }`',
@@ -399,12 +361,6 @@ export const map = defineTool({
       .describe('Control what entities appear. Use file type keys to enable symbols for that type.'),
 
     // ═══════════════════════════════════════════════════════
-    // DETAIL — How much information per symbol
-    // ═══════════════════════════════════════════════════════
-    detail: zod.enum(['minimal', 'names', 'signatures', 'full']).optional()
-      .describe('Detail level: minimal (structure only), names (symbol names), signatures (TypeScript types), full (+ JSDoc)'),
-
-    // ═══════════════════════════════════════════════════════
     // EXTRAS
     // ═══════════════════════════════════════════════════════
     includeImports: zod.boolean().optional()
@@ -423,7 +379,6 @@ export const map = defineTool({
     const scopeExclude = params.scope?.exclude;
     const showFolders = params.show?.folders ?? true;
     const showFiles = params.show?.files ?? true;
-    const detail: DetailLevel = params.detail ?? 'names';
     const includeStats = params.includeStats ?? false;
 
     // Build per-file-type symbol config
@@ -479,7 +434,6 @@ export const map = defineTool({
       showFolders,
       showFiles,
       symbolConfig,
-      detail,
       includeStats,
       hasAnySymbols,
     };
@@ -489,38 +443,27 @@ export const map = defineTool({
     let reductionsApplied: string[] = [];
 
     // ── Adaptive Compression ─────────────────────────────
-    // Level 1-4: Reduce detail level
-    const detailLevels: DetailLevel[] = ['full', 'signatures', 'names', 'minimal'];
-    let currentDetailIdx = detailLevels.indexOf(detail);
-
-    while (estimateTokens(output) > OUTPUT_TOKEN_LIMIT && currentDetailIdx < detailLevels.length - 1) {
-      currentDetailIdx++;
-      formatOpts.detail = detailLevels[currentDetailIdx];
-      reductionsApplied.push(`detail->${formatOpts.detail}`);
-      output = formatTree(overviewResult.tree, formatOpts, 0);
-    }
-
-    // Level 5: Remove symbols
+    // Level 1: Remove symbols
     if (estimateTokens(output) > OUTPUT_TOKEN_LIMIT && formatOpts.hasAnySymbols) {
       formatOpts.hasAnySymbols = false;
       reductionsApplied.push('remove-symbols');
       output = formatTree(overviewResult.tree, formatOpts, 0);
     }
 
-    // Level 6: Folders only
+    // Level 2: Folders only
     if (estimateTokens(output) > OUTPUT_TOKEN_LIMIT && formatOpts.showFiles) {
       formatOpts.showFiles = false;
       reductionsApplied.push('folders-only');
       output = formatTree(overviewResult.tree, formatOpts, 0);
     }
 
-    // Level 7: Flat paths
+    // Level 3: Flat paths
     if (estimateTokens(output) > OUTPUT_TOKEN_LIMIT && formatOpts.showFolders) {
       reductionsApplied.push('flat-paths');
       output = formatFlatPaths(overviewResult.tree);
     }
 
-    // Level 8: Folder summary
+    // Level 4: Folder summary
     if (estimateTokens(output) > OUTPUT_TOKEN_LIMIT) {
       reductionsApplied.push('folder-summary');
       output = formatFolderSummary(overviewResult.tree);
