@@ -371,7 +371,7 @@ function getDefaultExtensionPath(): string {
  * Get the host workspace where VS Code is running.
  * This is the parent of the mcp-server package.
  */
-function getHostWorkspace(): string {
+export function getHostWorkspace(): string {
   // Build output is in mcp-server/build/src/
   // Go up to mcp-server, then to parent (the host workspace)
   const packageRoot = dirname(dirname(__dirname));

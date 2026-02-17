@@ -16,14 +16,13 @@ import {
   type ImportGraphResult,
   type CircularChain,
 } from '../../client-pipe.js';
+import {getHostWorkspace} from '../../config.js';
 import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
 import {
   defineTool,
-  ResponseFormat,
-  responseFormatSchema,
 } from '../ToolDefinition.js';
-import {appendIgnoreContextMarkdown, buildIgnoreContextJson} from './ignore-context.js';
+import {buildIgnoreContextJson} from './ignore-context.js';
 
 // ── Tool Definition ──────────────────────────────────────
 
@@ -42,8 +41,7 @@ export const lint = defineTool({
     'Each result includes a `reason` explaining why the symbol is flagged and a\n' +
     '`confidence` level (high, medium, low).\n\n' +
     '**PARAMETERS:**\n' +
-    '- `rootDir` (string): Project root path. Defaults to workspace root\n' +
-    '- `checks` (string[]): Which checks to run. Default: [\'all\']\n' +
+    "- `checks` (string[]): Which checks to run. Default: ['all']\n" +
     '- `exportedOnly` (boolean): Only check exported symbols. Default: true\n' +
     '- `excludeTests` (boolean): Skip test files. Default: true\n' +
     '- `kinds` (string[]): Filter by symbol kind\n' +
@@ -56,7 +54,7 @@ export const lint = defineTool({
     '- Include test files: `{ excludeTests: false }`\n' +
     '- Check for errors: `{ checks: [\'errors\'] }`\n' +
     '- Check for circular deps: `{ checks: [\'circular-deps\'] }`',
-  timeoutMs: 60_000,
+  timeoutMs: 120_000,
   annotations: {
     title: 'Codebase Lint',
     category: ToolCategory.CODEBASE_ANALYSIS,
@@ -67,7 +65,6 @@ export const lint = defineTool({
     conditions: ['client-pipe'],
   },
   schema: {
-    response_format: responseFormatSchema,
     checks: zod
       .array(
         zod.enum(['all', 'dead-code', 'duplicates', 'errors', 'warnings', 'circular-deps']),
@@ -78,10 +75,6 @@ export const lint = defineTool({
         "Which lint checks to run. Default: ['all']. " +
           "Available: 'dead-code', 'duplicates', 'errors', 'warnings', 'circular-deps'.",
       ),
-    rootDir: zod
-      .string()
-      .optional()
-      .describe('Project root path. Defaults to workspace root.'),
     exportedOnly: zod
       .boolean()
       .optional()
@@ -156,7 +149,6 @@ export const lint = defineTool({
 
     const sections: LintSection[] = [];
 
-    // Run diagnostics (errors/warnings) — fast, reads VS Code state
     if (runErrors || runWarnings) {
       try {
         const severityFilter: string[] = [];
@@ -175,10 +167,9 @@ export const lint = defineTool({
       }
     }
 
-    // Run static analysis — expensive, full project scan
     if (runDeadCode) {
       const result = await codebaseFindDeadCode(
-        params.rootDir,
+        getHostWorkspace(),
         undefined,
         params.exportedOnly,
         params.excludeTests,
@@ -192,7 +183,7 @@ export const lint = defineTool({
 
     if (runDuplicates) {
       const result = await codebaseFindDuplicates(
-        params.rootDir,
+        getHostWorkspace(),
         params.kinds,
         params.limit,
         params.includePatterns,
@@ -204,7 +195,7 @@ export const lint = defineTool({
     if (runCircularDeps) {
       try {
         const result = await codebaseGetImportGraph(
-          params.rootDir,
+          getHostWorkspace(),
           params.includePatterns,
           params.excludePatterns,
         );
@@ -214,22 +205,18 @@ export const lint = defineTool({
       }
     }
 
-    if (params.response_format === ResponseFormat.JSON) {
-      const jsonResult = buildJsonResult(sections);
-      if (jsonResult.summary.totalIssues === 0) {
-        const rootDir = resolveRootDirFromSections(sections, params.rootDir);
-        if (rootDir) {
-          const withIgnore = {...jsonResult, ignoredBy: buildIgnoreContextJson(rootDir)};
-          response.appendResponseLine(JSON.stringify(withIgnore, null, 2));
-          return;
-        }
-      }
-      response.appendResponseLine(JSON.stringify(jsonResult, null, 2));
-      return;
-    }
+    response.setSkipLedger();
 
-    const markdown = formatLintReport(sections, params.rootDir);
-    response.appendResponseLine(markdown);
+    const jsonResult = buildJsonResult(sections);
+    if (jsonResult.summary.totalIssues === 0) {
+      const rootDir = resolveRootDirFromSections(sections);
+      if (rootDir) {
+        const withIgnore = {...jsonResult, ignoredBy: buildIgnoreContextJson(rootDir)};
+        response.appendResponseLine(JSON.stringify(withIgnore, null, 2));
+        return;
+      }
+    }
+    response.appendResponseLine(JSON.stringify(jsonResult, null, 2));
   },
 });
 
@@ -318,207 +305,10 @@ function buildJsonResult(sections: LintSection[]): LintJsonResult {
   };
 }
 
-// ── Markdown Formatting ──────────────────────────────────
-
-function formatLintReport(sections: LintSection[], requestedRootDir?: string): string {
-  const lines: string[] = [];
-  lines.push('## 🔍 Codebase Lint Report\n');
-
-  let totalIssues = 0;
-
-  for (const section of sections) {
-    if (section.check === 'diagnostics' && section.diagnosticsResult) {
-      const diagCount = section.diagnosticsResult.diagnostics.length;
-      totalIssues += diagCount;
-      formatDiagnosticsSection(section.diagnosticsResult, lines);
-    }
-    if (section.check === 'dead-code' && section.deadCodeResult) {
-      totalIssues += section.deadCodeResult.summary.totalDead;
-      formatDeadCodeSection(section.deadCodeResult, lines);
-    }
-    if (section.check === 'duplicates' && section.duplicatesResult) {
-      totalIssues += section.duplicatesResult.summary.totalGroups;
-      formatDuplicatesSection(section.duplicatesResult, lines);
-    }
-    if (section.check === 'circular-deps' && section.circularDepsResult) {
-      totalIssues += section.circularDepsResult.stats.circularCount;
-      formatCircularDepsSection(section.circularDepsResult, lines);
-    }
-  }
-
-  lines.push('---');
-  if (totalIssues === 0) {
-    lines.push('✅ **No issues found across all checks.**');
-    const rootDir = resolveRootDirFromSections(sections, requestedRootDir);
-    if (rootDir) {
-      appendIgnoreContextMarkdown(lines, rootDir);
-    }
-  } else {
-    lines.push(`**Total issues: ${totalIssues}**`);
-  }
-
-  return lines.join('\n');
-}
-
-function resolveRootDirFromSections(sections: LintSection[], fallback?: string): string | undefined {
+function resolveRootDirFromSections(sections: LintSection[]): string | undefined {
   for (const s of sections) {
     if (s.deadCodeResult?.resolvedRootDir) return s.deadCodeResult.resolvedRootDir;
     if (s.duplicatesResult?.resolvedRootDir) return s.duplicatesResult.resolvedRootDir;
   }
-  return fallback;
-}
-
-function formatDeadCodeSection(result: DeadCodeResult, lines: string[]): void {
-  lines.push('### 💀 Dead Code\n');
-
-  if (result.errorMessage) {
-    lines.push(`❌ **Error:** ${result.errorMessage}\n`);
-    return;
-  }
-
-  const {totalScanned, totalDead, scanDurationMs, byKind} = result.summary;
-  lines.push(
-    `**${totalDead}** dead code items found (${totalScanned} scanned) · ${scanDurationMs}ms\n`,
-  );
-
-  if (result.resolvedRootDir) {
-    lines.push(`*Project root: \`${result.resolvedRootDir}\`*\n`);
-  }
-
-  if (result.diagnostics && result.diagnostics.length > 0) {
-    for (const diag of result.diagnostics) {
-      lines.push(`💡 ${diag}\n`);
-    }
-  }
-
-  if (byKind && Object.keys(byKind).length > 0) {
-    const parts = Object.entries(byKind)
-      .sort(([, a], [, b]) => b - a)
-      .map(([kind, count]) => `${count} ${kind}${count > 1 ? 's' : ''}`);
-    lines.push(`*Breakdown: ${parts.join(', ')}*\n`);
-  }
-
-  if (result.deadCode.length === 0) {
-    lines.push('✅ No dead code found. All symbols are referenced.\n');
-    return;
-  }
-
-  const byFile = new Map<string, typeof result.deadCode>();
-  for (const item of result.deadCode) {
-    const existing = byFile.get(item.file) ?? [];
-    existing.push(item);
-    byFile.set(item.file, existing);
-  }
-
-  for (const [file, items] of byFile) {
-    lines.push(`#### ${file}\n`);
-    for (const item of items) {
-      const badge = item.exported ? '📤' : '🔒';
-      const conf = item.confidence === 'high' ? '🔴' : item.confidence === 'medium' ? '🟡' : '🟢';
-      lines.push(
-        `- ${badge} ${conf} \`${item.name}\` (${item.kind}) at line ${item.line}`,
-      );
-      lines.push(`  *${item.reason}*`);
-    }
-    lines.push('');
-  }
-}
-
-function formatDuplicatesSection(result: DuplicateDetectionResult, lines: string[]): void {
-  lines.push('### 🔁 Duplicate Code\n');
-
-  if (result.errorMessage) {
-    lines.push(`❌ **Error:** ${result.errorMessage}\n`);
-    return;
-  }
-
-  const {totalGroups, totalDuplicateInstances, filesWithDuplicates, scanDurationMs} = result.summary;
-  lines.push(
-    `**${totalGroups}** duplicate groups (${totalDuplicateInstances} instances across ${filesWithDuplicates} files) · ${scanDurationMs}ms\n`,
-  );
-
-  if (result.resolvedRootDir) {
-    lines.push(`*Project root: \`${result.resolvedRootDir}\`*\n`);
-  }
-
-  if (result.groups.length === 0) {
-    lines.push('✅ No structural duplicates found.\n');
-    return;
-  }
-
-  for (let i = 0; i < result.groups.length; i++) {
-    const group = result.groups[i];
-    const kindIcon = group.kind === 'function' ? '⚡' : group.kind === 'class' ? '🔷' : group.kind === 'interface' ? '🔶' : '📋';
-    lines.push(`#### ${kindIcon} Group ${i + 1} — ${group.kind} (${group.lineCount} lines, ${group.instances.length} copies)\n`);
-
-    for (const instance of group.instances) {
-      lines.push(`- \`${instance.name}\` in \`${instance.file}\` (lines ${instance.line}–${instance.endLine})`);
-    }
-    lines.push('');
-  }
-}
-
-function formatDiagnosticsSection(result: DiagnosticsResult, lines: string[]): void {
-  lines.push('### 🔴 Diagnostics\n');
-
-  if (result.errorMessage) {
-    lines.push(`❌ **Error:** ${result.errorMessage}\n`);
-    return;
-  }
-
-  const {totalErrors, totalWarnings, totalFiles} = result.summary;
-  const total = totalErrors + totalWarnings;
-  lines.push(
-    `**${total}** diagnostics across **${totalFiles}** files ` +
-      `(${totalErrors} errors, ${totalWarnings} warnings)\n`,
-  );
-
-  if (result.diagnostics.length === 0) {
-    lines.push('✅ No diagnostics found.\n');
-    return;
-  }
-
-  // Group by file
-  const byFile = new Map<string, DiagnosticItem[]>();
-  for (const item of result.diagnostics) {
-    const existing = byFile.get(item.file) ?? [];
-    existing.push(item);
-    byFile.set(item.file, existing);
-  }
-
-  for (const [file, items] of byFile) {
-    lines.push(`#### ${file}\n`);
-    for (const item of items) {
-      const icon = item.severity === 'error' ? '❌' : '⚠️';
-      const codeStr = item.code ? ` [${item.code}]` : '';
-      lines.push(
-        `- ${icon} **${item.severity}** at line ${item.line}:${item.column}${codeStr}`,
-      );
-      lines.push(`  ${item.message} *(${item.source})*`);
-    }
-    lines.push('');
-  }
-}
-
-function formatCircularDepsSection(result: ImportGraphResult, lines: string[]): void {
-  lines.push('### 🔄 Circular Dependencies\n');
-
-  if (result.errorMessage) {
-    lines.push(`❌ **Error:** ${result.errorMessage}\n`);
-    return;
-  }
-
-  const {circularCount} = result.stats;
-  lines.push(`**${circularCount}** circular dependency chains found\n`);
-
-  if (result.circular.length === 0) {
-    lines.push('✅ No circular dependencies found.\n');
-    return;
-  }
-
-  for (let i = 0; i < result.circular.length; i++) {
-    const cycle = result.circular[i];
-    lines.push(`${i + 1}. ⚠️ ${cycle.chain.join(' → ')}`);
-  }
-  lines.push('');
+  return undefined;
 }
