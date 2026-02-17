@@ -304,7 +304,15 @@ lifecycleService.registerShutdownHandlers();
 
 // Wire up auto-recovery: when any tool detects the Client pipe is dead,
 // the recovery handler asks the Host to restart the Client window.
+// If an extension hot-reload is already in progress, wait for it
+// rather than kicking off a separate recovery (which would restart
+// the Client window a second time).
 registerClientRecoveryHandler(async () => {
+  if (extensionHotReloadInProgress) {
+    logger('[client-recovery] Extension hot-reload in progress — waiting instead of independent recovery…');
+    try { await extensionHotReloadInProgress; } catch { /* hot-reload error handled elsewhere */ }
+    return;
+  }
   await lifecycleService.recoverClientConnection();
 });
 
@@ -358,6 +366,13 @@ const hotReloadMutex = new Mutex();
 // simultaneous Client rebuilds — only the first caller reloads,
 // subsequent callers wait then see the updated fingerprint/timestamp.
 const extHotReloadMutex = new Mutex();
+
+// Set while an extension hot-reload is in progress so the client
+// recovery handler (ensureClientAvailable) can wait for it instead of
+// triggering an independent window restart. Without this, parallel
+// tool calls that detect a dying Client pipe during a hot-reload would
+// each kick off separate recovery attempts → multiple window restarts.
+let extensionHotReloadInProgress: Promise<void> | null = null;
 
 /** Shared result from the hot-reload check — set by the winner, consumed by waiters. */
 let hotReloadResult: CallToolResult | null = null;
@@ -504,10 +519,21 @@ function registerTool(tool: ToolDefinition): void {
             if (stale || buildNewerThanWindow) {
               const reason = stale ? 'source stale' : 'manual build detected';
               logger(`[tool:${tool.name}] Extension needs hot-reload (${reason}) — reloading…`);
-              await lifecycleService.handleHotReload();
-              writeExtSourceFingerprint(config.extensionBridgePath);
-              extensionHotReloadInfo = {builtAt: Date.now()};
-              logger(`[tool:${tool.name}] Hot-reload complete — reconnected`);
+
+              // Expose the in-flight hot-reload as a promise so the client
+              // recovery handler can wait for it instead of triggering a
+              // separate (duplicate) window restart.
+              let resolveHotReload!: () => void;
+              extensionHotReloadInProgress = new Promise<void>(r => { resolveHotReload = r; });
+              try {
+                await lifecycleService.handleHotReload();
+                writeExtSourceFingerprint(config.extensionBridgePath);
+                extensionHotReloadInfo = {builtAt: Date.now()};
+                logger(`[tool:${tool.name}] Hot-reload complete — reconnected`);
+              } finally {
+                resolveHotReload();
+                extensionHotReloadInProgress = null;
+              }
             }
           } finally {
             extHrGuard.dispose();
