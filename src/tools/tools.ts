@@ -6,6 +6,7 @@
 
 import * as codebaseTools from './codebase/index.js';
 import * as consoleTools from './console.js';
+import * as fileTools from './file/index.js';
 import * as inputTools from './input.js';
 import * as screenshotTools from './screenshot.js';
 import * as snapshotTools from './snapshot.js';
@@ -15,6 +16,7 @@ import * as waitTools from './wait.js';
 const tools = [
   ...Object.values(codebaseTools),
   ...Object.values(consoleTools),
+  ...Object.values(fileTools),
   ...Object.values(inputTools),
   ...Object.values(screenshotTools),
   ...Object.values(snapshotTools),

@@ -217,6 +217,77 @@ export async function commandExecute(
   return result;
 }
 
+// ── Dragrace Methods ─────────────────────────────────────
+
+export interface DocumentSymbolResult {
+  symbols: unknown[];
+  error?: string;
+}
+
+/**
+ * Get document symbols from VS Code's language server for a file.
+ * Uses vscode.executeDocumentSymbolProvider internally via a dedicated handler
+ * that properly converts file paths to vscode.Uri objects.
+ */
+export async function dragraceGetDocumentSymbols(
+  filePath: string,
+): Promise<DocumentSymbolResult> {
+  const result = await sendClientRequest(
+    'dragrace.getDocumentSymbols',
+    {filePath},
+    30_000,
+  );
+  assertResult<DocumentSymbolResult>(result, 'dragrace.getDocumentSymbols');
+  return result;
+}
+
+// ── Dragrace: Folding Ranges ─────────────────────────────
+
+export interface FoldingRangeResult {
+  ranges: Array<{start: number; end: number; kind?: string}>;
+  error?: string;
+}
+
+export async function dragraceGetFoldingRanges(
+  filePath: string,
+): Promise<FoldingRangeResult> {
+  const result = await sendClientRequest(
+    'dragrace.getFoldingRanges',
+    {filePath},
+    30_000,
+  );
+  assertResult<FoldingRangeResult>(result, 'dragrace.getFoldingRanges');
+  return result;
+}
+
+// ── Dragrace: Semantic Tokens ────────────────────────────
+
+export interface DecodedSemanticToken {
+  line: number;
+  character: number;
+  length: number;
+  type: string;
+  modifiers: string[];
+}
+
+export interface SemanticTokensResult {
+  tokens: DecodedSemanticToken[];
+  legend: {tokenTypes: string[]; tokenModifiers: string[]};
+  error?: string;
+}
+
+export async function dragraceGetSemanticTokens(
+  filePath: string,
+): Promise<SemanticTokensResult> {
+  const result = await sendClientRequest(
+    'dragrace.getSemanticTokens',
+    {filePath},
+    30_000,
+  );
+  assertResult<SemanticTokensResult>(result, 'dragrace.getSemanticTokens');
+  return result;
+}
+
 // ── Codebase Types ───────────────────────────────────────
 
 export interface CodebaseSymbolNode {
@@ -629,6 +700,212 @@ export async function codebaseGetDiagnostics(
     timeout ?? 30_000,
   );
   assertResult<DiagnosticsResult>(result, 'codebase.getDiagnostics');
+  return result;
+}
+
+// ── File Service Types ───────────────────────────────────
+
+export interface FileSymbolRange {
+  startLine: number;
+  startChar: number;
+  endLine: number;
+  endChar: number;
+}
+
+export interface FileSymbol {
+  name: string;
+  kind: string;
+  detail?: string;
+  range: FileSymbolRange;
+  selectionRange: FileSymbolRange;
+  children: FileSymbol[];
+}
+
+export interface FileGetSymbolsResult {
+  symbols: FileSymbol[];
+}
+
+export interface FileReadContentResult {
+  content: string;
+  startLine: number;
+  endLine: number;
+  totalLines: number;
+}
+
+export interface FileApplyEditResult {
+  success: boolean;
+  file: string;
+}
+
+export interface FileDiagnosticItem {
+  line: number;
+  column: number;
+  endLine: number;
+  endColumn: number;
+  severity: string;
+  message: string;
+  code: string;
+  source: string;
+}
+
+export interface FileGetDiagnosticsResult {
+  diagnostics: FileDiagnosticItem[];
+}
+
+export interface FileExecuteRenameResult {
+  success: boolean;
+  filesAffected: string[];
+  totalEdits: number;
+  error?: string;
+}
+
+export interface FileFindReferencesResult {
+  references: Array<{file: string; line: number; character: number}>;
+}
+
+export interface FileCodeActionItem {
+  index: number;
+  title: string;
+  kind: string;
+  isPreferred: boolean;
+  hasEdit: boolean;
+  hasCommand: boolean;
+}
+
+export interface FileGetCodeActionsResult {
+  actions: FileCodeActionItem[];
+}
+
+export interface FileApplyCodeActionResult {
+  success: boolean;
+  title?: string;
+  error?: string;
+}
+
+// ── File Service Methods ─────────────────────────────────
+
+/**
+ * Get DocumentSymbols for a file with string kind names.
+ */
+export async function fileGetSymbols(filePath: string): Promise<FileGetSymbolsResult> {
+  const result = await sendClientRequest('file.getSymbols', {filePath}, 10_000);
+  assertResult<FileGetSymbolsResult>(result, 'file.getSymbols');
+  return result;
+}
+
+/**
+ * Read file content, optionally by line range (0-based).
+ */
+export async function fileReadContent(
+  filePath: string,
+  startLine?: number,
+  endLine?: number,
+): Promise<FileReadContentResult> {
+  const result = await sendClientRequest(
+    'file.readContent',
+    {filePath, startLine, endLine},
+    10_000,
+  );
+  assertResult<FileReadContentResult>(result, 'file.readContent');
+  return result;
+}
+
+/**
+ * Apply a text replacement (range → new content) and save.
+ */
+export async function fileApplyEdit(
+  filePath: string,
+  startLine: number,
+  endLine: number,
+  newContent: string,
+  startChar?: number,
+  endChar?: number,
+): Promise<FileApplyEditResult> {
+  const result = await sendClientRequest(
+    'file.applyEdit',
+    {filePath, startLine, startChar, endLine, endChar, newContent},
+    15_000,
+  );
+  assertResult<FileApplyEditResult>(result, 'file.applyEdit');
+  return result;
+}
+
+/**
+ * Get errors and warnings for a specific file.
+ */
+export async function fileGetDiagnostics(filePath: string): Promise<FileGetDiagnosticsResult> {
+  const result = await sendClientRequest('file.getDiagnostics', {filePath}, 10_000);
+  assertResult<FileGetDiagnosticsResult>(result, 'file.getDiagnostics');
+  return result;
+}
+
+/**
+ * Execute rename provider at a position.
+ */
+export async function fileExecuteRename(
+  filePath: string,
+  line: number,
+  character: number,
+  newName: string,
+): Promise<FileExecuteRenameResult> {
+  const result = await sendClientRequest(
+    'file.executeRename',
+    {filePath, line, character, newName},
+    15_000,
+  );
+  assertResult<FileExecuteRenameResult>(result, 'file.executeRename');
+  return result;
+}
+
+/**
+ * Find all references to a symbol at a position.
+ */
+export async function fileFindReferences(
+  filePath: string,
+  line: number,
+  character: number,
+): Promise<FileFindReferencesResult> {
+  const result = await sendClientRequest(
+    'file.findReferences',
+    {filePath, line, character},
+    10_000,
+  );
+  assertResult<FileFindReferencesResult>(result, 'file.findReferences');
+  return result;
+}
+
+/**
+ * Get available code actions for a line range.
+ */
+export async function fileGetCodeActions(
+  filePath: string,
+  startLine: number,
+  endLine: number,
+): Promise<FileGetCodeActionsResult> {
+  const result = await sendClientRequest(
+    'file.getCodeActions',
+    {filePath, startLine, endLine},
+    10_000,
+  );
+  assertResult<FileGetCodeActionsResult>(result, 'file.getCodeActions');
+  return result;
+}
+
+/**
+ * Apply a specific code action by index for a line range.
+ */
+export async function fileApplyCodeAction(
+  filePath: string,
+  startLine: number,
+  endLine: number,
+  actionIndex: number,
+): Promise<FileApplyCodeActionResult> {
+  const result = await sendClientRequest(
+    'file.applyCodeAction',
+    {filePath, startLine, endLine, actionIndex},
+    10_000,
+  );
+  assertResult<FileApplyCodeActionResult>(result, 'file.applyCodeAction');
   return result;
 }
 
