@@ -15,10 +15,39 @@ import type {SymbolMatch} from './types.js';
  * - "UserService.findById" → child "findById" of "UserService"
  * - "findById" → first top-level symbol named "findById"
  */
+/**
+ * Strip surrounding quotes from a string (single or double).
+ * E.g., "'./augmented'" → "./augmented", "\"foo\"" → "foo"
+ */
+function stripQuotes(s: string): string {
+  if (
+    (s.startsWith("'") && s.endsWith("'")) ||
+    (s.startsWith('"') && s.endsWith('"'))
+  ) {
+    return s.slice(1, -1);
+  }
+  return s;
+}
+
+/**
+ * Match a symbol name against a target, handling quoted module names.
+ */
+function nameMatches(symbolName: string, targetName: string): boolean {
+  if (symbolName === targetName) return true;
+  return stripQuotes(symbolName) === stripQuotes(targetName);
+}
+
 export function resolveSymbolTarget(
   symbols: FileSymbol[],
   target: string,
 ): SymbolMatch | undefined {
+  // First, try exact match at top level (handles module names with dots like './augmented')
+  const exactMatch = symbols.find(s => nameMatches(s.name, target));
+  if (exactMatch) {
+    return {symbol: exactMatch, parent: undefined, path: [target]};
+  }
+
+  // Then try dot-path resolution for nested symbols
   const segments = target.split('.');
 
   let currentList = symbols;
@@ -27,7 +56,7 @@ export function resolveSymbolTarget(
 
   for (let i = 0; i < segments.length; i++) {
     const name = segments[i];
-    const found = currentList.find(s => s.name === name);
+    const found = currentList.find(s => nameMatches(s.name, name));
     if (!found) return undefined;
 
     pathSoFar.push(name);
