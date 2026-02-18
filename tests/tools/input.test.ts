@@ -352,13 +352,40 @@ describe('input', () => {
       });
     });
 
+    it('fills out a textarea marked as combobox', async () => {
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedPage();
+        await page.setContent(html`<textarea role="combobox" />`);
+        await context.createTextSnapshot();
+        await fill.handler(
+          {
+            params: {
+              uid: '1_1',
+              value: '1',
+            },
+          },
+          response,
+          context,
+        );
+        assert.strictEqual(
+          response.responseLines[0],
+          'Successfully filled out the element',
+        );
+        assert.ok(response.includeSnapshot);
+        assert.ok(
+          await page.evaluate(() => {
+            return document.body.querySelector('textarea')?.value === '1';
+          }),
+        );
+      });
+    });
+
     it('fills out a textarea with long text', async () => {
       await withMcpContext(async (response, context) => {
         const page = context.getSelectedPage();
         await page.setContent(html`<textarea />`);
-        await page.focus('textarea');
         await context.createTextSnapshot();
-        await page.setDefaultTimeout(1000);
+        page.setDefaultTimeout(1000);
         await fill.handler(
           {
             params: {
