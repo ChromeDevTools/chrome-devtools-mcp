@@ -14,7 +14,7 @@ import {
   UniverseManager,
   urlsEqual,
 } from './DevtoolsUtils.js';
-import type {ListenerMap} from './PageCollector.js';
+import type {ListenerMap, UncaughtError} from './PageCollector.js';
 import {NetworkCollector, ConsoleCollector} from './PageCollector.js';
 import {Locator} from './third_party/index.js';
 import type {DevTools} from './third_party/index.js';
@@ -35,6 +35,10 @@ import {takeSnapshot} from './tools/snapshot.js';
 import {CLOSE_PAGE_ERROR} from './tools/ToolDefinition.js';
 import type {Context, DevToolsData} from './tools/ToolDefinition.js';
 import type {TraceResult} from './trace-processing/parse.js';
+import {
+  ExtensionRegistry,
+  type InstalledExtension,
+} from './utils/ExtensionRegistry.js';
 import {WaitForHelper} from './WaitForHelper.js';
 
 export interface TextSnapshotNode extends SerializedAXNode {
@@ -65,6 +69,8 @@ interface McpContextOptions {
   experimentalDevToolsDebugging: boolean;
   // Whether all page-like targets are exposed as pages.
   experimentalIncludeAllPages?: boolean;
+  // Whether CrUX data should be fetched.
+  performanceCrux: boolean;
 }
 
 const DEFAULT_TIMEOUT = 5_000;
@@ -112,6 +118,7 @@ export class McpContext implements Context {
   #networkCollector: NetworkCollector;
   #consoleCollector: ConsoleCollector;
   #devtoolsUniverseManager: UniverseManager;
+  #extensionRegistry = new ExtensionRegistry();
 
   #isRunningTrace = false;
   #networkConditionsMap = new WeakMap<Page, string>();
@@ -119,6 +126,7 @@ export class McpContext implements Context {
   #geolocationMap = new WeakMap<Page, GeolocationOptions>();
   #viewportMap = new WeakMap<Page, Viewport>();
   #userAgentMap = new WeakMap<Page, string>();
+  #colorSchemeMap = new WeakMap<Page, 'dark' | 'light'>();
   #dialog?: Dialog;
 
   #pageIdMap = new WeakMap<Page, number>();
@@ -150,14 +158,8 @@ export class McpContext implements Context {
         console: event => {
           collect(event);
         },
-        pageerror: event => {
-          if (event instanceof Error) {
-            collect(event);
-          } else {
-            const error = new Error(`${event}`);
-            error.stack = undefined;
-            collect(error);
-          }
+        uncaughtError: event => {
+          collect(event);
         },
         issue: event => {
           collect(event);
@@ -239,7 +241,7 @@ export class McpContext implements Context {
 
   getConsoleData(
     includePreservedMessages?: boolean,
-  ): Array<ConsoleMessage | Error | DevTools.AggregatedIssue> {
+  ): Array<ConsoleMessage | Error | DevTools.AggregatedIssue | UncaughtError> {
     const page = this.getSelectedPage();
     return this.#consoleCollector.getData(page, includePreservedMessages);
   }
@@ -249,19 +251,19 @@ export class McpContext implements Context {
   }
 
   getConsoleMessageStableId(
-    message: ConsoleMessage | Error | DevTools.AggregatedIssue,
+    message: ConsoleMessage | Error | DevTools.AggregatedIssue | UncaughtError,
   ): number {
     return this.#consoleCollector.getIdForResource(message);
   }
 
   getConsoleMessageById(
     id: number,
-  ): ConsoleMessage | Error | DevTools.AggregatedIssue {
+  ): ConsoleMessage | Error | DevTools.AggregatedIssue | UncaughtError {
     return this.#consoleCollector.getById(this.getSelectedPage(), id);
   }
 
-  async newPage(): Promise<Page> {
-    const page = await this.browser.newPage();
+  async newPage(background?: boolean): Promise<Page> {
+    const page = await this.browser.newPage({background});
     await this.createPagesSnapshot();
     this.selectPage(page);
     this.#networkCollector.addPage(page);
@@ -348,12 +350,30 @@ export class McpContext implements Context {
     return this.#userAgentMap.get(page) ?? null;
   }
 
+  setColorScheme(scheme: 'dark' | 'light' | null): void {
+    const page = this.getSelectedPage();
+    if (scheme === null) {
+      this.#colorSchemeMap.delete(page);
+    } else {
+      this.#colorSchemeMap.set(page, scheme);
+    }
+  }
+
+  getColorScheme(): 'dark' | 'light' | null {
+    const page = this.getSelectedPage();
+    return this.#colorSchemeMap.get(page) ?? null;
+  }
+
   setIsRunningPerformanceTrace(x: boolean): void {
     this.#isRunningTrace = x;
   }
 
   isRunningPerformanceTrace(): boolean {
     return this.#isRunningTrace;
+  }
+
+  isCruxEnabled(): boolean {
+    return this.#options.performanceCrux;
   }
 
   getDialog(): Dialog | undefined {
@@ -445,13 +465,20 @@ export class McpContext implements Context {
     }
     const node = this.#textSnapshot?.idToNode.get(uid);
     if (!node) {
-      throw new Error('No such element found in the snapshot');
+      throw new Error('No such element found in the snapshot.');
     }
-    const handle = await node.elementHandle();
-    if (!handle) {
-      throw new Error('No such element found in the snapshot');
+    const message = `Element with uid ${uid} no longer exists on the page.`;
+    try {
+      const handle = await node.elementHandle();
+      if (!handle) {
+        throw new Error(message);
+      }
+      return handle;
+    } catch (error) {
+      throw new Error(message, {
+        cause: error,
+      });
     }
-    return handle;
   }
 
   /**
@@ -700,7 +727,10 @@ export class McpContext implements Context {
     return new WaitForHelper(page, cpuMultiplier, networkMultiplier);
   }
 
-  waitForEventsAfterAction(action: () => Promise<unknown>): Promise<void> {
+  waitForEventsAfterAction(
+    action: () => Promise<unknown>,
+    options?: {timeout?: number},
+  ): Promise<void> {
     const page = this.getSelectedPage();
     const cpuMultiplier = this.getCpuThrottlingRate();
     const networkMultiplier = getNetworkMultiplierFromString(
@@ -711,7 +741,7 @@ export class McpContext implements Context {
       cpuMultiplier,
       networkMultiplier,
     );
-    return waitForHelper.waitForEventsAfterAction(action);
+    return waitForHelper.waitForEventsAfterAction(action, options);
   }
 
   getNetworkRequestStableId(request: HTTPRequest): number {
@@ -753,11 +783,22 @@ export class McpContext implements Context {
     await this.#networkCollector.init(await this.browser.pages());
   }
 
-  async installExtension(path: string): Promise<string> {
-    return this.browser.installExtension(path);
+  async installExtension(extensionPath: string): Promise<string> {
+    const id = await this.browser.installExtension(extensionPath);
+    await this.#extensionRegistry.registerExtension(id, extensionPath);
+    return id;
   }
 
   async uninstallExtension(id: string): Promise<void> {
-    return this.browser.uninstallExtension(id);
+    await this.browser.uninstallExtension(id);
+    this.#extensionRegistry.remove(id);
+  }
+
+  listExtensions(): InstalledExtension[] {
+    return this.#extensionRegistry.list();
+  }
+
+  getExtension(id: string): InstalledExtension | undefined {
+    return this.#extensionRegistry.getById(id);
   }
 }

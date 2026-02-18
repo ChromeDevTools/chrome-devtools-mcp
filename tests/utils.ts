@@ -80,7 +80,11 @@ export async function withBrowser(
 
 export async function withMcpContext(
   cb: (response: McpResponse, context: McpContext) => Promise<void>,
-  options: {debug?: boolean; autoOpenDevTools?: boolean} = {},
+  options: {
+    debug?: boolean;
+    autoOpenDevTools?: boolean;
+    performanceCrux?: boolean;
+  } = {},
 ) {
   await withBrowser(async browser => {
     const response = new McpResponse();
@@ -92,6 +96,7 @@ export async function withMcpContext(
       logger('test'),
       {
         experimentalDevToolsDebugging: false,
+        performanceCrux: options.performanceCrux ?? true,
       },
       Locator,
     );
@@ -282,6 +287,7 @@ export function getMockPage(): Page {
     send: () => {
       // no-op
     },
+    target: () => ({_targetId: '<mock target ID>'}),
   };
   return {
     mainFrame() {

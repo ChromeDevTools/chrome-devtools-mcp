@@ -8,6 +8,7 @@ import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
 import type {Dialog} from 'puppeteer-core';
+import sinon from 'sinon';
 
 import {
   listPages,
@@ -40,6 +41,30 @@ describe('pages', () => {
           context,
         );
         assert.strictEqual(context.getPageById(2), context.getSelectedPage());
+        assert.ok(response.includePages);
+      });
+    });
+    it('create a page in the background', async () => {
+      await withMcpContext(async (response, context) => {
+        const originalPage = context.getPageById(1);
+        assert.strictEqual(originalPage, context.getSelectedPage());
+        // Ensure original page has focus
+        await originalPage.bringToFront();
+        assert.strictEqual(
+          await originalPage.evaluate(() => document.hasFocus()),
+          true,
+        );
+        await newPage.handler(
+          {params: {url: 'about:blank', background: true}},
+          response,
+          context,
+        );
+        // New page should be selected but original should retain focus
+        assert.strictEqual(context.getPageById(2), context.getSelectedPage());
+        assert.strictEqual(
+          await originalPage.evaluate(() => document.hasFocus()),
+          true,
+        );
         assert.ok(response.includePages);
       });
     });
@@ -134,6 +159,34 @@ describe('pages', () => {
             'The selected page has been closed. Call list_pages to see open pages.',
           );
         }
+      });
+    });
+
+    it('respects the timeout parameter', async () => {
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedPage();
+        const stub = sinon.stub(page, 'waitForNavigation').resolves(null);
+
+        try {
+          await navigatePage.handler(
+            {
+              params: {
+                url: 'about:blank',
+                timeout: 12345,
+              },
+            },
+            response,
+            context,
+          );
+        } finally {
+          stub.restore();
+        }
+
+        assert.strictEqual(
+          stub.firstCall.args[0]?.timeout,
+          12345,
+          'The timeout parameter should be passed to waitForNavigation',
+        );
       });
     });
     it('go back', async () => {
@@ -270,6 +323,28 @@ describe('pages', () => {
             .at(0)
             ?.startsWith('Unable to navigate back in the selected page:'),
         );
+        assert.ok(response.includePages);
+      });
+    });
+    it('navigates to correct page with initScript', async () => {
+      await withMcpContext(async (response, context) => {
+        await navigatePage.handler(
+          {
+            params: {
+              url: 'data:text/html,<div>Hello MCP</div>',
+              initScript: 'window.initScript = "completed"',
+            },
+          },
+          response,
+          context,
+        );
+        const page = context.getSelectedPage();
+
+        // wait for up to 1s for the global variable to set by the initScript to exist
+        await page.waitForFunction("window.initScript==='completed'", {
+          timeout: 1000,
+        });
+
         assert.ok(response.includePages);
       });
     });

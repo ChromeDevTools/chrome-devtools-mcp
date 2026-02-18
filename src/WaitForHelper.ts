@@ -125,12 +125,13 @@ export class WaitForHelper {
 
   async waitForEventsAfterAction(
     action: () => Promise<unknown>,
+    options?: {timeout?: number},
   ): Promise<void> {
     const navigationFinished = this.waitForNavigationStarted()
       .then(navigationStated => {
         if (navigationStated) {
           return this.#page.waitForNavigation({
-            timeout: this.#navigationTimeout,
+            timeout: options?.timeout ?? this.#navigationTimeout,
             signal: this.#abortController.signal,
           });
         }

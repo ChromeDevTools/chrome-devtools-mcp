@@ -13,6 +13,7 @@ import type {
   Viewport,
 } from '../third_party/index.js';
 import type {InsightName, TraceResult} from '../trace-processing/parse.js';
+import type {InstalledExtension} from '../utils/ExtensionRegistry.js';
 import type {PaginationOptions} from '../utils/types.js';
 
 import type {ToolCategory} from './categories.js';
@@ -92,6 +93,7 @@ export interface Response {
     insightSetId: string,
     insightName: InsightName,
   ): void;
+  setListExtensions(): void;
 }
 
 /**
@@ -100,6 +102,7 @@ export interface Response {
 export type Context = Readonly<{
   isRunningPerformanceTrace(): boolean;
   setIsRunningPerformanceTrace(x: boolean): void;
+  isCruxEnabled(): boolean;
   recordedTraces(): TraceResult[];
   storeTraceRecording(result: TraceResult): void;
   getSelectedPage(): Page;
@@ -108,7 +111,7 @@ export type Context = Readonly<{
   getPageById(pageId: number): Page;
   getPageId(page: Page): number | undefined;
   isPageSelected(page: Page): boolean;
-  newPage(): Promise<Page>;
+  newPage(background?: boolean): Promise<Page>;
   closePage(pageId: number): Promise<void>;
   selectPage(page: Page): void;
   getElementByUid(uid: string): Promise<ElementHandle<Element>>;
@@ -120,6 +123,7 @@ export type Context = Readonly<{
   getViewport(): Viewport | null;
   setUserAgent(userAgent: string | null): void;
   getUserAgent(): string | null;
+  setColorScheme(scheme: 'dark' | 'light' | null): void;
   saveTemporaryFile(
     data: Uint8Array<ArrayBufferLike>,
     mimeType: 'image/png' | 'image/jpeg' | 'image/webp',
@@ -128,7 +132,10 @@ export type Context = Readonly<{
     data: Uint8Array<ArrayBufferLike>,
     filename: string,
   ): Promise<{filename: string}>;
-  waitForEventsAfterAction(action: () => Promise<unknown>): Promise<void>;
+  waitForEventsAfterAction(
+    action: () => Promise<unknown>,
+    options?: {timeout?: number},
+  ): Promise<void>;
   waitForTextOnPage(text: string, timeout?: number): Promise<Element>;
   getDevToolsData(): Promise<DevToolsData>;
   /**
@@ -141,6 +148,8 @@ export type Context = Readonly<{
   resolveCdpElementId(cdpBackendNodeId: number): string | undefined;
   installExtension(path: string): Promise<string>;
   uninstallExtension(id: string): Promise<void>;
+  listExtensions(): InstalledExtension[];
+  getExtension(id: string): InstalledExtension | undefined;
 }>;
 
 export function defineTool<Schema extends zod.ZodRawShape>(

@@ -467,4 +467,109 @@ describe('emulation', () => {
       });
     });
   });
+
+  describe('colorScheme', () => {
+    it('emulates color scheme', async () => {
+      await withMcpContext(async (response, context) => {
+        await emulate.handler(
+          {
+            params: {
+              colorScheme: 'dark',
+            },
+          },
+          response,
+          context,
+        );
+
+        assert.strictEqual(context.getColorScheme(), 'dark');
+        const page = context.getSelectedPage();
+        const scheme = await page.evaluate(() =>
+          window.matchMedia('(prefers-color-scheme: dark)').matches
+            ? 'dark'
+            : 'light',
+        );
+        assert.strictEqual(scheme, 'dark');
+      });
+    });
+
+    it('updates color scheme', async () => {
+      await withMcpContext(async (response, context) => {
+        await emulate.handler(
+          {
+            params: {
+              colorScheme: 'dark',
+            },
+          },
+          response,
+          context,
+        );
+        assert.strictEqual(context.getColorScheme(), 'dark');
+
+        await emulate.handler(
+          {
+            params: {
+              colorScheme: 'light',
+            },
+          },
+          response,
+          context,
+        );
+        assert.strictEqual(context.getColorScheme(), 'light');
+        const page = context.getSelectedPage();
+        const scheme = await page.evaluate(() =>
+          window.matchMedia('(prefers-color-scheme: light)').matches
+            ? 'light'
+            : 'dark',
+        );
+        assert.strictEqual(scheme, 'light');
+      });
+    });
+
+    it('resets color scheme when set to auto', async () => {
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedPage();
+
+        const initial = await page.evaluate(
+          () => window.matchMedia('(prefers-color-scheme: dark)').matches,
+        );
+
+        await emulate.handler(
+          {
+            params: {
+              colorScheme: 'dark',
+            },
+          },
+          response,
+          context,
+        );
+        assert.strictEqual(context.getColorScheme(), 'dark');
+        // Check manually that it is dark
+
+        assert.strictEqual(
+          await page.evaluate(
+            () => window.matchMedia('(prefers-color-scheme: dark)').matches,
+          ),
+          true,
+        );
+
+        await emulate.handler(
+          {
+            params: {
+              colorScheme: 'auto',
+            },
+          },
+          response,
+          context,
+        );
+
+        assert.strictEqual(context.getColorScheme(), null);
+        assert.strictEqual(
+          await page.evaluate(
+            () => window.matchMedia('(prefers-color-scheme: dark)').matches,
+          ),
+          initial,
+        );
+      });
+    });
+  });
 });

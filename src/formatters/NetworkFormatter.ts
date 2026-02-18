@@ -50,45 +50,36 @@ export class NetworkFormatter {
   async #loadDetailedData(): Promise<void> {
     // Load Request Body
     if (this.#request.hasPostData()) {
-      const data = this.#request.postData();
-      if (data) {
-        if (this.#options.requestFilePath) {
-          if (!this.#options.saveFile) {
-            throw new Error('saveFile is not provided');
-          }
+      let data;
+      try {
+        data =
+          this.#request.postData() ?? (await this.#request.fetchPostData());
+      } catch {
+        // Ignore parsing errors
+      }
+      const requestBodyNotAvailableMessage =
+        '<Request body not available anymore>';
+      if (this.#options.requestFilePath) {
+        if (!this.#options.saveFile) {
+          throw new Error('saveFile is not provided');
+        }
+        if (data) {
           await this.#options.saveFile(
             Buffer.from(data),
             this.#options.requestFilePath,
           );
           this.#requestBodyFilePath = this.#options.requestFilePath;
         } else {
+          this.#requestBody = requestBodyNotAvailableMessage;
+        }
+      } else {
+        if (data) {
           this.#requestBody = getSizeLimitedString(
             data,
             BODY_CONTEXT_SIZE_LIMIT,
           );
-        }
-      } else {
-        try {
-          const fetchData = await this.#request.fetchPostData();
-          if (fetchData) {
-            if (this.#options.requestFilePath) {
-              if (!this.#options.saveFile) {
-                throw new Error('saveFile is not provided');
-              }
-              await this.#options.saveFile(
-                Buffer.from(fetchData),
-                this.#options.requestFilePath,
-              );
-              this.#requestBodyFilePath = this.#options.requestFilePath;
-            } else {
-              this.#requestBody = getSizeLimitedString(
-                fetchData,
-                BODY_CONTEXT_SIZE_LIMIT,
-              );
-            }
-          }
-        } catch {
-          this.#requestBody = '<not available anymore>';
+        } else {
+          this.#requestBody = requestBodyNotAvailableMessage;
         }
       }
     }
@@ -96,11 +87,23 @@ export class NetworkFormatter {
     // Load Response Body
     const response = this.#request.response();
     if (response) {
+      const responseBodyNotAvailableMessage =
+        '<Response body not available anymore>';
       if (this.#options.responseFilePath) {
-        this.#responseBodyFilePath = await this.#saveResponseBodyToFile(
-          response,
-          this.#options.responseFilePath,
-        );
+        try {
+          const buffer = await response.buffer();
+          if (!this.#options.saveFile) {
+            throw new Error('saveFile is not provided');
+          }
+          await this.#options.saveFile(buffer, this.#options.responseFilePath);
+          this.#responseBodyFilePath = this.#options.responseFilePath;
+        } catch {
+          // Flatten error handling for buffer() failure and save failure
+        }
+
+        if (!this.#responseBodyFilePath) {
+          this.#responseBody = responseBodyNotAvailableMessage;
+        }
       } else {
         this.#responseBody = await this.#getFormattedResponseBody(
           response,
@@ -258,22 +261,6 @@ export class NetworkFormatter {
       }
 
       return '<binary data>';
-    } catch {
-      return '<not available anymore>';
-    }
-  }
-
-  async #saveResponseBodyToFile(
-    httpResponse: HTTPResponse,
-    filePath: string,
-  ): Promise<string> {
-    try {
-      const responseBuffer = await httpResponse.buffer();
-      if (!this.#options.saveFile) {
-        throw new Error('saveFile is not provided');
-      }
-      await this.#options.saveFile(responseBuffer, filePath);
-      return filePath;
     } catch {
       return '<not available anymore>';
     }

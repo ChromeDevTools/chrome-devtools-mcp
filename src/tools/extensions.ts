@@ -48,3 +48,40 @@ export const uninstallExtension = defineTool({
     response.appendResponseLine(`Extension uninstalled. Id: ${id}`);
   },
 });
+
+export const listExtensions = defineTool({
+  name: 'list_extensions',
+  description:
+    'Lists all extensions via this server, including their name, ID, version, and enabled status.',
+  annotations: {
+    category: ToolCategory.EXTENSIONS,
+    readOnlyHint: true,
+    conditions: [EXTENSIONS_CONDITION],
+  },
+  schema: {},
+  handler: async (_request, response, _context) => {
+    response.setListExtensions();
+  },
+});
+
+export const reloadExtension = defineTool({
+  name: 'reload_extension',
+  description: 'Reloads an unpacked Chrome extension by its ID.',
+  annotations: {
+    category: ToolCategory.EXTENSIONS,
+    readOnlyHint: false,
+    conditions: [EXTENSIONS_CONDITION],
+  },
+  schema: {
+    id: zod.string().describe('ID of the extension to reload.'),
+  },
+  handler: async (request, response, context) => {
+    const {id} = request.params;
+    const extension = context.getExtension(id);
+    if (!extension) {
+      throw new Error(`Extension with ID ${id} not found.`);
+    }
+    await context.installExtension(extension.path);
+    response.appendResponseLine('Extension reloaded.');
+  },
+});

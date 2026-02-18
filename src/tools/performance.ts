@@ -6,9 +6,10 @@
 
 import zlib from 'node:zlib';
 
-import {zod} from '../third_party/index.js';
+import {logger} from '../logger.js';
+import {zod, DevTools} from '../third_party/index.js';
 import type {Page} from '../third_party/index.js';
-import type {InsightName} from '../trace-processing/parse.js';
+import type {InsightName, TraceResult} from '../trace-processing/parse.js';
 import {
   parseRawTraceBuffer,
   traceResultIsSuccess,
@@ -202,6 +203,9 @@ async function stopTracingAndAppendOutput(
     const result = await parseRawTraceBuffer(traceEventsBuffer);
     response.appendResponseLine('The performance trace has been stopped.');
     if (traceResultIsSuccess(result)) {
+      if (context.isCruxEnabled()) {
+        await populateCruxData(result);
+      }
       context.storeTraceRecording(result);
       response.attachTraceSummary(result);
     } else {
@@ -212,4 +216,44 @@ async function stopTracingAndAppendOutput(
   } finally {
     context.setIsRunningPerformanceTrace(false);
   }
+}
+
+/** We tell CrUXManager to fetch data so it's available when DevTools.PerformanceTraceFormatter is invoked */
+async function populateCruxData(result: TraceResult): Promise<void> {
+  logger('populateCruxData called');
+  const cruxManager = DevTools.CrUXManager.instance();
+  // go/jtfbx. Yes, we're aware this API key is public. ;)
+  cruxManager.setEndpointForTesting(
+    'https://chromeuxreport.googleapis.com/v1/records:queryRecord?key=AIzaSyBn5gimNjhiEyA_euicSKko6IlD3HdgUfk',
+  );
+  const cruxSetting =
+    DevTools.Common.Settings.Settings.instance().createSetting('field-data', {
+      enabled: true,
+    });
+  cruxSetting.set({enabled: true});
+
+  // Gather URLs to fetch CrUX data for
+  const urls = [...(result.parsedTrace.insights?.values() ?? [])].map(c =>
+    c.url.toString(),
+  );
+  urls.push(result.parsedTrace.data.Meta.mainFrameURL);
+  const urlSet = new Set(urls);
+
+  if (urlSet.size === 0) {
+    logger('No URLs found for CrUX data');
+    return;
+  }
+
+  logger(
+    `Fetching CrUX data for ${urlSet.size} URLs: ${Array.from(urlSet).join(', ')}`,
+  );
+  const cruxData = await Promise.all(
+    Array.from(urlSet).map(async url => {
+      const data = await cruxManager.getFieldDataForPage(url);
+      logger(`CrUX data for ${url}: ${data ? 'found' : 'not found'}`);
+      return data;
+    }),
+  );
+
+  result.parsedTrace.metadata.cruxFieldData = cruxData;
 }

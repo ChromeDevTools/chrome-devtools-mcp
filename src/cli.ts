@@ -204,12 +204,32 @@ export const cliOptions = {
     hidden: true,
     describe: 'Set to false to exclude tools related to extensions.',
   },
+  performanceCrux: {
+    type: 'boolean',
+    default: true,
+    describe:
+      'Set to false to disable sending URLs from performance traces to CrUX API to get field performance data.',
+  },
   usageStatistics: {
     type: 'boolean',
-    // Marked as `false` until the feature is ready to be enabled by default.
-    default: false,
+    default: true,
+    describe:
+      'Set to false to opt-out of usage statistics collection. Google collects usage data to improve the tool, handled under the Google Privacy Policy (https://policies.google.com/privacy). This is independent from Chrome browser metrics. Disabled if CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS or CI env variables are set.',
+  },
+  clearcutEndpoint: {
+    type: 'string',
     hidden: true,
-    describe: 'Set to false to opt-out of usage statistics collection.',
+    describe: 'Endpoint for Clearcut telemetry.',
+  },
+  clearcutForceFlushIntervalMs: {
+    type: 'number',
+    hidden: true,
+    describe: 'Force flush interval in milliseconds (for testing).',
+  },
+  clearcutIncludePidHeader: {
+    type: 'boolean',
+    hidden: true,
+    describe: 'Include watchdog PID in Clearcut request headers (for testing).',
   },
 } satisfies Record<string, YargsOptions>;
 
@@ -278,6 +298,14 @@ export function parseArguments(version: string, argv = process.argv) {
       [
         '$0 --auto-connect --channel=canary',
         'Connect to a canary Chrome instance (Chrome 144+) running instead of launching a new instance',
+      ],
+      [
+        '$0 --no-usage-statistics',
+        'Do not send usage statistics https://github.com/ChromeDevTools/chrome-devtools-mcp#usage-statistics.',
+      ],
+      [
+        '$0 --no-performance-crux',
+        'Disable CrUX (field data) integration in performance tools.',
       ],
     ]);
 

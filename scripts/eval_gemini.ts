@@ -16,6 +16,7 @@ import {TestServer} from '../build/tests/server.js';
 
 const ROOT_DIR = path.resolve(import.meta.dirname, '..');
 const SCENARIOS_DIR = path.join(import.meta.dirname, 'eval_scenarios');
+const SKILL_PATH = path.join(ROOT_DIR, 'skills', 'chrome-devtools', 'SKILL.md');
 
 // Define schema for our test scenarios
 export interface CapturedFunctionCall {
@@ -49,6 +50,7 @@ async function runSingleScenario(
   server: TestServer,
   modelId: string,
   debug: boolean,
+  includeSkill: boolean,
 ): Promise<void> {
   const debugLog = (...args: unknown[]) => {
     if (debug) {
@@ -66,6 +68,17 @@ async function runSingleScenario(
   try {
     const loadedScenario = await loadScenario(absolutePath);
     const scenario = {...loadedScenario};
+
+    // Prepend skill content if requested
+    if (includeSkill) {
+      if (!fs.existsSync(SKILL_PATH)) {
+        throw new Error(
+          `Skill file not found at ${SKILL_PATH}. Please ensure the skill file exists.`,
+        );
+      }
+      const skillContent = fs.readFileSync(SKILL_PATH, 'utf-8');
+      scenario.prompt = `${skillContent}\n\n---\n\n${scenario.prompt}`;
+    }
 
     // Append random queryid to avoid caching issues and test distinct runs
     const randomId = Math.floor(Math.random() * 1000000);
@@ -129,7 +142,9 @@ async function runSingleScenario(
         name: request.name,
         args: (request.arguments as Record<string, unknown>) || {},
       });
-      return originalCallTool(request, schema);
+      const response = await originalCallTool(request, schema);
+      debugLog(`Tool response: ${JSON.stringify(response)}`);
+      return response;
     };
 
     const ai = new GoogleGenAI({apiKey});
@@ -180,6 +195,10 @@ async function main() {
         type: 'boolean',
         default: false,
       },
+      'include-skill': {
+        type: 'boolean',
+        default: false,
+      },
     },
     allowPositionals: true,
   });
@@ -187,6 +206,7 @@ async function main() {
   const modelId = values.model;
   const debug = values.debug;
   const repeat = values.repeat;
+  const includeSkill = values['include-skill'];
 
   const scenarioFiles =
     positionals.length > 0
@@ -211,7 +231,14 @@ async function main() {
               `Running scenario: ${path.relative(ROOT_DIR, scenarioPath)} (Run ${i}/3)`,
             );
           }
-          await runSingleScenario(scenarioPath, apiKey, server, modelId, debug);
+          await runSingleScenario(
+            scenarioPath,
+            apiKey,
+            server,
+            modelId,
+            debug,
+            includeSkill,
+          );
           console.log(`✔ ${path.relative(ROOT_DIR, scenarioPath)} (Run ${i})`);
           successCount++;
         } catch (e) {

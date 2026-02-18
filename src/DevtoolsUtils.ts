@@ -227,6 +227,184 @@ const SKIP_ALL_PAUSES = {
   },
 };
 
+/**
+ * Constructed from Runtime.ExceptionDetails of an uncaught error.
+ *
+ * TODO: Also construct from a RemoteObject of subtype 'error'.
+ *
+ * Consists of the message, a fully resolved stack trace and a fully resolved 'cause' chain.
+ */
+export class SymbolizedError {
+  readonly message: string;
+  readonly stackTrace?: DevTools.StackTrace.StackTrace.StackTrace;
+  readonly cause?: SymbolizedError;
+
+  private constructor(
+    message: string,
+    stackTrace?: DevTools.StackTrace.StackTrace.StackTrace,
+    cause?: SymbolizedError,
+  ) {
+    this.message = message;
+    this.stackTrace = stackTrace;
+    this.cause = cause;
+  }
+
+  static async fromDetails(opts: {
+    devTools?: TargetUniverse;
+    details: Protocol.Runtime.ExceptionDetails;
+    targetId: string;
+    includeStackAndCause?: boolean;
+    resolvedStackTraceForTesting?: DevTools.StackTrace.StackTrace.StackTrace;
+    resolvedCauseForTesting?: SymbolizedError;
+  }): Promise<SymbolizedError> {
+    const message = SymbolizedError.#getMessage(opts.details);
+    if (!opts.includeStackAndCause || !opts.devTools) {
+      return new SymbolizedError(
+        message,
+        opts.resolvedStackTraceForTesting,
+        opts.resolvedCauseForTesting,
+      );
+    }
+
+    let stackTrace: DevTools.StackTrace.StackTrace.StackTrace | undefined;
+    if (opts.resolvedStackTraceForTesting) {
+      stackTrace = opts.resolvedStackTraceForTesting;
+    } else if (opts.details.stackTrace) {
+      try {
+        stackTrace = await createStackTrace(
+          opts.devTools,
+          opts.details.stackTrace,
+          opts.targetId,
+        );
+      } catch {
+        // ignore
+      }
+    }
+
+    // TODO: Turn opts.details.exception into a JSHandle and retrieve the 'cause' property.
+    //       If its an Error, recursively create a SymbolizedError.
+    let cause: SymbolizedError | undefined;
+    if (opts.resolvedCauseForTesting) {
+      cause = opts.resolvedCauseForTesting;
+    } else if (opts.details.exception) {
+      try {
+        const causeRemoteObj = await SymbolizedError.#lookupCause(
+          opts.devTools,
+          opts.details.exception,
+          opts.targetId,
+        );
+        if (causeRemoteObj) {
+          cause = await SymbolizedError.fromError({
+            devTools: opts.devTools,
+            error: causeRemoteObj,
+            targetId: opts.targetId,
+          });
+        }
+      } catch {
+        // Ignore
+      }
+    }
+    return new SymbolizedError(message, stackTrace, cause);
+  }
+
+  static async fromError(opts: {
+    devTools?: TargetUniverse;
+    error: Protocol.Runtime.RemoteObject;
+    targetId: string;
+  }): Promise<SymbolizedError> {
+    const details = await SymbolizedError.#getExceptionDetails(
+      opts.devTools,
+      opts.error,
+      opts.targetId,
+    );
+    if (details) {
+      return SymbolizedError.fromDetails({
+        details,
+        devTools: opts.devTools,
+        targetId: opts.targetId,
+        includeStackAndCause: true,
+      });
+    }
+
+    return new SymbolizedError(
+      SymbolizedError.#getMessageFromException(opts.error),
+    );
+  }
+
+  static #getMessage(details: Protocol.Runtime.ExceptionDetails): string {
+    // For Runtime.exceptionThrown with a present exception object, `details.text` will be "Uncaught" and
+    // we have to manually parse out the error text from the exception description.
+    // In the case of Runtime.getExceptionDetails, `details.text` has the Error.message.
+    if (details.text === 'Uncaught' && details.exception) {
+      return (
+        'Uncaught ' +
+        SymbolizedError.#getMessageFromException(details.exception)
+      );
+    }
+    return details.text;
+  }
+
+  static #getMessageFromException(
+    error: Protocol.Runtime.RemoteObject,
+  ): string {
+    const messageWithRest = error.description?.split('\n    at ', 2) ?? [];
+    return messageWithRest[0] ?? '';
+  }
+
+  static async #getExceptionDetails(
+    devTools: TargetUniverse | undefined,
+    error: Protocol.Runtime.RemoteObject,
+    targetId: string,
+  ): Promise<Protocol.Runtime.ExceptionDetails | null> {
+    if (!devTools || (error.type !== 'object' && error.subtype !== 'error')) {
+      return null;
+    }
+
+    const targetManager = devTools.universe.context.get(DevTools.TargetManager);
+    const target = targetId
+      ? targetManager.targetById(targetId) || devTools.target
+      : devTools.target;
+    const model = target.model(DevTools.RuntimeModel) as DevTools.RuntimeModel;
+    return (
+      (await model.getExceptionDetails(
+        error.objectId as DevTools.Protocol.Runtime.RemoteObjectId,
+      )) ?? null
+    );
+  }
+
+  static async #lookupCause(
+    devTools: TargetUniverse | undefined,
+    error: Protocol.Runtime.RemoteObject,
+    targetId: string,
+  ): Promise<Protocol.Runtime.RemoteObject | null> {
+    if (!devTools || (error.type !== 'object' && error.subtype !== 'error')) {
+      return null;
+    }
+
+    const targetManager = devTools.universe.context.get(DevTools.TargetManager);
+    const target = targetId
+      ? targetManager.targetById(targetId) || devTools.target
+      : devTools.target;
+
+    const properties = await target.runtimeAgent().invoke_getProperties({
+      objectId: error.objectId as DevTools.Protocol.Runtime.RemoteObjectId,
+    });
+    if (properties.getError()) {
+      return null;
+    }
+
+    return properties.result.find(prop => prop.name === 'cause')?.value ?? null;
+  }
+
+  static createForTesting(
+    message: string,
+    stackTrace?: DevTools.StackTrace.StackTrace.StackTrace,
+    cause?: SymbolizedError,
+  ) {
+    return new SymbolizedError(message, stackTrace, cause);
+  }
+}
+
 export async function createStackTraceForConsoleMessage(
   devTools: TargetUniverse,
   consoleMessage: ConsoleMessage,
@@ -236,14 +414,20 @@ export async function createStackTraceForConsoleMessage(
     _targetId(): string | undefined;
   };
   const rawStackTrace = message._rawStackTrace();
-  if (!rawStackTrace) {
-    return undefined;
+  if (rawStackTrace) {
+    return createStackTrace(devTools, rawStackTrace, message._targetId());
   }
+  return undefined;
+}
 
+export async function createStackTrace(
+  devTools: TargetUniverse,
+  rawStackTrace: Protocol.Runtime.StackTrace,
+  targetId: string | undefined,
+): Promise<DevTools.StackTrace.StackTrace.StackTrace> {
   const targetManager = devTools.universe.context.get(DevTools.TargetManager);
-  const messageTargetId = message._targetId();
-  const target = messageTargetId
-    ? targetManager.targetById(messageTargetId) || devTools.target
+  const target = targetId
+    ? targetManager.targetById(targetId) || devTools.target
     : devTools.target;
   const model = target.model(DevTools.DebuggerModel) as DevTools.DebuggerModel;
 

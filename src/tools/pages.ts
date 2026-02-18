@@ -87,16 +87,25 @@ export const newPage = defineTool({
   },
   schema: {
     url: zod.string().describe('URL to load in a new page.'),
+    background: zod
+      .boolean()
+      .optional()
+      .describe(
+        'Whether to open the page in the background without bringing it to the front. Default is false (foreground).',
+      ),
     ...timeoutSchema,
   },
   handler: async (request, response, context) => {
-    const page = await context.newPage();
+    const page = await context.newPage(request.params.background);
 
-    await context.waitForEventsAfterAction(async () => {
-      await page.goto(request.params.url, {
-        timeout: request.params.timeout,
-      });
-    });
+    await context.waitForEventsAfterAction(
+      async () => {
+        await page.goto(request.params.url, {
+          timeout: request.params.timeout,
+        });
+      },
+      {timeout: request.params.timeout},
+    );
 
     response.setIncludePages(true);
   },
@@ -126,6 +135,12 @@ export const navigatePage = defineTool({
       .optional()
       .describe(
         'Whether to auto accept or beforeunload dialogs triggered by this navigation. Default is accept.',
+      ),
+    initScript: zod
+      .string()
+      .optional()
+      .describe(
+        'A JavaScript script to be executed on each new document before any other scripts for the next navigation.',
       ),
     ...timeoutSchema,
   },
@@ -157,67 +172,88 @@ export const navigatePage = defineTool({
         context.clearDialog();
       }
     };
+
+    let initScriptId: string | undefined;
+    if (request.params.initScript) {
+      const {identifier} = await page.evaluateOnNewDocument(
+        request.params.initScript,
+      );
+      initScriptId = identifier;
+    }
+
     page.on('dialog', dialogHandler);
 
     try {
-      await context.waitForEventsAfterAction(async () => {
-        switch (request.params.type) {
-          case 'url':
-            if (!request.params.url) {
-              throw new Error('A URL is required for navigation of type=url.');
-            }
-            try {
-              await page.goto(request.params.url, options);
-              response.appendResponseLine(
-                `Successfully navigated to ${request.params.url}.`,
-              );
-            } catch (error) {
-              response.appendResponseLine(
-                `Unable to navigate in the  selected page: ${error.message}.`,
-              );
-            }
-            break;
-          case 'back':
-            try {
-              await page.goBack(options);
-              response.appendResponseLine(
-                `Successfully navigated back to ${page.url()}.`,
-              );
-            } catch (error) {
-              response.appendResponseLine(
-                `Unable to navigate back in the selected page: ${error.message}.`,
-              );
-            }
-            break;
-          case 'forward':
-            try {
-              await page.goForward(options);
-              response.appendResponseLine(
-                `Successfully navigated forward to ${page.url()}.`,
-              );
-            } catch (error) {
-              response.appendResponseLine(
-                `Unable to navigate forward in the selected page: ${error.message}.`,
-              );
-            }
-            break;
-          case 'reload':
-            try {
-              await page.reload({
-                ...options,
-                ignoreCache: request.params.ignoreCache,
-              });
-              response.appendResponseLine(`Successfully reloaded the page.`);
-            } catch (error) {
-              response.appendResponseLine(
-                `Unable to reload the selected page: ${error.message}.`,
-              );
-            }
-            break;
-        }
-      });
+      await context.waitForEventsAfterAction(
+        async () => {
+          switch (request.params.type) {
+            case 'url':
+              if (!request.params.url) {
+                throw new Error(
+                  'A URL is required for navigation of type=url.',
+                );
+              }
+              try {
+                await page.goto(request.params.url, options);
+                response.appendResponseLine(
+                  `Successfully navigated to ${request.params.url}.`,
+                );
+              } catch (error) {
+                response.appendResponseLine(
+                  `Unable to navigate in the  selected page: ${error.message}.`,
+                );
+              }
+              break;
+            case 'back':
+              try {
+                await page.goBack(options);
+                response.appendResponseLine(
+                  `Successfully navigated back to ${page.url()}.`,
+                );
+              } catch (error) {
+                response.appendResponseLine(
+                  `Unable to navigate back in the selected page: ${error.message}.`,
+                );
+              }
+              break;
+            case 'forward':
+              try {
+                await page.goForward(options);
+                response.appendResponseLine(
+                  `Successfully navigated forward to ${page.url()}.`,
+                );
+              } catch (error) {
+                response.appendResponseLine(
+                  `Unable to navigate forward in the selected page: ${error.message}.`,
+                );
+              }
+              break;
+            case 'reload':
+              try {
+                await page.reload({
+                  ...options,
+                  ignoreCache: request.params.ignoreCache,
+                });
+                response.appendResponseLine(`Successfully reloaded the page.`);
+              } catch (error) {
+                response.appendResponseLine(
+                  `Unable to reload the selected page: ${error.message}.`,
+                );
+              }
+              break;
+          }
+        },
+        {timeout: request.params.timeout},
+      );
     } finally {
       page.off('dialog', dialogHandler);
+      if (initScriptId) {
+        await page
+          .removeScriptToEvaluateOnNewDocument(initScriptId)
+          .catch(error => {
+            logger(`Failed to remove init script`, error);
+          });
+      }
     }
 
     response.setIncludePages(true);

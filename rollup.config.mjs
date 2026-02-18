@@ -16,7 +16,7 @@
  */
 
 /**
- * @fileoverview take from {@link https://github.com/GoogleChromeLabs/chromium-bidi/blob/main/rollup.config.mjs | chromium-bidi}
+ * @fileoverview taken from {@link https://github.com/GoogleChromeLabs/chromium-bidi/blob/main/rollup.config.mjs | chromium-bidi}
  * and modified to specific requirement.
  */
 
@@ -41,21 +41,99 @@ const allowedLicenses = [
   '0BSD',
 ];
 
+const thirdPartyDir = './build/src/third_party';
+
+const {devDependencies = {}} = JSON.parse(
+  fs.readFileSync(path.join(process.cwd(), 'package.json'), 'utf-8'),
+);
+
+// special case for puppeteer, from which we only bundle puppeteer-core
+devDependencies['puppeteer-core'] = devDependencies['puppeteer'];
+
+const aggregatedStats = {
+  bundlesProcessed: 0,
+  totalBundles: 0,
+  bundledPackages: new Set(),
+};
+
+const projectNodeModulesPath =
+  path.join(process.cwd(), 'node_modules') + path.sep;
+
+function getPackageName(modulePath) {
+  // Handle rollup's virtual module paths (paths starting with 0x00)
+  const absolutePathStart = modulePath.indexOf(projectNodeModulesPath);
+  if (absolutePathStart < 0) {
+    return null;
+  }
+
+  const relativePath = modulePath.slice(
+    projectNodeModulesPath.length + absolutePathStart,
+  );
+  const segments = relativePath.split(path.sep);
+
+  // handle scoped packages
+  if (segments[0].startsWith('@') && segments[1]) {
+    return `${segments[0]}/${segments[1]}`;
+  }
+  return segments[0];
+}
+
 /**
- * @param {string} wrapperIndexPath
+ * @returns {import('rollup').Plugin}
+ */
+function listBundledDeps() {
+  aggregatedStats.totalBundles++;
+  return {
+    name: 'gather-bundled-dependencies',
+    generateBundle(options, bundle) {
+      for (const chunk of Object.values(bundle)) {
+        if (chunk.type === 'chunk' && chunk.modules) {
+          // chunk.modules is an object where keys are the absolute file paths
+          Object.keys(chunk.modules).forEach(modulePath => {
+            const packageName = getPackageName(modulePath);
+            if (packageName) {
+              aggregatedStats.bundledPackages.add(packageName);
+            }
+          });
+        }
+      }
+      aggregatedStats.bundlesProcessed++;
+
+      // Only write the file when the last bundle is finished
+      if (aggregatedStats.bundlesProcessed === aggregatedStats.totalBundles) {
+        const outputPath = path.join(thirdPartyDir, 'bundled-packages.json');
+
+        const bundledDevDeps = Object.fromEntries(
+          Object.entries(devDependencies).filter(
+            ([name]) =>
+              aggregatedStats.bundledPackages.has(name) ||
+              name === 'chrome-devtools-frontend',
+          ),
+        );
+
+        fs.writeFileSync(outputPath, JSON.stringify(bundledDevDeps, null, 2));
+      }
+    },
+  };
+}
+
+const seenDependencies = new Map();
+
+/**
+ * @param {string} wrapperIndexName
  * @param {import('rollup').OutputOptions} [extraOutputOptions={}]
  * @param {import('rollup').ExternalOption} [external=[]]
  * @returns {import('rollup').RollupOptions}
  */
 const bundleDependency = (
-  wrapperIndexPath,
+  wrapperIndexName,
   extraOutputOptions = {},
   external = [],
 ) => ({
-  input: wrapperIndexPath,
+  input: path.join(thirdPartyDir, wrapperIndexName),
   output: {
     ...extraOutputOptions,
-    file: wrapperIndexPath,
+    file: path.join(thirdPartyDir, wrapperIndexName),
     sourcemap: !isProduction,
     format: 'esm',
   },
@@ -76,12 +154,16 @@ const bundleDependency = (
           failOnViolation: true,
         },
         output: {
-          file: path.join(
-            path.dirname(wrapperIndexPath),
-            'THIRD_PARTY_NOTICES',
-          ),
+          file: path.join(thirdPartyDir, 'THIRD_PARTY_NOTICES'),
           template(dependencies) {
-            const stringifiedDependencies = dependencies.map(dependency => {
+            for (const dependency of dependencies) {
+              const key = `${dependency.name}:${dependency.version}`;
+              seenDependencies.set(key, dependency);
+            }
+
+            const stringifiedDependencies = Array.from(
+              seenDependencies.values(),
+            ).map(dependency => {
               let arr = [];
               arr.push(`Name: ${dependency.name ?? 'N/A'}`);
               let url = dependency.homepage ?? dependency.repository;
@@ -155,6 +237,7 @@ const bundleDependency = (
         },
       },
     }),
+    listBundledDeps(),
     commonjs(),
     json(),
     nodeResolve(),
@@ -164,7 +247,7 @@ const bundleDependency = (
 
 export default [
   bundleDependency(
-    './build/src/third_party/index.js',
+    'index.js',
     {
       inlineDynamicImports: true,
     },
@@ -186,7 +269,7 @@ export default [
     },
   ),
   bundleDependency(
-    './build/src/third_party/devtools-formatter-worker.js',
+    'devtools-formatter-worker.js',
     {
       inlineDynamicImports: true,
     },

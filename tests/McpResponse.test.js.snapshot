@@ -9,6 +9,38 @@ Showing 1-1 of 1 (Page 1 of 1).
 reqid=1 GET http://example.com [pending]
 `;
 
+exports[`McpResponse > add network request when attached 2`] = `
+{
+  "networkRequest": {
+    "requestId": 1,
+    "method": "GET",
+    "url": "http://example.com",
+    "status": "[pending]",
+    "requestHeaders": {
+      "content-size": "10"
+    }
+  },
+  "pagination": {
+    "currentPage": 0,
+    "totalPages": 1,
+    "hasNextPage": false,
+    "hasPreviousPage": false,
+    "startIndex": 0,
+    "endIndex": 1,
+    "invalidPage": false
+  },
+  "networkRequests": [
+    {
+      "requestId": 1,
+      "method": "GET",
+      "url": "http://example.com",
+      "status": "[pending]",
+      "selectedInDevToolsUI": false
+    }
+  ]
+}
+`;
+
 exports[`McpResponse > add network request when attached with POST data 1`] = `
 # test response
 ## Request http://example.com
@@ -26,6 +58,43 @@ Showing 1-1 of 1 (Page 1 of 1).
 reqid=1 POST http://example.com [success - 200]
 `;
 
+exports[`McpResponse > add network request when attached with POST data 2`] = `
+{
+  "networkRequest": {
+    "requestId": 1,
+    "method": "POST",
+    "url": "http://example.com",
+    "status": "[success - 200]",
+    "requestHeaders": {
+      "content-size": "10"
+    },
+    "requestBody": "{\\"request\\":\\"body\\"}",
+    "responseHeaders": {
+      "Content-Type": "application/json"
+    },
+    "responseBody": "{\\"response\\":\\"body\\"}"
+  },
+  "pagination": {
+    "currentPage": 0,
+    "totalPages": 1,
+    "hasNextPage": false,
+    "hasPreviousPage": false,
+    "startIndex": 0,
+    "endIndex": 1,
+    "invalidPage": false
+  },
+  "networkRequests": [
+    {
+      "requestId": 1,
+      "method": "POST",
+      "url": "http://example.com",
+      "status": "[success - 200]",
+      "selectedInDevToolsUI": false
+    }
+  ]
+}
+`;
+
 exports[`McpResponse > add network requests when setting is true 1`] = `
 # test response
 ## Network requests
@@ -34,10 +103,44 @@ reqid=1 GET http://example.com [pending]
 reqid=2 GET http://example.com [pending]
 `;
 
+exports[`McpResponse > add network requests when setting is true 2`] = `
+{
+  "pagination": {
+    "currentPage": 0,
+    "totalPages": 1,
+    "hasNextPage": false,
+    "hasPreviousPage": false,
+    "startIndex": 0,
+    "endIndex": 2,
+    "invalidPage": false
+  },
+  "networkRequests": [
+    {
+      "requestId": 1,
+      "method": "GET",
+      "url": "http://example.com",
+      "status": "[pending]",
+      "selectedInDevToolsUI": false
+    },
+    {
+      "requestId": 2,
+      "method": "GET",
+      "url": "http://example.com",
+      "status": "[pending]",
+      "selectedInDevToolsUI": false
+    }
+  ]
+}
+`;
+
 exports[`McpResponse > adds a message when no console messages exist 1`] = `
 # test response
 ## Console messages
 <no console messages found>
+`;
+
+exports[`McpResponse > adds a message when no console messages exist 2`] = `
+{}
 `;
 
 exports[`McpResponse > adds a prompt dialog 1`] = `
@@ -47,11 +150,43 @@ prompt: message (default value: "default").
 Call handle_dialog to handle it before continuing.
 `;
 
+exports[`McpResponse > adds a prompt dialog 2`] = `
+{
+  "dialog": {
+    "type": "prompt",
+    "message": "message",
+    "defaultValue": "default"
+  }
+}
+`;
+
 exports[`McpResponse > adds an alert dialog 1`] = `
 # test response
 # Open dialog
 alert: message.
 Call handle_dialog to handle it before continuing.
+`;
+
+exports[`McpResponse > adds an alert dialog 2`] = `
+{
+  "dialog": {
+    "type": "alert",
+    "message": "message",
+    "defaultValue": ""
+  }
+}
+`;
+
+exports[`McpResponse > adds color scheme emulation setting when it is set 1`] = `
+# test response
+## Color Scheme emulation
+Emulating: dark
+`;
+
+exports[`McpResponse > adds color scheme emulation setting when it is set 2`] = `
+{
+  "colorScheme": "dark"
+}
 `;
 
 exports[`McpResponse > adds console messages when the setting is true 1`] = `
@@ -61,10 +196,42 @@ Showing 1-1 of 1 (Page 1 of 1).
 msgid=1 [log] Hello from the test (1 args)
 `;
 
+exports[`McpResponse > adds console messages when the setting is true 2`] = `
+{
+  "pagination": {
+    "currentPage": 0,
+    "totalPages": 1,
+    "hasNextPage": false,
+    "hasPreviousPage": false,
+    "startIndex": 0,
+    "endIndex": 1,
+    "invalidPage": false
+  },
+  "consoleMessages": [
+    {
+      "type": "log",
+      "text": "Hello from the test",
+      "argsCount": 1,
+      "id": 1
+    }
+  ]
+}
+`;
+
 exports[`McpResponse > adds cpu throttling setting when it is over 1 1`] = `
 # test response
 ## CPU emulation
 Emulating: 4x slowdown
+`;
+
+exports[`McpResponse > adds cpu throttling setting when it is over 1 2`] = `
+{
+  "cpuThrottlingRate": 4
+}
+`;
+
+exports[`McpResponse > adds image when image is attached 1`] = `
+{}
 `;
 
 exports[`McpResponse > adds throttling setting when it is not null 1`] = `
@@ -74,10 +241,23 @@ Emulating: Slow 3G
 Default navigation timeout set to 100000 ms
 `;
 
+exports[`McpResponse > adds throttling setting when it is not null 2`] = `
+{
+  "networkConditions": "Slow 3G",
+  "navigationTimeout": 100000
+}
+`;
+
 exports[`McpResponse > adds userAgent emulation setting when it is set 1`] = `
 # test response
 ## UserAgent emulation
 Emulating userAgent: MyUA
+`;
+
+exports[`McpResponse > adds userAgent emulation setting when it is set 2`] = `
+{
+  "userAgent": "MyUA"
+}
 `;
 
 exports[`McpResponse > adds viewport emulation setting when it is set 1`] = `
@@ -86,16 +266,64 @@ exports[`McpResponse > adds viewport emulation setting when it is set 1`] = `
 Emulating viewport: {"width":400,"height":400,"deviceScaleFactor":1}
 `;
 
+exports[`McpResponse > adds viewport emulation setting when it is set 2`] = `
+{
+  "viewport": {
+    "width": 400,
+    "height": 400,
+    "deviceScaleFactor": 1
+  }
+}
+`;
+
 exports[`McpResponse > allows response text lines to be added 1`] = `
 # test response
 Testing 1
 Testing 2
 `;
 
+exports[`McpResponse > allows response text lines to be added 2`] = `
+{
+  "message": "Testing 1\\nTesting 2"
+}
+`;
+
+exports[`McpResponse > does not include anything in response if snapshot is null 1`] = `
+{}
+`;
+
+exports[`McpResponse > does not include cpu throttling setting when it is 1 1`] = `
+{}
+`;
+
+exports[`McpResponse > does not include network requests when setting is false 1`] = `
+{}
+`;
+
+exports[`McpResponse > does not include throttling setting when it is null 1`] = `
+{}
+`;
+
+exports[`McpResponse > doesn't list the issue message if mapping returns null 1`] = `
+{}
+`;
+
 exports[`McpResponse > list pages 1`] = `
 # test response
 ## Pages
 1: about:blank [selected]
+`;
+
+exports[`McpResponse > list pages 2`] = `
+{
+  "pages": [
+    {
+      "id": 1,
+      "url": "about:blank",
+      "selected": true
+    }
+  ]
+}
 `;
 
 exports[`McpResponse > returns correctly formatted snapshot for a simple tree 1`] = `
@@ -107,6 +335,31 @@ uid=1_0 RootWebArea "My test page" url="about:blank"
 
 `;
 
+exports[`McpResponse > returns correctly formatted snapshot for a simple tree 2`] = `
+{
+  "snapshot": {
+    "id": "1_0",
+    "role": "RootWebArea",
+    "name": "My test page",
+    "url": "about:blank",
+    "children": [
+      {
+        "id": "1_1",
+        "role": "button",
+        "name": "Click me",
+        "focusable": true,
+        "focused": true
+      },
+      {
+        "id": "1_2",
+        "role": "textbox",
+        "value": "Input"
+      }
+    ]
+  }
+}
+`;
+
 exports[`McpResponse > returns values for textboxes 1`] = `
 # test response
 ## Latest page snapshot
@@ -114,6 +367,32 @@ uid=1_0 RootWebArea "My test page" url="about:blank"
   uid=1_1 StaticText "username"
   uid=1_2 textbox "username" focusable focused value="mcp"
 
+`;
+
+exports[`McpResponse > returns values for textboxes 2`] = `
+{
+  "snapshot": {
+    "id": "1_0",
+    "role": "RootWebArea",
+    "name": "My test page",
+    "url": "about:blank",
+    "children": [
+      {
+        "id": "1_1",
+        "role": "StaticText",
+        "name": "username"
+      },
+      {
+        "id": "1_2",
+        "role": "textbox",
+        "name": "username",
+        "focusable": true,
+        "focused": true,
+        "value": "mcp"
+      }
+    ]
+  }
+}
 `;
 
 exports[`McpResponse > returns verbose snapshot and structured content 1`] = `
@@ -192,9 +471,266 @@ uid=1_0 RootWebArea "My test page" url="about:blank"
 
 `;
 
+exports[`McpResponse network pagination > handles invalid page number by showing first page 1`] = `
+{
+  "pagination": {
+    "currentPage": 0,
+    "totalPages": 3,
+    "hasNextPage": true,
+    "hasPreviousPage": false,
+    "startIndex": 0,
+    "endIndex": 2,
+    "invalidPage": true
+  },
+  "networkRequests": [
+    {
+      "requestId": 1,
+      "method": "GET",
+      "url": "http://example.com",
+      "status": "[pending]",
+      "selectedInDevToolsUI": false
+    },
+    {
+      "requestId": 1,
+      "method": "GET",
+      "url": "http://example.com",
+      "status": "[pending]",
+      "selectedInDevToolsUI": false
+    }
+  ]
+}
+`;
+
+exports[`McpResponse network pagination > returns all requests when pagination is not provided 1`] = `
+{
+  "pagination": {
+    "currentPage": 0,
+    "totalPages": 1,
+    "hasNextPage": false,
+    "hasPreviousPage": false,
+    "startIndex": 0,
+    "endIndex": 5,
+    "invalidPage": false
+  },
+  "networkRequests": [
+    {
+      "requestId": 1,
+      "method": "GET",
+      "url": "http://example.com",
+      "status": "[pending]",
+      "selectedInDevToolsUI": false
+    },
+    {
+      "requestId": 1,
+      "method": "GET",
+      "url": "http://example.com",
+      "status": "[pending]",
+      "selectedInDevToolsUI": false
+    },
+    {
+      "requestId": 1,
+      "method": "GET",
+      "url": "http://example.com",
+      "status": "[pending]",
+      "selectedInDevToolsUI": false
+    },
+    {
+      "requestId": 1,
+      "method": "GET",
+      "url": "http://example.com",
+      "status": "[pending]",
+      "selectedInDevToolsUI": false
+    },
+    {
+      "requestId": 1,
+      "method": "GET",
+      "url": "http://example.com",
+      "status": "[pending]",
+      "selectedInDevToolsUI": false
+    }
+  ]
+}
+`;
+
+exports[`McpResponse network pagination > returns first page by default 1`] = `
+{
+  "pagination": {
+    "currentPage": 0,
+    "totalPages": 3,
+    "hasNextPage": true,
+    "hasPreviousPage": false,
+    "startIndex": 0,
+    "endIndex": 10,
+    "invalidPage": false
+  },
+  "networkRequests": [
+    {
+      "requestId": 1,
+      "method": "GET-0",
+      "url": "http://example.com",
+      "status": "[pending]",
+      "selectedInDevToolsUI": false
+    },
+    {
+      "requestId": 1,
+      "method": "GET-1",
+      "url": "http://example.com",
+      "status": "[pending]",
+      "selectedInDevToolsUI": false
+    },
+    {
+      "requestId": 1,
+      "method": "GET-2",
+      "url": "http://example.com",
+      "status": "[pending]",
+      "selectedInDevToolsUI": false
+    },
+    {
+      "requestId": 1,
+      "method": "GET-3",
+      "url": "http://example.com",
+      "status": "[pending]",
+      "selectedInDevToolsUI": false
+    },
+    {
+      "requestId": 1,
+      "method": "GET-4",
+      "url": "http://example.com",
+      "status": "[pending]",
+      "selectedInDevToolsUI": false
+    },
+    {
+      "requestId": 1,
+      "method": "GET-5",
+      "url": "http://example.com",
+      "status": "[pending]",
+      "selectedInDevToolsUI": false
+    },
+    {
+      "requestId": 1,
+      "method": "GET-6",
+      "url": "http://example.com",
+      "status": "[pending]",
+      "selectedInDevToolsUI": false
+    },
+    {
+      "requestId": 1,
+      "method": "GET-7",
+      "url": "http://example.com",
+      "status": "[pending]",
+      "selectedInDevToolsUI": false
+    },
+    {
+      "requestId": 1,
+      "method": "GET-8",
+      "url": "http://example.com",
+      "status": "[pending]",
+      "selectedInDevToolsUI": false
+    },
+    {
+      "requestId": 1,
+      "method": "GET-9",
+      "url": "http://example.com",
+      "status": "[pending]",
+      "selectedInDevToolsUI": false
+    }
+  ]
+}
+`;
+
+exports[`McpResponse network pagination > returns subsequent page when pageIdx provided 1`] = `
+{
+  "pagination": {
+    "currentPage": 1,
+    "totalPages": 3,
+    "hasNextPage": true,
+    "hasPreviousPage": true,
+    "startIndex": 10,
+    "endIndex": 20,
+    "invalidPage": false
+  },
+  "networkRequests": [
+    {
+      "requestId": 1,
+      "method": "GET-10",
+      "url": "http://example.com",
+      "status": "[pending]",
+      "selectedInDevToolsUI": false
+    },
+    {
+      "requestId": 1,
+      "method": "GET-11",
+      "url": "http://example.com",
+      "status": "[pending]",
+      "selectedInDevToolsUI": false
+    },
+    {
+      "requestId": 1,
+      "method": "GET-12",
+      "url": "http://example.com",
+      "status": "[pending]",
+      "selectedInDevToolsUI": false
+    },
+    {
+      "requestId": 1,
+      "method": "GET-13",
+      "url": "http://example.com",
+      "status": "[pending]",
+      "selectedInDevToolsUI": false
+    },
+    {
+      "requestId": 1,
+      "method": "GET-14",
+      "url": "http://example.com",
+      "status": "[pending]",
+      "selectedInDevToolsUI": false
+    },
+    {
+      "requestId": 1,
+      "method": "GET-15",
+      "url": "http://example.com",
+      "status": "[pending]",
+      "selectedInDevToolsUI": false
+    },
+    {
+      "requestId": 1,
+      "method": "GET-16",
+      "url": "http://example.com",
+      "status": "[pending]",
+      "selectedInDevToolsUI": false
+    },
+    {
+      "requestId": 1,
+      "method": "GET-17",
+      "url": "http://example.com",
+      "status": "[pending]",
+      "selectedInDevToolsUI": false
+    },
+    {
+      "requestId": 1,
+      "method": "GET-18",
+      "url": "http://example.com",
+      "status": "[pending]",
+      "selectedInDevToolsUI": false
+    },
+    {
+      "requestId": 1,
+      "method": "GET-19",
+      "url": "http://example.com",
+      "status": "[pending]",
+      "selectedInDevToolsUI": false
+    }
+  ]
+}
+`;
+
 exports[`McpResponse network pagination > trace insights > includes error if insight not found 1`] = `
 # test response
 No Performance Insights for the given insight set id. Only use ids given in the "Available insight sets" list.
+`;
+
+exports[`McpResponse network pagination > trace insights > includes error if insight not found 2`] = `
+{}
 `;
 
 exports[`McpResponse network pagination > trace insights > includes the trace insight output 1`] = `
@@ -241,6 +777,10 @@ We can break this time down into the 4 phases that combine to make the LCP time:
 - https://developer.chrome.com/docs/performance/insights/lcp-breakdown
 - https://web.dev/articles/lcp
 - https://web.dev/articles/optimize-lcp
+`;
+
+exports[`McpResponse network pagination > trace insights > includes the trace insight output 2`] = `
+{}
 `;
 
 exports[`McpResponse network pagination > trace summaries > includes the trace summary text and structured data 1`] = `
@@ -446,11 +986,64 @@ reqid=1 GET http://example.com [pending]
 reqid=1 GET http://example.com [pending]
 `;
 
+exports[`McpResponse network request filtering > filters network requests by resource type 2`] = `
+{
+  "pagination": {
+    "currentPage": 0,
+    "totalPages": 1,
+    "hasNextPage": false,
+    "hasPreviousPage": false,
+    "startIndex": 0,
+    "endIndex": 2,
+    "invalidPage": false
+  },
+  "networkRequests": [
+    {
+      "requestId": 1,
+      "method": "GET",
+      "url": "http://example.com",
+      "status": "[pending]",
+      "selectedInDevToolsUI": false
+    },
+    {
+      "requestId": 1,
+      "method": "GET",
+      "url": "http://example.com",
+      "status": "[pending]",
+      "selectedInDevToolsUI": false
+    }
+  ]
+}
+`;
+
 exports[`McpResponse network request filtering > filters network requests by single resource type 1`] = `
 # test response
 ## Network requests
 Showing 1-1 of 1 (Page 1 of 1).
 reqid=1 GET http://example.com [pending]
+`;
+
+exports[`McpResponse network request filtering > filters network requests by single resource type 2`] = `
+{
+  "pagination": {
+    "currentPage": 0,
+    "totalPages": 1,
+    "hasNextPage": false,
+    "hasPreviousPage": false,
+    "startIndex": 0,
+    "endIndex": 1,
+    "invalidPage": false
+  },
+  "networkRequests": [
+    {
+      "requestId": 1,
+      "method": "GET",
+      "url": "http://example.com",
+      "status": "[pending]",
+      "selectedInDevToolsUI": false
+    }
+  ]
+}
 `;
 
 exports[`McpResponse network request filtering > shows all requests when empty resourceTypes array is provided 1`] = `
@@ -464,6 +1057,57 @@ reqid=1 GET http://example.com [pending]
 reqid=1 GET http://example.com [pending]
 `;
 
+exports[`McpResponse network request filtering > shows all requests when empty resourceTypes array is provided 2`] = `
+{
+  "pagination": {
+    "currentPage": 0,
+    "totalPages": 1,
+    "hasNextPage": false,
+    "hasPreviousPage": false,
+    "startIndex": 0,
+    "endIndex": 5,
+    "invalidPage": false
+  },
+  "networkRequests": [
+    {
+      "requestId": 1,
+      "method": "GET",
+      "url": "http://example.com",
+      "status": "[pending]",
+      "selectedInDevToolsUI": false
+    },
+    {
+      "requestId": 1,
+      "method": "GET",
+      "url": "http://example.com",
+      "status": "[pending]",
+      "selectedInDevToolsUI": false
+    },
+    {
+      "requestId": 1,
+      "method": "GET",
+      "url": "http://example.com",
+      "status": "[pending]",
+      "selectedInDevToolsUI": false
+    },
+    {
+      "requestId": 1,
+      "method": "GET",
+      "url": "http://example.com",
+      "status": "[pending]",
+      "selectedInDevToolsUI": false
+    },
+    {
+      "requestId": 1,
+      "method": "GET",
+      "url": "http://example.com",
+      "status": "[pending]",
+      "selectedInDevToolsUI": false
+    }
+  ]
+}
+`;
+
 exports[`McpResponse network request filtering > shows all requests when no filters are provided 1`] = `
 # test response
 ## Network requests
@@ -475,8 +1119,89 @@ reqid=1 GET http://example.com [pending]
 reqid=1 GET http://example.com [pending]
 `;
 
+exports[`McpResponse network request filtering > shows all requests when no filters are provided 2`] = `
+{
+  "pagination": {
+    "currentPage": 0,
+    "totalPages": 1,
+    "hasNextPage": false,
+    "hasPreviousPage": false,
+    "startIndex": 0,
+    "endIndex": 5,
+    "invalidPage": false
+  },
+  "networkRequests": [
+    {
+      "requestId": 1,
+      "method": "GET",
+      "url": "http://example.com",
+      "status": "[pending]",
+      "selectedInDevToolsUI": false
+    },
+    {
+      "requestId": 1,
+      "method": "GET",
+      "url": "http://example.com",
+      "status": "[pending]",
+      "selectedInDevToolsUI": false
+    },
+    {
+      "requestId": 1,
+      "method": "GET",
+      "url": "http://example.com",
+      "status": "[pending]",
+      "selectedInDevToolsUI": false
+    },
+    {
+      "requestId": 1,
+      "method": "GET",
+      "url": "http://example.com",
+      "status": "[pending]",
+      "selectedInDevToolsUI": false
+    },
+    {
+      "requestId": 1,
+      "method": "GET",
+      "url": "http://example.com",
+      "status": "[pending]",
+      "selectedInDevToolsUI": false
+    }
+  ]
+}
+`;
+
 exports[`McpResponse network request filtering > shows no requests when filter matches nothing 1`] = `
 # test response
-## Network requests
-No requests found.
+`;
+
+exports[`McpResponse network request filtering > shows no requests when filter matches nothing 2`] = `
+{}
+`;
+
+exports[`extensions > lists extensions 1`] = `
+# test response
+## Extensions
+id=id1 "Extension 1" v1.0 Enabled
+id=id2 "Extension 2" v2.0 Disabled
+`;
+
+exports[`extensions > lists extensions 2`] = `
+{
+  "extensions": [
+    {
+      "id": "id1",
+      "name": "Extension 1",
+      "version": "1.0",
+      "isEnabled": true,
+      "path": "/path/to/ext1"
+    },
+    {
+      "id": "id2",
+      "name": "Extension 2",
+      "version": "2.0",
+      "isEnabled": false,
+      "path": "/path/to/ext2"
+    }
+  ]
+}
 `;

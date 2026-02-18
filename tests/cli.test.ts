@@ -21,8 +21,10 @@ describe('cli args parsing', () => {
     categoryNetwork: true,
     'auto-connect': undefined,
     autoConnect: undefined,
-    'usage-statistics': false,
-    usageStatistics: false,
+    'performance-crux': true,
+    performanceCrux: true,
+    'usage-statistics': true,
+    usageStatistics: true,
   };
 
   it('parses with default args', async () => {
@@ -252,9 +254,9 @@ describe('cli args parsing', () => {
   });
 
   it('parses usage statistics flag', async () => {
-    // Test default (should be false)
+    // Test default (should be true).
     const defaultArgs = parseArguments('1.0.0', ['node', 'main.js']);
-    assert.strictEqual(defaultArgs.usageStatistics, false);
+    assert.strictEqual(defaultArgs.usageStatistics, true);
 
     // Test enabling it
     const enabledArgs = parseArguments('1.0.0', [
@@ -271,5 +273,25 @@ describe('cli args parsing', () => {
       '--no-usage-statistics',
     ]);
     assert.strictEqual(disabledArgs.usageStatistics, false);
+  });
+
+  it('parses performance crux flag', async () => {
+    const defaultArgs = parseArguments('1.0.0', ['node', 'main.js']);
+    assert.strictEqual(defaultArgs.performanceCrux, true);
+
+    // force enable
+    const enabledArgs = parseArguments('1.0.0', [
+      'node',
+      'main.js',
+      '--performance-crux',
+    ]);
+    assert.strictEqual(enabledArgs.performanceCrux, true);
+
+    const disabledArgs = parseArguments('1.0.0', [
+      'node',
+      'main.js',
+      '--no-performance-crux',
+    ]);
+    assert.strictEqual(disabledArgs.performanceCrux, false);
   });
 });

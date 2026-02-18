@@ -47,6 +47,14 @@ export interface LogRequest {
   }>;
 }
 
+export interface LogResponse {
+  /**
+   * If present, the client must wait this many milliseconds before
+   * issuing the next HTTP request.
+   */
+  next_request_wait_millis?: number;
+}
+
 // Enums
 export enum OsType {
   OS_TYPE_UNSPECIFIED = 0,

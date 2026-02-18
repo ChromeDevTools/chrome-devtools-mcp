@@ -9,11 +9,11 @@ import {describe, it, afterEach, beforeEach} from 'node:test';
 
 import sinon from 'sinon';
 
-import {ClearcutLogger} from '../../src/telemetry/clearcut-logger.js';
+import {ClearcutLogger} from '../../src/telemetry/ClearcutLogger.js';
 import type {Persistence} from '../../src/telemetry/persistence.js';
 import {FilePersistence} from '../../src/telemetry/persistence.js';
 import {WatchdogMessageType} from '../../src/telemetry/types.js';
-import {WatchdogClient} from '../../src/telemetry/watchdog-client.js';
+import {WatchdogClient} from '../../src/telemetry/WatchdogClient.js';
 
 describe('ClearcutLogger', () => {
   let mockPersistence: sinon.SinonStubbedInstance<Persistence>;
