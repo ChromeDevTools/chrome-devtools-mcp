@@ -4,17 +4,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {FileSymbol} from '../../client-pipe.js';
-import type {SymbolMatch} from './types.js';
-
 /**
- * Resolve a dot-path target (e.g. "UserService.findById") to a symbol in the tree.
- *
- * Supports:
- * - "UserService" → top-level symbol named "UserService"
- * - "UserService.findById" → child "findById" of "UserService"
- * - "findById" → first top-level symbol named "findById"
+ * Minimum shape required for symbol tree navigation.
+ * Both FileSymbol and UnifiedFileSymbol satisfy this.
  */
+export interface SymbolLike {
+  name: string;
+  kind: string;
+  children: SymbolLike[];
+}
+
 /**
  * Strip surrounding quotes from a string (single or double).
  * E.g., "'./augmented'" → "./augmented", "\"foo\"" → "foo"
@@ -37,10 +36,10 @@ function nameMatches(symbolName: string, targetName: string): boolean {
   return stripQuotes(symbolName) === stripQuotes(targetName);
 }
 
-export function resolveSymbolTarget(
-  symbols: FileSymbol[],
+export function resolveSymbolTarget<T extends SymbolLike>(
+  symbols: T[],
   target: string,
-): SymbolMatch | undefined {
+): { symbol: T; parent?: T; path: string[] } | undefined {
   // First, try exact match at top level (handles module names with dots like './augmented')
   const exactMatch = symbols.find(s => nameMatches(s.name, target));
   if (exactMatch) {
@@ -50,8 +49,8 @@ export function resolveSymbolTarget(
   // Then try dot-path resolution for nested symbols
   const segments = target.split('.');
 
-  let currentList = symbols;
-  let parent: FileSymbol | undefined;
+  let currentList: SymbolLike[] = symbols;
+  let parent: T | undefined;
   const pathSoFar: string[] = [];
 
   for (let i = 0; i < segments.length; i++) {
@@ -62,10 +61,10 @@ export function resolveSymbolTarget(
     pathSoFar.push(name);
 
     if (i < segments.length - 1) {
-      parent = found;
+      parent = found as T;
       currentList = found.children;
     } else {
-      return {symbol: found, parent, path: pathSoFar};
+      return {symbol: found as T, parent, path: pathSoFar};
     }
   }
 
@@ -75,9 +74,9 @@ export function resolveSymbolTarget(
 /**
  * Collect names of sibling symbols (same level, excluding the matched one).
  */
-export function getSiblingNames(
-  allSymbols: FileSymbol[],
-  match: SymbolMatch,
+export function getSiblingNames<T extends SymbolLike>(
+  allSymbols: T[],
+  match: { symbol: T; parent?: T },
 ): string[] {
   const siblingSource = match.parent ? match.parent.children : allSymbols;
   return siblingSource
@@ -89,7 +88,7 @@ export function getSiblingNames(
  * Collect child names of a symbol, up to maxDepth.
  */
 export function getChildNames(
-  symbol: FileSymbol,
+  symbol: SymbolLike,
   maxDepth?: number,
 ): string[] {
   if (maxDepth !== undefined && maxDepth <= 0) return [];
@@ -98,6 +97,7 @@ export function getChildNames(
 
 /**
  * Format a symbol's range as 1-indexed "lines X-Y of Z".
+ * Takes 0-indexed line numbers (legacy path).
  */
 export function formatRange(
   startLine: number,

@@ -7,23 +7,29 @@
 import path from 'node:path';
 
 import {
-  fileGetSymbols,
+  fileExtractStructure,
   fileReadContent,
   fileHighlightReadRange,
-  fileExtractOrphanedContent,
-  FileSymbol,
   OrphanedSymbolNode,
+  UnifiedFileSymbol,
+  UnifiedFileResult,
 } from '../../client-pipe.js';
 import {getHostWorkspace} from '../../config.js';
 import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
 import {CHARACTER_LIMIT, defineTool} from '../ToolDefinition.js';
 import {resolveSymbolTarget, getSiblingNames, getChildNames, formatRange} from './symbol-resolver.js';
+import type {SymbolLike} from './symbol-resolver.js';
 
 function resolveFilePath(file: string): string {
   if (path.isAbsolute(file)) return file;
   return path.resolve(getHostWorkspace(), file);
 }
+
+// Supported TS/JS file extensions for structured extraction
+const STRUCTURED_EXTS = new Set([
+  'ts', 'tsx', 'js', 'jsx', 'mts', 'mjs', 'cts', 'cjs',
+]);
 
 // Special target keywords for orphaned content
 const SPECIAL_TARGETS = ['#imports', '#exports', '#comments'] as const;
@@ -33,17 +39,23 @@ function isSpecialTarget(target: string): target is SpecialTarget {
   return SPECIAL_TARGETS.includes(target as SpecialTarget);
 }
 
-// Format skeleton entry for a symbol
+/**
+ * Extract lines from full content by 1-indexed line range.
+ */
+function getContentSlice(allLines: string[], startLine: number, endLine: number): string {
+  return allLines.slice(startLine - 1, endLine).join('\n');
+}
+
+// Format skeleton entry for a symbol (all ranges are 1-indexed)
 function formatSkeletonEntry(
-  symbol: FileSymbol | OrphanedSymbolNode,
+  symbol: SymbolLike | OrphanedSymbolNode,
   indent = '',
   recursive = false,
 ): string[] {
   const lines: string[] = [];
-  // Discriminate by range shape: FileSymbol has startLine/endLine (0-indexed),
-  // OrphanedSymbolNode has start/end (1-indexed)
+  // Both UnifiedFileSymbol and OrphanedSymbolNode are 1-indexed
   const range = 'startLine' in symbol.range
-    ? `${symbol.range.startLine + 1}-${symbol.range.endLine + 1}`
+    ? `${symbol.range.startLine}-${symbol.range.endLine}`
     : `${symbol.range.start}-${symbol.range.end}`;
   const kind = symbol.kind;
   const name = symbol.name;
@@ -53,17 +65,20 @@ function formatSkeletonEntry(
 
   if (recursive && symbol.children && symbol.children.length > 0) {
     for (const child of symbol.children) {
-      lines.push(...formatSkeletonEntry(child as FileSymbol, indent + '  ', recursive));
+      lines.push(...formatSkeletonEntry(child, indent + '  ', recursive));
     }
   }
 
   return lines;
 }
 
-// Format content with child placeholders
+/**
+ * Format content with child placeholders.
+ * contentStartLine and symbol ranges are all 1-indexed.
+ */
 function formatContentWithPlaceholders(
   content: string,
-  symbol: FileSymbol,
+  symbol: SymbolLike,
   contentStartLine: number,
 ): string {
   if (!symbol.children || symbol.children.length === 0) {
@@ -89,9 +104,9 @@ function formatContentWithPlaceholders(
       currentLine++;
     }
 
-    // Add placeholder for child
+    // Add placeholder for child (ranges already 1-indexed, no +1 needed)
     const lineCount = childEnd - childStart + 1;
-    result.push(`  [${child.name}] (${child.kind}, lines ${childStart + 1}-${childEnd + 1}, ${lineCount} lines)`);
+    result.push(`  [${child.name}] (${child.kind}, lines ${childStart}-${childEnd}, ${lineCount} lines)`);
 
     // Skip child lines
     currentLine = childEnd + 1;
@@ -174,7 +189,7 @@ export const read = defineTool({
     const skeleton = params.skeleton ?? false;
     const recursive = params.recursive ?? false;
 
-    // Normalize target to array: supports single string, JSON array string, or actual array
+    // Normalize target to array
     let targets: string[] = [];
     if (params.target) {
       if (Array.isArray(params.target)) {
@@ -197,85 +212,90 @@ export const read = defineTool({
     response.appendResponseLine(`## file_read: ${relativePath}`);
     response.appendResponseLine('');
 
-    // Get symbols for all operations
-    const symbolsResult = await fileGetSymbols(filePath);
+    // Check if this is a TS/JS file that supports structured extraction
+    const ext = path.extname(filePath).slice(1).toLowerCase();
+    const isStructuredFile = STRUCTURED_EXTS.has(ext);
 
-    // If no targets specified and skeleton mode, show file overview
+    // Get unified structure for TS/JS files (one call replaces three)
+    let structure: UnifiedFileResult | undefined;
+    let allLines: string[] = [];
+    if (isStructuredFile) {
+      structure = await fileExtractStructure(filePath);
+      allLines = structure.content.split('\n');
+    }
+
+    // ── Skeleton mode (no targets) ────────────────────────────
     if (targets.length === 0 && skeleton) {
-      // File skeleton mode: show all symbols, optionally imports/exports/comments
-      const ext = path.extname(filePath).slice(1).toLowerCase();
-      const tsExts = ['ts', 'tsx', 'js', 'jsx', 'mts', 'mjs', 'cts', 'cjs'];
+      if (!structure) {
+        // Non-TS/JS: fall back to fileReadContent for basic content
+        response.appendResponseLine('**Skeleton Mode** (0 symbols)');
+        response.appendResponseLine('');
+        response.appendResponseLine('Skeleton mode requires a TypeScript or JavaScript file.');
+        return;
+      }
 
       response.appendResponseLine(
-        `**Skeleton Mode** (${symbolsResult.symbols.length} symbols)`,
+        `**Skeleton Mode** (${structure.symbols.length} symbols)`,
       );
       response.appendResponseLine('');
 
-      // Get orphaned content for TS/JS files
-      if (tsExts.includes(ext)) {
-        try {
-          const orphaned = await fileExtractOrphanedContent(filePath);
-
-          if (orphaned.imports.length > 0) {
-            response.appendResponseLine(`**Imports (${orphaned.imports.length}):**`);
-            for (const imp of orphaned.imports) {
-              response.appendResponseLine(
-                `  [${imp.range.start}] ${imp.kind}: ${imp.name}`,
-              );
-            }
-            response.appendResponseLine('');
-          }
-
-          if (orphaned.exports.length > 0) {
-            response.appendResponseLine(`**Exports (${orphaned.exports.length}):**`);
-            for (const exp of orphaned.exports) {
-              response.appendResponseLine(
-                `  [${exp.range.start}] ${exp.kind}: ${exp.name}`,
-              );
-            }
-            response.appendResponseLine('');
-          }
-
-          if (orphaned.orphanComments.length > 0) {
-            response.appendResponseLine(`**Comments (${orphaned.orphanComments.length}):**`);
-            for (const comment of orphaned.orphanComments) {
-              response.appendResponseLine(
-                `  [${comment.range.start}] ${comment.kind}: ${comment.name}`,
-              );
-            }
-            response.appendResponseLine('');
-          }
-
-          if (orphaned.directives && orphaned.directives.length > 0) {
-            response.appendResponseLine(`**Directives (${orphaned.directives.length}):**`);
-            for (const dir of orphaned.directives) {
-              response.appendResponseLine(
-                `  [${dir.range.start}] ${dir.kind}: ${dir.name}`,
-              );
-            }
-            response.appendResponseLine('');
-          }
-        } catch {
-          // Skip orphaned content if extraction fails
+      // Imports
+      if (structure.imports.length > 0) {
+        response.appendResponseLine(`**Imports (${structure.imports.length}):**`);
+        for (const imp of structure.imports) {
+          response.appendResponseLine(
+            `  [${imp.range.start}] ${imp.kind}: ${imp.name}`,
+          );
         }
+        response.appendResponseLine('');
       }
 
-      // Show symbols
-      response.appendResponseLine(`**Symbols (${symbolsResult.symbols.length}):**`);
-      for (const sym of symbolsResult.symbols) {
-        const entries = formatSkeletonEntry(
-          sym,
-          '  ',
-          recursive,
-        );
+      // Exports
+      if (structure.exports.length > 0) {
+        response.appendResponseLine(`**Exports (${structure.exports.length}):**`);
+        for (const exp of structure.exports) {
+          response.appendResponseLine(
+            `  [${exp.range.start}] ${exp.kind}: ${exp.name}`,
+          );
+        }
+        response.appendResponseLine('');
+      }
+
+      // Comments
+      if (structure.orphanComments.length > 0) {
+        response.appendResponseLine(`**Comments (${structure.orphanComments.length}):**`);
+        for (const comment of structure.orphanComments) {
+          response.appendResponseLine(
+            `  [${comment.range.start}] ${comment.kind}: ${comment.name}`,
+          );
+        }
+        response.appendResponseLine('');
+      }
+
+      // Directives
+      if (structure.directives.length > 0) {
+        response.appendResponseLine(`**Directives (${structure.directives.length}):**`);
+        for (const dir of structure.directives) {
+          response.appendResponseLine(
+            `  [${dir.range.start}] ${dir.kind}: ${dir.name}`,
+          );
+        }
+        response.appendResponseLine('');
+      }
+
+      // Symbols
+      response.appendResponseLine(`**Symbols (${structure.symbols.length}):**`);
+      for (const sym of structure.symbols) {
+        const entries = formatSkeletonEntry(sym, '  ', recursive);
         for (const entry of entries) response.appendResponseLine(entry);
       }
 
       return;
     }
 
-    // If no targets and not skeleton mode, use legacy behavior (full file or line range)
+    // ── Legacy mode (no targets, no skeleton): full file or line range ──
     if (targets.length === 0) {
+      // Use fileReadContent for ALL file types (basic I/O, works everywhere)
       let startLine = params.startLine !== undefined ? params.startLine - 1 : undefined;
       let endLine = params.endLine !== undefined ? params.endLine - 1 : undefined;
 
@@ -296,90 +316,79 @@ export const read = defineTool({
       return;
     }
 
-    // Process each target
+    // ── Targets mode ─────────────────────────────────────────
+
+    // Targets require structured extraction (TS/JS only)
+    if (!structure) {
+      response.appendResponseLine(
+        'Target-based reading requires a TypeScript or JavaScript file.',
+      );
+      return;
+    }
+
     for (const target of targets) {
       if (isSpecialTarget(target)) {
         // Handle special keywords: #imports, #exports, #comments
-        try {
-          const orphaned = await fileExtractOrphanedContent(filePath);
-
-          if (target === '#imports') {
-            response.appendResponseLine(`**Imports (${orphaned.imports.length}):**`);
-            if (skeleton) {
-              for (const imp of orphaned.imports) {
-                response.appendResponseLine(
-                  `  [${imp.range.start}-${imp.range.end}] ${imp.kind}: ${imp.name}`,
-                );
-              }
-            } else {
-              // Content mode: read actual import lines
-              for (const imp of orphaned.imports) {
-                const content = await fileReadContent(
-                  filePath,
-                  imp.range.start - 1,
-                  imp.range.end - 1,
-                );
-                response.appendResponseLine(`\`\`\``);
-                response.appendResponseLine(content.content);
-                response.appendResponseLine(`\`\`\``);
-              }
+        if (target === '#imports') {
+          response.appendResponseLine(`**Imports (${structure.imports.length}):**`);
+          if (skeleton) {
+            for (const imp of structure.imports) {
+              response.appendResponseLine(
+                `  [${imp.range.start}-${imp.range.end}] ${imp.kind}: ${imp.name}`,
+              );
             }
-            response.appendResponseLine('');
-          } else if (target === '#exports') {
-            response.appendResponseLine(`**Exports (${orphaned.exports.length}):**`);
-            if (skeleton) {
-              for (const exp of orphaned.exports) {
-                response.appendResponseLine(
-                  `  [${exp.range.start}-${exp.range.end}] ${exp.kind}: ${exp.name}`,
-                );
-              }
-            } else {
-              for (const exp of orphaned.exports) {
-                const content = await fileReadContent(
-                  filePath,
-                  exp.range.start - 1,
-                  exp.range.end - 1,
-                );
-                response.appendResponseLine(`\`\`\``);
-                response.appendResponseLine(content.content);
-                response.appendResponseLine(`\`\`\``);
-              }
+          } else {
+            for (const imp of structure.imports) {
+              const content = getContentSlice(allLines, imp.range.start, imp.range.end);
+              response.appendResponseLine(`\`\`\``);
+              response.appendResponseLine(content);
+              response.appendResponseLine(`\`\`\``);
             }
-            response.appendResponseLine('');
-          } else if (target === '#comments') {
-            response.appendResponseLine(`**Comments (${orphaned.orphanComments.length}):**`);
-            if (skeleton) {
-              for (const comment of orphaned.orphanComments) {
-                response.appendResponseLine(
-                  `  [${comment.range.start}-${comment.range.end}] ${comment.kind}: ${comment.name}`,
-                );
-              }
-            } else {
-              for (const comment of orphaned.orphanComments) {
-                const content = await fileReadContent(
-                  filePath,
-                  comment.range.start - 1,
-                  comment.range.end - 1,
-                );
-                response.appendResponseLine(`\`\`\``);
-                response.appendResponseLine(content.content);
-                response.appendResponseLine(`\`\`\``);
-              }
-            }
-            response.appendResponseLine('');
           }
-        } catch (err) {
-          response.appendResponseLine(`**${target}:** Error extracting - ${err}`);
+          response.appendResponseLine('');
+        } else if (target === '#exports') {
+          response.appendResponseLine(`**Exports (${structure.exports.length}):**`);
+          if (skeleton) {
+            for (const exp of structure.exports) {
+              response.appendResponseLine(
+                `  [${exp.range.start}-${exp.range.end}] ${exp.kind}: ${exp.name}`,
+              );
+            }
+          } else {
+            for (const exp of structure.exports) {
+              const content = getContentSlice(allLines, exp.range.start, exp.range.end);
+              response.appendResponseLine(`\`\`\``);
+              response.appendResponseLine(content);
+              response.appendResponseLine(`\`\`\``);
+            }
+          }
+          response.appendResponseLine('');
+        } else if (target === '#comments') {
+          response.appendResponseLine(`**Comments (${structure.orphanComments.length}):**`);
+          if (skeleton) {
+            for (const comment of structure.orphanComments) {
+              response.appendResponseLine(
+                `  [${comment.range.start}-${comment.range.end}] ${comment.kind}: ${comment.name}`,
+              );
+            }
+          } else {
+            for (const comment of structure.orphanComments) {
+              const content = getContentSlice(allLines, comment.range.start, comment.range.end);
+              response.appendResponseLine(`\`\`\``);
+              response.appendResponseLine(content);
+              response.appendResponseLine(`\`\`\``);
+            }
+          }
           response.appendResponseLine('');
         }
       } else {
-        // Symbol targeting
-        const match = resolveSymbolTarget(symbolsResult.symbols, target);
+        // Symbol targeting (1-indexed ranges from ts-morph)
+        const match = resolveSymbolTarget(structure.symbols, target);
 
         if (!match) {
-          const available = symbolsResult.symbols.map(s => `${s.kind} ${s.name}`).join(', ');
+          const available = structure.symbols.map(s => `${s.kind} ${s.name}`).join(', ');
           response.appendResponseLine(
-            `**${target}:** Not found. Available: ${available || 'none'}`,
+            `**"${target}":** Not found. Available: ${available || 'none'}`,
           );
           response.appendResponseLine('');
           continue;
@@ -396,28 +405,29 @@ export const read = defineTool({
           for (const entry of entries) response.appendResponseLine(entry);
           response.appendResponseLine('');
         } else {
-          // Content mode
-          const content = await fileReadContent(filePath, startLine, endLine);
-          fileHighlightReadRange(filePath, content.startLine, content.endLine);
+          // Content mode: read from structure.content
+          const content = getContentSlice(allLines, startLine, endLine);
+          // Highlight in editor (convert 1-indexed to 0-indexed for VS Code)
+          fileHighlightReadRange(filePath, startLine - 1, endLine - 1);
 
           response.appendResponseLine(
-            `**${target}** (${symbol.kind}, lines ${startLine + 1}-${endLine + 1}):`,
+            `**${target}** (${symbol.kind}, lines ${startLine}-${endLine}):`,
           );
           response.appendResponseLine('```');
 
           if (recursive || !symbol.children || symbol.children.length === 0) {
             // Full content
             response.appendResponseLine(
-              content.content.length > CHARACTER_LIMIT
-                ? content.content.substring(0, CHARACTER_LIMIT) + '\n\n⚠️ Truncated'
-                : content.content,
+              content.length > CHARACTER_LIMIT
+                ? content.substring(0, CHARACTER_LIMIT) + '\n\n⚠️ Truncated'
+                : content,
             );
           } else {
             // Content with placeholders for children
             const formatted = formatContentWithPlaceholders(
-              content.content,
+              content,
               symbol,
-              content.startLine,
+              startLine,
             );
             response.appendResponseLine(
               formatted.length > CHARACTER_LIMIT

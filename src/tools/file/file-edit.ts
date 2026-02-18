@@ -6,13 +6,17 @@
 
 import path from 'node:path';
 
-import {fileGetSymbols, fileReadContent} from '../../client-pipe.js';
+import {fileExtractStructure, fileReadContent} from '../../client-pipe.js';
 import {getHostWorkspace} from '../../config.js';
 import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool} from '../ToolDefinition.js';
 import {executeEditWithSafetyLayer} from './safety-layer.js';
 import {resolveSymbolTarget} from './symbol-resolver.js';
+
+const STRUCTURED_EXTS = new Set([
+  'ts', 'tsx', 'js', 'jsx', 'mts', 'mjs', 'cts', 'cjs',
+]);
 
 function resolveFilePath(file: string): string {
   if (path.isAbsolute(file)) return file;
@@ -58,7 +62,7 @@ export const edit = defineTool({
     ),
     target: zod.string().optional().describe(
       'Symbol name to scope the edit: "UserService.findById". ' +
-      'Uses VS Code DocumentSymbols for precise targeting.',
+      'Only supported for TS/JS family files (.ts, .tsx, .js, .jsx, .mts, .mjs, .cts, .cjs).',
     ),
     startLine: zod.number().int().optional().describe(
       'Fallback: start line (1-indexed). Used when target is not specified.',
@@ -119,12 +123,22 @@ export const edit = defineTool({
     let targetLabel: string | undefined;
 
     if (params.target) {
-      // Symbol targeting: resolve via DocumentSymbols
-      const symbolsResult = await fileGetSymbols(filePath);
-      const match = resolveSymbolTarget(symbolsResult.symbols, params.target);
+      // Symbol targeting: resolve via ts-morph extraction (TS/JS family only)
+      const ext = path.extname(filePath).slice(1).toLowerCase();
+      if (!STRUCTURED_EXTS.has(ext)) {
+        response.appendResponseLine(
+          `❌ Symbol targeting is only supported for TS/JS family files ` +
+          `(.ts, .tsx, .js, .jsx, .mts, .mjs, .cts, .cjs).\n\n` +
+          `Use \`startLine\`/\`endLine\` instead for .${ext} files.`,
+        );
+        return;
+      }
+
+      const structure = await fileExtractStructure(filePath);
+      const match = resolveSymbolTarget(structure.symbols, params.target);
 
       if (!match) {
-        const available = symbolsResult.symbols.map(s => `${s.kind} ${s.name}`).join(', ');
+        const available = structure.symbols.map(s => `${s.kind} ${s.name}`).join(', ');
         response.appendResponseLine(
           `❌ Symbol "${params.target}" not found in ${relativePath}.\n\n` +
           `Available symbols: ${available || 'none'}`,
@@ -132,8 +146,9 @@ export const edit = defineTool({
         return;
       }
 
-      editStartLine = match.symbol.range.startLine;
-      editEndLine = match.symbol.range.endLine;
+      // ts-morph ranges are 1-indexed; safety layer expects 0-indexed
+      editStartLine = match.symbol.range.startLine - 1;
+      editEndLine = match.symbol.range.endLine - 1;
       targetLabel = params.target;
     } else if (params.startLine !== undefined && params.endLine !== undefined) {
       // Line-based targeting (convert 1-indexed to 0-indexed)

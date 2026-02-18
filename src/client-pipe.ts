@@ -785,6 +785,44 @@ export interface OrphanedContentResult {
   };
 }
 
+// ── Unified File Structure Types ─────────────────────────
+
+export interface UnifiedFileSymbolRange {
+  startLine: number;   // 1-indexed
+  startChar: number;   // 0-indexed (column)
+  endLine: number;     // 1-indexed
+  endChar: number;     // 0-indexed (column)
+}
+
+export interface UnifiedFileSymbol {
+  name: string;
+  kind: string;
+  detail?: string;
+  range: UnifiedFileSymbolRange;
+  children: UnifiedFileSymbol[];
+  exported?: boolean;
+  modifiers?: string[];
+}
+
+export interface UnifiedFileResult {
+  symbols: UnifiedFileSymbol[];
+  content: string;
+  totalLines: number;
+  imports: OrphanedSymbolNode[];
+  exports: OrphanedSymbolNode[];
+  orphanComments: OrphanedSymbolNode[];
+  directives: OrphanedSymbolNode[];
+  gaps: Array<{start: number; end: number; type: 'blank' | 'unknown'}>;
+  stats: {
+    totalImports: number;
+    totalExports: number;
+    totalOrphanComments: number;
+    totalDirectives: number;
+    totalBlankLines: number;
+    coveragePercent: number;
+  };
+}
+
 export interface FileFindReferencesResult {
   references: Array<{file: string; line: number; character: number}>;
 }
@@ -967,6 +1005,23 @@ export async function fileExtractOrphanedContent(
     30_000,
   );
   assertResult<OrphanedContentResult>(result, 'file.extractOrphanedContent');
+  return result;
+}
+
+/**
+ * Extract the complete file structure using ts-morph only.
+ * Returns symbols, content, imports, exports, comments, directives, gaps, and stats.
+ * Single round-trip replacement for fileGetSymbols + fileExtractOrphanedContent + fileReadContent.
+ */
+export async function fileExtractStructure(
+  filePath: string,
+): Promise<UnifiedFileResult> {
+  const result = await sendClientRequest(
+    'file.extractStructure',
+    {filePath},
+    30_000,
+  );
+  assertResult<UnifiedFileResult>(result, 'file.extractStructure');
   return result;
 }
 
