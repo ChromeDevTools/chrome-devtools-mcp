@@ -1,7 +1,7 @@
 exports[`McpResponse > add network request when attached 1`] = `
 # test response
 ## Request http://example.com
-Status: [pending]
+Status: pending
 ### Request Headers
 - content-size:10
 ## Network requests
@@ -15,7 +15,7 @@ exports[`McpResponse > add network request when attached 2`] = `
     "requestId": 1,
     "method": "GET",
     "url": "http://example.com",
-    "status": "[pending]",
+    "status": "pending",
     "requestHeaders": {
       "content-size": "10"
     }
@@ -34,7 +34,7 @@ exports[`McpResponse > add network request when attached 2`] = `
       "requestId": 1,
       "method": "GET",
       "url": "http://example.com",
-      "status": "[pending]",
+      "status": "pending",
       "selectedInDevToolsUI": false
     }
   ]
@@ -44,7 +44,7 @@ exports[`McpResponse > add network request when attached 2`] = `
 exports[`McpResponse > add network request when attached with POST data 1`] = `
 # test response
 ## Request http://example.com
-Status: [success - 200]
+Status: 200
 ### Request Headers
 - content-size:10
 ### Request Body
@@ -55,7 +55,7 @@ Status: [success - 200]
 {"response":"body"}
 ## Network requests
 Showing 1-1 of 1 (Page 1 of 1).
-reqid=1 POST http://example.com [success - 200]
+reqid=1 POST http://example.com [200]
 `;
 
 exports[`McpResponse > add network request when attached with POST data 2`] = `
@@ -64,7 +64,7 @@ exports[`McpResponse > add network request when attached with POST data 2`] = `
     "requestId": 1,
     "method": "POST",
     "url": "http://example.com",
-    "status": "[success - 200]",
+    "status": "200",
     "requestHeaders": {
       "content-size": "10"
     },
@@ -88,7 +88,7 @@ exports[`McpResponse > add network request when attached with POST data 2`] = `
       "requestId": 1,
       "method": "POST",
       "url": "http://example.com",
-      "status": "[success - 200]",
+      "status": "200",
       "selectedInDevToolsUI": false
     }
   ]
@@ -119,14 +119,14 @@ exports[`McpResponse > add network requests when setting is true 2`] = `
       "requestId": 1,
       "method": "GET",
       "url": "http://example.com",
-      "status": "[pending]",
+      "status": "pending",
       "selectedInDevToolsUI": false
     },
     {
       "requestId": 2,
       "method": "GET",
       "url": "http://example.com",
-      "status": "[pending]",
+      "status": "pending",
       "selectedInDevToolsUI": false
     }
   ]
@@ -487,14 +487,14 @@ exports[`McpResponse network pagination > handles invalid page number by showing
       "requestId": 1,
       "method": "GET",
       "url": "http://example.com",
-      "status": "[pending]",
+      "status": "pending",
       "selectedInDevToolsUI": false
     },
     {
       "requestId": 1,
       "method": "GET",
       "url": "http://example.com",
-      "status": "[pending]",
+      "status": "pending",
       "selectedInDevToolsUI": false
     }
   ]
@@ -517,35 +517,35 @@ exports[`McpResponse network pagination > returns all requests when pagination i
       "requestId": 1,
       "method": "GET",
       "url": "http://example.com",
-      "status": "[pending]",
+      "status": "pending",
       "selectedInDevToolsUI": false
     },
     {
       "requestId": 1,
       "method": "GET",
       "url": "http://example.com",
-      "status": "[pending]",
+      "status": "pending",
       "selectedInDevToolsUI": false
     },
     {
       "requestId": 1,
       "method": "GET",
       "url": "http://example.com",
-      "status": "[pending]",
+      "status": "pending",
       "selectedInDevToolsUI": false
     },
     {
       "requestId": 1,
       "method": "GET",
       "url": "http://example.com",
-      "status": "[pending]",
+      "status": "pending",
       "selectedInDevToolsUI": false
     },
     {
       "requestId": 1,
       "method": "GET",
       "url": "http://example.com",
-      "status": "[pending]",
+      "status": "pending",
       "selectedInDevToolsUI": false
     }
   ]
@@ -568,70 +568,70 @@ exports[`McpResponse network pagination > returns first page by default 1`] = `
       "requestId": 1,
       "method": "GET-0",
       "url": "http://example.com",
-      "status": "[pending]",
+      "status": "pending",
       "selectedInDevToolsUI": false
     },
     {
       "requestId": 1,
       "method": "GET-1",
       "url": "http://example.com",
-      "status": "[pending]",
+      "status": "pending",
       "selectedInDevToolsUI": false
     },
     {
       "requestId": 1,
       "method": "GET-2",
       "url": "http://example.com",
-      "status": "[pending]",
+      "status": "pending",
       "selectedInDevToolsUI": false
     },
     {
       "requestId": 1,
       "method": "GET-3",
       "url": "http://example.com",
-      "status": "[pending]",
+      "status": "pending",
       "selectedInDevToolsUI": false
     },
     {
       "requestId": 1,
       "method": "GET-4",
       "url": "http://example.com",
-      "status": "[pending]",
+      "status": "pending",
       "selectedInDevToolsUI": false
     },
     {
       "requestId": 1,
       "method": "GET-5",
       "url": "http://example.com",
-      "status": "[pending]",
+      "status": "pending",
       "selectedInDevToolsUI": false
     },
     {
       "requestId": 1,
       "method": "GET-6",
       "url": "http://example.com",
-      "status": "[pending]",
+      "status": "pending",
       "selectedInDevToolsUI": false
     },
     {
       "requestId": 1,
       "method": "GET-7",
       "url": "http://example.com",
-      "status": "[pending]",
+      "status": "pending",
       "selectedInDevToolsUI": false
     },
     {
       "requestId": 1,
       "method": "GET-8",
       "url": "http://example.com",
-      "status": "[pending]",
+      "status": "pending",
       "selectedInDevToolsUI": false
     },
     {
       "requestId": 1,
       "method": "GET-9",
       "url": "http://example.com",
-      "status": "[pending]",
+      "status": "pending",
       "selectedInDevToolsUI": false
     }
   ]
@@ -654,70 +654,70 @@ exports[`McpResponse network pagination > returns subsequent page when pageIdx p
       "requestId": 1,
       "method": "GET-10",
       "url": "http://example.com",
-      "status": "[pending]",
+      "status": "pending",
       "selectedInDevToolsUI": false
     },
     {
       "requestId": 1,
       "method": "GET-11",
       "url": "http://example.com",
-      "status": "[pending]",
+      "status": "pending",
       "selectedInDevToolsUI": false
     },
     {
       "requestId": 1,
       "method": "GET-12",
       "url": "http://example.com",
-      "status": "[pending]",
+      "status": "pending",
       "selectedInDevToolsUI": false
     },
     {
       "requestId": 1,
       "method": "GET-13",
       "url": "http://example.com",
-      "status": "[pending]",
+      "status": "pending",
       "selectedInDevToolsUI": false
     },
     {
       "requestId": 1,
       "method": "GET-14",
       "url": "http://example.com",
-      "status": "[pending]",
+      "status": "pending",
       "selectedInDevToolsUI": false
     },
     {
       "requestId": 1,
       "method": "GET-15",
       "url": "http://example.com",
-      "status": "[pending]",
+      "status": "pending",
       "selectedInDevToolsUI": false
     },
     {
       "requestId": 1,
       "method": "GET-16",
       "url": "http://example.com",
-      "status": "[pending]",
+      "status": "pending",
       "selectedInDevToolsUI": false
     },
     {
       "requestId": 1,
       "method": "GET-17",
       "url": "http://example.com",
-      "status": "[pending]",
+      "status": "pending",
       "selectedInDevToolsUI": false
     },
     {
       "requestId": 1,
       "method": "GET-18",
       "url": "http://example.com",
-      "status": "[pending]",
+      "status": "pending",
       "selectedInDevToolsUI": false
     },
     {
       "requestId": 1,
       "method": "GET-19",
       "url": "http://example.com",
-      "status": "[pending]",
+      "status": "pending",
       "selectedInDevToolsUI": false
     }
   ]
@@ -1002,14 +1002,14 @@ exports[`McpResponse network request filtering > filters network requests by res
       "requestId": 1,
       "method": "GET",
       "url": "http://example.com",
-      "status": "[pending]",
+      "status": "pending",
       "selectedInDevToolsUI": false
     },
     {
       "requestId": 1,
       "method": "GET",
       "url": "http://example.com",
-      "status": "[pending]",
+      "status": "pending",
       "selectedInDevToolsUI": false
     }
   ]
@@ -1039,7 +1039,7 @@ exports[`McpResponse network request filtering > filters network requests by sin
       "requestId": 1,
       "method": "GET",
       "url": "http://example.com",
-      "status": "[pending]",
+      "status": "pending",
       "selectedInDevToolsUI": false
     }
   ]
@@ -1073,35 +1073,35 @@ exports[`McpResponse network request filtering > shows all requests when empty r
       "requestId": 1,
       "method": "GET",
       "url": "http://example.com",
-      "status": "[pending]",
+      "status": "pending",
       "selectedInDevToolsUI": false
     },
     {
       "requestId": 1,
       "method": "GET",
       "url": "http://example.com",
-      "status": "[pending]",
+      "status": "pending",
       "selectedInDevToolsUI": false
     },
     {
       "requestId": 1,
       "method": "GET",
       "url": "http://example.com",
-      "status": "[pending]",
+      "status": "pending",
       "selectedInDevToolsUI": false
     },
     {
       "requestId": 1,
       "method": "GET",
       "url": "http://example.com",
-      "status": "[pending]",
+      "status": "pending",
       "selectedInDevToolsUI": false
     },
     {
       "requestId": 1,
       "method": "GET",
       "url": "http://example.com",
-      "status": "[pending]",
+      "status": "pending",
       "selectedInDevToolsUI": false
     }
   ]
@@ -1135,35 +1135,35 @@ exports[`McpResponse network request filtering > shows all requests when no filt
       "requestId": 1,
       "method": "GET",
       "url": "http://example.com",
-      "status": "[pending]",
+      "status": "pending",
       "selectedInDevToolsUI": false
     },
     {
       "requestId": 1,
       "method": "GET",
       "url": "http://example.com",
-      "status": "[pending]",
+      "status": "pending",
       "selectedInDevToolsUI": false
     },
     {
       "requestId": 1,
       "method": "GET",
       "url": "http://example.com",
-      "status": "[pending]",
+      "status": "pending",
       "selectedInDevToolsUI": false
     },
     {
       "requestId": 1,
       "method": "GET",
       "url": "http://example.com",
-      "status": "[pending]",
+      "status": "pending",
       "selectedInDevToolsUI": false
     },
     {
       "requestId": 1,
       "method": "GET",
       "url": "http://example.com",
-      "status": "[pending]",
+      "status": "pending",
       "selectedInDevToolsUI": false
     }
   ]
