@@ -23,6 +23,25 @@ export interface NetworkFormatterOptions {
   ) => Promise<{filename: string}>;
 }
 
+interface NetworkRequestConcise {
+  requestId?: number | string;
+  method: string;
+  url: string;
+  status: string;
+  selectedInDevToolsUI?: boolean;
+}
+
+interface NetworkRequestDetailed extends NetworkRequestConcise {
+  requestHeaders: Record<string, string>;
+  requestBody?: string;
+  requestBodyFilePath?: string;
+  responseHeaders?: Record<string, string>;
+  responseBody?: string;
+  responseBodyFilePath?: string;
+  failure?: string;
+  redirectChain?: NetworkRequestConcise[];
+}
+
 export class NetworkFormatter {
   #request: HTTPRequest;
   #options: NetworkFormatterOptions;
@@ -114,72 +133,14 @@ export class NetworkFormatter {
   }
 
   toString(): string {
-    // TODO truncate the URL
-    return `reqid=${this.#options.requestId} ${this.#request.method()} ${this.#request.url()} ${this.#getStatusFromRequest(this.#request)}${this.#options.selectedInDevToolsUI ? ` [selected in the DevTools Network panel]` : ''}`;
+    return convertNetworkRequestConciseToString(this.toJSON());
   }
 
   toStringDetailed(): string {
-    const response: string[] = [];
-    response.push(`## Request ${this.#request.url()}`);
-    response.push(`Status:  ${this.#getStatusFromRequest(this.#request)}`);
-    response.push(`### Request Headers`);
-    for (const line of this.#getFormattedHeaderValue(this.#request.headers())) {
-      response.push(line);
-    }
-
-    if (this.#requestBody) {
-      response.push(`### Request Body`);
-      response.push(this.#requestBody);
-    } else if (this.#requestBodyFilePath) {
-      response.push(`### Request Body`);
-      response.push(`Saved to ${this.#requestBodyFilePath}.`);
-    }
-
-    const httpResponse = this.#request.response();
-    if (httpResponse) {
-      response.push(`### Response Headers`);
-      for (const line of this.#getFormattedHeaderValue(
-        httpResponse.headers(),
-      )) {
-        response.push(line);
-      }
-    }
-
-    if (this.#responseBody) {
-      response.push(`### Response Body`);
-      response.push(this.#responseBody);
-    } else if (this.#responseBodyFilePath) {
-      response.push(`### Response Body`);
-      response.push(`Saved to ${this.#responseBodyFilePath}.`);
-    }
-
-    const httpFailure = this.#request.failure();
-    if (httpFailure) {
-      response.push(`### Request failed with`);
-      response.push(httpFailure.errorText);
-    }
-
-    const redirectChain = this.#request.redirectChain();
-    if (redirectChain.length) {
-      response.push(`### Redirect chain`);
-      let indent = 0;
-      for (const request of redirectChain.reverse()) {
-        const id = this.#options.requestIdResolver
-          ? this.#options.requestIdResolver(request)
-          : undefined;
-        // We create a temporary synchronous instance just for toString
-        const formatter = new NetworkFormatter(request, {
-          requestId: id,
-          saveFile: this.#options.saveFile,
-        });
-        response.push(`${'  '.repeat(indent)}${formatter.toString()}`);
-        indent++;
-      }
-    }
-    return response.join('\n');
+    return converNetworkRequestDetailedToStringDetailed(this.toJSONDetailed());
   }
 
-  toJSON(): object {
+  toJSON(): NetworkRequestConcise {
     return {
       requestId: this.#options.requestId,
       method: this.#request.method(),
@@ -189,7 +150,7 @@ export class NetworkFormatter {
     };
   }
 
-  toJSONDetailed(): object {
+  toJSONDetailed(): NetworkRequestDetailed {
     const redirectChain = this.#request.redirectChain();
     const formattedRedirectChain = redirectChain.reverse().map(request => {
       const id = this.#options.requestIdResolver
@@ -235,14 +196,6 @@ export class NetworkFormatter {
     return status;
   }
 
-  #getFormattedHeaderValue(headers: Record<string, string>): string[] {
-    const response: string[] = [];
-    for (const [name, value] of Object.entries(headers)) {
-      response.push(`- ${name}:${value}`);
-    }
-    return response;
-  }
-
   async #getFormattedResponseBody(
     httpResponse: HTTPResponse,
     sizeLimit = BODY_CONTEXT_SIZE_LIMIT,
@@ -272,4 +225,72 @@ function getSizeLimitedString(text: string, sizeLimit: number) {
     return text.substring(0, sizeLimit) + '... <truncated>';
   }
   return text;
+}
+
+function convertNetworkRequestConciseToString(
+  data: NetworkRequestConcise,
+): string {
+  // TODO truncate the URL
+  return `reqid=${data.requestId} ${data.method} ${data.url} ${data.status}${data.selectedInDevToolsUI ? ` [selected in the DevTools Network panel]` : ''}`;
+}
+
+function formatHeadlers(headers: Record<string, string>): string[] {
+  const response: string[] = [];
+  for (const [name, value] of Object.entries(headers)) {
+    response.push(`- ${name}:${value}`);
+  }
+  return response;
+}
+
+function converNetworkRequestDetailedToStringDetailed(
+  data: NetworkRequestDetailed,
+): string {
+  const response: string[] = [];
+  response.push(`## Request ${data.url}`);
+  response.push(`Status: ${data.status}`);
+  response.push(`### Request Headers`);
+  for (const line of formatHeadlers(data.requestHeaders)) {
+    response.push(line);
+  }
+
+  if (data.requestBody) {
+    response.push(`### Request Body`);
+    response.push(data.requestBody);
+  } else if (data.requestBodyFilePath) {
+    response.push(`### Request Body`);
+    response.push(`Saved to ${data.requestBodyFilePath}.`);
+  }
+
+  if (data.responseHeaders) {
+    response.push(`### Response Headers`);
+    for (const line of formatHeadlers(data.responseHeaders)) {
+      response.push(line);
+    }
+  }
+
+  if (data.responseBody) {
+    response.push(`### Response Body`);
+    response.push(data.responseBody);
+  } else if (data.responseBodyFilePath) {
+    response.push(`### Response Body`);
+    response.push(`Saved to ${data.responseBodyFilePath}.`);
+  }
+
+  if (data.failure) {
+    response.push(`### Request failed with`);
+    response.push(data.failure);
+  }
+
+  const redirectChain = data.redirectChain;
+  if (redirectChain?.length) {
+    response.push(`### Redirect chain`);
+    let indent = 0;
+    for (const request of redirectChain.reverse()) {
+      response.push(
+        `${'  '.repeat(indent)}${convertNetworkRequestConciseToString(request)})}`,
+      );
+      indent++;
+    }
+  }
+  return response.join('\n');
 }
