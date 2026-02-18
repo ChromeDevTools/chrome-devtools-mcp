@@ -183,15 +183,11 @@ export class NetworkFormatter {
     const failure = request.failure();
     let status: string;
     if (httpResponse) {
-      const responseStatus = httpResponse.status();
-      status =
-        responseStatus >= 200 && responseStatus <= 299
-          ? `[success - ${responseStatus}]`
-          : `[failed - ${responseStatus}]`;
+      status = httpResponse.status().toString();
     } else if (failure) {
-      status = `[failed - ${failure.errorText}]`;
+      status = failure.errorText;
     } else {
-      status = '[pending]';
+      status = 'pending';
     }
     return status;
   }
@@ -231,7 +227,7 @@ function convertNetworkRequestConciseToString(
   data: NetworkRequestConcise,
 ): string {
   // TODO truncate the URL
-  return `reqid=${data.requestId} ${data.method} ${data.url} ${data.status}${data.selectedInDevToolsUI ? ` [selected in the DevTools Network panel]` : ''}`;
+  return `reqid=${data.requestId} ${data.method} ${data.url} [${data.status}]${data.selectedInDevToolsUI ? ` [selected in the DevTools Network panel]` : ''}`;
 }
 
 function formatHeadlers(headers: Record<string, string>): string[] {

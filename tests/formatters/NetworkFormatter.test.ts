@@ -60,7 +60,7 @@ describe('NetworkFormatter', () => {
 
       assert.equal(
         formatter.toString(),
-        'reqid=1 GET http://example.com [success - 200]',
+        'reqid=1 GET http://example.com [200]',
       );
     });
     it('shows correct status for request with response code in 100', async () => {
@@ -75,7 +75,7 @@ describe('NetworkFormatter', () => {
 
       assert.equal(
         formatter.toString(),
-        'reqid=1 GET http://example.com [failed - 199]',
+        'reqid=1 GET http://example.com [199]',
       );
     });
     it('shows correct status for request with response code above 200', async () => {
@@ -90,7 +90,7 @@ describe('NetworkFormatter', () => {
 
       assert.equal(
         formatter.toString(),
-        'reqid=1 GET http://example.com [failed - 300]',
+        'reqid=1 GET http://example.com [300]',
       );
     });
     it('shows correct status for request that failed', async () => {
@@ -108,7 +108,7 @@ describe('NetworkFormatter', () => {
 
       assert.equal(
         formatter.toString(),
-        'reqid=1 GET http://example.com [failed - Error in Network]',
+        'reqid=1 GET http://example.com [Error in Network]',
       );
     });
 
@@ -385,7 +385,7 @@ describe('NetworkFormatter', () => {
         requestId: 1,
         method: 'GET',
         url: 'http://example.com',
-        status: '[pending]',
+        status: 'pending',
         selectedInDevToolsUI: true,
       });
     });
@@ -410,7 +410,7 @@ describe('NetworkFormatter', () => {
         requestId: 1,
         method: 'GET',
         url: 'http://example.com',
-        status: '[success - 200]',
+        status: '200',
         selectedInDevToolsUI: undefined,
         requestHeaders: {
           'content-size': '10',
