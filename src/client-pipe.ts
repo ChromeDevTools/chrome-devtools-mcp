@@ -811,6 +811,24 @@ export async function fileReadContent(
 }
 
 /**
+ * Open a file in the client editor and highlight the range that was just read.
+ * Fire-and-forget — does not block the tool response.
+ */
+export function fileHighlightReadRange(
+  filePath: string,
+  startLine: number,
+  endLine: number,
+): void {
+  sendClientRequest(
+    'file.highlightReadRange',
+    {filePath, startLine, endLine},
+    5_000,
+  ).catch(() => {
+    // Best-effort — don't let highlight failures affect tool responses
+  });
+}
+
+/**
  * Apply a text replacement (range → new content) and save.
  */
 export async function fileApplyEdit(

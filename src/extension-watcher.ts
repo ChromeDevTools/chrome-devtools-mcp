@@ -26,7 +26,7 @@ import path, {extname, join, relative} from 'node:path';
 
 import {logger} from './logger.js';
 
-const IGNORE_DIRS = new Set(['node_modules', 'dist', '.git']);
+const IGNORE_DIRS = new Set(['node_modules', 'dist', '.git', '.devtools']);
 const IGNORE_EXTENSIONS = new Set(['.vsix']);
 const DEVTOOLS_IGNORE_FILENAME = '.devtoolsignore';
 const EXT_FINGERPRINT_DIR = '.devtools';

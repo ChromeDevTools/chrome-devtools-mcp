@@ -6,7 +6,7 @@
 
 import path from 'node:path';
 
-import {fileGetSymbols, fileReadContent} from '../../client-pipe.js';
+import {fileGetSymbols, fileReadContent, fileHighlightReadRange} from '../../client-pipe.js';
 import {getHostWorkspace} from '../../config.js';
 import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
@@ -107,6 +107,9 @@ export const read = defineTool({
     // else: full file (leave start/end undefined)
 
     const contentResult = await fileReadContent(filePath, readStartLine, readEndLine);
+
+    // Fire-and-forget: highlight the read range in the client editor
+    fileHighlightReadRange(filePath, contentResult.startLine, contentResult.endLine);
 
     // Truncate if necessary
     let content = contentResult.content;
