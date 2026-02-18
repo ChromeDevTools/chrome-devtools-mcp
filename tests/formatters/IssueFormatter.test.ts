@@ -21,7 +21,7 @@ describe('IssueFormatter', () => {
   });
 
   afterEach(() => {
-    getIssueDescriptionStub.restore();
+    sinon.restore();
   });
 
   it('formats an issue message', t => {
