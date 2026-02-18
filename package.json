@@ -1,6 +1,6 @@
 {
   "name": "chrome-devtools-mcp",
-  "version": "0.17.0",
+  "version": "0.17.1",
   "description": "MCP server for Chrome DevTools",
   "type": "module",
   "bin": "./build/src/index.js",
@@ -55,7 +55,7 @@
     "@types/yargs": "^17.0.33",
     "@typescript-eslint/eslint-plugin": "^8.43.0",
     "@typescript-eslint/parser": "^8.43.0",
-    "chrome-devtools-frontend": "1.0.1583146",
+    "chrome-devtools-frontend": "1.0.1585538",
     "core-js": "3.48.0",
     "debug": "4.4.3",
     "eslint": "^9.35.0",
