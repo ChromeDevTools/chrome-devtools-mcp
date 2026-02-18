@@ -5,7 +5,7 @@
  */
 
 import assert from 'node:assert';
-import {describe, it} from 'node:test';
+import {afterEach, describe, it} from 'node:test';
 
 import sinon from 'sinon';
 
@@ -16,6 +16,10 @@ import type {TraceResult} from '../src/trace-processing/parse.js';
 import {getMockRequest, html, withMcpContext} from './utils.js';
 
 describe('McpContext', () => {
+  afterEach(() => {
+    sinon.restore();
+  });
+
   it('list pages', async () => {
     await withMcpContext(async (_response, context) => {
       const page = context.getSelectedPage();
