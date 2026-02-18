@@ -56,7 +56,7 @@ export async function executeEditWithSafetyLayer(
   let preExistingErrors = 0;
   try {
     const preDiags = await fileGetDiagnostics(filePath);
-    preExistingErrors = preDiags.diagnostics.filter(d => d.severity === 'Error').length;
+    preExistingErrors = preDiags.diagnostics.filter(d => d.severity.toLowerCase() === 'error').length;
   } catch {
     // Best-effort
   }
@@ -128,7 +128,7 @@ export async function executeEditWithSafetyLayer(
 
   try {
     const postDiags = await fileGetDiagnostics(filePath);
-    const newErrors = postDiags.diagnostics.filter(d => d.severity === 'Error');
+    const newErrors = postDiags.diagnostics.filter(d => d.severity.toLowerCase() === 'error');
 
     let fixAttempts = 0;
     for (const error of newErrors) {
@@ -167,7 +167,7 @@ export async function executeEditWithSafetyLayer(
         file: filePath,
         line: d.line,
         message: d.message,
-        severity: d.severity === 'Error' ? 'error' : 'warning',
+        severity: d.severity.toLowerCase() === 'error' ? 'error' : 'warning',
       });
     }
   } catch {

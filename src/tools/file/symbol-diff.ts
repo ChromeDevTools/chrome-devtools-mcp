@@ -22,6 +22,14 @@ export function diffSymbols(
 ): DetectedIntent[] {
   const intents: DetectedIntent[] = [];
 
+  // Guard: all old symbols gone with no replacements → bulk deletion
+  if (oldSymbols.length > 0 && newSymbols.length === 0) {
+    for (const s of oldSymbols) {
+      intents.push({type: 'delete', symbol: s.name});
+    }
+    return intents;
+  }
+
   const oldByName = new Map<string, FileSymbol>();
   for (const s of oldSymbols) oldByName.set(s.name, s);
 

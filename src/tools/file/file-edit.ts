@@ -73,7 +73,47 @@ export const edit = defineTool({
     const code = params.code;
     const relativePath = path.relative(getHostWorkspace(), filePath).replace(/\\/g, '/');
 
-    // Determine edit range based on targeting priority
+    // ── Input validation ──────────────────────────────────────────
+
+    // Bug #5: startLine > endLine
+    if (params.startLine !== undefined && params.endLine !== undefined && params.startLine > params.endLine) {
+      response.appendResponseLine(
+        `❌ Invalid line range: startLine (${params.startLine}) is greater than endLine (${params.endLine}).`,
+      );
+      return;
+    }
+
+    // Bug #2: Empty code targeting a symbol = accidental deletion
+    if (params.target && code.trim().length === 0) {
+      response.appendResponseLine(
+        `❌ Refusing to apply empty code to symbol "${params.target}" — this would delete it. ` +
+        `If deletion is intended, remove the symbol explicitly or use startLine/endLine.`,
+      );
+      return;
+    }
+
+    // Bug #6: Validate line ranges are within file bounds
+    if (params.startLine !== undefined || params.endLine !== undefined) {
+      try {
+        const contentResult = await fileReadContent(filePath);
+        const totalLines = contentResult.totalLines;
+
+        if (params.startLine !== undefined && (params.startLine < 1 || params.startLine > totalLines)) {
+          response.appendResponseLine(
+            `❌ startLine ${params.startLine} is out of bounds (file has ${totalLines} lines).`,
+          );
+          return;
+        }
+        if (params.endLine !== undefined && (params.endLine < 1 || params.endLine > totalLines)) {
+          response.appendResponseLine(
+            `❌ endLine ${params.endLine} is out of bounds (file has ${totalLines} lines).`,
+          );
+          return;
+        }
+      } catch {
+        // File might not exist yet; proceed and let the edit fail naturally
+      }
+    }
     let editStartLine: number;
     let editEndLine: number;
     let targetLabel: string | undefined;
