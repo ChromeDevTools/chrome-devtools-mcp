@@ -759,6 +759,32 @@ export interface FileExecuteRenameResult {
   error?: string;
 }
 
+// ── Orphaned Content Types ─────────────────────────────────
+
+export interface OrphanedSymbolNode {
+  name: string;
+  kind: string;
+  detail?: string;
+  range: {start: number; end: number};
+  children?: OrphanedSymbolNode[];
+}
+
+export interface OrphanedContentResult {
+  imports: OrphanedSymbolNode[];
+  exports: OrphanedSymbolNode[];
+  orphanComments: OrphanedSymbolNode[];
+  directives: OrphanedSymbolNode[];
+  gaps: Array<{start: number; end: number; type: 'blank' | 'unknown'}>;
+  stats: {
+    totalImports: number;
+    totalExports: number;
+    totalOrphanComments: number;
+    totalDirectives: number;
+    totalBlankLines: number;
+    coveragePercent: number;
+  };
+}
+
 export interface FileFindReferencesResult {
   references: Array<{file: string; line: number; character: number}>;
 }
@@ -924,6 +950,23 @@ export async function fileApplyCodeAction(
     10_000,
   );
   assertResult<FileApplyCodeActionResult>(result, 'file.applyCodeAction');
+  return result;
+}
+
+/**
+ * Extract orphaned content (imports, exports, comments) from TypeScript/JavaScript files.
+ * Supplements VS Code's DocumentSymbol API which doesn't include these constructs.
+ */
+export async function fileExtractOrphanedContent(
+  filePath: string,
+  includeSymbols = true,
+): Promise<OrphanedContentResult> {
+  const result = await sendClientRequest(
+    'file.extractOrphanedContent',
+    {filePath, includeSymbols},
+    30_000,
+  );
+  assertResult<OrphanedContentResult>(result, 'file.extractOrphanedContent');
   return result;
 }
 
