@@ -1,7 +1,7 @@
 exports[`McpResponse > add network request when attached 1`] = `
 # test response
 ## Request http://example.com
-Status:  [pending]
+Status: [pending]
 ### Request Headers
 - content-size:10
 ## Network requests
@@ -44,7 +44,7 @@ exports[`McpResponse > add network request when attached 2`] = `
 exports[`McpResponse > add network request when attached with POST data 1`] = `
 # test response
 ## Request http://example.com
-Status:  [success - 200]
+Status: [success - 200]
 ### Request Headers
 - content-size:10
 ### Request Body

@@ -1,7 +1,7 @@
 exports[`network > network_get_request > should get request from previous navigations 1`] = `
 # get_request response
 ## Request http://localhost:<port>/one
-Status:  [success - 200]
+Status: [success - 200]
 ### Request Headers
 - accept-language:<lang>
 - upgrade-insecure-requests:1
