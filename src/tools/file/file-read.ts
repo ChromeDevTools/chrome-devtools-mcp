@@ -192,17 +192,33 @@ function classifyLines(
 ): Map<number, LineOwner> {
   const owners = new Map<number, LineOwner>();
 
-  for (const sym of structure.symbols) {
-    const symStart = sym.range.startLine;
-    const symEnd = sym.range.endLine;
-    if (symEnd < startLine || symStart > endLine) continue;
-    const from = Math.max(symStart, startLine);
-    const to = Math.min(symEnd, endLine);
-    const owner: LineOwner = { type: 'symbol', symbol: sym };
-    for (let line = from; line <= to; line++) {
-      owners.set(line, owner);
+  // Walk the symbol tree recursively to find the most specific (deepest) child
+  // that owns each line. This ensures that for Markdown heading-dominance
+  // (where H1 spans the whole file), we classify lines by their immediate
+  // child sections rather than the all-encompassing parent.
+  const walkSymbols = (symbols: FileSymbol[]): void => {
+    for (const sym of symbols) {
+      const symStart = sym.range.startLine;
+      const symEnd = sym.range.endLine;
+      if (symEnd < startLine || symStart > endLine) continue;
+
+      if (sym.children.length > 0) {
+        // Recurse into children first — deeper symbols override parent
+        walkSymbols(sym.children);
+      }
+
+      // Only claim lines not already claimed by a deeper child
+      const from = Math.max(symStart, startLine);
+      const to = Math.min(symEnd, endLine);
+      const owner: LineOwner = { type: 'symbol', symbol: sym };
+      for (let line = from; line <= to; line++) {
+        if (!owners.has(line)) {
+          owners.set(line, owner);
+        }
+      }
     }
-  }
+  };
+  walkSymbols(structure.symbols);
 
   for (const block of blocks) {
     if (block.endLine < startLine || block.startLine > endLine) continue;
