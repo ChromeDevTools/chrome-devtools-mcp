@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {FileSymbol} from '../../client-pipe.js';
+import type {NativeDocumentSymbol} from '../../client-pipe.js';
 
 /**
  * A detected intent from comparing DocumentSymbol snapshots before/after an edit.
@@ -75,7 +75,7 @@ export interface FileEditResult {
  * A match in the symbol tree — the symbol and how to reach it.
  */
 export interface SymbolMatch {
-  symbol: FileSymbol;
-  parent?: FileSymbol;
+  symbol: NativeDocumentSymbol;
+  parent?: NativeDocumentSymbol;
   path: string[];
 }

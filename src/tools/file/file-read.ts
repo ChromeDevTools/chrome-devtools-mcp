@@ -11,9 +11,9 @@ import {
   fileExtractStructure,
   fileReadContent,
   fileHighlightReadRange,
-  OrphanedSymbolNode,
-  UnifiedFileSymbol,
-  UnifiedFileResult,
+  type OrphanedItem,
+  type FileSymbol,
+  type FileStructure,
 } from '../../client-pipe.js';
 import {getClientWorkspace} from '../../config.js';
 import {zod} from '../../third_party/index.js';
@@ -26,11 +26,6 @@ function resolveFilePath(file: string): string {
   if (path.isAbsolute(file)) return file;
   return path.resolve(getClientWorkspace(), file);
 }
-
-// Supported TS/JS file extensions for structured extraction
-const STRUCTURED_EXTS = new Set([
-  'ts', 'tsx', 'js', 'jsx', 'mts', 'mjs', 'cts', 'cjs',
-]);
 
 // Special target keywords for orphaned content
 const SPECIAL_TARGETS = ['#imports', '#exports', '#comments'] as const;
@@ -55,12 +50,12 @@ function addLineNumbers(content: string, startLine1: number): string {
 }
 
 function formatSkeletonEntry(
-  symbol: SymbolLike | OrphanedSymbolNode,
+  symbol: SymbolLike | OrphanedItem,
   indent = '',
   recursive = false,
 ): string[] {
   const lines: string[] = [];
-  // Both UnifiedFileSymbol and OrphanedSymbolNode are 1-indexed
+  // FileSymbol uses startLine/endLine, OrphanedItem uses start/end
   const startLine = 'startLine' in symbol.range ? symbol.range.startLine : symbol.range.start;
   const endLine = 'startLine' in symbol.range ? symbol.range.endLine : symbol.range.end;
   const range = startLine === endLine ? `${startLine}` : `${startLine}-${endLine}`;
@@ -129,7 +124,7 @@ interface NonSymbolBlock {
 }
 
 type LineOwner =
-  | { type: 'symbol'; symbol: UnifiedFileSymbol }
+  | { type: 'symbol'; symbol: FileSymbol }
   | { type: 'block'; block: NonSymbolBlock };
 
 /**
@@ -137,7 +132,7 @@ type LineOwner =
  * Each block represents a contiguous run of the same non-symbol category.
  * Lines within symbol ranges are excluded — only "between-symbol" content forms blocks.
  */
-function buildNonSymbolBlocks(structure: UnifiedFileResult): NonSymbolBlock[] {
+function buildNonSymbolBlocks(structure: FileStructure): NonSymbolBlock[] {
   // Build set of lines owned by symbols so we can exclude them
   const symbolLines = new Set<number>();
   for (const sym of structure.symbols) {
@@ -148,26 +143,19 @@ function buildNonSymbolBlocks(structure: UnifiedFileResult): NonSymbolBlock[] {
 
   const tagged: Array<{ line: number; type: NonSymbolType }> = [];
 
-  for (const imp of structure.imports) {
-    for (let line = imp.range.start; line <= imp.range.end; line++) {
-      if (!symbolLines.has(line)) tagged.push({ line, type: 'import' });
+  for (const item of structure.orphaned.items) {
+    const mappedType: NonSymbolType =
+      item.category === 'import' ? 'import' :
+      item.category === 'export' ? 'export' :
+      item.category === 'comment' ? 'comment' :
+      item.category === 'directive' ? 'directive' :
+      'comment'; // footnote/linkdef fall under comment for rendering
+
+    for (let line = item.range.start; line <= item.range.end; line++) {
+      if (!symbolLines.has(line)) tagged.push({ line, type: mappedType });
     }
   }
-  for (const exp of structure.exports) {
-    for (let line = exp.range.start; line <= exp.range.end; line++) {
-      if (!symbolLines.has(line)) tagged.push({ line, type: 'export' });
-    }
-  }
-  for (const comment of structure.orphanComments) {
-    for (let line = comment.range.start; line <= comment.range.end; line++) {
-      if (!symbolLines.has(line)) tagged.push({ line, type: 'comment' });
-    }
-  }
-  for (const dir of structure.directives) {
-    for (let line = dir.range.start; line <= dir.range.end; line++) {
-      if (!symbolLines.has(line)) tagged.push({ line, type: 'directive' });
-    }
-  }
+
   for (const gap of structure.gaps) {
     for (let line = gap.start; line <= gap.end; line++) {
       if (!symbolLines.has(line)) tagged.push({ line, type: 'gap' });
@@ -197,7 +185,7 @@ function buildNonSymbolBlocks(structure: UnifiedFileResult): NonSymbolBlock[] {
  * Only covers lines within the requested range for efficiency.
  */
 function classifyLines(
-  structure: UnifiedFileResult,
+  structure: FileStructure,
   blocks: NonSymbolBlock[],
   startLine: number,
   endLine: number,
@@ -259,7 +247,7 @@ function expandToBlockBoundaries(
  * Returns the actual source-line range that the output covers (for highlighting).
  */
 function renderStructuredRange(
-  structure: UnifiedFileResult,
+  structure: FileStructure,
   allLines: string[],
   requestedStart: number,
   requestedEnd: number,
@@ -280,7 +268,7 @@ function renderStructuredRange(
   const owners = classifyLines(structure, blocks, expandedStart, expandedEnd);
 
   const result: string[] = [];
-  const emittedSymbols = new Set<UnifiedFileSymbol>();
+  const emittedSymbols = new Set<FileSymbol>();
   const emittedBlocks = new Set<NonSymbolBlock>();
 
   // Track the actual source-line range that the output covers
@@ -504,14 +492,11 @@ export const read = defineTool({
     }
 
     // Check if this is a TS/JS file that supports structured extraction
-    const ext = path.extname(filePath).slice(1).toLowerCase();
-    const isStructuredFile = STRUCTURED_EXTS.has(ext);
-
-    // Get unified structure for TS/JS files (one call replaces three)
-    let structure: UnifiedFileResult | undefined;
+    // Get file structure via registry (supports any registered language)
+    let structure: FileStructure | undefined;
     let allLines: string[] = [];
-    if (isStructuredFile) {
-      structure = await fileExtractStructure(filePath);
+    structure = await fileExtractStructure(filePath);
+    if (structure) {
       allLines = structure.content.split('\n');
     }
 
@@ -573,7 +558,7 @@ export const read = defineTool({
     // ── Skeleton mode (no targets, no line range) ─────────────
     if (targets.length === 0 && skeleton) {
       if (!structure) {
-        response.appendResponseLine('Skeleton mode requires a TypeScript or JavaScript file.');
+        response.appendResponseLine('Skeleton mode requires a supported structured file type.');
         return;
       }
 
@@ -582,22 +567,19 @@ export const read = defineTool({
         startLine: number;
         endLine: number;
         category: 'imports' | 'exports' | 'comments' | 'directives' | 'symbol' | 'raw';
-        symbol?: UnifiedFileSymbol;
+        symbol?: FileSymbol;
       }
 
       const pieces: SkeletonPiece[] = [];
 
-      for (const imp of structure.imports) {
-        pieces.push({ startLine: imp.range.start, endLine: imp.range.end, category: 'imports' });
-      }
-      for (const exp of structure.exports) {
-        pieces.push({ startLine: exp.range.start, endLine: exp.range.end, category: 'exports' });
-      }
-      for (const comment of structure.orphanComments) {
-        pieces.push({ startLine: comment.range.start, endLine: comment.range.end, category: 'comments' });
-      }
-      for (const dir of structure.directives) {
-        pieces.push({ startLine: dir.range.start, endLine: dir.range.end, category: 'directives' });
+      for (const item of structure.orphaned.items) {
+        const cat: SkeletonPiece['category'] =
+          item.category === 'import' ? 'imports' :
+          item.category === 'export' ? 'exports' :
+          item.category === 'comment' ? 'comments' :
+          item.category === 'directive' ? 'directives' :
+          'comments';
+        pieces.push({ startLine: item.range.start, endLine: item.range.end, category: cat });
       }
       for (const sym of structure.symbols) {
         pieces.push({ startLine: sym.range.startLine, endLine: sym.range.endLine, category: 'symbol', symbol: sym });
@@ -662,10 +644,10 @@ export const read = defineTool({
 
     // ── Targets mode ─────────────────────────────────────────
 
-    // Targets require structured extraction (TS/JS only)
+    // Targets require structured extraction
     if (!structure) {
       response.appendResponseLine(
-        'Target-based reading requires a TypeScript or JavaScript file.',
+        'Target-based reading requires a supported structured file type.',
       );
       return;
     }
@@ -673,11 +655,11 @@ export const read = defineTool({
     for (const target of targets) {
       if (isSpecialTarget(target)) {
         // Handle special keywords: #imports, #exports, #comments
-        const items = target === '#imports'
-          ? structure.imports
-          : target === '#exports'
-            ? structure.exports
-            : structure.orphanComments;
+        const categoryFilter =
+          target === '#imports' ? 'import' :
+          target === '#exports' ? 'export' :
+          'comment';
+        const items = structure.orphaned.items.filter(i => i.category === categoryFilter);
 
         if (skeleton) {
           for (const item of items) {
@@ -694,7 +676,7 @@ export const read = defineTool({
           }
         }
       } else {
-        // Symbol targeting (1-indexed ranges from ts-morph)
+        // Symbol targeting (1-indexed ranges)
         const match = resolveSymbolTarget(structure.symbols, target);
 
         if (!match) {

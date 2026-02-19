@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {FileSymbol} from '../../client-pipe.js';
+import type {NativeDocumentSymbol} from '../../client-pipe.js';
 import type {DetectedIntent} from './types.js';
 
 /**
@@ -17,8 +17,8 @@ import type {DetectedIntent} from './types.js';
  * 4. Pass 3: Unmatched old → DELETE, unmatched new → ADD
  */
 export function diffSymbols(
-  oldSymbols: FileSymbol[],
-  newSymbols: FileSymbol[],
+  oldSymbols: NativeDocumentSymbol[],
+  newSymbols: NativeDocumentSymbol[],
 ): DetectedIntent[] {
   const intents: DetectedIntent[] = [];
 
@@ -30,10 +30,10 @@ export function diffSymbols(
     return intents;
   }
 
-  const oldByName = new Map<string, FileSymbol>();
+  const oldByName = new Map<string, NativeDocumentSymbol>();
   for (const s of oldSymbols) oldByName.set(s.name, s);
 
-  const newByName = new Map<string, FileSymbol>();
+  const newByName = new Map<string, NativeDocumentSymbol>();
   for (const s of newSymbols) newByName.set(s.name, s);
 
   const matchedOld = new Set<string>();

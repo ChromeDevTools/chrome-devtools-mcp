@@ -14,10 +14,6 @@ import {defineTool} from '../ToolDefinition.js';
 import {executeEditWithSafetyLayer} from './safety-layer.js';
 import {resolveSymbolTarget} from './symbol-resolver.js';
 
-const STRUCTURED_EXTS = new Set([
-  'ts', 'tsx', 'js', 'jsx', 'mts', 'mjs', 'cts', 'cjs',
-]);
-
 function resolveFilePath(file: string): string {
   if (path.isAbsolute(file)) return file;
   return path.resolve(getClientWorkspace(), file);
@@ -123,18 +119,17 @@ export const edit = defineTool({
     let targetLabel: string | undefined;
 
     if (params.target) {
-      // Symbol targeting: resolve via ts-morph extraction (TS/JS family only)
-      const ext = path.extname(filePath).slice(1).toLowerCase();
-      if (!STRUCTURED_EXTS.has(ext)) {
+      // Symbol targeting: resolve via registered language service
+      const structure = await fileExtractStructure(filePath);
+      if (!structure) {
+        const ext = path.extname(filePath).slice(1).toLowerCase();
         response.appendResponseLine(
-          `❌ Symbol targeting is only supported for TS/JS family files ` +
-          `(.ts, .tsx, .js, .jsx, .mts, .mjs, .cts, .cjs).\n\n` +
-          `Use \`startLine\`/\`endLine\` instead for .${ext} files.`,
+          `❌ Symbol targeting is not supported for .${ext} files.\n\n` +
+          `Use \`startLine\`/\`endLine\` instead.`,
         );
         return;
       }
 
-      const structure = await fileExtractStructure(filePath);
       const match = resolveSymbolTarget(structure.symbols, params.target);
 
       if (!match) {
@@ -146,7 +141,7 @@ export const edit = defineTool({
         return;
       }
 
-      // ts-morph ranges are 1-indexed; safety layer expects 0-indexed
+      // Ranges are 1-indexed; safety layer expects 0-indexed
       editStartLine = match.symbol.range.startLine - 1;
       editEndLine = match.symbol.range.endLine - 1;
       targetLabel = params.target;

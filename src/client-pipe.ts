@@ -637,24 +637,24 @@ export async function codebaseGetDiagnostics(
 
 // ── File Service Types ───────────────────────────────────
 
-export interface FileSymbolRange {
+export interface NativeDocumentSymbolRange {
   startLine: number;
   startChar: number;
   endLine: number;
   endChar: number;
 }
 
-export interface FileSymbol {
+export interface NativeDocumentSymbol {
   name: string;
   kind: string;
   detail?: string;
-  range: FileSymbolRange;
-  selectionRange: FileSymbolRange;
-  children: FileSymbol[];
+  range: NativeDocumentSymbolRange;
+  selectionRange: NativeDocumentSymbolRange;
+  children: NativeDocumentSymbol[];
 }
 
 export interface FileGetSymbolsResult {
-  symbols: FileSymbol[];
+  symbols: NativeDocumentSymbol[];
 }
 
 export interface FileReadContentResult {
@@ -757,6 +757,59 @@ export interface UnifiedFileResult {
 
 export interface FileFindReferencesResult {
   references: Array<{file: string; line: number; character: number}>;
+}
+
+// ── Shared File Structure Types (Multi-Language) ─────────
+
+export interface FileSymbolRange {
+  startLine: number;
+  endLine: number;
+  startChar?: number;
+  endChar?: number;
+}
+
+export interface FileSymbol {
+  name: string;
+  kind: string;
+  detail?: string;
+  range: FileSymbolRange;
+  children: FileSymbol[];
+  exported?: boolean;
+  modifiers?: string[];
+}
+
+export type OrphanedCategory =
+  | 'import'
+  | 'export'
+  | 'comment'
+  | 'directive'
+  | 'footnote'
+  | 'linkdef';
+
+export interface OrphanedItem {
+  name: string;
+  kind: string;
+  detail?: string;
+  range: {start: number; end: number};
+  children?: OrphanedItem[];
+  category: OrphanedCategory;
+}
+
+export interface FileStructureStats {
+  totalSymbols: number;
+  totalOrphaned: number;
+  totalBlankLines: number;
+  coveragePercent: number;
+}
+
+export interface FileStructure {
+  symbols: FileSymbol[];
+  content: string;
+  totalLines: number;
+  fileType: 'typescript' | 'markdown' | 'json' | 'unknown';
+  orphaned: {items: OrphanedItem[]};
+  gaps: Array<{start: number; end: number; type: 'blank' | 'unknown'}>;
+  stats: FileStructureStats;
 }
 
 export interface FileCodeActionItem {
@@ -943,20 +996,20 @@ export async function fileExtractOrphanedContent(
 }
 
 /**
- * Extract the complete file structure using ts-morph only.
- * Returns symbols, content, imports, exports, comments, directives, gaps, and stats.
- * Single round-trip replacement for fileGetSymbols + fileExtractOrphanedContent + fileReadContent.
+ * Extract the complete file structure via the LanguageServiceRegistry.
+ * Returns FileStructure if the file type is supported, undefined otherwise.
  */
 export async function fileExtractStructure(
   filePath: string,
-): Promise<UnifiedFileResult> {
+): Promise<FileStructure | undefined> {
   const result = await sendClientRequest(
     'file.extractStructure',
     {filePath},
     30_000,
   );
-  assertResult<UnifiedFileResult>(result, 'file.extractStructure');
-  return result;
+  // The registry returns undefined for unsupported file types
+  if (result === undefined || result === null) return undefined;
+  return result as FileStructure;
 }
 
 // ── Recovery Handler ─────────────────────────────────────

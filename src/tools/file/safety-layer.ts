@@ -12,7 +12,7 @@ import {
   fileFindReferences,
   fileGetCodeActions,
   fileApplyCodeAction,
-  type FileSymbol,
+  type NativeDocumentSymbol,
 } from '../../client-pipe.js';
 import {diffSymbols, extractNewName} from './symbol-diff.js';
 import type {
@@ -44,7 +44,7 @@ export async function executeEditWithSafetyLayer(
   const autoFixed: AutoFix[] = [];
 
   // ── Phase 1: Pre-check — Get symbols before edit ────────────────
-  let oldSymbols: FileSymbol[] = [];
+  let oldSymbols: NativeDocumentSymbol[] = [];
   try {
     const beforeResult = await fileGetSymbols(filePath);
     oldSymbols = beforeResult.symbols;
@@ -79,7 +79,7 @@ export async function executeEditWithSafetyLayer(
 
   // ── Phase 1b: Post-apply intent detection ───────────────────────
   // Get symbols after apply for comparison
-  let newSymbols: FileSymbol[] = [];
+  let newSymbols: NativeDocumentSymbol[] = [];
   if (oldSymbols.length > 0) {
     try {
       const afterResult = await fileGetSymbols(filePath);

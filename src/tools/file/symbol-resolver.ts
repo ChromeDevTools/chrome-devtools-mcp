@@ -6,7 +6,7 @@
 
 /**
  * Minimum shape required for symbol tree navigation.
- * Both FileSymbol and UnifiedFileSymbol satisfy this.
+ * FileSymbol from the shared interface satisfies this.
  */
 export interface SymbolLikeRange {
   startLine: number;
