@@ -19,7 +19,7 @@ import {getClientWorkspace} from '../../config.js';
 import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
 import {CHARACTER_LIMIT, defineTool} from '../ToolDefinition.js';
-import {resolveSymbolTarget, getSiblingNames, getChildNames, formatRange} from './symbol-resolver.js';
+import {resolveSymbolTarget} from './symbol-resolver.js';
 import type {SymbolLike} from './symbol-resolver.js';
 
 function resolveFilePath(file: string): string {
@@ -47,7 +47,13 @@ function getContentSlice(allLines: string[], startLine: number, endLine: number)
   return allLines.slice(startLine - 1, endLine).join('\n');
 }
 
-// Format skeleton entry for a symbol (all ranges are 1-indexed)
+/**
+ * Prefix each line in a content string with its 1-indexed line number.
+ */
+function addLineNumbers(content: string, startLine1: number): string {
+  return content.split('\n').map((line, i) => `[${startLine1 + i}] ${line}`).join('\n');
+}
+
 function formatSkeletonEntry(
   symbol: SymbolLike | OrphanedSymbolNode,
   indent = '',
@@ -55,14 +61,11 @@ function formatSkeletonEntry(
 ): string[] {
   const lines: string[] = [];
   // Both UnifiedFileSymbol and OrphanedSymbolNode are 1-indexed
-  const range = 'startLine' in symbol.range
-    ? `${symbol.range.startLine}-${symbol.range.endLine}`
-    : `${symbol.range.start}-${symbol.range.end}`;
-  const kind = symbol.kind;
-  const name = symbol.name;
-  const detail = 'detail' in symbol && symbol.detail ? ` (${symbol.detail})` : '';
+  const startLine = 'startLine' in symbol.range ? symbol.range.startLine : symbol.range.start;
+  const endLine = 'startLine' in symbol.range ? symbol.range.endLine : symbol.range.end;
+  const range = startLine === endLine ? `${startLine}` : `${startLine}-${endLine}`;
 
-  lines.push(`${indent}[${range}] ${kind}: ${name}${detail}`);
+  lines.push(`${indent}[${range}]: ${symbol.kind} ${symbol.name}`);
 
   if (recursive && symbol.children && symbol.children.length > 0) {
     for (const child of symbol.children) {
@@ -74,49 +77,42 @@ function formatSkeletonEntry(
 }
 
 /**
- * Format content with child placeholders.
- * contentStartLine and symbol ranges are all 1-indexed.
+ * Format content with child placeholders and line numbers.
+ * All line ranges are 1-indexed.
  */
 function formatContentWithPlaceholders(
-  content: string,
+  allLines: string[],
   symbol: SymbolLike,
-  contentStartLine: number,
+  startLine: number,
+  endLine: number,
 ): string {
   if (!symbol.children || symbol.children.length === 0) {
-    return content;
+    return addLineNumbers(getContentSlice(allLines, startLine, endLine), startLine);
   }
 
-  const lines = content.split('\n');
+  const childMap = new Map<number, SymbolLike>();
+  for (const child of symbol.children) {
+    for (let l = child.range.startLine; l <= child.range.endLine; l++) {
+      childMap.set(l, child);
+    }
+  }
+
+  const emitted = new Set<SymbolLike>();
   const result: string[] = [];
 
-  // Sort children by start line
-  const sortedChildren = [...symbol.children].sort(
-    (a, b) => a.range.startLine - b.range.startLine
-  );
-
-  let currentLine = contentStartLine;
-  for (const child of sortedChildren) {
-    const childStart = child.range.startLine;
-    const childEnd = child.range.endLine;
-
-    // Add lines before this child
-    while (currentLine < childStart && currentLine - contentStartLine < lines.length) {
-      result.push(lines[currentLine - contentStartLine]);
-      currentLine++;
+  for (let lineNum = startLine; lineNum <= endLine; lineNum++) {
+    const child = childMap.get(lineNum);
+    if (child) {
+      if (!emitted.has(child)) {
+        emitted.add(child);
+        const childRange = child.range.startLine === child.range.endLine
+          ? `${child.range.startLine}`
+          : `${child.range.startLine}-${child.range.endLine}`;
+        result.push(`[${childRange}]: ${child.kind} ${child.name}`);
+      }
+    } else {
+      result.push(`[${lineNum}] ${allLines[lineNum - 1] ?? ''}`);
     }
-
-    // Add placeholder for child (ranges already 1-indexed, no +1 needed)
-    const lineCount = childEnd - childStart + 1;
-    result.push(`  [${child.name}] (${child.kind}, lines ${childStart}-${childEnd}, ${lineCount} lines)`);
-
-    // Skip child lines
-    currentLine = childEnd + 1;
-  }
-
-  // Add remaining lines after last child
-  while (currentLine - contentStartLine < lines.length) {
-    result.push(lines[currentLine - contentStartLine]);
-    currentLine++;
   }
 
   return result.join('\n');
@@ -319,7 +315,7 @@ function renderStructuredRange(
 
     if (!owner) {
       // Unclassified line (shouldn't happen with complete coverage, but safe)
-      result.push(allLines[line - 1] ?? '');
+      result.push(`[${line}] ${allLines[line - 1] ?? ''}`);
       trackSourceLine(line);
       actualStart = Math.min(actualStart, line);
       actualEnd = Math.max(actualEnd, line);
@@ -331,14 +327,10 @@ function renderStructuredRange(
       const sym = owner.symbol;
       if (!emittedSymbols.has(sym)) {
         emittedSymbols.add(sym);
-        if (result.length > 0 && result[result.length - 1] !== '') {
-          result.push('');
-        }
-        result.push(
-          `--- symbol: ${sym.name} (${sym.kind}, lines ${sym.range.startLine}-${sym.range.endLine}) ---`,
-        );
-        result.push(`Use { target: "${sym.name}" } to read this symbol`);
-        result.push('');
+        const symRange = sym.range.startLine === sym.range.endLine
+          ? `${sym.range.startLine}`
+          : `${sym.range.startLine}-${sym.range.endLine}`;
+        result.push(`[${symRange}]: ${sym.kind} ${sym.name}`);
       }
       // Track all lines of this symbol within the range
       const symEndInRange = Math.min(sym.range.endLine, expandedEnd);
@@ -365,16 +357,15 @@ function renderStructuredRange(
         // Collapse imports/exports/comments/directives to stubs
         flushSourceRange();
         collapsedRanges.push({startLine: block.startLine, endLine: block.endLine});
-        const blockLineCount = block.endLine - block.startLine + 1;
-        const label = blockLineCount === 1
-          ? `--- ${block.type} (line ${block.startLine}) ---`
-          : `--- ${block.type} (lines ${block.startLine}-${block.endLine}) ---`;
-        result.push(label);
+        const blockRange = block.startLine === block.endLine
+          ? `${block.startLine}`
+          : `${block.startLine}-${block.endLine}`;
+        result.push(`[${blockRange}]: ${block.type}s`);
       } else {
         // Emit raw source for the block
         for (let l = blockStart; l <= blockEnd; l++) {
           trackSourceLine(l);
-          result.push(allLines[l - 1] ?? '');
+          result.push(`[${l}] ${allLines[l - 1] ?? ''}`);
         }
       }
     }
@@ -498,8 +489,6 @@ export const read = defineTool({
     }
 
     const relativePath = path.relative(getClientWorkspace(), filePath).replace(/\\/g, '/');
-    response.appendResponseLine(`## file_read: ${relativePath}`);
-    response.appendResponseLine('');
 
     // ── Mutual exclusivity: target + startLine/endLine ─────
     const hasLineRange = params.startLine !== undefined || params.endLine !== undefined;
@@ -533,17 +522,12 @@ export const read = defineTool({
         const rawEnd = params.endLine !== undefined ? params.endLine - 1 : undefined;
         const content = await fileReadContent(filePath, rawStart, rawEnd);
         fileHighlightReadRange(filePath, content.startLine, content.endLine);
+        const numbered = addLineNumbers(content.content, content.startLine + 1);
         response.appendResponseLine(
-          `**Range:** ${formatRange(content.startLine, content.endLine, content.totalLines)}`,
+          numbered.length > CHARACTER_LIMIT
+            ? numbered.substring(0, CHARACTER_LIMIT) + '\n\n⚠️ Truncated'
+            : numbered,
         );
-        response.appendResponseLine('');
-        response.appendResponseLine('```');
-        response.appendResponseLine(
-          content.content.length > CHARACTER_LIMIT
-            ? content.content.substring(0, CHARACTER_LIMIT) + '\n\n⚠️ Truncated'
-            : content.content,
-        );
-        response.appendResponseLine('```');
         return;
       }
 
@@ -575,13 +559,6 @@ export const read = defineTool({
       // Highlight source (yellow) and collapsed (grey + fold) ranges
       fileHighlightReadRange(filePath, actualStart - 1, actualEnd - 1, collapsedRanges, sourceRanges);
 
-      const rangeNote = (actualStart !== reqStart || actualEnd !== reqEnd)
-        ? ` (expanded from ${reqStart}-${reqEnd} to include complete non-symbol blocks)`
-        : '';
-      response.appendResponseLine(
-        `**Range:** lines ${actualStart}-${actualEnd} of ${structure.totalLines}${rangeNote}`,
-      );
-      response.appendResponseLine('');
       response.appendResponseLine(
         output.length > CHARACTER_LIMIT
           ? output.substring(0, CHARACTER_LIMIT) + '\n\n⚠️ Truncated'
@@ -593,83 +570,72 @@ export const read = defineTool({
     // ── Skeleton mode (no targets, no line range) ─────────────
     if (targets.length === 0 && skeleton) {
       if (!structure) {
-        // Non-TS/JS: fall back to fileReadContent for basic content
-        response.appendResponseLine('**Skeleton Mode** (0 symbols)');
-        response.appendResponseLine('');
         response.appendResponseLine('Skeleton mode requires a TypeScript or JavaScript file.');
         return;
       }
 
-      response.appendResponseLine(
-        `**Skeleton Mode** (${structure.symbols.length} symbols)`,
-      );
-      response.appendResponseLine('');
-
-      // Imports
-      if (structure.imports.length > 0) {
-        response.appendResponseLine(`**Imports (${structure.imports.length}):**`);
-        for (const imp of structure.imports) {
-          response.appendResponseLine(
-            `  [${imp.range.start}] ${imp.kind}: ${imp.name}`,
-          );
-        }
-        response.appendResponseLine('');
+      // Build source-ordered list of all items
+      interface SkeletonPiece {
+        startLine: number;
+        endLine: number;
+        category: 'imports' | 'exports' | 'comments' | 'directives' | 'symbol' | 'raw';
+        symbol?: UnifiedFileSymbol;
       }
 
-      // Exports
-      if (structure.exports.length > 0) {
-        response.appendResponseLine(`**Exports (${structure.exports.length}):**`);
-        for (const exp of structure.exports) {
-          response.appendResponseLine(
-            `  [${exp.range.start}] ${exp.kind}: ${exp.name}`,
-          );
-        }
-        response.appendResponseLine('');
-      }
+      const pieces: SkeletonPiece[] = [];
 
-      // Comments
-      if (structure.orphanComments.length > 0) {
-        response.appendResponseLine(`**Comments (${structure.orphanComments.length}):**`);
-        for (const comment of structure.orphanComments) {
-          response.appendResponseLine(
-            `  [${comment.range.start}] ${comment.kind}: ${comment.name}`,
-          );
-        }
-        response.appendResponseLine('');
+      for (const imp of structure.imports) {
+        pieces.push({ startLine: imp.range.start, endLine: imp.range.end, category: 'imports' });
       }
-
-      // Directives
-      if (structure.directives.length > 0) {
-        response.appendResponseLine(`**Directives (${structure.directives.length}):**`);
-        for (const dir of structure.directives) {
-          response.appendResponseLine(
-            `  [${dir.range.start}] ${dir.kind}: ${dir.name}`,
-          );
-        }
-        response.appendResponseLine('');
+      for (const exp of structure.exports) {
+        pieces.push({ startLine: exp.range.start, endLine: exp.range.end, category: 'exports' });
       }
-
-      // Symbols
-      response.appendResponseLine(`**Symbols (${structure.symbols.length}):**`);
+      for (const comment of structure.orphanComments) {
+        pieces.push({ startLine: comment.range.start, endLine: comment.range.end, category: 'comments' });
+      }
+      for (const dir of structure.directives) {
+        pieces.push({ startLine: dir.range.start, endLine: dir.range.end, category: 'directives' });
+      }
       for (const sym of structure.symbols) {
-        const entries = formatSkeletonEntry(sym, '  ', recursive);
-        for (const entry of entries) response.appendResponseLine(entry);
+        pieces.push({ startLine: sym.range.startLine, endLine: sym.range.endLine, category: 'symbol', symbol: sym });
+      }
+      for (const gap of structure.gaps) {
+        if (gap.type === 'unknown') {
+          pieces.push({ startLine: gap.start, endLine: gap.end, category: 'raw' });
+        }
       }
 
-      // Gaps (lines not covered by any category)
-      const unknownGaps = structure.gaps.filter(g => g.type === 'unknown');
-      if (unknownGaps.length > 0) {
-        response.appendResponseLine('');
-        response.appendResponseLine(`**Gaps (${unknownGaps.length}):**`);
-        for (const gap of unknownGaps) {
-          if (gap.start === gap.end) {
-            response.appendResponseLine(`  [${gap.start}] ${allLines[gap.start - 1] ?? ''}`);
-          } else {
-            response.appendResponseLine(`  [${gap.start}-${gap.end}]:`);
-            for (let l = gap.start; l <= gap.end; l++) {
-              response.appendResponseLine(`    ${allLines[l - 1] ?? ''}`);
-            }
+      pieces.sort((a, b) => a.startLine - b.startLine);
+
+      // Merge adjacent same-category block items
+      const merged: SkeletonPiece[] = [];
+      for (const piece of pieces) {
+        const prev = merged[merged.length - 1];
+        const canMerge = prev
+          && piece.category !== 'symbol'
+          && piece.category !== 'raw'
+          && prev.category === piece.category
+          && piece.startLine <= prev.endLine + 2;
+        if (canMerge && prev) {
+          prev.endLine = Math.max(prev.endLine, piece.endLine);
+        } else {
+          merged.push({ ...piece });
+        }
+      }
+
+      for (const piece of merged) {
+        if (piece.category === 'raw') {
+          for (let l = piece.startLine; l <= piece.endLine; l++) {
+            response.appendResponseLine(`[${l}] ${allLines[l - 1] ?? ''}`);
           }
+        } else if (piece.symbol) {
+          const entries = formatSkeletonEntry(piece.symbol, '', recursive);
+          for (const entry of entries) response.appendResponseLine(entry);
+        } else {
+          const range = piece.startLine === piece.endLine
+            ? `${piece.startLine}`
+            : `${piece.startLine}-${piece.endLine}`;
+          response.appendResponseLine(`[${range}]: ${piece.category}`);
         }
       }
 
@@ -681,17 +647,12 @@ export const read = defineTool({
       const content = await fileReadContent(filePath);
       fileHighlightReadRange(filePath, content.startLine, content.endLine);
 
+      const numbered = addLineNumbers(content.content, content.startLine + 1);
       response.appendResponseLine(
-        `**Range:** ${formatRange(content.startLine, content.endLine, content.totalLines)}`,
+        numbered.length > CHARACTER_LIMIT
+          ? numbered.substring(0, CHARACTER_LIMIT) + '\n\n⚠️ Truncated'
+          : numbered,
       );
-      response.appendResponseLine('');
-      response.appendResponseLine('```');
-      response.appendResponseLine(
-        content.content.length > CHARACTER_LIMIT
-          ? content.content.substring(0, CHARACTER_LIMIT) + '\n\n⚠️ Truncated'
-          : content.content,
-      );
-      response.appendResponseLine('```');
       return;
     }
 
@@ -708,57 +669,25 @@ export const read = defineTool({
     for (const target of targets) {
       if (isSpecialTarget(target)) {
         // Handle special keywords: #imports, #exports, #comments
-        if (target === '#imports') {
-          response.appendResponseLine(`**Imports (${structure.imports.length}):**`);
-          if (skeleton) {
-            for (const imp of structure.imports) {
-              response.appendResponseLine(
-                `  [${imp.range.start}-${imp.range.end}] ${imp.kind}: ${imp.name}`,
-              );
-            }
-          } else {
-            for (const imp of structure.imports) {
-              const content = getContentSlice(allLines, imp.range.start, imp.range.end);
-              response.appendResponseLine(`\`\`\``);
-              response.appendResponseLine(content);
-              response.appendResponseLine(`\`\`\``);
-            }
+        const items = target === '#imports'
+          ? structure.imports
+          : target === '#exports'
+            ? structure.exports
+            : structure.orphanComments;
+
+        if (skeleton) {
+          for (const item of items) {
+            const entries = formatSkeletonEntry(item, '', false);
+            for (const entry of entries) response.appendResponseLine(entry);
           }
-          response.appendResponseLine('');
-        } else if (target === '#exports') {
-          response.appendResponseLine(`**Exports (${structure.exports.length}):**`);
-          if (skeleton) {
-            for (const exp of structure.exports) {
-              response.appendResponseLine(
-                `  [${exp.range.start}-${exp.range.end}] ${exp.kind}: ${exp.name}`,
-              );
-            }
-          } else {
-            for (const exp of structure.exports) {
-              const content = getContentSlice(allLines, exp.range.start, exp.range.end);
-              response.appendResponseLine(`\`\`\``);
-              response.appendResponseLine(content);
-              response.appendResponseLine(`\`\`\``);
-            }
+        } else {
+          for (const item of items) {
+            const numbered = addLineNumbers(
+              getContentSlice(allLines, item.range.start, item.range.end),
+              item.range.start,
+            );
+            response.appendResponseLine(numbered);
           }
-          response.appendResponseLine('');
-        } else if (target === '#comments') {
-          response.appendResponseLine(`**Comments (${structure.orphanComments.length}):**`);
-          if (skeleton) {
-            for (const comment of structure.orphanComments) {
-              response.appendResponseLine(
-                `  [${comment.range.start}-${comment.range.end}] ${comment.kind}: ${comment.name}`,
-              );
-            }
-          } else {
-            for (const comment of structure.orphanComments) {
-              const content = getContentSlice(allLines, comment.range.start, comment.range.end);
-              response.appendResponseLine(`\`\`\``);
-              response.appendResponseLine(content);
-              response.appendResponseLine(`\`\`\``);
-            }
-          }
-          response.appendResponseLine('');
         }
       } else {
         // Symbol targeting (1-indexed ranges from ts-morph)
@@ -767,9 +696,8 @@ export const read = defineTool({
         if (!match) {
           const available = structure.symbols.map(s => `${s.kind} ${s.name}`).join(', ');
           response.appendResponseLine(
-            `**"${target}":** Not found. Available: ${available || 'none'}`,
+            `"${target}": Not found. Available: ${available || 'none'}`,
           );
-          response.appendResponseLine('');
           continue;
         }
 
@@ -778,35 +706,31 @@ export const read = defineTool({
         const endLine = symbol.range.endLine;
 
         if (skeleton) {
-          // Skeleton mode: show structure
-          response.appendResponseLine(`**${target}** (${symbol.kind}):`);
-          const entries = formatSkeletonEntry(symbol, '  ', recursive);
+          const entries = formatSkeletonEntry(symbol, '', recursive);
           for (const entry of entries) response.appendResponseLine(entry);
-          response.appendResponseLine('');
         } else {
-          // Content mode: read from structure.content
-          const content = getContentSlice(allLines, startLine, endLine);
           // Highlight in editor (convert 1-indexed to 0-indexed for VS Code)
           fileHighlightReadRange(filePath, startLine - 1, endLine - 1);
 
-          response.appendResponseLine(
-            `**${target}** (${symbol.kind}, lines ${startLine}-${endLine}):`,
-          );
-          response.appendResponseLine('```');
+          const range = startLine === endLine ? `${startLine}` : `${startLine}-${endLine}`;
+          response.appendResponseLine(`[${range}]: ${symbol.kind} ${symbol.name}`);
 
           if (recursive || !symbol.children || symbol.children.length === 0) {
-            // Full content
+            const numbered = addLineNumbers(
+              getContentSlice(allLines, startLine, endLine),
+              startLine,
+            );
             response.appendResponseLine(
-              content.length > CHARACTER_LIMIT
-                ? content.substring(0, CHARACTER_LIMIT) + '\n\n⚠️ Truncated'
-                : content,
+              numbered.length > CHARACTER_LIMIT
+                ? numbered.substring(0, CHARACTER_LIMIT) + '\n\n⚠️ Truncated'
+                : numbered,
             );
           } else {
-            // Content with placeholders for children
             const formatted = formatContentWithPlaceholders(
-              content,
+              allLines,
               symbol,
               startLine,
+              endLine,
             );
             response.appendResponseLine(
               formatted.length > CHARACTER_LIMIT
@@ -814,9 +738,6 @@ export const read = defineTool({
                 : formatted,
             );
           }
-
-          response.appendResponseLine('```');
-          response.appendResponseLine('');
         }
       }
     }
