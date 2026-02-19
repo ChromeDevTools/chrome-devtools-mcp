@@ -99,6 +99,12 @@ function formatTree(
   const indent = INDENT.repeat(depth);
 
   for (const node of nodes) {
+    if (node.ignored) {
+      const suffix = node.type === 'directory' ? `${node.name}/` : node.name;
+      output += `${indent}[Ignored] ${suffix}\n`;
+      continue;
+    }
+
     if (node.type === 'directory') {
       const willRecurse = !!node.children?.length
         && (opts.maxFolderDepth === undefined || depth < opts.maxFolderDepth);
@@ -194,19 +200,16 @@ export const map = defineTool({
   description: 'Get a structural map of the codebase at any granularity — folders, files, or symbols.\n\n' +
     'Returns a tree with folders ending in `/`, files with extensions, and symbols as `kind name`.\n\n' +
     '**Parameters:**\n' +
-    '- `folderPath` — Folder to map (relative or absolute). Defaults to workspace root.\n' +
+    '- `dir` — Folder to map (relative or absolute). Defaults to workspace root.\n' +
     '- `recursive` — Include subdirectories recursively. Default: false (immediate children only).\n' +
-    '- `fileTypes` — Which files to include: `"*"` (all), `"none"` (folders only), or array of extensions.\n' +
     '- `symbols` — Include symbol skeleton (name + kind, hierarchically nested). Default: false.\n' +
     '- `metadata` — Show counts per file/folder. Key: F=files, D=directories, L=lines, S=symbols. Example: `[5F|3D]` = 5 files, 3 dirs. `[61L|25S]` = 61 lines, 25 symbols. Default: false.\n\n' +
     '**EXAMPLES:**\n' +
     '- Shallow view of root: `{}`\n' +
     '- Full project tree: `{ recursive: true }`\n' +
-    '- Only TypeScript files: `{ fileTypes: [".ts"], recursive: true }`\n' +
-    '- Folder structure only: `{ fileTypes: "none", recursive: true }`\n' +
-    '- Specific folder with symbols: `{ folderPath: "src", recursive: true, symbols: true }`\n' +
+    '- Specific folder with symbols: `{ dir: "src", recursive: true, symbols: true }`\n' +
     '- Tree with metadata: `{ recursive: true, metadata: true }`\n' +
-    '- Only CSS files in a subfolder: `{ folderPath: "src/styles", fileTypes: [".css", ".scss"] }`',
+    '- Only a subfolder: `{ dir: "src/styles", recursive: true }`',
   annotations: {
     title: 'Codebase Map',
     category: ToolCategory.CODEBASE_ANALYSIS,
@@ -217,18 +220,11 @@ export const map = defineTool({
     conditions: ['client-pipe', 'codebase-sequential'],
   },
   schema: {
-    folderPath: zod.string().optional()
+    dir: zod.string().optional()
       .describe('Folder to map. Relative to workspace root or absolute. Defaults to workspace root.'),
 
     recursive: zod.boolean().optional()
       .describe('Include subdirectories recursively. Default: false (immediate children only).'),
-
-    fileTypes: zod.union([
-      zod.literal('*'),
-      zod.literal('none'),
-      zod.array(zod.string()),
-    ]).optional()
-      .describe('"*" = all files (default), "none" = folders only, or array of extensions like [".ts", ".md"].'),
 
     symbols: zod.boolean().optional()
       .describe('Include symbol skeleton (name + kind, hierarchically nested). Default: false.'),
@@ -241,12 +237,10 @@ export const map = defineTool({
     response.setSkipLedger();
 
     const rootDir = getClientWorkspace();
-    const folderPath = params.folderPath ?? rootDir;
+    const dir = params.dir ?? rootDir;
     const recursive = params.recursive ?? false;
-    const fileTypes = params.fileTypes ?? '*';
     const symbols = params.symbols ?? false;
     const metadata = params.metadata ?? false;
-    const isNone = fileTypes === 'none';
 
     // Dynamic timeout based on request scope
     const dynamicTimeout =
@@ -256,15 +250,15 @@ export const map = defineTool({
 
     const overviewResult = await codebaseGetOverview(
       rootDir,
-      folderPath,
+      dir,
       recursive,
-      fileTypes,
       symbols,
       dynamicTimeout,
       metadata,
+      'codebase_map',
     );
 
-    if (overviewResult.summary.totalFiles === 0 && !isNone) {
+    if (overviewResult.summary.totalFiles === 0) {
       const ignoreContext = readIgnoreContext(overviewResult.projectRoot);
       response.appendResponseLine('No files found. Check scope patterns or .devtoolsignore.\n');
       if (ignoreContext.activePatterns.length > 0) {
@@ -286,7 +280,7 @@ export const map = defineTool({
 
     // Quick check: does the full output fit without any compression?
     const fullOutput = formatTree(tree, {
-      showFiles: !isNone,
+      showFiles: true,
       showSymbols: symbols,
       metadata: metadata,
     });
@@ -313,7 +307,7 @@ export const map = defineTool({
         if (fd === 0) {
           response.appendResponseLine(
             'Error: the folder structure at the root level alone exceeds the output limit. ' +
-            'Try targeting a specific subfolder with the folderPath parameter.\n',
+            'Try targeting a specific subfolder with the dir parameter.\n',
           );
           return;
         }
@@ -327,7 +321,7 @@ export const map = defineTool({
 
     // Phase 2: Files — expand per folder depth level
     let fileLimit = -1;
-    if (!compressionLabel && !isNone) {
+    if (!compressionLabel) {
       for (let fd = 0; fd <= folderLimit; fd++) {
         const candidate = formatTree(tree, {
           showFiles: true, showSymbols: false, metadata: metaMode,
@@ -427,7 +421,7 @@ export const map = defineTool({
     if (compressionLabel) {
       response.appendResponseLine(
         `Output compressed: ${compressionLabel}. ` +
-        'Use folderPath to target a specific subfolder, or file_read for full file details.\n',
+        'Use dir to target a specific subfolder, or file_read for full file details.\n',
       );
     }
 
