@@ -5,7 +5,7 @@
  */
 
 import assert from 'node:assert';
-import {describe, it} from 'node:test';
+import {afterEach, describe, it} from 'node:test';
 
 import type {Dialog} from 'puppeteer-core';
 import sinon from 'sinon';
@@ -23,6 +23,10 @@ import {
 import {html, withMcpContext} from '../utils.js';
 
 describe('pages', () => {
+  afterEach(() => {
+    sinon.restore();
+  });
+
   describe('list_pages', () => {
     it('list pages', async () => {
       await withMcpContext(async (response, context) => {

@@ -6,7 +6,7 @@
 
 import assert from 'node:assert';
 import path from 'node:path';
-import {describe, it} from 'node:test';
+import {afterEach, describe, it} from 'node:test';
 
 import sinon from 'sinon';
 
@@ -34,6 +34,10 @@ function extractId(response: McpResponse) {
 }
 
 describe('extension', () => {
+  afterEach(() => {
+    sinon.restore();
+  });
+
   it('installs and uninstalls an extension and verifies it in chrome://extensions', async () => {
     await withMcpContext(async (response, context) => {
       // Install the extension

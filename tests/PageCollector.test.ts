@@ -5,7 +5,7 @@
  */
 
 import assert from 'node:assert';
-import {beforeEach, describe, it} from 'node:test';
+import {afterEach, beforeEach, describe, it} from 'node:test';
 
 import type {Frame, HTTPRequest, Target, Protocol} from 'puppeteer-core';
 import sinon from 'sinon';
@@ -300,6 +300,10 @@ describe('ConsoleCollector', () => {
         },
       },
     };
+  });
+
+  afterEach(() => {
+    sinon.restore();
   });
 
   it('emits issues on page', async () => {
