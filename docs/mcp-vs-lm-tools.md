@@ -87,10 +87,9 @@ These tools are under active development and may change significantly:
 
 The active workspace for MCP tools is configured via:
 
-1. CLI: `--test-workspace /path/to/workspace`
-2. Config: `.devtools/devtools.jsonc` → `"testWorkspace": "relative/or/absolute/path"`
+1. Config: `.devtools/host.config.jsonc` → `"clientWorkspace": "relative/or/absolute/path"`
 
-The sidebar **Workspace Root** panel shows all Git repositories discovered by VS Code's Git extension. Selecting a repository writes its relative path to `.devtools/devtools.jsonc`.
+The sidebar **Workspace Root** panel shows all Git repositories discovered by VS Code's Git extension. Selecting a repository writes its relative path to `.devtools/host.config.jsonc`.
 
 ### LM Tool Toggles
 

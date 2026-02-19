@@ -36,8 +36,8 @@ class LifecycleService {
   private exitCleanupDone = false;
   private shutdownHandlersRegistered = false;
 
-  /** Target workspace folder the Client should open */
-  private _targetWorkspace: string | undefined;
+  /** Client workspace folder the MCP server controls */
+  private _clientWorkspace: string | undefined;
   /** Extension development path for the Client */
   private _extensionPath: string | undefined;
   /** Launch flags for the Client VS Code window */
@@ -51,12 +51,12 @@ class LifecycleService {
    * 
    * @param params.wasHotReloaded - True if MCP server was just hot-reloaded (from marker file in main.ts)
    */
-  init(params: { targetWorkspace: string; extensionPath: string; launch?: Record<string, unknown>; wasHotReloaded?: boolean }): void {
-    this._targetWorkspace = params.targetWorkspace;
+  init(params: { clientWorkspace: string; extensionPath: string; launch?: Record<string, unknown>; wasHotReloaded?: boolean }): void {
+    this._clientWorkspace = params.clientWorkspace;
     this._extensionPath = params.extensionPath;
     this._launchFlags = params.launch;
     this._wasHotReloaded = params.wasHotReloaded ?? false;
-    logger(`[Lifecycle] Initialized — target=${params.targetWorkspace}, ext=${params.extensionPath}, wasHotReloaded=${this._wasHotReloaded}`);
+    logger(`[Lifecycle] Initialized — client=${params.clientWorkspace}, ext=${params.extensionPath}, wasHotReloaded=${this._wasHotReloaded}`);
   }
 
   // ── Startup ────────────────────────────────────────────
@@ -123,7 +123,7 @@ class LifecycleService {
   async handleHotReload(): Promise<void> {
     logger('[Lifecycle] Hot-reload — requesting Host rebuild…');
 
-    if (!this._targetWorkspace || !this._extensionPath) {
+    if (!this._clientWorkspace || !this._extensionPath) {
       throw new Error('[Lifecycle] Not initialized — call init() before handleHotReload()');
     }
 
@@ -139,7 +139,7 @@ class LifecycleService {
 
     try {
       const result = await hotReloadRequired({
-        targetWorkspace: this._targetWorkspace,
+        clientWorkspace: this._clientWorkspace,
         extensionPath: this._extensionPath,
         launch: this._launchFlags,
       });
@@ -153,7 +153,7 @@ class LifecycleService {
       logger(`[Lifecycle] Hot-reload RPC failed: ${msg} — retrying via mcpReady()…`);
 
       const fallbackResult = await mcpReady({
-        targetWorkspace: this._targetWorkspace,
+        clientWorkspace: this._clientWorkspace,
         extensionPath: this._extensionPath,
         launch: this._launchFlags,
       });
@@ -307,12 +307,12 @@ class LifecycleService {
   private async doConnect(options?: { forceRestart?: boolean }): Promise<void> {
     logger('[Lifecycle] Connecting — calling mcpReady()…');
 
-    if (!this._targetWorkspace || !this._extensionPath) {
+    if (!this._clientWorkspace || !this._extensionPath) {
       throw new Error('[Lifecycle] Not initialized — call init() before ensureConnection()');
     }
 
     const result = await mcpReady({
-      targetWorkspace: this._targetWorkspace,
+      clientWorkspace: this._clientWorkspace,
       extensionPath: this._extensionPath,
       launch: this._launchFlags,
       forceRestart: options?.forceRestart,
@@ -415,7 +415,7 @@ class LifecycleService {
   private async recoverBrokenConnection(): Promise<void> {
     logger('[Lifecycle] Recovering broken CDP connection…');
 
-    if (!this._targetWorkspace || !this._extensionPath) {
+    if (!this._clientWorkspace || !this._extensionPath) {
       throw new Error('[Lifecycle] Not initialized — call init() before recovery');
     }
 
@@ -476,7 +476,7 @@ class LifecycleService {
   private async doRecoverClientConnection(): Promise<void> {
     logger('[Lifecycle] Client pipe recovery requested — restarting Client…');
 
-    if (!this._targetWorkspace || !this._extensionPath) {
+    if (!this._clientWorkspace || !this._extensionPath) {
       throw new Error('[Lifecycle] Not initialized — call init() before recoverClientConnection()');
     }
 

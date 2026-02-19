@@ -15,7 +15,7 @@ import {
   UnifiedFileSymbol,
   UnifiedFileResult,
 } from '../../client-pipe.js';
-import {getHostWorkspace} from '../../config.js';
+import {getClientWorkspace} from '../../config.js';
 import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
 import {CHARACTER_LIMIT, defineTool} from '../ToolDefinition.js';
@@ -24,7 +24,7 @@ import type {SymbolLike} from './symbol-resolver.js';
 
 function resolveFilePath(file: string): string {
   if (path.isAbsolute(file)) return file;
-  return path.resolve(getHostWorkspace(), file);
+  return path.resolve(getClientWorkspace(), file);
 }
 
 // Supported TS/JS file extensions for structured extraction
@@ -497,7 +497,7 @@ export const read = defineTool({
       }
     }
 
-    const relativePath = path.relative(getHostWorkspace(), filePath).replace(/\\/g, '/');
+    const relativePath = path.relative(getClientWorkspace(), filePath).replace(/\\/g, '/');
     response.appendResponseLine(`## file_read: ${relativePath}`);
     response.appendResponseLine('');
 

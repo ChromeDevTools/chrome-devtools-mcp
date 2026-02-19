@@ -15,7 +15,7 @@ import {
   type TypeHierarchyInfo,
   type ImpactInfo,
 } from '../../client-pipe.js';
-import {getHostWorkspace} from '../../config.js';
+import {getClientWorkspace} from '../../config.js';
 import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
 import {
@@ -268,7 +268,7 @@ export const trace = defineTool({
 
     const result = await codebaseTraceSymbol(
       request.params.symbol,
-      getHostWorkspace(),
+      getClientWorkspace(),
       request.params.file,
       request.params.line,
       request.params.column,

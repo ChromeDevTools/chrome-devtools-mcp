@@ -61,23 +61,32 @@ export const DEFAULT_LAUNCH_FLAGS: LaunchFlags = {
   extraArgs: [],
 };
 
-const DEFAULT_CONFIG_TEMPLATE = `// VS Code DevTools MCP configuration (JSONC)
+const HOST_CONFIG_TEMPLATE = `// VS Code DevTools MCP — Host Configuration (JSONC)
 //
-// This file supports comments and trailing commas.
-// Only the keys you set are applied; omitted keys use defaults.
+// This file configures the VS Code DevTools MCP Server at the host level.
+// It determines which client workspace to control and which extension to load.
+// Logs are written to stderr and appear in VS Code's MCP output channel.
 
 {
-  // NOTE: This file should live at: <workspace>/.devtools/devtools.jsonc
+  // Path to the client workspace folder (absolute, or relative to host workspace root).
+  // This is the VS Code window that the MCP server controls.
+  // If omitted, the host workspace root is used.
+  // "clientWorkspace": "my-project",
 
-  // Path to the vscode-devtools VS Code extension folder (absolute or relative to this workspace).
-  // If omitted, defaults to the repo's "extension/" folder when present.
+  // Path to the vscode-devtools extension folder (absolute, or relative to host workspace root).
+  // If omitted, no extension is loaded in the client workspace.
   // "extensionPath": "extension",
+}
+`;
 
+const CLIENT_CONFIG_TEMPLATE = `// VS Code DevTools MCP — Client Configuration (JSONC)
+//
+// This file configures runtime behavior of the client VS Code window
+// controlled by the MCP server.
+
+{
   // Enable extra diagnostic tools (debug_evaluate).
   "devDiagnostic": false,
-
-  // Write logs to a file (absolute or relative path).
-  // Logs are written to stderr and appear in VS Code's MCP output channel.
 
   // Run VS Code headless (Linux only).
   "headless": false,
@@ -88,9 +97,9 @@ const DEFAULT_CONFIG_TEMPLATE = `// VS Code DevTools MCP configuration (JSONC)
   // Enable experimental structured content output.
   "experimentalStructuredContent": false,
 
-  // VS Code launch flags for the spawned Extension Development Host window.
+  // VS Code launch flags for the client VS Code window.
   "launch": {
-    // Open the target workspace in a new window.
+    // Open the client workspace in a new window.
     "newWindow": true,
 
     // Disable all extensions except those explicitly enabled below.
@@ -122,15 +131,21 @@ const DEFAULT_CONFIG_TEMPLATE = `// VS Code DevTools MCP configuration (JSONC)
 `;
 
 /**
- * Configuration schema for .devtools/devtools.jsonc
- * 
- * Note: The bridge socket path is computed deterministically from the workspace
- * path — there's no need for a `bridgeSocketPath` field.
+ * Host configuration read from .devtools/host.config.jsonc.
+ * Controls which client workspace and extension to use.
  */
-export interface DevToolsConfig {
-  /** Path to vscode-devtools extension (relative to workspace or absolute). Used for --extensionDevelopmentPath. */
+export interface HostConfig {
+  /** Path to the client workspace (absolute or relative to host root). Defaults to host root. */
+  clientWorkspace?: string;
+  /** Path to the extension folder (absolute or relative to host root). If omitted, no extension is loaded. */
   extensionPath?: string;
+}
 
+/**
+ * Client configuration read from .devtools/client.config.jsonc.
+ * Controls runtime behavior of the client VS Code window.
+ */
+export interface ClientConfig {
   /** Enable diagnostic tools (debug_evaluate) */
   devDiagnostic?: boolean;
 
@@ -143,7 +158,7 @@ export interface DevToolsConfig {
   /** Enable experimental structured content output */
   experimentalStructuredContent?: boolean;
 
-  /** VS Code launch flags for the Extension Development Host window */
+  /** VS Code launch flags for the client VS Code window */
   launch?: Partial<LaunchFlags>;
 }
 
@@ -151,12 +166,13 @@ export interface DevToolsConfig {
  * Resolved configuration with all paths made absolute
  */
 export interface ResolvedConfig {
-  /** The host workspace where VS Code is running (contains .vscode/sockpath) */
+  /** The host workspace where VS Code is running */
   hostWorkspace: string;
-  /** The target workspace to open in the debug window */
-  workspaceFolder: string;
+  /** The client workspace that the MCP server controls */
+  clientWorkspace: string;
+  /** Path to the extension folder, or empty string when no extension is configured */
   extensionBridgePath: string;
-  /** True when the extension dev path was explicitly supplied via CLI args. */
+  /** True when extensionPath was explicitly set in host config */
   explicitExtensionDevelopmentPath: boolean;
   devDiagnostic: boolean;
   headless: boolean;
@@ -199,13 +215,24 @@ function readOptionalStringArray(
   return strings;
 }
 
-function coerceDevToolsConfig(value: unknown): DevToolsConfig {
+function coerceHostConfig(value: unknown): HostConfig {
   if (!isRecord(value)) {return {};}
 
-  const config: DevToolsConfig = {};
+  const config: HostConfig = {};
+
+  const clientWorkspace = readOptionalString(value, 'clientWorkspace');
+  if (clientWorkspace) {config.clientWorkspace = clientWorkspace;}
 
   const extensionPath = readOptionalString(value, 'extensionPath');
   if (extensionPath) {config.extensionPath = extensionPath;}
+
+  return config;
+}
+
+function coerceClientConfig(value: unknown): ClientConfig {
+  if (!isRecord(value)) {return {};}
+
+  const config: ClientConfig = {};
 
   const devDiagnostic = readOptionalBoolean(value, 'devDiagnostic');
   if (typeof devDiagnostic === 'boolean') {config.devDiagnostic = devDiagnostic;}
@@ -271,33 +298,43 @@ function coerceDevToolsConfig(value: unknown): DevToolsConfig {
 }
 
 /**
- * Load devtools config from the target workspace.
- *
- * Prefers `.devtools/devtools.jsonc` (JSON-with-comments) but still supports
- * `.devtools/devtools.json` and legacy `.vscode/devtools.jsonc|devtools.json`
- * for backwards compatibility.
+ * Load host config from <hostRoot>/.devtools/host.config.jsonc.
+ * Contains clientWorkspace and extensionPath.
  */
-function loadConfigFile(workspaceFolder: string): DevToolsConfig {
-  const configDirPreferred = join(workspaceFolder, '.devtools');
-  const configPathJsoncPreferred = join(configDirPreferred, 'devtools.jsonc');
-  const configPathJsonPreferred = join(configDirPreferred, 'devtools.json');
+function loadHostConfig(hostRoot: string): HostConfig {
+  const configPath = join(hostRoot, '.devtools', 'host.config.jsonc');
 
-  const configDirLegacy = join(workspaceFolder, '.vscode');
-  const configPathJsoncLegacy = join(configDirLegacy, 'devtools.jsonc');
-  const configPathJsonLegacy = join(configDirLegacy, 'devtools.json');
+  if (!existsSync(configPath)) {
+    logger(`No host config found, creating template at ${configPath}`);
+    mkdirSync(join(hostRoot, '.devtools'), {recursive: true});
+    writeFileSync(configPath, HOST_CONFIG_TEMPLATE + '\n');
+    return {};
+  }
 
-  const configPath =
-    (existsSync(configPathJsoncPreferred) ? configPathJsoncPreferred : undefined) ??
-    (existsSync(configPathJsonPreferred) ? configPathJsonPreferred : undefined) ??
-    (existsSync(configPathJsoncLegacy) ? configPathJsoncLegacy : undefined) ??
-    (existsSync(configPathJsonLegacy) ? configPathJsonLegacy : undefined);
+  try {
+    const content = readFileSync(configPath, 'utf-8');
+    const parsed: unknown = parse(content);
+    const config = coerceHostConfig(parsed);
+    logger(`Loaded host config from ${configPath}`);
+    return config;
+  } catch (error) {
+    logger(`Failed to parse host config at ${configPath}: ${error}`);
+    return {};
+  }
+}
 
-  if (!configPath) {
-    logger(
-      `No config file found, creating template at ${configPathJsoncPreferred}`,
-    );
-    mkdirSync(configDirPreferred, {recursive: true});
-    writeFileSync(configPathJsoncPreferred, DEFAULT_CONFIG_TEMPLATE + '\n');
+/**
+ * Load client config from <clientRoot>/.devtools/client.config.jsonc.
+ * Contains runtime settings (headless, launch flags, etc.).
+ */
+function loadClientConfig(clientRoot: string): ClientConfig {
+  const configDir = join(clientRoot, '.devtools');
+  const configPath = join(configDir, 'client.config.jsonc');
+
+  if (!existsSync(configPath)) {
+    logger(`No client config found, creating template at ${configPath}`);
+    mkdirSync(configDir, {recursive: true});
+    writeFileSync(configPath, CLIENT_CONFIG_TEMPLATE + '\n');
     return {
       launch: {...DEFAULT_LAUNCH_FLAGS},
     };
@@ -306,11 +343,11 @@ function loadConfigFile(workspaceFolder: string): DevToolsConfig {
   try {
     const content = readFileSync(configPath, 'utf-8');
     const parsed: unknown = parse(content);
-    const config = coerceDevToolsConfig(parsed);
-    logger(`Loaded config from ${configPath}`);
+    const config = coerceClientConfig(parsed);
+    logger(`Loaded client config from ${configPath}`);
     return config;
   } catch (error) {
-    logger(`Failed to parse config at ${configPath}: ${error}`);
+    logger(`Failed to parse client config at ${configPath}: ${error}`);
     return {};
   }
 }
@@ -330,36 +367,6 @@ function resolveLaunchFlags(partial?: Partial<LaunchFlags>): LaunchFlags {
 /**
  * Resolve a path relative to workspace folder, or return absolute path as-is
  */
-function resolvePath(
-  basePath: string,
-  relativePath: string | undefined,
-): string | undefined {
-  if (!relativePath) {return undefined;}
-  if (isAbsolute(relativePath)) {return relativePath;}
-  return resolve(basePath, relativePath);
-}
-
-/**
- * Get default vscode-devtools extension path (parent of mcp-server package)
- */
-function getDefaultExtensionPath(): string {
-  // Build output is in mcp-server/build/src/
-  // Go up to mcp-server, then to parent (workspace root)
-  const packageRoot = dirname(dirname(__dirname));
-  const parentDir = dirname(packageRoot);
-
-  // In this repo, the VS Code extension lives in the "extension" folder.
-  const extensionFolder = join(parentDir, 'extension');
-  const extensionPackageJson = join(extensionFolder, 'package.json');
-  if (existsSync(extensionPackageJson)) {return extensionFolder;}
-
-  // Fallback for repos where the extension lives at the workspace root.
-  const rootPackageJson = join(parentDir, 'package.json');
-  if (existsSync(rootPackageJson)) {return parentDir;}
-
-  return parentDir;
-}
-
 /**
  * Get the host workspace where VS Code is running.
  * This is the parent of the mcp-server package.
@@ -371,99 +378,73 @@ export function getHostWorkspace(): string {
   return dirname(packageRoot);
 }
 
+// Module-level storage for the resolved client workspace path.
+// Set during loadConfig(), read via getClientWorkspace().
+let _resolvedClientWorkspace: string | undefined;
+
 /**
- * Load and resolve configuration from workspace's devtools.json
- * Priority: CLI args > env vars > config file defaults
+ * Get the client workspace that the MCP server controls.
+ * Falls back to the host workspace if loadConfig() hasn't been called yet.
+ */
+export function getClientWorkspace(): string {
+  return _resolvedClientWorkspace ?? getHostWorkspace();
+}
+
+/**
+ * Load and resolve configuration from host and client config files.
+ *
+ * Host config (.devtools/host.config.jsonc): clientWorkspace, extensionPath
+ * Client config (.devtools/client.config.jsonc): runtime settings (headless, launch, etc.)
  */
 export function loadConfig(cliArgs: {
-  testWorkspace?: string;
-  extension?: string;
-  // Backwards-compatibility aliases
-  workspace?: string;
-  extensionDevelopmentPath?: string;
-  // Legacy CLI args for backwards compatibility
-  folder?: string;
-  extensionBridgePath?: string;
-  targetFolder?: string;
   devDiagnostic?: boolean;
   headless?: boolean;
   experimentalVision?: boolean;
   experimentalStructuredContent?: boolean;
 }): ResolvedConfig {
-  // Workspace folder priority: CLI --test-workspace > legacy --workspace > legacy --folder > host devtools.jsonc
-  let workspaceFolder =
-    cliArgs.testWorkspace ?? cliArgs.workspace ?? cliArgs.folder;
-
-  // Fallback: read testWorkspace from the host workspace's devtools.jsonc
   const hostRoot = getHostWorkspace();
-  if (!workspaceFolder) {
-    const hostConfigPath = join(hostRoot, '.devtools', 'devtools.jsonc');
-    if (existsSync(hostConfigPath)) {
-      try {
-        const raw = readFileSync(hostConfigPath, 'utf8');
-        const parsed = parse(raw);
-        if (typeof parsed?.testWorkspace === 'string') {
-          // Resolve relative paths against host workspace root
-          workspaceFolder = isAbsolute(parsed.testWorkspace)
-            ? parsed.testWorkspace
-            : resolve(hostRoot, parsed.testWorkspace);
-          console.log(`[config] Using testWorkspace from host devtools.jsonc: ${workspaceFolder}`);
-        }
-      } catch {
-        // Ignore parse errors
-      }
-    }
-  }
 
-  if (!workspaceFolder) {
-    throw new Error(
-      'Workspace folder is required. Use --test-workspace /path/to/workspace or set testWorkspace in .devtools/devtools.jsonc',
-    );
-  }
+  // 1. Read host config for clientWorkspace and extensionPath
+  const hostConfig = loadHostConfig(hostRoot);
 
-  const absoluteWorkspace = isAbsolute(workspaceFolder)
-    ? workspaceFolder
-    : resolve(process.cwd(), workspaceFolder);
-
-  // Load config from workspace's .vscode/devtools.json
-  const fileConfig = loadConfigFile(absoluteWorkspace);
-
-  const explicitExtensionDevelopmentPath =
-    typeof cliArgs.extension === 'string' ||
-    typeof cliArgs.extensionDevelopmentPath === 'string' ||
-    typeof cliArgs.extensionBridgePath === 'string';
-
-  // Resolve extension path with priority: CLI > config > default
-  let extensionBridgePath: string;
-  const cliExtensionPath =
-    cliArgs.extension ??
-    cliArgs.extensionDevelopmentPath ??
-    cliArgs.extensionBridgePath;
-  if (cliExtensionPath) {
-    extensionBridgePath = isAbsolute(cliExtensionPath)
-      ? cliExtensionPath
-      : resolve(absoluteWorkspace, cliExtensionPath);
-  } else if (fileConfig.extensionPath) {
-    extensionBridgePath =
-      resolvePath(absoluteWorkspace, fileConfig.extensionPath) ??
-      getDefaultExtensionPath();
+  // 2. Resolve client workspace: from host config, or host root if not set
+  let clientWorkspace: string;
+  if (hostConfig.clientWorkspace) {
+    clientWorkspace = isAbsolute(hostConfig.clientWorkspace)
+      ? hostConfig.clientWorkspace
+      : resolve(hostRoot, hostConfig.clientWorkspace);
   } else {
-    extensionBridgePath = getDefaultExtensionPath();
+    clientWorkspace = hostRoot;
   }
+
+  // Store for getClientWorkspace() access by tools
+  _resolvedClientWorkspace = clientWorkspace;
+
+  // 3. Resolve extension path: from host config, or empty string (no extension)
+  let extensionBridgePath = '';
+  const explicitExtensionDevelopmentPath = typeof hostConfig.extensionPath === 'string';
+  if (hostConfig.extensionPath) {
+    extensionBridgePath = isAbsolute(hostConfig.extensionPath)
+      ? hostConfig.extensionPath
+      : resolve(hostRoot, hostConfig.extensionPath);
+  }
+
+  // 4. Read client config for runtime settings
+  const clientConfig = loadClientConfig(clientWorkspace);
 
   return {
-    hostWorkspace: getHostWorkspace(),
-    workspaceFolder: absoluteWorkspace,
+    hostWorkspace: hostRoot,
+    clientWorkspace,
     extensionBridgePath,
     explicitExtensionDevelopmentPath,
-    devDiagnostic: cliArgs.devDiagnostic ?? fileConfig.devDiagnostic ?? false,
-    headless: cliArgs.headless ?? fileConfig.headless ?? false,
+    devDiagnostic: cliArgs.devDiagnostic ?? clientConfig.devDiagnostic ?? false,
+    headless: cliArgs.headless ?? clientConfig.headless ?? false,
     experimentalVision:
-      cliArgs.experimentalVision ?? fileConfig.experimentalVision ?? false,
+      cliArgs.experimentalVision ?? clientConfig.experimentalVision ?? false,
     experimentalStructuredContent:
       cliArgs.experimentalStructuredContent ??
-      fileConfig.experimentalStructuredContent ??
+      clientConfig.experimentalStructuredContent ??
       false,
-    launch: resolveLaunchFlags(fileConfig.launch),
+    launch: resolveLaunchFlags(clientConfig.launch),
   };
 }

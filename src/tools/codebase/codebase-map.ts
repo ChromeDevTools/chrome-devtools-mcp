@@ -9,7 +9,7 @@ import {
   type CodebaseTreeNode,
   type CodebaseSymbolNode,
 } from '../../client-pipe.js';
-import {getHostWorkspace} from '../../config.js';
+import {getClientWorkspace} from '../../config.js';
 import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool} from '../ToolDefinition.js';
@@ -161,7 +161,7 @@ export const map = defineTool({
     const {params} = request;
     response.setSkipLedger();
 
-    const rootDir = getHostWorkspace();
+    const rootDir = getClientWorkspace();
     const folderPath = params.folderPath ?? rootDir;
     const recursive = params.recursive ?? false;
     const fileTypes = params.fileTypes ?? '*';

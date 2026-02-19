@@ -8,60 +8,9 @@ import type {YargsOptions} from './third_party/index.js';
 import {yargs, hideBin} from './third_party/index.js';
 
 export const cliOptions = {
-  // Primary arg: target workspace folder (the extension dev host opens this).
-  // Also used as the base path for loading .devtools/devtools.jsonc.
-  'test-workspace': {
-    type: 'string',
-    description:
-      'Path to the target workspace folder. Configuration is loaded from .devtools/devtools.jsonc within this folder.',
-    alias: 'w',
-  },
-
-  // Path to the dev extension folder.
-  // This is forwarded to the spawned VS Code instance as --extensionDevelopmentPath.
-  extension: {
-    type: 'string',
-    description:
-      'Path to the VS Code extension folder to load under development (vscode-devtools bridge). Overrides extensionPath in .devtools/devtools.jsonc.',
-    alias: 'e',
-  },
-
-  // Backwards-compatibility aliases (hidden from help)
-  workspace: {
-    type: 'string',
-    description: '[LEGACY] Use --test-workspace instead.',
-    hidden: true,
-  },
-  extensionDevelopmentPath: {
-    type: 'string',
-    description: '[LEGACY] Use --extension instead.',
-    hidden: true,
-  },
-
-  // Legacy args (kept for backwards compatibility, hidden from help)
-  folder: {
-    type: 'string',
-    description: '[LEGACY] Use --test-workspace instead.',
-    alias: 'f',
-    hidden: true,
-  },
-  extensionBridgePath: {
-    type: 'string',
-    description:
-      '[LEGACY] Override vscode-devtools extension path. Prefer setting extensionPath in .vscode/devtools.json.',
-    alias: 'b',
-    hidden: true,
-  },
-  targetFolder: {
-    type: 'string',
-    description:
-      '[LEGACY] Use --test-workspace to point to the target folder directly.',
-    alias: 't',
-    hidden: true,
-  },
   headless: {
     type: 'boolean',
-    description: '[LEGACY] Set headless in .vscode/devtools.json instead.',
+    description: 'Run VS Code headless (Linux only). Overrides client config.',
     default: false,
     hidden: true,
   },
@@ -77,7 +26,7 @@ export const cliOptions = {
   },
   devDiagnostic: {
     type: 'boolean',
-    describe: '[LEGACY] Set devDiagnostic in .vscode/devtools.json instead.',
+    describe: 'Enable extra diagnostic tools.',
     default: false,
     hidden: true,
   },
@@ -89,12 +38,8 @@ export function parseArguments(version: string, argv = process.argv) {
     .options(cliOptions)
     .example([
       [
-        '$0 --test-workspace /path/to/project',
-        'Start MCP server for a workspace (config from .devtools/devtools.jsonc)',
-      ],
-      [
-        '$0 -w /path/to/project',
-        'Short form of --test-workspace',
+        '$0',
+        'Start MCP server (reads config from .devtools/host.config.jsonc)',
       ],
     ]);
 

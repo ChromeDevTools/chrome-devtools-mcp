@@ -265,7 +265,7 @@ function withTimeout<T>(
 const VERSION = '0.16.0';
 // x-release-please-end
 
-// Parse CLI args and load config from workspace's .vscode/devtools.json
+// Parse CLI args and load config from .devtools/ config files
 const cliArgs = parseArguments(VERSION);
 export const config: ResolvedConfig = loadConfig(cliArgs);
 
@@ -285,7 +285,7 @@ if (wasHotReloaded) {
 // Initialize lifecycle service with MCP config (target workspace + extension path + launch flags)
 // Pass wasHotReloaded so the service uses a fresh timestamp for extension change detection
 lifecycleService.init({
-  targetWorkspace: config.workspaceFolder,
+  clientWorkspace: config.clientWorkspace,
   extensionPath: config.extensionBridgePath,
   launch: {...config.launch},
   wasHotReloaded,
@@ -316,7 +316,7 @@ process.on('unhandledRejection', (reason, promise) => {
 });
 
 logger(`Starting VS Code DevTools MCP Server v${VERSION}`);
-logger(`Config: hostWorkspace=${config.hostWorkspace}, targetFolder=${config.workspaceFolder}`);
+logger(`Config: hostWorkspace=${config.hostWorkspace}, clientWorkspace=${config.clientWorkspace}`);
 logger(`Config: extensionBridgePath=${config.extensionBridgePath}, headless=${config.headless}`);
 const server = new McpServer(
   {

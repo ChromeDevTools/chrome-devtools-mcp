@@ -7,7 +7,7 @@
 import path from 'node:path';
 
 import {fileExtractStructure, fileReadContent} from '../../client-pipe.js';
-import {getHostWorkspace} from '../../config.js';
+import {getClientWorkspace} from '../../config.js';
 import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool} from '../ToolDefinition.js';
@@ -20,7 +20,7 @@ const STRUCTURED_EXTS = new Set([
 
 function resolveFilePath(file: string): string {
   if (path.isAbsolute(file)) return file;
-  return path.resolve(getHostWorkspace(), file);
+  return path.resolve(getClientWorkspace(), file);
 }
 
 export const edit = defineTool({
@@ -75,7 +75,7 @@ export const edit = defineTool({
     const {params} = request;
     const filePath = resolveFilePath(params.file);
     const code = params.code;
-    const relativePath = path.relative(getHostWorkspace(), filePath).replace(/\\/g, '/');
+    const relativePath = path.relative(getClientWorkspace(), filePath).replace(/\\/g, '/');
 
     // ── Input validation ──────────────────────────────────────────
 

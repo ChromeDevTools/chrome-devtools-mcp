@@ -40,7 +40,7 @@ interface JsonRpcResponse {
 }
 
 export interface McpReadyParams {
-  targetWorkspace: string;
+  clientWorkspace: string;
   extensionPath: string;
   launch?: Record<string, unknown>;
   forceRestart?: boolean;

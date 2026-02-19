@@ -16,7 +16,7 @@ import {
   type ImportGraphResult,
   type CircularChain,
 } from '../../client-pipe.js';
-import {getHostWorkspace} from '../../config.js';
+import {getClientWorkspace} from '../../config.js';
 import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
 import {
@@ -186,7 +186,7 @@ export const lint = defineTool({
 
     if (runDeadCode) {
       const result = await codebaseFindDeadCode(
-        getHostWorkspace(),
+        getClientWorkspace(),
         undefined,
         params.exportedOnly,
         params.excludeTests,
@@ -201,7 +201,7 @@ export const lint = defineTool({
 
     if (runDuplicates) {
       const result = await codebaseFindDuplicates(
-        getHostWorkspace(),
+        getClientWorkspace(),
         params.kinds,
         params.limit,
         params.includePatterns,
@@ -214,7 +214,7 @@ export const lint = defineTool({
     if (runCircularDeps) {
       try {
         const result = await codebaseGetImportGraph(
-          getHostWorkspace(),
+          getClientWorkspace(),
           params.includePatterns,
           params.excludePatterns,
           dynamicTimeout,
