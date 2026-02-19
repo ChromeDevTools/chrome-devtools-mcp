@@ -38,6 +38,7 @@ export const edit = defineTool({
     '- `startLine` / `endLine` — Fallback line-based range (1-indexed)\n\n' +
     '**EXAMPLES:**\n' +
     '- Edit a method: `{ file: "src/service.ts", target: "UserService.findById", code: "..." }`\n' +
+    '- Edit a section: `{ file: "README.md", target: "Installation", code: "..." }`\n' +
     '- Edit by lines: `{ file: "src/config.ts", startLine: 10, endLine: 25, code: "..." }`\n' +
     '- Replace full file: `{ file: "src/types.ts", code: "..." }`',
   timeoutMs: 30_000,
@@ -58,7 +59,7 @@ export const edit = defineTool({
     ),
     target: zod.string().optional().describe(
       'Symbol name to scope the edit: "UserService.findById". ' +
-      'Only supported for TS/JS family files (.ts, .tsx, .js, .jsx, .mts, .mjs, .cts, .cjs).',
+      'Supported for TS/JS (.ts, .tsx, .js, .jsx, .mts, .mjs, .cts, .cjs) and Markdown (.md, .markdown) files.',
     ),
     startLine: zod.number().int().optional().describe(
       'Fallback: start line (1-indexed). Used when target is not specified.',
