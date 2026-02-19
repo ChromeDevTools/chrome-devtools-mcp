@@ -65,7 +65,7 @@ function formatSkeletonEntry(
   const endLine = 'startLine' in symbol.range ? symbol.range.endLine : symbol.range.end;
   const range = startLine === endLine ? `${startLine}` : `${startLine}-${endLine}`;
 
-  lines.push(`${indent}[${range}]: ${symbol.kind} ${symbol.name}`);
+  lines.push(`${indent}[${range}] ${symbol.kind} ${symbol.name}`);
 
   if (recursive && symbol.children && symbol.children.length > 0) {
     for (const child of symbol.children) {
@@ -108,7 +108,7 @@ function formatContentWithPlaceholders(
         const childRange = child.range.startLine === child.range.endLine
           ? `${child.range.startLine}`
           : `${child.range.startLine}-${child.range.endLine}`;
-        result.push(`[${childRange}]: ${child.kind} ${child.name}`);
+        result.push(`[${childRange}] ${child.kind} ${child.name}`);
       }
     } else {
       result.push(`[${lineNum}] ${allLines[lineNum - 1] ?? ''}`);
@@ -330,7 +330,7 @@ function renderStructuredRange(
         const symRange = sym.range.startLine === sym.range.endLine
           ? `${sym.range.startLine}`
           : `${sym.range.startLine}-${sym.range.endLine}`;
-        result.push(`[${symRange}]: ${sym.kind} ${sym.name}`);
+        result.push(`[${symRange}] ${sym.kind} ${sym.name}`);
       }
       // Track all lines of this symbol within the range
       const symEndInRange = Math.min(sym.range.endLine, expandedEnd);
@@ -354,13 +354,16 @@ function renderStructuredRange(
       actualEnd = Math.max(actualEnd, blockEnd);
 
       if (collapseSkeleton && block.type !== 'gap') {
-        // Collapse imports/exports/comments/directives to stubs
-        flushSourceRange();
-        collapsedRanges.push({startLine: block.startLine, endLine: block.endLine});
-        const blockRange = block.startLine === block.endLine
-          ? `${block.startLine}`
-          : `${block.startLine}-${block.endLine}`;
-        result.push(`[${blockRange}]: ${block.type}s`);
+        // Collapse multi-line imports/exports/comments/directives to stubs
+        // Single-line blocks show actual content
+        if (block.startLine === block.endLine) {
+          trackSourceLine(block.startLine);
+          result.push(`[${block.startLine}] ${allLines[block.startLine - 1] ?? ''}`);
+        } else {
+          flushSourceRange();
+          collapsedRanges.push({startLine: block.startLine, endLine: block.endLine});
+          result.push(`[${block.startLine}-${block.endLine}] ${block.type}s`);
+        }
       } else {
         // Emit raw source for the block
         for (let l = blockStart; l <= blockEnd; l++) {
@@ -631,11 +634,12 @@ export const read = defineTool({
         } else if (piece.symbol) {
           const entries = formatSkeletonEntry(piece.symbol, '', recursive);
           for (const entry of entries) response.appendResponseLine(entry);
+        } else if (piece.startLine === piece.endLine) {
+          // Single-line block: show actual content
+          response.appendResponseLine(`[${piece.startLine}] ${allLines[piece.startLine - 1] ?? ''}`);
         } else {
-          const range = piece.startLine === piece.endLine
-            ? `${piece.startLine}`
-            : `${piece.startLine}-${piece.endLine}`;
-          response.appendResponseLine(`[${range}]: ${piece.category}`);
+          // Multi-line block: show collapsed stub
+          response.appendResponseLine(`[${piece.startLine}-${piece.endLine}] ${piece.category}`);
         }
       }
 
@@ -713,7 +717,7 @@ export const read = defineTool({
           fileHighlightReadRange(filePath, startLine - 1, endLine - 1);
 
           const range = startLine === endLine ? `${startLine}` : `${startLine}-${endLine}`;
-          response.appendResponseLine(`[${range}]: ${symbol.kind} ${symbol.name}`);
+          response.appendResponseLine(`[${range}] ${symbol.kind} ${symbol.name}`);
 
           if (recursive || !symbol.children || symbol.children.length === 0) {
             const numbered = addLineNumbers(

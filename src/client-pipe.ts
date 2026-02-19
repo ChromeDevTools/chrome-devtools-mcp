@@ -232,6 +232,7 @@ export interface CodebaseTreeNode {
   type: 'directory' | 'file';
   children?: CodebaseTreeNode[];
   symbols?: CodebaseSymbolNode[];
+  lineCount?: number;
 }
 
 export interface CodebaseOverviewResult {
@@ -392,10 +393,11 @@ export async function codebaseGetOverview(
   fileTypes: string | string[],
   symbols: boolean,
   timeout?: number,
+  metadata?: boolean,
 ): Promise<CodebaseOverviewResult> {
   const result = await sendClientRequest(
     'codebase.getOverview',
-    {rootDir, folderPath, recursive, fileTypes, symbols},
+    {rootDir, folderPath, recursive, fileTypes, symbols, metadata},
     timeout ?? 30_000,
   );
   assertResult<CodebaseOverviewResult>(result, 'codebase.getOverview');
