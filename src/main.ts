@@ -7,6 +7,8 @@
 import './polyfill.js';
 
 import {exec} from 'node:child_process';
+import {randomUUID} from 'node:crypto';
+import {createServer} from 'node:http';
 import path from 'node:path';
 import process from 'node:process';
 
@@ -32,6 +34,7 @@ import {lifecycleService} from './services/index.js';
 import {
   McpServer,
   StdioServerTransport,
+  StreamableHTTPServerTransport,
   type CallToolResult,
   SetLevelRequestSchema,
 } from './third_party/index.js';
@@ -372,7 +375,7 @@ let extensionHotReloadInProgress: Promise<void> | null = null;
 /** Shared result from the hot-reload check — set by the winner, consumed by waiters. */
 let hotReloadResult: CallToolResult | null = null;
 
-function registerTool(tool: ToolDefinition): void {
+function registerTool(targetServer: McpServer, tool: ToolDefinition): void {
   if (
     tool.annotations.conditions?.includes('computerVision') &&
     !config.experimentalVision
@@ -386,7 +389,7 @@ function registerTool(tool: ToolDefinition): void {
   ) {
     return;
   }
-  server.registerTool(
+  targetServer.registerTool(
     tool.name,
     {
       description: tool.description,
@@ -700,7 +703,7 @@ function registerTool(tool: ToolDefinition): void {
 }
 
 for (const tool of tools) {
-  registerTool(tool);
+  registerTool(server, tool);
 }
 
 await loadIssueDescriptions();
@@ -724,4 +727,106 @@ try {
 
 logDisclaimers();
 
+// ── Inspector HTTP Server (Streamable HTTP transport) ────────────────
+// Exposes the same tools on a separate Streamable HTTP endpoint so
+// MCP Inspector (browser-based) can connect to this running server
+// instance without spawning a second process. Each Inspector browser
+// session gets its own McpServer + StreamableHTTPServerTransport that
+// share the same module-level state (connection, mutexes, etc.).
+const INSPECTOR_HTTP_PORT = 6274;
+
+function startInspectorServer(): void {
+  const sessions = new Map<string, {transport: StreamableHTTPServerTransport; mcpServer: McpServer}>();
+
+  const httpServer = createServer(async (req, res) => {
+    // CORS headers — Inspector runs in a browser on a different origin
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, mcp-session-id, mcp-protocol-version');
+    res.setHeader('Access-Control-Expose-Headers', 'mcp-session-id');
+
+    if (req.method === 'OPTIONS') {
+      res.writeHead(204);
+      res.end();
+      return;
+    }
+
+    const url = new URL(req.url ?? '/', `http://localhost:${INSPECTOR_HTTP_PORT}`);
+    if (url.pathname !== '/mcp') {
+      res.writeHead(404);
+      res.end('Not Found');
+      return;
+    }
+
+    try {
+      const sessionId = typeof req.headers['mcp-session-id'] === 'string'
+        ? req.headers['mcp-session-id']
+        : undefined;
+
+      // Route to existing session
+      if (sessionId) {
+        const entry = sessions.get(sessionId);
+        if (entry) {
+          await entry.transport.handleRequest(req, res);
+          return;
+        }
+        // Unknown session — per spec, 404
+        res.writeHead(404, {'Content-Type': 'application/json'});
+        res.end(JSON.stringify({
+          jsonrpc: '2.0',
+          error: {code: -32000, message: 'Session not found'},
+        }));
+        return;
+      }
+
+      // New session: create a dedicated McpServer + transport pair
+      const inspectorTransport = new StreamableHTTPServerTransport({
+        sessionIdGenerator: () => randomUUID(),
+        onsessioninitialized: (sid: string) => {
+          sessions.set(sid, {transport: inspectorTransport, mcpServer: inspectorMcp});
+          logger(`[inspector] New session: ${sid.substring(0, 8)}…`);
+        },
+        onsessionclosed: (sid: string) => {
+          sessions.delete(sid);
+          logger(`[inspector] Session ${sid.substring(0, 8)}… closed`);
+        },
+      });
+      const inspectorMcp = new McpServer(
+        {name: 'vscode_devtools', title: 'VS Code DevTools MCP server', version: VERSION},
+        {capabilities: {logging: {}}},
+      );
+      inspectorMcp.server.setRequestHandler(SetLevelRequestSchema, () => ({}));
+
+      for (const tool of tools) {
+        registerTool(inspectorMcp, tool);
+      }
+
+      await inspectorMcp.connect(inspectorTransport);
+      await inspectorTransport.handleRequest(req, res);
+    } catch (err) {
+      logger(`[inspector] Request error: ${err instanceof Error ? err.message : String(err)}`);
+      if (!res.headersSent) {
+        res.writeHead(500, {'Content-Type': 'application/json'});
+        res.end(JSON.stringify({
+          jsonrpc: '2.0',
+          error: {code: -32603, message: 'Internal error'},
+        }));
+      }
+    }
+  });
+
+  httpServer.listen(INSPECTOR_HTTP_PORT, () => {
+    logger(`[inspector] MCP Inspector endpoint ready at http://localhost:${INSPECTOR_HTTP_PORT}/mcp`);
+  });
+
+  httpServer.on('error', (err: NodeJS.ErrnoException) => {
+    if (err.code === 'EADDRINUSE') {
+      logger(`[inspector] ⚠ Port ${INSPECTOR_HTTP_PORT} in use — Inspector HTTP endpoint not available`);
+    } else {
+      logger(`[inspector] HTTP server error: ${err.message}`);
+    }
+  });
+}
+
+startInspectorServer();
 
