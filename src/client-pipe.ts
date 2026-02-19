@@ -880,6 +880,24 @@ export function fileHighlightReadRange(
 }
 
 /**
+ * Open an inline diff editor showing old vs new content after an edit.
+ * Old content was pre-captured by the extension's handleFileApplyEdit.
+ * Fire-and-forget — does not block the tool response.
+ */
+export function fileShowEditDiff(
+  filePath: string,
+  editStartLine: number,
+): void {
+  sendClientRequest(
+    'file.showEditDiff',
+    {filePath, editStartLine},
+    10_000,
+  ).catch(() => {
+    // Best-effort — don't let diff viewer failures affect tool responses
+  });
+}
+
+/**
  * Apply a text replacement (range → new content) and save.
  */
 export async function fileApplyEdit(

@@ -12,6 +12,8 @@ import type {NativeDocumentSymbol} from '../../client-pipe.js';
 export interface DetectedIntent {
   type: 'rename' | 'delete' | 'add' | 'body_change';
   symbol: string;
+  /** For renames: the new name from the DocumentSymbol provider. */
+  newName?: string;
   details?: string;
 }
 
