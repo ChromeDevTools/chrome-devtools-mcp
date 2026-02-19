@@ -398,13 +398,34 @@ export function loadConfig(cliArgs: {
   experimentalVision?: boolean;
   experimentalStructuredContent?: boolean;
 }): ResolvedConfig {
-  // Workspace folder priority: CLI --test-workspace > legacy --workspace > legacy --folder
-  const workspaceFolder =
+  // Workspace folder priority: CLI --test-workspace > legacy --workspace > legacy --folder > host devtools.jsonc
+  let workspaceFolder =
     cliArgs.testWorkspace ?? cliArgs.workspace ?? cliArgs.folder;
+
+  // Fallback: read testWorkspace from the host workspace's devtools.jsonc
+  const hostRoot = getHostWorkspace();
+  if (!workspaceFolder) {
+    const hostConfigPath = join(hostRoot, '.devtools', 'devtools.jsonc');
+    if (existsSync(hostConfigPath)) {
+      try {
+        const raw = readFileSync(hostConfigPath, 'utf8');
+        const parsed = parse(raw);
+        if (typeof parsed?.testWorkspace === 'string') {
+          // Resolve relative paths against host workspace root
+          workspaceFolder = isAbsolute(parsed.testWorkspace)
+            ? parsed.testWorkspace
+            : resolve(hostRoot, parsed.testWorkspace);
+          console.log(`[config] Using testWorkspace from host devtools.jsonc: ${workspaceFolder}`);
+        }
+      } catch {
+        // Ignore parse errors
+      }
+    }
+  }
 
   if (!workspaceFolder) {
     throw new Error(
-      'Workspace folder is required. Use --test-workspace /path/to/workspace',
+      'Workspace folder is required. Use --test-workspace /path/to/workspace or set testWorkspace in .devtools/devtools.jsonc',
     );
   }
 

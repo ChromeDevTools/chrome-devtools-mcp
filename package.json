@@ -19,6 +19,8 @@
     "docs:generate": "node --experimental-strip-types scripts/generate-docs.ts",
     "start": "pnpm run build && node build/src/index.js",
     "start-debug": "DEBUG=mcp:* DEBUG_COLORS=false pnpm run build && node build/src/index.js",
+    "inspect": "pnpm run build && npx @modelcontextprotocol/inspector node build/src/index.js --test-workspace ../test-workspace --extension ../extension",
+    "inspect:cli": "pnpm run build && npx @modelcontextprotocol/inspector --cli node build/src/index.js --test-workspace ../test-workspace --extension ../extension",
     "test": "pnpm run build && node scripts/test.mjs",
     "test:no-build": "node scripts/test.mjs",
     "test:only": "pnpm run build && node scripts/test.mjs --test-only",
@@ -34,7 +36,6 @@
   "license": "Apache-2.0",
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@modelcontextprotocol/sdk": "1.26.0",
     "@rollup/plugin-commonjs": "^29.0.0",
     "@rollup/plugin-json": "^6.1.0",
     "@rollup/plugin-node-resolve": "^16.0.3",
@@ -68,6 +69,7 @@
     "node": "^20.19.0 || ^22.12.0 || >=23"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "1.27.0",
     "get-port": "^7.1.0",
     "jsonc-parser": "^3.3.0",
     "logpare": "^0.1.0",

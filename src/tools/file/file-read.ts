@@ -394,7 +394,7 @@ function renderStructuredRange(
 }
 
 export const read = defineTool({
-  name: 'file_read',
+  name: 'exp_file_read',
   description:
     'Read file content with flexible targeting and output modes.\n\n' +
     '**Two Simple Questions:**\n' +

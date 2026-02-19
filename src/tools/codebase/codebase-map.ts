@@ -116,7 +116,7 @@ function countFiles(node: CodebaseTreeNode): number {
 // ── Tool Definition ──────────────────────────────────────
 
 export const map = defineTool({
-  name: 'codebase_map',
+  name: 'exp_codebase_map',
   description: 'Get a structural map of the codebase at any granularity — folders, files, or symbols.\n\n' +
     'Returns a tree with folders ending in `/`, files with extensions, and symbols as `kind name`.\n\n' +
     '**Parameters:**\n' +

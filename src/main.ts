@@ -398,7 +398,7 @@ function registerTool(tool: ToolDefinition): void {
       inputSchema: tool.schema,
       annotations: tool.annotations,
     },
-    async (params): Promise<CallToolResult> => {
+    async (params, extra): Promise<CallToolResult> => {
       const timeoutMs = tool.timeoutMs ?? DEFAULT_TOOL_TIMEOUT_MS;
       let guard: InstanceType<typeof Mutex.Guard> | undefined;
       try {
@@ -547,7 +547,7 @@ function registerTool(tool: ToolDefinition): void {
           // Standalone tools don't need VS Code connection or UI checks
           if (isStandalone) {
             const response = new McpResponse();
-            await tool.handler({params}, response);
+            await tool.handler({params}, response, extra);
             const content: CallToolResult['content'] = [];
             for (const line of response.responseLines) {
               content.push({type: 'text', text: line});
@@ -578,7 +578,7 @@ function registerTool(tool: ToolDefinition): void {
           const notificationBanner = uiCheck.notificationBanner;
 
           const response = new McpResponse();
-          await tool.handler({params}, response);
+          await tool.handler({params}, response, extra);
 
           const content: CallToolResult['content'] = [];
           if (notificationBanner) {

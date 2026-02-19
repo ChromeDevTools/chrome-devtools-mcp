@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {zod} from '../third_party/index.js';
+import {zod, type ToolExtra} from '../third_party/index.js';
 
 import type {ToolCategory} from './categories.js';
 
@@ -71,6 +71,7 @@ export interface ToolDefinition<
   handler: (
     request: Request<Schema>,
     response: Response,
+    extra: ToolExtra,
   ) => Promise<void>;
 }
 

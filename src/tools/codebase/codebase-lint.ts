@@ -34,7 +34,7 @@ const TIMEOUT_BROAD_SCOPE_MS = 30_000;
 // ── Tool Definition ──────────────────────────────────────
 
 export const lint = defineTool({
-  name: 'codebase_lint',
+  name: 'exp_codebase_lint',
   description: 'Find dead code, unused exports, and code quality issues.\n\n' +
     'Runs automated checks on TypeScript/JavaScript files. Use the `checks` parameter\n' +
     'to control which analyses to run.\n\n' +

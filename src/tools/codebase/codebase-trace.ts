@@ -135,7 +135,7 @@ function applyProgressiveReduction(
 // ── Tool Definition ──────────────────────────────────────
 
 export const trace = defineTool({
-  name: 'codebase_trace',
+  name: 'exp_codebase_trace',
   description: 'Trace a symbol through the codebase to understand its full lifecycle.\n\n' +
     "Finds a symbol's definition, all references, re-export chains, call hierarchy\n" +
     '(who calls it / what it calls), type flows (parameter types, return types,\n' +

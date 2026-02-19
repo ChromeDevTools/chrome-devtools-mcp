@@ -24,7 +24,7 @@ function resolveFilePath(file: string): string {
 }
 
 export const edit = defineTool({
-  name: 'file_edit',
+  name: 'exp_file_edit',
   description:
     'Direct model-to-code editing with an intelligent safety layer.\n\n' +
     'The model you selected writes the code, this tool applies it directly — ' +
