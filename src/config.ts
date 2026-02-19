@@ -77,7 +77,7 @@ const DEFAULT_CONFIG_TEMPLATE = `// VS Code DevTools MCP configuration (JSONC)
   "devDiagnostic": false,
 
   // Write logs to a file (absolute or relative path).
-  // "logFile": ".devtools/devtools-mcp.log",
+  // Logs are written to stderr and appear in VS Code's MCP output channel.
 
   // Run VS Code headless (Linux only).
   "headless": false,
@@ -134,9 +134,6 @@ export interface DevToolsConfig {
   /** Enable diagnostic tools (debug_evaluate) */
   devDiagnostic?: boolean;
 
-  /** Path to log file (relative to workspace or absolute) */
-  logFile?: string;
-
   /** Run VS Code headless (Linux only) */
   headless?: boolean;
 
@@ -162,7 +159,6 @@ export interface ResolvedConfig {
   /** True when the extension dev path was explicitly supplied via CLI args. */
   explicitExtensionDevelopmentPath: boolean;
   devDiagnostic: boolean;
-  logFile?: string;
   headless: boolean;
   experimentalVision: boolean;
   experimentalStructuredContent: boolean;
@@ -213,9 +209,6 @@ function coerceDevToolsConfig(value: unknown): DevToolsConfig {
 
   const devDiagnostic = readOptionalBoolean(value, 'devDiagnostic');
   if (typeof devDiagnostic === 'boolean') {config.devDiagnostic = devDiagnostic;}
-
-  const logFile = readOptionalString(value, 'logFile');
-  if (logFile) {config.logFile = logFile;}
 
   const headless = readOptionalBoolean(value, 'headless');
   if (typeof headless === 'boolean') {config.headless = headless;}
@@ -393,7 +386,6 @@ export function loadConfig(cliArgs: {
   extensionBridgePath?: string;
   targetFolder?: string;
   devDiagnostic?: boolean;
-  logFile?: string;
   headless?: boolean;
   experimentalVision?: boolean;
   experimentalStructuredContent?: boolean;
@@ -459,18 +451,12 @@ export function loadConfig(cliArgs: {
     extensionBridgePath = getDefaultExtensionPath();
   }
 
-  // Resolve log file path
-  const logFile =
-    cliArgs.logFile ??
-    resolvePath(absoluteWorkspace, fileConfig.logFile);
-
   return {
     hostWorkspace: getHostWorkspace(),
     workspaceFolder: absoluteWorkspace,
     extensionBridgePath,
     explicitExtensionDevelopmentPath,
     devDiagnostic: cliArgs.devDiagnostic ?? fileConfig.devDiagnostic ?? false,
-    logFile,
     headless: cliArgs.headless ?? fileConfig.headless ?? false,
     experimentalVision:
       cliArgs.experimentalVision ?? fileConfig.experimentalVision ?? false,

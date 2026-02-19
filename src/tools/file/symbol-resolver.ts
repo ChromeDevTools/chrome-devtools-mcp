@@ -8,9 +8,15 @@
  * Minimum shape required for symbol tree navigation.
  * Both FileSymbol and UnifiedFileSymbol satisfy this.
  */
+export interface SymbolLikeRange {
+  startLine: number;
+  endLine: number;
+}
+
 export interface SymbolLike {
   name: string;
   kind: string;
+  range: SymbolLikeRange;
   children: SymbolLike[];
 }
 

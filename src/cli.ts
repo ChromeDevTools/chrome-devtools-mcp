@@ -65,11 +65,6 @@ export const cliOptions = {
     default: false,
     hidden: true,
   },
-  logFile: {
-    type: 'string',
-    describe: '[LEGACY] Set logFile in .vscode/devtools.json instead.',
-    hidden: true,
-  },
   experimentalVision: {
     type: 'boolean',
     describe: 'Whether to enable vision tools.',

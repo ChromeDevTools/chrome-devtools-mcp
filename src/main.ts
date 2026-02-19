@@ -15,7 +15,7 @@ import {loadConfig, type ResolvedConfig} from './config.js';
 import {hasBuildChangedSinceWindowStart, isBuildStale, writeExtSourceFingerprint} from './extension-watcher.js';
 import {restartMcpServer, showHostNotification} from './host-pipe.js';
 import {loadIssueDescriptions} from './issue-descriptions.js';
-import {logger, saveLogsToFile} from './logger.js';
+import {logger} from './logger.js';
 import {McpResponse} from './McpResponse.js';
 import {
   consumeHotReloadMarker,
@@ -228,10 +228,9 @@ function formatProcessLedger(ledger: ProcessLedgerSummary): string {
     }
   }
 
-  // If nothing to report
+  // If nothing to report, return empty string (no notification)
   if (ledger.orphaned.length === 0 && sessions.length === 0 && ledger.active.length === 0 && completed.length === 0) {
-    parts.push('\n---');
-    parts.push('\n📋 **No Copilot-managed processes running.**');
+    return '';
   }
 
   return parts.join('');
@@ -272,10 +271,6 @@ export const config: ResolvedConfig = loadConfig(cliArgs);
 
 // Legacy export for backwards compatibility
 export const args = cliArgs;
-
-if (config.logFile) {
-  saveLogsToFile(config.logFile);
-}
 
 // ── MCP Server Hot-Reload Marker (detect post-restart) ───
 // Check this BEFORE initializing lifecycle service so we can pass the flag
@@ -322,7 +317,7 @@ process.on('unhandledRejection', (reason, promise) => {
 
 logger(`Starting VS Code DevTools MCP Server v${VERSION}`);
 logger(`Config: hostWorkspace=${config.hostWorkspace}, targetFolder=${config.workspaceFolder}`);
-logger(`Config: extensionBridgePath=${config.extensionBridgePath}, headless=${config.headless}, logFile=${config.logFile ?? '(none)'}`);
+logger(`Config: extensionBridgePath=${config.extensionBridgePath}, headless=${config.headless}`);
 const server = new McpServer(
   {
     name: 'vscode_devtools',
@@ -598,7 +593,9 @@ function registerTool(tool: ToolDefinition): void {
           if (!response.skipLedger) {
             const ledger = await getProcessLedger();
             const ledgerText = formatProcessLedger(ledger);
-            content.push({type: 'text', text: ledgerText});
+            if (ledgerText) {
+              content.push({type: 'text', text: ledgerText});
+            }
           }
 
           return {content};

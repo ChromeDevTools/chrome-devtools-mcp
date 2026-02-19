@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import fs from 'node:fs';
 import path from 'node:path';
 
 import {
@@ -460,6 +461,20 @@ export const read = defineTool({
   handler: async (request, response) => {
     const {params} = request;
     const filePath = resolveFilePath(params.file);
+
+    if (!fs.existsSync(filePath)) {
+      response.appendResponseLine(
+        `**Error:** File not found: \`${filePath}\``,
+      );
+      if (!path.isAbsolute(params.file)) {
+        response.appendResponseLine(
+          `The relative path \`${params.file}\` was resolved against the workspace root. ` +
+          'Use an absolute path or a path relative to the workspace root.',
+        );
+      }
+      return;
+    }
+
     const skeleton = params.skeleton ?? false;
     const recursive = params.recursive ?? false;
 
