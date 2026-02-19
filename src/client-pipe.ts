@@ -882,10 +882,12 @@ export function fileHighlightReadRange(
   filePath: string,
   startLine: number,
   endLine: number,
+  collapsedRanges?: Array<{startLine: number; endLine: number}>,
+  sourceRanges?: Array<{startLine: number; endLine: number}>,
 ): void {
   sendClientRequest(
     'file.highlightReadRange',
-    {filePath, startLine, endLine},
+    {filePath, startLine, endLine, collapsedRanges, sourceRanges},
     5_000,
   ).catch(() => {
     // Best-effort — don't let highlight failures affect tool responses
