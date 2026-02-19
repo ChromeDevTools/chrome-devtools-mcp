@@ -31,7 +31,7 @@ import {tools} from './tools/tools.js';
 
 // If moved update release-please config
 // x-release-please-start-version
-const VERSION = '0.17.1';
+const VERSION = '0.17.2';
 // x-release-please-end
 
 export const args = parseArguments(VERSION);
