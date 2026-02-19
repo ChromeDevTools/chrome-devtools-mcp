@@ -318,7 +318,7 @@ export const map = defineTool({
       const steps = reductionsApplied.join(' → ');
       response.appendResponseLine(
         `Output exceeded token limit. Compression applied: ${steps}. ` +
-        'Use the returned map to navigate from here, or use file_read with a specific folder/file for full detail.\n',
+        'Use the returned map to navigate from here, or use file_read with a specific file for full details.\n',
       );
     }
 
