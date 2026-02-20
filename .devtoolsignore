@@ -1,0 +1,16 @@
+# Files/folders ignored by vscode-devtools extension change detection.
+# Syntax is similar to .gitignore and supports:
+# - * and ** globs
+# - ! negation (re-include)
+# - trailing / for directories
+
+# Build output
+out/
+build/
+
+# Packaging artifacts
+*.vsix
+
+# Optional: ignore generated docs or notes
+# docs/generated/
+# .devtools/

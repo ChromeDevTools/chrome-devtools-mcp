@@ -1,0 +1,36 @@
+{
+  "ignoreExportsUsedInFile": true,
+  "ignoreWorkspaces": ["."],
+  "workspaces": {
+    "extension": {
+      "entry": [
+        "extension.ts",
+        "runtime.ts",
+        "codebase-worker.ts",
+        "codebase-worker-proxy.ts"
+      ],
+      "project": ["**/*.ts", "**/*.js"],
+      "ignoreDependencies": [
+        "@vscode/codicons",
+        "@sigma/edge-curve",
+        "@sigma/node-piechart",
+        "graphology",
+        "graphology-layout",
+        "graphology-layout-forceatlas2",
+        "sigma",
+        "@modelcontextprotocol/inspector"
+      ],
+      "ignoreBinaries": ["code", "tsc"]
+    },
+    "mcp-server": {
+      "entry": [
+        "src/index.ts",
+        "src/cli.ts",
+        "scripts/**/*.{ts,mts,mjs}"
+      ],
+      "project": ["src/**/*.ts", "scripts/**/*.{ts,mts,mjs}"],
+      "ignore": ["src/third_party/**"],
+      "ignoreDependencies": ["@typescript-eslint/eslint-plugin", "@types/filesystem"]
+    }
+  }
+}

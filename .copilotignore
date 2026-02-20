@@ -1,0 +1,5 @@
+documentation/archive/
+.devtools/
+backups/
+test-workspace/
+tests/

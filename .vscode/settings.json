@@ -1,0 +1,14 @@
+{
+	"git.autoRepositoryDetection": "subFolders",
+	"git.openRepositoryInParentFolders": "never",
+	"git.repositoryScanMaxDepth": 2,
+	"github.copilot.chat.githubMcpServer.enabled": true,
+	"eslint.workingDirectories": ["extension", "mcp-server"],
+	"eslint.useFlatConfig": true,
+	"eslint.validate": [
+		"javascript",
+		"javascriptreact",
+		"typescript",
+		"typescriptreact"
+	]
+}

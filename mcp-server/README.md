@@ -10,7 +10,7 @@ MCP server for controlling and inspecting VS Code with extensions through the Ch
 - **Hot Reload**: Automatically rebuilds extensions when source changes are detected
 - **UI Automation**: Interact with VS Code UI elements programmatically
 
-## [Tool Reference](./docs/tool-reference.md) | [Changelog](./CHANGELOG.md) | [Contributing](./CONTRIBUTING.md)
+## [Tool Reference](./docs/tool-reference.md) | [Changelog](../CHANGELOG.md) | [Contributing](./CONTRIBUTING.md)
 
 ## Installation
 

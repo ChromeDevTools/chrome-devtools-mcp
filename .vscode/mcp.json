@@ -1,0 +1,12 @@
+{
+    "servers": {
+        "vscode-devtools": {
+            "type": "stdio",
+            "command": "node",
+            "cwd": "${workspaceFolder}/mcp-server",
+            "args": [
+                "./build/src/index.js"
+            ]
+        }
+    }
+}

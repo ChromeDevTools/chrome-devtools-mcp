@@ -1,75 +1,351 @@
 {
-  "name": "vscode-devtools-mcp",
-  "version": "0.16.0",
-  "description": "MCP server for VS Code DevTools",
-  "type": "module",
-  "bin": "./build/src/index.js",
-  "main": "index.js",
-  "scripts": {
-    "clean": "node -e \"const fs=require('fs');if(fs.existsSync('build/src'))fs.rmSync('build/src',{recursive:true,force:true});for(const f of['build/tsconfig.tsbuildinfo','build/tsconfig.build.tsbuildinfo'])try{fs.unlinkSync(f)}catch{}\"",
-    "clean:all": "node -e \"require('fs').rmSync('build', {recursive: true, force: true})\"",
-    "bundle": "pnpm run clean:all && pnpm run build:full && rollup -c rollup.config.mjs && node -e \"require('fs').rmSync('build/node_modules', {recursive: true, force: true})\"",
-    "build": "pnpm run clean && tsc -p tsconfig.build.json && node --experimental-strip-types --no-warnings=ExperimentalWarning scripts/post-build.ts",
-    "build:full": "pnpm run clean:all && tsc && node --experimental-strip-types --no-warnings=ExperimentalWarning scripts/post-build.ts",
-    "typecheck": "tsc --noEmit",
-    "dev": "pnpm run clean && tsc -p tsconfig.build.json && node --experimental-strip-types --no-warnings=ExperimentalWarning scripts/post-build.ts && tsc -p tsconfig.build.json --watch --preserveWatchOutput",
-    "format": "eslint --cache --fix . && prettier --write --cache .",
-    "check-format": "eslint --cache . && prettier --check --cache .;",
-    "docs": "pnpm run build && pnpm run docs:generate && pnpm run format",
-    "docs:generate": "node --experimental-strip-types scripts/generate-docs.ts",
-    "start": "pnpm run build && node build/src/index.js",
-    "start-debug": "DEBUG=mcp:* DEBUG_COLORS=false pnpm run build && node build/src/index.js",
-    "inspect": "pnpm run build && npx @modelcontextprotocol/inspector node build/src/index.js --test-workspace ../test-workspace --extension ../extension",
-    "inspect:cli": "pnpm run build && npx @modelcontextprotocol/inspector --cli node build/src/index.js --test-workspace ../test-workspace --extension ../extension",
-    "test": "pnpm run build && node scripts/test.mjs",
-    "test:no-build": "node scripts/test.mjs",
-    "test:only": "pnpm run build && node scripts/test.mjs --test-only",
-    "test:update-snapshots": "pnpm run build && node scripts/test.mjs --test-update-snapshots",
-    "prepare": "node --experimental-strip-types scripts/prepare.ts"
-  },
-  "files": [
-    "build/src",
-    "build/node_modules",
-    "LICENSE",
-    "!*.tsbuildinfo"
-  ],
-  "license": "Apache-2.0",
-  "devDependencies": {
-    "@eslint/js": "^10.0.1",
-    "@rollup/plugin-commonjs": "^29.0.0",
-    "@rollup/plugin-json": "^6.1.0",
-    "@rollup/plugin-node-resolve": "^16.0.3",
-    "@stylistic/eslint-plugin": "^5.4.0",
-    "@types/debug": "^4.1.12",
-    "@types/filesystem": "^0.0.36",
-    "@types/node": "^25.0.0",
-    "@types/ws": "^8.18.1",
-    "@types/yargs": "^17.0.33",
-    "@typescript-eslint/eslint-plugin": "^8.43.0",
-    "@typescript-eslint/parser": "^8.43.0",
-    "chrome-devtools-frontend": "1.0.1579812",
-    "core-js": "3.48.0",
-    "debug": "4.4.3",
-    "eslint": "^10.0.0",
-    "eslint-import-resolver-typescript": "^4.4.4",
-    "eslint-plugin-import": "^2.32.0",
-    "globals": "^17.0.0",
-    "prettier": "^3.6.2",
-    "rollup": "4.57.1",
-    "rollup-plugin-cleanup": "^3.2.1",
-    "rollup-plugin-license": "^3.6.0",
-    "typescript": "^5.9.2",
-    "typescript-eslint": "^8.43.0",
-    "yargs": "18.0.0",
-    "zod": "^4.3.6"
-  },
+  "name": "vscode-devtools",
+  "displayName": "VS Code DevTools",
+  "description": "VS Code DevTools with Git workspace picker, LM tool management, and MCP integration",
+  "version": "0.1.0",
+  "publisher": "AndyLiner",
+  "icon": "icon.png",
   "engines": {
-    "node": "^20.19.0 || ^22.12.0 || >=23"
+    "vscode": "^1.100.0"
   },
+  "categories": [
+    "Other"
+  ],
+  "keywords": [
+    "api",
+    "devtools",
+    "mcp",
+    "automation"
+  ],
+  "activationEvents": [
+    "*"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "vscdt",
+          "title": "VS Code DevTools",
+          "icon": "icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "vscdt": [
+        {
+          "id": "vscdt.project",
+          "name": "Workspace Root",
+          "icon": "$(folder-library)",
+          "contextualTitle": "Git Workspace Picker",
+          "when": "vscdt.coreLoaded"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "vscode-devtools.refreshProjectTree",
+        "title": "VS Code DevTools: Refresh Workspaces",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "vscode-devtools.selectWorkspace",
+        "title": "VS Code DevTools: Select Workspace",
+        "icon": "$(folder-active)"
+      },
+      {
+        "command": "vscode-devtools.showASTGraph",
+        "title": "VS Code DevTools: Show AST Graph",
+        "icon": "$(type-hierarchy)"
+      },
+      {
+        "command": "vscode-devtools.graphVisualizer.refresh",
+        "title": "Refresh Graph",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "vscode-devtools.graphVisualizer.fit",
+        "title": "Fit to Screen",
+        "icon": "$(screen-full)"
+      },
+      {
+        "command": "vscode-devtools.graphVisualizer.zoomIn",
+        "title": "Zoom In",
+        "icon": "$(zoom-in)"
+      },
+      {
+        "command": "vscode-devtools.graphVisualizer.zoomOut",
+        "title": "Zoom Out",
+        "icon": "$(zoom-out)"
+      },
+      {
+        "command": "vscode-devtools.graphVisualizer.search",
+        "title": "Search Symbols",
+        "icon": "$(search)"
+      },
+      {
+        "command": "vscode-devtools.graphVisualizer.setLayout",
+        "title": "Set Layout"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "vscode-devtools.refreshProjectTree",
+          "when": "view == vscdt.project",
+          "group": "navigation@1"
+        }
+      ]
+    },
+    "languageModelTools": [
+      {
+        "name": "output_read",
+        "displayName": "Output Read",
+        "toolReferenceName": "output_read",
+        "icon": "$(output)",
+        "canBeReferencedInPrompt": true,
+        "userDescription": "Read VS Code output logs from all active sessions — Host and Client (Extension Development Host)",
+        "modelDescription": "Read VS Code output logs from all active sessions. When called without a channel, lists all available output channels organized by session (Host and Client) and category. When called with a channel name, returns log content with optional filtering. If the same channel name exists in both sessions, returns both.\n\n**LISTING CHANNELS (no channel provided):**\nReturns all available output channels grouped by session (Host, Client) and category (Main Logs, Window Logs, Extension Host, Extension Logs, Output Channels).\n\n**READING CHANNEL CONTENT (channel provided):**\n- `session` ('host' | 'client'): Filter to a specific session. Omit for both.\n- `limit` (number): Get the N most recent lines. Default: all lines\n- `pattern` (string): Regex pattern to match against line content (case-insensitive)\n- `afterLine` (number): Only lines after this line number (for incremental reads)\n- `beforeLine` (number): Only lines before this line number\n- `lineLimit` (number): Max characters per line (truncates with '...')\n\n**EXAMPLES:**\n- List all channels from all sessions: {}\n- List only client channels: { session: 'client' }\n- Read extension host logs: { channel: 'exthost' }\n- Read client-only exthost: { channel: 'exthost', session: 'client' }\n- Get last 50 lines: { channel: 'exthost', limit: 50 }\n- Find errors: { channel: 'main', pattern: 'error|exception|failed', limit: 100 }\n\n**USE THIS TOOL when:**\n- User asks about VS Code logs, output, or errors\n- Debugging extension issues in Host or Client windows\n- Looking for specific log messages\n- Monitoring extension host activity\n- Comparing Host vs Client behavior",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "channel": {
+              "type": "string",
+              "description": "Name of the output channel to read (e.g., 'exthost', 'main', 'Git'). If omitted, lists all available channels."
+            },
+            "session": {
+              "type": "string",
+              "enum": [
+                "host",
+                "client"
+              ],
+              "description": "Filter to a specific VS Code session. 'host' = main VS Code window, 'client' = Extension Development Host. If omitted, shows both sessions."
+            },
+            "limit": {
+              "type": "number",
+              "description": "Get the N most recent lines. Omit to get all lines."
+            },
+            "pattern": {
+              "type": "string",
+              "description": "Regex pattern to match against line content (case-insensitive)."
+            },
+            "afterLine": {
+              "type": "number",
+              "description": "Only return lines with line number greater than this (for incremental reads)."
+            },
+            "beforeLine": {
+              "type": "number",
+              "description": "Only return lines with line number less than this."
+            },
+            "lineLimit": {
+              "type": "number",
+              "description": "Max characters per line. Longer lines are truncated with '...'."
+            }
+          }
+        }
+      },
+      {
+        "name": "terminal_read",
+        "displayName": "Terminal Read",
+        "toolReferenceName": "terminal_read",
+        "icon": "$(terminal)",
+        "canBeReferencedInPrompt": true,
+        "userDescription": "Read the current output and state of a terminal",
+        "modelDescription": "Read the current output and state of any tracked terminal.\n\nUse this to:\n- Check if a previously started command has finished\n- See the latest output from a running or completed process\n- Determine if the terminal is waiting for input\n- Search terminal output for specific patterns\n- Get just the last N lines of output\n\n**PARAMETERS:**\n- `name` (string): Terminal name. Default: 'default'\n- `limit` (number): Return only the last N lines of output\n- `pattern` (string): Regex pattern to filter output lines (case-insensitive)\n- `logFormat` ('summary'|'detailed'|'json'): Log compression format. Default: no compression. Use 'summary' for compact overview with top templates + rare events. 'detailed' for full template list. 'json' for machine-readable.\n\n**RETURNS:**\n- status: 'idle' (no terminal), 'running', 'completed', or 'waiting_for_input'\n- output: Terminal output (optionally filtered)\n- exitCode: Process exit code (if completed)\n- prompt: Detected prompt (if waiting for input)\n- pid: Process ID\n- name: Terminal name",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "Terminal name. Default: 'default'"
+            },
+            "limit": {
+              "type": "number",
+              "description": "Return only the last N lines of output."
+            },
+            "pattern": {
+              "type": "string",
+              "description": "Regex pattern to filter output lines (case-insensitive)."
+            },
+            "logFormat": {
+              "type": "string",
+              "enum": [
+                "summary",
+                "detailed",
+                "json"
+              ],
+              "description": "Log compression format. 'summary': compact overview with top templates + rare events. 'detailed': full template list with sample variables & metadata. 'json': machine-readable JSON with complete template data."
+            }
+          }
+        }
+      },
+      {
+        "name": "terminal_execute",
+        "displayName": "Terminal Execute",
+        "toolReferenceName": "terminal_execute",
+        "icon": "$(terminal)",
+        "canBeReferencedInPrompt": true,
+        "userDescription": "Run a command or send input in the VS Code terminal",
+        "modelDescription": "Run a PowerShell command in the VS Code terminal, or send input to a terminal waiting for user input.\n\n**THREE MODES:**\n\n**Run Mode** (when `cwd` is provided): Execute a command in a terminal from a specific working directory.\nBy default (waitMode: 'completion'), BLOCKS until ALL commands fully complete (including chained commands with ; && ||).\nIf the command asks for user input (e.g., [Y/n] prompts), returns immediately with status 'waiting_for_input'.\nFor long-running dev servers, use waitMode: 'background' to return immediately.\n\n**Input Mode** (when `cwd` is omitted): Send input to an existing terminal that is waiting for user input.\nUse this after terminal_execute returns status 'waiting_for_input' (e.g., answering a [Y/n] prompt, entering a password).\n\n**Keys Mode** (when `keys` is provided): Send raw keystrokes for interactive TUI navigation.\nUse for arrow keys, Enter, Escape, Ctrl+C, etc. in interactive CLI programs.\n\n**BUSY TERMINAL:** If the terminal is already running a command, returns an error with the last command and current output. Set `force=true` to kill the running process and start a new one.\n\n**PARAMETERS:**\n- `command` (string): The PowerShell command to execute, or input text to send\n- `cwd` (string): Working directory. If provided = run mode. If omitted = input mode.\n- `ephemeral` (boolean, required): If true, terminal is auto-deleted after output is returned. If false, terminal persists.\n- `name` (string): Terminal name. Default: 'default'\n- `waitMode` ('completion' | 'background'): Default 'completion' blocks until done\n- `timeout` (number): Max wait time in milliseconds. Default: 120000\n- `force` (boolean): Kill running process and start new command. Default: false\n- `addNewline` (boolean): Whether to press Enter after input. Default: true (input mode only)\n- `keys` (string[]): Key sequences for TUI navigation (e.g., ['ArrowDown', 'Enter'])\n- `logFormat` ('summary'|'detailed'|'json'): Log compression format for output. Default: no compression.\n\n**RETURNS:**\n- status: 'completed' | 'running' | 'waiting_for_input' | 'timeout'\n- output: Terminal output text\n- cwd: The working directory the command ran from\n- exitCode: Process exit code (when completed)\n- prompt: Detected prompt text (when waiting_for_input)\n- pid: Process ID\n- name: Terminal name\n- durationMs: How long the command ran",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "command": {
+              "type": "string",
+              "description": "The PowerShell command to execute, or input text to send to an existing terminal."
+            },
+            "cwd": {
+              "type": "string",
+              "description": "Absolute path to the working directory. If provided, runs command in run mode. If omitted, sends command as input to existing terminal."
+            },
+            "ephemeral": {
+              "type": "boolean",
+              "description": "If true, the terminal is automatically deleted from the VS Code panel after the command completes and output is returned. If false, the terminal persists for reuse."
+            },
+            "name": {
+              "type": "string",
+              "description": "Terminal name. Default: 'default'"
+            },
+            "waitMode": {
+              "type": "string",
+              "enum": [
+                "completion",
+                "background"
+              ],
+              "description": "Wait mode: 'completion' (default) blocks until done; 'background' returns immediately."
+            },
+            "timeout": {
+              "type": "number",
+              "description": "Max wait time in milliseconds. Default: 120000"
+            },
+            "force": {
+              "type": "boolean",
+              "description": "Kill any running process in this terminal before executing the new command. Default: false"
+            },
+            "addNewline": {
+              "type": "boolean",
+              "description": "Whether to press Enter after sending input. Default: true. Only relevant in input mode (when cwd is omitted)."
+            },
+            "keys": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Key sequences for interactive TUI navigation. Available keys: ArrowUp, ArrowDown, ArrowLeft, ArrowRight, Enter, Escape, Tab, Backspace, Delete, Home, End, PageUp, PageDown, Space, Ctrl+C, Ctrl+D, Ctrl+Z, Ctrl+L, or any single character."
+            },
+            "logFormat": {
+              "type": "string",
+              "enum": [
+                "summary",
+                "detailed",
+                "json"
+              ],
+              "description": "Log compression format. 'summary': compact overview with top templates + rare events. 'detailed': full template list with sample variables & metadata. 'json': machine-readable JSON with complete template data."
+            }
+          },
+          "required": [
+            "ephemeral"
+          ]
+        }
+      },
+      {
+        "name": "wait",
+        "displayName": "Wait",
+        "toolReferenceName": "wait",
+        "icon": "$(watch)",
+        "canBeReferencedInPrompt": true,
+        "userDescription": "Wait for a specified duration before continuing",
+        "modelDescription": "Wait for a specified duration before continuing. Useful for giving the page time to update, animations to complete, or network requests to settle.\n\nArgs:\n  - durationMs (number): Duration in milliseconds (0-30000)\n  - reason (string): Optional explanation for the wait\n\nReturns:\n  { elapsed_ms, requested_ms, reason? }\n\nExamples:\n  - \"Wait for animation\" -> { durationMs: 500, reason: \"animation to complete\" }\n  - \"Wait for API response\" -> { durationMs: 2000, reason: \"network request to settle\" }\n\nError Handling:\n  - Duration must be between 0 and 30000ms",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "durationMs": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 30000,
+              "description": "Duration to wait in milliseconds. Must be between 0 and 30000 (30 seconds)."
+            },
+            "reason": {
+              "type": "string",
+              "description": "Optional reason for waiting (e.g., \"waiting for animation to complete\"). Included in the response for context."
+            }
+          },
+          "required": [
+            "durationMs"
+          ]
+        }
+      },
+      {
+        "name": "mcpStatus",
+        "displayName": "MCP Status",
+        "toolReferenceName": "mcpStatus",
+        "icon": "$(sync)",
+        "canBeReferencedInPrompt": true,
+        "userDescription": "Wait for the MCP server to be ready after a hot-reload restart",
+        "modelDescription": "Wait for the MCP server to be fully started and accepting tool calls after a hot-reload restart.\n\nCall this tool when any MCP tool returns a message indicating the server is restarting. This tool blocks until the MCP server is ready or the timeout is reached.\n\nDo NOT call this tool unless an MCP tool explicitly told you to. Do NOT call it more than once per restart.\n\n**Input:** {} (empty — no parameters needed, or optionally { timeoutMs: number })\n\n**Returns:**\n- Ready message when the MCP server is accepting tool calls\n- Timeout message if the server did not start within the timeout period",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "timeoutMs": {
+              "type": "integer",
+              "minimum": 1000,
+              "maximum": 300000,
+              "description": "Maximum time to wait in milliseconds. Default: 60000 (60 seconds)."
+            }
+          }
+        }
+      }
+    ]
+  },
+  "scripts": {
+    "clean": "node -e \"require('fs').rmSync('dist', {recursive: true, force: true})\"",
+    "vscode:prepublish": "npm run clean && npm run package",
+    "compile": "npm run clean && node esbuild.js",
+    "watch": "npm run clean && node esbuild.js --watch",
+    "package": "npm run clean && node esbuild.js --production",
+    "build": "npm run clean && vsce package --skip-license --allow-star-activation",
+    "uninstall": "code --uninstall-extension AndyLiner.vscode-devtools || echo Extension not installed, skipping",
+    "install:vsix": "node -e \"var p=require('./package.json');require('child_process').execSync('code --install-extension '+p.name+'-'+p.version+'.vsix --force',{stdio:'inherit'})\"",
+    "reinstall": "npm run compile && npm run build && npm run uninstall && npm run install:vsix",
+    "check-types": "tsc --noEmit",
+    "lint": "eslint . --ext ts"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.2",
+    "@modelcontextprotocol/inspector": "^0.16.0",
+    "@sigma/edge-curve": "^3.1.0",
+    "@sigma/node-piechart": "^3.0.0",
+    "@types/mdast": "^4.0.4",
+    "@types/node": "22.x",
+    "@types/vscode": "^1.100.0",
+    "@typescript-eslint/eslint-plugin": "^8.39.0",
+    "@typescript-eslint/parser": "^8.39.0",
+    "@vscode/codicons": "^0.0.44",
+    "@vscode/vsce": "^3.7.1",
+    "esbuild": "^0.25.8",
+    "eslint": "^9.32.0",
+    "graphology": "^0.26.0",
+    "graphology-layout": "^0.6.1",
+    "graphology-layout-forceatlas2": "^0.10.1",
+    "mdast-util-directive": "^3.1.0",
+    "mdast-util-math": "^3.0.0",
+    "sigma": "^3.0.2"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AndyLiner13/vscode-devtools.git"
+  },
+  "license": "Apache-2.0",
   "dependencies": {
-    "@modelcontextprotocol/sdk": "1.27.0",
-    "jsonc-parser": "^3.3.0",
+    "jsonc-parser": "^3.3.1",
     "logpare": "^0.1.0",
-    "ws": "^8.19.0"
+    "remark-frontmatter": "^5.0.0",
+    "remark-gfm": "^4.0.1",
+    "remark-math": "^6.0.0",
+    "remark-directive": "^3.0.1",
+    "remark-parse": "^11.0.0",
+    "ts-morph": "^27.0.2",
+    "unified": "^11.0.5",
+    "yaml": "^2.8.2"
   }
 }

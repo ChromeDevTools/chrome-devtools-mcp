@@ -1,0 +1,57 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "mcp:build",
+			"type": "shell",
+			"command": "npm run clean && npm run build && npm run typecheck",
+			"options": {
+				"cwd": "${workspaceFolder}/mcp-server"
+			},
+			"group": "build",
+			"problemMatcher": ["$eslint-stylish"],
+			"presentation": {
+				"focus": false,
+				"revealProblems": "onProblem",
+				"panel": "dedicated",
+				"showReuseMessage": false
+			}
+		},
+		{
+			"label": "ext:reinstall",
+			"type": "shell",
+			"command": "npm run compile && npx tsc --noEmit && npm run build && (code --uninstall-extension AndyLiner.vscode-devtools || $true) && code --install-extension (Get-ChildItem *.vsix | Sort-Object LastWriteTime -Descending | Select-Object -First 1).FullName --force",
+			"options": {
+				"cwd": "${workspaceFolder}/extension"
+			},
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			},
+			"problemMatcher": ["$eslint-stylish"],
+			"presentation": {
+				"focus": false,
+				"revealProblems": "onProblem",
+				"panel": "shared",
+				"clear": true,
+				"showReuseMessage": false
+			}
+		},
+		{
+			"label": "mcp:inspect",
+			"type": "shell",
+			"command": "$env:CLIENT_PORT='6275'; $env:MCP_INSPECTOR_OPENED_BY='vscode-task'; npx -y @modelcontextprotocol/inspector@latest",
+			"options": {
+				"cwd": "${workspaceFolder}/mcp-server"
+			},
+			"group": "test",
+			"isBackground": true,
+			"problemMatcher": [],
+			"presentation": {
+				"focus": false,
+				"panel": "dedicated",
+				"showReuseMessage": false
+			}
+		}
+	]
+}

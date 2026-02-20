@@ -1,0 +1,61 @@
+# Source files (not needed in VSIX — dist/ has the bundles)
+# Source files (not needed in VSIX — dist/ has the bundles)
+**/*.ts
+!**/*.d.ts
+esbuild.js
+tsconfig.json
+
+# Build artifacts & config
+package-lock.json
+*.vsix
+*.log
+
+# Docs (except README)
+*.md
+!README.md
+
+# Dotfiles / IDE
+.env*
+**/.env*
+.vscode/
+.gitignore
+.copilotignore
+
+# Parent directory leakage from npm workspaces
+../**
+
+# Always include dist/
+!dist/**
+
+# ── node_modules ──────────────────────────────────────────
+# Exclude ALL node_modules — esbuild bundles everything except
+# jsonc-parser and ts-morph (declared as externals in esbuild.js).
+# Only whitelist the runtime externals and their transitive dependencies.
+node_modules/**
+
+# jsonc-parser (leaf — no dependencies)
+!node_modules/jsonc-parser/**
+
+# ts-morph + dependency tree
+!node_modules/ts-morph/**
+!node_modules/@ts-morph/
+!node_modules/@ts-morph/**
+!node_modules/code-block-writer/**
+!node_modules/minimatch/**
+!node_modules/brace-expansion/**
+!node_modules/balanced-match/**
+!node_modules/path-browserify/**
+!node_modules/tinyglobby/**
+!node_modules/picomatch/**
+
+# typescript (transitive dep of ts-morph, used by hotReloadService for tsconfig parsing)
+!node_modules/typescript/**
+DE
+.env*
+**/.env*
+.vscode/
+.gitignore
+.copilotignore
+
+# Always include dist/
+!dist/**
