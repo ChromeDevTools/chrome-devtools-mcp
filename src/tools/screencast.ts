@@ -12,7 +12,6 @@ import {zod} from '../third_party/index.js';
 import type {ScreenRecorder} from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
-import type {Context, Response} from './ToolDefinition.js';
 import {defineTool} from './ToolDefinition.js';
 
 async function generateTempFilePath(): Promise<string> {
@@ -23,7 +22,7 @@ async function generateTempFilePath(): Promise<string> {
 export const startScreencast = defineTool({
   name: 'screencast_start',
   description:
-    'Starts recording a screencast (video) of the selected page in mp4 format. Requires ffmpeg to be installed on the system.',
+    'Starts recording a screencast (video) of the selected page in mp4 format.',
   annotations: {
     category: ToolCategory.DEBUGGING,
     readOnlyHint: false,
@@ -70,7 +69,7 @@ export const startScreencast = defineTool({
     context.setScreenRecorder({recorder, filePath: resolvedPath});
 
     response.appendResponseLine(
-      `Screencast recording started. The recording will be saved to ${resolvedPath}. Use screencast_stop to stop recording.`,
+      `Screencast recording started. The recording will be saved to ${resolvedPath}. Use ${stopScreencast.name} to stop recording.`,
     );
   },
 });
@@ -85,24 +84,17 @@ export const stopScreencast = defineTool({
   },
   schema: {},
   handler: async (_request, response, context) => {
-    await stopScreencastAndAppendOutput(response, context);
+    const data = context.getScreenRecorder();
+    if (!data) {
+      return;
+    }
+    try {
+      await data.recorder.stop();
+      response.appendResponseLine(
+        `The screencast recording has been stopped and saved to ${data.filePath}.`,
+      );
+    } finally {
+      context.setScreenRecorder(null);
+    }
   },
 });
-
-async function stopScreencastAndAppendOutput(
-  response: Response,
-  context: Context,
-): Promise<void> {
-  const data = context.getScreenRecorder();
-  if (!data) {
-    return;
-  }
-  try {
-    await data.recorder.stop();
-    response.appendResponseLine(
-      `The screencast recording has been stopped and saved to ${data.filePath}.`,
-    );
-  } finally {
-    context.setScreenRecorder(null);
-  }
-}

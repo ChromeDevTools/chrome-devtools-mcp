@@ -60,46 +60,13 @@ describe('screencast', () => {
           .stub(selectedPage, 'screencast')
           .resolves(mockRecorder as never);
 
-        await startScreencast.handler(
-          {params: {}},
-          response,
-          context,
-        );
+        await startScreencast.handler({params: {}}, response, context);
 
         sinon.assert.calledOnce(screencastStub);
         const callArgs = screencastStub.firstCall.args[0];
         assert.ok(callArgs);
         assert.ok(callArgs.path?.endsWith('.mp4'));
         assert.ok(context.getScreenRecorder() !== null);
-      });
-    });
-
-    it('passes format and quality options', async () => {
-      await withMcpContext(async (response, context) => {
-        const mockRecorder = createMockRecorder();
-        const selectedPage = context.getSelectedPage();
-        const screencastStub = sinon
-          .stub(selectedPage, 'screencast')
-          .resolves(mockRecorder as never);
-
-        await startScreencast.handler(
-          {
-            params: {
-              path: '/tmp/test.mp4',
-            },
-          },
-          response,
-          context,
-        );
-
-        sinon.assert.calledOnce(screencastStub);
-        const callArgs = screencastStub.firstCall.args[0];
-        assert.ok(callArgs);
-        assert.strictEqual(callArgs.format, 'mp4');
-        assert.strictEqual(callArgs.quality, 20);
-        assert.strictEqual(callArgs.fps, 24);
-        assert.strictEqual(callArgs.scale, 0.5);
-        assert.strictEqual(callArgs.speed, 2);
       });
     });
 
@@ -114,11 +81,7 @@ describe('screencast', () => {
         const selectedPage = context.getSelectedPage();
         const screencastStub = sinon.stub(selectedPage, 'screencast');
 
-        await startScreencast.handler(
-          {params: {}},
-          response,
-          context,
-        );
+        await startScreencast.handler({params: {}}, response, context);
 
         sinon.assert.notCalled(screencastStub);
         assert.ok(

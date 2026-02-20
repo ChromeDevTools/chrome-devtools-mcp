@@ -175,8 +175,8 @@ export const cliOptions = {
   },
   experimentalScreencast: {
     type: 'boolean',
-    describe: 'Whether to enable screencast tools',
-    hidden: true,
+    describe:
+      'Exposes experimental screencast tools (requires ffmpeg). Install ffmpeg https://www.ffmpeg.org/download.html and ensure it is available in the MCP server PATH.',
   },
   chromeArg: {
     type: 'array',
