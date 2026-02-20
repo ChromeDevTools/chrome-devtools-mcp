@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.18.0](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.17.3...chrome-devtools-mcp-v0.18.0) (2026-02-20)
+
+
+### 🎉 Features
+
+* add a new skill for accessibility debugging and auditing with Chrome DevTools MCP. ([#1002](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1002)) ([b0c6d04](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/b0c6d042e4d68763acf989edc8097ce07e85dc7a))
+* add experimental screencast recording tools ([#941](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/941)) ([33446d4](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/33446d457e4386fadcfe4ddf6c7a43b2e9098c9a))
+
+
+### ♻️ Chores
+
+* cleanup string and structured console formatters ([#1005](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1005)) ([0d78685](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/0d78685a5b37dc68bb11a1088ff8816ecff3bb82))
+* move emulation settings to context ([#1000](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1000)) ([bc3c40e](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/bc3c40e8f961433fb2ae858482d66f9a55fdde32))
+* simplify JavaScript code examples, update code block language, and refine descriptions in a11y debugging skill documentation. ([#1009](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1009)) ([5cedcaa](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/5cedcaad2c8a5e488064e21fb56cbd8643345440))
+
 ## [0.17.3](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.17.2...chrome-devtools-mcp-v0.17.3) (2026-02-19)
 
 
