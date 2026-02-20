@@ -132,7 +132,8 @@ _Pass the element's `uid` to test the contrast against WCAG AA (4.5:1 for normal
 Verify document-level accessibility settings often missed in component testing:
 
 ```javascript
-() => {
+(() => {
+  const f = () => {
   return {
     lang:
       document.documentElement.lang ||
@@ -147,6 +148,11 @@ Verify document-level accessibility settings often missed in component testing:
       : 'Disabled',
   };
 };
+  try {
+    console.log(f());
+  } catch (e) {} // Log for manual console usage
+  return f;
+})();
 ```
 
 ## Troubleshooting
