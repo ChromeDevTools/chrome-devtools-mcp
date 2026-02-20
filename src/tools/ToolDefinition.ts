@@ -112,9 +112,10 @@ export type Context = Readonly<{
   getPageById(pageId: number): Page;
   getPageId(page: Page): number | undefined;
   isPageSelected(page: Page): boolean;
-  newPage(background?: boolean): Promise<Page>;
+  newPage(background?: boolean, isolatedContextName?: string): Promise<Page>;
   closePage(pageId: number): Promise<void>;
   selectPage(page: Page): void;
+  getIsolatedContextName(page: Page): string | undefined;
   getElementByUid(uid: string): Promise<ElementHandle<Element>>;
   getAXNodeByUid(uid: string): TextSnapshotNode | undefined;
   emulate(options: {
