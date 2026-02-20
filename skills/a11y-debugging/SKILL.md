@@ -36,25 +36,27 @@ The accessibility tree exposes the heading hierarchy and semantic landmarks.
 3.  **Orphaned Inputs**: Verify that all form inputs have associated labels. Use `evaluate_script` to check for inputs missing `id` (for `label[for]`) or `aria-label`:
     ```javascript
     () => {
-  const inputs = Array.from(
-    document.querySelectorAll('input, select, textarea'),
-  );
-  return inputs
-    .filter(i => {
-      const hasId = i.id && document.querySelector(`label[for="${i.id}"]`);
-    const hasAria =
-    i.getAttribute('aria-label') || i.getAttribute('aria-labelledby');
-    const hasImplicitLabel = i.closest('label');
-    return !hasId && !hasAria && !hasImplicitLabel;
-    })
-    .map(i => ({
-    tag: i.tagName,
-    id: i.id,
-    name: i.name,
-    placeholder: i.placeholder,
-    }));
-    }
- ```
+      const inputs = Array.from(
+        document.querySelectorAll('input, select, textarea'),
+      );
+      return inputs
+        .filter(i => {
+          const hasId = i.id && document.querySelector(`label[for="${i.id}"]`);
+          const hasAria =
+            i.getAttribute('aria-label') || i.getAttribute('aria-labelledby');
+          const hasImplicitLabel = i.closest('label');
+          return !hasId && !hasAria && !hasImplicitLabel;
+        })
+        .map(i => ({
+          tag: i.tagName,
+          id: i.id,
+          name: i.name,
+          placeholder: i.placeholder,
+        }));
+    };
+    ```
+
+````
 
 4.  Check images for `alt` text.
 
@@ -74,10 +76,10 @@ According to web.dev, tap targets should be at least 48x48 pixels with sufficien
 ```javascript
 // Usage in console: copy, paste, and call with element: fn(element)
 el => {
-  const rect = el.getBoundingClientRect();
-  return {width: rect.width, height: rect.height};
+ const rect = el.getBoundingClientRect();
+ return {width: rect.width, height: rect.height};
 };
-```
+````
 
 _Pass the element's `uid` from the snapshot as an argument to the tool._
 
@@ -134,20 +136,20 @@ Verify document-level accessibility settings often missed in component testing:
 ```javascript
 (() => {
   const f = () => {
-  return {
-    lang:
-      document.documentElement.lang ||
-      'MISSING - Screen readers need this for pronunciation',
-    title: document.title || 'MISSING - Required for context',
-    viewport:
-      document.querySelector('meta[name="viewport"]')?.content ||
-      'MISSING - Check for user-scalable=no (bad practice)',
-    reducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)')
-      .matches
-      ? 'Enabled'
-      : 'Disabled',
+    return {
+      lang:
+        document.documentElement.lang ||
+        'MISSING - Screen readers need this for pronunciation',
+      title: document.title || 'MISSING - Required for context',
+      viewport:
+        document.querySelector('meta[name="viewport"]')?.content ||
+        'MISSING - Check for user-scalable=no (bad practice)',
+      reducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)')
+        .matches
+        ? 'Enabled'
+        : 'Disabled',
+    };
   };
-};
   try {
     console.log(f());
   } catch (e) {} // Log for manual console usage
