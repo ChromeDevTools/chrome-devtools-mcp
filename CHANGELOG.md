@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.17.3](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.17.2...chrome-devtools-mcp-v0.17.3) (2026-02-19)
+
+
+### 🛠️ Fixes
+
+* remove clean from prepare ([#997](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/997)) ([2016b98](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/2016b98217bf5aa8d65c6668b1e46c8a3400276f))
+
 ## [0.17.2](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.17.1...chrome-devtools-mcp-v0.17.2) (2026-02-19)
 
 

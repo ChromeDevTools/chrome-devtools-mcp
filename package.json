@@ -1,6 +1,6 @@
 {
   "name": "chrome-devtools-mcp",
-  "version": "0.17.2",
+  "version": "0.17.3",
   "description": "MCP server for Chrome DevTools",
   "type": "module",
   "bin": "./build/src/index.js",
@@ -20,14 +20,14 @@
     "test:no-build": "node scripts/test.mjs",
     "test:only": "npm run build && node scripts/test.mjs --test-only",
     "test:update-snapshots": "npm run build && node scripts/test.mjs --test-update-snapshots",
-    "prepare": "npm run clean && node --experimental-strip-types scripts/prepare.ts",
+    "prepare": "node --experimental-strip-types scripts/prepare.ts",
     "verify-server-json-version": "node --experimental-strip-types scripts/verify-server-json-version.ts",
+    "verify-npm-package": "node scripts/verify-npm-package.mjs",
     "eval": "npm run build && CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS=true node --experimental-strip-types scripts/eval_gemini.ts",
     "count-tokens": "node --experimental-strip-types scripts/count_tokens.ts"
   },
   "files": [
     "build/src",
-    "build/node_modules",
     "LICENSE",
     "!*.tsbuildinfo"
   ],
