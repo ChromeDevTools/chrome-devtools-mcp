@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {existsSync, statSync} from 'node:fs';
+import path from 'node:path';
+
 import {
   codebaseGetOverview,
   type CodebaseTreeNode,
@@ -241,6 +244,17 @@ export const map = defineTool({
     const recursive = params.recursive ?? false;
     const symbols = params.symbols ?? false;
     const metadata = params.metadata ?? false;
+
+    // Resolve relative paths against workspace root for validation
+    const resolvedDir = path.isAbsolute(dir) ? dir : path.resolve(rootDir, dir);
+
+    // Validate directory exists before scanning
+    if (!existsSync(resolvedDir)) {
+      throw new Error(`Directory not found: "${dir}". Verify the path exists and is accessible.`);
+    }
+    if (!statSync(resolvedDir).isDirectory()) {
+      throw new Error(`Path is not a directory: "${dir}". The "dir" parameter must point to a folder, not a file.`);
+    }
 
     // Dynamic timeout based on request scope
     const dynamicTimeout =

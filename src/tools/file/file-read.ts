@@ -19,7 +19,7 @@ import {getClientWorkspace} from '../../config.js';
 import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
 import {CHARACTER_LIMIT, defineTool} from '../ToolDefinition.js';
-import {resolveSymbolTarget} from './symbol-resolver.js';
+import {resolveSymbolTarget, findQualifiedPaths} from './symbol-resolver.js';
 import type {SymbolLike} from './symbol-resolver.js';
 
 function resolveFilePath(file: string): string {
@@ -700,6 +700,15 @@ export const read = defineTool({
           response.appendResponseLine(
             `"${target}": Not found. Available: ${available || 'none'}`,
           );
+
+          // Check if the target exists as a nested child and suggest qualified path
+          const qualifiedPaths = findQualifiedPaths(structure.symbols, target);
+          if (qualifiedPaths.length > 0) {
+            const suggestions = qualifiedPaths.map(p => `"${p}"`).join(', ');
+            response.appendResponseLine(
+              `Hint: Did you mean ${suggestions}? Use the qualified dot-path to target nested symbols.`,
+            );
+          }
           continue;
         }
 

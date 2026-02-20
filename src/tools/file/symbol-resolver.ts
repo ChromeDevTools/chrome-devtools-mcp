@@ -102,6 +102,38 @@ export function getChildNames(
 }
 
 /**
+ * Search all children (recursively) of all top-level symbols for a name match.
+ * Returns the qualified dot-path(s) if found, e.g. ["ParentSection.ChildName"].
+ * Useful for suggesting the correct qualified path when an unqualified name fails.
+ */
+export function findQualifiedPaths(
+  symbols: SymbolLike[],
+  targetName: string,
+): string[] {
+  const results: string[] = [];
+
+  function searchChildren(children: SymbolLike[], parentPath: string): void {
+    for (const child of children) {
+      const qualifiedPath = `${parentPath}.${child.name}`;
+      if (nameMatches(child.name, targetName)) {
+        results.push(qualifiedPath);
+      }
+      if (child.children.length > 0) {
+        searchChildren(child.children, qualifiedPath);
+      }
+    }
+  }
+
+  for (const symbol of symbols) {
+    if (symbol.children.length > 0) {
+      searchChildren(symbol.children, symbol.name);
+    }
+  }
+
+  return results;
+}
+
+/**
  * Format a symbol's range as 1-indexed "lines X-Y of Z".
  * Takes 0-indexed line numbers (legacy path).
  */
