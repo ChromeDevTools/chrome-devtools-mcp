@@ -58,9 +58,11 @@ if (args.usageStatistics) {
   });
 }
 
-process.on('unhandledRejection', (reason, promise) => {
-  logger('Unhandled promise rejection', promise, reason);
-});
+if (process.env['CHROME_DEVTOOLS_MCP_CRASH_ON_UNCAUGHT'] !== 'true') {
+  process.on('unhandledRejection', (reason, promise) => {
+    logger('Unhandled promise rejection', promise, reason);
+  });
+}
 
 logger(`Starting Chrome DevTools MCP Server v${VERSION}`);
 const server = new McpServer(
