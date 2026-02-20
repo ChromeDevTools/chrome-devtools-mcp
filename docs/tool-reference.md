@@ -1,7 +1,9 @@
 <!-- AUTO GENERATED DO NOT EDIT - run 'npm run docs' to update-->
 
-# Chrome DevTools MCP Tool Reference (~6661 cl100k_base tokens)
+# Chrome DevTools MCP Tool Reference (~6922 cl100k_base tokens)
 
+- **[Audits](#audits)** (1 tools)
+  - [`lighthouse_audit`](#lighthouse_audit)
 - **[Input automation](#input-automation)** (8 tools)
   - [`click`](#click)
   - [`drag`](#drag)
@@ -34,6 +36,20 @@
   - [`list_console_messages`](#list_console_messages)
   - [`take_screenshot`](#take_screenshot)
   - [`take_snapshot`](#take_snapshot)
+
+## Audits
+
+### `lighthouse_audit`
+
+**Description:** Get Lighthouse score and reports for accesibility, SEO and best practices.
+
+**Parameters:**
+
+- **device** (enum: "desktop", "mobile") _(optional)_: The device to [`emulate`](#emulate).
+- **mode** (enum: "navigation", "snapshot") _(optional)_: "navigation" reloads the selected page and audits during the navigation. The "snapshot" mode analyzes the page in its current state.
+- **outputDirPath** (string) _(optional)_: The directory to output the reports to. If not provided, temporary files will be created.
+
+---
 
 ## Input automation
 

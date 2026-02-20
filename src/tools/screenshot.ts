@@ -90,11 +90,11 @@ export const screenshot = defineTool({
       const file = await context.saveFile(screenshot, request.params.filePath);
       response.appendResponseLine(`Saved screenshot to ${file.filename}.`);
     } else if (screenshot.length >= 2_000_000) {
-      const {filename} = await context.saveTemporaryFile(
+      const {filepath} = await context.saveTemporaryFile(
         screenshot,
-        `image/${request.params.format}`,
+        `screenshot.${request.params.format}`,
       );
-      response.appendResponseLine(`Saved screenshot to ${filename}.`);
+      response.appendResponseLine(`Saved screenshot to ${filepath}.`);
     } else {
       response.attachImage({
         mimeType: `image/${request.params.format}`,
