@@ -5,9 +5,9 @@
  */
 
 import assert from 'node:assert';
-import {describe, it} from 'node:test';
 import fs from 'node:fs';
 import path from 'node:path';
+import { describe, it } from 'node:test';
 
 import {evaluateScript} from '../../src/tools/script.js';
 import {withMcpContext} from '../utils.js';
@@ -44,32 +44,35 @@ describe('a11y-debugging', () => {
     assert.ok(globalPageChecksSnippet, 'Global page checks snippet not found');
 
     await withMcpContext(async (response, context) => {
-        const page = context.getSelectedPage();
-        await page.setContent('<input id="foo"><label for="foo">Foo</label>');
+      const page = context.getSelectedPage();
+      await page.setContent('<input id="foo"><label for="foo">Foo</label>');
 
-        // Test Orphaned Inputs Snippet
-        await evaluateScript.handler(
-            {params: {function: orphanInputsSnippet}},
-            response,
-            context
-        );
-        let lineEvaluation = response.responseLines.at(2)!;
-        let result = JSON.parse(lineEvaluation);
-        // Expect empty array because we have a valid label
-        assert.deepStrictEqual(result, []);
+      // Test Orphaned Inputs Snippet
+      await evaluateScript.handler(
+        { params: { function: orphanInputsSnippet } },
+        response,
+        context,
+      );
+      let lineEvaluation = response.responseLines.at(2)!;
+      let result = JSON.parse(lineEvaluation);
+      // Expect empty array because we have a valid label
+      assert.deepStrictEqual(result, []);
 
-        // Test Global Page Checks Snippet
-        response.resetResponseLineForTesting();
-        await evaluateScript.handler(
-            {params: {function: globalPageChecksSnippet}},
-            response,
-            context
-        );
-        lineEvaluation = response.responseLines.at(2)!;
-        result = JSON.parse(lineEvaluation);
-        // We expect some result, just check keys
-        assert.ok('lang' in result);
-        assert.ok('title' in result);
+      // Test Global Page Checks Snippet
+      response.resetResponseLineForTesting();
+      await evaluateScript.handler(
+        { params: { function: globalPageChecksSnippet } },
+        response,
+        context,
+      );
+      console.log('Global Page Checks Snippet:', globalPageChecksSnippet);
+      const output = response.toString();
+      console.log('Response Output:', output);
+      lineEvaluation = response.responseLines.at(2)!;
+      result = JSON.parse(lineEvaluation);
+      // We expect some result, just check keys
+      assert.ok('lang' in result);
+      assert.ok('title' in result);
     });
   });
 });

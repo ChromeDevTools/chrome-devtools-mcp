@@ -35,30 +35,27 @@ The accessibility tree exposes the heading hierarchy and semantic landmarks.
 2.  Ensure interactive elements have an accessible name (e.g., a button should not just say `""` if it only contains an icon).
 3.  **Orphaned Inputs**: Verify that all form inputs have associated labels. Use `evaluate_script` to check for inputs missing `id` (for `label[for]`) or `aria-label`:
     ```javascript
-    (() => {
-      const f = () => {
-        const inputs = Array.from(
-          document.querySelectorAll('input, select, textarea'),
-        );
-        return inputs
-          .filter(i => {
-            const hasId = i.id && document.querySelector(`label[for="${i.id}"]`);
-            const hasAria =
-              i.getAttribute('aria-label') || i.getAttribute('aria-labelledby');
-            const hasImplicitLabel = i.closest('label');
-            return !hasId && !hasAria && !hasImplicitLabel;
-          })
-          .map(i => ({
-            tag: i.tagName,
-            id: i.id,
-            name: i.name,
-            placeholder: i.placeholder,
-          }));
-      };
-      try { console.log(f()); } catch(e) {} // Log for manual console usage
-      return f;
-    })()
-    ```
+    () => {
+  const inputs = Array.from(
+    document.querySelectorAll('input, select, textarea'),
+  );
+  return inputs
+    .filter(i => {
+      const hasId = i.id && document.querySelector(`label[for="${i.id}"]`);
+    const hasAria =
+    i.getAttribute('aria-label') || i.getAttribute('aria-labelledby');
+    const hasImplicitLabel = i.closest('label');
+    return !hasId && !hasAria && !hasImplicitLabel;
+    })
+    .map(i => ({
+    tag: i.tagName,
+    id: i.id,
+    name: i.name,
+    placeholder: i.placeholder,
+    }));
+    }
+ ```
+
 4.  Check images for `alt` text.
 
 ### 4. Focus & Keyboard Navigation
@@ -96,7 +93,6 @@ If native audits do not report issues (which may happen in some headless environ
 **Note**: This script uses a simplified algorithm and may not account for transparency, gradients, or background images. For production-grade auditing, consider injecting `axe-core`.
 
 ```javascript
-// Usage in console: copy, paste, and call with element: fn(element)
 el => {
   function getRGB(colorStr) {
     const match = colorStr.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
@@ -136,24 +132,21 @@ _Pass the element's `uid` to test the contrast against WCAG AA (4.5:1 for normal
 Verify document-level accessibility settings often missed in component testing:
 
 ```javascript
-(() => {
-  const f = () => {
-    return {
-      lang:
-        document.documentElement.lang ||
-        'MISSING - Screen readers need this for pronunciation',
-      title: document.title || 'MISSING - Required for context',
-      viewport:
-        document.querySelector('meta[name="viewport"]')?.content ||
-        'MISSING - Check for user-scalable=no (bad practice)',
-      reducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)').matches
-        ? 'Enabled'
-        : 'Disabled',
-    };
+() => {
+  return {
+    lang:
+      document.documentElement.lang ||
+      'MISSING - Screen readers need this for pronunciation',
+    title: document.title || 'MISSING - Required for context',
+    viewport:
+      document.querySelector('meta[name="viewport"]')?.content ||
+      'MISSING - Check for user-scalable=no (bad practice)',
+    reducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)')
+      .matches
+      ? 'Enabled'
+      : 'Disabled',
   };
-  try { console.log(f()); } catch(e) {} // Log for manual console usage
-  return f;
-})()
+};
 ```
 
 ## Troubleshooting
