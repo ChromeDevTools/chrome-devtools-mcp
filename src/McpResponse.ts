@@ -504,17 +504,31 @@ Call ${handleDialog.name} to handle it before continuing.`);
     if (this.#includePages) {
       const parts = [`## Pages`];
       for (const page of context.getPages()) {
+        const isolatedContextName = context.getIsolatedContextName(page);
+        const contextLabel = isolatedContextName
+          ? ` isolatedContext=${isolatedContextName}`
+          : '';
         parts.push(
-          `${context.getPageId(page)}: ${page.url()}${context.isPageSelected(page) ? ' [selected]' : ''}`,
+          `${context.getPageId(page)}: ${page.url()}${context.isPageSelected(page) ? ' [selected]' : ''}${contextLabel}`,
         );
       }
       response.push(...parts);
       structuredContent.pages = context.getPages().map(page => {
-        return {
+        const isolatedContextName = context.getIsolatedContextName(page);
+        const entry: {
+          id: number | undefined;
+          url: string;
+          selected: boolean;
+          isolatedContext?: string;
+        } = {
           id: context.getPageId(page),
           url: page.url(),
           selected: context.isPageSelected(page),
         };
+        if (isolatedContextName) {
+          entry.isolatedContext = isolatedContextName;
+        }
+        return entry;
       });
     }
 
