@@ -236,6 +236,11 @@ export const cliOptions = {
     hidden: true,
     describe: 'Include watchdog PID in Clearcut request headers (for testing).',
   },
+  slim: {
+    type: 'boolean',
+    describe:
+      'Exposes a "slim" set of 3 tools covering navigation, script execution and screenshots only. Useful for basic browser tasks.',
+  },
 } satisfies Record<string, YargsOptions>;
 
 export function parseArguments(version: string, argv = process.argv) {
@@ -311,6 +316,10 @@ export function parseArguments(version: string, argv = process.argv) {
       [
         '$0 --no-performance-crux',
         'Disable CrUX (field data) integration in performance tools.',
+      ],
+      [
+        '$0 --slim',
+        'Only 3 tools: navigation, JavaScript execution and screenshot',
       ],
     ]);
 

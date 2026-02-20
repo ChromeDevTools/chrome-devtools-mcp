@@ -1,0 +1,11 @@
+exports[`slim > evaluates 1`] = `
+10
+`;
+
+exports[`slim > handles errors 1`] = `
+test error
+`;
+
+exports[`slim > navigates to correct page 1`] = `
+Navigated to data:text/html,<div>Hello MCP</div>.
+`;

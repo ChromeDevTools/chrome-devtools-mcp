@@ -92,7 +92,7 @@ describe('e2e', () => {
       const files = fs.readdirSync('build/src/tools');
       const definedNames = [];
       for (const file of files) {
-        if (file === 'ToolDefinition.js') {
+        if (file === 'ToolDefinition.js' || file === 'slim') {
           continue;
         }
         const fileTools = await import(`../src/tools/${file}`);
