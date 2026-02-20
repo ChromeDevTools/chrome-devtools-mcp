@@ -200,7 +200,7 @@ export async function hotReloadRequired(params: McpReadyParams): Promise<HotRelo
 /**
  * Query the current state of the Host and Client.
  */
-export async function getStatus(): Promise<HostStatus> {
+async function getStatus(): Promise<HostStatus> {
   const result = await sendHostRequest('getStatus', {});
   return result as HostStatus;
 }
@@ -218,7 +218,7 @@ export async function teardown(): Promise<TeardownResult> {
  * Request a session takeover from the existing Host.
  * Used when a new MCP instance wants to control the session.
  */
-export async function requestTakeover(): Promise<TakeoverResult> {
+async function requestTakeover(): Promise<TakeoverResult> {
   const result = await sendHostRequest('takeover', {});
   return result as TakeoverResult;
 }
@@ -254,7 +254,7 @@ export async function showHostNotification(message: string): Promise<void> {
 /**
  * Check if the Host pipe is reachable via a system.ping.
  */
-export async function pingHost(): Promise<boolean> {
+async function pingHost(): Promise<boolean> {
   try {
     await sendHostRequest('system.ping', {}, 3_000);
     return true;
@@ -266,6 +266,6 @@ export async function pingHost(): Promise<boolean> {
 /**
  * Returns the fixed Host pipe path for this platform.
  */
-export function getHostPipePath(): string {
+function getHostPipePath(): string {
   return HOST_PIPE_PATH;
 }

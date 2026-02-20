@@ -37,11 +37,11 @@ let watchRestartPending = false;
 
 // ── Public API ──────────────────────────────────────────
 
-export function isWatchRestartPending(): boolean {
+function isWatchRestartPending(): boolean {
   return watchRestartPending;
 }
 
-export function clearWatchRestartPending(): void {
+function clearWatchRestartPending(): void {
   watchRestartPending = false;
 }
 

@@ -208,7 +208,7 @@ function sendClientRequest(
 /**
  * Execute a VS Code command in the Client window.
  */
-export async function commandExecute(
+async function commandExecute(
   command: string,
   args?: unknown[],
 ): Promise<CommandExecuteResult> {
@@ -408,7 +408,7 @@ export async function codebaseGetOverview(
 /**
  * Get detailed exports from a module/file/directory.
  */
-export async function codebaseGetExports(
+async function codebaseGetExports(
   path: string,
   rootDir?: string,
   includeTypes?: boolean,
@@ -736,7 +736,7 @@ export interface UnifiedFileSymbol {
   modifiers?: string[];
 }
 
-export interface UnifiedFileResult {
+interface UnifiedFileResult {
   symbols: UnifiedFileSymbol[];
   content: string;
   totalLines: number;
@@ -1000,7 +1000,7 @@ export async function fileApplyCodeAction(
  * Extract orphaned content (imports, exports, comments) from TypeScript/JavaScript files.
  * Supplements VS Code's DocumentSymbol API which doesn't include these constructs.
  */
-export async function fileExtractOrphanedContent(
+async function fileExtractOrphanedContent(
   filePath: string,
   includeSymbols = true,
 ): Promise<OrphanedContentResult> {
@@ -1133,7 +1133,7 @@ export async function ensureClientAvailable(): Promise<void> {
 /**
  * Returns the fixed Client pipe path for this platform.
  */
-export function getClientPipePath(): string {
+function getClientPipePath(): string {
   return CLIENT_PIPE_PATH;
 }
 

@@ -273,7 +273,7 @@ const cliArgs = parseArguments(VERSION);
 export const config: ResolvedConfig = loadConfig(cliArgs);
 
 // Legacy export for backwards compatibility
-export const args = cliArgs;
+const args = cliArgs;
 
 // ── MCP Server Hot-Reload Marker (detect post-restart) ───
 // Check this BEFORE initializing lifecycle service so we can pass the flag

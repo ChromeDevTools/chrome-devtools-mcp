@@ -74,7 +74,7 @@ function buildLogpareOptions(format: LogFormat): CompressOptions {
  * Consolidate a raw text string (e.g., terminal or task output).
  * Returns LogPare's compressed format when meaningful compression is achievable.
  */
-export function consolidateOutput(
+function consolidateOutput(
   text: string,
   options?: ConsolidationOptions,
 ): ConsolidationResult {
@@ -157,7 +157,7 @@ function noCompression(text: string, lineCount: number): ConsolidationResult {
 /**
  * Convert a ConsolidationResult to a JSON-safe object for API responses.
  */
-export function toConsolidatedJson(
+function toConsolidatedJson(
   result: ConsolidationResult,
 ): Record<string, unknown> {
   return {

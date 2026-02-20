@@ -286,7 +286,7 @@ export function writeExtSourceFingerprint(extensionDir: string): void {
  * @param sessionStartedAtMs Debug session start timestamp in epoch ms
  * @deprecated Use isBuildStale instead for proper source vs build comparison
  */
-export function hasExtensionChangedSince(
+function hasExtensionChangedSince(
   extensionDir: string,
   sessionStartedAtMs: number,
 ): boolean {

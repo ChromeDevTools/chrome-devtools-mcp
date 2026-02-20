@@ -339,7 +339,7 @@ export async function checkForBlockingUI(): Promise<{
 /**
  * Click a button in a modal dialog by its label.
  */
-export async function clickModalButton(buttonLabel: string): Promise<boolean> {
+async function clickModalButton(buttonLabel: string): Promise<boolean> {
   try {
     const result = await cdpService.sendCdp('Runtime.evaluate', {
       expression: `(function() {
@@ -363,7 +363,7 @@ export async function clickModalButton(buttonLabel: string): Promise<boolean> {
 /**
  * Click a button in a notification toast by its label.
  */
-export async function clickNotificationButton(buttonLabel: string): Promise<boolean> {
+async function clickNotificationButton(buttonLabel: string): Promise<boolean> {
   try {
     const result = await cdpService.sendCdp('Runtime.evaluate', {
       expression: `(function() {
@@ -387,7 +387,7 @@ export async function clickNotificationButton(buttonLabel: string): Promise<bool
 /**
  * Dismiss the topmost notification toast.
  */
-export async function dismissTopNotification(): Promise<boolean> {
+async function dismissTopNotification(): Promise<boolean> {
   try {
     const result = await cdpService.sendCdp('Runtime.evaluate', {
       expression: `(function() {

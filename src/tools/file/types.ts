@@ -47,7 +47,7 @@ export interface RemainingError {
 /**
  * Result of file_read.
  */
-export interface FileReadResult {
+interface FileReadResult {
   file: string;
   content: string;
   range: {startLine: number; endLine: number};
@@ -76,7 +76,7 @@ export interface FileEditResult {
 /**
  * A match in the symbol tree — the symbol and how to reach it.
  */
-export interface SymbolMatch {
+interface SymbolMatch {
   symbol: NativeDocumentSymbol;
   parent?: NativeDocumentSymbol;
   path: string[];

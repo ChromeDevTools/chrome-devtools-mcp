@@ -84,12 +84,12 @@ export interface ImageContentData {
   mimeType: string;
 }
 
-export interface SnapshotParams {
+interface SnapshotParams {
   verbose?: boolean;
   filePath?: string;
 }
 
-export interface DevToolsData {
+interface DevToolsData {
   cdpRequestId?: string;
   cdpBackendNodeId?: number;
 }
@@ -117,7 +117,7 @@ export const responseFormatSchema = zod.nativeEnum(ResponseFormat)
     'Output format: "markdown" for human-readable or "json" for machine-readable structured data.',
   );
 
-export const timeoutSchema = {
+const timeoutSchema = {
   timeout: zod
     .number()
     .int()
@@ -167,7 +167,7 @@ export function checkCharacterLimit(
 /**
  * Create standard pagination metadata.
  */
-export function createPaginationMetadata(
+function createPaginationMetadata(
   total: number,
   count: number,
   offset: number,

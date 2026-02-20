@@ -526,7 +526,7 @@ export async function fetchAXTree(verbose: boolean): Promise<AXTreeResult> {
 /**
  * Get the frame ID for a given UID (for cross-frame interactions).
  */
-export function getFrameIdForUid(uid: string): string | undefined {
+function getFrameIdForUid(uid: string): string | undefined {
   return uidToFrameId.get(uid);
 }
 
@@ -587,7 +587,7 @@ export function getBackendNodeId(uid: string): number {
 /**
  * Resolve a UID to a CDP RemoteObjectId by calling DOM.resolveNode.
  */
-export async function resolveNodeToRemoteObject(uid: string): Promise<string> {
+async function resolveNodeToRemoteObject(uid: string): Promise<string> {
   const backendNodeId = getBackendNodeId(uid);
   const sessionId = getSessionIdForUid(uid);
   const opts = sessionId ? {sessionId} : undefined;

@@ -80,7 +80,7 @@ export function resolveSymbolTarget<T extends SymbolLike>(
 /**
  * Collect names of sibling symbols (same level, excluding the matched one).
  */
-export function getSiblingNames<T extends SymbolLike>(
+function getSiblingNames<T extends SymbolLike>(
   allSymbols: T[],
   match: { symbol: T; parent?: T },
 ): string[] {
@@ -93,7 +93,7 @@ export function getSiblingNames<T extends SymbolLike>(
 /**
  * Collect child names of a symbol, up to maxDepth.
  */
-export function getChildNames(
+function getChildNames(
   symbol: SymbolLike,
   maxDepth?: number,
 ): string[] {
@@ -137,7 +137,7 @@ export function findQualifiedPaths(
  * Format a symbol's range as 1-indexed "lines X-Y of Z".
  * Takes 0-indexed line numbers (legacy path).
  */
-export function formatRange(
+function formatRange(
   startLine: number,
   endLine: number,
   totalLines: number,

@@ -48,7 +48,7 @@ export function getIssueDescription(fileName: string): string | null {
   return issueDescriptions[fileName] ?? null;
 }
 
-export const ISSUE_UTILS = {
+const ISSUE_UTILS = {
   loadIssueDescriptions,
   getIssueDescription,
 };
