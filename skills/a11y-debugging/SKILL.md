@@ -81,7 +81,14 @@ _Pass the element's `uid` from the snapshot as an argument to the tool._
 
 ### 6. Color Contrast
 
-To verify color contrast ratios without the DevTools UI, use `evaluate_script` to compute the relative luminance of the text (`color`) and background (`backgroundColor`).
+To verify color contrast ratios, start by checking for native accessibility issues:
+
+1.  Call `list_console_messages` with `types: ["issue"]`.
+2.  Look for "Low Contrast" issues in the output.
+
+If native audits do not report issues (which may happen in some headless environments) or if you need to check a specific element manually, you can use the following script as a fallback approximation.
+
+**Note**: This script uses a simplified algorithm and may not account for transparency, gradients, or background images. For production-grade auditing, consider injecting `axe-core`.
 
 ```javascript
 el => {
