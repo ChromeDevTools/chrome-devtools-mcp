@@ -5,7 +5,7 @@
  */
 
 import assert from 'node:assert';
-import {describe, it} from 'node:test';
+import {afterEach, describe, it} from 'node:test';
 
 import sinon from 'sinon';
 
@@ -16,6 +16,10 @@ import type {TraceResult} from '../src/trace-processing/parse.js';
 import {getMockRequest, html, withMcpContext} from './utils.js';
 
 describe('McpContext', () => {
+  afterEach(() => {
+    sinon.restore();
+  });
+
   it('list pages', async () => {
     await withMcpContext(async (_response, context) => {
       const page = context.getSelectedPage();
@@ -47,7 +51,7 @@ describe('McpContext', () => {
     await withMcpContext(async (_response, context) => {
       const page = await context.newPage();
       const timeoutBefore = page.getDefaultTimeout();
-      context.setCpuThrottlingRate(2);
+      await context.emulate({cpuThrottlingRate: 2});
       const timeoutAfter = page.getDefaultTimeout();
       assert(timeoutBefore < timeoutAfter, 'Timeout was less then expected');
     });
@@ -57,7 +61,7 @@ describe('McpContext', () => {
     await withMcpContext(async (_response, context) => {
       const page = await context.newPage();
       const timeoutBefore = page.getDefaultNavigationTimeout();
-      context.setNetworkConditions('Slow 3G');
+      await context.emulate({networkConditions: 'Slow 3G'});
       const timeoutAfter = page.getDefaultNavigationTimeout();
       assert(timeoutBefore < timeoutAfter, 'Timeout was less then expected');
     });
@@ -67,8 +71,10 @@ describe('McpContext', () => {
     await withMcpContext(async (_response, context) => {
       const page = await context.newPage();
 
-      context.setCpuThrottlingRate(2);
-      context.setNetworkConditions('Slow 3G');
+      await context.emulate({
+        cpuThrottlingRate: 2,
+        networkConditions: 'Slow 3G',
+      });
       const stub = sinon.spy(context, 'getWaitForHelper');
 
       await context.waitForEventsAfterAction(async () => {

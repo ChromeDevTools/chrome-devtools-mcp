@@ -117,14 +117,20 @@ export type Context = Readonly<{
   selectPage(page: Page): void;
   getElementByUid(uid: string): Promise<ElementHandle<Element>>;
   getAXNodeByUid(uid: string): TextSnapshotNode | undefined;
-  setNetworkConditions(conditions: string | null): void;
-  setCpuThrottlingRate(rate: number): void;
-  setGeolocation(geolocation: GeolocationOptions | null): void;
-  setViewport(viewport: Viewport | null): void;
+  emulate(options: {
+    networkConditions?: string | null;
+    cpuThrottlingRate?: number | null;
+    geolocation?: GeolocationOptions | null;
+    userAgent?: string | null;
+    colorScheme?: 'dark' | 'light' | 'auto' | null;
+    viewport?: Viewport | null;
+  }): Promise<void>;
+  getNetworkConditions(): string | null;
+  getCpuThrottlingRate(): number;
+  getGeolocation(): GeolocationOptions | null;
   getViewport(): Viewport | null;
-  setUserAgent(userAgent: string | null): void;
   getUserAgent(): string | null;
-  setColorScheme(scheme: 'dark' | 'light' | null): void;
+  getColorScheme(): 'dark' | 'light' | null;
   saveTemporaryFile(
     data: Uint8Array<ArrayBufferLike>,
     mimeType: 'image/png' | 'image/jpeg' | 'image/webp',

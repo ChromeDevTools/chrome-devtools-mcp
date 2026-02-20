@@ -27,9 +27,21 @@ export type IgnoreCheck = (
   frame: DevTools.DevTools.StackTrace.StackTrace.Frame,
 ) => boolean;
 
-export class ConsoleFormatter {
-  static readonly #STACK_TRACE_MAX_LINES = 50;
+interface ConsoleMessageConcise {
+  type: string;
+  text: string;
+  argsCount: number;
+  id: number;
+}
 
+interface ConsoleMessageDetailed extends ConsoleMessageConcise {
+  // pre-formatted args.
+  args: string[];
+  // pre-formatted stacktrace.
+  stackTrace?: string;
+}
+
+export class ConsoleFormatter {
   readonly #id: number;
   readonly #type: string;
   readonly #text: string;
@@ -40,7 +52,7 @@ export class ConsoleFormatter {
   readonly #stack?: DevTools.DevTools.StackTrace.StackTrace.StackTrace;
   readonly #cause?: SymbolizedError;
 
-  readonly #isIgnored: IgnoreCheck;
+  readonly isIgnored: IgnoreCheck;
 
   private constructor(params: {
     id: number;
@@ -59,7 +71,7 @@ export class ConsoleFormatter {
     this.#resolvedArgs = params.resolvedArgs ?? [];
     this.#stack = params.stack;
     this.#cause = params.cause;
-    this.#isIgnored = params.isIgnored;
+    this.isIgnored = params.isIgnored;
   }
 
   static async from(
@@ -160,20 +172,12 @@ export class ConsoleFormatter {
 
   // The short format for a console message.
   toString(): string {
-    return `msgid=${this.#id} [${this.#type}] ${this.#text} (${this.#argCount} args)`;
+    return convertConsoleMessageConciseToString(this.toJSON());
   }
 
   // The verbose format for a console message, including all details.
   toStringDetailed(): string {
-    const result = [
-      `ID: ${this.#id}`,
-      `Message: ${this.#type}> ${this.#text}`,
-      this.#formatArgs(),
-      this.#formatStackTrace(this.#stack, this.#cause, {
-        includeHeading: true,
-      }),
-    ].filter(line => !!line);
-    return result.join('\n');
+    return convertConsoleMessageConciseDetailedToString(this.toJSONDetailed());
   }
 
   #getArgs(): unknown[] {
@@ -188,123 +192,7 @@ export class ConsoleFormatter {
     return [];
   }
 
-  #formatArg(arg: unknown) {
-    if (arg instanceof SymbolizedError) {
-      return [
-        arg.message,
-        this.#formatStackTrace(arg.stackTrace, arg.cause, {
-          includeHeading: false,
-        }),
-      ]
-        .filter(line => !!line)
-        .join('\n');
-    }
-    return typeof arg === 'object' ? JSON.stringify(arg) : String(arg);
-  }
-
-  #formatArgs(): string {
-    const args = this.#getArgs();
-
-    if (!args.length) {
-      return '';
-    }
-
-    const result = ['### Arguments'];
-
-    for (const [key, arg] of args.entries()) {
-      result.push(`Arg #${key}: ${this.#formatArg(arg)}`);
-    }
-
-    return result.join('\n');
-  }
-
-  #formatStackTrace(
-    stackTrace: DevTools.DevTools.StackTrace.StackTrace.StackTrace | undefined,
-    cause: SymbolizedError | undefined,
-    opts: {includeHeading: boolean},
-  ): string {
-    if (!stackTrace) {
-      return '';
-    }
-
-    const lines = this.#formatStackTraceInner(stackTrace, cause);
-    const includedLines = lines.slice(
-      0,
-      ConsoleFormatter.#STACK_TRACE_MAX_LINES,
-    );
-    const reminderCount = lines.length - includedLines.length;
-
-    return [
-      opts.includeHeading ? '### Stack trace' : '',
-      ...includedLines,
-      reminderCount > 0 ? `... and ${reminderCount} more frames` : '',
-      'Note: line and column numbers use 1-based indexing',
-    ]
-      .filter(line => !!line)
-      .join('\n');
-  }
-
-  #formatStackTraceInner(
-    stackTrace: DevTools.DevTools.StackTrace.StackTrace.StackTrace | undefined,
-    cause: SymbolizedError | undefined,
-  ): string[] {
-    if (!stackTrace) {
-      return [];
-    }
-
-    return [
-      ...this.#formatFragment(stackTrace.syncFragment),
-      ...stackTrace.asyncFragments
-        .map(this.#formatAsyncFragment.bind(this))
-        .flat(),
-      ...this.#formatCause(cause),
-    ];
-  }
-
-  #formatFragment(
-    fragment: DevTools.DevTools.StackTrace.StackTrace.Fragment,
-  ): string[] {
-    const frames = fragment.frames.filter(frame => !this.#isIgnored(frame));
-    return frames.map(this.#formatFrame.bind(this));
-  }
-
-  #formatAsyncFragment(
-    fragment: DevTools.DevTools.StackTrace.StackTrace.AsyncFragment,
-  ): string[] {
-    const formattedFrames = this.#formatFragment(fragment);
-    if (formattedFrames.length === 0) {
-      return [];
-    }
-
-    const separatorLineLength = 40;
-    const prefix = `--- ${fragment.description || 'async'} `;
-    const separator = prefix + '-'.repeat(separatorLineLength - prefix.length);
-    return [separator, ...formattedFrames];
-  }
-
-  #formatFrame(frame: DevTools.DevTools.StackTrace.StackTrace.Frame): string {
-    let result = `at ${frame.name ?? '<anonymous>'}`;
-    if (frame.uiSourceCode) {
-      const location = frame.uiSourceCode.uiLocation(frame.line, frame.column);
-      result += ` (${location.linkText(/* skipTrim */ false, /* showColumnNumber */ true)})`;
-    } else if (frame.url) {
-      result += ` (${frame.url}:${frame.line}:${frame.column})`;
-    }
-    return result;
-  }
-
-  #formatCause(cause: SymbolizedError | undefined): string[] {
-    if (!cause) {
-      return [];
-    }
-
-    return [
-      `Caused by: ${cause.message}`,
-      ...this.#formatStackTraceInner(cause.stackTrace, cause.cause),
-    ];
-  }
-
-  toJSON(): object {
+  toJSON(): ConsoleMessageConcise {
     return {
       type: this.#type,
       text: this.#text,
@@ -313,15 +201,150 @@ export class ConsoleFormatter {
     };
   }
 
-  toJSONDetailed(): object {
+  toJSONDetailed(): ConsoleMessageDetailed {
     return {
       id: this.#id,
       type: this.#type,
       text: this.#text,
-      args: this.#getArgs().map(arg =>
-        typeof arg === 'object' ? arg : String(arg),
-      ),
-      stackTrace: this.#stack,
+      argsCount: this.#argCount,
+      args: this.#getArgs().map(arg => formatArg(arg, this)),
+      stackTrace: this.#stack
+        ? formatStackTrace(this.#stack, this.#cause, this)
+        : undefined,
     };
   }
+}
+
+function convertConsoleMessageConciseToString(msg: ConsoleMessageConcise) {
+  return `msgid=${msg.id} [${msg.type}] ${msg.text} (${msg.argsCount} args)`;
+}
+
+function convertConsoleMessageConciseDetailedToString(
+  msg: ConsoleMessageDetailed,
+) {
+  const result = [
+    `ID: ${msg.id}`,
+    `Message: ${msg.type}> ${msg.text}`,
+    formatArgs(msg),
+    ...(msg.stackTrace ? ['### Stack trace', msg.stackTrace] : []),
+  ].filter(line => !!line);
+  return result.join('\n');
+}
+
+function formatArgs(msg: ConsoleMessageDetailed): string {
+  const args = msg.args;
+
+  if (!args.length) {
+    return '';
+  }
+
+  const result = ['### Arguments'];
+
+  for (const [key, arg] of args.entries()) {
+    result.push(`Arg #${key}: ${arg}`);
+  }
+
+  return result.join('\n');
+}
+
+function formatArg(arg: unknown, formatter: {isIgnored: IgnoreCheck}) {
+  if (arg instanceof SymbolizedError) {
+    return [
+      arg.message,
+      arg.stackTrace
+        ? formatStackTrace(arg.stackTrace, arg.cause, formatter)
+        : undefined,
+    ]
+      .filter(line => !!line)
+      .join('\n');
+  }
+  return typeof arg === 'object' ? JSON.stringify(arg) : String(arg);
+}
+
+const STACK_TRACE_MAX_LINES = 50;
+
+function formatStackTrace(
+  stackTrace: DevTools.DevTools.StackTrace.StackTrace.StackTrace,
+  cause: SymbolizedError | undefined,
+  formatter: {isIgnored: IgnoreCheck},
+): string {
+  const lines = formatStackTraceInner(stackTrace, cause, formatter);
+  const includedLines = lines.slice(0, STACK_TRACE_MAX_LINES);
+  const reminderCount = lines.length - includedLines.length;
+
+  return [
+    ...includedLines,
+    reminderCount > 0 ? `... and ${reminderCount} more frames` : '',
+    'Note: line and column numbers use 1-based indexing',
+  ]
+    .filter(line => !!line)
+    .join('\n');
+}
+
+function formatStackTraceInner(
+  stackTrace: DevTools.DevTools.StackTrace.StackTrace.StackTrace | undefined,
+  cause: SymbolizedError | undefined,
+  formatter: {isIgnored: IgnoreCheck},
+): string[] {
+  if (!stackTrace) {
+    return [];
+  }
+
+  return [
+    ...formatFragment(stackTrace.syncFragment, formatter),
+    ...stackTrace.asyncFragments
+      .map(item => formatAsyncFragment(item, formatter))
+      .flat(),
+    ...formatCause(cause, formatter),
+  ];
+}
+
+function formatFragment(
+  fragment: DevTools.DevTools.StackTrace.StackTrace.Fragment,
+  formatter: {isIgnored: IgnoreCheck},
+): string[] {
+  const frames = fragment.frames.filter(frame => !formatter.isIgnored(frame));
+  return frames.map(formatFrame);
+}
+
+function formatAsyncFragment(
+  fragment: DevTools.DevTools.StackTrace.StackTrace.AsyncFragment,
+  formatter: {isIgnored: IgnoreCheck},
+): string[] {
+  const formattedFrames = formatFragment(fragment, formatter);
+  if (formattedFrames.length === 0) {
+    return [];
+  }
+
+  const separatorLineLength = 40;
+  const prefix = `--- ${fragment.description || 'async'} `;
+  const separator = prefix + '-'.repeat(separatorLineLength - prefix.length);
+  return [separator, ...formattedFrames];
+}
+
+function formatFrame(
+  frame: DevTools.DevTools.StackTrace.StackTrace.Frame,
+): string {
+  let result = `at ${frame.name ?? '<anonymous>'}`;
+  if (frame.uiSourceCode) {
+    const location = frame.uiSourceCode.uiLocation(frame.line, frame.column);
+    result += ` (${location.linkText(/* skipTrim */ false, /* showColumnNumber */ true)})`;
+  } else if (frame.url) {
+    result += ` (${frame.url}:${frame.line}:${frame.column})`;
+  }
+  return result;
+}
+
+function formatCause(
+  cause: SymbolizedError | undefined,
+  formatter: {isIgnored: IgnoreCheck},
+): string[] {
+  if (!cause) {
+    return [];
+  }
+
+  return [
+    `Caused by: ${cause.message}`,
+    ...formatStackTraceInner(cause.stackTrace, cause.cause, formatter),
+  ];
 }
