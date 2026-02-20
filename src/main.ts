@@ -6,31 +6,20 @@
 
 import './polyfill.js';
 
-import {exec} from 'node:child_process';
 import {randomUUID} from 'node:crypto';
 import {createServer} from 'node:http';
-import path from 'node:path';
 import process from 'node:process';
 
 import {parseArguments} from './cli.js';
-import {loadConfig, type ResolvedConfig} from './config.js';
-import {hasBuildChangedSinceWindowStart, isBuildStale, writeExtSourceFingerprint} from './extension-watcher.js';
-import {restartMcpServer, showHostNotification} from './host-pipe.js';
+import {loadConfig, getMcpServerRoot, type ResolvedConfig} from './config.js';
+import {checkForChanges, readyToRestart} from './host-pipe.js';
 import {loadIssueDescriptions} from './issue-descriptions.js';
 import {logger} from './logger.js';
 import {McpResponse} from './McpResponse.js';
-import {
-  consumeHotReloadMarker,
-  getMcpServerRoot,
-  hasBuildChangedSinceProcessStart,
-  hasMcpServerSourceChanged,
-  writeHotReloadMarker,
-  writeSourceFingerprint,
-} from './mcp-server-watcher.js';
 import {startMcpSocketServer} from './mcp-socket-server.js';
-import {Mutex} from './Mutex.js';
 import {checkForBlockingUI} from './notification-gate.js';
 import {lifecycleService} from './services/index.js';
+import {RequestPipeline} from './services/requestPipeline.js';
 import {
   McpServer,
   StdioServerTransport,
@@ -52,72 +41,8 @@ const DEFAULT_TOOL_TIMEOUT_MS = 30_000;
 let lastErrorSnapshotText: string | null = null;
 let lastErrorSnapshotGeneration = -1;
 
-// ── MCP Server Self Hot-Reload State ─────────────────────
-
+// ── MCP Server Root ──────────────────────────────────────
 const mcpServerDir = getMcpServerRoot();
-const mcpProcessStartTime = Date.now();
-let mcpServerHotReloadInfo: {builtAt: number} | null = null;
-let mcpServerRestartScheduled = false;
-
-// ── Extension Hot-Reload State ──────────────────────────
-
-let extensionHotReloadInfo: {builtAt: number} | null = null;
-
-/**
- * Run an incremental build for hot-reload using the fast tsconfig.build.json
- * (src-only, noCheck) WITHOUT `rmSync('build')`.
- *
- * Uses tsconfig.build.json which only compiles src/ files with noCheck,
- * skipping the 800+ chrome-devtools-frontend files and type-checking.
- * This reduces build time from ~18s to ~2s.
- *
- * Incremental tsc overwrites files in-place, which works fine even while
- * the old code is loaded (Node.js has already read them into memory).
- */
-function runMcpServerBuild(): Promise<{stdout: string; stderr: string}> {
-  return new Promise((resolve, reject) => {
-    logger(`[mcp-hot-reload] Running incremental build in ${mcpServerDir}`);
-    const tscBin = path.join(mcpServerDir, 'node_modules', '.bin', process.platform === 'win32' ? 'tsc.cmd' : 'tsc');
-    const cmd = `"${tscBin}" -p tsconfig.build.json && node --experimental-strip-types --no-warnings=ExperimentalWarning scripts/post-build.ts`;
-    exec(
-      cmd,
-      {cwd: mcpServerDir, timeout: 30_000, shell: process.platform === 'win32' ? 'cmd.exe' : '/bin/sh'},
-      (err, stdout, stderr) => {
-        if (err) {
-          const output = [stdout, stderr].filter(Boolean).join('\n').trim();
-          reject(new Error(`MCP server build failed:\n${output}`));
-        } else {
-          logger('[mcp-hot-reload] Incremental build completed successfully');
-          resolve({stdout, stderr});
-        }
-      },
-    );
-  });
-}
-
-/**
- * Schedule MCP server restart via Host extension RPC.
- * Called after the tool response is sent to give stdio time to flush.
- * Always exits after the RPC so VS Code can respawn the process.
- */
-function scheduleMcpServerRestart(): void {
-  if (mcpServerRestartScheduled) return;
-  mcpServerRestartScheduled = true;
-  setTimeout(async () => {
-    logger('[mcp-hot-reload] Sending restart RPC to Host extension…');
-    try {
-      await restartMcpServer();
-      logger('[mcp-hot-reload] Restart RPC sent successfully');
-    } catch {
-      logger('[mcp-hot-reload] Restart RPC failed — exiting anyway');
-    }
-    // Always exit — VS Code will respawn the MCP server process.
-    // If the Host RPC succeeded, VS Code already knows to restart.
-    // If it failed, a clean exit lets VS Code detect the crash and respawn.
-    logger('[mcp-hot-reload] Exiting process for restart');
-    process.exit(0);
-  }, 500);
-}
 
 /**
  * Format child processes as indented tree lines for a parent process.
@@ -275,23 +200,12 @@ export const config: ResolvedConfig = loadConfig(cliArgs);
 // Legacy export for backwards compatibility
 const args = cliArgs;
 
-// ── MCP Server Hot-Reload Marker (detect post-restart) ───
-// Check this BEFORE initializing lifecycle service so we can pass the flag
-const _hotReloadBuildTime = consumeHotReloadMarker(mcpServerDir);
-const wasHotReloaded = _hotReloadBuildTime !== null;
-if (wasHotReloaded) {
-  mcpServerHotReloadInfo = {builtAt: _hotReloadBuildTime};
-  const agoSec = Math.round((Date.now() - _hotReloadBuildTime) / 1000);
-  logger(`[mcp-hot-reload] Post-restart detected — rebuilt ${agoSec}s ago`);
-}
-
 // Initialize lifecycle service with MCP config (target workspace + extension path + launch flags)
-// Pass wasHotReloaded so the service uses a fresh timestamp for extension change detection
 lifecycleService.init({
   clientWorkspace: config.clientWorkspace,
   extensionPath: config.extensionBridgePath,
   launch: {...config.launch},
-  wasHotReloaded,
+  wasHotReloaded: false,
 });
 
 // Start MCP socket server so the extension can send commands (e.g. detach-gracefully)
@@ -302,15 +216,7 @@ lifecycleService.registerShutdownHandlers();
 
 // Wire up auto-recovery: when any tool detects the Client pipe is dead,
 // the recovery handler asks the Host to restart the Client window.
-// If an extension hot-reload is already in progress, wait for it
-// rather than kicking off a separate recovery (which would restart
-// the Client window a second time).
 registerClientRecoveryHandler(async () => {
-  if (extensionHotReloadInProgress) {
-    logger('[client-recovery] Extension hot-reload in progress — waiting instead of independent recovery…');
-    try { await extensionHotReloadInProgress; } catch { /* hot-reload error handled elsewhere */ }
-    return;
-  }
   await lifecycleService.recoverClientConnection();
 });
 
@@ -348,32 +254,24 @@ Avoid sharing sensitive or personal information that you do not want to share wi
   );
 };
 
-const toolMutex = new Mutex();
+// ── Request Pipeline ─────────────────────────────────────
+// Single unified FIFO queue for all tool calls (replaces all 4 old mutexes).
+// Both the stdio server (Copilot) and inspector HTTP server share this instance.
+// Closure set by startInspectorServer() so pipeline can close HTTP on restart.
+let inspectorShutdownFn: (() => Promise<void>) | null = null;
 
-// Serializes codebase tools (codebase_map, codebase_trace, codebase_lint) so they
-// process sequentially. The mutex is acquired BEFORE starting any timeout timer,
-// so queue wait time doesn't count against the tool's execution budget.
-const codebaseMutex = new Mutex();
-
-// Serializes the hot-reload detection + build so parallel tool calls
-// don't race each other. Only the first caller does the actual check;
-// subsequent callers wait and then re-check the flags.
-const hotReloadMutex = new Mutex();
-
-// Guards extension hot-reload so parallel tool calls can't trigger
-// simultaneous Client rebuilds — only the first caller reloads,
-// subsequent callers wait then see the updated fingerprint/timestamp.
-const extHotReloadMutex = new Mutex();
-
-// Set while an extension hot-reload is in progress so the client
-// recovery handler (ensureClientAvailable) can wait for it instead of
-// triggering an independent window restart. Without this, parallel
-// tool calls that detect a dying Client pipe during a hot-reload would
-// each kick off separate recovery attempts → multiple window restarts.
-let extensionHotReloadInProgress: Promise<void> | null = null;
-
-/** Shared result from the hot-reload check — set by the winner, consumed by waiters. */
-let hotReloadResult: CallToolResult | null = null;
+const pipeline = new RequestPipeline({
+  checkForChanges: (mcpRoot, extPath) => checkForChanges(mcpRoot, extPath),
+  readyToRestart: () => readyToRestart(),
+  onShutdown: async () => {
+    if (inspectorShutdownFn) {
+      await inspectorShutdownFn();
+    }
+  },
+  mcpServerRoot: mcpServerDir,
+  extensionPath: config.extensionBridgePath,
+  hotReloadEnabled: config.hotReload.enabled && config.explicitExtensionDevelopmentPath,
+});
 
 function registerTool(targetServer: McpServer, tool: ToolDefinition): void {
   if (
@@ -382,7 +280,6 @@ function registerTool(targetServer: McpServer, tool: ToolDefinition): void {
   ) {
     return;
   }
-  // Hide diagnostic tools in production unless explicitly enabled
   if (
     tool.annotations.conditions?.includes('devDiagnostic') &&
     !config.devDiagnostic
@@ -398,306 +295,143 @@ function registerTool(targetServer: McpServer, tool: ToolDefinition): void {
     },
     async (params, extra): Promise<CallToolResult> => {
       const timeoutMs = tool.timeoutMs ?? DEFAULT_TOOL_TIMEOUT_MS;
-      let guard: InstanceType<typeof Mutex.Guard> | undefined;
-      try {
-        // ── MCP Server Self Hot-Reload (Serialized) ─────────
-        // Serialize the hot-reload check with its own mutex so parallel
-        // tool calls don't race each other. The FIRST caller does the
-        // detection + build; subsequent callers wait, then see the
-        // `mcpServerRestartScheduled` flag and short-circuit.
-        {
-          const hrGuard = await hotReloadMutex.acquire();
-          try {
-            // Check 1: Source files newer than build output → needs rebuild.
-            if (!mcpServerRestartScheduled && hasMcpServerSourceChanged(mcpServerDir)) {
-              logger(`[tool:${tool.name}] MCP server source changed — triggering self rebuild…`);
-              showHostNotification('🔨 MCP Server: Rebuilding…').catch(() => {});
 
-              try {
-                await runMcpServerBuild();
-                writeSourceFingerprint(mcpServerDir);
-                writeHotReloadMarker(mcpServerDir);
-                scheduleMcpServerRestart();
+      return pipeline.submit(tool.name, async () => {
+        // Everything inside execute() runs AFTER pipeline dequeues and
+        // hot-reload check completes. Timeouts start here, not when
+        // the tool entered the queue.
+        try {
+          const executeBody = async (): Promise<CallToolResult> => {
+            logger(`${tool.name} request: ${JSON.stringify(params, null, '  ')}`);
 
-                hotReloadResult = {
-                  content: [{
-                    type: 'text',
-                    text: [
-                      '⚡ **MCP server source changed — rebuilt successfully.**',
-                      '',
-                      'The MCP server will now restart to apply the latest changes.',
-                      'Please call the tool again to use the newest version.',
-                    ].join('\n'),
-                  }],
-                };
-                return hotReloadResult;
-              } catch (buildErr) {
-                const msg = buildErr instanceof Error ? buildErr.message : String(buildErr);
-                logger(`[mcp-hot-reload] Build failed: ${msg}`);
-                return {
-                  content: [{type: 'text', text: `❌ **MCP server rebuild failed:**\n\n\`\`\`\n${msg}\n\`\`\``}],
-                  isError: true,
-                };
+            const isStandalone = tool.annotations.conditions?.includes('standalone');
+
+            // Ensure VS Code connection is alive
+            if (!isStandalone) {
+              await ensureConnection();
+            }
+
+            // Ensure Client pipe is alive for tools that need it
+            const needsClientPipe = tool.annotations.conditions?.includes('client-pipe');
+            if (needsClientPipe) {
+              await ensureClientAvailable();
+            }
+
+            // Standalone tools don't need VS Code connection or UI checks
+            if (isStandalone) {
+              const response = new McpResponse();
+              await tool.handler({params}, response, extra);
+              const content: CallToolResult['content'] = [];
+              for (const line of response.responseLines) {
+                content.push({type: 'text', text: line});
               }
-            }
-
-            // Check 2: Build output newer than this process → manual CLI build.
-            if (!mcpServerRestartScheduled && hasBuildChangedSinceProcessStart(mcpServerDir, mcpProcessStartTime)) {
-              logger(`[tool:${tool.name}] MCP server build updated (manual build) — restarting…`);
-              writeHotReloadMarker(mcpServerDir);
-              scheduleMcpServerRestart();
-
-              hotReloadResult = {
-                content: [{
-                  type: 'text',
-                  text: [
-                    '⚡ **MCP server build updated — restart required.**',
-                    '',
-                    'A newer build was detected. The MCP server will restart to load the latest code.',
-                    'Please call the tool again after the restart.',
-                  ].join('\n'),
-                }],
-              };
-              return hotReloadResult;
-            }
-          } finally {
-            hrGuard.dispose();
-          }
-        }
-
-        // If a restart was scheduled (by first caller), all waiters hit this.
-        if (mcpServerRestartScheduled) {
-          return hotReloadResult ?? {
-            content: [{
-              type: 'text',
-              text: '⏳ MCP server is restarting. Please wait a moment and try again.',
-            }],
-          };
-        }
-
-        // Standalone tools (e.g., wait) don't need VS Code connection
-        const isStandalone = tool.annotations.conditions?.includes('standalone');
-
-        // Ensure VS Code connection is alive (retries if startup failed).
-        // ensureConnection() is idempotent — returns immediately if already connected.
-        if (!isStandalone) {
-          await ensureConnection();
-        }
-
-        // Tools that talk directly to the Client pipe need the pipe to
-        // be alive. ensureClientAvailable() auto-recovers via the Host
-        // if the Client window crashed or was closed.
-        const needsClientPipe = tool.annotations.conditions?.includes('client-pipe');
-        if (needsClientPipe) {
-          await ensureClientAvailable();
-        }
-
-        // Hot-reload: check two conditions for extension staleness:
-        // 1. Source files are newer than build output → needs rebuild + reload
-        // 2. Build output is newer than Client window start → needs reload only
-        // Either condition triggers handleHotReload() which tells Host to
-        // stop Client → build → spawn new Client. If build is already current,
-        // the rebuild step is a fast no-op.
-        //
-        // Serialized via extHotReloadMutex so parallel tool calls can't
-        // trigger simultaneous Client rebuilds. The first caller does the
-        // reload; subsequent callers wait, then re-check and see the
-        // updated fingerprint/timestamp.
-        if (!isStandalone && config.explicitExtensionDevelopmentPath) {
-          const extHrGuard = await extHotReloadMutex.acquire();
-          try {
-            const stale = isBuildStale(config.extensionBridgePath);
-            const windowStartedAt = lifecycleService.debugWindowStartedAt;
-            const buildNewerThanWindow = !stale
-              && windowStartedAt !== undefined
-              && hasBuildChangedSinceWindowStart(config.extensionBridgePath, windowStartedAt);
-
-            logger(`[hot-reload] check: stale=${stale}, buildNewerThanWindow=${buildNewerThanWindow}, extDir=${config.extensionBridgePath}`);
-
-            if (stale || buildNewerThanWindow) {
-              const reason = stale ? 'source stale' : 'manual build detected';
-              logger(`[tool:${tool.name}] Extension needs hot-reload (${reason}) — reloading…`);
-
-              // Expose the in-flight hot-reload as a promise so the client
-              // recovery handler can wait for it instead of triggering a
-              // separate (duplicate) window restart.
-              let resolveHotReload!: () => void;
-              extensionHotReloadInProgress = new Promise<void>(r => { resolveHotReload = r; });
-              try {
-                await lifecycleService.handleHotReload();
-                writeExtSourceFingerprint(config.extensionBridgePath);
-                extensionHotReloadInfo = {builtAt: Date.now()};
-                logger(`[tool:${tool.name}] Hot-reload complete — reconnected`);
-              } finally {
-                resolveHotReload();
-                extensionHotReloadInProgress = null;
+              if (content.length === 0) {
+                content.push({type: 'text', text: '(no output)'});
               }
+              return {content};
             }
-          } finally {
-            extHrGuard.dispose();
-          }
-        }
 
-        // Shared tool execution body: UI checks → handler → response formatting
-        const executeBody = async (): Promise<CallToolResult> => {
-          logger(`${tool.name} request: ${JSON.stringify(params, null, '  ')}`);
+            // Check for blocking modals/notifications before tool execution
+            const inputTools = ['keyboard_hotkey', 'mouse_click', 'mouse_hover', 'mouse_drag', 'keyboard_type', 'mouse_scroll'];
+            const isInputTool = inputTools.includes(tool.name);
 
-          // Standalone tools don't need VS Code connection or UI checks
-          if (isStandalone) {
+            const uiCheck = await checkForBlockingUI();
+            if (uiCheck.blocked && !isInputTool) {
+              const content: CallToolResult['content'] = [];
+              if (uiCheck.notificationBanner) {
+                content.push({type: 'text', text: uiCheck.notificationBanner});
+              }
+              content.push({type: 'text', text: uiCheck.blockingMessage!});
+              return {content};
+            }
+            const notificationBanner = uiCheck.notificationBanner;
+
             const response = new McpResponse();
             await tool.handler({params}, response, extra);
+
             const content: CallToolResult['content'] = [];
+            if (notificationBanner) {
+              content.push({type: 'text', text: notificationBanner});
+            }
             for (const line of response.responseLines) {
               content.push({type: 'text', text: line});
+            }
+            for (const img of response.images) {
+              content.push({type: 'image', data: img.data, mimeType: img.mimeType});
             }
             if (content.length === 0) {
               content.push({type: 'text', text: '(no output)'});
             }
-            return {content};
-          }
 
-          // Check for blocking modals/notifications before tool execution.
-          // BLOCKING modals (e.g., "Save file?") → STOP tool, return modal info.
-          // NON-BLOCKING notifications (toasts) → Prepend banner, let tool proceed.
-          //
-          // Input tools bypass blocking UI so the user can dismiss dialogs via MCP.
-          const inputTools = ['keyboard_hotkey', 'mouse_click', 'mouse_hover', 'mouse_drag', 'keyboard_type', 'mouse_scroll'];
-          const isInputTool = inputTools.includes(tool.name);
-          
-          const uiCheck = await checkForBlockingUI();
-          if (uiCheck.blocked && !isInputTool) {
-            const content: CallToolResult['content'] = [];
-            if (uiCheck.notificationBanner) {
-              content.push({type: 'text', text: uiCheck.notificationBanner});
+            // Append process ledger summary unless tool opted out
+            if (!response.skipLedger) {
+              const ledger = await getProcessLedger();
+              const ledgerText = formatProcessLedger(ledger);
+              if (ledgerText) {
+                content.push({type: 'text', text: ledgerText});
+              }
             }
-            content.push({type: 'text', text: uiCheck.blockingMessage!});
+
             return {content};
-          }
-          const notificationBanner = uiCheck.notificationBanner;
-
-          const response = new McpResponse();
-          await tool.handler({params}, response, extra);
-
-          const content: CallToolResult['content'] = [];
-          if (notificationBanner) {
-            content.push({type: 'text', text: notificationBanner});
-          }
-          for (const line of response.responseLines) {
-            content.push({type: 'text', text: line});
-          }
-          for (const img of response.images) {
-            content.push({type: 'image', data: img.data, mimeType: img.mimeType});
-          }
-          if (content.length === 0) {
-            content.push({type: 'text', text: '(no output)'});
-          }
-
-          // Append process ledger summary unless tool opted out (JSON format)
-          if (!response.skipLedger) {
-            const ledger = await getProcessLedger();
-            const ledgerText = formatProcessLedger(ledger);
-            if (ledgerText) {
-              content.push({type: 'text', text: ledgerText});
-            }
-          }
-
-          return {content};
-        };
-
-        let result: CallToolResult;
-        const isCodebaseTool = tool.annotations.conditions?.includes('codebase-sequential');
-
-        if (isCodebaseTool) {
-          // Codebase tools (codebase_map, codebase_trace, codebase_lint):
-          // Acquire dedicated mutex FIRST — queue wait doesn't count against
-          // the tool's timeout. Each handler manages its own dynamic timeout
-          // internally based on scope, file count, and request complexity.
-          guard = await codebaseMutex.acquire();
-          result = await executeBody();
-        } else {
-          // Standard tools: acquire toolMutex inside withTimeout so the
-          // outer timeout acts as a hard ceiling on total wait + execution.
-          const executeWithMutex = async () => {
-            guard = await toolMutex.acquire();
-            return executeBody();
           };
-          result = await withTimeout(executeWithMutex(), timeoutMs, tool.name);
-        }
 
-        // Inject "just updated" banner on first tool call after hot-reload restart
-        if (mcpServerHotReloadInfo) {
-          const secondsAgo = Math.round((Date.now() - mcpServerHotReloadInfo.builtAt) / 1000);
-          result.content.unshift({
-            type: 'text',
-            text: `✅ **MCP server was recently updated.** Latest build completed ${secondsAgo}s ago. All tools are now running the newest code.`,
-          });
-          mcpServerHotReloadInfo = null;
-        }
+          // Apply timeout — starts AFTER pipeline dequeue + hot-reload check
+          const isCodebaseTool = tool.annotations.conditions?.includes('codebase-sequential');
+          if (isCodebaseTool) {
+            // Codebase tools manage their own dynamic timeout internally
+            return await executeBody();
+          }
+          return await withTimeout(executeBody(), timeoutMs, tool.name);
 
-        // Inject extension hot-reload banner on first tool call after extension reload
-        if (extensionHotReloadInfo) {
-          const secondsAgo = Math.round((Date.now() - extensionHotReloadInfo.builtAt) / 1000);
-          result.content.unshift({
-            type: 'text',
-            text: `✅ **Extension was recently updated.** Latest build completed ${secondsAgo}s ago. The Extension Development Host is now running the newest code.`,
-          });
-          extensionHotReloadInfo = null;
-        }
+        } catch (err) {
+          const typedErr = err instanceof Error ? err : new Error(String(err));
+          logger(`[tool:${tool.name}] ERROR: ${typedErr.message}`);
+          if (typedErr.stack) {
+            logger(`[tool:${tool.name}] Stack: ${typedErr.stack}`);
+          }
+          let errorText = typedErr.message;
+          if ('cause' in typedErr && typedErr.cause instanceof Error) {
+            errorText += `\nCause: ${typedErr.cause.message}`;
+          }
 
-        return result;
-      } catch (err) {
-        logger(`[tool:${tool.name}] ERROR: ${err && 'message' in err ? err.message : String(err)}`);
-        if (err?.stack) {
-          logger(`[tool:${tool.name}] Stack: ${err.stack}`);
-        }
-        let errorText = err && 'message' in err ? err.message : String(err);
-        if ('cause' in err && err.cause) {
-          errorText += `\nCause: ${err.cause.message}`;
-        }
+          // Detect build failures and format them with full logs
+          const buildFailureMatch = errorText.match(/Build failed:\n?([\s\S]*)/);
+          if (buildFailureMatch) {
+            const buildLogs = buildFailureMatch[1].trim();
+            return {
+              content: [{type: 'text', text: `❌ **Extension build failed.** Full build output:\n\n\`\`\`\n${buildLogs}\n\`\`\``}],
+              isError: true,
+            };
+          }
 
-        // Detect build failures and format them with full logs
-        const buildFailureMatch = errorText.match(/Build failed:\n?([\s\S]*)/);
-        if (buildFailureMatch) {
-          const buildLogs = buildFailureMatch[1].trim();
-          const content: CallToolResult['content'] = [
-            {type: 'text', text: `❌ **Extension build failed.** Full build output:\n\n\`\`\`\n${buildLogs}\n\`\`\``},
-          ];
+          const content: CallToolResult['content'] = [{type: 'text', text: errorText}];
+
+          // Snapshot deduplication: include snapshot on error only if
+          // the CDP session changed or snapshot content differs
+          try {
+            const currentGeneration = lifecycleService.cdpGeneration;
+            const snapshot = await fetchAXTree(false);
+
+            if (snapshot.formatted) {
+              const isNewSession = currentGeneration !== lastErrorSnapshotGeneration;
+              const isDifferent = snapshot.formatted !== lastErrorSnapshotText;
+
+              if (isNewSession || isDifferent) {
+                content.push({
+                  type: 'text',
+                  text: `\n## Latest page snapshot\n${snapshot.formatted}`,
+                });
+                lastErrorSnapshotText = snapshot.formatted;
+                lastErrorSnapshotGeneration = currentGeneration;
+              }
+            }
+          } catch (snapshotErr) {
+            logger('Failed to capture snapshot on error:', snapshotErr);
+          }
+
           return {content, isError: true};
         }
-
-        const content: CallToolResult['content'] = [
-          {type: 'text', text: errorText},
-        ];
-
-        // Snapshot deduplication: only include a full snapshot on error if
-        // the CDP session changed (new window / hot-reload) OR the snapshot
-        // content differs from the last error snapshot we sent.
-        try {
-          const currentGeneration = lifecycleService.cdpGeneration;
-          const snapshot = await fetchAXTree(false);
-
-          if (snapshot.formatted) {
-            const isNewSession = currentGeneration !== lastErrorSnapshotGeneration;
-            const isDifferent = snapshot.formatted !== lastErrorSnapshotText;
-
-            if (isNewSession || isDifferent) {
-              content.push({
-                type: 'text',
-                text: `\n## Latest page snapshot\n${snapshot.formatted}`,
-              });
-              lastErrorSnapshotText = snapshot.formatted;
-              lastErrorSnapshotGeneration = currentGeneration;
-            }
-            // If same session + same snapshot → skip (already sent)
-          }
-        } catch (snapshotErr) {
-          logger('Failed to capture snapshot on error:', snapshotErr);
-        }
-
-        return {content, isError: true};
-      } finally {
-        guard?.dispose();
-      }
+      });
     },
   );
 }
@@ -732,7 +466,7 @@ logDisclaimers();
 // MCP Inspector (browser-based) can connect to this running server
 // instance without spawning a second process. Each Inspector browser
 // session gets its own McpServer + StreamableHTTPServerTransport that
-// share the same module-level state (connection, mutexes, etc.).
+// share the same module-level state (connection, pipeline, etc.).
 const INSPECTOR_HTTP_PORT = 6274;
 
 function startInspectorServer(): void {
@@ -818,6 +552,21 @@ function startInspectorServer(): void {
   httpServer.listen(INSPECTOR_HTTP_PORT, () => {
     logger(`[inspector] MCP Inspector endpoint ready at http://localhost:${INSPECTOR_HTTP_PORT}/mcp`);
   });
+
+  // Wire HTTP server shutdown so the pipeline can close it before process.exit()
+  inspectorShutdownFn = () =>
+    new Promise<void>((resolve) => {
+      for (const [sid, entry] of sessions) {
+        entry.transport.close?.();
+        sessions.delete(sid);
+      }
+      httpServer.close(() => {
+        logger('[inspector] HTTP server closed for restart');
+        resolve();
+      });
+      // If close hangs, force-resolve after 3s
+      setTimeout(resolve, 3000);
+    });
 
   httpServer.on('error', (err: NodeJS.ErrnoException) => {
     if (err.code === 'EADDRINUSE') {

@@ -224,30 +224,56 @@ async function requestTakeover(): Promise<TakeoverResult> {
 }
 
 /**
- * Request the Host extension to restart the MCP server.
- * Host calls `workbench.mcp.restartServer` which closes stdin,
- * triggering graceful detach, then respawns the MCP process.
+ * Ask the Host extension to check both MCP server and extension source
+ * for content changes, rebuild if needed, and return the results.
  *
- * Fire-and-forget — the response may never arrive since the
- * MCP process is about to be killed.
+ * The extension is the single authority for all change detection.
+ * The MCP server does ZERO hashing — it only asks and acts on the answer.
+ *
+ * Timeout is set high (120s) because the extension may need to:
+ * 1. Discover source files (tsconfig parsing)
+ * 2. Compute content hashes (SHA-256 of all source files)
+ * 3. Rebuild MCP server and/or extension if changed
+ * 4. Restart the Client window if extension was rebuilt
  */
-export async function restartMcpServer(): Promise<void> {
-  try {
-    await sendHostRequest('restartMcpServer', {}, 15_000);
-  } catch {
-    // Expected — the server may be killed before the response arrives
-  }
+export async function checkForChanges(
+  mcpServerRoot: string,
+  extensionPath: string,
+): Promise<CheckForChangesResult> {
+  const result = await sendHostRequest(
+    'checkForChanges',
+    {mcpServerRoot, extensionPath},
+    HOT_RELOAD_TIMEOUT_MS,
+  );
+  return result as CheckForChangesResult;
+}
+
+export interface CheckForChangesResult {
+  mcpChanged: boolean;
+  mcpRebuilt: boolean;
+  mcpBuildError: string | null;
+  extChanged: boolean;
+  extRebuilt: boolean;
+  extBuildError: string | null;
+  extClientReloaded: boolean;
 }
 
 /**
- * Send a notification message to the Host extension for display
- * in the VS Code window. Fire-and-forget — failures are silently ignored.
+ * Signal the Host extension that the MCP server has drained its queue
+ * and is ready to be killed and restarted.
+ *
+ * The extension will: stop MCP server → clear tool cache → start MCP server.
+ * The build was already done during the checkForChanges RPC, so the
+ * restart is near-instant.
+ *
+ * Fire-and-forget — the response may never arrive since the MCP process
+ * is about to be killed.
  */
-export async function showHostNotification(message: string): Promise<void> {
+export async function readyToRestart(): Promise<void> {
   try {
-    await sendHostRequest('showNotification', {message}, 5_000);
+    await sendHostRequest('readyToRestart', {}, 15_000);
   } catch {
-    // Non-critical — notification may not be shown
+    // Expected — the server may be killed before the response arrives
   }
 }
 

@@ -131,6 +131,28 @@ const CLIENT_CONFIG_TEMPLATE = `// VS Code DevTools MCP — Client Configuration
 `;
 
 /**
+ * Hot-reload configuration for automatic change detection and rebuild.
+ * All fields are optional with sensible defaults.
+ */
+export interface HotReloadConfig {
+  /** Master switch — set false to disable all hot-reload checks. Default: true */
+  enabled: boolean;
+  /** The MCP server name as defined in .vscode/mcp.json. Used for VS Code server definition ID. Default: 'vscode-devtools' */
+  mcpServerName: string;
+  /** Delay (ms) between stopping and starting MCP server during restart. Default: 2000 */
+  restartDelay: number;
+  /** Max wait time (ms) for mcpStatus LM tool before timeout. Default: 60000 */
+  mcpStatusTimeout: number;
+}
+
+const DEFAULT_HOT_RELOAD_CONFIG: HotReloadConfig = {
+  enabled: true,
+  mcpServerName: 'vscode-devtools',
+  restartDelay: 2000,
+  mcpStatusTimeout: 60_000,
+};
+
+/**
  * Host configuration read from .devtools/host.config.jsonc.
  * Controls which client workspace and extension to use.
  */
@@ -139,6 +161,8 @@ export interface HostConfig {
   clientWorkspace?: string;
   /** Path to the extension folder (absolute or relative to host root). If omitted, no extension is loaded. */
   extensionPath?: string;
+  /** Hot-reload configuration. All fields optional with sensible defaults. */
+  hotReload?: Partial<HotReloadConfig>;
 }
 
 /**
@@ -179,6 +203,8 @@ export interface ResolvedConfig {
   experimentalVision: boolean;
   experimentalStructuredContent: boolean;
   launch: LaunchFlags;
+  /** Resolved hot-reload configuration with defaults applied */
+  hotReload: HotReloadConfig;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -199,6 +225,14 @@ function readOptionalBoolean(
 ): boolean | undefined {
   const value = obj[key];
   return typeof value === 'boolean' ? value : undefined;
+}
+
+function readOptionalNumber(
+  obj: Record<string, unknown>,
+  key: string,
+): number | undefined {
+  const value = obj[key];
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
 }
 
 function readOptionalStringArray(
@@ -225,6 +259,25 @@ function coerceHostConfig(value: unknown): HostConfig {
 
   const extensionPath = readOptionalString(value, 'extensionPath');
   if (extensionPath) {config.extensionPath = extensionPath;}
+
+  const hotReloadValue = value['hotReload'];
+  if (isRecord(hotReloadValue)) {
+    const hotReload: Partial<HotReloadConfig> = {};
+
+    const enabled = readOptionalBoolean(hotReloadValue, 'enabled');
+    if (typeof enabled === 'boolean') {hotReload.enabled = enabled;}
+
+    const mcpServerName = readOptionalString(hotReloadValue, 'mcpServerName');
+    if (mcpServerName) {hotReload.mcpServerName = mcpServerName;}
+
+    const restartDelay = readOptionalNumber(hotReloadValue, 'restartDelay');
+    if (typeof restartDelay === 'number') {hotReload.restartDelay = restartDelay;}
+
+    const mcpStatusTimeout = readOptionalNumber(hotReloadValue, 'mcpStatusTimeout');
+    if (typeof mcpStatusTimeout === 'number') {hotReload.mcpStatusTimeout = mcpStatusTimeout;}
+
+    config.hotReload = hotReload;
+  }
 
   return config;
 }
@@ -364,6 +417,15 @@ function resolveLaunchFlags(partial?: Partial<LaunchFlags>): LaunchFlags {
   };
 }
 
+/** Merge partial hot-reload config over defaults. */
+function resolveHotReloadConfig(partial?: Partial<HotReloadConfig>): HotReloadConfig {
+  if (!partial) {return {...DEFAULT_HOT_RELOAD_CONFIG};}
+  return {
+    ...DEFAULT_HOT_RELOAD_CONFIG,
+    ...partial,
+  };
+}
+
 /**
  * Resolve a path relative to workspace folder, or return absolute path as-is
  */
@@ -376,6 +438,16 @@ export function getHostWorkspace(): string {
   // Go up to mcp-server, then to parent (the host workspace)
   const packageRoot = dirname(dirname(__dirname));
   return dirname(packageRoot);
+}
+
+/**
+ * Get the MCP server package root directory.
+ * Build output is at mcp-server/build/src/, so __dirname goes up twice.
+ *
+ * Relocated from mcp-server-watcher.ts to consolidate path utilities.
+ */
+export function getMcpServerRoot(): string {
+  return dirname(dirname(__dirname));
 }
 
 // Module-level storage for the resolved client workspace path.
@@ -446,5 +518,6 @@ export function loadConfig(cliArgs: {
       clientConfig.experimentalStructuredContent ??
       false,
     launch: resolveLaunchFlags(clientConfig.launch),
+    hotReload: resolveHotReloadConfig(hostConfig.hotReload),
   };
 }
