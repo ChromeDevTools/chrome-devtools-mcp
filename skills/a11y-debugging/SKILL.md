@@ -59,22 +59,11 @@ The accessibility tree exposes the heading hierarchy and semantic landmarks.
 
 ### 4. Focus & Keyboard Navigation
 
-Testing "keyboard traps" and proper focus management without visual feedback relies on precise scripting.
+Testing "keyboard traps" and proper focus management without visual feedback relies on tracking the focused element.
 
-1.  Use `evaluate_script` to find the currently focused element:
-    ```javascript
-    () => {
-      const active = document.activeElement;
-      return {
-        tag: active.tagName,
-        id: active.id,
-        className: active.className,
-        text: active.innerText,
-      };
-    };
-    ```
-2.  Use the `press_key` tool with `"Tab"` or `"Shift+Tab"` to move focus.
-3.  Re-run the script in step 1 to ensure focus moved to the expected next interactive element.
+1.  Use the `press_key` tool with `"Tab"` or `"Shift+Tab"` to move focus.
+2.  Use `take_snapshot` to capture the updated accessibility tree.
+3.  Locate the element marked as focused in the snapshot to verify focus moved to the expected interactive element.
 4.  If a modal opens, focus must move into the modal and "trap" within it until closed.
 
 ### 5. Tap Targets and Visuals
