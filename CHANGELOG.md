@@ -1,5 +1,32 @@
 # Changelog
 
+## [0.17.3](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.17.2...chrome-devtools-mcp-v0.17.3) (2026-02-19)
+
+
+### 🛠️ Fixes
+
+* remove clean from prepare ([#997](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/997)) ([2016b98](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/2016b98217bf5aa8d65c6668b1e46c8a3400276f))
+
+## [0.17.2](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.17.1...chrome-devtools-mcp-v0.17.2) (2026-02-19)
+
+
+### 🛠️ Fixes
+
+* check that combobox is actually a select element before filling out options ([#979](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/979)) ([d2bc489](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/d2bc489e4351551ba62a104433839c4198ecae84))
+* handle network request pagination correctly ([#980](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/980)) ([0d9f422](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/0d9f422201538aa847a50417f1ed370e3a6c95b2))
+
+
+### 📄 Documentation
+
+* Add a note about previously installed server installations ([#982](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/982)) ([c0009f7](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/c0009f7ab2f15bedd1c4ceb609db77bcb3c96f2d))
+* update codex doc URL ([#987](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/987)) ([ebbbea7](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/ebbbea7f9d20e4dea902d06e9b86dfe1cc9b221f))
+
+
+### ♻️ Chores
+
+* **network:** de-duplicate String and JSON formatters ([#985](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/985)) ([1896dbb](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/1896dbb5a7cdc3fc0bcc5e665aee986a1180b014))
+* remove text from the status code for Network requests ([#778](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/778)) ([327a388](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/327a3884d8443b8591c06ddb3f9081771ae973c3))
+
 ## [0.17.1](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.17.0...chrome-devtools-mcp-v0.17.1) (2026-02-16)
 
 
