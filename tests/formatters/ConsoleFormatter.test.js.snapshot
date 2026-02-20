@@ -1,20 +1,67 @@
-exports[`ConsoleFormatter > toString > formats a console.log message 1`] = `
+exports[`ConsoleFormatter > toString/toJSON > formats a console.log message toJSON 1`] = `
+{
+  "type": "log",
+  "text": "Hello, world!",
+  "argsCount": 0,
+  "id": 1
+}
+`;
+
+exports[`ConsoleFormatter > toString/toJSON > formats a console.log message toString 1`] = `
 msgid=1 [log] Hello, world! (0 args)
 `;
 
-exports[`ConsoleFormatter > toString > formats a console.log message with multiple arguments 1`] = `
-msgid=3 [log] Processing file: (2 args)
+exports[`ConsoleFormatter > toString/toJSON > formats a console.log message with multiple arguments toJSON 1`] = `
+{
+  "type": "log",
+  "text": "Processing file:",
+  "argsCount": 2,
+  "id": 1
+}
 `;
 
-exports[`ConsoleFormatter > toString > formats a console.log message with one argument 1`] = `
-msgid=2 [log] Processing file: (1 args)
+exports[`ConsoleFormatter > toString/toJSON > formats a console.log message with multiple arguments toString 1`] = `
+msgid=1 [log] Processing file: (2 args)
 `;
 
-exports[`ConsoleFormatter > toString > formats an UncaughtError 1`] = `
-msgid=4 [error] Uncaught TypeError: Cannot read properties of undefined (0 args)
+exports[`ConsoleFormatter > toString/toJSON > formats a console.log message with one argument toJSON 1`] = `
+{
+  "type": "log",
+  "text": "Processing file:",
+  "argsCount": 1,
+  "id": 1
+}
 `;
 
-exports[`ConsoleFormatter > toStringDetailed > does not show call frames with ignore listed scripts 1`] = `
+exports[`ConsoleFormatter > toString/toJSON > formats a console.log message with one argument toString 1`] = `
+msgid=1 [log] Processing file: (1 args)
+`;
+
+exports[`ConsoleFormatter > toString/toJSON > formats an UncaughtError toJSON 1`] = `
+{
+  "type": "error",
+  "text": "Uncaught TypeError: Cannot read properties of undefined",
+  "argsCount": 0,
+  "id": 1
+}
+`;
+
+exports[`ConsoleFormatter > toString/toJSON > formats an UncaughtError toString 1`] = `
+msgid=1 [error] Uncaught TypeError: Cannot read properties of undefined (0 args)
+`;
+
+exports[`ConsoleFormatter > toStringDetailed/toJSONDetailed > does not show call frames with ignore listed scripts toJSONDetailed 1`] = `
+{
+  "id": 12,
+  "type": "log",
+  "text": "Hello stack trace!",
+  "argsCount": 0,
+  "args": [],
+  "stackTrace": "at foo (foo.ts:10:2)\\nat bar (foo.ts:20:2)\\nNote: line and column numbers use 1-based indexing"
+}
+`;
+
+exports[`ConsoleFormatter > toStringDetailed/toJSONDetailed > does not show call frames with ignore listed scripts toStringDetailed 1`] = `
 ID: 12
 Message: log> Hello stack trace!
 ### Stack trace
@@ -23,7 +70,18 @@ at bar (foo.ts:20:2)
 Note: line and column numbers use 1-based indexing
 `;
 
-exports[`ConsoleFormatter > toStringDetailed > does not show fragments where all frames are ignore listed 1`] = `
+exports[`ConsoleFormatter > toStringDetailed/toJSONDetailed > does not show fragments where all frames are ignore listed toJSONDetailed 1`] = `
+{
+  "id": 13,
+  "type": "log",
+  "text": "Hello stack trace!",
+  "argsCount": 0,
+  "args": [],
+  "stackTrace": "at foo (foo.ts:10:2)\\n--- await ------------------------------\\nat bar (foo.ts:20:2)\\nNote: line and column numbers use 1-based indexing"
+}
+`;
+
+exports[`ConsoleFormatter > toStringDetailed/toJSONDetailed > does not show fragments where all frames are ignore listed toStringDetailed 1`] = `
 ID: 13
 Message: log> Hello stack trace!
 ### Stack trace
@@ -33,8 +91,19 @@ at bar (foo.ts:20:2)
 Note: line and column numbers use 1-based indexing
 `;
 
-exports[`ConsoleFormatter > toStringDetailed > formats a console message with a stack trace 1`] = `
-ID: 5
+exports[`ConsoleFormatter > toStringDetailed/toJSONDetailed > formats a console message with a stack trace toJSONDetailed 1`] = `
+{
+  "id": 1,
+  "type": "log",
+  "text": "Hello stack trace!",
+  "argsCount": 0,
+  "args": [],
+  "stackTrace": "at foo (foo.ts:10:2)\\nat bar (foo.ts:20:2)\\n--- setTimeout -------------------------\\nat schedule (util.ts:5:2)\\nNote: line and column numbers use 1-based indexing"
+}
+`;
+
+exports[`ConsoleFormatter > toStringDetailed/toJSONDetailed > formats a console message with a stack trace toStringDetailed 1`] = `
+ID: 1
 Message: log> Hello stack trace!
 ### Stack trace
 at foo (foo.ts:10:2)
@@ -44,7 +113,19 @@ at schedule (util.ts:5:2)
 Note: line and column numbers use 1-based indexing
 `;
 
-exports[`ConsoleFormatter > toStringDetailed > formats a console message with an Error object argument 1`] = `
+exports[`ConsoleFormatter > toStringDetailed/toJSONDetailed > formats a console message with an Error object argument toJSONDetailed 1`] = `
+{
+  "id": 8,
+  "type": "log",
+  "text": "JSHandle@error",
+  "argsCount": 1,
+  "args": [
+    "TypeError: Cannot read properties of undefined\\nat foo (foo.ts:10:2)\\nat bar (foo.ts:20:2)\\nNote: line and column numbers use 1-based indexing"
+  ]
+}
+`;
+
+exports[`ConsoleFormatter > toStringDetailed/toJSONDetailed > formats a console message with an Error object argument toStringDetailed 1`] = `
 ID: 8
 Message: log> JSHandle@error
 ### Arguments
@@ -54,7 +135,19 @@ at bar (foo.ts:20:2)
 Note: line and column numbers use 1-based indexing
 `;
 
-exports[`ConsoleFormatter > toStringDetailed > formats a console message with an Error object with cause 1`] = `
+exports[`ConsoleFormatter > toStringDetailed/toJSONDetailed > formats a console message with an Error object with cause toJSONDetailed 1`] = `
+{
+  "id": 9,
+  "type": "log",
+  "text": "JSHandle@error",
+  "argsCount": 1,
+  "args": [
+    "AppError: Compute failed\\nat foo (foo.ts:10:2)\\nat bar (foo.ts:20:2)\\nCaused by: TypeError: Cannot read properties of undefined\\nat compute (library.js:5:10)\\nNote: line and column numbers use 1-based indexing"
+  ]
+}
+`;
+
+exports[`ConsoleFormatter > toStringDetailed/toJSONDetailed > formats a console message with an Error object with cause toStringDetailed 1`] = `
 ID: 9
 Message: log> JSHandle@error
 ### Arguments
@@ -66,43 +159,88 @@ at compute (library.js:5:10)
 Note: line and column numbers use 1-based indexing
 `;
 
-exports[`ConsoleFormatter > toStringDetailed > formats a console.error message 1`] = `
-ID: 4
+exports[`ConsoleFormatter > toStringDetailed/toJSONDetailed > formats a console.error message toJSONDetailed 1`] = `
+{
+  "id": 1,
+  "type": "error",
+  "text": "Something went wrong",
+  "argsCount": 0,
+  "args": []
+}
+`;
+
+exports[`ConsoleFormatter > toStringDetailed/toJSONDetailed > formats a console.error message toStringDetailed 1`] = `
+ID: 1
 Message: error> Something went wrong
 `;
 
-exports[`ConsoleFormatter > toStringDetailed > formats a console.log message 1`] = `
+exports[`ConsoleFormatter > toStringDetailed/toJSONDetailed > formats a console.log message toJSONDetailed 1`] = `
+{
+  "id": 1,
+  "type": "log",
+  "text": "Hello, world!",
+  "argsCount": 0,
+  "args": []
+}
+`;
+
+exports[`ConsoleFormatter > toStringDetailed/toJSONDetailed > formats a console.log message toStringDetailed 1`] = `
 ID: 1
 Message: log> Hello, world!
 `;
 
-exports[`ConsoleFormatter > toStringDetailed > formats a console.log message with multiple arguments 1`] = `
-ID: 3
+exports[`ConsoleFormatter > toStringDetailed/toJSONDetailed > formats a console.log message with multiple arguments toJSONDetailed 1`] = `
+{
+  "id": 1,
+  "type": "log",
+  "text": "Processing file:",
+  "argsCount": 2,
+  "args": [
+    "file.txt",
+    "another file"
+  ]
+}
+`;
+
+exports[`ConsoleFormatter > toStringDetailed/toJSONDetailed > formats a console.log message with multiple arguments toStringDetailed 1`] = `
+ID: 1
 Message: log> Processing file:
 ### Arguments
 Arg #0: file.txt
 Arg #1: another file
 `;
 
-exports[`ConsoleFormatter > toStringDetailed > formats a console.log message with one argument 1`] = `
-ID: 2
+exports[`ConsoleFormatter > toStringDetailed/toJSONDetailed > formats a console.log message with one argument toJSONDetailed 1`] = `
+{
+  "id": 1,
+  "type": "log",
+  "text": "Processing file:",
+  "argsCount": 1,
+  "args": [
+    "file.txt"
+  ]
+}
+`;
+
+exports[`ConsoleFormatter > toStringDetailed/toJSONDetailed > formats a console.log message with one argument toStringDetailed 1`] = `
+ID: 1
 Message: log> Processing file:
 ### Arguments
 Arg #0: file.txt
 `;
 
-exports[`ConsoleFormatter > toStringDetailed > formats an UncaughtError with a stack trace 1`] = `
-ID: 7
-Message: error> Uncaught TypeError: Cannot read properties of undefined
-### Stack trace
-at foo (foo.ts:10:2)
-at bar (foo.ts:20:2)
---- setTimeout -------------------------
-at schedule (util.ts:5:2)
-Note: line and column numbers use 1-based indexing
+exports[`ConsoleFormatter > toStringDetailed/toJSONDetailed > formats an UncaughtError with a stack trace and a cause toJSONDetailed 1`] = `
+{
+  "id": 10,
+  "type": "error",
+  "text": "Uncaught TypeError: Cannot read properties of undefined",
+  "argsCount": 0,
+  "args": [],
+  "stackTrace": "at foo (foo.ts:10:2)\\nat bar (foo.ts:20:2)\\n--- setTimeout -------------------------\\nat schedule (util.ts:5:2)\\nCaused by: TypeError: Cannot read properties of undefined\\nat compute (library.js:5:8)\\nNote: line and column numbers use 1-based indexing"
+}
 `;
 
-exports[`ConsoleFormatter > toStringDetailed > formats an UncaughtError with a stack trace and a cause 1`] = `
+exports[`ConsoleFormatter > toStringDetailed/toJSONDetailed > formats an UncaughtError with a stack trace and a cause toStringDetailed 1`] = `
 ID: 10
 Message: error> Uncaught TypeError: Cannot read properties of undefined
 ### Stack trace
@@ -115,14 +253,59 @@ at compute (library.js:5:8)
 Note: line and column numbers use 1-based indexing
 `;
 
-exports[`ConsoleFormatter > toStringDetailed > handles \"Execution context is not available\" error in args 1`] = `
+exports[`ConsoleFormatter > toStringDetailed/toJSONDetailed > formats an UncaughtError with a stack trace toJSONDetailed 1`] = `
+{
+  "id": 7,
+  "type": "error",
+  "text": "Uncaught TypeError: Cannot read properties of undefined",
+  "argsCount": 0,
+  "args": [],
+  "stackTrace": "at foo (foo.ts:10:2)\\nat bar (foo.ts:20:2)\\n--- setTimeout -------------------------\\nat schedule (util.ts:5:2)\\nNote: line and column numbers use 1-based indexing"
+}
+`;
+
+exports[`ConsoleFormatter > toStringDetailed/toJSONDetailed > formats an UncaughtError with a stack trace toStringDetailed 1`] = `
+ID: 7
+Message: error> Uncaught TypeError: Cannot read properties of undefined
+### Stack trace
+at foo (foo.ts:10:2)
+at bar (foo.ts:20:2)
+--- setTimeout -------------------------
+at schedule (util.ts:5:2)
+Note: line and column numbers use 1-based indexing
+`;
+
+exports[`ConsoleFormatter > toStringDetailed/toJSONDetailed > handles \"Execution context is not available\" error in args toJSONDetailed 1`] = `
+{
+  "id": 6,
+  "type": "log",
+  "text": "Processing file:",
+  "argsCount": 1,
+  "args": [
+    "<error: Argument 0 is no longer available>"
+  ]
+}
+`;
+
+exports[`ConsoleFormatter > toStringDetailed/toJSONDetailed > handles \"Execution context is not available\" error in args toStringDetailed 1`] = `
 ID: 6
 Message: log> Processing file:
 ### Arguments
 Arg #0: <error: Argument 0 is no longer available>
 `;
 
-exports[`ConsoleFormatter > toStringDetailed > limits the number lines for a stack trace 1`] = `
+exports[`ConsoleFormatter > toStringDetailed/toJSONDetailed > limits the number lines for a stack trace toJSONDetailed 1`] = `
+{
+  "id": 11,
+  "type": "log",
+  "text": "Hello stack trace!",
+  "argsCount": 0,
+  "args": [],
+  "stackTrace": "at fn0 (main.js:0:0)\\nat fn1 (main.js:1:1)\\nat fn2 (main.js:2:2)\\nat fn3 (main.js:3:3)\\nat fn4 (main.js:4:4)\\nat fn5 (main.js:5:5)\\nat fn6 (main.js:6:6)\\nat fn7 (main.js:7:7)\\nat fn8 (main.js:8:8)\\nat fn9 (main.js:9:9)\\nat fn10 (main.js:10:10)\\nat fn11 (main.js:11:11)\\nat fn12 (main.js:12:12)\\nat fn13 (main.js:13:13)\\nat fn14 (main.js:14:14)\\nat fn15 (main.js:15:15)\\nat fn16 (main.js:16:16)\\nat fn17 (main.js:17:17)\\nat fn18 (main.js:18:18)\\nat fn19 (main.js:19:19)\\nat fn20 (main.js:20:20)\\nat fn21 (main.js:21:21)\\nat fn22 (main.js:22:22)\\nat fn23 (main.js:23:23)\\nat fn24 (main.js:24:24)\\nat fn25 (main.js:25:25)\\nat fn26 (main.js:26:26)\\nat fn27 (main.js:27:27)\\nat fn28 (main.js:28:28)\\nat fn29 (main.js:29:29)\\nat fn30 (main.js:30:30)\\nat fn31 (main.js:31:31)\\nat fn32 (main.js:32:32)\\nat fn33 (main.js:33:33)\\nat fn34 (main.js:34:34)\\nat fn35 (main.js:35:35)\\nat fn36 (main.js:36:36)\\nat fn37 (main.js:37:37)\\nat fn38 (main.js:38:38)\\nat fn39 (main.js:39:39)\\nat fn40 (main.js:40:40)\\nat fn41 (main.js:41:41)\\nat fn42 (main.js:42:42)\\nat fn43 (main.js:43:43)\\nat fn44 (main.js:44:44)\\nat fn45 (main.js:45:45)\\nat fn46 (main.js:46:46)\\nat fn47 (main.js:47:47)\\nat fn48 (main.js:48:48)\\nat fn49 (main.js:49:49)\\n... and 50 more frames\\nNote: line and column numbers use 1-based indexing"
+}
+`;
+
+exports[`ConsoleFormatter > toStringDetailed/toJSONDetailed > limits the number lines for a stack trace toStringDetailed 1`] = `
 ID: 11
 Message: log> Hello stack trace!
 ### Stack trace
