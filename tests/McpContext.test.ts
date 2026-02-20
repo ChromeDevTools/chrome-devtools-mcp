@@ -51,7 +51,7 @@ describe('McpContext', () => {
     await withMcpContext(async (_response, context) => {
       const page = await context.newPage();
       const timeoutBefore = page.getDefaultTimeout();
-      context.setCpuThrottlingRate(2);
+      await context.emulate({cpuThrottlingRate: 2});
       const timeoutAfter = page.getDefaultTimeout();
       assert(timeoutBefore < timeoutAfter, 'Timeout was less then expected');
     });
@@ -61,7 +61,7 @@ describe('McpContext', () => {
     await withMcpContext(async (_response, context) => {
       const page = await context.newPage();
       const timeoutBefore = page.getDefaultNavigationTimeout();
-      context.setNetworkConditions('Slow 3G');
+      await context.emulate({networkConditions: 'Slow 3G'});
       const timeoutAfter = page.getDefaultNavigationTimeout();
       assert(timeoutBefore < timeoutAfter, 'Timeout was less then expected');
     });
@@ -71,8 +71,10 @@ describe('McpContext', () => {
     await withMcpContext(async (_response, context) => {
       const page = await context.newPage();
 
-      context.setCpuThrottlingRate(2);
-      context.setNetworkConditions('Slow 3G');
+      await context.emulate({
+        cpuThrottlingRate: 2,
+        networkConditions: 'Slow 3G',
+      });
       const stub = sinon.spy(context, 'getWaitForHelper');
 
       await context.waitForEventsAfterAction(async () => {

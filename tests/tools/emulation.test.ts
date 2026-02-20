@@ -119,7 +119,9 @@ describe('emulation', () => {
 
     it('disables cpu throttling', async () => {
       await withMcpContext(async (response, context) => {
-        context.setCpuThrottlingRate(4); // Set it to something first.
+        await context.emulate({
+          cpuThrottlingRate: 4,
+        });
         await emulate.handler(
           {
             params: {

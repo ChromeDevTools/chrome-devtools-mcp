@@ -263,15 +263,18 @@ exports[`McpResponse > adds userAgent emulation setting when it is set 2`] = `
 exports[`McpResponse > adds viewport emulation setting when it is set 1`] = `
 # test response
 ## Viewport emulation
-Emulating viewport: {"width":400,"height":400,"deviceScaleFactor":1}
+Emulating viewport: {"deviceScaleFactor":1,"isMobile":false,"hasTouch":false,"isLandscape":false,"width":400,"height":400}
 `;
 
 exports[`McpResponse > adds viewport emulation setting when it is set 2`] = `
 {
   "viewport": {
+    "deviceScaleFactor": 1,
+    "isMobile": false,
+    "hasTouch": false,
+    "isLandscape": false,
     "width": 400,
-    "height": 400,
-    "deviceScaleFactor": 1
+    "height": 400
   }
 }
 `;
