@@ -14,8 +14,9 @@ description: Uses Chrome DevTools MCP for accessibility (a11y) debugging and aud
 ### 1. Browser Issues & Audits
 
 Chrome automatically checks for common accessibility problems. Use `list_console_messages` to check for these native audits first:
--   `types`: `["issue"]`
--   `includePreservedMessages`: `true` (to catch issues that occurred during page load)
+
+- `types`: `["issue"]`
+- `includePreservedMessages`: `true` (to catch issues that occurred during page load)
 
 This often reveals missing labels, invalid ARIA attributes, and other critical errors without manual investigation.
 
@@ -35,14 +36,24 @@ The accessibility tree exposes the heading hierarchy and semantic landmarks.
 3.  **Orphaned Inputs**: Verify that all form inputs have associated labels. Use `evaluate_script` to check for inputs missing `id` (for `label[for]`) or `aria-label`:
     ```javascript
     () => {
-      const inputs = Array.from(document.querySelectorAll('input, select, textarea'));
-      return inputs.filter(i => {
-        const hasId = i.id && document.querySelector(`label[for="${i.id}"]`);
-        const hasAria = i.getAttribute('aria-label') || i.getAttribute('aria-labelledby');
-        const hasImplicitLabel = i.closest('label');
-        return !hasId && !hasAria && !hasImplicitLabel;
-      }).map(i => ({ tag: i.tagName, id: i.id, name: i.name, placeholder: i.placeholder }));
-    }
+      const inputs = Array.from(
+        document.querySelectorAll('input, select, textarea'),
+      );
+      return inputs
+        .filter(i => {
+          const hasId = i.id && document.querySelector(`label[for="${i.id}"]`);
+          const hasAria =
+            i.getAttribute('aria-label') || i.getAttribute('aria-labelledby');
+          const hasImplicitLabel = i.closest('label');
+          return !hasId && !hasAria && !hasImplicitLabel;
+        })
+        .map(i => ({
+          tag: i.tagName,
+          id: i.id,
+          name: i.name,
+          placeholder: i.placeholder,
+        }));
+    };
     ```
 4.  Check images for `alt` text.
 
@@ -54,8 +65,13 @@ Testing "keyboard traps" and proper focus management without visual feedback rel
     ```javascript
     () => {
       const active = document.activeElement;
-      return { tag: active.tagName, id: active.id, className: active.className, text: active.innerText };
-    }
+      return {
+        tag: active.tagName,
+        id: active.id,
+        className: active.className,
+        text: active.innerText,
+      };
+    };
     ```
 2.  Use the `press_key` tool with `"Tab"` or `"Shift+Tab"` to move focus.
 3.  Re-run the script in step 1 to ensure focus moved to the expected next interactive element.
@@ -66,22 +82,25 @@ Testing "keyboard traps" and proper focus management without visual feedback rel
 According to web.dev, tap targets should be at least 48x48 pixels with sufficient spacing. Since the accessibility tree doesn't show sizes, use `evaluate_script`:
 
 ```javascript
-(el) => {
+el => {
   const rect = el.getBoundingClientRect();
-  return { width: rect.width, height: rect.height };
-}
+  return {width: rect.width, height: rect.height};
+};
 ```
-*Pass the element's `uid` from the snapshot as an argument to the tool.*
+
+_Pass the element's `uid` from the snapshot as an argument to the tool._
 
 ### 6. Color Contrast
 
-To verify color contrast ratios without the DevTools UI, use `evaluate_script` to compute the relative luminance of the text (`color`) and background (`backgroundColor`). 
+To verify color contrast ratios without the DevTools UI, use `evaluate_script` to compute the relative luminance of the text (`color`) and background (`backgroundColor`).
 
 ```javascript
-(el) => {
+el => {
   function getRGB(colorStr) {
     const match = colorStr.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
-    return match ? [parseInt(match[1]), parseInt(match[2]), parseInt(match[3])] : [255, 255, 255];
+    return match
+      ? [parseInt(match[1]), parseInt(match[2]), parseInt(match[3])]
+      : [255, 255, 255];
   }
   function luminance(r, g, b) {
     const a = [r, g, b].map(function (v) {
@@ -90,20 +109,25 @@ To verify color contrast ratios without the DevTools UI, use `evaluate_script` t
     });
     return a[0] * 0.2126 + a[1] * 0.7152 + a[2] * 0.0722;
   }
-  
+
   const style = window.getComputedStyle(el);
   const fg = getRGB(style.color);
   let bg = getRGB(style.backgroundColor);
-  
+
   // Basic contrast calculation (Note: Doesn't account for transparency over background images)
   const l1 = luminance(fg[0], fg[1], fg[2]);
   const l2 = luminance(bg[0], bg[1], bg[2]);
   const ratio = (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05);
-  
-  return { color: style.color, bg: style.backgroundColor, contrastRatio: ratio.toFixed(2) };
-}
+
+  return {
+    color: style.color,
+    bg: style.backgroundColor,
+    contrastRatio: ratio.toFixed(2),
+  };
+};
 ```
-*Pass the element's `uid` to test the contrast against WCAG AA (4.5:1 for normal text, 3:1 for large text).*
+
+_Pass the element's `uid` to test the contrast against WCAG AA (4.5:1 for normal text, 3:1 for large text)._
 
 ### 7. Global Page Checks
 
@@ -112,16 +136,22 @@ Verify document-level accessibility settings often missed in component testing:
 ```javascript
 () => {
   return {
-    lang: document.documentElement.lang || 'MISSING - Screen readers need this for pronunciation',
+    lang:
+      document.documentElement.lang ||
+      'MISSING - Screen readers need this for pronunciation',
     title: document.title || 'MISSING - Required for context',
-    viewport: document.querySelector('meta[name="viewport"]')?.content || 'MISSING - Check for user-scalable=no (bad practice)',
-    reducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'Enabled' : 'Disabled'
+    viewport:
+      document.querySelector('meta[name="viewport"]')?.content ||
+      'MISSING - Check for user-scalable=no (bad practice)',
+    reducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      ? 'Enabled'
+      : 'Disabled',
   };
-}
+};
 ```
 
 ## Troubleshooting
 
 If standard a11y queries fail or the `evaluate_script` snippets return unexpected results:
 
-*   **Visual Inspection**: If automated scripts cannot determine contrast (e.g., text over gradient images or complex backgrounds), use `take_screenshot` to capture the element. While models cannot measure exact contrast ratios from images, they can visually assess legibility and identifying obvious issues.
+- **Visual Inspection**: If automated scripts cannot determine contrast (e.g., text over gradient images or complex backgrounds), use `take_screenshot` to capture the element. While models cannot measure exact contrast ratios from images, they can visually assess legibility and identifying obvious issues.
