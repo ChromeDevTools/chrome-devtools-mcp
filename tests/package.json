@@ -1,0 +1,16 @@
+{
+  "name": "vscode-devtools-tests",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
+  },
+  "devDependencies": {
+    "ts-morph": "^27.0.2",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  }
+}
