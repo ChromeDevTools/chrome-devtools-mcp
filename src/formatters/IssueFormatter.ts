@@ -11,13 +11,29 @@ import {DevTools} from '../third_party/index.js';
 export interface IssueFormatterOptions {
   requestIdResolver?: (requestId: string) => number | undefined;
   elementIdResolver?: (backendNodeId: number) => string | undefined;
-  id?: number;
+  id: number;
 }
 
 export interface AffectedResource {
   uid?: string;
   data?: unknown;
   request?: string | number;
+}
+
+interface IssueConcise {
+  type: 'issue';
+  title?: string;
+  count: number;
+  id: number;
+}
+
+interface IssueDetailed extends IssueConcise {
+  description?: string;
+  links?: Array<{
+    link: string;
+    linkTitle: string;
+  }>;
+  affectedResources: AffectedResource[];
 }
 
 export class IssueFormatter {
@@ -30,70 +46,14 @@ export class IssueFormatter {
   }
 
   toString(): string {
-    const title = this.#getTitle();
-    const count = this.#issue.getAggregatedIssuesCount();
-    const idPart =
-      this.#options.id !== undefined ? `msgid=${this.#options.id} ` : '';
-    return `${idPart}[issue] ${title} (count: ${count})`;
+    return convertIssueConciseToString(this.toJSON());
   }
 
   toStringDetailed(): string {
-    const result: string[] = [];
-    if (this.#options.id !== undefined) {
-      result.push(`ID: ${this.#options.id}`);
-    }
-
-    const bodyParts: string[] = [];
-
-    const description = this.#getDescription();
-    let processedMarkdown = description?.trim();
-    // Remove heading in order not to conflict with the whole console message response markdown
-    if (processedMarkdown?.startsWith('# ')) {
-      processedMarkdown = processedMarkdown.substring(2).trimStart();
-    }
-    if (processedMarkdown) {
-      bodyParts.push(processedMarkdown);
-    } else {
-      bodyParts.push(this.#getTitle() ?? 'Unknown Issue');
-    }
-
-    const links = this.#issue.getDescription()?.links;
-    if (links && links.length > 0) {
-      bodyParts.push('Learn more:');
-      for (const link of links) {
-        bodyParts.push(`[${link.linkTitle}](${link.link})`);
-      }
-    }
-
-    const affectedResources = this.#getAffectedResources();
-    if (affectedResources.length) {
-      bodyParts.push('### Affected resources');
-      bodyParts.push(
-        ...affectedResources.map(item => {
-          const details = [];
-          if (item.uid) {
-            details.push(`uid=${item.uid}`);
-          }
-          if (item.request) {
-            details.push(
-              (typeof item.request === 'number' ? `reqid=` : 'url=') +
-                item.request,
-            );
-          }
-          if (item.data) {
-            details.push(`data=${JSON.stringify(item.data)}`);
-          }
-          return details.join(' ');
-        }),
-      );
-    }
-
-    result.push(`Message: issue> ${bodyParts.join('\n')}`);
-
-    return result.join('\n');
+    return convertIssueDetailedToString(this.toJSONDetailed());
   }
 
-  toJSON(): object {
+  toJSON(): IssueConcise {
     return {
       type: 'issue',
       title: this.#getTitle(),
@@ -102,10 +62,11 @@ export class IssueFormatter {
     };
   }
 
-  toJSONDetailed(): object {
+  toJSONDetailed(): IssueDetailed {
     return {
       id: this.#options.id,
       type: 'issue',
+      count: this.#issue.getAggregatedIssuesCount(),
       title: this.#getTitle(),
       description: this.#getDescription(),
       links: this.#issue.getDescription()?.links,
@@ -250,4 +211,62 @@ export class IssueFormatter {
       return undefined;
     }
   }
+}
+
+function convertIssueConciseToString(issue: IssueConcise): string {
+  return `msgid=${issue.id} [issue] ${issue.title} (count: ${issue.count})`;
+}
+
+function convertIssueDetailedToString(issue: IssueDetailed): string {
+  const result: string[] = [];
+  result.push(`ID: ${issue.id}`);
+
+  const bodyParts: string[] = [];
+
+  const description = issue.description;
+  let processedMarkdown = description?.trim();
+  // Remove heading in order not to conflict with the whole console message response markdown
+  if (processedMarkdown?.startsWith('# ')) {
+    processedMarkdown = processedMarkdown.substring(2).trimStart();
+  }
+  if (processedMarkdown) {
+    bodyParts.push(processedMarkdown);
+  } else {
+    bodyParts.push(issue.title ?? 'Unknown Issue');
+  }
+
+  const links = issue.links;
+  if (links && links.length > 0) {
+    bodyParts.push('Learn more:');
+    for (const link of links) {
+      bodyParts.push(`[${link.linkTitle}](${link.link})`);
+    }
+  }
+
+  const affectedResources = issue.affectedResources;
+  if (affectedResources.length) {
+    bodyParts.push('### Affected resources');
+    bodyParts.push(
+      ...affectedResources.map(item => {
+        const details = [];
+        if (item.uid) {
+          details.push(`uid=${item.uid}`);
+        }
+        if (item.request) {
+          details.push(
+            (typeof item.request === 'number' ? `reqid=` : 'url=') +
+              item.request,
+          );
+        }
+        if (item.data) {
+          details.push(`data=${JSON.stringify(item.data)}`);
+        }
+        return details.join(' ');
+      }),
+    );
+  }
+
+  result.push(`Message: issue> ${bodyParts.join('\n')}`);
+
+  return result.join('\n');
 }
