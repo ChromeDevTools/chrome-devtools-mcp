@@ -71,6 +71,8 @@ export interface ChangeCheckResult {
   extRebuilt: boolean;
   extBuildError: string | null;
   extClientReloaded: boolean;
+  newCdpPort?: number;
+  newClientStartedAt?: number;
 }
 
 interface PipelineEntry {
@@ -100,6 +102,10 @@ export interface PipelineDeps {
   extensionPath: string;
   /** Master switch — when false, all hot-reload checks are skipped. */
   hotReloadEnabled: boolean;
+  /** Suppress CDP disconnect handling before checkForChanges (extension may kill Client). */
+  onBeforeChangeCheck?: () => void;
+  /** Restore CDP disconnect handling + reconnect CDP if extension reloaded Client. */
+  onAfterChangeCheck?: (result: ChangeCheckResult) => Promise<void>;
 }
 
 // ── RequestPipeline ──────────────────────────────────────
@@ -206,6 +212,9 @@ export class RequestPipeline {
   ): Promise<ChangeCheckResult | null> {
     let check: ChangeCheckResult;
 
+    // Suppress CDP disconnect handling — extension may kill Client during rebuild
+    this.deps.onBeforeChangeCheck?.();
+
     try {
       check = await this.deps.checkForChanges(
         this.deps.mcpServerRoot,
@@ -215,7 +224,7 @@ export class RequestPipeline {
       // checkForChanges RPC failed — proceed in degraded mode
       const message = err instanceof Error ? err.message : String(err);
       logger(`[pipeline] checkForChanges RPC failed: ${message} — proceeding without hot-reload check`);
-      return {
+      check = {
         mcpChanged: false,
         mcpRebuilt: false,
         mcpBuildError: null,
@@ -224,6 +233,14 @@ export class RequestPipeline {
         extBuildError: null,
         extClientReloaded: false,
       };
+    }
+
+    // Restore CDP disconnect handling + reconnect if extension reloaded Client
+    try {
+      await this.deps.onAfterChangeCheck?.(check);
+    } catch (afterErr) {
+      const msg = afterErr instanceof Error ? afterErr.message : String(afterErr);
+      logger(`[pipeline] onAfterChangeCheck failed: ${msg}`);
     }
 
     // Extension build failure → return error, skip tool execution

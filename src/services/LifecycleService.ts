@@ -36,6 +36,12 @@ class LifecycleService {
   private exitCleanupDone = false;
   private shutdownHandlersRegistered = false;
 
+  /**
+   * When true, CDP disconnect events are suppressed (not treated as crashes).
+   * Set during checkForChanges RPC which may kill the Client window.
+   */
+  private _changeCheckInProgress = false;
+
   /** Client workspace folder the MCP server controls */
   private _clientWorkspace: string | undefined;
   /** Extension development path for the Client */
@@ -254,7 +260,8 @@ class LifecycleService {
 
     // Unexpected CDP close → user closed the debug window → exit
     cdpService.setDisconnectHandler((intentional, lastPort) => {
-      if (intentional) {
+      if (intentional || this._changeCheckInProgress) {
+        logger(`[Lifecycle] CDP closed (suppressed — intentional=${intentional}, changeCheck=${this._changeCheckInProgress})`);
         return;
       }
 
@@ -284,6 +291,45 @@ class LifecycleService {
   }
 
   // ── State Getters ──────────────────────────────────────
+
+  // ── Change Check CDP Suppression ────────────────────────
+
+  /**
+   * Suppress CDP disconnect handling during checkForChanges RPC.
+   * The extension may kill the Client window during this RPC,
+   * which would otherwise be treated as "user closed debug window".
+   */
+  suppressCdpDisconnectDuringChangeCheck(): void {
+    this._changeCheckInProgress = true;
+    logger('[Lifecycle] CDP disconnect suppressed for change check');
+  }
+
+  /**
+   * Resume normal CDP disconnect handling after checkForChanges.
+   */
+  resumeCdpDisconnectHandling(): void {
+    this._changeCheckInProgress = false;
+    logger('[Lifecycle] CDP disconnect handling resumed');
+  }
+
+  /**
+   * Update internal state after the extension reloaded the Client.
+   * Reconnects CDP to the new port and re-inits event subscriptions.
+   */
+  async reconnectAfterExtensionReload(newCdpPort: number, clientStartedAt?: number): Promise<void> {
+    logger(`[Lifecycle] Reconnecting CDP after extension reload — new port: ${newCdpPort}`);
+
+    // Disconnect old CDP (if still lingering) — intentional
+    cdpService.disconnect();
+    clearCdpEventData();
+
+    this._cdpPort = newCdpPort;
+    await cdpService.connect(newCdpPort);
+    await initCdpEventSubscriptions();
+
+    this._debugWindowStartedAt = clientStartedAt ?? Date.now();
+    logger(`[Lifecycle] Extension reload reconnect complete — sessionTs=${new Date(this._debugWindowStartedAt).toISOString()}`);
+  }
 
   get isConnected(): boolean {
     return cdpService.isConnected;

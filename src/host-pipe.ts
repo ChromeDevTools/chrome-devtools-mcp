@@ -256,6 +256,8 @@ export interface CheckForChangesResult {
   extRebuilt: boolean;
   extBuildError: string | null;
   extClientReloaded: boolean;
+  newCdpPort?: number;
+  newClientStartedAt?: number;
 }
 
 /**

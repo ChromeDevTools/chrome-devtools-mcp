@@ -271,6 +271,18 @@ const pipeline = new RequestPipeline({
   mcpServerRoot: mcpServerDir,
   extensionPath: config.extensionBridgePath,
   hotReloadEnabled: config.hotReload.enabled && config.explicitExtensionDevelopmentPath,
+  onBeforeChangeCheck: () => {
+    lifecycleService.suppressCdpDisconnectDuringChangeCheck();
+  },
+  onAfterChangeCheck: async (result) => {
+    lifecycleService.resumeCdpDisconnectHandling();
+    if (result.extClientReloaded && result.newCdpPort) {
+      await lifecycleService.reconnectAfterExtensionReload(
+        result.newCdpPort,
+        result.newClientStartedAt,
+      );
+    }
+  },
 });
 
 function registerTool(targetServer: McpServer, tool: ToolDefinition): void {
