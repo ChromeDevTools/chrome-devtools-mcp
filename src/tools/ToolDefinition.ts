@@ -144,7 +144,10 @@ export type Context = Readonly<{
     action: () => Promise<unknown>,
     options?: {timeout?: number},
   ): Promise<void>;
-  waitForTextOnPage(text: string, timeout?: number): Promise<Element>;
+  waitForTextOnPage(
+    text: string | string[],
+    timeout?: number,
+  ): Promise<Element>;
   getDevToolsData(): Promise<DevToolsData>;
   /**
    * Returns a reqid for a cdpRequestId.

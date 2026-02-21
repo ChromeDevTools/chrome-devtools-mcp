@@ -43,13 +43,17 @@ in the DevTools Elements panel (if any).`,
 
 export const waitFor = defineTool({
   name: 'wait_for',
-  description: `Wait for the specified text to appear on the selected page.`,
+  description: `Wait for the specified text to appear on the selected page. You can provide a single text value or a list of texts; the tool resolves when any text appears.`,
   annotations: {
     category: ToolCategory.NAVIGATION,
     readOnlyHint: true,
   },
   schema: {
-    text: zod.string().describe('Text to appear on the page'),
+    text: zod
+      .union([zod.string(), zod.array(zod.string()).nonempty()])
+      .describe(
+        'Text to appear on the page, or a non-empty list of texts. Resolves when any value appears.',
+      ),
     ...timeoutSchema,
   },
   handler: async (request, response, context) => {
@@ -58,9 +62,15 @@ export const waitFor = defineTool({
       request.params.timeout,
     );
 
-    response.appendResponseLine(
-      `Element with text "${request.params.text}" found.`,
-    );
+    if (Array.isArray(request.params.text)) {
+      response.appendResponseLine(
+        `Element matching one of ${JSON.stringify(request.params.text)} found.`,
+      );
+    } else {
+      response.appendResponseLine(
+        `Element with text "${request.params.text}" found.`,
+      );
+    }
 
     response.includeSnapshot();
   },

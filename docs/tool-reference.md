@@ -191,11 +191,11 @@
 
 ### `wait_for`
 
-**Description:** Wait for the specified text to appear on the selected page.
+**Description:** Wait for the specified text to appear on the selected page. You can provide a single text value or a list of texts; the tool resolves when any text appears.
 
 **Parameters:**
 
-- **text** (string) **(required)**: Text to appear on the page
+- **text** (string | array of string) **(required)**: Text to appear on the page, or a non-empty list of texts. Resolves when any value appears.
 - **timeout** (integer) _(optional)_: Maximum wait time in milliseconds. If set to 0, the default timeout will be used.
 
 ---
