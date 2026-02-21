@@ -265,6 +265,7 @@ for (const tool of tools) {
 await loadIssueDescriptions();
 const transport = new StdioServerTransport();
 await server.connect(transport);
+
 logger('Chrome DevTools MCP Server connected');
 logDisclaimers();
 void clearcutLogger?.logDailyActiveIfNeeded();
