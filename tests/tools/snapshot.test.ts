@@ -20,6 +20,15 @@ describe('snapshot', () => {
     });
   });
   describe('browser_wait_for', () => {
+    it('accepts string or non-empty array text input', () => {
+      assert.equal(waitFor.schema.text.safeParse('Hello').success, true);
+      assert.equal(
+        waitFor.schema.text.safeParse(['Hello', 'World']).success,
+        true,
+      );
+      assert.equal(waitFor.schema.text.safeParse([]).success, false);
+    });
+
     it('should work', async () => {
       await withMcpContext(async (response, context) => {
         const page = context.getSelectedPage();
@@ -44,6 +53,62 @@ describe('snapshot', () => {
         assert.ok(response.includeSnapshot);
       });
     });
+
+    it('should work with any-match array', async () => {
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedPage();
+
+        await page.setContent(
+          html`<main><span>Status</span><div>Error</div></main>`,
+        );
+        await waitFor.handler(
+          {
+            params: {
+              text: ['Complete', 'Error'],
+            },
+          },
+          response,
+          context,
+        );
+
+        assert.equal(
+          response.responseLines[0],
+          'Element matching one of ["Complete","Error"] found.',
+        );
+        assert.ok(response.includeSnapshot);
+      });
+    });
+
+    it('should work with any-match array when element shows up later', async () => {
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedPage();
+
+        const handlePromise = waitFor.handler(
+          {
+            params: {
+              text: ['Complete', 'Error'],
+            },
+          },
+          response,
+          context,
+        );
+
+        await page.setContent(
+          html`<main
+            ><span>Hello</span><span> </span><div>Complete</div></main
+          >`,
+        );
+
+        await handlePromise;
+
+        assert.equal(
+          response.responseLines[0],
+          'Element matching one of ["Complete","Error"] found.',
+        );
+        assert.ok(response.includeSnapshot);
+      });
+    });
+
     it('should work with element that show up later', async () => {
       await withMcpContext(async (response, context) => {
         const page = context.getSelectedPage();

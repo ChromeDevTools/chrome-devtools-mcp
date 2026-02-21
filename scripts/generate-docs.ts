@@ -72,6 +72,7 @@ interface ZodDef {
   checks?: ZodCheck[];
   values?: string[];
   type?: ZodSchema;
+  options?: ZodSchema[];
   innerType?: ZodSchema;
   schema?: ZodSchema;
   defaultValue?: () => unknown;
@@ -290,6 +291,22 @@ function getZodTypeInfo(schema: ZodSchema): TypeInfo {
       result.type = 'array';
       if (def.type) {
         result.items = getZodTypeInfo(def.type);
+      }
+      break;
+    case 'ZodUnion':
+      if (def.options?.length) {
+        result.type = def.options
+          .map(option => {
+            const optionInfo = getZodTypeInfo(option);
+            if (optionInfo.type === 'array') {
+              const itemType = optionInfo.items?.type ?? 'unknown';
+              return `array of ${itemType}`;
+            }
+            return optionInfo.type;
+          })
+          .join(' | ');
+      } else {
+        result.type = 'unknown';
       }
       break;
     default:
