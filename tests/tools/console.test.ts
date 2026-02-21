@@ -66,6 +66,43 @@ describe('console', () => {
       });
     });
 
+    it('groups consecutive identical messages', async () => {
+      await withMcpContext(async (response, context) => {
+        const page = await context.newPage();
+        await page.setContent(`
+          <script>
+            console.log('same');
+            console.log('same');
+            console.log('different');
+            console.log('same');
+            console.log('same');
+          </script>
+        `);
+        await listConsoleMessages.handler({params: {}}, response, context);
+
+        const formattedResponse = await response.handle('test', context);
+        const textContent = getTextContent(formattedResponse.content[0]);
+        const messageLines = textContent
+          .split('\n')
+          .filter(line => line.startsWith('msgid='));
+
+        assert.deepStrictEqual(messageLines.length, 3);
+        assert.ok(messageLines[0]?.endsWith('[log] same (1 args) [2 times]'));
+        assert.ok(messageLines[1]?.endsWith('[log] different (1 args)'));
+        assert.ok(messageLines[2]?.endsWith('[log] same (1 args) [2 times]'));
+
+        const groupedConsoleMessages = (
+          formattedResponse.structuredContent as {
+            consoleMessages?: Array<Record<string, unknown>>;
+          }
+        ).consoleMessages;
+        assert.ok(groupedConsoleMessages);
+        assert.deepStrictEqual(groupedConsoleMessages.length, 3);
+        assert.deepStrictEqual(groupedConsoleMessages[0]?.occurrences, 2);
+        assert.deepStrictEqual(groupedConsoleMessages[2]?.occurrences, 2);
+      });
+    });
+
     describe('issues', () => {
       it('lists issues', async () => {
         await withMcpContext(async (response, context) => {
