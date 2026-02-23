@@ -16,20 +16,22 @@ import {
 } from './DevtoolsUtils.js';
 import type {ListenerMap, UncaughtError} from './PageCollector.js';
 import {NetworkCollector, ConsoleCollector} from './PageCollector.js';
-import {Locator} from './third_party/index.js';
 import type {DevTools} from './third_party/index.js';
 import type {
   Browser,
+  BrowserContext,
   ConsoleMessage,
   Debugger,
   Dialog,
   ElementHandle,
   HTTPRequest,
   Page,
+  ScreenRecorder,
   SerializedAXNode,
-  PredefinedNetworkConditions,
   Viewport,
 } from './third_party/index.js';
+import {Locator} from './third_party/index.js';
+import {PredefinedNetworkConditions} from './third_party/index.js';
 import {listPages} from './tools/pages.js';
 import {takeSnapshot} from './tools/snapshot.js';
 import {CLOSE_PAGE_ERROR} from './tools/ToolDefinition.js';
@@ -62,6 +64,15 @@ export interface TextSnapshot {
   // snapshot. This flag indicates if there is any selected element.
   hasSelectedElement: boolean;
   verbose: boolean;
+}
+
+interface EmulationSettings {
+  networkConditions?: string | null;
+  cpuThrottlingRate?: number | null;
+  geolocation?: GeolocationOptions | null;
+  userAgent?: string | null;
+  colorScheme?: 'dark' | 'light' | null;
+  viewport?: Viewport | null;
 }
 
 interface McpContextOptions {
@@ -97,11 +108,17 @@ export class McpContext implements Context {
   browser: Browser;
   logger: Debugger;
 
-  // The most recent page state.
+  // Maps LLM-provided isolatedContext name → Puppeteer BrowserContext.
+  #isolatedContexts = new Map<string, BrowserContext>();
+  // Reverse lookup: Page → isolatedContext name (for snapshot labeling).
+  // WeakMap so closed pages are garbage-collected automatically.
+  #pageToIsolatedContextName = new WeakMap<Page, string>();
+  // Auto-generated name counter for when no name is provided.
+  #nextIsolatedContextId = 1;
+
   #pages: Page[] = [];
   #pageToDevToolsPage = new Map<Page, Page>();
   #selectedPage?: Page;
-  // The most recent snapshot.
   #textSnapshot: TextSnapshot | null = null;
   #networkCollector: NetworkCollector;
   #consoleCollector: ConsoleCollector;
@@ -109,12 +126,9 @@ export class McpContext implements Context {
   #extensionRegistry = new ExtensionRegistry();
 
   #isRunningTrace = false;
-  #networkConditionsMap = new WeakMap<Page, string>();
-  #cpuThrottlingRateMap = new WeakMap<Page, number>();
-  #geolocationMap = new WeakMap<Page, GeolocationOptions>();
-  #viewportMap = new WeakMap<Page, Viewport>();
-  #userAgentMap = new WeakMap<Page, string>();
-  #colorSchemeMap = new WeakMap<Page, 'dark' | 'light'>();
+  #screenRecorderData: {recorder: ScreenRecorder; filePath: string} | null =
+    null;
+  #emulationSettingsMap = new WeakMap<Page, EmulationSettings>();
   #dialog?: Dialog;
 
   #pageIdMap = new WeakMap<Page, number>();
@@ -168,6 +182,10 @@ export class McpContext implements Context {
     this.#networkCollector.dispose();
     this.#consoleCollector.dispose();
     this.#devtoolsUniverseManager.dispose();
+    // Isolated contexts are intentionally not closed here.
+    // Either the entire browser will be closed or we disconnect
+    // without destroying browser state.
+    this.#isolatedContexts.clear();
   }
 
   static async from(
@@ -250,8 +268,22 @@ export class McpContext implements Context {
     return this.#consoleCollector.getById(this.getSelectedPage(), id);
   }
 
-  async newPage(background?: boolean): Promise<Page> {
-    const page = await this.browser.newPage({background});
+  async newPage(
+    background?: boolean,
+    isolatedContextName?: string,
+  ): Promise<Page> {
+    let page: Page;
+    if (isolatedContextName !== undefined) {
+      let ctx = this.#isolatedContexts.get(isolatedContextName);
+      if (!ctx) {
+        ctx = await this.browser.createBrowserContext();
+        this.#isolatedContexts.set(isolatedContextName, ctx);
+      }
+      page = await ctx.newPage();
+      this.#pageToIsolatedContextName.set(page, isolatedContextName);
+    } else {
+      page = await this.browser.newPage({background});
+    }
     await this.createPagesSnapshot();
     this.selectPage(page);
     this.#networkCollector.addPage(page);
@@ -264,92 +296,159 @@ export class McpContext implements Context {
     }
     const page = this.getPageById(pageId);
     await page.close({runBeforeUnload: false});
+    this.#pageToIsolatedContextName.delete(page);
   }
 
   getNetworkRequestById(reqid: number): HTTPRequest {
     return this.#networkCollector.getById(this.getSelectedPage(), reqid);
   }
 
-  setNetworkConditions(conditions: string | null): void {
+  async restoreEmulation() {
     const page = this.getSelectedPage();
-    if (conditions === null) {
-      this.#networkConditionsMap.delete(page);
-    } else {
-      this.#networkConditionsMap.set(page, conditions);
+    const currentSettings = this.#emulationSettingsMap.get(page) ?? {};
+    await this.emulate(currentSettings);
+  }
+
+  async emulate(options: {
+    networkConditions?: string | null;
+    cpuThrottlingRate?: number | null;
+    geolocation?: GeolocationOptions | null;
+    userAgent?: string | null;
+    colorScheme?: 'dark' | 'light' | 'auto' | null;
+    viewport?: Viewport | null;
+  }): Promise<void> {
+    const page = this.getSelectedPage();
+    const currentSettings = this.#emulationSettingsMap.get(page) ?? {};
+    const newSettings: EmulationSettings = {...currentSettings};
+    let timeoutsNeedUpdate = false;
+
+    if (options.networkConditions !== undefined) {
+      timeoutsNeedUpdate = true;
+      if (
+        options.networkConditions === null ||
+        options.networkConditions === 'No emulation'
+      ) {
+        await page.emulateNetworkConditions(null);
+        delete newSettings.networkConditions;
+      } else if (options.networkConditions === 'Offline') {
+        await page.emulateNetworkConditions({
+          offline: true,
+          download: 0,
+          upload: 0,
+          latency: 0,
+        });
+        newSettings.networkConditions = 'Offline';
+      } else if (options.networkConditions in PredefinedNetworkConditions) {
+        const networkCondition =
+          PredefinedNetworkConditions[
+            options.networkConditions as keyof typeof PredefinedNetworkConditions
+          ];
+        await page.emulateNetworkConditions(networkCondition);
+        newSettings.networkConditions = options.networkConditions;
+      }
     }
-    this.#updateSelectedPageTimeouts();
+
+    if (options.cpuThrottlingRate !== undefined) {
+      timeoutsNeedUpdate = true;
+      if (options.cpuThrottlingRate === null) {
+        await page.emulateCPUThrottling(1);
+        delete newSettings.cpuThrottlingRate;
+      } else {
+        await page.emulateCPUThrottling(options.cpuThrottlingRate);
+        newSettings.cpuThrottlingRate = options.cpuThrottlingRate;
+      }
+    }
+
+    if (options.geolocation !== undefined) {
+      if (options.geolocation === null) {
+        await page.setGeolocation({latitude: 0, longitude: 0});
+        delete newSettings.geolocation;
+      } else {
+        await page.setGeolocation(options.geolocation);
+        newSettings.geolocation = options.geolocation;
+      }
+    }
+
+    if (options.userAgent !== undefined) {
+      if (options.userAgent === null) {
+        await page.setUserAgent({userAgent: undefined});
+        delete newSettings.userAgent;
+      } else {
+        await page.setUserAgent({userAgent: options.userAgent});
+        newSettings.userAgent = options.userAgent;
+      }
+    }
+
+    if (options.colorScheme !== undefined) {
+      if (options.colorScheme === null || options.colorScheme === 'auto') {
+        await page.emulateMediaFeatures([
+          {name: 'prefers-color-scheme', value: ''},
+        ]);
+        delete newSettings.colorScheme;
+      } else {
+        await page.emulateMediaFeatures([
+          {name: 'prefers-color-scheme', value: options.colorScheme},
+        ]);
+        newSettings.colorScheme = options.colorScheme;
+      }
+    }
+
+    if (options.viewport !== undefined) {
+      if (options.viewport === null) {
+        await page.setViewport(null);
+        delete newSettings.viewport;
+      } else {
+        const defaults = {
+          deviceScaleFactor: 1,
+          isMobile: false,
+          hasTouch: false,
+          isLandscape: false,
+        };
+        const viewport = {...defaults, ...options.viewport};
+        await page.setViewport(viewport);
+        newSettings.viewport = viewport;
+      }
+    }
+
+    if (Object.keys(newSettings).length) {
+      this.#emulationSettingsMap.set(page, newSettings);
+    } else {
+      this.#emulationSettingsMap.delete(page);
+    }
+
+    if (timeoutsNeedUpdate) {
+      this.#updateSelectedPageTimeouts();
+    }
   }
 
   getNetworkConditions(): string | null {
     const page = this.getSelectedPage();
-    return this.#networkConditionsMap.get(page) ?? null;
-  }
-
-  setCpuThrottlingRate(rate: number): void {
-    const page = this.getSelectedPage();
-    this.#cpuThrottlingRateMap.set(page, rate);
-    this.#updateSelectedPageTimeouts();
+    return this.#emulationSettingsMap.get(page)?.networkConditions ?? null;
   }
 
   getCpuThrottlingRate(): number {
     const page = this.getSelectedPage();
-    return this.#cpuThrottlingRateMap.get(page) ?? 1;
-  }
-
-  setGeolocation(geolocation: GeolocationOptions | null): void {
-    const page = this.getSelectedPage();
-    if (geolocation === null) {
-      this.#geolocationMap.delete(page);
-    } else {
-      this.#geolocationMap.set(page, geolocation);
-    }
+    return this.#emulationSettingsMap.get(page)?.cpuThrottlingRate ?? 1;
   }
 
   getGeolocation(): GeolocationOptions | null {
     const page = this.getSelectedPage();
-    return this.#geolocationMap.get(page) ?? null;
-  }
-
-  setViewport(viewport: Viewport | null): void {
-    const page = this.getSelectedPage();
-    if (viewport === null) {
-      this.#viewportMap.delete(page);
-    } else {
-      this.#viewportMap.set(page, viewport);
-    }
+    return this.#emulationSettingsMap.get(page)?.geolocation ?? null;
   }
 
   getViewport(): Viewport | null {
     const page = this.getSelectedPage();
-    return this.#viewportMap.get(page) ?? null;
-  }
-
-  setUserAgent(userAgent: string | null): void {
-    const page = this.getSelectedPage();
-    if (userAgent === null) {
-      this.#userAgentMap.delete(page);
-    } else {
-      this.#userAgentMap.set(page, userAgent);
-    }
+    return this.#emulationSettingsMap.get(page)?.viewport ?? null;
   }
 
   getUserAgent(): string | null {
     const page = this.getSelectedPage();
-    return this.#userAgentMap.get(page) ?? null;
-  }
-
-  setColorScheme(scheme: 'dark' | 'light' | null): void {
-    const page = this.getSelectedPage();
-    if (scheme === null) {
-      this.#colorSchemeMap.delete(page);
-    } else {
-      this.#colorSchemeMap.set(page, scheme);
-    }
+    return this.#emulationSettingsMap.get(page)?.userAgent ?? null;
   }
 
   getColorScheme(): 'dark' | 'light' | null {
     const page = this.getSelectedPage();
-    return this.#colorSchemeMap.get(page) ?? null;
+    return this.#emulationSettingsMap.get(page)?.colorScheme ?? null;
   }
 
   setIsRunningPerformanceTrace(x: boolean): void {
@@ -358,6 +457,16 @@ export class McpContext implements Context {
 
   isRunningPerformanceTrace(): boolean {
     return this.#isRunningTrace;
+  }
+
+  getScreenRecorder(): {recorder: ScreenRecorder; filePath: string} | null {
+    return this.#screenRecorderData;
+  }
+
+  setScreenRecorder(
+    data: {recorder: ScreenRecorder; filePath: string} | null,
+  ): void {
+    this.#screenRecorderData = data;
   }
 
   isCruxEnabled(): boolean {
@@ -469,13 +578,8 @@ export class McpContext implements Context {
     }
   }
 
-  /**
-   * Creates a snapshot of the pages.
-   */
   async createPagesSnapshot(): Promise<Page[]> {
-    const allPages = await this.browser.pages(
-      this.#options.experimentalIncludeAllPages,
-    );
+    const allPages = await this.#getAllPages();
 
     for (const page of allPages) {
       if (!this.#pageIdMap.has(page)) {
@@ -484,8 +588,6 @@ export class McpContext implements Context {
     }
 
     this.#pages = allPages.filter(page => {
-      // If we allow debugging DevTools windows, return all pages.
-      // If we are in regular mode, the user should only see non-DevTools page.
       return (
         this.#options.experimentalDevToolsDebugging ||
         !page.url().startsWith('devtools://')
@@ -504,11 +606,44 @@ export class McpContext implements Context {
     return this.#pages;
   }
 
-  async detectOpenDevToolsWindows() {
-    this.logger('Detecting open DevTools windows');
-    const pages = await this.browser.pages(
+  async #getAllPages(): Promise<Page[]> {
+    const defaultCtx = this.browser.defaultBrowserContext();
+    const allPages = await this.browser.pages(
       this.#options.experimentalIncludeAllPages,
     );
+
+    // Build a reverse lookup from BrowserContext instance → name.
+    const contextToName = new Map<BrowserContext, string>();
+    for (const [name, ctx] of this.#isolatedContexts) {
+      contextToName.set(ctx, name);
+    }
+
+    // Auto-discover BrowserContexts not in our mapping (e.g., externally
+    // created incognito contexts) and assign generated names.
+    const knownContexts = new Set(this.#isolatedContexts.values());
+    for (const ctx of this.browser.browserContexts()) {
+      if (ctx !== defaultCtx && !ctx.closed && !knownContexts.has(ctx)) {
+        const name = `isolated-context-${this.#nextIsolatedContextId++}`;
+        this.#isolatedContexts.set(name, ctx);
+        contextToName.set(ctx, name);
+      }
+    }
+
+    // Use page.browserContext() to determine each page's context membership.
+    for (const page of allPages) {
+      const ctx = page.browserContext();
+      const name = contextToName.get(ctx);
+      if (name) {
+        this.#pageToIsolatedContextName.set(page, name);
+      }
+    }
+
+    return allPages;
+  }
+
+  async detectOpenDevToolsWindows() {
+    this.logger('Detecting open DevTools windows');
+    const pages = await this.#getAllPages();
     this.#pageToDevToolsPage = new Map<Page, Page>();
     for (const devToolsPage of pages) {
       if (devToolsPage.url().startsWith('devtools://')) {
@@ -538,6 +673,10 @@ export class McpContext implements Context {
 
   getPages(): Page[] {
     return this.#pages;
+  }
+
+  getIsolatedContextName(page: Page): string | undefined {
+    return this.#pageToIsolatedContextName.get(page);
   }
 
   getDevToolsPage(page: Page): Page | undefined {
@@ -766,7 +905,8 @@ export class McpContext implements Context {
         },
       } as ListenerMap;
     });
-    await this.#networkCollector.init(await this.browser.pages());
+    const pages = await this.#getAllPages();
+    await this.#networkCollector.init(pages);
   }
 
   async installExtension(extensionPath: string): Promise<string> {

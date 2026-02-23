@@ -1,5 +1,5 @@
 /**
- * Lighthouse v13.0.3-2-g52036f707 (Feb 13 2026)
+ * Lighthouse v13.0.3-4-ga9dfea556 (Feb 23 2026)
  *
  * Automated auditing, performance metrics, and best practices for the web.
  *

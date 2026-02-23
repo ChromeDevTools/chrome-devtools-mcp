@@ -10,6 +10,7 @@ import type {
   Dialog,
   ElementHandle,
   Page,
+  ScreenRecorder,
   Viewport,
 } from '../third_party/index.js';
 import type {InsightName, TraceResult} from '../trace-processing/parse.js';
@@ -133,19 +134,27 @@ export type Context = Readonly<{
   getPageById(pageId: number): Page;
   getPageId(page: Page): number | undefined;
   isPageSelected(page: Page): boolean;
-  newPage(background?: boolean): Promise<Page>;
+  newPage(background?: boolean, isolatedContextName?: string): Promise<Page>;
   closePage(pageId: number): Promise<void>;
   selectPage(page: Page): void;
+  getIsolatedContextName(page: Page): string | undefined;
   getElementByUid(uid: string): Promise<ElementHandle<Element>>;
   getAXNodeByUid(uid: string): TextSnapshotNode | undefined;
-  setNetworkConditions(conditions: string | null): void;
-  setCpuThrottlingRate(rate: number): void;
-  setGeolocation(geolocation: GeolocationOptions | null): void;
-  setViewport(viewport: Viewport | null): void;
+  emulate(options: {
+    networkConditions?: string | null;
+    cpuThrottlingRate?: number | null;
+    geolocation?: GeolocationOptions | null;
+    userAgent?: string | null;
+    colorScheme?: 'dark' | 'light' | 'auto' | null;
+    viewport?: Viewport | null;
+  }): Promise<void>;
+  restoreEmulation(): Promise<void>;
+  getNetworkConditions(): string | null;
+  getCpuThrottlingRate(): number;
+  getGeolocation(): GeolocationOptions | null;
   getViewport(): Viewport | null;
-  setUserAgent(userAgent: string | null): void;
   getUserAgent(): string | null;
-  setColorScheme(scheme: 'dark' | 'light' | null): void;
+  getColorScheme(): 'dark' | 'light' | null;
   saveTemporaryFile(
     data: Uint8Array<ArrayBufferLike>,
     filename: string,
@@ -168,6 +177,10 @@ export type Context = Readonly<{
    * Returns a reqid for a cdpRequestId.
    */
   resolveCdpElementId(cdpBackendNodeId: number): string | undefined;
+  getScreenRecorder(): {recorder: ScreenRecorder; filePath: string} | null;
+  setScreenRecorder(
+    data: {recorder: ScreenRecorder; filePath: string} | null,
+  ): void;
   installExtension(path: string): Promise<string>;
   uninstallExtension(id: string): Promise<void>;
   listExtensions(): InstalledExtension[];

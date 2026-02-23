@@ -1,6 +1,6 @@
 <!-- AUTO GENERATED DO NOT EDIT - run 'npm run docs' to update-->
 
-# Chrome DevTools MCP Tool Reference (~6922 cl100k_base tokens)
+# Chrome DevTools MCP Tool Reference (~6980 cl100k_base tokens)
 
 - **[Audits](#audits)** (1 tools)
   - [`lighthouse_audit`](#lighthouse_audit)
@@ -188,6 +188,7 @@
 
 - **url** (string) **(required)**: URL to load in a new page.
 - **background** (boolean) _(optional)_: Whether to open the page in the background without bringing it to the front. Default is false (foreground).
+- **isolatedContext** (string) _(optional)_: If specified, the page is created in an isolated browser context with the given name. Pages in the same browser context share cookies and storage. Pages in different browser contexts are fully isolated.
 - **timeout** (integer) _(optional)_: Maximum wait time in milliseconds. If set to 0, the default timeout will be used.
 
 ---

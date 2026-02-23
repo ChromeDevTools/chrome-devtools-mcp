@@ -57,6 +57,8 @@ export const lighthouseAudit = defineTool({
     const flags: Flags = {
       onlyCategories: categories,
       output: formats,
+      // Default 30 second timeout for page load.
+      maxWaitForLoad: 30_000,
     };
 
     if (device === 'desktop') {
@@ -68,14 +70,6 @@ export const lighthouseAudit = defineTool({
         deviceScaleFactor: 1,
         disabled: false,
       };
-      flags.throttling = {
-        rttMs: 40,
-        throughputKbps: 10 * 1024,
-        cpuSlowdownMultiplier: 1,
-        requestLatencyMs: 0,
-        downloadThroughputKbps: 0,
-        uploadThroughputKbps: 0,
-      };
     } else {
       flags.formFactor = 'mobile';
       flags.screenEmulation = {
@@ -85,29 +79,25 @@ export const lighthouseAudit = defineTool({
         deviceScaleFactor: 1.75,
         disabled: false,
       };
-      flags.throttling = {
-        rttMs: 150,
-        throughputKbps: 1.6 * 1024,
-        cpuSlowdownMultiplier: 4,
-        requestLatencyMs: 0,
-        downloadThroughputKbps: 0,
-        uploadThroughputKbps: 0,
-      };
     }
 
     let result: RunnerResult | undefined;
-    if (mode === 'navigation') {
-      result = await navigation(page, page.url(), {
-        flags,
-      });
-    } else {
-      result = await snapshot(page, {
-        flags,
-      });
-    }
+    try {
+      if (mode === 'navigation') {
+        result = await navigation(page, page.url(), {
+          flags,
+        });
+      } else {
+        result = await snapshot(page, {
+          flags,
+        });
+      }
 
-    if (!result) {
-      throw new Error('Lighthouse audit failed.');
+      if (!result) {
+        throw new Error('Lighthouse audit failed.');
+      }
+    } finally {
+      await context.restoreEmulation();
     }
 
     const lhr = result.lhr;

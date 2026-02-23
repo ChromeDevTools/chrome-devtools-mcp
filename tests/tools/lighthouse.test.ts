@@ -51,6 +51,70 @@ describe('lighthouse', () => {
       });
     });
 
+    it('restores emulation', async () => {
+      server.addHtmlRoute('/test-mobile', html`<div>Test Mobile</div>`);
+
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedPage();
+        await page.goto(server.getRoute('/test-mobile'));
+        await context.emulate({
+          viewport: {
+            width: 400,
+            height: 400,
+            deviceScaleFactor: 1,
+            hasTouch: true,
+          },
+        });
+
+        {
+          const viewportData = await page.evaluate(() => {
+            return {
+              width: window.innerWidth,
+              height: window.innerHeight,
+              deviceScaleFactor: window.devicePixelRatio,
+              hasTouch: navigator.maxTouchPoints > 0,
+            };
+          });
+
+          assert.deepStrictEqual(viewportData, {
+            width: 400,
+            height: 400,
+            deviceScaleFactor: 1,
+            hasTouch: true,
+          });
+        }
+
+        await lighthouseAudit.handler(
+          {
+            params: {
+              mode: 'snapshot',
+              device: 'mobile',
+            },
+          },
+          response,
+          context,
+        );
+
+        {
+          const viewportData = await page.evaluate(() => {
+            return {
+              width: window.innerWidth,
+              height: window.innerHeight,
+              deviceScaleFactor: window.devicePixelRatio,
+              hasTouch: navigator.maxTouchPoints > 0,
+            };
+          });
+
+          assert.deepStrictEqual(viewportData, {
+            width: 400,
+            height: 400,
+            deviceScaleFactor: 1,
+            hasTouch: true,
+          });
+        }
+      });
+    });
+
     it('runs Lighthouse in snapshot mode with mobile device', async () => {
       server.addHtmlRoute('/test-mobile', html`<div>Test Mobile</div>`);
 

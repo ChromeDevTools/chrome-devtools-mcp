@@ -10,10 +10,7 @@ import path from 'node:path';
 
 const ROOT_DIR = process.cwd();
 const LIGHTHOUSE_DIR = path.resolve(ROOT_DIR, '../lighthouse');
-const DEST_PATH = path.join(
-  ROOT_DIR,
-  'src/third_party/lighthouse-devtools-mcp-bundle.js',
-);
+const DEST_DIR = path.join(ROOT_DIR, 'src/third_party');
 
 function main() {
   if (!fs.existsSync(LIGHTHOUSE_DIR)) {
@@ -27,29 +24,29 @@ function main() {
   console.log('Building lighthouse-devtools-mcp bundle...');
   execSync('yarn build-devtools-mcp', {cwd: LIGHTHOUSE_DIR, stdio: 'inherit'});
 
-  // Look for the bundle in dist/ or root
-  const potentialPaths = [
-    path.join(LIGHTHOUSE_DIR, 'dist', 'lighthouse-devtools-mcp-bundle.js'),
-    path.join(LIGHTHOUSE_DIR, 'lighthouse-devtools-mcp-bundle.js'),
-  ];
+  const bundlePath = path.join(
+    LIGHTHOUSE_DIR,
+    'dist',
+    'lighthouse-devtools-mcp-bundle.js',
+  );
 
-  let bundlePath = '';
-  for (const p of potentialPaths) {
-    if (fs.existsSync(p)) {
-      bundlePath = p;
-      break;
-    }
-  }
+  console.log(`Copying bundle from ${bundlePath} to ${DEST_DIR}...`);
+  fs.copyFileSync(
+    bundlePath,
+    path.join(DEST_DIR, 'lighthouse-devtools-mcp-bundle.js'),
+  );
 
-  if (!bundlePath) {
-    console.error(
-      `Could not find built bundle. Checked:\n${potentialPaths.join('\n')}`,
-    );
-    process.exit(1);
-  }
+  const noticesPath = path.join(
+    LIGHTHOUSE_DIR,
+    'dist',
+    'LIGHTHOUSE_MCP_BUNDLE_THIRD_PARTY_NOTICES',
+  );
 
-  console.log(`Copying bundle from ${bundlePath} to ${DEST_PATH}...`);
-  fs.copyFileSync(bundlePath, DEST_PATH);
+  console.log(`Copying notices from ${noticesPath} to ${DEST_DIR}...`);
+  fs.copyFileSync(
+    noticesPath,
+    path.join(DEST_DIR, 'LIGHTHOUSE_MCP_BUNDLE_THIRD_PARTY_NOTICES'),
+  );
 
   console.log('Done.');
 }

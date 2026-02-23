@@ -12,6 +12,7 @@ import * as lighthouseTools from './lighthouse.js';
 import * as networkTools from './network.js';
 import * as pagesTools from './pages.js';
 import * as performanceTools from './performance.js';
+import * as screencastTools from './screencast.js';
 import * as screenshotTools from './screenshot.js';
 import * as scriptTools from './script.js';
 import * as snapshotTools from './snapshot.js';
@@ -26,6 +27,7 @@ const tools = [
   ...Object.values(networkTools),
   ...Object.values(pagesTools),
   ...Object.values(performanceTools),
+  ...Object.values(screencastTools),
   ...Object.values(screenshotTools),
   ...Object.values(scriptTools),
   ...Object.values(snapshotTools),
