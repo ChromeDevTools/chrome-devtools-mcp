@@ -913,7 +913,7 @@ export class McpContext implements Context {
         },
       } as ListenerMap;
     });
-    const pages = await this.browser.pages();
+    const pages = await this.#getAllPages();
     await this.#networkCollector.init(pages);
   }
 
