@@ -31,7 +31,7 @@ import {tools} from './tools/tools.js';
 
 // If moved update release-please config
 // x-release-please-start-version
-const VERSION = '0.17.1';
+const VERSION = '0.17.3';
 // x-release-please-end
 
 export const args = parseArguments(VERSION);
@@ -58,9 +58,11 @@ if (args.usageStatistics) {
   });
 }
 
-process.on('unhandledRejection', (reason, promise) => {
-  logger('Unhandled promise rejection', promise, reason);
-});
+if (process.env['CHROME_DEVTOOLS_MCP_CRASH_ON_UNCAUGHT'] !== 'true') {
+  process.on('unhandledRejection', (reason, promise) => {
+    logger('Unhandled promise rejection', promise, reason);
+  });
+}
 
 logger(`Starting Chrome DevTools MCP Server v${VERSION}`);
 const server = new McpServer(
@@ -179,6 +181,12 @@ function registerTool(tool: ToolDefinition): void {
   if (
     tool.annotations.conditions?.includes('experimentalInteropTools') &&
     !args.experimentalInteropTools
+  ) {
+    return;
+  }
+  if (
+    tool.annotations.conditions?.includes('screencast') &&
+    !args.experimentalScreencast
   ) {
     return;
   }

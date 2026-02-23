@@ -50,7 +50,7 @@ const nodeArgs = [
   './build/tests/setup.js',
   '--no-warnings=ExperimentalWarning',
   '--test-reporter',
-  'spec',
+  (process.env['NODE_TEST_REPORTER'] ?? process.env['CI']) ? 'spec' : 'dot',
   '--test-force-exit',
   '--test',
   '--test-timeout=60000',
@@ -68,6 +68,7 @@ async function runTests(attempt) {
       env: {
         ...process.env,
         CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: true,
+        CHROME_DEVTOOLS_MCP_CRASH_ON_UNCAUGHT: true,
       },
     });
 

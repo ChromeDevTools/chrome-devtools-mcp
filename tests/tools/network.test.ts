@@ -105,7 +105,9 @@ describe('network', () => {
       await withMcpContext(async (response, context) => {
         await context.setUpNetworkCollectorForTesting();
         const page = context.getSelectedPage();
-        await page.goto(server.getRoute('/redirect'));
+        await page.goto(server.getRoute('/redirect'), {
+          waitUntil: 'networkidle0',
+        });
         await listNetworkRequests.handler(
           {
             params: {
