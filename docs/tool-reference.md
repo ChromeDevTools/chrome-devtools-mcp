@@ -1,6 +1,6 @@
 <!-- AUTO GENERATED DO NOT EDIT - run 'npm run docs' to update-->
 
-# Chrome DevTools MCP Tool Reference (~6885 cl100k_base tokens)
+# Chrome DevTools MCP Tool Reference (~6750 cl100k_base tokens)
 
 - **[Input automation](#input-automation)** (8 tools)
   - [`click`](#click)
@@ -195,7 +195,7 @@
 
 **Parameters:**
 
-- **text** (unknown) **(required)**: Non-empty list of texts. Resolves when any value appears on the page.
+- **text** (array) **(required)**: Non-empty list of texts. Resolves when any value appears on the page.
 - **timeout** (integer) _(optional)_: Maximum wait time in milliseconds. If set to 0, the default timeout will be used.
 
 ---

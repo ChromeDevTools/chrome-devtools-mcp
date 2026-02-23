@@ -50,8 +50,8 @@ export const waitFor = defineTool({
   },
   schema: {
     text: zod
-      .tuple([zod.string()])
-      .rest(zod.string())
+      .array(zod.string())
+      .min(1)
       .describe(
         'Non-empty list of texts. Resolves when any value appears on the page.',
       ),

@@ -881,10 +881,7 @@ export class McpContext implements Context {
     return this.#networkCollector.getIdForResource(request);
   }
 
-  waitForTextOnPage(
-    text: [string, ...string[]],
-    timeout?: number,
-  ): Promise<Element> {
+  waitForTextOnPage(text: string[], timeout?: number): Promise<Element> {
     const page = this.getSelectedPage();
     const frames = page.frames();
 
