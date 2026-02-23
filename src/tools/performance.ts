@@ -17,7 +17,7 @@ import {
 
 import {ToolCategory} from './categories.js';
 import type {Context, Response} from './ToolDefinition.js';
-import {defineTool} from './ToolDefinition.js';
+import {defineTool, isolatedContextSchema} from './ToolDefinition.js';
 
 const filePathSchema = zod
   .string()
@@ -34,6 +34,7 @@ export const startTrace = defineTool({
     readOnlyHint: false,
   },
   schema: {
+    ...isolatedContextSchema,
     reload: zod
       .boolean()
       .describe(
@@ -55,7 +56,9 @@ export const startTrace = defineTool({
     }
     context.setIsRunningPerformanceTrace(true);
 
-    const page = context.getSelectedPage();
+    const page = context.resolvePageByContext(
+      request.params.isolatedContext,
+    );
     const pageUrlForTracing = page.url();
 
     if (request.params.reload) {
@@ -121,13 +124,16 @@ export const stopTrace = defineTool({
     readOnlyHint: false,
   },
   schema: {
+    ...isolatedContextSchema,
     filePath: filePathSchema,
   },
   handler: async (request, response, context) => {
     if (!context.isRunningPerformanceTrace()) {
       return;
     }
-    const page = context.getSelectedPage();
+    const page = context.resolvePageByContext(
+      request.params.isolatedContext,
+    );
     await stopTracingAndAppendOutput(
       page,
       response,

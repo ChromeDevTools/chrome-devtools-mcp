@@ -238,6 +238,7 @@ export class McpResponse implements Response {
       await context.createTextSnapshot(
         this.#snapshotParams.verbose,
         this.#devToolsData,
+        this.#snapshotParams.page,
       );
       const textSnapshot = context.getTextSnapshot();
       if (textSnapshot) {

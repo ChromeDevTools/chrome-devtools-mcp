@@ -7,7 +7,11 @@
 import {zod} from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
-import {defineTool, timeoutSchema} from './ToolDefinition.js';
+import {
+  defineTool,
+  isolatedContextSchema,
+  timeoutSchema,
+} from './ToolDefinition.js';
 
 export const takeSnapshot = defineTool({
   name: 'take_snapshot',
@@ -20,6 +24,7 @@ in the DevTools Elements panel (if any).`,
     readOnlyHint: false,
   },
   schema: {
+    ...isolatedContextSchema,
     verbose: zod
       .boolean()
       .optional()
@@ -33,10 +38,14 @@ in the DevTools Elements panel (if any).`,
         'The absolute path, or a path relative to the current working directory, to save the snapshot to instead of attaching it to the response.',
       ),
   },
-  handler: async (request, response) => {
+  handler: async (request, response, context) => {
+    const page = context.resolvePageByContext(
+      request.params.isolatedContext,
+    );
     response.includeSnapshot({
       verbose: request.params.verbose ?? false,
       filePath: request.params.filePath,
+      page,
     });
   },
 });
@@ -49,19 +58,24 @@ export const waitFor = defineTool({
     readOnlyHint: true,
   },
   schema: {
+    ...isolatedContextSchema,
     text: zod.string().describe('Text to appear on the page'),
     ...timeoutSchema,
   },
   handler: async (request, response, context) => {
+    const page = context.resolvePageByContext(
+      request.params.isolatedContext,
+    );
     await context.waitForTextOnPage(
       request.params.text,
       request.params.timeout,
+      page,
     );
 
     response.appendResponseLine(
       `Element with text "${request.params.text}" found.`,
     );
 
-    response.includeSnapshot();
+    response.includeSnapshot({ page });
   },
 });

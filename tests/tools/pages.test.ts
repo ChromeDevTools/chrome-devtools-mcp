@@ -176,6 +176,108 @@ describe('pages', () => {
     });
   });
 
+  describe('resolvePageByContext', () => {
+    it('returns the correct page regardless of global selection', async () => {
+      await withMcpContext(async (response, context) => {
+        // Create two pages in separate isolated contexts with different content.
+        await newPage.handler(
+          {
+            params: {
+              url: 'data:text/html,<h1>Page A</h1>',
+              isolatedContext: 'ctx-a',
+            },
+          },
+          response,
+          context,
+        );
+        const pageA = context.getSelectedPage();
+
+        await newPage.handler(
+          {
+            params: {
+              url: 'data:text/html,<h1>Page B</h1>',
+              isolatedContext: 'ctx-b',
+            },
+          },
+          response,
+          context,
+        );
+        const pageB = context.getSelectedPage();
+
+        // Global selection is now pageB (the last created page).
+        assert.strictEqual(context.getSelectedPage(), pageB);
+
+        // resolvePageByContext should return the correct page for each context,
+        // regardless of which page is globally selected.
+        assert.strictEqual(context.resolvePageByContext('ctx-a'), pageA);
+        assert.strictEqual(context.resolvePageByContext('ctx-b'), pageB);
+      });
+    });
+
+    it('falls back to getSelectedPage when no isolatedContext is provided', async () => {
+      await withMcpContext(async (_response, context) => {
+        const selectedPage = context.getSelectedPage();
+        assert.strictEqual(
+          context.resolvePageByContext(undefined),
+          selectedPage,
+        );
+      });
+    });
+
+    it('throws for an unknown context name', async () => {
+      await withMcpContext(async (_response, context) => {
+        assert.throws(
+          () => context.resolvePageByContext('nonexistent'),
+          /No isolated context named "nonexistent" exists/,
+        );
+      });
+    });
+
+    it('navigate_page targets the isolatedContext page, not the global selection', async () => {
+      await withMcpContext(async (response, context) => {
+        await newPage.handler(
+          {
+            params: {
+              url: 'data:text/html,<h1>Initial</h1>',
+              isolatedContext: 'nav-ctx',
+            },
+          },
+          response,
+          context,
+        );
+        const isolatedPage = context.getSelectedPage();
+
+        // Switch global selection back to the default page.
+        await selectPage.handler({params: {pageId: 1}}, response, context);
+        assert.notStrictEqual(context.getSelectedPage(), isolatedPage);
+
+        // Navigate using isolatedContext; should target the isolated page.
+        await navigatePage.handler(
+          {
+            params: {
+              url: 'data:text/html,<h1>Navigated</h1>',
+              isolatedContext: 'nav-ctx',
+            },
+          },
+          response,
+          context,
+        );
+
+        // Verify the isolated page was navigated.
+        const content = await isolatedPage.evaluate(
+          () => document.querySelector('h1')?.textContent,
+        );
+        assert.strictEqual(content, 'Navigated');
+
+        // Verify the default page was NOT affected.
+        const defaultContent = await context
+          .getSelectedPage()
+          .evaluate(() => document.querySelector('h1')?.textContent);
+        assert.notStrictEqual(defaultContent, 'Navigated');
+      });
+    });
+  });
+
   describe('close_page', () => {
     it('closes a page', async () => {
       await withMcpContext(async (response, context) => {
