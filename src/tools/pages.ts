@@ -12,7 +12,7 @@ import {ToolCategory} from './categories.js';
 import {
   CLOSE_PAGE_ERROR,
   defineTool,
-  isolatedContextSchema,
+  pageIdSchema,
   timeoutSchema,
 } from './ToolDefinition.js';
 
@@ -137,7 +137,7 @@ export const navigatePage = defineTool({
     readOnlyHint: false,
   },
   schema: {
-    ...isolatedContextSchema,
+    ...pageIdSchema,
     type: zod
       .enum(['url', 'back', 'forward', 'reload'])
       .optional()
@@ -164,9 +164,7 @@ export const navigatePage = defineTool({
     ...timeoutSchema,
   },
   handler: async (request, response, context) => {
-    const page = context.resolvePageByContext(
-      request.params.isolatedContext,
-    );
+    const page = context.resolvePageById(request.params.pageId);
     const options = {
       timeout: request.params.timeout,
     };
@@ -289,14 +287,12 @@ export const resizePage = defineTool({
     readOnlyHint: false,
   },
   schema: {
-    ...isolatedContextSchema,
+    ...pageIdSchema,
     width: zod.number().describe('Page width'),
     height: zod.number().describe('Page height'),
   },
   handler: async (request, response, context) => {
-    const page = context.resolvePageByContext(
-      request.params.isolatedContext,
-    );
+    const page = context.resolvePageById(request.params.pageId);
 
     try {
       const browser = page.browser();

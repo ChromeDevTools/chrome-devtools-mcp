@@ -235,10 +235,10 @@ describe('pages', () => {
     });
   });
 
-  describe('resolvePageByContext', () => {
+  describe('resolvePageById', () => {
     it('returns the correct page regardless of global selection', async () => {
       await withMcpContext(async (response, context) => {
-        // Create two pages in separate isolated contexts with different content.
+        // Create two pages with different content.
         await newPage.handler(
           {
             params: {
@@ -250,6 +250,7 @@ describe('pages', () => {
           context,
         );
         const pageA = context.getSelectedPage();
+        const pageAId = context.getPageId(pageA)!;
 
         await newPage.handler(
           {
@@ -262,37 +263,32 @@ describe('pages', () => {
           context,
         );
         const pageB = context.getSelectedPage();
+        const pageBId = context.getPageId(pageB)!;
 
         // Global selection is now pageB (the last created page).
         assert.strictEqual(context.getSelectedPage(), pageB);
 
-        // resolvePageByContext should return the correct page for each context,
+        // resolvePageById should return the correct page for each ID,
         // regardless of which page is globally selected.
-        assert.strictEqual(context.resolvePageByContext('ctx-a'), pageA);
-        assert.strictEqual(context.resolvePageByContext('ctx-b'), pageB);
+        assert.strictEqual(context.resolvePageById(pageAId), pageA);
+        assert.strictEqual(context.resolvePageById(pageBId), pageB);
       });
     });
 
-    it('falls back to getSelectedPage when no isolatedContext is provided', async () => {
+    it('falls back to getSelectedPage when no pageId is provided', async () => {
       await withMcpContext(async (_response, context) => {
         const selectedPage = context.getSelectedPage();
-        assert.strictEqual(
-          context.resolvePageByContext(undefined),
-          selectedPage,
-        );
+        assert.strictEqual(context.resolvePageById(undefined), selectedPage);
       });
     });
 
-    it('throws for an unknown context name', async () => {
+    it('throws for an unknown pageId', async () => {
       await withMcpContext(async (_response, context) => {
-        assert.throws(
-          () => context.resolvePageByContext('nonexistent'),
-          /No isolated context named "nonexistent" exists/,
-        );
+        assert.throws(() => context.resolvePageById(99999), /No page found/);
       });
     });
 
-    it('navigate_page targets the isolatedContext page, not the global selection', async () => {
+    it('navigate_page targets the pageId page, not the global selection', async () => {
       await withMcpContext(async (response, context) => {
         await newPage.handler(
           {
@@ -305,17 +301,18 @@ describe('pages', () => {
           context,
         );
         const isolatedPage = context.getSelectedPage();
+        const isolatedPageId = context.getPageId(isolatedPage)!;
 
         // Switch global selection back to the default page.
         await selectPage.handler({params: {pageId: 1}}, response, context);
         assert.notStrictEqual(context.getSelectedPage(), isolatedPage);
 
-        // Navigate using isolatedContext; should target the isolated page.
+        // Navigate using pageId; should target the isolated page.
         await navigatePage.handler(
           {
             params: {
               url: 'data:text/html,<h1>Navigated</h1>',
-              isolatedContext: 'nav-ctx',
+              pageId: isolatedPageId,
             },
           },
           response,

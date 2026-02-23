@@ -7,11 +7,7 @@
 import {zod} from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
-import {
-  defineTool,
-  isolatedContextSchema,
-  timeoutSchema,
-} from './ToolDefinition.js';
+import {defineTool, pageIdSchema, timeoutSchema} from './ToolDefinition.js';
 
 export const takeSnapshot = defineTool({
   name: 'take_snapshot',
@@ -24,7 +20,7 @@ in the DevTools Elements panel (if any).`,
     readOnlyHint: false,
   },
   schema: {
-    ...isolatedContextSchema,
+    ...pageIdSchema,
     verbose: zod
       .boolean()
       .optional()
@@ -39,9 +35,7 @@ in the DevTools Elements panel (if any).`,
       ),
   },
   handler: async (request, response, context) => {
-    const page = context.resolvePageByContext(
-      request.params.isolatedContext,
-    );
+    const page = context.resolvePageById(request.params.pageId);
     response.includeSnapshot({
       verbose: request.params.verbose ?? false,
       filePath: request.params.filePath,
@@ -58,7 +52,7 @@ export const waitFor = defineTool({
     readOnlyHint: true,
   },
   schema: {
-    ...isolatedContextSchema,
+    ...pageIdSchema,
     text: zod
       .array(zod.string())
       .min(1)
@@ -68,9 +62,7 @@ export const waitFor = defineTool({
     ...timeoutSchema,
   },
   handler: async (request, response, context) => {
-    const page = context.resolvePageByContext(
-      request.params.isolatedContext,
-    );
+    const page = context.resolvePageById(request.params.pageId);
     await context.waitForTextOnPage(
       request.params.text,
       request.params.timeout,
@@ -81,6 +73,6 @@ export const waitFor = defineTool({
       `Element matching one of ${JSON.stringify(request.params.text)} found.`,
     );
 
-    response.includeSnapshot({ page });
+    response.includeSnapshot({page});
   },
 });

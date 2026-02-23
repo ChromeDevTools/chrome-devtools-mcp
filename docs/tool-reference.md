@@ -1,8 +1,8 @@
 <!-- AUTO GENERATED DO NOT EDIT - run 'npm run docs' to update-->
 
-# Chrome DevTools MCP Tool Reference (~7084 cl100k_base tokens)
+# Chrome DevTools MCP Tool Reference (~7267 cl100k_base tokens)
 
-- **[Input automation](#input-automation)** (9 tools)
+- **[Input automation](#input-automation)** (8 tools)
   - [`click`](#click)
   - [`drag`](#drag)
   - [`fill`](#fill)
@@ -10,7 +10,6 @@
   - [`handle_dialog`](#handle_dialog)
   - [`hover`](#hover)
   - [`press_key`](#press_key)
-  - [`type_text`](#type_text)
   - [`upload_file`](#upload_file)
 - **[Navigation automation](#navigation-automation)** (6 tools)
   - [`close_page`](#close_page)
@@ -72,6 +71,7 @@
 - **uid** (string) **(required)**: The uid of an element on the page from the page content snapshot
 - **value** (string) **(required)**: The value to [`fill`](#fill) in
 - **includeSnapshot** (boolean) _(optional)_: Whether to include a snapshot in the response. Default is false.
+- **pageId** (number) _(optional)_: Targets a specific page by ID.
 
 ---
 
@@ -83,6 +83,7 @@
 
 - **elements** (array) **(required)**: Elements from snapshot to [`fill`](#fill) out.
 - **includeSnapshot** (boolean) _(optional)_: Whether to include a snapshot in the response. Default is false.
+- **pageId** (number) _(optional)_: Targets a specific page by ID.
 
 ---
 
@@ -116,17 +117,7 @@
 
 - **key** (string) **(required)**: A key or a combination (e.g., "Enter", "Control+A", "Control++", "Control+Shift+R"). Modifiers: Control, Shift, Alt, Meta
 - **includeSnapshot** (boolean) _(optional)_: Whether to include a snapshot in the response. Default is false.
-
----
-
-### `type_text`
-
-**Description:** Type text using keyboard into a previously focused input
-
-**Parameters:**
-
-- **text** (string) **(required)**: The text to type
-- **submitKey** (string) _(optional)_: Optional key to press after typing. E.g., "Enter", "Tab", "Escape"
+- **pageId** (number) _(optional)_: Targets a specific page by ID.
 
 ---
 
@@ -139,6 +130,7 @@
 - **filePath** (string) **(required)**: The local path of the file to upload
 - **uid** (string) **(required)**: The uid of the file input element or an element that will open file chooser on the page from the page content snapshot
 - **includeSnapshot** (boolean) _(optional)_: Whether to include a snapshot in the response. Default is false.
+- **pageId** (number) _(optional)_: Targets a specific page by ID.
 
 ---
 
@@ -171,6 +163,7 @@
 - **handleBeforeUnload** (enum: "accept", "decline") _(optional)_: Whether to auto accept or beforeunload dialogs triggered by this navigation. Default is accept.
 - **ignoreCache** (boolean) _(optional)_: Whether to ignore cache on reload.
 - **initScript** (string) _(optional)_: A JavaScript script to be executed on each new document before any other scripts for the next navigation.
+- **pageId** (number) _(optional)_: Targets a specific page by ID.
 - **timeout** (integer) _(optional)_: Maximum wait time in milliseconds. If set to 0, the default timeout will be used.
 - **type** (enum: "url", "back", "forward", "reload") _(optional)_: Navigate the page by URL, back or forward in history, or reload.
 - **url** (string) _(optional)_: Target URL (only type=url)
@@ -208,6 +201,7 @@
 **Parameters:**
 
 - **text** (array) **(required)**: Non-empty list of texts. Resolves when any value appears on the page.
+- **pageId** (number) _(optional)_: Targets a specific page by ID.
 - **timeout** (integer) _(optional)_: Maximum wait time in milliseconds. If set to 0, the default timeout will be used.
 
 ---
@@ -224,6 +218,7 @@
 - **cpuThrottlingRate** (number) _(optional)_: Represents the CPU slowdown factor. Set the rate to 1 to disable throttling. If omitted, throttling remains unchanged.
 - **geolocation** (unknown) _(optional)_: Geolocation to [`emulate`](#emulate). Set to null to clear the geolocation override.
 - **networkConditions** (enum: "No emulation", "Offline", "Slow 3G", "Fast 3G", "Slow 4G", "Fast 4G") _(optional)_: Throttle network. Set to "No emulation" to disable. If omitted, conditions remain unchanged.
+- **pageId** (number) _(optional)_: Targets a specific page by ID.
 - **userAgent** (unknown) _(optional)_: User agent to [`emulate`](#emulate). Set to null to clear the user agent override.
 - **viewport** (unknown) _(optional)_: Viewport to [`emulate`](#emulate). Set to null to reset to the default viewport.
 
@@ -237,6 +232,7 @@
 
 - **height** (number) **(required)**: Page height
 - **width** (number) **(required)**: Page width
+- **pageId** (number) _(optional)_: Targets a specific page by ID.
 
 ---
 
@@ -262,6 +258,7 @@
 - **autoStop** (boolean) **(required)**: Determines if the trace recording should be automatically stopped.
 - **reload** (boolean) **(required)**: Determines if, once tracing has started, the current selected page should be automatically reloaded. Navigate the page to the right URL using the [`navigate_page`](#navigate_page) tool BEFORE starting the trace if reload or autoStop is set to true.
 - **filePath** (string) _(optional)_: The absolute file path, or a file path relative to the current working directory, to save the raw trace data. For example, trace.json.gz (compressed) or trace.json (uncompressed).
+- **pageId** (number) _(optional)_: Targets a specific page by ID.
 
 ---
 
@@ -272,6 +269,7 @@
 **Parameters:**
 
 - **filePath** (string) _(optional)_: The absolute file path, or a file path relative to the current working directory, to save the raw trace data. For example, trace.json.gz (compressed) or trace.json (uncompressed).
+- **pageId** (number) _(optional)_: Targets a specific page by ID.
 
 ---
 
@@ -332,6 +330,7 @@ so returned values have to be JSON-serializable.
 }`
 
 - **args** (array) _(optional)_: An optional list of arguments to pass to the function.
+- **pageId** (number) _(optional)_: Targets a specific page by ID.
 
 ---
 
@@ -367,6 +366,7 @@ so returned values have to be JSON-serializable.
 - **filePath** (string) _(optional)_: The absolute path, or a path relative to the current working directory, to save the screenshot to instead of attaching it to the response.
 - **format** (enum: "png", "jpeg", "webp") _(optional)_: Type of format to save the screenshot as. Default is "png"
 - **fullPage** (boolean) _(optional)_: If set to true takes a screenshot of the full page instead of the currently visible viewport. Incompatible with uid.
+- **pageId** (number) _(optional)_: Targets a specific page by ID.
 - **quality** (number) _(optional)_: Compression quality for JPEG and WebP formats (0-100). Higher values mean better quality but larger file sizes. Ignored for PNG format.
 - **uid** (string) _(optional)_: The uid of an element on the page from the page content snapshot. If omitted takes a pages screenshot.
 
@@ -381,6 +381,7 @@ in the DevTools Elements panel (if any).
 **Parameters:**
 
 - **filePath** (string) _(optional)_: The absolute path, or a path relative to the current working directory, to save the snapshot to instead of attaching it to the response.
+- **pageId** (number) _(optional)_: Targets a specific page by ID.
 - **verbose** (boolean) _(optional)_: Whether to include all possible information available in the full a11y tree. Default is false.
 
 ---

@@ -140,8 +140,6 @@ export class McpContext implements Context {
 
   #pageToDevToolsPage = new Map<Page, Page>();
   #selectedPage?: Page;
-  // Per-context selected page tracking for parallel agent support.
-  #contextSelectedPage = new Map<string, Page>();
   #textSnapshot: TextSnapshot | null = null;
   #networkCollector: NetworkCollector;
   #consoleCollector: ConsoleCollector;
@@ -518,39 +516,11 @@ export class McpContext implements Context {
     return page;
   }
 
-  resolvePageByContext(isolatedContext?: string): Page {
-    if (isolatedContext === undefined) {
+  resolvePageById(pageId?: number): Page {
+    if (pageId === undefined) {
       return this.getSelectedPage();
     }
-
-    // Try the per-context selected page first.
-    const tracked = this.#contextSelectedPage.get(isolatedContext);
-    if (tracked && !tracked.isClosed()) {
-      return tracked;
-    }
-
-    // Fall back: find any non-closed page in the context.
-    const ctx = this.#isolatedContexts.get(isolatedContext);
-    if (!ctx) {
-      throw new Error(
-        `No isolated context named "${isolatedContext}" exists. ` +
-          `Create one first with new_page(isolatedContext: "${isolatedContext}").`,
-      );
-    }
-
-    for (const page of this.#pages) {
-      if (
-        !page.isClosed() &&
-        this.#pageToIsolatedContextName.get(page) === isolatedContext
-      ) {
-        this.#contextSelectedPage.set(isolatedContext, page);
-        return page;
-      }
-    }
-
-    throw new Error(
-      `No open page found in isolated context "${isolatedContext}".`,
-    );
+    return this.getPageById(pageId);
   }
 
   getPageById(pageId: number): Page {
@@ -587,12 +557,6 @@ export class McpContext implements Context {
     void newPage.emulateFocusedPage(true).catch(error => {
       this.logger('Error turning on focused page emulation', error);
     });
-
-    // Track per-context selected page for parallel agent routing.
-    const contextName = this.#pageToIsolatedContextName.get(newPage);
-    if (contextName) {
-      this.#contextSelectedPage.set(contextName, newPage);
-    }
   }
 
   #updateSelectedPageTimeouts() {

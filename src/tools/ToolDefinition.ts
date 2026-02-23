@@ -109,7 +109,7 @@ export type Context = Readonly<{
   recordedTraces(): TraceResult[];
   storeTraceRecording(result: TraceResult): void;
   getSelectedPage(): Page;
-  resolvePageByContext(isolatedContext?: string): Page;
+  resolvePageById(pageId?: number): Page;
   getDialog(): Dialog | undefined;
   clearDialog(): void;
   getPageById(pageId: number): Page;
@@ -196,16 +196,8 @@ export function defineTool<
 export const CLOSE_PAGE_ERROR =
   'The last open page cannot be closed. It is fine to keep it open.';
 
-export const isolatedContextSchema = {
-  isolatedContext: zod
-    .string()
-    .optional()
-    .describe(
-      'The name of the isolated browser context to resolve the page from. ' +
-        'When provided, the tool operates on the page belonging to this context ' +
-        'instead of the globally selected page. ' +
-        'Use this to avoid race conditions when multiple agents work in parallel.',
-    ),
+export const pageIdSchema = {
+  pageId: zod.number().optional().describe('Targets a specific page by ID.'),
 };
 
 export const timeoutSchema = {

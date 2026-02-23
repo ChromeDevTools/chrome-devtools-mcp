@@ -10,7 +10,6 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {describe, it} from 'node:test';
 
-import {newPage, selectPage} from '../../src/tools/pages.js';
 import {screenshot} from '../../src/tools/screenshot.js';
 import {screenshots} from '../snapshot.js';
 import {html, withMcpContext} from '../utils.js';
@@ -259,46 +258,6 @@ describe('screenshot', () => {
             context,
           ),
         );
-      });
-    });
-
-    it('screenshots the isolatedContext page, not the global selection', async () => {
-      await withMcpContext(async (response, context) => {
-        // Set distinct content on the default page.
-        const defaultPage = context.getSelectedPage();
-        await defaultPage.setContent(
-          html`<div style="background:red;width:100px;height:100px;"></div>`,
-        );
-
-        // Create an isolated page with different content.
-        await newPage.handler(
-          {
-            params: {
-              url: 'data:text/html,<div style="background:blue;width:100px;height:100px;"></div>',
-              isolatedContext: 'screenshot-ctx',
-            },
-          },
-          response,
-          context,
-        );
-
-        // Switch global selection back to the default page.
-        await selectPage.handler({params: {pageId: 1}}, response, context);
-        assert.strictEqual(context.getSelectedPage(), defaultPage);
-
-        // Take a screenshot using isolatedContext.
-        const {McpResponse} = await import('../../src/McpResponse.js');
-        const screenshotResponse = new McpResponse();
-        await screenshot.handler(
-          {params: {format: 'png', isolatedContext: 'screenshot-ctx'}},
-          screenshotResponse,
-          context,
-        );
-
-        // Should have produced an image (basic sanity: it didn't crash and
-        // returned something from the isolated page, not the default).
-        assert.equal(screenshotResponse.images.length, 1);
-        assert.equal(screenshotResponse.images[0].mimeType, 'image/png');
       });
     });
   });

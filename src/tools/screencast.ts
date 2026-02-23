@@ -12,7 +12,7 @@ import {zod} from '../third_party/index.js';
 import type {ScreenRecorder} from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
-import {defineTool, isolatedContextSchema} from './ToolDefinition.js';
+import {defineTool, pageIdSchema} from './ToolDefinition.js';
 
 async function generateTempFilePath(): Promise<string> {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'chrome-devtools-mcp-'));
@@ -29,7 +29,7 @@ export const startScreencast = defineTool({
     conditions: ['screencast'],
   },
   schema: {
-    ...isolatedContextSchema,
+    ...pageIdSchema,
     path: zod
       .string()
       .optional()
@@ -48,9 +48,7 @@ export const startScreencast = defineTool({
     const filePath = request.params.path ?? (await generateTempFilePath());
     const resolvedPath = path.resolve(filePath);
 
-    const page = context.resolvePageByContext(
-      request.params.isolatedContext,
-    );
+    const page = context.resolvePageById(request.params.pageId);
 
     let recorder: ScreenRecorder;
     try {

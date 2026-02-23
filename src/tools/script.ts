@@ -8,7 +8,7 @@ import {zod} from '../third_party/index.js';
 import type {Frame, JSHandle, Page} from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
-import {defineTool, isolatedContextSchema} from './ToolDefinition.js';
+import {defineTool, pageIdSchema} from './ToolDefinition.js';
 
 export const evaluateScript = defineTool({
   name: 'evaluate_script',
@@ -19,7 +19,7 @@ so returned values have to be JSON-serializable.`,
     readOnlyHint: false,
   },
   schema: {
-    ...isolatedContextSchema,
+    ...pageIdSchema,
     function: zod.string().describe(
       `A JavaScript function declaration to be executed by the tool in the currently selected page.
 Example without arguments: \`() => {
@@ -63,7 +63,7 @@ Example with arguments: \`(el) => {
       } else {
         pageOrFrame =
           [...frames.values()][0] ??
-          context.resolvePageByContext(request.params.isolatedContext);
+          context.resolvePageById(request.params.pageId);
       }
       const fn = await pageOrFrame.evaluateHandle(
         `(${request.params.function})`,
