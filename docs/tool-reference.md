@@ -195,7 +195,7 @@
 
 **Parameters:**
 
-- **text** (array of string) **(required)**: Non-empty list of texts. Resolves when any value appears on the page.
+- **text** (unknown) **(required)**: Non-empty list of texts. Resolves when any value appears on the page.
 - **timeout** (integer) _(optional)_: Maximum wait time in milliseconds. If set to 0, the default timeout will be used.
 
 ---
