@@ -1,6 +1,7 @@
 # LCP Optimization Strategies
 
 ## 1. Eliminate Resource Load Delay
+
 **Goal**: Ensure the LCP resource starts loading as early as possible.
 
 - **Early Discovery**: Ensure the LCP resource is discoverable in the initial HTML document response (not dynamically added by JS or hidden in `data-src`).
@@ -10,6 +11,7 @@
 - **Same Origin**: Host critical resources on the same origin or use `<link rel="preconnect">`.
 
 ## 2. Eliminate Element Render Delay
+
 **Goal**: Ensure the LCP element can render immediately after its resource has finished loading.
 
 - **Minimize Render-Blocking CSS**: Inline critical CSS and defer non-critical CSS. Ensure the stylesheet is smaller than the LCP resource.
@@ -18,6 +20,7 @@
 - **Break Up Long Tasks**: Prevent large JavaScript tasks from blocking the main thread during rendering.
 
 ## 3. Reduce Resource Load Duration
+
 **Goal**: Reduce the time spent transferring the bytes of the resource.
 
 - **Optimize Resource Size**: Serve optimal image sizes, use modern formats (AVIF, WebP), and compress images/fonts.
@@ -26,6 +29,7 @@
 - **Caching**: Use efficient `Cache-Control` policies.
 
 ## 4. Reduce Time to First Byte (TTFB)
+
 **Goal**: Deliver the initial HTML as quickly as possible.
 
 - **Minimize Redirects**: Avoid multiple redirects from advertisements or shortened links.

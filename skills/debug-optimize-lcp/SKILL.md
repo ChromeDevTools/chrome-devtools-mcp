@@ -17,12 +17,12 @@ LCP is a Core Web Vital that directly affects user experience and search ranking
 
 Every page's LCP breaks down into four sequential subparts with no gaps or overlaps. Understanding which subpart is the bottleneck is the key to effective optimization.
 
-| Subpart | Ideal % of LCP | What it measures |
-|---------|---------------|------------------|
-| **Time to First Byte (TTFB)** | ~40% | Navigation start → first byte of HTML received |
-| **Resource load delay** | <10% | TTFB → browser starts loading the LCP resource |
-| **Resource load duration** | ~40% | Time to download the LCP resource |
-| **Element render delay** | <10% | LCP resource downloaded → LCP element rendered |
+| Subpart                       | Ideal % of LCP | What it measures                               |
+| ----------------------------- | -------------- | ---------------------------------------------- |
+| **Time to First Byte (TTFB)** | ~40%           | Navigation start → first byte of HTML received |
+| **Resource load delay**       | <10%           | TTFB → browser starts loading the LCP resource |
+| **Resource load duration**    | ~40%           | Time to download the LCP resource              |
+| **Element render delay**      | <10%           | LCP resource downloaded → LCP element rendered |
 
 The "delay" subparts should be as close to zero as possible. If either delay subpart is large relative to the total LCP, that's the first place to optimize.
 
@@ -66,6 +66,7 @@ Use `list_network_requests` to see when the LCP resource loaded relative to othe
 - Then use `get_network_request` with the LCP resource's request ID for full details.
 
 **Key Checks:**
+
 - **Start Time**: Compare against the HTML document and the first resource. If the LCP resource starts much later than the first resource, there's resource load delay to eliminate.
 - **Duration**: A large resource load duration suggests the file is too big or the server is slow.
 
@@ -78,28 +79,36 @@ Use `evaluate_script` with the **"Audit Common Issues" snippet** found in [refer
 After identifying the bottleneck subpart, apply these prioritized fixes.
 
 ### 1. Eliminate Resource Load Delay (target: <10%)
+
 The most common bottleneck. The LCP resource should start loading immediately.
+
 - **Root Cause**: LCP image loaded via JS/CSS, `data-src` usage, or `loading="lazy"`.
 - **Fix**: Use standard `<img>` with `src`. **Never** lazy-load the LCP image.
 - **Fix**: Add `<link rel="preload" fetchpriority="high">` if the image isn't discoverable in HTML.
 - **Fix**: Add `fetchpriority="high"` to the LCP `<img>` tag.
 
 ### 2. Eliminate Element Render Delay (target: <10%)
+
 The element should render immediately after loading.
+
 - **Root Cause**: Large stylesheets, synchronous scripts in `<head>`, or main thread blocking.
 - **Fix**: Inline critical CSS, defer non-critical CSS/JS.
 - **Fix**: Break up long tasks blocking the main thread.
 - **Fix**: Use Server-Side Rendering (SSR) so the element exists in initial HTML.
 
 ### 3. Reduce Resource Load Duration (target: ~40%)
+
 Make the resource smaller or faster to deliver.
+
 - **Fix**: Use modern formats (WebP, AVIF) and responsive images (`srcset`).
 - **Fix**: Serve from a CDN.
 - **Fix**: Set `Cache-Control` headers.
 - **Fix**: Use `font-display: swap` if LCP is text blocked by a web font.
 
 ### 4. Reduce TTFB (target: ~40%)
+
 The HTML document itself takes too long to arrive.
+
 - **Fix**: Minimize redirects and optimize server response time.
 - **Fix**: Cache HTML at the edge (CDN).
 - **Fix**: Ensure pages are eligible for back/forward cache (bfcache).
