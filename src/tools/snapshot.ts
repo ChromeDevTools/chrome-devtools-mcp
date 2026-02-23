@@ -50,9 +50,10 @@ export const waitFor = defineTool({
   },
   schema: {
     text: zod
-      .union([zod.string(), zod.array(zod.string()).nonempty()])
+      .tuple([zod.string()])
+      .rest(zod.string())
       .describe(
-        'Text to appear on the page, or a non-empty list of texts. Resolves when any value appears.',
+        'Non-empty list of texts. Resolves when any value appears on the page.',
       ),
     ...timeoutSchema,
   },
@@ -62,15 +63,9 @@ export const waitFor = defineTool({
       request.params.timeout,
     );
 
-    if (Array.isArray(request.params.text)) {
-      response.appendResponseLine(
-        `Element matching one of ${JSON.stringify(request.params.text)} found.`,
-      );
-    } else {
-      response.appendResponseLine(
-        `Element with text "${request.params.text}" found.`,
-      );
-    }
+    response.appendResponseLine(
+      `Element matching one of ${JSON.stringify(request.params.text)} found.`,
+    );
 
     response.includeSnapshot();
   },

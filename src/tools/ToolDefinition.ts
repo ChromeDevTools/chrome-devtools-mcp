@@ -145,7 +145,7 @@ export type Context = Readonly<{
     options?: {timeout?: number},
   ): Promise<void>;
   waitForTextOnPage(
-    text: string | string[],
+    text: [string, ...string[]],
     timeout?: number,
   ): Promise<Element>;
   getDevToolsData(): Promise<DevToolsData>;

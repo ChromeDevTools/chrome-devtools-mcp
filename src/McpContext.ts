@@ -882,20 +882,15 @@ export class McpContext implements Context {
   }
 
   waitForTextOnPage(
-    text: string | string[],
+    text: [string, ...string[]],
     timeout?: number,
   ): Promise<Element> {
     const page = this.getSelectedPage();
     const frames = page.frames();
-    const texts = Array.isArray(text) ? text : [text];
-
-    if (texts.length === 0) {
-      throw new Error('At least one text value is required.');
-    }
 
     let locator = this.#locatorClass.race(
       frames.flatMap(frame =>
-        texts.flatMap(value => [
+        text.flatMap(value => [
           frame.locator(`aria/${value}`),
           frame.locator(`text/${value}`),
         ]),

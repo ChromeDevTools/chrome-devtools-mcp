@@ -30,7 +30,7 @@ describe('snapshot', () => {
         await waitFor.handler(
           {
             params: {
-              text: 'Hello',
+              text: ['Hello'],
             },
           },
           response,
@@ -39,7 +39,7 @@ describe('snapshot', () => {
 
         assert.equal(
           response.responseLines[0],
-          'Element with text "Hello" found.',
+          'Element matching one of ["Hello"] found.',
         );
         assert.ok(response.includeSnapshot);
       });
@@ -107,7 +107,7 @@ describe('snapshot', () => {
         const handlePromise = waitFor.handler(
           {
             params: {
-              text: 'Hello World',
+              text: ['Hello World'],
             },
           },
           response,
@@ -122,7 +122,7 @@ describe('snapshot', () => {
 
         assert.equal(
           response.responseLines[0],
-          'Element with text "Hello World" found.',
+          'Element matching one of ["Hello World"] found.',
         );
         assert.ok(response.includeSnapshot);
       });
@@ -138,7 +138,7 @@ describe('snapshot', () => {
         await waitFor.handler(
           {
             params: {
-              text: 'Header',
+              text: ['Header'],
             },
           },
           response,
@@ -147,7 +147,7 @@ describe('snapshot', () => {
 
         assert.equal(
           response.responseLines[0],
-          'Element with text "Header" found.',
+          'Element matching one of ["Header"] found.',
         );
         assert.ok(response.includeSnapshot);
       });
@@ -165,7 +165,7 @@ describe('snapshot', () => {
         await waitFor.handler(
           {
             params: {
-              text: 'Hello iframe',
+              text: ['Hello iframe'],
             },
           },
           response,
@@ -174,7 +174,7 @@ describe('snapshot', () => {
 
         assert.equal(
           response.responseLines[0],
-          'Element with text "Hello iframe" found.',
+          'Element matching one of ["Hello iframe"] found.',
         );
         assert.ok(response.includeSnapshot);
       });
