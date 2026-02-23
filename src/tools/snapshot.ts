@@ -43,7 +43,7 @@ in the DevTools Elements panel (if any).`,
 
 export const waitFor = defineTool({
   name: 'wait_for',
-  description: `Wait for the specified text to appear on the selected page. You can provide a single text value or a list of texts; the tool resolves when any text appears.`,
+  description: `Wait for the specified text to appear on the selected page.`,
   annotations: {
     category: ToolCategory.NAVIGATION,
     readOnlyHint: true,

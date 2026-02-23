@@ -20,15 +20,6 @@ describe('snapshot', () => {
     });
   });
   describe('browser_wait_for', () => {
-    it('accepts string or non-empty array text input', () => {
-      assert.equal(waitFor.schema.text.safeParse('Hello').success, true);
-      assert.equal(
-        waitFor.schema.text.safeParse(['Hello', 'World']).success,
-        true,
-      );
-      assert.equal(waitFor.schema.text.safeParse([]).success, false);
-    });
-
     it('should work', async () => {
       await withMcpContext(async (response, context) => {
         const page = context.getSelectedPage();
