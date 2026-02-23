@@ -75,7 +75,7 @@ interface EmulationSettings {
   viewport?: Viewport | null;
 }
 
-export interface McpContextOptions {
+interface McpContextOptions {
   // Whether the DevTools windows are exposed as pages for debugging of DevTools.
   experimentalDevToolsDebugging: boolean;
   // Whether all page-like targets are exposed as pages.
