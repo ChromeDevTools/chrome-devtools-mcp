@@ -197,6 +197,7 @@ export class McpContext implements Context {
     // Isolated contexts are intentionally not closed here.
     // Either the entire browser will be closed or we disconnect
     // without destroying browser state.
+    this.#isolatedContexts.clear();
   }
 
   static async from(
