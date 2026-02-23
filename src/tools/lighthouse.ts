@@ -21,7 +21,7 @@ import {defineTool} from './ToolDefinition.js';
 
 export const lighthouseAudit = defineTool({
   name: 'lighthouse_audit',
-  description: `Get Lighthouse score and reports for accesibility, SEO and best practices.`,
+  description: `Get Lighthouse score and reports for accessibility, SEO and best practices.`,
   annotations: {
     category: ToolCategory.DEBUGGING,
     readOnlyHint: true,
@@ -31,18 +31,16 @@ export const lighthouseAudit = defineTool({
       .enum(['navigation', 'snapshot'])
       .default('navigation')
       .describe(
-        '"navigation" reloads the selected page and audits during the navigation. The "snapshot" mode analyzes the page in its current state.',
+        '"navigation" reloads & audits. "snapshot" analyzes current state.',
       ),
     device: zod
       .enum(['desktop', 'mobile'])
       .default('desktop')
-      .describe('The device to emulate.'),
+      .describe('Device to emulate.'),
     outputDirPath: zod
       .string()
       .optional()
-      .describe(
-        'The directory to output the reports to. If not provided, temporary files will be created.',
-      ),
+      .describe('Directory for reports. If omitted, uses temporary files.'),
   },
   handler: async (request, response, context) => {
     const page = context.getSelectedPage();

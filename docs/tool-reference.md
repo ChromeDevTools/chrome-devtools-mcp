@@ -1,6 +1,6 @@
 <!-- AUTO GENERATED DO NOT EDIT - run 'npm run docs' to update-->
 
-# Chrome DevTools MCP Tool Reference (~7146 cl100k_base tokens)
+# Chrome DevTools MCP Tool Reference (~7125 cl100k_base tokens)
 
 - **[Input automation](#input-automation)** (8 tools)
   - [`click`](#click)
@@ -336,13 +336,13 @@ so returned values have to be JSON-serializable.
 
 ### `lighthouse_audit`
 
-**Description:** Get Lighthouse score and reports for accesibility, SEO and best practices.
+**Description:** Get Lighthouse score and reports for accessibility, SEO and best practices.
 
 **Parameters:**
 
-- **device** (enum: "desktop", "mobile") _(optional)_: The device to [`emulate`](#emulate).
-- **mode** (enum: "navigation", "snapshot") _(optional)_: "navigation" reloads the selected page and audits during the navigation. The "snapshot" mode analyzes the page in its current state.
-- **outputDirPath** (string) _(optional)_: The directory to output the reports to. If not provided, temporary files will be created.
+- **device** (enum: "desktop", "mobile") _(optional)_: Device to [`emulate`](#emulate).
+- **mode** (enum: "navigation", "snapshot") _(optional)_: "navigation" reloads &amp; audits. "snapshot" analyzes current state.
+- **outputDirPath** (string) _(optional)_: Directory for reports. If omitted, uses temporary files.
 
 ---
 
