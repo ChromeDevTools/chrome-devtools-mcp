@@ -2,8 +2,6 @@
 
 # Chrome DevTools MCP Tool Reference (~6980 cl100k_base tokens)
 
-- **[Audits](#audits)** (1 tools)
-  - [`lighthouse_audit`](#lighthouse_audit)
 - **[Input automation](#input-automation)** (8 tools)
   - [`click`](#click)
   - [`drag`](#drag)
@@ -30,26 +28,13 @@
 - **[Network](#network)** (2 tools)
   - [`get_network_request`](#get_network_request)
   - [`list_network_requests`](#list_network_requests)
-- **[Debugging](#debugging)** (5 tools)
+- **[Debugging](#debugging)** (6 tools)
   - [`evaluate_script`](#evaluate_script)
   - [`get_console_message`](#get_console_message)
+  - [`lighthouse_audit`](#lighthouse_audit)
   - [`list_console_messages`](#list_console_messages)
   - [`take_screenshot`](#take_screenshot)
   - [`take_snapshot`](#take_snapshot)
-
-## Audits
-
-### `lighthouse_audit`
-
-**Description:** Get Lighthouse score and reports for accesibility, SEO and best practices.
-
-**Parameters:**
-
-- **device** (enum: "desktop", "mobile") _(optional)_: The device to [`emulate`](#emulate).
-- **mode** (enum: "navigation", "snapshot") _(optional)_: "navigation" reloads the selected page and audits during the navigation. The "snapshot" mode analyzes the page in its current state.
-- **outputDirPath** (string) _(optional)_: The directory to output the reports to. If not provided, temporary files will be created.
-
----
 
 ## Input automation
 
@@ -335,6 +320,18 @@ so returned values have to be JSON-serializable.
 **Parameters:**
 
 - **msgid** (number) **(required)**: The msgid of a console message on the page from the listed console messages
+
+---
+
+### `lighthouse_audit`
+
+**Description:** Get Lighthouse score and reports for accesibility, SEO and best practices.
+
+**Parameters:**
+
+- **device** (enum: "desktop", "mobile") _(optional)_: The device to [`emulate`](#emulate).
+- **mode** (enum: "navigation", "snapshot") _(optional)_: "navigation" reloads the selected page and audits during the navigation. The "snapshot" mode analyzes the page in its current state.
+- **outputDirPath** (string) _(optional)_: The directory to output the reports to. If not provided, temporary files will be created.
 
 ---
 

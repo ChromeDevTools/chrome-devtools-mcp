@@ -23,7 +23,7 @@ export const lighthouseAudit = defineTool({
   name: 'lighthouse_audit',
   description: `Get Lighthouse score and reports for accesibility, SEO and best practices.`,
   annotations: {
-    category: ToolCategory.AUDITS,
+    category: ToolCategory.DEBUGGING,
     readOnlyHint: true,
   },
   schema: {

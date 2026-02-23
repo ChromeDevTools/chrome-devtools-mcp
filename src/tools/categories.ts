@@ -5,7 +5,6 @@
  */
 
 export enum ToolCategory {
-  AUDITS = 'audits',
   INPUT = 'input',
   NAVIGATION = 'navigation',
   EMULATION = 'emulation',
@@ -16,7 +15,6 @@ export enum ToolCategory {
 }
 
 export const labels = {
-  [ToolCategory.AUDITS]: 'Audits',
   [ToolCategory.INPUT]: 'Input automation',
   [ToolCategory.NAVIGATION]: 'Navigation automation',
   [ToolCategory.EMULATION]: 'Emulation',

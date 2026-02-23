@@ -73,6 +73,21 @@ Add the following config to your MCP client:
 > [!NOTE]  
 > Using `chrome-devtools-mcp@latest` ensures that your MCP client will always use the latest version of the Chrome DevTools MCP server.
 
+If you are intersted in doing only basic browser tasks, use the `--slim` mode:
+
+```json
+{
+  "mcpServers": {
+    "chrome-devtools": {
+      "command": "npx",
+      "args": ["-y", "chrome-devtools-mcp@latest", "--slim", "--headless"]
+    }
+  }
+}
+```
+
+See [Slim tool reference](./docs/slim-tool-reference.md).
+
 ### MCP Client configuration
 
 <details>
@@ -399,8 +414,6 @@ If you run into any issues, checkout our [troubleshooting guide](./docs/troubles
 
 <!-- BEGIN AUTO GENERATED TOOLS -->
 
-- **Audits** (1 tools)
-  - [`lighthouse_audit`](docs/tool-reference.md#lighthouse_audit)
 - **Input automation** (8 tools)
   - [`click`](docs/tool-reference.md#click)
   - [`drag`](docs/tool-reference.md#drag)
@@ -427,9 +440,10 @@ If you run into any issues, checkout our [troubleshooting guide](./docs/troubles
 - **Network** (2 tools)
   - [`get_network_request`](docs/tool-reference.md#get_network_request)
   - [`list_network_requests`](docs/tool-reference.md#list_network_requests)
-- **Debugging** (5 tools)
+- **Debugging** (6 tools)
   - [`evaluate_script`](docs/tool-reference.md#evaluate_script)
   - [`get_console_message`](docs/tool-reference.md#get_console_message)
+  - [`lighthouse_audit`](docs/tool-reference.md#lighthouse_audit)
   - [`list_console_messages`](docs/tool-reference.md#list_console_messages)
   - [`take_screenshot`](docs/tool-reference.md#take_screenshot)
   - [`take_snapshot`](docs/tool-reference.md#take_snapshot)
@@ -533,6 +547,10 @@ The Chrome DevTools MCP server supports the following configuration option:
   Set to false to opt-out of usage statistics collection. Google collects usage data to improve the tool, handled under the Google Privacy Policy (https://policies.google.com/privacy). This is independent from Chrome browser metrics. Disabled if CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS or CI env variables are set.
   - **Type:** boolean
   - **Default:** `true`
+
+- **`--slim`**
+  Exposes a "slim" set of 3 tools covering navigation, script execution and screenshots only. Useful for basic browser tasks.
+  - **Type:** boolean
 
 <!-- END AUTO GENERATED OPTIONS -->
 
