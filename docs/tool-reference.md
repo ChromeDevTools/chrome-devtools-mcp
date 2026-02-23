@@ -191,7 +191,7 @@
 
 ### `wait_for`
 
-**Description:** Wait for the specified text to appear on the selected page. You can provide a single text value or a list of texts; the tool resolves when any text appears.
+**Description:** Wait for the specified text to appear on the selected page.
 
 **Parameters:**
 
