@@ -22,13 +22,11 @@ import {defineTool} from './ToolDefinition.js';
 const filePathSchema = zod
   .string()
   .optional()
-  .describe(
-    'The absolute file path, or a file path relative to the current working directory, to save the raw trace data. For example, trace.json.gz (compressed) or trace.json (uncompressed).',
-  );
+  .describe('Path to save raw trace data, e.g., trace.json or trace.json.gz.');
 
 export const startTrace = defineTool({
   name: 'performance_start_trace',
-  description: `Starts a performance trace recording on the selected page. This can be used to look for performance problems and insights to improve the performance of the page. It will also report Core Web Vital (CWV) scores for the page.`,
+  description: `Starts a performance trace recording to find performance problems and insights.`,
   annotations: {
     category: ToolCategory.PERFORMANCE,
     readOnlyHint: false,
@@ -37,13 +35,9 @@ export const startTrace = defineTool({
     reload: zod
       .boolean()
       .describe(
-        'Determines if, once tracing has started, the current selected page should be automatically reloaded. Navigate the page to the right URL using the navigate_page tool BEFORE starting the trace if reload or autoStop is set to true.',
+        'Auto-reload page on trace start. Use navigate_page first if needed.',
       ),
-    autoStop: zod
-      .boolean()
-      .describe(
-        'Determines if the trace recording should be automatically stopped.',
-      ),
+    autoStop: zod.boolean().describe('Auto-stop trace recording.'),
     filePath: filePathSchema,
   },
   handler: async (request, response, context) => {
@@ -114,8 +108,7 @@ export const startTrace = defineTool({
 
 export const stopTrace = defineTool({
   name: 'performance_stop_trace',
-  description:
-    'Stops the active performance trace recording on the selected page.',
+  description: 'Stops the active performance trace recording.',
   annotations: {
     category: ToolCategory.PERFORMANCE,
     readOnlyHint: false,
@@ -139,8 +132,7 @@ export const stopTrace = defineTool({
 
 export const analyzeInsight = defineTool({
   name: 'performance_analyze_insight',
-  description:
-    'Provides more detailed information on a specific Performance Insight of an insight set that was highlighted in the results of a trace recording.',
+  description: 'Provides more details on a specific Performance Insight.',
   annotations: {
     category: ToolCategory.PERFORMANCE,
     readOnlyHint: true,
@@ -149,12 +141,12 @@ export const analyzeInsight = defineTool({
     insightSetId: zod
       .string()
       .describe(
-        'The id for the specific insight set. Only use the ids given in the "Available insight sets" list.',
+        'ID of the insight set from the "Available insight sets" list.',
       ),
     insightName: zod
       .string()
       .describe(
-        'The name of the Insight you want more information on. For example: "DocumentLatency" or "LCPBreakdown"',
+        'Name of the insight, e.g., "DocumentLatency" or "LCPBreakdown".',
       ),
   },
   handler: async (request, response, context) => {

@@ -72,6 +72,8 @@ const server = new McpServer(
     name: 'chrome_devtools',
     title: 'Chrome DevTools MCP server',
     version: VERSION,
+    description:
+      'All tools operate on the currently selected page. Many tools take a `uid` of an element from a page content snapshot.',
   },
   {capabilities: {logging: {}}},
 );

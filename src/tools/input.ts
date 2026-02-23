@@ -16,12 +16,12 @@ import {defineTool} from './ToolDefinition.js';
 const dblClickSchema = zod
   .boolean()
   .optional()
-  .describe('Set to true for double clicks. Default is false.');
+  .describe('true for double click. Default: false.');
 
 const includeSnapshotSchema = zod
   .boolean()
   .optional()
-  .describe('Whether to include a snapshot in the response. Default is false.');
+  .describe('Include snapshot in response. Default: false.');
 
 function handleActionError(error: unknown, uid: string) {
   logger('failed to act using a locator', error);
@@ -35,17 +35,13 @@ function handleActionError(error: unknown, uid: string) {
 
 export const click = defineTool({
   name: 'click',
-  description: `Clicks on the provided element`,
+  description: `Clicks on an element.`,
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
   },
   schema: {
-    uid: zod
-      .string()
-      .describe(
-        'The uid of an element on the page from the page content snapshot',
-      ),
+    uid: zod.string().describe('uid of element from snapshot.'),
     dblClick: dblClickSchema,
     includeSnapshot: includeSnapshotSchema,
   },
@@ -76,7 +72,7 @@ export const click = defineTool({
 
 export const clickAt = defineTool({
   name: 'click_at',
-  description: `Clicks at the provided coordinates`,
+  description: `Clicks at coordinates.`,
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
@@ -108,17 +104,13 @@ export const clickAt = defineTool({
 
 export const hover = defineTool({
   name: 'hover',
-  description: `Hover over the provided element`,
+  description: `Hovers over an element.`,
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
   },
   schema: {
-    uid: zod
-      .string()
-      .describe(
-        'The uid of an element on the page from the page content snapshot',
-      ),
+    uid: zod.string().describe('uid of element from snapshot.'),
     includeSnapshot: includeSnapshotSchema,
   },
   handler: async (request, response, context) => {
@@ -210,18 +202,14 @@ async function fillFormElement(
 
 export const fill = defineTool({
   name: 'fill',
-  description: `Type text into a input, text area or select an option from a <select> element.`,
+  description: `Types text into an input, textarea or selects an option from a <select> element.`,
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
   },
   schema: {
-    uid: zod
-      .string()
-      .describe(
-        'The uid of an element on the page from the page content snapshot',
-      ),
-    value: zod.string().describe('The value to fill in'),
+    uid: zod.string().describe('uid of element from snapshot.'),
+    value: zod.string().describe('Value to fill.'),
     includeSnapshot: includeSnapshotSchema,
   },
   handler: async (request, response, context) => {
@@ -241,14 +229,14 @@ export const fill = defineTool({
 
 export const drag = defineTool({
   name: 'drag',
-  description: `Drag an element onto another element`,
+  description: `Drags an element onto another element.`,
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
   },
   schema: {
-    from_uid: zod.string().describe('The uid of the element to drag'),
-    to_uid: zod.string().describe('The uid of the element to drop into'),
+    from_uid: zod.string().describe('uid of element to drag.'),
+    to_uid: zod.string().describe('uid of element to drop into.'),
     includeSnapshot: includeSnapshotSchema,
   },
   handler: async (request, response, context) => {
@@ -273,7 +261,7 @@ export const drag = defineTool({
 
 export const fillForm = defineTool({
   name: 'fill_form',
-  description: `Fill out multiple form elements at once`,
+  description: `Fills out multiple form elements at once.`,
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
@@ -286,7 +274,7 @@ export const fillForm = defineTool({
           value: zod.string().describe('Value for the element'),
         }),
       )
-      .describe('Elements from snapshot to fill out.'),
+      .describe('Elements from snapshot to fill.'),
     includeSnapshot: includeSnapshotSchema,
   },
   handler: async (request, response, context) => {
@@ -308,7 +296,7 @@ export const fillForm = defineTool({
 
 export const uploadFile = defineTool({
   name: 'upload_file',
-  description: 'Upload a file through a provided element.',
+  description: 'Uploads a file through a provided element.',
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
@@ -316,10 +304,8 @@ export const uploadFile = defineTool({
   schema: {
     uid: zod
       .string()
-      .describe(
-        'The uid of the file input element or an element that will open file chooser on the page from the page content snapshot',
-      ),
-    filePath: zod.string().describe('The local path of the file to upload'),
+      .describe('uid of file input or element that opens file chooser.'),
+    filePath: zod.string().describe('Local path of file to upload.'),
     includeSnapshot: includeSnapshotSchema,
   },
   handler: async (request, response, context) => {
@@ -359,7 +345,7 @@ export const uploadFile = defineTool({
 
 export const pressKey = defineTool({
   name: 'press_key',
-  description: `Press a key or key combination. Use this when other input methods like fill() cannot be used (e.g., keyboard shortcuts, navigation keys, or special key combinations).`,
+  description: `Presses a key or key combination. Use this when other input methods like fill() cannot be used (e.g., keyboard shortcuts, navigation keys, or special key combinations).`,
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
@@ -368,7 +354,7 @@ export const pressKey = defineTool({
     key: zod
       .string()
       .describe(
-        'A key or a combination (e.g., "Enter", "Control+A", "Control++", "Control+Shift+R"). Modifiers: Control, Shift, Alt, Meta',
+        'Key or combination (e.g., "Enter", "Control+A"). Modifiers: Control, Shift, Alt, Meta.',
       ),
     includeSnapshot: includeSnapshotSchema,
   },

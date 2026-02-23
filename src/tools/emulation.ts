@@ -18,7 +18,7 @@ const throttlingOptions: [string, ...string[]] = [
 
 export const emulate = defineTool({
   name: 'emulate',
-  description: `Emulates various features on the selected page.`,
+  description: `Emulates various features.`,
   annotations: {
     category: ToolCategory.EMULATION,
     readOnlyHint: false,
@@ -28,16 +28,14 @@ export const emulate = defineTool({
       .enum(throttlingOptions)
       .optional()
       .describe(
-        `Throttle network. Set to "No emulation" to disable. If omitted, conditions remain unchanged.`,
+        `Throttle network. "No emulation" to disable. Omit to keep unchanged.`,
       ),
     cpuThrottlingRate: zod
       .number()
       .min(1)
       .max(20)
       .optional()
-      .describe(
-        'Represents the CPU slowdown factor. Set the rate to 1 to disable throttling. If omitted, throttling remains unchanged.',
-      ),
+      .describe('CPU slowdown factor. 1 to disable. Omit to keep unchanged.'),
     geolocation: zod
       .object({
         latitude: zod
@@ -53,55 +51,41 @@ export const emulate = defineTool({
       })
       .nullable()
       .optional()
-      .describe(
-        'Geolocation to emulate. Set to null to clear the geolocation override.',
-      ),
+      .describe('Geolocation to emulate. null to clear override.'),
     userAgent: zod
       .string()
       .nullable()
       .optional()
-      .describe(
-        'User agent to emulate. Set to null to clear the user agent override.',
-      ),
+      .describe('User agent to emulate. null to clear override.'),
     colorScheme: zod
       .enum(['dark', 'light', 'auto'])
       .optional()
-      .describe(
-        'Emulate the dark or the light mode. Set to "auto" to reset to the default.',
-      ),
+      .describe('Emulate dark or light mode. "auto" to reset.'),
     viewport: zod
       .object({
-        width: zod.number().int().min(0).describe('Page width in pixels.'),
-        height: zod.number().int().min(0).describe('Page height in pixels.'),
+        width: zod.number().int().min(0).describe('Page width (px).'),
+        height: zod.number().int().min(0).describe('Page height (px).'),
         deviceScaleFactor: zod
           .number()
           .min(0)
           .optional()
-          .describe('Specify device scale factor (can be thought of as dpr).'),
+          .describe('Device scale factor (dpr).'),
         isMobile: zod
           .boolean()
           .optional()
-          .describe(
-            'Whether the meta viewport tag is taken into account. Defaults to false.',
-          ),
+          .describe('Use meta viewport tag. Default: false.'),
         hasTouch: zod
           .boolean()
           .optional()
-          .describe(
-            'Specifies if viewport supports touch events. This should be set to true for mobile devices.',
-          ),
+          .describe('Viewport supports touch. true for mobile.'),
         isLandscape: zod
           .boolean()
           .optional()
-          .describe(
-            'Specifies if viewport is in landscape mode. Defaults to false.',
-          ),
+          .describe('Landscape mode. Default: false.'),
       })
       .nullable()
       .optional()
-      .describe(
-        'Viewport to emulate. Set to null to reset to the default viewport.',
-      ),
+      .describe('Viewport to emulate. null to reset.'),
   },
   handler: async (request, _response, context) => {
     await context.emulate(request.params);

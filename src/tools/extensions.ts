@@ -20,9 +20,7 @@ export const installExtension = defineTool({
     conditions: [EXTENSIONS_CONDITION],
   },
   schema: {
-    path: zod
-      .string()
-      .describe('Absolute path to the unpacked extension folder.'),
+    path: zod.string().describe('Absolute path to unpacked extension.'),
   },
   handler: async (request, response, context) => {
     const {path} = request.params;
@@ -40,7 +38,7 @@ export const uninstallExtension = defineTool({
     conditions: [EXTENSIONS_CONDITION],
   },
   schema: {
-    id: zod.string().describe('ID of the extension to uninstall.'),
+    id: zod.string().describe('ID of extension to uninstall.'),
   },
   handler: async (request, response, context) => {
     const {id} = request.params;
@@ -51,8 +49,7 @@ export const uninstallExtension = defineTool({
 
 export const listExtensions = defineTool({
   name: 'list_extensions',
-  description:
-    'Lists all extensions via this server, including their name, ID, version, and enabled status.',
+  description: 'Lists all extensions with name, ID, version, and status.',
   annotations: {
     category: ToolCategory.EXTENSIONS,
     readOnlyHint: true,
@@ -73,7 +70,7 @@ export const reloadExtension = defineTool({
     conditions: [EXTENSIONS_CONDITION],
   },
   schema: {
-    id: zod.string().describe('ID of the extension to reload.'),
+    id: zod.string().describe('ID of extension to reload.'),
   },
   handler: async (request, response, context) => {
     const {id} = request.params;

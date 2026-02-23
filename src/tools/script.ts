@@ -12,37 +12,25 @@ import {defineTool} from './ToolDefinition.js';
 
 export const evaluateScript = defineTool({
   name: 'evaluate_script',
-  description: `Evaluate a JavaScript function inside the currently selected page. Returns the response as JSON,
-so returned values have to be JSON-serializable.`,
+  description: `Evaluate a JavaScript function. Returns the response as JSON, so returned values have to be JSON-serializable.`,
   annotations: {
     category: ToolCategory.DEBUGGING,
     readOnlyHint: false,
   },
   schema: {
-    function: zod.string().describe(
-      `A JavaScript function declaration to be executed by the tool in the currently selected page.
-Example without arguments: \`() => {
-  return document.title
-}\` or \`async () => {
-  return await fetch("example.com")
-}\`.
-Example with arguments: \`(el) => {
-  return el.innerText;
-}\`
-`,
-    ),
+    function: zod
+      .string()
+      .describe(
+        `JS function to run on the page. Ex: \`() => document.title\`, or with args: \`(el) => el.innerText\`.`,
+      ),
     args: zod
       .array(
         zod.object({
-          uid: zod
-            .string()
-            .describe(
-              'The uid of an element on the page from the page content snapshot',
-            ),
+          uid: zod.string().describe('uid of an element from the snapshot.'),
         }),
       )
       .optional()
-      .describe(`An optional list of arguments to pass to the function.`),
+      .describe(`Optional arguments for the function.`),
   },
   handler: async (request, response, context) => {
     const args: Array<JSHandle<unknown>> = [];

@@ -1,6 +1,6 @@
 <!-- AUTO GENERATED DO NOT EDIT - run 'npm run docs' to update-->
 
-# Chrome DevTools MCP Tool Reference (~6885 cl100k_base tokens)
+# Chrome DevTools MCP Tool Reference (~6182 cl100k_base tokens)
 
 - **[Input automation](#input-automation)** (8 tools)
   - [`click`](#click)
@@ -40,93 +40,93 @@
 
 ### `click`
 
-**Description:** Clicks on the provided element
+**Description:** Clicks on an element.
 
 **Parameters:**
 
-- **uid** (string) **(required)**: The uid of an element on the page from the page content snapshot
-- **dblClick** (boolean) _(optional)_: Set to true for double clicks. Default is false.
-- **includeSnapshot** (boolean) _(optional)_: Whether to include a snapshot in the response. Default is false.
+- **uid** (string) **(required)**: uid of element from snapshot.
+- **dblClick** (boolean) _(optional)_: true for double [`click`](#click). Default: false.
+- **includeSnapshot** (boolean) _(optional)_: Include snapshot in response. Default: false.
 
 ---
 
 ### `drag`
 
-**Description:** [`Drag`](#drag) an element onto another element
+**Description:** Drags an element onto another element.
 
 **Parameters:**
 
-- **from_uid** (string) **(required)**: The uid of the element to [`drag`](#drag)
-- **to_uid** (string) **(required)**: The uid of the element to drop into
-- **includeSnapshot** (boolean) _(optional)_: Whether to include a snapshot in the response. Default is false.
+- **from_uid** (string) **(required)**: uid of element to [`drag`](#drag).
+- **to_uid** (string) **(required)**: uid of element to drop into.
+- **includeSnapshot** (boolean) _(optional)_: Include snapshot in response. Default: false.
 
 ---
 
 ### `fill`
 
-**Description:** Type text into a input, text area or select an option from a &lt;select&gt; element.
+**Description:** Types text into an input, textarea or selects an option from a &lt;select&gt; element.
 
 **Parameters:**
 
-- **uid** (string) **(required)**: The uid of an element on the page from the page content snapshot
-- **value** (string) **(required)**: The value to [`fill`](#fill) in
-- **includeSnapshot** (boolean) _(optional)_: Whether to include a snapshot in the response. Default is false.
+- **uid** (string) **(required)**: uid of element from snapshot.
+- **value** (string) **(required)**: Value to [`fill`](#fill).
+- **includeSnapshot** (boolean) _(optional)_: Include snapshot in response. Default: false.
 
 ---
 
 ### `fill_form`
 
-**Description:** [`Fill`](#fill) out multiple form elements at once
+**Description:** Fills out multiple form elements at once.
 
 **Parameters:**
 
-- **elements** (array) **(required)**: Elements from snapshot to [`fill`](#fill) out.
-- **includeSnapshot** (boolean) _(optional)_: Whether to include a snapshot in the response. Default is false.
+- **elements** (array) **(required)**: Elements from snapshot to [`fill`](#fill).
+- **includeSnapshot** (boolean) _(optional)_: Include snapshot in response. Default: false.
 
 ---
 
 ### `handle_dialog`
 
-**Description:** If a browser dialog was opened, use this command to handle it
+**Description:** Handles an open browser dialog.
 
 **Parameters:**
 
-- **action** (enum: "accept", "dismiss") **(required)**: Whether to dismiss or accept the dialog
-- **promptText** (string) _(optional)_: Optional prompt text to enter into the dialog.
+- **action** (enum: "accept", "dismiss") **(required)**: Dialog action: accept or dismiss.
+- **promptText** (string) _(optional)_: Optional prompt text for dialog.
 
 ---
 
 ### `hover`
 
-**Description:** [`Hover`](#hover) over the provided element
+**Description:** Hovers over an element.
 
 **Parameters:**
 
-- **uid** (string) **(required)**: The uid of an element on the page from the page content snapshot
-- **includeSnapshot** (boolean) _(optional)_: Whether to include a snapshot in the response. Default is false.
+- **uid** (string) **(required)**: uid of element from snapshot.
+- **includeSnapshot** (boolean) _(optional)_: Include snapshot in response. Default: false.
 
 ---
 
 ### `press_key`
 
-**Description:** Press a key or key combination. Use this when other input methods like [`fill`](#fill)() cannot be used (e.g., keyboard shortcuts, navigation keys, or special key combinations).
+**Description:** Presses a key or key combination. Use this when other input methods like [`fill`](#fill)() cannot be used (e.g., keyboard shortcuts, navigation keys, or special key combinations).
 
 **Parameters:**
 
-- **key** (string) **(required)**: A key or a combination (e.g., "Enter", "Control+A", "Control++", "Control+Shift+R"). Modifiers: Control, Shift, Alt, Meta
-- **includeSnapshot** (boolean) _(optional)_: Whether to include a snapshot in the response. Default is false.
+- **key** (string) **(required)**: Key or combination (e.g., "Enter", "Control+A"). Modifiers: Control, Shift, Alt, Meta.
+- **includeSnapshot** (boolean) _(optional)_: Include snapshot in response. Default: false.
 
 ---
 
 ### `upload_file`
 
-**Description:** Upload a file through a provided element.
+**Description:** Uploads a file through a provided element.
 
 **Parameters:**
 
-- **filePath** (string) **(required)**: The local path of the file to upload
-- **uid** (string) **(required)**: The uid of the file input element or an element that will open file chooser on the page from the page content snapshot
-- **includeSnapshot** (boolean) _(optional)_: Whether to include a snapshot in the response. Default is false.
+- **filePath** (string) **(required)**: Local path of file to upload.
+- **uid** (string) **(required)**: uid of file input or element that opens file chooser.
+- **includeSnapshot** (boolean) _(optional)_: Include snapshot in response. Default: false.
 
 ---
 
@@ -134,17 +134,17 @@
 
 ### `close_page`
 
-**Description:** Closes the page by its index. The last open page cannot be closed.
+**Description:** Closes a page by its index. The last open page cannot be closed.
 
 **Parameters:**
 
-- **pageId** (number) **(required)**: The ID of the page to close. Call [`list_pages`](#list_pages) to list pages.
+- **pageId** (number) **(required)**: ID of page to close. Use [`list_pages`](#list_pages).
 
 ---
 
 ### `list_pages`
 
-**Description:** Get a list of pages open in the browser.
+**Description:** Get a list of open pages.
 
 **Parameters:** None
 
@@ -152,51 +152,51 @@
 
 ### `navigate_page`
 
-**Description:** Navigates the currently selected page to a URL.
+**Description:** Navigates to a URL.
 
 **Parameters:**
 
-- **handleBeforeUnload** (enum: "accept", "decline") _(optional)_: Whether to auto accept or beforeunload dialogs triggered by this navigation. Default is accept.
-- **ignoreCache** (boolean) _(optional)_: Whether to ignore cache on reload.
-- **initScript** (string) _(optional)_: A JavaScript script to be executed on each new document before any other scripts for the next navigation.
-- **timeout** (integer) _(optional)_: Maximum wait time in milliseconds. If set to 0, the default timeout will be used.
-- **type** (enum: "url", "back", "forward", "reload") _(optional)_: Navigate the page by URL, back or forward in history, or reload.
-- **url** (string) _(optional)_: Target URL (only type=url)
+- **handleBeforeUnload** (enum: "accept", "decline") _(optional)_: Auto-handle beforeunload dialogs. Default: accept.
+- **ignoreCache** (boolean) _(optional)_: Ignore cache on reload.
+- **initScript** (string) _(optional)_: JS script to run on new documents for next navigation.
+- **timeout** (integer) _(optional)_: Max wait time in ms. 0 for default.
+- **type** (enum: "url", "back", "forward", "reload") _(optional)_: Navigation type: url, back, forward, or reload.
+- **url** (string) _(optional)_: Target URL (for type=url).
 
 ---
 
 ### `new_page`
 
-**Description:** Creates a new page
+**Description:** Creates a new page.
 
 **Parameters:**
 
-- **url** (string) **(required)**: URL to load in a new page.
-- **background** (boolean) _(optional)_: Whether to open the page in the background without bringing it to the front. Default is false (foreground).
-- **isolatedContext** (string) _(optional)_: If specified, the page is created in an isolated browser context with the given name. Pages in the same browser context share cookies and storage. Pages in different browser contexts are fully isolated.
-- **timeout** (integer) _(optional)_: Maximum wait time in milliseconds. If set to 0, the default timeout will be used.
+- **url** (string) **(required)**: URL for new page.
+- **background** (boolean) _(optional)_: Open in background. Default: false.
+- **isolatedContext** (string) _(optional)_: Name for isolated browser context. Pages in same context share cookies/storage.
+- **timeout** (integer) _(optional)_: Max wait time in ms. 0 for default.
 
 ---
 
 ### `select_page`
 
-**Description:** Select a page as a context for future tool calls.
+**Description:** Select a page as a context for future calls.
 
 **Parameters:**
 
-- **pageId** (number) **(required)**: The ID of the page to select. Call [`list_pages`](#list_pages) to get available pages.
-- **bringToFront** (boolean) _(optional)_: Whether to focus the page and bring it to the top.
+- **pageId** (number) **(required)**: ID of page to select. Use [`list_pages`](#list_pages) to list pages.
+- **bringToFront** (boolean) _(optional)_: Focus the page and bring it to top.
 
 ---
 
 ### `wait_for`
 
-**Description:** Wait for the specified text to appear on the selected page.
+**Description:** Waits for a text to appear.
 
 **Parameters:**
 
-- **text** (string) **(required)**: Text to appear on the page
-- **timeout** (integer) _(optional)_: Maximum wait time in milliseconds. If set to 0, the default timeout will be used.
+- **text** (string) **(required)**: Text to find on the page.
+- **timeout** (integer) _(optional)_: Max wait time in ms. 0 for default.
 
 ---
 
@@ -204,27 +204,27 @@
 
 ### `emulate`
 
-**Description:** Emulates various features on the selected page.
+**Description:** Emulates various features.
 
 **Parameters:**
 
-- **colorScheme** (enum: "dark", "light", "auto") _(optional)_: [`Emulate`](#emulate) the dark or the light mode. Set to "auto" to reset to the default.
-- **cpuThrottlingRate** (number) _(optional)_: Represents the CPU slowdown factor. Set the rate to 1 to disable throttling. If omitted, throttling remains unchanged.
-- **geolocation** (unknown) _(optional)_: Geolocation to [`emulate`](#emulate). Set to null to clear the geolocation override.
-- **networkConditions** (enum: "No emulation", "Offline", "Slow 3G", "Fast 3G", "Slow 4G", "Fast 4G") _(optional)_: Throttle network. Set to "No emulation" to disable. If omitted, conditions remain unchanged.
-- **userAgent** (unknown) _(optional)_: User agent to [`emulate`](#emulate). Set to null to clear the user agent override.
-- **viewport** (unknown) _(optional)_: Viewport to [`emulate`](#emulate). Set to null to reset to the default viewport.
+- **colorScheme** (enum: "dark", "light", "auto") _(optional)_: [`Emulate`](#emulate) dark or light mode. "auto" to reset.
+- **cpuThrottlingRate** (number) _(optional)_: CPU slowdown factor. 1 to disable. Omit to keep unchanged.
+- **geolocation** (unknown) _(optional)_: Geolocation to [`emulate`](#emulate). null to clear override.
+- **networkConditions** (enum: "No emulation", "Offline", "Slow 3G", "Fast 3G", "Slow 4G", "Fast 4G") _(optional)_: Throttle network. "No emulation" to disable. Omit to keep unchanged.
+- **userAgent** (unknown) _(optional)_: User agent to [`emulate`](#emulate). null to clear override.
+- **viewport** (unknown) _(optional)_: Viewport to [`emulate`](#emulate). null to reset.
 
 ---
 
 ### `resize_page`
 
-**Description:** Resizes the selected page's window so that the page has specified dimension
+**Description:** Resizes the page's window to a specified dimension.
 
 **Parameters:**
 
-- **height** (number) **(required)**: Page height
-- **width** (number) **(required)**: Page width
+- **height** (number) **(required)**: Page height.
+- **width** (number) **(required)**: Page width.
 
 ---
 
@@ -232,44 +232,44 @@
 
 ### `performance_analyze_insight`
 
-**Description:** Provides more detailed information on a specific Performance Insight of an insight set that was highlighted in the results of a trace recording.
+**Description:** Provides more details on a specific Performance Insight.
 
 **Parameters:**
 
-- **insightName** (string) **(required)**: The name of the Insight you want more information on. For example: "DocumentLatency" or "LCPBreakdown"
-- **insightSetId** (string) **(required)**: The id for the specific insight set. Only use the ids given in the "Available insight sets" list.
+- **insightName** (string) **(required)**: Name of the insight, e.g., "DocumentLatency" or "LCPBreakdown".
+- **insightSetId** (string) **(required)**: ID of the insight set from the "Available insight sets" list.
 
 ---
 
 ### `performance_start_trace`
 
-**Description:** Starts a performance trace recording on the selected page. This can be used to look for performance problems and insights to improve the performance of the page. It will also report Core Web Vital (CWV) scores for the page.
+**Description:** Starts a performance trace recording to find performance problems and insights.
 
 **Parameters:**
 
-- **autoStop** (boolean) **(required)**: Determines if the trace recording should be automatically stopped.
-- **reload** (boolean) **(required)**: Determines if, once tracing has started, the current selected page should be automatically reloaded. Navigate the page to the right URL using the [`navigate_page`](#navigate_page) tool BEFORE starting the trace if reload or autoStop is set to true.
-- **filePath** (string) _(optional)_: The absolute file path, or a file path relative to the current working directory, to save the raw trace data. For example, trace.json.gz (compressed) or trace.json (uncompressed).
+- **autoStop** (boolean) **(required)**: Auto-stop trace recording.
+- **reload** (boolean) **(required)**: Auto-reload page on trace start. Use [`navigate_page`](#navigate_page) first if needed.
+- **filePath** (string) _(optional)_: Path to save raw trace data, e.g., trace.json or trace.json.gz.
 
 ---
 
 ### `performance_stop_trace`
 
-**Description:** Stops the active performance trace recording on the selected page.
+**Description:** Stops the active performance trace recording.
 
 **Parameters:**
 
-- **filePath** (string) _(optional)_: The absolute file path, or a file path relative to the current working directory, to save the raw trace data. For example, trace.json.gz (compressed) or trace.json (uncompressed).
+- **filePath** (string) _(optional)_: Path to save raw trace data, e.g., trace.json or trace.json.gz.
 
 ---
 
 ### `take_memory_snapshot`
 
-**Description:** Capture a memory heapsnapshot of the currently selected page to memory leak debugging
+**Description:** Capture a memory heapsnapshot for memory leak debugging.
 
 **Parameters:**
 
-- **filePath** (string) **(required)**: A path to a .heapsnapshot file to save the heapsnapshot to.
+- **filePath** (string) **(required)**: Path to a .heapsnapshot file.
 
 ---
 
@@ -281,22 +281,22 @@
 
 **Parameters:**
 
-- **reqid** (number) _(optional)_: The reqid of the network request. If omitted returns the currently selected request in the DevTools Network panel.
-- **requestFilePath** (string) _(optional)_: The absolute or relative path to save the request body to. If omitted, the body is returned inline.
-- **responseFilePath** (string) _(optional)_: The absolute or relative path to save the response body to. If omitted, the body is returned inline.
+- **reqid** (number) _(optional)_: reqid of network request. Omit for selected in DevTools.
+- **requestFilePath** (string) _(optional)_: Path to save request body. Omit for inline.
+- **responseFilePath** (string) _(optional)_: Path to save response body. Omit for inline.
 
 ---
 
 ### `list_network_requests`
 
-**Description:** List all requests for the currently selected page since the last navigation.
+**Description:** List all requests since the last navigation.
 
 **Parameters:**
 
-- **includePreservedRequests** (boolean) _(optional)_: Set to true to return the preserved requests over the last 3 navigations.
-- **pageIdx** (integer) _(optional)_: Page number to return (0-based). When omitted, returns the first page.
-- **pageSize** (integer) _(optional)_: Maximum number of requests to return. When omitted, returns all requests.
-- **resourceTypes** (array) _(optional)_: Filter requests to only return requests of the specified resource types. When omitted or empty, returns all requests.
+- **includePreservedRequests** (boolean) _(optional)_: Set to true for preserved requests over last 3 navigations.
+- **pageIdx** (integer) _(optional)_: 0-based page number. Omit for first page.
+- **pageSize** (integer) _(optional)_: Max requests to return. Omit for all.
+- **resourceTypes** (array) _(optional)_: Filter by resource type. Omit or empty for all.
 
 ---
 
@@ -304,22 +304,12 @@
 
 ### `evaluate_script`
 
-**Description:** Evaluate a JavaScript function inside the currently selected page. Returns the response as JSON,
-so returned values have to be JSON-serializable.
+**Description:** Evaluate a JavaScript function. Returns the response as JSON, so returned values have to be JSON-serializable.
 
 **Parameters:**
 
-- **function** (string) **(required)**: A JavaScript function declaration to be executed by the tool in the currently selected page.
-  Example without arguments: `() => {
-  return document.title
-}` or `async () => {
-  return await fetch("example.com")
-}`.
-  Example with arguments: `(el) => {
-  return el.innerText;
-}`
-
-- **args** (array) _(optional)_: An optional list of arguments to pass to the function.
+- **function** (string) **(required)**: JS function to run on the page. Ex: `() => document.title`, or with args: `(el) => el.innerText`.
+- **args** (array) _(optional)_: Optional arguments for the function.
 
 ---
 
@@ -329,46 +319,44 @@ so returned values have to be JSON-serializable.
 
 **Parameters:**
 
-- **msgid** (number) **(required)**: The msgid of a console message on the page from the listed console messages
+- **msgid** (number) **(required)**: msgid of a console message from listed messages
 
 ---
 
 ### `list_console_messages`
 
-**Description:** List all console messages for the currently selected page since the last navigation.
+**Description:** List all console messages since the last navigation.
 
 **Parameters:**
 
-- **includePreservedMessages** (boolean) _(optional)_: Set to true to return the preserved messages over the last 3 navigations.
-- **pageIdx** (integer) _(optional)_: Page number to return (0-based). When omitted, returns the first page.
-- **pageSize** (integer) _(optional)_: Maximum number of messages to return. When omitted, returns all requests.
-- **types** (array) _(optional)_: Filter messages to only return messages of the specified resource types. When omitted or empty, returns all messages.
+- **includePreservedMessages** (boolean) _(optional)_: Set to true for preserved messages over last 3 navigations.
+- **pageIdx** (integer) _(optional)_: 0-based page number. Omit for first page.
+- **pageSize** (integer) _(optional)_: Max messages to return. Omit for all.
+- **types** (array) _(optional)_: Filter by message type. Omit or empty for all.
 
 ---
 
 ### `take_screenshot`
 
-**Description:** Take a screenshot of the page or element.
+**Description:** Takes a screenshot of the page or an element.
 
 **Parameters:**
 
-- **filePath** (string) _(optional)_: The absolute path, or a path relative to the current working directory, to save the screenshot to instead of attaching it to the response.
-- **format** (enum: "png", "jpeg", "webp") _(optional)_: Type of format to save the screenshot as. Default is "png"
-- **fullPage** (boolean) _(optional)_: If set to true takes a screenshot of the full page instead of the currently visible viewport. Incompatible with uid.
-- **quality** (number) _(optional)_: Compression quality for JPEG and WebP formats (0-100). Higher values mean better quality but larger file sizes. Ignored for PNG format.
-- **uid** (string) _(optional)_: The uid of an element on the page from the page content snapshot. If omitted takes a pages screenshot.
+- **filePath** (string) _(optional)_: Path to save screenshot. If omitted, attaches to response.
+- **format** (enum: "png", "jpeg", "webp") _(optional)_: Screenshot format. Default: "png".
+- **fullPage** (boolean) _(optional)_: true for full page screenshot. Incompatible with uid.
+- **quality** (number) _(optional)_: JPEG/WebP quality (0-100). Higher is better. Ignored for PNG.
+- **uid** (string) _(optional)_: uid of element from snapshot. Omit for page screenshot.
 
 ---
 
 ### `take_snapshot`
 
-**Description:** Take a text snapshot of the currently selected page based on the a11y tree. The snapshot lists page elements along with a unique
-identifier (uid). Always use the latest snapshot. Prefer taking a snapshot over taking a screenshot. The snapshot indicates the element selected
-in the DevTools Elements panel (if any).
+**Description:** Take a text snapshot based on the a11y tree.
 
 **Parameters:**
 
-- **filePath** (string) _(optional)_: The absolute path, or a path relative to the current working directory, to save the snapshot to instead of attaching it to the response.
-- **verbose** (boolean) _(optional)_: Whether to include all possible information available in the full a11y tree. Default is false.
+- **filePath** (string) _(optional)_: Path to save snapshot. If omitted, attaches to response.
+- **verbose** (boolean) _(optional)_: Include all info from the a11y tree. Default: false.
 
 ---

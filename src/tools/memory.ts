@@ -11,7 +11,7 @@ import {defineTool} from './ToolDefinition.js';
 
 export const takeMemorySnapshot = defineTool({
   name: 'take_memory_snapshot',
-  description: `Capture a memory heapsnapshot of the currently selected page to memory leak debugging`,
+  description: `Capture a memory heapsnapshot for memory leak debugging.`,
   annotations: {
     category: ToolCategory.PERFORMANCE,
     readOnlyHint: true,
@@ -19,7 +19,7 @@ export const takeMemorySnapshot = defineTool({
   schema: {
     filePath: zod
       .string()
-      .describe('A path to a .heapsnapshot file to save the heapsnapshot to.')
+      .describe('Path to a .heapsnapshot file.')
       .endsWith('.heapsnapshot'),
   },
   handler: async (request, response, context) => {

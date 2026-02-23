@@ -178,9 +178,7 @@ export const timeoutSchema = {
     .number()
     .int()
     .optional()
-    .describe(
-      `Maximum wait time in milliseconds. If set to 0, the default timeout will be used.`,
-    )
+    .describe(`Max wait time in ms. 0 for default.`)
     .transform(value => {
       return value && value <= 0 ? undefined : value;
     }),

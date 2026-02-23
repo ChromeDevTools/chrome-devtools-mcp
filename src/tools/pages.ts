@@ -13,7 +13,7 @@ import {CLOSE_PAGE_ERROR, defineTool, timeoutSchema} from './ToolDefinition.js';
 
 export const listPages = defineTool({
   name: 'list_pages',
-  description: `Get a list of pages open in the browser.`,
+  description: `Get a list of open pages.`,
   annotations: {
     category: ToolCategory.NAVIGATION,
     readOnlyHint: true,
@@ -26,7 +26,7 @@ export const listPages = defineTool({
 
 export const selectPage = defineTool({
   name: 'select_page',
-  description: `Select a page as a context for future tool calls.`,
+  description: `Select a page as a context for future calls.`,
   annotations: {
     category: ToolCategory.NAVIGATION,
     readOnlyHint: true,
@@ -34,13 +34,11 @@ export const selectPage = defineTool({
   schema: {
     pageId: zod
       .number()
-      .describe(
-        `The ID of the page to select. Call ${listPages.name} to get available pages.`,
-      ),
+      .describe(`ID of page to select. Use ${listPages.name} to list pages.`),
     bringToFront: zod
       .boolean()
       .optional()
-      .describe('Whether to focus the page and bring it to the top.'),
+      .describe('Focus the page and bring it to top.'),
   },
   handler: async (request, response, context) => {
     const page = context.getPageById(request.params.pageId);
@@ -54,15 +52,13 @@ export const selectPage = defineTool({
 
 export const closePage = defineTool({
   name: 'close_page',
-  description: `Closes the page by its index. The last open page cannot be closed.`,
+  description: `Closes a page by its index. The last open page cannot be closed.`,
   annotations: {
     category: ToolCategory.NAVIGATION,
     readOnlyHint: false,
   },
   schema: {
-    pageId: zod
-      .number()
-      .describe('The ID of the page to close. Call list_pages to list pages.'),
+    pageId: zod.number().describe('ID of page to close. Use list_pages.'),
   },
   handler: async (request, response, context) => {
     try {
@@ -80,26 +76,22 @@ export const closePage = defineTool({
 
 export const newPage = defineTool({
   name: 'new_page',
-  description: `Creates a new page`,
+  description: `Creates a new page.`,
   annotations: {
     category: ToolCategory.NAVIGATION,
     readOnlyHint: false,
   },
   schema: {
-    url: zod.string().describe('URL to load in a new page.'),
+    url: zod.string().describe('URL for new page.'),
     background: zod
       .boolean()
       .optional()
-      .describe(
-        'Whether to open the page in the background without bringing it to the front. Default is false (foreground).',
-      ),
+      .describe('Open in background. Default: false.'),
     isolatedContext: zod
       .string()
       .optional()
       .describe(
-        'If specified, the page is created in an isolated browser context with the given name. ' +
-          'Pages in the same browser context share cookies and storage. ' +
-          'Pages in different browser contexts are fully isolated.',
+        'Name for isolated browser context. Pages in same context share cookies/storage.',
       ),
     ...timeoutSchema,
   },
@@ -124,7 +116,7 @@ export const newPage = defineTool({
 
 export const navigatePage = defineTool({
   name: 'navigate_page',
-  description: `Navigates the currently selected page to a URL.`,
+  description: `Navigates to a URL.`,
   annotations: {
     category: ToolCategory.NAVIGATION,
     readOnlyHint: false,
@@ -133,26 +125,17 @@ export const navigatePage = defineTool({
     type: zod
       .enum(['url', 'back', 'forward', 'reload'])
       .optional()
-      .describe(
-        'Navigate the page by URL, back or forward in history, or reload.',
-      ),
-    url: zod.string().optional().describe('Target URL (only type=url)'),
-    ignoreCache: zod
-      .boolean()
-      .optional()
-      .describe('Whether to ignore cache on reload.'),
+      .describe('Navigation type: url, back, forward, or reload.'),
+    url: zod.string().optional().describe('Target URL (for type=url).'),
+    ignoreCache: zod.boolean().optional().describe('Ignore cache on reload.'),
     handleBeforeUnload: zod
       .enum(['accept', 'decline'])
       .optional()
-      .describe(
-        'Whether to auto accept or beforeunload dialogs triggered by this navigation. Default is accept.',
-      ),
+      .describe('Auto-handle beforeunload dialogs. Default: accept.'),
     initScript: zod
       .string()
       .optional()
-      .describe(
-        'A JavaScript script to be executed on each new document before any other scripts for the next navigation.',
-      ),
+      .describe('JS script to run on new documents for next navigation.'),
     ...timeoutSchema,
   },
   handler: async (request, response, context) => {
@@ -273,14 +256,14 @@ export const navigatePage = defineTool({
 
 export const resizePage = defineTool({
   name: 'resize_page',
-  description: `Resizes the selected page's window so that the page has specified dimension`,
+  description: `Resizes the page's window to a specified dimension.`,
   annotations: {
     category: ToolCategory.EMULATION,
     readOnlyHint: false,
   },
   schema: {
-    width: zod.number().describe('Page width'),
-    height: zod.number().describe('Page height'),
+    width: zod.number().describe('Page width.'),
+    height: zod.number().describe('Page height.'),
   },
   handler: async (request, response, context) => {
     const page = context.getSelectedPage();
@@ -312,7 +295,7 @@ export const resizePage = defineTool({
 
 export const handleDialog = defineTool({
   name: 'handle_dialog',
-  description: `If a browser dialog was opened, use this command to handle it`,
+  description: `Handles an open browser dialog.`,
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
@@ -320,11 +303,11 @@ export const handleDialog = defineTool({
   schema: {
     action: zod
       .enum(['accept', 'dismiss'])
-      .describe('Whether to dismiss or accept the dialog'),
+      .describe('Dialog action: accept or dismiss.'),
     promptText: zod
       .string()
       .optional()
-      .describe('Optional prompt text to enter into the dialog.'),
+      .describe('Optional prompt text for dialog.'),
   },
   handler: async (request, response, context) => {
     const dialog = context.getDialog();
@@ -362,7 +345,7 @@ export const handleDialog = defineTool({
 
 export const getTabId = defineTool({
   name: 'get_tab_id',
-  description: `Get the tab ID of the page`,
+  description: `Gets the tab ID of the page.`,
   annotations: {
     category: ToolCategory.NAVIGATION,
     readOnlyHint: true,
@@ -372,7 +355,7 @@ export const getTabId = defineTool({
     pageId: zod
       .number()
       .describe(
-        `The ID of the page to get the tab ID for. Call ${listPages.name} to get available pages.`,
+        `ID of page to get tab ID for. Use ${listPages.name} to list pages.`,
       ),
   },
   handler: async (request, response, context) => {

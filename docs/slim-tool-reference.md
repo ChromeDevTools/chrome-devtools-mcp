@@ -1,6 +1,6 @@
 <!-- AUTO GENERATED DO NOT EDIT - run 'npm run docs' to update-->
 
-# Chrome DevTools MCP Slim Tool Reference (~368 cl100k_base tokens)
+# Chrome DevTools MCP Slim Tool Reference (~359 cl100k_base tokens)
 
 - **[Navigation automation](#navigation-automation)** (1 tools)
   - [`navigate`](#navigate)
@@ -12,11 +12,11 @@
 
 ### `navigate`
 
-**Description:** Load URL in the browser
+**Description:** Loads a URL.
 
 **Parameters:**
 
-- **url** (string) **(required)**: Page URL
+- **url** (string) **(required)**: URL to [`navigate`](#navigate) to.
 
 ---
 
@@ -24,17 +24,17 @@
 
 ### `evaluate`
 
-**Description:** [`Evaluate`](#evaluate) a JavaScript function on the last loaded page
+**Description:** Evaluates a JavaScript function.
 
 **Parameters:**
 
-- **fn** (string) **(required)**: A JavaScript function to be executed on the active page
+- **fn** (string) **(required)**: JS function to run on the page.
 
 ---
 
 ### `screenshot`
 
-**Description:** Take a [`screenshot`](#screenshot) of the active page.
+**Description:** Takes a [`screenshot`](#screenshot).
 
 **Parameters:** None
 

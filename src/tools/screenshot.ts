@@ -12,7 +12,7 @@ import {defineTool} from './ToolDefinition.js';
 
 export const screenshot = defineTool({
   name: 'take_screenshot',
-  description: `Take a screenshot of the page or element.`,
+  description: `Takes a screenshot of the page or an element.`,
   annotations: {
     category: ToolCategory.DEBUGGING,
     // Not read-only due to filePath param.
@@ -22,33 +22,27 @@ export const screenshot = defineTool({
     format: zod
       .enum(['png', 'jpeg', 'webp'])
       .default('png')
-      .describe('Type of format to save the screenshot as. Default is "png"'),
+      .describe('Screenshot format. Default: "png".'),
     quality: zod
       .number()
       .min(0)
       .max(100)
       .optional()
       .describe(
-        'Compression quality for JPEG and WebP formats (0-100). Higher values mean better quality but larger file sizes. Ignored for PNG format.',
+        'JPEG/WebP quality (0-100). Higher is better. Ignored for PNG.',
       ),
     uid: zod
       .string()
       .optional()
-      .describe(
-        'The uid of an element on the page from the page content snapshot. If omitted takes a pages screenshot.',
-      ),
+      .describe('uid of element from snapshot. Omit for page screenshot.'),
     fullPage: zod
       .boolean()
       .optional()
-      .describe(
-        'If set to true takes a screenshot of the full page instead of the currently visible viewport. Incompatible with uid.',
-      ),
+      .describe('true for full page screenshot. Incompatible with uid.'),
     filePath: zod
       .string()
       .optional()
-      .describe(
-        'The absolute path, or a path relative to the current working directory, to save the screenshot to instead of attaching it to the response.',
-      ),
+      .describe('Path to save screenshot. If omitted, attaches to response.'),
   },
   handler: async (request, response, context) => {
     if (request.params.uid && request.params.fullPage) {

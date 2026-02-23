@@ -34,7 +34,7 @@ const FILTERABLE_RESOURCE_TYPES: readonly [ResourceType, ...ResourceType[]] = [
 
 export const listNetworkRequests = defineTool({
   name: 'list_network_requests',
-  description: `List all requests for the currently selected page since the last navigation.`,
+  description: `List all requests since the last navigation.`,
   annotations: {
     category: ToolCategory.NETWORK,
     readOnlyHint: true,
@@ -45,30 +45,22 @@ export const listNetworkRequests = defineTool({
       .int()
       .positive()
       .optional()
-      .describe(
-        'Maximum number of requests to return. When omitted, returns all requests.',
-      ),
+      .describe('Max requests to return. Omit for all.'),
     pageIdx: zod
       .number()
       .int()
       .min(0)
       .optional()
-      .describe(
-        'Page number to return (0-based). When omitted, returns the first page.',
-      ),
+      .describe('0-based page number. Omit for first page.'),
     resourceTypes: zod
       .array(zod.enum(FILTERABLE_RESOURCE_TYPES))
       .optional()
-      .describe(
-        'Filter requests to only return requests of the specified resource types. When omitted or empty, returns all requests.',
-      ),
+      .describe('Filter by resource type. Omit or empty for all.'),
     includePreservedRequests: zod
       .boolean()
       .default(false)
       .optional()
-      .describe(
-        'Set to true to return the preserved requests over the last 3 navigations.',
-      ),
+      .describe('Set to true for preserved requests over last 3 navigations.'),
   },
   handler: async (request, response, context) => {
     const data = await context.getDevToolsData();
@@ -97,21 +89,15 @@ export const getNetworkRequest = defineTool({
     reqid: zod
       .number()
       .optional()
-      .describe(
-        'The reqid of the network request. If omitted returns the currently selected request in the DevTools Network panel.',
-      ),
+      .describe('reqid of network request. Omit for selected in DevTools.'),
     requestFilePath: zod
       .string()
       .optional()
-      .describe(
-        'The absolute or relative path to save the request body to. If omitted, the body is returned inline.',
-      ),
+      .describe('Path to save request body. Omit for inline.'),
     responseFilePath: zod
       .string()
       .optional()
-      .describe(
-        'The absolute or relative path to save the response body to. If omitted, the body is returned inline.',
-      ),
+      .describe('Path to save response body. Omit for inline.'),
   },
   handler: async (request, response, context) => {
     if (request.params.reqid) {

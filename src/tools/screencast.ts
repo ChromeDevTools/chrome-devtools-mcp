@@ -21,8 +21,7 @@ async function generateTempFilePath(): Promise<string> {
 
 export const startScreencast = defineTool({
   name: 'screencast_start',
-  description:
-    'Starts recording a screencast (video) of the selected page in mp4 format.',
+  description: 'Starts recording a screencast (video) in mp4 format.',
   annotations: {
     category: ToolCategory.DEBUGGING,
     readOnlyHint: false,
@@ -32,9 +31,7 @@ export const startScreencast = defineTool({
     path: zod
       .string()
       .optional()
-      .describe(
-        'Output path. Uses mkdtemp to generate a unique path if not provided.',
-      ),
+      .describe('Output path. Uses a temp path if not provided.'),
   },
   handler: async (request, response, context) => {
     if (context.getScreenRecorder() !== null) {
@@ -76,7 +73,7 @@ export const startScreencast = defineTool({
 
 export const stopScreencast = defineTool({
   name: 'screencast_stop',
-  description: 'Stops the active screencast recording on the selected page.',
+  description: 'Stops the active screencast recording.',
   annotations: {
     category: ToolCategory.DEBUGGING,
     readOnlyHint: false,

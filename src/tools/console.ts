@@ -39,8 +39,7 @@ const FILTERABLE_MESSAGE_TYPES: [
 
 export const listConsoleMessages = defineTool({
   name: 'list_console_messages',
-  description:
-    'List all console messages for the currently selected page since the last navigation.',
+  description: 'List all console messages since the last navigation.',
   annotations: {
     category: ToolCategory.DEBUGGING,
     readOnlyHint: true,
@@ -51,30 +50,22 @@ export const listConsoleMessages = defineTool({
       .int()
       .positive()
       .optional()
-      .describe(
-        'Maximum number of messages to return. When omitted, returns all requests.',
-      ),
+      .describe('Max messages to return. Omit for all.'),
     pageIdx: zod
       .number()
       .int()
       .min(0)
       .optional()
-      .describe(
-        'Page number to return (0-based). When omitted, returns the first page.',
-      ),
+      .describe('0-based page number. Omit for first page.'),
     types: zod
       .array(zod.enum(FILTERABLE_MESSAGE_TYPES))
       .optional()
-      .describe(
-        'Filter messages to only return messages of the specified resource types. When omitted or empty, returns all messages.',
-      ),
+      .describe('Filter by message type. Omit or empty for all.'),
     includePreservedMessages: zod
       .boolean()
       .default(false)
       .optional()
-      .describe(
-        'Set to true to return the preserved messages over the last 3 navigations.',
-      ),
+      .describe('Set to true for preserved messages over last 3 navigations.'),
   },
   handler: async (request, response) => {
     response.setIncludeConsoleData(true, {
@@ -96,9 +87,7 @@ export const getConsoleMessage = defineTool({
   schema: {
     msgid: zod
       .number()
-      .describe(
-        'The msgid of a console message on the page from the listed console messages',
-      ),
+      .describe('msgid of a console message from listed messages'),
   },
   handler: async (request, response) => {
     response.attachConsoleMessage(request.params.msgid);

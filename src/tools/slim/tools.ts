@@ -12,7 +12,7 @@ import {defineTool} from '../ToolDefinition.js';
 
 export const screenshot = defineTool({
   name: 'screenshot',
-  description: `Take a screenshot of the active page.`,
+  description: `Takes a screenshot.`,
   annotations: {
     category: ToolCategory.DEBUGGING,
     // Not read-only due to filePath param.
@@ -32,13 +32,13 @@ export const screenshot = defineTool({
 
 export const navigate = defineTool({
   name: 'navigate',
-  description: `Load URL in the browser`,
+  description: `Loads a URL.`,
   annotations: {
     category: ToolCategory.NAVIGATION,
     readOnlyHint: false,
   },
   schema: {
-    url: zod.string().describe('Page URL'),
+    url: zod.string().describe('URL to navigate to.'),
   },
   handler: async (request, response, context) => {
     const page = context.getSelectedPage();
@@ -68,15 +68,13 @@ export const navigate = defineTool({
 
 export const evaluate = defineTool({
   name: 'evaluate',
-  description: `Evaluate a JavaScript function on the last loaded page`,
+  description: `Evaluates a JavaScript function.`,
   annotations: {
     category: ToolCategory.DEBUGGING,
     readOnlyHint: false,
   },
   schema: {
-    fn: zod
-      .string()
-      .describe(`A JavaScript function to be executed on the active page`),
+    fn: zod.string().describe(`JS function to run on the page.`),
   },
   handler: async (request, response, context) => {
     const page = context.getSelectedPage();
