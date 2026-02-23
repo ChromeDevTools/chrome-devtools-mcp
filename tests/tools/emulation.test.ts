@@ -8,6 +8,7 @@ import assert from 'node:assert';
 import {beforeEach, describe, it} from 'node:test';
 
 import {emulate} from '../../src/tools/emulation.js';
+import {newPage, selectPage} from '../../src/tools/pages.js';
 import {serverHooks} from '../server.js';
 import {html, withMcpContext} from '../utils.js';
 
@@ -466,6 +467,67 @@ describe('emulation', () => {
             return navigator.userAgent !== 'MyUA';
           }),
         );
+      });
+    });
+  });
+
+  describe('isolatedContext routing', () => {
+    beforeEach(() => {
+      server.addHtmlRoute('/emulate-test', html`<h1>Emulate Test</h1>`);
+    });
+
+    it('emulates viewport on the isolatedContext page, not the global selection', async () => {
+      await withMcpContext(async (response, context) => {
+        // Create an isolated page.
+        await newPage.handler(
+          {
+            params: {
+              url: server.baseUrl + '/emulate-test',
+              isolatedContext: 'emulate-ctx',
+            },
+          },
+          response,
+          context,
+        );
+        const isolatedPage = context.getSelectedPage();
+
+        // Switch global selection back to the default page.
+        await selectPage.handler({params: {pageId: 1}}, response, context);
+        const defaultPage = context.getSelectedPage();
+        assert.notStrictEqual(defaultPage, isolatedPage);
+
+        // Emulate viewport on the isolated page via isolatedContext.
+        await emulate.handler(
+          {
+            params: {
+              isolatedContext: 'emulate-ctx',
+              viewport: {
+                width: 390,
+                height: 844,
+                isMobile: true,
+                hasTouch: true,
+              },
+            },
+          },
+          response,
+          context,
+        );
+
+        // Verify the isolated page received the viewport.
+        const isolatedViewport = await isolatedPage.evaluate(() => ({
+          width: window.innerWidth,
+          height: window.innerHeight,
+          hasTouch: navigator.maxTouchPoints > 0,
+        }));
+        assert.strictEqual(isolatedViewport.width, 390);
+        assert.strictEqual(isolatedViewport.height, 844);
+        assert.strictEqual(isolatedViewport.hasTouch, true);
+
+        // Verify the default page was NOT affected.
+        const defaultViewport = await defaultPage.evaluate(() => ({
+          width: window.innerWidth,
+        }));
+        assert.notStrictEqual(defaultViewport.width, 390);
       });
     });
   });

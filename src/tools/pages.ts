@@ -9,7 +9,12 @@ import type {Dialog} from '../third_party/index.js';
 import {zod} from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
-import {CLOSE_PAGE_ERROR, defineTool, timeoutSchema} from './ToolDefinition.js';
+import {
+  CLOSE_PAGE_ERROR,
+  defineTool,
+  isolatedContextSchema,
+  timeoutSchema,
+} from './ToolDefinition.js';
 
 export const listPages = defineTool(args => {
   return {
@@ -132,6 +137,7 @@ export const navigatePage = defineTool({
     readOnlyHint: false,
   },
   schema: {
+    ...isolatedContextSchema,
     type: zod
       .enum(['url', 'back', 'forward', 'reload'])
       .optional()
@@ -158,7 +164,9 @@ export const navigatePage = defineTool({
     ...timeoutSchema,
   },
   handler: async (request, response, context) => {
-    const page = context.getSelectedPage();
+    const page = context.resolvePageByContext(
+      request.params.isolatedContext,
+    );
     const options = {
       timeout: request.params.timeout,
     };
@@ -281,11 +289,14 @@ export const resizePage = defineTool({
     readOnlyHint: false,
   },
   schema: {
+    ...isolatedContextSchema,
     width: zod.number().describe('Page width'),
     height: zod.number().describe('Page height'),
   },
   handler: async (request, response, context) => {
-    const page = context.getSelectedPage();
+    const page = context.resolvePageByContext(
+      request.params.isolatedContext,
+    );
 
     try {
       const browser = page.browser();

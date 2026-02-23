@@ -140,6 +140,8 @@ export class McpContext implements Context {
 
   #pageToDevToolsPage = new Map<Page, Page>();
   #selectedPage?: Page;
+  // Per-context selected page tracking for parallel agent support.
+  #contextSelectedPage = new Map<string, Page>();
   #textSnapshot: TextSnapshot | null = null;
   #networkCollector: NetworkCollector;
   #consoleCollector: ConsoleCollector;
@@ -328,15 +330,18 @@ export class McpContext implements Context {
     return this.#networkCollector.getById(this.getSelectedPage(), reqid);
   }
 
-  async emulate(options: {
-    networkConditions?: string | null;
-    cpuThrottlingRate?: number | null;
-    geolocation?: GeolocationOptions | null;
-    userAgent?: string | null;
-    colorScheme?: 'dark' | 'light' | 'auto' | null;
-    viewport?: Viewport | null;
-  }): Promise<void> {
-    const page = this.getSelectedPage();
+  async emulate(
+    options: {
+      networkConditions?: string | null;
+      cpuThrottlingRate?: number | null;
+      geolocation?: GeolocationOptions | null;
+      userAgent?: string | null;
+      colorScheme?: 'dark' | 'light' | 'auto' | null;
+      viewport?: Viewport | null;
+    },
+    targetPage?: Page,
+  ): Promise<void> {
+    const page = targetPage ?? this.getSelectedPage();
     const currentSettings = this.#emulationSettingsMap.get(page) ?? {};
     const newSettings: EmulationSettings = {...currentSettings};
     let timeoutsNeedUpdate = false;
@@ -513,6 +518,41 @@ export class McpContext implements Context {
     return page;
   }
 
+  resolvePageByContext(isolatedContext?: string): Page {
+    if (isolatedContext === undefined) {
+      return this.getSelectedPage();
+    }
+
+    // Try the per-context selected page first.
+    const tracked = this.#contextSelectedPage.get(isolatedContext);
+    if (tracked && !tracked.isClosed()) {
+      return tracked;
+    }
+
+    // Fall back: find any non-closed page in the context.
+    const ctx = this.#isolatedContexts.get(isolatedContext);
+    if (!ctx) {
+      throw new Error(
+        `No isolated context named "${isolatedContext}" exists. ` +
+          `Create one first with new_page(isolatedContext: "${isolatedContext}").`,
+      );
+    }
+
+    for (const page of this.#pages) {
+      if (
+        !page.isClosed() &&
+        this.#pageToIsolatedContextName.get(page) === isolatedContext
+      ) {
+        this.#contextSelectedPage.set(isolatedContext, page);
+        return page;
+      }
+    }
+
+    throw new Error(
+      `No open page found in isolated context "${isolatedContext}".`,
+    );
+  }
+
   getPageById(pageId: number): Page {
     const page = this.#pages.find(p => this.#pageIdMap.get(p) === pageId);
     if (!page) {
@@ -547,6 +587,12 @@ export class McpContext implements Context {
     void newPage.emulateFocusedPage(true).catch(error => {
       this.logger('Error turning on focused page emulation', error);
     });
+
+    // Track per-context selected page for parallel agent routing.
+    const contextName = this.#pageToIsolatedContextName.get(newPage);
+    if (contextName) {
+      this.#contextSelectedPage.set(contextName, newPage);
+    }
   }
 
   #updateSelectedPageTimeouts() {
@@ -787,8 +833,9 @@ export class McpContext implements Context {
   async createTextSnapshot(
     verbose = false,
     devtoolsData: DevToolsData | undefined = undefined,
+    targetPage?: Page,
   ): Promise<void> {
-    const page = this.getSelectedPage();
+    const page = targetPage ?? this.getSelectedPage();
     const rootNode = await page.accessibility.snapshot({
       includeIframes: true,
       interestingOnly: !verbose,
@@ -939,8 +986,12 @@ export class McpContext implements Context {
     return this.#networkCollector.getIdForResource(request);
   }
 
-  waitForTextOnPage(text: string[], timeout?: number): Promise<Element> {
-    const page = this.getSelectedPage();
+  waitForTextOnPage(
+    text: string[],
+    timeout?: number,
+    targetPage?: Page,
+  ): Promise<Element> {
+    const page = targetPage ?? this.getSelectedPage();
     const frames = page.frames();
 
     let locator = this.#locatorClass.race(

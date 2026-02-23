@@ -7,11 +7,11 @@
 import {logger} from '../logger.js';
 import type {McpContext, TextSnapshotNode} from '../McpContext.js';
 import {zod} from '../third_party/index.js';
-import type {ElementHandle, KeyInput} from '../third_party/index.js';
+import type {ElementHandle, KeyInput, Page} from '../third_party/index.js';
 import {parseKey} from '../utils/keyboard.js';
 
 import {ToolCategory} from './categories.js';
-import {defineTool} from './ToolDefinition.js';
+import {defineTool, isolatedContextSchema} from './ToolDefinition.js';
 
 const dblClickSchema = zod
   .boolean()
@@ -90,13 +90,16 @@ export const clickAt = defineTool({
     conditions: ['computerVision'],
   },
   schema: {
+    ...isolatedContextSchema,
     x: zod.number().describe('The x coordinate'),
     y: zod.number().describe('The y coordinate'),
     dblClick: dblClickSchema,
     includeSnapshot: includeSnapshotSchema,
   },
   handler: async (request, response, context) => {
-    const page = context.getSelectedPage();
+    const page = context.resolvePageByContext(
+      request.params.isolatedContext,
+    );
     await context.waitForEventsAfterAction(async () => {
       await page.mouse.click(request.params.x, request.params.y, {
         clickCount: request.params.dblClick ? 2 : 1,
@@ -108,7 +111,7 @@ export const clickAt = defineTool({
         : `Successfully clicked at the coordinates`,
     );
     if (request.params.includeSnapshot) {
-      response.includeSnapshot();
+      response.includeSnapshot({ page });
     }
   },
 });
@@ -192,6 +195,7 @@ async function fillFormElement(
   uid: string,
   value: string,
   context: McpContext,
+  page?: Page,
 ) {
   const handle = await context.getElementByUid(uid);
   try {
@@ -203,8 +207,9 @@ async function fillFormElement(
     } else {
       // Increase timeout for longer input values.
       const timeoutPerChar = 10; // ms
+      const targetPage = page ?? context.getSelectedPage();
       const fillTimeout =
-        context.getSelectedPage().getDefaultTimeout() +
+        targetPage.getDefaultTimeout() +
         value.length * timeoutPerChar;
       await handle.asLocator().setTimeout(fillTimeout).fill(value);
     }
@@ -223,6 +228,7 @@ export const fill = defineTool({
     readOnlyHint: false,
   },
   schema: {
+    ...isolatedContextSchema,
     uid: zod
       .string()
       .describe(
@@ -232,16 +238,20 @@ export const fill = defineTool({
     includeSnapshot: includeSnapshotSchema,
   },
   handler: async (request, response, context) => {
+    const page = context.resolvePageByContext(
+      request.params.isolatedContext,
+    );
     await context.waitForEventsAfterAction(async () => {
       await fillFormElement(
         request.params.uid,
         request.params.value,
         context as McpContext,
+        page,
       );
     });
     response.appendResponseLine(`Successfully filled out the element`);
     if (request.params.includeSnapshot) {
-      response.includeSnapshot();
+      response.includeSnapshot({ page });
     }
   },
 });
@@ -311,6 +321,7 @@ export const fillForm = defineTool({
     readOnlyHint: false,
   },
   schema: {
+    ...isolatedContextSchema,
     elements: zod
       .array(
         zod.object({
@@ -322,18 +333,22 @@ export const fillForm = defineTool({
     includeSnapshot: includeSnapshotSchema,
   },
   handler: async (request, response, context) => {
+    const page = context.resolvePageByContext(
+      request.params.isolatedContext,
+    );
     for (const element of request.params.elements) {
       await context.waitForEventsAfterAction(async () => {
         await fillFormElement(
           element.uid,
           element.value,
           context as McpContext,
+          page,
         );
       });
     }
     response.appendResponseLine(`Successfully filled out the form`);
     if (request.params.includeSnapshot) {
-      response.includeSnapshot();
+      response.includeSnapshot({ page });
     }
   },
 });
@@ -346,6 +361,7 @@ export const uploadFile = defineTool({
     readOnlyHint: false,
   },
   schema: {
+    ...isolatedContextSchema,
     uid: zod
       .string()
       .describe(
@@ -367,7 +383,9 @@ export const uploadFile = defineTool({
         // a type=file element. In this case, we want to default to
         // Page.waitForFileChooser() and upload the file this way.
         try {
-          const page = context.getSelectedPage();
+          const page = context.resolvePageByContext(
+            request.params.isolatedContext,
+          );
           const [fileChooser] = await Promise.all([
             page.waitForFileChooser({timeout: 3000}),
             handle.asLocator().click(),
@@ -380,7 +398,10 @@ export const uploadFile = defineTool({
         }
       }
       if (request.params.includeSnapshot) {
-        response.includeSnapshot();
+        const page = context.resolvePageByContext(
+          request.params.isolatedContext,
+        );
+        response.includeSnapshot({ page });
       }
       response.appendResponseLine(`File uploaded from ${filePath}.`);
     } finally {
@@ -397,6 +418,7 @@ export const pressKey = defineTool({
     readOnlyHint: false,
   },
   schema: {
+    ...isolatedContextSchema,
     key: zod
       .string()
       .describe(
@@ -405,7 +427,9 @@ export const pressKey = defineTool({
     includeSnapshot: includeSnapshotSchema,
   },
   handler: async (request, response, context) => {
-    const page = context.getSelectedPage();
+    const page = context.resolvePageByContext(
+      request.params.isolatedContext,
+    );
     const tokens = parseKey(request.params.key);
     const [key, ...modifiers] = tokens;
 
@@ -423,7 +447,7 @@ export const pressKey = defineTool({
       `Successfully pressed key: ${request.params.key}`,
     );
     if (request.params.includeSnapshot) {
-      response.includeSnapshot();
+      response.includeSnapshot({ page });
     }
   },
 });

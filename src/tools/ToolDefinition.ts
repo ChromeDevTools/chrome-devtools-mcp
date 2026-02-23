@@ -54,6 +54,7 @@ export interface ImageContentData {
 export interface SnapshotParams {
   verbose?: boolean;
   filePath?: string;
+  page?: Page;
 }
 
 export interface DevToolsData {
@@ -108,6 +109,7 @@ export type Context = Readonly<{
   recordedTraces(): TraceResult[];
   storeTraceRecording(result: TraceResult): void;
   getSelectedPage(): Page;
+  resolvePageByContext(isolatedContext?: string): Page;
   getDialog(): Dialog | undefined;
   clearDialog(): void;
   getPageById(pageId: number): Page;
@@ -116,14 +118,23 @@ export type Context = Readonly<{
   selectPage(page: Page): void;
   getElementByUid(uid: string): Promise<ElementHandle<Element>>;
   getAXNodeByUid(uid: string): TextSnapshotNode | undefined;
-  emulate(options: {
-    networkConditions?: string | null;
-    cpuThrottlingRate?: number | null;
-    geolocation?: GeolocationOptions | null;
-    userAgent?: string | null;
-    colorScheme?: 'dark' | 'light' | 'auto' | null;
-    viewport?: Viewport | null;
-  }): Promise<void>;
+  emulate(
+    options: {
+      networkConditions?: string | null;
+      cpuThrottlingRate?: number | null;
+      geolocation?: GeolocationOptions | null;
+      userAgent?: string | null;
+      colorScheme?: 'dark' | 'light' | 'auto' | null;
+      viewport?: Viewport | null;
+    },
+    targetPage?: Page,
+  ): Promise<void>;
+  getNetworkConditions(): string | null;
+  getCpuThrottlingRate(): number;
+  getGeolocation(): GeolocationOptions | null;
+  getViewport(): Viewport | null;
+  getUserAgent(): string | null;
+  getColorScheme(): 'dark' | 'light' | null;
   saveTemporaryFile(
     data: Uint8Array<ArrayBufferLike>,
     mimeType: 'image/png' | 'image/jpeg' | 'image/webp',
@@ -136,7 +147,11 @@ export type Context = Readonly<{
     action: () => Promise<unknown>,
     options?: {timeout?: number},
   ): Promise<void>;
-  waitForTextOnPage(text: string[], timeout?: number): Promise<Element>;
+  waitForTextOnPage(
+    text: string[],
+    timeout?: number,
+    page?: Page,
+  ): Promise<Element>;
   getDevToolsData(): Promise<DevToolsData>;
   /**
    * Returns a reqid for a cdpRequestId.
@@ -180,6 +195,18 @@ export function defineTool<
 
 export const CLOSE_PAGE_ERROR =
   'The last open page cannot be closed. It is fine to keep it open.';
+
+export const isolatedContextSchema = {
+  isolatedContext: zod
+    .string()
+    .optional()
+    .describe(
+      'The name of the isolated browser context to resolve the page from. ' +
+        'When provided, the tool operates on the page belonging to this context ' +
+        'instead of the globally selected page. ' +
+        'Use this to avoid race conditions when multiple agents work in parallel.',
+    ),
+};
 
 export const timeoutSchema = {
   timeout: zod

@@ -8,7 +8,7 @@ import {zod} from '../third_party/index.js';
 import type {ElementHandle, Page} from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
-import {defineTool} from './ToolDefinition.js';
+import {defineTool, isolatedContextSchema} from './ToolDefinition.js';
 
 export const screenshot = defineTool({
   name: 'take_screenshot',
@@ -19,6 +19,7 @@ export const screenshot = defineTool({
     readOnlyHint: false,
   },
   schema: {
+    ...isolatedContextSchema,
     format: zod
       .enum(['png', 'jpeg', 'webp'])
       .default('png')
@@ -59,7 +60,9 @@ export const screenshot = defineTool({
     if (request.params.uid) {
       pageOrHandle = await context.getElementByUid(request.params.uid);
     } else {
-      pageOrHandle = context.getSelectedPage();
+      pageOrHandle = context.resolvePageByContext(
+        request.params.isolatedContext,
+      );
     }
 
     const format = request.params.format;
