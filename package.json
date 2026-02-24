@@ -23,7 +23,7 @@
     "prepare": "node --experimental-strip-types scripts/prepare.ts",
     "verify-server-json-version": "node --experimental-strip-types scripts/verify-server-json-version.ts",
     "verify-npm-package": "node scripts/verify-npm-package.mjs",
-    "eval": "npm run build && CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS=true node --experimental-strip-types scripts/eval_gemini.ts",
+    "eval": "npm run build && node --experimental-strip-types scripts/eval_gemini.ts",
     "count-tokens": "node --experimental-strip-types scripts/count_tokens.ts"
   },
   "files": [
