@@ -1,8 +1,8 @@
 <!-- AUTO GENERATED DO NOT EDIT - run 'npm run docs' to update-->
 
-# Chrome DevTools MCP Tool Reference (~6916 cl100k_base tokens)
+# Chrome DevTools MCP Tool Reference (~7094 cl100k_base tokens)
 
-- **[Input automation](#input-automation)** (8 tools)
+- **[Input automation](#input-automation)** (9 tools)
   - [`click`](#click)
   - [`drag`](#drag)
   - [`fill`](#fill)
@@ -10,6 +10,7 @@
   - [`handle_dialog`](#handle_dialog)
   - [`hover`](#hover)
   - [`press_key`](#press_key)
+  - [`type_text`](#type_text)
   - [`upload_file`](#upload_file)
 - **[Navigation automation](#navigation-automation)** (6 tools)
   - [`close_page`](#close_page)
@@ -115,6 +116,17 @@
 
 - **key** (string) **(required)**: A key or a combination (e.g., "Enter", "Control+A", "Control++", "Control+Shift+R"). Modifiers: Control, Shift, Alt, Meta
 - **includeSnapshot** (boolean) _(optional)_: Whether to include a snapshot in the response. Default is false.
+
+---
+
+### `type_text`
+
+**Description:** Type text using keyboard into a previously focused input
+
+**Parameters:**
+
+- **text** (string) **(required)**: The text to type
+- **submitKey** (string) _(optional)_: Optional key to press after typing. E.g., "Enter", "Tab", "Escape"
 
 ---
 
