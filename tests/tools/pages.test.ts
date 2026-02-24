@@ -7,7 +7,7 @@
 import assert from 'node:assert';
 import {afterEach, describe, it} from 'node:test';
 
-import type {Dialog} from 'puppeteer-core';
+import type {Dialog, Target} from 'puppeteer-core';
 import sinon from 'sinon';
 
 import {
@@ -30,10 +30,73 @@ describe('pages', () => {
   describe('list_pages', () => {
     it('list pages', async () => {
       await withMcpContext(async (response, context) => {
-        await listPages.handler({params: {}}, response, context);
+        await listPages(false).handler({params: {}}, response, context);
         assert.ok(response.includePages);
       });
     });
+
+    for(const enableExtensions of [true, false]) {
+      it(`list pages ${enableExtensions ? 'with' : 'without'} --category-extensions`, async () => {
+        await withMcpContext(async (response, context) => {
+          const browser = context.browser;
+          const defaultContext = browser.defaultBrowserContext();
+          const extensionServiceWorker = {
+            url: () => 'chrome-extension://abc/sw.js',
+            type: () => 'service_worker',
+            page: async () => null,
+            browserContext: () => defaultContext,
+          };
+          const webServiceWorker = {
+            url: () => 'https://example.com/sw.js',
+            type: () => 'service_worker',
+            page: async () => null,
+            browserContext: () => defaultContext,
+          };
+          const pageTarget = {
+            url: () => 'https://example.com',
+            type: () => 'page',
+            page: async () => null,
+            browserContext: () => defaultContext,
+          };
+
+          const targetsStub = sinon
+            .stub(browser, 'targets')
+            .returns([
+              extensionServiceWorker,
+              webServiceWorker,
+              pageTarget,
+            ] as unknown as Target[]);
+
+          try {
+            await listPages(enableExtensions).handler({params: {}}, response, context);
+
+            const result = await response.handle('list_pages', context);
+            const textContent = result.content.find(c => c.type === 'text') as {
+              type: 'text';
+              text: string;
+            };
+            assert.ok(textContent);
+
+            if(enableExtensions) {
+              assert.ok(textContent.text.includes('chrome-extension://abc/sw.js'));
+              const structured = result.structuredContent as {
+                extensionServiceWorkers: Array<{url: string}>;
+              };
+              assert.deepStrictEqual(
+                structured.extensionServiceWorkers.map(sw => sw.url),
+                ['chrome-extension://abc/sw.js'],
+              );
+            } else {
+              assert.ok(!textContent.text.includes('chrome-extension://abc/sw.js'));
+            }
+            assert.ok(!textContent.text.includes('https://example.com/sw.js'));
+
+          } finally {
+            targetsStub.restore();
+          }
+        });
+      });
+    }
   });
   describe('new_page', () => {
     it('create a page', async () => {

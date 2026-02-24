@@ -6,14 +6,16 @@
 
 import type {CallToolResult} from '@modelcontextprotocol/sdk/types.js';
 import logger from 'debug';
-import type {Browser} from 'puppeteer';
+import type {Browser, BrowserContext, CDPSession, WebWorker} from 'puppeteer';
 import puppeteer, {Locator} from 'puppeteer';
-import type {
-  Frame,
-  HTTPRequest,
-  HTTPResponse,
-  LaunchOptions,
-  Page,
+import {
+  type Frame,
+  type HTTPRequest,
+  type HTTPResponse,
+  type LaunchOptions,
+  type Page,
+  type Target,
+  TargetType,
 } from 'puppeteer-core';
 import sinon from 'sinon';
 
@@ -301,11 +303,43 @@ export function getMockPage(): Page {
   } satisfies Page;
 }
 
+export function getMockTarget(): Target {
+  return {
+    url: () => 'chrome-extension://abcdefg/sw.js',
+    type: () => TargetType.SERVICE_WORKER,
+    worker: function (): Promise<WebWorker | null> {
+      throw new Error('Function not implemented.');
+    },
+    page: function (): Promise<Page | null> {
+      throw new Error('Function not implemented.');
+    },
+    asPage: function (): Promise<Page> {
+      throw new Error('Function not implemented.');
+    },
+    createCDPSession: function (): Promise<CDPSession> {
+      throw new Error('Function not implemented.');
+    },
+    browser: function (): Browser {
+      throw new Error('Function not implemented.');
+    },
+    browserContext: function (): BrowserContext {
+      throw new Error('Function not implemented.');
+    },
+    opener: function (): Target | undefined {
+      throw new Error('Function not implemented.');
+    }
+  } satisfies Target;
+}
+
 export function getMockBrowser(): Browser {
   const pages = [getMockPage()];
+  const targets = [getMockTarget()];
   return {
     pages() {
       return Promise.resolve(pages);
+    },
+    targets() {
+      return targets;
     },
     ...mockListener(),
   } as Browser;

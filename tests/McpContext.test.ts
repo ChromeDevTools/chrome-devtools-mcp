@@ -183,4 +183,29 @@ describe('McpContext', () => {
       fromStub.restore();
     });
   });
+  it('should generate correct service worker IDs', async () => {
+    await withMcpContext(async (_response, context) => {
+      const mockServiceWorkerTarget = {
+        url: () => 'chrome-extension://abcdefg/sw.js',
+        type: () => 'service_worker',
+      };
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const browser = (context as any).browser;
+      const targetsStub = sinon
+        .stub(browser, 'targets')
+        .resolves([mockServiceWorkerTarget]);
+
+      try {
+        const workers = await context.createExtensionServiceWorkersSnapshot();
+        assert.strictEqual(workers.length, 1);
+        const worker = workers[0]!;
+        const id = context.getExtensionServiceWorkerId(worker);
+        assert.ok(id);
+        assert.match(id, /^sw-\d+$/);
+      } finally {
+        targetsStub.restore();
+      }
+    });
+  });
 });

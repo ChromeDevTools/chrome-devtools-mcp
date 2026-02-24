@@ -7,9 +7,15 @@
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
-import {evaluateScript} from '../../src/tools/script.js';
+import sinon from 'sinon';
+
+import type {ExtensionServiceWorker} from '../../src/McpContext.js';
+import type {ElementHandle, Frame} from '../../src/third_party/index.js';
+import {evaluateScriptTool} from '../../src/tools/script.js';
 import {serverHooks} from '../server.js';
 import {html, withMcpContext} from '../utils.js';
+
+const evaluateScript = evaluateScriptTool(true);
 
 describe('script', () => {
   const server = serverHooks();
@@ -182,6 +188,75 @@ describe('script', () => {
         );
         const lineEvaluation = response.responseLines.at(2)!;
         assert.strictEqual(JSON.parse(lineEvaluation), 'I am iframe button');
+      });
+    });
+    it('evaluates in service worker', async () => {
+      await withMcpContext(async (response, context) => {
+        const expectedResult = 'workerResult';
+        const mockWorker = {
+          evaluateHandle: async () => {
+            const fn = Object.assign(() => expectedResult, {
+              dispose: async () => {
+                // do nothing
+              },
+            });
+            return fn;
+          },
+          evaluate: async (
+            fn: (...args: unknown[]) => unknown,
+            ...args: unknown[]
+          ) => {
+            return fn(...args);
+          },
+        };
+
+        const workerTarget = {
+          worker: async () => mockWorker,
+        };
+        const serviceWorker = {
+          target: workerTarget,
+        };
+
+        const swStub = sinon
+          .stub(context, 'getExtensionServiceWorkers')
+          .returns([serviceWorker as unknown as ExtensionServiceWorker]);
+
+        const swIdStub = sinon
+          .stub(context, 'getExtensionServiceWorkerId')
+          .returns('sw-1');
+
+        await evaluateScript.handler(
+          {
+            params: {
+              function: `() => '${expectedResult}'`,
+              serviceWorkerId: 'sw-1',
+            },
+          },
+          response,
+          context,
+        );
+
+        const lineEvaluation = response.responseLines.at(2)!;
+        assert.strictEqual(JSON.parse(lineEvaluation), expectedResult);
+
+        swStub.restore();
+        swIdStub.restore();
+      });
+    });
+    it('runs on page when serviceWorkerId is provided but extensions are disabled', async () => {
+      await withMcpContext(async (response, context) => {
+        await evaluateScriptTool(false).handler(
+          {
+            params: {
+              function: '() => document.title',
+              serviceWorkerId: 'sw-1', 
+            },
+          },
+          response,
+          context,
+        );
+        const lineEvaluation = response.responseLines.at(2)!;
+        assert.strictEqual(JSON.parse(lineEvaluation), '');
       });
     });
   });

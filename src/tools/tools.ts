@@ -18,23 +18,34 @@ import * as scriptTools from './script.js';
 import * as snapshotTools from './snapshot.js';
 import type {ToolDefinition} from './ToolDefinition.js';
 
-const tools = [
-  ...Object.values(consoleTools),
-  ...Object.values(emulationTools),
-  ...Object.values(extensionTools),
-  ...Object.values(inputTools),
+export const createTools = (enableExtensions: boolean) => {
+  const rawTools = [
+    ...Object.values(consoleTools),
+    ...Object.values(emulationTools),
+    ...Object.values(extensionTools),
+    ...Object.values(inputTools),
   ...Object.values(memoryTools),
-  ...Object.values(networkTools),
-  ...Object.values(pagesTools),
-  ...Object.values(performanceTools),
-  ...Object.values(screencastTools),
-  ...Object.values(screenshotTools),
-  ...Object.values(scriptTools),
-  ...Object.values(snapshotTools),
-] as ToolDefinition[];
+    ...Object.values(networkTools),
+    ...Object.values(pagesTools),
+    ...Object.values(performanceTools),
+    ...Object.values(screencastTools),
+    ...Object.values(screenshotTools),
+    ...Object.values(scriptTools),
+    ...Object.values(snapshotTools),
+  ];
 
-tools.sort((a, b) => {
-  return a.name.localeCompare(b.name);
-});
+  const tools: ToolDefinition[] = [];
+  for (const tool of rawTools) {
+    if (typeof tool === 'function') {
+      tools.push(tool(enableExtensions) as unknown as ToolDefinition);
+    } else {
+      tools.push(tool as unknown as ToolDefinition);
+    }
+  }
 
-export {tools};
+  tools.sort((a, b) => {
+    return a.name.localeCompare(b.name);
+  });
+
+  return tools;
+};

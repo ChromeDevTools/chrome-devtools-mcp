@@ -543,13 +543,15 @@ Call ${handleDialog.name} to handle it before continuing.`);
     }
 
     if (this.#includeExtensionServiceWorkers) {
-      const parts = [`## Extension Service Workers`];
+      if (!context.getExtensionServiceWorkers().length) {
+        response.push(`## Extension Service Workers`);
+      }
+
       for (const extensionServiceWorker of context.getExtensionServiceWorkers()) {
-        parts.push(
+        response.push(
           `${extensionServiceWorker.id}: ${extensionServiceWorker.url}`,
         );
       }
-      response.push(...parts);
       structuredContent.extensionServiceWorkers = context
         .getExtensionServiceWorkers()
         .map(extensionServiceWorker => {

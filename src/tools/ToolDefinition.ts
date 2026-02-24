@@ -175,6 +175,22 @@ export type Context = Readonly<{
 
 export function defineTool<Schema extends zod.ZodRawShape>(
   definition: ToolDefinition<Schema>,
+): ToolDefinition<Schema>;
+export function defineTool<
+  Schema extends zod.ZodRawShape,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  Args extends any[] = any[],
+>(
+  definition: (...args: Args) => ToolDefinition<Schema>,
+): (...args: Args) => ToolDefinition<Schema>;
+export function defineTool<
+  Schema extends zod.ZodRawShape,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  Args extends any[] = any[],
+>(
+  definition:
+    | ToolDefinition<Schema>
+    | ((...args: Args) => ToolDefinition<Schema>),
 ) {
   return definition;
 }
