@@ -38,11 +38,7 @@ describe('pages', () => {
   describe('list_pages', () => {
     it('list pages', async () => {
       await withMcpContext(async (response, context) => {
-        await listPages({} as ParsedArguments).handler(
-          {params: {}},
-          response,
-          context,
-        );
+        await listPages().handler({params: {}}, response, context);
         assert.ok(response.includePages);
       });
     });
@@ -64,7 +60,9 @@ describe('pages', () => {
 
           response.resetResponseLineForTesting();
 
-          const listPageDef = listPages({categoryExtensions} as ParsedArguments);
+          const listPageDef = listPages({
+            categoryExtensions,
+          } as ParsedArguments);
           await listPageDef.handler({params: {}}, response, context);
 
           const result = await response.handle(listPageDef.name, context);

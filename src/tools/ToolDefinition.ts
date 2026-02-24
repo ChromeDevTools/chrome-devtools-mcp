@@ -165,14 +165,16 @@ export function defineTool<
   Schema extends zod.ZodRawShape,
   Args extends ParsedArguments = ParsedArguments,
 >(
-  definition: (args: Args) => ToolDefinition<Schema>,
-): (args: Args) => ToolDefinition<Schema>;
+  definition: (args?: Args) => ToolDefinition<Schema>,
+): (args?: Args) => ToolDefinition<Schema>;
 
 export function defineTool<
   Schema extends zod.ZodRawShape,
   Args extends ParsedArguments = ParsedArguments,
 >(
-  definition: ToolDefinition<Schema> | ((args: Args) => ToolDefinition<Schema>),
+  definition:
+    | ToolDefinition<Schema>
+    | ((args?: Args) => ToolDefinition<Schema>),
 ) {
   return definition;
 }
