@@ -94,10 +94,21 @@ export const newPage = defineTool({
       .describe(
         'Whether to open the page in the background without bringing it to the front. Default is false (foreground).',
       ),
+    isolatedContext: zod
+      .string()
+      .optional()
+      .describe(
+        'If specified, the page is created in an isolated browser context with the given name. ' +
+          'Pages in the same browser context share cookies and storage. ' +
+          'Pages in different browser contexts are fully isolated.',
+      ),
     ...timeoutSchema,
   },
   handler: async (request, response, context) => {
-    const page = await context.newPage(request.params.background);
+    const page = await context.newPage(
+      request.params.background,
+      request.params.isolatedContext,
+    );
 
     await context.waitForEventsAfterAction(
       async () => {

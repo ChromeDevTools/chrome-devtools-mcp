@@ -16,6 +16,7 @@ import {logger, saveLogsToFile} from './logger.js';
 import {McpContext} from './McpContext.js';
 import {McpResponse} from './McpResponse.js';
 import {Mutex} from './Mutex.js';
+import {SlimMcpResponse} from './SlimMcpResponse.js';
 import {ClearcutLogger} from './telemetry/ClearcutLogger.js';
 import {computeFlagUsage} from './telemetry/flagUtils.js';
 import {bucketizeLatency} from './telemetry/metricUtils.js';
@@ -26,6 +27,7 @@ import {
   SetLevelRequestSchema,
 } from './third_party/index.js';
 import {ToolCategory} from './tools/categories.js';
+import {tools as slimTools} from './tools/slim/tools.js';
 import type {ToolDefinition} from './tools/ToolDefinition.js';
 import {tools} from './tools/tools.js';
 
@@ -58,9 +60,11 @@ if (args.usageStatistics) {
   });
 }
 
-process.on('unhandledRejection', (reason, promise) => {
-  logger('Unhandled promise rejection', promise, reason);
-});
+if (process.env['CHROME_DEVTOOLS_MCP_CRASH_ON_UNCAUGHT'] !== 'true') {
+  process.on('unhandledRejection', (reason, promise) => {
+    logger('Unhandled promise rejection', promise, reason);
+  });
+}
 
 logger(`Starting Chrome DevTools MCP Server v${VERSION}`);
 const server = new McpServer(
@@ -128,13 +132,13 @@ debug, and modify any data in the browser or DevTools.
 Avoid sharing sensitive or personal information that you do not want to share with MCP clients.`,
   );
 
-  if (args.performanceCrux) {
+  if (!args.slim && args.performanceCrux) {
     console.error(
       `Performance tools may send trace URLs to the Google CrUX API to fetch real-user experience data. To disable, run with --no-performance-crux.`,
     );
   }
 
-  if (args.usageStatistics) {
+  if (!args.slim && args.usageStatistics) {
     console.error(
       `
 Google collects usage statistics to improve Chrome DevTools MCP. To opt-out, run with --no-usage-statistics.
@@ -182,6 +186,12 @@ function registerTool(tool: ToolDefinition): void {
   ) {
     return;
   }
+  if (
+    tool.annotations.conditions?.includes('screencast') &&
+    !args.experimentalScreencast
+  ) {
+    return;
+  }
   server.registerTool(
     tool.name,
     {
@@ -198,7 +208,7 @@ function registerTool(tool: ToolDefinition): void {
         const context = await getContext();
         logger(`${tool.name} context: resolved`);
         await context.detectOpenDevToolsWindows();
-        const response = new McpResponse();
+        const response = args.slim ? new SlimMcpResponse() : new McpResponse();
         await tool.handler(
           {
             params,
@@ -250,7 +260,7 @@ function registerTool(tool: ToolDefinition): void {
   );
 }
 
-for (const tool of tools) {
+for (const tool of args.slim ? slimTools : tools) {
   registerTool(tool);
 }
 

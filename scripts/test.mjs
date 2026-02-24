@@ -68,6 +68,7 @@ async function runTests(attempt) {
       env: {
         ...process.env,
         CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: true,
+        CHROME_DEVTOOLS_MCP_CRASH_ON_UNCAUGHT: true,
       },
     });
 

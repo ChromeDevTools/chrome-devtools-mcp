@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {readFileSync} from 'node:fs';
 import {parseArgs} from 'node:util';
 
 import {GoogleGenAI} from '@google/genai';
@@ -16,18 +17,28 @@ const {values, positionals} = parseArgs({
       type: 'string',
       default: 'gemini-2.5-flash',
     },
+    file: {
+      type: 'string',
+      short: 'f',
+    },
   },
   allowPositionals: true,
 });
 
-if (!positionals[0]) {
-  console.error('Usage: npm run count-tokens -- -- <text>');
+let contents = positionals[0];
+
+if (values.file) {
+  contents = readFileSync(values.file, 'utf8');
+}
+
+if (!contents) {
+  console.error('Usage: npm run count-tokens -- [-f <file>] [<text>]');
   process.exit(1);
 }
 
 const response = await ai.models.countTokens({
   model: values.model,
-  contents: positionals[0],
+  contents,
 });
-console.log(`Input: ${positionals[0]}`);
+console.log(`Input: ${values.file || positionals[0]}`);
 console.log(`Tokens: ${response.totalTokens}`);
