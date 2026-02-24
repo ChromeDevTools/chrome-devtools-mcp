@@ -873,15 +873,17 @@ export class McpContext implements Context {
     return this.#networkCollector.getIdForResource(request);
   }
 
-  waitForTextOnPage(text: string, timeout?: number): Promise<Element> {
+  waitForTextOnPage(text: string[], timeout?: number): Promise<Element> {
     const page = this.getSelectedPage();
     const frames = page.frames();
 
     let locator = this.#locatorClass.race(
-      frames.flatMap(frame => [
-        frame.locator(`aria/${text}`),
-        frame.locator(`text/${text}`),
-      ]),
+      frames.flatMap(frame =>
+        text.flatMap(value => [
+          frame.locator(`aria/${value}`),
+          frame.locator(`text/${value}`),
+        ]),
+      ),
     );
 
     if (timeout) {

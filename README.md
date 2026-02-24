@@ -414,7 +414,7 @@ If you run into any issues, checkout our [troubleshooting guide](./docs/troubles
 
 <!-- BEGIN AUTO GENERATED TOOLS -->
 
-- **Input automation** (8 tools)
+- **Input automation** (9 tools)
   - [`click`](docs/tool-reference.md#click)
   - [`drag`](docs/tool-reference.md#drag)
   - [`fill`](docs/tool-reference.md#fill)
@@ -422,6 +422,7 @@ If you run into any issues, checkout our [troubleshooting guide](./docs/troubles
   - [`handle_dialog`](docs/tool-reference.md#handle_dialog)
   - [`hover`](docs/tool-reference.md#hover)
   - [`press_key`](docs/tool-reference.md#press_key)
+  - [`type_text`](docs/tool-reference.md#type_text)
   - [`upload_file`](docs/tool-reference.md#upload_file)
 - **Navigation automation** (6 tools)
   - [`close_page`](docs/tool-reference.md#close_page)

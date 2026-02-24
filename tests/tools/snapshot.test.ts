@@ -30,7 +30,7 @@ describe('snapshot', () => {
         await waitFor.handler(
           {
             params: {
-              text: 'Hello',
+              text: ['Hello'],
             },
           },
           response,
@@ -39,11 +39,67 @@ describe('snapshot', () => {
 
         assert.equal(
           response.responseLines[0],
-          'Element with text "Hello" found.',
+          'Element matching one of ["Hello"] found.',
         );
         assert.ok(response.includeSnapshot);
       });
     });
+
+    it('should work with any-match array', async () => {
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedPage();
+
+        await page.setContent(
+          html`<main><span>Status</span><div>Error</div></main>`,
+        );
+        await waitFor.handler(
+          {
+            params: {
+              text: ['Complete', 'Error'],
+            },
+          },
+          response,
+          context,
+        );
+
+        assert.equal(
+          response.responseLines[0],
+          'Element matching one of ["Complete","Error"] found.',
+        );
+        assert.ok(response.includeSnapshot);
+      });
+    });
+
+    it('should work with any-match array when element shows up later', async () => {
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedPage();
+
+        const handlePromise = waitFor.handler(
+          {
+            params: {
+              text: ['Complete', 'Error'],
+            },
+          },
+          response,
+          context,
+        );
+
+        await page.setContent(
+          html`<main
+            ><span>Hello</span><span> </span><div>Complete</div></main
+          >`,
+        );
+
+        await handlePromise;
+
+        assert.equal(
+          response.responseLines[0],
+          'Element matching one of ["Complete","Error"] found.',
+        );
+        assert.ok(response.includeSnapshot);
+      });
+    });
+
     it('should work with element that show up later', async () => {
       await withMcpContext(async (response, context) => {
         const page = context.getSelectedPage();
@@ -51,7 +107,7 @@ describe('snapshot', () => {
         const handlePromise = waitFor.handler(
           {
             params: {
-              text: 'Hello World',
+              text: ['Hello World'],
             },
           },
           response,
@@ -66,7 +122,7 @@ describe('snapshot', () => {
 
         assert.equal(
           response.responseLines[0],
-          'Element with text "Hello World" found.',
+          'Element matching one of ["Hello World"] found.',
         );
         assert.ok(response.includeSnapshot);
       });
@@ -82,7 +138,7 @@ describe('snapshot', () => {
         await waitFor.handler(
           {
             params: {
-              text: 'Header',
+              text: ['Header'],
             },
           },
           response,
@@ -91,7 +147,7 @@ describe('snapshot', () => {
 
         assert.equal(
           response.responseLines[0],
-          'Element with text "Header" found.',
+          'Element matching one of ["Header"] found.',
         );
         assert.ok(response.includeSnapshot);
       });
@@ -109,7 +165,7 @@ describe('snapshot', () => {
         await waitFor.handler(
           {
             params: {
-              text: 'Hello iframe',
+              text: ['Hello iframe'],
             },
           },
           response,
@@ -118,7 +174,7 @@ describe('snapshot', () => {
 
         assert.equal(
           response.responseLines[0],
-          'Element with text "Hello iframe" found.',
+          'Element matching one of ["Hello iframe"] found.',
         );
         assert.ok(response.includeSnapshot);
       });

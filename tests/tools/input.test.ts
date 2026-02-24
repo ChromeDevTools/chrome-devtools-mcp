@@ -19,6 +19,7 @@ import {
   uploadFile,
   pressKey,
   clickAt,
+  typeText,
 } from '../../src/tools/input.js';
 import {parseKey} from '../../src/utils/keyboard.js';
 import {serverHooks} from '../server.js';
@@ -355,7 +356,7 @@ describe('input', () => {
     it('fills out a textarea marked as combobox', async () => {
       await withMcpContext(async (response, context) => {
         const page = context.getSelectedPage();
-        await page.setContent(html`<textarea role="combobox" />`);
+        await page.setContent(html`<textarea role="combobox"></textarea>`);
         await context.createTextSnapshot();
         await fill.handler(
           {
@@ -383,7 +384,7 @@ describe('input', () => {
     it('fills out a textarea with long text', async () => {
       await withMcpContext(async (response, context) => {
         const page = context.getSelectedPage();
-        await page.setContent(html`<textarea />`);
+        await page.setContent(html`<textarea></textarea>`);
         await context.createTextSnapshot();
         page.setDefaultTimeout(1000);
         await fill.handler(
@@ -408,6 +409,90 @@ describe('input', () => {
             );
           }),
         );
+      });
+    });
+
+    it('types text', async () => {
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedPage();
+        await page.setContent(html`<textarea></textarea>`);
+        await page.click('textarea');
+        await context.createTextSnapshot();
+        await typeText.handler(
+          {
+            params: {
+              text: 'test',
+            },
+          },
+          response,
+          context,
+        );
+        assert.strictEqual(response.responseLines[0], 'Typed text "test"');
+        assert.strictEqual(
+          await page.evaluate(() => {
+            return document.body.querySelector('textarea')?.value;
+          }),
+          'test',
+        );
+      });
+    });
+
+    it('types text with submit key', async () => {
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedPage();
+        await page.setContent(html`<textarea></textarea>`);
+        await page.click('textarea');
+        await context.createTextSnapshot();
+        await typeText.handler(
+          {
+            params: {
+              text: 'test',
+              submitKey: 'Tab',
+            },
+          },
+          response,
+          context,
+        );
+        assert.strictEqual(
+          response.responseLines[0],
+          'Typed text "test + Tab"',
+        );
+        assert.strictEqual(
+          await page.evaluate(() => {
+            return document.body.querySelector('textarea')?.value;
+          }),
+          'test',
+        );
+        assert.ok(
+          await page.evaluate(() => {
+            return (
+              document.body.querySelector('textarea') !== document.activeElement
+            );
+          }),
+        );
+      });
+    });
+
+    it('errors on invalid submit key', async () => {
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedPage();
+        await page.setContent(html`<textarea></textarea>`);
+        await page.click('textarea');
+        await context.createTextSnapshot();
+        try {
+          await typeText.handler(
+            {
+              params: {
+                text: 'test',
+                submitKey: 'XXX',
+              },
+            },
+            response,
+            context,
+          );
+        } catch (err) {
+          assert.strictEqual(err.message, 'Unknown key: "XXX"');
+        }
       });
     });
 
