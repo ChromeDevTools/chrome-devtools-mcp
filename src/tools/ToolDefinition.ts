@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type {ParsedArguments} from '../cli.js';
 import type {TextSnapshotNode, GeolocationOptions} from '../McpContext.js';
 import {zod} from '../third_party/index.js';
 import type {
@@ -157,6 +158,20 @@ export type Context = Readonly<{
 
 export function defineTool<Schema extends zod.ZodRawShape>(
   definition: ToolDefinition<Schema>,
+): ToolDefinition<Schema>;
+
+export function defineTool<
+  Schema extends zod.ZodRawShape,
+  Args extends ParsedArguments = ParsedArguments,
+>(
+  definition: (args: Args) => ToolDefinition<Schema>,
+): (args: Args) => ToolDefinition<Schema>;
+
+export function defineTool<
+  Schema extends zod.ZodRawShape,
+  Args extends ParsedArguments = ParsedArguments,
+>(
+  definition: ToolDefinition<Schema> | ((args: Args) => ToolDefinition<Schema>),
 ) {
   return definition;
 }

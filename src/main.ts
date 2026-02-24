@@ -29,7 +29,7 @@ import {
 import {ToolCategory} from './tools/categories.js';
 import {tools as slimTools} from './tools/slim/tools.js';
 import type {ToolDefinition} from './tools/ToolDefinition.js';
-import {tools} from './tools/tools.js';
+import {createTools} from './tools/tools.js';
 import {VERSION} from './version.js';
 
 export const args = parseArguments(VERSION);
@@ -256,6 +256,7 @@ function registerTool(tool: ToolDefinition): void {
   );
 }
 
+const tools = createTools(args);
 for (const tool of args.slim ? slimTools : tools) {
   registerTool(tool);
 }

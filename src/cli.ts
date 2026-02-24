@@ -243,6 +243,8 @@ export const cliOptions = {
   },
 } satisfies Record<string, YargsOptions>;
 
+export type ParsedArguments = ReturnType<typeof parseArguments>;
+
 export function parseArguments(version: string, argv = process.argv) {
   const yargsInstance = yargs(hideBin(argv))
     .scriptName('npx chrome-devtools-mcp@latest')

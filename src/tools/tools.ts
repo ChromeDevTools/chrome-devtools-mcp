@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type {ParsedArguments} from '../cli.js';
+
 import * as consoleTools from './console.js';
 import * as emulationTools from './emulation.js';
 import * as extensionTools from './extensions.js';
@@ -18,23 +20,36 @@ import * as scriptTools from './script.js';
 import * as snapshotTools from './snapshot.js';
 import type {ToolDefinition} from './ToolDefinition.js';
 
-const tools = [
-  ...Object.values(consoleTools),
-  ...Object.values(emulationTools),
-  ...Object.values(extensionTools),
-  ...Object.values(inputTools),
-  ...Object.values(memoryTools),
-  ...Object.values(networkTools),
-  ...Object.values(pagesTools),
-  ...Object.values(performanceTools),
-  ...Object.values(screencastTools),
-  ...Object.values(screenshotTools),
-  ...Object.values(scriptTools),
-  ...Object.values(snapshotTools),
-] as ToolDefinition[];
+export const createTools = (args: ParsedArguments) => {
+  
+  const rawTools = [
+    ...Object.values(consoleTools),
+    ...Object.values(emulationTools),
+    ...Object.values(extensionTools),
+    ...Object.values(inputTools),
+    ...Object.values(memoryTools),
+    ...Object.values(networkTools),
+    ...Object.values(pagesTools),
+    ...Object.values(performanceTools),
+    ...Object.values(screencastTools),
+    ...Object.values(screenshotTools),
+    ...Object.values(scriptTools),
+    ...Object.values(snapshotTools),
+  ];
 
-tools.sort((a, b) => {
-  return a.name.localeCompare(b.name);
-});
+  const tools: ToolDefinition[] = [];
+  for (const tool of rawTools) {
+    if (typeof tool === 'function') {
+      // @ts-expect-error none of the tools for now implement the function type tool has type "never"
+      tools.push(tool(args) as ToolDefinition);
+    } else {
+      tools.push(tool as ToolDefinition);
+    }
+  }
 
-export {tools};
+  tools.sort((a, b) => {
+    return a.name.localeCompare(b.name);
+  });
+
+  return tools;
+};
