@@ -32,8 +32,6 @@ import type {ToolDefinition} from './tools/ToolDefinition.js';
 import {tools} from './tools/tools.js';
 import {VERSION} from './version.js';
 
-
-
 export const args = parseArguments(VERSION);
 
 const logFile = args.logFile ? saveLogsToFile(args.logFile) : undefined;
