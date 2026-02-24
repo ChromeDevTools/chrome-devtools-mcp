@@ -17,27 +17,27 @@ import * as performanceTools from './performance.js';
 import * as screencastTools from './screencast.js';
 import * as screenshotTools from './screenshot.js';
 import * as scriptTools from './script.js';
-import {tools as slimTools} from './slim/tools.js';
+import * as slimTools from './slim/tools.js';
 import * as snapshotTools from './snapshot.js';
 import type {ToolDefinition} from './ToolDefinition.js';
 
 export const createTools = (args: ParsedArguments) => {
   const rawTools = args.slim
-    ? [...Object.values(slimTools)]
+    ? Object.values(slimTools)
     : [
         ...Object.values(consoleTools),
-    ...Object.values(emulationTools),
-    ...Object.values(extensionTools),
-    ...Object.values(inputTools),
-    ...Object.values(memoryTools),
-    ...Object.values(networkTools),
-    ...Object.values(pagesTools),
-    ...Object.values(performanceTools),
-    ...Object.values(screencastTools),
-    ...Object.values(screenshotTools),
-    ...Object.values(scriptTools),
-    ...Object.values(snapshotTools),
-  ];
+        ...Object.values(emulationTools),
+        ...Object.values(extensionTools),
+        ...Object.values(inputTools),
+        ...Object.values(memoryTools),
+        ...Object.values(networkTools),
+        ...Object.values(pagesTools),
+        ...Object.values(performanceTools),
+        ...Object.values(screencastTools),
+        ...Object.values(screenshotTools),
+        ...Object.values(scriptTools),
+        ...Object.values(snapshotTools),
+      ];
 
   const tools: ToolDefinition[] = [];
   for (const tool of rawTools) {

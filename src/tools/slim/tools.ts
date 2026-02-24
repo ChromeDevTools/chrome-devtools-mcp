@@ -7,7 +7,6 @@
 import type {Dialog} from '../../third_party/index.js';
 import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
-import type {ToolDefinition} from '../ToolDefinition.js';
 import {defineTool} from '../ToolDefinition.js';
 
 export const screenshot = defineTool({
@@ -86,5 +85,3 @@ export const evaluate = defineTool({
     }
   },
 });
-
-export const tools = [screenshot, evaluate, navigate] as ToolDefinition[];

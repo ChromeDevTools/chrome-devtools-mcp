@@ -12,9 +12,9 @@ import type {Tool} from '@modelcontextprotocol/sdk/types.js';
 import {get_encoding} from 'tiktoken';
 
 import {cliOptions} from '../build/src/cli.js';
+import type {ParsedArguments} from '../build/src/cli.js';
 import {ToolCategory, labels} from '../build/src/tools/categories.js';
-import {tools as slimTools} from '../build/src/tools/slim/tools.js';
-import {tools} from '../build/src/tools/tools.js';
+import {createTools} from '../build/src/tools/tools.js';
 
 const OUTPUT_PATH = './docs/tool-reference.md';
 const SLIM_OUTPUT_PATH = './docs/slim-tool-reference.md';
@@ -504,7 +504,7 @@ async function generateToolDocumentation(): Promise<void> {
 
     {
       const {toolsWithAnnotations, categories, sortedCategories} =
-        getToolsAndCategories(tools);
+        getToolsAndCategories(createTools({slim: false} as ParsedArguments));
       await generateReference(
         'Chrome DevTools MCP Tool Reference',
         OUTPUT_PATH,
@@ -521,7 +521,7 @@ async function generateToolDocumentation(): Promise<void> {
 
     {
       const {toolsWithAnnotations, categories, sortedCategories} =
-        getToolsAndCategories(slimTools);
+        getToolsAndCategories(createTools({slim: true} as ParsedArguments));
       await generateReference(
         'Chrome DevTools MCP Slim Tool Reference',
         SLIM_OUTPUT_PATH,
