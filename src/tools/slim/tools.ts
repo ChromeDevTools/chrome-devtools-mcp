@@ -12,7 +12,7 @@ import {defineTool} from '../ToolDefinition.js';
 
 export const screenshot = defineTool({
   name: 'screenshot',
-  description: `Take a screenshot of the active page.`,
+  description: `Takes a screenshot`,
   annotations: {
     category: ToolCategory.DEBUGGING,
     // Not read-only due to filePath param.
@@ -32,13 +32,13 @@ export const screenshot = defineTool({
 
 export const navigate = defineTool({
   name: 'navigate',
-  description: `Load URL in the browser`,
+  description: `Loads a URL`,
   annotations: {
     category: ToolCategory.NAVIGATION,
     readOnlyHint: false,
   },
   schema: {
-    url: zod.string().describe('Page URL'),
+    url: zod.string().describe('URL to navigate to'),
   },
   handler: async (request, response, context) => {
     const page = context.getSelectedPage();
@@ -68,29 +68,21 @@ export const navigate = defineTool({
 
 export const evaluate = defineTool({
   name: 'evaluate',
-  description: `Evaluate a JavaScript function on the last loaded page`,
+  description: `Evaluates a JavaScript script`,
   annotations: {
     category: ToolCategory.DEBUGGING,
     readOnlyHint: false,
   },
   schema: {
-    fn: zod
-      .string()
-      .describe(`A JavaScript function to be executed on the active page`),
+    script: zod.string().describe(`JS script to run on the page`),
   },
   handler: async (request, response, context) => {
     const page = context.getSelectedPage();
-    const fn = await page.evaluateHandle(`(${request.params.fn})`);
     try {
-      const result = await page.evaluate(async fn => {
-        // @ts-expect-error no types.
-        return JSON.stringify(await fn());
-      }, fn);
-      response.appendResponseLine(result);
+      const result = await page.evaluate(request.params.script);
+      response.appendResponseLine(JSON.stringify(result));
     } catch (err) {
       response.appendResponseLine(String(err.message));
-    } finally {
-      void fn.dispose();
     }
   },
 });
