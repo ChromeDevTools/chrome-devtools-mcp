@@ -24,6 +24,7 @@ import {
 } from './third_party/index.js';
 import {ToolCategory} from './tools/categories.js';
 import type {ToolDefinition} from './tools/ToolDefinition.js';
+import {pageIdSchema} from './tools/ToolDefinition.js';
 import {createTools} from './tools/tools.js';
 import {VERSION} from './version.js';
 
@@ -149,11 +150,15 @@ export async function createMcpServer(
     ) {
       return;
     }
+    const schema = tool.annotations.pageScoped
+      ? {...tool.schema, ...pageIdSchema}
+      : tool.schema;
+
     server.registerTool(
       tool.name,
       {
         description: tool.description,
-        inputSchema: tool.schema,
+        inputSchema: schema,
         annotations: tool.annotations,
       },
       async (params): Promise<CallToolResult> => {
@@ -168,10 +173,13 @@ export async function createMcpServer(
           const response = serverArgs.slim
             ? new SlimMcpResponse(serverArgs)
             : new McpResponse(serverArgs);
-
+          const page = tool.annotations.pageScoped
+            ? context.resolvePageById(params.pageId as number | undefined)
+            : undefined;
           await tool.handler(
             {
               params,
+              page,
             },
             response,
             context,

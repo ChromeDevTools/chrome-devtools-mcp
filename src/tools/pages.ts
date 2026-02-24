@@ -9,12 +9,7 @@ import type {Dialog} from '../third_party/index.js';
 import {zod} from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
-import {
-  CLOSE_PAGE_ERROR,
-  defineTool,
-  pageIdSchema,
-  timeoutSchema,
-} from './ToolDefinition.js';
+import {CLOSE_PAGE_ERROR, defineTool, timeoutSchema} from './ToolDefinition.js';
 
 export const listPages = defineTool(args => {
   return {
@@ -135,9 +130,9 @@ export const navigatePage = defineTool({
   annotations: {
     category: ToolCategory.NAVIGATION,
     readOnlyHint: false,
+    pageScoped: true,
   },
   schema: {
-    ...pageIdSchema,
     type: zod
       .enum(['url', 'back', 'forward', 'reload'])
       .optional()
@@ -164,7 +159,7 @@ export const navigatePage = defineTool({
     ...timeoutSchema,
   },
   handler: async (request, response, context) => {
-    const page = context.resolvePageById(request.params.pageId);
+    const page = request.page!;
     const options = {
       timeout: request.params.timeout,
     };
@@ -188,7 +183,7 @@ export const navigatePage = defineTool({
           void dialog.dismiss();
         }
         // We are not going to report the dialog like regular dialogs.
-        context.clearDialog();
+        context.clearDialog(page);
       }
     };
 
@@ -285,14 +280,14 @@ export const resizePage = defineTool({
   annotations: {
     category: ToolCategory.EMULATION,
     readOnlyHint: false,
+    pageScoped: true,
   },
   schema: {
-    ...pageIdSchema,
     width: zod.number().describe('Page width'),
     height: zod.number().describe('Page height'),
   },
-  handler: async (request, response, context) => {
-    const page = context.resolvePageById(request.params.pageId);
+  handler: async (request, response, _context) => {
+    const page = request.page!;
 
     try {
       const browser = page.browser();
@@ -325,6 +320,7 @@ export const handleDialog = defineTool({
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
+    pageScoped: true,
   },
   schema: {
     action: zod
@@ -336,7 +332,8 @@ export const handleDialog = defineTool({
       .describe('Optional prompt text to enter into the dialog.'),
   },
   handler: async (request, response, context) => {
-    const dialog = context.getDialog();
+    const page = request.page!;
+    const dialog = context.getDialog(page);
     if (!dialog) {
       throw new Error('No open dialog found');
     }
@@ -364,7 +361,7 @@ export const handleDialog = defineTool({
       }
     }
 
-    context.clearDialog();
+    context.clearDialog(page);
     response.setIncludePages(true);
   },
 });

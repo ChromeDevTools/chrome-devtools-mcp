@@ -8,7 +8,7 @@
 import {zod, PredefinedNetworkConditions} from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
-import {defineTool, pageIdSchema} from './ToolDefinition.js';
+import {defineTool} from './ToolDefinition.js';
 
 const throttlingOptions: [string, ...string[]] = [
   'No emulation',
@@ -22,9 +22,9 @@ export const emulate = defineTool({
   annotations: {
     category: ToolCategory.EMULATION,
     readOnlyHint: false,
+    pageScoped: true,
   },
   schema: {
-    ...pageIdSchema,
     networkConditions: zod
       .enum(throttlingOptions)
       .optional()
@@ -105,7 +105,7 @@ export const emulate = defineTool({
       ),
   },
   handler: async (request, _response, context) => {
-    const page = context.resolvePageById(request.params.pageId);
+    const page = request.page!;
     await context.emulate(request.params, page);
   },
 });

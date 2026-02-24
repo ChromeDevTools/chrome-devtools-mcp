@@ -5,7 +5,6 @@
  */
 
 import type {ParsedArguments} from '../cli.js';
-import type {TextSnapshotNode, GeolocationOptions} from '../McpContext.js';
 import {zod} from '../third_party/index.js';
 import type {
   Dialog,
@@ -15,6 +14,7 @@ import type {
   Viewport,
 } from '../third_party/index.js';
 import type {InsightName, TraceResult} from '../trace-processing/parse.js';
+import type {TextSnapshotNode, GeolocationOptions} from '../types.js';
 import type {InstalledExtension} from '../utils/ExtensionRegistry.js';
 import type {PaginationOptions} from '../utils/types.js';
 
@@ -33,6 +33,12 @@ export interface ToolDefinition<
      */
     readOnlyHint: boolean;
     conditions?: string[];
+    /**
+     * If true, the tool operates on a specific page.
+     * The `pageId` schema field is auto-injected and the resolved
+     * page is provided via `request.page`.
+     */
+    pageScoped?: boolean;
   };
   schema: Schema;
   handler: (
@@ -44,6 +50,8 @@ export interface ToolDefinition<
 
 export interface Request<Schema extends zod.ZodRawShape> {
   params: zod.objectOutputType<Schema, zod.ZodTypeAny>;
+  /** Populated centrally for tools with `pageScoped: true`. */
+  page?: Page;
 }
 
 export interface ImageContentData {
@@ -110,14 +118,15 @@ export type Context = Readonly<{
   storeTraceRecording(result: TraceResult): void;
   getSelectedPage(): Page;
   resolvePageById(pageId?: number): Page;
-  getDialog(): Dialog | undefined;
-  clearDialog(): void;
+  getDialog(page?: Page): Dialog | undefined;
+  clearDialog(page?: Page): void;
   getPageById(pageId: number): Page;
   newPage(background?: boolean, isolatedContextName?: string): Promise<Page>;
   closePage(pageId: number): Promise<void>;
   selectPage(page: Page): void;
   getElementByUid(uid: string): Promise<ElementHandle<Element>>;
   getAXNodeByUid(uid: string): TextSnapshotNode | undefined;
+  assertUidOnSelectedPage(uid: string): void;
   emulate(
     options: {
       networkConditions?: string | null;
@@ -160,7 +169,10 @@ export type Context = Readonly<{
   /**
    * Returns a reqid for a cdpRequestId.
    */
-  resolveCdpElementId(cdpBackendNodeId: number): string | undefined;
+  resolveCdpElementId(
+    cdpBackendNodeId: number,
+    page?: Page,
+  ): string | undefined;
   getScreenRecorder(): {recorder: ScreenRecorder; filePath: string} | null;
   setScreenRecorder(
     data: {recorder: ScreenRecorder; filePath: string} | null,
@@ -190,7 +202,31 @@ export function defineTool<
     | ToolDefinition<Schema>
     | ((args?: Args) => ToolDefinition<Schema>),
 ) {
+  if (typeof definition === 'function') {
+    const factory = definition;
+    return (args: Args) => {
+      const tool = factory(args);
+      wrapPageScopedHandler(tool);
+      return tool;
+    };
+  }
+  wrapPageScopedHandler(definition);
   return definition;
+}
+
+function wrapPageScopedHandler<Schema extends zod.ZodRawShape>(
+  definition: ToolDefinition<Schema>,
+) {
+  if (definition.annotations.pageScoped) {
+    const originalHandler = definition.handler;
+    definition.handler = async (request, response, context) => {
+      // In production, main.ts resolves request.page centrally before calling
+      // the handler. This fallback exists for tests that invoke handlers
+      // directly without going through main.ts.
+      request.page ??= context.getSelectedPage();
+      return originalHandler(request, response, context);
+    };
+  }
 }
 
 export const CLOSE_PAGE_ERROR =

@@ -301,19 +301,18 @@ describe('pages', () => {
           context,
         );
         const isolatedPage = context.getSelectedPage();
-        const isolatedPageId = context.getPageId(isolatedPage)!;
 
         // Switch global selection back to the default page.
         await selectPage.handler({params: {pageId: 1}}, response, context);
         assert.notStrictEqual(context.getSelectedPage(), isolatedPage);
 
-        // Navigate using pageId; should target the isolated page.
+        // Navigate using page; should target the isolated page.
         await navigatePage.handler(
           {
             params: {
               url: 'data:text/html,<h1>Navigated</h1>',
-              pageId: isolatedPageId,
             },
+            page: isolatedPage,
           },
           response,
           context,
@@ -383,6 +382,165 @@ describe('pages', () => {
           true,
         );
         assert.ok(response.includePages);
+      });
+    });
+    it('preserves focus across different browser contexts', async () => {
+      await withMcpContext(async (response, context) => {
+        // Create pages in separate isolated contexts.
+        await newPage.handler(
+          {params: {url: 'about:blank', isolatedContext: 'ctx-a'}},
+          response,
+          context,
+        );
+        const pageA = context.getSelectedPage();
+        const pageAId = context.getPageId(pageA)!;
+
+        await newPage.handler(
+          {params: {url: 'about:blank', isolatedContext: 'ctx-b'}},
+          response,
+          context,
+        );
+        const pageB = context.getSelectedPage();
+
+        // Selecting pageB (ctx-b) should not defocus pageA (ctx-a).
+        assert.strictEqual(
+          await pageA.evaluate(() => document.hasFocus()),
+          true,
+        );
+        assert.strictEqual(
+          await pageB.evaluate(() => document.hasFocus()),
+          true,
+        );
+
+        // Switching back to pageA should preserve pageB's focus.
+        await selectPage.handler(
+          {params: {pageId: pageAId}},
+          response,
+          context,
+        );
+        assert.strictEqual(
+          await pageA.evaluate(() => document.hasFocus()),
+          true,
+        );
+        assert.strictEqual(
+          await pageB.evaluate(() => document.hasFocus()),
+          true,
+        );
+      });
+    });
+    it('focuses correct same-context page after cross-context interleaving', async () => {
+      await withMcpContext(async (response, context) => {
+        // Create 2 pages in ctx-a, 1 in ctx-b.
+        await newPage.handler(
+          {params: {url: 'about:blank', isolatedContext: 'ctx-a'}},
+          response,
+          context,
+        );
+        const pageA1 = context.getSelectedPage();
+        const pageA1Id = context.getPageId(pageA1)!;
+
+        await newPage.handler(
+          {params: {url: 'about:blank', isolatedContext: 'ctx-b'}},
+          response,
+          context,
+        );
+        const pageB = context.getSelectedPage();
+
+        // pageA1 still focused (cross-context select doesn't defocus it).
+        assert.strictEqual(
+          await pageA1.evaluate(() => document.hasFocus()),
+          true,
+        );
+
+        // Create second page in ctx-a. This should defocus pageA1,
+        // even though #selectedPage was pageB (different context).
+        await newPage.handler(
+          {params: {url: 'about:blank', isolatedContext: 'ctx-a'}},
+          response,
+          context,
+        );
+        const pageA2 = context.getSelectedPage();
+
+        // pageA1 and pageA2 share the same BrowserContext.
+        assert.strictEqual(pageA1.browserContext(), pageA2.browserContext());
+
+        assert.strictEqual(
+          await pageA1.evaluate(() => document.hasFocus()),
+          false,
+          'pageA1 should lose focus when pageA2 is created in the same context',
+        );
+        assert.strictEqual(
+          await pageA2.evaluate(() => document.hasFocus()),
+          true,
+        );
+        // pageB is unaffected by ctx-a changes.
+        assert.strictEqual(
+          await pageB.evaluate(() => document.hasFocus()),
+          true,
+        );
+
+        // Re-selecting pageA1 should grant it focus via the override.
+        await selectPage.handler(
+          {params: {pageId: pageA1Id}},
+          response,
+          context,
+        );
+        assert.strictEqual(
+          await pageA1.evaluate(() => document.hasFocus()),
+          true,
+        );
+        // pageB still unaffected.
+        assert.strictEqual(
+          await pageB.evaluate(() => document.hasFocus()),
+          true,
+        );
+      });
+    });
+    it('handles focus correctly after closing the focused page in a context', async () => {
+      await withMcpContext(async (response, context) => {
+        await newPage.handler(
+          {params: {url: 'about:blank', isolatedContext: 'ctx-a'}},
+          response,
+          context,
+        );
+        const pageA1 = context.getSelectedPage();
+
+        await newPage.handler(
+          {params: {url: 'about:blank', isolatedContext: 'ctx-a'}},
+          response,
+          context,
+        );
+        const pageA2 = context.getSelectedPage();
+        const pageA2Id = context.getPageId(pageA2)!;
+
+        // pageA2 is focused, pageA1 is not.
+        assert.strictEqual(
+          await pageA2.evaluate(() => document.hasFocus()),
+          true,
+        );
+        assert.strictEqual(
+          await pageA1.evaluate(() => document.hasFocus()),
+          false,
+        );
+
+        // Close pageA2 (the focused page).
+        await closePage.handler(
+          {params: {pageId: pageA2Id}},
+          response,
+          context,
+        );
+
+        // Selecting pageA1 should work without errors.
+        const pageA1Id = context.getPageId(pageA1)!;
+        await selectPage.handler(
+          {params: {pageId: pageA1Id}},
+          response,
+          context,
+        );
+        assert.strictEqual(
+          await pageA1.evaluate(() => document.hasFocus()),
+          true,
+        );
       });
     });
   });
@@ -848,6 +1006,88 @@ describe('pages', () => {
           response.responseLines[0],
           'Successfully dismissed the dialog',
         );
+      });
+    });
+    it('can handle a dialog on a non-selected page via pageId', async () => {
+      await withMcpContext(async (response, context) => {
+        const page1 = context.getSelectedPage();
+        await context.newPage(); // page2 is now selected
+
+        const dialogPromise = new Promise<void>(resolve => {
+          page1.once('dialog', () => {
+            resolve();
+          });
+        });
+        page1.evaluate(() => {
+          alert('test');
+        });
+        await dialogPromise;
+
+        // page1 is not selected, but its dialog should be accessible via page.
+        await handleDialog.handler(
+          {
+            params: {
+              action: 'accept',
+            },
+            page: page1,
+          },
+          response,
+          context,
+        );
+        assert.strictEqual(context.getDialog(page1), undefined);
+        assert.strictEqual(
+          response.responseLines[0],
+          'Successfully accepted the dialog',
+        );
+      });
+    });
+    it('tracks dialogs independently per page', async () => {
+      await withMcpContext(async (response, context) => {
+        const page1 = context.getSelectedPage();
+        const page2 = await context.newPage();
+
+        // Trigger dialog on page1.
+        const dialog1Promise = new Promise<void>(resolve => {
+          page1.once('dialog', () => {
+            resolve();
+          });
+        });
+        page1.evaluate(() => {
+          alert('dialog1');
+        });
+        await dialog1Promise;
+
+        // Trigger dialog on page2.
+        const dialog2Promise = new Promise<void>(resolve => {
+          page2.once('dialog', () => {
+            resolve();
+          });
+        });
+        page2.evaluate(() => {
+          alert('dialog2');
+        });
+        await dialog2Promise;
+
+        // Both dialogs should be tracked.
+        assert.ok(context.getDialog(page1));
+        assert.ok(context.getDialog(page2));
+
+        // Handle page1's dialog; page2's should remain.
+        await handleDialog.handler(
+          {params: {action: 'accept'}, page: page1},
+          response,
+          context,
+        );
+        assert.strictEqual(context.getDialog(page1), undefined);
+        assert.ok(context.getDialog(page2));
+
+        // Handle page2's dialog.
+        await handleDialog.handler(
+          {params: {action: 'dismiss'}, page: page2},
+          response,
+          context,
+        );
+        assert.strictEqual(context.getDialog(page2), undefined);
       });
     });
   });

@@ -11,7 +11,7 @@ import type {ElementHandle, KeyInput, Page} from '../third_party/index.js';
 import {parseKey} from '../utils/keyboard.js';
 
 import {ToolCategory} from './categories.js';
-import {defineTool, pageIdSchema} from './ToolDefinition.js';
+import {defineTool} from './ToolDefinition.js';
 
 const dblClickSchema = zod
   .boolean()
@@ -58,6 +58,7 @@ export const click = defineTool({
   },
   handler: async (request, response, context) => {
     const uid = request.params.uid;
+    context.assertUidOnSelectedPage(uid);
     const handle = await context.getElementByUid(uid);
     try {
       await context.waitForEventsAfterAction(async () => {
@@ -88,16 +89,16 @@ export const clickAt = defineTool({
     category: ToolCategory.INPUT,
     readOnlyHint: false,
     conditions: ['computerVision'],
+    pageScoped: true,
   },
   schema: {
-    ...pageIdSchema,
     x: zod.number().describe('The x coordinate'),
     y: zod.number().describe('The y coordinate'),
     dblClick: dblClickSchema,
     includeSnapshot: includeSnapshotSchema,
   },
   handler: async (request, response, context) => {
-    const page = context.resolvePageById(request.params.pageId);
+    const page = request.page!;
     await context.waitForEventsAfterAction(async () => {
       await page.mouse.click(request.params.x, request.params.y, {
         clickCount: request.params.dblClick ? 2 : 1,
@@ -131,6 +132,7 @@ export const hover = defineTool({
   },
   handler: async (request, response, context) => {
     const uid = request.params.uid;
+    context.assertUidOnSelectedPage(uid);
     const handle = await context.getElementByUid(uid);
     try {
       await context.waitForEventsAfterAction(async () => {
@@ -223,9 +225,9 @@ export const fill = defineTool({
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
+    pageScoped: true,
   },
   schema: {
-    ...pageIdSchema,
     uid: zod
       .string()
       .describe(
@@ -235,7 +237,7 @@ export const fill = defineTool({
     includeSnapshot: includeSnapshotSchema,
   },
   handler: async (request, response, context) => {
-    const page = context.resolvePageById(request.params.pageId);
+    const page = request.page!;
     await context.waitForEventsAfterAction(async () => {
       await fillFormElement(
         request.params.uid,
@@ -289,6 +291,7 @@ export const drag = defineTool({
     includeSnapshot: includeSnapshotSchema,
   },
   handler: async (request, response, context) => {
+    context.assertUidOnSelectedPage(request.params.from_uid);
     const fromHandle = await context.getElementByUid(request.params.from_uid);
     const toHandle = await context.getElementByUid(request.params.to_uid);
     try {
@@ -314,9 +317,9 @@ export const fillForm = defineTool({
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
+    pageScoped: true,
   },
   schema: {
-    ...pageIdSchema,
     elements: zod
       .array(
         zod.object({
@@ -328,7 +331,7 @@ export const fillForm = defineTool({
     includeSnapshot: includeSnapshotSchema,
   },
   handler: async (request, response, context) => {
-    const page = context.resolvePageById(request.params.pageId);
+    const page = request.page!;
     for (const element of request.params.elements) {
       await context.waitForEventsAfterAction(async () => {
         await fillFormElement(
@@ -352,9 +355,9 @@ export const uploadFile = defineTool({
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
+    pageScoped: true,
   },
   schema: {
-    ...pageIdSchema,
     uid: zod
       .string()
       .describe(
@@ -376,9 +379,8 @@ export const uploadFile = defineTool({
         // a type=file element. In this case, we want to default to
         // Page.waitForFileChooser() and upload the file this way.
         try {
-          const page = context.resolvePageById(request.params.pageId);
           const [fileChooser] = await Promise.all([
-            page.waitForFileChooser({timeout: 3000}),
+            request.page!.waitForFileChooser({timeout: 3000}),
             handle.asLocator().click(),
           ]);
           await fileChooser.accept([filePath]);
@@ -389,8 +391,7 @@ export const uploadFile = defineTool({
         }
       }
       if (request.params.includeSnapshot) {
-        const page = context.resolvePageById(request.params.pageId);
-        response.includeSnapshot({page});
+        response.includeSnapshot({page: request.page!});
       }
       response.appendResponseLine(`File uploaded from ${filePath}.`);
     } finally {
@@ -405,9 +406,9 @@ export const pressKey = defineTool({
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
+    pageScoped: true,
   },
   schema: {
-    ...pageIdSchema,
     key: zod
       .string()
       .describe(
@@ -416,7 +417,7 @@ export const pressKey = defineTool({
     includeSnapshot: includeSnapshotSchema,
   },
   handler: async (request, response, context) => {
-    const page = context.resolvePageById(request.params.pageId);
+    const page = request.page!;
     const tokens = parseKey(request.params.key);
     const [key, ...modifiers] = tokens;
 

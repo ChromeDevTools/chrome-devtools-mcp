@@ -7,7 +7,7 @@
 import {zod} from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
-import {defineTool, pageIdSchema, timeoutSchema} from './ToolDefinition.js';
+import {defineTool, timeoutSchema} from './ToolDefinition.js';
 
 export const takeSnapshot = defineTool({
   name: 'take_snapshot',
@@ -18,9 +18,9 @@ in the DevTools Elements panel (if any).`,
     category: ToolCategory.DEBUGGING,
     // Not read-only due to filePath param.
     readOnlyHint: false,
+    pageScoped: true,
   },
   schema: {
-    ...pageIdSchema,
     verbose: zod
       .boolean()
       .optional()
@@ -34,12 +34,11 @@ in the DevTools Elements panel (if any).`,
         'The absolute path, or a path relative to the current working directory, to save the snapshot to instead of attaching it to the response.',
       ),
   },
-  handler: async (request, response, context) => {
-    const page = context.resolvePageById(request.params.pageId);
+  handler: async (request, response) => {
     response.includeSnapshot({
       verbose: request.params.verbose ?? false,
       filePath: request.params.filePath,
-      page,
+      page: request.page!,
     });
   },
 });
@@ -50,9 +49,9 @@ export const waitFor = defineTool({
   annotations: {
     category: ToolCategory.NAVIGATION,
     readOnlyHint: true,
+    pageScoped: true,
   },
   schema: {
-    ...pageIdSchema,
     text: zod
       .array(zod.string())
       .min(1)
@@ -62,7 +61,7 @@ export const waitFor = defineTool({
     ...timeoutSchema,
   },
   handler: async (request, response, context) => {
-    const page = context.resolvePageById(request.params.pageId);
+    const page = request.page!;
     await context.waitForTextOnPage(
       request.params.text,
       request.params.timeout,
