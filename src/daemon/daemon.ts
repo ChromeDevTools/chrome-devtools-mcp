@@ -15,6 +15,7 @@ import {StdioClientTransport} from '@modelcontextprotocol/sdk/client/stdio.js';
 
 import {logger} from '../logger.js';
 import {PipeTransport} from '../third_party/index.js';
+import {VERSION} from '../version.js';
 
 import {
   getSocketPath,
@@ -43,8 +44,7 @@ async function setupMCPClient() {
   mcpClient = new Client(
     {
       name: 'chrome-devtools-cli-daemon',
-      // TODO: handle client version (optional).
-      version: '0.1.0',
+      version: VERSION,
     },
     {
       capabilities: {},
