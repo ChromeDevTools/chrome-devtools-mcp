@@ -11,9 +11,13 @@ import {describe, it} from 'node:test';
 
 import {executablePath} from 'puppeteer';
 
-import {ensureBrowserConnected, launch} from '../src/browser.js';
+import {detectDisplay, ensureBrowserConnected, launch} from '../src/browser.js';
 
 describe('browser', () => {
+  it('detects display does not crash', () => {
+    detectDisplay();
+  });
+
   it('cannot launch multiple times with the same profile', async () => {
     const tmpDir = os.tmpdir();
     const folderPath = path.join(tmpDir, `temp-folder-${crypto.randomUUID()}`);
