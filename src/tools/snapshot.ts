@@ -49,7 +49,12 @@ export const waitFor = defineTool({
     readOnlyHint: true,
   },
   schema: {
-    text: zod.string().describe('Text to appear on the page'),
+    text: zod
+      .array(zod.string())
+      .min(1)
+      .describe(
+        'Non-empty list of texts. Resolves when any value appears on the page.',
+      ),
     ...timeoutSchema,
   },
   handler: async (request, response, context) => {
@@ -59,7 +64,7 @@ export const waitFor = defineTool({
     );
 
     response.appendResponseLine(
-      `Element with text "${request.params.text}" found.`,
+      `Element matching one of ${JSON.stringify(request.params.text)} found.`,
     );
 
     response.includeSnapshot();

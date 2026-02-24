@@ -7,7 +7,7 @@
 import {logger} from '../logger.js';
 import type {McpContext, TextSnapshotNode} from '../McpContext.js';
 import {zod} from '../third_party/index.js';
-import type {ElementHandle} from '../third_party/index.js';
+import type {ElementHandle, KeyInput} from '../third_party/index.js';
 import {parseKey} from '../utils/keyboard.js';
 
 import {ToolCategory} from './categories.js';
@@ -22,6 +22,13 @@ const includeSnapshotSchema = zod
   .boolean()
   .optional()
   .describe('Whether to include a snapshot in the response. Default is false.');
+
+const submitKeySchema = zod
+  .string()
+  .optional()
+  .describe(
+    'Optional key to press after typing. E.g., "Enter", "Tab", "Escape"',
+  );
 
 function handleActionError(error: unknown, uid: string) {
   logger('failed to act using a locator', error);
@@ -236,6 +243,31 @@ export const fill = defineTool({
     if (request.params.includeSnapshot) {
       response.includeSnapshot();
     }
+  },
+});
+
+export const typeText = defineTool({
+  name: 'type_text',
+  description: `Type text using keyboard into a previously focused input`,
+  annotations: {
+    category: ToolCategory.INPUT,
+    readOnlyHint: false,
+  },
+  schema: {
+    text: zod.string().describe('The text to type'),
+    submitKey: submitKeySchema,
+  },
+  handler: async (request, response, context) => {
+    await context.waitForEventsAfterAction(async () => {
+      const page = context.getSelectedPage();
+      await page.keyboard.type(request.params.text);
+      if (request.params.submitKey) {
+        await page.keyboard.press(request.params.submitKey as KeyInput);
+      }
+    });
+    response.appendResponseLine(
+      `Typed text "${request.params.text}${request.params.submitKey ? ` + ${request.params.submitKey}` : ''}"`,
+    );
   },
 });
 

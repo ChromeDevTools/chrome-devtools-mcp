@@ -16,6 +16,7 @@ import {logger, saveLogsToFile} from './logger.js';
 import {McpContext} from './McpContext.js';
 import {McpResponse} from './McpResponse.js';
 import {Mutex} from './Mutex.js';
+import {SlimMcpResponse} from './SlimMcpResponse.js';
 import {ClearcutLogger} from './telemetry/ClearcutLogger.js';
 import {computeFlagUsage} from './telemetry/flagUtils.js';
 import {bucketizeLatency} from './telemetry/metricUtils.js';
@@ -27,12 +28,8 @@ import {
 } from './third_party/index.js';
 import {ToolCategory} from './tools/categories.js';
 import type {ToolDefinition} from './tools/ToolDefinition.js';
-import {tools} from './tools/tools.js';
-
-// If moved update release-please config
-// x-release-please-start-version
-const VERSION = '0.17.3';
-// x-release-please-end
+import {createTools} from './tools/tools.js';
+import {VERSION} from './version.js';
 
 export const args = parseArguments(VERSION);
 
@@ -130,13 +127,13 @@ debug, and modify any data in the browser or DevTools.
 Avoid sharing sensitive or personal information that you do not want to share with MCP clients.`,
   );
 
-  if (args.performanceCrux) {
+  if (!args.slim && args.performanceCrux) {
     console.error(
       `Performance tools may send trace URLs to the Google CrUX API to fetch real-user experience data. To disable, run with --no-performance-crux.`,
     );
   }
 
-  if (args.usageStatistics) {
+  if (!args.slim && args.usageStatistics) {
     console.error(
       `
 Google collects usage statistics to improve Chrome DevTools MCP. To opt-out, run with --no-usage-statistics.
@@ -206,7 +203,7 @@ function registerTool(tool: ToolDefinition): void {
         const context = await getContext();
         logger(`${tool.name} context: resolved`);
         await context.detectOpenDevToolsWindows();
-        const response = new McpResponse();
+        const response = args.slim ? new SlimMcpResponse() : new McpResponse();
         await tool.handler(
           {
             params,
@@ -258,6 +255,7 @@ function registerTool(tool: ToolDefinition): void {
   );
 }
 
+const tools = createTools(args);
 for (const tool of tools) {
   registerTool(tool);
 }

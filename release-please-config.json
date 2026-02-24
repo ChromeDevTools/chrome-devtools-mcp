@@ -18,7 +18,7 @@
       "extra-files": [
         {
           "type": "generic",
-          "path": "src/main.ts"
+          "path": "src/version.ts"
         },
         {
           "type": "json",

@@ -6,6 +6,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import {pathToFileURL} from 'node:url';
 import {parseArgs} from 'node:util';
 
 import {GoogleGenAI, mcpToTool} from '@google/genai';
@@ -35,7 +36,7 @@ export interface TestScenario {
 }
 
 async function loadScenario(scenarioPath: string): Promise<TestScenario> {
-  const module = await import(scenarioPath);
+  const module = await import(pathToFileURL(scenarioPath).href);
   if (!module.scenario) {
     throw new Error(
       `Scenario file ${scenarioPath} does not export a 'scenario' object.`,
@@ -110,6 +111,7 @@ async function runSingleScenario(
         env[key] = value;
       }
     });
+    env['CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS'] = 'true';
 
     const args = [serverPath];
     if (!debug) {

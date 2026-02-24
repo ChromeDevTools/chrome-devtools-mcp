@@ -19,6 +19,7 @@ import {NetworkCollector, ConsoleCollector} from './PageCollector.js';
 import type {DevTools} from './third_party/index.js';
 import type {
   Browser,
+  BrowserContext,
   ConsoleMessage,
   Debugger,
   Dialog,
@@ -119,11 +120,17 @@ export class McpContext implements Context {
   browser: Browser;
   logger: Debugger;
 
-  // The most recent page state.
+  // Maps LLM-provided isolatedContext name → Puppeteer BrowserContext.
+  #isolatedContexts = new Map<string, BrowserContext>();
+  // Reverse lookup: Page → isolatedContext name (for snapshot labeling).
+  // WeakMap so closed pages are garbage-collected automatically.
+  #pageToIsolatedContextName = new WeakMap<Page, string>();
+  // Auto-generated name counter for when no name is provided.
+  #nextIsolatedContextId = 1;
+
   #pages: Page[] = [];
   #pageToDevToolsPage = new Map<Page, Page>();
   #selectedPage?: Page;
-  // The most recent snapshot.
   #textSnapshot: TextSnapshot | null = null;
   #networkCollector: NetworkCollector;
   #consoleCollector: ConsoleCollector;
@@ -187,6 +194,10 @@ export class McpContext implements Context {
     this.#networkCollector.dispose();
     this.#consoleCollector.dispose();
     this.#devtoolsUniverseManager.dispose();
+    // Isolated contexts are intentionally not closed here.
+    // Either the entire browser will be closed or we disconnect
+    // without destroying browser state.
+    this.#isolatedContexts.clear();
   }
 
   static async from(
@@ -269,8 +280,22 @@ export class McpContext implements Context {
     return this.#consoleCollector.getById(this.getSelectedPage(), id);
   }
 
-  async newPage(background?: boolean): Promise<Page> {
-    const page = await this.browser.newPage({background});
+  async newPage(
+    background?: boolean,
+    isolatedContextName?: string,
+  ): Promise<Page> {
+    let page: Page;
+    if (isolatedContextName !== undefined) {
+      let ctx = this.#isolatedContexts.get(isolatedContextName);
+      if (!ctx) {
+        ctx = await this.browser.createBrowserContext();
+        this.#isolatedContexts.set(isolatedContextName, ctx);
+      }
+      page = await ctx.newPage();
+      this.#pageToIsolatedContextName.set(page, isolatedContextName);
+    } else {
+      page = await this.browser.newPage({background});
+    }
     await this.createPagesSnapshot();
     this.selectPage(page);
     this.#networkCollector.addPage(page);
@@ -283,6 +308,7 @@ export class McpContext implements Context {
     }
     const page = this.getPageById(pageId);
     await page.close({runBeforeUnload: false});
+    this.#pageToIsolatedContextName.delete(page);
   }
 
   getNetworkRequestById(reqid: number): HTTPRequest {
@@ -558,13 +584,8 @@ export class McpContext implements Context {
     }
   }
 
-  /**
-   * Creates a snapshot of the pages.
-   */
   async createPagesSnapshot(): Promise<Page[]> {
-    const allPages = await this.browser.pages(
-      this.#options.experimentalIncludeAllPages,
-    );
+    const allPages = await this.#getAllPages();
 
     for (const page of allPages) {
       if (!this.#pageIdMap.has(page)) {
@@ -573,8 +594,6 @@ export class McpContext implements Context {
     }
 
     this.#pages = allPages.filter(page => {
-      // If we allow debugging DevTools windows, return all pages.
-      // If we are in regular mode, the user should only see non-DevTools page.
       return (
         this.#options.experimentalDevToolsDebugging ||
         !page.url().startsWith('devtools://')
@@ -593,11 +612,44 @@ export class McpContext implements Context {
     return this.#pages;
   }
 
-  async detectOpenDevToolsWindows() {
-    this.logger('Detecting open DevTools windows');
-    const pages = await this.browser.pages(
+  async #getAllPages(): Promise<Page[]> {
+    const defaultCtx = this.browser.defaultBrowserContext();
+    const allPages = await this.browser.pages(
       this.#options.experimentalIncludeAllPages,
     );
+
+    // Build a reverse lookup from BrowserContext instance → name.
+    const contextToName = new Map<BrowserContext, string>();
+    for (const [name, ctx] of this.#isolatedContexts) {
+      contextToName.set(ctx, name);
+    }
+
+    // Auto-discover BrowserContexts not in our mapping (e.g., externally
+    // created incognito contexts) and assign generated names.
+    const knownContexts = new Set(this.#isolatedContexts.values());
+    for (const ctx of this.browser.browserContexts()) {
+      if (ctx !== defaultCtx && !ctx.closed && !knownContexts.has(ctx)) {
+        const name = `isolated-context-${this.#nextIsolatedContextId++}`;
+        this.#isolatedContexts.set(name, ctx);
+        contextToName.set(ctx, name);
+      }
+    }
+
+    // Use page.browserContext() to determine each page's context membership.
+    for (const page of allPages) {
+      const ctx = page.browserContext();
+      const name = contextToName.get(ctx);
+      if (name) {
+        this.#pageToIsolatedContextName.set(page, name);
+      }
+    }
+
+    return allPages;
+  }
+
+  async detectOpenDevToolsWindows() {
+    this.logger('Detecting open DevTools windows');
+    const pages = await this.#getAllPages();
     this.#pageToDevToolsPage = new Map<Page, Page>();
     for (const devToolsPage of pages) {
       if (devToolsPage.url().startsWith('devtools://')) {
@@ -627,6 +679,10 @@ export class McpContext implements Context {
 
   getPages(): Page[] {
     return this.#pages;
+  }
+
+  getIsolatedContextName(page: Page): string | undefined {
+    return this.#pageToIsolatedContextName.get(page);
   }
 
   getDevToolsPage(page: Page): Page | undefined {
@@ -825,15 +881,17 @@ export class McpContext implements Context {
     return this.#networkCollector.getIdForResource(request);
   }
 
-  waitForTextOnPage(text: string, timeout?: number): Promise<Element> {
+  waitForTextOnPage(text: string[], timeout?: number): Promise<Element> {
     const page = this.getSelectedPage();
     const frames = page.frames();
 
     let locator = this.#locatorClass.race(
-      frames.flatMap(frame => [
-        frame.locator(`aria/${text}`),
-        frame.locator(`text/${text}`),
-      ]),
+      frames.flatMap(frame =>
+        text.flatMap(value => [
+          frame.locator(`aria/${value}`),
+          frame.locator(`text/${value}`),
+        ]),
+      ),
     );
 
     if (timeout) {
@@ -857,7 +915,8 @@ export class McpContext implements Context {
         },
       } as ListenerMap;
     });
-    await this.#networkCollector.init(await this.browser.pages());
+    const pages = await this.#getAllPages();
+    await this.#networkCollector.init(pages);
   }
 
   async installExtension(extensionPath: string): Promise<string> {
