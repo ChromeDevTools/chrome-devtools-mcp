@@ -8,6 +8,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
+import type {ParsedArguments} from './cli.js';
 import type {TargetUniverse} from './DevtoolsUtils.js';
 import {
   extractUrlLikeFromDevToolsTitle,
@@ -29,6 +30,7 @@ import type {
   ScreenRecorder,
   SerializedAXNode,
   Viewport,
+  Target,
 } from './third_party/index.js';
 import {Locator} from './third_party/index.js';
 import {PredefinedNetworkConditions} from './third_party/index.js';
@@ -48,6 +50,12 @@ export interface TextSnapshotNode extends SerializedAXNode {
   backendNodeId?: number;
   loaderId?: string;
   children: TextSnapshotNode[];
+}
+
+export interface ExtensionServiceWorker {
+	url: string;
+	target: Target;
+	id: string;
 }
 
 export interface GeolocationOptions {
@@ -129,6 +137,8 @@ export class McpContext implements Context {
   #nextIsolatedContextId = 1;
 
   #pages: Page[] = [];
+  #extensionServiceWorkers: ExtensionServiceWorker[] = [];
+
   #pageToDevToolsPage = new Map<Page, Page>();
   #selectedPage?: Page;
   #textSnapshot: TextSnapshot | null = null;
@@ -145,6 +155,9 @@ export class McpContext implements Context {
 
   #pageIdMap = new WeakMap<Page, number>();
   #nextPageId = 1;
+
+	#extensionServiceWorkerMap = new WeakMap<Target, string>();
+	#nextExtensionServiceWorkerId = 1;
 
   #nextSnapshotId = 1;
   #traceResults: TraceResult[] = [];
@@ -185,6 +198,7 @@ export class McpContext implements Context {
 
   async #init() {
     const pages = await this.createPagesSnapshot();
+    await this.createExtensionServiceWorkersSnapshot();
     await this.#networkCollector.init(pages);
     await this.#consoleCollector.init(pages);
     await this.#devtoolsUniverseManager.init(pages);
@@ -494,7 +508,7 @@ export class McpContext implements Context {
     }
     if (page.isClosed()) {
       throw new Error(
-        `The selected page has been closed. Call ${listPages.name} to see open pages.`,
+        `The selected page has been closed. Call ${listPages({} as ParsedArguments).name} to see open pages.`,
       );
     }
     return page;
@@ -583,6 +597,41 @@ export class McpContext implements Context {
       });
     }
   }
+
+	/**
+	 * Creates a snapshot of the extension service workers.
+	 */
+	async createExtensionServiceWorkersSnapshot(): Promise<
+		ExtensionServiceWorker[]
+	> {
+		const allTargets = await this.browser.targets();
+
+		const serviceWorkers = allTargets.filter(target => {
+			return (
+				target.type() === 'service_worker' &&
+				target.url().includes('chrome-extension://')
+			);
+		});
+
+		for (const serviceWorker of serviceWorkers) {
+			if (!this.#extensionServiceWorkerMap.has(serviceWorker)) {
+				this.#extensionServiceWorkerMap.set(
+					serviceWorker,
+					'sw-' + this.#nextExtensionServiceWorkerId++,
+				);
+			}
+		}
+
+		this.#extensionServiceWorkers = serviceWorkers.map(serviceWorker => {
+			return {
+				target: serviceWorker,
+				id: this.#extensionServiceWorkerMap.get(serviceWorker)!,
+				url: serviceWorker.url(),
+			};
+		});
+
+		return this.#extensionServiceWorkers;
+	}
 
   async createPagesSnapshot(): Promise<Page[]> {
     const allPages = await this.#getAllPages();
@@ -676,6 +725,16 @@ export class McpContext implements Context {
       }
     }
   }
+
+	getExtensionServiceWorkers(): ExtensionServiceWorker[] {
+		return this.#extensionServiceWorkers;
+	}
+
+	getExtensionServiceWorkerId(
+		extensionServiceWorker: ExtensionServiceWorker,
+	): string | undefined {
+		return this.#extensionServiceWorkerMap.get(extensionServiceWorker.target);
+	}
 
   getPages(): Page[] {
     return this.#pages;

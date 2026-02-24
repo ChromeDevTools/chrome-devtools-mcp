@@ -96,6 +96,7 @@ export interface Response {
     insightName: InsightName,
   ): void;
   setListExtensions(): void;
+  setIncludeExtensionServiceWorkers(value: boolean): void;
 }
 
 /**

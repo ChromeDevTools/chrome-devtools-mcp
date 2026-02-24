@@ -5,11 +5,14 @@
  */
 
 import assert from 'node:assert';
+import path from 'node:path';
 import {afterEach, describe, it} from 'node:test';
 
 import type {Dialog} from 'puppeteer-core';
 import sinon from 'sinon';
 
+import type {ParsedArguments} from '../../src/cli.js';
+import {installExtension} from '../../src/tools/extensions.js';
 import {
   listPages,
   newPage,
@@ -22,6 +25,11 @@ import {
 } from '../../src/tools/pages.js';
 import {html, withMcpContext} from '../utils.js';
 
+const EXTENSION_PATH = path.join(
+  import.meta.dirname,
+  '../../../tests/tools/fixtures/extension-sw',
+);
+
 describe('pages', () => {
   afterEach(() => {
     sinon.restore();
@@ -30,10 +38,57 @@ describe('pages', () => {
   describe('list_pages', () => {
     it('list pages', async () => {
       await withMcpContext(async (response, context) => {
-        await listPages.handler({params: {}}, response, context);
+        await listPages({} as ParsedArguments).handler(
+          {params: {}},
+          response,
+          context,
+        );
         assert.ok(response.includePages);
       });
     });
+    for (const categoryExtensions of [true, false]) {
+      it(`list pages ${categoryExtensions ? 'with' : 'without'} --category-extensions`, async () => {
+        await withMcpContext(async (response, context) => {
+          await installExtension.handler(
+            {params: {path: EXTENSION_PATH}},
+            response,
+            context,
+          );
+
+          const swTarget = await context.browser.waitForTarget(
+            t =>
+              t.type() === 'service_worker' &&
+              t.url().includes('chrome-extension://'),
+          );
+          const swUrl = swTarget.url();
+
+          response.resetResponseLineForTesting();
+
+          const listPageDef = listPages({categoryExtensions} as ParsedArguments);
+          await listPageDef.handler({params: {}}, response, context);
+
+          const result = await response.handle(listPageDef.name, context);
+          const textContent = result.content.find(c => c.type === 'text') as {
+            type: 'text';
+            text: string;
+          };
+          assert.ok(textContent);
+
+          if (categoryExtensions) {
+            assert.ok(textContent.text.includes(swUrl));
+            const structured = result.structuredContent as {
+              extensionServiceWorkers: Array<{url: string}>;
+            };
+            assert.deepStrictEqual(
+              structured.extensionServiceWorkers.map(sw => sw.url),
+              [swUrl],
+            );
+          } else {
+            assert.ok(!textContent.text.includes(swUrl));
+          }
+        });
+      });
+    }
   });
   describe('new_page', () => {
     it('create a page', async () => {

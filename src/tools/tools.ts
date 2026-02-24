@@ -42,8 +42,7 @@ export const createTools = (args: ParsedArguments) => {
   const tools: ToolDefinition[] = [];
   for (const tool of rawTools) {
     if (typeof tool === 'function') {
-      // @ts-expect-error none of the tools for now implement the function type tool has type "never"
-      tools.push(tool(args) as ToolDefinition);
+      tools.push(tool(args));
     } else {
       tools.push(tool as ToolDefinition);
     }
