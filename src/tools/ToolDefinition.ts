@@ -110,12 +110,9 @@ export type Context = Readonly<{
   getDialog(): Dialog | undefined;
   clearDialog(): void;
   getPageById(pageId: number): Page;
-  getPageId(page: Page): number | undefined;
-  isPageSelected(page: Page): boolean;
   newPage(background?: boolean, isolatedContextName?: string): Promise<Page>;
   closePage(pageId: number): Promise<void>;
   selectPage(page: Page): void;
-  getIsolatedContextName(page: Page): string | undefined;
   getElementByUid(uid: string): Promise<ElementHandle<Element>>;
   getAXNodeByUid(uid: string): TextSnapshotNode | undefined;
   emulate(options: {
@@ -126,12 +123,6 @@ export type Context = Readonly<{
     colorScheme?: 'dark' | 'light' | 'auto' | null;
     viewport?: Viewport | null;
   }): Promise<void>;
-  getNetworkConditions(): string | null;
-  getCpuThrottlingRate(): number;
-  getGeolocation(): GeolocationOptions | null;
-  getViewport(): Viewport | null;
-  getUserAgent(): string | null;
-  getColorScheme(): 'dark' | 'light' | null;
   saveTemporaryFile(
     data: Uint8Array<ArrayBufferLike>,
     mimeType: 'image/png' | 'image/jpeg' | 'image/webp',
