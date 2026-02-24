@@ -27,7 +27,6 @@ import {
   SetLevelRequestSchema,
 } from './third_party/index.js';
 import {ToolCategory} from './tools/categories.js';
-import {tools as slimTools} from './tools/slim/tools.js';
 import type {ToolDefinition} from './tools/ToolDefinition.js';
 import {createTools} from './tools/tools.js';
 import {VERSION} from './version.js';
@@ -257,7 +256,7 @@ function registerTool(tool: ToolDefinition): void {
 }
 
 const tools = createTools(args);
-for (const tool of args.slim ? slimTools : tools) {
+for (const tool of tools) {
   registerTool(tool);
 }
 
