@@ -19,8 +19,7 @@ export const takeMemorySnapshot = defineTool({
   schema: {
     filePath: zod
       .string()
-      .describe('A path to a .heapsnapshot file to save the heapsnapshot to.')
-      .endsWith('.heapsnapshot'),
+      .describe('A path to a .heapsnapshot file to save the heapsnapshot to.'),
   },
   handler: async (request, response, context) => {
     const page = context.getSelectedPage();
