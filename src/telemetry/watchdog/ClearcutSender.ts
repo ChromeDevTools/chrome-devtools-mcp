@@ -168,6 +168,7 @@ export class ClearcutSender {
   }
 
   #scheduleFlush(delayMs: number): void {
+    logger(`Scheduling flush in ${delayMs}`);
     if (this.#flushTimer) {
       clearTimeout(this.#flushTimer);
     }
@@ -183,6 +184,7 @@ export class ClearcutSender {
     isPermanentError?: boolean;
     nextRequestWaitMs?: number;
   }> {
+    logger(`Sending batch ${events.length}`);
     const requestBody: LogRequest = {
       log_source: LOG_SOURCE,
       request_time_ms: Date.now().toString(),
