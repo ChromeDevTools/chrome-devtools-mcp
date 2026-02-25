@@ -58,7 +58,10 @@ export const screenshot = defineTool({
 
     let pageOrHandle: Page | ElementHandle;
     if (request.params.uid) {
-      pageOrHandle = await context.getElementByUid(request.params.uid);
+      pageOrHandle = await context.getElementByUid(
+        request.params.uid,
+        request.page,
+      );
     } else {
       pageOrHandle = request.page!;
     }

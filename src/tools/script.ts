@@ -50,7 +50,7 @@ Example with arguments: \`(el) => {
     try {
       const frames = new Set<Frame>();
       for (const el of request.params.args ?? []) {
-        const handle = await context.getElementByUid(el.uid);
+        const handle = await context.getElementByUid(el.uid, request.page);
         frames.add(handle.frame);
         args.push(handle);
       }

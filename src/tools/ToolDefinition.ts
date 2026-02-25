@@ -117,16 +117,15 @@ export type Context = Readonly<{
   recordedTraces(): TraceResult[];
   storeTraceRecording(result: TraceResult): void;
   getSelectedPage(): Page;
-  resolvePageById(pageId?: number): Page;
   getDialog(page?: Page): Dialog | undefined;
   clearDialog(page?: Page): void;
   getPageById(pageId: number): Page;
   newPage(background?: boolean, isolatedContextName?: string): Promise<Page>;
   closePage(pageId: number): Promise<void>;
   selectPage(page: Page): void;
-  getElementByUid(uid: string): Promise<ElementHandle<Element>>;
+  assertPageIsFocused(page: Page): void;
+  getElementByUid(uid: string, page?: Page): Promise<ElementHandle<Element>>;
   getAXNodeByUid(uid: string): TextSnapshotNode | undefined;
-  assertUidOnSelectedPage(uid: string): void;
   emulate(
     options: {
       networkConditions?: string | null;
@@ -138,12 +137,6 @@ export type Context = Readonly<{
     },
     targetPage?: Page,
   ): Promise<void>;
-  getNetworkConditions(): string | null;
-  getCpuThrottlingRate(): number;
-  getGeolocation(): GeolocationOptions | null;
-  getViewport(): Viewport | null;
-  getUserAgent(): string | null;
-  getColorScheme(): 'dark' | 'light' | null;
   saveTemporaryFile(
     data: Uint8Array<ArrayBufferLike>,
     mimeType: 'image/png' | 'image/jpeg' | 'image/webp',
@@ -166,13 +159,6 @@ export type Context = Readonly<{
    * Returns a reqid for a cdpRequestId.
    */
   resolveCdpRequestId(cdpRequestId: string): number | undefined;
-  /**
-   * Returns a reqid for a cdpRequestId.
-   */
-  resolveCdpElementId(
-    cdpBackendNodeId: number,
-    page?: Page,
-  ): string | undefined;
   getScreenRecorder(): {recorder: ScreenRecorder; filePath: string} | null;
   setScreenRecorder(
     data: {recorder: ScreenRecorder; filePath: string} | null,

@@ -176,31 +176,38 @@ export async function createMcpServer(
           const page = tool.annotations.pageScoped
             ? context.resolvePageById(params.pageId as number | undefined)
             : undefined;
-          await tool.handler(
-            {
-              params,
-              page,
-            },
-            response,
-            context,
-          );
-          const {content, structuredContent} = await response.handle(
-            tool.name,
-            context,
-          );
-          const result: CallToolResult & {
-            structuredContent?: Record<string, unknown>;
-          } = {
-            content,
-          };
-          success = true;
-          if (serverArgs.experimentalStructuredContent) {
-            result.structuredContent = structuredContent as Record<
-              string,
-              unknown
-            >;
+          if (page) {
+            context.setRequestPage(page);
           }
-          return result;
+          try {
+            await tool.handler(
+              {
+                params,
+                page,
+              },
+              response,
+              context,
+            );
+            const {content, structuredContent} = await response.handle(
+              tool.name,
+              context,
+            );
+            const result: CallToolResult & {
+              structuredContent?: Record<string, unknown>;
+            } = {
+              content,
+            };
+            success = true;
+            if (serverArgs.experimentalStructuredContent) {
+              result.structuredContent = structuredContent as Record<
+                string,
+                unknown
+              >;
+            }
+            return result;
+          } finally {
+            context.setRequestPage(undefined);
+          }
         } catch (err) {
           logger(`${tool.name} error:`, err, err?.stack);
           let errorText = err && 'message' in err ? err.message : String(err);

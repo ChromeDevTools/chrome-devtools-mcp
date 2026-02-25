@@ -58,7 +58,6 @@ export const click = defineTool({
   },
   handler: async (request, response, context) => {
     const uid = request.params.uid;
-    context.assertUidOnSelectedPage(uid);
     const handle = await context.getElementByUid(uid);
     try {
       await context.waitForEventsAfterAction(async () => {
@@ -99,6 +98,7 @@ export const clickAt = defineTool({
   },
   handler: async (request, response, context) => {
     const page = request.page!;
+    context.assertPageIsFocused(page);
     await context.waitForEventsAfterAction(async () => {
       await page.mouse.click(request.params.x, request.params.y, {
         clickCount: request.params.dblClick ? 2 : 1,
@@ -132,7 +132,6 @@ export const hover = defineTool({
   },
   handler: async (request, response, context) => {
     const uid = request.params.uid;
-    context.assertUidOnSelectedPage(uid);
     const handle = await context.getElementByUid(uid);
     try {
       await context.waitForEventsAfterAction(async () => {
@@ -195,9 +194,9 @@ async function fillFormElement(
   uid: string,
   value: string,
   context: McpContext,
-  page?: Page,
+  page: Page,
 ) {
-  const handle = await context.getElementByUid(uid);
+  const handle = await context.getElementByUid(uid, page);
   try {
     const aXNode = context.getAXNodeByUid(uid);
     // We assume that combobox needs to be handled as select if it has
@@ -207,9 +206,8 @@ async function fillFormElement(
     } else {
       // Increase timeout for longer input values.
       const timeoutPerChar = 10; // ms
-      const targetPage = page ?? context.getSelectedPage();
       const fillTimeout =
-        targetPage.getDefaultTimeout() + value.length * timeoutPerChar;
+        page.getDefaultTimeout() + value.length * timeoutPerChar;
       await handle.asLocator().setTimeout(fillTimeout).fill(value);
     }
   } catch (error) {
@@ -259,14 +257,16 @@ export const typeText = defineTool({
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
+    pageScoped: true,
   },
   schema: {
     text: zod.string().describe('The text to type'),
     submitKey: submitKeySchema,
   },
   handler: async (request, response, context) => {
+    const page = request.page!;
+    context.assertPageIsFocused(page);
     await context.waitForEventsAfterAction(async () => {
-      const page = context.getSelectedPage();
       await page.keyboard.type(request.params.text);
       if (request.params.submitKey) {
         await page.keyboard.press(request.params.submitKey as KeyInput);
@@ -291,7 +291,6 @@ export const drag = defineTool({
     includeSnapshot: includeSnapshotSchema,
   },
   handler: async (request, response, context) => {
-    context.assertUidOnSelectedPage(request.params.from_uid);
     const fromHandle = await context.getElementByUid(request.params.from_uid);
     const toHandle = await context.getElementByUid(request.params.to_uid);
     try {
@@ -370,6 +369,7 @@ export const uploadFile = defineTool({
     const {uid, filePath} = request.params;
     const handle = (await context.getElementByUid(
       uid,
+      request.page,
     )) as ElementHandle<HTMLInputElement>;
     try {
       try {
@@ -418,6 +418,7 @@ export const pressKey = defineTool({
   },
   handler: async (request, response, context) => {
     const page = request.page!;
+    context.assertPageIsFocused(page);
     const tokens = parseKey(request.params.key);
     const [key, ...modifiers] = tokens;
 
