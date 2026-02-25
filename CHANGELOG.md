@@ -1,5 +1,34 @@
 # Changelog
 
+## [0.18.0](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.17.3...chrome-devtools-mcp-v0.18.0) (2026-02-24)
+
+
+### 🎉 Features
+
+* `--slim` mode for maximum token savings ([#958](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/958)) ([c402b43](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/c402b43697d834994c4fc141305189082da14bee))
+* add a new skill for accessibility debugging and auditing with Chrome DevTools MCP. ([#1002](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1002)) ([b0c6d04](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/b0c6d042e4d68763acf989edc8097ce07e85dc7a))
+* add experimental screencast recording tools ([#941](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/941)) ([33446d4](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/33446d457e4386fadcfe4ddf6c7a43b2e9098c9a))
+* add skill to debug and optimize LCP ([#993](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/993)) ([2cd9b95](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/2cd9b95346226aa52cce18f6ab889a2ae194806c))
+* add storage-isolated browser contexts ([#991](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/991)) ([59f6477](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/59f6477a70eb07585e9a510089f1dfc840a012fd))
+* add take_memory_snapshot tool ([#1023](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1023)) ([7ffdc5e](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/7ffdc5ee4d9df9f62f03354fa758fb4d022c3b08))
+* support any-match text arrays in wait_for ([#1011](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1011)) ([496ab1b](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/496ab1b45f7a283a1432643777e0795a17f33667))
+* support type_text ([#1026](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1026)) ([b5d01b5](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/b5d01b5fe65fa20f9b76555b86a749960a5d1738))
+
+
+### 🛠️ Fixes
+
+* detect X server display on Linux ([#1027](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1027)) ([1746ed9](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/1746ed9ee11c212f78dcbb00af99a0400595e778))
+
+
+### ♻️ Chores
+
+* cleanup string and structured console formatters ([#1005](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1005)) ([0d78685](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/0d78685a5b37dc68bb11a1088ff8816ecff3bb82))
+* extract version in a seprate file ([#1032](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1032)) ([0106865](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/0106865aad6d51b6cb590bf98ccaf7078e8d7436))
+* move emulation settings to context ([#1000](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1000)) ([bc3c40e](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/bc3c40e8f961433fb2ae858482d66f9a55fdde32))
+* optimize slim tool descriptions and params ([#1028](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1028)) ([ca6635d](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/ca6635d5a5d5e8b7b9944fa8b4e1063e6269a5f2))
+* simplify JavaScript code examples, update code block language, and refine descriptions in a11y debugging skill documentation. ([#1009](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1009)) ([5cedcaa](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/5cedcaad2c8a5e488064e21fb56cbd8643345440))
+* types for JSON output of IssueFormatter ([#1007](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1007)) ([9ef4479](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/9ef4479bec39c5f2651d6ebb63e9ec0fecf8bf89))
+
 ## [0.17.3](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.17.2...chrome-devtools-mcp-v0.17.3) (2026-02-19)
 
 
