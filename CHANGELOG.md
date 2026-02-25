@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.18.1](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.18.0...chrome-devtools-mcp-v0.18.1) (2026-02-25)
+
+
+### 🛠️ Fixes
+
+* remove endsWith for filePath in memory tools ([#1041](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1041)) ([d0622d5](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/d0622d52d46ac72a28bc22f93a337fb5007214c7))
+
 ## [0.18.0](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.17.3...chrome-devtools-mcp-v0.18.0) (2026-02-24)
 
 
