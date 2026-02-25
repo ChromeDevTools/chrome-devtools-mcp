@@ -21,7 +21,7 @@ export const listPages = defineTool(args => {
     },
     schema: {},
     handler: async (_request, response) => {
-      response.setIncludePages(true, args?.categoryExtensions);
+      response.setIncludePages(true);
     },
   };
 });

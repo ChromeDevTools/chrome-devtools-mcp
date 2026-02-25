@@ -63,7 +63,7 @@ export interface DevToolsData {
 
 export interface Response {
   appendResponseLine(value: string): void;
-  setIncludePages(value: boolean, shouldIncludeExtension?: boolean): void;
+  setIncludePages(value: boolean): void;
   setIncludeNetworkRequests(
     value: boolean,
     options?: PaginationOptions & {

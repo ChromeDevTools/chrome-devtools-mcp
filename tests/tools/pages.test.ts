@@ -44,47 +44,53 @@ describe('pages', () => {
     });
     for (const categoryExtensions of [true, false]) {
       it(`list pages ${categoryExtensions ? 'with' : 'without'} --category-extensions`, async () => {
-        await withMcpContext(async (response, context) => {
-          await installExtension.handler(
-            {params: {path: EXTENSION_PATH}},
-            response,
-            context,
-          );
-
-          const swTarget = await context.browser.waitForTarget(
-            t =>
-              t.type() === 'service_worker' &&
-              t.url().includes('chrome-extension://'),
-          );
-          const swUrl = swTarget.url();
-
-          response.resetResponseLineForTesting();
-
-          const listPageDef = listPages({
-            categoryExtensions,
-          } as ParsedArguments);
-          await listPageDef.handler({params: {}}, response, context);
-
-          const result = await response.handle(listPageDef.name, context);
-          const textContent = result.content.find(c => c.type === 'text') as {
-            type: 'text';
-            text: string;
-          };
-          assert.ok(textContent);
-
-          if (categoryExtensions) {
-            assert.ok(textContent.text.includes(swUrl));
-            const structured = result.structuredContent as {
-              extensionServiceWorkers: Array<{url: string}>;
-            };
-            assert.deepStrictEqual(
-              structured.extensionServiceWorkers.map(sw => sw.url),
-              [swUrl],
+        await withMcpContext(
+          async (response, context) => {
+            await installExtension.handler(
+              {params: {path: EXTENSION_PATH}},
+              response,
+              context,
             );
-          } else {
-            assert.ok(!textContent.text.includes(swUrl));
-          }
-        });
+
+            const swTarget = await context.browser.waitForTarget(
+              t =>
+                t.type() === 'service_worker' &&
+                t.url().includes('chrome-extension://'),
+            );
+            const swUrl = swTarget.url();
+
+            response.resetResponseLineForTesting();
+
+            const listPageDef = listPages({
+              categoryExtensions,
+            } as ParsedArguments);
+            await listPageDef.handler({params: {}}, response, context);
+
+            const result = await response.handle(listPageDef.name, context);
+            const textContent = result.content.find(c => c.type === 'text') as {
+              type: 'text';
+              text: string;
+            };
+            assert.ok(textContent);
+
+            if (categoryExtensions) {
+              assert.ok(textContent.text.includes(swUrl));
+              const structured = result.structuredContent as {
+                extensionServiceWorkers: Array<{url: string}>;
+              };
+              assert.deepStrictEqual(
+                structured.extensionServiceWorkers.map(sw => sw.url),
+                [swUrl],
+              );
+            } else {
+              assert.ok(!textContent.text.includes(swUrl));
+            }
+          },
+          {},
+          {
+            categoryExtensions,
+          } as ParsedArguments,
+        );
       });
     }
   });

@@ -203,7 +203,10 @@ function registerTool(tool: ToolDefinition): void {
         const context = await getContext();
         logger(`${tool.name} context: resolved`);
         await context.detectOpenDevToolsWindows();
-        const response = args.slim ? new SlimMcpResponse() : new McpResponse();
+        const response = args.slim
+          ? new SlimMcpResponse(args)
+          : new McpResponse(args);
+
         await tool.handler(
           {
             params,

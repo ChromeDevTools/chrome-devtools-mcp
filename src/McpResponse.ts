@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type {ParsedArguments} from './cli.js';
 import {ConsoleFormatter} from './formatters/ConsoleFormatter.js';
 import {IssueFormatter} from './formatters/IssueFormatter.js';
 import {NetworkFormatter} from './formatters/NetworkFormatter.js';
@@ -66,6 +67,11 @@ export class McpResponse implements Response {
   #listExtensions?: boolean;
   #devToolsData?: DevToolsData;
   #tabId?: string;
+  #args: ParsedArguments;
+
+  constructor(args: ParsedArguments) {
+    this.#args = args;
+  }
 
   attachDevToolsData(data: DevToolsData): void {
     this.#devToolsData = data;
@@ -75,10 +81,10 @@ export class McpResponse implements Response {
     this.#tabId = tabId;
   }
 
-  setIncludePages(value: boolean, includeServiceWorkers?: boolean): void {
+  setIncludePages(value: boolean): void {
     this.#includePages = value;
 
-    if (includeServiceWorkers) {
+    if (this.#args.categoryExtensions) {
       this.#includeExtensionServiceWorkers = value;
     }
   }
