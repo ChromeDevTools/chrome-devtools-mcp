@@ -184,7 +184,7 @@ export class ClearcutSender {
     isPermanentError?: boolean;
     nextRequestWaitMs?: number;
   }> {
-    logger(`Sending batch ${events.length}`);
+    logger(`Sending batch of ${events.length}`);
     const requestBody: LogRequest = {
       log_source: LOG_SOURCE,
       request_time_ms: Date.now().toString(),
