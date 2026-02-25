@@ -63,7 +63,7 @@ export interface DevToolsData {
 
 export interface Response {
   appendResponseLine(value: string): void;
-  setIncludePages(value: boolean): void;
+  setIncludePages(value: boolean, shouldIncludeExtension?: boolean): void;
   setIncludeNetworkRequests(
     value: boolean,
     options?: PaginationOptions & {
@@ -96,7 +96,6 @@ export interface Response {
     insightName: InsightName,
   ): void;
   setListExtensions(): void;
-  setIncludeExtensionServiceWorkers(value: boolean): void;
 }
 
 /**

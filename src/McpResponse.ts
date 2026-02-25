@@ -75,8 +75,12 @@ export class McpResponse implements Response {
     this.#tabId = tabId;
   }
 
-  setIncludePages(value: boolean): void {
+  setIncludePages(value: boolean, includeServiceWorkers?: boolean): void {
     this.#includePages = value;
+
+    if (includeServiceWorkers) {
+      this.#includeExtensionServiceWorkers = value;
+    }
   }
 
   includeSnapshot(params?: SnapshotParams): void {
@@ -87,10 +91,6 @@ export class McpResponse implements Response {
 
   setListExtensions(): void {
     this.#listExtensions = true;
-  }
-
-  setIncludeExtensionServiceWorkers(value: boolean): void {
-    this.#includeExtensionServiceWorkers = value;
   }
 
   setIncludeNetworkRequests(
