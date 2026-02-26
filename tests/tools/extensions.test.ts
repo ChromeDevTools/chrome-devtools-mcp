@@ -16,6 +16,7 @@ import {
   uninstallExtension,
   listExtensions,
   reloadExtension,
+  triggerExtensionAction,
 } from '../../src/tools/extensions.js';
 import {withMcpContext} from '../utils.js';
 
@@ -127,5 +128,40 @@ describe('extension', () => {
       const reinstalled = list.find(e => e.id === extensionId);
       assert.ok(reinstalled, 'Extension should be present after reload');
     });
+  });
+
+  it('triggers an extension action', async () => {
+    await withMcpContext(
+      async (response, context) => {
+        const triggerSpy = sinon.spy(context, 'triggerExtensionAction');
+
+        await installExtension.handler(
+          {params: {path: EXTENSION_PATH}},
+          response,
+          context,
+        );
+
+        const extensionId = extractId(response);
+        response.resetResponseLineForTesting();
+
+        await triggerExtensionAction.handler(
+          {params: {id: extensionId}},
+          response,
+          context,
+        );
+
+        assert.ok(
+          triggerSpy.calledOnceWithExactly(extensionId),
+          'triggerExtensionAction should be called with correct params',
+        );
+        assert.ok(
+          response.responseLines[0].includes(
+            `Extension action triggered. Id: ${extensionId}`,
+          ),
+          'Response should indicate action triggered',
+        );
+      },
+      {channel: 'chrome-canary'},
+    );
   });
 });

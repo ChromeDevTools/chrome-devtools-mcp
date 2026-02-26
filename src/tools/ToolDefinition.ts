@@ -190,6 +190,7 @@ export type Context = Readonly<{
   ): void;
   installExtension(path: string): Promise<string>;
   uninstallExtension(id: string): Promise<void>;
+  triggerExtensionAction(id: string): Promise<void>;
   listExtensions(): InstalledExtension[];
   getExtension(id: string): InstalledExtension | undefined;
   getSelectedMcpPage(): McpPage;
