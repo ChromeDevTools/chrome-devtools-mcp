@@ -3,17 +3,21 @@
   "version": "0.18.1",
   "description": "MCP server for Chrome DevTools",
   "type": "module",
-  "bin": "./build/src/index.js",
+  "bin": {
+    "chrome-devtools-mcp": "./build/src/index.js",
+    "chrome-devtools": "./build/src/bin/chrome-devtools.js"
+  },
   "main": "index.js",
   "scripts": {
     "clean": "node -e \"require('fs').rmSync('build', {recursive: true, force: true})\"",
     "bundle": "npm run clean && npm run build && rollup -c rollup.config.mjs && node -e \"require('fs').rmSync('build/node_modules', {recursive: true, force: true})\"",
     "build": "tsc && node --experimental-strip-types --no-warnings=ExperimentalWarning scripts/post-build.ts",
     "typecheck": "tsc --noEmit",
-    "format": "eslint --cache --fix . && prettier --write --cache .",
+    "format": "prettier --write --cache . && eslint --cache --fix .",
     "check-format": "eslint --cache . && prettier --check --cache .;",
     "docs": "npm run build && npm run docs:generate && npm run format",
     "docs:generate": "node --experimental-strip-types scripts/generate-docs.ts",
+    "cli:generate": "node --experimental-strip-types scripts/generate-cli.ts && npm run format && npm run build",
     "start": "npm run build && node build/src/index.js",
     "start-debug": "DEBUG=mcp:* DEBUG_COLORS=false npm run build && node build/src/index.js",
     "test": "npm run build && node scripts/test.mjs",
