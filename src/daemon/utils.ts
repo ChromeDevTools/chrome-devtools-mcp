@@ -9,6 +9,8 @@ import os from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
 
+import {logger} from '../logger.js';
+
 export const DAEMON_SCRIPT_PATH = path.join(import.meta.dirname, 'daemon.js');
 export const INDEX_SCRIPT_PATH = path.join(
   import.meta.dirname,
@@ -60,26 +62,38 @@ export function getRuntimeHome(): string {
 
 export const IS_WINDOWS = os.platform() === 'win32';
 
-export function handlePidFile() {
+export function getPidFilePath() {
   const runtimeDir = getRuntimeHome();
-  const pidPath = path.join(runtimeDir, 'daemon.pid');
+  return path.join(runtimeDir, 'daemon.pid');
+}
 
-  if (fs.existsSync(pidPath)) {
-    const oldPid = parseInt(fs.readFileSync(pidPath, 'utf8'), 10);
+export function getDaemonPid() {
+  try {
+    const pidFile = getPidFilePath();
+    logger(`Daemon pid file ${pidFile}`);
+    if (!fs.existsSync(pidFile)) {
+      return null;
+    }
+    const pidContent = fs.readFileSync(pidFile, 'utf-8');
+    const pid = parseInt(pidContent.trim(), 10);
+    logger(`Daemon pid: ${pid}`);
+    if (isNaN(pid)) {
+      return null;
+    }
+    return pid;
+  } catch {
+    return null;
+  }
+}
+
+export function isDaemonRunning(pid = getDaemonPid()): pid is number {
+  if (pid) {
     try {
-      // Sending signal 0 checks if the process is still alive without killing it
-      process.kill(oldPid, 0);
-      console.error('Daemon is already running!');
-      process.exit(1);
+      process.kill(pid, 0); // Throws if process doesn't exist
+      return true;
     } catch {
-      // Process is dead, we can safely overwrite the PID file
-      fs.unlinkSync(pidPath);
+      // Process is dead, stale PID file. Proceed with startup.
     }
   }
-
-  fs.mkdirSync(path.dirname(pidPath), {
-    recursive: true,
-  });
-  fs.writeFileSync(pidPath, process.pid.toString());
-  return pidPath;
+  return false;
 }
