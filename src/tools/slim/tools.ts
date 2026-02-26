@@ -24,8 +24,11 @@ export const screenshot = defineTool({
       type: 'png',
       optimizeForSpeed: true,
     });
-    const {filename} = await context.saveTemporaryFile(screenshot, `image/png`);
-    response.appendResponseLine(filename);
+    const {filepath} = await context.saveTemporaryFile(
+      screenshot,
+      `screenshot.png`,
+    );
+    response.appendResponseLine(filepath);
   },
 });
 

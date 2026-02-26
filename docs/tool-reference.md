@@ -1,6 +1,6 @@
 <!-- AUTO GENERATED DO NOT EDIT - run 'npm run docs' to update-->
 
-# Chrome DevTools MCP Tool Reference (~7094 cl100k_base tokens)
+# Chrome DevTools MCP Tool Reference (~7324 cl100k_base tokens)
 
 - **[Input automation](#input-automation)** (9 tools)
   - [`click`](#click)
@@ -30,9 +30,10 @@
 - **[Network](#network)** (2 tools)
   - [`get_network_request`](#get_network_request)
   - [`list_network_requests`](#list_network_requests)
-- **[Debugging](#debugging)** (5 tools)
+- **[Debugging](#debugging)** (6 tools)
   - [`evaluate_script`](#evaluate_script)
   - [`get_console_message`](#get_console_message)
+  - [`lighthouse_audit`](#lighthouse_audit)
   - [`list_console_messages`](#list_console_messages)
   - [`take_screenshot`](#take_screenshot)
   - [`take_snapshot`](#take_snapshot)
@@ -342,6 +343,18 @@ so returned values have to be JSON-serializable.
 **Parameters:**
 
 - **msgid** (number) **(required)**: The msgid of a console message on the page from the listed console messages
+
+---
+
+### `lighthouse_audit`
+
+**Description:** Get Lighthouse score and reports for accessibility, SEO and best practices.
+
+**Parameters:**
+
+- **device** (enum: "desktop", "mobile") _(optional)_: Device to [`emulate`](#emulate).
+- **mode** (enum: "navigation", "snapshot") _(optional)_: "navigation" reloads &amp; audits. "snapshot" analyzes current state.
+- **outputDirPath** (string) _(optional)_: Directory for reports. If omitted, uses temporary files.
 
 ---
 

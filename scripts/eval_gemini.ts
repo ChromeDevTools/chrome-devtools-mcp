@@ -33,6 +33,8 @@ export interface TestScenario {
     path: string;
     htmlContent: string;
   };
+  /** Extra CLI flags passed to the MCP server (e.g. '--experimental-page-id-routing'). */
+  serverArgs?: string[];
 }
 
 async function loadScenario(scenarioPath: string): Promise<TestScenario> {
@@ -116,6 +118,9 @@ async function runSingleScenario(
     const args = [serverPath];
     if (!debug) {
       args.push('--headless');
+    }
+    if (scenario.serverArgs) {
+      args.push(...scenario.serverArgs);
     }
 
     transport = new StdioClientTransport({

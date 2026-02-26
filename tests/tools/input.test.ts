@@ -9,6 +9,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import {describe, it} from 'node:test';
 
+import type {ParsedArguments} from '../../src/cli.js';
 import {McpResponse} from '../../src/McpResponse.js';
 import {
   click,
@@ -41,6 +42,7 @@ describe('input', () => {
             params: {
               uid: '1_1',
             },
+            page: context.getSelectedPage(),
           },
           response,
           context,
@@ -68,6 +70,7 @@ describe('input', () => {
               uid: '1_1',
               dblClick: true,
             },
+            page: context.getSelectedPage(),
           },
           response,
           context,
@@ -101,6 +104,7 @@ describe('input', () => {
             params: {
               uid: '1_1',
             },
+            page: context.getSelectedPage(),
           },
           response,
           context,
@@ -144,6 +148,7 @@ describe('input', () => {
               params: {
                 uid: '1_1',
               },
+              page: context.getSelectedPage(),
             },
             response,
             context,
@@ -170,6 +175,7 @@ describe('input', () => {
             params: {
               uid: '1_1',
             },
+            page: context.getSelectedPage(),
           },
           response,
           context,
@@ -195,6 +201,7 @@ describe('input', () => {
               uid: '1_1',
               includeSnapshot: true,
             },
+            page: context.getSelectedPage(),
           },
           response,
           context,
@@ -221,6 +228,7 @@ describe('input', () => {
             params: {
               uid: '1_1',
             },
+            page: context.getSelectedPage(),
           },
           response,
           context,
@@ -252,6 +260,7 @@ describe('input', () => {
               x: 50,
               y: 50,
             },
+            page: context.getSelectedPage(),
           },
           response,
           context,
@@ -282,6 +291,7 @@ describe('input', () => {
               y: 50,
               dblClick: true,
             },
+            page: context.getSelectedPage(),
           },
           response,
           context,
@@ -308,6 +318,7 @@ describe('input', () => {
               uid: '1_1',
               value: 'test',
             },
+            page: context.getSelectedPage(),
           },
           response,
           context,
@@ -337,6 +348,7 @@ describe('input', () => {
               uid: '1_1',
               value: 'two',
             },
+            page: context.getSelectedPage(),
           },
           response,
           context,
@@ -364,6 +376,7 @@ describe('input', () => {
               uid: '1_1',
               value: '1',
             },
+            page: context.getSelectedPage(),
           },
           response,
           context,
@@ -393,6 +406,7 @@ describe('input', () => {
               uid: '1_1',
               value: '1'.repeat(3000),
             },
+            page: context.getSelectedPage(),
           },
           response,
           context,
@@ -423,6 +437,7 @@ describe('input', () => {
             params: {
               text: 'test',
             },
+            page: context.getSelectedPage(),
           },
           response,
           context,
@@ -449,6 +464,7 @@ describe('input', () => {
               text: 'test',
               submitKey: 'Tab',
             },
+            page: context.getSelectedPage(),
           },
           response,
           context,
@@ -486,6 +502,7 @@ describe('input', () => {
                 text: 'test',
                 submitKey: 'XXX',
               },
+              page: context.getSelectedPage(),
             },
             response,
             context,
@@ -514,13 +531,14 @@ describe('input', () => {
         await context.createTextSnapshot();
 
         // Fill email
-        const response1 = new McpResponse();
+        const response1 = new McpResponse({} as ParsedArguments);
         await fill.handler(
           {
             params: {
               uid: '1_1', // email input
               value: 'new@test.com',
             },
+            page: context.getSelectedPage(),
           },
           response1,
           context,
@@ -531,13 +549,14 @@ describe('input', () => {
         );
 
         // Fill password
-        const response2 = new McpResponse();
+        const response2 = new McpResponse({} as ParsedArguments);
         await fill.handler(
           {
             params: {
               uid: '1_2', // password input
               value: 'secret',
             },
+            page: context.getSelectedPage(),
           },
           response2,
           context,
@@ -610,6 +629,7 @@ describe('input', () => {
               from_uid: '1_1',
               to_uid: '1_2',
             },
+            page: context.getSelectedPage(),
           },
           response,
           context,
@@ -661,6 +681,7 @@ describe('input', () => {
                 },
               ],
             },
+            page: context.getSelectedPage(),
           },
           response,
           context,
@@ -707,6 +728,7 @@ describe('input', () => {
               uid: '1_1',
               filePath: testFilePath,
             },
+            page: context.getSelectedPage(),
           },
           response,
           context,
@@ -749,6 +771,7 @@ describe('input', () => {
               uid: '1_1',
               filePath: testFilePath,
             },
+            page: context.getSelectedPage(),
           },
           response,
           context,
@@ -784,6 +807,7 @@ describe('input', () => {
                 uid: '1_1',
                 filePath: testFilePath,
               },
+              page: context.getSelectedPage(),
             },
             response,
             context,
@@ -847,6 +871,7 @@ describe('input', () => {
             params: {
               key: 'Control+Shift+C',
             },
+            page: context.getSelectedPage(),
           },
           response,
           context,

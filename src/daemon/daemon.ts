@@ -6,8 +6,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import fs from 'node:fs/promises';
+import fs from 'node:fs';
 import {createServer, type Server} from 'node:net';
+import path from 'node:path';
 import process from 'node:process';
 
 import {Client} from '@modelcontextprotocol/sdk/client/index.js';
@@ -17,14 +18,28 @@ import {logger} from '../logger.js';
 import {PipeTransport} from '../third_party/index.js';
 import {VERSION} from '../version.js';
 
+import type {DaemonMessage} from './types.js';
 import {
+  getDaemonPid,
+  getPidFilePath,
   getSocketPath,
-  handlePidFile,
   INDEX_SCRIPT_PATH,
   IS_WINDOWS,
+  isDaemonRunning,
 } from './utils.js';
 
-const pidFile = handlePidFile();
+const pid = getDaemonPid();
+if (isDaemonRunning(pid)) {
+  logger('Another daemon process is running.');
+  process.exit(1);
+}
+const pidFilePath = getPidFilePath();
+fs.mkdirSync(path.dirname(pidFilePath), {
+  recursive: true,
+});
+fs.writeFileSync(pidFilePath, process.pid.toString());
+logger(`Writing ${process.pid.toString()} to ${pidFilePath}`);
+
 const socketPath = getSocketPath();
 
 let mcpClient: Client | null = null;
@@ -64,17 +79,6 @@ interface McpResult {
   content?: McpContent[] | string;
   text?: string;
 }
-
-type DaemonMessage =
-  | {
-      method: 'stop';
-    }
-  | {
-      method: 'invoke_tool';
-      tool: string;
-      args?: Record<string, unknown>;
-    };
-
 async function handleRequest(msg: DaemonMessage) {
   try {
     if (msg.method === 'invoke_tool') {
@@ -93,7 +97,9 @@ async function handleRequest(msg: DaemonMessage) {
         result: JSON.stringify(result),
       };
     } else if (msg.method === 'stop') {
-      // Trigger cleanup asynchronously
+      // Ensure we are not interrupting in-progress starting.
+      await started;
+      // Trigger cleanup asynchronously.
       setImmediate(() => {
         void cleanup();
       });
@@ -120,7 +126,7 @@ async function startSocketServer() {
   // Remove existing socket file if it exists (only on non-Windows)
   if (!IS_WINDOWS) {
     try {
-      await fs.unlink(socketPath);
+      fs.unlinkSync(socketPath);
     } catch {
       // ignore errors.
     }
@@ -179,12 +185,22 @@ async function cleanup() {
   } catch (error) {
     logger('Error closing MCP transport:', error);
   }
-  server?.close(() => {
-    if (!IS_WINDOWS) {
-      void fs.unlink(socketPath).catch(() => undefined);
+  if (server) {
+    await new Promise<void>(resolve => {
+      server!.close(() => resolve());
+    });
+  }
+  if (!IS_WINDOWS) {
+    try {
+      fs.unlinkSync(socketPath);
+    } catch {
+      // ignore errors
     }
-  });
-  await fs.unlink(pidFile).catch(() => undefined);
+  }
+  logger(`unlinking ${pidFilePath}`);
+  if (fs.existsSync(pidFilePath)) {
+    fs.unlinkSync(pidFilePath);
+  }
   process.exit(0);
 }
 
@@ -208,7 +224,7 @@ process.on('unhandledRejection', error => {
 });
 
 // Start the server
-startSocketServer().catch(error => {
+const started = startSocketServer().catch(error => {
   logger('Failed to start daemon server:', error);
   process.exit(1);
 });

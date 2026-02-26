@@ -17,7 +17,7 @@ import {
 
 import {ToolCategory} from './categories.js';
 import type {Context, Response} from './ToolDefinition.js';
-import {defineTool} from './ToolDefinition.js';
+import {definePageTool} from './ToolDefinition.js';
 
 const filePathSchema = zod
   .string()
@@ -26,7 +26,7 @@ const filePathSchema = zod
     'The absolute file path, or a file path relative to the current working directory, to save the raw trace data. For example, trace.json.gz (compressed) or trace.json (uncompressed).',
   );
 
-export const startTrace = defineTool({
+export const startTrace = definePageTool({
   name: 'performance_start_trace',
   description: `Starts a performance trace recording on the selected page. This can be used to look for performance problems and insights to improve the performance of the page. It will also report Core Web Vital (CWV) scores for the page.`,
   annotations: {
@@ -55,7 +55,7 @@ export const startTrace = defineTool({
     }
     context.setIsRunningPerformanceTrace(true);
 
-    const page = context.getSelectedPage();
+    const page = request.page;
     const pageUrlForTracing = page.url();
 
     if (request.params.reload) {
@@ -112,7 +112,7 @@ export const startTrace = defineTool({
   },
 });
 
-export const stopTrace = defineTool({
+export const stopTrace = definePageTool({
   name: 'performance_stop_trace',
   description:
     'Stops the active performance trace recording on the selected page.',
@@ -127,7 +127,7 @@ export const stopTrace = defineTool({
     if (!context.isRunningPerformanceTrace()) {
       return;
     }
-    const page = context.getSelectedPage();
+    const page = request.page;
     await stopTracingAndAppendOutput(
       page,
       response,
@@ -137,7 +137,7 @@ export const stopTrace = defineTool({
   },
 });
 
-export const analyzeInsight = defineTool({
+export const analyzeInsight = definePageTool({
   name: 'performance_analyze_insight',
   description:
     'Provides more detailed information on a specific Performance Insight of an insight set that was highlighted in the results of a trace recording.',

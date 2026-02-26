@@ -101,6 +101,178 @@ describe('McpContext', () => {
       },
     );
   });
+  it('resolves uid from a non-selected page snapshot', async () => {
+    await withMcpContext(async (_response, context) => {
+      // Page 1: set content and snapshot
+      const page1 = context.getSelectedPage();
+      await page1.setContent(html`<button>Page1 Button</button>`);
+      await context.createTextSnapshot(false, undefined, page1);
+
+      // Capture a uid from page1's snapshot (snapshotId=1, button is node 1)
+      const page1Uid = '1_1';
+      const page1Node = context.getAXNodeByUid(page1Uid);
+      assert.ok(page1Node, 'uid should resolve from page1 snapshot');
+
+      // Page 2: new page, set content, snapshot
+      const page2 = await context.newPage();
+      context.selectPage(page2);
+      await page2.setContent(html`<button>Page2 Button</button>`);
+      await context.createTextSnapshot(false, undefined, page2);
+
+      // Page 2 is now selected. Page 1's uid should still resolve.
+      const node = context.getAXNodeByUid(page1Uid);
+      assert.ok(node, 'page1 uid should still resolve after page2 snapshot');
+      assert.strictEqual(node?.name, 'Page1 Button');
+
+      // The element should also be retrievable when the target page is provided.
+      const element = await context.getElementByUid(page1Uid, page1);
+      assert.ok(element, 'should get element handle from page1 snapshot uid');
+    });
+  });
+
+  describe('getElementByUid context-focus validation', () => {
+    it('resolves for the focused page in an isolated context', async () => {
+      await withMcpContext(async (_response, context) => {
+        const page = await context.newPage(false, 'agent-a');
+        await page.setContent(html`<button>A1 Button</button>`);
+        await context.createTextSnapshot(false, undefined, page);
+
+        // page is focused for agent-a context; should resolve.
+        const handle = await context.getElementByUid('1_1');
+        void handle.dispose();
+      });
+    });
+
+    it('throws for a non-focused page in the same context', async () => {
+      await withMcpContext(async (_response, context) => {
+        const pageA1 = await context.newPage(false, 'agent-a');
+        await pageA1.setContent(html`<button>A1 Button</button>`);
+        await context.createTextSnapshot(false, undefined, pageA1);
+        const a1Uid = '1_1'; // button on pageA1
+
+        // Open a second page in the same context (becomes focused).
+        const pageA2 = await context.newPage(false, 'agent-a');
+        await pageA2.setContent(html`<button>A2 Button</button>`);
+        await context.createTextSnapshot(false, undefined, pageA2);
+
+        // pageA2 is now focused for agent-a; clicking pageA1's uid should throw.
+        await assert.rejects(
+          () => context.getElementByUid(a1Uid),
+          (err: Error) => {
+            assert.ok(err.message.includes('belongs to page'));
+            assert.ok(err.message.includes('currently selected'));
+            return true;
+          },
+        );
+      });
+    });
+
+    it('resolves after cross-context select_page race', async () => {
+      await withMcpContext(async (_response, context) => {
+        // Set up two pages in separate isolated contexts.
+        const pageA = await context.newPage(false, 'agent-a');
+        await pageA.setContent(html`<button>Agent A Button</button>`);
+        await context.createTextSnapshot(false, undefined, pageA);
+        const uidA = '1_1';
+
+        const pageB = await context.newPage(false, 'agent-b');
+        await pageB.setContent(html`<button>Agent B Button</button>`);
+        await context.createTextSnapshot(false, undefined, pageB);
+        const uidB = '2_1';
+
+        // Simulate race: agent-a selects its page, then agent-b overwrites global.
+        context.selectPage(pageA);
+        context.selectPage(pageB);
+        // Global #selectedPage is now pageB.
+
+        // Agent A's uid should still resolve (per-context focus for agent-a is pageA).
+        const handleA = await context.getElementByUid(uidA);
+        void handleA.dispose();
+        // Agent B's uid should also resolve.
+        const handleB = await context.getElementByUid(uidB);
+        void handleB.dispose();
+      });
+    });
+
+    it('aligns global selectedPage after resolution', async () => {
+      await withMcpContext(async (_response, context) => {
+        const pageA = await context.newPage(false, 'agent-a');
+        await pageA.setContent(html`<button>Agent A Button</button>`);
+        await context.createTextSnapshot(false, undefined, pageA);
+        const uidA = '1_1';
+
+        const pageB = await context.newPage(false, 'agent-b');
+        await pageB.setContent(html`<button>Agent B Button</button>`);
+        await context.createTextSnapshot(false, undefined, pageB);
+
+        // Global is on pageB after newPage.
+        assert.strictEqual(context.getSelectedPage(), pageB);
+
+        // Resolve uid from pageA; should pass and align global.
+        const handle = await context.getElementByUid(uidA);
+        void handle.dispose();
+        assert.strictEqual(context.getSelectedPage(), pageA);
+      });
+    });
+
+    it('throws for nonexistent uid', async () => {
+      await withMcpContext(async (_response, context) => {
+        const page = await context.newPage(false, 'agent-a');
+        await page.setContent(html`<button>A Button</button>`);
+        await context.createTextSnapshot(false, undefined, page);
+
+        await assert.rejects(() => context.getElementByUid('nonexistent_99'), {
+          message: 'No such element found in any snapshot.',
+        });
+      });
+    });
+
+    it('resolves for default context page alongside isolated contexts', async () => {
+      await withMcpContext(async (_response, context) => {
+        // Default context page (already exists from withMcpContext setup).
+        const defaultPage = context.getSelectedPage();
+        await defaultPage.setContent(html`<button>Default Button</button>`);
+        await context.createTextSnapshot(false, undefined, defaultPage);
+        const defaultUid = '1_1';
+
+        // Isolated context page.
+        const isoPage = await context.newPage(false, 'agent-a');
+        await isoPage.setContent(html`<button>Isolated Button</button>`);
+        await context.createTextSnapshot(false, undefined, isoPage);
+        const isoUid = '2_1';
+
+        // Global is now isoPage. Default context focus is still defaultPage.
+        // Both should resolve via per-context lookup.
+        const handleDefault = await context.getElementByUid(defaultUid);
+        void handleDefault.dispose();
+        const handleIso = await context.getElementByUid(isoUid);
+        void handleIso.dispose();
+      });
+    });
+
+    it('scopes search to target page when page is provided', async () => {
+      await withMcpContext(async (_response, context) => {
+        const pageA = await context.newPage(false, 'agent-a');
+        await pageA.setContent(html`<button>Agent A Button</button>`);
+        await context.createTextSnapshot(false, undefined, pageA);
+        const uidA = '1_1';
+
+        const pageB = await context.newPage(false, 'agent-b');
+        await pageB.setContent(html`<button>Agent B Button</button>`);
+        await context.createTextSnapshot(false, undefined, pageB);
+
+        // uidA belongs to pageA; searching with pageB should throw.
+        await assert.rejects(() => context.getElementByUid(uidA, pageB), {
+          message: /not found on page/,
+        });
+
+        // Searching with the correct page should resolve.
+        const handle = await context.getElementByUid(uidA, pageA);
+        void handle.dispose();
+      });
+    });
+  });
+
   it('should include network requests in structured content', async t => {
     await withMcpContext(async (response, context) => {
       const mockRequest = getMockRequest({

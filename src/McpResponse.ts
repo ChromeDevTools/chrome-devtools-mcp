@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type {ParsedArguments} from './cli.js';
 import {ConsoleFormatter} from './formatters/ConsoleFormatter.js';
 import {IssueFormatter} from './formatters/IssueFormatter.js';
 import {NetworkFormatter} from './formatters/NetworkFormatter.js';
@@ -21,6 +22,7 @@ import {handleDialog} from './tools/pages.js';
 import type {
   DevToolsData,
   ImageContentData,
+  LighthouseData,
   Response,
   SnapshotParams,
 } from './tools/ToolDefinition.js';
@@ -38,6 +40,7 @@ interface TraceInsightData {
 
 export class McpResponse implements Response {
   #includePages = false;
+  #includeExtensionServiceWorkers = false;
   #snapshotParams?: SnapshotParams;
   #attachedNetworkRequestId?: number;
   #attachedNetworkRequestOptions?: {
@@ -47,6 +50,7 @@ export class McpResponse implements Response {
   #attachedConsoleMessageId?: number;
   #attachedTraceSummary?: TraceResult;
   #attachedTraceInsight?: TraceInsightData;
+  #attachedLighthouseResult?: LighthouseData;
   #textResponseLines: string[] = [];
   #images: ImageContentData[] = [];
   #networkRequestsOptions?: {
@@ -65,6 +69,11 @@ export class McpResponse implements Response {
   #listExtensions?: boolean;
   #devToolsData?: DevToolsData;
   #tabId?: string;
+  #args: ParsedArguments;
+
+  constructor(args: ParsedArguments) {
+    this.#args = args;
+  }
 
   attachDevToolsData(data: DevToolsData): void {
     this.#devToolsData = data;
@@ -76,6 +85,10 @@ export class McpResponse implements Response {
 
   setIncludePages(value: boolean): void {
     this.#includePages = value;
+
+    if (this.#args.categoryExtensions) {
+      this.#includeExtensionServiceWorkers = value;
+    }
   }
 
   includeSnapshot(params?: SnapshotParams): void {
@@ -170,6 +183,10 @@ export class McpResponse implements Response {
     };
   }
 
+  attachLighthouseResult(result: LighthouseData): void {
+    this.#attachedLighthouseResult = result;
+  }
+
   get includePages(): boolean {
     return this.#includePages;
   }
@@ -180,6 +197,10 @@ export class McpResponse implements Response {
 
   get attachedTracedInsight(): TraceInsightData | undefined {
     return this.#attachedTraceInsight;
+  }
+
+  get attachedLighthouseResult(): LighthouseData | undefined {
+    return this.#attachedLighthouseResult;
   }
 
   get includeNetworkRequests(): boolean {
@@ -233,13 +254,18 @@ export class McpResponse implements Response {
       await context.createPagesSnapshot();
     }
 
+    if (this.#includeExtensionServiceWorkers) {
+      await context.createExtensionServiceWorkersSnapshot();
+    }
+
     let snapshot: SnapshotFormatter | string | undefined;
     if (this.#snapshotParams) {
       await context.createTextSnapshot(
         this.#snapshotParams.verbose,
         this.#devToolsData,
+        this.#snapshotParams.page,
       );
-      const textSnapshot = context.getTextSnapshot();
+      const textSnapshot = context.getTextSnapshot(this.#snapshotParams.page);
       if (textSnapshot) {
         const formatter = new SnapshotFormatter(textSnapshot);
         if (this.#snapshotParams.filePath) {
@@ -396,6 +422,7 @@ export class McpResponse implements Response {
       traceInsight: this.#attachedTraceInsight,
       traceSummary: this.#attachedTraceSummary,
       extensions,
+      lighthouseResult: this.#attachedLighthouseResult,
     });
   }
 
@@ -411,6 +438,7 @@ export class McpResponse implements Response {
       traceSummary?: TraceResult;
       traceInsight?: TraceInsightData;
       extensions?: InstalledExtension[];
+      lighthouseResult?: LighthouseData;
     },
   ): {content: Array<TextContent | ImageContent>; structuredContent: object} {
     const structuredContent: {
@@ -423,6 +451,7 @@ export class McpResponse implements Response {
       consoleMessages?: object[];
       traceSummary?: string;
       traceInsights?: Array<{insightName: string; insightKey: string}>;
+      lighthouseResult?: object;
       extensions?: object[];
       message?: string;
       networkConditions?: string;
@@ -438,6 +467,7 @@ export class McpResponse implements Response {
       };
       pages?: object[];
       pagination?: object;
+      extensionServiceWorkers?: object[];
     } = {};
 
     const response = [`# ${toolName} response`];
@@ -532,6 +562,26 @@ Call ${handleDialog.name} to handle it before continuing.`);
       });
     }
 
+    if (this.#includeExtensionServiceWorkers) {
+      if (!context.getExtensionServiceWorkers().length) {
+        response.push(`## Extension Service Workers`);
+      }
+
+      for (const extensionServiceWorker of context.getExtensionServiceWorkers()) {
+        response.push(
+          `${extensionServiceWorker.id}: ${extensionServiceWorker.url}`,
+        );
+      }
+      structuredContent.extensionServiceWorkers = context
+        .getExtensionServiceWorkers()
+        .map(extensionServiceWorker => {
+          return {
+            id: extensionServiceWorker.id,
+            url: extensionServiceWorker.url,
+          };
+        });
+    }
+
     if (this.#tabId) {
       structuredContent.tabId = this.#tabId;
     }
@@ -561,6 +611,29 @@ Call ${handleDialog.name} to handle it before continuing.`);
         response.push(insightOutput.error);
       } else {
         response.push(insightOutput.output);
+      }
+    }
+
+    if (data.lighthouseResult) {
+      structuredContent.lighthouseResult = data.lighthouseResult;
+      const {summary, reports} = data.lighthouseResult;
+      response.push('## Lighthouse Audit Results');
+      response.push(`Mode: ${summary.mode}`);
+      response.push(`Device: ${summary.device}`);
+      response.push(`URL: ${summary.url}`);
+      response.push('### Category Scores');
+      for (const score of summary.scores) {
+        response.push(
+          `- ${score.title}: ${(score.score ?? 0) * 100} (${score.id})`,
+        );
+      }
+      response.push('### Audit Summary');
+      response.push(`Passed: ${summary.audits.passed}`);
+      response.push(`Failed: ${summary.audits.failed}`);
+      response.push(`Total Timing: ${summary.timing.total}ms`);
+      response.push('### Reports');
+      for (const report of reports) {
+        response.push(`- ${report}`);
       }
     }
 

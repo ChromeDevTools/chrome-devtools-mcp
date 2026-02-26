@@ -8,7 +8,7 @@ import {zod} from '../third_party/index.js';
 import type {ConsoleMessageType} from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
-import {defineTool} from './ToolDefinition.js';
+import {definePageTool} from './ToolDefinition.js';
 type ConsoleResponseType = ConsoleMessageType | 'issue';
 
 const FILTERABLE_MESSAGE_TYPES: [
@@ -37,7 +37,7 @@ const FILTERABLE_MESSAGE_TYPES: [
   'issue',
 ];
 
-export const listConsoleMessages = defineTool({
+export const listConsoleMessages = definePageTool({
   name: 'list_console_messages',
   description:
     'List all console messages for the currently selected page since the last navigation.',
@@ -86,7 +86,7 @@ export const listConsoleMessages = defineTool({
   },
 });
 
-export const getConsoleMessage = defineTool({
+export const getConsoleMessage = definePageTool({
   name: 'get_console_message',
   description: `Gets a console message by its ID. You can get all messages by calling ${listConsoleMessages.name}.`,
   annotations: {
