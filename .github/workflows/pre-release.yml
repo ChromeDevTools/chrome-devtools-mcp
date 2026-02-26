@@ -10,7 +10,7 @@ on:
 
 jobs:
   pre-release:
-    name: 'Verify MCP server schema unchanged'
+    name: 'Verify artifacts before release'
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
