@@ -38,7 +38,11 @@ describe('pages', () => {
   describe('list_pages', () => {
     it('list pages', async () => {
       await withMcpContext(async (response, context) => {
-        await listPages().handler({params: {}}, response, context);
+        await listPages().handler(
+          {params: {}, page: context.getSelectedPage()},
+          response,
+          context,
+        );
         assert.ok(response.includePages);
       });
     });
@@ -64,7 +68,11 @@ describe('pages', () => {
             const listPageDef = listPages({
               categoryExtensions,
             } as ParsedArguments);
-            await listPageDef.handler({params: {}}, response, context);
+            await listPageDef.handler(
+              {params: {}, page: context.getSelectedPage()},
+              response,
+              context,
+            );
 
             const result = await response.handle(listPageDef.name, context);
             const textContent = result.content.find(c => c.type === 'text') as {
@@ -548,7 +556,10 @@ describe('pages', () => {
     it('navigates to correct page', async () => {
       await withMcpContext(async (response, context) => {
         await navigatePage.handler(
-          {params: {url: 'data:text/html,<div>Hello MCP</div>'}},
+          {
+            params: {url: 'data:text/html,<div>Hello MCP</div>'},
+            page: context.getSelectedPage(),
+          },
           response,
           context,
         );
@@ -571,7 +582,10 @@ describe('pages', () => {
 
         try {
           await navigatePage.handler(
-            {params: {url: 'data:text/html,<div>Hello MCP</div>'}},
+            {
+              params: {url: 'data:text/html,<div>Hello MCP</div>'},
+              page: context.getSelectedPage(),
+            },
             response,
             context,
           );
@@ -597,6 +611,7 @@ describe('pages', () => {
                 url: 'about:blank',
                 timeout: 12345,
               },
+              page: context.getSelectedPage(),
             },
             response,
             context,
@@ -616,7 +631,11 @@ describe('pages', () => {
       await withMcpContext(async (response, context) => {
         const page = context.getSelectedPage();
         await page.goto('data:text/html,<div>Hello MCP</div>');
-        await navigatePage.handler({params: {type: 'back'}}, response, context);
+        await navigatePage.handler(
+          {params: {type: 'back'}, page: context.getSelectedPage()},
+          response,
+          context,
+        );
 
         assert.equal(
           await page.evaluate(() => document.location.href),
@@ -631,7 +650,7 @@ describe('pages', () => {
         await page.goto('data:text/html,<div>Hello MCP</div>');
         await page.goBack();
         await navigatePage.handler(
-          {params: {type: 'forward'}},
+          {params: {type: 'forward'}, page: context.getSelectedPage()},
           response,
           context,
         );
@@ -648,7 +667,7 @@ describe('pages', () => {
         const page = context.getSelectedPage();
         await page.goto('data:text/html,<div>Hello MCP</div>');
         await navigatePage.handler(
-          {params: {type: 'reload'}},
+          {params: {type: 'reload'}, page: context.getSelectedPage()},
           response,
           context,
         );
@@ -674,7 +693,7 @@ describe('pages', () => {
         );
 
         await navigatePage.handler(
-          {params: {type: 'reload'}},
+          {params: {type: 'reload'}, page: context.getSelectedPage()},
           response,
           context,
         );
@@ -707,6 +726,7 @@ describe('pages', () => {
               handleBeforeUnload: 'decline',
               timeout: 500,
             },
+            page: context.getSelectedPage(),
           },
           response,
           context,
@@ -724,7 +744,7 @@ describe('pages', () => {
     it('go forward with error', async () => {
       await withMcpContext(async (response, context) => {
         await navigatePage.handler(
-          {params: {type: 'forward'}},
+          {params: {type: 'forward'}, page: context.getSelectedPage()},
           response,
           context,
         );
@@ -739,7 +759,11 @@ describe('pages', () => {
     });
     it('go back with error', async () => {
       await withMcpContext(async (response, context) => {
-        await navigatePage.handler({params: {type: 'back'}}, response, context);
+        await navigatePage.handler(
+          {params: {type: 'back'}, page: context.getSelectedPage()},
+          response,
+          context,
+        );
 
         assert.ok(
           response.responseLines
@@ -757,6 +781,7 @@ describe('pages', () => {
               url: 'data:text/html,<div>Hello MCP</div>',
               initScript: 'window.initScript = "completed"',
             },
+            page: context.getSelectedPage(),
           },
           response,
           context,
@@ -782,7 +807,7 @@ describe('pages', () => {
           });
         });
         await resizePage.handler(
-          {params: {width: 700, height: 500}},
+          {params: {width: 700, height: 500}, page: context.getSelectedPage()},
           response,
           context,
         );
@@ -813,7 +838,7 @@ describe('pages', () => {
           });
         });
         await resizePage.handler(
-          {params: {width: 650, height: 450}},
+          {params: {width: 650, height: 450}, page: context.getSelectedPage()},
           response,
           context,
         );
@@ -844,7 +869,7 @@ describe('pages', () => {
           });
         });
         await resizePage.handler(
-          {params: {width: 750, height: 550}},
+          {params: {width: 750, height: 550}, page: context.getSelectedPage()},
           response,
           context,
         );
@@ -875,7 +900,7 @@ describe('pages', () => {
           });
         });
         await resizePage.handler(
-          {params: {width: 725, height: 525}},
+          {params: {width: 725, height: 525}, page: context.getSelectedPage()},
           response,
           context,
         );
@@ -906,7 +931,7 @@ describe('pages', () => {
           });
         });
         await resizePage.handler(
-          {params: {width: 850, height: 650}},
+          {params: {width: 850, height: 650}, page: context.getSelectedPage()},
           response,
           context,
         );
@@ -940,6 +965,7 @@ describe('pages', () => {
             params: {
               action: 'accept',
             },
+            page: context.getSelectedPage(),
           },
           response,
           context,
@@ -968,6 +994,7 @@ describe('pages', () => {
             params: {
               action: 'dismiss',
             },
+            page: context.getSelectedPage(),
           },
           response,
           context,
@@ -997,6 +1024,7 @@ describe('pages', () => {
             params: {
               action: 'dismiss',
             },
+            page: context.getSelectedPage(),
           },
           response,
           context,
@@ -1100,7 +1128,11 @@ describe('pages', () => {
         assert.ok(typeof page._tabId === 'string');
         // @ts-expect-error _tabId is internal.
         page._tabId = 'test-tab-id';
-        await getTabId.handler({params: {pageId: 1}}, response, context);
+        await getTabId.handler(
+          {params: {pageId: 1}, page: context.getSelectedPage()},
+          response,
+          context,
+        );
         const result = await response.handle('get_tab_id', context);
         // @ts-expect-error _tabId is internal.
         assert.strictEqual(result.structuredContent.tabId, 'test-tab-id');

@@ -49,7 +49,10 @@ describe('performance', () => {
         const selectedPage = context.getSelectedPage();
         const startTracingStub = sinon.stub(selectedPage.tracing, 'start');
         await startTrace.handler(
-          {params: {reload: true, autoStop: false}},
+          {
+            params: {reload: true, autoStop: false},
+            page: context.getSelectedPage(),
+          },
           response,
           context,
         );
@@ -70,7 +73,10 @@ describe('performance', () => {
         const gotoStub = sinon.stub(selectedPage, 'goto');
         const startTracingStub = sinon.stub(selectedPage.tracing, 'start');
         await startTrace.handler(
-          {params: {reload: true, autoStop: false}},
+          {
+            params: {reload: true, autoStop: false},
+            page: context.getSelectedPage(),
+          },
           response,
           context,
         );
@@ -106,7 +112,10 @@ describe('performance', () => {
 
         const clock = sinon.useFakeTimers();
         const handlerPromise = startTrace.handler(
-          {params: {reload: true, autoStop: true}},
+          {
+            params: {reload: true, autoStop: true},
+            page: context.getSelectedPage(),
+          },
           response,
           context,
         );
@@ -141,7 +150,10 @@ describe('performance', () => {
         const selectedPage = context.getSelectedPage();
         const startTracingStub = sinon.stub(selectedPage.tracing, 'start');
         await startTrace.handler(
-          {params: {reload: true, autoStop: false}},
+          {
+            params: {reload: true, autoStop: false},
+            page: context.getSelectedPage(),
+          },
           response,
           context,
         );
@@ -172,7 +184,10 @@ describe('performance', () => {
           .resolves({filename: filePath});
 
         const handlerPromise = startTrace.handler(
-          {params: {reload: true, autoStop: true, filePath}},
+          {
+            params: {reload: true, autoStop: true, filePath},
+            page: context.getSelectedPage(),
+          },
           response,
           context,
         );
@@ -220,6 +235,7 @@ describe('performance', () => {
               insightSetId: 'NAVIGATION_0',
               insightName: 'LCPBreakdown',
             },
+            page: context.getSelectedPage(),
           },
           response,
           context,
@@ -237,6 +253,7 @@ describe('performance', () => {
               insightSetId: '8463DF94CD61B265B664E7F768183DE3',
               insightName: 'LCPBreakdown',
             },
+            page: context.getSelectedPage(),
           },
           response,
           context,
@@ -258,7 +275,11 @@ describe('performance', () => {
         context.setIsRunningPerformanceTrace(false);
         const selectedPage = context.getSelectedPage();
         const stopTracingStub = sinon.stub(selectedPage.tracing, 'stop');
-        await stopTrace.handler({params: {}}, response, context);
+        await stopTrace.handler(
+          {params: {}, page: context.getSelectedPage()},
+          response,
+          context,
+        );
         sinon.assert.notCalled(stopTracingStub);
         assert.strictEqual(context.isRunningPerformanceTrace(), false);
       });
@@ -274,7 +295,11 @@ describe('performance', () => {
           .callsFake(async () => {
             return rawData;
           });
-        await stopTrace.handler({params: {}}, response, context);
+        await stopTrace.handler(
+          {params: {}, page: context.getSelectedPage()},
+          response,
+          context,
+        );
         assert.ok(
           response.responseLines.includes(
             'The performance trace has been stopped.',
@@ -294,7 +319,11 @@ describe('performance', () => {
           .returns(Promise.resolve(undefined));
 
         await assert.rejects(
-          stopTrace.handler({params: {}}, response, context),
+          stopTrace.handler(
+            {params: {}, page: context.getSelectedPage()},
+            response,
+            context,
+          ),
           /There was an unexpected error parsing the trace/,
         );
       });
@@ -313,7 +342,11 @@ describe('performance', () => {
           .stub(context, 'saveFile')
           .resolves({filename: filePath});
 
-        await stopTrace.handler({params: {filePath}}, response, context);
+        await stopTrace.handler(
+          {params: {filePath}, page: context.getSelectedPage()},
+          response,
+          context,
+        );
 
         sinon.assert.calledOnce(stopTracingStub);
         sinon.assert.calledOnce(saveFileStub);
@@ -334,7 +367,11 @@ describe('performance', () => {
           const selectedPage = context.getSelectedPage();
           sinon.stub(selectedPage.tracing, 'stop').resolves(rawData);
 
-          await stopTrace.handler({params: {}}, response, context);
+          await stopTrace.handler(
+            {params: {}, page: context.getSelectedPage()},
+            response,
+            context,
+          );
 
           const cruxEndpoint =
             'https://chromeuxreport.googleapis.com/v1/records:queryRecord';

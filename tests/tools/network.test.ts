@@ -24,7 +24,11 @@ describe('network', () => {
   describe('network_list_requests', () => {
     it('list requests', async () => {
       await withMcpContext(async (response, context) => {
-        await listNetworkRequests.handler({params: {}}, response, context);
+        await listNetworkRequests.handler(
+          {params: {}, page: context.getSelectedPage()},
+          response,
+          context,
+        );
         assert.ok(response.includeNetworkRequests);
         assert.strictEqual(response.networkRequestsPageIdx, undefined);
       });
@@ -44,6 +48,8 @@ describe('network', () => {
         await listNetworkRequests.handler(
           {
             params: {},
+
+            page: context.getSelectedPage(),
           },
           response,
           context,
@@ -71,6 +77,7 @@ describe('network', () => {
             params: {
               includePreservedRequests: true,
             },
+            page: context.getSelectedPage(),
           },
           response,
           context,
@@ -113,6 +120,7 @@ describe('network', () => {
             params: {
               includePreservedRequests: true,
             },
+            page: context.getSelectedPage(),
           },
           response,
           context,
@@ -130,7 +138,7 @@ describe('network', () => {
         const page = context.getSelectedPage();
         await page.goto('data:text/html,<div>Hello MCP</div>');
         await getNetworkRequest.handler(
-          {params: {reqid: 1}},
+          {params: {reqid: 1}, page: context.getSelectedPage()},
           response,
           context,
         );
@@ -143,7 +151,7 @@ describe('network', () => {
         const page = context.getSelectedPage();
         await page.goto('data:text/html,<div>Hello MCP</div>');
         await getNetworkRequest.handler(
-          {params: {reqid: 1}},
+          {params: {reqid: 1}, page: context.getSelectedPage()},
           response,
           context,
         );
@@ -166,6 +174,7 @@ describe('network', () => {
             params: {
               reqid: 1,
             },
+            page: context.getSelectedPage(),
           },
           response,
           context,

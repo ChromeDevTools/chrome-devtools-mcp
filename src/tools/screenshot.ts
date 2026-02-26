@@ -8,16 +8,15 @@ import {zod} from '../third_party/index.js';
 import type {ElementHandle, Page} from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
-import {defineTool} from './ToolDefinition.js';
+import {definePageTool} from './ToolDefinition.js';
 
-export const screenshot = defineTool({
+export const screenshot = definePageTool({
   name: 'take_screenshot',
   description: `Take a screenshot of the page or element.`,
   annotations: {
     category: ToolCategory.DEBUGGING,
     // Not read-only due to filePath param.
     readOnlyHint: false,
-    pageScoped: true,
   },
   schema: {
     format: zod
@@ -63,7 +62,7 @@ export const screenshot = defineTool({
         request.page,
       );
     } else {
-      pageOrHandle = request.page!;
+      pageOrHandle = request.page;
     }
 
     const format = request.params.format;

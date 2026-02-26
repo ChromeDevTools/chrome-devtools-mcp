@@ -23,7 +23,7 @@ import {
   SetLevelRequestSchema,
 } from './third_party/index.js';
 import {ToolCategory} from './tools/categories.js';
-import type {ToolDefinition} from './tools/ToolDefinition.js';
+import type {DefinedPageTool, ToolDefinition} from './tools/ToolDefinition.js';
 import {pageIdSchema} from './tools/ToolDefinition.js';
 import {createTools} from './tools/tools.js';
 import {VERSION} from './version.js';
@@ -107,7 +107,7 @@ export async function createMcpServer(
 
   const toolMutex = new Mutex();
 
-  function registerTool(tool: ToolDefinition): void {
+  function registerTool(tool: ToolDefinition | DefinedPageTool): void {
     if (
       tool.annotations.category === ToolCategory.EMULATION &&
       serverArgs.categoryEmulation === false
@@ -151,7 +151,9 @@ export async function createMcpServer(
       return;
     }
     const schema =
-      tool.annotations.pageScoped && serverArgs.experimentalPageIdRouting
+      'pageScoped' in tool &&
+      tool.pageScoped &&
+      serverArgs.experimentalPageIdRouting
         ? {...tool.schema, ...pageIdSchema}
         : tool.schema;
 
@@ -174,22 +176,31 @@ export async function createMcpServer(
           const response = serverArgs.slim
             ? new SlimMcpResponse(serverArgs)
             : new McpResponse(serverArgs);
-          const page =
-            tool.annotations.pageScoped && serverArgs.experimentalPageIdRouting
-              ? context.resolvePageById(params.pageId as number | undefined)
-              : undefined;
-          if (page) {
-            context.setRequestPage(page);
-          }
           try {
-            await tool.handler(
-              {
-                params,
-                page,
-              },
-              response,
-              context,
-            );
+            if ('pageScoped' in tool && tool.pageScoped) {
+              const page =
+                serverArgs.experimentalPageIdRouting && params.pageId
+                  ? context.resolvePageById(params.pageId)
+                  : context.getSelectedPage();
+              context.setRequestPage(page);
+              await tool.handler(
+                {
+                  params,
+                  page,
+                },
+                response,
+                context,
+              );
+            } else {
+              await tool.handler(
+                // @ts-expect-error types do not match.
+                {
+                  params,
+                },
+                response,
+                context,
+              );
+            }
             const {content, structuredContent} = await response.handle(
               tool.name,
               context,

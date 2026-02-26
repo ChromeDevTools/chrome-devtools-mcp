@@ -41,7 +41,7 @@ export const createTools = (args: ParsedArguments) => {
         ...Object.values(snapshotTools),
       ];
 
-  const tools: ToolDefinition[] = [];
+  const tools = [];
   for (const tool of rawTools) {
     if (typeof tool === 'function') {
       tools.push(tool(args));

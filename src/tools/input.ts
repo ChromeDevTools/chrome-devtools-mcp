@@ -11,7 +11,7 @@ import type {ElementHandle, KeyInput, Page} from '../third_party/index.js';
 import {parseKey} from '../utils/keyboard.js';
 
 import {ToolCategory} from './categories.js';
-import {defineTool} from './ToolDefinition.js';
+import {definePageTool} from './ToolDefinition.js';
 
 const dblClickSchema = zod
   .boolean()
@@ -40,7 +40,7 @@ function handleActionError(error: unknown, uid: string) {
   );
 }
 
-export const click = defineTool({
+export const click = definePageTool({
   name: 'click',
   description: `Clicks on the provided element`,
   annotations: {
@@ -81,14 +81,13 @@ export const click = defineTool({
   },
 });
 
-export const clickAt = defineTool({
+export const clickAt = definePageTool({
   name: 'click_at',
   description: `Clicks at the provided coordinates`,
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
     conditions: ['computerVision'],
-    pageScoped: true,
   },
   schema: {
     x: zod.number().describe('The x coordinate'),
@@ -97,7 +96,7 @@ export const clickAt = defineTool({
     includeSnapshot: includeSnapshotSchema,
   },
   handler: async (request, response, context) => {
-    const page = request.page!;
+    const page = request.page;
     context.assertPageIsFocused(page);
     await context.waitForEventsAfterAction(async () => {
       await page.mouse.click(request.params.x, request.params.y, {
@@ -115,7 +114,7 @@ export const clickAt = defineTool({
   },
 });
 
-export const hover = defineTool({
+export const hover = definePageTool({
   name: 'hover',
   description: `Hover over the provided element`,
   annotations: {
@@ -217,13 +216,12 @@ async function fillFormElement(
   }
 }
 
-export const fill = defineTool({
+export const fill = definePageTool({
   name: 'fill',
   description: `Type text into a input, text area or select an option from a <select> element.`,
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
-    pageScoped: true,
   },
   schema: {
     uid: zod
@@ -235,7 +233,7 @@ export const fill = defineTool({
     includeSnapshot: includeSnapshotSchema,
   },
   handler: async (request, response, context) => {
-    const page = request.page!;
+    const page = request.page;
     await context.waitForEventsAfterAction(async () => {
       await fillFormElement(
         request.params.uid,
@@ -251,20 +249,19 @@ export const fill = defineTool({
   },
 });
 
-export const typeText = defineTool({
+export const typeText = definePageTool({
   name: 'type_text',
   description: `Type text using keyboard into a previously focused input`,
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
-    pageScoped: true,
   },
   schema: {
     text: zod.string().describe('The text to type'),
     submitKey: submitKeySchema,
   },
   handler: async (request, response, context) => {
-    const page = request.page!;
+    const page = request.page;
     context.assertPageIsFocused(page);
     await context.waitForEventsAfterAction(async () => {
       await page.keyboard.type(request.params.text);
@@ -278,7 +275,7 @@ export const typeText = defineTool({
   },
 });
 
-export const drag = defineTool({
+export const drag = definePageTool({
   name: 'drag',
   description: `Drag an element onto another element`,
   annotations: {
@@ -310,13 +307,12 @@ export const drag = defineTool({
   },
 });
 
-export const fillForm = defineTool({
+export const fillForm = definePageTool({
   name: 'fill_form',
   description: `Fill out multiple form elements at once`,
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
-    pageScoped: true,
   },
   schema: {
     elements: zod
@@ -330,7 +326,7 @@ export const fillForm = defineTool({
     includeSnapshot: includeSnapshotSchema,
   },
   handler: async (request, response, context) => {
-    const page = request.page!;
+    const page = request.page;
     for (const element of request.params.elements) {
       await context.waitForEventsAfterAction(async () => {
         await fillFormElement(
@@ -348,13 +344,12 @@ export const fillForm = defineTool({
   },
 });
 
-export const uploadFile = defineTool({
+export const uploadFile = definePageTool({
   name: 'upload_file',
   description: 'Upload a file through a provided element.',
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
-    pageScoped: true,
   },
   schema: {
     uid: zod
@@ -380,7 +375,7 @@ export const uploadFile = defineTool({
         // Page.waitForFileChooser() and upload the file this way.
         try {
           const [fileChooser] = await Promise.all([
-            request.page!.waitForFileChooser({timeout: 3000}),
+            request.page.waitForFileChooser({timeout: 3000}),
             handle.asLocator().click(),
           ]);
           await fileChooser.accept([filePath]);
@@ -391,7 +386,7 @@ export const uploadFile = defineTool({
         }
       }
       if (request.params.includeSnapshot) {
-        response.includeSnapshot({page: request.page!});
+        response.includeSnapshot({page: request.page});
       }
       response.appendResponseLine(`File uploaded from ${filePath}.`);
     } finally {
@@ -400,13 +395,12 @@ export const uploadFile = defineTool({
   },
 });
 
-export const pressKey = defineTool({
+export const pressKey = definePageTool({
   name: 'press_key',
   description: `Press a key or key combination. Use this when other input methods like fill() cannot be used (e.g., keyboard shortcuts, navigation keys, or special key combinations).`,
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
-    pageScoped: true,
   },
   schema: {
     key: zod
@@ -417,7 +411,7 @@ export const pressKey = defineTool({
     includeSnapshot: includeSnapshotSchema,
   },
   handler: async (request, response, context) => {
-    const page = request.page!;
+    const page = request.page;
     context.assertPageIsFocused(page);
     const tokens = parseKey(request.params.key);
     const [key, ...modifiers] = tokens;

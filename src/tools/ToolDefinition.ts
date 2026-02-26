@@ -20,7 +20,7 @@ import type {PaginationOptions} from '../utils/types.js';
 
 import type {ToolCategory} from './categories.js';
 
-export interface ToolDefinition<
+export interface BaseToolDefinition<
   Schema extends zod.ZodRawShape = zod.ZodRawShape,
 > {
   name: string;
@@ -33,13 +33,13 @@ export interface ToolDefinition<
      */
     readOnlyHint: boolean;
     conditions?: string[];
-    /**
-     * If true, the tool operates on a specific page.
-     * The `pageId` schema field is auto-injected and the resolved
-     * page is provided via `request.page`.
-     */
-    pageScoped?: boolean;
   };
+  schema: Schema;
+}
+
+export interface ToolDefinition<
+  Schema extends zod.ZodRawShape = zod.ZodRawShape,
+> extends BaseToolDefinition<Schema> {
   schema: Schema;
   handler: (
     request: Request<Schema>,
@@ -50,8 +50,6 @@ export interface ToolDefinition<
 
 export interface Request<Schema extends zod.ZodRawShape> {
   params: zod.objectOutputType<Schema, zod.ZodTypeAny>;
-  /** Populated centrally for tools with `pageScoped: true`. */
-  page?: Page;
 }
 
 export interface ImageContentData {
@@ -215,28 +213,65 @@ export function defineTool<
   if (typeof definition === 'function') {
     const factory = definition;
     return (args: Args) => {
-      const tool = factory(args);
-      wrapPageScopedHandler(tool);
-      return tool;
+      return factory(args);
     };
   }
-  wrapPageScopedHandler(definition);
   return definition;
 }
 
-function wrapPageScopedHandler<Schema extends zod.ZodRawShape>(
-  definition: ToolDefinition<Schema>,
-) {
-  if (definition.annotations.pageScoped) {
-    const originalHandler = definition.handler;
-    definition.handler = async (request, response, context) => {
-      // In production, main.ts resolves request.page centrally before calling
-      // the handler. This fallback exists for tests that invoke handlers
-      // directly without going through main.ts.
-      request.page ??= context.getSelectedPage();
-      return originalHandler(request, response, context);
+interface PageToolDefinition<
+  Schema extends zod.ZodRawShape = zod.ZodRawShape,
+> extends BaseToolDefinition<Schema> {
+  handler: (
+    request: Request<Schema> & {page: Page},
+    response: Response,
+    context: Context,
+  ) => Promise<void>;
+}
+
+export type DefinedPageTool<Schema extends zod.ZodRawShape = zod.ZodRawShape> =
+  PageToolDefinition<Schema> & {
+    pageScoped: true;
+    handler: (
+      request: Request<Schema> & {page: Page},
+      response: Response,
+      context: Context,
+    ) => Promise<void>;
+  };
+
+export function definePageTool<Schema extends zod.ZodRawShape>(
+  definition: PageToolDefinition<Schema>,
+): DefinedPageTool<Schema>;
+
+export function definePageTool<
+  Schema extends zod.ZodRawShape,
+  Args extends ParsedArguments = ParsedArguments,
+>(
+  definition: (args?: Args) => PageToolDefinition<Schema>,
+): (args?: Args) => DefinedPageTool<Schema>;
+
+export function definePageTool<
+  Schema extends zod.ZodRawShape,
+  Args extends ParsedArguments = ParsedArguments,
+>(
+  definition:
+    | PageToolDefinition<Schema>
+    | ((args?: Args) => PageToolDefinition<Schema>),
+): DefinedPageTool<Schema> | ((args?: Args) => DefinedPageTool<Schema>) {
+  if (typeof definition === 'function') {
+    return (args?: Args): DefinedPageTool<Schema> => {
+      const tool = definition(args);
+      return {
+        ...tool,
+        pageScoped: true,
+      };
     };
   }
+
+  return {
+    ...definition,
+    pageScoped: true,
+  } as DefinedPageTool<Schema>;
 }
 
 export const CLOSE_PAGE_ERROR =

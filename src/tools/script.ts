@@ -8,16 +8,15 @@ import {zod} from '../third_party/index.js';
 import type {Frame, JSHandle, Page} from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
-import {defineTool} from './ToolDefinition.js';
+import {definePageTool} from './ToolDefinition.js';
 
-export const evaluateScript = defineTool({
+export const evaluateScript = definePageTool({
   name: 'evaluate_script',
   description: `Evaluate a JavaScript function inside the currently selected page. Returns the response as JSON,
 so returned values have to be JSON-serializable.`,
   annotations: {
     category: ToolCategory.DEBUGGING,
     readOnlyHint: false,
-    pageScoped: true,
   },
   schema: {
     function: zod.string().describe(
@@ -61,7 +60,7 @@ Example with arguments: \`(el) => {
           "Elements from different frames can't be evaluated together.",
         );
       } else {
-        pageOrFrame = [...frames.values()][0] ?? request.page!;
+        pageOrFrame = [...frames.values()][0] ?? request.page;
       }
       const fn = await pageOrFrame.evaluateHandle(
         `(${request.params.function})`,

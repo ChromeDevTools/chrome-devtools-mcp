@@ -8,7 +8,7 @@ import {zod} from '../third_party/index.js';
 import type {ResourceType} from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
-import {defineTool} from './ToolDefinition.js';
+import {definePageTool} from './ToolDefinition.js';
 
 const FILTERABLE_RESOURCE_TYPES: readonly [ResourceType, ...ResourceType[]] = [
   'document',
@@ -32,13 +32,12 @@ const FILTERABLE_RESOURCE_TYPES: readonly [ResourceType, ...ResourceType[]] = [
   'other',
 ];
 
-export const listNetworkRequests = defineTool({
+export const listNetworkRequests = definePageTool({
   name: 'list_network_requests',
   description: `List all requests for the currently selected page since the last navigation.`,
   annotations: {
     category: ToolCategory.NETWORK,
     readOnlyHint: true,
-    pageScoped: true,
   },
   schema: {
     pageSize: zod
@@ -87,13 +86,12 @@ export const listNetworkRequests = defineTool({
   },
 });
 
-export const getNetworkRequest = defineTool({
+export const getNetworkRequest = definePageTool({
   name: 'get_network_request',
   description: `Gets a network request by an optional reqid, if omitted returns the currently selected request in the DevTools Network panel.`,
   annotations: {
     category: ToolCategory.NETWORK,
     readOnlyHint: false,
-    pageScoped: true,
   },
   schema: {
     reqid: zod

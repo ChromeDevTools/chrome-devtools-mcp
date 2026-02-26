@@ -17,15 +17,14 @@ import {
 } from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
-import {defineTool} from './ToolDefinition.js';
+import {definePageTool} from './ToolDefinition.js';
 
-export const lighthouseAudit = defineTool({
+export const lighthouseAudit = definePageTool({
   name: 'lighthouse_audit',
   description: `Get Lighthouse score and reports for accessibility, SEO and best practices.`,
   annotations: {
     category: ToolCategory.DEBUGGING,
     readOnlyHint: true,
-    pageScoped: true,
   },
   schema: {
     mode: zod
@@ -44,7 +43,7 @@ export const lighthouseAudit = defineTool({
       .describe('Directory for reports. If omitted, uses temporary files.'),
   },
   handler: async (request, response, context) => {
-    const page = request.page!;
+    const page = request.page;
     const categories = ['accessibility', 'seo', 'best-practices'];
     const formats = ['json', 'html'] as OutputMode[];
     const {

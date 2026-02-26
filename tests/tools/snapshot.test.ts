@@ -14,7 +14,11 @@ describe('snapshot', () => {
   describe('browser_snapshot', () => {
     it('includes a snapshot', async () => {
       await withMcpContext(async (response, context) => {
-        await takeSnapshot.handler({params: {}}, response, context);
+        await takeSnapshot.handler(
+          {params: {}, page: context.getSelectedPage()},
+          response,
+          context,
+        );
         assert.ok(response.includeSnapshot);
       });
     });
@@ -32,6 +36,7 @@ describe('snapshot', () => {
             params: {
               text: ['Hello'],
             },
+            page,
           },
           response,
           context,
@@ -57,6 +62,7 @@ describe('snapshot', () => {
             params: {
               text: ['Complete', 'Error'],
             },
+            page,
           },
           response,
           context,
@@ -79,6 +85,7 @@ describe('snapshot', () => {
             params: {
               text: ['Complete', 'Error'],
             },
+            page,
           },
           response,
           context,
@@ -109,6 +116,7 @@ describe('snapshot', () => {
             params: {
               text: ['Hello World'],
             },
+            page,
           },
           response,
           context,
@@ -140,6 +148,7 @@ describe('snapshot', () => {
             params: {
               text: ['Header'],
             },
+            page,
           },
           response,
           context,
@@ -167,6 +176,7 @@ describe('snapshot', () => {
             params: {
               text: ['Hello iframe'],
             },
+            page,
           },
           response,
           context,

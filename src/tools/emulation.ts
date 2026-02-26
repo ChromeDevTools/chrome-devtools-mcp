@@ -8,7 +8,7 @@
 import {zod, PredefinedNetworkConditions} from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
-import {defineTool} from './ToolDefinition.js';
+import {definePageTool} from './ToolDefinition.js';
 
 const throttlingOptions: [string, ...string[]] = [
   'No emulation',
@@ -16,13 +16,12 @@ const throttlingOptions: [string, ...string[]] = [
   ...Object.keys(PredefinedNetworkConditions),
 ];
 
-export const emulate = defineTool({
+export const emulate = definePageTool({
   name: 'emulate',
   description: `Emulates various features on the selected page.`,
   annotations: {
     category: ToolCategory.EMULATION,
     readOnlyHint: false,
-    pageScoped: true,
   },
   schema: {
     networkConditions: zod
@@ -105,7 +104,7 @@ export const emulate = defineTool({
       ),
   },
   handler: async (request, _response, context) => {
-    const page = request.page!;
+    const page = request.page;
     await context.emulate(request.params, page);
   },
 });
