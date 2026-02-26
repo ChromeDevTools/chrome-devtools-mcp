@@ -16,16 +16,18 @@ description: Uses Chrome DevTools MCP for accessibility (a11y) debugging and aud
 Start by running a Lighthouse accessibility audit to get a comprehensive baseline. This tool provides a high-level score and lists specific failing elements with remediation advice.
 
 1.  Run the audit:
-1.  Run the audit:
-    Call the `lighthouse_audit` tool. It checks "accessibility", "seo", and "best-practices" by default.
     - Set `mode` to `"navigation"` to refresh the page and capture load issues.
-    - Optionally set `outputDirPath` to save full HTML/JSON reports.
+    - Set `outputDirPath` (e.g., `/tmp/lh-report`) to save the full JSON report.
 2.  **Analyze the Summary**:
     - Check `scores` (0-1 scale). A score < 1 indicates violations.
     - Review `audits.failed` count.
-3.  **Review the Report**:
-    - If you saved the report, open the JSON file to see detailed findings and exact element selectors.
-    - If you only have the summary, proceed to specific checks below for the failing categories.
+3.  **Review the Report (CRITICAL)**:
+    - **Parsing**: Do not read the entire file line-by-line. Use a CLI tool like `jq` or a Node.js one-liner to filter for failures:
+      ```bash
+      # Extract failing audits with their details
+      node -e "const r=require('./report.json'); Object.values(r.audits).filter(a=>a.score!==null && a.score<1).forEach(a=>console.log(JSON.stringify({id:a.id, title:a.title, items:a.details?.items})))"
+      ```
+    - This efficiently extracts the `selector` and `snippet` of failing elements without loading the full report into context.
 
 ### 2. Browser Issues & Audits
 
