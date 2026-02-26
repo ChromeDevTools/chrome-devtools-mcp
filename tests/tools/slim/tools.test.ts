@@ -17,7 +17,11 @@ describe('slim', () => {
   it('evaluates', async t => {
     await withMcpContext(async (response, context) => {
       await evaluate.handler(
-        {params: {fn: String(() => 2 * 5)}},
+        {
+          params: {
+            script: `2 * 5`,
+          },
+        },
         response,
         context,
       );
@@ -30,9 +34,7 @@ describe('slim', () => {
       await evaluate.handler(
         {
           params: {
-            fn: String(() => {
-              throw new Error('test error');
-            }),
+            script: `throw new Error('test error')`,
           },
         },
         response,

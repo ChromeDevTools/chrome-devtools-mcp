@@ -11,17 +11,19 @@ import {zod} from '../third_party/index.js';
 import {ToolCategory} from './categories.js';
 import {CLOSE_PAGE_ERROR, defineTool, timeoutSchema} from './ToolDefinition.js';
 
-export const listPages = defineTool({
-  name: 'list_pages',
-  description: `Get a list of pages open in the browser.`,
-  annotations: {
-    category: ToolCategory.NAVIGATION,
-    readOnlyHint: true,
-  },
-  schema: {},
-  handler: async (_request, response) => {
-    response.setIncludePages(true);
-  },
+export const listPages = defineTool(args => {
+  return {
+    name: 'list_pages',
+    description: `Get a list of pages ${args?.categoryExtensions ? 'including extension service workers' : ''} open in the browser.`,
+    annotations: {
+      category: ToolCategory.NAVIGATION,
+      readOnlyHint: true,
+    },
+    schema: {},
+    handler: async (_request, response) => {
+      response.setIncludePages(true);
+    },
+  };
 });
 
 export const selectPage = defineTool({
@@ -35,7 +37,7 @@ export const selectPage = defineTool({
     pageId: zod
       .number()
       .describe(
-        `The ID of the page to select. Call ${listPages.name} to get available pages.`,
+        `The ID of the page to select. Call ${listPages().name} to get available pages.`,
       ),
     bringToFront: zod
       .boolean()
@@ -128,6 +130,7 @@ export const navigatePage = defineTool({
   annotations: {
     category: ToolCategory.NAVIGATION,
     readOnlyHint: false,
+    pageScoped: true,
   },
   schema: {
     type: zod
@@ -156,7 +159,7 @@ export const navigatePage = defineTool({
     ...timeoutSchema,
   },
   handler: async (request, response, context) => {
-    const page = context.getSelectedPage();
+    const page = request.page!;
     const options = {
       timeout: request.params.timeout,
     };
@@ -180,7 +183,7 @@ export const navigatePage = defineTool({
           void dialog.dismiss();
         }
         // We are not going to report the dialog like regular dialogs.
-        context.clearDialog();
+        context.clearDialog(page);
       }
     };
 
@@ -277,13 +280,14 @@ export const resizePage = defineTool({
   annotations: {
     category: ToolCategory.EMULATION,
     readOnlyHint: false,
+    pageScoped: true,
   },
   schema: {
     width: zod.number().describe('Page width'),
     height: zod.number().describe('Page height'),
   },
-  handler: async (request, response, context) => {
-    const page = context.getSelectedPage();
+  handler: async (request, response, _context) => {
+    const page = request.page!;
 
     try {
       const browser = page.browser();
@@ -316,6 +320,7 @@ export const handleDialog = defineTool({
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
+    pageScoped: true,
   },
   schema: {
     action: zod
@@ -327,7 +332,8 @@ export const handleDialog = defineTool({
       .describe('Optional prompt text to enter into the dialog.'),
   },
   handler: async (request, response, context) => {
-    const dialog = context.getDialog();
+    const page = request.page!;
+    const dialog = context.getDialog(page);
     if (!dialog) {
       throw new Error('No open dialog found');
     }
@@ -355,7 +361,7 @@ export const handleDialog = defineTool({
       }
     }
 
-    context.clearDialog();
+    context.clearDialog(page);
     response.setIncludePages(true);
   },
 });
@@ -372,7 +378,7 @@ export const getTabId = defineTool({
     pageId: zod
       .number()
       .describe(
-        `The ID of the page to get the tab ID for. Call ${listPages.name} to get available pages.`,
+        `The ID of the page to get the tab ID for. Call ${listPages().name} to get available pages.`,
       ),
   },
   handler: async (request, response, context) => {

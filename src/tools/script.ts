@@ -17,6 +17,7 @@ so returned values have to be JSON-serializable.`,
   annotations: {
     category: ToolCategory.DEBUGGING,
     readOnlyHint: false,
+    pageScoped: true,
   },
   schema: {
     function: zod.string().describe(
@@ -49,7 +50,7 @@ Example with arguments: \`(el) => {
     try {
       const frames = new Set<Frame>();
       for (const el of request.params.args ?? []) {
-        const handle = await context.getElementByUid(el.uid);
+        const handle = await context.getElementByUid(el.uid, request.page);
         frames.add(handle.frame);
         args.push(handle);
       }
@@ -60,7 +61,7 @@ Example with arguments: \`(el) => {
           "Elements from different frames can't be evaluated together.",
         );
       } else {
-        pageOrFrame = [...frames.values()][0] ?? context.getSelectedPage();
+        pageOrFrame = [...frames.values()][0] ?? request.page!;
       }
       const fn = await pageOrFrame.evaluateHandle(
         `(${request.params.function})`,

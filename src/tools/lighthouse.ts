@@ -25,6 +25,7 @@ export const lighthouseAudit = defineTool({
   annotations: {
     category: ToolCategory.DEBUGGING,
     readOnlyHint: true,
+    pageScoped: true,
   },
   schema: {
     mode: zod
@@ -43,7 +44,7 @@ export const lighthouseAudit = defineTool({
       .describe('Directory for reports. If omitted, uses temporary files.'),
   },
   handler: async (request, response, context) => {
-    const page = context.getSelectedPage();
+    const page = request.page!;
     const categories = ['accessibility', 'seo', 'best-practices'];
     const formats = ['json', 'html'] as OutputMode[];
     const {

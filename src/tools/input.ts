@@ -7,7 +7,7 @@
 import {logger} from '../logger.js';
 import type {McpContext, TextSnapshotNode} from '../McpContext.js';
 import {zod} from '../third_party/index.js';
-import type {ElementHandle, KeyInput} from '../third_party/index.js';
+import type {ElementHandle, KeyInput, Page} from '../third_party/index.js';
 import {parseKey} from '../utils/keyboard.js';
 
 import {ToolCategory} from './categories.js';
@@ -88,6 +88,7 @@ export const clickAt = defineTool({
     category: ToolCategory.INPUT,
     readOnlyHint: false,
     conditions: ['computerVision'],
+    pageScoped: true,
   },
   schema: {
     x: zod.number().describe('The x coordinate'),
@@ -96,7 +97,8 @@ export const clickAt = defineTool({
     includeSnapshot: includeSnapshotSchema,
   },
   handler: async (request, response, context) => {
-    const page = context.getSelectedPage();
+    const page = request.page!;
+    context.assertPageIsFocused(page);
     await context.waitForEventsAfterAction(async () => {
       await page.mouse.click(request.params.x, request.params.y, {
         clickCount: request.params.dblClick ? 2 : 1,
@@ -108,7 +110,7 @@ export const clickAt = defineTool({
         : `Successfully clicked at the coordinates`,
     );
     if (request.params.includeSnapshot) {
-      response.includeSnapshot();
+      response.includeSnapshot({page});
     }
   },
 });
@@ -192,8 +194,9 @@ async function fillFormElement(
   uid: string,
   value: string,
   context: McpContext,
+  page: Page,
 ) {
-  const handle = await context.getElementByUid(uid);
+  const handle = await context.getElementByUid(uid, page);
   try {
     const aXNode = context.getAXNodeByUid(uid);
     // We assume that combobox needs to be handled as select if it has
@@ -204,8 +207,7 @@ async function fillFormElement(
       // Increase timeout for longer input values.
       const timeoutPerChar = 10; // ms
       const fillTimeout =
-        context.getSelectedPage().getDefaultTimeout() +
-        value.length * timeoutPerChar;
+        page.getDefaultTimeout() + value.length * timeoutPerChar;
       await handle.asLocator().setTimeout(fillTimeout).fill(value);
     }
   } catch (error) {
@@ -221,6 +223,7 @@ export const fill = defineTool({
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
+    pageScoped: true,
   },
   schema: {
     uid: zod
@@ -232,16 +235,18 @@ export const fill = defineTool({
     includeSnapshot: includeSnapshotSchema,
   },
   handler: async (request, response, context) => {
+    const page = request.page!;
     await context.waitForEventsAfterAction(async () => {
       await fillFormElement(
         request.params.uid,
         request.params.value,
         context as McpContext,
+        page,
       );
     });
     response.appendResponseLine(`Successfully filled out the element`);
     if (request.params.includeSnapshot) {
-      response.includeSnapshot();
+      response.includeSnapshot({page});
     }
   },
 });
@@ -252,14 +257,16 @@ export const typeText = defineTool({
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
+    pageScoped: true,
   },
   schema: {
     text: zod.string().describe('The text to type'),
     submitKey: submitKeySchema,
   },
   handler: async (request, response, context) => {
+    const page = request.page!;
+    context.assertPageIsFocused(page);
     await context.waitForEventsAfterAction(async () => {
-      const page = context.getSelectedPage();
       await page.keyboard.type(request.params.text);
       if (request.params.submitKey) {
         await page.keyboard.press(request.params.submitKey as KeyInput);
@@ -309,6 +316,7 @@ export const fillForm = defineTool({
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
+    pageScoped: true,
   },
   schema: {
     elements: zod
@@ -322,18 +330,20 @@ export const fillForm = defineTool({
     includeSnapshot: includeSnapshotSchema,
   },
   handler: async (request, response, context) => {
+    const page = request.page!;
     for (const element of request.params.elements) {
       await context.waitForEventsAfterAction(async () => {
         await fillFormElement(
           element.uid,
           element.value,
           context as McpContext,
+          page,
         );
       });
     }
     response.appendResponseLine(`Successfully filled out the form`);
     if (request.params.includeSnapshot) {
-      response.includeSnapshot();
+      response.includeSnapshot({page});
     }
   },
 });
@@ -344,6 +354,7 @@ export const uploadFile = defineTool({
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
+    pageScoped: true,
   },
   schema: {
     uid: zod
@@ -358,6 +369,7 @@ export const uploadFile = defineTool({
     const {uid, filePath} = request.params;
     const handle = (await context.getElementByUid(
       uid,
+      request.page,
     )) as ElementHandle<HTMLInputElement>;
     try {
       try {
@@ -367,9 +379,8 @@ export const uploadFile = defineTool({
         // a type=file element. In this case, we want to default to
         // Page.waitForFileChooser() and upload the file this way.
         try {
-          const page = context.getSelectedPage();
           const [fileChooser] = await Promise.all([
-            page.waitForFileChooser({timeout: 3000}),
+            request.page!.waitForFileChooser({timeout: 3000}),
             handle.asLocator().click(),
           ]);
           await fileChooser.accept([filePath]);
@@ -380,7 +391,7 @@ export const uploadFile = defineTool({
         }
       }
       if (request.params.includeSnapshot) {
-        response.includeSnapshot();
+        response.includeSnapshot({page: request.page!});
       }
       response.appendResponseLine(`File uploaded from ${filePath}.`);
     } finally {
@@ -395,6 +406,7 @@ export const pressKey = defineTool({
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
+    pageScoped: true,
   },
   schema: {
     key: zod
@@ -405,7 +417,8 @@ export const pressKey = defineTool({
     includeSnapshot: includeSnapshotSchema,
   },
   handler: async (request, response, context) => {
-    const page = context.getSelectedPage();
+    const page = request.page!;
+    context.assertPageIsFocused(page);
     const tokens = parseKey(request.params.key);
     const [key, ...modifiers] = tokens;
 
@@ -423,7 +436,7 @@ export const pressKey = defineTool({
       `Successfully pressed key: ${request.params.key}`,
     );
     if (request.params.includeSnapshot) {
-      response.includeSnapshot();
+      response.includeSnapshot({page});
     }
   },
 });

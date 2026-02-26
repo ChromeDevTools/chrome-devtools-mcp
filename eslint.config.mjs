@@ -17,6 +17,7 @@ export default defineConfig([
   globalIgnores([
     '**/node_modules',
     '**/build/',
+    'tests/tools/fixtures/',
     'src/third_party/lighthouse-devtools-mcp-bundle.js',
   ]),
   importPlugin.flatConfigs.typescript,

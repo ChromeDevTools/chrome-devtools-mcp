@@ -17,6 +17,7 @@ export const screenshot = defineTool({
     category: ToolCategory.DEBUGGING,
     // Not read-only due to filePath param.
     readOnlyHint: false,
+    pageScoped: true,
   },
   schema: {
     format: zod
@@ -57,9 +58,12 @@ export const screenshot = defineTool({
 
     let pageOrHandle: Page | ElementHandle;
     if (request.params.uid) {
-      pageOrHandle = await context.getElementByUid(request.params.uid);
+      pageOrHandle = await context.getElementByUid(
+        request.params.uid,
+        request.page,
+      );
     } else {
-      pageOrHandle = context.getSelectedPage();
+      pageOrHandle = request.page!;
     }
 
     const format = request.params.format;

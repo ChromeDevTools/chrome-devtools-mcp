@@ -1,10 +1,10 @@
 {
   "name": "chrome-devtools-mcp",
-  "version": "0.17.3",
+  "version": "0.18.1",
   "description": "MCP server for Chrome DevTools",
   "type": "module",
   "bin": "./build/src/index.js",
-  "main": "index.js",
+  "main": "./build/src/server.js",
   "scripts": {
     "clean": "node -e \"require('fs').rmSync('build', {recursive: true, force: true})\"",
     "bundle": "npm run clean && npm run build && rollup -c rollup.config.mjs && node -e \"require('fs').rmSync('build/node_modules', {recursive: true, force: true})\" && node --experimental-strip-types scripts/append-lighthouse-notices.ts",
@@ -24,7 +24,7 @@
     "verify-server-json-version": "node --experimental-strip-types scripts/verify-server-json-version.ts",
     "update-lighthouse": "node --experimental-strip-types scripts/update-lighthouse.ts",
     "verify-npm-package": "node scripts/verify-npm-package.mjs",
-    "eval": "npm run build && CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS=true node --experimental-strip-types scripts/eval_gemini.ts",
+    "eval": "npm run build && node --experimental-strip-types scripts/eval_gemini.ts",
     "count-tokens": "node --experimental-strip-types scripts/count_tokens.ts"
   },
   "files": [
@@ -65,7 +65,7 @@
     "lighthouse": "13.0.2",
     "prettier": "^3.6.2",
     "puppeteer": "24.37.5",
-    "rollup": "4.58.0",
+    "rollup": "4.59.0",
     "rollup-plugin-cleanup": "^3.2.1",
     "rollup-plugin-license": "^3.6.0",
     "sinon": "^21.0.0",

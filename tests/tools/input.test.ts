@@ -9,6 +9,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import {describe, it} from 'node:test';
 
+import type {ParsedArguments} from '../../src/cli.js';
 import {McpResponse} from '../../src/McpResponse.js';
 import {
   click,
@@ -514,7 +515,7 @@ describe('input', () => {
         await context.createTextSnapshot();
 
         // Fill email
-        const response1 = new McpResponse();
+        const response1 = new McpResponse({} as ParsedArguments);
         await fill.handler(
           {
             params: {
@@ -531,7 +532,7 @@ describe('input', () => {
         );
 
         // Fill password
-        const response2 = new McpResponse();
+        const response2 = new McpResponse({} as ParsedArguments);
         await fill.handler(
           {
             params: {

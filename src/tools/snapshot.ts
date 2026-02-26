@@ -18,6 +18,7 @@ in the DevTools Elements panel (if any).`,
     category: ToolCategory.DEBUGGING,
     // Not read-only due to filePath param.
     readOnlyHint: false,
+    pageScoped: true,
   },
   schema: {
     verbose: zod
@@ -37,6 +38,7 @@ in the DevTools Elements panel (if any).`,
     response.includeSnapshot({
       verbose: request.params.verbose ?? false,
       filePath: request.params.filePath,
+      page: request.page!,
     });
   },
 });
@@ -47,6 +49,7 @@ export const waitFor = defineTool({
   annotations: {
     category: ToolCategory.NAVIGATION,
     readOnlyHint: true,
+    pageScoped: true,
   },
   schema: {
     text: zod
@@ -58,15 +61,17 @@ export const waitFor = defineTool({
     ...timeoutSchema,
   },
   handler: async (request, response, context) => {
+    const page = request.page!;
     await context.waitForTextOnPage(
       request.params.text,
       request.params.timeout,
+      page,
     );
 
     response.appendResponseLine(
       `Element matching one of ${JSON.stringify(request.params.text)} found.`,
     );
 
-    response.includeSnapshot();
+    response.includeSnapshot({page});
   },
 });

@@ -26,6 +26,7 @@ export const startScreencast = defineTool({
   annotations: {
     category: ToolCategory.DEBUGGING,
     readOnlyHint: false,
+    pageScoped: true,
     conditions: ['screencast'],
   },
   schema: {
@@ -47,7 +48,7 @@ export const startScreencast = defineTool({
     const filePath = request.params.path ?? (await generateTempFilePath());
     const resolvedPath = path.resolve(filePath);
 
-    const page = context.getSelectedPage();
+    const page = request.page!;
 
     let recorder: ScreenRecorder;
     try {

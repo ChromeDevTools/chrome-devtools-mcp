@@ -32,6 +32,7 @@ export const startTrace = defineTool({
   annotations: {
     category: ToolCategory.PERFORMANCE,
     readOnlyHint: false,
+    pageScoped: true,
   },
   schema: {
     reload: zod
@@ -55,7 +56,7 @@ export const startTrace = defineTool({
     }
     context.setIsRunningPerformanceTrace(true);
 
-    const page = context.getSelectedPage();
+    const page = request.page!;
     const pageUrlForTracing = page.url();
 
     if (request.params.reload) {
@@ -119,6 +120,7 @@ export const stopTrace = defineTool({
   annotations: {
     category: ToolCategory.PERFORMANCE,
     readOnlyHint: false,
+    pageScoped: true,
   },
   schema: {
     filePath: filePathSchema,
@@ -127,7 +129,7 @@ export const stopTrace = defineTool({
     if (!context.isRunningPerformanceTrace()) {
       return;
     }
-    const page = context.getSelectedPage();
+    const page = request.page!;
     await stopTracingAndAppendOutput(
       page,
       response,

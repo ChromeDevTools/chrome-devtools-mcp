@@ -22,6 +22,7 @@ export const emulate = defineTool({
   annotations: {
     category: ToolCategory.EMULATION,
     readOnlyHint: false,
+    pageScoped: true,
   },
   schema: {
     networkConditions: zod
@@ -104,6 +105,7 @@ export const emulate = defineTool({
       ),
   },
   handler: async (request, _response, context) => {
-    await context.emulate(request.params);
+    const page = request.page!;
+    await context.emulate(request.params, page);
   },
 });

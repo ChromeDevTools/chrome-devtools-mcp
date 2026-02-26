@@ -7,6 +7,7 @@
 import assert from 'node:assert';
 import {before, describe, it} from 'node:test';
 
+import type {ParsedArguments} from '../../src/cli.js';
 import {loadIssueDescriptions} from '../../src/issue-descriptions.js';
 import {McpResponse} from '../../src/McpResponse.js';
 import {DevTools} from '../../src/third_party/index.js';
@@ -170,7 +171,7 @@ describe('console', () => {
           await context.createTextSnapshot();
           await issuePromise;
           await listConsoleMessages.handler({params: {}}, response, context);
-          const response2 = new McpResponse();
+          const response2 = new McpResponse({} as ParsedArguments);
           await getConsoleMessage.handler(
             {params: {msgid: 1}},
             response2,
@@ -225,7 +226,7 @@ describe('console', () => {
             response,
             context,
           );
-          const response2 = new McpResponse();
+          const response2 = new McpResponse({} as ParsedArguments);
           await getConsoleMessage.handler(
             {params: {msgid: id}},
             response2,

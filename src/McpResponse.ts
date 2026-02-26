@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type {ParsedArguments} from './cli.js';
 import {ConsoleFormatter} from './formatters/ConsoleFormatter.js';
 import {IssueFormatter} from './formatters/IssueFormatter.js';
 import {NetworkFormatter} from './formatters/NetworkFormatter.js';
@@ -39,6 +40,7 @@ interface TraceInsightData {
 
 export class McpResponse implements Response {
   #includePages = false;
+  #includeExtensionServiceWorkers = false;
   #snapshotParams?: SnapshotParams;
   #attachedNetworkRequestId?: number;
   #attachedNetworkRequestOptions?: {
@@ -67,6 +69,11 @@ export class McpResponse implements Response {
   #listExtensions?: boolean;
   #devToolsData?: DevToolsData;
   #tabId?: string;
+  #args: ParsedArguments;
+
+  constructor(args: ParsedArguments) {
+    this.#args = args;
+  }
 
   attachDevToolsData(data: DevToolsData): void {
     this.#devToolsData = data;
@@ -78,6 +85,10 @@ export class McpResponse implements Response {
 
   setIncludePages(value: boolean): void {
     this.#includePages = value;
+
+    if (this.#args.categoryExtensions) {
+      this.#includeExtensionServiceWorkers = value;
+    }
   }
 
   includeSnapshot(params?: SnapshotParams): void {
@@ -243,13 +254,18 @@ export class McpResponse implements Response {
       await context.createPagesSnapshot();
     }
 
+    if (this.#includeExtensionServiceWorkers) {
+      await context.createExtensionServiceWorkersSnapshot();
+    }
+
     let snapshot: SnapshotFormatter | string | undefined;
     if (this.#snapshotParams) {
       await context.createTextSnapshot(
         this.#snapshotParams.verbose,
         this.#devToolsData,
+        this.#snapshotParams.page,
       );
-      const textSnapshot = context.getTextSnapshot();
+      const textSnapshot = context.getTextSnapshot(this.#snapshotParams.page);
       if (textSnapshot) {
         const formatter = new SnapshotFormatter(textSnapshot);
         if (this.#snapshotParams.filePath) {
@@ -451,6 +467,7 @@ export class McpResponse implements Response {
       };
       pages?: object[];
       pagination?: object;
+      extensionServiceWorkers?: object[];
     } = {};
 
     const response = [`# ${toolName} response`];
@@ -543,6 +560,26 @@ Call ${handleDialog.name} to handle it before continuing.`);
         }
         return entry;
       });
+    }
+
+    if (this.#includeExtensionServiceWorkers) {
+      if (!context.getExtensionServiceWorkers().length) {
+        response.push(`## Extension Service Workers`);
+      }
+
+      for (const extensionServiceWorker of context.getExtensionServiceWorkers()) {
+        response.push(
+          `${extensionServiceWorker.id}: ${extensionServiceWorker.url}`,
+        );
+      }
+      structuredContent.extensionServiceWorkers = context
+        .getExtensionServiceWorkers()
+        .map(extensionServiceWorker => {
+          return {
+            id: extensionServiceWorker.id,
+            url: extensionServiceWorker.url,
+          };
+        });
     }
 
     if (this.#tabId) {
