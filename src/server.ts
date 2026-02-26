@@ -150,9 +150,10 @@ export async function createMcpServer(
     ) {
       return;
     }
-    const schema = tool.annotations.pageScoped
-      ? {...tool.schema, ...pageIdSchema}
-      : tool.schema;
+    const schema =
+      tool.annotations.pageScoped && serverArgs.experimentalPageIdRouting
+        ? {...tool.schema, ...pageIdSchema}
+        : tool.schema;
 
     server.registerTool(
       tool.name,
@@ -173,9 +174,10 @@ export async function createMcpServer(
           const response = serverArgs.slim
             ? new SlimMcpResponse(serverArgs)
             : new McpResponse(serverArgs);
-          const page = tool.annotations.pageScoped
-            ? context.resolvePageById(params.pageId as number | undefined)
-            : undefined;
+          const page =
+            tool.annotations.pageScoped && serverArgs.experimentalPageIdRouting
+              ? context.resolvePageById(params.pageId as number | undefined)
+              : undefined;
           if (page) {
             context.setRequestPage(page);
           }

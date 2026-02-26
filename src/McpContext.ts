@@ -205,6 +205,9 @@ export class McpContext implements Context {
     return context;
   }
 
+  // TODO: Refactor away mutable request state (e.g. per-request facade,
+  // per-request context object, or another approach). Once resolved, the
+  // global toolMutex could become per-BrowserContext for parallel execution.
   setRequestPage(page?: Page): void {
     this.#requestPage = page;
   }

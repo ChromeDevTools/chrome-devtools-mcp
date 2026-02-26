@@ -9,6 +9,7 @@ import assert from 'node:assert';
 import type {TestScenario} from '../eval_gemini.ts';
 
 export const scenario: TestScenario = {
+  serverArgs: ['--experimental-page-id-routing'],
   prompt: `Open two new pages in isolated contexts:
 - Page A (isolatedContext "contextA") at data:text/html,<button>Click A</button>
 - Page B (isolatedContext "contextB") at data:text/html,<button>Click B</button>

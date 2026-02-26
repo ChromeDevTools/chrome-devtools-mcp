@@ -116,6 +116,7 @@ export type Context = Readonly<{
   isCruxEnabled(): boolean;
   recordedTraces(): TraceResult[];
   storeTraceRecording(result: TraceResult): void;
+  // TODO: Remove once slim tools are converted to pageScoped: true.
   getSelectedPage(): Page;
   getDialog(page?: Page): Dialog | undefined;
   clearDialog(page?: Page): void;
