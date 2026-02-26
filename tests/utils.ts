@@ -9,6 +9,7 @@ import logger from 'debug';
 import type {Browser} from 'puppeteer';
 import puppeteer, {Locator} from 'puppeteer';
 import type {
+  ChromeReleaseChannel,
   Frame,
   HTTPRequest,
   HTTPResponse,
@@ -51,7 +52,7 @@ export async function withBrowser(
 ) {
   const launchOptions: LaunchOptions = {
     executablePath: process.env.PUPPETEER_EXECUTABLE_PATH,
-    channel: options.channel as any,
+    channel: options.channel as ChromeReleaseChannel,
     headless: !options.debug,
     defaultViewport: null,
     devtools: options.autoOpenDevTools ?? false,
