@@ -167,6 +167,45 @@ export function detectDisplay(): void {
   }
 }
 
+/**
+ * Removes stale Chrome singleton lock files from a user data directory.
+ *
+ * When an MCP client crashes without cleanly shutting down the browser,
+ * Chrome's singleton lock files (SingletonLock, SingletonSocket,
+ * SingletonCookie) remain on disk. On the next startup, Chrome refuses to
+ * launch because it thinks an instance is already running. This function
+ * checks whether the process referenced by SingletonLock is still alive and,
+ * if not, removes the stale lock files so Chrome can start cleanly.
+ */
+async function clearStaleSingletonLock(userDataDir: string): Promise<void> {
+  const lockPath = path.join(userDataDir, 'SingletonLock');
+  let lockTarget: string;
+  try {
+    lockTarget = await fs.promises.readlink(lockPath);
+  } catch {
+    return; // No lock file present, nothing to do.
+  }
+
+  const pid = parseInt(lockTarget.split('-').at(-1) ?? '', 10);
+  if (isNaN(pid)) {
+    return;
+  }
+
+  try {
+    process.kill(pid, 0); // Throws if the process does not exist.
+    return; // Process is alive, leave the lock alone.
+  } catch {
+    // Process is gone — the lock is stale.
+  }
+
+  logger(`Removing stale Chrome singleton lock for PID ${pid} in ${userDataDir}`);
+  await Promise.all([
+    fs.promises.unlink(lockPath).catch(() => {}),
+    fs.promises.unlink(path.join(userDataDir, 'SingletonSocket')).catch(() => {}),
+    fs.promises.unlink(path.join(userDataDir, 'SingletonCookie')).catch(() => {}),
+  ]);
+}
+
 export async function launch(options: McpLaunchOptions): Promise<Browser> {
   const {channel, executablePath, headless, isolated} = options;
   const profileDirName =
@@ -210,6 +249,10 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
 
   if (!headless) {
     detectDisplay();
+  }
+
+  if (userDataDir) {
+    await clearStaleSingletonLock(userDataDir);
   }
 
   try {
