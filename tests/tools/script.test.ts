@@ -18,7 +18,10 @@ describe('script', () => {
     it('evaluates', async () => {
       await withMcpContext(async (response, context) => {
         await evaluateScript.handler(
-          {params: {function: String(() => 2 * 5)}},
+          {
+            params: {function: String(() => 2 * 5)},
+            page: context.getSelectedPage(),
+          },
           response,
           context,
         );
@@ -29,7 +32,10 @@ describe('script', () => {
     it('runs in selected page', async () => {
       await withMcpContext(async (response, context) => {
         await evaluateScript.handler(
-          {params: {function: String(() => document.title)}},
+          {
+            params: {function: String(() => document.title)},
+            page: context.getSelectedPage(),
+          },
           response,
           context,
         );
@@ -46,7 +52,10 @@ describe('script', () => {
 
         response.resetResponseLineForTesting();
         await evaluateScript.handler(
-          {params: {function: String(() => document.title)}},
+          {
+            params: {function: String(() => document.title)},
+            page: context.getSelectedPage(),
+          },
           response,
           context,
         );
@@ -73,6 +82,7 @@ describe('script', () => {
                 return {scripts};
               }),
             },
+            page: context.getSelectedPage(),
           },
           response,
           context,
@@ -98,6 +108,7 @@ describe('script', () => {
                 return 'Works';
               }),
             },
+            page: context.getSelectedPage(),
           },
           response,
           context,
@@ -123,6 +134,7 @@ describe('script', () => {
               }),
               args: [{uid: '1_1'}],
             },
+            page: context.getSelectedPage(),
           },
           response,
           context,
@@ -148,6 +160,7 @@ describe('script', () => {
               }),
               args: [{uid: '1_0'}, {uid: '1_1'}],
             },
+            page: context.getSelectedPage(),
           },
           response,
           context,
@@ -176,6 +189,7 @@ describe('script', () => {
               }),
               args: [{uid: '1_3'}],
             },
+            page: context.getSelectedPage(),
           },
           response,
           context,

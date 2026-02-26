@@ -12,20 +12,21 @@ import {zod} from '../third_party/index.js';
 import type {ScreenRecorder} from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
-import {defineTool} from './ToolDefinition.js';
+import {definePageTool} from './ToolDefinition.js';
 
 async function generateTempFilePath(): Promise<string> {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'chrome-devtools-mcp-'));
   return path.join(dir, `screencast.mp4`);
 }
 
-export const startScreencast = defineTool({
+export const startScreencast = definePageTool({
   name: 'screencast_start',
   description:
     'Starts recording a screencast (video) of the selected page in mp4 format.',
   annotations: {
     category: ToolCategory.DEBUGGING,
     readOnlyHint: false,
+
     conditions: ['screencast'],
   },
   schema: {
@@ -47,7 +48,7 @@ export const startScreencast = defineTool({
     const filePath = request.params.path ?? (await generateTempFilePath());
     const resolvedPath = path.resolve(filePath);
 
-    const page = context.getSelectedPage();
+    const page = request.page;
 
     let recorder: ScreenRecorder;
     try {
@@ -74,7 +75,7 @@ export const startScreencast = defineTool({
   },
 });
 
-export const stopScreencast = defineTool({
+export const stopScreencast = definePageTool({
   name: 'screencast_stop',
   description: 'Stops the active screencast recording on the selected page.',
   annotations: {

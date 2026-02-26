@@ -1,8 +1,8 @@
 <!-- AUTO GENERATED DO NOT EDIT - run 'npm run docs' to update-->
 
-# Chrome DevTools MCP Tool Reference (~6885 cl100k_base tokens)
+# Chrome DevTools MCP Tool Reference (~7324 cl100k_base tokens)
 
-- **[Input automation](#input-automation)** (8 tools)
+- **[Input automation](#input-automation)** (9 tools)
   - [`click`](#click)
   - [`drag`](#drag)
   - [`fill`](#fill)
@@ -10,6 +10,7 @@
   - [`handle_dialog`](#handle_dialog)
   - [`hover`](#hover)
   - [`press_key`](#press_key)
+  - [`type_text`](#type_text)
   - [`upload_file`](#upload_file)
 - **[Navigation automation](#navigation-automation)** (6 tools)
   - [`close_page`](#close_page)
@@ -29,9 +30,10 @@
 - **[Network](#network)** (2 tools)
   - [`get_network_request`](#get_network_request)
   - [`list_network_requests`](#list_network_requests)
-- **[Debugging](#debugging)** (5 tools)
+- **[Debugging](#debugging)** (6 tools)
   - [`evaluate_script`](#evaluate_script)
   - [`get_console_message`](#get_console_message)
+  - [`lighthouse_audit`](#lighthouse_audit)
   - [`list_console_messages`](#list_console_messages)
   - [`take_screenshot`](#take_screenshot)
   - [`take_snapshot`](#take_snapshot)
@@ -118,6 +120,17 @@
 
 ---
 
+### `type_text`
+
+**Description:** Type text using keyboard into a previously focused input
+
+**Parameters:**
+
+- **text** (string) **(required)**: The text to type
+- **submitKey** (string) _(optional)_: Optional key to press after typing. E.g., "Enter", "Tab", "Escape"
+
+---
+
 ### `upload_file`
 
 **Description:** Upload a file through a provided element.
@@ -195,7 +208,7 @@
 
 **Parameters:**
 
-- **text** (string) **(required)**: Text to appear on the page
+- **text** (array) **(required)**: Non-empty list of texts. Resolves when any value appears on the page.
 - **timeout** (integer) _(optional)_: Maximum wait time in milliseconds. If set to 0, the default timeout will be used.
 
 ---
@@ -330,6 +343,18 @@ so returned values have to be JSON-serializable.
 **Parameters:**
 
 - **msgid** (number) **(required)**: The msgid of a console message on the page from the listed console messages
+
+---
+
+### `lighthouse_audit`
+
+**Description:** Get Lighthouse score and reports for accessibility, SEO and best practices.
+
+**Parameters:**
+
+- **device** (enum: "desktop", "mobile") _(optional)_: Device to [`emulate`](#emulate).
+- **mode** (enum: "navigation", "snapshot") _(optional)_: "navigation" reloads &amp; audits. "snapshot" analyzes current state.
+- **outputDirPath** (string) _(optional)_: Directory for reports. If omitted, uses temporary files.
 
 ---
 

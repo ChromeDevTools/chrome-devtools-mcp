@@ -17,6 +17,7 @@ import type {
 } from 'puppeteer-core';
 import sinon from 'sinon';
 
+import type {ParsedArguments} from '../src/cli.js';
 import {McpContext} from '../src/McpContext.js';
 import {McpResponse} from '../src/McpResponse.js';
 import {stableIdSymbol} from '../src/PageCollector.js';
@@ -85,9 +86,10 @@ export async function withMcpContext(
     autoOpenDevTools?: boolean;
     performanceCrux?: boolean;
   } = {},
+  args: ParsedArguments = {} as ParsedArguments,
 ) {
   await withBrowser(async browser => {
-    const response = new McpResponse();
+    const response = new McpResponse(args);
     if (context) {
       context.dispose();
     }

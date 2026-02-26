@@ -7,9 +7,9 @@
 import {zod} from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
-import {defineTool} from './ToolDefinition.js';
+import {definePageTool} from './ToolDefinition.js';
 
-export const takeMemorySnapshot = defineTool({
+export const takeMemorySnapshot = definePageTool({
   name: 'take_memory_snapshot',
   description: `Capture a memory heapsnapshot of the currently selected page to memory leak debugging`,
   annotations: {
@@ -19,11 +19,10 @@ export const takeMemorySnapshot = defineTool({
   schema: {
     filePath: zod
       .string()
-      .describe('A path to a .heapsnapshot file to save the heapsnapshot to.')
-      .endsWith('.heapsnapshot'),
+      .describe('A path to a .heapsnapshot file to save the heapsnapshot to.'),
   },
-  handler: async (request, response, context) => {
-    const page = context.getSelectedPage();
+  handler: async (request, response, _context) => {
+    const page = request.page;
 
     await page.captureHeapSnapshot({
       path: request.params.filePath,

@@ -147,6 +147,12 @@ export const cliOptions = {
     type: 'boolean',
     description: `If enabled, ignores errors relative to self-signed and expired certificates. Use with caution.`,
   },
+  experimentalPageIdRouting: {
+    type: 'boolean',
+    describe:
+      'Whether to expose pageId on page-scoped tools and route requests by page ID.',
+    hidden: true,
+  },
   experimentalDevtools: {
     type: 'boolean',
     describe: 'Whether to enable automation over DevTools targets',
@@ -242,6 +248,8 @@ export const cliOptions = {
       'Exposes a "slim" set of 3 tools covering navigation, script execution and screenshots only. Useful for basic browser tasks.',
   },
 } satisfies Record<string, YargsOptions>;
+
+export type ParsedArguments = ReturnType<typeof parseArguments>;
 
 export function parseArguments(version: string, argv = process.argv) {
   const yargsInstance = yargs(hideBin(argv))

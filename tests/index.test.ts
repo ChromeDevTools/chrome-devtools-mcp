@@ -92,16 +92,35 @@ describe('e2e', () => {
       const files = fs.readdirSync('build/src/tools');
       const definedNames = [];
       for (const file of files) {
-        if (file === 'ToolDefinition.js' || file === 'slim') {
+        if (
+          file === 'ToolDefinition.js' ||
+          file === 'tools.js' ||
+          file === 'slim'
+        ) {
           continue;
         }
         const fileTools = await import(`../src/tools/${file}`);
-        for (const maybeTool of Object.values<ToolDefinition>(fileTools)) {
-          if ('name' in maybeTool) {
-            if (maybeTool.annotations?.conditions) {
+        for (const maybeTool of Object.values<unknown>(fileTools)) {
+          if (typeof maybeTool === 'function') {
+            const tool = (maybeTool as (val: boolean) => ToolDefinition)(false);
+            if (tool && typeof tool === 'object' && 'name' in tool) {
+              if (tool.annotations?.conditions) {
+                continue;
+              }
+              definedNames.push(tool.name);
+            }
+            continue;
+          }
+          if (
+            typeof maybeTool === 'object' &&
+            maybeTool !== null &&
+            'name' in maybeTool
+          ) {
+            const tool = maybeTool as ToolDefinition;
+            if (tool.annotations?.conditions) {
               continue;
             }
-            definedNames.push(maybeTool.name);
+            definedNames.push(tool.name);
           }
         }
       }

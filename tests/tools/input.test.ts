@@ -9,6 +9,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import {describe, it} from 'node:test';
 
+import type {ParsedArguments} from '../../src/cli.js';
 import {McpResponse} from '../../src/McpResponse.js';
 import {
   click,
@@ -19,6 +20,7 @@ import {
   uploadFile,
   pressKey,
   clickAt,
+  typeText,
 } from '../../src/tools/input.js';
 import {parseKey} from '../../src/utils/keyboard.js';
 import {serverHooks} from '../server.js';
@@ -40,6 +42,7 @@ describe('input', () => {
             params: {
               uid: '1_1',
             },
+            page: context.getSelectedPage(),
           },
           response,
           context,
@@ -67,6 +70,7 @@ describe('input', () => {
               uid: '1_1',
               dblClick: true,
             },
+            page: context.getSelectedPage(),
           },
           response,
           context,
@@ -100,6 +104,7 @@ describe('input', () => {
             params: {
               uid: '1_1',
             },
+            page: context.getSelectedPage(),
           },
           response,
           context,
@@ -143,6 +148,7 @@ describe('input', () => {
               params: {
                 uid: '1_1',
               },
+              page: context.getSelectedPage(),
             },
             response,
             context,
@@ -169,6 +175,7 @@ describe('input', () => {
             params: {
               uid: '1_1',
             },
+            page: context.getSelectedPage(),
           },
           response,
           context,
@@ -194,6 +201,7 @@ describe('input', () => {
               uid: '1_1',
               includeSnapshot: true,
             },
+            page: context.getSelectedPage(),
           },
           response,
           context,
@@ -220,6 +228,7 @@ describe('input', () => {
             params: {
               uid: '1_1',
             },
+            page: context.getSelectedPage(),
           },
           response,
           context,
@@ -251,6 +260,7 @@ describe('input', () => {
               x: 50,
               y: 50,
             },
+            page: context.getSelectedPage(),
           },
           response,
           context,
@@ -281,6 +291,7 @@ describe('input', () => {
               y: 50,
               dblClick: true,
             },
+            page: context.getSelectedPage(),
           },
           response,
           context,
@@ -307,6 +318,7 @@ describe('input', () => {
               uid: '1_1',
               value: 'test',
             },
+            page: context.getSelectedPage(),
           },
           response,
           context,
@@ -336,6 +348,7 @@ describe('input', () => {
               uid: '1_1',
               value: 'two',
             },
+            page: context.getSelectedPage(),
           },
           response,
           context,
@@ -355,7 +368,7 @@ describe('input', () => {
     it('fills out a textarea marked as combobox', async () => {
       await withMcpContext(async (response, context) => {
         const page = context.getSelectedPage();
-        await page.setContent(html`<textarea role="combobox" />`);
+        await page.setContent(html`<textarea role="combobox"></textarea>`);
         await context.createTextSnapshot();
         await fill.handler(
           {
@@ -363,6 +376,7 @@ describe('input', () => {
               uid: '1_1',
               value: '1',
             },
+            page: context.getSelectedPage(),
           },
           response,
           context,
@@ -383,7 +397,7 @@ describe('input', () => {
     it('fills out a textarea with long text', async () => {
       await withMcpContext(async (response, context) => {
         const page = context.getSelectedPage();
-        await page.setContent(html`<textarea />`);
+        await page.setContent(html`<textarea></textarea>`);
         await context.createTextSnapshot();
         page.setDefaultTimeout(1000);
         await fill.handler(
@@ -392,6 +406,7 @@ describe('input', () => {
               uid: '1_1',
               value: '1'.repeat(3000),
             },
+            page: context.getSelectedPage(),
           },
           response,
           context,
@@ -408,6 +423,93 @@ describe('input', () => {
             );
           }),
         );
+      });
+    });
+
+    it('types text', async () => {
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedPage();
+        await page.setContent(html`<textarea></textarea>`);
+        await page.click('textarea');
+        await context.createTextSnapshot();
+        await typeText.handler(
+          {
+            params: {
+              text: 'test',
+            },
+            page: context.getSelectedPage(),
+          },
+          response,
+          context,
+        );
+        assert.strictEqual(response.responseLines[0], 'Typed text "test"');
+        assert.strictEqual(
+          await page.evaluate(() => {
+            return document.body.querySelector('textarea')?.value;
+          }),
+          'test',
+        );
+      });
+    });
+
+    it('types text with submit key', async () => {
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedPage();
+        await page.setContent(html`<textarea></textarea>`);
+        await page.click('textarea');
+        await context.createTextSnapshot();
+        await typeText.handler(
+          {
+            params: {
+              text: 'test',
+              submitKey: 'Tab',
+            },
+            page: context.getSelectedPage(),
+          },
+          response,
+          context,
+        );
+        assert.strictEqual(
+          response.responseLines[0],
+          'Typed text "test + Tab"',
+        );
+        assert.strictEqual(
+          await page.evaluate(() => {
+            return document.body.querySelector('textarea')?.value;
+          }),
+          'test',
+        );
+        assert.ok(
+          await page.evaluate(() => {
+            return (
+              document.body.querySelector('textarea') !== document.activeElement
+            );
+          }),
+        );
+      });
+    });
+
+    it('errors on invalid submit key', async () => {
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedPage();
+        await page.setContent(html`<textarea></textarea>`);
+        await page.click('textarea');
+        await context.createTextSnapshot();
+        try {
+          await typeText.handler(
+            {
+              params: {
+                text: 'test',
+                submitKey: 'XXX',
+              },
+              page: context.getSelectedPage(),
+            },
+            response,
+            context,
+          );
+        } catch (err) {
+          assert.strictEqual(err.message, 'Unknown key: "XXX"');
+        }
       });
     });
 
@@ -429,13 +531,14 @@ describe('input', () => {
         await context.createTextSnapshot();
 
         // Fill email
-        const response1 = new McpResponse();
+        const response1 = new McpResponse({} as ParsedArguments);
         await fill.handler(
           {
             params: {
               uid: '1_1', // email input
               value: 'new@test.com',
             },
+            page: context.getSelectedPage(),
           },
           response1,
           context,
@@ -446,13 +549,14 @@ describe('input', () => {
         );
 
         // Fill password
-        const response2 = new McpResponse();
+        const response2 = new McpResponse({} as ParsedArguments);
         await fill.handler(
           {
             params: {
               uid: '1_2', // password input
               value: 'secret',
             },
+            page: context.getSelectedPage(),
           },
           response2,
           context,
@@ -525,6 +629,7 @@ describe('input', () => {
               from_uid: '1_1',
               to_uid: '1_2',
             },
+            page: context.getSelectedPage(),
           },
           response,
           context,
@@ -576,6 +681,7 @@ describe('input', () => {
                 },
               ],
             },
+            page: context.getSelectedPage(),
           },
           response,
           context,
@@ -622,6 +728,7 @@ describe('input', () => {
               uid: '1_1',
               filePath: testFilePath,
             },
+            page: context.getSelectedPage(),
           },
           response,
           context,
@@ -664,6 +771,7 @@ describe('input', () => {
               uid: '1_1',
               filePath: testFilePath,
             },
+            page: context.getSelectedPage(),
           },
           response,
           context,
@@ -699,6 +807,7 @@ describe('input', () => {
                 uid: '1_1',
                 filePath: testFilePath,
               },
+              page: context.getSelectedPage(),
             },
             response,
             context,
@@ -762,6 +871,7 @@ describe('input', () => {
             params: {
               key: 'Control+Shift+C',
             },
+            page: context.getSelectedPage(),
           },
           response,
           context,

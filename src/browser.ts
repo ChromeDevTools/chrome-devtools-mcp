@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {execSync} from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -148,6 +149,24 @@ interface McpLaunchOptions {
   enableExtensions?: boolean;
 }
 
+export function detectDisplay(): void {
+  // Only detect display on Linux/UNIX.
+  if (os.platform() === 'win32' || os.platform() === 'darwin') {
+    return;
+  }
+  if (!process.env['DISPLAY']) {
+    try {
+      const result = execSync(
+        `ps -u $(id -u) -o pid= | xargs -I{} cat /proc/{}/environ 2>/dev/null | tr '\\0' '\\n' | grep -m1 '^DISPLAY=' | cut -d= -f2`,
+      );
+      const display = result.toString('utf8').trim();
+      process.env['DISPLAY'] = display;
+    } catch {
+      // no-op
+    }
+  }
+}
+
 export async function launch(options: McpLaunchOptions): Promise<Browser> {
   const {channel, executablePath, headless, isolated} = options;
   const profileDirName =
@@ -187,6 +206,10 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
       channel && channel !== 'stable'
         ? (`chrome-${channel}` as ChromeReleaseChannel)
         : 'chrome';
+  }
+
+  if (!headless) {
+    detectDisplay();
   }
 
   try {

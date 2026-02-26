@@ -1208,3 +1208,50 @@ exports[`extensions > lists extensions 2`] = `
   ]
 }
 `;
+
+exports[`lighthouse > includes lighthouse report paths 1`] = `
+# test response
+## Lighthouse Audit Results
+Mode: navigation
+Device: desktop
+URL: https://example.com
+### Category Scores
+- Performance: 90 (performance)
+### Audit Summary
+Passed: 10
+Failed: 1
+Total Timing: 1000ms
+### Reports
+- /tmp/report.json
+- /tmp/report.html
+`;
+
+exports[`lighthouse > includes lighthouse report paths 2`] = `
+{
+  "lighthouseResult": {
+    "summary": {
+      "mode": "navigation",
+      "device": "desktop",
+      "url": "https://example.com",
+      "scores": [
+        {
+          "id": "performance",
+          "title": "Performance",
+          "score": 0.9
+        }
+      ],
+      "audits": {
+        "failed": 1,
+        "passed": 10
+      },
+      "timing": {
+        "total": 1000
+      }
+    },
+    "reports": [
+      "/tmp/report.json",
+      "/tmp/report.html"
+    ]
+  }
+}
+`;

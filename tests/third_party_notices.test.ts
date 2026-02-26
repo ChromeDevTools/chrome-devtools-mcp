@@ -16,10 +16,9 @@ describe('THIRD_PARTY_NOTICES', () => {
     );
     if (fs.existsSync(noticesPath)) {
       const content = fs.readFileSync(noticesPath, 'utf-8');
-      const normalizedContent = content.replace(
-        /^Version: .*$/gm,
-        'Version: <VERSION>',
-      );
+      const normalizedContent = content
+        .replace(/^Version: .*$/gm, 'Version: <VERSION>')
+        .replaceAll('\r', '');
       t.assert.snapshot?.(normalizedContent);
     }
   });
