@@ -320,10 +320,19 @@ export class McpResponse implements Response {
           devTools: devTools ?? undefined,
         });
       } else if (message instanceof DevTools.AggregatedIssue) {
+        if (!this.#page) {
+          throw new Error(`Response must have an McpPage`);
+        }
         const formatter = new IssueFormatter(message, {
           id: consoleMessageStableId,
-          requestIdResolver: context.resolveCdpRequestId.bind(context),
-          elementIdResolver: context.resolveCdpElementId.bind(context),
+          requestIdResolver: context.resolveCdpRequestId.bind(
+            context,
+            this.#page,
+          ),
+          elementIdResolver: context.resolveCdpElementId.bind(
+            context,
+            this.#page,
+          ),
         });
         if (!formatter.isValid()) {
           throw new Error(

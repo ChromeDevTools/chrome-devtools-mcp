@@ -74,7 +74,7 @@ export const listNetworkRequests = definePageTool({
     const data = await context.getDevToolsData();
     response.attachDevToolsData(data);
     const reqid = data?.cdpRequestId
-      ? context.resolveCdpRequestId(data.cdpRequestId)
+      ? context.resolveCdpRequestId(request.page, data.cdpRequestId)
       : undefined;
     response.setIncludeNetworkRequests(true, {
       pageSize: request.params.pageSize,
@@ -123,7 +123,7 @@ export const getNetworkRequest = definePageTool({
       const data = await context.getDevToolsData();
       response.attachDevToolsData(data);
       const reqid = data?.cdpRequestId
-        ? context.resolveCdpRequestId(data.cdpRequestId)
+        ? context.resolveCdpRequestId(request.page, data.cdpRequestId)
         : undefined;
       if (reqid) {
         response.attachNetworkRequest(reqid, {

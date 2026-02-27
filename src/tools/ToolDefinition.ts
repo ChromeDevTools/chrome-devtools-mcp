@@ -179,7 +179,10 @@ export type Context = Readonly<{
   /**
    * Returns a reqid for a cdpRequestId.
    */
-  resolveCdpRequestId(cdpRequestId: string): number | undefined;
+  resolveCdpRequestId(
+    page: ContextPage,
+    cdpRequestId: string,
+  ): number | undefined;
   getScreenRecorder(): {recorder: ScreenRecorder; filePath: string} | null;
   setScreenRecorder(
     data: {recorder: ScreenRecorder; filePath: string} | null,

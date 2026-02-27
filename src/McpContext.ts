@@ -207,13 +207,12 @@ export class McpContext implements Context {
     return this.#requestPage?.pptrPage ?? this.getSelectedPptrPage();
   }
 
-  resolveCdpRequestId(cdpRequestId: string): number | undefined {
-    const selectedPage = this.#resolveTargetPage();
+  resolveCdpRequestId(page: McpPage, cdpRequestId: string): number | undefined {
     if (!cdpRequestId) {
       this.logger('no network request');
       return;
     }
-    const request = this.#networkCollector.find(selectedPage, request => {
+    const request = this.#networkCollector.find(page.pptrPage, request => {
       // @ts-expect-error id is internal.
       return request.id === cdpRequestId;
     });
@@ -225,31 +224,27 @@ export class McpContext implements Context {
   }
 
   resolveCdpElementId(
+    page: McpPage,
     cdpBackendNodeId: number,
-    page?: Page,
   ): string | undefined {
     if (!cdpBackendNodeId) {
       this.logger('no cdpBackendNodeId');
       return;
     }
-    const snapshots = page
-      ? [this.#mcpPages.get(page)?.textSnapshot].filter(Boolean)
-      : [...this.#mcpPages.values()].map(mp => mp.textSnapshot).filter(Boolean);
-    if (!snapshots.length) {
+    const snapshot = page.textSnapshot;
+    if (!snapshot) {
       this.logger('no text snapshot');
       return;
     }
     // TODO: index by backendNodeId instead.
-    for (const snapshot of snapshots) {
-      const queue = [snapshot!.root];
-      while (queue.length) {
-        const current = queue.pop()!;
-        if (current.backendNodeId === cdpBackendNodeId) {
-          return current.id;
-        }
-        for (const child of current.children) {
-          queue.push(child);
-        }
+    const queue = [snapshot.root];
+    while (queue.length) {
+      const current = queue.pop()!;
+      if (current.backendNodeId === cdpBackendNodeId) {
+        return current.id;
+      }
+      for (const child of current.children) {
+        queue.push(child);
       }
     }
     return;
@@ -971,8 +966,8 @@ export class McpContext implements Context {
     if (data?.cdpBackendNodeId) {
       snapshot.hasSelectedElement = true;
       snapshot.selectedElementUid = this.resolveCdpElementId(
+        mcpPage,
         data?.cdpBackendNodeId,
-        page,
       );
     }
 
