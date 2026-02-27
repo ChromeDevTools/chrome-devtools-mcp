@@ -48,11 +48,19 @@ let context: McpContext | undefined;
 
 export async function withBrowser(
   cb: (browser: Browser, page: Page) => Promise<void>,
-  options: {debug?: boolean; autoOpenDevTools?: boolean; channel?: string} = {},
+  options: {
+    debug?: boolean;
+    autoOpenDevTools?: boolean;
+    channel?: string;
+    executablePath?: string;
+  } = {},
 ) {
   const launchOptions: LaunchOptions = {
-    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH,
-    channel: options.channel as ChromeReleaseChannel,
+    executablePath:
+      options.executablePath ?? process.env.PUPPETEER_EXECUTABLE_PATH,
+    channel: (options.executablePath
+      ? undefined
+      : options.channel) as ChromeReleaseChannel,
     headless: !options.debug,
     defaultViewport: null,
     devtools: options.autoOpenDevTools ?? false,
@@ -88,6 +96,7 @@ export async function withMcpContext(
     autoOpenDevTools?: boolean;
     performanceCrux?: boolean;
     channel?: string;
+    executablePath?: string;
   } = {},
   args: ParsedArguments = {} as ParsedArguments,
 ) {

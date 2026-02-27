@@ -940,7 +940,7 @@ export class McpContext implements Context {
   }
 
   async triggerExtensionAction(id: string): Promise<void> {
-    const page = this.getSelectedPage();
+    const page = this.getSelectedPptrPage();
     // @ts-expect-error internal puppeteer api is needed since we don't have a way to get
     // a tab id at the moment
     const theTarget = page._tabId;
