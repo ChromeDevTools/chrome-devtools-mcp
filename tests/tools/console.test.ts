@@ -212,6 +212,7 @@ describe('console', () => {
             context,
           );
           const response2 = new McpResponse({} as ParsedArguments);
+          response2.setPage(context.getSelectedMcpPage());
           await getConsoleMessage.handler(
             {params: {msgid: 1}, page: context.getSelectedMcpPage()},
             response2,
@@ -267,6 +268,7 @@ describe('console', () => {
             context,
           );
           const response2 = new McpResponse({} as ParsedArguments);
+          response2.setPage(context.getSelectedMcpPage());
           await getConsoleMessage.handler(
             {params: {msgid: id}, page: context.getSelectedMcpPage()},
             response2,
