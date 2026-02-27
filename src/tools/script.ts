@@ -84,7 +84,7 @@ Example with arguments: \`(el) => {
       }
 
       const mcpPage = cliArgs?.experimentalPageIdRouting
-        ? context.resolvePageById(request.params.pageId)
+        ? context.getPageById(request.params.pageId)
         : context.getSelectedMcpPage();
       const page: Page = mcpPage.pptrPage;
 
@@ -92,7 +92,7 @@ Example with arguments: \`(el) => {
       try {
         const frames = new Set<Frame>();
         for (const el of uidArgs ?? []) {
-          const handle = await context.getElementByUid(el.uid, page);
+          const handle = await mcpPage.getElementByUid(el.uid);
           frames.add(handle.frame);
           args.push(handle);
         }
