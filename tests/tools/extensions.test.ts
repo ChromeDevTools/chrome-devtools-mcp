@@ -10,7 +10,7 @@ import {afterEach, describe, it} from 'node:test';
 
 import sinon from 'sinon';
 
-import type { ParsedArguments } from '../../src/cli.js';
+import type {ParsedArguments} from '../../src/cli.js';
 import type {McpResponse} from '../../src/McpResponse.js';
 import {
   installExtension,
@@ -19,7 +19,7 @@ import {
   reloadExtension,
   triggerExtensionAction,
 } from '../../src/tools/extensions.js';
-import { listPages } from '../../src/tools/pages.js';
+import {listPages} from '../../src/tools/pages.js';
 import {withMcpContext} from '../utils.js';
 
 const EXTENSION_WITH_SW_PATH = path.join(
@@ -170,11 +170,9 @@ describe('extension', () => {
           response,
           context,
         );
-        
+
         const swTarget = await context.browser.waitForTarget(
-          t =>
-            t.type() === 'service_worker' &&
-            t.url().includes(extensionId),
+          t => t.type() === 'service_worker' && t.url().includes(extensionId),
         );
         const swUrl = swTarget.url();
 
@@ -202,7 +200,7 @@ describe('extension', () => {
       },
       {
         categoryExtensions: true,
-      } as ParsedArguments
+      } as ParsedArguments,
     );
   });
 });
