@@ -56,11 +56,11 @@ export const startTrace = definePageTool({
     context.setIsRunningPerformanceTrace(true);
 
     const page = request.page;
-    const pageUrlForTracing = page.url();
+    const pageUrlForTracing = page.pptrPage.url();
 
     if (request.params.reload) {
       // Before starting the recording, navigate to about:blank to clear out any state.
-      await page.goto('about:blank', {
+      await page.pptrPage.goto('about:blank', {
         waitUntil: ['networkidle0'],
       });
     }
@@ -86,12 +86,12 @@ export const startTrace = definePageTool({
       'v8.execute',
       'v8',
     ];
-    await page.tracing.start({
+    await page.pptrPage.tracing.start({
       categories,
     });
 
     if (request.params.reload) {
-      await page.goto(pageUrlForTracing, {
+      await page.pptrPage.goto(pageUrlForTracing, {
         waitUntil: ['load'],
       });
     }
@@ -99,7 +99,7 @@ export const startTrace = definePageTool({
     if (request.params.autoStop) {
       await new Promise(resolve => setTimeout(resolve, 5_000));
       await stopTracingAndAppendOutput(
-        page,
+        page.pptrPage,
         response,
         context,
         request.params.filePath,
@@ -129,7 +129,7 @@ export const stopTrace = definePageTool({
     }
     const page = request.page;
     await stopTracingAndAppendOutput(
-      page,
+      page.pptrPage,
       response,
       context,
       request.params.filePath,

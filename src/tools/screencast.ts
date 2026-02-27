@@ -52,7 +52,7 @@ export const startScreencast = definePageTool({
 
     let recorder: ScreenRecorder;
     try {
-      recorder = await page.screencast({
+      recorder = await page.pptrPage.screencast({
         path: resolvedPath as `${string}.mp4`,
         format: 'mp4' as const,
       });

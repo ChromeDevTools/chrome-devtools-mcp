@@ -4,7 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {SerializedAXNode, Viewport} from './third_party/index.js';
+import type {SerializedAXNode, Viewport, Target} from './third_party/index.js';
+
+export interface ExtensionServiceWorker {
+  url: string;
+  target: Target;
+  id: string;
+}
 
 export interface TextSnapshotNode extends SerializedAXNode {
   id: string;

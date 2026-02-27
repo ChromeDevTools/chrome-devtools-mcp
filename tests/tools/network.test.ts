@@ -25,7 +25,7 @@ describe('network', () => {
     it('list requests', async () => {
       await withMcpContext(async (response, context) => {
         await listNetworkRequests.handler(
-          {params: {}, page: context.getSelectedPage()},
+          {params: {}, page: context.getSelectedMcpPage()},
           response,
           context,
         );
@@ -41,7 +41,7 @@ describe('network', () => {
 
       await withMcpContext(async (response, context) => {
         await context.setUpNetworkCollectorForTesting();
-        const page = context.getSelectedPage();
+        const page = context.getSelectedPptrPage();
         await page.goto(server.getRoute('/one'));
         await page.goto(server.getRoute('/two'));
         await page.goto(server.getRoute('/three'));
@@ -49,7 +49,7 @@ describe('network', () => {
           {
             params: {},
 
-            page: context.getSelectedPage(),
+            page: context.getSelectedMcpPage(),
           },
           response,
           context,
@@ -68,7 +68,7 @@ describe('network', () => {
 
       await withMcpContext(async (response, context) => {
         await context.setUpNetworkCollectorForTesting();
-        const page = context.getSelectedPage();
+        const page = context.getSelectedPptrPage();
         await page.goto(server.getRoute('/one'));
         await page.goto(server.getRoute('/two'));
         await page.goto(server.getRoute('/three'));
@@ -77,7 +77,7 @@ describe('network', () => {
             params: {
               includePreservedRequests: true,
             },
-            page: context.getSelectedPage(),
+            page: context.getSelectedMcpPage(),
           },
           response,
           context,
@@ -111,7 +111,7 @@ describe('network', () => {
 
       await withMcpContext(async (response, context) => {
         await context.setUpNetworkCollectorForTesting();
-        const page = context.getSelectedPage();
+        const page = context.getSelectedPptrPage();
         await page.goto(server.getRoute('/redirect'), {
           waitUntil: 'networkidle0',
         });
@@ -120,7 +120,7 @@ describe('network', () => {
             params: {
               includePreservedRequests: true,
             },
-            page: context.getSelectedPage(),
+            page: context.getSelectedMcpPage(),
           },
           response,
           context,
@@ -135,10 +135,10 @@ describe('network', () => {
   describe('network_get_request', () => {
     it('attaches request', async () => {
       await withMcpContext(async (response, context) => {
-        const page = context.getSelectedPage();
+        const page = context.getSelectedPptrPage();
         await page.goto('data:text/html,<div>Hello MCP</div>');
         await getNetworkRequest.handler(
-          {params: {reqid: 1}, page: context.getSelectedPage()},
+          {params: {reqid: 1}, page: context.getSelectedMcpPage()},
           response,
           context,
         );
@@ -148,10 +148,10 @@ describe('network', () => {
     });
     it('should not add the request list', async () => {
       await withMcpContext(async (response, context) => {
-        const page = context.getSelectedPage();
+        const page = context.getSelectedPptrPage();
         await page.goto('data:text/html,<div>Hello MCP</div>');
         await getNetworkRequest.handler(
-          {params: {reqid: 1}, page: context.getSelectedPage()},
+          {params: {reqid: 1}, page: context.getSelectedMcpPage()},
           response,
           context,
         );
@@ -165,7 +165,7 @@ describe('network', () => {
 
       await withMcpContext(async (response, context) => {
         await context.setUpNetworkCollectorForTesting();
-        const page = context.getSelectedPage();
+        const page = context.getSelectedPptrPage();
         await page.goto(server.getRoute('/one'));
         await page.goto(server.getRoute('/two'));
         await page.goto(server.getRoute('/three'));
@@ -174,7 +174,7 @@ describe('network', () => {
             params: {
               reqid: 1,
             },
-            page: context.getSelectedPage(),
+            page: context.getSelectedMcpPage(),
           },
           response,
           context,

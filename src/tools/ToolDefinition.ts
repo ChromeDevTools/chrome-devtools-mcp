@@ -5,6 +5,7 @@
  */
 
 import type {ParsedArguments} from '../cli.js';
+import type {McpPage} from '../McpPage.js';
 import {zod} from '../third_party/index.js';
 import type {
   Dialog,
@@ -14,7 +15,11 @@ import type {
   Viewport,
 } from '../third_party/index.js';
 import type {InsightName, TraceResult} from '../trace-processing/parse.js';
-import type {TextSnapshotNode, GeolocationOptions} from '../types.js';
+import type {
+  TextSnapshotNode,
+  GeolocationOptions,
+  ExtensionServiceWorker,
+} from '../types.js';
 import type {InstalledExtension} from '../utils/ExtensionRegistry.js';
 import type {PaginationOptions} from '../utils/types.js';
 
@@ -60,7 +65,6 @@ export interface ImageContentData {
 export interface SnapshotParams {
   verbose?: boolean;
   filePath?: string;
-  page?: Page;
 }
 
 export interface LighthouseData {
@@ -136,18 +140,14 @@ export type Context = Readonly<{
   isCruxEnabled(): boolean;
   recordedTraces(): TraceResult[];
   storeTraceRecording(result: TraceResult): void;
-  // TODO: Remove once slim tools are converted to pageScoped: true.
-  getSelectedPage(): Page;
-  getDialog(page?: Page): Dialog | undefined;
-  clearDialog(page?: Page): void;
-  getPageById(pageId: number): Page;
-  newPage(background?: boolean, isolatedContextName?: string): Promise<Page>;
+  getPageById(pageId: number): ContextPage;
+  newPage(
+    background?: boolean,
+    isolatedContextName?: string,
+  ): Promise<ContextPage>;
   closePage(pageId: number): Promise<void>;
-  selectPage(page: Page): void;
-  assertPageIsFocused(page: Page): void;
-  getElementByUid(uid: string, page?: Page): Promise<ElementHandle<Element>>;
-  getAXNodeByUid(uid: string): TextSnapshotNode | undefined;
-  restoreEmulation(): Promise<void>;
+  selectPage(page: ContextPage): void;
+  restoreEmulation(page: ContextPage): Promise<void>;
   emulate(
     options: {
       networkConditions?: string | null;
@@ -176,11 +176,14 @@ export type Context = Readonly<{
     timeout?: number,
     page?: Page,
   ): Promise<Element>;
-  getDevToolsData(): Promise<DevToolsData>;
+  getDevToolsData(page: ContextPage): Promise<DevToolsData>;
   /**
    * Returns a reqid for a cdpRequestId.
    */
-  resolveCdpRequestId(cdpRequestId: string): number | undefined;
+  resolveCdpRequestId(
+    page: ContextPage,
+    cdpRequestId: string,
+  ): number | undefined;
   getScreenRecorder(): {recorder: ScreenRecorder; filePath: string} | null;
   setScreenRecorder(
     data: {recorder: ScreenRecorder; filePath: string} | null,
@@ -189,6 +192,20 @@ export type Context = Readonly<{
   uninstallExtension(id: string): Promise<void>;
   listExtensions(): InstalledExtension[];
   getExtension(id: string): InstalledExtension | undefined;
+  getSelectedMcpPage(): McpPage;
+  getExtensionServiceWorkers(): ExtensionServiceWorker[];
+  getExtensionServiceWorkerId(
+    extensionServiceWorker: ExtensionServiceWorker,
+  ): string | undefined;
+}>;
+
+export type ContextPage = Readonly<{
+  readonly pptrPage: Page;
+  getAXNodeByUid(uid: string): TextSnapshotNode | undefined;
+  getElementByUid(uid: string): Promise<ElementHandle<Element>>;
+
+  getDialog(): Dialog | undefined;
+  clearDialog(): void;
 }>;
 
 export function defineTool<Schema extends zod.ZodRawShape>(
@@ -223,7 +240,7 @@ interface PageToolDefinition<
   Schema extends zod.ZodRawShape = zod.ZodRawShape,
 > extends BaseToolDefinition<Schema> {
   handler: (
-    request: Request<Schema> & {page: Page},
+    request: Request<Schema> & {page: ContextPage},
     response: Response,
     context: Context,
   ) => Promise<void>;
@@ -233,7 +250,7 @@ export type DefinedPageTool<Schema extends zod.ZodRawShape = zod.ZodRawShape> =
   PageToolDefinition<Schema> & {
     pageScoped: true;
     handler: (
-      request: Request<Schema> & {page: Page},
+      request: Request<Schema> & {page: ContextPage},
       response: Response,
       context: Context,
     ) => Promise<void>;

@@ -57,12 +57,9 @@ export const screenshot = definePageTool({
 
     let pageOrHandle: Page | ElementHandle;
     if (request.params.uid) {
-      pageOrHandle = await context.getElementByUid(
-        request.params.uid,
-        request.page,
-      );
+      pageOrHandle = await request.page.getElementByUid(request.params.uid);
     } else {
-      pageOrHandle = request.page;
+      pageOrHandle = request.page.pptrPage;
     }
 
     const format = request.params.format;

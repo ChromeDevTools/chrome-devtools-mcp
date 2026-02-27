@@ -21,7 +21,7 @@ describe('lighthouse', () => {
       server.addHtmlRoute('/test', html`<div>Test</div>`);
 
       await withMcpContext(async (response, context) => {
-        const page = context.getSelectedPage();
+        const page = context.getSelectedPptrPage();
         await page.goto(server.getRoute('/test'));
 
         await lighthouseAudit.handler(
@@ -30,7 +30,7 @@ describe('lighthouse', () => {
               mode: 'navigation',
               device: 'desktop',
             },
-            page: context.getSelectedPage(),
+            page: context.getSelectedMcpPage(),
           },
           response,
           context,
@@ -56,7 +56,7 @@ describe('lighthouse', () => {
       server.addHtmlRoute('/test-mobile', html`<div>Test Mobile</div>`);
 
       await withMcpContext(async (response, context) => {
-        const page = context.getSelectedPage();
+        const page = context.getSelectedPptrPage();
         await page.goto(server.getRoute('/test-mobile'));
         await context.emulate({
           viewport: {
@@ -91,7 +91,7 @@ describe('lighthouse', () => {
               mode: 'snapshot',
               device: 'mobile',
             },
-            page: context.getSelectedPage(),
+            page: context.getSelectedMcpPage(),
           },
           response,
           context,
@@ -121,7 +121,7 @@ describe('lighthouse', () => {
       server.addHtmlRoute('/test-mobile', html`<div>Test Mobile</div>`);
 
       await withMcpContext(async (response, context) => {
-        const page = context.getSelectedPage();
+        const page = context.getSelectedPptrPage();
         await page.goto(server.getRoute('/test-mobile'));
 
         await lighthouseAudit.handler(
@@ -130,7 +130,7 @@ describe('lighthouse', () => {
               mode: 'snapshot',
               device: 'mobile',
             },
-            page: context.getSelectedPage(),
+            page: context.getSelectedMcpPage(),
           },
           response,
           context,
@@ -156,7 +156,7 @@ describe('lighthouse', () => {
 
       try {
         await withMcpContext(async (response, context) => {
-          const page = context.getSelectedPage();
+          const page = context.getSelectedPptrPage();
           await page.goto(server.getRoute('/test-mobile'));
 
           await lighthouseAudit.handler(
@@ -166,7 +166,7 @@ describe('lighthouse', () => {
                 device: 'mobile',
                 outputDirPath: folderPath,
               },
-              page: context.getSelectedPage(),
+              page: context.getSelectedMcpPage(),
             },
             response,
             context,

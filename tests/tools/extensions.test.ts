@@ -24,7 +24,7 @@ const EXTENSION_PATH = path.join(
   '../../../tests/tools/fixtures/extension',
 );
 
-function extractId(response: McpResponse) {
+export function extractId(response: McpResponse) {
   const responseLine = response.responseLines[0];
   assert.ok(responseLine, 'Response should not be empty');
   const match = responseLine.match(/Extension installed\. Id: (.+)/);
@@ -48,7 +48,7 @@ describe('extension', () => {
       );
 
       const extensionId = extractId(response);
-      const page = context.getSelectedPage();
+      const page = context.getSelectedPptrPage();
       await page.goto('chrome://extensions');
 
       const element = await page.waitForSelector(
