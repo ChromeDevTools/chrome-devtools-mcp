@@ -34,11 +34,7 @@ import {Locator} from './third_party/index.js';
 import {PredefinedNetworkConditions} from './third_party/index.js';
 import {listPages} from './tools/pages.js';
 import {CLOSE_PAGE_ERROR} from './tools/ToolDefinition.js';
-import type {
-  Context,
-  DevToolsData,
-  ContextPage,
-} from './tools/ToolDefinition.js';
+import type {Context, DevToolsData} from './tools/ToolDefinition.js';
 import type {TraceResult} from './trace-processing/parse.js';
 import type {
   EmulationSettings,
@@ -111,7 +107,6 @@ export class McpContext implements Context {
   #isRunningTrace = false;
   #screenRecorderData: {recorder: ScreenRecorder; filePath: string} | null =
     null;
-  #focusedPagePerContext = new Map<BrowserContext, Page>();
 
   #nextPageId = 1;
 
@@ -296,10 +291,6 @@ export class McpContext implements Context {
     if (page) {
       page.dispose();
       this.#mcpPages.delete(page.pptrPage);
-    }
-    const ctx = page.pptrPage.browserContext();
-    if (this.#focusedPagePerContext.get(ctx) === page.pptrPage) {
-      this.#focusedPagePerContext.delete(ctx);
     }
     await page.pptrPage.close({runBeforeUnload: false});
   }
@@ -494,38 +485,9 @@ export class McpContext implements Context {
     return this.#selectedPage?.pptrPage === page;
   }
 
-  assertPageIsFocused(pageToCheck: Page | ContextPage): void {
-    const page = 'pptrPage' in pageToCheck ? pageToCheck.pptrPage : pageToCheck;
-    const ctx = page.browserContext();
-    const focused = this.#focusedPagePerContext.get(ctx);
-    if (focused && focused !== page) {
-      const targetId = this.#mcpPages.get(page)?.id ?? '?';
-      const focusedId = this.#mcpPages.get(focused)?.id ?? '?';
-      throw new Error(
-        `Page ${targetId} is not the active page in its browser context (page ${focusedId} is). ` +
-          `Call select_page with pageId ${targetId} first.`,
-      );
-    }
-  }
-
   selectPage(newPage: McpPage): void {
-    const ctx = newPage.pptrPage.browserContext();
-    const oldFocused = this.#focusedPagePerContext.get(ctx);
-    if (
-      oldFocused &&
-      oldFocused !== newPage.pptrPage &&
-      !oldFocused.isClosed()
-    ) {
-      void oldFocused.emulateFocusedPage(false).catch(error => {
-        this.logger('Error turning off focused page emulation', error);
-      });
-    }
-    this.#focusedPagePerContext.set(ctx, newPage.pptrPage);
     this.#selectedPage = newPage;
     this.#updateSelectedPageTimeouts();
-    void newPage.pptrPage.emulateFocusedPage(true).catch(error => {
-      this.logger('Error turning on focused page emulation', error);
-    });
   }
 
   #updateSelectedPageTimeouts() {
@@ -601,6 +563,10 @@ export class McpContext implements Context {
       if (!mcpPage) {
         mcpPage = new McpPage(page, this.#nextPageId++);
         this.#mcpPages.set(page, mcpPage);
+        // We emulate a focused page for all pages to support multi-agent workflows.
+        void page.emulateFocusedPage(true).catch(error => {
+          this.logger('Error turning on focused page emulation', error);
+        });
       }
       mcpPage.isolatedContextName = isolatedContextNames.get(page);
     }
@@ -611,12 +577,6 @@ export class McpContext implements Context {
       if (!currentPages.has(page)) {
         mcpPage.dispose();
         this.#mcpPages.delete(page);
-      }
-    }
-    // Prune stale #focusedPagePerContext entries.
-    for (const [ctx, page] of this.#focusedPagePerContext) {
-      if (!currentPages.has(page)) {
-        this.#focusedPagePerContext.delete(ctx);
       }
     }
 

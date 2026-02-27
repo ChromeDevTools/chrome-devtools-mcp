@@ -147,7 +147,6 @@ export type Context = Readonly<{
   ): Promise<ContextPage>;
   closePage(pageId: number): Promise<void>;
   selectPage(page: ContextPage): void;
-  assertPageIsFocused(page: Page): void;
   restoreEmulation(page: ContextPage): Promise<void>;
   emulate(
     options: {
