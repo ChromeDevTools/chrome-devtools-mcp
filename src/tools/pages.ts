@@ -5,7 +5,7 @@
  */
 
 import {logger} from '../logger.js';
-import type {Dialog} from '../third_party/index.js';
+import type {CdpPage, Dialog} from '../third_party/index.js';
 import {zod} from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
@@ -385,8 +385,7 @@ export const getTabId = definePageTool({
   },
   handler: async (request, response, context) => {
     const page = context.getPageById(request.params.pageId);
-    // @ts-expect-error _tabId is internal.
-    const tabId = page.pptrPage._tabId;
+    const tabId = (page.pptrPage as unknown as CdpPage)._tabId;
     response.setTabId(tabId);
   },
 });
