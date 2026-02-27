@@ -45,6 +45,7 @@ import type {
   GeolocationOptions,
   TextSnapshot,
   TextSnapshotNode,
+  ExtensionServiceWorker,
 } from './types.js';
 import {
   ExtensionRegistry,
@@ -58,12 +59,6 @@ export type {
   TextSnapshot,
   TextSnapshotNode,
 } from './types.js';
-
-export interface ExtensionServiceWorker {
-  url: string;
-  target: Target;
-  id: string;
-}
 
 interface McpContextOptions {
   // Whether the DevTools windows are exposed as pages for debugging of DevTools.

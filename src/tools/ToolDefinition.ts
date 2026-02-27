@@ -5,6 +5,7 @@
  */
 
 import type {ParsedArguments} from '../cli.js';
+import type {McpPage} from '../McpPage.js';
 import {zod} from '../third_party/index.js';
 import type {
   Dialog,
@@ -14,7 +15,11 @@ import type {
   Viewport,
 } from '../third_party/index.js';
 import type {InsightName, TraceResult} from '../trace-processing/parse.js';
-import type {TextSnapshotNode, GeolocationOptions} from '../types.js';
+import type {
+  TextSnapshotNode,
+  GeolocationOptions,
+  ExtensionServiceWorker,
+} from '../types.js';
 import type {InstalledExtension} from '../utils/ExtensionRegistry.js';
 import type {PaginationOptions} from '../utils/types.js';
 
@@ -136,6 +141,7 @@ export type Context = Readonly<{
   recordedTraces(): TraceResult[];
   storeTraceRecording(result: TraceResult): void;
   getPageById(pageId: number): ContextPage;
+  resolvePageById(pageId?: number): ContextPage;
   newPage(
     background?: boolean,
     isolatedContextName?: string,
@@ -188,6 +194,11 @@ export type Context = Readonly<{
   uninstallExtension(id: string): Promise<void>;
   listExtensions(): InstalledExtension[];
   getExtension(id: string): InstalledExtension | undefined;
+  getSelectedMcpPage(): McpPage;
+  getExtensionServiceWorkers(): ExtensionServiceWorker[];
+  getExtensionServiceWorkerId(
+    extensionServiceWorker: ExtensionServiceWorker,
+  ): string | undefined;
 }>;
 
 export type ContextPage = Readonly<{
