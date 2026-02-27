@@ -37,7 +37,6 @@ import {CLOSE_PAGE_ERROR} from './tools/ToolDefinition.js';
 import type {
   Context,
   DevToolsData,
-  ContextPage,
 } from './tools/ToolDefinition.js';
 import type {TraceResult} from './trace-processing/parse.js';
 import type {
