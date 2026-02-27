@@ -274,9 +274,7 @@ export class McpResponse implements Response {
         this.#snapshotParams.verbose,
         this.#devToolsData,
       );
-      const textSnapshot = context.getTextSnapshot(
-        this.#snapshotParams.page?.pptrPage,
-      );
+      const textSnapshot = this.#page.textSnapshot;
       if (textSnapshot) {
         const formatter = new SnapshotFormatter(textSnapshot);
         if (this.#snapshotParams.filePath) {

@@ -107,7 +107,7 @@ describe('pages', () => {
       await withMcpContext(async (response, context) => {
         assert.strictEqual(
           context.getPageById(1),
-          context.getSelectedPptrPage(),
+          context.getSelectedMcpPage(),
         );
         await newPage.handler(
           {params: {url: 'about:blank'}},
@@ -116,7 +116,7 @@ describe('pages', () => {
         );
         assert.strictEqual(
           context.getPageById(2),
-          context.getSelectedPptrPage(),
+          context.getSelectedMcpPage(),
         );
         assert.ok(response.includePages);
       });
@@ -124,11 +124,11 @@ describe('pages', () => {
     it('create a page in the background', async () => {
       await withMcpContext(async (response, context) => {
         const originalPage = context.getPageById(1);
-        assert.strictEqual(originalPage, context.getSelectedPptrPage());
+        assert.strictEqual(originalPage, context.getSelectedMcpPage());
         // Ensure original page has focus
-        await originalPage.bringToFront();
+        await originalPage.pptrPage.bringToFront();
         assert.strictEqual(
-          await originalPage.evaluate(() => document.hasFocus()),
+          await originalPage.pptrPage.evaluate(() => document.hasFocus()),
           true,
         );
         await newPage.handler(
@@ -139,10 +139,10 @@ describe('pages', () => {
         // New page should be selected but original should retain focus
         assert.strictEqual(
           context.getPageById(2),
-          context.getSelectedPptrPage(),
+          context.getSelectedMcpPage(),
         );
         assert.strictEqual(
-          await originalPage.evaluate(() => document.hasFocus()),
+          await originalPage.pptrPage.evaluate(() => document.hasFocus()),
           true,
         );
         assert.ok(response.includePages);
@@ -252,104 +252,47 @@ describe('pages', () => {
     });
   });
 
-  describe('resolvePageById', () => {
-    it('returns the correct page regardless of global selection', async () => {
-      await withMcpContext(async (response, context) => {
-        // Create two pages with different content.
-        await newPage.handler(
-          {
-            params: {
-              url: 'data:text/html,<h1>Page A</h1>',
-              isolatedContext: 'ctx-a',
-            },
+  it('navigate_page targets the pageId page, not the global selection', async () => {
+    await withMcpContext(async (response, context) => {
+      await newPage.handler(
+        {
+          params: {
+            url: 'data:text/html,<h1>Initial</h1>',
+            isolatedContext: 'nav-ctx',
           },
-          response,
-          context,
-        );
-        const pageA = context.getSelectedMcpPage();
-        const pageAId = context.getPageId(pageA.pptrPage)!;
+        },
+        response,
+        context,
+      );
+      const isolatedPage = context.getSelectedMcpPage();
 
-        await newPage.handler(
-          {
-            params: {
-              url: 'data:text/html,<h1>Page B</h1>',
-              isolatedContext: 'ctx-b',
-            },
+      // Switch global selection back to the default page.
+      await selectPage.handler({params: {pageId: 1}}, response, context);
+      assert.notStrictEqual(context.getSelectedMcpPage(), isolatedPage);
+
+      // Navigate using page; should target the isolated page.
+      await navigatePage.handler(
+        {
+          params: {
+            url: 'data:text/html,<h1>Navigated</h1>',
           },
-          response,
-          context,
-        );
-        const pageB = context.getSelectedMcpPage();
-        const pageBId = context.getPageId(pageB.pptrPage)!;
+          page: isolatedPage,
+        },
+        response,
+        context,
+      );
 
-        // Global selection is now pageB (the last created page).
-        assert.strictEqual(context.getSelectedMcpPage(), pageB);
+      // Verify the isolated page was navigated.
+      const content = await isolatedPage.pptrPage.evaluate(
+        () => document.querySelector('h1')?.textContent,
+      );
+      assert.strictEqual(content, 'Navigated');
 
-        // resolvePageById should return the correct page for each ID,
-        // regardless of which page is globally selected.
-        assert.strictEqual(context.resolvePageById(pageAId), pageA);
-        assert.strictEqual(context.resolvePageById(pageBId), pageB);
-      });
-    });
-
-    it('falls back to getSelectedPage when no pageId is provided', async () => {
-      await withMcpContext(async (_response, context) => {
-        const selectedPage = context.getSelectedPptrPage();
-        assert.strictEqual(
-          context.resolvePageById(undefined).pptrPage,
-          selectedPage,
-        );
-      });
-    });
-
-    it('throws for an unknown pageId', async () => {
-      await withMcpContext(async (_response, context) => {
-        assert.throws(() => context.resolvePageById(99999), /No page found/);
-      });
-    });
-
-    it('navigate_page targets the pageId page, not the global selection', async () => {
-      await withMcpContext(async (response, context) => {
-        await newPage.handler(
-          {
-            params: {
-              url: 'data:text/html,<h1>Initial</h1>',
-              isolatedContext: 'nav-ctx',
-            },
-          },
-          response,
-          context,
-        );
-        const isolatedPage = context.getSelectedMcpPage();
-
-        // Switch global selection back to the default page.
-        await selectPage.handler({params: {pageId: 1}}, response, context);
-        assert.notStrictEqual(context.getSelectedPptrPage(), isolatedPage);
-
-        // Navigate using page; should target the isolated page.
-        await navigatePage.handler(
-          {
-            params: {
-              url: 'data:text/html,<h1>Navigated</h1>',
-            },
-            page: isolatedPage,
-          },
-          response,
-          context,
-        );
-
-        // Verify the isolated page was navigated.
-        const content = await isolatedPage.pptrPage.evaluate(
-          () => document.querySelector('h1')?.textContent,
-        );
-        assert.strictEqual(content, 'Navigated');
-
-        // Verify the default page was NOT affected.
-        const defaultContent = await context
-          .getSelectedPptrPage()
-          .evaluate(() => document.querySelector('h1')?.textContent);
-        assert.notStrictEqual(defaultContent, 'Navigated');
-      });
+      // Verify the default page was NOT affected.
+      const defaultContent = await context
+        .getSelectedPptrPage()
+        .evaluate(() => document.querySelector('h1')?.textContent);
+      assert.notStrictEqual(defaultContent, 'Navigated');
     });
   });
 
@@ -359,9 +302,9 @@ describe('pages', () => {
         const page = await context.newPage();
         assert.strictEqual(
           context.getPageById(2),
-          context.getSelectedPptrPage(),
+          context.getSelectedMcpPage(),
         );
-        assert.strictEqual(context.getPageById(2), page.pptrPage);
+        assert.strictEqual(context.getPageById(2), page);
         await closePage.handler({params: {pageId: 2}}, response, context);
         assert.ok(page.pptrPage.isClosed());
         assert.ok(response.includePages);
@@ -386,12 +329,12 @@ describe('pages', () => {
         await context.newPage();
         assert.strictEqual(
           context.getPageById(2),
-          context.getSelectedPptrPage(),
+          context.getSelectedMcpPage(),
         );
         await selectPage.handler({params: {pageId: 1}}, response, context);
         assert.strictEqual(
           context.getPageById(1),
-          context.getSelectedPptrPage(),
+          context.getSelectedMcpPage(),
         );
         assert.ok(response.includePages);
       });
@@ -401,19 +344,23 @@ describe('pages', () => {
         await context.newPage();
         assert.strictEqual(
           context.getPageById(2),
-          context.getSelectedPptrPage(),
+          context.getSelectedMcpPage(),
         );
         assert.strictEqual(
-          await context.getPageById(1).evaluate(() => document.hasFocus()),
+          await context
+            .getPageById(1)
+            .pptrPage.evaluate(() => document.hasFocus()),
           false,
         );
         await selectPage.handler({params: {pageId: 1}}, response, context);
         assert.strictEqual(
           context.getPageById(1),
-          context.getSelectedPptrPage(),
+          context.getSelectedMcpPage(),
         );
         assert.strictEqual(
-          await context.getPageById(1).evaluate(() => document.hasFocus()),
+          await context
+            .getPageById(1)
+            .pptrPage.evaluate(() => document.hasFocus()),
           true,
         );
         assert.ok(response.includePages);
@@ -604,9 +551,9 @@ describe('pages', () => {
         const page = await context.newPage();
         assert.strictEqual(
           context.getPageById(2),
-          context.getSelectedPptrPage(),
+          context.getSelectedMcpPage(),
         );
-        assert.strictEqual(context.getPageById(2), page.pptrPage);
+        assert.strictEqual(context.getPageById(2), page);
 
         await page.pptrPage.close();
 

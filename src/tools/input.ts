@@ -7,10 +7,11 @@
 import {logger} from '../logger.js';
 import type {McpContext, TextSnapshotNode} from '../McpContext.js';
 import {zod} from '../third_party/index.js';
-import type {ElementHandle, KeyInput, Page} from '../third_party/index.js';
+import type {ElementHandle, KeyInput} from '../third_party/index.js';
 import {parseKey} from '../utils/keyboard.js';
 
 import {ToolCategory} from './categories.js';
+import type {ContextPage} from './ToolDefinition.js';
 import {definePageTool} from './ToolDefinition.js';
 
 const dblClickSchema = zod
@@ -58,7 +59,7 @@ export const click = definePageTool({
   },
   handler: async (request, response, context) => {
     const uid = request.params.uid;
-    const handle = await context.getElementByUid(uid);
+    const handle = await request.page.getElementByUid(uid);
     try {
       await context.waitForEventsAfterAction(async () => {
         await handle.asLocator().click({
@@ -109,7 +110,7 @@ export const clickAt = definePageTool({
         : `Successfully clicked at the coordinates`,
     );
     if (request.params.includeSnapshot) {
-      response.includeSnapshot({page});
+      response.includeSnapshot();
     }
   },
 });
@@ -131,7 +132,7 @@ export const hover = definePageTool({
   },
   handler: async (request, response, context) => {
     const uid = request.params.uid;
-    const handle = await context.getElementByUid(uid);
+    const handle = await request.page.getElementByUid(uid);
     try {
       await context.waitForEventsAfterAction(async () => {
         await handle.asLocator().hover();
@@ -193,9 +194,9 @@ async function fillFormElement(
   uid: string,
   value: string,
   context: McpContext,
-  page: Page,
+  page: ContextPage,
 ) {
-  const handle = await context.getElementByUid(uid, page);
+  const handle = await page.getElementByUid(uid);
   try {
     const aXNode = context.getAXNodeByUid(uid);
     // We assume that combobox needs to be handled as select if it has
@@ -206,7 +207,7 @@ async function fillFormElement(
       // Increase timeout for longer input values.
       const timeoutPerChar = 10; // ms
       const fillTimeout =
-        page.getDefaultTimeout() + value.length * timeoutPerChar;
+        page.pptrPage.getDefaultTimeout() + value.length * timeoutPerChar;
       await handle.asLocator().setTimeout(fillTimeout).fill(value);
     }
   } catch (error) {
@@ -239,12 +240,12 @@ export const fill = definePageTool({
         request.params.uid,
         request.params.value,
         context as McpContext,
-        page.pptrPage,
+        page,
       );
     });
     response.appendResponseLine(`Successfully filled out the element`);
     if (request.params.includeSnapshot) {
-      response.includeSnapshot({page});
+      response.includeSnapshot();
     }
   },
 });
@@ -290,8 +291,10 @@ export const drag = definePageTool({
     includeSnapshot: includeSnapshotSchema,
   },
   handler: async (request, response, context) => {
-    const fromHandle = await context.getElementByUid(request.params.from_uid);
-    const toHandle = await context.getElementByUid(request.params.to_uid);
+    const fromHandle = await request.page.getElementByUid(
+      request.params.from_uid,
+    );
+    const toHandle = await request.page.getElementByUid(request.params.to_uid);
     try {
       await context.waitForEventsAfterAction(async () => {
         await fromHandle.drag(toHandle);
@@ -335,13 +338,13 @@ export const fillForm = definePageTool({
           element.uid,
           element.value,
           context as McpContext,
-          page.pptrPage,
+          page,
         );
       });
     }
     response.appendResponseLine(`Successfully filled out the form`);
     if (request.params.includeSnapshot) {
-      response.includeSnapshot({page});
+      response.includeSnapshot();
     }
   },
 });
@@ -362,11 +365,10 @@ export const uploadFile = definePageTool({
     filePath: zod.string().describe('The local path of the file to upload'),
     includeSnapshot: includeSnapshotSchema,
   },
-  handler: async (request, response, context) => {
+  handler: async (request, response) => {
     const {uid, filePath} = request.params;
-    const handle = (await context.getElementByUid(
+    const handle = (await request.page.getElementByUid(
       uid,
-      request.page.pptrPage,
     )) as ElementHandle<HTMLInputElement>;
     try {
       try {
@@ -388,7 +390,7 @@ export const uploadFile = definePageTool({
         }
       }
       if (request.params.includeSnapshot) {
-        response.includeSnapshot({page: request.page});
+        response.includeSnapshot();
       }
       response.appendResponseLine(`File uploaded from ${filePath}.`);
     } finally {
@@ -432,7 +434,7 @@ export const pressKey = definePageTool({
       `Successfully pressed key: ${request.params.key}`,
     );
     if (request.params.includeSnapshot) {
-      response.includeSnapshot({page});
+      response.includeSnapshot();
     }
   },
 });

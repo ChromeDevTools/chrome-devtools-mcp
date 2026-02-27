@@ -37,7 +37,6 @@ in the DevTools Elements panel (if any).`,
     response.includeSnapshot({
       verbose: request.params.verbose ?? false,
       filePath: request.params.filePath,
-      page: request.page,
     });
   },
 });
@@ -70,6 +69,6 @@ export const waitFor = definePageTool({
       `Element matching one of ${JSON.stringify(request.params.text)} found.`,
     );
 
-    response.includeSnapshot({page});
+    response.includeSnapshot();
   },
 });

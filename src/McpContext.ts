@@ -23,7 +23,6 @@ import type {
   BrowserContext,
   ConsoleMessage,
   Debugger,
-  ElementHandle,
   HTTPRequest,
   Page,
   ScreenRecorder,
@@ -34,7 +33,6 @@ import type {
 import {Locator} from './third_party/index.js';
 import {PredefinedNetworkConditions} from './third_party/index.js';
 import {listPages} from './tools/pages.js';
-import {takeSnapshot} from './tools/snapshot.js';
 import {CLOSE_PAGE_ERROR} from './tools/ToolDefinition.js';
 import type {
   Context,
@@ -109,7 +107,7 @@ export class McpContext implements Context {
   #extensionServiceWorkers: ExtensionServiceWorker[] = [];
 
   #mcpPages = new Map<Page, McpPage>();
-  #selectedPage?: Page;
+  #selectedPage?: McpPage;
   #networkCollector: NetworkCollector;
   #consoleCollector: ConsoleCollector;
   #devtoolsUniverseManager: UniverseManager;
@@ -290,7 +288,7 @@ export class McpContext implements Context {
       page = await this.browser.newPage({background});
     }
     await this.createPagesSnapshot();
-    this.selectPage(page);
+    this.selectPage(this.#getMcpPage(page));
     this.#networkCollector.addPage(page);
     this.#consoleCollector.addPage(page);
     return this.#getMcpPage(page);
@@ -300,16 +298,15 @@ export class McpContext implements Context {
       throw new Error(CLOSE_PAGE_ERROR);
     }
     const page = this.getPageById(pageId);
-    const mcpPage = this.#mcpPages.get(page);
-    if (mcpPage) {
-      mcpPage.dispose();
-      this.#mcpPages.delete(page);
+    if (page) {
+      page.dispose();
+      this.#mcpPages.delete(page.pptrPage);
     }
-    const ctx = page.browserContext();
-    if (this.#focusedPagePerContext.get(ctx) === page) {
+    const ctx = page.pptrPage.browserContext();
+    if (this.#focusedPagePerContext.get(ctx) === page.pptrPage) {
       this.#focusedPagePerContext.delete(ctx);
     }
-    await page.close({runBeforeUnload: false});
+    await page.pptrPage.close({runBeforeUnload: false});
   }
 
   getNetworkRequestById(page: McpPage, reqid: number): HTTPRequest {
@@ -461,12 +458,12 @@ export class McpContext implements Context {
     if (!page) {
       throw new Error('No page selected');
     }
-    if (page.isClosed()) {
+    if (page.pptrPage.isClosed()) {
       throw new Error(
         `The selected page has been closed. Call ${listPages().name} to see open pages.`,
       );
     }
-    return page;
+    return page.pptrPage;
   }
 
   getSelectedMcpPage(): McpPage {
@@ -474,16 +471,8 @@ export class McpContext implements Context {
     return this.#getMcpPage(page);
   }
 
-  resolvePageById(pageId?: number): McpPage {
-    if (pageId === undefined) {
-      return this.getSelectedMcpPage();
-    }
-    const page = this.getPageById(pageId);
-    return this.#getMcpPage(page);
-  }
-
-  getPageById(pageId: number): Page {
-    const page = this.#pages.find(p => this.#mcpPages.get(p)?.id === pageId);
+  getPageById(pageId: number): McpPage {
+    const page = this.#mcpPages.values().find(mcpPage => mcpPage.id === pageId);
     if (!page) {
       throw new Error('No page found');
     }
@@ -507,7 +496,7 @@ export class McpContext implements Context {
   }
 
   isPageSelected(page: Page): boolean {
-    return this.#selectedPage === page;
+    return this.#selectedPage?.pptrPage === page;
   }
 
   assertPageIsFocused(pageToCheck: Page | ContextPage): void {
@@ -524,20 +513,22 @@ export class McpContext implements Context {
     }
   }
 
-  selectPage(pageToSelect: Page | ContextPage): void {
-    const newPage =
-      'pptrPage' in pageToSelect ? pageToSelect.pptrPage : pageToSelect;
-    const ctx = newPage.browserContext();
+  selectPage(newPage: McpPage): void {
+    const ctx = newPage.pptrPage.browserContext();
     const oldFocused = this.#focusedPagePerContext.get(ctx);
-    if (oldFocused && oldFocused !== newPage && !oldFocused.isClosed()) {
+    if (
+      oldFocused &&
+      oldFocused !== newPage.pptrPage &&
+      !oldFocused.isClosed()
+    ) {
       void oldFocused.emulateFocusedPage(false).catch(error => {
         this.logger('Error turning off focused page emulation', error);
       });
     }
-    this.#focusedPagePerContext.set(ctx, newPage);
+    this.#focusedPagePerContext.set(ctx, newPage.pptrPage);
     this.#selectedPage = newPage;
     this.#updateSelectedPageTimeouts();
-    void newPage.emulateFocusedPage(true).catch(error => {
+    void newPage.pptrPage.emulateFocusedPage(true).catch(error => {
       this.logger('Error turning on focused page emulation', error);
     });
   }
@@ -570,63 +561,6 @@ export class McpContext implements Context {
       }
     }
     return undefined;
-  }
-
-  async getElementByUid(
-    uid: string,
-    page?: Page,
-  ): Promise<ElementHandle<Element>> {
-    if (page) {
-      // Scoped search: only look in the target page's snapshot.
-      const mcpPage = this.#mcpPages.get(page);
-      if (!mcpPage?.textSnapshot) {
-        throw new Error(
-          `No snapshot found for page ${mcpPage?.id ?? '?'}. Use ${takeSnapshot.name} to capture one.`,
-        );
-      }
-      const node = mcpPage.textSnapshot.idToNode.get(uid);
-      if (!node) {
-        throw new Error(
-          `Element uid "${uid}" not found on page ${mcpPage.id}.`,
-        );
-      }
-      return this.#resolveElementHandle(node, uid);
-    }
-
-    // Cross-page search with context-focus validation.
-    let anySnapshot = false;
-    for (const [searchPage, mcpPage] of this.#mcpPages.entries()) {
-      if (!mcpPage.textSnapshot) {
-        continue;
-      }
-      anySnapshot = true;
-      const node = mcpPage.textSnapshot.idToNode.get(uid);
-      if (node) {
-        const ctx = searchPage.browserContext();
-        const contextSelectedPage = this.#focusedPagePerContext.get(ctx);
-        if (contextSelectedPage !== searchPage) {
-          const targetId = mcpPage.id;
-          const selectedId = contextSelectedPage
-            ? this.#mcpPages.get(contextSelectedPage)?.id
-            : this.#getSelectedMcpPage().id;
-          throw new Error(
-            `Element uid "${uid}" belongs to page ${targetId}, but page ${selectedId} is currently selected. ` +
-              `Call select_page with pageId ${targetId} first.`,
-          );
-        }
-        // Align global #selectedPage for waitForEventsAfterAction etc.
-        if (this.#selectedPage !== searchPage) {
-          this.#selectedPage = searchPage;
-        }
-        return this.#resolveElementHandle(node, uid);
-      }
-    }
-    if (!anySnapshot) {
-      throw new Error(
-        `No snapshot found. Use ${takeSnapshot.name} to capture one.`,
-      );
-    }
-    throw new Error('No such element found in any snapshot.');
   }
 
   /**
@@ -664,24 +598,6 @@ export class McpContext implements Context {
     return this.#extensionServiceWorkers;
   }
 
-  async #resolveElementHandle(
-    node: TextSnapshotNode,
-    uid: string,
-  ): Promise<ElementHandle<Element>> {
-    const message = `Element with uid ${uid} no longer exists on the page.`;
-    try {
-      const handle = await node.elementHandle();
-      if (!handle) {
-        throw new Error(message);
-      }
-      return handle;
-    } catch (error) {
-      throw new Error(message, {
-        cause: error,
-      });
-    }
-  }
-
   async createPagesSnapshot(): Promise<Page[]> {
     const {pages: allPages, isolatedContextNames} = await this.#getAllPages();
 
@@ -717,10 +633,11 @@ export class McpContext implements Context {
     });
 
     if (
-      (!this.#selectedPage || this.#pages.indexOf(this.#selectedPage) === -1) &&
+      (!this.#selectedPage ||
+        this.#pages.indexOf(this.#selectedPage.pptrPage) === -1) &&
       this.#pages[0]
     ) {
-      this.selectPage(this.#pages[0]);
+      this.selectPage(this.#getMcpPage(this.#pages[0]));
     }
 
     await this.detectOpenDevToolsWindows();
@@ -941,14 +858,6 @@ export class McpContext implements Context {
         uniqueBackendNodeIdToMcpId.delete(key);
       }
     }
-  }
-
-  getTextSnapshot(targetPage?: Page): TextSnapshot | null {
-    const page = targetPage ?? this.#selectedPage;
-    if (!page) {
-      return null;
-    }
-    return this.#mcpPages.get(page)?.textSnapshot ?? null;
   }
 
   async saveTemporaryFile(

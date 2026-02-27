@@ -54,7 +54,7 @@ export const selectPage = defineTool({
     context.selectPage(page);
     response.setIncludePages(true);
     if (request.params.bringToFront) {
-      await page.bringToFront();
+      await page.pptrPage.bringToFront();
     }
   },
 });
@@ -386,7 +386,7 @@ export const getTabId = definePageTool({
   handler: async (request, response, context) => {
     const page = context.getPageById(request.params.pageId);
     // @ts-expect-error _tabId is internal.
-    const tabId = page._tabId;
+    const tabId = page.pptrPage._tabId;
     response.setTabId(tabId);
   },
 });

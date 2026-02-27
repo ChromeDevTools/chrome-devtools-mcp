@@ -60,7 +60,6 @@ export interface ImageContentData {
 export interface SnapshotParams {
   verbose?: boolean;
   filePath?: string;
-  page?: ContextPage;
 }
 
 export interface LighthouseData {
@@ -136,16 +135,14 @@ export type Context = Readonly<{
   isCruxEnabled(): boolean;
   recordedTraces(): TraceResult[];
   storeTraceRecording(result: TraceResult): void;
-  getPageById(pageId: number): Page;
+  getPageById(pageId: number): ContextPage;
   newPage(
     background?: boolean,
     isolatedContextName?: string,
   ): Promise<ContextPage>;
   closePage(pageId: number): Promise<void>;
-  selectPage(page: Page): void;
+  selectPage(page: ContextPage): void;
   assertPageIsFocused(page: Page): void;
-  getElementByUid(uid: string, page?: Page): Promise<ElementHandle<Element>>;
-  getAXNodeByUid(uid: string): TextSnapshotNode | undefined;
   restoreEmulation(page: ContextPage): Promise<void>;
   emulate(
     options: {
