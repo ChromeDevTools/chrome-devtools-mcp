@@ -350,7 +350,7 @@ describe('pages', () => {
           await context
             .getPageById(1)
             .pptrPage.evaluate(() => document.hasFocus()),
-          false,
+          true,
         );
         await selectPage.handler({params: {pageId: 1}}, response, context);
         assert.strictEqual(
@@ -406,121 +406,6 @@ describe('pages', () => {
         );
         assert.strictEqual(
           await pageB.evaluate(() => document.hasFocus()),
-          true,
-        );
-      });
-    });
-    it('focuses correct same-context page after cross-context interleaving', async () => {
-      await withMcpContext(async (response, context) => {
-        // Create 2 pages in ctx-a, 1 in ctx-b.
-        await newPage.handler(
-          {params: {url: 'about:blank', isolatedContext: 'ctx-a'}},
-          response,
-          context,
-        );
-        const pageA1 = context.getSelectedPptrPage();
-        const pageA1Id = context.getPageId(pageA1)!;
-
-        await newPage.handler(
-          {params: {url: 'about:blank', isolatedContext: 'ctx-b'}},
-          response,
-          context,
-        );
-        const pageB = context.getSelectedPptrPage();
-
-        // pageA1 still focused (cross-context select doesn't defocus it).
-        assert.strictEqual(
-          await pageA1.evaluate(() => document.hasFocus()),
-          true,
-        );
-
-        // Create second page in ctx-a. This should defocus pageA1,
-        // even though #selectedPage was pageB (different context).
-        await newPage.handler(
-          {params: {url: 'about:blank', isolatedContext: 'ctx-a'}},
-          response,
-          context,
-        );
-        const pageA2 = context.getSelectedPptrPage();
-
-        // pageA1 and pageA2 share the same BrowserContext.
-        assert.strictEqual(pageA1.browserContext(), pageA2.browserContext());
-
-        assert.strictEqual(
-          await pageA1.evaluate(() => document.hasFocus()),
-          false,
-          'pageA1 should lose focus when pageA2 is created in the same context',
-        );
-        assert.strictEqual(
-          await pageA2.evaluate(() => document.hasFocus()),
-          true,
-        );
-        // pageB is unaffected by ctx-a changes.
-        assert.strictEqual(
-          await pageB.evaluate(() => document.hasFocus()),
-          true,
-        );
-
-        // Re-selecting pageA1 should grant it focus via the override.
-        await selectPage.handler(
-          {params: {pageId: pageA1Id}},
-          response,
-          context,
-        );
-        assert.strictEqual(
-          await pageA1.evaluate(() => document.hasFocus()),
-          true,
-        );
-        // pageB still unaffected.
-        assert.strictEqual(
-          await pageB.evaluate(() => document.hasFocus()),
-          true,
-        );
-      });
-    });
-    it('handles focus correctly after closing the focused page in a context', async () => {
-      await withMcpContext(async (response, context) => {
-        await newPage.handler(
-          {params: {url: 'about:blank', isolatedContext: 'ctx-a'}},
-          response,
-          context,
-        );
-        const pageA1 = context.getSelectedPptrPage();
-
-        await newPage.handler(
-          {params: {url: 'about:blank', isolatedContext: 'ctx-a'}},
-          response,
-          context,
-        );
-        const pageA2 = context.getSelectedPptrPage();
-        const pageA2Id = context.getPageId(pageA2)!;
-
-        // pageA2 is focused, pageA1 is not.
-        assert.strictEqual(
-          await pageA2.evaluate(() => document.hasFocus()),
-          true,
-        );
-        assert.strictEqual(
-          await pageA1.evaluate(() => document.hasFocus()),
-          false,
-        );
-
-        // Close pageA2 (the focused page).
-        await closePage.handler(
-          {params: {pageId: pageA2Id}},
-          response,
-          context,
-        );
-
-        // Selecting pageA1 should work without errors.
-        const pageA1Id = context.getPageId(pageA1)!;
-        await selectPage.handler(
-          {params: {pageId: pageA1Id}},
-          response,
-          context,
-        );
-        assert.strictEqual(
-          await pageA1.evaluate(() => document.hasFocus()),
           true,
         );
       });

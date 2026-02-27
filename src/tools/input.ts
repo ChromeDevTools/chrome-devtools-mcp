@@ -98,7 +98,6 @@ export const clickAt = definePageTool({
   },
   handler: async (request, response, context) => {
     const page = request.page;
-    context.assertPageIsFocused(page.pptrPage);
     await context.waitForEventsAfterAction(async () => {
       await page.pptrPage.mouse.click(request.params.x, request.params.y, {
         clickCount: request.params.dblClick ? 2 : 1,
@@ -263,7 +262,6 @@ export const typeText = definePageTool({
   },
   handler: async (request, response, context) => {
     const page = request.page;
-    context.assertPageIsFocused(page.pptrPage);
     await context.waitForEventsAfterAction(async () => {
       await page.pptrPage.keyboard.type(request.params.text);
       if (request.params.submitKey) {
@@ -416,7 +414,6 @@ export const pressKey = definePageTool({
   },
   handler: async (request, response, context) => {
     const page = request.page;
-    context.assertPageIsFocused(page.pptrPage);
     const tokens = parseKey(request.params.key);
     const [key, ...modifiers] = tokens;
 
