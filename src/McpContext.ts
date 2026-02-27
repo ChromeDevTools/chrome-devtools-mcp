@@ -23,7 +23,6 @@ import type {
   BrowserContext,
   ConsoleMessage,
   Debugger,
-  Dialog,
   ElementHandle,
   HTTPRequest,
   Page,
@@ -205,7 +204,7 @@ export class McpContext implements Context {
   }
 
   #resolveTargetPage(): Page {
-    return this.#requestPage?.pptrPage ?? this.getSelectedPage();
+    return this.#requestPage?.pptrPage ?? this.getSelectedPptrPage();
   }
 
   resolveCdpRequestId(cdpRequestId: string): number | undefined {
@@ -327,7 +326,7 @@ export class McpContext implements Context {
   }
 
   async restoreEmulation(targetPage?: Page) {
-    const page = targetPage ?? this.getSelectedPage();
+    const page = targetPage ?? this.getSelectedPptrPage();
     const mcpPage = this.#getMcpPage(page);
     const currentSetting = mcpPage.emulationSettings;
     await this.emulate(currentSetting, targetPage);
@@ -344,7 +343,7 @@ export class McpContext implements Context {
     },
     targetPage?: Page,
   ): Promise<void> {
-    const page = targetPage ?? this.getSelectedPage();
+    const page = targetPage ?? this.getSelectedPptrPage();
     const mcpPage = this.#getMcpPage(page);
     const newSettings: EmulationSettings = {...mcpPage.emulationSettings};
     let timeoutsNeedUpdate = false;
@@ -492,23 +491,7 @@ export class McpContext implements Context {
     return this.#options.performanceCrux;
   }
 
-  getDialog(page?: Page): Dialog | undefined {
-    const targetPage =
-      page ?? this.#requestPage?.pptrPage ?? this.#selectedPage;
-    if (!targetPage) {
-      return undefined;
-    }
-    return this.#mcpPages.get(targetPage)?.dialog;
-  }
-
-  clearDialog(page?: Page): void {
-    const targetPage = page ?? this.#selectedPage;
-    if (targetPage) {
-      this.#mcpPages.get(targetPage)?.clearDialog();
-    }
-  }
-
-  getSelectedPage(): Page {
+  getSelectedPptrPage(): Page {
     const page = this.#selectedPage;
     if (!page) {
       throw new Error('No page selected');
@@ -522,7 +505,7 @@ export class McpContext implements Context {
   }
 
   getSelectedMcpPage(): McpPage {
-    const page = this.getSelectedPage();
+    const page = this.getSelectedPptrPage();
     return this.#getMcpPage(page);
   }
 
@@ -555,7 +538,7 @@ export class McpContext implements Context {
   }
 
   #getSelectedMcpPage(): McpPage {
-    return this.#getMcpPage(this.getSelectedPage());
+    return this.#getMcpPage(this.getSelectedPptrPage());
   }
 
   isPageSelected(page: Page): boolean {
@@ -595,7 +578,7 @@ export class McpContext implements Context {
   }
 
   #updateSelectedPageTimeouts() {
-    const page = this.getSelectedPage();
+    const page = this.getSelectedPptrPage();
     // For waiters 5sec timeout should be sufficient.
     // Increased in case we throttle the CPU
     const cpuMultiplier = this.getCpuThrottlingRate();
@@ -922,7 +905,7 @@ export class McpContext implements Context {
     devtoolsData: DevToolsData | undefined = undefined,
     targetPage?: Page,
   ): Promise<void> {
-    const page = targetPage ?? this.getSelectedPage();
+    const page = targetPage ?? this.getSelectedPptrPage();
     const mcpPage = this.#getMcpPage(page);
     const rootNode = await page.accessibility.snapshot({
       includeIframes: true,
@@ -1063,7 +1046,7 @@ export class McpContext implements Context {
     action: () => Promise<unknown>,
     options?: {timeout?: number},
   ): Promise<void> {
-    const page = this.getSelectedPage();
+    const page = this.getSelectedPptrPage();
     const cpuMultiplier = this.getCpuThrottlingRate();
     const networkMultiplier = getNetworkMultiplierFromString(
       this.getNetworkConditions(),
@@ -1085,7 +1068,7 @@ export class McpContext implements Context {
     timeout?: number,
     targetPage?: Page,
   ): Promise<Element> {
-    const page = targetPage ?? this.getSelectedPage();
+    const page = targetPage ?? this.getSelectedPptrPage();
     const frames = page.frames();
 
     let locator = this.#locatorClass.race(

@@ -187,7 +187,7 @@ export const navigatePage = definePageTool({
           void dialog.dismiss();
         }
         // We are not going to report the dialog like regular dialogs.
-        context.clearDialog(page.pptrPage);
+        page.clearDialog();
       }
     };
 
@@ -333,9 +333,9 @@ export const handleDialog = definePageTool({
       .optional()
       .describe('Optional prompt text to enter into the dialog.'),
   },
-  handler: async (request, response, context) => {
+  handler: async (request, response, _context) => {
     const page = request.page;
-    const dialog = context.getDialog(page.pptrPage);
+    const dialog = page.getDialog();
     if (!dialog) {
       throw new Error('No open dialog found');
     }
@@ -363,7 +363,7 @@ export const handleDialog = definePageTool({
       }
     }
 
-    context.clearDialog(page.pptrPage);
+    page.clearDialog();
     response.setIncludePages(true);
   },
 });

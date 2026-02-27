@@ -136,10 +136,6 @@ export type Context = Readonly<{
   isCruxEnabled(): boolean;
   recordedTraces(): TraceResult[];
   storeTraceRecording(result: TraceResult): void;
-  // TODO: Remove once slim tools are converted to pageScoped: true.
-  getSelectedPage(): Page;
-  getDialog(page?: Page): Dialog | undefined;
-  clearDialog(page?: Page): void;
   getPageById(pageId: number): Page;
   newPage(
     background?: boolean,
@@ -198,6 +194,9 @@ export type ContextPage = Readonly<{
   readonly pptrPage: Page;
   getAXNodeByUid(uid: string): TextSnapshotNode | undefined;
   getElementByUid(uid: string): Promise<ElementHandle<Element>>;
+
+  getDialog(): Dialog | undefined;
+  clearDialog(): void;
 }>;
 
 export function defineTool<Schema extends zod.ZodRawShape>(

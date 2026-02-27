@@ -153,7 +153,8 @@ export async function createMcpServer(
     const schema =
       'pageScoped' in tool &&
       tool.pageScoped &&
-      serverArgs.experimentalPageIdRouting
+      serverArgs.experimentalPageIdRouting &&
+      !serverArgs.slim
         ? {...tool.schema, ...pageIdSchema}
         : tool.schema;
 
@@ -179,10 +180,13 @@ export async function createMcpServer(
           try {
             if ('pageScoped' in tool && tool.pageScoped) {
               const page =
-                serverArgs.experimentalPageIdRouting && params.pageId
+                serverArgs.experimentalPageIdRouting &&
+                params.pageId &&
+                !serverArgs.slim
                   ? context.resolvePageById(params.pageId)
                   : context.getSelectedMcpPage();
               context.setRequestPage(page);
+              response.setPage(page);
               await tool.handler(
                 {
                   params,

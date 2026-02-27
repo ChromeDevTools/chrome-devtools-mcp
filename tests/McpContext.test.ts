@@ -22,7 +22,7 @@ describe('McpContext', () => {
 
   it('list pages', async () => {
     await withMcpContext(async (_response, context) => {
-      const page = context.getSelectedPage();
+      const page = context.getSelectedPptrPage();
       await page.setContent(
         html`<button>Click me</button>
           <input
@@ -104,7 +104,7 @@ describe('McpContext', () => {
   it('resolves uid from a non-selected page snapshot', async () => {
     await withMcpContext(async (_response, context) => {
       // Page 1: set content and snapshot
-      const page1 = context.getSelectedPage();
+      const page1 = context.getSelectedPptrPage();
       await page1.setContent(html`<button>Page1 Button</button>`);
       await context.createTextSnapshot(false, undefined, page1);
 
@@ -230,7 +230,7 @@ describe('McpContext', () => {
     it('resolves for default context page alongside isolated contexts', async () => {
       await withMcpContext(async (_response, context) => {
         // Default context page (already exists from withMcpContext setup).
-        const defaultPage = context.getSelectedPage();
+        const defaultPage = context.getSelectedPptrPage();
         await defaultPage.setContent(html`<button>Default Button</button>`);
         await context.createTextSnapshot(false, undefined, defaultPage);
         const defaultUid = '1_1';

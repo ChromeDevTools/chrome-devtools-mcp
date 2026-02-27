@@ -27,7 +27,7 @@ describe('screencast', () => {
     it('starts a screencast recording with filePath', async () => {
       await withMcpContext(async (response, context) => {
         const mockRecorder = createMockRecorder();
-        const selectedPage = context.getSelectedPage();
+        const selectedPage = context.getSelectedPptrPage();
         const screencastStub = sinon
           .stub(selectedPage, 'screencast')
           .resolves(mockRecorder as never);
@@ -58,7 +58,7 @@ describe('screencast', () => {
     it('starts a screencast recording with temp file when no filePath', async () => {
       await withMcpContext(async (response, context) => {
         const mockRecorder = createMockRecorder();
-        const selectedPage = context.getSelectedPage();
+        const selectedPage = context.getSelectedPptrPage();
         const screencastStub = sinon
           .stub(selectedPage, 'screencast')
           .resolves(mockRecorder as never);
@@ -85,7 +85,7 @@ describe('screencast', () => {
           filePath: '/tmp/existing.mp4',
         });
 
-        const selectedPage = context.getSelectedPage();
+        const selectedPage = context.getSelectedPptrPage();
         const screencastStub = sinon.stub(selectedPage, 'screencast');
 
         await startScreencast.handler(
@@ -105,7 +105,7 @@ describe('screencast', () => {
 
     it('provides a clear error when ffmpeg is not found', async () => {
       await withMcpContext(async (response, context) => {
-        const selectedPage = context.getSelectedPage();
+        const selectedPage = context.getSelectedPptrPage();
         const error = new Error('spawn ffmpeg ENOENT');
         sinon.stub(selectedPage, 'screencast').rejects(error);
 

@@ -48,7 +48,7 @@ describe('extension', () => {
       );
 
       const extensionId = extractId(response);
-      const page = context.getSelectedPage();
+      const page = context.getSelectedPptrPage();
       await page.goto('chrome://extensions');
 
       const element = await page.waitForSelector(

@@ -26,7 +26,7 @@ describe('snapshot', () => {
   describe('browser_wait_for', () => {
     it('should work', async () => {
       await withMcpContext(async (response, context) => {
-        const page = context.getSelectedPage();
+        const page = context.getSelectedPptrPage();
 
         await page.setContent(
           html`<main><span>Hello</span><span> </span><div>World</div></main>`,
@@ -52,7 +52,7 @@ describe('snapshot', () => {
 
     it('should work with any-match array', async () => {
       await withMcpContext(async (response, context) => {
-        const page = context.getSelectedPage();
+        const page = context.getSelectedPptrPage();
 
         await page.setContent(
           html`<main><span>Status</span><div>Error</div></main>`,
@@ -78,7 +78,7 @@ describe('snapshot', () => {
 
     it('should work with any-match array when element shows up later', async () => {
       await withMcpContext(async (response, context) => {
-        const page = context.getSelectedPage();
+        const page = context.getSelectedPptrPage();
 
         const handlePromise = waitFor.handler(
           {
@@ -109,7 +109,7 @@ describe('snapshot', () => {
 
     it('should work with element that show up later', async () => {
       await withMcpContext(async (response, context) => {
-        const page = context.getSelectedPage();
+        const page = context.getSelectedPptrPage();
 
         const handlePromise = waitFor.handler(
           {
@@ -137,7 +137,7 @@ describe('snapshot', () => {
     });
     it('should work with aria elements', async () => {
       await withMcpContext(async (response, context) => {
-        const page = context.getSelectedPage();
+        const page = context.getSelectedPptrPage();
 
         await page.setContent(
           html`<main><h1>Header</h1><div>Text</div></main>`,
@@ -164,7 +164,7 @@ describe('snapshot', () => {
 
     it('should work with iframe content', async () => {
       await withMcpContext(async (response, context) => {
-        const page = context.getSelectedPage();
+        const page = context.getSelectedPptrPage();
 
         await page.setContent(
           html`<h1>Top level</h1>

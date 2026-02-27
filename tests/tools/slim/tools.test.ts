@@ -21,6 +21,7 @@ describe('slim', () => {
           params: {
             script: `2 * 5`,
           },
+          page: context.getSelectedMcpPage(),
         },
         response,
         context,
@@ -36,6 +37,7 @@ describe('slim', () => {
           params: {
             script: `throw new Error('test error')`,
           },
+          page: context.getSelectedMcpPage(),
         },
         response,
         context,
@@ -47,11 +49,14 @@ describe('slim', () => {
   it('navigates to correct page', async t => {
     await withMcpContext(async (response, context) => {
       await navigate.handler(
-        {params: {url: 'data:text/html,<div>Hello MCP</div>'}},
+        {
+          params: {url: 'data:text/html,<div>Hello MCP</div>'},
+          page: context.getSelectedMcpPage(),
+        },
         response,
         context,
       );
-      const page = context.getSelectedPage();
+      const page = context.getSelectedPptrPage();
       assert.equal(
         await page.evaluate(() => document.querySelector('div')?.textContent),
         'Hello MCP',
@@ -64,9 +69,13 @@ describe('slim', () => {
   it('with default options', async () => {
     await withMcpContext(async (response, context) => {
       const fixture = screenshots.basic;
-      const page = context.getSelectedPage();
+      const page = context.getSelectedPptrPage();
       await page.setContent(fixture.html);
-      await screenshot.handler({params: {format: 'png'}}, response, context);
+      await screenshot.handler(
+        {params: {format: 'png'}, page: context.getSelectedMcpPage()},
+        response,
+        context,
+      );
       assert(path.isAbsolute(response.responseLines.at(0)!));
       assert(fs.existsSync(response.responseLines.at(0)!));
     });

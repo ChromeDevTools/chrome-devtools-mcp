@@ -7,9 +7,9 @@
 import type {Dialog} from '../../third_party/index.js';
 import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
-import {defineTool} from '../ToolDefinition.js';
+import {definePageTool} from '../ToolDefinition.js';
 
-export const screenshot = defineTool({
+export const screenshot = definePageTool({
   name: 'screenshot',
   description: `Takes a screenshot`,
   annotations: {
@@ -19,8 +19,8 @@ export const screenshot = defineTool({
   },
   schema: {},
   handler: async (request, response, context) => {
-    const page = context.getSelectedPage();
-    const screenshot = await page.screenshot({
+    const page = request.page;
+    const screenshot = await page.pptrPage.screenshot({
       type: 'png',
       optimizeForSpeed: true,
     });
@@ -32,7 +32,7 @@ export const screenshot = defineTool({
   },
 });
 
-export const navigate = defineTool({
+export const navigate = definePageTool({
   name: 'navigate',
   description: `Loads a URL`,
   annotations: {
@@ -42,8 +42,9 @@ export const navigate = defineTool({
   schema: {
     url: zod.string().describe('URL to navigate to'),
   },
-  handler: async (request, response, context) => {
-    const page = context.getSelectedPage();
+  handler: async (request, response) => {
+    const page = request.page;
+
     const options = {
       timeout: 30_000,
     };
@@ -53,22 +54,22 @@ export const navigate = defineTool({
         response.appendResponseLine(`Accepted a beforeunload dialog.`);
         void dialog.accept();
         // We are not going to report the dialog like regular dialogs.
-        context.clearDialog();
+        page.clearDialog();
       }
     };
 
-    page.on('dialog', dialogHandler);
+    page.pptrPage.on('dialog', dialogHandler);
 
     try {
-      await page.goto(request.params.url, options);
-      response.appendResponseLine(`Navigated to ${page.url()}.`);
+      await page.pptrPage.goto(request.params.url, options);
+      response.appendResponseLine(`Navigated to ${page.pptrPage.url()}.`);
     } finally {
-      page.off('dialog', dialogHandler);
+      page.pptrPage.off('dialog', dialogHandler);
     }
   },
 });
 
-export const evaluate = defineTool({
+export const evaluate = definePageTool({
   name: 'evaluate',
   description: `Evaluates a JavaScript script`,
   annotations: {
@@ -78,10 +79,10 @@ export const evaluate = defineTool({
   schema: {
     script: zod.string().describe(`JS script to run on the page`),
   },
-  handler: async (request, response, context) => {
-    const page = context.getSelectedPage();
+  handler: async (request, response) => {
+    const page = request.page;
     try {
-      const result = await page.evaluate(request.params.script);
+      const result = await page.pptrPage.evaluate(request.params.script);
       response.appendResponseLine(JSON.stringify(result));
     } catch (err) {
       response.appendResponseLine(String(err.message));

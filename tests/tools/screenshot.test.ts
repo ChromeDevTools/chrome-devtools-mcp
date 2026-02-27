@@ -19,7 +19,7 @@ describe('screenshot', () => {
     it('with default options', async () => {
       await withMcpContext(async (response, context) => {
         const fixture = screenshots.basic;
-        const page = context.getSelectedPage();
+        const page = context.getSelectedPptrPage();
         await page.setContent(fixture.html);
         await screenshot.handler(
           {params: {format: 'png'}, page: context.getSelectedMcpPage()},
@@ -38,7 +38,7 @@ describe('screenshot', () => {
     it('ignores quality', async () => {
       await withMcpContext(async (response, context) => {
         const fixture = screenshots.basic;
-        const page = context.getSelectedPage();
+        const page = context.getSelectedPptrPage();
         await page.setContent(fixture.html);
         await screenshot.handler(
           {
@@ -92,7 +92,7 @@ describe('screenshot', () => {
     it('with full page', async () => {
       await withMcpContext(async (response, context) => {
         const fixture = screenshots.viewportOverflow;
-        const page = context.getSelectedPage();
+        const page = context.getSelectedPptrPage();
         await page.setContent(fixture.html);
         await screenshot.handler(
           {
@@ -114,7 +114,7 @@ describe('screenshot', () => {
 
     it('with full page resulting in a large screenshot', async () => {
       await withMcpContext(async (response, context) => {
-        const page = context.getSelectedPage();
+        const page = context.getSelectedPptrPage();
 
         await page.setContent(
           html`${`<div style="color:blue;">test</div>`.repeat(6500)}
@@ -153,7 +153,7 @@ describe('screenshot', () => {
       await withMcpContext(async (response, context) => {
         const fixture = screenshots.button;
 
-        const page = context.getSelectedPage();
+        const page = context.getSelectedPptrPage();
         await page.setContent(fixture.html);
         await context.createTextSnapshot();
         await screenshot.handler(
@@ -182,7 +182,7 @@ describe('screenshot', () => {
         const filePath = join(tmpdir(), 'test-screenshot.png');
         try {
           const fixture = screenshots.basic;
-          const page = context.getSelectedPage();
+          const page = context.getSelectedPptrPage();
           await page.setContent(fixture.html);
           await screenshot.handler(
             {
@@ -225,7 +225,7 @@ describe('screenshot', () => {
         try {
           await withMcpContext(async (response, context) => {
             const fixture = screenshots.basic;
-            const page = context.getSelectedPage();
+            const page = context.getSelectedPptrPage();
             await page.setContent(fixture.html);
             await assert.rejects(
               screenshot.handler(
@@ -252,7 +252,7 @@ describe('screenshot', () => {
         try {
           await withMcpContext(async (response, context) => {
             const fixture = screenshots.basic;
-            const page = context.getSelectedPage();
+            const page = context.getSelectedPptrPage();
             await page.setContent(fixture.html);
             await assert.rejects(
               screenshot.handler(
@@ -280,7 +280,7 @@ describe('screenshot', () => {
         const invalidChar = process.platform === 'win32' ? '>' : '\0';
         const filePath = `malformed${invalidChar}path.png`;
         const fixture = screenshots.basic;
-        const page = context.getSelectedPage();
+        const page = context.getSelectedPptrPage();
         await page.setContent(fixture.html);
         await assert.rejects(
           screenshot.handler(

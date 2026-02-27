@@ -258,7 +258,7 @@ describe('emulation', () => {
 
     it('emulates viewport', async () => {
       await withMcpContext(async (response, context) => {
-        const page = context.getSelectedPage();
+        const page = context.getSelectedPptrPage();
         await page.goto(server.baseUrl + '/viewport');
         await emulate.handler(
           {
@@ -298,7 +298,7 @@ describe('emulation', () => {
 
     it('clears viewport override when viewport is set to null', async () => {
       await withMcpContext(async (response, context) => {
-        const page = context.getSelectedPage();
+        const page = context.getSelectedPptrPage();
         // First set a viewport
         await emulate.handler(
           {
@@ -341,7 +341,7 @@ describe('emulation', () => {
         assert.strictEqual(context.getViewport(), null);
 
         // Somehow reset of the viewport seems to be async.
-        await context.getSelectedPage().waitForFunction(() => {
+        await context.getSelectedPptrPage().waitForFunction(() => {
           return window.innerWidth !== 400 && window.innerHeight !== 400;
         });
       });
@@ -370,7 +370,7 @@ describe('emulation', () => {
 
         assert.strictEqual(context.getViewport(), null);
         assert.ok(
-          await context.getSelectedPage().evaluate(() => {
+          await context.getSelectedPptrPage().evaluate(() => {
             return window.innerWidth !== 400 && window.innerHeight !== 400;
           }),
         );
@@ -393,7 +393,7 @@ describe('emulation', () => {
         );
 
         assert.strictEqual(context.getUserAgent(), 'MyUA');
-        const page = context.getSelectedPage();
+        const page = context.getSelectedPptrPage();
         const ua = await page.evaluate(() => navigator.userAgent);
         assert.strictEqual(ua, 'MyUA');
       });
@@ -424,7 +424,7 @@ describe('emulation', () => {
           context,
         );
         assert.strictEqual(context.getUserAgent(), 'UA2');
-        const page = context.getSelectedPage();
+        const page = context.getSelectedPptrPage();
         const ua = await page.evaluate(() => navigator.userAgent);
         assert.strictEqual(ua, 'UA2');
       });
@@ -457,7 +457,7 @@ describe('emulation', () => {
         );
 
         assert.strictEqual(context.getUserAgent(), null);
-        const page = context.getSelectedPage();
+        const page = context.getSelectedPptrPage();
         const ua = await page.evaluate(() => navigator.userAgent);
         assert.notStrictEqual(ua, 'MyUA');
         assert.ok(ua.length > 0);
@@ -484,7 +484,7 @@ describe('emulation', () => {
 
         assert.strictEqual(context.getUserAgent(), null);
         assert.ok(
-          await context.getSelectedPage().evaluate(() => {
+          await context.getSelectedPptrPage().evaluate(() => {
             return navigator.userAgent !== 'MyUA';
           }),
         );
@@ -507,7 +507,7 @@ describe('emulation', () => {
         );
 
         assert.strictEqual(context.getColorScheme(), 'dark');
-        const page = context.getSelectedPage();
+        const page = context.getSelectedPptrPage();
         const scheme = await page.evaluate(() =>
           window.matchMedia('(prefers-color-scheme: dark)').matches
             ? 'dark'
@@ -542,7 +542,7 @@ describe('emulation', () => {
           context,
         );
         assert.strictEqual(context.getColorScheme(), 'light');
-        const page = context.getSelectedPage();
+        const page = context.getSelectedPptrPage();
         const scheme = await page.evaluate(() =>
           window.matchMedia('(prefers-color-scheme: light)').matches
             ? 'light'
@@ -554,7 +554,7 @@ describe('emulation', () => {
 
     it('resets color scheme when set to auto', async () => {
       await withMcpContext(async (response, context) => {
-        const page = context.getSelectedPage();
+        const page = context.getSelectedPptrPage();
 
         const initial = await page.evaluate(
           () => window.matchMedia('(prefers-color-scheme: dark)').matches,

@@ -10,6 +10,7 @@ import {IssueFormatter} from './formatters/IssueFormatter.js';
 import {NetworkFormatter} from './formatters/NetworkFormatter.js';
 import {SnapshotFormatter} from './formatters/SnapshotFormatter.js';
 import type {McpContext} from './McpContext.js';
+import type {McpPage} from './McpPage.js';
 import {UncaughtError} from './PageCollector.js';
 import {DevTools} from './third_party/index.js';
 import type {
@@ -70,9 +71,14 @@ export class McpResponse implements Response {
   #devToolsData?: DevToolsData;
   #tabId?: string;
   #args: ParsedArguments;
+  #page?: McpPage;
 
   constructor(args: ParsedArguments) {
     this.#args = args;
+  }
+
+  setPage(page: McpPage): void {
+    this.#page = page;
   }
 
   attachDevToolsData(data: DevToolsData): void {
@@ -517,7 +523,7 @@ export class McpResponse implements Response {
       structuredContent.colorScheme = colorScheme;
     }
 
-    const dialog = context.getDialog();
+    const dialog = this.#page?.getDialog();
     if (dialog) {
       const defaultValueIfNeeded =
         dialog.type() === 'prompt'
