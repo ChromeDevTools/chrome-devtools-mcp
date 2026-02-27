@@ -25,7 +25,7 @@ describe('network', () => {
     it('list requests', async () => {
       await withMcpContext(async (response, context) => {
         await listNetworkRequests.handler(
-          {params: {}, page: context.getSelectedPage()},
+          {params: {}, page: context.getSelectedMcpPage()},
           response,
           context,
         );
@@ -49,7 +49,7 @@ describe('network', () => {
           {
             params: {},
 
-            page: context.getSelectedPage(),
+            page: context.getSelectedMcpPage(),
           },
           response,
           context,
@@ -77,7 +77,7 @@ describe('network', () => {
             params: {
               includePreservedRequests: true,
             },
-            page: context.getSelectedPage(),
+            page: context.getSelectedMcpPage(),
           },
           response,
           context,
@@ -120,7 +120,7 @@ describe('network', () => {
             params: {
               includePreservedRequests: true,
             },
-            page: context.getSelectedPage(),
+            page: context.getSelectedMcpPage(),
           },
           response,
           context,
@@ -138,7 +138,7 @@ describe('network', () => {
         const page = context.getSelectedPage();
         await page.goto('data:text/html,<div>Hello MCP</div>');
         await getNetworkRequest.handler(
-          {params: {reqid: 1}, page: context.getSelectedPage()},
+          {params: {reqid: 1}, page: context.getSelectedMcpPage()},
           response,
           context,
         );
@@ -151,7 +151,7 @@ describe('network', () => {
         const page = context.getSelectedPage();
         await page.goto('data:text/html,<div>Hello MCP</div>');
         await getNetworkRequest.handler(
-          {params: {reqid: 1}, page: context.getSelectedPage()},
+          {params: {reqid: 1}, page: context.getSelectedMcpPage()},
           response,
           context,
         );
@@ -174,7 +174,7 @@ describe('network', () => {
             params: {
               reqid: 1,
             },
-            page: context.getSelectedPage(),
+            page: context.getSelectedMcpPage(),
           },
           response,
           context,

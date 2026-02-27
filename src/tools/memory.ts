@@ -24,7 +24,7 @@ export const takeMemorySnapshot = definePageTool({
   handler: async (request, response, _context) => {
     const page = request.page;
 
-    await page.captureHeapSnapshot({
+    await page.pptrPage.captureHeapSnapshot({
       path: request.params.filePath,
     });
 

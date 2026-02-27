@@ -35,7 +35,7 @@ describe('screencast', () => {
         await startScreencast.handler(
           {
             params: {path: '/tmp/test-recording.mp4'},
-            page: context.getSelectedPage(),
+            page: context.getSelectedMcpPage(),
           },
           response,
           context,
@@ -64,7 +64,7 @@ describe('screencast', () => {
           .resolves(mockRecorder as never);
 
         await startScreencast.handler(
-          {params: {}, page: context.getSelectedPage()},
+          {params: {}, page: context.getSelectedMcpPage()},
           response,
           context,
         );
@@ -89,7 +89,7 @@ describe('screencast', () => {
         const screencastStub = sinon.stub(selectedPage, 'screencast');
 
         await startScreencast.handler(
-          {params: {}, page: context.getSelectedPage()},
+          {params: {}, page: context.getSelectedMcpPage()},
           response,
           context,
         );
@@ -111,7 +111,10 @@ describe('screencast', () => {
 
         await assert.rejects(
           startScreencast.handler(
-            {params: {path: '/tmp/test.mp4'}, page: context.getSelectedPage()},
+            {
+              params: {path: '/tmp/test.mp4'},
+              page: context.getSelectedMcpPage(),
+            },
             response,
             context,
           ),
@@ -128,7 +131,7 @@ describe('screencast', () => {
       await withMcpContext(async (response, context) => {
         assert.strictEqual(context.getScreenRecorder(), null);
         await stopScreencast.handler(
-          {params: {}, page: context.getSelectedPage()},
+          {params: {}, page: context.getSelectedMcpPage()},
           response,
           context,
         );
@@ -146,7 +149,7 @@ describe('screencast', () => {
         });
 
         await stopScreencast.handler(
-          {params: {}, page: context.getSelectedPage()},
+          {params: {}, page: context.getSelectedMcpPage()},
           response,
           context,
         );
@@ -172,7 +175,7 @@ describe('screencast', () => {
 
         await assert.rejects(
           stopScreencast.handler(
-            {params: {}, page: context.getSelectedPage()},
+            {params: {}, page: context.getSelectedMcpPage()},
             response,
             context,
           ),

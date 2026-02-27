@@ -49,7 +49,7 @@ Example with arguments: \`(el) => {
     try {
       const frames = new Set<Frame>();
       for (const el of request.params.args ?? []) {
-        const handle = await context.getElementByUid(el.uid, request.page);
+        const handle = await request.page.getElementByUid(el.uid);
         frames.add(handle.frame);
         args.push(handle);
       }
@@ -60,7 +60,7 @@ Example with arguments: \`(el) => {
           "Elements from different frames can't be evaluated together.",
         );
       } else {
-        pageOrFrame = [...frames.values()][0] ?? request.page;
+        pageOrFrame = [...frames.values()][0] ?? request.page.pptrPage;
       }
       const fn = await pageOrFrame.evaluateHandle(
         `(${request.params.function})`,

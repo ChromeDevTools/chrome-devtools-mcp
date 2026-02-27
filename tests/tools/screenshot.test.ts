@@ -22,7 +22,7 @@ describe('screenshot', () => {
         const page = context.getSelectedPage();
         await page.setContent(fixture.html);
         await screenshot.handler(
-          {params: {format: 'png'}, page: context.getSelectedPage()},
+          {params: {format: 'png'}, page: context.getSelectedMcpPage()},
           response,
           context,
         );
@@ -43,7 +43,7 @@ describe('screenshot', () => {
         await screenshot.handler(
           {
             params: {format: 'png', quality: 0},
-            page: context.getSelectedPage(),
+            page: context.getSelectedMcpPage(),
           },
           response,
           context,
@@ -60,7 +60,7 @@ describe('screenshot', () => {
     it('with jpeg', async () => {
       await withMcpContext(async (response, context) => {
         await screenshot.handler(
-          {params: {format: 'jpeg'}, page: context.getSelectedPage()},
+          {params: {format: 'jpeg'}, page: context.getSelectedMcpPage()},
           response,
           context,
         );
@@ -76,7 +76,7 @@ describe('screenshot', () => {
     it('with webp', async () => {
       await withMcpContext(async (response, context) => {
         await screenshot.handler(
-          {params: {format: 'webp'}, page: context.getSelectedPage()},
+          {params: {format: 'webp'}, page: context.getSelectedMcpPage()},
           response,
           context,
         );
@@ -97,7 +97,7 @@ describe('screenshot', () => {
         await screenshot.handler(
           {
             params: {format: 'png', fullPage: true},
-            page: context.getSelectedPage(),
+            page: context.getSelectedMcpPage(),
           },
           response,
           context,
@@ -132,7 +132,7 @@ describe('screenshot', () => {
         await screenshot.handler(
           {
             params: {format: 'png', fullPage: true},
-            page: context.getSelectedPage(),
+            page: context.getSelectedMcpPage(),
           },
           response,
           context,
@@ -162,7 +162,7 @@ describe('screenshot', () => {
               format: 'png',
               uid: '1_1',
             },
-            page: context.getSelectedPage(),
+            page: context.getSelectedMcpPage(),
           },
           response,
           context,
@@ -187,7 +187,7 @@ describe('screenshot', () => {
           await screenshot.handler(
             {
               params: {format: 'png', filePath},
-              page: context.getSelectedPage(),
+              page: context.getSelectedMcpPage(),
             },
             response,
             context,
@@ -231,7 +231,7 @@ describe('screenshot', () => {
               screenshot.handler(
                 {
                   params: {format: 'png', filePath},
-                  page: context.getSelectedPage(),
+                  page: context.getSelectedMcpPage(),
                 },
                 response,
                 context,
@@ -258,7 +258,7 @@ describe('screenshot', () => {
               screenshot.handler(
                 {
                   params: {format: 'png', filePath},
-                  page: context.getSelectedPage(),
+                  page: context.getSelectedMcpPage(),
                 },
                 response,
                 context,
@@ -286,7 +286,7 @@ describe('screenshot', () => {
           screenshot.handler(
             {
               params: {format: 'png', filePath},
-              page: context.getSelectedPage(),
+              page: context.getSelectedMcpPage(),
             },
             response,
             context,

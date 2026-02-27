@@ -86,8 +86,8 @@ describe('assertPageIsFocused', () => {
     it('throws when targeting a non-focused page', async () => {
       await withMcpContext(async (_response, context) => {
         const pageA1 = await context.newPage(false, 'ctx-a');
-        await pageA1.setContent(html`<textarea></textarea>`);
-        await pageA1.click('textarea');
+        await pageA1.pptrPage.setContent(html`<textarea></textarea>`);
+        await pageA1.pptrPage.click('textarea');
         await context.newPage(false, 'ctx-a');
 
         await assert.rejects(
@@ -108,8 +108,8 @@ describe('assertPageIsFocused', () => {
     it('succeeds on the focused page', async () => {
       await withMcpContext(async (_response, context) => {
         const page = await context.newPage(false, 'ctx-a');
-        await page.setContent(html`<textarea></textarea>`);
-        await page.click('textarea');
+        await page.pptrPage.setContent(html`<textarea></textarea>`);
+        await page.pptrPage.click('textarea');
 
         const response = new McpResponse(emptyArgs);
         await typeText.handler(
@@ -119,7 +119,9 @@ describe('assertPageIsFocused', () => {
         );
         assert.strictEqual(response.responseLines[0], 'Typed text "hello"');
         assert.strictEqual(
-          await page.evaluate(() => document.querySelector('textarea')?.value),
+          await page.pptrPage.evaluate(
+            () => document.querySelector('textarea')?.value,
+          ),
           'hello',
         );
       });
@@ -128,7 +130,7 @@ describe('assertPageIsFocused', () => {
     it('succeeds after re-selecting the correct page', async () => {
       await withMcpContext(async (_response, context) => {
         const pageA1 = await context.newPage(false, 'ctx-a');
-        await pageA1.setContent(html`<textarea></textarea>`);
+        await pageA1.pptrPage.setContent(html`<textarea></textarea>`);
         await context.newPage(false, 'ctx-a');
 
         await assert.rejects(() =>
@@ -140,7 +142,7 @@ describe('assertPageIsFocused', () => {
         );
 
         context.selectPage(pageA1);
-        await pageA1.click('textarea');
+        await pageA1.pptrPage.click('textarea');
 
         const response = new McpResponse(emptyArgs);
         await typeText.handler(
@@ -157,7 +159,7 @@ describe('assertPageIsFocused', () => {
     it('throws when targeting a non-focused page', async () => {
       await withMcpContext(async (_response, context) => {
         const pageA1 = await context.newPage(false, 'ctx-a');
-        await pageA1.setContent(html`<div>content</div>`);
+        await pageA1.pptrPage.setContent(html`<div>content</div>`);
         await context.newPage(false, 'ctx-a');
 
         await assert.rejects(
@@ -178,7 +180,7 @@ describe('assertPageIsFocused', () => {
     it('succeeds on the focused page', async () => {
       await withMcpContext(async (_response, context) => {
         const page = await context.newPage(false, 'ctx-a');
-        await page.setContent(
+        await page.pptrPage.setContent(
           html`<script>
             logs = [];
             document.addEventListener('keydown', e => logs.push(e.key));
@@ -195,7 +197,7 @@ describe('assertPageIsFocused', () => {
           response.responseLines[0],
           'Successfully pressed key: Enter',
         );
-        assert.deepStrictEqual(await page.evaluate('logs'), ['Enter']);
+        assert.deepStrictEqual(await page.pptrPage.evaluate('logs'), ['Enter']);
       });
     });
   });
@@ -204,7 +206,7 @@ describe('assertPageIsFocused', () => {
     it('throws when targeting a non-focused page', async () => {
       await withMcpContext(async (_response, context) => {
         const pageA1 = await context.newPage(false, 'ctx-a');
-        await pageA1.setContent(
+        await pageA1.pptrPage.setContent(
           html`<div style="width:100px;height:100px;background:red;"></div>`,
         );
         await context.newPage(false, 'ctx-a');
@@ -227,7 +229,7 @@ describe('assertPageIsFocused', () => {
     it('succeeds on the focused page', async () => {
       await withMcpContext(async (_response, context) => {
         const page = await context.newPage(false, 'ctx-a');
-        await page.setContent(
+        await page.pptrPage.setContent(
           html`<div
             style="width:100px;height:100px;background:red;"
             onclick="this.innerText='clicked'"
@@ -244,7 +246,7 @@ describe('assertPageIsFocused', () => {
           response.responseLines[0],
           'Successfully clicked at the coordinates',
         );
-        assert.ok(await page.$('text/clicked'));
+        assert.ok(await page.pptrPage.$('text/clicked'));
       });
     });
   });
@@ -253,13 +255,13 @@ describe('assertPageIsFocused', () => {
     it('type_text in one context does not affect another', async () => {
       await withMcpContext(async (_response, context) => {
         const pageA = await context.newPage(false, 'ctx-a');
-        await pageA.setContent(html`<textarea></textarea>`);
+        await pageA.pptrPage.setContent(html`<textarea></textarea>`);
 
         const pageB = await context.newPage(false, 'ctx-b');
-        await pageB.setContent(html`<textarea></textarea>`);
+        await pageB.pptrPage.setContent(html`<textarea></textarea>`);
 
         context.selectPage(pageA);
-        await pageA.click('textarea');
+        await pageA.pptrPage.click('textarea');
         await typeText.handler(
           {params: {text: 'agent-a'}, page: pageA},
           new McpResponse(emptyArgs),
@@ -267,7 +269,7 @@ describe('assertPageIsFocused', () => {
         );
 
         context.selectPage(pageB);
-        await pageB.click('textarea');
+        await pageB.pptrPage.click('textarea');
         await typeText.handler(
           {params: {text: 'agent-b'}, page: pageB},
           new McpResponse(emptyArgs),
@@ -275,11 +277,15 @@ describe('assertPageIsFocused', () => {
         );
 
         assert.strictEqual(
-          await pageA.evaluate(() => document.querySelector('textarea')?.value),
+          await pageA.pptrPage.evaluate(
+            () => document.querySelector('textarea')?.value,
+          ),
           'agent-a',
         );
         assert.strictEqual(
-          await pageB.evaluate(() => document.querySelector('textarea')?.value),
+          await pageB.pptrPage.evaluate(
+            () => document.querySelector('textarea')?.value,
+          ),
           'agent-b',
         );
       });
@@ -289,13 +295,13 @@ describe('assertPageIsFocused', () => {
       await withMcpContext(async (_response, context) => {
         await context.newPage(false, 'ctx-a');
         const pageA2 = await context.newPage(false, 'ctx-a');
-        await pageA2.setContent(html`<div>A2</div>`);
+        await pageA2.pptrPage.setContent(html`<div>A2</div>`);
 
         const pageB = await context.newPage(false, 'ctx-b');
-        await pageB.setContent(html`<textarea></textarea>`);
+        await pageB.pptrPage.setContent(html`<textarea></textarea>`);
 
         // ctx-a focus is on pageA2, ctx-b focus is on pageB.
-        await pageB.click('textarea');
+        await pageB.pptrPage.click('textarea');
         const response = new McpResponse(emptyArgs);
         await typeText.handler(
           {params: {text: 'still works'}, page: pageB},
@@ -303,7 +309,9 @@ describe('assertPageIsFocused', () => {
           context,
         );
         assert.strictEqual(
-          await pageB.evaluate(() => document.querySelector('textarea')?.value),
+          await pageB.pptrPage.evaluate(
+            () => document.querySelector('textarea')?.value,
+          ),
           'still works',
         );
       });

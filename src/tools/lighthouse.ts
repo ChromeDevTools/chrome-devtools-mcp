@@ -82,11 +82,11 @@ export const lighthouseAudit = definePageTool({
     let result: RunnerResult | undefined;
     try {
       if (mode === 'navigation') {
-        result = await navigation(page, page.url(), {
+        result = await navigation(page.pptrPage, page.pptrPage.url(), {
           flags,
         });
       } else {
-        result = await snapshot(page, {
+        result = await snapshot(page.pptrPage, {
           flags,
         });
       }

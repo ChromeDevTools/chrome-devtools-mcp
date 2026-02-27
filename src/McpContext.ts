@@ -37,7 +37,11 @@ import {PredefinedNetworkConditions} from './third_party/index.js';
 import {listPages} from './tools/pages.js';
 import {takeSnapshot} from './tools/snapshot.js';
 import {CLOSE_PAGE_ERROR} from './tools/ToolDefinition.js';
-import type {Context, DevToolsData} from './tools/ToolDefinition.js';
+import type {
+  Context,
+  DevToolsData,
+  ContextPage,
+} from './tools/ToolDefinition.js';
 import type {TraceResult} from './trace-processing/parse.js';
 import type {
   EmulationSettings,
@@ -117,7 +121,7 @@ export class McpContext implements Context {
     null;
   #focusedPagePerContext = new Map<BrowserContext, Page>();
 
-  #requestPage?: Page;
+  #requestPage?: ContextPage;
 
   #nextPageId = 1;
 
@@ -196,12 +200,12 @@ export class McpContext implements Context {
   // TODO: Refactor away mutable request state (e.g. per-request facade,
   // per-request context object, or another approach). Once resolved, the
   // global toolMutex could become per-BrowserContext for parallel execution.
-  setRequestPage(page?: Page): void {
+  setRequestPage(page?: ContextPage): void {
     this.#requestPage = page;
   }
 
   #resolveTargetPage(): Page {
-    return this.#requestPage ?? this.getSelectedPage();
+    return this.#requestPage?.pptrPage ?? this.getSelectedPage();
   }
 
   resolveCdpRequestId(cdpRequestId: string): number | undefined {
@@ -283,7 +287,7 @@ export class McpContext implements Context {
   async newPage(
     background?: boolean,
     isolatedContextName?: string,
-  ): Promise<Page> {
+  ): Promise<ContextPage> {
     let page: Page;
     if (isolatedContextName !== undefined) {
       let ctx = this.#isolatedContexts.get(isolatedContextName);
@@ -299,7 +303,7 @@ export class McpContext implements Context {
     this.selectPage(page);
     this.#networkCollector.addPage(page);
     this.#consoleCollector.addPage(page);
-    return page;
+    return this.#getMcpPage(page);
   }
   async closePage(pageId: number): Promise<void> {
     if (this.#pages.length === 1) {
@@ -489,7 +493,8 @@ export class McpContext implements Context {
   }
 
   getDialog(page?: Page): Dialog | undefined {
-    const targetPage = page ?? this.#requestPage ?? this.#selectedPage;
+    const targetPage =
+      page ?? this.#requestPage?.pptrPage ?? this.#selectedPage;
     if (!targetPage) {
       return undefined;
     }
@@ -516,11 +521,17 @@ export class McpContext implements Context {
     return page;
   }
 
-  resolvePageById(pageId?: number): Page {
+  getSelectedMcpPage(): McpPage {
+    const page = this.getSelectedPage();
+    return this.#getMcpPage(page);
+  }
+
+  resolvePageById(pageId?: number): McpPage {
     if (pageId === undefined) {
-      return this.getSelectedPage();
+      return this.getSelectedMcpPage();
     }
-    return this.getPageById(pageId);
+    const page = this.getPageById(pageId);
+    return this.#getMcpPage(page);
   }
 
   getPageById(pageId: number): Page {
@@ -551,7 +562,8 @@ export class McpContext implements Context {
     return this.#selectedPage === page;
   }
 
-  assertPageIsFocused(page: Page): void {
+  assertPageIsFocused(pageToCheck: Page | ContextPage): void {
+    const page = 'pptrPage' in pageToCheck ? pageToCheck.pptrPage : pageToCheck;
     const ctx = page.browserContext();
     const focused = this.#focusedPagePerContext.get(ctx);
     if (focused && focused !== page) {
@@ -564,7 +576,9 @@ export class McpContext implements Context {
     }
   }
 
-  selectPage(newPage: Page): void {
+  selectPage(pageToSelect: Page | ContextPage): void {
+    const newPage =
+      'pptrPage' in pageToSelect ? pageToSelect.pptrPage : pageToSelect;
     const ctx = newPage.browserContext();
     const oldFocused = this.#focusedPagePerContext.get(ctx);
     if (oldFocused && oldFocused !== newPage && !oldFocused.isClosed()) {

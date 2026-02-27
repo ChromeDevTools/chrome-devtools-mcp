@@ -97,9 +97,9 @@ export const clickAt = definePageTool({
   },
   handler: async (request, response, context) => {
     const page = request.page;
-    context.assertPageIsFocused(page);
+    context.assertPageIsFocused(page.pptrPage);
     await context.waitForEventsAfterAction(async () => {
-      await page.mouse.click(request.params.x, request.params.y, {
+      await page.pptrPage.mouse.click(request.params.x, request.params.y, {
         clickCount: request.params.dblClick ? 2 : 1,
       });
     });
@@ -239,7 +239,7 @@ export const fill = definePageTool({
         request.params.uid,
         request.params.value,
         context as McpContext,
-        page,
+        page.pptrPage,
       );
     });
     response.appendResponseLine(`Successfully filled out the element`);
@@ -262,11 +262,13 @@ export const typeText = definePageTool({
   },
   handler: async (request, response, context) => {
     const page = request.page;
-    context.assertPageIsFocused(page);
+    context.assertPageIsFocused(page.pptrPage);
     await context.waitForEventsAfterAction(async () => {
-      await page.keyboard.type(request.params.text);
+      await page.pptrPage.keyboard.type(request.params.text);
       if (request.params.submitKey) {
-        await page.keyboard.press(request.params.submitKey as KeyInput);
+        await page.pptrPage.keyboard.press(
+          request.params.submitKey as KeyInput,
+        );
       }
     });
     response.appendResponseLine(
@@ -333,7 +335,7 @@ export const fillForm = definePageTool({
           element.uid,
           element.value,
           context as McpContext,
-          page,
+          page.pptrPage,
         );
       });
     }
@@ -364,7 +366,7 @@ export const uploadFile = definePageTool({
     const {uid, filePath} = request.params;
     const handle = (await context.getElementByUid(
       uid,
-      request.page,
+      request.page.pptrPage,
     )) as ElementHandle<HTMLInputElement>;
     try {
       try {
@@ -375,7 +377,7 @@ export const uploadFile = definePageTool({
         // Page.waitForFileChooser() and upload the file this way.
         try {
           const [fileChooser] = await Promise.all([
-            request.page.waitForFileChooser({timeout: 3000}),
+            request.page.pptrPage.waitForFileChooser({timeout: 3000}),
             handle.asLocator().click(),
           ]);
           await fileChooser.accept([filePath]);
@@ -412,17 +414,17 @@ export const pressKey = definePageTool({
   },
   handler: async (request, response, context) => {
     const page = request.page;
-    context.assertPageIsFocused(page);
+    context.assertPageIsFocused(page.pptrPage);
     const tokens = parseKey(request.params.key);
     const [key, ...modifiers] = tokens;
 
     await context.waitForEventsAfterAction(async () => {
       for (const modifier of modifiers) {
-        await page.keyboard.down(modifier);
+        await page.pptrPage.keyboard.down(modifier);
       }
-      await page.keyboard.press(key);
+      await page.pptrPage.keyboard.press(key);
       for (const modifier of modifiers.toReversed()) {
-        await page.keyboard.up(modifier);
+        await page.pptrPage.keyboard.up(modifier);
       }
     });
 

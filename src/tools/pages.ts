@@ -118,7 +118,7 @@ export const newPage = defineTool({
 
     await context.waitForEventsAfterAction(
       async () => {
-        await page.goto(request.params.url, {
+        await page.pptrPage.goto(request.params.url, {
           timeout: request.params.timeout,
         });
       },
@@ -187,19 +187,19 @@ export const navigatePage = definePageTool({
           void dialog.dismiss();
         }
         // We are not going to report the dialog like regular dialogs.
-        context.clearDialog(page);
+        context.clearDialog(page.pptrPage);
       }
     };
 
     let initScriptId: string | undefined;
     if (request.params.initScript) {
-      const {identifier} = await page.evaluateOnNewDocument(
+      const {identifier} = await page.pptrPage.evaluateOnNewDocument(
         request.params.initScript,
       );
       initScriptId = identifier;
     }
 
-    page.on('dialog', dialogHandler);
+    page.pptrPage.on('dialog', dialogHandler);
 
     try {
       await context.waitForEventsAfterAction(
@@ -212,7 +212,7 @@ export const navigatePage = definePageTool({
                 );
               }
               try {
-                await page.goto(request.params.url, options);
+                await page.pptrPage.goto(request.params.url, options);
                 response.appendResponseLine(
                   `Successfully navigated to ${request.params.url}.`,
                 );
@@ -224,9 +224,9 @@ export const navigatePage = definePageTool({
               break;
             case 'back':
               try {
-                await page.goBack(options);
+                await page.pptrPage.goBack(options);
                 response.appendResponseLine(
-                  `Successfully navigated back to ${page.url()}.`,
+                  `Successfully navigated back to ${page.pptrPage.url()}.`,
                 );
               } catch (error) {
                 response.appendResponseLine(
@@ -236,9 +236,9 @@ export const navigatePage = definePageTool({
               break;
             case 'forward':
               try {
-                await page.goForward(options);
+                await page.pptrPage.goForward(options);
                 response.appendResponseLine(
-                  `Successfully navigated forward to ${page.url()}.`,
+                  `Successfully navigated forward to ${page.pptrPage.url()}.`,
                 );
               } catch (error) {
                 response.appendResponseLine(
@@ -248,7 +248,7 @@ export const navigatePage = definePageTool({
               break;
             case 'reload':
               try {
-                await page.reload({
+                await page.pptrPage.reload({
                   ...options,
                   ignoreCache: request.params.ignoreCache,
                 });
@@ -264,9 +264,9 @@ export const navigatePage = definePageTool({
         {timeout: request.params.timeout},
       );
     } finally {
-      page.off('dialog', dialogHandler);
+      page.pptrPage.off('dialog', dialogHandler);
       if (initScriptId) {
-        await page
+        await page.pptrPage
           .removeScriptToEvaluateOnNewDocument(initScriptId)
           .catch(error => {
             logger(`Failed to remove init script`, error);
@@ -293,8 +293,8 @@ export const resizePage = definePageTool({
     const page = request.page;
 
     try {
-      const browser = page.browser();
-      const windowId = await page.windowId();
+      const browser = page.pptrPage.browser();
+      const windowId = await page.pptrPage.windowId();
 
       const bounds = await browser.getWindowBounds(windowId);
 
@@ -308,7 +308,7 @@ export const resizePage = definePageTool({
     } catch {
       // Window APIs are not supported on all platforms
     }
-    await page.resize({
+    await page.pptrPage.resize({
       contentWidth: request.params.width,
       contentHeight: request.params.height,
     });
@@ -335,7 +335,7 @@ export const handleDialog = definePageTool({
   },
   handler: async (request, response, context) => {
     const page = request.page;
-    const dialog = context.getDialog(page);
+    const dialog = context.getDialog(page.pptrPage);
     if (!dialog) {
       throw new Error('No open dialog found');
     }
@@ -363,7 +363,7 @@ export const handleDialog = definePageTool({
       }
     }
 
-    context.clearDialog(page);
+    context.clearDialog(page.pptrPage);
     response.setIncludePages(true);
   },
 });

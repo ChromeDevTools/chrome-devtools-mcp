@@ -105,6 +105,6 @@ export const emulate = definePageTool({
   },
   handler: async (request, _response, context) => {
     const page = request.page;
-    await context.emulate(request.params, page);
+    await context.emulate(request.params, page.pptrPage);
   },
 });

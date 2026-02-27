@@ -60,7 +60,7 @@ export interface ImageContentData {
 export interface SnapshotParams {
   verbose?: boolean;
   filePath?: string;
-  page?: Page;
+  page?: ContextPage;
 }
 
 export interface LighthouseData {
@@ -141,7 +141,10 @@ export type Context = Readonly<{
   getDialog(page?: Page): Dialog | undefined;
   clearDialog(page?: Page): void;
   getPageById(pageId: number): Page;
-  newPage(background?: boolean, isolatedContextName?: string): Promise<Page>;
+  newPage(
+    background?: boolean,
+    isolatedContextName?: string,
+  ): Promise<ContextPage>;
   closePage(pageId: number): Promise<void>;
   selectPage(page: Page): void;
   assertPageIsFocused(page: Page): void;
@@ -191,6 +194,12 @@ export type Context = Readonly<{
   getExtension(id: string): InstalledExtension | undefined;
 }>;
 
+export type ContextPage = Readonly<{
+  readonly pptrPage: Page;
+  getAXNodeByUid(uid: string): TextSnapshotNode | undefined;
+  getElementByUid(uid: string): Promise<ElementHandle<Element>>;
+}>;
+
 export function defineTool<Schema extends zod.ZodRawShape>(
   definition: ToolDefinition<Schema>,
 ): ToolDefinition<Schema>;
@@ -223,7 +232,7 @@ interface PageToolDefinition<
   Schema extends zod.ZodRawShape = zod.ZodRawShape,
 > extends BaseToolDefinition<Schema> {
   handler: (
-    request: Request<Schema> & {page: Page},
+    request: Request<Schema> & {page: ContextPage},
     response: Response,
     context: Context,
   ) => Promise<void>;
@@ -233,7 +242,7 @@ export type DefinedPageTool<Schema extends zod.ZodRawShape = zod.ZodRawShape> =
   PageToolDefinition<Schema> & {
     pageScoped: true;
     handler: (
-      request: Request<Schema> & {page: Page},
+      request: Request<Schema> & {page: ContextPage},
       response: Response,
       context: Context,
     ) => Promise<void>;

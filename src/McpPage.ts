@@ -4,11 +4,19 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {Dialog, Page, Viewport} from './third_party/index.js';
+import type {
+  Dialog,
+  ElementHandle,
+  Page,
+  Viewport,
+} from './third_party/index.js';
+import {takeSnapshot} from './tools/snapshot.js';
+import type {ContextPage} from './tools/ToolDefinition.js';
 import type {
   EmulationSettings,
   GeolocationOptions,
   TextSnapshot,
+  TextSnapshotNode,
 } from './types.js';
 
 /**
@@ -19,8 +27,8 @@ import type {
  * read/write access. The dialog field is private because it requires an
  * event listener lifecycle managed by the constructor/dispose pair.
  */
-export class McpPage {
-  readonly page: Page;
+export class McpPage implements ContextPage {
+  readonly pptrPage: Page;
   readonly id: number;
 
   // Snapshot
@@ -39,7 +47,7 @@ export class McpPage {
   #dialogHandler: (dialog: Dialog) => void;
 
   constructor(page: Page, id: number) {
-    this.page = page;
+    this.pptrPage = page;
     this.id = id;
     this.#dialogHandler = (dialog: Dialog): void => {
       this.#dialog = dialog;
@@ -80,6 +88,41 @@ export class McpPage {
   }
 
   dispose(): void {
-    this.page.off('dialog', this.#dialogHandler);
+    this.pptrPage.off('dialog', this.#dialogHandler);
+  }
+
+  async getElementByUid(uid: string): Promise<ElementHandle<Element>> {
+    if (!this.textSnapshot) {
+      throw new Error(
+        `No snapshot found for page ${this.id ?? '?'}. Use ${takeSnapshot.name} to capture one.`,
+      );
+    }
+    const node = this.textSnapshot.idToNode.get(uid);
+    if (!node) {
+      throw new Error(`Element uid "${uid}" not found on page ${this.id}.`);
+    }
+    return this.#resolveElementHandle(node, uid);
+  }
+
+  async #resolveElementHandle(
+    node: TextSnapshotNode,
+    uid: string,
+  ): Promise<ElementHandle<Element>> {
+    const message = `Element with uid ${uid} no longer exists on the page.`;
+    try {
+      const handle = await node.elementHandle();
+      if (!handle) {
+        throw new Error(message);
+      }
+      return handle;
+    } catch (error) {
+      throw new Error(message, {
+        cause: error,
+      });
+    }
+  }
+
+  getAXNodeByUid(uid: string) {
+    return this.textSnapshot?.idToNode.get(uid);
   }
 }

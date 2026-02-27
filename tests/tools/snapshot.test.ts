@@ -15,7 +15,7 @@ describe('snapshot', () => {
     it('includes a snapshot', async () => {
       await withMcpContext(async (response, context) => {
         await takeSnapshot.handler(
-          {params: {}, page: context.getSelectedPage()},
+          {params: {}, page: context.getSelectedMcpPage()},
           response,
           context,
         );
@@ -36,7 +36,7 @@ describe('snapshot', () => {
             params: {
               text: ['Hello'],
             },
-            page,
+            page: context.getSelectedMcpPage(),
           },
           response,
           context,
@@ -62,7 +62,7 @@ describe('snapshot', () => {
             params: {
               text: ['Complete', 'Error'],
             },
-            page,
+            page: context.getSelectedMcpPage(),
           },
           response,
           context,
@@ -85,7 +85,7 @@ describe('snapshot', () => {
             params: {
               text: ['Complete', 'Error'],
             },
-            page,
+            page: context.getSelectedMcpPage(),
           },
           response,
           context,
@@ -116,7 +116,7 @@ describe('snapshot', () => {
             params: {
               text: ['Hello World'],
             },
-            page,
+            page: context.getSelectedMcpPage(),
           },
           response,
           context,
@@ -148,7 +148,7 @@ describe('snapshot', () => {
             params: {
               text: ['Header'],
             },
-            page,
+            page: context.getSelectedMcpPage(),
           },
           response,
           context,
@@ -176,7 +176,7 @@ describe('snapshot', () => {
             params: {
               text: ['Hello iframe'],
             },
-            page,
+            page: context.getSelectedMcpPage(),
           },
           response,
           context,

@@ -51,7 +51,7 @@ describe('performance', () => {
         await startTrace.handler(
           {
             params: {reload: true, autoStop: false},
-            page: context.getSelectedPage(),
+            page: context.getSelectedMcpPage(),
           },
           response,
           context,
@@ -75,7 +75,7 @@ describe('performance', () => {
         await startTrace.handler(
           {
             params: {reload: true, autoStop: false},
-            page: context.getSelectedPage(),
+            page: context.getSelectedMcpPage(),
           },
           response,
           context,
@@ -114,7 +114,7 @@ describe('performance', () => {
         const handlerPromise = startTrace.handler(
           {
             params: {reload: true, autoStop: true},
-            page: context.getSelectedPage(),
+            page: context.getSelectedMcpPage(),
           },
           response,
           context,
@@ -152,7 +152,7 @@ describe('performance', () => {
         await startTrace.handler(
           {
             params: {reload: true, autoStop: false},
-            page: context.getSelectedPage(),
+            page: context.getSelectedMcpPage(),
           },
           response,
           context,
@@ -186,7 +186,7 @@ describe('performance', () => {
         const handlerPromise = startTrace.handler(
           {
             params: {reload: true, autoStop: true, filePath},
-            page: context.getSelectedPage(),
+            page: context.getSelectedMcpPage(),
           },
           response,
           context,
@@ -235,7 +235,7 @@ describe('performance', () => {
               insightSetId: 'NAVIGATION_0',
               insightName: 'LCPBreakdown',
             },
-            page: context.getSelectedPage(),
+            page: context.getSelectedMcpPage(),
           },
           response,
           context,
@@ -253,7 +253,7 @@ describe('performance', () => {
               insightSetId: '8463DF94CD61B265B664E7F768183DE3',
               insightName: 'LCPBreakdown',
             },
-            page: context.getSelectedPage(),
+            page: context.getSelectedMcpPage(),
           },
           response,
           context,
@@ -276,7 +276,7 @@ describe('performance', () => {
         const selectedPage = context.getSelectedPage();
         const stopTracingStub = sinon.stub(selectedPage.tracing, 'stop');
         await stopTrace.handler(
-          {params: {}, page: context.getSelectedPage()},
+          {params: {}, page: context.getSelectedMcpPage()},
           response,
           context,
         );
@@ -296,7 +296,7 @@ describe('performance', () => {
             return rawData;
           });
         await stopTrace.handler(
-          {params: {}, page: context.getSelectedPage()},
+          {params: {}, page: context.getSelectedMcpPage()},
           response,
           context,
         );
@@ -320,7 +320,7 @@ describe('performance', () => {
 
         await assert.rejects(
           stopTrace.handler(
-            {params: {}, page: context.getSelectedPage()},
+            {params: {}, page: context.getSelectedMcpPage()},
             response,
             context,
           ),
@@ -343,7 +343,7 @@ describe('performance', () => {
           .resolves({filename: filePath});
 
         await stopTrace.handler(
-          {params: {filePath}, page: context.getSelectedPage()},
+          {params: {filePath}, page: context.getSelectedMcpPage()},
           response,
           context,
         );
@@ -368,7 +368,7 @@ describe('performance', () => {
           sinon.stub(selectedPage.tracing, 'stop').resolves(rawData);
 
           await stopTrace.handler(
-            {params: {}, page: context.getSelectedPage()},
+            {params: {}, page: context.getSelectedMcpPage()},
             response,
             context,
           );

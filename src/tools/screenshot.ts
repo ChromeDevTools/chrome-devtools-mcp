@@ -59,10 +59,10 @@ export const screenshot = definePageTool({
     if (request.params.uid) {
       pageOrHandle = await context.getElementByUid(
         request.params.uid,
-        request.page,
+        request.page.pptrPage,
       );
     } else {
-      pageOrHandle = request.page;
+      pageOrHandle = request.page.pptrPage;
     }
 
     const format = request.params.format;

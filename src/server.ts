@@ -181,7 +181,7 @@ export async function createMcpServer(
               const page =
                 serverArgs.experimentalPageIdRouting && params.pageId
                   ? context.resolvePageById(params.pageId)
-                  : context.getSelectedPage();
+                  : context.getSelectedMcpPage();
               context.setRequestPage(page);
               await tool.handler(
                 {

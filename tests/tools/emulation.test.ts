@@ -22,7 +22,7 @@ describe('emulation', () => {
             params: {
               networkConditions: 'Offline',
             },
-            page: context.getSelectedPage(),
+            page: context.getSelectedMcpPage(),
           },
           response,
           context,
@@ -38,7 +38,7 @@ describe('emulation', () => {
             params: {
               networkConditions: 'Slow 3G',
             },
-            page: context.getSelectedPage(),
+            page: context.getSelectedMcpPage(),
           },
           response,
           context,
@@ -55,7 +55,7 @@ describe('emulation', () => {
             params: {
               networkConditions: 'No emulation',
             },
-            page: context.getSelectedPage(),
+            page: context.getSelectedMcpPage(),
           },
           response,
           context,
@@ -72,7 +72,7 @@ describe('emulation', () => {
             params: {
               networkConditions: 'Slow 11G',
             },
-            page: context.getSelectedPage(),
+            page: context.getSelectedMcpPage(),
           },
           response,
           context,
@@ -89,7 +89,7 @@ describe('emulation', () => {
             params: {
               networkConditions: 'Slow 3G',
             },
-            page: context.getSelectedPage(),
+            page: context.getSelectedMcpPage(),
           },
           response,
           context,
@@ -113,7 +113,7 @@ describe('emulation', () => {
             params: {
               cpuThrottlingRate: 4,
             },
-            page: context.getSelectedPage(),
+            page: context.getSelectedMcpPage(),
           },
           response,
           context,
@@ -133,7 +133,7 @@ describe('emulation', () => {
             params: {
               cpuThrottlingRate: 1,
             },
-            page: context.getSelectedPage(),
+            page: context.getSelectedMcpPage(),
           },
           response,
           context,
@@ -150,7 +150,7 @@ describe('emulation', () => {
             params: {
               cpuThrottlingRate: 4,
             },
-            page: context.getSelectedPage(),
+            page: context.getSelectedMcpPage(),
           },
           response,
           context,
@@ -177,7 +177,7 @@ describe('emulation', () => {
                 longitude: 11.576124,
               },
             },
-            page: context.getSelectedPage(),
+            page: context.getSelectedMcpPage(),
           },
           response,
           context,
@@ -200,7 +200,7 @@ describe('emulation', () => {
                 longitude: 11.576124,
               },
             },
-            page: context.getSelectedPage(),
+            page: context.getSelectedMcpPage(),
           },
           response,
           context,
@@ -214,7 +214,7 @@ describe('emulation', () => {
             params: {
               geolocation: null,
             },
-            page: context.getSelectedPage(),
+            page: context.getSelectedMcpPage(),
           },
           response,
           context,
@@ -234,7 +234,7 @@ describe('emulation', () => {
                 longitude: 11.576124,
               },
             },
-            page: context.getSelectedPage(),
+            page: context.getSelectedMcpPage(),
           },
           response,
           context,
@@ -272,7 +272,7 @@ describe('emulation', () => {
                 isLandscape: false,
               },
             },
-            page: context.getSelectedPage(),
+            page: context.getSelectedMcpPage(),
           },
           response,
           context,
@@ -308,7 +308,7 @@ describe('emulation', () => {
                 height: 400,
               },
             },
-            page: context.getSelectedPage(),
+            page: context.getSelectedMcpPage(),
           },
           response,
           context,
@@ -332,7 +332,7 @@ describe('emulation', () => {
             params: {
               viewport: null,
             },
-            page: context.getSelectedPage(),
+            page: context.getSelectedMcpPage(),
           },
           response,
           context,
@@ -357,7 +357,7 @@ describe('emulation', () => {
                 height: 400,
               },
             },
-            page: context.getSelectedPage(),
+            page: context.getSelectedMcpPage(),
           },
           response,
           context,
@@ -386,7 +386,7 @@ describe('emulation', () => {
             params: {
               userAgent: 'MyUA',
             },
-            page: context.getSelectedPage(),
+            page: context.getSelectedMcpPage(),
           },
           response,
           context,
@@ -406,7 +406,7 @@ describe('emulation', () => {
             params: {
               userAgent: 'UA1',
             },
-            page: context.getSelectedPage(),
+            page: context.getSelectedMcpPage(),
           },
           response,
           context,
@@ -418,7 +418,7 @@ describe('emulation', () => {
             params: {
               userAgent: 'UA2',
             },
-            page: context.getSelectedPage(),
+            page: context.getSelectedMcpPage(),
           },
           response,
           context,
@@ -437,7 +437,7 @@ describe('emulation', () => {
             params: {
               userAgent: 'MyUA',
             },
-            page: context.getSelectedPage(),
+            page: context.getSelectedMcpPage(),
           },
           response,
           context,
@@ -450,7 +450,7 @@ describe('emulation', () => {
             params: {
               userAgent: null,
             },
-            page: context.getSelectedPage(),
+            page: context.getSelectedMcpPage(),
           },
           response,
           context,
@@ -471,7 +471,7 @@ describe('emulation', () => {
             params: {
               userAgent: 'MyUA',
             },
-            page: context.getSelectedPage(),
+            page: context.getSelectedMcpPage(),
           },
           response,
           context,
@@ -500,7 +500,7 @@ describe('emulation', () => {
             params: {
               colorScheme: 'dark',
             },
-            page: context.getSelectedPage(),
+            page: context.getSelectedMcpPage(),
           },
           response,
           context,
@@ -524,7 +524,7 @@ describe('emulation', () => {
             params: {
               colorScheme: 'dark',
             },
-            page: context.getSelectedPage(),
+            page: context.getSelectedMcpPage(),
           },
           response,
           context,
@@ -536,7 +536,7 @@ describe('emulation', () => {
             params: {
               colorScheme: 'light',
             },
-            page: context.getSelectedPage(),
+            page: context.getSelectedMcpPage(),
           },
           response,
           context,
@@ -565,7 +565,7 @@ describe('emulation', () => {
             params: {
               colorScheme: 'dark',
             },
-            page: context.getSelectedPage(),
+            page: context.getSelectedMcpPage(),
           },
           response,
           context,
@@ -585,7 +585,7 @@ describe('emulation', () => {
             params: {
               colorScheme: 'auto',
             },
-            page: context.getSelectedPage(),
+            page: context.getSelectedMcpPage(),
           },
           response,
           context,

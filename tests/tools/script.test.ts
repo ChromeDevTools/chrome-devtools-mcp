@@ -20,7 +20,7 @@ describe('script', () => {
         await evaluateScript.handler(
           {
             params: {function: String(() => 2 * 5)},
-            page: context.getSelectedPage(),
+            page: context.getSelectedMcpPage(),
           },
           response,
           context,
@@ -34,7 +34,7 @@ describe('script', () => {
         await evaluateScript.handler(
           {
             params: {function: String(() => document.title)},
-            page: context.getSelectedPage(),
+            page: context.getSelectedMcpPage(),
           },
           response,
           context,
@@ -44,7 +44,7 @@ describe('script', () => {
         assert.strictEqual(JSON.parse(lineEvaluation), '');
 
         const page = await context.newPage();
-        await page.setContent(`
+        await page.pptrPage.setContent(`
           <head>
             <title>New Page</title>
           </head>
@@ -54,7 +54,7 @@ describe('script', () => {
         await evaluateScript.handler(
           {
             params: {function: String(() => document.title)},
-            page: context.getSelectedPage(),
+            page: context.getSelectedMcpPage(),
           },
           response,
           context,
@@ -82,7 +82,7 @@ describe('script', () => {
                 return {scripts};
               }),
             },
-            page: context.getSelectedPage(),
+            page: context.getSelectedMcpPage(),
           },
           response,
           context,
@@ -108,7 +108,7 @@ describe('script', () => {
                 return 'Works';
               }),
             },
-            page: context.getSelectedPage(),
+            page: context.getSelectedMcpPage(),
           },
           response,
           context,
@@ -134,7 +134,7 @@ describe('script', () => {
               }),
               args: [{uid: '1_1'}],
             },
-            page: context.getSelectedPage(),
+            page: context.getSelectedMcpPage(),
           },
           response,
           context,
@@ -160,7 +160,7 @@ describe('script', () => {
               }),
               args: [{uid: '1_0'}, {uid: '1_1'}],
             },
-            page: context.getSelectedPage(),
+            page: context.getSelectedMcpPage(),
           },
           response,
           context,
@@ -189,7 +189,7 @@ describe('script', () => {
               }),
               args: [{uid: '1_3'}],
             },
-            page: context.getSelectedPage(),
+            page: context.getSelectedMcpPage(),
           },
           response,
           context,
