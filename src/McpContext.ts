@@ -1126,4 +1126,135 @@ export class McpContext implements Context {
   getExtension(id: string): InstalledExtension | undefined {
     return this.#extensionRegistry.getById(id);
   }
+
+  // ── Debugger methods ──
+  async enableDebugger(targetPage?: Page): Promise<void> {
+    const page = targetPage ?? this.getSelectedPage();
+    const mcpPage = this.#getMcpPage(page);
+    await mcpPage.enableDebugger();
+  }
+
+  async disableDebugger(targetPage?: Page): Promise<void> {
+    const page = targetPage ?? this.getSelectedPage();
+    const mcpPage = this.#getMcpPage(page);
+    await mcpPage.disableDebugger();
+  }
+
+  isDebuggerEnabled(targetPage?: Page): boolean {
+    const page = targetPage ?? this.getSelectedPage();
+    const mcpPage = this.#mcpPages.get(page);
+    return mcpPage?.debuggerState.enabled ?? false;
+  }
+  getDebuggerPausedState(targetPage?: Page) {
+    const page = targetPage ?? this.getSelectedPage();
+    const mcpPage = this.#getMcpPage(page);
+    return mcpPage.debuggerState.paused;
+  }
+  getDebuggerScripts(targetPage?: Page) {
+    const page = targetPage ?? this.getSelectedPage();
+    const mcpPage = this.#getMcpPage(page);
+    return [...mcpPage.debuggerState.scripts.values()];
+  }
+  getBreakpoints(targetPage?: Page) {
+    const page = targetPage ?? this.getSelectedPage();
+    const mcpPage = this.#getMcpPage(page);
+    return [...mcpPage.debuggerState.breakpoints.values()];
+  }
+  async setBreakpoint(
+    targetPage: Page | undefined,
+    url: string,
+    lineNumber: number,
+    columnNumber?: number,
+    condition?: string,
+  ) {
+    const page = targetPage ?? this.getSelectedPage();
+    const mcpPage = this.#getMcpPage(page);
+    const session = mcpPage.getCdpSession();
+    const result = await session.send('Debugger.setBreakpointByUrl', {
+      urlRegex: url.replace(/[.*+?^$()|[\]\\]/g, '\\$&'),
+      lineNumber,
+      columnNumber,
+      condition,
+    });
+    const info = {
+      breakpointId: result.breakpointId,
+      url,
+      lineNumber,
+      columnNumber,
+      condition,
+      locations: (result.locations ?? []).map(loc => ({
+        scriptId: loc.scriptId,
+        lineNumber: loc.lineNumber,
+        columnNumber: loc.columnNumber ?? 0,
+      })),
+    };
+    mcpPage.debuggerState.breakpoints.set(info.breakpointId, info);
+    return info;
+  }
+  async removeBreakpoint(
+    targetPage: Page | undefined,
+    breakpointId: string,
+  ): Promise<void> {
+    const page = targetPage ?? this.getSelectedPage();
+    const mcpPage = this.#getMcpPage(page);
+    const session = mcpPage.getCdpSession();
+    await session.send('Debugger.removeBreakpoint', {breakpointId});
+    mcpPage.debuggerState.breakpoints.delete(breakpointId);
+  }
+  async resumeDebugger(targetPage?: Page): Promise<void> {
+    const page = targetPage ?? this.getSelectedPage();
+    const mcpPage = this.#getMcpPage(page);
+    const session = mcpPage.getCdpSession();
+    await session.send('Debugger.resume');
+  }
+  async stepOver(targetPage?: Page): Promise<void> {
+    const page = targetPage ?? this.getSelectedPage();
+    const mcpPage = this.#getMcpPage(page);
+    const session = mcpPage.getCdpSession();
+    await session.send('Debugger.stepOver');
+  }
+  async stepInto(targetPage?: Page): Promise<void> {
+    const page = targetPage ?? this.getSelectedPage();
+    const mcpPage = this.#getMcpPage(page);
+    const session = mcpPage.getCdpSession();
+    await session.send('Debugger.stepInto');
+  }
+  async stepOut(targetPage?: Page): Promise<void> {
+    const page = targetPage ?? this.getSelectedPage();
+    const mcpPage = this.#getMcpPage(page);
+    const session = mcpPage.getCdpSession();
+    await session.send('Debugger.stepOut');
+  }
+  async evaluateOnCallFrame(
+    targetPage: Page | undefined,
+    callFrameId: string,
+    expression: string,
+  ): Promise<string> {
+    const page = targetPage ?? this.getSelectedPage();
+    const mcpPage = this.#getMcpPage(page);
+    const session = mcpPage.getCdpSession();
+    const result = await session.send(
+      'Debugger.evaluateOnCallFrame',
+      {callFrameId, expression, returnByValue: true},
+    );
+    const remoteObj = result.result;
+    if (remoteObj.type === 'undefined') return 'undefined';
+    if (remoteObj.value !== undefined) {
+      return JSON.stringify(remoteObj.value);
+    }
+    return remoteObj.description ?? String(remoteObj.type);
+  }
+  async getScriptSource(
+    targetPage: Page | undefined,
+    scriptId: string,
+  ): Promise<string> {
+    const page = targetPage ?? this.getSelectedPage();
+    const mcpPage = this.#getMcpPage(page);
+    const session = mcpPage.getCdpSession();
+    const result = await session.send(
+      'Debugger.getScriptSource',
+      {scriptId},
+    );
+    return result.scriptSource;
+  }
 }

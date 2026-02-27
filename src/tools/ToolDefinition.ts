@@ -14,7 +14,13 @@ import type {
   Viewport,
 } from '../third_party/index.js';
 import type {InsightName, TraceResult} from '../trace-processing/parse.js';
-import type {TextSnapshotNode, GeolocationOptions} from '../types.js';
+import type {
+  TextSnapshotNode,
+  GeolocationOptions,
+  DebuggerPausedState,
+  DebuggerBreakpointInfo,
+  DebuggerScriptInfo,
+} from '../types.js';
 import type {InstalledExtension} from '../utils/ExtensionRegistry.js';
 import type {PaginationOptions} from '../utils/types.js';
 
@@ -189,6 +195,31 @@ export type Context = Readonly<{
   uninstallExtension(id: string): Promise<void>;
   listExtensions(): InstalledExtension[];
   getExtension(id: string): InstalledExtension | undefined;
+  // Debugger
+  enableDebugger(page: Page): Promise<void>;
+  disableDebugger(page: Page): Promise<void>;
+  isDebuggerEnabled(page: Page): boolean;
+  getDebuggerPausedState(page: Page): DebuggerPausedState | null;
+  setBreakpoint(
+    page: Page,
+    url: string,
+    lineNumber: number,
+    columnNumber?: number,
+    condition?: string,
+  ): Promise<DebuggerBreakpointInfo>;
+  removeBreakpoint(page: Page, breakpointId: string): Promise<void>;
+  getBreakpoints(page: Page): DebuggerBreakpointInfo[];
+  resumeDebugger(page: Page): Promise<void>;
+  stepOver(page: Page): Promise<void>;
+  stepInto(page: Page): Promise<void>;
+  stepOut(page: Page): Promise<void>;
+  evaluateOnCallFrame(
+    page: Page,
+    callFrameId: string,
+    expression: string,
+  ): Promise<string>;
+  getScriptSource(page: Page, scriptId: string): Promise<string>;
+  getDebuggerScripts(page: Page): DebuggerScriptInfo[];
 }>;
 
 export function defineTool<Schema extends zod.ZodRawShape>(

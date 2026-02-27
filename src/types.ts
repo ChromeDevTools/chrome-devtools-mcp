@@ -37,3 +37,47 @@ export interface EmulationSettings {
   colorScheme?: 'dark' | 'light' | null;
   viewport?: Viewport | null;
 }
+
+// Debugger types
+export interface DebuggerBreakpointInfo {
+  breakpointId: string;
+  url: string;
+  lineNumber: number;
+  columnNumber?: number;
+  condition?: string;
+  locations: Array<{scriptId: string; lineNumber: number; columnNumber: number}>;
+}
+
+export interface DebuggerPausedState {
+  callFrames: Array<{
+    callFrameId: string;
+    functionName: string;
+    url: string;
+    lineNumber: number;
+    columnNumber: number;
+    scopeChain: Array<{
+      type: string;
+      name?: string;
+      objectId?: string;
+    }>;
+  }>;
+  reason: string;
+  hitBreakpoints?: string[];
+}
+
+export interface DebuggerScriptInfo {
+  scriptId: string;
+  url: string;
+  startLine: number;
+  startColumn: number;
+  endLine: number;
+  endColumn: number;
+  sourceMapURL?: string;
+}
+
+export interface DebuggerState {
+  enabled: boolean;
+  paused: DebuggerPausedState | null;
+  breakpoints: Map<string, DebuggerBreakpointInfo>;
+  scripts: Map<string, DebuggerScriptInfo>;
+}

@@ -7,6 +7,7 @@
 import type {ParsedArguments} from '../cli.js';
 
 import * as consoleTools from './console.js';
+import * as debuggerTools from './debugger.js';
 import * as emulationTools from './emulation.js';
 import * as extensionTools from './extensions.js';
 import * as inputTools from './input.js';
@@ -27,6 +28,7 @@ export const createTools = (args: ParsedArguments) => {
     ? Object.values(slimTools)
     : [
         ...Object.values(consoleTools),
+        ...Object.values(debuggerTools),
         ...Object.values(emulationTools),
         ...Object.values(extensionTools),
         ...Object.values(inputTools),
