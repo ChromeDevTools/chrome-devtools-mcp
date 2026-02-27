@@ -155,7 +155,7 @@ describe('screenshot', () => {
 
         const page = context.getSelectedPptrPage();
         await page.setContent(fixture.html);
-        await context.createTextSnapshot();
+        await context.createTextSnapshot(context.getSelectedMcpPage());
         await screenshot.handler(
           {
             params: {

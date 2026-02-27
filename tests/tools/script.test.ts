@@ -124,7 +124,7 @@ describe('script', () => {
 
         await page.setContent(html`<button id="test">test</button>`);
 
-        await context.createTextSnapshot();
+        await context.createTextSnapshot(context.getSelectedMcpPage());
 
         await evaluateScript.handler(
           {
@@ -150,7 +150,7 @@ describe('script', () => {
 
         await page.setContent(html`<button id="test">test</button>`);
 
-        await context.createTextSnapshot();
+        await context.createTextSnapshot(context.getSelectedMcpPage());
 
         await evaluateScript.handler(
           {
@@ -180,7 +180,7 @@ describe('script', () => {
       await withMcpContext(async (response, context) => {
         const page = context.getSelectedPptrPage();
         await page.goto(server.getRoute('/main'));
-        await context.createTextSnapshot();
+        await context.createTextSnapshot(context.getSelectedMcpPage());
         await evaluateScript.handler(
           {
             params: {

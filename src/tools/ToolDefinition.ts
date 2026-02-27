@@ -146,7 +146,7 @@ export type Context = Readonly<{
   assertPageIsFocused(page: Page): void;
   getElementByUid(uid: string, page?: Page): Promise<ElementHandle<Element>>;
   getAXNodeByUid(uid: string): TextSnapshotNode | undefined;
-  restoreEmulation(): Promise<void>;
+  restoreEmulation(page: ContextPage): Promise<void>;
   emulate(
     options: {
       networkConditions?: string | null;
@@ -175,7 +175,7 @@ export type Context = Readonly<{
     timeout?: number,
     page?: Page,
   ): Promise<Element>;
-  getDevToolsData(): Promise<DevToolsData>;
+  getDevToolsData(page: ContextPage): Promise<DevToolsData>;
   /**
    * Returns a reqid for a cdpRequestId.
    */

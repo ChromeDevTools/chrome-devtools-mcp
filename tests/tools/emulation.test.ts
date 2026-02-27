@@ -28,7 +28,10 @@ describe('emulation', () => {
           context,
         );
 
-        assert.strictEqual(context.getNetworkConditions(), 'Offline');
+        assert.strictEqual(
+          context.getSelectedMcpPage().networkConditions,
+          'Offline',
+        );
       });
     });
     it('emulates network throttling when the throttling option is valid', async () => {
@@ -44,7 +47,10 @@ describe('emulation', () => {
           context,
         );
 
-        assert.strictEqual(context.getNetworkConditions(), 'Slow 3G');
+        assert.strictEqual(
+          context.getSelectedMcpPage().networkConditions,
+          'Slow 3G',
+        );
       });
     });
 
@@ -61,7 +67,10 @@ describe('emulation', () => {
           context,
         );
 
-        assert.strictEqual(context.getNetworkConditions(), null);
+        assert.strictEqual(
+          context.getSelectedMcpPage().networkConditions,
+          null,
+        );
       });
     });
 
@@ -78,7 +87,10 @@ describe('emulation', () => {
           context,
         );
 
-        assert.strictEqual(context.getNetworkConditions(), null);
+        assert.strictEqual(
+          context.getSelectedMcpPage().networkConditions,
+          null,
+        );
       });
     });
 
@@ -95,12 +107,18 @@ describe('emulation', () => {
           context,
         );
 
-        assert.strictEqual(context.getNetworkConditions(), 'Slow 3G');
+        assert.strictEqual(
+          context.getSelectedMcpPage().networkConditions,
+          'Slow 3G',
+        );
 
         const page = await context.newPage();
         context.selectPage(page);
 
-        assert.strictEqual(context.getNetworkConditions(), null);
+        assert.strictEqual(
+          context.getSelectedMcpPage().networkConditions,
+          null,
+        );
       });
     });
   });
@@ -119,7 +137,7 @@ describe('emulation', () => {
           context,
         );
 
-        assert.strictEqual(context.getCpuThrottlingRate(), 4);
+        assert.strictEqual(context.getSelectedMcpPage().cpuThrottlingRate, 4);
       });
     });
 
@@ -139,7 +157,7 @@ describe('emulation', () => {
           context,
         );
 
-        assert.strictEqual(context.getCpuThrottlingRate(), 1);
+        assert.strictEqual(context.getSelectedMcpPage().cpuThrottlingRate, 1);
       });
     });
 
@@ -156,12 +174,12 @@ describe('emulation', () => {
           context,
         );
 
-        assert.strictEqual(context.getCpuThrottlingRate(), 4);
+        assert.strictEqual(context.getSelectedMcpPage().cpuThrottlingRate, 4);
 
         const page = await context.newPage();
         context.selectPage(page);
 
-        assert.strictEqual(context.getCpuThrottlingRate(), 1);
+        assert.strictEqual(context.getSelectedMcpPage().cpuThrottlingRate, 1);
       });
     });
   });
@@ -183,7 +201,7 @@ describe('emulation', () => {
           context,
         );
 
-        const geolocation = context.getGeolocation();
+        const geolocation = context.getSelectedMcpPage().geolocation;
         assert.strictEqual(geolocation?.latitude, 48.137154);
         assert.strictEqual(geolocation?.longitude, 11.576124);
       });
@@ -206,7 +224,7 @@ describe('emulation', () => {
           context,
         );
 
-        assert.notStrictEqual(context.getGeolocation(), null);
+        assert.notStrictEqual(context.getSelectedMcpPage().geolocation, null);
 
         // Then clear it by setting geolocation to null
         await emulate.handler(
@@ -220,7 +238,7 @@ describe('emulation', () => {
           context,
         );
 
-        assert.strictEqual(context.getGeolocation(), null);
+        assert.strictEqual(context.getSelectedMcpPage().geolocation, null);
       });
     });
 
@@ -240,14 +258,14 @@ describe('emulation', () => {
           context,
         );
 
-        const geolocation = context.getGeolocation();
+        const geolocation = context.getSelectedMcpPage().geolocation;
         assert.strictEqual(geolocation?.latitude, 48.137154);
         assert.strictEqual(geolocation?.longitude, 11.576124);
 
         const page = await context.newPage();
         context.selectPage(page);
 
-        assert.strictEqual(context.getGeolocation(), null);
+        assert.strictEqual(context.getSelectedMcpPage().geolocation, null);
       });
     });
   });
@@ -338,7 +356,7 @@ describe('emulation', () => {
           context,
         );
 
-        assert.strictEqual(context.getViewport(), null);
+        assert.strictEqual(context.getSelectedMcpPage().viewport, null);
 
         // Somehow reset of the viewport seems to be async.
         await context.getSelectedPptrPage().waitForFunction(() => {
@@ -363,12 +381,12 @@ describe('emulation', () => {
           context,
         );
 
-        assert.ok(context.getViewport());
+        assert.ok(context.getSelectedMcpPage().viewport);
 
         const page = await context.newPage();
         context.selectPage(page);
 
-        assert.strictEqual(context.getViewport(), null);
+        assert.strictEqual(context.getSelectedMcpPage().viewport, null);
         assert.ok(
           await context.getSelectedPptrPage().evaluate(() => {
             return window.innerWidth !== 400 && window.innerHeight !== 400;
@@ -392,7 +410,7 @@ describe('emulation', () => {
           context,
         );
 
-        assert.strictEqual(context.getUserAgent(), 'MyUA');
+        assert.strictEqual(context.getSelectedMcpPage().userAgent, 'MyUA');
         const page = context.getSelectedPptrPage();
         const ua = await page.evaluate(() => navigator.userAgent);
         assert.strictEqual(ua, 'MyUA');
@@ -411,7 +429,7 @@ describe('emulation', () => {
           response,
           context,
         );
-        assert.strictEqual(context.getUserAgent(), 'UA1');
+        assert.strictEqual(context.getSelectedMcpPage().userAgent, 'UA1');
 
         await emulate.handler(
           {
@@ -423,7 +441,7 @@ describe('emulation', () => {
           response,
           context,
         );
-        assert.strictEqual(context.getUserAgent(), 'UA2');
+        assert.strictEqual(context.getSelectedMcpPage().userAgent, 'UA2');
         const page = context.getSelectedPptrPage();
         const ua = await page.evaluate(() => navigator.userAgent);
         assert.strictEqual(ua, 'UA2');
@@ -443,7 +461,7 @@ describe('emulation', () => {
           context,
         );
 
-        assert.strictEqual(context.getUserAgent(), 'MyUA');
+        assert.strictEqual(context.getSelectedMcpPage().userAgent, 'MyUA');
 
         await emulate.handler(
           {
@@ -456,7 +474,7 @@ describe('emulation', () => {
           context,
         );
 
-        assert.strictEqual(context.getUserAgent(), null);
+        assert.strictEqual(context.getSelectedMcpPage().userAgent, null);
         const page = context.getSelectedPptrPage();
         const ua = await page.evaluate(() => navigator.userAgent);
         assert.notStrictEqual(ua, 'MyUA');
@@ -477,12 +495,12 @@ describe('emulation', () => {
           context,
         );
 
-        assert.strictEqual(context.getUserAgent(), 'MyUA');
+        assert.strictEqual(context.getSelectedMcpPage().userAgent, 'MyUA');
 
         const page = await context.newPage();
         context.selectPage(page);
 
-        assert.strictEqual(context.getUserAgent(), null);
+        assert.strictEqual(context.getSelectedMcpPage().userAgent, null);
         assert.ok(
           await context.getSelectedPptrPage().evaluate(() => {
             return navigator.userAgent !== 'MyUA';
@@ -506,7 +524,7 @@ describe('emulation', () => {
           context,
         );
 
-        assert.strictEqual(context.getColorScheme(), 'dark');
+        assert.strictEqual(context.getSelectedMcpPage().colorScheme, 'dark');
         const page = context.getSelectedPptrPage();
         const scheme = await page.evaluate(() =>
           window.matchMedia('(prefers-color-scheme: dark)').matches
@@ -529,7 +547,7 @@ describe('emulation', () => {
           response,
           context,
         );
-        assert.strictEqual(context.getColorScheme(), 'dark');
+        assert.strictEqual(context.getSelectedMcpPage().colorScheme, 'dark');
 
         await emulate.handler(
           {
@@ -541,7 +559,7 @@ describe('emulation', () => {
           response,
           context,
         );
-        assert.strictEqual(context.getColorScheme(), 'light');
+        assert.strictEqual(context.getSelectedMcpPage().colorScheme, 'light');
         const page = context.getSelectedPptrPage();
         const scheme = await page.evaluate(() =>
           window.matchMedia('(prefers-color-scheme: light)').matches
@@ -570,7 +588,7 @@ describe('emulation', () => {
           response,
           context,
         );
-        assert.strictEqual(context.getColorScheme(), 'dark');
+        assert.strictEqual(context.getSelectedMcpPage().colorScheme, 'dark');
         // Check manually that it is dark
 
         assert.strictEqual(
@@ -591,7 +609,7 @@ describe('emulation', () => {
           context,
         );
 
-        assert.strictEqual(context.getColorScheme(), null);
+        assert.strictEqual(context.getSelectedMcpPage().colorScheme, null);
         assert.strictEqual(
           await page.evaluate(
             () => window.matchMedia('(prefers-color-scheme: dark)').matches,

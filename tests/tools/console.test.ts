@@ -36,7 +36,7 @@ describe('console', () => {
 
     it('lists error messages', async () => {
       await withMcpContext(async (response, context) => {
-        const page = await context.newPage();
+        const page = context.getSelectedMcpPage();
         await page.pptrPage.setContent(
           '<script>console.error("This is an error")</script>',
         );
@@ -53,7 +53,7 @@ describe('console', () => {
 
     it('lists error objects', async t => {
       await withMcpContext(async (response, context) => {
-        const page = await context.newPage();
+        const page = context.getSelectedMcpPage();
         await page.pptrPage.setContent(
           '<script>console.error(new Error("This is an error"))</script>',
         );
@@ -70,7 +70,7 @@ describe('console', () => {
 
     it('work with primitive unhandled errors', async () => {
       await withMcpContext(async (response, context) => {
-        const page = await context.newPage();
+        const page = context.getSelectedMcpPage();
         await page.pptrPage.setContent('<script>throw undefined;</script>');
         await listConsoleMessages.handler(
           {params: {}, page: context.getSelectedMcpPage()},
@@ -86,7 +86,7 @@ describe('console', () => {
     describe('issues', () => {
       it('lists issues', async () => {
         await withMcpContext(async (response, context) => {
-          const page = await context.newPage();
+          const page = context.getSelectedMcpPage();
           const issuePromise = new Promise<void>(resolve => {
             page.pptrPage.once('issue', () => {
               resolve();
@@ -114,6 +114,7 @@ describe('console', () => {
       it('lists issues after a page reload', async () => {
         await withMcpContext(async (response, context) => {
           const page = await context.newPage();
+          response.setPage(page);
           const issuePromise = new Promise<void>(resolve => {
             page.pptrPage.once('issue', () => {
               resolve();
@@ -168,7 +169,7 @@ describe('console', () => {
 
     it('gets a specific console message', async () => {
       await withMcpContext(async (response, context) => {
-        const page = await context.newPage();
+        const page = context.getSelectedMcpPage();
         await page.pptrPage.setContent(
           '<script>console.error("This is an error")</script>',
         );
@@ -195,7 +196,7 @@ describe('console', () => {
     describe('issues type', () => {
       it('gets issue details with node id parsing', async t => {
         await withMcpContext(async (response, context) => {
-          const page = await context.newPage();
+          const page = context.getSelectedMcpPage();
           const issuePromise = new Promise<void>(resolve => {
             page.pptrPage.once('issue', () => {
               resolve();
@@ -204,7 +205,7 @@ describe('console', () => {
           await page.pptrPage.setContent(
             '<input type="text" name="username" />',
           );
-          await context.createTextSnapshot();
+          await context.createTextSnapshot(page);
           await issuePromise;
           await listConsoleMessages.handler(
             {params: {}, page: context.getSelectedMcpPage()},
@@ -230,7 +231,7 @@ describe('console', () => {
         });
 
         await withMcpContext(async (response, context) => {
-          const page = await context.newPage();
+          const page = context.getSelectedMcpPage();
           const issuePromise = new Promise<void>(resolve => {
             page.pptrPage.once('issue', () => {
               resolve();
@@ -249,9 +250,9 @@ describe('console', () => {
               });
             </script>
           `);
-          await context.createTextSnapshot();
+          await context.createTextSnapshot(page);
           await issuePromise;
-          const messages = context.getConsoleData();
+          const messages = context.getConsoleData(page);
           let issueMsg;
           for (const message of messages) {
             if (message instanceof DevTools.AggregatedIssue) {
@@ -299,7 +300,7 @@ describe('console', () => {
       );
 
       await withMcpContext(async (response, context) => {
-        const page = await context.newPage();
+        const page = context.getSelectedMcpPage();
         await page.pptrPage.goto(server.getRoute('/index.html'));
 
         await getConsoleMessage.handler(
@@ -328,7 +329,7 @@ describe('console', () => {
       );
 
       await withMcpContext(async (response, context) => {
-        const page = await context.newPage();
+        const page = context.getSelectedMcpPage();
         await page.pptrPage.goto(server.getRoute('/index.html'));
 
         await getConsoleMessage.handler(
@@ -357,7 +358,7 @@ describe('console', () => {
       );
 
       await withMcpContext(async (response, context) => {
-        const page = await context.newPage();
+        const page = context.getSelectedMcpPage();
         await page.pptrPage.goto(server.getRoute('/index.html'));
 
         await getConsoleMessage.handler(
@@ -386,7 +387,7 @@ describe('console', () => {
       );
 
       await withMcpContext(async (response, context) => {
-        const page = await context.newPage();
+        const page = context.getSelectedMcpPage();
         await page.pptrPage.goto(server.getRoute('/index.html'));
 
         await getConsoleMessage.handler(
@@ -415,7 +416,7 @@ describe('console', () => {
       );
 
       await withMcpContext(async (response, context) => {
-        const page = await context.newPage();
+        const page = context.getSelectedMcpPage();
         await page.pptrPage.goto(server.getRoute('/index.html'));
 
         await getConsoleMessage.handler(
@@ -458,7 +459,7 @@ describe('console', () => {
       );
 
       await withMcpContext(async (response, context) => {
-        const page = await context.newPage();
+        const page = context.getSelectedMcpPage();
         await page.pptrPage.goto(server.getRoute('/index.html'));
 
         await getConsoleMessage.handler(

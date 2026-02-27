@@ -71,7 +71,7 @@ export const listNetworkRequests = definePageTool({
       ),
   },
   handler: async (request, response, context) => {
-    const data = await context.getDevToolsData();
+    const data = await context.getDevToolsData(request.page);
     response.attachDevToolsData(data);
     const reqid = data?.cdpRequestId
       ? context.resolveCdpRequestId(request.page, data.cdpRequestId)
@@ -120,7 +120,7 @@ export const getNetworkRequest = definePageTool({
         responseFilePath: request.params.responseFilePath,
       });
     } else {
-      const data = await context.getDevToolsData();
+      const data = await context.getDevToolsData(request.page);
       response.attachDevToolsData(data);
       const reqid = data?.cdpRequestId
         ? context.resolveCdpRequestId(request.page, data.cdpRequestId)

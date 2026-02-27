@@ -120,8 +120,6 @@ export class McpContext implements Context {
     null;
   #focusedPagePerContext = new Map<BrowserContext, Page>();
 
-  #requestPage?: ContextPage;
-
   #nextPageId = 1;
 
   #extensionServiceWorkerMap = new WeakMap<Target, string>();
@@ -196,17 +194,6 @@ export class McpContext implements Context {
     return context;
   }
 
-  // TODO: Refactor away mutable request state (e.g. per-request facade,
-  // per-request context object, or another approach). Once resolved, the
-  // global toolMutex could become per-BrowserContext for parallel execution.
-  setRequestPage(page?: ContextPage): void {
-    this.#requestPage = page;
-  }
-
-  #resolveTargetPage(): Page {
-    return this.#requestPage?.pptrPage ?? this.getSelectedPptrPage();
-  }
-
   resolveCdpRequestId(page: McpPage, cdpRequestId: string): number | undefined {
     if (!cdpRequestId) {
       this.logger('no network request');
@@ -250,20 +237,28 @@ export class McpContext implements Context {
     return;
   }
 
-  getNetworkRequests(includePreservedRequests?: boolean): HTTPRequest[] {
-    const page = this.#resolveTargetPage();
-    return this.#networkCollector.getData(page, includePreservedRequests);
+  getNetworkRequests(
+    page: McpPage,
+    includePreservedRequests?: boolean,
+  ): HTTPRequest[] {
+    return this.#networkCollector.getData(
+      page.pptrPage,
+      includePreservedRequests,
+    );
   }
 
   getConsoleData(
+    page: McpPage,
     includePreservedMessages?: boolean,
   ): Array<ConsoleMessage | Error | DevTools.AggregatedIssue | UncaughtError> {
-    const page = this.#resolveTargetPage();
-    return this.#consoleCollector.getData(page, includePreservedMessages);
+    return this.#consoleCollector.getData(
+      page.pptrPage,
+      includePreservedMessages,
+    );
   }
 
-  getDevToolsUniverse(): TargetUniverse | null {
-    return this.#devtoolsUniverseManager.get(this.#resolveTargetPage());
+  getDevToolsUniverse(page: McpPage): TargetUniverse | null {
+    return this.#devtoolsUniverseManager.get(page.pptrPage);
   }
 
   getConsoleMessageStableId(
@@ -273,15 +268,16 @@ export class McpContext implements Context {
   }
 
   getConsoleMessageById(
+    page: McpPage,
     id: number,
   ): ConsoleMessage | Error | DevTools.AggregatedIssue | UncaughtError {
-    return this.#consoleCollector.getById(this.#resolveTargetPage(), id);
+    return this.#consoleCollector.getById(page.pptrPage, id);
   }
 
   async newPage(
     background?: boolean,
     isolatedContextName?: string,
-  ): Promise<ContextPage> {
+  ): Promise<McpPage> {
     let page: Page;
     if (isolatedContextName !== undefined) {
       let ctx = this.#isolatedContexts.get(isolatedContextName);
@@ -316,15 +312,13 @@ export class McpContext implements Context {
     await page.close({runBeforeUnload: false});
   }
 
-  getNetworkRequestById(reqid: number): HTTPRequest {
-    return this.#networkCollector.getById(this.#resolveTargetPage(), reqid);
+  getNetworkRequestById(page: McpPage, reqid: number): HTTPRequest {
+    return this.#networkCollector.getById(page.pptrPage, reqid);
   }
 
-  async restoreEmulation(targetPage?: Page) {
-    const page = targetPage ?? this.getSelectedPptrPage();
-    const mcpPage = this.#getMcpPage(page);
-    const currentSetting = mcpPage.emulationSettings;
-    await this.emulate(currentSetting, targetPage);
+  async restoreEmulation(page: McpPage) {
+    const currentSetting = page.emulationSettings;
+    await this.emulate(currentSetting, page.pptrPage);
   }
 
   async emulate(
@@ -440,30 +434,6 @@ export class McpContext implements Context {
     }
   }
 
-  getNetworkConditions(): string | null {
-    return this.#getMcpPage(this.#resolveTargetPage()).networkConditions;
-  }
-
-  getCpuThrottlingRate(): number {
-    return this.#getMcpPage(this.#resolveTargetPage()).cpuThrottlingRate;
-  }
-
-  getGeolocation(): GeolocationOptions | null {
-    return this.#getMcpPage(this.#resolveTargetPage()).geolocation;
-  }
-
-  getViewport(): Viewport | null {
-    return this.#getMcpPage(this.#resolveTargetPage()).viewport;
-  }
-
-  getUserAgent(): string | null {
-    return this.#getMcpPage(this.#resolveTargetPage()).userAgent;
-  }
-
-  getColorScheme(): 'dark' | 'light' | null {
-    return this.#getMcpPage(this.#resolveTargetPage()).colorScheme;
-  }
-
   setIsRunningPerformanceTrace(x: boolean): void {
     this.#isRunningTrace = x;
   }
@@ -573,23 +543,20 @@ export class McpContext implements Context {
   }
 
   #updateSelectedPageTimeouts() {
-    const page = this.getSelectedPptrPage();
+    const page = this.#getSelectedMcpPage();
     // For waiters 5sec timeout should be sufficient.
     // Increased in case we throttle the CPU
-    const cpuMultiplier = this.getCpuThrottlingRate();
-    page.setDefaultTimeout(DEFAULT_TIMEOUT * cpuMultiplier);
+    const cpuMultiplier = page.cpuThrottlingRate;
+    page.pptrPage.setDefaultTimeout(DEFAULT_TIMEOUT * cpuMultiplier);
     // 10sec should be enough for the load event to be emitted during
     // navigations.
     // Increased in case we throttle the network requests
     const networkMultiplier = getNetworkMultiplierFromString(
-      this.getNetworkConditions(),
+      page.networkConditions,
     );
-    page.setDefaultNavigationTimeout(NAVIGATION_TIMEOUT * networkMultiplier);
-  }
-
-  getNavigationTimeout() {
-    const page = this.#resolveTargetPage();
-    return page.getDefaultNavigationTimeout();
+    page.pptrPage.setDefaultNavigationTimeout(
+      NAVIGATION_TIMEOUT * networkMultiplier,
+    );
   }
 
   // Linear scan over per-page snapshots. The page count is small (typically
@@ -858,11 +825,10 @@ export class McpContext implements Context {
     return this.#mcpPages.get(page)?.devToolsPage;
   }
 
-  async getDevToolsData(): Promise<DevToolsData> {
+  async getDevToolsData(page: McpPage): Promise<DevToolsData> {
     try {
       this.logger('Getting DevTools UI data');
-      const selectedPage = this.#resolveTargetPage();
-      const devtoolsPage = this.getDevToolsPage(selectedPage);
+      const devtoolsPage = this.getDevToolsPage(page.pptrPage);
       if (!devtoolsPage) {
         this.logger('No DevTools page detected');
         return {};
@@ -896,13 +862,11 @@ export class McpContext implements Context {
    * Creates a text snapshot of a page.
    */
   async createTextSnapshot(
+    page: McpPage,
     verbose = false,
     devtoolsData: DevToolsData | undefined = undefined,
-    targetPage?: Page,
   ): Promise<void> {
-    const page = targetPage ?? this.getSelectedPptrPage();
-    const mcpPage = this.#getMcpPage(page);
-    const rootNode = await page.accessibility.snapshot({
+    const rootNode = await page.pptrPage.accessibility.snapshot({
       includeIframes: true,
       interestingOnly: !verbose,
     });
@@ -910,7 +874,7 @@ export class McpContext implements Context {
       return;
     }
 
-    const {uniqueBackendNodeIdToMcpId} = mcpPage;
+    const {uniqueBackendNodeIdToMcpId} = page;
 
     const snapshotId = this.#nextSnapshotId++;
     // Iterate through the whole accessibility node tree and assign node ids that
@@ -961,12 +925,12 @@ export class McpContext implements Context {
       hasSelectedElement: false,
       verbose,
     };
-    mcpPage.textSnapshot = snapshot;
-    const data = devtoolsData ?? (await this.getDevToolsData());
+    page.textSnapshot = snapshot;
+    const data = devtoolsData ?? (await this.getDevToolsData(page));
     if (data?.cdpBackendNodeId) {
       snapshot.hasSelectedElement = true;
       snapshot.selectedElementUid = this.resolveCdpElementId(
-        mcpPage,
+        page,
         data?.cdpBackendNodeId,
       );
     }
@@ -1041,13 +1005,13 @@ export class McpContext implements Context {
     action: () => Promise<unknown>,
     options?: {timeout?: number},
   ): Promise<void> {
-    const page = this.getSelectedPptrPage();
-    const cpuMultiplier = this.getCpuThrottlingRate();
+    const page = this.#getSelectedMcpPage();
+    const cpuMultiplier = page.cpuThrottlingRate;
     const networkMultiplier = getNetworkMultiplierFromString(
-      this.getNetworkConditions(),
+      page.networkConditions,
     );
     const waitForHelper = this.getWaitForHelper(
-      page,
+      page.pptrPage,
       cpuMultiplier,
       networkMultiplier,
     );
