@@ -27,13 +27,16 @@ describe('screencast', () => {
     it('starts a screencast recording with filePath', async () => {
       await withMcpContext(async (response, context) => {
         const mockRecorder = createMockRecorder();
-        const selectedPage = context.getSelectedPage();
+        const selectedPage = context.getSelectedPptrPage();
         const screencastStub = sinon
           .stub(selectedPage, 'screencast')
           .resolves(mockRecorder as never);
 
         await startScreencast.handler(
-          {params: {path: '/tmp/test-recording.mp4'}},
+          {
+            params: {path: '/tmp/test-recording.mp4'},
+            page: context.getSelectedMcpPage(),
+          },
           response,
           context,
         );
@@ -55,12 +58,16 @@ describe('screencast', () => {
     it('starts a screencast recording with temp file when no filePath', async () => {
       await withMcpContext(async (response, context) => {
         const mockRecorder = createMockRecorder();
-        const selectedPage = context.getSelectedPage();
+        const selectedPage = context.getSelectedPptrPage();
         const screencastStub = sinon
           .stub(selectedPage, 'screencast')
           .resolves(mockRecorder as never);
 
-        await startScreencast.handler({params: {}}, response, context);
+        await startScreencast.handler(
+          {params: {}, page: context.getSelectedMcpPage()},
+          response,
+          context,
+        );
 
         sinon.assert.calledOnce(screencastStub);
         const callArgs = screencastStub.firstCall.args[0];
@@ -78,10 +85,14 @@ describe('screencast', () => {
           filePath: '/tmp/existing.mp4',
         });
 
-        const selectedPage = context.getSelectedPage();
+        const selectedPage = context.getSelectedPptrPage();
         const screencastStub = sinon.stub(selectedPage, 'screencast');
 
-        await startScreencast.handler({params: {}}, response, context);
+        await startScreencast.handler(
+          {params: {}, page: context.getSelectedMcpPage()},
+          response,
+          context,
+        );
 
         sinon.assert.notCalled(screencastStub);
         assert.ok(
@@ -94,13 +105,16 @@ describe('screencast', () => {
 
     it('provides a clear error when ffmpeg is not found', async () => {
       await withMcpContext(async (response, context) => {
-        const selectedPage = context.getSelectedPage();
+        const selectedPage = context.getSelectedPptrPage();
         const error = new Error('spawn ffmpeg ENOENT');
         sinon.stub(selectedPage, 'screencast').rejects(error);
 
         await assert.rejects(
           startScreencast.handler(
-            {params: {path: '/tmp/test.mp4'}},
+            {
+              params: {path: '/tmp/test.mp4'},
+              page: context.getSelectedMcpPage(),
+            },
             response,
             context,
           ),
@@ -116,7 +130,11 @@ describe('screencast', () => {
     it('does nothing if no recording is active', async () => {
       await withMcpContext(async (response, context) => {
         assert.strictEqual(context.getScreenRecorder(), null);
-        await stopScreencast.handler({params: {}}, response, context);
+        await stopScreencast.handler(
+          {params: {}, page: context.getSelectedMcpPage()},
+          response,
+          context,
+        );
         assert.strictEqual(response.responseLines.length, 0);
       });
     });
@@ -130,7 +148,11 @@ describe('screencast', () => {
           filePath,
         });
 
-        await stopScreencast.handler({params: {}}, response, context);
+        await stopScreencast.handler(
+          {params: {}, page: context.getSelectedMcpPage()},
+          response,
+          context,
+        );
 
         sinon.assert.calledOnce(mockRecorder.stop);
         assert.strictEqual(context.getScreenRecorder(), null);
@@ -152,7 +174,11 @@ describe('screencast', () => {
         });
 
         await assert.rejects(
-          stopScreencast.handler({params: {}}, response, context),
+          stopScreencast.handler(
+            {params: {}, page: context.getSelectedMcpPage()},
+            response,
+            context,
+          ),
           /ffmpeg process error/,
         );
 

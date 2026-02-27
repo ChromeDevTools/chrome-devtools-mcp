@@ -21,7 +21,7 @@ describe('memory', () => {
         const filePath = join(tmpdir(), 'test-screenshot.heapsnapshot');
         try {
           await takeMemorySnapshot.handler(
-            {params: {filePath}},
+            {params: {filePath}, page: context.getSelectedMcpPage()},
             response,
             context,
           );

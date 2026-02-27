@@ -18,7 +18,10 @@ describe('script', () => {
     it('evaluates', async () => {
       await withMcpContext(async (response, context) => {
         await evaluateScript.handler(
-          {params: {function: String(() => 2 * 5)}},
+          {
+            params: {function: String(() => 2 * 5)},
+            page: context.getSelectedMcpPage(),
+          },
           response,
           context,
         );
@@ -29,7 +32,10 @@ describe('script', () => {
     it('runs in selected page', async () => {
       await withMcpContext(async (response, context) => {
         await evaluateScript.handler(
-          {params: {function: String(() => document.title)}},
+          {
+            params: {function: String(() => document.title)},
+            page: context.getSelectedMcpPage(),
+          },
           response,
           context,
         );
@@ -38,7 +44,7 @@ describe('script', () => {
         assert.strictEqual(JSON.parse(lineEvaluation), '');
 
         const page = await context.newPage();
-        await page.setContent(`
+        await page.pptrPage.setContent(`
           <head>
             <title>New Page</title>
           </head>
@@ -46,7 +52,10 @@ describe('script', () => {
 
         response.resetResponseLineForTesting();
         await evaluateScript.handler(
-          {params: {function: String(() => document.title)}},
+          {
+            params: {function: String(() => document.title)},
+            page: context.getSelectedMcpPage(),
+          },
           response,
           context,
         );
@@ -58,7 +67,7 @@ describe('script', () => {
 
     it('work for complex objects', async () => {
       await withMcpContext(async (response, context) => {
-        const page = context.getSelectedPage();
+        const page = context.getSelectedPptrPage();
 
         await page.setContent(html`<script src="./scripts.js"></script> `);
 
@@ -73,6 +82,7 @@ describe('script', () => {
                 return {scripts};
               }),
             },
+            page: context.getSelectedMcpPage(),
           },
           response,
           context,
@@ -86,7 +96,7 @@ describe('script', () => {
 
     it('work for async functions', async () => {
       await withMcpContext(async (response, context) => {
-        const page = context.getSelectedPage();
+        const page = context.getSelectedPptrPage();
 
         await page.setContent(html`<script src="./scripts.js"></script> `);
 
@@ -98,6 +108,7 @@ describe('script', () => {
                 return 'Works';
               }),
             },
+            page: context.getSelectedMcpPage(),
           },
           response,
           context,
@@ -109,11 +120,11 @@ describe('script', () => {
 
     it('work with one argument', async () => {
       await withMcpContext(async (response, context) => {
-        const page = context.getSelectedPage();
+        const page = context.getSelectedPptrPage();
 
         await page.setContent(html`<button id="test">test</button>`);
 
-        await context.createTextSnapshot();
+        await context.createTextSnapshot(context.getSelectedMcpPage());
 
         await evaluateScript.handler(
           {
@@ -123,6 +134,7 @@ describe('script', () => {
               }),
               args: [{uid: '1_1'}],
             },
+            page: context.getSelectedMcpPage(),
           },
           response,
           context,
@@ -134,11 +146,11 @@ describe('script', () => {
 
     it('work with multiple args', async () => {
       await withMcpContext(async (response, context) => {
-        const page = context.getSelectedPage();
+        const page = context.getSelectedPptrPage();
 
         await page.setContent(html`<button id="test">test</button>`);
 
-        await context.createTextSnapshot();
+        await context.createTextSnapshot(context.getSelectedMcpPage());
 
         await evaluateScript.handler(
           {
@@ -148,6 +160,7 @@ describe('script', () => {
               }),
               args: [{uid: '1_0'}, {uid: '1_1'}],
             },
+            page: context.getSelectedMcpPage(),
           },
           response,
           context,
@@ -165,9 +178,9 @@ describe('script', () => {
       server.addHtmlRoute('/main', html`<iframe src="/iframe"></iframe>`);
 
       await withMcpContext(async (response, context) => {
-        const page = context.getSelectedPage();
+        const page = context.getSelectedPptrPage();
         await page.goto(server.getRoute('/main'));
-        await context.createTextSnapshot();
+        await context.createTextSnapshot(context.getSelectedMcpPage());
         await evaluateScript.handler(
           {
             params: {
@@ -176,6 +189,7 @@ describe('script', () => {
               }),
               args: [{uid: '1_3'}],
             },
+            page: context.getSelectedMcpPage(),
           },
           response,
           context,

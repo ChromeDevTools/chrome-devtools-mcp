@@ -8,9 +8,9 @@ import {zod} from '../third_party/index.js';
 import type {Frame, JSHandle, Page} from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
-import {defineTool} from './ToolDefinition.js';
+import {definePageTool} from './ToolDefinition.js';
 
-export const evaluateScript = defineTool({
+export const evaluateScript = definePageTool({
   name: 'evaluate_script',
   description: `Evaluate a JavaScript function inside the currently selected page. Returns the response as JSON,
 so returned values have to be JSON-serializable.`,
@@ -49,7 +49,7 @@ Example with arguments: \`(el) => {
     try {
       const frames = new Set<Frame>();
       for (const el of request.params.args ?? []) {
-        const handle = await context.getElementByUid(el.uid);
+        const handle = await request.page.getElementByUid(el.uid);
         frames.add(handle.frame);
         args.push(handle);
       }
@@ -60,7 +60,7 @@ Example with arguments: \`(el) => {
           "Elements from different frames can't be evaluated together.",
         );
       } else {
-        pageOrFrame = [...frames.values()][0] ?? context.getSelectedPage();
+        pageOrFrame = [...frames.values()][0] ?? request.page.pptrPage;
       }
       const fn = await pageOrFrame.evaluateHandle(
         `(${request.params.function})`,

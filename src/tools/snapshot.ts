@@ -7,9 +7,9 @@
 import {zod} from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
-import {defineTool, timeoutSchema} from './ToolDefinition.js';
+import {definePageTool, timeoutSchema} from './ToolDefinition.js';
 
-export const takeSnapshot = defineTool({
+export const takeSnapshot = definePageTool({
   name: 'take_snapshot',
   description: `Take a text snapshot of the currently selected page based on the a11y tree. The snapshot lists page elements along with a unique
 identifier (uid). Always use the latest snapshot. Prefer taking a snapshot over taking a screenshot. The snapshot indicates the element selected
@@ -37,11 +37,12 @@ in the DevTools Elements panel (if any).`,
     response.includeSnapshot({
       verbose: request.params.verbose ?? false,
       filePath: request.params.filePath,
+      page: request.page,
     });
   },
 });
 
-export const waitFor = defineTool({
+export const waitFor = definePageTool({
   name: 'wait_for',
   description: `Wait for the specified text to appear on the selected page.`,
   annotations: {
@@ -58,15 +59,17 @@ export const waitFor = defineTool({
     ...timeoutSchema,
   },
   handler: async (request, response, context) => {
+    const page = request.page;
     await context.waitForTextOnPage(
       request.params.text,
       request.params.timeout,
+      page.pptrPage,
     );
 
     response.appendResponseLine(
       `Element matching one of ${JSON.stringify(request.params.text)} found.`,
     );
 
-    response.includeSnapshot();
+    response.includeSnapshot({page});
   },
 });
