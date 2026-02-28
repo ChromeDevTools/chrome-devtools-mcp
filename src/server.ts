@@ -153,7 +153,8 @@ export async function createMcpServer(
     const schema =
       'pageScoped' in tool &&
       tool.pageScoped &&
-      serverArgs.experimentalPageIdRouting
+      serverArgs.experimentalPageIdRouting &&
+      !serverArgs.slim
         ? {...tool.schema, ...pageIdSchema}
         : tool.schema;
 
@@ -176,51 +177,49 @@ export async function createMcpServer(
           const response = serverArgs.slim
             ? new SlimMcpResponse(serverArgs)
             : new McpResponse(serverArgs);
-          try {
-            if ('pageScoped' in tool && tool.pageScoped) {
-              const page =
-                serverArgs.experimentalPageIdRouting && params.pageId
-                  ? context.resolvePageById(params.pageId)
-                  : context.getSelectedPage();
-              context.setRequestPage(page);
-              await tool.handler(
-                {
-                  params,
-                  page,
-                },
-                response,
-                context,
-              );
-            } else {
-              await tool.handler(
-                // @ts-expect-error types do not match.
-                {
-                  params,
-                },
-                response,
-                context,
-              );
-            }
-            const {content, structuredContent} = await response.handle(
-              tool.name,
+          if ('pageScoped' in tool && tool.pageScoped) {
+            const page =
+              serverArgs.experimentalPageIdRouting &&
+              params.pageId &&
+              !serverArgs.slim
+                ? context.getPageById(params.pageId)
+                : context.getSelectedMcpPage();
+            response.setPage(page);
+            await tool.handler(
+              {
+                params,
+                page,
+              },
+              response,
               context,
             );
-            const result: CallToolResult & {
-              structuredContent?: Record<string, unknown>;
-            } = {
-              content,
-            };
-            success = true;
-            if (serverArgs.experimentalStructuredContent) {
-              result.structuredContent = structuredContent as Record<
-                string,
-                unknown
-              >;
-            }
-            return result;
-          } finally {
-            context.setRequestPage(undefined);
+          } else {
+            await tool.handler(
+              // @ts-expect-error types do not match.
+              {
+                params,
+              },
+              response,
+              context,
+            );
           }
+          const {content, structuredContent} = await response.handle(
+            tool.name,
+            context,
+          );
+          const result: CallToolResult & {
+            structuredContent?: Record<string, unknown>;
+          } = {
+            content,
+          };
+          success = true;
+          if (serverArgs.experimentalStructuredContent) {
+            result.structuredContent = structuredContent as Record<
+              string,
+              unknown
+            >;
+          }
+          return result;
         } catch (err) {
           logger(`${tool.name} error:`, err, err?.stack);
           let errorText = err && 'message' in err ? err.message : String(err);

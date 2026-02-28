@@ -103,6 +103,8 @@ export async function withMcpContext(
       Locator,
     );
 
+    response.setPage(context.getSelectedMcpPage());
+
     await cb(response, context);
   }, options);
 }

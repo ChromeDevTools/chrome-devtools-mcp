@@ -10,6 +10,7 @@ import {IssueFormatter} from './formatters/IssueFormatter.js';
 import {NetworkFormatter} from './formatters/NetworkFormatter.js';
 import {SnapshotFormatter} from './formatters/SnapshotFormatter.js';
 import type {McpContext} from './McpContext.js';
+import type {McpPage} from './McpPage.js';
 import {UncaughtError} from './PageCollector.js';
 import {DevTools} from './third_party/index.js';
 import type {
@@ -70,9 +71,14 @@ export class McpResponse implements Response {
   #devToolsData?: DevToolsData;
   #tabId?: string;
   #args: ParsedArguments;
+  #page?: McpPage;
 
   constructor(args: ParsedArguments) {
     this.#args = args;
+  }
+
+  setPage(page: McpPage): void {
+    this.#page = page;
   }
 
   attachDevToolsData(data: DevToolsData): void {
@@ -260,12 +266,15 @@ export class McpResponse implements Response {
 
     let snapshot: SnapshotFormatter | string | undefined;
     if (this.#snapshotParams) {
+      if (!this.#page) {
+        throw new Error('Response must have a page');
+      }
       await context.createTextSnapshot(
+        this.#page,
         this.#snapshotParams.verbose,
         this.#devToolsData,
-        this.#snapshotParams.page,
       );
-      const textSnapshot = context.getTextSnapshot(this.#snapshotParams.page);
+      const textSnapshot = this.#page.textSnapshot;
       if (textSnapshot) {
         const formatter = new SnapshotFormatter(textSnapshot);
         if (this.#snapshotParams.filePath) {
@@ -282,7 +291,11 @@ export class McpResponse implements Response {
 
     let detailedNetworkRequest: NetworkFormatter | undefined;
     if (this.#attachedNetworkRequestId) {
+      if (!this.#page) {
+        throw new Error(`Response must have an McpPage`);
+      }
       const request = context.getNetworkRequestById(
+        this.#page,
         this.#attachedNetworkRequestId,
       );
       const formatter = await NetworkFormatter.from(request, {
@@ -299,13 +312,18 @@ export class McpResponse implements Response {
     let detailedConsoleMessage: ConsoleFormatter | IssueFormatter | undefined;
 
     if (this.#attachedConsoleMessageId) {
+      if (!this.#page) {
+        throw new Error(`Response must have an McpPage`);
+      }
+
       const message = context.getConsoleMessageById(
+        this.#page,
         this.#attachedConsoleMessageId,
       );
       const consoleMessageStableId = this.#attachedConsoleMessageId;
       if ('args' in message || message instanceof UncaughtError) {
         const consoleMessage = message as ConsoleMessage | UncaughtError;
-        const devTools = context.getDevToolsUniverse();
+        const devTools = context.getDevToolsUniverse(this.#page);
         detailedConsoleMessage = await ConsoleFormatter.from(consoleMessage, {
           id: consoleMessageStableId,
           fetchDetailedData: true,
@@ -314,8 +332,14 @@ export class McpResponse implements Response {
       } else if (message instanceof DevTools.AggregatedIssue) {
         const formatter = new IssueFormatter(message, {
           id: consoleMessageStableId,
-          requestIdResolver: context.resolveCdpRequestId.bind(context),
-          elementIdResolver: context.resolveCdpElementId.bind(context),
+          requestIdResolver: context.resolveCdpRequestId.bind(
+            context,
+            this.#page,
+          ),
+          elementIdResolver: context.resolveCdpElementId.bind(
+            context,
+            this.#page,
+          ),
         });
         if (!formatter.isValid()) {
           throw new Error(
@@ -332,7 +356,12 @@ export class McpResponse implements Response {
     }
     let consoleMessages: Array<ConsoleFormatter | IssueFormatter> | undefined;
     if (this.#consoleDataOptions?.include) {
+      if (!this.#page) {
+        throw new Error(`Response must have an McpPage`);
+      }
+      const page = this.#page;
       let messages = context.getConsoleData(
+        this.#page,
         this.#consoleDataOptions.includePreservedMessages,
       );
 
@@ -357,7 +386,7 @@ export class McpResponse implements Response {
                 context.getConsoleMessageStableId(item);
               if ('args' in item || item instanceof UncaughtError) {
                 const consoleMessage = item as ConsoleMessage | UncaughtError;
-                const devTools = context.getDevToolsUniverse();
+                const devTools = context.getDevToolsUniverse(page);
                 return await ConsoleFormatter.from(consoleMessage, {
                   id: consoleMessageStableId,
                   fetchDetailedData: false,
@@ -382,7 +411,11 @@ export class McpResponse implements Response {
 
     let networkRequests: NetworkFormatter[] | undefined;
     if (this.#networkRequestsOptions?.include) {
+      if (!this.#page) {
+        throw new Error(`Response must have an McpPage`);
+      }
       let requests = context.getNetworkRequests(
+        this.#page,
         this.#networkRequestsOptions?.includePreservedRequests,
       );
 
@@ -476,46 +509,45 @@ export class McpResponse implements Response {
       response.push(...this.#textResponseLines);
     }
 
-    const networkConditions = context.getNetworkConditions();
+    const networkConditions = this.#page?.networkConditions;
     if (networkConditions) {
+      const timeout = this.#page!.pptrPage.getDefaultNavigationTimeout();
       response.push(`## Network emulation`);
       response.push(`Emulating: ${networkConditions}`);
-      response.push(
-        `Default navigation timeout set to ${context.getNavigationTimeout()} ms`,
-      );
+      response.push(`Default navigation timeout set to ${timeout} ms`);
       structuredContent.networkConditions = networkConditions;
-      structuredContent.navigationTimeout = context.getNavigationTimeout();
+      structuredContent.navigationTimeout = timeout;
     }
 
-    const viewport = context.getViewport();
+    const viewport = this.#page?.viewport;
     if (viewport) {
       response.push(`## Viewport emulation`);
       response.push(`Emulating viewport: ${JSON.stringify(viewport)}`);
       structuredContent.viewport = viewport;
     }
 
-    const userAgent = context.getUserAgent();
+    const userAgent = this.#page?.userAgent;
     if (userAgent) {
       response.push(`## UserAgent emulation`);
       response.push(`Emulating userAgent: ${userAgent}`);
       structuredContent.userAgent = userAgent;
     }
 
-    const cpuThrottlingRate = context.getCpuThrottlingRate();
+    const cpuThrottlingRate = this.#page?.cpuThrottlingRate ?? 1;
     if (cpuThrottlingRate > 1) {
       response.push(`## CPU emulation`);
       response.push(`Emulating: ${cpuThrottlingRate}x slowdown`);
       structuredContent.cpuThrottlingRate = cpuThrottlingRate;
     }
 
-    const colorScheme = context.getColorScheme();
+    const colorScheme = this.#page?.colorScheme;
     if (colorScheme) {
       response.push(`## Color Scheme emulation`);
       response.push(`Emulating: ${colorScheme}`);
       structuredContent.colorScheme = colorScheme;
     }
 
-    const dialog = context.getDialog();
+    const dialog = this.#page?.getDialog();
     if (dialog) {
       const defaultValueIfNeeded =
         dialog.type() === 'prompt'

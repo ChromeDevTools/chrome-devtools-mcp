@@ -71,10 +71,10 @@ export const listNetworkRequests = definePageTool({
       ),
   },
   handler: async (request, response, context) => {
-    const data = await context.getDevToolsData();
+    const data = await context.getDevToolsData(request.page);
     response.attachDevToolsData(data);
     const reqid = data?.cdpRequestId
-      ? context.resolveCdpRequestId(data.cdpRequestId)
+      ? context.resolveCdpRequestId(request.page, data.cdpRequestId)
       : undefined;
     response.setIncludeNetworkRequests(true, {
       pageSize: request.params.pageSize,
@@ -120,10 +120,10 @@ export const getNetworkRequest = definePageTool({
         responseFilePath: request.params.responseFilePath,
       });
     } else {
-      const data = await context.getDevToolsData();
+      const data = await context.getDevToolsData(request.page);
       response.attachDevToolsData(data);
       const reqid = data?.cdpRequestId
-        ? context.resolveCdpRequestId(data.cdpRequestId)
+        ? context.resolveCdpRequestId(request.page, data.cdpRequestId)
         : undefined;
       if (reqid) {
         response.attachNetworkRequest(reqid, {

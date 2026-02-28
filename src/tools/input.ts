@@ -7,10 +7,11 @@
 import {logger} from '../logger.js';
 import type {McpContext, TextSnapshotNode} from '../McpContext.js';
 import {zod} from '../third_party/index.js';
-import type {ElementHandle, KeyInput, Page} from '../third_party/index.js';
+import type {ElementHandle, KeyInput} from '../third_party/index.js';
 import {parseKey} from '../utils/keyboard.js';
 
 import {ToolCategory} from './categories.js';
+import type {ContextPage} from './ToolDefinition.js';
 import {definePageTool} from './ToolDefinition.js';
 
 const dblClickSchema = zod
@@ -58,7 +59,7 @@ export const click = definePageTool({
   },
   handler: async (request, response, context) => {
     const uid = request.params.uid;
-    const handle = await context.getElementByUid(uid);
+    const handle = await request.page.getElementByUid(uid);
     try {
       await context.waitForEventsAfterAction(async () => {
         await handle.asLocator().click({
@@ -97,9 +98,8 @@ export const clickAt = definePageTool({
   },
   handler: async (request, response, context) => {
     const page = request.page;
-    context.assertPageIsFocused(page);
     await context.waitForEventsAfterAction(async () => {
-      await page.mouse.click(request.params.x, request.params.y, {
+      await page.pptrPage.mouse.click(request.params.x, request.params.y, {
         clickCount: request.params.dblClick ? 2 : 1,
       });
     });
@@ -109,7 +109,7 @@ export const clickAt = definePageTool({
         : `Successfully clicked at the coordinates`,
     );
     if (request.params.includeSnapshot) {
-      response.includeSnapshot({page});
+      response.includeSnapshot();
     }
   },
 });
@@ -131,7 +131,7 @@ export const hover = definePageTool({
   },
   handler: async (request, response, context) => {
     const uid = request.params.uid;
-    const handle = await context.getElementByUid(uid);
+    const handle = await request.page.getElementByUid(uid);
     try {
       await context.waitForEventsAfterAction(async () => {
         await handle.asLocator().hover();
@@ -193,9 +193,9 @@ async function fillFormElement(
   uid: string,
   value: string,
   context: McpContext,
-  page: Page,
+  page: ContextPage,
 ) {
-  const handle = await context.getElementByUid(uid, page);
+  const handle = await page.getElementByUid(uid);
   try {
     const aXNode = context.getAXNodeByUid(uid);
     // We assume that combobox needs to be handled as select if it has
@@ -206,7 +206,7 @@ async function fillFormElement(
       // Increase timeout for longer input values.
       const timeoutPerChar = 10; // ms
       const fillTimeout =
-        page.getDefaultTimeout() + value.length * timeoutPerChar;
+        page.pptrPage.getDefaultTimeout() + value.length * timeoutPerChar;
       await handle.asLocator().setTimeout(fillTimeout).fill(value);
     }
   } catch (error) {
@@ -244,7 +244,7 @@ export const fill = definePageTool({
     });
     response.appendResponseLine(`Successfully filled out the element`);
     if (request.params.includeSnapshot) {
-      response.includeSnapshot({page});
+      response.includeSnapshot();
     }
   },
 });
@@ -262,11 +262,12 @@ export const typeText = definePageTool({
   },
   handler: async (request, response, context) => {
     const page = request.page;
-    context.assertPageIsFocused(page);
     await context.waitForEventsAfterAction(async () => {
-      await page.keyboard.type(request.params.text);
+      await page.pptrPage.keyboard.type(request.params.text);
       if (request.params.submitKey) {
-        await page.keyboard.press(request.params.submitKey as KeyInput);
+        await page.pptrPage.keyboard.press(
+          request.params.submitKey as KeyInput,
+        );
       }
     });
     response.appendResponseLine(
@@ -288,8 +289,10 @@ export const drag = definePageTool({
     includeSnapshot: includeSnapshotSchema,
   },
   handler: async (request, response, context) => {
-    const fromHandle = await context.getElementByUid(request.params.from_uid);
-    const toHandle = await context.getElementByUid(request.params.to_uid);
+    const fromHandle = await request.page.getElementByUid(
+      request.params.from_uid,
+    );
+    const toHandle = await request.page.getElementByUid(request.params.to_uid);
     try {
       await context.waitForEventsAfterAction(async () => {
         await fromHandle.drag(toHandle);
@@ -339,7 +342,7 @@ export const fillForm = definePageTool({
     }
     response.appendResponseLine(`Successfully filled out the form`);
     if (request.params.includeSnapshot) {
-      response.includeSnapshot({page});
+      response.includeSnapshot();
     }
   },
 });
@@ -360,11 +363,10 @@ export const uploadFile = definePageTool({
     filePath: zod.string().describe('The local path of the file to upload'),
     includeSnapshot: includeSnapshotSchema,
   },
-  handler: async (request, response, context) => {
+  handler: async (request, response) => {
     const {uid, filePath} = request.params;
-    const handle = (await context.getElementByUid(
+    const handle = (await request.page.getElementByUid(
       uid,
-      request.page,
     )) as ElementHandle<HTMLInputElement>;
     try {
       try {
@@ -375,7 +377,7 @@ export const uploadFile = definePageTool({
         // Page.waitForFileChooser() and upload the file this way.
         try {
           const [fileChooser] = await Promise.all([
-            request.page.waitForFileChooser({timeout: 3000}),
+            request.page.pptrPage.waitForFileChooser({timeout: 3000}),
             handle.asLocator().click(),
           ]);
           await fileChooser.accept([filePath]);
@@ -386,7 +388,7 @@ export const uploadFile = definePageTool({
         }
       }
       if (request.params.includeSnapshot) {
-        response.includeSnapshot({page: request.page});
+        response.includeSnapshot();
       }
       response.appendResponseLine(`File uploaded from ${filePath}.`);
     } finally {
@@ -412,17 +414,16 @@ export const pressKey = definePageTool({
   },
   handler: async (request, response, context) => {
     const page = request.page;
-    context.assertPageIsFocused(page);
     const tokens = parseKey(request.params.key);
     const [key, ...modifiers] = tokens;
 
     await context.waitForEventsAfterAction(async () => {
       for (const modifier of modifiers) {
-        await page.keyboard.down(modifier);
+        await page.pptrPage.keyboard.down(modifier);
       }
-      await page.keyboard.press(key);
+      await page.pptrPage.keyboard.press(key);
       for (const modifier of modifiers.toReversed()) {
-        await page.keyboard.up(modifier);
+        await page.pptrPage.keyboard.up(modifier);
       }
     });
 
@@ -430,7 +431,7 @@ export const pressKey = definePageTool({
       `Successfully pressed key: ${request.params.key}`,
     );
     if (request.params.includeSnapshot) {
-      response.includeSnapshot({page});
+      response.includeSnapshot();
     }
   },
 });
