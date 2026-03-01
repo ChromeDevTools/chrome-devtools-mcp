@@ -62,7 +62,7 @@
     "eslint-import-resolver-typescript": "^4.4.4",
     "eslint-plugin-import": "^2.32.0",
     "globals": "^17.0.0",
-    "lighthouse": "13.0.2",
+    "lighthouse": "13.0.3",
     "prettier": "^3.6.2",
     "puppeteer": "24.37.5",
     "rollup": "4.59.0",
