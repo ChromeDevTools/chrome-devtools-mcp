@@ -27,16 +27,24 @@ export class SnapshotFormatter {
 Get a verbose snapshot to include all elements if you are interested in the selected element.\n\n`);
     }
 
-    chunks.push(this.#formatNode(root, 0));
+    chunks.push(this.formatNode(root, 0));
     return chunks.join('');
   }
 
   toJSON(): object {
-    return this.#nodeToJSON(this.#snapshot.root);
+    return this.nodeToJSON(this.#snapshot.root);
   }
 
-  #formatNode(node: TextSnapshotNode, depth = 0): string {
-    const chunks: string[] = [];
+  formatNode(node: TextSnapshotNode, depth = 0): string {
+    const chunks: string[] = [this.formatNodeSelf(node, depth)];
+
+    for (const child of node.children) {
+      chunks.push(this.formatNode(child, depth + 1));
+    }
+    return chunks.join('');
+  }
+
+  formatNodeSelf(node: TextSnapshotNode, depth = 0): string {
     const attributes = this.#getAttributes(node);
     const line =
       ' '.repeat(depth * 2) +
@@ -45,17 +53,12 @@ Get a verbose snapshot to include all elements if you are interested in the sele
         ? ' [selected in the DevTools Elements panel]'
         : '') +
       '\n';
-    chunks.push(line);
-
-    for (const child of node.children) {
-      chunks.push(this.#formatNode(child, depth + 1));
-    }
-    return chunks.join('');
+    return line;
   }
 
-  #nodeToJSON(node: TextSnapshotNode): object {
+  nodeToJSON(node: TextSnapshotNode): object {
     const rawAttrs = this.#getAttributesMap(node);
-    const children = node.children.map(child => this.#nodeToJSON(child));
+    const children = node.children.map(child => this.nodeToJSON(child));
     const result: Record<string, unknown> = structuredClone(rawAttrs);
     if (children.length > 0) {
       result.children = children;
