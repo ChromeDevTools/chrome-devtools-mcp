@@ -85,3 +85,21 @@ export const reloadExtension = defineTool({
     response.appendResponseLine('Extension reloaded.');
   },
 });
+
+export const triggerExtensionAction = defineTool({
+  name: 'trigger_extension_action',
+  description: 'Triggers an action in a Chrome extension.',
+  annotations: {
+    category: ToolCategory.EXTENSIONS,
+    readOnlyHint: false,
+    conditions: [EXTENSIONS_CONDITION],
+  },
+  schema: {
+    id: zod.string().describe('ID of the extension.'),
+  },
+  handler: async (request, response, context) => {
+    const {id} = request.params;
+    await context.triggerExtensionAction(id);
+    response.appendResponseLine(`Extension action triggered. Id: ${id}`);
+  },
+});

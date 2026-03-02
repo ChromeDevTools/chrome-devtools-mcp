@@ -939,6 +939,24 @@ export class McpContext implements Context {
     this.#extensionRegistry.remove(id);
   }
 
+  async triggerExtensionAction(id: string): Promise<void> {
+    const page = this.getSelectedPptrPage();
+    // @ts-expect-error internal puppeteer api is needed since we don't have a way to get
+    // a tab id at the moment
+    const theTarget = page._tabId;
+    const session = await this.browser.target().createCDPSession();
+
+    try {
+      // @ts-expect-error triggerAction is not yet available
+      await session.send('Extensions.triggerAction', {
+        id,
+        targetId: theTarget,
+      });
+    } finally {
+      await session.detach();
+    }
+  }
+
   listExtensions(): InstalledExtension[] {
     return this.#extensionRegistry.list();
   }

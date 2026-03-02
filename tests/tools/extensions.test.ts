@@ -10,15 +10,22 @@ import {afterEach, describe, it} from 'node:test';
 
 import sinon from 'sinon';
 
+import type {ParsedArguments} from '../../src/cli.js';
 import type {McpResponse} from '../../src/McpResponse.js';
 import {
   installExtension,
   uninstallExtension,
   listExtensions,
   reloadExtension,
+  triggerExtensionAction,
 } from '../../src/tools/extensions.js';
+import {listPages} from '../../src/tools/pages.js';
 import {withMcpContext} from '../utils.js';
 
+const EXTENSION_WITH_SW_PATH = path.join(
+  import.meta.dirname,
+  '../../../tests/tools/fixtures/extension-sw',
+);
 const EXTENSION_PATH = path.join(
   import.meta.dirname,
   '../../../tests/tools/fixtures/extension',
@@ -127,5 +134,70 @@ describe('extension', () => {
       const reinstalled = list.find(e => e.id === extensionId);
       assert.ok(reinstalled, 'Extension should be present after reload');
     });
+  });
+  it('triggers an extension action', async () => {
+    await withMcpContext(
+      async (response, context) => {
+        await installExtension.handler(
+          {params: {path: EXTENSION_WITH_SW_PATH}},
+          response,
+          context,
+        );
+
+        const extensionId = extractId(response);
+
+        response.resetResponseLineForTesting();
+        const listPageDef = listPages({
+          categoryExtensions: true,
+        } as ParsedArguments);
+        await listPageDef.handler(
+          {params: {}, page: context.getSelectedMcpPage()},
+          response,
+          context,
+        );
+        let result = await response.handle(listPageDef.name, context);
+        let textContent = result.content.find(c => c.type === 'text') as {
+          type: 'text';
+          text: string;
+        };
+        assert.ok(
+          !textContent.text.includes(extensionId),
+          'Response should not contain extension service worker id',
+        );
+
+        await triggerExtensionAction.handler(
+          {params: {id: extensionId}},
+          response,
+          context,
+        );
+
+        const swTarget = await context.browser.waitForTarget(
+          t => t.type() === 'service_worker' && t.url().includes(extensionId),
+        );
+        const swUrl = swTarget.url();
+
+        response.resetResponseLineForTesting();
+        await listPageDef.handler(
+          {params: {}, page: context.getSelectedMcpPage()},
+          response,
+          context,
+        );
+        result = await response.handle(listPageDef.name, context);
+        textContent = result.content.find(c => c.type === 'text') as {
+          type: 'text';
+          text: string;
+        };
+        assert.ok(
+          textContent.text.includes(swUrl),
+          'Response should contain extension service worker url',
+        );
+      },
+      {
+        executablePath: process.env.CANARY_EXECUTABLE_PATH,
+      },
+      {
+        categoryExtensions: true,
+      } as ParsedArguments,
+    );
   });
 });
