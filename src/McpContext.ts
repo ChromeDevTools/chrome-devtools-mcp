@@ -306,115 +306,95 @@ export class McpContext implements Context {
 
   async emulate(
     options: {
-      networkConditions?: string | null;
-      cpuThrottlingRate?: number | null;
-      geolocation?: GeolocationOptions | null;
-      userAgent?: string | null;
-      colorScheme?: 'dark' | 'light' | 'auto' | null;
-      viewport?: Viewport | null;
+      networkConditions?: string;
+      cpuThrottlingRate?: number;
+      geolocation?: GeolocationOptions;
+      userAgent?: string;
+      colorScheme?: 'dark' | 'light' | 'auto';
+      viewport?: Viewport;
     },
     targetPage?: Page,
   ): Promise<void> {
     const page = targetPage ?? this.getSelectedPptrPage();
     const mcpPage = this.#getMcpPage(page);
     const newSettings: EmulationSettings = {...mcpPage.emulationSettings};
-    let timeoutsNeedUpdate = false;
 
-    if (options.networkConditions !== undefined) {
-      timeoutsNeedUpdate = true;
-      if (
-        options.networkConditions === null ||
-        options.networkConditions === 'No emulation'
-      ) {
-        await page.emulateNetworkConditions(null);
-        delete newSettings.networkConditions;
-      } else if (options.networkConditions === 'Offline') {
-        await page.emulateNetworkConditions({
-          offline: true,
-          download: 0,
-          upload: 0,
-          latency: 0,
-        });
-        newSettings.networkConditions = 'Offline';
-      } else if (options.networkConditions in PredefinedNetworkConditions) {
-        const networkCondition =
-          PredefinedNetworkConditions[
-            options.networkConditions as keyof typeof PredefinedNetworkConditions
-          ];
-        await page.emulateNetworkConditions(networkCondition);
-        newSettings.networkConditions = options.networkConditions;
-      }
+    if (!options.networkConditions) {
+      await page.emulateNetworkConditions(null);
+      delete newSettings.networkConditions;
+    } else if (options.networkConditions === 'Offline') {
+      await page.emulateNetworkConditions({
+        offline: true,
+        download: 0,
+        upload: 0,
+        latency: 0,
+      });
+      newSettings.networkConditions = 'Offline';
+    } else if (options.networkConditions in PredefinedNetworkConditions) {
+      const networkCondition =
+        PredefinedNetworkConditions[
+          options.networkConditions as keyof typeof PredefinedNetworkConditions
+        ];
+      await page.emulateNetworkConditions(networkCondition);
+      newSettings.networkConditions = options.networkConditions;
     }
 
-    if (options.cpuThrottlingRate !== undefined) {
-      timeoutsNeedUpdate = true;
-      if (options.cpuThrottlingRate === null) {
-        await page.emulateCPUThrottling(1);
-        delete newSettings.cpuThrottlingRate;
-      } else {
-        await page.emulateCPUThrottling(options.cpuThrottlingRate);
-        newSettings.cpuThrottlingRate = options.cpuThrottlingRate;
-      }
+    if (!options.cpuThrottlingRate) {
+      await page.emulateCPUThrottling(1);
+      delete newSettings.cpuThrottlingRate;
+    } else {
+      await page.emulateCPUThrottling(options.cpuThrottlingRate);
+      newSettings.cpuThrottlingRate = options.cpuThrottlingRate;
     }
 
-    if (options.geolocation !== undefined) {
-      if (options.geolocation === null) {
-        await page.setGeolocation({latitude: 0, longitude: 0});
-        delete newSettings.geolocation;
-      } else {
-        await page.setGeolocation(options.geolocation);
-        newSettings.geolocation = options.geolocation;
-      }
+    if (!options.geolocation) {
+      await page.setGeolocation({latitude: 0, longitude: 0});
+      delete newSettings.geolocation;
+    } else {
+      await page.setGeolocation(options.geolocation);
+      newSettings.geolocation = options.geolocation;
     }
 
-    if (options.userAgent !== undefined) {
-      if (options.userAgent === null) {
-        await page.setUserAgent({userAgent: undefined});
-        delete newSettings.userAgent;
-      } else {
-        await page.setUserAgent({userAgent: options.userAgent});
-        newSettings.userAgent = options.userAgent;
-      }
+    if (!options.userAgent) {
+      await page.setUserAgent({userAgent: undefined});
+      delete newSettings.userAgent;
+    } else {
+      await page.setUserAgent({userAgent: options.userAgent});
+      newSettings.userAgent = options.userAgent;
     }
 
-    if (options.colorScheme !== undefined) {
-      if (options.colorScheme === null || options.colorScheme === 'auto') {
-        await page.emulateMediaFeatures([
-          {name: 'prefers-color-scheme', value: ''},
-        ]);
-        delete newSettings.colorScheme;
-      } else {
-        await page.emulateMediaFeatures([
-          {name: 'prefers-color-scheme', value: options.colorScheme},
-        ]);
-        newSettings.colorScheme = options.colorScheme;
-      }
+    if (!options.colorScheme || options.colorScheme === 'auto') {
+      await page.emulateMediaFeatures([
+        {name: 'prefers-color-scheme', value: ''},
+      ]);
+      delete newSettings.colorScheme;
+    } else {
+      await page.emulateMediaFeatures([
+        {name: 'prefers-color-scheme', value: options.colorScheme},
+      ]);
+      newSettings.colorScheme = options.colorScheme;
     }
 
-    if (options.viewport !== undefined) {
-      if (options.viewport === null) {
-        await page.setViewport(null);
-        delete newSettings.viewport;
-      } else {
-        const defaults = {
-          deviceScaleFactor: 1,
-          isMobile: false,
-          hasTouch: false,
-          isLandscape: false,
-        };
-        const viewport = {...defaults, ...options.viewport};
-        await page.setViewport(viewport);
-        newSettings.viewport = viewport;
-      }
+    if (!options.viewport) {
+      await page.setViewport(null);
+      delete newSettings.viewport;
+    } else {
+      const defaults = {
+        deviceScaleFactor: 1,
+        isMobile: false,
+        hasTouch: false,
+        isLandscape: false,
+      };
+      const viewport = {...defaults, ...options.viewport};
+      await page.setViewport(viewport);
+      newSettings.viewport = viewport;
     }
 
     mcpPage.emulationSettings = Object.keys(newSettings).length
       ? newSettings
       : {};
 
-    if (timeoutsNeedUpdate) {
-      this.#updateSelectedPageTimeouts();
-    }
+    this.#updateSelectedPageTimeouts();
   }
 
   setIsRunningPerformanceTrace(x: boolean): void {

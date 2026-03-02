@@ -135,7 +135,7 @@ describe('script', () => {
               function: String(async (el: Element) => {
                 return el.id;
               }),
-              args: [{uid: '1_1'}],
+              args: ['1_1'],
             },
           },
           response,
@@ -160,7 +160,7 @@ describe('script', () => {
               function: String((container: Element, child: Element) => {
                 return container.contains(child);
               }),
-              args: [{uid: '1_0'}, {uid: '1_1'}],
+              args: ['1_0', '1_1'],
             },
           },
           response,
@@ -188,7 +188,7 @@ describe('script', () => {
               function: String((element: Element) => {
                 return element.textContent;
               }),
-              args: [{uid: '1_3'}],
+              args: ['1_3'],
             },
           },
           response,
@@ -284,7 +284,7 @@ describe('script', () => {
                 params: {
                   function: String(() => 'test'),
                   serviceWorkerId: 'example_service_worker',
-                  args: [{uid: '1_1'}],
+                  args: ['1_1'],
                 },
               },
               response,
