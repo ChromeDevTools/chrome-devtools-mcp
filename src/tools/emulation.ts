@@ -8,10 +8,13 @@
 import {zod, PredefinedNetworkConditions} from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
-import {definePageTool} from './ToolDefinition.js';
+import {
+  definePageTool,
+  geolocationTransform,
+  viewportTransform,
+} from './ToolDefinition.js';
 
 const throttlingOptions: [string, ...string[]] = [
-  'No emulation',
   'Offline',
   ...Object.keys(PredefinedNetworkConditions),
 ];
@@ -27,41 +30,27 @@ export const emulate = definePageTool({
     networkConditions: zod
       .enum(throttlingOptions)
       .optional()
-      .describe(
-        `Throttle network. Set to "No emulation" to disable. If omitted, conditions remain unchanged.`,
-      ),
+      .describe(`Throttle network. Omit to disable throttling.`),
     cpuThrottlingRate: zod
       .number()
       .min(1)
       .max(20)
       .optional()
       .describe(
-        'Represents the CPU slowdown factor. Set the rate to 1 to disable throttling. If omitted, throttling remains unchanged.',
+        'Represents the CPU slowdown factor. Omit or set the rate to 1 to disable throttling',
       ),
     geolocation: zod
-      .object({
-        latitude: zod
-          .number()
-          .min(-90)
-          .max(90)
-          .describe('Latitude between -90 and 90.'),
-        longitude: zod
-          .number()
-          .min(-180)
-          .max(180)
-          .describe('Longitude between -180 and 180.'),
-      })
-      .nullable()
+      .string()
       .optional()
+      .transform(geolocationTransform)
       .describe(
-        'Geolocation to emulate. Set to null to clear the geolocation override.',
+        'Geolocation (`<latitude>x<longitude>`) to emulate. Latitude between -90 and 90. Longitude between -180 and 180. Omit clear the geolocation override.',
       ),
     userAgent: zod
       .string()
-      .nullable()
       .optional()
       .describe(
-        'User agent to emulate. Set to null to clear the user agent override.',
+        'User agent to emulate. Set to empty string to clear the user agent override.',
       ),
     colorScheme: zod
       .enum(['dark', 'light', 'auto'])
@@ -70,37 +59,11 @@ export const emulate = definePageTool({
         'Emulate the dark or the light mode. Set to "auto" to reset to the default.',
       ),
     viewport: zod
-      .object({
-        width: zod.number().int().min(0).describe('Page width in pixels.'),
-        height: zod.number().int().min(0).describe('Page height in pixels.'),
-        deviceScaleFactor: zod
-          .number()
-          .min(0)
-          .optional()
-          .describe('Specify device scale factor (can be thought of as dpr).'),
-        isMobile: zod
-          .boolean()
-          .optional()
-          .describe(
-            'Whether the meta viewport tag is taken into account. Defaults to false.',
-          ),
-        hasTouch: zod
-          .boolean()
-          .optional()
-          .describe(
-            'Specifies if viewport supports touch events. This should be set to true for mobile devices.',
-          ),
-        isLandscape: zod
-          .boolean()
-          .optional()
-          .describe(
-            'Specifies if viewport is in landscape mode. Defaults to false.',
-          ),
-      })
-      .nullable()
+      .string()
       .optional()
+      .transform(viewportTransform)
       .describe(
-        'Viewport to emulate. Set to null to reset to the default viewport.',
+        `Emulate device viewports '<width>x<height>x<devicePixelRatio>[,mobile][,touch][,landscape]'. 'touch' and 'mobile' to emulate mobile devices. 'landscape' to emulate landscape mode.`,
       ),
   },
   handler: async (request, _response, context) => {

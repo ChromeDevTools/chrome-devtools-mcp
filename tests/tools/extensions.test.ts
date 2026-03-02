@@ -10,28 +10,24 @@ import {afterEach, describe, it} from 'node:test';
 
 import sinon from 'sinon';
 
-import type {McpResponse} from '../../src/McpResponse.js';
+import type {ParsedArguments} from '../../src/cli.js';
 import {
   installExtension,
   uninstallExtension,
   listExtensions,
   reloadExtension,
+  triggerExtensionAction,
 } from '../../src/tools/extensions.js';
-import {withMcpContext} from '../utils.js';
+import {extractExtensionId, withMcpContext} from '../utils.js';
 
+const EXTENSION_WITH_SW_PATH = path.join(
+  import.meta.dirname,
+  '../../../tests/tools/fixtures/extension-sw',
+);
 const EXTENSION_PATH = path.join(
   import.meta.dirname,
   '../../../tests/tools/fixtures/extension',
 );
-
-export function extractId(response: McpResponse) {
-  const responseLine = response.responseLines[0];
-  assert.ok(responseLine, 'Response should not be empty');
-  const match = responseLine.match(/Extension installed\. Id: (.+)/);
-  const extensionId = match ? match[1] : null;
-  assert.ok(extensionId, 'Response should contain a valid key');
-  return extensionId;
-}
 
 describe('extension', () => {
   afterEach(() => {
@@ -47,7 +43,7 @@ describe('extension', () => {
         context,
       );
 
-      const extensionId = extractId(response);
+      const extensionId = extractExtensionId(response);
       const page = context.getSelectedPptrPage();
       await page.goto('chrome://extensions');
 
@@ -102,7 +98,7 @@ describe('extension', () => {
         context,
       );
 
-      const extensionId = extractId(response);
+      const extensionId = extractExtensionId(response);
       const installSpy = sinon.spy(context, 'installExtension');
       response.resetResponseLineForTesting();
 
@@ -127,5 +123,37 @@ describe('extension', () => {
       const reinstalled = list.find(e => e.id === extensionId);
       assert.ok(reinstalled, 'Extension should be present after reload');
     });
+  });
+  it('triggers an extension action', async () => {
+    await withMcpContext(
+      async (response, context) => {
+        const extensionId = await context.installExtension(
+          EXTENSION_WITH_SW_PATH,
+        );
+
+        const targetsBefore = context.browser.targets();
+        const pageTargetBefore = targetsBefore.find(
+          t => t.type() === 'page' && t.url().includes(extensionId),
+        );
+        assert.ok(!pageTargetBefore, 'Page should not exist before action');
+
+        await triggerExtensionAction.handler(
+          {params: {id: extensionId}},
+          response,
+          context,
+        );
+
+        const pageTargetAfter = await context.browser.waitForTarget(
+          t => t.type() === 'page' && t.url().includes(extensionId),
+        );
+        assert.ok(pageTargetAfter, 'Page should exist after action');
+      },
+      {
+        executablePath: process.env.CANARY_EXECUTABLE_PATH,
+      },
+      {
+        categoryExtensions: true,
+      } as ParsedArguments,
+    );
   });
 });
