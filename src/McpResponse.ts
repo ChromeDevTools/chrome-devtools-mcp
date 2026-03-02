@@ -16,6 +16,7 @@ import {DevTools} from './third_party/index.js';
 import type {
   ConsoleMessage,
   ImageContent,
+  Page,
   ResourceType,
   TextContent,
 } from './third_party/index.js';
@@ -568,9 +569,19 @@ Call ${handleDialog.name} to handle it before continuing.`);
 
     if (this.#includePages) {
       const allPages = context.getPages();
-      const regularPages = this.#includeExtensionPages
-        ? allPages.filter(p => !p.url().startsWith('chrome-extension://'))
-        : allPages;
+
+      // Use reduce to separate extension pages and normal pages
+      const {regularPages, extensionPages} = allPages.reduce(
+        (acc: {regularPages: Page[]; extensionPages: Page[]}, page: Page) => {
+          if (page.url().startsWith('chrome-extension://')) {
+            acc.extensionPages.push(page);
+          } else {
+            acc.regularPages.push(page);
+          }
+          return acc;
+        },
+        {regularPages: [], extensionPages: []},
+      );
 
       if (regularPages.length) {
         const parts = [`## Pages`];
@@ -604,9 +615,6 @@ Call ${handleDialog.name} to handle it before continuing.`);
       }
 
       if (this.#includeExtensionPages) {
-        const extensionPages = allPages.filter(p =>
-          p.url().startsWith('chrome-extension://'),
-        );
         if (extensionPages.length) {
           response.push(`## Extension Pages`);
           for (const page of extensionPages) {

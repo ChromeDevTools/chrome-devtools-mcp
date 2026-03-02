@@ -109,7 +109,7 @@ export class McpContext implements Context {
     null;
 
   #nextPageId = 1;
-  #extensionPopupPages = new WeakMap<Target, Page>();
+  #extensionPages = new WeakMap<Target, Page>();
 
   #extensionServiceWorkerMap = new WeakMap<Target, string>();
   #nextExtensionServiceWorkerId = 1;
@@ -559,7 +559,7 @@ export class McpContext implements Context {
   async createPagesSnapshot(): Promise<Page[]> {
     const {pages: allPages, isolatedContextNames} = await this.#getAllPages();
 
-    const allTargets = await this.browser.targets();
+    const allTargets = this.browser.targets();
     const extensionTargets = allTargets.filter(target => {
       return (
         target.url().startsWith('chrome-extension://') &&
@@ -570,11 +570,11 @@ export class McpContext implements Context {
     for (const target of extensionTargets) {
       let page = await target.page();
       if (!page) {
-        page = this.#extensionPopupPages.get(target) ?? null;
+        page = this.#extensionPages.get(target) ?? null;
         if (!page) {
           try {
             page = await target.asPage();
-            this.#extensionPopupPages.set(target, page);
+            this.#extensionPages.set(target, page);
           } catch (e) {
             this.logger('Failed to get page for extension target', e);
           }
