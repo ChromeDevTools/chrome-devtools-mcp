@@ -51,6 +51,30 @@ describe('console', () => {
       });
     });
 
+    it('groups identical messages', async () => {
+      await withMcpContext(async (response, context) => {
+        const page = await context.newPage();
+        await page.setContent(`
+          <script>
+            for (let i = 0; i < 5; i++) {
+              console.log('spam');
+            }
+          </script>
+        `);
+        await listConsoleMessages.handler({params: {}}, response, context);
+        const formattedResponse = await response.handle('test', context);
+        const textContent = getTextContent(formattedResponse.content[0]);
+        assert.ok(
+          textContent.includes('msgid=1 [log] spam (1 args) [5 times]'),
+          textContent,
+        );
+        assert.ok(
+          !textContent.includes('msgid=2 [log] spam'),
+          'Should collapse subsequent identical messages',
+        );
+      });
+    });
+
     it('lists error objects', async t => {
       await withMcpContext(async (response, context) => {
         const page = context.getSelectedMcpPage();

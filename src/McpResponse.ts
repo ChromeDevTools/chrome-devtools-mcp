@@ -39,6 +39,51 @@ interface TraceInsightData {
   insightName: InsightName;
 }
 
+class GroupedConsoleMessage {
+  readonly key: string;
+  #first: ConsoleFormatter;
+  #count = 0;
+  #msgids: number[] = [];
+
+  constructor(first: ConsoleFormatter) {
+    this.#first = first;
+    this.key = GroupedConsoleMessage.keyFor(first);
+    this.add(first);
+  }
+
+  static keyFor(message: ConsoleFormatter): string {
+    const json = message.toJSON();
+    return JSON.stringify({
+      type: json.type,
+      text: json.text,
+      argsCount: json.argsCount,
+    });
+  }
+
+  add(message: ConsoleFormatter): void {
+    const json = message.toJSON();
+    this.#count++;
+    this.#msgids.push(json.id);
+  }
+
+  toString(): string {
+    const base = this.#first.toString();
+    if (this.#count <= 1) {
+      return base;
+    }
+    return `${base} [${this.#count} times]`;
+  }
+
+  toJSON(): object {
+    const base = this.#first.toJSON();
+    return {
+      ...base,
+      count: this.#count,
+      msgids: this.#msgids,
+    };
+  }
+}
+
 export class McpResponse implements Response {
   #includePages = false;
   #includeExtensionServiceWorkers = false;
@@ -731,7 +776,7 @@ Call ${handleDialog.name} to handle it before continuing.`);
     }
 
     if (this.#consoleDataOptions?.include) {
-      const messages = data.consoleMessages ?? [];
+      const messages = this.#groupConsoleMessages(data.consoleMessages ?? []);
 
       response.push('## Console messages');
       if (messages.length) {
@@ -767,6 +812,41 @@ Call ${handleDialog.name} to handle it before continuing.`);
       content: [text, ...images],
       structuredContent,
     };
+  }
+
+  #groupConsoleMessages(
+    messages: Array<ConsoleFormatter | IssueFormatter>,
+  ): Array<ConsoleFormatter | IssueFormatter | GroupedConsoleMessage> {
+    const result: Array<ConsoleFormatter | IssueFormatter | GroupedConsoleMessage> = [];
+
+    let activeGroup: GroupedConsoleMessage | null = null;
+
+    const flush = () => {
+      if (activeGroup) {
+        result.push(activeGroup);
+        activeGroup = null;
+      }
+    };
+
+    for (const message of messages) {
+      if (!(message instanceof ConsoleFormatter)) {
+        flush();
+        result.push(message);
+        continue;
+      }
+
+      const key = GroupedConsoleMessage.keyFor(message);
+      if (activeGroup && activeGroup.key === key) {
+        activeGroup.add(message);
+        continue;
+      }
+
+      flush();
+      activeGroup = new GroupedConsoleMessage(message);
+    }
+
+    flush();
+    return result;
   }
 
   #dataWithPagination<T>(data: T[], pagination?: PaginationOptions) {
