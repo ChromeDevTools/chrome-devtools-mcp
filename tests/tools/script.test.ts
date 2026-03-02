@@ -12,7 +12,7 @@ import type {ParsedArguments} from '../../src/cli.js';
 import {installExtension} from '../../src/tools/extensions.js';
 import {evaluateScript} from '../../src/tools/script.js';
 import {serverHooks} from '../server.js';
-import {extractId, html, withMcpContext} from '../utils.js';
+import {extractExtensionId, html, withMcpContext} from '../utils.js';
 
 const EXTENSION_PATH = path.join(
   import.meta.dirname,
@@ -207,7 +207,7 @@ describe('script', () => {
             context,
           );
 
-          const extensionId = extractId(response);
+          const extensionId = extractExtensionId(response);
           const swTarget = await context.browser.waitForTarget(
             t => t.type() === 'service_worker' && t.url().includes(extensionId),
           );

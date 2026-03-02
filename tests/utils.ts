@@ -44,7 +44,7 @@ export function getImageContent(content: CallToolResult['content'][number]): {
   throw new Error(`Expected image content but got ${content.type}`);
 }
 
-export function extractId(response: McpResponse) {
+export function extractExtensionId(response: McpResponse) {
   const responseLine = response.responseLines[0];
   assert.ok(responseLine, 'Response should not be empty');
   const match = responseLine.match(/Extension installed\. Id: (.+)/);
@@ -101,7 +101,6 @@ export async function withMcpContext(
     debug?: boolean;
     autoOpenDevTools?: boolean;
     performanceCrux?: boolean;
-    channel?: string;
     executablePath?: string;
   } = {},
   args: ParsedArguments = {} as ParsedArguments,

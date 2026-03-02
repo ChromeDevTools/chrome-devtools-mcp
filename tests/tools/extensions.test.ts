@@ -19,7 +19,7 @@ import {
   triggerExtensionAction,
 } from '../../src/tools/extensions.js';
 import {listPages} from '../../src/tools/pages.js';
-import {extractId, withMcpContext} from '../utils.js';
+import {extractExtensionId, withMcpContext} from '../utils.js';
 
 const EXTENSION_WITH_SW_PATH = path.join(
   import.meta.dirname,
@@ -44,7 +44,7 @@ describe('extension', () => {
         context,
       );
 
-      const extensionId = extractId(response);
+      const extensionId = extractExtensionId(response);
       const page = context.getSelectedPptrPage();
       await page.goto('chrome://extensions');
 
@@ -99,7 +99,7 @@ describe('extension', () => {
         context,
       );
 
-      const extensionId = extractId(response);
+      const extensionId = extractExtensionId(response);
       const installSpy = sinon.spy(context, 'installExtension');
       response.resetResponseLineForTesting();
 
@@ -132,7 +132,6 @@ describe('extension', () => {
           EXTENSION_WITH_SW_PATH,
         );
 
-        response.resetResponseLineForTesting();
         const listPageDef = listPages({
           categoryExtensions: true,
         } as ParsedArguments);
