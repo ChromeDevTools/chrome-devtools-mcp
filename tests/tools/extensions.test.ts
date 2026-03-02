@@ -193,9 +193,6 @@ describe('extension', () => {
         );
       },
       {
-        channel: process.env.CANARY_EXECUTABLE_PATH
-          ? undefined
-          : 'chrome-canary',
         executablePath: process.env.CANARY_EXECUTABLE_PATH,
       },
       {
