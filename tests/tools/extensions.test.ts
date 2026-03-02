@@ -11,7 +11,6 @@ import {afterEach, describe, it} from 'node:test';
 import sinon from 'sinon';
 
 import type {ParsedArguments} from '../../src/cli.js';
-import type {McpResponse} from '../../src/McpResponse.js';
 import {
   installExtension,
   uninstallExtension,
@@ -20,7 +19,7 @@ import {
   triggerExtensionAction,
 } from '../../src/tools/extensions.js';
 import {listPages} from '../../src/tools/pages.js';
-import {withMcpContext} from '../utils.js';
+import {extractId, withMcpContext} from '../utils.js';
 
 const EXTENSION_WITH_SW_PATH = path.join(
   import.meta.dirname,
@@ -30,15 +29,6 @@ const EXTENSION_PATH = path.join(
   import.meta.dirname,
   '../../../tests/tools/fixtures/extension',
 );
-
-export function extractId(response: McpResponse) {
-  const responseLine = response.responseLines[0];
-  assert.ok(responseLine, 'Response should not be empty');
-  const match = responseLine.match(/Extension installed\. Id: (.+)/);
-  const extensionId = match ? match[1] : null;
-  assert.ok(extensionId, 'Response should contain a valid key');
-  return extensionId;
-}
 
 describe('extension', () => {
   afterEach(() => {
@@ -135,16 +125,12 @@ describe('extension', () => {
       assert.ok(reinstalled, 'Extension should be present after reload');
     });
   });
-  it('triggers an extension action', async () => {
+  it('triggers an extension action', async t => {
     await withMcpContext(
       async (response, context) => {
-        await installExtension.handler(
-          {params: {path: EXTENSION_WITH_SW_PATH}},
-          response,
-          context,
+        const extensionId = await context.installExtension(
+          EXTENSION_WITH_SW_PATH,
         );
-
-        const extensionId = extractId(response);
 
         response.resetResponseLineForTesting();
         const listPageDef = listPages({
@@ -160,9 +146,8 @@ describe('extension', () => {
           type: 'text';
           text: string;
         };
-        assert.ok(
-          !textContent.text.includes(extensionId),
-          'Response should not contain extension service worker id',
+        t.assert.snapshot?.(
+          textContent.text.replaceAll(extensionId, '<extension-id>'),
         );
 
         await triggerExtensionAction.handler(
@@ -187,9 +172,11 @@ describe('extension', () => {
           type: 'text';
           text: string;
         };
-        assert.ok(
-          textContent.text.includes(swUrl),
-          'Response should contain extension service worker url',
+        t.assert.snapshot?.(
+          textContent.text
+            .replaceAll(extensionId, '<extension-id>')
+            .replaceAll(swUrl, '<sw-url>')
+            .replaceAll(/localhost:\d+/g, 'localhost:<port>'),
         );
       },
       {

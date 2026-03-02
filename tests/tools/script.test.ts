@@ -12,9 +12,7 @@ import type {ParsedArguments} from '../../src/cli.js';
 import {installExtension} from '../../src/tools/extensions.js';
 import {evaluateScript} from '../../src/tools/script.js';
 import {serverHooks} from '../server.js';
-import {html, withMcpContext} from '../utils.js';
-
-import {extractId} from './extensions.test.js';
+import {extractId, html, withMcpContext} from '../utils.js';
 
 const EXTENSION_PATH = path.join(
   import.meta.dirname,

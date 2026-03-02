@@ -1,0 +1,13 @@
+exports[`extension > triggers an extension action 1`] = `
+# list_pages response
+## Pages
+1: about:blank [selected]
+`;
+
+exports[`extension > triggers an extension action 2`] = `
+# list_pages response
+## Pages
+1: about:blank [selected]
+## Extension Service Workers
+sw-1: chrome-extension://<extension-id>/sw.js
+`;
