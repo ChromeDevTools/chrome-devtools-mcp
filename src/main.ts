@@ -17,6 +17,10 @@ import {VERSION} from './version.js';
 
 export const args = parseArguments(VERSION);
 
+if (args.slim === undefined) {
+  args.slim = false;
+}
+
 const logFile = args.logFile ? saveLogsToFile(args.logFile) : undefined;
 if (
   process.env['CI'] ||
