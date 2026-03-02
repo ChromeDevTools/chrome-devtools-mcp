@@ -36,10 +36,10 @@ export interface TextSnapshot {
 }
 
 export interface EmulationSettings {
-  networkConditions?: string | null;
-  cpuThrottlingRate?: number | null;
-  geolocation?: GeolocationOptions | null;
-  userAgent?: string | null;
-  colorScheme?: 'dark' | 'light' | null;
-  viewport?: Viewport | null;
+  networkConditions?: string;
+  cpuThrottlingRate?: number;
+  geolocation?: GeolocationOptions;
+  userAgent?: string;
+  colorScheme?: 'dark' | 'light';
+  viewport?: Viewport;
 }

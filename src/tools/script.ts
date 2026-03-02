@@ -38,13 +38,11 @@ Example with arguments: \`(el) => {
       ),
       args: zod
         .array(
-          zod.object({
-            uid: zod
-              .string()
-              .describe(
-                'The uid of an element on the page from the page content snapshot',
-              ),
-          }),
+          zod
+            .string()
+            .describe(
+              'The uid of an element on the page from the page content snapshot',
+            ),
         )
         .optional()
         .describe(`An optional list of arguments to pass to the function.`),
@@ -91,8 +89,8 @@ Example with arguments: \`(el) => {
       const args: Array<JSHandle<unknown>> = [];
       try {
         const frames = new Set<Frame>();
-        for (const el of uidArgs ?? []) {
-          const handle = await mcpPage.getElementByUid(el.uid);
+        for (const uid of uidArgs ?? []) {
+          const handle = await mcpPage.getElementByUid(uid);
           frames.add(handle.frame);
           args.push(handle);
         }

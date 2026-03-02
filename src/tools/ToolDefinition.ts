@@ -150,12 +150,12 @@ export type Context = Readonly<{
   restoreEmulation(page: ContextPage): Promise<void>;
   emulate(
     options: {
-      networkConditions?: string | null;
-      cpuThrottlingRate?: number | null;
-      geolocation?: GeolocationOptions | null;
-      userAgent?: string | null;
-      colorScheme?: 'dark' | 'light' | 'auto' | null;
-      viewport?: Viewport | null;
+      networkConditions?: string;
+      cpuThrottlingRate?: number;
+      geolocation?: GeolocationOptions;
+      userAgent?: string;
+      colorScheme?: 'dark' | 'light' | 'auto';
+      viewport?: Viewport;
     },
     targetPage?: Page,
   ): Promise<void>;
@@ -310,3 +310,46 @@ export const timeoutSchema = {
       return value && value <= 0 ? undefined : value;
     }),
 };
+
+export function viewportTransform(arg: string | undefined):
+  | {
+      width: number;
+      height: number;
+      deviceScaleFactor?: number;
+      isMobile?: boolean;
+      isLandscape?: boolean;
+      hasTouch?: boolean;
+    }
+  | undefined {
+  if (!arg) {
+    return undefined;
+  }
+  const [dimensions, ...tags] = arg.split(',');
+  const isMobile = tags.includes('mobile');
+  const hasTouch = tags.includes('touch');
+  const isLandscape = tags.includes('landscape');
+  const [width, height, dpr] = dimensions.split('x').map(Number) as [
+    number,
+    number,
+    number | undefined,
+  ];
+  return {
+    width,
+    height,
+    deviceScaleFactor: dpr,
+    isMobile: isMobile,
+    isLandscape: isLandscape,
+    hasTouch: hasTouch,
+  };
+}
+
+export function geolocationTransform(arg: string | undefined) {
+  if (!arg) {
+    return undefined;
+  }
+  const [latitude, longitude] = arg.split('x').map(Number) as [number, number];
+  return {
+    latitude,
+    longitude,
+  };
+}
