@@ -11,7 +11,7 @@ import net from 'node:net';
 import {logger} from '../logger.js';
 import {PipeTransport} from '../third_party/index.js';
 
-import type {DaemonMessage} from './types.js';
+import type {DaemonMessage, DaemonResponse} from './types.js';
 import {
   DAEMON_SCRIPT_PATH,
   getSocketPath,
@@ -80,7 +80,9 @@ const SEND_COMMAND_TIMEOUT = 60_000; // ms
 /**
  * `sendCommand` opens a socket connection sends a single command and disconnects.
  */
-async function sendCommand(command: DaemonMessage) {
+export async function sendCommand(
+  command: DaemonMessage,
+): Promise<DaemonResponse> {
   const socketPath = getSocketPath();
 
   const socket = net.createConnection({
