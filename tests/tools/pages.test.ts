@@ -12,7 +12,10 @@ import type {Dialog} from 'puppeteer-core';
 import sinon from 'sinon';
 
 import type {ParsedArguments} from '../../src/cli.js';
-import {installExtension} from '../../src/tools/extensions.js';
+import {
+  installExtension,
+  triggerExtensionAction,
+} from '../../src/tools/extensions.js';
 import {
   listPages,
   newPage,
@@ -24,6 +27,8 @@ import {
   getTabId,
 } from '../../src/tools/pages.js';
 import {html, withMcpContext} from '../utils.js';
+
+import {extractId} from './extensions.test.js';
 
 const EXTENSION_PATH = path.join(
   import.meta.dirname,
@@ -46,8 +51,61 @@ describe('pages', () => {
         assert.ok(response.includePages);
       });
     });
+    it(`list pages for extension pages with --category-extensions`, async () => {
+      await withMcpContext(
+        async (response, context) => {
+          await installExtension.handler(
+            {params: {path: EXTENSION_PATH}},
+            response,
+            context,
+          );
+
+          const extensionId = extractId(response);
+          assert.ok(extensionId);
+
+          await triggerExtensionAction.handler(
+            {params: {id: extensionId}},
+            response,
+            context,
+          );
+          const popupTarget = await context.browser.waitForTarget(
+            t => t.type() === 'page' && t.url().includes('chrome-extension://'),
+          );
+
+          response.resetResponseLineForTesting();
+
+          const listPageDef = listPages({
+            categoryExtensions: true,
+          } as ParsedArguments);
+          await listPageDef.handler(
+            {params: {}, page: context.getSelectedMcpPage()},
+            response,
+            context,
+          );
+
+          const result = await response.handle(listPageDef.name, context);
+          const textContent = result.content.find(c => c.type === 'text') as {
+            type: 'text';
+            text: string;
+          };
+          assert.ok(textContent);
+
+          assert.ok(textContent.text.includes(popupTarget.url()));
+        },
+        {
+          channel: process.env.CANARY_EXECUTABLE_PATH
+            ? undefined
+            : 'chrome-canary',
+          executablePath: process.env.CANARY_EXECUTABLE_PATH,
+        },
+        {
+          categoryExtensions: true,
+        } as ParsedArguments,
+      );
+    });
+
     for (const categoryExtensions of [true, false]) {
-      it(`list pages ${categoryExtensions ? 'with' : 'without'} --category-extensions`, async () => {
+      it(`list pages for extension service workers ${categoryExtensions ? 'with' : 'without'} --category-extensions`, async () => {
         await withMcpContext(
           async (response, context) => {
             await installExtension.handler(
