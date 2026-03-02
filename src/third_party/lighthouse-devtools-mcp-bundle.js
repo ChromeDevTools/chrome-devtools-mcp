@@ -1,5 +1,5 @@
 /**
- * Lighthouse v13.0.3-4-ga9dfea556 (Feb 23 2026)
+ * Lighthouse v13.0.3-3-g565cfd0f2 (Mar 02 2026)
  *
  * Automated auditing, performance metrics, and best practices for the web.
  *
@@ -3608,80 +3608,6 @@ var init_audit = __esm({
         const gatherContext = artifacts.GatherContext;
         const { URL: URL3, HostDPR, SourceMaps: SourceMaps2 } = artifacts;
         return { trace, devtoolsLog, gatherContext, settings: context.settings, URL: URL3, SourceMaps: SourceMaps2, HostDPR, simulator: null };
-      }
-    };
-  }
-});
-
-// core/scoring.js
-var clampTo2Decimals2, ReportScoring;
-var init_scoring = __esm({
-  "core/scoring.js"() {
-    "use strict";
-    init_process_global();
-    init_audit();
-    /**
-     * @license
-     * Copyright 2018 Google LLC
-     * SPDX-License-Identifier: Apache-2.0
-     */
-    clampTo2Decimals2 = /* @__PURE__ */ __name((val) => Math.round(val * 100) / 100, "clampTo2Decimals");
-    ReportScoring = class _ReportScoring {
-      static {
-        __name(this, "ReportScoring");
-      }
-      /**
-       * Computes the weighted-average of the score of the list of items.
-       * @param {Array<{score: number|null, weight: number}>} items
-       * @return {number|null}
-       */
-      static arithmeticMean(items) {
-        items = items.filter((item) => item.weight > 0);
-        if (items.some((item) => item.score === null)) return null;
-        const results = items.reduce(
-          (result, item) => {
-            const score = item.score;
-            const weight = item.weight;
-            return {
-              weight: result.weight + weight,
-              sum: result.sum + /** @type {number} */
-              score * weight
-            };
-          },
-          { weight: 0, sum: 0 }
-        );
-        return clampTo2Decimals2(results.sum / results.weight || 0);
-      }
-      /**
-       * Returns the report JSON object with computed scores.
-       * @param {Object<string, LH.Config.Category>} configCategories
-       * @param {Object<string, LH.RawIcu<LH.Audit.Result>>} resultsByAuditId
-       * @return {Object<string, LH.RawIcu<LH.Result.Category>>}
-       */
-      static scoreAllCategories(configCategories, resultsByAuditId) {
-        const scoredCategories = {};
-        for (const [categoryId, configCategory] of Object.entries(configCategories)) {
-          const auditRefs = configCategory.auditRefs.map((configMember) => {
-            const member = { ...configMember };
-            const result = resultsByAuditId[member.id];
-            if (result.scoreDisplayMode === Audit.SCORING_MODES.NOT_APPLICABLE || result.scoreDisplayMode === Audit.SCORING_MODES.INFORMATIVE || result.scoreDisplayMode === Audit.SCORING_MODES.MANUAL) {
-              member.weight = 0;
-            }
-            return member;
-          });
-          const scores = auditRefs.map((auditRef) => ({
-            score: resultsByAuditId[auditRef.id].score,
-            weight: auditRef.weight
-          }));
-          const score = _ReportScoring.arithmeticMean(scores);
-          scoredCategories[categoryId] = {
-            ...configCategory,
-            auditRefs,
-            id: categoryId,
-            score
-          };
-        }
-        return scoredCategories;
       }
     };
   }
@@ -10081,126 +10007,6 @@ var init_i18n = __esm({
     __name(lookupLocale, "lookupLocale");
     __name(createIcuMessageFn, "createIcuMessageFn");
     __name(isStringOrIcuMessage, "isStringOrIcuMessage");
-  }
-});
-
-// core/lib/stack-packs.js
-function getStackPacks(pageStacks) {
-  if (!pageStacks) return [];
-  const packs = [];
-  for (const pageStack of pageStacks) {
-    const stackPackToIncl = stackPacksToInclude.find((stackPackToIncl2) => stackPackToIncl2.requiredStacks.includes(`${pageStack.detector}:${pageStack.id}`));
-    if (!stackPackToIncl) {
-      continue;
-    }
-    const matchedPack = import_lighthouse_stack_packs.default.find((pack) => pack.id === stackPackToIncl.packId);
-    if (!matchedPack) {
-      lighthouse_logger_default.warn(
-        "StackPacks",
-        `'${stackPackToIncl.packId}' stack pack was matched but is not found in stack-packs lib`
-      );
-      continue;
-    }
-    const str_105 = createIcuMessageFn(
-      `node_modules/lighthouse-stack-packs/packs/${matchedPack.id}.js`,
-      matchedPack.UIStrings
-    );
-    const descriptions = {};
-    const UIStrings125 = matchedPack.UIStrings;
-    for (const key in UIStrings125) {
-      if (UIStrings125[key]) {
-        descriptions[key] = str_105(UIStrings125[key]);
-      }
-    }
-    packs.push({
-      id: matchedPack.id,
-      title: matchedPack.title,
-      iconDataURL: matchedPack.icon,
-      descriptions
-    });
-  }
-  return packs.sort((a, b) => {
-    const aVal = stackPacksToInclude.findIndex((p) => p.packId === a.id);
-    const bVal = stackPacksToInclude.findIndex((p) => p.packId === b.id);
-    return aVal - bVal;
-  });
-}
-var import_lighthouse_stack_packs, stackPacksToInclude;
-var init_stack_packs = __esm({
-  "core/lib/stack-packs.js"() {
-    "use strict";
-    init_process_global();
-    init_lighthouse_logger();
-    import_lighthouse_stack_packs = __toESM(require_lighthouse_stack_packs(), 1);
-    init_i18n();
-    /**
-     * @license
-     * Copyright 2019 Google LLC
-     * SPDX-License-Identifier: Apache-2.0
-     */
-    stackPacksToInclude = [
-      {
-        packId: "gatsby",
-        requiredStacks: ["js:gatsby"]
-      },
-      {
-        packId: "wordpress",
-        requiredStacks: ["js:wordpress"]
-      },
-      {
-        packId: "wix",
-        requiredStacks: ["js:wix"]
-      },
-      {
-        packId: "wp-rocket",
-        requiredStacks: ["js:wp-rocket"]
-      },
-      {
-        packId: "ezoic",
-        requiredStacks: ["js:ezoic"]
-      },
-      {
-        packId: "drupal",
-        requiredStacks: ["js:drupal"]
-      },
-      {
-        packId: "nitropack",
-        requiredStacks: ["js:nitropack"]
-      },
-      {
-        packId: "amp",
-        requiredStacks: ["js:amp"]
-      },
-      {
-        packId: "magento",
-        requiredStacks: ["js:magento"]
-      },
-      {
-        packId: "octobercms",
-        requiredStacks: ["js:octobercms"]
-      },
-      {
-        packId: "joomla",
-        requiredStacks: ["js:joomla"]
-      },
-      {
-        packId: "next.js",
-        requiredStacks: ["js:next"]
-      },
-      {
-        packId: "nuxt",
-        requiredStacks: ["js:nuxt"]
-      },
-      {
-        packId: "angular",
-        requiredStacks: ["js:angular"]
-      },
-      {
-        packId: "react",
-        requiredStacks: ["js:react"]
-      }
-    ];
-    __name(getStackPacks, "getStackPacks");
   }
 });
 
@@ -30133,19 +29939,6 @@ var init_lantern2 = __esm({
   }
 });
 
-// core/lib/lantern-trace-saver.js
-var init_lantern_trace_saver = __esm({
-  "core/lib/lantern-trace-saver.js"() {
-    "use strict";
-    init_process_global();
-    /**
-     * @license
-     * Copyright 2018 Google LLC
-     * SPDX-License-Identifier: Apache-2.0
-     */
-  }
-});
-
 // core/lib/tracehouse/trace-processor.js
 var ACCEPTABLE_NAVIGATION_URL_REGEX, BASE_RESPONSE_LATENCY, SCHEDULABLE_TASK_TITLE_LH2, SCHEDULABLE_TASK_TITLE_ALT12, SCHEDULABLE_TASK_TITLE_ALT22, SCHEDULABLE_TASK_TITLE_ALT32, TraceProcessor2;
 var init_trace_processor = __esm({
@@ -30886,21 +30679,6 @@ var init_trace_processor = __esm({
         };
       }
     };
-  }
-});
-
-// core/lib/traces/metric-trace-events.js
-var init_metric_trace_events = __esm({
-  "core/lib/traces/metric-trace-events.js"() {
-    "use strict";
-    init_process_global();
-    init_lighthouse_logger();
-    init_trace_processor();
-    /**
-     * @license
-     * Copyright 2017 Google LLC
-     * SPDX-License-Identifier: Apache-2.0
-     */
   }
 });
 
@@ -33082,1607 +32860,6 @@ var init_network_records = __esm({
       }
     };
     NetworkRecordsComputed = makeComputedArtifact(NetworkRecords, null);
-  }
-});
-
-// core/computed/network-analysis.js
-var NetworkAnalysis, NetworkAnalysisComputed;
-var init_network_analysis = __esm({
-  "core/computed/network-analysis.js"() {
-    "use strict";
-    init_process_global();
-    init_lighthouse_logger();
-    init_lantern2();
-    init_computed_artifact();
-    init_network_records();
-    /**
-     * @license
-     * Copyright 2017 Google LLC
-     * SPDX-License-Identifier: Apache-2.0
-     */
-    NetworkAnalysis = class {
-      static {
-        __name(this, "NetworkAnalysis");
-      }
-      /**
-       * @param {LH.DevtoolsLog} devtoolsLog
-       * @param {LH.Artifacts.ComputedContext} context
-       * @return {Promise<LH.Artifacts.NetworkAnalysis>}
-       */
-      static async compute_(devtoolsLog, context) {
-        const records = await NetworkRecordsComputed.request(devtoolsLog, context);
-        const analysis = core_exports.NetworkAnalyzer.analyze(records);
-        if (!analysis) {
-          lighthouse_logger_default.error("NetworkAnalysis", "Network analysis failed due to lack of transfer data");
-          return {
-            throughput: 0,
-            rtt: Number.POSITIVE_INFINITY,
-            additionalRttByOrigin: /* @__PURE__ */ new Map(),
-            serverResponseTimeByOrigin: /* @__PURE__ */ new Map()
-          };
-        }
-        return analysis;
-      }
-    };
-    NetworkAnalysisComputed = makeComputedArtifact(NetworkAnalysis, null);
-  }
-});
-
-// core/computed/load-simulator.js
-var LoadSimulator, LoadSimulatorComputed;
-var init_load_simulator = __esm({
-  "core/computed/load-simulator.js"() {
-    "use strict";
-    init_process_global();
-    init_computed_artifact();
-    init_lantern2();
-    init_network_analysis();
-    /**
-     * @license
-     * Copyright 2018 Google LLC
-     * SPDX-License-Identifier: Apache-2.0
-     */
-    LoadSimulator = class {
-      static {
-        __name(this, "LoadSimulator");
-      }
-      /**
-       * @param {{devtoolsLog: LH.DevtoolsLog, settings: LH.Audit.Context['settings']}} data
-       * @param {LH.Artifacts.ComputedContext} context
-       * @return {Promise<LH.Gatherer.Simulation.Simulator>}
-       */
-      static async compute_(data31, context) {
-        const networkAnalysis = await NetworkAnalysisComputed.request(data31.devtoolsLog, context);
-        return simulation_exports.Simulator.createSimulator({ ...data31.settings, networkAnalysis });
-      }
-      /**
-       * @param {LH.Artifacts.NetworkAnalysis} networkAnalysis
-       * @return {LH.PrecomputedLanternData}
-       */
-      static convertAnalysisToSaveableLanternData(networkAnalysis) {
-        const lanternData = { additionalRttByOrigin: {}, serverResponseTimeByOrigin: {} };
-        for (const [origin, value] of networkAnalysis.additionalRttByOrigin.entries()) {
-          if (origin.startsWith("http")) lanternData.additionalRttByOrigin[origin] = value;
-        }
-        for (const [origin, value] of networkAnalysis.serverResponseTimeByOrigin.entries()) {
-          if (origin.startsWith("http")) lanternData.serverResponseTimeByOrigin[origin] = value;
-        }
-        return lanternData;
-      }
-    };
-    LoadSimulatorComputed = makeComputedArtifact(LoadSimulator, ["devtoolsLog", "settings"]);
-  }
-});
-
-// core/lib/asset-saver.js
-import fs from "fs";
-import path3 from "path";
-import stream from "stream";
-import { createGzip, gunzipSync } from "zlib";
-async function writeJson(contents, path7, gzip) {
-  const writeStream = fs.createWriteStream(gzip ? path7 + ".gz" : path7);
-  if (gzip) {
-    await stream.promises.pipeline(contents, createGzip(), writeStream);
-  } else {
-    await stream.promises.pipeline(contents, writeStream);
-  }
-}
-function readJson(filename, reviver) {
-  if (fs.existsSync(filename + ".gz")) {
-    filename = filename + ".gz";
-  }
-  if (!filename.endsWith(".json.gz")) {
-    return JSON.parse(fs.readFileSync(filename, "utf8"), reviver);
-  }
-  const buffer = gunzipSync(fs.readFileSync(filename));
-  return JSON.parse(buffer.toString("utf8"), reviver);
-}
-function endsWithSuffix(filename, suffix) {
-  return filename.endsWith(suffix) || filename.endsWith(suffix + ".gz");
-}
-function loadArtifacts(basePath) {
-  lighthouse_logger_default.log("Reading artifacts from disk:", basePath);
-  if (!fs.existsSync(basePath)) {
-    throw new Error("No saved artifacts found at " + basePath);
-  }
-  const artifacts = readJson(path3.join(basePath, artifactsFilename), LighthouseError.parseReviver);
-  const filenames = fs.readdirSync(basePath);
-  filenames.filter((f) => endsWithSuffix(f, devtoolsFilename)).forEach((filename) => {
-    const devtoolsLog = readJson(path3.join(basePath, filename));
-    if (filename.startsWith(devtoolsFilename)) {
-      artifacts.DevtoolsLog = devtoolsLog;
-    } else if (filename.startsWith(errorPrefix)) {
-      artifacts.DevtoolsLogError = devtoolsLog;
-    }
-  });
-  filenames.filter((f) => endsWithSuffix(f, traceFilename)).forEach((filename) => {
-    let trace = readJson(path3.join(basePath, filename));
-    if (Array.isArray(trace)) {
-      trace = { traceEvents: trace };
-    }
-    if (filename.startsWith(traceFilename)) {
-      artifacts.Trace = trace;
-    } else if (filename.startsWith(errorPrefix)) {
-      artifacts.TraceError = trace;
-    }
-  });
-  if (Array.isArray(artifacts.Timing)) {
-    artifacts.Timing.forEach((entry) => entry.gather = true);
-  }
-  return artifacts;
-}
-function stringifyReplacer(key, value) {
-  if (value instanceof Error) {
-    return LighthouseError.stringifyReplacer(value);
-  }
-  return value;
-}
-async function saveArtifacts(artifacts, basePath, options = {}) {
-  const status = { msg: "Saving artifacts", id: "lh:assetSaver:saveArtifacts" };
-  lighthouse_logger_default.time(status);
-  fs.mkdirSync(basePath, { recursive: true });
-  const filenames = fs.readdirSync(basePath);
-  for (const filename of filenames) {
-    const isPreviousFile = filename.endsWith(traceFilename) || filename.endsWith(devtoolsFilename) || filename.endsWith(traceFilename + ".gz") || filename.endsWith(devtoolsFilename + ".gz") || filename === artifactsFilename || filename === artifactsFilename + ".gz";
-    if (isPreviousFile) {
-      fs.unlinkSync(`${basePath}/${filename}`);
-    }
-  }
-  const {
-    DevtoolsLog: DevtoolsLog2,
-    Trace,
-    DevtoolsLogError,
-    TraceError,
-    ...restArtifacts
-  } = artifacts;
-  if (Trace) {
-    await saveTrace(Trace, `${basePath}/${traceFilename}`, options);
-  }
-  if (TraceError) {
-    await saveTrace(TraceError, `${basePath}/${errorPrefix}${traceFilename}`, options);
-  }
-  if (DevtoolsLog2) {
-    await saveDevtoolsLog(
-      DevtoolsLog2,
-      `${basePath}/${devtoolsFilename}`,
-      options
-    );
-  }
-  if (DevtoolsLogError) {
-    await saveDevtoolsLog(
-      DevtoolsLogError,
-      `${basePath}/${errorPrefix}${devtoolsFilename}`,
-      options
-    );
-  }
-  const restArtifactsString = JSON.stringify(restArtifacts, stringifyReplacer, 2);
-  await writeJson(function* () {
-    yield restArtifactsString;
-    yield "\n";
-  }, `${basePath}/${artifactsFilename}`, !!options.gzip);
-  lighthouse_logger_default.log("Artifacts saved to disk in folder:", basePath);
-  lighthouse_logger_default.timeEnd(status);
-}
-function saveLhr(lhr, basePath) {
-  fs.writeFileSync(`${basePath}/lhr.report.json`, JSON.stringify(lhr, null, 2));
-}
-function* arrayOfObjectsJsonGenerator(arrayOfObjects) {
-  const ITEMS_PER_ITERATION = 500;
-  yield "[\n";
-  if (arrayOfObjects.length > 0) {
-    const itemsIterator = arrayOfObjects[Symbol.iterator]();
-    const firstItem = itemsIterator.next().value;
-    yield `  ${JSON.stringify(firstItem)}`;
-    let itemsRemaining = ITEMS_PER_ITERATION;
-    let itemsJSON = "";
-    for (const item of itemsIterator) {
-      itemsJSON += `,
-  ${JSON.stringify(item)}`;
-      itemsRemaining--;
-      if (itemsRemaining === 0) {
-        yield itemsJSON;
-        itemsRemaining = ITEMS_PER_ITERATION;
-        itemsJSON = "";
-      }
-    }
-    yield itemsJSON;
-  }
-  yield "\n]";
-}
-function* traceJsonGenerator(traceData) {
-  const { traceEvents, ...rest } = traceData;
-  yield "{\n";
-  yield '"traceEvents": ';
-  yield* arrayOfObjectsJsonGenerator(traceEvents);
-  for (const [key, value] of Object.entries(rest)) {
-    yield `,
-"${key}": ${JSON.stringify(value, null, 2)}`;
-  }
-  yield "}\n";
-}
-function saveTrace(traceData, traceFilename2, options = {}) {
-  const traceIter = traceJsonGenerator(traceData);
-  return writeJson(traceIter, traceFilename2, !!options.gzip);
-}
-function saveDevtoolsLog(devtoolsLog, devtoolLogFilename, options = {}) {
-  return writeJson(function* () {
-    yield* arrayOfObjectsJsonGenerator(devtoolsLog);
-    yield "\n";
-  }, devtoolLogFilename, !!options.gzip);
-}
-var artifactsFilename, traceFilename, devtoolsFilename, errorPrefix;
-var init_asset_saver = __esm({
-  "core/lib/asset-saver.js"() {
-    "use strict";
-    init_process_global();
-    init_url();
-    init_lighthouse_logger();
-    init_lantern2();
-    init_lantern_trace_saver();
-    init_metric_trace_events();
-    init_network_analysis();
-    init_load_simulator();
-    init_lh_error();
-    init_root2();
-    /**
-     * @license
-     * Copyright 2016 Google LLC
-     * SPDX-License-Identifier: Apache-2.0
-     */
-    artifactsFilename = "artifacts.json";
-    traceFilename = "trace.json";
-    devtoolsFilename = "devtoolslog.json";
-    errorPrefix = "pageLoadError.";
-    __name(writeJson, "writeJson");
-    __name(readJson, "readJson");
-    __name(endsWithSuffix, "endsWithSuffix");
-    __name(loadArtifacts, "loadArtifacts");
-    __name(stringifyReplacer, "stringifyReplacer");
-    __name(saveArtifacts, "saveArtifacts");
-    __name(saveLhr, "saveLhr");
-    __name(arrayOfObjectsJsonGenerator, "arrayOfObjectsJsonGenerator");
-    __name(traceJsonGenerator, "traceJsonGenerator");
-    __name(saveTrace, "saveTrace");
-    __name(saveDevtoolsLog, "saveDevtoolsLog");
-  }
-});
-
-// core/config/constants.js
-var constants_exports = {};
-__export(constants_exports, {
-  defaultSettings: () => defaultSettings,
-  nonSimulatedSettingsOverrides: () => nonSimulatedSettingsOverrides,
-  screenEmulationMetrics: () => screenEmulationMetrics,
-  throttling: () => throttling2,
-  userAgents: () => userAgents
-});
-var throttling2, MOTOGPOWER_EMULATION_METRICS, DESKTOP_EMULATION_METRICS, screenEmulationMetrics, MOTOG4_USERAGENT, DESKTOP_USERAGENT, userAgents, defaultSettings, nonSimulatedSettingsOverrides;
-var init_constants = __esm({
-  "core/config/constants.js"() {
-    "use strict";
-    init_process_global();
-    init_lantern2();
-    /**
-     * @license
-     * Copyright 2018 Google LLC
-     * SPDX-License-Identifier: Apache-2.0
-     */
-    throttling2 = simulation_exports.Constants.throttling;
-    MOTOGPOWER_EMULATION_METRICS = {
-      mobile: true,
-      width: 412,
-      height: 823,
-      // This value has some interesting ramifications for image-size-responsive, see:
-      // https://github.com/GoogleChrome/lighthouse/issues/10741#issuecomment-626903508
-      deviceScaleFactor: 1.75,
-      disabled: false
-    };
-    DESKTOP_EMULATION_METRICS = {
-      mobile: false,
-      width: 1350,
-      height: 940,
-      deviceScaleFactor: 1,
-      disabled: false
-    };
-    screenEmulationMetrics = {
-      mobile: MOTOGPOWER_EMULATION_METRICS,
-      desktop: DESKTOP_EMULATION_METRICS
-    };
-    MOTOG4_USERAGENT = "Mozilla/5.0 (Linux; Android 11; moto g power (2022)) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Mobile Safari/537.36";
-    DESKTOP_USERAGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36";
-    userAgents = {
-      mobile: MOTOG4_USERAGENT,
-      desktop: DESKTOP_USERAGENT
-    };
-    defaultSettings = {
-      output: "json",
-      maxWaitForFcp: 30 * 1e3,
-      maxWaitForLoad: 45 * 1e3,
-      pauseAfterFcpMs: 1e3,
-      pauseAfterLoadMs: 1e3,
-      networkQuietThresholdMs: 1e3,
-      cpuQuietThresholdMs: 1e3,
-      formFactor: "mobile",
-      throttling: throttling2.mobileSlow4G,
-      throttlingMethod: "simulate",
-      screenEmulation: screenEmulationMetrics.mobile,
-      emulatedUserAgent: userAgents.mobile,
-      auditMode: false,
-      gatherMode: false,
-      clearStorageTypes: ["file_systems", "shader_cache", "service_workers", "cache_storage"],
-      disableStorageReset: false,
-      debugNavigation: false,
-      channel: "node",
-      usePassiveGathering: false,
-      disableFullPageScreenshot: false,
-      skipAboutBlank: false,
-      blankPage: "about:blank",
-      ignoreStatusCode: false,
-      // the following settings have no defaults but we still want ensure that `key in settings`
-      // in config will work in a typechecked way
-      locale: "en-US",
-      // actual default determined by Config using lib/i18n
-      blockedUrlPatterns: null,
-      additionalTraceCategories: null,
-      extraHeaders: null,
-      precomputedLanternData: null,
-      onlyAudits: null,
-      onlyCategories: null,
-      skipAudits: null
-    };
-    nonSimulatedSettingsOverrides = {
-      pauseAfterFcpMs: 5250,
-      pauseAfterLoadMs: 5250,
-      networkQuietThresholdMs: 5250,
-      cpuQuietThresholdMs: 5250
-    };
-  }
-});
-
-// core/config/default-config.js
-var UIStrings21, str_2, defaultConfig, default_config_default;
-var init_default_config = __esm({
-  "core/config/default-config.js"() {
-    "use strict";
-    init_process_global();
-    init_lh();
-    init_constants();
-    init_i18n();
-    /**
-     * @license
-     * Copyright 2018 Google LLC
-     * SPDX-License-Identifier: Apache-2.0
-     */
-    UIStrings21 = {
-      /** Title of the Performance category of audits. Equivalent to 'Web performance', this term is inclusive of all web page speed and loading optimization topics. Also used as a label of a score gauge; try to limit to 20 characters. */
-      performanceCategoryTitle: "Performance",
-      /** Title of the speed metrics section of the Performance category. Within this section are various speed metrics which quantify the pageload performance into values presented in seconds and milliseconds. */
-      metricGroupTitle: "Metrics",
-      /** Title of the insights section of the Performance category. Within this section are various insights to give developers tips on how to improve the performance of their page. */
-      insightsGroupTitle: "Insights",
-      /** Description of the insights section of the Performance category. Within this section are various insights to give developers tips on how to improve the performance of their page. */
-      insightsGroupDescription: "These insights are also available in the Chrome DevTools Performance Panel - [record a trace](https://developer.chrome.com/docs/devtools/performance/reference) to view more detailed information.",
-      /** Title of an opportunity sub-section of the Performance category. Within this section are audits with imperative titles that suggest actions the user can take to improve the time of the first initial render of the webpage. */
-      firstPaintImprovementsGroupTitle: "First Paint Improvements",
-      /** Description of an opportunity sub-section of the Performance category. Within this section are audits with imperative titles that suggest actions the user can take to improve the time of the first initial render of the webpage. */
-      firstPaintImprovementsGroupDescription: "The most critical aspect of performance is how quickly pixels are rendered onscreen. Key metrics: First Contentful Paint, First Meaningful Paint",
-      /** Title of an opportunity sub-section of the Performance category. Within this section are audits with imperative titles that suggest actions the user can take to improve the overall loading performance of their web page. */
-      overallImprovementsGroupTitle: "Overall Improvements",
-      /** Description of an opportunity sub-section of the Performance category. Within this section are audits with imperative titles that suggest actions the user can take to improve the overall loading performance of their web page. */
-      overallImprovementsGroupDescription: "Enhance the overall loading experience, so the page is responsive and ready to use as soon as possible. Key metrics: Time to Interactive, Speed Index",
-      /** Title of the diagnostics section of the Performance category. Within this section are audits with non-imperative titles that provide more detail on the page's page load performance characteristics. Whereas the 'Opportunities' suggest an action along with expected time savings, diagnostics do not. Within this section, the user may read the details and deduce additional actions they could take. */
-      diagnosticsGroupTitle: "Diagnostics",
-      /** Description of the diagnostics section of the Performance category. Within this section are audits with non-imperative titles that provide more detail on a web page's load performance characteristics. Within this section, the user may read the details and deduce additional actions they could take to improve performance. */
-      diagnosticsGroupDescription: "More information about the performance of your application. These numbers don't [directly affect](https://developer.chrome.com/docs/lighthouse/performance/performance-scoring/) the Performance score.",
-      /** Title of the Accessibility category of audits. This section contains audits focused on making web content accessible to all users. Also used as a label of a score gauge; try to limit to 20 characters. */
-      a11yCategoryTitle: "Accessibility",
-      /** Description of the Accessibility category. This is displayed at the top of a list of audits focused on making web content accessible to all users. No character length limits. 'improve the accessibility of your web app' and 'manual testing' become link texts to additional documentation. */
-      a11yCategoryDescription: "These checks highlight opportunities to [improve the accessibility of your web app](https://developer.chrome.com/docs/lighthouse/accessibility/). Automatic detection can only detect a subset of issues and does not guarantee the accessibility of your web app, so [manual testing](https://web.dev/articles/how-to-review) is also encouraged.",
-      /** Description of the Accessibility manual checks category. This description is displayed above a list of accessibility audits that currently have no automated test and so must be verified manually by the user. No character length limits. 'conducting an accessibility review' becomes link text to additional documentation. */
-      a11yCategoryManualDescription: "These items address areas which an automated testing tool cannot cover. Learn more in our guide on [conducting an accessibility review](https://web.dev/articles/how-to-review).",
-      /** Title of the best practices section of the Accessibility category. Within this section are audits with descriptive titles that highlight common accessibility best practices. */
-      a11yBestPracticesGroupTitle: "Best practices",
-      /** Description of the best practices section within the Accessibility category. Within this section are audits with descriptive titles that highlight common accessibility best practices. */
-      a11yBestPracticesGroupDescription: "These items highlight common accessibility best practices.",
-      /** Title of the color contrast section within the Accessibility category. Within this section are audits with descriptive titles that highlight the color and vision aspects of the page's accessibility that are passing or failing. */
-      a11yColorContrastGroupTitle: "Contrast",
-      /** Description of the color contrast section within the Accessibility category. Within this section are audits with descriptive titles that highlight the color and vision aspects of the page's accessibility that are passing or failing. */
-      a11yColorContrastGroupDescription: "These are opportunities to improve the legibility of your content.",
-      /** Title of the HTML element naming section within the Accessibility category. Within this section are audits with descriptive titles that highlight if the non-textual HTML elements on the page have names discernible by a screen reader. */
-      a11yNamesLabelsGroupTitle: "Names and labels",
-      /** Description of the HTML element naming section within the Accessibility category. Within this section are audits with descriptive titles that highlight if the non-textual HTML elements on the page have names discernible by a screen reader. */
-      a11yNamesLabelsGroupDescription: "These are opportunities to improve the semantics of the controls in your application. This may enhance the experience for users of assistive technology, like a screen reader.",
-      /** Title of the navigation section within the Accessibility category. Within this section are audits with descriptive titles that highlight opportunities to improve keyboard navigation. */
-      a11yNavigationGroupTitle: "Navigation",
-      /** Description of the navigation section within the Accessibility category. Within this section are audits with descriptive titles that highlight opportunities to improve keyboard navigation. */
-      a11yNavigationGroupDescription: "These are opportunities to improve keyboard navigation in your application.",
-      /** Title of the ARIA validity section within the Accessibility category. Within this section are audits with descriptive titles that highlight if whether all the aria-* HTML attributes have been used properly. */
-      a11yAriaGroupTitle: "ARIA",
-      /** Description of the ARIA validity section within the Accessibility category. Within this section are audits with descriptive titles that highlight if whether all the aria-* HTML attributes have been used properly. */
-      a11yAriaGroupDescription: "These are opportunities to improve the usage of ARIA in your application which may enhance the experience for users of assistive technology, like a screen reader.",
-      /** Title of the language section within the Accessibility category. Within this section are audits with descriptive titles that highlight if the language has been annotated in the correct HTML attributes on the page. */
-      a11yLanguageGroupTitle: "Internationalization and localization",
-      /** Description of the language section within the Accessibility category. Within this section are audits with descriptive titles that highlight if the language has been annotated in the correct HTML attributes on the page. */
-      a11yLanguageGroupDescription: "These are opportunities to improve the interpretation of your content by users in different locales.",
-      /** Title of the navigation section within the Accessibility category. Within this section are audits with descriptive titles that highlight opportunities to provide alternative content for audio and video. */
-      a11yAudioVideoGroupTitle: "Audio and video",
-      /** Description of the navigation section within the Accessibility category. Within this section are audits with descriptive titles that highlight opportunities to provide alternative content for audio and video. */
-      a11yAudioVideoGroupDescription: "These are opportunities to provide alternative content for audio and video. This may improve the experience for users with hearing or vision impairments.",
-      /** Title of the navigation section within the Accessibility category. Within this section are audits with descriptive titles that highlight opportunities to improve the experience of reading tabular or list data using assistive technology. */
-      a11yTablesListsVideoGroupTitle: "Tables and lists",
-      /** Description of the navigation section within the Accessibility category. Within this section are audits with descriptive titles that highlight opportunities to improve the experience of reading tabular or list data using assistive technology. */
-      a11yTablesListsVideoGroupDescription: "These are opportunities to improve the experience of reading tabular or list data using assistive technology, like a screen reader.",
-      /** Title of the Search Engine Optimization (SEO) category of audits. This is displayed at the top of a list of audits focused on topics related to optimizing a website for indexing by search engines. Also used as a label of a score gauge; try to limit to 20 characters. */
-      seoCategoryTitle: "SEO",
-      /** Description of the Search Engine Optimization (SEO) category. This is displayed at the top of a list of audits focused on optimizing a website for indexing by search engines. No character length limits. The last sentence starting with 'Learn' becomes link text to additional documentation. */
-      seoCategoryDescription: "These checks ensure that your page is following basic search engine optimization advice. There are many additional factors Lighthouse does not score here that may affect your search ranking, including performance on [Core Web Vitals](https://web.dev/explore/vitals). [Learn more about Google Search Essentials](https://support.google.com/webmasters/answer/35769).",
-      /** Description of the Search Engine Optimization (SEO) manual checks category, the additional validators must be run by hand in order to check all SEO best practices. This is displayed at the top of a list of manually run audits focused on optimizing a website for indexing by search engines. No character length limits. */
-      seoCategoryManualDescription: "Run these additional validators on your site to check additional SEO best practices.",
-      /** Title of the navigation section within the Search Engine Optimization (SEO) category. Within this section are audits with descriptive titles that highlight opportunities to make a page more usable on mobile devices. */
-      seoMobileGroupTitle: "Mobile Friendly",
-      /** Description of the navigation section within the Search Engine Optimization (SEO) category. Within this section are audits with descriptive titles that highlight opportunities to make a page more usable on mobile devices. */
-      seoMobileGroupDescription: "Make sure your pages are mobile friendly so users don’t have to pinch or zoom in order to read the content pages. [Learn how to make pages mobile-friendly](https://developers.google.com/search/mobile-sites/).",
-      /** Title of the navigation section within the Search Engine Optimization (SEO) category. Within this section are audits with descriptive titles that highlight ways to make a website content more easily understood by search engine crawler bots. */
-      seoContentGroupTitle: "Content Best Practices",
-      /** Description of the navigation section within the Search Engine Optimization (SEO) category. Within this section are audits with descriptive titles that highlight ways to make a website content more easily understood by search engine crawler bots. */
-      seoContentGroupDescription: "Format your HTML in a way that enables crawlers to better understand your app’s content.",
-      /** Title of the navigation section within the Search Engine Optimization (SEO) category. Within this section are audits with descriptive titles that highlight ways to make a website accessible to search engine crawlers. */
-      seoCrawlingGroupTitle: "Crawling and Indexing",
-      /** Description of the navigation section within the Search Engine Optimization (SEO) category. Within this section are audits with descriptive titles that highlight ways to make a website accessible to search engine crawlers. */
-      seoCrawlingGroupDescription: "To appear in search results, crawlers need access to your app.",
-      /** Title of the Best Practices category of audits. This is displayed at the top of a list of audits focused on topics related to following web development best practices and accepted guidelines. Also used as a label of a score gauge; try to limit to 20 characters. */
-      bestPracticesCategoryTitle: "Best Practices",
-      /** Title of the Trust & Safety group of audits. This is displayed at the top of a list of audits focused on maintaining user trust and protecting security in web development. */
-      bestPracticesTrustSafetyGroupTitle: "Trust and Safety",
-      /** Title of the User Experience group of the Best Practices category. Within this section are the audits related to the end user's experience of the webpage. */
-      bestPracticesUXGroupTitle: "User Experience",
-      /** Title of the Browser Compatibility group of the Best Practices category. Within this section are the audits related to whether the page is interpreted consistently by browsers. */
-      bestPracticesBrowserCompatGroupTitle: "Browser Compatibility",
-      /** Title of the General group of the Best Practices category. Within this section are the audits that don't belong to a specific group but are of general interest. */
-      bestPracticesGeneralGroupTitle: "General"
-    };
-    str_2 = createIcuMessageFn({ url: "core/config/default-config.js" }.url, UIStrings21);
-    defaultConfig = {
-      settings: defaultSettings,
-      artifacts: [
-        // Artifacts which can be depended on come first.
-        { id: "DevtoolsLog", gatherer: "devtools-log" },
-        { id: "Trace", gatherer: "trace" },
-        { id: "Accessibility", gatherer: "accessibility" },
-        { id: "AnchorElements", gatherer: "anchor-elements" },
-        { id: "ConsoleMessages", gatherer: "console-messages" },
-        { id: "CSSUsage", gatherer: "css-usage" },
-        { id: "Doctype", gatherer: "dobetterweb/doctype" },
-        { id: "Inputs", gatherer: "inputs" },
-        { id: "IFrameElements", gatherer: "iframe-elements" },
-        { id: "ImageElements", gatherer: "image-elements" },
-        { id: "InspectorIssues", gatherer: "inspector-issues" },
-        { id: "JsUsage", gatherer: "js-usage" },
-        { id: "LinkElements", gatherer: "link-elements" },
-        { id: "MainDocumentContent", gatherer: "main-document-content" },
-        { id: "MetaElements", gatherer: "meta-elements" },
-        { id: "NetworkUserAgent", gatherer: "network-user-agent" },
-        { id: "RobotsTxt", gatherer: "seo/robots-txt" },
-        { id: "Scripts", gatherer: "scripts" },
-        { id: "SourceMaps", gatherer: "source-maps" },
-        { id: "Stacks", gatherer: "stacks" },
-        { id: "Stylesheets", gatherer: "stylesheets" },
-        { id: "TraceElements", gatherer: "trace-elements" },
-        { id: "ViewportDimensions", gatherer: "viewport-dimensions" },
-        // FullPageScreenshot comes at the end so all other node analysis is captured.
-        { id: "FullPageScreenshot", gatherer: "full-page-screenshot" },
-        // BFCacheFailures comes at the very end because it can perform a page navigation.
-        { id: "BFCacheFailures", gatherer: "bf-cache-failures" }
-      ],
-      audits: [
-        "is-on-https",
-        "redirects-http",
-        "metrics/first-contentful-paint",
-        "metrics/largest-contentful-paint",
-        "metrics/speed-index",
-        "screenshot-thumbnails",
-        "final-screenshot",
-        "metrics/total-blocking-time",
-        "metrics/max-potential-fid",
-        "metrics/cumulative-layout-shift",
-        "metrics/interaction-to-next-paint",
-        "errors-in-console",
-        "server-response-time",
-        "metrics/interactive",
-        "user-timings",
-        "redirects",
-        "image-aspect-ratio",
-        "image-size-responsive",
-        "deprecations",
-        "third-party-cookies",
-        "mainthread-work-breakdown",
-        "bootup-time",
-        "diagnostics",
-        "network-requests",
-        "network-rtt",
-        "network-server-latency",
-        "main-thread-tasks",
-        "metrics",
-        "resource-summary",
-        "layout-shifts",
-        "long-tasks",
-        "non-composited-animations",
-        "unsized-images",
-        "valid-source-maps",
-        "csp-xss",
-        "has-hsts",
-        "origin-isolation",
-        "clickjacking-mitigation",
-        "trusted-types-xss",
-        "script-treemap-data",
-        "accessibility/accesskeys",
-        "accessibility/aria-allowed-attr",
-        "accessibility/aria-allowed-role",
-        "accessibility/aria-command-name",
-        "accessibility/aria-conditional-attr",
-        "accessibility/aria-deprecated-role",
-        "accessibility/aria-dialog-name",
-        "accessibility/aria-hidden-body",
-        "accessibility/aria-hidden-focus",
-        "accessibility/aria-input-field-name",
-        "accessibility/aria-meter-name",
-        "accessibility/aria-progressbar-name",
-        "accessibility/aria-prohibited-attr",
-        "accessibility/aria-required-attr",
-        "accessibility/aria-required-children",
-        "accessibility/aria-required-parent",
-        "accessibility/aria-roles",
-        "accessibility/aria-text",
-        "accessibility/aria-toggle-field-name",
-        "accessibility/aria-tooltip-name",
-        "accessibility/aria-treeitem-name",
-        "accessibility/aria-valid-attr-value",
-        "accessibility/aria-valid-attr",
-        "accessibility/button-name",
-        "accessibility/bypass",
-        "accessibility/color-contrast",
-        "accessibility/definition-list",
-        "accessibility/dlitem",
-        "accessibility/document-title",
-        "accessibility/duplicate-id-aria",
-        "accessibility/empty-heading",
-        "accessibility/form-field-multiple-labels",
-        "accessibility/frame-title",
-        "accessibility/heading-order",
-        "accessibility/html-has-lang",
-        "accessibility/html-lang-valid",
-        "accessibility/html-xml-lang-mismatch",
-        "accessibility/identical-links-same-purpose",
-        "accessibility/image-alt",
-        "accessibility/image-redundant-alt",
-        "accessibility/input-button-name",
-        "accessibility/input-image-alt",
-        "accessibility/label-content-name-mismatch",
-        "accessibility/label",
-        "accessibility/landmark-one-main",
-        "accessibility/link-name",
-        "accessibility/link-in-text-block",
-        "accessibility/list",
-        "accessibility/listitem",
-        "accessibility/meta-refresh",
-        "accessibility/meta-viewport",
-        "accessibility/object-alt",
-        "accessibility/select-name",
-        "accessibility/skip-link",
-        "accessibility/tabindex",
-        "accessibility/table-duplicate-name",
-        "accessibility/table-fake-caption",
-        "accessibility/target-size",
-        "accessibility/td-has-header",
-        "accessibility/td-headers-attr",
-        "accessibility/th-has-data-cells",
-        "accessibility/valid-lang",
-        "accessibility/video-caption",
-        "accessibility/manual/custom-controls-labels",
-        "accessibility/manual/custom-controls-roles",
-        "accessibility/manual/focus-traps",
-        "accessibility/manual/focusable-controls",
-        "accessibility/manual/interactive-element-affordance",
-        "accessibility/manual/logical-tab-order",
-        "accessibility/manual/managed-focus",
-        "accessibility/manual/offscreen-content-hidden",
-        "accessibility/manual/use-landmarks",
-        "accessibility/manual/visual-order-follows-dom",
-        "byte-efficiency/total-byte-weight",
-        "byte-efficiency/unminified-css",
-        "byte-efficiency/unminified-javascript",
-        "byte-efficiency/unused-css-rules",
-        "byte-efficiency/unused-javascript",
-        "dobetterweb/doctype",
-        "dobetterweb/charset",
-        "dobetterweb/geolocation-on-start",
-        "dobetterweb/inspector-issues",
-        "dobetterweb/js-libraries",
-        "dobetterweb/notification-on-start",
-        "dobetterweb/paste-preventing-inputs",
-        "seo/meta-description",
-        "seo/http-status-code",
-        "seo/link-text",
-        "seo/crawlable-anchors",
-        "seo/is-crawlable",
-        "seo/robots-txt",
-        "seo/hreflang",
-        "seo/canonical",
-        "seo/manual/structured-data",
-        "bf-cache",
-        "insights/cache-insight",
-        "insights/cls-culprits-insight",
-        "insights/document-latency-insight",
-        "insights/dom-size-insight",
-        "insights/duplicated-javascript-insight",
-        "insights/font-display-insight",
-        "insights/forced-reflow-insight",
-        "insights/image-delivery-insight",
-        "insights/inp-breakdown-insight",
-        "insights/lcp-breakdown-insight",
-        "insights/lcp-discovery-insight",
-        "insights/legacy-javascript-insight",
-        "insights/modern-http-insight",
-        "insights/network-dependency-tree-insight",
-        "insights/render-blocking-insight",
-        "insights/third-parties-insight",
-        "insights/viewport-insight"
-      ],
-      groups: {
-        "metrics": {
-          title: str_2(UIStrings21.metricGroupTitle)
-        },
-        "insights": {
-          title: str_2(UIStrings21.insightsGroupTitle),
-          description: str_2(UIStrings21.insightsGroupDescription)
-        },
-        "diagnostics": {
-          title: str_2(UIStrings21.diagnosticsGroupTitle),
-          description: str_2(UIStrings21.diagnosticsGroupDescription)
-        },
-        "a11y-best-practices": {
-          title: str_2(UIStrings21.a11yBestPracticesGroupTitle),
-          description: str_2(UIStrings21.a11yBestPracticesGroupDescription)
-        },
-        "a11y-color-contrast": {
-          title: str_2(UIStrings21.a11yColorContrastGroupTitle),
-          description: str_2(UIStrings21.a11yColorContrastGroupDescription)
-        },
-        "a11y-names-labels": {
-          title: str_2(UIStrings21.a11yNamesLabelsGroupTitle),
-          description: str_2(UIStrings21.a11yNamesLabelsGroupDescription)
-        },
-        "a11y-navigation": {
-          title: str_2(UIStrings21.a11yNavigationGroupTitle),
-          description: str_2(UIStrings21.a11yNavigationGroupDescription)
-        },
-        "a11y-aria": {
-          title: str_2(UIStrings21.a11yAriaGroupTitle),
-          description: str_2(UIStrings21.a11yAriaGroupDescription)
-        },
-        "a11y-language": {
-          title: str_2(UIStrings21.a11yLanguageGroupTitle),
-          description: str_2(UIStrings21.a11yLanguageGroupDescription)
-        },
-        "a11y-audio-video": {
-          title: str_2(UIStrings21.a11yAudioVideoGroupTitle),
-          description: str_2(UIStrings21.a11yAudioVideoGroupDescription)
-        },
-        "a11y-tables-lists": {
-          title: str_2(UIStrings21.a11yTablesListsVideoGroupTitle),
-          description: str_2(UIStrings21.a11yTablesListsVideoGroupDescription)
-        },
-        "seo-mobile": {
-          title: str_2(UIStrings21.seoMobileGroupTitle),
-          description: str_2(UIStrings21.seoMobileGroupDescription)
-        },
-        "seo-content": {
-          title: str_2(UIStrings21.seoContentGroupTitle),
-          description: str_2(UIStrings21.seoContentGroupDescription)
-        },
-        "seo-crawl": {
-          title: str_2(UIStrings21.seoCrawlingGroupTitle),
-          description: str_2(UIStrings21.seoCrawlingGroupDescription)
-        },
-        "best-practices-trust-safety": {
-          title: str_2(UIStrings21.bestPracticesTrustSafetyGroupTitle)
-        },
-        "best-practices-ux": {
-          title: str_2(UIStrings21.bestPracticesUXGroupTitle)
-        },
-        "best-practices-browser-compat": {
-          title: str_2(UIStrings21.bestPracticesBrowserCompatGroupTitle)
-        },
-        "best-practices-general": {
-          title: str_2(UIStrings21.bestPracticesGeneralGroupTitle)
-        },
-        // Group for audits that should not be displayed.
-        "hidden": { title: "" }
-      },
-      categories: {
-        "performance": {
-          title: str_2(UIStrings21.performanceCategoryTitle),
-          supportedModes: ["navigation", "timespan", "snapshot"],
-          auditRefs: [
-            { id: "first-contentful-paint", weight: 10, group: "metrics", acronym: "FCP" },
-            { id: "largest-contentful-paint", weight: 25, group: "metrics", acronym: "LCP" },
-            { id: "total-blocking-time", weight: 30, group: "metrics", acronym: "TBT" },
-            { id: "cumulative-layout-shift", weight: 25, group: "metrics", acronym: "CLS" },
-            { id: "speed-index", weight: 10, group: "metrics", acronym: "SI" },
-            { id: "interaction-to-next-paint", weight: 0, group: "metrics", acronym: "INP" },
-            // Insight audits.
-            { id: "cache-insight", weight: 0, group: "insights" },
-            { id: "cls-culprits-insight", weight: 0, group: "insights" },
-            { id: "document-latency-insight", weight: 0, group: "insights" },
-            { id: "dom-size-insight", weight: 0, group: "insights" },
-            { id: "duplicated-javascript-insight", weight: 0, group: "insights" },
-            { id: "font-display-insight", weight: 0, group: "insights" },
-            { id: "forced-reflow-insight", weight: 0, group: "insights" },
-            { id: "image-delivery-insight", weight: 0, group: "insights" },
-            { id: "inp-breakdown-insight", weight: 0, group: "insights" },
-            { id: "lcp-breakdown-insight", weight: 0, group: "insights" },
-            { id: "lcp-discovery-insight", weight: 0, group: "insights" },
-            { id: "legacy-javascript-insight", weight: 0, group: "insights" },
-            { id: "modern-http-insight", weight: 0, group: "insights" },
-            { id: "network-dependency-tree-insight", weight: 0, group: "insights" },
-            { id: "render-blocking-insight", weight: 0, group: "insights" },
-            { id: "third-parties-insight", weight: 0, group: "insights" },
-            { id: "viewport-insight", weight: 0, group: "insights" },
-            // These are our "invisible" metrics. Not displayed, but still in the LHR.
-            { id: "interactive", weight: 0, group: "hidden", acronym: "TTI" },
-            { id: "max-potential-fid", weight: 0, group: "hidden" },
-            { id: "unminified-css", weight: 0, group: "diagnostics" },
-            { id: "unminified-javascript", weight: 0, group: "diagnostics" },
-            { id: "unused-css-rules", weight: 0, group: "diagnostics" },
-            { id: "unused-javascript", weight: 0, group: "diagnostics" },
-            { id: "total-byte-weight", weight: 0, group: "diagnostics" },
-            { id: "user-timings", weight: 0, group: "diagnostics" },
-            { id: "bootup-time", weight: 0, group: "diagnostics" },
-            { id: "mainthread-work-breakdown", weight: 0, group: "diagnostics" },
-            { id: "long-tasks", weight: 0, group: "diagnostics" },
-            { id: "non-composited-animations", weight: 0, group: "diagnostics" },
-            { id: "unsized-images", weight: 0, group: "diagnostics" },
-            { id: "bf-cache", weight: 0, group: "diagnostics" },
-            // Audits past this point contain useful data but are not displayed with other audits.
-            { id: "network-requests", weight: 0, group: "hidden" },
-            { id: "network-rtt", weight: 0, group: "hidden" },
-            { id: "network-server-latency", weight: 0, group: "hidden" },
-            { id: "main-thread-tasks", weight: 0, group: "hidden" },
-            { id: "diagnostics", weight: 0, group: "hidden" },
-            { id: "metrics", weight: 0, group: "hidden" },
-            { id: "screenshot-thumbnails", weight: 0, group: "hidden" },
-            { id: "final-screenshot", weight: 0, group: "hidden" },
-            { id: "script-treemap-data", weight: 0, group: "hidden" },
-            { id: "resource-summary", weight: 0, group: "hidden" },
-            { id: "redirects", weight: 0, group: "hidden" },
-            { id: "server-response-time", weight: 0, group: "hidden" },
-            { id: "layout-shifts", weight: 0, group: "hidden" }
-          ]
-        },
-        "accessibility": {
-          title: str_2(UIStrings21.a11yCategoryTitle),
-          description: str_2(UIStrings21.a11yCategoryDescription),
-          manualDescription: str_2(UIStrings21.a11yCategoryManualDescription),
-          supportedModes: ["navigation", "snapshot"],
-          // Audit weights weights are derived from the axe-core "Impact",
-          // with adjustments based on axe-core "Tags":
-          //
-          // ┌────────────┬───────────────────────────────────────────────┐
-          // │ Impact     │ Weight Based on Tags                          │
-          // │            ├──────────────┬─────────────────┬──────────────┤
-          // │            │  wcag A+AA   │  best-practice  │ experimental │
-          // │            │ (ex: wcag2aa)│ (w/o wcag tag)  │              │
-          // ├────────────┼──────────────┼─────────────────┼──────────────┤
-          // │ Minor      │       1      │        0        │      0       │
-          // │ Moderate   │       3      │        3        │      0       │
-          // │ Serious    │       7      │        7        │      0       │
-          // │ Critical   │      10      │       10        │      0       │
-          // └────────────┴──────────────┴─────────────────┴──────────────┘
-          //
-          // Notes:
-          //  • Experimental rules always have weight 0
-          //  • Best practice rules only affect scores when tagged with wcagA+AA
-          //    and are moderate, serious, or critical.
-          //
-          // To find the latest axe-core Impact and Tag values:
-          //   1. Browse to https://dequeuniversity.com/rules/axe/html.
-          //   2. Click on the latest rule set (ex: https://dequeuniversity.com/rules/axe/html/4.10)
-          //   3. Review the tables
-          auditRefs: [
-            { id: "accesskeys", weight: 7, group: "a11y-navigation" },
-            // Serious, best-practice
-            { id: "aria-allowed-attr", weight: 10, group: "a11y-aria" },
-            // Critical, wcag2a
-            { id: "aria-command-name", weight: 7, group: "a11y-aria" },
-            // Serious, wcag2a
-            { id: "aria-conditional-attr", weight: 7, group: "a11y-aria" },
-            // Serious, wcag2a
-            { id: "aria-deprecated-role", weight: 1, group: "a11y-aria" },
-            // Minor, wcag2a
-            { id: "aria-dialog-name", weight: 7, group: "a11y-aria" },
-            // Serious, best-practice
-            { id: "aria-hidden-body", weight: 10, group: "a11y-aria" },
-            // Critical, wcag2a
-            { id: "aria-hidden-focus", weight: 7, group: "a11y-aria" },
-            // Serious, wcag2a
-            { id: "aria-input-field-name", weight: 7, group: "a11y-aria" },
-            // Serious, wcag2a
-            { id: "aria-meter-name", weight: 7, group: "a11y-aria" },
-            // Serious, wcag2a
-            { id: "aria-progressbar-name", weight: 7, group: "a11y-aria" },
-            // Serious, wcag2a
-            { id: "aria-prohibited-attr", weight: 7, group: "a11y-aria" },
-            // Serious, wcag2a
-            { id: "aria-required-attr", weight: 10, group: "a11y-aria" },
-            // Critical, wcag2a
-            { id: "aria-required-children", weight: 10, group: "a11y-aria" },
-            // Critical, wcag2a
-            { id: "aria-required-parent", weight: 10, group: "a11y-aria" },
-            // Critical, wcag2a
-            { id: "aria-roles", weight: 10, group: "a11y-aria" },
-            // Critical, wcag2a
-            { id: "aria-text", weight: 7, group: "a11y-aria" },
-            // Serious, best-practice
-            { id: "aria-toggle-field-name", weight: 7, group: "a11y-aria" },
-            // Serious, wcag2a
-            { id: "aria-tooltip-name", weight: 7, group: "a11y-aria" },
-            // Serious, wcag2a
-            { id: "aria-treeitem-name", weight: 7, group: "a11y-aria" },
-            // Serious, best-practice
-            { id: "aria-valid-attr-value", weight: 10, group: "a11y-aria" },
-            // Critical, wcag2a
-            { id: "aria-valid-attr", weight: 10, group: "a11y-aria" },
-            // Critical, wcag2a
-            { id: "button-name", weight: 10, group: "a11y-names-labels" },
-            // Critical, wcag2a
-            { id: "bypass", weight: 7, group: "a11y-navigation" },
-            // Serious, wcag2a
-            { id: "color-contrast", weight: 7, group: "a11y-color-contrast" },
-            // Serious, wcag2aa
-            { id: "definition-list", weight: 7, group: "a11y-tables-lists" },
-            // Serious, wcag2a
-            { id: "dlitem", weight: 7, group: "a11y-tables-lists" },
-            // Serious, wcag2a
-            { id: "document-title", weight: 7, group: "a11y-names-labels" },
-            // Serious, wcag2a
-            { id: "duplicate-id-aria", weight: 10, group: "a11y-aria" },
-            // Critical, wcag2a
-            { id: "form-field-multiple-labels", weight: 3, group: "a11y-names-labels" },
-            // Moderate, wcag2a
-            { id: "frame-title", weight: 7, group: "a11y-names-labels" },
-            // Serious, wcag2a
-            { id: "heading-order", weight: 3, group: "a11y-navigation" },
-            // Moderate, best-practice
-            { id: "html-has-lang", weight: 7, group: "a11y-language" },
-            // Serious, wcag2a
-            { id: "html-lang-valid", weight: 7, group: "a11y-language" },
-            // Serious, wcag2a
-            { id: "html-xml-lang-mismatch", weight: 3, group: "a11y-language" },
-            // Moderate, wcag2a
-            { id: "image-alt", weight: 10, group: "a11y-names-labels" },
-            // Critical, wcag2a
-            { id: "input-button-name", weight: 10, group: "a11y-names-labels" },
-            // Critical, wcag2a
-            { id: "input-image-alt", weight: 10, group: "a11y-names-labels" },
-            // Critical, wcag2a
-            { id: "label", weight: 10, group: "a11y-names-labels" },
-            // Critical, wcag2a
-            { id: "link-in-text-block", weight: 7, group: "a11y-color-contrast" },
-            // Serious, wcag2a
-            { id: "link-name", weight: 7, group: "a11y-names-labels" },
-            // Serious, wcag2a
-            { id: "list", weight: 7, group: "a11y-tables-lists" },
-            // Serious, wcag2a
-            { id: "listitem", weight: 7, group: "a11y-tables-lists" },
-            // Serious, wcag2a
-            { id: "meta-refresh", weight: 10, group: "a11y-best-practices" },
-            // Critical, wcag2a
-            { id: "meta-viewport", weight: 10, group: "a11y-best-practices" },
-            // Critical, wcag2aa
-            { id: "object-alt", weight: 7, group: "a11y-names-labels" },
-            // Serious, wcag2a
-            { id: "select-name", weight: 10, group: "a11y-names-labels" },
-            // Critical, wcag2a
-            { id: "skip-link", weight: 3, group: "a11y-names-labels" },
-            // Moderate, best-practice
-            { id: "tabindex", weight: 7, group: "a11y-navigation" },
-            // Serious, best-practice
-            { id: "target-size", weight: 7, group: "a11y-best-practices" },
-            // Serious, wcag22aa
-            { id: "td-headers-attr", weight: 7, group: "a11y-tables-lists" },
-            // Serious, wcag2a
-            { id: "th-has-data-cells", weight: 7, group: "a11y-tables-lists" },
-            // Serious, wcag2a
-            { id: "valid-lang", weight: 7, group: "a11y-language" },
-            // Serious, wcag2aa
-            { id: "video-caption", weight: 10, group: "a11y-audio-video" },
-            // Critical, wcag2a
-            { id: "landmark-one-main", weight: 3, group: "a11y-best-practices" },
-            // Moderate, best-practice
-            // Manual audits
-            { id: "focusable-controls", weight: 0 },
-            { id: "interactive-element-affordance", weight: 0 },
-            { id: "logical-tab-order", weight: 0 },
-            { id: "visual-order-follows-dom", weight: 0 },
-            { id: "focus-traps", weight: 0 },
-            { id: "managed-focus", weight: 0 },
-            { id: "use-landmarks", weight: 0 },
-            { id: "offscreen-content-hidden", weight: 0 },
-            { id: "custom-controls-labels", weight: 0 },
-            { id: "custom-controls-roles", weight: 0 },
-            // Low-impact best-practices
-            { id: "table-duplicate-name", weight: 0, group: "a11y-best-practices" },
-            // Minor, best-practice
-            { id: "empty-heading", weight: 0, group: "a11y-best-practices" },
-            // Minor, best-practice
-            { id: "aria-allowed-role", weight: 0, group: "a11y-best-practices" },
-            // Minor, best-practice
-            { id: "image-redundant-alt", weight: 0, group: "a11y-names-labels" },
-            // Minor, best-practice
-            // WCAG AAA
-            { id: "identical-links-same-purpose", weight: 0, group: "a11y-best-practices" },
-            // Minor, wcag2aaa
-            // Hidden audits (ie. experimental)
-            { id: "label-content-name-mismatch", weight: 0, group: "hidden" },
-            // Serious, experimental
-            { id: "table-fake-caption", weight: 0, group: "hidden" },
-            // Serious, experimental
-            { id: "td-has-header", weight: 0, group: "hidden" }
-            // Critical, experimental
-          ]
-        },
-        "best-practices": {
-          title: str_2(UIStrings21.bestPracticesCategoryTitle),
-          supportedModes: ["navigation", "timespan", "snapshot"],
-          auditRefs: [
-            // Trust & Safety
-            { id: "is-on-https", weight: 5, group: "best-practices-trust-safety" },
-            { id: "redirects-http", weight: 1, group: "best-practices-trust-safety" },
-            { id: "geolocation-on-start", weight: 1, group: "best-practices-trust-safety" },
-            { id: "notification-on-start", weight: 1, group: "best-practices-trust-safety" },
-            { id: "csp-xss", weight: 0, group: "best-practices-trust-safety" },
-            { id: "has-hsts", weight: 0, group: "best-practices-trust-safety" },
-            { id: "origin-isolation", weight: 0, group: "best-practices-trust-safety" },
-            { id: "clickjacking-mitigation", weight: 0, group: "best-practices-trust-safety" },
-            { id: "trusted-types-xss", weight: 0, group: "best-practices-trust-safety" },
-            // User Experience
-            { id: "paste-preventing-inputs", weight: 3, group: "best-practices-ux" },
-            { id: "image-aspect-ratio", weight: 1, group: "best-practices-ux" },
-            { id: "image-size-responsive", weight: 1, group: "best-practices-ux" },
-            // Browser Compatibility
-            { id: "doctype", weight: 1, group: "best-practices-browser-compat" },
-            { id: "charset", weight: 1, group: "best-practices-browser-compat" },
-            // General Group
-            { id: "js-libraries", weight: 0, group: "best-practices-general" },
-            { id: "deprecations", weight: 5, group: "best-practices-general" },
-            { id: "third-party-cookies", weight: 5, group: "best-practices-general" },
-            { id: "errors-in-console", weight: 1, group: "best-practices-general" },
-            { id: "valid-source-maps", weight: 0, group: "best-practices-general" },
-            { id: "inspector-issues", weight: 1, group: "best-practices-general" }
-          ]
-        },
-        "seo": {
-          title: str_2(UIStrings21.seoCategoryTitle),
-          description: str_2(UIStrings21.seoCategoryDescription),
-          manualDescription: str_2(UIStrings21.seoCategoryManualDescription),
-          supportedModes: ["navigation", "snapshot"],
-          auditRefs: [
-            // Should be at least 31% of the score, such that this audit failing
-            // results in the SEO category failing.
-            // Solve for w:
-            //    w / (w + T) >= 0.31
-            // where T is the sum of all the other weights.
-            { id: "is-crawlable", weight: 93 / 23, group: "seo-crawl" },
-            { id: "document-title", weight: 1, group: "seo-content" },
-            { id: "meta-description", weight: 1, group: "seo-content" },
-            { id: "http-status-code", weight: 1, group: "seo-crawl" },
-            { id: "link-text", weight: 1, group: "seo-content" },
-            { id: "crawlable-anchors", weight: 1, group: "seo-crawl" },
-            { id: "robots-txt", weight: 1, group: "seo-crawl" },
-            { id: "image-alt", weight: 1, group: "seo-content" },
-            { id: "hreflang", weight: 1, group: "seo-content" },
-            { id: "canonical", weight: 1, group: "seo-content" },
-            // Manual audits
-            { id: "structured-data", weight: 0 }
-          ]
-        }
-      }
-    };
-    Object.defineProperty(defaultConfig, "UIStrings", {
-      enumerable: false,
-      get: /* @__PURE__ */ __name(() => UIStrings21, "get")
-    });
-    default_config_default = defaultConfig;
-  }
-});
-
-// core/config/validation.js
-function isValidArtifactDependency(dependent, dependency) {
-  const levels = { timespan: 0, snapshot: 1, navigation: 2 };
-  const dependentLevel = Math.min(...dependent.instance.meta.supportedModes.map((l) => levels[l]));
-  const dependencyLevel = Math.min(...dependency.instance.meta.supportedModes.map((l) => levels[l]));
-  if (dependentLevel === levels.timespan) return dependencyLevel === levels.timespan;
-  if (dependentLevel === levels.snapshot) return dependencyLevel === levels.snapshot;
-  return true;
-}
-function assertValidPluginName(config3, pluginName) {
-  const parts = pluginName.split("/");
-  if (parts.length === 2) {
-    pluginName = parts[1];
-  }
-  if (!pluginName.startsWith("lighthouse-plugin-")) {
-    throw new Error(`plugin name '${pluginName}' does not start with 'lighthouse-plugin-'`);
-  }
-  if (config3.categories?.[pluginName]) {
-    throw new Error(`plugin name '${pluginName}' not allowed because it is the id of a category already found in config`);
-  }
-}
-function assertValidArtifact(artifactDefn) {
-  const gatherer = artifactDefn.gatherer.instance;
-  if (typeof gatherer.meta !== "object") {
-    throw new Error(`Gatherer for ${artifactDefn.id} did not provide a meta object.`);
-  }
-  if (gatherer.meta.supportedModes.length === 0) {
-    throw new Error(`Gatherer for ${artifactDefn.id} did not support any gather modes.`);
-  }
-  if (typeof gatherer.getArtifact !== "function" || gatherer.getArtifact === base_gatherer_default.prototype.getArtifact) {
-    throw new Error(`Gatherer for ${artifactDefn.id} did not define a "getArtifact" method.`);
-  }
-}
-function assertValidAudit(auditDefinition) {
-  const { implementation, path: auditPath } = auditDefinition;
-  const auditName = auditPath || implementation?.meta?.id || "Unknown audit";
-  if (typeof implementation.audit !== "function" || implementation.audit === Audit.audit) {
-    throw new Error(`${auditName} has no audit() method.`);
-  }
-  if (typeof implementation.meta.id !== "string") {
-    throw new Error(`${auditName} has no meta.id property, or the property is not a string.`);
-  }
-  if (!isStringOrIcuMessage(implementation.meta.title)) {
-    throw new Error(`${auditName} has no meta.title property, or the property is not a string.`);
-  }
-  const scoreDisplayMode = implementation.meta.scoreDisplayMode || Audit.SCORING_MODES.BINARY;
-  if (!isStringOrIcuMessage(implementation.meta.failureTitle) && scoreDisplayMode === Audit.SCORING_MODES.BINARY) {
-    throw new Error(`${auditName} has no meta.failureTitle and should.`);
-  }
-  if (!isStringOrIcuMessage(implementation.meta.description)) {
-    throw new Error(
-      `${auditName} has no meta.description property, or the property is not a string.`
-    );
-  } else if (implementation.meta.description === "") {
-    throw new Error(
-      `${auditName} has an empty meta.description string. Please add a description for the UI.`
-    );
-  }
-  if (!Array.isArray(implementation.meta.requiredArtifacts)) {
-    throw new Error(
-      `${auditName} has no meta.requiredArtifacts property, or the property is not an array.`
-    );
-  }
-}
-function assertValidCategories(categories, audits, groups) {
-  if (!categories) {
-    return;
-  }
-  const auditsKeyedById = new Map((audits || []).map((audit) => {
-    return [audit.implementation.meta.id, audit];
-  }));
-  Object.keys(categories).forEach((categoryId) => {
-    categories[categoryId].auditRefs.forEach((auditRef, index) => {
-      if (!auditRef.id) {
-        throw new Error(`missing an audit id at ${categoryId}[${index}]`);
-      }
-      const audit = auditsKeyedById.get(auditRef.id);
-      if (!audit) {
-        throw new Error(`could not find ${auditRef.id} audit for category ${categoryId}`);
-      }
-      const auditImpl = audit.implementation;
-      const isManual = auditImpl.meta.scoreDisplayMode === "manual";
-      if (categoryId === "accessibility" && !auditRef.group && !isManual) {
-        throw new Error(`${auditRef.id} accessibility audit does not have a group`);
-      }
-      if (auditRef.weight > 0 && isManual) {
-        throw new Error(`${auditRef.id} is manual but has a positive weight`);
-      }
-      if (auditRef.group && (!groups || !groups[auditRef.group])) {
-        throw new Error(`${auditRef.id} references unknown group ${auditRef.group}`);
-      }
-    });
-  });
-}
-function assertValidSettings(settings) {
-  if (!settings.formFactor) {
-    throw new Error(`\`settings.formFactor\` must be defined as 'mobile' or 'desktop'. See https://github.com/GoogleChrome/lighthouse/blob/main/docs/emulation.md`);
-  }
-  if (!settings.screenEmulation.disabled) {
-    if (settings.screenEmulation.mobile !== (settings.formFactor === "mobile")) {
-      throw new Error(`Screen emulation mobile setting (${settings.screenEmulation.mobile}) does not match formFactor setting (${settings.formFactor}). See https://github.com/GoogleChrome/lighthouse/blob/main/docs/emulation.md`);
-    }
-  }
-  const skippedAndOnlyAuditId = settings.skipAudits?.find((auditId) => settings.onlyAudits?.includes(auditId));
-  if (skippedAndOnlyAuditId) {
-    throw new Error(`${skippedAndOnlyAuditId} appears in both skipAudits and onlyAudits`);
-  }
-}
-function assertValidArtifacts(artifactDefns) {
-  const availableArtifacts = /* @__PURE__ */ new Set();
-  for (const artifact of artifactDefns) {
-    assertValidArtifact(artifact);
-    if (availableArtifacts.has(artifact.id)) {
-      throw new Error(`Config defined multiple artifacts with id '${artifact.id}'`);
-    }
-    availableArtifacts.add(artifact.id);
-    if (!artifact.dependencies) continue;
-    for (const [dependencyKey, { id: dependencyId }] of Object.entries(artifact.dependencies)) {
-      if (availableArtifacts.has(dependencyId)) continue;
-      throwInvalidDependencyOrder(artifact.id, dependencyKey);
-    }
-  }
-}
-function assertValidConfig(resolvedConfig) {
-  assertValidArtifacts(resolvedConfig.artifacts || []);
-  for (const auditDefn of resolvedConfig.audits || []) {
-    assertValidAudit(auditDefn);
-  }
-  assertValidCategories(resolvedConfig.categories, resolvedConfig.audits, resolvedConfig.groups);
-  assertValidSettings(resolvedConfig.settings);
-}
-function throwInvalidDependencyOrder(artifactId, dependencyKey) {
-  throw new Error(
-    [
-      `Failed to find dependency "${dependencyKey}" for "${artifactId}" artifact`,
-      `Check that...`,
-      `  1. A gatherer exposes a matching Symbol that satisfies "${dependencyKey}".`,
-      `  2. "${dependencyKey}" is configured to run before "${artifactId}"`
-    ].join("\n")
-  );
-}
-function throwInvalidArtifactDependency(artifactId, dependencyKey) {
-  throw new Error(
-    [
-      `Dependency "${dependencyKey}" for "${artifactId}" artifact is invalid.`,
-      `The dependency must be collected before the dependent.`
-    ].join("\n")
-  );
-}
-var init_validation = __esm({
-  "core/config/validation.js"() {
-    "use strict";
-    init_process_global();
-    init_audit();
-    init_base_gatherer();
-    init_i18n();
-    /**
-     * @license
-     * Copyright 2021 Google LLC
-     * SPDX-License-Identifier: Apache-2.0
-     */
-    __name(isValidArtifactDependency, "isValidArtifactDependency");
-    __name(assertValidPluginName, "assertValidPluginName");
-    __name(assertValidArtifact, "assertValidArtifact");
-    __name(assertValidAudit, "assertValidAudit");
-    __name(assertValidCategories, "assertValidCategories");
-    __name(assertValidSettings, "assertValidSettings");
-    __name(assertValidArtifacts, "assertValidArtifacts");
-    __name(assertValidConfig, "assertValidConfig");
-    __name(throwInvalidDependencyOrder, "throwInvalidDependencyOrder");
-    __name(throwInvalidArtifactDependency, "throwInvalidArtifactDependency");
-  }
-});
-
-// core/config/filters.js
-function getAuditIdsInCategories(allCategories, onlyCategories) {
-  if (!allCategories) return /* @__PURE__ */ new Set();
-  onlyCategories = onlyCategories || Object.keys(allCategories);
-  const categories = onlyCategories.map((categoryId) => allCategories[categoryId]);
-  const auditRefs = categories.flatMap((category) => category?.auditRefs || []);
-  return new Set(auditRefs.map((auditRef) => auditRef.id));
-}
-function filterArtifactsByAvailableAudits(artifacts, audits) {
-  if (!artifacts) return null;
-  if (!audits) return artifacts;
-  const artifactsById = new Map(artifacts.map((artifact) => [artifact.id, artifact]));
-  const artifactIdsToKeep = /* @__PURE__ */ new Set([
-    ...filterResistantArtifactIds,
-    ...audits.flatMap((audit) => audit.implementation.meta.requiredArtifacts)
-  ]);
-  let previousSize = 0;
-  while (previousSize !== artifactIdsToKeep.size) {
-    previousSize = artifactIdsToKeep.size;
-    for (const artifactId of artifactIdsToKeep) {
-      const artifact = artifactsById.get(artifactId);
-      if (!artifact) continue;
-      if (!artifact.dependencies) continue;
-      for (const dep of Object.values(artifact.dependencies)) {
-        artifactIdsToKeep.add(dep.id);
-      }
-    }
-  }
-  return artifacts.filter((artifact) => artifactIdsToKeep.has(artifact.id));
-}
-function filterArtifactsByGatherMode(artifacts, mode) {
-  if (!artifacts) return null;
-  return artifacts.filter((artifact) => {
-    return artifact.gatherer.instance.meta.supportedModes.includes(mode);
-  });
-}
-function filterAuditsByAvailableArtifacts(audits, availableArtifacts) {
-  if (!audits) return null;
-  const availableArtifactIds = new Set(
-    availableArtifacts.map((artifact) => artifact.id).concat(baseArtifactKeys)
-  );
-  return audits.filter((audit) => {
-    const meta = audit.implementation.meta;
-    return meta.requiredArtifacts.every((id) => availableArtifactIds.has(id));
-  });
-}
-function filterAuditsByGatherMode(audits, mode) {
-  if (!audits) return null;
-  return audits.filter((audit) => {
-    const meta = audit.implementation.meta;
-    return !meta.supportedModes || meta.supportedModes.includes(mode);
-  });
-}
-function filterCategoriesByGatherMode(categories, mode) {
-  if (!categories) return null;
-  const categoriesToKeep = Object.entries(categories).filter(([_, category]) => {
-    return !category.supportedModes || category.supportedModes.includes(mode);
-  });
-  return Object.fromEntries(categoriesToKeep);
-}
-function filterCategoriesByExplicitFilters(categories, onlyCategories) {
-  if (!categories || !onlyCategories) return categories;
-  const categoriesToKeep = Object.entries(categories).filter(([categoryId]) => onlyCategories.includes(categoryId));
-  return Object.fromEntries(categoriesToKeep);
-}
-function errorOnUnknownOnlyCategories(allCategories, onlyCategories) {
-  if (!onlyCategories) return;
-  const unknown = onlyCategories.filter((c) => !allCategories?.[c]);
-  if (unknown.length) {
-    throw new Error(`unrecognized category in 'onlyCategories': ${unknown.join(", ")}`);
-  }
-}
-function filterCategoriesByAvailableAudits(categories, availableAudits) {
-  if (!categories) return categories;
-  const availableAuditIdToMeta = new Map(
-    availableAudits.map((audit) => [audit.implementation.meta.id, audit.implementation.meta])
-  );
-  const categoryEntries = Object.entries(categories).map(([categoryId, category]) => {
-    const filteredCategory = {
-      ...category,
-      auditRefs: category.auditRefs.filter((ref) => availableAuditIdToMeta.has(ref.id))
-    };
-    const didFilter = filteredCategory.auditRefs.length < category.auditRefs.length;
-    const hasOnlyManualAudits = filteredCategory.auditRefs.every((ref) => {
-      const meta = availableAuditIdToMeta.get(ref.id);
-      if (!meta) return false;
-      return meta.scoreDisplayMode === Audit.SCORING_MODES.MANUAL;
-    });
-    if (didFilter && hasOnlyManualAudits) filteredCategory.auditRefs = [];
-    return [categoryId, filteredCategory];
-  }).filter((entry) => typeof entry[1] === "object" && entry[1].auditRefs.length);
-  return Object.fromEntries(categoryEntries);
-}
-function filterConfigByGatherMode(resolvedConfig, mode) {
-  const artifacts = filterArtifactsByGatherMode(resolvedConfig.artifacts, mode);
-  const supportedAudits = filterAuditsByGatherMode(resolvedConfig.audits, mode);
-  const audits = filterAuditsByAvailableArtifacts(supportedAudits, artifacts || []);
-  const supportedCategories = filterCategoriesByGatherMode(resolvedConfig.categories, mode);
-  const categories = filterCategoriesByAvailableAudits(supportedCategories, audits || []);
-  return {
-    ...resolvedConfig,
-    artifacts,
-    audits,
-    categories
-  };
-}
-function filterConfigByExplicitFilters(resolvedConfig, filters) {
-  const { onlyAudits, onlyCategories, skipAudits } = filters;
-  if (onlyAudits && !onlyAudits.length) {
-    throw new Error(`onlyAudits cannot be an empty array.`);
-  }
-  if (onlyCategories && !onlyCategories.length) {
-    throw new Error(`onlyCategories cannot be an empty array.`);
-  }
-  errorOnUnknownOnlyCategories(resolvedConfig.categories, onlyCategories);
-  let baseAuditIds = getAuditIdsInCategories(resolvedConfig.categories, void 0);
-  if (onlyCategories) {
-    baseAuditIds = getAuditIdsInCategories(resolvedConfig.categories, onlyCategories);
-  } else if (onlyAudits) {
-    baseAuditIds = /* @__PURE__ */ new Set();
-  } else if (!resolvedConfig.categories || !Object.keys(resolvedConfig.categories).length) {
-    baseAuditIds = new Set(resolvedConfig.audits?.map((audit) => audit.implementation.meta.id));
-  }
-  const auditIdsToKeep = new Set(
-    [
-      ...baseAuditIds,
-      // Start with our base audits.
-      ...onlyAudits || [],
-      // Additionally include the opt-in audits from `onlyAudits`.
-      ...filterResistantAuditIds
-      // Always include any filter-resistant audits.
-    ].filter((auditId) => !skipAudits || !skipAudits.includes(auditId))
-  );
-  const audits = auditIdsToKeep.size && resolvedConfig.audits ? resolvedConfig.audits.filter((audit) => auditIdsToKeep.has(audit.implementation.meta.id)) : resolvedConfig.audits;
-  const availableCategories = filterCategoriesByAvailableAudits(resolvedConfig.categories, audits || []);
-  const categories = filterCategoriesByExplicitFilters(availableCategories, onlyCategories);
-  let artifacts = filterArtifactsByAvailableAudits(resolvedConfig.artifacts, audits);
-  if (artifacts && resolvedConfig.settings.disableFullPageScreenshot) {
-    artifacts = artifacts.filter(({ id }) => id !== "FullPageScreenshot");
-  }
-  return {
-    ...resolvedConfig,
-    artifacts,
-    audits,
-    categories
-  };
-}
-var baseArtifactKeySource, baseArtifactKeys, filterResistantAuditIds, filterResistantArtifactIds;
-var init_filters = __esm({
-  "core/config/filters.js"() {
-    "use strict";
-    init_process_global();
-    init_audit();
-    /**
-     * @license
-     * Copyright 2021 Google LLC
-     * SPDX-License-Identifier: Apache-2.0
-     */
-    baseArtifactKeySource = {
-      fetchTime: "",
-      LighthouseRunWarnings: "",
-      BenchmarkIndex: "",
-      HostDPR: "",
-      settings: "",
-      Timing: "",
-      URL: "",
-      PageLoadError: "",
-      HostFormFactor: "",
-      HostUserAgent: "",
-      HostProduct: "",
-      GatherContext: ""
-    };
-    baseArtifactKeys = Object.keys(baseArtifactKeySource);
-    filterResistantAuditIds = [];
-    filterResistantArtifactIds = ["Stacks", "NetworkUserAgent", "FullPageScreenshot"];
-    __name(getAuditIdsInCategories, "getAuditIdsInCategories");
-    __name(filterArtifactsByAvailableAudits, "filterArtifactsByAvailableAudits");
-    __name(filterArtifactsByGatherMode, "filterArtifactsByGatherMode");
-    __name(filterAuditsByAvailableArtifacts, "filterAuditsByAvailableArtifacts");
-    __name(filterAuditsByGatherMode, "filterAuditsByGatherMode");
-    __name(filterCategoriesByGatherMode, "filterCategoriesByGatherMode");
-    __name(filterCategoriesByExplicitFilters, "filterCategoriesByExplicitFilters");
-    __name(errorOnUnknownOnlyCategories, "errorOnUnknownOnlyCategories");
-    __name(filterCategoriesByAvailableAudits, "filterCategoriesByAvailableAudits");
-    __name(filterConfigByGatherMode, "filterConfigByGatherMode");
-    __name(filterConfigByExplicitFilters, "filterConfigByExplicitFilters");
-  }
-});
-
-// core/config/config-plugin.js
-function isArrayOfUnknownObjects(arr) {
-  return Array.isArray(arr) && arr.every(isObjectOfUnknownProperties);
-}
-function isObjectOfUnknownProperties(val) {
-  return typeof val === "object" && val !== null && !Array.isArray(val);
-}
-function objectIsGatherMode(str) {
-  if (typeof str !== "string") return false;
-  return str === "navigation" || str === "timespan" || str === "snapshot";
-}
-function isArrayOfGatherModes(arr) {
-  if (!Array.isArray(arr)) return false;
-  return arr.every(objectIsGatherMode);
-}
-function assertNoExcessProperties(obj, pluginName, objectName = "") {
-  if (objectName) {
-    objectName += " ";
-  }
-  const invalidKeys = Object.keys(obj);
-  if (invalidKeys.length > 0) {
-    const keys2 = invalidKeys.join(", ");
-    throw new Error(`${pluginName} has unrecognized ${objectName}properties: [${keys2}]`);
-  }
-}
-var ConfigPlugin, config_plugin_default;
-var init_config_plugin = __esm({
-  "core/config/config-plugin.js"() {
-    "use strict";
-    init_process_global();
-    init_i18n();
-    /**
-     * @license
-     * Copyright 2019 Google LLC
-     * SPDX-License-Identifier: Apache-2.0
-     */
-    __name(isArrayOfUnknownObjects, "isArrayOfUnknownObjects");
-    __name(isObjectOfUnknownProperties, "isObjectOfUnknownProperties");
-    __name(objectIsGatherMode, "objectIsGatherMode");
-    __name(isArrayOfGatherModes, "isArrayOfGatherModes");
-    __name(assertNoExcessProperties, "assertNoExcessProperties");
-    ConfigPlugin = class _ConfigPlugin {
-      static {
-        __name(this, "ConfigPlugin");
-      }
-      /**
-       * Extract and validate the list of AuditDefns added by the plugin (or undefined
-       * if no additional audits are being added by the plugin).
-       * @param {unknown} auditsJson
-       * @param {string} pluginName
-       * @return {Array<{path: string}>|undefined}
-       */
-      static _parseAuditsList(auditsJson, pluginName) {
-        if (auditsJson === void 0) {
-          return void 0;
-        } else if (!isArrayOfUnknownObjects(auditsJson)) {
-          throw new Error(`${pluginName} has an invalid audits array.`);
-        }
-        return auditsJson.map((auditDefnJson) => {
-          const { path: path7, ...invalidRest } = auditDefnJson;
-          assertNoExcessProperties(invalidRest, pluginName, "audit");
-          if (typeof path7 !== "string") {
-            throw new Error(`${pluginName} has a missing audit path.`);
-          }
-          return {
-            path: path7
-          };
-        });
-      }
-      /**
-       * Extract and validate the list of category AuditRefs added by the plugin.
-       * @param {unknown} auditRefsJson
-       * @param {string} pluginName
-       * @return {Array<LH.Config.AuditRefJson>}
-       */
-      static _parseAuditRefsList(auditRefsJson, pluginName) {
-        if (!isArrayOfUnknownObjects(auditRefsJson)) {
-          throw new Error(`${pluginName} has no valid auditsRefs.`);
-        }
-        return auditRefsJson.map((auditRefJson) => {
-          const { id, weight, group, ...invalidRest } = auditRefJson;
-          assertNoExcessProperties(invalidRest, pluginName, "auditRef");
-          if (typeof id !== "string") {
-            throw new Error(`${pluginName} has an invalid auditRef id.`);
-          }
-          if (typeof weight !== "number") {
-            throw new Error(`${pluginName} has an invalid auditRef weight.`);
-          }
-          if (typeof group !== "string" && typeof group !== "undefined") {
-            throw new Error(`${pluginName} has an invalid auditRef group.`);
-          }
-          const prependedGroup = group ? `${pluginName}-${group}` : group;
-          return {
-            id,
-            weight,
-            group: prependedGroup
-          };
-        });
-      }
-      /**
-       * Extract and validate the category added by the plugin.
-       * @param {unknown} categoryJson
-       * @param {string} pluginName
-       * @return {LH.Config.CategoryJson}
-       */
-      static _parseCategory(categoryJson, pluginName) {
-        if (!isObjectOfUnknownProperties(categoryJson)) {
-          throw new Error(`${pluginName} has no valid category.`);
-        }
-        const {
-          title,
-          description,
-          manualDescription,
-          auditRefs: auditRefsJson,
-          supportedModes,
-          ...invalidRest
-        } = categoryJson;
-        assertNoExcessProperties(invalidRest, pluginName, "category");
-        if (!isStringOrIcuMessage(title)) {
-          throw new Error(`${pluginName} has an invalid category tile.`);
-        }
-        if (!isStringOrIcuMessage(description) && description !== void 0) {
-          throw new Error(`${pluginName} has an invalid category description.`);
-        }
-        if (!isStringOrIcuMessage(manualDescription) && manualDescription !== void 0) {
-          throw new Error(`${pluginName} has an invalid category manualDescription.`);
-        }
-        if (!isArrayOfGatherModes(supportedModes) && supportedModes !== void 0) {
-          throw new Error(
-            `${pluginName} supportedModes must be an array, valid array values are "navigation", "timespan", and "snapshot".`
-          );
-        }
-        const auditRefs = _ConfigPlugin._parseAuditRefsList(auditRefsJson, pluginName);
-        return {
-          title,
-          auditRefs,
-          description,
-          manualDescription,
-          supportedModes
-        };
-      }
-      /**
-       * Extract and validate groups JSON added by the plugin.
-       * @param {unknown} groupsJson
-       * @param {string} pluginName
-       * @return {Record<string, LH.Config.GroupJson>|undefined}
-       */
-      static _parseGroups(groupsJson, pluginName) {
-        if (groupsJson === void 0) {
-          return void 0;
-        }
-        if (!isObjectOfUnknownProperties(groupsJson)) {
-          throw new Error(`${pluginName} groups json is not defined as an object.`);
-        }
-        const groups = Object.entries(groupsJson);
-        const parsedGroupsJson = {};
-        groups.forEach(([groupId, groupJson]) => {
-          if (!isObjectOfUnknownProperties(groupJson)) {
-            throw new Error(`${pluginName} has a group not defined as an object.`);
-          }
-          const { title, description, ...invalidRest } = groupJson;
-          assertNoExcessProperties(invalidRest, pluginName, "group");
-          if (!isStringOrIcuMessage(title)) {
-            throw new Error(`${pluginName} has an invalid group title.`);
-          }
-          if (!isStringOrIcuMessage(description) && description !== void 0) {
-            throw new Error(`${pluginName} has an invalid group description.`);
-          }
-          parsedGroupsJson[`${pluginName}-${groupId}`] = {
-            title,
-            description
-          };
-        });
-        return parsedGroupsJson;
-      }
-      /**
-       * Extracts and validates a config from the provided plugin input, throwing
-       * if it deviates from the expected object shape.
-       * @param {unknown} pluginJson
-       * @param {string} pluginName
-       * @return {LH.Config}
-       */
-      static parsePlugin(pluginJson, pluginName) {
-        pluginJson = JSON.parse(JSON.stringify(pluginJson));
-        if (!isObjectOfUnknownProperties(pluginJson)) {
-          throw new Error(`${pluginName} is not defined as an object.`);
-        }
-        const {
-          audits: pluginAuditsJson,
-          category: pluginCategoryJson,
-          groups: pluginGroupsJson,
-          ...invalidRest
-        } = pluginJson;
-        assertNoExcessProperties(invalidRest, pluginName);
-        return {
-          audits: _ConfigPlugin._parseAuditsList(pluginAuditsJson, pluginName),
-          categories: {
-            [pluginName]: _ConfigPlugin._parseCategory(pluginCategoryJson, pluginName)
-          },
-          groups: _ConfigPlugin._parseGroups(pluginGroupsJson, pluginName)
-        };
-      }
-    };
-    config_plugin_default = ConfigPlugin;
   }
 });
 
@@ -48291,196 +46468,6 @@ var init_trace_engine_result = __esm({
   }
 });
 
-// node_modules/lighthouse-plugin-soft-navigation/plugin.js
-var plugin_exports = {};
-__export(plugin_exports, {
-  default: () => plugin_default
-});
-var plugin_default;
-var init_plugin = __esm({
-  "node_modules/lighthouse-plugin-soft-navigation/plugin.js"() {
-    init_process_global();
-    plugin_default = {
-      audits: [
-        { path: "lighthouse-plugin-soft-navigation/audits/soft-nav-fcp" },
-        { path: "lighthouse-plugin-soft-navigation/audits/soft-nav-lcp" }
-      ],
-      groups: {
-        "metrics": {
-          title: "Metrics associated with a soft navigation"
-        }
-      },
-      category: {
-        title: "Soft Navigation",
-        supportedModes: ["timespan"],
-        auditRefs: [
-          { id: "soft-nav-fcp", weight: 1, group: "metrics" },
-          { id: "soft-nav-lcp", weight: 1, group: "metrics" }
-        ]
-      }
-    };
-  }
-});
-
-// node_modules/lighthouse-plugin-soft-navigation/lib/metric-timings.js
-function computeMetricTimings(traceEvents) {
-  let softNavEvent;
-  let lastLcpCandidate;
-  let fcpEvent;
-  for (const event of traceEvents) {
-    switch (event.name) {
-      case "SoftNavigationHeuristics_SoftNavigationDetected":
-        if (softNavEvent) throw new Error("Multiple soft navigations detected");
-        softNavEvent = event;
-        break;
-      case "largestContentfulPaint::Candidate":
-        if (softNavEvent) {
-          lastLcpCandidate = event;
-        }
-        break;
-      case "firstContentfulPaint":
-        if (softNavEvent) {
-          fcpEvent = event;
-        }
-        break;
-    }
-  }
-  if (!softNavEvent) return {};
-  const timeOriginTs = softNavEvent.ts;
-  const getTiming = /* @__PURE__ */ __name((event) => {
-    if (!event) return void 0;
-    return (event.ts - timeOriginTs) / 1e3;
-  }, "getTiming");
-  return {
-    lcpTiming: getTiming(lastLcpCandidate),
-    fcpTiming: getTiming(fcpEvent)
-  };
-}
-var init_metric_timings = __esm({
-  "node_modules/lighthouse-plugin-soft-navigation/lib/metric-timings.js"() {
-    init_process_global();
-    __name(computeMetricTimings, "computeMetricTimings");
-  }
-});
-
-// node_modules/lighthouse-plugin-soft-navigation/audits/soft-nav-fcp.js
-var soft_nav_fcp_exports = {};
-__export(soft_nav_fcp_exports, {
-  default: () => soft_nav_fcp_default
-});
-var SoftNavFCP, soft_nav_fcp_default;
-var init_soft_nav_fcp = __esm({
-  "node_modules/lighthouse-plugin-soft-navigation/audits/soft-nav-fcp.js"() {
-    init_process_global();
-    init_core2();
-    init_processed_trace();
-    init_metric_timings();
-    SoftNavFCP = class extends Audit {
-      static {
-        __name(this, "SoftNavFCP");
-      }
-      /**
-       * @return {AuditMeta}
-       */
-      static get meta() {
-        return {
-          id: "soft-nav-fcp",
-          title: "Soft Navigation First Contentful Paint",
-          description: "First Contentful Paint of a soft navigation.",
-          scoreDisplayMode: Audit.SCORING_MODES.NUMERIC,
-          supportedModes: ["timespan"],
-          requiredArtifacts: ["Trace"]
-        };
-      }
-      /**
-       * @param {import('lighthouse').Artifacts} artifacts 
-       * @param {AuditContext} context 
-       * @return {Promise<AuditProduct>}
-       */
-      static async audit(artifacts, context) {
-        const trace = artifacts.Trace;
-        const processedTrace = await ProcessedTraceComputed.request(trace, context);
-        const { fcpTiming } = computeMetricTimings(processedTrace.mainThreadEvents);
-        if (!fcpTiming) {
-          return {
-            notApplicable: true,
-            score: 1
-          };
-        }
-        return {
-          numericValue: fcpTiming,
-          numericUnit: "millisecond",
-          displayValue: `${fcpTiming} ms`,
-          score: Audit.computeLogNormalScore({
-            p10: 1800,
-            median: 3e3
-          }, fcpTiming)
-        };
-      }
-    };
-    soft_nav_fcp_default = SoftNavFCP;
-  }
-});
-
-// node_modules/lighthouse-plugin-soft-navigation/audits/soft-nav-lcp.js
-var soft_nav_lcp_exports = {};
-__export(soft_nav_lcp_exports, {
-  default: () => soft_nav_lcp_default
-});
-var SoftNavLCP, soft_nav_lcp_default;
-var init_soft_nav_lcp = __esm({
-  "node_modules/lighthouse-plugin-soft-navigation/audits/soft-nav-lcp.js"() {
-    init_process_global();
-    init_core2();
-    init_processed_trace();
-    init_metric_timings();
-    SoftNavLCP = class extends Audit {
-      static {
-        __name(this, "SoftNavLCP");
-      }
-      /**
-       * @return {AuditMeta}
-       */
-      static get meta() {
-        return {
-          id: "soft-nav-lcp",
-          title: "Soft Navigation Largest Contentful Paint",
-          description: "Largest Contentful Paint of a soft navigation.",
-          scoreDisplayMode: Audit.SCORING_MODES.NUMERIC,
-          supportedModes: ["timespan"],
-          requiredArtifacts: ["Trace"]
-        };
-      }
-      /**
-       * @param {import('lighthouse').Artifacts} artifacts 
-       * @param {AuditContext} context 
-       * @return {Promise<AuditProduct>}
-       */
-      static async audit(artifacts, context) {
-        const trace = artifacts.Trace;
-        const processedTrace = await ProcessedTraceComputed.request(trace, context);
-        const { lcpTiming } = computeMetricTimings(processedTrace.mainThreadEvents);
-        if (!lcpTiming) {
-          return {
-            notApplicable: true,
-            score: 1
-          };
-        }
-        return {
-          numericValue: lcpTiming,
-          numericUnit: "millisecond",
-          displayValue: `${lcpTiming} ms`,
-          score: Audit.computeLogNormalScore({
-            p10: 2500,
-            median: 4e3
-          }, lcpTiming)
-        };
-      }
-    };
-    soft_nav_lcp_default = SoftNavLCP;
-  }
-});
-
 // lh-gatherer-shim:/Users/alexrudenko/src/lighthouse/core/gather/gatherers/bf-cache-failures.js
 var bf_cache_failures_exports = {};
 __export(bf_cache_failures_exports, {
@@ -50363,8 +48350,1813 @@ var init_user_timings = __esm({
   }
 });
 
+// replace-modules:/Users/alexrudenko/src/lighthouse/node_modules/@sentry/node/build/cjs/index.js
+var cjs_exports = {};
+__export(cjs_exports, {
+  default: () => cjs_default
+});
+var cjs_default;
+var init_cjs = __esm({
+  "replace-modules:/Users/alexrudenko/src/lighthouse/node_modules/@sentry/node/build/cjs/index.js"() {
+    init_process_global();
+    cjs_default = {};
+  }
+});
+
+// clients/devtools-mcp/devtools-mcp-entry.js
+init_process_global();
+
+// core/index.js
+init_process_global();
+init_trace();
+
+// core/runner.js
+init_process_global();
+init_lighthouse_logger();
+init_lodash();
+import path6 from "path";
+
+// core/scoring.js
+init_process_global();
+init_audit();
+/**
+ * @license
+ * Copyright 2018 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+var clampTo2Decimals2 = /* @__PURE__ */ __name((val) => Math.round(val * 100) / 100, "clampTo2Decimals");
+var ReportScoring = class _ReportScoring {
+  static {
+    __name(this, "ReportScoring");
+  }
+  /**
+   * Computes the weighted-average of the score of the list of items.
+   * @param {Array<{score: number|null, weight: number}>} items
+   * @return {number|null}
+   */
+  static arithmeticMean(items) {
+    items = items.filter((item) => item.weight > 0);
+    if (items.some((item) => item.score === null)) return null;
+    const results = items.reduce(
+      (result, item) => {
+        const score = item.score;
+        const weight = item.weight;
+        return {
+          weight: result.weight + weight,
+          sum: result.sum + /** @type {number} */
+          score * weight
+        };
+      },
+      { weight: 0, sum: 0 }
+    );
+    return clampTo2Decimals2(results.sum / results.weight || 0);
+  }
+  /**
+   * Returns the report JSON object with computed scores.
+   * @param {Object<string, LH.Config.Category>} configCategories
+   * @param {Object<string, LH.RawIcu<LH.Audit.Result>>} resultsByAuditId
+   * @return {Object<string, LH.RawIcu<LH.Result.Category>>}
+   */
+  static scoreAllCategories(configCategories, resultsByAuditId) {
+    const scoredCategories = {};
+    for (const [categoryId, configCategory] of Object.entries(configCategories)) {
+      const auditRefs = configCategory.auditRefs.map((configMember) => {
+        const member = { ...configMember };
+        const result = resultsByAuditId[member.id];
+        if (result.scoreDisplayMode === Audit.SCORING_MODES.NOT_APPLICABLE || result.scoreDisplayMode === Audit.SCORING_MODES.INFORMATIVE || result.scoreDisplayMode === Audit.SCORING_MODES.MANUAL) {
+          member.weight = 0;
+        }
+        return member;
+      });
+      const scores = auditRefs.map((auditRef) => ({
+        score: resultsByAuditId[auditRef.id].score,
+        weight: auditRef.weight
+      }));
+      const score = _ReportScoring.arithmeticMean(scores);
+      scoredCategories[categoryId] = {
+        ...configCategory,
+        auditRefs,
+        id: categoryId,
+        score
+      };
+    }
+    return scoredCategories;
+  }
+};
+
+// core/runner.js
+init_audit();
+init_format();
+
+// core/lib/stack-packs.js
+init_process_global();
+init_lighthouse_logger();
+var import_lighthouse_stack_packs = __toESM(require_lighthouse_stack_packs(), 1);
+init_i18n();
+/**
+ * @license
+ * Copyright 2019 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+var stackPacksToInclude = [
+  {
+    packId: "gatsby",
+    requiredStacks: ["js:gatsby"]
+  },
+  {
+    packId: "wordpress",
+    requiredStacks: ["js:wordpress"]
+  },
+  {
+    packId: "wix",
+    requiredStacks: ["js:wix"]
+  },
+  {
+    packId: "wp-rocket",
+    requiredStacks: ["js:wp-rocket"]
+  },
+  {
+    packId: "ezoic",
+    requiredStacks: ["js:ezoic"]
+  },
+  {
+    packId: "drupal",
+    requiredStacks: ["js:drupal"]
+  },
+  {
+    packId: "nitropack",
+    requiredStacks: ["js:nitropack"]
+  },
+  {
+    packId: "amp",
+    requiredStacks: ["js:amp"]
+  },
+  {
+    packId: "magento",
+    requiredStacks: ["js:magento"]
+  },
+  {
+    packId: "octobercms",
+    requiredStacks: ["js:octobercms"]
+  },
+  {
+    packId: "joomla",
+    requiredStacks: ["js:joomla"]
+  },
+  {
+    packId: "next.js",
+    requiredStacks: ["js:next"]
+  },
+  {
+    packId: "nuxt",
+    requiredStacks: ["js:nuxt"]
+  },
+  {
+    packId: "angular",
+    requiredStacks: ["js:angular"]
+  },
+  {
+    packId: "react",
+    requiredStacks: ["js:react"]
+  }
+];
+function getStackPacks(pageStacks) {
+  if (!pageStacks) return [];
+  const packs = [];
+  for (const pageStack of pageStacks) {
+    const stackPackToIncl = stackPacksToInclude.find((stackPackToIncl2) => stackPackToIncl2.requiredStacks.includes(`${pageStack.detector}:${pageStack.id}`));
+    if (!stackPackToIncl) {
+      continue;
+    }
+    const matchedPack = import_lighthouse_stack_packs.default.find((pack) => pack.id === stackPackToIncl.packId);
+    if (!matchedPack) {
+      lighthouse_logger_default.warn(
+        "StackPacks",
+        `'${stackPackToIncl.packId}' stack pack was matched but is not found in stack-packs lib`
+      );
+      continue;
+    }
+    const str_105 = createIcuMessageFn(
+      `node_modules/lighthouse-stack-packs/packs/${matchedPack.id}.js`,
+      matchedPack.UIStrings
+    );
+    const descriptions = {};
+    const UIStrings125 = matchedPack.UIStrings;
+    for (const key in UIStrings125) {
+      if (UIStrings125[key]) {
+        descriptions[key] = str_105(UIStrings125[key]);
+      }
+    }
+    packs.push({
+      id: matchedPack.id,
+      title: matchedPack.title,
+      iconDataURL: matchedPack.icon,
+      descriptions
+    });
+  }
+  return packs.sort((a, b) => {
+    const aVal = stackPacksToInclude.findIndex((p) => p.packId === a.id);
+    const bVal = stackPacksToInclude.findIndex((p) => p.packId === b.id);
+    return aVal - bVal;
+  });
+}
+__name(getStackPacks, "getStackPacks");
+
+// core/lib/asset-saver.js
+init_process_global();
+init_url();
+init_lighthouse_logger();
+init_lantern2();
+import fs from "fs";
+import path3 from "path";
+import stream from "stream";
+import { createGzip, gunzipSync } from "zlib";
+
+// core/lib/lantern-trace-saver.js
+init_process_global();
+/**
+ * @license
+ * Copyright 2018 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+// core/lib/traces/metric-trace-events.js
+init_process_global();
+init_lighthouse_logger();
+init_trace_processor();
+/**
+ * @license
+ * Copyright 2017 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+// core/computed/network-analysis.js
+init_process_global();
+init_lighthouse_logger();
+init_lantern2();
+init_computed_artifact();
+init_network_records();
+/**
+ * @license
+ * Copyright 2017 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+var NetworkAnalysis = class {
+  static {
+    __name(this, "NetworkAnalysis");
+  }
+  /**
+   * @param {LH.DevtoolsLog} devtoolsLog
+   * @param {LH.Artifacts.ComputedContext} context
+   * @return {Promise<LH.Artifacts.NetworkAnalysis>}
+   */
+  static async compute_(devtoolsLog, context) {
+    const records = await NetworkRecordsComputed.request(devtoolsLog, context);
+    const analysis = core_exports.NetworkAnalyzer.analyze(records);
+    if (!analysis) {
+      lighthouse_logger_default.error("NetworkAnalysis", "Network analysis failed due to lack of transfer data");
+      return {
+        throughput: 0,
+        rtt: Number.POSITIVE_INFINITY,
+        additionalRttByOrigin: /* @__PURE__ */ new Map(),
+        serverResponseTimeByOrigin: /* @__PURE__ */ new Map()
+      };
+    }
+    return analysis;
+  }
+};
+var NetworkAnalysisComputed = makeComputedArtifact(NetworkAnalysis, null);
+
+// core/computed/load-simulator.js
+init_process_global();
+init_computed_artifact();
+init_lantern2();
+/**
+ * @license
+ * Copyright 2018 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+var LoadSimulator = class {
+  static {
+    __name(this, "LoadSimulator");
+  }
+  /**
+   * @param {{devtoolsLog: LH.DevtoolsLog, settings: LH.Audit.Context['settings']}} data
+   * @param {LH.Artifacts.ComputedContext} context
+   * @return {Promise<LH.Gatherer.Simulation.Simulator>}
+   */
+  static async compute_(data31, context) {
+    const networkAnalysis = await NetworkAnalysisComputed.request(data31.devtoolsLog, context);
+    return simulation_exports.Simulator.createSimulator({ ...data31.settings, networkAnalysis });
+  }
+  /**
+   * @param {LH.Artifacts.NetworkAnalysis} networkAnalysis
+   * @return {LH.PrecomputedLanternData}
+   */
+  static convertAnalysisToSaveableLanternData(networkAnalysis) {
+    const lanternData = { additionalRttByOrigin: {}, serverResponseTimeByOrigin: {} };
+    for (const [origin, value] of networkAnalysis.additionalRttByOrigin.entries()) {
+      if (origin.startsWith("http")) lanternData.additionalRttByOrigin[origin] = value;
+    }
+    for (const [origin, value] of networkAnalysis.serverResponseTimeByOrigin.entries()) {
+      if (origin.startsWith("http")) lanternData.serverResponseTimeByOrigin[origin] = value;
+    }
+    return lanternData;
+  }
+};
+var LoadSimulatorComputed = makeComputedArtifact(LoadSimulator, ["devtoolsLog", "settings"]);
+
+// core/lib/asset-saver.js
+init_lh_error();
+init_root2();
+/**
+ * @license
+ * Copyright 2016 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+var artifactsFilename = "artifacts.json";
+var traceFilename = "trace.json";
+var devtoolsFilename = "devtoolslog.json";
+var errorPrefix = "pageLoadError.";
+async function writeJson(contents, path7, gzip) {
+  const writeStream = fs.createWriteStream(gzip ? path7 + ".gz" : path7);
+  if (gzip) {
+    await stream.promises.pipeline(contents, createGzip(), writeStream);
+  } else {
+    await stream.promises.pipeline(contents, writeStream);
+  }
+}
+__name(writeJson, "writeJson");
+function readJson(filename, reviver) {
+  if (fs.existsSync(filename + ".gz")) {
+    filename = filename + ".gz";
+  }
+  if (!filename.endsWith(".json.gz")) {
+    return JSON.parse(fs.readFileSync(filename, "utf8"), reviver);
+  }
+  const buffer = gunzipSync(fs.readFileSync(filename));
+  return JSON.parse(buffer.toString("utf8"), reviver);
+}
+__name(readJson, "readJson");
+function endsWithSuffix(filename, suffix) {
+  return filename.endsWith(suffix) || filename.endsWith(suffix + ".gz");
+}
+__name(endsWithSuffix, "endsWithSuffix");
+function loadArtifacts(basePath) {
+  lighthouse_logger_default.log("Reading artifacts from disk:", basePath);
+  if (!fs.existsSync(basePath)) {
+    throw new Error("No saved artifacts found at " + basePath);
+  }
+  const artifacts = readJson(path3.join(basePath, artifactsFilename), LighthouseError.parseReviver);
+  const filenames = fs.readdirSync(basePath);
+  filenames.filter((f) => endsWithSuffix(f, devtoolsFilename)).forEach((filename) => {
+    const devtoolsLog = readJson(path3.join(basePath, filename));
+    if (filename.startsWith(devtoolsFilename)) {
+      artifacts.DevtoolsLog = devtoolsLog;
+    } else if (filename.startsWith(errorPrefix)) {
+      artifacts.DevtoolsLogError = devtoolsLog;
+    }
+  });
+  filenames.filter((f) => endsWithSuffix(f, traceFilename)).forEach((filename) => {
+    let trace = readJson(path3.join(basePath, filename));
+    if (Array.isArray(trace)) {
+      trace = { traceEvents: trace };
+    }
+    if (filename.startsWith(traceFilename)) {
+      artifacts.Trace = trace;
+    } else if (filename.startsWith(errorPrefix)) {
+      artifacts.TraceError = trace;
+    }
+  });
+  if (Array.isArray(artifacts.Timing)) {
+    artifacts.Timing.forEach((entry) => entry.gather = true);
+  }
+  return artifacts;
+}
+__name(loadArtifacts, "loadArtifacts");
+function stringifyReplacer(key, value) {
+  if (value instanceof Error) {
+    return LighthouseError.stringifyReplacer(value);
+  }
+  return value;
+}
+__name(stringifyReplacer, "stringifyReplacer");
+async function saveArtifacts(artifacts, basePath, options = {}) {
+  const status = { msg: "Saving artifacts", id: "lh:assetSaver:saveArtifacts" };
+  lighthouse_logger_default.time(status);
+  fs.mkdirSync(basePath, { recursive: true });
+  const filenames = fs.readdirSync(basePath);
+  for (const filename of filenames) {
+    const isPreviousFile = filename.endsWith(traceFilename) || filename.endsWith(devtoolsFilename) || filename.endsWith(traceFilename + ".gz") || filename.endsWith(devtoolsFilename + ".gz") || filename === artifactsFilename || filename === artifactsFilename + ".gz";
+    if (isPreviousFile) {
+      fs.unlinkSync(`${basePath}/${filename}`);
+    }
+  }
+  const {
+    DevtoolsLog: DevtoolsLog2,
+    Trace,
+    DevtoolsLogError,
+    TraceError,
+    ...restArtifacts
+  } = artifacts;
+  if (Trace) {
+    await saveTrace(Trace, `${basePath}/${traceFilename}`, options);
+  }
+  if (TraceError) {
+    await saveTrace(TraceError, `${basePath}/${errorPrefix}${traceFilename}`, options);
+  }
+  if (DevtoolsLog2) {
+    await saveDevtoolsLog(
+      DevtoolsLog2,
+      `${basePath}/${devtoolsFilename}`,
+      options
+    );
+  }
+  if (DevtoolsLogError) {
+    await saveDevtoolsLog(
+      DevtoolsLogError,
+      `${basePath}/${errorPrefix}${devtoolsFilename}`,
+      options
+    );
+  }
+  const restArtifactsString = JSON.stringify(restArtifacts, stringifyReplacer, 2);
+  await writeJson(function* () {
+    yield restArtifactsString;
+    yield "\n";
+  }, `${basePath}/${artifactsFilename}`, !!options.gzip);
+  lighthouse_logger_default.log("Artifacts saved to disk in folder:", basePath);
+  lighthouse_logger_default.timeEnd(status);
+}
+__name(saveArtifacts, "saveArtifacts");
+function saveLhr(lhr, basePath) {
+  fs.writeFileSync(`${basePath}/lhr.report.json`, JSON.stringify(lhr, null, 2));
+}
+__name(saveLhr, "saveLhr");
+function* arrayOfObjectsJsonGenerator(arrayOfObjects) {
+  const ITEMS_PER_ITERATION = 500;
+  yield "[\n";
+  if (arrayOfObjects.length > 0) {
+    const itemsIterator = arrayOfObjects[Symbol.iterator]();
+    const firstItem = itemsIterator.next().value;
+    yield `  ${JSON.stringify(firstItem)}`;
+    let itemsRemaining = ITEMS_PER_ITERATION;
+    let itemsJSON = "";
+    for (const item of itemsIterator) {
+      itemsJSON += `,
+  ${JSON.stringify(item)}`;
+      itemsRemaining--;
+      if (itemsRemaining === 0) {
+        yield itemsJSON;
+        itemsRemaining = ITEMS_PER_ITERATION;
+        itemsJSON = "";
+      }
+    }
+    yield itemsJSON;
+  }
+  yield "\n]";
+}
+__name(arrayOfObjectsJsonGenerator, "arrayOfObjectsJsonGenerator");
+function* traceJsonGenerator(traceData) {
+  const { traceEvents, ...rest } = traceData;
+  yield "{\n";
+  yield '"traceEvents": ';
+  yield* arrayOfObjectsJsonGenerator(traceEvents);
+  for (const [key, value] of Object.entries(rest)) {
+    yield `,
+"${key}": ${JSON.stringify(value, null, 2)}`;
+  }
+  yield "}\n";
+}
+__name(traceJsonGenerator, "traceJsonGenerator");
+function saveTrace(traceData, traceFilename2, options = {}) {
+  const traceIter = traceJsonGenerator(traceData);
+  return writeJson(traceIter, traceFilename2, !!options.gzip);
+}
+__name(saveTrace, "saveTrace");
+function saveDevtoolsLog(devtoolsLog, devtoolLogFilename, options = {}) {
+  return writeJson(function* () {
+    yield* arrayOfObjectsJsonGenerator(devtoolsLog);
+    yield "\n";
+  }, devtoolLogFilename, !!options.gzip);
+}
+__name(saveDevtoolsLog, "saveDevtoolsLog");
+
+// core/lib/sentry.js
+init_process_global();
+init_lighthouse_logger();
+
+// core/config/config.js
+init_process_global();
+init_lighthouse_logger();
+import path5 from "path";
+
+// core/config/default-config.js
+init_process_global();
+init_lh();
+
+// core/config/constants.js
+var constants_exports = {};
+__export(constants_exports, {
+  defaultSettings: () => defaultSettings,
+  nonSimulatedSettingsOverrides: () => nonSimulatedSettingsOverrides,
+  screenEmulationMetrics: () => screenEmulationMetrics,
+  throttling: () => throttling2,
+  userAgents: () => userAgents
+});
+init_process_global();
+init_lantern2();
+/**
+ * @license
+ * Copyright 2018 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+var throttling2 = simulation_exports.Constants.throttling;
+var MOTOGPOWER_EMULATION_METRICS = {
+  mobile: true,
+  width: 412,
+  height: 823,
+  // This value has some interesting ramifications for image-size-responsive, see:
+  // https://github.com/GoogleChrome/lighthouse/issues/10741#issuecomment-626903508
+  deviceScaleFactor: 1.75,
+  disabled: false
+};
+var DESKTOP_EMULATION_METRICS = {
+  mobile: false,
+  width: 1350,
+  height: 940,
+  deviceScaleFactor: 1,
+  disabled: false
+};
+var screenEmulationMetrics = {
+  mobile: MOTOGPOWER_EMULATION_METRICS,
+  desktop: DESKTOP_EMULATION_METRICS
+};
+var MOTOG4_USERAGENT = "Mozilla/5.0 (Linux; Android 11; moto g power (2022)) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Mobile Safari/537.36";
+var DESKTOP_USERAGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36";
+var userAgents = {
+  mobile: MOTOG4_USERAGENT,
+  desktop: DESKTOP_USERAGENT
+};
+var defaultSettings = {
+  output: "json",
+  maxWaitForFcp: 30 * 1e3,
+  maxWaitForLoad: 45 * 1e3,
+  pauseAfterFcpMs: 1e3,
+  pauseAfterLoadMs: 1e3,
+  networkQuietThresholdMs: 1e3,
+  cpuQuietThresholdMs: 1e3,
+  formFactor: "mobile",
+  throttling: throttling2.mobileSlow4G,
+  throttlingMethod: "simulate",
+  screenEmulation: screenEmulationMetrics.mobile,
+  emulatedUserAgent: userAgents.mobile,
+  auditMode: false,
+  gatherMode: false,
+  clearStorageTypes: ["file_systems", "shader_cache", "service_workers", "cache_storage"],
+  disableStorageReset: false,
+  debugNavigation: false,
+  channel: "node",
+  usePassiveGathering: false,
+  disableFullPageScreenshot: false,
+  skipAboutBlank: false,
+  blankPage: "about:blank",
+  ignoreStatusCode: false,
+  // the following settings have no defaults but we still want ensure that `key in settings`
+  // in config will work in a typechecked way
+  locale: "en-US",
+  // actual default determined by Config using lib/i18n
+  blockedUrlPatterns: null,
+  additionalTraceCategories: null,
+  extraHeaders: null,
+  precomputedLanternData: null,
+  onlyAudits: null,
+  onlyCategories: null,
+  skipAudits: null
+};
+var nonSimulatedSettingsOverrides = {
+  pauseAfterFcpMs: 5250,
+  pauseAfterLoadMs: 5250,
+  networkQuietThresholdMs: 5250,
+  cpuQuietThresholdMs: 5250
+};
+
+// core/config/default-config.js
+init_i18n();
+/**
+ * @license
+ * Copyright 2018 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+var UIStrings21 = {
+  /** Title of the Performance category of audits. Equivalent to 'Web performance', this term is inclusive of all web page speed and loading optimization topics. Also used as a label of a score gauge; try to limit to 20 characters. */
+  performanceCategoryTitle: "Performance",
+  /** Title of the speed metrics section of the Performance category. Within this section are various speed metrics which quantify the pageload performance into values presented in seconds and milliseconds. */
+  metricGroupTitle: "Metrics",
+  /** Title of the insights section of the Performance category. Within this section are various insights to give developers tips on how to improve the performance of their page. */
+  insightsGroupTitle: "Insights",
+  /** Description of the insights section of the Performance category. Within this section are various insights to give developers tips on how to improve the performance of their page. */
+  insightsGroupDescription: "These insights are also available in the Chrome DevTools Performance Panel - [record a trace](https://developer.chrome.com/docs/devtools/performance/reference) to view more detailed information.",
+  /** Title of an opportunity sub-section of the Performance category. Within this section are audits with imperative titles that suggest actions the user can take to improve the time of the first initial render of the webpage. */
+  firstPaintImprovementsGroupTitle: "First Paint Improvements",
+  /** Description of an opportunity sub-section of the Performance category. Within this section are audits with imperative titles that suggest actions the user can take to improve the time of the first initial render of the webpage. */
+  firstPaintImprovementsGroupDescription: "The most critical aspect of performance is how quickly pixels are rendered onscreen. Key metrics: First Contentful Paint, First Meaningful Paint",
+  /** Title of an opportunity sub-section of the Performance category. Within this section are audits with imperative titles that suggest actions the user can take to improve the overall loading performance of their web page. */
+  overallImprovementsGroupTitle: "Overall Improvements",
+  /** Description of an opportunity sub-section of the Performance category. Within this section are audits with imperative titles that suggest actions the user can take to improve the overall loading performance of their web page. */
+  overallImprovementsGroupDescription: "Enhance the overall loading experience, so the page is responsive and ready to use as soon as possible. Key metrics: Time to Interactive, Speed Index",
+  /** Title of the diagnostics section of the Performance category. Within this section are audits with non-imperative titles that provide more detail on the page's page load performance characteristics. Whereas the 'Opportunities' suggest an action along with expected time savings, diagnostics do not. Within this section, the user may read the details and deduce additional actions they could take. */
+  diagnosticsGroupTitle: "Diagnostics",
+  /** Description of the diagnostics section of the Performance category. Within this section are audits with non-imperative titles that provide more detail on a web page's load performance characteristics. Within this section, the user may read the details and deduce additional actions they could take to improve performance. */
+  diagnosticsGroupDescription: "More information about the performance of your application. These numbers don't [directly affect](https://developer.chrome.com/docs/lighthouse/performance/performance-scoring/) the Performance score.",
+  /** Title of the Accessibility category of audits. This section contains audits focused on making web content accessible to all users. Also used as a label of a score gauge; try to limit to 20 characters. */
+  a11yCategoryTitle: "Accessibility",
+  /** Description of the Accessibility category. This is displayed at the top of a list of audits focused on making web content accessible to all users. No character length limits. 'improve the accessibility of your web app' and 'manual testing' become link texts to additional documentation. */
+  a11yCategoryDescription: "These checks highlight opportunities to [improve the accessibility of your web app](https://developer.chrome.com/docs/lighthouse/accessibility/). Automatic detection can only detect a subset of issues and does not guarantee the accessibility of your web app, so [manual testing](https://web.dev/articles/how-to-review) is also encouraged.",
+  /** Description of the Accessibility manual checks category. This description is displayed above a list of accessibility audits that currently have no automated test and so must be verified manually by the user. No character length limits. 'conducting an accessibility review' becomes link text to additional documentation. */
+  a11yCategoryManualDescription: "These items address areas which an automated testing tool cannot cover. Learn more in our guide on [conducting an accessibility review](https://web.dev/articles/how-to-review).",
+  /** Title of the best practices section of the Accessibility category. Within this section are audits with descriptive titles that highlight common accessibility best practices. */
+  a11yBestPracticesGroupTitle: "Best practices",
+  /** Description of the best practices section within the Accessibility category. Within this section are audits with descriptive titles that highlight common accessibility best practices. */
+  a11yBestPracticesGroupDescription: "These items highlight common accessibility best practices.",
+  /** Title of the color contrast section within the Accessibility category. Within this section are audits with descriptive titles that highlight the color and vision aspects of the page's accessibility that are passing or failing. */
+  a11yColorContrastGroupTitle: "Contrast",
+  /** Description of the color contrast section within the Accessibility category. Within this section are audits with descriptive titles that highlight the color and vision aspects of the page's accessibility that are passing or failing. */
+  a11yColorContrastGroupDescription: "These are opportunities to improve the legibility of your content.",
+  /** Title of the HTML element naming section within the Accessibility category. Within this section are audits with descriptive titles that highlight if the non-textual HTML elements on the page have names discernible by a screen reader. */
+  a11yNamesLabelsGroupTitle: "Names and labels",
+  /** Description of the HTML element naming section within the Accessibility category. Within this section are audits with descriptive titles that highlight if the non-textual HTML elements on the page have names discernible by a screen reader. */
+  a11yNamesLabelsGroupDescription: "These are opportunities to improve the semantics of the controls in your application. This may enhance the experience for users of assistive technology, like a screen reader.",
+  /** Title of the navigation section within the Accessibility category. Within this section are audits with descriptive titles that highlight opportunities to improve keyboard navigation. */
+  a11yNavigationGroupTitle: "Navigation",
+  /** Description of the navigation section within the Accessibility category. Within this section are audits with descriptive titles that highlight opportunities to improve keyboard navigation. */
+  a11yNavigationGroupDescription: "These are opportunities to improve keyboard navigation in your application.",
+  /** Title of the ARIA validity section within the Accessibility category. Within this section are audits with descriptive titles that highlight if whether all the aria-* HTML attributes have been used properly. */
+  a11yAriaGroupTitle: "ARIA",
+  /** Description of the ARIA validity section within the Accessibility category. Within this section are audits with descriptive titles that highlight if whether all the aria-* HTML attributes have been used properly. */
+  a11yAriaGroupDescription: "These are opportunities to improve the usage of ARIA in your application which may enhance the experience for users of assistive technology, like a screen reader.",
+  /** Title of the language section within the Accessibility category. Within this section are audits with descriptive titles that highlight if the language has been annotated in the correct HTML attributes on the page. */
+  a11yLanguageGroupTitle: "Internationalization and localization",
+  /** Description of the language section within the Accessibility category. Within this section are audits with descriptive titles that highlight if the language has been annotated in the correct HTML attributes on the page. */
+  a11yLanguageGroupDescription: "These are opportunities to improve the interpretation of your content by users in different locales.",
+  /** Title of the navigation section within the Accessibility category. Within this section are audits with descriptive titles that highlight opportunities to provide alternative content for audio and video. */
+  a11yAudioVideoGroupTitle: "Audio and video",
+  /** Description of the navigation section within the Accessibility category. Within this section are audits with descriptive titles that highlight opportunities to provide alternative content for audio and video. */
+  a11yAudioVideoGroupDescription: "These are opportunities to provide alternative content for audio and video. This may improve the experience for users with hearing or vision impairments.",
+  /** Title of the navigation section within the Accessibility category. Within this section are audits with descriptive titles that highlight opportunities to improve the experience of reading tabular or list data using assistive technology. */
+  a11yTablesListsVideoGroupTitle: "Tables and lists",
+  /** Description of the navigation section within the Accessibility category. Within this section are audits with descriptive titles that highlight opportunities to improve the experience of reading tabular or list data using assistive technology. */
+  a11yTablesListsVideoGroupDescription: "These are opportunities to improve the experience of reading tabular or list data using assistive technology, like a screen reader.",
+  /** Title of the Search Engine Optimization (SEO) category of audits. This is displayed at the top of a list of audits focused on topics related to optimizing a website for indexing by search engines. Also used as a label of a score gauge; try to limit to 20 characters. */
+  seoCategoryTitle: "SEO",
+  /** Description of the Search Engine Optimization (SEO) category. This is displayed at the top of a list of audits focused on optimizing a website for indexing by search engines. No character length limits. The last sentence starting with 'Learn' becomes link text to additional documentation. */
+  seoCategoryDescription: "These checks ensure that your page is following basic search engine optimization advice. There are many additional factors Lighthouse does not score here that may affect your search ranking, including performance on [Core Web Vitals](https://web.dev/explore/vitals). [Learn more about Google Search Essentials](https://support.google.com/webmasters/answer/35769).",
+  /** Description of the Search Engine Optimization (SEO) manual checks category, the additional validators must be run by hand in order to check all SEO best practices. This is displayed at the top of a list of manually run audits focused on optimizing a website for indexing by search engines. No character length limits. */
+  seoCategoryManualDescription: "Run these additional validators on your site to check additional SEO best practices.",
+  /** Title of the navigation section within the Search Engine Optimization (SEO) category. Within this section are audits with descriptive titles that highlight opportunities to make a page more usable on mobile devices. */
+  seoMobileGroupTitle: "Mobile Friendly",
+  /** Description of the navigation section within the Search Engine Optimization (SEO) category. Within this section are audits with descriptive titles that highlight opportunities to make a page more usable on mobile devices. */
+  seoMobileGroupDescription: "Make sure your pages are mobile friendly so users don’t have to pinch or zoom in order to read the content pages. [Learn how to make pages mobile-friendly](https://developers.google.com/search/mobile-sites/).",
+  /** Title of the navigation section within the Search Engine Optimization (SEO) category. Within this section are audits with descriptive titles that highlight ways to make a website content more easily understood by search engine crawler bots. */
+  seoContentGroupTitle: "Content Best Practices",
+  /** Description of the navigation section within the Search Engine Optimization (SEO) category. Within this section are audits with descriptive titles that highlight ways to make a website content more easily understood by search engine crawler bots. */
+  seoContentGroupDescription: "Format your HTML in a way that enables crawlers to better understand your app’s content.",
+  /** Title of the navigation section within the Search Engine Optimization (SEO) category. Within this section are audits with descriptive titles that highlight ways to make a website accessible to search engine crawlers. */
+  seoCrawlingGroupTitle: "Crawling and Indexing",
+  /** Description of the navigation section within the Search Engine Optimization (SEO) category. Within this section are audits with descriptive titles that highlight ways to make a website accessible to search engine crawlers. */
+  seoCrawlingGroupDescription: "To appear in search results, crawlers need access to your app.",
+  /** Title of the Best Practices category of audits. This is displayed at the top of a list of audits focused on topics related to following web development best practices and accepted guidelines. Also used as a label of a score gauge; try to limit to 20 characters. */
+  bestPracticesCategoryTitle: "Best Practices",
+  /** Title of the Trust & Safety group of audits. This is displayed at the top of a list of audits focused on maintaining user trust and protecting security in web development. */
+  bestPracticesTrustSafetyGroupTitle: "Trust and Safety",
+  /** Title of the User Experience group of the Best Practices category. Within this section are the audits related to the end user's experience of the webpage. */
+  bestPracticesUXGroupTitle: "User Experience",
+  /** Title of the Browser Compatibility group of the Best Practices category. Within this section are the audits related to whether the page is interpreted consistently by browsers. */
+  bestPracticesBrowserCompatGroupTitle: "Browser Compatibility",
+  /** Title of the General group of the Best Practices category. Within this section are the audits that don't belong to a specific group but are of general interest. */
+  bestPracticesGeneralGroupTitle: "General"
+};
+var str_2 = createIcuMessageFn({ url: "core/config/default-config.js" }.url, UIStrings21);
+var defaultConfig = {
+  settings: defaultSettings,
+  artifacts: [
+    // Artifacts which can be depended on come first.
+    { id: "DevtoolsLog", gatherer: "devtools-log" },
+    { id: "Trace", gatherer: "trace" },
+    { id: "Accessibility", gatherer: "accessibility" },
+    { id: "AnchorElements", gatherer: "anchor-elements" },
+    { id: "ConsoleMessages", gatherer: "console-messages" },
+    { id: "CSSUsage", gatherer: "css-usage" },
+    { id: "Doctype", gatherer: "dobetterweb/doctype" },
+    { id: "Inputs", gatherer: "inputs" },
+    { id: "IFrameElements", gatherer: "iframe-elements" },
+    { id: "ImageElements", gatherer: "image-elements" },
+    { id: "InspectorIssues", gatherer: "inspector-issues" },
+    { id: "JsUsage", gatherer: "js-usage" },
+    { id: "LinkElements", gatherer: "link-elements" },
+    { id: "MainDocumentContent", gatherer: "main-document-content" },
+    { id: "MetaElements", gatherer: "meta-elements" },
+    { id: "NetworkUserAgent", gatherer: "network-user-agent" },
+    { id: "RobotsTxt", gatherer: "seo/robots-txt" },
+    { id: "Scripts", gatherer: "scripts" },
+    { id: "SourceMaps", gatherer: "source-maps" },
+    { id: "Stacks", gatherer: "stacks" },
+    { id: "Stylesheets", gatherer: "stylesheets" },
+    { id: "TraceElements", gatherer: "trace-elements" },
+    { id: "ViewportDimensions", gatherer: "viewport-dimensions" },
+    // FullPageScreenshot comes at the end so all other node analysis is captured.
+    { id: "FullPageScreenshot", gatherer: "full-page-screenshot" },
+    // BFCacheFailures comes at the very end because it can perform a page navigation.
+    { id: "BFCacheFailures", gatherer: "bf-cache-failures" }
+  ],
+  audits: [
+    "is-on-https",
+    "redirects-http",
+    "metrics/first-contentful-paint",
+    "metrics/largest-contentful-paint",
+    "metrics/speed-index",
+    "screenshot-thumbnails",
+    "final-screenshot",
+    "metrics/total-blocking-time",
+    "metrics/max-potential-fid",
+    "metrics/cumulative-layout-shift",
+    "metrics/interaction-to-next-paint",
+    "errors-in-console",
+    "server-response-time",
+    "metrics/interactive",
+    "user-timings",
+    "redirects",
+    "image-aspect-ratio",
+    "image-size-responsive",
+    "deprecations",
+    "third-party-cookies",
+    "mainthread-work-breakdown",
+    "bootup-time",
+    "diagnostics",
+    "network-requests",
+    "network-rtt",
+    "network-server-latency",
+    "main-thread-tasks",
+    "metrics",
+    "resource-summary",
+    "layout-shifts",
+    "long-tasks",
+    "non-composited-animations",
+    "unsized-images",
+    "valid-source-maps",
+    "csp-xss",
+    "has-hsts",
+    "origin-isolation",
+    "clickjacking-mitigation",
+    "trusted-types-xss",
+    "script-treemap-data",
+    "accessibility/accesskeys",
+    "accessibility/aria-allowed-attr",
+    "accessibility/aria-allowed-role",
+    "accessibility/aria-command-name",
+    "accessibility/aria-conditional-attr",
+    "accessibility/aria-deprecated-role",
+    "accessibility/aria-dialog-name",
+    "accessibility/aria-hidden-body",
+    "accessibility/aria-hidden-focus",
+    "accessibility/aria-input-field-name",
+    "accessibility/aria-meter-name",
+    "accessibility/aria-progressbar-name",
+    "accessibility/aria-prohibited-attr",
+    "accessibility/aria-required-attr",
+    "accessibility/aria-required-children",
+    "accessibility/aria-required-parent",
+    "accessibility/aria-roles",
+    "accessibility/aria-text",
+    "accessibility/aria-toggle-field-name",
+    "accessibility/aria-tooltip-name",
+    "accessibility/aria-treeitem-name",
+    "accessibility/aria-valid-attr-value",
+    "accessibility/aria-valid-attr",
+    "accessibility/button-name",
+    "accessibility/bypass",
+    "accessibility/color-contrast",
+    "accessibility/definition-list",
+    "accessibility/dlitem",
+    "accessibility/document-title",
+    "accessibility/duplicate-id-aria",
+    "accessibility/empty-heading",
+    "accessibility/form-field-multiple-labels",
+    "accessibility/frame-title",
+    "accessibility/heading-order",
+    "accessibility/html-has-lang",
+    "accessibility/html-lang-valid",
+    "accessibility/html-xml-lang-mismatch",
+    "accessibility/identical-links-same-purpose",
+    "accessibility/image-alt",
+    "accessibility/image-redundant-alt",
+    "accessibility/input-button-name",
+    "accessibility/input-image-alt",
+    "accessibility/label-content-name-mismatch",
+    "accessibility/label",
+    "accessibility/landmark-one-main",
+    "accessibility/link-name",
+    "accessibility/link-in-text-block",
+    "accessibility/list",
+    "accessibility/listitem",
+    "accessibility/meta-refresh",
+    "accessibility/meta-viewport",
+    "accessibility/object-alt",
+    "accessibility/select-name",
+    "accessibility/skip-link",
+    "accessibility/tabindex",
+    "accessibility/table-duplicate-name",
+    "accessibility/table-fake-caption",
+    "accessibility/target-size",
+    "accessibility/td-has-header",
+    "accessibility/td-headers-attr",
+    "accessibility/th-has-data-cells",
+    "accessibility/valid-lang",
+    "accessibility/video-caption",
+    "accessibility/manual/custom-controls-labels",
+    "accessibility/manual/custom-controls-roles",
+    "accessibility/manual/focus-traps",
+    "accessibility/manual/focusable-controls",
+    "accessibility/manual/interactive-element-affordance",
+    "accessibility/manual/logical-tab-order",
+    "accessibility/manual/managed-focus",
+    "accessibility/manual/offscreen-content-hidden",
+    "accessibility/manual/use-landmarks",
+    "accessibility/manual/visual-order-follows-dom",
+    "byte-efficiency/total-byte-weight",
+    "byte-efficiency/unminified-css",
+    "byte-efficiency/unminified-javascript",
+    "byte-efficiency/unused-css-rules",
+    "byte-efficiency/unused-javascript",
+    "dobetterweb/doctype",
+    "dobetterweb/charset",
+    "dobetterweb/geolocation-on-start",
+    "dobetterweb/inspector-issues",
+    "dobetterweb/js-libraries",
+    "dobetterweb/notification-on-start",
+    "dobetterweb/paste-preventing-inputs",
+    "seo/meta-description",
+    "seo/http-status-code",
+    "seo/link-text",
+    "seo/crawlable-anchors",
+    "seo/is-crawlable",
+    "seo/robots-txt",
+    "seo/hreflang",
+    "seo/canonical",
+    "seo/manual/structured-data",
+    "bf-cache",
+    "insights/cache-insight",
+    "insights/cls-culprits-insight",
+    "insights/document-latency-insight",
+    "insights/dom-size-insight",
+    "insights/duplicated-javascript-insight",
+    "insights/font-display-insight",
+    "insights/forced-reflow-insight",
+    "insights/image-delivery-insight",
+    "insights/inp-breakdown-insight",
+    "insights/lcp-breakdown-insight",
+    "insights/lcp-discovery-insight",
+    "insights/legacy-javascript-insight",
+    "insights/modern-http-insight",
+    "insights/network-dependency-tree-insight",
+    "insights/render-blocking-insight",
+    "insights/third-parties-insight",
+    "insights/viewport-insight"
+  ],
+  groups: {
+    "metrics": {
+      title: str_2(UIStrings21.metricGroupTitle)
+    },
+    "insights": {
+      title: str_2(UIStrings21.insightsGroupTitle),
+      description: str_2(UIStrings21.insightsGroupDescription)
+    },
+    "diagnostics": {
+      title: str_2(UIStrings21.diagnosticsGroupTitle),
+      description: str_2(UIStrings21.diagnosticsGroupDescription)
+    },
+    "a11y-best-practices": {
+      title: str_2(UIStrings21.a11yBestPracticesGroupTitle),
+      description: str_2(UIStrings21.a11yBestPracticesGroupDescription)
+    },
+    "a11y-color-contrast": {
+      title: str_2(UIStrings21.a11yColorContrastGroupTitle),
+      description: str_2(UIStrings21.a11yColorContrastGroupDescription)
+    },
+    "a11y-names-labels": {
+      title: str_2(UIStrings21.a11yNamesLabelsGroupTitle),
+      description: str_2(UIStrings21.a11yNamesLabelsGroupDescription)
+    },
+    "a11y-navigation": {
+      title: str_2(UIStrings21.a11yNavigationGroupTitle),
+      description: str_2(UIStrings21.a11yNavigationGroupDescription)
+    },
+    "a11y-aria": {
+      title: str_2(UIStrings21.a11yAriaGroupTitle),
+      description: str_2(UIStrings21.a11yAriaGroupDescription)
+    },
+    "a11y-language": {
+      title: str_2(UIStrings21.a11yLanguageGroupTitle),
+      description: str_2(UIStrings21.a11yLanguageGroupDescription)
+    },
+    "a11y-audio-video": {
+      title: str_2(UIStrings21.a11yAudioVideoGroupTitle),
+      description: str_2(UIStrings21.a11yAudioVideoGroupDescription)
+    },
+    "a11y-tables-lists": {
+      title: str_2(UIStrings21.a11yTablesListsVideoGroupTitle),
+      description: str_2(UIStrings21.a11yTablesListsVideoGroupDescription)
+    },
+    "seo-mobile": {
+      title: str_2(UIStrings21.seoMobileGroupTitle),
+      description: str_2(UIStrings21.seoMobileGroupDescription)
+    },
+    "seo-content": {
+      title: str_2(UIStrings21.seoContentGroupTitle),
+      description: str_2(UIStrings21.seoContentGroupDescription)
+    },
+    "seo-crawl": {
+      title: str_2(UIStrings21.seoCrawlingGroupTitle),
+      description: str_2(UIStrings21.seoCrawlingGroupDescription)
+    },
+    "best-practices-trust-safety": {
+      title: str_2(UIStrings21.bestPracticesTrustSafetyGroupTitle)
+    },
+    "best-practices-ux": {
+      title: str_2(UIStrings21.bestPracticesUXGroupTitle)
+    },
+    "best-practices-browser-compat": {
+      title: str_2(UIStrings21.bestPracticesBrowserCompatGroupTitle)
+    },
+    "best-practices-general": {
+      title: str_2(UIStrings21.bestPracticesGeneralGroupTitle)
+    },
+    // Group for audits that should not be displayed.
+    "hidden": { title: "" }
+  },
+  categories: {
+    "performance": {
+      title: str_2(UIStrings21.performanceCategoryTitle),
+      supportedModes: ["navigation", "timespan", "snapshot"],
+      auditRefs: [
+        { id: "first-contentful-paint", weight: 10, group: "metrics", acronym: "FCP" },
+        { id: "largest-contentful-paint", weight: 25, group: "metrics", acronym: "LCP" },
+        { id: "total-blocking-time", weight: 30, group: "metrics", acronym: "TBT" },
+        { id: "cumulative-layout-shift", weight: 25, group: "metrics", acronym: "CLS" },
+        { id: "speed-index", weight: 10, group: "metrics", acronym: "SI" },
+        { id: "interaction-to-next-paint", weight: 0, group: "metrics", acronym: "INP" },
+        // Insight audits.
+        { id: "cache-insight", weight: 0, group: "insights" },
+        { id: "cls-culprits-insight", weight: 0, group: "insights" },
+        { id: "document-latency-insight", weight: 0, group: "insights" },
+        { id: "dom-size-insight", weight: 0, group: "insights" },
+        { id: "duplicated-javascript-insight", weight: 0, group: "insights" },
+        { id: "font-display-insight", weight: 0, group: "insights" },
+        { id: "forced-reflow-insight", weight: 0, group: "insights" },
+        { id: "image-delivery-insight", weight: 0, group: "insights" },
+        { id: "inp-breakdown-insight", weight: 0, group: "insights" },
+        { id: "lcp-breakdown-insight", weight: 0, group: "insights" },
+        { id: "lcp-discovery-insight", weight: 0, group: "insights" },
+        { id: "legacy-javascript-insight", weight: 0, group: "insights" },
+        { id: "modern-http-insight", weight: 0, group: "insights" },
+        { id: "network-dependency-tree-insight", weight: 0, group: "insights" },
+        { id: "render-blocking-insight", weight: 0, group: "insights" },
+        { id: "third-parties-insight", weight: 0, group: "insights" },
+        { id: "viewport-insight", weight: 0, group: "insights" },
+        // These are our "invisible" metrics. Not displayed, but still in the LHR.
+        { id: "interactive", weight: 0, group: "hidden", acronym: "TTI" },
+        { id: "max-potential-fid", weight: 0, group: "hidden" },
+        { id: "unminified-css", weight: 0, group: "diagnostics" },
+        { id: "unminified-javascript", weight: 0, group: "diagnostics" },
+        { id: "unused-css-rules", weight: 0, group: "diagnostics" },
+        { id: "unused-javascript", weight: 0, group: "diagnostics" },
+        { id: "total-byte-weight", weight: 0, group: "diagnostics" },
+        { id: "user-timings", weight: 0, group: "diagnostics" },
+        { id: "bootup-time", weight: 0, group: "diagnostics" },
+        { id: "mainthread-work-breakdown", weight: 0, group: "diagnostics" },
+        { id: "long-tasks", weight: 0, group: "diagnostics" },
+        { id: "non-composited-animations", weight: 0, group: "diagnostics" },
+        { id: "unsized-images", weight: 0, group: "diagnostics" },
+        { id: "bf-cache", weight: 0, group: "diagnostics" },
+        // Audits past this point contain useful data but are not displayed with other audits.
+        { id: "network-requests", weight: 0, group: "hidden" },
+        { id: "network-rtt", weight: 0, group: "hidden" },
+        { id: "network-server-latency", weight: 0, group: "hidden" },
+        { id: "main-thread-tasks", weight: 0, group: "hidden" },
+        { id: "diagnostics", weight: 0, group: "hidden" },
+        { id: "metrics", weight: 0, group: "hidden" },
+        { id: "screenshot-thumbnails", weight: 0, group: "hidden" },
+        { id: "final-screenshot", weight: 0, group: "hidden" },
+        { id: "script-treemap-data", weight: 0, group: "hidden" },
+        { id: "resource-summary", weight: 0, group: "hidden" },
+        { id: "redirects", weight: 0, group: "hidden" },
+        { id: "server-response-time", weight: 0, group: "hidden" },
+        { id: "layout-shifts", weight: 0, group: "hidden" }
+      ]
+    },
+    "accessibility": {
+      title: str_2(UIStrings21.a11yCategoryTitle),
+      description: str_2(UIStrings21.a11yCategoryDescription),
+      manualDescription: str_2(UIStrings21.a11yCategoryManualDescription),
+      supportedModes: ["navigation", "snapshot"],
+      // Audit weights weights are derived from the axe-core "Impact",
+      // with adjustments based on axe-core "Tags":
+      //
+      // ┌────────────┬───────────────────────────────────────────────┐
+      // │ Impact     │ Weight Based on Tags                          │
+      // │            ├──────────────┬─────────────────┬──────────────┤
+      // │            │  wcag A+AA   │  best-practice  │ experimental │
+      // │            │ (ex: wcag2aa)│ (w/o wcag tag)  │              │
+      // ├────────────┼──────────────┼─────────────────┼──────────────┤
+      // │ Minor      │       1      │        0        │      0       │
+      // │ Moderate   │       3      │        3        │      0       │
+      // │ Serious    │       7      │        7        │      0       │
+      // │ Critical   │      10      │       10        │      0       │
+      // └────────────┴──────────────┴─────────────────┴──────────────┘
+      //
+      // Notes:
+      //  • Experimental rules always have weight 0
+      //  • Best practice rules only affect scores when tagged with wcagA+AA
+      //    and are moderate, serious, or critical.
+      //
+      // To find the latest axe-core Impact and Tag values:
+      //   1. Browse to https://dequeuniversity.com/rules/axe/html.
+      //   2. Click on the latest rule set (ex: https://dequeuniversity.com/rules/axe/html/4.10)
+      //   3. Review the tables
+      auditRefs: [
+        { id: "accesskeys", weight: 7, group: "a11y-navigation" },
+        // Serious, best-practice
+        { id: "aria-allowed-attr", weight: 10, group: "a11y-aria" },
+        // Critical, wcag2a
+        { id: "aria-command-name", weight: 7, group: "a11y-aria" },
+        // Serious, wcag2a
+        { id: "aria-conditional-attr", weight: 7, group: "a11y-aria" },
+        // Serious, wcag2a
+        { id: "aria-deprecated-role", weight: 1, group: "a11y-aria" },
+        // Minor, wcag2a
+        { id: "aria-dialog-name", weight: 7, group: "a11y-aria" },
+        // Serious, best-practice
+        { id: "aria-hidden-body", weight: 10, group: "a11y-aria" },
+        // Critical, wcag2a
+        { id: "aria-hidden-focus", weight: 7, group: "a11y-aria" },
+        // Serious, wcag2a
+        { id: "aria-input-field-name", weight: 7, group: "a11y-aria" },
+        // Serious, wcag2a
+        { id: "aria-meter-name", weight: 7, group: "a11y-aria" },
+        // Serious, wcag2a
+        { id: "aria-progressbar-name", weight: 7, group: "a11y-aria" },
+        // Serious, wcag2a
+        { id: "aria-prohibited-attr", weight: 7, group: "a11y-aria" },
+        // Serious, wcag2a
+        { id: "aria-required-attr", weight: 10, group: "a11y-aria" },
+        // Critical, wcag2a
+        { id: "aria-required-children", weight: 10, group: "a11y-aria" },
+        // Critical, wcag2a
+        { id: "aria-required-parent", weight: 10, group: "a11y-aria" },
+        // Critical, wcag2a
+        { id: "aria-roles", weight: 10, group: "a11y-aria" },
+        // Critical, wcag2a
+        { id: "aria-text", weight: 7, group: "a11y-aria" },
+        // Serious, best-practice
+        { id: "aria-toggle-field-name", weight: 7, group: "a11y-aria" },
+        // Serious, wcag2a
+        { id: "aria-tooltip-name", weight: 7, group: "a11y-aria" },
+        // Serious, wcag2a
+        { id: "aria-treeitem-name", weight: 7, group: "a11y-aria" },
+        // Serious, best-practice
+        { id: "aria-valid-attr-value", weight: 10, group: "a11y-aria" },
+        // Critical, wcag2a
+        { id: "aria-valid-attr", weight: 10, group: "a11y-aria" },
+        // Critical, wcag2a
+        { id: "button-name", weight: 10, group: "a11y-names-labels" },
+        // Critical, wcag2a
+        { id: "bypass", weight: 7, group: "a11y-navigation" },
+        // Serious, wcag2a
+        { id: "color-contrast", weight: 7, group: "a11y-color-contrast" },
+        // Serious, wcag2aa
+        { id: "definition-list", weight: 7, group: "a11y-tables-lists" },
+        // Serious, wcag2a
+        { id: "dlitem", weight: 7, group: "a11y-tables-lists" },
+        // Serious, wcag2a
+        { id: "document-title", weight: 7, group: "a11y-names-labels" },
+        // Serious, wcag2a
+        { id: "duplicate-id-aria", weight: 10, group: "a11y-aria" },
+        // Critical, wcag2a
+        { id: "form-field-multiple-labels", weight: 3, group: "a11y-names-labels" },
+        // Moderate, wcag2a
+        { id: "frame-title", weight: 7, group: "a11y-names-labels" },
+        // Serious, wcag2a
+        { id: "heading-order", weight: 3, group: "a11y-navigation" },
+        // Moderate, best-practice
+        { id: "html-has-lang", weight: 7, group: "a11y-language" },
+        // Serious, wcag2a
+        { id: "html-lang-valid", weight: 7, group: "a11y-language" },
+        // Serious, wcag2a
+        { id: "html-xml-lang-mismatch", weight: 3, group: "a11y-language" },
+        // Moderate, wcag2a
+        { id: "image-alt", weight: 10, group: "a11y-names-labels" },
+        // Critical, wcag2a
+        { id: "input-button-name", weight: 10, group: "a11y-names-labels" },
+        // Critical, wcag2a
+        { id: "input-image-alt", weight: 10, group: "a11y-names-labels" },
+        // Critical, wcag2a
+        { id: "label", weight: 10, group: "a11y-names-labels" },
+        // Critical, wcag2a
+        { id: "link-in-text-block", weight: 7, group: "a11y-color-contrast" },
+        // Serious, wcag2a
+        { id: "link-name", weight: 7, group: "a11y-names-labels" },
+        // Serious, wcag2a
+        { id: "list", weight: 7, group: "a11y-tables-lists" },
+        // Serious, wcag2a
+        { id: "listitem", weight: 7, group: "a11y-tables-lists" },
+        // Serious, wcag2a
+        { id: "meta-refresh", weight: 10, group: "a11y-best-practices" },
+        // Critical, wcag2a
+        { id: "meta-viewport", weight: 10, group: "a11y-best-practices" },
+        // Critical, wcag2aa
+        { id: "object-alt", weight: 7, group: "a11y-names-labels" },
+        // Serious, wcag2a
+        { id: "select-name", weight: 10, group: "a11y-names-labels" },
+        // Critical, wcag2a
+        { id: "skip-link", weight: 3, group: "a11y-names-labels" },
+        // Moderate, best-practice
+        { id: "tabindex", weight: 7, group: "a11y-navigation" },
+        // Serious, best-practice
+        { id: "target-size", weight: 7, group: "a11y-best-practices" },
+        // Serious, wcag22aa
+        { id: "td-headers-attr", weight: 7, group: "a11y-tables-lists" },
+        // Serious, wcag2a
+        { id: "th-has-data-cells", weight: 7, group: "a11y-tables-lists" },
+        // Serious, wcag2a
+        { id: "valid-lang", weight: 7, group: "a11y-language" },
+        // Serious, wcag2aa
+        { id: "video-caption", weight: 10, group: "a11y-audio-video" },
+        // Critical, wcag2a
+        { id: "landmark-one-main", weight: 3, group: "a11y-best-practices" },
+        // Moderate, best-practice
+        // Manual audits
+        { id: "focusable-controls", weight: 0 },
+        { id: "interactive-element-affordance", weight: 0 },
+        { id: "logical-tab-order", weight: 0 },
+        { id: "visual-order-follows-dom", weight: 0 },
+        { id: "focus-traps", weight: 0 },
+        { id: "managed-focus", weight: 0 },
+        { id: "use-landmarks", weight: 0 },
+        { id: "offscreen-content-hidden", weight: 0 },
+        { id: "custom-controls-labels", weight: 0 },
+        { id: "custom-controls-roles", weight: 0 },
+        // Low-impact best-practices
+        { id: "table-duplicate-name", weight: 0, group: "a11y-best-practices" },
+        // Minor, best-practice
+        { id: "empty-heading", weight: 0, group: "a11y-best-practices" },
+        // Minor, best-practice
+        { id: "aria-allowed-role", weight: 0, group: "a11y-best-practices" },
+        // Minor, best-practice
+        { id: "image-redundant-alt", weight: 0, group: "a11y-names-labels" },
+        // Minor, best-practice
+        // WCAG AAA
+        { id: "identical-links-same-purpose", weight: 0, group: "a11y-best-practices" },
+        // Minor, wcag2aaa
+        // Hidden audits (ie. experimental)
+        { id: "label-content-name-mismatch", weight: 0, group: "hidden" },
+        // Serious, experimental
+        { id: "table-fake-caption", weight: 0, group: "hidden" },
+        // Serious, experimental
+        { id: "td-has-header", weight: 0, group: "hidden" }
+        // Critical, experimental
+      ]
+    },
+    "best-practices": {
+      title: str_2(UIStrings21.bestPracticesCategoryTitle),
+      supportedModes: ["navigation", "timespan", "snapshot"],
+      auditRefs: [
+        // Trust & Safety
+        { id: "is-on-https", weight: 5, group: "best-practices-trust-safety" },
+        { id: "redirects-http", weight: 1, group: "best-practices-trust-safety" },
+        { id: "geolocation-on-start", weight: 1, group: "best-practices-trust-safety" },
+        { id: "notification-on-start", weight: 1, group: "best-practices-trust-safety" },
+        { id: "csp-xss", weight: 0, group: "best-practices-trust-safety" },
+        { id: "has-hsts", weight: 0, group: "best-practices-trust-safety" },
+        { id: "origin-isolation", weight: 0, group: "best-practices-trust-safety" },
+        { id: "clickjacking-mitigation", weight: 0, group: "best-practices-trust-safety" },
+        { id: "trusted-types-xss", weight: 0, group: "best-practices-trust-safety" },
+        // User Experience
+        { id: "paste-preventing-inputs", weight: 3, group: "best-practices-ux" },
+        { id: "image-aspect-ratio", weight: 1, group: "best-practices-ux" },
+        { id: "image-size-responsive", weight: 1, group: "best-practices-ux" },
+        // Browser Compatibility
+        { id: "doctype", weight: 1, group: "best-practices-browser-compat" },
+        { id: "charset", weight: 1, group: "best-practices-browser-compat" },
+        // General Group
+        { id: "js-libraries", weight: 0, group: "best-practices-general" },
+        { id: "deprecations", weight: 5, group: "best-practices-general" },
+        { id: "third-party-cookies", weight: 5, group: "best-practices-general" },
+        { id: "errors-in-console", weight: 1, group: "best-practices-general" },
+        { id: "valid-source-maps", weight: 0, group: "best-practices-general" },
+        { id: "inspector-issues", weight: 1, group: "best-practices-general" }
+      ]
+    },
+    "seo": {
+      title: str_2(UIStrings21.seoCategoryTitle),
+      description: str_2(UIStrings21.seoCategoryDescription),
+      manualDescription: str_2(UIStrings21.seoCategoryManualDescription),
+      supportedModes: ["navigation", "snapshot"],
+      auditRefs: [
+        // Should be at least 31% of the score, such that this audit failing
+        // results in the SEO category failing.
+        // Solve for w:
+        //    w / (w + T) >= 0.31
+        // where T is the sum of all the other weights.
+        { id: "is-crawlable", weight: 93 / 23, group: "seo-crawl" },
+        { id: "document-title", weight: 1, group: "seo-content" },
+        { id: "meta-description", weight: 1, group: "seo-content" },
+        { id: "http-status-code", weight: 1, group: "seo-crawl" },
+        { id: "link-text", weight: 1, group: "seo-content" },
+        { id: "crawlable-anchors", weight: 1, group: "seo-crawl" },
+        { id: "robots-txt", weight: 1, group: "seo-crawl" },
+        { id: "image-alt", weight: 1, group: "seo-content" },
+        { id: "hreflang", weight: 1, group: "seo-content" },
+        { id: "canonical", weight: 1, group: "seo-content" },
+        // Manual audits
+        { id: "structured-data", weight: 0 }
+      ]
+    }
+  }
+};
+Object.defineProperty(defaultConfig, "UIStrings", {
+  enumerable: false,
+  get: /* @__PURE__ */ __name(() => UIStrings21, "get")
+});
+var default_config_default = defaultConfig;
+
+// core/config/validation.js
+init_process_global();
+init_audit();
+init_base_gatherer();
+init_i18n();
+/**
+ * @license
+ * Copyright 2021 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+function isValidArtifactDependency(dependent, dependency) {
+  const levels = { timespan: 0, snapshot: 1, navigation: 2 };
+  const dependentLevel = Math.min(...dependent.instance.meta.supportedModes.map((l) => levels[l]));
+  const dependencyLevel = Math.min(...dependency.instance.meta.supportedModes.map((l) => levels[l]));
+  if (dependentLevel === levels.timespan) return dependencyLevel === levels.timespan;
+  if (dependentLevel === levels.snapshot) return dependencyLevel === levels.snapshot;
+  return true;
+}
+__name(isValidArtifactDependency, "isValidArtifactDependency");
+function assertValidPluginName(config3, pluginName) {
+  const parts = pluginName.split("/");
+  if (parts.length === 2) {
+    pluginName = parts[1];
+  }
+  if (!pluginName.startsWith("lighthouse-plugin-")) {
+    throw new Error(`plugin name '${pluginName}' does not start with 'lighthouse-plugin-'`);
+  }
+  if (config3.categories?.[pluginName]) {
+    throw new Error(`plugin name '${pluginName}' not allowed because it is the id of a category already found in config`);
+  }
+}
+__name(assertValidPluginName, "assertValidPluginName");
+function assertValidArtifact(artifactDefn) {
+  const gatherer = artifactDefn.gatherer.instance;
+  if (typeof gatherer.meta !== "object") {
+    throw new Error(`Gatherer for ${artifactDefn.id} did not provide a meta object.`);
+  }
+  if (gatherer.meta.supportedModes.length === 0) {
+    throw new Error(`Gatherer for ${artifactDefn.id} did not support any gather modes.`);
+  }
+  if (typeof gatherer.getArtifact !== "function" || gatherer.getArtifact === base_gatherer_default.prototype.getArtifact) {
+    throw new Error(`Gatherer for ${artifactDefn.id} did not define a "getArtifact" method.`);
+  }
+}
+__name(assertValidArtifact, "assertValidArtifact");
+function assertValidAudit(auditDefinition) {
+  const { implementation, path: auditPath } = auditDefinition;
+  const auditName = auditPath || implementation?.meta?.id || "Unknown audit";
+  if (typeof implementation.audit !== "function" || implementation.audit === Audit.audit) {
+    throw new Error(`${auditName} has no audit() method.`);
+  }
+  if (typeof implementation.meta.id !== "string") {
+    throw new Error(`${auditName} has no meta.id property, or the property is not a string.`);
+  }
+  if (!isStringOrIcuMessage(implementation.meta.title)) {
+    throw new Error(`${auditName} has no meta.title property, or the property is not a string.`);
+  }
+  const scoreDisplayMode = implementation.meta.scoreDisplayMode || Audit.SCORING_MODES.BINARY;
+  if (!isStringOrIcuMessage(implementation.meta.failureTitle) && scoreDisplayMode === Audit.SCORING_MODES.BINARY) {
+    throw new Error(`${auditName} has no meta.failureTitle and should.`);
+  }
+  if (!isStringOrIcuMessage(implementation.meta.description)) {
+    throw new Error(
+      `${auditName} has no meta.description property, or the property is not a string.`
+    );
+  } else if (implementation.meta.description === "") {
+    throw new Error(
+      `${auditName} has an empty meta.description string. Please add a description for the UI.`
+    );
+  }
+  if (!Array.isArray(implementation.meta.requiredArtifacts)) {
+    throw new Error(
+      `${auditName} has no meta.requiredArtifacts property, or the property is not an array.`
+    );
+  }
+}
+__name(assertValidAudit, "assertValidAudit");
+function assertValidCategories(categories, audits, groups) {
+  if (!categories) {
+    return;
+  }
+  const auditsKeyedById = new Map((audits || []).map((audit) => {
+    return [audit.implementation.meta.id, audit];
+  }));
+  Object.keys(categories).forEach((categoryId) => {
+    categories[categoryId].auditRefs.forEach((auditRef, index) => {
+      if (!auditRef.id) {
+        throw new Error(`missing an audit id at ${categoryId}[${index}]`);
+      }
+      const audit = auditsKeyedById.get(auditRef.id);
+      if (!audit) {
+        throw new Error(`could not find ${auditRef.id} audit for category ${categoryId}`);
+      }
+      const auditImpl = audit.implementation;
+      const isManual = auditImpl.meta.scoreDisplayMode === "manual";
+      if (categoryId === "accessibility" && !auditRef.group && !isManual) {
+        throw new Error(`${auditRef.id} accessibility audit does not have a group`);
+      }
+      if (auditRef.weight > 0 && isManual) {
+        throw new Error(`${auditRef.id} is manual but has a positive weight`);
+      }
+      if (auditRef.group && (!groups || !groups[auditRef.group])) {
+        throw new Error(`${auditRef.id} references unknown group ${auditRef.group}`);
+      }
+    });
+  });
+}
+__name(assertValidCategories, "assertValidCategories");
+function assertValidSettings(settings) {
+  if (!settings.formFactor) {
+    throw new Error(`\`settings.formFactor\` must be defined as 'mobile' or 'desktop'. See https://github.com/GoogleChrome/lighthouse/blob/main/docs/emulation.md`);
+  }
+  if (!settings.screenEmulation.disabled) {
+    if (settings.screenEmulation.mobile !== (settings.formFactor === "mobile")) {
+      throw new Error(`Screen emulation mobile setting (${settings.screenEmulation.mobile}) does not match formFactor setting (${settings.formFactor}). See https://github.com/GoogleChrome/lighthouse/blob/main/docs/emulation.md`);
+    }
+  }
+  const skippedAndOnlyAuditId = settings.skipAudits?.find((auditId) => settings.onlyAudits?.includes(auditId));
+  if (skippedAndOnlyAuditId) {
+    throw new Error(`${skippedAndOnlyAuditId} appears in both skipAudits and onlyAudits`);
+  }
+}
+__name(assertValidSettings, "assertValidSettings");
+function assertValidArtifacts(artifactDefns) {
+  const availableArtifacts = /* @__PURE__ */ new Set();
+  for (const artifact of artifactDefns) {
+    assertValidArtifact(artifact);
+    if (availableArtifacts.has(artifact.id)) {
+      throw new Error(`Config defined multiple artifacts with id '${artifact.id}'`);
+    }
+    availableArtifacts.add(artifact.id);
+    if (!artifact.dependencies) continue;
+    for (const [dependencyKey, { id: dependencyId }] of Object.entries(artifact.dependencies)) {
+      if (availableArtifacts.has(dependencyId)) continue;
+      throwInvalidDependencyOrder(artifact.id, dependencyKey);
+    }
+  }
+}
+__name(assertValidArtifacts, "assertValidArtifacts");
+function assertValidConfig(resolvedConfig) {
+  assertValidArtifacts(resolvedConfig.artifacts || []);
+  for (const auditDefn of resolvedConfig.audits || []) {
+    assertValidAudit(auditDefn);
+  }
+  assertValidCategories(resolvedConfig.categories, resolvedConfig.audits, resolvedConfig.groups);
+  assertValidSettings(resolvedConfig.settings);
+}
+__name(assertValidConfig, "assertValidConfig");
+function throwInvalidDependencyOrder(artifactId, dependencyKey) {
+  throw new Error(
+    [
+      `Failed to find dependency "${dependencyKey}" for "${artifactId}" artifact`,
+      `Check that...`,
+      `  1. A gatherer exposes a matching Symbol that satisfies "${dependencyKey}".`,
+      `  2. "${dependencyKey}" is configured to run before "${artifactId}"`
+    ].join("\n")
+  );
+}
+__name(throwInvalidDependencyOrder, "throwInvalidDependencyOrder");
+function throwInvalidArtifactDependency(artifactId, dependencyKey) {
+  throw new Error(
+    [
+      `Dependency "${dependencyKey}" for "${artifactId}" artifact is invalid.`,
+      `The dependency must be collected before the dependent.`
+    ].join("\n")
+  );
+}
+__name(throwInvalidArtifactDependency, "throwInvalidArtifactDependency");
+
+// core/config/filters.js
+init_process_global();
+init_audit();
+/**
+ * @license
+ * Copyright 2021 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+var baseArtifactKeySource = {
+  fetchTime: "",
+  LighthouseRunWarnings: "",
+  BenchmarkIndex: "",
+  HostDPR: "",
+  settings: "",
+  Timing: "",
+  URL: "",
+  PageLoadError: "",
+  HostFormFactor: "",
+  HostUserAgent: "",
+  HostProduct: "",
+  GatherContext: ""
+};
+var baseArtifactKeys = Object.keys(baseArtifactKeySource);
+var filterResistantAuditIds = [];
+var filterResistantArtifactIds = ["Stacks", "NetworkUserAgent", "FullPageScreenshot"];
+function getAuditIdsInCategories(allCategories, onlyCategories) {
+  if (!allCategories) return /* @__PURE__ */ new Set();
+  onlyCategories = onlyCategories || Object.keys(allCategories);
+  const categories = onlyCategories.map((categoryId) => allCategories[categoryId]);
+  const auditRefs = categories.flatMap((category) => category?.auditRefs || []);
+  return new Set(auditRefs.map((auditRef) => auditRef.id));
+}
+__name(getAuditIdsInCategories, "getAuditIdsInCategories");
+function filterArtifactsByAvailableAudits(artifacts, audits) {
+  if (!artifacts) return null;
+  if (!audits) return artifacts;
+  const artifactsById = new Map(artifacts.map((artifact) => [artifact.id, artifact]));
+  const artifactIdsToKeep = /* @__PURE__ */ new Set([
+    ...filterResistantArtifactIds,
+    ...audits.flatMap((audit) => audit.implementation.meta.requiredArtifacts)
+  ]);
+  let previousSize = 0;
+  while (previousSize !== artifactIdsToKeep.size) {
+    previousSize = artifactIdsToKeep.size;
+    for (const artifactId of artifactIdsToKeep) {
+      const artifact = artifactsById.get(artifactId);
+      if (!artifact) continue;
+      if (!artifact.dependencies) continue;
+      for (const dep of Object.values(artifact.dependencies)) {
+        artifactIdsToKeep.add(dep.id);
+      }
+    }
+  }
+  return artifacts.filter((artifact) => artifactIdsToKeep.has(artifact.id));
+}
+__name(filterArtifactsByAvailableAudits, "filterArtifactsByAvailableAudits");
+function filterArtifactsByGatherMode(artifacts, mode) {
+  if (!artifacts) return null;
+  return artifacts.filter((artifact) => {
+    return artifact.gatherer.instance.meta.supportedModes.includes(mode);
+  });
+}
+__name(filterArtifactsByGatherMode, "filterArtifactsByGatherMode");
+function filterAuditsByAvailableArtifacts(audits, availableArtifacts) {
+  if (!audits) return null;
+  const availableArtifactIds = new Set(
+    availableArtifacts.map((artifact) => artifact.id).concat(baseArtifactKeys)
+  );
+  return audits.filter((audit) => {
+    const meta = audit.implementation.meta;
+    return meta.requiredArtifacts.every((id) => availableArtifactIds.has(id));
+  });
+}
+__name(filterAuditsByAvailableArtifacts, "filterAuditsByAvailableArtifacts");
+function filterAuditsByGatherMode(audits, mode) {
+  if (!audits) return null;
+  return audits.filter((audit) => {
+    const meta = audit.implementation.meta;
+    return !meta.supportedModes || meta.supportedModes.includes(mode);
+  });
+}
+__name(filterAuditsByGatherMode, "filterAuditsByGatherMode");
+function filterCategoriesByGatherMode(categories, mode) {
+  if (!categories) return null;
+  const categoriesToKeep = Object.entries(categories).filter(([_, category]) => {
+    return !category.supportedModes || category.supportedModes.includes(mode);
+  });
+  return Object.fromEntries(categoriesToKeep);
+}
+__name(filterCategoriesByGatherMode, "filterCategoriesByGatherMode");
+function filterCategoriesByExplicitFilters(categories, onlyCategories) {
+  if (!categories || !onlyCategories) return categories;
+  const categoriesToKeep = Object.entries(categories).filter(([categoryId]) => onlyCategories.includes(categoryId));
+  return Object.fromEntries(categoriesToKeep);
+}
+__name(filterCategoriesByExplicitFilters, "filterCategoriesByExplicitFilters");
+function errorOnUnknownOnlyCategories(allCategories, onlyCategories) {
+  if (!onlyCategories) return;
+  const unknown = onlyCategories.filter((c) => !allCategories?.[c]);
+  if (unknown.length) {
+    throw new Error(`unrecognized category in 'onlyCategories': ${unknown.join(", ")}`);
+  }
+}
+__name(errorOnUnknownOnlyCategories, "errorOnUnknownOnlyCategories");
+function filterCategoriesByAvailableAudits(categories, availableAudits) {
+  if (!categories) return categories;
+  const availableAuditIdToMeta = new Map(
+    availableAudits.map((audit) => [audit.implementation.meta.id, audit.implementation.meta])
+  );
+  const categoryEntries = Object.entries(categories).map(([categoryId, category]) => {
+    const filteredCategory = {
+      ...category,
+      auditRefs: category.auditRefs.filter((ref) => availableAuditIdToMeta.has(ref.id))
+    };
+    const didFilter = filteredCategory.auditRefs.length < category.auditRefs.length;
+    const hasOnlyManualAudits = filteredCategory.auditRefs.every((ref) => {
+      const meta = availableAuditIdToMeta.get(ref.id);
+      if (!meta) return false;
+      return meta.scoreDisplayMode === Audit.SCORING_MODES.MANUAL;
+    });
+    if (didFilter && hasOnlyManualAudits) filteredCategory.auditRefs = [];
+    return [categoryId, filteredCategory];
+  }).filter((entry) => typeof entry[1] === "object" && entry[1].auditRefs.length);
+  return Object.fromEntries(categoryEntries);
+}
+__name(filterCategoriesByAvailableAudits, "filterCategoriesByAvailableAudits");
+function filterConfigByGatherMode(resolvedConfig, mode) {
+  const artifacts = filterArtifactsByGatherMode(resolvedConfig.artifacts, mode);
+  const supportedAudits = filterAuditsByGatherMode(resolvedConfig.audits, mode);
+  const audits = filterAuditsByAvailableArtifacts(supportedAudits, artifacts || []);
+  const supportedCategories = filterCategoriesByGatherMode(resolvedConfig.categories, mode);
+  const categories = filterCategoriesByAvailableAudits(supportedCategories, audits || []);
+  return {
+    ...resolvedConfig,
+    artifacts,
+    audits,
+    categories
+  };
+}
+__name(filterConfigByGatherMode, "filterConfigByGatherMode");
+function filterConfigByExplicitFilters(resolvedConfig, filters) {
+  const { onlyAudits, onlyCategories, skipAudits } = filters;
+  if (onlyAudits && !onlyAudits.length) {
+    throw new Error(`onlyAudits cannot be an empty array.`);
+  }
+  if (onlyCategories && !onlyCategories.length) {
+    throw new Error(`onlyCategories cannot be an empty array.`);
+  }
+  errorOnUnknownOnlyCategories(resolvedConfig.categories, onlyCategories);
+  let baseAuditIds = getAuditIdsInCategories(resolvedConfig.categories, void 0);
+  if (onlyCategories) {
+    baseAuditIds = getAuditIdsInCategories(resolvedConfig.categories, onlyCategories);
+  } else if (onlyAudits) {
+    baseAuditIds = /* @__PURE__ */ new Set();
+  } else if (!resolvedConfig.categories || !Object.keys(resolvedConfig.categories).length) {
+    baseAuditIds = new Set(resolvedConfig.audits?.map((audit) => audit.implementation.meta.id));
+  }
+  const auditIdsToKeep = new Set(
+    [
+      ...baseAuditIds,
+      // Start with our base audits.
+      ...onlyAudits || [],
+      // Additionally include the opt-in audits from `onlyAudits`.
+      ...filterResistantAuditIds
+      // Always include any filter-resistant audits.
+    ].filter((auditId) => !skipAudits || !skipAudits.includes(auditId))
+  );
+  const audits = auditIdsToKeep.size && resolvedConfig.audits ? resolvedConfig.audits.filter((audit) => auditIdsToKeep.has(audit.implementation.meta.id)) : resolvedConfig.audits;
+  const availableCategories = filterCategoriesByAvailableAudits(resolvedConfig.categories, audits || []);
+  const categories = filterCategoriesByExplicitFilters(availableCategories, onlyCategories);
+  let artifacts = filterArtifactsByAvailableAudits(resolvedConfig.artifacts, audits);
+  if (artifacts && resolvedConfig.settings.disableFullPageScreenshot) {
+    artifacts = artifacts.filter(({ id }) => id !== "FullPageScreenshot");
+  }
+  return {
+    ...resolvedConfig,
+    artifacts,
+    audits,
+    categories
+  };
+}
+__name(filterConfigByExplicitFilters, "filterConfigByExplicitFilters");
+
 // core/config/config-helpers.js
+init_process_global();
+init_module();
+init_url();
+init_lodash();
 import path4 from "path";
+
+// core/config/config-plugin.js
+init_process_global();
+init_i18n();
+/**
+ * @license
+ * Copyright 2019 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+function isArrayOfUnknownObjects(arr) {
+  return Array.isArray(arr) && arr.every(isObjectOfUnknownProperties);
+}
+__name(isArrayOfUnknownObjects, "isArrayOfUnknownObjects");
+function isObjectOfUnknownProperties(val) {
+  return typeof val === "object" && val !== null && !Array.isArray(val);
+}
+__name(isObjectOfUnknownProperties, "isObjectOfUnknownProperties");
+function objectIsGatherMode(str) {
+  if (typeof str !== "string") return false;
+  return str === "navigation" || str === "timespan" || str === "snapshot";
+}
+__name(objectIsGatherMode, "objectIsGatherMode");
+function isArrayOfGatherModes(arr) {
+  if (!Array.isArray(arr)) return false;
+  return arr.every(objectIsGatherMode);
+}
+__name(isArrayOfGatherModes, "isArrayOfGatherModes");
+function assertNoExcessProperties(obj, pluginName, objectName = "") {
+  if (objectName) {
+    objectName += " ";
+  }
+  const invalidKeys = Object.keys(obj);
+  if (invalidKeys.length > 0) {
+    const keys2 = invalidKeys.join(", ");
+    throw new Error(`${pluginName} has unrecognized ${objectName}properties: [${keys2}]`);
+  }
+}
+__name(assertNoExcessProperties, "assertNoExcessProperties");
+var ConfigPlugin = class _ConfigPlugin {
+  static {
+    __name(this, "ConfigPlugin");
+  }
+  /**
+   * Extract and validate the list of AuditDefns added by the plugin (or undefined
+   * if no additional audits are being added by the plugin).
+   * @param {unknown} auditsJson
+   * @param {string} pluginName
+   * @return {Array<{path: string}>|undefined}
+   */
+  static _parseAuditsList(auditsJson, pluginName) {
+    if (auditsJson === void 0) {
+      return void 0;
+    } else if (!isArrayOfUnknownObjects(auditsJson)) {
+      throw new Error(`${pluginName} has an invalid audits array.`);
+    }
+    return auditsJson.map((auditDefnJson) => {
+      const { path: path7, ...invalidRest } = auditDefnJson;
+      assertNoExcessProperties(invalidRest, pluginName, "audit");
+      if (typeof path7 !== "string") {
+        throw new Error(`${pluginName} has a missing audit path.`);
+      }
+      return {
+        path: path7
+      };
+    });
+  }
+  /**
+   * Extract and validate the list of category AuditRefs added by the plugin.
+   * @param {unknown} auditRefsJson
+   * @param {string} pluginName
+   * @return {Array<LH.Config.AuditRefJson>}
+   */
+  static _parseAuditRefsList(auditRefsJson, pluginName) {
+    if (!isArrayOfUnknownObjects(auditRefsJson)) {
+      throw new Error(`${pluginName} has no valid auditsRefs.`);
+    }
+    return auditRefsJson.map((auditRefJson) => {
+      const { id, weight, group, ...invalidRest } = auditRefJson;
+      assertNoExcessProperties(invalidRest, pluginName, "auditRef");
+      if (typeof id !== "string") {
+        throw new Error(`${pluginName} has an invalid auditRef id.`);
+      }
+      if (typeof weight !== "number") {
+        throw new Error(`${pluginName} has an invalid auditRef weight.`);
+      }
+      if (typeof group !== "string" && typeof group !== "undefined") {
+        throw new Error(`${pluginName} has an invalid auditRef group.`);
+      }
+      const prependedGroup = group ? `${pluginName}-${group}` : group;
+      return {
+        id,
+        weight,
+        group: prependedGroup
+      };
+    });
+  }
+  /**
+   * Extract and validate the category added by the plugin.
+   * @param {unknown} categoryJson
+   * @param {string} pluginName
+   * @return {LH.Config.CategoryJson}
+   */
+  static _parseCategory(categoryJson, pluginName) {
+    if (!isObjectOfUnknownProperties(categoryJson)) {
+      throw new Error(`${pluginName} has no valid category.`);
+    }
+    const {
+      title,
+      description,
+      manualDescription,
+      auditRefs: auditRefsJson,
+      supportedModes,
+      ...invalidRest
+    } = categoryJson;
+    assertNoExcessProperties(invalidRest, pluginName, "category");
+    if (!isStringOrIcuMessage(title)) {
+      throw new Error(`${pluginName} has an invalid category tile.`);
+    }
+    if (!isStringOrIcuMessage(description) && description !== void 0) {
+      throw new Error(`${pluginName} has an invalid category description.`);
+    }
+    if (!isStringOrIcuMessage(manualDescription) && manualDescription !== void 0) {
+      throw new Error(`${pluginName} has an invalid category manualDescription.`);
+    }
+    if (!isArrayOfGatherModes(supportedModes) && supportedModes !== void 0) {
+      throw new Error(
+        `${pluginName} supportedModes must be an array, valid array values are "navigation", "timespan", and "snapshot".`
+      );
+    }
+    const auditRefs = _ConfigPlugin._parseAuditRefsList(auditRefsJson, pluginName);
+    return {
+      title,
+      auditRefs,
+      description,
+      manualDescription,
+      supportedModes
+    };
+  }
+  /**
+   * Extract and validate groups JSON added by the plugin.
+   * @param {unknown} groupsJson
+   * @param {string} pluginName
+   * @return {Record<string, LH.Config.GroupJson>|undefined}
+   */
+  static _parseGroups(groupsJson, pluginName) {
+    if (groupsJson === void 0) {
+      return void 0;
+    }
+    if (!isObjectOfUnknownProperties(groupsJson)) {
+      throw new Error(`${pluginName} groups json is not defined as an object.`);
+    }
+    const groups = Object.entries(groupsJson);
+    const parsedGroupsJson = {};
+    groups.forEach(([groupId, groupJson]) => {
+      if (!isObjectOfUnknownProperties(groupJson)) {
+        throw new Error(`${pluginName} has a group not defined as an object.`);
+      }
+      const { title, description, ...invalidRest } = groupJson;
+      assertNoExcessProperties(invalidRest, pluginName, "group");
+      if (!isStringOrIcuMessage(title)) {
+        throw new Error(`${pluginName} has an invalid group title.`);
+      }
+      if (!isStringOrIcuMessage(description) && description !== void 0) {
+        throw new Error(`${pluginName} has an invalid group description.`);
+      }
+      parsedGroupsJson[`${pluginName}-${groupId}`] = {
+        title,
+        description
+      };
+    });
+    return parsedGroupsJson;
+  }
+  /**
+   * Extracts and validates a config from the provided plugin input, throwing
+   * if it deviates from the expected object shape.
+   * @param {unknown} pluginJson
+   * @param {string} pluginName
+   * @return {LH.Config}
+   */
+  static parsePlugin(pluginJson, pluginName) {
+    pluginJson = JSON.parse(JSON.stringify(pluginJson));
+    if (!isObjectOfUnknownProperties(pluginJson)) {
+      throw new Error(`${pluginName} is not defined as an object.`);
+    }
+    const {
+      audits: pluginAuditsJson,
+      category: pluginCategoryJson,
+      groups: pluginGroupsJson,
+      ...invalidRest
+    } = pluginJson;
+    assertNoExcessProperties(invalidRest, pluginName);
+    return {
+      audits: _ConfigPlugin._parseAuditsList(pluginAuditsJson, pluginName),
+      categories: {
+        [pluginName]: _ConfigPlugin._parseCategory(pluginCategoryJson, pluginName)
+      },
+      groups: _ConfigPlugin._parseGroups(pluginGroupsJson, pluginName)
+    };
+  }
+};
+var config_plugin_default = ConfigPlugin;
+
+// core/config/config-helpers.js
+init_i18n();
+init_esm_utils();
+/**
+ * @license
+ * Copyright 2019 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+var require4 = createRequire({ url: "core/config/config-helpers.js" }.url);
 function isBundledEnvironment2() {
   if (global.isDevtools || global.isLightrider) return true;
   try {
@@ -50374,6 +50166,19 @@ function isBundledEnvironment2() {
     return true;
   }
 }
+__name(isBundledEnvironment2, "isBundledEnvironment");
+var mergeOptionsOfItems = /* @__PURE__ */ __name(function(items) {
+  const mergedItems = [];
+  for (const item of items) {
+    const existingItem = item.path && mergedItems.find((candidate) => candidate.path === item.path);
+    if (!existingItem) {
+      mergedItems.push(item);
+      continue;
+    }
+    existingItem.options = Object.assign({}, existingItem.options, item.options);
+  }
+  return mergedItems;
+}, "mergeOptionsOfItems");
 function _mergeConfigFragment(base, extension, overwriteArrays = false) {
   if (typeof base === "undefined" || base === null) {
     return extension;
@@ -50398,6 +50203,8 @@ function _mergeConfigFragment(base, extension, overwriteArrays = false) {
   }
   return extension;
 }
+__name(_mergeConfigFragment, "_mergeConfigFragment");
+var mergeConfigFragment = _mergeConfigFragment;
 function mergeConfigFragmentArrayByKey(baseArray, extensionArray, keyFn) {
   const itemsByKey = /* @__PURE__ */ new Map();
   const mergedArray = baseArray || [];
@@ -50417,6 +50224,7 @@ function mergeConfigFragmentArrayByKey(baseArray, extensionArray, keyFn) {
   }
   return mergedArray;
 }
+__name(mergeConfigFragmentArrayByKey, "mergeConfigFragmentArrayByKey");
 function expandGathererShorthand(gatherer) {
   if (typeof gatherer === "string") {
     return { path: gatherer };
@@ -50435,6 +50243,7 @@ function expandGathererShorthand(gatherer) {
     throw new Error("Invalid Gatherer type " + JSON.stringify(gatherer));
   }
 }
+__name(expandGathererShorthand, "expandGathererShorthand");
 function expandAuditShorthand(audit) {
   if (typeof audit === "string") {
     return { path: audit, options: {} };
@@ -50448,6 +50257,194 @@ function expandAuditShorthand(audit) {
     throw new Error("Invalid Audit type " + JSON.stringify(audit));
   }
 }
+__name(expandAuditShorthand, "expandAuditShorthand");
+var bundledModules = /* @__PURE__ */ new Map([
+  ["../gather/gatherers/accessibility", Promise.resolve().then(() => (init_accessibility(), accessibility_exports))],
+  ["../gather/gatherers/anchor-elements", Promise.resolve().then(() => (init_anchor_elements(), anchor_elements_exports))],
+  ["../gather/gatherers/console-messages", Promise.resolve().then(() => (init_console_messages(), console_messages_exports))],
+  ["../gather/gatherers/devtools-log", Promise.resolve().then(() => (init_devtools_log(), devtools_log_exports))],
+  ["../gather/gatherers/dobetterweb/doctype", Promise.resolve().then(() => (init_doctype(), doctype_exports))],
+  ["../gather/gatherers/image-elements", Promise.resolve().then(() => (init_image_elements(), image_elements_exports))],
+  ["../gather/gatherers/inputs", Promise.resolve().then(() => (init_inputs(), inputs_exports))],
+  ["../gather/gatherers/inspector-issues", Promise.resolve().then(() => (init_inspector_issues(), inspector_issues_exports))],
+  ["../gather/gatherers/link-elements", Promise.resolve().then(() => (init_link_elements(), link_elements_exports))],
+  ["../gather/gatherers/main-document-content", Promise.resolve().then(() => (init_main_document_content(), main_document_content_exports))],
+  ["../gather/gatherers/meta-elements", Promise.resolve().then(() => (init_meta_elements(), meta_elements_exports))],
+  ["../gather/gatherers/scripts", Promise.resolve().then(() => (init_scripts(), scripts_exports))],
+  ["../gather/gatherers/seo/robots-txt", Promise.resolve().then(() => (init_robots_txt(), robots_txt_exports))],
+  ["../gather/gatherers/source-maps", Promise.resolve().then(() => (init_source_maps(), source_maps_exports))],
+  ["../gather/gatherers/stacks", Promise.resolve().then(() => (init_stacks(), stacks_exports))],
+  ["../gather/gatherers/viewport-dimensions", Promise.resolve().then(() => (init_viewport_dimensions(), viewport_dimensions_exports))],
+  ["../audits/accessibility/accesskeys", Promise.resolve().then(() => (init_accesskeys(), accesskeys_exports))],
+  ["../audits/accessibility/aria-allowed-attr", Promise.resolve().then(() => (init_aria_allowed_attr(), aria_allowed_attr_exports))],
+  ["../audits/accessibility/aria-allowed-role", Promise.resolve().then(() => (init_aria_allowed_role(), aria_allowed_role_exports))],
+  ["../audits/accessibility/aria-command-name", Promise.resolve().then(() => (init_aria_command_name(), aria_command_name_exports))],
+  ["../audits/accessibility/aria-conditional-attr", Promise.resolve().then(() => (init_aria_conditional_attr(), aria_conditional_attr_exports))],
+  ["../audits/accessibility/aria-deprecated-role", Promise.resolve().then(() => (init_aria_deprecated_role(), aria_deprecated_role_exports))],
+  ["../audits/accessibility/aria-dialog-name", Promise.resolve().then(() => (init_aria_dialog_name(), aria_dialog_name_exports))],
+  ["../audits/accessibility/aria-hidden-body", Promise.resolve().then(() => (init_aria_hidden_body(), aria_hidden_body_exports))],
+  ["../audits/accessibility/aria-hidden-focus", Promise.resolve().then(() => (init_aria_hidden_focus(), aria_hidden_focus_exports))],
+  ["../audits/accessibility/aria-input-field-name", Promise.resolve().then(() => (init_aria_input_field_name(), aria_input_field_name_exports))],
+  ["../audits/accessibility/aria-meter-name", Promise.resolve().then(() => (init_aria_meter_name(), aria_meter_name_exports))],
+  ["../audits/accessibility/aria-progressbar-name", Promise.resolve().then(() => (init_aria_progressbar_name(), aria_progressbar_name_exports))],
+  ["../audits/accessibility/aria-prohibited-attr", Promise.resolve().then(() => (init_aria_prohibited_attr(), aria_prohibited_attr_exports))],
+  ["../audits/accessibility/aria-required-attr", Promise.resolve().then(() => (init_aria_required_attr(), aria_required_attr_exports))],
+  ["../audits/accessibility/aria-required-children", Promise.resolve().then(() => (init_aria_required_children(), aria_required_children_exports))],
+  ["../audits/accessibility/aria-required-parent", Promise.resolve().then(() => (init_aria_required_parent(), aria_required_parent_exports))],
+  ["../audits/accessibility/aria-roles", Promise.resolve().then(() => (init_aria_roles(), aria_roles_exports))],
+  ["../audits/accessibility/aria-text", Promise.resolve().then(() => (init_aria_text(), aria_text_exports))],
+  ["../audits/accessibility/aria-toggle-field-name", Promise.resolve().then(() => (init_aria_toggle_field_name(), aria_toggle_field_name_exports))],
+  ["../audits/accessibility/aria-tooltip-name", Promise.resolve().then(() => (init_aria_tooltip_name(), aria_tooltip_name_exports))],
+  ["../audits/accessibility/aria-treeitem-name", Promise.resolve().then(() => (init_aria_treeitem_name(), aria_treeitem_name_exports))],
+  ["../audits/accessibility/aria-valid-attr-value", Promise.resolve().then(() => (init_aria_valid_attr_value(), aria_valid_attr_value_exports))],
+  ["../audits/accessibility/aria-valid-attr", Promise.resolve().then(() => (init_aria_valid_attr(), aria_valid_attr_exports))],
+  ["../audits/accessibility/button-name", Promise.resolve().then(() => (init_button_name(), button_name_exports))],
+  ["../audits/accessibility/bypass", Promise.resolve().then(() => (init_bypass(), bypass_exports))],
+  ["../audits/accessibility/color-contrast", Promise.resolve().then(() => (init_color_contrast(), color_contrast_exports))],
+  ["../audits/accessibility/definition-list", Promise.resolve().then(() => (init_definition_list(), definition_list_exports))],
+  ["../audits/accessibility/dlitem", Promise.resolve().then(() => (init_dlitem(), dlitem_exports))],
+  ["../audits/accessibility/document-title", Promise.resolve().then(() => (init_document_title(), document_title_exports))],
+  ["../audits/accessibility/duplicate-id-aria", Promise.resolve().then(() => (init_duplicate_id_aria(), duplicate_id_aria_exports))],
+  ["../audits/accessibility/empty-heading", Promise.resolve().then(() => (init_empty_heading(), empty_heading_exports))],
+  ["../audits/accessibility/form-field-multiple-labels", Promise.resolve().then(() => (init_form_field_multiple_labels(), form_field_multiple_labels_exports))],
+  ["../audits/accessibility/frame-title", Promise.resolve().then(() => (init_frame_title(), frame_title_exports))],
+  ["../audits/accessibility/heading-order", Promise.resolve().then(() => (init_heading_order(), heading_order_exports))],
+  ["../audits/accessibility/html-has-lang", Promise.resolve().then(() => (init_html_has_lang(), html_has_lang_exports))],
+  ["../audits/accessibility/html-lang-valid", Promise.resolve().then(() => (init_html_lang_valid(), html_lang_valid_exports))],
+  ["../audits/accessibility/html-xml-lang-mismatch", Promise.resolve().then(() => (init_html_xml_lang_mismatch(), html_xml_lang_mismatch_exports))],
+  ["../audits/accessibility/identical-links-same-purpose", Promise.resolve().then(() => (init_identical_links_same_purpose(), identical_links_same_purpose_exports))],
+  ["../audits/accessibility/image-alt", Promise.resolve().then(() => (init_image_alt(), image_alt_exports))],
+  ["../audits/accessibility/image-redundant-alt", Promise.resolve().then(() => (init_image_redundant_alt(), image_redundant_alt_exports))],
+  ["../audits/accessibility/input-button-name", Promise.resolve().then(() => (init_input_button_name(), input_button_name_exports))],
+  ["../audits/accessibility/input-image-alt", Promise.resolve().then(() => (init_input_image_alt(), input_image_alt_exports))],
+  ["../audits/accessibility/label-content-name-mismatch", Promise.resolve().then(() => (init_label_content_name_mismatch(), label_content_name_mismatch_exports))],
+  ["../audits/accessibility/label", Promise.resolve().then(() => (init_label(), label_exports))],
+  ["../audits/accessibility/landmark-one-main", Promise.resolve().then(() => (init_landmark_one_main(), landmark_one_main_exports))],
+  ["../audits/accessibility/link-in-text-block", Promise.resolve().then(() => (init_link_in_text_block(), link_in_text_block_exports))],
+  ["../audits/accessibility/link-name", Promise.resolve().then(() => (init_link_name(), link_name_exports))],
+  ["../audits/accessibility/list", Promise.resolve().then(() => (init_list(), list_exports))],
+  ["../audits/accessibility/listitem", Promise.resolve().then(() => (init_listitem(), listitem_exports))],
+  ["../audits/accessibility/manual/custom-controls-labels", Promise.resolve().then(() => (init_custom_controls_labels(), custom_controls_labels_exports))],
+  ["../audits/accessibility/manual/custom-controls-roles", Promise.resolve().then(() => (init_custom_controls_roles(), custom_controls_roles_exports))],
+  ["../audits/accessibility/manual/focus-traps", Promise.resolve().then(() => (init_focus_traps(), focus_traps_exports))],
+  ["../audits/accessibility/manual/focusable-controls", Promise.resolve().then(() => (init_focusable_controls(), focusable_controls_exports))],
+  ["../audits/accessibility/manual/interactive-element-affordance", Promise.resolve().then(() => (init_interactive_element_affordance(), interactive_element_affordance_exports))],
+  ["../audits/accessibility/manual/logical-tab-order", Promise.resolve().then(() => (init_logical_tab_order(), logical_tab_order_exports))],
+  ["../audits/accessibility/manual/managed-focus", Promise.resolve().then(() => (init_managed_focus(), managed_focus_exports))],
+  ["../audits/accessibility/manual/offscreen-content-hidden", Promise.resolve().then(() => (init_offscreen_content_hidden(), offscreen_content_hidden_exports))],
+  ["../audits/accessibility/manual/use-landmarks", Promise.resolve().then(() => (init_use_landmarks(), use_landmarks_exports))],
+  ["../audits/accessibility/manual/visual-order-follows-dom", Promise.resolve().then(() => (init_visual_order_follows_dom(), visual_order_follows_dom_exports))],
+  ["../audits/accessibility/meta-refresh", Promise.resolve().then(() => (init_meta_refresh(), meta_refresh_exports))],
+  ["../audits/accessibility/meta-viewport", Promise.resolve().then(() => (init_meta_viewport(), meta_viewport_exports))],
+  ["../audits/accessibility/object-alt", Promise.resolve().then(() => (init_object_alt(), object_alt_exports))],
+  ["../audits/accessibility/select-name", Promise.resolve().then(() => (init_select_name(), select_name_exports))],
+  ["../audits/accessibility/skip-link", Promise.resolve().then(() => (init_skip_link(), skip_link_exports))],
+  ["../audits/accessibility/tabindex", Promise.resolve().then(() => (init_tabindex(), tabindex_exports))],
+  ["../audits/accessibility/table-duplicate-name", Promise.resolve().then(() => (init_table_duplicate_name(), table_duplicate_name_exports))],
+  ["../audits/accessibility/table-fake-caption", Promise.resolve().then(() => (init_table_fake_caption(), table_fake_caption_exports))],
+  ["../audits/accessibility/target-size", Promise.resolve().then(() => (init_target_size(), target_size_exports))],
+  ["../audits/accessibility/td-has-header", Promise.resolve().then(() => (init_td_has_header(), td_has_header_exports))],
+  ["../audits/accessibility/td-headers-attr", Promise.resolve().then(() => (init_td_headers_attr(), td_headers_attr_exports))],
+  ["../audits/accessibility/th-has-data-cells", Promise.resolve().then(() => (init_th_has_data_cells(), th_has_data_cells_exports))],
+  ["../audits/accessibility/valid-lang", Promise.resolve().then(() => (init_valid_lang(), valid_lang_exports))],
+  ["../audits/accessibility/video-caption", Promise.resolve().then(() => (init_video_caption(), video_caption_exports))],
+  ["../audits/clickjacking-mitigation", Promise.resolve().then(() => (init_clickjacking_mitigation(), clickjacking_mitigation_exports))],
+  ["../audits/csp-xss", Promise.resolve().then(() => (init_csp_xss(), csp_xss_exports))],
+  ["../audits/deprecations", Promise.resolve().then(() => (init_deprecations(), deprecations_exports))],
+  ["../audits/dobetterweb/charset", Promise.resolve().then(() => (init_charset(), charset_exports))],
+  ["../audits/dobetterweb/doctype", Promise.resolve().then(() => (init_doctype2(), doctype_exports2))],
+  ["../audits/dobetterweb/geolocation-on-start", Promise.resolve().then(() => (init_geolocation_on_start(), geolocation_on_start_exports))],
+  ["../audits/dobetterweb/inspector-issues", Promise.resolve().then(() => (init_inspector_issues2(), inspector_issues_exports2))],
+  ["../audits/dobetterweb/js-libraries", Promise.resolve().then(() => (init_js_libraries(), js_libraries_exports))],
+  ["../audits/dobetterweb/notification-on-start", Promise.resolve().then(() => (init_notification_on_start(), notification_on_start_exports))],
+  ["../audits/dobetterweb/paste-preventing-inputs", Promise.resolve().then(() => (init_paste_preventing_inputs(), paste_preventing_inputs_exports))],
+  ["../audits/errors-in-console", Promise.resolve().then(() => (init_errors_in_console(), errors_in_console_exports))],
+  ["../audits/has-hsts", Promise.resolve().then(() => (init_has_hsts(), has_hsts_exports))],
+  ["../audits/image-aspect-ratio", Promise.resolve().then(() => (init_image_aspect_ratio(), image_aspect_ratio_exports))],
+  ["../audits/image-size-responsive", Promise.resolve().then(() => (init_image_size_responsive(), image_size_responsive_exports))],
+  ["../audits/is-on-https", Promise.resolve().then(() => (init_is_on_https(), is_on_https_exports))],
+  ["../audits/origin-isolation", Promise.resolve().then(() => (init_origin_isolation(), origin_isolation_exports))],
+  ["../audits/redirects-http", Promise.resolve().then(() => (init_redirects_http(), redirects_http_exports))],
+  ["../audits/seo/canonical", Promise.resolve().then(() => (init_canonical(), canonical_exports))],
+  ["../audits/seo/crawlable-anchors", Promise.resolve().then(() => (init_crawlable_anchors(), crawlable_anchors_exports))],
+  ["../audits/seo/hreflang", Promise.resolve().then(() => (init_hreflang(), hreflang_exports))],
+  ["../audits/seo/http-status-code", Promise.resolve().then(() => (init_http_status_code(), http_status_code_exports))],
+  ["../audits/seo/is-crawlable", Promise.resolve().then(() => (init_is_crawlable(), is_crawlable_exports))],
+  ["../audits/seo/link-text", Promise.resolve().then(() => (init_link_text(), link_text_exports))],
+  ["../audits/seo/manual/structured-data", Promise.resolve().then(() => (init_structured_data(), structured_data_exports))],
+  ["../audits/seo/meta-description", Promise.resolve().then(() => (init_meta_description(), meta_description_exports))],
+  ["../audits/seo/robots-txt", Promise.resolve().then(() => (init_robots_txt2(), robots_txt_exports2))],
+  ["../audits/third-party-cookies", Promise.resolve().then(() => (init_third_party_cookies(), third_party_cookies_exports))],
+  ["../audits/trusted-types-xss", Promise.resolve().then(() => (init_trusted_types_xss(), trusted_types_xss_exports))],
+  ["../audits/valid-source-maps", Promise.resolve().then(() => (init_valid_source_maps(), valid_source_maps_exports))],
+  ["../computed/speedline", Promise.resolve().then(() => (init_speedline(), speedline_exports))],
+  ["../computed/metrics/timing-summary", Promise.resolve().then(() => (init_timing_summary(), timing_summary_exports))],
+  ["../computed/entity-classification", Promise.resolve().then(() => (init_entity_classification(), entity_classification_exports))],
+  ["../computed/trace-engine-result", Promise.resolve().then(() => (init_trace_engine_result(), trace_engine_result_exports))],
+  ["../gather/gatherers/bf-cache-failures", Promise.resolve().then(() => (init_bf_cache_failures(), bf_cache_failures_exports))],
+  ["../gather/gatherers/css-usage", Promise.resolve().then(() => (init_css_usage(), css_usage_exports))],
+  ["../gather/gatherers/full-page-screenshot", Promise.resolve().then(() => (init_full_page_screenshot(), full_page_screenshot_exports))],
+  ["../gather/gatherers/iframe-elements", Promise.resolve().then(() => (init_iframe_elements(), iframe_elements_exports))],
+  ["../gather/gatherers/js-usage", Promise.resolve().then(() => (init_js_usage(), js_usage_exports))],
+  ["../gather/gatherers/network-user-agent", Promise.resolve().then(() => (init_network_user_agent(), network_user_agent_exports))],
+  ["../gather/gatherers/stylesheets", Promise.resolve().then(() => (init_stylesheets(), stylesheets_exports))],
+  ["../gather/gatherers/trace-elements", Promise.resolve().then(() => (init_trace_elements(), trace_elements_exports))],
+  ["../gather/gatherers/trace", Promise.resolve().then(() => (init_trace(), trace_exports))],
+  ["../audits/autocomplete", Promise.resolve().then(() => (init_autocomplete(), autocomplete_exports))],
+  ["../audits/bf-cache", Promise.resolve().then(() => (init_bf_cache(), bf_cache_exports))],
+  ["../audits/bootup-time", Promise.resolve().then(() => (init_bootup_time(), bootup_time_exports))],
+  ["../audits/byte-efficiency/total-byte-weight", Promise.resolve().then(() => (init_total_byte_weight(), total_byte_weight_exports))],
+  ["../audits/byte-efficiency/unminified-css", Promise.resolve().then(() => (init_unminified_css(), unminified_css_exports))],
+  ["../audits/byte-efficiency/unminified-javascript", Promise.resolve().then(() => (init_unminified_javascript(), unminified_javascript_exports))],
+  ["../audits/byte-efficiency/unused-css-rules", Promise.resolve().then(() => (init_unused_css_rules(), unused_css_rules_exports))],
+  ["../audits/byte-efficiency/unused-javascript", Promise.resolve().then(() => (init_unused_javascript(), unused_javascript_exports))],
+  ["../audits/diagnostics", Promise.resolve().then(() => (init_diagnostics(), diagnostics_exports))],
+  ["../audits/final-screenshot", Promise.resolve().then(() => (init_final_screenshot(), final_screenshot_exports))],
+  ["../audits/insights/cache-insight", Promise.resolve().then(() => (init_cache_insight(), cache_insight_exports))],
+  ["../audits/insights/cls-culprits-insight", Promise.resolve().then(() => (init_cls_culprits_insight(), cls_culprits_insight_exports))],
+  ["../audits/insights/document-latency-insight", Promise.resolve().then(() => (init_document_latency_insight(), document_latency_insight_exports))],
+  ["../audits/insights/dom-size-insight", Promise.resolve().then(() => (init_dom_size_insight(), dom_size_insight_exports))],
+  ["../audits/insights/duplicated-javascript-insight", Promise.resolve().then(() => (init_duplicated_javascript_insight(), duplicated_javascript_insight_exports))],
+  ["../audits/insights/font-display-insight", Promise.resolve().then(() => (init_font_display_insight(), font_display_insight_exports))],
+  ["../audits/insights/forced-reflow-insight", Promise.resolve().then(() => (init_forced_reflow_insight(), forced_reflow_insight_exports))],
+  ["../audits/insights/image-delivery-insight", Promise.resolve().then(() => (init_image_delivery_insight(), image_delivery_insight_exports))],
+  ["../audits/insights/inp-breakdown-insight", Promise.resolve().then(() => (init_inp_breakdown_insight(), inp_breakdown_insight_exports))],
+  ["../audits/insights/lcp-breakdown-insight", Promise.resolve().then(() => (init_lcp_breakdown_insight(), lcp_breakdown_insight_exports))],
+  ["../audits/insights/lcp-discovery-insight", Promise.resolve().then(() => (init_lcp_discovery_insight(), lcp_discovery_insight_exports))],
+  ["../audits/insights/legacy-javascript-insight", Promise.resolve().then(() => (init_legacy_javascript_insight(), legacy_javascript_insight_exports))],
+  ["../audits/insights/modern-http-insight", Promise.resolve().then(() => (init_modern_http_insight(), modern_http_insight_exports))],
+  ["../audits/insights/network-dependency-tree-insight", Promise.resolve().then(() => (init_network_dependency_tree_insight(), network_dependency_tree_insight_exports))],
+  ["../audits/insights/render-blocking-insight", Promise.resolve().then(() => (init_render_blocking_insight(), render_blocking_insight_exports))],
+  ["../audits/insights/slow-css-selector-insight", Promise.resolve().then(() => (init_slow_css_selector_insight(), slow_css_selector_insight_exports))],
+  ["../audits/insights/third-parties-insight", Promise.resolve().then(() => (init_third_parties_insight(), third_parties_insight_exports))],
+  ["../audits/insights/viewport-insight", Promise.resolve().then(() => (init_viewport_insight(), viewport_insight_exports))],
+  ["../audits/layout-shifts", Promise.resolve().then(() => (init_layout_shifts(), layout_shifts_exports))],
+  ["../audits/long-tasks", Promise.resolve().then(() => (init_long_tasks(), long_tasks_exports))],
+  ["../audits/main-thread-tasks", Promise.resolve().then(() => (init_main_thread_tasks(), main_thread_tasks_exports))],
+  ["../audits/mainthread-work-breakdown", Promise.resolve().then(() => (init_mainthread_work_breakdown(), mainthread_work_breakdown_exports))],
+  ["../audits/metrics", Promise.resolve().then(() => (init_metrics2(), metrics_exports2))],
+  ["../audits/metrics/cumulative-layout-shift", Promise.resolve().then(() => (init_cumulative_layout_shift(), cumulative_layout_shift_exports))],
+  ["../audits/metrics/first-contentful-paint", Promise.resolve().then(() => (init_first_contentful_paint(), first_contentful_paint_exports))],
+  ["../audits/metrics/interaction-to-next-paint", Promise.resolve().then(() => (init_interaction_to_next_paint(), interaction_to_next_paint_exports))],
+  ["../audits/metrics/interactive", Promise.resolve().then(() => (init_interactive(), interactive_exports))],
+  ["../audits/metrics/largest-contentful-paint", Promise.resolve().then(() => (init_largest_contentful_paint(), largest_contentful_paint_exports))],
+  ["../audits/metrics/max-potential-fid", Promise.resolve().then(() => (init_max_potential_fid(), max_potential_fid_exports))],
+  ["../audits/metrics/speed-index", Promise.resolve().then(() => (init_speed_index(), speed_index_exports))],
+  ["../audits/metrics/total-blocking-time", Promise.resolve().then(() => (init_total_blocking_time(), total_blocking_time_exports))],
+  ["../audits/network-requests", Promise.resolve().then(() => (init_network_requests(), network_requests_exports))],
+  ["../audits/network-rtt", Promise.resolve().then(() => (init_network_rtt(), network_rtt_exports))],
+  ["../audits/network-server-latency", Promise.resolve().then(() => (init_network_server_latency(), network_server_latency_exports))],
+  ["../audits/non-composited-animations", Promise.resolve().then(() => (init_non_composited_animations(), non_composited_animations_exports))],
+  ["../audits/oopif-iframe-test-audit", Promise.resolve().then(() => (init_oopif_iframe_test_audit(), oopif_iframe_test_audit_exports))],
+  ["../audits/predictive-perf", Promise.resolve().then(() => (init_predictive_perf(), predictive_perf_exports))],
+  ["../audits/redirects", Promise.resolve().then(() => (init_redirects(), redirects_exports))],
+  ["../audits/resource-summary", Promise.resolve().then(() => (init_resource_summary(), resource_summary_exports))],
+  ["../audits/screenshot-thumbnails", Promise.resolve().then(() => (init_screenshot_thumbnails(), screenshot_thumbnails_exports))],
+  ["../audits/script-treemap-data", Promise.resolve().then(() => (init_script_treemap_data(), script_treemap_data_exports))],
+  ["../audits/server-response-time", Promise.resolve().then(() => (init_server_response_time(), server_response_time_exports))],
+  ["../audits/unsized-images", Promise.resolve().then(() => (init_unsized_images(), unsized_images_exports))],
+  ["../audits/user-timings", Promise.resolve().then(() => (init_user_timings(), user_timings_exports))]
+]);
 async function requireWrapper(requirePath) {
   if (path4.isAbsolute(requirePath)) {
     requirePath = url_default.pathToFileURL(requirePath).href;
@@ -50473,6 +50470,7 @@ async function requireWrapper(requirePath) {
   }
   throw new Error(`module '${requirePath}' missing default export`);
 }
+__name(requireWrapper, "requireWrapper");
 async function requireGatherer(gathererPath, coreGathererList, configDir) {
   const coreGatherer = coreGathererList.find((a) => a === `${gathererPath}.js`);
   let requirePath = `../gather/gatherers/${gathererPath}`;
@@ -50489,6 +50487,7 @@ async function requireGatherer(gathererPath, coreGathererList, configDir) {
     path: gathererPath
   };
 }
+__name(requireGatherer, "requireGatherer");
 function requireAudit(auditPath, coreAuditList, configDir) {
   const auditPathJs = `${auditPath}.js`;
   const coreAudit = coreAuditList.find((a) => a === auditPathJs);
@@ -50507,6 +50506,7 @@ function requireAudit(auditPath, coreAuditList, configDir) {
   }
   return requireWrapper(requirePath);
 }
+__name(requireAudit, "requireAudit");
 function cleanFlagsForSettings(flags = {}) {
   const settings = {};
   for (const key of Object.keys(flags)) {
@@ -50516,6 +50516,7 @@ function cleanFlagsForSettings(flags = {}) {
   }
   return settings;
 }
+__name(cleanFlagsForSettings, "cleanFlagsForSettings");
 function resolveSettings(settingsJson = {}, overrides = void 0) {
   const locale = lookupLocale(overrides?.locale || settingsJson.locale);
   const { defaultSettings: defaultSettings2 } = constants_exports;
@@ -50532,6 +50533,7 @@ function resolveSettings(settingsJson = {}, overrides = void 0) {
   assertValidSettings(settingsWithFlags);
   return settingsWithFlags;
 }
+__name(resolveSettings, "resolveSettings");
 async function mergePlugins(config3, configDir, flags) {
   const configPlugins = config3.plugins || [];
   const flagPlugins = flags?.plugins || [];
@@ -50545,6 +50547,7 @@ async function mergePlugins(config3, configDir, flags) {
   }
   return config3;
 }
+__name(mergePlugins, "mergePlugins");
 async function resolveGathererToDefn(gathererJson, coreGathererList, configDir) {
   const gathererDefn = expandGathererShorthand(gathererJson);
   if (gathererDefn.instance) {
@@ -50567,6 +50570,7 @@ async function resolveGathererToDefn(gathererJson, coreGathererList, configDir) 
     throw new Error("Invalid expanded Gatherer: " + JSON.stringify(gathererDefn));
   }
 }
+__name(resolveGathererToDefn, "resolveGathererToDefn");
 async function resolveAuditsToDefns(audits, configDir) {
   if (!audits) {
     return null;
@@ -50591,6 +50595,7 @@ async function resolveAuditsToDefns(audits, configDir) {
   mergedAuditDefns.forEach((audit) => assertValidAudit(audit));
   return mergedAuditDefns;
 }
+__name(resolveAuditsToDefns, "resolveAuditsToDefns");
 function resolveModulePath(moduleIdentifier, configDir, category) {
   try {
     return require4.resolve(moduleIdentifier);
@@ -50624,6 +50629,7 @@ function resolveModulePath(moduleIdentifier, configDir, category) {
   throw new Error(errorString + `
        ${relativePath}`);
 }
+__name(resolveModulePath, "resolveModulePath");
 function shallowClone(item) {
   if (typeof item === "object") {
     return Object.assign(
@@ -50635,9 +50641,11 @@ function shallowClone(item) {
   }
   return item;
 }
+__name(shallowClone, "shallowClone");
 function deepClone(json) {
   return JSON.parse(JSON.stringify(json));
 }
+__name(deepClone, "deepClone");
 function deepCloneConfigJson(json) {
   const cloned = deepClone(json);
   if (Array.isArray(json.audits)) {
@@ -50651,251 +50659,24 @@ function deepCloneConfigJson(json) {
   }
   return cloned;
 }
-var require4, mergeOptionsOfItems, mergeConfigFragment, bundledModules;
-var init_config_helpers = __esm({
-  "core/config/config-helpers.js"() {
-    "use strict";
-    init_process_global();
-    init_module();
-    init_url();
-    init_lodash();
-    init_constants();
-    init_config_plugin();
-    init_runner();
-    init_i18n();
-    init_validation();
-    init_esm_utils();
-    /**
-     * @license
-     * Copyright 2019 Google LLC
-     * SPDX-License-Identifier: Apache-2.0
-     */
-    require4 = createRequire({ url: "core/config/config-helpers.js" }.url);
-    __name(isBundledEnvironment2, "isBundledEnvironment");
-    mergeOptionsOfItems = /* @__PURE__ */ __name(function(items) {
-      const mergedItems = [];
-      for (const item of items) {
-        const existingItem = item.path && mergedItems.find((candidate) => candidate.path === item.path);
-        if (!existingItem) {
-          mergedItems.push(item);
-          continue;
-        }
-        existingItem.options = Object.assign({}, existingItem.options, item.options);
-      }
-      return mergedItems;
-    }, "mergeOptionsOfItems");
-    __name(_mergeConfigFragment, "_mergeConfigFragment");
-    mergeConfigFragment = _mergeConfigFragment;
-    __name(mergeConfigFragmentArrayByKey, "mergeConfigFragmentArrayByKey");
-    __name(expandGathererShorthand, "expandGathererShorthand");
-    __name(expandAuditShorthand, "expandAuditShorthand");
-    bundledModules = /* @__PURE__ */ new Map([
-      ["../gather/gatherers/accessibility", Promise.resolve().then(() => (init_accessibility(), accessibility_exports))],
-      ["../gather/gatherers/anchor-elements", Promise.resolve().then(() => (init_anchor_elements(), anchor_elements_exports))],
-      ["../gather/gatherers/console-messages", Promise.resolve().then(() => (init_console_messages(), console_messages_exports))],
-      ["../gather/gatherers/devtools-log", Promise.resolve().then(() => (init_devtools_log(), devtools_log_exports))],
-      ["../gather/gatherers/dobetterweb/doctype", Promise.resolve().then(() => (init_doctype(), doctype_exports))],
-      ["../gather/gatherers/image-elements", Promise.resolve().then(() => (init_image_elements(), image_elements_exports))],
-      ["../gather/gatherers/inputs", Promise.resolve().then(() => (init_inputs(), inputs_exports))],
-      ["../gather/gatherers/inspector-issues", Promise.resolve().then(() => (init_inspector_issues(), inspector_issues_exports))],
-      ["../gather/gatherers/link-elements", Promise.resolve().then(() => (init_link_elements(), link_elements_exports))],
-      ["../gather/gatherers/main-document-content", Promise.resolve().then(() => (init_main_document_content(), main_document_content_exports))],
-      ["../gather/gatherers/meta-elements", Promise.resolve().then(() => (init_meta_elements(), meta_elements_exports))],
-      ["../gather/gatherers/scripts", Promise.resolve().then(() => (init_scripts(), scripts_exports))],
-      ["../gather/gatherers/seo/robots-txt", Promise.resolve().then(() => (init_robots_txt(), robots_txt_exports))],
-      ["../gather/gatherers/source-maps", Promise.resolve().then(() => (init_source_maps(), source_maps_exports))],
-      ["../gather/gatherers/stacks", Promise.resolve().then(() => (init_stacks(), stacks_exports))],
-      ["../gather/gatherers/viewport-dimensions", Promise.resolve().then(() => (init_viewport_dimensions(), viewport_dimensions_exports))],
-      ["../audits/accessibility/accesskeys", Promise.resolve().then(() => (init_accesskeys(), accesskeys_exports))],
-      ["../audits/accessibility/aria-allowed-attr", Promise.resolve().then(() => (init_aria_allowed_attr(), aria_allowed_attr_exports))],
-      ["../audits/accessibility/aria-allowed-role", Promise.resolve().then(() => (init_aria_allowed_role(), aria_allowed_role_exports))],
-      ["../audits/accessibility/aria-command-name", Promise.resolve().then(() => (init_aria_command_name(), aria_command_name_exports))],
-      ["../audits/accessibility/aria-conditional-attr", Promise.resolve().then(() => (init_aria_conditional_attr(), aria_conditional_attr_exports))],
-      ["../audits/accessibility/aria-deprecated-role", Promise.resolve().then(() => (init_aria_deprecated_role(), aria_deprecated_role_exports))],
-      ["../audits/accessibility/aria-dialog-name", Promise.resolve().then(() => (init_aria_dialog_name(), aria_dialog_name_exports))],
-      ["../audits/accessibility/aria-hidden-body", Promise.resolve().then(() => (init_aria_hidden_body(), aria_hidden_body_exports))],
-      ["../audits/accessibility/aria-hidden-focus", Promise.resolve().then(() => (init_aria_hidden_focus(), aria_hidden_focus_exports))],
-      ["../audits/accessibility/aria-input-field-name", Promise.resolve().then(() => (init_aria_input_field_name(), aria_input_field_name_exports))],
-      ["../audits/accessibility/aria-meter-name", Promise.resolve().then(() => (init_aria_meter_name(), aria_meter_name_exports))],
-      ["../audits/accessibility/aria-progressbar-name", Promise.resolve().then(() => (init_aria_progressbar_name(), aria_progressbar_name_exports))],
-      ["../audits/accessibility/aria-prohibited-attr", Promise.resolve().then(() => (init_aria_prohibited_attr(), aria_prohibited_attr_exports))],
-      ["../audits/accessibility/aria-required-attr", Promise.resolve().then(() => (init_aria_required_attr(), aria_required_attr_exports))],
-      ["../audits/accessibility/aria-required-children", Promise.resolve().then(() => (init_aria_required_children(), aria_required_children_exports))],
-      ["../audits/accessibility/aria-required-parent", Promise.resolve().then(() => (init_aria_required_parent(), aria_required_parent_exports))],
-      ["../audits/accessibility/aria-roles", Promise.resolve().then(() => (init_aria_roles(), aria_roles_exports))],
-      ["../audits/accessibility/aria-text", Promise.resolve().then(() => (init_aria_text(), aria_text_exports))],
-      ["../audits/accessibility/aria-toggle-field-name", Promise.resolve().then(() => (init_aria_toggle_field_name(), aria_toggle_field_name_exports))],
-      ["../audits/accessibility/aria-tooltip-name", Promise.resolve().then(() => (init_aria_tooltip_name(), aria_tooltip_name_exports))],
-      ["../audits/accessibility/aria-treeitem-name", Promise.resolve().then(() => (init_aria_treeitem_name(), aria_treeitem_name_exports))],
-      ["../audits/accessibility/aria-valid-attr-value", Promise.resolve().then(() => (init_aria_valid_attr_value(), aria_valid_attr_value_exports))],
-      ["../audits/accessibility/aria-valid-attr", Promise.resolve().then(() => (init_aria_valid_attr(), aria_valid_attr_exports))],
-      ["../audits/accessibility/button-name", Promise.resolve().then(() => (init_button_name(), button_name_exports))],
-      ["../audits/accessibility/bypass", Promise.resolve().then(() => (init_bypass(), bypass_exports))],
-      ["../audits/accessibility/color-contrast", Promise.resolve().then(() => (init_color_contrast(), color_contrast_exports))],
-      ["../audits/accessibility/definition-list", Promise.resolve().then(() => (init_definition_list(), definition_list_exports))],
-      ["../audits/accessibility/dlitem", Promise.resolve().then(() => (init_dlitem(), dlitem_exports))],
-      ["../audits/accessibility/document-title", Promise.resolve().then(() => (init_document_title(), document_title_exports))],
-      ["../audits/accessibility/duplicate-id-aria", Promise.resolve().then(() => (init_duplicate_id_aria(), duplicate_id_aria_exports))],
-      ["../audits/accessibility/empty-heading", Promise.resolve().then(() => (init_empty_heading(), empty_heading_exports))],
-      ["../audits/accessibility/form-field-multiple-labels", Promise.resolve().then(() => (init_form_field_multiple_labels(), form_field_multiple_labels_exports))],
-      ["../audits/accessibility/frame-title", Promise.resolve().then(() => (init_frame_title(), frame_title_exports))],
-      ["../audits/accessibility/heading-order", Promise.resolve().then(() => (init_heading_order(), heading_order_exports))],
-      ["../audits/accessibility/html-has-lang", Promise.resolve().then(() => (init_html_has_lang(), html_has_lang_exports))],
-      ["../audits/accessibility/html-lang-valid", Promise.resolve().then(() => (init_html_lang_valid(), html_lang_valid_exports))],
-      ["../audits/accessibility/html-xml-lang-mismatch", Promise.resolve().then(() => (init_html_xml_lang_mismatch(), html_xml_lang_mismatch_exports))],
-      ["../audits/accessibility/identical-links-same-purpose", Promise.resolve().then(() => (init_identical_links_same_purpose(), identical_links_same_purpose_exports))],
-      ["../audits/accessibility/image-alt", Promise.resolve().then(() => (init_image_alt(), image_alt_exports))],
-      ["../audits/accessibility/image-redundant-alt", Promise.resolve().then(() => (init_image_redundant_alt(), image_redundant_alt_exports))],
-      ["../audits/accessibility/input-button-name", Promise.resolve().then(() => (init_input_button_name(), input_button_name_exports))],
-      ["../audits/accessibility/input-image-alt", Promise.resolve().then(() => (init_input_image_alt(), input_image_alt_exports))],
-      ["../audits/accessibility/label-content-name-mismatch", Promise.resolve().then(() => (init_label_content_name_mismatch(), label_content_name_mismatch_exports))],
-      ["../audits/accessibility/label", Promise.resolve().then(() => (init_label(), label_exports))],
-      ["../audits/accessibility/landmark-one-main", Promise.resolve().then(() => (init_landmark_one_main(), landmark_one_main_exports))],
-      ["../audits/accessibility/link-in-text-block", Promise.resolve().then(() => (init_link_in_text_block(), link_in_text_block_exports))],
-      ["../audits/accessibility/link-name", Promise.resolve().then(() => (init_link_name(), link_name_exports))],
-      ["../audits/accessibility/list", Promise.resolve().then(() => (init_list(), list_exports))],
-      ["../audits/accessibility/listitem", Promise.resolve().then(() => (init_listitem(), listitem_exports))],
-      ["../audits/accessibility/manual/custom-controls-labels", Promise.resolve().then(() => (init_custom_controls_labels(), custom_controls_labels_exports))],
-      ["../audits/accessibility/manual/custom-controls-roles", Promise.resolve().then(() => (init_custom_controls_roles(), custom_controls_roles_exports))],
-      ["../audits/accessibility/manual/focus-traps", Promise.resolve().then(() => (init_focus_traps(), focus_traps_exports))],
-      ["../audits/accessibility/manual/focusable-controls", Promise.resolve().then(() => (init_focusable_controls(), focusable_controls_exports))],
-      ["../audits/accessibility/manual/interactive-element-affordance", Promise.resolve().then(() => (init_interactive_element_affordance(), interactive_element_affordance_exports))],
-      ["../audits/accessibility/manual/logical-tab-order", Promise.resolve().then(() => (init_logical_tab_order(), logical_tab_order_exports))],
-      ["../audits/accessibility/manual/managed-focus", Promise.resolve().then(() => (init_managed_focus(), managed_focus_exports))],
-      ["../audits/accessibility/manual/offscreen-content-hidden", Promise.resolve().then(() => (init_offscreen_content_hidden(), offscreen_content_hidden_exports))],
-      ["../audits/accessibility/manual/use-landmarks", Promise.resolve().then(() => (init_use_landmarks(), use_landmarks_exports))],
-      ["../audits/accessibility/manual/visual-order-follows-dom", Promise.resolve().then(() => (init_visual_order_follows_dom(), visual_order_follows_dom_exports))],
-      ["../audits/accessibility/meta-refresh", Promise.resolve().then(() => (init_meta_refresh(), meta_refresh_exports))],
-      ["../audits/accessibility/meta-viewport", Promise.resolve().then(() => (init_meta_viewport(), meta_viewport_exports))],
-      ["../audits/accessibility/object-alt", Promise.resolve().then(() => (init_object_alt(), object_alt_exports))],
-      ["../audits/accessibility/select-name", Promise.resolve().then(() => (init_select_name(), select_name_exports))],
-      ["../audits/accessibility/skip-link", Promise.resolve().then(() => (init_skip_link(), skip_link_exports))],
-      ["../audits/accessibility/tabindex", Promise.resolve().then(() => (init_tabindex(), tabindex_exports))],
-      ["../audits/accessibility/table-duplicate-name", Promise.resolve().then(() => (init_table_duplicate_name(), table_duplicate_name_exports))],
-      ["../audits/accessibility/table-fake-caption", Promise.resolve().then(() => (init_table_fake_caption(), table_fake_caption_exports))],
-      ["../audits/accessibility/target-size", Promise.resolve().then(() => (init_target_size(), target_size_exports))],
-      ["../audits/accessibility/td-has-header", Promise.resolve().then(() => (init_td_has_header(), td_has_header_exports))],
-      ["../audits/accessibility/td-headers-attr", Promise.resolve().then(() => (init_td_headers_attr(), td_headers_attr_exports))],
-      ["../audits/accessibility/th-has-data-cells", Promise.resolve().then(() => (init_th_has_data_cells(), th_has_data_cells_exports))],
-      ["../audits/accessibility/valid-lang", Promise.resolve().then(() => (init_valid_lang(), valid_lang_exports))],
-      ["../audits/accessibility/video-caption", Promise.resolve().then(() => (init_video_caption(), video_caption_exports))],
-      ["../audits/clickjacking-mitigation", Promise.resolve().then(() => (init_clickjacking_mitigation(), clickjacking_mitigation_exports))],
-      ["../audits/csp-xss", Promise.resolve().then(() => (init_csp_xss(), csp_xss_exports))],
-      ["../audits/deprecations", Promise.resolve().then(() => (init_deprecations(), deprecations_exports))],
-      ["../audits/dobetterweb/charset", Promise.resolve().then(() => (init_charset(), charset_exports))],
-      ["../audits/dobetterweb/doctype", Promise.resolve().then(() => (init_doctype2(), doctype_exports2))],
-      ["../audits/dobetterweb/geolocation-on-start", Promise.resolve().then(() => (init_geolocation_on_start(), geolocation_on_start_exports))],
-      ["../audits/dobetterweb/inspector-issues", Promise.resolve().then(() => (init_inspector_issues2(), inspector_issues_exports2))],
-      ["../audits/dobetterweb/js-libraries", Promise.resolve().then(() => (init_js_libraries(), js_libraries_exports))],
-      ["../audits/dobetterweb/notification-on-start", Promise.resolve().then(() => (init_notification_on_start(), notification_on_start_exports))],
-      ["../audits/dobetterweb/paste-preventing-inputs", Promise.resolve().then(() => (init_paste_preventing_inputs(), paste_preventing_inputs_exports))],
-      ["../audits/errors-in-console", Promise.resolve().then(() => (init_errors_in_console(), errors_in_console_exports))],
-      ["../audits/has-hsts", Promise.resolve().then(() => (init_has_hsts(), has_hsts_exports))],
-      ["../audits/image-aspect-ratio", Promise.resolve().then(() => (init_image_aspect_ratio(), image_aspect_ratio_exports))],
-      ["../audits/image-size-responsive", Promise.resolve().then(() => (init_image_size_responsive(), image_size_responsive_exports))],
-      ["../audits/is-on-https", Promise.resolve().then(() => (init_is_on_https(), is_on_https_exports))],
-      ["../audits/origin-isolation", Promise.resolve().then(() => (init_origin_isolation(), origin_isolation_exports))],
-      ["../audits/redirects-http", Promise.resolve().then(() => (init_redirects_http(), redirects_http_exports))],
-      ["../audits/seo/canonical", Promise.resolve().then(() => (init_canonical(), canonical_exports))],
-      ["../audits/seo/crawlable-anchors", Promise.resolve().then(() => (init_crawlable_anchors(), crawlable_anchors_exports))],
-      ["../audits/seo/hreflang", Promise.resolve().then(() => (init_hreflang(), hreflang_exports))],
-      ["../audits/seo/http-status-code", Promise.resolve().then(() => (init_http_status_code(), http_status_code_exports))],
-      ["../audits/seo/is-crawlable", Promise.resolve().then(() => (init_is_crawlable(), is_crawlable_exports))],
-      ["../audits/seo/link-text", Promise.resolve().then(() => (init_link_text(), link_text_exports))],
-      ["../audits/seo/manual/structured-data", Promise.resolve().then(() => (init_structured_data(), structured_data_exports))],
-      ["../audits/seo/meta-description", Promise.resolve().then(() => (init_meta_description(), meta_description_exports))],
-      ["../audits/seo/robots-txt", Promise.resolve().then(() => (init_robots_txt2(), robots_txt_exports2))],
-      ["../audits/third-party-cookies", Promise.resolve().then(() => (init_third_party_cookies(), third_party_cookies_exports))],
-      ["../audits/trusted-types-xss", Promise.resolve().then(() => (init_trusted_types_xss(), trusted_types_xss_exports))],
-      ["../audits/valid-source-maps", Promise.resolve().then(() => (init_valid_source_maps(), valid_source_maps_exports))],
-      ["../computed/speedline", Promise.resolve().then(() => (init_speedline(), speedline_exports))],
-      ["../computed/metrics/timing-summary", Promise.resolve().then(() => (init_timing_summary(), timing_summary_exports))],
-      ["../computed/entity-classification", Promise.resolve().then(() => (init_entity_classification(), entity_classification_exports))],
-      ["../computed/trace-engine-result", Promise.resolve().then(() => (init_trace_engine_result(), trace_engine_result_exports))],
-      ["lighthouse-plugin-soft-navigation", Promise.resolve().then(() => (init_plugin(), plugin_exports))],
-      ["lighthouse-plugin-soft-navigation/audits/soft-nav-fcp", Promise.resolve().then(() => (init_soft_nav_fcp(), soft_nav_fcp_exports))],
-      ["lighthouse-plugin-soft-navigation/audits/soft-nav-lcp", Promise.resolve().then(() => (init_soft_nav_lcp(), soft_nav_lcp_exports))],
-      ["../gather/gatherers/bf-cache-failures", Promise.resolve().then(() => (init_bf_cache_failures(), bf_cache_failures_exports))],
-      ["../gather/gatherers/css-usage", Promise.resolve().then(() => (init_css_usage(), css_usage_exports))],
-      ["../gather/gatherers/full-page-screenshot", Promise.resolve().then(() => (init_full_page_screenshot(), full_page_screenshot_exports))],
-      ["../gather/gatherers/iframe-elements", Promise.resolve().then(() => (init_iframe_elements(), iframe_elements_exports))],
-      ["../gather/gatherers/js-usage", Promise.resolve().then(() => (init_js_usage(), js_usage_exports))],
-      ["../gather/gatherers/network-user-agent", Promise.resolve().then(() => (init_network_user_agent(), network_user_agent_exports))],
-      ["../gather/gatherers/stylesheets", Promise.resolve().then(() => (init_stylesheets(), stylesheets_exports))],
-      ["../gather/gatherers/trace-elements", Promise.resolve().then(() => (init_trace_elements(), trace_elements_exports))],
-      ["../gather/gatherers/trace", Promise.resolve().then(() => (init_trace(), trace_exports))],
-      ["../audits/autocomplete", Promise.resolve().then(() => (init_autocomplete(), autocomplete_exports))],
-      ["../audits/bf-cache", Promise.resolve().then(() => (init_bf_cache(), bf_cache_exports))],
-      ["../audits/bootup-time", Promise.resolve().then(() => (init_bootup_time(), bootup_time_exports))],
-      ["../audits/byte-efficiency/total-byte-weight", Promise.resolve().then(() => (init_total_byte_weight(), total_byte_weight_exports))],
-      ["../audits/byte-efficiency/unminified-css", Promise.resolve().then(() => (init_unminified_css(), unminified_css_exports))],
-      ["../audits/byte-efficiency/unminified-javascript", Promise.resolve().then(() => (init_unminified_javascript(), unminified_javascript_exports))],
-      ["../audits/byte-efficiency/unused-css-rules", Promise.resolve().then(() => (init_unused_css_rules(), unused_css_rules_exports))],
-      ["../audits/byte-efficiency/unused-javascript", Promise.resolve().then(() => (init_unused_javascript(), unused_javascript_exports))],
-      ["../audits/diagnostics", Promise.resolve().then(() => (init_diagnostics(), diagnostics_exports))],
-      ["../audits/final-screenshot", Promise.resolve().then(() => (init_final_screenshot(), final_screenshot_exports))],
-      ["../audits/insights/cache-insight", Promise.resolve().then(() => (init_cache_insight(), cache_insight_exports))],
-      ["../audits/insights/cls-culprits-insight", Promise.resolve().then(() => (init_cls_culprits_insight(), cls_culprits_insight_exports))],
-      ["../audits/insights/document-latency-insight", Promise.resolve().then(() => (init_document_latency_insight(), document_latency_insight_exports))],
-      ["../audits/insights/dom-size-insight", Promise.resolve().then(() => (init_dom_size_insight(), dom_size_insight_exports))],
-      ["../audits/insights/duplicated-javascript-insight", Promise.resolve().then(() => (init_duplicated_javascript_insight(), duplicated_javascript_insight_exports))],
-      ["../audits/insights/font-display-insight", Promise.resolve().then(() => (init_font_display_insight(), font_display_insight_exports))],
-      ["../audits/insights/forced-reflow-insight", Promise.resolve().then(() => (init_forced_reflow_insight(), forced_reflow_insight_exports))],
-      ["../audits/insights/image-delivery-insight", Promise.resolve().then(() => (init_image_delivery_insight(), image_delivery_insight_exports))],
-      ["../audits/insights/inp-breakdown-insight", Promise.resolve().then(() => (init_inp_breakdown_insight(), inp_breakdown_insight_exports))],
-      ["../audits/insights/lcp-breakdown-insight", Promise.resolve().then(() => (init_lcp_breakdown_insight(), lcp_breakdown_insight_exports))],
-      ["../audits/insights/lcp-discovery-insight", Promise.resolve().then(() => (init_lcp_discovery_insight(), lcp_discovery_insight_exports))],
-      ["../audits/insights/legacy-javascript-insight", Promise.resolve().then(() => (init_legacy_javascript_insight(), legacy_javascript_insight_exports))],
-      ["../audits/insights/modern-http-insight", Promise.resolve().then(() => (init_modern_http_insight(), modern_http_insight_exports))],
-      ["../audits/insights/network-dependency-tree-insight", Promise.resolve().then(() => (init_network_dependency_tree_insight(), network_dependency_tree_insight_exports))],
-      ["../audits/insights/render-blocking-insight", Promise.resolve().then(() => (init_render_blocking_insight(), render_blocking_insight_exports))],
-      ["../audits/insights/slow-css-selector-insight", Promise.resolve().then(() => (init_slow_css_selector_insight(), slow_css_selector_insight_exports))],
-      ["../audits/insights/third-parties-insight", Promise.resolve().then(() => (init_third_parties_insight(), third_parties_insight_exports))],
-      ["../audits/insights/viewport-insight", Promise.resolve().then(() => (init_viewport_insight(), viewport_insight_exports))],
-      ["../audits/layout-shifts", Promise.resolve().then(() => (init_layout_shifts(), layout_shifts_exports))],
-      ["../audits/long-tasks", Promise.resolve().then(() => (init_long_tasks(), long_tasks_exports))],
-      ["../audits/main-thread-tasks", Promise.resolve().then(() => (init_main_thread_tasks(), main_thread_tasks_exports))],
-      ["../audits/mainthread-work-breakdown", Promise.resolve().then(() => (init_mainthread_work_breakdown(), mainthread_work_breakdown_exports))],
-      ["../audits/metrics", Promise.resolve().then(() => (init_metrics2(), metrics_exports2))],
-      ["../audits/metrics/cumulative-layout-shift", Promise.resolve().then(() => (init_cumulative_layout_shift(), cumulative_layout_shift_exports))],
-      ["../audits/metrics/first-contentful-paint", Promise.resolve().then(() => (init_first_contentful_paint(), first_contentful_paint_exports))],
-      ["../audits/metrics/interaction-to-next-paint", Promise.resolve().then(() => (init_interaction_to_next_paint(), interaction_to_next_paint_exports))],
-      ["../audits/metrics/interactive", Promise.resolve().then(() => (init_interactive(), interactive_exports))],
-      ["../audits/metrics/largest-contentful-paint", Promise.resolve().then(() => (init_largest_contentful_paint(), largest_contentful_paint_exports))],
-      ["../audits/metrics/max-potential-fid", Promise.resolve().then(() => (init_max_potential_fid(), max_potential_fid_exports))],
-      ["../audits/metrics/speed-index", Promise.resolve().then(() => (init_speed_index(), speed_index_exports))],
-      ["../audits/metrics/total-blocking-time", Promise.resolve().then(() => (init_total_blocking_time(), total_blocking_time_exports))],
-      ["../audits/network-requests", Promise.resolve().then(() => (init_network_requests(), network_requests_exports))],
-      ["../audits/network-rtt", Promise.resolve().then(() => (init_network_rtt(), network_rtt_exports))],
-      ["../audits/network-server-latency", Promise.resolve().then(() => (init_network_server_latency(), network_server_latency_exports))],
-      ["../audits/non-composited-animations", Promise.resolve().then(() => (init_non_composited_animations(), non_composited_animations_exports))],
-      ["../audits/oopif-iframe-test-audit", Promise.resolve().then(() => (init_oopif_iframe_test_audit(), oopif_iframe_test_audit_exports))],
-      ["../audits/predictive-perf", Promise.resolve().then(() => (init_predictive_perf(), predictive_perf_exports))],
-      ["../audits/redirects", Promise.resolve().then(() => (init_redirects(), redirects_exports))],
-      ["../audits/resource-summary", Promise.resolve().then(() => (init_resource_summary(), resource_summary_exports))],
-      ["../audits/screenshot-thumbnails", Promise.resolve().then(() => (init_screenshot_thumbnails(), screenshot_thumbnails_exports))],
-      ["../audits/script-treemap-data", Promise.resolve().then(() => (init_script_treemap_data(), script_treemap_data_exports))],
-      ["../audits/server-response-time", Promise.resolve().then(() => (init_server_response_time(), server_response_time_exports))],
-      ["../audits/unsized-images", Promise.resolve().then(() => (init_unsized_images(), unsized_images_exports))],
-      ["../audits/user-timings", Promise.resolve().then(() => (init_user_timings(), user_timings_exports))]
-    ]);
-    __name(requireWrapper, "requireWrapper");
-    __name(requireGatherer, "requireGatherer");
-    __name(requireAudit, "requireAudit");
-    __name(cleanFlagsForSettings, "cleanFlagsForSettings");
-    __name(resolveSettings, "resolveSettings");
-    __name(mergePlugins, "mergePlugins");
-    __name(resolveGathererToDefn, "resolveGathererToDefn");
-    __name(resolveAuditsToDefns, "resolveAuditsToDefns");
-    __name(resolveModulePath, "resolveModulePath");
-    __name(shallowClone, "shallowClone");
-    __name(deepClone, "deepClone");
-    __name(deepCloneConfigJson, "deepCloneConfigJson");
-  }
-});
+__name(deepCloneConfigJson, "deepCloneConfigJson");
 
 // core/config/config.js
-import path5 from "path";
+init_esm_utils();
+init_format();
+/**
+ * @license
+ * Copyright 2020 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+var defaultConfigPath = path5.join(
+  "",
+  "../../config/default-config.js"
+);
+var internalArtifactPriorities = {
+  FullPageScreenshot: 1,
+  BFCacheFailures: 1
+};
 function resolveWorkingCopy(config3, context) {
   let { configPath } = context;
   if (configPath && !path5.isAbsolute(configPath)) {
@@ -50912,6 +50693,7 @@ function resolveWorkingCopy(config3, context) {
     configDir
   };
 }
+__name(resolveWorkingCopy, "resolveWorkingCopy");
 function resolveExtensions(config3) {
   if (!config3.extends) return config3;
   if (config3.extends !== "lighthouse:default") {
@@ -50927,6 +50709,7 @@ function resolveExtensions(config3) {
   );
   return mergedConfig;
 }
+__name(resolveExtensions, "resolveExtensions");
 function resolveArtifactDependencies(artifact, gatherer, artifactDefnsBySymbol) {
   if (!("dependencies" in gatherer.instance.meta)) return void 0;
   const dependencies = Object.entries(gatherer.instance.meta.dependencies).map(
@@ -50940,6 +50723,7 @@ function resolveArtifactDependencies(artifact, gatherer, artifactDefnsBySymbol) 
   );
   return Object.fromEntries(dependencies);
 }
+__name(resolveArtifactDependencies, "resolveArtifactDependencies");
 async function resolveArtifactsToDefns(artifacts, configDir) {
   if (!artifacts) return null;
   const status = { msg: "Resolve artifact definitions", id: "lh:config:resolveArtifactsToDefns" };
@@ -50968,6 +50752,7 @@ async function resolveArtifactsToDefns(artifacts, configDir) {
   lighthouse_logger_default.timeEnd(status);
   return artifactDefns;
 }
+__name(resolveArtifactsToDefns, "resolveArtifactsToDefns");
 function overrideSettingsForGatherMode(settings, gatherMode) {
   if (gatherMode === "timespan") {
     if (settings.throttlingMethod === "simulate") {
@@ -50975,6 +50760,7 @@ function overrideSettingsForGatherMode(settings, gatherMode) {
     }
   }
 }
+__name(overrideSettingsForGatherMode, "overrideSettingsForGatherMode");
 function overrideThrottlingWindows(settings) {
   if (settings.throttlingMethod === "simulate") return;
   settings.cpuQuietThresholdMs = Math.max(
@@ -50994,6 +50780,7 @@ function overrideThrottlingWindows(settings) {
     nonSimulatedSettingsOverrides.pauseAfterLoadMs
   );
 }
+__name(overrideThrottlingWindows, "overrideThrottlingWindows");
 async function initializeConfig(gatherMode, config3, flags = {}) {
   const status = { msg: "Initialize config", id: "lh:config" };
   lighthouse_logger_default.time(status, "verbose");
@@ -51017,57 +50804,33 @@ async function initializeConfig(gatherMode, config3, flags = {}) {
   lighthouse_logger_default.timeEnd(status);
   return { resolvedConfig };
 }
-var defaultConfigPath, internalArtifactPriorities;
-var init_config = __esm({
-  "core/config/config.js"() {
-    "use strict";
-    init_process_global();
-    init_lighthouse_logger();
-    init_runner();
-    init_default_config();
-    init_constants();
-    init_validation();
-    init_filters();
-    init_config_helpers();
-    init_esm_utils();
-    init_format();
-    /**
-     * @license
-     * Copyright 2020 Google LLC
-     * SPDX-License-Identifier: Apache-2.0
-     */
-    defaultConfigPath = path5.join(
-      "",
-      "../../config/default-config.js"
-    );
-    internalArtifactPriorities = {
-      FullPageScreenshot: 1,
-      BFCacheFailures: 1
-    };
-    __name(resolveWorkingCopy, "resolveWorkingCopy");
-    __name(resolveExtensions, "resolveExtensions");
-    __name(resolveArtifactDependencies, "resolveArtifactDependencies");
-    __name(resolveArtifactsToDefns, "resolveArtifactsToDefns");
-    __name(overrideSettingsForGatherMode, "overrideSettingsForGatherMode");
-    __name(overrideThrottlingWindows, "overrideThrottlingWindows");
-    __name(initializeConfig, "initializeConfig");
-  }
-});
-
-// replace-modules:/Users/alexrudenko/src/lighthouse/node_modules/@sentry/node/build/cjs/index.js
-var cjs_exports = {};
-__export(cjs_exports, {
-  default: () => cjs_default
-});
-var cjs_default;
-var init_cjs = __esm({
-  "replace-modules:/Users/alexrudenko/src/lighthouse/node_modules/@sentry/node/build/cjs/index.js"() {
-    init_process_global();
-    cjs_default = {};
-  }
-});
+__name(initializeConfig, "initializeConfig");
 
 // core/lib/sentry.js
+/**
+ * @license
+ * Copyright 2017 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+var SENTRY_URL = "https://a6bb0da87ee048cc9ae2a345fc09ab2e:63a7029f46f74265981b7e005e0f69f8@sentry.io/174697";
+var SAMPLE_RATE = 0.01;
+var noop = /* @__PURE__ */ __name(() => {
+}, "noop");
+var sentryDelegate = {
+  init,
+  /** @type {(message: string, level?: SeverityLevel) => void} */
+  captureMessage: noop,
+  /** @type {(breadcrumb: Breadcrumb) => void} */
+  captureBreadcrumb: noop,
+  /** @type {() => any} */
+  getContext: noop,
+  /** @type {(error: Error, options: {level?: string, tags?: {[key: string]: any}, extra?: {[key: string]: any}}) => Promise<void>} */
+  captureException: /* @__PURE__ */ __name(async () => {
+  }, "captureException"),
+  _shouldSample() {
+    return SAMPLE_RATE >= Math.random();
+  }
+};
 async function init(opts) {
   if (!opts.flags.enableErrorReporting) {
     return;
@@ -51144,49 +50907,16 @@ async function init(opts) {
     );
   }
 }
-var SENTRY_URL, SAMPLE_RATE, noop, sentryDelegate, Sentry;
-var init_sentry = __esm({
-  "core/lib/sentry.js"() {
-    "use strict";
-    init_process_global();
-    init_lighthouse_logger();
-    init_config();
-    /**
-     * @license
-     * Copyright 2017 Google LLC
-     * SPDX-License-Identifier: Apache-2.0
-     */
-    SENTRY_URL = "https://a6bb0da87ee048cc9ae2a345fc09ab2e:63a7029f46f74265981b7e005e0f69f8@sentry.io/174697";
-    SAMPLE_RATE = 0.01;
-    noop = /* @__PURE__ */ __name(() => {
-    }, "noop");
-    sentryDelegate = {
-      init,
-      /** @type {(message: string, level?: SeverityLevel) => void} */
-      captureMessage: noop,
-      /** @type {(breadcrumb: Breadcrumb) => void} */
-      captureBreadcrumb: noop,
-      /** @type {() => any} */
-      getContext: noop,
-      /** @type {(error: Error, options: {level?: string, tags?: {[key: string]: any}, extra?: {[key: string]: any}}) => Promise<void>} */
-      captureException: /* @__PURE__ */ __name(async () => {
-      }, "captureException"),
-      _shouldSample() {
-        return SAMPLE_RATE >= Math.random();
-      }
-    };
-    __name(init, "init");
-    Sentry = sentryDelegate;
-  }
-});
+__name(init, "init");
+var Sentry = sentryDelegate;
+
+// report/generator/report-generator.js
+init_process_global();
 
 // replace-modules:/Users/alexrudenko/src/lighthouse/report/generator/report-assets.js
-var reportAssets;
-var init_report_assets = __esm({
-  "replace-modules:/Users/alexrudenko/src/lighthouse/report/generator/report-assets.js"() {
-    init_process_global();
-    reportAssets = {
-      REPORT_TEMPLATE: `<!--
+init_process_global();
+var reportAssets = {
+  REPORT_TEMPLATE: `<!--
 @license
 Copyright 2018 Google LLC
 SPDX-License-Identifier: Apache-2.0
@@ -51214,881 +50944,861 @@ SPDX-License-Identifier: Apache-2.0
 </body>
 </html>
 `,
-      REPORT_JAVASCRIPT: '"use strict";(()=>{var Re=.8999999999999999,Ne=.5,Ie=.49999999999999994;function He(o){let e=Math.sign(o);o=Math.abs(o);let t=.254829592,n=-.284496736,r=1.421413741,i=-1.453152027,a=1.061405429,s=1/(1+.3275911*o),c=s*(t+s*(n+s*(r+s*(i+s*a))));return e*(1-c*Math.exp(-o*o))}function fe({median:o,p10:e},t){if(o<=0)throw new Error("median must be greater than zero");if(e<=0)throw new Error("p10 must be greater than zero");if(e>=o)throw new Error("p10 must be less than the median");if(t<=0)return 1;let n=.9061938024368232,r=Math.max(Number.MIN_VALUE,t/o),i=Math.log(r),a=Math.max(Number.MIN_VALUE,e/o),l=-Math.log(a),s=i*n/l,c=(1-He(s))/2,d;return t<=e?d=Math.max(.9,Math.min(1,c)):t<=o?d=Math.max(Ne,Math.min(Re,c)):d=Math.max(0,Math.min(Ie,c)),d}var U="\\u2026",Oe="\\xA0",ve=.9,$e={PASS:{label:"pass",minScore:ve},AVERAGE:{label:"average",minScore:.5},FAIL:{label:"fail"},ERROR:{label:"error"}},Ve=["com","co","gov","edu","ac","org","go","gob","or","net","in","ne","nic","\
-gouv","web","spb","blog","jus","kiev","mil","wi","qc","ca","bel","on"],E=class o{static get RATINGS(){return $e}static get PASS_THRESHOLD(){return ve}static get MS_DISPLAY_VALUE(){return`%10d${Oe}ms`}static getFinalDisplayedUrl(e){if(e.finalDisplayedUrl)return e.finalDisplayedUrl;if(e.finalUrl)return e.finalUrl;throw new Error("Could not determine final displayed URL")}static getMainDocumentUrl(e){return e.mainDocumentUrl||e.finalUrl}static getFullPageScreenshot(e){return e.fullPageScreenshot?e.fullPageScreenshot:e.audits["full-page-screenshot"]?.details}static getEntityFromUrl(e,t){return t&&t.find(r=>r.origins.find(i=>e.startsWith(i)))||o.getPseudoRootDomain(e)}static splitMarkdownCodeSpans(e){let t=[],n=e.split(/`(.*?)`/g);for(let r=0;r<n.length;r++){let i=n[r];if(!i)continue;let a=r%2!==0;t.push({isCode:a,text:i})}return t}static splitMarkdownLink(e){let t=[],n=e.split(/\\[([^\\]]+?)\\]\\((https?:\\/\\/.*?)\\)/g);for(;n.length;){let[r,i,a]=n.splice(0,3);r&&t.push({isLink:!1,text:r}),i&&a&\
-&t.push({isLink:!0,text:i,linkHref:a})}return t}static truncate(e,t,n="\\u2026"){if(e.length<=t)return e;let i=new Intl.Segmenter(void 0,{granularity:"grapheme"}).segment(e)[Symbol.iterator](),a=0;for(let l=0;l<=t-n.length;l++){let s=i.next();if(s.done)return e;a=s.value.index}for(let l=0;l<n.length;l++)if(i.next().done)return e;return e.slice(0,a)+n}static getURLDisplayName(e,t){t=t||{numPathParts:void 0,preserveQuery:void 0,preserveHost:void 0};let n=t.numPathParts!==void 0?t.numPathParts:2,r=t.preserveQuery!==void 0?t.preserveQuery:!0,i=t.preserveHost||!1,a;if(e.protocol==="about:"||e.protocol==="data:")a=e.href;else{a=e.pathname;let s=a.split("/").filter(c=>c.length);n&&s.length>n&&(a=U+s.slice(-1*n).join("/")),i&&(a=`${e.host}/${a.replace(/^\\//,"")}`),r&&(a=`${a}${e.search}`)}let l=64;if(e.protocol!=="data:"&&(a=a.slice(0,200),a=a.replace(/([a-f0-9]{7})[a-f0-9]{13}[a-f0-9]*/g,`$1${U}`),a=a.replace(/([a-zA-Z0-9-_]{9})(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])[a-zA-Z0-9-_]{10,}/g,`$1${U}`),a=\
-a.replace(/(\\d{3})\\d{6,}/g,`$1${U}`),a=a.replace(/\\u2026+/g,U),a.length>l&&a.includes("?")&&(a=a.replace(/\\?([^=]*)(=)?.*/,`?$1$2${U}`),a.length>l&&(a=a.replace(/\\?.*/,`?${U}`)))),a.length>l){let s=a.lastIndexOf(".");s>=0?a=a.slice(0,l-1-(a.length-s))+`${U}${a.slice(s)}`:a=a.slice(0,l-1)+U}return a}static getChromeExtensionOrigin(e){let t=new URL(e);return t.protocol+"//"+t.host}static parseURL(e){let t=new URL(e);return{file:o.getURLDisplayName(t),hostname:t.hostname,origin:t.protocol==="chrome-extension:"?o.getChromeExtensionOrigin(e):t.origin}}static createOrReturnURL(e){return e instanceof URL?e:new URL(e)}static getPseudoTld(e){let t=e.split(".").slice(-2);return Ve.includes(t[0])?`.${t.join(".")}`:`.${t[t.length-1]}`}static getPseudoRootDomain(e){let t=o.createOrReturnURL(e).hostname,r=o.getPseudoTld(t).split(".");return t.split(".").slice(-r.length).join(".")}static filterRelevantLines(e,t,n){if(t.length===0)return e.slice(0,n*2+1);let r=3,i=new Set;return t=t.sort((a,l)=>(a.lin\
-eNumber||0)-(l.lineNumber||0)),t.forEach(({lineNumber:a})=>{let l=a-n,s=a+n;for(;l<1;)l++,s++;i.has(l-r-1)&&(l-=r);for(let c=l;c<=s;c++){let d=c;i.add(d)}}),e.filter(a=>i.has(a.lineNumber))}static computeLogNormalScore(e,t){let n=fe(e,t);return n>.9&&(n+=.05*(n-.9)),Math.floor(n*100)/100}};function Ge(o){let e=o.createFragment(),t=o.createElement("style");t.append(`\n    .lh-3p-filter {\n      color: var(--color-gray-600);\n      float: right;\n      padding: 6px var(--stackpack-padding-horizontal);\n    }\n    .lh-3p-filter-label, .lh-3p-filter-input {\n      vertical-align: middle;\n      user-select: none;\n    }\n    .lh-3p-filter-input:disabled + .lh-3p-ui-string {\n      text-decoration: line-through;\n    }\n  `),e.append(t);let n=o.createElement("div","lh-3p-filter"),r=o.createElement("label","lh-3p-filter-label"),i=o.createElement("input","lh-3p-filter-input");i.setAttribute("type","checkbox"),i.setAttribute("checked","");let a=o.createElement("span","lh-3p-ui-string");a.append("Show 3rd p\
-arty resources");let l=o.createElement("span","lh-3p-filter-count");return r.append(" ",i," ",a," (",l,") "),n.append(" ",r," "),e.append(n),e}function Be(o){let e=o.createFragment(),t=o.createElement("div","lh-audit"),n=o.createElement("details","lh-expandable-details"),r=o.createElement("summary"),i=o.createElement("div","lh-audit__header lh-expandable-details__summary"),a=o.createElement("span","lh-audit__score-icon"),l=o.createElement("span","lh-audit__title-and-text"),s=o.createElement("span","lh-audit__title"),c=o.createElement("span","lh-audit__display-text");l.append(" ",s," ",c," ");let d=o.createElement("div","lh-chevron-container");i.append(" ",a," ",l," ",d," "),r.append(" ",i," ");let h=o.createElement("div","lh-audit__description"),p=o.createElement("div","lh-audit__stackpacks");return n.append(" ",r," ",h," ",p," "),t.append(" ",n," "),e.append(t),e}function qe(o){let e=o.createFragment(),t=o.createElement("div","lh-category-header"),n=o.createElement("div","lh-score__ga\
-uge");n.setAttribute("role","heading"),n.setAttribute("aria-level","2");let r=o.createElement("div","lh-category-header__description");return t.append(" ",n," ",r," "),e.append(t),e}function je(o){let e=o.createFragment(),t=o.createElementNS("http://www.w3.org/2000/svg","svg","lh-chevron");t.setAttribute("viewBox","0 0 100 100");let n=o.createElementNS("http://www.w3.org/2000/svg","g","lh-chevron__lines"),r=o.createElementNS("http://www.w3.org/2000/svg","path","lh-chevron__line lh-chevron__line-left");r.setAttribute("d","M10 50h40");let i=o.createElementNS("http://www.w3.org/2000/svg","path","lh-chevron__line lh-chevron__line-right");return i.setAttribute("d","M90 50H50"),n.append(" ",r," ",i," "),t.append(" ",n," "),e.append(t),e}function We(o){let e=o.createFragment(),t=o.createElement("div","lh-audit-group"),n=o.createElement("details","lh-clump"),r=o.createElement("summary"),i=o.createElement("div","lh-audit-group__summary"),a=o.createElement("div","lh-audit-group__header"),l=o.cre\
-ateElement("span","lh-audit-group__title"),s=o.createElement("span","lh-audit-group__itemcount");a.append(" ",l," ",s," "," "," ");let c=o.createElement("div","lh-clump-toggle"),d=o.createElement("span","lh-clump-toggletext--show"),h=o.createElement("span","lh-clump-toggletext--hide");return c.append(" ",d," ",h," "),i.append(" ",a," ",c," "),r.append(" ",i," "),n.append(" ",r," "),t.append(" "," ",n," "),e.append(t),e}function Ke(o){let e=o.createFragment(),t=o.createElement("div","lh-crc-container"),n=o.createElement("style");n.append(`\n      .lh-crc .lh-tree-marker {\n        width: 12px;\n        height: 26px;\n        display: block;\n        float: left;\n        background-position: top left;\n      }\n      .lh-crc .lh-horiz-down {\n        background: url(\'data:image/svg+xml;utf8,<svg width="16" height="26" viewBox="0 0 16 26" xmlns="http://www.w3.org/2000/svg"><g fill="%23D8D8D8" fill-rule="evenodd"><path d="M16 12v2H-2v-2z"/><path d="M9 12v14H7V12z"/></g></svg>\');\n      }\n      .lh-\
-crc .lh-right {\n        background: url(\'data:image/svg+xml;utf8,<svg width="16" height="26" viewBox="0 0 16 26" xmlns="http://www.w3.org/2000/svg"><path d="M16 12v2H0v-2z" fill="%23D8D8D8" fill-rule="evenodd"/></svg>\');\n      }\n      .lh-crc .lh-up-right {\n        background: url(\'data:image/svg+xml;utf8,<svg width="16" height="26" viewBox="0 0 16 26" xmlns="http://www.w3.org/2000/svg"><path d="M7 0h2v14H7zm2 12h7v2H9z" fill="%23D8D8D8" fill-rule="evenodd"/></svg>\');\n      }\n      .lh-crc .lh-vert-right {\n        background: url(\'data:image/svg+xml;utf8,<svg width="16" height="26" viewBox="0 0 16 26" xmlns="http://www.w3.org/2000/svg"><path d="M7 0h2v27H7zm2 12h7v2H9z" fill="%23D8D8D8" fill-rule="evenodd"/></svg>\');\n      }\n      .lh-crc .lh-vert {\n        background: url(\'data:image/svg+xml;utf8,<svg width="16" height="26" viewBox="0 0 16 26" xmlns="http://www.w3.org/2000/svg"><path d="M7 0h2v26H7z" fill="%23D8D8D8" fill-rule="evenodd"/></svg>\');\n      }\n      .lh-crc .lh-crc-tree {\n\
-        font-size: 14px;\n        width: 100%;\n        overflow-x: auto;\n      }\n      .lh-crc .lh-crc-node {\n        height: 26px;\n        line-height: 26px;\n        white-space: nowrap;\n      }\n      .lh-crc .lh-crc-node__longest {\n        color: var(--color-average-secondary);\n      }\n      .lh-crc .lh-crc-node__tree-value {\n        margin-left: 10px;\n      }\n      .lh-crc .lh-crc-node__tree-value div {\n        display: inline;\n      }\n      .lh-crc .lh-crc-node__chain-duration {\n        font-weight: 700;\n      }\n      .lh-crc .lh-crc-initial-nav {\n        color: #595959;\n        font-style: italic;\n      }\n      .lh-crc__summary-value {\n        margin-bottom: 10px;\n      }\n    `);let r=o.createElement("div"),i=o.createElement("div","lh-crc__summary-value"),a=o.createElement("span","lh-crc__longest_duration_label"),l=o.createElement("b","lh-crc__longest_duration");i.append(" ",a," ",l," "),r.append(" ",i," ");let s=o.createElement("div","lh-crc"),c=o.createElement("div","lh-crc-initi\
-al-nav");return s.append(" ",c," "," "),t.append(" ",n," ",r," ",s," "),e.append(t),e}function Je(o){let e=o.createFragment(),t=o.createElement("div","lh-crc-node"),n=o.createElement("span","lh-crc-node__tree-marker"),r=o.createElement("span","lh-crc-node__tree-value");return t.append(" ",n," ",r," "),e.append(t),e}function Ze(o){let e=o.createFragment(),t=o.createElement("div","lh-element-screenshot"),n=o.createElement("div","lh-element-screenshot__content"),r=o.createElement("div","lh-element-screenshot__image"),i=o.createElement("div","lh-element-screenshot__mask"),a=o.createElementNS("http://www.w3.org/2000/svg","svg");a.setAttribute("height","0"),a.setAttribute("width","0");let l=o.createElementNS("http://www.w3.org/2000/svg","defs"),s=o.createElementNS("http://www.w3.org/2000/svg","clipPath");s.setAttribute("clipPathUnits","objectBoundingBox"),l.append(" ",s," "," "),a.append(" ",l," "),i.append(" ",a," ");let c=o.createElement("div","lh-element-screenshot__element-marker");retur\
-n r.append(" ",i," ",c," "),n.append(" ",r," "),t.append(" ",n," "),e.append(t),e}function Qe(o){let e=o.createFragment(),t=o.createElement("div","lh-exp-gauge-component"),n=o.createElement("div","lh-exp-gauge__wrapper");n.setAttribute("target","_blank");let r=o.createElement("div","lh-exp-gauge__svg-wrapper"),i=o.createElementNS("http://www.w3.org/2000/svg","svg","lh-exp-gauge"),a=o.createElementNS("http://www.w3.org/2000/svg","g","lh-exp-gauge__inner"),l=o.createElementNS("http://www.w3.org/2000/svg","circle","lh-exp-gauge__bg"),s=o.createElementNS("http://www.w3.org/2000/svg","circle","lh-exp-gauge__base lh-exp-gauge--faded"),c=o.createElementNS("http://www.w3.org/2000/svg","circle","lh-exp-gauge__arc"),d=o.createElementNS("http://www.w3.org/2000/svg","text","lh-exp-gauge__percentage");a.append(" ",l," ",s," ",c," ",d," ");let h=o.createElementNS("http://www.w3.org/2000/svg","g","lh-exp-gauge__outer"),p=o.createElementNS("http://www.w3.org/2000/svg","circle","lh-cover");h.append(" "\
-,p," ");let g=o.createElementNS("http://www.w3.org/2000/svg","text","lh-exp-gauge__label");return g.setAttribute("text-anchor","middle"),g.setAttribute("x","0"),g.setAttribute("y","60"),i.append(" ",a," ",h," ",g," "),r.append(" ",i," "),n.append(" ",r," "),t.append(" ",n," "),e.append(t),e}function Ye(o){let e=o.createFragment(),t=o.createElement("style");t.append(`\n    .lh-footer {\n      padding: var(--footer-padding-vertical) calc(var(--default-padding) * 2);\n      max-width: var(--report-content-max-width);\n      margin: 0 auto;\n    }\n    .lh-footer .lh-generated {\n      text-align: center;\n    }\n  `),e.append(t);let n=o.createElement("footer","lh-footer"),r=o.createElement("ul","lh-meta__items");r.append(" ");let i=o.createElement("div","lh-generated"),a=o.createElement("b");a.append("Lighthouse");let l=o.createElement("span","lh-footer__version"),s=o.createElement("a","lh-footer__version_issue");return s.setAttribute("href","https://github.com/GoogleChrome/Lighthouse/issues"),s.s\
-etAttribute("target","_blank"),s.setAttribute("rel","noopener"),s.append("File an issue"),i.append(" "," Generated by ",a," ",l," | ",s," "),n.append(" ",r," ",i," "),e.append(n),e}function Xe(o){let e=o.createFragment(),t=o.createElement("a","lh-fraction__wrapper"),n=o.createElement("div","lh-fraction__content-wrapper"),r=o.createElement("div","lh-fraction__content"),i=o.createElement("div","lh-fraction__background");r.append(" ",i," "),n.append(" ",r," ");let a=o.createElement("div","lh-fraction__label");return t.append(" ",n," ",a," "),e.append(t),e}function et(o){let e=o.createFragment(),t=o.createElement("a","lh-gauge__wrapper"),n=o.createElement("div","lh-gauge__svg-wrapper"),r=o.createElementNS("http://www.w3.org/2000/svg","svg","lh-gauge");r.setAttribute("viewBox","0 0 120 120");let i=o.createElementNS("http://www.w3.org/2000/svg","circle","lh-gauge-base");i.setAttribute("r","56"),i.setAttribute("cx","60"),i.setAttribute("cy","60"),i.setAttribute("stroke-width","8");let a=o.cre\
-ateElementNS("http://www.w3.org/2000/svg","circle","lh-gauge-arc");a.setAttribute("r","56"),a.setAttribute("cx","60"),a.setAttribute("cy","60"),a.setAttribute("stroke-width","8"),r.append(" ",i," ",a," "),n.append(" ",r," ");let l=o.createElement("div","lh-gauge__percentage"),s=o.createElement("div","lh-gauge__label");return t.append(" "," ",n," ",l," "," ",s," "),e.append(t),e}function tt(o){let e=o.createFragment(),t=o.createElement("style");t.append(`\n    /* CSS Fireworks. Originally by Eddie Lin\n       https://codepen.io/paulirish/pen/yEVMbP\n    */\n    .lh-pyro {\n      display: none;\n      z-index: 1;\n      pointer-events: none;\n    }\n    .lh-score100 .lh-pyro {\n      display: block;\n    }\n    .lh-score100 .lh-lighthouse stop:first-child {\n      stop-color: hsla(200, 12%, 95%, 0);\n    }\n    .lh-score100 .lh-lighthouse stop:last-child {\n      stop-color: hsla(65, 81%, 76%, 1);\n    }\n\n    .lh-pyro > .lh-pyro-before, .lh-pyro > .lh-pyro-after {\n      position: absolute;\n      width: 5\
-px;\n      height: 5px;\n      border-radius: 2.5px;\n      box-shadow: 0 0 #fff, 0 0 #fff, 0 0 #fff, 0 0 #fff, 0 0 #fff, 0 0 #fff, 0 0 #fff, 0 0 #fff, 0 0 #fff, 0 0 #fff, 0 0 #fff, 0 0 #fff, 0 0 #fff, 0 0 #fff, 0 0 #fff, 0 0 #fff, 0 0 #fff, 0 0 #fff, 0 0 #fff, 0 0 #fff, 0 0 #fff, 0 0 #fff, 0 0 #fff, 0 0 #fff, 0 0 #fff, 0 0 #fff, 0 0 #fff, 0 0 #fff, 0 0 #fff, 0 0 #fff, 0 0 #fff, 0 0 #fff, 0 0 #fff, 0 0 #fff, 0 0 #fff, 0 0 #fff, 0 0 #fff, 0 0 #fff, 0 0 #fff, 0 0 #fff, 0 0 #fff, 0 0 #fff, 0 0 #fff, 0 0 #fff, 0 0 #fff, 0 0 #fff, 0 0 #fff, 0 0 #fff, 0 0 #fff, 0 0 #fff, 0 0 #fff;\n      animation: 1s bang ease-out infinite backwards,  1s gravity ease-in infinite backwards,  5s position linear infinite backwards;\n      animation-delay: 1s, 1s, 1s;\n    }\n\n    .lh-pyro > .lh-pyro-after {\n      animation-delay: 2.25s, 2.25s, 2.25s;\n      animation-duration: 1.25s, 1.25s, 6.25s;\n    }\n\n    @keyframes bang {\n      to {\n        opacity: 1;\n        box-shadow: -70px -115.67px #47ebbc, -28px -99.67px #e\
-b47a4, 58px -31.67px #7eeb47, 13px -141.67px #eb47c5, -19px 6.33px #7347eb, -2px -74.67px #ebd247, 24px -151.67px #eb47e0, 57px -138.67px #b4eb47, -51px -104.67px #479eeb, 62px 8.33px #ebcf47, -93px 0.33px #d547eb, -16px -118.67px #47bfeb, 53px -84.67px #47eb83, 66px -57.67px #eb47bf, -93px -65.67px #91eb47, 30px -13.67px #86eb47, -2px -59.67px #83eb47, -44px 1.33px #eb47eb, 61px -58.67px #47eb73, 5px -22.67px #47e8eb, -66px -28.67px #ebe247, 42px -123.67px #eb5547, -75px 26.33px #7beb47, 15px -52.67px #a147eb, 36px -51.67px #eb8347, -38px -12.67px #eb5547, -46px -59.67px #47eb81, 78px -114.67px #eb47ba, 15px -156.67px #eb47bf, -36px 1.33px #eb4783, -72px -86.67px #eba147, 31px -46.67px #ebe247, -68px 29.33px #47e2eb, -55px 19.33px #ebe047, -56px 27.33px #4776eb, -13px -91.67px #eb5547, -47px -138.67px #47ebc7, -18px -96.67px #eb47ac, 11px -88.67px #4783eb, -67px -28.67px #47baeb, 53px 10.33px #ba47eb, 11px 19.33px #5247eb, -5px -11.67px #eb4791, -68px -4.67px #47eba7, 95px -37.67px #e\
-b478b, -67px -162.67px #eb5d47, -54px -120.67px #eb6847, 49px -12.67px #ebe047, 88px 8.33px #47ebda, 97px 33.33px #eb8147, 6px -71.67px #ebbc47;\n      }\n    }\n    @keyframes gravity {\n      from {\n        opacity: 1;\n      }\n      to {\n        transform: translateY(80px);\n        opacity: 0;\n      }\n    }\n    @keyframes position {\n      0%, 19.9% {\n        margin-top: 4%;\n        margin-left: 47%;\n      }\n      20%, 39.9% {\n        margin-top: 7%;\n        margin-left: 30%;\n      }\n      40%, 59.9% {\n        margin-top: 6%;\n        margin-left: 70%;\n      }\n      60%, 79.9% {\n        margin-top: 3%;\n        margin-left: 20%;\n      }\n      80%, 99.9% {\n        margin-top: 3%;\n        margin-left: 80%;\n      }\n    }\n  `),e.append(t);let n=o.createElement("div","lh-header-container"),r=o.createElement("div","lh-scores-wrapper-placeholder");return n.append(" ",r," "),e.append(n),e}function nt(o){let e=o.createFragment(),t=o.createElement("div","lh-metric"),n=o.createElement("div","lh-metric\
-__innerwrap"),r=o.createElement("div","lh-metric__icon"),i=o.createElement("span","lh-metric__title"),a=o.createElement("div","lh-metric__value"),l=o.createElement("div","lh-metric__description");return n.append(" ",r," ",i," ",a," ",l," "),t.append(" ",n," "),e.append(t),e}function rt(o){let e=o.createFragment(),t=o.createElement("div","lh-scorescale"),n=o.createElement("span","lh-scorescale-range lh-scorescale-range--fail");n.append("0\\u201349");let r=o.createElement("span","lh-scorescale-range lh-scorescale-range--average");r.append("50\\u201389");let i=o.createElement("span","lh-scorescale-range lh-scorescale-range--pass");return i.append("90\\u2013100"),t.append(" ",n," ",r," ",i," "),e.append(t),e}function ot(o){let e=o.createFragment(),t=o.createElement("style");t.append(`\n    .lh-scores-container {\n      display: flex;\n      flex-direction: column;\n      padding: var(--default-padding) 0;\n      position: relative;\n      width: 100%;\n    }\n\n    .lh-sticky-header {\n      --gauge-ci\
-rcle-size: var(--gauge-circle-size-sm);\n      --plugin-badge-size: 16px;\n      --plugin-icon-size: 75%;\n      --gauge-wrapper-width: 60px;\n      --gauge-percentage-font-size: 13px;\n      position: fixed;\n      left: 0;\n      right: 0;\n      top: var(--topbar-height);\n      font-weight: 500;\n      display: none;\n      justify-content: center;\n      background-color: var(--sticky-header-background-color);\n      border-bottom: 1px solid var(--color-gray-200);\n      padding-top: var(--score-container-padding);\n      padding-bottom: 4px;\n      z-index: 2;\n      pointer-events: none;\n    }\n\n    .lh-devtools .lh-sticky-header {\n      /* The report within DevTools is placed in a container with overflow, which changes the placement of this header unless we change \\`position\\` to \\`sticky.\\` */\n      position: sticky;\n    }\n\n    .lh-sticky-header--visible {\n      display: grid;\n      grid-auto-flow: column;\n      pointer-events: auto;\n    }\n\n    /* Disable the gauge arc animation for the sticky \
-header, so toggling display: none\n       does not play the animation. */\n    .lh-sticky-header .lh-gauge-arc {\n      animation: none;\n    }\n\n    .lh-sticky-header .lh-gauge__label,\n    .lh-sticky-header .lh-fraction__label {\n      display: none;\n    }\n\n    .lh-highlighter {\n      width: var(--gauge-wrapper-width);\n      height: 1px;\n      background-color: var(--highlighter-background-color);\n      /* Position at bottom of first gauge in sticky header. */\n      position: absolute;\n      grid-column: 1;\n      bottom: -1px;\n      left: 0px;\n      right: 0px;\n    }\n  `),e.append(t);let n=o.createElement("div","lh-scores-wrapper"),r=o.createElement("div","lh-scores-container"),i=o.createElement("div","lh-pyro"),a=o.createElement("div","lh-pyro-before"),l=o.createElement("div","lh-pyro-after");return i.append(" ",a," ",l," "),r.append(" ",i," "),n.append(" ",r," "),e.append(n),e}function it(o){let e=o.createFragment(),t=o.createElement("div","lh-snippet"),n=o.createElement("style");return n\
-.append(`\n          :root {\n            --snippet-highlight-light: #fbf1f2;\n            --snippet-highlight-dark: #ffd6d8;\n          }\n\n         .lh-snippet__header {\n          position: relative;\n          overflow: hidden;\n          padding: 10px;\n          border-bottom: none;\n          color: var(--snippet-color);\n          background-color: var(--snippet-background-color);\n          border: 1px solid var(--report-border-color-secondary);\n        }\n        .lh-snippet__title {\n          font-weight: bold;\n          float: left;\n        }\n        .lh-snippet__node {\n          float: left;\n          margin-left: 4px;\n        }\n        .lh-snippet__toggle-expand {\n          padding: 1px 7px;\n          margin-top: -1px;\n          margin-right: -7px;\n          float: right;\n          background: transparent;\n          border: none;\n          cursor: pointer;\n          font-size: 14px;\n          color: #0c50c7;\n        }\n\n        .lh-snippet__snippet {\n          overflow: auto;\n         \
- border: 1px solid var(--report-border-color-secondary);\n        }\n        /* Container needed so that all children grow to the width of the scroll container */\n        .lh-snippet__snippet-inner {\n          display: inline-block;\n          min-width: 100%;\n        }\n\n        .lh-snippet:not(.lh-snippet--expanded) .lh-snippet__show-if-expanded {\n          display: none;\n        }\n        .lh-snippet.lh-snippet--expanded .lh-snippet__show-if-collapsed {\n          display: none;\n        }\n\n        .lh-snippet__line {\n          background: white;\n          white-space: pre;\n          display: flex;\n        }\n        .lh-snippet__line:not(.lh-snippet__line--message):first-child {\n          padding-top: 4px;\n        }\n        .lh-snippet__line:not(.lh-snippet__line--message):last-child {\n          padding-bottom: 4px;\n        }\n        .lh-snippet__line--content-highlighted {\n          background: var(--snippet-highlight-dark);\n        }\n        .lh-snippet__line--message {\n          backgr\
-ound: var(--snippet-highlight-light);\n        }\n        .lh-snippet__line--message .lh-snippet__line-number {\n          padding-top: 10px;\n          padding-bottom: 10px;\n        }\n        .lh-snippet__line--message code {\n          padding: 10px;\n          padding-left: 5px;\n          color: var(--color-fail);\n          font-family: var(--report-font-family);\n        }\n        .lh-snippet__line--message code {\n          white-space: normal;\n        }\n        .lh-snippet__line-icon {\n          padding-top: 10px;\n          display: none;\n        }\n        .lh-snippet__line--message .lh-snippet__line-icon {\n          display: block;\n        }\n        .lh-snippet__line-icon:before {\n          content: "";\n          display: inline-block;\n          vertical-align: middle;\n          margin-right: 4px;\n          width: var(--score-icon-size);\n          height: var(--score-icon-size);\n          background-image: var(--fail-icon-url);\n        }\n        .lh-snippet__line-number {\n          flex\
--shrink: 0;\n          width: 40px;\n          text-align: right;\n          font-family: monospace;\n          padding-right: 5px;\n          margin-right: 5px;\n          color: var(--color-gray-600);\n          user-select: none;\n        }\n    `),t.append(" ",n," "),e.append(t),e}function at(o){let e=o.createFragment(),t=o.createElement("div","lh-snippet__snippet"),n=o.createElement("div","lh-snippet__snippet-inner");return t.append(" ",n," "),e.append(t),e}function lt(o){let e=o.createFragment(),t=o.createElement("div","lh-snippet__header"),n=o.createElement("div","lh-snippet__title"),r=o.createElement("div","lh-snippet__node"),i=o.createElement("button","lh-snippet__toggle-expand"),a=o.createElement("span","lh-snippet__btn-label-collapse lh-snippet__show-if-expanded"),l=o.createElement("span","lh-snippet__btn-label-expand lh-snippet__show-if-collapsed");return i.append(" ",a," ",l," "),t.append(" ",n," ",r," ",i," "),e.append(t),e}function st(o){let e=o.createFragment(),t=o.createElement\
-("div","lh-snippet__line"),n=o.createElement("div","lh-snippet__line-number"),r=o.createElement("div","lh-snippet__line-icon"),i=o.createElement("code");return t.append(" ",n," ",r," ",i," "),e.append(t),e}function ct(o){let e=o.createFragment(),t=o.createElement("style");return t.append(`/**\n * @license\n * Copyright 2017 Google LLC\n * SPDX-License-Identifier: Apache-2.0\n */\n\n/*\n  Naming convention:\n\n  If a variable is used for a specific component: --{component}-{property name}-{modifier}\n\n  Both {component} and {property name} should be kebab-case. If the target is the entire page,\n  use \'report\' for the component. The property name should not be abbreviated. Use the\n  property name the variable is intended for - if it\'s used for multiple, a common descriptor\n  is fine (ex: \'size\' for a variable applied to \'width\' and \'height\'). If a variable is shared\n  across multiple components, either create more variables or just drop the "{component}-"\n  part of the name. Append any modifiers a\
-t the end (ex: \'big\', \'dark\').\n\n  For colors: --color-{hue}-{intensity}\n\n  {intensity} is the Material Design tag - 700, A700, etc.\n*/\n.lh-vars {\n  /* Palette using Material Design Colors\n   * https://www.materialui.co/colors */\n  --color-amber-50: #FFF8E1;\n  --color-blue-200: #90CAF9;\n  --color-blue-900: #0D47A1;\n  --color-blue-A700: #2962FF;\n  --color-blue-primary: #06f;\n  --color-cyan-500: #00BCD4;\n  --color-gray-100: #F5F5F5;\n  --color-gray-300: #CFCFCF;\n  --color-gray-200: #E0E0E0;\n  --color-gray-400: #BDBDBD;\n  --color-gray-50: #FAFAFA;\n  --color-gray-500: #9E9E9E;\n  --color-gray-600: #757575;\n  --color-gray-700: #616161;\n  --color-gray-800: #424242;\n  --color-gray-900: #212121;\n  --color-gray: #000000;\n  --color-green-700: #080;\n  --color-green: #0c6;\n  --color-lime-400: #D3E156;\n  --color-orange-50: #FFF3E0;\n  --color-orange-700: #C33300;\n  --color-orange: #fa3;\n  --color-red-700: #c00;\n  --color-red: #f33;\n  --color-teal-600: #00897B;\n  --color-white: #FFFFFF;\n\n  /* Context-sp\
-ecific colors */\n  --color-average-secondary: var(--color-orange-700);\n  --color-average: var(--color-orange);\n  --color-fail-secondary: var(--color-red-700);\n  --color-fail: var(--color-red);\n  --color-hover: var(--color-gray-50);\n  --color-informative: var(--color-blue-900);\n  --color-pass-secondary: var(--color-green-700);\n  --color-pass: var(--color-green);\n  --color-not-applicable: var(--color-gray-600);\n\n  /* Component variables */\n  --audit-description-padding-left: calc(var(--score-icon-size) + var(--score-icon-margin-left) + var(--score-icon-margin-right));\n  --audit-explanation-line-height: 16px;\n  --audit-group-margin-bottom: calc(var(--default-padding) * 6);\n  --audit-group-padding-vertical: 8px;\n  --audit-margin-horizontal: 5px;\n  --audit-padding-vertical: 8px;\n  --category-padding: calc(var(--default-padding) * 6) var(--edge-gap-padding) calc(var(--default-padding) * 4);\n  --chevron-line-stroke: var(--color-gray-600);\n  --chevron-size: 12px;\n  --default-padding: 8px;\n  --\
-edge-gap-padding: calc(var(--default-padding) * 4);\n  --env-item-background-color: var(--color-gray-100);\n  --env-item-font-size: 28px;\n  --env-item-line-height: 36px;\n  --env-item-padding: 10px 0px;\n  --env-name-min-width: 220px;\n  --footer-padding-vertical: 16px;\n  --gauge-circle-size-big: 96px;\n  --gauge-circle-size: 48px;\n  --gauge-circle-size-sm: 32px;\n  --gauge-label-font-size-big: 18px;\n  --gauge-label-font-size: var(--report-font-size-secondary);\n  --gauge-label-line-height-big: 24px;\n  --gauge-label-line-height: var(--report-line-height-secondary);\n  --gauge-percentage-font-size-big: 38px;\n  --gauge-percentage-font-size: var(--report-font-size-secondary);\n  --gauge-wrapper-width: 120px;\n  --header-line-height: 24px;\n  --highlighter-background-color: var(--report-text-color);\n  --icon-square-size: calc(var(--score-icon-size) * 0.88);\n  --image-preview-size: 48px;\n  --link-color: var(--color-blue-primary);\n  --locale-selector-background-color: var(--color-white);\n  --metric-togg\
-le-lines-fill: #7F7F7F;\n  --metric-value-font-size: calc(var(--report-font-size) * 1.8);\n  --metrics-toggle-background-color: var(--color-gray-200);\n  --plugin-badge-background-color: var(--color-white);\n  --plugin-badge-size-big: calc(var(--gauge-circle-size-big) / 2.7);\n  --plugin-badge-size: calc(var(--gauge-circle-size) / 2.7);\n  --plugin-icon-size: 65%;\n  --report-background-color: #fff;\n  --report-border-color-secondary: #ebebeb;\n  --report-font-family-monospace: monospace, \'Roboto Mono\', \'Menlo\', \'dejavu sans mono\', \'Consolas\', \'Lucida Console\';\n  --report-font-family: system-ui, Roboto, Helvetica, Arial, sans-serif;\n  --report-font-size: 14px;\n  --report-font-size-secondary: 12px;\n  --report-icon-size: var(--score-icon-background-size);\n  --report-line-height: 24px;\n  --report-line-height-secondary: 20px;\n  --report-monospace-font-size: calc(var(--report-font-size) * 0.85);\n  --report-text-color-secondary: var(--color-gray-800);\n  --report-text-color: var(--color-gray-900);\n  -\
--report-content-max-width: calc(60 * var(--report-font-size)); /* defaults to 840px */\n  --report-content-min-width: 360px;\n  --report-content-max-width-minus-edge-gap: calc(var(--report-content-max-width) - var(--edge-gap-padding) * 2);\n  --score-container-padding: 8px;\n  --score-icon-background-size: 24px;\n  --score-icon-margin-left: 6px;\n  --score-icon-margin-right: 14px;\n  --score-icon-margin: 0 var(--score-icon-margin-right) 0 var(--score-icon-margin-left);\n  --score-icon-size: 12px;\n  --score-icon-size-big: 16px;\n  --screenshot-overlay-background: rgba(0, 0, 0, 0.3);\n  --section-padding-vertical: calc(var(--default-padding) * 6);\n  --snippet-background-color: var(--color-gray-50);\n  --snippet-color: #0938C2;\n  --stackpack-padding-horizontal: 10px;\n  --sticky-header-background-color: var(--report-background-color);\n  --sticky-header-buffer: var(--topbar-height);\n  --sticky-header-height: calc(var(--gauge-circle-size-sm) + var(--score-container-padding) * 2 + 1em);\n  --table-group-\
-header-background-color: #EEF1F4;\n  --table-group-header-text-color: var(--color-gray-700);\n  --table-higlight-background-color: #F5F7FA;\n  --tools-icon-color: var(--color-gray-600);\n  --topbar-background-color: var(--color-white);\n  --topbar-height: 32px;\n  --topbar-logo-size: 24px;\n  --topbar-padding: 0 8px;\n  --toplevel-warning-background-color: hsla(30, 100%, 75%, 10%);\n  --toplevel-warning-message-text-color: var(--color-average-secondary);\n  --toplevel-warning-padding: 18px;\n  --toplevel-warning-text-color: var(--report-text-color);\n\n  /* SVGs */\n  --plugin-icon-url-dark: url(\'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24px" height="24px" viewBox="0 0 24 24" fill="%23FFFFFF"><path d="M0 0h24v24H0z" fill="none"/><path d="M20.5 11H19V7c0-1.1-.9-2-2-2h-4V3.5C13 2.12 11.88 1 10.5 1S8 2.12 8 3.5V5H4c-1.1 0-1.99.9-1.99 2v3.8H3.5c1.49 0 2.7 1.21 2.7 2.7s-1.21 2.7-2.7 2.7H2V20c0 1.1.9 2 2 2h3.8v-1.5c0-1.49 1.21-2.7 2.7-2.7 1.49 0 2.7 1.21 2.7 2.7V22H17c1.1 0 2\
--.9 2-2v-4h1.5c1.38 0 2.5-1.12 2.5-2.5S21.88 11 20.5 11z"/></svg>\');\n  --plugin-icon-url: url(\'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24px" height="24px" viewBox="0 0 24 24" fill="%23757575"><path d="M0 0h24v24H0z" fill="none"/><path d="M20.5 11H19V7c0-1.1-.9-2-2-2h-4V3.5C13 2.12 11.88 1 10.5 1S8 2.12 8 3.5V5H4c-1.1 0-1.99.9-1.99 2v3.8H3.5c1.49 0 2.7 1.21 2.7 2.7s-1.21 2.7-2.7 2.7H2V20c0 1.1.9 2 2 2h3.8v-1.5c0-1.49 1.21-2.7 2.7-2.7 1.49 0 2.7 1.21 2.7 2.7V22H17c1.1 0 2-.9 2-2v-4h1.5c1.38 0 2.5-1.12 2.5-2.5S21.88 11 20.5 11z"/></svg>\');\n\n  --pass-icon-url: url(\'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><title>check</title><path fill="%23178239" d="M24 4C12.95 4 4 12.95 4 24c0 11.04 8.95 20 20 20 11.04 0 20-8.96 20-20 0-11.05-8.96-20-20-20zm-4 30L10 24l2.83-2.83L20 28.34l15.17-15.17L38 16 20 34z"/></svg>\');\n  --average-icon-url: url(\'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48\
-"><title>info</title><path fill="%23E67700" d="M24 4C12.95 4 4 12.95 4 24s8.95 20 20 20 20-8.95 20-20S35.05 4 24 4zm2 30h-4V22h4v12zm0-16h-4v-4h4v4z"/></svg>\');\n  --fail-icon-url: url(\'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><title>warn</title><path fill="%23C7221F" d="M2 42h44L24 4 2 42zm24-6h-4v-4h4v4zm0-8h-4v-8h4v8z"/></svg>\');\n  --error-icon-url: url(\'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 3 15"><title>error</title><path d="M0 15H 3V 12H 0V" fill="%23FF4E42"/><path d="M0 9H 3V 0H 0V" fill="%23FF4E42"/></svg>\');\n\n  --swap-locale-icon-url: url(\'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px" fill="%23000000"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M12.87 15.07l-2.54-2.51.03-.03c1.74-1.94 2.98-4.17 3.71-6.53H17V4h-7V2H8v2H1v1.99h11.17C11.5 7.92 10.44 9.75 9 11.35 8.07 10.32 7.3 9.19 6.69 8h-2c.73 1.63 1.73 3.17 2.98 4.56l-5.09 5.02L4 \
-19l5-5 3.11 3.11.76-2.04zM18.5 10h-2L12 22h2l1.12-3h4.75L21 22h2l-4.5-12zm-2.62 7l1.62-4.33L19.12 17h-3.24z"/></svg>\');\n}\n\n@media not print {\n  .lh-dark {\n    /* Pallete */\n    --color-gray-200: var(--color-gray-800);\n    --color-gray-300: #616161;\n    --color-gray-400: var(--color-gray-600);\n    --color-gray-700: var(--color-gray-400);\n    --color-gray-50: #757575;\n    --color-gray-600: var(--color-gray-500);\n    --color-green-700: var(--color-green);\n    --color-orange-700: var(--color-orange);\n    --color-red-700: var(--color-red);\n    --color-teal-600: var(--color-cyan-500);\n\n    /* Context-specific colors */\n    --color-hover: rgba(0, 0, 0, 0.2);\n    --color-informative: var(--color-blue-200);\n\n    /* Component variables */\n    --env-item-background-color: #393535;\n    --link-color: var(--color-blue-200);\n    --locale-selector-background-color: var(--color-gray-200);\n    --plugin-badge-background-color: var(--color-gray-800);\n    --report-background-color: var(--color-gray-900);\n \
-   --report-border-color-secondary: var(--color-gray-200);\n    --report-text-color-secondary: var(--color-gray-400);\n    --report-text-color: var(--color-gray-100);\n    --snippet-color: var(--color-cyan-500);\n    --topbar-background-color: var(--color-gray);\n    --toplevel-warning-background-color: hsl(33deg 14% 18%);\n    --toplevel-warning-message-text-color: var(--color-orange-700);\n    --toplevel-warning-text-color: var(--color-gray-100);\n    --table-group-header-background-color: rgba(186, 196, 206, 0.15);\n    --table-group-header-text-color: var(--color-gray-100);\n    --table-higlight-background-color: rgba(186, 196, 206, 0.09);\n\n    /* SVGs */\n    --plugin-icon-url: var(--plugin-icon-url-dark);\n  }\n}\n\n/**\n* This media query is a temporary fallback for browsers that do not support \\`@container query\\`.\n* TODO: remove this media query when \\`@container query\\` is fully supported by browsers\n* See https://github.com/GoogleChrome/lighthouse/pull/16332\n*/\n@media only screen and (max-w\
-idth: 480px) {\n  .lh-vars {\n    --audit-group-margin-bottom: 20px;\n    --edge-gap-padding: var(--default-padding);\n    --env-name-min-width: 120px;\n    --gauge-circle-size-big: 96px;\n    --gauge-circle-size: 72px;\n    --gauge-label-font-size-big: 22px;\n    --gauge-label-font-size: 14px;\n    --gauge-label-line-height-big: 26px;\n    --gauge-label-line-height: 20px;\n    --gauge-percentage-font-size-big: 34px;\n    --gauge-percentage-font-size: 26px;\n    --gauge-wrapper-width: 112px;\n    --header-padding: 16px 0 16px 0;\n    --image-preview-size: 24px;\n    --plugin-icon-size: 75%;\n    --report-font-size: 14px;\n    --report-line-height: 20px;\n    --score-icon-margin-left: 2px;\n    --score-icon-size: 10px;\n    --topbar-height: 28px;\n    --topbar-logo-size: 20px;\n  }\n}\n\n@container lh-container (max-width: 480px) {\n  .lh-vars {\n    --audit-group-margin-bottom: 20px;\n    --edge-gap-padding: var(--default-padding);\n    --env-name-min-width: 120px;\n    --gauge-circle-size-big: 96px;\n    --gauge-cir\
-cle-size: 72px;\n    --gauge-label-font-size-big: 22px;\n    --gauge-label-font-size: 14px;\n    --gauge-label-line-height-big: 26px;\n    --gauge-label-line-height: 20px;\n    --gauge-percentage-font-size-big: 34px;\n    --gauge-percentage-font-size: 26px;\n    --gauge-wrapper-width: 112px;\n    --header-padding: 16px 0 16px 0;\n    --image-preview-size: 24px;\n    --plugin-icon-size: 75%;\n    --report-font-size: 14px;\n    --report-line-height: 20px;\n    --score-icon-margin-left: 2px;\n    --score-icon-size: 10px;\n    --topbar-height: 28px;\n    --topbar-logo-size: 20px;\n  }\n}\n\n.lh-vars.lh-devtools {\n  --audit-explanation-line-height: 14px;\n  --audit-group-margin-bottom: 20px;\n  --audit-group-padding-vertical: 12px;\n  --audit-padding-vertical: 4px;\n  --category-padding: 12px;\n  --default-padding: 12px;\n  --env-name-min-width: 120px;\n  --footer-padding-vertical: 8px;\n  --gauge-circle-size-big: 72px;\n  --gauge-circle-size: 64px;\n  --gauge-label-font-size-big: 22px;\n  --gauge-label-font-size: 14px;\n\
-  --gauge-label-line-height-big: 26px;\n  --gauge-label-line-height: 20px;\n  --gauge-percentage-font-size-big: 34px;\n  --gauge-percentage-font-size: 26px;\n  --gauge-wrapper-width: 97px;\n  --header-line-height: 20px;\n  --header-padding: 16px 0 16px 0;\n  --screenshot-overlay-background: transparent;\n  --plugin-icon-size: 75%;\n  --report-font-size: 12px;\n  --report-line-height: 20px;\n  --score-icon-margin-left: 2px;\n  --score-icon-size: 10px;\n  --section-padding-vertical: 8px;\n}\n\n.lh-devtools :focus-visible {\n  outline: -webkit-focus-ring-color auto 1px;\n}\n\n.lh-container:has(.lh-sticky-header) {\n  --sticky-header-buffer: calc(var(--topbar-height) + var(--sticky-header-height));\n}\n\n.lh-container:not(.lh-topbar + .lh-container) {\n  --topbar-height: 0;\n  --sticky-header-height: 0;\n  --sticky-header-buffer: 0;\n}\n\n.lh-max-viewport {\n  display: flex;\n  flex-direction: column;\n  min-height: 100vh;\n  width: 100%;\n}\n\n.lh-devtools.lh-root {\n  height: 100%;\n}\n.lh-devtools.lh-root img {\n  /* Override \
-devtools default \'min-width: 0\' so svg without size in a flexbox isn\'t collapsed. */\n  min-width: auto;\n}\n.lh-devtools .lh-container {\n  overflow-y: scroll;\n  height: calc(100% - var(--topbar-height));\n  /** The .lh-container is the scroll parent in DevTools so we exclude the topbar from the sticky header buffer. */\n  --sticky-header-buffer: 0;\n}\n.lh-devtools .lh-container:has(.lh-sticky-header) {\n  /** The .lh-container is the scroll parent in DevTools so we exclude the topbar from the sticky header buffer. */\n  --sticky-header-buffer: var(--sticky-header-height);\n}\n@media print {\n  .lh-devtools .lh-container {\n    overflow: unset;\n  }\n}\n.lh-devtools .lh-sticky-header {\n  /* This is normally the height of the topbar, but we want it to stick to the top of our scroll container .lh-container\\` */\n  top: 0;\n}\n.lh-devtools .lh-element-screenshot__overlay {\n  position: absolute;\n}\n\n@keyframes fadeIn {\n  0% { opacity: 0;}\n  100% { opacity: 0.6;}\n}\n\n.lh-root *, .lh-root *::before, .lh-root *:\
-:after {\n  box-sizing: border-box;\n}\n\n.lh-root {\n  font-family: var(--report-font-family);\n  font-size: var(--report-font-size);\n  margin: 0;\n  line-height: var(--report-line-height);\n  background: var(--report-background-color);\n  color: var(--report-text-color);\n}\n\n.lh-root [hidden] {\n  display: none !important;\n}\n\n.lh-root pre {\n  margin: 0;\n}\n\n.lh-root pre,\n.lh-root code {\n  font-family: var(--report-font-family-monospace);\n}\n\n.lh-root details > summary {\n  cursor: pointer;\n}\n\n.lh-hidden {\n  display: none !important;\n}\n\n.lh-container {\n  /*\n  Text wrapping in the report is so much FUN!\n  We have a \\`word-break: break-word;\\` globally here to prevent a few common scenarios, namely\n  long non-breakable text (usually URLs) found in:\n    1. The footer\n    2. .lh-node (outerHTML)\n    3. .lh-code\n\n  With that sorted, the next challenge is appropriate column sizing and text wrapping inside our\n  .lh-details tables. Even more fun.\n    * We don\'t want table headers ("Est Savings (ms)") to w\
-rap or their column values, but\n      we\'d be happy for the URL column to wrap if the URLs are particularly long.\n    * We want the narrow columns to remain narrow, providing the most column width for URL\n    * We don\'t want the table to extend past 100% width.\n    * Long URLs in the URL column can wrap. Util.getURLDisplayName maxes them out at 64 characters,\n      but they do not get any overflow:ellipsis treatment.\n  */\n  word-break: break-word;\n\n  container-name: lh-container;\n  container-type: inline-size;\n}\n\n.lh-audit-group a,\n.lh-category-header__description a,\n.lh-audit__description a,\n.lh-warnings a,\n.lh-footer a,\n.lh-table-column--link a {\n  color: var(--link-color);\n}\n\n.lh-audit__description, .lh-audit__stackpack, .lh-list-section__description {\n  --inner-audit-padding-right: var(--stackpack-padding-horizontal);\n  padding-left: var(--audit-description-padding-left);\n  padding-right: var(--inner-audit-padding-right);\n  padding-top: 8px;\n  padding-bottom: 8px;\n}\n\n.lh-details {\n\
-  margin-top: var(--default-padding);\n  margin-bottom: var(--default-padding);\n  margin-left: var(--audit-description-padding-left);\n}\n\n.lh-audit__stackpack {\n  display: flex;\n  align-items: center;\n}\n\n.lh-audit__stackpack__img {\n  max-width: 30px;\n  margin-right: var(--default-padding)\n}\n\n/* Report header */\n\n.lh-report-icon {\n  display: flex;\n  align-items: center;\n  padding: 10px 12px;\n  cursor: pointer;\n}\n.lh-report-icon[disabled] {\n  opacity: 0.3;\n  pointer-events: none;\n}\n\n.lh-report-icon::before {\n  content: "";\n  margin: 4px;\n  background-repeat: no-repeat;\n  width: var(--report-icon-size);\n  height: var(--report-icon-size);\n  opacity: 0.7;\n  display: inline-block;\n  vertical-align: middle;\n}\n.lh-report-icon:hover::before {\n  opacity: 1;\n}\n.lh-dark .lh-report-icon::before {\n  filter: invert(1);\n}\n.lh-report-icon--print::before {\n  background-image: url(\'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path d="M19 8H5c-1\
-.66 0-3 1.34-3 3v6h4v4h12v-4h4v-6c0-1.66-1.34-3-3-3zm-3 11H8v-5h8v5zm3-7c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm-1-9H6v4h12V3z"/><path fill="none" d="M0 0h24v24H0z"/></svg>\');\n}\n.lh-report-icon--copy::before {\n  background-image: url(\'data:image/svg+xml;utf8,<svg height="24" viewBox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M0 0h24v24H0z" fill="none"/><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>\');\n}\n.lh-report-icon--open::before {\n  background-image: url(\'data:image/svg+xml;utf8,<svg height="24" viewBox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M0 0h24v24H0z" fill="none"/><path d="M19 4H5c-1.11 0-2 .9-2 2v12c0 1.1.89 2 2 2h4v-2H5V8h14v10h-4v2h4c1.1 0 2-.9 2-2V6c0-1.1-.89-2-2-2zm-7 6l-4 4h3v6h2v-6h3l-4-4z"/></svg>\');\n}\n.lh-report-icon--download::before {\n  background-image: url(\'data:image/svg+xml;utf8,<svg height="24" viewBox="\
-0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/><path d="M0 0h24v24H0z" fill="none"/></svg>\');\n}\n.lh-report-icon--dark::before {\n  background-image:url(\'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 0 100 125"><path d="M50 23.587c-16.27 0-22.799 12.574-22.799 21.417 0 12.917 10.117 22.451 12.436 32.471h20.726c2.32-10.02 12.436-19.554 12.436-32.471 0-8.843-6.528-21.417-22.799-21.417zM39.637 87.161c0 3.001 1.18 4.181 4.181 4.181h.426l.41 1.231C45.278 94.449 46.042 95 48.019 95h3.963c1.978 0 2.74-.551 3.365-2.427l.409-1.231h.427c3.002 0 4.18-1.18 4.18-4.181V80.91H39.637v6.251zM50 18.265c1.26 0 2.072-.814 2.072-2.073v-9.12C52.072 5.813 51.26 5 50 5c-1.259 0-2.072.813-2.072 2.073v9.12c0 1.259.813 2.072 2.072 2.072zM68.313 23.727c.994.774 2.135.634 2.91-.357l5.614-7.187c.776-.992.636-2.135-.356-2.909-.992-.776-2.135-.636-2.91.357l-5.613 7.186c-.778.993-.636 2.135.355 2.91zM91.157 36.373c-.3\
-06-1.222-1.291-1.815-2.513-1.51l-8.85 2.207c-1.222.305-1.814 1.29-1.51 2.512.305 1.223 1.291 1.814 2.513 1.51l8.849-2.206c1.223-.305 1.816-1.291 1.511-2.513zM86.757 60.48l-8.331-3.709c-1.15-.512-2.225-.099-2.736 1.052-.512 1.151-.1 2.224 1.051 2.737l8.33 3.707c1.15.514 2.225.101 2.736-1.05.513-1.149.1-2.223-1.05-2.737zM28.779 23.37c.775.992 1.917 1.131 2.909.357.992-.776 1.132-1.917.357-2.91l-5.615-7.186c-.775-.992-1.917-1.132-2.909-.357s-1.131 1.917-.356 2.909l5.614 7.187zM21.715 39.583c.305-1.223-.288-2.208-1.51-2.513l-8.849-2.207c-1.222-.303-2.208.289-2.513 1.511-.303 1.222.288 2.207 1.511 2.512l8.848 2.206c1.222.304 2.208-.287 2.513-1.509zM21.575 56.771l-8.331 3.711c-1.151.511-1.563 1.586-1.05 2.735.511 1.151 1.586 1.563 2.736 1.052l8.331-3.711c1.151-.511 1.563-1.586 1.05-2.735-.512-1.15-1.585-1.562-2.736-1.052z"/></svg>\');\n}\n.lh-report-icon--treemap::before {\n  background-image: url(\'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" \
-width="24px" fill="black"><path d="M3 5v14h19V5H3zm2 2h15v4H5V7zm0 10v-4h4v4H5zm6 0v-4h9v4h-9z"/></svg>\');\n}\n\n.lh-report-icon--date::before {\n  background-image: url(\'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M7 11h2v2H7v-2zm14-5v14a2 2 0 01-2 2H5a2 2 0 01-2-2V6c0-1.1.9-2 2-2h1V2h2v2h8V2h2v2h1a2 2 0 012 2zM5 8h14V6H5v2zm14 12V10H5v10h14zm-4-7h2v-2h-2v2zm-4 0h2v-2h-2v2z"/></svg>\');\n}\n.lh-report-icon--devices::before {\n  background-image: url(\'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 6h18V4H4a2 2 0 00-2 2v11H0v3h14v-3H4V6zm19 2h-6a1 1 0 00-1 1v10c0 .6.5 1 1 1h6c.6 0 1-.5 1-1V9c0-.6-.5-1-1-1zm-1 9h-4v-7h4v7z"/></svg>\');\n}\n.lh-report-icon--world::before {\n  background-image: url(\'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm7 6h-3c-.3-1.3-.8-2.5-1.4-3.6A8 8 0 0 1 18.9 8zm-7-4a14 14 0 0 1 2 4h-4a14 \
-14 0 0 1 2-4zM4.3 14a8.2 8.2 0 0 1 0-4h3.3a16.5 16.5 0 0 0 0 4H4.3zm.8 2h3a14 14 0 0 0 1.3 3.6A8 8 0 0 1 5.1 16zm3-8H5a8 8 0 0 1 4.3-3.6L8 8zM12 20a14 14 0 0 1-2-4h4a14 14 0 0 1-2 4zm2.3-6H9.7a14.7 14.7 0 0 1 0-4h4.6a14.6 14.6 0 0 1 0 4zm.3 5.6c.6-1.2 1-2.4 1.4-3.6h3a8 8 0 0 1-4.4 3.6zm1.8-5.6a16.5 16.5 0 0 0 0-4h3.3a8.2 8.2 0 0 1 0 4h-3.3z"/></svg>\');\n}\n.lh-report-icon--stopwatch::before {\n  background-image: url(\'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M15 1H9v2h6V1zm-4 13h2V8h-2v6zm8.1-6.6L20.5 6l-1.4-1.4L17.7 6A9 9 0 0 0 3 13a9 9 0 1 0 16-5.6zm-7 12.6a7 7 0 1 1 0-14 7 7 0 0 1 0 14z"/></svg>\');\n}\n.lh-report-icon--networkspeed::before {\n  background-image: url(\'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M15.9 5c-.2 0-.3 0-.4.2v.2L10.1 17a2 2 0 0 0-.2 1 2 2 0 0 0 4 .4l2.4-12.9c0-.3-.2-.5-.5-.5zM1 9l2 2c2.9-2.9 6.8-4 10.5-3.6l1.2-2.7C10 3.8 4.7 5.3 1 9zm20 2 2-2a15.4 15.4 0 0 0-5.6-3.\
-6L17 8.2c1.5.7 2.9 1.6 4.1 2.8zm-4 4 2-2a9.9 9.9 0 0 0-2.7-1.9l-.5 3 1.2.9zM5 13l2 2a7.1 7.1 0 0 1 4-2l1.3-2.9C9.7 10.1 7 11 5 13z"/></svg>\');\n}\n.lh-report-icon--samples-one::before {\n  background-image: url(\'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="7" cy="14" r="3"/><path d="M7 18a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm0-6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm4-2a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm0-6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm5.6 17.6a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm0-6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>\');\n}\n.lh-report-icon--samples-many::before {\n  background-image: url(\'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M7 18a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm0-6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm4-2a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm0-6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm5.6 17.6a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm0-6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2\
--2z"/><circle cx="7" cy="14" r="3"/><circle cx="11" cy="6" r="3"/></svg>\');\n}\n.lh-report-icon--chrome::before {\n  background-image: url(\'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="-50 -50 562 562"><path d="M256 25.6v25.6a204 204 0 0 1 144.8 60 204 204 0 0 1 60 144.8 204 204 0 0 1-60 144.8 204 204 0 0 1-144.8 60 204 204 0 0 1-144.8-60 204 204 0 0 1-60-144.8 204 204 0 0 1 60-144.8 204 204 0 0 1 144.8-60V0a256 256 0 1 0 0 512 256 256 0 0 0 0-512v25.6z"/><path d="M256 179.2v25.6a51.3 51.3 0 0 1 0 102.4 51.3 51.3 0 0 1 0-102.4v-51.2a102.3 102.3 0 1 0-.1 204.7 102.3 102.3 0 0 0 .1-204.7v25.6z"/><path d="M256 204.8h217.6a25.6 25.6 0 0 0 0-51.2H256a25.6 25.6 0 0 0 0 51.2m44.3 76.8L191.5 470.1a25.6 25.6 0 1 0 44.4 25.6l108.8-188.5a25.6 25.6 0 1 0-44.4-25.6m-88.6 0L102.9 93.2a25.7 25.7 0 0 0-35-9.4 25.7 25.7 0 0 0-9.4 35l108.8 188.5a25.7 25.7 0 0 0 35 9.4 25.9 25.9 0 0 0 9.4-35.1"/></svg>\');\n}\n.lh-report-icon--external::before {\n  background-image: url(\'data:image/s\
-vg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg"><path d="M3.15 11.9a1.01 1.01 0 0 1-.743-.307 1.01 1.01 0 0 1-.306-.743v-7.7c0-.292.102-.54.306-.744a1.01 1.01 0 0 1 .744-.306H7v1.05H3.15v7.7h7.7V7h1.05v3.85c0 .291-.103.54-.307.743a1.01 1.01 0 0 1-.743.307h-7.7Zm2.494-2.8-.743-.744 5.206-5.206H8.401V2.1h3.5v3.5h-1.05V3.893L5.644 9.1Z"/></svg>\');\n}\n.lh-report-icon--experiment::before {\n  background-image: url(\'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none"><path d="M4.50002 17C3.86136 17 3.40302 16.7187 3.12502 16.156C2.84702 15.5933 2.90936 15.069 3.31202 14.583L7.50002 9.5V4.5H6.75002C6.54202 4.5 6.36502 4.427 6.21902 4.281C6.07302 4.135 6.00002 3.958 6.00002 3.75C6.00002 3.542 6.07302 3.365 6.21902 3.219C6.36502 3.073 6.54202 3 6.75002 3H13.25C13.458 3 13.635 3.073 13.781 3.219C13.927 3.365 14 3.542 14 3.75C14 3.958 13.927 4.135 13.781 4.281C13.635 4.427 13.458 4.5 13.25 4.5H12.5V9.5L16.688 14.583C17.0767 15.069 17.132 15.5933 16.85\
-4 16.156C16.5767 16.7187 16.1254 17 15.5 17H4.50002ZM4.50002 15.5H15.5L11 10V4.5H9.00002V10L4.50002 15.5Z" fill="black"/></svg>\');\n}\n\n/** These are still icons, but w/o the auto-color invert / opacity / etc. that come with .lh-report-icon */\n\n.lh-report-plain-icon {\n  display: flex;\n  align-items: center;\n}\n.lh-report-plain-icon::before {\n  content: "";\n  background-repeat: no-repeat;\n  width: var(--report-icon-size);\n  height: var(--report-icon-size);\n  display: inline-block;\n  margin-right: 5px;\n}\n\n.lh-report-plain-icon--checklist-pass::before {\n  --icon-url: url(\'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M8.938 13L13.896 8.062L12.833 7L8.938 10.875L7.167 9.125L6.104 10.188L8.938 13ZM10 18C8.90267 18 7.868 17.7917 6.896 17.375C5.924 16.9583 5.07333 16.3853 4.344 15.656C3.61467 14.9267 3.04167 14.076 2.625 13.104C2.20833 12.132 2 11.0973 2 10C2 8.88867 2.20833 7.85033 2.625 6.885C3.04167 5.92033 3.61467 5.07333 4.344 4.344C5.07333 3.6\
-1467 5.924 3.04167 6.896 2.625C7.868 2.20833 8.90267 2 10 2C11.1113 2 12.1497 2.20833 13.115 2.625C14.0797 3.04167 14.9267 3.61467 15.656 4.344C16.3853 5.07333 16.9583 5.92033 17.375 6.885C17.7917 7.85033 18 8.88867 18 10C18 11.0973 17.7917 12.132 17.375 13.104C16.9583 14.076 16.3853 14.9267 15.656 15.656C14.9267 16.3853 14.0797 16.9583 13.115 17.375C12.1497 17.7917 11.1113 18 10 18ZM10 16.5C11.8053 16.5 13.34 15.868 14.604 14.604C15.868 13.34 16.5 11.8053 16.5 10C16.5 8.19467 15.868 6.66 14.604 5.396C13.34 4.132 11.8053 3.5 10 3.5C8.19467 3.5 6.66 4.132 5.396 5.396C4.132 6.66 3.5 8.19467 3.5 10C3.5 11.8053 4.132 13.34 5.396 14.604C6.66 15.868 8.19467 16.5 10 16.5Z" fill="black"/></svg>\');\n  background-color: var(--color-pass);\n  mask: var(--icon-url) center / contain no-repeat;\n}\n.lh-report-plain-icon--checklist-fail::before {\n  --icon-url: url(\'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path fill-rule="evenodd" clip-rule="evenodd" d="M17.5 10\
-C17.5 14.1421 14.1421 17.5 10 17.5C5.85786 17.5 2.5 14.1421 2.5 10C2.5 5.85786 5.85786 2.5 10 2.5C14.1421 2.5 17.5 5.85786 17.5 10ZM16 10C16 13.3137 13.3137 16 10 16C8.6135 16 7.33683 15.5297 6.32083 14.7399L14.7399 6.32083C15.5297 7.33683 16 8.6135 16 10ZM5.26016 13.6793L13.6793 5.26016C12.6633 4.47033 11.3866 4 10 4C6.68629 4 4 6.68629 4 10C4 11.3866 4.47033 12.6633 5.26016 13.6793Z" fill="black"/></svg>\');\n  background-color: var(--color-fail);\n  mask: var(--icon-url) center / contain no-repeat;\n}\n\n.lh-buttons {\n  display: flex;\n  flex-wrap: wrap;\n  margin: var(--default-padding) 0;\n}\n.lh-button {\n  height: 32px;\n  border: 1px solid var(--report-border-color-secondary);\n  border-radius: 3px;\n  color: var(--link-color);\n  background-color: var(--report-background-color);\n  margin: 5px;\n}\n\n.lh-button:first-of-type {\n  margin-left: 0;\n}\n\n/* Node */\n.lh-node {\n  display: flow-root;\n}\n\n.lh-node__snippet {\n  font-family: var(--report-font-family-monospace);\n  color: var(--snippet-color);\n\
-  font-size: var(--report-monospace-font-size);\n  line-height: 20px;\n}\n\n.lh-checklist {\n  list-style: none;\n  padding: 0;\n}\n\n.lh-checklist-item {\n  margin: 10px 0 10px 0;\n}\n\n/* Score */\n\n.lh-audit__score-icon {\n  width: var(--score-icon-size);\n  height: var(--score-icon-size);\n  margin: var(--score-icon-margin);\n}\n\n.lh-audit--pass .lh-audit__display-text {\n  color: var(--color-pass-secondary);\n}\n.lh-audit--pass .lh-audit__score-icon,\n.lh-scorescale-range--pass::before {\n  border-radius: 100%;\n  background: var(--color-pass);\n}\n\n.lh-audit--average .lh-audit__display-text {\n  color: var(--color-average-secondary);\n}\n.lh-audit--average .lh-audit__score-icon,\n.lh-scorescale-range--average::before {\n  background: var(--color-average);\n  width: var(--icon-square-size);\n  height: var(--icon-square-size);\n}\n\n.lh-audit--fail .lh-audit__display-text {\n  color: var(--color-fail-secondary);\n}\n.lh-audit--fail .lh-audit__score-icon,\n.lh-audit--error .lh-audit__score-icon,\n.lh-scorescale-range--fail:\
-:before {\n  border-left: calc(var(--score-icon-size) / 2) solid transparent;\n  border-right: calc(var(--score-icon-size) / 2) solid transparent;\n  border-bottom: var(--score-icon-size) solid var(--color-fail);\n}\n\n.lh-audit--error .lh-audit__score-icon,\n.lh-metric--error .lh-metric__icon {\n  background-image: var(--error-icon-url);\n  background-repeat: no-repeat;\n  background-position: center;\n  border: none;\n}\n\n.lh-gauge__wrapper--fail .lh-gauge--error {\n  background-image: var(--error-icon-url);\n  background-repeat: no-repeat;\n  background-position: center;\n  transform: scale(0.5);\n  top: var(--score-container-padding);\n}\n\n.lh-audit--manual .lh-audit__display-text,\n.lh-audit--notapplicable .lh-audit__display-text {\n  color: var(--color-gray-600);\n}\n.lh-audit--manual .lh-audit__score-icon,\n.lh-audit--notapplicable .lh-audit__score-icon {\n  border: calc(0.2 * var(--score-icon-size)) solid var(--color-gray-400);\n  border-radius: 100%;\n  background: none;\n}\n\n.lh-audit--informative .lh-aud\
-it__display-text {\n  color: var(--color-gray-600);\n}\n\n.lh-audit--informative .lh-audit__score-icon {\n  border: calc(0.2 * var(--score-icon-size)) solid var(--color-gray-400);\n  border-radius: 100%;\n}\n\n.lh-audit__description,\n.lh-audit__stackpack {\n  color: var(--report-text-color-secondary);\n}\n.lh-audit__adorn {\n  border: 1px solid var(--color-gray-500);\n  border-radius: 3px;\n  margin: 0 3px;\n  padding: 0 2px;\n  line-height: 1.1;\n  display: inline-block;\n  font-size: 90%;\n  color: var(--report-text-color-secondary);\n}\n\n.lh-category-header__description  {\n  text-align: center;\n  color: var(--color-gray-700);\n  margin: 0px auto;\n  max-width: 400px;\n}\n\n\n.lh-audit__display-text,\n.lh-chevron-container {\n  margin: 0 var(--audit-margin-horizontal);\n}\n.lh-chevron-container {\n  margin-right: 0;\n}\n\n.lh-audit__title-and-text {\n  flex: 1;\n}\n\n.lh-audit__title-and-text code {\n  color: var(--snippet-color);\n  font-size: var(--report-monospace-font-size);\n}\n\n/* Prepend display text with em dash separa\
-tor. */\n.lh-audit__display-text:not(:empty):before {\n  content: \'\\u2014\';\n  margin-right: var(--audit-margin-horizontal);\n}\n\n/* Expandable Details (Audit Groups, Audits) */\n.lh-audit__header {\n  display: flex;\n  align-items: center;\n  padding: var(--default-padding);\n}\n\n\n.lh-metricfilter {\n  display: grid;\n  justify-content: end;\n  align-items: center;\n  grid-auto-flow: column;\n  gap: 4px;\n  color: var(--color-gray-700);\n}\n\n.lh-metricfilter__radio {\n  /*\n   * Instead of hiding, position offscreen so it\'s still accessible to screen readers\n   * https://bugs.chromium.org/p/chromium/issues/detail?id=1439785\n   */\n  position: fixed;\n  left: -9999px;\n}\n.lh-metricfilter input[type=\'radio\']:focus-visible + label {\n  outline: -webkit-focus-ring-color auto 1px;\n}\n\n.lh-metricfilter__label {\n  display: inline-flex;\n  padding: 0 4px;\n  height: 16px;\n  text-decoration: underline;\n  align-items: center;\n  cursor: pointer;\n  font-size: 90%;\n}\n\n.lh-metricfilter__label--active {\n  background: var(--col\
-or-blue-primary);\n  color: var(--color-white);\n  border-radius: 3px;\n  text-decoration: none;\n}\n/* Give the \'All\' choice a more muted display */\n.lh-metricfilter__label--active[for="metric-All"] {\n  background-color: var(--color-blue-200) !important;\n  color: black !important;\n}\n\n.lh-metricfilter__text {\n  margin-right: 8px;\n}\n\n/* If audits are filtered, hide the itemcount for Passed Audits\\u2026 */\n.lh-category--filtered .lh-audit-group .lh-audit-group__itemcount {\n  display: none;\n}\n\n\n.lh-audit__header:hover {\n  background-color: var(--color-hover);\n}\n\n/* We want to hide the browser\'s default arrow marker on summary elements. Admittedly, it\'s complicated. */\n.lh-root details > summary {\n  /* Blink 89+ and Firefox will hide the arrow when display is changed from (new) default of \\`list-item\\` to block.  https://chromestatus.com/feature/6730096436051968*/\n  display: block;\n}\n/* Safari and Blink <=88 require using the -webkit-details-marker selector */\n.lh-root details > summary::-webki\
-t-details-marker {\n  display: none;\n}\n\n/* Perf Metric */\n\n.lh-metrics-container {\n  display: grid;\n  grid-auto-rows: 1fr;\n  grid-template-columns: 1fr 1fr;\n  grid-column-gap: var(--report-line-height);\n  margin-bottom: var(--default-padding);\n}\n\n.lh-metric {\n  border-top: 1px solid var(--report-border-color-secondary);\n}\n\n.lh-category:not(.lh--hoisted-meta) .lh-metric:nth-last-child(-n+2) {\n  border-bottom: 1px solid var(--report-border-color-secondary);\n}\n\n.lh-metric__innerwrap {\n  display: grid;\n  /**\n   * Icon -- Metric Name\n   *      -- Metric Value\n   */\n  grid-template-columns: calc(var(--score-icon-size) + var(--score-icon-margin-left) + var(--score-icon-margin-right)) 1fr;\n  align-items: center;\n  padding: var(--default-padding);\n}\n\n.lh-metric__details {\n  order: -1;\n}\n\n.lh-metric__title {\n  flex: 1;\n}\n\n.lh-calclink {\n  padding-left: calc(1ex / 3);\n}\n\n.lh-metric__description {\n  display: none;\n  grid-column-start: 2;\n  grid-column-end: 4;\n  color: var(--report-text-color-second\
-ary);\n}\n\n.lh-metric__value {\n  font-size: var(--metric-value-font-size);\n  margin: calc(var(--default-padding) / 2) 0;\n  white-space: nowrap; /* No wrapping between metric value and the icon */\n  grid-column-start: 2;\n}\n\n/**\n* This media query is a temporary fallback for browsers that do not support \\`@container query\\`.\n* TODO: remove this media query when \\`@container query\\` is fully supported by browsers\n* See https://github.com/GoogleChrome/lighthouse/pull/16332\n*/\n@media screen and (max-width: 535px) {\n  .lh-metrics-container {\n    display: block;\n  }\n\n  .lh-metric {\n    border-bottom: none !important;\n  }\n  .lh-category:not(.lh--hoisted-meta) .lh-metric:nth-last-child(1) {\n    border-bottom: 1px solid var(--report-border-color-secondary) !important;\n  }\n\n  /* Change the grid to 3 columns for narrow viewport. */\n  .lh-metric__innerwrap {\n  /**\n   * Icon -- Metric Name -- Metric Value\n   */\n    grid-template-columns: calc(var(--score-icon-size) + var(--score-icon-margin-left) + va\
-r(--score-icon-margin-right)) 2fr 1fr;\n  }\n  .lh-metric__value {\n    justify-self: end;\n    grid-column-start: unset;\n  }\n}\n\n@container lh-container (max-width: 535px) {\n  .lh-metrics-container {\n    display: block;\n  }\n\n  .lh-metric {\n    border-bottom: none !important;\n  }\n  .lh-category:not(.lh--hoisted-meta) .lh-metric:nth-last-child(1) {\n    border-bottom: 1px solid var(--report-border-color-secondary) !important;\n  }\n\n  /* Change the grid to 3 columns for narrow viewport. */\n  .lh-metric__innerwrap {\n  /**\n   * Icon -- Metric Name -- Metric Value\n   */\n    grid-template-columns: calc(var(--score-icon-size) + var(--score-icon-margin-left) + var(--score-icon-margin-right)) 2fr 1fr;\n  }\n  .lh-metric__value {\n    justify-self: end;\n    grid-column-start: unset;\n  }\n}\n\n/* No-JS toggle switch */\n/* Keep this selector sync\'d w/ \\`magicSelector\\` in report-ui-features-test.js */\n .lh-metrics-toggle__input:checked ~ .lh-metrics-container .lh-metric__description {\n  display: block;\n}\n\n/* T\
-ODO get rid of the SVGS and clean up these some more */\n.lh-metrics-toggle__input {\n  opacity: 0;\n  position: absolute;\n  right: 0;\n  top: 0px;\n}\n\n.lh-metrics-toggle__input + div > label > .lh-metrics-toggle__labeltext--hide,\n.lh-metrics-toggle__input:checked + div > label > .lh-metrics-toggle__labeltext--show {\n  display: none;\n}\n.lh-metrics-toggle__input:checked + div > label > .lh-metrics-toggle__labeltext--hide {\n  display: inline;\n}\n.lh-metrics-toggle__input:focus + div > label {\n  outline: -webkit-focus-ring-color auto 3px;\n}\n\n.lh-metrics-toggle__label {\n  cursor: pointer;\n  font-size: var(--report-font-size-secondary);\n  line-height: var(--report-line-height-secondary);\n  color: var(--color-gray-700);\n}\n\n/* Pushes the metric description toggle button to the right. */\n.lh-audit-group--metrics .lh-audit-group__header {\n  display: flex;\n  justify-content: space-between;\n}\n\n.lh-metric__icon,\n.lh-scorescale-range::before {\n  content: \'\';\n  width: var(--score-icon-size);\n  height: var\
-(--score-icon-size);\n  display: inline-block;\n  margin: var(--score-icon-margin);\n}\n\n.lh-metric--pass .lh-metric__value {\n  color: var(--color-pass-secondary);\n}\n.lh-metric--pass .lh-metric__icon {\n  border-radius: 100%;\n  background: var(--color-pass);\n}\n\n.lh-metric--average .lh-metric__value {\n  color: var(--color-average-secondary);\n}\n.lh-metric--average .lh-metric__icon {\n  background: var(--color-average);\n  width: var(--icon-square-size);\n  height: var(--icon-square-size);\n}\n\n.lh-metric--fail .lh-metric__value {\n  color: var(--color-fail-secondary);\n}\n.lh-metric--fail .lh-metric__icon {\n  border-left: calc(var(--score-icon-size) / 2) solid transparent;\n  border-right: calc(var(--score-icon-size) / 2) solid transparent;\n  border-bottom: var(--score-icon-size) solid var(--color-fail);\n}\n\n.lh-metric--error .lh-metric__value,\n.lh-metric--error .lh-metric__description {\n  color: var(--color-fail-secondary);\n}\n\n/* Filmstrip */\n\n.lh-filmstrip-container {\n  /* smaller gap between metrics\
- and filmstrip */\n  margin: -8px auto 0 auto;\n}\n\n.lh-filmstrip {\n  display: flex;\n  justify-content: space-between;\n  justify-items: center;\n  margin-bottom: var(--default-padding);\n  width: 100%;\n}\n\n.lh-filmstrip__frame {\n  overflow: hidden;\n  line-height: 0;\n}\n\n.lh-filmstrip__thumbnail {\n  border: 1px solid var(--report-border-color-secondary);\n  max-height: 150px;\n  max-width: 120px;\n}\n\n.lh-dark .lh-perf-toggle-text {\n  color: rgba(30, 164, 70, 1);\n}\n\n.lh-perf-toggle-text a {\n  color: var(--link-color);\n}\n\n/* Audit */\n\n.lh-audit {\n  border-bottom: 1px solid var(--report-border-color-secondary);\n}\n\n/* Apply border-top to just the first audit. */\n.lh-audit {\n  border-top: 1px solid var(--report-border-color-secondary);\n}\n.lh-audit ~ .lh-audit {\n  border-top: none;\n}\n\n\n.lh-audit--error .lh-audit__display-text {\n  color: var(--color-fail-secondary);\n}\n\n/* Audit Group */\n\n.lh-audit-group {\n  margin-bottom: var(--audit-group-margin-bottom);\n  position: relative;\n}\n.lh-audit-group--metrics\
- {\n  margin-bottom: calc(var(--audit-group-margin-bottom) / 2);\n}\n\n.lh-audit-group--metrics .lh-audit-group__summary {\n  margin-top: 0;\n  margin-bottom: 0;\n}\n\n.lh-audit-group__summary {\n  display: flex;\n  justify-content: space-between;\n  align-items: center;\n}\n\n.lh-audit-group__header .lh-chevron {\n  margin-top: calc((var(--report-line-height) - 5px) / 2);\n}\n\n.lh-audit-group__header {\n  letter-spacing: 0.8px;\n  padding: var(--default-padding);\n  padding-left: 0;\n}\n\n.lh-audit-group__header, .lh-audit-group__summary {\n  font-size: var(--report-font-size-secondary);\n  line-height: var(--report-line-height-secondary);\n  color: var(--color-gray-700);\n}\n\n.lh-audit-group__title {\n  text-transform: uppercase;\n  font-weight: 500;\n}\n\n.lh-audit-group__itemcount {\n  color: var(--color-gray-600);\n}\n\n.lh-audit-group__footer {\n  color: var(--color-gray-600);\n  display: block;\n  margin-top: var(--default-padding);\n}\n\n.lh-details,\n.lh-category-header__description,\n.lh-audit-group__footer {\n  font-size\
-: var(--report-font-size-secondary);\n  line-height: var(--report-line-height-secondary);\n}\n\n.lh-audit-explanation {\n  margin: var(--audit-padding-vertical) 0 calc(var(--audit-padding-vertical) / 2) var(--audit-margin-horizontal);\n  line-height: var(--audit-explanation-line-height);\n  display: inline-block;\n}\n\n.lh-audit--fail .lh-audit-explanation {\n  color: var(--color-fail-secondary);\n}\n\n/* Report */\n.lh-list {\n  margin-right: calc(var(--default-padding) * 2);\n}\n.lh-list > :not(:last-child) {\n  margin-bottom: calc(var(--default-padding) * 2);\n  border-bottom: 1px solid #A8C7FA;\n}\n.lh-list-section {\n  padding: calc(var(--default-padding) * 2) 0;\n}\n.lh-list-section__title {\n  text-decoration: underline;\n}\n\n.lh-header-container {\n  display: block;\n  margin: 0 auto;\n  position: relative;\n  word-wrap: break-word;\n}\n\n.lh-header-container .lh-scores-wrapper {\n  border-bottom: 1px solid var(--color-gray-200);\n}\n\n\n.lh-report {\n  min-width: var(--report-content-min-width);\n}\n\n.lh-exception {\n  \
-font-size: large;\n}\n\n.lh-code {\n  white-space: normal;\n  margin-top: 0;\n  font-size: var(--report-monospace-font-size);\n}\n\n.lh-warnings {\n  --item-margin: calc(var(--report-line-height) / 6);\n  color: var(--color-average-secondary);\n  margin: var(--audit-padding-vertical) 0;\n  padding: var(--default-padding)\n    var(--default-padding)\n    var(--default-padding)\n    calc(var(--audit-description-padding-left));\n  background-color: var(--toplevel-warning-background-color);\n}\n.lh-warnings span {\n  font-weight: bold;\n}\n\n.lh-warnings--toplevel {\n  --item-margin: calc(var(--header-line-height) / 4);\n  color: var(--toplevel-warning-text-color);\n  margin-left: auto;\n  margin-right: auto;\n  max-width: var(--report-content-max-width-minus-edge-gap);\n  padding: var(--toplevel-warning-padding);\n  border-radius: 8px;\n}\n\n.lh-warnings__msg {\n  color: var(--toplevel-warning-message-text-color);\n  margin: 0;\n}\n\n.lh-warnings ul {\n  margin: 0;\n}\n.lh-warnings li {\n  margin: var(--item-margin) 0;\n}\n.lh-warn\
-ings li:last-of-type {\n  margin-bottom: 0;\n}\n\n.lh-scores-header {\n  display: flex;\n  flex-wrap: wrap;\n  justify-content: center;\n}\n.lh-scores-header__solo {\n  padding: 0;\n  border: 0;\n}\n\n/* Gauge */\n\n.lh-gauge__wrapper--pass {\n  color: var(--color-pass-secondary);\n  fill: var(--color-pass);\n  stroke: var(--color-pass);\n}\n\n.lh-gauge__wrapper--average {\n  color: var(--color-average-secondary);\n  fill: var(--color-average);\n  stroke: var(--color-average);\n}\n\n.lh-gauge__wrapper--fail {\n  color: var(--color-fail-secondary);\n  fill: var(--color-fail);\n  stroke: var(--color-fail);\n}\n\n.lh-gauge__wrapper--not-applicable {\n  color: var(--color-not-applicable);\n  fill: var(--color-not-applicable);\n  stroke: var(--color-not-applicable);\n}\n\n.lh-fraction__wrapper .lh-fraction__content::before {\n  content: \'\';\n  height: var(--score-icon-size);\n  width: var(--score-icon-size);\n  margin: var(--score-icon-margin);\n  display: inline-block;\n}\n.lh-fraction__wrapper--pass .lh-fraction__content {\n  color: va\
-r(--color-pass-secondary);\n}\n.lh-fraction__wrapper--pass .lh-fraction__background {\n  background-color: var(--color-pass);\n}\n.lh-fraction__wrapper--pass .lh-fraction__content::before {\n  background-color: var(--color-pass);\n  border-radius: 50%;\n}\n.lh-fraction__wrapper--average .lh-fraction__content {\n  color: var(--color-average-secondary);\n}\n.lh-fraction__wrapper--average .lh-fraction__background,\n.lh-fraction__wrapper--average .lh-fraction__content::before {\n  background-color: var(--color-average);\n}\n.lh-fraction__wrapper--fail .lh-fraction__content {\n  color: var(--color-fail);\n}\n.lh-fraction__wrapper--fail .lh-fraction__background {\n  background-color: var(--color-fail);\n}\n.lh-fraction__wrapper--fail .lh-fraction__content::before {\n  border-left: calc(var(--score-icon-size) / 2) solid transparent;\n  border-right: calc(var(--score-icon-size) / 2) solid transparent;\n  border-bottom: var(--score-icon-size) solid var(--color-fail);\n}\n.lh-fraction__wrapper--null .lh-fraction__content \
-{\n  color: var(--color-gray-700);\n}\n.lh-fraction__wrapper--null .lh-fraction__background {\n  background-color: var(--color-gray-700);\n}\n.lh-fraction__wrapper--null .lh-fraction__content::before {\n  border-radius: 50%;\n  border: calc(0.2 * var(--score-icon-size)) solid var(--color-gray-700);\n}\n\n.lh-fraction__background {\n  position: absolute;\n  height: 100%;\n  width: 100%;\n  border-radius: calc(var(--gauge-circle-size) / 2);\n  opacity: 0.1;\n  z-index: -1;\n}\n\n.lh-fraction__content-wrapper {\n  height: var(--gauge-circle-size);\n  display: flex;\n  align-items: center;\n}\n\n.lh-fraction__content {\n  display: flex;\n  position: relative;\n  align-items: center;\n  justify-content: center;\n  font-size: calc(0.3 * var(--gauge-circle-size));\n  line-height: calc(0.4 * var(--gauge-circle-size));\n  width: max-content;\n  min-width: calc(1.5 * var(--gauge-circle-size));\n  padding: calc(0.1 * var(--gauge-circle-size)) calc(0.2 * var(--gauge-circle-size));\n  --score-icon-size: calc(0.21 * var(--gauge-circle\
--size));\n  --score-icon-margin: 0 calc(0.15 * var(--gauge-circle-size)) 0 0;\n}\n\n.lh-gauge {\n  stroke-linecap: round;\n  width: var(--gauge-circle-size);\n  height: var(--gauge-circle-size);\n}\n\n.lh-category .lh-gauge {\n  --gauge-circle-size: var(--gauge-circle-size-big);\n}\n\n.lh-gauge-base {\n  opacity: 0.1;\n}\n\n.lh-gauge-arc {\n  fill: none;\n  transform-origin: 50% 50%;\n  animation: load-gauge var(--transition-length) ease both;\n  animation-delay: 250ms;\n}\n\n.lh-gauge__svg-wrapper {\n  position: relative;\n  height: var(--gauge-circle-size);\n}\n.lh-category .lh-gauge__svg-wrapper,\n.lh-category .lh-fraction__wrapper {\n  --gauge-circle-size: var(--gauge-circle-size-big);\n}\n\n/* The plugin badge overlay */\n.lh-gauge__wrapper--plugin .lh-gauge__svg-wrapper::before {\n  width: var(--plugin-badge-size);\n  height: var(--plugin-badge-size);\n  background-color: var(--plugin-badge-background-color);\n  background-image: var(--plugin-icon-url);\n  background-repeat: no-repeat;\n  background-size: var(--plugin-i\
-con-size);\n  background-position: 58% 50%;\n  content: "";\n  position: absolute;\n  right: -6px;\n  bottom: 0px;\n  display: block;\n  z-index: 100;\n  box-shadow: 0 0 4px rgba(0,0,0,.2);\n  border-radius: 25%;\n}\n.lh-category .lh-gauge__wrapper--plugin .lh-gauge__svg-wrapper::before {\n  width: var(--plugin-badge-size-big);\n  height: var(--plugin-badge-size-big);\n}\n\n@keyframes load-gauge {\n  from { stroke-dasharray: 0 352; }\n}\n\n.lh-gauge__percentage {\n  width: 100%;\n  height: var(--gauge-circle-size);\n  line-height: var(--gauge-circle-size);\n  position: absolute;\n  font-family: var(--report-font-family-monospace);\n  font-size: calc(var(--gauge-circle-size) * 0.34 + 1.3px);\n  text-align: center;\n  top: var(--score-container-padding);\n}\n\n.lh-category .lh-gauge__percentage {\n  --gauge-circle-size: var(--gauge-circle-size-big);\n  --gauge-percentage-font-size: var(--gauge-percentage-font-size-big);\n}\n\n.lh-gauge__wrapper,\n.lh-fraction__wrapper {\n  position: relative;\n  display: flex;\n  align-items: \
-center;\n  flex-direction: column;\n  text-decoration: none;\n  padding: var(--score-container-padding);\n\n  --transition-length: 1s;\n\n  /* Contain the layout style paint & layers during animation*/\n  contain: content;\n  will-change: opacity; /* Only using for layer promotion */\n}\n\n.lh-gauge__label,\n.lh-fraction__label {\n  font-size: var(--gauge-label-font-size);\n  font-weight: 500;\n  line-height: var(--gauge-label-line-height);\n  margin-top: 10px;\n  text-align: center;\n  color: var(--report-text-color);\n  word-break: keep-all;\n}\n\n/* TODO(#8185) use more BEM (.lh-gauge__label--big) instead of relying on descendant selector */\n.lh-category .lh-gauge__label,\n.lh-category .lh-fraction__label {\n  --gauge-label-font-size: var(--gauge-label-font-size-big);\n  --gauge-label-line-height: var(--gauge-label-line-height-big);\n  margin-top: 14px;\n}\n\n.lh-scores-header .lh-gauge__wrapper,\n.lh-scores-header .lh-fraction__wrapper,\n.lh-sticky-header .lh-gauge__wrapper,\n.lh-sticky-header .lh-fraction__wrappe\
-r {\n  width: var(--gauge-wrapper-width);\n}\n\n.lh-scorescale {\n  display: inline-flex;\n\n  gap: calc(var(--default-padding) * 4);\n  margin: 16px auto 0 auto;\n  font-size: var(--report-font-size-secondary);\n  color: var(--color-gray-700);\n\n}\n\n.lh-scorescale-range {\n  display: flex;\n  align-items: center;\n  font-family: var(--report-font-family-monospace);\n  white-space: nowrap;\n}\n\n.lh-category-header__finalscreenshot .lh-scorescale {\n  border: 0;\n  display: flex;\n  justify-content: center;\n}\n\n.lh-category-header__finalscreenshot .lh-scorescale-range {\n  font-family: unset;\n  font-size: 12px;\n}\n\n.lh-scorescale-wrap {\n  display: contents;\n}\n\n/* Hide category score gauages if it\'s a single category report */\n.lh-header--solo-category .lh-scores-wrapper {\n  display: none;\n}\n\n\n.lh-categories {\n  width: 100%;\n}\n\n.lh-category {\n  padding: var(--category-padding);\n  max-width: var(--report-content-max-width);\n  margin: 0 auto;\n\n  scroll-margin-top: calc(var(--sticky-header-buffer) - 1em);\n}\n\n.lh-c\
-ategory-wrapper {\n  border-bottom: 1px solid var(--color-gray-200);\n}\n.lh-category-wrapper:last-of-type {\n  border-bottom: 0;\n}\n\n.lh-category-header {\n  margin-bottom: var(--section-padding-vertical);\n}\n\n.lh-category-header .lh-score__gauge {\n  max-width: 400px;\n  width: auto;\n  margin: 0px auto;\n}\n\n.lh-category-header__finalscreenshot {\n  display: grid;\n  grid-template: none / 1fr 1px 1fr;\n  justify-items: center;\n  align-items: center;\n  gap: var(--report-line-height);\n  min-height: 288px;\n  margin-bottom: var(--default-padding);\n}\n\n.lh-final-ss-image {\n  /* constrain the size of the image to not be too large */\n  max-height: calc(var(--gauge-circle-size-big) * 2.8);\n  max-width: calc(var(--gauge-circle-size-big) * 3.5);\n  border: 1px solid var(--color-gray-200);\n  padding: 4px;\n  border-radius: 3px;\n  display: block;\n}\n\n.lh-category-headercol--separator {\n  background: var(--color-gray-200);\n  width: 1px;\n  height: var(--gauge-circle-size-big);\n}\n\n/**\n* This media query is a tempora\
-ry fallback for browsers that do not support \\`@container query\\`.\n* TODO: remove this media query when \\`@container query\\` is fully supported by browsers\n* See https://github.com/GoogleChrome/lighthouse/pull/16332\n*/\n@media screen and (max-width: 780px) {\n  .lh-category-header__finalscreenshot {\n    grid-template: 1fr 1fr / none\n  }\n  .lh-category-headercol--separator {\n    display: none;\n  }\n}\n\n@container lh-container (max-width: 780px) {\n  .lh-category-header__finalscreenshot {\n    grid-template: 1fr 1fr / none\n  }\n  .lh-category-headercol--separator {\n    display: none;\n  }\n}\n\n/**\n* This media query is a temporary fallback for browsers that do not support \\`@container query\\`.\n* TODO: remove this media query when \\`@container query\\` is fully supported by browsers\n* See https://github.com/GoogleChrome/lighthouse/pull/16332\n*/\n@media screen and (max-width: 964px) {\n  .lh-report {\n    margin-left: 0;\n    width: 100%;\n  }\n}\n\n/* 964 fits the min-width of the filmstrip */\n@container lh\
--container (max-width: 964px) {\n  .lh-report {\n    margin-left: 0;\n    width: 100%;\n  }\n}\n\n@media print {\n  body {\n    -webkit-print-color-adjust: exact; /* print background colors */\n  }\n  .lh-container {\n    display: block;\n  }\n  .lh-report {\n    margin-left: 0;\n    padding-top: 0;\n  }\n  .lh-categories {\n    margin-top: 0;\n  }\n  .lh-buttons, .lh-highlighter {\n    /* hide stickyheader marker when printing. crbug.com/41486992 */\n    display: none;\n  }\n}\n\n.lh-table {\n  position: relative;\n  border-collapse: separate;\n  border-spacing: 0;\n  /* Can\'t assign padding to table, so shorten the width instead. */\n  width: calc(100% - var(--audit-description-padding-left) - var(--stackpack-padding-horizontal));\n  border: 1px solid var(--report-border-color-secondary);\n}\n\n.lh-table thead th {\n  position: sticky;\n  top: var(--sticky-header-buffer);\n  z-index: 1;\n  background-color: var(--report-background-color);\n  border-bottom: 1px solid var(--report-border-color-secondary);\n  font-weight: norma\
-l;\n  color: var(--color-gray-600);\n  /* See text-wrapping comment on .lh-container. */\n  word-break: normal;\n}\n\n.lh-row--group {\n  background-color: var(--table-group-header-background-color);\n}\n\n.lh-row--group td {\n  font-weight: bold;\n  font-size: 1.05em;\n  color: var(--table-group-header-text-color);\n}\n\n.lh-row--group td:first-child {\n  display: block;\n  min-width: max-content;\n  font-weight: normal;\n}\n\n.lh-row--group .lh-text {\n  color: inherit;\n  text-decoration: none;\n  display: inline-block;\n}\n\n.lh-row--group a.lh-link:hover {\n  text-decoration: underline;\n}\n\n.lh-row--group .lh-audit__adorn {\n  text-transform: capitalize;\n  font-weight: normal;\n  padding: 2px 3px 1px 3px;\n}\n\n.lh-row--group .lh-audit__adorn1p {\n  color: var(--link-color);\n  border-color: var(--link-color);\n}\n\n.lh-row--group .lh-report-icon--external::before {\n  content: "";\n  background-repeat: no-repeat;\n  width: 14px;\n  height: 16px;\n  opacity: 0.7;\n  display: inline-block;\n  vertical-align: middle;\n}\n\n.lh-row-\
--group .lh-report-icon--external {\n  visibility: hidden;\n}\n\n.lh-row--group:hover .lh-report-icon--external {\n  visibility: visible;\n}\n\n.lh-dark .lh-report-icon--external::before {\n  filter: invert(1);\n}\n\n/** Manages indentation of two-level and three-level nested adjacent rows */\n\n.lh-row--group ~ [data-entity]:not(.lh-row--group) td:first-child {\n  padding-left: 20px;\n}\n\n.lh-row--group ~ [data-entity]:not(.lh-row--group) ~ .lh-sub-item-row td:first-child {\n  margin-left: 20px;\n  padding-left: 10px;\n  border-left: 1px solid #A8C7FA;\n  display: block;\n}\n\n.lh-row--even {\n  background-color: var(--table-group-header-background-color);\n}\n.lh-row--hidden {\n  display: none;\n}\n\n.lh-table th,\n.lh-table td {\n  padding: var(--default-padding);\n}\n\n.lh-table tr {\n  vertical-align: middle;\n}\n\n.lh-table tr:hover {\n  background-color: var(--table-higlight-background-color);\n}\n\n/* Looks unnecessary, but mostly for keeping the <th>s left-aligned */\n.lh-table-column--text,\n.lh-table-column--source-locat\
-ion,\n.lh-table-column--url,\n/* .lh-table-column--thumbnail, */\n/* .lh-table-column--empty,*/\n.lh-table-column--code,\n.lh-table-column--node {\n  text-align: left;\n}\n\n.lh-table-column--code {\n  min-width: 100px;\n}\n\n.lh-table-column--bytes,\n.lh-table-column--timespanMs,\n.lh-table-column--ms,\n.lh-table-column--numeric {\n  text-align: right;\n  word-break: normal;\n}\n\n\n\n.lh-table .lh-table-column--thumbnail {\n  width: var(--image-preview-size);\n}\n\n.lh-table-column--url {\n  min-width: 250px;\n}\n\n.lh-table-column--text {\n  min-width: 80px;\n}\n\n/* Keep columns narrow if they follow the URL column */\n/* 12% was determined to be a decent narrow width, but wide enough for column headings */\n.lh-table-column--url + th.lh-table-column--bytes,\n.lh-table-column--url + .lh-table-column--bytes + th.lh-table-column--bytes,\n.lh-table-column--url + .lh-table-column--ms,\n.lh-table-column--url + .lh-table-column--ms + th.lh-table-column--bytes,\n.lh-table-column--url + .lh-table-column--bytes + th.lh-table-colum\
-n--timespanMs {\n  width: 12%;\n}\n\n/** Tweak styling for tables in insight audits. */\n.lh-audit[id$="-insight"] .lh-table {\n  border: none;\n}\n\n.lh-audit[id$="-insight"] .lh-table thead th {\n  font-weight: bold;\n  color: unset;\n}\n\n.lh-audit[id$="-insight"] .lh-table th,\n.lh-audit[id$="-insight"] .lh-table td {\n  padding: calc(var(--default-padding) / 2);\n}\n\n.lh-audit[id$="-insight"] .lh-table .lh-row--even,\n.lh-audit[id$="-insight"] .lh-table tr:not(.lh-row--group):hover {\n  background-color: unset;\n}\n\n.lh-text__url-host {\n  display: inline;\n}\n\n.lh-text__url-host {\n  margin-left: calc(var(--report-font-size) / 2);\n  opacity: 0.6;\n  font-size: 90%\n}\n\n.lh-thumbnail {\n  object-fit: cover;\n  width: var(--image-preview-size);\n  height: var(--image-preview-size);\n  display: block;\n}\n\n.lh-unknown pre {\n  overflow: scroll;\n  border: solid 1px var(--color-gray-200);\n}\n\n.lh-text__url > a {\n  color: inherit;\n  text-decoration: none;\n}\n\n.lh-text__url > a:hover {\n  text-decoration: underline dotted #9\
-99;\n}\n\n.lh-sub-item-row {\n  margin-left: 20px;\n  margin-bottom: 0;\n  color: var(--color-gray-700);\n}\n\n.lh-sub-item-row td {\n  padding-top: 4px;\n  padding-bottom: 4px;\n  padding-left: 20px;\n}\n\n.lh-sub-item-row .lh-element-screenshot {\n  zoom: 0.6;\n}\n\n/* Chevron\n   https://codepen.io/paulirish/pen/LmzEmK\n */\n.lh-chevron {\n  --chevron-angle: 42deg;\n  /* Edge doesn\'t support transform: rotate(calc(...)), so we define it here */\n  --chevron-angle-right: -42deg;\n  width: var(--chevron-size);\n  height: var(--chevron-size);\n  margin-top: calc((var(--report-line-height) - 12px) / 2);\n}\n\n.lh-chevron__lines {\n  transition: transform 0.4s;\n  transform: translateY(var(--report-line-height));\n}\n.lh-chevron__line {\n stroke: var(--chevron-line-stroke);\n stroke-width: var(--chevron-size);\n stroke-linecap: square;\n transform-origin: 50%;\n transform: rotate(var(--chevron-angle));\n transition: transform 300ms, stroke 300ms;\n}\n\n.lh-expandable-details .lh-chevron__line-right,\n.lh-expandable-details[open] .l\
-h-chevron__line-left {\n transform: rotate(var(--chevron-angle-right));\n}\n\n.lh-expandable-details[open] .lh-chevron__line-right {\n  transform: rotate(var(--chevron-angle));\n}\n\n\n.lh-expandable-details[open]  .lh-chevron__lines {\n transform: translateY(calc(var(--chevron-size) * -1));\n}\n\n.lh-expandable-details[open] {\n  animation: 300ms openDetails forwards;\n  padding-bottom: var(--default-padding);\n}\n\n@keyframes openDetails {\n  from {\n    outline: 1px solid var(--report-background-color);\n  }\n  to {\n   outline: 1px solid;\n   box-shadow: 0 2px 4px rgba(0, 0, 0, .24);\n  }\n}\n\n/**\n* This media query is a temporary fallback for browsers that do not support \\`@container query\\`.\n* TODO: remove this media query when \\`@container query\\` is fully supported by browsers\n* See https://github.com/GoogleChrome/lighthouse/pull/16332\n*/\n@media screen and (max-width: 780px) {\n  /* no black outline if we\'re not confident the entire table can be displayed within bounds */\n  .lh-expandable-details[open] {\n\
-    animation: none;\n  }\n}\n\n@container lh-container (max-width: 780px) {\n  /* no black outline if we\'re not confident the entire table can be displayed within bounds */\n  .lh-expandable-details[open] {\n    animation: none;\n  }\n}\n\n.lh-expandable-details[open] summary, details.lh-clump > summary {\n  border-bottom: 1px solid var(--report-border-color-secondary);\n}\ndetails.lh-clump[open] > summary {\n  border-bottom-width: 0;\n}\n\n\n\ndetails .lh-clump-toggletext--hide,\ndetails[open] .lh-clump-toggletext--show { display: none; }\ndetails[open] .lh-clump-toggletext--hide { display: block;}\n\n\n/* Tooltip */\n.lh-tooltip-boundary {\n  position: relative;\n}\n\n.lh-tooltip {\n  position: absolute;\n  display: none; /* Don\'t retain these layers when not needed */\n  opacity: 0;\n  background: #ffffff;\n  white-space: pre-line; /* Render newlines in the text */\n  min-width: 246px;\n  max-width: 275px;\n  padding: 15px;\n  border-radius: 5px;\n  text-align: initial;\n  line-height: 1.4;\n}\n\n/**\n* This media query is a \
-temporary fallback for browsers that do not support \\`@container query\\`.\n* TODO: remove this media query when \\`@container query\\` is fully supported by browsers\n* See https://github.com/GoogleChrome/lighthouse/pull/16332\n*/\n@media screen and (max-width: 535px) {\n  .lh-tooltip {\n    min-width: 45cqi;\n    padding: 3cqi;\n  }\n}\n\n/* shrink tooltips to not be cutoff on left edge of narrow container\n   45vw is chosen to be ~= width of the left column of metrics\n*/\n@container lh-container (max-width: 535px) {\n  .lh-tooltip {\n    min-width: 45cqi;\n    padding: 3cqi;\n  }\n}\n\n.lh-tooltip-boundary:hover .lh-tooltip {\n  display: block;\n  animation: fadeInTooltip 250ms;\n  animation-fill-mode: forwards;\n  animation-delay: 850ms;\n  bottom: 100%;\n  z-index: 1;\n  will-change: opacity;\n  right: 0;\n  pointer-events: none;\n}\n\n.lh-tooltip::before {\n  content: "";\n  border: solid transparent;\n  border-bottom-color: #fff;\n  border-width: 10px;\n  position: absolute;\n  bottom: -20px;\n  right: 6px;\n  transform:\
- rotate(180deg);\n  pointer-events: none;\n}\n\n@keyframes fadeInTooltip {\n  0% { opacity: 0; }\n  75% { opacity: 1; }\n  100% { opacity: 1;  filter: drop-shadow(1px 0px 1px #aaa) drop-shadow(0px 2px 4px hsla(206, 6%, 25%, 0.15)); pointer-events: auto; }\n}\n\n/* Element screenshot */\n.lh-element-screenshot {\n  float: left;\n  margin-right: 20px;\n}\n.lh-element-screenshot__content {\n  overflow: hidden;\n  min-width: 110px;\n  display: flex;\n  justify-content: center;\n  background-color: var(--report-background-color);\n}\n.lh-element-screenshot__image {\n  position: relative;\n  /* Set by ElementScreenshotRenderer.installFullPageScreenshotCssVariable */\n  background-image: var(--element-screenshot-url);\n  outline: 2px solid #777;\n  background-color: white;\n  background-repeat: no-repeat;\n}\n.lh-element-screenshot__mask {\n  position: absolute;\n  background: #555;\n  opacity: 0.8;\n}\n.lh-element-screenshot__element-marker {\n  position: absolute;\n  outline: 2px solid var(--color-lime-400);\n}\n.lh-element-scre\
-enshot__overlay {\n  position: fixed;\n  top: 0;\n  left: 0;\n  right: 0;\n  bottom: 0;\n  z-index: 2000; /* .lh-topbar is 1000 */\n  background: var(--screenshot-overlay-background);\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  cursor: zoom-out;\n}\n\n.lh-element-screenshot__overlay .lh-element-screenshot {\n  margin-right: 0; /* clearing margin used in thumbnail case */\n  outline: 1px solid var(--color-gray-700);\n}\n\n.lh-screenshot-overlay--enabled .lh-element-screenshot {\n  cursor: zoom-out;\n}\n.lh-screenshot-overlay--enabled .lh-node .lh-element-screenshot {\n  cursor: zoom-in;\n}\n\n\n.lh-meta__items {\n  --meta-icon-size: calc(var(--report-icon-size) * 0.667);\n  padding: var(--default-padding);\n  display: grid;\n  grid-template-columns: 1fr 1fr 1fr;\n  background-color: var(--env-item-background-color);\n  border-radius: 3px;\n  margin: 0 0 var(--default-padding) 0;\n  font-size: 12px;\n  column-gap: var(--default-padding);\n  color: var(--color-gray-700);\n}\n\n.lh-meta__item {\n  dis\
-play: block;\n  list-style-type: none;\n  position: relative;\n  padding: 0 0 0 calc(var(--meta-icon-size) + var(--default-padding) * 2);\n  cursor: unset; /* disable pointer cursor from report-icon */\n}\n\n.lh-meta__item.lh-tooltip-boundary {\n  text-decoration: dotted underline var(--color-gray-500);\n  cursor: help;\n}\n\n.lh-meta__item.lh-report-icon::before {\n  position: absolute;\n  left: var(--default-padding);\n  width: var(--meta-icon-size);\n  height: var(--meta-icon-size);\n}\n\n.lh-meta__item.lh-report-icon:hover::before {\n  opacity: 0.7;\n}\n\n.lh-meta__item .lh-tooltip {\n  color: var(--color-gray-800);\n}\n\n.lh-meta__item .lh-tooltip::before {\n  right: auto; /* Set the tooltip arrow to the leftside */\n  left: 6px;\n}\n\n.lh-meta__item:hover .lh-tooltip {\n  right: auto;\n  left: 6px;\n}\n/**\n* This media query is a temporary fallback for browsers that do not support \\`@container query\\`.\n* TODO: remove this media query when \\`@container query\\` is fully supported by browsers\n* See https://github.com/\
-GoogleChrome/lighthouse/pull/16332\n*/\n@media screen and (max-width: 640px) {\n  .lh-meta__items {\n    grid-template-columns: 1fr 1fr;\n  }\n}\n\n/* Change the grid for narrow container */\n@container lh-container (max-width: 640px) {\n  .lh-meta__items {\n    grid-template-columns: 1fr 1fr;\n  }\n}\n\n/**\n* This media query is a temporary fallback for browsers that do not support \\`@container query\\`.\n* TODO: remove this media query when \\`@container query\\` is fully supported by browsers\n* See https://github.com/GoogleChrome/lighthouse/pull/16332\n*/\n@media screen and (max-width: 535px) {\n  .lh-meta__items {\n    display: block;\n  }\n}\n\n@container lh-container (max-width: 535px) {\n  .lh-meta__items {\n    display: block;\n  }\n}\n\n/* Explodey gauge */\n\n.lh-exp-gauge-component {\n  margin-bottom: 10px;\n}\n\n.lh-exp-gauge-component circle {\n  stroke: currentcolor;\n  r: var(--radius);\n}\n\n.lh-exp-gauge-component text {\n  font-size: calc(var(--radius) * 0.2);\n}\n\n.lh-exp-gauge-component .lh-exp-gauge {\n  margin:\
- 0 auto;\n  width: 225px;\n  stroke-width: var(--stroke-width);\n  stroke-linecap: round;\n\n  /* for better rendering perf */\n  contain: strict;\n  height: 225px;\n  will-change: transform;\n}\n.lh-exp-gauge-component .lh-exp-gauge--faded {\n  opacity: 0.1;\n}\n.lh-exp-gauge-component .lh-exp-gauge__wrapper {\n  font-family: var(--report-font-family-monospace);\n  text-align: center;\n  text-decoration: none;\n  transition: .3s;\n}\n.lh-exp-gauge-component .lh-exp-gauge__wrapper--pass {\n  color: var(--color-pass);\n}\n.lh-exp-gauge-component .lh-exp-gauge__wrapper--average {\n  color: var(--color-average);\n}\n.lh-exp-gauge-component .lh-exp-gauge__wrapper--fail {\n  color: var(--color-fail);\n}\n.lh-exp-gauge-component .state--expanded {\n  transition: color .3s;\n}\n.lh-exp-gauge-component .state--highlight {\n  color: var(--color-highlight);\n}\n.lh-exp-gauge-component .lh-exp-gauge__svg-wrapper {\n  display: flex;\n  flex-direction: column-reverse;\n}\n\n.lh-exp-gauge-component .lh-exp-gauge__label {\n  fill: var(--re\
-port-text-color);\n  font-family: var(--report-font-family);\n  font-size: 12px;\n}\n\n.lh-exp-gauge-component .lh-exp-gauge__cutout {\n  opacity: .999;\n  transition: opacity .3s;\n}\n.lh-exp-gauge-component .state--highlight .lh-exp-gauge__cutout {\n  opacity: 0;\n}\n\n.lh-exp-gauge-component .lh-exp-gauge__inner {\n  color: inherit;\n}\n.lh-exp-gauge-component .lh-exp-gauge__base {\n  fill: currentcolor;\n}\n\n\n.lh-exp-gauge-component .lh-exp-gauge__arc {\n  fill: none;\n  transition: opacity .3s;\n}\n.lh-exp-gauge-component .lh-exp-gauge__arc--metric {\n  color: var(--metric-color);\n  stroke-dashoffset: var(--metric-offset);\n  opacity: 0.3;\n}\n.lh-exp-gauge-component .lh-exp-gauge-hovertarget {\n  color: currentcolor;\n  opacity: 0.001;\n  stroke-linecap: butt;\n  stroke-width: 24;\n  /* hack. move the hover target out of the center. ideally i tweak the r instead but that rquires considerably more math. */\n  transform: scale(1.15);\n}\n.lh-exp-gauge-component .lh-exp-gauge__arc--metric.lh-exp-gauge--miniarc {\n  op\
-acity: 0;\n  stroke-dasharray: 0 calc(var(--circle-meas) * var(--radius));\n  transition: 0s .005s;\n}\n.lh-exp-gauge-component .state--expanded .lh-exp-gauge__arc--metric.lh-exp-gauge--miniarc {\n  opacity: .999;\n  stroke-dasharray: var(--metric-array);\n  transition: 0.3s; /*  calc(.005s + var(--i)*.05s); entrace animation */\n}\n.lh-exp-gauge-component .state--expanded .lh-exp-gauge__inner .lh-exp-gauge__arc {\n  opacity: 0;\n}\n\n\n.lh-exp-gauge-component .lh-exp-gauge__percentage {\n  text-anchor: middle;\n  dominant-baseline: middle;\n  opacity: .999;\n  font-size: calc(var(--radius) * 0.625);\n  transition: opacity .3s ease-in;\n}\n.lh-exp-gauge-component .state--highlight .lh-exp-gauge__percentage {\n  opacity: 0;\n}\n\n.lh-exp-gauge-component .lh-exp-gauge__wrapper--fail .lh-exp-gauge__percentage {\n  fill: var(--color-fail);\n}\n.lh-exp-gauge-component .lh-exp-gauge__wrapper--average .lh-exp-gauge__percentage {\n  fill: var(--color-average);\n}\n.lh-exp-gauge-component .lh-exp-gauge__wrapper--pass .lh-exp\
--gauge__percentage {\n  fill: var(--color-pass);\n}\n\n.lh-exp-gauge-component .lh-cover {\n  fill: none;\n  opacity: .001;\n  pointer-events: none;\n}\n.lh-exp-gauge-component .state--expanded .lh-cover {\n  pointer-events: auto;\n}\n\n.lh-exp-gauge-component .metric {\n  transform: scale(var(--scale-initial));\n  opacity: 0;\n  transition: transform .1s .2s ease-out,  opacity .3s ease-out;\n  pointer-events: none;\n}\n.lh-exp-gauge-component .metric text {\n  pointer-events: none;\n}\n.lh-exp-gauge-component .metric__value {\n  fill: currentcolor;\n  opacity: 0;\n  transition: opacity 0.2s;\n}\n.lh-exp-gauge-component .state--expanded .metric {\n  transform: scale(1);\n  opacity: .999;\n  transition: transform .3s ease-out,  opacity .3s ease-in,  stroke-width .1s ease-out;\n  transition-delay: calc(var(--i)*.05s);\n  pointer-events: auto;\n}\n.lh-exp-gauge-component .state--highlight .metric {\n  opacity: .3;\n}\n.lh-exp-gauge-component .state--highlight .metric--highlight {\n  opacity: .999;\n  stroke-width: calc(1.5*var\
-(--stroke-width));\n}\n.lh-exp-gauge-component .state--highlight .metric--highlight .metric__value {\n  opacity: 0.999;\n}\n\n\n/*\n the initial first load peek\n*/\n.lh-exp-gauge-component .lh-exp-gauge__bg {  /* needed for the use zindex stacking w/ transparency */\n  fill: var(--report-background-color);\n  stroke: var(--report-background-color);\n}\n.lh-exp-gauge-component .state--peek .metric {\n  transition-delay: 0ms;\n  animation: peek var(--peek-dur) cubic-bezier(0.46, 0.03, 0.52, 0.96);\n  animation-fill-mode: forwards;\n}\n.lh-exp-gauge-component .state--peek .lh-exp-gauge__inner .lh-exp-gauge__arc {\n  opacity: 1;\n}\n.lh-exp-gauge-component .state--peek .lh-exp-gauge__arc.lh-exp-gauge--faded {\n  opacity: 0.3; /* just a tad stronger cuz its fighting with a big solid arg */\n}\n/* do i need to set expanded and override this? */\n.lh-exp-gauge-component .state--peek .lh-exp-gauge__arc--metric.lh-exp-gauge--miniarc {\n  transition: opacity 0.3s;\n}\n.lh-exp-gauge-component .state--peek {\n  color: unset;\n\
-}\n.lh-exp-gauge-component .state--peek .metric__label {\n  display: none;\n}\n\n.lh-exp-gauge-component .metric__label {\n  fill: var(--report-text-color);\n}\n\n@keyframes peek {\n  /* biggest it should go is 0.92. smallest is 0.8 */\n  0% {\n    transform: scale(0.8);\n    opacity: 0.8;\n  }\n\n  50% {\n    transform: scale(0.92);\n    opacity: 1;\n  }\n\n  100% {\n    transform: scale(0.8);\n    opacity: 0.8;\n  }\n}\n\n.lh-exp-gauge-component .wrapper {\n  width: 620px;\n}\n\n/*# sourceURL=report-styles.css */\n`),e.append(t),e}function dt(o){let e=o.createFragment(),t=o.createElement("style");t.append(`\n    .lh-topbar {\n      position: sticky;\n      top: 0;\n      left: 0;\n      right: 0;\n      z-index: 1000;\n      display: flex;\n      align-items: center;\n      height: var(--topbar-height);\n      padding: var(--topbar-padding);\n      font-size: var(--report-font-size-secondary);\n      background-color: var(--topbar-background-color);\n      border-bottom: 1px solid var(--color-gray-200);\n    }\n\n    .lh-topbar__l\
-ogo {\n      width: var(--topbar-logo-size);\n      height: var(--topbar-logo-size);\n      user-select: none;\n      flex: none;\n    }\n\n    .lh-topbar__url {\n      margin: var(--topbar-padding);\n      text-decoration: none;\n      color: var(--report-text-color);\n      text-overflow: ellipsis;\n      overflow: hidden;\n      white-space: nowrap;\n    }\n\n    .lh-tools {\n      display: flex;\n      align-items: center;\n      margin-left: auto;\n      will-change: transform;\n      min-width: var(--report-icon-size);\n    }\n    .lh-tools__button {\n      width: var(--report-icon-size);\n      min-width: 24px;\n      height: var(--report-icon-size);\n      cursor: pointer;\n      margin-right: 5px;\n      /* This is actually a button element, but we want to style it like a transparent div. */\n      display: flex;\n      background: none;\n      color: inherit;\n      border: none;\n      padding: 0;\n      font: inherit;\n    }\n    .lh-tools__button svg {\n      fill: var(--tools-icon-color);\n    }\n    .lh-dark .\
-lh-tools__button svg {\n      filter: invert(1);\n    }\n    .lh-tools__button.lh-active + .lh-tools__dropdown {\n      opacity: 1;\n      clip: rect(-1px, 194px, 270px, -3px);\n      visibility: visible;\n    }\n    .lh-tools__dropdown {\n      position: absolute;\n      background-color: var(--report-background-color);\n      border: 1px solid var(--report-border-color);\n      border-radius: 3px;\n      padding: calc(var(--default-padding) / 2) 0;\n      cursor: pointer;\n      top: 36px;\n      right: 0;\n      box-shadow: 1px 1px 3px #ccc;\n      min-width: 125px;\n      clip: rect(0, 164px, 0, 0);\n      visibility: hidden;\n      opacity: 0;\n      transition: all 200ms cubic-bezier(0,0,0.2,1);\n    }\n    .lh-tools__dropdown a {\n      color: currentColor;\n      text-decoration: none;\n      white-space: nowrap;\n      padding: 0 6px;\n      line-height: 2;\n    }\n    .lh-tools__dropdown a:hover,\n    .lh-tools__dropdown a:focus {\n      background-color: var(--color-gray-200);\n      outline: none;\n    }\n   \
- /* save-gist option hidden in report. */\n    .lh-tools__dropdown a[data-action=\'save-gist\'] {\n      display: none;\n    }\n\n    .lh-locale-selector {\n      width: 100%;\n      color: var(--report-text-color);\n      background-color: var(--locale-selector-background-color);\n      padding: 2px;\n    }\n    .lh-tools-locale {\n      display: flex;\n      align-items: center;\n      flex-direction: row-reverse;\n    }\n    .lh-tools-locale__selector-wrapper {\n      transition: opacity 0.15s;\n      opacity: 0;\n      max-width: 200px;\n    }\n    .lh-button.lh-tool-locale__button {\n      height: var(--topbar-height);\n      color: var(--tools-icon-color);\n      padding: calc(var(--default-padding) / 2);\n    }\n    .lh-tool-locale__button.lh-active + .lh-tools-locale__selector-wrapper {\n      opacity: 1;\n      clip: rect(-1px, 255px, 242px, -3px);\n      visibility: visible;\n      margin: 0 4px;\n    }\n\n    /**\n    * This media query is a temporary fallback for browsers that do not support \\`@container quer\
-y\\`.\n    * TODO: remove this media query when \\`@container query\\` is fully supported by browsers\n    * See https://github.com/GoogleChrome/lighthouse/pull/16332\n    */\n    @media screen and (max-width: 964px) {\n      .lh-tools__dropdown {\n        right: 0;\n        left: initial;\n      }\n    }\n\n    @container lh-container (max-width: 964px) {\n      .lh-tools__dropdown {\n        right: 0;\n        left: initial;\n      }\n    }\n\n    @media print {\n      .lh-topbar {\n        position: static;\n        margin-left: 0;\n      }\n\n      .lh-tools__dropdown {\n        display: none;\n      }\n    }\n  `),e.append(t);let n=o.createElement("div","lh-topbar"),r=o.createElementNS("http://www.w3.org/2000/svg","svg","lh-topbar__logo");r.setAttribute("role","img"),r.setAttribute("title","Lighthouse logo"),r.setAttribute("fill","none"),r.setAttribute("xmlns","http://www.w3.org/2000/svg"),r.setAttribute("viewBox","0 0 48 48");let i=o.createElementNS("http://www.w3.org/2000/svg","path");i.setAttribute("d","m14 \
-7 10-7 10 7v10h5v7h-5l5 24H9l5-24H9v-7h5V7Z"),i.setAttribute("fill","#F63");let a=o.createElementNS("http://www.w3.org/2000/svg","path");a.setAttribute("d","M31.561 24H14l-1.689 8.105L31.561 24ZM18.983 48H9l1.022-4.907L35.723 32.27l1.663 7.98L18.983 48Z"),a.setAttribute("fill","#FFA385");let l=o.createElementNS("http://www.w3.org/2000/svg","path");l.setAttribute("fill","#FF3"),l.setAttribute("d","M20.5 10h7v7h-7z"),r.append(" ",i," ",a," ",l," ");let s=o.createElement("a","lh-topbar__url");s.setAttribute("href",""),s.setAttribute("target","_blank"),s.setAttribute("rel","noopener");let c=o.createElement("div","lh-tools"),d=o.createElement("div","lh-tools-locale lh-hidden"),h=o.createElement("button","lh-button lh-tool-locale__button");h.setAttribute("id","lh-button__swap-locales"),h.setAttribute("title","Show Language Picker"),h.setAttribute("aria-label","Toggle language picker"),h.setAttribute("aria-haspopup","menu"),h.setAttribute("aria-expanded","false"),h.setAttribute("aria-controls\
-","lh-tools-locale__selector-wrapper");let p=o.createElementNS("http://www.w3.org/2000/svg","svg");p.setAttribute("width","20px"),p.setAttribute("height","20px"),p.setAttribute("viewBox","0 0 24 24"),p.setAttribute("fill","currentColor");let g=o.createElementNS("http://www.w3.org/2000/svg","path");g.setAttribute("d","M0 0h24v24H0V0z"),g.setAttribute("fill","none");let b=o.createElementNS("http://www.w3.org/2000/svg","path");b.setAttribute("d","M12.87 15.07l-2.54-2.51.03-.03c1.74-1.94 2.98-4.17 3.71-6.53H17V4h-7V2H8v2H1v1.99h11.17C11.5 7.92 10.44 9.75 9 11.35 8.07 10.32 7.3 9.19 6.69 8h-2c.73 1.63 1.73 3.17 2.98 4.56l-5.09 5.02L4 19l5-5 3.11 3.11.76-2.04zM18.5 10h-2L12 22h2l1.12-3h4.75L21 22h2l-4.5-12zm-2.62 7l1.62-4.33L19.12 17h-3.24z"),p.append(g,b),h.append(" ",p," ");let w=o.createElement("div","lh-tools-locale__selector-wrapper");w.setAttribute("id","lh-tools-locale__selector-wrapper"),w.setAttribute("role","menu"),w.setAttribute("aria-labelledby","lh-button__swap-locales"),w.setAt\
-tribute("aria-hidden","true"),w.append(" "," "),d.append(" ",h," ",w," ");let f=o.createElement("button","lh-tools__button");f.setAttribute("id","lh-tools-button"),f.setAttribute("title","Tools menu"),f.setAttribute("aria-label","Toggle report tools menu"),f.setAttribute("aria-haspopup","menu"),f.setAttribute("aria-expanded","false"),f.setAttribute("aria-controls","lh-tools-dropdown");let u=o.createElementNS("http://www.w3.org/2000/svg","svg");u.setAttribute("width","100%"),u.setAttribute("height","100%"),u.setAttribute("viewBox","0 0 24 24");let v=o.createElementNS("http://www.w3.org/2000/svg","path");v.setAttribute("d","M0 0h24v24H0z"),v.setAttribute("fill","none");let _=o.createElementNS("http://www.w3.org/2000/svg","path");_.setAttribute("d","M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"),u.append(" ",v," ",_," "),f.append(" ",u," ");let x=o.createElement("div","lh-tools__dropdown")\
-;x.setAttribute("id","lh-tools-dropdown"),x.setAttribute("role","menu"),x.setAttribute("aria-labelledby","lh-tools-button");let S=o.createElement("a","lh-report-icon lh-report-icon--print");S.setAttribute("role","menuitem"),S.setAttribute("tabindex","-1"),S.setAttribute("href","#"),S.setAttribute("data-i18n","dropdownPrintSummary"),S.setAttribute("data-action","print-summary");let A=o.createElement("a","lh-report-icon lh-report-icon--print");A.setAttribute("role","menuitem"),A.setAttribute("tabindex","-1"),A.setAttribute("href","#"),A.setAttribute("data-i18n","dropdownPrintExpanded"),A.setAttribute("data-action","print-expanded");let z=o.createElement("a","lh-report-icon lh-report-icon--copy");z.setAttribute("role","menuitem"),z.setAttribute("tabindex","-1"),z.setAttribute("href","#"),z.setAttribute("data-i18n","dropdownCopyJSON"),z.setAttribute("data-action","copy");let M=o.createElement("a","lh-report-icon lh-report-icon--download lh-hidden");M.setAttribute("role","menuitem"),M.setAt\
-tribute("tabindex","-1"),M.setAttribute("href","#"),M.setAttribute("data-i18n","dropdownSaveHTML"),M.setAttribute("data-action","save-html");let $=o.createElement("a","lh-report-icon lh-report-icon--download");$.setAttribute("role","menuitem"),$.setAttribute("tabindex","-1"),$.setAttribute("href","#"),$.setAttribute("data-i18n","dropdownSaveJSON"),$.setAttribute("data-action","save-json");let R=o.createElement("a","lh-report-icon lh-report-icon--open");R.setAttribute("role","menuitem"),R.setAttribute("tabindex","-1"),R.setAttribute("href","#"),R.setAttribute("data-i18n","dropdownViewer"),R.setAttribute("data-action","open-viewer");let N=o.createElement("a","lh-report-icon lh-report-icon--open");N.setAttribute("role","menuitem"),N.setAttribute("tabindex","-1"),N.setAttribute("href","#"),N.setAttribute("data-i18n","dropdownSaveGist"),N.setAttribute("data-action","save-gist");let D=o.createElement("a","lh-report-icon lh-report-icon--open lh-hidden");D.setAttribute("role","menuitem"),D.set\
-Attribute("tabindex","-1"),D.setAttribute("href","#"),D.setAttribute("data-i18n","dropdownViewUnthrottledTrace"),D.setAttribute("data-action","view-unthrottled-trace");let I=o.createElement("a","lh-report-icon lh-report-icon--dark");return I.setAttribute("role","menuitem"),I.setAttribute("tabindex","-1"),I.setAttribute("href","#"),I.setAttribute("data-i18n","dropdownDarkTheme"),I.setAttribute("data-action","toggle-dark"),x.append(" ",S," ",A," ",z," "," ",M," ",$," ",R," ",N," "," ",D," ",I," "),c.append(" ",d," ",f," ",x," "),n.append(" "," ",r," ",s," ",c," "),e.append(n),e}function ht(o){let e=o.createFragment(),t=o.createElement("div","lh-warnings lh-warnings--toplevel"),n=o.createElement("p","lh-warnings__msg"),r=o.createElement("ul");return t.append(" ",n," ",r," "),e.append(t),e}function be(o,e){switch(e){case"3pFilter":return Ge(o);case"audit":return Be(o);case"categoryHeader":return qe(o);case"chevron":return je(o);case"clump":return We(o);case"crc":return Ke(o);case"crcChain"\
-:return Je(o);case"elementScreenshot":return Ze(o);case"explodeyGauge":return Qe(o);case"footer":return Ye(o);case"fraction":return Xe(o);case"gauge":return et(o);case"heading":return tt(o);case"metric":return nt(o);case"scorescale":return rt(o);case"scoresWrapper":return ot(o);case"snippet":return it(o);case"snippetContent":return at(o);case"snippetHeader":return lt(o);case"snippetLine":return st(o);case"styles":return ct(o);case"topbar":return dt(o);case"warningsToplevel":return ht(o)}throw new Error("unexpected component: "+e)}var ee=class{constructor(e,t){this._document=e,this._lighthouseChannel="unknown",this._componentCache=new Map,this.rootEl=t}createElement(e,t){let n=this._document.createElement(e);if(t)for(let r of t.split(/\\s+/))r&&n.classList.add(r);return n}createElementNS(e,t,n){let r=this._document.createElementNS(e,t);if(n)for(let i of n.split(/\\s+/))i&&r.classList.add(i);return r}createSVGElement(e,t){return this._document.createElementNS("http://www.w3.org/2000/svg",e\
-,t)}createFragment(){return this._document.createDocumentFragment()}createTextNode(e){return this._document.createTextNode(e)}createChildOf(e,t,n){let r=this.createElement(t,n);return e.append(r),r}createComponent(e){let t=this._componentCache.get(e);if(t){let r=t.cloneNode(!0);return this.findAll("style",r).forEach(i=>i.remove()),r}return t=be(this,e),this._componentCache.set(e,t),t.cloneNode(!0)}clearComponentCache(){this._componentCache.clear()}convertMarkdownLinkSnippets(e,t={}){let n=this.createElement("span");for(let r of E.splitMarkdownLink(e)){let i=r.text.includes("`")?this.convertMarkdownCodeSnippets(r.text):r.text;if(!r.isLink){n.append(i);continue}let a=new URL(r.linkHref);(["https://developers.google.com","https://web.dev","https://developer.chrome.com"].includes(a.origin)||t.alwaysAppendUtmSource)&&(a.searchParams.set("utm_source","lighthouse"),a.searchParams.set("utm_medium",this._lighthouseChannel));let s=this.createElement("a");s.rel="noopener",s.target="_blank",s.appe\
-nd(i),this.safelySetHref(s,a.href),n.append(s)}return n}safelySetHref(e,t){if(t=t||"",t.startsWith("#")){e.href=t;return}let n=["https:","http:"],r;try{r=new URL(t)}catch{}r&&n.includes(r.protocol)&&(e.href=r.href)}safelySetBlobHref(e,t){if(t.type!=="text/html"&&t.type!=="application/json")throw new Error("Unsupported blob type");let n=URL.createObjectURL(t);e.href=n}convertMarkdownCodeSnippets(e){let t=this.createElement("span");for(let n of E.splitMarkdownCodeSpans(e))if(n.isCode){let r=this.createElement("code");r.textContent=n.text,t.append(r)}else t.append(this._document.createTextNode(n.text));return t}setLighthouseChannel(e){this._lighthouseChannel=e}document(){return this._document}isDevTools(){return!!this._document.querySelector(".lh-devtools")}find(e,t=this.rootEl??this._document){let n=this.maybeFind(e,t);if(n===null)throw new Error(`query ${e} not found`);return n}maybeFind(e,t=this.rootEl??this._document){return t.querySelector(e)}findAll(e,t){return Array.from(t.querySel\
-ectorAll(e))}fireEventOn(e,t=this._document,n){let r=new CustomEvent(e,n?{detail:n}:void 0);t.dispatchEvent(r)}saveFile(e,t){let n=this.createElement("a");n.download=t,this.safelySetBlobHref(n,e),this._document.body.append(n),n.click(),this._document.body.removeChild(n),setTimeout(()=>URL.revokeObjectURL(n.href),500)}};var _e=0,m=class o{static i18n=null;static strings={};static reportJson=null;static apply(e){o.strings={...we,...e.providedStrings},o.i18n=e.i18n,o.reportJson=e.reportJson}static getUniqueSuffix(){return _e++}static resetUniqueSuffix(){_e=0}};var ye="data:image/jpeg;base64,";function xe(o){o.configSettings.locale||(o.configSettings.locale="en"),o.configSettings.formFactor||(o.configSettings.formFactor=o.configSettings.emulatedFormFactor),o.finalDisplayedUrl=E.getFinalDisplayedUrl(o),o.mainDocumentUrl=E.getMainDocumentUrl(o);for(let n of Object.values(o.audits))if((n.scoreDisplayMode==="not_applicable"||n.scoreDisplayMode==="not-applicable")&&(n.scoreDisplayMode="notAppli\
-cable"),n.scoreDisplayMode==="informative"&&(n.score=1),n.details){if((n.details.type===void 0||n.details.type==="diagnostic")&&(n.details.type="debugdata"),n.details.type==="filmstrip")for(let r of n.details.items)r.data.startsWith(ye)||(r.data=ye+r.data);if(n.details.type==="table")for(let r of n.details.headings){let{itemType:i,text:a}=r;i!==void 0&&(r.valueType=i,delete r.itemType),a!==void 0&&(r.label=a,delete r.text);let l=r.subItemsHeading?.itemType;r.subItemsHeading&&l!==void 0&&(r.subItemsHeading.valueType=l,delete r.subItemsHeading.itemType)}if(n.id==="third-party-summary"&&(n.details.type==="opportunity"||n.details.type==="table")){let{headings:r,items:i}=n.details;if(r[0].valueType==="link"){r[0].valueType="text";for(let a of i)typeof a.entity=="object"&&a.entity.type==="link"&&(a.entity=a.entity.text);n.details.isEntityGrouped=!0}}}let[e]=o.lighthouseVersion.split(".").map(Number),t=o.categories.performance;if(t){if(e<9){o.categoryGroups||(o.categoryGroups={}),o.categoryGr\
-oups.hidden={title:""};for(let n of t.auditRefs)n.group?n.group==="load-opportunities"&&(n.group="diagnostics"):n.group="hidden"}else if(e<12)for(let n of t.auditRefs)n.group||(n.group="diagnostics")}if(e<12&&t){let n=new Map;for(let r of t.auditRefs){let i=r.relevantAudits;if(!(!i||!r.acronym))for(let a of i){let l=n.get(a)||[];l.push(r.acronym),n.set(a,l)}}for(let[r,i]of n){if(!i.length)continue;let a=o.audits[r];if(a&&!a.metricSavings){a.metricSavings={};for(let l of i)a.metricSavings[l]=0}}}if(o.environment||(o.environment={benchmarkIndex:0,networkUserAgent:o.userAgent,hostUserAgent:o.userAgent}),o.configSettings.screenEmulation||(o.configSettings.screenEmulation={width:-1,height:-1,deviceScaleFactor:-1,mobile:/mobile/i.test(o.environment.hostUserAgent),disabled:!1}),o.i18n||(o.i18n={}),o.audits["full-page-screenshot"]){let n=o.audits["full-page-screenshot"].details;n?o.fullPageScreenshot={screenshot:n.screenshot,nodes:n.nodes}:o.fullPageScreenshot=null,delete o.audits["full-page-s\
-creenshot"]}}var O=E.RATINGS,k=class o{static prepareReportResult(e){let t=JSON.parse(JSON.stringify(e));xe(t);for(let r of Object.values(t.audits))r.details&&(r.details.type==="opportunity"||r.details.type==="table")&&!r.details.isEntityGrouped&&t.entities&&o.classifyEntities(t.entities,r.details);if(typeof t.categories!="object")throw new Error("No categories provided.");let n=new Map;for(let r of Object.values(t.categories))r.auditRefs.forEach(i=>{i.acronym&&n.set(i.acronym,i)}),r.auditRefs.forEach(i=>{let a=t.audits[i.id];i.result=a;let l=Object.keys(i.result.metricSavings||{});if(l.length){i.relevantMetrics=[];for(let s of l){let c=n.get(s);c&&i.relevantMetrics.push(c)}}if(t.stackPacks){let s=[i.id,...i.result.replacesAudits??[]];t.stackPacks.forEach(c=>{let d=s.find(h=>c.descriptions[h]);d&&c.descriptions[d]&&(i.stackPacks=i.stackPacks||[],i.stackPacks.push({title:c.title,iconDataURL:c.iconDataURL,description:c.descriptions[d]}))})}});return t}static getUrlLocatorFn(e){let t=e.fi\
-nd(r=>r.valueType==="url")?.key;if(t&&typeof t=="string")return r=>{let i=r[t];if(typeof i=="string")return i};let n=e.find(r=>r.valueType==="source-location")?.key;if(n)return r=>{let i=r[n];if(typeof i=="object"&&i.type==="source-location")return i.url}}static classifyEntities(e,t){let{items:n,headings:r}=t;if(!n.length||n.some(a=>a.entity))return;let i=o.getUrlLocatorFn(r);if(i)for(let a of n){let l=i(a);if(!l)continue;let s="";try{s=E.parseURL(l).origin}catch{}if(!s)continue;let c=e.find(d=>d.origins.includes(s));c&&(a.entity=c.name)}}static getTableItemSortComparator(e){return(t,n)=>{for(let r of e){let i=t[r],a=n[r];if((typeof i!=typeof a||!["number","string"].includes(typeof i))&&console.warn(`Warning: Attempting to sort unsupported value type: ${r}.`),typeof i=="number"&&typeof a=="number"&&i!==a)return a-i;if(typeof i=="string"&&typeof a=="string"&&i!==a)return i.localeCompare(a)}return 0}}static getEmulationDescriptions(e){let t,n,r,i=e.throttling,a=m.i18n,l=m.strings;switch(\
-e.throttlingMethod){case"provided":r=n=t=l.throttlingProvided;break;case"devtools":{let{cpuSlowdownMultiplier:p,requestLatencyMs:g}=i;t=`${a.formatNumber(p)}x slowdown (DevTools)`,n=`${a.formatMilliseconds(g)} HTTP RTT, ${a.formatKbps(i.downloadThroughputKbps)} down, ${a.formatKbps(i.uploadThroughputKbps)} up (DevTools)`,r=g===150*3.75&&i.downloadThroughputKbps===1.6*1024*.9&&i.uploadThroughputKbps===750*.9?l.runtimeSlow4g:l.runtimeCustom;break}case"simulate":{let{cpuSlowdownMultiplier:p,rttMs:g,throughputKbps:b}=i;t=`${a.formatNumber(p)}x slowdown (Simulated)`,n=`${a.formatMilliseconds(g)} TCP RTT, ${a.formatKbps(b)} throughput (Simulated)`,r=g===150&&b===1.6*1024?l.runtimeSlow4g:l.runtimeCustom;break}default:r=t=n=l.runtimeUnknown}let s=e.channel==="devtools"?!1:e.screenEmulation.disabled,c=e.channel==="devtools"?e.formFactor==="mobile":e.screenEmulation.mobile,d=l.runtimeMobileEmulation;s?d=l.runtimeNoEmulation:c||(d=l.runtimeDesktopEmulation);let h=s?void 0:`${e.screenEmulation.wid\
-th}x${e.screenEmulation.height}, DPR ${e.screenEmulation.deviceScaleFactor}`;return{deviceEmulation:d,screenEmulation:h,cpuThrottling:t,networkThrottling:n,summary:r}}static showAsPassed(e){switch(e.scoreDisplayMode){case"manual":case"notApplicable":return!0;case"error":case"informative":return!1;case"numeric":case"binary":default:return Number(e.score)>=O.PASS.minScore}}static calculateRating(e,t){if(t==="manual"||t==="notApplicable")return O.PASS.label;if(t==="error")return O.ERROR.label;if(e===null)return O.FAIL.label;let n=O.FAIL.label;return e>=O.PASS.minScore?n=O.PASS.label:e>=O.AVERAGE.minScore&&(n=O.AVERAGE.label),n}static calculateCategoryFraction(e){let t=0,n=0,r=0,i=0;for(let a of e.auditRefs){let l=o.showAsPassed(a.result);if(!(a.group==="hidden"||a.result.scoreDisplayMode==="manual"||a.result.scoreDisplayMode==="notApplicable")){if(a.result.scoreDisplayMode==="informative"){l||++r;continue}++t,i+=a.weight,l&&n++}}return{numPassed:n,numPassableAudits:t,numInformative:r,tota\
-lWeight:i}}static isPluginCategory(e){return e.startsWith("lighthouse-plugin-")}static shouldDisplayAsFraction(e){return e==="timespan"||e==="snapshot"}},we={varianceDisclaimer:"Values are estimated and may vary. The [performance score is calculated](https://developer.chrome.com/docs/lighthouse/performance/performance-scoring/) directly from these metrics.",calculatorLink:"See calculator.",showRelevantAudits:"Show audits relevant to:",opportunityResourceColumnLabel:"Opportunity",opportunitySavingsColumnLabel:"Estimated Savings",errorMissingAuditInfo:"Report error: no audit information",errorLabel:"Error!",warningHeader:"Warnings: ",warningAuditsGroupTitle:"Passed audits but with warnings",passedAuditsGroupTitle:"Passed audits",notApplicableAuditsGroupTitle:"Not applicable",manualAuditsGroupTitle:"Additional items to manually check",toplevelWarningsMessage:"There were issues affecting this run of Lighthouse:",crcInitialNavigation:"Initial Navigation",crcLongestDurationLabel:"Maximum cri\
-tical path latency:",snippetExpandButtonLabel:"Expand snippet",snippetCollapseButtonLabel:"Collapse snippet",lsPerformanceCategoryDescription:"[Lighthouse](https://developers.google.com/web/tools/lighthouse/) analysis of the current page on an emulated mobile network. Values are estimated and may vary.",labDataTitle:"Lab Data",thirdPartyResourcesLabel:"Show 3rd-party resources",viewTreemapLabel:"View Treemap",viewTraceLabel:"View Trace",dropdownPrintSummary:"Print Summary",dropdownPrintExpanded:"Print Expanded",dropdownCopyJSON:"Copy JSON",dropdownSaveHTML:"Save as HTML",dropdownSaveJSON:"Save as JSON",dropdownViewer:"Open in Viewer",dropdownSaveGist:"Save as Gist",dropdownDarkTheme:"Toggle Dark Theme",dropdownViewUnthrottledTrace:"View Unthrottled Trace",runtimeSettingsDevice:"Device",runtimeSettingsNetworkThrottling:"Network throttling",runtimeSettingsCPUThrottling:"CPU throttling",runtimeSettingsUANetwork:"User agent (network)",runtimeSettingsBenchmark:"Unthrottled CPU/Memory Power"\
-,runtimeSettingsAxeVersion:"Axe version",runtimeSettingsScreenEmulation:"Screen emulation",footerIssue:"File an issue",runtimeNoEmulation:"No emulation",runtimeMobileEmulation:"Emulated Moto G Power",runtimeDesktopEmulation:"Emulated Desktop",runtimeUnknown:"Unknown",runtimeSingleLoad:"Single page session",runtimeAnalysisWindow:"Initial page load",runtimeAnalysisWindowTimespan:"User interactions timespan",runtimeAnalysisWindowSnapshot:"Point-in-time snapshot",runtimeSingleLoadTooltip:"This data is taken from a single page session, as opposed to field data summarizing many sessions.",throttlingProvided:"Provided by environment",show:"Show",hide:"Hide",expandView:"Expand view",collapseView:"Collapse view",runtimeSlow4g:"Slow 4G throttling",runtimeCustom:"Custom throttling",firstPartyChipLabel:"1st party",openInANewTabTooltip:"Open in a new tab",unattributable:"Unattributable",unscoredLabel:"Unscored",unscoredTitle:"This audit does not contribute to the overall category score."};var G=cla\
-ss{constructor(e,t){this.dom=e,this.detailsRenderer=t}get _clumpTitles(){return{warning:m.strings.warningAuditsGroupTitle,manual:m.strings.manualAuditsGroupTitle,passed:m.strings.passedAuditsGroupTitle,notApplicable:m.strings.notApplicableAuditsGroupTitle}}renderAudit(e){let t=m.strings,n=this.dom.createComponent("audit"),r=this.dom.find("div.lh-audit",n);r.id=e.result.id;let i=e.result.scoreDisplayMode;e.result.displayValue&&(this.dom.find(".lh-audit__display-text",r).textContent=e.result.displayValue);let a=this.dom.find(".lh-audit__title",r);a.append(this.dom.convertMarkdownCodeSnippets(e.result.title));let l=this.dom.find(".lh-audit__description",r);l.append(this.dom.convertMarkdownLinkSnippets(e.result.description));for(let p of e.relevantMetrics||[]){let g=this.dom.createChildOf(l,"span","lh-audit__adorn");g.title=`Relevant to ${p.result.title}`,g.textContent=p.acronym||p.id}if(e.weight===0){let p=this.dom.createChildOf(l,"span","lh-audit__adorn");p.title=m.strings.unscoredTitle,\
-p.textContent=m.strings.unscoredLabel}e.stackPacks&&e.stackPacks.forEach(p=>{let g=this.dom.createElement("img","lh-audit__stackpack__img");g.src=p.iconDataURL,g.alt=p.title;let b=this.dom.convertMarkdownLinkSnippets(p.description,{alwaysAppendUtmSource:!0}),w=this.dom.createElement("div","lh-audit__stackpack");w.append(g,b),this.dom.find(".lh-audit__stackpacks",r).append(w)});let s=this.dom.find("details",r);if(e.result.details){let p=this.detailsRenderer.render(e.result.details);p&&(p.classList.add("lh-details"),s.append(p))}if(this.dom.find(".lh-chevron-container",r).append(this._createChevron()),this._setRatingClass(r,e.result.score,i),e.result.scoreDisplayMode==="error"){r.classList.add("lh-audit--error");let p=this.dom.find(".lh-audit__display-text",r);p.textContent=t.errorLabel,p.classList.add("lh-tooltip-boundary");let g=this.dom.createChildOf(p,"div","lh-tooltip lh-tooltip--error");g.textContent=e.result.errorMessage||t.errorMissingAuditInfo}else if(e.result.explanation){let p\
-=this.dom.createChildOf(a,"div","lh-audit-explanation");p.textContent=e.result.explanation}let c=e.result.warnings;if(!c||c.length===0)return r;let d=this.dom.find("summary",s),h=this.dom.createChildOf(d,"div","lh-warnings");if(this.dom.createChildOf(h,"span").textContent=t.warningHeader,c.length===1)h.append(this.dom.createTextNode(c.join("")));else{let p=this.dom.createChildOf(h,"ul");for(let g of c){let b=this.dom.createChildOf(p,"li");b.textContent=g}}return r}injectFinalScreenshot(e,t,n){let r=t["final-screenshot"];if(!r||r.scoreDisplayMode==="error"||!r.details||r.details.type!=="screenshot")return null;let i=this.dom.createElement("img","lh-final-ss-image"),a=r.details.data;i.src=a,i.alt=r.title;let l=this.dom.find(".lh-category .lh-category-header",e),s=this.dom.createElement("div","lh-category-headercol"),c=this.dom.createElement("div","lh-category-headercol lh-category-headercol--separator"),d=this.dom.createElement("div","lh-category-headercol");s.append(...l.childNodes),s.a\
-ppend(n),d.append(i),l.append(s,c,d),l.classList.add("lh-category-header__finalscreenshot")}_createChevron(){let e=this.dom.createComponent("chevron");return this.dom.find("svg.lh-chevron",e)}_setRatingClass(e,t,n){let r=k.calculateRating(t,n);return e.classList.add(`lh-audit--${n.toLowerCase()}`),n!=="informative"&&e.classList.add(`lh-audit--${r}`),e}renderCategoryHeader(e,t,n){let r=this.dom.createComponent("categoryHeader"),i=this.dom.find(".lh-score__gauge",r),a=this.renderCategoryScore(e,t,n);if(i.append(a),e.description){let l=this.dom.convertMarkdownLinkSnippets(e.description);this.dom.find(".lh-category-header__description",r).append(l)}return r}renderAuditGroup(e){let t=this.dom.createElement("div","lh-audit-group"),n=this.dom.createElement("div","lh-audit-group__header");this.dom.createChildOf(n,"span","lh-audit-group__title").textContent=e.title,t.append(n);let r=null;return e.description&&(r=this.dom.convertMarkdownLinkSnippets(e.description),r.classList.add("lh-audit-group\
-__description","lh-audit-group__footer"),t.append(r)),[t,r]}_renderGroupedAudits(e,t){let n=new Map,r="NotAGroup";n.set(r,[]);for(let a of e){let l=a.group||r,s=n.get(l)||[];s.push(a),n.set(l,s)}let i=[];for(let[a,l]of n){if(a===r){for(let h of l)i.push(this.renderAudit(h));continue}let s=t[a],[c,d]=this.renderAuditGroup(s);for(let h of l)c.insertBefore(this.renderAudit(h),d);c.classList.add(`lh-audit-group--${a}`),i.push(c)}return i}renderUnexpandableClump(e,t){let n=this.dom.createElement("div");return this._renderGroupedAudits(e,t).forEach(i=>n.append(i)),n}renderClump(e,{auditRefsOrEls:t,description:n,openByDefault:r}){let i=this.dom.createComponent("clump"),a=this.dom.find(".lh-clump",i);r&&a.setAttribute("open","");let l=this.dom.find(".lh-audit-group__header",a),s=this._clumpTitles[e];this.dom.find(".lh-audit-group__title",l).textContent=s;let c=this.dom.find(".lh-audit-group__itemcount",a);c.textContent=`(${t.length})`;let d=t.map(p=>p instanceof HTMLElement?p:this.renderAudit(\
-p));a.append(...d);let h=this.dom.find(".lh-audit-group",i);if(n){let p=this.dom.convertMarkdownLinkSnippets(n);p.classList.add("lh-audit-group__description","lh-audit-group__footer"),h.append(p)}return this.dom.find(".lh-clump-toggletext--show",h).textContent=m.strings.show,this.dom.find(".lh-clump-toggletext--hide",h).textContent=m.strings.hide,a.classList.add(`lh-clump--${e.toLowerCase()}`),h}renderCategoryScore(e,t,n){let r;if(n&&k.shouldDisplayAsFraction(n.gatherMode)?r=this.renderCategoryFraction(e):r=this.renderScoreGauge(e,t),n?.omitLabel&&this.dom.find(".lh-gauge__label,.lh-fraction__label",r).remove(),n?.onPageAnchorRendered){let i=this.dom.find("a",r);n.onPageAnchorRendered(i)}return r}renderScoreGauge(e,t){let n=this.dom.createComponent("gauge"),r=this.dom.find("a.lh-gauge__wrapper",n);k.isPluginCategory(e.id)&&r.classList.add("lh-gauge__wrapper--plugin");let i=Number(e.score),a=this.dom.find(".lh-gauge",n),l=this.dom.find("circle.lh-gauge-arc",a);l&&this._setGaugeArc(l,i);\
-let s=Math.round(i*100),c=this.dom.find("div.lh-gauge__percentage",n);return c.textContent=s.toString(),e.score===null&&(c.classList.add("lh-gauge--error"),c.textContent="",c.title=m.strings.errorLabel),e.auditRefs.length===0||this.hasApplicableAudits(e)?r.classList.add(`lh-gauge__wrapper--${k.calculateRating(e.score)}`):(r.classList.add("lh-gauge__wrapper--not-applicable"),c.textContent="-",c.title=m.strings.notApplicableAuditsGroupTitle),this.dom.find(".lh-gauge__label",n).textContent=e.title,n}renderCategoryFraction(e){let t=this.dom.createComponent("fraction"),n=this.dom.find("a.lh-fraction__wrapper",t),{numPassed:r,numPassableAudits:i,totalWeight:a}=k.calculateCategoryFraction(e),l=r/i,s=this.dom.find(".lh-fraction__content",t),c=this.dom.createElement("span");c.textContent=`${r}/${i}`,s.append(c);let d=k.calculateRating(l);return a===0&&(d="null"),n.classList.add(`lh-fraction__wrapper--${d}`),this.dom.find(".lh-fraction__label",t).textContent=e.title,t}hasApplicableAudits(e){retu\
-rn e.auditRefs.some(t=>t.result.scoreDisplayMode!=="notApplicable")}_setGaugeArc(e,t){let n=2*Math.PI*Number(e.getAttribute("r")),r=Number(e.getAttribute("stroke-width")),i=.25*r/n;e.style.transform=`rotate(${-90+i*360}deg)`;let a=t*n-r/2;t===0&&(e.style.opacity="0"),t===1&&(a=n),e.style.strokeDasharray=`${Math.max(a,0)} ${n}`}_auditHasWarning(e){return!!e.result.warnings?.length}_getClumpIdForAuditRef(e){let t=e.result.scoreDisplayMode;return t==="manual"||t==="notApplicable"?t:k.showAsPassed(e.result)?this._auditHasWarning(e)?"warning":"passed":"failed"}render(e,t={},n){let r=this.dom.createElement("div","lh-category");r.id=e.id,r.append(this.renderCategoryHeader(e,t,n));let i=new Map;i.set("failed",[]),i.set("warning",[]),i.set("manual",[]),i.set("passed",[]),i.set("notApplicable",[]);for(let l of e.auditRefs){if(l.group==="hidden")continue;let s=this._getClumpIdForAuditRef(l),c=i.get(s);c.push(l),i.set(s,c)}for(let l of i.values())l.sort((s,c)=>c.weight-s.weight);let a=i.get("faile\
-d")?.length;for(let[l,s]of i){if(s.length===0)continue;if(l==="failed"){let p=this.renderUnexpandableClump(s,t);p.classList.add("lh-clump--failed"),r.append(p);continue}let c=l==="manual"?e.manualDescription:void 0,d=l==="warning"||l==="manual"&&a===0,h=this.renderClump(l,{auditRefsOrEls:s,description:c,openByDefault:d});r.append(h)}return r}};var Y=class{static createSegment(e,t,n,r){let i=e[t],a=Object.keys(e),l=a.indexOf(t)===a.length-1,s=!!i.children&&Object.keys(i.children).length>0,c=Array.isArray(n)?n.slice(0):[];return typeof r<"u"&&c.push(!r),{node:i,isLastChild:l,hasChildren:s,treeMarkers:c}}static createChainNode(e,t,n){let r=e.createComponent("crcChain"),i,a,l,s,c;"request"in t.node?(a=t.node.request.transferSize,l=t.node.request.url,i=(t.node.request.endTime-t.node.request.startTime)*1e3,s=!1):(a=t.node.transferSize,l=t.node.url,i=t.node.navStartToEndTime,s=!0,c=t.node.isLongest);let d=e.find(".lh-crc-node",r);d.setAttribute("title",l),c&&d.classList.add("lh-crc-node__long\
-est");let h=e.find(".lh-crc-node__tree-marker",r);t.treeMarkers.forEach(f=>{let u=f?"lh-tree-marker lh-vert":"lh-tree-marker";h.append(e.createElement("span",u),e.createElement("span","lh-tree-marker"))});let p=t.isLastChild?"lh-tree-marker lh-up-right":"lh-tree-marker lh-vert-right",g=t.hasChildren?"lh-tree-marker lh-horiz-down":"lh-tree-marker lh-right";h.append(e.createElement("span",p),e.createElement("span","lh-tree-marker lh-right"),e.createElement("span",g));let b=n.renderTextURL(l),w=e.find(".lh-crc-node__tree-value",r);if(w.append(b),!t.hasChildren||s){let f=e.createElement("span","lh-crc-node__chain-duration");f.textContent=" - "+m.i18n.formatMilliseconds(i)+", ";let u=e.createElement("span","lh-crc-node__chain-size");u.textContent=m.i18n.formatBytesToKiB(a,.01),w.append(f,u)}return r}static buildTree(e,t,n,r){if(n.append(Q.createChainNode(e,t,r)),t.node.children)for(let i of Object.keys(t.node.children)){let a=Q.createSegment(t.node.children,i,t.treeMarkers,t.isLastChild);Q.\
-buildTree(e,a,n,r)}}static render(e,t,n){let r=e.createComponent("crc"),i=e.find(".lh-crc",r);e.find(".lh-crc-initial-nav",r).textContent=m.strings.crcInitialNavigation,e.find(".lh-crc__longest_duration_label",r).textContent=m.strings.crcLongestDurationLabel,e.find(".lh-crc__longest_duration",r).textContent=m.i18n.formatMilliseconds(t.longestChain.duration);let a=t.chains;for(let l of Object.keys(a)){let s=Q.createSegment(a,l);Q.buildTree(e,s,i,n)}return e.find(".lh-crc-container",r)}},Q=Y;function pt(o,e){return e.left<=o.width&&0<=e.right&&e.top<=o.height&&0<=e.bottom}function ke(o,e,t){return o<e?e:o>t?t:o}function ut(o){return{x:o.left+o.width/2,y:o.top+o.height/2}}var V=class o{static getScreenshotPositions(e,t,n){let r=ut(e),i=ke(r.x-t.width/2,0,n.width-t.width),a=ke(r.y-t.height/2,0,n.height-t.height);return{screenshot:{left:i,top:a},clip:{left:e.left-i,top:e.top-a}}}static renderClipPathInScreenshot(e,t,n,r,i){let a=e.find("clipPath",t),l=`clip-${m.getUniqueSuffix()}`;a.id=l,t.\
-style.clipPath=`url(#${l})`;let s=n.top/i.height,c=s+r.height/i.height,d=n.left/i.width,h=d+r.width/i.width,p=[`0,0             1,0            1,${s}          0,${s}`,`0,${c}     1,${c}    1,1               0,1`,`0,${s}        ${d},${s} ${d},${c} 0,${c}`,`${h},${s} 1,${s}       1,${c}       ${h},${c}`];for(let g of p){let b=e.createElementNS("http://www.w3.org/2000/svg","polygon");b.setAttribute("points",g),a.append(b)}}static installFullPageScreenshot(e,t){e.style.setProperty("--element-screenshot-url",`url(\'${t.data}\')`)}static installOverlayFeature(e){let{dom:t,rootEl:n,overlayContainerEl:r,fullPageScreenshot:i}=e,a="lh-screenshot-overlay--enabled";n.classList.contains(a)||(n.classList.add(a),n.addEventListener("click",l=>{let s=l.target;if(!s)return;let c=s.closest(".lh-node > .lh-element-screenshot");if(!c)return;let d=t.createElement("div","lh-element-screenshot__overlay");r.append(d);let h={width:d.clientWidth*.95,height:d.clientHeight*.8},p={width:Number(c.dataset.rectWidth),he\
-ight:Number(c.dataset.rectHeight),left:Number(c.dataset.rectLeft),right:Number(c.dataset.rectLeft)+Number(c.dataset.rectWidth),top:Number(c.dataset.rectTop),bottom:Number(c.dataset.rectTop)+Number(c.dataset.rectHeight)},g=o.render(t,i.screenshot,p,h);if(!g){d.remove();return}d.append(g),d.addEventListener("click",()=>d.remove())}))}static _computeZoomFactor(e,t){let r={x:t.width/e.width,y:t.height/e.height},i=.75*Math.min(r.x,r.y);return Math.min(1,i)}static render(e,t,n,r){if(!pt(t,n))return null;let i=e.createComponent("elementScreenshot"),a=e.find("div.lh-element-screenshot",i);a.dataset.rectWidth=n.width.toString(),a.dataset.rectHeight=n.height.toString(),a.dataset.rectLeft=n.left.toString(),a.dataset.rectTop=n.top.toString();let l=this._computeZoomFactor(n,r),s={width:r.width/l,height:r.height/l};s.width=Math.min(t.width,s.width),s.height=Math.min(t.height,s.height);let c={width:s.width*l,height:s.height*l},d=o.getScreenshotPositions(n,s,{width:t.width,height:t.height}),h=e.find("\
-div.lh-element-screenshot__image",a);h.style.width=c.width+"px",h.style.height=c.height+"px",h.style.backgroundPositionY=-(d.screenshot.top*l)+"px",h.style.backgroundPositionX=-(d.screenshot.left*l)+"px",h.style.backgroundSize=`${t.width*l}px ${t.height*l}px`;let p=e.find("div.lh-element-screenshot__element-marker",a);p.style.width=n.width*l+"px",p.style.height=n.height*l+"px",p.style.left=d.clip.left*l+"px",p.style.top=d.clip.top*l+"px";let g=e.find("div.lh-element-screenshot__mask",a);return g.style.width=c.width+"px",g.style.height=c.height+"px",o.renderClipPathInScreenshot(e,g,d.clip,n,s),a}};var gt=["http://","https://","data:"],mt=["bytes","numeric","ms","timespanMs"],X=class{constructor(e,t={}){this._dom=e,this._fullPageScreenshot=t.fullPageScreenshot,this._entities=t.entities}render(e){switch(e.type){case"filmstrip":return this._renderFilmstrip(e);case"list":return this._renderList(e);case"checklist":return this._renderChecklist(e);case"table":case"opportunity":return this._ren\
-derTable(e);case"network-tree":case"criticalrequestchain":return Y.render(this._dom,e,this);case"screenshot":case"debugdata":case"treemap-data":return null;default:return this._renderUnknown(e.type,e)}}_renderBytes(e){let t=m.i18n.formatBytesToKiB(e.value,e.granularity||.1),n=this._renderText(t);return n.title=m.i18n.formatBytes(e.value),n}_renderMilliseconds(e){let t;return e.displayUnit==="duration"?t=m.i18n.formatDuration(e.value):t=m.i18n.formatMilliseconds(e.value,e.granularity||10),this._renderText(t)}renderTextURL(e){let t=e,n,r,i;try{let l=E.parseURL(t);n=l.file==="/"?l.origin:l.file,r=l.file==="/"||l.hostname===""?"":`(${l.hostname})`,i=t}catch{n=t}let a=this._dom.createElement("div","lh-text__url");if(a.append(this._renderLink({text:n,url:t})),r){let l=this._renderText(r);l.classList.add("lh-text__url-host"),a.append(l)}return i&&(a.title=t,a.dataset.url=t),a}_renderLink(e){let t=this._dom.createElement("a");if(this._dom.safelySetHref(t,e.url),!t.href){let n=this._renderText(\
-e.text);return n.classList.add("lh-link"),n}return t.rel="noopener",t.target="_blank",t.textContent=e.text,t.classList.add("lh-link"),t}_renderText(e){let t=this._dom.createElement("div","lh-text");return t.textContent=e,t}_renderNumeric(e){let t=m.i18n.formatNumber(e.value,e.granularity||.1),n=this._dom.createElement("div","lh-numeric");return n.textContent=t,n}_renderThumbnail(e){let t=this._dom.createElement("img","lh-thumbnail"),n=e;return t.src=n,t.title=n,t.alt="",t}_renderUnknown(e,t){console.error(`Unknown details type: ${e}`,t);let n=this._dom.createElement("details","lh-unknown");return this._dom.createChildOf(n,"summary").textContent=`We don\'t know how to render audit details of type \\`${e}\\`. The Lighthouse version that collected this data is likely newer than the Lighthouse version of the report renderer. Expand for the raw JSON.`,this._dom.createChildOf(n,"pre").textContent=JSON.stringify(t,null,2),n}_renderTableValue(e,t){if(e==null)return null;if(typeof e=="object")swit\
-ch(e.type){case"code":return this._renderCode(e.value);case"link":return this._renderLink(e);case"node":return this.renderNode(e);case"numeric":return this._renderNumeric(e);case"text":return this._renderText(e.value);case"source-location":return this.renderSourceLocation(e);case"url":return this.renderTextURL(e.value);default:return this._renderUnknown(e.type,e)}switch(t.valueType){case"bytes":{let n=Number(e);return this._renderBytes({value:n,granularity:t.granularity})}case"code":{let n=String(e);return this._renderCode(n)}case"ms":{let n={value:Number(e),granularity:t.granularity,displayUnit:t.displayUnit};return this._renderMilliseconds(n)}case"numeric":{let n=Number(e);return this._renderNumeric({value:n,granularity:t.granularity})}case"text":{let n=String(e);return this._renderText(n)}case"thumbnail":{let n=String(e);return this._renderThumbnail(n)}case"timespanMs":{let n=Number(e);return this._renderMilliseconds({value:n})}case"url":{let n=String(e);return gt.some(r=>n.startsWi\
-th(r))?this.renderTextURL(n):this._renderCode(n)}default:return this._renderUnknown(t.valueType,e)}}_getDerivedSubItemsHeading(e){return e.subItemsHeading?{key:e.subItemsHeading.key||"",valueType:e.subItemsHeading.valueType||e.valueType,granularity:e.subItemsHeading.granularity||e.granularity,displayUnit:e.subItemsHeading.displayUnit||e.displayUnit,label:""}:null}_renderTableRow(e,t){let n=this._dom.createElement("tr");for(let r of t){if(!r||!r.key){this._dom.createChildOf(n,"td","lh-table-column--empty");continue}let i=e[r.key],a;if(i!=null&&(a=this._renderTableValue(i,r)),a){let l=`lh-table-column--${r.valueType}`;this._dom.createChildOf(n,"td",l).append(a)}else this._dom.createChildOf(n,"td","lh-table-column--empty")}return n}_renderTableRowsFromItem(e,t){let n=this._dom.createFragment();if(n.append(this._renderTableRow(e,t)),!e.subItems)return n;let r=t.map(this._getDerivedSubItemsHeading);if(!r.some(Boolean))return n;for(let i of e.subItems.items){let a=this._renderTableRow(i,r);a\
-.classList.add("lh-sub-item-row"),n.append(a)}return n}_adornEntityGroupRow(e){let t=e.dataset.entity;if(!t)return;let n=this._entities?.find(i=>i.name===t);if(!n)return;let r=this._dom.find("td",e);if(n.category){let i=this._dom.createElement("span");i.classList.add("lh-audit__adorn"),i.textContent=n.category,r.append(" ",i)}if(n.isFirstParty){let i=this._dom.createElement("span");i.classList.add("lh-audit__adorn","lh-audit__adorn1p"),i.textContent=m.strings.firstPartyChipLabel,r.append(" ",i)}if(n.homepage){let i=this._dom.createElement("a");i.href=n.homepage,i.target="_blank",i.title=m.strings.openInANewTabTooltip,i.classList.add("lh-report-icon--external"),r.append(" ",i)}}_renderEntityGroupRow(e,t){let n={...t[0]};n.valueType="text";let r=[n,...t.slice(1)],i=this._dom.createFragment();return i.append(this._renderTableRow(e,r)),this._dom.find("tr",i).classList.add("lh-row--group"),i}_getEntityGroupItems(e){let{items:t,headings:n,sortedBy:r}=e;if(!t.length||e.isEntityGrouped||!t.som\
-e(d=>d.entity))return[];let i=new Set(e.skipSumming||[]),a=[];for(let d of n)!d.key||i.has(d.key)||mt.includes(d.valueType)&&a.push(d.key);let l=n[0].key;if(!l)return[];let s=new Map;for(let d of t){let h=typeof d.entity=="string"?d.entity:void 0,p=s.get(h)||{[l]:h||m.strings.unattributable,entity:h};for(let g of a)p[g]=Number(p[g]||0)+Number(d[g]||0);s.set(h,p)}let c=[...s.values()];return r&&c.sort(k.getTableItemSortComparator(r)),c}_renderTable(e){if(!e.items.length)return this._dom.createElement("span");let t=this._dom.createElement("table","lh-table"),n=this._dom.createChildOf(t,"thead"),r=this._dom.createChildOf(n,"tr");for(let l of e.headings){let c=`lh-table-column--${l.valueType||"text"}`,d=this._dom.createElement("div","lh-text");d.textContent=l.label,this._dom.createChildOf(r,"th",c).append(d)}let i=this._getEntityGroupItems(e),a=this._dom.createChildOf(t,"tbody");if(i.length)for(let l of i){let s=typeof l.entity=="string"?l.entity:void 0,c=this._renderEntityGroupRow(l,e.hea\
-dings);for(let h of e.items.filter(p=>p.entity===s))c.append(this._renderTableRowsFromItem(h,e.headings));let d=this._dom.findAll("tr",c);s&&d.length&&(d.forEach(h=>h.dataset.entity=s),this._adornEntityGroupRow(d[0])),a.append(c)}else{let l=!0;for(let s of e.items){let c=this._renderTableRowsFromItem(s,e.headings),d=this._dom.findAll("tr",c),h=d[0];if(typeof s.entity=="string"&&(h.dataset.entity=s.entity),e.isEntityGrouped&&s.entity)h.classList.add("lh-row--group"),this._adornEntityGroupRow(h);else for(let p of d)p.classList.add(l?"lh-row--even":"lh-row--odd");l=!l,a.append(c)}}return t}_renderListValue(e){return e.type==="node"?this.renderNode(e):e.type==="text"?this._renderText(e.value):this.render(e)}_renderList(e){let t=this._dom.createElement("div","lh-list");return e.items.forEach(n=>{if(n.type==="list-section"){let i=this._dom.createElement("div","lh-list-section");n.title&&this._dom.createChildOf(i,"div","lh-list-section__title").append(this._dom.convertMarkdownLinkSnippets(n.t\
-itle)),n.description&&this._dom.createChildOf(i,"div","lh-list-section__description").append(this._dom.convertMarkdownLinkSnippets(n.description));let a=this._renderListValue(n.value);a&&i.append(a),t.append(i);return}let r=this._renderListValue(n);r&&t.append(r)}),t}_renderChecklist(e){let t=this._dom.createElement("ul","lh-checklist");return Object.values(e.items).forEach(n=>{let r=this._dom.createChildOf(t,"li","lh-checklist-item"),i=n.value?"lh-report-plain-icon--checklist-pass":"lh-report-plain-icon--checklist-fail";this._dom.createChildOf(r,"span",`lh-report-plain-icon ${i}`).textContent=n.label}),t}renderNode(e){let t=this._dom.createElement("span","lh-node");if(e.nodeLabel){let a=this._dom.createElement("div");a.textContent=e.nodeLabel,t.append(a)}if(e.snippet){let a=this._dom.createElement("div");a.classList.add("lh-node__snippet"),a.textContent=e.snippet,t.append(a)}if(e.selector&&(t.title=e.selector),e.path&&t.setAttribute("data-path",e.path),e.selector&&t.setAttribute("data\
--selector",e.selector),e.snippet&&t.setAttribute("data-snippet",e.snippet),!this._fullPageScreenshot)return t;let n=e.lhId&&this._fullPageScreenshot.nodes[e.lhId];if(!n||n.width===0||n.height===0)return t;let r={width:147,height:100},i=V.render(this._dom,this._fullPageScreenshot.screenshot,n,r);return i&&t.prepend(i),t}renderSourceLocation(e){if(!e.url)return null;let t=`${e.url}:${e.line+1}:${e.column}`,n;e.original&&(n=`${e.original.file||"<unmapped>"}:${e.original.line+1}:${e.original.column}`);let r;if(e.urlProvider==="network"&&n)r=this._renderLink({url:e.url,text:n}),r.title=`maps to generated location ${t}`;else if(e.urlProvider==="network"&&!n)r=this.renderTextURL(e.url),this._dom.find(".lh-link",r).textContent+=`:${e.line+1}:${e.column}`;else if(e.urlProvider==="comment"&&n)r=this._renderText(`${n} (from source map)`),r.title=`${t} (from sourceURL)`;else if(e.urlProvider==="comment"&&!n)r=this._renderText(`${t} (from sourceURL)`);else return null;return r.classList.add("lh-sou\
-rce-location"),r.setAttribute("data-source-url",e.url),r.setAttribute("data-source-line",String(e.line)),r.setAttribute("data-source-column",String(e.column)),r}_renderFilmstrip(e){let t=this._dom.createElement("div","lh-filmstrip");for(let n of e.items){let r=this._dom.createChildOf(t,"div","lh-filmstrip__frame"),i=this._dom.createChildOf(r,"img","lh-filmstrip__thumbnail");i.src=n.data,i.alt="Screenshot"}return t}_renderCode(e){let t=this._dom.createElement("pre","lh-code");return t.textContent=e,t}};var te=class{constructor(e){e==="en-XA"&&(e="de"),this._locale=e,this._cachedNumberFormatters=new Map}_formatNumberWithGranularity(e,t,n={}){if(t!==void 0){let a=-Math.log10(t);Number.isInteger(a)||(console.warn(`granularity of ${t} is invalid. Using 1 instead`),t=1),t<1&&(n={...n},n.minimumFractionDigits=n.maximumFractionDigits=Math.ceil(a)),e=Math.round(e/t)*t,Object.is(e,-0)&&(e=0)}else Math.abs(e)<5e-4&&(e=0);let r,i=[n.minimumFractionDigits,n.maximumFractionDigits,n.style,n.unit,n.un\
-itDisplay,this._locale].join("");return r=this._cachedNumberFormatters.get(i),r||(r=new Intl.NumberFormat(this._locale,n),this._cachedNumberFormatters.set(i,r)),r.format(e).replace(" ","\\xA0")}formatNumber(e,t){return this._formatNumberWithGranularity(e,t)}formatInteger(e){return this._formatNumberWithGranularity(e,1)}formatPercent(e){return new Intl.NumberFormat(this._locale,{style:"percent"}).format(e)}formatBytesToKiB(e,t=void 0){return this._formatNumberWithGranularity(e/1024,t)+"\\xA0KiB"}formatBytesToMiB(e,t=void 0){return this._formatNumberWithGranularity(e/1048576,t)+"\\xA0MiB"}formatBytes(e,t=1){return this._formatNumberWithGranularity(e,t,{style:"unit",unit:"byte",unitDisplay:"long"})}formatBytesWithBestUnit(e,t=.1){return e>=1048576?this.formatBytesToMiB(e,t):e>=1024?this.formatBytesToKiB(e,t):this._formatNumberWithGranularity(e,t,{style:"unit",unit:"byte",unitDisplay:"narrow"})}formatKbps(e,t=void 0){return this._formatNumberWithGranularity(e,t,{style:"unit",unit:"kilobit-per\
--second",unitDisplay:"short"})}formatMilliseconds(e,t=void 0){return this._formatNumberWithGranularity(e,t,{style:"unit",unit:"millisecond",unitDisplay:"short"})}formatSeconds(e,t=void 0){return this._formatNumberWithGranularity(e/1e3,t,{style:"unit",unit:"second",unitDisplay:"narrow"})}formatDateTime(e){let t={month:"short",day:"numeric",year:"numeric",hour:"numeric",minute:"numeric",timeZoneName:"short"},n;try{n=new Intl.DateTimeFormat(this._locale,t)}catch{t.timeZone="UTC",n=new Intl.DateTimeFormat(this._locale,t)}return n.format(new Date(e))}formatDuration(e){let t=e/1e3;if(Math.round(t)===0)return"None";let n=[],r={day:3600*24,hour:3600,minute:60,second:1};return Object.keys(r).forEach(i=>{let a=r[i],l=Math.floor(t/a);if(l>0){t-=l*a;let s=this._formatNumberWithGranularity(l,1,{style:"unit",unit:i,unitDisplay:"narrow"});n.push(s)}}),n.join(" ")}};function Ee(o){let e=o.createComponent("explodeyGauge");return o.find(".lh-exp-gauge-component",e)}function Se(o,e,t){let n=o.find("div.l\
-h-exp-gauge__wrapper",e);n.className="",n.classList.add("lh-exp-gauge__wrapper",`lh-exp-gauge__wrapper--${k.calculateRating(t.score)}`),vt(o,n,t)}function ft(o,e,t){t=t||o/32;let n=o/t,r=.5*t,i=n+r+t,a=2*Math.PI*n,l=Math.acos(1-.5*Math.pow(.5*t/n,2))*n,s=2*Math.PI*i,c=Math.acos(1-.5*Math.pow(.5*t/i,2))*i;return{radiusInner:n,radiusOuter:i,circumferenceInner:a,circumferenceOuter:s,getArcLength:()=>Math.max(0,Number(e*a)),getMetricArcLength:(d,h=!1)=>{let p=h?0:2*c;return Math.max(0,Number(d*s-r-p))},endDiffInner:l,endDiffOuter:c,strokeWidth:t,strokeGap:r}}function vt(o,e,t){let i=Number(t.score),{radiusInner:a,radiusOuter:l,circumferenceInner:s,circumferenceOuter:c,getArcLength:d,getMetricArcLength:h,endDiffInner:p,endDiffOuter:g,strokeWidth:b,strokeGap:w}=ft(128,i),f=o.find("svg.lh-exp-gauge",e);o.find(".lh-exp-gauge__label",f).textContent=t.title,f.setAttribute("viewBox",[-64,-64/2,128,128/2].join(" ")),f.style.setProperty("--stroke-width",`${b}px`),f.style.setProperty("--circle-meas"\
-,(2*Math.PI).toFixed(4));let u=o.find("g.lh-exp-gauge__outer",e),v=o.find("g.lh-exp-gauge__inner",e),_=o.find("circle.lh-cover",u),x=o.find("circle.lh-exp-gauge__arc",v),S=o.find("text.lh-exp-gauge__percentage",v);u.style.setProperty("--scale-initial",String(a/l)),u.style.setProperty("--radius",`${l}px`),_.style.setProperty("--radius",`${.5*(a+l)}px`),_.setAttribute("stroke-width",String(w)),f.style.setProperty("--radius",`${a}px`),x.setAttribute("stroke-dasharray",`${d()} ${(s-d()).toFixed(4)}`),x.setAttribute("stroke-dashoffset",String(.25*s-p)),S.textContent=Math.round(i*100).toString();let A=l+b,z=l-b,M=t.auditRefs.filter(y=>y.group==="metrics"&&y.weight),$=M.reduce((y,C)=>y+=C.weight,0),R=.25*c-g-.5*w,N=-.5*Math.PI;u.querySelectorAll(".metric").forEach(y=>{M.map(F=>`metric--${F.id}`).find(F=>y.classList.contains(F))||y.remove()}),M.forEach((y,C)=>{let L=y.acronym??y.id,F=!u.querySelector(`.metric--${L}`),T=o.maybeFind(`g.metric--${L}`,u)||o.createSVGElement("g"),B=o.maybeFind(`.me\
-tric--${L} circle.lh-exp-gauge--faded`,u)||o.createSVGElement("circle"),K=o.maybeFind(`.metric--${L} circle.lh-exp-gauge--miniarc`,u)||o.createSVGElement("circle"),q=o.maybeFind(`.metric--${L} circle.lh-exp-gauge-hovertarget`,u)||o.createSVGElement("circle"),P=o.maybeFind(`.metric--${L} text.metric__label`,u)||o.createSVGElement("text"),H=o.maybeFind(`.metric--${L} text.metric__value`,u)||o.createSVGElement("text");T.classList.add("metric",`metric--${L}`),B.classList.add("lh-exp-gauge__arc","lh-exp-gauge__arc--metric","lh-exp-gauge--faded"),K.classList.add("lh-exp-gauge__arc","lh-exp-gauge__arc--metric","lh-exp-gauge--miniarc"),q.classList.add("lh-exp-gauge__arc","lh-exp-gauge__arc--metric","lh-exp-gauge-hovertarget");let j=y.weight/$,de=h(j),he=y.result.score?y.result.score*j:0,pe=h(he),Pe=j*c,ue=h(j,!0),ge=k.calculateRating(y.result.score,y.result.scoreDisplayMode);T.style.setProperty("--metric-rating",ge),T.style.setProperty("--metric-color",`var(--color-${ge})`),T.style.setProperty\
-("--metric-offset",`${R}`),T.style.setProperty("--i",C.toString()),B.setAttribute("stroke-dasharray",`${de} ${c-de}`),K.style.setProperty("--metric-array",`${pe} ${c-pe}`),q.setAttribute("stroke-dasharray",`${ue} ${c-ue-g}`),P.classList.add("metric__label"),H.classList.add("metric__value"),P.textContent=L,H.textContent=`+${Math.round(he*100)}`;let me=N+j*Math.PI,J=Math.cos(me),Z=Math.sin(me);switch(!0){case J>0:H.setAttribute("text-anchor","end");break;case J<0:P.setAttribute("text-anchor","end");break;case J===0:P.setAttribute("text-anchor","middle"),H.setAttribute("text-anchor","middle");break}switch(!0){case Z>0:P.setAttribute("dominant-baseline","hanging");break;case Z<0:H.setAttribute("dominant-baseline","hanging");break;case Z===0:P.setAttribute("dominant-baseline","middle"),H.setAttribute("dominant-baseline","middle");break}P.setAttribute("x",(A*J).toFixed(2)),P.setAttribute("y",(A*Z).toFixed(2)),H.setAttribute("x",(z*J).toFixed(2)),H.setAttribute("y",(z*Z).toFixed(2)),F&&(T.app\
-endChild(B),T.appendChild(K),T.appendChild(q),T.appendChild(P),T.appendChild(H),u.appendChild(T)),R-=Pe,N+=j*2*Math.PI});let D=u.querySelector(".lh-exp-gauge-underhovertarget")||o.createSVGElement("circle");D.classList.add("lh-exp-gauge__arc","lh-exp-gauge__arc--metric","lh-exp-gauge-hovertarget","lh-exp-gauge-underhovertarget");let I=h(1,!0);if(D.setAttribute("stroke-dasharray",`${I} ${c-I-g}`),D.isConnected||u.prepend(D),f.dataset.listenersSetup)return;f.dataset.listenersSetup=!0,De(f),f.addEventListener("pointerover",y=>{if(y.target===f&&f.classList.contains("state--expanded")){f.classList.remove("state--expanded"),f.classList.contains("state--highlight")&&(f.classList.remove("state--highlight"),o.find(".metric--highlight",f).classList.remove("metric--highlight"));return}if(!(y.target instanceof Element))return;let C=y.target.parentNode;if(C instanceof SVGElement){if(C&&C===v){f.classList.contains("state--expanded")?f.classList.contains("state--highlight")&&(f.classList.remove("stat\
-e--highlight"),o.find(".metric--highlight",f).classList.remove("metric--highlight")):f.classList.add("state--expanded");return}if(C&&C.classList&&C.classList.contains("metric")){let L=C.style.getPropertyValue("--metric-rating");if(e.style.setProperty("--color-highlight",`var(--color-${L}-secondary)`),!f.classList.contains("state--highlight"))f.classList.add("state--highlight"),C.classList.add("metric--highlight");else{let F=o.find(".metric--highlight",f);C!==F&&(F.classList.remove("metric--highlight"),C.classList.add("metric--highlight"))}}}}),f.addEventListener("mouseleave",()=>{f.classList.remove("state--highlight"),f.querySelector(".metric--highlight")?.classList.remove("metric--highlight")});async function De(y){if(await new Promise(P=>setTimeout(P,1e3)),y.classList.contains("state--expanded"))return;let C=o.find(".lh-exp-gauge__inner",y),L=`uniq-${Math.random()}`;C.setAttribute("id",L);let F=o.createSVGElement("use");F.setAttribute("href",`#${L}`),y.appendChild(F);let T=2.5;y.styl\
-e.setProperty("--peek-dur",`${T}s`),y.classList.add("state--peek","state--expanded");let B=()=>{y.classList.remove("state--peek","state--expanded"),F.remove()},K=setTimeout(()=>{y.removeEventListener("mouseenter",q),B()},T*1e3*1.5);function q(){clearTimeout(K),B()}y.addEventListener("mouseenter",q,{once:!0})}}var ne=class extends G{_renderMetric(e){let t=this.dom.createComponent("metric"),n=this.dom.find(".lh-metric",t);n.id=e.result.id;let r=k.calculateRating(e.result.score,e.result.scoreDisplayMode);n.classList.add(`lh-metric--${r}`);let i=this.dom.find(".lh-metric__title",t);i.textContent=e.result.title;let a=this.dom.find(".lh-metric__value",t);a.textContent=e.result.displayValue||"";let l=this.dom.find(".lh-metric__description",t);if(l.append(this.dom.convertMarkdownLinkSnippets(e.result.description)),e.result.scoreDisplayMode==="error"){l.textContent="",a.textContent="Error!";let s=this.dom.createChildOf(l,"span");s.textContent=e.result.errorMessage||"Report error: no metric info\
-rmation"}else e.result.scoreDisplayMode==="notApplicable"&&(a.textContent="--");return n}_getScoringCalculatorHref(e){let t=e.filter(h=>h.group==="metrics"),n=e.find(h=>h.id==="interactive"),r=e.find(h=>h.id==="first-cpu-idle"),i=e.find(h=>h.id==="first-meaningful-paint");n&&t.push(n),r&&t.push(r),i&&typeof i.result.score=="number"&&t.push(i);let a=h=>Math.round(h*100)/100,s=[...t.map(h=>{let p;return typeof h.result.numericValue=="number"?(p=h.id==="cumulative-layout-shift"?a(h.result.numericValue):Math.round(h.result.numericValue),p=p.toString()):p="null",[h.acronym||h.id,p]})];m.reportJson&&(s.push(["device",m.reportJson.configSettings.formFactor]),s.push(["version",m.reportJson.lighthouseVersion]));let c=new URLSearchParams(s),d=new URL("https://googlechrome.github.io/lighthouse/scorecalc/");return d.hash=c.toString(),d.href}overallImpact(e,t){if(!e.result.metricSavings)return{overallImpact:0,overallLinearImpact:0};let n=0,r=0;for(let[i,a]of Object.entries(e.result.metricSavings)){\
-if(a===void 0)continue;let l=t.find(g=>g.acronym===i);if(!l||l.result.score===null)continue;let s=l.result.numericValue;if(!s)continue;let c=a/s*l.weight;r+=c;let d=l.result.scoringOptions;if(!d)continue;let p=(E.computeLogNormalScore(d,s-a)-l.result.score)*l.weight;n+=p}return{overallImpact:n,overallLinearImpact:r}}render(e,t,n){let r=m.strings,i=this.dom.createElement("div","lh-category");i.id=e.id,i.append(this.renderCategoryHeader(e,t,n));let a=e.auditRefs.filter(p=>p.group==="metrics");if(a.length){let[p,g]=this.renderAuditGroup(t.metrics),b=this.dom.createElement("input","lh-metrics-toggle__input"),w=`lh-metrics-toggle${m.getUniqueSuffix()}`;b.setAttribute("aria-label","Toggle the display of metric descriptions"),b.type="checkbox",b.id=w,p.prepend(b);let f=this.dom.find(".lh-audit-group__header",p),u=this.dom.createChildOf(f,"label","lh-metrics-toggle__label");u.htmlFor=w;let v=this.dom.createChildOf(u,"span","lh-metrics-toggle__labeltext--show"),_=this.dom.createChildOf(u,"span"\
-,"lh-metrics-toggle__labeltext--hide");v.textContent=m.strings.expandView,_.textContent=m.strings.collapseView;let x=this.dom.createElement("div","lh-metrics-container");if(p.insertBefore(x,g),a.forEach(S=>{x.append(this._renderMetric(S))}),i.querySelector(".lh-gauge__wrapper")){let S=this.dom.find(".lh-category-header__description",i),A=this.dom.createChildOf(S,"div","lh-metrics__disclaimer"),z=this.dom.convertMarkdownLinkSnippets(r.varianceDisclaimer);A.append(z);let M=this.dom.createChildOf(A,"a","lh-calclink");M.target="_blank",M.textContent=r.calculatorLink,this.dom.safelySetHref(M,this._getScoringCalculatorHref(e.auditRefs))}p.classList.add("lh-audit-group--metrics"),i.append(p)}let l=this.dom.createChildOf(i,"div","lh-filmstrip-container"),c=e.auditRefs.find(p=>p.id==="screenshot-thumbnails")?.result;if(c?.details){l.id=c.id;let p=this.detailsRenderer.render(c.details);p&&l.append(p)}let d=this.renderFilterableSection(e,t,["insights","diagnostics"],a);if(d&&(d.classList.add("lh-\
-perf-audits"),i.append(d)),(!n||n?.gatherMode==="navigation")&&e.score!==null){let p=Ee(this.dom);Se(this.dom,p,e),this.dom.find(".lh-score__gauge",i).replaceWith(p)}return i}renderFilterableSection(e,t,n,r){if(n.some(u=>!t[u]))return null;let i=this.dom.createElement("div"),a=u=>u.group??"",s=e.auditRefs.filter(u=>n.includes(a(u))).map(u=>{let{overallImpact:v,overallLinearImpact:_}=this.overallImpact(u,r),x=u.result.guidanceLevel||1,S=this.renderAudit(u);return{auditRef:u,auditEl:S,overallImpact:v,overallLinearImpact:_,guidanceLevel:x}}),c=s.filter(u=>!k.showAsPassed(u.auditRef.result)),d=s.filter(u=>k.showAsPassed(u.auditRef.result)),h={};for(let u of n){let v=this.renderAuditGroup(t[u]);v[0].classList.add(`lh-audit-group--${u}`),h[u]=v}function p(u){for(let v of s)if(u==="All")v.auditEl.hidden=!1;else{let _=v.auditRef.result.metricSavings?.[u]===void 0;v.auditEl.hidden=_}c.sort((v,_)=>{let x=v.auditRef.result.score||0,S=_.auditRef.result.score||0;if(x!==S)return x-S;if(u!=="All"){le\
-t A=v.auditRef.result.metricSavings?.[u]??-1,z=_.auditRef.result.metricSavings?.[u]??-1;if(A!==z)return z-A}return v.overallImpact!==_.overallImpact?_.overallImpact*_.guidanceLevel-v.overallImpact*v.guidanceLevel:v.overallImpact===0&&_.overallImpact===0&&v.overallLinearImpact!==_.overallLinearImpact?_.overallLinearImpact*_.guidanceLevel-v.overallLinearImpact*v.guidanceLevel:_.guidanceLevel-v.guidanceLevel});for(let v of c){if(!v.auditRef.group)continue;let _=h[a(v.auditRef)];if(!_)continue;let[x,S]=_;x.insertBefore(v.auditEl,S)}}let g=new Set;for(let u of c){let v=u.auditRef.result.metricSavings||{};for(let[_,x]of Object.entries(v))typeof x=="number"&&g.add(_)}let b=r.filter(u=>u.acronym&&g.has(u.acronym));b.length&&this.renderMetricAuditFilter(b,i,p),p("All");for(let u of n)if(c.some(v=>a(v.auditRef)===u)){let v=h[u];if(!v)continue;i.append(v[0])}if(!d.length)return i;let w={auditRefsOrEls:d.map(u=>u.auditEl),groupDefinitions:t},f=this.renderClump("passed",w);return i.append(f),i}rend\
-erMetricAuditFilter(e,t,n){let r=this.dom.createElement("div","lh-metricfilter"),i=this.dom.createChildOf(r,"span","lh-metricfilter__text");i.textContent=m.strings.showRelevantAudits;let a=[{acronym:"All",id:"All"},...e],l=m.getUniqueSuffix();for(let s of a){let c=`metric-${s.acronym}-${l}`,d=this.dom.createChildOf(r,"input","lh-metricfilter__radio");d.type="radio",d.name=`metricsfilter-${l}`,d.id=c;let h=this.dom.createChildOf(r,"label","lh-metricfilter__label");h.htmlFor=c,h.title="result"in s?s.result.title:"",h.textContent=s.acronym||s.id,s.acronym==="All"&&(d.checked=!0,h.classList.add("lh-metricfilter__label--active")),t.append(r),d.addEventListener("input",p=>{for(let b of t.querySelectorAll("label.lh-metricfilter__label"))b.classList.toggle("lh-metricfilter__label--active",b.htmlFor===c);t.classList.toggle("lh-category--filtered",s.acronym!=="All"),n(s.acronym||"All");let g=t.querySelectorAll("div.lh-audit-group, details.lh-audit-group");for(let b of g){b.hidden=!1;let w=Array.\
-from(b.querySelectorAll("div.lh-audit")),f=!!w.length&&w.every(u=>u.hidden);b.hidden=f}})}}};var re=class{constructor(e){this._dom=e,this._opts={}}renderReport(e,t,n){if(!this._dom.rootEl&&t){console.warn("Please adopt the new report API in renderer/api.js.");let i=t.closest(".lh-root");i?this._dom.rootEl=i:(t.classList.add("lh-root","lh-vars"),this._dom.rootEl=t)}else this._dom.rootEl&&t&&(this._dom.rootEl=t);n&&(this._opts=n),this._dom.setLighthouseChannel(e.configSettings.channel||"unknown");let r=k.prepareReportResult(e);return this._dom.rootEl.textContent="",this._dom.rootEl.append(this._renderReport(r)),this._opts.occupyEntireViewport&&this._dom.rootEl.classList.add("lh-max-viewport"),this._dom.rootEl}_renderReportTopbar(e){let t=this._dom.createComponent("topbar"),n=this._dom.find("a.lh-topbar__url",t);return n.textContent=e.finalDisplayedUrl,n.title=e.finalDisplayedUrl,this._dom.safelySetHref(n,e.finalDisplayedUrl),t}_renderReportHeader(){let e=this._dom.createComponent("headin\
-g"),t=this._dom.createComponent("scoresWrapper");return this._dom.find(".lh-scores-wrapper-placeholder",e).replaceWith(t),e}_renderReportFooter(e){let t=this._dom.createComponent("footer");return this._renderMetaBlock(e,t),this._dom.find(".lh-footer__version_issue",t).textContent=m.strings.footerIssue,this._dom.find(".lh-footer__version",t).textContent=e.lighthouseVersion,t}_renderMetaBlock(e,t){let n=k.getEmulationDescriptions(e.configSettings||{}),r=e.userAgent.match(/(\\w*Chrome\\/[\\d.]+)/),i=Array.isArray(r)?r[1].replace("/"," ").replace("Chrome","Chromium"):"Chromium",a=e.configSettings.channel,l=e.environment.benchmarkIndex.toFixed(0),s=e.environment.credits?.["axe-core"],c=[`${m.strings.runtimeSettingsBenchmark}: ${l}`,`${m.strings.runtimeSettingsCPUThrottling}: ${n.cpuThrottling}`];n.screenEmulation&&c.push(`${m.strings.runtimeSettingsScreenEmulation}: ${n.screenEmulation}`),s&&c.push(`${m.strings.runtimeSettingsAxeVersion}: ${s}`);let d=m.strings.runtimeAnalysisWindow;e.gatherMo\
-de==="timespan"?d=m.strings.runtimeAnalysisWindowTimespan:e.gatherMode==="snapshot"&&(d=m.strings.runtimeAnalysisWindowSnapshot);let h=[["date",`Captured at ${m.i18n.formatDateTime(e.fetchTime)}`],["devices",`${n.deviceEmulation} with Lighthouse ${e.lighthouseVersion}`,c.join(`\n`)],["samples-one",m.strings.runtimeSingleLoad,m.strings.runtimeSingleLoadTooltip],["stopwatch",d],["networkspeed",`${n.summary}`,`${m.strings.runtimeSettingsNetworkThrottling}: ${n.networkThrottling}`],["chrome",`Using ${i}`+(a?` with ${a}`:""),`${m.strings.runtimeSettingsUANetwork}: "${e.environment.networkUserAgent}"`]],p=this._dom.find(".lh-meta__items",t);for(let[g,b,w]of h){let f=this._dom.createChildOf(p,"li","lh-meta__item");if(f.textContent=b,w){f.classList.add("lh-tooltip-boundary");let u=this._dom.createChildOf(f,"div","lh-tooltip");u.textContent=w}f.classList.add("lh-report-icon",`lh-report-icon--${g}`)}}_renderReportWarnings(e){if(!e.runWarnings||e.runWarnings.length===0)return this._dom.createEleme\
-nt("div");let t=this._dom.createComponent("warningsToplevel"),n=this._dom.find(".lh-warnings__msg",t);n.textContent=m.strings.toplevelWarningsMessage;let r=[];for(let i of e.runWarnings){let a=this._dom.createElement("li");a.append(this._dom.convertMarkdownLinkSnippets(i)),r.push(a)}return this._dom.find("ul",t).append(...r),t}_renderScoreGauges(e,t,n){let r=[],i=[];for(let a of Object.values(e.categories)){let s=(n[a.id]||t).renderCategoryScore(a,e.categoryGroups||{},{gatherMode:e.gatherMode}),c=this._dom.find("a.lh-gauge__wrapper, a.lh-fraction__wrapper",s);c&&(this._dom.safelySetHref(c,`#${a.id}`),c.addEventListener("click",d=>{if(!c.matches(\'[href^="#"]\'))return;let h=c.getAttribute("href"),p=this._dom.rootEl;if(!h||!p)return;let g=this._dom.find(h,p);d.preventDefault(),g.scrollIntoView()}),this._opts.onPageAnchorRendered?.(c)),k.isPluginCategory(a.id)?i.push(s):r.push(s)}return[...r,...i]}_renderReport(e){m.apply({providedStrings:e.i18n.rendererFormattedStrings,i18n:new te(e.confi\
-gSettings.locale),reportJson:e});let t=new X(this._dom,{fullPageScreenshot:e.fullPageScreenshot??void 0,entities:e.entities}),n=new G(this._dom,t),r={performance:new ne(this._dom,t)},i=this._dom.createElement("div");i.append(this._renderReportHeader());let a=this._dom.createElement("div","lh-container"),l=this._dom.createElement("div","lh-report");l.append(this._renderReportWarnings(e));let s;Object.keys(e.categories).length===1?i.classList.add("lh-header--solo-category"):s=this._dom.createElement("div","lh-scores-header");let d=this._dom.createElement("div");if(d.classList.add("lh-scorescale-wrap"),d.append(this._dom.createComponent("scorescale")),s){let b=this._dom.find(".lh-scores-container",i);s.append(...this._renderScoreGauges(e,n,r)),b.append(s,d);let w=this._dom.createElement("div","lh-sticky-header");w.append(...this._renderScoreGauges(e,n,r)),a.append(w)}let h=this._dom.createElement("div","lh-categories");l.append(h);let p={gatherMode:e.gatherMode};for(let b of Object.values\
-(e.categories)){let w=r[b.id]||n;w.dom.createChildOf(h,"div","lh-category-wrapper").append(w.render(b,e.categoryGroups,p))}n.injectFinalScreenshot(h,e.audits,d);let g=this._dom.createFragment();return this._opts.omitGlobalStyles||g.append(this._dom.createComponent("styles")),this._opts.omitTopbar||g.append(this._renderReportTopbar(e)),g.append(a),l.append(this._renderReportFooter(e)),a.append(i,l),e.fullPageScreenshot&&V.installFullPageScreenshot(this._dom.rootEl,e.fullPageScreenshot.screenshot),g}};function W(o,e){let t=o.rootEl;typeof e>"u"?t.classList.toggle("lh-dark"):t.classList.toggle("lh-dark",e)}var bt=typeof btoa<"u"?btoa:o=>Buffer.from(o).toString("base64"),_t=typeof atob<"u"?atob:o=>Buffer.from(o,"base64").toString();async function wt(o,e){let t=new TextEncoder().encode(o);if(e.gzip)if(typeof CompressionStream<"u"){let i=new CompressionStream("gzip"),a=i.writable.getWriter();a.write(t),a.close();let l=await new Response(i.readable).arrayBuffer();t=new Uint8Array(l)}else t=wi\
-ndow.pako.gzip(o);let n="",r=5e3;for(let i=0;i<t.length;i+=r)n+=String.fromCharCode(...t.subarray(i,i+r));return bt(n)}function yt(o,e){let t=_t(o),n=Uint8Array.from(t,r=>r.charCodeAt(0));return e.gzip?window.pako.ungzip(n,{to:"string"}):new TextDecoder().decode(n)}var Ce={toBase64:wt,fromBase64:yt};function se(){let o=window.location.host.endsWith(".vercel.app"),e=new URLSearchParams(window.location.search).has("dev");return o?`https://${window.location.host}/gh-pages`:e?"http://localhost:7333":"https://googlechrome.github.io/lighthouse"}function ce(o){let e=o.generatedTime,t=o.fetchTime||e;return`${o.lighthouseVersion}-${o.finalDisplayedUrl}-${t}`}function xt(o,e,t){let n=new URL(e).origin;window.addEventListener("message",function i(a){a.origin===n&&r&&a.data.opened&&(r.postMessage(o,n),window.removeEventListener("message",i))});let r=window.open(e,t)}async function Ae(o,e,t){let n=new URL(e),r=!!window.CompressionStream;n.hash=await Ce.toBase64(JSON.stringify(o),{gzip:r}),r&&n.sear\
-chParams.set("gzip","1"),window.open(n.toString(),t)}async function Le(o){let e="viewer-"+ce(o),t=se()+"/viewer/";await Ae({lhr:o},t,e)}async function ze(o){let e="viewer-"+ce(o),t=se()+"/viewer/";xt({lhr:o},t,e)}function Me(o){if(!o.audits["script-treemap-data"].details)throw new Error("no script treemap data found");let t={lhr:{mainDocumentUrl:o.mainDocumentUrl,finalUrl:o.finalUrl,finalDisplayedUrl:o.finalDisplayedUrl,audits:{"script-treemap-data":o.audits["script-treemap-data"]},configSettings:{locale:o.configSettings.locale}}},n=se()+"/treemap/",r="treemap-"+ce(o);Ae(t,n,r)}var oe=class{constructor(e){this._dom=e,this._toggleEl,this._menuEl,this.onDocumentKeyDown=this.onDocumentKeyDown.bind(this),this.onToggleClick=this.onToggleClick.bind(this),this.onToggleKeydown=this.onToggleKeydown.bind(this),this.onMenuFocusOut=this.onMenuFocusOut.bind(this),this.onMenuKeydown=this.onMenuKeydown.bind(this),this._getNextMenuItem=this._getNextMenuItem.bind(this),this._getNextSelectableNode=this.\
-_getNextSelectableNode.bind(this),this._getPreviousMenuItem=this._getPreviousMenuItem.bind(this)}setup(e){this._toggleEl=this._dom.find(".lh-topbar button.lh-tools__button",this._dom.rootEl),this._toggleEl.addEventListener("click",this.onToggleClick),this._toggleEl.addEventListener("keydown",this.onToggleKeydown),this._menuEl=this._dom.find(".lh-topbar div.lh-tools__dropdown",this._dom.rootEl),this._menuEl.addEventListener("keydown",this.onMenuKeydown),this._menuEl.addEventListener("click",e)}close(){this._toggleEl.classList.remove("lh-active"),this._toggleEl.setAttribute("aria-expanded","false"),this._menuEl.contains(this._dom.document().activeElement)&&this._toggleEl.focus(),this._menuEl.removeEventListener("focusout",this.onMenuFocusOut),this._dom.document().removeEventListener("keydown",this.onDocumentKeyDown)}open(e){this._toggleEl.classList.contains("lh-active")?e.focus():this._menuEl.addEventListener("transitionend",()=>{e.focus()},{once:!0}),this._toggleEl.classList.add("lh-act\
-ive"),this._toggleEl.setAttribute("aria-expanded","true"),this._menuEl.addEventListener("focusout",this.onMenuFocusOut),this._dom.document().addEventListener("keydown",this.onDocumentKeyDown)}onToggleClick(e){e.preventDefault(),e.stopImmediatePropagation(),this._toggleEl.classList.contains("lh-active")?this.close():this.open(this._getNextMenuItem())}onToggleKeydown(e){switch(e.code){case"ArrowUp":e.preventDefault(),this.open(this._getPreviousMenuItem());break;case"ArrowDown":case"Enter":case" ":e.preventDefault(),this.open(this._getNextMenuItem());break;default:}}onMenuKeydown(e){let t=e.target;switch(e.code){case"ArrowUp":e.preventDefault(),this._getPreviousMenuItem(t).focus();break;case"ArrowDown":e.preventDefault(),this._getNextMenuItem(t).focus();break;case"Home":e.preventDefault(),this._getNextMenuItem().focus();break;case"End":e.preventDefault(),this._getPreviousMenuItem().focus();break;default:}}onDocumentKeyDown(e){e.keyCode===27&&this.close()}onMenuFocusOut(e){let t=e.relatedT\
-arget;this._menuEl.contains(t)||this.close()}_getNextSelectableNode(e,t){let n=e.filter(i=>i instanceof HTMLElement).filter(i=>!(i.hasAttribute("disabled")||window.getComputedStyle(i).display==="none")),r=t?n.indexOf(t)+1:0;return r>=n.length&&(r=0),n[r]}_getNextMenuItem(e){let t=Array.from(this._menuEl.childNodes);return this._getNextSelectableNode(t,e)}_getPreviousMenuItem(e){let t=Array.from(this._menuEl.childNodes).reverse();return this._getNextSelectableNode(t,e)}};var ie=class{constructor(e,t){this.lhr,this._reportUIFeatures=e,this._dom=t,this._dropDownMenu=new oe(this._dom),this._copyAttempt=!1,this.topbarEl,this.categoriesEl,this.stickyHeaderEl,this.highlightEl,this.onDropDownMenuClick=this.onDropDownMenuClick.bind(this),this.onKeyUp=this.onKeyUp.bind(this),this.onCopy=this.onCopy.bind(this),this.collapseAllDetails=this.collapseAllDetails.bind(this)}enable(e){this.lhr=e,this._dom.rootEl.addEventListener("keyup",this.onKeyUp),this._dom.document().addEventListener("copy",this.onC\
-opy),this._dropDownMenu.setup(this.onDropDownMenuClick),this._setUpCollapseDetailsAfterPrinting(),this._dom.find(".lh-topbar__logo",this._dom.rootEl).addEventListener("click",()=>W(this._dom)),this._setupStickyHeader()}onDropDownMenuClick(e){e.preventDefault();let t=e.target;if(!(!t||!t.hasAttribute("data-action"))){switch(t.getAttribute("data-action")){case"copy":this.onCopyButtonClick();break;case"print-summary":this.collapseAllDetails(),this._print();break;case"print-expanded":this.expandAllDetails(),this._print();break;case"save-json":{let n=JSON.stringify(this.lhr,null,2);this._reportUIFeatures._saveFile(new Blob([n],{type:"application/json"}));break}case"save-html":{let n=this._reportUIFeatures.getReportHtml();try{this._reportUIFeatures._saveFile(new Blob([n],{type:"text/html"}))}catch(r){this._dom.fireEventOn("lh-log",this._dom.document(),{cmd:"error",msg:"Could not export as HTML. "+r.message})}break}case"open-viewer":{this._dom.isDevTools()?Le(this.lhr):ze(this.lhr);break}case\
-"save-gist":{this._reportUIFeatures.saveAsGist();break}case"toggle-dark":{W(this._dom);break}case"view-unthrottled-trace":this._reportUIFeatures._opts.onViewTrace?.()}this._dropDownMenu.close()}}onCopy(e){this._copyAttempt&&e.clipboardData&&(e.preventDefault(),e.clipboardData.setData("text/plain",JSON.stringify(this.lhr,null,2)),this._dom.fireEventOn("lh-log",this._dom.document(),{cmd:"log",msg:"Report JSON copied to clipboard"})),this._copyAttempt=!1}onCopyButtonClick(){this._dom.fireEventOn("lh-analytics",this._dom.document(),{name:"copy"});try{this._dom.document().queryCommandSupported("copy")&&(this._copyAttempt=!0,this._dom.document().execCommand("copy")||(this._copyAttempt=!1,this._dom.fireEventOn("lh-log",this._dom.document(),{cmd:"warn",msg:"Your browser does not support copy to clipboard."})))}catch(e){this._copyAttempt=!1,this._dom.fireEventOn("lh-log",this._dom.document(),{cmd:"log",msg:e.message})}}onKeyUp(e){(e.ctrlKey||e.metaKey)&&e.keyCode===80&&this._dropDownMenu.close(\
-)}expandAllDetails(){this._dom.findAll(".lh-categories details",this._dom.rootEl).map(t=>t.open=!0)}collapseAllDetails(){this._dom.findAll(".lh-categories details",this._dom.rootEl).map(t=>t.open=!1)}_print(){this._reportUIFeatures._opts.onPrintOverride?this._reportUIFeatures._opts.onPrintOverride(this._dom.rootEl):self.print()}resetUIState(){this._dropDownMenu.close()}_getScrollParent(e){let{overflowY:t}=window.getComputedStyle(e);return t!=="visible"&&t!=="hidden"?e:e.parentElement?this._getScrollParent(e.parentElement):document}_setUpCollapseDetailsAfterPrinting(){"onbeforeprint"in self?self.addEventListener("afterprint",this.collapseAllDetails):self.matchMedia("print").addListener(t=>{t.matches?this.expandAllDetails():this.collapseAllDetails()})}_setupStickyHeader(){this.topbarEl=this._dom.find("div.lh-topbar",this._dom.rootEl),this.categoriesEl=this._dom.find("div.lh-categories",this._dom.rootEl),requestAnimationFrame(()=>requestAnimationFrame(()=>{try{this.stickyHeaderEl=this._do\
-m.find("div.lh-sticky-header",this._dom.rootEl)}catch{return}this.highlightEl=this._dom.createChildOf(this.stickyHeaderEl,"div","lh-highlighter");let e=this._getScrollParent(this._dom.find(".lh-container",this._dom.rootEl));e.addEventListener("scroll",()=>this._updateStickyHeader());let t=e instanceof window.Document?document.documentElement:e;new window.ResizeObserver(()=>this._updateStickyHeader()).observe(t)}))}_updateStickyHeader(){if(!this.stickyHeaderEl)return;let e=this.topbarEl.getBoundingClientRect().bottom,t=this.categoriesEl.getBoundingClientRect().top,n=e>=t,i=Array.from(this._dom.rootEl.querySelectorAll(".lh-category")).filter(h=>h.getBoundingClientRect().top-window.innerHeight/2<0),a=i.length>0?i.length-1:0,l=this.stickyHeaderEl.querySelectorAll(".lh-gauge__wrapper, .lh-fraction__wrapper"),s=l[a],c=l[0].getBoundingClientRect().left,d=s.getBoundingClientRect().left-c;this.highlightEl.style.transform=`translate(${d}px)`,this.stickyHeaderEl.classList.toggle("lh-sticky-header\
---visible",n)}};function kt(o,e){let t=e?new Date(e):new Date,n=t.toLocaleTimeString("en-US",{hour12:!1}),r=t.toLocaleDateString("en-US",{year:"numeric",month:"2-digit",day:"2-digit"}).split("/");r.unshift(r.pop());let i=r.join("-");return`${o}_${i}_${n}`.replace(/[/?<>\\\\:*|"]/g,"-")}function Te(o){let e=new URL(o.finalDisplayedUrl).hostname;return kt(e,o.fetchTime)}function Et(o){return Array.from(o.tBodies[0].rows)}var ae=class{constructor(e,t={}){this.json,this._dom=e,this._opts=t,this._topbar=t.omitTopbar?null:new ie(this,e),this.onMediaQueryChange=this.onMediaQueryChange.bind(this)}initFeatures(e){this.json=e,this._fullPageScreenshot=E.getFullPageScreenshot(e),this._topbar&&(this._topbar.enable(e),this._topbar.resetUIState()),this._setupMediaQueryListeners(),this._setupThirdPartyFilter(),this._setupElementScreenshotOverlay(this._dom.rootEl);let t=this._dom.isDevTools()||this._opts.disableDarkMode||this._opts.disableAutoDarkModeAndFireworks;!t&&window.matchMedia("(prefers-color-sch\
-eme: dark)").matches&&W(this._dom,!0);let r=["performance","accessibility","best-practices","seo"].every(s=>{let c=e.categories[s];return c&&c.score===1}),i=this._opts.disableFireworks||this._opts.disableAutoDarkModeAndFireworks;if(r&&!i&&(this._enableFireworks(),t||W(this._dom,!0)),e.categories.performance&&e.categories.performance.auditRefs.some(s=>!!(s.group==="metrics"&&e.audits[s.id].errorMessage))){let s=this._dom.find("input.lh-metrics-toggle__input",this._dom.rootEl);s.checked=!0}this.json.audits["script-treemap-data"]&&this.json.audits["script-treemap-data"].details&&this.addButton({text:m.strings.viewTreemapLabel,icon:"treemap",onClick:()=>Me(this.json)}),this._opts.onViewTrace&&(e.configSettings.throttlingMethod==="simulate"?this._dom.find(\'a[data-action="view-unthrottled-trace"]\',this._dom.rootEl).classList.remove("lh-hidden"):this.addButton({text:m.strings.viewTraceLabel,onClick:()=>this._opts.onViewTrace?.()})),this._opts.getStandaloneReportHTML&&this._dom.find(\'a[data-ac\
-tion="save-html"]\',this._dom.rootEl).classList.remove("lh-hidden");for(let s of this._dom.findAll("[data-i18n]",this._dom.rootEl)){let d=s.getAttribute("data-i18n");s.textContent=m.strings[d]}}addButton(e){let t=this._dom.rootEl.querySelector(".lh-audit-group--metrics");if(!t)return;let n=t.querySelector(".lh-buttons");n||(n=this._dom.createChildOf(t,"div","lh-buttons"));let r=["lh-button"];e.icon&&(r.push("lh-report-icon"),r.push(`lh-report-icon--${e.icon}`));let i=this._dom.createChildOf(n,"button",r.join(" "));return i.textContent=e.text,i.addEventListener("click",e.onClick),i}resetUIState(){this._topbar&&this._topbar.resetUIState()}getReportHtml(){if(!this._opts.getStandaloneReportHTML)throw new Error("`getStandaloneReportHTML` is not set");return this.resetUIState(),this._opts.getStandaloneReportHTML()}saveAsGist(){throw new Error("Cannot save as gist from base report")}_enableFireworks(){this._dom.find(".lh-scores-container",this._dom.rootEl).classList.add("lh-score100")}_setupMe\
-diaQueryListeners(){let e=self.matchMedia("(max-width: 500px)");e.addListener(this.onMediaQueryChange),this.onMediaQueryChange(e)}_resetUIState(){this._topbar&&this._topbar.resetUIState()}onMediaQueryChange(e){this._dom.rootEl.classList.toggle("lh-narrow",e.matches)}_setupThirdPartyFilter(){let e=["uses-rel-preconnect","third-party-facades","network-dependency-tree-insight"],t=["legacy-javascript","legacy-javascript-insight"];Array.from(this._dom.rootEl.querySelectorAll("table.lh-table")).filter(i=>i.querySelector("td.lh-table-column--url, td.lh-table-column--source-location")).filter(i=>{let a=i.closest(".lh-audit");if(!a)throw new Error(".lh-table not within audit");return!e.includes(a.id)}).forEach(i=>{let a=Et(i),l=a.filter(f=>!f.classList.contains("lh-sub-item-row")),s=this._getThirdPartyRows(l,E.getFinalDisplayedUrl(this.json)),c=a.some(f=>f.classList.contains("lh-row--even")),d=this._dom.createComponent("3pFilter"),h=this._dom.find("input",d);h.addEventListener("change",f=>{let \
-u=f.target instanceof HTMLInputElement&&!f.target.checked,v=!0,_=l[0];for(;_;){let x=u&&s.includes(_);do _.classList.toggle("lh-row--hidden",x),c&&(_.classList.toggle("lh-row--even",!x&&v),_.classList.toggle("lh-row--odd",!x&&!v)),_=_.nextElementSibling;while(_&&_.classList.contains("lh-sub-item-row"));x||(v=!v)}});let p=s.filter(f=>!f.classList.contains("lh-row--group")).length;this._dom.find(".lh-3p-filter-count",d).textContent=`${p}`,this._dom.find(".lh-3p-ui-string",d).textContent=m.strings.thirdPartyResourcesLabel;let g=s.length===l.length,b=!s.length;if((g||b)&&(this._dom.find("div.lh-3p-filter",d).hidden=!0),!i.parentNode)return;i.parentNode.insertBefore(d,i);let w=i.closest(".lh-audit");if(!w)throw new Error(".lh-table not within audit");t.includes(w.id)&&!g&&h.click()})}_setupElementScreenshotOverlay(e){this._fullPageScreenshot&&V.installOverlayFeature({dom:this._dom,rootEl:e,overlayContainerEl:e,fullPageScreenshot:this._fullPageScreenshot})}_getThirdPartyRows(e,t){let n=E.get\
-EntityFromUrl(t,this.json.entities),r=this.json.entities?.find(a=>a.isFirstParty===!0)?.name,i=[];for(let a of e){if(r){if(!a.dataset.entity||a.dataset.entity===r)continue}else{let l=a.querySelector("div.lh-text__url");if(!l)continue;let s=l.dataset.url;if(!s||!(E.getEntityFromUrl(s,this.json.entities)!==n))continue}i.push(a)}return i}_saveFile(e){let t=e.type.match("json")?".json":".html",n=Te({finalDisplayedUrl:E.getFinalDisplayedUrl(this.json),fetchTime:this.json.fetchTime})+t;this._opts.onSaveFileOverride?this._opts.onSaveFileOverride(e,n):this._dom.saveFile(e,n)}};function Fe(o,e={}){let t=document.createElement("article");t.classList.add("lh-root","lh-vars");let n=new ee(t.ownerDocument,t);return new re(n).renderReport(o,t,e),new ae(n,e).initFeatures(o),t}var le=class{constructor(e){this.el=e;let t=document.createElement("style");if(t.textContent=`\n      #lh-log {\n        position: fixed;\n        background-color: #323232;\n        color: #fff;\n        min-height: 48px;\n        mi\
-n-width: 288px;\n        padding: 16px 24px;\n        box-shadow: 0 2px 5px 0 rgba(0, 0, 0, 0.26);\n        border-radius: 2px;\n        margin: 12px;\n        font-size: 14px;\n        cursor: default;\n        transition: transform 0.3s, opacity 0.3s;\n        transform: translateY(100px);\n        opacity: 0;\n        bottom: 0;\n        left: 0;\n        z-index: 3;\n        display: flex;\n        flex-direction: row;\n        justify-content: center;\n        align-items: center;\n      }\n      \n      #lh-log.lh-show {\n        opacity: 1;\n        transform: translateY(0);\n      }\n    `,!this.el.parentNode)throw new Error("element needs to be in the DOM");this.el.parentNode.insertBefore(t,this.el),this._id=void 0}log(e,t=!0){this._id&&clearTimeout(this._id),this.el.textContent=e,this.el.classList.add("lh-show"),t&&(this._id=setTimeout(()=>{this.el.classList.remove("lh-show")},7e3))}warn(e){this.log("Warning: "+e)}error(e){this.log(e),setTimeout(()=>{throw new Error(e)},0)}hide(){this._id&&clearTim\
-eout(this._id),this.el.classList.remove("lh-show")}};function St(){let o=window.__LIGHTHOUSE_JSON__,e=Fe(o,{occupyEntireViewport:!0,getStandaloneReportHTML(){return document.documentElement.outerHTML}});document.body.append(e),document.addEventListener("lh-analytics",t=>{let n=t;"gtag"in window&&window.gtag("event",n.detail.name,n.detail.data??{})}),document.addEventListener("lh-log",t=>{let n=document.querySelector("div#lh-log");if(!n)return;let r=new le(n),i=t.detail;switch(i.cmd){case"log":r.log(i.msg);break;case"warn":r.warn(i.msg);break;case"error":r.error(i.msg);break;case"hide":r.hide();break}})}window.__initLighthouseReport__=St;})();\n/**\n * @license\n * Copyright 2017 Google LLC\n * SPDX-License-Identifier: Apache-2.0\n */\n/**\n * @license\n * Copyright 2023 Google LLC\n * SPDX-License-Identifier: Apache-2.0\n */\n/**\n * @license\n * Copyright 2020 Google LLC\n * SPDX-License-Identifier: Apache-2.0\n */\n/**\n * @license Copyright 2023 The Lighthouse Authors. All Rights Reserved.\n * Licens\
-ed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the License. You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0\n * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.\n*/\n/**\n * @license\n * Copyright 2018 Google LLC\n * SPDX-License-Identifier: Apache-2.0\n */\n/**\n * @license\n * Copyright 2017 Google LLC\n * SPDX-License-Identifier: Apache-2.0\n *\n * Dummy text for ensuring report robustness: <\\/script> pre$`post %%LIGHTHOUSE_JSON%%\n * (this is handled by terser)\n */\n/**\n * @license\n * Copyright 2021 Google LLC\n * SPDX-License-Identifier: Apache-2.0\n */\n'
-    };
-  }
-});
+  REPORT_JAVASCRIPT: '"use strict";(()=>{var Re=.8999999999999999,Ne=.5,Ie=.49999999999999994;function He(o){let e=Math.sign(o);o=Math.abs(o);let t=.254829592,n=-.284496736,r=1.421413741,i=-1.453152027,a=1.061405429,s=1/(1+.3275911*o),c=s*(t+s*(n+s*(r+s*(i+s*a))));return e*(1-c*Math.exp(-o*o))}function fe({median:o,p10:e},t){if(o<=0)throw new Error("median must be greater than zero");if(e<=0)throw new Error("p10 must be greater than zero");if(e>=o)throw new Error("p10 must be less than the median");if(t<=0)return 1;let n=.9061938024368232,r=Math.max(Number.MIN_VALUE,t/o),i=Math.log(r),a=Math.max(Number.MIN_VALUE,e/o),l=-Math.log(a),s=i*n/l,c=(1-He(s))/2,d;return t<=e?d=Math.max(.9,Math.min(1,c)):t<=o?d=Math.max(Ne,Math.min(Re,c)):d=Math.max(0,Math.min(Ie,c)),d}var U="\\u2026",Oe="\\xA0",ve=.9,$e={PASS:{label:"pass",minScore:ve},AVERAGE:{label:"average",minScore:.5},FAIL:{label:"fail"},ERROR:{label:"error"}},Ve=["com","co","gov","edu","ac","org","go","gob","or","net","in","ne","nic","gouv\
+","web","spb","blog","jus","kiev","mil","wi","qc","ca","bel","on"],E=class o{static get RATINGS(){return $e}static get PASS_THRESHOLD(){return ve}static get MS_DISPLAY_VALUE(){return`%10d${Oe}ms`}static getFinalDisplayedUrl(e){if(e.finalDisplayedUrl)return e.finalDisplayedUrl;if(e.finalUrl)return e.finalUrl;throw new Error("Could not determine final displayed URL")}static getMainDocumentUrl(e){return e.mainDocumentUrl||e.finalUrl}static getFullPageScreenshot(e){return e.fullPageScreenshot?e.fullPageScreenshot:e.audits["full-page-screenshot"]?.details}static getEntityFromUrl(e,t){return t&&t.find(r=>r.origins.find(i=>e.startsWith(i)))||o.getPseudoRootDomain(e)}static splitMarkdownCodeSpans(e){let t=[],n=e.split(/`(.*?)`/g);for(let r=0;r<n.length;r++){let i=n[r];if(!i)continue;let a=r%2!==0;t.push({isCode:a,text:i})}return t}static splitMarkdownLink(e){let t=[],n=e.split(/\\[([^\\]]+?)\\]\\((https?:\\/\\/.*?)\\)/g);for(;n.length;){let[r,i,a]=n.splice(0,3);r&&t.push({isLink:!1,text:r}),i&&a&&t.p\
+ush({isLink:!0,text:i,linkHref:a})}return t}static truncate(e,t,n="\\u2026"){if(e.length<=t)return e;let i=new Intl.Segmenter(void 0,{granularity:"grapheme"}).segment(e)[Symbol.iterator](),a=0;for(let l=0;l<=t-n.length;l++){let s=i.next();if(s.done)return e;a=s.value.index}for(let l=0;l<n.length;l++)if(i.next().done)return e;return e.slice(0,a)+n}static getURLDisplayName(e,t){t=t||{numPathParts:void 0,preserveQuery:void 0,preserveHost:void 0};let n=t.numPathParts!==void 0?t.numPathParts:2,r=t.preserveQuery!==void 0?t.preserveQuery:!0,i=t.preserveHost||!1,a;if(e.protocol==="about:"||e.protocol==="data:")a=e.href;else{a=e.pathname;let s=a.split("/").filter(c=>c.length);n&&s.length>n&&(a=U+s.slice(-1*n).join("/")),i&&(a=`${e.host}/${a.replace(/^\\//,"")}`),r&&(a=`${a}${e.search}`)}let l=64;if(e.protocol!=="data:"&&(a=a.slice(0,200),a=a.replace(/([a-f0-9]{7})[a-f0-9]{13}[a-f0-9]*/g,`$1${U}`),a=a.replace(/([a-zA-Z0-9-_]{9})(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])[a-zA-Z0-9-_]{10,}/g,`$1${U}`),a=a.re\
+place(/(\\d{3})\\d{6,}/g,`$1${U}`),a=a.replace(/\\u2026+/g,U),a.length>l&&a.includes("?")&&(a=a.replace(/\\?([^=]*)(=)?.*/,`?$1$2${U}`),a.length>l&&(a=a.replace(/\\?.*/,`?${U}`)))),a.length>l){let s=a.lastIndexOf(".");s>=0?a=a.slice(0,l-1-(a.length-s))+`${U}${a.slice(s)}`:a=a.slice(0,l-1)+U}return a}static getChromeExtensionOrigin(e){let t=new URL(e);return t.protocol+"//"+t.host}static parseURL(e){let t=new URL(e);return{file:o.getURLDisplayName(t),hostname:t.hostname,origin:t.protocol==="chrome-extension:"?o.getChromeExtensionOrigin(e):t.origin}}static createOrReturnURL(e){return e instanceof URL?e:new URL(e)}static getPseudoTld(e){let t=e.split(".").slice(-2);return Ve.includes(t[0])?`.${t.join(".")}`:`.${t[t.length-1]}`}static getPseudoRootDomain(e){let t=o.createOrReturnURL(e).hostname,r=o.getPseudoTld(t).split(".");return t.split(".").slice(-r.length).join(".")}static filterRelevantLines(e,t,n){if(t.length===0)return e.slice(0,n*2+1);let r=3,i=new Set;return t=t.sort((a,l)=>(a.lineNum\
+ber||0)-(l.lineNumber||0)),t.forEach(({lineNumber:a})=>{let l=a-n,s=a+n;for(;l<1;)l++,s++;i.has(l-r-1)&&(l-=r);for(let c=l;c<=s;c++){let d=c;i.add(d)}}),e.filter(a=>i.has(a.lineNumber))}static computeLogNormalScore(e,t){let n=fe(e,t);return n>.9&&(n+=.05*(n-.9)),Math.floor(n*100)/100}};function Ge(o){let e=o.createFragment(),t=o.createElement("style");t.append(`\n    .lh-3p-filter {\n      color: var(--color-gray-600);\n      float: right;\n      padding: 6px var(--stackpack-padding-horizontal);\n    }\n    .lh-3p-filter-label, .lh-3p-filter-input {\n      vertical-align: middle;\n      user-select: none;\n    }\n    .lh-3p-filter-input:disabled + .lh-3p-ui-string {\n      text-decoration: line-through;\n    }\n  `),e.append(t);let n=o.createElement("div","lh-3p-filter"),r=o.createElement("label","lh-3p-filter-label"),i=o.createElement("input","lh-3p-filter-input");i.setAttribute("type","checkbox"),i.setAttribute("checked","");let a=o.createElement("span","lh-3p-ui-string");a.append("Show 3rd party\
+ resources");let l=o.createElement("span","lh-3p-filter-count");return r.append(" ",i," ",a," (",l,") "),n.append(" ",r," "),e.append(n),e}function Be(o){let e=o.createFragment(),t=o.createElement("div","lh-audit"),n=o.createElement("details","lh-expandable-details"),r=o.createElement("summary"),i=o.createElement("div","lh-audit__header lh-expandable-details__summary"),a=o.createElement("span","lh-audit__score-icon"),l=o.createElement("span","lh-audit__title-and-text"),s=o.createElement("span","lh-audit__title"),c=o.createElement("span","lh-audit__display-text");l.append(" ",s," ",c," ");let d=o.createElement("div","lh-chevron-container");i.append(" ",a," ",l," ",d," "),r.append(" ",i," ");let h=o.createElement("div","lh-audit__description"),p=o.createElement("div","lh-audit__stackpacks");return n.append(" ",r," ",h," ",p," "),t.append(" ",n," "),e.append(t),e}function qe(o){let e=o.createFragment(),t=o.createElement("div","lh-category-header"),n=o.createElement("div","lh-score__gauge"\
+);n.setAttribute("role","heading"),n.setAttribute("aria-level","2");let r=o.createElement("div","lh-category-header__description");return t.append(" ",n," ",r," "),e.append(t),e}function je(o){let e=o.createFragment(),t=o.createElementNS("http://www.w3.org/2000/svg","svg","lh-chevron");t.setAttribute("viewBox","0 0 100 100");let n=o.createElementNS("http://www.w3.org/2000/svg","g","lh-chevron__lines"),r=o.createElementNS("http://www.w3.org/2000/svg","path","lh-chevron__line lh-chevron__line-left");r.setAttribute("d","M10 50h40");let i=o.createElementNS("http://www.w3.org/2000/svg","path","lh-chevron__line lh-chevron__line-right");return i.setAttribute("d","M90 50H50"),n.append(" ",r," ",i," "),t.append(" ",n," "),e.append(t),e}function We(o){let e=o.createFragment(),t=o.createElement("div","lh-audit-group"),n=o.createElement("details","lh-clump"),r=o.createElement("summary"),i=o.createElement("div","lh-audit-group__summary"),a=o.createElement("div","lh-audit-group__header"),l=o.createE\
+lement("span","lh-audit-group__title"),s=o.createElement("span","lh-audit-group__itemcount");a.append(" ",l," ",s," "," "," ");let c=o.createElement("div","lh-clump-toggle"),d=o.createElement("span","lh-clump-toggletext--show"),h=o.createElement("span","lh-clump-toggletext--hide");return c.append(" ",d," ",h," "),i.append(" ",a," ",c," "),r.append(" ",i," "),n.append(" ",r," "),t.append(" "," ",n," "),e.append(t),e}function Ke(o){let e=o.createFragment(),t=o.createElement("div","lh-crc-container"),n=o.createElement("style");n.append(`\n      .lh-crc .lh-tree-marker {\n        width: 12px;\n        height: 26px;\n        display: block;\n        float: left;\n        background-position: top left;\n      }\n      .lh-crc .lh-horiz-down {\n        background: url(\'data:image/svg+xml;utf8,<svg width="16" height="26" viewBox="0 0 16 26" xmlns="http://www.w3.org/2000/svg"><g fill="%23D8D8D8" fill-rule="evenodd"><path d="M16 12v2H-2v-2z"/><path d="M9 12v14H7V12z"/></g></svg>\');\n      }\n      .lh-crc \
+.lh-right {\n        background: url(\'data:image/svg+xml;utf8,<svg width="16" height="26" viewBox="0 0 16 26" xmlns="http://www.w3.org/2000/svg"><path d="M16 12v2H0v-2z" fill="%23D8D8D8" fill-rule="evenodd"/></svg>\');\n      }\n      .lh-crc .lh-up-right {\n        background: url(\'data:image/svg+xml;utf8,<svg width="16" height="26" viewBox="0 0 16 26" xmlns="http://www.w3.org/2000/svg"><path d="M7 0h2v14H7zm2 12h7v2H9z" fill="%23D8D8D8" fill-rule="evenodd"/></svg>\');\n      }\n      .lh-crc .lh-vert-right {\n        background: url(\'data:image/svg+xml;utf8,<svg width="16" height="26" viewBox="0 0 16 26" xmlns="http://www.w3.org/2000/svg"><path d="M7 0h2v27H7zm2 12h7v2H9z" fill="%23D8D8D8" fill-rule="evenodd"/></svg>\');\n      }\n      .lh-crc .lh-vert {\n        background: url(\'data:image/svg+xml;utf8,<svg width="16" height="26" viewBox="0 0 16 26" xmlns="http://www.w3.org/2000/svg"><path d="M7 0h2v26H7z" fill="%23D8D8D8" fill-rule="evenodd"/></svg>\');\n      }\n      .lh-crc .lh-crc-tree {\n    \
+    font-size: 14px;\n        width: 100%;\n        overflow-x: auto;\n      }\n      .lh-crc .lh-crc-node {\n        height: 26px;\n        line-height: 26px;\n        white-space: nowrap;\n      }\n      .lh-crc .lh-crc-node__longest {\n        color: var(--color-average-secondary);\n      }\n      .lh-crc .lh-crc-node__tree-value {\n        margin-left: 10px;\n      }\n      .lh-crc .lh-crc-node__tree-value div {\n        display: inline;\n      }\n      .lh-crc .lh-crc-node__chain-duration {\n        font-weight: 700;\n      }\n      .lh-crc .lh-crc-initial-nav {\n        color: #595959;\n        font-style: italic;\n      }\n      .lh-crc__summary-value {\n        margin-bottom: 10px;\n      }\n    `);let r=o.createElement("div"),i=o.createElement("div","lh-crc__summary-value"),a=o.createElement("span","lh-crc__longest_duration_label"),l=o.createElement("b","lh-crc__longest_duration");i.append(" ",a," ",l," "),r.append(" ",i," ");let s=o.createElement("div","lh-crc"),c=o.createElement("div","lh-crc-initial-n\
+av");return s.append(" ",c," "," "),t.append(" ",n," ",r," ",s," "),e.append(t),e}function Je(o){let e=o.createFragment(),t=o.createElement("div","lh-crc-node"),n=o.createElement("span","lh-crc-node__tree-marker"),r=o.createElement("span","lh-crc-node__tree-value");return t.append(" ",n," ",r," "),e.append(t),e}function Ze(o){let e=o.createFragment(),t=o.createElement("div","lh-element-screenshot"),n=o.createElement("div","lh-element-screenshot__content"),r=o.createElement("div","lh-element-screenshot__image"),i=o.createElement("div","lh-element-screenshot__mask"),a=o.createElementNS("http://www.w3.org/2000/svg","svg");a.setAttribute("height","0"),a.setAttribute("width","0");let l=o.createElementNS("http://www.w3.org/2000/svg","defs"),s=o.createElementNS("http://www.w3.org/2000/svg","clipPath");s.setAttribute("clipPathUnits","objectBoundingBox"),l.append(" ",s," "," "),a.append(" ",l," "),i.append(" ",a," ");let c=o.createElement("div","lh-element-screenshot__element-marker");return r.\
+append(" ",i," ",c," "),n.append(" ",r," "),t.append(" ",n," "),e.append(t),e}function Qe(o){let e=o.createFragment(),t=o.createElement("div","lh-exp-gauge-component"),n=o.createElement("div","lh-exp-gauge__wrapper");n.setAttribute("target","_blank");let r=o.createElement("div","lh-exp-gauge__svg-wrapper"),i=o.createElementNS("http://www.w3.org/2000/svg","svg","lh-exp-gauge"),a=o.createElementNS("http://www.w3.org/2000/svg","g","lh-exp-gauge__inner"),l=o.createElementNS("http://www.w3.org/2000/svg","circle","lh-exp-gauge__bg"),s=o.createElementNS("http://www.w3.org/2000/svg","circle","lh-exp-gauge__base lh-exp-gauge--faded"),c=o.createElementNS("http://www.w3.org/2000/svg","circle","lh-exp-gauge__arc"),d=o.createElementNS("http://www.w3.org/2000/svg","text","lh-exp-gauge__percentage");a.append(" ",l," ",s," ",c," ",d," ");let h=o.createElementNS("http://www.w3.org/2000/svg","g","lh-exp-gauge__outer"),p=o.createElementNS("http://www.w3.org/2000/svg","circle","lh-cover");h.append(" ",p,"\
+ ");let g=o.createElementNS("http://www.w3.org/2000/svg","text","lh-exp-gauge__label");return g.setAttribute("text-anchor","middle"),g.setAttribute("x","0"),g.setAttribute("y","60"),i.append(" ",a," ",h," ",g," "),r.append(" ",i," "),n.append(" ",r," "),t.append(" ",n," "),e.append(t),e}function Ye(o){let e=o.createFragment(),t=o.createElement("style");t.append(`\n    .lh-footer {\n      padding: var(--footer-padding-vertical) calc(var(--default-padding) * 2);\n      max-width: var(--report-content-max-width);\n      margin: 0 auto;\n    }\n    .lh-footer .lh-generated {\n      text-align: center;\n    }\n  `),e.append(t);let n=o.createElement("footer","lh-footer"),r=o.createElement("ul","lh-meta__items");r.append(" ");let i=o.createElement("div","lh-generated"),a=o.createElement("b");a.append("Lighthouse");let l=o.createElement("span","lh-footer__version"),s=o.createElement("a","lh-footer__version_issue");return s.setAttribute("href","https://github.com/GoogleChrome/Lighthouse/issues"),s.setAt\
+tribute("target","_blank"),s.setAttribute("rel","noopener"),s.append("File an issue"),i.append(" "," Generated by ",a," ",l," | ",s," "),n.append(" ",r," ",i," "),e.append(n),e}function Xe(o){let e=o.createFragment(),t=o.createElement("a","lh-fraction__wrapper"),n=o.createElement("div","lh-fraction__content-wrapper"),r=o.createElement("div","lh-fraction__content"),i=o.createElement("div","lh-fraction__background");r.append(" ",i," "),n.append(" ",r," ");let a=o.createElement("div","lh-fraction__label");return t.append(" ",n," ",a," "),e.append(t),e}function et(o){let e=o.createFragment(),t=o.createElement("a","lh-gauge__wrapper"),n=o.createElement("div","lh-gauge__svg-wrapper"),r=o.createElementNS("http://www.w3.org/2000/svg","svg","lh-gauge");r.setAttribute("viewBox","0 0 120 120");let i=o.createElementNS("http://www.w3.org/2000/svg","circle","lh-gauge-base");i.setAttribute("r","56"),i.setAttribute("cx","60"),i.setAttribute("cy","60"),i.setAttribute("stroke-width","8");let a=o.createE\
+lementNS("http://www.w3.org/2000/svg","circle","lh-gauge-arc");a.setAttribute("r","56"),a.setAttribute("cx","60"),a.setAttribute("cy","60"),a.setAttribute("stroke-width","8"),r.append(" ",i," ",a," "),n.append(" ",r," ");let l=o.createElement("div","lh-gauge__percentage"),s=o.createElement("div","lh-gauge__label");return t.append(" "," ",n," ",l," "," ",s," "),e.append(t),e}function tt(o){let e=o.createFragment(),t=o.createElement("style");t.append(`\n    /* CSS Fireworks. Originally by Eddie Lin\n       https://codepen.io/paulirish/pen/yEVMbP\n    */\n    .lh-pyro {\n      display: none;\n      z-index: 1;\n      pointer-events: none;\n    }\n    .lh-score100 .lh-pyro {\n      display: block;\n    }\n    .lh-score100 .lh-lighthouse stop:first-child {\n      stop-color: hsla(200, 12%, 95%, 0);\n    }\n    .lh-score100 .lh-lighthouse stop:last-child {\n      stop-color: hsla(65, 81%, 76%, 1);\n    }\n\n    .lh-pyro > .lh-pyro-before, .lh-pyro > .lh-pyro-after {\n      position: absolute;\n      width: 5px;\n\
+      height: 5px;\n      border-radius: 2.5px;\n      box-shadow: 0 0 #fff, 0 0 #fff, 0 0 #fff, 0 0 #fff, 0 0 #fff, 0 0 #fff, 0 0 #fff, 0 0 #fff, 0 0 #fff, 0 0 #fff, 0 0 #fff, 0 0 #fff, 0 0 #fff, 0 0 #fff, 0 0 #fff, 0 0 #fff, 0 0 #fff, 0 0 #fff, 0 0 #fff, 0 0 #fff, 0 0 #fff, 0 0 #fff, 0 0 #fff, 0 0 #fff, 0 0 #fff, 0 0 #fff, 0 0 #fff, 0 0 #fff, 0 0 #fff, 0 0 #fff, 0 0 #fff, 0 0 #fff, 0 0 #fff, 0 0 #fff, 0 0 #fff, 0 0 #fff, 0 0 #fff, 0 0 #fff, 0 0 #fff, 0 0 #fff, 0 0 #fff, 0 0 #fff, 0 0 #fff, 0 0 #fff, 0 0 #fff, 0 0 #fff, 0 0 #fff, 0 0 #fff, 0 0 #fff, 0 0 #fff, 0 0 #fff;\n      animation: 1s bang ease-out infinite backwards,  1s gravity ease-in infinite backwards,  5s position linear infinite backwards;\n      animation-delay: 1s, 1s, 1s;\n    }\n\n    .lh-pyro > .lh-pyro-after {\n      animation-delay: 2.25s, 2.25s, 2.25s;\n      animation-duration: 1.25s, 1.25s, 6.25s;\n    }\n\n    @keyframes bang {\n      to {\n        opacity: 1;\n        box-shadow: -70px -115.67px #47ebbc, -28px -99.67px #eb47a\
+4, 58px -31.67px #7eeb47, 13px -141.67px #eb47c5, -19px 6.33px #7347eb, -2px -74.67px #ebd247, 24px -151.67px #eb47e0, 57px -138.67px #b4eb47, -51px -104.67px #479eeb, 62px 8.33px #ebcf47, -93px 0.33px #d547eb, -16px -118.67px #47bfeb, 53px -84.67px #47eb83, 66px -57.67px #eb47bf, -93px -65.67px #91eb47, 30px -13.67px #86eb47, -2px -59.67px #83eb47, -44px 1.33px #eb47eb, 61px -58.67px #47eb73, 5px -22.67px #47e8eb, -66px -28.67px #ebe247, 42px -123.67px #eb5547, -75px 26.33px #7beb47, 15px -52.67px #a147eb, 36px -51.67px #eb8347, -38px -12.67px #eb5547, -46px -59.67px #47eb81, 78px -114.67px #eb47ba, 15px -156.67px #eb47bf, -36px 1.33px #eb4783, -72px -86.67px #eba147, 31px -46.67px #ebe247, -68px 29.33px #47e2eb, -55px 19.33px #ebe047, -56px 27.33px #4776eb, -13px -91.67px #eb5547, -47px -138.67px #47ebc7, -18px -96.67px #eb47ac, 11px -88.67px #4783eb, -67px -28.67px #47baeb, 53px 10.33px #ba47eb, 11px 19.33px #5247eb, -5px -11.67px #eb4791, -68px -4.67px #47eba7, 95px -37.67px #eb478\
+b, -67px -162.67px #eb5d47, -54px -120.67px #eb6847, 49px -12.67px #ebe047, 88px 8.33px #47ebda, 97px 33.33px #eb8147, 6px -71.67px #ebbc47;\n      }\n    }\n    @keyframes gravity {\n      from {\n        opacity: 1;\n      }\n      to {\n        transform: translateY(80px);\n        opacity: 0;\n      }\n    }\n    @keyframes position {\n      0%, 19.9% {\n        margin-top: 4%;\n        margin-left: 47%;\n      }\n      20%, 39.9% {\n        margin-top: 7%;\n        margin-left: 30%;\n      }\n      40%, 59.9% {\n        margin-top: 6%;\n        margin-left: 70%;\n      }\n      60%, 79.9% {\n        margin-top: 3%;\n        margin-left: 20%;\n      }\n      80%, 99.9% {\n        margin-top: 3%;\n        margin-left: 80%;\n      }\n    }\n  `),e.append(t);let n=o.createElement("div","lh-header-container"),r=o.createElement("div","lh-scores-wrapper-placeholder");return n.append(" ",r," "),e.append(n),e}function nt(o){let e=o.createFragment(),t=o.createElement("div","lh-metric"),n=o.createElement("div","lh-metric__in\
+nerwrap"),r=o.createElement("div","lh-metric__icon"),i=o.createElement("span","lh-metric__title"),a=o.createElement("div","lh-metric__value"),l=o.createElement("div","lh-metric__description");return n.append(" ",r," ",i," ",a," ",l," "),t.append(" ",n," "),e.append(t),e}function rt(o){let e=o.createFragment(),t=o.createElement("div","lh-scorescale"),n=o.createElement("span","lh-scorescale-range lh-scorescale-range--fail");n.append("0\\u201349");let r=o.createElement("span","lh-scorescale-range lh-scorescale-range--average");r.append("50\\u201389");let i=o.createElement("span","lh-scorescale-range lh-scorescale-range--pass");return i.append("90\\u2013100"),t.append(" ",n," ",r," ",i," "),e.append(t),e}function ot(o){let e=o.createFragment(),t=o.createElement("style");t.append(`\n    .lh-scores-container {\n      display: flex;\n      flex-direction: column;\n      padding: var(--default-padding) 0;\n      position: relative;\n      width: 100%;\n    }\n\n    .lh-sticky-header {\n      --gauge-circle\
+-size: var(--gauge-circle-size-sm);\n      --plugin-badge-size: 16px;\n      --plugin-icon-size: 75%;\n      --gauge-wrapper-width: 60px;\n      --gauge-percentage-font-size: 13px;\n      position: fixed;\n      left: 0;\n      right: 0;\n      top: var(--topbar-height);\n      font-weight: 500;\n      display: none;\n      justify-content: center;\n      background-color: var(--sticky-header-background-color);\n      border-bottom: 1px solid var(--color-gray-200);\n      padding-top: var(--score-container-padding);\n      padding-bottom: 4px;\n      z-index: 2;\n      pointer-events: none;\n    }\n\n    .lh-devtools .lh-sticky-header {\n      /* The report within DevTools is placed in a container with overflow, which changes the placement of this header unless we change \\`position\\` to \\`sticky.\\` */\n      position: sticky;\n    }\n\n    .lh-sticky-header--visible {\n      display: grid;\n      grid-auto-flow: column;\n      pointer-events: auto;\n    }\n\n    /* Disable the gauge arc animation for the sticky head\
+er, so toggling display: none\n       does not play the animation. */\n    .lh-sticky-header .lh-gauge-arc {\n      animation: none;\n    }\n\n    .lh-sticky-header .lh-gauge__label,\n    .lh-sticky-header .lh-fraction__label {\n      display: none;\n    }\n\n    .lh-highlighter {\n      width: var(--gauge-wrapper-width);\n      height: 1px;\n      background-color: var(--highlighter-background-color);\n      /* Position at bottom of first gauge in sticky header. */\n      position: absolute;\n      grid-column: 1;\n      bottom: -1px;\n      left: 0px;\n      right: 0px;\n    }\n  `),e.append(t);let n=o.createElement("div","lh-scores-wrapper"),r=o.createElement("div","lh-scores-container"),i=o.createElement("div","lh-pyro"),a=o.createElement("div","lh-pyro-before"),l=o.createElement("div","lh-pyro-after");return i.append(" ",a," ",l," "),r.append(" ",i," "),n.append(" ",r," "),e.append(n),e}function it(o){let e=o.createFragment(),t=o.createElement("div","lh-snippet"),n=o.createElement("style");return n.app\
+end(`\n          :root {\n            --snippet-highlight-light: #fbf1f2;\n            --snippet-highlight-dark: #ffd6d8;\n          }\n\n         .lh-snippet__header {\n          position: relative;\n          overflow: hidden;\n          padding: 10px;\n          border-bottom: none;\n          color: var(--snippet-color);\n          background-color: var(--snippet-background-color);\n          border: 1px solid var(--report-border-color-secondary);\n        }\n        .lh-snippet__title {\n          font-weight: bold;\n          float: left;\n        }\n        .lh-snippet__node {\n          float: left;\n          margin-left: 4px;\n        }\n        .lh-snippet__toggle-expand {\n          padding: 1px 7px;\n          margin-top: -1px;\n          margin-right: -7px;\n          float: right;\n          background: transparent;\n          border: none;\n          cursor: pointer;\n          font-size: 14px;\n          color: #0c50c7;\n        }\n\n        .lh-snippet__snippet {\n          overflow: auto;\n          bor\
+der: 1px solid var(--report-border-color-secondary);\n        }\n        /* Container needed so that all children grow to the width of the scroll container */\n        .lh-snippet__snippet-inner {\n          display: inline-block;\n          min-width: 100%;\n        }\n\n        .lh-snippet:not(.lh-snippet--expanded) .lh-snippet__show-if-expanded {\n          display: none;\n        }\n        .lh-snippet.lh-snippet--expanded .lh-snippet__show-if-collapsed {\n          display: none;\n        }\n\n        .lh-snippet__line {\n          background: white;\n          white-space: pre;\n          display: flex;\n        }\n        .lh-snippet__line:not(.lh-snippet__line--message):first-child {\n          padding-top: 4px;\n        }\n        .lh-snippet__line:not(.lh-snippet__line--message):last-child {\n          padding-bottom: 4px;\n        }\n        .lh-snippet__line--content-highlighted {\n          background: var(--snippet-highlight-dark);\n        }\n        .lh-snippet__line--message {\n          background\
+: var(--snippet-highlight-light);\n        }\n        .lh-snippet__line--message .lh-snippet__line-number {\n          padding-top: 10px;\n          padding-bottom: 10px;\n        }\n        .lh-snippet__line--message code {\n          padding: 10px;\n          padding-left: 5px;\n          color: var(--color-fail);\n          font-family: var(--report-font-family);\n        }\n        .lh-snippet__line--message code {\n          white-space: normal;\n        }\n        .lh-snippet__line-icon {\n          padding-top: 10px;\n          display: none;\n        }\n        .lh-snippet__line--message .lh-snippet__line-icon {\n          display: block;\n        }\n        .lh-snippet__line-icon:before {\n          content: "";\n          display: inline-block;\n          vertical-align: middle;\n          margin-right: 4px;\n          width: var(--score-icon-size);\n          height: var(--score-icon-size);\n          background-image: var(--fail-icon-url);\n        }\n        .lh-snippet__line-number {\n          flex-shr\
+ink: 0;\n          width: 40px;\n          text-align: right;\n          font-family: monospace;\n          padding-right: 5px;\n          margin-right: 5px;\n          color: var(--color-gray-600);\n          user-select: none;\n        }\n    `),t.append(" ",n," "),e.append(t),e}function at(o){let e=o.createFragment(),t=o.createElement("div","lh-snippet__snippet"),n=o.createElement("div","lh-snippet__snippet-inner");return t.append(" ",n," "),e.append(t),e}function lt(o){let e=o.createFragment(),t=o.createElement("div","lh-snippet__header"),n=o.createElement("div","lh-snippet__title"),r=o.createElement("div","lh-snippet__node"),i=o.createElement("button","lh-snippet__toggle-expand"),a=o.createElement("span","lh-snippet__btn-label-collapse lh-snippet__show-if-expanded"),l=o.createElement("span","lh-snippet__btn-label-expand lh-snippet__show-if-collapsed");return i.append(" ",a," ",l," "),t.append(" ",n," ",r," ",i," "),e.append(t),e}function st(o){let e=o.createFragment(),t=o.createElement("di\
+v","lh-snippet__line"),n=o.createElement("div","lh-snippet__line-number"),r=o.createElement("div","lh-snippet__line-icon"),i=o.createElement("code");return t.append(" ",n," ",r," ",i," "),e.append(t),e}function ct(o){let e=o.createFragment(),t=o.createElement("style");return t.append(`/**\n * @license\n * Copyright 2017 Google LLC\n * SPDX-License-Identifier: Apache-2.0\n */\n\n/*\n  Naming convention:\n\n  If a variable is used for a specific component: --{component}-{property name}-{modifier}\n\n  Both {component} and {property name} should be kebab-case. If the target is the entire page,\n  use \'report\' for the component. The property name should not be abbreviated. Use the\n  property name the variable is intended for - if it\'s used for multiple, a common descriptor\n  is fine (ex: \'size\' for a variable applied to \'width\' and \'height\'). If a variable is shared\n  across multiple components, either create more variables or just drop the "{component}-"\n  part of the name. Append any modifiers at th\
+e end (ex: \'big\', \'dark\').\n\n  For colors: --color-{hue}-{intensity}\n\n  {intensity} is the Material Design tag - 700, A700, etc.\n*/\n.lh-vars {\n  /* Palette using Material Design Colors\n   * https://www.materialui.co/colors */\n  --color-amber-50: #FFF8E1;\n  --color-blue-200: #90CAF9;\n  --color-blue-900: #0D47A1;\n  --color-blue-A700: #2962FF;\n  --color-blue-primary: #06f;\n  --color-cyan-500: #00BCD4;\n  --color-gray-100: #F5F5F5;\n  --color-gray-300: #CFCFCF;\n  --color-gray-200: #E0E0E0;\n  --color-gray-400: #BDBDBD;\n  --color-gray-50: #FAFAFA;\n  --color-gray-500: #9E9E9E;\n  --color-gray-600: #757575;\n  --color-gray-700: #616161;\n  --color-gray-800: #424242;\n  --color-gray-900: #212121;\n  --color-gray: #000000;\n  --color-green-700: #080;\n  --color-green: #0c6;\n  --color-lime-400: #D3E156;\n  --color-orange-50: #FFF3E0;\n  --color-orange-700: #C33300;\n  --color-orange: #fa3;\n  --color-red-700: #c00;\n  --color-red: #f33;\n  --color-teal-600: #00897B;\n  --color-white: #FFFFFF;\n\n  /* Context-specif\
+ic colors */\n  --color-average-secondary: var(--color-orange-700);\n  --color-average: var(--color-orange);\n  --color-fail-secondary: var(--color-red-700);\n  --color-fail: var(--color-red);\n  --color-hover: var(--color-gray-50);\n  --color-informative: var(--color-blue-900);\n  --color-pass-secondary: var(--color-green-700);\n  --color-pass: var(--color-green);\n  --color-not-applicable: var(--color-gray-600);\n\n  /* Component variables */\n  --audit-description-padding-left: calc(var(--score-icon-size) + var(--score-icon-margin-left) + var(--score-icon-margin-right));\n  --audit-explanation-line-height: 16px;\n  --audit-group-margin-bottom: calc(var(--default-padding) * 6);\n  --audit-group-padding-vertical: 8px;\n  --audit-margin-horizontal: 5px;\n  --audit-padding-vertical: 8px;\n  --category-padding: calc(var(--default-padding) * 6) var(--edge-gap-padding) calc(var(--default-padding) * 4);\n  --chevron-line-stroke: var(--color-gray-600);\n  --chevron-size: 12px;\n  --default-padding: 8px;\n  --edge\
+-gap-padding: calc(var(--default-padding) * 4);\n  --env-item-background-color: var(--color-gray-100);\n  --env-item-font-size: 28px;\n  --env-item-line-height: 36px;\n  --env-item-padding: 10px 0px;\n  --env-name-min-width: 220px;\n  --footer-padding-vertical: 16px;\n  --gauge-circle-size-big: 96px;\n  --gauge-circle-size: 48px;\n  --gauge-circle-size-sm: 32px;\n  --gauge-label-font-size-big: 18px;\n  --gauge-label-font-size: var(--report-font-size-secondary);\n  --gauge-label-line-height-big: 24px;\n  --gauge-label-line-height: var(--report-line-height-secondary);\n  --gauge-percentage-font-size-big: 38px;\n  --gauge-percentage-font-size: var(--report-font-size-secondary);\n  --gauge-wrapper-width: 120px;\n  --header-line-height: 24px;\n  --highlighter-background-color: var(--report-text-color);\n  --icon-square-size: calc(var(--score-icon-size) * 0.88);\n  --image-preview-size: 48px;\n  --link-color: var(--color-blue-primary);\n  --locale-selector-background-color: var(--color-white);\n  --metric-toggle-l\
+ines-fill: #7F7F7F;\n  --metric-value-font-size: calc(var(--report-font-size) * 1.8);\n  --metrics-toggle-background-color: var(--color-gray-200);\n  --plugin-badge-background-color: var(--color-white);\n  --plugin-badge-size-big: calc(var(--gauge-circle-size-big) / 2.7);\n  --plugin-badge-size: calc(var(--gauge-circle-size) / 2.7);\n  --plugin-icon-size: 65%;\n  --report-background-color: #fff;\n  --report-border-color-secondary: #ebebeb;\n  --report-font-family-monospace: monospace, \'Roboto Mono\', \'Menlo\', \'dejavu sans mono\', \'Consolas\', \'Lucida Console\';\n  --report-font-family: system-ui, Roboto, Helvetica, Arial, sans-serif;\n  --report-font-size: 14px;\n  --report-font-size-secondary: 12px;\n  --report-icon-size: var(--score-icon-background-size);\n  --report-line-height: 24px;\n  --report-line-height-secondary: 20px;\n  --report-monospace-font-size: calc(var(--report-font-size) * 0.85);\n  --report-text-color-secondary: var(--color-gray-800);\n  --report-text-color: var(--color-gray-900);\n  --rep\
+ort-content-max-width: calc(60 * var(--report-font-size)); /* defaults to 840px */\n  --report-content-min-width: 360px;\n  --report-content-max-width-minus-edge-gap: calc(var(--report-content-max-width) - var(--edge-gap-padding) * 2);\n  --score-container-padding: 8px;\n  --score-icon-background-size: 24px;\n  --score-icon-margin-left: 6px;\n  --score-icon-margin-right: 14px;\n  --score-icon-margin: 0 var(--score-icon-margin-right) 0 var(--score-icon-margin-left);\n  --score-icon-size: 12px;\n  --score-icon-size-big: 16px;\n  --screenshot-overlay-background: rgba(0, 0, 0, 0.3);\n  --section-padding-vertical: calc(var(--default-padding) * 6);\n  --snippet-background-color: var(--color-gray-50);\n  --snippet-color: #0938C2;\n  --stackpack-padding-horizontal: 10px;\n  --sticky-header-background-color: var(--report-background-color);\n  --sticky-header-buffer: var(--topbar-height);\n  --sticky-header-height: calc(var(--gauge-circle-size-sm) + var(--score-container-padding) * 2 + 1em);\n  --table-group-head\
+er-background-color: #EEF1F4;\n  --table-group-header-text-color: var(--color-gray-700);\n  --table-higlight-background-color: #F5F7FA;\n  --tools-icon-color: var(--color-gray-600);\n  --topbar-background-color: var(--color-white);\n  --topbar-height: 32px;\n  --topbar-logo-size: 24px;\n  --topbar-padding: 0 8px;\n  --toplevel-warning-background-color: hsla(30, 100%, 75%, 10%);\n  --toplevel-warning-message-text-color: var(--color-average-secondary);\n  --toplevel-warning-padding: 18px;\n  --toplevel-warning-text-color: var(--report-text-color);\n\n  /* SVGs */\n  --plugin-icon-url-dark: url(\'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24px" height="24px" viewBox="0 0 24 24" fill="%23FFFFFF"><path d="M0 0h24v24H0z" fill="none"/><path d="M20.5 11H19V7c0-1.1-.9-2-2-2h-4V3.5C13 2.12 11.88 1 10.5 1S8 2.12 8 3.5V5H4c-1.1 0-1.99.9-1.99 2v3.8H3.5c1.49 0 2.7 1.21 2.7 2.7s-1.21 2.7-2.7 2.7H2V20c0 1.1.9 2 2 2h3.8v-1.5c0-1.49 1.21-2.7 2.7-2.7 1.49 0 2.7 1.21 2.7 2.7V22H17c1.1 0 2-.9 \
+2-2v-4h1.5c1.38 0 2.5-1.12 2.5-2.5S21.88 11 20.5 11z"/></svg>\');\n  --plugin-icon-url: url(\'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24px" height="24px" viewBox="0 0 24 24" fill="%23757575"><path d="M0 0h24v24H0z" fill="none"/><path d="M20.5 11H19V7c0-1.1-.9-2-2-2h-4V3.5C13 2.12 11.88 1 10.5 1S8 2.12 8 3.5V5H4c-1.1 0-1.99.9-1.99 2v3.8H3.5c1.49 0 2.7 1.21 2.7 2.7s-1.21 2.7-2.7 2.7H2V20c0 1.1.9 2 2 2h3.8v-1.5c0-1.49 1.21-2.7 2.7-2.7 1.49 0 2.7 1.21 2.7 2.7V22H17c1.1 0 2-.9 2-2v-4h1.5c1.38 0 2.5-1.12 2.5-2.5S21.88 11 20.5 11z"/></svg>\');\n\n  --pass-icon-url: url(\'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><title>check</title><path fill="%23178239" d="M24 4C12.95 4 4 12.95 4 24c0 11.04 8.95 20 20 20 11.04 0 20-8.96 20-20 0-11.05-8.96-20-20-20zm-4 30L10 24l2.83-2.83L20 28.34l15.17-15.17L38 16 20 34z"/></svg>\');\n  --average-icon-url: url(\'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><t\
+itle>info</title><path fill="%23E67700" d="M24 4C12.95 4 4 12.95 4 24s8.95 20 20 20 20-8.95 20-20S35.05 4 24 4zm2 30h-4V22h4v12zm0-16h-4v-4h4v4z"/></svg>\');\n  --fail-icon-url: url(\'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><title>warn</title><path fill="%23C7221F" d="M2 42h44L24 4 2 42zm24-6h-4v-4h4v4zm0-8h-4v-8h4v8z"/></svg>\');\n  --error-icon-url: url(\'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 3 15"><title>error</title><path d="M0 15H 3V 12H 0V" fill="%23FF4E42"/><path d="M0 9H 3V 0H 0V" fill="%23FF4E42"/></svg>\');\n\n  --swap-locale-icon-url: url(\'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px" fill="%23000000"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M12.87 15.07l-2.54-2.51.03-.03c1.74-1.94 2.98-4.17 3.71-6.53H17V4h-7V2H8v2H1v1.99h11.17C11.5 7.92 10.44 9.75 9 11.35 8.07 10.32 7.3 9.19 6.69 8h-2c.73 1.63 1.73 3.17 2.98 4.56l-5.09 5.02L4 19l5\
+-5 3.11 3.11.76-2.04zM18.5 10h-2L12 22h2l1.12-3h4.75L21 22h2l-4.5-12zm-2.62 7l1.62-4.33L19.12 17h-3.24z"/></svg>\');\n}\n\n@media not print {\n  .lh-dark {\n    /* Pallete */\n    --color-gray-200: var(--color-gray-800);\n    --color-gray-300: #616161;\n    --color-gray-400: var(--color-gray-600);\n    --color-gray-700: var(--color-gray-400);\n    --color-gray-50: #757575;\n    --color-gray-600: var(--color-gray-500);\n    --color-green-700: var(--color-green);\n    --color-orange-700: var(--color-orange);\n    --color-red-700: var(--color-red);\n    --color-teal-600: var(--color-cyan-500);\n\n    /* Context-specific colors */\n    --color-hover: rgba(0, 0, 0, 0.2);\n    --color-informative: var(--color-blue-200);\n\n    /* Component variables */\n    --env-item-background-color: #393535;\n    --link-color: var(--color-blue-200);\n    --locale-selector-background-color: var(--color-gray-200);\n    --plugin-badge-background-color: var(--color-gray-800);\n    --report-background-color: var(--color-gray-900);\n    -\
+-report-border-color-secondary: var(--color-gray-200);\n    --report-text-color-secondary: var(--color-gray-400);\n    --report-text-color: var(--color-gray-100);\n    --snippet-color: var(--color-cyan-500);\n    --topbar-background-color: var(--color-gray);\n    --toplevel-warning-background-color: hsl(33deg 14% 18%);\n    --toplevel-warning-message-text-color: var(--color-orange-700);\n    --toplevel-warning-text-color: var(--color-gray-100);\n    --table-group-header-background-color: rgba(186, 196, 206, 0.15);\n    --table-group-header-text-color: var(--color-gray-100);\n    --table-higlight-background-color: rgba(186, 196, 206, 0.09);\n\n    /* SVGs */\n    --plugin-icon-url: var(--plugin-icon-url-dark);\n  }\n}\n\n/**\n* This media query is a temporary fallback for browsers that do not support \\`@container query\\`.\n* TODO: remove this media query when \\`@container query\\` is fully supported by browsers\n* See https://github.com/GoogleChrome/lighthouse/pull/16332\n*/\n@media only screen and (max-width\
+: 480px) {\n  .lh-vars {\n    --audit-group-margin-bottom: 20px;\n    --edge-gap-padding: var(--default-padding);\n    --env-name-min-width: 120px;\n    --gauge-circle-size-big: 96px;\n    --gauge-circle-size: 72px;\n    --gauge-label-font-size-big: 22px;\n    --gauge-label-font-size: 14px;\n    --gauge-label-line-height-big: 26px;\n    --gauge-label-line-height: 20px;\n    --gauge-percentage-font-size-big: 34px;\n    --gauge-percentage-font-size: 26px;\n    --gauge-wrapper-width: 112px;\n    --header-padding: 16px 0 16px 0;\n    --image-preview-size: 24px;\n    --plugin-icon-size: 75%;\n    --report-font-size: 14px;\n    --report-line-height: 20px;\n    --score-icon-margin-left: 2px;\n    --score-icon-size: 10px;\n    --topbar-height: 28px;\n    --topbar-logo-size: 20px;\n  }\n}\n\n@container lh-container (max-width: 480px) {\n  .lh-vars {\n    --audit-group-margin-bottom: 20px;\n    --edge-gap-padding: var(--default-padding);\n    --env-name-min-width: 120px;\n    --gauge-circle-size-big: 96px;\n    --gauge-circle-\
+size: 72px;\n    --gauge-label-font-size-big: 22px;\n    --gauge-label-font-size: 14px;\n    --gauge-label-line-height-big: 26px;\n    --gauge-label-line-height: 20px;\n    --gauge-percentage-font-size-big: 34px;\n    --gauge-percentage-font-size: 26px;\n    --gauge-wrapper-width: 112px;\n    --header-padding: 16px 0 16px 0;\n    --image-preview-size: 24px;\n    --plugin-icon-size: 75%;\n    --report-font-size: 14px;\n    --report-line-height: 20px;\n    --score-icon-margin-left: 2px;\n    --score-icon-size: 10px;\n    --topbar-height: 28px;\n    --topbar-logo-size: 20px;\n  }\n}\n\n.lh-vars.lh-devtools {\n  --audit-explanation-line-height: 14px;\n  --audit-group-margin-bottom: 20px;\n  --audit-group-padding-vertical: 12px;\n  --audit-padding-vertical: 4px;\n  --category-padding: 12px;\n  --default-padding: 12px;\n  --env-name-min-width: 120px;\n  --footer-padding-vertical: 8px;\n  --gauge-circle-size-big: 72px;\n  --gauge-circle-size: 64px;\n  --gauge-label-font-size-big: 22px;\n  --gauge-label-font-size: 14px;\n  --\
+gauge-label-line-height-big: 26px;\n  --gauge-label-line-height: 20px;\n  --gauge-percentage-font-size-big: 34px;\n  --gauge-percentage-font-size: 26px;\n  --gauge-wrapper-width: 97px;\n  --header-line-height: 20px;\n  --header-padding: 16px 0 16px 0;\n  --screenshot-overlay-background: transparent;\n  --plugin-icon-size: 75%;\n  --report-font-size: 12px;\n  --report-line-height: 20px;\n  --score-icon-margin-left: 2px;\n  --score-icon-size: 10px;\n  --section-padding-vertical: 8px;\n}\n\n.lh-devtools :focus-visible {\n  outline: -webkit-focus-ring-color auto 1px;\n}\n\n.lh-container:has(.lh-sticky-header) {\n  --sticky-header-buffer: calc(var(--topbar-height) + var(--sticky-header-height));\n}\n\n.lh-container:not(.lh-topbar + .lh-container) {\n  --topbar-height: 0;\n  --sticky-header-height: 0;\n  --sticky-header-buffer: 0;\n}\n\n.lh-max-viewport {\n  display: flex;\n  flex-direction: column;\n  min-height: 100vh;\n  width: 100%;\n}\n\n.lh-devtools.lh-root {\n  height: 100%;\n}\n.lh-devtools.lh-root img {\n  /* Override devt\
+ools default \'min-width: 0\' so svg without size in a flexbox isn\'t collapsed. */\n  min-width: auto;\n}\n.lh-devtools .lh-container {\n  overflow-y: scroll;\n  height: calc(100% - var(--topbar-height));\n  /** The .lh-container is the scroll parent in DevTools so we exclude the topbar from the sticky header buffer. */\n  --sticky-header-buffer: 0;\n}\n.lh-devtools .lh-container:has(.lh-sticky-header) {\n  /** The .lh-container is the scroll parent in DevTools so we exclude the topbar from the sticky header buffer. */\n  --sticky-header-buffer: var(--sticky-header-height);\n}\n@media print {\n  .lh-devtools .lh-container {\n    overflow: unset;\n  }\n}\n.lh-devtools .lh-sticky-header {\n  /* This is normally the height of the topbar, but we want it to stick to the top of our scroll container .lh-container\\` */\n  top: 0;\n}\n.lh-devtools .lh-element-screenshot__overlay {\n  position: absolute;\n}\n\n@keyframes fadeIn {\n  0% { opacity: 0;}\n  100% { opacity: 0.6;}\n}\n\n.lh-root *, .lh-root *::before, .lh-root *::aft\
+er {\n  box-sizing: border-box;\n}\n\n.lh-root {\n  font-family: var(--report-font-family);\n  font-size: var(--report-font-size);\n  margin: 0;\n  line-height: var(--report-line-height);\n  background: var(--report-background-color);\n  color: var(--report-text-color);\n}\n\n.lh-root [hidden] {\n  display: none !important;\n}\n\n.lh-root pre {\n  margin: 0;\n}\n\n.lh-root pre,\n.lh-root code {\n  font-family: var(--report-font-family-monospace);\n}\n\n.lh-root details > summary {\n  cursor: pointer;\n}\n\n.lh-hidden {\n  display: none !important;\n}\n\n.lh-container {\n  /*\n  Text wrapping in the report is so much FUN!\n  We have a \\`word-break: break-word;\\` globally here to prevent a few common scenarios, namely\n  long non-breakable text (usually URLs) found in:\n    1. The footer\n    2. .lh-node (outerHTML)\n    3. .lh-code\n\n  With that sorted, the next challenge is appropriate column sizing and text wrapping inside our\n  .lh-details tables. Even more fun.\n    * We don\'t want table headers ("Est Savings (ms)") to wrap \
+or their column values, but\n      we\'d be happy for the URL column to wrap if the URLs are particularly long.\n    * We want the narrow columns to remain narrow, providing the most column width for URL\n    * We don\'t want the table to extend past 100% width.\n    * Long URLs in the URL column can wrap. Util.getURLDisplayName maxes them out at 64 characters,\n      but they do not get any overflow:ellipsis treatment.\n  */\n  word-break: break-word;\n\n  container-name: lh-container;\n  container-type: inline-size;\n}\n\n.lh-audit-group a,\n.lh-category-header__description a,\n.lh-audit__description a,\n.lh-warnings a,\n.lh-footer a,\n.lh-table-column--link a {\n  color: var(--link-color);\n}\n\n.lh-audit__description, .lh-audit__stackpack, .lh-list-section__description {\n  --inner-audit-padding-right: var(--stackpack-padding-horizontal);\n  padding-left: var(--audit-description-padding-left);\n  padding-right: var(--inner-audit-padding-right);\n  padding-top: 8px;\n  padding-bottom: 8px;\n}\n\n.lh-details {\n  ma\
+rgin-top: var(--default-padding);\n  margin-bottom: var(--default-padding);\n  margin-left: var(--audit-description-padding-left);\n}\n\n.lh-audit__stackpack {\n  display: flex;\n  align-items: center;\n}\n\n.lh-audit__stackpack__img {\n  max-width: 30px;\n  margin-right: var(--default-padding)\n}\n\n/* Report header */\n\n.lh-report-icon {\n  display: flex;\n  align-items: center;\n  padding: 10px 12px;\n  cursor: pointer;\n}\n.lh-report-icon[disabled] {\n  opacity: 0.3;\n  pointer-events: none;\n}\n\n.lh-report-icon::before {\n  content: "";\n  margin: 4px;\n  background-repeat: no-repeat;\n  width: var(--report-icon-size);\n  height: var(--report-icon-size);\n  opacity: 0.7;\n  display: inline-block;\n  vertical-align: middle;\n}\n.lh-report-icon:hover::before {\n  opacity: 1;\n}\n.lh-dark .lh-report-icon::before {\n  filter: invert(1);\n}\n.lh-report-icon--print::before {\n  background-image: url(\'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path d="M19 8H5c-1.66 \
+0-3 1.34-3 3v6h4v4h12v-4h4v-6c0-1.66-1.34-3-3-3zm-3 11H8v-5h8v5zm3-7c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm-1-9H6v4h12V3z"/><path fill="none" d="M0 0h24v24H0z"/></svg>\');\n}\n.lh-report-icon--copy::before {\n  background-image: url(\'data:image/svg+xml;utf8,<svg height="24" viewBox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M0 0h24v24H0z" fill="none"/><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>\');\n}\n.lh-report-icon--open::before {\n  background-image: url(\'data:image/svg+xml;utf8,<svg height="24" viewBox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M0 0h24v24H0z" fill="none"/><path d="M19 4H5c-1.11 0-2 .9-2 2v12c0 1.1.89 2 2 2h4v-2H5V8h14v10h-4v2h4c1.1 0 2-.9 2-2V6c0-1.1-.89-2-2-2zm-7 6l-4 4h3v6h2v-6h3l-4-4z"/></svg>\');\n}\n.lh-report-icon--download::before {\n  background-image: url(\'data:image/svg+xml;utf8,<svg height="24" viewBox="0 0 \
+24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/><path d="M0 0h24v24H0z" fill="none"/></svg>\');\n}\n.lh-report-icon--dark::before {\n  background-image:url(\'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 0 100 125"><path d="M50 23.587c-16.27 0-22.799 12.574-22.799 21.417 0 12.917 10.117 22.451 12.436 32.471h20.726c2.32-10.02 12.436-19.554 12.436-32.471 0-8.843-6.528-21.417-22.799-21.417zM39.637 87.161c0 3.001 1.18 4.181 4.181 4.181h.426l.41 1.231C45.278 94.449 46.042 95 48.019 95h3.963c1.978 0 2.74-.551 3.365-2.427l.409-1.231h.427c3.002 0 4.18-1.18 4.18-4.181V80.91H39.637v6.251zM50 18.265c1.26 0 2.072-.814 2.072-2.073v-9.12C52.072 5.813 51.26 5 50 5c-1.259 0-2.072.813-2.072 2.073v9.12c0 1.259.813 2.072 2.072 2.072zM68.313 23.727c.994.774 2.135.634 2.91-.357l5.614-7.187c.776-.992.636-2.135-.356-2.909-.992-.776-2.135-.636-2.91.357l-5.613 7.186c-.778.993-.636 2.135.355 2.91zM91.157 36.373c-.306-1\
+.222-1.291-1.815-2.513-1.51l-8.85 2.207c-1.222.305-1.814 1.29-1.51 2.512.305 1.223 1.291 1.814 2.513 1.51l8.849-2.206c1.223-.305 1.816-1.291 1.511-2.513zM86.757 60.48l-8.331-3.709c-1.15-.512-2.225-.099-2.736 1.052-.512 1.151-.1 2.224 1.051 2.737l8.33 3.707c1.15.514 2.225.101 2.736-1.05.513-1.149.1-2.223-1.05-2.737zM28.779 23.37c.775.992 1.917 1.131 2.909.357.992-.776 1.132-1.917.357-2.91l-5.615-7.186c-.775-.992-1.917-1.132-2.909-.357s-1.131 1.917-.356 2.909l5.614 7.187zM21.715 39.583c.305-1.223-.288-2.208-1.51-2.513l-8.849-2.207c-1.222-.303-2.208.289-2.513 1.511-.303 1.222.288 2.207 1.511 2.512l8.848 2.206c1.222.304 2.208-.287 2.513-1.509zM21.575 56.771l-8.331 3.711c-1.151.511-1.563 1.586-1.05 2.735.511 1.151 1.586 1.563 2.736 1.052l8.331-3.711c1.151-.511 1.563-1.586 1.05-2.735-.512-1.15-1.585-1.562-2.736-1.052z"/></svg>\');\n}\n.lh-report-icon--treemap::before {\n  background-image: url(\'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" widt\
+h="24px" fill="black"><path d="M3 5v14h19V5H3zm2 2h15v4H5V7zm0 10v-4h4v4H5zm6 0v-4h9v4h-9z"/></svg>\');\n}\n\n.lh-report-icon--date::before {\n  background-image: url(\'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M7 11h2v2H7v-2zm14-5v14a2 2 0 01-2 2H5a2 2 0 01-2-2V6c0-1.1.9-2 2-2h1V2h2v2h8V2h2v2h1a2 2 0 012 2zM5 8h14V6H5v2zm14 12V10H5v10h14zm-4-7h2v-2h-2v2zm-4 0h2v-2h-2v2z"/></svg>\');\n}\n.lh-report-icon--devices::before {\n  background-image: url(\'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 6h18V4H4a2 2 0 00-2 2v11H0v3h14v-3H4V6zm19 2h-6a1 1 0 00-1 1v10c0 .6.5 1 1 1h6c.6 0 1-.5 1-1V9c0-.6-.5-1-1-1zm-1 9h-4v-7h4v7z"/></svg>\');\n}\n.lh-report-icon--world::before {\n  background-image: url(\'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm7 6h-3c-.3-1.3-.8-2.5-1.4-3.6A8 8 0 0 1 18.9 8zm-7-4a14 14 0 0 1 2 4h-4a14 14 0\
+ 0 1 2-4zM4.3 14a8.2 8.2 0 0 1 0-4h3.3a16.5 16.5 0 0 0 0 4H4.3zm.8 2h3a14 14 0 0 0 1.3 3.6A8 8 0 0 1 5.1 16zm3-8H5a8 8 0 0 1 4.3-3.6L8 8zM12 20a14 14 0 0 1-2-4h4a14 14 0 0 1-2 4zm2.3-6H9.7a14.7 14.7 0 0 1 0-4h4.6a14.6 14.6 0 0 1 0 4zm.3 5.6c.6-1.2 1-2.4 1.4-3.6h3a8 8 0 0 1-4.4 3.6zm1.8-5.6a16.5 16.5 0 0 0 0-4h3.3a8.2 8.2 0 0 1 0 4h-3.3z"/></svg>\');\n}\n.lh-report-icon--stopwatch::before {\n  background-image: url(\'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M15 1H9v2h6V1zm-4 13h2V8h-2v6zm8.1-6.6L20.5 6l-1.4-1.4L17.7 6A9 9 0 0 0 3 13a9 9 0 1 0 16-5.6zm-7 12.6a7 7 0 1 1 0-14 7 7 0 0 1 0 14z"/></svg>\');\n}\n.lh-report-icon--networkspeed::before {\n  background-image: url(\'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M15.9 5c-.2 0-.3 0-.4.2v.2L10.1 17a2 2 0 0 0-.2 1 2 2 0 0 0 4 .4l2.4-12.9c0-.3-.2-.5-.5-.5zM1 9l2 2c2.9-2.9 6.8-4 10.5-3.6l1.2-2.7C10 3.8 4.7 5.3 1 9zm20 2 2-2a15.4 15.4 0 0 0-5.6-3.6L17\
+ 8.2c1.5.7 2.9 1.6 4.1 2.8zm-4 4 2-2a9.9 9.9 0 0 0-2.7-1.9l-.5 3 1.2.9zM5 13l2 2a7.1 7.1 0 0 1 4-2l1.3-2.9C9.7 10.1 7 11 5 13z"/></svg>\');\n}\n.lh-report-icon--samples-one::before {\n  background-image: url(\'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="7" cy="14" r="3"/><path d="M7 18a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm0-6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm4-2a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm0-6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm5.6 17.6a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm0-6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>\');\n}\n.lh-report-icon--samples-many::before {\n  background-image: url(\'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M7 18a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm0-6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm4-2a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm0-6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm5.6 17.6a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm0-6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"\
+/><circle cx="7" cy="14" r="3"/><circle cx="11" cy="6" r="3"/></svg>\');\n}\n.lh-report-icon--chrome::before {\n  background-image: url(\'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="-50 -50 562 562"><path d="M256 25.6v25.6a204 204 0 0 1 144.8 60 204 204 0 0 1 60 144.8 204 204 0 0 1-60 144.8 204 204 0 0 1-144.8 60 204 204 0 0 1-144.8-60 204 204 0 0 1-60-144.8 204 204 0 0 1 60-144.8 204 204 0 0 1 144.8-60V0a256 256 0 1 0 0 512 256 256 0 0 0 0-512v25.6z"/><path d="M256 179.2v25.6a51.3 51.3 0 0 1 0 102.4 51.3 51.3 0 0 1 0-102.4v-51.2a102.3 102.3 0 1 0-.1 204.7 102.3 102.3 0 0 0 .1-204.7v25.6z"/><path d="M256 204.8h217.6a25.6 25.6 0 0 0 0-51.2H256a25.6 25.6 0 0 0 0 51.2m44.3 76.8L191.5 470.1a25.6 25.6 0 1 0 44.4 25.6l108.8-188.5a25.6 25.6 0 1 0-44.4-25.6m-88.6 0L102.9 93.2a25.7 25.7 0 0 0-35-9.4 25.7 25.7 0 0 0-9.4 35l108.8 188.5a25.7 25.7 0 0 0 35 9.4 25.9 25.9 0 0 0 9.4-35.1"/></svg>\');\n}\n.lh-report-icon--external::before {\n  background-image: url(\'data:image/svg+x\
+ml;utf8,<svg xmlns="http://www.w3.org/2000/svg"><path d="M3.15 11.9a1.01 1.01 0 0 1-.743-.307 1.01 1.01 0 0 1-.306-.743v-7.7c0-.292.102-.54.306-.744a1.01 1.01 0 0 1 .744-.306H7v1.05H3.15v7.7h7.7V7h1.05v3.85c0 .291-.103.54-.307.743a1.01 1.01 0 0 1-.743.307h-7.7Zm2.494-2.8-.743-.744 5.206-5.206H8.401V2.1h3.5v3.5h-1.05V3.893L5.644 9.1Z"/></svg>\');\n}\n.lh-report-icon--experiment::before {\n  background-image: url(\'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none"><path d="M4.50002 17C3.86136 17 3.40302 16.7187 3.12502 16.156C2.84702 15.5933 2.90936 15.069 3.31202 14.583L7.50002 9.5V4.5H6.75002C6.54202 4.5 6.36502 4.427 6.21902 4.281C6.07302 4.135 6.00002 3.958 6.00002 3.75C6.00002 3.542 6.07302 3.365 6.21902 3.219C6.36502 3.073 6.54202 3 6.75002 3H13.25C13.458 3 13.635 3.073 13.781 3.219C13.927 3.365 14 3.542 14 3.75C14 3.958 13.927 4.135 13.781 4.281C13.635 4.427 13.458 4.5 13.25 4.5H12.5V9.5L16.688 14.583C17.0767 15.069 17.132 15.5933 16.854 16\
+.156C16.5767 16.7187 16.1254 17 15.5 17H4.50002ZM4.50002 15.5H15.5L11 10V4.5H9.00002V10L4.50002 15.5Z" fill="black"/></svg>\');\n}\n\n/** These are still icons, but w/o the auto-color invert / opacity / etc. that come with .lh-report-icon */\n\n.lh-report-plain-icon {\n  display: flex;\n  align-items: center;\n}\n.lh-report-plain-icon::before {\n  content: "";\n  background-repeat: no-repeat;\n  width: var(--report-icon-size);\n  height: var(--report-icon-size);\n  display: inline-block;\n  margin-right: 5px;\n}\n\n.lh-report-plain-icon--checklist-pass::before {\n  --icon-url: url(\'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M8.938 13L13.896 8.062L12.833 7L8.938 10.875L7.167 9.125L6.104 10.188L8.938 13ZM10 18C8.90267 18 7.868 17.7917 6.896 17.375C5.924 16.9583 5.07333 16.3853 4.344 15.656C3.61467 14.9267 3.04167 14.076 2.625 13.104C2.20833 12.132 2 11.0973 2 10C2 8.88867 2.20833 7.85033 2.625 6.885C3.04167 5.92033 3.61467 5.07333 4.344 4.344C5.07333 3.61467\
+ 5.924 3.04167 6.896 2.625C7.868 2.20833 8.90267 2 10 2C11.1113 2 12.1497 2.20833 13.115 2.625C14.0797 3.04167 14.9267 3.61467 15.656 4.344C16.3853 5.07333 16.9583 5.92033 17.375 6.885C17.7917 7.85033 18 8.88867 18 10C18 11.0973 17.7917 12.132 17.375 13.104C16.9583 14.076 16.3853 14.9267 15.656 15.656C14.9267 16.3853 14.0797 16.9583 13.115 17.375C12.1497 17.7917 11.1113 18 10 18ZM10 16.5C11.8053 16.5 13.34 15.868 14.604 14.604C15.868 13.34 16.5 11.8053 16.5 10C16.5 8.19467 15.868 6.66 14.604 5.396C13.34 4.132 11.8053 3.5 10 3.5C8.19467 3.5 6.66 4.132 5.396 5.396C4.132 6.66 3.5 8.19467 3.5 10C3.5 11.8053 4.132 13.34 5.396 14.604C6.66 15.868 8.19467 16.5 10 16.5Z" fill="black"/></svg>\');\n  background-color: var(--color-pass);\n  mask: var(--icon-url) center / contain no-repeat;\n}\n.lh-report-plain-icon--checklist-fail::before {\n  --icon-url: url(\'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path fill-rule="evenodd" clip-rule="evenodd" d="M17.5 10C17.\
+5 14.1421 14.1421 17.5 10 17.5C5.85786 17.5 2.5 14.1421 2.5 10C2.5 5.85786 5.85786 2.5 10 2.5C14.1421 2.5 17.5 5.85786 17.5 10ZM16 10C16 13.3137 13.3137 16 10 16C8.6135 16 7.33683 15.5297 6.32083 14.7399L14.7399 6.32083C15.5297 7.33683 16 8.6135 16 10ZM5.26016 13.6793L13.6793 5.26016C12.6633 4.47033 11.3866 4 10 4C6.68629 4 4 6.68629 4 10C4 11.3866 4.47033 12.6633 5.26016 13.6793Z" fill="black"/></svg>\');\n  background-color: var(--color-fail);\n  mask: var(--icon-url) center / contain no-repeat;\n}\n\n.lh-buttons {\n  display: flex;\n  flex-wrap: wrap;\n  margin: var(--default-padding) 0;\n}\n.lh-button {\n  height: 32px;\n  border: 1px solid var(--report-border-color-secondary);\n  border-radius: 3px;\n  color: var(--link-color);\n  background-color: var(--report-background-color);\n  margin: 5px;\n}\n\n.lh-button:first-of-type {\n  margin-left: 0;\n}\n\n/* Node */\n.lh-node {\n  display: flow-root;\n}\n\n.lh-node__snippet {\n  font-family: var(--report-font-family-monospace);\n  color: var(--snippet-color);\n  fo\
+nt-size: var(--report-monospace-font-size);\n  line-height: 20px;\n}\n\n.lh-checklist {\n  list-style: none;\n  padding: 0;\n}\n\n.lh-checklist-item {\n  margin: 10px 0 10px 0;\n}\n\n/* Score */\n\n.lh-audit__score-icon {\n  width: var(--score-icon-size);\n  height: var(--score-icon-size);\n  margin: var(--score-icon-margin);\n}\n\n.lh-audit--pass .lh-audit__display-text {\n  color: var(--color-pass-secondary);\n}\n.lh-audit--pass .lh-audit__score-icon,\n.lh-scorescale-range--pass::before {\n  border-radius: 100%;\n  background: var(--color-pass);\n}\n\n.lh-audit--average .lh-audit__display-text {\n  color: var(--color-average-secondary);\n}\n.lh-audit--average .lh-audit__score-icon,\n.lh-scorescale-range--average::before {\n  background: var(--color-average);\n  width: var(--icon-square-size);\n  height: var(--icon-square-size);\n}\n\n.lh-audit--fail .lh-audit__display-text {\n  color: var(--color-fail-secondary);\n}\n.lh-audit--fail .lh-audit__score-icon,\n.lh-audit--error .lh-audit__score-icon,\n.lh-scorescale-range--fail::bef\
+ore {\n  border-left: calc(var(--score-icon-size) / 2) solid transparent;\n  border-right: calc(var(--score-icon-size) / 2) solid transparent;\n  border-bottom: var(--score-icon-size) solid var(--color-fail);\n}\n\n.lh-audit--error .lh-audit__score-icon,\n.lh-metric--error .lh-metric__icon {\n  background-image: var(--error-icon-url);\n  background-repeat: no-repeat;\n  background-position: center;\n  border: none;\n}\n\n.lh-gauge__wrapper--fail .lh-gauge--error {\n  background-image: var(--error-icon-url);\n  background-repeat: no-repeat;\n  background-position: center;\n  transform: scale(0.5);\n  top: var(--score-container-padding);\n}\n\n.lh-audit--manual .lh-audit__display-text,\n.lh-audit--notapplicable .lh-audit__display-text {\n  color: var(--color-gray-600);\n}\n.lh-audit--manual .lh-audit__score-icon,\n.lh-audit--notapplicable .lh-audit__score-icon {\n  border: calc(0.2 * var(--score-icon-size)) solid var(--color-gray-400);\n  border-radius: 100%;\n  background: none;\n}\n\n.lh-audit--informative .lh-audit__\
+display-text {\n  color: var(--color-gray-600);\n}\n\n.lh-audit--informative .lh-audit__score-icon {\n  border: calc(0.2 * var(--score-icon-size)) solid var(--color-gray-400);\n  border-radius: 100%;\n}\n\n.lh-audit__description,\n.lh-audit__stackpack {\n  color: var(--report-text-color-secondary);\n}\n.lh-audit__adorn {\n  border: 1px solid var(--color-gray-500);\n  border-radius: 3px;\n  margin: 0 3px;\n  padding: 0 2px;\n  line-height: 1.1;\n  display: inline-block;\n  font-size: 90%;\n  color: var(--report-text-color-secondary);\n}\n\n.lh-category-header__description  {\n  text-align: center;\n  color: var(--color-gray-700);\n  margin: 0px auto;\n  max-width: 400px;\n}\n\n\n.lh-audit__display-text,\n.lh-chevron-container {\n  margin: 0 var(--audit-margin-horizontal);\n}\n.lh-chevron-container {\n  margin-right: 0;\n}\n\n.lh-audit__title-and-text {\n  flex: 1;\n}\n\n.lh-audit__title-and-text code {\n  color: var(--snippet-color);\n  font-size: var(--report-monospace-font-size);\n}\n\n/* Prepend display text with em dash separator.\
+ */\n.lh-audit__display-text:not(:empty):before {\n  content: \'\\u2014\';\n  margin-right: var(--audit-margin-horizontal);\n}\n\n/* Expandable Details (Audit Groups, Audits) */\n.lh-audit__header {\n  display: flex;\n  align-items: center;\n  padding: var(--default-padding);\n}\n\n\n.lh-metricfilter {\n  display: grid;\n  justify-content: end;\n  align-items: center;\n  grid-auto-flow: column;\n  gap: 4px;\n  color: var(--color-gray-700);\n}\n\n.lh-metricfilter__radio {\n  /*\n   * Instead of hiding, position offscreen so it\'s still accessible to screen readers\n   * https://bugs.chromium.org/p/chromium/issues/detail?id=1439785\n   */\n  position: fixed;\n  left: -9999px;\n}\n.lh-metricfilter input[type=\'radio\']:focus-visible + label {\n  outline: -webkit-focus-ring-color auto 1px;\n}\n\n.lh-metricfilter__label {\n  display: inline-flex;\n  padding: 0 4px;\n  height: 16px;\n  text-decoration: underline;\n  align-items: center;\n  cursor: pointer;\n  font-size: 90%;\n}\n\n.lh-metricfilter__label--active {\n  background: var(--color-b\
+lue-primary);\n  color: var(--color-white);\n  border-radius: 3px;\n  text-decoration: none;\n}\n/* Give the \'All\' choice a more muted display */\n.lh-metricfilter__label--active[for="metric-All"] {\n  background-color: var(--color-blue-200) !important;\n  color: black !important;\n}\n\n.lh-metricfilter__text {\n  margin-right: 8px;\n}\n\n/* If audits are filtered, hide the itemcount for Passed Audits\\u2026 */\n.lh-category--filtered .lh-audit-group .lh-audit-group__itemcount {\n  display: none;\n}\n\n\n.lh-audit__header:hover {\n  background-color: var(--color-hover);\n}\n\n/* We want to hide the browser\'s default arrow marker on summary elements. Admittedly, it\'s complicated. */\n.lh-root details > summary {\n  /* Blink 89+ and Firefox will hide the arrow when display is changed from (new) default of \\`list-item\\` to block.  https://chromestatus.com/feature/6730096436051968*/\n  display: block;\n}\n/* Safari and Blink <=88 require using the -webkit-details-marker selector */\n.lh-root details > summary::-webkit-de\
+tails-marker {\n  display: none;\n}\n\n/* Perf Metric */\n\n.lh-metrics-container {\n  display: grid;\n  grid-auto-rows: 1fr;\n  grid-template-columns: 1fr 1fr;\n  grid-column-gap: var(--report-line-height);\n  margin-bottom: var(--default-padding);\n}\n\n.lh-metric {\n  border-top: 1px solid var(--report-border-color-secondary);\n}\n\n.lh-category:not(.lh--hoisted-meta) .lh-metric:nth-last-child(-n+2) {\n  border-bottom: 1px solid var(--report-border-color-secondary);\n}\n\n.lh-metric__innerwrap {\n  display: grid;\n  /**\n   * Icon -- Metric Name\n   *      -- Metric Value\n   */\n  grid-template-columns: calc(var(--score-icon-size) + var(--score-icon-margin-left) + var(--score-icon-margin-right)) 1fr;\n  align-items: center;\n  padding: var(--default-padding);\n}\n\n.lh-metric__details {\n  order: -1;\n}\n\n.lh-metric__title {\n  flex: 1;\n}\n\n.lh-calclink {\n  padding-left: calc(1ex / 3);\n}\n\n.lh-metric__description {\n  display: none;\n  grid-column-start: 2;\n  grid-column-end: 4;\n  color: var(--report-text-color-secondary)\
+;\n}\n\n.lh-metric__value {\n  font-size: var(--metric-value-font-size);\n  margin: calc(var(--default-padding) / 2) 0;\n  white-space: nowrap; /* No wrapping between metric value and the icon */\n  grid-column-start: 2;\n}\n\n/**\n* This media query is a temporary fallback for browsers that do not support \\`@container query\\`.\n* TODO: remove this media query when \\`@container query\\` is fully supported by browsers\n* See https://github.com/GoogleChrome/lighthouse/pull/16332\n*/\n@media screen and (max-width: 535px) {\n  .lh-metrics-container {\n    display: block;\n  }\n\n  .lh-metric {\n    border-bottom: none !important;\n  }\n  .lh-category:not(.lh--hoisted-meta) .lh-metric:nth-last-child(1) {\n    border-bottom: 1px solid var(--report-border-color-secondary) !important;\n  }\n\n  /* Change the grid to 3 columns for narrow viewport. */\n  .lh-metric__innerwrap {\n  /**\n   * Icon -- Metric Name -- Metric Value\n   */\n    grid-template-columns: calc(var(--score-icon-size) + var(--score-icon-margin-left) + var(--\
+score-icon-margin-right)) 2fr 1fr;\n  }\n  .lh-metric__value {\n    justify-self: end;\n    grid-column-start: unset;\n  }\n}\n\n@container lh-container (max-width: 535px) {\n  .lh-metrics-container {\n    display: block;\n  }\n\n  .lh-metric {\n    border-bottom: none !important;\n  }\n  .lh-category:not(.lh--hoisted-meta) .lh-metric:nth-last-child(1) {\n    border-bottom: 1px solid var(--report-border-color-secondary) !important;\n  }\n\n  /* Change the grid to 3 columns for narrow viewport. */\n  .lh-metric__innerwrap {\n  /**\n   * Icon -- Metric Name -- Metric Value\n   */\n    grid-template-columns: calc(var(--score-icon-size) + var(--score-icon-margin-left) + var(--score-icon-margin-right)) 2fr 1fr;\n  }\n  .lh-metric__value {\n    justify-self: end;\n    grid-column-start: unset;\n  }\n}\n\n/* No-JS toggle switch */\n/* Keep this selector sync\'d w/ \\`magicSelector\\` in report-ui-features-test.js */\n .lh-metrics-toggle__input:checked ~ .lh-metrics-container .lh-metric__description {\n  display: block;\n}\n\n/* TODO \
+get rid of the SVGS and clean up these some more */\n.lh-metrics-toggle__input {\n  opacity: 0;\n  position: absolute;\n  right: 0;\n  top: 0px;\n}\n\n.lh-metrics-toggle__input + div > label > .lh-metrics-toggle__labeltext--hide,\n.lh-metrics-toggle__input:checked + div > label > .lh-metrics-toggle__labeltext--show {\n  display: none;\n}\n.lh-metrics-toggle__input:checked + div > label > .lh-metrics-toggle__labeltext--hide {\n  display: inline;\n}\n.lh-metrics-toggle__input:focus + div > label {\n  outline: -webkit-focus-ring-color auto 3px;\n}\n\n.lh-metrics-toggle__label {\n  cursor: pointer;\n  font-size: var(--report-font-size-secondary);\n  line-height: var(--report-line-height-secondary);\n  color: var(--color-gray-700);\n}\n\n/* Pushes the metric description toggle button to the right. */\n.lh-audit-group--metrics .lh-audit-group__header {\n  display: flex;\n  justify-content: space-between;\n}\n\n.lh-metric__icon,\n.lh-scorescale-range::before {\n  content: \'\';\n  width: var(--score-icon-size);\n  height: var(--s\
+core-icon-size);\n  display: inline-block;\n  margin: var(--score-icon-margin);\n}\n\n.lh-metric--pass .lh-metric__value {\n  color: var(--color-pass-secondary);\n}\n.lh-metric--pass .lh-metric__icon {\n  border-radius: 100%;\n  background: var(--color-pass);\n}\n\n.lh-metric--average .lh-metric__value {\n  color: var(--color-average-secondary);\n}\n.lh-metric--average .lh-metric__icon {\n  background: var(--color-average);\n  width: var(--icon-square-size);\n  height: var(--icon-square-size);\n}\n\n.lh-metric--fail .lh-metric__value {\n  color: var(--color-fail-secondary);\n}\n.lh-metric--fail .lh-metric__icon {\n  border-left: calc(var(--score-icon-size) / 2) solid transparent;\n  border-right: calc(var(--score-icon-size) / 2) solid transparent;\n  border-bottom: var(--score-icon-size) solid var(--color-fail);\n}\n\n.lh-metric--error .lh-metric__value,\n.lh-metric--error .lh-metric__description {\n  color: var(--color-fail-secondary);\n}\n\n/* Filmstrip */\n\n.lh-filmstrip-container {\n  /* smaller gap between metrics and\
+ filmstrip */\n  margin: -8px auto 0 auto;\n}\n\n.lh-filmstrip {\n  display: flex;\n  justify-content: space-between;\n  justify-items: center;\n  margin-bottom: var(--default-padding);\n  width: 100%;\n}\n\n.lh-filmstrip__frame {\n  overflow: hidden;\n  line-height: 0;\n}\n\n.lh-filmstrip__thumbnail {\n  border: 1px solid var(--report-border-color-secondary);\n  max-height: 150px;\n  max-width: 120px;\n}\n\n.lh-dark .lh-perf-toggle-text {\n  color: rgba(30, 164, 70, 1);\n}\n\n.lh-perf-toggle-text a {\n  color: var(--link-color);\n}\n\n/* Audit */\n\n.lh-audit {\n  border-bottom: 1px solid var(--report-border-color-secondary);\n}\n\n/* Apply border-top to just the first audit. */\n.lh-audit {\n  border-top: 1px solid var(--report-border-color-secondary);\n}\n.lh-audit ~ .lh-audit {\n  border-top: none;\n}\n\n\n.lh-audit--error .lh-audit__display-text {\n  color: var(--color-fail-secondary);\n}\n\n/* Audit Group */\n\n.lh-audit-group {\n  margin-bottom: var(--audit-group-margin-bottom);\n  position: relative;\n}\n.lh-audit-group--metrics {\n \
+ margin-bottom: calc(var(--audit-group-margin-bottom) / 2);\n}\n\n.lh-audit-group--metrics .lh-audit-group__summary {\n  margin-top: 0;\n  margin-bottom: 0;\n}\n\n.lh-audit-group__summary {\n  display: flex;\n  justify-content: space-between;\n  align-items: center;\n}\n\n.lh-audit-group__header .lh-chevron {\n  margin-top: calc((var(--report-line-height) - 5px) / 2);\n}\n\n.lh-audit-group__header {\n  letter-spacing: 0.8px;\n  padding: var(--default-padding);\n  padding-left: 0;\n}\n\n.lh-audit-group__header, .lh-audit-group__summary {\n  font-size: var(--report-font-size-secondary);\n  line-height: var(--report-line-height-secondary);\n  color: var(--color-gray-700);\n}\n\n.lh-audit-group__title {\n  text-transform: uppercase;\n  font-weight: 500;\n}\n\n.lh-audit-group__itemcount {\n  color: var(--color-gray-600);\n}\n\n.lh-audit-group__footer {\n  color: var(--color-gray-600);\n  display: block;\n  margin-top: var(--default-padding);\n}\n\n.lh-details,\n.lh-category-header__description,\n.lh-audit-group__footer {\n  font-size: va\
+r(--report-font-size-secondary);\n  line-height: var(--report-line-height-secondary);\n}\n\n.lh-audit-explanation {\n  margin: var(--audit-padding-vertical) 0 calc(var(--audit-padding-vertical) / 2) var(--audit-margin-horizontal);\n  line-height: var(--audit-explanation-line-height);\n  display: inline-block;\n}\n\n.lh-audit--fail .lh-audit-explanation {\n  color: var(--color-fail-secondary);\n}\n\n/* Report */\n.lh-list {\n  margin-right: calc(var(--default-padding) * 2);\n}\n.lh-list > :not(:last-child) {\n  margin-bottom: calc(var(--default-padding) * 2);\n  border-bottom: 1px solid #A8C7FA;\n}\n.lh-list-section {\n  padding: calc(var(--default-padding) * 2) 0;\n}\n.lh-list-section__title {\n  text-decoration: underline;\n}\n\n.lh-header-container {\n  display: block;\n  margin: 0 auto;\n  position: relative;\n  word-wrap: break-word;\n}\n\n.lh-header-container .lh-scores-wrapper {\n  border-bottom: 1px solid var(--color-gray-200);\n}\n\n\n.lh-report {\n  min-width: var(--report-content-min-width);\n}\n\n.lh-exception {\n  font\
+-size: large;\n}\n\n.lh-code {\n  white-space: normal;\n  margin-top: 0;\n  font-size: var(--report-monospace-font-size);\n}\n\n.lh-warnings {\n  --item-margin: calc(var(--report-line-height) / 6);\n  color: var(--color-average-secondary);\n  margin: var(--audit-padding-vertical) 0;\n  padding: var(--default-padding)\n    var(--default-padding)\n    var(--default-padding)\n    calc(var(--audit-description-padding-left));\n  background-color: var(--toplevel-warning-background-color);\n}\n.lh-warnings span {\n  font-weight: bold;\n}\n\n.lh-warnings--toplevel {\n  --item-margin: calc(var(--header-line-height) / 4);\n  color: var(--toplevel-warning-text-color);\n  margin-left: auto;\n  margin-right: auto;\n  max-width: var(--report-content-max-width-minus-edge-gap);\n  padding: var(--toplevel-warning-padding);\n  border-radius: 8px;\n}\n\n.lh-warnings__msg {\n  color: var(--toplevel-warning-message-text-color);\n  margin: 0;\n}\n\n.lh-warnings ul {\n  margin: 0;\n}\n.lh-warnings li {\n  margin: var(--item-margin) 0;\n}\n.lh-warnings\
+ li:last-of-type {\n  margin-bottom: 0;\n}\n\n.lh-scores-header {\n  display: flex;\n  flex-wrap: wrap;\n  justify-content: center;\n}\n.lh-scores-header__solo {\n  padding: 0;\n  border: 0;\n}\n\n/* Gauge */\n\n.lh-gauge__wrapper--pass {\n  color: var(--color-pass-secondary);\n  fill: var(--color-pass);\n  stroke: var(--color-pass);\n}\n\n.lh-gauge__wrapper--average {\n  color: var(--color-average-secondary);\n  fill: var(--color-average);\n  stroke: var(--color-average);\n}\n\n.lh-gauge__wrapper--fail {\n  color: var(--color-fail-secondary);\n  fill: var(--color-fail);\n  stroke: var(--color-fail);\n}\n\n.lh-gauge__wrapper--not-applicable {\n  color: var(--color-not-applicable);\n  fill: var(--color-not-applicable);\n  stroke: var(--color-not-applicable);\n}\n\n.lh-fraction__wrapper .lh-fraction__content::before {\n  content: \'\';\n  height: var(--score-icon-size);\n  width: var(--score-icon-size);\n  margin: var(--score-icon-margin);\n  display: inline-block;\n}\n.lh-fraction__wrapper--pass .lh-fraction__content {\n  color: var(--\
+color-pass-secondary);\n}\n.lh-fraction__wrapper--pass .lh-fraction__background {\n  background-color: var(--color-pass);\n}\n.lh-fraction__wrapper--pass .lh-fraction__content::before {\n  background-color: var(--color-pass);\n  border-radius: 50%;\n}\n.lh-fraction__wrapper--average .lh-fraction__content {\n  color: var(--color-average-secondary);\n}\n.lh-fraction__wrapper--average .lh-fraction__background,\n.lh-fraction__wrapper--average .lh-fraction__content::before {\n  background-color: var(--color-average);\n}\n.lh-fraction__wrapper--fail .lh-fraction__content {\n  color: var(--color-fail);\n}\n.lh-fraction__wrapper--fail .lh-fraction__background {\n  background-color: var(--color-fail);\n}\n.lh-fraction__wrapper--fail .lh-fraction__content::before {\n  border-left: calc(var(--score-icon-size) / 2) solid transparent;\n  border-right: calc(var(--score-icon-size) / 2) solid transparent;\n  border-bottom: var(--score-icon-size) solid var(--color-fail);\n}\n.lh-fraction__wrapper--null .lh-fraction__content {\n  \
+color: var(--color-gray-700);\n}\n.lh-fraction__wrapper--null .lh-fraction__background {\n  background-color: var(--color-gray-700);\n}\n.lh-fraction__wrapper--null .lh-fraction__content::before {\n  border-radius: 50%;\n  border: calc(0.2 * var(--score-icon-size)) solid var(--color-gray-700);\n}\n\n.lh-fraction__background {\n  position: absolute;\n  height: 100%;\n  width: 100%;\n  border-radius: calc(var(--gauge-circle-size) / 2);\n  opacity: 0.1;\n  z-index: -1;\n}\n\n.lh-fraction__content-wrapper {\n  height: var(--gauge-circle-size);\n  display: flex;\n  align-items: center;\n}\n\n.lh-fraction__content {\n  display: flex;\n  position: relative;\n  align-items: center;\n  justify-content: center;\n  font-size: calc(0.3 * var(--gauge-circle-size));\n  line-height: calc(0.4 * var(--gauge-circle-size));\n  width: max-content;\n  min-width: calc(1.5 * var(--gauge-circle-size));\n  padding: calc(0.1 * var(--gauge-circle-size)) calc(0.2 * var(--gauge-circle-size));\n  --score-icon-size: calc(0.21 * var(--gauge-circle-siz\
+e));\n  --score-icon-margin: 0 calc(0.15 * var(--gauge-circle-size)) 0 0;\n}\n\n.lh-gauge {\n  stroke-linecap: round;\n  width: var(--gauge-circle-size);\n  height: var(--gauge-circle-size);\n}\n\n.lh-category .lh-gauge {\n  --gauge-circle-size: var(--gauge-circle-size-big);\n}\n\n.lh-gauge-base {\n  opacity: 0.1;\n}\n\n.lh-gauge-arc {\n  fill: none;\n  transform-origin: 50% 50%;\n  animation: load-gauge var(--transition-length) ease both;\n  animation-delay: 250ms;\n}\n\n.lh-gauge__svg-wrapper {\n  position: relative;\n  height: var(--gauge-circle-size);\n}\n.lh-category .lh-gauge__svg-wrapper,\n.lh-category .lh-fraction__wrapper {\n  --gauge-circle-size: var(--gauge-circle-size-big);\n}\n\n/* The plugin badge overlay */\n.lh-gauge__wrapper--plugin .lh-gauge__svg-wrapper::before {\n  width: var(--plugin-badge-size);\n  height: var(--plugin-badge-size);\n  background-color: var(--plugin-badge-background-color);\n  background-image: var(--plugin-icon-url);\n  background-repeat: no-repeat;\n  background-size: var(--plugin-icon-\
+size);\n  background-position: 58% 50%;\n  content: "";\n  position: absolute;\n  right: -6px;\n  bottom: 0px;\n  display: block;\n  z-index: 100;\n  box-shadow: 0 0 4px rgba(0,0,0,.2);\n  border-radius: 25%;\n}\n.lh-category .lh-gauge__wrapper--plugin .lh-gauge__svg-wrapper::before {\n  width: var(--plugin-badge-size-big);\n  height: var(--plugin-badge-size-big);\n}\n\n@keyframes load-gauge {\n  from { stroke-dasharray: 0 352; }\n}\n\n.lh-gauge__percentage {\n  width: 100%;\n  height: var(--gauge-circle-size);\n  line-height: var(--gauge-circle-size);\n  position: absolute;\n  font-family: var(--report-font-family-monospace);\n  font-size: calc(var(--gauge-circle-size) * 0.34 + 1.3px);\n  text-align: center;\n  top: var(--score-container-padding);\n}\n\n.lh-category .lh-gauge__percentage {\n  --gauge-circle-size: var(--gauge-circle-size-big);\n  --gauge-percentage-font-size: var(--gauge-percentage-font-size-big);\n}\n\n.lh-gauge__wrapper,\n.lh-fraction__wrapper {\n  position: relative;\n  display: flex;\n  align-items: cent\
+er;\n  flex-direction: column;\n  text-decoration: none;\n  padding: var(--score-container-padding);\n\n  --transition-length: 1s;\n\n  /* Contain the layout style paint & layers during animation*/\n  contain: content;\n  will-change: opacity; /* Only using for layer promotion */\n}\n\n.lh-gauge__label,\n.lh-fraction__label {\n  font-size: var(--gauge-label-font-size);\n  font-weight: 500;\n  line-height: var(--gauge-label-line-height);\n  margin-top: 10px;\n  text-align: center;\n  color: var(--report-text-color);\n  word-break: keep-all;\n}\n\n/* TODO(#8185) use more BEM (.lh-gauge__label--big) instead of relying on descendant selector */\n.lh-category .lh-gauge__label,\n.lh-category .lh-fraction__label {\n  --gauge-label-font-size: var(--gauge-label-font-size-big);\n  --gauge-label-line-height: var(--gauge-label-line-height-big);\n  margin-top: 14px;\n}\n\n.lh-scores-header .lh-gauge__wrapper,\n.lh-scores-header .lh-fraction__wrapper,\n.lh-sticky-header .lh-gauge__wrapper,\n.lh-sticky-header .lh-fraction__wrapper {\n\
+  width: var(--gauge-wrapper-width);\n}\n\n.lh-scorescale {\n  display: inline-flex;\n\n  gap: calc(var(--default-padding) * 4);\n  margin: 16px auto 0 auto;\n  font-size: var(--report-font-size-secondary);\n  color: var(--color-gray-700);\n\n}\n\n.lh-scorescale-range {\n  display: flex;\n  align-items: center;\n  font-family: var(--report-font-family-monospace);\n  white-space: nowrap;\n}\n\n.lh-category-header__finalscreenshot .lh-scorescale {\n  border: 0;\n  display: flex;\n  justify-content: center;\n}\n\n.lh-category-header__finalscreenshot .lh-scorescale-range {\n  font-family: unset;\n  font-size: 12px;\n}\n\n.lh-scorescale-wrap {\n  display: contents;\n}\n\n/* Hide category score gauages if it\'s a single category report */\n.lh-header--solo-category .lh-scores-wrapper {\n  display: none;\n}\n\n\n.lh-categories {\n  width: 100%;\n}\n\n.lh-category {\n  padding: var(--category-padding);\n  max-width: var(--report-content-max-width);\n  margin: 0 auto;\n\n  scroll-margin-top: calc(var(--sticky-header-buffer) - 1em);\n}\n\n.lh-categ\
+ory-wrapper {\n  border-bottom: 1px solid var(--color-gray-200);\n}\n.lh-category-wrapper:last-of-type {\n  border-bottom: 0;\n}\n\n.lh-category-header {\n  margin-bottom: var(--section-padding-vertical);\n}\n\n.lh-category-header .lh-score__gauge {\n  max-width: 400px;\n  width: auto;\n  margin: 0px auto;\n}\n\n.lh-category-header__finalscreenshot {\n  display: grid;\n  grid-template: none / 1fr 1px 1fr;\n  justify-items: center;\n  align-items: center;\n  gap: var(--report-line-height);\n  min-height: 288px;\n  margin-bottom: var(--default-padding);\n}\n\n.lh-final-ss-image {\n  /* constrain the size of the image to not be too large */\n  max-height: calc(var(--gauge-circle-size-big) * 2.8);\n  max-width: calc(var(--gauge-circle-size-big) * 3.5);\n  border: 1px solid var(--color-gray-200);\n  padding: 4px;\n  border-radius: 3px;\n  display: block;\n}\n\n.lh-category-headercol--separator {\n  background: var(--color-gray-200);\n  width: 1px;\n  height: var(--gauge-circle-size-big);\n}\n\n/**\n* This media query is a temporary f\
+allback for browsers that do not support \\`@container query\\`.\n* TODO: remove this media query when \\`@container query\\` is fully supported by browsers\n* See https://github.com/GoogleChrome/lighthouse/pull/16332\n*/\n@media screen and (max-width: 780px) {\n  .lh-category-header__finalscreenshot {\n    grid-template: 1fr 1fr / none\n  }\n  .lh-category-headercol--separator {\n    display: none;\n  }\n}\n\n@container lh-container (max-width: 780px) {\n  .lh-category-header__finalscreenshot {\n    grid-template: 1fr 1fr / none\n  }\n  .lh-category-headercol--separator {\n    display: none;\n  }\n}\n\n/**\n* This media query is a temporary fallback for browsers that do not support \\`@container query\\`.\n* TODO: remove this media query when \\`@container query\\` is fully supported by browsers\n* See https://github.com/GoogleChrome/lighthouse/pull/16332\n*/\n@media screen and (max-width: 964px) {\n  .lh-report {\n    margin-left: 0;\n    width: 100%;\n  }\n}\n\n/* 964 fits the min-width of the filmstrip */\n@container lh-con\
+tainer (max-width: 964px) {\n  .lh-report {\n    margin-left: 0;\n    width: 100%;\n  }\n}\n\n@media print {\n  body {\n    -webkit-print-color-adjust: exact; /* print background colors */\n  }\n  .lh-container {\n    display: block;\n  }\n  .lh-report {\n    margin-left: 0;\n    padding-top: 0;\n  }\n  .lh-categories {\n    margin-top: 0;\n  }\n  .lh-buttons, .lh-highlighter {\n    /* hide stickyheader marker when printing. crbug.com/41486992 */\n    display: none;\n  }\n}\n\n.lh-table {\n  position: relative;\n  border-collapse: separate;\n  border-spacing: 0;\n  /* Can\'t assign padding to table, so shorten the width instead. */\n  width: calc(100% - var(--audit-description-padding-left) - var(--stackpack-padding-horizontal));\n  border: 1px solid var(--report-border-color-secondary);\n}\n\n.lh-table thead th {\n  position: sticky;\n  top: var(--sticky-header-buffer);\n  z-index: 1;\n  background-color: var(--report-background-color);\n  border-bottom: 1px solid var(--report-border-color-secondary);\n  font-weight: normal;\n \
+ color: var(--color-gray-600);\n  /* See text-wrapping comment on .lh-container. */\n  word-break: normal;\n}\n\n.lh-row--group {\n  background-color: var(--table-group-header-background-color);\n}\n\n.lh-row--group td {\n  font-weight: bold;\n  font-size: 1.05em;\n  color: var(--table-group-header-text-color);\n}\n\n.lh-row--group td:first-child {\n  display: block;\n  min-width: max-content;\n  font-weight: normal;\n}\n\n.lh-row--group .lh-text {\n  color: inherit;\n  text-decoration: none;\n  display: inline-block;\n}\n\n.lh-row--group a.lh-link:hover {\n  text-decoration: underline;\n}\n\n.lh-row--group .lh-audit__adorn {\n  text-transform: capitalize;\n  font-weight: normal;\n  padding: 2px 3px 1px 3px;\n}\n\n.lh-row--group .lh-audit__adorn1p {\n  color: var(--link-color);\n  border-color: var(--link-color);\n}\n\n.lh-row--group .lh-report-icon--external::before {\n  content: "";\n  background-repeat: no-repeat;\n  width: 14px;\n  height: 16px;\n  opacity: 0.7;\n  display: inline-block;\n  vertical-align: middle;\n}\n\n.lh-row--gro\
+up .lh-report-icon--external {\n  visibility: hidden;\n}\n\n.lh-row--group:hover .lh-report-icon--external {\n  visibility: visible;\n}\n\n.lh-dark .lh-report-icon--external::before {\n  filter: invert(1);\n}\n\n/** Manages indentation of two-level and three-level nested adjacent rows */\n\n.lh-row--group ~ [data-entity]:not(.lh-row--group) td:first-child {\n  padding-left: 20px;\n}\n\n.lh-row--group ~ [data-entity]:not(.lh-row--group) ~ .lh-sub-item-row td:first-child {\n  margin-left: 20px;\n  padding-left: 10px;\n  border-left: 1px solid #A8C7FA;\n  display: block;\n}\n\n.lh-row--even {\n  background-color: var(--table-group-header-background-color);\n}\n.lh-row--hidden {\n  display: none;\n}\n\n.lh-table th,\n.lh-table td {\n  padding: var(--default-padding);\n}\n\n.lh-table tr {\n  vertical-align: middle;\n}\n\n.lh-table tr:hover {\n  background-color: var(--table-higlight-background-color);\n}\n\n/* Looks unnecessary, but mostly for keeping the <th>s left-aligned */\n.lh-table-column--text,\n.lh-table-column--source-location,\
+\n.lh-table-column--url,\n/* .lh-table-column--thumbnail, */\n/* .lh-table-column--empty,*/\n.lh-table-column--code,\n.lh-table-column--node {\n  text-align: left;\n}\n\n.lh-table-column--code {\n  min-width: 100px;\n}\n\n.lh-table-column--bytes,\n.lh-table-column--timespanMs,\n.lh-table-column--ms,\n.lh-table-column--numeric {\n  text-align: right;\n  word-break: normal;\n}\n\n\n\n.lh-table .lh-table-column--thumbnail {\n  width: var(--image-preview-size);\n}\n\n.lh-table-column--url {\n  min-width: 250px;\n}\n\n.lh-table-column--text {\n  min-width: 80px;\n}\n\n/* Keep columns narrow if they follow the URL column */\n/* 12% was determined to be a decent narrow width, but wide enough for column headings */\n.lh-table-column--url + th.lh-table-column--bytes,\n.lh-table-column--url + .lh-table-column--bytes + th.lh-table-column--bytes,\n.lh-table-column--url + .lh-table-column--ms,\n.lh-table-column--url + .lh-table-column--ms + th.lh-table-column--bytes,\n.lh-table-column--url + .lh-table-column--bytes + th.lh-table-column--t\
+imespanMs {\n  width: 12%;\n}\n\n/** Tweak styling for tables in insight audits. */\n.lh-audit[id$="-insight"] .lh-table {\n  border: none;\n}\n\n.lh-audit[id$="-insight"] .lh-table thead th {\n  font-weight: bold;\n  color: unset;\n}\n\n.lh-audit[id$="-insight"] .lh-table th,\n.lh-audit[id$="-insight"] .lh-table td {\n  padding: calc(var(--default-padding) / 2);\n}\n\n.lh-audit[id$="-insight"] .lh-table .lh-row--even,\n.lh-audit[id$="-insight"] .lh-table tr:not(.lh-row--group):hover {\n  background-color: unset;\n}\n\n.lh-text__url-host {\n  display: inline;\n}\n\n.lh-text__url-host {\n  margin-left: calc(var(--report-font-size) / 2);\n  opacity: 0.6;\n  font-size: 90%\n}\n\n.lh-thumbnail {\n  object-fit: cover;\n  width: var(--image-preview-size);\n  height: var(--image-preview-size);\n  display: block;\n}\n\n.lh-unknown pre {\n  overflow: scroll;\n  border: solid 1px var(--color-gray-200);\n}\n\n.lh-text__url > a {\n  color: inherit;\n  text-decoration: none;\n}\n\n.lh-text__url > a:hover {\n  text-decoration: underline dotted #999;\n\
+}\n\n.lh-sub-item-row {\n  margin-left: 20px;\n  margin-bottom: 0;\n  color: var(--color-gray-700);\n}\n\n.lh-sub-item-row td {\n  padding-top: 4px;\n  padding-bottom: 4px;\n  padding-left: 20px;\n}\n\n.lh-sub-item-row .lh-element-screenshot {\n  zoom: 0.6;\n}\n\n/* Chevron\n   https://codepen.io/paulirish/pen/LmzEmK\n */\n.lh-chevron {\n  --chevron-angle: 42deg;\n  /* Edge doesn\'t support transform: rotate(calc(...)), so we define it here */\n  --chevron-angle-right: -42deg;\n  width: var(--chevron-size);\n  height: var(--chevron-size);\n  margin-top: calc((var(--report-line-height) - 12px) / 2);\n}\n\n.lh-chevron__lines {\n  transition: transform 0.4s;\n  transform: translateY(var(--report-line-height));\n}\n.lh-chevron__line {\n stroke: var(--chevron-line-stroke);\n stroke-width: var(--chevron-size);\n stroke-linecap: square;\n transform-origin: 50%;\n transform: rotate(var(--chevron-angle));\n transition: transform 300ms, stroke 300ms;\n}\n\n.lh-expandable-details .lh-chevron__line-right,\n.lh-expandable-details[open] .lh-ch\
+evron__line-left {\n transform: rotate(var(--chevron-angle-right));\n}\n\n.lh-expandable-details[open] .lh-chevron__line-right {\n  transform: rotate(var(--chevron-angle));\n}\n\n\n.lh-expandable-details[open]  .lh-chevron__lines {\n transform: translateY(calc(var(--chevron-size) * -1));\n}\n\n.lh-expandable-details[open] {\n  animation: 300ms openDetails forwards;\n  padding-bottom: var(--default-padding);\n}\n\n@keyframes openDetails {\n  from {\n    outline: 1px solid var(--report-background-color);\n  }\n  to {\n   outline: 1px solid;\n   box-shadow: 0 2px 4px rgba(0, 0, 0, .24);\n  }\n}\n\n/**\n* This media query is a temporary fallback for browsers that do not support \\`@container query\\`.\n* TODO: remove this media query when \\`@container query\\` is fully supported by browsers\n* See https://github.com/GoogleChrome/lighthouse/pull/16332\n*/\n@media screen and (max-width: 780px) {\n  /* no black outline if we\'re not confident the entire table can be displayed within bounds */\n  .lh-expandable-details[open] {\n    \
+animation: none;\n  }\n}\n\n@container lh-container (max-width: 780px) {\n  /* no black outline if we\'re not confident the entire table can be displayed within bounds */\n  .lh-expandable-details[open] {\n    animation: none;\n  }\n}\n\n.lh-expandable-details[open] summary, details.lh-clump > summary {\n  border-bottom: 1px solid var(--report-border-color-secondary);\n}\ndetails.lh-clump[open] > summary {\n  border-bottom-width: 0;\n}\n\n\n\ndetails .lh-clump-toggletext--hide,\ndetails[open] .lh-clump-toggletext--show { display: none; }\ndetails[open] .lh-clump-toggletext--hide { display: block;}\n\n\n/* Tooltip */\n.lh-tooltip-boundary {\n  position: relative;\n}\n\n.lh-tooltip {\n  position: absolute;\n  display: none; /* Don\'t retain these layers when not needed */\n  opacity: 0;\n  background: #ffffff;\n  white-space: pre-line; /* Render newlines in the text */\n  min-width: 246px;\n  max-width: 275px;\n  padding: 15px;\n  border-radius: 5px;\n  text-align: initial;\n  line-height: 1.4;\n}\n\n/**\n* This media query is a temp\
+orary fallback for browsers that do not support \\`@container query\\`.\n* TODO: remove this media query when \\`@container query\\` is fully supported by browsers\n* See https://github.com/GoogleChrome/lighthouse/pull/16332\n*/\n@media screen and (max-width: 535px) {\n  .lh-tooltip {\n    min-width: 45cqi;\n    padding: 3cqi;\n  }\n}\n\n/* shrink tooltips to not be cutoff on left edge of narrow container\n   45vw is chosen to be ~= width of the left column of metrics\n*/\n@container lh-container (max-width: 535px) {\n  .lh-tooltip {\n    min-width: 45cqi;\n    padding: 3cqi;\n  }\n}\n\n.lh-tooltip-boundary:hover .lh-tooltip {\n  display: block;\n  animation: fadeInTooltip 250ms;\n  animation-fill-mode: forwards;\n  animation-delay: 850ms;\n  bottom: 100%;\n  z-index: 1;\n  will-change: opacity;\n  right: 0;\n  pointer-events: none;\n}\n\n.lh-tooltip::before {\n  content: "";\n  border: solid transparent;\n  border-bottom-color: #fff;\n  border-width: 10px;\n  position: absolute;\n  bottom: -20px;\n  right: 6px;\n  transform: rot\
+ate(180deg);\n  pointer-events: none;\n}\n\n@keyframes fadeInTooltip {\n  0% { opacity: 0; }\n  75% { opacity: 1; }\n  100% { opacity: 1;  filter: drop-shadow(1px 0px 1px #aaa) drop-shadow(0px 2px 4px hsla(206, 6%, 25%, 0.15)); pointer-events: auto; }\n}\n\n/* Element screenshot */\n.lh-element-screenshot {\n  float: left;\n  margin-right: 20px;\n}\n.lh-element-screenshot__content {\n  overflow: hidden;\n  min-width: 110px;\n  display: flex;\n  justify-content: center;\n  background-color: var(--report-background-color);\n}\n.lh-element-screenshot__image {\n  position: relative;\n  /* Set by ElementScreenshotRenderer.installFullPageScreenshotCssVariable */\n  background-image: var(--element-screenshot-url);\n  outline: 2px solid #777;\n  background-color: white;\n  background-repeat: no-repeat;\n}\n.lh-element-screenshot__mask {\n  position: absolute;\n  background: #555;\n  opacity: 0.8;\n}\n.lh-element-screenshot__element-marker {\n  position: absolute;\n  outline: 2px solid var(--color-lime-400);\n}\n.lh-element-screensh\
+ot__overlay {\n  position: fixed;\n  top: 0;\n  left: 0;\n  right: 0;\n  bottom: 0;\n  z-index: 2000; /* .lh-topbar is 1000 */\n  background: var(--screenshot-overlay-background);\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  cursor: zoom-out;\n}\n\n.lh-element-screenshot__overlay .lh-element-screenshot {\n  margin-right: 0; /* clearing margin used in thumbnail case */\n  outline: 1px solid var(--color-gray-700);\n}\n\n.lh-screenshot-overlay--enabled .lh-element-screenshot {\n  cursor: zoom-out;\n}\n.lh-screenshot-overlay--enabled .lh-node .lh-element-screenshot {\n  cursor: zoom-in;\n}\n\n\n.lh-meta__items {\n  --meta-icon-size: calc(var(--report-icon-size) * 0.667);\n  padding: var(--default-padding);\n  display: grid;\n  grid-template-columns: 1fr 1fr 1fr;\n  background-color: var(--env-item-background-color);\n  border-radius: 3px;\n  margin: 0 0 var(--default-padding) 0;\n  font-size: 12px;\n  column-gap: var(--default-padding);\n  color: var(--color-gray-700);\n}\n\n.lh-meta__item {\n  display\
+: block;\n  list-style-type: none;\n  position: relative;\n  padding: 0 0 0 calc(var(--meta-icon-size) + var(--default-padding) * 2);\n  cursor: unset; /* disable pointer cursor from report-icon */\n}\n\n.lh-meta__item.lh-tooltip-boundary {\n  text-decoration: dotted underline var(--color-gray-500);\n  cursor: help;\n}\n\n.lh-meta__item.lh-report-icon::before {\n  position: absolute;\n  left: var(--default-padding);\n  width: var(--meta-icon-size);\n  height: var(--meta-icon-size);\n}\n\n.lh-meta__item.lh-report-icon:hover::before {\n  opacity: 0.7;\n}\n\n.lh-meta__item .lh-tooltip {\n  color: var(--color-gray-800);\n}\n\n.lh-meta__item .lh-tooltip::before {\n  right: auto; /* Set the tooltip arrow to the leftside */\n  left: 6px;\n}\n\n.lh-meta__item:hover .lh-tooltip {\n  right: auto;\n  left: 6px;\n}\n/**\n* This media query is a temporary fallback for browsers that do not support \\`@container query\\`.\n* TODO: remove this media query when \\`@container query\\` is fully supported by browsers\n* See https://github.com/Goog\
+leChrome/lighthouse/pull/16332\n*/\n@media screen and (max-width: 640px) {\n  .lh-meta__items {\n    grid-template-columns: 1fr 1fr;\n  }\n}\n\n/* Change the grid for narrow container */\n@container lh-container (max-width: 640px) {\n  .lh-meta__items {\n    grid-template-columns: 1fr 1fr;\n  }\n}\n\n/**\n* This media query is a temporary fallback for browsers that do not support \\`@container query\\`.\n* TODO: remove this media query when \\`@container query\\` is fully supported by browsers\n* See https://github.com/GoogleChrome/lighthouse/pull/16332\n*/\n@media screen and (max-width: 535px) {\n  .lh-meta__items {\n    display: block;\n  }\n}\n\n@container lh-container (max-width: 535px) {\n  .lh-meta__items {\n    display: block;\n  }\n}\n\n/* Explodey gauge */\n\n.lh-exp-gauge-component {\n  margin-bottom: 10px;\n}\n\n.lh-exp-gauge-component circle {\n  stroke: currentcolor;\n  r: var(--radius);\n}\n\n.lh-exp-gauge-component text {\n  font-size: calc(var(--radius) * 0.2);\n}\n\n.lh-exp-gauge-component .lh-exp-gauge {\n  margin: 0 a\
+uto;\n  width: 225px;\n  stroke-width: var(--stroke-width);\n  stroke-linecap: round;\n\n  /* for better rendering perf */\n  contain: strict;\n  height: 225px;\n  will-change: transform;\n}\n.lh-exp-gauge-component .lh-exp-gauge--faded {\n  opacity: 0.1;\n}\n.lh-exp-gauge-component .lh-exp-gauge__wrapper {\n  font-family: var(--report-font-family-monospace);\n  text-align: center;\n  text-decoration: none;\n  transition: .3s;\n}\n.lh-exp-gauge-component .lh-exp-gauge__wrapper--pass {\n  color: var(--color-pass);\n}\n.lh-exp-gauge-component .lh-exp-gauge__wrapper--average {\n  color: var(--color-average);\n}\n.lh-exp-gauge-component .lh-exp-gauge__wrapper--fail {\n  color: var(--color-fail);\n}\n.lh-exp-gauge-component .state--expanded {\n  transition: color .3s;\n}\n.lh-exp-gauge-component .state--highlight {\n  color: var(--color-highlight);\n}\n.lh-exp-gauge-component .lh-exp-gauge__svg-wrapper {\n  display: flex;\n  flex-direction: column-reverse;\n}\n\n.lh-exp-gauge-component .lh-exp-gauge__label {\n  fill: var(--report\
+-text-color);\n  font-family: var(--report-font-family);\n  font-size: 12px;\n}\n\n.lh-exp-gauge-component .lh-exp-gauge__cutout {\n  opacity: .999;\n  transition: opacity .3s;\n}\n.lh-exp-gauge-component .state--highlight .lh-exp-gauge__cutout {\n  opacity: 0;\n}\n\n.lh-exp-gauge-component .lh-exp-gauge__inner {\n  color: inherit;\n}\n.lh-exp-gauge-component .lh-exp-gauge__base {\n  fill: currentcolor;\n}\n\n\n.lh-exp-gauge-component .lh-exp-gauge__arc {\n  fill: none;\n  transition: opacity .3s;\n}\n.lh-exp-gauge-component .lh-exp-gauge__arc--metric {\n  color: var(--metric-color);\n  stroke-dashoffset: var(--metric-offset);\n  opacity: 0.3;\n}\n.lh-exp-gauge-component .lh-exp-gauge-hovertarget {\n  color: currentcolor;\n  opacity: 0.001;\n  stroke-linecap: butt;\n  stroke-width: 24;\n  /* hack. move the hover target out of the center. ideally i tweak the r instead but that rquires considerably more math. */\n  transform: scale(1.15);\n}\n.lh-exp-gauge-component .lh-exp-gauge__arc--metric.lh-exp-gauge--miniarc {\n  opacit\
+y: 0;\n  stroke-dasharray: 0 calc(var(--circle-meas) * var(--radius));\n  transition: 0s .005s;\n}\n.lh-exp-gauge-component .state--expanded .lh-exp-gauge__arc--metric.lh-exp-gauge--miniarc {\n  opacity: .999;\n  stroke-dasharray: var(--metric-array);\n  transition: 0.3s; /*  calc(.005s + var(--i)*.05s); entrace animation */\n}\n.lh-exp-gauge-component .state--expanded .lh-exp-gauge__inner .lh-exp-gauge__arc {\n  opacity: 0;\n}\n\n\n.lh-exp-gauge-component .lh-exp-gauge__percentage {\n  text-anchor: middle;\n  dominant-baseline: middle;\n  opacity: .999;\n  font-size: calc(var(--radius) * 0.625);\n  transition: opacity .3s ease-in;\n}\n.lh-exp-gauge-component .state--highlight .lh-exp-gauge__percentage {\n  opacity: 0;\n}\n\n.lh-exp-gauge-component .lh-exp-gauge__wrapper--fail .lh-exp-gauge__percentage {\n  fill: var(--color-fail);\n}\n.lh-exp-gauge-component .lh-exp-gauge__wrapper--average .lh-exp-gauge__percentage {\n  fill: var(--color-average);\n}\n.lh-exp-gauge-component .lh-exp-gauge__wrapper--pass .lh-exp-gau\
+ge__percentage {\n  fill: var(--color-pass);\n}\n\n.lh-exp-gauge-component .lh-cover {\n  fill: none;\n  opacity: .001;\n  pointer-events: none;\n}\n.lh-exp-gauge-component .state--expanded .lh-cover {\n  pointer-events: auto;\n}\n\n.lh-exp-gauge-component .metric {\n  transform: scale(var(--scale-initial));\n  opacity: 0;\n  transition: transform .1s .2s ease-out,  opacity .3s ease-out;\n  pointer-events: none;\n}\n.lh-exp-gauge-component .metric text {\n  pointer-events: none;\n}\n.lh-exp-gauge-component .metric__value {\n  fill: currentcolor;\n  opacity: 0;\n  transition: opacity 0.2s;\n}\n.lh-exp-gauge-component .state--expanded .metric {\n  transform: scale(1);\n  opacity: .999;\n  transition: transform .3s ease-out,  opacity .3s ease-in,  stroke-width .1s ease-out;\n  transition-delay: calc(var(--i)*.05s);\n  pointer-events: auto;\n}\n.lh-exp-gauge-component .state--highlight .metric {\n  opacity: .3;\n}\n.lh-exp-gauge-component .state--highlight .metric--highlight {\n  opacity: .999;\n  stroke-width: calc(1.5*var(--s\
+troke-width));\n}\n.lh-exp-gauge-component .state--highlight .metric--highlight .metric__value {\n  opacity: 0.999;\n}\n\n\n/*\n the initial first load peek\n*/\n.lh-exp-gauge-component .lh-exp-gauge__bg {  /* needed for the use zindex stacking w/ transparency */\n  fill: var(--report-background-color);\n  stroke: var(--report-background-color);\n}\n.lh-exp-gauge-component .state--peek .metric {\n  transition-delay: 0ms;\n  animation: peek var(--peek-dur) cubic-bezier(0.46, 0.03, 0.52, 0.96);\n  animation-fill-mode: forwards;\n}\n.lh-exp-gauge-component .state--peek .lh-exp-gauge__inner .lh-exp-gauge__arc {\n  opacity: 1;\n}\n.lh-exp-gauge-component .state--peek .lh-exp-gauge__arc.lh-exp-gauge--faded {\n  opacity: 0.3; /* just a tad stronger cuz its fighting with a big solid arg */\n}\n/* do i need to set expanded and override this? */\n.lh-exp-gauge-component .state--peek .lh-exp-gauge__arc--metric.lh-exp-gauge--miniarc {\n  transition: opacity 0.3s;\n}\n.lh-exp-gauge-component .state--peek {\n  color: unset;\n}\n.l\
+h-exp-gauge-component .state--peek .metric__label {\n  display: none;\n}\n\n.lh-exp-gauge-component .metric__label {\n  fill: var(--report-text-color);\n}\n\n@keyframes peek {\n  /* biggest it should go is 0.92. smallest is 0.8 */\n  0% {\n    transform: scale(0.8);\n    opacity: 0.8;\n  }\n\n  50% {\n    transform: scale(0.92);\n    opacity: 1;\n  }\n\n  100% {\n    transform: scale(0.8);\n    opacity: 0.8;\n  }\n}\n\n.lh-exp-gauge-component .wrapper {\n  width: 620px;\n}\n\n/*# sourceURL=report-styles.css */\n`),e.append(t),e}function dt(o){let e=o.createFragment(),t=o.createElement("style");t.append(`\n    .lh-topbar {\n      position: sticky;\n      top: 0;\n      left: 0;\n      right: 0;\n      z-index: 1000;\n      display: flex;\n      align-items: center;\n      height: var(--topbar-height);\n      padding: var(--topbar-padding);\n      font-size: var(--report-font-size-secondary);\n      background-color: var(--topbar-background-color);\n      border-bottom: 1px solid var(--color-gray-200);\n    }\n\n    .lh-topbar__logo \
+{\n      width: var(--topbar-logo-size);\n      height: var(--topbar-logo-size);\n      user-select: none;\n      flex: none;\n    }\n\n    .lh-topbar__url {\n      margin: var(--topbar-padding);\n      text-decoration: none;\n      color: var(--report-text-color);\n      text-overflow: ellipsis;\n      overflow: hidden;\n      white-space: nowrap;\n    }\n\n    .lh-tools {\n      display: flex;\n      align-items: center;\n      margin-left: auto;\n      will-change: transform;\n      min-width: var(--report-icon-size);\n    }\n    .lh-tools__button {\n      width: var(--report-icon-size);\n      min-width: 24px;\n      height: var(--report-icon-size);\n      cursor: pointer;\n      margin-right: 5px;\n      /* This is actually a button element, but we want to style it like a transparent div. */\n      display: flex;\n      background: none;\n      color: inherit;\n      border: none;\n      padding: 0;\n      font: inherit;\n    }\n    .lh-tools__button svg {\n      fill: var(--tools-icon-color);\n    }\n    .lh-dark .lh-t\
+ools__button svg {\n      filter: invert(1);\n    }\n    .lh-tools__button.lh-active + .lh-tools__dropdown {\n      opacity: 1;\n      clip: rect(-1px, 194px, 270px, -3px);\n      visibility: visible;\n    }\n    .lh-tools__dropdown {\n      position: absolute;\n      background-color: var(--report-background-color);\n      border: 1px solid var(--report-border-color);\n      border-radius: 3px;\n      padding: calc(var(--default-padding) / 2) 0;\n      cursor: pointer;\n      top: 36px;\n      right: 0;\n      box-shadow: 1px 1px 3px #ccc;\n      min-width: 125px;\n      clip: rect(0, 164px, 0, 0);\n      visibility: hidden;\n      opacity: 0;\n      transition: all 200ms cubic-bezier(0,0,0.2,1);\n    }\n    .lh-tools__dropdown a {\n      color: currentColor;\n      text-decoration: none;\n      white-space: nowrap;\n      padding: 0 6px;\n      line-height: 2;\n    }\n    .lh-tools__dropdown a:hover,\n    .lh-tools__dropdown a:focus {\n      background-color: var(--color-gray-200);\n      outline: none;\n    }\n    /* \
+save-gist option hidden in report. */\n    .lh-tools__dropdown a[data-action=\'save-gist\'] {\n      display: none;\n    }\n\n    .lh-locale-selector {\n      width: 100%;\n      color: var(--report-text-color);\n      background-color: var(--locale-selector-background-color);\n      padding: 2px;\n    }\n    .lh-tools-locale {\n      display: flex;\n      align-items: center;\n      flex-direction: row-reverse;\n    }\n    .lh-tools-locale__selector-wrapper {\n      transition: opacity 0.15s;\n      opacity: 0;\n      max-width: 200px;\n    }\n    .lh-button.lh-tool-locale__button {\n      height: var(--topbar-height);\n      color: var(--tools-icon-color);\n      padding: calc(var(--default-padding) / 2);\n    }\n    .lh-tool-locale__button.lh-active + .lh-tools-locale__selector-wrapper {\n      opacity: 1;\n      clip: rect(-1px, 255px, 242px, -3px);\n      visibility: visible;\n      margin: 0 4px;\n    }\n\n    /**\n    * This media query is a temporary fallback for browsers that do not support \\`@container query\\`.\
+\n    * TODO: remove this media query when \\`@container query\\` is fully supported by browsers\n    * See https://github.com/GoogleChrome/lighthouse/pull/16332\n    */\n    @media screen and (max-width: 964px) {\n      .lh-tools__dropdown {\n        right: 0;\n        left: initial;\n      }\n    }\n\n    @container lh-container (max-width: 964px) {\n      .lh-tools__dropdown {\n        right: 0;\n        left: initial;\n      }\n    }\n\n    @media print {\n      .lh-topbar {\n        position: static;\n        margin-left: 0;\n      }\n\n      .lh-tools__dropdown {\n        display: none;\n      }\n    }\n  `),e.append(t);let n=o.createElement("div","lh-topbar"),r=o.createElementNS("http://www.w3.org/2000/svg","svg","lh-topbar__logo");r.setAttribute("role","img"),r.setAttribute("title","Lighthouse logo"),r.setAttribute("fill","none"),r.setAttribute("xmlns","http://www.w3.org/2000/svg"),r.setAttribute("viewBox","0 0 48 48");let i=o.createElementNS("http://www.w3.org/2000/svg","path");i.setAttribute("d","m14 7 10\
+-7 10 7v10h5v7h-5l5 24H9l5-24H9v-7h5V7Z"),i.setAttribute("fill","#F63");let a=o.createElementNS("http://www.w3.org/2000/svg","path");a.setAttribute("d","M31.561 24H14l-1.689 8.105L31.561 24ZM18.983 48H9l1.022-4.907L35.723 32.27l1.663 7.98L18.983 48Z"),a.setAttribute("fill","#FFA385");let l=o.createElementNS("http://www.w3.org/2000/svg","path");l.setAttribute("fill","#FF3"),l.setAttribute("d","M20.5 10h7v7h-7z"),r.append(" ",i," ",a," ",l," ");let s=o.createElement("a","lh-topbar__url");s.setAttribute("href",""),s.setAttribute("target","_blank"),s.setAttribute("rel","noopener");let c=o.createElement("div","lh-tools"),d=o.createElement("div","lh-tools-locale lh-hidden"),h=o.createElement("button","lh-button lh-tool-locale__button");h.setAttribute("id","lh-button__swap-locales"),h.setAttribute("title","Show Language Picker"),h.setAttribute("aria-label","Toggle language picker"),h.setAttribute("aria-haspopup","menu"),h.setAttribute("aria-expanded","false"),h.setAttribute("aria-controls","l\
+h-tools-locale__selector-wrapper");let p=o.createElementNS("http://www.w3.org/2000/svg","svg");p.setAttribute("width","20px"),p.setAttribute("height","20px"),p.setAttribute("viewBox","0 0 24 24"),p.setAttribute("fill","currentColor");let g=o.createElementNS("http://www.w3.org/2000/svg","path");g.setAttribute("d","M0 0h24v24H0V0z"),g.setAttribute("fill","none");let b=o.createElementNS("http://www.w3.org/2000/svg","path");b.setAttribute("d","M12.87 15.07l-2.54-2.51.03-.03c1.74-1.94 2.98-4.17 3.71-6.53H17V4h-7V2H8v2H1v1.99h11.17C11.5 7.92 10.44 9.75 9 11.35 8.07 10.32 7.3 9.19 6.69 8h-2c.73 1.63 1.73 3.17 2.98 4.56l-5.09 5.02L4 19l5-5 3.11 3.11.76-2.04zM18.5 10h-2L12 22h2l1.12-3h4.75L21 22h2l-4.5-12zm-2.62 7l1.62-4.33L19.12 17h-3.24z"),p.append(g,b),h.append(" ",p," ");let w=o.createElement("div","lh-tools-locale__selector-wrapper");w.setAttribute("id","lh-tools-locale__selector-wrapper"),w.setAttribute("role","menu"),w.setAttribute("aria-labelledby","lh-button__swap-locales"),w.setAttrib\
+ute("aria-hidden","true"),w.append(" "," "),d.append(" ",h," ",w," ");let f=o.createElement("button","lh-tools__button");f.setAttribute("id","lh-tools-button"),f.setAttribute("title","Tools menu"),f.setAttribute("aria-label","Toggle report tools menu"),f.setAttribute("aria-haspopup","menu"),f.setAttribute("aria-expanded","false"),f.setAttribute("aria-controls","lh-tools-dropdown");let u=o.createElementNS("http://www.w3.org/2000/svg","svg");u.setAttribute("width","100%"),u.setAttribute("height","100%"),u.setAttribute("viewBox","0 0 24 24");let v=o.createElementNS("http://www.w3.org/2000/svg","path");v.setAttribute("d","M0 0h24v24H0z"),v.setAttribute("fill","none");let _=o.createElementNS("http://www.w3.org/2000/svg","path");_.setAttribute("d","M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"),u.append(" ",v," ",_," "),f.append(" ",u," ");let x=o.createElement("div","lh-tools__dropdown");x.s\
+etAttribute("id","lh-tools-dropdown"),x.setAttribute("role","menu"),x.setAttribute("aria-labelledby","lh-tools-button");let S=o.createElement("a","lh-report-icon lh-report-icon--print");S.setAttribute("role","menuitem"),S.setAttribute("tabindex","-1"),S.setAttribute("href","#"),S.setAttribute("data-i18n","dropdownPrintSummary"),S.setAttribute("data-action","print-summary");let A=o.createElement("a","lh-report-icon lh-report-icon--print");A.setAttribute("role","menuitem"),A.setAttribute("tabindex","-1"),A.setAttribute("href","#"),A.setAttribute("data-i18n","dropdownPrintExpanded"),A.setAttribute("data-action","print-expanded");let z=o.createElement("a","lh-report-icon lh-report-icon--copy");z.setAttribute("role","menuitem"),z.setAttribute("tabindex","-1"),z.setAttribute("href","#"),z.setAttribute("data-i18n","dropdownCopyJSON"),z.setAttribute("data-action","copy");let M=o.createElement("a","lh-report-icon lh-report-icon--download lh-hidden");M.setAttribute("role","menuitem"),M.setAttrib\
+ute("tabindex","-1"),M.setAttribute("href","#"),M.setAttribute("data-i18n","dropdownSaveHTML"),M.setAttribute("data-action","save-html");let $=o.createElement("a","lh-report-icon lh-report-icon--download");$.setAttribute("role","menuitem"),$.setAttribute("tabindex","-1"),$.setAttribute("href","#"),$.setAttribute("data-i18n","dropdownSaveJSON"),$.setAttribute("data-action","save-json");let R=o.createElement("a","lh-report-icon lh-report-icon--open");R.setAttribute("role","menuitem"),R.setAttribute("tabindex","-1"),R.setAttribute("href","#"),R.setAttribute("data-i18n","dropdownViewer"),R.setAttribute("data-action","open-viewer");let N=o.createElement("a","lh-report-icon lh-report-icon--open");N.setAttribute("role","menuitem"),N.setAttribute("tabindex","-1"),N.setAttribute("href","#"),N.setAttribute("data-i18n","dropdownSaveGist"),N.setAttribute("data-action","save-gist");let D=o.createElement("a","lh-report-icon lh-report-icon--open lh-hidden");D.setAttribute("role","menuitem"),D.setAttr\
+ibute("tabindex","-1"),D.setAttribute("href","#"),D.setAttribute("data-i18n","dropdownViewUnthrottledTrace"),D.setAttribute("data-action","view-unthrottled-trace");let I=o.createElement("a","lh-report-icon lh-report-icon--dark");return I.setAttribute("role","menuitem"),I.setAttribute("tabindex","-1"),I.setAttribute("href","#"),I.setAttribute("data-i18n","dropdownDarkTheme"),I.setAttribute("data-action","toggle-dark"),x.append(" ",S," ",A," ",z," "," ",M," ",$," ",R," ",N," "," ",D," ",I," "),c.append(" ",d," ",f," ",x," "),n.append(" "," ",r," ",s," ",c," "),e.append(n),e}function ht(o){let e=o.createFragment(),t=o.createElement("div","lh-warnings lh-warnings--toplevel"),n=o.createElement("p","lh-warnings__msg"),r=o.createElement("ul");return t.append(" ",n," ",r," "),e.append(t),e}function be(o,e){switch(e){case"3pFilter":return Ge(o);case"audit":return Be(o);case"categoryHeader":return qe(o);case"chevron":return je(o);case"clump":return We(o);case"crc":return Ke(o);case"crcChain":ret\
+urn Je(o);case"elementScreenshot":return Ze(o);case"explodeyGauge":return Qe(o);case"footer":return Ye(o);case"fraction":return Xe(o);case"gauge":return et(o);case"heading":return tt(o);case"metric":return nt(o);case"scorescale":return rt(o);case"scoresWrapper":return ot(o);case"snippet":return it(o);case"snippetContent":return at(o);case"snippetHeader":return lt(o);case"snippetLine":return st(o);case"styles":return ct(o);case"topbar":return dt(o);case"warningsToplevel":return ht(o)}throw new Error("unexpected component: "+e)}var ee=class{constructor(e,t){this._document=e,this._lighthouseChannel="unknown",this._componentCache=new Map,this.rootEl=t}createElement(e,t){let n=this._document.createElement(e);if(t)for(let r of t.split(/\\s+/))r&&n.classList.add(r);return n}createElementNS(e,t,n){let r=this._document.createElementNS(e,t);if(n)for(let i of n.split(/\\s+/))i&&r.classList.add(i);return r}createSVGElement(e,t){return this._document.createElementNS("http://www.w3.org/2000/svg",e,t)}\
+createFragment(){return this._document.createDocumentFragment()}createTextNode(e){return this._document.createTextNode(e)}createChildOf(e,t,n){let r=this.createElement(t,n);return e.append(r),r}createComponent(e){let t=this._componentCache.get(e);if(t){let r=t.cloneNode(!0);return this.findAll("style",r).forEach(i=>i.remove()),r}return t=be(this,e),this._componentCache.set(e,t),t.cloneNode(!0)}clearComponentCache(){this._componentCache.clear()}convertMarkdownLinkSnippets(e,t={}){let n=this.createElement("span");for(let r of E.splitMarkdownLink(e)){let i=r.text.includes("`")?this.convertMarkdownCodeSnippets(r.text):r.text;if(!r.isLink){n.append(i);continue}let a=new URL(r.linkHref);(["https://developers.google.com","https://web.dev","https://developer.chrome.com"].includes(a.origin)||t.alwaysAppendUtmSource)&&(a.searchParams.set("utm_source","lighthouse"),a.searchParams.set("utm_medium",this._lighthouseChannel));let s=this.createElement("a");s.rel="noopener",s.target="_blank",s.append(i\
+),this.safelySetHref(s,a.href),n.append(s)}return n}safelySetHref(e,t){if(t=t||"",t.startsWith("#")){e.href=t;return}let n=["https:","http:"],r;try{r=new URL(t)}catch{}r&&n.includes(r.protocol)&&(e.href=r.href)}safelySetBlobHref(e,t){if(t.type!=="text/html"&&t.type!=="application/json")throw new Error("Unsupported blob type");let n=URL.createObjectURL(t);e.href=n}convertMarkdownCodeSnippets(e){let t=this.createElement("span");for(let n of E.splitMarkdownCodeSpans(e))if(n.isCode){let r=this.createElement("code");r.textContent=n.text,t.append(r)}else t.append(this._document.createTextNode(n.text));return t}setLighthouseChannel(e){this._lighthouseChannel=e}document(){return this._document}isDevTools(){return!!this._document.querySelector(".lh-devtools")}find(e,t=this.rootEl??this._document){let n=this.maybeFind(e,t);if(n===null)throw new Error(`query ${e} not found`);return n}maybeFind(e,t=this.rootEl??this._document){return t.querySelector(e)}findAll(e,t){return Array.from(t.querySelecto\
+rAll(e))}fireEventOn(e,t=this._document,n){let r=new CustomEvent(e,n?{detail:n}:void 0);t.dispatchEvent(r)}saveFile(e,t){let n=this.createElement("a");n.download=t,this.safelySetBlobHref(n,e),this._document.body.append(n),n.click(),this._document.body.removeChild(n),setTimeout(()=>URL.revokeObjectURL(n.href),500)}};var _e=0,m=class o{static i18n=null;static strings={};static reportJson=null;static apply(e){o.strings={...we,...e.providedStrings},o.i18n=e.i18n,o.reportJson=e.reportJson}static getUniqueSuffix(){return _e++}static resetUniqueSuffix(){_e=0}};var ye="data:image/jpeg;base64,";function xe(o){o.configSettings.locale||(o.configSettings.locale="en"),o.configSettings.formFactor||(o.configSettings.formFactor=o.configSettings.emulatedFormFactor),o.finalDisplayedUrl=E.getFinalDisplayedUrl(o),o.mainDocumentUrl=E.getMainDocumentUrl(o);for(let n of Object.values(o.audits))if((n.scoreDisplayMode==="not_applicable"||n.scoreDisplayMode==="not-applicable")&&(n.scoreDisplayMode="notApplicabl\
+e"),n.scoreDisplayMode==="informative"&&(n.score=1),n.details){if((n.details.type===void 0||n.details.type==="diagnostic")&&(n.details.type="debugdata"),n.details.type==="filmstrip")for(let r of n.details.items)r.data.startsWith(ye)||(r.data=ye+r.data);if(n.details.type==="table")for(let r of n.details.headings){let{itemType:i,text:a}=r;i!==void 0&&(r.valueType=i,delete r.itemType),a!==void 0&&(r.label=a,delete r.text);let l=r.subItemsHeading?.itemType;r.subItemsHeading&&l!==void 0&&(r.subItemsHeading.valueType=l,delete r.subItemsHeading.itemType)}if(n.id==="third-party-summary"&&(n.details.type==="opportunity"||n.details.type==="table")){let{headings:r,items:i}=n.details;if(r[0].valueType==="link"){r[0].valueType="text";for(let a of i)typeof a.entity=="object"&&a.entity.type==="link"&&(a.entity=a.entity.text);n.details.isEntityGrouped=!0}}}let[e]=o.lighthouseVersion.split(".").map(Number),t=o.categories.performance;if(t){if(e<9){o.categoryGroups||(o.categoryGroups={}),o.categoryGroups\
+.hidden={title:""};for(let n of t.auditRefs)n.group?n.group==="load-opportunities"&&(n.group="diagnostics"):n.group="hidden"}else if(e<12)for(let n of t.auditRefs)n.group||(n.group="diagnostics")}if(e<12&&t){let n=new Map;for(let r of t.auditRefs){let i=r.relevantAudits;if(!(!i||!r.acronym))for(let a of i){let l=n.get(a)||[];l.push(r.acronym),n.set(a,l)}}for(let[r,i]of n){if(!i.length)continue;let a=o.audits[r];if(a&&!a.metricSavings){a.metricSavings={};for(let l of i)a.metricSavings[l]=0}}}if(o.environment||(o.environment={benchmarkIndex:0,networkUserAgent:o.userAgent,hostUserAgent:o.userAgent}),o.configSettings.screenEmulation||(o.configSettings.screenEmulation={width:-1,height:-1,deviceScaleFactor:-1,mobile:/mobile/i.test(o.environment.hostUserAgent),disabled:!1}),o.i18n||(o.i18n={}),o.audits["full-page-screenshot"]){let n=o.audits["full-page-screenshot"].details;n?o.fullPageScreenshot={screenshot:n.screenshot,nodes:n.nodes}:o.fullPageScreenshot=null,delete o.audits["full-page-scree\
+nshot"]}}var O=E.RATINGS,k=class o{static prepareReportResult(e){let t=JSON.parse(JSON.stringify(e));xe(t);for(let r of Object.values(t.audits))r.details&&(r.details.type==="opportunity"||r.details.type==="table")&&!r.details.isEntityGrouped&&t.entities&&o.classifyEntities(t.entities,r.details);if(typeof t.categories!="object")throw new Error("No categories provided.");let n=new Map;for(let r of Object.values(t.categories))r.auditRefs.forEach(i=>{i.acronym&&n.set(i.acronym,i)}),r.auditRefs.forEach(i=>{let a=t.audits[i.id];i.result=a;let l=Object.keys(i.result.metricSavings||{});if(l.length){i.relevantMetrics=[];for(let s of l){let c=n.get(s);c&&i.relevantMetrics.push(c)}}if(t.stackPacks){let s=[i.id,...i.result.replacesAudits??[]];t.stackPacks.forEach(c=>{let d=s.find(h=>c.descriptions[h]);d&&c.descriptions[d]&&(i.stackPacks=i.stackPacks||[],i.stackPacks.push({title:c.title,iconDataURL:c.iconDataURL,description:c.descriptions[d]}))})}});return t}static getUrlLocatorFn(e){let t=e.find(r\
+=>r.valueType==="url")?.key;if(t&&typeof t=="string")return r=>{let i=r[t];if(typeof i=="string")return i};let n=e.find(r=>r.valueType==="source-location")?.key;if(n)return r=>{let i=r[n];if(typeof i=="object"&&i.type==="source-location")return i.url}}static classifyEntities(e,t){let{items:n,headings:r}=t;if(!n.length||n.some(a=>a.entity))return;let i=o.getUrlLocatorFn(r);if(i)for(let a of n){let l=i(a);if(!l)continue;let s="";try{s=E.parseURL(l).origin}catch{}if(!s)continue;let c=e.find(d=>d.origins.includes(s));c&&(a.entity=c.name)}}static getTableItemSortComparator(e){return(t,n)=>{for(let r of e){let i=t[r],a=n[r];if((typeof i!=typeof a||!["number","string"].includes(typeof i))&&console.warn(`Warning: Attempting to sort unsupported value type: ${r}.`),typeof i=="number"&&typeof a=="number"&&i!==a)return a-i;if(typeof i=="string"&&typeof a=="string"&&i!==a)return i.localeCompare(a)}return 0}}static getEmulationDescriptions(e){let t,n,r,i=e.throttling,a=m.i18n,l=m.strings;switch(e.th\
+rottlingMethod){case"provided":r=n=t=l.throttlingProvided;break;case"devtools":{let{cpuSlowdownMultiplier:p,requestLatencyMs:g}=i;t=`${a.formatNumber(p)}x slowdown (DevTools)`,n=`${a.formatMilliseconds(g)} HTTP RTT, ${a.formatKbps(i.downloadThroughputKbps)} down, ${a.formatKbps(i.uploadThroughputKbps)} up (DevTools)`,r=g===150*3.75&&i.downloadThroughputKbps===1.6*1024*.9&&i.uploadThroughputKbps===750*.9?l.runtimeSlow4g:l.runtimeCustom;break}case"simulate":{let{cpuSlowdownMultiplier:p,rttMs:g,throughputKbps:b}=i;t=`${a.formatNumber(p)}x slowdown (Simulated)`,n=`${a.formatMilliseconds(g)} TCP RTT, ${a.formatKbps(b)} throughput (Simulated)`,r=g===150&&b===1.6*1024?l.runtimeSlow4g:l.runtimeCustom;break}default:r=t=n=l.runtimeUnknown}let s=e.channel==="devtools"?!1:e.screenEmulation.disabled,c=e.channel==="devtools"?e.formFactor==="mobile":e.screenEmulation.mobile,d=l.runtimeMobileEmulation;s?d=l.runtimeNoEmulation:c||(d=l.runtimeDesktopEmulation);let h=s?void 0:`${e.screenEmulation.width}x\
+${e.screenEmulation.height}, DPR ${e.screenEmulation.deviceScaleFactor}`;return{deviceEmulation:d,screenEmulation:h,cpuThrottling:t,networkThrottling:n,summary:r}}static showAsPassed(e){switch(e.scoreDisplayMode){case"manual":case"notApplicable":return!0;case"error":case"informative":return!1;case"numeric":case"binary":default:return Number(e.score)>=O.PASS.minScore}}static calculateRating(e,t){if(t==="manual"||t==="notApplicable")return O.PASS.label;if(t==="error")return O.ERROR.label;if(e===null)return O.FAIL.label;let n=O.FAIL.label;return e>=O.PASS.minScore?n=O.PASS.label:e>=O.AVERAGE.minScore&&(n=O.AVERAGE.label),n}static calculateCategoryFraction(e){let t=0,n=0,r=0,i=0;for(let a of e.auditRefs){let l=o.showAsPassed(a.result);if(!(a.group==="hidden"||a.result.scoreDisplayMode==="manual"||a.result.scoreDisplayMode==="notApplicable")){if(a.result.scoreDisplayMode==="informative"){l||++r;continue}++t,i+=a.weight,l&&n++}}return{numPassed:n,numPassableAudits:t,numInformative:r,totalWei\
+ght:i}}static isPluginCategory(e){return e.startsWith("lighthouse-plugin-")}static shouldDisplayAsFraction(e){return e==="timespan"||e==="snapshot"}},we={varianceDisclaimer:"Values are estimated and may vary. The [performance score is calculated](https://developer.chrome.com/docs/lighthouse/performance/performance-scoring/) directly from these metrics.",calculatorLink:"See calculator.",showRelevantAudits:"Show audits relevant to:",opportunityResourceColumnLabel:"Opportunity",opportunitySavingsColumnLabel:"Estimated Savings",errorMissingAuditInfo:"Report error: no audit information",errorLabel:"Error!",warningHeader:"Warnings: ",warningAuditsGroupTitle:"Passed audits but with warnings",passedAuditsGroupTitle:"Passed audits",notApplicableAuditsGroupTitle:"Not applicable",manualAuditsGroupTitle:"Additional items to manually check",toplevelWarningsMessage:"There were issues affecting this run of Lighthouse:",crcInitialNavigation:"Initial Navigation",crcLongestDurationLabel:"Maximum critica\
+l path latency:",snippetExpandButtonLabel:"Expand snippet",snippetCollapseButtonLabel:"Collapse snippet",lsPerformanceCategoryDescription:"[Lighthouse](https://developers.google.com/web/tools/lighthouse/) analysis of the current page on an emulated mobile network. Values are estimated and may vary.",labDataTitle:"Lab Data",thirdPartyResourcesLabel:"Show 3rd-party resources",viewTreemapLabel:"View Treemap",viewTraceLabel:"View Trace",dropdownPrintSummary:"Print Summary",dropdownPrintExpanded:"Print Expanded",dropdownCopyJSON:"Copy JSON",dropdownSaveHTML:"Save as HTML",dropdownSaveJSON:"Save as JSON",dropdownViewer:"Open in Viewer",dropdownSaveGist:"Save as Gist",dropdownDarkTheme:"Toggle Dark Theme",dropdownViewUnthrottledTrace:"View Unthrottled Trace",runtimeSettingsDevice:"Device",runtimeSettingsNetworkThrottling:"Network throttling",runtimeSettingsCPUThrottling:"CPU throttling",runtimeSettingsUANetwork:"User agent (network)",runtimeSettingsBenchmark:"Unthrottled CPU/Memory Power",run\
+timeSettingsAxeVersion:"Axe version",runtimeSettingsScreenEmulation:"Screen emulation",footerIssue:"File an issue",runtimeNoEmulation:"No emulation",runtimeMobileEmulation:"Emulated Moto G Power",runtimeDesktopEmulation:"Emulated Desktop",runtimeUnknown:"Unknown",runtimeSingleLoad:"Single page session",runtimeAnalysisWindow:"Initial page load",runtimeAnalysisWindowTimespan:"User interactions timespan",runtimeAnalysisWindowSnapshot:"Point-in-time snapshot",runtimeSingleLoadTooltip:"This data is taken from a single page session, as opposed to field data summarizing many sessions.",throttlingProvided:"Provided by environment",show:"Show",hide:"Hide",expandView:"Expand view",collapseView:"Collapse view",runtimeSlow4g:"Slow 4G throttling",runtimeCustom:"Custom throttling",firstPartyChipLabel:"1st party",openInANewTabTooltip:"Open in a new tab",unattributable:"Unattributable",unscoredLabel:"Unscored",unscoredTitle:"This audit does not contribute to the overall category score."};var G=class{c\
+onstructor(e,t){this.dom=e,this.detailsRenderer=t}get _clumpTitles(){return{warning:m.strings.warningAuditsGroupTitle,manual:m.strings.manualAuditsGroupTitle,passed:m.strings.passedAuditsGroupTitle,notApplicable:m.strings.notApplicableAuditsGroupTitle}}renderAudit(e){let t=m.strings,n=this.dom.createComponent("audit"),r=this.dom.find("div.lh-audit",n);r.id=e.result.id;let i=e.result.scoreDisplayMode;e.result.displayValue&&(this.dom.find(".lh-audit__display-text",r).textContent=e.result.displayValue);let a=this.dom.find(".lh-audit__title",r);a.append(this.dom.convertMarkdownCodeSnippets(e.result.title));let l=this.dom.find(".lh-audit__description",r);l.append(this.dom.convertMarkdownLinkSnippets(e.result.description));for(let p of e.relevantMetrics||[]){let g=this.dom.createChildOf(l,"span","lh-audit__adorn");g.title=`Relevant to ${p.result.title}`,g.textContent=p.acronym||p.id}if(e.weight===0){let p=this.dom.createChildOf(l,"span","lh-audit__adorn");p.title=m.strings.unscoredTitle,p.te\
+xtContent=m.strings.unscoredLabel}e.stackPacks&&e.stackPacks.forEach(p=>{let g=this.dom.createElement("img","lh-audit__stackpack__img");g.src=p.iconDataURL,g.alt=p.title;let b=this.dom.convertMarkdownLinkSnippets(p.description,{alwaysAppendUtmSource:!0}),w=this.dom.createElement("div","lh-audit__stackpack");w.append(g,b),this.dom.find(".lh-audit__stackpacks",r).append(w)});let s=this.dom.find("details",r);if(e.result.details){let p=this.detailsRenderer.render(e.result.details);p&&(p.classList.add("lh-details"),s.append(p))}if(this.dom.find(".lh-chevron-container",r).append(this._createChevron()),this._setRatingClass(r,e.result.score,i),e.result.scoreDisplayMode==="error"){r.classList.add("lh-audit--error");let p=this.dom.find(".lh-audit__display-text",r);p.textContent=t.errorLabel,p.classList.add("lh-tooltip-boundary");let g=this.dom.createChildOf(p,"div","lh-tooltip lh-tooltip--error");g.textContent=e.result.errorMessage||t.errorMissingAuditInfo}else if(e.result.explanation){let p=thi\
+s.dom.createChildOf(a,"div","lh-audit-explanation");p.textContent=e.result.explanation}let c=e.result.warnings;if(!c||c.length===0)return r;let d=this.dom.find("summary",s),h=this.dom.createChildOf(d,"div","lh-warnings");if(this.dom.createChildOf(h,"span").textContent=t.warningHeader,c.length===1)h.append(this.dom.createTextNode(c.join("")));else{let p=this.dom.createChildOf(h,"ul");for(let g of c){let b=this.dom.createChildOf(p,"li");b.textContent=g}}return r}injectFinalScreenshot(e,t,n){let r=t["final-screenshot"];if(!r||r.scoreDisplayMode==="error"||!r.details||r.details.type!=="screenshot")return null;let i=this.dom.createElement("img","lh-final-ss-image"),a=r.details.data;i.src=a,i.alt=r.title;let l=this.dom.find(".lh-category .lh-category-header",e),s=this.dom.createElement("div","lh-category-headercol"),c=this.dom.createElement("div","lh-category-headercol lh-category-headercol--separator"),d=this.dom.createElement("div","lh-category-headercol");s.append(...l.childNodes),s.appen\
+d(n),d.append(i),l.append(s,c,d),l.classList.add("lh-category-header__finalscreenshot")}_createChevron(){let e=this.dom.createComponent("chevron");return this.dom.find("svg.lh-chevron",e)}_setRatingClass(e,t,n){let r=k.calculateRating(t,n);return e.classList.add(`lh-audit--${n.toLowerCase()}`),n!=="informative"&&e.classList.add(`lh-audit--${r}`),e}renderCategoryHeader(e,t,n){let r=this.dom.createComponent("categoryHeader"),i=this.dom.find(".lh-score__gauge",r),a=this.renderCategoryScore(e,t,n);if(i.append(a),e.description){let l=this.dom.convertMarkdownLinkSnippets(e.description);this.dom.find(".lh-category-header__description",r).append(l)}return r}renderAuditGroup(e){let t=this.dom.createElement("div","lh-audit-group"),n=this.dom.createElement("div","lh-audit-group__header");this.dom.createChildOf(n,"span","lh-audit-group__title").textContent=e.title,t.append(n);let r=null;return e.description&&(r=this.dom.convertMarkdownLinkSnippets(e.description),r.classList.add("lh-audit-group__de\
+scription","lh-audit-group__footer"),t.append(r)),[t,r]}_renderGroupedAudits(e,t){let n=new Map,r="NotAGroup";n.set(r,[]);for(let a of e){let l=a.group||r,s=n.get(l)||[];s.push(a),n.set(l,s)}let i=[];for(let[a,l]of n){if(a===r){for(let h of l)i.push(this.renderAudit(h));continue}let s=t[a],[c,d]=this.renderAuditGroup(s);for(let h of l)c.insertBefore(this.renderAudit(h),d);c.classList.add(`lh-audit-group--${a}`),i.push(c)}return i}renderUnexpandableClump(e,t){let n=this.dom.createElement("div");return this._renderGroupedAudits(e,t).forEach(i=>n.append(i)),n}renderClump(e,{auditRefsOrEls:t,description:n,openByDefault:r}){let i=this.dom.createComponent("clump"),a=this.dom.find(".lh-clump",i);r&&a.setAttribute("open","");let l=this.dom.find(".lh-audit-group__header",a),s=this._clumpTitles[e];this.dom.find(".lh-audit-group__title",l).textContent=s;let c=this.dom.find(".lh-audit-group__itemcount",a);c.textContent=`(${t.length})`;let d=t.map(p=>p instanceof HTMLElement?p:this.renderAudit(p));\
+a.append(...d);let h=this.dom.find(".lh-audit-group",i);if(n){let p=this.dom.convertMarkdownLinkSnippets(n);p.classList.add("lh-audit-group__description","lh-audit-group__footer"),h.append(p)}return this.dom.find(".lh-clump-toggletext--show",h).textContent=m.strings.show,this.dom.find(".lh-clump-toggletext--hide",h).textContent=m.strings.hide,a.classList.add(`lh-clump--${e.toLowerCase()}`),h}renderCategoryScore(e,t,n){let r;if(n&&k.shouldDisplayAsFraction(n.gatherMode)?r=this.renderCategoryFraction(e):r=this.renderScoreGauge(e,t),n?.omitLabel&&this.dom.find(".lh-gauge__label,.lh-fraction__label",r).remove(),n?.onPageAnchorRendered){let i=this.dom.find("a",r);n.onPageAnchorRendered(i)}return r}renderScoreGauge(e,t){let n=this.dom.createComponent("gauge"),r=this.dom.find("a.lh-gauge__wrapper",n);k.isPluginCategory(e.id)&&r.classList.add("lh-gauge__wrapper--plugin");let i=Number(e.score),a=this.dom.find(".lh-gauge",n),l=this.dom.find("circle.lh-gauge-arc",a);l&&this._setGaugeArc(l,i);let \
+s=Math.round(i*100),c=this.dom.find("div.lh-gauge__percentage",n);return c.textContent=s.toString(),e.score===null&&(c.classList.add("lh-gauge--error"),c.textContent="",c.title=m.strings.errorLabel),e.auditRefs.length===0||this.hasApplicableAudits(e)?r.classList.add(`lh-gauge__wrapper--${k.calculateRating(e.score)}`):(r.classList.add("lh-gauge__wrapper--not-applicable"),c.textContent="-",c.title=m.strings.notApplicableAuditsGroupTitle),this.dom.find(".lh-gauge__label",n).textContent=e.title,n}renderCategoryFraction(e){let t=this.dom.createComponent("fraction"),n=this.dom.find("a.lh-fraction__wrapper",t),{numPassed:r,numPassableAudits:i,totalWeight:a}=k.calculateCategoryFraction(e),l=r/i,s=this.dom.find(".lh-fraction__content",t),c=this.dom.createElement("span");c.textContent=`${r}/${i}`,s.append(c);let d=k.calculateRating(l);return a===0&&(d="null"),n.classList.add(`lh-fraction__wrapper--${d}`),this.dom.find(".lh-fraction__label",t).textContent=e.title,t}hasApplicableAudits(e){return e\
+.auditRefs.some(t=>t.result.scoreDisplayMode!=="notApplicable")}_setGaugeArc(e,t){let n=2*Math.PI*Number(e.getAttribute("r")),r=Number(e.getAttribute("stroke-width")),i=.25*r/n;e.style.transform=`rotate(${-90+i*360}deg)`;let a=t*n-r/2;t===0&&(e.style.opacity="0"),t===1&&(a=n),e.style.strokeDasharray=`${Math.max(a,0)} ${n}`}_auditHasWarning(e){return!!e.result.warnings?.length}_getClumpIdForAuditRef(e){let t=e.result.scoreDisplayMode;return t==="manual"||t==="notApplicable"?t:k.showAsPassed(e.result)?this._auditHasWarning(e)?"warning":"passed":"failed"}render(e,t={},n){let r=this.dom.createElement("div","lh-category");r.id=e.id,r.append(this.renderCategoryHeader(e,t,n));let i=new Map;i.set("failed",[]),i.set("warning",[]),i.set("manual",[]),i.set("passed",[]),i.set("notApplicable",[]);for(let l of e.auditRefs){if(l.group==="hidden")continue;let s=this._getClumpIdForAuditRef(l),c=i.get(s);c.push(l),i.set(s,c)}for(let l of i.values())l.sort((s,c)=>c.weight-s.weight);let a=i.get("failed")?\
+.length;for(let[l,s]of i){if(s.length===0)continue;if(l==="failed"){let p=this.renderUnexpandableClump(s,t);p.classList.add("lh-clump--failed"),r.append(p);continue}let c=l==="manual"?e.manualDescription:void 0,d=l==="warning"||l==="manual"&&a===0,h=this.renderClump(l,{auditRefsOrEls:s,description:c,openByDefault:d});r.append(h)}return r}};var Y=class{static createSegment(e,t,n,r){let i=e[t],a=Object.keys(e),l=a.indexOf(t)===a.length-1,s=!!i.children&&Object.keys(i.children).length>0,c=Array.isArray(n)?n.slice(0):[];return typeof r<"u"&&c.push(!r),{node:i,isLastChild:l,hasChildren:s,treeMarkers:c}}static createChainNode(e,t,n){let r=e.createComponent("crcChain"),i,a,l,s,c;"request"in t.node?(a=t.node.request.transferSize,l=t.node.request.url,i=(t.node.request.endTime-t.node.request.startTime)*1e3,s=!1):(a=t.node.transferSize,l=t.node.url,i=t.node.navStartToEndTime,s=!0,c=t.node.isLongest);let d=e.find(".lh-crc-node",r);d.setAttribute("title",l),c&&d.classList.add("lh-crc-node__longest"\
+);let h=e.find(".lh-crc-node__tree-marker",r);t.treeMarkers.forEach(f=>{let u=f?"lh-tree-marker lh-vert":"lh-tree-marker";h.append(e.createElement("span",u),e.createElement("span","lh-tree-marker"))});let p=t.isLastChild?"lh-tree-marker lh-up-right":"lh-tree-marker lh-vert-right",g=t.hasChildren?"lh-tree-marker lh-horiz-down":"lh-tree-marker lh-right";h.append(e.createElement("span",p),e.createElement("span","lh-tree-marker lh-right"),e.createElement("span",g));let b=n.renderTextURL(l),w=e.find(".lh-crc-node__tree-value",r);if(w.append(b),!t.hasChildren||s){let f=e.createElement("span","lh-crc-node__chain-duration");f.textContent=" - "+m.i18n.formatMilliseconds(i)+", ";let u=e.createElement("span","lh-crc-node__chain-size");u.textContent=m.i18n.formatBytesToKiB(a,.01),w.append(f,u)}return r}static buildTree(e,t,n,r){if(n.append(Q.createChainNode(e,t,r)),t.node.children)for(let i of Object.keys(t.node.children)){let a=Q.createSegment(t.node.children,i,t.treeMarkers,t.isLastChild);Q.buil\
+dTree(e,a,n,r)}}static render(e,t,n){let r=e.createComponent("crc"),i=e.find(".lh-crc",r);e.find(".lh-crc-initial-nav",r).textContent=m.strings.crcInitialNavigation,e.find(".lh-crc__longest_duration_label",r).textContent=m.strings.crcLongestDurationLabel,e.find(".lh-crc__longest_duration",r).textContent=m.i18n.formatMilliseconds(t.longestChain.duration);let a=t.chains;for(let l of Object.keys(a)){let s=Q.createSegment(a,l);Q.buildTree(e,s,i,n)}return e.find(".lh-crc-container",r)}},Q=Y;function pt(o,e){return e.left<=o.width&&0<=e.right&&e.top<=o.height&&0<=e.bottom}function ke(o,e,t){return o<e?e:o>t?t:o}function ut(o){return{x:o.left+o.width/2,y:o.top+o.height/2}}var V=class o{static getScreenshotPositions(e,t,n){let r=ut(e),i=ke(r.x-t.width/2,0,n.width-t.width),a=ke(r.y-t.height/2,0,n.height-t.height);return{screenshot:{left:i,top:a},clip:{left:e.left-i,top:e.top-a}}}static renderClipPathInScreenshot(e,t,n,r,i){let a=e.find("clipPath",t),l=`clip-${m.getUniqueSuffix()}`;a.id=l,t.styl\
+e.clipPath=`url(#${l})`;let s=n.top/i.height,c=s+r.height/i.height,d=n.left/i.width,h=d+r.width/i.width,p=[`0,0             1,0            1,${s}          0,${s}`,`0,${c}     1,${c}    1,1               0,1`,`0,${s}        ${d},${s} ${d},${c} 0,${c}`,`${h},${s} 1,${s}       1,${c}       ${h},${c}`];for(let g of p){let b=e.createElementNS("http://www.w3.org/2000/svg","polygon");b.setAttribute("points",g),a.append(b)}}static installFullPageScreenshot(e,t){e.style.setProperty("--element-screenshot-url",`url(\'${t.data}\')`)}static installOverlayFeature(e){let{dom:t,rootEl:n,overlayContainerEl:r,fullPageScreenshot:i}=e,a="lh-screenshot-overlay--enabled";n.classList.contains(a)||(n.classList.add(a),n.addEventListener("click",l=>{let s=l.target;if(!s)return;let c=s.closest(".lh-node > .lh-element-screenshot");if(!c)return;let d=t.createElement("div","lh-element-screenshot__overlay");r.append(d);let h={width:d.clientWidth*.95,height:d.clientHeight*.8},p={width:Number(c.dataset.rectWidth),height\
+:Number(c.dataset.rectHeight),left:Number(c.dataset.rectLeft),right:Number(c.dataset.rectLeft)+Number(c.dataset.rectWidth),top:Number(c.dataset.rectTop),bottom:Number(c.dataset.rectTop)+Number(c.dataset.rectHeight)},g=o.render(t,i.screenshot,p,h);if(!g){d.remove();return}d.append(g),d.addEventListener("click",()=>d.remove())}))}static _computeZoomFactor(e,t){let r={x:t.width/e.width,y:t.height/e.height},i=.75*Math.min(r.x,r.y);return Math.min(1,i)}static render(e,t,n,r){if(!pt(t,n))return null;let i=e.createComponent("elementScreenshot"),a=e.find("div.lh-element-screenshot",i);a.dataset.rectWidth=n.width.toString(),a.dataset.rectHeight=n.height.toString(),a.dataset.rectLeft=n.left.toString(),a.dataset.rectTop=n.top.toString();let l=this._computeZoomFactor(n,r),s={width:r.width/l,height:r.height/l};s.width=Math.min(t.width,s.width),s.height=Math.min(t.height,s.height);let c={width:s.width*l,height:s.height*l},d=o.getScreenshotPositions(n,s,{width:t.width,height:t.height}),h=e.find("div.\
+lh-element-screenshot__image",a);h.style.width=c.width+"px",h.style.height=c.height+"px",h.style.backgroundPositionY=-(d.screenshot.top*l)+"px",h.style.backgroundPositionX=-(d.screenshot.left*l)+"px",h.style.backgroundSize=`${t.width*l}px ${t.height*l}px`;let p=e.find("div.lh-element-screenshot__element-marker",a);p.style.width=n.width*l+"px",p.style.height=n.height*l+"px",p.style.left=d.clip.left*l+"px",p.style.top=d.clip.top*l+"px";let g=e.find("div.lh-element-screenshot__mask",a);return g.style.width=c.width+"px",g.style.height=c.height+"px",o.renderClipPathInScreenshot(e,g,d.clip,n,s),a}};var gt=["http://","https://","data:"],mt=["bytes","numeric","ms","timespanMs"],X=class{constructor(e,t={}){this._dom=e,this._fullPageScreenshot=t.fullPageScreenshot,this._entities=t.entities}render(e){switch(e.type){case"filmstrip":return this._renderFilmstrip(e);case"list":return this._renderList(e);case"checklist":return this._renderChecklist(e);case"table":case"opportunity":return this._renderT\
+able(e);case"network-tree":case"criticalrequestchain":return Y.render(this._dom,e,this);case"screenshot":case"debugdata":case"treemap-data":return null;default:return this._renderUnknown(e.type,e)}}_renderBytes(e){let t=m.i18n.formatBytesToKiB(e.value,e.granularity||.1),n=this._renderText(t);return n.title=m.i18n.formatBytes(e.value),n}_renderMilliseconds(e){let t;return e.displayUnit==="duration"?t=m.i18n.formatDuration(e.value):t=m.i18n.formatMilliseconds(e.value,e.granularity||10),this._renderText(t)}renderTextURL(e){let t=e,n,r,i;try{let l=E.parseURL(t);n=l.file==="/"?l.origin:l.file,r=l.file==="/"||l.hostname===""?"":`(${l.hostname})`,i=t}catch{n=t}let a=this._dom.createElement("div","lh-text__url");if(a.append(this._renderLink({text:n,url:t})),r){let l=this._renderText(r);l.classList.add("lh-text__url-host"),a.append(l)}return i&&(a.title=t,a.dataset.url=t),a}_renderLink(e){let t=this._dom.createElement("a");if(this._dom.safelySetHref(t,e.url),!t.href){let n=this._renderText(e.te\
+xt);return n.classList.add("lh-link"),n}return t.rel="noopener",t.target="_blank",t.textContent=e.text,t.classList.add("lh-link"),t}_renderText(e){let t=this._dom.createElement("div","lh-text");return t.textContent=e,t}_renderNumeric(e){let t=m.i18n.formatNumber(e.value,e.granularity||.1),n=this._dom.createElement("div","lh-numeric");return n.textContent=t,n}_renderThumbnail(e){let t=this._dom.createElement("img","lh-thumbnail"),n=e;return t.src=n,t.title=n,t.alt="",t}_renderUnknown(e,t){console.error(`Unknown details type: ${e}`,t);let n=this._dom.createElement("details","lh-unknown");return this._dom.createChildOf(n,"summary").textContent=`We don\'t know how to render audit details of type \\`${e}\\`. The Lighthouse version that collected this data is likely newer than the Lighthouse version of the report renderer. Expand for the raw JSON.`,this._dom.createChildOf(n,"pre").textContent=JSON.stringify(t,null,2),n}_renderTableValue(e,t){if(e==null)return null;if(typeof e=="object")switch(e\
+.type){case"code":return this._renderCode(e.value);case"link":return this._renderLink(e);case"node":return this.renderNode(e);case"numeric":return this._renderNumeric(e);case"text":return this._renderText(e.value);case"source-location":return this.renderSourceLocation(e);case"url":return this.renderTextURL(e.value);default:return this._renderUnknown(e.type,e)}switch(t.valueType){case"bytes":{let n=Number(e);return this._renderBytes({value:n,granularity:t.granularity})}case"code":{let n=String(e);return this._renderCode(n)}case"ms":{let n={value:Number(e),granularity:t.granularity,displayUnit:t.displayUnit};return this._renderMilliseconds(n)}case"numeric":{let n=Number(e);return this._renderNumeric({value:n,granularity:t.granularity})}case"text":{let n=String(e);return this._renderText(n)}case"thumbnail":{let n=String(e);return this._renderThumbnail(n)}case"timespanMs":{let n=Number(e);return this._renderMilliseconds({value:n})}case"url":{let n=String(e);return gt.some(r=>n.startsWith(r\
+))?this.renderTextURL(n):this._renderCode(n)}default:return this._renderUnknown(t.valueType,e)}}_getDerivedSubItemsHeading(e){return e.subItemsHeading?{key:e.subItemsHeading.key||"",valueType:e.subItemsHeading.valueType||e.valueType,granularity:e.subItemsHeading.granularity||e.granularity,displayUnit:e.subItemsHeading.displayUnit||e.displayUnit,label:""}:null}_renderTableRow(e,t){let n=this._dom.createElement("tr");for(let r of t){if(!r||!r.key){this._dom.createChildOf(n,"td","lh-table-column--empty");continue}let i=e[r.key],a;if(i!=null&&(a=this._renderTableValue(i,r)),a){let l=`lh-table-column--${r.valueType}`;this._dom.createChildOf(n,"td",l).append(a)}else this._dom.createChildOf(n,"td","lh-table-column--empty")}return n}_renderTableRowsFromItem(e,t){let n=this._dom.createFragment();if(n.append(this._renderTableRow(e,t)),!e.subItems)return n;let r=t.map(this._getDerivedSubItemsHeading);if(!r.some(Boolean))return n;for(let i of e.subItems.items){let a=this._renderTableRow(i,r);a.cla\
+ssList.add("lh-sub-item-row"),n.append(a)}return n}_adornEntityGroupRow(e){let t=e.dataset.entity;if(!t)return;let n=this._entities?.find(i=>i.name===t);if(!n)return;let r=this._dom.find("td",e);if(n.category){let i=this._dom.createElement("span");i.classList.add("lh-audit__adorn"),i.textContent=n.category,r.append(" ",i)}if(n.isFirstParty){let i=this._dom.createElement("span");i.classList.add("lh-audit__adorn","lh-audit__adorn1p"),i.textContent=m.strings.firstPartyChipLabel,r.append(" ",i)}if(n.homepage){let i=this._dom.createElement("a");i.href=n.homepage,i.target="_blank",i.title=m.strings.openInANewTabTooltip,i.classList.add("lh-report-icon--external"),r.append(" ",i)}}_renderEntityGroupRow(e,t){let n={...t[0]};n.valueType="text";let r=[n,...t.slice(1)],i=this._dom.createFragment();return i.append(this._renderTableRow(e,r)),this._dom.find("tr",i).classList.add("lh-row--group"),i}_getEntityGroupItems(e){let{items:t,headings:n,sortedBy:r}=e;if(!t.length||e.isEntityGrouped||!t.some(d=\
+>d.entity))return[];let i=new Set(e.skipSumming||[]),a=[];for(let d of n)!d.key||i.has(d.key)||mt.includes(d.valueType)&&a.push(d.key);let l=n[0].key;if(!l)return[];let s=new Map;for(let d of t){let h=typeof d.entity=="string"?d.entity:void 0,p=s.get(h)||{[l]:h||m.strings.unattributable,entity:h};for(let g of a)p[g]=Number(p[g]||0)+Number(d[g]||0);s.set(h,p)}let c=[...s.values()];return r&&c.sort(k.getTableItemSortComparator(r)),c}_renderTable(e){if(!e.items.length)return this._dom.createElement("span");let t=this._dom.createElement("table","lh-table"),n=this._dom.createChildOf(t,"thead"),r=this._dom.createChildOf(n,"tr");for(let l of e.headings){let c=`lh-table-column--${l.valueType||"text"}`,d=this._dom.createElement("div","lh-text");d.textContent=l.label,this._dom.createChildOf(r,"th",c).append(d)}let i=this._getEntityGroupItems(e),a=this._dom.createChildOf(t,"tbody");if(i.length)for(let l of i){let s=typeof l.entity=="string"?l.entity:void 0,c=this._renderEntityGroupRow(l,e.heading\
+s);for(let h of e.items.filter(p=>p.entity===s))c.append(this._renderTableRowsFromItem(h,e.headings));let d=this._dom.findAll("tr",c);s&&d.length&&(d.forEach(h=>h.dataset.entity=s),this._adornEntityGroupRow(d[0])),a.append(c)}else{let l=!0;for(let s of e.items){let c=this._renderTableRowsFromItem(s,e.headings),d=this._dom.findAll("tr",c),h=d[0];if(typeof s.entity=="string"&&(h.dataset.entity=s.entity),e.isEntityGrouped&&s.entity)h.classList.add("lh-row--group"),this._adornEntityGroupRow(h);else for(let p of d)p.classList.add(l?"lh-row--even":"lh-row--odd");l=!l,a.append(c)}}return t}_renderListValue(e){return e.type==="node"?this.renderNode(e):e.type==="text"?this._renderText(e.value):this.render(e)}_renderList(e){let t=this._dom.createElement("div","lh-list");return e.items.forEach(n=>{if(n.type==="list-section"){let i=this._dom.createElement("div","lh-list-section");n.title&&this._dom.createChildOf(i,"div","lh-list-section__title").append(this._dom.convertMarkdownLinkSnippets(n.title\
+)),n.description&&this._dom.createChildOf(i,"div","lh-list-section__description").append(this._dom.convertMarkdownLinkSnippets(n.description));let a=this._renderListValue(n.value);a&&i.append(a),t.append(i);return}let r=this._renderListValue(n);r&&t.append(r)}),t}_renderChecklist(e){let t=this._dom.createElement("ul","lh-checklist");return Object.values(e.items).forEach(n=>{let r=this._dom.createChildOf(t,"li","lh-checklist-item"),i=n.value?"lh-report-plain-icon--checklist-pass":"lh-report-plain-icon--checklist-fail";this._dom.createChildOf(r,"span",`lh-report-plain-icon ${i}`).textContent=n.label}),t}renderNode(e){let t=this._dom.createElement("span","lh-node");if(e.nodeLabel){let a=this._dom.createElement("div");a.textContent=e.nodeLabel,t.append(a)}if(e.snippet){let a=this._dom.createElement("div");a.classList.add("lh-node__snippet"),a.textContent=e.snippet,t.append(a)}if(e.selector&&(t.title=e.selector),e.path&&t.setAttribute("data-path",e.path),e.selector&&t.setAttribute("data-sel\
+ector",e.selector),e.snippet&&t.setAttribute("data-snippet",e.snippet),!this._fullPageScreenshot)return t;let n=e.lhId&&this._fullPageScreenshot.nodes[e.lhId];if(!n||n.width===0||n.height===0)return t;let r={width:147,height:100},i=V.render(this._dom,this._fullPageScreenshot.screenshot,n,r);return i&&t.prepend(i),t}renderSourceLocation(e){if(!e.url)return null;let t=`${e.url}:${e.line+1}:${e.column}`,n;e.original&&(n=`${e.original.file||"<unmapped>"}:${e.original.line+1}:${e.original.column}`);let r;if(e.urlProvider==="network"&&n)r=this._renderLink({url:e.url,text:n}),r.title=`maps to generated location ${t}`;else if(e.urlProvider==="network"&&!n)r=this.renderTextURL(e.url),this._dom.find(".lh-link",r).textContent+=`:${e.line+1}:${e.column}`;else if(e.urlProvider==="comment"&&n)r=this._renderText(`${n} (from source map)`),r.title=`${t} (from sourceURL)`;else if(e.urlProvider==="comment"&&!n)r=this._renderText(`${t} (from sourceURL)`);else return null;return r.classList.add("lh-source-\
+location"),r.setAttribute("data-source-url",e.url),r.setAttribute("data-source-line",String(e.line)),r.setAttribute("data-source-column",String(e.column)),r}_renderFilmstrip(e){let t=this._dom.createElement("div","lh-filmstrip");for(let n of e.items){let r=this._dom.createChildOf(t,"div","lh-filmstrip__frame"),i=this._dom.createChildOf(r,"img","lh-filmstrip__thumbnail");i.src=n.data,i.alt="Screenshot"}return t}_renderCode(e){let t=this._dom.createElement("pre","lh-code");return t.textContent=e,t}};var te=class{constructor(e){e==="en-XA"&&(e="de"),this._locale=e,this._cachedNumberFormatters=new Map}_formatNumberWithGranularity(e,t,n={}){if(t!==void 0){let a=-Math.log10(t);Number.isInteger(a)||(console.warn(`granularity of ${t} is invalid. Using 1 instead`),t=1),t<1&&(n={...n},n.minimumFractionDigits=n.maximumFractionDigits=Math.ceil(a)),e=Math.round(e/t)*t,Object.is(e,-0)&&(e=0)}else Math.abs(e)<5e-4&&(e=0);let r,i=[n.minimumFractionDigits,n.maximumFractionDigits,n.style,n.unit,n.unitDi\
+splay,this._locale].join("");return r=this._cachedNumberFormatters.get(i),r||(r=new Intl.NumberFormat(this._locale,n),this._cachedNumberFormatters.set(i,r)),r.format(e).replace(" ","\\xA0")}formatNumber(e,t){return this._formatNumberWithGranularity(e,t)}formatInteger(e){return this._formatNumberWithGranularity(e,1)}formatPercent(e){return new Intl.NumberFormat(this._locale,{style:"percent"}).format(e)}formatBytesToKiB(e,t=void 0){return this._formatNumberWithGranularity(e/1024,t)+"\\xA0KiB"}formatBytesToMiB(e,t=void 0){return this._formatNumberWithGranularity(e/1048576,t)+"\\xA0MiB"}formatBytes(e,t=1){return this._formatNumberWithGranularity(e,t,{style:"unit",unit:"byte",unitDisplay:"long"})}formatBytesWithBestUnit(e,t=.1){return e>=1048576?this.formatBytesToMiB(e,t):e>=1024?this.formatBytesToKiB(e,t):this._formatNumberWithGranularity(e,t,{style:"unit",unit:"byte",unitDisplay:"narrow"})}formatKbps(e,t=void 0){return this._formatNumberWithGranularity(e,t,{style:"unit",unit:"kilobit-per-sec\
+ond",unitDisplay:"short"})}formatMilliseconds(e,t=void 0){return this._formatNumberWithGranularity(e,t,{style:"unit",unit:"millisecond",unitDisplay:"short"})}formatSeconds(e,t=void 0){return this._formatNumberWithGranularity(e/1e3,t,{style:"unit",unit:"second",unitDisplay:"narrow"})}formatDateTime(e){let t={month:"short",day:"numeric",year:"numeric",hour:"numeric",minute:"numeric",timeZoneName:"short"},n;try{n=new Intl.DateTimeFormat(this._locale,t)}catch{t.timeZone="UTC",n=new Intl.DateTimeFormat(this._locale,t)}return n.format(new Date(e))}formatDuration(e){let t=e/1e3;if(Math.round(t)===0)return"None";let n=[],r={day:3600*24,hour:3600,minute:60,second:1};return Object.keys(r).forEach(i=>{let a=r[i],l=Math.floor(t/a);if(l>0){t-=l*a;let s=this._formatNumberWithGranularity(l,1,{style:"unit",unit:i,unitDisplay:"narrow"});n.push(s)}}),n.join(" ")}};function Ee(o){let e=o.createComponent("explodeyGauge");return o.find(".lh-exp-gauge-component",e)}function Se(o,e,t){let n=o.find("div.lh-ex\
+p-gauge__wrapper",e);n.className="",n.classList.add("lh-exp-gauge__wrapper",`lh-exp-gauge__wrapper--${k.calculateRating(t.score)}`),vt(o,n,t)}function ft(o,e,t){t=t||o/32;let n=o/t,r=.5*t,i=n+r+t,a=2*Math.PI*n,l=Math.acos(1-.5*Math.pow(.5*t/n,2))*n,s=2*Math.PI*i,c=Math.acos(1-.5*Math.pow(.5*t/i,2))*i;return{radiusInner:n,radiusOuter:i,circumferenceInner:a,circumferenceOuter:s,getArcLength:()=>Math.max(0,Number(e*a)),getMetricArcLength:(d,h=!1)=>{let p=h?0:2*c;return Math.max(0,Number(d*s-r-p))},endDiffInner:l,endDiffOuter:c,strokeWidth:t,strokeGap:r}}function vt(o,e,t){let i=Number(t.score),{radiusInner:a,radiusOuter:l,circumferenceInner:s,circumferenceOuter:c,getArcLength:d,getMetricArcLength:h,endDiffInner:p,endDiffOuter:g,strokeWidth:b,strokeGap:w}=ft(128,i),f=o.find("svg.lh-exp-gauge",e);o.find(".lh-exp-gauge__label",f).textContent=t.title,f.setAttribute("viewBox",[-64,-64/2,128,128/2].join(" ")),f.style.setProperty("--stroke-width",`${b}px`),f.style.setProperty("--circle-meas",(2*\
+Math.PI).toFixed(4));let u=o.find("g.lh-exp-gauge__outer",e),v=o.find("g.lh-exp-gauge__inner",e),_=o.find("circle.lh-cover",u),x=o.find("circle.lh-exp-gauge__arc",v),S=o.find("text.lh-exp-gauge__percentage",v);u.style.setProperty("--scale-initial",String(a/l)),u.style.setProperty("--radius",`${l}px`),_.style.setProperty("--radius",`${.5*(a+l)}px`),_.setAttribute("stroke-width",String(w)),f.style.setProperty("--radius",`${a}px`),x.setAttribute("stroke-dasharray",`${d()} ${(s-d()).toFixed(4)}`),x.setAttribute("stroke-dashoffset",String(.25*s-p)),S.textContent=Math.round(i*100).toString();let A=l+b,z=l-b,M=t.auditRefs.filter(y=>y.group==="metrics"&&y.weight),$=M.reduce((y,C)=>y+=C.weight,0),R=.25*c-g-.5*w,N=-.5*Math.PI;u.querySelectorAll(".metric").forEach(y=>{M.map(F=>`metric--${F.id}`).find(F=>y.classList.contains(F))||y.remove()}),M.forEach((y,C)=>{let L=y.acronym??y.id,F=!u.querySelector(`.metric--${L}`),T=o.maybeFind(`g.metric--${L}`,u)||o.createSVGElement("g"),B=o.maybeFind(`.metric\
+--${L} circle.lh-exp-gauge--faded`,u)||o.createSVGElement("circle"),K=o.maybeFind(`.metric--${L} circle.lh-exp-gauge--miniarc`,u)||o.createSVGElement("circle"),q=o.maybeFind(`.metric--${L} circle.lh-exp-gauge-hovertarget`,u)||o.createSVGElement("circle"),P=o.maybeFind(`.metric--${L} text.metric__label`,u)||o.createSVGElement("text"),H=o.maybeFind(`.metric--${L} text.metric__value`,u)||o.createSVGElement("text");T.classList.add("metric",`metric--${L}`),B.classList.add("lh-exp-gauge__arc","lh-exp-gauge__arc--metric","lh-exp-gauge--faded"),K.classList.add("lh-exp-gauge__arc","lh-exp-gauge__arc--metric","lh-exp-gauge--miniarc"),q.classList.add("lh-exp-gauge__arc","lh-exp-gauge__arc--metric","lh-exp-gauge-hovertarget");let j=y.weight/$,de=h(j),he=y.result.score?y.result.score*j:0,pe=h(he),Pe=j*c,ue=h(j,!0),ge=k.calculateRating(y.result.score,y.result.scoreDisplayMode);T.style.setProperty("--metric-rating",ge),T.style.setProperty("--metric-color",`var(--color-${ge})`),T.style.setProperty("--\
+metric-offset",`${R}`),T.style.setProperty("--i",C.toString()),B.setAttribute("stroke-dasharray",`${de} ${c-de}`),K.style.setProperty("--metric-array",`${pe} ${c-pe}`),q.setAttribute("stroke-dasharray",`${ue} ${c-ue-g}`),P.classList.add("metric__label"),H.classList.add("metric__value"),P.textContent=L,H.textContent=`+${Math.round(he*100)}`;let me=N+j*Math.PI,J=Math.cos(me),Z=Math.sin(me);switch(!0){case J>0:H.setAttribute("text-anchor","end");break;case J<0:P.setAttribute("text-anchor","end");break;case J===0:P.setAttribute("text-anchor","middle"),H.setAttribute("text-anchor","middle");break}switch(!0){case Z>0:P.setAttribute("dominant-baseline","hanging");break;case Z<0:H.setAttribute("dominant-baseline","hanging");break;case Z===0:P.setAttribute("dominant-baseline","middle"),H.setAttribute("dominant-baseline","middle");break}P.setAttribute("x",(A*J).toFixed(2)),P.setAttribute("y",(A*Z).toFixed(2)),H.setAttribute("x",(z*J).toFixed(2)),H.setAttribute("y",(z*Z).toFixed(2)),F&&(T.appendC\
+hild(B),T.appendChild(K),T.appendChild(q),T.appendChild(P),T.appendChild(H),u.appendChild(T)),R-=Pe,N+=j*2*Math.PI});let D=u.querySelector(".lh-exp-gauge-underhovertarget")||o.createSVGElement("circle");D.classList.add("lh-exp-gauge__arc","lh-exp-gauge__arc--metric","lh-exp-gauge-hovertarget","lh-exp-gauge-underhovertarget");let I=h(1,!0);if(D.setAttribute("stroke-dasharray",`${I} ${c-I-g}`),D.isConnected||u.prepend(D),f.dataset.listenersSetup)return;f.dataset.listenersSetup=!0,De(f),f.addEventListener("pointerover",y=>{if(y.target===f&&f.classList.contains("state--expanded")){f.classList.remove("state--expanded"),f.classList.contains("state--highlight")&&(f.classList.remove("state--highlight"),o.find(".metric--highlight",f).classList.remove("metric--highlight"));return}if(!(y.target instanceof Element))return;let C=y.target.parentNode;if(C instanceof SVGElement){if(C&&C===v){f.classList.contains("state--expanded")?f.classList.contains("state--highlight")&&(f.classList.remove("state--h\
+ighlight"),o.find(".metric--highlight",f).classList.remove("metric--highlight")):f.classList.add("state--expanded");return}if(C&&C.classList&&C.classList.contains("metric")){let L=C.style.getPropertyValue("--metric-rating");if(e.style.setProperty("--color-highlight",`var(--color-${L}-secondary)`),!f.classList.contains("state--highlight"))f.classList.add("state--highlight"),C.classList.add("metric--highlight");else{let F=o.find(".metric--highlight",f);C!==F&&(F.classList.remove("metric--highlight"),C.classList.add("metric--highlight"))}}}}),f.addEventListener("mouseleave",()=>{f.classList.remove("state--highlight"),f.querySelector(".metric--highlight")?.classList.remove("metric--highlight")});async function De(y){if(await new Promise(P=>setTimeout(P,1e3)),y.classList.contains("state--expanded"))return;let C=o.find(".lh-exp-gauge__inner",y),L=`uniq-${Math.random()}`;C.setAttribute("id",L);let F=o.createSVGElement("use");F.setAttribute("href",`#${L}`),y.appendChild(F);let T=2.5;y.style.se\
+tProperty("--peek-dur",`${T}s`),y.classList.add("state--peek","state--expanded");let B=()=>{y.classList.remove("state--peek","state--expanded"),F.remove()},K=setTimeout(()=>{y.removeEventListener("mouseenter",q),B()},T*1e3*1.5);function q(){clearTimeout(K),B()}y.addEventListener("mouseenter",q,{once:!0})}}var ne=class extends G{_renderMetric(e){let t=this.dom.createComponent("metric"),n=this.dom.find(".lh-metric",t);n.id=e.result.id;let r=k.calculateRating(e.result.score,e.result.scoreDisplayMode);n.classList.add(`lh-metric--${r}`);let i=this.dom.find(".lh-metric__title",t);i.textContent=e.result.title;let a=this.dom.find(".lh-metric__value",t);a.textContent=e.result.displayValue||"";let l=this.dom.find(".lh-metric__description",t);if(l.append(this.dom.convertMarkdownLinkSnippets(e.result.description)),e.result.scoreDisplayMode==="error"){l.textContent="",a.textContent="Error!";let s=this.dom.createChildOf(l,"span");s.textContent=e.result.errorMessage||"Report error: no metric informat\
+ion"}else e.result.scoreDisplayMode==="notApplicable"&&(a.textContent="--");return n}_getScoringCalculatorHref(e){let t=e.filter(h=>h.group==="metrics"),n=e.find(h=>h.id==="interactive"),r=e.find(h=>h.id==="first-cpu-idle"),i=e.find(h=>h.id==="first-meaningful-paint");n&&t.push(n),r&&t.push(r),i&&typeof i.result.score=="number"&&t.push(i);let a=h=>Math.round(h*100)/100,s=[...t.map(h=>{let p;return typeof h.result.numericValue=="number"?(p=h.id==="cumulative-layout-shift"?a(h.result.numericValue):Math.round(h.result.numericValue),p=p.toString()):p="null",[h.acronym||h.id,p]})];m.reportJson&&(s.push(["device",m.reportJson.configSettings.formFactor]),s.push(["version",m.reportJson.lighthouseVersion]));let c=new URLSearchParams(s),d=new URL("https://googlechrome.github.io/lighthouse/scorecalc/");return d.hash=c.toString(),d.href}overallImpact(e,t){if(!e.result.metricSavings)return{overallImpact:0,overallLinearImpact:0};let n=0,r=0;for(let[i,a]of Object.entries(e.result.metricSavings)){if(a\
+===void 0)continue;let l=t.find(g=>g.acronym===i);if(!l||l.result.score===null)continue;let s=l.result.numericValue;if(!s)continue;let c=a/s*l.weight;r+=c;let d=l.result.scoringOptions;if(!d)continue;let p=(E.computeLogNormalScore(d,s-a)-l.result.score)*l.weight;n+=p}return{overallImpact:n,overallLinearImpact:r}}render(e,t,n){let r=m.strings,i=this.dom.createElement("div","lh-category");i.id=e.id,i.append(this.renderCategoryHeader(e,t,n));let a=e.auditRefs.filter(p=>p.group==="metrics");if(a.length){let[p,g]=this.renderAuditGroup(t.metrics),b=this.dom.createElement("input","lh-metrics-toggle__input"),w=`lh-metrics-toggle${m.getUniqueSuffix()}`;b.setAttribute("aria-label","Toggle the display of metric descriptions"),b.type="checkbox",b.id=w,p.prepend(b);let f=this.dom.find(".lh-audit-group__header",p),u=this.dom.createChildOf(f,"label","lh-metrics-toggle__label");u.htmlFor=w;let v=this.dom.createChildOf(u,"span","lh-metrics-toggle__labeltext--show"),_=this.dom.createChildOf(u,"span","lh\
+-metrics-toggle__labeltext--hide");v.textContent=m.strings.expandView,_.textContent=m.strings.collapseView;let x=this.dom.createElement("div","lh-metrics-container");if(p.insertBefore(x,g),a.forEach(S=>{x.append(this._renderMetric(S))}),i.querySelector(".lh-gauge__wrapper")){let S=this.dom.find(".lh-category-header__description",i),A=this.dom.createChildOf(S,"div","lh-metrics__disclaimer"),z=this.dom.convertMarkdownLinkSnippets(r.varianceDisclaimer);A.append(z);let M=this.dom.createChildOf(A,"a","lh-calclink");M.target="_blank",M.textContent=r.calculatorLink,this.dom.safelySetHref(M,this._getScoringCalculatorHref(e.auditRefs))}p.classList.add("lh-audit-group--metrics"),i.append(p)}let l=this.dom.createChildOf(i,"div","lh-filmstrip-container"),c=e.auditRefs.find(p=>p.id==="screenshot-thumbnails")?.result;if(c?.details){l.id=c.id;let p=this.detailsRenderer.render(c.details);p&&l.append(p)}let d=this.renderFilterableSection(e,t,["insights","diagnostics"],a);if(d&&(d.classList.add("lh-perf\
+-audits"),i.append(d)),(!n||n?.gatherMode==="navigation")&&e.score!==null){let p=Ee(this.dom);Se(this.dom,p,e),this.dom.find(".lh-score__gauge",i).replaceWith(p)}return i}renderFilterableSection(e,t,n,r){if(n.some(u=>!t[u]))return null;let i=this.dom.createElement("div"),a=u=>u.group??"",s=e.auditRefs.filter(u=>n.includes(a(u))).map(u=>{let{overallImpact:v,overallLinearImpact:_}=this.overallImpact(u,r),x=u.result.guidanceLevel||1,S=this.renderAudit(u);return{auditRef:u,auditEl:S,overallImpact:v,overallLinearImpact:_,guidanceLevel:x}}),c=s.filter(u=>!k.showAsPassed(u.auditRef.result)),d=s.filter(u=>k.showAsPassed(u.auditRef.result)),h={};for(let u of n){let v=this.renderAuditGroup(t[u]);v[0].classList.add(`lh-audit-group--${u}`),h[u]=v}function p(u){for(let v of s)if(u==="All")v.auditEl.hidden=!1;else{let _=v.auditRef.result.metricSavings?.[u]===void 0;v.auditEl.hidden=_}c.sort((v,_)=>{let x=v.auditRef.result.score||0,S=_.auditRef.result.score||0;if(x!==S)return x-S;if(u!=="All"){let A=\
+v.auditRef.result.metricSavings?.[u]??-1,z=_.auditRef.result.metricSavings?.[u]??-1;if(A!==z)return z-A}return v.overallImpact!==_.overallImpact?_.overallImpact*_.guidanceLevel-v.overallImpact*v.guidanceLevel:v.overallImpact===0&&_.overallImpact===0&&v.overallLinearImpact!==_.overallLinearImpact?_.overallLinearImpact*_.guidanceLevel-v.overallLinearImpact*v.guidanceLevel:_.guidanceLevel-v.guidanceLevel});for(let v of c){if(!v.auditRef.group)continue;let _=h[a(v.auditRef)];if(!_)continue;let[x,S]=_;x.insertBefore(v.auditEl,S)}}let g=new Set;for(let u of c){let v=u.auditRef.result.metricSavings||{};for(let[_,x]of Object.entries(v))typeof x=="number"&&g.add(_)}let b=r.filter(u=>u.acronym&&g.has(u.acronym));b.length&&this.renderMetricAuditFilter(b,i,p),p("All");for(let u of n)if(c.some(v=>a(v.auditRef)===u)){let v=h[u];if(!v)continue;i.append(v[0])}if(!d.length)return i;let w={auditRefsOrEls:d.map(u=>u.auditEl),groupDefinitions:t},f=this.renderClump("passed",w);return i.append(f),i}renderMe\
+tricAuditFilter(e,t,n){let r=this.dom.createElement("div","lh-metricfilter"),i=this.dom.createChildOf(r,"span","lh-metricfilter__text");i.textContent=m.strings.showRelevantAudits;let a=[{acronym:"All",id:"All"},...e],l=m.getUniqueSuffix();for(let s of a){let c=`metric-${s.acronym}-${l}`,d=this.dom.createChildOf(r,"input","lh-metricfilter__radio");d.type="radio",d.name=`metricsfilter-${l}`,d.id=c;let h=this.dom.createChildOf(r,"label","lh-metricfilter__label");h.htmlFor=c,h.title="result"in s?s.result.title:"",h.textContent=s.acronym||s.id,s.acronym==="All"&&(d.checked=!0,h.classList.add("lh-metricfilter__label--active")),t.append(r),d.addEventListener("input",p=>{for(let b of t.querySelectorAll("label.lh-metricfilter__label"))b.classList.toggle("lh-metricfilter__label--active",b.htmlFor===c);t.classList.toggle("lh-category--filtered",s.acronym!=="All"),n(s.acronym||"All");let g=t.querySelectorAll("div.lh-audit-group, details.lh-audit-group");for(let b of g){b.hidden=!1;let w=Array.from\
+(b.querySelectorAll("div.lh-audit")),f=!!w.length&&w.every(u=>u.hidden);b.hidden=f}})}}};var re=class{constructor(e){this._dom=e,this._opts={}}renderReport(e,t,n){if(!this._dom.rootEl&&t){console.warn("Please adopt the new report API in renderer/api.js.");let i=t.closest(".lh-root");i?this._dom.rootEl=i:(t.classList.add("lh-root","lh-vars"),this._dom.rootEl=t)}else this._dom.rootEl&&t&&(this._dom.rootEl=t);n&&(this._opts=n),this._dom.setLighthouseChannel(e.configSettings.channel||"unknown");let r=k.prepareReportResult(e);return this._dom.rootEl.textContent="",this._dom.rootEl.append(this._renderReport(r)),this._opts.occupyEntireViewport&&this._dom.rootEl.classList.add("lh-max-viewport"),this._dom.rootEl}_renderReportTopbar(e){let t=this._dom.createComponent("topbar"),n=this._dom.find("a.lh-topbar__url",t);return n.textContent=e.finalDisplayedUrl,n.title=e.finalDisplayedUrl,this._dom.safelySetHref(n,e.finalDisplayedUrl),t}_renderReportHeader(){let e=this._dom.createComponent("heading"),\
+t=this._dom.createComponent("scoresWrapper");return this._dom.find(".lh-scores-wrapper-placeholder",e).replaceWith(t),e}_renderReportFooter(e){let t=this._dom.createComponent("footer");return this._renderMetaBlock(e,t),this._dom.find(".lh-footer__version_issue",t).textContent=m.strings.footerIssue,this._dom.find(".lh-footer__version",t).textContent=e.lighthouseVersion,t}_renderMetaBlock(e,t){let n=k.getEmulationDescriptions(e.configSettings||{}),r=e.userAgent.match(/(\\w*Chrome\\/[\\d.]+)/),i=Array.isArray(r)?r[1].replace("/"," ").replace("Chrome","Chromium"):"Chromium",a=e.configSettings.channel,l=e.environment.benchmarkIndex.toFixed(0),s=e.environment.credits?.["axe-core"],c=[`${m.strings.runtimeSettingsBenchmark}: ${l}`,`${m.strings.runtimeSettingsCPUThrottling}: ${n.cpuThrottling}`];n.screenEmulation&&c.push(`${m.strings.runtimeSettingsScreenEmulation}: ${n.screenEmulation}`),s&&c.push(`${m.strings.runtimeSettingsAxeVersion}: ${s}`);let d=m.strings.runtimeAnalysisWindow;e.gatherMode==\
+="timespan"?d=m.strings.runtimeAnalysisWindowTimespan:e.gatherMode==="snapshot"&&(d=m.strings.runtimeAnalysisWindowSnapshot);let h=[["date",`Captured at ${m.i18n.formatDateTime(e.fetchTime)}`],["devices",`${n.deviceEmulation} with Lighthouse ${e.lighthouseVersion}`,c.join(`\n`)],["samples-one",m.strings.runtimeSingleLoad,m.strings.runtimeSingleLoadTooltip],["stopwatch",d],["networkspeed",`${n.summary}`,`${m.strings.runtimeSettingsNetworkThrottling}: ${n.networkThrottling}`],["chrome",`Using ${i}`+(a?` with ${a}`:""),`${m.strings.runtimeSettingsUANetwork}: "${e.environment.networkUserAgent}"`]],p=this._dom.find(".lh-meta__items",t);for(let[g,b,w]of h){let f=this._dom.createChildOf(p,"li","lh-meta__item");if(f.textContent=b,w){f.classList.add("lh-tooltip-boundary");let u=this._dom.createChildOf(f,"div","lh-tooltip");u.textContent=w}f.classList.add("lh-report-icon",`lh-report-icon--${g}`)}}_renderReportWarnings(e){if(!e.runWarnings||e.runWarnings.length===0)return this._dom.createElement("\
+div");let t=this._dom.createComponent("warningsToplevel"),n=this._dom.find(".lh-warnings__msg",t);n.textContent=m.strings.toplevelWarningsMessage;let r=[];for(let i of e.runWarnings){let a=this._dom.createElement("li");a.append(this._dom.convertMarkdownLinkSnippets(i)),r.push(a)}return this._dom.find("ul",t).append(...r),t}_renderScoreGauges(e,t,n){let r=[],i=[];for(let a of Object.values(e.categories)){let s=(n[a.id]||t).renderCategoryScore(a,e.categoryGroups||{},{gatherMode:e.gatherMode}),c=this._dom.find("a.lh-gauge__wrapper, a.lh-fraction__wrapper",s);c&&(this._dom.safelySetHref(c,`#${a.id}`),c.addEventListener("click",d=>{if(!c.matches(\'[href^="#"]\'))return;let h=c.getAttribute("href"),p=this._dom.rootEl;if(!h||!p)return;let g=this._dom.find(h,p);d.preventDefault(),g.scrollIntoView()}),this._opts.onPageAnchorRendered?.(c)),k.isPluginCategory(a.id)?i.push(s):r.push(s)}return[...r,...i]}_renderReport(e){m.apply({providedStrings:e.i18n.rendererFormattedStrings,i18n:new te(e.configSet\
+tings.locale),reportJson:e});let t=new X(this._dom,{fullPageScreenshot:e.fullPageScreenshot??void 0,entities:e.entities}),n=new G(this._dom,t),r={performance:new ne(this._dom,t)},i=this._dom.createElement("div");i.append(this._renderReportHeader());let a=this._dom.createElement("div","lh-container"),l=this._dom.createElement("div","lh-report");l.append(this._renderReportWarnings(e));let s;Object.keys(e.categories).length===1?i.classList.add("lh-header--solo-category"):s=this._dom.createElement("div","lh-scores-header");let d=this._dom.createElement("div");if(d.classList.add("lh-scorescale-wrap"),d.append(this._dom.createComponent("scorescale")),s){let b=this._dom.find(".lh-scores-container",i);s.append(...this._renderScoreGauges(e,n,r)),b.append(s,d);let w=this._dom.createElement("div","lh-sticky-header");w.append(...this._renderScoreGauges(e,n,r)),a.append(w)}let h=this._dom.createElement("div","lh-categories");l.append(h);let p={gatherMode:e.gatherMode};for(let b of Object.values(e.c\
+ategories)){let w=r[b.id]||n;w.dom.createChildOf(h,"div","lh-category-wrapper").append(w.render(b,e.categoryGroups,p))}n.injectFinalScreenshot(h,e.audits,d);let g=this._dom.createFragment();return this._opts.omitGlobalStyles||g.append(this._dom.createComponent("styles")),this._opts.omitTopbar||g.append(this._renderReportTopbar(e)),g.append(a),l.append(this._renderReportFooter(e)),a.append(i,l),e.fullPageScreenshot&&V.installFullPageScreenshot(this._dom.rootEl,e.fullPageScreenshot.screenshot),g}};function W(o,e){let t=o.rootEl;typeof e>"u"?t.classList.toggle("lh-dark"):t.classList.toggle("lh-dark",e)}var bt=typeof btoa<"u"?btoa:o=>Buffer.from(o).toString("base64"),_t=typeof atob<"u"?atob:o=>Buffer.from(o,"base64").toString();async function wt(o,e){let t=new TextEncoder().encode(o);if(e.gzip)if(typeof CompressionStream<"u"){let i=new CompressionStream("gzip"),a=i.writable.getWriter();a.write(t),a.close();let l=await new Response(i.readable).arrayBuffer();t=new Uint8Array(l)}else t=window\
+.pako.gzip(o);let n="",r=5e3;for(let i=0;i<t.length;i+=r)n+=String.fromCharCode(...t.subarray(i,i+r));return bt(n)}function yt(o,e){let t=_t(o),n=Uint8Array.from(t,r=>r.charCodeAt(0));return e.gzip?window.pako.ungzip(n,{to:"string"}):new TextDecoder().decode(n)}var Ce={toBase64:wt,fromBase64:yt};function se(){let o=window.location.host.endsWith(".vercel.app"),e=new URLSearchParams(window.location.search).has("dev");return o?`https://${window.location.host}/gh-pages`:e?"http://localhost:7333":"https://googlechrome.github.io/lighthouse"}function ce(o){let e=o.generatedTime,t=o.fetchTime||e;return`${o.lighthouseVersion}-${o.finalDisplayedUrl}-${t}`}function xt(o,e,t){let n=new URL(e).origin;window.addEventListener("message",function i(a){a.origin===n&&r&&a.data.opened&&(r.postMessage(o,n),window.removeEventListener("message",i))});let r=window.open(e,t)}async function Ae(o,e,t){let n=new URL(e),r=!!window.CompressionStream;n.hash=await Ce.toBase64(JSON.stringify(o),{gzip:r}),r&&n.searchPa\
+rams.set("gzip","1"),window.open(n.toString(),t)}async function Le(o){let e="viewer-"+ce(o),t=se()+"/viewer/";await Ae({lhr:o},t,e)}async function ze(o){let e="viewer-"+ce(o),t=se()+"/viewer/";xt({lhr:o},t,e)}function Me(o){if(!o.audits["script-treemap-data"].details)throw new Error("no script treemap data found");let t={lhr:{mainDocumentUrl:o.mainDocumentUrl,finalUrl:o.finalUrl,finalDisplayedUrl:o.finalDisplayedUrl,audits:{"script-treemap-data":o.audits["script-treemap-data"]},configSettings:{locale:o.configSettings.locale}}},n=se()+"/treemap/",r="treemap-"+ce(o);Ae(t,n,r)}var oe=class{constructor(e){this._dom=e,this._toggleEl,this._menuEl,this.onDocumentKeyDown=this.onDocumentKeyDown.bind(this),this.onToggleClick=this.onToggleClick.bind(this),this.onToggleKeydown=this.onToggleKeydown.bind(this),this.onMenuFocusOut=this.onMenuFocusOut.bind(this),this.onMenuKeydown=this.onMenuKeydown.bind(this),this._getNextMenuItem=this._getNextMenuItem.bind(this),this._getNextSelectableNode=this._get\
+NextSelectableNode.bind(this),this._getPreviousMenuItem=this._getPreviousMenuItem.bind(this)}setup(e){this._toggleEl=this._dom.find(".lh-topbar button.lh-tools__button",this._dom.rootEl),this._toggleEl.addEventListener("click",this.onToggleClick),this._toggleEl.addEventListener("keydown",this.onToggleKeydown),this._menuEl=this._dom.find(".lh-topbar div.lh-tools__dropdown",this._dom.rootEl),this._menuEl.addEventListener("keydown",this.onMenuKeydown),this._menuEl.addEventListener("click",e)}close(){this._toggleEl.classList.remove("lh-active"),this._toggleEl.setAttribute("aria-expanded","false"),this._menuEl.contains(this._dom.document().activeElement)&&this._toggleEl.focus(),this._menuEl.removeEventListener("focusout",this.onMenuFocusOut),this._dom.document().removeEventListener("keydown",this.onDocumentKeyDown)}open(e){this._toggleEl.classList.contains("lh-active")?e.focus():this._menuEl.addEventListener("transitionend",()=>{e.focus()},{once:!0}),this._toggleEl.classList.add("lh-active"\
+),this._toggleEl.setAttribute("aria-expanded","true"),this._menuEl.addEventListener("focusout",this.onMenuFocusOut),this._dom.document().addEventListener("keydown",this.onDocumentKeyDown)}onToggleClick(e){e.preventDefault(),e.stopImmediatePropagation(),this._toggleEl.classList.contains("lh-active")?this.close():this.open(this._getNextMenuItem())}onToggleKeydown(e){switch(e.code){case"ArrowUp":e.preventDefault(),this.open(this._getPreviousMenuItem());break;case"ArrowDown":case"Enter":case" ":e.preventDefault(),this.open(this._getNextMenuItem());break;default:}}onMenuKeydown(e){let t=e.target;switch(e.code){case"ArrowUp":e.preventDefault(),this._getPreviousMenuItem(t).focus();break;case"ArrowDown":e.preventDefault(),this._getNextMenuItem(t).focus();break;case"Home":e.preventDefault(),this._getNextMenuItem().focus();break;case"End":e.preventDefault(),this._getPreviousMenuItem().focus();break;default:}}onDocumentKeyDown(e){e.keyCode===27&&this.close()}onMenuFocusOut(e){let t=e.relatedTarge\
+t;this._menuEl.contains(t)||this.close()}_getNextSelectableNode(e,t){let n=e.filter(i=>i instanceof HTMLElement).filter(i=>!(i.hasAttribute("disabled")||window.getComputedStyle(i).display==="none")),r=t?n.indexOf(t)+1:0;return r>=n.length&&(r=0),n[r]}_getNextMenuItem(e){let t=Array.from(this._menuEl.childNodes);return this._getNextSelectableNode(t,e)}_getPreviousMenuItem(e){let t=Array.from(this._menuEl.childNodes).reverse();return this._getNextSelectableNode(t,e)}};var ie=class{constructor(e,t){this.lhr,this._reportUIFeatures=e,this._dom=t,this._dropDownMenu=new oe(this._dom),this._copyAttempt=!1,this.topbarEl,this.categoriesEl,this.stickyHeaderEl,this.highlightEl,this.onDropDownMenuClick=this.onDropDownMenuClick.bind(this),this.onKeyUp=this.onKeyUp.bind(this),this.onCopy=this.onCopy.bind(this),this.collapseAllDetails=this.collapseAllDetails.bind(this)}enable(e){this.lhr=e,this._dom.rootEl.addEventListener("keyup",this.onKeyUp),this._dom.document().addEventListener("copy",this.onCopy)\
+,this._dropDownMenu.setup(this.onDropDownMenuClick),this._setUpCollapseDetailsAfterPrinting(),this._dom.find(".lh-topbar__logo",this._dom.rootEl).addEventListener("click",()=>W(this._dom)),this._setupStickyHeader()}onDropDownMenuClick(e){e.preventDefault();let t=e.target;if(!(!t||!t.hasAttribute("data-action"))){switch(t.getAttribute("data-action")){case"copy":this.onCopyButtonClick();break;case"print-summary":this.collapseAllDetails(),this._print();break;case"print-expanded":this.expandAllDetails(),this._print();break;case"save-json":{let n=JSON.stringify(this.lhr,null,2);this._reportUIFeatures._saveFile(new Blob([n],{type:"application/json"}));break}case"save-html":{let n=this._reportUIFeatures.getReportHtml();try{this._reportUIFeatures._saveFile(new Blob([n],{type:"text/html"}))}catch(r){this._dom.fireEventOn("lh-log",this._dom.document(),{cmd:"error",msg:"Could not export as HTML. "+r.message})}break}case"open-viewer":{this._dom.isDevTools()?Le(this.lhr):ze(this.lhr);break}case"sav\
+e-gist":{this._reportUIFeatures.saveAsGist();break}case"toggle-dark":{W(this._dom);break}case"view-unthrottled-trace":this._reportUIFeatures._opts.onViewTrace?.()}this._dropDownMenu.close()}}onCopy(e){this._copyAttempt&&e.clipboardData&&(e.preventDefault(),e.clipboardData.setData("text/plain",JSON.stringify(this.lhr,null,2)),this._dom.fireEventOn("lh-log",this._dom.document(),{cmd:"log",msg:"Report JSON copied to clipboard"})),this._copyAttempt=!1}onCopyButtonClick(){this._dom.fireEventOn("lh-analytics",this._dom.document(),{name:"copy"});try{this._dom.document().queryCommandSupported("copy")&&(this._copyAttempt=!0,this._dom.document().execCommand("copy")||(this._copyAttempt=!1,this._dom.fireEventOn("lh-log",this._dom.document(),{cmd:"warn",msg:"Your browser does not support copy to clipboard."})))}catch(e){this._copyAttempt=!1,this._dom.fireEventOn("lh-log",this._dom.document(),{cmd:"log",msg:e.message})}}onKeyUp(e){(e.ctrlKey||e.metaKey)&&e.keyCode===80&&this._dropDownMenu.close()}ex\
+pandAllDetails(){this._dom.findAll(".lh-categories details",this._dom.rootEl).map(t=>t.open=!0)}collapseAllDetails(){this._dom.findAll(".lh-categories details",this._dom.rootEl).map(t=>t.open=!1)}_print(){this._reportUIFeatures._opts.onPrintOverride?this._reportUIFeatures._opts.onPrintOverride(this._dom.rootEl):self.print()}resetUIState(){this._dropDownMenu.close()}_getScrollParent(e){let{overflowY:t}=window.getComputedStyle(e);return t!=="visible"&&t!=="hidden"?e:e.parentElement?this._getScrollParent(e.parentElement):document}_setUpCollapseDetailsAfterPrinting(){"onbeforeprint"in self?self.addEventListener("afterprint",this.collapseAllDetails):self.matchMedia("print").addListener(t=>{t.matches?this.expandAllDetails():this.collapseAllDetails()})}_setupStickyHeader(){this.topbarEl=this._dom.find("div.lh-topbar",this._dom.rootEl),this.categoriesEl=this._dom.find("div.lh-categories",this._dom.rootEl),requestAnimationFrame(()=>requestAnimationFrame(()=>{try{this.stickyHeaderEl=this._dom.fi\
+nd("div.lh-sticky-header",this._dom.rootEl)}catch{return}this.highlightEl=this._dom.createChildOf(this.stickyHeaderEl,"div","lh-highlighter");let e=this._getScrollParent(this._dom.find(".lh-container",this._dom.rootEl));e.addEventListener("scroll",()=>this._updateStickyHeader());let t=e instanceof window.Document?document.documentElement:e;new window.ResizeObserver(()=>this._updateStickyHeader()).observe(t)}))}_updateStickyHeader(){if(!this.stickyHeaderEl)return;let e=this.topbarEl.getBoundingClientRect().bottom,t=this.categoriesEl.getBoundingClientRect().top,n=e>=t,i=Array.from(this._dom.rootEl.querySelectorAll(".lh-category")).filter(h=>h.getBoundingClientRect().top-window.innerHeight/2<0),a=i.length>0?i.length-1:0,l=this.stickyHeaderEl.querySelectorAll(".lh-gauge__wrapper, .lh-fraction__wrapper"),s=l[a],c=l[0].getBoundingClientRect().left,d=s.getBoundingClientRect().left-c;this.highlightEl.style.transform=`translate(${d}px)`,this.stickyHeaderEl.classList.toggle("lh-sticky-header--vi\
+sible",n)}};function kt(o,e){let t=e?new Date(e):new Date,n=t.toLocaleTimeString("en-US",{hour12:!1}),r=t.toLocaleDateString("en-US",{year:"numeric",month:"2-digit",day:"2-digit"}).split("/");r.unshift(r.pop());let i=r.join("-");return`${o}_${i}_${n}`.replace(/[/?<>\\\\:*|"]/g,"-")}function Te(o){let e=new URL(o.finalDisplayedUrl).hostname;return kt(e,o.fetchTime)}function Et(o){return Array.from(o.tBodies[0].rows)}var ae=class{constructor(e,t={}){this.json,this._dom=e,this._opts=t,this._topbar=t.omitTopbar?null:new ie(this,e),this.onMediaQueryChange=this.onMediaQueryChange.bind(this)}initFeatures(e){this.json=e,this._fullPageScreenshot=E.getFullPageScreenshot(e),this._topbar&&(this._topbar.enable(e),this._topbar.resetUIState()),this._setupMediaQueryListeners(),this._setupThirdPartyFilter(),this._setupElementScreenshotOverlay(this._dom.rootEl);let t=this._dom.isDevTools()||this._opts.disableDarkMode||this._opts.disableAutoDarkModeAndFireworks;!t&&window.matchMedia("(prefers-color-scheme:\
+ dark)").matches&&W(this._dom,!0);let r=["performance","accessibility","best-practices","seo"].every(s=>{let c=e.categories[s];return c&&c.score===1}),i=this._opts.disableFireworks||this._opts.disableAutoDarkModeAndFireworks;if(r&&!i&&(this._enableFireworks(),t||W(this._dom,!0)),e.categories.performance&&e.categories.performance.auditRefs.some(s=>!!(s.group==="metrics"&&e.audits[s.id].errorMessage))){let s=this._dom.find("input.lh-metrics-toggle__input",this._dom.rootEl);s.checked=!0}this.json.audits["script-treemap-data"]&&this.json.audits["script-treemap-data"].details&&this.addButton({text:m.strings.viewTreemapLabel,icon:"treemap",onClick:()=>Me(this.json)}),this._opts.onViewTrace&&(e.configSettings.throttlingMethod==="simulate"?this._dom.find(\'a[data-action="view-unthrottled-trace"]\',this._dom.rootEl).classList.remove("lh-hidden"):this.addButton({text:m.strings.viewTraceLabel,onClick:()=>this._opts.onViewTrace?.()})),this._opts.getStandaloneReportHTML&&this._dom.find(\'a[data-action\
+="save-html"]\',this._dom.rootEl).classList.remove("lh-hidden");for(let s of this._dom.findAll("[data-i18n]",this._dom.rootEl)){let d=s.getAttribute("data-i18n");s.textContent=m.strings[d]}}addButton(e){let t=this._dom.rootEl.querySelector(".lh-audit-group--metrics");if(!t)return;let n=t.querySelector(".lh-buttons");n||(n=this._dom.createChildOf(t,"div","lh-buttons"));let r=["lh-button"];e.icon&&(r.push("lh-report-icon"),r.push(`lh-report-icon--${e.icon}`));let i=this._dom.createChildOf(n,"button",r.join(" "));return i.textContent=e.text,i.addEventListener("click",e.onClick),i}resetUIState(){this._topbar&&this._topbar.resetUIState()}getReportHtml(){if(!this._opts.getStandaloneReportHTML)throw new Error("`getStandaloneReportHTML` is not set");return this.resetUIState(),this._opts.getStandaloneReportHTML()}saveAsGist(){throw new Error("Cannot save as gist from base report")}_enableFireworks(){this._dom.find(".lh-scores-container",this._dom.rootEl).classList.add("lh-score100")}_setupMediaQ\
+ueryListeners(){let e=self.matchMedia("(max-width: 500px)");e.addListener(this.onMediaQueryChange),this.onMediaQueryChange(e)}_resetUIState(){this._topbar&&this._topbar.resetUIState()}onMediaQueryChange(e){this._dom.rootEl.classList.toggle("lh-narrow",e.matches)}_setupThirdPartyFilter(){let e=["uses-rel-preconnect","third-party-facades","network-dependency-tree-insight"],t=["legacy-javascript","legacy-javascript-insight"];Array.from(this._dom.rootEl.querySelectorAll("table.lh-table")).filter(i=>i.querySelector("td.lh-table-column--url, td.lh-table-column--source-location")).filter(i=>{let a=i.closest(".lh-audit");if(!a)throw new Error(".lh-table not within audit");return!e.includes(a.id)}).forEach(i=>{let a=Et(i),l=a.filter(f=>!f.classList.contains("lh-sub-item-row")),s=this._getThirdPartyRows(l,E.getFinalDisplayedUrl(this.json)),c=a.some(f=>f.classList.contains("lh-row--even")),d=this._dom.createComponent("3pFilter"),h=this._dom.find("input",d);h.addEventListener("change",f=>{let u=f.\
+target instanceof HTMLInputElement&&!f.target.checked,v=!0,_=l[0];for(;_;){let x=u&&s.includes(_);do _.classList.toggle("lh-row--hidden",x),c&&(_.classList.toggle("lh-row--even",!x&&v),_.classList.toggle("lh-row--odd",!x&&!v)),_=_.nextElementSibling;while(_&&_.classList.contains("lh-sub-item-row"));x||(v=!v)}});let p=s.filter(f=>!f.classList.contains("lh-row--group")).length;this._dom.find(".lh-3p-filter-count",d).textContent=`${p}`,this._dom.find(".lh-3p-ui-string",d).textContent=m.strings.thirdPartyResourcesLabel;let g=s.length===l.length,b=!s.length;if((g||b)&&(this._dom.find("div.lh-3p-filter",d).hidden=!0),!i.parentNode)return;i.parentNode.insertBefore(d,i);let w=i.closest(".lh-audit");if(!w)throw new Error(".lh-table not within audit");t.includes(w.id)&&!g&&h.click()})}_setupElementScreenshotOverlay(e){this._fullPageScreenshot&&V.installOverlayFeature({dom:this._dom,rootEl:e,overlayContainerEl:e,fullPageScreenshot:this._fullPageScreenshot})}_getThirdPartyRows(e,t){let n=E.getEnti\
+tyFromUrl(t,this.json.entities),r=this.json.entities?.find(a=>a.isFirstParty===!0)?.name,i=[];for(let a of e){if(r){if(!a.dataset.entity||a.dataset.entity===r)continue}else{let l=a.querySelector("div.lh-text__url");if(!l)continue;let s=l.dataset.url;if(!s||!(E.getEntityFromUrl(s,this.json.entities)!==n))continue}i.push(a)}return i}_saveFile(e){let t=e.type.match("json")?".json":".html",n=Te({finalDisplayedUrl:E.getFinalDisplayedUrl(this.json),fetchTime:this.json.fetchTime})+t;this._opts.onSaveFileOverride?this._opts.onSaveFileOverride(e,n):this._dom.saveFile(e,n)}};function Fe(o,e={}){let t=document.createElement("article");t.classList.add("lh-root","lh-vars");let n=new ee(t.ownerDocument,t);return new re(n).renderReport(o,t,e),new ae(n,e).initFeatures(o),t}var le=class{constructor(e){this.el=e;let t=document.createElement("style");if(t.textContent=`\n      #lh-log {\n        position: fixed;\n        background-color: #323232;\n        color: #fff;\n        min-height: 48px;\n        min-wi\
+dth: 288px;\n        padding: 16px 24px;\n        box-shadow: 0 2px 5px 0 rgba(0, 0, 0, 0.26);\n        border-radius: 2px;\n        margin: 12px;\n        font-size: 14px;\n        cursor: default;\n        transition: transform 0.3s, opacity 0.3s;\n        transform: translateY(100px);\n        opacity: 0;\n        bottom: 0;\n        left: 0;\n        z-index: 3;\n        display: flex;\n        flex-direction: row;\n        justify-content: center;\n        align-items: center;\n      }\n      \n      #lh-log.lh-show {\n        opacity: 1;\n        transform: translateY(0);\n      }\n    `,!this.el.parentNode)throw new Error("element needs to be in the DOM");this.el.parentNode.insertBefore(t,this.el),this._id=void 0}log(e,t=!0){this._id&&clearTimeout(this._id),this.el.textContent=e,this.el.classList.add("lh-show"),t&&(this._id=setTimeout(()=>{this.el.classList.remove("lh-show")},7e3))}warn(e){this.log("Warning: "+e)}error(e){this.log(e),setTimeout(()=>{throw new Error(e)},0)}hide(){this._id&&clearTimeout\
+(this._id),this.el.classList.remove("lh-show")}};function St(){let o=window.__LIGHTHOUSE_JSON__,e=Fe(o,{occupyEntireViewport:!0,getStandaloneReportHTML(){return document.documentElement.outerHTML}});document.body.append(e),document.addEventListener("lh-analytics",t=>{let n=t;"gtag"in window&&window.gtag("event",n.detail.name,n.detail.data??{})}),document.addEventListener("lh-log",t=>{let n=document.querySelector("div#lh-log");if(!n)return;let r=new le(n),i=t.detail;switch(i.cmd){case"log":r.log(i.msg);break;case"warn":r.warn(i.msg);break;case"error":r.error(i.msg);break;case"hide":r.hide();break}})}window.__initLighthouseReport__=St;})();\n/**\n * @license\n * Copyright 2017 Google LLC\n * SPDX-License-Identifier: Apache-2.0\n */\n/**\n * @license\n * Copyright 2023 Google LLC\n * SPDX-License-Identifier: Apache-2.0\n */\n/**\n * @license\n * Copyright 2020 Google LLC\n * SPDX-License-Identifier: Apache-2.0\n */\n/**\n * @license Copyright 2023 The Lighthouse Authors. All Rights Reserved.\n * Licensed u\
+nder the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the License. You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0\n * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.\n*/\n/**\n * @license\n * Copyright 2018 Google LLC\n * SPDX-License-Identifier: Apache-2.0\n */\n/**\n * @license\n * Copyright 2017 Google LLC\n * SPDX-License-Identifier: Apache-2.0\n *\n * Dummy text for ensuring report robustness: <\\/script> pre$`post %%LIGHTHOUSE_JSON%%\n * (this is handled by terser)\n */\n/**\n * @license\n * Copyright 2021 Google LLC\n * SPDX-License-Identifier: Apache-2.0\n */\n'
+};
 
 // report/generator/report-generator.js
-var ReportGenerator;
-var init_report_generator = __esm({
-  "report/generator/report-generator.js"() {
-    "use strict";
-    init_process_global();
-    init_report_assets();
-    /**
-     * @license
-     * Copyright 2017 Google LLC
-     * SPDX-License-Identifier: Apache-2.0
-     */
-    ReportGenerator = class _ReportGenerator {
-      static {
-        __name(this, "ReportGenerator");
-      }
-      /**
-       * Replaces all the specified strings in source without serial replacements.
-       * @param {string} source
-       * @param {!Array<{search: string, replacement: string}>} replacements
-       * @return {string}
-       */
-      static replaceStrings(source, replacements) {
-        if (replacements.length === 0) {
-          return source;
-        }
-        const firstReplacement = replacements[0];
-        const nextReplacements = replacements.slice(1);
-        return source.split(firstReplacement.search).map((part) => _ReportGenerator.replaceStrings(part, nextReplacements)).join(firstReplacement.replacement);
-      }
-      /**
-       * @param {unknown} object
-       * @return {string}
-       */
-      static sanitizeJson(object) {
-        return JSON.stringify(object).replace(/</g, "\\u003c").replace(/\u2028/g, "\\u2028").replace(/\u2029/g, "\\u2029");
-      }
-      /**
-       * Returns the standalone report HTML as a string with the report JSON and renderer JS inlined.
-       * @param {LHResult} lhr
-       * @return {string}
-       */
-      static generateReportHtml(lhr) {
-        const sanitizedJson = _ReportGenerator.sanitizeJson(lhr);
-        const sanitizedJavascript = reportAssets.REPORT_JAVASCRIPT.replace(/<\//g, "\\u003c/");
-        return _ReportGenerator.replaceStrings(reportAssets.REPORT_TEMPLATE, [
-          { search: "%%LIGHTHOUSE_JSON%%", replacement: sanitizedJson },
-          { search: "%%LIGHTHOUSE_JAVASCRIPT%%", replacement: sanitizedJavascript }
-        ]);
-      }
-      /**
-       * Returns the standalone flow report HTML as a string with the report JSON and renderer JS inlined.
-       * @param {FlowResult} flow
-       * @return {string}
-       */
-      static generateFlowReportHtml(flow) {
-        const sanitizedJson = _ReportGenerator.sanitizeJson(flow);
-        const sanitizedJavascript = reportAssets.FLOW_REPORT_JAVASCRIPT.replace(/<\//g, "\\u003c/");
-        return _ReportGenerator.replaceStrings(reportAssets.FLOW_REPORT_TEMPLATE, [
-          { search: "%%LIGHTHOUSE_FLOW_JSON%%", replacement: sanitizedJson },
-          { search: "%%LIGHTHOUSE_FLOW_JAVASCRIPT%%", replacement: sanitizedJavascript },
-          { search: "/*%%LIGHTHOUSE_FLOW_CSS%%*/", replacement: reportAssets.FLOW_REPORT_CSS }
-        ]);
-      }
-      /**
-       * Converts the results to a CSV formatted string
-       * Each row describes the result of 1 audit with
-       *  - the name of the category the audit belongs to
-       *  - the name of the audit
-       *  - a description of the audit
-       *  - the score type that is used for the audit
-       *  - the score value of the audit
-       *
-       * @param {LHResult} lhr
-       * @return {string}
-       */
-      static generateReportCSV(lhr) {
-        const CRLF = "\r\n";
-        const separator = ",";
-        const escape = /* @__PURE__ */ __name((value) => `"${value.replace(/"/g, '""')}"`, "escape");
-        const rowFormatter = /* @__PURE__ */ __name((row) => row.map((value) => {
-          if (value === null) return "null";
-          return value.toString();
-        }).map(escape), "rowFormatter");
-        const rows = [];
-        const topLevelKeys = (
-          /** @type {const} */
-          ["requestedUrl", "finalDisplayedUrl", "fetchTime", "gatherMode"]
-        );
-        rows.push(rowFormatter(topLevelKeys));
-        rows.push(rowFormatter(topLevelKeys.map((key) => lhr[key] ?? null)));
-        rows.push([]);
-        rows.push(["category", "score"]);
-        for (const category of Object.values(lhr.categories)) {
-          rows.push(rowFormatter([
-            category.id,
-            category.score
-          ]));
-        }
-        rows.push([]);
-        rows.push(["category", "audit", "score", "displayValue", "description"]);
-        for (const category of Object.values(lhr.categories)) {
-          for (const auditRef of category.auditRefs) {
-            const audit = lhr.audits[auditRef.id];
-            if (!audit) continue;
-            rows.push(rowFormatter([
-              category.id,
-              auditRef.id,
-              audit.score,
-              audit.displayValue || "",
-              audit.description
-            ]));
-          }
-        }
-        return rows.map((row) => row.join(separator)).join(CRLF);
-      }
-      /**
-       * @param {LHResult|FlowResult} result
-       * @return {result is FlowResult}
-       */
-      static isFlowResult(result) {
-        return "steps" in result;
-      }
-      /**
-       * Creates the results output in a format based on the `mode`.
-       * @param {LHResult|FlowResult} result
-       * @param {LHResult['configSettings']['output']} outputModes
-       * @return {string|string[]}
-       */
-      static generateReport(result, outputModes) {
-        const outputAsArray = Array.isArray(outputModes);
-        if (typeof outputModes === "string") outputModes = [outputModes];
-        const output = outputModes.map((outputMode) => {
-          if (outputMode === "html") {
-            if (_ReportGenerator.isFlowResult(result)) {
-              return _ReportGenerator.generateFlowReportHtml(result);
-            }
-            return _ReportGenerator.generateReportHtml(result);
-          }
-          if (outputMode === "csv") {
-            if (_ReportGenerator.isFlowResult(result)) {
-              throw new Error("CSV output is not support for user flows");
-            }
-            return _ReportGenerator.generateReportCSV(result);
-          }
-          if (outputMode === "json") {
-            return JSON.stringify(result, null, 2);
-          }
-          throw new Error("Invalid output mode: " + outputMode);
-        });
-        return outputAsArray ? output : output[0];
-      }
-    };
+/**
+ * @license
+ * Copyright 2017 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+var ReportGenerator = class _ReportGenerator {
+  static {
+    __name(this, "ReportGenerator");
   }
-});
+  /**
+   * Replaces all the specified strings in source without serial replacements.
+   * @param {string} source
+   * @param {!Array<{search: string, replacement: string}>} replacements
+   * @return {string}
+   */
+  static replaceStrings(source, replacements) {
+    if (replacements.length === 0) {
+      return source;
+    }
+    const firstReplacement = replacements[0];
+    const nextReplacements = replacements.slice(1);
+    return source.split(firstReplacement.search).map((part) => _ReportGenerator.replaceStrings(part, nextReplacements)).join(firstReplacement.replacement);
+  }
+  /**
+   * @param {unknown} object
+   * @return {string}
+   */
+  static sanitizeJson(object) {
+    return JSON.stringify(object).replace(/</g, "\\u003c").replace(/\u2028/g, "\\u2028").replace(/\u2029/g, "\\u2029");
+  }
+  /**
+   * Returns the standalone report HTML as a string with the report JSON and renderer JS inlined.
+   * @param {LHResult} lhr
+   * @return {string}
+   */
+  static generateReportHtml(lhr) {
+    const sanitizedJson = _ReportGenerator.sanitizeJson(lhr);
+    const sanitizedJavascript = reportAssets.REPORT_JAVASCRIPT.replace(/<\//g, "\\u003c/");
+    return _ReportGenerator.replaceStrings(reportAssets.REPORT_TEMPLATE, [
+      { search: "%%LIGHTHOUSE_JSON%%", replacement: sanitizedJson },
+      { search: "%%LIGHTHOUSE_JAVASCRIPT%%", replacement: sanitizedJavascript }
+    ]);
+  }
+  /**
+   * Returns the standalone flow report HTML as a string with the report JSON and renderer JS inlined.
+   * @param {FlowResult} flow
+   * @return {string}
+   */
+  static generateFlowReportHtml(flow) {
+    const sanitizedJson = _ReportGenerator.sanitizeJson(flow);
+    const sanitizedJavascript = reportAssets.FLOW_REPORT_JAVASCRIPT.replace(/<\//g, "\\u003c/");
+    return _ReportGenerator.replaceStrings(reportAssets.FLOW_REPORT_TEMPLATE, [
+      { search: "%%LIGHTHOUSE_FLOW_JSON%%", replacement: sanitizedJson },
+      { search: "%%LIGHTHOUSE_FLOW_JAVASCRIPT%%", replacement: sanitizedJavascript },
+      { search: "/*%%LIGHTHOUSE_FLOW_CSS%%*/", replacement: reportAssets.FLOW_REPORT_CSS }
+    ]);
+  }
+  /**
+   * Converts the results to a CSV formatted string
+   * Each row describes the result of 1 audit with
+   *  - the name of the category the audit belongs to
+   *  - the name of the audit
+   *  - a description of the audit
+   *  - the score type that is used for the audit
+   *  - the score value of the audit
+   *
+   * @param {LHResult} lhr
+   * @return {string}
+   */
+  static generateReportCSV(lhr) {
+    const CRLF = "\r\n";
+    const separator = ",";
+    const escape = /* @__PURE__ */ __name((value) => `"${value.replace(/"/g, '""')}"`, "escape");
+    const rowFormatter = /* @__PURE__ */ __name((row) => row.map((value) => {
+      if (value === null) return "null";
+      return value.toString();
+    }).map(escape), "rowFormatter");
+    const rows = [];
+    const topLevelKeys = (
+      /** @type {const} */
+      ["requestedUrl", "finalDisplayedUrl", "fetchTime", "gatherMode"]
+    );
+    rows.push(rowFormatter(topLevelKeys));
+    rows.push(rowFormatter(topLevelKeys.map((key) => lhr[key] ?? null)));
+    rows.push([]);
+    rows.push(["category", "score"]);
+    for (const category of Object.values(lhr.categories)) {
+      rows.push(rowFormatter([
+        category.id,
+        category.score
+      ]));
+    }
+    rows.push([]);
+    rows.push(["category", "audit", "score", "displayValue", "description"]);
+    for (const category of Object.values(lhr.categories)) {
+      for (const auditRef of category.auditRefs) {
+        const audit = lhr.audits[auditRef.id];
+        if (!audit) continue;
+        rows.push(rowFormatter([
+          category.id,
+          auditRef.id,
+          audit.score,
+          audit.displayValue || "",
+          audit.description
+        ]));
+      }
+    }
+    return rows.map((row) => row.join(separator)).join(CRLF);
+  }
+  /**
+   * @param {LHResult|FlowResult} result
+   * @return {result is FlowResult}
+   */
+  static isFlowResult(result) {
+    return "steps" in result;
+  }
+  /**
+   * Creates the results output in a format based on the `mode`.
+   * @param {LHResult|FlowResult} result
+   * @param {LHResult['configSettings']['output']} outputModes
+   * @return {string|string[]}
+   */
+  static generateReport(result, outputModes) {
+    const outputAsArray = Array.isArray(outputModes);
+    if (typeof outputModes === "string") outputModes = [outputModes];
+    const output = outputModes.map((outputMode) => {
+      if (outputMode === "html") {
+        if (_ReportGenerator.isFlowResult(result)) {
+          return _ReportGenerator.generateFlowReportHtml(result);
+        }
+        return _ReportGenerator.generateReportHtml(result);
+      }
+      if (outputMode === "csv") {
+        if (_ReportGenerator.isFlowResult(result)) {
+          throw new Error("CSV output is not support for user flows");
+        }
+        return _ReportGenerator.generateReportCSV(result);
+      }
+      if (outputMode === "json") {
+        return JSON.stringify(result, null, 2);
+      }
+      throw new Error("Invalid output mode: " + outputMode);
+    });
+    return outputAsArray ? output : output[0];
+  }
+};
 
 // core/runner.js
-import path6 from "path";
-var Runner;
-var init_runner = __esm({
-  "core/runner.js"() {
-    "use strict";
-    init_process_global();
-    init_lighthouse_logger();
-    init_lodash();
-    init_scoring();
-    init_audit();
-    init_format();
-    init_stack_packs();
-    init_asset_saver();
-    init_sentry();
-    init_report_generator();
-    init_lh_error();
-    init_root2();
-    init_esm_utils();
-    init_entity_classification();
-    init_url_utils();
-    /**
-     * @license
-     * Copyright 2016 Google LLC
-     * SPDX-License-Identifier: Apache-2.0
-     */
-    Runner = class _Runner {
-      static {
-        __name(this, "Runner");
+init_lh_error();
+init_root2();
+init_esm_utils();
+init_entity_classification();
+init_url_utils();
+/**
+ * @license
+ * Copyright 2016 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+var Runner = class _Runner {
+  static {
+    __name(this, "Runner");
+  }
+  /**
+   * @param {LH.Artifacts} artifacts
+   * @param {{resolvedConfig: LH.Config.ResolvedConfig, computedCache: Map<string, ArbitraryEqualityMap>}} options
+   * @return {Promise<LH.RunnerResult|undefined>}
+   */
+  static async audit(artifacts, options) {
+    const { resolvedConfig, computedCache } = options;
+    const settings = resolvedConfig.settings;
+    try {
+      const runnerStatus = { msg: "Audit phase", id: "lh:runner:audit" };
+      lighthouse_logger_default.time(runnerStatus, "verbose");
+      const lighthouseRunWarnings = [];
+      if (settings.gatherMode && !settings.auditMode) return;
+      if (!resolvedConfig.audits) {
+        throw new Error("No audits to evaluate.");
       }
-      /**
-       * @param {LH.Artifacts} artifacts
-       * @param {{resolvedConfig: LH.Config.ResolvedConfig, computedCache: Map<string, ArbitraryEqualityMap>}} options
-       * @return {Promise<LH.RunnerResult|undefined>}
-       */
-      static async audit(artifacts, options) {
-        const { resolvedConfig, computedCache } = options;
-        const settings = resolvedConfig.settings;
-        try {
-          const runnerStatus = { msg: "Audit phase", id: "lh:runner:audit" };
-          lighthouse_logger_default.time(runnerStatus, "verbose");
-          const lighthouseRunWarnings = [];
-          if (settings.gatherMode && !settings.auditMode) return;
-          if (!resolvedConfig.audits) {
-            throw new Error("No audits to evaluate.");
-          }
-          const auditResultsById = await _Runner._runAudits(
-            settings,
-            resolvedConfig.audits,
-            artifacts,
-            lighthouseRunWarnings,
-            computedCache
-          );
-          const resultsStatus = { msg: "Generating results...", id: "lh:runner:generate" };
-          lighthouse_logger_default.time(resultsStatus);
-          if (artifacts.LighthouseRunWarnings) {
-            lighthouseRunWarnings.push(...artifacts.LighthouseRunWarnings);
-          }
-          const axeVersion = artifacts.Accessibility?.version;
-          const credits = {
-            "axe-core": axeVersion
-          };
-          let categories = {};
-          if (resolvedConfig.categories) {
-            categories = ReportScoring.scoreAllCategories(resolvedConfig.categories, auditResultsById);
-          }
-          lighthouse_logger_default.timeEnd(resultsStatus);
-          lighthouse_logger_default.timeEnd(runnerStatus);
-          let fullPageScreenshot = artifacts.FullPageScreenshot;
-          if (resolvedConfig.settings.disableFullPageScreenshot || fullPageScreenshot instanceof Error) {
-            fullPageScreenshot = void 0;
-          }
-          const i18nLhr = {
-            lighthouseVersion,
-            requestedUrl: artifacts.URL.requestedUrl,
-            mainDocumentUrl: artifacts.URL.mainDocumentUrl,
-            finalDisplayedUrl: artifacts.URL.finalDisplayedUrl,
-            finalUrl: artifacts.URL.mainDocumentUrl,
-            fetchTime: artifacts.fetchTime,
-            gatherMode: artifacts.GatherContext.gatherMode,
-            runtimeError: _Runner.getArtifactRuntimeError(artifacts),
-            runWarnings: lighthouseRunWarnings,
-            userAgent: artifacts.HostUserAgent,
-            environment: {
-              networkUserAgent: artifacts.NetworkUserAgent,
-              hostUserAgent: artifacts.HostUserAgent,
-              benchmarkIndex: artifacts.BenchmarkIndex,
-              credits
-            },
-            audits: auditResultsById,
-            configSettings: settings,
-            categories,
-            categoryGroups: resolvedConfig.groups || void 0,
-            stackPacks: getStackPacks(artifacts.Stacks),
-            entities: await _Runner.getEntityClassification(artifacts, { computedCache }),
-            fullPageScreenshot,
-            timing: this._getTiming(artifacts),
-            i18n: {
-              rendererFormattedStrings: getRendererFormattedStrings(settings.locale),
-              icuMessagePaths: {}
-            }
-          };
-          i18nLhr.i18n.icuMessagePaths = replaceIcuMessages(i18nLhr, settings.locale);
-          const lhr = (
-            /** @type {LH.Result} */
-            i18nLhr
-          );
-          if (settings.auditMode) {
-            const path7 = _Runner._getDataSavePath(settings);
-            saveLhr(lhr, path7);
-          }
-          const report = ReportGenerator.generateReport(lhr, settings.output);
-          return { lhr, artifacts, report };
-        } catch (err) {
-          throw _Runner.createRunnerError(err, settings);
+      const auditResultsById = await _Runner._runAudits(
+        settings,
+        resolvedConfig.audits,
+        artifacts,
+        lighthouseRunWarnings,
+        computedCache
+      );
+      const resultsStatus = { msg: "Generating results...", id: "lh:runner:generate" };
+      lighthouse_logger_default.time(resultsStatus);
+      if (artifacts.LighthouseRunWarnings) {
+        lighthouseRunWarnings.push(...artifacts.LighthouseRunWarnings);
+      }
+      const axeVersion = artifacts.Accessibility?.version;
+      const credits = {
+        "axe-core": axeVersion
+      };
+      let categories = {};
+      if (resolvedConfig.categories) {
+        categories = ReportScoring.scoreAllCategories(resolvedConfig.categories, auditResultsById);
+      }
+      lighthouse_logger_default.timeEnd(resultsStatus);
+      lighthouse_logger_default.timeEnd(runnerStatus);
+      let fullPageScreenshot = artifacts.FullPageScreenshot;
+      if (resolvedConfig.settings.disableFullPageScreenshot || fullPageScreenshot instanceof Error) {
+        fullPageScreenshot = void 0;
+      }
+      const i18nLhr = {
+        lighthouseVersion,
+        requestedUrl: artifacts.URL.requestedUrl,
+        mainDocumentUrl: artifacts.URL.mainDocumentUrl,
+        finalDisplayedUrl: artifacts.URL.finalDisplayedUrl,
+        finalUrl: artifacts.URL.mainDocumentUrl,
+        fetchTime: artifacts.fetchTime,
+        gatherMode: artifacts.GatherContext.gatherMode,
+        runtimeError: _Runner.getArtifactRuntimeError(artifacts),
+        runWarnings: lighthouseRunWarnings,
+        userAgent: artifacts.HostUserAgent,
+        environment: {
+          networkUserAgent: artifacts.NetworkUserAgent,
+          hostUserAgent: artifacts.HostUserAgent,
+          benchmarkIndex: artifacts.BenchmarkIndex,
+          credits
+        },
+        audits: auditResultsById,
+        configSettings: settings,
+        categories,
+        categoryGroups: resolvedConfig.groups || void 0,
+        stackPacks: getStackPacks(artifacts.Stacks),
+        entities: await _Runner.getEntityClassification(artifacts, { computedCache }),
+        fullPageScreenshot,
+        timing: this._getTiming(artifacts),
+        i18n: {
+          rendererFormattedStrings: getRendererFormattedStrings(settings.locale),
+          icuMessagePaths: {}
         }
+      };
+      i18nLhr.i18n.icuMessagePaths = replaceIcuMessages(i18nLhr, settings.locale);
+      const lhr = (
+        /** @type {LH.Result} */
+        i18nLhr
+      );
+      if (settings.auditMode) {
+        const path7 = _Runner._getDataSavePath(settings);
+        saveLhr(lhr, path7);
       }
-      /**
-       * @param {LH.Artifacts} artifacts
-       * @param {LH.Artifacts.ComputedContext} context
-       */
-      static async getEntityClassification(artifacts, context) {
-        const devtoolsLog = artifacts.DevtoolsLog;
-        if (!devtoolsLog) return;
-        const classifiedEntities = await EntityClassification.request(
-          { URL: artifacts.URL, devtoolsLog },
-          context
-        );
-        const entities = [];
-        for (const [entity, entityUrls] of classifiedEntities.urlsByEntity) {
-          const uniqueOrigins = /* @__PURE__ */ new Set();
-          for (const url of entityUrls) {
-            const origin = url_utils_default.getOrigin(url);
-            if (origin) uniqueOrigins.add(origin);
-          }
-          const shortEntity = {
-            name: entity.name,
-            homepage: entity.homepage,
-            origins: [...uniqueOrigins]
-          };
-          if (entity === classifiedEntities.firstParty) shortEntity.isFirstParty = true;
-          if (entity.isUnrecognized) shortEntity.isUnrecognized = true;
-          if (entity.category) shortEntity.category = entity.category;
-          entities.push(shortEntity);
-        }
-        return entities;
+      const report = ReportGenerator.generateReport(lhr, settings.output);
+      return { lhr, artifacts, report };
+    } catch (err) {
+      throw _Runner.createRunnerError(err, settings);
+    }
+  }
+  /**
+   * @param {LH.Artifacts} artifacts
+   * @param {LH.Artifacts.ComputedContext} context
+   */
+  static async getEntityClassification(artifacts, context) {
+    const devtoolsLog = artifacts.DevtoolsLog;
+    if (!devtoolsLog) return;
+    const classifiedEntities = await EntityClassification.request(
+      { URL: artifacts.URL, devtoolsLog },
+      context
+    );
+    const entities = [];
+    for (const [entity, entityUrls] of classifiedEntities.urlsByEntity) {
+      const uniqueOrigins = /* @__PURE__ */ new Set();
+      for (const url of entityUrls) {
+        const origin = url_utils_default.getOrigin(url);
+        if (origin) uniqueOrigins.add(origin);
       }
-      /**
-       * User can run -G solo, -A solo, or -GA together
-       * -G and -A will run partial lighthouse pipelines,
-       * and -GA will run everything plus save artifacts and lhr to disk.
-       *
-       * @param {(runnerData: {resolvedConfig: LH.Config.ResolvedConfig}) => Promise<LH.Artifacts>} gatherFn
-       * @param {{resolvedConfig: LH.Config.ResolvedConfig, computedCache: Map<string, ArbitraryEqualityMap>}} options
-       * @return {Promise<LH.Artifacts>}
-       */
-      static async gather(gatherFn, options) {
-        const settings = options.resolvedConfig.settings;
-        try {
-          const sentryContext = Sentry.getContext();
-          Sentry.captureBreadcrumb({
-            message: "Run started",
-            category: "lifecycle",
-            data: sentryContext
-          });
-          if (settings.auditMode && !settings.gatherMode) {
-            const path7 = this._getDataSavePath(settings);
-            return loadArtifacts(path7);
-          }
-          const runnerStatus = { msg: "Gather phase", id: "lh:runner:gather" };
-          lighthouse_logger_default.time(runnerStatus, "verbose");
-          const artifacts = await gatherFn({ resolvedConfig: options.resolvedConfig });
-          lighthouse_logger_default.timeEnd(runnerStatus);
-          artifacts.Timing = lighthouse_logger_default.takeTimeEntries();
-          if (settings.gatherMode) {
-            const path7 = this._getDataSavePath(settings);
-            await saveArtifacts(artifacts, path7);
-          }
-          return artifacts;
-        } catch (err) {
-          throw _Runner.createRunnerError(err, settings);
-        }
+      const shortEntity = {
+        name: entity.name,
+        homepage: entity.homepage,
+        origins: [...uniqueOrigins]
+      };
+      if (entity === classifiedEntities.firstParty) shortEntity.isFirstParty = true;
+      if (entity.isUnrecognized) shortEntity.isUnrecognized = true;
+      if (entity.category) shortEntity.category = entity.category;
+      entities.push(shortEntity);
+    }
+    return entities;
+  }
+  /**
+   * User can run -G solo, -A solo, or -GA together
+   * -G and -A will run partial lighthouse pipelines,
+   * and -GA will run everything plus save artifacts and lhr to disk.
+   *
+   * @param {(runnerData: {resolvedConfig: LH.Config.ResolvedConfig}) => Promise<LH.Artifacts>} gatherFn
+   * @param {{resolvedConfig: LH.Config.ResolvedConfig, computedCache: Map<string, ArbitraryEqualityMap>}} options
+   * @return {Promise<LH.Artifacts>}
+   */
+  static async gather(gatherFn, options) {
+    const settings = options.resolvedConfig.settings;
+    try {
+      const sentryContext = Sentry.getContext();
+      Sentry.captureBreadcrumb({
+        message: "Run started",
+        category: "lifecycle",
+        data: sentryContext
+      });
+      if (settings.auditMode && !settings.gatherMode) {
+        const path7 = this._getDataSavePath(settings);
+        return loadArtifacts(path7);
       }
-      /**
-       * @param {any} err
-       * @param {LH.Config.Settings} settings
-       */
-      static createRunnerError(err, settings) {
-        if (err.friendlyMessage) {
-          err.friendlyMessage = getFormatted(err.friendlyMessage, settings.locale);
-        }
-        Sentry.captureException(err, { level: "fatal" });
-        return err;
+      const runnerStatus = { msg: "Gather phase", id: "lh:runner:gather" };
+      lighthouse_logger_default.time(runnerStatus, "verbose");
+      const artifacts = await gatherFn({ resolvedConfig: options.resolvedConfig });
+      lighthouse_logger_default.timeEnd(runnerStatus);
+      artifacts.Timing = lighthouse_logger_default.takeTimeEntries();
+      if (settings.gatherMode) {
+        const path7 = this._getDataSavePath(settings);
+        await saveArtifacts(artifacts, path7);
       }
-      /**
-       * This handles both the auditMode case where gatherer entries need to be merged in and
-       * the gather/audit case where timingEntriesFromRunner contains all entries from this run,
-       * including those also in timingEntriesFromArtifacts.
-       * @param {LH.Artifacts} artifacts
-       * @return {LH.Result.Timing}
-       */
-      static _getTiming(artifacts) {
-        const timingEntriesFromArtifacts = artifacts.Timing || [];
-        const timingEntriesFromRunner = lighthouse_logger_default.takeTimeEntries();
-        const timingEntriesKeyValues = [
-          ...timingEntriesFromArtifacts,
-          ...timingEntriesFromRunner
-        ].map((entry) => (
-          /** @type {[string, PerformanceEntry]} */
-          [
-            // As entries can share a name and start time, dedupe based on the name, startTime and duration
-            `${entry.startTime}-${entry.name}-${entry.duration}`,
-            entry
-          ]
-        ));
-        const timingEntries = Array.from(new Map(timingEntriesKeyValues).values()).map((entry) => {
-          return {
-            // Don't spread entry because browser PerformanceEntries can't be spread.
-            // https://github.com/GoogleChrome/lighthouse/issues/8638
-            startTime: parseFloat(entry.startTime.toFixed(2)),
-            name: entry.name,
-            duration: parseFloat(entry.duration.toFixed(2)),
-            entryType: entry.entryType
-          };
-        }).sort((a, b) => a.startTime - b.startTime);
-        const gatherEntry = timingEntries.find((e) => e.name === "lh:runner:gather");
-        const auditEntry = timingEntries.find((e) => e.name === "lh:runner:audit");
-        const gatherTiming = gatherEntry?.duration || 0;
-        const auditTiming = auditEntry?.duration || 0;
-        return { entries: timingEntries, total: gatherTiming + auditTiming };
-      }
-      /**
-       * Run all audits with specified settings and artifacts.
-       * @param {LH.Config.Settings} settings
-       * @param {Array<LH.Config.AuditDefn>} audits
-       * @param {LH.Artifacts} artifacts
-       * @param {Array<string | LH.IcuMessage>} runWarnings
-       * @param {Map<string, ArbitraryEqualityMap>} computedCache
-       * @return {Promise<Record<string, LH.RawIcu<LH.Audit.Result>>>}
-       */
-      static async _runAudits(settings, audits, artifacts, runWarnings, computedCache) {
-        const status = { msg: "Analyzing and running audits...", id: "lh:runner:auditing" };
-        lighthouse_logger_default.time(status);
-        if (artifacts.settings) {
-          const overrides = {
-            locale: void 0,
-            gatherMode: void 0,
-            auditMode: void 0,
-            output: void 0,
-            channel: void 0
-          };
-          const normalizedGatherSettings = Object.assign({}, artifacts.settings, overrides);
-          const normalizedAuditSettings = Object.assign({}, settings, overrides);
-          const keys2 = /* @__PURE__ */ new Set([
-            ...Object.keys(normalizedGatherSettings),
-            ...Object.keys(normalizedAuditSettings)
-          ]);
-          for (const k of keys2) {
-            if (!isEqual_default(normalizedGatherSettings[k], normalizedAuditSettings[k])) {
-              throw new Error(
-                `Cannot change settings between gathering and auditing…
+      return artifacts;
+    } catch (err) {
+      throw _Runner.createRunnerError(err, settings);
+    }
+  }
+  /**
+   * @param {any} err
+   * @param {LH.Config.Settings} settings
+   */
+  static createRunnerError(err, settings) {
+    if (err.friendlyMessage) {
+      err.friendlyMessage = getFormatted(err.friendlyMessage, settings.locale);
+    }
+    Sentry.captureException(err, { level: "fatal" });
+    return err;
+  }
+  /**
+   * This handles both the auditMode case where gatherer entries need to be merged in and
+   * the gather/audit case where timingEntriesFromRunner contains all entries from this run,
+   * including those also in timingEntriesFromArtifacts.
+   * @param {LH.Artifacts} artifacts
+   * @return {LH.Result.Timing}
+   */
+  static _getTiming(artifacts) {
+    const timingEntriesFromArtifacts = artifacts.Timing || [];
+    const timingEntriesFromRunner = lighthouse_logger_default.takeTimeEntries();
+    const timingEntriesKeyValues = [
+      ...timingEntriesFromArtifacts,
+      ...timingEntriesFromRunner
+    ].map((entry) => (
+      /** @type {[string, PerformanceEntry]} */
+      [
+        // As entries can share a name and start time, dedupe based on the name, startTime and duration
+        `${entry.startTime}-${entry.name}-${entry.duration}`,
+        entry
+      ]
+    ));
+    const timingEntries = Array.from(new Map(timingEntriesKeyValues).values()).map((entry) => {
+      return {
+        // Don't spread entry because browser PerformanceEntries can't be spread.
+        // https://github.com/GoogleChrome/lighthouse/issues/8638
+        startTime: parseFloat(entry.startTime.toFixed(2)),
+        name: entry.name,
+        duration: parseFloat(entry.duration.toFixed(2)),
+        entryType: entry.entryType
+      };
+    }).sort((a, b) => a.startTime - b.startTime);
+    const gatherEntry = timingEntries.find((e) => e.name === "lh:runner:gather");
+    const auditEntry = timingEntries.find((e) => e.name === "lh:runner:audit");
+    const gatherTiming = gatherEntry?.duration || 0;
+    const auditTiming = auditEntry?.duration || 0;
+    return { entries: timingEntries, total: gatherTiming + auditTiming };
+  }
+  /**
+   * Run all audits with specified settings and artifacts.
+   * @param {LH.Config.Settings} settings
+   * @param {Array<LH.Config.AuditDefn>} audits
+   * @param {LH.Artifacts} artifacts
+   * @param {Array<string | LH.IcuMessage>} runWarnings
+   * @param {Map<string, ArbitraryEqualityMap>} computedCache
+   * @return {Promise<Record<string, LH.RawIcu<LH.Audit.Result>>>}
+   */
+  static async _runAudits(settings, audits, artifacts, runWarnings, computedCache) {
+    const status = { msg: "Analyzing and running audits...", id: "lh:runner:auditing" };
+    lighthouse_logger_default.time(status);
+    if (artifacts.settings) {
+      const overrides = {
+        locale: void 0,
+        gatherMode: void 0,
+        auditMode: void 0,
+        output: void 0,
+        channel: void 0
+      };
+      const normalizedGatherSettings = Object.assign({}, artifacts.settings, overrides);
+      const normalizedAuditSettings = Object.assign({}, settings, overrides);
+      const keys2 = /* @__PURE__ */ new Set([
+        ...Object.keys(normalizedGatherSettings),
+        ...Object.keys(normalizedAuditSettings)
+      ]);
+      for (const k of keys2) {
+        if (!isEqual_default(normalizedGatherSettings[k], normalizedAuditSettings[k])) {
+          throw new Error(
+            `Cannot change settings between gathering and auditing…
 Difference found at: \`${k}\`: ${JSON.stringify(normalizedGatherSettings[k], null, 2)}
 vs: ${JSON.stringify(normalizedAuditSettings[k], null, 2)}`
-              );
-            }
-          }
-          if (!isEqual_default(normalizedGatherSettings, normalizedAuditSettings)) {
-            throw new Error("Cannot change settings between gathering and auditing");
-          }
-        }
-        const sharedAuditContext = {
-          settings,
-          computedCache
-        };
-        const auditResultsById = {};
-        for (const auditDefn of audits) {
-          const auditId = auditDefn.implementation.meta.id;
-          const auditResult = await _Runner._runAudit(
-            auditDefn,
-            artifacts,
-            sharedAuditContext,
-            runWarnings
           );
-          auditResultsById[auditId] = auditResult;
         }
-        lighthouse_logger_default.timeEnd(status);
-        return auditResultsById;
       }
-      /**
-       * Checks that the audit's required artifacts exist and runs the audit if so.
-       * Otherwise returns error audit result.
-       * @param {LH.Config.AuditDefn} auditDefn
-       * @param {LH.Artifacts} artifacts
-       * @param {Pick<LH.Audit.Context, 'settings'|'computedCache'>} sharedAuditContext
-       * @param {Array<string | LH.IcuMessage>} runWarnings
-       * @return {Promise<LH.RawIcu<LH.Audit.Result>>}
-       * @private
-       */
-      static async _runAudit(auditDefn, artifacts, sharedAuditContext, runWarnings) {
-        const audit = auditDefn.implementation;
-        const status = {
-          msg: `Auditing: ${getFormatted(audit.meta.title, "en-US")}`,
-          id: `lh:audit:${audit.meta.id}`
-        };
-        lighthouse_logger_default.time(status);
-        let auditResult;
-        try {
-          if (artifacts.PageLoadError) throw artifacts.PageLoadError;
-          for (const artifactName of audit.meta.requiredArtifacts) {
-            const noArtifact = artifacts[artifactName] === void 0;
-            if (noArtifact) {
-              lighthouse_logger_default.warn(
-                "Runner",
-                `${artifactName} gatherer, required by audit ${audit.meta.id}, did not run.`
-              );
-              throw new LighthouseError(
-                LighthouseError.errors.MISSING_REQUIRED_ARTIFACT,
-                { artifactName }
-              );
-            }
-            if (artifacts[artifactName] instanceof Error) {
-              const artifactError = artifacts[artifactName];
-              lighthouse_logger_default.warn("Runner", `${artifactName} gatherer, required by audit ${audit.meta.id}, encountered an error: ${artifactError.message}`);
-              const error = new LighthouseError(
-                LighthouseError.errors.ERRORED_REQUIRED_ARTIFACT,
-                { artifactName, errorMessage: artifactError.message },
-                { cause: artifactError }
-              );
-              error.expected = true;
-              throw error;
-            }
-          }
-          const auditOptions = Object.assign({}, audit.defaultOptions, auditDefn.options);
-          const auditContext = {
-            options: auditOptions,
-            ...sharedAuditContext
-          };
-          const requestedArtifacts = audit.meta.requiredArtifacts.concat(audit.meta.__internalOptionalArtifacts || []);
-          const narrowedArtifacts = requestedArtifacts.reduce(
-            (narrowedArtifacts2, artifactName) => {
-              const requestedArtifact = artifacts[artifactName];
-              narrowedArtifacts2[artifactName] = requestedArtifact;
-              return narrowedArtifacts2;
-            },
-            /** @type {LH.Artifacts} */
-            {}
-          );
-          const product = await audit.audit(narrowedArtifacts, auditContext);
-          runWarnings.push(...product.runWarnings || []);
-          auditResult = Audit.generateAuditResult(audit, product);
-        } catch (err) {
-          if (err.code !== "MISSING_REQUIRED_ARTIFACT" && err.code !== "ERRORED_REQUIRED_ARTIFACT") {
-            lighthouse_logger_default.warn(audit.meta.id, `Caught exception: ${err.message}`);
-          }
-          Sentry.captureException(err, { tags: { audit: audit.meta.id }, level: "error" });
-          const errorMessage = err.friendlyMessage ? err.friendlyMessage : err.message;
-          const stack = err.cause?.stack ?? err.stack;
-          auditResult = Audit.generateErrorAuditResult(audit, errorMessage, stack);
-        }
-        lighthouse_logger_default.timeEnd(status);
-        return auditResult;
+      if (!isEqual_default(normalizedGatherSettings, normalizedAuditSettings)) {
+        throw new Error("Cannot change settings between gathering and auditing");
       }
-      /**
-       * Searches a pass's artifacts for any `lhrRuntimeError` error artifacts.
-       * Returns the first one found or `null` if none found.
-       * @param {LH.Artifacts} artifacts
-       * @return {LH.RawIcu<LH.Result['runtimeError']>|undefined}
-       */
-      static getArtifactRuntimeError(artifacts) {
-        const possibleErrorArtifacts = [
-          ["PageLoadError", artifacts.PageLoadError],
-          // Preferentially use `PageLoadError`, if it exists.
-          ...Object.entries(artifacts)
-          // Otherwise check amongst all artifacts.
-        ];
-        for (const [artifactKey, possibleErrorArtifact] of possibleErrorArtifacts) {
-          const isError = possibleErrorArtifact instanceof LighthouseError;
-          if (isError && possibleErrorArtifact.lhrRuntimeError) {
-            const errorMessage = possibleErrorArtifact.friendlyMessage || possibleErrorArtifact.message;
-            const stack = (
-              /** @type {any} */
-              possibleErrorArtifact.cause?.stack ?? possibleErrorArtifact.stack
-            );
-            return {
-              code: possibleErrorArtifact.code,
-              message: errorMessage,
-              errorStack: stack,
-              artifactKey
-            };
-          }
-        }
-        return void 0;
-      }
-      /**
-       * Returns list of audit names for external querying.
-       * @return {Array<string>}
-       */
-      static getAuditList() {
-        const ignoredFiles = [
-          "audit.js",
-          "violation-audit.js",
-          "accessibility/axe-audit.js",
-          "multi-check-audit.js",
-          "byte-efficiency/byte-efficiency-audit.js",
-          "manual/manual-audit.js",
-          "insights/insight-audit.js"
-        ];
-        const fileList = [
-          ...["accessibility", "audit.js", "autocomplete.js", "bf-cache.js", "bootup-time.js", "byte-efficiency", "clickjacking-mitigation.js", "csp-xss.js", "deprecations.js", "diagnostics.js", "dobetterweb", "errors-in-console.js", "final-screenshot.js", "has-hsts.js", "image-aspect-ratio.js", "image-size-responsive.js", "insights", "is-on-https.js", "layout-shifts.js", "long-tasks.js", "main-thread-tasks.js", "mainthread-work-breakdown.js", "manual", "metrics", "metrics.js", "network-requests.js", "network-rtt.js", "network-server-latency.js", "non-composited-animations.js", "oopif-iframe-test-audit.js", "origin-isolation.js", "predictive-perf.js", "redirects-http.js", "redirects.js", "resource-summary.js", "screenshot-thumbnails.js", "script-treemap-data.js", "seo", "server-response-time.js", "third-party-cookies.js", "trusted-types-xss.js", "unsized-images.js", "user-timings.js", "valid-source-maps.js", "violation-audit.js"],
-          ...["charset.js", "doctype.js", "geolocation-on-start.js", "inspector-issues.js", "js-libraries.js", "notification-on-start.js", "paste-preventing-inputs.js"].map((f) => `dobetterweb/${f}`),
-          ...["cumulative-layout-shift.js", "first-contentful-paint.js", "interaction-to-next-paint.js", "interactive.js", "largest-contentful-paint.js", "max-potential-fid.js", "speed-index.js", "total-blocking-time.js"].map((f) => `metrics/${f}`),
-          ...["canonical.js", "crawlable-anchors.js", "hreflang.js", "http-status-code.js", "is-crawlable.js", "link-text.js", "manual", "meta-description.js", "robots-txt.js"].map((f) => `seo/${f}`),
-          ...["structured-data.js"].map((f) => `seo/manual/${f}`),
-          ...["accesskeys.js", "aria-allowed-attr.js", "aria-allowed-role.js", "aria-command-name.js", "aria-conditional-attr.js", "aria-deprecated-role.js", "aria-dialog-name.js", "aria-hidden-body.js", "aria-hidden-focus.js", "aria-input-field-name.js", "aria-meter-name.js", "aria-progressbar-name.js", "aria-prohibited-attr.js", "aria-required-attr.js", "aria-required-children.js", "aria-required-parent.js", "aria-roles.js", "aria-text.js", "aria-toggle-field-name.js", "aria-tooltip-name.js", "aria-treeitem-name.js", "aria-valid-attr-value.js", "aria-valid-attr.js", "axe-audit.js", "button-name.js", "bypass.js", "color-contrast.js", "definition-list.js", "dlitem.js", "document-title.js", "duplicate-id-aria.js", "empty-heading.js", "form-field-multiple-labels.js", "frame-title.js", "heading-order.js", "html-has-lang.js", "html-lang-valid.js", "html-xml-lang-mismatch.js", "identical-links-same-purpose.js", "image-alt.js", "image-redundant-alt.js", "input-button-name.js", "input-image-a\
-lt.js", "label-content-name-mismatch.js", "label.js", "landmark-one-main.js", "link-in-text-block.js", "link-name.js", "list.js", "listitem.js", "manual", "meta-refresh.js", "meta-viewport.js", "object-alt.js", "select-name.js", "skip-link.js", "tabindex.js", "table-duplicate-name.js", "table-fake-caption.js", "target-size.js", "td-has-header.js", "td-headers-attr.js", "th-has-data-cells.js", "valid-lang.js", "video-caption.js"].map((f) => `accessibility/${f}`),
-          ...["custom-controls-labels.js", "custom-controls-roles.js", "focus-traps.js", "focusable-controls.js", "interactive-element-affordance.js", "logical-tab-order.js", "managed-focus.js", "offscreen-content-hidden.js", "use-landmarks.js", "visual-order-follows-dom.js"].map((f) => `accessibility/manual/${f}`),
-          ...["byte-efficiency-audit.js", "total-byte-weight.js", "unminified-css.js", "unminified-javascript.js", "unused-css-rules.js", "unused-javascript.js"].map((f) => `byte-efficiency/${f}`),
-          ...["manual-audit.js"].map((f) => `manual/${f}`),
-          ...["README.md", "cache-insight.js", "cls-culprits-insight.js", "document-latency-insight.js", "dom-size-insight.js", "duplicated-javascript-insight.js", "font-display-insight.js", "forced-reflow-insight.js", "image-delivery-insight.js", "inp-breakdown-insight.js", "insight-audit.js", "lcp-breakdown-insight.js", "lcp-discovery-insight.js", "legacy-javascript-insight.js", "modern-http-insight.js", "network-dependency-tree-insight.js", "render-blocking-insight.js", "slow-css-selector-insight.js", "third-parties-insight.js", "viewport-insight.js"].map((f) => `insights/${f}`)
-        ];
-        return fileList.filter((f) => {
-          return /\.js$/.test(f) && !ignoredFiles.includes(f);
-        }).sort();
-      }
-      /**
-       * Returns list of gatherer names for external querying.
-       * @return {Array<string>}
-       */
-      static getGathererList() {
-        const fileList = [
-          ...["accessibility.js", "anchor-elements.js", "bf-cache-failures.js", "console-messages.js", "css-usage.js", "devtools-log.js", "dobetterweb", "full-page-screenshot.js", "iframe-elements.js", "image-elements.js", "inputs.js", "inspector-issues.js", "js-usage.js", "link-elements.js", "main-document-content.js", "meta-elements.js", "network-user-agent.js", "scripts.js", "seo", "source-maps.js", "stacks.js", "stylesheets.js", "trace-elements.js", "trace.js", "viewport-dimensions.js"],
-          ...["robots-txt.js"].map((f) => `seo/${f}`),
-          ...["doctype.js"].map((f) => `dobetterweb/${f}`)
-        ];
-        return fileList.filter((f) => /\.js$/.test(f) && f !== "gatherer.js").sort();
-      }
-      /**
-       * Get path to use for -G and -A modes. Defaults to $CWD/latest-run
-       * @param {LH.Config.Settings} settings
-       * @return {string}
-       */
-      static _getDataSavePath(settings) {
-        const { auditMode, gatherMode } = settings;
-        if (typeof auditMode === "string") return path6.resolve(process.cwd(), auditMode);
-        if (typeof gatherMode === "string") return path6.resolve(process.cwd(), gatherMode);
-        return path6.join(process.cwd(), "latest-run");
-      }
+    }
+    const sharedAuditContext = {
+      settings,
+      computedCache
     };
+    const auditResultsById = {};
+    for (const auditDefn of audits) {
+      const auditId = auditDefn.implementation.meta.id;
+      const auditResult = await _Runner._runAudit(
+        auditDefn,
+        artifacts,
+        sharedAuditContext,
+        runWarnings
+      );
+      auditResultsById[auditId] = auditResult;
+    }
+    lighthouse_logger_default.timeEnd(status);
+    return auditResultsById;
   }
-});
+  /**
+   * Checks that the audit's required artifacts exist and runs the audit if so.
+   * Otherwise returns error audit result.
+   * @param {LH.Config.AuditDefn} auditDefn
+   * @param {LH.Artifacts} artifacts
+   * @param {Pick<LH.Audit.Context, 'settings'|'computedCache'>} sharedAuditContext
+   * @param {Array<string | LH.IcuMessage>} runWarnings
+   * @return {Promise<LH.RawIcu<LH.Audit.Result>>}
+   * @private
+   */
+  static async _runAudit(auditDefn, artifacts, sharedAuditContext, runWarnings) {
+    const audit = auditDefn.implementation;
+    const status = {
+      msg: `Auditing: ${getFormatted(audit.meta.title, "en-US")}`,
+      id: `lh:audit:${audit.meta.id}`
+    };
+    lighthouse_logger_default.time(status);
+    let auditResult;
+    try {
+      if (artifacts.PageLoadError) throw artifacts.PageLoadError;
+      for (const artifactName of audit.meta.requiredArtifacts) {
+        const noArtifact = artifacts[artifactName] === void 0;
+        if (noArtifact) {
+          lighthouse_logger_default.warn(
+            "Runner",
+            `${artifactName} gatherer, required by audit ${audit.meta.id}, did not run.`
+          );
+          throw new LighthouseError(
+            LighthouseError.errors.MISSING_REQUIRED_ARTIFACT,
+            { artifactName }
+          );
+        }
+        if (artifacts[artifactName] instanceof Error) {
+          const artifactError = artifacts[artifactName];
+          lighthouse_logger_default.warn("Runner", `${artifactName} gatherer, required by audit ${audit.meta.id}, encountered an error: ${artifactError.message}`);
+          const error = new LighthouseError(
+            LighthouseError.errors.ERRORED_REQUIRED_ARTIFACT,
+            { artifactName, errorMessage: artifactError.message },
+            { cause: artifactError }
+          );
+          error.expected = true;
+          throw error;
+        }
+      }
+      const auditOptions = Object.assign({}, audit.defaultOptions, auditDefn.options);
+      const auditContext = {
+        options: auditOptions,
+        ...sharedAuditContext
+      };
+      const requestedArtifacts = audit.meta.requiredArtifacts.concat(audit.meta.__internalOptionalArtifacts || []);
+      const narrowedArtifacts = requestedArtifacts.reduce(
+        (narrowedArtifacts2, artifactName) => {
+          const requestedArtifact = artifacts[artifactName];
+          narrowedArtifacts2[artifactName] = requestedArtifact;
+          return narrowedArtifacts2;
+        },
+        /** @type {LH.Artifacts} */
+        {}
+      );
+      const product = await audit.audit(narrowedArtifacts, auditContext);
+      runWarnings.push(...product.runWarnings || []);
+      auditResult = Audit.generateAuditResult(audit, product);
+    } catch (err) {
+      if (err.code !== "MISSING_REQUIRED_ARTIFACT" && err.code !== "ERRORED_REQUIRED_ARTIFACT") {
+        lighthouse_logger_default.warn(audit.meta.id, `Caught exception: ${err.message}`);
+      }
+      Sentry.captureException(err, { tags: { audit: audit.meta.id }, level: "error" });
+      const errorMessage = err.friendlyMessage ? err.friendlyMessage : err.message;
+      const stack = err.cause?.stack ?? err.stack;
+      auditResult = Audit.generateErrorAuditResult(audit, errorMessage, stack);
+    }
+    lighthouse_logger_default.timeEnd(status);
+    return auditResult;
+  }
+  /**
+   * Searches a pass's artifacts for any `lhrRuntimeError` error artifacts.
+   * Returns the first one found or `null` if none found.
+   * @param {LH.Artifacts} artifacts
+   * @return {LH.RawIcu<LH.Result['runtimeError']>|undefined}
+   */
+  static getArtifactRuntimeError(artifacts) {
+    const possibleErrorArtifacts = [
+      ["PageLoadError", artifacts.PageLoadError],
+      // Preferentially use `PageLoadError`, if it exists.
+      ...Object.entries(artifacts)
+      // Otherwise check amongst all artifacts.
+    ];
+    for (const [artifactKey, possibleErrorArtifact] of possibleErrorArtifacts) {
+      const isError = possibleErrorArtifact instanceof LighthouseError;
+      if (isError && possibleErrorArtifact.lhrRuntimeError) {
+        const errorMessage = possibleErrorArtifact.friendlyMessage || possibleErrorArtifact.message;
+        const stack = (
+          /** @type {any} */
+          possibleErrorArtifact.cause?.stack ?? possibleErrorArtifact.stack
+        );
+        return {
+          code: possibleErrorArtifact.code,
+          message: errorMessage,
+          errorStack: stack,
+          artifactKey
+        };
+      }
+    }
+    return void 0;
+  }
+  /**
+   * Returns list of audit names for external querying.
+   * @return {Array<string>}
+   */
+  static getAuditList() {
+    const ignoredFiles = [
+      "audit.js",
+      "violation-audit.js",
+      "accessibility/axe-audit.js",
+      "multi-check-audit.js",
+      "byte-efficiency/byte-efficiency-audit.js",
+      "manual/manual-audit.js",
+      "insights/insight-audit.js"
+    ];
+    const fileList = [
+      ...["accessibility", "audit.js", "autocomplete.js", "bf-cache.js", "bootup-time.js", "byte-efficiency", "clickjacking-mitigation.js", "csp-xss.js", "deprecations.js", "diagnostics.js", "dobetterweb", "errors-in-console.js", "final-screenshot.js", "has-hsts.js", "image-aspect-ratio.js", "image-size-responsive.js", "insights", "is-on-https.js", "layout-shifts.js", "long-tasks.js", "main-thread-tasks.js", "mainthread-work-breakdown.js", "manual", "metrics", "metrics.js", "network-requests.js", "network-rtt.js", "network-server-latency.js", "non-composited-animations.js", "oopif-iframe-test-audit.js", "origin-isolation.js", "predictive-perf.js", "redirects-http.js", "redirects.js", "resource-summary.js", "screenshot-thumbnails.js", "script-treemap-data.js", "seo", "server-response-time.js", "third-party-cookies.js", "trusted-types-xss.js", "unsized-images.js", "user-timings.js", "valid-source-maps.js", "violation-audit.js"],
+      ...["charset.js", "doctype.js", "geolocation-on-start.js", "inspector-issues.js", "js-libraries.js", "notification-on-start.js", "paste-preventing-inputs.js"].map((f) => `dobetterweb/${f}`),
+      ...["cumulative-layout-shift.js", "first-contentful-paint.js", "interaction-to-next-paint.js", "interactive.js", "largest-contentful-paint.js", "max-potential-fid.js", "speed-index.js", "total-blocking-time.js"].map((f) => `metrics/${f}`),
+      ...["canonical.js", "crawlable-anchors.js", "hreflang.js", "http-status-code.js", "is-crawlable.js", "link-text.js", "manual", "meta-description.js", "robots-txt.js"].map((f) => `seo/${f}`),
+      ...["structured-data.js"].map((f) => `seo/manual/${f}`),
+      ...["accesskeys.js", "aria-allowed-attr.js", "aria-allowed-role.js", "aria-command-name.js", "aria-conditional-attr.js", "aria-deprecated-role.js", "aria-dialog-name.js", "aria-hidden-body.js", "aria-hidden-focus.js", "aria-input-field-name.js", "aria-meter-name.js", "aria-progressbar-name.js", "aria-prohibited-attr.js", "aria-required-attr.js", "aria-required-children.js", "aria-required-parent.js", "aria-roles.js", "aria-text.js", "aria-toggle-field-name.js", "aria-tooltip-name.js", "aria-treeitem-name.js", "aria-valid-attr-value.js", "aria-valid-attr.js", "axe-audit.js", "button-name.js", "bypass.js", "color-contrast.js", "definition-list.js", "dlitem.js", "document-title.js", "duplicate-id-aria.js", "empty-heading.js", "form-field-multiple-labels.js", "frame-title.js", "heading-order.js", "html-has-lang.js", "html-lang-valid.js", "html-xml-lang-mismatch.js", "identical-links-same-purpose.js", "image-alt.js", "image-redundant-alt.js", "input-button-name.js", "input-image-alt.j\
+s", "label-content-name-mismatch.js", "label.js", "landmark-one-main.js", "link-in-text-block.js", "link-name.js", "list.js", "listitem.js", "manual", "meta-refresh.js", "meta-viewport.js", "object-alt.js", "select-name.js", "skip-link.js", "tabindex.js", "table-duplicate-name.js", "table-fake-caption.js", "target-size.js", "td-has-header.js", "td-headers-attr.js", "th-has-data-cells.js", "valid-lang.js", "video-caption.js"].map((f) => `accessibility/${f}`),
+      ...["custom-controls-labels.js", "custom-controls-roles.js", "focus-traps.js", "focusable-controls.js", "interactive-element-affordance.js", "logical-tab-order.js", "managed-focus.js", "offscreen-content-hidden.js", "use-landmarks.js", "visual-order-follows-dom.js"].map((f) => `accessibility/manual/${f}`),
+      ...["byte-efficiency-audit.js", "total-byte-weight.js", "unminified-css.js", "unminified-javascript.js", "unused-css-rules.js", "unused-javascript.js"].map((f) => `byte-efficiency/${f}`),
+      ...["manual-audit.js"].map((f) => `manual/${f}`),
+      ...["README.md", "cache-insight.js", "cls-culprits-insight.js", "document-latency-insight.js", "dom-size-insight.js", "duplicated-javascript-insight.js", "font-display-insight.js", "forced-reflow-insight.js", "image-delivery-insight.js", "inp-breakdown-insight.js", "insight-audit.js", "lcp-breakdown-insight.js", "lcp-discovery-insight.js", "legacy-javascript-insight.js", "modern-http-insight.js", "network-dependency-tree-insight.js", "render-blocking-insight.js", "slow-css-selector-insight.js", "third-parties-insight.js", "viewport-insight.js"].map((f) => `insights/${f}`)
+    ];
+    return fileList.filter((f) => {
+      return /\.js$/.test(f) && !ignoredFiles.includes(f);
+    }).sort();
+  }
+  /**
+   * Returns list of gatherer names for external querying.
+   * @return {Array<string>}
+   */
+  static getGathererList() {
+    const fileList = [
+      ...["accessibility.js", "anchor-elements.js", "bf-cache-failures.js", "console-messages.js", "css-usage.js", "devtools-log.js", "dobetterweb", "full-page-screenshot.js", "iframe-elements.js", "image-elements.js", "inputs.js", "inspector-issues.js", "js-usage.js", "link-elements.js", "main-document-content.js", "meta-elements.js", "network-user-agent.js", "scripts.js", "seo", "source-maps.js", "stacks.js", "stylesheets.js", "trace-elements.js", "trace.js", "viewport-dimensions.js"],
+      ...["robots-txt.js"].map((f) => `seo/${f}`),
+      ...["doctype.js"].map((f) => `dobetterweb/${f}`)
+    ];
+    return fileList.filter((f) => /\.js$/.test(f) && f !== "gatherer.js").sort();
+  }
+  /**
+   * Get path to use for -G and -A modes. Defaults to $CWD/latest-run
+   * @param {LH.Config.Settings} settings
+   * @return {string}
+   */
+  static _getDataSavePath(settings) {
+    const { auditMode, gatherMode } = settings;
+    if (typeof auditMode === "string") return path6.resolve(process.cwd(), auditMode);
+    if (typeof gatherMode === "string") return path6.resolve(process.cwd(), gatherMode);
+    return path6.join(process.cwd(), "latest-run");
+  }
+};
+
+// core/user-flow.js
+init_process_global();
+
+// core/gather/snapshot-runner.js
+init_process_global();
+init_lighthouse_logger();
+
+// core/gather/driver.js
+init_process_global();
+init_lighthouse_logger();
 
 // core/gather/driver/execution-context.js
-var ExecutionContext;
-var init_execution_context = __esm({
-  "core/gather/driver/execution-context.js"() {
-    "use strict";
-    init_process_global();
-    init_lh();
-    init_page_functions();
-    /**
-     * @license
-     * Copyright 2020 Google LLC
-     * SPDX-License-Identifier: Apache-2.0
-     */
-    ExecutionContext = class _ExecutionContext {
-      static {
-        __name(this, "ExecutionContext");
+init_process_global();
+init_lh();
+init_page_functions();
+/**
+ * @license
+ * Copyright 2020 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+var ExecutionContext = class _ExecutionContext {
+  static {
+    __name(this, "ExecutionContext");
+  }
+  /** @param {LH.Gatherer.ProtocolSession} session */
+  constructor(session) {
+    this._session = session;
+    this._executionContextId = void 0;
+    this._executionContextIdentifiersCreated = 0;
+    session.on("Page.frameNavigated", () => this.clearContextId());
+    session.on("Runtime.executionContextDestroyed", (event) => {
+      if (event.executionContextId === this._executionContextId) {
+        this.clearContextId();
       }
-      /** @param {LH.Gatherer.ProtocolSession} session */
-      constructor(session) {
-        this._session = session;
-        this._executionContextId = void 0;
-        this._executionContextIdentifiersCreated = 0;
-        session.on("Page.frameNavigated", () => this.clearContextId());
-        session.on("Runtime.executionContextDestroyed", (event) => {
-          if (event.executionContextId === this._executionContextId) {
-            this.clearContextId();
-          }
-        });
-      }
-      /**
-       * Returns the isolated context ID currently in use.
-       */
-      getContextId() {
-        return this._executionContextId;
-      }
-      /**
-       * Clears the remembered context ID. Use this method when we have knowledge that the runtime context
-       * we were using has been destroyed by the browser and is no longer available.
-       */
-      clearContextId() {
-        this._executionContextId = void 0;
-      }
-      /**
-       * Returns the cached isolated execution context ID or creates a new execution context for the main
-       * frame. The cached execution context is cleared on every gotoURL invocation, so a new one will
-       * always be created on the first call on a new page.
-       * @return {Promise<number>}
-       */
-      async _getOrCreateIsolatedContextId() {
-        if (typeof this._executionContextId === "number") return this._executionContextId;
-        await this._session.sendCommand("Page.enable");
-        await this._session.sendCommand("Runtime.enable");
-        const frameTreeResponse = await this._session.sendCommand("Page.getFrameTree");
-        const mainFrameId2 = frameTreeResponse.frameTree.frame.id;
-        const isolatedWorldResponse = await this._session.sendCommand("Page.createIsolatedWorld", {
-          frameId: mainFrameId2,
-          worldName: "lighthouse_isolated_context"
-        });
-        this._executionContextId = isolatedWorldResponse.executionContextId;
-        this._executionContextIdentifiersCreated++;
-        return isolatedWorldResponse.executionContextId;
-      }
-      /**
-       * Evaluate an expression in the given execution context; an undefined contextId implies the main
-       * page without isolation.
-       * @param {string} expression
-       * @param {number|undefined} contextId
-       * @param {number} timeout
-       * @return {Promise<*>}
-       */
-      async _evaluateInContext(expression, contextId, timeout) {
-        const uniqueExecutionContextIdentifier = contextId === void 0 ? void 0 : this._executionContextIdentifiersCreated;
-        const evaluationParams = {
-          // We need to explicitly wrap the raw expression for several purposes:
-          // 1. Ensure that the expression will be a native Promise and not a polyfill/non-Promise.
-          // 2. Ensure that errors in the expression are captured by the Promise.
-          // 3. Ensure that errors captured in the Promise are converted into plain-old JS Objects
-          //    so that they can be serialized properly b/c JSON.stringify(new Error('foo')) === '{}'
-          //
-          // `__lighthouseExecutionContextUniqueIdentifier` is only used by the FullPageScreenshot gatherer.
-          // See `getNodeDetails` in page-functions.
-          expression: `(function wrapInNativePromise() {
+    });
+  }
+  /**
+   * Returns the isolated context ID currently in use.
+   */
+  getContextId() {
+    return this._executionContextId;
+  }
+  /**
+   * Clears the remembered context ID. Use this method when we have knowledge that the runtime context
+   * we were using has been destroyed by the browser and is no longer available.
+   */
+  clearContextId() {
+    this._executionContextId = void 0;
+  }
+  /**
+   * Returns the cached isolated execution context ID or creates a new execution context for the main
+   * frame. The cached execution context is cleared on every gotoURL invocation, so a new one will
+   * always be created on the first call on a new page.
+   * @return {Promise<number>}
+   */
+  async _getOrCreateIsolatedContextId() {
+    if (typeof this._executionContextId === "number") return this._executionContextId;
+    await this._session.sendCommand("Page.enable");
+    await this._session.sendCommand("Runtime.enable");
+    const frameTreeResponse = await this._session.sendCommand("Page.getFrameTree");
+    const mainFrameId2 = frameTreeResponse.frameTree.frame.id;
+    const isolatedWorldResponse = await this._session.sendCommand("Page.createIsolatedWorld", {
+      frameId: mainFrameId2,
+      worldName: "lighthouse_isolated_context"
+    });
+    this._executionContextId = isolatedWorldResponse.executionContextId;
+    this._executionContextIdentifiersCreated++;
+    return isolatedWorldResponse.executionContextId;
+  }
+  /**
+   * Evaluate an expression in the given execution context; an undefined contextId implies the main
+   * page without isolation.
+   * @param {string} expression
+   * @param {number|undefined} contextId
+   * @param {number} timeout
+   * @return {Promise<*>}
+   */
+  async _evaluateInContext(expression, contextId, timeout) {
+    const uniqueExecutionContextIdentifier = contextId === void 0 ? void 0 : this._executionContextIdentifiersCreated;
+    const evaluationParams = {
+      // We need to explicitly wrap the raw expression for several purposes:
+      // 1. Ensure that the expression will be a native Promise and not a polyfill/non-Promise.
+      // 2. Ensure that errors in the expression are captured by the Promise.
+      // 3. Ensure that errors captured in the Promise are converted into plain-old JS Objects
+      //    so that they can be serialized properly b/c JSON.stringify(new Error('foo')) === '{}'
+      //
+      // `__lighthouseExecutionContextUniqueIdentifier` is only used by the FullPageScreenshot gatherer.
+      // See `getNodeDetails` in page-functions.
+      expression: `(function wrapInNativePromise() {
         ${_ExecutionContext._cachedNativesPreamble};
         globalThis.__lighthouseExecutionContextUniqueIdentifier =
           ${uniqueExecutionContextIdentifier};
@@ -52101,920 +51811,897 @@ var init_execution_context = __esm({
         });
       }())
       //# sourceURL=_lighthouse-eval.js`,
-          includeCommandLineAPI: true,
-          awaitPromise: true,
-          returnByValue: true,
-          timeout,
-          contextId
-        };
-        this._session.setNextProtocolTimeout(timeout);
-        const response = await this._session.sendCommand("Runtime.evaluate", evaluationParams);
-        const ex = response.exceptionDetails;
-        if (ex) {
-          const elidedExpression = expression.replace(/\s+/g, " ").substring(0, 100);
-          const messageLines = [
-            "Runtime.evaluate exception",
-            `Expression: ${elidedExpression}
+      includeCommandLineAPI: true,
+      awaitPromise: true,
+      returnByValue: true,
+      timeout,
+      contextId
+    };
+    this._session.setNextProtocolTimeout(timeout);
+    const response = await this._session.sendCommand("Runtime.evaluate", evaluationParams);
+    const ex = response.exceptionDetails;
+    if (ex) {
+      const elidedExpression = expression.replace(/\s+/g, " ").substring(0, 100);
+      const messageLines = [
+        "Runtime.evaluate exception",
+        `Expression: ${elidedExpression}
 ---- (elided)`,
-            !ex.stackTrace ? `Parse error at: ${ex.lineNumber + 1}:${ex.columnNumber + 1}` : null,
-            ex.exception?.description || ex.text
-          ].filter(Boolean);
-          const evaluationError = new Error(messageLines.join("\n"));
-          return Promise.reject(evaluationError);
-        }
-        if (response.result === void 0) {
-          return Promise.reject(
-            new Error('Runtime.evaluate response did not contain a "result" object')
-          );
-        }
-        const value = response.result.value;
-        if (value?.__failedInBrowser) {
-          return Promise.reject(Object.assign(new Error(), value));
-        } else {
-          return value;
-        }
+        !ex.stackTrace ? `Parse error at: ${ex.lineNumber + 1}:${ex.columnNumber + 1}` : null,
+        ex.exception?.description || ex.text
+      ].filter(Boolean);
+      const evaluationError = new Error(messageLines.join("\n"));
+      return Promise.reject(evaluationError);
+    }
+    if (response.result === void 0) {
+      return Promise.reject(
+        new Error('Runtime.evaluate response did not contain a "result" object')
+      );
+    }
+    const value = response.result.value;
+    if (value?.__failedInBrowser) {
+      return Promise.reject(Object.assign(new Error(), value));
+    } else {
+      return value;
+    }
+  }
+  /**
+   * Evaluate an expression in the context of the current page. If useIsolation is true, the expression
+   * will be evaluated in a content script that has access to the page's DOM but whose JavaScript state
+   * is completely separate.
+   * Returns a promise that resolves on the expression's value.
+   *
+   * @deprecated Use `evaluate` instead! It has a better API, and unlike `evaluateAsync` doesn't sometimes
+   * execute invalid code.
+   * @param {string} expression
+   * @param {{useIsolation?: boolean}=} options
+   * @return {Promise<*>}
+   */
+  async evaluateAsync(expression, options = {}) {
+    const timeout = this._session.hasNextProtocolTimeout() ? this._session.getNextProtocolTimeout() : 6e4;
+    const contextId = options.useIsolation ? await this._getOrCreateIsolatedContextId() : void 0;
+    try {
+      return await this._evaluateInContext(expression, contextId, timeout);
+    } catch (err) {
+      if (contextId && err.message.includes("Cannot find context")) {
+        this.clearContextId();
+        const freshContextId = await this._getOrCreateIsolatedContextId();
+        return this._evaluateInContext(expression, freshContextId, timeout);
       }
-      /**
-       * Evaluate an expression in the context of the current page. If useIsolation is true, the expression
-       * will be evaluated in a content script that has access to the page's DOM but whose JavaScript state
-       * is completely separate.
-       * Returns a promise that resolves on the expression's value.
-       *
-       * @deprecated Use `evaluate` instead! It has a better API, and unlike `evaluateAsync` doesn't sometimes
-       * execute invalid code.
-       * @param {string} expression
-       * @param {{useIsolation?: boolean}=} options
-       * @return {Promise<*>}
-       */
-      async evaluateAsync(expression, options = {}) {
-        const timeout = this._session.hasNextProtocolTimeout() ? this._session.getNextProtocolTimeout() : 6e4;
-        const contextId = options.useIsolation ? await this._getOrCreateIsolatedContextId() : void 0;
-        try {
-          return await this._evaluateInContext(expression, contextId, timeout);
-        } catch (err) {
-          if (contextId && err.message.includes("Cannot find context")) {
-            this.clearContextId();
-            const freshContextId = await this._getOrCreateIsolatedContextId();
-            return this._evaluateInContext(expression, freshContextId, timeout);
-          }
-          throw err;
-        }
-      }
-      /**
-       * Evaluate a function in the context of the current page.
-       * If `useIsolation` is true, the function will be evaluated in a content script that has
-       * access to the page's DOM but whose JavaScript state is completely separate.
-       * Returns a promise that resolves on a value of `mainFn`'s return type.
-       * @template {unknown[]} T, R
-       * @param {((...args: T) => R)} mainFn The main function to call.
-       * @param {{args: T, useIsolation?: boolean, deps?: Array<Function|string>}} options `args` should
-       *   match the args of `mainFn`, and can be any serializable value. `deps` are functions that must be
-       *   defined for `mainFn` to work.
-       * @return {Promise<Awaited<R>>}
-       */
-      evaluate(mainFn, options) {
-        const argsSerialized = _ExecutionContext.serializeArguments(options.args);
-        const depsSerialized = _ExecutionContext.serializeDeps(options.deps);
-        const expression = `(() => {
+      throw err;
+    }
+  }
+  /**
+   * Evaluate a function in the context of the current page.
+   * If `useIsolation` is true, the function will be evaluated in a content script that has
+   * access to the page's DOM but whose JavaScript state is completely separate.
+   * Returns a promise that resolves on a value of `mainFn`'s return type.
+   * @template {unknown[]} T, R
+   * @param {((...args: T) => R)} mainFn The main function to call.
+   * @param {{args: T, useIsolation?: boolean, deps?: Array<Function|string>}} options `args` should
+   *   match the args of `mainFn`, and can be any serializable value. `deps` are functions that must be
+   *   defined for `mainFn` to work.
+   * @return {Promise<Awaited<R>>}
+   */
+  evaluate(mainFn, options) {
+    const argsSerialized = _ExecutionContext.serializeArguments(options.args);
+    const depsSerialized = _ExecutionContext.serializeDeps(options.deps);
+    const expression = `(() => {
       ${depsSerialized}
       return (${mainFn})(${argsSerialized});
     })()`;
-        return this.evaluateAsync(expression, options);
-      }
-      /**
-       * Evaluate a function on every new frame from now on.
-       * @template {unknown[]} T
-       * @param {((...args: T) => void)} mainFn The main function to call.
-       * @param {{args: T, deps?: Array<Function|string>}} options `args` should
-       *   match the args of `mainFn`, and can be any serializable value. `deps` are functions that must be
-       *   defined for `mainFn` to work.
-       * @return {Promise<void>}
-       */
-      async evaluateOnNewDocument(mainFn, options) {
-        const argsSerialized = _ExecutionContext.serializeArguments(options.args);
-        const depsSerialized = _ExecutionContext.serializeDeps(options.deps);
-        const expression = `(() => {
+    return this.evaluateAsync(expression, options);
+  }
+  /**
+   * Evaluate a function on every new frame from now on.
+   * @template {unknown[]} T
+   * @param {((...args: T) => void)} mainFn The main function to call.
+   * @param {{args: T, deps?: Array<Function|string>}} options `args` should
+   *   match the args of `mainFn`, and can be any serializable value. `deps` are functions that must be
+   *   defined for `mainFn` to work.
+   * @return {Promise<void>}
+   */
+  async evaluateOnNewDocument(mainFn, options) {
+    const argsSerialized = _ExecutionContext.serializeArguments(options.args);
+    const depsSerialized = _ExecutionContext.serializeDeps(options.deps);
+    const expression = `(() => {
       ${_ExecutionContext._cachedNativesPreamble};
       ${depsSerialized};
       (${mainFn})(${argsSerialized});
     })()
     //# sourceURL=_lighthouse-eval.js`;
-        await this._session.sendCommand("Page.addScriptToEvaluateOnNewDocument", { source: expression });
-      }
-      /**
-       * Cache native functions/objects inside window so we are sure polyfills do not overwrite the
-       * native implementations when the page loads.
-       * @return {Promise<void>}
-       */
-      async cacheNativesOnNewDocument() {
-        await this.evaluateOnNewDocument(() => {
-          window.__nativePromise = window.Promise;
-          window.__nativeURL = window.URL;
-          window.__nativePerformance = window.performance;
-          window.__nativeFetch = window.fetch;
-          window.__ElementMatches = window.Element.prototype.matches;
-          window.__HTMLElementBoundingClientRect = window.HTMLElement.prototype.getBoundingClientRect;
-        }, { args: [] });
-      }
-      /**
-       * Prefix every script evaluation with a shadowing of common globals that tend to be ponyfilled
-       * incorrectly by many sites. This allows functions to still refer to `Promise` instead of
-       * Lighthouse-specific backups like `__nativePromise` (injected by `cacheNativesOnNewDocument` above).
-       */
-      static _cachedNativesPreamble = [
-        "const Promise = globalThis.__nativePromise || globalThis.Promise",
-        "const URL = globalThis.__nativeURL || globalThis.URL",
-        "const performance = globalThis.__nativePerformance || globalThis.performance",
-        "const fetch = globalThis.__nativeFetch || globalThis.fetch"
-      ].join(";\n");
-      /**
-       * Serializes an array of arguments for use in an `eval` string across the protocol.
-       * @param {unknown[]} args
-       * @return {string}
-       */
-      static serializeArguments(args) {
-        return args.map((arg) => arg === void 0 ? "undefined" : JSON.stringify(arg)).join(",");
-      }
-      /**
-       * Serializes an array of functions or strings.
-       *
-       * Also makes sure that an esbuild-bundled version of Lighthouse will
-       * continue to create working code to be executed within the browser.
-       * @param {Array<Function|string>=} deps
-       * @return {string}
-       */
-      static serializeDeps(deps17) {
-        deps17 = [pageFunctions.esbuildFunctionWrapperString, ...deps17 || []];
-        return deps17.map((dep) => {
-          if (typeof dep === "function") {
-            const output = dep.toString();
-            const runtimeName = pageFunctions.getRuntimeFunctionName(dep);
-            if (runtimeName !== dep.name) {
-              return `${output}; const ${dep.name} = ${runtimeName};`;
-            } else {
-              return output;
-            }
-          } else {
-            return dep;
-          }
-        }).join("\n");
-      }
-    };
+    await this._session.sendCommand("Page.addScriptToEvaluateOnNewDocument", { source: expression });
   }
-});
-
-// core/gather/session.js
-import EventEmitter3 from "events";
-var DEFAULT_PROTOCOL_TIMEOUT, PPTR_BUFFER, MAX_TIMEOUT, CrdpEventEmitter, ProtocolSession;
-var init_session = __esm({
-  "core/gather/session.js"() {
-    "use strict";
-    init_process_global();
-    init_lighthouse_logger();
-    init_lh_error();
-    /**
-     * @license
-     * Copyright 2020 Google LLC
-     * SPDX-License-Identifier: Apache-2.0
-     */
-    DEFAULT_PROTOCOL_TIMEOUT = 3e4;
-    PPTR_BUFFER = 50;
-    MAX_TIMEOUT = 2147483647 - PPTR_BUFFER;
-    CrdpEventEmitter = /** @type {CrdpEventMessageEmitter} */
-    EventEmitter3;
-    ProtocolSession = class extends CrdpEventEmitter {
-      static {
-        __name(this, "ProtocolSession");
-      }
-      /**
-       * @param {LH.Puppeteer.CDPSession} cdpSession
-       */
-      constructor(cdpSession) {
-        super();
-        this._cdpSession = cdpSession;
-        this._targetInfo = void 0;
-        this._nextProtocolTimeout = void 0;
-        this._handleProtocolEvent = this._handleProtocolEvent.bind(this);
-        this._cdpSession.on("*", this._handleProtocolEvent);
-        let rej = /* @__PURE__ */ __name((_) => {
-        }, "rej");
-        this._targetCrashedPromise = /** @type {Promise<never>} */
-        new Promise((_, theRej) => rej = theRej);
-        this.on("Inspector.targetCrashed", async () => {
-          lighthouse_logger_default.error("TargetManager", "Inspector.targetCrashed");
-          void this.dispose();
-          rej(new LighthouseError(LighthouseError.errors.TARGET_CRASHED));
-        });
-      }
-      id() {
-        return this._cdpSession.id();
-      }
-      /**
-       * Re-emit protocol events from the underlying CDPSession.
-       * @template {keyof LH.CrdpEvents} E
-       * @param {E} method
-       * @param {LH.CrdpEvents[E]} params
-       */
-      _handleProtocolEvent(method, ...params) {
-        this.emit(method, ...params);
-      }
-      /** @param {LH.Crdp.Target.TargetInfo} targetInfo */
-      setTargetInfo(targetInfo) {
-        this._targetInfo = targetInfo;
-      }
-      /**
-       * @return {boolean}
-       */
-      hasNextProtocolTimeout() {
-        return this._nextProtocolTimeout !== void 0;
-      }
-      /**
-       * @return {number}
-       */
-      getNextProtocolTimeout() {
-        return this._nextProtocolTimeout || DEFAULT_PROTOCOL_TIMEOUT;
-      }
-      /**
-       * @param {number} ms
-       */
-      setNextProtocolTimeout(ms) {
-        if (ms > MAX_TIMEOUT) ms = MAX_TIMEOUT;
-        this._nextProtocolTimeout = ms;
-      }
-      /**
-       * @template {keyof LH.CrdpCommands} C
-       * @param {C} method
-       * @param {LH.CrdpCommands[C]['paramsType']} params
-       * @return {Promise<LH.CrdpCommands[C]['returnType']>}
-       */
-      sendCommand(method, ...params) {
-        const timeoutMs = this.getNextProtocolTimeout();
-        this._nextProtocolTimeout = void 0;
-        let timeout;
-        const timeoutPromise = new Promise((resolve, reject) => {
-          timeout = setTimeout(reject, timeoutMs, new LighthouseError(LighthouseError.errors.PROTOCOL_TIMEOUT, {
-            protocolMethod: method
-          }));
-        });
-        const resultPromise = this._cdpSession.send(method, ...params, {
-          // Add 50ms to the Puppeteer timeout to ensure the Lighthouse timeout finishes first.
-          timeout: timeoutMs + PPTR_BUFFER
-        }).catch((error) => {
-          lighthouse_logger_default.formatProtocol("method <= browser ERR", { method }, "error");
-          throw LighthouseError.fromProtocolMessage(method, error);
-        });
-        const resultWithTimeoutPromise = Promise.race([resultPromise, timeoutPromise, this._targetCrashedPromise]);
-        return resultWithTimeoutPromise.finally(() => {
-          if (timeout) clearTimeout(timeout);
-        });
-      }
-      /**
-       * Send and if there's an error response, do not reject.
-       * @template {keyof LH.CrdpCommands} C
-       * @param {C} method
-       * @param {LH.CrdpCommands[C]['paramsType']} params
-       * @return {Promise<void>}
-       */
-      sendCommandAndIgnore(method, ...params) {
-        return this.sendCommand(method, ...params).catch((e) => lighthouse_logger_default.verbose("session", method, e.message)).then((_) => void 0);
-      }
-      /**
-       * Disposes of a session so that it can no longer talk to Chrome.
-       * @return {Promise<void>}
-       */
-      async dispose() {
-        this._cdpSession.off("*", this._handleProtocolEvent);
-        await this._cdpSession.detach().catch((e) => lighthouse_logger_default.verbose("session", "detach failed", e.message));
-      }
-      onCrashPromise() {
-        return this._targetCrashedPromise;
-      }
-    };
+  /**
+   * Cache native functions/objects inside window so we are sure polyfills do not overwrite the
+   * native implementations when the page loads.
+   * @return {Promise<void>}
+   */
+  async cacheNativesOnNewDocument() {
+    await this.evaluateOnNewDocument(() => {
+      window.__nativePromise = window.Promise;
+      window.__nativeURL = window.URL;
+      window.__nativePerformance = window.performance;
+      window.__nativeFetch = window.fetch;
+      window.__ElementMatches = window.Element.prototype.matches;
+      window.__HTMLElementBoundingClientRect = window.HTMLElement.prototype.getBoundingClientRect;
+    }, { args: [] });
   }
-});
+  /**
+   * Prefix every script evaluation with a shadowing of common globals that tend to be ponyfilled
+   * incorrectly by many sites. This allows functions to still refer to `Promise` instead of
+   * Lighthouse-specific backups like `__nativePromise` (injected by `cacheNativesOnNewDocument` above).
+   */
+  static _cachedNativesPreamble = [
+    "const Promise = globalThis.__nativePromise || globalThis.Promise",
+    "const URL = globalThis.__nativeURL || globalThis.URL",
+    "const performance = globalThis.__nativePerformance || globalThis.performance",
+    "const fetch = globalThis.__nativeFetch || globalThis.fetch"
+  ].join(";\n");
+  /**
+   * Serializes an array of arguments for use in an `eval` string across the protocol.
+   * @param {unknown[]} args
+   * @return {string}
+   */
+  static serializeArguments(args) {
+    return args.map((arg) => arg === void 0 ? "undefined" : JSON.stringify(arg)).join(",");
+  }
+  /**
+   * Serializes an array of functions or strings.
+   *
+   * Also makes sure that an esbuild-bundled version of Lighthouse will
+   * continue to create working code to be executed within the browser.
+   * @param {Array<Function|string>=} deps
+   * @return {string}
+   */
+  static serializeDeps(deps17) {
+    deps17 = [pageFunctions.esbuildFunctionWrapperString, ...deps17 || []];
+    return deps17.map((dep) => {
+      if (typeof dep === "function") {
+        const output = dep.toString();
+        const runtimeName = pageFunctions.getRuntimeFunctionName(dep);
+        if (runtimeName !== dep.name) {
+          return `${output}; const ${dep.name} = ${runtimeName};`;
+        } else {
+          return output;
+        }
+      } else {
+        return dep;
+      }
+    }).join("\n");
+  }
+};
 
 // core/gather/driver/target-manager.js
+init_process_global();
+init_lighthouse_logger();
 import EventEmitter4 from "events";
-var ProtocolEventEmitter, TargetManager;
-var init_target_manager = __esm({
-  "core/gather/driver/target-manager.js"() {
-    "use strict";
-    init_process_global();
-    init_lighthouse_logger();
-    init_session();
-    /**
-     * @license
-     * Copyright 2021 Google LLC
-     * SPDX-License-Identifier: Apache-2.0
-     */
-    ProtocolEventEmitter = /** @type {ProtocolEventMessageEmitter} */
-    EventEmitter4;
-    TargetManager = class extends ProtocolEventEmitter {
-      static {
-        __name(this, "TargetManager");
-      }
-      /** @param {LH.Puppeteer.CDPSession} cdpSession */
-      constructor(cdpSession) {
-        super();
-        this._enabled = false;
-        this._rootCdpSession = cdpSession;
-        this._mainFrameId = "";
-        this._targetIdToTargets = /* @__PURE__ */ new Map();
-        this._executionContextIdToDescriptions = /* @__PURE__ */ new Map();
-        this._onSessionAttached = this._onSessionAttached.bind(this);
-        this._onFrameNavigated = this._onFrameNavigated.bind(this);
-        this._onExecutionContextCreated = this._onExecutionContextCreated.bind(this);
-        this._onExecutionContextDestroyed = this._onExecutionContextDestroyed.bind(this);
-        this._onExecutionContextsCleared = this._onExecutionContextsCleared.bind(this);
-      }
-      /**
-       * @param {LH.Crdp.Page.FrameNavigatedEvent} frameNavigatedEvent
-       */
-      async _onFrameNavigated(frameNavigatedEvent) {
-        if (frameNavigatedEvent.frame.parentId) return;
-        if (!this._enabled) return;
-        try {
-          await this._rootCdpSession.send("Target.setAutoAttach", {
-            autoAttach: true,
-            flatten: true,
-            waitForDebuggerOnStart: true
-          });
-        } catch (err) {
-          if (this._enabled) throw err;
-        }
-      }
-      /**
-       * @param {string} sessionId
-       * @return {LH.Gatherer.ProtocolSession}
-       */
-      _findSession(sessionId) {
-        for (const { session, cdpSession } of this._targetIdToTargets.values()) {
-          if (cdpSession.id() === sessionId) return session;
-        }
-        throw new Error(`session ${sessionId} not found`);
-      }
-      /**
-       * @param {string} targetType
-       * @return {targetType is LH.Protocol.TargetType}
-       */
-      _isAcceptedTargetType(targetType) {
-        return targetType === "page" || targetType === "iframe" || targetType === "worker";
-      }
-      /**
-       * Returns the root session.
-       * @return {LH.Gatherer.ProtocolSession}
-       */
-      rootSession() {
-        const rootSessionId = this._rootCdpSession.id();
-        return this._findSession(rootSessionId);
-      }
-      mainFrameExecutionContexts() {
-        return [...this._executionContextIdToDescriptions.values()].filter((executionContext) => {
-          return executionContext.auxData.frameId === this._mainFrameId;
-        });
-      }
-      /**
-       * @param {LH.Puppeteer.CDPSession} cdpSession
-       */
-      async _onSessionAttached(cdpSession) {
-        const newSession = new ProtocolSession(cdpSession);
-        let targetType;
-        try {
-          const { targetInfo } = await newSession.sendCommand("Target.getTargetInfo");
-          targetType = targetInfo.type;
-          if (!this._isAcceptedTargetType(targetType)) return;
-          const targetId = targetInfo.targetId;
-          if (this._targetIdToTargets.has(targetId)) return;
-          newSession.setTargetInfo(targetInfo);
-          const targetName = targetInfo.url || targetInfo.targetId;
-          lighthouse_logger_default.verbose("target-manager", `target ${targetName} attached`);
-          const trueProtocolListener = this._getProtocolEventListener(targetType, newSession.id());
-          const protocolListener = trueProtocolListener;
-          cdpSession.on("*", protocolListener);
-          cdpSession.on("sessionattached", this._onSessionAttached);
-          const targetWithSession = {
-            target: targetInfo,
-            cdpSession,
-            session: newSession,
-            protocolListener
-          };
-          this._targetIdToTargets.set(targetId, targetWithSession);
-          await newSession.sendCommand("Network.enable");
-          await newSession.sendCommand("Target.setAutoAttach", {
-            autoAttach: true,
-            flatten: true,
-            waitForDebuggerOnStart: true
-          });
-        } catch (err) {
-          if (/Target closed/.test(err.message)) return;
-          if (/'Target.getTargetInfo' wasn't found/.test(err)) return;
-          if (targetType === "worker") {
-            lighthouse_logger_default.warn("target-manager", `Issue attaching to worker target: ${err}`);
-            return;
-          }
-          throw err;
-        } finally {
-          await newSession.sendCommandAndIgnore("Runtime.runIfWaitingForDebugger");
-        }
-      }
-      /**
-       * @param {LH.Crdp.Runtime.ExecutionContextCreatedEvent} event
-       */
-      _onExecutionContextCreated(event) {
-        if (event.context.name.match(/^__puppeteer_utility_world__/)) return;
-        if (event.context.name === "lighthouse_isolated_context") return;
-        this._executionContextIdToDescriptions.set(event.context.uniqueId, event.context);
-      }
-      /**
-       * @param {LH.Crdp.Runtime.ExecutionContextDestroyedEvent} event
-       */
-      _onExecutionContextDestroyed(event) {
-        this._executionContextIdToDescriptions.delete(event.executionContextUniqueId);
-      }
-      _onExecutionContextsCleared() {
-        this._executionContextIdToDescriptions.clear();
-      }
-      /**
-       * Returns a listener for all protocol events from session, and augments the
-       * event with the sessionId.
-       * @param {LH.Protocol.TargetType} targetType
-       * @param {string} sessionId
-       */
-      _getProtocolEventListener(targetType, sessionId) {
-        const onProtocolEvent = /* @__PURE__ */ __name((method, params) => {
-          const payload = (
-            /** @type {LH.Protocol.RawEventMessage} */
-            { method, params, targetType, sessionId }
-          );
-          this.emit("protocolevent", payload);
-        }, "onProtocolEvent");
-        return onProtocolEvent;
-      }
-      /**
-       * @return {Promise<void>}
-       */
-      async enable() {
-        if (this._enabled) return;
-        this._enabled = true;
-        this._targetIdToTargets = /* @__PURE__ */ new Map();
-        this._executionContextIdToDescriptions = /* @__PURE__ */ new Map();
-        this._rootCdpSession.on("Page.frameNavigated", this._onFrameNavigated);
-        this._rootCdpSession.on("Runtime.executionContextCreated", this._onExecutionContextCreated);
-        this._rootCdpSession.on("Runtime.executionContextDestroyed", this._onExecutionContextDestroyed);
-        this._rootCdpSession.on("Runtime.executionContextsCleared", this._onExecutionContextsCleared);
-        await this._rootCdpSession.send("Page.enable");
-        await this._rootCdpSession.send("Runtime.enable");
-        this._mainFrameId = (await this._rootCdpSession.send("Page.getFrameTree")).frameTree.frame.id;
-        await this._onSessionAttached(this._rootCdpSession);
-      }
-      /**
-       * @return {Promise<void>}
-       */
-      async disable() {
-        this._rootCdpSession.off("Page.frameNavigated", this._onFrameNavigated);
-        this._rootCdpSession.off("Runtime.executionContextCreated", this._onExecutionContextCreated);
-        this._rootCdpSession.off(
-          "Runtime.executionContextDestroyed",
-          this._onExecutionContextDestroyed
-        );
-        this._rootCdpSession.off("Runtime.executionContextsCleared", this._onExecutionContextsCleared);
-        for (const { cdpSession, protocolListener } of this._targetIdToTargets.values()) {
-          cdpSession.off("*", protocolListener);
-          cdpSession.off("sessionattached", this._onSessionAttached);
-        }
-        await this._rootCdpSession.send("Page.disable").catch((_) => {
-        });
-        await this._rootCdpSession.send("Runtime.disable").catch((_) => {
-        });
-        this._enabled = false;
-        this._targetIdToTargets = /* @__PURE__ */ new Map();
-        this._executionContextIdToDescriptions = /* @__PURE__ */ new Map();
-        this._mainFrameId = "";
-      }
-    };
+
+// core/gather/session.js
+init_process_global();
+init_lighthouse_logger();
+init_lh_error();
+import EventEmitter3 from "events";
+/**
+ * @license
+ * Copyright 2020 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+var DEFAULT_PROTOCOL_TIMEOUT = 3e4;
+var PPTR_BUFFER = 50;
+var MAX_TIMEOUT = 2147483647 - PPTR_BUFFER;
+var CrdpEventEmitter = (
+  /** @type {CrdpEventMessageEmitter} */
+  EventEmitter3
+);
+var ProtocolSession = class extends CrdpEventEmitter {
+  static {
+    __name(this, "ProtocolSession");
   }
-});
+  /**
+   * @param {LH.Puppeteer.CDPSession} cdpSession
+   */
+  constructor(cdpSession) {
+    super();
+    this._cdpSession = cdpSession;
+    this._targetInfo = void 0;
+    this._nextProtocolTimeout = void 0;
+    this._handleProtocolEvent = this._handleProtocolEvent.bind(this);
+    this._cdpSession.on("*", this._handleProtocolEvent);
+    let rej = /* @__PURE__ */ __name((_) => {
+    }, "rej");
+    this._targetCrashedPromise = /** @type {Promise<never>} */
+    new Promise((_, theRej) => rej = theRej);
+    this.on("Inspector.targetCrashed", async () => {
+      lighthouse_logger_default.error("TargetManager", "Inspector.targetCrashed");
+      void this.dispose();
+      rej(new LighthouseError(LighthouseError.errors.TARGET_CRASHED));
+    });
+  }
+  id() {
+    return this._cdpSession.id();
+  }
+  /**
+   * Re-emit protocol events from the underlying CDPSession.
+   * @template {keyof LH.CrdpEvents} E
+   * @param {E} method
+   * @param {LH.CrdpEvents[E]} params
+   */
+  _handleProtocolEvent(method, ...params) {
+    this.emit(method, ...params);
+  }
+  /** @param {LH.Crdp.Target.TargetInfo} targetInfo */
+  setTargetInfo(targetInfo) {
+    this._targetInfo = targetInfo;
+  }
+  /**
+   * @return {boolean}
+   */
+  hasNextProtocolTimeout() {
+    return this._nextProtocolTimeout !== void 0;
+  }
+  /**
+   * @return {number}
+   */
+  getNextProtocolTimeout() {
+    return this._nextProtocolTimeout || DEFAULT_PROTOCOL_TIMEOUT;
+  }
+  /**
+   * @param {number} ms
+   */
+  setNextProtocolTimeout(ms) {
+    if (ms > MAX_TIMEOUT) ms = MAX_TIMEOUT;
+    this._nextProtocolTimeout = ms;
+  }
+  /**
+   * @template {keyof LH.CrdpCommands} C
+   * @param {C} method
+   * @param {LH.CrdpCommands[C]['paramsType']} params
+   * @return {Promise<LH.CrdpCommands[C]['returnType']>}
+   */
+  sendCommand(method, ...params) {
+    const timeoutMs = this.getNextProtocolTimeout();
+    this._nextProtocolTimeout = void 0;
+    let timeout;
+    const timeoutPromise = new Promise((resolve, reject) => {
+      timeout = setTimeout(reject, timeoutMs, new LighthouseError(LighthouseError.errors.PROTOCOL_TIMEOUT, {
+        protocolMethod: method
+      }));
+    });
+    const resultPromise = this._cdpSession.send(method, ...params, {
+      // Add 50ms to the Puppeteer timeout to ensure the Lighthouse timeout finishes first.
+      timeout: timeoutMs + PPTR_BUFFER
+    }).catch((error) => {
+      lighthouse_logger_default.formatProtocol("method <= browser ERR", { method }, "error");
+      throw LighthouseError.fromProtocolMessage(method, error);
+    });
+    const resultWithTimeoutPromise = Promise.race([resultPromise, timeoutPromise, this._targetCrashedPromise]);
+    return resultWithTimeoutPromise.finally(() => {
+      if (timeout) clearTimeout(timeout);
+    });
+  }
+  /**
+   * Send and if there's an error response, do not reject.
+   * @template {keyof LH.CrdpCommands} C
+   * @param {C} method
+   * @param {LH.CrdpCommands[C]['paramsType']} params
+   * @return {Promise<void>}
+   */
+  sendCommandAndIgnore(method, ...params) {
+    return this.sendCommand(method, ...params).catch((e) => lighthouse_logger_default.verbose("session", method, e.message)).then((_) => void 0);
+  }
+  /**
+   * Disposes of a session so that it can no longer talk to Chrome.
+   * @return {Promise<void>}
+   */
+  async dispose() {
+    this._cdpSession.off("*", this._handleProtocolEvent);
+    await this._cdpSession.detach().catch((e) => lighthouse_logger_default.verbose("session", "detach failed", e.message));
+  }
+  onCrashPromise() {
+    return this._targetCrashedPromise;
+  }
+};
+
+// core/gather/driver/target-manager.js
+/**
+ * @license
+ * Copyright 2021 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+var ProtocolEventEmitter = (
+  /** @type {ProtocolEventMessageEmitter} */
+  EventEmitter4
+);
+var TargetManager = class extends ProtocolEventEmitter {
+  static {
+    __name(this, "TargetManager");
+  }
+  /** @param {LH.Puppeteer.CDPSession} cdpSession */
+  constructor(cdpSession) {
+    super();
+    this._enabled = false;
+    this._rootCdpSession = cdpSession;
+    this._mainFrameId = "";
+    this._targetIdToTargets = /* @__PURE__ */ new Map();
+    this._executionContextIdToDescriptions = /* @__PURE__ */ new Map();
+    this._onSessionAttached = this._onSessionAttached.bind(this);
+    this._onFrameNavigated = this._onFrameNavigated.bind(this);
+    this._onExecutionContextCreated = this._onExecutionContextCreated.bind(this);
+    this._onExecutionContextDestroyed = this._onExecutionContextDestroyed.bind(this);
+    this._onExecutionContextsCleared = this._onExecutionContextsCleared.bind(this);
+  }
+  /**
+   * @param {LH.Crdp.Page.FrameNavigatedEvent} frameNavigatedEvent
+   */
+  async _onFrameNavigated(frameNavigatedEvent) {
+    if (frameNavigatedEvent.frame.parentId) return;
+    if (!this._enabled) return;
+    try {
+      await this._rootCdpSession.send("Target.setAutoAttach", {
+        autoAttach: true,
+        flatten: true,
+        waitForDebuggerOnStart: true
+      });
+    } catch (err) {
+      if (this._enabled) throw err;
+    }
+  }
+  /**
+   * @param {string} sessionId
+   * @return {LH.Gatherer.ProtocolSession}
+   */
+  _findSession(sessionId) {
+    for (const { session, cdpSession } of this._targetIdToTargets.values()) {
+      if (cdpSession.id() === sessionId) return session;
+    }
+    throw new Error(`session ${sessionId} not found`);
+  }
+  /**
+   * @param {string} targetType
+   * @return {targetType is LH.Protocol.TargetType}
+   */
+  _isAcceptedTargetType(targetType) {
+    return targetType === "page" || targetType === "iframe" || targetType === "worker";
+  }
+  /**
+   * Returns the root session.
+   * @return {LH.Gatherer.ProtocolSession}
+   */
+  rootSession() {
+    const rootSessionId = this._rootCdpSession.id();
+    return this._findSession(rootSessionId);
+  }
+  mainFrameExecutionContexts() {
+    return [...this._executionContextIdToDescriptions.values()].filter((executionContext) => {
+      return executionContext.auxData.frameId === this._mainFrameId;
+    });
+  }
+  /**
+   * @param {LH.Puppeteer.CDPSession} cdpSession
+   */
+  async _onSessionAttached(cdpSession) {
+    const newSession = new ProtocolSession(cdpSession);
+    let targetType;
+    try {
+      const { targetInfo } = await newSession.sendCommand("Target.getTargetInfo");
+      targetType = targetInfo.type;
+      if (!this._isAcceptedTargetType(targetType)) return;
+      const targetId = targetInfo.targetId;
+      if (this._targetIdToTargets.has(targetId)) return;
+      newSession.setTargetInfo(targetInfo);
+      const targetName = targetInfo.url || targetInfo.targetId;
+      lighthouse_logger_default.verbose("target-manager", `target ${targetName} attached`);
+      const trueProtocolListener = this._getProtocolEventListener(targetType, newSession.id());
+      const protocolListener = trueProtocolListener;
+      cdpSession.on("*", protocolListener);
+      cdpSession.on("sessionattached", this._onSessionAttached);
+      const targetWithSession = {
+        target: targetInfo,
+        cdpSession,
+        session: newSession,
+        protocolListener
+      };
+      this._targetIdToTargets.set(targetId, targetWithSession);
+      await newSession.sendCommand("Network.enable");
+      await newSession.sendCommand("Target.setAutoAttach", {
+        autoAttach: true,
+        flatten: true,
+        waitForDebuggerOnStart: true
+      });
+    } catch (err) {
+      if (/Target closed/.test(err.message)) return;
+      if (/'Target.getTargetInfo' wasn't found/.test(err)) return;
+      if (targetType === "worker") {
+        lighthouse_logger_default.warn("target-manager", `Issue attaching to worker target: ${err}`);
+        return;
+      }
+      throw err;
+    } finally {
+      await newSession.sendCommandAndIgnore("Runtime.runIfWaitingForDebugger");
+    }
+  }
+  /**
+   * @param {LH.Crdp.Runtime.ExecutionContextCreatedEvent} event
+   */
+  _onExecutionContextCreated(event) {
+    if (event.context.name.match(/^__puppeteer_utility_world__/)) return;
+    if (event.context.name === "lighthouse_isolated_context") return;
+    this._executionContextIdToDescriptions.set(event.context.uniqueId, event.context);
+  }
+  /**
+   * @param {LH.Crdp.Runtime.ExecutionContextDestroyedEvent} event
+   */
+  _onExecutionContextDestroyed(event) {
+    this._executionContextIdToDescriptions.delete(event.executionContextUniqueId);
+  }
+  _onExecutionContextsCleared() {
+    this._executionContextIdToDescriptions.clear();
+  }
+  /**
+   * Returns a listener for all protocol events from session, and augments the
+   * event with the sessionId.
+   * @param {LH.Protocol.TargetType} targetType
+   * @param {string} sessionId
+   */
+  _getProtocolEventListener(targetType, sessionId) {
+    const onProtocolEvent = /* @__PURE__ */ __name((method, params) => {
+      const payload = (
+        /** @type {LH.Protocol.RawEventMessage} */
+        { method, params, targetType, sessionId }
+      );
+      this.emit("protocolevent", payload);
+    }, "onProtocolEvent");
+    return onProtocolEvent;
+  }
+  /**
+   * @return {Promise<void>}
+   */
+  async enable() {
+    if (this._enabled) return;
+    this._enabled = true;
+    this._targetIdToTargets = /* @__PURE__ */ new Map();
+    this._executionContextIdToDescriptions = /* @__PURE__ */ new Map();
+    this._rootCdpSession.on("Page.frameNavigated", this._onFrameNavigated);
+    this._rootCdpSession.on("Runtime.executionContextCreated", this._onExecutionContextCreated);
+    this._rootCdpSession.on("Runtime.executionContextDestroyed", this._onExecutionContextDestroyed);
+    this._rootCdpSession.on("Runtime.executionContextsCleared", this._onExecutionContextsCleared);
+    await this._rootCdpSession.send("Page.enable");
+    await this._rootCdpSession.send("Runtime.enable");
+    this._mainFrameId = (await this._rootCdpSession.send("Page.getFrameTree")).frameTree.frame.id;
+    await this._onSessionAttached(this._rootCdpSession);
+  }
+  /**
+   * @return {Promise<void>}
+   */
+  async disable() {
+    this._rootCdpSession.off("Page.frameNavigated", this._onFrameNavigated);
+    this._rootCdpSession.off("Runtime.executionContextCreated", this._onExecutionContextCreated);
+    this._rootCdpSession.off(
+      "Runtime.executionContextDestroyed",
+      this._onExecutionContextDestroyed
+    );
+    this._rootCdpSession.off("Runtime.executionContextsCleared", this._onExecutionContextsCleared);
+    for (const { cdpSession, protocolListener } of this._targetIdToTargets.values()) {
+      cdpSession.off("*", protocolListener);
+      cdpSession.off("sessionattached", this._onSessionAttached);
+    }
+    await this._rootCdpSession.send("Page.disable").catch((_) => {
+    });
+    await this._rootCdpSession.send("Runtime.disable").catch((_) => {
+    });
+    this._enabled = false;
+    this._targetIdToTargets = /* @__PURE__ */ new Map();
+    this._executionContextIdToDescriptions = /* @__PURE__ */ new Map();
+    this._mainFrameId = "";
+  }
+};
 
 // core/gather/fetcher.js
-var Fetcher;
-var init_fetcher = __esm({
-  "core/gather/fetcher.js"() {
-    "use strict";
-    init_process_global();
-    init_lh();
-    /**
-     * @license Copyright 2020 Google LLC
-     * SPDX-License-Identifier: Apache-2.0
-     */
-    Fetcher = class {
-      static {
-        __name(this, "Fetcher");
-      }
-      /**
-       * @param {LH.Gatherer.ProtocolSession} session
-       */
-      constructor(session) {
-        this.session = session;
-      }
-      /**
-       * Fetches any resource using the network directly.
-       *
-       * @param {string} url
-       * @param {{timeout: number}=} options timeout is in ms
-       * @return {Promise<FetchResponse>}
-       */
-      async fetchResource(url, options = { timeout: 2e3 }) {
-        if (global.isLightrider) {
-          return this._wrapWithTimeout(this._fetchWithFetchApi(url), options.timeout);
-        }
-        return this._fetchResourceOverProtocol(url, options);
-      }
-      /**
-       * @param {string} url
-       * @return {Promise<FetchResponse>}
-       */
-      async _fetchWithFetchApi(url) {
-        const response = await fetch(url);
-        let content = null;
-        try {
-          content = await response.text();
-        } catch {
-        }
-        return {
-          content,
-          status: response.status
-        };
-      }
-      /**
-       * @param {string} handle
-       * @param {{timeout: number}=} options,
-       * @return {Promise<string>}
-       */
-      async _readIOStream(handle, options = { timeout: 2e3 }) {
-        const startTime = Date.now();
-        let ioResponse;
-        let data31 = "";
-        while (!ioResponse || !ioResponse.eof) {
-          const elapsedTime = Date.now() - startTime;
-          if (elapsedTime > options.timeout) {
-            throw new Error("Waiting for the end of the IO stream exceeded the allotted time.");
-          }
-          ioResponse = await this.session.sendCommand("IO.read", { handle });
-          const responseData = ioResponse.base64Encoded ? Buffer.from(ioResponse.data, "base64").toString("utf-8") : ioResponse.data;
-          data31 = data31.concat(responseData);
-        }
-        return data31;
-      }
-      /**
-       * @param {string} url
-       * @return {Promise<{stream: LH.Crdp.IO.StreamHandle|null, status: number|null}>}
-       */
-      async _loadNetworkResource(url) {
-        const frameTreeResponse = await this.session.sendCommand("Page.getFrameTree");
-        const networkResponse = await this.session.sendCommand("Network.loadNetworkResource", {
-          frameId: frameTreeResponse.frameTree.frame.id,
-          url,
-          options: {
-            disableCache: true,
-            includeCredentials: true
-          }
-        });
-        return {
-          stream: networkResponse.resource.success ? networkResponse.resource.stream || null : null,
-          status: networkResponse.resource.httpStatusCode || null
-        };
-      }
-      /**
-       * @param {string} url
-       * @param {{timeout: number}} options timeout is in ms
-       * @return {Promise<FetchResponse>}
-       */
-      async _fetchResourceOverProtocol(url, options) {
-        const startTime = Date.now();
-        const response = await this._wrapWithTimeout(this._loadNetworkResource(url), options.timeout);
-        const isOk = response.status && response.status >= 200 && response.status <= 299;
-        if (!response.stream || !isOk) return { status: response.status, content: null };
-        const timeout = options.timeout - (Date.now() - startTime);
-        const content = await this._readIOStream(response.stream, { timeout });
-        return { status: response.status, content };
-      }
-      /**
-       * @template T
-       * @param {Promise<T>} promise
-       * @param {number} ms
-       */
-      async _wrapWithTimeout(promise, ms) {
-        let timeoutHandle;
-        const timeoutPromise = new Promise((_, reject) => {
-          timeoutHandle = setTimeout(reject, ms, new Error("Timed out fetching resource"));
-        });
-        const wrappedPromise = await Promise.race([promise, timeoutPromise]).finally(() => clearTimeout(timeoutHandle));
-        return wrappedPromise;
-      }
+init_process_global();
+init_lh();
+/**
+ * @license Copyright 2020 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+var Fetcher = class {
+  static {
+    __name(this, "Fetcher");
+  }
+  /**
+   * @param {LH.Gatherer.ProtocolSession} session
+   */
+  constructor(session) {
+    this.session = session;
+  }
+  /**
+   * Fetches any resource using the network directly.
+   *
+   * @param {string} url
+   * @param {{timeout: number}=} options timeout is in ms
+   * @return {Promise<FetchResponse>}
+   */
+  async fetchResource(url, options = { timeout: 2e3 }) {
+    if (global.isLightrider) {
+      return this._wrapWithTimeout(this._fetchWithFetchApi(url), options.timeout);
+    }
+    return this._fetchResourceOverProtocol(url, options);
+  }
+  /**
+   * @param {string} url
+   * @return {Promise<FetchResponse>}
+   */
+  async _fetchWithFetchApi(url) {
+    const response = await fetch(url);
+    let content = null;
+    try {
+      content = await response.text();
+    } catch {
+    }
+    return {
+      content,
+      status: response.status
     };
   }
-});
+  /**
+   * @param {string} handle
+   * @param {{timeout: number}=} options,
+   * @return {Promise<string>}
+   */
+  async _readIOStream(handle, options = { timeout: 2e3 }) {
+    const startTime = Date.now();
+    let ioResponse;
+    let data31 = "";
+    while (!ioResponse || !ioResponse.eof) {
+      const elapsedTime = Date.now() - startTime;
+      if (elapsedTime > options.timeout) {
+        throw new Error("Waiting for the end of the IO stream exceeded the allotted time.");
+      }
+      ioResponse = await this.session.sendCommand("IO.read", { handle });
+      const responseData = ioResponse.base64Encoded ? Buffer.from(ioResponse.data, "base64").toString("utf-8") : ioResponse.data;
+      data31 = data31.concat(responseData);
+    }
+    return data31;
+  }
+  /**
+   * @param {string} url
+   * @return {Promise<{stream: LH.Crdp.IO.StreamHandle|null, status: number|null}>}
+   */
+  async _loadNetworkResource(url) {
+    const frameTreeResponse = await this.session.sendCommand("Page.getFrameTree");
+    const networkResponse = await this.session.sendCommand("Network.loadNetworkResource", {
+      frameId: frameTreeResponse.frameTree.frame.id,
+      url,
+      options: {
+        disableCache: true,
+        includeCredentials: true
+      }
+    });
+    return {
+      stream: networkResponse.resource.success ? networkResponse.resource.stream || null : null,
+      status: networkResponse.resource.httpStatusCode || null
+    };
+  }
+  /**
+   * @param {string} url
+   * @param {{timeout: number}} options timeout is in ms
+   * @return {Promise<FetchResponse>}
+   */
+  async _fetchResourceOverProtocol(url, options) {
+    const startTime = Date.now();
+    const response = await this._wrapWithTimeout(this._loadNetworkResource(url), options.timeout);
+    const isOk = response.status && response.status >= 200 && response.status <= 299;
+    if (!response.stream || !isOk) return { status: response.status, content: null };
+    const timeout = options.timeout - (Date.now() - startTime);
+    const content = await this._readIOStream(response.stream, { timeout });
+    return { status: response.status, content };
+  }
+  /**
+   * @template T
+   * @param {Promise<T>} promise
+   * @param {number} ms
+   */
+  async _wrapWithTimeout(promise, ms) {
+    let timeoutHandle;
+    const timeoutPromise = new Promise((_, reject) => {
+      timeoutHandle = setTimeout(reject, ms, new Error("Timed out fetching resource"));
+    });
+    const wrappedPromise = await Promise.race([promise, timeoutPromise]).finally(() => clearTimeout(timeoutHandle));
+    return wrappedPromise;
+  }
+};
 
 // core/gather/driver/network-monitor.js
+init_process_global();
+init_lighthouse_logger();
+init_lh();
+init_network_recorder();
+init_network_request();
+init_url_utils();
 import { EventEmitter as EventEmitter5 } from "events";
-var NetworkMonitorEventEmitter, NetworkMonitor;
-var init_network_monitor = __esm({
-  "core/gather/driver/network-monitor.js"() {
-    "use strict";
-    init_process_global();
-    init_lighthouse_logger();
-    init_lh();
-    init_network_recorder();
-    init_network_request();
-    init_url_utils();
-    /**
-     * @license
-     * Copyright 2021 Google LLC
-     * SPDX-License-Identifier: Apache-2.0
-     */
-    NetworkMonitorEventEmitter = /** @type {NetworkMonitorEmitter} */
-    EventEmitter5;
-    NetworkMonitor = class extends NetworkMonitorEventEmitter {
-      static {
-        __name(this, "NetworkMonitor");
-      }
-      /** @type {NetworkRecorder|undefined} */
-      _networkRecorder = void 0;
-      /** @type {Array<LH.Crdp.Page.Frame>} */
-      _frameNavigations = [];
-      /** @param {LH.Gatherer.Driver['targetManager']} targetManager */
-      constructor(targetManager) {
-        super();
-        this._targetManager = targetManager;
-        this._session = targetManager.rootSession();
-        this._onFrameNavigated = (event) => this._frameNavigations.push(event.frame);
-        this._onProtocolMessage = (event) => {
-          if (!this._networkRecorder) return;
-          this._networkRecorder.dispatch(event);
-        };
-      }
-      /**
-       * @return {Promise<void>}
-       */
-      async enable() {
-        if (this._networkRecorder) return;
-        this._frameNavigations = [];
-        this._networkRecorder = new NetworkRecorder();
-        const reEmit = /* @__PURE__ */ __name((event) => (r) => {
-          this.emit(event, r);
-          this._emitNetworkStatus();
-        }, "reEmit");
-        this._networkRecorder.on("requeststarted", reEmit("requeststarted"));
-        this._networkRecorder.on("requestfinished", reEmit("requestfinished"));
-        this._session.on("Page.frameNavigated", this._onFrameNavigated);
-        this._targetManager.on("protocolevent", this._onProtocolMessage);
-      }
-      /**
-       * @return {Promise<void>}
-       */
-      async disable() {
-        if (!this._networkRecorder) return;
-        this._session.off("Page.frameNavigated", this._onFrameNavigated);
-        this._targetManager.off("protocolevent", this._onProtocolMessage);
-        this._frameNavigations = [];
-        this._networkRecorder = void 0;
-      }
-      /** @return {Promise<{requestedUrl?: string, mainDocumentUrl?: string}>} */
-      async getNavigationUrls() {
-        const frameNavigations = this._frameNavigations;
-        if (!frameNavigations.length) return {};
-        const mainFrameNavigations2 = frameNavigations.filter((frame) => !frame.parentId);
-        if (!mainFrameNavigations2.length) lighthouse_logger_default.warn("NetworkMonitor", "No detected navigations");
-        let requestedUrl = mainFrameNavigations2[0]?.url;
-        if (this._networkRecorder) {
-          const records = this._networkRecorder.getRawRecords();
-          let initialUrlRequest = records.find((record) => record.url === requestedUrl);
-          while (initialUrlRequest?.redirectSource) {
-            initialUrlRequest = initialUrlRequest.redirectSource;
-            requestedUrl = initialUrlRequest.url;
-          }
-        }
-        return {
-          requestedUrl,
-          mainDocumentUrl: mainFrameNavigations2[mainFrameNavigations2.length - 1]?.url
-        };
-      }
-      /**
-       * @return {Array<NetworkRequest>}
-       */
-      getInflightRequests() {
-        if (!this._networkRecorder) return [];
-        return this._networkRecorder.getRawRecords().filter((request) => !request.finished);
-      }
-      /**
-       * Returns whether the network is completely idle (i.e. there are 0 inflight network requests).
-       */
-      isIdle() {
-        return this._isIdlePeriod(0);
-      }
-      /**
-       * Returns whether any important resources for the page are in progress.
-       * Above-the-fold images and XHRs should be included.
-       * Tracking pixels, low priority images, and cross frame requests should be excluded.
-       * @return {boolean}
-       */
-      isCriticalIdle() {
-        if (!this._networkRecorder) return false;
-        const requests = this._networkRecorder.getRawRecords();
-        const rootFrameRequest = requests.find((r) => r.resourceType === "Document");
-        const rootFrameId = rootFrameRequest?.frameId;
-        return this._isIdlePeriod(
-          0,
-          // Return true if it should be a candidate for critical.
-          (request) => request.frameId === rootFrameId && // WebSocket and Server-sent Events are typically long-lived and shouldn't be considered critical.
-          request.resourceType !== "WebSocket" && request.resourceType !== "EventSource" && (request.priority === "VeryHigh" || request.priority === "High")
-        );
-      }
-      /**
-       * Returns whether the network is semi-idle (i.e. there are 2 or fewer inflight network requests).
-       */
-      is2Idle() {
-        return this._isIdlePeriod(2);
-      }
-      /**
-       * Returns whether the number of currently inflight requests is less than or
-       * equal to the number of allowed concurrent requests.
-       * @param {number} allowedRequests
-       * @param {(request: NetworkRequest) => boolean} [requestFilter]
-       * @return {boolean}
-       */
-      _isIdlePeriod(allowedRequests, requestFilter) {
-        if (!this._networkRecorder) return false;
-        const requests = this._networkRecorder.getRawRecords();
-        let inflightRequests = 0;
-        for (let i = 0; i < requests.length; i++) {
-          const request = requests[i];
-          if (request.finished) continue;
-          if (requestFilter?.(request) === false) continue;
-          if (NetworkRequest.isNonNetworkRequest(request)) continue;
-          inflightRequests++;
-        }
-        return inflightRequests <= allowedRequests;
-      }
-      /**
-       * Emits the appropriate network status event.
-       */
-      _emitNetworkStatus() {
-        const zeroQuiet = this.isIdle();
-        const twoQuiet = this.is2Idle();
-        const criticalQuiet = this.isCriticalIdle();
-        this.emit(zeroQuiet ? "networkidle" : "networkbusy");
-        this.emit(twoQuiet ? "network-2-idle" : "network-2-busy");
-        this.emit(criticalQuiet ? "network-critical-idle" : "network-critical-busy");
-        if (twoQuiet && zeroQuiet) lighthouse_logger_default.verbose("NetworkRecorder", "network fully-quiet");
-        else if (twoQuiet && !zeroQuiet) lighthouse_logger_default.verbose("NetworkRecorder", "network semi-quiet");
-        else lighthouse_logger_default.verbose("NetworkRecorder", "network busy");
-      }
-      /**
-       * Finds all time periods where the number of inflight requests is less than or equal to the
-       * number of allowed concurrent requests.
-       * The time periods returned are in ms.
-       * @param {Array<LH.Artifacts.NetworkRequest>} requests
-       * @param {number} allowedConcurrentRequests
-       * @param {number=} endTime In ms
-       * @return {Array<{start: number, end: number}>}
-       */
-      static findNetworkQuietPeriods(requests, allowedConcurrentRequests, endTime = Infinity) {
-        let timeBoundaries = [];
-        requests.forEach((request) => {
-          if (url_utils_default.isNonNetworkProtocol(request.protocol)) return;
-          if (request.protocol === "ws" || request.protocol === "wss") return;
-          timeBoundaries.push({ time: request.networkRequestTime, isStart: true });
-          if (request.finished) {
-            timeBoundaries.push({ time: request.networkEndTime, isStart: false });
-          }
-        });
-        timeBoundaries = timeBoundaries.filter((boundary) => boundary.time <= endTime).sort((a, b) => a.time - b.time);
-        let numInflightRequests = 0;
-        let quietPeriodStart = 0;
-        const quietPeriods = [];
-        timeBoundaries.forEach((boundary) => {
-          if (boundary.isStart) {
-            if (numInflightRequests === allowedConcurrentRequests) {
-              quietPeriods.push({ start: quietPeriodStart, end: boundary.time });
-            }
-            numInflightRequests++;
-          } else {
-            numInflightRequests--;
-            if (numInflightRequests === allowedConcurrentRequests) {
-              quietPeriodStart = boundary.time;
-            }
-          }
-        });
-        if (numInflightRequests <= allowedConcurrentRequests) {
-          quietPeriods.push({ start: quietPeriodStart, end: endTime });
-        }
-        return quietPeriods.filter((period) => period.start !== period.end);
-      }
+/**
+ * @license
+ * Copyright 2021 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+var NetworkMonitorEventEmitter = (
+  /** @type {NetworkMonitorEmitter} */
+  EventEmitter5
+);
+var NetworkMonitor = class extends NetworkMonitorEventEmitter {
+  static {
+    __name(this, "NetworkMonitor");
+  }
+  /** @type {NetworkRecorder|undefined} */
+  _networkRecorder = void 0;
+  /** @type {Array<LH.Crdp.Page.Frame>} */
+  _frameNavigations = [];
+  /** @param {LH.Gatherer.Driver['targetManager']} targetManager */
+  constructor(targetManager) {
+    super();
+    this._targetManager = targetManager;
+    this._session = targetManager.rootSession();
+    this._onFrameNavigated = (event) => this._frameNavigations.push(event.frame);
+    this._onProtocolMessage = (event) => {
+      if (!this._networkRecorder) return;
+      this._networkRecorder.dispatch(event);
     };
   }
-});
+  /**
+   * @return {Promise<void>}
+   */
+  async enable() {
+    if (this._networkRecorder) return;
+    this._frameNavigations = [];
+    this._networkRecorder = new NetworkRecorder();
+    const reEmit = /* @__PURE__ */ __name((event) => (r) => {
+      this.emit(event, r);
+      this._emitNetworkStatus();
+    }, "reEmit");
+    this._networkRecorder.on("requeststarted", reEmit("requeststarted"));
+    this._networkRecorder.on("requestfinished", reEmit("requestfinished"));
+    this._session.on("Page.frameNavigated", this._onFrameNavigated);
+    this._targetManager.on("protocolevent", this._onProtocolMessage);
+  }
+  /**
+   * @return {Promise<void>}
+   */
+  async disable() {
+    if (!this._networkRecorder) return;
+    this._session.off("Page.frameNavigated", this._onFrameNavigated);
+    this._targetManager.off("protocolevent", this._onProtocolMessage);
+    this._frameNavigations = [];
+    this._networkRecorder = void 0;
+  }
+  /** @return {Promise<{requestedUrl?: string, mainDocumentUrl?: string}>} */
+  async getNavigationUrls() {
+    const frameNavigations = this._frameNavigations;
+    if (!frameNavigations.length) return {};
+    const mainFrameNavigations2 = frameNavigations.filter((frame) => !frame.parentId);
+    if (!mainFrameNavigations2.length) lighthouse_logger_default.warn("NetworkMonitor", "No detected navigations");
+    let requestedUrl = mainFrameNavigations2[0]?.url;
+    if (this._networkRecorder) {
+      const records = this._networkRecorder.getRawRecords();
+      let initialUrlRequest = records.find((record) => record.url === requestedUrl);
+      while (initialUrlRequest?.redirectSource) {
+        initialUrlRequest = initialUrlRequest.redirectSource;
+        requestedUrl = initialUrlRequest.url;
+      }
+    }
+    return {
+      requestedUrl,
+      mainDocumentUrl: mainFrameNavigations2[mainFrameNavigations2.length - 1]?.url
+    };
+  }
+  /**
+   * @return {Array<NetworkRequest>}
+   */
+  getInflightRequests() {
+    if (!this._networkRecorder) return [];
+    return this._networkRecorder.getRawRecords().filter((request) => !request.finished);
+  }
+  /**
+   * Returns whether the network is completely idle (i.e. there are 0 inflight network requests).
+   */
+  isIdle() {
+    return this._isIdlePeriod(0);
+  }
+  /**
+   * Returns whether any important resources for the page are in progress.
+   * Above-the-fold images and XHRs should be included.
+   * Tracking pixels, low priority images, and cross frame requests should be excluded.
+   * @return {boolean}
+   */
+  isCriticalIdle() {
+    if (!this._networkRecorder) return false;
+    const requests = this._networkRecorder.getRawRecords();
+    const rootFrameRequest = requests.find((r) => r.resourceType === "Document");
+    const rootFrameId = rootFrameRequest?.frameId;
+    return this._isIdlePeriod(
+      0,
+      // Return true if it should be a candidate for critical.
+      (request) => request.frameId === rootFrameId && // WebSocket and Server-sent Events are typically long-lived and shouldn't be considered critical.
+      request.resourceType !== "WebSocket" && request.resourceType !== "EventSource" && (request.priority === "VeryHigh" || request.priority === "High")
+    );
+  }
+  /**
+   * Returns whether the network is semi-idle (i.e. there are 2 or fewer inflight network requests).
+   */
+  is2Idle() {
+    return this._isIdlePeriod(2);
+  }
+  /**
+   * Returns whether the number of currently inflight requests is less than or
+   * equal to the number of allowed concurrent requests.
+   * @param {number} allowedRequests
+   * @param {(request: NetworkRequest) => boolean} [requestFilter]
+   * @return {boolean}
+   */
+  _isIdlePeriod(allowedRequests, requestFilter) {
+    if (!this._networkRecorder) return false;
+    const requests = this._networkRecorder.getRawRecords();
+    let inflightRequests = 0;
+    for (let i = 0; i < requests.length; i++) {
+      const request = requests[i];
+      if (request.finished) continue;
+      if (requestFilter?.(request) === false) continue;
+      if (NetworkRequest.isNonNetworkRequest(request)) continue;
+      inflightRequests++;
+    }
+    return inflightRequests <= allowedRequests;
+  }
+  /**
+   * Emits the appropriate network status event.
+   */
+  _emitNetworkStatus() {
+    const zeroQuiet = this.isIdle();
+    const twoQuiet = this.is2Idle();
+    const criticalQuiet = this.isCriticalIdle();
+    this.emit(zeroQuiet ? "networkidle" : "networkbusy");
+    this.emit(twoQuiet ? "network-2-idle" : "network-2-busy");
+    this.emit(criticalQuiet ? "network-critical-idle" : "network-critical-busy");
+    if (twoQuiet && zeroQuiet) lighthouse_logger_default.verbose("NetworkRecorder", "network fully-quiet");
+    else if (twoQuiet && !zeroQuiet) lighthouse_logger_default.verbose("NetworkRecorder", "network semi-quiet");
+    else lighthouse_logger_default.verbose("NetworkRecorder", "network busy");
+  }
+  /**
+   * Finds all time periods where the number of inflight requests is less than or equal to the
+   * number of allowed concurrent requests.
+   * The time periods returned are in ms.
+   * @param {Array<LH.Artifacts.NetworkRequest>} requests
+   * @param {number} allowedConcurrentRequests
+   * @param {number=} endTime In ms
+   * @return {Array<{start: number, end: number}>}
+   */
+  static findNetworkQuietPeriods(requests, allowedConcurrentRequests, endTime = Infinity) {
+    let timeBoundaries = [];
+    requests.forEach((request) => {
+      if (url_utils_default.isNonNetworkProtocol(request.protocol)) return;
+      if (request.protocol === "ws" || request.protocol === "wss") return;
+      timeBoundaries.push({ time: request.networkRequestTime, isStart: true });
+      if (request.finished) {
+        timeBoundaries.push({ time: request.networkEndTime, isStart: false });
+      }
+    });
+    timeBoundaries = timeBoundaries.filter((boundary) => boundary.time <= endTime).sort((a, b) => a.time - b.time);
+    let numInflightRequests = 0;
+    let quietPeriodStart = 0;
+    const quietPeriods = [];
+    timeBoundaries.forEach((boundary) => {
+      if (boundary.isStart) {
+        if (numInflightRequests === allowedConcurrentRequests) {
+          quietPeriods.push({ start: quietPeriodStart, end: boundary.time });
+        }
+        numInflightRequests++;
+      } else {
+        numInflightRequests--;
+        if (numInflightRequests === allowedConcurrentRequests) {
+          quietPeriodStart = boundary.time;
+        }
+      }
+    });
+    if (numInflightRequests <= allowedConcurrentRequests) {
+      quietPeriods.push({ start: quietPeriodStart, end: endTime });
+    }
+    return quietPeriods.filter((period) => period.start !== period.end);
+  }
+};
 
 // core/gather/driver.js
-var throwNotConnectedFn, throwingSession, Driver;
-var init_driver = __esm({
-  "core/gather/driver.js"() {
-    "use strict";
-    init_process_global();
-    init_lighthouse_logger();
-    init_execution_context();
-    init_target_manager();
-    init_fetcher();
-    init_network_monitor();
-    /**
-     * @license
-     * Copyright 2020 Google LLC
-     * SPDX-License-Identifier: Apache-2.0
-     */
-    throwNotConnectedFn = /* @__PURE__ */ __name(() => {
-      throw new Error("Session not connected");
-    }, "throwNotConnectedFn");
-    throwingSession = {
-      setTargetInfo: throwNotConnectedFn,
-      hasNextProtocolTimeout: throwNotConnectedFn,
-      getNextProtocolTimeout: throwNotConnectedFn,
-      setNextProtocolTimeout: throwNotConnectedFn,
-      on: throwNotConnectedFn,
-      once: throwNotConnectedFn,
-      off: throwNotConnectedFn,
-      sendCommand: throwNotConnectedFn,
-      sendCommandAndIgnore: throwNotConnectedFn,
-      dispose: throwNotConnectedFn,
-      onCrashPromise: throwNotConnectedFn
-    };
-    Driver = class {
-      static {
-        __name(this, "Driver");
-      }
-      /**
-       * @param {LH.Puppeteer.Page} page
-       */
-      constructor(page) {
-        this._page = page;
-        this._targetManager = void 0;
-        this._networkMonitor = void 0;
-        this._executionContext = void 0;
-        this._fetcher = void 0;
-        this.defaultSession = throwingSession;
-      }
-      /** @return {LH.Gatherer.Driver['executionContext']} */
-      get executionContext() {
-        if (!this._executionContext) return throwNotConnectedFn();
-        return this._executionContext;
-      }
-      get fetcher() {
-        if (!this._fetcher) return throwNotConnectedFn();
-        return this._fetcher;
-      }
-      get targetManager() {
-        if (!this._targetManager) return throwNotConnectedFn();
-        return this._targetManager;
-      }
-      get networkMonitor() {
-        if (!this._networkMonitor) return throwNotConnectedFn();
-        return this._networkMonitor;
-      }
-      /** @return {Promise<string>} */
-      async url() {
-        return this._page.url();
-      }
-      /** @return {Promise<void>} */
-      async connect() {
-        if (this.defaultSession !== throwingSession) return;
-        const status = { msg: "Connecting to browser", id: "lh:driver:connect" };
-        lighthouse_logger_default.time(status);
-        const cdpSession = await this._page.target().createCDPSession();
-        this._targetManager = new TargetManager(cdpSession);
-        await this._targetManager.enable();
-        this._networkMonitor = new NetworkMonitor(this._targetManager);
-        await this._networkMonitor.enable();
-        this.defaultSession = this._targetManager.rootSession();
-        this._executionContext = new ExecutionContext(this.defaultSession);
-        this._fetcher = new Fetcher(this.defaultSession);
-        lighthouse_logger_default.timeEnd(status);
-      }
-      /** @return {Promise<void>} */
-      async disconnect() {
-        if (this.defaultSession === throwingSession) return;
-        await this._targetManager?.disable();
-        await this._networkMonitor?.disable();
-        await this.defaultSession.dispose();
-      }
-    };
+/**
+ * @license
+ * Copyright 2020 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+var throwNotConnectedFn = /* @__PURE__ */ __name(() => {
+  throw new Error("Session not connected");
+}, "throwNotConnectedFn");
+var throwingSession = {
+  setTargetInfo: throwNotConnectedFn,
+  hasNextProtocolTimeout: throwNotConnectedFn,
+  getNextProtocolTimeout: throwNotConnectedFn,
+  setNextProtocolTimeout: throwNotConnectedFn,
+  on: throwNotConnectedFn,
+  once: throwNotConnectedFn,
+  off: throwNotConnectedFn,
+  sendCommand: throwNotConnectedFn,
+  sendCommandAndIgnore: throwNotConnectedFn,
+  dispose: throwNotConnectedFn,
+  onCrashPromise: throwNotConnectedFn
+};
+var Driver = class {
+  static {
+    __name(this, "Driver");
   }
-});
+  /**
+   * @param {LH.Puppeteer.Page} page
+   */
+  constructor(page) {
+    this._page = page;
+    this._targetManager = void 0;
+    this._networkMonitor = void 0;
+    this._executionContext = void 0;
+    this._fetcher = void 0;
+    this.defaultSession = throwingSession;
+  }
+  /** @return {LH.Gatherer.Driver['executionContext']} */
+  get executionContext() {
+    if (!this._executionContext) return throwNotConnectedFn();
+    return this._executionContext;
+  }
+  get fetcher() {
+    if (!this._fetcher) return throwNotConnectedFn();
+    return this._fetcher;
+  }
+  get targetManager() {
+    if (!this._targetManager) return throwNotConnectedFn();
+    return this._targetManager;
+  }
+  get networkMonitor() {
+    if (!this._networkMonitor) return throwNotConnectedFn();
+    return this._networkMonitor;
+  }
+  /** @return {Promise<string>} */
+  async url() {
+    return this._page.url();
+  }
+  /** @return {Promise<void>} */
+  async connect() {
+    if (this.defaultSession !== throwingSession) return;
+    const status = { msg: "Connecting to browser", id: "lh:driver:connect" };
+    lighthouse_logger_default.time(status);
+    const cdpSession = await this._page.target().createCDPSession();
+    this._targetManager = new TargetManager(cdpSession);
+    await this._targetManager.enable();
+    this._networkMonitor = new NetworkMonitor(this._targetManager);
+    await this._networkMonitor.enable();
+    this.defaultSession = this._targetManager.rootSession();
+    this._executionContext = new ExecutionContext(this.defaultSession);
+    this._fetcher = new Fetcher(this.defaultSession);
+    lighthouse_logger_default.timeEnd(status);
+  }
+  /** @return {Promise<void>} */
+  async disconnect() {
+    if (this.defaultSession === throwingSession) return;
+    await this._targetManager?.disable();
+    await this._networkMonitor?.disable();
+    await this.defaultSession.dispose();
+  }
+};
 
 // core/gather/runner-helpers.js
+init_process_global();
+init_lighthouse_logger();
+/**
+ * @license
+ * Copyright 2021 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
 function createDependencyError(dependency, error) {
   const err = new Error(`Dependency "${dependency.id}" failed with exception: ${error.message}`);
   err.expected = true;
   return err;
 }
+__name(createDependencyError, "createDependencyError");
 function getEmptyArtifactState() {
   return {
     startInstrumentation: {},
@@ -53024,6 +52711,14 @@ function getEmptyArtifactState() {
     getArtifact: {}
   };
 }
+__name(getEmptyArtifactState, "getEmptyArtifactState");
+var phaseToPriorPhase = {
+  startInstrumentation: void 0,
+  startSensitiveInstrumentation: "startInstrumentation",
+  stopSensitiveInstrumentation: "startSensitiveInstrumentation",
+  stopInstrumentation: "stopSensitiveInstrumentation",
+  getArtifact: "stopInstrumentation"
+};
 async function collectPhaseArtifacts(options) {
   const {
     driver,
@@ -53079,6 +52774,7 @@ async function collectPhaseArtifacts(options) {
     artifactState[phase][artifactDefn.id] = artifactPromise;
   }
 }
+__name(collectPhaseArtifacts, "collectPhaseArtifacts");
 async function collectArtifactDependencies(artifact, artifactsById) {
   if (!artifact.dependencies) return (
     /** @type {Dependencies} */
@@ -53097,6 +52793,7 @@ async function collectArtifactDependencies(artifact, artifactsById) {
   );
   return Object.fromEntries(await Promise.all(dependencyPromises));
 }
+__name(collectArtifactDependencies, "collectArtifactDependencies");
 async function awaitArtifacts(artifactState) {
   const artifacts = {};
   for (const [id, promise] of Object.entries(artifactState.getArtifact)) {
@@ -53105,34 +52802,32 @@ async function awaitArtifacts(artifactState) {
   }
   return artifacts;
 }
-var phaseToPriorPhase;
-var init_runner_helpers = __esm({
-  "core/gather/runner-helpers.js"() {
-    "use strict";
-    init_process_global();
-    init_lighthouse_logger();
-    init_sentry();
-    /**
-     * @license
-     * Copyright 2021 Google LLC
-     * SPDX-License-Identifier: Apache-2.0
-     */
-    __name(createDependencyError, "createDependencyError");
-    __name(getEmptyArtifactState, "getEmptyArtifactState");
-    phaseToPriorPhase = {
-      startInstrumentation: void 0,
-      startSensitiveInstrumentation: "startInstrumentation",
-      stopSensitiveInstrumentation: "startSensitiveInstrumentation",
-      stopInstrumentation: "stopSensitiveInstrumentation",
-      getArtifact: "stopInstrumentation"
-    };
-    __name(collectPhaseArtifacts, "collectPhaseArtifacts");
-    __name(collectArtifactDependencies, "collectArtifactDependencies");
-    __name(awaitArtifacts, "awaitArtifacts");
-  }
-});
+__name(awaitArtifacts, "awaitArtifacts");
+
+// core/gather/base-artifacts.js
+init_process_global();
+init_lighthouse_logger();
+init_lodash();
 
 // core/gather/driver/environment.js
+init_process_global();
+init_lighthouse_logger();
+init_page_functions();
+init_i18n();
+/**
+ * @license
+ * Copyright 2021 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+var UIStrings119 = {
+  /**
+   * @description Warning that the host device where Lighthouse is running appears to have a slower
+   * CPU than the expected Lighthouse baseline.
+   */
+  warningSlowHostCpu: "The tested device appears to have a slower CPU than  Lighthouse expects. This can negatively affect your performance score. Learn more about [calibrating an appropriate CPU slowdown multiplier](https://github.com/GoogleChrome/lighthouse/blob/main/docs/throttling.md#cpu-throttling)."
+};
+var SLOW_CPU_BENCHMARK_INDEX_THRESHOLD = 1e3;
+var str_99 = createIcuMessageFn({ url: "core/gather/driver/environment.js" }.url, UIStrings119);
 async function getBrowserVersion(session) {
   const status = { msg: "Getting browser version", id: "lh:gather:getVersion" };
   lighthouse_logger_default.time(status, "verbose");
@@ -53142,6 +52837,7 @@ async function getBrowserVersion(session) {
   lighthouse_logger_default.timeEnd(status);
   return Object.assign(version, { milestone });
 }
+__name(getBrowserVersion, "getBrowserVersion");
 async function getBenchmarkIndex(executionContext) {
   const status = { msg: "Benchmarking machine", id: "lh:gather:getBenchmarkIndex" };
   lighthouse_logger_default.time(status);
@@ -53151,6 +52847,7 @@ async function getBenchmarkIndex(executionContext) {
   lighthouse_logger_default.timeEnd(status);
   return indexVal;
 }
+__name(getBenchmarkIndex, "getBenchmarkIndex");
 async function getDevicePixelRatio(executionContext) {
   const status = { msg: "Host device pixel ratio", id: "lh:gather:getDevicePixelRatio" };
   lighthouse_logger_default.time(status);
@@ -53160,6 +52857,7 @@ async function getDevicePixelRatio(executionContext) {
   lighthouse_logger_default.timeEnd(status);
   return indexVal;
 }
+__name(getDevicePixelRatio, "getDevicePixelRatio");
 function getSlowHostCpuWarning(context) {
   const { settings, baseArtifacts } = context;
   const { throttling: throttling3, throttlingMethod } = settings;
@@ -53171,43 +52869,20 @@ function getSlowHostCpuWarning(context) {
   if (baseArtifacts.BenchmarkIndex > SLOW_CPU_BENCHMARK_INDEX_THRESHOLD) return;
   return str_99(UIStrings119.warningSlowHostCpu);
 }
+__name(getSlowHostCpuWarning, "getSlowHostCpuWarning");
 function getEnvironmentWarnings(context) {
   return [
     getSlowHostCpuWarning(context)
   ].filter((s) => !!s);
 }
-var UIStrings119, SLOW_CPU_BENCHMARK_INDEX_THRESHOLD, str_99;
-var init_environment = __esm({
-  "core/gather/driver/environment.js"() {
-    "use strict";
-    init_process_global();
-    init_lighthouse_logger();
-    init_constants();
-    init_page_functions();
-    init_i18n();
-    /**
-     * @license
-     * Copyright 2021 Google LLC
-     * SPDX-License-Identifier: Apache-2.0
-     */
-    UIStrings119 = {
-      /**
-       * @description Warning that the host device where Lighthouse is running appears to have a slower
-       * CPU than the expected Lighthouse baseline.
-       */
-      warningSlowHostCpu: "The tested device appears to have a slower CPU than  Lighthouse expects. This can negatively affect your performance score. Learn more about [calibrating an appropriate CPU slowdown multiplier](https://github.com/GoogleChrome/lighthouse/blob/main/docs/throttling.md#cpu-throttling)."
-    };
-    SLOW_CPU_BENCHMARK_INDEX_THRESHOLD = 1e3;
-    str_99 = createIcuMessageFn({ url: "core/gather/driver/environment.js" }.url, UIStrings119);
-    __name(getBrowserVersion, "getBrowserVersion");
-    __name(getBenchmarkIndex, "getBenchmarkIndex");
-    __name(getDevicePixelRatio, "getDevicePixelRatio");
-    __name(getSlowHostCpuWarning, "getSlowHostCpuWarning");
-    __name(getEnvironmentWarnings, "getEnvironmentWarnings");
-  }
-});
+__name(getEnvironmentWarnings, "getEnvironmentWarnings");
 
 // core/gather/base-artifacts.js
+/**
+ * @license
+ * Copyright 2021 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
 async function getBaseArtifacts(resolvedConfig, driver, context) {
   const BenchmarkIndex = await getBenchmarkIndex(driver.executionContext);
   const { userAgent, product } = await getBrowserVersion(driver.defaultSession);
@@ -53232,6 +52907,7 @@ async function getBaseArtifacts(resolvedConfig, driver, context) {
     GatherContext: context
   };
 }
+__name(getBaseArtifacts, "getBaseArtifacts");
 function deduplicateWarnings(warnings) {
   const unique = [];
   for (const warning of warnings) {
@@ -53240,6 +52916,7 @@ function deduplicateWarnings(warnings) {
   }
   return unique;
 }
+__name(deduplicateWarnings, "deduplicateWarnings");
 function finalizeArtifacts(baseArtifacts, gathererArtifacts) {
   baseArtifacts.LighthouseRunWarnings.push(
     ...getEnvironmentWarnings({ settings: baseArtifacts.settings, baseArtifacts })
@@ -53256,25 +52933,14 @@ function finalizeArtifacts(baseArtifacts, gathererArtifacts) {
   if (!artifacts.URL.finalDisplayedUrl) throw new Error("Runner did not set finalDisplayedUrl");
   return artifacts;
 }
-var init_base_artifacts = __esm({
-  "core/gather/base-artifacts.js"() {
-    "use strict";
-    init_process_global();
-    init_lighthouse_logger();
-    init_lodash();
-    init_environment();
-    /**
-     * @license
-     * Copyright 2021 Google LLC
-     * SPDX-License-Identifier: Apache-2.0
-     */
-    __name(getBaseArtifacts, "getBaseArtifacts");
-    __name(deduplicateWarnings, "deduplicateWarnings");
-    __name(finalizeArtifacts, "finalizeArtifacts");
-  }
-});
+__name(finalizeArtifacts, "finalizeArtifacts");
 
 // core/gather/snapshot-runner.js
+/**
+ * @license
+ * Copyright 2020 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
 async function snapshotGather(page, options = {}) {
   const { flags = {}, config: config3 } = options;
   lighthouse_logger_default.setLevel(flags.logLevel || "error");
@@ -53309,26 +52975,40 @@ async function snapshotGather(page, options = {}) {
   const artifacts = await Runner.gather(gatherFn, runnerOptions);
   return { artifacts, runnerOptions };
 }
-var init_snapshot_runner = __esm({
-  "core/gather/snapshot-runner.js"() {
-    "use strict";
-    init_process_global();
-    init_lighthouse_logger();
-    init_driver();
-    init_runner();
-    init_runner_helpers();
-    init_config();
-    init_base_artifacts();
-    /**
-     * @license
-     * Copyright 2020 Google LLC
-     * SPDX-License-Identifier: Apache-2.0
-     */
-    __name(snapshotGather, "snapshotGather");
-  }
-});
+__name(snapshotGather, "snapshotGather");
+
+// core/gather/timespan-runner.js
+init_process_global();
+init_lighthouse_logger();
+
+// core/gather/driver/prepare.js
+init_process_global();
+init_lighthouse_logger();
 
 // core/gather/driver/storage.js
+init_process_global();
+init_lighthouse_logger();
+init_i18n();
+/**
+ * @license
+ * Copyright 2021 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+var UIStrings120 = {
+  /**
+   * @description A warning that previously-saved data may have affected the measured performance and instructions on how to avoid the problem. "locations" will be a list of possible types of data storage locations, e.g. "IndexedDB",  "Local Storage", or "Web SQL".
+   * @example {IndexedDB, Local Storage} locations
+   */
+  warningData: `{locationCount, plural,
+    =1 {There may be stored data affecting loading performance in this location: {locations}. Audit this page in an incognito window to prevent those resources from affecting your scores.}
+    other {There may be stored data affecting loading performance in these locations: {locations}. Audit this page in an incognito window to prevent those resources from affecting your scores.}
+  }`,
+  /** A warning that the data in the browser cache may have affected the measured performance because the operation to clear the browser cache timed out. */
+  warningCacheTimeout: "Clearing the browser cache timed out. Try auditing this page again and file a bug if the issue persists.",
+  /** A warning that the data on the page's origin may have affected the measured performance because the operation to clear the origin data timed out. */
+  warningOriginDataTimeout: "Clearing the origin data timed out. Try auditing this page again and file a bug if the issue persists."
+};
+var str_100 = createIcuMessageFn({ url: "core/gather/driver/storage.js" }.url, UIStrings120);
 async function clearDataForOrigin(session, url, clearStorageTypes) {
   const status = { msg: "Cleaning origin data", id: "lh:storage:clearDataForOrigin" };
   lighthouse_logger_default.time(status);
@@ -53356,6 +53036,7 @@ async function clearDataForOrigin(session, url, clearStorageTypes) {
   }
   return warnings;
 }
+__name(clearDataForOrigin, "clearDataForOrigin");
 async function getImportantStorageWarning(session, url) {
   const usageData = await session.sendCommand("Storage.getUsageAndQuota", {
     origin: url
@@ -53373,6 +53054,7 @@ async function getImportantStorageWarning(session, url) {
     });
   }
 }
+__name(getImportantStorageWarning, "getImportantStorageWarning");
 async function clearBrowserCaches(session) {
   const status = { msg: "Cleaning browser cache", id: "lh:storage:clearBrowserCaches" };
   lighthouse_logger_default.time(status);
@@ -53396,40 +53078,24 @@ async function clearBrowserCaches(session) {
   }
   return warnings;
 }
-var UIStrings120, str_100;
-var init_storage = __esm({
-  "core/gather/driver/storage.js"() {
-    "use strict";
-    init_process_global();
-    init_lighthouse_logger();
-    init_i18n();
-    /**
-     * @license
-     * Copyright 2021 Google LLC
-     * SPDX-License-Identifier: Apache-2.0
-     */
-    UIStrings120 = {
-      /**
-       * @description A warning that previously-saved data may have affected the measured performance and instructions on how to avoid the problem. "locations" will be a list of possible types of data storage locations, e.g. "IndexedDB",  "Local Storage", or "Web SQL".
-       * @example {IndexedDB, Local Storage} locations
-       */
-      warningData: `{locationCount, plural,
-    =1 {There may be stored data affecting loading performance in this location: {locations}. Audit this page in an incognito window to prevent those resources from affecting your scores.}
-    other {There may be stored data affecting loading performance in these locations: {locations}. Audit this page in an incognito window to prevent those resources from affecting your scores.}
-  }`,
-      /** A warning that the data in the browser cache may have affected the measured performance because the operation to clear the browser cache timed out. */
-      warningCacheTimeout: "Clearing the browser cache timed out. Try auditing this page again and file a bug if the issue persists.",
-      /** A warning that the data on the page's origin may have affected the measured performance because the operation to clear the origin data timed out. */
-      warningOriginDataTimeout: "Clearing the origin data timed out. Try auditing this page again and file a bug if the issue persists."
-    };
-    str_100 = createIcuMessageFn({ url: "core/gather/driver/storage.js" }.url, UIStrings120);
-    __name(clearDataForOrigin, "clearDataForOrigin");
-    __name(getImportantStorageWarning, "getImportantStorageWarning");
-    __name(clearBrowserCaches, "clearBrowserCaches");
-  }
-});
+__name(clearBrowserCaches, "clearBrowserCaches");
 
 // core/lib/emulation.js
+init_process_global();
+/**
+ * @license
+ * Copyright 2016 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+var NO_THROTTLING_METRICS = {
+  latency: 0,
+  downloadThroughput: 0,
+  uploadThroughput: 0,
+  offline: false
+};
+var NO_CPU_THROTTLE_METRICS = {
+  rate: 1
+};
 function parseUseragentIntoMetadata(fullVersion, formFactor) {
   const [version] = fullVersion.split(".", 1);
   const brands = [
@@ -53459,12 +53125,14 @@ function parseUseragentIntoMetadata(fullVersion, formFactor) {
     mobile
   };
 }
+__name(parseUseragentIntoMetadata, "parseUseragentIntoMetadata");
 async function matchHostUAVersion(session, userAgent) {
   const { milestone } = await getBrowserVersion(session);
   const tweakedUA = userAgent.replace(/(Chrome\/)[\d.]+/, `$1${milestone}.0.0.0`);
   const fullVersion = `${milestone}.0.0.0`;
   return { tweakedUA, fullVersion };
 }
+__name(matchHostUAVersion, "matchHostUAVersion");
 async function emulate(session, settings) {
   if (settings.emulatedUserAgent !== false) {
     const userAgent = (
@@ -53486,6 +53154,7 @@ async function emulate(session, settings) {
     });
   }
 }
+__name(emulate, "emulate");
 async function throttle(session, settings) {
   if (settings.throttlingMethod !== "devtools") return clearNetworkThrottling(session);
   await Promise.all([
@@ -53493,9 +53162,11 @@ async function throttle(session, settings) {
     enableCPUThrottling(session, settings.throttling)
   ]);
 }
+__name(throttle, "throttle");
 async function clearThrottling(session) {
   await Promise.all([clearNetworkThrottling(session), clearCPUThrottling(session)]);
 }
+__name(clearThrottling, "clearThrottling");
 function enableNetworkThrottling(session, throttlingSettings) {
   const conditions = {
     offline: false,
@@ -53507,49 +53178,28 @@ function enableNetworkThrottling(session, throttlingSettings) {
   conditions.uploadThroughput = Math.floor(conditions.uploadThroughput * 1024 / 8);
   return session.sendCommand("Network.emulateNetworkConditions", conditions);
 }
+__name(enableNetworkThrottling, "enableNetworkThrottling");
 function clearNetworkThrottling(session) {
   return session.sendCommandAndIgnore("Network.emulateNetworkConditions", NO_THROTTLING_METRICS);
 }
+__name(clearNetworkThrottling, "clearNetworkThrottling");
 function enableCPUThrottling(session, throttlingSettings) {
   const rate = throttlingSettings.cpuSlowdownMultiplier;
   return session.sendCommand("Emulation.setCPUThrottlingRate", { rate });
 }
+__name(enableCPUThrottling, "enableCPUThrottling");
 function clearCPUThrottling(session) {
   return session.sendCommandAndIgnore("Emulation.setCPUThrottlingRate", NO_CPU_THROTTLE_METRICS);
 }
-var NO_THROTTLING_METRICS, NO_CPU_THROTTLE_METRICS;
-var init_emulation = __esm({
-  "core/lib/emulation.js"() {
-    "use strict";
-    init_process_global();
-    init_environment();
-    /**
-     * @license
-     * Copyright 2016 Google LLC
-     * SPDX-License-Identifier: Apache-2.0
-     */
-    NO_THROTTLING_METRICS = {
-      latency: 0,
-      downloadThroughput: 0,
-      uploadThroughput: 0,
-      offline: false
-    };
-    NO_CPU_THROTTLE_METRICS = {
-      rate: 1
-    };
-    __name(parseUseragentIntoMetadata, "parseUseragentIntoMetadata");
-    __name(matchHostUAVersion, "matchHostUAVersion");
-    __name(emulate, "emulate");
-    __name(throttle, "throttle");
-    __name(clearThrottling, "clearThrottling");
-    __name(enableNetworkThrottling, "enableNetworkThrottling");
-    __name(clearNetworkThrottling, "clearNetworkThrottling");
-    __name(enableCPUThrottling, "enableCPUThrottling");
-    __name(clearCPUThrottling, "clearCPUThrottling");
-  }
-});
+__name(clearCPUThrottling, "clearCPUThrottling");
 
 // core/gather/driver/prepare.js
+init_page_functions();
+/**
+ * @license
+ * Copyright 2021 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
 async function enableAsyncStacks(session) {
   const enable = /* @__PURE__ */ __name(async () => {
     await session.sendCommand("Debugger.enable");
@@ -53574,11 +53224,13 @@ async function enableAsyncStacks(session) {
     session.off("Page.frameNavigated", onFrameNavigated);
   };
 }
+__name(enableAsyncStacks, "enableAsyncStacks");
 async function shimRequestIdleCallbackOnNewDocument(driver, settings) {
   await driver.executionContext.evaluateOnNewDocument(pageFunctions.wrapRequestIdleCallback, {
     args: [settings.throttling.cpuSlowdownMultiplier]
   });
 }
+__name(shimRequestIdleCallbackOnNewDocument, "shimRequestIdleCallbackOnNewDocument");
 async function dismissJavaScriptDialogs(session) {
   session.on("Page.javascriptDialogOpening", (data31) => {
     lighthouse_logger_default.warn("Driver", `${data31.type} dialog opened by the page automatically suppressed.`);
@@ -53589,6 +53241,7 @@ async function dismissJavaScriptDialogs(session) {
   });
   await session.sendCommand("Page.enable");
 }
+__name(dismissJavaScriptDialogs, "dismissJavaScriptDialogs");
 async function resetStorageForUrl(session, url, clearStorageTypes) {
   const warnings = [];
   const clearDataWarnings = await clearDataForOrigin(session, url, clearStorageTypes);
@@ -53599,6 +53252,7 @@ async function resetStorageForUrl(session, url, clearStorageTypes) {
   if (importantStorageWarning) warnings.push(importantStorageWarning);
   return { warnings };
 }
+__name(resetStorageForUrl, "resetStorageForUrl");
 async function prepareThrottlingAndNetwork(session, settings) {
   const status = { msg: "Preparing network conditions", id: `lh:gather:prepareThrottlingAndNetwork` };
   lighthouse_logger_default.time(status);
@@ -53609,15 +53263,18 @@ async function prepareThrottlingAndNetwork(session, settings) {
   if (headers) await session.sendCommand("Network.setExtraHTTPHeaders", { headers });
   lighthouse_logger_default.timeEnd(status);
 }
+__name(prepareThrottlingAndNetwork, "prepareThrottlingAndNetwork");
 async function prepareDeviceEmulation(driver, settings) {
   await driver.defaultSession.sendCommand("Network.enable");
   await emulate(driver.defaultSession, settings);
 }
+__name(prepareDeviceEmulation, "prepareDeviceEmulation");
 async function warmUpIntlSegmenter(driver) {
   await driver.executionContext.evaluate(pageFunctions.truncate, {
     args: ["aaa", 2]
   });
 }
+__name(warmUpIntlSegmenter, "warmUpIntlSegmenter");
 async function prepareTargetForNavigationMode(driver, settings, requestor) {
   const status = { msg: "Preparing target for navigation mode", id: "lh:prepare:navigationMode" };
   lighthouse_logger_default.time(status);
@@ -53643,62 +53300,44 @@ async function prepareTargetForNavigationMode(driver, settings, requestor) {
   lighthouse_logger_default.timeEnd(status);
   return { warnings };
 }
-var init_prepare = __esm({
-  "core/gather/driver/prepare.js"() {
-    "use strict";
-    init_process_global();
-    init_lighthouse_logger();
-    init_storage();
-    init_emulation();
-    init_page_functions();
-    /**
-     * @license
-     * Copyright 2021 Google LLC
-     * SPDX-License-Identifier: Apache-2.0
-     */
-    __name(enableAsyncStacks, "enableAsyncStacks");
-    __name(shimRequestIdleCallbackOnNewDocument, "shimRequestIdleCallbackOnNewDocument");
-    __name(dismissJavaScriptDialogs, "dismissJavaScriptDialogs");
-    __name(resetStorageForUrl, "resetStorageForUrl");
-    __name(prepareThrottlingAndNetwork, "prepareThrottlingAndNetwork");
-    __name(prepareDeviceEmulation, "prepareDeviceEmulation");
-    __name(warmUpIntlSegmenter, "warmUpIntlSegmenter");
-    __name(prepareTargetForNavigationMode, "prepareTargetForNavigationMode");
-  }
-});
+__name(prepareTargetForNavigationMode, "prepareTargetForNavigationMode");
 
 // core/gather/timespan-runner.js
-var UIStrings121, str_101;
-var init_timespan_runner = __esm({
-  "core/gather/timespan-runner.js"() {
-    "use strict";
-    init_process_global();
-    init_lighthouse_logger();
-    init_driver();
-    init_runner();
-    init_runner_helpers();
-    init_prepare();
-    init_config();
-    init_base_artifacts();
-    init_i18n();
-    /**
-     * @license
-     * Copyright 2021 Google LLC
-     * SPDX-License-Identifier: Apache-2.0
-     */
-    UIStrings121 = {
-      /** A warning that indicates page navigations should be audited using navigation mode, as opposed to timespan mode. "navigation mode" refers to a Lighthouse mode that analyzes a page navigation. "timespan mode" refers to a Lighthouse mode that analyzes user interactions over an arbitrary period of time. */
-      warningNavigationDetected: "A page navigation was detected during the run. Using timespan mode to audit page navigations is not recommended. Use navigation mode to audit page navigations for better third-party attribution and main thread detection."
-    };
-    str_101 = createIcuMessageFn({ url: "core/gather/timespan-runner.js" }.url, UIStrings121);
-  }
-});
+init_i18n();
+/**
+ * @license
+ * Copyright 2021 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+var UIStrings121 = {
+  /** A warning that indicates page navigations should be audited using navigation mode, as opposed to timespan mode. "navigation mode" refers to a Lighthouse mode that analyzes a page navigation. "timespan mode" refers to a Lighthouse mode that analyzes user interactions over an arbitrary period of time. */
+  warningNavigationDetected: "A page navigation was detected during the run. Using timespan mode to audit page navigations is not recommended. Use navigation mode to audit page navigations for better third-party attribution and main thread detection."
+};
+var str_101 = createIcuMessageFn({ url: "core/gather/timespan-runner.js" }.url, UIStrings121);
+
+// core/gather/navigation-runner.js
+init_process_global();
+init_lighthouse_logger();
+import puppeteer from "puppeteer-core";
+
+// core/gather/driver/navigation.js
+init_process_global();
+init_lighthouse_logger();
 
 // core/gather/driver/wait-for-condition.js
+init_process_global();
+init_lighthouse_logger();
+init_lh_error();
+/**
+ * @license
+ * Copyright 2020 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
 function waitForNothing() {
   return { promise: Promise.resolve(), cancel() {
   } };
 }
+__name(waitForNothing, "waitForNothing");
 function waitForFrameNavigated(session) {
   let cancel = /* @__PURE__ */ __name(() => {
     throw new Error("waitForFrameNavigated.cancel() called before it was defined");
@@ -53712,6 +53351,7 @@ function waitForFrameNavigated(session) {
   });
   return { promise, cancel };
 }
+__name(waitForFrameNavigated, "waitForFrameNavigated");
 function waitForFcp(session, pauseAfterFcpMs, maxWaitForFcpMs) {
   let cancel = /* @__PURE__ */ __name(() => {
     throw new Error("waitForFcp.cancel() called before it was defined");
@@ -53745,6 +53385,7 @@ function waitForFcp(session, pauseAfterFcpMs, maxWaitForFcpMs) {
     cancel
   };
 }
+__name(waitForFcp, "waitForFcp");
 function waitForNetworkIdle(session, networkMonitor, networkQuietOptions) {
   let hasDCLFired = false;
   let idleTimeout;
@@ -53813,6 +53454,7 @@ function waitForNetworkIdle(session, networkMonitor, networkQuietOptions) {
     cancel
   };
 }
+__name(waitForNetworkIdle, "waitForNetworkIdle");
 function waitForCPUIdle(session, waitForCPUQuiet) {
   if (!waitForCPUQuiet) {
     return {
@@ -53859,6 +53501,7 @@ function waitForCPUIdle(session, waitForCPUQuiet) {
     cancel
   };
 }
+__name(waitForCPUIdle, "waitForCPUIdle");
 function registerPerformanceObserverInPage() {
   if (window.____lastLongTask !== void 0) return;
   window.____lastLongTask = performance.now();
@@ -53873,6 +53516,7 @@ function registerPerformanceObserverInPage() {
   });
   observer.observe({ type: "longtask", buffered: true });
 }
+__name(registerPerformanceObserverInPage, "registerPerformanceObserverInPage");
 function checkTimeSinceLastLongTaskInPage() {
   return new Promise((resolve) => {
     const firstAttemptTs = performance.now();
@@ -53890,6 +53534,7 @@ function checkTimeSinceLastLongTaskInPage() {
     }, 150);
   });
 }
+__name(checkTimeSinceLastLongTaskInPage, "checkTimeSinceLastLongTaskInPage");
 function waitForLoadEvent(session, pauseAfterLoadMs) {
   let cancel = /* @__PURE__ */ __name(() => {
     throw new Error("waitForLoadEvent.cancel() called before it was defined");
@@ -53913,6 +53558,7 @@ function waitForLoadEvent(session, pauseAfterLoadMs) {
     cancel
   };
 }
+__name(waitForLoadEvent, "waitForLoadEvent");
 async function isPageHung(session) {
   try {
     session.setNextProtocolTimeout(1e3);
@@ -53926,6 +53572,8 @@ async function isPageHung(session) {
     return true;
   }
 }
+__name(isPageHung, "isPageHung");
+var DEFAULT_WAIT_FUNCTIONS = { waitForFcp, waitForLoadEvent, waitForCPUIdle, waitForNetworkIdle };
 async function waitForFullyLoaded(session, networkMonitor, options) {
   const {
     pauseAfterFcpMs,
@@ -54018,6 +53666,7 @@ async function waitForFullyLoaded(session, networkMonitor, options) {
   resolveOnCPUIdle.cancel();
   return cleanupFn();
 }
+__name(waitForFullyLoaded, "waitForFullyLoaded");
 function waitForUserToContinue(driver) {
   function createInPagePromise() {
     let resolve = /* @__PURE__ */ __name(() => {
@@ -54035,35 +53684,33 @@ function waitForUserToContinue(driver) {
   driver.defaultSession.setNextProtocolTimeout(Infinity);
   return driver.executionContext.evaluate(createInPagePromise, { args: [] });
 }
-var DEFAULT_WAIT_FUNCTIONS;
-var init_wait_for_condition = __esm({
-  "core/gather/driver/wait-for-condition.js"() {
-    "use strict";
-    init_process_global();
-    init_lighthouse_logger();
-    init_lh_error();
-    init_execution_context();
-    /**
-     * @license
-     * Copyright 2020 Google LLC
-     * SPDX-License-Identifier: Apache-2.0
-     */
-    __name(waitForNothing, "waitForNothing");
-    __name(waitForFrameNavigated, "waitForFrameNavigated");
-    __name(waitForFcp, "waitForFcp");
-    __name(waitForNetworkIdle, "waitForNetworkIdle");
-    __name(waitForCPUIdle, "waitForCPUIdle");
-    __name(registerPerformanceObserverInPage, "registerPerformanceObserverInPage");
-    __name(checkTimeSinceLastLongTaskInPage, "checkTimeSinceLastLongTaskInPage");
-    __name(waitForLoadEvent, "waitForLoadEvent");
-    __name(isPageHung, "isPageHung");
-    DEFAULT_WAIT_FUNCTIONS = { waitForFcp, waitForLoadEvent, waitForCPUIdle, waitForNetworkIdle };
-    __name(waitForFullyLoaded, "waitForFullyLoaded");
-    __name(waitForUserToContinue, "waitForUserToContinue");
-  }
-});
+__name(waitForUserToContinue, "waitForUserToContinue");
 
 // core/gather/driver/navigation.js
+init_i18n();
+init_url_utils();
+/**
+ * @license
+ * Copyright 2021 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+var UIStrings122 = {
+  /**
+   * @description Warning that the web page redirected during testing and that may have affected the load.
+   * @example {https://example.com/requested/page} requested
+   * @example {https://example.com/final/resolved/page} final
+   */
+  warningRedirected: `The page may not be loading as expected because your test URL ({requested}) was redirected to {final}. Try testing the second URL directly.`,
+  /**
+   * @description Warning that Lighthouse timed out while waiting for the page to load.
+   */
+  warningTimeout: "The page loaded too slowly to finish within the time limit. Results may be incomplete."
+};
+var str_102 = createIcuMessageFn({ url: "core/gather/driver/navigation.js" }.url, UIStrings122);
+var DEFAULT_PAUSE_AFTER_FCP = 0;
+var DEFAULT_PAUSE_AFTER_LOAD = 0;
+var DEFAULT_NETWORK_QUIET_THRESHOLD = 5e3;
+var DEFAULT_CPU_QUIET_THRESHOLD = 0;
 function resolveWaitForFullyLoadedOptions(options) {
   let { pauseAfterFcpMs, pauseAfterLoadMs, networkQuietThresholdMs, cpuQuietThresholdMs } = options;
   let maxWaitMs = options.maxWaitForLoad;
@@ -54086,6 +53733,7 @@ function resolveWaitForFullyLoadedOptions(options) {
     maxWaitForFcpMs: maxFCPMs
   };
 }
+__name(resolveWaitForFullyLoadedOptions, "resolveWaitForFullyLoadedOptions");
 async function gotoURL(driver, requestor, options) {
   const status = typeof requestor === "string" ? { msg: `Navigating to ${requestor}`, id: "lh:driver:navigate" } : { msg: "Navigating using a user defined function", id: "lh:driver:navigate" };
   lighthouse_logger_default.time(status);
@@ -54143,6 +53791,7 @@ async function gotoURL(driver, requestor, options) {
     warnings: getNavigationWarnings({ timedOut, mainDocumentUrl, requestedUrl })
   };
 }
+__name(gotoURL, "gotoURL");
 function getNavigationWarnings(navigation2) {
   const { requestedUrl, mainDocumentUrl } = navigation2;
   const warnings = [];
@@ -54155,45 +53804,39 @@ function getNavigationWarnings(navigation2) {
   }
   return warnings;
 }
-var UIStrings122, str_102, DEFAULT_PAUSE_AFTER_FCP, DEFAULT_PAUSE_AFTER_LOAD, DEFAULT_NETWORK_QUIET_THRESHOLD, DEFAULT_CPU_QUIET_THRESHOLD;
-var init_navigation = __esm({
-  "core/gather/driver/navigation.js"() {
-    "use strict";
-    init_process_global();
-    init_lighthouse_logger();
-    init_wait_for_condition();
-    init_constants();
-    init_i18n();
-    init_url_utils();
-    /**
-     * @license
-     * Copyright 2021 Google LLC
-     * SPDX-License-Identifier: Apache-2.0
-     */
-    UIStrings122 = {
-      /**
-       * @description Warning that the web page redirected during testing and that may have affected the load.
-       * @example {https://example.com/requested/page} requested
-       * @example {https://example.com/final/resolved/page} final
-       */
-      warningRedirected: `The page may not be loading as expected because your test URL ({requested}) was redirected to {final}. Try testing the second URL directly.`,
-      /**
-       * @description Warning that Lighthouse timed out while waiting for the page to load.
-       */
-      warningTimeout: "The page loaded too slowly to finish within the time limit. Results may be incomplete."
-    };
-    str_102 = createIcuMessageFn({ url: "core/gather/driver/navigation.js" }.url, UIStrings122);
-    DEFAULT_PAUSE_AFTER_FCP = 0;
-    DEFAULT_PAUSE_AFTER_LOAD = 0;
-    DEFAULT_NETWORK_QUIET_THRESHOLD = 5e3;
-    DEFAULT_CPU_QUIET_THRESHOLD = 0;
-    __name(resolveWaitForFullyLoadedOptions, "resolveWaitForFullyLoadedOptions");
-    __name(gotoURL, "gotoURL");
-    __name(getNavigationWarnings, "getNavigationWarnings");
-  }
-});
+__name(getNavigationWarnings, "getNavigationWarnings");
+
+// core/gather/navigation-runner.js
+init_format();
+init_lh_error();
+init_url_utils();
 
 // core/lib/navigation-error.js
+init_process_global();
+init_lantern2();
+init_lh_error();
+init_network_request();
+init_i18n();
+/**
+ * @license
+ * Copyright 2021 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+var UIStrings123 = {
+  /**
+   * Warning shown in report when the page under test is an XHTML document, which Lighthouse does not directly support
+   * so we display a warning.
+   */
+  warningXhtml: "The page MIME type is XHTML: Lighthouse does not explicitly support this document type",
+  /**
+   * @description Warning shown in report when the page under test returns an error code, which Lighthouse is not able to reliably load so we display a warning.
+   * @example {404} errorCode
+   */
+  warningStatusCode: "Lighthouse was unable to reliably load the page you requested. Make sure you are testing the correct URL and that the server is properly responding to all requests. (Status code: {errorCode})"
+};
+var str_103 = createIcuMessageFn({ url: "core/lib/navigation-error.js" }.url, UIStrings123);
+var HTML_MIME_TYPE = "text/html";
+var XHTML_MIME_TYPE = "application/xhtml+xml";
 function getNetworkError(mainRecord, context) {
   if (!mainRecord) {
     return new LighthouseError(LighthouseError.errors.NO_DOCUMENT_REQUEST);
@@ -54217,6 +53860,7 @@ function getNetworkError(mainRecord, context) {
     }
   }
 }
+__name(getNetworkError, "getNetworkError");
 function getInterstitialError(mainRecord, networkRecords) {
   if (!mainRecord) return void 0;
   const interstitialRequest = networkRecords.find(
@@ -54231,6 +53875,7 @@ function getInterstitialError(mainRecord, networkRecords) {
   }
   return new LighthouseError(LighthouseError.errors.CHROME_INTERSTITIAL_ERROR);
 }
+__name(getInterstitialError, "getInterstitialError");
 function getNonHtmlError(finalRecord) {
   if (!finalRecord) return void 0;
   if (!finalRecord.mimeType || finalRecord.statusCode === -1) return void 0;
@@ -54241,6 +53886,7 @@ function getNonHtmlError(finalRecord) {
   }
   return void 0;
 }
+__name(getNonHtmlError, "getNonHtmlError");
 function getPageLoadError(navigationError, context) {
   const { url, networkRecords } = context;
   let mainRecord = core_exports.NetworkAnalyzer.findResourceForUrl(networkRecords, url);
@@ -54271,44 +53917,19 @@ function getPageLoadError(navigationError, context) {
   if (nonHtmlError) return nonHtmlError;
   return navigationError;
 }
-var UIStrings123, str_103, HTML_MIME_TYPE, XHTML_MIME_TYPE;
-var init_navigation_error = __esm({
-  "core/lib/navigation-error.js"() {
-    "use strict";
-    init_process_global();
-    init_lantern2();
-    init_lh_error();
-    init_network_request();
-    init_i18n();
-    /**
-     * @license
-     * Copyright 2021 Google LLC
-     * SPDX-License-Identifier: Apache-2.0
-     */
-    UIStrings123 = {
-      /**
-       * Warning shown in report when the page under test is an XHTML document, which Lighthouse does not directly support
-       * so we display a warning.
-       */
-      warningXhtml: "The page MIME type is XHTML: Lighthouse does not explicitly support this document type",
-      /**
-       * @description Warning shown in report when the page under test returns an error code, which Lighthouse is not able to reliably load so we display a warning.
-       * @example {404} errorCode
-       */
-      warningStatusCode: "Lighthouse was unable to reliably load the page you requested. Make sure you are testing the correct URL and that the server is properly responding to all requests. (Status code: {errorCode})"
-    };
-    str_103 = createIcuMessageFn({ url: "core/lib/navigation-error.js" }.url, UIStrings123);
-    HTML_MIME_TYPE = "text/html";
-    XHTML_MIME_TYPE = "application/xhtml+xml";
-    __name(getNetworkError, "getNetworkError");
-    __name(getInterstitialError, "getInterstitialError");
-    __name(getNonHtmlError, "getNonHtmlError");
-    __name(getPageLoadError, "getPageLoadError");
-  }
-});
+__name(getPageLoadError, "getPageLoadError");
 
 // core/gather/navigation-runner.js
-import puppeteer from "puppeteer-core";
+init_trace();
+init_devtools_log();
+init_network_records();
+/**
+ * @license
+ * Copyright 2021 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+var DEFAULT_HOSTNAME = "127.0.0.1";
+var DEFAULT_PORT = 9222;
 async function _setup({ driver, resolvedConfig, requestor }) {
   await driver.connect();
   if (typeof requestor === "string" && !resolvedConfig.settings.skipAboutBlank) {
@@ -54321,9 +53942,11 @@ async function _setup({ driver, resolvedConfig, requestor }) {
   baseArtifacts.LighthouseRunWarnings.push(...warnings);
   return { baseArtifacts };
 }
+__name(_setup, "_setup");
 async function _cleanupNavigation({ driver }) {
   await clearThrottling(driver.defaultSession);
 }
+__name(_cleanupNavigation, "_cleanupNavigation");
 async function _navigate(navigationContext) {
   const { driver, resolvedConfig, requestor } = navigationContext;
   try {
@@ -54346,6 +53969,7 @@ async function _navigate(navigationContext) {
     };
   }
 }
+__name(_navigate, "_navigate");
 async function _collectDebugData(navigationContext, phaseState) {
   let devtoolsLog;
   let trace;
@@ -54360,6 +53984,7 @@ async function _collectDebugData(navigationContext, phaseState) {
   const records = devtoolsLog && await NetworkRecordsComputed.request(devtoolsLog, navigationContext);
   return { devtoolsLog, records, trace };
 }
+__name(_collectDebugData, "_collectDebugData");
 async function _computeNavigationResult(navigationContext, phaseState, navigateResult) {
   const { navigationError, requestedUrl, mainDocumentUrl } = navigateResult;
   const debugData = await _collectDebugData(navigationContext, phaseState);
@@ -54388,6 +54013,7 @@ async function _computeNavigationResult(navigationContext, phaseState, navigateR
     return await awaitArtifacts(phaseState.artifactState);
   }
 }
+__name(_computeNavigationResult, "_computeNavigationResult");
 async function _navigation(navigationContext) {
   if (!navigationContext.resolvedConfig.artifacts) {
     throw new Error("No artifacts were defined on the config");
@@ -54425,6 +54051,7 @@ async function _navigation(navigationContext) {
   await _cleanupNavigation(navigationContext);
   return _computeNavigationResult(navigationContext, phaseState, navigateResult);
 }
+__name(_navigation, "_navigation");
 async function _cleanup({ requestedUrl, driver, resolvedConfig, lhBrowser, lhPage }) {
   const didResetStorage = !resolvedConfig.settings.disableStorageReset && requestedUrl;
   if (didResetStorage) {
@@ -54438,6 +54065,7 @@ async function _cleanup({ requestedUrl, driver, resolvedConfig, lhBrowser, lhPag
   await lhPage?.close();
   await lhBrowser?.disconnect();
 }
+__name(_cleanup, "_cleanup");
 async function navigationGather(page, requestor, options = {}) {
   const { flags = {}, config: config3 } = options;
   lighthouse_logger_default.setLevel(flags.logLevel || "error");
@@ -54473,127 +54101,82 @@ async function navigationGather(page, requestor, options = {}) {
   const artifacts = await Runner.gather(gatherFn, runnerOptions);
   return { artifacts, runnerOptions };
 }
-var DEFAULT_HOSTNAME, DEFAULT_PORT;
-var init_navigation_runner = __esm({
-  "core/gather/navigation-runner.js"() {
-    "use strict";
-    init_process_global();
-    init_lighthouse_logger();
-    init_driver();
-    init_runner();
-    init_runner_helpers();
-    init_prepare();
-    init_navigation();
-    init_storage();
-    init_emulation();
-    init_config();
-    init_base_artifacts();
-    init_format();
-    init_lh_error();
-    init_url_utils();
-    init_navigation_error();
-    init_trace();
-    init_devtools_log();
-    init_network_records();
-    /**
-     * @license
-     * Copyright 2021 Google LLC
-     * SPDX-License-Identifier: Apache-2.0
-     */
-    DEFAULT_HOSTNAME = "127.0.0.1";
-    DEFAULT_PORT = 9222;
-    __name(_setup, "_setup");
-    __name(_cleanupNavigation, "_cleanupNavigation");
-    __name(_navigate, "_navigate");
-    __name(_collectDebugData, "_collectDebugData");
-    __name(_computeNavigationResult, "_computeNavigationResult");
-    __name(_navigation, "_navigation");
-    __name(_cleanup, "_cleanup");
-    __name(navigationGather, "navigationGather");
-  }
-});
+__name(navigationGather, "navigationGather");
 
 // core/user-flow.js
-var UIStrings124, str_104;
-var init_user_flow = __esm({
-  "core/user-flow.js"() {
-    "use strict";
-    init_process_global();
-    init_report_generator();
-    init_snapshot_runner();
-    init_timespan_runner();
-    init_navigation_runner();
-    init_runner();
-    init_config();
-    init_format();
-    init_config_helpers();
-    init_i18n();
-    init_lh();
-    /**
-     * @license
-     * Copyright 2021 Google LLC
-     * SPDX-License-Identifier: Apache-2.0
-     */
-    UIStrings124 = {
-      /**
-       * @description Default name for a user flow on the given url. "User flow" refers to the series of page navigations and user interactions being tested on the page. "url" is a trimmed version of a url that only includes the domain name.
-       * @example {example.com} url
-       */
-      defaultFlowName: "User flow ({url})",
-      /**
-       * @description Default name for a Lighthouse report that analyzes a page navigation. "url" is a trimmed version of a url that only includes the domain name and path.
-       * @example {example.com/page} url
-       */
-      defaultNavigationName: "Navigation report ({url})",
-      /**
-       * @description Default name for a Lighthouse report that analyzes user interactions over a period of time. "url" is a trimmed version of a url that only includes the domain name and path.
-       * @example {example.com/page} url
-       */
-      defaultTimespanName: "Timespan report ({url})",
-      /**
-       * @description Default name for a Lighthouse report that analyzes the page state at a point in time. "url" is a trimmed version of a url that only includes the domain name and path.
-       * @example {example.com/page} url
-       */
-      defaultSnapshotName: "Snapshot report ({url})"
-    };
-    str_104 = createIcuMessageFn({ url: "core/user-flow.js" }.url, UIStrings124);
-  }
-});
-
-// core/config/desktop-config.js
-var config2;
-var init_desktop_config = __esm({
-  "core/config/desktop-config.js"() {
-    "use strict";
-    init_process_global();
-    init_lh();
-    init_constants();
-    /**
-     * @license
-     * Copyright 2020 Google LLC
-     * SPDX-License-Identifier: Apache-2.0
-     */
-    config2 = {
-      extends: "lighthouse:default",
-      settings: {
-        formFactor: "desktop",
-        throttling: throttling2.desktopDense4G,
-        screenEmulation: screenEmulationMetrics.desktop,
-        emulatedUserAgent: userAgents.desktop
-      }
-    };
-  }
-});
+init_format();
+init_i18n();
+init_lh();
+/**
+ * @license
+ * Copyright 2021 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+var UIStrings124 = {
+  /**
+   * @description Default name for a user flow on the given url. "User flow" refers to the series of page navigations and user interactions being tested on the page. "url" is a trimmed version of a url that only includes the domain name.
+   * @example {example.com} url
+   */
+  defaultFlowName: "User flow ({url})",
+  /**
+   * @description Default name for a Lighthouse report that analyzes a page navigation. "url" is a trimmed version of a url that only includes the domain name and path.
+   * @example {example.com/page} url
+   */
+  defaultNavigationName: "Navigation report ({url})",
+  /**
+   * @description Default name for a Lighthouse report that analyzes user interactions over a period of time. "url" is a trimmed version of a url that only includes the domain name and path.
+   * @example {example.com/page} url
+   */
+  defaultTimespanName: "Timespan report ({url})",
+  /**
+   * @description Default name for a Lighthouse report that analyzes the page state at a point in time. "url" is a trimmed version of a url that only includes the domain name and path.
+   * @example {example.com/page} url
+   */
+  defaultSnapshotName: "Snapshot report ({url})"
+};
+var str_104 = createIcuMessageFn({ url: "core/user-flow.js" }.url, UIStrings124);
 
 // core/index.js
+init_lh();
+init_audit();
+init_base_gatherer();
+init_network_records();
+
+// core/config/desktop-config.js
+init_process_global();
+init_lh();
+/**
+ * @license
+ * Copyright 2020 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+var config2 = {
+  extends: "lighthouse:default",
+  settings: {
+    formFactor: "desktop",
+    throttling: throttling2.desktopDense4G,
+    screenEmulation: screenEmulationMetrics.desktop,
+    emulatedUserAgent: userAgents.desktop
+  }
+};
+
+// core/index.js
+init_lh();
+/**
+ * @license
+ * Copyright 2016 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
 async function navigation(page, requestor, options) {
   const gatherResult = await navigationGather(page, requestor, options);
   return Runner.audit(gatherResult.artifacts, gatherResult.runnerOptions);
 }
+__name(navigation, "navigation");
 async function snapshot(page, options) {
   const gatherResult = await snapshotGather(page, options);
   return Runner.audit(gatherResult.artifacts, gatherResult.runnerOptions);
 }
+__name(snapshot, "snapshot");
 function generateReport(result, format = "html") {
   const reportOutput = ReportGenerator.generateReport(result, format);
   if (Array.isArray(reportOutput)) {
@@ -54602,40 +54185,10 @@ function generateReport(result, format = "html") {
     return reportOutput;
   }
 }
-var traceCategories;
-var init_core2 = __esm({
-  "core/index.js"() {
-    "use strict";
-    init_process_global();
-    init_trace();
-    init_runner();
-    init_user_flow();
-    init_report_generator();
-    init_timespan_runner();
-    init_snapshot_runner();
-    init_navigation_runner();
-    init_lh();
-    init_audit();
-    init_base_gatherer();
-    init_network_records();
-    init_default_config();
-    init_desktop_config();
-    init_lh();
-    /**
-     * @license
-     * Copyright 2016 Google LLC
-     * SPDX-License-Identifier: Apache-2.0
-     */
-    __name(navigation, "navigation");
-    __name(snapshot, "snapshot");
-    __name(generateReport, "generateReport");
-    traceCategories = trace_default.getDefaultTraceCategories();
-  }
-});
+__name(generateReport, "generateReport");
+var traceCategories = trace_default.getDefaultTraceCategories();
 
 // clients/devtools-mcp/devtools-mcp-entry.js
-init_process_global();
-init_core2();
 /**
  * @license
  * Copyright 2026 Google LLC
