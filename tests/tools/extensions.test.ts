@@ -18,7 +18,6 @@ import {
   reloadExtension,
   triggerExtensionAction,
 } from '../../src/tools/extensions.js';
-import {listPages} from '../../src/tools/pages.js';
 import {extractExtensionId, withMcpContext} from '../utils.js';
 
 const EXTENSION_WITH_SW_PATH = path.join(
@@ -125,29 +124,18 @@ describe('extension', () => {
       assert.ok(reinstalled, 'Extension should be present after reload');
     });
   });
-  it('triggers an extension action', async t => {
+  it('triggers an extension action', async () => {
     await withMcpContext(
       async (response, context) => {
         const extensionId = await context.installExtension(
           EXTENSION_WITH_SW_PATH,
         );
 
-        const listPageDef = listPages({
-          categoryExtensions: true,
-        } as ParsedArguments);
-        await listPageDef.handler(
-          {params: {}, page: context.getSelectedMcpPage()},
-          response,
-          context,
+        const targetsBefore = context.browser.targets();
+        const pageTargetBefore = targetsBefore.find(
+          t => t.type() === 'page' && t.url().includes(extensionId),
         );
-        let result = await response.handle(listPageDef.name, context);
-        let textContent = result.content.find(c => c.type === 'text') as {
-          type: 'text';
-          text: string;
-        };
-        t.assert.snapshot?.(
-          textContent.text.replaceAll(extensionId, '<extension-id>'),
-        );
+        assert.ok(!pageTargetBefore, 'Page should not exist before action');
 
         await triggerExtensionAction.handler(
           {params: {id: extensionId}},
@@ -155,28 +143,10 @@ describe('extension', () => {
           context,
         );
 
-        const swTarget = await context.browser.waitForTarget(
-          t => t.type() === 'service_worker' && t.url().includes(extensionId),
+        const pageTargetAfter = await context.browser.waitForTarget(
+          t => t.type() === 'page' && t.url().includes(extensionId),
         );
-        const swUrl = swTarget.url();
-
-        response.resetResponseLineForTesting();
-        await listPageDef.handler(
-          {params: {}, page: context.getSelectedMcpPage()},
-          response,
-          context,
-        );
-        result = await response.handle(listPageDef.name, context);
-        textContent = result.content.find(c => c.type === 'text') as {
-          type: 'text';
-          text: string;
-        };
-        t.assert.snapshot?.(
-          textContent.text
-            .replaceAll(extensionId, '<extension-id>')
-            .replaceAll(swUrl, '<sw-url>')
-            .replaceAll(/localhost:\d+/g, 'localhost:<port>'),
-        );
+        assert.ok(pageTargetAfter, 'Page should exist after action');
       },
       {
         executablePath: process.env.CANARY_EXECUTABLE_PATH,
