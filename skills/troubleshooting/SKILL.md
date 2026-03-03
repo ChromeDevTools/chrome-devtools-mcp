@@ -12,6 +12,7 @@ You are acting as a troubleshooting wizard to help the user configure and fix th
 Identify the exact error message from the failed tool call or the MCP initialization logs. Look for common errors such as:
 
 - `Target closed`
+- "Tool not found" (check if they are using `--slim` which only enables navigation and screenshot tools).
 - `ProtocolError: Network.enable timed out` or `The socket connection was closed unexpectedly`
 - `Error [ERR_MODULE_NOT_FOUND]: Cannot find module`
 - Any sandboxing or host validation errors.
@@ -22,7 +23,7 @@ Read the contents of https://github.com/ChromeDevTools/chrome-devtools-mcp/blob/
 
 - Sandboxing restrictions (macOS Seatbelt, Linux containers).
 - WSL requirements.
-- `--autoConnect` handshakes, timeouts, and requirements.
+- `--autoConnect` handshakes, timeouts, and requirements (requires Chrome 144+).
 - Conflicts between `--autoConnect`/`--browser-url` and extension debugging.
 
 ### Step 3: Formulate a Configuration
@@ -33,6 +34,7 @@ Based on the exact error and the user's environment (OS, MCP client), formulate 
 - Remove `--enableCategoryExtensions` if using `--autoConnect`.
 - Enable remote debugging in Chrome (`chrome://inspect/#remote-debugging`) and accept the connection prompt.
 - Add `--logFile <absolute_path_to_log_file>` to capture debug logs for analysis.
+- Increase `startup_timeout_ms` (e.g. to 20000) if using Codex on Windows.
 
 _If you are unsure of the user's configuration, ask the user to provide their current MCP server JSON configuration._
 
