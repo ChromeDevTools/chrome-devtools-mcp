@@ -31,6 +31,13 @@ Your primary goal is to guide the user to ensure Chrome is running and properly 
 3. **Once the user confirms both steps, your only next action should be to call the `list_pages` tool.** This is the simplest and safest way to verify if the connection is now successful. Do not retry the original, more complex command yet.
 4. **If `list_pages` succeeds, the problem is resolved.** If it still fails with the same error, then you can proceed to the more advanced steps like suggesting `--browserUrl` or checking for sandboxing issues.
 
+#### Symptom: Server starts but creates a new empty profile
+
+If the server starts successfully but `list_pages` returns an empty list or creates a new profile instead of connecting to the existing Chrome instance, check for typos in the arguments.
+
+- **Check for flag typos:** For example, `--autoBronnect` instead of `--autoConnect`.
+- **Verify the configuration:** Ensure the arguments match the expected flags exactly.
+
 #### Other Common Errors
 
 Identify other error messages from the failed tool call or the MCP initialization logs:
