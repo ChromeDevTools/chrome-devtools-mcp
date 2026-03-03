@@ -11,8 +11,14 @@ import process from 'node:process';
 import yargs, {type Options, type PositionalOptions} from 'yargs';
 import {hideBin} from 'yargs/helpers';
 
-import {startDaemon, stopDaemon, sendCommand} from '../daemon/client.js';
+import {
+  startDaemon,
+  stopDaemon,
+  sendCommand,
+  handleResponse,
+} from '../daemon/client.js';
 import {isDaemonRunning} from '../daemon/utils.js';
+import type {CallToolResult} from '../third_party/index.js';
 import {VERSION} from '../version.js';
 
 import {commands} from './cliDefinitions.js';
@@ -24,6 +30,8 @@ if (argv.length === 0 || argv[0] === '--custom-help') {
   console.log(generateCustomHelp(VERSION, commands));
   process.exit(0);
 }
+
+const defaultArgs = ['--viaCli', '--experimentalStructuredContent'];
 
 const y = yargs(argv)
   .scriptName('chrome-devtools')
@@ -44,7 +52,7 @@ y.command(
     // Extract args after 'start'
     const startIndex = process.argv.indexOf('start');
     const args = startIndex !== -1 ? process.argv.slice(startIndex + 1) : [];
-    await startDaemon([...args, '--via-cli']);
+    await startDaemon([...args, ...defaultArgs]);
   },
 );
 
@@ -75,6 +83,10 @@ for (const [commandName, commandDef] of Object.entries(commands)) {
     commandStr,
     commandDef.description,
     y => {
+      y.option('format', {
+        choices: ['text', 'json'],
+        default: 'text',
+      });
       for (const [argName, opt] of Object.entries(args)) {
         const type =
           opt.type === 'integer' || opt.type === 'number'
@@ -115,7 +127,7 @@ for (const [commandName, commandDef] of Object.entries(commands)) {
     async argv => {
       try {
         if (!isDaemonRunning()) {
-          await startDaemon(['--via-cli']);
+          await startDaemon(defaultArgs);
         }
 
         const commandArgs: Record<string, unknown> = {};
@@ -132,7 +144,12 @@ for (const [commandName, commandDef] of Object.entries(commands)) {
         });
 
         if (response.success) {
-          console.log(response.result);
+          console.log(
+            handleResponse(
+              JSON.parse(response.result) as unknown as CallToolResult,
+              argv['format'] as 'json' | 'text',
+            ),
+          );
         } else {
           console.error('Error:', response.error);
           process.exit(1);

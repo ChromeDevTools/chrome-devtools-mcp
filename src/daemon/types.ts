@@ -16,6 +16,7 @@ export type DaemonMessage =
 
 export interface DaemonResponse {
   success: boolean;
-  result: unknown;
+  // Stringified CallToolResult.
+  result: string;
   error: unknown;
 }

@@ -9,6 +9,7 @@ import fs from 'node:fs';
 import net from 'node:net';
 
 import {logger} from '../logger.js';
+import type {CallToolResult} from '../third_party/index.js';
 import {PipeTransport} from '../third_party/index.js';
 
 import type {DaemonMessage, DaemonResponse} from './types.js';
@@ -123,4 +124,28 @@ export async function stopDaemon() {
   }
 
   await sendCommand({method: 'stop'});
+}
+
+export function handleResponse(
+  response: CallToolResult,
+  format: 'json' | 'text',
+): string {
+  if (response.isError) {
+    return JSON.stringify(response.content);
+  }
+  if (format === 'json') {
+    if (response.structuredContent) {
+      return JSON.stringify(response.structuredContent);
+    }
+    // Fall-through to text for backward compatibility.
+  }
+  const chunks = [];
+  for (const content of response.content) {
+    if (content.type === 'text') {
+      chunks.push(content.text);
+    } else {
+      throw new Error('Not supported response content type');
+    }
+  }
+  return format === 'text' ? chunks.join('') : JSON.stringify(chunks);
 }
