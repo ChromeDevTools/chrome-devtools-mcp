@@ -108,7 +108,3 @@ If you are using the `--autoConnect` flag and tools like `list_pages`, `new_page
 2. Remote debugging is enabled in Chrome via `chrome://inspect/#remote-debugging`.
 3. You have allowed the remote debugging connection prompt in the browser.
 4. There is no other MCP server or tool trying to connect to the same debugging port.
-
-### Conflicts with Extension Debugging
-
-Extension debugging is not supported when using `--browserUrl` (`--browser-url`) and `--autoConnect`. These options are mutually exclusive to the `--enableCategoryExtensions` (if applicable) or general extension debugging features. Attempting to use them together will result in connection failures or undefined behavior.
