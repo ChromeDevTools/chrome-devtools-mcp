@@ -104,7 +104,7 @@ Possible workarounds include:
 
 If you are using the `--autoConnect` flag and tools like `list_pages`, `new_page`, or `navigate_page` fail with a timeout (e.g., `ProtocolError: Network.enable timed out` or `The socket connection was closed unexpectedly`), this usually means the MCP server cannot handshake with the running Chrome instance correctly. Ensure:
 
-1. Chrome 144+ is running.
+1. Chrome 144+ is **already** running.
 2. Remote debugging is enabled in Chrome via `chrome://inspect/#remote-debugging`.
 3. You have allowed the remote debugging connection prompt in the browser.
 4. There is no other MCP server or tool trying to connect to the same debugging port.

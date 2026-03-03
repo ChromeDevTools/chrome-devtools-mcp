@@ -23,7 +23,7 @@ Read the contents of https://github.com/ChromeDevTools/chrome-devtools-mcp/blob/
 
 - Sandboxing restrictions (macOS Seatbelt, Linux containers).
 - WSL requirements.
-- `--autoConnect` handshakes, timeouts, and requirements (requires Chrome 144+).
+- `--autoConnect` handshakes, timeouts, and requirements (requires **running** Chrome 144+).
 - Conflicts between `--autoConnect`/`--browser-url` and extension debugging.
 
 ### Step 3: Formulate a Configuration
@@ -32,7 +32,7 @@ Based on the exact error and the user's environment (OS, MCP client), formulate 
 
 - Pass `--browser-url=http://127.0.0.1:9222` instead of `--autoConnect` (e.g. if they are in a sandboxed environment like Claude Desktop).
 - Remove `--enableCategoryExtensions` if using `--autoConnect`.
-- Enable remote debugging in Chrome (`chrome://inspect/#remote-debugging`) and accept the connection prompt.
+- Enable remote debugging in Chrome (`chrome://inspect/#remote-debugging`) and accept the connection prompt. **Ask the user to verify this is enabled if using `--autoConnect`.**
 - Add `--logFile <absolute_path_to_log_file>` to capture debug logs for analysis.
 - Increase `startup_timeout_ms` (e.g. to 20000) if using Codex on Windows.
 
