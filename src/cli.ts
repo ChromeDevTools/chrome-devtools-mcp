@@ -247,6 +247,12 @@ export const cliOptions = {
     describe:
       'Exposes a "slim" set of 3 tools covering navigation, script execution and screenshots only. Useful for basic browser tasks.',
   },
+  viaCli: {
+    type: 'boolean',
+    describe:
+      'Set by Chrome DevTools CLI if the MCP server is started via the CLI client (this arg exists for usage stats)',
+    hidden: true,
+  },
 } satisfies Record<string, YargsOptions>;
 
 export type ParsedArguments = ReturnType<typeof parseArguments>;
