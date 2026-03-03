@@ -18,7 +18,7 @@ Identify the exact error message from the failed tool call or the MCP initializa
 
 ### Step 2: Read Known Issues
 
-Use the `view_file` tool to read the contents of `docs/troubleshooting.md` in the project root to map the error to a known issue. Pay close attention to:
+Read the contents of https://github.com/ChromeDevTools/chrome-devtools-mcp/blob/main/docs/troubleshooting.md to map the error to a known issue. Pay close attention to:
 
 - Sandboxing restrictions (macOS Seatbelt, Linux containers).
 - WSL requirements.
@@ -37,14 +37,14 @@ _If you are unsure of the user's configuration, ask the user to provide their cu
 
 ### Step 4: Run Diagnostic Commands
 
-If the issue is still unclear, use the `run_command` tool to run diagnostic commands to test the server directly:
+If the issue is still unclear, run diagnostic commands to test the server directly:
 
 - `npx chrome-devtools-mcp@latest --help` (to verify the installation and Node.js environment)
 - Ask the user to run `DEBUG=* npx chrome-devtools-mcp@latest --log-file=/tmp/cdm-test.log` to capture verbose logs if they are attempting to run it from an IDE or different environment.
 
 ### Step 5: Check GitHub for Existing Issues
 
-If `docs/troubleshooting.md` does not cover the specific error, check if the `gh` (GitHub CLI) tool is available in the environment. If so, use the `run_command` tool to search the GitHub repository for similar issues:
+If https://github.com/ChromeDevTools/chrome-devtools-mcp/blob/main/docs/troubleshooting.md does not cover the specific error, check if the `gh` (GitHub CLI) tool is available in the environment. If so, search the GitHub repository for similar issues:
 `gh issue list --repo ChromeDevTools/chrome-devtools-mcp --search "<error snippet>" --state all`
 
 Alternatively, you can recommend that the user checks https://github.com/ChromeDevTools/chrome-devtools-mcp/issues and https://github.com/ChromeDevTools/chrome-devtools-mcp/discussions for help.
