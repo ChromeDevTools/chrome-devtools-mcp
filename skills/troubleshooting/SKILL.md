@@ -9,7 +9,7 @@ You are acting as a troubleshooting wizard to help the user configure and fix th
 
 ### Step 1: Read Configuration
 
-Ask the user to provide their MCP configuration file content (e.g. `claude_desktop_config.json`, `.vscode/launch.json` or `.mcp.json`).
+Ask the user to provide their MCP configuration file content (e.g. `.claude/settings.json`, `./gemini/settings.json`, or `.mcp.json`).
 
 Interpret the configuration to identify potential issues such as:
 
