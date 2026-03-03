@@ -8,11 +8,80 @@ import assert from 'node:assert';
 import {beforeEach, describe, it} from 'node:test';
 
 import {emulate} from '../../src/tools/emulation.js';
+import {
+  geolocationTransform,
+  viewportTransform,
+} from '../../src/tools/ToolDefinition.js';
 import {serverHooks} from '../server.js';
 import {html, withMcpContext} from '../utils.js';
 
 describe('emulation', () => {
   const server = serverHooks();
+
+  describe('transforms', () => {
+    describe('viewportTransform', () => {
+      it('returns undefined for undefined input', () => {
+        assert.strictEqual(viewportTransform(undefined), undefined);
+      });
+
+      it('parses basic dimensions', () => {
+        assert.deepStrictEqual(viewportTransform('800x600'), {
+          width: 800,
+          height: 600,
+          deviceScaleFactor: undefined,
+          isMobile: false,
+          isLandscape: false,
+          hasTouch: false,
+        });
+      });
+
+      it('parses dimensions with devicePixelRatio', () => {
+        assert.deepStrictEqual(viewportTransform('1024x768x2'), {
+          width: 1024,
+          height: 768,
+          deviceScaleFactor: 2,
+          isMobile: false,
+          isLandscape: false,
+          hasTouch: false,
+        });
+      });
+
+      it('parses mobile and touch tags', () => {
+        assert.deepStrictEqual(viewportTransform('375x667x2,mobile,touch'), {
+          width: 375,
+          height: 667,
+          deviceScaleFactor: 2,
+          isMobile: true,
+          hasTouch: true,
+          isLandscape: false,
+        });
+      });
+
+      it('parses landscape tag', () => {
+        assert.deepStrictEqual(viewportTransform('1024x768x1,landscape'), {
+          width: 1024,
+          height: 768,
+          deviceScaleFactor: 1,
+          isMobile: false,
+          hasTouch: false,
+          isLandscape: true,
+        });
+      });
+    });
+
+    describe('geolocationTransform', () => {
+      it('returns undefined for undefined input', () => {
+        assert.strictEqual(geolocationTransform(undefined), undefined);
+      });
+
+      it('parses latitude and longitude', () => {
+        assert.deepStrictEqual(geolocationTransform('48.137154x11.576124'), {
+          latitude: 48.137154,
+          longitude: 11.576124,
+        });
+      });
+    });
+  });
 
   describe('network', () => {
     it('emulates offline network conditions', async () => {
@@ -58,9 +127,7 @@ describe('emulation', () => {
       await withMcpContext(async (response, context) => {
         await emulate.handler(
           {
-            params: {
-              networkConditions: 'No emulation',
-            },
+            params: {},
             page: context.getSelectedMcpPage(),
           },
           response,
@@ -229,9 +296,7 @@ describe('emulation', () => {
         // Then clear it by setting geolocation to null
         await emulate.handler(
           {
-            params: {
-              geolocation: null,
-            },
+            params: {},
             page: context.getSelectedMcpPage(),
           },
           response,
@@ -347,9 +412,7 @@ describe('emulation', () => {
         // Then clear it by setting viewport to null
         await emulate.handler(
           {
-            params: {
-              viewport: null,
-            },
+            params: {},
             page: context.getSelectedMcpPage(),
           },
           response,
@@ -465,9 +528,7 @@ describe('emulation', () => {
 
         await emulate.handler(
           {
-            params: {
-              userAgent: null,
-            },
+            params: {},
             page: context.getSelectedMcpPage(),
           },
           response,

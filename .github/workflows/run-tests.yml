@@ -41,6 +41,12 @@ jobs:
         shell: bash
         run: npm ci
 
+      - name: Install Chrome Canary
+        shell: bash
+        run: |
+          CANARY_PATH=$(npx @puppeteer/browsers install chrome@canary --format "{{path}}")
+          echo "CANARY_EXECUTABLE_PATH=$CANARY_PATH" >> $GITHUB_ENV
+
       - name: Build
         run: npm run bundle
         env:

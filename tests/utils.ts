@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import assert from 'node:assert';
+
 import type {CallToolResult} from '@modelcontextprotocol/sdk/types.js';
 import logger from 'debug';
 import type {Browser} from 'puppeteer';
@@ -42,15 +44,29 @@ export function getImageContent(content: CallToolResult['content'][number]): {
   throw new Error(`Expected image content but got ${content.type}`);
 }
 
+export function extractExtensionId(response: McpResponse) {
+  const responseLine = response.responseLines[0];
+  assert.ok(responseLine, 'Response should not be empty');
+  const match = responseLine.match(/Extension installed\. Id: (.+)/);
+  const extensionId = match ? match[1] : null;
+  assert.ok(extensionId, 'Response should contain a valid key');
+  return extensionId;
+}
+
 const browsers = new Map<string, Browser>();
 let context: McpContext | undefined;
 
 export async function withBrowser(
   cb: (browser: Browser, page: Page) => Promise<void>,
-  options: {debug?: boolean; autoOpenDevTools?: boolean} = {},
+  options: {
+    debug?: boolean;
+    autoOpenDevTools?: boolean;
+    executablePath?: string;
+  } = {},
 ) {
   const launchOptions: LaunchOptions = {
-    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH,
+    executablePath:
+      options.executablePath ?? process.env.PUPPETEER_EXECUTABLE_PATH,
     headless: !options.debug,
     defaultViewport: null,
     devtools: options.autoOpenDevTools ?? false,
@@ -85,6 +101,7 @@ export async function withMcpContext(
     debug?: boolean;
     autoOpenDevTools?: boolean;
     performanceCrux?: boolean;
+    executablePath?: string;
   } = {},
   args: ParsedArguments = {} as ParsedArguments,
 ) {

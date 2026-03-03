@@ -12,9 +12,7 @@ import type {ParsedArguments} from '../../src/cli.js';
 import {installExtension} from '../../src/tools/extensions.js';
 import {evaluateScript} from '../../src/tools/script.js';
 import {serverHooks} from '../server.js';
-import {html, withMcpContext} from '../utils.js';
-
-import {extractId} from './extensions.test.js';
+import {extractExtensionId, html, withMcpContext} from '../utils.js';
 
 const EXTENSION_PATH = path.join(
   import.meta.dirname,
@@ -137,7 +135,7 @@ describe('script', () => {
               function: String(async (el: Element) => {
                 return el.id;
               }),
-              args: [{uid: '1_1'}],
+              args: ['1_1'],
             },
           },
           response,
@@ -162,7 +160,7 @@ describe('script', () => {
               function: String((container: Element, child: Element) => {
                 return container.contains(child);
               }),
-              args: [{uid: '1_0'}, {uid: '1_1'}],
+              args: ['1_0', '1_1'],
             },
           },
           response,
@@ -190,7 +188,7 @@ describe('script', () => {
               function: String((element: Element) => {
                 return element.textContent;
               }),
-              args: [{uid: '1_3'}],
+              args: ['1_3'],
             },
           },
           response,
@@ -209,7 +207,7 @@ describe('script', () => {
             context,
           );
 
-          const extensionId = extractId(response);
+          const extensionId = extractExtensionId(response);
           const swTarget = await context.browser.waitForTarget(
             t => t.type() === 'service_worker' && t.url().includes(extensionId),
           );
@@ -286,7 +284,7 @@ describe('script', () => {
                 params: {
                   function: String(() => 'test'),
                   serviceWorkerId: 'example_service_worker',
-                  args: [{uid: '1_1'}],
+                  args: ['1_1'],
                 },
               },
               response,

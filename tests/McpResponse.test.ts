@@ -302,7 +302,7 @@ describe('McpResponse', () => {
         'test',
         context,
       );
-      await context.emulate({networkConditions: null});
+      await context.emulate({});
       assert.equal(content[0].type, 'text');
       assert.strictEqual(getTextContent(content[0]), `# test response`);
       t.assert.snapshot?.(

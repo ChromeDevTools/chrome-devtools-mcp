@@ -595,7 +595,7 @@ Call ${handleDialog.name} to handle it before continuing.`);
     }
 
     if (this.#includeExtensionServiceWorkers) {
-      if (!context.getExtensionServiceWorkers().length) {
+      if (context.getExtensionServiceWorkers().length) {
         response.push(`## Extension Service Workers`);
       }
 
