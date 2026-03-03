@@ -12,6 +12,7 @@ You are acting as a troubleshooting wizard to help the user configure and fix th
 Ask the user to provide their MCP configuration file content (e.g. `claude_desktop_config.json`, `.vscode/launch.json` or `.mcp.json`).
 
 Interpret the configuration to identify potential issues such as:
+
 - Incorrect arguments or flags.
 - Missing environment variables.
 - Usage of `--autoConnect` in incompatible environments.
