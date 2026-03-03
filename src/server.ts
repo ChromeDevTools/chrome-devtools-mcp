@@ -256,3 +256,5 @@ export async function createMcpServer(
 
   return {server, clearcutLogger};
 }
+
+export const START_INDICATOR = 'Server started.';

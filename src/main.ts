@@ -10,7 +10,7 @@ import process from 'node:process';
 
 import {cliOptions, parseArguments} from './cli.js';
 import {logger, saveLogsToFile} from './logger.js';
-import {createMcpServer} from './server.js';
+import {createMcpServer, START_INDICATOR} from './server.js';
 import {computeFlagUsage} from './telemetry/flagUtils.js';
 import {StdioServerTransport} from './third_party/index.js';
 import {VERSION} from './version.js';
@@ -56,6 +56,8 @@ Google collects usage statistics to improve Chrome DevTools MCP. To opt-out, run
 For more details, visit: https://github.com/ChromeDevTools/chrome-devtools-mcp#usage-statistics`,
     );
   }
+
+  console.error(START_INDICATOR);
 };
 
 const {server, clearcutLogger} = await createMcpServer(args, {
