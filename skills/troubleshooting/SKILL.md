@@ -32,6 +32,7 @@ Based on the exact error and the user's environment (OS, MCP client), formulate 
 - Pass `--browser-url=http://127.0.0.1:9222` instead of `--autoConnect` (e.g. if they are in a sandboxed environment like Claude Desktop).
 - Remove `--enableCategoryExtensions` if using `--autoConnect`.
 - Enable remote debugging in Chrome (`chrome://inspect/#remote-debugging`) and accept the connection prompt.
+- Add `--logFile <absolute_path_to_log_file>` to capture debug logs for analysis.
 
 _If you are unsure of the user's configuration, ask the user to provide their current MCP server JSON configuration._
 
@@ -40,7 +41,7 @@ _If you are unsure of the user's configuration, ask the user to provide their cu
 If the issue is still unclear, run diagnostic commands to test the server directly:
 
 - `npx chrome-devtools-mcp@latest --help` (to verify the installation and Node.js environment)
-- Ask the user to run `DEBUG=* npx chrome-devtools-mcp@latest --log-file=/tmp/cdm-test.log` to capture verbose logs if they are attempting to run it from an IDE or different environment.
+- Ask the user to run `DEBUG=* npx chrome-devtools-mcp@latest --logFile=/tmp/cdm-test.log` to capture verbose logs if they are attempting to run it from an IDE or different environment.
 
 ### Step 5: Check GitHub for Existing Issues
 
