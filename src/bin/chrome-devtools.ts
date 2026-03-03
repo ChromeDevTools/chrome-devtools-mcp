@@ -24,14 +24,6 @@ import type {CallToolResult} from '../third_party/index.js';
 import {VERSION} from '../version.js';
 
 import {commands} from './cliDefinitions.js';
-import {generateCustomHelp} from './customHelp.js';
-
-const argv = hideBin(process.argv);
-
-if (argv.length === 0 || argv[0] === '--custom-help') {
-  console.log(generateCustomHelp(VERSION, commands));
-  process.exit(0);
-}
 
 async function start(args: string[]) {
   const combinedArgs = [...args, ...defaultArgs];
@@ -41,13 +33,18 @@ async function start(args: string[]) {
 
 const defaultArgs = ['--viaCli', '--experimentalStructuredContent'];
 
-const y = yargs(argv)
+const y = yargs(hideBin(process.argv))
   .scriptName('chrome-devtools')
   .showHelpOnFail(true)
+  .usage('chrome-devtools <command> [...args] --flags')
+  .usage(
+    `Run 'chrome-devtools <command> --help' for help on the specific command.`,
+  )
   .demandCommand()
   .version(VERSION)
   .strict()
-  .help(true);
+  .help(true)
+  .wrap(120);
 
 y.command(
   'start',
@@ -84,7 +81,6 @@ y.command('status', 'Checks if chrome-devtools-mcp is running', async () => {
 y.command('stop', 'Stop chrome-devtools-mcp if any', async () => {
   if (!isDaemonRunning()) {
     process.exit(0);
-    return;
   }
   await stopDaemon();
   process.exit(0);
@@ -96,9 +92,17 @@ for (const [commandName, commandDef] of Object.entries(commands)) {
     name => args[name].required,
   );
 
+  const optionalArgNames = Object.keys(args).filter(
+    name => !args[name].required,
+  );
+
   let commandStr = commandName;
   for (const arg of requiredArgNames) {
     commandStr += ` <${arg}>`;
+  }
+
+  for (const arg of optionalArgNames) {
+    commandStr += ` [--${arg}]`;
   }
 
   y.command(
