@@ -5,7 +5,7 @@
  */
 
 import assert from 'node:assert';
-import {describe, it, afterEach} from 'node:test';
+import {describe, it, afterEach, beforeEach} from 'node:test';
 
 import {
   handleResponse,
@@ -16,12 +16,12 @@ import {isDaemonRunning} from '../../src/daemon/utils.js';
 
 describe('daemon client', () => {
   describe('start/stop', () => {
+    beforeEach(async () => {
+      await stopDaemon();
+    });
+
     afterEach(async () => {
-      if (isDaemonRunning()) {
-        await stopDaemon();
-        // Wait a bit for the daemon to fully terminate and clean up its files.
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      }
+      await stopDaemon();
     });
 
     it('should start and stop daemon', async () => {
@@ -31,7 +31,6 @@ describe('daemon client', () => {
       assert.ok(isDaemonRunning(), 'Daemon should be running after start');
 
       await stopDaemon();
-      await new Promise(resolve => setTimeout(resolve, 1000));
       assert.ok(!isDaemonRunning(), 'Daemon should not be running after stop');
     });
 
@@ -54,12 +53,12 @@ describe('daemon client', () => {
   });
 
   describe('parsing', () => {
-    it('handles MCP response with text format', () => {
+    it('handles MCP response with text format', async () => {
       const textResponse = {content: [{type: 'text' as const, text: 'test'}]};
       assert.strictEqual(handleResponse(textResponse, 'text'), 'test');
     });
 
-    it('handles JSON response', () => {
+    it('handles JSON response', async () => {
       const jsonResponse = {
         content: [],
         structuredContent: {
@@ -73,7 +72,7 @@ describe('daemon client', () => {
       );
     });
 
-    it('handles error response when isError is true', () => {
+    it('handles error response when isError is true', async () => {
       const errorResponse = {
         isError: true,
         content: [{type: 'text' as const, text: 'Something went wrong'}],
@@ -84,7 +83,7 @@ describe('daemon client', () => {
       );
     });
 
-    it('handles text response when json format is requested but no structured content', () => {
+    it('handles text response when json format is requested but no structured content', async () => {
       const textResponse = {
         content: [{type: 'text' as const, text: 'Fall through text'}],
       };
@@ -94,7 +93,7 @@ describe('daemon client', () => {
       );
     });
 
-    it('throws error for unsupported content type', () => {
+    it('throws error for unsupported content type', async () => {
       const unsupportedContentResponse = {
         content: [
           {

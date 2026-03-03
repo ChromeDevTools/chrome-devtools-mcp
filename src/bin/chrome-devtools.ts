@@ -11,6 +11,7 @@ import process from 'node:process';
 import yargs, {type Options, type PositionalOptions} from 'yargs';
 import {hideBin} from 'yargs/helpers';
 
+import {parseArguments} from '../cli.js';
 import {
   startDaemon,
   stopDaemon,
@@ -18,6 +19,7 @@ import {
   handleResponse,
 } from '../daemon/client.js';
 import {isDaemonRunning} from '../daemon/utils.js';
+import {logDisclaimers} from '../server.js';
 import type {CallToolResult} from '../third_party/index.js';
 import {VERSION} from '../version.js';
 
@@ -29,6 +31,12 @@ const argv = hideBin(process.argv);
 if (argv.length === 0 || argv[0] === '--custom-help') {
   console.log(generateCustomHelp(VERSION, commands));
   process.exit(0);
+}
+
+async function start(args: string[]) {
+  const combinedArgs = [...args, ...defaultArgs];
+  await startDaemon([...args, ...defaultArgs]);
+  logDisclaimers(parseArguments(VERSION, combinedArgs));
 }
 
 const defaultArgs = ['--viaCli', '--experimentalStructuredContent'];
@@ -44,7 +52,14 @@ const y = yargs(argv)
 y.command(
   'start',
   'Start or restart chrome-devtools-mcp',
-  y => y.help(false), // Disable help for start command to avoid parsing issues with passed args
+  y =>
+    y
+      .help(false) // Disable help for start command to avoid parsing issues with passed args.
+      .example(
+        '$0 start --port 8080 --url http://localhost:8080',
+        'Start the server on port 8080 with a specific URL',
+      )
+      .strict(false), // Don't validate arguments for start, as they are passed through to the daemon.
   async () => {
     if (isDaemonRunning()) {
       await stopDaemon();
@@ -52,20 +67,27 @@ y.command(
     // Extract args after 'start'
     const startIndex = process.argv.indexOf('start');
     const args = startIndex !== -1 ? process.argv.slice(startIndex + 1) : [];
-    await startDaemon([...args, ...defaultArgs]);
+    await start(args);
+    process.exit(0);
   },
-);
+).strict(); // Re-enable strict validation for other commands; this is applied to the yargs instance itself
 
 y.command('status', 'Checks if chrome-devtools-mcp is running', async () => {
   if (isDaemonRunning()) {
     console.log('chrome-devtools-mcp daemon is running.');
   } else {
-    console.log('chrome-devtools-mcp daemon is not running');
+    console.log('chrome-devtools-mcp daemon is not running.');
   }
+  process.exit(0);
 });
 
 y.command('stop', 'Stop chrome-devtools-mcp if any', async () => {
+  if (!isDaemonRunning()) {
+    process.exit(0);
+    return;
+  }
   await stopDaemon();
+  process.exit(0);
 });
 
 for (const [commandName, commandDef] of Object.entries(commands)) {
@@ -127,7 +149,7 @@ for (const [commandName, commandDef] of Object.entries(commands)) {
     async argv => {
       try {
         if (!isDaemonRunning()) {
-          await startDaemon(defaultArgs);
+          await start([]);
         }
 
         const commandArgs: Record<string, unknown> = {};

@@ -9,7 +9,6 @@ import fs from 'node:fs';
 import net from 'node:net';
 
 import {logger} from '../logger.js';
-import {START_INDICATOR} from '../server.js';
 import type {CallToolResult} from '../third_party/index.js';
 import {PipeTransport} from '../third_party/index.js';
 
@@ -21,12 +20,29 @@ import {
   isDaemonRunning,
 } from './utils.js';
 
+const FILE_TIMEOUT = 10_000;
+
 /**
- * Waits for a file to be created and populated.
+ * Waits for a file to be created and populated (removed = false) or removed (removed = true).
  */
-function waitForFile(filePath: string, timeout = 5000) {
+function waitForFile(filePath: string, removed = false) {
   return new Promise<void>((resolve, reject) => {
-    if (fs.existsSync(filePath) && fs.statSync(filePath).size > 0) {
+    const check = () => {
+      const exists = fs.existsSync(filePath);
+      if (removed) {
+        return !exists;
+      }
+      if (!exists) {
+        return false;
+      }
+      try {
+        return fs.statSync(filePath).size > 0;
+      } catch {
+        return false;
+      }
+    };
+
+    if (check()) {
       resolve();
       return;
     }
@@ -34,14 +50,16 @@ function waitForFile(filePath: string, timeout = 5000) {
     const timer = setTimeout(() => {
       fs.unwatchFile(filePath);
       reject(
-        new Error(`Timeout: file ${filePath} not found within ${timeout}ms`),
+        new Error(
+          `Timeout: file ${filePath} ${removed ? 'not removed' : 'not found'} within ${FILE_TIMEOUT}ms`,
+        ),
       );
-    }, timeout);
+    }, FILE_TIMEOUT);
 
-    fs.watchFile(filePath, {interval: 500}, curr => {
-      if (curr.size > 0) {
+    fs.watchFile(filePath, {interval: 500}, () => {
+      if (check()) {
         clearTimeout(timer);
-        fs.unwatchFile(filePath); // Always clean up your listeners!
+        fs.unwatchFile(filePath);
         resolve();
       }
     });
@@ -54,38 +72,22 @@ export async function startDaemon(mcpArgs: string[] = []) {
     return;
   }
 
+  const pidFilePath = getPidFilePath();
+
+  if (fs.existsSync(pidFilePath)) {
+    fs.unlinkSync(pidFilePath);
+  }
+
   logger('Starting daemon...');
   const child = spawn(process.execPath, [DAEMON_SCRIPT_PATH, ...mcpArgs], {
     detached: true,
-    stdio: ['ignore', 'ignore', 'pipe'],
+    stdio: 'ignore',
+    env: process.env,
     cwd: process.cwd(),
   });
+  child.unref();
 
-  await new Promise<void>((resolve, reject) => {
-    child.on('error', err => {
-      reject(err);
-    });
-    child.on('exit', code => {
-      logger(`Child exited with code ${code}`);
-      reject(new Error(`Daemon process exited prematurely with code ${code}`));
-    });
-
-    waitForFile(getPidFilePath()).then(resolve).catch(reject);
-  });
-
-  logger(`Pid file found ${getPidFilePath()}`);
-
-  child.stderr.pipe(process.stderr);
-  await new Promise<void>(resolve => {
-    child.stderr.on('data', data => {
-      if (data.toString().includes(START_INDICATOR)) {
-        child.stderr.unpipe(process.stderr);
-        child.stderr.destroy();
-        child.unref();
-        resolve();
-      }
-    });
-  });
+  await waitForFile(pidFilePath);
 }
 
 const SEND_COMMAND_TIMEOUT = 60_000; // ms
@@ -135,7 +137,11 @@ export async function stopDaemon() {
     return;
   }
 
+  const pidFilePath = getPidFilePath();
+
   await sendCommand({method: 'stop'});
+
+  await waitForFile(pidFilePath, /*removed=*/ true);
 }
 
 export function handleResponse(
