@@ -7,7 +7,16 @@ description: Uses Chrome DevTools MCP and documentation to troubleshoot connecti
 
 You are acting as a troubleshooting wizard to help the user configure and fix their Chrome DevTools MCP server setup. When this skill is triggered (e.g., because `list_pages`, `new_page`, or `navigate_page` failed, or the server wouldn't start), follow this step-by-step diagnostic process:
 
-### Step 1: Determine the Exact Error
+### Step 1: Read Configuration
+
+Ask the user to provide their MCP configuration file content (e.g. `claude_desktop_config.json`, `.vscode/launch.json` or `.mcp.json`).
+
+Interpret the configuration to identify potential issues such as:
+- Incorrect arguments or flags.
+- Missing environment variables.
+- Usage of `--autoConnect` in incompatible environments.
+
+### Step 2: Determine the Exact Error
 
 Identify the exact error message from the failed tool call or the MCP initialization logs. Look for common errors such as:
 
@@ -17,7 +26,7 @@ Identify the exact error message from the failed tool call or the MCP initializa
 - `Error [ERR_MODULE_NOT_FOUND]: Cannot find module`
 - Any sandboxing or host validation errors.
 
-### Step 2: Read Known Issues
+### Step 3: Read Known Issues
 
 Read the contents of https://github.com/ChromeDevTools/chrome-devtools-mcp/blob/main/docs/troubleshooting.md to map the error to a known issue. Pay close attention to:
 
@@ -26,7 +35,7 @@ Read the contents of https://github.com/ChromeDevTools/chrome-devtools-mcp/blob/
 - `--autoConnect` handshakes, timeouts, and requirements (requires **running** Chrome 144+).
 - Conflicts between `--autoConnect`/`--browser-url` and extension debugging.
 
-### Step 3: Formulate a Configuration
+### Step 4: Formulate a Configuration
 
 Based on the exact error and the user's environment (OS, MCP client), formulate the correct MCP configuration snippet. Check if they need to:
 
@@ -38,14 +47,14 @@ Based on the exact error and the user's environment (OS, MCP client), formulate 
 
 _If you are unsure of the user's configuration, ask the user to provide their current MCP server JSON configuration._
 
-### Step 4: Run Diagnostic Commands
+### Step 5: Run Diagnostic Commands
 
 If the issue is still unclear, run diagnostic commands to test the server directly:
 
 - `npx chrome-devtools-mcp@latest --help` (to verify the installation and Node.js environment)
 - Ask the user to run `DEBUG=* npx chrome-devtools-mcp@latest --logFile=/tmp/cdm-test.log` to capture verbose logs if they are attempting to run it from an IDE or different environment.
 
-### Step 5: Check GitHub for Existing Issues
+### Step 6: Check GitHub for Existing Issues
 
 If https://github.com/ChromeDevTools/chrome-devtools-mcp/blob/main/docs/troubleshooting.md does not cover the specific error, check if the `gh` (GitHub CLI) tool is available in the environment. If so, search the GitHub repository for similar issues:
 `gh issue list --repo ChromeDevTools/chrome-devtools-mcp --search "<error snippet>" --state all`
