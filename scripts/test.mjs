@@ -62,7 +62,7 @@ const nodeArgs = [
 function installChrome(version) {
   try {
     return execSync(
-      `npx @puppeteer/browsers install chrome@${version} --format "{{path}}"`,
+      `npx puppeteer browsers install chrome@${version} --format "{{path}}"`,
     )
       .toString()
       .trim();
