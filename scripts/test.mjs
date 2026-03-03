@@ -92,7 +92,7 @@ async function runTests(attempt) {
 }
 
 const chromePath = installChrome('146.0.7680.31');
-process.env.TRIGGER_ACTION_EXECUTABLE_PATH = chromePath;
+process.env.CHROME_M146_EXECUTABLE_PATH = chromePath;
 
 const maxAttempts = shouldRetry ? 3 : 1;
 let exitCode = 1;
