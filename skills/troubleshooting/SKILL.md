@@ -16,9 +16,24 @@ Interpret the configuration to identify potential issues such as:
 - Missing environment variables.
 - Usage of `--autoConnect` in incompatible environments.
 
-### Step 2: Determine the Exact Error
+### Step 2: Triage Common Connection Errors
 
-Identify the exact error message from the failed tool call or the MCP initialization logs. Look for common errors such as:
+Before reading documentation or suggesting configuration changes, check if the error message matches one of the following common patterns.
+
+#### Error: `Could not find DevToolsActivePort`
+
+This error is highly specific to the `--autoConnect` feature. It means the MCP server cannot find the file created by a running, debuggable Chrome instance. This is not a generic connection failure.
+
+Your primary goal is to guide the user to ensure Chrome is running and properly configured. Do not immediately suggest switching to `--browserUrl`. Follow this exact sequence:
+
+1. **Ask the user to confirm that the correct Chrome version** (e.g., "Chrome Canary" if the error mentions it) is currently running.
+2. **If the user confirms it is running, instruct them to enable remote debugging.** Be very specific about the URL and the action: "Please open a new tab in Chrome, navigate to `chrome://inspect/#remote-debugging`, and make sure the 'Enable remote debugging' checkbox is checked."
+3. **Once the user confirms both steps, your only next action should be to call the `list_pages` tool.** This is the simplest and safest way to verify if the connection is now successful. Do not retry the original, more complex command yet.
+4. **If `list_pages` succeeds, the problem is resolved.** If it still fails with the same error, then you can proceed to the more advanced steps like suggesting `--browserUrl` or checking for sandboxing issues.
+
+#### Other Common Errors
+
+Identify other error messages from the failed tool call or the MCP initialization logs:
 
 - `Target closed`
 - "Tool not found" (check if they are using `--slim` which only enables navigation and screenshot tools).
