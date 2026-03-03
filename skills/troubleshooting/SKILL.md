@@ -7,15 +7,17 @@ description: Uses Chrome DevTools MCP and documentation to troubleshoot connecti
 
 You are acting as a troubleshooting wizard to help the user configure and fix their Chrome DevTools MCP server setup. When this skill is triggered (e.g., because `list_pages`, `new_page`, or `navigate_page` failed, or the server wouldn't start), follow this step-by-step diagnostic process:
 
-### Step 1: Read Configuration
+### Step 1: Find and Read Configuration
 
-Ask the user to provide their MCP configuration file content (e.g. `.claude/settings.json`, `./gemini/settings.json`, or `.mcp.json`).
+Your first action should be to locate and read the MCP configuration file. Search for the following files in the user's workspace: `.mcp.json`, `gemini-extension.json`, `.claude/settings.json`, `.vscode/launch.json`, or `.gemini/settings.json`.
 
-Interpret the configuration to identify potential issues such as:
+If you find a configuration file, read and interpret it to identify potential issues such as:
 
 - Incorrect arguments or flags.
 - Missing environment variables.
 - Usage of `--autoConnect` in incompatible environments.
+
+If you cannot find any of these files, only then should you ask the user to provide their configuration file content.
 
 ### Step 2: Triage Common Connection Errors
 
@@ -72,8 +74,8 @@ _If you are unsure of the user's configuration, ask the user to provide their cu
 
 If the issue is still unclear, run diagnostic commands to test the server directly:
 
-- `npx chrome-devtools-mcp@latest --help` (to verify the installation and Node.js environment)
-- Ask the user to run `DEBUG=* npx chrome-devtools-mcp@latest --logFile=/tmp/cdm-test.log` to capture verbose logs if they are attempting to run it from an IDE or different environment.
+- Run `npx chrome-devtools-mcp@latest --help` to verify the installation and Node.js environment.
+- If you need more information, run `DEBUG=* npx chrome-devtools-mcp@latest --logFile=/tmp/cdm-test.log` to capture verbose logs. Analyze the output for errors.
 
 ### Step 6: Check GitHub for Existing Issues
 
