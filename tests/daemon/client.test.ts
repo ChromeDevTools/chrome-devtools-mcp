@@ -55,7 +55,7 @@ describe('daemon client', () => {
   describe('parsing', () => {
     it('handles MCP response with text format', async () => {
       const textResponse = {content: [{type: 'text' as const, text: 'test'}]};
-      assert.strictEqual(handleResponse(textResponse, 'text'), 'test');
+      assert.strictEqual(handleResponse(textResponse, 'md'), 'test');
     });
 
     it('handles JSON response', async () => {
@@ -78,7 +78,7 @@ describe('daemon client', () => {
         content: [{type: 'text' as const, text: 'Something went wrong'}],
       };
       assert.strictEqual(
-        handleResponse(errorResponse, 'text'),
+        handleResponse(errorResponse, 'md'),
         JSON.stringify(errorResponse.content),
       );
     });
@@ -108,7 +108,7 @@ describe('daemon client', () => {
         structuredContent: {},
       };
       assert.throws(
-        () => handleResponse(unsupportedContentResponse, 'text'),
+        () => handleResponse(unsupportedContentResponse, 'md'),
         new Error('Not supported response content type'),
       );
     });
