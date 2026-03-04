@@ -23,6 +23,19 @@ If you cannot find any of these files, only then should you ask the user to prov
 
 Before reading documentation or suggesting configuration changes, check if the error message matches one of the following common patterns.
 
+#### Quick Reference
+
+| Error / Symptom | Likely Cause | First Action |
+|---|---|---|
+| `Could not find DevToolsActivePort` | `--autoConnect`: Chrome not running or remote debugging not enabled | Ask user to open `chrome://inspect/#remote-debugging` and enable it |
+| `Target closed` | Browser could not start; another Chrome instance may be running | Close other Chrome instances, verify Chrome is installed |
+| `ProtocolError: Network.enable timed out` / `socket connection was closed unexpectedly` | `--autoConnect` handshake failure | Verify Chrome 144+ is running, remote debugging is enabled, and no other tool occupies the debug port |
+| `Error [ERR_MODULE_NOT_FOUND]: Cannot find module` | Corrupted npm/npx cache or unsupported Node version | Clear cache: `rm -rf ~/.npm/_npx && npm cache clean --force` |
+| "Tool not found" | Server started with `--slim` flag | Remove `--slim` from config to enable all tools |
+| Server starts but creates a new empty profile | Typo in flags (e.g., `--autoBronnect`) | Check config for flag typos |
+| Sandbox / permission errors on macOS | MCP client Seatbelt sandbox blocks Chrome | Disable sandbox for `chrome-devtools-mcp` or use `--browser-url` with manually launched Chrome |
+| Connection fails from VM to host | Chrome rejects connection due to Host header validation | Create SSH tunnel: `ssh -N -L 127.0.0.1:9222:127.0.0.1:9222 user@host` |
+
 #### Error: `Could not find DevToolsActivePort`
 
 This error is highly specific to the `--autoConnect` feature. It means the MCP server cannot find the file created by a running, debuggable Chrome instance. This is not a generic connection failure.
