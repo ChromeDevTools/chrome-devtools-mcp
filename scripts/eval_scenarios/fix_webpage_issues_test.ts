@@ -39,8 +39,13 @@ export const scenario: TestScenario = {
   },
   expectations: calls => {
     const NAVIGATION_TOOLS = ['navigate_page', 'new_page'];
-    assert.ok(calls.length >= 2, 'Expected at least navigation and one inspection');
-    const navigationIndex = calls.findIndex(c => NAVIGATION_TOOLS.includes(c.name));
+    assert.ok(
+      calls.length >= 2,
+      'Expected at least navigation and one inspection',
+    );
+    const navigationIndex = calls.findIndex(c =>
+      NAVIGATION_TOOLS.includes(c.name),
+    );
     assert.ok(
       navigationIndex !== -1,
       `Expected a navigation call (${NAVIGATION_TOOLS.join(' or ')}), got: ${calls.map(c => c.name).join(', ')}`,

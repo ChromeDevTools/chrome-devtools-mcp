@@ -87,8 +87,7 @@ export const closePage = defineTool({
 
 export const newPage = defineTool({
   name: 'new_page',
-
-  description: `Open a new tab and load a URL. If no URL given, ask to run from current directory or for the URL.`,
+  description: `Open a new tab and load a URL. Use project URL if not specified otherwise.`,
   annotations: {
     category: ToolCategory.NAVIGATION,
     readOnlyHint: false,
