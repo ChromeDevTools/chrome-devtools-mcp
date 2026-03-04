@@ -132,7 +132,7 @@ export const newPage = defineTool({
 
 export const navigatePage = definePageTool({
   name: 'navigate_page',
-  description: `Go to a URL, or back, forward, or reload. If no URL given, ask to run from current directory or for the URL.`,
+  description: `Go to a URL, or back, forward, or reload. Use project URL if not specified otherwise.`,
   annotations: {
     category: ToolCategory.NAVIGATION,
     readOnlyHint: false,
