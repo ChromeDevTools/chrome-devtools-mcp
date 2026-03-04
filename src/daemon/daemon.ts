@@ -11,11 +11,12 @@ import {createServer, type Server} from 'node:net';
 import path from 'node:path';
 import process from 'node:process';
 
-import {Client} from '@modelcontextprotocol/sdk/client/index.js';
-import {StdioClientTransport} from '@modelcontextprotocol/sdk/client/stdio.js';
-
 import {logger} from '../logger.js';
-import {PipeTransport} from '../third_party/index.js';
+import {
+  Client,
+  PipeTransport,
+  StdioClientTransport,
+} from '../third_party/index.js';
 import {VERSION} from '../version.js';
 
 import type {DaemonMessage} from './types.js';
