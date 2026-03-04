@@ -1,5 +1,4 @@
 exports[`McpResponse > add network request when attached 1`] = `
-# test response
 ## Request http://example.com
 Status: pending
 ### Request Headers
@@ -42,7 +41,6 @@ exports[`McpResponse > add network request when attached 2`] = `
 `;
 
 exports[`McpResponse > add network request when attached with POST data 1`] = `
-# test response
 ## Request http://example.com
 Status: 200
 ### Request Headers
@@ -96,7 +94,6 @@ exports[`McpResponse > add network request when attached with POST data 2`] = `
 `;
 
 exports[`McpResponse > add network requests when setting is true 1`] = `
-# test response
 ## Network requests
 Showing 1-2 of 2 (Page 1 of 1).
 reqid=1 GET http://example.com [pending]
@@ -134,7 +131,6 @@ exports[`McpResponse > add network requests when setting is true 2`] = `
 `;
 
 exports[`McpResponse > adds a message when no console messages exist 1`] = `
-# test response
 ## Console messages
 <no console messages found>
 `;
@@ -144,7 +140,6 @@ exports[`McpResponse > adds a message when no console messages exist 2`] = `
 `;
 
 exports[`McpResponse > adds a prompt dialog 1`] = `
-# test response
 # Open dialog
 prompt: message (default value: "default").
 Call handle_dialog to handle it before continuing.
@@ -161,7 +156,6 @@ exports[`McpResponse > adds a prompt dialog 2`] = `
 `;
 
 exports[`McpResponse > adds an alert dialog 1`] = `
-# test response
 # Open dialog
 alert: message.
 Call handle_dialog to handle it before continuing.
@@ -178,9 +172,7 @@ exports[`McpResponse > adds an alert dialog 2`] = `
 `;
 
 exports[`McpResponse > adds color scheme emulation setting when it is set 1`] = `
-# test response
-## Color Scheme emulation
-Emulating: dark
+Emulating color scheme: dark
 `;
 
 exports[`McpResponse > adds color scheme emulation setting when it is set 2`] = `
@@ -190,7 +182,6 @@ exports[`McpResponse > adds color scheme emulation setting when it is set 2`] = 
 `;
 
 exports[`McpResponse > adds console messages when the setting is true 1`] = `
-# test response
 ## Console messages
 Showing 1-1 of 1 (Page 1 of 1).
 msgid=1 [log] Hello from the test (1 args)
@@ -219,9 +210,7 @@ exports[`McpResponse > adds console messages when the setting is true 2`] = `
 `;
 
 exports[`McpResponse > adds cpu throttling setting when it is over 1 1`] = `
-# test response
-## CPU emulation
-Emulating: 4x slowdown
+Emulating CPU throttling: 4x slowdown
 `;
 
 exports[`McpResponse > adds cpu throttling setting when it is over 1 2`] = `
@@ -231,13 +220,15 @@ exports[`McpResponse > adds cpu throttling setting when it is over 1 2`] = `
 `;
 
 exports[`McpResponse > adds image when image is attached 1`] = `
+
+`;
+
+exports[`McpResponse > adds image when image is attached 2`] = `
 {}
 `;
 
 exports[`McpResponse > adds throttling setting when it is not null 1`] = `
-# test response
-## Network emulation
-Emulating: Slow 3G
+Emulating network conditions: Slow 3G
 Default navigation timeout set to 100000 ms
 `;
 
@@ -249,9 +240,7 @@ exports[`McpResponse > adds throttling setting when it is not null 2`] = `
 `;
 
 exports[`McpResponse > adds userAgent emulation setting when it is set 1`] = `
-# test response
-## UserAgent emulation
-Emulating userAgent: MyUA
+Emulating user agent: MyUA
 `;
 
 exports[`McpResponse > adds userAgent emulation setting when it is set 2`] = `
@@ -261,8 +250,6 @@ exports[`McpResponse > adds userAgent emulation setting when it is set 2`] = `
 `;
 
 exports[`McpResponse > adds viewport emulation setting when it is set 1`] = `
-# test response
-## Viewport emulation
 Emulating viewport: {"deviceScaleFactor":1,"isMobile":false,"hasTouch":false,"isLandscape":false,"width":400,"height":400}
 `;
 
@@ -280,7 +267,6 @@ exports[`McpResponse > adds viewport emulation setting when it is set 2`] = `
 `;
 
 exports[`McpResponse > allows response text lines to be added 1`] = `
-# test response
 Testing 1
 Testing 2
 `;
@@ -292,18 +278,34 @@ exports[`McpResponse > allows response text lines to be added 2`] = `
 `;
 
 exports[`McpResponse > does not include anything in response if snapshot is null 1`] = `
+
+`;
+
+exports[`McpResponse > does not include anything in response if snapshot is null 2`] = `
 {}
 `;
 
 exports[`McpResponse > does not include cpu throttling setting when it is 1 1`] = `
+
+`;
+
+exports[`McpResponse > does not include cpu throttling setting when it is 1 2`] = `
 {}
 `;
 
 exports[`McpResponse > does not include network requests when setting is false 1`] = `
+
+`;
+
+exports[`McpResponse > does not include network requests when setting is false 2`] = `
 {}
 `;
 
 exports[`McpResponse > does not include throttling setting when it is null 1`] = `
+
+`;
+
+exports[`McpResponse > does not include throttling setting when it is null 2`] = `
 {}
 `;
 
@@ -312,7 +314,6 @@ exports[`McpResponse > doesn't list the issue message if mapping returns null 1`
 `;
 
 exports[`McpResponse > list pages 1`] = `
-# test response
 ## Pages
 1: about:blank [selected]
 `;
@@ -330,7 +331,6 @@ exports[`McpResponse > list pages 2`] = `
 `;
 
 exports[`McpResponse > returns correctly formatted snapshot for a simple tree 1`] = `
-# test response
 ## Latest page snapshot
 uid=1_0 RootWebArea "My test page" url="about:blank"
   uid=1_1 button "Click me" focusable focused
@@ -364,7 +364,6 @@ exports[`McpResponse > returns correctly formatted snapshot for a simple tree 2`
 `;
 
 exports[`McpResponse > returns values for textboxes 1`] = `
-# test response
 ## Latest page snapshot
 uid=1_0 RootWebArea "My test page" url="about:blank"
   uid=1_1 StaticText "username"
@@ -399,7 +398,6 @@ exports[`McpResponse > returns values for textboxes 2`] = `
 `;
 
 exports[`McpResponse > returns verbose snapshot and structured content 1`] = `
-# test response
 ## Latest page snapshot
 uid=1_0 RootWebArea "My test page" url="about:blank"
   uid=1_1 ignored
@@ -454,7 +452,6 @@ exports[`McpResponse > returns verbose snapshot and structured content 2`] = `
 `;
 
 exports[`McpResponse > saves snapshot to file and returns structured content 1`] = `
-# test response
 Saved snapshot to <file>
 `;
 
@@ -728,7 +725,6 @@ exports[`McpResponse network pagination > returns subsequent page when pageIdx p
 `;
 
 exports[`McpResponse network pagination > trace insights > includes error if insight not found 1`] = `
-# test response
 No Performance Insights for the given insight set id. Only use ids given in the "Available insight sets" list.
 `;
 
@@ -737,7 +733,6 @@ exports[`McpResponse network pagination > trace insights > includes error if ins
 `;
 
 exports[`McpResponse network pagination > trace insights > includes the trace insight output 1`] = `
-# test response
 ## Insight Title: LCP breakdown
 
 ## Insight Summary:
@@ -787,7 +782,6 @@ exports[`McpResponse network pagination > trace insights > includes the trace in
 `;
 
 exports[`McpResponse network pagination > trace summaries > includes the trace summary text and structured data 1`] = `
-# test response
 ## Summary of Performance trace findings:
 URL: https://web.dev/
 Trace bounds: {min: 122410994891, max: 122416385853}
@@ -982,7 +976,6 @@ exports[`McpResponse network pagination > trace summaries > includes the trace s
 `;
 
 exports[`McpResponse network request filtering > filters network requests by resource type 1`] = `
-# test response
 ## Network requests
 Showing 1-2 of 2 (Page 1 of 1).
 reqid=1 GET http://example.com [pending]
@@ -1020,7 +1013,6 @@ exports[`McpResponse network request filtering > filters network requests by res
 `;
 
 exports[`McpResponse network request filtering > filters network requests by single resource type 1`] = `
-# test response
 ## Network requests
 Showing 1-1 of 1 (Page 1 of 1).
 reqid=1 GET http://example.com [pending]
@@ -1050,7 +1042,6 @@ exports[`McpResponse network request filtering > filters network requests by sin
 `;
 
 exports[`McpResponse network request filtering > shows all requests when empty resourceTypes array is provided 1`] = `
-# test response
 ## Network requests
 Showing 1-5 of 5 (Page 1 of 1).
 reqid=1 GET http://example.com [pending]
@@ -1112,7 +1103,6 @@ exports[`McpResponse network request filtering > shows all requests when empty r
 `;
 
 exports[`McpResponse network request filtering > shows all requests when no filters are provided 1`] = `
-# test response
 ## Network requests
 Showing 1-5 of 5 (Page 1 of 1).
 reqid=1 GET http://example.com [pending]
@@ -1174,7 +1164,7 @@ exports[`McpResponse network request filtering > shows all requests when no filt
 `;
 
 exports[`McpResponse network request filtering > shows no requests when filter matches nothing 1`] = `
-# test response
+
 `;
 
 exports[`McpResponse network request filtering > shows no requests when filter matches nothing 2`] = `
@@ -1182,7 +1172,6 @@ exports[`McpResponse network request filtering > shows no requests when filter m
 `;
 
 exports[`extensions > lists extensions 1`] = `
-# test response
 ## Extensions
 id=id1 "Extension 1" v1.0 Enabled
 id=id2 "Extension 2" v2.0 Disabled
@@ -1210,7 +1199,6 @@ exports[`extensions > lists extensions 2`] = `
 `;
 
 exports[`lighthouse > includes lighthouse report paths 1`] = `
-# test response
 ## Lighthouse Audit Results
 Mode: navigation
 Device: desktop

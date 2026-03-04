@@ -47,24 +47,17 @@ describe('e2e', () => {
       await client.close();
     }
   }
-  it('calls a tool', async () => {
+  it('calls a tool', async t => {
     await withClient(async client => {
       const result = await client.callTool({
         name: 'list_pages',
         arguments: {},
       });
-      assert.deepStrictEqual(result, {
-        content: [
-          {
-            type: 'text',
-            text: '# list_pages response\n## Pages\n1: about:blank [selected]',
-          },
-        ],
-      });
+      t.assert.snapshot?.(JSON.stringify(result.content));
     });
   });
 
-  it('calls a tool multiple times', async () => {
+  it('calls a tool multiple times', async t => {
     await withClient(async client => {
       let result = await client.callTool({
         name: 'list_pages',
@@ -74,14 +67,7 @@ describe('e2e', () => {
         name: 'list_pages',
         arguments: {},
       });
-      assert.deepStrictEqual(result, {
-        content: [
-          {
-            type: 'text',
-            text: '# list_pages response\n## Pages\n1: about:blank [selected]',
-          },
-        ],
-      });
+      t.assert.snapshot?.(JSON.stringify(result.content));
     });
   });
 

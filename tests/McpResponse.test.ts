@@ -70,8 +70,7 @@ describe('McpResponse', () => {
         'test',
         context,
       );
-      assert.equal(content[0].type, 'text');
-      assert.deepStrictEqual(getTextContent(content[0]), `# test response`);
+      t.assert.snapshot?.(getTextContent(content[0]));
       t.assert.snapshot?.(
         JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
       );
@@ -94,7 +93,6 @@ describe('McpResponse', () => {
         'test',
         context,
       );
-      assert.equal(content[0].type, 'text');
       t.assert.snapshot?.(getTextContent(content[0]));
       t.assert.snapshot?.(
         JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
@@ -303,8 +301,7 @@ describe('McpResponse', () => {
         context,
       );
       await context.emulate({});
-      assert.equal(content[0].type, 'text');
-      assert.strictEqual(getTextContent(content[0]), `# test response`);
+      t.assert.snapshot?.(getTextContent(content[0]));
       t.assert.snapshot?.(
         JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
       );
@@ -317,7 +314,7 @@ describe('McpResponse', () => {
         'test',
         context,
       );
-      assert.strictEqual(getTextContent(content[0]), `# test response`);
+      t.assert.snapshot?.(getTextContent(content[0]));
       assert.equal(content[1].type, 'image');
       assert.strictEqual(getImageContent(content[1]).data, 'imageBase64');
       assert.strictEqual(getImageContent(content[1]).mimeType, 'image/png');
@@ -348,7 +345,7 @@ describe('McpResponse', () => {
         'test',
         context,
       );
-      assert.strictEqual(getTextContent(content[0]), `# test response`);
+      t.assert.snapshot?.(getTextContent(content[0]));
       t.assert.snapshot?.(
         JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
       );
@@ -474,7 +471,7 @@ describe('McpResponse', () => {
         'test',
         context,
       );
-      assert.strictEqual(getTextContent(content[0]), `# test response`);
+      t.assert.snapshot?.(getTextContent(content[0]));
       t.assert.snapshot?.(
         JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
       );
