@@ -1,5 +1,5 @@
 /**
- * Lighthouse v13.0.3-3-g565cfd0f2 (Mar 02 2026)
+ * Lighthouse v13.0.3-4-gd6e2a8e40 (Mar 04 2026)
  *
  * Automated auditing, performance metrics, and best practices for the web.
  *
@@ -53317,8 +53317,13 @@ var str_101 = createIcuMessageFn({ url: "core/gather/timespan-runner.js" }.url, 
 
 // core/gather/navigation-runner.js
 init_process_global();
+
+// replace-modules:/Users/alexrudenko/src/lighthouse/node_modules/puppeteer-core/lib/cjs/puppeteer/puppeteer-core.js
+init_process_global();
+var puppeteer_core_default = {};
+
+// core/gather/navigation-runner.js
 init_lighthouse_logger();
-import puppeteer from "puppeteer-core";
 
 // core/gather/driver/navigation.js
 init_process_global();
@@ -54079,7 +54084,7 @@ async function navigationGather(page, requestor, options = {}) {
     let lhPage = void 0;
     if (!page) {
       const { hostname = DEFAULT_HOSTNAME, port = DEFAULT_PORT } = flags;
-      lhBrowser = await puppeteer.connect({ browserURL: `http://${hostname}:${port}`, defaultViewport: null });
+      lhBrowser = await puppeteer_core_default.connect({ browserURL: `http://${hostname}:${port}`, defaultViewport: null });
       lhPage = await lhBrowser.newPage();
       page = lhPage;
     }

@@ -38,8 +38,8 @@ Available insights:
   - insight name: RenderBlocking
     description: Requests are blocking the page's initial render, which may delay LCP. [Deferring or inlining](https://developer.chrome.com/docs/performance/insights/render-blocking) can move these network requests out of the critical path.
     relevant trace bounds: {min: 122411037528, max: 122411053852}
-    example question: Show me the most impactful render blocking requests that I should focus on
-    example question: How can I reduce the number of render blocking requests?
+    example question: Show me the most impactful render-blocking requests that I should focus on
+    example question: How can I reduce the number of render-blocking requests?
   - insight name: DocumentLatency
     description: Your first network request is the most important. [Reduce its latency](https://developer.chrome.com/docs/performance/insights/document-latency) by avoiding redirects, ensuring a fast server response, and enabling text compression.
     relevant trace bounds: {min: 122410998910, max: 122411043781}
