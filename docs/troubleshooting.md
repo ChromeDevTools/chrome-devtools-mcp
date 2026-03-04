@@ -8,6 +8,7 @@
   auto-accept installation prompt.
 - Find a specific error in the output of the `chrome-devtools-mcp` server.
   Usually, if your client is an IDE, logs would be in the Output pane.
+- Search the [GitHub repository issues and discussions](https://github.com/ChromeDevTools/chrome-devtools-mcp) for help or existing similar problems.
 
 ## Debugging
 
@@ -98,3 +99,12 @@ Possible workarounds include:
      `npx chrome-devtools-mcp --browser-url http://127.0.0.1:9222`
 
 - **Use Powershell or Git Bash** instead of WSL.
+
+### Connection timeouts with `--autoConnect`
+
+If you are using the `--autoConnect` flag and tools like `list_pages`, `new_page`, or `navigate_page` fail with a timeout (e.g., `ProtocolError: Network.enable timed out` or `The socket connection was closed unexpectedly`), this usually means the MCP server cannot handshake with the running Chrome instance correctly. Ensure:
+
+1. Chrome 144+ is **already** running.
+2. Remote debugging is enabled in Chrome via `chrome://inspect/#remote-debugging`.
+3. You have allowed the remote debugging connection prompt in the browser.
+4. There is no other MCP server or tool trying to connect to the same debugging port.

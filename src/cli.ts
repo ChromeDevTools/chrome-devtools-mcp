@@ -11,7 +11,7 @@ export const cliOptions = {
   autoConnect: {
     type: 'boolean',
     description:
-      'If specified, automatically connects to a browser (Chrome 144+) running in the user data directory identified by the channel param. Requires the remoted debugging server to be started in the Chrome instance via chrome://inspect/#remote-debugging.',
+      'If specified, automatically connects to a browser (Chrome 144+) running locally from the user data directory identified by the channel param (default channel is stable). Requires the remoted debugging server to be started in the Chrome instance via chrome://inspect/#remote-debugging.',
     conflicts: ['isolated', 'executablePath'],
     default: false,
     coerce: (value: boolean | undefined) => {
@@ -246,6 +246,12 @@ export const cliOptions = {
     type: 'boolean',
     describe:
       'Exposes a "slim" set of 3 tools covering navigation, script execution and screenshots only. Useful for basic browser tasks.',
+  },
+  viaCli: {
+    type: 'boolean',
+    describe:
+      'Set by Chrome DevTools CLI if the MCP server is started via the CLI client (this arg exists for usage stats)',
+    hidden: true,
   },
 } satisfies Record<string, YargsOptions>;
 

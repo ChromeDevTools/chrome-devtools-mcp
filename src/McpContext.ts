@@ -927,7 +927,6 @@ export class McpContext implements Context {
     const session = await this.browser.target().createCDPSession();
 
     try {
-      // @ts-expect-error triggerAction is not yet available
       await session.send('Extensions.triggerAction', {
         id,
         targetId: theTarget,

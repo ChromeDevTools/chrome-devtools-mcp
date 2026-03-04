@@ -149,7 +149,7 @@ describe('extension', () => {
         assert.ok(pageTargetAfter, 'Page should exist after action');
       },
       {
-        executablePath: process.env.CANARY_EXECUTABLE_PATH,
+        executablePath: process.env.CHROME_M146_EXECUTABLE_PATH,
       },
       {
         categoryExtensions: true,

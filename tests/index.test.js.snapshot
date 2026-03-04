@@ -1,0 +1,7 @@
+exports[`e2e > calls a tool 1`] = `
+[{"type":"text","text":"## Pages\\n1: about:blank [selected]"}]
+`;
+
+exports[`e2e > calls a tool multiple times 1`] = `
+[{"type":"text","text":"## Pages\\n1: about:blank [selected]"}]
+`;

@@ -503,7 +503,7 @@ export class McpResponse implements Response {
       extensionServiceWorkers?: object[];
     } = {};
 
-    const response = [`# ${toolName} response`];
+    const response = [];
     if (this.#textResponseLines.length) {
       structuredContent.message = this.#textResponseLines.join('\n');
       response.push(...this.#textResponseLines);
@@ -512,8 +512,7 @@ export class McpResponse implements Response {
     const networkConditions = this.#page?.networkConditions;
     if (networkConditions) {
       const timeout = this.#page!.pptrPage.getDefaultNavigationTimeout();
-      response.push(`## Network emulation`);
-      response.push(`Emulating: ${networkConditions}`);
+      response.push(`Emulating network conditions: ${networkConditions}`);
       response.push(`Default navigation timeout set to ${timeout} ms`);
       structuredContent.networkConditions = networkConditions;
       structuredContent.navigationTimeout = timeout;
@@ -521,29 +520,25 @@ export class McpResponse implements Response {
 
     const viewport = this.#page?.viewport;
     if (viewport) {
-      response.push(`## Viewport emulation`);
       response.push(`Emulating viewport: ${JSON.stringify(viewport)}`);
       structuredContent.viewport = viewport;
     }
 
     const userAgent = this.#page?.userAgent;
     if (userAgent) {
-      response.push(`## UserAgent emulation`);
-      response.push(`Emulating userAgent: ${userAgent}`);
+      response.push(`Emulating user agent: ${userAgent}`);
       structuredContent.userAgent = userAgent;
     }
 
     const cpuThrottlingRate = this.#page?.cpuThrottlingRate ?? 1;
     if (cpuThrottlingRate > 1) {
-      response.push(`## CPU emulation`);
-      response.push(`Emulating: ${cpuThrottlingRate}x slowdown`);
+      response.push(`Emulating CPU throttling: ${cpuThrottlingRate}x slowdown`);
       structuredContent.cpuThrottlingRate = cpuThrottlingRate;
     }
 
     const colorScheme = this.#page?.colorScheme;
     if (colorScheme) {
-      response.push(`## Color Scheme emulation`);
-      response.push(`Emulating: ${colorScheme}`);
+      response.push(`Emulating color scheme: ${colorScheme}`);
       structuredContent.colorScheme = colorScheme;
     }
 

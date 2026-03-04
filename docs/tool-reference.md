@@ -1,6 +1,6 @@
 <!-- AUTO GENERATED DO NOT EDIT - run 'npm run docs' to update-->
 
-# Chrome DevTools MCP Tool Reference (~6919 cl100k_base tokens)
+# Chrome DevTools MCP Tool Reference (~6915 cl100k_base tokens)
 
 - **[Input automation](#input-automation)** (9 tools)
   - [`click`](#click)
@@ -260,9 +260,9 @@
 
 **Parameters:**
 
-- **autoStop** (boolean) **(required)**: Determines if the trace recording should be automatically stopped.
-- **reload** (boolean) **(required)**: Determines if, once tracing has started, the current selected page should be automatically reloaded. Navigate the page to the right URL using the [`navigate_page`](#navigate_page) tool BEFORE starting the trace if reload or autoStop is set to true.
+- **autoStop** (boolean) _(optional)_: Determines if the trace recording should be automatically stopped.
 - **filePath** (string) _(optional)_: The absolute file path, or a file path relative to the current working directory, to save the raw trace data. For example, trace.json.gz (compressed) or trace.json (uncompressed).
+- **reload** (boolean) _(optional)_: Determines if, once tracing has started, the current selected page should be automatically reloaded. Navigate the page to the right URL using the [`navigate_page`](#navigate_page) tool BEFORE starting the trace if reload or autoStop is set to true.
 
 ---
 

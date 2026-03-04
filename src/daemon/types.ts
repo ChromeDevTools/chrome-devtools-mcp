@@ -13,3 +13,10 @@ export type DaemonMessage =
       tool: string;
       args?: Record<string, unknown>;
     };
+
+export interface DaemonResponse {
+  success: boolean;
+  // Stringified CallToolResult.
+  result: string;
+  error: unknown;
+}

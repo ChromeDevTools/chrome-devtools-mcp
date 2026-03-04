@@ -1,5 +1,4 @@
 exports[`console > get_console_message > applies source maps to stack traces of Error object (with cause) console.log arguments 1`] = `
-# test response
 ID: 1
 Message: log> foo failed Error: bar failed
 ### Arguments
@@ -21,7 +20,6 @@ Note: line and column numbers use 1-based indexing
 `;
 
 exports[`console > get_console_message > applies source maps to stack traces of Error object console.log arguments 1`] = `
-# test response
 ID: 1
 Message: log> An error happened: Error: b00m!
 ### Arguments
@@ -39,7 +37,6 @@ Note: line and column numbers use 1-based indexing
 `;
 
 exports[`console > get_console_message > applies source maps to stack traces of console messages 1`] = `
-# test response
 ID: 1
 Message: warn> hello world
 ### Arguments
@@ -53,7 +50,6 @@ Note: line and column numbers use 1-based indexing
 `;
 
 exports[`console > get_console_message > applies source maps to stack traces of uncaught exceptions 1`] = `
-# test response
 ID: 1
 Message: error> Uncaught Error: b00m!
 ### Stack trace
@@ -65,7 +61,6 @@ Note: line and column numbers use 1-based indexing
 `;
 
 exports[`console > get_console_message > applies source maps to stack traces of uncaught exceptions with cause 1`] = `
-# test response
 ID: 1
 Message: error> Uncaught Error: foo failed
 ### Stack trace
@@ -84,7 +79,6 @@ Note: line and column numbers use 1-based indexing
 `;
 
 exports[`console > get_console_message > ignores frames from ignore listed URLs 1`] = `
-# test response
 ID: 1
 Message: log> hello from callback
 ### Arguments
@@ -97,7 +91,6 @@ Note: line and column numbers use 1-based indexing
 `;
 
 exports[`console > get_console_message > issues type > gets issue details with node id parsing 1`] = `
-# test response
 ID: 1
 Message: issue> An element doesn't have an autocomplete attribute
 
@@ -111,7 +104,6 @@ uid=1_1 data={"violatingNodeAttribute":"name"}
 `;
 
 exports[`console > get_console_message > issues type > gets issue details with request id parsing 1`] = `
-# test response
 ID: <ID>
 Message: issue> Ensure CORS response header values are valid
 
@@ -123,11 +115,10 @@ Note that if an opaque response is sufficient, the request's mode can be set to 
 Learn more:
 [Cross-Origin Resource Sharing (\`CORS\`)](https://web.dev/cross-origin-resource-sharing)
 ### Affected resources
-reqid=<reqid> data={"corsErrorStatus":{"corsError":"PreflightMissingAllowOriginHeader","failedParameter":""},"isWarning":false,"request":{"url":"http://hostname:port/data.json"},"initiatorOrigin":"","clientSecurityState":{"initiatorIsSecureContext":false,"initiatorIPAddressSpace":"Loopback","privateNetworkRequestPolicy":"BlockFromInsecureToMorePrivate"}}
+reqid=<reqid> data={"corsErrorStatus":{"corsError":"PreflightMissingAllowOriginHeader","failedParameter":""},"isWarning":false,"request":{"url":"http://hostname:port/data.json"},"initiatorOrigin":"","clientSecurityState":{"initiatorIsSecureContext":false,"initiatorIPAddressSpace":"Loopback","localNetworkAccessRequestPolicy":"BlockFromInsecureToMorePrivate"}}
 `;
 
 exports[`console > list_console_messages > lists error objects 1`] = `
-# test response
 ## Console messages
 Showing 1-1 of 1 (Page 1 of 1).
 msgid=1 [error] Error: This is an error (1 args)
