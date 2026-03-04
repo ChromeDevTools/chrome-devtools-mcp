@@ -51,26 +51,7 @@ The accessibility tree exposes the heading hierarchy and semantic landmarks.
 
 1.  Locate buttons, inputs, and images in the `take_snapshot` output.
 2.  Ensure interactive elements have an accessible name (e.g., a button should not just say `""` if it only contains an icon).
-3.  **Orphaned Inputs**: Verify that all form inputs have associated labels. Use `evaluate_script` to check for inputs missing `id` (for `label[for]`) or `aria-label`:
-    ```js
-    () =>
-      Array.from(document.querySelectorAll('input, select, textarea'))
-        .filter(i => {
-          const hasId = i.id && document.querySelector(`label[for="${i.id}"]`);
-          const hasAria =
-            i.getAttribute('aria-label') || i.getAttribute('aria-labelledby');
-          return !hasId && !hasAria && !i.closest('label');
-        })
-        .map(i => ({
-          tag: i.tagName,
-          id: i.id,
-          name: i.name,
-          placeholder: i.placeholder,
-        }));
-    ```
-
-````
-
+3.  **Orphaned Inputs**: Verify that all form inputs have associated labels. Use `evaluate_script` with the **"Find Orphaned Form Inputs" snippet** found in [references/a11y-snippets.md](references/a11y-snippets.md).
 4.  Check images for `alt` text.
 
 ### 5. Focus & Keyboard Navigation
@@ -84,15 +65,7 @@ Testing "keyboard traps" and proper focus management without visual feedback rel
 
 ### 6. Tap Targets and Visuals
 
-According to web.dev, tap targets should be at least 48x48 pixels with sufficient spacing. Since the accessibility tree doesn't show sizes, use `evaluate_script`:
-
-```js
-// Usage in console: copy, paste, and call with element: fn(element)
-el => {
- const rect = el.getBoundingClientRect();
- return {width: rect.width, height: rect.height};
-};
-````
+According to web.dev, tap targets should be at least 48x48 pixels with sufficient spacing. Since the accessibility tree doesn't show sizes, use `evaluate_script` with the **"Measure Tap Target Size" snippet** found in [references/a11y-snippets.md](references/a11y-snippets.md).
 
 _Pass the element's `uid` from the snapshot as an argument to `evaluate_script`._
 
@@ -103,66 +76,14 @@ To verify color contrast ratios, start by checking for native accessibility issu
 1.  Call `list_console_messages` with `types: ["issue"]`.
 2.  Look for "Low Contrast" issues in the output.
 
-If native audits do not report issues (which may happen in some headless environments) or if you need to check a specific element manually, you can use the following script as a fallback approximation.
-
-**Note**: This script uses a simplified algorithm and may not account for transparency, gradients, or background images. For production-grade auditing, consider injecting `axe-core`.
-
-```js
-el => {
-  function getRGB(colorStr) {
-    const match = colorStr.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
-    return match
-      ? [parseInt(match[1]), parseInt(match[2]), parseInt(match[3])]
-      : [255, 255, 255];
-  }
-  function luminance(r, g, b) {
-    const a = [r, g, b].map(function (v) {
-      v /= 255;
-      return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
-    });
-    return a[0] * 0.2126 + a[1] * 0.7152 + a[2] * 0.0722;
-  }
-
-  const style = window.getComputedStyle(el);
-  const fg = getRGB(style.color);
-  let bg = getRGB(style.backgroundColor);
-
-  // Basic contrast calculation (Note: Doesn't account for transparency over background images)
-  const l1 = luminance(fg[0], fg[1], fg[2]);
-  const l2 = luminance(bg[0], bg[1], bg[2]);
-  const ratio = (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05);
-
-  return {
-    color: style.color,
-    bg: style.backgroundColor,
-    contrastRatio: ratio.toFixed(2),
-  };
-};
-```
-
-_Pass the element's `uid` to test the contrast against WCAG AA (4.5:1 for normal text, 3:1 for large text)._
+If native audits do not report issues (which may happen in some headless environments) or if you need to check a specific element manually, use `evaluate_script` with the **"Check Color Contrast" snippet** found in [references/a11y-snippets.md](references/a11y-snippets.md).
 
 ### 8. Global Page Checks
 
-Verify document-level accessibility settings often missed in component testing:
-
-```js
-() => ({
-  lang:
-    document.documentElement.lang ||
-    'MISSING - Screen readers need this for pronunciation',
-  title: document.title || 'MISSING - Required for context',
-  viewport:
-    document.querySelector('meta[name="viewport"]')?.content ||
-    'MISSING - Check for user-scalable=no (bad practice)',
-  reducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    ? 'Enabled'
-    : 'Disabled',
-});
-```
+Verify document-level accessibility settings often missed in component testing using the **"Global Page Checks" snippet** found in [references/a11y-snippets.md](references/a11y-snippets.md).
 
 ## Troubleshooting
 
 If standard a11y queries fail or the `evaluate_script` snippets return unexpected results:
 
-- **Visual Inspection**: If automated scripts cannot determine contrast (e.g., text over gradient images or complex backgrounds), use `take_screenshot` to capture the element. While models cannot measure exact contrast ratios from images, they can visually assess legibility and identifying obvious issues.
+- **Visual Inspection**: If automated scripts cannot determine contrast (e.g., text over gradient images or complex backgrounds), use `take_screenshot` to capture the element. While models cannot measure exact contrast ratios from images, they can visually assess legibility and identify obvious issues.
