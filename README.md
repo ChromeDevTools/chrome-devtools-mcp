@@ -73,7 +73,7 @@ Add the following config to your MCP client:
 > [!NOTE]  
 > Using `chrome-devtools-mcp@latest` ensures that your MCP client will always use the latest version of the Chrome DevTools MCP server.
 
-If you are intersted in doing only basic browser tasks, use the `--slim` mode:
+If you are interested in doing only basic browser tasks, use the `--slim` mode:
 
 ```json
 {
