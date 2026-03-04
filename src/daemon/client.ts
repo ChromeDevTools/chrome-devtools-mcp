@@ -146,7 +146,7 @@ export async function stopDaemon() {
 
 export function handleResponse(
   response: CallToolResult,
-  format: 'json' | 'text',
+  format: 'json' | 'md',
 ): string {
   if (response.isError) {
     return JSON.stringify(response.content);
@@ -165,5 +165,5 @@ export function handleResponse(
       throw new Error('Not supported response content type');
     }
   }
-  return format === 'text' ? chunks.join('') : JSON.stringify(chunks);
+  return format === 'md' ? chunks.join('') : JSON.stringify(chunks);
 }

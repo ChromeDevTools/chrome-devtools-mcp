@@ -110,8 +110,8 @@ for (const [commandName, commandDef] of Object.entries(commands)) {
     commandDef.description,
     y => {
       y.option('format', {
-        choices: ['text', 'json'],
-        default: 'text',
+        choices: ['md', 'json'],
+        default: 'md',
       });
       for (const [argName, opt] of Object.entries(args)) {
         const type =
@@ -173,7 +173,7 @@ for (const [commandName, commandDef] of Object.entries(commands)) {
           console.log(
             handleResponse(
               JSON.parse(response.result) as unknown as CallToolResult,
-              argv['format'] as 'json' | 'text',
+              argv['format'] as 'json' | 'md',
             ),
           );
         } else {
