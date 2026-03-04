@@ -1,0 +1,128 @@
+name: Sync WebPerf Skills
+
+on:
+  schedule:
+    - cron: '0 9 * * 1' # Every Monday at 9:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync:
+    name: Sync skills from webperf-snippets
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Get latest release from webperf-snippets
+        id: upstream
+        run: |
+          RELEASE=$(curl -s "https://api.github.com/repos/nucliweb/webperf-snippets/releases/latest")
+          TAG=$(echo "$RELEASE" | jq -r '.tag_name')
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Latest webperf-snippets release: $TAG"
+
+      - name: Check current synced version
+        id: current
+        run: |
+          VERSION_FILE=".github/webperf-snippets-version"
+          if [ -f "$VERSION_FILE" ]; then
+            CURRENT=$(cat "$VERSION_FILE")
+          else
+            CURRENT="none"
+          fi
+          echo "version=$CURRENT" >> "$GITHUB_OUTPUT"
+          echo "Current synced version: $CURRENT"
+
+      - name: Download and extract skills
+        if: steps.upstream.outputs.tag != steps.current.outputs.version
+        env:
+          TAG: ${{ steps.upstream.outputs.tag }}
+        run: |
+          curl -fsSL "https://github.com/nucliweb/webperf-snippets/archive/refs/tags/${TAG}.tar.gz" \
+            -o /tmp/webperf-snippets.tar.gz
+          mkdir -p /tmp/webperf-snippets
+          tar xz -f /tmp/webperf-snippets.tar.gz -C /tmp/webperf-snippets --strip-components=1
+          cp -r /tmp/webperf-snippets/skills/. skills/
+          # Adapt tool references from standalone format to MCP server internal format
+          find skills/ -name "*.md" -exec sed -i 's/`mcp__chrome-devtools__/`/g' {} +
+          echo "$TAG" > .github/webperf-snippets-version
+
+      - name: Check for changes
+        if: steps.upstream.outputs.tag != steps.current.outputs.version
+        id: changes
+        run: |
+          git add skills/ .github/webperf-snippets-version
+          if git diff --staged --quiet; then
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
+            echo "No changes detected, skills are already up to date."
+          else
+            echo "has_changes=true" >> "$GITHUB_OUTPUT"
+            git diff --staged --stat
+          fi
+
+      - name: Check for existing PR
+        if: steps.changes.outputs.has_changes == 'true'
+        id: existing_pr
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.upstream.outputs.tag }}
+        run: |
+          BRANCH="sync/webperf-snippets-${TAG}"
+          PR=$(gh pr list --head "$BRANCH" --json number --jq '.[0].number // empty')
+          echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
+          echo "number=$PR" >> "$GITHUB_OUTPUT"
+
+      - name: Create pull request
+        if: steps.changes.outputs.has_changes == 'true' && steps.existing_pr.outputs.number == ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.upstream.outputs.tag }}
+          BRANCH: ${{ steps.existing_pr.outputs.branch }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$BRANCH"
+          git commit -m "sync: update webperf skills from webperf-snippets ${TAG}"
+          git push origin "$BRANCH"
+
+          SKILLS=$(find skills/ -maxdepth 1 -mindepth 1 -name "webperf*" -type d \
+            | sort | xargs -I{} basename {} | sed 's/^/- `/' | sed 's/$/`/')
+          STAT=$(git diff HEAD~1 --stat | tail -1)
+
+          {
+            echo "Automated sync of WebPerf skills from [nucliweb/webperf-snippets](https://github.com/nucliweb/webperf-snippets) release [${TAG}](https://github.com/nucliweb/webperf-snippets/releases/tag/${TAG})."
+            echo ""
+            echo "## Skills included"
+            echo ""
+            echo "${SKILLS}"
+            echo ""
+            echo "## Adaptations"
+            echo ""
+            echo "Tool references are automatically adapted from the standalone skill format (\`mcp__chrome-devtools__tool_name\`) to the MCP server internal format (\`tool_name\`) during sync."
+            echo ""
+            echo "## Stats"
+            echo ""
+            echo "${STAT}"
+          } > /tmp/pr-body.md
+
+          gh pr create \
+            --title "sync: webperf skills from webperf-snippets ${TAG}" \
+            --body-file /tmp/pr-body.md
+
+      - name: Skip — PR already exists
+        if: steps.changes.outputs.has_changes == 'true' && steps.existing_pr.outputs.number != ''
+        env:
+          TAG: ${{ steps.upstream.outputs.tag }}
+        run: |
+          echo "PR already exists for ${TAG} (#${{ steps.existing_pr.outputs.number }}), skipping."
+
+      - name: Skip — already up to date
+        if: steps.upstream.outputs.tag == steps.current.outputs.version
+        env:
+          TAG: ${{ steps.upstream.outputs.tag }}
+        run: echo "Already synced to ${TAG}, nothing to do."
