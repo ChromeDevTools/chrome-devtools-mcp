@@ -94,6 +94,7 @@ export async function createMcpServer(
             acceptInsecureCerts: serverArgs.acceptInsecureCerts,
             devtools,
             enableExtensions: serverArgs.categoryExtensions,
+            viaCli: serverArgs.viaCli,
           });
 
     if (context?.browser !== browser) {

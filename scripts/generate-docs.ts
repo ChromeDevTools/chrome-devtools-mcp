@@ -323,7 +323,7 @@ async function generateReference(
   console.log(`Found ${toolsWithAnnotations.length} tools`);
 
   // Generate markdown documentation
-  let markdown = `<!-- AUTO GENERATED DO NOT EDIT - run 'npm run docs' to update-->
+  let markdown = `<!-- AUTO GENERATED DO NOT EDIT - run 'npm run gen' to update-->
 
 # ${title} (~${(await measureServer(serverArgs)).tokenCount} cl100k_base tokens)
 

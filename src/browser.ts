@@ -149,6 +149,7 @@ interface McpLaunchOptions {
   ignoreDefaultChromeArgs?: string[];
   devtools: boolean;
   enableExtensions?: boolean;
+  viaCli?: boolean;
 }
 
 export function detectDisplay(): void {
@@ -181,7 +182,7 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
     userDataDir = path.join(
       os.homedir(),
       '.cache',
-      'chrome-devtools-mcp',
+      options.viaCli ? 'chrome-devtools-mcp-cli' : 'chrome-devtools-mcp',
       profileDirName,
     );
     await fs.promises.mkdir(userDataDir, {
