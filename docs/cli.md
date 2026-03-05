@@ -1,6 +1,6 @@
 # Chrome DevTools CLI
 
-The `chrome-devtools-mcp` package includes a CLI interface that allows you to interact with the browser directly from your terminal. This is particularly useful for debugging or when you want an agent to generate scripts that automate browser actions.
+The `chrome-devtools-mcp` package includes an **experimental** CLI interface that allows you to interact with the browser directly from your terminal. This is particularly useful for debugging or when you want an agent to generate scripts that automate browser actions.
 
 ## Getting started
 
@@ -13,7 +13,7 @@ chrome-devtools status # check if install worked.
 
 ## How it works
 
-The CLI acts as a client to a background `chrome-devtools-mcp` daemon.
+The CLI acts as a client to a background `chrome-devtools-mcp` daemon (uses Unix sockets on Linux/Mac and named pipes on Windows).
 
 - **Automatic Start**: The first time you call a tool (e.g., `list_pages`), the CLI automatically starts the MCP server and the browser in the background if they aren't already running.
 - **Persistence**: The same background instance is reused for subsequent commands, preserving the browser state (open pages, cookies, etc.).
