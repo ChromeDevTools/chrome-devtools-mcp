@@ -79,6 +79,7 @@ export async function createMcpServer(
               : undefined,
             userDataDir: serverArgs.userDataDir,
             devtools,
+            enableExtensions: serverArgs.categoryExtensions,
           })
         : await ensureBrowserLaunched({
             headless: serverArgs.headless,

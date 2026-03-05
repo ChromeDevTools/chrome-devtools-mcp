@@ -16,6 +16,7 @@ import {DevTools} from './third_party/index.js';
 import type {
   ConsoleMessage,
   ImageContent,
+  Page,
   ResourceType,
   TextContent,
 } from './third_party/index.js';
@@ -42,6 +43,7 @@ interface TraceInsightData {
 export class McpResponse implements Response {
   #includePages = false;
   #includeExtensionServiceWorkers = false;
+  #includeExtensionPages = false;
   #snapshotParams?: SnapshotParams;
   #attachedNetworkRequestId?: number;
   #attachedNetworkRequestOptions?: {
@@ -94,6 +96,7 @@ export class McpResponse implements Response {
 
     if (this.#args.categoryExtensions) {
       this.#includeExtensionServiceWorkers = value;
+      this.#includeExtensionPages = value;
     }
   }
 
@@ -501,6 +504,7 @@ export class McpResponse implements Response {
       pages?: object[];
       pagination?: object;
       extensionServiceWorkers?: object[];
+      extensionPages?: object[];
     } = {};
 
     const response = [];
@@ -559,34 +563,54 @@ Call ${handleDialog.name} to handle it before continuing.`);
     }
 
     if (this.#includePages) {
-      const parts = [`## Pages`];
-      for (const page of context.getPages()) {
-        const isolatedContextName = context.getIsolatedContextName(page);
-        const contextLabel = isolatedContextName
-          ? ` isolatedContext=${isolatedContextName}`
-          : '';
-        parts.push(
-          `${context.getPageId(page)}: ${page.url()}${context.isPageSelected(page) ? ' [selected]' : ''}${contextLabel}`,
-        );
-      }
-      response.push(...parts);
-      structuredContent.pages = context.getPages().map(page => {
-        const isolatedContextName = context.getIsolatedContextName(page);
-        const entry: {
-          id: number | undefined;
-          url: string;
-          selected: boolean;
-          isolatedContext?: string;
-        } = {
-          id: context.getPageId(page),
-          url: page.url(),
-          selected: context.isPageSelected(page),
-        };
-        if (isolatedContextName) {
-          entry.isolatedContext = isolatedContextName;
+      const allPages = context.getPages();
+
+      const {regularPages, extensionPages} = allPages.reduce(
+        (acc: {regularPages: Page[]; extensionPages: Page[]}, page: Page) => {
+          if (page.url().startsWith('chrome-extension://')) {
+            acc.extensionPages.push(page);
+          } else {
+            acc.regularPages.push(page);
+          }
+          return acc;
+        },
+        {regularPages: [], extensionPages: []},
+      );
+
+      if (regularPages.length) {
+        const parts = [`## Pages`];
+        const structuredPages = [];
+        for (const page of regularPages) {
+          const isolatedContextName = context.getIsolatedContextName(page);
+          const contextLabel = isolatedContextName
+            ? ` isolatedContext=${isolatedContextName}`
+            : '';
+          parts.push(
+            `${context.getPageId(page)}: ${page.url()}${context.isPageSelected(page) ? ' [selected]' : ''}${contextLabel}`,
+          );
+          structuredPages.push(createStructuredPage(page, context));
         }
-        return entry;
-      });
+        response.push(...parts);
+        structuredContent.pages = structuredPages;
+      }
+
+      if (this.#includeExtensionPages) {
+        if (extensionPages.length) {
+          response.push(`## Extension Pages`);
+          const structuredExtensionPages = [];
+          for (const page of extensionPages) {
+            const isolatedContextName = context.getIsolatedContextName(page);
+            const contextLabel = isolatedContextName
+              ? ` isolatedContext=${isolatedContextName}`
+              : '';
+            response.push(
+              `${context.getPageId(page)}: ${page.url()}${context.isPageSelected(page) ? ' [selected]' : ''}${contextLabel}`,
+            );
+            structuredExtensionPages.push(createStructuredPage(page, context));
+          }
+          structuredContent.extensionPages = structuredExtensionPages;
+        }
+      }
     }
 
     if (this.#includeExtensionServiceWorkers) {
@@ -802,4 +826,21 @@ Call ${handleDialog.name} to handle it before continuing.`);
   resetResponseLineForTesting() {
     this.#textResponseLines = [];
   }
+}
+function createStructuredPage(page: Page, context: McpContext) {
+  const isolatedContextName = context.getIsolatedContextName(page);
+  const entry: {
+    id: number | undefined;
+    url: string;
+    selected: boolean;
+    isolatedContext?: string;
+  } = {
+    id: context.getPageId(page),
+    url: page.url(),
+    selected: context.isPageSelected(page),
+  };
+  if (isolatedContextName) {
+    entry.isolatedContext = isolatedContextName;
+  }
+  return entry;
 }

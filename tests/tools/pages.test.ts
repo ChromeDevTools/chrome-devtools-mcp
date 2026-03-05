@@ -12,7 +12,6 @@ import type {Dialog} from 'puppeteer-core';
 import sinon from 'sinon';
 
 import type {ParsedArguments} from '../../src/cli.js';
-import {installExtension} from '../../src/tools/extensions.js';
 import {
   listPages,
   newPage,
@@ -25,9 +24,17 @@ import {
 } from '../../src/tools/pages.js';
 import {html, withMcpContext} from '../utils.js';
 
-const EXTENSION_PATH = path.join(
+const EXTENSION_SW_PATH = path.join(
   import.meta.dirname,
   '../../../tests/tools/fixtures/extension-sw',
+);
+const EXTENSION_PATH = path.join(
+  import.meta.dirname,
+  '../../../tests/tools/fixtures/extension',
+);
+const EXTENSION_SIDE_PANEL_PATH = path.join(
+  import.meta.dirname,
+  '../../../tests/tools/fixtures/extension-side-panel',
 );
 
 describe('pages', () => {
@@ -46,24 +53,65 @@ describe('pages', () => {
         assert.ok(response.includePages);
       });
     });
+    it(`list pages for extension pages with --category-extensions`, async t => {
+      await withMcpContext(
+        async (response, context) => {
+          const extensionId = await context.installExtension(EXTENSION_PATH);
+
+          assert.ok(extensionId);
+
+          await context.triggerExtensionAction(extensionId);
+
+          const _popupTarget = await context.browser.waitForTarget(
+            t => t.type() === 'page' && t.url().includes('chrome-extension://'),
+          );
+
+          response.resetResponseLineForTesting();
+          const listPageDef = listPages({
+            categoryExtensions: true,
+          } as ParsedArguments);
+          await listPageDef.handler(
+            {params: {}, page: context.getSelectedMcpPage()},
+            response,
+            context,
+          );
+
+          const result = await response.handle(listPageDef.name, context);
+          const textContent = result.content.find(c => c.type === 'text') as {
+            type: 'text';
+            text: string;
+          };
+          assert.ok(textContent);
+
+          const text = textContent.text.replaceAll(
+            extensionId,
+            '<extension-id>',
+          );
+          t.assert.snapshot?.(text);
+        },
+        {
+          executablePath: process.env.CHROME_M146_EXECUTABLE_PATH,
+        },
+        {
+          categoryExtensions: true,
+        } as ParsedArguments,
+      );
+    });
+
     for (const categoryExtensions of [true, false]) {
-      it(`list pages ${categoryExtensions ? 'with' : 'without'} --category-extensions`, async () => {
+      it(`list pages for extension service workers ${categoryExtensions ? 'with' : 'without'} --category-extensions`, async t => {
         await withMcpContext(
           async (response, context) => {
-            await installExtension.handler(
-              {params: {path: EXTENSION_PATH}},
-              response,
-              context,
-            );
+            const extensionId =
+              await context.installExtension(EXTENSION_SW_PATH);
+            assert.ok(extensionId);
 
             const swTarget = await context.browser.waitForTarget(
-              t =>
-                t.type() === 'service_worker' &&
-                t.url().includes('chrome-extension://'),
+              target =>
+                target.type() === 'service_worker' &&
+                target.url().includes('chrome-extension://'),
             );
             const swUrl = swTarget.url();
-
-            response.resetResponseLineForTesting();
 
             const listPageDef = listPages({
               categoryExtensions,
@@ -82,7 +130,6 @@ describe('pages', () => {
             assert.ok(textContent);
 
             if (categoryExtensions) {
-              assert.ok(textContent.text.includes(swUrl));
               const structured = result.structuredContent as {
                 extensionServiceWorkers: Array<{url: string}>;
               };
@@ -90,9 +137,13 @@ describe('pages', () => {
                 structured.extensionServiceWorkers.map(sw => sw.url),
                 [swUrl],
               );
-            } else {
-              assert.ok(!textContent.text.includes(swUrl));
             }
+
+            const text = textContent.text.replaceAll(
+              extensionId,
+              '<extension-id>',
+            );
+            t.assert.snapshot?.(text);
           },
           {},
           {
@@ -101,6 +152,53 @@ describe('pages', () => {
         );
       });
     }
+
+    it('list pages for side panels with --category-extensions', async t => {
+      await withMcpContext(
+        async (response, context) => {
+          const extensionId = await context.installExtension(
+            EXTENSION_SIDE_PANEL_PATH,
+          );
+
+          assert.ok(extensionId);
+
+          const _sidePanelPage = await context.newPage();
+          await _sidePanelPage.pptrPage.goto(
+            `chrome-extension://${extensionId}/sidepanel.html`,
+          );
+
+          await context.waitForTextOnPage(['Side Panel']);
+
+          const listPageDef = listPages({
+            categoryExtensions: true,
+          } as ParsedArguments);
+          await listPageDef.handler(
+            {params: {}, page: context.getSelectedMcpPage()},
+            response,
+            context,
+          );
+
+          const result = await response.handle(listPageDef.name, context);
+          const textContent = result.content.find(c => c.type === 'text') as {
+            type: 'text';
+            text: string;
+          };
+          assert.ok(textContent);
+
+          const text = textContent.text.replaceAll(
+            extensionId,
+            '<extension-id>',
+          );
+          t.assert.snapshot?.(text);
+        },
+        {
+          executablePath: process.env.CHROME_M146_EXECUTABLE_PATH,
+        },
+        {
+          categoryExtensions: true,
+        } as ParsedArguments,
+      );
+    });
   });
   describe('new_page', () => {
     it('create a page', async () => {
