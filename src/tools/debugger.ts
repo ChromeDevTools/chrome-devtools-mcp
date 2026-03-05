@@ -38,6 +38,12 @@ async function getSession(page: Page): Promise<CDPSession> {
     pausedState.delete(session);
   });
 
+  session.on('closed', () => {
+    sessions.delete(page);
+    scriptMap.delete(session);
+    pausedState.delete(session);
+  });
+
   // We intentionally do NOT auto-enable here to give users control,
   // but many tools will check or imply functionality that requires it.
   return session;
@@ -217,6 +223,10 @@ export const getPausedState = definePageTool({
   },
   schema: {},
   handler: async (request, response) => {
+    if (!sessions.has(request.page.pptrPage)) {
+      response.appendResponseLine('Debugger is not enabled (or no active session).');
+      return;
+    }
     const session = await getSession(request.page.pptrPage);
     const state = pausedState.get(session);
     
@@ -254,6 +264,9 @@ export const getScopeVariables = definePageTool({
         scopeIndex: zod.number().default(0).describe('The scope index (0 is typically local)'),
     },
     handler: async (request, response) => {
+      if (!sessions.has(request.page.pptrPage)) {
+        throw new Error('Debugger is not enabled.');
+      }
         const session = await getSession(request.page.pptrPage);
         const {callFrameId, scopeIndex} = request.params;
         
@@ -305,6 +318,9 @@ export const evaluateOnCallFrame = definePageTool({
         expression: zod.string().describe('The expression to evaluate'),
     },
     handler: async (request, response) => {
+      if (!sessions.has(request.page.pptrPage)) {
+        throw new Error('Debugger is not enabled.');
+      }
         const session = await getSession(request.page.pptrPage);
         const {callFrameId, expression} = request.params;
         
@@ -334,6 +350,9 @@ export const getScriptSource = definePageTool({
         scriptId: zod.string().describe('The script ID'),
     },
     handler: async (request, response) => {
+      if (!sessions.has(request.page.pptrPage)) {
+        throw new Error('Debugger is not enabled.');
+      }
         const session = await getSession(request.page.pptrPage);
         const {scriptId} = request.params;
         
@@ -355,6 +374,9 @@ export const getCodeLines = definePageTool({
         count: zod.number().default(10).describe('Number of lines to retrieve (default 10)'),
     },
     handler: async (request, response) => {
+      if (!sessions.has(request.page.pptrPage)) {
+        throw new Error('Debugger is not enabled.');
+      }
         const session = await getSession(request.page.pptrPage);
         const {scriptId, lineNumber, count} = request.params;
         

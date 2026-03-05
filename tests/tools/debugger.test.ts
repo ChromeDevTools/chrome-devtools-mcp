@@ -144,7 +144,31 @@ describe('debugger', () => {
       }
     });
   });
-  
+
+  it('reports not enabled when calling getPausedState without enabling', async () => {
+    await withMcpContext(async (response, context) => {
+      const page = context.getSelectedMcpPage();
+      await getPausedState.handler({ params: {}, page }, response, context);
+      assert.ok(response.responseLines[0].includes('Debugger is not enabled'));
+    });
+  });
+
+  it('throws when calling getScopeVariables without enabling', async () => {
+    await withMcpContext(async (response, context) => {
+      const page = context.getSelectedMcpPage();
+      try {
+        await getScopeVariables.handler({ params: { callFrameId: '1', scopeIndex: 0 }, page }, response, context);
+        assert.fail('Should have thrown');
+      } catch (e: any) {
+        if (!e.message.includes('Debugger is not enabled')) {
+          console.error('Unexpected error:', e);
+          assert.fail(`Expected "Debugger is not enabled", got: ${e.message}`);
+        }
+        assert.ok(true);
+      }
+    });
+  });
+
   it('evaluates on call frame (mock check)', async () => {
       // This is hard to test e2e without actually being paused.
       // We verified "not paused" error in getPausedState.
