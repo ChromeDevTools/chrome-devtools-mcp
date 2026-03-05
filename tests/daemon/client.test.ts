@@ -55,7 +55,7 @@ describe('daemon client', () => {
   describe('parsing', () => {
     it('handles MCP response with text format', async () => {
       const textResponse = {content: [{type: 'text' as const, text: 'test'}]};
-      assert.strictEqual(handleResponse(textResponse, 'md'), 'test');
+      assert.strictEqual(await handleResponse(textResponse, 'md'), 'test');
     });
 
     it('handles JSON response', async () => {
@@ -67,7 +67,7 @@ describe('daemon client', () => {
         },
       };
       assert.strictEqual(
-        handleResponse(jsonResponse, 'json'),
+        await handleResponse(jsonResponse, 'json'),
         JSON.stringify(jsonResponse.structuredContent),
       );
     });
@@ -78,7 +78,7 @@ describe('daemon client', () => {
         content: [{type: 'text' as const, text: 'Something went wrong'}],
       };
       assert.strictEqual(
-        handleResponse(errorResponse, 'md'),
+        await handleResponse(errorResponse, 'md'),
         JSON.stringify(errorResponse.content),
       );
     });
@@ -88,29 +88,24 @@ describe('daemon client', () => {
         content: [{type: 'text' as const, text: 'Fall through text'}],
       };
       assert.deepStrictEqual(
-        handleResponse(textResponse, 'json'),
+        await handleResponse(textResponse, 'json'),
         JSON.stringify(['Fall through text']),
       );
     });
 
-    it('throws error for unsupported content type', async () => {
+    it('supports images', async () => {
       const unsupportedContentResponse = {
         content: [
           {
-            type: 'resource' as const,
-            resource: {
-              uri: 'data:image/png;base64,base64data',
-              blob: 'base64data',
-              mimeType: 'image/png',
-            },
+            type: 'image' as const,
+            data: 'base64data',
+            mimeType: 'image/png',
           },
         ],
         structuredContent: {},
       };
-      assert.throws(
-        () => handleResponse(unsupportedContentResponse, 'md'),
-        new Error('Not supported response content type'),
-      );
+      const response = await handleResponse(unsupportedContentResponse, 'md');
+      assert.ok(response.includes('.png'));
     });
   });
 });

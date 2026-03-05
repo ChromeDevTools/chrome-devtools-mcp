@@ -11,6 +11,7 @@ import net from 'node:net';
 import {logger} from '../logger.js';
 import type {CallToolResult} from '../third_party/index.js';
 import {PipeTransport} from '../third_party/index.js';
+import {saveTemporaryFile} from '../utils/files.js';
 
 import type {DaemonMessage, DaemonResponse} from './types.js';
 import {
@@ -144,10 +145,10 @@ export async function stopDaemon() {
   await waitForFile(pidFilePath, /*removed=*/ true);
 }
 
-export function handleResponse(
+export async function handleResponse(
   response: CallToolResult,
   format: 'json' | 'md',
-): string {
+): Promise<string> {
   if (response.isError) {
     return JSON.stringify(response.content);
   }
@@ -161,9 +162,26 @@ export function handleResponse(
   for (const content of response.content) {
     if (content.type === 'text') {
       chunks.push(content.text);
+    } else if (content.type === 'image') {
+      const imageData = content.data;
+      const mimeType = content.mimeType;
+      let extension = '.png';
+      switch (mimeType) {
+        case 'image/jpg':
+        case 'image/jpeg':
+          extension = '.jpeg';
+          break;
+        case 'webp':
+          extension = '.webp';
+          break;
+      }
+      const data = Buffer.from(imageData, 'base64');
+      const name = crypto.randomUUID();
+      const {filepath} = await saveTemporaryFile(data, `${name}${extension}`);
+      chunks.push(`Saved to ${filepath}.`);
     } else {
       throw new Error('Not supported response content type');
     }
   }
-  return format === 'md' ? chunks.join('') : JSON.stringify(chunks);
+  return format === 'md' ? chunks.join(' ') : JSON.stringify(chunks);
 }

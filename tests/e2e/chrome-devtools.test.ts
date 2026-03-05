@@ -108,6 +108,26 @@ describe('chrome-devtools', () => {
     );
   });
 
+  it('can take screenshot', async () => {
+    const startResult = spawnSync('node', [CLI_PATH, 'start', ...START_ARGS]);
+    assert.strictEqual(
+      startResult.status,
+      0,
+      `start command failed: ${startResult.stderr.toString()}`,
+    );
+
+    const result = spawnSync('node', [CLI_PATH, 'take_screenshot']);
+    assert.strictEqual(
+      result.status,
+      0,
+      `take_screenshot command failed: ${result.stderr.toString()}`,
+    );
+    assert(
+      result.stdout.toString().includes('.png'),
+      'take_screenshot output is unexpected',
+    );
+  });
+
   it('forwards disclaimers to stderr on start', () => {
     const result = spawnSync('node', [CLI_PATH, 'start', ...START_ARGS]);
     assert.strictEqual(
