@@ -9,7 +9,9 @@ import os from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
 
+import type {ParsedArguments} from '../cli.js';
 import {logger} from '../logger.js';
+import type {YargsOptions} from '../third_party/index.js';
 
 export const DAEMON_SCRIPT_PATH = path.join(import.meta.dirname, 'daemon.js');
 export const INDEX_SCRIPT_PATH = path.join(
@@ -96,4 +98,33 @@ export function isDaemonRunning(pid = getDaemonPid()): pid is number {
     }
   }
   return false;
+}
+
+export function serializeArgs(
+  options: Record<string, YargsOptions>,
+  argv: ParsedArguments,
+): string[] {
+  const args: string[] = [];
+  for (const key of Object.keys(options)) {
+    if (argv[key] === undefined || argv[key] === null) {
+      continue;
+    }
+    const value = argv[key];
+    const kebabKey = key.replace(/[A-Z]/g, m => `-${m.toLowerCase()}`);
+
+    if (typeof value === 'boolean') {
+      if (value) {
+        args.push(`--${kebabKey}`);
+      } else {
+        args.push(`--no-${kebabKey}`);
+      }
+    } else if (Array.isArray(value)) {
+      for (const item of value) {
+        args.push(`--${kebabKey}`, String(item));
+      }
+    } else {
+      args.push(`--${kebabKey}`, String(value));
+    }
+  }
+  return args;
 }

@@ -10,14 +10,14 @@ import process from 'node:process';
 
 import type {Options, PositionalOptions} from 'yargs';
 
-import {parseArguments} from '../cli.js';
+import {cliOptions, parseArguments} from '../cli.js';
 import {
   startDaemon,
   stopDaemon,
   sendCommand,
   handleResponse,
 } from '../daemon/client.js';
-import {isDaemonRunning} from '../daemon/utils.js';
+import {isDaemonRunning, serializeArgs} from '../daemon/utils.js';
 import {logDisclaimers} from '../server.js';
 import {hideBin, yargs, type CallToolResult} from '../third_party/index.js';
 import {VERSION} from '../version.js';
@@ -26,7 +26,7 @@ import {commands} from './cliDefinitions.js';
 
 async function start(args: string[]) {
   const combinedArgs = [...args, ...defaultArgs];
-  await startDaemon([...args, ...defaultArgs]);
+  await startDaemon(combinedArgs);
   logDisclaimers(parseArguments(VERSION, combinedArgs));
 }
 
@@ -50,19 +50,17 @@ y.command(
   'Start or restart chrome-devtools-mcp',
   y =>
     y
-      .help(false) // Disable help for start command to avoid parsing issues with passed args.
+      .options(cliOptions)
       .example(
-        '$0 start --port 8080 --url http://localhost:8080',
-        'Start the server on port 8080 with a specific URL',
+        '$0 start --browserUrl http://localhost:9222',
+        'Start the server connecting to an existing browser',
       )
-      .strict(false), // Don't validate arguments for start, as they are passed through to the daemon.
-  async () => {
+      .strict(),
+  async argv => {
     if (isDaemonRunning()) {
       await stopDaemon();
     }
-    // Extract args after 'start'
-    const startIndex = process.argv.indexOf('start');
-    const args = startIndex !== -1 ? process.argv.slice(startIndex + 1) : [];
+    const args = serializeArgs(cliOptions, argv);
     await start(args);
     process.exit(0);
   },
