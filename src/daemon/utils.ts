@@ -16,7 +16,8 @@ export const DAEMON_SCRIPT_PATH = path.join(import.meta.dirname, 'daemon.js');
 export const INDEX_SCRIPT_PATH = path.join(
   import.meta.dirname,
   '..',
-  'index.js',
+  'bin',
+  'chrome-devtools-mcp.js',
 );
 
 const APP_NAME = 'chrome-devtools-mcp';

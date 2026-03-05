@@ -22,7 +22,7 @@ describe('e2e', () => {
     const transport = new StdioClientTransport({
       command: 'node',
       args: [
-        'build/src/index.js',
+        'build/src/bin/chrome-devtools-mcp.js',
         '--headless',
         '--isolated',
         '--executable-path',

@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {ParsedArguments} from './cli.js';
+import type {ParsedArguments} from './bin/chrome-devtools-mcp-cli-options.js';
 import {ConsoleFormatter} from './formatters/ConsoleFormatter.js';
 import {IssueFormatter} from './formatters/IssueFormatter.js';
 import {NetworkFormatter} from './formatters/NetworkFormatter.js';
