@@ -5,6 +5,7 @@
  */
 
 const currentYear = new Date().getFullYear();
+
 const licenseHeader = `
 /**
  * @license
