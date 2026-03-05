@@ -20,6 +20,8 @@ export {default as debug} from 'debug';
 export type {Debugger} from 'debug';
 export {McpServer} from '@modelcontextprotocol/sdk/server/mcp.js';
 export {StdioServerTransport} from '@modelcontextprotocol/sdk/server/stdio.js';
+export {StdioClientTransport} from '@modelcontextprotocol/sdk/client/stdio.js';
+export {Client} from '@modelcontextprotocol/sdk/client/index.js';
 export {
   type CallToolResult,
   SetLevelRequestSchema,

@@ -8,8 +8,7 @@
 
 import process from 'node:process';
 
-import yargs, {type Options, type PositionalOptions} from 'yargs';
-import {hideBin} from 'yargs/helpers';
+import type {Options, PositionalOptions} from 'yargs';
 
 import {parseArguments} from '../cli.js';
 import {
@@ -20,7 +19,7 @@ import {
 } from '../daemon/client.js';
 import {isDaemonRunning} from '../daemon/utils.js';
 import {logDisclaimers} from '../server.js';
-import type {CallToolResult} from '../third_party/index.js';
+import {hideBin, yargs, type CallToolResult} from '../third_party/index.js';
 import {VERSION} from '../version.js';
 
 import {commands} from './cliDefinitions.js';
