@@ -103,6 +103,7 @@ Possible workarounds include:
 ### Windows 10: Error during discovery for MCP server 'chrome-devtools': MCP error -32000: Connection closed
 
 - **Solution 1** Call using `cmd` (For more info https://github.com/modelcontextprotocol/servers/issues/1082#issuecomment-2791786310)
+
   ```json
   "mcpServers": {
       "chrome-devtools": {
@@ -110,7 +111,8 @@ Possible workarounds include:
         "args": ["/c", "npx", "-y", "chrome-devtools-mcp@latest"]
       }
     }
-  ``` 
+  ```
+
   > **The Key Change:** On Windows, running a Node.js package via `npx` often requires the `cmd /c` prefix to be executed correctly from within another process like VSCode's extension host. Therefore, `"command": "npx"` was replaced with `"command": "cmd"`, and the actual `npx` command was moved into the `"args"` array, preceded by `"/c"`. This fix allows Windows to interpret the command correctly and launch the server.
 
 - **Solution 2** Instead of another layer of shell you can write the absolute path to `npx`:
@@ -132,4 +134,3 @@ If you are using the `--autoConnect` flag and tools like `list_pages`, `new_page
 2. Remote debugging is enabled in Chrome via `chrome://inspect/#remote-debugging`.
 3. You have allowed the remote debugging connection prompt in the browser.
 4. There is no other MCP server or tool trying to connect to the same debugging port.
-
