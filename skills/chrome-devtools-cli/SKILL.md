@@ -44,7 +44,7 @@ chrome-devtools <tool> [arguments] [flags]
 - **Optional Arguments**: Passed as flags (e.g., `--filePath`, `--fullPage`).
 - **--help**: Each command supports `--help` for details about arguments.
 
-Each command accepts `--format=json` to output in JSON format. The default format is Markdown (`md`).
+Each command accepts `--output-format=json` to output in JSON format. The default format is Markdown (`md`).
 
 ## Input Automation (<uid> from snapshot)
 
