@@ -37,6 +37,22 @@ information on using pull requests.
 Please follow [conventional commits](https://www.conventionalcommits.org/en/v1.0.0/)
 for PR and commit titles.
 
+### Feature release checklist
+
+Use `chore:` for commits containing incomplete features that are not available
+to users yet. Once the feature is ready to be released, create a PR with a
+`feat:` prefix that enables the feature. The following criteria need to be
+completed:
+
+- Documentation for the feature is up to date. For example, README.md and tools
+  reference are updated.
+- The feature can be used with Chrome stable or version restrictions are
+  documented otherwise.
+- Corresponding skills are updated or new skills are added if needed.
+- The feature fulfills the use case by its own or in conjunction with existing
+  features (we want to avoid features that offer some tools but cannot be used
+  successfully to debug things).
+
 ## Installation
 
 Check that you are using node version specified in .nvmrc, then run following commands:
