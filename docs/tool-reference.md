@@ -1,6 +1,6 @@
 <!-- AUTO GENERATED DO NOT EDIT - run 'npm run docs' to update-->
 
-# Chrome DevTools MCP Tool Reference (~6927 cl100k_base tokens)
+# Chrome DevTools MCP Tool Reference (~6940 cl100k_base tokens)
 
 - **[Input automation](#input-automation)** (9 tools)
   - [`click`](#click)
@@ -348,7 +348,7 @@ so returned values have to be JSON-serializable.
 
 ### `lighthouse_audit`
 
-**Description:** Get Lighthouse score and reports for accessibility, SEO and best practices.
+**Description:** Get Lighthouse score and reports for accessibility, SEO and best practices. This excludes performance. For performance audits, run [`performance_start_trace`](#performance_start_trace)
 
 **Parameters:**
 
