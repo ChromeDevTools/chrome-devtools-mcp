@@ -287,7 +287,7 @@ export const commands: Commands = {
   },
   lighthouse_audit: {
     description:
-      'Get Lighthouse score and reports for accessibility, SEO and best practices.',
+      'Get Lighthouse score and reports for accessibility, SEO and best practices. This excludes performance. For performance audits, run performance_start_trace',
     category: 'Debugging',
     args: {
       mode: {
@@ -393,7 +393,8 @@ export const commands: Commands = {
     args: {},
   },
   navigate_page: {
-    description: 'Navigates the currently selected page to a URL.',
+    description:
+      'Go to a URL, or back, forward, or reload. Use project URL if not specified otherwise.',
     category: 'Navigation automation',
     args: {
       type: {
@@ -441,7 +442,8 @@ export const commands: Commands = {
     },
   },
   new_page: {
-    description: 'Creates a new page',
+    description:
+      'Open a new tab and load a URL. Use project URL if not specified otherwise.',
     category: 'Navigation automation',
     args: {
       url: {
@@ -496,7 +498,7 @@ export const commands: Commands = {
   },
   performance_start_trace: {
     description:
-      'Starts a performance trace recording on the selected page. This can be used to look for performance problems and insights to improve the performance of the page. It will also report Core Web Vital (CWV) scores for the page.',
+      'Start a performance trace on the selected webpage. Use to find frontend performance issues, Core Web Vitals (LCP, INP, CLS), and improve page load speed.',
     category: 'Performance',
     args: {
       reload: {
@@ -504,14 +506,16 @@ export const commands: Commands = {
         type: 'boolean',
         description:
           'Determines if, once tracing has started, the current selected page should be automatically reloaded. Navigate the page to the right URL using the navigate_page tool BEFORE starting the trace if reload or autoStop is set to true.',
-        required: true,
+        required: false,
+        default: true,
       },
       autoStop: {
         name: 'autoStop',
         type: 'boolean',
         description:
           'Determines if the trace recording should be automatically stopped.',
-        required: true,
+        required: false,
+        default: true,
       },
       filePath: {
         name: 'filePath',
@@ -524,7 +528,7 @@ export const commands: Commands = {
   },
   performance_stop_trace: {
     description:
-      'Stops the active performance trace recording on the selected page.',
+      'Stop the active performance trace recording on the selected webpage.',
     category: 'Performance',
     args: {
       filePath: {

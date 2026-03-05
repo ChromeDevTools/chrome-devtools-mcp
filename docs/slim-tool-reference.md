@@ -1,4 +1,4 @@
-<!-- AUTO GENERATED DO NOT EDIT - run 'npm run docs' to update-->
+<!-- AUTO GENERATED DO NOT EDIT - run 'npm run gen' to update-->
 
 # Chrome DevTools MCP Slim Tool Reference (~359 cl100k_base tokens)
 
