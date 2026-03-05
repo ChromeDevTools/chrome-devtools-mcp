@@ -1,6 +1,6 @@
 <!-- AUTO GENERATED DO NOT EDIT - run 'npm run docs' to update-->
 
-# Chrome DevTools MCP Tool Reference (~6915 cl100k_base tokens)
+# Chrome DevTools MCP Tool Reference (~6927 cl100k_base tokens)
 
 - **[Input automation](#input-automation)** (9 tools)
   - [`click`](#click)
@@ -165,7 +165,7 @@
 
 ### `navigate_page`
 
-**Description:** Navigates the currently selected page to a URL.
+**Description:** Go to a URL, or back, forward, or reload. Use project URL if not specified otherwise.
 
 **Parameters:**
 
@@ -180,7 +180,7 @@
 
 ### `new_page`
 
-**Description:** Creates a new page
+**Description:** Open a new tab and load a URL. Use project URL if not specified otherwise.
 
 **Parameters:**
 
@@ -256,7 +256,7 @@
 
 ### `performance_start_trace`
 
-**Description:** Starts a performance trace recording on the selected page. This can be used to look for performance problems and insights to improve the performance of the page. It will also report Core Web Vital (CWV) scores for the page.
+**Description:** Start a performance trace on the selected webpage. Use to find frontend performance issues, Core Web Vitals (LCP, INP, CLS), and improve page load speed.
 
 **Parameters:**
 
@@ -268,7 +268,7 @@
 
 ### `performance_stop_trace`
 
-**Description:** Stops the active performance trace recording on the selected page.
+**Description:** Stop the active performance trace recording on the selected webpage.
 
 **Parameters:**
 

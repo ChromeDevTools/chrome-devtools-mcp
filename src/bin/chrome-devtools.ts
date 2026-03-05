@@ -71,6 +71,23 @@ y.command(
 y.command('status', 'Checks if chrome-devtools-mcp is running', async () => {
   if (isDaemonRunning()) {
     console.log('chrome-devtools-mcp daemon is running.');
+    const response = await sendCommand({
+      method: 'status',
+    });
+    if (response.success) {
+      const data = JSON.parse(response.result) as {
+        pid: number | null;
+        socketPath: string;
+        startDate: string;
+        version: string;
+      };
+      console.log(
+        `pid=${data.pid} socket=${data.socketPath} start-date=${data.startDate} version=${data.version}`,
+      );
+    } else {
+      console.error('Error:', response.error);
+      process.exit(1);
+    }
   } else {
     console.log('chrome-devtools-mcp daemon is not running.');
   }
@@ -108,9 +125,9 @@ for (const [commandName, commandDef] of Object.entries(commands)) {
     commandStr,
     commandDef.description,
     y => {
-      y.option('format', {
-        choices: ['text', 'json'],
-        default: 'text',
+      y.option('output-format', {
+        choices: ['md', 'json'],
+        default: 'md',
       });
       for (const [argName, opt] of Object.entries(args)) {
         const type =
@@ -170,9 +187,9 @@ for (const [commandName, commandDef] of Object.entries(commands)) {
 
         if (response.success) {
           console.log(
-            handleResponse(
+            await handleResponse(
               JSON.parse(response.result) as unknown as CallToolResult,
-              argv['format'] as 'json' | 'text',
+              argv['output-format'] as 'json' | 'md',
             ),
           );
         } else {

@@ -43,6 +43,8 @@ logger(`Writing ${process.pid.toString()} to ${pidFilePath}`);
 
 const socketPath = getSocketPath();
 
+const startDate = new Date();
+
 let mcpClient: Client | null = null;
 let mcpTransport: StdioClientTransport | null = null;
 let server: Server | null = null;
@@ -108,7 +110,18 @@ async function handleRequest(msg: DaemonMessage) {
         success: true,
         message: 'stopping',
       };
-    } else {
+    } else if (msg.method === 'status') {
+      return {
+        success: true,
+        result: JSON.stringify({
+          pid: process.pid,
+          socketPath,
+          startDate: startDate.toISOString(),
+          version: VERSION,
+        }),
+      };
+    }
+    {
       return {
         success: false,
         error: `Unknown method: ${JSON.stringify(msg, null, 2)}`,
