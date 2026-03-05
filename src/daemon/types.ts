@@ -9,6 +9,9 @@ export type DaemonMessage =
       method: 'stop';
     }
   | {
+      method: 'status';
+    }
+  | {
       method: 'invoke_tool';
       tool: string;
       args?: Record<string, unknown>;

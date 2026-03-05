@@ -22,6 +22,16 @@ describe('chrome-devtools', () => {
     );
   }
 
+  function assertDaemonIsRunning() {
+    const result = spawnSync('node', [CLI_PATH, 'status']);
+    assert.ok(
+      result.stdout
+        .toString()
+        .startsWith('chrome-devtools-mcp daemon is running.\n'),
+      'chrome-devtools-mcp daemon is not running',
+    );
+  }
+
   beforeEach(() => {
     spawnSync('node', [CLI_PATH, 'stop']);
     assertDaemonIsNotRunning();
@@ -42,11 +52,7 @@ describe('chrome-devtools', () => {
       `start command failed: ${startResult.stderr.toString()}`,
     );
 
-    const result = spawnSync('node', [CLI_PATH, 'status']);
-    assert.strictEqual(
-      result.stdout.toString(),
-      'chrome-devtools-mcp daemon is running.\n',
-    );
+    assertDaemonIsRunning();
   });
 
   it('can start and stop the daemon', () => {
@@ -59,11 +65,7 @@ describe('chrome-devtools', () => {
       `start command failed: ${startResult.stderr.toString()}`,
     );
 
-    let result = spawnSync('node', [CLI_PATH, 'status']);
-    assert.strictEqual(
-      result.stdout.toString(),
-      'chrome-devtools-mcp daemon is running.\n',
-    );
+    assertDaemonIsRunning();
 
     const stopResult = spawnSync('node', [CLI_PATH, 'stop']);
     assert.strictEqual(
@@ -72,11 +74,7 @@ describe('chrome-devtools', () => {
       `stop command failed: ${stopResult.stderr.toString()}`,
     );
 
-    result = spawnSync('node', [CLI_PATH, 'status']);
-    assert.strictEqual(
-      result.stdout.toString(),
-      'chrome-devtools-mcp daemon is not running.\n',
-    );
+    assertDaemonIsNotRunning();
   });
 
   it('can invoke list_pages', async () => {
@@ -100,12 +98,7 @@ describe('chrome-devtools', () => {
       'list_pages output is unexpected',
     );
 
-    // Daemon should now be running.
-    const result = spawnSync('node', [CLI_PATH, 'status']);
-    assert.strictEqual(
-      result.stdout.toString(),
-      'chrome-devtools-mcp daemon is running.\n',
-    );
+    assertDaemonIsRunning();
   });
 
   it('forwards disclaimers to stderr on start', () => {

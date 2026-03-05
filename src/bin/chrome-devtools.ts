@@ -72,6 +72,23 @@ y.command(
 y.command('status', 'Checks if chrome-devtools-mcp is running', async () => {
   if (isDaemonRunning()) {
     console.log('chrome-devtools-mcp daemon is running.');
+    const response = await sendCommand({
+      method: 'status',
+    });
+    if (response.success) {
+      const data = JSON.parse(response.result) as {
+        pid: number | null;
+        socketPath: string;
+        startDate: string;
+        version: string;
+      };
+      console.log(
+        `pid=${data.pid} socket=${data.socketPath} start-date=${data.startDate} version=${data.version}`,
+      );
+    } else {
+      console.error('Error:', response.error);
+      process.exit(1);
+    }
   } else {
     console.log('chrome-devtools-mcp daemon is not running.');
   }
