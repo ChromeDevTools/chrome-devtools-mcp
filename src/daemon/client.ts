@@ -79,7 +79,7 @@ export async function startDaemon(mcpArgs: string[] = []) {
     fs.unlinkSync(pidFilePath);
   }
 
-  logger('Starting daemon...');
+  logger('Starting daemon...', ...mcpArgs);
   const child = spawn(process.execPath, [DAEMON_SCRIPT_PATH, ...mcpArgs], {
     detached: true,
     stdio: 'ignore',

@@ -9,7 +9,6 @@ import os from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
 
-import type {ParsedArguments} from '../cli.js';
 import {logger} from '../logger.js';
 import type {YargsOptions} from '../third_party/index.js';
 
@@ -102,7 +101,7 @@ export function isDaemonRunning(pid = getDaemonPid()): pid is number {
 
 export function serializeArgs(
   options: Record<string, YargsOptions>,
-  argv: ParsedArguments,
+  argv: Record<string, unknown>,
 ): string[] {
   const args: string[] = [];
   for (const key of Object.keys(options)) {

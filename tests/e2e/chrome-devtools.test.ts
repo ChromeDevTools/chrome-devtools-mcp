@@ -12,8 +12,6 @@ import {describe, it, afterEach, beforeEach} from 'node:test';
 const CLI_PATH = path.resolve('build/src/bin/chrome-devtools.js');
 
 describe('chrome-devtools', () => {
-  const START_ARGS = ['--headless', '--isolated'];
-
   function assertDaemonIsNotRunning() {
     const result = spawnSync('node', [CLI_PATH, 'status']);
     assert.strictEqual(
@@ -45,7 +43,7 @@ describe('chrome-devtools', () => {
   it('reports daemon status correctly', () => {
     assertDaemonIsNotRunning();
 
-    const startResult = spawnSync('node', [CLI_PATH, 'start', ...START_ARGS]);
+    const startResult = spawnSync('node', [CLI_PATH, 'start']);
     assert.strictEqual(
       startResult.status,
       0,
@@ -58,7 +56,7 @@ describe('chrome-devtools', () => {
   it('can start and stop the daemon', () => {
     assertDaemonIsNotRunning();
 
-    const startResult = spawnSync('node', [CLI_PATH, 'start', ...START_ARGS]);
+    const startResult = spawnSync('node', [CLI_PATH, 'start']);
     assert.strictEqual(
       startResult.status,
       0,
@@ -80,7 +78,7 @@ describe('chrome-devtools', () => {
   it('can invoke list_pages', async () => {
     assertDaemonIsNotRunning();
 
-    const startResult = spawnSync('node', [CLI_PATH, 'start', ...START_ARGS]);
+    const startResult = spawnSync('node', [CLI_PATH, 'start']);
     assert.strictEqual(
       startResult.status,
       0,
@@ -102,7 +100,7 @@ describe('chrome-devtools', () => {
   });
 
   it('can take screenshot', async () => {
-    const startResult = spawnSync('node', [CLI_PATH, 'start', ...START_ARGS]);
+    const startResult = spawnSync('node', [CLI_PATH, 'start']);
     assert.strictEqual(
       startResult.status,
       0,
@@ -122,7 +120,7 @@ describe('chrome-devtools', () => {
   });
 
   it('forwards disclaimers to stderr on start', () => {
-    const result = spawnSync('node', [CLI_PATH, 'start', ...START_ARGS]);
+    const result = spawnSync('node', [CLI_PATH, 'start']);
     assert.strictEqual(
       result.status,
       0,

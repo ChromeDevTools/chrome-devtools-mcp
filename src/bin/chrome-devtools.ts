@@ -32,6 +32,35 @@ async function start(args: string[]) {
 
 const defaultArgs = ['--viaCli', '--experimentalStructuredContent'];
 
+const startCliOptions = {
+  ...cliOptions,
+} as Partial<typeof cliOptions>;
+
+// Not supported in CLI on purpose.
+delete startCliOptions.autoConnect;
+// Missing CLI serialization.
+delete startCliOptions.viewport;
+// CLI is generated based on the default tool definitions. To enable conditional
+// tools, they needs to be enabled during CLI generation.
+delete startCliOptions.experimentalPageIdRouting;
+delete startCliOptions.experimentalVision;
+delete startCliOptions.experimentalInteropTools;
+delete startCliOptions.experimentalScreencast;
+delete startCliOptions.categoryEmulation;
+delete startCliOptions.categoryPerformance;
+delete startCliOptions.categoryNetwork;
+delete startCliOptions.categoryExtensions;
+// Always on in CLI.
+delete startCliOptions.experimentalStructuredContent;
+// Change the defaults.
+if (!('default' in cliOptions.headless)) {
+  throw new Error('headless cli option unexpectedly does not have a default');
+}
+if ('default' in cliOptions.isolated) {
+  throw new Error('headless cli option unexpectedly does not have a default');
+}
+startCliOptions.headless!.default = true;
+
 const y = yargs(hideBin(process.argv))
   .scriptName('chrome-devtools')
   .showHelpOnFail(true)
@@ -50,7 +79,7 @@ y.command(
   'Start or restart chrome-devtools-mcp',
   y =>
     y
-      .options(cliOptions)
+      .options(startCliOptions)
       .example(
         '$0 start --browserUrl http://localhost:9222',
         'Start the server connecting to an existing browser',
@@ -59,6 +88,13 @@ y.command(
   async argv => {
     if (isDaemonRunning()) {
       await stopDaemon();
+    }
+    // Defaults but we do not want to affect the yargs conflict resolution.
+    if (argv.isolated === undefined) {
+      argv.isolated = true;
+    }
+    if (argv.headless === undefined) {
+      argv.headless = true;
     }
     const args = serializeArgs(cliOptions, argv);
     await start(args);
