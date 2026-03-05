@@ -28,6 +28,14 @@ function makeTargetFilter() {
   ]);
 
   return function targetFilter(target: Target): boolean {
+    // Only attach to page-level targets. Iframes, service workers, shared
+    // workers, webviews, and background pages are not needed for MCP page
+    // interactions and attempting to initialize them (Network.enable, etc.)
+    // on frozen or suspended targets can cause connection timeouts.
+    const type = target.type();
+    if (type !== 'page' && type !== 'other') {
+      return false;
+    }
     if (target.url() === 'chrome://newtab/') {
       return true;
     }
