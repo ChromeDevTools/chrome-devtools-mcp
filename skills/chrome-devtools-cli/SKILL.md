@@ -3,48 +3,32 @@ name: chrome-devtools-cli
 description: Use this to skill to write shell scripts or run shell commands to automate tasks in the browser or otherwise use Chrome DevTools via CLI.
 ---
 
-The `chrome-devtools-mcp` package includes a CLI interface that allows you to interact with the browser directly from your terminal. This is particularly useful for debugging or when you want an agent to generate scripts that automate browser actions.
+The `chrome-devtools-mcp` CLI lets you interact with the browser from your terminal.
 
-## Getting started
+## Setup
 
-Install the package globally to make the `chrome-devtools` command available:
+_Note: If this is your very first time using the CLI, see [references/installation.md](references/installation.md) for setup. Installation is a one-time prerequisite and is **not** part of the regular AI workflow._
 
-```sh
-npm i chrome-devtools-mcp@latest -g
-chrome-devtools status # check if install worked.
-```
+## AI Workflow
 
-## How it works
+1. **Execute**: Run tools directly (e.g., `chrome-devtools list_pages`). The background server starts implicitly; **do not** run `start`/`status`/`stop` before each use.
+2. **Inspect**: Use `take_snapshot` to get an element `<uid>`.
+3. **Act**: Use `click`, `fill`, etc. State persists across commands.
 
-The CLI acts as a client to a background `chrome-devtools-mcp` daemon.
-
-- **Automatic Start**: The first time you call a tool (e.g., `list_pages`), the CLI automatically starts the MCP server and the browser in the background if they aren't already running.
-- **Persistence**: The same background instance is reused for subsequent commands, preserving the browser state (open pages, cookies, etc.).
-- **Manual Control**: You can explicitly manage the background process using `start`, `stop`, and `status`. The `start` command forwards all subsequent arguments to the underlying MCP server (e.g., `--headless`, `--userDataDir`).
-
-Snapshots looks like this:
+Snapshot example:
 
 ```
 uid=1_0 RootWebArea "Example Domain" url="https://example.com/"
   uid=1_1 heading "Example Domain" level="1"
-  uid=1_2 StaticText "This domain is for use in documentation examples without needing permission. Avoid use in operations."
-  uid=1_3 link "Learn more" url="https://iana.org/domains/example"
-    uid=1_4 StaticText "Learn more
 ```
 
 ## Command Usage
-
-The CLI supports all tools available in the Chrome DevTools MCP by default.
 
 ```sh
 chrome-devtools <tool> [arguments] [flags]
 ```
 
-- **Required Arguments**: Passed as positional arguments.
-- **Optional Arguments**: Passed as flags (e.g., `--filePath`, `--fullPage`).
-- **--help**: Each command supports `--help` for details about arguments.
-
-Each command accepts `--output-format=json` to output in JSON format. The default format is Markdown (`md`).
+Use `--help` on any command. Output defaults to Markdown, use `--output-format=json` for JSON.
 
 ## Input Automation (<uid> from snapshot)
 
@@ -57,8 +41,6 @@ chrome-devtools drag "src" "dst" # Drag an element onto another element
 chrome-devtools drag "src" "dst" --includeSnapshot true # Drag an element and return a snapshot
 chrome-devtools fill "id" "text" # Type text into an input or select an option
 chrome-devtools fill "id" "text" --includeSnapshot true # Fill an element and return a snapshot
-chrome-devtools fill_form "json" # Fill out multiple form elements at once
-chrome-devtools fill_form "json" --includeSnapshot true # Fill a form and return a snapshot
 chrome-devtools handle_dialog accept # Handle a browser dialog
 chrome-devtools handle_dialog dismiss --promptText "hi" # Dismiss a dialog with prompt text
 chrome-devtools hover "id" # Hover over the provided element
@@ -86,8 +68,6 @@ chrome-devtools new_page "https://example.com" --background true --timeout 5000 
 chrome-devtools new_page "https://example.com" --isolatedContext "ctx" # Create new page with isolated context
 chrome-devtools select_page 1 # Select a page as a context for future tool calls
 chrome-devtools select_page 1 --bringToFront true # Select a page and bring it to front
-chrome-devtools wait_for "Success!" # Wait for the specified text to appear on the page
-chrome-devtools wait_for "Success!" --timeout 10000 # Wait for text with a timeout
 ```
 
 ## Emulation
@@ -115,11 +95,11 @@ chrome-devtools take_memory_snapshot "./snap.heapsnapshot" # Capture a memory he
 
 ```bash
 chrome-devtools get_network_request # Get the currently selected network request
-chrome-devtools get_network_request --reqid 1 --requestFilePath req.json # Get request by id and save to file
-chrome-devtools get_network_request --responseFilePath res.json # Save response body to file
+chrome-devtools get_network_request --reqid 1 --requestFilePath req.md # Get request by id and save to file
+chrome-devtools get_network_request --responseFilePath res.md # Save response body to file
 chrome-devtools list_network_requests # List all network requests
 chrome-devtools list_network_requests --pageSize 50 --pageIdx 0 # List network requests with pagination
-chrome-devtools list_network_requests --resourceTypes '["Fetch"]' # Filter requests by resource type
+chrome-devtools list_network_requests --resourceTypes Fetch # Filter requests by resource type
 chrome-devtools list_network_requests --includePreservedRequests true # Include preserved requests
 ```
 
@@ -134,7 +114,7 @@ chrome-devtools lighthouse_audit --mode "snapshot" --device "mobile" # Run Light
 chrome-devtools lighthouse_audit --outputDirPath ./out # Run Lighthouse audit and save reports
 chrome-devtools list_console_messages # List all console messages
 chrome-devtools list_console_messages --pageSize 20 --pageIdx 1 # List console messages with pagination
-chrome-devtools list_console_messages --types '["error"]' # Filter console messages by type
+chrome-devtools list_console_messages --types error --types info # Filter console messages by type
 chrome-devtools list_console_messages --includePreservedMessages true # Include preserved messages
 chrome-devtools take_screenshot # Take a screenshot of the page viewport
 chrome-devtools take_screenshot --fullPage true --format "jpeg" --quality 80 # Take a full page screenshot as JPEG with quality
