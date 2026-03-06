@@ -28,7 +28,7 @@ export const createTools = (args: ParsedArguments) => {
     ? Object.values(slimTools)
     : [
         ...Object.values(consoleTools),
-      ...Object.values(debuggerTools),
+        ...Object.values(debuggerTools),
         ...Object.values(emulationTools),
         ...Object.values(extensionTools),
         ...Object.values(inputTools),

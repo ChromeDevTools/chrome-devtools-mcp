@@ -41,7 +41,7 @@ export const DEFAULT_LOCALE = 'en-US';
 export const REMOTE_FETCH_PATTERN = '@HOST@/remote/serve_file/@VERSION@/core/i18n/locales/@LOCALE@.json';
 
 export const LOCAL_FETCH_PATTERN = './locales/@LOCALE@.json';`;
-  fs.mkdirSync(i18nDir, { recursive: true });
+  fs.mkdirSync(i18nDir, {recursive: true});
   writeFile(localesFile, localesContent);
 
   // Create codemirror.next mock.
