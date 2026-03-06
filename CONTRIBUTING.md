@@ -67,7 +67,7 @@ npm run build
 ### Testing with @modelcontextprotocol/inspector
 
 ```sh
-npx @modelcontextprotocol/inspector node build/src/index.js
+npx @modelcontextprotocol/inspector node /build/src/bin/chrome-devtools-mcp.js
 ```
 
 ### Testing with an MCP client
@@ -79,7 +79,7 @@ Add the MCP server to your client's config.
   "mcpServers": {
     "chrome-devtools": {
       "command": "node",
-      "args": ["/path-to/build/src/index.js"]
+      "args": ["/path-to/build/src/bin/chrome-devtools-mcp.js"]
     }
   }
 }
@@ -95,7 +95,7 @@ Usually VS Code automatically detects and forwards `6274` but fails to detect `6
 To write debug logs to `log.txt` in the working directory, run with the following commands:
 
 ```sh
-npx @modelcontextprotocol/inspector node build/src/index.js --log-file=/your/desired/path/log.txt
+npx @modelcontextprotocol/inspector node /build/src/bin/chrome-devtools-mcp.js --log-file=/your/desired/path/log.txt
 ```
 
 You can use the `DEBUG` environment variable as usual to control categories that are logged.
