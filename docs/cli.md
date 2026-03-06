@@ -91,3 +91,11 @@ For more verbose logs, set the `DEBUG` environment variable:
 ```sh
 DEBUG=* chrome-devtools list_pages
 ```
+
+## CLI generation
+
+Implemented in `scripts/generate-cli.ts`. Some commands are excluded from CLI
+generation such as `wait_for` and `fill_form`.
+
+`chrome-devtools-mcp` args are also filtered in `src/bin/chrome-devtools.ts`
+because not all args make sense in a CLI interface.

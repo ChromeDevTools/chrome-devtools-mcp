@@ -102,8 +102,23 @@ function schemaToCLIOptions(schema: JsonSchema): CliOption[] {
 
 async function generateCli() {
   const tools = await fetchTools();
+
   // Sort tools by name
-  const sortedTools = tools.sort((a, b) => a.name.localeCompare(b.name));
+  const sortedTools = tools
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .filter(tool => {
+      // Skipping fill_form because it is not relevant in shell scripts
+      // and CLI does not handle array/JSON args well.
+      if (tool.name === 'fill_form') {
+        return false;
+      }
+      // Skipping wait_for because CLI does not handle array/JSON args well
+      // and shell scripts have many mechanisms for waiting.
+      if (tool.name === 'wait_for') {
+        return false;
+      }
+      return true;
+    });
 
   const staticTools = createTools(parseArguments());
   const toolNameToCategory = new Map<string, string>();
