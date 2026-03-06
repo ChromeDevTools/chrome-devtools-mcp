@@ -75,7 +75,7 @@ chrome-devtools lighthouse_audit --mode snapshot
 By default, the CLI outputs a human-readable summary of the tool's result. For programmatic use, you can request raw JSON:
 
 ```sh
-chrome-devtools list_pages --format=json
+chrome-devtools list_pages --output-format=json
 ```
 
 ## Troubleshooting
