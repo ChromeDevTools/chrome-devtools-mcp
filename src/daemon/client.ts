@@ -85,6 +85,7 @@ export async function startDaemon(mcpArgs: string[] = []) {
     stdio: 'ignore',
     env: process.env,
     cwd: process.cwd(),
+    windowsHide: true,
   });
   child.unref();
 
