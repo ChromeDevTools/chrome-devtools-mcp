@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.19.1](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.19.0...chrome-devtools-mcp-v0.19.1) (2026-03-06)
+
+
+### 📄 Documentation
+
+* fix typos and improve phrasing ([#1130](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1130)) ([70d4f36](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/70d4f365dc619a5743e697c30800f7065bc6227d))
+* revise contribution process and add release process ([#1134](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1134)) ([d7d26a1](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/d7d26a103b840e2feb7cb9af6a242edda94f1ddf))
+* Update troubleshooting for MCP server connection errors ([#1017](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1017)) ([00f9c31](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/00f9c3108ab9caefca57998439052c728298920b))
+
+
+### 🏗️ Refactor
+
+* move main files ([#1120](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1120)) ([c2d8009](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/c2d8009ff75f76bce1ec4cf79c2467b50d81725e))
+
 ## [0.19.0](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.18.1...chrome-devtools-mcp-v0.19.0) (2026-03-05)
 
 
