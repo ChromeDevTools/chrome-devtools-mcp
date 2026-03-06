@@ -8,7 +8,7 @@ import assert from 'node:assert';
 import path from 'node:path';
 import {describe, it} from 'node:test';
 
-import type {ParsedArguments} from '../../src/cli.js';
+import type {ParsedArguments} from '../../src/bin/chrome-devtools-mcp-cli-options.js';
 import {installExtension} from '../../src/tools/extensions.js';
 import {evaluateScript} from '../../src/tools/script.js';
 import {serverHooks} from '../server.js';
