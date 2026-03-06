@@ -109,6 +109,7 @@ export class McpContext implements Context {
     null;
 
   #nextPageId = 1;
+  #extensionPages = new WeakMap<Target, Page>();
 
   #extensionServiceWorkerMap = new WeakMap<Target, string>();
   #nextExtensionServiceWorkerId = 1;
@@ -588,6 +589,36 @@ export class McpContext implements Context {
     const allPages = await this.browser.pages(
       this.#options.experimentalIncludeAllPages,
     );
+
+    const allTargets = this.browser.targets();
+    const extensionTargets = allTargets.filter(target => {
+      return (
+        target.url().startsWith('chrome-extension://') &&
+        target.type() === 'page'
+      );
+    });
+
+    for (const target of extensionTargets) {
+      // Right now target.page() returns null for popup and side panel pages.
+      let page = await target.page();
+      if (!page) {
+        // We need to cache pages instances for targets because target.asPage()
+        // returns a new page instance every time.
+        page = this.#extensionPages.get(target) ?? null;
+        if (!page) {
+          try {
+            page = await target.asPage();
+            this.#extensionPages.set(target, page);
+          } catch (e) {
+            this.logger('Failed to get page for extension target', e);
+          }
+        }
+      }
+
+      if (page && !allPages.includes(page)) {
+        allPages.push(page);
+      }
+    }
 
     // Build a reverse lookup from BrowserContext instance → name.
     const contextToName = new Map<BrowserContext, string>();

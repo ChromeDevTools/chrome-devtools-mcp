@@ -75,7 +75,7 @@ chrome-devtools lighthouse_audit --mode snapshot
 By default, the CLI outputs a human-readable summary of the tool's result. For programmatic use, you can request raw JSON:
 
 ```sh
-chrome-devtools list_pages --format=json
+chrome-devtools list_pages --output-format=json
 ```
 
 ## Troubleshooting
@@ -91,3 +91,11 @@ For more verbose logs, set the `DEBUG` environment variable:
 ```sh
 DEBUG=* chrome-devtools list_pages
 ```
+
+## CLI generation
+
+Implemented in `scripts/generate-cli.ts`. Some commands are excluded from CLI
+generation such as `wait_for` and `fill_form`.
+
+`chrome-devtools-mcp` args are also filtered in `src/bin/chrome-devtools.ts`
+because not all args make sense in a CLI interface.

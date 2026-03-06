@@ -7,7 +7,7 @@
 import assert from 'node:assert';
 import {before, describe, it} from 'node:test';
 
-import type {ParsedArguments} from '../../src/cli.js';
+import type {ParsedArguments} from '../../src/bin/chrome-devtools-mcp-cli-options.js';
 import {loadIssueDescriptions} from '../../src/issue-descriptions.js';
 import {McpResponse} from '../../src/McpResponse.js';
 import {DevTools} from '../../src/third_party/index.js';

@@ -10,7 +10,6 @@ import process from 'node:process';
 
 import type {Options, PositionalOptions} from 'yargs';
 
-import {cliOptions, parseArguments} from '../cli.js';
 import {
   startDaemon,
   stopDaemon,
@@ -18,11 +17,12 @@ import {
   handleResponse,
 } from '../daemon/client.js';
 import {isDaemonRunning, serializeArgs} from '../daemon/utils.js';
-import {logDisclaimers} from '../server.js';
+import {logDisclaimers} from '../index.js';
 import {hideBin, yargs, type CallToolResult} from '../third_party/index.js';
 import {VERSION} from '../version.js';
 
-import {commands} from './cliDefinitions.js';
+import {commands} from './chrome-devtools-cli-options.js';
+import {cliOptions, parseArguments} from './chrome-devtools-mcp-cli-options.js';
 
 async function start(args: string[]) {
   const combinedArgs = [...args, ...defaultArgs];

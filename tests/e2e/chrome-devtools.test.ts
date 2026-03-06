@@ -5,129 +5,147 @@
  */
 
 import assert from 'node:assert';
-import {spawnSync} from 'node:child_process';
+import {spawn} from 'node:child_process';
 import path from 'node:path';
 import {describe, it, afterEach, beforeEach} from 'node:test';
 
 const CLI_PATH = path.resolve('build/src/bin/chrome-devtools.js');
 
+async function runCli(
+  args: string[],
+): Promise<{status: number | null; stdout: string; stderr: string}> {
+  return new Promise((resolve, reject) => {
+    const child = spawn('node', [CLI_PATH, ...args]);
+    let stdout = '';
+    let stderr = '';
+    child.stdout.on('data', chunk => {
+      stdout += chunk;
+      process.stdout.write(chunk);
+    });
+    child.stderr.on('data', chunk => {
+      stderr += chunk;
+      process.stderr.write(chunk);
+    });
+    child.on('close', status => resolve({status, stdout, stderr}));
+    child.on('error', reject);
+  });
+}
+
 describe('chrome-devtools', () => {
-  function assertDaemonIsNotRunning() {
-    const result = spawnSync('node', [CLI_PATH, 'status']);
+  async function assertDaemonIsNotRunning() {
+    const result = await runCli(['status']);
     assert.strictEqual(
-      result.stdout.toString(),
+      result.stdout,
       'chrome-devtools-mcp daemon is not running.\n',
     );
   }
 
-  function assertDaemonIsRunning() {
-    const result = spawnSync('node', [CLI_PATH, 'status']);
+  async function assertDaemonIsRunning() {
+    const result = await runCli(['status']);
     assert.ok(
-      result.stdout
-        .toString()
-        .startsWith('chrome-devtools-mcp daemon is running.\n'),
+      result.stdout.startsWith('chrome-devtools-mcp daemon is running.\n'),
       'chrome-devtools-mcp daemon is not running',
     );
   }
 
-  beforeEach(() => {
-    spawnSync('node', [CLI_PATH, 'stop']);
-    assertDaemonIsNotRunning();
+  beforeEach(async () => {
+    await runCli(['stop']);
+    await assertDaemonIsNotRunning();
   });
 
-  afterEach(() => {
-    spawnSync('node', [CLI_PATH, 'stop']);
-    assertDaemonIsNotRunning();
+  afterEach(async () => {
+    await runCli(['stop']);
+    await assertDaemonIsNotRunning();
   });
 
-  it('reports daemon status correctly', () => {
-    assertDaemonIsNotRunning();
+  it('reports daemon status correctly', async () => {
+    await assertDaemonIsNotRunning();
 
-    const startResult = spawnSync('node', [CLI_PATH, 'start']);
+    const startResult = await runCli(['start']);
     assert.strictEqual(
       startResult.status,
       0,
-      `start command failed: ${startResult.stderr.toString()}`,
+      `start command failed: ${startResult.stderr}`,
     );
 
-    assertDaemonIsRunning();
+    await assertDaemonIsRunning();
   });
 
-  it('can start and stop the daemon', () => {
-    assertDaemonIsNotRunning();
+  it('can start and stop the daemon', async () => {
+    await assertDaemonIsNotRunning();
 
-    const startResult = spawnSync('node', [CLI_PATH, 'start']);
+    const startResult = await runCli(['start']);
     assert.strictEqual(
       startResult.status,
       0,
-      `start command failed: ${startResult.stderr.toString()}`,
+      `start command failed: ${startResult.stderr}`,
     );
 
-    assertDaemonIsRunning();
+    await assertDaemonIsRunning();
 
-    const stopResult = spawnSync('node', [CLI_PATH, 'stop']);
+    const stopResult = await runCli(['stop']);
     assert.strictEqual(
       stopResult.status,
       0,
-      `stop command failed: ${stopResult.stderr.toString()}`,
+      `stop command failed: ${stopResult.stderr}`,
     );
 
-    assertDaemonIsNotRunning();
+    await assertDaemonIsNotRunning();
   });
 
   it('can invoke list_pages', async () => {
-    assertDaemonIsNotRunning();
+    await assertDaemonIsNotRunning();
 
-    const startResult = spawnSync('node', [CLI_PATH, 'start']);
+    const startResult = await runCli(['start']);
     assert.strictEqual(
       startResult.status,
       0,
-      `start command failed: ${startResult.stderr.toString()}`,
+      `start command failed: ${startResult.stderr}`,
     );
 
-    const listPagesResult = spawnSync('node', [CLI_PATH, 'list_pages']);
+    const listPagesResult = await runCli(['list_pages']);
     assert.strictEqual(
       listPagesResult.status,
       0,
-      `list_pages command failed: ${listPagesResult.stderr.toString()}`,
+      `list_pages command failed: ${listPagesResult.stderr}`,
     );
     assert(
-      listPagesResult.stdout.toString().includes('about:blank'),
+      listPagesResult.stdout.includes('about:blank'),
       'list_pages output is unexpected',
     );
 
-    assertDaemonIsRunning();
+    await assertDaemonIsRunning();
   });
 
   it('can take screenshot', async () => {
-    const startResult = spawnSync('node', [CLI_PATH, 'start']);
+    const startResult = await runCli(['start']);
     assert.strictEqual(
       startResult.status,
       0,
-      `start command failed: ${startResult.stderr.toString()}`,
+      `start command failed: ${startResult.stderr}`,
     );
 
-    const result = spawnSync('node', [CLI_PATH, 'take_screenshot']);
+    const result = await runCli(['take_screenshot']);
     assert.strictEqual(
       result.status,
       0,
-      `take_screenshot command failed: ${result.stderr.toString()}`,
+      `take_screenshot command failed: ${result.stderr}`,
     );
     assert(
-      result.stdout.toString().includes('.png'),
+      result.stdout.includes('.png'),
       'take_screenshot output is unexpected',
     );
   });
 
-  it('forwards disclaimers to stderr on start', () => {
-    const result = spawnSync('node', [CLI_PATH, 'start']);
+  it('forwards disclaimers to stderr on start', async () => {
+    const result = await runCli(['start']);
     assert.strictEqual(
       result.status,
       0,
-      `start command failed: ${result.stderr.toString()}`,
+      `start command failed: ${result.stderr}`,
     );
     assert(
-      result.stderr.toString().includes('chrome-devtools-mcp exposes content'),
+      result.stderr.includes('chrome-devtools-mcp exposes content'),
       'Disclaimer not found in stderr on start',
     );
   });
