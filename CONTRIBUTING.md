@@ -55,11 +55,10 @@ completed:
 
 ### Release process
 
-Releasing `chrome-devtools-mcp` is automated by GitHub actions. Reviewing,
-testing and landing a PR titled `chore(main): release chrome-devtools-mcp`
-is sufficient to release a new version. The release PR is automatically
-opened if there are any changes on the main branch that show up in the 
-changelog.
+Releasing `chrome-devtools-mcp` is automated by GitHub Actions. To release a new
+version, [search for a PR titled `chore(main): release chrome-devtools-mcp`](https://github.com/ChromeDevTools/chrome-devtools-mcp/pulls?q=is%3Apr+is%3Aopen+%22chore%28main%29%3A+release+chrome-devtools-mcp%22)
+and review, test, and land it. The release PR is automatically opened if there
+are any changes on the main branch that show up in the changelog.
 
 ## Installation
 
