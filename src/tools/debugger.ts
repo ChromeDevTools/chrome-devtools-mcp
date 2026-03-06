@@ -169,7 +169,10 @@ export const setLogpoint = definePageTool({
     // NOTE: This simple regex replacement assumes balanced braces and no nested braces.
     const runExpression =
       'console.log(`' +
-      message.replace(/`/g, '\\`').replace(/\{([^}]+)\}/g, '${$1}') +
+      message
+        .replace(/\\/g, '\\\\')
+        .replace(/`/g, '\\`')
+        .replace(/\{([^}]+)\}/g, '${$1}') +
       '`)';
     const condition = `(${runExpression}, false)`;
 
