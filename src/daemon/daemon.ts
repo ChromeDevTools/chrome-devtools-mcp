@@ -44,6 +44,7 @@ logger(`Writing ${process.pid.toString()} to ${pidFilePath}`);
 const socketPath = getSocketPath();
 
 const startDate = new Date();
+const mcpServerArgs = process.argv.slice(2);
 
 let mcpClient: Client | null = null;
 let mcpTransport: StdioClientTransport | null = null;
@@ -52,11 +53,10 @@ let server: Server | null = null;
 async function setupMCPClient() {
   console.log('Setting up MCP client connection...');
 
-  const args = process.argv.slice(2);
   // Create stdio transport for chrome-devtools-mcp
   mcpTransport = new StdioClientTransport({
     command: process.execPath,
-    args: [INDEX_SCRIPT_PATH, ...args],
+    args: [INDEX_SCRIPT_PATH, ...mcpServerArgs],
     env: process.env as Record<string, string>,
   });
   mcpClient = new Client(
@@ -118,6 +118,7 @@ async function handleRequest(msg: DaemonMessage) {
           socketPath,
           startDate: startDate.toISOString(),
           version: VERSION,
+          args: mcpServerArgs,
         }),
       };
     }
