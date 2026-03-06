@@ -184,25 +184,6 @@ export const commands: Commands = {
       },
     },
   },
-  fill_form: {
-    description: 'Fill out multiple form elements at once',
-    category: 'Input automation',
-    args: {
-      elements: {
-        name: 'elements',
-        type: 'array',
-        description: 'Elements from snapshot to fill out.',
-        required: true,
-      },
-      includeSnapshot: {
-        name: 'includeSnapshot',
-        type: 'boolean',
-        description:
-          'Whether to include a snapshot in the response. Default is false.',
-        required: false,
-      },
-    },
-  },
   get_console_message: {
     description:
       'Gets a console message by its ID. You can get all messages by calling list_console_messages.',
@@ -718,26 +699,6 @@ export const commands: Commands = {
         type: 'boolean',
         description:
           'Whether to include a snapshot in the response. Default is false.',
-        required: false,
-      },
-    },
-  },
-  wait_for: {
-    description: 'Wait for the specified text to appear on the selected page.',
-    category: 'Navigation automation',
-    args: {
-      text: {
-        name: 'text',
-        type: 'array',
-        description:
-          'Non-empty list of texts. Resolves when any value appears on the page.',
-        required: true,
-      },
-      timeout: {
-        name: 'timeout',
-        type: 'integer',
-        description:
-          'Maximum wait time in milliseconds. If set to 0, the default timeout will be used.',
         required: false,
       },
     },
