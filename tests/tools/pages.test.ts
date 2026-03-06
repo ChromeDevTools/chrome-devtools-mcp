@@ -11,7 +11,7 @@ import {afterEach, describe, it} from 'node:test';
 import type {Dialog} from 'puppeteer-core';
 import sinon from 'sinon';
 
-import type {ParsedArguments} from '../../src/cli.js';
+import type {ParsedArguments} from '../../src/bin/chrome-devtools-mcp-cli-options.js';
 import {
   listPages,
   newPage,
@@ -162,12 +162,17 @@ describe('pages', () => {
 
           assert.ok(extensionId);
 
-          const _sidePanelPage = await context.newPage();
-          await _sidePanelPage.pptrPage.goto(
+          const sidePanelPage = await context.newPage();
+          await sidePanelPage.pptrPage.goto(
             `chrome-extension://${extensionId}/sidepanel.html`,
           );
 
           await context.waitForTextOnPage(['Side Panel']);
+
+          // Wait for service worker used in the snapshot.
+          await context.browser.waitForTarget(
+            target => target.type() === 'service_worker',
+          );
 
           const listPageDef = listPages({
             categoryExtensions: true,

@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {YargsOptions} from './third_party/index.js';
-import {yargs, hideBin} from './third_party/index.js';
+import type {YargsOptions} from '../third_party/index.js';
+import {yargs, hideBin} from '../third_party/index.js';
 
 export const cliOptions = {
   autoConnect: {

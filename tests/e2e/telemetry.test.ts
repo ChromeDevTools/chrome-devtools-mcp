@@ -13,7 +13,7 @@ import {describe, it} from 'node:test';
 
 import type {ChromeDevToolsMcpExtension} from '../../src/telemetry/types';
 
-const SERVER_PATH = path.resolve('build/src/main.js');
+const SERVER_PATH = path.resolve('build/src/bin/chrome-devtools-mcp.js');
 
 interface MockServerContext {
   server: http.Server;
