@@ -77,6 +77,41 @@ describe('browser', () => {
       await browser.close();
     }
   });
+
+  it('launches with the initial viewport device scale factor', async () => {
+    const tmpDir = os.tmpdir();
+    const folderPath = path.join(tmpDir, `temp-folder-${crypto.randomUUID()}`);
+    const browser = await launch({
+      headless: true,
+      isolated: false,
+      userDataDir: folderPath,
+      executablePath: executablePath(),
+      viewport: {
+        width: 1501,
+        height: 801,
+        deviceScaleFactor: 2,
+      },
+      devtools: false,
+    });
+    try {
+      const [page] = await browser.pages();
+      const result = await page.evaluate(() => {
+        return {
+          width: window.innerWidth,
+          height: window.innerHeight,
+          devicePixelRatio: window.devicePixelRatio,
+        };
+      });
+      assert.deepStrictEqual(result, {
+        width: 1501,
+        height: 801,
+        devicePixelRatio: 2,
+      });
+    } finally {
+      await browser.close();
+    }
+  });
+
   it('connects to an existing browser with userDataDir', async () => {
     const tmpDir = os.tmpdir();
     const folderPath = path.join(tmpDir, `temp-folder-${crypto.randomUUID()}`);
