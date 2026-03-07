@@ -144,6 +144,7 @@ interface McpLaunchOptions {
   viewport?: {
     width: number;
     height: number;
+    deviceScaleFactor?: number;
   };
   chromeArgs?: string[];
   ignoreDefaultChromeArgs?: string[];
@@ -242,6 +243,14 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
         contentWidth: options.viewport.width,
         contentHeight: options.viewport.height,
       });
+      if (options.viewport.deviceScaleFactor !== undefined) {
+        // page.resize() only affects the content size. Apply DPR separately.
+        await page?.setViewport({
+          width: options.viewport.width,
+          height: options.viewport.height,
+          deviceScaleFactor: options.viewport.deviceScaleFactor,
+        });
+      }
     }
     return browser;
   } catch (error) {
