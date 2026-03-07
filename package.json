@@ -3,7 +3,10 @@
   "version": "0.19.0",
   "description": "MCP server for Chrome DevTools",
   "type": "module",
-  "bin": "./build/src/bin/chrome-devtools-mcp.js",
+  "bin": {
+    "chrome-devtools-mcp": "./build/src/bin/chrome-devtools-mcp.js",
+    "chrome-devtools": "./build/src/bin/chrome-devtools.js"
+  },
   "main": "./build/src/index.js",
   "scripts": {
     "cli:generate": "node --experimental-strip-types scripts/generate-cli.ts",
