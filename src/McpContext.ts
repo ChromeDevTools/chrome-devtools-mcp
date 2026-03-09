@@ -657,7 +657,6 @@ export class McpContext implements Context {
           return;
         }
 
-        // @ts-expect-error no types
         if (await page.hasDevTools()) {
           mcpPage.devToolsPage = await page.openDevTools();
         } else {
