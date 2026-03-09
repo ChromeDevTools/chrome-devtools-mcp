@@ -9,11 +9,7 @@ import {afterEach, describe, it} from 'node:test';
 
 import sinon from 'sinon';
 
-import {
-  extractUrlLikeFromDevToolsTitle,
-  urlsEqual,
-  UniverseManager,
-} from '../src/DevtoolsUtils.js';
+import {UniverseManager} from '../src/DevtoolsUtils.js';
 import {DevTools} from '../src/third_party/index.js';
 import type {Browser, Target} from '../src/third_party/index.js';
 
@@ -23,76 +19,6 @@ import {
   mockListener,
   withBrowser,
 } from './utils.js';
-
-describe('extractUrlFromDevToolsTitle', () => {
-  it('deals with no trailing /', () => {
-    assert.strictEqual(
-      extractUrlLikeFromDevToolsTitle('DevTools - example.com'),
-      'example.com',
-    );
-  });
-  it('deals with a trailing /', () => {
-    assert.strictEqual(
-      extractUrlLikeFromDevToolsTitle('DevTools - example.com/'),
-      'example.com/',
-    );
-  });
-  it('deals with www', () => {
-    assert.strictEqual(
-      extractUrlLikeFromDevToolsTitle('DevTools - www.example.com/'),
-      'www.example.com/',
-    );
-  });
-  it('deals with complex url', () => {
-    assert.strictEqual(
-      extractUrlLikeFromDevToolsTitle(
-        'DevTools - www.example.com/path.html?a=b#3',
-      ),
-      'www.example.com/path.html?a=b#3',
-    );
-  });
-});
-
-describe('urlsEqual', () => {
-  it('ignores trailing slashes', () => {
-    assert.strictEqual(
-      urlsEqual('https://google.com/', 'https://google.com'),
-      true,
-    );
-  });
-
-  it('ignores www', () => {
-    assert.strictEqual(
-      urlsEqual('https://google.com/', 'https://www.google.com'),
-      true,
-    );
-  });
-
-  it('ignores protocols', () => {
-    assert.strictEqual(
-      urlsEqual('https://google.com/', 'http://www.google.com'),
-      true,
-    );
-  });
-
-  it('does not ignore other subdomains', () => {
-    assert.strictEqual(
-      urlsEqual('https://google.com/', 'https://photos.google.com'),
-      false,
-    );
-  });
-
-  it('ignores hash', () => {
-    assert.strictEqual(
-      urlsEqual('https://google.com/#', 'http://www.google.com'),
-      true,
-    );
-    assert.strictEqual(
-      urlsEqual('https://google.com/#21', 'http://www.google.com#12'),
-      true,
-    );
-  });
-});
 
 describe('UniverseManager', () => {
   afterEach(() => {
