@@ -114,10 +114,12 @@ y.command('status', 'Checks if chrome-devtools-mcp is running', async () => {
         socketPath: string;
         startDate: string;
         version: string;
+        args: string[];
       };
       console.log(
         `pid=${data.pid} socket=${data.socketPath} start-date=${data.startDate} version=${data.version}`,
       );
+      console.log(`args=${JSON.stringify(data.args)}`);
     } else {
       console.error('Error:', response.error);
       process.exit(1);
