@@ -15,7 +15,6 @@ import type {
   Target as PuppeteerTarget,
 } from './third_party/index.js';
 
-
 /**
  * A mock implementation of an issues manager that only implements the methods
  * that are actually used by the IssuesAggregator
