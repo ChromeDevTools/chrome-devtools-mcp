@@ -3,7 +3,10 @@
   "version": "0.19.0",
   "description": "MCP server for Chrome DevTools",
   "type": "module",
-  "bin": "./build/src/bin/chrome-devtools-mcp.js",
+  "bin": {
+    "chrome-devtools-mcp": "./build/src/bin/chrome-devtools-mcp.js",
+    "chrome-devtools": "./build/src/bin/chrome-devtools.js"
+  },
   "main": "./build/src/index.js",
   "scripts": {
     "cli:generate": "node --experimental-strip-types scripts/generate-cli.ts",
@@ -65,7 +68,7 @@
     "globals": "^17.0.0",
     "lighthouse": "13.0.3",
     "prettier": "^3.6.2",
-    "puppeteer": "24.38.0",
+    "puppeteer": "24.39.0",
     "rollup": "4.59.0",
     "rollup-plugin-cleanup": "^3.2.1",
     "rollup-plugin-license": "^3.6.0",
