@@ -358,7 +358,7 @@ Alternatively, follow the <a href="https://docs.qoder.com/user-guide/chat/model-
 <details>
   <summary>Qoder CLI</summary>
 
-Install the Chrome DevTools MCP server using the Qoder CLI (<a href="https://docs.qoder.com/cli/using-cli#mcp-servsers">guide</a>):
+Install the Chrome DevTools MCP server using the Qoder CLI (<a href="https://docs.qoder.com/cli/using-cli#mcp-servers">guide</a>):
 
 **Project wide:**
 
