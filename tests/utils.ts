@@ -105,7 +105,15 @@ export async function withMcpContext(
   } = {},
   args: ParsedArguments = {} as ParsedArguments,
 ) {
-  await withBrowser(async browser => {
+  await withBrowser(async (browser, page) => {
+    if (args.viewport?.deviceScaleFactor !== undefined) {
+      await page.setViewport({
+        width: args.viewport.width,
+        height: args.viewport.height,
+        deviceScaleFactor: args.viewport.deviceScaleFactor,
+      });
+    }
+
     const response = new McpResponse(args);
     if (context) {
       context.dispose();
@@ -116,6 +124,10 @@ export async function withMcpContext(
       {
         experimentalDevToolsDebugging: false,
         performanceCrux: options.performanceCrux ?? true,
+        initialViewport:
+          args.viewport?.deviceScaleFactor === undefined
+            ? undefined
+            : args.viewport,
       },
       Locator,
     );

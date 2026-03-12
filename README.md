@@ -510,7 +510,7 @@ The Chrome DevTools MCP server supports the following configuration option:
   - **Type:** string
 
 - **`--viewport`**
-  Initial viewport size for the Chrome instances started by the server. For example, `1280x720`. In headless mode, max size is 3840x2160px.
+  Initial viewport size for the Chrome instances started by the server. For example, `1280x720` or `1280x720x2` to set the device scale factor. In headless mode, max size is 3840x2160px.
   - **Type:** string
 
 - **`--proxyServer`/ `--proxy-server`**
