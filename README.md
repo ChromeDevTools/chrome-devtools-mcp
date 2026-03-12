@@ -228,8 +228,16 @@ Configure the following fields and press `CTRL+S` to save the configuration:
 Follow the MCP install <a href="https://code.visualstudio.com/docs/copilot/chat/mcp-servers#_add-an-mcp-server">guide</a>,
 with the standard config from above. You can also install the Chrome DevTools MCP server using the VS Code CLI:
 
+For macOS and Linux:
+
 ```bash
 code --add-mcp '{"name":"io.github.ChromeDevTools/chrome-devtools-mcp","command":"npx","args":["-y","chrome-devtools-mcp"],"env":{}}'
+```
+
+For Windows (PowerShell):
+
+```powershell
+code --add-mcp '{"""name""":"""io.github.ChromeDevTools/chrome-devtools-mcp""","""command""":"""npx""","""args""":["""-y""","""chrome-devtools-mcp"""]}'
 ```
 
 </details>
