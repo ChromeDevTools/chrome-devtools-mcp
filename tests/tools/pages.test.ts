@@ -46,7 +46,25 @@ describe('pages', () => {
     it('list pages', async () => {
       await withMcpContext(async (response, context) => {
         await listPages().handler(
-          {params: {}, page: context.getSelectedMcpPage()},
+          {params: {}},
+          response,
+          context,
+        );
+        assert.ok(response.includePages);
+      });
+    });
+    it('list pages after selected page is closed', async () => {
+      await withMcpContext(async (response, context) => {
+        // Create a second page and select it.
+        const page2 = await context.newPage();
+        assert.strictEqual(context.getSelectedMcpPage(), page2);
+
+        // Close the selected page via puppeteer (simulating external close).
+        await page2.pptrPage.close();
+
+        // list_pages should still work even though the selected page is gone.
+        await listPages().handler(
+          {params: {}},
           response,
           context,
         );
@@ -71,7 +89,7 @@ describe('pages', () => {
             categoryExtensions: true,
           } as ParsedArguments);
           await listPageDef.handler(
-            {params: {}, page: context.getSelectedMcpPage()},
+            {params: {}},
             response,
             context,
           );
@@ -117,7 +135,7 @@ describe('pages', () => {
               categoryExtensions,
             } as ParsedArguments);
             await listPageDef.handler(
-              {params: {}, page: context.getSelectedMcpPage()},
+              {params: {}},
               response,
               context,
             );
@@ -178,7 +196,7 @@ describe('pages', () => {
             categoryExtensions: true,
           } as ParsedArguments);
           await listPageDef.handler(
-            {params: {}, page: context.getSelectedMcpPage()},
+            {params: {}},
             response,
             context,
           );
