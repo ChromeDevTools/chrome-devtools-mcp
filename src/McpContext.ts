@@ -582,9 +582,18 @@ export class McpContext implements Context {
     isolatedContextNames: Map<Page, string>;
   }> {
     const defaultCtx = this.browser.defaultBrowserContext();
-    const allPages = await this.browser.pages(
-      this.#options.experimentalIncludeAllPages,
-    );
+    let allPages: Page[];
+    try {
+      allPages = await this.browser.pages(
+        this.#options.experimentalIncludeAllPages,
+      );
+    } catch (error) {
+      this.logger('browser.pages() failed, retrying:', error);
+      await new Promise(resolve => setTimeout(resolve, 100));
+      allPages = await this.browser.pages(
+        this.#options.experimentalIncludeAllPages,
+      );
+    }
 
     const allTargets = this.browser.targets();
     const extensionTargets = allTargets.filter(target => {
@@ -657,9 +666,15 @@ export class McpContext implements Context {
           return;
         }
 
-        if (await page.hasDevTools()) {
-          mcpPage.devToolsPage = await page.openDevTools();
-        } else {
+        try {
+          if (await page.hasDevTools()) {
+            mcpPage.devToolsPage = await page.openDevTools();
+          } else {
+            mcpPage.devToolsPage = undefined;
+          }
+        } catch (error) {
+          // Page may have closed between getAllPages() and this check.
+          this.logger('Error detecting DevTools for page, skipping:', error);
           mcpPage.devToolsPage = undefined;
         }
       }),

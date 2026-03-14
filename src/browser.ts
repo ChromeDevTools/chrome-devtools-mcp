@@ -57,6 +57,12 @@ export async function ensureBrowserConnected(options: {
     return browser;
   }
 
+  // Clear stale browser reference to force fresh reconnection.
+  if (browser) {
+    logger('Browser disconnected, clearing stale reference');
+    browser = undefined;
+  }
+
   const connectOptions: Parameters<typeof puppeteer.connect>[0] = {
     targetFilter: makeTargetFilter(enableExtensions),
     defaultViewport: null,
@@ -75,35 +81,7 @@ export async function ensureBrowserConnected(options: {
     const userDataDir = options.userDataDir;
     if (userDataDir) {
       autoConnect = true;
-      // TODO: re-expose this logic via Puppeteer.
-      const portPath = path.join(userDataDir, 'DevToolsActivePort');
-      try {
-        const fileContent = await fs.promises.readFile(portPath, 'utf8');
-        const [rawPort, rawPath] = fileContent
-          .split('\n')
-          .map(line => {
-            return line.trim();
-          })
-          .filter(line => {
-            return !!line;
-          });
-        if (!rawPort || !rawPath) {
-          throw new Error(`Invalid DevToolsActivePort '${fileContent}' found`);
-        }
-        const port = parseInt(rawPort, 10);
-        if (isNaN(port) || port <= 0 || port > 65535) {
-          throw new Error(`Invalid port '${rawPort}' found`);
-        }
-        const browserWSEndpoint = `ws://127.0.0.1:${port}${rawPath}`;
-        connectOptions.browserWSEndpoint = browserWSEndpoint;
-      } catch (error) {
-        throw new Error(
-          `Could not connect to Chrome in ${userDataDir}. Check if Chrome is running and remote debugging is enabled by going to chrome://inspect/#remote-debugging.`,
-          {
-            cause: error,
-          },
-        );
-      }
+      await readDevToolsActivePort(userDataDir, connectOptions);
     } else {
       if (!channel) {
         throw new Error('Channel must be provided if userDataDir is missing');
@@ -119,18 +97,88 @@ export async function ensureBrowserConnected(options: {
   }
 
   logger('Connecting Puppeteer to ', JSON.stringify(connectOptions));
-  try {
-    browser = await puppeteer.connect(connectOptions);
-  } catch (err) {
+  const retryDelays = [500, 1000, 2000];
+  let lastConnectError: unknown;
+  for (let attempt = 0; attempt <= retryDelays.length; attempt++) {
+    try {
+      browser = await puppeteer.connect(connectOptions);
+      lastConnectError = undefined;
+      break;
+    } catch (err) {
+      lastConnectError = err;
+      if (attempt < retryDelays.length) {
+        logger(
+          `Connection attempt ${attempt + 1} failed, retrying in ${retryDelays[attempt]}ms...`,
+        );
+        await new Promise(resolve =>
+          setTimeout(resolve, retryDelays[attempt]),
+        );
+        // Re-read DevToolsActivePort in case Chrome restarted with a new port.
+        if (autoConnect && options.userDataDir) {
+          try {
+            await readDevToolsActivePort(options.userDataDir, connectOptions);
+          } catch {
+            // Will retry connection with existing endpoint.
+          }
+        }
+      }
+    }
+  }
+  if (lastConnectError) {
     throw new Error(
       `Could not connect to Chrome. ${autoConnect ? `Check if Chrome is running and remote debugging is enabled by going to chrome://inspect/#remote-debugging.` : `Check if Chrome is running.`}`,
       {
-        cause: err,
+        cause: lastConnectError,
       },
     );
   }
   logger('Connected Puppeteer');
-  return browser;
+  // browser is guaranteed to be set here: either puppeteer.connect succeeded
+  // or lastConnectError was thrown above.
+  return browser!;
+}
+
+async function readDevToolsActivePort(
+  userDataDir: string,
+  connectOptions: Parameters<typeof puppeteer.connect>[0],
+): Promise<void> {
+  // TODO: re-expose this logic via Puppeteer.
+  const portPath = path.join(userDataDir, 'DevToolsActivePort');
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 5; attempt++) {
+    try {
+      const fileContent = await fs.promises.readFile(portPath, 'utf8');
+      const [rawPort, rawPath] = fileContent
+        .split('\n')
+        .map(line => line.trim())
+        .filter(line => !!line);
+      if (!rawPort || !rawPath) {
+        throw new Error(`Invalid DevToolsActivePort '${fileContent}' found`);
+      }
+      const port = parseInt(rawPort, 10);
+      if (isNaN(port) || port <= 0 || port > 65535) {
+        throw new Error(`Invalid port '${rawPort}' found`);
+      }
+      connectOptions.browserWSEndpoint = `ws://127.0.0.1:${port}${rawPath}`;
+      return;
+    } catch (error) {
+      // Validation errors (invalid port/format) won't self-resolve — fail immediately.
+      if (error instanceof Error && (error.message.startsWith('Invalid port') || error.message.startsWith('Invalid DevToolsActivePort'))) {
+        throw error;
+      }
+      lastError = error;
+      if (attempt < 4) {
+        logger(
+          `DevToolsActivePort read attempt ${attempt + 1} failed, retrying in 1s...`,
+        );
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    }
+  }
+  throw new Error(
+    `Could not connect to Chrome in ${userDataDir}. Check if Chrome is running and remote debugging is enabled by going to chrome://inspect/#remote-debugging.`,
+    {cause: lastError},
+  );
 }
 
 interface McpLaunchOptions {
