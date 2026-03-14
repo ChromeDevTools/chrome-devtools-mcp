@@ -97,6 +97,7 @@ export async function createMcpServer(
           });
 
     if (context?.browser !== browser) {
+      context?.dispose();
       context = await McpContext.from(browser, logger, {
         experimentalDevToolsDebugging: devtools,
         experimentalIncludeAllPages: serverArgs.experimentalIncludeAllPages,
@@ -174,7 +175,11 @@ export async function createMcpServer(
           logger(`${tool.name} request: ${JSON.stringify(params, null, '  ')}`);
           const context = await getContext();
           logger(`${tool.name} context: resolved`);
-          await context.detectOpenDevToolsWindows();
+          try {
+            await context.detectOpenDevToolsWindows();
+          } catch (error) {
+            logger('detectOpenDevToolsWindows failed, continuing:', error);
+          }
           const response = serverArgs.slim
             ? new SlimMcpResponse(serverArgs)
             : new McpResponse(serverArgs);
