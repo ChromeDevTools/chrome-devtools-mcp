@@ -2,7 +2,7 @@
 
 We'd love to accept your patches and contributions to this project.
 
-## Before you begin
+## Before you begin.
 
 ### Sign our Contributor License Agreement
 
