@@ -5,5 +5,11 @@
  */
 
 import checkLicenseRule from './check-license-rule.js';
+import noZodNullableObjectRule from './no-zod-nullable-object-rule.js';
 
-export default {rules: {'check-license': checkLicenseRule}};
+export default {
+  rules: {
+    'check-license': checkLicenseRule,
+    'no-zod-nullable-object': noZodNullableObjectRule,
+  },
+};
