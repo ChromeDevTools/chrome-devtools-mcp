@@ -80,6 +80,7 @@ describe('e2e', () => {
       for (const file of files) {
         if (
           file === 'ToolDefinition.js' ||
+          file === 'tool-name-aliaser.js' ||
           file === 'tools.js' ||
           file === 'slim'
         ) {
