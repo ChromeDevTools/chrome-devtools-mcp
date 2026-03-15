@@ -136,6 +136,13 @@ export default defineConfig([
     },
   },
   {
+    name: 'Tool schema restrictions',
+    files: ['src/tools/**/*.ts'],
+    rules: {
+      '@local/no-zod-nullable-object': 'error',
+    },
+  },
+  {
     name: 'Tests',
     files: ['**/*.test.ts'],
     rules: {

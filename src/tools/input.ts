@@ -321,25 +321,25 @@ export const fillForm = definePageTool({
   },
   schema: {
     elements: zod
-      .array(
-        zod.object({
-          uid: zod.string().describe('The uid of the element to fill out'),
-          value: zod.string().describe('Value for the element'),
-        }),
-      )
-      .describe('Elements from snapshot to fill out.'),
+      .array(zod.string())
+      .describe(
+        'Elements from snapshot to fill out. Each entry is formatted as "uid=value".',
+      ),
     includeSnapshot: includeSnapshotSchema,
   },
   handler: async (request, response, context) => {
     const page = request.page;
-    for (const element of request.params.elements) {
-      await context.waitForEventsAfterAction(async () => {
-        await fillFormElement(
-          element.uid,
-          element.value,
-          context as McpContext,
-          page,
+    for (const entry of request.params.elements) {
+      const separatorIndex = entry.indexOf('=');
+      if (separatorIndex === -1) {
+        throw new Error(
+          `Invalid element format: "${entry}". Expected "uid=value".`,
         );
+      }
+      const uid = entry.slice(0, separatorIndex);
+      const value = entry.slice(separatorIndex + 1);
+      await context.waitForEventsAfterAction(async () => {
+        await fillFormElement(uid, value, context as McpContext, page);
       });
     }
     response.appendResponseLine(`Successfully filled out the form`);
