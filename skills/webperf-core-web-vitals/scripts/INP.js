@@ -77,9 +77,9 @@
     }
     if (interactions.length === 0) {
       return {
-        script: "INP", status: "error", error: "No interactions recorded yet",
-        metric: "INP", value: 0, unit: "ms", rating: "good",
-        thresholds: { good: 200, needsImprovement: 500 }, details,
+        script: "INP", status: "error",
+        error: "No interactions recorded yet. Interact with the page and call getINP() again.",
+        getDataFn: "getINP",
       };
     }
     return {

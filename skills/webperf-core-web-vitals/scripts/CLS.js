@@ -39,5 +39,6 @@
     unit: "score",
     rating: valueToRating(clsSync),
     thresholds: { good: 0.1, needsImprovement: 0.25 },
+    message: "CLS tracking active. Call getCLS() for updated value after page interactions.",
   };
 })();

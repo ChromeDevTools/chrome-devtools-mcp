@@ -1,4 +1,6 @@
 (() => {
+  const HIGHLIGHT = window.__cwvHighlight !== false;
+
   const valueToRating = (ms) =>
     ms <= 2500 ? "good" : ms <= 4000 ? "needs-improvement" : "poor";
 
@@ -7,16 +9,17 @@
     return navEntry?.activationStart || 0;
   };
 
+  const highlightElement = (element, color = "lime") => {
+    if (!HIGHLIGHT || !element) return;
+    element.style.outline = `3px dashed ${color}`;
+    element.style.outlineOffset = "2px";
+  };
+
   // Highlight LCP element as candidates update
   const observer = new PerformanceObserver((list) => {
     const entries = list.getEntries();
     const lastEntry = entries[entries.length - 1];
-    if (!lastEntry) return;
-    const element = lastEntry.element;
-    if (element) {
-      element.style.outline = "3px dashed lime";
-      element.style.outlineOffset = "2px";
-    }
+    if (lastEntry?.element) highlightElement(lastEntry.element);
   });
 
   observer.observe({ type: "largest-contentful-paint", buffered: true });
@@ -42,14 +45,14 @@
       if (classes) selector = `${el.tagName.toLowerCase()}.${classes}`;
     }
     const tag = el.tagName.toLowerCase();
+    const hasCssBackground = window.getComputedStyle(el).backgroundImage !== "none";
     elementType =
       tag === "img" ? "Image" :
       tag === "video" ? "Video poster" :
-      el.style?.backgroundImage ? "Background image" :
+      hasCssBackground ? "Background image" :
       (tag === "h1" || tag === "p" ? "Text block" : tag);
 
-    el.style.outline = "3px dashed lime";
-    el.style.outlineOffset = "2px";
+    highlightElement(el);
   }
 
   return {

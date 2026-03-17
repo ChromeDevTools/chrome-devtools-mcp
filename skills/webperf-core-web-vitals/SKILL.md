@@ -36,6 +36,8 @@ INP requires real user interactions to measure. The workflow is:
 2. **Tell the user:** "INP tracking is now active. Please interact with the page — click buttons, open menus, fill form fields — then let me know when you're done."
 3. Wait for the user to confirm they've interacted.
 4. Call `evaluate_script("getINP()")` to collect results.
+5. If `getINP()` returns `status: "error"` → the user has not interacted yet. Remind them and wait.
+6. For a full breakdown of all interactions, call `evaluate_script("getINPDetails()")` — returns all recorded interactions sorted by duration.
 
 > The agent cannot interact with the page on behalf of the user for INP measurement. Real user interactions are required.
 
@@ -66,7 +68,7 @@ When LCP is slow or the user asks "debug LCP" or "why is LCP slow":
 When layout shifts are detected or the user asks "debug CLS" or "layout shift issues":
 
 1. **CLS.js** - Measure overall CLS score
-2. **Layout-Shift-Loading-and-Interaction.js** (from Interaction skill) - Separate loading vs interaction shifts
+2. **Layout-Shift-Loading-and-Interaction.js** (from `webperf-interaction` skill) - Separate loading vs interaction shifts
 3. Cross-reference with **webperf-loading** skill:
    - Find-Above-The-Fold-Lazy-Loaded-Images.js (lazy images causing shifts)
    - Fonts-Preloaded-Loaded-and-used-above-the-fold.js (font swap causing shifts)
@@ -77,10 +79,11 @@ When interactions feel slow or the user asks "debug INP" or "slow interactions":
 
 1. **INP.js** - Start tracking. Tell the user to interact with the page and confirm when done.
 2. Call `getINP()` to collect results once the user confirms.
-3. **Interactions.js** (from Interaction skill) - List all interactions with timing
-4. **Input-Latency-Breakdown.js** (from Interaction skill) - Break down input delay, processing, presentation
-5. **Long-Animation-Frames.js** (from Interaction skill) - Identify blocking animation frames
-6. **Long-Animation-Frames-Script-Attribution.js** (from Interaction skill) - Find scripts causing delays
+3. Call `getINPDetails()` to see all interactions ranked by duration.
+4. **Interactions.js** (from `webperf-interaction` skill) - List all interactions with timing
+5. **Input-Latency-Breakdown.js** (from `webperf-interaction` skill) - Break down input delay, processing, presentation
+6. **Long-Animation-Frames.js** (from `webperf-interaction` skill) - Identify blocking animation frames
+7. **Long-Animation-Frames-Script-Attribution.js** (from `webperf-interaction` skill) - Find scripts causing delays
 
 ### Video as LCP Investigation
 
@@ -212,3 +215,25 @@ These triggers recommend using snippets from other skills:
 
 - **If render delay or interaction delay is high** → Use **webperf-interaction** skill:
   - Long-Animation-Frames.js (main thread blocking)
+
+> **Note on cross-skill references:** This skill runs in an isolated subagent (`context: fork`). When a decision tree recommends scripts from another skill (e.g., `webperf-loading`, `webperf-interaction`, `webperf-media`), report the recommendation to the user as a next step — do not attempt to execute those scripts directly. The user or the main agent can activate the appropriate skill to continue the investigation.
+
+## Error Recovery
+
+When a script returns `status: "error"`:
+
+- **LCP/CLS/LCP-Sub-Parts/LCP-Trail** → The page may not have finished loading. Ask the user to wait for full load or reload, then re-run the script.
+- **INP** (`getINP()` returns error) → No interactions have been recorded yet. Remind the user to interact with the page, then call `getINP()` again.
+- **LCP-Image-Entropy** → No images with measurable BPP found. This is normal for text-only pages or pages where all images are data URIs.
+- **LCP-Video-Candidate** → No LCP entries found; see LCP error recovery above.
+
+## Visual Highlighting
+
+By default, scripts highlight the LCP element(s) with colored dashed outlines — useful when the user is watching the browser while the agent runs. To disable:
+
+```js
+window.__cwvHighlight = false;
+// then run any LCP script
+```
+
+Scripts that support this flag: `LCP.js`, `LCP-Sub-Parts.js`, `LCP-Trail.js`.

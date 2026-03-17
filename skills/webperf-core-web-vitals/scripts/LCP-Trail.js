@@ -1,4 +1,6 @@
 (() => {
+  const HIGHLIGHT = window.__cwvHighlight !== false;
+
   const PALETTE = [
     { color: "#EF4444" },
     { color: "#F97316" },
@@ -42,8 +44,10 @@
       const { element } = entry;
       if (!element || seen.has(element)) continue;
       const { color } = PALETTE[colorIndex % PALETTE.length];
-      element.style.outline = `3px dashed ${color}`;
-      element.style.outlineOffset = "2px";
+      if (HIGHLIGHT) {
+        element.style.outline = `3px dashed ${color}`;
+        element.style.outlineOffset = "2px";
+      }
       seen.add(element);
       colorIndex++;
     }

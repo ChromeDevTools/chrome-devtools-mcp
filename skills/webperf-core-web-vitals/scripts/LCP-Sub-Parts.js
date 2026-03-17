@@ -1,4 +1,6 @@
 (() => {
+  const HIGHLIGHT = window.__cwvHighlight !== false;
+
   const valueToRating = (ms) =>
     ms <= 2500 ? "good" : ms <= 4000 ? "needs-improvement" : "poor";
 
@@ -44,7 +46,7 @@
 
     const { ttfb, lcpRequestStart, lcpResponseEnd, total } = calcSubParts(lcpEntry, navEntry);
 
-    if (lcpEntry.element) {
+    if (HIGHLIGHT && lcpEntry.element) {
       lcpEntry.element.style.outline = "3px dashed lime";
       lcpEntry.element.style.outlineOffset = "2px";
     }

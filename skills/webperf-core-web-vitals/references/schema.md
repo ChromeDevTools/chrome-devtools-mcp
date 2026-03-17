@@ -90,7 +90,7 @@ data = evaluate_script("getCLS()")
 ```json
 { "script": "INP", "status": "tracking", "message": "INP tracking active. Interact with the page then call getINP() for results.", "getDataFn": "getINP" }
 ```
-`getINP()` returns:
+`getINP()` returns (after interactions):
 ```json
 {
   "script": "INP", "status": "ok", "metric": "INP",
@@ -98,6 +98,17 @@ data = evaluate_script("getCLS()")
   "thresholds": { "good": 200, "needsImprovement": 500 },
   "details": { "totalInteractions": 5, "worstEvent": "click → button.submit", "phases": { "inputDelay": 120, "processingTime": 180, "presentationDelay": 50 } }
 }
+```
+`getINP()` returns (no interactions yet):
+```json
+{ "script": "INP", "status": "error", "error": "No interactions recorded yet. Interact with the page and call getINP() again.", "getDataFn": "getINP" }
+```
+`getINPDetails()` returns all recorded interactions sorted by duration (useful for INP deep-dive):
+```json
+[
+  { "formattedName": "click → button.submit", "duration": 350, "startTime": 4210, "phases": { "inputDelay": 120, "processingTime": 180, "presentationDelay": 50 } },
+  { "formattedName": "keydown → input#search", "duration": 180, "startTime": 8540, "phases": { "inputDelay": 20, "processingTime": 140, "presentationDelay": 20 } }
+]
 ```
 
 ### LCP-Sub-Parts

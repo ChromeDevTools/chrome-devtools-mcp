@@ -10,6 +10,11 @@
   const valueToRating = (ms) =>
     ms <= 2500 ? "good" : ms <= 4000 ? "needs-improvement" : "poor";
 
+  const getActivationStart = () => {
+    const navEntry = performance.getEntriesByType("navigation")[0];
+    return navEntry?.activationStart || 0;
+  };
+
   const detectFormat = (url) => {
     if (!url) return "unknown";
     const ext = url.toLowerCase().split("?")[0].match(/\.(avif|webp|jxl|png|gif|jpg|jpeg|svg)(?:[?#]|$)/);
@@ -22,14 +27,16 @@
     catch { return url; }
   };
 
+  const activationStart = getActivationStart();
+
   if (!element || element.tagName !== "VIDEO") {
     return {
       script: "LCP-Video-Candidate",
       status: "ok",
       metric: "LCP",
-      value: Math.round(lcp.startTime),
+      value: Math.round(Math.max(0, lcp.startTime - activationStart)),
       unit: "ms",
-      rating: valueToRating(lcp.startTime),
+      rating: valueToRating(Math.max(0, lcp.startTime - activationStart)),
       thresholds: { good: 2500, needsImprovement: 4000 },
       details: { isVideo: false },
       issues: [],
@@ -76,13 +83,14 @@
     issues.push({ severity: "warning", message: 'preload="none" on a non-autoplay video may delay poster image loading in some browsers' });
   }
 
+  const lcpValue = Math.round(Math.max(0, lcp.startTime - activationStart));
   return {
     script: "LCP-Video-Candidate",
     status: "ok",
     metric: "LCP",
-    value: Math.round(lcp.startTime),
+    value: lcpValue,
     unit: "ms",
-    rating: valueToRating(lcp.startTime),
+    rating: valueToRating(lcpValue),
     thresholds: { good: 2500, needsImprovement: 4000 },
     details: {
       isVideo: true,
