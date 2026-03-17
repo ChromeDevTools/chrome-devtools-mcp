@@ -126,6 +126,47 @@ Possible workarounds include:
     }
   ```
 
+### Claude Code plugin installation fails with `Failed to clone repository`
+
+When installing `chrome-devtools-mcp` as a Claude Code plugin (either from the
+official marketplace or via `/plugin marketplace add`), the installation may fail
+with a timeout error if your environment cannot reach `github.com` on port 443
+(HTTPS):
+
+```
+Failed to download/cache plugin chrome-devtools-mcp: Failed to clone repository:
+  Cloning into '...'...
+  fatal: unable to access 'https://github.com/ChromeDevTools/chrome-devtools-mcp.git/':
+  Failed to connect to github.com port 443
+```
+
+This can happen in environments with restricted outbound HTTPS connectivity,
+corporate firewalls, or proxy configurations that block HTTPS git operations.
+
+**Workaround 1: Use SSH instead of HTTPS**
+
+If you have SSH access to GitHub configured, you can redirect all GitHub HTTPS
+URLs to use SSH by running:
+
+```sh
+git config --global url."git@github.com:".insteadOf "https://github.com/"
+```
+
+Then retry the plugin installation. This tells git to use your SSH key for all
+GitHub operations instead of HTTPS.
+
+**Workaround 2: Install via CLI instead**
+
+If the plugin marketplace approach fails, you can install `chrome-devtools-mcp`
+as an MCP server directly without cloning the repository:
+
+```sh
+claude mcp add chrome-devtools --scope user npx chrome-devtools-mcp@latest
+```
+
+This bypasses the git clone entirely and uses npm/npx to fetch the package. Note
+that this method installs only the MCP server without the bundled skills.
+
 ### Connection timeouts with `--autoConnect`
 
 If you are using the `--autoConnect` flag and tools like `list_pages`, `new_page`, or `navigate_page` fail with a timeout (e.g., `ProtocolError: Network.enable timed out` or `The socket connection was closed unexpectedly`), this usually means the MCP server cannot handshake with the running Chrome instance correctly. Ensure:

@@ -156,6 +156,9 @@ Then, install the plugin:
 
 Restart Claude Code to have the MCP server and skills load (check with `/skills`).
 
+> [!TIP]
+> If the plugin installation fails with a `Failed to clone repository` error (e.g., HTTPS connectivity issues behind a corporate firewall), see the [troubleshooting guide](./docs/troubleshooting.md#claude-code-plugin-installation-fails-with-failed-to-clone-repository) for workarounds, or use the CLI installation method above instead.
+
 </details>
 
 <details>
