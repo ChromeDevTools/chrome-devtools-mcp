@@ -10,27 +10,56 @@ import process from 'node:process';
 
 import type {Options, PositionalOptions} from 'yargs';
 
-import {parseArguments} from '../cli.js';
 import {
   startDaemon,
   stopDaemon,
   sendCommand,
   handleResponse,
 } from '../daemon/client.js';
-import {isDaemonRunning} from '../daemon/utils.js';
-import {logDisclaimers} from '../server.js';
+import {isDaemonRunning, serializeArgs} from '../daemon/utils.js';
+import {logDisclaimers} from '../index.js';
 import {hideBin, yargs, type CallToolResult} from '../third_party/index.js';
 import {VERSION} from '../version.js';
 
-import {commands} from './cliDefinitions.js';
+import {commands} from './chrome-devtools-cli-options.js';
+import {cliOptions, parseArguments} from './chrome-devtools-mcp-cli-options.js';
 
 async function start(args: string[]) {
   const combinedArgs = [...args, ...defaultArgs];
-  await startDaemon([...args, ...defaultArgs]);
+  await startDaemon(combinedArgs);
   logDisclaimers(parseArguments(VERSION, combinedArgs));
 }
 
 const defaultArgs = ['--viaCli', '--experimentalStructuredContent'];
+
+const startCliOptions = {
+  ...cliOptions,
+} as Partial<typeof cliOptions>;
+
+// Not supported in CLI on purpose.
+delete startCliOptions.autoConnect;
+// Missing CLI serialization.
+delete startCliOptions.viewport;
+// CLI is generated based on the default tool definitions. To enable conditional
+// tools, they needs to be enabled during CLI generation.
+delete startCliOptions.experimentalPageIdRouting;
+delete startCliOptions.experimentalVision;
+delete startCliOptions.experimentalInteropTools;
+delete startCliOptions.experimentalScreencast;
+delete startCliOptions.categoryEmulation;
+delete startCliOptions.categoryPerformance;
+delete startCliOptions.categoryNetwork;
+delete startCliOptions.categoryExtensions;
+// Always on in CLI.
+delete startCliOptions.experimentalStructuredContent;
+// Change the defaults.
+if (!('default' in cliOptions.headless)) {
+  throw new Error('headless cli option unexpectedly does not have a default');
+}
+if ('default' in cliOptions.isolated) {
+  throw new Error('headless cli option unexpectedly does not have a default');
+}
+startCliOptions.headless!.default = true;
 
 const y = yargs(hideBin(process.argv))
   .scriptName('chrome-devtools')
@@ -50,19 +79,24 @@ y.command(
   'Start or restart chrome-devtools-mcp',
   y =>
     y
-      .help(false) // Disable help for start command to avoid parsing issues with passed args.
+      .options(startCliOptions)
       .example(
-        '$0 start --port 8080 --url http://localhost:8080',
-        'Start the server on port 8080 with a specific URL',
+        '$0 start --browserUrl http://localhost:9222',
+        'Start the server connecting to an existing browser',
       )
-      .strict(false), // Don't validate arguments for start, as they are passed through to the daemon.
-  async () => {
+      .strict(),
+  async argv => {
     if (isDaemonRunning()) {
       await stopDaemon();
     }
-    // Extract args after 'start'
-    const startIndex = process.argv.indexOf('start');
-    const args = startIndex !== -1 ? process.argv.slice(startIndex + 1) : [];
+    // Defaults but we do not want to affect the yargs conflict resolution.
+    if (argv.isolated === undefined) {
+      argv.isolated = true;
+    }
+    if (argv.headless === undefined) {
+      argv.headless = true;
+    }
+    const args = serializeArgs(cliOptions, argv);
     await start(args);
     process.exit(0);
   },
@@ -80,10 +114,12 @@ y.command('status', 'Checks if chrome-devtools-mcp is running', async () => {
         socketPath: string;
         startDate: string;
         version: string;
+        args: string[];
       };
       console.log(
         `pid=${data.pid} socket=${data.socketPath} start-date=${data.startDate} version=${data.version}`,
       );
+      console.log(`args=${JSON.stringify(data.args)}`);
     } else {
       console.error('Error:', response.error);
       process.exit(1);

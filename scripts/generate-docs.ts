@@ -11,8 +11,8 @@ import {StdioClientTransport} from '@modelcontextprotocol/sdk/client/stdio.js';
 import type {Tool} from '@modelcontextprotocol/sdk/types.js';
 import {get_encoding} from 'tiktoken';
 
-import {cliOptions} from '../build/src/cli.js';
-import type {ParsedArguments} from '../build/src/cli.js';
+import {cliOptions} from '../build/src/bin/chrome-devtools-mcp-cli-options.js';
+import type {ParsedArguments} from '../build/src/bin/chrome-devtools-mcp-cli-options.js';
 import {ToolCategory, labels} from '../build/src/tools/categories.js';
 import {createTools} from '../build/src/tools/tools.js';
 
@@ -24,7 +24,7 @@ async function measureServer(args: string[]) {
   // 1. Connect to your actual MCP server
   const transport = new StdioClientTransport({
     command: 'node',
-    args: ['./build/src/index.js', ...args], // Point to your built MCP server
+    args: ['./build/src/bin/chrome-devtools-mcp.js', ...args], // Point to your built MCP server
   });
 
   const client = new Client(
@@ -323,7 +323,7 @@ async function generateReference(
   console.log(`Found ${toolsWithAnnotations.length} tools`);
 
   // Generate markdown documentation
-  let markdown = `<!-- AUTO GENERATED DO NOT EDIT - run 'npm run docs' to update-->
+  let markdown = `<!-- AUTO GENERATED DO NOT EDIT - run 'npm run gen' to update-->
 
 # ${title} (~${(await measureServer(serverArgs)).tokenCount} cl100k_base tokens)
 

@@ -10,7 +10,7 @@ import path from 'node:path';
 import {Client} from '@modelcontextprotocol/sdk/client/index.js';
 import {StdioClientTransport} from '@modelcontextprotocol/sdk/client/stdio.js';
 
-import {parseArguments} from '../build/src/cli.js';
+import {parseArguments} from '../build/src/bin/chrome-devtools-mcp-cli-options.js';
 import {labels} from '../build/src/tools/categories.js';
 import {createTools} from '../build/src/tools/tools.js';
 
@@ -22,7 +22,10 @@ const OUTPUT_PATH = path.join(
 async function fetchTools() {
   console.log('Connecting to chrome-devtools-mcp to fetch tools...');
   // Use the local build of the server
-  const serverPath = path.join(import.meta.dirname, '../build/src/index.js');
+  const serverPath = path.join(
+    import.meta.dirname,
+    '../build/src/bin/chrome-devtools-mcp.js',
+  );
 
   const transport = new StdioClientTransport({
     command: 'node',
@@ -99,8 +102,23 @@ function schemaToCLIOptions(schema: JsonSchema): CliOption[] {
 
 async function generateCli() {
   const tools = await fetchTools();
+
   // Sort tools by name
-  const sortedTools = tools.sort((a, b) => a.name.localeCompare(b.name));
+  const sortedTools = tools
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .filter(tool => {
+      // Skipping fill_form because it is not relevant in shell scripts
+      // and CLI does not handle array/JSON args well.
+      if (tool.name === 'fill_form') {
+        return false;
+      }
+      // Skipping wait_for because CLI does not handle array/JSON args well
+      // and shell scripts have many mechanisms for waiting.
+      if (tool.name === 'wait_for') {
+        return false;
+      }
+      return true;
+    });
 
   const staticTools = createTools(parseArguments());
   const toolNameToCategory = new Map<string, string>();

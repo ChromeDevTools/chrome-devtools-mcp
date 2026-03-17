@@ -17,11 +17,12 @@ import {
 } from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
+import {startTrace} from './performance.js';
 import {definePageTool} from './ToolDefinition.js';
 
 export const lighthouseAudit = definePageTool({
   name: 'lighthouse_audit',
-  description: `Get Lighthouse score and reports for accessibility, SEO and best practices.`,
+  description: `Get Lighthouse score and reports for accessibility, SEO and best practices. This excludes performance. For performance audits, run ${startTrace.name}`,
   annotations: {
     category: ToolCategory.DEBUGGING,
     readOnlyHint: true,

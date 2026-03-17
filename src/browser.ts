@@ -20,12 +20,11 @@ import {puppeteer} from './third_party/index.js';
 
 let browser: Browser | undefined;
 
-function makeTargetFilter() {
-  const ignoredPrefixes = new Set([
-    'chrome://',
-    'chrome-extension://',
-    'chrome-untrusted://',
-  ]);
+function makeTargetFilter(enableExtensions = false) {
+  const ignoredPrefixes = new Set(['chrome://', 'chrome-untrusted://']);
+  if (!enableExtensions) {
+    ignoredPrefixes.add('chrome-extension://');
+  }
 
   return function targetFilter(target: Target): boolean {
     if (target.url() === 'chrome://newtab/') {
@@ -51,14 +50,15 @@ export async function ensureBrowserConnected(options: {
   devtools: boolean;
   channel?: Channel;
   userDataDir?: string;
+  enableExtensions?: boolean;
 }) {
-  const {channel} = options;
+  const {channel, enableExtensions} = options;
   if (browser?.connected) {
     return browser;
   }
 
   const connectOptions: Parameters<typeof puppeteer.connect>[0] = {
-    targetFilter: makeTargetFilter(),
+    targetFilter: makeTargetFilter(enableExtensions),
     defaultViewport: null,
     handleDevToolsAsPage: true,
   };
@@ -149,6 +149,7 @@ interface McpLaunchOptions {
   ignoreDefaultChromeArgs?: string[];
   devtools: boolean;
   enableExtensions?: boolean;
+  viaCli?: boolean;
 }
 
 export function detectDisplay(): void {
@@ -181,7 +182,7 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
     userDataDir = path.join(
       os.homedir(),
       '.cache',
-      'chrome-devtools-mcp',
+      options.viaCli ? 'chrome-devtools-mcp-cli' : 'chrome-devtools-mcp',
       profileDirName,
     );
     await fs.promises.mkdir(userDataDir, {
@@ -217,7 +218,7 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
   try {
     const browser = await puppeteer.launch({
       channel: puppeteerChannel,
-      targetFilter: makeTargetFilter(),
+      targetFilter: makeTargetFilter(options.enableExtensions),
       executablePath,
       defaultViewport: null,
       userDataDir,

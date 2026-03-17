@@ -122,7 +122,7 @@ To use the Chrome DevTools MCP server follow the instructions from <a href="http
 
 This will make the Chrome DevTools MCP server automatically connect to the browser that Antigravity is using. If you are not using port 9222, make sure to adjust accordingly.
 
-Chrome DevTools MCP will not start the browser instance automatically using this approach as as the Chrome DevTools MCP server runs in Antigravity's built-in browser. If the browser is not already running, you have to start it first by clicking the Chrome icon at the top right corner.
+Chrome DevTools MCP will not start the browser instance automatically using this approach because the Chrome DevTools MCP server connects to Antigravity's built-in browser. If the browser is not already running, you have to start it first by clicking the Chrome icon at the top right corner.
 
 </details>
 
@@ -228,8 +228,16 @@ Configure the following fields and press `CTRL+S` to save the configuration:
 Follow the MCP install <a href="https://code.visualstudio.com/docs/copilot/chat/mcp-servers#_add-an-mcp-server">guide</a>,
 with the standard config from above. You can also install the Chrome DevTools MCP server using the VS Code CLI:
 
+For macOS and Linux:
+
 ```bash
 code --add-mcp '{"name":"io.github.ChromeDevTools/chrome-devtools-mcp","command":"npx","args":["-y","chrome-devtools-mcp"],"env":{}}'
+```
+
+For Windows (PowerShell):
+
+```powershell
+code --add-mcp '{"""name""":"""io.github.ChromeDevTools/chrome-devtools-mcp""","""command""":"""npx""","""args""":["""-y""","""chrome-devtools-mcp"""]}'
 ```
 
 </details>
@@ -358,7 +366,7 @@ Alternatively, follow the <a href="https://docs.qoder.com/user-guide/chat/model-
 <details>
   <summary>Qoder CLI</summary>
 
-Install the Chrome DevTools MCP server using the Qoder CLI (<a href="https://docs.qoder.com/cli/using-cli#mcp-servsers">guide</a>):
+Install the Chrome DevTools MCP server using the Qoder CLI (<a href="https://docs.qoder.com/cli/using-cli#mcp-servers">guide</a>):
 
 **Project wide:**
 

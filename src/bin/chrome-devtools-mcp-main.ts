@@ -4,16 +4,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import './polyfill.js';
+import '../polyfill.js';
 
 import process from 'node:process';
 
-import {cliOptions, parseArguments} from './cli.js';
-import {logger, saveLogsToFile} from './logger.js';
-import {createMcpServer, logDisclaimers} from './server.js';
-import {computeFlagUsage} from './telemetry/flagUtils.js';
-import {StdioServerTransport} from './third_party/index.js';
-import {VERSION} from './version.js';
+import {createMcpServer, logDisclaimers} from '../index.js';
+import {logger, saveLogsToFile} from '../logger.js';
+import {computeFlagUsage} from '../telemetry/flagUtils.js';
+import {StdioServerTransport} from '../third_party/index.js';
+import {VERSION} from '../version.js';
+
+import {cliOptions, parseArguments} from './chrome-devtools-mcp-cli-options.js';
 
 export const args = parseArguments(VERSION);
 
