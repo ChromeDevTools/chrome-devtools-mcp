@@ -211,7 +211,6 @@ export const cliOptions = {
   },
   categoryExtensions: {
     type: 'boolean',
-    default: false,
     hidden: true,
     conflicts: ['browserUrl', 'autoConnect', 'wsEndpoint'],
     describe:

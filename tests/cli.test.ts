@@ -15,8 +15,6 @@ describe('cli args parsing', () => {
     categoryEmulation: true,
     'category-performance': true,
     categoryPerformance: true,
-    'category-extensions': false,
-    categoryExtensions: false,
     'category-network': true,
     categoryNetwork: true,
     'auto-connect': undefined,
