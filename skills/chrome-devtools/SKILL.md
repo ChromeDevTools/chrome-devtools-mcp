@@ -22,6 +22,7 @@ description: Uses Chrome DevTools via MCP for efficient debugging, troubleshooti
 
 ### Efficient data retrieval
 
+- Use `diff: true` in `take_snapshot` to receive only the changes since the last snapshot (reset on navigation).
 - Use `filePath` parameter for large outputs (screenshots, snapshots, traces)
 - Use pagination (`pageIdx`, `pageSize`) and filtering (`types`) to minimize data
 - Set `includeSnapshot: false` on input actions unless you need updated page state

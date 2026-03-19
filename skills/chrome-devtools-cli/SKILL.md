@@ -120,6 +120,7 @@ chrome-devtools take_screenshot # Take a screenshot of the page viewport
 chrome-devtools take_screenshot --fullPage true --format "jpeg" --quality 80 # Take a full page screenshot as JPEG with quality
 chrome-devtools take_screenshot --uid "id" --filePath "s.png" # Take a screenshot of an element
 chrome-devtools take_snapshot # Take a text snapshot of the page from the a11y tree
+chrome-devtools take_snapshot --diff true # Return only the changes since the last snapshot
 chrome-devtools take_snapshot --verbose true --filePath "s.txt" # Take a verbose snapshot and save to file
 ```
 
