@@ -728,6 +728,9 @@ export class McpContext implements Context {
     page: McpPage,
     verbose = false,
     devtoolsData: DevToolsData | undefined = undefined,
+    options: {
+      diff?: boolean;
+    } = {},
   ): Promise<void> {
     const rootNode = await page.pptrPage.accessibility.snapshot({
       includeIframes: true,
@@ -745,10 +748,20 @@ export class McpContext implements Context {
     let idCounter = 0;
     const idToNode = new Map<string, TextSnapshotNode>();
     const seenUniqueIds = new Set<string>();
-    const assignIds = (node: SerializedAXNode): TextSnapshotNode => {
+    const assignIds = (
+      node: SerializedAXNode,
+      parentId = 'root',
+      index = 0,
+    ): TextSnapshotNode => {
       let id = '';
-      // @ts-expect-error untyped loaderId & backendNodeId.
-      const uniqueBackendId = `${node.loaderId}_${node.backendNodeId}`;
+      const nodeAny = node as any;
+      // StaticText nodes often have unstable backendNodeIds in some contexts,
+      // or we might want to group them by their parent.
+      const uniqueBackendId =
+        nodeAny.backendNodeId && node.role !== 'StaticText'
+          ? `${nodeAny.loaderId}_${nodeAny.backendNodeId}`
+          : `${nodeAny.loaderId}_${nodeAny.role}_${parentId}_${index}`;
+
       if (uniqueBackendNodeIdToMcpId.has(uniqueBackendId)) {
         // Re-use MCP exposed ID if the uniqueId is the same.
         id = uniqueBackendNodeIdToMcpId.get(uniqueBackendId)!;
@@ -763,7 +776,7 @@ export class McpContext implements Context {
         ...node,
         id,
         children: node.children
-          ? node.children.map(child => assignIds(child))
+          ? node.children.map((child, i) => assignIds(child, id, i))
           : [],
       };
 
@@ -788,7 +801,38 @@ export class McpContext implements Context {
       hasSelectedElement: false,
       verbose,
     };
+
+    if (options.diff && page.lastSnapshot) {
+      const lastIdToNode = page.lastSnapshot.idToNode;
+      const added: string[] = [];
+      const changed: string[] = [];
+      const removed: string[] = [];
+
+      for (const [id, node] of idToNode) {
+        const lastNode = lastIdToNode.get(id);
+        if (!lastNode) {
+          added.push(id);
+        } else if (
+          node.name !== lastNode.name ||
+          node.value !== lastNode.value ||
+          node.description !== lastNode.description ||
+          node.role !== lastNode.role
+        ) {
+          changed.push(id);
+        }
+      }
+
+      for (const id of lastIdToNode.keys()) {
+        if (!idToNode.has(id)) {
+          removed.push(id);
+        }
+      }
+
+      snapshot.diff = {added, changed, removed};
+    }
+
     page.textSnapshot = snapshot;
+    page.lastSnapshot = snapshot;
     const data = devtoolsData ?? (await this.getDevToolsData(page));
     if (data?.cdpBackendNodeId) {
       snapshot.hasSelectedElement = true;

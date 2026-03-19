@@ -27,19 +27,53 @@ export class SnapshotFormatter {
 Get a verbose snapshot to include all elements if you are interested in the selected element.\n\n`);
     }
 
+    if (this.#snapshot.diff) {
+      const {added, changed, removed} = this.#snapshot.diff;
+      if (added.length === 0 && changed.length === 0 && removed.length === 0) {
+        chunks.push('No changes since last snapshot.\n');
+        return chunks.join('');
+      }
+    }
+
     chunks.push(this.#formatNode(root, 0));
+
+    if (this.#snapshot.diff?.removed.length) {
+      chunks.push('\n[REMOVED] elements:\n');
+      for (const uid of this.#snapshot.diff.removed) {
+        chunks.push(`- uid=${uid}\n`);
+      }
+    }
+
     return chunks.join('');
   }
 
   toJSON(): object {
-    return this.#nodeToJSON(this.#snapshot.root);
+    const result = this.#nodeToJSON(this.#snapshot.root) as Record<
+      string,
+      unknown
+    >;
+    if (this.#snapshot.diff) {
+      result.diff = this.#snapshot.diff;
+    }
+    return result;
   }
 
   #formatNode(node: TextSnapshotNode, depth = 0): string {
     const chunks: string[] = [];
     const attributes = this.#getAttributes(node);
+
+    let prefix = '';
+    if (this.#snapshot.diff) {
+      if (this.#snapshot.diff.added.includes(node.id)) {
+        prefix = '[ADDED] ';
+      } else if (this.#snapshot.diff.changed.includes(node.id)) {
+        prefix = '[CHANGED] ';
+      }
+    }
+
     const line =
       ' '.repeat(depth * 2) +
+      prefix +
       attributes.join(' ') +
       (node.id === this.#snapshot.selectedElementUid
         ? ' [selected in the DevTools Elements panel]'

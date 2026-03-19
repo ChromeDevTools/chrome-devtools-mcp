@@ -130,6 +130,59 @@ describe('McpContext', () => {
     });
   });
 
+  describe('take_snapshot diffing', () => {
+    it('should support snapshot diffing', async () => {
+      await withMcpContext(async (_response, context) => {
+        const page = context.getSelectedMcpPage();
+
+        // 1. Initial snapshot
+        await page.pptrPage.setContent(html`<button>Button 1</button>`);
+        await context.createTextSnapshot(page, false, undefined, {diff: true});
+        assert.strictEqual(page.textSnapshot?.diff, undefined); // First one has no diff
+
+        // 2. Add an element
+        await page.pptrPage.setContent(
+          html`<button>Button 1</button><button id="btn2">Button 2</button>`,
+        );
+        await context.createTextSnapshot(page, false, undefined, {diff: true});
+        let snapshot = page.textSnapshot;
+        assert.ok(snapshot?.diff);
+        assert.ok(snapshot!.diff!.added.length >= 1);
+        // Verify that Button 2 is in the added list
+        const addedNodes = snapshot!.diff!.added.map(id =>
+          snapshot!.idToNode.get(id),
+        );
+        assert.ok(addedNodes.some(n => n?.name === 'Button 2'));
+
+        // 3. Change an element
+        await page.pptrPage.setContent(
+          html`<button>Button 1 Changed</button><button id="btn2">Button 2</button>`,
+        );
+        await context.createTextSnapshot(page, false, undefined, {diff: true});
+        snapshot = page.textSnapshot;
+        assert.ok(snapshot?.diff);
+        // At least one of added/changed/removed should have something.
+        assert.ok(
+          snapshot!.diff!.changed.length >= 1 ||
+            (snapshot!.diff!.added.length >= 1 &&
+              snapshot!.diff!.removed.length >= 1),
+        );
+
+        // 4. Remove an element
+        await page.pptrPage.setContent(html`<button>Button 1 Changed</button>`);
+        await context.createTextSnapshot(page, false, undefined, {diff: true});
+        snapshot = page.textSnapshot;
+        assert.ok(snapshot?.diff);
+        assert.ok(snapshot!.diff!.removed.length >= 1);
+
+        // 5. Navigation should reset
+        await page.pptrPage.goto('about:blank');
+        await context.createTextSnapshot(page, false, undefined, {diff: true});
+        assert.strictEqual(page.textSnapshot?.diff, undefined); // Should be reset
+      });
+    });
+  });
+
   it('should include network requests in structured content', async t => {
     await withMcpContext(async (response, context) => {
       const mockRequest = getMockRequest({
