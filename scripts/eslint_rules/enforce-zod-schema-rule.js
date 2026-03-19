@@ -1,11 +1,11 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
 export default {
-  name: 'no-zod-nullable-object',
+  name: 'enforce-zod-schema',
   meta: {
     type: 'problem',
     docs: {
@@ -33,6 +33,9 @@ export default {
 
         const methodName = node.callee.property.name;
 
+        // We don't validate that .nullable() is called on a ZodObject
+        // specifically - this intentionally catches all .nullable() calls
+        // in tool schema files.
         if (methodName === 'nullable') {
           context.report({
             node: node.callee.property,

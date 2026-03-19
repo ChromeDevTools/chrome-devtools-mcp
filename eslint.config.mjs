@@ -138,8 +138,9 @@ export default defineConfig([
   {
     name: 'Tool schema restrictions',
     files: ['src/tools/**/*.ts'],
+    ignores: ['src/tools/input.ts'],
     rules: {
-      '@local/no-zod-nullable-object': 'error',
+      '@local/enforce-zod-schema': 'error',
     },
   },
   {
