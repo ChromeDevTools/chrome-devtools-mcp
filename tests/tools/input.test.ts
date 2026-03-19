@@ -670,7 +670,16 @@ describe('input', () => {
         await fillForm.handler(
           {
             params: {
-              elements: ['1_2=test', '1_4=test2'],
+              elements: [
+                {
+                  uid: '1_2',
+                  value: 'test',
+                },
+                {
+                  uid: '1_4',
+                  value: 'test2',
+                },
+              ],
             },
             page: context.getSelectedMcpPage(),
           },
