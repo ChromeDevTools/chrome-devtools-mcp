@@ -129,7 +129,7 @@ export async function createMcpServer(
     }
     if (
       tool.annotations.category === ToolCategory.EXTENSIONS &&
-      serverArgs.categoryExtensions === false
+      !serverArgs.categoryExtensions
     ) {
       return;
     }
