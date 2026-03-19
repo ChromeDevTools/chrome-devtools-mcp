@@ -27,6 +27,12 @@ export class SnapshotFormatter {
 Get a verbose snapshot to include all elements if you are interested in the selected element.\n\n`);
     }
 
+    if (this.#snapshot.diffReset) {
+      chunks.push(
+        'Note: no previous snapshot found for this page (cache may have been reset due to navigation). Returning full snapshot.\n\n',
+      );
+    }
+
     if (this.#snapshot.diff) {
       const {added, changed, removed} = this.#snapshot.diff;
       if (added.length === 0 && changed.length === 0 && removed.length === 0) {

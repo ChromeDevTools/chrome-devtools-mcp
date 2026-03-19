@@ -757,10 +757,9 @@ export class McpContext implements Context {
       const nodeAny = node as unknown as Record<string, unknown>;
       // StaticText nodes often have unstable backendNodeIds in some contexts,
       // or we might want to group them by their parent.
-      const uniqueBackendId =
-        nodeAny.backendNodeId && node.role !== 'StaticText'
-          ? `${nodeAny.loaderId}_${nodeAny.backendNodeId}`
-          : `${nodeAny.loaderId}_${node.role}_${parentId}_${index}`;
+      const uniqueBackendId = nodeAny.backendNodeId
+        ? `${nodeAny.loaderId}_${nodeAny.backendNodeId}`
+        : `${nodeAny.loaderId}_${nodeAny.role}_${parentId}_${index}`;
 
       if (uniqueBackendNodeIdToMcpId.has(uniqueBackendId)) {
         // Re-use MCP exposed ID if the uniqueId is the same.
@@ -800,6 +799,7 @@ export class McpContext implements Context {
       idToNode,
       hasSelectedElement: false,
       verbose,
+      diffReset: !!(options.diff && !page.lastSnapshot),
     };
 
     if (options.diff && page.lastSnapshot) {

@@ -180,6 +180,7 @@ describe('McpContext', () => {
         await page.pptrPage.goto('about:blank');
         await context.createTextSnapshot(page, false, undefined, {diff: true});
         assert.strictEqual(page.textSnapshot?.diff, undefined); // Should be reset
+        assert.strictEqual(page.textSnapshot?.diffReset, true);
       });
     });
   });

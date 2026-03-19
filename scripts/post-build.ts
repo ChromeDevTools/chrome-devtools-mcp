@@ -26,6 +26,7 @@ function main(): void {
 
   // Create i18n mock
   const i18nDir = path.join(BUILD_DIR, devtoolsFrontEndCorePath, 'i18n');
+  fs.mkdirSync(i18nDir, {recursive: true});
   const localesFile = path.join(i18nDir, 'locales.js');
   const localesContent = `
 export const LOCALES = [
