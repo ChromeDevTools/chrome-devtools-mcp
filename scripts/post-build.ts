@@ -108,7 +108,10 @@ function copySnapshotFiles() {
   const files = fs.readdirSync(testsDir);
   for (const file of files) {
     if (file.endsWith('.snapshot')) {
-      fs.copyFileSync(path.join(testsDir, file), path.join(buildTestsDir, file));
+      fs.copyFileSync(
+        path.join(testsDir, file),
+        path.join(buildTestsDir, file),
+      );
     }
   }
 

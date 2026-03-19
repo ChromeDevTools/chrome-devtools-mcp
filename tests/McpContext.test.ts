@@ -156,7 +156,8 @@ describe('McpContext', () => {
 
         // 3. Change an element
         await page.pptrPage.setContent(
-          html`<button>Button 1 Changed</button><button id="btn2">Button 2</button>`,
+          html`<button>Button 1 Changed</button
+            ><button id="btn2">Button 2</button>`,
         );
         await context.createTextSnapshot(page, false, undefined, {diff: true});
         snapshot = page.textSnapshot;
