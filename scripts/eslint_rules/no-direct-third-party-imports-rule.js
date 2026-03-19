@@ -15,18 +15,61 @@
  * (because devDependencies are installed) but fails once the package is
  * bundled and published via `npm pack`.
  *
+ * The list of bundled packages is derived dynamically by scanning
+ * `src/third_party/*.ts` for import/export statements at ESLint load time.
+ *
  * See https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1123
  */
 
-const THIRD_PARTY_PACKAGES = [
-  '@modelcontextprotocol/sdk',
-  'puppeteer-core',
-  '@puppeteer/browsers',
-  'yargs',
-  'debug',
-  'zod',
-  'core-js',
-];
+import {readdirSync, readFileSync} from 'node:fs';
+import {join, dirname} from 'node:path';
+import {fileURLToPath} from 'node:url';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const THIRD_PARTY_DIR = join(__dirname, '..', '..', 'src', 'third_party');
+
+/**
+ * Parse all .ts files in src/third_party/ and extract the bare package names
+ * from import/export statements. Relative imports and node_modules paths
+ * (used for chrome-devtools-frontend) are skipped.
+ */
+function discoverBundledPackages() {
+  const packages = new Set();
+  // Match `from 'pkg'` (may appear on a different line than `import`)
+  // and side-effect imports like `import 'pkg'`.
+  const fromRe = /from\s+['"]([^'"]+)['"]/g;
+  const sideEffectRe = /^import\s+['"]([^'"]+)['"]/gm;
+
+  let files;
+  try {
+    files = readdirSync(THIRD_PARTY_DIR).filter(f => f.endsWith('.ts'));
+  } catch {
+    return [];
+  }
+
+  for (const file of files) {
+    const content = readFileSync(join(THIRD_PARTY_DIR, file), 'utf8');
+    for (const re of [fromRe, sideEffectRe]) {
+      re.lastIndex = 0;
+      let match;
+      while ((match = re.exec(content)) !== null) {
+        const source = match[1];
+        // Skip relative imports and node_modules paths.
+        if (source.startsWith('.') || source.startsWith('/')) {
+          continue;
+        }
+        // Extract the bare package name (handle scoped packages like @foo/bar).
+        const parts = source.split('/');
+        const pkg = source.startsWith('@') ? parts.slice(0, 2).join('/') : parts[0];
+        packages.add(pkg);
+      }
+    }
+  }
+
+  return [...packages];
+}
+
+const THIRD_PARTY_PACKAGES = discoverBundledPackages();
 
 /** Matches any import source that starts with one of the restricted packages. */
 function isRestrictedSource(source) {
