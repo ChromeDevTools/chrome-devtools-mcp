@@ -75,6 +75,7 @@ export enum McpClient {
   MCP_CLIENT_UNSPECIFIED = 0,
   MCP_CLIENT_CLAUDE_CODE = 1,
   MCP_CLIENT_GEMINI_CLI = 2,
+  MCP_CLIENT_OTHER = 3,
 }
 
 // IPC types for messages between the main process and the
