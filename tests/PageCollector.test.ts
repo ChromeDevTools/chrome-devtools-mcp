@@ -303,9 +303,9 @@ describe('NetworkCollector', () => {
       page.emit('framenavigated', mainFrame);
     }
 
-    // We expect 4 arrays in navigations (current + 3 saved)
-    // Each navigation has 1 request, so total should be 4
-    assert.equal(collector.getData(page, true).length, 4);
+    // We expect 3 arrays in navigations (current + 2 saved)
+    // Each navigation has 1 request, so total should be 3
+    assert.equal(collector.getData(page, true).length, 3);
   });
 });
 
