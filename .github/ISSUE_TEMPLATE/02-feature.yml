@@ -3,7 +3,7 @@ description: Suggest an idea for for chrome-devtools-mcp
 title: '<short description of the feature request>'
 type: 'Feature'
 labels:
-  - enhancement
+  - feature
 body:
   - id: description
     type: textarea

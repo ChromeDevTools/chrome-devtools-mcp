@@ -51,6 +51,10 @@ Available insights:
     description: 3rd party code can significantly impact load performance. [Reduce and defer loading of 3rd party code](https://developer.chrome.com/docs/performance/insights/third-parties) to prioritize your page's content.
     relevant trace bounds: {min: 122411037881, max: 122416229595}
     example question: Which third parties are having the largest impact on my page performance?
+  - insight name: CharacterSet
+    description: A character encoding declaration is required. It can be done with a meta charset tag in the first 1024 bytes of the HTML or in the Content-Type HTTP response header. [Learn more about declaring the character encoding](https://developer.chrome.com/docs/insights/charset/).
+    relevant trace bounds: {min: 122410998910, max: 122411043781}
+    example question: How do I declare a character encoding for my page?
 
 ## Details on call tree & network request formats:
 Information on performance traces may contain main thread activity represented as call frames and network requests.
