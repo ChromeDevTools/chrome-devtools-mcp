@@ -63,7 +63,7 @@ describe('ClearcutLogger', () => {
       });
 
       logger.setClientName('gemini-cli-mcp-client');
-      await logger.logServerStart({ headless: true });
+      await logger.logServerStart({headless: true});
 
       assert(mockWatchdogClient.send.calledOnce);
       const msg = mockWatchdogClient.send.firstCall.args[0];
