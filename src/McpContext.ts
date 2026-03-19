@@ -728,6 +728,11 @@ export class McpContext implements Context {
     page: McpPage,
     verbose = false,
     devtoolsData: DevToolsData | undefined = undefined,
+    options: {
+      role?: string;
+      name?: string;
+      text?: string;
+    } = {},
   ): Promise<void> {
     const rootNode = await page.pptrPage.accessibility.snapshot({
       includeIframes: true,
@@ -781,8 +786,35 @@ export class McpContext implements Context {
     };
 
     const rootNodeWithId = assignIds(rootNode);
+
+    let filteredRootNode = rootNodeWithId;
+    if (options.role || options.name || options.text) {
+      filteredRootNode = filterTree(rootNodeWithId, options)!;
+
+      // If everything was filtered out, we might get null.
+      // But we should at least keep the root if possible or handle null.
+      if (!filteredRootNode) {
+        // Return an empty tree or just the root?
+        // Let's keep the root but with no children if it doesn't match.
+        filteredRootNode = {
+          ...rootNodeWithId,
+          children: [],
+        };
+      }
+
+      // Rebuild idToNode map to only include filtered nodes.
+      idToNode.clear();
+      const addToMap = (node: TextSnapshotNode) => {
+        idToNode.set(node.id, node);
+        for (const child of node.children) {
+          addToMap(child);
+        }
+      };
+      addToMap(filteredRootNode);
+    }
+
     const snapshot: TextSnapshot = {
-      root: rootNodeWithId,
+      root: filteredRootNode,
       snapshotId: String(snapshotId),
       idToNode,
       hasSelectedElement: false,
@@ -943,4 +975,75 @@ export class McpContext implements Context {
   getExtension(id: string): InstalledExtension | undefined {
     return this.#extensionRegistry.getById(id);
   }
+}
+
+function filterTree(
+  node: TextSnapshotNode,
+  options: {
+    role?: string;
+    name?: string;
+    text?: string;
+  },
+): TextSnapshotNode | null {
+  const matchingChildren: TextSnapshotNode[] = [];
+  for (const child of node.children) {
+    const filteredChild = filterTree(child, options);
+    if (filteredChild) {
+      matchingChildren.push(filteredChild);
+    }
+  }
+
+  const matches = isNodeMatching(node, options);
+
+  if (matches || matchingChildren.length > 0) {
+    return {
+      ...node,
+      children: matchingChildren,
+    };
+  }
+
+  return null;
+}
+
+function isNodeMatching(
+  node: TextSnapshotNode,
+  options: {
+    role?: string;
+    name?: string;
+    text?: string;
+  },
+): boolean {
+  let filterApplied = false;
+
+  if (options.role) {
+    filterApplied = true;
+    if (node.role !== options.role) {
+      return false;
+    }
+  }
+
+  if (options.name) {
+    filterApplied = true;
+    const regex = new RegExp(options.name, 'i');
+    if (!node.name || !regex.test(node.name.toString())) {
+      return false;
+    }
+  }
+
+  if (options.text) {
+    filterApplied = true;
+    const regex = new RegExp(options.text, 'i');
+    const textContent = [
+      node.name?.toString(),
+      node.value?.toString(),
+      node.description?.toString(),
+    ]
+      .filter(Boolean)
+      .join(' ');
+    if (!regex.test(textContent)) {
+      return false;
+    }
+  }
+
+  return filterApplied;
 }

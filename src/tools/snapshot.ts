@@ -32,11 +32,30 @@ in the DevTools Elements panel (if any).`,
       .describe(
         'The absolute path, or a path relative to the current working directory, to save the snapshot to instead of attaching it to the response.',
       ),
+    role: zod
+      .string()
+      .optional()
+      .describe('Filter elements by their accessibility role.'),
+    name: zod
+      .string()
+      .optional()
+      .describe(
+        'Filter elements by their accessibility name (supports regular expressions).',
+      ),
+    text: zod
+      .string()
+      .optional()
+      .describe(
+        'Filter elements by their text content (supports regular expressions).',
+      ),
   },
   handler: async (request, response) => {
     response.includeSnapshot({
       verbose: request.params.verbose ?? false,
       filePath: request.params.filePath,
+      role: request.params.role,
+      name: request.params.name,
+      text: request.params.text,
     });
   },
 });
