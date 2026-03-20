@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {TextSnapshot, TextSnapshotNode} from '../McpContext.js';
+import type {TextSnapshot, TextSnapshotNode} from '../types.js';
 
 export class SnapshotFormatter {
   #snapshot: TextSnapshot;

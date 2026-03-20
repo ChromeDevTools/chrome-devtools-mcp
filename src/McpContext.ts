@@ -10,8 +10,12 @@ import path from 'node:path';
 import type {TargetUniverse} from './DevtoolsUtils.js';
 import {UniverseManager} from './DevtoolsUtils.js';
 import {McpPage} from './McpPage.js';
-import type {ListenerMap, UncaughtError} from './PageCollector.js';
-import {NetworkCollector, ConsoleCollector} from './PageCollector.js';
+import {
+  NetworkCollector,
+  ConsoleCollector,
+  type ListenerMap,
+  type UncaughtError,
+} from './PageCollector.js';
 import type {DevTools} from './third_party/index.js';
 import type {
   Browser,
@@ -44,13 +48,6 @@ import {
 } from './utils/ExtensionRegistry.js';
 import {saveTemporaryFile} from './utils/files.js';
 import {WaitForHelper} from './WaitForHelper.js';
-
-export type {
-  EmulationSettings,
-  GeolocationOptions,
-  TextSnapshot,
-  TextSnapshotNode,
-} from './types.js';
 
 interface McpContextOptions {
   // Whether the DevTools windows are exposed as pages for debugging of DevTools.

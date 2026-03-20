@@ -10,7 +10,7 @@ import {describe, it} from 'node:test';
 import type {ElementHandle} from 'puppeteer-core';
 
 import {SnapshotFormatter} from '../../src/formatters/SnapshotFormatter.js';
-import type {TextSnapshot, TextSnapshotNode} from '../../src/McpContext.js';
+import type {TextSnapshot, TextSnapshotNode} from '../../src/types.js';
 
 describe('snapshotFormatter', () => {
   it('formats a snapshot with value properties', () => {
