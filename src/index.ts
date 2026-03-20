@@ -101,6 +101,10 @@ export async function createMcpServer(
         experimentalDevToolsDebugging: devtools,
         experimentalIncludeAllPages: serverArgs.experimentalIncludeAllPages,
         performanceCrux: serverArgs.performanceCrux,
+        initialViewport:
+          serverArgs.viewport?.deviceScaleFactor === undefined
+            ? undefined
+            : serverArgs.viewport,
       });
     }
     return context;

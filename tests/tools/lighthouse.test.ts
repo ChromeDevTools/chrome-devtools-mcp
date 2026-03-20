@@ -10,6 +10,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {describe, it} from 'node:test';
 
+import type {ParsedArguments} from '../../src/bin/chrome-devtools-mcp-cli-options.js';
 import {lighthouseAudit} from '../../src/tools/lighthouse.js';
 import {serverHooks} from '../server.js';
 import {html, withMcpContext} from '../utils.js';
@@ -115,6 +116,69 @@ describe('lighthouse', () => {
           });
         }
       });
+    });
+
+    it('restores launch-time viewport device scale factor', async () => {
+      server.addHtmlRoute('/test-launch-viewport', html`<div>Test DPR</div>`);
+
+      await withMcpContext(
+        async (response, context) => {
+          const page = context.getSelectedPptrPage();
+          await page.goto(server.getRoute('/test-launch-viewport'));
+
+          {
+            const viewportData = await page.evaluate(() => {
+              return {
+                width: window.innerWidth,
+                height: window.innerHeight,
+                deviceScaleFactor: window.devicePixelRatio,
+              };
+            });
+
+            assert.deepStrictEqual(viewportData, {
+              width: 400,
+              height: 400,
+              deviceScaleFactor: 2,
+            });
+          }
+
+          await lighthouseAudit.handler(
+            {
+              params: {
+                mode: 'snapshot',
+                device: 'desktop',
+              },
+              page: context.getSelectedMcpPage(),
+            },
+            response,
+            context,
+          );
+
+          {
+            const viewportData = await page.evaluate(() => {
+              return {
+                width: window.innerWidth,
+                height: window.innerHeight,
+                deviceScaleFactor: window.devicePixelRatio,
+              };
+            });
+
+            assert.deepStrictEqual(viewportData, {
+              width: 400,
+              height: 400,
+              deviceScaleFactor: 2,
+            });
+          }
+        },
+        {},
+        {
+          viewport: {
+            width: 400,
+            height: 400,
+            deviceScaleFactor: 2,
+          },
+        } as ParsedArguments,
+      );
     });
 
     it('runs Lighthouse in snapshot mode with mobile device', async () => {

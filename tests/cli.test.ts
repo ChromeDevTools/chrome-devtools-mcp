@@ -129,6 +129,27 @@ describe('cli args parsing', () => {
     });
   });
 
+  it('parses viewport with device scale factor', async () => {
+    const args = parseArguments('1.0.0', [
+      'node',
+      'main.js',
+      '--viewport',
+      '888x777x2',
+    ]);
+    assert.deepStrictEqual(args, {
+      ...defaultArgs,
+      _: [],
+      headless: false,
+      $0: 'npx chrome-devtools-mcp@latest',
+      channel: 'stable',
+      viewport: {
+        width: 888,
+        height: 777,
+        deviceScaleFactor: 2,
+      },
+    });
+  });
+
   it('parses chrome args', async () => {
     const args = parseArguments('1.0.0', [
       'node',

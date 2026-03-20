@@ -7,6 +7,39 @@
 import type {YargsOptions} from '../third_party/index.js';
 import {yargs, hideBin} from '../third_party/index.js';
 
+function parseViewportOption(arg: string | undefined) {
+  if (arg === undefined) {
+    return;
+  }
+
+  const dimensions = arg.split('x');
+  if (dimensions.length < 2 || dimensions.length > 3) {
+    throw new Error(
+      'Invalid viewport. Expected format is `1280x720` or `1280x720x2`.',
+    );
+  }
+
+  const [width, height, deviceScaleFactor] = dimensions.map(Number);
+  if (
+    !width ||
+    !height ||
+    Number.isNaN(width) ||
+    Number.isNaN(height) ||
+    (deviceScaleFactor !== undefined &&
+      (deviceScaleFactor <= 0 || Number.isNaN(deviceScaleFactor)))
+  ) {
+    throw new Error(
+      'Invalid viewport. Expected format is `1280x720` or `1280x720x2`.',
+    );
+  }
+
+  return {
+    width,
+    height,
+    ...(deviceScaleFactor === undefined ? {} : {deviceScaleFactor}),
+  };
+}
+
 export const cliOptions = {
   autoConnect: {
     type: 'boolean',
@@ -124,20 +157,8 @@ export const cliOptions = {
   viewport: {
     type: 'string',
     describe:
-      'Initial viewport size for the Chrome instances started by the server. For example, `1280x720`. In headless mode, max size is 3840x2160px.',
-    coerce: (arg: string | undefined) => {
-      if (arg === undefined) {
-        return;
-      }
-      const [width, height] = arg.split('x').map(Number);
-      if (!width || !height || Number.isNaN(width) || Number.isNaN(height)) {
-        throw new Error('Invalid viewport. Expected format is `1280x720`.');
-      }
-      return {
-        width,
-        height,
-      };
-    },
+      'Initial viewport size for the Chrome instances started by the server. For example, `1280x720` or `1280x720x2` to set the device scale factor. In headless mode, max size is 3840x2160px.',
+    coerce: parseViewportOption,
   },
   proxyServer: {
     type: 'string',
@@ -297,6 +318,10 @@ export function parseArguments(version: string, argv = process.argv) {
       [
         '$0 --viewport 1280x720',
         'Launch Chrome with the initial viewport size of 1280x720px',
+      ],
+      [
+        '$0 --viewport 1280x720x2',
+        'Launch Chrome with the initial viewport size of 1280x720px and device scale factor 2',
       ],
       [
         `$0 --chrome-arg='--no-sandbox' --chrome-arg='--disable-setuid-sandbox'`,

@@ -56,6 +56,8 @@ interface McpContextOptions {
   experimentalIncludeAllPages?: boolean;
   // Whether CrUX data should be fetched.
   performanceCrux: boolean;
+  // Viewport emulation applied before the context was created.
+  initialViewport?: Viewport;
 }
 
 const DEFAULT_TIMEOUT = 5_000;
@@ -76,6 +78,16 @@ function getNetworkMultiplierFromString(condition: string | null): number {
       return 10;
   }
   return 1;
+}
+
+function normalizeViewportSettings(viewport: Viewport): Viewport {
+  return {
+    deviceScaleFactor: 1,
+    isMobile: false,
+    hasTouch: false,
+    isLandscape: false,
+    ...viewport,
+  };
 }
 
 export class McpContext implements Context {
@@ -144,6 +156,11 @@ export class McpContext implements Context {
 
   async #init() {
     const pages = await this.createPagesSnapshot();
+    if (this.#selectedPage && this.#options.initialViewport) {
+      this.#selectedPage.emulationSettings.viewport = normalizeViewportSettings(
+        this.#options.initialViewport,
+      );
+    }
     await this.createExtensionServiceWorkersSnapshot();
     await this.#networkCollector.init(pages);
     await this.#consoleCollector.init(pages);
@@ -373,13 +390,7 @@ export class McpContext implements Context {
       await page.setViewport(null);
       delete newSettings.viewport;
     } else {
-      const defaults = {
-        deviceScaleFactor: 1,
-        isMobile: false,
-        hasTouch: false,
-        isLandscape: false,
-      };
-      const viewport = {...defaults, ...options.viewport};
+      const viewport = normalizeViewportSettings(options.viewport);
       await page.setViewport(viewport);
       newSettings.viewport = viewport;
     }
