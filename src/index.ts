@@ -7,13 +7,12 @@
 import type fs from 'node:fs';
 
 import type {parseArguments} from './bin/chrome-devtools-mcp-cli-options.js';
-import type {Channel} from './browser.js';
-import {ensureBrowserConnected, ensureBrowserLaunched} from './browser.js';
 import {loadIssueDescriptions} from './issue-descriptions.js';
 import {logger} from './logger.js';
-import {McpContext} from './McpContext.js';
+import type {McpContext} from './McpContext.js';
 import {McpResponse} from './McpResponse.js';
 import {Mutex} from './Mutex.js';
+import {SessionManager} from './SessionManager.js';
 import {SlimMcpResponse} from './SlimMcpResponse.js';
 import {ClearcutLogger} from './telemetry/ClearcutLogger.js';
 import {bucketizeLatency} from './telemetry/metricUtils.js';
@@ -23,6 +22,7 @@ import {
   SetLevelRequestSchema,
 } from './third_party/index.js';
 import {ToolCategory} from './tools/categories.js';
+import {createSessionTools} from './tools/sessions.js';
 import type {DefinedPageTool, ToolDefinition} from './tools/ToolDefinition.js';
 import {pageIdSchema} from './tools/ToolDefinition.js';
 import {createTools} from './tools/tools.js';
@@ -57,60 +57,19 @@ export async function createMcpServer(
     return {};
   });
 
-  server.server.oninitialized = () => {
-    const clientName = server.server.getClientVersion()?.name;
-    if (clientName) {
-      clearcutLogger?.setClientName(clientName);
-    }
+  const devtools = serverArgs.experimentalDevtools ?? false;
+  const contextOpts = {
+    experimentalDevToolsDebugging: devtools,
+    experimentalIncludeAllPages: serverArgs.experimentalIncludeAllPages,
+    performanceCrux: serverArgs.performanceCrux,
   };
+  const sessionManager = new SessionManager(contextOpts);
 
-  let context: McpContext;
   async function getContext(): Promise<McpContext> {
-    const chromeArgs: string[] = (serverArgs.chromeArg ?? []).map(String);
-    const ignoreDefaultChromeArgs: string[] = (
-      serverArgs.ignoreDefaultChromeArg ?? []
-    ).map(String);
-    if (serverArgs.proxyServer) {
-      chromeArgs.push(`--proxy-server=${serverArgs.proxyServer}`);
+    if (!sessionManager.hasActiveSession()) {
+      await sessionManager.createDefaultSession(serverArgs, options.logFile);
     }
-    const devtools = serverArgs.experimentalDevtools ?? false;
-    const browser =
-      serverArgs.browserUrl || serverArgs.wsEndpoint || serverArgs.autoConnect
-        ? await ensureBrowserConnected({
-            browserURL: serverArgs.browserUrl,
-            wsEndpoint: serverArgs.wsEndpoint,
-            wsHeaders: serverArgs.wsHeaders,
-            // Important: only pass channel, if autoConnect is true.
-            channel: serverArgs.autoConnect
-              ? (serverArgs.channel as Channel)
-              : undefined,
-            userDataDir: serverArgs.userDataDir,
-            devtools,
-          })
-        : await ensureBrowserLaunched({
-            headless: serverArgs.headless,
-            executablePath: serverArgs.executablePath,
-            channel: serverArgs.channel as Channel,
-            isolated: serverArgs.isolated ?? false,
-            userDataDir: serverArgs.userDataDir,
-            logFile: options.logFile,
-            viewport: serverArgs.viewport,
-            chromeArgs,
-            ignoreDefaultChromeArgs,
-            acceptInsecureCerts: serverArgs.acceptInsecureCerts,
-            devtools,
-            enableExtensions: serverArgs.categoryExtensions,
-            viaCli: serverArgs.viaCli,
-          });
-
-    if (context?.browser !== browser) {
-      context = await McpContext.from(browser, logger, {
-        experimentalDevToolsDebugging: devtools,
-        experimentalIncludeAllPages: serverArgs.experimentalIncludeAllPages,
-        performanceCrux: serverArgs.performanceCrux,
-      });
-    }
-    return context;
+    return sessionManager.getActiveContext();
   }
 
   const toolMutex = new Mutex();
@@ -258,6 +217,50 @@ export async function createMcpServer(
   const tools = createTools(serverArgs);
   for (const tool of tools) {
     registerTool(tool);
+  }
+
+  if (serverArgs.categorySession) {
+    const sessionTools = createSessionTools(sessionManager);
+    for (const sessionTool of sessionTools) {
+      server.registerTool(
+        sessionTool.name,
+        {
+          description: sessionTool.description,
+          inputSchema: sessionTool.schema,
+          annotations: sessionTool.annotations,
+        },
+        async (params): Promise<CallToolResult> => {
+          const guard = await toolMutex.acquire();
+          const startTime = Date.now();
+          let success = false;
+          try {
+            logger(
+              `${sessionTool.name} request: ${JSON.stringify(params, null, '  ')}`,
+            );
+            const text = await sessionTool.handler(params);
+            success = true;
+            return {
+              content: [{type: 'text', text}],
+            };
+          } catch (err) {
+            logger(`${sessionTool.name} error:`, err, err?.stack);
+            const errorText =
+              err && 'message' in err ? err.message : String(err);
+            return {
+              content: [{type: 'text', text: errorText}],
+              isError: true,
+            };
+          } finally {
+            void clearcutLogger?.logToolInvocation({
+              toolName: sessionTool.name,
+              success,
+              latencyMs: bucketizeLatency(Date.now() - startTime),
+            });
+            guard.dispose();
+          }
+        },
+      );
+    }
   }
 
   await loadIssueDescriptions();

@@ -216,6 +216,12 @@ export const cliOptions = {
     describe:
       'Set to true to include tools related to extensions. Note: This feature is only supported with a pipe connection. autoConnect is not supported.',
   },
+  categorySession: {
+    type: 'boolean',
+    default: false,
+    describe:
+      'Set to true to enable session management tools for working with multiple browser instances.',
+  },
   performanceCrux: {
     type: 'boolean',
     default: true,

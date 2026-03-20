@@ -164,6 +164,19 @@ export class McpContext implements Context {
     this.#isolatedContexts.clear();
   }
 
+  async close(mode: 'close' | 'disconnect'): Promise<void> {
+    this.dispose();
+    try {
+      if (mode === 'close') {
+        await this.browser.close();
+      } else {
+        await this.browser.disconnect();
+      }
+    } catch {
+      // Browser may already be closed/disconnected.
+    }
+  }
+
   static async from(
     browser: Browser,
     logger: Debugger,

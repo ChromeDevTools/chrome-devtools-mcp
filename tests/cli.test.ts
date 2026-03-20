@@ -17,6 +17,8 @@ describe('cli args parsing', () => {
     categoryPerformance: true,
     'category-network': true,
     categoryNetwork: true,
+    'category-session': false,
+    categorySession: false,
     'auto-connect': undefined,
     autoConnect: undefined,
     'performance-crux': true,
