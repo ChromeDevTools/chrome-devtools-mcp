@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.20.3](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.20.2...chrome-devtools-mcp-v0.20.3) (2026-03-20)
+
+
+### 🛠️ Fixes
+
+* mark categoryExtensions flag mutually exclusive with autoConnect ([#1202](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1202)) ([8c2a7fc](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/8c2a7fc21ead6091567e85608f7916c001ccc7db)), closes [#1072](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1072)
+
+
+### ⚡ Performance
+
+* **memory:** release old navigation request in NetworkCollector ([#1200](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1200)) ([1e6456c](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/1e6456ce222a8f392341a530b2340336c7a1ab02))
+* use CDP to find open DevTools pages (reland) ([#1210](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1210)) ([53483bc](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/53483bc637566658754d781d88f4353ad47f44a7))
+
 ## [0.20.2](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.20.1...chrome-devtools-mcp-v0.20.2) (2026-03-18)
 
 
