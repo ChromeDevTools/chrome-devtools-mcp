@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.21.0](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.20.3...chrome-devtools-mcp-v0.21.0) (2026-03-21)
+
+
+### 🎉 Features
+
+* record client name in telemetry. ([#1208](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1208)) ([9a47b65](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/9a47b657d7b17b9bc64508530c93d55e8033e2a6))
+
 ## [0.20.3](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.20.2...chrome-devtools-mcp-v0.20.3) (2026-03-20)
 
 
