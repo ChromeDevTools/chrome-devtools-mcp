@@ -9,6 +9,7 @@
 ## Analyzing Snapshots
 
 You can use the `take_memory_snapshot` tool provided by the `chrome-devtools-mcp` extension to generate heap snapshots during an investigation. To find leaks, you generally need 3 snapshots:
+
 1.  **Baseline:** Before the suspect action.
 2.  **Target:** After the suspect action.
 3.  **Final:** After reverting the suspect action (e.g., closing a modal, navigating away).
