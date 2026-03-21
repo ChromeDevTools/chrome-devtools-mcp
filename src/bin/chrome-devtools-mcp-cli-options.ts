@@ -254,6 +254,11 @@ export const cliOptions = {
       'Set by Chrome DevTools CLI if the MCP server is started via the CLI client (this arg exists for usage stats)',
     hidden: true,
   },
+  maxToolNameLength: {
+    type: 'number',
+    describe:
+      'Maximum length for exported MCP tool names. Names exceeding this limit are automatically shortened with human-readable aliases. Useful when MCP client prefixes cause tool names to exceed provider limits (e.g., AWS Bedrock 64-char limit).',
+  },
 } satisfies Record<string, YargsOptions>;
 
 export type ParsedArguments = ReturnType<typeof parseArguments>;

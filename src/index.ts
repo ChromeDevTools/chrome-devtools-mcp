@@ -23,6 +23,7 @@ import {
   SetLevelRequestSchema,
 } from './third_party/index.js';
 import {ToolCategory} from './tools/categories.js';
+import {ToolNameAliaser} from './tools/tool-name-aliaser.js';
 import type {DefinedPageTool, ToolDefinition} from './tools/ToolDefinition.js';
 import {pageIdSchema} from './tools/ToolDefinition.js';
 import {createTools} from './tools/tools.js';
@@ -115,6 +116,10 @@ export async function createMcpServer(
 
   const toolMutex = new Mutex();
 
+  const aliaser = serverArgs.maxToolNameLength
+    ? new ToolNameAliaser(serverArgs.maxToolNameLength)
+    : undefined;
+
   function registerTool(tool: ToolDefinition | DefinedPageTool): void {
     if (
       tool.annotations.category === ToolCategory.EMULATION &&
@@ -166,8 +171,17 @@ export async function createMcpServer(
         ? {...tool.schema, ...pageIdSchema}
         : tool.schema;
 
+    const registrationName = aliaser
+      ? aliaser.register(tool.name)
+      : tool.name;
+    if (registrationName !== tool.name) {
+      logger(
+        `Tool "${tool.name}" aliased to "${registrationName}" (max length: ${serverArgs.maxToolNameLength})`,
+      );
+    }
+
     server.registerTool(
-      tool.name,
+      registrationName,
       {
         description: tool.description,
         inputSchema: schema,
