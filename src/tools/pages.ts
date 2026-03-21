@@ -16,7 +16,7 @@ import {
   timeoutSchema,
 } from './ToolDefinition.js';
 
-export const listPages = definePageTool(args => {
+export const listPages = defineTool(args => {
   return {
     name: 'list_pages',
     description: `Get a list of pages ${args?.categoryExtensions ? 'including extension service workers' : ''} open in the browser.`,
