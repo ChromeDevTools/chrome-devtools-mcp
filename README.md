@@ -636,6 +636,9 @@ In these cases, start Chrome first and let the Chrome DevTools MCP server connec
 - **Automatic connection (available in Chrome 144)**: best for sharing state between manual and agent-driven testing.
 - **Manual connection via remote debugging port**: best when running inside a sandboxed environment.
 
+> [!NOTE]
+> To include extension pages and extension service workers while connecting to an existing Chrome instance, add `--category-extensions`. This applies to `--autoConnect`, `--browserUrl`, and `--wsEndpoint`.
+
 #### Automatically connecting to a running Chrome instance
 
 **Step 1:** Set up remote debugging in Chrome
