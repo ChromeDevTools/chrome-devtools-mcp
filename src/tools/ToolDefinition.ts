@@ -65,6 +65,7 @@ export interface ImageContentData {
 export interface SnapshotParams {
   verbose?: boolean;
   filePath?: string;
+  diff?: boolean;
 }
 
 export interface LighthouseData {

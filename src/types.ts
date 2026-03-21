@@ -33,6 +33,12 @@ export interface TextSnapshot {
   // snapshot. This flag indicates if there is any selected element.
   hasSelectedElement: boolean;
   verbose: boolean;
+  diffReset?: boolean;
+  diff?: {
+    added: string[];
+    removed: string[];
+    changed: string[];
+  };
 }
 
 export interface EmulationSettings {

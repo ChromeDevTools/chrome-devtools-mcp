@@ -276,6 +276,9 @@ export class McpResponse implements Response {
         this.#page,
         this.#snapshotParams.verbose,
         this.#devToolsData,
+        {
+          diff: this.#snapshotParams.diff,
+        },
       );
       const textSnapshot = this.#page.textSnapshot;
       if (textSnapshot) {

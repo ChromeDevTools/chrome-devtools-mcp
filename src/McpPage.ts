@@ -33,6 +33,7 @@ export class McpPage implements ContextPage {
 
   // Snapshot
   textSnapshot: TextSnapshot | null = null;
+  lastSnapshot: TextSnapshot | null = null;
   uniqueBackendNodeIdToMcpId = new Map<string, string>();
 
   // Emulation
@@ -45,6 +46,7 @@ export class McpPage implements ContextPage {
   // Dialog
   #dialog?: Dialog;
   #dialogHandler: (dialog: Dialog) => void;
+  #navigationHandler: () => void;
 
   constructor(page: Page, id: number) {
     this.pptrPage = page;
@@ -52,7 +54,11 @@ export class McpPage implements ContextPage {
     this.#dialogHandler = (dialog: Dialog): void => {
       this.#dialog = dialog;
     };
+    this.#navigationHandler = (): void => {
+      this.lastSnapshot = null;
+    };
     page.on('dialog', this.#dialogHandler);
+    page.on('framenavigated', this.#navigationHandler);
   }
 
   get dialog(): Dialog | undefined {
@@ -93,6 +99,7 @@ export class McpPage implements ContextPage {
 
   dispose(): void {
     this.pptrPage.off('dialog', this.#dialogHandler);
+    this.pptrPage.off('framenavigated', this.#navigationHandler);
   }
 
   async getElementByUid(uid: string): Promise<ElementHandle<Element>> {

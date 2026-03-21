@@ -656,6 +656,13 @@ export const commands: Commands = {
           'The absolute path, or a path relative to the current working directory, to save the snapshot to instead of attaching it to the response.',
         required: false,
       },
+      diff: {
+        name: 'diff',
+        type: 'boolean',
+        description:
+          'Return only the changes since the last snapshot. The cache is reset on navigation.',
+        required: false,
+      },
     },
   },
   type_text: {

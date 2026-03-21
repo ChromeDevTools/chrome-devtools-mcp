@@ -32,11 +32,18 @@ in the DevTools Elements panel (if any).`,
       .describe(
         'The absolute path, or a path relative to the current working directory, to save the snapshot to instead of attaching it to the response.',
       ),
+    diff: zod
+      .boolean()
+      .optional()
+      .describe(
+        'Return only the changes since the last snapshot. The cache is reset on navigation.',
+      ),
   },
   handler: async (request, response) => {
     response.includeSnapshot({
       verbose: request.params.verbose ?? false,
       filePath: request.params.filePath,
+      diff: request.params.diff,
     });
   },
 });
