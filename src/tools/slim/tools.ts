@@ -9,6 +9,8 @@ import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
 import {definePageTool} from '../ToolDefinition.js';
 
+export {switch_browser, list_browsers, add_browser} from '../multibrowser.js';
+
 export const screenshot = definePageTool({
   name: 'screenshot',
   description: `Takes a screenshot`,

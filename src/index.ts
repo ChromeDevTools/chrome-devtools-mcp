@@ -8,7 +8,7 @@ import type fs from 'node:fs';
 
 import type {parseArguments} from './bin/chrome-devtools-mcp-cli-options.js';
 import type {Channel} from './browser.js';
-import {ensureBrowserConnected, ensureBrowserLaunched} from './browser.js';
+import {ensureBrowserConnected, ensureBrowserLaunched, getActiveBrowserId} from './browser.js';
 import {loadIssueDescriptions} from './issue-descriptions.js';
 import {logger} from './logger.js';
 import {McpContext} from './McpContext.js';
@@ -65,6 +65,7 @@ export async function createMcpServer(
   };
 
   let context: McpContext;
+  const contextRegistry = new Map<string, McpContext>();
   async function getContext(): Promise<McpContext> {
     const chromeArgs: string[] = (serverArgs.chromeArg ?? []).map(String);
     const ignoreDefaultChromeArgs: string[] = (
@@ -103,12 +104,17 @@ export async function createMcpServer(
             viaCli: serverArgs.viaCli,
           });
 
-    if (context?.browser !== browser) {
+    const browserId = getActiveBrowserId();
+    const existingContext = contextRegistry.get(browserId);
+    if (existingContext?.browser === browser && browser?.connected) {
+      context = existingContext;
+    } else if (context?.browser !== browser) {
       context = await McpContext.from(browser, logger, {
         experimentalDevToolsDebugging: devtools,
         experimentalIncludeAllPages: serverArgs.experimentalIncludeAllPages,
         performanceCrux: serverArgs.performanceCrux,
       });
+      contextRegistry.set(browserId, context);
     }
     return context;
   }

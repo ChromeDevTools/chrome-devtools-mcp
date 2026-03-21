@@ -20,6 +20,81 @@ import {puppeteer} from './third_party/index.js';
 
 let browser: Browser | undefined;
 
+// Multi-browser registry
+const browserRegistry = new Map<string, Browser>();
+let activeBrowserId = 'default';
+
+export function switchActiveBrowser(browserId: string): Browser {
+  if (!browserRegistry.has(browserId)) {
+    const available = [...browserRegistry.keys()];
+    if (available.length === 0) {
+      throw new Error(
+        `Browser '${browserId}' not found. No browsers are currently registered.`,
+      );
+    }
+    throw new Error(
+      `Browser '${browserId}' not found. Available browsers: ${available.join(', ')}`,
+    );
+  }
+  const targetBrowser = browserRegistry.get(browserId)!;
+  if (!targetBrowser?.connected) {
+    throw new Error(
+      `Browser '${browserId}' is disconnected. Remove it and add again with add_browser.`,
+    );
+  }
+  activeBrowserId = browserId;
+  browser = targetBrowser;
+  return browser;
+}
+
+export interface BrowserInfo {
+  id: string;
+  connected: boolean;
+  active: boolean;
+}
+
+export function listBrowsers(): BrowserInfo[] {
+  const result: BrowserInfo[] = [];
+  for (const [id, b] of browserRegistry.entries()) {
+    result.push({
+      id,
+      connected: b?.connected ?? false,
+      active: id === activeBrowserId,
+    });
+  }
+  return result;
+}
+
+export async function addBrowser(
+  browserId: string,
+  options: {browserURL?: string; wsEndpoint?: string; enableExtensions?: boolean},
+): Promise<Browser> {
+  const connectOptions: Parameters<typeof puppeteer.connect>[0] = {
+    targetFilter: makeTargetFilter(options.enableExtensions ?? false),
+    defaultViewport: null,
+    handleDevToolsAsPage: true,
+  };
+  if (options.browserURL) {
+    connectOptions.browserURL = options.browserURL;
+  } else if (options.wsEndpoint) {
+    connectOptions.browserWSEndpoint = options.wsEndpoint;
+  } else {
+    throw new Error('Either browserURL or wsEndpoint must be provided');
+  }
+  logger('Adding browser', browserId, JSON.stringify(connectOptions));
+  const newBrowser = await puppeteer.connect(connectOptions);
+  browserRegistry.set(browserId, newBrowser);
+  if (!browser || browserRegistry.size === 1) {
+    browser = newBrowser;
+    activeBrowserId = browserId;
+  }
+  return newBrowser;
+}
+
+export function getActiveBrowserId(): string {
+  return activeBrowserId;
+}
+
 function makeTargetFilter(enableExtensions = false) {
   const ignoredPrefixes = new Set(['chrome://', 'chrome-untrusted://']);
   if (!enableExtensions) {
@@ -130,6 +205,7 @@ export async function ensureBrowserConnected(options: {
     );
   }
   logger('Connected Puppeteer');
+  browserRegistry.set(activeBrowserId, browser);
   return browser;
 }
 
@@ -267,6 +343,7 @@ export async function ensureBrowserLaunched(
     return browser;
   }
   browser = await launch(options);
+  browserRegistry.set(activeBrowserId, browser);
   return browser;
 }
 
