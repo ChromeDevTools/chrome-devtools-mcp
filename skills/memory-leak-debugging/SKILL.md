@@ -36,3 +36,13 @@ Once you have generated `.heapsnapshot` files using `take_memory_snapshot`, use 
 When you have found a leak trace (e.g., via `memlab` output), you must identify the root cause in the code.
 
 - Read [references/common-leaks.md](references/common-leaks.md) for examples of common memory leaks and how to fix them.
+
+### 4. Fallback: Comparing Snapshots Manually
+
+If `memlab` is not available, you MUST use the fallback script in the references directory to compare two `.heapsnapshot` files and identify the top growing objects and common leak types.
+
+Run the script using Node.js:
+```bash
+node compare_snapshots.js <baseline.heapsnapshot> <target.heapsnapshot>
+```
+The script will analyze and output the top growing objects by size and highlight the 3 most common types of memory leaks (e.g., Detached DOM nodes, closures, Contexts) if they are present.
