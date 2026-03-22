@@ -10,7 +10,12 @@ import {logger} from '../logger.js';
 
 import type {LocalState, Persistence} from './persistence.js';
 import {FilePersistence} from './persistence.js';
-import {type FlagUsage, WatchdogMessageType, OsType} from './types.js';
+import {
+  McpClient,
+  type FlagUsage,
+  WatchdogMessageType,
+  OsType,
+} from './types.js';
 import {WatchdogClient} from './WatchdogClient.js';
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
@@ -31,6 +36,7 @@ function detectOsType(): OsType {
 export class ClearcutLogger {
   #persistence: Persistence;
   #watchdog: WatchdogClient;
+  #mcpClient: McpClient;
 
   constructor(options: {
     appVersion: string;
@@ -53,6 +59,18 @@ export class ClearcutLogger {
         clearcutForceFlushIntervalMs: options.clearcutForceFlushIntervalMs,
         clearcutIncludePidHeader: options.clearcutIncludePidHeader,
       });
+    this.#mcpClient = McpClient.MCP_CLIENT_UNSPECIFIED;
+  }
+
+  setClientName(clientName: string): void {
+    const lowerName = clientName.toLowerCase();
+    if (lowerName.includes('claude')) {
+      this.#mcpClient = McpClient.MCP_CLIENT_CLAUDE_CODE;
+    } else if (lowerName.includes('gemini')) {
+      this.#mcpClient = McpClient.MCP_CLIENT_GEMINI_CLI;
+    } else {
+      this.#mcpClient = McpClient.MCP_CLIENT_OTHER;
+    }
   }
 
   async logToolInvocation(args: {
@@ -63,6 +81,7 @@ export class ClearcutLogger {
     this.#watchdog.send({
       type: WatchdogMessageType.LOG_EVENT,
       payload: {
+        mcp_client: this.#mcpClient,
         tool_invocation: {
           tool_name: args.toolName,
           success: args.success,
@@ -76,6 +95,7 @@ export class ClearcutLogger {
     this.#watchdog.send({
       type: WatchdogMessageType.LOG_EVENT,
       payload: {
+        mcp_client: this.#mcpClient,
         server_start: {
           flag_usage: flagUsage,
         },
@@ -99,6 +119,7 @@ export class ClearcutLogger {
         this.#watchdog.send({
           type: WatchdogMessageType.LOG_EVENT,
           payload: {
+            mcp_client: this.#mcpClient,
             daily_active: {
               days_since_last_active: daysSince,
             },

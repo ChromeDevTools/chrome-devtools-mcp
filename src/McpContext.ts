@@ -8,14 +8,14 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 
 import type {TargetUniverse} from './DevtoolsUtils.js';
-import {
-  extractUrlLikeFromDevToolsTitle,
-  UniverseManager,
-  urlsEqual,
-} from './DevtoolsUtils.js';
+import {UniverseManager} from './DevtoolsUtils.js';
 import {McpPage} from './McpPage.js';
-import type {ListenerMap, UncaughtError} from './PageCollector.js';
-import {NetworkCollector, ConsoleCollector} from './PageCollector.js';
+import {
+  NetworkCollector,
+  ConsoleCollector,
+  type ListenerMap,
+  type UncaughtError,
+} from './PageCollector.js';
 import type {DevTools} from './third_party/index.js';
 import type {
   Browser,
@@ -48,13 +48,6 @@ import {
 } from './utils/ExtensionRegistry.js';
 import {saveTemporaryFile} from './utils/files.js';
 import {WaitForHelper} from './WaitForHelper.js';
-
-export type {
-  EmulationSettings,
-  GeolocationOptions,
-  TextSnapshot,
-  TextSnapshotNode,
-} from './types.js';
 
 interface McpContextOptions {
   // Whether the DevTools windows are exposed as pages for debugging of DevTools.
@@ -653,37 +646,28 @@ export class McpContext implements Context {
   async detectOpenDevToolsWindows() {
     this.logger('Detecting open DevTools windows');
     const {pages} = await this.#getAllPages();
-    // Clear all devToolsPage references before re-detecting.
-    for (const mcpPage of this.#mcpPages.values()) {
-      mcpPage.devToolsPage = undefined;
-    }
-    for (const devToolsPage of pages) {
-      if (devToolsPage.url().startsWith('devtools://')) {
-        try {
-          this.logger('Calling getTargetInfo for ' + devToolsPage.url());
-          const data = await devToolsPage
-            // @ts-expect-error no types for _client().
-            ._client()
-            .send('Target.getTargetInfo');
-          const devtoolsPageTitle = data.targetInfo.title;
-          const urlLike = extractUrlLikeFromDevToolsTitle(devtoolsPageTitle);
-          if (!urlLike) {
-            continue;
-          }
-          // TODO: lookup without a loop.
-          for (const page of this.#pages) {
-            if (urlsEqual(page.url(), urlLike)) {
-              const mcpPage = this.#mcpPages.get(page);
-              if (mcpPage) {
-                mcpPage.devToolsPage = devToolsPage;
-              }
-            }
-          }
-        } catch (error) {
-          this.logger('Issue occurred while trying to find DevTools', error);
+
+    await Promise.all(
+      pages.map(async page => {
+        const mcpPage = this.#mcpPages.get(page);
+        if (!mcpPage) {
+          return;
         }
-      }
-    }
+
+        // Prior to Chrome 144.0.7559.59, the command fails,
+        // Some Electron apps still use older version
+        // Fall back to not exposing DevTools at all.
+        try {
+          if (await page.hasDevTools()) {
+            mcpPage.devToolsPage = await page.openDevTools();
+          } else {
+            mcpPage.devToolsPage = undefined;
+          }
+        } catch {
+          mcpPage.devToolsPage = undefined;
+        }
+      }),
+    );
   }
 
   getExtensionServiceWorkers(): ExtensionServiceWorker[] {

@@ -54,6 +54,24 @@ describe('ClearcutLogger', () => {
     });
   });
 
+  describe('setClientName', () => {
+    it('appends mapped mcp_client to payload', async () => {
+      const logger = new ClearcutLogger({
+        persistence: mockPersistence,
+        appVersion: '1.0.0',
+        watchdogClient: mockWatchdogClient,
+      });
+
+      logger.setClientName('gemini-cli-mcp-client');
+      await logger.logServerStart({headless: true});
+
+      assert(mockWatchdogClient.send.calledOnce);
+      const msg = mockWatchdogClient.send.firstCall.args[0];
+      assert.strictEqual(msg.type, WatchdogMessageType.LOG_EVENT);
+      assert.strictEqual(msg.payload.mcp_client, 2); // 2 is MCP_CLIENT_GEMINI_CLI
+    });
+  });
+
   describe('logServerStart', () => {
     it('logs flag usage', async () => {
       const logger = new ClearcutLogger({

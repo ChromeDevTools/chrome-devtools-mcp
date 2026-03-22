@@ -284,6 +284,29 @@ describe('NetworkCollector', () => {
     page.emit('request', request);
     assert.equal(collector.getData(page, true).length, 3);
   });
+
+  it('should not grow beyond maxNavigationSaved', async () => {
+    const browser = getMockBrowser();
+    const page = (await browser.pages())[0];
+    const mainFrame = page.mainFrame();
+    const collector = new NetworkCollector(browser);
+    await collector.init([page]);
+
+    // Simulate 5 navigations (maxNavigationSaved is 3)
+    for (let i = 0; i < 5; i++) {
+      const req = getMockRequest({
+        url: `http://example.com/nav${i}`,
+        navigationRequest: true,
+        frame: mainFrame,
+      });
+      page.emit('request', req);
+      page.emit('framenavigated', mainFrame);
+    }
+
+    // We expect 3 arrays in navigations (current + 2 saved)
+    // Each navigation has 1 request, so total should be 3
+    assert.equal(collector.getData(page, true).length, 3);
+  });
 });
 
 describe('ConsoleCollector', () => {

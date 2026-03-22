@@ -156,6 +156,9 @@ Then, install the plugin:
 
 Restart Claude Code to have the MCP server and skills load (check with `/skills`).
 
+> [!TIP]
+> If the plugin installation fails with a `Failed to clone repository` error (e.g., HTTPS connectivity issues behind a corporate firewall), see the [troubleshooting guide](./docs/troubleshooting.md#claude-code-plugin-installation-fails-with-failed-to-clone-repository) for workarounds, or use the CLI installation method above instead.
+
 </details>
 
 <details>
@@ -228,8 +231,16 @@ Configure the following fields and press `CTRL+S` to save the configuration:
 Follow the MCP install <a href="https://code.visualstudio.com/docs/copilot/chat/mcp-servers#_add-an-mcp-server">guide</a>,
 with the standard config from above. You can also install the Chrome DevTools MCP server using the VS Code CLI:
 
+For macOS and Linux:
+
 ```bash
 code --add-mcp '{"name":"io.github.ChromeDevTools/chrome-devtools-mcp","command":"npx","args":["-y","chrome-devtools-mcp"],"env":{}}'
+```
+
+For Windows (PowerShell):
+
+```powershell
+code --add-mcp '{"""name""":"""io.github.ChromeDevTools/chrome-devtools-mcp""","""command""":"""npx""","""args""":["""-y""","""chrome-devtools-mcp"""]}'
 ```
 
 </details>

@@ -57,6 +57,13 @@ export async function createMcpServer(
     return {};
   });
 
+  server.server.oninitialized = () => {
+    const clientName = server.server.getClientVersion()?.name;
+    if (clientName) {
+      clearcutLogger?.setClientName(clientName);
+    }
+  };
+
   let context: McpContext;
   async function getContext(): Promise<McpContext> {
     const chromeArgs: string[] = (serverArgs.chromeArg ?? []).map(String);
@@ -129,7 +136,7 @@ export async function createMcpServer(
     }
     if (
       tool.annotations.category === ToolCategory.EXTENSIONS &&
-      serverArgs.categoryExtensions === false
+      !serverArgs.categoryExtensions
     ) {
       return;
     }

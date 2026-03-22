@@ -5,9 +5,10 @@
  */
 
 import {logger} from '../logger.js';
-import type {McpContext, TextSnapshotNode} from '../McpContext.js';
+import type {McpContext} from '../McpContext.js';
 import {zod} from '../third_party/index.js';
 import type {ElementHandle, KeyInput} from '../third_party/index.js';
+import type {TextSnapshotNode} from '../types.js';
 import {parseKey} from '../utils/keyboard.js';
 
 import {ToolCategory} from './categories.js';
