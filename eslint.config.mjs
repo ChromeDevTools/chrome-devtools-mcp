@@ -135,6 +135,14 @@ export default defineConfig([
     },
   },
   {
+    name: 'Tool schema restrictions',
+    files: ['src/tools/**/*.ts'],
+    ignores: ['src/tools/input.ts'],
+    rules: {
+      '@local/enforce-zod-schema': 'error',
+    },
+  },
+  {
     name: 'Tests',
     files: ['**/*.test.ts'],
     rules: {
