@@ -1,6 +1,6 @@
 <!-- AUTO GENERATED DO NOT EDIT - run 'npm run gen' to update-->
 
-# Chrome DevTools MCP Tool Reference (~6940 cl100k_base tokens)
+# Chrome DevTools MCP Tool Reference (~7028 cl100k_base tokens)
 
 - **[Input automation](#input-automation)** (9 tools)
   - [`click`](#click)
@@ -394,6 +394,9 @@ in the DevTools Elements panel (if any).
 **Parameters:**
 
 - **filePath** (string) _(optional)_: The absolute path, or a path relative to the current working directory, to save the snapshot to instead of attaching it to the response.
+- **name** (string) _(optional)_: Filter elements by their accessibility name (supports regular expressions).
+- **role** (string) _(optional)_: Filter elements by their accessibility role.
+- **text** (string) _(optional)_: Filter elements by their text content (supports regular expressions).
 - **verbose** (boolean) _(optional)_: Whether to include all possible information available in the full a11y tree. Default is false.
 
 ---
