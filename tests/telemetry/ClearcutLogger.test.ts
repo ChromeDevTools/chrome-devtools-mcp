@@ -9,6 +9,7 @@ import {describe, it, afterEach, beforeEach} from 'node:test';
 
 import sinon from 'sinon';
 
+import {DAEMON_CLIENT_NAME} from '../../src/daemon/utils.js';
 import {ClearcutLogger} from '../../src/telemetry/ClearcutLogger.js';
 import type {Persistence} from '../../src/telemetry/persistence.js';
 import {FilePersistence} from '../../src/telemetry/persistence.js';
@@ -55,21 +56,32 @@ describe('ClearcutLogger', () => {
   });
 
   describe('setClientName', () => {
-    it('appends mapped mcp_client to payload', async () => {
-      const logger = new ClearcutLogger({
-        persistence: mockPersistence,
-        appVersion: '1.0.0',
-        watchdogClient: mockWatchdogClient,
+    const clients = [
+      {name: 'claude-code', expected: 1}, // MCP_CLIENT_CLAUDE_CODE
+      {name: 'gemini-cli', expected: 2}, // MCP_CLIENT_GEMINI_CLI
+      {name: DAEMON_CLIENT_NAME, expected: 4}, // MCP_CLIENT_DT_MCP_CLI
+      {name: 'openclaw-browser', expected: 5}, // MCP_CLIENT_OPENCLAW
+      {name: 'codex-mcp-client', expected: 6}, // MCP_CLIENT_CODEX
+      {name: 'antigravity-client', expected: 7}, // MCP_CLIENT_ANTIGRAVITY
+    ];
+
+    for (const {name, expected} of clients) {
+      it(`maps ${name} client correctly`, async () => {
+        const logger = new ClearcutLogger({
+          persistence: mockPersistence,
+          appVersion: '1.0.0',
+          watchdogClient: mockWatchdogClient,
+        });
+
+        logger.setClientName(name);
+        await logger.logServerStart({headless: true});
+
+        assert(mockWatchdogClient.send.calledOnce);
+        const msg = mockWatchdogClient.send.firstCall.args[0];
+        assert.strictEqual(msg.type, WatchdogMessageType.LOG_EVENT);
+        assert.strictEqual(msg.payload.mcp_client, expected);
       });
-
-      logger.setClientName('gemini-cli-mcp-client');
-      await logger.logServerStart({headless: true});
-
-      assert(mockWatchdogClient.send.calledOnce);
-      const msg = mockWatchdogClient.send.firstCall.args[0];
-      assert.strictEqual(msg.type, WatchdogMessageType.LOG_EVENT);
-      assert.strictEqual(msg.payload.mcp_client, 2); // 2 is MCP_CLIENT_GEMINI_CLI
-    });
+    }
   });
 
   describe('logServerStart', () => {

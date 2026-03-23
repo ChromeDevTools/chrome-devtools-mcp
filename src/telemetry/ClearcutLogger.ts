@@ -73,6 +73,12 @@ export class ClearcutLogger {
       this.#mcpClient = McpClient.MCP_CLIENT_DT_MCP_CLI;
     } else if (lowerName.includes('openclaw')) {
       this.#mcpClient = McpClient.MCP_CLIENT_OPENCLAW;
+    } else if (lowerName.includes('codex')) {
+      // "codex-mcp-client" is the client name from Codex CLI.
+      this.#mcpClient = McpClient.MCP_CLIENT_CODEX;
+    } else if (lowerName.includes('antigravity')) {
+      // "antigravity-client" is the client name from antigravity.
+      this.#mcpClient = McpClient.MCP_CLIENT_ANTIGRAVITY;
     } else {
       this.#mcpClient = McpClient.MCP_CLIENT_OTHER;
     }
