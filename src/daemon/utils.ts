@@ -21,6 +21,7 @@ export const INDEX_SCRIPT_PATH = path.join(
 );
 
 const APP_NAME = 'chrome-devtools-mcp';
+export const DAEMON_CLIENT_NAME = 'chrome-devtools-cli-daemon';
 
 // Using these paths due to strict limits on the POSIX socket path length.
 export function getSocketPath(): string {

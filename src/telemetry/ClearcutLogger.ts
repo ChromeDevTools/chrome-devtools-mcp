@@ -6,6 +6,7 @@
 
 import process from 'node:process';
 
+import {DAEMON_CLIENT_NAME} from '../daemon/utils.js';
 import {logger} from '../logger.js';
 
 import type {LocalState, Persistence} from './persistence.js';
@@ -68,6 +69,10 @@ export class ClearcutLogger {
       this.#mcpClient = McpClient.MCP_CLIENT_CLAUDE_CODE;
     } else if (lowerName.includes('gemini')) {
       this.#mcpClient = McpClient.MCP_CLIENT_GEMINI_CLI;
+    } else if (clientName === DAEMON_CLIENT_NAME) {
+      this.#mcpClient = McpClient.MCP_CLIENT_DT_MCP_CLI;
+    } else if (lowerName.includes('openclaw')) {
+      this.#mcpClient = McpClient.MCP_CLIENT_OPENCLAW;
     } else {
       this.#mcpClient = McpClient.MCP_CLIENT_OTHER;
     }

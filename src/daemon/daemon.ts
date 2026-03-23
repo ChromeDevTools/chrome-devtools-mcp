@@ -21,6 +21,7 @@ import {VERSION} from '../version.js';
 
 import type {DaemonMessage} from './types.js';
 import {
+  DAEMON_CLIENT_NAME,
   getDaemonPid,
   getPidFilePath,
   getSocketPath,
@@ -65,7 +66,7 @@ async function setupMCPClient() {
   });
   mcpClient = new Client(
     {
-      name: 'chrome-devtools-cli-daemon',
+      name: DAEMON_CLIENT_NAME,
       version: VERSION,
     },
     {
