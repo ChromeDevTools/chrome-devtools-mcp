@@ -138,3 +138,30 @@ export const getNetworkRequest = definePageTool({
     }
   },
 });
+
+export const setExtraHTTPHeaders = definePageTool({
+  name: 'set_extra_http_headers',
+  description: `Set extra HTTP headers to be sent with every request made by the selected page. Headers persist across navigations until cleared. Pass an empty object to clear all extra headers.`,
+  annotations: {
+    category: ToolCategory.NETWORK,
+    readOnlyHint: false,
+  },
+  schema: {
+    headers: zod
+      .record(zod.string(), zod.string())
+      .describe(
+        'Header name-value pairs to set, e.g. {"X-Custom": "value"}. Pass an empty object {} to clear all extra headers.',
+      ),
+  },
+  handler: async (request, response) => {
+    await request.page.pptrPage.setExtraHTTPHeaders(request.params.headers);
+    const headerCount = Object.keys(request.params.headers).length;
+    if (headerCount === 0) {
+      response.appendResponseLine('Extra HTTP headers cleared.');
+    } else {
+      response.appendResponseLine(
+        `Set ${headerCount} extra HTTP header${headerCount === 1 ? '' : 's'}: ${Object.keys(request.params.headers).join(', ')}`,
+      );
+    }
+  },
+});
