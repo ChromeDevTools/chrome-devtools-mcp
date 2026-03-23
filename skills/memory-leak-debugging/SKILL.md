@@ -11,7 +11,7 @@ This skill provides expert guidance and workflows for finding, diagnosing, and f
 
 - **Prefer `memlab`:** Do NOT attempt to read raw `.heapsnapshot` files directly, as they are extremely large and will consume too many tokens. Always recommend and use `memlab` to process snapshots and identify leak traces.
 - **Isolate the Leak:** Determine if the leak is in the browser (client-side) or Node.js (server-side).
-- **Common Culprits:** Look for detached DOM nodes, unhandled closures, global variables, event listeners not being removed, and caches growing unbounded. *Note: Detached DOM nodes are sometimes intentional caches; always ask the user before nulling them.*
+- **Common Culprits:** Look for detached DOM nodes, unhandled closures, global variables, event listeners not being removed, and caches growing unbounded. _Note: Detached DOM nodes are sometimes intentional caches; always ask the user before nulling them._
 
 ## Workflows
 
@@ -42,7 +42,9 @@ When you have found a leak trace (e.g., via `memlab` output), you must identify 
 If `memlab` is not available, you MUST use the fallback script in the references directory to compare two `.heapsnapshot` files and identify the top growing objects and common leak types.
 
 Run the script using Node.js:
+
 ```bash
 node compare_snapshots.js <baseline.heapsnapshot> <target.heapsnapshot>
 ```
+
 The script will analyze and output the top growing objects by size and highlight the 3 most common types of memory leaks (e.g., Detached DOM nodes, closures, Contexts) if they are present.
