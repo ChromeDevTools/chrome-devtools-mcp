@@ -37,6 +37,7 @@ export default defineConfig([
             'puppeteer.config.cjs',
             'eslint.config.mjs',
             'rollup.config.mjs',
+            'skills/memory-leak-debugging/references/compare_snapshots.js',
           ],
         },
       },
