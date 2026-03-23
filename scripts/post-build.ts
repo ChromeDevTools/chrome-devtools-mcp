@@ -94,6 +94,42 @@ export const ExperimentName = {
   writeFile(runtimeFile, runtimeContent);
 
   copyDevToolsDescriptionFiles();
+  copySnapshotFiles();
+}
+
+function copySnapshotFiles() {
+  const testsDir = path.join(process.cwd(), 'tests');
+  const buildTestsDir = path.join(BUILD_DIR, 'tests');
+
+  if (!fs.existsSync(buildTestsDir)) {
+    fs.mkdirSync(buildTestsDir, {recursive: true});
+  }
+
+  const files = fs.readdirSync(testsDir);
+  for (const file of files) {
+    if (file.endsWith('.snapshot')) {
+      fs.copyFileSync(path.join(testsDir, file), path.join(buildTestsDir, file));
+    }
+  }
+
+  // Also handle subdirectories if needed, but for now we only have snapshots in the root of tests/
+  // Wait, let's check tools/
+  const toolsTestsDir = path.join(testsDir, 'tools');
+  const buildToolsTestsDir = path.join(buildTestsDir, 'tools');
+  if (fs.existsSync(toolsTestsDir)) {
+    if (!fs.existsSync(buildToolsTestsDir)) {
+      fs.mkdirSync(buildToolsTestsDir, {recursive: true});
+    }
+    const toolsFiles = fs.readdirSync(toolsTestsDir);
+    for (const file of toolsFiles) {
+      if (file.endsWith('.snapshot')) {
+        fs.copyFileSync(
+          path.join(toolsTestsDir, file),
+          path.join(buildToolsTestsDir, file),
+        );
+      }
+    }
+  }
 }
 
 function copyDevToolsDescriptionFiles() {

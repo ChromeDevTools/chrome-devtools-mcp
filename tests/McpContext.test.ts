@@ -130,6 +130,90 @@ describe('McpContext', () => {
     });
   });
 
+  describe('take_snapshot filtering', () => {
+    it('should filter by role', async () => {
+      await withMcpContext(async (_response, context) => {
+        const page = context.getSelectedMcpPage();
+        await page.pptrPage.setContent(
+          html`<div>
+            <button>Button 1</button>
+            <a href="#">Link 1</a>
+            <button>Button 2</button>
+          </div>`,
+        );
+
+        await context.createTextSnapshot(page, false, undefined, {
+          role: 'button',
+        });
+        const snapshot = page.textSnapshot;
+        assert.ok(snapshot);
+
+        // Root might be 'WebArea' or similar, we expect only buttons as descendants.
+        const buttons = Array.from(snapshot.idToNode.values()).filter(
+          node => node.role === 'button',
+        );
+        const links = Array.from(snapshot.idToNode.values()).filter(
+          node => node.role === 'link',
+        );
+
+        assert.strictEqual(buttons.length, 2);
+        assert.strictEqual(links.length, 0);
+      });
+    });
+
+    it('should filter by name', async () => {
+      await withMcpContext(async (_response, context) => {
+        const page = context.getSelectedMcpPage();
+        await page.pptrPage.setContent(
+          html`<div>
+            <button>Submit Form</button>
+            <button>Cancel</button>
+          </div>`,
+        );
+
+        await context.createTextSnapshot(page, false, undefined, {
+          name: 'Submit',
+        });
+        const snapshot = page.textSnapshot;
+        assert.ok(snapshot);
+
+        const nodes = Array.from(snapshot.idToNode.values()).filter(
+          node => node.role === 'button',
+        );
+        assert.strictEqual(nodes.length, 1);
+        assert.strictEqual(nodes[0].name, 'Submit Form');
+      });
+    });
+
+    it('should filter by text content', async () => {
+      await withMcpContext(async (_response, context) => {
+        const page = context.getSelectedMcpPage();
+        await page.pptrPage.setContent(
+          html`<div>
+            <p>This is a secret message.</p>
+            <p>Public info.</p>
+          </div>`,
+        );
+
+        await context.createTextSnapshot(page, false, undefined, {
+          text: 'secret',
+        });
+        const snapshot = page.textSnapshot;
+        assert.ok(snapshot);
+
+        const textFound = Array.from(snapshot.idToNode.values()).some(
+          node => node.name && node.name.toString().includes('secret'),
+        );
+        const publicFound = Array.from(snapshot.idToNode.values()).some(
+          node => node.name && node.name.toString().includes('Public'),
+        );
+
+        assert.ok(textFound);
+        assert.strictEqual(publicFound, false);
+      });
+    });
+  });
+
   it('should include network requests in structured content', async t => {
     await withMcpContext(async (response, context) => {
       const mockRequest = getMockRequest({
