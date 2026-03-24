@@ -509,7 +509,7 @@ export class McpContext implements Context {
     const serviceWorkers = allTargets.filter(target => {
       return (
         target.type() === 'service_worker' &&
-        isExtensionUrl(target.url()
+        isExtensionUrl(target.url())
       );
     });
 
