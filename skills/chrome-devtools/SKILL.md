@@ -5,7 +5,9 @@ description: Uses Chrome DevTools via MCP for efficient debugging, troubleshooti
 
 ## Core Concepts
 
-**Browser lifecycle**: Browser starts automatically on first tool call using a persistent Chrome profile. Configure via CLI args in the MCP server configuration: `npx chrome-devtools-mcp@latest --help`.
+**Browser lifecycle**: Browser starts automatically on first tool call using a persistent browser profile. Configure via CLI args in the MCP server configuration: `npx chrome-devtools-mcp@latest --help`.
+
+**Browser selection**: With no browser selection arguments, stable channel Chrome browser is the default. You can use `--browser=edge` to specify the Microsoft Edge browser. You can also use `--channel=stable|beta|dev|canary` to specify a channel. Alternatively, use `--executablePath` to specify the binary path of the browser you want to use.
 
 **Page selection**: Tools operate on the currently selected page. Use `list_pages` to see available pages, then `select_page` to switch context.
 

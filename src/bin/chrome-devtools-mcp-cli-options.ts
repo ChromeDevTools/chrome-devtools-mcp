@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import os from 'node:os';
+
 import type {YargsOptions} from '../third_party/index.js';
 import {yargs, hideBin} from '../third_party/index.js';
 
@@ -115,6 +117,12 @@ export const cliOptions = {
       'Specify a different Chrome channel that should be used. The default is the stable channel version.',
     choices: ['stable', 'canary', 'beta', 'dev'] as const,
     conflicts: ['browserUrl', 'wsEndpoint', 'executablePath'],
+  },
+  browser: {
+    type: 'string',
+    description: 'Specify which browser to use. Defaults to Chrome.',
+    choices: ['chrome', 'edge'] as const,
+    default: 'chrome',
   },
   logFile: {
     type: 'string',
@@ -272,6 +280,12 @@ export function parseArguments(version: string, argv = process.argv) {
       ) {
         args.channel = 'stable';
       }
+      // Edge Canary is not available on Linux.
+      if (args.browser === 'edge' && args.channel === 'canary' && os.platform() === 'linux') {
+        throw new Error(
+          `Edge Canary is not available on Linux. Use --executablePath to specify a custom Edge binary.`,
+        );
+      }
       return true;
     })
     .example([
@@ -291,6 +305,7 @@ export function parseArguments(version: string, argv = process.argv) {
       ['$0 --channel canary', 'Use Chrome Canary installed on this system'],
       ['$0 --channel dev', 'Use Chrome Dev installed on this system'],
       ['$0 --channel stable', 'Use stable Chrome installed on this system'],
+      ['$0 --browser edge', 'Use Microsoft Edge instead of Chrome'],
       ['$0 --logFile /tmp/log.txt', 'Save logs to a file'],
       ['$0 --help', 'Print CLI options'],
       [
@@ -322,6 +337,10 @@ export function parseArguments(version: string, argv = process.argv) {
       [
         '$0 --auto-connect --channel=canary',
         'Connect to a canary Chrome instance (Chrome 144+) running instead of launching a new instance',
+      ],
+      [
+        '$0 --auto-connect --browser=edge',
+        'Connect to a stable Edge instance running instead of launching a new instance',
       ],
       [
         '$0 --no-usage-statistics',

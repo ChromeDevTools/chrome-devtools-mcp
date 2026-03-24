@@ -5,6 +5,7 @@
  */
 
 import type {ParsedArguments} from './bin/chrome-devtools-mcp-cli-options.js';
+import {isExtensionUrl} from './browser.js';
 import {ConsoleFormatter} from './formatters/ConsoleFormatter.js';
 import {IssueFormatter} from './formatters/IssueFormatter.js';
 import {NetworkFormatter} from './formatters/NetworkFormatter.js';
@@ -567,7 +568,7 @@ Call ${handleDialog.name} to handle it before continuing.`);
 
       const {regularPages, extensionPages} = allPages.reduce(
         (acc: {regularPages: Page[]; extensionPages: Page[]}, page: Page) => {
-          if (page.url().startsWith('chrome-extension://')) {
+          if (isExtensionUrl(page.url())) {
             acc.extensionPages.push(page);
           } else {
             acc.regularPages.push(page);

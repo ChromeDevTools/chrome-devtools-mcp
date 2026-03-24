@@ -7,6 +7,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
+import {isExtensionUrl} from './browser.js';
 import type {TargetUniverse} from './DevtoolsUtils.js';
 import {UniverseManager} from './DevtoolsUtils.js';
 import {McpPage} from './McpPage.js';
@@ -508,7 +509,7 @@ export class McpContext implements Context {
     const serviceWorkers = allTargets.filter(target => {
       return (
         target.type() === 'service_worker' &&
-        target.url().includes('chrome-extension://')
+        isExtensionUrl(target.url()
       );
     });
 
@@ -589,7 +590,7 @@ export class McpContext implements Context {
     const allTargets = this.browser.targets();
     const extensionTargets = allTargets.filter(target => {
       return (
-        target.url().startsWith('chrome-extension://') &&
+        isExtensionUrl(target.url()) && 
         target.type() === 'page'
       );
     });

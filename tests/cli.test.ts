@@ -5,12 +5,14 @@
  */
 
 import assert from 'node:assert';
+import os from 'node:os';
 import {describe, it} from 'node:test';
 
 import {parseArguments} from '../src/bin/chrome-devtools-mcp-cli-options.js';
 
 describe('cli args parsing', () => {
   const defaultArgs = {
+    browser: 'chrome',
     'category-emulation': true,
     categoryEmulation: true,
     'category-performance': true,
@@ -293,5 +295,134 @@ describe('cli args parsing', () => {
       '--no-performance-crux',
     ]);
     assert.strictEqual(disabledArgs.performanceCrux, false);
+  });
+
+  it('parses --browser edge', async () => {
+    const args = parseArguments('1.0.0', [
+      'node',
+      'main.js',
+      '--browser',
+      'edge',
+    ]);
+    assert.strictEqual(args.browser, 'edge');
+    assert.strictEqual(args.channel, 'stable');
+  });
+
+  it('parses --browser edge --channel beta', async () => {
+    const args = parseArguments('1.0.0', [
+      'node',
+      'main.js',
+      '--browser',
+      'edge',
+      '--channel',
+      'beta',
+    ]);
+    assert.strictEqual(args.browser, 'edge');
+    assert.strictEqual(args.channel, 'beta');
+  });
+
+  it('rejects --browser edge --channel canary on Linux', { skip: os.platform() !== 'linux' }, async () => {
+    // Yargs .check() calls process.exit() on validation failure instead of
+    // throwing, so we intercept process.exit to capture the rejection.
+    let exitCalled = false;
+    const originalExit = process.exit;
+    process.exit = (() => {
+      exitCalled = true;
+    }) as unknown as typeof process.exit;
+    try {
+      parseArguments('1.0.0', [
+        'node',
+        'main.js',
+        '--browser',
+        'edge',
+        '--channel',
+        'canary',
+      ]);
+    } finally {
+      process.exit = originalExit;
+    }
+    assert.strictEqual(
+      exitCalled,
+      true,
+      'Edge Canary on Linux should cause process.exit',
+    );
+  });
+
+  it('accepts --browser edge --channel canary on non-Linux', { skip: os.platform() === 'linux' }, async () => {
+    const args = parseArguments('1.0.0', [
+      'node',
+      'main.js',
+      '--browser',
+      'edge',
+      '--channel',
+      'canary',
+    ]);
+    assert.strictEqual(args.browser, 'edge');
+    assert.strictEqual(args.channel, 'canary');
+  });
+
+  it('accepts --browser edge --channel dev', async () => {
+    const args = parseArguments('1.0.0', [
+      'node',
+      'main.js',
+      '--browser',
+      'edge',
+      '--channel',
+      'dev',
+    ]);
+    assert.strictEqual(args.browser, 'edge');
+    assert.strictEqual(args.channel, 'dev');
+  });
+
+  it('accepts --browser edge --channel stable explicitly', async () => {
+    const args = parseArguments('1.0.0', [
+      'node',
+      'main.js',
+      '--browser',
+      'edge',
+      '--channel',
+      'stable',
+    ]);
+    assert.strictEqual(args.browser, 'edge');
+    assert.strictEqual(args.channel, 'stable');
+  });
+
+  it('defaults to stable channel for --browser edge', async () => {
+    const args = parseArguments('1.0.0', [
+      'node',
+      'main.js',
+      '--browser',
+      'edge',
+    ]);
+    assert.strictEqual(args.browser, 'edge');
+    assert.strictEqual(args.channel, 'stable');
+  });
+
+  it('accepts --browser edge --auto-connect', async () => {
+    const args = parseArguments('1.0.0', [
+      'node',
+      'main.js',
+      '--browser',
+      'edge',
+      '--auto-connect',
+    ]);
+    assert.strictEqual(args.browser, 'edge');
+    assert.strictEqual(args.autoConnect, true);
+    assert.strictEqual(args.channel, 'stable');
+  });
+
+  it('accepts --browser edge --auto-connect --channel beta', async () => {
+    const args = parseArguments('1.0.0', [
+      'node',
+      'main.js',
+      '--browser',
+      'edge',
+      '--auto-connect',
+      '--channel',
+      'beta',
+    ]);
+    assert.strictEqual(args.browser, 'edge');
+    assert.strictEqual(args.autoConnect, true);
+    assert.strictEqual(args.channel, 'beta');
   });
 });

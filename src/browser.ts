@@ -9,6 +9,10 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
+import {
+  resolveEdgeExecutablePath,
+  resolveEdgeUserDataDir,
+} from './edgePaths.js';
 import {logger} from './logger.js';
 import type {
   Browser,
@@ -21,17 +25,23 @@ import {puppeteer} from './third_party/index.js';
 let browser: Browser | undefined;
 
 function makeTargetFilter(enableExtensions = false) {
-  const ignoredPrefixes = new Set(['chrome://', 'chrome-untrusted://']);
+  const ignoredPrefixes = new Set([
+    'chrome://',
+    'chrome-untrusted://',
+    'edge://',
+    'edge-untrusted://',
+  ]);
   if (!enableExtensions) {
     ignoredPrefixes.add('chrome-extension://');
+    ignoredPrefixes.add('edge-extension://');
   }
 
   return function targetFilter(target: Target): boolean {
-    if (target.url() === 'chrome://newtab/') {
+    if (isBrowserNewTabUrl(target.url())) {
       return true;
     }
     // Could be the only page opened in the browser.
-    if (target.url().startsWith('chrome://inspect')) {
+    if (isBrowserInspectUrl(target.url())) {
       return true;
     }
     for (const prefix of ignoredPrefixes) {
@@ -49,10 +59,11 @@ export async function ensureBrowserConnected(options: {
   wsHeaders?: Record<string, string>;
   devtools: boolean;
   channel?: Channel;
+  browserKind?: BrowserKind;
   userDataDir?: string;
   enableExtensions?: boolean;
 }) {
-  const {channel, enableExtensions} = options;
+  const {channel, enableExtensions, browserKind = 'chrome'} = options;
   if (browser?.connected) {
     return browser;
   }
@@ -72,7 +83,12 @@ export async function ensureBrowserConnected(options: {
   } else if (options.browserURL) {
     connectOptions.browserURL = options.browserURL;
   } else if (channel || options.userDataDir) {
-    const userDataDir = options.userDataDir;
+    let userDataDir = options.userDataDir;
+    // Puppeteer's runtime does not resolve Edge channels, so we find
+    // Edge's default user data dir ourselves for auto-connect.
+    if (!userDataDir && browserKind === 'edge' && channel) {
+      userDataDir = resolveEdgeUserDataDir(channel);
+    }
     if (userDataDir) {
       autoConnect = true;
       // TODO: re-expose this logic via Puppeteer.
@@ -98,7 +114,7 @@ export async function ensureBrowserConnected(options: {
         connectOptions.browserWSEndpoint = browserWSEndpoint;
       } catch (error) {
         throw new Error(
-          `Could not connect to Chrome in ${userDataDir}. Check if Chrome is running and remote debugging is enabled by going to chrome://inspect/#remote-debugging.`,
+          `Could not connect to ${browserName(browserKind)} in ${userDataDir}. Check if ${browserName(browserKind)} is running and remote debugging is enabled by going to ${inspectUrl(browserKind)}.`,
           {
             cause: error,
           },
@@ -123,7 +139,7 @@ export async function ensureBrowserConnected(options: {
     browser = await puppeteer.connect(connectOptions);
   } catch (err) {
     throw new Error(
-      `Could not connect to Chrome. ${autoConnect ? `Check if Chrome is running and remote debugging is enabled by going to chrome://inspect/#remote-debugging.` : `Check if Chrome is running.`}`,
+      `Could not connect to ${browserName(browserKind)}. ${autoConnect ? `Check if ${browserName(browserKind)} is running and remote debugging is enabled by going to ${inspectUrl(browserKind)}.` : `Check if ${browserName(browserKind)} is running.`}`,
       {
         cause: err,
       },
@@ -137,6 +153,7 @@ interface McpLaunchOptions {
   acceptInsecureCerts?: boolean;
   executablePath?: string;
   channel?: Channel;
+  browserKind?: BrowserKind;
   userDataDir?: string;
   headless: boolean;
   isolated: boolean;
@@ -171,11 +188,18 @@ export function detectDisplay(): void {
 }
 
 export async function launch(options: McpLaunchOptions): Promise<Browser> {
-  const {channel, executablePath, headless, isolated} = options;
+  const {
+    channel,
+    executablePath,
+    headless,
+    isolated,
+    browserKind = 'chrome',
+  } = options;
+  const browserPrefix = browserKind === 'edge' ? 'edge' : 'chrome';
   const profileDirName =
     channel && channel !== 'stable'
-      ? `chrome-profile-${channel}`
-      : 'chrome-profile';
+      ? `${browserPrefix}-profile-${channel}`
+      : `${browserPrefix}-profile`;
 
   let userDataDir = options.userDataDir;
   if (!isolated && !userDataDir) {
@@ -204,11 +228,19 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
   if (options.devtools) {
     args.push('--auto-open-devtools-for-tabs');
   }
-  if (!executablePath) {
-    puppeteerChannel =
-      channel && channel !== 'stable'
-        ? (`chrome-${channel}` as ChromeReleaseChannel)
-        : 'chrome';
+  let resolvedExecutablePath = executablePath;
+  if (!resolvedExecutablePath) {
+    if (browserKind === 'edge') {
+      // Puppeteer's runtime does not resolve Edge channels, so we find the
+      // Edge executable ourselves and pass it as executablePath.
+      const edgeChannel = channel ?? 'stable';
+      resolvedExecutablePath = resolveEdgeExecutablePath(edgeChannel);
+    } else {
+      puppeteerChannel =
+        channel && channel !== 'stable'
+          ? (`chrome-${channel}` as ChromeReleaseChannel)
+          : 'chrome';
+    }
   }
 
   if (!headless) {
@@ -219,7 +251,7 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
     const browser = await puppeteer.launch({
       channel: puppeteerChannel,
       targetFilter: makeTargetFilter(options.enableExtensions),
-      executablePath,
+      executablePath: resolvedExecutablePath,
       defaultViewport: null,
       userDataDir,
       pipe: true,
@@ -271,3 +303,33 @@ export async function ensureBrowserLaunched(
 }
 
 export type Channel = 'stable' | 'canary' | 'beta' | 'dev';
+
+export type BrowserKind = 'chrome' | 'edge';
+
+export function browserName(browserKind: BrowserKind): string {
+  return browserKind === 'edge' ? 'Edge' : 'Chrome';
+}
+
+export function inspectUrl(browserKind: BrowserKind): string {
+  return browserKind === 'edge'
+    ? 'edge://inspect/#remote-debugging'
+    : 'chrome://inspect/#remote-debugging';
+}
+
+export function isExtensionUrl(url: string): boolean {
+  return url.startsWith('chrome-extension://') || 
+    url.startsWith('edge-extension://');
+}
+
+export function isBrowserNewTabUrl(url: string): boolean {
+  return url === 'chrome://newtab/' || url === 'edge://newtab/';
+}
+
+export function isBrowserInspectUrl(url: string): boolean {
+  return url.startsWith('chrome://inspect') || url.startsWith('edge://inspect');
+}
+
+export {
+  resolveEdgeExecutablePath,
+  resolveEdgeUserDataDir,
+} from './edgePaths.js';

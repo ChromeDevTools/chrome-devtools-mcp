@@ -7,7 +7,7 @@
 import type fs from 'node:fs';
 
 import type {parseArguments} from './bin/chrome-devtools-mcp-cli-options.js';
-import type {Channel} from './browser.js';
+import type {Channel, BrowserKind} from './browser.js';
 import {ensureBrowserConnected, ensureBrowserLaunched} from './browser.js';
 import {loadIssueDescriptions} from './issue-descriptions.js';
 import {logger} from './logger.js';
@@ -67,6 +67,8 @@ export async function createMcpServer(
       chromeArgs.push(`--proxy-server=${serverArgs.proxyServer}`);
     }
     const devtools = serverArgs.experimentalDevtools ?? false;
+    const browserKind: BrowserKind =
+      serverArgs.browser === 'edge' ? 'edge' : 'chrome';
     const browser =
       serverArgs.browserUrl || serverArgs.wsEndpoint || serverArgs.autoConnect
         ? await ensureBrowserConnected({
@@ -77,6 +79,7 @@ export async function createMcpServer(
             channel: serverArgs.autoConnect
               ? (serverArgs.channel as Channel)
               : undefined,
+            browserKind,
             userDataDir: serverArgs.userDataDir,
             devtools,
           })
@@ -84,6 +87,7 @@ export async function createMcpServer(
             headless: serverArgs.headless,
             executablePath: serverArgs.executablePath,
             channel: serverArgs.channel as Channel,
+            browserKind,
             isolated: serverArgs.isolated ?? false,
             userDataDir: serverArgs.userDataDir,
             logFile: options.logFile,
