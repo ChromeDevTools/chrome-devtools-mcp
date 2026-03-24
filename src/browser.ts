@@ -317,8 +317,9 @@ export function inspectUrl(browserKind: BrowserKind): string {
 }
 
 export function isExtensionUrl(url: string): boolean {
-  return url.startsWith('chrome-extension://') || 
-    url.startsWith('edge-extension://');
+  return (
+    url.startsWith('chrome-extension://') || url.startsWith('edge-extension://')
+  );
 }
 
 export function isBrowserNewTabUrl(url: string): boolean {

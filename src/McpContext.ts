@@ -507,10 +507,7 @@ export class McpContext implements Context {
     const allTargets = await this.browser.targets();
 
     const serviceWorkers = allTargets.filter(target => {
-      return (
-        target.type() === 'service_worker' &&
-        isExtensionUrl(target.url())
-      );
+      return target.type() === 'service_worker' && isExtensionUrl(target.url());
     });
 
     for (const serviceWorker of serviceWorkers) {
@@ -589,10 +586,7 @@ export class McpContext implements Context {
 
     const allTargets = this.browser.targets();
     const extensionTargets = allTargets.filter(target => {
-      return (
-        isExtensionUrl(target.url()) && 
-        target.type() === 'page'
-      );
+      return isExtensionUrl(target.url()) && target.type() === 'page';
     });
 
     for (const target of extensionTargets) {

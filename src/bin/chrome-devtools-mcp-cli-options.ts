@@ -281,7 +281,11 @@ export function parseArguments(version: string, argv = process.argv) {
         args.channel = 'stable';
       }
       // Edge Canary is not available on Linux.
-      if (args.browser === 'edge' && args.channel === 'canary' && os.platform() === 'linux') {
+      if (
+        args.browser === 'edge' &&
+        args.channel === 'canary' &&
+        os.platform() === 'linux'
+      ) {
         throw new Error(
           `Edge Canary is not available on Linux. Use --executablePath to specify a custom Edge binary.`,
         );

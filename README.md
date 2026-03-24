@@ -789,11 +789,11 @@ npx chrome-devtools-mcp@latest --browser=edge --channel=beta
 
 The MCP server automatically detects Edge installations in the standard locations:
 
-| Platform | Stable channel path |
-|----------|-------------|
-| **Windows** | `C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe` |
-| **macOS** | `/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge` |
-| **Linux** | `/opt/microsoft/msedge/msedge` or `/usr/bin/microsoft-edge` |
+| Platform    | Stable channel path                                              |
+| ----------- | ---------------------------------------------------------------- |
+| **Windows** | `C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe`   |
+| **macOS**   | `/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge` |
+| **Linux**   | `/opt/microsoft/msedge/msedge` or `/usr/bin/microsoft-edge`      |
 
 If Edge is installed in a non-standard location, use `--executablePath` to specify the path manually.
 
@@ -813,7 +813,12 @@ Use `--autoConnect` with `--browser=edge` to connect to an already-running Edge 
   "mcpServers": {
     "chrome-devtools": {
       "command": "npx",
-      "args": ["-y", "chrome-devtools-mcp@latest", "--autoConnect", "--browser=edge"]
+      "args": [
+        "-y",
+        "chrome-devtools-mcp@latest",
+        "--autoConnect",
+        "--browser=edge"
+      ]
     }
   }
 }

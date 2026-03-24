@@ -184,7 +184,10 @@ describe('ensureBrowserConnected Edge auto-connect', () => {
       return; // Edge not installed — skip
     }
 
-    const folderPath = path.join(os.tmpdir(), `edge-autoconnect-${crypto.randomUUID()}`);
+    const folderPath = path.join(
+      os.tmpdir(),
+      `edge-autoconnect-${crypto.randomUUID()}`,
+    );
     let browser;
     try {
       browser = await launch({
@@ -240,8 +243,11 @@ describe('ensureBrowserConnected Edge auto-connect', () => {
   });
 
   it('uses Edge-specific error message on connection failure', async () => {
-    const fakePath = path.join(os.tmpdir(), `edge-no-exist-${crypto.randomUUID()}`);
-    await fs.promises.mkdir(fakePath, { recursive: true });
+    const fakePath = path.join(
+      os.tmpdir(),
+      `edge-no-exist-${crypto.randomUUID()}`,
+    );
+    await fs.promises.mkdir(fakePath, {recursive: true});
     try {
       await ensureBrowserConnected({
         userDataDir: fakePath,
@@ -250,16 +256,25 @@ describe('ensureBrowserConnected Edge auto-connect', () => {
       });
       assert.fail('should have thrown');
     } catch (err) {
-      assert.ok(err.message.includes('Edge'), `Error should mention Edge: ${err.message}`);
-      assert.ok(err.message.includes('edge://inspect'), `Error should mention edge://inspect: ${err.message}`);
+      assert.ok(
+        err.message.includes('Edge'),
+        `Error should mention Edge: ${err.message}`,
+      );
+      assert.ok(
+        err.message.includes('edge://inspect'),
+        `Error should mention edge://inspect: ${err.message}`,
+      );
     } finally {
-      await fs.promises.rm(fakePath, { recursive: true, force: true });
+      await fs.promises.rm(fakePath, {recursive: true, force: true});
     }
   });
 
   it('uses Chrome-specific error message on connection failure', async () => {
-    const fakePath = path.join(os.tmpdir(), `chrome-no-exist-${crypto.randomUUID()}`);
-    await fs.promises.mkdir(fakePath, { recursive: true });
+    const fakePath = path.join(
+      os.tmpdir(),
+      `chrome-no-exist-${crypto.randomUUID()}`,
+    );
+    await fs.promises.mkdir(fakePath, {recursive: true});
     try {
       await ensureBrowserConnected({
         userDataDir: fakePath,
@@ -268,10 +283,16 @@ describe('ensureBrowserConnected Edge auto-connect', () => {
       });
       assert.fail('should have thrown');
     } catch (err) {
-      assert.ok(err.message.includes('Chrome'), `Error should mention Chrome: ${err.message}`);
-      assert.ok(err.message.includes('chrome://inspect'), `Error should mention chrome://inspect: ${err.message}`);
+      assert.ok(
+        err.message.includes('Chrome'),
+        `Error should mention Chrome: ${err.message}`,
+      );
+      assert.ok(
+        err.message.includes('chrome://inspect'),
+        `Error should mention chrome://inspect: ${err.message}`,
+      );
     } finally {
-      await fs.promises.rm(fakePath, { recursive: true, force: true });
+      await fs.promises.rm(fakePath, {recursive: true, force: true});
     }
   });
 });
@@ -285,7 +306,10 @@ describe('launch Edge executable resolution', () => {
     }
 
     const tmpDir = os.tmpdir();
-    const folderPath = path.join(tmpDir, `edge-launch-test-${crypto.randomUUID()}`);
+    const folderPath = path.join(
+      tmpDir,
+      `edge-launch-test-${crypto.randomUUID()}`,
+    );
     let browser;
     try {
       browser = await launch({
@@ -314,7 +338,10 @@ describe('launch Edge executable resolution', () => {
     }
 
     const tmpDir = os.tmpdir();
-    const folderPath = path.join(tmpDir, `edge-beta-launch-${crypto.randomUUID()}`);
+    const folderPath = path.join(
+      tmpDir,
+      `edge-beta-launch-${crypto.randomUUID()}`,
+    );
     let browser;
     try {
       browser = await launch({
@@ -344,7 +371,10 @@ describe('launch Edge executable resolution', () => {
     }
 
     const tmpDir = os.tmpdir();
-    const folderPath = path.join(tmpDir, `edge-dev-launch-${crypto.randomUUID()}`);
+    const folderPath = path.join(
+      tmpDir,
+      `edge-dev-launch-${crypto.randomUUID()}`,
+    );
     let browser;
     try {
       browser = await launch({
@@ -368,18 +398,27 @@ describe('launch Edge executable resolution', () => {
 
   it('creates edge-profile directory prefix for Edge', async () => {
     const tmpDir = os.tmpdir();
-    const basePath = path.join(tmpDir, `edge-profile-test-${crypto.randomUUID()}`);
-    await fs.promises.mkdir(basePath, { recursive: true });
+    const basePath = path.join(
+      tmpDir,
+      `edge-profile-test-${crypto.randomUUID()}`,
+    );
+    await fs.promises.mkdir(basePath, {recursive: true});
 
     try {
       resolveEdgeExecutablePath('stable');
     } catch {
-      await fs.promises.rm(basePath, { recursive: true, force: true });
+      await fs.promises.rm(basePath, {recursive: true, force: true});
       return; // Edge not installed — skip
     }
 
-    const cliCacheDir = path.join(os.homedir(), '.cache', 'chrome-devtools-mcp-cli');
-    const entriesBefore = await fs.promises.readdir(cliCacheDir).catch(() => [] as string[]);
+    const cliCacheDir = path.join(
+      os.homedir(),
+      '.cache',
+      'chrome-devtools-mcp-cli',
+    );
+    const entriesBefore = await fs.promises
+      .readdir(cliCacheDir)
+      .catch(() => [] as string[]);
 
     const browser = await launch({
       headless: true,
@@ -398,14 +437,19 @@ describe('launch Edge executable resolution', () => {
     } finally {
       await browser.close();
       // Clean up any new edge-profile dirs created by this test
-      const entriesAfter = await fs.promises.readdir(cliCacheDir).catch(() => [] as string[]);
+      const entriesAfter = await fs.promises
+        .readdir(cliCacheDir)
+        .catch(() => [] as string[]);
       const newEntries = entriesAfter.filter(
         e => e.startsWith('edge-profile') && !entriesBefore.includes(e),
       );
       for (const entry of newEntries) {
-        await fs.promises.rm(path.join(cliCacheDir, entry), { recursive: true, force: true });
+        await fs.promises.rm(path.join(cliCacheDir, entry), {
+          recursive: true,
+          force: true,
+        });
       }
-      await fs.promises.rm(basePath, { recursive: true, force: true });
+      await fs.promises.rm(basePath, {recursive: true, force: true});
     }
   });
 
@@ -414,12 +458,12 @@ describe('launch Edge executable resolution', () => {
     // The launch function uses `${browserPrefix}-profile-${channel}` for non-stable
     const browserPrefix = 'edge';
     const cases = [
-      { channel: 'stable', expected: 'edge-profile' },
-      { channel: 'beta', expected: 'edge-profile-beta' },
-      { channel: 'dev', expected: 'edge-profile-dev' },
-      { channel: 'canary', expected: 'edge-profile-canary' },
+      {channel: 'stable', expected: 'edge-profile'},
+      {channel: 'beta', expected: 'edge-profile-beta'},
+      {channel: 'dev', expected: 'edge-profile-dev'},
+      {channel: 'canary', expected: 'edge-profile-canary'},
     ];
-    for (const { channel, expected } of cases) {
+    for (const {channel, expected} of cases) {
       const profileDirName =
         channel && channel !== 'stable'
           ? `${browserPrefix}-profile-${channel}`
@@ -428,5 +472,3 @@ describe('launch Edge executable resolution', () => {
     }
   });
 });
-
-

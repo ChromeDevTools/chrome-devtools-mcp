@@ -111,9 +111,7 @@ const EDGE_EXECUTABLE_PATHS: Record<
     ],
   },
   darwin: {
-    stable: [
-      '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
-    ],
+    stable: ['/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge'],
     beta: [
       '/Applications/Microsoft Edge Beta.app/Contents/MacOS/Microsoft Edge Beta',
     ],
@@ -135,16 +133,17 @@ export function resolveEdgeExecutablePath(channel: Channel): string {
   const platform = os.platform();
   const paths = EDGE_EXECUTABLE_PATHS[platform]?.[channel];
   if (!paths || paths.length === 0) {
-    throw new Error(
-      `Edge ${channel} channel is not available on ${platform}.`,
-    );
+    throw new Error(`Edge ${channel} channel is not available on ${platform}.`);
   }
   for (const candidate of paths) {
     if (fs.existsSync(candidate)) {
       return candidate;
     }
   }
-  const channelName = channel === 'stable' ? 'Edge' : `Edge ${channel[0].toUpperCase() + channel.slice(1)}`;
+  const channelName =
+    channel === 'stable'
+      ? 'Edge'
+      : `Edge ${channel[0].toUpperCase() + channel.slice(1)}`;
   throw new Error(
     `Could not find Microsoft ${channelName} executable. Tried:\n` +
       paths.map(p => `  ${p}`).join('\n') +
@@ -152,10 +151,7 @@ export function resolveEdgeExecutablePath(channel: Channel): string {
   );
 }
 
-const EDGE_USER_DATA_DIRS: Record<
-  string,
-  Partial<Record<Channel, string>>
-> = {
+const EDGE_USER_DATA_DIRS: Record<string, Partial<Record<Channel, string>>> = {
   win32: {
     ...(process.env['LOCALAPPDATA']
       ? {
@@ -223,9 +219,7 @@ export function resolveEdgeUserDataDir(channel: Channel): string {
   const platform = os.platform();
   const dir = EDGE_USER_DATA_DIRS[platform]?.[channel];
   if (!dir) {
-    throw new Error(
-      `Edge ${channel} channel is not available on ${platform}.`,
-    );
+    throw new Error(`Edge ${channel} channel is not available on ${platform}.`);
   }
   return dir;
 }

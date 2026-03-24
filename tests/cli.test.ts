@@ -321,16 +321,42 @@ describe('cli args parsing', () => {
     assert.strictEqual(args.channel, 'beta');
   });
 
-  it('rejects --browser edge --channel canary on Linux', { skip: os.platform() !== 'linux' }, async () => {
-    // Yargs .check() calls process.exit() on validation failure instead of
-    // throwing, so we intercept process.exit to capture the rejection.
-    let exitCalled = false;
-    const originalExit = process.exit;
-    process.exit = (() => {
-      exitCalled = true;
-    }) as unknown as typeof process.exit;
-    try {
-      parseArguments('1.0.0', [
+  it(
+    'rejects --browser edge --channel canary on Linux',
+    {skip: os.platform() !== 'linux'},
+    async () => {
+      // Yargs .check() calls process.exit() on validation failure instead of
+      // throwing, so we intercept process.exit to capture the rejection.
+      let exitCalled = false;
+      const originalExit = process.exit;
+      process.exit = (() => {
+        exitCalled = true;
+      }) as unknown as typeof process.exit;
+      try {
+        parseArguments('1.0.0', [
+          'node',
+          'main.js',
+          '--browser',
+          'edge',
+          '--channel',
+          'canary',
+        ]);
+      } finally {
+        process.exit = originalExit;
+      }
+      assert.strictEqual(
+        exitCalled,
+        true,
+        'Edge Canary on Linux should cause process.exit',
+      );
+    },
+  );
+
+  it(
+    'accepts --browser edge --channel canary on non-Linux',
+    {skip: os.platform() === 'linux'},
+    async () => {
+      const args = parseArguments('1.0.0', [
         'node',
         'main.js',
         '--browser',
@@ -338,28 +364,10 @@ describe('cli args parsing', () => {
         '--channel',
         'canary',
       ]);
-    } finally {
-      process.exit = originalExit;
-    }
-    assert.strictEqual(
-      exitCalled,
-      true,
-      'Edge Canary on Linux should cause process.exit',
-    );
-  });
-
-  it('accepts --browser edge --channel canary on non-Linux', { skip: os.platform() === 'linux' }, async () => {
-    const args = parseArguments('1.0.0', [
-      'node',
-      'main.js',
-      '--browser',
-      'edge',
-      '--channel',
-      'canary',
-    ]);
-    assert.strictEqual(args.browser, 'edge');
-    assert.strictEqual(args.channel, 'canary');
-  });
+      assert.strictEqual(args.browser, 'edge');
+      assert.strictEqual(args.channel, 'canary');
+    },
+  );
 
   it('accepts --browser edge --channel dev', async () => {
     const args = parseArguments('1.0.0', [
