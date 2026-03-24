@@ -10,105 +10,37 @@ import path from 'node:path';
 
 type Channel = 'stable' | 'canary' | 'beta' | 'dev';
 
+function win32EdgeExe(envVar: string, fallback: string, folder: string) {
+  if (!process.env[envVar] && !fallback) {
+    return '';
+  }
+  return path.join(
+    process.env[envVar] ?? fallback,
+    'Microsoft',
+    folder,
+    'Application',
+    'msedge.exe',
+  );
+}
+
+function win32EdgeExePaths(folder: string): string[] {
+  return [
+    win32EdgeExe('PROGRAMFILES(X86)', 'C:\\Program Files (x86)', folder),
+    win32EdgeExe('LOCALAPPDATA', '', folder)
+  ].filter(p => p); // Filter out empty paths if env vars are missing
+}
+
 const EDGE_EXECUTABLE_PATHS: Record<
   string,
   Partial<Record<Channel, string[]>>
 > = {
   win32: {
-    stable: [
-      path.join(
-        process.env['PROGRAMFILES(X86)'] ?? 'C:\\Program Files (x86)',
-        'Microsoft',
-        'Edge',
-        'Application',
-        'msedge.exe',
-      ),
-      path.join(
-        process.env['PROGRAMFILES'] ?? 'C:\\Program Files',
-        'Microsoft',
-        'Edge',
-        'Application',
-        'msedge.exe',
-      ),
-      ...(process.env['LOCALAPPDATA']
-        ? [
-            path.join(
-              process.env['LOCALAPPDATA'],
-              'Microsoft',
-              'Edge',
-              'Application',
-              'msedge.exe',
-            ),
-          ]
-        : []),
-    ],
-    beta: [
-      path.join(
-        process.env['PROGRAMFILES(X86)'] ?? 'C:\\Program Files (x86)',
-        'Microsoft',
-        'Edge Beta',
-        'Application',
-        'msedge.exe',
-      ),
-      path.join(
-        process.env['PROGRAMFILES'] ?? 'C:\\Program Files',
-        'Microsoft',
-        'Edge Beta',
-        'Application',
-        'msedge.exe',
-      ),
-      ...(process.env['LOCALAPPDATA']
-        ? [
-            path.join(
-              process.env['LOCALAPPDATA'],
-              'Microsoft',
-              'Edge Beta',
-              'Application',
-              'msedge.exe',
-            ),
-          ]
-        : []),
-    ],
-    dev: [
-      path.join(
-        process.env['PROGRAMFILES(X86)'] ?? 'C:\\Program Files (x86)',
-        'Microsoft',
-        'Edge Dev',
-        'Application',
-        'msedge.exe',
-      ),
-      path.join(
-        process.env['PROGRAMFILES'] ?? 'C:\\Program Files',
-        'Microsoft',
-        'Edge Dev',
-        'Application',
-        'msedge.exe',
-      ),
-      ...(process.env['LOCALAPPDATA']
-        ? [
-            path.join(
-              process.env['LOCALAPPDATA'],
-              'Microsoft',
-              'Edge Dev',
-              'Application',
-              'msedge.exe',
-            ),
-          ]
-        : []),
-    ],
-    canary: [
-      ...(process.env['LOCALAPPDATA']
-        ? [
-            path.join(
-              process.env['LOCALAPPDATA'],
-              'Microsoft',
-              'Edge SxS',
-              'Application',
-              'msedge.exe',
-            ),
-          ]
-        : []),
-    ],
+    stable: win32EdgeExePaths('Edge'),
+    beta: win32EdgeExePaths('Edge Beta'),
+    dev: win32EdgeExePaths('Edge Dev'),
+    canary: process.env['LOCALAPPDATA']
+      ? [win32EdgeExe('LOCALAPPDATA', '', 'Edge SxS')]
+      : [],
   },
   darwin: {
     stable: ['/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge'],
@@ -151,34 +83,26 @@ export function resolveEdgeExecutablePath(channel: Channel): string {
   );
 }
 
+function win32EdgeUserDataDir(folder: string): string | undefined {
+  if (!process.env['LOCALAPPDATA']) {
+    return undefined;
+  }
+  return path.join(
+    process.env['LOCALAPPDATA'],
+    'Microsoft',
+    folder,
+    'User Data',
+  );
+}
+
 const EDGE_USER_DATA_DIRS: Record<string, Partial<Record<Channel, string>>> = {
   win32: {
     ...(process.env['LOCALAPPDATA']
       ? {
-          stable: path.join(
-            process.env['LOCALAPPDATA'],
-            'Microsoft',
-            'Edge',
-            'User Data',
-          ),
-          beta: path.join(
-            process.env['LOCALAPPDATA'],
-            'Microsoft',
-            'Edge Beta',
-            'User Data',
-          ),
-          dev: path.join(
-            process.env['LOCALAPPDATA'],
-            'Microsoft',
-            'Edge Dev',
-            'User Data',
-          ),
-          canary: path.join(
-            process.env['LOCALAPPDATA'],
-            'Microsoft',
-            'Edge SxS',
-            'User Data',
-          ),
+          stable: win32EdgeUserDataDir('Edge')!,
+          beta: win32EdgeUserDataDir('Edge Beta')!,
+          dev: win32EdgeUserDataDir('Edge Dev')!,
+          canary: win32EdgeUserDataDir('Edge SxS')!,
         }
       : {}),
   },
