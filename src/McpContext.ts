@@ -60,6 +60,67 @@ interface McpContextOptions {
 
 const DEFAULT_TIMEOUT = 5_000;
 const NAVIGATION_TIMEOUT = 10_000;
+const RECOVERABLE_PAGE_INITIALIZATION_TIMEOUTS = [
+  'Network.enable timed out',
+  'Page.enable timed out',
+  'Runtime.enable timed out',
+];
+
+function isRecoverablePageInitializationError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return RECOVERABLE_PAGE_INITIALIZATION_TIMEOUTS.some(timeout => {
+    return message.includes(timeout);
+  });
+}
+
+async function getPageFromTarget(
+  target: Target,
+  logger: Debugger,
+  operation: string,
+  skipRecoverableErrors = false,
+): Promise<Page | null> {
+  try {
+    return await target.page();
+  } catch (error) {
+    if (
+      !skipRecoverableErrors ||
+      !isRecoverablePageInitializationError(error)
+    ) {
+      throw error;
+    }
+
+    logger(
+      `Skipping target during ${operation}: ${target.type()} ${target.url()}`,
+      error,
+    );
+    return null;
+  }
+}
+
+async function enumerateHealthyPagesByTarget(
+  browser: Browser,
+  logger: Debugger,
+): Promise<Page[]> {
+  const pages: Page[] = [];
+
+  for (const target of browser.targets()) {
+    if (target.type() !== 'page') {
+      continue;
+    }
+
+    const page = await getPageFromTarget(
+      target,
+      logger,
+      'fallback page enumeration',
+      true,
+    );
+    if (page && !pages.includes(page)) {
+      pages.push(page);
+    }
+  }
+
+  return pages;
+}
 
 function getNetworkMultiplierFromString(condition: string | null): number {
   const puppeteerCondition =
@@ -579,9 +640,22 @@ export class McpContext implements Context {
     isolatedContextNames: Map<Page, string>;
   }> {
     const defaultCtx = this.browser.defaultBrowserContext();
-    const allPages = await this.browser.pages(
-      this.#options.experimentalIncludeAllPages,
-    );
+    let allPages: Page[];
+    try {
+      allPages = await this.browser.pages(
+        this.#options.experimentalIncludeAllPages,
+      );
+    } catch (error) {
+      if (!isRecoverablePageInitializationError(error)) {
+        throw error;
+      }
+
+      this.logger(
+        'browser.pages() failed with a recoverable page initialization error, falling back to per-target enumeration',
+        error,
+      );
+      allPages = await enumerateHealthyPagesByTarget(this.browser, this.logger);
+    }
 
     const allTargets = this.browser.targets();
     const extensionTargets = allTargets.filter(target => {
@@ -593,7 +667,12 @@ export class McpContext implements Context {
 
     for (const target of extensionTargets) {
       // Right now target.page() returns null for popup and side panel pages.
-      let page = await target.page();
+      let page = await getPageFromTarget(
+        target,
+        this.logger,
+        'extension target enumeration',
+        true,
+      );
       if (!page) {
         // We need to cache pages instances for targets because target.asPage()
         // returns a new page instance every time.

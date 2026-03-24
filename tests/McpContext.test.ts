@@ -10,7 +10,7 @@ import {afterEach, describe, it} from 'node:test';
 import sinon from 'sinon';
 
 import {NetworkFormatter} from '../src/formatters/NetworkFormatter.js';
-import type {HTTPResponse} from '../src/third_party/index.js';
+import type {HTTPResponse, Target} from '../src/third_party/index.js';
 import type {TraceResult} from '../src/trace-processing/parse.js';
 
 import {getMockRequest, html, withMcpContext} from './utils.js';
@@ -34,6 +34,42 @@ describe('McpContext', () => {
       assert.ok(await page.getElementByUid('1_1'));
       await context.createTextSnapshot(context.getSelectedMcpPage());
       await page.getElementByUid('1_1');
+    });
+  });
+
+  it('falls back to healthy targets when browser.pages hits a recoverable timeout', async () => {
+    await withMcpContext(async (_response, context) => {
+      const healthyPage = context.getSelectedMcpPage().pptrPage;
+      const timeoutError = new Error(
+        "Network.enable timed out. Increase the 'protocolTimeout' setting in launch/connect calls for a higher timeout if needed.",
+      );
+      const healthyTarget = {
+        type: () => {
+          return 'page';
+        },
+        url: () => {
+          return healthyPage.url();
+        },
+        page: sinon.stub().resolves(healthyPage),
+      } as unknown as Target;
+      const frozenTarget = {
+        type: () => {
+          return 'page';
+        },
+        url: () => {
+          return 'https://discarded.example.test/';
+        },
+        page: sinon.stub().rejects(timeoutError),
+      } as unknown as Target;
+
+      sinon.stub(context.browser, 'pages').rejects(timeoutError);
+      sinon
+        .stub(context.browser, 'targets')
+        .returns([healthyTarget, frozenTarget]);
+
+      const pages = await context.createPagesSnapshot();
+
+      assert.deepStrictEqual(pages, [healthyPage]);
     });
   });
 
