@@ -272,13 +272,13 @@ class PageEventSubscriber {
     if (this.#issueAggregator) {
       this.#issueAggregator.removeEventListener(
         DevTools.IssueAggregatorEvents.AGGREGATED_ISSUE_UPDATED,
-        this.#onAggregatedissue,
+        this.#onAggregatedIssue,
       );
     }
     this.#issueAggregator = new DevTools.IssueAggregator(this.#issueManager);
     this.#issueAggregator.addEventListener(
       DevTools.IssueAggregatorEvents.AGGREGATED_ISSUE_UPDATED,
-      this.#onAggregatedissue,
+      this.#onAggregatedIssue,
     );
   }
 
@@ -303,7 +303,7 @@ class PageEventSubscriber {
     if (this.#issueAggregator) {
       this.#issueAggregator.removeEventListener(
         DevTools.IssueAggregatorEvents.AGGREGATED_ISSUE_UPDATED,
-        this.#onAggregatedissue,
+        this.#onAggregatedIssue,
       );
     }
     void this.#session.send('Audits.disable').catch(() => {
@@ -311,7 +311,7 @@ class PageEventSubscriber {
     });
   }
 
-  #onAggregatedissue = (
+  #onAggregatedIssue = (
     event: DevTools.Common.EventTarget.EventTargetEvent<DevTools.AggregatedIssue>,
   ) => {
     if (this.#seenIssues.has(event.data)) {
