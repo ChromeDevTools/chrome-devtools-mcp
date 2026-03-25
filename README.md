@@ -27,6 +27,10 @@ allowing them to inspect, debug, and modify any data in the browser or DevTools.
 Avoid sharing sensitive or personal information that you don't want to share with
 MCP clients.
 
+`chrome-devtools-mcp` officially supports Google Chrome and [Chrome for Testing](https://developer.chrome.com/blog/chrome-for-testing/) only.
+Other Chromium-based browser may work, but this is not guaranteed, and you may encounter unexpected behavior. Use at your own discretion.
+We are committed to providing fixes and support for the latest version of [Extended Stable Chrome](https://chromiumdash.appspot.com/schedule).
+
 Performance tools may send trace URLs to the Google CrUX API to fetch real-user
 experience data. This helps provide a holistic performance picture by
 presenting field data alongside lab data. This data is collected by the [Chrome
@@ -53,7 +57,7 @@ Collection is disabled if CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS or CI env vari
 
 - [Node.js](https://nodejs.org/) v20.19 or a newer [latest maintenance LTS](https://github.com/nodejs/Release#release-schedule) version.
 - [Chrome](https://www.google.com/chrome/) current stable version or newer.
-- [npm](https://www.npmjs.com/).
+- [npm](https://www.npmjs.com/)
 
 ## Getting started
 
