@@ -1,6 +1,6 @@
 {
   "name": "chrome-devtools-mcp",
-  "version": "latest",
+  "version": "0.20.3",
   "mcpServers": {
     "chrome-devtools": {
       "command": "npx",
