@@ -41,7 +41,7 @@ delete startCliOptions.autoConnect;
 // Missing CLI serialization.
 delete startCliOptions.viewport;
 // CLI is generated based on the default tool definitions. To enable conditional
-// tools, they needs to be enabled during CLI generation.
+// tools, they need to be enabled during CLI generation.
 delete startCliOptions.experimentalPageIdRouting;
 delete startCliOptions.experimentalVision;
 delete startCliOptions.experimentalInteropTools;

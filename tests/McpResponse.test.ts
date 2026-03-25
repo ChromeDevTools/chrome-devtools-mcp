@@ -10,6 +10,9 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {describe, it} from 'node:test';
 
+import sinon from 'sinon';
+
+import type {ParsedArguments} from '../src/bin/chrome-devtools-mcp-cli-options.js';
 import type {InsightName} from '../src/trace-processing/parse.js';
 import {
   parseRawTraceBuffer,
@@ -1011,5 +1014,79 @@ describe('lighthouse', () => {
         JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
       );
     });
+  });
+});
+
+describe('in-page tools', () => {
+  function stubToolDiscovery(page: object) {
+    // @ts-expect-error Internal API
+    const client = page._client();
+    const originalSend = client.send.bind(client);
+    sinon.stub(client, 'send').callsFake(async (method: string, params?: Record<string, unknown>) => {
+      if (method === 'DOMDebugger.getEventListeners') {
+        return {
+          listeners: [
+            {
+              type: 'devtoolstooldiscovery',
+              useCapture: false,
+              passive: false,
+              once: false,
+              scriptId: '0',
+              lineNumber: 0,
+              columnNumber: 0,
+            },
+          ],
+        };
+      }
+      return originalSend(method, params);
+    });
+  }
+
+  it('lists in-page tools', async t => {
+    await withMcpContext(
+      async (response, context) => {
+        response.setListInPageTools();
+        const emptyResult = await response.handle('test', context);
+        const emptyText = getTextContent(emptyResult.content[0]);
+        assert.ok(
+          emptyText.includes('No in-page tools available.'),
+          'Should show message for empty in-page tools',
+        );
+
+        response.resetResponseLineForTesting();
+        const mcpPage = context.getSelectedMcpPage();
+        stubToolDiscovery(mcpPage.pptrPage);
+        sinon.stub(mcpPage.pptrPage, 'evaluate').resolves({
+          name: 'My Tool Group',
+          description: 'A group of tools',
+          tools: [
+            {
+              name: 'myTool',
+              description: 'Does something',
+              inputSchema: {
+                type: 'object',
+                properties: {
+                  foo: {type: 'string'},
+                },
+              },
+            },
+          ],
+        });
+        response.setListInPageTools();
+        const {content, structuredContent} = await response.handle(
+          'test',
+          context,
+        );
+        const responseText = getTextContent(content[0]);
+        t.assert.snapshot?.(responseText);
+        assert.ok(
+          responseText.includes('inputSchema={"type":"object"'),
+          'Response should include inputSchema',
+        );
+        t.assert.snapshot?.(JSON.stringify(structuredContent, null, 2));
+      },
+      undefined,
+      {categoryInPageTools: true} as ParsedArguments,
+    );
   });
 });

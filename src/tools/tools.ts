@@ -9,6 +9,7 @@ import type {ParsedArguments} from '../bin/chrome-devtools-mcp-cli-options.js';
 import * as consoleTools from './console.js';
 import * as emulationTools from './emulation.js';
 import * as extensionTools from './extensions.js';
+import * as inPageTools from './inPage.js';
 import * as inputTools from './input.js';
 import * as lighthouseTools from './lighthouse.js';
 import * as memoryTools from './memory.js';
@@ -29,6 +30,7 @@ export const createTools = (args: ParsedArguments) => {
         ...Object.values(consoleTools),
         ...Object.values(emulationTools),
         ...Object.values(extensionTools),
+        ...Object.values(inPageTools),
         ...Object.values(inputTools),
         ...Object.values(lighthouseTools),
         ...Object.values(memoryTools),
