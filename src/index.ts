@@ -57,6 +57,13 @@ export async function createMcpServer(
     return {};
   });
 
+  server.server.oninitialized = () => {
+    const clientName = server.server.getClientVersion()?.name;
+    if (clientName) {
+      clearcutLogger?.setClientName(clientName);
+    }
+  };
+
   const devtools = serverArgs.experimentalDevtools ?? false;
   const contextOpts = {
     experimentalDevToolsDebugging: devtools,
