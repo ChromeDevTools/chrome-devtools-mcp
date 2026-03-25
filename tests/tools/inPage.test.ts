@@ -8,6 +8,7 @@ import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
 import type {ParsedArguments} from '../../src/bin/chrome-devtools-mcp-cli-options.js';
+import type {ToolGroup, ToolDefinition} from '../../src/tools/inPage.js';
 import {listInPageTools} from '../../src/tools/inPage.js';
 import {withMcpContext} from '../utils.js';
 
@@ -85,7 +86,7 @@ describe('inPage', () => {
           const result = await response.handle('list_in_page_tools', context);
           assert.ok('inPageTools' in result.structuredContent);
           assert.deepEqual(
-            (result.structuredContent as {inPageTools: undefined}).inPageTools,
+            (result.structuredContent as {inPageTools: ToolGroup<ToolDefinition>}).inPageTools,
             {},
           );
         },
@@ -109,7 +110,7 @@ describe('inPage', () => {
           const result = await response.handle('list_in_page_tools', context);
           assert.ok('inPageTools' in result.structuredContent);
           assert.strictEqual(
-            (result.structuredContent as {inPageTools: undefined}).inPageTools,
+            (result.structuredContent as {inPageTools: ToolGroup<ToolDefinition>}).inPageTools,
             undefined,
           );
         },
