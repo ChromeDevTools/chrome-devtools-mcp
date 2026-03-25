@@ -19,6 +19,9 @@ Chrome DevTools for reliable automation, in-depth debugging, and performance ana
 - **Reliable automation**. Uses
   [puppeteer](https://github.com/puppeteer/puppeteer) to automate actions in
   Chrome and automatically wait for action results.
+- **Multi-session support**: Manage multiple browser instances simultaneously
+  with session management tools. Launch, connect, switch between, and close
+  independent browser sessions.
 
 ## Disclaimers
 
@@ -467,6 +470,26 @@ If you run into any issues, checkout our [troubleshooting guide](./docs/troubles
 
 <!-- END AUTO GENERATED TOOLS -->
 
+### Session management tools (opt-in)
+
+Enable with `--category-session`. These tools allow working with multiple browser instances simultaneously.
+
+- **[`create_session`](docs/tool-reference.md#create_session)** — Launch a new browser or connect to an existing one. The new session becomes active.
+- **[`list_sessions`](docs/tool-reference.md#list_sessions)** — List all active browser sessions.
+- **[`select_session`](docs/tool-reference.md#select_session)** — Switch to a different browser session by ID or name.
+- **[`close_session`](docs/tool-reference.md#close_session)** — Close and disconnect a browser session.
+
+```json
+{
+  "mcpServers": {
+    "chrome-devtools": {
+      "command": "npx",
+      "args": ["chrome-devtools-mcp@latest", "--category-session"]
+    }
+  }
+}
+```
+
 ## Configuration
 
 The Chrome DevTools MCP server supports the following configuration option:
@@ -554,6 +577,11 @@ The Chrome DevTools MCP server supports the following configuration option:
   Set to false to exclude tools related to network.
   - **Type:** boolean
   - **Default:** `true`
+
+- **`--categorySession`/ `--category-session`**
+  Set to true to enable session management tools for working with multiple browser instances.
+  - **Type:** boolean
+  - **Default:** `false`
 
 - **`--performanceCrux`/ `--performance-crux`**
   Set to false to disable sending URLs from performance traces to CrUX API to get field performance data.
@@ -749,6 +777,18 @@ Your MCP client should connect to the running Chrome instance and receive a perf
 If you hit VM-to-host port forwarding issues, see the “Remote debugging between virtual machine (VM) and host fails” section in [`docs/troubleshooting.md`](./docs/troubleshooting.md#remote-debugging-between-virtual-machine-vm-and-host-fails).
 
 For more details on remote debugging, see the [Chrome DevTools documentation](https://developer.chrome.com/docs/devtools/remote-debugging/).
+
+### Session management
+
+By default, `chrome-devtools-mcp` manages a single browser instance. With the `--category-session` flag, you can work with multiple browser instances simultaneously. This is useful when you need to:
+
+- Compare behavior across different Chrome channels (e.g., stable vs canary).
+- Test with multiple user profiles or browser contexts in parallel.
+- Connect to remote browsers (e.g., via WebSocket with authentication headers) while also running a local instance.
+
+Each session has a unique ID and optional name. One session is always "active" — all standard tools (navigation, screenshots, etc.) operate on the active session. Use `select_session` to switch between sessions.
+
+Sessions created with `type: "launch"` start a new browser process (closed on `close_session`). Sessions created with `type: "connect"` attach to an existing browser (disconnected on `close_session`, but the browser keeps running).
 
 ### Debugging Chrome on Android
 

@@ -37,6 +37,11 @@
   - [`list_console_messages`](#list_console_messages)
   - [`take_screenshot`](#take_screenshot)
   - [`take_snapshot`](#take_snapshot)
+- **[Session management](#session-management-opt-in---category-session)** (4 tools, opt-in: `--category-session`)
+  - [`create_session`](#create_session)
+  - [`list_sessions`](#list_sessions)
+  - [`select_session`](#select_session)
+  - [`close_session`](#close_session)
 
 ## Input automation
 
@@ -395,5 +400,55 @@ in the DevTools Elements panel (if any).
 
 - **filePath** (string) _(optional)_: The absolute path, or a path relative to the current working directory, to save the snapshot to instead of attaching it to the response.
 - **verbose** (boolean) _(optional)_: Whether to include all possible information available in the full a11y tree. Default is false.
+
+---
+
+## Session management (opt-in: `--category-session`)
+
+These tools are available when the `--category-session` flag is enabled. They allow working with multiple browser instances simultaneously.
+
+### `create_session`
+
+**Description:** Create a new browser session by launching a new browser or connecting to an existing one. The new session becomes the active session.
+
+**Parameters:**
+
+- **type** (enum: "launch", "connect") **(required)**: Whether to launch a new browser or connect to an existing one.
+- **name** (string) _(optional)_: Optional human-readable name for the session.
+- **browserUrl** (string) _(optional)_: For connect: HTTP URL of the browser debugging endpoint (e.g., `http://127.0.0.1:9222`).
+- **wsEndpoint** (string) _(optional)_: For connect: WebSocket endpoint URL (e.g., `ws://127.0.0.1:9222/devtools/browser/<id>`).
+- **wsHeaders** (object) _(optional)_: For connect: custom headers for WebSocket connection as key-value pairs.
+- **headless** (boolean) _(optional)_: For launch: whether to run headless. Default: false.
+- **channel** (enum: "stable", "canary", "beta", "dev") _(optional)_: For launch: Chrome channel. Default: stable.
+- **isolated** (boolean) _(optional)_: For launch: use temporary user data directory. Default: true.
+
+---
+
+### `list_sessions`
+
+**Description:** List all active browser sessions.
+
+**Parameters:** None
+
+---
+
+### `select_session`
+
+**Description:** Switch to a different browser session by ID or name.
+
+**Parameters:**
+
+- **sessionId** (number) _(optional)_: The numeric ID of the session to select.
+- **name** (string) _(optional)_: The name of the session to select.
+
+---
+
+### `close_session`
+
+**Description:** Close and disconnect a browser session. If closing the active session, the next available session becomes active.
+
+**Parameters:**
+
+- **sessionId** (number) **(required)**: The ID of the session to close.
 
 ---

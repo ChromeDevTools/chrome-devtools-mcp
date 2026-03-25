@@ -66,13 +66,17 @@ export class SessionManager {
   }
 
   hasActiveSession(): boolean {
-    return this.#activeSessionId !== undefined &&
-      this.#sessions.has(this.#activeSessionId);
+    return (
+      this.#activeSessionId !== undefined &&
+      this.#sessions.has(this.#activeSessionId)
+    );
   }
 
   getActiveContext(): McpContext {
     if (!this.#activeSessionId) {
-      throw new Error('No active session. Call create_session or list_sessions first.');
+      throw new Error(
+        'No active session. Call create_session or list_sessions first.',
+      );
     }
     const session = this.#sessions.get(this.#activeSessionId);
     if (!session) {
@@ -102,7 +106,11 @@ export class SessionManager {
     let connectionType: 'launched' | 'connected';
     let connectionInfo: string;
 
-    if (serverArgs.browserUrl || serverArgs.wsEndpoint || serverArgs.autoConnect) {
+    if (
+      serverArgs.browserUrl ||
+      serverArgs.wsEndpoint ||
+      serverArgs.autoConnect
+    ) {
       browser = await ensureBrowserConnected({
         browserURL: serverArgs.browserUrl,
         wsEndpoint: serverArgs.wsEndpoint,
@@ -115,7 +123,8 @@ export class SessionManager {
         enableExtensions: serverArgs.categoryExtensions,
       });
       connectionType = 'connected';
-      connectionInfo = serverArgs.wsEndpoint ?? serverArgs.browserUrl ?? 'auto-connect';
+      connectionInfo =
+        serverArgs.wsEndpoint ?? serverArgs.browserUrl ?? 'auto-connect';
     } else {
       browser = await launch({
         headless: serverArgs.headless,
@@ -137,7 +146,13 @@ export class SessionManager {
     }
 
     const context = await McpContext.from(browser, logger, this.#contextOpts);
-    return this.#addSession('default', browser, context, connectionType, connectionInfo);
+    return this.#addSession(
+      'default',
+      browser,
+      context,
+      connectionType,
+      connectionInfo,
+    );
   }
 
   async launchSession(opts: LaunchSessionOptions): Promise<Session> {
@@ -153,7 +168,13 @@ export class SessionManager {
     });
 
     const context = await McpContext.from(browser, logger, this.#contextOpts);
-    return this.#addSession(name, browser, context, 'launched', opts.channel ?? 'stable');
+    return this.#addSession(
+      name,
+      browser,
+      context,
+      'launched',
+      opts.channel ?? 'stable',
+    );
   }
 
   async connectSession(opts: ConnectSessionOptions): Promise<Session> {
@@ -173,7 +194,13 @@ export class SessionManager {
 
     const context = await McpContext.from(browser, logger, this.#contextOpts);
     const connectionInfo = opts.wsEndpoint ?? opts.browserUrl ?? 'unknown';
-    return this.#addSession(name, browser, context, 'connected', connectionInfo);
+    return this.#addSession(
+      name,
+      browser,
+      context,
+      'connected',
+      connectionInfo,
+    );
   }
 
   selectSession(id: number): void {
@@ -228,7 +255,8 @@ export class SessionManager {
 
   async disposeAll(): Promise<void> {
     for (const session of this.#sessions.values()) {
-      const mode = session.connectionType === 'launched' ? 'close' : 'disconnect';
+      const mode =
+        session.connectionType === 'launched' ? 'close' : 'disconnect';
       try {
         await session.context.close(mode);
       } catch {
