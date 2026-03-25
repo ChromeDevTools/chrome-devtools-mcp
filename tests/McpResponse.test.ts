@@ -1022,24 +1022,26 @@ describe('in-page tools', () => {
     // @ts-expect-error Internal API
     const client = page._client();
     const originalSend = client.send.bind(client);
-    sinon.stub(client, 'send').callsFake(async (method: string, params?: Record<string, unknown>) => {
-      if (method === 'DOMDebugger.getEventListeners') {
-        return {
-          listeners: [
-            {
-              type: 'devtoolstooldiscovery',
-              useCapture: false,
-              passive: false,
-              once: false,
-              scriptId: '0',
-              lineNumber: 0,
-              columnNumber: 0,
-            },
-          ],
-        };
-      }
-      return originalSend(method, params);
-    });
+    sinon
+      .stub(client, 'send')
+      .callsFake(async (method: string, params?: Record<string, unknown>) => {
+        if (method === 'DOMDebugger.getEventListeners') {
+          return {
+            listeners: [
+              {
+                type: 'devtoolstooldiscovery',
+                useCapture: false,
+                passive: false,
+                once: false,
+                scriptId: '0',
+                lineNumber: 0,
+                columnNumber: 0,
+              },
+            ],
+          };
+        }
+        return originalSend(method, params);
+      });
   }
 
   it('lists in-page tools', async t => {

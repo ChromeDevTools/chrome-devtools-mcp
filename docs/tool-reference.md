@@ -37,6 +37,8 @@
   - [`list_console_messages`](#list_console_messages)
   - [`take_screenshot`](#take_screenshot)
   - [`take_snapshot`](#take_snapshot)
+- **[In-page tools](#in-page-tools)** (1 tools)
+  - [`list_in_page_tools`](#list_in_page_tools)
 
 ## Input automation
 
@@ -395,5 +397,17 @@ in the DevTools Elements panel (if any).
 
 - **filePath** (string) _(optional)_: The absolute path, or a path relative to the current working directory, to save the snapshot to instead of attaching it to the response.
 - **verbose** (boolean) _(optional)_: Whether to include all possible information available in the full a11y tree. Default is false.
+
+---
+
+## In-page tools
+
+### `list_in_page_tools`
+
+**Description:** Lists all in-page-tools the page exposes for providing runtime information.
+In-page-tools are exposed on the page via the 'window.\_\_dtmcp.executeTool(toolName, params)'
+function where they can be called by '[`evaluate_script`](#evaluate_script)'.
+
+**Parameters:** None
 
 ---
