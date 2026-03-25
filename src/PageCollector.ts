@@ -65,6 +65,14 @@ export class PageCollector<T> {
   protected maxNavigationSaved = 3;
 
   /**
+   * Max number of collected items to keep for the *current* navigation.
+   *
+   * This is a safety valve to prevent unbounded memory growth in long-running
+   * sessions (e.g. autoConnect mode) on highly active pages.
+   */
+  protected maxItemsSavedPerNavigation = Number.POSITIVE_INFINITY;
+
+  /**
    * This maps a Page to a list of navigations with a sub-list
    * of all collected resources.
    * The newer navigations come first.
@@ -134,7 +142,9 @@ export class PageCollector<T> {
       withId[stableIdSymbol] = idGenerator();
 
       const navigations = this.storage.get(page) ?? [[]];
-      navigations[0].push(withId);
+      const current = navigations[0];
+      current.push(withId);
+      this.#pruneCurrentNavigation(current);
     });
 
     listeners['framenavigated'] = (frame: Frame) => {
@@ -150,6 +160,20 @@ export class PageCollector<T> {
     }
 
     this.#listeners.set(page, listeners);
+  }
+
+  #pruneCurrentNavigation(navigation: Array<WithSymbolId<T>>) {
+    const max = this.maxItemsSavedPerNavigation;
+    if (!Number.isFinite(max)) {
+      return;
+    }
+    if (max <= 0) {
+      navigation.length = 0;
+      return;
+    }
+    if (navigation.length > max) {
+      navigation.splice(0, navigation.length - max);
+    }
   }
 
   protected splitAfterNavigation(page: Page) {
@@ -233,6 +257,8 @@ export class ConsoleCollector extends PageCollector<
   ConsoleMessage | Error | DevTools.AggregatedIssue | UncaughtError
 > {
   #subscribedPages = new WeakMap<Page, PageEventSubscriber>();
+
+  protected override maxItemsSavedPerNavigation = 1000;
 
   override addPage(page: Page): void {
     super.addPage(page);
@@ -372,6 +398,8 @@ class PageEventSubscriber {
 }
 
 export class NetworkCollector extends PageCollector<HTTPRequest> {
+  protected override maxItemsSavedPerNavigation = 5000;
+
   constructor(
     browser: Browser,
     listeners: (

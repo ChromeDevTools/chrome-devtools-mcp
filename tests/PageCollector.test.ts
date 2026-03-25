@@ -185,6 +185,37 @@ describe('PageCollector', () => {
     assert.equal(collector.getIdForResource(request1), 1);
     assert.equal(collector.getIdForResource(request2), 2);
   });
+
+  it('should prune current navigation to maxItemsSavedPerNavigation', async () => {
+    const browser = getMockBrowser();
+    const page = (await browser.pages())[0];
+
+    class LimitedCollector extends PageCollector<HTTPRequest> {
+      protected override maxItemsSavedPerNavigation = 2;
+    }
+
+    const request1 = getMockRequest({url: 'http://example.com/1'});
+    const request2 = getMockRequest({url: 'http://example.com/2'});
+    const request3 = getMockRequest({url: 'http://example.com/3'});
+
+    const collector = new LimitedCollector(browser, collect => {
+      return {
+        request: req => {
+          collect(req);
+        },
+      } as ListenerMap;
+    });
+    await collector.init([page]);
+
+    page.emit('request', request1);
+    page.emit('request', request2);
+    page.emit('request', request3);
+
+    const data = collector.getData(page);
+    assert.equal(data.length, 2);
+    assert.equal(data[0], request2);
+    assert.equal(data[1], request3);
+  });
 });
 
 describe('NetworkCollector', () => {
