@@ -206,6 +206,7 @@ Use the Command Code CLI to add the Chrome DevTools MCP server (<a href="https:/
 ```bash
 cmd mcp add chrome-devtools --scope user npx chrome-devtools-mcp@latest
 ```
+
 </details>
 
 <details>
