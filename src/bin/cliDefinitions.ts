@@ -110,7 +110,7 @@ export const commands: Commands = {
         name: 'geolocation',
         type: 'string',
         description:
-          'Geolocation (`<latitude>x<longitude>`) to emulate. Latitude between -90 and 90. Longitude between -180 and 180. Omit clear the geolocation override.',
+          'Geolocation (`<latitude>x<longitude>`) to emulate. Latitude between -90 and 90. Longitude between -180 and 180. Omit to clear the geolocation override.',
         required: false,
       },
       userAgent: {
@@ -159,7 +159,7 @@ export const commands: Commands = {
   },
   fill: {
     description:
-      'Type text into a input, text area or select an option from a <select> element.',
+      'Type text into an input, text area or select an option from a <select> element.',
     category: 'Input automation',
     args: {
       uid: {
@@ -305,7 +305,7 @@ export const commands: Commands = {
         name: 'pageSize',
         type: 'integer',
         description:
-          'Maximum number of messages to return. When omitted, returns all requests.',
+          'Maximum number of messages to return. When omitted, returns all messages.',
         required: false,
       },
       pageIdx: {
@@ -582,7 +582,7 @@ export const commands: Commands = {
   },
   take_memory_snapshot: {
     description:
-      'Capture a memory heapsnapshot of the currently selected page to memory leak debugging',
+      'Capture a memory heapsnapshot of the currently selected page for memory leak debugging',
     category: 'Performance',
     args: {
       filePath: {
@@ -618,7 +618,7 @@ export const commands: Commands = {
         name: 'uid',
         type: 'string',
         description:
-          'The uid of an element on the page from the page content snapshot. If omitted takes a pages screenshot.',
+          'The uid of an element on the page from the page content snapshot. If omitted, takes a page screenshot.',
         required: false,
       },
       fullPage: {

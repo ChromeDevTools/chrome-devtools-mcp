@@ -219,7 +219,7 @@ async function fillFormElement(
 
 export const fill = definePageTool({
   name: 'fill',
-  description: `Type text into a input, text area or select an option from a <select> element.`,
+  description: `Type text into an input, text area or select an option from a <select> element.`,
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,

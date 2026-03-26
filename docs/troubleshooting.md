@@ -98,7 +98,7 @@ Possible workarounds include:
   3. Start `chrome-devtools-mcp` with:
      `npx chrome-devtools-mcp --browser-url http://127.0.0.1:9222`
 
-- **Use Powershell or Git Bash** instead of WSL.
+- **Use PowerShell or Git Bash** instead of WSL.
 
 ### Windows 10: Error during discovery for MCP server 'chrome-devtools': MCP error -32000: Connection closed
 

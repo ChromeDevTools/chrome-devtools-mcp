@@ -44,7 +44,7 @@ If `memlab` is not available, you MUST use the fallback script in the references
 Run the script using Node.js:
 
 ```bash
-node compare_snapshots.js <baseline.heapsnapshot> <target.heapsnapshot>
+node skills/memory-leak-debugging/references/compare_snapshots.js <baseline.heapsnapshot> <target.heapsnapshot>
 ```
 
 The script will analyze and output the top growing objects by size and highlight the 3 most common types of memory leaks (e.g., Detached DOM nodes, closures, Contexts) if they are present.

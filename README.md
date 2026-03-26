@@ -28,7 +28,7 @@ Avoid sharing sensitive or personal information that you don't want to share wit
 MCP clients.
 
 `chrome-devtools-mcp` officially supports Google Chrome and [Chrome for Testing](https://developer.chrome.com/blog/chrome-for-testing/) only.
-Other Chromium-based browser may work, but this is not guaranteed, and you may encounter unexpected behavior. Use at your own discretion.
+Other Chromium-based browsers may work, but this is not guaranteed, and you may encounter unexpected behavior. Use at your own discretion.
 We are committed to providing fixes and support for the latest version of [Extended Stable Chrome](https://chromiumdash.appspot.com/schedule).
 
 Performance tools may send trace URLs to the Google CrUX API to fetch real-user
@@ -474,7 +474,7 @@ The Chrome DevTools MCP server supports the following configuration option:
 <!-- BEGIN AUTO GENERATED OPTIONS -->
 
 - **`--autoConnect`/ `--auto-connect`**
-  If specified, automatically connects to a browser (Chrome 144+) running locally from the user data directory identified by the channel param (default channel is stable). Requires the remoted debugging server to be started in the Chrome instance via chrome://inspect/#remote-debugging.
+  If specified, automatically connects to a browser (Chrome 144+) running locally from the user data directory identified by the channel param (default channel is stable). Requires the remote debugging server to be started in the Chrome instance via chrome://inspect/#remote-debugging.
   - **Type:** boolean
   - **Default:** `false`
 

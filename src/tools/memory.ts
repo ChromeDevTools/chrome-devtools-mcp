@@ -11,7 +11,7 @@ import {definePageTool} from './ToolDefinition.js';
 
 export const takeMemorySnapshot = definePageTool({
   name: 'take_memory_snapshot',
-  description: `Capture a memory heapsnapshot of the currently selected page to memory leak debugging`,
+  description: `Capture a memory heapsnapshot of the currently selected page for memory leak debugging`,
   annotations: {
     category: ToolCategory.PERFORMANCE,
     readOnlyHint: true,

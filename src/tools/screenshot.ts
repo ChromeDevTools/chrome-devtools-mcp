@@ -35,7 +35,7 @@ export const screenshot = definePageTool({
       .string()
       .optional()
       .describe(
-        'The uid of an element on the page from the page content snapshot. If omitted takes a pages screenshot.',
+        'The uid of an element on the page from the page content snapshot. If omitted, takes a page screenshot.',
       ),
     fullPage: zod
       .boolean()
