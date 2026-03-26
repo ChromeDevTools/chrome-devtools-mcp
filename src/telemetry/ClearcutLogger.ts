@@ -21,7 +21,7 @@ import {
 import {WatchdogClient} from './WatchdogClient.js';
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
-const PARAM_BLOCKLIST = new Set(['uid']);
+export const PARAM_BLOCKLIST = new Set(['uid', 'reqid', 'msgid']);
 
 const SUPPORTED_ZOD_TYPES = [
   'ZodString',
@@ -36,7 +36,7 @@ function isZodType(type: string): type is ZodType {
   return SUPPORTED_ZOD_TYPES.includes(type as ZodType);
 }
 
-function getZodType(zodType: zod.ZodTypeAny): ZodType {
+export function getZodType(zodType: zod.ZodTypeAny): ZodType {
   const def = zodType._def;
   const typeName = def.typeName;
 
@@ -59,13 +59,29 @@ function getZodType(zodType: zod.ZodTypeAny): ZodType {
 
 type LoggedToolCallArgValue = string | number | boolean;
 
-function transformName(zodType: ZodType, name: string): string {
+export function transformArgName(zodType: ZodType, name: string): string {
   if (zodType === 'ZodString') {
     return `${name}_length`;
   } else if (zodType === 'ZodArray') {
     return `${name}_count`;
   } else {
     return name;
+  }
+}
+
+export function transformArgType(zodType: ZodType): string {
+  if (zodType === 'ZodString' || zodType === 'ZodArray') {
+    return 'number';
+  }
+  switch (zodType) {
+    case 'ZodNumber':
+      return 'number';
+    case 'ZodBoolean':
+      return 'boolean';
+    case 'ZodEnum':
+      return 'enum';
+    default:
+      throw new Error(`Unsupported zod type for tool parameter: ${zodType}`);
   }
 }
 
@@ -117,7 +133,7 @@ export function sanitizeParams(
         `parameter ${name} has type ${zodType} but value ${value} is not of equivalent type`,
       );
     }
-    const transformedName = transformName(zodType, name);
+    const transformedName = transformArgName(zodType, name);
     const transformedValue = transformValue(zodType, value);
     transformed[transformedName] = transformedValue;
   }
