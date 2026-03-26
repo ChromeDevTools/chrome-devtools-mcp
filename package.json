@@ -1,7 +1,7 @@
 {
-  "name": "chrome-devtools-mcp",
-  "version": "0.20.3",
-  "description": "MCP server for Chrome DevTools",
+  "name": "@holepunchto/electron-devtools-mcp",
+  "version": "0.1.0",
+  "description": "MCP server for Electron DevTools (based on chrome-devtools-mcp)",
   "type": "module",
   "bin": {
     "chrome-devtools-mcp": "./build/src/bin/chrome-devtools-mcp.js",
@@ -24,6 +24,7 @@
     "test:no-build": "node scripts/test.mjs",
     "test:only": "npm run build && node scripts/test.mjs --test-only",
     "test:update-snapshots": "npm run build && node scripts/test.mjs --test-update-snapshots",
+    "postinstall": "patch-package",
     "prepare": "node --experimental-strip-types scripts/prepare.ts",
     "verify-server-json-version": "node --experimental-strip-types scripts/verify-server-json-version.ts",
     "update-lighthouse": "node --experimental-strip-types scripts/update-lighthouse.ts",
@@ -67,6 +68,7 @@
     "eslint-plugin-import": "^2.32.0",
     "globals": "^17.0.0",
     "lighthouse": "13.0.3",
+    "patch-package": "^8.0.1",
     "prettier": "^3.6.2",
     "puppeteer": "24.39.1",
     "rollup": "4.59.1",

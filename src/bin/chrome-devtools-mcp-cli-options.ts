@@ -25,7 +25,7 @@ export const cliOptions = {
     type: 'string',
     description:
       'Connect to a running, debuggable Chrome instance (e.g. `http://127.0.0.1:9222`). For more details see: https://github.com/ChromeDevTools/chrome-devtools-mcp#connecting-to-a-running-chrome-instance.',
-    alias: 'u',
+    alias: ['u', 'cdp-url'],
     conflicts: ['wsEndpoint', 'categoryExtensions'],
     coerce: (url: string | undefined) => {
       if (!url) {

@@ -1,0 +1,48 @@
+diff --git a/node_modules/puppeteer-core/lib/cjs/puppeteer/cdp/Browser.js b/node_modules/puppeteer-core/lib/cjs/puppeteer/cdp/Browser.js
+index 945e493..04bb0f2 100644
+--- a/node_modules/puppeteer-core/lib/cjs/puppeteer/cdp/Browser.js
++++ b/node_modules/puppeteer-core/lib/cjs/puppeteer/cdp/Browser.js
+@@ -244,10 +244,15 @@ class CdpBrowser extends Browser_js_1.Browser {
+         return page;
+     }
+     async _hasDevToolsTarget(pageTargetId) {
+-        const response = await this.#connection.send('Target.getDevToolsTarget', {
+-            targetId: pageTargetId,
+-        });
+-        return response.targetId;
++        try {
++            const response = await this.#connection.send('Target.getDevToolsTarget', {
++                targetId: pageTargetId,
++            });
++            return response.targetId;
++        } catch {
++            // Electron doesn't support Target.getDevToolsTarget
++            return undefined;
++        }
+     }
+     async installExtension(path) {
+         const { id } = await this.#connection.send('Extensions.loadUnpacked', { path });
+diff --git a/node_modules/puppeteer-core/lib/esm/puppeteer/cdp/Browser.js b/node_modules/puppeteer-core/lib/esm/puppeteer/cdp/Browser.js
+index 8ed5f49..14ba887 100644
+--- a/node_modules/puppeteer-core/lib/esm/puppeteer/cdp/Browser.js
++++ b/node_modules/puppeteer-core/lib/esm/puppeteer/cdp/Browser.js
+@@ -241,10 +241,15 @@ export class CdpBrowser extends BrowserBase {
+         return page;
+     }
+     async _hasDevToolsTarget(pageTargetId) {
+-        const response = await this.#connection.send('Target.getDevToolsTarget', {
+-            targetId: pageTargetId,
+-        });
+-        return response.targetId;
++        try {
++            const response = await this.#connection.send('Target.getDevToolsTarget', {
++                targetId: pageTargetId,
++            });
++            return response.targetId;
++        } catch {
++            // Electron doesn't support Target.getDevToolsTarget
++            return undefined;
++        }
+     }
+     async installExtension(path) {
+         const { id } = await this.#connection.send('Extensions.loadUnpacked', { path });
