@@ -619,7 +619,7 @@ describe('McpResponse', () => {
       try {
         await response.handle('test', context);
       } catch (e) {
-        assert.ok(e.message.includes("Can't provide detals for the msgid 1"));
+        assert.ok(e.message.includes("Can't provide details for the msgid 1"));
       }
     });
   });
