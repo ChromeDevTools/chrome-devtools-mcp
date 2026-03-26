@@ -62,11 +62,14 @@ export const click = definePageTool({
     const uid = request.params.uid;
     const handle = await request.page.getElementByUid(uid);
     try {
-      await context.waitForEventsAfterAction(async () => {
-        await handle.asLocator().click({
-          count: request.params.dblClick ? 2 : 1,
-        });
-      });
+      await context.waitForEventsAfterAction(
+        async () => {
+          await handle.asLocator().click({
+            count: request.params.dblClick ? 2 : 1,
+          });
+        },
+        {page: request.page},
+      );
       response.appendResponseLine(
         request.params.dblClick
           ? `Successfully double clicked on the element`
@@ -99,11 +102,14 @@ export const clickAt = definePageTool({
   },
   handler: async (request, response, context) => {
     const page = request.page;
-    await context.waitForEventsAfterAction(async () => {
-      await page.pptrPage.mouse.click(request.params.x, request.params.y, {
-        clickCount: request.params.dblClick ? 2 : 1,
-      });
-    });
+    await context.waitForEventsAfterAction(
+      async () => {
+        await page.pptrPage.mouse.click(request.params.x, request.params.y, {
+          clickCount: request.params.dblClick ? 2 : 1,
+        });
+      },
+      {page},
+    );
     response.appendResponseLine(
       request.params.dblClick
         ? `Successfully double clicked at the coordinates`
@@ -134,9 +140,12 @@ export const hover = definePageTool({
     const uid = request.params.uid;
     const handle = await request.page.getElementByUid(uid);
     try {
-      await context.waitForEventsAfterAction(async () => {
-        await handle.asLocator().hover();
-      });
+      await context.waitForEventsAfterAction(
+        async () => {
+          await handle.asLocator().hover();
+        },
+        {page: request.page},
+      );
       response.appendResponseLine(`Successfully hovered over the element`);
       if (request.params.includeSnapshot) {
         response.includeSnapshot();
@@ -235,14 +244,17 @@ export const fill = definePageTool({
   },
   handler: async (request, response, context) => {
     const page = request.page;
-    await context.waitForEventsAfterAction(async () => {
-      await fillFormElement(
-        request.params.uid,
-        request.params.value,
-        context as McpContext,
-        page,
-      );
-    });
+    await context.waitForEventsAfterAction(
+      async () => {
+        await fillFormElement(
+          request.params.uid,
+          request.params.value,
+          context as McpContext,
+          page,
+        );
+      },
+      {page},
+    );
     response.appendResponseLine(`Successfully filled out the element`);
     if (request.params.includeSnapshot) {
       response.includeSnapshot();
@@ -263,14 +275,17 @@ export const typeText = definePageTool({
   },
   handler: async (request, response, context) => {
     const page = request.page;
-    await context.waitForEventsAfterAction(async () => {
-      await page.pptrPage.keyboard.type(request.params.text);
-      if (request.params.submitKey) {
-        await page.pptrPage.keyboard.press(
-          request.params.submitKey as KeyInput,
-        );
-      }
-    });
+    await context.waitForEventsAfterAction(
+      async () => {
+        await page.pptrPage.keyboard.type(request.params.text);
+        if (request.params.submitKey) {
+          await page.pptrPage.keyboard.press(
+            request.params.submitKey as KeyInput,
+          );
+        }
+      },
+      {page},
+    );
     response.appendResponseLine(
       `Typed text "${request.params.text}${request.params.submitKey ? ` + ${request.params.submitKey}` : ''}"`,
     );
@@ -295,11 +310,14 @@ export const drag = definePageTool({
     );
     const toHandle = await request.page.getElementByUid(request.params.to_uid);
     try {
-      await context.waitForEventsAfterAction(async () => {
-        await fromHandle.drag(toHandle);
-        await new Promise(resolve => setTimeout(resolve, 50));
-        await toHandle.drop(fromHandle);
-      });
+      await context.waitForEventsAfterAction(
+        async () => {
+          await fromHandle.drag(toHandle);
+          await new Promise(resolve => setTimeout(resolve, 50));
+          await toHandle.drop(fromHandle);
+        },
+        {page: request.page},
+      );
       response.appendResponseLine(`Successfully dragged an element`);
       if (request.params.includeSnapshot) {
         response.includeSnapshot();
@@ -332,14 +350,17 @@ export const fillForm = definePageTool({
   handler: async (request, response, context) => {
     const page = request.page;
     for (const element of request.params.elements) {
-      await context.waitForEventsAfterAction(async () => {
-        await fillFormElement(
-          element.uid,
-          element.value,
-          context as McpContext,
-          page,
-        );
-      });
+      await context.waitForEventsAfterAction(
+        async () => {
+          await fillFormElement(
+            element.uid,
+            element.value,
+            context as McpContext,
+            page,
+          );
+        },
+        {page},
+      );
     }
     response.appendResponseLine(`Successfully filled out the form`);
     if (request.params.includeSnapshot) {
@@ -418,15 +439,18 @@ export const pressKey = definePageTool({
     const tokens = parseKey(request.params.key);
     const [key, ...modifiers] = tokens;
 
-    await context.waitForEventsAfterAction(async () => {
-      for (const modifier of modifiers) {
-        await page.pptrPage.keyboard.down(modifier);
-      }
-      await page.pptrPage.keyboard.press(key);
-      for (const modifier of modifiers.toReversed()) {
-        await page.pptrPage.keyboard.up(modifier);
-      }
-    });
+    await context.waitForEventsAfterAction(
+      async () => {
+        for (const modifier of modifiers) {
+          await page.pptrPage.keyboard.down(modifier);
+        }
+        await page.pptrPage.keyboard.press(key);
+        for (const modifier of modifiers.toReversed()) {
+          await page.pptrPage.keyboard.up(modifier);
+        }
+      },
+      {page},
+    );
 
     response.appendResponseLine(
       `Successfully pressed key: ${request.params.key}`,

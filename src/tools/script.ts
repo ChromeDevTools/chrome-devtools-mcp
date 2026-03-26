@@ -9,7 +9,7 @@ import type {Frame, JSHandle, Page, WebWorker} from '../third_party/index.js';
 import type {ExtensionServiceWorker} from '../types.js';
 
 import {ToolCategory} from './categories.js';
-import type {Context, Response} from './ToolDefinition.js';
+import type {Context, ContextPage, Response} from './ToolDefinition.js';
 import {defineTool, pageIdSchema} from './ToolDefinition.js';
 
 export type Evaluatable = Page | Frame | WebWorker;
@@ -46,7 +46,7 @@ Example with arguments: \`(el) => {
         )
         .optional()
         .describe(`An optional list of arguments to pass to the function.`),
-      ...(cliArgs?.experimentalPageIdRouting ? pageIdSchema : {}),
+      ...pageIdSchema,
       ...(cliArgs?.categoryExtensions
         ? {
             serviceWorkerId: zod
@@ -81,8 +81,8 @@ Example with arguments: \`(el) => {
         return;
       }
 
-      const mcpPage = cliArgs?.experimentalPageIdRouting
-        ? context.getPageById(request.params.pageId)
+      const mcpPage = pageId
+        ? context.getPageById(pageId)
         : context.getSelectedMcpPage();
       const page: Page = mcpPage.pptrPage;
 
@@ -97,7 +97,14 @@ Example with arguments: \`(el) => {
 
         const evaluatable = await getPageOrFrame(page, frames);
 
-        await performEvaluation(evaluatable, fnString, args, response, context);
+        await performEvaluation(
+          evaluatable,
+          fnString,
+          args,
+          response,
+          context,
+          mcpPage,
+        );
       } finally {
         void Promise.allSettled(args.map(arg => arg.dispose()));
       }
@@ -111,23 +118,27 @@ const performEvaluation = async (
   args: Array<JSHandle<unknown>>,
   response: Response,
   context: Context,
+  page?: ContextPage,
 ) => {
   const fn = await evaluatable.evaluateHandle(`(${fnString})`);
   try {
-    await context.waitForEventsAfterAction(async () => {
-      const result = await evaluatable.evaluate(
-        async (fn, ...args) => {
-          // @ts-expect-error no types for function fn
-          return JSON.stringify(await fn(...args));
-        },
-        fn,
-        ...args,
-      );
-      response.appendResponseLine('Script ran on page and returned:');
-      response.appendResponseLine('```json');
-      response.appendResponseLine(`${result}`);
-      response.appendResponseLine('```');
-    });
+    await context.waitForEventsAfterAction(
+      async () => {
+        const result = await evaluatable.evaluate(
+          async (fn, ...args) => {
+            // @ts-expect-error no types for function fn
+            return JSON.stringify(await fn(...args));
+          },
+          fn,
+          ...args,
+        );
+        response.appendResponseLine('Script ran on page and returned:');
+        response.appendResponseLine('```json');
+        response.appendResponseLine(`${result}`);
+        response.appendResponseLine('```');
+      },
+      page ? {page} : undefined,
+    );
   } finally {
     void fn.dispose();
   }

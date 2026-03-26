@@ -150,7 +150,7 @@ export const cliOptions = {
   experimentalPageIdRouting: {
     type: 'boolean',
     describe:
-      'Whether to expose pageId on page-scoped tools and route requests by page ID.',
+      '(Deprecated, now always enabled) pageId is always exposed on page-scoped tools.',
     hidden: true,
   },
   experimentalDevtools: {

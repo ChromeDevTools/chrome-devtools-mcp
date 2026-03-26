@@ -33,7 +33,7 @@ export const listPages = definePageTool(args => {
 
 export const selectPage = defineTool({
   name: 'select_page',
-  description: `Select a page as a context for future tool calls.`,
+  description: `Select a page as a context for future tool calls. For multi-agent workflows, prefer passing pageId directly to each tool instead of using select_page.`,
   annotations: {
     category: ToolCategory.NAVIGATION,
     readOnlyHint: true,
@@ -122,7 +122,7 @@ export const newPage = defineTool({
           timeout: request.params.timeout,
         });
       },
-      {timeout: request.params.timeout},
+      {timeout: request.params.timeout, page},
     );
 
     response.setIncludePages(true);
@@ -261,7 +261,7 @@ export const navigatePage = definePageTool({
               break;
           }
         },
-        {timeout: request.params.timeout},
+        {timeout: request.params.timeout, page},
       );
     } finally {
       page.pptrPage.off('dialog', dialogHandler);

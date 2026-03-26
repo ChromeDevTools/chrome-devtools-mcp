@@ -169,7 +169,7 @@ export type Context = Readonly<{
   ): Promise<{filename: string}>;
   waitForEventsAfterAction(
     action: () => Promise<unknown>,
-    options?: {timeout?: number},
+    options?: {timeout?: number; page?: ContextPage},
   ): Promise<void>;
   waitForTextOnPage(
     text: string[],
@@ -296,7 +296,12 @@ export const CLOSE_PAGE_ERROR =
   'The last open page cannot be closed. It is fine to keep it open.';
 
 export const pageIdSchema = {
-  pageId: zod.number().optional().describe('Targets a specific page by ID.'),
+  pageId: zod
+    .number()
+    .optional()
+    .describe(
+      'Targets a specific page by ID. Use list_pages to get available page IDs. If omitted, operates on the most recently selected page.',
+    ),
 };
 
 export const timeoutSchema = {

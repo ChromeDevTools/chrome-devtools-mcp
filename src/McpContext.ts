@@ -851,9 +851,11 @@ export class McpContext implements Context {
 
   waitForEventsAfterAction(
     action: () => Promise<unknown>,
-    options?: {timeout?: number},
+    options?: {timeout?: number; page?: McpPage},
   ): Promise<void> {
-    const page = this.#getSelectedMcpPage();
+    const page = options?.page
+      ? this.#getMcpPage(options.page.pptrPage)
+      : this.#getSelectedMcpPage();
     const cpuMultiplier = page.cpuThrottlingRate;
     const networkMultiplier = getNetworkMultiplierFromString(
       page.networkConditions,

@@ -1,6 +1,6 @@
 <!-- AUTO GENERATED DO NOT EDIT - run 'npm run gen' to update-->
 
-# Chrome DevTools MCP Tool Reference (~6940 cl100k_base tokens)
+# Chrome DevTools MCP Tool Reference (~8190 cl100k_base tokens)
 
 - **[Input automation](#input-automation)** (9 tools)
   - [`click`](#click)
@@ -193,7 +193,7 @@
 
 ### `select_page`
 
-**Description:** Select a page as a context for future tool calls.
+**Description:** Select a page as a context for future tool calls. For multi-agent workflows, prefer passing pageId directly to each tool instead of using [`select_page`](#select_page).
 
 **Parameters:**
 
@@ -333,6 +333,7 @@ so returned values have to be JSON-serializable.
 }`
 
 - **args** (array) _(optional)_: An optional list of arguments to pass to the function.
+- **pageId** (number) _(optional)_: Targets a specific page by ID. Use [`list_pages`](#list_pages) to get available page IDs. If omitted, operates on the most recently selected page.
 
 ---
 
