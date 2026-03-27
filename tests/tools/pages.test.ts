@@ -88,6 +88,7 @@ describe('pages', () => {
             '<extension-id>',
           );
           t.assert.snapshot?.(text);
+          await context.uninstallExtension(extensionId);
         },
         {},
         {
@@ -142,6 +143,7 @@ describe('pages', () => {
               '<extension-id>',
             );
             t.assert.snapshot?.(text);
+            await context.uninstallExtension(extensionId);
           },
           {},
           {
@@ -193,6 +195,7 @@ describe('pages', () => {
             '<extension-id>',
           );
           t.assert.snapshot?.(text);
+          await context.uninstallExtension(extensionId);
         },
         {},
         {
