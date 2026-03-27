@@ -62,7 +62,7 @@ export async function withBrowser(
     debug?: boolean;
     autoOpenDevTools?: boolean;
     executablePath?: string;
-    userDataDir?: string;
+    spawnNewBrowser?: boolean;
   } = {},
 ) {
   const launchOptions: LaunchOptions = {
@@ -75,11 +75,10 @@ export async function withBrowser(
     handleDevToolsAsPage: true,
     args: ['--screen-info={3840x2160}'],
     enableExtensions: true,
-    userDataDir: options.userDataDir,
   };
   const key = JSON.stringify(launchOptions);
 
-  let browser = browsers.get(key);
+  let browser = options.spawnNewBrowser && browsers.get(key);
   if (!browser) {
     browser = await puppeteer.launch(launchOptions);
     browsers.set(key, browser);
@@ -104,7 +103,7 @@ export async function withMcpContext(
     autoOpenDevTools?: boolean;
     performanceCrux?: boolean;
     executablePath?: string;
-    userDataDir?: string;
+    spawnNewBrowser?: boolean;
   } = {},
   args: ParsedArguments = {} as ParsedArguments,
 ) {

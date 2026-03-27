@@ -198,7 +198,7 @@ describe('pages', () => {
           await context.uninstallExtension(extensionId);
         },
         {
-          userDataDir: '/tmp/chrome-test',
+          spawnNewBrowser: true,
         },
         {
           categoryExtensions: true,
