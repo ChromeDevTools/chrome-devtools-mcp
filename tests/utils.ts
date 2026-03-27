@@ -62,6 +62,7 @@ export async function withBrowser(
     debug?: boolean;
     autoOpenDevTools?: boolean;
     executablePath?: string;
+    userDataDir?: string;
   } = {},
 ) {
   const launchOptions: LaunchOptions = {
@@ -74,6 +75,7 @@ export async function withBrowser(
     handleDevToolsAsPage: true,
     args: ['--screen-info={3840x2160}'],
     enableExtensions: true,
+    userDataDir: options.userDataDir,
   };
   const key = JSON.stringify(launchOptions);
 
@@ -102,6 +104,7 @@ export async function withMcpContext(
     autoOpenDevTools?: boolean;
     performanceCrux?: boolean;
     executablePath?: string;
+    userDataDir?: string;
   } = {},
   args: ParsedArguments = {} as ParsedArguments,
 ) {

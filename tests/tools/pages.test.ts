@@ -197,7 +197,9 @@ describe('pages', () => {
           t.assert.snapshot?.(text);
           await context.uninstallExtension(extensionId);
         },
-        {},
+        {
+          userDataDir: '/tmp/chrome-test',
+        },
         {
           categoryExtensions: true,
         } as ParsedArguments,
