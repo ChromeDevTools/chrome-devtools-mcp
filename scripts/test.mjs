@@ -59,7 +59,7 @@ const nodeArgs = [
   ...files,
 ];
 
-function installChrome(version) {
+function _installChrome(version) {
   try {
     return execSync(
       `npx puppeteer browsers install chrome@${version} --format "{{path}}"`,
