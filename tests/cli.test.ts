@@ -23,8 +23,6 @@ describe('cli args parsing', () => {
     performanceCrux: true,
     'usage-statistics': true,
     usageStatistics: true,
-    'category-in-page-tools': false,
-    categoryInPageTools: false,
   };
 
   it('parses with default args', async () => {

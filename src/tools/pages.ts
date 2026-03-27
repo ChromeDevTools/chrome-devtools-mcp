@@ -27,6 +27,7 @@ export const listPages = defineTool(args => {
     schema: {},
     handler: async (_request, response) => {
       response.setIncludePages(true);
+      response.setListInPageTools();
     },
   };
 });
@@ -53,6 +54,7 @@ export const selectPage = defineTool({
     const page = context.getPageById(request.params.pageId);
     context.selectPage(page);
     response.setIncludePages(true);
+    response.setListInPageTools();
     if (request.params.bringToFront) {
       await page.pptrPage.bringToFront();
     }
@@ -82,6 +84,7 @@ export const closePage = defineTool({
       }
     }
     response.setIncludePages(true);
+    response.setListInPageTools();
   },
 });
 
@@ -275,6 +278,7 @@ export const navigatePage = definePageTool({
     }
 
     response.setIncludePages(true);
+    response.setListInPageTools();
   },
 });
 

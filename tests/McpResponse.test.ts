@@ -13,6 +13,14 @@ import {describe, it} from 'node:test';
 import sinon from 'sinon';
 
 import type {ParsedArguments} from '../src/bin/chrome-devtools-mcp-cli-options.js';
+import type {McpContext} from '../src/McpContext.js';
+import type {McpResponse} from '../src/McpResponse.js';
+import {
+  closePage,
+  listPages,
+  navigatePage,
+  selectPage,
+} from '../src/tools/pages.js';
 import type {InsightName} from '../src/trace-processing/parse.js';
 import {
   parseRawTraceBuffer,
@@ -1090,5 +1098,94 @@ describe('inPage tools', () => {
       undefined,
       {categoryInPageTools: true} as ParsedArguments,
     );
+  });
+
+  async function testIncludesInPageTools(
+    handlerAction: (
+      response: McpResponse,
+      context: McpContext,
+    ) => Promise<void>,
+    toolName: string,
+  ) {
+    await withMcpContext(
+      async (response, context) => {
+        const mcpPage = context.getSelectedMcpPage();
+        stubToolDiscovery(mcpPage.pptrPage);
+
+        const initScript = `
+          window.__dtmcp = {
+            toolGroup: {
+              name: 'In-Page group',
+              description: 'Test tools',
+              tools: [
+                {
+                  name: 'inPageTool',
+                  description: 'A test tool',
+                  inputSchema: {
+                    type: 'object',
+                    properties: {},
+                  },
+                  execute: () => 'result',
+                },
+              ],
+            },
+          };
+          window.addEventListener('devtoolstooldiscovery', (e) => {
+            e.respondWith(window.__dtmcp?.toolGroup);
+          });
+        `;
+        await mcpPage.pptrPage.evaluateOnNewDocument(initScript);
+        await mcpPage.pptrPage.evaluate(initScript);
+
+        await handlerAction(response, context);
+
+        const {content} = await response.handle(toolName, context);
+        const responseText = getTextContent(content[0]);
+        assert.ok(
+          responseText.includes('inPageTool'),
+          `Should include in-page tool name in the ${toolName} response`,
+        );
+      },
+      undefined,
+      {categoryInPageTools: true} as ParsedArguments,
+    );
+  }
+
+  it('includes in-page tools in list_pages response', async () => {
+    await testIncludesInPageTools(async (response, context) => {
+      const listPagesDef = listPages({
+        categoryInPageTools: true,
+      } as ParsedArguments);
+      await listPagesDef.handler({params: {}}, response, context);
+    }, 'list_pages');
+  });
+
+  it('includes in-page tools in select_page response', async () => {
+    await testIncludesInPageTools(async (response, context) => {
+      const pageId =
+        context.getPageId(context.getSelectedMcpPage().pptrPage) ?? 1;
+      await selectPage.handler({params: {pageId}}, response, context);
+    }, 'select_page');
+  });
+
+  it('includes in-page tools in close_page response', async () => {
+    await testIncludesInPageTools(async (response, context) => {
+      const pageId =
+        context.getPageId(context.getSelectedMcpPage().pptrPage) ?? 1;
+      await closePage.handler({params: {pageId}}, response, context);
+    }, 'close_page');
+  });
+
+  it('includes in-page tools in navigate_page response', async () => {
+    await testIncludesInPageTools(async (response, context) => {
+      await navigatePage.handler(
+        {
+          params: {type: 'url', url: 'about:blank'},
+          page: context.getSelectedMcpPage(),
+        },
+        response,
+        context,
+      );
+    }, 'navigate_page');
   });
 });

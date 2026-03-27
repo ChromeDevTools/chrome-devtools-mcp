@@ -86,7 +86,11 @@ describe('inPage', () => {
           const result = await response.handle('list_in_page_tools', context);
           assert.ok('inPageTools' in result.structuredContent);
           assert.deepEqual(
-            (result.structuredContent as {inPageTools: ToolGroup<ToolDefinition>}).inPageTools,
+            (
+              result.structuredContent as {
+                inPageTools: ToolGroup<ToolDefinition>;
+              }
+            ).inPageTools,
             {},
           );
         },
@@ -110,7 +114,11 @@ describe('inPage', () => {
           const result = await response.handle('list_in_page_tools', context);
           assert.ok('inPageTools' in result.structuredContent);
           assert.strictEqual(
-            (result.structuredContent as {inPageTools: ToolGroup<ToolDefinition>}).inPageTools,
+            (
+              result.structuredContent as {
+                inPageTools: ToolGroup<ToolDefinition>;
+              }
+            ).inPageTools,
             undefined,
           );
         },
