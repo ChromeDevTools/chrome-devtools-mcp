@@ -8,6 +8,7 @@ import process from 'node:process';
 
 import {DAEMON_CLIENT_NAME} from '../daemon/utils.js';
 import {logger} from '../logger.js';
+import type {zod, ShapeOutput} from '../third_party/index.js';
 
 import type {LocalState, Persistence} from './persistence.js';
 import {FilePersistence} from './persistence.js';
@@ -20,6 +21,108 @@ import {
 import {WatchdogClient} from './WatchdogClient.js';
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
+const PARAM_BLOCKLIST = new Set(['uid']);
+
+const SUPPORTED_ZOD_TYPES = [
+  'ZodString',
+  'ZodNumber',
+  'ZodBoolean',
+  'ZodArray',
+  'ZodEnum',
+] as const;
+type ZodType = (typeof SUPPORTED_ZOD_TYPES)[number];
+
+function isZodType(type: string): type is ZodType {
+  return SUPPORTED_ZOD_TYPES.includes(type as ZodType);
+}
+
+function getZodType(zodType: zod.ZodTypeAny): ZodType {
+  const def = zodType._def;
+  const typeName = def.typeName;
+
+  if (
+    typeName === 'ZodOptional' ||
+    typeName === 'ZodDefault' ||
+    typeName === 'ZodNullable'
+  ) {
+    return getZodType(def.innerType);
+  }
+  if (typeName === 'ZodEffects') {
+    return getZodType(def.schema);
+  }
+
+  if (isZodType(typeName)) {
+    return typeName;
+  }
+  throw new Error(`Unsupported zod type for tool parameter: ${typeName}`);
+}
+
+type LoggedToolCallArgValue = string | number | boolean;
+
+function transformName(zodType: ZodType, name: string): string {
+  if (zodType === 'ZodString') {
+    return `${name}_length`;
+  } else if (zodType === 'ZodArray') {
+    return `${name}_count`;
+  } else {
+    return name;
+  }
+}
+
+function transformValue(
+  zodType: ZodType,
+  value: unknown,
+): LoggedToolCallArgValue {
+  if (zodType === 'ZodString') {
+    return (value as string).length;
+  } else if (zodType === 'ZodArray') {
+    return (value as unknown[]).length;
+  } else {
+    return value as LoggedToolCallArgValue;
+  }
+}
+
+function hasEquivalentType(zodType: ZodType, value: unknown): boolean {
+  if (zodType === 'ZodString') {
+    return typeof value === 'string';
+  } else if (zodType === 'ZodArray') {
+    return Array.isArray(value);
+  } else if (zodType === 'ZodNumber') {
+    return typeof value === 'number';
+  } else if (zodType === 'ZodBoolean') {
+    return typeof value === 'boolean';
+  } else if (zodType === 'ZodEnum') {
+    return (
+      typeof value === 'string' ||
+      typeof value === 'number' ||
+      typeof value === 'boolean'
+    );
+  } else {
+    return false;
+  }
+}
+
+export function sanitizeParams(
+  params: ShapeOutput<zod.ZodRawShape>,
+  schema: zod.ZodRawShape,
+): ShapeOutput<zod.ZodRawShape> {
+  const transformed: ShapeOutput<zod.ZodRawShape> = {};
+  for (const [name, value] of Object.entries(params)) {
+    if (PARAM_BLOCKLIST.has(name)) {
+      continue;
+    }
+    const zodType = getZodType(schema[name]);
+    if (!hasEquivalentType(zodType, value)) {
+      throw new Error(
+        `parameter ${name} has type ${zodType} but value ${value} is not of equivalent type`,
+      );
+    }
+    const transformedName = transformName(zodType, name);
+    const transformedValue = transformValue(zodType, value);
+    transformed[transformedName] = transformedValue;
+  }
+  return transformed;
+}
 
 function detectOsType(): OsType {
   switch (process.platform) {

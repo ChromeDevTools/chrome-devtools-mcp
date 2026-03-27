@@ -10,11 +10,15 @@ import {describe, it, afterEach, beforeEach} from 'node:test';
 import sinon from 'sinon';
 
 import {DAEMON_CLIENT_NAME} from '../../src/daemon/utils.js';
-import {ClearcutLogger} from '../../src/telemetry/ClearcutLogger.js';
+import {
+  ClearcutLogger,
+  sanitizeParams,
+} from '../../src/telemetry/ClearcutLogger.js';
 import type {Persistence} from '../../src/telemetry/persistence.js';
 import {FilePersistence} from '../../src/telemetry/persistence.js';
 import {WatchdogMessageType} from '../../src/telemetry/types.js';
 import {WatchdogClient} from '../../src/telemetry/WatchdogClient.js';
+import {zod} from '../../src/third_party/index.js';
 
 describe('ClearcutLogger', () => {
   let mockPersistence: sinon.SinonStubbedInstance<Persistence>;
@@ -161,6 +165,66 @@ describe('ClearcutLogger', () => {
       assert.strictEqual(msg.type, WatchdogMessageType.LOG_EVENT);
       assert.strictEqual(msg.payload.daily_active?.days_since_last_active, -1);
       assert(mockPersistence.saveState.called);
+    });
+  });
+
+  describe('sanitizeParams', () => {
+    it('filters out uid and transforms strings and arrays', () => {
+      const schema = {
+        uid: zod.string(),
+        myString: zod.string(),
+        myArray: zod.array(zod.string()),
+        myNumber: zod.number(),
+        myBool: zod.boolean(),
+        myEnum: zod.enum(['a', 'b']),
+      };
+
+      const params = {
+        uid: 'sensitive',
+        myString: 'hello',
+        myArray: ['one', 'two'],
+        myNumber: 42,
+        myBool: true,
+        myEnum: 'a' as const,
+      };
+
+      const sanitized = sanitizeParams(params, schema);
+
+      assert.deepStrictEqual(sanitized, {
+        myString_length: 5,
+        myArray_count: 2,
+        myNumber: 42,
+        myBool: true,
+        myEnum: 'a',
+      });
+    });
+
+    it('throws error for unsupported types', () => {
+      const schema = {
+        myObj: zod.object({foo: zod.string()}),
+      };
+      const params = {
+        myObj: {foo: 'bar'},
+      };
+
+      assert.throws(
+        () => sanitizeParams(params, schema),
+        /Unsupported zod type for tool parameter: ZodObject/,
+      );
+    });
+
+    it('throws error when value is not of equivalent type', () => {
+      const schema = {
+        myString: zod.string(),
+      };
+      const params = {
+        myString: 123,
+      };
+
+      assert.throws(
+        () => sanitizeParams(params, schema),
+        /parameter myString has type ZodString but value 123 is not of equivalent type/,
+      );
     });
   });
 });
