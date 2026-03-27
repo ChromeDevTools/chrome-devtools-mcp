@@ -19,10 +19,15 @@ import {
 import {isDaemonRunning, serializeArgs} from '../daemon/utils.js';
 import {logDisclaimers} from '../index.js';
 import {hideBin, yargs, type CallToolResult} from '../third_party/index.js';
+import {notifyUpdate} from '../utils/update-notifier.js';
 import {VERSION} from '../version.js';
 
 import {commands} from './chrome-devtools-cli-options.js';
 import {cliOptions, parseArguments} from './chrome-devtools-mcp-cli-options.js';
+
+notifyUpdate(
+  'Run `{updateCommand}` and `chrome-devtools start` to update and restart the daemon.',
+);
 
 async function start(args: string[]) {
   const combinedArgs = [...args, ...defaultArgs];

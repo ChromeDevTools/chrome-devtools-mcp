@@ -56,6 +56,7 @@
     "@types/filesystem": "^0.0.36",
     "@types/node": "^25.0.0",
     "@types/sinon": "^21.0.0",
+    "@types/update-notifier": "^6.0.8",
     "@types/yargs": "^17.0.33",
     "@typescript-eslint/eslint-plugin": "^8.43.0",
     "@typescript-eslint/parser": "^8.43.0",
@@ -80,5 +81,8 @@
   },
   "engines": {
     "node": "^20.19.0 || ^22.12.0 || >=23"
+  },
+  "dependencies": {
+    "update-notifier": "^7.3.1"
   }
 }

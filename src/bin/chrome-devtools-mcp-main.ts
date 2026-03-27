@@ -12,9 +12,12 @@ import {createMcpServer, logDisclaimers} from '../index.js';
 import {logger, saveLogsToFile} from '../logger.js';
 import {computeFlagUsage} from '../telemetry/flagUtils.js';
 import {StdioServerTransport} from '../third_party/index.js';
+import {notifyUpdate} from '../utils/update-notifier.js';
 import {VERSION} from '../version.js';
 
 import {cliOptions, parseArguments} from './chrome-devtools-mcp-cli-options.js';
+
+notifyUpdate('Run `{updateCommand}` to update.');
 
 export const args = parseArguments(VERSION);
 
