@@ -122,7 +122,6 @@ describe('extension', () => {
       assert.ok(list.length === 1, 'List should have only one extension');
       const reinstalled = list.find(e => e.id === extensionId);
       assert.ok(reinstalled, 'Extension should be present after reload');
-      await context.uninstallExtension(EXTENSION_WITH_SW_PATH);
     });
   });
   it('triggers an extension action', async () => {
@@ -148,7 +147,6 @@ describe('extension', () => {
           t => t.type() === 'page' && t.url().includes(extensionId),
         );
         assert.ok(pageTargetAfter, 'Page should exist after action');
-        await context.uninstallExtension(EXTENSION_WITH_SW_PATH);
       },
       {},
       {
