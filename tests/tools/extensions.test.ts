@@ -148,9 +148,7 @@ describe('extension', () => {
         );
         assert.ok(pageTargetAfter, 'Page should exist after action');
       },
-      {
-        executablePath: process.env.CHROME_M146_EXECUTABLE_PATH,
-      },
+      {},
       {
         categoryExtensions: true,
       } as ParsedArguments,

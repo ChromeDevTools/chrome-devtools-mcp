@@ -89,9 +89,7 @@ describe('pages', () => {
           );
           t.assert.snapshot?.(text);
         },
-        {
-          executablePath: process.env.CHROME_M146_EXECUTABLE_PATH,
-        },
+        {},
         {
           categoryExtensions: true,
         } as ParsedArguments,
@@ -196,9 +194,7 @@ describe('pages', () => {
           );
           t.assert.snapshot?.(text);
         },
-        {
-          executablePath: process.env.CHROME_M146_EXECUTABLE_PATH,
-        },
+        {},
         {
           categoryExtensions: true,
         } as ParsedArguments,
