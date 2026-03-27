@@ -1017,7 +1017,7 @@ describe('lighthouse', () => {
   });
 });
 
-describe('in-page tools', () => {
+describe('inPage tools', () => {
   function stubToolDiscovery(page: object) {
     // @ts-expect-error Internal API
     const client = page._client();

@@ -13,19 +13,18 @@ export interface ToolDefinition {
   name: string;
   description: string;
   inputSchema: JSONSchema7;
-  execute: (input: Record<string, unknown>) => unknown;
 }
 
-export interface ToolGroup {
+export interface ToolGroup<T extends ToolDefinition> {
   name: string;
   description: string;
-  tools: ToolDefinition[];
+  tools: T[];
 }
 
 declare global {
   interface Window {
     __dtmcp?: {
-      toolGroup?: ToolGroup;
+      toolGroup?: ToolGroup<ToolDefinition & {execute: (args: Record<string, unknown>) => unknown}>;
       executeTool?: (
         toolName: string,
         args: Record<string, unknown>,
@@ -37,11 +36,12 @@ declare global {
 export const listInPageTools = definePageTool({
   name: 'list_in_page_tools',
   description: `Lists all in-page-tools the page exposes for providing runtime information.
-  In-page-tools are exposed on the page via the 'window.__dtmcp.executeTool(toolName, params)'
-  function where they can be called by 'evaluate_script'.`,
+  To call 'list_in_page_tools', call 'evaluate_script' with
+  'window.__dtmcp.executeTool("list_in_page_tools", {})'.`,
   annotations: {
     category: ToolCategory.IN_PAGE,
     readOnlyHint: true,
+    conditions: ['inPageTools'],
   },
   schema: {},
   handler: async (_request, response, _context) => {

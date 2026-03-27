@@ -20,7 +20,7 @@ import type {
   ResourceType,
   TextContent,
 } from './third_party/index.js';
-import type {ToolGroup} from './tools/inPage.js';
+import type {ToolGroup, ToolDefinition} from './tools/inPage.js';
 import {handleDialog} from './tools/pages.js';
 import type {
   DevToolsData,
@@ -41,7 +41,7 @@ interface TraceInsightData {
   insightName: InsightName;
 }
 
-async function getToolGroup(page: McpPage): Promise<ToolGroup | undefined> {
+async function getToolGroup(page: McpPage): Promise<ToolGroup<ToolDefinition> | undefined> {
   // Check if there is a `devtoolstooldiscovery` event listener
   const windowHandle = await page.pptrPage.evaluateHandle(() => window);
   // @ts-expect-error internal API
@@ -55,7 +55,7 @@ async function getToolGroup(page: McpPage): Promise<ToolGroup | undefined> {
   }
 
   const toolGroup = await page.pptrPage.evaluate(() => {
-    return new Promise<ToolGroup | undefined>(resolve => {
+    return new Promise<ToolGroup<ToolDefinition> | undefined>(resolve => {
       const event = new CustomEvent('devtoolstooldiscovery');
       // @ts-expect-error Adding custom property
       event.respondWith = (toolGroup: ToolGroup) => {
@@ -83,7 +83,7 @@ async function getToolGroup(page: McpPage): Promise<ToolGroup | undefined> {
         resolve(toolGroup);
       };
       window.dispatchEvent(event);
-      // If the page does not call `event.respondWith`, return instead of timing out
+      // If the page does not synchronously call `event.respondWith`, return instead of timing out
       setTimeout(() => {
         resolve(undefined);
       }, 0);
@@ -417,7 +417,7 @@ export class McpResponse implements Response {
       extensions = context.listExtensions();
     }
 
-    let inPageTools: ToolGroup | undefined;
+    let inPageTools: ToolGroup<ToolDefinition> | undefined;
     if (this.#listInPageTools) {
       inPageTools = await getToolGroup(context.getSelectedMcpPage());
     }
@@ -541,7 +541,7 @@ export class McpResponse implements Response {
       traceInsight?: TraceInsightData;
       extensions?: InstalledExtension[];
       lighthouseResult?: LighthouseData;
-      inPageTools?: ToolGroup;
+      inPageTools?: ToolGroup<ToolDefinition>;
     },
   ): {content: Array<TextContent | ImageContent>; structuredContent: object} {
     const structuredContent: {
@@ -797,7 +797,7 @@ Call ${handleDialog.name} to handle it before continuing.`);
     if (this.#listInPageTools) {
       structuredContent.inPageTools = data.inPageTools ?? undefined;
       response.push('## In-page tools');
-      if (!data.inPageTools) {
+      if (!data.inPageTools || !data.inPageTools.tools) {
         response.push('No in-page tools available.');
       } else {
         const toolGroup = data.inPageTools;

@@ -218,7 +218,7 @@ export const cliOptions = {
   },
   categoryInPageTools: {
     type: 'boolean',
-    default: false,
+    hidden: true,
     describe:
       'Set to true to enable tools exposed by the inspected page itself',
   },

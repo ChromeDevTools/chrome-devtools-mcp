@@ -1206,14 +1206,14 @@ exports[`extensions > lists extensions 2`] = `
 }
 `;
 
-exports[`in-page tools > lists in-page tools 1`] = `
+exports[`inPage tools > lists in-page tools 1`] = `
 ## In-page tools
 My Tool Group: A group of tools
 Available tools:
 name="myTool", description="Does something", inputSchema={"type":"object","properties":{"foo":{"type":"string"}}}
 `;
 
-exports[`in-page tools > lists in-page tools 2`] = `
+exports[`inPage tools > lists in-page tools 2`] = `
 {
   "inPageTools": {
     "name": "My Tool Group",
