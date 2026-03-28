@@ -6,6 +6,8 @@
 
 import assert from 'node:assert';
 import {spawn} from 'node:child_process';
+import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import {describe, it, afterEach, beforeEach} from 'node:test';
 
@@ -91,6 +93,29 @@ describe('chrome-devtools', () => {
     );
 
     await assertDaemonIsNotRunning();
+  });
+
+  it('can start the daemon with userDataDir', async () => {
+    const userDataDir = path.join(
+      os.tmpdir(),
+      `chrome-devtools-test-${crypto.randomUUID()}`,
+    );
+    fs.mkdirSync(userDataDir, {recursive: true});
+
+    const startResult = await runCli(['start', '--userDataDir', userDataDir]);
+    assert.strictEqual(
+      startResult.status,
+      0,
+      `start command failed: ${startResult.stderr}`,
+    );
+    assert.ok(
+      !startResult.stderr.includes(
+        'Arguments userDataDir and isolated are mutually exclusive',
+      ),
+      `unexpected conflict error: ${startResult.stderr}`,
+    );
+
+    await assertDaemonIsRunning();
   });
 
   it('can invoke list_pages', async () => {
