@@ -361,17 +361,30 @@ export const uploadFile = definePageTool({
       .describe(
         'The uid of the file input element or an element that will open file chooser on the page from the page content snapshot',
       ),
-    filePath: zod.string().describe('The local path of the file to upload'),
+    filePath: zod
+      .string()
+      .describe('The local path of a file to upload. Use filePaths for multiple files.')
+      .optional(),
+    filePaths: zod
+      .array(zod.string())
+      .describe('One or more local file paths to upload in a single operation.')
+      .optional(),
     includeSnapshot: includeSnapshotSchema,
   },
   handler: async (request, response) => {
-    const {uid, filePath} = request.params;
+    const {uid} = request.params;
+    const filePaths =
+      request.params.filePaths ??
+      (request.params.filePath ? [request.params.filePath] : []);
+    if (!filePaths.length) {
+      throw new Error('Provide filePath or filePaths to upload.');
+    }
     const handle = (await request.page.getElementByUid(
       uid,
     )) as ElementHandle<HTMLInputElement>;
     try {
       try {
-        await handle.uploadFile(filePath);
+        await handle.uploadFile(...filePaths);
       } catch {
         // Some sites use a proxy element to trigger file upload instead of
         // a type=file element. In this case, we want to default to
@@ -381,7 +394,7 @@ export const uploadFile = definePageTool({
             request.page.pptrPage.waitForFileChooser({timeout: 3000}),
             handle.asLocator().click(),
           ]);
-          await fileChooser.accept([filePath]);
+          await fileChooser.accept(filePaths);
         } catch {
           throw new Error(
             `Failed to upload file. The element could not accept the file directly, and clicking it did not trigger a file chooser.`,
@@ -391,7 +404,11 @@ export const uploadFile = definePageTool({
       if (request.params.includeSnapshot) {
         response.includeSnapshot();
       }
-      response.appendResponseLine(`File uploaded from ${filePath}.`);
+      response.appendResponseLine(
+        filePaths.length === 1
+          ? `File uploaded from ${filePaths[0]}.`
+          : `Files uploaded from ${filePaths.join(', ')}.`,
+      );
     } finally {
       void handle.dispose();
     }
