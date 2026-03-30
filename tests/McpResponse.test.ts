@@ -19,6 +19,7 @@ import {
   closePage,
   listPages,
   navigatePage,
+  newPage,
   selectPage,
 } from '../src/tools/pages.js';
 import type {InsightName} from '../src/trace-processing/parse.js';
@@ -1187,5 +1188,20 @@ describe('inPage tools', () => {
         context,
       );
     }, 'navigate_page');
+  });
+
+  it('includes in-page tools in new_page response', async () => {
+    await testIncludesInPageTools(async (response, context) => {
+      // Workaround to ensure the test environment's new page contain in-page tools
+      sinon.stub(context, 'newPage').resolves(context.getSelectedMcpPage());
+
+      await newPage.handler(
+        {
+          params: {url: 'about:blank'},
+        },
+        response,
+        context,
+      );
+    }, 'new_page');
   });
 });

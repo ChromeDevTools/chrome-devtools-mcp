@@ -129,6 +129,7 @@ export const newPage = defineTool({
     );
 
     response.setIncludePages(true);
+    response.setListInPageTools();
   },
 });
 
