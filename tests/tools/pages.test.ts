@@ -45,11 +45,7 @@ describe('pages', () => {
   describe('list_pages', () => {
     it('list pages', async () => {
       await withMcpContext(async (response, context) => {
-        await listPages().handler(
-          {params: {}},
-          response,
-          context,
-        );
+        await listPages().handler({params: {}}, response, context);
         assert.ok(response.includePages);
       });
     });
@@ -63,11 +59,7 @@ describe('pages', () => {
         await page2.pptrPage.close();
 
         // list_pages should still work even though the selected page is gone.
-        await listPages().handler(
-          {params: {}},
-          response,
-          context,
-        );
+        await listPages().handler({params: {}}, response, context);
         assert.ok(response.includePages);
       });
     });
@@ -88,11 +80,7 @@ describe('pages', () => {
           const listPageDef = listPages({
             categoryExtensions: true,
           } as ParsedArguments);
-          await listPageDef.handler(
-            {params: {}},
-            response,
-            context,
-          );
+          await listPageDef.handler({params: {}}, response, context);
 
           const result = await response.handle(listPageDef.name, context);
           const textContent = result.content.find(c => c.type === 'text') as {
@@ -134,11 +122,7 @@ describe('pages', () => {
             const listPageDef = listPages({
               categoryExtensions,
             } as ParsedArguments);
-            await listPageDef.handler(
-              {params: {}},
-              response,
-              context,
-            );
+            await listPageDef.handler({params: {}}, response, context);
 
             const result = await response.handle(listPageDef.name, context);
             const textContent = result.content.find(c => c.type === 'text') as {
@@ -195,11 +179,7 @@ describe('pages', () => {
           const listPageDef = listPages({
             categoryExtensions: true,
           } as ParsedArguments);
-          await listPageDef.handler(
-            {params: {}},
-            response,
-            context,
-          );
+          await listPageDef.handler({params: {}}, response, context);
 
           const result = await response.handle(listPageDef.name, context);
           const textContent = result.content.find(c => c.type === 'text') as {
