@@ -87,6 +87,20 @@ export const cliOptions = {
       }
     },
   },
+  protocolTimeout: {
+    type: 'number',
+    description:
+      'Timeout in milliseconds for Chrome DevTools Protocol commands. Passed to Puppeteer as protocolTimeout.',
+    coerce: (value: number | undefined) => {
+      if (value === undefined) {
+        return;
+      }
+      if (!Number.isFinite(value) || value <= 0) {
+        throw new Error('protocolTimeout must be a positive number of ms.');
+      }
+      return value;
+    },
+  },
   headless: {
     type: 'boolean',
     description: 'Whether to run in headless (no UI) mode.',
