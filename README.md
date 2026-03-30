@@ -475,8 +475,6 @@ If you run into any issues, checkout our [troubleshooting guide](./docs/troubles
   - [`list_console_messages`](docs/tool-reference.md#list_console_messages)
   - [`take_screenshot`](docs/tool-reference.md#take_screenshot)
   - [`take_snapshot`](docs/tool-reference.md#take_snapshot)
-- **In-page tools** (1 tools)
-  - [`list_in_page_tools`](docs/tool-reference.md#list_in_page_tools)
 
 <!-- END AUTO GENERATED TOOLS -->
 
@@ -567,11 +565,6 @@ The Chrome DevTools MCP server supports the following configuration option:
   Set to false to exclude tools related to network.
   - **Type:** boolean
   - **Default:** `true`
-
-- **`--categoryInPageTools`/ `--category-in-page-tools`**
-  Set to true to enable tools exposed by the inspected page itself
-  - **Type:** boolean
-  - **Default:** `false`
 
 - **`--performanceCrux`/ `--performance-crux`**
   Set to false to disable sending URLs from performance traces to CrUX API to get field performance data.
