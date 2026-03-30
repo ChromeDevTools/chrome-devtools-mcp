@@ -31,6 +31,7 @@ import type {
 } from './third_party/index.js';
 import {Locator} from './third_party/index.js';
 import {PredefinedNetworkConditions} from './third_party/index.js';
+import type {ToolGroup, ToolDefinition} from './tools/inPage.js';
 import {listPages} from './tools/pages.js';
 import {CLOSE_PAGE_ERROR} from './tools/ToolDefinition.js';
 import type {Context, DevToolsData} from './tools/ToolDefinition.js';
@@ -101,6 +102,7 @@ export class McpContext implements Context {
   #screenRecorderData: {recorder: ScreenRecorder; filePath: string} | null =
     null;
 
+  #inPageTools?: ToolGroup<ToolDefinition>;
   #nextPageId = 1;
   #extensionPages = new WeakMap<Target, Page>();
 
@@ -462,6 +464,14 @@ export class McpContext implements Context {
   selectPage(newPage: McpPage): void {
     this.#selectedPage = newPage;
     this.#updateSelectedPageTimeouts();
+  }
+
+  setInPageTools(toolGroup?: ToolGroup<ToolDefinition>) {
+    this.#inPageTools = toolGroup;
+  }
+
+  getInPageTools(): ToolGroup<ToolDefinition> | undefined {
+    return this.#inPageTools;
   }
 
   #updateSelectedPageTimeouts() {
