@@ -53,16 +53,16 @@ describe('inPage', () => {
           assert.strictEqual(actualGroup.description, 'test description');
           assert.strictEqual(actualGroup.tools.length, 1);
           assert.strictEqual(actualGroup.tools[0].name, 'test-tool');
-            assert.strictEqual(
-              actualGroup.tools[0].description,
-              'test tool description',
-            );
-            assert.deepEqual(actualGroup.tools[0].inputSchema, {
-              type: 'object',
-              properties: {
-                arg: {type: 'string'},
-              },
-            });
+          assert.strictEqual(
+            actualGroup.tools[0].description,
+            'test tool description',
+          );
+          assert.deepEqual(actualGroup.tools[0].inputSchema, {
+            type: 'object',
+            properties: {
+              arg: {type: 'string'},
+            },
+          });
         },
         undefined,
         {categoryInPageTools: true} as ParsedArguments,

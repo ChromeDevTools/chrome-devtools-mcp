@@ -24,7 +24,9 @@ export interface ToolGroup<T extends ToolDefinition> {
 declare global {
   interface Window {
     __dtmcp?: {
-      toolGroup?: ToolGroup<ToolDefinition & {execute: (args: Record<string, unknown>) => unknown}>;
+      toolGroup?: ToolGroup<
+        ToolDefinition & {execute: (args: Record<string, unknown>) => unknown}
+      >;
       executeTool?: (
         toolName: string,
         args: Record<string, unknown>,

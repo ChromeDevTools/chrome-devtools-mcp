@@ -41,7 +41,9 @@ interface TraceInsightData {
   insightName: InsightName;
 }
 
-async function getToolGroup(page: McpPage): Promise<ToolGroup<ToolDefinition> | undefined> {
+async function getToolGroup(
+  page: McpPage,
+): Promise<ToolGroup<ToolDefinition> | undefined> {
   // Check if there is a `devtoolstooldiscovery` event listener
   const windowHandle = await page.pptrPage.evaluateHandle(() => window);
   // @ts-expect-error internal API
