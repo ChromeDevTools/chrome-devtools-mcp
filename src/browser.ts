@@ -8,6 +8,7 @@ import {execSync} from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import process from 'node:process';
 
 import {logger} from './logger.js';
 import type {
@@ -19,6 +20,92 @@ import type {
 import {puppeteer} from './third_party/index.js';
 
 let browser: Browser | undefined;
+
+/**
+ * Ensures only one chrome-devtools-mcp process connects to a given endpoint.
+ * Multiple CDP clients on the same debug port cause "Network.enable timed out"
+ * errors because sessions conflict. This kills any previous instance before
+ * connecting.
+ */
+function getLockDir(): string {
+  const uid = os.userInfo().uid;
+  const dir = path.join(os.tmpdir(), `chrome-devtools-mcp-${uid}`);
+  fs.mkdirSync(dir, {recursive: true});
+  return dir;
+}
+
+function endpointToLockName(endpoint: string): string {
+  // Normalize endpoint to a safe filename. Include host so different
+  // hosts on the same port don't collide.
+  return endpoint.replace(/[^a-zA-Z0-9]/g, '_') + '.lock';
+}
+
+export function acquireEndpointLock(endpoint: string): void {
+  const lockPath = path.join(getLockDir(), endpointToLockName(endpoint));
+
+  // Check for and kill any existing owner.
+  try {
+    const content = fs.readFileSync(lockPath, 'utf-8').trim();
+    const lines = content.split('\n');
+    const pid = parseInt(lines[0] ?? '', 10);
+    if (!isNaN(pid) && pid !== process.pid) {
+      try {
+        process.kill(pid, 0); // Throws if process doesn't exist.
+        logger(`Killing previous MCP process (PID ${pid}) for ${endpoint}`);
+        process.kill(pid, 'SIGTERM');
+        // Wait for the process to actually exit before proceeding.
+        const start = Date.now();
+        while (Date.now() - start < 1000) {
+          try {
+            process.kill(pid, 0);
+          } catch {
+            break; // Process exited.
+          }
+        }
+        // Force kill if still alive after 1s.
+        try {
+          process.kill(pid, 'SIGKILL');
+        } catch {
+          // Already dead.
+        }
+      } catch {
+        // Process already dead, stale lock file.
+      }
+      // Remove stale lock before acquiring.
+      try {
+        fs.unlinkSync(lockPath);
+      } catch {
+        // Best effort.
+      }
+    }
+  } catch {
+    // No lock file exists yet.
+  }
+
+  // Write lock atomically. If another process races us, one of us will fail
+  // the 'wx' open and retry or proceed without the lock.
+  try {
+    const fd = fs.openSync(lockPath, 'wx');
+    fs.writeSync(fd, `${process.pid}\n${endpoint}\n`);
+    fs.closeSync(fd);
+  } catch {
+    // File already exists (race). Overwrite since we already killed the owner.
+    fs.writeFileSync(lockPath, `${process.pid}\n${endpoint}\n`);
+  }
+}
+
+export function releaseEndpointLock(endpoint: string): void {
+  try {
+    const lockPath = path.join(getLockDir(), endpointToLockName(endpoint));
+    const content = fs.readFileSync(lockPath, 'utf-8').trim();
+    const pid = parseInt(content.split('\n')[0] ?? '', 10);
+    if (pid === process.pid) {
+      fs.unlinkSync(lockPath);
+    }
+  } catch {
+    // Best effort cleanup.
+  }
+}
 
 function makeTargetFilter(enableExtensions = false) {
   const ignoredPrefixes = new Set(['chrome://', 'chrome-untrusted://']);
@@ -116,6 +203,12 @@ export async function ensureBrowserConnected(options: {
     throw new Error(
       'Either browserURL, wsEndpoint, channel or userDataDir must be provided',
     );
+  }
+
+  // Acquire endpoint lock to prevent multiple clients on the same browser.
+  const endpoint = options.browserURL ?? options.wsEndpoint;
+  if (endpoint) {
+    acquireEndpointLock(endpoint);
   }
 
   logger('Connecting Puppeteer to ', JSON.stringify(connectOptions));
