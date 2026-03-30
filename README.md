@@ -199,6 +199,17 @@ startup_timeout_ms = 20_000
 </details>
 
 <details>
+  <summary>Command Code</summary>
+  
+Use the Command Code CLI to add the Chrome DevTools MCP server (<a href="https://commandcode.ai/docs/mcp">MCP guide</a>):
+
+```bash
+cmd mcp add chrome-devtools --scope user npx chrome-devtools-mcp@latest
+```
+
+</details>
+
+<details>
   <summary>Copilot CLI</summary>
 
 Start Copilot CLI:

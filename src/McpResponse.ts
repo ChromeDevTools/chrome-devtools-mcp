@@ -224,10 +224,10 @@ export class McpResponse implements Response {
   }
 
   attachNetworkRequest(
-    reqid: number,
+    reqId: number,
     options?: {requestFilePath?: string; responseFilePath?: string},
   ): void {
-    this.#attachedNetworkRequestId = reqid;
+    this.#attachedNetworkRequestId = reqId;
     this.#attachedNetworkRequestOptions = options;
   }
 
@@ -405,7 +405,7 @@ export class McpResponse implements Response {
         });
         if (!formatter.isValid()) {
           throw new Error(
-            "Can't provide detals for the msgid " + consoleMessageStableId,
+            "Can't provide details for the msgid " + consoleMessageStableId,
           );
         }
         detailedConsoleMessage = formatter;
