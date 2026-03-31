@@ -14,7 +14,7 @@ export const takeMemorySnapshot = definePageTool({
   description: `Capture a memory heapsnapshot of the currently selected page to memory leak debugging`,
   annotations: {
     category: ToolCategory.PERFORMANCE,
-    readOnlyHint: true,
+    readOnlyHint: false,
   },
   schema: {
     filePath: zod
