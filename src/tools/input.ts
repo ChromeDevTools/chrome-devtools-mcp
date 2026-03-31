@@ -58,7 +58,7 @@ export const click = definePageTool({
     dblClick: dblClickSchema,
     includeSnapshot: includeSnapshotSchema,
   },
-  handler: async (request, response, _context) => {
+  handler: async (request, response) => {
     const uid = request.params.uid;
     const handle = await request.page.getElementByUid(uid);
     try {
@@ -130,7 +130,7 @@ export const hover = definePageTool({
       ),
     includeSnapshot: includeSnapshotSchema,
   },
-  handler: async (request, response, _context) => {
+  handler: async (request, response) => {
     const uid = request.params.uid;
     const handle = await request.page.getElementByUid(uid);
     try {
