@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import fs from 'node:fs/promises';
+import path from 'node:path';
+
 import {zod} from '../third_party/index.js';
 import type {Frame, JSHandle, Page, WebWorker} from '../third_party/index.js';
 import type {ExtensionServiceWorker} from '../types.js';
@@ -85,6 +88,79 @@ Example with arguments: \`(el) => {
         ? context.getPageById(request.params.pageId)
         : context.getSelectedMcpPage();
       const page: Page = mcpPage.pptrPage;
+
+      const args: Array<JSHandle<unknown>> = [];
+      try {
+        const frames = new Set<Frame>();
+        for (const uid of uidArgs ?? []) {
+          const handle = await mcpPage.getElementByUid(uid);
+          frames.add(handle.frame);
+          args.push(handle);
+        }
+
+        const evaluatable = await getPageOrFrame(page, frames);
+
+        await performEvaluation(evaluatable, fnString, args, response, context);
+      } finally {
+        void Promise.allSettled(args.map(arg => arg.dispose()));
+      }
+    },
+  };
+});
+
+export const evaluateScriptFile = defineTool(cliArgs => {
+  return {
+    name: 'evaluate_script_file',
+    description: `Read a JavaScript file from the local filesystem and evaluate it inside the currently selected page.
+The file should contain a JavaScript function declaration (e.g., an arrow function or function expression).
+Returns the response as JSON, so returned values have to be JSON-serializable.
+This is useful for evaluating large scripts without needing to pass the entire script content as a parameter.`,
+    annotations: {
+      category: ToolCategory.DEBUGGING,
+      readOnlyHint: false,
+    },
+    schema: {
+      filePath: zod.string().describe(
+        `The absolute path to a JavaScript file containing a function declaration to be executed in the currently selected page.
+The file content should be a JavaScript function declaration, for example:
+\`() => { return document.title; }\` or \`async () => { return await fetch("example.com"); }\`
+`,
+      ),
+      args: zod
+        .array(
+          zod
+            .string()
+            .describe(
+              'The uid of an element on the page from the page content snapshot',
+            ),
+        )
+        .optional()
+        .describe(`An optional list of arguments to pass to the function.`),
+      ...(cliArgs?.experimentalPageIdRouting ? pageIdSchema : {}),
+    },
+    handler: async (request, response, context) => {
+      const {args: uidArgs, filePath, pageId} = request.params;
+
+      const resolvedPath = path.isAbsolute(filePath)
+        ? filePath
+        : path.resolve(filePath);
+
+      let fnString: string;
+      try {
+        fnString = await fs.readFile(resolvedPath, 'utf-8');
+      } catch (err) {
+        throw new Error(
+          `Could not read script file: ${resolvedPath}`,
+          {cause: err},
+        );
+      }
+
+      fnString = fnString.trim();
+
+      const mcpPage = cliArgs?.experimentalPageIdRouting
+        ? context.getPageById(pageId)
+        : context.getSelectedMcpPage();
+      const page = mcpPage.pptrPage;
 
       const args: Array<JSHandle<unknown>> = [];
       try {

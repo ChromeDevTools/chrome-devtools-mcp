@@ -1,6 +1,6 @@
 <!-- AUTO GENERATED DO NOT EDIT - run 'npm run gen' to update-->
 
-# Chrome DevTools MCP Tool Reference (~6940 cl100k_base tokens)
+# Chrome DevTools MCP Tool Reference (~7262 cl100k_base tokens)
 
 - **[Input automation](#input-automation)** (9 tools)
   - [`click`](#click)
@@ -30,8 +30,9 @@
 - **[Network](#network)** (2 tools)
   - [`get_network_request`](#get_network_request)
   - [`list_network_requests`](#list_network_requests)
-- **[Debugging](#debugging)** (6 tools)
+- **[Debugging](#debugging)** (7 tools)
   - [`evaluate_script`](#evaluate_script)
+  - [`evaluate_script_file`](#evaluate_script_file)
   - [`get_console_message`](#get_console_message)
   - [`lighthouse_audit`](#lighthouse_audit)
   - [`list_console_messages`](#list_console_messages)
@@ -157,7 +158,7 @@
 
 ### `list_pages`
 
-**Description:** Get a list of pages open in the browser.
+**Description:** Get a list of pages  open in the browser.
 
 **Parameters:** None
 
@@ -323,14 +324,31 @@ so returned values have to be JSON-serializable.
 **Parameters:**
 
 - **function** (string) **(required)**: A JavaScript function declaration to be executed by the tool in the currently selected page.
-  Example without arguments: `() => {
+Example without arguments: `() => {
   return document.title
 }` or `async () => {
   return await fetch("example.com")
 }`.
-  Example with arguments: `(el) => {
+Example with arguments: `(el) => {
   return el.innerText;
 }`
+
+- **args** (array) _(optional)_: An optional list of arguments to pass to the function.
+
+---
+
+### `evaluate_script_file`
+
+**Description:** Read a JavaScript file from the local filesystem and evaluate it inside the currently selected page.
+The file should contain a JavaScript function declaration (e.g., an arrow function or function expression).
+Returns the response as JSON, so returned values have to be JSON-serializable.
+This is useful for evaluating large scripts without needing to pass the entire script content as a parameter.
+
+**Parameters:**
+
+- **filePath** (string) **(required)**: The absolute path to a JavaScript file containing a function declaration to be executed in the currently selected page.
+The file content should be a JavaScript function declaration, for example:
+`() => { return document.title; }` or `async () => { return await fetch("example.com"); }`
 
 - **args** (array) _(optional)_: An optional list of arguments to pass to the function.
 
