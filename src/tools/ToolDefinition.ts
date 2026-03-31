@@ -198,7 +198,6 @@ export type Context = Readonly<{
   triggerExtensionAction(id: string): Promise<void>;
   listExtensions(): InstalledExtension[];
   getExtension(id: string): InstalledExtension | undefined;
-  setInPageTools(toolGroup?: ToolGroup<InPageToolDefinition>): void;
   getInPageTools(): ToolGroup<InPageToolDefinition> | undefined;
   getSelectedMcpPage(): McpPage;
   getExtensionServiceWorkers(): ExtensionServiceWorker[];

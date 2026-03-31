@@ -194,7 +194,7 @@ describe('inPage', () => {
             {
               params: {
                 toolName: 'test-tool',
-                params: {arg: 'value'},
+                params: JSON.stringify({arg: 'value'}),
               },
               page: context.getSelectedMcpPage(),
             },
@@ -233,7 +233,7 @@ describe('inPage', () => {
               {
                 params: {
                   toolName: 'missing-tool',
-                  params: {},
+                  params: JSON.stringify({}),
                 },
                 page: context.getSelectedMcpPage(),
               },
@@ -282,7 +282,7 @@ describe('inPage', () => {
                 {
                   params: {
                     toolName: 'test-tool',
-                    params: {}, // Missing required 'arg'
+                    params: JSON.stringify({}), // Missing required 'arg'
                   },
                   page: context.getSelectedMcpPage(),
                 },
@@ -326,7 +326,7 @@ describe('inPage', () => {
             {
               params: {
                 toolName: 'test-tool',
-                params: {},
+                params: JSON.stringify({}),
               },
               page: context.getSelectedMcpPage(),
             },

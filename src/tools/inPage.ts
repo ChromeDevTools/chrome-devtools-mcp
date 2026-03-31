@@ -66,14 +66,27 @@ export const executeInPageTool = definePageTool({
   schema: {
     toolName: zod.string().describe('The name of the tool to execute'),
     params: zod
-      .record(zod.string(), zod.unknown())
+      .string()
       .optional()
-      .describe('The parameters to pass to the tool'),
+      .describe('The JSON-stringified parameters to pass to the tool'),
   },
   handler: async (request, response, context) => {
     const page = context.getSelectedMcpPage();
     const toolName = request.params.toolName;
-    const params = request.params.params ?? {};
+    let params: Record<string, unknown> = {};
+    if (request.params.params) {
+      try {
+        const parsed = JSON.parse(request.params.params);
+        if (typeof parsed === 'object' && parsed !== null) {
+          params = parsed;
+        } else {
+          throw new Error('Parsed params is not an object');
+        }
+      } catch (e) {
+        const errorMessage = e instanceof Error ? e.message : String(e);
+        throw new Error(`Failed to parse params as JSON: ${errorMessage}`);
+      }
+    }
 
     const toolGroup = context.getInPageTools();
     const tool = toolGroup?.tools.find(t => t.name === toolName);
