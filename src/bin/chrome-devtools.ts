@@ -6,6 +6,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+process.title = 'chrome-devtools';
+
 import process from 'node:process';
 
 import type {Options, PositionalOptions} from 'yargs';
