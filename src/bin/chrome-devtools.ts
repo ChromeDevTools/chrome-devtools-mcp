@@ -100,7 +100,7 @@ y.command(
     await start(args);
     process.exit(0);
   },
-).strict(); // Re-enable strict validation for other commands; this is applied to the yargs instance itself.
+).strict(); // Re-enable strict validation for other commands; this is applied to the yargs instance itself
 
 y.command('status', 'Checks if chrome-devtools-mcp is running', async () => {
   if (isDaemonRunning()) {
