@@ -1,6 +1,6 @@
 <!-- AUTO GENERATED DO NOT EDIT - run 'npm run gen' to update-->
 
-# Chrome DevTools MCP Tool Reference (~6940 cl100k_base tokens)
+# Chrome DevTools MCP Tool Reference (~6949 cl100k_base tokens)
 
 - **[Input automation](#input-automation)** (9 tools)
   - [`click`](#click)
@@ -278,7 +278,7 @@
 
 ### `take_memory_snapshot`
 
-**Description:** Capture a memory heapsnapshot of the currently selected page to memory leak debugging
+**Description:** Capture a heap snapshot of the currently selected page. Use to analyze the memory distribution of JavaScript objects and debug memory leaks.
 
 **Parameters:**
 
