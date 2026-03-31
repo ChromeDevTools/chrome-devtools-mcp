@@ -10,9 +10,14 @@ import {describe, it} from 'node:test';
 
 import type {ParsedArguments} from '../../src/bin/chrome-devtools-mcp-cli-options.js';
 import {installExtension} from '../../src/tools/extensions.js';
-import {evaluateScript} from '../../src/tools/script.js';
+import {evaluateScript, evaluateScriptFile} from '../../src/tools/script.js';
 import {serverHooks} from '../server.js';
 import {extractExtensionId, html, withMcpContext} from '../utils.js';
+
+const FIXTURE_DIR = path.join(
+  import.meta.dirname,
+  '../../../tests/tools/fixtures',
+);
 
 const EXTENSION_PATH = path.join(
   import.meta.dirname,
@@ -299,6 +304,87 @@ describe('script', () => {
         {},
         {categoryExtensions: true} as ParsedArguments,
       );
+    });
+  });
+
+  describe('evaluate_script_file', () => {
+    it('evaluates a script file', async () => {
+      await withMcpContext(async (response, context) => {
+        const page = await context.newPage();
+        await page.pptrPage.setContent(`
+          <head>
+            <title>Test Page</title>
+          </head>
+        `);
+
+        await evaluateScriptFile().handler(
+          {
+            params: {
+              filePath: path.join(FIXTURE_DIR, 'test-script.js'),
+            },
+          },
+          response,
+          context,
+        );
+        const lineEvaluation = response.responseLines.at(2)!;
+        assert.strictEqual(JSON.parse(lineEvaluation), 'Test Page');
+      });
+    });
+
+    it('evaluates an async script file', async () => {
+      await withMcpContext(async (response, context) => {
+        await evaluateScriptFile().handler(
+          {
+            params: {
+              filePath: path.join(FIXTURE_DIR, 'test-script-async.js'),
+            },
+          },
+          response,
+          context,
+        );
+        const lineEvaluation = response.responseLines.at(2)!;
+        assert.strictEqual(JSON.parse(lineEvaluation), 'async-works');
+      });
+    });
+
+    it('evaluates a script file with element arguments', async () => {
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedPptrPage();
+        await page.setContent(html`<button id="test">test</button>`);
+        await context.createTextSnapshot(context.getSelectedMcpPage());
+
+        await evaluateScriptFile().handler(
+          {
+            params: {
+              filePath: path.join(FIXTURE_DIR, 'test-script-with-args.js'),
+              args: ['1_1'],
+            },
+          },
+          response,
+          context,
+        );
+        const lineEvaluation = response.responseLines.at(2)!;
+        assert.strictEqual(JSON.parse(lineEvaluation), 'test');
+      });
+    });
+
+    it('throws error for non-existent file', async () => {
+      await withMcpContext(async (response, context) => {
+        await assert.rejects(
+          evaluateScriptFile().handler(
+            {
+              params: {
+                filePath: '/non/existent/file.js',
+              },
+            },
+            response,
+            context,
+          ),
+          {
+            message: 'Could not read script file: /non/existent/file.js',
+          },
+        );
+      });
     });
   });
 });

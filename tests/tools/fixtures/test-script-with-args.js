@@ -1,0 +1,3 @@
+(el) => {
+  return el.id;
+}
