@@ -30,11 +30,61 @@ export function validateEnumHomogeneity(values: unknown[]): string {
 export interface ArgMetric {
   name: string;
   argType: string;
+  isDeprecated?: boolean;
 }
 
 export interface ToolMetric {
   name: string;
   args: ArgMetric[];
+  isDeprecated?: boolean;
+}
+
+export function applyToExistingMetrics(
+  existing: ToolMetric[],
+  update: ToolMetric[],
+): ToolMetric[] {
+  const updated = applyToExisting<ToolMetric>(existing, update);
+  const existingByName = new Map(existing.map(tool => [tool.name, tool]));
+  const updatedByName = new Map(update.map(tool => [tool.name, tool]));
+
+  return updated.map(tool => {
+    const existingTool = existingByName.get(tool.name);
+    const updatedTool = updatedByName.get(tool.name);
+    // If the tool still exists in the update, we will update the args.
+    if (existingTool && updatedTool) {
+      const updatedArgs = applyToExisting<ArgMetric>(
+        existingTool.args,
+        updatedTool.args,
+      );
+      return {...tool, args: updatedArgs};
+    }
+    return tool;
+  });
+}
+
+function applyToExisting<T extends {name: string; isDeprecated?: boolean}>(
+  existing: T[],
+  update: T[],
+): T[] {
+  const existingNames = new Set(existing.map(item => item.name));
+  const updatedNames = new Set(update.map(item => item.name));
+
+  const result: T[] = [];
+  // Keep the original ordering.
+  for (const entry of existing) {
+    const toAdd = {...entry};
+    if (!updatedNames.has(entry.name)) {
+      toAdd.isDeprecated = true;
+    }
+    result.push(toAdd);
+  }
+  // New entries must be added to the very back of the list.
+  for (const entry of update) {
+    if (!existingNames.has(entry.name)) {
+      result.push({...entry});
+    }
+  }
+  return result;
 }
 
 /**

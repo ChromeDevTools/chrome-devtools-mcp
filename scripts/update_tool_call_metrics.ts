@@ -8,7 +8,11 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 
 import type {ParsedArguments} from '../build/src/bin/chrome-devtools-mcp-cli-options.js';
-import {generateToolMetrics} from '../build/src/telemetry/toolMetricsUtils.js';
+import {
+  applyToExistingMetrics,
+  generateToolMetrics,
+  type ToolMetric,
+} from '../build/src/telemetry/toolMetricsUtils.js';
 import type {ToolDefinition} from '../build/src/tools/ToolDefinition.js';
 import {createTools} from '../build/src/tools/tools.js';
 
@@ -35,16 +39,26 @@ function writeToolCallMetricsConfig() {
     throw new Error('Error: Duplicate tool names found.');
   }
 
-  // Map tools to their metadata
-  const toolData = generateToolMetrics(allTools);
+  let existingMetrics: ToolMetric[] = [];
+  if (fs.existsSync(outputPath)) {
+    try {
+      existingMetrics = JSON.parse(
+        fs.readFileSync(outputPath, 'utf8'),
+      ) as ToolMetric[];
+    } catch {
+      console.warn(
+        `Warning: Failed to parse existing metrics from ${outputPath}. Starting fresh.`,
+      );
+    }
+  }
 
-  // Sort by name for determinism
-  toolData.sort((a, b) => a.name.localeCompare(b.name));
+  const newMetrics = generateToolMetrics(allTools);
+  const mergedMetrics = applyToExistingMetrics(existingMetrics, newMetrics);
 
-  fs.writeFileSync(outputPath, JSON.stringify(toolData, null, 2) + '\n');
+  fs.writeFileSync(outputPath, JSON.stringify(mergedMetrics, null, 2) + '\n');
 
   console.log(
-    `Successfully wrote ${toolData.length} tool names with arguments to ${outputPath}`,
+    `Successfully wrote ${mergedMetrics.length} total tool metrics (including deprecated ones) to ${outputPath}`,
   );
 }
 
