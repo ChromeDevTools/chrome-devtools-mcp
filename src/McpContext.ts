@@ -47,7 +47,7 @@ import {
   type InstalledExtension,
 } from './utils/ExtensionRegistry.js';
 import {saveTemporaryFile} from './utils/files.js';
-import {getNetworkMultiplierFromString, WaitForHelper} from './WaitForHelper.js';
+import {getNetworkMultiplierFromString} from './WaitForHelper.js';
 
 interface McpContextOptions {
   // Whether the DevTools windows are exposed as pages for debugging of DevTools.
@@ -822,31 +822,6 @@ export class McpContext implements Context {
 
   recordedTraces(): TraceResult[] {
     return this.#traceResults;
-  }
-
-  getWaitForHelper(
-    page: Page,
-    cpuMultiplier: number,
-    networkMultiplier: number,
-  ) {
-    return new WaitForHelper(page, cpuMultiplier, networkMultiplier);
-  }
-
-  waitForEventsAfterAction(
-    action: () => Promise<unknown>,
-    options?: {timeout?: number},
-  ): Promise<void> {
-    const page = this.#getSelectedMcpPage();
-    const cpuMultiplier = page.cpuThrottlingRate;
-    const networkMultiplier = getNetworkMultiplierFromString(
-      page.networkConditions,
-    );
-    const waitForHelper = this.getWaitForHelper(
-      page.pptrPage,
-      cpuMultiplier,
-      networkMultiplier,
-    );
-    return waitForHelper.waitForEventsAfterAction(action, options);
   }
 
   getNetworkRequestStableId(request: HTTPRequest): number {

@@ -58,11 +58,11 @@ export const click = definePageTool({
     dblClick: dblClickSchema,
     includeSnapshot: includeSnapshotSchema,
   },
-  handler: async (request, response, context) => {
+  handler: async (request, response, _context) => {
     const uid = request.params.uid;
     const handle = await request.page.getElementByUid(uid);
     try {
-      await context.waitForEventsAfterAction(async () => {
+      await request.page.waitForEventsAfterAction(async () => {
         await handle.asLocator().click({
           count: request.params.dblClick ? 2 : 1,
         });
@@ -97,9 +97,9 @@ export const clickAt = definePageTool({
     dblClick: dblClickSchema,
     includeSnapshot: includeSnapshotSchema,
   },
-  handler: async (request, response, context) => {
+  handler: async (request, response) => {
     const page = request.page;
-    await context.waitForEventsAfterAction(async () => {
+    await page.waitForEventsAfterAction(async () => {
       await page.pptrPage.mouse.click(request.params.x, request.params.y, {
         clickCount: request.params.dblClick ? 2 : 1,
       });
@@ -130,11 +130,11 @@ export const hover = definePageTool({
       ),
     includeSnapshot: includeSnapshotSchema,
   },
-  handler: async (request, response, context) => {
+  handler: async (request, response, _context) => {
     const uid = request.params.uid;
     const handle = await request.page.getElementByUid(uid);
     try {
-      await context.waitForEventsAfterAction(async () => {
+      await request.page.waitForEventsAfterAction(async () => {
         await handle.asLocator().hover();
       });
       response.appendResponseLine(`Successfully hovered over the element`);
@@ -235,7 +235,7 @@ export const fill = definePageTool({
   },
   handler: async (request, response, context) => {
     const page = request.page;
-    await context.waitForEventsAfterAction(async () => {
+    await page.waitForEventsAfterAction(async () => {
       await fillFormElement(
         request.params.uid,
         request.params.value,
@@ -261,9 +261,9 @@ export const typeText = definePageTool({
     text: zod.string().describe('The text to type'),
     submitKey: submitKeySchema,
   },
-  handler: async (request, response, context) => {
+  handler: async (request, response) => {
     const page = request.page;
-    await context.waitForEventsAfterAction(async () => {
+    await page.waitForEventsAfterAction(async () => {
       await page.pptrPage.keyboard.type(request.params.text);
       if (request.params.submitKey) {
         await page.pptrPage.keyboard.press(
@@ -289,13 +289,13 @@ export const drag = definePageTool({
     to_uid: zod.string().describe('The uid of the element to drop into'),
     includeSnapshot: includeSnapshotSchema,
   },
-  handler: async (request, response, context) => {
+  handler: async (request, response) => {
     const fromHandle = await request.page.getElementByUid(
       request.params.from_uid,
     );
     const toHandle = await request.page.getElementByUid(request.params.to_uid);
     try {
-      await context.waitForEventsAfterAction(async () => {
+      await request.page.waitForEventsAfterAction(async () => {
         await fromHandle.drag(toHandle);
         await new Promise(resolve => setTimeout(resolve, 50));
         await toHandle.drop(fromHandle);
@@ -332,7 +332,7 @@ export const fillForm = definePageTool({
   handler: async (request, response, context) => {
     const page = request.page;
     for (const element of request.params.elements) {
-      await context.waitForEventsAfterAction(async () => {
+      await page.waitForEventsAfterAction(async () => {
         await fillFormElement(
           element.uid,
           element.value,
@@ -413,12 +413,12 @@ export const pressKey = definePageTool({
       ),
     includeSnapshot: includeSnapshotSchema,
   },
-  handler: async (request, response, context) => {
+  handler: async (request, response) => {
     const page = request.page;
     const tokens = parseKey(request.params.key);
     const [key, ...modifiers] = tokens;
 
-    await context.waitForEventsAfterAction(async () => {
+    await page.waitForEventsAfterAction(async () => {
       for (const modifier of modifiers) {
         await page.pptrPage.keyboard.down(modifier);
       }

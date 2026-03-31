@@ -9,7 +9,7 @@ import type {Frame, JSHandle, Page, WebWorker} from '../third_party/index.js';
 import type {ExtensionServiceWorker} from '../types.js';
 
 import {ToolCategory} from './categories.js';
-import type {Context, Response} from './ToolDefinition.js';
+import type {Context, ContextPage, Response} from './ToolDefinition.js';
 import {defineTool, pageIdSchema} from './ToolDefinition.js';
 
 export type Evaluatable = Page | Frame | WebWorker;
@@ -77,7 +77,7 @@ Example with arguments: \`(el) => {
         }
 
         const worker = await getWebWorker(context, serviceWorkerId);
-        await performEvaluation(worker, fnString, [], response, context);
+        await performEvaluation(worker, fnString, [], response, context.getSelectedMcpPage());
         return;
       }
 
@@ -97,7 +97,7 @@ Example with arguments: \`(el) => {
 
         const evaluatable = await getPageOrFrame(page, frames);
 
-        await performEvaluation(evaluatable, fnString, args, response, context);
+        await performEvaluation(evaluatable, fnString, args, response, mcpPage);
       } finally {
         void Promise.allSettled(args.map(arg => arg.dispose()));
       }
@@ -110,11 +110,11 @@ const performEvaluation = async (
   fnString: string,
   args: Array<JSHandle<unknown>>,
   response: Response,
-  context: Context,
+  page: ContextPage,
 ) => {
   const fn = await evaluatable.evaluateHandle(`(${fnString})`);
   try {
-    await context.waitForEventsAfterAction(async () => {
+    await page.waitForEventsAfterAction(async () => {
       const result = await evaluatable.evaluate(
         async (fn, ...args) => {
           // @ts-expect-error no types for function fn
