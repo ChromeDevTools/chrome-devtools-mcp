@@ -47,7 +47,7 @@ import {
   type InstalledExtension,
 } from './utils/ExtensionRegistry.js';
 import {saveTemporaryFile} from './utils/files.js';
-import {WaitForHelper} from './WaitForHelper.js';
+import {getNetworkMultiplierFromString, WaitForHelper} from './WaitForHelper.js';
 
 interface McpContextOptions {
   // Whether the DevTools windows are exposed as pages for debugging of DevTools.
@@ -60,23 +60,6 @@ interface McpContextOptions {
 
 const DEFAULT_TIMEOUT = 5_000;
 const NAVIGATION_TIMEOUT = 10_000;
-
-function getNetworkMultiplierFromString(condition: string | null): number {
-  const puppeteerCondition =
-    condition as keyof typeof PredefinedNetworkConditions;
-
-  switch (puppeteerCondition) {
-    case 'Fast 4G':
-      return 1;
-    case 'Slow 4G':
-      return 2.5;
-    case 'Fast 3G':
-      return 5;
-    case 'Slow 3G':
-      return 10;
-  }
-  return 1;
-}
 
 export class McpContext implements Context {
   browser: Browser;
