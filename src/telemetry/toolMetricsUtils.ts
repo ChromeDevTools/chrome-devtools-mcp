@@ -52,8 +52,14 @@ export function generateToolMetrics(tools: ToolDefinition[]): ToolMetric[] {
       const transformedName = transformArgName(zodType, name);
       let argType = transformArgType(zodType);
 
-      if (zodType === 'ZodEnum' && schema._def.values?.length > 0) {
-        argType = validateEnumHomogeneity(schema._def.values);
+      if (argType === 'enum') {
+        let values;
+        if (schema._def.values?.length > 0) {
+          values = schema._def.values;
+        } else {
+          values = schema._def.innerType._def.values;
+        }
+        argType = validateEnumHomogeneity(values);
       }
 
       args.push({

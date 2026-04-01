@@ -64,7 +64,7 @@
     "args": [
       {
         "name": "networkConditions",
-        "argType": "enum"
+        "argType": "string"
       },
       {
         "name": "cpuThrottlingRate",
@@ -80,7 +80,7 @@
       },
       {
         "name": "colorScheme",
-        "argType": "enum"
+        "argType": "string"
       },
       {
         "name": "viewport_length",
@@ -211,11 +211,11 @@
     "args": [
       {
         "name": "mode",
-        "argType": "enum"
+        "argType": "string"
       },
       {
         "name": "device",
-        "argType": "enum"
+        "argType": "string"
       },
       {
         "name": "outputDirPath_length",
@@ -291,7 +291,7 @@
     "args": [
       {
         "name": "type",
-        "argType": "enum"
+        "argType": "string"
       },
       {
         "name": "url_length",
@@ -303,7 +303,7 @@
       },
       {
         "name": "handleBeforeUnload",
-        "argType": "enum"
+        "argType": "string"
       },
       {
         "name": "initScript_length",
@@ -454,7 +454,7 @@
     "args": [
       {
         "name": "format",
-        "argType": "enum"
+        "argType": "string"
       },
       {
         "name": "quality",
