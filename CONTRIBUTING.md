@@ -145,7 +145,5 @@ export const scenario: TestScenario = {
 
 ## Restrictions on JSON schema
 
-- no .nullable(), no .object() types.
+- no .nullable(), no .object() types. Enforced by the `@local/enforce-zod-schema` ESLint rule.
 - represent complex object as a short formatted string.
-
-TODO: implement eslint for schema https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1076
