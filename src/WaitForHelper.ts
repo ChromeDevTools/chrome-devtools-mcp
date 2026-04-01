@@ -126,8 +126,19 @@ export class WaitForHelper {
 
   async waitForEventsAfterAction(
     action: () => Promise<unknown>,
-    options?: {timeout?: number},
+    options?: {timeout?: number; dialog?: 'accept' | 'dismiss'},
   ): Promise<void> {
+    const dialogHandler = (dialog: any) => {
+      if (options?.dialog === 'dismiss') {
+        void dialog.dismiss();
+      } else {
+        void dialog.accept();
+      }
+    };
+    if (options?.dialog) {
+      this.#page.on('dialog', dialogHandler);
+    }
+
     const navigationFinished = this.waitForNavigationStarted()
       .then(navigationStated => {
         if (navigationStated) {
@@ -158,6 +169,9 @@ export class WaitForHelper {
       logger(error);
     } finally {
       this.#abortController.abort();
+      if (options?.dialog) {
+        this.#page.off('dialog', dialogHandler);
+      }
     }
   }
 }

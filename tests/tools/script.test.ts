@@ -98,6 +98,29 @@ describe('script', () => {
       });
     });
 
+    it('work for scripts that trigger dialogs', async () => {
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedPptrPage();
+
+        await page.setContent(html`<button id="test">test</button>`);
+
+        await evaluateScript().handler(
+          {
+            params: {
+              function: String(() => {
+                alert('hello');
+                return 'Works';
+              }),
+            },
+          },
+          response,
+          context,
+        );
+        const lineEvaluation = response.responseLines.at(2)!;
+        assert.strictEqual(JSON.parse(lineEvaluation), 'Works');
+      });
+    });
+
     it('work for async functions', async () => {
       await withMcpContext(async (response, context) => {
         const page = context.getSelectedPptrPage();

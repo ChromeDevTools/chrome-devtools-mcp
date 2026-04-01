@@ -81,7 +81,7 @@ Example with arguments: \`(el) => {
           .getSelectedMcpPage()
           .waitForEventsAfterAction(async () => {
             await performEvaluation(worker, fnString, [], response);
-          });
+          }, {dialog: 'accept'});
         return;
       }
 
@@ -103,7 +103,7 @@ Example with arguments: \`(el) => {
 
         await mcpPage.waitForEventsAfterAction(async () => {
           await performEvaluation(evaluatable, fnString, args, response);
-        });
+        }, {dialog: 'accept'});
       } finally {
         void Promise.allSettled(args.map(arg => arg.dispose()));
       }
