@@ -136,13 +136,13 @@ export default defineConfig([
     },
   },
   {
-    name: 'Bundle import guard',
+    name: 'Source files',
     files: ['src/**/*.ts'],
     rules: {
       '@local/no-direct-third-party-imports': 'error',
     },
   },
-    {
+  {
     name: 'Tests',
     files: ['**/*.test.ts'],
     rules: {

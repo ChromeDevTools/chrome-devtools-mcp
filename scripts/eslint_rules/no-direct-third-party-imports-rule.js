@@ -22,11 +22,15 @@
  */
 
 import {readdirSync, readFileSync} from 'node:fs';
-import {join, dirname} from 'node:path';
-import {fileURLToPath} from 'node:url';
+import {join} from 'node:path';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const THIRD_PARTY_DIR = join(__dirname, '..', '..', 'src', 'third_party');
+const THIRD_PARTY_DIR = join(
+  import.meta.dirname,
+  '..',
+  '..',
+  'src',
+  'third_party',
+);
 
 /**
  * Parse all .ts files in src/third_party/ and extract the bare package names
@@ -60,7 +64,9 @@ function discoverBundledPackages() {
         }
         // Extract the bare package name (handle scoped packages like @foo/bar).
         const parts = source.split('/');
-        const pkg = source.startsWith('@') ? parts.slice(0, 2).join('/') : parts[0];
+        const pkg = source.startsWith('@')
+          ? parts.slice(0, 2).join('/')
+          : parts[0];
         packages.add(pkg);
       }
     }
@@ -100,7 +106,7 @@ export default {
   },
   defaultOptions: [],
   create(context) {
-    const filename = context.getFilename();
+    const filename = context.filename;
     if (isThirdPartyBarrel(filename)) {
       return {};
     }
