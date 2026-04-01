@@ -77,7 +77,9 @@ Example with arguments: \`(el) => {
         }
 
         const worker = await getWebWorker(context, serviceWorkerId);
-        await performEvaluation(worker, fnString, [], response);
+        await context.getSelectedMcpPage().waitForEventsAfterAction(async () => {
+          await performEvaluation(worker, fnString, [], response);
+        });
         return;
       }
 
