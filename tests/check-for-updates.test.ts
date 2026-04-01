@@ -22,11 +22,11 @@ describe('checkForUpdates', () => {
 
   it('notifies if cache exists and version is different', async () => {
     sinon.stub(os, 'homedir').returns('/home/user');
+    sinon.stub(fs, 'stat').resolves({mtimeMs: Date.now()} as any);
     sinon.stub(fs, 'readFile').callsFake(async filePath => {
       if (filePath.toString().includes('latest.json')) {
         return JSON.stringify({
           version: '99.9.9',
-          timestamp: Date.now(),
         });
       }
       throw new Error(`File not found: ${filePath}`);
@@ -46,11 +46,11 @@ describe('checkForUpdates', () => {
 
   it('does not spawn fetch process if cache is fresh', async () => {
     sinon.stub(os, 'homedir').returns('/home/user');
+    sinon.stub(fs, 'stat').resolves({mtimeMs: Date.now()} as any);
     sinon.stub(fs, 'readFile').callsFake(async filePath => {
       if (filePath.toString().includes('latest.json')) {
         return JSON.stringify({
           version: VERSION,
-          timestamp: Date.now(),
         });
       }
       throw new Error(`File not found: ${filePath}`);
@@ -64,11 +64,13 @@ describe('checkForUpdates', () => {
 
   it('spawns detached process if cache is stale', async () => {
     sinon.stub(os, 'homedir').returns('/home/user');
+    sinon.stub(fs, 'stat').resolves({
+      mtimeMs: Date.now() - 25 * 60 * 60 * 1000, // 25 hours ago
+    } as any);
     sinon.stub(fs, 'readFile').callsFake(async filePath => {
       if (filePath.toString().includes('latest.json')) {
         return JSON.stringify({
           version: VERSION,
-          timestamp: Date.now() - 25 * 60 * 60 * 1000, // 25 hours ago
         });
       }
       throw new Error(`File not found: ${filePath}`);
@@ -83,7 +85,9 @@ describe('checkForUpdates', () => {
 
     assert.ok(spawnStub.calledOnce);
     assert.strictEqual(spawnStub.firstCall.args[0], process.execPath);
-    assert.ok(spawnStub.firstCall.args[1][0]?.includes('check-latest-version.js'));
+    assert.ok(
+      spawnStub.firstCall.args[1][0]?.includes('check-latest-version.js'),
+    );
     assert.ok(spawnStub.firstCall.args[1][1]?.includes('latest.json'));
     assert.strictEqual(spawnStub.firstCall.args[2]?.detached, true);
     assert.ok(unrefSpy.calledOnce);
@@ -91,6 +95,7 @@ describe('checkForUpdates', () => {
 
   it('spawns detached process if cache is missing', async () => {
     sinon.stub(os, 'homedir').returns('/home/user');
+    sinon.stub(fs, 'stat').rejects(new Error('File not found'));
     sinon.stub(fs, 'readFile').callsFake(async filePath => {
       throw new Error(`File not found: ${filePath}`);
     });
@@ -104,7 +109,9 @@ describe('checkForUpdates', () => {
 
     assert.ok(spawnStub.calledOnce);
     assert.strictEqual(spawnStub.firstCall.args[0], process.execPath);
-    assert.ok(spawnStub.firstCall.args[1][0]?.includes('check-latest-version.js'));
+    assert.ok(
+      spawnStub.firstCall.args[1][0]?.includes('check-latest-version.js'),
+    );
     assert.ok(spawnStub.firstCall.args[1][1]?.includes('latest.json'));
     assert.strictEqual(spawnStub.firstCall.args[2]?.detached, true);
     assert.ok(unrefSpy.calledOnce);

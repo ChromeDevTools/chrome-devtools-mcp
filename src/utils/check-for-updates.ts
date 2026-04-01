@@ -24,22 +24,24 @@ export async function checkForUpdates(message: string) {
     'latest.json',
   );
 
-  let cache: {version: string; timestamp: number} | undefined;
+  let cachedVersion: string | undefined;
+  let stats: {mtimeMs: number} | undefined;
   try {
+    stats = await fs.stat(cachePath);
     const data = await fs.readFile(cachePath, 'utf8');
-    cache = JSON.parse(data);
+    cachedVersion = JSON.parse(data).version;
   } catch {
     // Ignore errors reading cache.
   }
 
-  if (cache && typeof cache.version === 'string' && cache.version !== VERSION) {
+  if (cachedVersion && cachedVersion !== VERSION) {
     console.warn(
-      `\nUpdate available: ${VERSION} -> ${cache.version}\n${message}\n`,
+      `\nUpdate available: ${VERSION} -> ${cachedVersion}\n${message}\n`,
     );
   }
 
   const now = Date.now();
-  if (cache && now - cache.timestamp < 24 * 60 * 60 * 1000) {
+  if (stats && now - stats.mtimeMs < 24 * 60 * 60 * 1000) {
     return;
   }
 

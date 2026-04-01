@@ -26,7 +26,7 @@ if (cachePath) {
       await fs.mkdir(path.dirname(cachePath), {recursive: true});
       await fs.writeFile(
         cachePath,
-        JSON.stringify({version: data.version, timestamp: Date.now()}),
+        JSON.stringify({version: data.version}),
       );
     }
   } catch {
