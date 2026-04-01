@@ -217,6 +217,7 @@ async function fillFormElement(
   }
 }
 
+// here
 export const fill = definePageTool({
   name: 'fill',
   description: `Type text into a input, text area or select an option from a <select> element.`,
@@ -321,6 +322,7 @@ export const fillForm = definePageTool({
   schema: {
     elements: zod
       .array(
+        // eslint-disable-next-line @local/enforce-zod-schema
         zod.object({
           uid: zod.string().describe('The uid of the element to fill out'),
           value: zod.string().describe('Value for the element'),

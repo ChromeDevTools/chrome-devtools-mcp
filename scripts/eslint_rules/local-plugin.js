@@ -5,5 +5,13 @@
  */
 
 import checkLicenseRule from './check-license-rule.js';
+import enforceZodSchemaRule from './enforce-zod-schema-rule.js';
+import noDirectThirdPartyImportsRule from './no-direct-third-party-imports-rule.js';
 
-export default {rules: {'check-license': checkLicenseRule}};
+export default {
+  rules: {
+    'check-license': checkLicenseRule,
+    'no-direct-third-party-imports': noDirectThirdPartyImportsRule,
+    'enforce-zod-schema': enforceZodSchemaRule,
+  },
+};
