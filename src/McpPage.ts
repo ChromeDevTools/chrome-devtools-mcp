@@ -95,6 +95,7 @@ export class McpPage implements ContextPage {
     return this.emulationSettings.colorScheme ?? null;
   }
 
+  // Public for testability: tests spy on this method to verify throttle multipliers.
   createWaitForHelper(
     cpuMultiplier: number,
     networkMultiplier: number,
