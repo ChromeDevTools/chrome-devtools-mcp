@@ -81,9 +81,10 @@ Example with arguments: \`(el) => {
         return;
       }
 
-      const mcpPage = cliArgs?.pageIdRouting
-        ? context.getPageById(request.params.pageId)
-        : context.getSelectedMcpPage();
+      const mcpPage =
+        cliArgs?.pageIdRouting && request.params.pageId
+          ? context.getPageById(request.params.pageId)
+          : context.getSelectedMcpPage();
       const page: Page = mcpPage.pptrPage;
 
       const args: Array<JSHandle<unknown>> = [];
