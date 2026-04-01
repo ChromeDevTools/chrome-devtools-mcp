@@ -12,7 +12,7 @@ import {SnapshotFormatter} from './formatters/SnapshotFormatter.js';
 import type {McpContext} from './McpContext.js';
 import type {McpPage} from './McpPage.js';
 import {UncaughtError} from './PageCollector.js';
-import {DevTools} from './third_party/index.js';
+import {DevTools, type Protocol} from './third_party/index.js';
 import type {
   ConsoleMessage,
   ImageContent,
@@ -20,6 +20,7 @@ import type {
   ResourceType,
   TextContent,
 } from './third_party/index.js';
+import type {ToolGroup, ToolDefinition} from './tools/inPage.js';
 import {handleDialog} from './tools/pages.js';
 import type {
   DevToolsData,
@@ -38,6 +39,59 @@ interface TraceInsightData {
   trace: TraceResult;
   insightSetId: string;
   insightName: InsightName;
+}
+
+async function getToolGroup(
+  page: McpPage,
+): Promise<ToolGroup<ToolDefinition> | undefined> {
+  // Check if there is a `devtoolstooldiscovery` event listener
+  const windowHandle = await page.pptrPage.evaluateHandle(() => window);
+  // @ts-expect-error internal API
+  const client = page.pptrPage._client();
+  const {listeners}: {listeners: Protocol.DOMDebugger.EventListener[]} =
+    await client.send('DOMDebugger.getEventListeners', {
+      objectId: windowHandle.remoteObject().objectId,
+    });
+  if (listeners.find(l => l.type === 'devtoolstooldiscovery') === undefined) {
+    return;
+  }
+
+  const toolGroup = await page.pptrPage.evaluate(() => {
+    return new Promise<ToolGroup<ToolDefinition> | undefined>(resolve => {
+      const event = new CustomEvent('devtoolstooldiscovery');
+      // @ts-expect-error Adding custom property
+      event.respondWith = (toolGroup: ToolGroup) => {
+        if (!window.__dtmcp) {
+          window.__dtmcp = {};
+        }
+        window.__dtmcp.toolGroup = toolGroup;
+
+        // When receiving a toolGroup for the first time, expose a simple execution helper
+        if (!window.__dtmcp.executeTool) {
+          window.__dtmcp.executeTool = async (toolName, args) => {
+            if (!window.__dtmcp?.toolGroup) {
+              throw new Error('No tools found on the page');
+            }
+            const tool = window.__dtmcp.toolGroup.tools.find(
+              t => t.name === toolName,
+            );
+            if (!tool) {
+              throw new Error(`Tool ${toolName} not found`);
+            }
+            return await tool.execute(args);
+          };
+        }
+
+        resolve(toolGroup);
+      };
+      window.dispatchEvent(event);
+      // If the page does not synchronously call `event.respondWith`, return instead of timing out
+      setTimeout(() => {
+        resolve(undefined);
+      }, 0);
+    });
+  });
+  return toolGroup;
 }
 
 export class McpResponse implements Response {
@@ -70,6 +124,7 @@ export class McpResponse implements Response {
     includePreservedMessages?: boolean;
   };
   #listExtensions?: boolean;
+  #listInPageTools?: boolean;
   #devToolsData?: DevToolsData;
   #tabId?: string;
   #args: ParsedArguments;
@@ -108,6 +163,12 @@ export class McpResponse implements Response {
 
   setListExtensions(): void {
     this.#listExtensions = true;
+  }
+
+  setListInPageTools(): void {
+    if (this.#args.categoryInPageTools) {
+      this.#listInPageTools = true;
+    }
   }
 
   setIncludeNetworkRequests(
@@ -357,6 +418,14 @@ export class McpResponse implements Response {
     if (this.#listExtensions) {
       extensions = context.listExtensions();
     }
+
+    let inPageTools: ToolGroup<ToolDefinition> | undefined;
+    if (this.#listInPageTools) {
+      const page = this.#page ?? context.getSelectedMcpPage();
+      inPageTools = await getToolGroup(page);
+      page.inPageTools = inPageTools;
+    }
+
     let consoleMessages: Array<ConsoleFormatter | IssueFormatter> | undefined;
     if (this.#consoleDataOptions?.include) {
       if (!this.#page) {
@@ -459,6 +528,7 @@ export class McpResponse implements Response {
       traceSummary: this.#attachedTraceSummary,
       extensions,
       lighthouseResult: this.#attachedLighthouseResult,
+      inPageTools,
     });
   }
 
@@ -475,6 +545,7 @@ export class McpResponse implements Response {
       traceInsight?: TraceInsightData;
       extensions?: InstalledExtension[];
       lighthouseResult?: LighthouseData;
+      inPageTools?: ToolGroup<ToolDefinition>;
     },
   ): {content: Array<TextContent | ImageContent>; structuredContent: object} {
     const structuredContent: {
@@ -489,6 +560,7 @@ export class McpResponse implements Response {
       traceInsights?: Array<{insightName: string; insightKey: string}>;
       lighthouseResult?: object;
       extensions?: object[];
+      inPageTools?: object;
       message?: string;
       networkConditions?: string;
       navigationTimeout?: number;
@@ -723,6 +795,26 @@ Call ${handleDialog.name} to handle it before continuing.`);
           })
           .join('\n');
         response.push(extensionsMessage);
+      }
+    }
+
+    if (this.#listInPageTools) {
+      structuredContent.inPageTools = data.inPageTools ?? undefined;
+      response.push('## In-page tools');
+      if (!data.inPageTools || !data.inPageTools.tools) {
+        response.push('No in-page tools available.');
+      } else {
+        const toolGroup = data.inPageTools;
+        response.push(`${toolGroup.name}: ${toolGroup.description}`);
+        response.push('Available tools:');
+        const toolDefinitionsMessage = toolGroup.tools
+          .map(tool => {
+            return `name="${tool.name}", description="${tool.description}", inputSchema=${JSON.stringify(
+              tool.inputSchema,
+            )}`;
+          })
+          .join('\n');
+        response.push(toolDefinitionsMessage);
       }
     }
 

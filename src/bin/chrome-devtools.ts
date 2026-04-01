@@ -6,6 +6,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+process.title = 'chrome-devtools';
+
 import process from 'node:process';
 
 import type {Options, PositionalOptions} from 'yargs';
@@ -41,7 +43,7 @@ delete startCliOptions.autoConnect;
 // Missing CLI serialization.
 delete startCliOptions.viewport;
 // CLI is generated based on the default tool definitions. To enable conditional
-// tools, they needs to be enabled during CLI generation.
+// tools, they need to be enabled during CLI generation.
 delete startCliOptions.experimentalPageIdRouting;
 delete startCliOptions.experimentalVision;
 delete startCliOptions.experimentalInteropTools;
@@ -57,9 +59,11 @@ if (!('default' in cliOptions.headless)) {
   throw new Error('headless cli option unexpectedly does not have a default');
 }
 if ('default' in cliOptions.isolated) {
-  throw new Error('headless cli option unexpectedly does not have a default');
+  throw new Error('isolated cli option unexpectedly has a default');
 }
 startCliOptions.headless!.default = true;
+startCliOptions.isolated!.description =
+  'If specified, creates a temporary user-data-dir that is automatically cleaned up after the browser is closed. Defaults to true unless userDataDir is provided.';
 
 const y = yargs(hideBin(process.argv))
   .scriptName('chrome-devtools')
@@ -90,7 +94,7 @@ y.command(
       await stopDaemon();
     }
     // Defaults but we do not want to affect the yargs conflict resolution.
-    if (argv.isolated === undefined) {
+    if (argv.isolated === undefined && argv.userDataDir === undefined) {
       argv.isolated = true;
     }
     if (argv.headless === undefined) {

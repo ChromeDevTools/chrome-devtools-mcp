@@ -199,6 +199,17 @@ startup_timeout_ms = 20_000
 </details>
 
 <details>
+  <summary>Command Code</summary>
+  
+Use the Command Code CLI to add the Chrome DevTools MCP server (<a href="https://commandcode.ai/docs/mcp">MCP guide</a>):
+
+```bash
+cmd mcp add chrome-devtools --scope user npx chrome-devtools-mcp@latest
+```
+
+</details>
+
+<details>
   <summary>Copilot CLI</summary>
 
 Start Copilot CLI:
@@ -526,6 +537,10 @@ The Chrome DevTools MCP server supports the following configuration option:
 
 - **`--acceptInsecureCerts`/ `--accept-insecure-certs`**
   If enabled, ignores errors relative to self-signed and expired certificates. Use with caution.
+  - **Type:** boolean
+
+- **`--experimentalVision`/ `--experimental-vision`**
+  Whether to enable coordinate-based tools such as click_at(x,y). Usually requires a computer-use model able to produce accurate coordinates by looking at screenshots.
   - **Type:** boolean
 
 - **`--experimentalScreencast`/ `--experimental-screencast`**

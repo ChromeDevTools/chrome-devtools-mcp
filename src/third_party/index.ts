@@ -19,6 +19,7 @@ export {hideBin} from 'yargs/helpers';
 export {default as debug} from 'debug';
 export type {Debugger} from 'debug';
 export {McpServer} from '@modelcontextprotocol/sdk/server/mcp.js';
+export {type ShapeOutput} from '@modelcontextprotocol/sdk/server/zod-compat.js';
 export {StdioServerTransport} from '@modelcontextprotocol/sdk/server/stdio.js';
 export {StdioClientTransport} from '@modelcontextprotocol/sdk/client/stdio.js';
 export {Client} from '@modelcontextprotocol/sdk/client/index.js';
@@ -29,6 +30,7 @@ export {
   type TextContent,
 } from '@modelcontextprotocol/sdk/types.js';
 export {z as zod} from 'zod';
+export {default as ajv} from 'ajv';
 export {
   Locator,
   PredefinedNetworkConditions,
@@ -39,6 +41,7 @@ export {default as puppeteer} from 'puppeteer-core';
 export type * from 'puppeteer-core';
 export {PipeTransport} from 'puppeteer-core/internal/node/PipeTransport.js';
 export type {CdpPage} from 'puppeteer-core/internal/cdp/Page.js';
+export type {JSONSchema7} from 'json-schema';
 export {
   resolveDefaultUserDataDir,
   detectBrowserPlatform,

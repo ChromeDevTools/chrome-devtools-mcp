@@ -75,13 +75,13 @@ describe('McpContext', () => {
         cpuThrottlingRate: 2,
         networkConditions: 'Slow 3G',
       });
-      const stub = sinon.spy(context, 'getWaitForHelper');
+      const stub = sinon.spy(page, 'createWaitForHelper');
 
-      await context.waitForEventsAfterAction(async () => {
+      await page.waitForEventsAfterAction(async () => {
         // trigger the waiting only
       });
 
-      sinon.assert.calledWithExactly(stub, page.pptrPage, 2, 10);
+      sinon.assert.calledWithExactly(stub, 2, 10);
     });
   });
 

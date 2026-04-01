@@ -115,12 +115,27 @@ describe('e2e', () => {
     });
   });
 
+  it('has experimental in-Page tools', async () => {
+    await withClient(
+      async client => {
+        const {tools} = await client.listTools();
+        const listInPageTools = tools.find(
+          t => t.name === 'list_in_page_tools',
+        );
+        assert.ok(listInPageTools);
+      },
+      ['--category-in-page-tools'],
+    );
+  });
+
   it('has experimental extensions tools', async () => {
     await withClient(
       async client => {
         const {tools} = await client.listTools();
-        const clickAt = tools.find(t => t.name === 'install_extension');
-        assert.ok(clickAt);
+        const installExtension = tools.find(
+          t => t.name === 'install_extension',
+        );
+        assert.ok(installExtension);
       },
       ['--category-extensions'],
     );

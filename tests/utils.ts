@@ -5,6 +5,8 @@
  */
 
 import assert from 'node:assert';
+import {spawn} from 'node:child_process';
+import path from 'node:path';
 
 import type {CallToolResult} from '@modelcontextprotocol/sdk/types.js';
 import logger from 'debug';
@@ -330,4 +332,42 @@ export function getMockBrowser(): Browser {
     },
     ...mockListener(),
   } as Browser;
+}
+
+export const CLI_PATH = path.resolve('build/src/bin/chrome-devtools.js');
+
+export async function runCli(
+  args: string[],
+): Promise<{status: number | null; stdout: string; stderr: string}> {
+  return new Promise((resolve, reject) => {
+    const child = spawn('node', [CLI_PATH, ...args]);
+    let stdout = '';
+    let stderr = '';
+    child.stdout.on('data', chunk => {
+      stdout += chunk;
+      process.stdout.write(chunk);
+    });
+    child.stderr.on('data', chunk => {
+      stderr += chunk;
+      process.stderr.write(chunk);
+    });
+    child.on('close', status => resolve({status, stdout, stderr}));
+    child.on('error', reject);
+  });
+}
+
+export async function assertDaemonIsNotRunning() {
+  const result = await runCli(['status']);
+  assert.strictEqual(
+    result.stdout,
+    'chrome-devtools-mcp daemon is not running.\n',
+  );
+}
+
+export async function assertDaemonIsRunning() {
+  const result = await runCli(['status']);
+  assert.ok(
+    result.stdout.startsWith('chrome-devtools-mcp daemon is running.\n'),
+    'chrome-devtools-mcp daemon is not running',
+  );
 }

@@ -160,8 +160,9 @@ export const cliOptions = {
   },
   experimentalVision: {
     type: 'boolean',
-    describe: 'Whether to enable vision tools',
-    hidden: true,
+    describe:
+      'Whether to enable coordinate-based tools such as click_at(x,y). Usually requires a computer-use model able to produce accurate coordinates by looking at screenshots.',
+    hidden: false,
   },
   experimentalStructuredContent: {
     type: 'boolean',
@@ -215,6 +216,12 @@ export const cliOptions = {
     conflicts: ['browserUrl', 'autoConnect', 'wsEndpoint'],
     describe:
       'Set to true to include tools related to extensions. Note: This feature is only supported with a pipe connection. autoConnect is not supported.',
+  },
+  categoryInPageTools: {
+    type: 'boolean',
+    hidden: true,
+    describe:
+      'Set to true to enable tools exposed by the inspected page itself',
   },
   performanceCrux: {
     type: 'boolean',

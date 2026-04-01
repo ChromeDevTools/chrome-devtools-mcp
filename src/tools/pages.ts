@@ -16,7 +16,7 @@ import {
   timeoutSchema,
 } from './ToolDefinition.js';
 
-export const listPages = definePageTool(args => {
+export const listPages = defineTool(args => {
   return {
     name: 'list_pages',
     description: `Get a list of pages ${args?.categoryExtensions ? 'including extension service workers' : ''} open in the browser.`,
@@ -27,6 +27,7 @@ export const listPages = definePageTool(args => {
     schema: {},
     handler: async (_request, response) => {
       response.setIncludePages(true);
+      response.setListInPageTools();
     },
   };
 });
@@ -53,6 +54,7 @@ export const selectPage = defineTool({
     const page = context.getPageById(request.params.pageId);
     context.selectPage(page);
     response.setIncludePages(true);
+    response.setListInPageTools();
     if (request.params.bringToFront) {
       await page.pptrPage.bringToFront();
     }
@@ -82,6 +84,7 @@ export const closePage = defineTool({
       }
     }
     response.setIncludePages(true);
+    response.setListInPageTools();
   },
 });
 
@@ -116,7 +119,7 @@ export const newPage = defineTool({
       request.params.isolatedContext,
     );
 
-    await context.waitForEventsAfterAction(
+    await page.waitForEventsAfterAction(
       async () => {
         await page.pptrPage.goto(request.params.url, {
           timeout: request.params.timeout,
@@ -126,6 +129,7 @@ export const newPage = defineTool({
     );
 
     response.setIncludePages(true);
+    response.setListInPageTools();
   },
 });
 
@@ -162,7 +166,7 @@ export const navigatePage = definePageTool({
       ),
     ...timeoutSchema,
   },
-  handler: async (request, response, context) => {
+  handler: async (request, response) => {
     const page = request.page;
     const options = {
       timeout: request.params.timeout,
@@ -202,7 +206,7 @@ export const navigatePage = definePageTool({
     page.pptrPage.on('dialog', dialogHandler);
 
     try {
-      await context.waitForEventsAfterAction(
+      await page.waitForEventsAfterAction(
         async () => {
           switch (request.params.type) {
             case 'url':
@@ -275,6 +279,7 @@ export const navigatePage = definePageTool({
     }
 
     response.setIncludePages(true);
+    response.setListInPageTools();
   },
 });
 

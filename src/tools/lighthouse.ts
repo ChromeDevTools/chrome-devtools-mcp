@@ -25,7 +25,7 @@ export const lighthouseAudit = definePageTool({
   description: `Get Lighthouse score and reports for accessibility, SEO and best practices. This excludes performance. For performance audits, run ${startTrace.name}`,
   annotations: {
     category: ToolCategory.DEBUGGING,
-    readOnlyHint: true,
+    readOnlyHint: false,
   },
   schema: {
     mode: zod

@@ -1,6 +1,6 @@
 {
   "name": "chrome-devtools-mcp",
-  "version": "0.20.3",
+  "version": "0.21.0",
   "description": "MCP server for Chrome DevTools",
   "type": "module",
   "bin": {
@@ -16,7 +16,7 @@
     "typecheck": "tsc --noEmit",
     "format": "eslint --cache --fix . && prettier --write --cache .",
     "check-format": "eslint --cache . && prettier --check --cache .;",
-    "gen": "npm run build && npm run docs:generate && npm run cli:generate && npm run format",
+    "gen": "npm run build && npm run docs:generate && npm run cli:generate && npm run update-tool-call-metrics && npm run format",
     "docs:generate": "node --experimental-strip-types scripts/generate-docs.ts",
     "start": "npm run build && node build/src/index.js",
     "start-debug": "DEBUG=mcp:* DEBUG_COLORS=false npm run build && node build/src/index.js",
@@ -27,6 +27,7 @@
     "prepare": "node --experimental-strip-types scripts/prepare.ts",
     "verify-server-json-version": "node --experimental-strip-types scripts/verify-server-json-version.ts",
     "update-lighthouse": "node --experimental-strip-types scripts/update-lighthouse.ts",
+    "update-tool-call-metrics": "node --experimental-strip-types scripts/update_tool_call_metrics.ts",
     "verify-npm-package": "node scripts/verify-npm-package.mjs",
     "eval": "npm run build && node --experimental-strip-types scripts/eval_gemini.ts",
     "count-tokens": "node --experimental-strip-types scripts/count_tokens.ts"
@@ -47,7 +48,7 @@
   "devDependencies": {
     "@eslint/js": "^9.35.0",
     "@google/genai": "^1.37.0",
-    "@modelcontextprotocol/sdk": "1.28.0",
+    "@modelcontextprotocol/sdk": "1.29.0",
     "@rollup/plugin-commonjs": "^29.0.0",
     "@rollup/plugin-json": "^6.1.0",
     "@rollup/plugin-node-resolve": "^16.0.3",
@@ -69,12 +70,12 @@
     "lighthouse": "13.0.3",
     "prettier": "^3.6.2",
     "puppeteer": "24.40.0",
-    "rollup": "4.59.1",
+    "rollup": "4.60.1",
     "rollup-plugin-cleanup": "^3.2.1",
     "rollup-plugin-license": "^3.6.0",
     "sinon": "^21.0.0",
     "tiktoken": "^1.0.22",
-    "typescript": "^5.9.2",
+    "typescript": "^6.0.2",
     "typescript-eslint": "^8.43.0",
     "yargs": "18.0.0"
   },

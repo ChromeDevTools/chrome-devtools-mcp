@@ -24,6 +24,10 @@ import type {InstalledExtension} from '../utils/ExtensionRegistry.js';
 import type {PaginationOptions} from '../utils/types.js';
 
 import type {ToolCategory} from './categories.js';
+import type {
+  ToolGroup,
+  ToolDefinition as InPageToolDefinition,
+} from './inPage.js';
 
 export interface BaseToolDefinition<
   Schema extends zod.ZodRawShape = zod.ZodRawShape,
@@ -129,6 +133,7 @@ export interface Response {
   ): void;
   setListExtensions(): void;
   attachLighthouseResult(result: LighthouseData): void;
+  setListInPageTools(): void;
 }
 
 /**
@@ -167,10 +172,6 @@ export type Context = Readonly<{
     data: Uint8Array<ArrayBufferLike>,
     filename: string,
   ): Promise<{filename: string}>;
-  waitForEventsAfterAction(
-    action: () => Promise<unknown>,
-    options?: {timeout?: number},
-  ): Promise<void>;
   waitForTextOnPage(
     text: string[],
     timeout?: number,
@@ -207,6 +208,11 @@ export type ContextPage = Readonly<{
 
   getDialog(): Dialog | undefined;
   clearDialog(): void;
+  waitForEventsAfterAction(
+    action: () => Promise<unknown>,
+    options?: {timeout?: number},
+  ): Promise<void>;
+  getInPageTools(): ToolGroup<InPageToolDefinition> | undefined;
 }>;
 
 export function defineTool<Schema extends zod.ZodRawShape>(
