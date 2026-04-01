@@ -160,8 +160,9 @@ export const cliOptions = {
   },
   experimentalVision: {
     type: 'boolean',
-    describe: 'Whether to enable vision tools',
-    hidden: true,
+    describe:
+      'Whether to enable coordinate-based tools such as click_at(x,y). Usually requires a computer-use model able to produce accurate coordinates by looking at screenshots.',
+    hidden: false,
   },
   experimentalStructuredContent: {
     type: 'boolean',
