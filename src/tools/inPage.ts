@@ -71,7 +71,7 @@ export const executeInPageTool = definePageTool({
       .describe('The JSON-stringified parameters to pass to the tool'),
   },
   handler: async (request, response, context) => {
-    const page = context.getSelectedMcpPage();
+    const page = request.page;
     const toolName = request.params.toolName;
     let params: Record<string, unknown> = {};
     if (request.params.params) {
