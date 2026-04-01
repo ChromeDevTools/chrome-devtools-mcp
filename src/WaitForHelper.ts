@@ -10,7 +10,7 @@ import type {PredefinedNetworkConditions} from './third_party/index.js';
 
 export class WaitForHelper {
   #abortController = new AbortController();
-  #page: CdpPage;
+  #page: Page;
   #stableDomTimeout: number;
   #stableDomFor: number;
   #expectNavigationIn: number;
@@ -25,7 +25,7 @@ export class WaitForHelper {
     this.#stableDomFor = 100 * cpuTimeoutMultiplier;
     this.#expectNavigationIn = 100 * cpuTimeoutMultiplier;
     this.#navigationTimeout = 3000 * networkTimeoutMultiplier;
-    this.#page = page as unknown as CdpPage;
+    this.#page = page;
   }
 
   /**
@@ -101,10 +101,11 @@ export class WaitForHelper {
         resolve(true);
       };
 
-      this.#page._client().on('Page.frameStartedNavigating', listener);
+      const client = (this.#page as unknown as CdpPage)._client();
+      client.on('Page.frameStartedNavigating', listener);
       this.#abortController.signal.addEventListener('abort', () => {
         resolve(false);
-        this.#page._client().off('Page.frameStartedNavigating', listener);
+        client.off('Page.frameStartedNavigating', listener);
       });
     });
 
@@ -128,16 +129,18 @@ export class WaitForHelper {
     action: () => Promise<unknown>,
     options?: {timeout?: number; dialog?: 'accept' | 'dismiss'},
   ): Promise<void> {
-    let dialogHandler: ((dialog: Dialog) => void) | undefined;
     if (options?.dialog) {
-      dialogHandler = (dialog: Dialog) => {
+      const dialogHandler = (dialog: Dialog) => {
         if (options.dialog === 'dismiss') {
           void dialog.dismiss();
         } else {
           void dialog.accept();
         }
       };
-      (this.#page as unknown as Page).on('dialog', dialogHandler);
+      this.#page.on('dialog', dialogHandler);
+      this.#abortController.signal.addEventListener('abort', () => {
+        this.#page.off('dialog', dialogHandler);
+      });
     }
 
     const navigationFinished = this.waitForNavigationStarted()
@@ -170,9 +173,6 @@ export class WaitForHelper {
       logger(error);
     } finally {
       this.#abortController.abort();
-      if (options?.dialog && dialogHandler) {
-        (this.#page as unknown as Page).off('dialog', dialogHandler);
-      }
     }
   }
 }
