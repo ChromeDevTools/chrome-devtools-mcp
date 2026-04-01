@@ -19,6 +19,7 @@ import type {
   Page,
   ResourceType,
   TextContent,
+  JSONSchema7Definition,
 } from './third_party/index.js';
 import type {ToolGroup, ToolDefinition} from './tools/inPage.js';
 import {handleDialog} from './tools/pages.js';
@@ -39,6 +40,57 @@ interface TraceInsightData {
   trace: TraceResult;
   insightSetId: string;
   insightName: InsightName;
+}
+
+export function replaceHtmlElementsWithUids(schema: JSONSchema7Definition) {
+  if (typeof schema === 'boolean') {
+    return;
+  }
+
+  let isHtmlElement = false;
+  for (const [key, value] of Object.entries(schema)) {
+    if (key === 'x-mcp-type' && value === 'HTMLElement') {
+      isHtmlElement = true;
+      break;
+    }
+  }
+
+  if (isHtmlElement) {
+    schema.properties = {uid: {type: 'string'}};
+    schema.required = ['uid'];
+  }
+
+  if (schema.properties) {
+    for (const key of Object.keys(schema.properties)) {
+      replaceHtmlElementsWithUids(schema.properties[key]);
+    }
+  }
+
+  if (schema.items) {
+    if (Array.isArray(schema.items)) {
+      for (const item of schema.items) {
+        replaceHtmlElementsWithUids(item);
+      }
+    } else {
+      replaceHtmlElementsWithUids(schema.items);
+    }
+  }
+
+  if (schema.anyOf) {
+    for (const s of schema.anyOf) {
+      replaceHtmlElementsWithUids(s);
+    }
+  }
+  if (schema.allOf) {
+    for (const s of schema.allOf) {
+      replaceHtmlElementsWithUids(s);
+    }
+  }
+  if (schema.oneOf) {
+    for (const s of schema.oneOf) {
+      replaceHtmlElementsWithUids(s);
+    }
+  }
 }
 
 async function getToolGroup(
@@ -91,6 +143,10 @@ async function getToolGroup(
       }, 0);
     });
   });
+
+  for (const tool of toolGroup?.tools ?? []) {
+    replaceHtmlElementsWithUids(tool.inputSchema);
+  }
   return toolGroup;
 }
 
