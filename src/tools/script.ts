@@ -77,11 +77,12 @@ Example with arguments: \`(el) => {
         }
 
         const worker = await getWebWorker(context, serviceWorkerId);
-        await context
-          .getSelectedMcpPage()
-          .waitForEventsAfterAction(async () => {
+        await context.getSelectedMcpPage().waitForEventsAfterAction(
+          async () => {
             await performEvaluation(worker, fnString, [], response);
-          }, {dialog: 'accept'});
+          },
+          {dialog: 'accept'},
+        );
         return;
       }
 
@@ -101,9 +102,12 @@ Example with arguments: \`(el) => {
 
         const evaluatable = await getPageOrFrame(page, frames);
 
-        await mcpPage.waitForEventsAfterAction(async () => {
-          await performEvaluation(evaluatable, fnString, args, response);
-        }, {dialog: 'accept'});
+        await mcpPage.waitForEventsAfterAction(
+          async () => {
+            await performEvaluation(evaluatable, fnString, args, response);
+          },
+          {dialog: 'accept'},
+        );
       } finally {
         void Promise.allSettled(args.map(arg => arg.dispose()));
       }

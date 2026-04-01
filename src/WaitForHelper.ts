@@ -5,7 +5,7 @@
  */
 
 import {logger} from './logger.js';
-import type {Page, Protocol, CdpPage} from './third_party/index.js';
+import type {Page, Protocol, CdpPage, Dialog} from './third_party/index.js';
 import type {PredefinedNetworkConditions} from './third_party/index.js';
 
 export class WaitForHelper {
@@ -128,15 +128,16 @@ export class WaitForHelper {
     action: () => Promise<unknown>,
     options?: {timeout?: number; dialog?: 'accept' | 'dismiss'},
   ): Promise<void> {
-    const dialogHandler = (dialog: any) => {
-      if (options?.dialog === 'dismiss') {
-        void dialog.dismiss();
-      } else {
-        void dialog.accept();
-      }
-    };
+    let dialogHandler: ((dialog: Dialog) => void) | undefined;
     if (options?.dialog) {
-      this.#page.on('dialog', dialogHandler);
+      dialogHandler = (dialog: Dialog) => {
+        if (options.dialog === 'dismiss') {
+          void dialog.dismiss();
+        } else {
+          void dialog.accept();
+        }
+      };
+      (this.#page as unknown as Page).on('dialog', dialogHandler);
     }
 
     const navigationFinished = this.waitForNavigationStarted()
@@ -169,8 +170,8 @@ export class WaitForHelper {
       logger(error);
     } finally {
       this.#abortController.abort();
-      if (options?.dialog) {
-        this.#page.off('dialog', dialogHandler);
+      if (options?.dialog && dialogHandler) {
+        (this.#page as unknown as Page).off('dialog', dialogHandler);
       }
     }
   }
