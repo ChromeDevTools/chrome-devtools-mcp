@@ -20,6 +20,7 @@ describe('inPage', () => {
       await withMcpContext(
         async (response, context) => {
           const page = await context.newPage();
+          response.setPage(page);
 
           await page.pptrPage.evaluate(() => {
             window.__dtmcp = {
@@ -76,6 +77,7 @@ describe('inPage', () => {
       await withMcpContext(
         async (response, context) => {
           const page = await context.newPage();
+          response.setPage(page);
           await page.pptrPage.evaluate(() => {
             window.addEventListener('devtoolstooldiscovery', (e: Event) => {
               // @ts-expect-error Event has `respondWith`
@@ -105,6 +107,7 @@ describe('inPage', () => {
       await withMcpContext(
         async (response, context) => {
           const page = await context.newPage();
+          response.setPage(page);
           await page.pptrPage.evaluate(() => {
             window.addEventListener('devtoolstooldiscovery', () => {
               // do nothing
@@ -133,6 +136,7 @@ describe('inPage', () => {
       await withMcpContext(
         async (response, context) => {
           const page = await context.newPage();
+          response.setPage(page);
           await listInPageTools.handler({params: {}, page}, response, context);
 
           const result = await response.handle('list_in_page_tools', context);
@@ -155,6 +159,7 @@ describe('inPage', () => {
       evaluateFn: () => void,
     ) {
       const page = await context.newPage();
+      response.setPage(page);
       await page.pptrPage.evaluate(evaluateFn);
       await listInPageTools.handler({params: {}, page}, response, context);
       await response.handle('list_in_page_tools', context);

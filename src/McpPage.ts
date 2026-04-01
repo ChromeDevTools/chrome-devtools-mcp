@@ -10,6 +10,7 @@ import type {
   Page,
   Viewport,
 } from './third_party/index.js';
+import type {ToolGroup, ToolDefinition} from './tools/inPage.js';
 import {takeSnapshot} from './tools/snapshot.js';
 import type {ContextPage} from './tools/ToolDefinition.js';
 import type {
@@ -46,6 +47,8 @@ export class McpPage implements ContextPage {
   #dialog?: Dialog;
   #dialogHandler: (dialog: Dialog) => void;
 
+  inPageTools: ToolGroup<ToolDefinition> | undefined;
+
   constructor(page: Page, id: number) {
     this.pptrPage = page;
     this.id = id;
@@ -65,6 +68,10 @@ export class McpPage implements ContextPage {
 
   clearDialog(): void {
     this.#dialog = undefined;
+  }
+
+  getInPageTools(): ToolGroup<ToolDefinition> | undefined {
+    return this.inPageTools;
   }
 
   get networkConditions(): string | null {

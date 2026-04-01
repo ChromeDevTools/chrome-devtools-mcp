@@ -70,8 +70,7 @@ export const executeInPageTool = definePageTool({
       .optional()
       .describe('The JSON-stringified parameters to pass to the tool'),
   },
-  handler: async (request, response, context) => {
-    const page = context.getSelectedMcpPage();
+  handler: async (request, response) => {
     const toolName = request.params.toolName;
     let params: Record<string, unknown> = {};
     if (request.params.params) {
@@ -88,7 +87,7 @@ export const executeInPageTool = definePageTool({
       }
     }
 
-    const toolGroup = context.getInPageTools();
+    const toolGroup = request.page.getInPageTools();
     const tool = toolGroup?.tools.find(t => t.name === toolName);
     if (!tool) {
       throw new Error(`Tool ${toolName} not found`);
@@ -102,7 +101,7 @@ export const executeInPageTool = definePageTool({
       );
     }
 
-    const result = await page.pptrPage.evaluate(
+    const result = await request.page.pptrPage.evaluate(
       async (name, args) => {
         if (!window.__dtmcp?.executeTool) {
           throw new Error('No tools found on the page');
