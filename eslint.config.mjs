@@ -136,7 +136,7 @@ export default defineConfig([
     },
   },
   {
-    name: 'Tool schema restrictions',
+    name: 'Tools definitions',
     files: ['src/tools/**/*.ts'],
     ignores: ['src/tools/input.ts'],
     rules: {
