@@ -55,10 +55,6 @@ async function setupMCPClient() {
   console.log('Setting up MCP client connection...');
 
   // Create stdio transport for chrome-devtools-mcp
-  // Workaround for https://github.com/modelcontextprotocol/typescript-sdk/blob/v1.x/src/client/stdio.ts#L128
-  // which causes the console window to show on Windows.
-  // @ts-expect-error no types for type.
-  process.type = 'mcp-client';
   mcpTransport = new StdioClientTransport({
     command: process.execPath,
     args: [INDEX_SCRIPT_PATH, ...mcpServerArgs],
