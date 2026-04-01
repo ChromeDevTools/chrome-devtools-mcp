@@ -322,6 +322,7 @@ export const fillForm = definePageTool({
   schema: {
     elements: zod
       .array(
+        // eslint-disable-next-line @local/enforce-zod-schema
         zod.object({
           uid: zod.string().describe('The uid of the element to fill out'),
           value: zod.string().describe('Value for the element'),
