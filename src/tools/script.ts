@@ -46,7 +46,7 @@ Example with arguments: \`(el) => {
         )
         .optional()
         .describe(`An optional list of arguments to pass to the function.`),
-      ...pageIdSchema,
+      ...(cliArgs?.pageIdRouting ? pageIdSchema : {}),
       ...(cliArgs?.categoryExtensions
         ? {
             serviceWorkerId: zod
@@ -81,7 +81,7 @@ Example with arguments: \`(el) => {
         return;
       }
 
-      const mcpPage = request.params.pageId
+      const mcpPage = cliArgs?.pageIdRouting
         ? context.getPageById(request.params.pageId)
         : context.getSelectedMcpPage();
       const page: Page = mcpPage.pptrPage;

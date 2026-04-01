@@ -44,7 +44,6 @@ delete startCliOptions.autoConnect;
 delete startCliOptions.viewport;
 // CLI is generated based on the default tool definitions. To enable conditional
 // tools, they need to be enabled during CLI generation.
-delete startCliOptions.experimentalPageIdRouting;
 delete startCliOptions.experimentalVision;
 delete startCliOptions.experimentalInteropTools;
 delete startCliOptions.experimentalScreencast;

@@ -352,7 +352,6 @@ so returned values have to be JSON-serializable.
 }`
 
 - **args** (array) _(optional)_: An optional list of arguments to pass to the function.
-- **pageId** (number) _(optional)_: Targets a specific page by ID. Use [`list_pages`](#list_pages) to get available page IDs. If omitted, operates on the most recently selected page.
 
 ---
 
