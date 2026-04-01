@@ -19,6 +19,10 @@ import type {
   TextSnapshot,
   TextSnapshotNode,
 } from './types.js';
+import {
+  getNetworkMultiplierFromString,
+  WaitForHelper,
+} from './WaitForHelper.js';
 
 /**
  * Per-page state wrapper. Consolidates dialog, snapshot, emulation,
@@ -96,6 +100,25 @@ export class McpPage implements ContextPage {
 
   get colorScheme(): 'dark' | 'light' | null {
     return this.emulationSettings.colorScheme ?? null;
+  }
+
+  // Public for testability: tests spy on this method to verify throttle multipliers.
+  createWaitForHelper(
+    cpuMultiplier: number,
+    networkMultiplier: number,
+  ): WaitForHelper {
+    return new WaitForHelper(this.pptrPage, cpuMultiplier, networkMultiplier);
+  }
+
+  waitForEventsAfterAction(
+    action: () => Promise<unknown>,
+    options?: {timeout?: number},
+  ): Promise<void> {
+    const helper = this.createWaitForHelper(
+      this.cpuThrottlingRate,
+      getNetworkMultiplierFromString(this.networkConditions),
+    );
+    return helper.waitForEventsAfterAction(action, options);
   }
 
   dispose(): void {

@@ -119,7 +119,7 @@ export const newPage = defineTool({
       request.params.isolatedContext,
     );
 
-    await context.waitForEventsAfterAction(
+    await page.waitForEventsAfterAction(
       async () => {
         await page.pptrPage.goto(request.params.url, {
           timeout: request.params.timeout,
@@ -166,7 +166,7 @@ export const navigatePage = definePageTool({
       ),
     ...timeoutSchema,
   },
-  handler: async (request, response, context) => {
+  handler: async (request, response) => {
     const page = request.page;
     const options = {
       timeout: request.params.timeout,
@@ -206,7 +206,7 @@ export const navigatePage = definePageTool({
     page.pptrPage.on('dialog', dialogHandler);
 
     try {
-      await context.waitForEventsAfterAction(
+      await page.waitForEventsAfterAction(
         async () => {
           switch (request.params.type) {
             case 'url':

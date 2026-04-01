@@ -172,10 +172,6 @@ export type Context = Readonly<{
     data: Uint8Array<ArrayBufferLike>,
     filename: string,
   ): Promise<{filename: string}>;
-  waitForEventsAfterAction(
-    action: () => Promise<unknown>,
-    options?: {timeout?: number},
-  ): Promise<void>;
   waitForTextOnPage(
     text: string[],
     timeout?: number,
@@ -212,7 +208,10 @@ export type ContextPage = Readonly<{
 
   getDialog(): Dialog | undefined;
   clearDialog(): void;
-
+  waitForEventsAfterAction(
+    action: () => Promise<unknown>,
+    options?: {timeout?: number},
+  ): Promise<void>;
   getInPageTools(): ToolGroup<InPageToolDefinition> | undefined;
 }>;
 

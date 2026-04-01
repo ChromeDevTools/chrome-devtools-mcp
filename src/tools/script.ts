@@ -77,7 +77,11 @@ Example with arguments: \`(el) => {
         }
 
         const worker = await getWebWorker(context, serviceWorkerId);
-        await performEvaluation(worker, fnString, [], response, context);
+        await context
+          .getSelectedMcpPage()
+          .waitForEventsAfterAction(async () => {
+            await performEvaluation(worker, fnString, [], response);
+          });
         return;
       }
 
@@ -97,7 +101,9 @@ Example with arguments: \`(el) => {
 
         const evaluatable = await getPageOrFrame(page, frames);
 
-        await performEvaluation(evaluatable, fnString, args, response, context);
+        await mcpPage.waitForEventsAfterAction(async () => {
+          await performEvaluation(evaluatable, fnString, args, response);
+        });
       } finally {
         void Promise.allSettled(args.map(arg => arg.dispose()));
       }
@@ -110,24 +116,21 @@ const performEvaluation = async (
   fnString: string,
   args: Array<JSHandle<unknown>>,
   response: Response,
-  context: Context,
 ) => {
   const fn = await evaluatable.evaluateHandle(`(${fnString})`);
   try {
-    await context.waitForEventsAfterAction(async () => {
-      const result = await evaluatable.evaluate(
-        async (fn, ...args) => {
-          // @ts-expect-error no types for function fn
-          return JSON.stringify(await fn(...args));
-        },
-        fn,
-        ...args,
-      );
-      response.appendResponseLine('Script ran on page and returned:');
-      response.appendResponseLine('```json');
-      response.appendResponseLine(`${result}`);
-      response.appendResponseLine('```');
-    });
+    const result = await evaluatable.evaluate(
+      async (fn, ...args) => {
+        // @ts-expect-error no types for function fn
+        return JSON.stringify(await fn(...args));
+      },
+      fn,
+      ...args,
+    );
+    response.appendResponseLine('Script ran on page and returned:');
+    response.appendResponseLine('```json');
+    response.appendResponseLine(`${result}`);
+    response.appendResponseLine('```');
   } finally {
     void fn.dispose();
   }
