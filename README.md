@@ -235,6 +235,22 @@ Configure the following fields and press `CTRL+S` to save the configuration:
 <details>
   <summary>Copilot / VS Code</summary>
 
+**Install as a Plugin (Recommended)**
+
+The easiest way to get up and running is to install `chrome-devtools-mcp` as an agent plugin.
+This bundles the **MCP server** and all **skills** together, so your agent gets both the tools
+and the expert guidance it needs to use them effectively.
+
+1.  Open the **Command Palette** (`Cmd+Shift+P` on macOS or `Ctrl+Shift+P` on Windows/Linux).
+2.  Search for and run the **Chat: Install Plugin From Source** command.
+3.  Paste in our repository URL: `https://github.com/ChromeDevTools/chrome-devtools-mcp`
+
+That's it! Your agent is now supercharged with Chrome DevTools capabilities.
+
+---
+
+**Install as an MCP Server (MCP only)**
+
 **Click the button to install:**
 
 [<img src="https://img.shields.io/badge/VS_Code-VS_Code?style=flat-square&label=Install%20Server&color=0098FF" alt="Install in VS Code">](https://vscode.dev/redirect/mcp/install?name=io.github.ChromeDevTools%2Fchrome-devtools-mcp&config=%7B%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22chrome-devtools-mcp%22%5D%2C%22env%22%3A%7B%7D%7D)
@@ -243,8 +259,7 @@ Configure the following fields and press `CTRL+S` to save the configuration:
 
 **Or install manually:**
 
-Follow the MCP install <a href="https://code.visualstudio.com/docs/copilot/chat/mcp-servers#_add-an-mcp-server">guide</a>,
-with the standard config from above. You can also install the Chrome DevTools MCP server using the VS Code CLI:
+Follow the VS Code [MCP configuration guide](https://code.visualstudio.com/docs/copilot/chat/mcp-servers#_add-an-mcp-server) using the standard config from above, or use the CLI:
 
 For macOS and Linux:
 
