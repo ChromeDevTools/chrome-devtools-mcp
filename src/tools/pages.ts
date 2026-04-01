@@ -166,7 +166,7 @@ export const navigatePage = definePageTool({
       ),
     ...timeoutSchema,
   },
-  handler: async (request, response, context) => {
+  handler: async (request, response) => {
     const page = request.page;
     const options = {
       timeout: request.params.timeout,

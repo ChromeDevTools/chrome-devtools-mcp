@@ -6,7 +6,7 @@
 
 import {logger} from './logger.js';
 import type {Page, Protocol, CdpPage} from './third_party/index.js';
-import {PredefinedNetworkConditions} from './third_party/index.js';
+import type {PredefinedNetworkConditions} from './third_party/index.js';
 
 export class WaitForHelper {
   #abortController = new AbortController();
