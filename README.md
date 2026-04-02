@@ -51,12 +51,7 @@ Google handles this data in accordance with the [Google Privacy Policy](https://
 
 Google's collection of usage statistics for Chrome DevTools MCP is independent from the Chrome browser's usage statistics. Opting out of Chrome metrics does not automatically opt you out of this tool, and vice-versa.
 
-Collection is disabled if `CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS` or `CI` env variables are set.
-
-## Update checks
-
-By default, the server periodically checks the npm registry for updates and logs a notification when a newer version is available.
-You can disable these update checks by setting the `CHROME_DEVTOOLS_MCP_NO_UPDATE_CHECKS` environment variable.
+Collection is disabled if CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS or CI env variables are set.
 
 ## Requirements
 
@@ -240,22 +235,6 @@ Configure the following fields and press `CTRL+S` to save the configuration:
 <details>
   <summary>Copilot / VS Code</summary>
 
-**Install as a Plugin (Recommended)**
-
-The easiest way to get up and running is to install `chrome-devtools-mcp` as an agent plugin.
-This bundles the **MCP server** and all **skills** together, so your agent gets both the tools
-and the expert guidance it needs to use them effectively.
-
-1.  Open the **Command Palette** (`Cmd+Shift+P` on macOS or `Ctrl+Shift+P` on Windows/Linux).
-2.  Search for and run the **Chat: Install Plugin From Source** command.
-3.  Paste in our repository URL: `https://github.com/ChromeDevTools/chrome-devtools-mcp`
-
-That's it! Your agent is now supercharged with Chrome DevTools capabilities.
-
----
-
-**Install as an MCP Server (MCP only)**
-
 **Click the button to install:**
 
 [<img src="https://img.shields.io/badge/VS_Code-VS_Code?style=flat-square&label=Install%20Server&color=0098FF" alt="Install in VS Code">](https://vscode.dev/redirect/mcp/install?name=io.github.ChromeDevTools%2Fchrome-devtools-mcp&config=%7B%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22chrome-devtools-mcp%22%5D%2C%22env%22%3A%7B%7D%7D)
@@ -264,7 +243,8 @@ That's it! Your agent is now supercharged with Chrome DevTools capabilities.
 
 **Or install manually:**
 
-Follow the VS Code [MCP configuration guide](https://code.visualstudio.com/docs/copilot/chat/mcp-servers#_add-an-mcp-server) using the standard config from above, or use the CLI:
+Follow the MCP install <a href="https://code.visualstudio.com/docs/copilot/chat/mcp-servers#_add-an-mcp-server">guide</a>,
+with the standard config from above. You can also install the Chrome DevTools MCP server using the VS Code CLI:
 
 For macOS and Linux:
 
@@ -423,10 +403,9 @@ qodercli mcp add -s user chrome-devtools -- npx chrome-devtools-mcp@latest
 <details>
   <summary>Visual Studio</summary>
 
-**Click the button to install:**
+  **Click the button to install:**
 
-[<img src="https://img.shields.io/badge/Visual_Studio-Install-C16FDE?logo=visualstudio&logoColor=white" alt="Install in Visual Studio">](https://vs-open.link/mcp-install?%7B%22name%22%3A%22chrome-devtools%22%2C%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22chrome-devtools-mcp%40latest%22%5D%7D)
-
+  [<img src="https://img.shields.io/badge/Visual_Studio-Install-C16FDE?logo=visualstudio&logoColor=white" alt="Install in Visual Studio">](https://vs-open.link/mcp-install?%7B%22name%22%3A%22chrome-devtools%22%2C%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22chrome-devtools-mcp%40latest%22%5D%7D)
 </details>
 
 <details>
@@ -560,10 +539,6 @@ The Chrome DevTools MCP server supports the following configuration option:
   If enabled, ignores errors relative to self-signed and expired certificates. Use with caution.
   - **Type:** boolean
 
-- **`--experimentalVision`/ `--experimental-vision`**
-  Whether to enable coordinate-based tools such as click_at(x,y). Usually requires a computer-use model able to produce accurate coordinates by looking at screenshots.
-  - **Type:** boolean
-
 - **`--experimentalScreencast`/ `--experimental-screencast`**
   Exposes experimental screencast tools (requires ffmpeg). Install ffmpeg https://www.ffmpeg.org/download.html and ensure it is available in the MCP server PATH.
   - **Type:** boolean
@@ -597,7 +572,7 @@ The Chrome DevTools MCP server supports the following configuration option:
   - **Default:** `true`
 
 - **`--usageStatistics`/ `--usage-statistics`**
-  Set to false to opt-out of usage statistics collection. Google collects usage data to improve the tool, handled under the Google Privacy Policy (https://policies.google.com/privacy). This is independent from Chrome browser metrics. Disabled if `CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS` or `CI` env variables are set.
+  Set to false to opt-out of usage statistics collection. Google collects usage data to improve the tool, handled under the Google Privacy Policy (https://policies.google.com/privacy). This is independent from Chrome browser metrics. Disabled if CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS or CI env variables are set.
   - **Type:** boolean
   - **Default:** `true`
 

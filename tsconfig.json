@@ -5,13 +5,14 @@
       "ES2023",
       "DOM",
       "ES2024.Promise",
-      "ES2025.Iterator",
-      "ES2025.Collection"
+      "ESNext.Iterator",
+      "ESNext.Collection"
     ],
-    "types": ["node", "filesystem"],
+    "module": "esnext",
     "moduleResolution": "bundler",
     "outDir": "./build",
     "rootDir": ".",
+    "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,

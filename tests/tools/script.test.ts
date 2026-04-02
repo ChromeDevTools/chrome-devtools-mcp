@@ -107,8 +107,9 @@ describe('script', () => {
         await evaluateScript().handler(
           {
             params: {
-              function: String(() => {
-                alert('hello');
+              function: String(async () => {
+                setTimeout(() => alert('hello'), 10);
+                await new Promise(r => setTimeout(r, 20));
                 return 'Works';
               }),
             },

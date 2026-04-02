@@ -39,11 +39,6 @@
           "type": "json",
           "path": ".claude-plugin/plugin.json",
           "jsonpath": "version"
-        },
-        {
-          "type": "json",
-          "path": ".github/plugin/plugin.json",
-          "jsonpath": "version"
         }
       ]
     }

@@ -126,14 +126,20 @@ export class WaitForHelper {
 
   async waitForEventsAfterAction(
     action: () => Promise<unknown>,
-    options?: {timeout?: number; handleDialog?: boolean},
+    options?: {timeout?: number; dialog?: 'accept' | 'dismiss'},
   ): Promise<void> {
-    if (options?.handleDialog) {
-      const dialogHandler = (dialog: Pick<Dialog, 'accept'>) => {
-        void dialog.accept();
+    if (options?.dialog) {
+      const dialogHandler = (dialog: Dialog) => {
+        if (options.dialog === 'dismiss') {
+          dialog.dismiss().catch((e: unknown) => logger(e));
+        } else {
+          dialog.accept().catch((e: unknown) => logger(e));
+        }
       };
+      // @ts-expect-error The Dialog type from CdpPage and Page are incompatible due to private properties.
       this.#page.on('dialog', dialogHandler);
       this.#abortController.signal.addEventListener('abort', () => {
+        // @ts-expect-error The Dialog type from CdpPage and Page are incompatible due to private properties.
         this.#page.off('dialog', dialogHandler);
       });
     }
