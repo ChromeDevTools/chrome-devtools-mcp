@@ -47,6 +47,13 @@ export const commands: Commands = {
           'Whether to include a snapshot in the response. Default is false.',
         required: false,
       },
+      pageId: {
+        name: 'pageId',
+        type: 'number',
+        description:
+          'Targets a specific page by ID. Use list_pages to get available page IDs. If omitted, operates on the most recently selected page.',
+        required: false,
+      },
     },
   },
   close_page: {
@@ -84,6 +91,13 @@ export const commands: Commands = {
         type: 'boolean',
         description:
           'Whether to include a snapshot in the response. Default is false.',
+        required: false,
+      },
+      pageId: {
+        name: 'pageId',
+        type: 'number',
+        description:
+          'Targets a specific page by ID. Use list_pages to get available page IDs. If omitted, operates on the most recently selected page.',
         required: false,
       },
     },
@@ -135,6 +149,13 @@ export const commands: Commands = {
           "Emulate device viewports '<width>x<height>x<devicePixelRatio>[,mobile][,touch][,landscape]'. 'touch' and 'mobile' to emulate mobile devices. 'landscape' to emulate landscape mode.",
         required: false,
       },
+      pageId: {
+        name: 'pageId',
+        type: 'number',
+        description:
+          'Targets a specific page by ID. Use list_pages to get available page IDs. If omitted, operates on the most recently selected page.',
+        required: false,
+      },
     },
   },
   evaluate_script: {
@@ -153,6 +174,13 @@ export const commands: Commands = {
         name: 'args',
         type: 'array',
         description: 'An optional list of arguments to pass to the function.',
+        required: false,
+      },
+      pageId: {
+        name: 'pageId',
+        type: 'number',
+        description:
+          'Targets a specific page by ID. Use list_pages to get available page IDs. If omitted, operates on the most recently selected page.',
         required: false,
       },
     },
@@ -182,6 +210,13 @@ export const commands: Commands = {
           'Whether to include a snapshot in the response. Default is false.',
         required: false,
       },
+      pageId: {
+        name: 'pageId',
+        type: 'number',
+        description:
+          'Targets a specific page by ID. Use list_pages to get available page IDs. If omitted, operates on the most recently selected page.',
+        required: false,
+      },
     },
   },
   get_console_message: {
@@ -195,6 +230,13 @@ export const commands: Commands = {
         description:
           'The msgid of a console message on the page from the listed console messages',
         required: true,
+      },
+      pageId: {
+        name: 'pageId',
+        type: 'number',
+        description:
+          'Targets a specific page by ID. Use list_pages to get available page IDs. If omitted, operates on the most recently selected page.',
+        required: false,
       },
     },
   },
@@ -224,6 +266,13 @@ export const commands: Commands = {
           'The absolute or relative path to save the response body to. If omitted, the body is returned inline.',
         required: false,
       },
+      pageId: {
+        name: 'pageId',
+        type: 'number',
+        description:
+          'Targets a specific page by ID. Use list_pages to get available page IDs. If omitted, operates on the most recently selected page.',
+        required: false,
+      },
     },
   },
   handle_dialog: {
@@ -244,6 +293,13 @@ export const commands: Commands = {
         description: 'Optional prompt text to enter into the dialog.',
         required: false,
       },
+      pageId: {
+        name: 'pageId',
+        type: 'number',
+        description:
+          'Targets a specific page by ID. Use list_pages to get available page IDs. If omitted, operates on the most recently selected page.',
+        required: false,
+      },
     },
   },
   hover: {
@@ -262,6 +318,13 @@ export const commands: Commands = {
         type: 'boolean',
         description:
           'Whether to include a snapshot in the response. Default is false.',
+        required: false,
+      },
+      pageId: {
+        name: 'pageId',
+        type: 'number',
+        description:
+          'Targets a specific page by ID. Use list_pages to get available page IDs. If omitted, operates on the most recently selected page.',
         required: false,
       },
     },
@@ -292,6 +355,13 @@ export const commands: Commands = {
         name: 'outputDirPath',
         type: 'string',
         description: 'Directory for reports. If omitted, uses temporary files.',
+        required: false,
+      },
+      pageId: {
+        name: 'pageId',
+        type: 'number',
+        description:
+          'Targets a specific page by ID. Use list_pages to get available page IDs. If omitted, operates on the most recently selected page.',
         required: false,
       },
     },
@@ -330,6 +400,13 @@ export const commands: Commands = {
         required: false,
         default: false,
       },
+      pageId: {
+        name: 'pageId',
+        type: 'number',
+        description:
+          'Targets a specific page by ID. Use list_pages to get available page IDs. If omitted, operates on the most recently selected page.',
+        required: false,
+      },
     },
   },
   list_network_requests: {
@@ -365,6 +442,13 @@ export const commands: Commands = {
           'Set to true to return the preserved requests over the last 3 navigations.',
         required: false,
         default: false,
+      },
+      pageId: {
+        name: 'pageId',
+        type: 'number',
+        description:
+          'Targets a specific page by ID. Use list_pages to get available page IDs. If omitted, operates on the most recently selected page.',
+        required: false,
       },
     },
   },
@@ -418,6 +502,13 @@ export const commands: Commands = {
         type: 'integer',
         description:
           'Maximum wait time in milliseconds. If set to 0, the default timeout will be used.',
+        required: false,
+      },
+      pageId: {
+        name: 'pageId',
+        type: 'number',
+        description:
+          'Targets a specific page by ID. Use list_pages to get available page IDs. If omitted, operates on the most recently selected page.',
         required: false,
       },
     },
@@ -475,6 +566,13 @@ export const commands: Commands = {
           'The name of the Insight you want more information on. For example: "DocumentLatency" or "LCPBreakdown"',
         required: true,
       },
+      pageId: {
+        name: 'pageId',
+        type: 'number',
+        description:
+          'Targets a specific page by ID. Use list_pages to get available page IDs. If omitted, operates on the most recently selected page.',
+        required: false,
+      },
     },
   },
   performance_start_trace: {
@@ -505,6 +603,13 @@ export const commands: Commands = {
           'The absolute file path, or a file path relative to the current working directory, to save the raw trace data. For example, trace.json.gz (compressed) or trace.json (uncompressed).',
         required: false,
       },
+      pageId: {
+        name: 'pageId',
+        type: 'number',
+        description:
+          'Targets a specific page by ID. Use list_pages to get available page IDs. If omitted, operates on the most recently selected page.',
+        required: false,
+      },
     },
   },
   performance_stop_trace: {
@@ -517,6 +622,13 @@ export const commands: Commands = {
         type: 'string',
         description:
           'The absolute file path, or a file path relative to the current working directory, to save the raw trace data. For example, trace.json.gz (compressed) or trace.json (uncompressed).',
+        required: false,
+      },
+      pageId: {
+        name: 'pageId',
+        type: 'number',
+        description:
+          'Targets a specific page by ID. Use list_pages to get available page IDs. If omitted, operates on the most recently selected page.',
         required: false,
       },
     },
@@ -540,6 +652,13 @@ export const commands: Commands = {
           'Whether to include a snapshot in the response. Default is false.',
         required: false,
       },
+      pageId: {
+        name: 'pageId',
+        type: 'number',
+        description:
+          'Targets a specific page by ID. Use list_pages to get available page IDs. If omitted, operates on the most recently selected page.',
+        required: false,
+      },
     },
   },
   resize_page: {
@@ -558,6 +677,13 @@ export const commands: Commands = {
         type: 'number',
         description: 'Page height',
         required: true,
+      },
+      pageId: {
+        name: 'pageId',
+        type: 'number',
+        description:
+          'Targets a specific page by ID. Use list_pages to get available page IDs. If omitted, operates on the most recently selected page.',
+        required: false,
       },
     },
   },
@@ -591,6 +717,13 @@ export const commands: Commands = {
         description:
           'A path to a .heapsnapshot file to save the heapsnapshot to.',
         required: true,
+      },
+      pageId: {
+        name: 'pageId',
+        type: 'number',
+        description:
+          'Targets a specific page by ID. Use list_pages to get available page IDs. If omitted, operates on the most recently selected page.',
+        required: false,
       },
     },
   },
@@ -635,6 +768,13 @@ export const commands: Commands = {
           'The absolute path, or a path relative to the current working directory, to save the screenshot to instead of attaching it to the response.',
         required: false,
       },
+      pageId: {
+        name: 'pageId',
+        type: 'number',
+        description:
+          'Targets a specific page by ID. Use list_pages to get available page IDs. If omitted, operates on the most recently selected page.',
+        required: false,
+      },
     },
   },
   take_snapshot: {
@@ -656,6 +796,13 @@ export const commands: Commands = {
           'The absolute path, or a path relative to the current working directory, to save the snapshot to instead of attaching it to the response.',
         required: false,
       },
+      pageId: {
+        name: 'pageId',
+        type: 'number',
+        description:
+          'Targets a specific page by ID. Use list_pages to get available page IDs. If omitted, operates on the most recently selected page.',
+        required: false,
+      },
     },
   },
   type_text: {
@@ -673,6 +820,13 @@ export const commands: Commands = {
         type: 'string',
         description:
           'Optional key to press after typing. E.g., "Enter", "Tab", "Escape"',
+        required: false,
+      },
+      pageId: {
+        name: 'pageId',
+        type: 'number',
+        description:
+          'Targets a specific page by ID. Use list_pages to get available page IDs. If omitted, operates on the most recently selected page.',
         required: false,
       },
     },
@@ -699,6 +853,13 @@ export const commands: Commands = {
         type: 'boolean',
         description:
           'Whether to include a snapshot in the response. Default is false.',
+        required: false,
+      },
+      pageId: {
+        name: 'pageId',
+        type: 'number',
+        description:
+          'Targets a specific page by ID. Use list_pages to get available page IDs. If omitted, operates on the most recently selected page.',
         required: false,
       },
     },

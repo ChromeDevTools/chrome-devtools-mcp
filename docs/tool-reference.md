@@ -1,6 +1,6 @@
 <!-- AUTO GENERATED DO NOT EDIT - run 'npm run gen' to update-->
 
-# Chrome DevTools MCP Tool Reference (~6949 cl100k_base tokens)
+# Chrome DevTools MCP Tool Reference (~8124 cl100k_base tokens)
 
 - **[Input automation](#input-automation)** (9 tools)
   - [`click`](#click)
@@ -49,6 +49,7 @@
 - **uid** (string) **(required)**: The uid of an element on the page from the page content snapshot
 - **dblClick** (boolean) _(optional)_: Set to true for double clicks. Default is false.
 - **includeSnapshot** (boolean) _(optional)_: Whether to include a snapshot in the response. Default is false.
+- **pageId** (number) _(optional)_: Targets a specific page by ID. Use [`list_pages`](#list_pages) to get available page IDs. If omitted, operates on the most recently selected page.
 
 ---
 
@@ -61,6 +62,7 @@
 - **from_uid** (string) **(required)**: The uid of the element to [`drag`](#drag)
 - **to_uid** (string) **(required)**: The uid of the element to drop into
 - **includeSnapshot** (boolean) _(optional)_: Whether to include a snapshot in the response. Default is false.
+- **pageId** (number) _(optional)_: Targets a specific page by ID. Use [`list_pages`](#list_pages) to get available page IDs. If omitted, operates on the most recently selected page.
 
 ---
 
@@ -73,6 +75,7 @@
 - **uid** (string) **(required)**: The uid of an element on the page from the page content snapshot
 - **value** (string) **(required)**: The value to [`fill`](#fill) in
 - **includeSnapshot** (boolean) _(optional)_: Whether to include a snapshot in the response. Default is false.
+- **pageId** (number) _(optional)_: Targets a specific page by ID. Use [`list_pages`](#list_pages) to get available page IDs. If omitted, operates on the most recently selected page.
 
 ---
 
@@ -84,6 +87,7 @@
 
 - **elements** (array) **(required)**: Elements from snapshot to [`fill`](#fill) out.
 - **includeSnapshot** (boolean) _(optional)_: Whether to include a snapshot in the response. Default is false.
+- **pageId** (number) _(optional)_: Targets a specific page by ID. Use [`list_pages`](#list_pages) to get available page IDs. If omitted, operates on the most recently selected page.
 
 ---
 
@@ -94,6 +98,7 @@
 **Parameters:**
 
 - **action** (enum: "accept", "dismiss") **(required)**: Whether to dismiss or accept the dialog
+- **pageId** (number) _(optional)_: Targets a specific page by ID. Use [`list_pages`](#list_pages) to get available page IDs. If omitted, operates on the most recently selected page.
 - **promptText** (string) _(optional)_: Optional prompt text to enter into the dialog.
 
 ---
@@ -106,6 +111,7 @@
 
 - **uid** (string) **(required)**: The uid of an element on the page from the page content snapshot
 - **includeSnapshot** (boolean) _(optional)_: Whether to include a snapshot in the response. Default is false.
+- **pageId** (number) _(optional)_: Targets a specific page by ID. Use [`list_pages`](#list_pages) to get available page IDs. If omitted, operates on the most recently selected page.
 
 ---
 
@@ -117,6 +123,7 @@
 
 - **key** (string) **(required)**: A key or a combination (e.g., "Enter", "Control+A", "Control++", "Control+Shift+R"). Modifiers: Control, Shift, Alt, Meta
 - **includeSnapshot** (boolean) _(optional)_: Whether to include a snapshot in the response. Default is false.
+- **pageId** (number) _(optional)_: Targets a specific page by ID. Use [`list_pages`](#list_pages) to get available page IDs. If omitted, operates on the most recently selected page.
 
 ---
 
@@ -127,6 +134,7 @@
 **Parameters:**
 
 - **text** (string) **(required)**: The text to type
+- **pageId** (number) _(optional)_: Targets a specific page by ID. Use [`list_pages`](#list_pages) to get available page IDs. If omitted, operates on the most recently selected page.
 - **submitKey** (string) _(optional)_: Optional key to press after typing. E.g., "Enter", "Tab", "Escape"
 
 ---
@@ -140,6 +148,7 @@
 - **filePath** (string) **(required)**: The local path of the file to upload
 - **uid** (string) **(required)**: The uid of the file input element or an element that will open file chooser on the page from the page content snapshot
 - **includeSnapshot** (boolean) _(optional)_: Whether to include a snapshot in the response. Default is false.
+- **pageId** (number) _(optional)_: Targets a specific page by ID. Use [`list_pages`](#list_pages) to get available page IDs. If omitted, operates on the most recently selected page.
 
 ---
 
@@ -172,6 +181,7 @@
 - **handleBeforeUnload** (enum: "accept", "decline") _(optional)_: Whether to auto accept or beforeunload dialogs triggered by this navigation. Default is accept.
 - **ignoreCache** (boolean) _(optional)_: Whether to ignore cache on reload.
 - **initScript** (string) _(optional)_: A JavaScript script to be executed on each new document before any other scripts for the next navigation.
+- **pageId** (number) _(optional)_: Targets a specific page by ID. Use [`list_pages`](#list_pages) to get available page IDs. If omitted, operates on the most recently selected page.
 - **timeout** (integer) _(optional)_: Maximum wait time in milliseconds. If set to 0, the default timeout will be used.
 - **type** (enum: "url", "back", "forward", "reload") _(optional)_: Navigate the page by URL, back or forward in history, or reload.
 - **url** (string) _(optional)_: Target URL (only type=url)
@@ -209,6 +219,7 @@
 **Parameters:**
 
 - **text** (array) **(required)**: Non-empty list of texts. Resolves when any value appears on the page.
+- **pageId** (number) _(optional)_: Targets a specific page by ID. Use [`list_pages`](#list_pages) to get available page IDs. If omitted, operates on the most recently selected page.
 - **timeout** (integer) _(optional)_: Maximum wait time in milliseconds. If set to 0, the default timeout will be used.
 
 ---
@@ -225,6 +236,7 @@
 - **cpuThrottlingRate** (number) _(optional)_: Represents the CPU slowdown factor. Omit or set the rate to 1 to disable throttling
 - **geolocation** (string) _(optional)_: Geolocation (`&lt;latitude&gt;x&lt;longitude&gt;`) to [`emulate`](#emulate). Latitude between -90 and 90. Longitude between -180 and 180. Omit clear the geolocation override.
 - **networkConditions** (enum: "Offline", "Slow 3G", "Fast 3G", "Slow 4G", "Fast 4G") _(optional)_: Throttle network. Omit to disable throttling.
+- **pageId** (number) _(optional)_: Targets a specific page by ID. Use [`list_pages`](#list_pages) to get available page IDs. If omitted, operates on the most recently selected page.
 - **userAgent** (string) _(optional)_: User agent to [`emulate`](#emulate). Set to empty string to clear the user agent override.
 - **viewport** (string) _(optional)_: [`Emulate`](#emulate) device viewports '&lt;width&gt;x&lt;height&gt;x&lt;devicePixelRatio&gt;[,mobile][,touch][,landscape]'. 'touch' and 'mobile' to [`emulate`](#emulate) mobile devices. 'landscape' to [`emulate`](#emulate) landscape mode.
 
@@ -238,6 +250,7 @@
 
 - **height** (number) **(required)**: Page height
 - **width** (number) **(required)**: Page width
+- **pageId** (number) _(optional)_: Targets a specific page by ID. Use [`list_pages`](#list_pages) to get available page IDs. If omitted, operates on the most recently selected page.
 
 ---
 
@@ -251,6 +264,7 @@
 
 - **insightName** (string) **(required)**: The name of the Insight you want more information on. For example: "DocumentLatency" or "LCPBreakdown"
 - **insightSetId** (string) **(required)**: The id for the specific insight set. Only use the ids given in the "Available insight sets" list.
+- **pageId** (number) _(optional)_: Targets a specific page by ID. Use [`list_pages`](#list_pages) to get available page IDs. If omitted, operates on the most recently selected page.
 
 ---
 
@@ -262,6 +276,7 @@
 
 - **autoStop** (boolean) _(optional)_: Determines if the trace recording should be automatically stopped.
 - **filePath** (string) _(optional)_: The absolute file path, or a file path relative to the current working directory, to save the raw trace data. For example, trace.json.gz (compressed) or trace.json (uncompressed).
+- **pageId** (number) _(optional)_: Targets a specific page by ID. Use [`list_pages`](#list_pages) to get available page IDs. If omitted, operates on the most recently selected page.
 - **reload** (boolean) _(optional)_: Determines if, once tracing has started, the current selected page should be automatically reloaded. Navigate the page to the right URL using the [`navigate_page`](#navigate_page) tool BEFORE starting the trace if reload or autoStop is set to true.
 
 ---
@@ -273,6 +288,7 @@
 **Parameters:**
 
 - **filePath** (string) _(optional)_: The absolute file path, or a file path relative to the current working directory, to save the raw trace data. For example, trace.json.gz (compressed) or trace.json (uncompressed).
+- **pageId** (number) _(optional)_: Targets a specific page by ID. Use [`list_pages`](#list_pages) to get available page IDs. If omitted, operates on the most recently selected page.
 
 ---
 
@@ -283,6 +299,7 @@
 **Parameters:**
 
 - **filePath** (string) **(required)**: A path to a .heapsnapshot file to save the heapsnapshot to.
+- **pageId** (number) _(optional)_: Targets a specific page by ID. Use [`list_pages`](#list_pages) to get available page IDs. If omitted, operates on the most recently selected page.
 
 ---
 
@@ -294,6 +311,7 @@
 
 **Parameters:**
 
+- **pageId** (number) _(optional)_: Targets a specific page by ID. Use [`list_pages`](#list_pages) to get available page IDs. If omitted, operates on the most recently selected page.
 - **reqid** (number) _(optional)_: The reqid of the network request. If omitted returns the currently selected request in the DevTools Network panel.
 - **requestFilePath** (string) _(optional)_: The absolute or relative path to save the request body to. If omitted, the body is returned inline.
 - **responseFilePath** (string) _(optional)_: The absolute or relative path to save the response body to. If omitted, the body is returned inline.
@@ -307,6 +325,7 @@
 **Parameters:**
 
 - **includePreservedRequests** (boolean) _(optional)_: Set to true to return the preserved requests over the last 3 navigations.
+- **pageId** (number) _(optional)_: Targets a specific page by ID. Use [`list_pages`](#list_pages) to get available page IDs. If omitted, operates on the most recently selected page.
 - **pageIdx** (integer) _(optional)_: Page number to return (0-based). When omitted, returns the first page.
 - **pageSize** (integer) _(optional)_: Maximum number of requests to return. When omitted, returns all requests.
 - **resourceTypes** (array) _(optional)_: Filter requests to only return requests of the specified resource types. When omitted or empty, returns all requests.
@@ -343,6 +362,7 @@ so returned values have to be JSON-serializable.
 **Parameters:**
 
 - **msgid** (number) **(required)**: The msgid of a console message on the page from the listed console messages
+- **pageId** (number) _(optional)_: Targets a specific page by ID. Use [`list_pages`](#list_pages) to get available page IDs. If omitted, operates on the most recently selected page.
 
 ---
 
@@ -355,6 +375,7 @@ so returned values have to be JSON-serializable.
 - **device** (enum: "desktop", "mobile") _(optional)_: Device to [`emulate`](#emulate).
 - **mode** (enum: "navigation", "snapshot") _(optional)_: "navigation" reloads &amp; audits. "snapshot" analyzes current state.
 - **outputDirPath** (string) _(optional)_: Directory for reports. If omitted, uses temporary files.
+- **pageId** (number) _(optional)_: Targets a specific page by ID. Use [`list_pages`](#list_pages) to get available page IDs. If omitted, operates on the most recently selected page.
 
 ---
 
@@ -365,6 +386,7 @@ so returned values have to be JSON-serializable.
 **Parameters:**
 
 - **includePreservedMessages** (boolean) _(optional)_: Set to true to return the preserved messages over the last 3 navigations.
+- **pageId** (number) _(optional)_: Targets a specific page by ID. Use [`list_pages`](#list_pages) to get available page IDs. If omitted, operates on the most recently selected page.
 - **pageIdx** (integer) _(optional)_: Page number to return (0-based). When omitted, returns the first page.
 - **pageSize** (integer) _(optional)_: Maximum number of messages to return. When omitted, returns all requests.
 - **types** (array) _(optional)_: Filter messages to only return messages of the specified resource types. When omitted or empty, returns all messages.
@@ -380,6 +402,7 @@ so returned values have to be JSON-serializable.
 - **filePath** (string) _(optional)_: The absolute path, or a path relative to the current working directory, to save the screenshot to instead of attaching it to the response.
 - **format** (enum: "png", "jpeg", "webp") _(optional)_: Type of format to save the screenshot as. Default is "png"
 - **fullPage** (boolean) _(optional)_: If set to true takes a screenshot of the full page instead of the currently visible viewport. Incompatible with uid.
+- **pageId** (number) _(optional)_: Targets a specific page by ID. Use [`list_pages`](#list_pages) to get available page IDs. If omitted, operates on the most recently selected page.
 - **quality** (number) _(optional)_: Compression quality for JPEG and WebP formats (0-100). Higher values mean better quality but larger file sizes. Ignored for PNG format.
 - **uid** (string) _(optional)_: The uid of an element on the page from the page content snapshot. If omitted takes a pages screenshot.
 
@@ -394,6 +417,7 @@ in the DevTools Elements panel (if any).
 **Parameters:**
 
 - **filePath** (string) _(optional)_: The absolute path, or a path relative to the current working directory, to save the snapshot to instead of attaching it to the response.
+- **pageId** (number) _(optional)_: Targets a specific page by ID. Use [`list_pages`](#list_pages) to get available page IDs. If omitted, operates on the most recently selected page.
 - **verbose** (boolean) _(optional)_: Whether to include all possible information available in the full a11y tree. Default is false.
 
 ---
