@@ -81,7 +81,7 @@ Example with arguments: \`(el) => {
           async () => {
             await performEvaluation(worker, fnString, [], response);
           },
-          {dialog: 'accept'},
+          {handleDialog: true},
         );
         return;
       }
@@ -106,7 +106,7 @@ Example with arguments: \`(el) => {
           async () => {
             await performEvaluation(evaluatable, fnString, args, response);
           },
-          {dialog: 'accept'},
+          {handleDialog: true},
         );
       } finally {
         void Promise.allSettled(args.map(arg => arg.dispose()));

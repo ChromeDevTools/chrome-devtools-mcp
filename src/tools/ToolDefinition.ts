@@ -210,7 +210,7 @@ export type ContextPage = Readonly<{
   clearDialog(): void;
   waitForEventsAfterAction(
     action: () => Promise<unknown>,
-    options?: {timeout?: number; dialog?: 'accept' | 'dismiss'},
+    options?: {timeout?: number; handleDialog?: boolean},
   ): Promise<void>;
   getInPageTools(): ToolGroup<InPageToolDefinition> | undefined;
 }>;
