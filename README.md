@@ -51,7 +51,12 @@ Google handles this data in accordance with the [Google Privacy Policy](https://
 
 Google's collection of usage statistics for Chrome DevTools MCP is independent from the Chrome browser's usage statistics. Opting out of Chrome metrics does not automatically opt you out of this tool, and vice-versa.
 
-Collection is disabled if CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS or CI env variables are set.
+Collection is disabled if `CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS` or `CI` env variables are set.
+
+## Update checks
+
+By default, the server periodically checks the npm registry for updates and logs a notification when a newer version is available.
+You can disable these update checks by setting the `CHROME_DEVTOOLS_MCP_NO_UPDATE_CHECKS` environment variable.
 
 ## Requirements
 
@@ -74,7 +79,7 @@ Add the following config to your MCP client:
 }
 ```
 
-> [!NOTE]  
+> [!NOTE]
 > Using `chrome-devtools-mcp@latest` ensures that your MCP client will always use the latest version of the Chrome DevTools MCP server.
 
 If you are interested in doing only basic browser tasks, use the `--slim` mode:
@@ -143,7 +148,7 @@ claude mcp add chrome-devtools --scope user npx chrome-devtools-mcp@latest
 
 **Install as a Plugin (MCP + Skills)**
 
-> [!NOTE]  
+> [!NOTE]
 > If you already had Chrome DevTools MCP installed previously for Claude Code, make sure to remove it first from your installation and configuration files.
 
 To install Chrome DevTools MCP with skills, add the marketplace registry in Claude Code:
@@ -200,7 +205,7 @@ startup_timeout_ms = 20_000
 
 <details>
   <summary>Command Code</summary>
-  
+
 Use the Command Code CLI to add the Chrome DevTools MCP server (<a href="https://commandcode.ai/docs/mcp">MCP guide</a>):
 
 ```bash
@@ -402,10 +407,11 @@ qodercli mcp add -s user chrome-devtools -- npx chrome-devtools-mcp@latest
 
 <details>
   <summary>Visual Studio</summary>
-  
-  **Click the button to install:**
-  
-  [<img src="https://img.shields.io/badge/Visual_Studio-Install-C16FDE?logo=visualstudio&logoColor=white" alt="Install in Visual Studio">](https://vs-open.link/mcp-install?%7B%22name%22%3A%22chrome-devtools%22%2C%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22chrome-devtools-mcp%40latest%22%5D%7D)
+
+**Click the button to install:**
+
+[<img src="https://img.shields.io/badge/Visual_Studio-Install-C16FDE?logo=visualstudio&logoColor=white" alt="Install in Visual Studio">](https://vs-open.link/mcp-install?%7B%22name%22%3A%22chrome-devtools%22%2C%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22chrome-devtools-mcp%40latest%22%5D%7D)
+
 </details>
 
 <details>
@@ -431,7 +437,7 @@ Check the performance of https://developers.chrome.com
 
 Your MCP client should open the browser and record a performance trace.
 
-> [!NOTE]  
+> [!NOTE]
 > The MCP server will start the browser automatically once the MCP client uses a tool that requires a running browser instance. Connecting to the Chrome DevTools MCP server on its own will not automatically start the browser.
 
 ## Tools
@@ -572,7 +578,7 @@ The Chrome DevTools MCP server supports the following configuration option:
   - **Default:** `true`
 
 - **`--usageStatistics`/ `--usage-statistics`**
-  Set to false to opt-out of usage statistics collection. Google collects usage data to improve the tool, handled under the Google Privacy Policy (https://policies.google.com/privacy). This is independent from Chrome browser metrics. Disabled if CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS or CI env variables are set.
+  Set to false to opt-out of usage statistics collection. Google collects usage data to improve the tool, handled under the Google Privacy Policy (https://policies.google.com/privacy). This is independent from Chrome browser metrics. Disabled if `CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS` or `CI` env variables are set.
   - **Type:** boolean
   - **Default:** `true`
 
@@ -686,7 +692,7 @@ Make sure your browser is running. Open gemini-cli and run the following prompt:
 Check the performance of https://developers.chrome.com
 ```
 
-> [!NOTE]  
+> [!NOTE]
 > The <code>autoConnect</code> option requires the user to start Chrome. If the user has multiple active profiles, the MCP server will connect to the default profile (as determined by Chrome). The MCP server has access to all open windows for the selected profile.
 
 The Chrome DevTools MCP server will try to connect to your running Chrome
@@ -722,7 +728,7 @@ Add the `--browser-url` option to your MCP client configuration. The value of th
 
 **Step 2: Start the Chrome browser**
 
-> [!WARNING]  
+> [!WARNING]
 > Enabling the remote debugging port opens up a debugging port on the running browser instance. Any application on your machine can connect to this port and control the browser. Make sure that you are not browsing any sensitive websites while the debugging port is open.
 
 Start the Chrome browser with the remote debugging port enabled. Make sure to close any running Chrome instances before starting a new one with the debugging port enabled. The port number you choose must be the same as the one you specified in the `--browser-url` option in your MCP client configuration.

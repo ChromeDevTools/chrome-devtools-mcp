@@ -17,6 +17,10 @@ import {VERSION} from '../version.js';
  * @param message The message to display in the update notification.
  */
 export async function checkForUpdates(message: string) {
+  if (process.env['CHROME_DEVTOOLS_MCP_NO_UPDATE_CHECKS']) {
+    return;
+  }
+
   const cachePath = path.join(
     os.homedir(),
     '.cache',
@@ -47,7 +51,12 @@ export async function checkForUpdates(message: string) {
 
   // In a separate process, check the latest available version number
   // and update the local snapshot accordingly.
-  const scriptPath = path.join(import.meta.dirname, '..', 'bin', 'check-latest-version.js');
+  const scriptPath = path.join(
+    import.meta.dirname,
+    '..',
+    'bin',
+    'check-latest-version.js',
+  );
 
   try {
     const child = child_process.spawn(

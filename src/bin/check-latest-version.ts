@@ -24,10 +24,7 @@ if (cachePath) {
       typeof data.version === 'string'
     ) {
       await fs.mkdir(path.dirname(cachePath), {recursive: true});
-      await fs.writeFile(
-        cachePath,
-        JSON.stringify({version: data.version}),
-      );
+      await fs.writeFile(cachePath, JSON.stringify({version: data.version}));
     }
   } catch {
     // Ignore errors.

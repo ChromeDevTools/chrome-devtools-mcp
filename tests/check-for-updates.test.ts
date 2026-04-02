@@ -6,6 +6,7 @@
 
 import assert from 'node:assert';
 import child_process from 'node:child_process';
+import type {Stats} from 'node:fs';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import {afterEach, describe, it} from 'node:test';
@@ -20,9 +21,27 @@ describe('checkForUpdates', () => {
     sinon.restore();
   });
 
+  it('does nothing if CHROME_DEVTOOLS_MCP_NO_UPDATE_CHECKS is set', async () => {
+    process.env['CHROME_DEVTOOLS_MCP_NO_UPDATE_CHECKS'] = 'true';
+
+    const warnStub = sinon.stub(console, 'warn');
+    const spawnStub = sinon.stub(child_process, 'spawn');
+    const readFileStub = sinon.stub(fs, 'readFile');
+    const statStub = sinon.stub(fs, 'stat');
+
+    await checkForUpdates('Run `npm update` to update.');
+
+    assert.ok(warnStub.notCalled);
+    assert.ok(spawnStub.notCalled);
+    assert.ok(readFileStub.notCalled);
+    assert.ok(statStub.notCalled);
+
+    delete process.env['CHROME_DEVTOOLS_MCP_NO_UPDATE_CHECKS'];
+  });
+
   it('notifies if cache exists and version is different', async () => {
     sinon.stub(os, 'homedir').returns('/home/user');
-    sinon.stub(fs, 'stat').resolves({mtimeMs: Date.now()} as any);
+    sinon.stub(fs, 'stat').resolves({mtimeMs: Date.now()} as unknown as Stats);
     sinon.stub(fs, 'readFile').callsFake(async filePath => {
       if (filePath.toString().includes('latest.json')) {
         return JSON.stringify({
@@ -46,7 +65,7 @@ describe('checkForUpdates', () => {
 
   it('does not spawn fetch process if cache is fresh', async () => {
     sinon.stub(os, 'homedir').returns('/home/user');
-    sinon.stub(fs, 'stat').resolves({mtimeMs: Date.now()} as any);
+    sinon.stub(fs, 'stat').resolves({mtimeMs: Date.now()} as unknown as Stats);
     sinon.stub(fs, 'readFile').callsFake(async filePath => {
       if (filePath.toString().includes('latest.json')) {
         return JSON.stringify({
@@ -66,7 +85,7 @@ describe('checkForUpdates', () => {
     sinon.stub(os, 'homedir').returns('/home/user');
     sinon.stub(fs, 'stat').resolves({
       mtimeMs: Date.now() - 25 * 60 * 60 * 1000, // 25 hours ago
-    } as any);
+    } as unknown as Stats);
     sinon.stub(fs, 'readFile').callsFake(async filePath => {
       if (filePath.toString().includes('latest.json')) {
         return JSON.stringify({
