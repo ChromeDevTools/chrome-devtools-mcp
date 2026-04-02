@@ -9,16 +9,26 @@ import child_process from 'node:child_process';
 import type {Stats} from 'node:fs';
 import fs from 'node:fs/promises';
 import os from 'node:os';
-import {afterEach, describe, it} from 'node:test';
+import {afterEach, beforeEach, describe, it} from 'node:test';
 
 import sinon from 'sinon';
 
-import {checkForUpdates} from '../src/utils/check-for-updates.js';
+import {
+  checkForUpdates,
+  resetUpdateCheckFlagForTesting,
+} from '../src/utils/check-for-updates.js';
 import {VERSION} from '../src/version.js';
 
 describe('checkForUpdates', () => {
+  beforeEach(() => {
+    sinon.stub(fs, 'mkdir').resolves();
+    sinon.stub(fs, 'utimes').resolves();
+    sinon.stub(fs, 'writeFile').resolves();
+  });
+
   afterEach(() => {
     sinon.restore();
+    resetUpdateCheckFlagForTesting();
   });
 
   it('does nothing if CHROME_DEVTOOLS_MCP_NO_UPDATE_CHECKS is set', async () => {
