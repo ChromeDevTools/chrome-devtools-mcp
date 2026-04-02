@@ -136,10 +136,8 @@ export class WaitForHelper {
           void dialog.accept();
         }
       };
-      // @ts-expect-error The Dialog type from CdpPage and Page are incompatible due to private properties.
       this.#page.on('dialog', dialogHandler);
       this.#abortController.signal.addEventListener('abort', () => {
-        // @ts-expect-error The Dialog type from CdpPage and Page are incompatible due to private properties.
         this.#page.off('dialog', dialogHandler);
       });
     }
