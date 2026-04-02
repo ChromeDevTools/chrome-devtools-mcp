@@ -1,0 +1,23 @@
+{
+  "name": "chrome-devtools-mcp",
+  "version": "0.1.0",
+  "description": "Chrome DevTools for coding agents via Codex",
+  "author": {
+    "name": "ChromeDevTools",
+    "url": "https://github.com/ChromeDevTools/chrome-devtools-mcp"
+  },
+  "homepage": "https://github.com/ChromeDevTools/chrome-devtools-mcp",
+  "repository": "https://github.com/ChromeDevTools/chrome-devtools-mcp",
+  "keywords": [
+    "mcp",
+    "codex"
+  ],
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "Chrome DevTools MCP",
+    "shortDescription": "Chrome DevTools for coding agents via Codex",
+    "longDescription": "Chrome DevTools Protocol integration for AI coding agents. Control Chrome tabs, inspect pages, and debug.",
+    "category": "Development",
+    "websiteURL": "https://github.com/ChromeDevTools/chrome-devtools-mcp"
+  }
+}
