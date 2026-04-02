@@ -10,7 +10,7 @@ import type {PredefinedNetworkConditions} from './third_party/index.js';
 
 export class WaitForHelper {
   #abortController = new AbortController();
-  #page: Page;
+  #page: CdpPage;
   #stableDomTimeout: number;
   #stableDomFor: number;
   #expectNavigationIn: number;
@@ -25,7 +25,7 @@ export class WaitForHelper {
     this.#stableDomFor = 100 * cpuTimeoutMultiplier;
     this.#expectNavigationIn = 100 * cpuTimeoutMultiplier;
     this.#navigationTimeout = 3000 * networkTimeoutMultiplier;
-    this.#page = page;
+    this.#page = page as unknown as CdpPage;
   }
 
   /**
@@ -101,11 +101,10 @@ export class WaitForHelper {
         resolve(true);
       };
 
-      const client = (this.#page as unknown as CdpPage)._client();
-      client.on('Page.frameStartedNavigating', listener);
+      this.#page._client().on('Page.frameStartedNavigating', listener);
       this.#abortController.signal.addEventListener('abort', () => {
         resolve(false);
-        client.off('Page.frameStartedNavigating', listener);
+        this.#page._client().off('Page.frameStartedNavigating', listener);
       });
     });
 
@@ -137,8 +136,10 @@ export class WaitForHelper {
           void dialog.accept();
         }
       };
+      // @ts-expect-error The Dialog type from CdpPage and Page are incompatible due to private properties.
       this.#page.on('dialog', dialogHandler);
       this.#abortController.signal.addEventListener('abort', () => {
+        // @ts-expect-error The Dialog type from CdpPage and Page are incompatible due to private properties.
         this.#page.off('dialog', dialogHandler);
       });
     }
