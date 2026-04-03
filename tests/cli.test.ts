@@ -23,6 +23,8 @@ describe('cli args parsing', () => {
     performanceCrux: true,
     'usage-statistics': true,
     usageStatistics: true,
+    'skip-unresponsive-tabs': false,
+    skipUnresponsiveTabs: false,
   };
 
   it('parses with default args', async () => {
@@ -52,6 +54,17 @@ describe('cli args parsing', () => {
       browserUrl: 'http://localhost:3000',
       u: 'http://localhost:3000',
     });
+  });
+
+  it('parses --skipUnresponsiveTabs', async () => {
+    const args = parseArguments('1.0.0', [
+      'node',
+      'main.js',
+      '--browserUrl',
+      'http://localhost:9222',
+      '--skipUnresponsiveTabs',
+    ]);
+    assert.strictEqual(args.skipUnresponsiveTabs, true);
   });
 
   it('parses with user data dir', async () => {

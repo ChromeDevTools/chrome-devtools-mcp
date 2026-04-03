@@ -56,6 +56,8 @@ interface McpContextOptions {
   experimentalIncludeAllPages?: boolean;
   // Whether CrUX data should be fetched.
   performanceCrux: boolean;
+  // Whether to skip unresponsive tabs when enumerating pages.
+  skipUnresponsiveTabs?: boolean;
 }
 
 const DEFAULT_TIMEOUT = 5_000;
@@ -562,9 +564,53 @@ export class McpContext implements Context {
     isolatedContextNames: Map<Page, string>;
   }> {
     const defaultCtx = this.browser.defaultBrowserContext();
-    const allPages = await this.browser.pages(
-      this.#options.experimentalIncludeAllPages,
-    );
+
+    let allPages: Page[];
+    if (this.#options.skipUnresponsiveTabs) {
+      // Tolerant page enumeration: browser.pages() hangs indefinitely when
+      // any tab is unresponsive (e.g. discarded/sleeping tabs). Fall back to
+      // per-target enumeration so that one bad tab doesn't block the server.
+      try {
+        allPages = await Promise.race([
+          this.browser.pages(this.#options.experimentalIncludeAllPages),
+          new Promise<never>((_, reject) =>
+            setTimeout(
+              () => reject(new Error('browser.pages() timed out')),
+              10_000,
+            ),
+          ),
+        ]);
+      } catch {
+        this.logger(
+          'browser.pages() timed out, falling back to per-target enumeration',
+        );
+        const pageTargets = this.browser
+          .targets()
+          .filter(t => t.type() === 'page');
+        allPages = [];
+        await Promise.all(
+          pageTargets.map(async target => {
+            try {
+              const page = await Promise.race([
+                target.page(),
+                new Promise<never>((_, reject) =>
+                  setTimeout(() => reject(new Error('timeout')), 5_000),
+                ),
+              ]);
+              if (page) {
+                allPages.push(page);
+              }
+            } catch {
+              this.logger(`Skipping unresponsive tab: ${target.url()}`);
+            }
+          }),
+        );
+      }
+    } else {
+      allPages = await this.browser.pages(
+        this.#options.experimentalIncludeAllPages,
+      );
+    }
 
     const allTargets = this.browser.targets();
     const extensionTargets = allTargets.filter(target => {

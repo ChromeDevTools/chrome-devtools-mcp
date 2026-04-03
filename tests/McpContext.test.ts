@@ -37,6 +37,17 @@ describe('McpContext', () => {
     });
   });
 
+  it('list pages with skipUnresponsiveTabs enabled', async () => {
+    await withMcpContext(
+      async (_response, context) => {
+        const page = context.getSelectedMcpPage();
+        assert.ok(page, 'Should have a selected page');
+        assert.ok(page.pptrPage.url(), 'Page should have a URL');
+      },
+      {skipUnresponsiveTabs: true},
+    );
+  });
+
   it('can store and retrieve the latest performance trace', async () => {
     await withMcpContext(async (_response, context) => {
       const fakeTrace1 = {} as unknown as TraceResult;

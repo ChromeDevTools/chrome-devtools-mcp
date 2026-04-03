@@ -51,6 +51,7 @@ export async function ensureBrowserConnected(options: {
   channel?: Channel;
   userDataDir?: string;
   enableExtensions?: boolean;
+  skipUnresponsiveTabs?: boolean;
 }) {
   const {channel, enableExtensions} = options;
   if (browser?.connected) {
@@ -61,6 +62,7 @@ export async function ensureBrowserConnected(options: {
     targetFilter: makeTargetFilter(enableExtensions),
     defaultViewport: null,
     handleDevToolsAsPage: true,
+    ...(options.skipUnresponsiveTabs ? {protocolTimeout: 15_000} : {}),
   };
 
   let autoConnect = false;
