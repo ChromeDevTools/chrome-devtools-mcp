@@ -19,5 +19,6 @@
     "longDescription": "Chrome DevTools Protocol integration for AI coding agents. Control Chrome tabs, inspect pages, and debug.",
     "category": "Development",
     "websiteURL": "https://github.com/ChromeDevTools/chrome-devtools-mcp"
-  }
+  },
+  "skills": "./skills/"
 }
