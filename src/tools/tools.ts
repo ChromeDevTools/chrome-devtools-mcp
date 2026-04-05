@@ -9,6 +9,7 @@ import * as emulationTools from './emulation.js';
 import * as inputTools from './input.js';
 import * as networkTools from './network.js';
 import * as pagesTools from './pages.js';
+import * as pdfTools from './pdf.js';
 import * as performanceTools from './performance.js';
 import * as screenshotTools from './screenshot.js';
 import * as scriptTools from './script.js';
@@ -22,6 +23,7 @@ const tools = [
   ...Object.values(inputTools),
   ...Object.values(networkTools),
   ...Object.values(pagesTools),
+  ...Object.values(pdfTools),
   ...Object.values(performanceTools),
   ...Object.values(screenshotTools),
   ...Object.values(scriptTools),
