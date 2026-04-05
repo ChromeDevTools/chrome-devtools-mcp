@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {getConfig} from './config/config.js';
+import {redact} from './security/redact.js';
+import {wrapExternalContent} from './security/content-wrapper.js';
 import {mapIssueToMessageObject} from './DevtoolsUtils.js';
 import type {ConsoleMessageData} from './formatters/consoleFormatter.js';
 import {
@@ -405,7 +408,9 @@ Call ${handleDialog.name} to handle it before continuing.`);
 
     if (data.formattedSnapshot) {
       response.push('## Latest page snapshot');
-      response.push(data.formattedSnapshot);
+      const pageUrl = context.getSelectedPage().url();
+      const wrappedSnapshot = wrapExternalContent(data.formattedSnapshot, pageUrl);
+      response.push(wrappedSnapshot);
     }
 
     response.push(...this.#formatNetworkRequestData(context, data.bodies));
@@ -467,9 +472,14 @@ Call ${handleDialog.name} to handle it before continuing.`);
       }
     }
 
+    const redactionConfig = getConfig().security?.redaction;
+    const rawText = response.join('\n');
     const text: TextContent = {
       type: 'text',
-      text: response.join('\n'),
+      text: redact(rawText, {
+        enabled: redactionConfig?.enabled,
+        additionalPatterns: redactionConfig?.patterns,
+      }),
     };
     const images: ImageContent[] = this.#images.map(imageData => {
       return {

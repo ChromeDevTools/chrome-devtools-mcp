@@ -5,10 +5,17 @@
  */
 
 import {logger} from '../logger.js';
+import {getConfig} from '../config/config.js';
+import {guardNavigation, guardRedirect} from '../security/navigation-guard.js';
+import type {SsrfPolicy} from '../security/ssrf.js';
 import {zod} from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
 import {CLOSE_PAGE_ERROR, defineTool, timeoutSchema} from './ToolDefinition.js';
+
+function getSsrfPolicy(): SsrfPolicy {
+  return getConfig().security?.ssrf ?? {};
+}
 
 export const listPages = defineTool({
   name: 'list_pages',
@@ -91,6 +98,15 @@ export const newPage = defineTool({
     ...timeoutSchema,
   },
   handler: async (request, response, context) => {
+    const navCheck = guardNavigation(request.params.url, getSsrfPolicy());
+    if (!navCheck.allowed) {
+      response.appendResponseLine(`Navigation blocked: ${navCheck.reason}`);
+      return;
+    }
+    if (navCheck.warnings?.length) {
+      for (const w of navCheck.warnings) response.appendResponseLine(`⚠ ${w}`);
+    }
+
     const page = await context.newPage();
 
     await context.waitForEventsAfterAction(async () => {
@@ -140,12 +156,33 @@ export const navigatePage = defineTool({
 
     await context.waitForEventsAfterAction(async () => {
       switch (request.params.type) {
-        case 'url':
+        case 'url': {
           if (!request.params.url) {
             throw new Error('A URL is required for navigation of type=url.');
           }
+          const navCheck = guardNavigation(request.params.url, getSsrfPolicy());
+          if (!navCheck.allowed) {
+            response.appendResponseLine(`Navigation blocked: ${navCheck.reason}`);
+            break;
+          }
+          if (navCheck.warnings?.length) {
+            for (const w of navCheck.warnings) response.appendResponseLine(`⚠ ${w}`);
+          }
           try {
             await page.goto(request.params.url, options);
+            // Post-redirect SSRF check
+            const finalUrl = page.url();
+            if (finalUrl !== request.params.url) {
+              const redirectCheck = guardRedirect(request.params.url, finalUrl, getSsrfPolicy());
+              if (!redirectCheck.allowed) {
+                await page.goto('about:blank');
+                response.appendResponseLine(`Redirect blocked: ${redirectCheck.reason}`);
+                break;
+              }
+              if (redirectCheck.warnings?.length) {
+                for (const w of redirectCheck.warnings) response.appendResponseLine(`⚠ ${w}`);
+              }
+            }
             response.appendResponseLine(
               `Successfully navigated to ${request.params.url}.`,
             );
@@ -155,6 +192,7 @@ export const navigatePage = defineTool({
             );
           }
           break;
+        }
         case 'back':
           try {
             await page.goBack(options);
