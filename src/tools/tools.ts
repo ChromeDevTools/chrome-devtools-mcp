@@ -7,6 +7,7 @@ import * as autonomyTools from './autonomy.js';
 import * as consoleTools from './console.js';
 import * as emulationTools from './emulation.js';
 import * as inputTools from './input.js';
+import * as intelligenceTools from './intelligence.js';
 import * as networkTools from './network.js';
 import * as pagesTools from './pages.js';
 import * as pdfTools from './pdf.js';
@@ -22,6 +23,7 @@ const tools = [
   ...Object.values(consoleTools),
   ...Object.values(emulationTools),
   ...Object.values(inputTools),
+  ...Object.values(intelligenceTools),
   ...Object.values(networkTools),
   ...Object.values(pagesTools),
   ...Object.values(pdfTools),
