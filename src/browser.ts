@@ -17,6 +17,7 @@ import type {
 } from './third_party/index.js';
 import {puppeteer} from './third_party/index.js';
 import {applyGhostMode, type GhostModeConfig} from './ghost-mode.js';
+import type {ResolvedProfile} from './config/profiles.js';
 
 let browser: Browser | undefined;
 
@@ -251,3 +252,113 @@ export async function ensureBrowserLaunched(
 }
 
 export type Channel = 'stable' | 'canary' | 'beta' | 'dev';
+
+// --- Profile-based browser management ---
+
+const profileBrowsers = new Map<string, Browser>();
+
+/**
+ * Launch or connect a browser for a ResolvedProfile.
+ *
+ * - 'managed' profiles launch a new Chrome via `launch()`.
+ * - 'existing-session' profiles connect to a running Chrome via `ensureBrowserConnected()`.
+ *
+ * Returns the Browser instance and caches it by profile name.
+ * If a connected browser already exists for the profile, returns it immediately.
+ */
+export async function ensureBrowserForProfile(
+  profile: ResolvedProfile,
+  ghostMode?: Partial<GhostModeConfig>,
+): Promise<Browser> {
+  const existing = profileBrowsers.get(profile.name);
+  if (existing?.connected) {
+    return existing;
+  }
+
+  let instance: Browser;
+
+  if (profile.driver === 'managed') {
+    const userDataDir =
+      profile.userDataDir ??
+      path.join(
+        os.homedir(),
+        '.boss-ghost',
+        'profiles',
+        profile.name,
+        'chrome-data',
+      );
+
+    const args: string[] = [...profile.extraArgs];
+    if (profile.cdpPort) {
+      args.push(`--remote-debugging-port=${profile.cdpPort}`);
+    }
+
+    instance = await launch({
+      headless: profile.headless,
+      channel: profile.channel,
+      executablePath: profile.executablePath,
+      userDataDir,
+      args,
+      isolated: false,
+      devtools: false,
+      ghostMode,
+    });
+  } else {
+    // existing-session: connect to a running browser
+    if (profile.cdpUrl) {
+      instance = await ensureBrowserConnected({
+        wsEndpoint: profile.cdpUrl,
+        devtools: false,
+      });
+    } else {
+      instance = await ensureBrowserConnected({
+        browserURL: `http://127.0.0.1:${profile.cdpPort}`,
+        devtools: false,
+      });
+    }
+
+    // Apply ghost mode to connected browsers manually since launch() won't do it
+    if (ghostMode) {
+      await applyGhostMode(instance, ghostMode);
+      logger('Ghost Mode applied to connected profile "%s"', profile.name);
+    }
+  }
+
+  profileBrowsers.set(profile.name, instance);
+  logger('Browser ready for profile "%s" (driver=%s)', profile.name, profile.driver);
+  return instance;
+}
+
+/**
+ * Retrieve a cached browser instance by profile name.
+ * Returns undefined if no browser exists or it has disconnected.
+ */
+export function getBrowserForProfile(name: string): Browser | undefined {
+  const instance = profileBrowsers.get(name);
+  if (instance && !instance.connected) {
+    profileBrowsers.delete(name);
+    return undefined;
+  }
+  return instance;
+}
+
+/**
+ * Close/disconnect a profile's browser and remove it from the cache.
+ */
+export async function closeBrowserForProfile(name: string): Promise<void> {
+  const instance = profileBrowsers.get(name);
+  if (!instance) {
+    return;
+  }
+
+  profileBrowsers.delete(name);
+
+  if (instance.connected) {
+    try {
+      await instance.close();
+      logger('Closed browser for profile "%s"', name);
+    } catch (err) {
+      logger('Error closing browser for profile "%s": %s', name, err);
+    }
+  }
+}

@@ -8,6 +8,7 @@
 
 import type {CloudBrowserProvider} from './base.js';
 import {BrowserbaseProvider} from './browserbase.js';
+import {BrowserUseProvider} from './browser-use.js';
 import {logger} from '../logger.js';
 import {getConfig} from '../config/config.js';
 
@@ -16,6 +17,7 @@ type ProviderConstructor = new (config?: Record<string, unknown>) => CloudBrowse
 /** Registry of known provider constructors, keyed by name. */
 const PROVIDER_REGISTRY = new Map<string, ProviderConstructor>([
   ['browserbase', BrowserbaseProvider as unknown as ProviderConstructor],
+  ['browser-use', BrowserUseProvider as unknown as ProviderConstructor],
 ]);
 
 /** Cached provider instance (resolved once per process). */
@@ -79,6 +81,14 @@ export function getCloudProvider(): CloudBrowserProvider | null {
     logger('Cloud provider: browserbase (auto-detected from env vars)');
     cachedProvider = browserbase;
     return browserbase;
+  }
+
+  // Auto-detect: try Browser Use env vars
+  const browserUse = new BrowserUseProvider();
+  if (browserUse.isConfigured()) {
+    logger('Cloud provider: browser-use (auto-detected from env vars)');
+    cachedProvider = browserUse;
+    return browserUse;
   }
 
   logger('Cloud provider: local mode (no provider configured)');
