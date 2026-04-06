@@ -7,6 +7,17 @@
 import type {YargsOptions} from '../third_party/index.js';
 import {yargs, hideBin} from '../third_party/index.js';
 
+/**
+ * On macOS, Node.js `dns.lookup('localhost')` non-deterministically resolves
+ * to `::1` (IPv6) or `127.0.0.1` (IPv4) depending on network state. Chrome's
+ * debug port typically binds only one address family, causing intermittent
+ * connection failures. This function replaces `localhost` with `127.0.0.1`
+ * to match Chrome's default binding while preserving the original URL format.
+ */
+function resolveLocalhostToIPv4(url: string): string {
+  return url.replace(/\/\/localhost([:/])/i, '//127.0.0.1$1');
+}
+
 export const cliOptions = {
   autoConnect: {
     type: 'boolean',
@@ -36,7 +47,7 @@ export const cliOptions = {
       } catch {
         throw new Error(`Provided browserUrl ${url} is not valid URL.`);
       }
-      return url;
+      return resolveLocalhostToIPv4(url);
     },
   },
   wsEndpoint: {
@@ -56,7 +67,7 @@ export const cliOptions = {
             `Provided wsEndpoint ${url} must use ws:// or wss:// protocol.`,
           );
         }
-        return url;
+        return resolveLocalhostToIPv4(url);
       } catch (error) {
         if ((error as Error).message.includes('ws://')) {
           throw error;

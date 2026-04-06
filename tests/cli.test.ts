@@ -43,15 +43,56 @@ describe('cli args parsing', () => {
       '--browserUrl',
       'http://localhost:3000',
     ]);
+    // localhost is resolved to 127.0.0.1 to avoid IPv6 resolution issues
     assert.deepStrictEqual(args, {
       ...defaultArgs,
       _: [],
       headless: false,
       $0: 'npx chrome-devtools-mcp@latest',
-      'browser-url': 'http://localhost:3000',
-      browserUrl: 'http://localhost:3000',
-      u: 'http://localhost:3000',
+      'browser-url': 'http://127.0.0.1:3000',
+      browserUrl: 'http://127.0.0.1:3000',
+      u: 'http://127.0.0.1:3000',
     });
+  });
+
+  it('resolves localhost to 127.0.0.1 in browser url', async () => {
+    const args = parseArguments('1.0.0', [
+      'node',
+      'main.js',
+      '--browserUrl',
+      'http://localhost:9222',
+    ]);
+    assert.strictEqual(args.browserUrl, 'http://127.0.0.1:9222');
+  });
+
+  it('resolves LOCALHOST to 127.0.0.1 in browser url', async () => {
+    const args = parseArguments('1.0.0', [
+      'node',
+      'main.js',
+      '--browserUrl',
+      'http://LOCALHOST:9222',
+    ]);
+    assert.strictEqual(args.browserUrl, 'http://127.0.0.1:9222');
+  });
+
+  it('preserves explicit 127.0.0.1 in browser url', async () => {
+    const args = parseArguments('1.0.0', [
+      'node',
+      'main.js',
+      '--browserUrl',
+      'http://127.0.0.1:9222',
+    ]);
+    assert.strictEqual(args.browserUrl, 'http://127.0.0.1:9222');
+  });
+
+  it('preserves explicit [::1] in browser url', async () => {
+    const args = parseArguments('1.0.0', [
+      'node',
+      'main.js',
+      '--browserUrl',
+      'http://[::1]:9222',
+    ]);
+    assert.strictEqual(args.browserUrl, 'http://[::1]:9222');
   });
 
   it('parses with user data dir', async () => {
@@ -205,6 +246,19 @@ describe('cli args parsing', () => {
       wsEndpoint: 'wss://example.com:9222/devtools/browser/abc123',
       w: 'wss://example.com:9222/devtools/browser/abc123',
     });
+  });
+
+  it('resolves localhost to 127.0.0.1 in wsEndpoint', async () => {
+    const args = parseArguments('1.0.0', [
+      'node',
+      'main.js',
+      '--wsEndpoint',
+      'ws://localhost:9222/devtools/browser/abc123',
+    ]);
+    assert.strictEqual(
+      args.wsEndpoint,
+      'ws://127.0.0.1:9222/devtools/browser/abc123',
+    );
   });
 
   it('parses wsHeaders with valid JSON', async () => {
