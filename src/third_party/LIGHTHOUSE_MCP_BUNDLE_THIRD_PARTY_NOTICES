@@ -120,7 +120,7 @@ SOFTWARE.
 
 Name: axe-core
 URL: https://www.deque.com/axe/
-Version: 4.11.0
+Version: 4.11.2
 License: MPL-2.0
 
 Mozilla Public License, version 2.0
@@ -1556,7 +1556,7 @@ SOFTWARE.
 
 Name: puppeteer-core
 URL: https://github.com/puppeteer/puppeteer/tree/main/packages/puppeteer-core
-Version: 24.23.0
+Version: 24.40.0
 License: Apache-2.0
 
 -------------------- DEPENDENCY DIVIDER --------------------
@@ -1622,7 +1622,7 @@ SOFTWARE.
 
 Name: tldts-core
 URL: https://github.com/remusao/tldts#readme
-Version: 7.0.17
+Version: 7.0.27
 License: MIT
 
 Copyright (c) 2017 Thomas Parisot, 2018 Rémi Berson
@@ -1644,7 +1644,7 @@ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTH
 
 Name: tldts-icann
 URL: https://github.com/remusao/tldts#readme
-Version: 7.0.17
+Version: 7.0.27
 License: MIT
 
 Copyright (c) 2017 Thomas Parisot, 2018 Rémi Berson
