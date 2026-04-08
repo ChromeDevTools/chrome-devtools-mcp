@@ -12,15 +12,20 @@ import sinon from 'sinon';
 import {UniverseManager} from '../src/DevtoolsUtils.js';
 import {DevTools} from '../src/third_party/index.js';
 import type {Browser, Target} from '../src/third_party/index.js';
+import {Events as NetworkManagerEvents, NetworkManager} from '../node_modules/chrome-devtools-frontend/front_end/core/sdk/NetworkManager.js';
 
+import {serverHooks} from './server.js';
 import {
   getMockBrowser,
   getMockPage,
+  html,
   mockListener,
   withBrowser,
 } from './utils.js';
 
 describe('UniverseManager', () => {
+  const server = serverHooks();
+
   afterEach(() => {
     sinon.restore();
   });
@@ -84,6 +89,27 @@ describe('UniverseManager', () => {
       assert.strictEqual(result, 2);
 
       sinon.assert.notCalled(pausedSpy);
+    });
+  });
+
+  it('disables network domain', async () => {
+    server.addHtmlRoute('/test', html`<div>Test</div>`);
+
+    await withBrowser(async (browser, page) => {
+      const manager = new UniverseManager(browser);
+      await manager.init([page]);
+      const targetUniverse = manager.get(page);
+      assert.ok(targetUniverse);
+
+      const networkManager = targetUniverse.target.model(NetworkManager);
+      assert.ok(networkManager);
+
+      const requestStartedSpy = sinon.stub();
+      networkManager.addEventListener(NetworkManagerEvents.RequestStarted as any, requestStartedSpy);
+
+      await page.goto(server.getRoute('/test'));
+
+      sinon.assert.notCalled(requestStartedSpy);
     });
   });
 });
