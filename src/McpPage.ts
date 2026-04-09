@@ -39,6 +39,7 @@ export class McpPage implements ContextPage {
   // Snapshot
   textSnapshot: TextSnapshot | null = null;
   uniqueBackendNodeIdToMcpId = new Map<string, string>();
+  extraHandles?: ElementHandle[];
 
   // Emulation
   emulationSettings: EmulationSettings = {};
@@ -158,5 +159,21 @@ export class McpPage implements ContextPage {
 
   getAXNodeByUid(uid: string) {
     return this.textSnapshot?.idToNode.get(uid);
+  }
+
+  getSnapshot(): TextSnapshot | null {
+    return this.textSnapshot;
+  }
+
+  setSnapshot(snapshot: TextSnapshot): void {
+    this.textSnapshot = snapshot;
+  }
+
+  getExtraHandles(): ElementHandle[] | undefined {
+    return this.extraHandles;
+  }
+
+  setExtraHandles(extraHandles: ElementHandle[]): void {
+    this.extraHandles = extraHandles;
   }
 }

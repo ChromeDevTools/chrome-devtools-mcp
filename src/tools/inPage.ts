@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {logger} from '../logger.js';
 import {
   zod,
   ajv,
@@ -32,6 +33,7 @@ declare global {
       toolGroup?: ToolGroup<
         ToolDefinition & {execute: (args: Record<string, unknown>) => unknown}
       >;
+      stashedElements?: Element[];
       executeTool?: (
         toolName: string,
         args: Record<string, unknown>,
@@ -75,7 +77,7 @@ export const executeInPageTool = definePageTool({
       .optional()
       .describe('The JSON-stringified parameters to pass to the tool'),
   },
-  handler: async (request, response) => {
+  handler: async (request, response, context) => {
     const toolName = request.params.toolName;
     let params: Record<string, unknown> = {};
     if (request.params.params) {
@@ -141,14 +143,150 @@ export const executeInPageTool = definePageTool({
         }
         const toolResult = await window.__dtmcp.executeTool(name, args);
 
+        const stashDOMElement = (el: Element) => {
+          if (!window.__dtmcp) {
+            window.__dtmcp = {};
+          }
+          if (window.__dtmcp.stashedElements === undefined) {
+            window.__dtmcp.stashedElements = [];
+          }
+          window.__dtmcp.stashedElements.push(el);
+          return {
+            stashedId: `stashed-${window.__dtmcp.stashedElements.length - 1}`,
+          };
+        };
+
+        // Recursively walks the tool result:
+        // - Replaces DOM elements with UIDs
+        // - Replaces functions with the string 'function'
+        // - Removes items which are deeper than cutoff
+        const processToolResult = (
+          data: unknown,
+          depth = 0,
+          cutoff = 8,
+        ): unknown => {
+          if (depth >= cutoff) {
+            return undefined;
+          }
+
+          // 1. Handle DOM Elements
+          if (data instanceof Element) {
+            return stashDOMElement(data);
+          }
+
+          // 2. Handle Arrays
+          if (Array.isArray(data)) {
+            if (depth >= cutoff - 1) {
+              return [];
+            }
+            return data.map((item: unknown) =>
+              processToolResult(item, depth + 1, cutoff),
+            );
+          }
+
+          // 3. Handle Objects
+          if (data !== null && typeof data === 'object') {
+            const processedObj: Record<string, unknown> = {};
+            if (depth < cutoff - 1) {
+              for (const [key, value] of Object.entries(data)) {
+                processedObj[key] = processToolResult(value, depth + 1, cutoff);
+              }
+            }
+            return processedObj;
+          }
+
+          // 4. Handle Functions
+          if (typeof data === 'function') {
+            return 'function';
+          }
+
+          // 5. Return primitives (strings, numbers, booleans) as-is
+          return data;
+        };
+
         return {
-          result: toolResult,
+          result: processToolResult(toolResult),
+          stashed: window.__dtmcp?.stashedElements?.length ?? 0,
         };
       },
       toolName,
       params,
       ...handles,
     );
-    response.appendResponseLine(JSON.stringify(result, null, 2));
+
+    const elementHandles: ElementHandle[] = [];
+    for (let i = 0; i < (result.stashed ?? 0); i++) {
+      const elementHandle = await request.page.pptrPage.evaluateHandle(
+        index => {
+          return window.__dtmcp?.stashedElements?.[index] ?? null;
+        },
+        i,
+      );
+      elementHandles.push(elementHandle as ElementHandle);
+    }
+    const resultWithStashedElements = result.result;
+
+    let isPageSnapshotUpdated = false;
+    const stashedToUid = async (index: number) => {
+      const backendNodeId = await elementHandles[index].backendNodeId();
+      if (!backendNodeId) {
+        logger(`No backendNodeId for stashed DOM element with index ${index}`);
+        return {uid: `stashed-${index}`};
+      }
+      let cdpElementId = context.resolveCdpElementId(
+        request.page,
+        backendNodeId,
+      );
+      if (!cdpElementId) {
+        await context.createTextSnapshot(
+          request.page,
+          false,
+          undefined,
+          elementHandles,
+        );
+        isPageSnapshotUpdated = true;
+        cdpElementId = context.resolveCdpElementId(request.page, backendNodeId);
+      }
+      if (!cdpElementId) {
+        logger(`Could not get cdpElementId for backend node ${backendNodeId}`);
+        return {uid: `stashed-${index}`};
+      }
+      return {uid: cdpElementId};
+    };
+
+    const recursivelyReplaceStashedElements = async (
+      node: unknown,
+    ): Promise<unknown> => {
+      if (Array.isArray(node)) {
+        return await Promise.all(
+          node.map(async x => await recursivelyReplaceStashedElements(x)),
+        );
+      }
+      if (node !== null && typeof node === 'object') {
+        if (
+          'stashedId' in node &&
+          typeof node.stashedId === 'string' &&
+          node.stashedId.startsWith('stashed-') &&
+          Object.keys(node).length === 1
+        ) {
+          const index = parseInt(node.stashedId.split('-')[1]);
+          return stashedToUid(index);
+        }
+        const resultObj: Record<string, unknown> = {};
+        for (const [key, value] of Object.entries(node)) {
+          resultObj[key] = await recursivelyReplaceStashedElements(value);
+        }
+        return resultObj;
+      }
+      return node;
+    };
+
+    const resultWithUids = await recursivelyReplaceStashedElements(
+      resultWithStashedElements,
+    );
+    response.appendResponseLine(JSON.stringify(resultWithUids, null, 2));
+    if (isPageSnapshotUpdated) {
+      response.includeSnapshot();
+    }
   },
 });

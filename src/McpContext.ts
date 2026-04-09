@@ -16,7 +16,7 @@ import {
   type ListenerMap,
   type UncaughtError,
 } from './PageCollector.js';
-import type {DevTools} from './third_party/index.js';
+import type {DevTools, Protocol} from './third_party/index.js';
 import type {
   Browser,
   BrowserContext,
@@ -29,11 +29,15 @@ import type {
   Viewport,
   Target,
 } from './third_party/index.js';
-import {Locator} from './third_party/index.js';
+import {Locator, type ElementHandle} from './third_party/index.js';
 import {PredefinedNetworkConditions} from './third_party/index.js';
 import {listPages} from './tools/pages.js';
 import {CLOSE_PAGE_ERROR} from './tools/ToolDefinition.js';
-import type {Context, DevToolsData} from './tools/ToolDefinition.js';
+import type {
+  Context,
+  DevToolsData,
+  ContextPage,
+} from './tools/ToolDefinition.js';
 import type {TraceResult} from './trace-processing/parse.js';
 import type {
   EmulationSettings,
@@ -74,7 +78,7 @@ export class McpContext implements Context {
   #extensionServiceWorkers: ExtensionServiceWorker[] = [];
 
   #mcpPages = new Map<Page, McpPage>();
-  #selectedPage?: McpPage;
+  #selectedPage?: ContextPage;
   #networkCollector: NetworkCollector;
   #consoleCollector: ConsoleCollector;
   #devtoolsUniverseManager: UniverseManager;
@@ -159,7 +163,10 @@ export class McpContext implements Context {
     return context;
   }
 
-  resolveCdpRequestId(page: McpPage, cdpRequestId: string): number | undefined {
+  resolveCdpRequestId(
+    page: ContextPage,
+    cdpRequestId: string,
+  ): number | undefined {
     if (!cdpRequestId) {
       this.logger('no network request');
       return;
@@ -176,14 +183,14 @@ export class McpContext implements Context {
   }
 
   resolveCdpElementId(
-    page: McpPage,
+    page: ContextPage,
     cdpBackendNodeId: number,
   ): string | undefined {
     if (!cdpBackendNodeId) {
       this.logger('no cdpBackendNodeId');
       return;
     }
-    const snapshot = page.textSnapshot;
+    const snapshot = page.getSnapshot();
     if (!snapshot) {
       this.logger('no text snapshot');
       return;
@@ -276,7 +283,7 @@ export class McpContext implements Context {
     return this.#networkCollector.getById(page.pptrPage, reqid);
   }
 
-  async restoreEmulation(page: McpPage) {
+  async restoreEmulation(page: ContextPage) {
     const currentSetting = page.emulationSettings;
     await this.emulate(currentSetting, page.pptrPage);
   }
@@ -442,7 +449,7 @@ export class McpContext implements Context {
     return this.#selectedPage?.pptrPage === page;
   }
 
-  selectPage(newPage: McpPage): void {
+  selectPage(newPage: ContextPage): void {
     this.#selectedPage = newPage;
     this.#updateSelectedPageTimeouts();
   }
@@ -675,7 +682,7 @@ export class McpContext implements Context {
     return this.#mcpPages.get(page)?.devToolsPage;
   }
 
-  async getDevToolsData(page: McpPage): Promise<DevToolsData> {
+  async getDevToolsData(page: ContextPage): Promise<DevToolsData> {
     try {
       this.logger('Getting DevTools UI data');
       const devtoolsPage = this.getDevToolsPage(page.pptrPage);
@@ -712,9 +719,10 @@ export class McpContext implements Context {
    * Creates a text snapshot of a page.
    */
   async createTextSnapshot(
-    page: McpPage,
+    page: ContextPage,
     verbose = false,
     devtoolsData: DevToolsData | undefined = undefined,
+    extraHandles?: ElementHandle[],
   ): Promise<void> {
     const rootNode = await page.pptrPage.accessibility.snapshot({
       includeIframes: true,
@@ -768,6 +776,151 @@ export class McpContext implements Context {
     };
 
     const rootNodeWithId = assignIds(rootNode);
+
+    const createExtraNode = async (
+      handle: ElementHandle,
+    ): Promise<TextSnapshotNode | null> => {
+      const backendNodeId = await handle.backendNodeId();
+      if (!backendNodeId) {
+        return null;
+      }
+      const uniqueBackendId = `custom_${backendNodeId}`;
+      if (seenUniqueIds.has(uniqueBackendId)) {
+        return null;
+      }
+
+      let id = '';
+      if (uniqueBackendNodeIdToMcpId.has(uniqueBackendId)) {
+        id = uniqueBackendNodeIdToMcpId.get(uniqueBackendId)!;
+      } else {
+        id = `${snapshotId}_${idCounter++}`;
+        uniqueBackendNodeIdToMcpId.set(uniqueBackendId, id);
+      }
+      seenUniqueIds.add(uniqueBackendId);
+
+      const tagHandle = await handle.getProperty('localName');
+      const tagValue = await tagHandle.jsonValue();
+      const extraNode: TextSnapshotNode = {
+        role: tagValue,
+        id,
+        backendNodeId,
+        children: [],
+        elementHandle: async () => handle,
+      };
+      return extraNode;
+    };
+
+    const findAncestorNode = async (
+      handle: ElementHandle,
+    ): Promise<TextSnapshotNode | null> => {
+      let ancestorHandle = await handle.evaluateHandle(el => el.parentElement);
+
+      while (ancestorHandle) {
+        const ancestorElement = ancestorHandle.asElement();
+        if (!ancestorElement) {
+          await ancestorHandle.dispose();
+          return null;
+        }
+
+        const ancestorBackendId = await ancestorElement.backendNodeId();
+        if (ancestorBackendId) {
+          const ancestorNode = idToNode
+            .values()
+            .find(node => node.backendNodeId === ancestorBackendId);
+          if (ancestorNode) {
+            await ancestorHandle.dispose();
+            return ancestorNode;
+          }
+        }
+
+        const nextHandle = await ancestorElement.evaluateHandle(
+          el => el.parentElement,
+        );
+        await ancestorHandle.dispose();
+        ancestorHandle = nextHandle;
+      }
+      return null;
+    };
+
+    const findDescendantNodes = async (
+      backendNodeId: number,
+    ): Promise<Set<number>> => {
+      const descendantIds = new Set<number>();
+      try {
+        // @ts-expect-error internal API
+        const client = page.pptrPage._client();
+        if (client) {
+          const {node}: {node: Protocol.DOM.Node} = await client.send(
+            'DOM.describeNode',
+            {
+              backendNodeId,
+              depth: -1,
+              pierce: true,
+            },
+          );
+          const collect = (node: Protocol.DOM.Node) => {
+            if (node.backendNodeId && node.backendNodeId !== backendNodeId) {
+              descendantIds.add(node.backendNodeId);
+            }
+            if (node.children) {
+              for (const child of node.children) {
+                collect(child);
+              }
+            }
+          };
+          collect(node);
+        }
+      } catch (e) {
+        this.logger(
+          `Failed to collect descendants for backend node ${backendNodeId}`,
+          e,
+        );
+      }
+      return descendantIds;
+    };
+
+    const moveChildNodes = (
+      attachTarget: TextSnapshotNode,
+      extraNode: TextSnapshotNode,
+      descendantIds: Set<number>,
+    ): number => {
+      let firstMovedIndex = -1;
+      if (descendantIds.size > 0 && attachTarget.children) {
+        const remainingChildren: TextSnapshotNode[] = [];
+        for (const child of attachTarget.children) {
+          if (child.backendNodeId && descendantIds.has(child.backendNodeId)) {
+            if (firstMovedIndex === -1) {
+              firstMovedIndex = remainingChildren.length;
+            }
+            extraNode.children.push(child);
+          } else {
+            remainingChildren.push(child);
+          }
+        }
+        attachTarget.children = remainingChildren;
+      }
+      return firstMovedIndex !== -1
+        ? firstMovedIndex
+        : attachTarget.children
+          ? attachTarget.children.length
+          : 0;
+    };
+
+    if (extraHandles) {
+      page.setExtraHandles(extraHandles);
+    }
+    for (const handle of page.getExtraHandles() ?? []) {
+      const extraNode = await createExtraNode(handle);
+      if (!extraNode) {
+        continue;
+      }
+      idToNode.set(extraNode.id, extraNode);
+      const attachTarget = (await findAncestorNode(handle)) || rootNodeWithId;
+      const descendantIds = await findDescendantNodes(extraNode.backendNodeId!);
+      const index = moveChildNodes(attachTarget, extraNode, descendantIds);
+      attachTarget.children.splice(index, 0, extraNode);
+    }
+
     const snapshot: TextSnapshot = {
       root: rootNodeWithId,
       snapshotId: String(snapshotId),
@@ -775,7 +928,7 @@ export class McpContext implements Context {
       hasSelectedElement: false,
       verbose,
     };
-    page.textSnapshot = snapshot;
+    page.setSnapshot(snapshot);
     const data = devtoolsData ?? (await this.getDevToolsData(page));
     if (data?.cdpBackendNodeId) {
       snapshot.hasSelectedElement = true;
