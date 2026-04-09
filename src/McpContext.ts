@@ -38,6 +38,7 @@ import type {
   DevToolsData,
   ContextPage,
   SupportedExtensions,
+  ContextPage,
 } from './tools/ToolDefinition.js';
 import type {TraceResult} from './trace-processing/parse.js';
 import type {
