@@ -159,6 +159,12 @@ export async function createMcpServer(
       return;
     }
     if (
+      tool.annotations.conditions?.includes('experimentalWebauthn') &&
+      !serverArgs.experimentalWebauthn
+    ) {
+      return;
+    }
+    if (
       tool.annotations.conditions?.includes('screencast') &&
       !serverArgs.experimentalScreencast
     ) {

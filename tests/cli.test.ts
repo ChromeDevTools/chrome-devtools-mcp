@@ -23,6 +23,8 @@ describe('cli args parsing', () => {
     performanceCrux: true,
     'usage-statistics': true,
     usageStatistics: true,
+    'experimental-webauthn': false,
+    experimentalWebauthn: false,
   };
 
   it('parses with default args', async () => {

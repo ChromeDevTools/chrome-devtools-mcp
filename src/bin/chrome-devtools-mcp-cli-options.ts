@@ -180,6 +180,13 @@ export const cliOptions = {
     describe: 'Whether to enable interoperability tools',
     hidden: true,
   },
+  experimentalWebauthn: {
+    type: 'boolean',
+    describe:
+      'Whether to enable experimental WebAuthn virtual authenticator tools.',
+    hidden: false,
+    default: false,
+  },
   experimentalScreencast: {
     type: 'boolean',
     describe:
@@ -342,6 +349,10 @@ export function parseArguments(version: string, argv = process.argv) {
       [
         '$0 --slim',
         'Only 3 tools: navigation, JavaScript execution and screenshot',
+      ],
+      [
+        '$0 --experimental-webauthn',
+        'Enable experimental WebAuthn virtual authenticator tooling.',
       ],
     ]);
 

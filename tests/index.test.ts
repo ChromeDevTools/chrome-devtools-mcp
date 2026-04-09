@@ -162,4 +162,17 @@ describe('e2e', () => {
       ['--experimental-interop-tools'],
     );
   });
+
+  it('has experimental webauthn tools', async () => {
+    await withClient(
+      async client => {
+        const {tools} = await client.listTools();
+        const configureWebauthn = tools.find(
+          t => t.name === 'configure_webauthn',
+        );
+        assert.ok(configureWebauthn);
+      },
+      ['--experimental-webauthn'],
+    );
+  });
 });
