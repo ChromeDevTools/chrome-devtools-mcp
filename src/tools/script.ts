@@ -17,44 +17,28 @@ export type Evaluatable = Page | Frame | WebWorker;
 export const evaluateScript = defineTool(cliArgs => {
   return {
     name: 'evaluate_script',
-    description: `Evaluate a JavaScript function inside the currently selected page. Returns the response as JSON,
-so returned values have to be JSON-serializable.`,
+    description: `Evaluate JS function in page. Returns JSON-serializable response.`,
     annotations: {
       category: ToolCategory.DEBUGGING,
       readOnlyHint: false,
     },
     schema: {
-      function: zod.string().describe(
-        `A JavaScript function declaration to be executed by the tool in the currently selected page.
-Example without arguments: \`() => {
-  return document.title
-}\` or \`async () => {
-  return await fetch("example.com")
-}\`.
-Example with arguments: \`(el) => {
-  return el.innerText;
-}\`
-`,
-      ),
+      function: zod
+        .string()
+        .describe(
+          `JS function to execute. Examples: \`() => document.title\`, \`(el) => el.innerText\`.`,
+        ),
       args: zod
-        .array(
-          zod
-            .string()
-            .describe(
-              'The uid of an element on the page from the page content snapshot',
-            ),
-        )
+        .array(zod.string().describe('Element UID from snapshot.'))
         .optional()
-        .describe(`An optional list of arguments to pass to the function.`),
+        .describe(`Arguments to pass to the function.`),
       ...(cliArgs?.experimentalPageIdRouting ? pageIdSchema : {}),
       ...(cliArgs?.categoryExtensions
         ? {
             serviceWorkerId: zod
               .string()
               .optional()
-              .describe(
-                `An optional service worker id to evaluate the script in.`,
-              ),
+              .describe(`Service worker ID to evaluate script in.`),
           }
         : {}),
     },

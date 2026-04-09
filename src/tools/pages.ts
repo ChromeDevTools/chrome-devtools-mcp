@@ -19,7 +19,7 @@ import {
 export const listPages = defineTool(args => {
   return {
     name: 'list_pages',
-    description: `Get a list of pages ${args?.categoryExtensions ? 'including extension service workers' : ''} open in the browser.`,
+    description: `List open pages${args?.categoryExtensions ? ' including extension service workers' : ''}.`,
     annotations: {
       category: ToolCategory.NAVIGATION,
       readOnlyHint: true,
@@ -48,7 +48,7 @@ export const selectPage = defineTool({
     bringToFront: zod
       .boolean()
       .optional()
-      .describe('Whether to focus the page and bring it to the top.'),
+      .describe('Focus page and bring to top.'),
   },
   handler: async (request, response, context) => {
     const page = context.getPageById(request.params.pageId);
@@ -63,7 +63,7 @@ export const selectPage = defineTool({
 
 export const closePage = defineTool({
   name: 'close_page',
-  description: `Closes the page by its index. The last open page cannot be closed.`,
+  description: `Close page by ID. Cannot close last page.`,
   annotations: {
     category: ToolCategory.NAVIGATION,
     readOnlyHint: false,
@@ -90,26 +90,22 @@ export const closePage = defineTool({
 
 export const newPage = defineTool({
   name: 'new_page',
-  description: `Open a new tab and load a URL. Use project URL if not specified otherwise.`,
+  description: `Open new tab and load URL.`,
   annotations: {
     category: ToolCategory.NAVIGATION,
     readOnlyHint: false,
   },
   schema: {
-    url: zod.string().describe('URL to load in a new page.'),
+    url: zod.string().describe('URL to load.'),
     background: zod
       .boolean()
       .optional()
-      .describe(
-        'Whether to open the page in the background without bringing it to the front. Default is false (foreground).',
-      ),
+      .describe('Open page in background. If omitted: false (foreground)'),
     isolatedContext: zod
       .string()
       .optional()
       .describe(
-        'If specified, the page is created in an isolated browser context with the given name. ' +
-          'Pages in the same browser context share cookies and storage. ' +
-          'Pages in different browser contexts are fully isolated.',
+        'Isolated browser context name. Shared cookies/storage within context.',
       ),
     ...timeoutSchema,
   },
@@ -135,7 +131,7 @@ export const newPage = defineTool({
 
 export const navigatePage = definePageTool({
   name: 'navigate_page',
-  description: `Go to a URL, or back, forward, or reload. Use project URL if not specified otherwise.`,
+  description: `Go to URL, back, forward, or reload.`,
   annotations: {
     category: ToolCategory.NAVIGATION,
     readOnlyHint: false,
@@ -144,26 +140,17 @@ export const navigatePage = definePageTool({
     type: zod
       .enum(['url', 'back', 'forward', 'reload'])
       .optional()
-      .describe(
-        'Navigate the page by URL, back or forward in history, or reload.',
-      ),
-    url: zod.string().optional().describe('Target URL (only type=url)'),
-    ignoreCache: zod
-      .boolean()
-      .optional()
-      .describe('Whether to ignore cache on reload.'),
+      .describe('Navigation type.'),
+    url: zod.string().optional().describe('Target URL.'),
+    ignoreCache: zod.boolean().optional().describe('Ignore cache on reload.'),
     handleBeforeUnload: zod
       .enum(['accept', 'decline'])
       .optional()
-      .describe(
-        'Whether to auto accept or beforeunload dialogs triggered by this navigation. Default is accept.',
-      ),
+      .describe('Auto accept beforeunload dialogs. If omitted: accept'),
     initScript: zod
       .string()
       .optional()
-      .describe(
-        'A JavaScript script to be executed on each new document before any other scripts for the next navigation.',
-      ),
+      .describe('JS script to execute on new documents.'),
     ...timeoutSchema,
   },
   handler: async (request, response) => {
@@ -234,7 +221,7 @@ export const navigatePage = definePageTool({
                 );
               } catch (error) {
                 response.appendResponseLine(
-                  `Unable to navigate back in the selected page: ${error.message}.`,
+                  `Unable to navigate back in the page: ${error.message}.`,
                 );
               }
               break;
@@ -246,7 +233,7 @@ export const navigatePage = definePageTool({
                 );
               } catch (error) {
                 response.appendResponseLine(
-                  `Unable to navigate forward in the selected page: ${error.message}.`,
+                  `Unable to navigate forward in the page: ${error.message}.`,
                 );
               }
               break;
@@ -259,7 +246,7 @@ export const navigatePage = definePageTool({
                 response.appendResponseLine(`Successfully reloaded the page.`);
               } catch (error) {
                 response.appendResponseLine(
-                  `Unable to reload the selected page: ${error.message}.`,
+                  `Unable to reload the page: ${error.message}.`,
                 );
               }
               break;
@@ -285,7 +272,7 @@ export const navigatePage = definePageTool({
 
 export const resizePage = definePageTool({
   name: 'resize_page',
-  description: `Resizes the selected page's window so that the page has specified dimension`,
+  description: `Resize page window.`,
   annotations: {
     category: ToolCategory.EMULATION,
     readOnlyHint: false,
@@ -324,7 +311,7 @@ export const resizePage = definePageTool({
 
 export const handleDialog = definePageTool({
   name: 'handle_dialog',
-  description: `If a browser dialog was opened, use this command to handle it`,
+  description: `Handle open browser dialog.`,
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
@@ -332,11 +319,8 @@ export const handleDialog = definePageTool({
   schema: {
     action: zod
       .enum(['accept', 'dismiss'])
-      .describe('Whether to dismiss or accept the dialog'),
-    promptText: zod
-      .string()
-      .optional()
-      .describe('Optional prompt text to enter into the dialog.'),
+      .describe('Dismiss or accept dialog.'),
+    promptText: zod.string().optional().describe('Prompt text to enter.'),
   },
   handler: async (request, response, _context) => {
     const page = request.page;

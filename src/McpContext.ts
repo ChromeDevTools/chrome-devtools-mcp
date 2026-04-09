@@ -403,7 +403,7 @@ export class McpContext implements Context {
     }
     if (page.pptrPage.isClosed()) {
       throw new Error(
-        `The selected page has been closed. Call ${listPages().name} to see open pages.`,
+        `The page has been closed. Call ${listPages().name} to see open pages.`,
       );
     }
     return page.pptrPage;

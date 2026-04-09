@@ -21,7 +21,7 @@ const throttlingOptions: [string, ...string[]] = [
 
 export const emulate = definePageTool({
   name: 'emulate',
-  description: `Emulates various features on the selected page.`,
+  description: `Emulate features on page.`,
   annotations: {
     category: ToolCategory.EMULATION,
     readOnlyHint: false,
@@ -30,41 +30,31 @@ export const emulate = definePageTool({
     networkConditions: zod
       .enum(throttlingOptions)
       .optional()
-      .describe(`Throttle network. Omit to disable throttling.`),
+      .describe(`Throttle network. Omit to disable.`),
     cpuThrottlingRate: zod
       .number()
       .min(1)
       .max(20)
       .optional()
-      .describe(
-        'Represents the CPU slowdown factor. Omit or set the rate to 1 to disable throttling',
-      ),
+      .describe('CPU slowdown factor. 1 to disable.'),
     geolocation: zod
       .string()
       .optional()
       .transform(geolocationTransform)
-      .describe(
-        'Geolocation (`<latitude>x<longitude>`) to emulate. Latitude between -90 and 90. Longitude between -180 and 180. Omit to clear the geolocation override.',
-      ),
+      .describe('Geolocation (<lat>x<lon>). Lat: -90 to 90. Lon: -180 to 180.'),
     userAgent: zod
       .string()
       .optional()
-      .describe(
-        'User agent to emulate. Set to empty string to clear the user agent override.',
-      ),
+      .describe('User agent to emulate. Empty string to clear.'),
     colorScheme: zod
       .enum(['dark', 'light', 'auto'])
       .optional()
-      .describe(
-        'Emulate the dark or the light mode. Set to "auto" to reset to the default.',
-      ),
+      .describe('Emulate dark or light mode. "auto" to reset.'),
     viewport: zod
       .string()
       .optional()
       .transform(viewportTransform)
-      .describe(
-        `Emulate device viewports '<width>x<height>x<devicePixelRatio>[,mobile][,touch][,landscape]'. 'touch' and 'mobile' to emulate mobile devices. 'landscape' to emulate landscape mode.`,
-      ),
+      .describe(`Viewport spec: '<w>x<h>x<dpr>[,mobile][,touch][,landscape]'.`),
   },
   handler: async (request, _response, context) => {
     const page = request.page;

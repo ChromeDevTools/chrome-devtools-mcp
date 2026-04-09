@@ -563,7 +563,7 @@ export const commands: Commands = {
   },
   resize_page: {
     description:
-      "Resizes the selected page's window so that the page has specified dimension",
+      "Resizes the page's window so that the page has specified dimension",
     category: 'Emulation',
     args: {
       width: {
@@ -723,7 +723,7 @@ export const commands: Commands = {
     },
   },
   wait_for: {
-    description: 'Wait for the specified text to appear on the selected page.',
+    description: 'Wait for the specified text to appear on the page.',
     category: 'Navigation automation',
     args: {
       text: {

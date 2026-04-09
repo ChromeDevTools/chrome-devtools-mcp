@@ -18,12 +18,12 @@ import {definePageTool} from './ToolDefinition.js';
 const dblClickSchema = zod
   .boolean()
   .optional()
-  .describe('Set to true for double clicks. Default is false.');
+  .describe('Set to true for double clicks. If omitted: false');
 
 const includeSnapshotSchema = zod
   .boolean()
   .optional()
-  .describe('Whether to include a snapshot in the response. Default is false.');
+  .describe('Include snapshot in response. If omitted: false');
 
 const submitKeySchema = zod
   .string()
@@ -50,11 +50,7 @@ export const click = definePageTool({
     readOnlyHint: false,
   },
   schema: {
-    uid: zod
-      .string()
-      .describe(
-        'The uid of an element on the page from the page content snapshot',
-      ),
+    uid: zod.string().describe('Element UID from snapshot.'),
     dblClick: dblClickSchema,
     includeSnapshot: includeSnapshotSchema,
   },
@@ -123,11 +119,7 @@ export const hover = definePageTool({
     readOnlyHint: false,
   },
   schema: {
-    uid: zod
-      .string()
-      .describe(
-        'The uid of an element on the page from the page content snapshot',
-      ),
+    uid: zod.string().describe('Element UID from snapshot.'),
     includeSnapshot: includeSnapshotSchema,
   },
   handler: async (request, response) => {
@@ -219,18 +211,14 @@ async function fillFormElement(
 
 export const fill = definePageTool({
   name: 'fill',
-  description: `Type text into an input, text area or select an option from a <select> element.`,
+  description: `Type text into input, textarea, or select option.`,
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
   },
   schema: {
-    uid: zod
-      .string()
-      .describe(
-        'The uid of an element on the page from the page content snapshot',
-      ),
-    value: zod.string().describe('The value to fill in'),
+    uid: zod.string().describe('Element UID from snapshot.'),
+    value: zod.string().describe('Value to fill.'),
     includeSnapshot: includeSnapshotSchema,
   },
   handler: async (request, response, context) => {
@@ -252,13 +240,13 @@ export const fill = definePageTool({
 
 export const typeText = definePageTool({
   name: 'type_text',
-  description: `Type text using keyboard into a previously focused input`,
+  description: `Type text into focused input.`,
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
   },
   schema: {
-    text: zod.string().describe('The text to type'),
+    text: zod.string().describe('Text to type.'),
     submitKey: submitKeySchema,
   },
   handler: async (request, response) => {
@@ -285,8 +273,8 @@ export const drag = definePageTool({
     readOnlyHint: false,
   },
   schema: {
-    from_uid: zod.string().describe('The uid of the element to drag'),
-    to_uid: zod.string().describe('The uid of the element to drop into'),
+    from_uid: zod.string().describe('UID of element to drag.'),
+    to_uid: zod.string().describe('UID of element to drop into.'),
     includeSnapshot: includeSnapshotSchema,
   },
   handler: async (request, response) => {
@@ -313,7 +301,7 @@ export const drag = definePageTool({
 
 export const fillForm = definePageTool({
   name: 'fill_form',
-  description: `Fill out multiple form elements at once`,
+  description: `Fill multiple form elements.`,
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
@@ -323,8 +311,8 @@ export const fillForm = definePageTool({
       .array(
         // eslint-disable-next-line @local/enforce-zod-schema
         zod.object({
-          uid: zod.string().describe('The uid of the element to fill out'),
-          value: zod.string().describe('Value for the element'),
+          uid: zod.string().describe('Element UID.'),
+          value: zod.string().describe('Value to fill.'),
         }),
       )
       .describe('Elements from snapshot to fill out.'),
@@ -351,7 +339,7 @@ export const fillForm = definePageTool({
 
 export const uploadFile = definePageTool({
   name: 'upload_file',
-  description: 'Upload a file through a provided element.',
+  description: 'Upload file through element.',
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
@@ -359,10 +347,8 @@ export const uploadFile = definePageTool({
   schema: {
     uid: zod
       .string()
-      .describe(
-        'The uid of the file input element or an element that will open file chooser on the page from the page content snapshot',
-      ),
-    filePath: zod.string().describe('The local path of the file to upload'),
+      .describe('UID of file input or element opening file chooser.'),
+    filePath: zod.string().describe('Local path of file to upload.'),
     includeSnapshot: includeSnapshotSchema,
   },
   handler: async (request, response) => {
@@ -401,7 +387,7 @@ export const uploadFile = definePageTool({
 
 export const pressKey = definePageTool({
   name: 'press_key',
-  description: `Press a key or key combination. Use this when other input methods like fill() cannot be used (e.g., keyboard shortcuts, navigation keys, or special key combinations).`,
+  description: `Press a key or combination. Use for shortcuts or when fill() fails.`,
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
@@ -410,7 +396,7 @@ export const pressKey = definePageTool({
     key: zod
       .string()
       .describe(
-        'A key or a combination (e.g., "Enter", "Control+A", "Control++", "Control+Shift+R"). Modifiers: Control, Shift, Alt, Meta',
+        'Key or combination (e.g., "Enter", "Control+A"). Modifiers: Control, Shift, Alt, Meta.',
       ),
     includeSnapshot: includeSnapshotSchema,
   },

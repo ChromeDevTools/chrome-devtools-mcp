@@ -11,9 +11,7 @@ import {definePageTool, timeoutSchema} from './ToolDefinition.js';
 
 export const takeSnapshot = definePageTool({
   name: 'take_snapshot',
-  description: `Take a text snapshot of the currently selected page based on the a11y tree. The snapshot lists page elements along with a unique
-identifier (uid). Always use the latest snapshot. Prefer taking a snapshot over taking a screenshot. The snapshot indicates the element selected
-in the DevTools Elements panel (if any).`,
+  description: `Take a text snapshot using the a11y tree. Lists elements with a unique ID (uid). Prefer snapshots over screenshots. Indicates the element selected in the DevTools Elements panel.`,
   annotations: {
     category: ToolCategory.DEBUGGING,
     // Not read-only due to filePath param.
@@ -23,9 +21,7 @@ in the DevTools Elements panel (if any).`,
     verbose: zod
       .boolean()
       .optional()
-      .describe(
-        'Whether to include all possible information available in the full a11y tree. Default is false.',
-      ),
+      .describe('Include all info in the a11y tree. If omitted: false'),
     filePath: zod
       .string()
       .optional()
@@ -43,7 +39,7 @@ in the DevTools Elements panel (if any).`,
 
 export const waitFor = definePageTool({
   name: 'wait_for',
-  description: `Wait for the specified text to appear on the selected page.`,
+  description: `Wait for the specified text to appear on the page.`,
   annotations: {
     category: ToolCategory.NAVIGATION,
     readOnlyHint: true,

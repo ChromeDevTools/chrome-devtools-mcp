@@ -39,8 +39,7 @@ const FILTERABLE_MESSAGE_TYPES: [
 
 export const listConsoleMessages = definePageTool({
   name: 'list_console_messages',
-  description:
-    'List all console messages for the currently selected page since the last navigation.',
+  description: 'List console messages since last navigation.',
   annotations: {
     category: ToolCategory.DEBUGGING,
     readOnlyHint: true,
@@ -51,30 +50,22 @@ export const listConsoleMessages = definePageTool({
       .int()
       .positive()
       .optional()
-      .describe(
-        'Maximum number of messages to return. When omitted, returns all messages.',
-      ),
+      .describe('Max messages to return. If omitted: all.'),
     pageIdx: zod
       .number()
       .int()
       .min(0)
       .optional()
-      .describe(
-        'Page number to return (0-based). When omitted, returns the first page.',
-      ),
+      .describe('Page number (0-based). If omitted: 0.'),
     types: zod
       .array(zod.enum(FILTERABLE_MESSAGE_TYPES))
       .optional()
-      .describe(
-        'Filter messages to only return messages of the specified resource types. When omitted or empty, returns all messages.',
-      ),
+      .describe('Filter by message types. If omitted: all.'),
     includePreservedMessages: zod
       .boolean()
       .default(false)
       .optional()
-      .describe(
-        'Set to true to return the preserved messages over the last 3 navigations.',
-      ),
+      .describe('Return preserved messages over last 3 navigations.'),
   },
   handler: async (request, response) => {
     response.setIncludeConsoleData(true, {

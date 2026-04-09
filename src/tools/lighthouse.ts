@@ -22,7 +22,7 @@ import {definePageTool} from './ToolDefinition.js';
 
 export const lighthouseAudit = definePageTool({
   name: 'lighthouse_audit',
-  description: `Get Lighthouse score and reports for accessibility, SEO and best practices. This excludes performance. For performance audits, run ${startTrace.name}`,
+  description: `Get Lighthouse score for a11y, SEO, and best practices. Excludes performance (use ${startTrace.name}).`,
   annotations: {
     category: ToolCategory.DEBUGGING,
     readOnlyHint: false,
@@ -41,7 +41,7 @@ export const lighthouseAudit = definePageTool({
     outputDirPath: zod
       .string()
       .optional()
-      .describe('Directory for reports. If omitted, uses temporary files.'),
+      .describe('Directory for reports. Default temporary files.'),
   },
   handler: async (request, response, context) => {
     const page = request.page;

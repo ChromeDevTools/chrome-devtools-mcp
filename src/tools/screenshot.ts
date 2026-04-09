@@ -22,21 +22,19 @@ export const screenshot = definePageTool({
     format: zod
       .enum(['png', 'jpeg', 'webp'])
       .default('png')
-      .describe('Type of format to save the screenshot as. Default is "png"'),
+      .describe('Type of format to save the screenshot as. If omitted: "png"'),
     quality: zod
       .number()
       .min(0)
       .max(100)
       .optional()
       .describe(
-        'Compression quality for JPEG and WebP formats (0-100). Higher values mean better quality but larger file sizes. Ignored for PNG format.',
+        'Compression quality for (0-100). Higher values mean better quality but larger sizes. Ignored for PNG format.',
       ),
     uid: zod
       .string()
       .optional()
-      .describe(
-        'The uid of an element on the page from the page content snapshot. If omitted, takes a page screenshot.',
-      ),
+      .describe('Element UID from snapshot. If omitted: page screenshot'),
     fullPage: zod
       .boolean()
       .optional()

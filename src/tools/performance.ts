@@ -22,13 +22,11 @@ import {definePageTool} from './ToolDefinition.js';
 const filePathSchema = zod
   .string()
   .optional()
-  .describe(
-    'The absolute file path, or a file path relative to the current working directory, to save the raw trace data. For example, trace.json.gz (compressed) or trace.json (uncompressed).',
-  );
+  .describe('Path to save raw trace data. E.g., trace.json.gz.');
 
 export const startTrace = definePageTool({
   name: 'performance_start_trace',
-  description: `Start a performance trace on the selected webpage. Use to find frontend performance issues, Core Web Vitals (LCP, INP, CLS), and improve page load speed.`,
+  description: `Start performance trace. Use to find issues and improve speed.`,
   annotations: {
     category: ToolCategory.PERFORMANCE,
     readOnlyHint: false,
@@ -37,15 +35,11 @@ export const startTrace = definePageTool({
     reload: zod
       .boolean()
       .default(true)
-      .describe(
-        'Determines if, once tracing has started, the current selected page should be automatically reloaded. Navigate the page to the right URL using the navigate_page tool BEFORE starting the trace if reload or autoStop is set to true.',
-      ),
+      .describe('Reload page. Use navigate_page BEFORE starting if true.'),
     autoStop: zod
       .boolean()
       .default(true)
-      .describe(
-        'Determines if the trace recording should be automatically stopped.',
-      ),
+      .describe('Auto stop trace recording.'),
     filePath: filePathSchema,
   },
   handler: async (request, response, context) => {
@@ -116,8 +110,7 @@ export const startTrace = definePageTool({
 
 export const stopTrace = definePageTool({
   name: 'performance_stop_trace',
-  description:
-    'Stop the active performance trace recording on the selected webpage.',
+  description: 'Stop active performance trace.',
   annotations: {
     category: ToolCategory.PERFORMANCE,
     readOnlyHint: false,
@@ -141,8 +134,7 @@ export const stopTrace = definePageTool({
 
 export const analyzeInsight = definePageTool({
   name: 'performance_analyze_insight',
-  description:
-    'Provides more detailed information on a specific Performance Insight of an insight set that was highlighted in the results of a trace recording.',
+  description: 'Get details on a specific Performance Insight.',
   annotations: {
     category: ToolCategory.PERFORMANCE,
     readOnlyHint: true,
@@ -150,14 +142,10 @@ export const analyzeInsight = definePageTool({
   schema: {
     insightSetId: zod
       .string()
-      .describe(
-        'The id for the specific insight set. Only use the ids given in the "Available insight sets" list.',
-      ),
+      .describe('ID for specific insight set. Use IDs from results.'),
     insightName: zod
       .string()
-      .describe(
-        'The name of the Insight you want more information on. For example: "DocumentLatency" or "LCPBreakdown"',
-      ),
+      .describe('Insight name (e.g., "DocumentLatency").'),
   },
   handler: async (request, response, context) => {
     const lastRecording = context.recordedTraces().at(-1);

@@ -68,7 +68,7 @@ if ('default' in cliOptions.isolated) {
 }
 startCliOptions.headless!.default = true;
 startCliOptions.isolated!.description =
-  'If specified, creates a temporary user-data-dir that is automatically cleaned up after the browser is closed. Defaults to true unless userDataDir is provided.';
+  'If specified, creates a temporary user-data-dir that is automatically cleaned up after the browser is closed. Default true unless userDataDir is provided';
 
 const y = yargs(hideBin(process.argv))
   .scriptName('chrome-devtools')

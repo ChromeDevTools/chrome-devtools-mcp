@@ -34,7 +34,7 @@ const FILTERABLE_RESOURCE_TYPES: readonly [ResourceType, ...ResourceType[]] = [
 
 export const listNetworkRequests = definePageTool({
   name: 'list_network_requests',
-  description: `List all requests for the currently selected page since the last navigation.`,
+  description: `List network requests since last navigation.`,
   annotations: {
     category: ToolCategory.NETWORK,
     readOnlyHint: true,
@@ -45,30 +45,22 @@ export const listNetworkRequests = definePageTool({
       .int()
       .positive()
       .optional()
-      .describe(
-        'Maximum number of requests to return. When omitted, returns all requests.',
-      ),
+      .describe('Max requests to return. If omitted: all.'),
     pageIdx: zod
       .number()
       .int()
       .min(0)
       .optional()
-      .describe(
-        'Page number to return (0-based). When omitted, returns the first page.',
-      ),
+      .describe('Page number (0-based). If omitted: 0.'),
     resourceTypes: zod
       .array(zod.enum(FILTERABLE_RESOURCE_TYPES))
       .optional()
-      .describe(
-        'Filter requests to only return requests of the specified resource types. When omitted or empty, returns all requests.',
-      ),
+      .describe('Filter by resource types. If omitted: all.'),
     includePreservedRequests: zod
       .boolean()
       .default(false)
       .optional()
-      .describe(
-        'Set to true to return the preserved requests over the last 3 navigations.',
-      ),
+      .describe('Return preserved requests over last 3 navigations.'),
   },
   handler: async (request, response, context) => {
     const data = await context.getDevToolsData(request.page);
@@ -88,7 +80,7 @@ export const listNetworkRequests = definePageTool({
 
 export const getNetworkRequest = definePageTool({
   name: 'get_network_request',
-  description: `Gets a network request by an optional reqid, if omitted returns the currently selected request in the DevTools Network panel.`,
+  description: `Gets a network request by an optional reqid. If omitted: selected request`,
   annotations: {
     category: ToolCategory.NETWORK,
     readOnlyHint: false,
@@ -98,19 +90,19 @@ export const getNetworkRequest = definePageTool({
       .number()
       .optional()
       .describe(
-        'The reqid of the network request. If omitted returns the currently selected request in the DevTools Network panel.',
+        'The reqid of the network request. If omitted: selected request',
       ),
     requestFilePath: zod
       .string()
       .optional()
       .describe(
-        'The absolute or relative path to save the request body to. If omitted, the body is returned inline.',
+        'The absolute or relative path to save the request body to. If omitted: inline',
       ),
     responseFilePath: zod
       .string()
       .optional()
       .describe(
-        'The absolute or relative path to save the response body to. If omitted, the body is returned inline.',
+        'The absolute or relative path to save the response body to. If omitted: inline',
       ),
   },
   handler: async (request, response, context) => {
