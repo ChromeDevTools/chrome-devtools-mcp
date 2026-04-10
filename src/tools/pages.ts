@@ -28,6 +28,7 @@ export const listPages = defineTool(args => {
     handler: async (_request, response) => {
       response.setIncludePages(true);
       response.setListInPageTools();
+      response.setListWebMcpTools();
     },
   };
 });

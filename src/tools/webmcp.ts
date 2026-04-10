@@ -11,7 +11,7 @@ export const listWebMcpTools = definePageTool({
   name: 'list_webmcp_tools',
   description: `Lists all WebMCP tools the page exposes.`,
   annotations: {
-    category: ToolCategory.IN_PAGE,
+    category: ToolCategory.DEBUGGING,
     readOnlyHint: true,
     conditions: ['experimentalWebmcp'],
   },

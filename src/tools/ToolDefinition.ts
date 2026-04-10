@@ -201,7 +201,6 @@ export type Context = Readonly<{
   getExtensionServiceWorkerId(
     extensionServiceWorker: ExtensionServiceWorker,
   ): string | undefined;
-  getWebMcpTools(page: ContextPage): WebMcpTool[];
 }>;
 
 export type ContextPage = Readonly<{
