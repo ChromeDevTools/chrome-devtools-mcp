@@ -374,6 +374,21 @@ Once connected, the Chrome DevTools MCP tools will be available in StudioAssist.
 </details>
 
 <details>
+  <summary>Mistral Vibe</summary>
+
+Add in ~/.vibe/config.toml:
+
+```toml
+[[mcp_servers]]
+name = "chrome-devtools"
+transport = "stdio"
+command = "npx"
+args = ["chrome-devtools-mcp@latest"]
+```
+
+</details>
+
+<details>
   <summary>OpenCode</summary>
 
 Add the following configuration to your `opencode.json` file. If you don't have one, create it at `~/.config/opencode/opencode.json` (<a href="https://opencode.ai/docs/mcp-servers">guide</a>):
