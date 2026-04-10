@@ -7,13 +7,14 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
+import type {WebMCPTool} from 'puppeteer-core/internal/cdp/WebMCP.js';
+
 import type {TargetUniverse} from './DevtoolsUtils.js';
 import {UniverseManager} from './DevtoolsUtils.js';
 import {McpPage} from './McpPage.js';
 import {
   NetworkCollector,
   ConsoleCollector,
-  WebMcpCollector,
   type ListenerMap,
   type UncaughtError,
 } from './PageCollector.js';
@@ -42,7 +43,6 @@ import type {
   TextSnapshot,
   TextSnapshotNode,
   ExtensionServiceWorker,
-  WebMcpTool,
 } from './types.js';
 import {
   ExtensionRegistry,
@@ -79,7 +79,6 @@ export class McpContext implements Context {
   #selectedPage?: McpPage;
   #networkCollector: NetworkCollector;
   #consoleCollector: ConsoleCollector;
-  #webmcpCollector: WebMcpCollector;
   #devtoolsUniverseManager: UniverseManager;
   #extensionRegistry = new ExtensionRegistry();
 
@@ -125,13 +124,6 @@ export class McpContext implements Context {
         },
       } as ListenerMap;
     });
-    this.#webmcpCollector = new WebMcpCollector(this.browser, collect => {
-      return {
-        webmcpToolAdded: event => {
-          collect(event);
-        },
-      } as ListenerMap;
-    });
     this.#devtoolsUniverseManager = new UniverseManager(this.browser);
   }
 
@@ -140,14 +132,12 @@ export class McpContext implements Context {
     await this.createExtensionServiceWorkersSnapshot();
     await this.#networkCollector.init(pages);
     await this.#consoleCollector.init(pages);
-    await this.#webmcpCollector.init(pages);
     await this.#devtoolsUniverseManager.init(pages);
   }
 
   dispose() {
     this.#networkCollector.dispose();
     this.#consoleCollector.dispose();
-    this.#webmcpCollector.dispose();
     this.#devtoolsUniverseManager.dispose();
     for (const mcpPage of this.#mcpPages.values()) {
       mcpPage.dispose();
@@ -234,8 +224,8 @@ export class McpContext implements Context {
     );
   }
 
-  getWebMcpTools(page: McpPage): WebMcpTool[] {
-    return this.#webmcpCollector.getData(page.pptrPage) ?? [];
+  getWebMcpTools(page: McpPage): WebMCPTool[] {
+    return page.pptrPage.webmcp.tools();
   }
 
   getDevToolsUniverse(page: McpPage): TargetUniverse | null {

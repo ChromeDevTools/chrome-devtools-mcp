@@ -4,12 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {
-  SerializedAXNode,
-  Viewport,
-  Target,
-  Protocol,
-} from './third_party/index.js';
+import type {SerializedAXNode, Viewport, Target} from './third_party/index.js';
 
 export interface ExtensionServiceWorker {
   url: string;
@@ -47,19 +42,4 @@ export interface EmulationSettings {
   userAgent?: string;
   colorScheme?: 'dark' | 'light';
   viewport?: Viewport;
-}
-
-export interface WebMcpAnnotation {
-  readOnly?: boolean;
-  autosubmit?: boolean;
-}
-
-export interface WebMcpTool {
-  name: string;
-  description: string;
-  inputSchema?: object;
-  annotations?: WebMcpAnnotation;
-  frameId: string;
-  backendNodeId?: number;
-  stackTrace?: Protocol.Runtime.StackTrace;
 }

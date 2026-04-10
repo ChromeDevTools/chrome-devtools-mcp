@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type {WebMCPTool} from 'puppeteer-core/internal/cdp/WebMCP.js';
+
 import type {ParsedArguments} from './bin/chrome-devtools-mcp-cli-options.js';
 import {ConsoleFormatter} from './formatters/ConsoleFormatter.js';
 import {IssueFormatter} from './formatters/IssueFormatter.js';
@@ -32,7 +34,6 @@ import type {
 } from './tools/ToolDefinition.js';
 import type {InsightName, TraceResult} from './trace-processing/parse.js';
 import {getInsightOutput, getTraceSummary} from './trace-processing/parse.js';
-import type {WebMcpTool} from './types.js';
 import type {InstalledExtension} from './utils/ExtensionRegistry.js';
 import {paginate} from './utils/pagination.js';
 import type {PaginationOptions} from './utils/types.js';
@@ -490,7 +491,7 @@ export class McpResponse implements Response {
       page.inPageTools = inPageTools;
     }
 
-    let webmcpTools: WebMcpTool[] | undefined;
+    let webmcpTools: WebMCPTool[] | undefined;
     if (this.#listWebMcpTools) {
       const page = this.#page ?? context.getSelectedMcpPage();
       webmcpTools = context.getWebMcpTools(page);
@@ -617,7 +618,7 @@ export class McpResponse implements Response {
       extensions?: InstalledExtension[];
       lighthouseResult?: LighthouseData;
       inPageTools?: ToolGroup<ToolDefinition>;
-      webmcpTools?: WebMcpTool[];
+      webmcpTools?: WebMCPTool[];
     },
   ): {content: Array<TextContent | ImageContent>; structuredContent: object} {
     const structuredContent: {

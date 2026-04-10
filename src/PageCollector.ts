@@ -21,7 +21,6 @@ import {
   type Page,
   type PageEvents as PuppeteerPageEvents,
 } from './third_party/index.js';
-import type {WebMcpTool} from './types.js';
 
 export class UncaughtError {
   readonly details: Protocol.Runtime.ExceptionDetails;
@@ -36,7 +35,6 @@ export class UncaughtError {
 interface PageEvents extends PuppeteerPageEvents {
   issue: DevTools.AggregatedIssue;
   uncaughtError: UncaughtError;
-  webmcpToolAdded: WebMcpTool;
 }
 
 export type ListenerMap<EventMap extends PageEvents = PageEvents> = {
@@ -412,61 +410,5 @@ export class NetworkCollector extends PageCollector<HTTPRequest> {
       navigations.unshift([]);
     }
     navigations.splice(this.maxNavigationSaved);
-  }
-}
-
-export class WebMcpCollector extends PageCollector<WebMcpTool> {
-  #subscribedPages = new WeakMap<Page, WebMcpSubscriber>();
-
-  override addPage(page: Page): void {
-    super.addPage(page);
-    if (!this.#subscribedPages.has(page)) {
-      const subscriber = new WebMcpSubscriber(page);
-      this.#subscribedPages.set(page, subscriber);
-      void subscriber.subscribe();
-    }
-  }
-
-  protected override cleanupPageDestroyed(page: Page): void {
-    super.cleanupPageDestroyed(page);
-    void this.#subscribedPages.get(page)?.unsubscribe();
-    this.#subscribedPages.delete(page);
-  }
-}
-
-class WebMcpSubscriber {
-  #page: Page;
-  #session: CDPSession;
-  #onToolsAdded: (data: unknown) => void;
-
-  constructor(page: Page) {
-    this.#page = page;
-    // @ts-expect-error use existing CDP client (internal Puppeteer API).
-    this.#session = this.#page._client() as CDPSession;
-    this.#onToolsAdded = (data: unknown) => {
-      for (const tool of (data as {tools: WebMcpTool[]}).tools) {
-        this.#page.emit('webmcpToolAdded', tool);
-      }
-    };
-  }
-
-  async subscribe() {
-    this.#session.on('WebMCP.toolsAdded', this.#onToolsAdded);
-    try {
-      // @ts-expect-error WebMCP is an experimental domain
-      await this.#session.send('WebMCP.enable');
-    } catch (error) {
-      logger('Error subscribing to WebMCP', error);
-    }
-  }
-
-  async unsubscribe() {
-    this.#session.off('WebMCP.toolsAdded', this.#onToolsAdded);
-    try {
-      // @ts-expect-error WebMCP is an experimental domain
-      await this.#session.send('WebMCP.disable');
-    } catch (error) {
-      logger('Error unsubscribing to WebMCP', error);
-    }
   }
 }

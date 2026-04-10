@@ -19,7 +19,6 @@ import type {
   TextSnapshotNode,
   GeolocationOptions,
   ExtensionServiceWorker,
-  WebMcpTool,
 } from '../types.js';
 import type {InstalledExtension} from '../utils/ExtensionRegistry.js';
 import type {PaginationOptions} from '../utils/types.js';
