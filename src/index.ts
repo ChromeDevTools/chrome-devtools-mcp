@@ -199,6 +199,11 @@ export async function createMcpServer(
                 ? context.getPageById(params.pageId)
                 : context.getSelectedMcpPage();
             response.setPage(page);
+            if (page.getDialog() && tool.name !== 'handle_dialog') {
+              throw new Error(
+                'A browser dialog is open. Call handle_dialog to accept or dismiss it before continuing.',
+              );
+            }
             await tool.handler(
               {
                 params,
