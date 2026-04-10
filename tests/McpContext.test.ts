@@ -9,6 +9,7 @@ import path from 'node:path';
 import {afterEach, describe, it} from 'node:test';
 import {pathToFileURL} from 'node:url';
 
+import type {Target} from 'puppeteer-core';
 import sinon from 'sinon';
 
 import {NetworkFormatter} from '../src/formatters/NetworkFormatter.js';
@@ -255,6 +256,31 @@ describe('McpContext', () => {
         () => context.validatePath(path.resolve('/tmp/anywhere.txt')),
         /Access denied/,
       );
+    });
+  });
+
+  it('should skip frozen targets that hang on target.page()', async () => {
+    await withMcpContext(async (_response, context) => {
+      const browser = context.browser;
+      const realTargets = browser.targets();
+
+      // Inject a fake target whose page() never resolves (simulates a frozen tab).
+      const frozenTarget = {
+        type: () => 'page',
+        url: () => 'https://frozen-tab.example.com',
+        page: () => new Promise<null>(() => {}),
+      } as unknown as Target;
+
+      sinon.stub(browser, 'targets').returns([...realTargets, frozenTarget]);
+
+      const start = Date.now();
+      const pages = await context.createPagesSnapshot();
+      const elapsed = Date.now() - start;
+
+      // The frozen target should be skipped, not block for 180s.
+      assert.ok(elapsed < 15_000, `Took ${elapsed}ms, expected < 15s`);
+      // Real pages should still be enumerated.
+      assert.ok(pages.length > 0, 'Should still enumerate healthy pages');
     });
   });
 });
