@@ -8,6 +8,7 @@
 // Node 20 does not support --experimental-strip-types flag.
 
 import {spawn, execSync} from 'node:child_process';
+import {readFile} from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 
@@ -38,10 +39,27 @@ if (userArgs.length > 0) {
   }
 } else {
   const isNode20 = process.version.startsWith('v20.');
-  if (isNode20) {
-    files.push('build/tests');
-  } else {
-    files.push('build/tests/**/*.test.js');
+  if (flags.includes('--test-only')) {
+    if (isNode20) {
+      throw new Error(`--test-only is not supported for Node 20`);
+    }
+    const {glob} = await import('node:fs/promises');
+    for await (const tsFile of glob('tests/**/*.test.ts')) {
+      const content = await readFile(tsFile, 'utf8');
+      if (content.includes('.only(')) {
+        files.push(path.join('build', tsFile.replace(/\.ts$/, '.js')));
+      }
+    }
+    if (files.length === 0) {
+      console.warn('no files contain .only');
+      process.exit(0);
+    }
+  } else if (files.length === 0) {
+    if (isNode20) {
+      files.push('build/tests');
+    } else {
+      files.push('build/tests/**/*.test.js');
+    }
   }
 }
 
