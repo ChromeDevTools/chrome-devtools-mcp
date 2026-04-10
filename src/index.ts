@@ -86,6 +86,7 @@ export async function createMcpServer(
               : undefined,
             userDataDir: serverArgs.userDataDir,
             devtools,
+            skipUnresponsiveTabs: serverArgs.skipUnresponsiveTabs,
           })
         : await ensureBrowserLaunched({
             headless: serverArgs.headless,
@@ -108,6 +109,7 @@ export async function createMcpServer(
         experimentalDevToolsDebugging: devtools,
         experimentalIncludeAllPages: serverArgs.experimentalIncludeAllPages,
         performanceCrux: serverArgs.performanceCrux,
+        skipUnresponsiveTabs: serverArgs.skipUnresponsiveTabs,
       });
     }
     return context;

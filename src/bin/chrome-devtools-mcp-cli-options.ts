@@ -147,6 +147,11 @@ export const cliOptions = {
     type: 'boolean',
     description: `If enabled, ignores errors relative to self-signed and expired certificates. Use with caution.`,
   },
+  skipUnresponsiveTabs: {
+    type: 'boolean',
+    description: `When connecting to an existing browser, skip tabs that don't respond to CDP commands (e.g. discarded or sleeping tabs) instead of hanging. Recommended when using --browserUrl with many open tabs.`,
+    default: false,
+  },
   experimentalPageIdRouting: {
     type: 'boolean',
     describe:

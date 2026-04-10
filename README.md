@@ -575,6 +575,11 @@ The Chrome DevTools MCP server supports the following configuration option:
   If enabled, ignores errors relative to self-signed and expired certificates. Use with caution.
   - **Type:** boolean
 
+- **`--skipUnresponsiveTabs`/ `--skip-unresponsive-tabs`**
+  When connecting to an existing browser, skip tabs that don't respond to CDP commands (e.g. discarded or sleeping tabs) instead of hanging. Recommended when using --browserUrl with many open tabs.
+  - **Type:** boolean
+  - **Default:** `false`
+
 - **`--experimentalVision`/ `--experimental-vision`**
   Whether to enable coordinate-based tools such as click_at(x,y). Usually requires a computer-use model able to produce accurate coordinates by looking at screenshots.
   - **Type:** boolean
@@ -739,6 +744,8 @@ trace.
 #### Manual connection using port forwarding
 
 You can connect to a running Chrome instance by using the `--browser-url` option. This is useful if you are running the MCP server in a sandboxed environment that does not allow starting a new Chrome instance.
+
+If you have many tabs open, some may be discarded by the browser to save memory. These tabs don't respond to CDP commands, which can cause the MCP server to hang on startup. Use `--skip-unresponsive-tabs` to skip these tabs instead of blocking.
 
 Here is a step-by-step guide on how to connect to a running Chrome instance:
 

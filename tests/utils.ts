@@ -103,6 +103,7 @@ export async function withMcpContext(
     debug?: boolean;
     autoOpenDevTools?: boolean;
     performanceCrux?: boolean;
+    skipUnresponsiveTabs?: boolean;
     executablePath?: string;
   } = {},
   args: ParsedArguments = {} as ParsedArguments,
@@ -118,6 +119,7 @@ export async function withMcpContext(
       {
         experimentalDevToolsDebugging: false,
         performanceCrux: options.performanceCrux ?? true,
+        skipUnresponsiveTabs: options.skipUnresponsiveTabs,
       },
       Locator,
     );
