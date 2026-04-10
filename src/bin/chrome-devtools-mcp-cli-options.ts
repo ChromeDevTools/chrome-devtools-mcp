@@ -185,6 +185,11 @@ export const cliOptions = {
     describe:
       'Exposes experimental screencast tools (requires ffmpeg). Install ffmpeg https://www.ffmpeg.org/download.html and ensure it is available in the MCP server PATH.',
   },
+  experimentalWebmcp: {
+    type: 'boolean',
+    describe: 'Set to true to enable debugging WebMCP tools.',
+    hidden: true,
+  },
   chromeArg: {
     type: 'array',
     describe:

@@ -539,5 +539,9 @@
         "argType": "number"
       }
     ]
+  },
+  {
+    "name": "list_webmcp_tools",
+    "args": []
   }
 ]

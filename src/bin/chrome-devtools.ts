@@ -51,6 +51,7 @@ delete startCliOptions.viewport;
 // tools, they need to be enabled during CLI generation.
 delete startCliOptions.experimentalPageIdRouting;
 delete startCliOptions.experimentalVision;
+delete startCliOptions.experimentalWebmcp;
 delete startCliOptions.experimentalInteropTools;
 delete startCliOptions.experimentalScreencast;
 delete startCliOptions.categoryEmulation;
