@@ -7,7 +7,219 @@
       "command": "npx",
       "args": [
         "chrome-devtools-mcp@latest"
-      ]
+      ],
+      "env": {
+        "CHROME_DEVTOOLS_MCP_AUTO_CONNECT": "${user_config.autoConnect}",
+        "CHROME_DEVTOOLS_MCP_BROWSER_URL": "${user_config.browserUrl}",
+        "CHROME_DEVTOOLS_MCP_WS_ENDPOINT": "${user_config.wsEndpoint}",
+        "CHROME_DEVTOOLS_MCP_WS_HEADERS": "${user_config.wsHeaders}",
+        "CHROME_DEVTOOLS_MCP_HEADLESS": "${user_config.headless}",
+        "CHROME_DEVTOOLS_MCP_EXECUTABLE_PATH": "${user_config.executablePath}",
+        "CHROME_DEVTOOLS_MCP_ISOLATED": "${user_config.isolated}",
+        "CHROME_DEVTOOLS_MCP_USER_DATA_DIR": "${user_config.userDataDir}",
+        "CHROME_DEVTOOLS_MCP_CHANNEL": "${user_config.channel}",
+        "CHROME_DEVTOOLS_MCP_LOG_FILE": "${user_config.logFile}",
+        "CHROME_DEVTOOLS_MCP_VIEWPORT": "${user_config.viewport}",
+        "CHROME_DEVTOOLS_MCP_PROXY_SERVER": "${user_config.proxyServer}",
+        "CHROME_DEVTOOLS_MCP_ACCEPT_INSECURE_CERTS": "${user_config.acceptInsecureCerts}",
+        "CHROME_DEVTOOLS_MCP_EXPERIMENTAL_VISION": "${user_config.experimentalVision}",
+        "CHROME_DEVTOOLS_MCP_EXPERIMENTAL_SCREENCAST": "${user_config.experimentalScreencast}",
+        "CHROME_DEVTOOLS_MCP_EXPERIMENTAL_FFMPEG_PATH": "${user_config.experimentalFfmpegPath}",
+        "CHROME_DEVTOOLS_MCP_CATEGORY_EXPERIMENTAL_WEBMCP": "${user_config.categoryExperimentalWebmcp}",
+        "CHROME_DEVTOOLS_MCP_CHROME_ARG": "${user_config.chromeArg}",
+        "CHROME_DEVTOOLS_MCP_IGNORE_DEFAULT_CHROME_ARG": "${user_config.ignoreDefaultChromeArg}",
+        "CHROME_DEVTOOLS_MCP_CATEGORY_EMULATION": "${user_config.categoryEmulation}",
+        "CHROME_DEVTOOLS_MCP_CATEGORY_PERFORMANCE": "${user_config.categoryPerformance}",
+        "CHROME_DEVTOOLS_MCP_CATEGORY_NETWORK": "${user_config.categoryNetwork}",
+        "CHROME_DEVTOOLS_MCP_CATEGORY_EXTENSIONS": "${user_config.categoryExtensions}",
+        "CHROME_DEVTOOLS_MCP_CATEGORY_EXPERIMENTAL_THIRD_PARTY": "${user_config.categoryExperimentalThirdParty}",
+        "CHROME_DEVTOOLS_MCP_PERFORMANCE_CRUX": "${user_config.performanceCrux}",
+        "CHROME_DEVTOOLS_MCP_USAGE_STATISTICS": "${user_config.usageStatistics}",
+        "CHROME_DEVTOOLS_MCP_SLIM": "${user_config.slim}",
+        "CHROME_DEVTOOLS_MCP_REDACT_NETWORK_HEADERS": "${user_config.redactNetworkHeaders}"
+      }
+    }
+  },
+  "userConfig": {
+    "autoConnect": {
+      "type": "boolean",
+      "title": "Auto Connect",
+      "description": "If specified, automatically connects to a browser (Chrome 144+) running locally from the user data directory identified by the channel param (default channel is stable). Requires the remote debugging server to be started in the Chrome instance via chrome://inspect/#remote-debugging.",
+      "sensitive": false,
+      "default": false
+    },
+    "browserUrl": {
+      "type": "string",
+      "title": "Browser URL",
+      "description": "Connect to a running, debuggable Chrome instance (e.g. `http://127.0.0.1:9222`). For more details see: https://github.com/ChromeDevTools/chrome-devtools-mcp#connecting-to-a-running-chrome-instance.",
+      "sensitive": false
+    },
+    "wsEndpoint": {
+      "type": "string",
+      "title": "WebSocket Endpoint",
+      "description": "WebSocket endpoint to connect to a running Chrome instance (e.g., ws://127.0.0.1:9222/devtools/browser/<id>). Alternative to --browserUrl.",
+      "sensitive": false
+    },
+    "wsHeaders": {
+      "type": "string",
+      "title": "WebSocket Headers",
+      "description": "Custom headers for WebSocket connection in JSON format (e.g., '{\"Authorization\":\"Bearer token\"}'). Only works with --wsEndpoint.",
+      "sensitive": false
+    },
+    "headless": {
+      "type": "boolean",
+      "title": "Headless",
+      "description": "Whether to run in headless (no UI) mode.",
+      "sensitive": false,
+      "default": false
+    },
+    "executablePath": {
+      "type": "string",
+      "title": "Executable Path",
+      "description": "Path to custom Chrome executable.",
+      "sensitive": false
+    },
+    "isolated": {
+      "type": "boolean",
+      "title": "Isolated",
+      "description": "If specified, creates a temporary user-data-dir that is automatically cleaned up after the browser is closed. Defaults to false.",
+      "sensitive": false
+    },
+    "userDataDir": {
+      "type": "string",
+      "title": "User Data Dir",
+      "description": "Path to the user data directory for Chrome. Default is $HOME/.cache/chrome-devtools-mcp/chrome-profile$CHANNEL_SUFFIX_IF_NON_STABLE",
+      "sensitive": false
+    },
+    "channel": {
+      "type": "string",
+      "title": "Channel",
+      "description": "Specify a different Chrome channel that should be used. The default is the stable channel version.",
+      "sensitive": false
+    },
+    "logFile": {
+      "type": "string",
+      "title": "Log File",
+      "description": "Path to a file to write debug logs to. Set the env variable `DEBUG` to `*` to enable verbose logs. Useful for submitting bug reports.",
+      "sensitive": false
+    },
+    "viewport": {
+      "type": "string",
+      "title": "Viewport",
+      "description": "Initial viewport size for the Chrome instances started by the server. For example, `1280x720`. In headless mode, max size is 3840x2160px.",
+      "sensitive": false
+    },
+    "proxyServer": {
+      "type": "string",
+      "title": "Proxy Server",
+      "description": "Proxy server configuration for Chrome passed as --proxy-server when launching the browser. See https://www.chromium.org/developers/design-documents/network-settings/ for details.",
+      "sensitive": false
+    },
+    "acceptInsecureCerts": {
+      "type": "boolean",
+      "title": "Accept Insecure Certs",
+      "description": "If enabled, ignores errors relative to self-signed and expired certificates. Use with caution.",
+      "sensitive": false
+    },
+    "experimentalVision": {
+      "type": "boolean",
+      "title": "Experimental Vision",
+      "description": "Whether to enable coordinate-based tools such as click_at(x,y). Usually requires a computer-use model able to produce accurate coordinates by looking at screenshots.",
+      "sensitive": false
+    },
+    "experimentalScreencast": {
+      "type": "boolean",
+      "title": "Experimental Screencast",
+      "description": "Exposes experimental screencast tools (requires ffmpeg). Install ffmpeg https://www.ffmpeg.org/download.html and ensure it is available in the MCP server PATH.",
+      "sensitive": false
+    },
+    "experimentalFfmpegPath": {
+      "type": "string",
+      "title": "Experimental FFmpeg Path",
+      "description": "Path to ffmpeg executable for screencast recording.",
+      "sensitive": false
+    },
+    "categoryExperimentalWebmcp": {
+      "type": "boolean",
+      "title": "Category Experimental WebMCP",
+      "description": "Set to true to enable debugging WebMCP tools. Requires Chrome 149+ with the following flags: `--enable-features=WebMCPTesting,DevToolsWebMCPSupport`",
+      "sensitive": false
+    },
+    "chromeArg": {
+      "type": "string",
+      "title": "Chrome Arg",
+      "description": "Additional arguments for Chrome. Only applies when Chrome is launched by chrome-devtools-mcp.",
+      "sensitive": false,
+      "multiple": true
+    },
+    "ignoreDefaultChromeArg": {
+      "type": "string",
+      "title": "Ignore Default Chrome Arg",
+      "description": "Explicitly disable default arguments for Chrome. Only applies when Chrome is launched by chrome-devtools-mcp.",
+      "sensitive": false,
+      "multiple": true
+    },
+    "categoryEmulation": {
+      "type": "boolean",
+      "title": "Category Emulation",
+      "description": "Set to false to exclude tools related to emulation.",
+      "sensitive": false,
+      "default": true
+    },
+    "categoryPerformance": {
+      "type": "boolean",
+      "title": "Category Performance",
+      "description": "Set to false to exclude tools related to performance.",
+      "sensitive": false,
+      "default": true
+    },
+    "categoryNetwork": {
+      "type": "boolean",
+      "title": "Category Network",
+      "description": "Set to false to exclude tools related to network.",
+      "sensitive": false,
+      "default": true
+    },
+    "categoryExtensions": {
+      "type": "boolean",
+      "title": "Category Extensions",
+      "description": "Set to true to include tools related to extensions. Note: This feature is currently only supported with a pipe connection. autoConnect, browserUrl, and wsEndpoint are not supported with this feature until 149 will be released.",
+      "sensitive": false,
+      "default": false
+    },
+    "categoryExperimentalThirdParty": {
+      "type": "boolean",
+      "title": "Category Experimental Third Party",
+      "description": "Set to true to enable third-party developer tools exposed by the inspected page itself",
+      "sensitive": false,
+      "default": false
+    },
+    "performanceCrux": {
+      "type": "boolean",
+      "title": "Performance Crux",
+      "description": "Set to false to disable sending URLs from performance traces to CrUX API to get field performance data.",
+      "sensitive": false,
+      "default": true
+    },
+    "usageStatistics": {
+      "type": "boolean",
+      "title": "Usage Statistics",
+      "description": "Set to false to opt-out of usage statistics collection. Google collects usage data to improve the tool, handled under the Google Privacy Policy (https://policies.google.com/privacy). This is independent from Chrome browser metrics. Disabled if `CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS` or `CI` env variables are set.",
+      "sensitive": false,
+      "default": true
+    },
+    "slim": {
+      "type": "boolean",
+      "title": "Slim",
+      "description": "Exposes a \"slim\" set of 3 tools covering navigation, script execution and screenshots only. Useful for basic browser tasks.",
+      "sensitive": false
+    },
+    "redactNetworkHeaders": {
+      "type": "boolean",
+      "title": "Redact Network Headers",
+      "description": "If true, redacts some of the network headers considered senstive before returning to the client.",
+      "sensitive": false,
+      "default": false
     }
   }
 }

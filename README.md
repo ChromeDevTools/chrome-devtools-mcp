@@ -166,6 +166,22 @@ Then, install the plugin:
 
 Restart Claude Code to have the MCP server and skills load (check with `/skills`).
 
+To connect the plugin to a Chrome instance that is already running with remote debugging, set the plugin's `browserUrl` option in your Claude Code settings:
+
+```json
+{
+  "pluginConfigs": {
+    "chrome-devtools-mcp@claude-plugins-official": {
+      "options": {
+        "browserUrl": "http://127.0.0.1:9222"
+      }
+    }
+  }
+}
+```
+
+Leave `browserUrl` blank to use the default behavior where Chrome DevTools MCP launches Chrome automatically.
+
 > [!TIP]
 > If the plugin installation fails with a `Failed to clone repository` error (e.g., HTTPS connectivity issues behind a corporate firewall), see the [troubleshooting guide](./docs/troubleshooting.md#claude-code-plugin-installation-fails-with-failed-to-clone-repository) for workarounds, or use the CLI installation method above instead.
 
