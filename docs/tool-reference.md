@@ -1,6 +1,6 @@
 <!-- AUTO GENERATED DO NOT EDIT - run 'npm run gen' to update-->
 
-# Chrome DevTools MCP Tool Reference (~6951 cl100k_base tokens)
+# Chrome DevTools MCP Tool Reference (~8663 cl100k_base tokens)
 
 - **[Input automation](#input-automation)** (9 tools)
   - [`click`](#click)
@@ -30,11 +30,19 @@
 - **[Network](#network)** (2 tools)
   - [`get_network_request`](#get_network_request)
   - [`list_network_requests`](#list_network_requests)
-- **[Debugging](#debugging)** (6 tools)
+- **[Debugging](#debugging)** (14 tools)
+  - [`diff_computed_styles`](#diff_computed_styles)
+  - [`diff_computed_styles_snapshot`](#diff_computed_styles_snapshot)
   - [`evaluate_script`](#evaluate_script)
+  - [`get_box_model`](#get_box_model)
+  - [`get_computed_styles`](#get_computed_styles)
+  - [`get_computed_styles_batch`](#get_computed_styles_batch)
   - [`get_console_message`](#get_console_message)
+  - [`get_visibility`](#get_visibility)
+  - [`highlight_elements_for_styles`](#highlight_elements_for_styles)
   - [`lighthouse_audit`](#lighthouse_audit)
   - [`list_console_messages`](#list_console_messages)
+  - [`save_computed_styles_snapshot`](#save_computed_styles_snapshot)
   - [`take_screenshot`](#take_screenshot)
   - [`take_snapshot`](#take_snapshot)
 
@@ -157,7 +165,7 @@
 
 ### `list_pages`
 
-**Description:** Get a list of pages open in the browser.
+**Description:** Get a list of pages  open in the browser.
 
 **Parameters:** None
 
@@ -315,6 +323,33 @@
 
 ## Debugging
 
+### `diff_computed_styles`
+
+**Description:** Return the changed computed properties between two elements (A vs B).
+
+**Parameters:**
+
+- **uidA** (string) **(required)**: First element uid
+- **uidB** (string) **(required)**: Second element uid
+- **compareGeometry** (boolean) _(optional)_: If true, compare border-box geometry and classify effective layout change.
+- **properties** (array) _(optional)_: Optional filter list
+
+---
+
+### `diff_computed_styles_snapshot`
+
+**Description:** Diff current computed styles (and optional geometry) vs a saved snapshot. Use domPath to match when a11y uids drift between captures.
+
+**Parameters:**
+
+- **name** (string) **(required)**: Snapshot name
+- **uid** (string) **(required)**: Element uid for the live node (from current snapshot)
+- **compareGeometry** (boolean) _(optional)_: Compare border-box rects to detect effective layout change.
+- **domPath** (string) _(optional)_: If baseline uid differs, match saved element by domPath from v1 snapshot.
+- **properties** (array) _(optional)_: Optional filter list
+
+---
+
 ### `evaluate_script`
 
 **Description:** Evaluate a JavaScript function inside the currently selected page. Returns the response as JSON,
@@ -323,16 +358,49 @@ so returned values have to be JSON-serializable.
 **Parameters:**
 
 - **function** (string) **(required)**: A JavaScript function declaration to be executed by the tool in the currently selected page.
-  Example without arguments: `() => {
+Example without arguments: `() => {
   return document.title
 }` or `async () => {
   return await fetch("example.com")
 }`.
-  Example with arguments: `(el) => {
+Example with arguments: `(el) => {
   return el.innerText;
 }`
 
 - **args** (array) _(optional)_: An optional list of arguments to pass to the function.
+
+---
+
+### `get_box_model`
+
+**Description:** Return box model for an element (content/padding/border/margin) and rects (content, padding, border, margin, client, bounding).
+
+**Parameters:**
+
+- **uid** (string) **(required)**: The uid of an element on the page from the page content snapshot
+
+---
+
+### `get_computed_styles`
+
+**Description:** Return CSS computed styles for an element. Optionally filter properties and include rule origins.
+
+**Parameters:**
+
+- **uid** (string) **(required)**: The uid of an element on the page from the page content snapshot
+- **includeSources** (boolean) _(optional)_: If true, include best-effort winning rule origins
+- **properties** (array) _(optional)_: Optional filter list
+
+---
+
+### `get_computed_styles_batch`
+
+**Description:** Return CSS computed styles for multiple elements. Optionally filter properties.
+
+**Parameters:**
+
+- **uids** (array) **(required)**: The uids of elements on the page from the page content snapshot
+- **properties** (array) _(optional)_: Optional filter list
 
 ---
 
@@ -343,6 +411,26 @@ so returned values have to be JSON-serializable.
 **Parameters:**
 
 - **msgid** (number) **(required)**: The msgid of a console message on the page from the listed console messages
+
+---
+
+### `get_visibility`
+
+**Description:** Return visibility diagnostics for an element: isVisible and reasons.
+
+**Parameters:**
+
+- **uid** (string) **(required)**: The uid of an element on the page from the page content snapshot
+
+---
+
+### `highlight_elements_for_styles`
+
+**Description:** Enable CDP overlay highlights on elements (last uid wins in DevTools; response lists all border quads for external overlays).
+
+**Parameters:**
+
+- **uids** (array) **(required)**: Element uids from the current page snapshot
 
 ---
 
@@ -368,6 +456,18 @@ so returned values have to be JSON-serializable.
 - **pageIdx** (integer) _(optional)_: Page number to return (0-based). When omitted, returns the first page.
 - **pageSize** (integer) _(optional)_: Maximum number of messages to return. When omitted, returns all messages.
 - **types** (array) _(optional)_: Filter messages to only return messages of the specified resource types. When omitted or empty, returns all messages.
+
+---
+
+### `save_computed_styles_snapshot`
+
+**Description:** Save a named snapshot (schema v1): computed styles, optional border geometry, domPath, backendNodeId, and page meta for later diff/matching.
+
+**Parameters:**
+
+- **name** (string) **(required)**: Snapshot name
+- **uids** (array) **(required)**: The uids of elements on the page from the page content snapshot
+- **properties** (array) _(optional)_: Optional filter list
 
 ---
 
