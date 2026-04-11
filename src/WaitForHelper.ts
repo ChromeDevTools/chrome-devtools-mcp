@@ -127,10 +127,12 @@ export class WaitForHelper {
   async waitForEventsAfterAction(
     action: () => Promise<unknown>,
     options?: {timeout?: number},
-  ): Promise<void> {
+  ): Promise<WaitForEventsResult> {
+    let navigated = false;
     const navigationFinished = this.waitForNavigationStarted()
       .then(navigationStated => {
         if (navigationStated) {
+          navigated = true;
           return this.#page.waitForNavigation({
             timeout: options?.timeout ?? this.#navigationTimeout,
             signal: this.#abortController.signal,
@@ -159,7 +161,17 @@ export class WaitForHelper {
     } finally {
       this.#abortController.abort();
     }
+
+    return {navigated};
   }
+}
+
+export interface WaitForEventsResult {
+  /**
+   * Whether a cross-document navigation started and finished during the
+   * action. Same-document (history API) navigations are not reported.
+   */
+  navigated: boolean;
 }
 
 export function getNetworkMultiplierFromString(

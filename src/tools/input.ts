@@ -10,9 +10,10 @@ import {zod} from '../third_party/index.js';
 import type {ElementHandle, KeyInput} from '../third_party/index.js';
 import type {TextSnapshotNode} from '../types.js';
 import {parseKey} from '../utils/keyboard.js';
+import type {WaitForEventsResult} from '../WaitForHelper.js';
 
 import {ToolCategory} from './categories.js';
-import type {ContextPage} from './ToolDefinition.js';
+import type {ContextPage, Response} from './ToolDefinition.js';
 import {definePageTool} from './ToolDefinition.js';
 
 const dblClickSchema = zod
@@ -42,6 +43,16 @@ function handleActionError(error: unknown, uid: string) {
   );
 }
 
+function appendNavigationIfAny(
+  page: ContextPage,
+  response: Response,
+  result: WaitForEventsResult,
+) {
+  if (result.navigated) {
+    response.appendResponseLine(`Page navigated to ${page.pptrPage.url()}.`);
+  }
+}
+
 export const click = definePageTool({
   name: 'click',
   description: `Clicks on the provided element`,
@@ -62,7 +73,7 @@ export const click = definePageTool({
     const uid = request.params.uid;
     const handle = await request.page.getElementByUid(uid);
     try {
-      await request.page.waitForEventsAfterAction(async () => {
+      const result = await request.page.waitForEventsAfterAction(async () => {
         await handle.asLocator().click({
           count: request.params.dblClick ? 2 : 1,
         });
@@ -72,6 +83,7 @@ export const click = definePageTool({
           ? `Successfully double clicked on the element`
           : `Successfully clicked on the element`,
       );
+      appendNavigationIfAny(request.page, response, result);
       if (request.params.includeSnapshot) {
         response.includeSnapshot();
       }
@@ -99,7 +111,7 @@ export const clickAt = definePageTool({
   },
   handler: async (request, response) => {
     const page = request.page;
-    await page.waitForEventsAfterAction(async () => {
+    const result = await page.waitForEventsAfterAction(async () => {
       await page.pptrPage.mouse.click(request.params.x, request.params.y, {
         clickCount: request.params.dblClick ? 2 : 1,
       });
@@ -109,6 +121,7 @@ export const clickAt = definePageTool({
         ? `Successfully double clicked at the coordinates`
         : `Successfully clicked at the coordinates`,
     );
+    appendNavigationIfAny(page, response, result);
     if (request.params.includeSnapshot) {
       response.includeSnapshot();
     }
@@ -134,10 +147,11 @@ export const hover = definePageTool({
     const uid = request.params.uid;
     const handle = await request.page.getElementByUid(uid);
     try {
-      await request.page.waitForEventsAfterAction(async () => {
+      const result = await request.page.waitForEventsAfterAction(async () => {
         await handle.asLocator().hover();
       });
       response.appendResponseLine(`Successfully hovered over the element`);
+      appendNavigationIfAny(request.page, response, result);
       if (request.params.includeSnapshot) {
         response.includeSnapshot();
       }
@@ -235,7 +249,7 @@ export const fill = definePageTool({
   },
   handler: async (request, response, context) => {
     const page = request.page;
-    await page.waitForEventsAfterAction(async () => {
+    const result = await page.waitForEventsAfterAction(async () => {
       await fillFormElement(
         request.params.uid,
         request.params.value,
@@ -244,6 +258,7 @@ export const fill = definePageTool({
       );
     });
     response.appendResponseLine(`Successfully filled out the element`);
+    appendNavigationIfAny(page, response, result);
     if (request.params.includeSnapshot) {
       response.includeSnapshot();
     }
@@ -263,7 +278,7 @@ export const typeText = definePageTool({
   },
   handler: async (request, response) => {
     const page = request.page;
-    await page.waitForEventsAfterAction(async () => {
+    const result = await page.waitForEventsAfterAction(async () => {
       await page.pptrPage.keyboard.type(request.params.text);
       if (request.params.submitKey) {
         await page.pptrPage.keyboard.press(
@@ -274,6 +289,7 @@ export const typeText = definePageTool({
     response.appendResponseLine(
       `Typed text "${request.params.text}${request.params.submitKey ? ` + ${request.params.submitKey}` : ''}"`,
     );
+    appendNavigationIfAny(page, response, result);
   },
 });
 
@@ -295,12 +311,13 @@ export const drag = definePageTool({
     );
     const toHandle = await request.page.getElementByUid(request.params.to_uid);
     try {
-      await request.page.waitForEventsAfterAction(async () => {
+      const result = await request.page.waitForEventsAfterAction(async () => {
         await fromHandle.drag(toHandle);
         await new Promise(resolve => setTimeout(resolve, 50));
         await toHandle.drop(fromHandle);
       });
       response.appendResponseLine(`Successfully dragged an element`);
+      appendNavigationIfAny(request.page, response, result);
       if (request.params.includeSnapshot) {
         response.includeSnapshot();
       }
@@ -332,8 +349,9 @@ export const fillForm = definePageTool({
   },
   handler: async (request, response, context) => {
     const page = request.page;
+    let lastResult: WaitForEventsResult = {navigated: false};
     for (const element of request.params.elements) {
-      await page.waitForEventsAfterAction(async () => {
+      lastResult = await page.waitForEventsAfterAction(async () => {
         await fillFormElement(
           element.uid,
           element.value,
@@ -343,6 +361,7 @@ export const fillForm = definePageTool({
       });
     }
     response.appendResponseLine(`Successfully filled out the form`);
+    appendNavigationIfAny(page, response, lastResult);
     if (request.params.includeSnapshot) {
       response.includeSnapshot();
     }
@@ -419,7 +438,7 @@ export const pressKey = definePageTool({
     const tokens = parseKey(request.params.key);
     const [key, ...modifiers] = tokens;
 
-    await page.waitForEventsAfterAction(async () => {
+    const result = await page.waitForEventsAfterAction(async () => {
       for (const modifier of modifiers) {
         await page.pptrPage.keyboard.down(modifier);
       }
@@ -432,6 +451,7 @@ export const pressKey = definePageTool({
     response.appendResponseLine(
       `Successfully pressed key: ${request.params.key}`,
     );
+    appendNavigationIfAny(page, response, result);
     if (request.params.includeSnapshot) {
       response.includeSnapshot();
     }
