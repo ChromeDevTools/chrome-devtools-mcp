@@ -358,6 +358,35 @@ describe('ConsoleCollector', () => {
     assert.equal(data.length, 2);
   });
 
+  it('silently ignores unmapped PerformanceIssue events', async () => {
+    const browser = getMockBrowser();
+    const page = (await browser.pages())[0];
+    const warnStub = sinon.stub(console, 'warn');
+
+    const collector = new ConsoleCollector(browser, collect => {
+      return {
+        devtoolsAggregatedIssue: issue => {
+          collect(issue);
+        },
+      } as ListenerMap;
+    });
+    await collector.init([page]);
+
+    const performanceIssue = {
+      code: 'PerformanceIssue',
+      details: {
+        performanceIssueDetails: {
+          performanceIssueType: 'DocumentCookie',
+        },
+      },
+    } as unknown as Protocol.Audits.InspectorIssue;
+
+    page.emit('issue', performanceIssue);
+
+    assert.equal(collector.getData(page).length, 0);
+    sinon.assert.notCalled(warnStub);
+  });
+
   it('filters duplicated issues', async () => {
     const browser = getMockBrowser();
     const page = (await browser.pages())[0];

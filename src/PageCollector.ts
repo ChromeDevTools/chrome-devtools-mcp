@@ -342,6 +342,11 @@ class PageEventSubscriber {
 
   #onIssueAdded = (inspectorIssue: Issue) => {
     try {
+      // DevTools currently defines this protocol issue code but has no
+      // IssuesManager handler for it, so calling into the mapper only warns.
+      if (String(inspectorIssue.code) === 'PerformanceIssue') {
+        return;
+      }
       const issue = DevTools.createIssuesFromProtocolIssue(
         null,
         // @ts-expect-error Protocol types diverge.
