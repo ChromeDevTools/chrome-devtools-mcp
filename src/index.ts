@@ -86,6 +86,7 @@ export async function createMcpServer(
               : undefined,
             userDataDir: serverArgs.userDataDir,
             devtools,
+            enableExtensions: serverArgs.categoryExtensions,
           })
         : await ensureBrowserLaunched({
             headless: serverArgs.headless,
@@ -114,6 +115,11 @@ export async function createMcpServer(
   }
 
   const toolMutex = new Mutex();
+  const extensionToolsEnabled =
+    serverArgs.categoryExtensions &&
+    !serverArgs.browserUrl &&
+    !serverArgs.wsEndpoint &&
+    !serverArgs.autoConnect;
 
   function registerTool(tool: ToolDefinition | DefinedPageTool): void {
     if (
@@ -136,7 +142,7 @@ export async function createMcpServer(
     }
     if (
       tool.annotations.category === ToolCategory.EXTENSIONS &&
-      !serverArgs.categoryExtensions
+      !extensionToolsEnabled
     ) {
       return;
     }

@@ -251,6 +251,47 @@ describe('cli args parsing', () => {
     });
   });
 
+  it('parses browserUrl with categoryExtensions', async () => {
+    const args = parseArguments('1.0.0', [
+      'node',
+      'main.js',
+      '--browserUrl',
+      'http://localhost:3000',
+      '--category-extensions',
+    ]);
+    assert.deepStrictEqual(args, {
+      ...defaultArgs,
+      _: [],
+      headless: false,
+      $0: 'npx chrome-devtools-mcp@latest',
+      'browser-url': 'http://localhost:3000',
+      browserUrl: 'http://localhost:3000',
+      u: 'http://localhost:3000',
+      'category-extensions': true,
+      categoryExtensions: true,
+    });
+  });
+
+  it('parses auto-connect with categoryExtensions', async () => {
+    const args = parseArguments('1.0.0', [
+      'node',
+      'main.js',
+      '--auto-connect',
+      '--category-extensions',
+    ]);
+    assert.deepStrictEqual(args, {
+      ...defaultArgs,
+      _: [],
+      headless: false,
+      $0: 'npx chrome-devtools-mcp@latest',
+      channel: 'stable',
+      'auto-connect': true,
+      autoConnect: true,
+      'category-extensions': true,
+      categoryExtensions: true,
+    });
+  });
+
   it('parses usage statistics flag', async () => {
     // Test default (should be true).
     const defaultArgs = parseArguments('1.0.0', ['node', 'main.js']);
