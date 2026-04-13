@@ -1,11 +1,12 @@
-# Chrome DevTools MCP
+# Chrome DevTools for Agents
 
 [![npm chrome-devtools-mcp package](https://img.shields.io/npm/v/chrome-devtools-mcp.svg)](https://npmjs.org/package/chrome-devtools-mcp)
 
-`chrome-devtools-mcp` lets your coding agent (such as Gemini, Claude, Cursor or Copilot)
+Chrome DevTools for Agents (`chrome-devtools-mcp`) lets your coding agent (such as Gemini, Claude, Cursor or Copilot)
 control and inspect a live Chrome browser. It acts as a Model-Context-Protocol
 (MCP) server, giving your AI coding assistant access to the full power of
 Chrome DevTools for reliable automation, in-depth debugging, and performance analysis.
+In addition it bolsters a [CLI](./docs/cli.md), if MCP is not available or desired.
 
 ## [Tool reference](./docs/tool-reference.md) | [Changelog](./CHANGELOG.md) | [Contributing](./CONTRIBUTING.md) | [Troubleshooting](./docs/troubleshooting.md) | [Design Principles](./docs/design-principles.md)
 
