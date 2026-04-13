@@ -19,7 +19,6 @@ export const scenario: TestScenario = {
     `,
   },
   expectations: calls => {
-    console.log(JSON.stringify(calls, null, 2));
     assert.strictEqual(calls.length, 2);
     assert.ok(calls[0].name === 'new_page', 'First call should be navigation');
     assert.deepStrictEqual(calls[0].args.isolatedContext, 'contextB');

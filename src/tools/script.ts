@@ -17,19 +17,26 @@ export type Evaluatable = Page | Frame | WebWorker;
 export const evaluateScript = defineTool(cliArgs => {
   return {
     name: 'evaluate_script',
-    description: `Evaluate JS function in page. Returns JSON-serializable response.`,
+    description: `Evaluate JS function on the page. Must return JSON-serializable response.`,
     annotations: {
       category: ToolCategory.DEBUGGING,
       readOnlyHint: false,
     },
     schema: {
-      function: zod
-        .string()
-        .describe(
-          `JS function to execute. Examples: \`() => document.title\`, \`(el) => el.innerText\`.`,
-        ),
+      function: zod.string().describe(
+        `JS function to execute on the page.
+Example without arguments: \`() => {
+  return document.title
+}\` or \`async () => {
+  return await fetch("example.com")
+}\`.
+Example with arguments: \`(el) => {
+  return el.innerText;
+}\`
+`,
+      ),
       args: zod
-        .array(zod.string().describe('Element UID from snapshot.'))
+        .array(zod.string().describe('Element UID from snapshot'))
         .optional()
         .describe(`Arguments to pass to the function.`),
       ...(cliArgs?.experimentalPageIdRouting ? pageIdSchema : {}),

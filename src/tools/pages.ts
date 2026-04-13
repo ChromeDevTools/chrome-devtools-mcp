@@ -96,7 +96,7 @@ export const newPage = defineTool({
     readOnlyHint: false,
   },
   schema: {
-    url: zod.string().describe('URL to load.'),
+    url: zod.string().describe('URL to load'),
     background: zod
       .boolean()
       .optional()
@@ -105,7 +105,7 @@ export const newPage = defineTool({
       .string()
       .optional()
       .describe(
-        'Isolated browser context name. Shared cookies/storage within context.',
+        'Isolated browser context name. Shared cookies/storage within context',
       ),
     ...timeoutSchema,
   },
@@ -140,9 +140,9 @@ export const navigatePage = definePageTool({
     type: zod
       .enum(['url', 'back', 'forward', 'reload'])
       .optional()
-      .describe('Navigation type.'),
-    url: zod.string().optional().describe('Target URL.'),
-    ignoreCache: zod.boolean().optional().describe('Ignore cache on reload.'),
+      .describe('Navigation type'),
+    url: zod.string().optional().describe('Target URL'),
+    ignoreCache: zod.boolean().optional().describe('Ignore cache on reload'),
     handleBeforeUnload: zod
       .enum(['accept', 'decline'])
       .optional()
@@ -150,7 +150,7 @@ export const navigatePage = definePageTool({
     initScript: zod
       .string()
       .optional()
-      .describe('JS script to execute on new documents.'),
+      .describe('JS script to execute on new documents'),
     ...timeoutSchema,
   },
   handler: async (request, response) => {
@@ -319,8 +319,8 @@ export const handleDialog = definePageTool({
   schema: {
     action: zod
       .enum(['accept', 'dismiss'])
-      .describe('Dismiss or accept dialog.'),
-    promptText: zod.string().optional().describe('Prompt text to enter.'),
+      .describe('Dismiss or accept dialog'),
+    promptText: zod.string().optional().describe('Prompt text to enter'),
   },
   handler: async (request, response, _context) => {
     const page = request.page;

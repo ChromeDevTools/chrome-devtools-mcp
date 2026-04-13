@@ -34,7 +34,7 @@ const FILTERABLE_RESOURCE_TYPES: readonly [ResourceType, ...ResourceType[]] = [
 
 export const listNetworkRequests = definePageTool({
   name: 'list_network_requests',
-  description: `List network requests since last navigation.`,
+  description: `List all requests for the page`,
   annotations: {
     category: ToolCategory.NETWORK,
     readOnlyHint: true,
@@ -45,22 +45,24 @@ export const listNetworkRequests = definePageTool({
       .int()
       .positive()
       .optional()
-      .describe('Max requests to return. If omitted: all.'),
+      .describe('Max requests to return. If omitted: all'),
     pageIdx: zod
       .number()
       .int()
       .min(0)
       .optional()
-      .describe('Page number (0-based). If omitted: 0.'),
+      .describe('Page number (0-based). If omitted: 0'),
     resourceTypes: zod
       .array(zod.enum(FILTERABLE_RESOURCE_TYPES))
       .optional()
-      .describe('Filter by resource types. If omitted: all.'),
+      .describe('Filter by resource types. If omitted: all'),
     includePreservedRequests: zod
       .boolean()
       .default(false)
       .optional()
-      .describe('Return preserved requests over last 3 navigations.'),
+      .describe(
+        'Returns requests from last 3 navigations. If omitted: only last navigation',
+      ),
   },
   handler: async (request, response, context) => {
     const data = await context.getDevToolsData(request.page);

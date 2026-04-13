@@ -217,8 +217,8 @@ export const fill = definePageTool({
     readOnlyHint: false,
   },
   schema: {
-    uid: zod.string().describe('Element UID from snapshot.'),
-    value: zod.string().describe('Value to fill.'),
+    uid: zod.string().describe('Element UID from snapshot'),
+    value: zod.string().describe('Value to fill'),
     includeSnapshot: includeSnapshotSchema,
   },
   handler: async (request, response, context) => {
@@ -240,13 +240,13 @@ export const fill = definePageTool({
 
 export const typeText = definePageTool({
   name: 'type_text',
-  description: `Type text into focused input.`,
+  description: `Type text into focused input`,
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
   },
   schema: {
-    text: zod.string().describe('Text to type.'),
+    text: zod.string().describe('Text to type'),
     submitKey: submitKeySchema,
   },
   handler: async (request, response) => {
@@ -273,8 +273,8 @@ export const drag = definePageTool({
     readOnlyHint: false,
   },
   schema: {
-    from_uid: zod.string().describe('UID of element to drag.'),
-    to_uid: zod.string().describe('UID of element to drop into.'),
+    from_uid: zod.string().describe('UID of element to drag'),
+    to_uid: zod.string().describe('UID of element to drop into'),
     includeSnapshot: includeSnapshotSchema,
   },
   handler: async (request, response) => {
@@ -311,11 +311,11 @@ export const fillForm = definePageTool({
       .array(
         // eslint-disable-next-line @local/enforce-zod-schema
         zod.object({
-          uid: zod.string().describe('Element UID.'),
-          value: zod.string().describe('Value to fill.'),
+          uid: zod.string().describe('Element UID'),
+          value: zod.string().describe('Value to fill'),
         }),
       )
-      .describe('Elements from snapshot to fill out.'),
+      .describe('Elements from snapshot to fill out'),
     includeSnapshot: includeSnapshotSchema,
   },
   handler: async (request, response, context) => {
@@ -339,7 +339,7 @@ export const fillForm = definePageTool({
 
 export const uploadFile = definePageTool({
   name: 'upload_file',
-  description: 'Upload file through element.',
+  description: 'Upload file through element',
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
@@ -347,8 +347,8 @@ export const uploadFile = definePageTool({
   schema: {
     uid: zod
       .string()
-      .describe('UID of file input or element opening file chooser.'),
-    filePath: zod.string().describe('Local path of file to upload.'),
+      .describe('UID of file input or element opening file chooser'),
+    filePath: zod.string().describe('Path of file to upload'),
     includeSnapshot: includeSnapshotSchema,
   },
   handler: async (request, response) => {

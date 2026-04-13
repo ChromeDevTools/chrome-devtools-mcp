@@ -302,7 +302,7 @@ export const CLOSE_PAGE_ERROR =
   'The last open page cannot be closed. It is fine to keep it open.';
 
 export const pageIdSchema = {
-  pageId: zod.number().optional().describe('Targets a specific page by ID.'),
+  pageId: zod.number().optional().describe('Targets a specific page by ID'),
 };
 
 export const timeoutSchema = {
@@ -310,7 +310,7 @@ export const timeoutSchema = {
     .number()
     .int()
     .optional()
-    .describe('Max wait time in ms. 0 for default.')
+    .describe('Max wait time in ms. 0 for default')
     .transform(value => {
       return value && value <= 0 ? undefined : value;
     }),

@@ -29,28 +29,28 @@ export const screenshot = definePageTool({
       .max(100)
       .optional()
       .describe(
-        'Compression quality for (0-100). Higher values mean better quality but larger sizes. Ignored for PNG format.',
+        'Compression quality for (0-100). Higher values means better quality but larger sizes. Ignored for PNG format.',
       ),
     uid: zod
       .string()
       .optional()
-      .describe('Element UID from snapshot. If omitted: page screenshot'),
+      .describe('Element UID from snapshot. If omitted: takes page screenshot'),
     fullPage: zod
       .boolean()
       .optional()
       .describe(
-        'If set to true takes a screenshot of the full page instead of the currently visible viewport. Incompatible with uid.',
+        'Takes a screenshot of the entire page instead of the currently visible viewport. Incompatible with uid.',
       ),
     filePath: zod
       .string()
       .optional()
       .describe(
-        'The absolute path, or a path relative to the current working directory, to save the screenshot to instead of attaching it to the response.',
+        'Path to save the screenshot to instead of attaching it to the response',
       ),
   },
   handler: async (request, response, context) => {
     if (request.params.uid && request.params.fullPage) {
-      throw new Error('Providing both "uid" and "fullPage" is not allowed.');
+      throw new Error('Providing both "uid" and "fullPage" is not allowed');
     }
 
     let pageOrHandle: Page | ElementHandle;

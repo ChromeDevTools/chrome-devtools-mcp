@@ -77,7 +77,7 @@ export const startScreencast = definePageTool({
 
 export const stopScreencast = definePageTool({
   name: 'screencast_stop',
-  description: 'Stops the active screencast recording on the page.',
+  description: 'Stops the active screencast recording on the page',
   annotations: {
     category: ToolCategory.DEBUGGING,
     readOnlyHint: false,

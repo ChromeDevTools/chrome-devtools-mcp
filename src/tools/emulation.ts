@@ -36,25 +36,27 @@ export const emulate = definePageTool({
       .min(1)
       .max(20)
       .optional()
-      .describe('CPU slowdown factor. 1 to disable.'),
+      .describe('CPU slowdown factor. 1 to disable'),
     geolocation: zod
       .string()
       .optional()
       .transform(geolocationTransform)
-      .describe('Geolocation (<lat>x<lon>). Lat: -90 to 90. Lon: -180 to 180.'),
+      .describe('Geolocation (<lat>x<lon>). Lat: -90 to 90. Lon: -180 to 180'),
     userAgent: zod
       .string()
       .optional()
-      .describe('User agent to emulate. Empty string to clear.'),
+      .describe('User agent to emulate. Empty string to clear'),
     colorScheme: zod
       .enum(['dark', 'light', 'auto'])
       .optional()
-      .describe('Emulate dark or light mode. "auto" to reset.'),
+      .describe('Emulate dark or light mode. "auto" to reset'),
     viewport: zod
       .string()
       .optional()
       .transform(viewportTransform)
-      .describe(`Viewport spec: '<w>x<h>x<dpr>[,mobile][,touch][,landscape]'.`),
+      .describe(
+        `Viewport spec: '<width>x<height>x<devicePixelRatio>[,mobile][,touch][,landscape]'. 'touch' and 'mobile' to emulate mobile devices.`,
+      ),
   },
   handler: async (request, _response, context) => {
     const page = request.page;

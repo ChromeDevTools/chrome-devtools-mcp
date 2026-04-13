@@ -11,7 +11,8 @@ import {definePageTool, timeoutSchema} from './ToolDefinition.js';
 
 export const takeSnapshot = definePageTool({
   name: 'take_snapshot',
-  description: `Take a text snapshot using the a11y tree. Lists elements with a unique ID (uid). Prefer snapshots over screenshots. Indicates the element selected in the DevTools Elements panel.`,
+  description: `Take a text snapshot using the a11y tree. Lists elements with unique
+identifier (UID). Prefer snapshots over screenshots. Indicates the element selected in the DevTools Elements panel.`,
   annotations: {
     category: ToolCategory.DEBUGGING,
     // Not read-only due to filePath param.
@@ -26,7 +27,7 @@ export const takeSnapshot = definePageTool({
       .string()
       .optional()
       .describe(
-        'The absolute path, or a path relative to the current working directory, to save the snapshot to instead of attaching it to the response.',
+        'Path to save the snapshot to instead of attaching it to the response.',
       ),
   },
   handler: async (request, response) => {

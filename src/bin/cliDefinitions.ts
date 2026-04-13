@@ -189,29 +189,26 @@ export const commands: Commands = {
     },
   },
   get_network_request: {
-    description:
-      'Gets a network request by an optional reqid. If omitted: selected request',
+    description: 'Gets specific network request',
     category: 'Network',
     args: {
       reqid: {
         name: 'reqid',
         type: 'number',
         description:
-          'The reqid of the network request. If omitted: selected request',
+          'The reqid of the network request. If omitted: the currently selected request in the DevTools Network panel.',
         required: false,
       },
       requestFilePath: {
         name: 'requestFilePath',
         type: 'string',
-        description:
-          'The absolute or relative path to save the request body to. If omitted: inline',
+        description: 'Path to save the request body to. If omitted: inline',
         required: false,
       },
       responseFilePath: {
         name: 'responseFilePath',
         type: 'string',
-        description:
-          'The absolute or relative path to save the response body to. If omitted: inline',
+        description: 'Path to save the response body to. If omitted: inline',
         required: false,
       },
     },
@@ -296,13 +293,13 @@ export const commands: Commands = {
       pageIdx: {
         name: 'pageIdx',
         type: 'integer',
-        description: 'Page number (0-based). If omitted: 0.',
+        description: 'Page number (0-based). If omitted: 0',
         required: false,
       },
       types: {
         name: 'types',
         type: 'array',
-        description: 'Filter by message types. If omitted: all.',
+        description: 'Filter by message types. If omitted: all',
         required: false,
       },
       includePreservedMessages: {
@@ -534,7 +531,7 @@ export const commands: Commands = {
       bringToFront: {
         name: 'bringToFront',
         type: 'boolean',
-        description: 'Focus page and bring to top.',
+        description: 'Focus page and bring to front',
         required: false,
       },
     },
