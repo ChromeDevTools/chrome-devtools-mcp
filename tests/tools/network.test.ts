@@ -10,7 +10,6 @@ import {describe, it} from 'node:test';
 import {
   getNetworkRequest,
   listNetworkRequests,
-  setExtraHTTPHeaders,
 } from '../../src/tools/network.js';
 import {serverHooks} from '../server.js';
 import {
@@ -185,85 +184,6 @@ describe('network', () => {
         t.assert.snapshot?.(
           stabilizeResponseOutput(getTextContent(responseData.content[0])),
         );
-      });
-    });
-  });
-
-  describe('set_extra_http_headers', () => {
-    it('sets extra headers on requests', async () => {
-      let receivedHeaders: Record<string, string> = {};
-      server.addRoute('/headers-test', async (req, res) => {
-        receivedHeaders = req.headers as Record<string, string>;
-        res.writeHead(200, {'Content-Type': 'text/html'});
-        res.end('<main>Headers Test</main>');
-      });
-
-      await withMcpContext(async (response, context) => {
-        const page = context.getSelectedPptrPage();
-        await setExtraHTTPHeaders.handler(
-          {
-            params: {headers: {'X-Custom-Header': 'test-value'}},
-            page: context.getSelectedMcpPage(),
-          },
-          response,
-          context,
-        );
-        assert.ok(
-          response.responseLines[0]?.includes('1 extra HTTP header'),
-        );
-
-        await page.goto(server.getRoute('/headers-test'));
-        assert.strictEqual(receivedHeaders['x-custom-header'], 'test-value');
-      });
-    });
-
-    it('clears extra headers when empty object is passed', async () => {
-      await withMcpContext(async (response, context) => {
-        const page = context.getSelectedPptrPage();
-        // Set headers first.
-        await page.setExtraHTTPHeaders({'X-To-Clear': 'value'});
-
-        await setExtraHTTPHeaders.handler(
-          {
-            params: {headers: {}},
-            page: context.getSelectedMcpPage(),
-          },
-          response,
-          context,
-        );
-        assert.ok(response.responseLines[0]?.includes('cleared'));
-      });
-    });
-
-    it('headers persist across navigations', async () => {
-      const receivedHeaders: Array<Record<string, string>> = [];
-      server.addRoute('/persist-one', async (req, res) => {
-        receivedHeaders.push({...req.headers} as Record<string, string>);
-        res.writeHead(200, {'Content-Type': 'text/html'});
-        res.end('<main>Page One</main>');
-      });
-      server.addRoute('/persist-two', async (req, res) => {
-        receivedHeaders.push({...req.headers} as Record<string, string>);
-        res.writeHead(200, {'Content-Type': 'text/html'});
-        res.end('<main>Page Two</main>');
-      });
-
-      await withMcpContext(async (response, context) => {
-        const page = context.getSelectedPptrPage();
-        await setExtraHTTPHeaders.handler(
-          {
-            params: {headers: {'X-Persist': 'yes'}},
-            page: context.getSelectedMcpPage(),
-          },
-          response,
-          context,
-        );
-
-        await page.goto(server.getRoute('/persist-one'));
-        await page.goto(server.getRoute('/persist-two'));
-
-        assert.strictEqual(receivedHeaders[0]?.['x-persist'], 'yes');
-        assert.strictEqual(receivedHeaders[1]?.['x-persist'], 'yes');
       });
     });
   });

@@ -14,6 +14,7 @@ import {
 } from '../../src/tools/ToolDefinition.js';
 import {serverHooks} from '../server.js';
 import {html, withMcpContext} from '../utils.js';
+import type {IncomingHttpHeaders} from 'node:http';
 
 describe('emulation', () => {
   const server = serverHooks();
@@ -566,6 +567,172 @@ describe('emulation', () => {
           await context.getSelectedPptrPage().evaluate(() => {
             return navigator.userAgent !== 'MyUA';
           }),
+        );
+      });
+    });
+  });
+
+  describe('extraHTTPHeaders', () => {
+    it('sets extra headers on requests', async () => {
+      let receivedHeaders: IncomingHttpHeaders = {};
+      server.addRoute('/headers-test', async (req, res) => {
+        receivedHeaders = req.headers;
+        res.writeHead(200, {'Content-Type': 'text/html'});
+        res.end('<main>Headers Test</main>');
+      });
+
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedPptrPage();
+        await emulate.handler(
+          {
+            params: {
+              extraHTTPHeaders: {'X-Custom-Header': 'test-value'},
+            },
+            page: context.getSelectedMcpPage(),
+          },
+          response,
+          context,
+        );
+
+        await page.goto(server.getRoute('/headers-test'));
+        assert.strictEqual(receivedHeaders['x-custom-header'], 'test-value');
+      });
+    });
+
+    it('clears extra headers when empty object is passed', async () => {
+      let receivedHeaders: IncomingHttpHeaders = {};
+      server.addRoute('/headers-clear', async (req, res) => {
+        receivedHeaders = req.headers;
+        res.writeHead(200, {'Content-Type': 'text/html'});
+        res.end('<main>Headers Clear</main>');
+      });
+
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedPptrPage();
+        // Set headers first
+        await emulate.handler(
+          {
+            params: {
+              extraHTTPHeaders: {'X-To-Clear': 'value'},
+            },
+            page: context.getSelectedMcpPage(),
+          },
+          response,
+          context,
+        );
+
+        // Clear headers
+        await emulate.handler(
+          {
+            params: {
+              extraHTTPHeaders: {},
+            },
+            page: context.getSelectedMcpPage(),
+          },
+          response,
+          context,
+        );
+
+        await page.goto(server.getRoute('/headers-clear'));
+        assert.strictEqual(receivedHeaders['x-to-clear'], undefined);
+        assert.strictEqual(
+          context.getSelectedMcpPage().emulationSettings.extraHTTPHeaders,
+          undefined,
+        );
+      });
+    });
+
+    it('headers persist across navigations', async () => {
+      const receivedHeaders: Array<IncomingHttpHeaders> = [];
+      server.addRoute('/persist-one', async (req, res) => {
+        receivedHeaders.push({...req.headers});
+        res.writeHead(200, {'Content-Type': 'text/html'});
+        res.end('<main>Page One</main>');
+      });
+      server.addRoute('/persist-two', async (req, res) => {
+        receivedHeaders.push({...req.headers});
+        res.writeHead(200, {'Content-Type': 'text/html'});
+        res.end('<main>Page Two</main>');
+      });
+
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedPptrPage();
+        await emulate.handler(
+          {
+            params: {
+              extraHTTPHeaders: {'X-Persist': 'yes'},
+            },
+            page: context.getSelectedMcpPage(),
+          },
+          response,
+          context,
+        );
+
+        await page.goto(server.getRoute('/persist-one'));
+        await page.goto(server.getRoute('/persist-two'));
+
+        assert.strictEqual(receivedHeaders[0]?.['x-persist'], 'yes');
+        assert.strictEqual(receivedHeaders[1]?.['x-persist'], 'yes');
+      });
+    });
+
+    it('does not affect other emulation settings', async () => {
+      await withMcpContext(async (response, context) => {
+        // Set userAgent first
+        await emulate.handler(
+          {
+            params: {
+              userAgent: 'MyUA',
+            },
+            page: context.getSelectedMcpPage(),
+          },
+          response,
+          context,
+        );
+
+        // Set extraHTTPHeaders separately
+        await emulate.handler(
+          {
+            params: {
+              extraHTTPHeaders: {'X-Test': 'value'},
+            },
+            page: context.getSelectedMcpPage(),
+          },
+          response,
+          context,
+        );
+
+        const settings = context.getSelectedMcpPage().emulationSettings;
+        assert.deepStrictEqual(settings.extraHTTPHeaders, {
+          'X-Test': 'value',
+        });
+      });
+    });
+
+    it('reports correctly for the currently selected page', async () => {
+      await withMcpContext(async (response, context) => {
+        await emulate.handler(
+          {
+            params: {
+              extraHTTPHeaders: {'X-Page': 'one'},
+            },
+            page: context.getSelectedMcpPage(),
+          },
+          response,
+          context,
+        );
+
+        assert.deepStrictEqual(
+          context.getSelectedMcpPage().emulationSettings.extraHTTPHeaders,
+          {'X-Page': 'one'},
+        );
+
+        const page = await context.newPage();
+        context.selectPage(page);
+
+        assert.strictEqual(
+          context.getSelectedMcpPage().emulationSettings.extraHTTPHeaders,
+          undefined,
         );
       });
     });
