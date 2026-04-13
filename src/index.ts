@@ -254,6 +254,8 @@ export async function createMcpServer(
         } finally {
           void clearcutLogger?.logToolInvocation({
             toolName: tool.name,
+            params,
+            schema,
             success,
             latencyMs: bucketizeLatency(Date.now() - startTime),
           });
