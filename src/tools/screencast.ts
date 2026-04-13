@@ -16,7 +16,7 @@ import {ToolCategory} from './categories.js';
 import {definePageTool} from './ToolDefinition.js';
 
 async function generateTempFilePath(): Promise<string> {
-  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'chrome-devtools-mcp-'));
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'brave-devtools-mcp-'));
   return path.join(dir, `screencast.mp4`);
 }
 

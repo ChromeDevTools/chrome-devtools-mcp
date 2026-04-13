@@ -6,7 +6,7 @@
 
 import type fs from 'node:fs';
 
-import type {parseArguments} from './bin/chrome-devtools-mcp-cli-options.js';
+import type {parseArguments} from './bin/brave-devtools-mcp-cli-options.js';
 import type {Channel} from './browser.js';
 import {ensureBrowserConnected, ensureBrowserLaunched} from './browser.js';
 import {loadIssueDescriptions} from './issue-descriptions.js';
@@ -49,8 +49,8 @@ export async function createMcpServer(
 
   const server = new McpServer(
     {
-      name: 'chrome_devtools',
-      title: 'Chrome DevTools MCP server',
+      name: 'brave_devtools',
+      title: 'Brave DevTools MCP server',
       version: VERSION,
     },
     {capabilities: {logging: {}}},
@@ -92,12 +92,12 @@ export async function createMcpServer(
 
   let context: McpContext;
   async function getContext(): Promise<McpContext> {
-    const chromeArgs: string[] = (serverArgs.chromeArg ?? []).map(String);
-    const ignoreDefaultChromeArgs: string[] = (
-      serverArgs.ignoreDefaultChromeArg ?? []
+    const braveArgs: string[] = (serverArgs.braveArg ?? []).map(String);
+    const ignoreDefaultBraveArgs: string[] = (
+      serverArgs.ignoreDefaultBraveArg ?? []
     ).map(String);
     if (serverArgs.proxyServer) {
-      chromeArgs.push(`--proxy-server=${serverArgs.proxyServer}`);
+      braveArgs.push(`--proxy-server=${serverArgs.proxyServer}`);
     }
     const devtools = serverArgs.experimentalDevtools ?? false;
     const browser =
@@ -106,7 +106,6 @@ export async function createMcpServer(
             browserURL: serverArgs.browserUrl,
             wsEndpoint: serverArgs.wsEndpoint,
             wsHeaders: serverArgs.wsHeaders,
-            // Important: only pass channel, if autoConnect is true.
             channel: serverArgs.autoConnect
               ? (serverArgs.channel as Channel)
               : undefined,
@@ -121,8 +120,8 @@ export async function createMcpServer(
             userDataDir: serverArgs.userDataDir,
             logFile: options.logFile,
             viewport: serverArgs.viewport,
-            chromeArgs,
-            ignoreDefaultChromeArgs,
+            braveArgs,
+            ignoreDefaultBraveArgs,
             acceptInsecureCerts: serverArgs.acceptInsecureCerts,
             devtools,
             enableExtensions: serverArgs.categoryExtensions,
@@ -316,7 +315,7 @@ export async function createMcpServer(
 
 export const logDisclaimers = (args: ReturnType<typeof parseArguments>) => {
   console.error(
-    `chrome-devtools-mcp exposes content of the browser instance to the MCP clients allowing them to inspect,
+    `brave-devtools-mcp exposes content of the browser instance to the MCP clients allowing them to inspect,
 debug, and modify any data in the browser or DevTools.
 Avoid sharing sensitive or personal information that you do not want to share with MCP clients.`,
   );
@@ -329,9 +328,7 @@ Avoid sharing sensitive or personal information that you do not want to share wi
 
   if (!args.slim && args.usageStatistics) {
     console.error(
-      `
-Google collects usage statistics to improve Chrome DevTools MCP. To opt-out, run with --no-usage-statistics.
-For more details, visit: https://github.com/ChromeDevTools/chrome-devtools-mcp#usage-statistics`,
+      `Usage statistics are enabled. To opt-out, run with --no-usage-statistics.`,
     );
   }
 };

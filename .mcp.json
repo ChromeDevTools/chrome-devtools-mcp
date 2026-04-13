@@ -1,8 +1,8 @@
 {
   "mcpServers": {
-    "chrome-devtools": {
+    "brave-devtools": {
       "command": "npx",
-      "args": ["chrome-devtools-mcp@latest"]
+      "args": ["brave-mcp@latest"]
     }
   }
 }

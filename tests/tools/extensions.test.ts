@@ -10,7 +10,7 @@ import {afterEach, describe, it} from 'node:test';
 
 import sinon from 'sinon';
 
-import type {ParsedArguments} from '../../src/bin/chrome-devtools-mcp-cli-options.js';
+import type {ParsedArguments} from '../../src/bin/brave-devtools-mcp-cli-options.js';
 import {listConsoleMessages} from '../../src/tools/console.js';
 import {
   installExtension,

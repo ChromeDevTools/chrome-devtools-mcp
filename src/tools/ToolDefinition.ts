@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {ParsedArguments} from '../bin/chrome-devtools-mcp-cli-options.js';
+import type {ParsedArguments} from '../bin/brave-devtools-mcp-cli-options.js';
 import type {AggregatedInfoWithUid} from '../HeapSnapshotManager.js';
 import type {McpPage} from '../McpPage.js';
 import {zod} from '../third_party/index.js';

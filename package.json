@@ -1,11 +1,12 @@
 {
-  "name": "chrome-devtools-mcp",
-  "version": "0.23.0",
-  "description": "MCP server for Chrome DevTools",
+  "name": "brave-mcp",
+  "version": "0.1.1",
+  "description": "MCP server for Brave DevTools",
   "type": "module",
   "bin": {
-    "chrome-devtools-mcp": "./build/src/bin/chrome-devtools-mcp.js",
-    "chrome-devtools": "./build/src/bin/chrome-devtools.js"
+    "brave-mcp": "./build/src/bin/brave-devtools-mcp.js",
+    "brave-devtools-mcp": "./build/src/bin/brave-devtools-mcp.js",
+    "brave-devtools": "./build/src/bin/brave-devtools.js"
   },
   "main": "./build/src/index.js",
   "scripts": {
@@ -24,6 +25,7 @@
     "test:no-build": "node scripts/test.mjs",
     "test:only": "npm run build && node scripts/test.mjs --test-only",
     "test:update-snapshots": "npm run build && node scripts/test.mjs --test-update-snapshots",
+    "test:brave": "npm run build && node tests/e2e/brave-integration.test.mjs",
     "prepare": "node --experimental-strip-types scripts/prepare.ts",
     "verify-server-json-version": "node --experimental-strip-types scripts/verify-server-json-version.ts",
     "update-lighthouse": "node --experimental-strip-types scripts/update-lighthouse.ts",
@@ -38,14 +40,14 @@
     "!*.tsbuildinfo",
     "!*.js.map"
   ],
-  "repository": "ChromeDevTools/chrome-devtools-mcp",
-  "author": "Google LLC",
+  "repository": "triuzzi/brave-devtools-mcp",
+  "author": "Emanuele Triuzzi",
   "license": "Apache-2.0",
   "bugs": {
-    "url": "https://github.com/ChromeDevTools/chrome-devtools-mcp/issues"
+    "url": "https://github.com/triuzzi/brave-devtools-mcp/issues"
   },
-  "homepage": "https://github.com/ChromeDevTools/chrome-devtools-mcp#readme",
-  "mcpName": "io.github.ChromeDevTools/chrome-devtools-mcp",
+  "homepage": "https://github.com/triuzzi/brave-devtools-mcp#readme",
+  "mcpName": "io.github.triuzzi/brave-devtools-mcp",
   "devDependencies": {
     "@eslint/js": "^9.35.0",
     "@google/genai": "^1.37.0",

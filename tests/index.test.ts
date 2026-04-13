@@ -31,7 +31,7 @@ describe('e2e', () => {
     const transport = new StdioClientTransport({
       command: 'node',
       args: [
-        'build/src/bin/chrome-devtools-mcp.js',
+        'build/src/bin/brave-devtools-mcp.js',
         '--headless',
         '--isolated',
         '--executable-path',

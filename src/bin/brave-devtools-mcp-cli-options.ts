@@ -11,7 +11,7 @@ export const cliOptions = {
   autoConnect: {
     type: 'boolean',
     description:
-      'If specified, automatically connects to a browser (Chrome 144+) running locally from the user data directory identified by the channel param (default channel is stable). Requires the remote debugging server to be started in the Chrome instance via chrome://inspect/#remote-debugging.',
+      'If specified, automatically connects to a Brave instance running locally from the user data directory identified by the channel param (default channel is release). Requires the remote debugging server to be started in the Brave instance via brave://inspect/#remote-debugging.',
     conflicts: ['isolated', 'executablePath'],
     default: false,
     coerce: (value: boolean | undefined) => {
@@ -24,7 +24,7 @@ export const cliOptions = {
   browserUrl: {
     type: 'string',
     description:
-      'Connect to a running, debuggable Chrome instance (e.g. `http://127.0.0.1:9222`). For more details see: https://github.com/ChromeDevTools/chrome-devtools-mcp#connecting-to-a-running-chrome-instance.',
+      'Connect to a running, debuggable Brave instance (e.g. `http://127.0.0.1:9222`).',
     alias: 'u',
     conflicts: ['wsEndpoint'],
     coerce: (url: string | undefined) => {
@@ -42,7 +42,7 @@ export const cliOptions = {
   wsEndpoint: {
     type: 'string',
     description:
-      'WebSocket endpoint to connect to a running Chrome instance (e.g., ws://127.0.0.1:9222/devtools/browser/<id>). Alternative to --browserUrl.',
+      'WebSocket endpoint to connect to a running Brave instance (e.g., ws://127.0.0.1:9222/devtools/browser/<id>). Alternative to --browserUrl.',
     alias: 'w',
     conflicts: ['browserUrl'],
     coerce: (url: string | undefined) => {
@@ -94,7 +94,7 @@ export const cliOptions = {
   },
   executablePath: {
     type: 'string',
-    description: 'Path to custom Chrome executable.',
+    description: 'Path to custom Brave executable. Can also be set via BRAVE_PATH environment variable.',
     conflicts: ['browserUrl', 'wsEndpoint'],
     alias: 'e',
   },
@@ -106,14 +106,14 @@ export const cliOptions = {
   userDataDir: {
     type: 'string',
     description:
-      'Path to the user data directory for Chrome. Default is $HOME/.cache/chrome-devtools-mcp/chrome-profile$CHANNEL_SUFFIX_IF_NON_STABLE',
+      'Path to the user data directory for Brave. Default is $HOME/.cache/brave-devtools-mcp/brave-profile$CHANNEL_SUFFIX_IF_NON_RELEASE',
     conflicts: ['browserUrl', 'wsEndpoint', 'isolated'],
   },
   channel: {
     type: 'string',
     description:
-      'Specify a different Chrome channel that should be used. The default is the stable channel version.',
-    choices: ['canary', 'dev', 'beta', 'stable'] as const,
+      'Specify a different Brave channel that should be used. The default is the release channel.',
+    choices: ['release', 'beta', 'nightly', 'dev'] as const,
     conflicts: ['browserUrl', 'wsEndpoint', 'executablePath'],
   },
   logFile: {
@@ -124,7 +124,7 @@ export const cliOptions = {
   viewport: {
     type: 'string',
     describe:
-      'Initial viewport size for the Chrome instances started by the server. For example, `1280x720`. In headless mode, max size is 3840x2160px.',
+      'Initial viewport size for the Brave instances started by the server. For example, `1280x720`. In headless mode, max size is 3840x2160px.',
     coerce: (arg: string | undefined) => {
       if (arg === undefined) {
         return;
@@ -141,7 +141,7 @@ export const cliOptions = {
   },
   proxyServer: {
     type: 'string',
-    description: `Proxy server configuration for Chrome passed as --proxy-server when launching the browser. See https://www.chromium.org/developers/design-documents/network-settings/ for details.`,
+    description: `Proxy server configuration for Brave passed as --proxy-server when launching the browser. See https://www.chromium.org/developers/design-documents/network-settings/ for details.`,
   },
   acceptInsecureCerts: {
     type: 'boolean',
@@ -203,17 +203,17 @@ export const cliOptions = {
   experimentalWebmcp: {
     type: 'boolean',
     describe:
-      'Set to true to enable debugging WebMCP tools. Requires Chrome 149+ with the following flags: `--enable-features=WebMCPTesting,DevToolsWebMCPSupport`',
+      'Set to true to enable debugging WebMCP tools. Requires Brave with the following flags: `--enable-features=WebMCPTesting,DevToolsWebMCPSupport`',
   },
-  chromeArg: {
+  braveArg: {
     type: 'array',
     describe:
-      'Additional arguments for Chrome. Only applies when Chrome is launched by chrome-devtools-mcp.',
+      'Additional arguments for Brave. Only applies when Brave is launched by brave-devtools-mcp.',
   },
-  ignoreDefaultChromeArg: {
+  ignoreDefaultBraveArg: {
     type: 'array',
     describe:
-      'Explicitly disable default arguments for Chrome. Only applies when Chrome is launched by chrome-devtools-mcp.',
+      'Explicitly disable default arguments for Brave. Only applies when Brave is launched by brave-devtools-mcp.',
   },
   categoryEmulation: {
     type: 'boolean',
@@ -251,9 +251,9 @@ export const cliOptions = {
   },
   usageStatistics: {
     type: 'boolean',
-    default: true,
+    default: false,
     describe:
-      'Set to false to opt-out of usage statistics collection. Google collects usage data to improve the tool, handled under the Google Privacy Policy (https://policies.google.com/privacy). This is independent from Chrome browser metrics. Disabled if `CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS` or `CI` env variables are set.',
+      'Usage statistics collection (disabled by default in this fork).',
   },
   clearcutEndpoint: {
     type: 'string',
@@ -278,7 +278,7 @@ export const cliOptions = {
   viaCli: {
     type: 'boolean',
     describe:
-      'Set by Chrome DevTools CLI if the MCP server is started via the CLI client (this arg exists for usage stats)',
+      'Set by Brave DevTools CLI if the MCP server is started via the CLI client (this arg exists for usage stats)',
     hidden: true,
   },
   redactNetworkHeaders: {
@@ -293,50 +293,48 @@ export type ParsedArguments = ReturnType<typeof parseArguments>;
 
 export function parseArguments(version: string, argv = process.argv) {
   const yargsInstance = yargs(hideBin(argv))
-    .scriptName('npx chrome-devtools-mcp@latest')
+    .scriptName('npx brave-devtools-mcp@latest')
     .options(cliOptions)
     .check(args => {
-      // We can't set default in the options else
-      // Yargs will complain
       if (
         !args.channel &&
         !args.browserUrl &&
         !args.wsEndpoint &&
         !args.executablePath
       ) {
-        args.channel = 'stable';
+        args.channel = 'release';
       }
       return true;
     })
     .example([
       [
         '$0 --browserUrl http://127.0.0.1:9222',
-        'Connect to an existing browser instance via HTTP',
+        'Connect to an existing Brave instance via HTTP',
       ],
       [
         '$0 --wsEndpoint ws://127.0.0.1:9222/devtools/browser/abc123',
-        'Connect to an existing browser instance via WebSocket',
+        'Connect to an existing Brave instance via WebSocket',
       ],
       [
         `$0 --wsEndpoint ws://127.0.0.1:9222/devtools/browser/abc123 --wsHeaders '{"Authorization":"Bearer token"}'`,
         'Connect via WebSocket with custom headers',
       ],
-      ['$0 --channel beta', 'Use Chrome Beta installed on this system'],
-      ['$0 --channel canary', 'Use Chrome Canary installed on this system'],
-      ['$0 --channel dev', 'Use Chrome Dev installed on this system'],
-      ['$0 --channel stable', 'Use stable Chrome installed on this system'],
+      ['$0 --channel beta', 'Use Brave Beta installed on this system'],
+      ['$0 --channel nightly', 'Use Brave Nightly installed on this system'],
+      ['$0 --channel dev', 'Use Brave Dev installed on this system'],
+      ['$0 --channel release', 'Use release Brave installed on this system'],
       ['$0 --logFile /tmp/log.txt', 'Save logs to a file'],
       ['$0 --help', 'Print CLI options'],
       [
         '$0 --viewport 1280x720',
-        'Launch Chrome with the initial viewport size of 1280x720px',
+        'Launch Brave with the initial viewport size of 1280x720px',
       ],
       [
-        `$0 --chrome-arg='--no-sandbox' --chrome-arg='--disable-setuid-sandbox'`,
-        'Launch Chrome without sandboxes. Use with caution.',
+        `$0 --brave-arg='--no-sandbox' --brave-arg='--disable-setuid-sandbox'`,
+        'Launch Brave without sandboxes. Use with caution.',
       ],
       [
-        `$0 --ignore-default-chrome-arg='--disable-extensions'`,
+        `$0 --ignore-default-brave-arg='--disable-extensions'`,
         'Disable the default arguments provided by Puppeteer. Use with caution.',
       ],
       ['$0 --no-category-emulation', 'Disable tools in the emulation category'],
@@ -351,19 +349,11 @@ export function parseArguments(version: string, argv = process.argv) {
       ],
       [
         '$0 --auto-connect',
-        'Connect to a stable Chrome instance (Chrome 144+) running instead of launching a new instance',
+        'Connect to a release Brave instance running instead of launching a new instance',
       ],
       [
-        '$0 --auto-connect --channel=canary',
-        'Connect to a canary Chrome instance (Chrome 144+) running instead of launching a new instance',
-      ],
-      [
-        '$0 --no-usage-statistics',
-        'Do not send usage statistics https://github.com/ChromeDevTools/chrome-devtools-mcp#usage-statistics.',
-      ],
-      [
-        '$0 --no-performance-crux',
-        'Disable CrUX (field data) integration in performance tools.',
+        '$0 --auto-connect --channel=nightly',
+        'Connect to a nightly Brave instance running instead of launching a new instance',
       ],
       [
         '$0 --slim',

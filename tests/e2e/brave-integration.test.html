@@ -1,0 +1,26 @@
+<html>
+<head><title>Brave MCP Test Page</title></head>
+<body>
+<h1 id="heading">Brave DevTools MCP Test</h1>
+<form id="testform">
+  <label for="name">Name</label>
+  <input type="text" id="name" placeholder="Name" />
+  <label for="email">Email</label>
+  <input type="email" id="email" placeholder="Email" />
+  <label for="browser">Browser</label>
+  <select id="browser"><option value="brave">Brave</option><option value="chrome">Chrome</option></select>
+  <label for="notes">Notes</label>
+  <textarea id="notes" placeholder="Notes"></textarea>
+  <input type="file" id="fileupload" />
+  <button type="submit" id="submitbtn">Submit</button>
+</form>
+<div id="dragsource" draggable="true" style="width:80px;height:80px;background:blue;display:inline-block;color:white;text-align:center;line-height:80px;">Drag</div>
+<div id="droptarget" style="width:80px;height:80px;background:green;display:inline-block;margin-left:20px;color:white;text-align:center;line-height:80px;">Drop</div>
+<div id="result"></div>
+<script>
+console.log("Test page loaded");
+console.warn("Test warning");
+fetch("https://httpbin.org/get");
+</script>
+</body>
+</html>

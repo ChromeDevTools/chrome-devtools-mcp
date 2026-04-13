@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {ParsedArguments} from '../bin/chrome-devtools-mcp-cli-options.js';
+import type {ParsedArguments} from '../bin/brave-devtools-mcp-cli-options.js';
 
 import * as consoleTools from './console.js';
 import * as emulationTools from './emulation.js';

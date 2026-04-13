@@ -7,7 +7,7 @@
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
-import type {ParsedArguments} from '../../src/bin/chrome-devtools-mcp-cli-options.js';
+import type {ParsedArguments} from '../../src/bin/brave-devtools-mcp-cli-options.js';
 import {serializeArgs} from '../../src/daemon/utils.js';
 import type {YargsOptions} from '../../src/third_party/index.js';
 
