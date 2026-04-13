@@ -32,7 +32,7 @@ describe('chrome-devtools', () => {
       `start command failed: ${result.stderr}`,
     );
     assert(
-      result.stderr.includes('chrome-devtools-mcp exposes content'),
+      result.stderr.includes('brave-devtools-mcp exposes content'),
       'Disclaimer not found in stderr on start',
     );
   });

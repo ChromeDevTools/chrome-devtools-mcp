@@ -25,7 +25,7 @@ export function resetUpdateCheckFlagForTesting() {
 }
 
 export async function checkForUpdates(message: string) {
-  if (isChecking || process.env['CHROME_DEVTOOLS_MCP_NO_UPDATE_CHECKS']) {
+  if (isChecking || process.env['BRAVE_DEVTOOLS_MCP_NO_UPDATE_CHECKS']) {
     return;
   }
   isChecking = true;
@@ -33,7 +33,7 @@ export async function checkForUpdates(message: string) {
   const cachePath = path.join(
     os.homedir(),
     '.cache',
-    'chrome-devtools-mcp',
+    'brave-devtools-mcp',
     'latest.json',
   );
 

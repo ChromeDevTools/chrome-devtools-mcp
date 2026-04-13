@@ -17,11 +17,11 @@ export const INDEX_SCRIPT_PATH = path.join(
   import.meta.dirname,
   '..',
   'bin',
-  'chrome-devtools-mcp.js',
+  'brave-devtools-mcp.js',
 );
 
-const APP_NAME = 'chrome-devtools-mcp';
-export const DAEMON_CLIENT_NAME = 'chrome-devtools-cli-daemon';
+const APP_NAME = 'brave-devtools-mcp';
+export const DAEMON_CLIENT_NAME = 'brave-devtools-cli-daemon';
 
 // Using these paths due to strict limits on the POSIX socket path length.
 export function getSocketPath(sessionId: string): string {

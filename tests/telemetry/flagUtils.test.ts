@@ -7,7 +7,7 @@
 import assert from 'node:assert/strict';
 import {describe, it} from 'node:test';
 
-import type {cliOptions} from '../../src/bin/chrome-devtools-mcp-cli-options.js';
+import type {cliOptions} from '../../src/bin/brave-devtools-mcp-cli-options.js';
 import {
   computeFlagUsage,
   getPossibleFlagMetrics,
