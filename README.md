@@ -714,7 +714,6 @@ Check the performance of https://developers.chrome.com
 > [!NOTE]
 > The <code>autoConnect</code> option requires the user to start Chrome. If the user has multiple active profiles, the MCP server will connect to the default profile (as determined by Chrome). The MCP server has access to all open windows for the selected profile.
 >
-> [!NOTE]
 > Network requests that occurred before the MCP server connected are not available via <code>list_network_requests</code> / <code>get_network_request</code>. If you need those, start the MCP server first or reload the page after it connects.
 
 The Chrome DevTools MCP server will try to connect to your running Chrome
