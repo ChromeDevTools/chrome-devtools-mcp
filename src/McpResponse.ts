@@ -8,6 +8,7 @@ import type {WebMCPTool} from 'puppeteer-core';
 
 import type {ParsedArguments} from './bin/chrome-devtools-mcp-cli-options.js';
 import {ConsoleFormatter} from './formatters/ConsoleFormatter.js';
+import {HeapSnapshotFormatter} from './formatters/HeapSnapshotFormatter.js';
 import {IssueFormatter} from './formatters/IssueFormatter.js';
 import {NetworkFormatter} from './formatters/NetworkFormatter.js';
 import {SnapshotFormatter} from './formatters/SnapshotFormatter.js';
@@ -168,6 +169,14 @@ export class McpResponse implements Response {
   #attachedLighthouseResult?: LighthouseData;
   #textResponseLines: string[] = [];
   #images: ImageContentData[] = [];
+  #heapSnapshotOptions?: {
+    include: boolean;
+    aggregates: Record<
+      string,
+      DevTools.HeapSnapshotModel.HeapSnapshotModel.AggregatedInfo
+    >;
+    pagination?: PaginationOptions;
+  };
   #networkRequestsOptions?: {
     include: boolean;
     pagination?: PaginationOptions;
@@ -363,6 +372,20 @@ export class McpResponse implements Response {
 
   appendResponseLine(value: string): void {
     this.#textResponseLines.push(value);
+  }
+
+  setHeapSnapshot(
+    aggregates: Record<
+      string,
+      DevTools.HeapSnapshotModel.HeapSnapshotModel.AggregatedInfo
+    >,
+    options?: PaginationOptions,
+  ) {
+    this.#heapSnapshotOptions = {
+      include: true,
+      aggregates,
+      pagination: options,
+    };
   }
 
   attachImage(value: ImageContentData): void {
@@ -661,6 +684,7 @@ export class McpResponse implements Response {
       };
       pages?: object[];
       pagination?: object;
+      heapSnapshot?: object[];
       extensionServiceWorkers?: object[];
       extensionPages?: object[];
     } = {};
@@ -855,6 +879,26 @@ Call ${handleDialog.name} to handle it before continuing.`);
         response.push(data.snapshot.toString());
         structuredContent.snapshot = data.snapshot.toJSON();
       }
+    }
+
+    if (this.#heapSnapshotOptions?.include) {
+      const aggregates = this.#heapSnapshotOptions.aggregates;
+      const entries = Object.entries(aggregates);
+      const sortedEntries = entries.sort((a, b) => b[1].self - a[1].self);
+
+      const paginationData = this.#dataWithPagination(
+        sortedEntries,
+        this.#heapSnapshotOptions.pagination,
+      );
+
+      structuredContent.pagination = paginationData.pagination;
+      response.push(...paginationData.info);
+
+      const paginatedRecord = Object.fromEntries(paginationData.items);
+      const formatter = new HeapSnapshotFormatter(paginatedRecord);
+
+      response.push(formatter.toString());
+      structuredContent.heapSnapshot = formatter.toJSON();
     }
 
     if (data.detailedNetworkRequest) {

@@ -13,6 +13,7 @@ import type {
   Page,
   ScreenRecorder,
   Viewport,
+  DevTools,
 } from '../third_party/index.js';
 import type {InsightName, TraceResult} from '../trace-processing/parse.js';
 import type {
@@ -99,6 +100,13 @@ export interface DevToolsData {
 
 export interface Response {
   appendResponseLine(value: string): void;
+  setHeapSnapshot(
+    aggregates: Record<
+      string,
+      DevTools.HeapSnapshotModel.HeapSnapshotModel.AggregatedInfo
+    >,
+    options?: PaginationOptions,
+  ): void;
   setIncludePages(value: boolean): void;
   setIncludeNetworkRequests(
     value: boolean,
@@ -118,7 +126,7 @@ export interface Response {
   includeSnapshot(params?: SnapshotParams): void;
   attachImage(value: ImageContentData): void;
   attachNetworkRequest(
-    reqid: number,
+    reqId: number,
     options?: {requestFilePath?: string; responseFilePath?: string},
   ): void;
   attachConsoleMessage(msgid: number): void;
@@ -213,6 +221,9 @@ export type Context = Readonly<{
   getExtensionServiceWorkerId(
     extensionServiceWorker: ExtensionServiceWorker,
   ): string | undefined;
+  getHeapSnapshotProxy(
+    heapsnapshotPath: string,
+  ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotProxy.HeapSnapshotProxy>;
 }>;
 
 export type ContextPage = Readonly<{

@@ -296,4 +296,11 @@ export default [
     },
     (_source, _importer, _isResolved) => false,
   ),
+  bundleDependency(
+    'devtools-heap-snapshot-worker.js',
+    {
+      inlineDynamicImports: true,
+    },
+    (_source, _importer, _isResolved) => false,
+  ),
 ];

@@ -33,6 +33,7 @@
     "node_modules/chrome-devtools-frontend/front_end/core/root",
     "node_modules/chrome-devtools-frontend/front_end/core/sdk",
     "node_modules/chrome-devtools-frontend/front_end/entrypoints/formatter_worker",
+    "node_modules/chrome-devtools-frontend/front_end/entrypoints/heap_snapshot_worker",
     "node_modules/chrome-devtools-frontend/front_end/foundation/foundation.ts",
     "node_modules/chrome-devtools-frontend/front_end/foundation/Universe.ts",
     "node_modules/chrome-devtools-frontend/front_end/generated",

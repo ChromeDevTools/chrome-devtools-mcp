@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import fsSync from 'node:fs';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
@@ -16,7 +17,6 @@ import {
   type ListenerMap,
   type UncaughtError,
 } from './PageCollector.js';
-import type {DevTools} from './third_party/index.js';
 import type {
   Browser,
   BrowserContext,
@@ -29,6 +29,7 @@ import type {
   Viewport,
   Target,
 } from './third_party/index.js';
+import {DevTools} from './third_party/index.js';
 import {Locator} from './third_party/index.js';
 import {PredefinedNetworkConditions} from './third_party/index.js';
 import {listPages} from './tools/pages.js';
@@ -912,5 +913,50 @@ export class McpContext implements Context {
 
   getExtension(id: string): InstalledExtension | undefined {
     return this.#extensionRegistry.getById(id);
+  }
+
+  async getHeapSnapshotProxy(
+    heapsnapshotPath: string,
+  ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotProxy.HeapSnapshotProxy> {
+    const workerProxy =
+      new DevTools.HeapSnapshotModel.HeapSnapshotProxy.HeapSnapshotWorkerProxy(
+        () => {
+          /* noop */
+        },
+        import.meta.resolve('../third_party/devtools-heap-snapshot-worker.js'),
+      );
+
+    const absolutePath = path.resolve(heapsnapshotPath);
+
+    try {
+      const {promise: snapshotPromise, resolve: resolveSnapshot} =
+        Promise.withResolvers<DevTools.HeapSnapshotModel.HeapSnapshotProxy.HeapSnapshotProxy>();
+
+      const loaderProxy = workerProxy.createLoader(
+        1,
+        (
+          snapshotProxy: DevTools.HeapSnapshotModel.HeapSnapshotProxy.HeapSnapshotProxy,
+        ) => {
+          resolveSnapshot(snapshotProxy);
+        },
+      );
+
+      const fileStream = fsSync.createReadStream(absolutePath, {
+        encoding: 'utf-8',
+        highWaterMark: 1024 * 1024,
+      });
+
+      for await (const chunk of fileStream) {
+        await loaderProxy.write(chunk);
+      }
+
+      await loaderProxy.close();
+
+      const snapshot = await snapshotPromise;
+
+      return snapshot;
+    } finally {
+      workerProxy.dispose();
+    }
   }
 }
