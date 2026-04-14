@@ -620,6 +620,11 @@ The Chrome DevTools MCP server supports the following configuration option:
   Exposes a "slim" set of 3 tools covering navigation, script execution and screenshots only. Useful for basic browser tasks.
   - **Type:** boolean
 
+- **`--redactNetworkHeaders`/ `--redact-network-headers`**
+  If true, redacts some of the network headers considered senstive before returning to the client.
+  - **Type:** boolean
+  - **Default:** `false`
+
 <!-- END AUTO GENERATED OPTIONS -->
 
 Pass them via the `args` property in the JSON configuration. For example:

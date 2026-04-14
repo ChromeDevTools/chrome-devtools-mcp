@@ -142,6 +142,7 @@ export function getMockRequest(
     navigationRequest?: boolean;
     frame?: Frame;
     redirectChain?: HTTPRequest[];
+    headers?: Record<string, string>;
   } = {},
 ): HTTPRequest {
   return {
@@ -170,9 +171,11 @@ export function getMockRequest(
       return options.resourceType ?? 'document';
     },
     headers(): Record<string, string> {
-      return {
-        'content-size': '10',
-      };
+      return (
+        options.headers ?? {
+          'content-size': '10',
+        }
+      );
     },
     redirectChain(): HTTPRequest[] {
       return options.redirectChain ?? [];
@@ -190,6 +193,7 @@ export function getMockRequest(
 export function getMockResponse(
   options: {
     status?: number;
+    headers?: Record<string, string>;
   } = {},
 ): HTTPResponse {
   return {
@@ -197,9 +201,9 @@ export function getMockResponse(
       return options.status ?? 200;
     },
     headers(): Record<string, string> {
-      return {};
+      return options.headers ?? {};
     },
-  } as HTTPResponse;
+  } as unknown as HTTPResponse;
 }
 
 export function html(

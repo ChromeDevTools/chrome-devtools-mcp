@@ -6,7 +6,7 @@ exports[`McpContext > should include detailed network request in structured cont
     "url": "http://example.com/detail",
     "status": "pending",
     "requestHeaders": {
-      "content-size": "10"
+      "content-size": "<redacted>"
     }
   }
 }

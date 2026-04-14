@@ -6,7 +6,11 @@
 
 import {isUtf8} from 'node:buffer';
 
-import type {HTTPRequest, HTTPResponse} from '../third_party/index.js';
+import {
+  DevTools,
+  type HTTPRequest,
+  type HTTPResponse,
+} from '../third_party/index.js';
 
 const BODY_CONTEXT_SIZE_LIMIT = 10000;
 
@@ -21,6 +25,7 @@ export interface NetworkFormatterOptions {
     data: Uint8Array<ArrayBufferLike>,
     filename: string,
   ) => Promise<{filename: string}>;
+  redactNetworkHeaders: boolean;
 }
 
 interface NetworkRequestConcise {
@@ -150,6 +155,20 @@ export class NetworkFormatter {
     };
   }
 
+  #redactNetworkHeaders(
+    headers: Record<string, string>,
+  ): Record<string, string> {
+    const headersList = Object.entries(headers).map(item => {
+      return {name: item[0], value: item[1]};
+    });
+    const redacted =
+      DevTools.NetworkRequestFormatter.sanitizeHeaders(headersList);
+    return redacted.reduce<Record<string, string>>((acc, item) => {
+      acc[item.name] = item.value;
+      return acc;
+    }, {});
+  }
+
   toJSONDetailed(): NetworkRequestDetailed {
     const redirectChain = this.#request.redirectChain();
     const formattedRedirectChain = redirectChain.reverse().map(request => {
@@ -159,16 +178,24 @@ export class NetworkFormatter {
       const formatter = new NetworkFormatter(request, {
         requestId: id,
         saveFile: this.#options.saveFile,
+        redactNetworkHeaders: this.#options.redactNetworkHeaders,
       });
       return formatter.toJSON();
     });
 
+    const responseHeaders = this.#request.response()?.headers();
+
     return {
       ...this.toJSON(),
-      requestHeaders: this.#request.headers(),
+      requestHeaders: this.#options.redactNetworkHeaders
+        ? this.#redactNetworkHeaders(this.#request.headers())
+        : this.#request.headers(),
       requestBody: this.#requestBody,
       requestBodyFilePath: this.#requestBodyFilePath,
-      responseHeaders: this.#request.response()?.headers(),
+      responseHeaders:
+        this.#options.redactNetworkHeaders && responseHeaders
+          ? this.#redactNetworkHeaders(responseHeaders)
+          : this.#request.response()?.headers(),
       responseBody: this.#responseBody,
       responseBodyFilePath: this.#responseBodyFilePath,
       failure: this.#request.failure()?.errorText,
