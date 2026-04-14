@@ -60,12 +60,16 @@ export function getZodType(zodType: zod.ZodTypeAny): ZodType {
 type LoggedToolCallArgValue = string | number | boolean;
 
 export function transformArgName(zodType: ZodType, name: string): string {
+  const snakeCaseName = name.replace(
+    /[A-Z]/g,
+    letter => `_${letter.toLowerCase()}`,
+  );
   if (zodType === 'ZodString') {
-    return `${name}_length`;
+    return `${snakeCaseName}_length`;
   } else if (zodType === 'ZodArray') {
-    return `${name}_count`;
+    return `${snakeCaseName}_count`;
   } else {
-    return name;
+    return snakeCaseName;
   }
 }
 

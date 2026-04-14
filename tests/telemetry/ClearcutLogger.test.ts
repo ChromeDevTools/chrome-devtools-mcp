@@ -191,11 +191,11 @@ describe('ClearcutLogger', () => {
       const sanitized = sanitizeParams(params, schema);
 
       assert.deepStrictEqual(sanitized, {
-        myString_length: 5,
-        myArray_count: 2,
-        myNumber: 42,
-        myBool: true,
-        myEnum: 'a',
+        my_string_length: 5,
+        my_array_count: 2,
+        my_number: 42,
+        my_bool: true,
+        my_enum: 'a',
       });
     });
 
