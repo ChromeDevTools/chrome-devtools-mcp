@@ -101,6 +101,7 @@ async function runTests(attempt) {
         ...process.env,
         CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: true,
         CHROME_DEVTOOLS_MCP_CRASH_ON_UNCAUGHT: true,
+        CHROME_DEVTOOLS_MCP_NO_UPDATE_CHECKS: true,
       },
     });
 
