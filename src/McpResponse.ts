@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {WebMCPTool} from 'puppeteer-core/internal/cdp/WebMCP.js';
+import type {WebMCPTool} from 'puppeteer-core';
 
 import type {ParsedArguments} from './bin/chrome-devtools-mcp-cli-options.js';
 import {ConsoleFormatter} from './formatters/ConsoleFormatter.js';

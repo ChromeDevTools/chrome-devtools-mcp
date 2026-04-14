@@ -7,7 +7,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
-import type {WebMCPTool} from 'puppeteer-core/internal/cdp/WebMCP.js';
+import type {WebMCPTool} from 'puppeteer-core';
 
 import type {TargetUniverse} from './DevtoolsUtils.js';
 import {UniverseManager} from './DevtoolsUtils.js';
