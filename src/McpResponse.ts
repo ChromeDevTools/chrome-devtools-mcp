@@ -185,6 +185,7 @@ export class McpResponse implements Response {
   #tabId?: string;
   #args: ParsedArguments;
   #page?: McpPage;
+  #redactNetworkHeaders = true;
 
   constructor(args: ParsedArguments) {
     this.#args = args;
@@ -192,6 +193,10 @@ export class McpResponse implements Response {
 
   setPage(page: McpPage): void {
     this.#page = page;
+  }
+
+  setRedactNetworkHeaders(value: boolean): void {
+    this.#redactNetworkHeaders = value;
   }
 
   attachDevToolsData(data: DevToolsData): void {
@@ -425,6 +430,7 @@ export class McpResponse implements Response {
         requestFilePath: this.#attachedNetworkRequestOptions?.requestFilePath,
         responseFilePath: this.#attachedNetworkRequestOptions?.responseFilePath,
         saveFile: (data, filename) => context.saveFile(data, filename),
+        redactNetworkHeaders: this.#redactNetworkHeaders,
       });
       detailedNetworkRequest = formatter;
     }
@@ -568,6 +574,7 @@ export class McpResponse implements Response {
                 this.#networkRequestsOptions?.networkRequestIdInDevToolsUI,
               fetchData: false,
               saveFile: (data, filename) => context.saveFile(data, filename),
+              redactNetworkHeaders: this.#redactNetworkHeaders,
             }),
           ),
         );
