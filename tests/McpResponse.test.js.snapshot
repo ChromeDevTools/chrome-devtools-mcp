@@ -2,7 +2,7 @@ exports[`McpResponse > add network request when attached 1`] = `
 ## Request http://example.com
 Status: pending
 ### Request Headers
-- content-size:10
+- content-size:<redacted>
 ## Network requests
 Showing 1-1 of 1 (Page 1 of 1).
 reqid=1 GET http://example.com [pending]
@@ -16,7 +16,7 @@ exports[`McpResponse > add network request when attached 2`] = `
     "url": "http://example.com",
     "status": "pending",
     "requestHeaders": {
-      "content-size": "10"
+      "content-size": "<redacted>"
     }
   },
   "pagination": {
@@ -44,7 +44,7 @@ exports[`McpResponse > add network request when attached with POST data 1`] = `
 ## Request http://example.com
 Status: 200
 ### Request Headers
-- content-size:10
+- content-size:<redacted>
 ### Request Body
 {"request":"body"}
 ### Response Headers
@@ -64,7 +64,7 @@ exports[`McpResponse > add network request when attached with POST data 2`] = `
     "url": "http://example.com",
     "status": "200",
     "requestHeaders": {
-      "content-size": "10"
+      "content-size": "<redacted>"
     },
     "requestBody": "{\\"request\\":\\"body\\"}",
     "responseHeaders": {

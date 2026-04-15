@@ -122,6 +122,7 @@ async function runNodeTestBatch(testTimeoutMs, testFiles, label) {
         ...process.env,
         CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: true,
         CHROME_DEVTOOLS_MCP_CRASH_ON_UNCAUGHT: true,
+        CHROME_DEVTOOLS_MCP_NO_UPDATE_CHECKS: true,
       },
     });
     child.on('close', code => {

@@ -1,11 +1,12 @@
-# Chrome DevTools MCP
+# Chrome DevTools for Agents
 
 [![npm chrome-devtools-mcp package](https://img.shields.io/npm/v/chrome-devtools-mcp.svg)](https://npmjs.org/package/chrome-devtools-mcp)
 
-`chrome-devtools-mcp` lets your coding agent (such as Gemini, Claude, Cursor or Copilot)
+Chrome DevTools for Agents (`chrome-devtools-mcp`) lets your coding agent (such as Gemini, Claude, Cursor or Copilot)
 control and inspect a live Chrome browser. It acts as a Model-Context-Protocol
 (MCP) server, giving your AI coding assistant access to the full power of
 Chrome DevTools for reliable automation, in-depth debugging, and performance analysis.
+A [CLI](docs/cli.md) is also provided for use without MCP.
 
 ## [Tool reference](./docs/tool-reference.md) | [MCP tools guide](./docs/mcp-tools-user-guide.md) | [Changelog](./CHANGELOG.md) | [Contributing](./CONTRIBUTING.md) | [Troubleshooting](./docs/troubleshooting.md) | [Design Principles](./docs/design-principles.md)
 
@@ -629,6 +630,11 @@ The Chrome DevTools MCP server supports the following configuration option:
 - **`--slim`**
   Exposes a "slim" set of 3 tools covering navigation, script execution and screenshots only. Useful for basic browser tasks.
   - **Type:** boolean
+
+- **`--redactNetworkHeaders`/ `--redact-network-headers`**
+  If true, redacts some of the network headers considered senstive before returning to the client.
+  - **Type:** boolean
+  - **Default:** `false`
 
 <!-- END AUTO GENERATED OPTIONS -->
 
