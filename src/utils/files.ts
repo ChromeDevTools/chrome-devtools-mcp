@@ -25,10 +25,10 @@ export async function saveTemporaryFile(
   }
 }
 
-export function ensureExtension(filepath: string, extension: string): string {
-  const normalizedExtension = extension.startsWith('.')
-    ? extension
-    : `.${extension}`;
+export function ensureExtension(
+  filepath: string,
+  extension: `.${string}`,
+): string {
   const ext = path.extname(filepath);
-  return filepath.slice(0, filepath.length - ext.length) + normalizedExtension;
+  return filepath.slice(0, filepath.length - ext.length) + extension;
 }

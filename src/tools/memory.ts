@@ -5,6 +5,7 @@
  */
 
 import {zod} from '../third_party/index.js';
+import {ensureExtension} from '../utils/files.js';
 
 import {ToolCategory} from './categories.js';
 import {definePageTool} from './ToolDefinition.js';
@@ -25,7 +26,7 @@ export const takeMemorySnapshot = definePageTool({
     const page = request.page;
 
     await page.pptrPage.captureHeapSnapshot({
-      path: request.params.filePath,
+      path: ensureExtension(request.params.filePath, '.heapsnapshot'),
     });
 
     response.appendResponseLine(
