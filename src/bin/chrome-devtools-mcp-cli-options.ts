@@ -250,6 +250,27 @@ export const cliOptions = {
     hidden: true,
     describe: 'Include watchdog PID in Clearcut request headers (for testing).',
   },
+  screenshotFormat: {
+    type: 'string',
+    description:
+      'Override the default output format used by take_screenshot when the caller does not specify one. JPEG and WebP are ~3-5x smaller than PNG, which helps reduce context size in AI conversations. Unset preserves the existing default ("png").',
+    choices: ['jpeg', 'png', 'webp'] as const,
+  },
+  screenshotQuality: {
+    type: 'number',
+    description:
+      'Override the default compression quality (0-100) used by take_screenshot for JPEG and WebP when the caller does not specify one. Lower values mean smaller files. Ignored for PNG. Unset preserves the Puppeteer default.',
+  },
+  screenshotMaxWidth: {
+    type: 'number',
+    description:
+      'Maximum width in pixels for screenshots. If the captured image is wider, it is downscaled (preserving aspect ratio) before being returned. Reduces context size in AI conversations. Unset means no resize.',
+  },
+  screenshotMaxHeight: {
+    type: 'number',
+    description:
+      'Maximum height in pixels for screenshots. If the captured image is taller, it is downscaled (preserving aspect ratio) before being returned. Can be combined with --screenshot-max-width; the smaller scale factor wins. Unset means no resize.',
+  },
   slim: {
     type: 'boolean',
     describe:
