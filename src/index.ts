@@ -197,6 +197,8 @@ export async function createMcpServer(
           const response = serverArgs.slim
             ? new SlimMcpResponse(serverArgs)
             : new McpResponse(serverArgs);
+
+          response.setRedactNetworkHeaders(serverArgs.redactNetworkHeaders);
           if ('pageScoped' in tool && tool.pageScoped) {
             const page =
               serverArgs.experimentalPageIdRouting &&
