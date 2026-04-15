@@ -44,8 +44,6 @@ describe('webmcp', () => {
   it('list no webmcp tools if there are none', async () => {
     await withMcpContext(
       async (response, context) => {
-        const page = context.getSelectedMcpPage().pptrPage;
-
         await listWebMcpTools.handler(
           {params: {}, page: context.getSelectedMcpPage()},
           response,
