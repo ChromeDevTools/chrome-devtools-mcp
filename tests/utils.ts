@@ -74,7 +74,11 @@ export async function withBrowser(
     devtools: options.autoOpenDevTools ?? false,
     pipe: true,
     handleDevToolsAsPage: true,
-    args: ['--screen-info={3840x2160}'],
+    args: [
+      '--screen-info={3840x2160}',
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+    ],
     enableExtensions: true,
   };
   const key = JSON.stringify(launchOptions);

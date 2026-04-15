@@ -12,7 +12,9 @@ import {definePageTool} from './ToolDefinition.js';
 
 export const screenshot = definePageTool({
   name: 'take_screenshot',
-  description: `Take a screenshot of the page or element.`,
+  description:
+    'Capture PNG/JPEG/WebP of viewport, full page, or a uid element; use ' +
+    'when pixels matter (layout, regressions), not for DOM structure.',
   annotations: {
     category: ToolCategory.DEBUGGING,
     // Not read-only due to filePath param.

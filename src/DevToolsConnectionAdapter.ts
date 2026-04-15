@@ -88,6 +88,7 @@ export class PuppeteerDevToolsConnection
     const handler = this.#sessionEventHandlers.get(session.id());
     if (handler) {
       session.off('*', handler);
+      this.#sessionEventHandlers.delete(session.id());
     }
   }
 

@@ -28,7 +28,9 @@ const filePathSchema = zod
 
 export const startTrace = definePageTool({
   name: 'performance_start_trace',
-  description: `Start a performance trace on the selected webpage. Use to find frontend performance issues, Core Web Vitals (LCP, INP, CLS), and improve page load speed.`,
+  description:
+    'Record a DevTools performance trace (reload optional). Use for load ' +
+    'speed, main-thread jank, and Core Web Vitals—not Lighthouse scores.',
   annotations: {
     category: ToolCategory.PERFORMANCE,
     readOnlyHint: false,
@@ -117,7 +119,8 @@ export const startTrace = definePageTool({
 export const stopTrace = definePageTool({
   name: 'performance_stop_trace',
   description:
-    'Stop the active performance trace recording on the selected webpage.',
+    'Stop tracing and return trace summary; optional filePath for raw ' +
+    'trace JSON (.json or .gz).',
   annotations: {
     category: ToolCategory.PERFORMANCE,
     readOnlyHint: false,
@@ -142,7 +145,8 @@ export const stopTrace = definePageTool({
 export const analyzeInsight = definePageTool({
   name: 'performance_analyze_insight',
   description:
-    'Provides more detailed information on a specific Performance Insight of an insight set that was highlighted in the results of a trace recording.',
+    'Expand one insight from the last trace (insightSetId + insightName ' +
+    'from trace output).',
   annotations: {
     category: ToolCategory.PERFORMANCE,
     readOnlyHint: true,

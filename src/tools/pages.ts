@@ -19,7 +19,11 @@ import {
 export const listPages = defineTool(args => {
   return {
     name: 'list_pages',
-    description: `Get a list of pages ${args?.categoryExtensions ? 'including extension service workers' : ''} open in the browser.`,
+    description:
+      'List browser tabs with ids and URLs for select_page / close_page.' +
+      (args?.categoryExtensions
+        ? ' Includes extension service worker targets when enabled.'
+        : ''),
     annotations: {
       category: ToolCategory.NAVIGATION,
       readOnlyHint: true,
@@ -34,7 +38,9 @@ export const listPages = defineTool(args => {
 
 export const selectPage = defineTool({
   name: 'select_page',
-  description: `Select a page as a context for future tool calls.`,
+  description:
+    'Make pageId the active tab for following tools (required when multiple ' +
+    'tabs are open).',
   annotations: {
     category: ToolCategory.NAVIGATION,
     readOnlyHint: true,
@@ -63,7 +69,8 @@ export const selectPage = defineTool({
 
 export const closePage = defineTool({
   name: 'close_page',
-  description: `Closes the page by its index. The last open page cannot be closed.`,
+  description:
+    'Close a tab by pageId from list_pages. The last tab cannot be closed.',
   annotations: {
     category: ToolCategory.NAVIGATION,
     readOnlyHint: false,
@@ -90,7 +97,9 @@ export const closePage = defineTool({
 
 export const newPage = defineTool({
   name: 'new_page',
-  description: `Open a new tab and load a URL. Use project URL if not specified otherwise.`,
+  description:
+    'Open a tab and goto url; optional background or isolatedContext ' +
+    '(separate storage). Use for parallel sessions.',
   annotations: {
     category: ToolCategory.NAVIGATION,
     readOnlyHint: false,
@@ -135,7 +144,9 @@ export const newPage = defineTool({
 
 export const navigatePage = definePageTool({
   name: 'navigate_page',
-  description: `Go to a URL, or back, forward, or reload. Use project URL if not specified otherwise.`,
+  description:
+    'Navigate: url, back, forward, or reload; optional cache bypass, ' +
+    'per-navigation init script, beforeunload handling.',
   annotations: {
     category: ToolCategory.NAVIGATION,
     readOnlyHint: false,
@@ -285,7 +296,9 @@ export const navigatePage = definePageTool({
 
 export const resizePage = definePageTool({
   name: 'resize_page',
-  description: `Resizes the selected page's window so that the page has specified dimension`,
+  description:
+    'Resize the window so the page content matches width x height ' +
+    '(responsive layout debugging).',
   annotations: {
     category: ToolCategory.EMULATION,
     readOnlyHint: false,
@@ -324,7 +337,9 @@ export const resizePage = definePageTool({
 
 export const handleDialog = definePageTool({
   name: 'handle_dialog',
-  description: `If a browser dialog was opened, use this command to handle it`,
+  description:
+    'Accept or dismiss the current alert/confirm/prompt; optional ' +
+    'promptText for prompt().',
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
@@ -375,7 +390,8 @@ export const handleDialog = definePageTool({
 
 export const getTabId = definePageTool({
   name: 'get_tab_id',
-  description: `Get the tab ID of the page`,
+  description:
+    'Return Chrome tab id for interop with external DevTools clients.',
   annotations: {
     category: ToolCategory.NAVIGATION,
     readOnlyHint: true,

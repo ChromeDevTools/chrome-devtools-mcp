@@ -60,32 +60,50 @@ export class WaitForHelper {
       return domObserver;
     }, this.#stableDomFor);
 
-    this.#abortController.signal.addEventListener('abort', async () => {
-      try {
-        await stableDomObserver.evaluate(observer => {
-          observer.observer.disconnect();
-          observer.resolver.resolve();
-        });
-        await stableDomObserver.dispose();
-      } catch {
-        // Ignored cleanup errors
-      }
-    });
+    this.#abortController.signal.addEventListener(
+      'abort',
+      async () => {
+        try {
+          await stableDomObserver.evaluate(observer => {
+            observer.observer.disconnect();
+            observer.resolver.resolve();
+          });
+        } catch {
+          // Ignored cleanup errors
+        }
+      },
+      {once: true},
+    );
 
-    return Promise.race([
-      stableDomObserver.evaluate(async observer => {
-        return await observer.resolver.promise;
-      }),
-      this.timeout(this.#stableDomTimeout).then(() => {
-        throw new Error('Timeout');
-      }),
-    ]);
+    try {
+      return await Promise.race([
+        stableDomObserver.evaluate(async observer => {
+          return await observer.resolver.promise;
+        }),
+        this.timeout(this.#stableDomTimeout).then(() => {
+          throw new Error('Timeout');
+        }),
+      ]);
+    } finally {
+      await stableDomObserver.dispose().catch(() => undefined);
+    }
   }
 
   async waitForNavigationStarted() {
     // Currently Puppeteer does not have API
     // For when a navigation is about to start
+    const client = this.#page._client();
     const navigationStartedPromise = new Promise<boolean>(resolve => {
+      let settled = false;
+      const settle = (value: boolean) => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        client.off('Page.frameStartedNavigating', listener);
+        resolve(value);
+      };
+
       const listener = (event: Protocol.Page.FrameStartedNavigatingEvent) => {
         if (
           [
@@ -94,18 +112,18 @@ export class WaitForHelper {
             'sameDocument',
           ].includes(event.navigationType)
         ) {
-          resolve(false);
+          settle(false);
           return;
         }
-
-        resolve(true);
+        settle(true);
       };
 
-      this.#page._client().on('Page.frameStartedNavigating', listener);
-      this.#abortController.signal.addEventListener('abort', () => {
-        resolve(false);
-        this.#page._client().off('Page.frameStartedNavigating', listener);
-      });
+      client.on('Page.frameStartedNavigating', listener);
+      this.#abortController.signal.addEventListener(
+        'abort',
+        () => settle(false),
+        {once: true},
+      );
     });
 
     return await Promise.race([
@@ -117,10 +135,14 @@ export class WaitForHelper {
   timeout(time: number): Promise<void> {
     return new Promise<void>(res => {
       const id = setTimeout(res, time);
-      this.#abortController.signal.addEventListener('abort', () => {
-        res();
-        clearTimeout(id);
-      });
+      this.#abortController.signal.addEventListener(
+        'abort',
+        () => {
+          res();
+          clearTimeout(id);
+        },
+        {once: true},
+      );
     });
   }
 

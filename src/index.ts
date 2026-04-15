@@ -104,6 +104,7 @@ export async function createMcpServer(
           });
 
     if (context?.browser !== browser) {
+      context?.dispose();
       context = await McpContext.from(browser, logger, {
         experimentalDevToolsDebugging: devtools,
         experimentalIncludeAllPages: serverArgs.experimentalIncludeAllPages,

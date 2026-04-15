@@ -1,6 +1,6 @@
 <!-- AUTO GENERATED DO NOT EDIT - run 'npm run gen' to update-->
 
-# Chrome DevTools MCP Tool Reference (~8663 cl100k_base tokens)
+# Chrome DevTools MCP Tool Reference (~8805 cl100k_base tokens)
 
 - **[Input automation](#input-automation)** (9 tools)
   - [`click`](#click)
@@ -50,7 +50,7 @@
 
 ### `click`
 
-**Description:** Clicks on the provided element
+**Description:** Perform a primary (or double) [`click`](#click) on an element identified by snapshot uid. Prefer this over guessing selectors when automating from [`take_snapshot`](#take_snapshot).
 
 **Parameters:**
 
@@ -62,7 +62,7 @@
 
 ### `drag`
 
-**Description:** [`Drag`](#drag) an element onto another element
+**Description:** [`Drag`](#drag) from_uid onto to_uid for drop targets, reorder lists, or file-like interactions modeled as [`drag`](#drag)-and-drop.
 
 **Parameters:**
 
@@ -74,7 +74,7 @@
 
 ### `fill`
 
-**Description:** Type text into an input, text area or select an option from a &lt;select&gt; element.
+**Description:** Set value on inputs, textareas, or select/combobox options from snapshot uid. Prefer over [`type_text`](#type_text) when filling whole fields.
 
 **Parameters:**
 
@@ -86,7 +86,7 @@
 
 ### `fill_form`
 
-**Description:** [`Fill`](#fill) out multiple form elements at once
+**Description:** Batch-[`fill`](#fill) many {uid, value} pairs in one call for multi-field forms.
 
 **Parameters:**
 
@@ -97,7 +97,7 @@
 
 ### `handle_dialog`
 
-**Description:** If a browser dialog was opened, use this command to handle it
+**Description:** Accept or dismiss the current alert/confirm/prompt; optional promptText for prompt().
 
 **Parameters:**
 
@@ -108,7 +108,7 @@
 
 ### `hover`
 
-**Description:** [`Hover`](#hover) over the provided element
+**Description:** Move the pointer over a uid so [`hover`](#hover)-only UI (menus, tooltips) appears before another action.
 
 **Parameters:**
 
@@ -119,7 +119,7 @@
 
 ### `press_key`
 
-**Description:** Press a key or key combination. Use this when other input methods like [`fill`](#fill)() cannot be used (e.g., keyboard shortcuts, navigation keys, or special key combinations).
+**Description:** Press a key chord (e.g. Control+R, Escape). Use for shortcuts or when [`fill`](#fill)/[`type_text`](#type_text) cannot model the interaction.
 
 **Parameters:**
 
@@ -130,7 +130,7 @@
 
 ### `type_text`
 
-**Description:** Type text using keyboard into a previously focused input
+**Description:** Send keystrokes to the focused element; optional submitKey (e.g. Enter). Use after [`click`](#click)/[`fill`](#fill) when key-by-key input matters.
 
 **Parameters:**
 
@@ -141,7 +141,7 @@
 
 ### `upload_file`
 
-**Description:** Upload a file through a provided element.
+**Description:** Attach a local file path to a file input or an element that opens a file chooser.
 
 **Parameters:**
 
@@ -155,7 +155,7 @@
 
 ### `close_page`
 
-**Description:** Closes the page by its index. The last open page cannot be closed.
+**Description:** Close a tab by pageId from [`list_pages`](#list_pages). The last tab cannot be closed.
 
 **Parameters:**
 
@@ -165,7 +165,7 @@
 
 ### `list_pages`
 
-**Description:** Get a list of pages  open in the browser.
+**Description:** List browser tabs with ids and URLs for [`select_page`](#select_page) / [`close_page`](#close_page).
 
 **Parameters:** None
 
@@ -173,7 +173,7 @@
 
 ### `navigate_page`
 
-**Description:** Go to a URL, or back, forward, or reload. Use project URL if not specified otherwise.
+**Description:** Navigate: url, back, forward, or reload; optional cache bypass, per-navigation init script, beforeunload handling.
 
 **Parameters:**
 
@@ -188,7 +188,7 @@
 
 ### `new_page`
 
-**Description:** Open a new tab and load a URL. Use project URL if not specified otherwise.
+**Description:** Open a tab and goto url; optional background or isolatedContext (separate storage). Use for parallel sessions.
 
 **Parameters:**
 
@@ -201,7 +201,7 @@
 
 ### `select_page`
 
-**Description:** Select a page as a context for future tool calls.
+**Description:** Make pageId the active tab for following tools (required when multiple tabs are open).
 
 **Parameters:**
 
@@ -212,7 +212,7 @@
 
 ### `wait_for`
 
-**Description:** Wait for the specified text to appear on the selected page.
+**Description:** Wait until any of the given strings appears (async rendering, SPA transitions).
 
 **Parameters:**
 
@@ -225,7 +225,7 @@
 
 ### `emulate`
 
-**Description:** Emulates various features on the selected page.
+**Description:** Apply one-shot emulation: throttling, CPU slowdown, geolocation, UA, color scheme, device viewport string.
 
 **Parameters:**
 
@@ -240,7 +240,7 @@
 
 ### `resize_page`
 
-**Description:** Resizes the selected page's window so that the page has specified dimension
+**Description:** Resize the window so the page content matches width x height (responsive layout debugging).
 
 **Parameters:**
 
@@ -253,7 +253,7 @@
 
 ### `performance_analyze_insight`
 
-**Description:** Provides more detailed information on a specific Performance Insight of an insight set that was highlighted in the results of a trace recording.
+**Description:** Expand one insight from the last trace (insightSetId + insightName from trace output).
 
 **Parameters:**
 
@@ -264,7 +264,7 @@
 
 ### `performance_start_trace`
 
-**Description:** Start a performance trace on the selected webpage. Use to find frontend performance issues, Core Web Vitals (LCP, INP, CLS), and improve page load speed.
+**Description:** Record a DevTools performance trace (reload optional). Use for load speed, main-thread jank, and Core Web Vitals—not Lighthouse scores.
 
 **Parameters:**
 
@@ -276,7 +276,7 @@
 
 ### `performance_stop_trace`
 
-**Description:** Stop the active performance trace recording on the selected webpage.
+**Description:** Stop tracing and return trace summary; optional filePath for raw trace JSON (.json or .gz).
 
 **Parameters:**
 
@@ -286,7 +286,7 @@
 
 ### `take_memory_snapshot`
 
-**Description:** Capture a heap snapshot of the currently selected page. Use to analyze the memory distribution of JavaScript objects and debug memory leaks.
+**Description:** Write a .heapsnapshot for the current target; open in Memory panel to find leaks and retainers.
 
 **Parameters:**
 
@@ -298,7 +298,7 @@
 
 ### `get_network_request`
 
-**Description:** Gets a network request by an optional reqid, if omitted returns the currently selected request in the DevTools Network panel.
+**Description:** Full request/response for a reqid from [`list_network_requests`](#list_network_requests); omit reqid to use the row selected in the Network panel.
 
 **Parameters:**
 
@@ -310,7 +310,7 @@
 
 ### `list_network_requests`
 
-**Description:** List all requests for the currently selected page since the last navigation.
+**Description:** HTTP/S requests since navigation: URL, status, timing, size. Filter by resource type; paginate large logs.
 
 **Parameters:**
 
@@ -325,7 +325,7 @@
 
 ### `diff_computed_styles`
 
-**Description:** Return the changed computed properties between two elements (A vs B).
+**Description:** Side-by-side style diff for two uids on the same page; optional geometry compare for layout-affecting changes.
 
 **Parameters:**
 
@@ -338,7 +338,7 @@
 
 ### `diff_computed_styles_snapshot`
 
-**Description:** Diff current computed styles (and optional geometry) vs a saved snapshot. Use domPath to match when a11y uids drift between captures.
+**Description:** Compare live uid to [`save_computed_styles_snapshot`](#save_computed_styles_snapshot) baseline; domPath when uids differ between loads.
 
 **Parameters:**
 
@@ -352,18 +352,17 @@
 
 ### `evaluate_script`
 
-**Description:** Evaluate a JavaScript function inside the currently selected page. Returns the response as JSON,
-so returned values have to be JSON-serializable.
+**Description:** Run an async/sync function body in the page; result JSON-serializable. Pass snapshot element uids as args to receive DOM handles. For extensions, optional serviceWorkerId targets the worker.
 
 **Parameters:**
 
 - **function** (string) **(required)**: A JavaScript function declaration to be executed by the tool in the currently selected page.
-Example without arguments: `() => {
+  Example without arguments: `() => {
   return document.title
 }` or `async () => {
   return await fetch("example.com")
 }`.
-Example with arguments: `(el) => {
+  Example with arguments: `(el) => {
   return el.innerText;
 }`
 
@@ -373,7 +372,7 @@ Example with arguments: `(el) => {
 
 ### `get_box_model`
 
-**Description:** Return box model for an element (content/padding/border/margin) and rects (content, padding, border, margin, client, bounding).
+**Description:** CDP box model quads and rects for layout misalignment, overflow, and offset debugging.
 
 **Parameters:**
 
@@ -383,7 +382,7 @@ Example with arguments: `(el) => {
 
 ### `get_computed_styles`
 
-**Description:** Return CSS computed styles for an element. Optionally filter properties and include rule origins.
+**Description:** Resolved computed styles for one uid; optional property filter and winning-rule hints (includeSources). Prefer over scraping styles in [`evaluate_script`](#evaluate_script).
 
 **Parameters:**
 
@@ -395,7 +394,7 @@ Example with arguments: `(el) => {
 
 ### `get_computed_styles_batch`
 
-**Description:** Return CSS computed styles for multiple elements. Optionally filter properties.
+**Description:** Batch computed styles map keyed by uid—use for design tokens or multi-node parity checks.
 
 **Parameters:**
 
@@ -406,7 +405,7 @@ Example with arguments: `(el) => {
 
 ### `get_console_message`
 
-**Description:** Gets a console message by its ID. You can get all messages by calling [`list_console_messages`](#list_console_messages).
+**Description:** Fetch one console entry by msgid from [`list_console_messages`](#list_console_messages) (stack, args, issue details).
 
 **Parameters:**
 
@@ -416,7 +415,7 @@ Example with arguments: `(el) => {
 
 ### `get_visibility`
 
-**Description:** Return visibility diagnostics for an element: isVisible and reasons.
+**Description:** Explain why an element is invisible (display, opacity, zero size, off-viewport, clip-path).
 
 **Parameters:**
 
@@ -426,7 +425,7 @@ Example with arguments: `(el) => {
 
 ### `highlight_elements_for_styles`
 
-**Description:** Enable CDP overlay highlights on elements (last uid wins in DevTools; response lists all border quads for external overlays).
+**Description:** Highlight border quads in DevTools and return coordinates for screenshot overlays or docs.
 
 **Parameters:**
 
@@ -436,7 +435,7 @@ Example with arguments: `(el) => {
 
 ### `lighthouse_audit`
 
-**Description:** Get Lighthouse score and reports for accessibility, SEO and best practices. This excludes performance. For performance audits, run [`performance_start_trace`](#performance_start_trace)
+**Description:** Lighthouse a11y/SEO/best-practices only (HTML+JSON reports). For load/runtime timelines use [`performance_start_trace`](#performance_start_trace).
 
 **Parameters:**
 
@@ -448,7 +447,7 @@ Example with arguments: `(el) => {
 
 ### `list_console_messages`
 
-**Description:** List all console messages for the currently selected page since the last navigation.
+**Description:** Paginated console logs (and issues) since navigation; filter by type or include prior navigations.
 
 **Parameters:**
 
@@ -461,7 +460,7 @@ Example with arguments: `(el) => {
 
 ### `save_computed_styles_snapshot`
 
-**Description:** Save a named snapshot (schema v1): computed styles, optional border geometry, domPath, backendNodeId, and page meta for later diff/matching.
+**Description:** Store baseline computed styles + domPath/meta under a name for cross-navigation regression checks.
 
 **Parameters:**
 
@@ -473,7 +472,7 @@ Example with arguments: `(el) => {
 
 ### `take_screenshot`
 
-**Description:** Take a screenshot of the page or element.
+**Description:** Capture PNG/JPEG/WebP of viewport, full page, or a uid element; use when pixels matter (layout, regressions), not for DOM structure.
 
 **Parameters:**
 
@@ -487,9 +486,7 @@ Example with arguments: `(el) => {
 
 ### `take_snapshot`
 
-**Description:** Take a text snapshot of the currently selected page based on the a11y tree. The snapshot lists page elements along with a unique
-identifier (uid). Always use the latest snapshot. Prefer taking a snapshot over taking a screenshot. The snapshot indicates the element selected
-in the DevTools Elements panel (if any).
+**Description:** Accessibility tree with stable uids for automation. Always use the latest snapshot after DOM changes. Prefer over screenshot for structure; reflects Elements panel selection when set.
 
 **Parameters:**
 

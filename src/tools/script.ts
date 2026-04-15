@@ -17,8 +17,10 @@ export type Evaluatable = Page | Frame | WebWorker;
 export const evaluateScript = defineTool(cliArgs => {
   return {
     name: 'evaluate_script',
-    description: `Evaluate a JavaScript function inside the currently selected page. Returns the response as JSON,
-so returned values have to be JSON-serializable.`,
+    description:
+      'Run an async/sync function body in the page; result JSON-serializable. ' +
+      'Pass snapshot element uids as args to receive DOM handles. For ' +
+      'extensions, optional serviceWorkerId targets the worker.',
     annotations: {
       category: ToolCategory.DEBUGGING,
       readOnlyHint: false,

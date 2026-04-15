@@ -21,7 +21,9 @@ function findUidFromSnapshot(text, includes) {
   for (const line of body.split('\n')) {
     if (line.includes('uid=') && line.includes(includes)) {
       const m = line.match(/uid=(\d+_\d+)/);
-      if (m) return m[1];
+      if (m) {
+        return m[1];
+      }
     }
   }
   throw new Error('UID not found for: ' + includes);
@@ -81,9 +83,12 @@ async function main() {
       includeSources: true,
     });
     const boxJson = extractJson(csBox.content?.[0]?.text || '');
-    if (boxJson.computed.display !== 'block') throw new Error('box display');
-    if (!boxJson.computed.color?.startsWith('rgb(0, 0, 255'))
+    if (boxJson.computed.display !== 'block') {
+      throw new Error('box display');
+    }
+    if (!boxJson.computed.color?.startsWith('rgb(0, 0, 255')) {
       throw new Error('box color');
+    }
 
     const csIcon = await call('get_computed_styles', {
       uid: uidIcon,
@@ -91,21 +96,26 @@ async function main() {
       includeSources: true,
     });
     const iconJson = extractJson(csIcon.content?.[0]?.text || '');
-    if (iconJson.computed.display !== 'inline-block')
+    if (iconJson.computed.display !== 'inline-block') {
       throw new Error('icon display');
-    if (!iconJson.computed.color?.startsWith('rgb(0, 128, 0'))
+    }
+    if (!iconJson.computed.color?.startsWith('rgb(0, 128, 0')) {
       throw new Error('icon color');
+    }
 
     // 5) Box model
     const bm = await call('get_box_model', {uid: uidBox});
     const bmJson = extractJson(bm.content?.[0]?.text || '');
-    if (!(bmJson.borderRect.width >= bmJson.contentRect.width))
+    if (!(bmJson.borderRect.width >= bmJson.contentRect.width)) {
       throw new Error('box model width');
+    }
 
     // 6) Visibility
     const vis1 = await call('get_visibility', {uid: uidBox});
     const vis1Json = extractJson(vis1.content?.[0]?.text || '');
-    if (!vis1Json.isVisible) throw new Error('vis1');
+    if (!vis1Json.isVisible) {
+      throw new Error('vis1');
+    }
 
     // 7) Batch
     const batch = await call('get_computed_styles_batch', {
@@ -113,9 +123,12 @@ async function main() {
       properties: ['display', 'color'],
     });
     const batchJson = extractJson(batch.content?.[0]?.text || '');
-    if (batchJson[uidBox].display !== 'block') throw new Error('batch box');
-    if (batchJson[uidIcon].display !== 'inline-block')
+    if (batchJson[uidBox].display !== 'block') {
+      throw new Error('batch box');
+    }
+    if (batchJson[uidIcon].display !== 'inline-block') {
       throw new Error('batch icon');
+    }
 
     // 8) Diff A vs B
     const diff = await call('diff_computed_styles', {
@@ -125,7 +138,9 @@ async function main() {
     });
     const diffJson = extractJson(diff.content?.[0]?.text || '');
     const foundDisplay = diffJson.find(d => d.property === 'display');
-    if (!foundDisplay) throw new Error('diff display missing');
+    if (!foundDisplay) {
+      throw new Error('diff display missing');
+    }
 
     // 9) Save snapshot
     await call('save_computed_styles_snapshot', {

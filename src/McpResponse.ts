@@ -98,14 +98,18 @@ async function getToolGroup(
 ): Promise<ToolGroup<ToolDefinition> | undefined> {
   // Check if there is a `devtoolstooldiscovery` event listener
   const windowHandle = await page.pptrPage.evaluateHandle(() => window);
-  // @ts-expect-error internal API
-  const client = page.pptrPage._client();
-  const {listeners}: {listeners: Protocol.DOMDebugger.EventListener[]} =
-    await client.send('DOMDebugger.getEventListeners', {
-      objectId: windowHandle.remoteObject().objectId,
-    });
-  if (listeners.find(l => l.type === 'devtoolstooldiscovery') === undefined) {
-    return;
+  try {
+    // @ts-expect-error internal API
+    const client = page.pptrPage._client();
+    const {listeners}: {listeners: Protocol.DOMDebugger.EventListener[]} =
+      await client.send('DOMDebugger.getEventListeners', {
+        objectId: windowHandle.remoteObject().objectId,
+      });
+    if (listeners.find(l => l.type === 'devtoolstooldiscovery') === undefined) {
+      return;
+    }
+  } finally {
+    await windowHandle.dispose().catch(() => undefined);
   }
 
   const toolGroup = await page.pptrPage.evaluate(() => {

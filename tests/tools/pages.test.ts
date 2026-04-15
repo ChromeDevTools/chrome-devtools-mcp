@@ -37,6 +37,34 @@ const EXTENSION_SIDE_PANEL_PATH = path.join(
   '../../../tests/tools/fixtures/extension-side-panel',
 );
 
+/**
+ * Shared Puppeteer browsers can retain other extensions' service workers.
+ * Keep snapshots stable by keeping only SW lines for this test's extension
+ * and renumbering sw-N.
+ */
+function normalizeListPagesSnapshotText(
+  raw: string,
+  extensionId: string,
+): string {
+  const marked = raw.replaceAll(extensionId, '<extension-id>');
+  const lines = marked.split('\n');
+  const out: string[] = [];
+  let swCounter = 0;
+  for (const line of lines) {
+    const swMatch = /^sw-\d+:(.*)$/.exec(line);
+    if (swMatch) {
+      if (!line.includes('<extension-id>')) {
+        continue;
+      }
+      swCounter++;
+      out.push(`sw-${swCounter}:${swMatch[1]}`);
+      continue;
+    }
+    out.push(line);
+  }
+  return out.join('\n');
+}
+
 describe('pages', () => {
   afterEach(() => {
     sinon.restore();
@@ -89,9 +117,9 @@ describe('pages', () => {
           };
           assert.ok(textContent);
 
-          const text = textContent.text.replaceAll(
+          const text = normalizeListPagesSnapshotText(
+            textContent.text,
             extensionId,
-            '<extension-id>',
           );
           t.assert.snapshot?.(text);
         },
@@ -115,7 +143,7 @@ describe('pages', () => {
             const swTarget = await context.browser.waitForTarget(
               target =>
                 target.type() === 'service_worker' &&
-                target.url().includes('chrome-extension://'),
+                target.url().includes(`chrome-extension://${extensionId}/`),
             );
             const swUrl = swTarget.url();
 
@@ -135,15 +163,18 @@ describe('pages', () => {
               const structured = result.structuredContent as {
                 extensionServiceWorkers: Array<{url: string}>;
               };
+              const ours = structured.extensionServiceWorkers.filter(sw =>
+                sw.url.includes(extensionId),
+              );
               assert.deepStrictEqual(
-                structured.extensionServiceWorkers.map(sw => sw.url),
+                ours.map(sw => sw.url),
                 [swUrl],
               );
             }
 
-            const text = textContent.text.replaceAll(
+            const text = normalizeListPagesSnapshotText(
+              textContent.text,
               extensionId,
-              '<extension-id>',
             );
             t.assert.snapshot?.(text);
           },
@@ -188,9 +219,9 @@ describe('pages', () => {
           };
           assert.ok(textContent);
 
-          const text = textContent.text.replaceAll(
+          const text = normalizeListPagesSnapshotText(
+            textContent.text,
             extensionId,
-            '<extension-id>',
           );
           t.assert.snapshot?.(text);
         },

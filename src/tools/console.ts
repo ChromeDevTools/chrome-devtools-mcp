@@ -40,7 +40,8 @@ const FILTERABLE_MESSAGE_TYPES: [
 export const listConsoleMessages = definePageTool({
   name: 'list_console_messages',
   description:
-    'List all console messages for the currently selected page since the last navigation.',
+    'Paginated console logs (and issues) since navigation; filter by type ' +
+    'or include prior navigations.',
   annotations: {
     category: ToolCategory.DEBUGGING,
     readOnlyHint: true,
@@ -88,7 +89,9 @@ export const listConsoleMessages = definePageTool({
 
 export const getConsoleMessage = definePageTool({
   name: 'get_console_message',
-  description: `Gets a console message by its ID. You can get all messages by calling ${listConsoleMessages.name}.`,
+  description:
+    `Fetch one console entry by msgid from ${listConsoleMessages.name} ` +
+    '(stack, args, issue details).',
   annotations: {
     category: ToolCategory.DEBUGGING,
     readOnlyHint: true,

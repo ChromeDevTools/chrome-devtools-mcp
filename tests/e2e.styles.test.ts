@@ -4,10 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import assert from 'node:assert';
+import {describe, it} from 'node:test';
+
 import {Client} from '@modelcontextprotocol/sdk/client/index.js';
 import {StdioClientTransport} from '@modelcontextprotocol/sdk/client/stdio.js';
-import {describe, it} from 'node:test';
-import assert from 'node:assert';
 import {executablePath} from 'puppeteer';
 
 function extractJson(text: string): unknown {
@@ -22,11 +23,14 @@ async function withClient(cb: (client: Client) => Promise<void>) {
   const transport = new StdioClientTransport({
     command: 'node',
     args: [
-      'build/src/index.js',
+      'build/src/bin/chrome-devtools-mcp.js',
       '--headless',
       '--isolated',
       '--executable-path',
       executablePath(),
+      '--no-usage-statistics',
+      '--chrome-arg=--no-sandbox',
+      '--chrome-arg=--disable-setuid-sandbox',
     ],
   });
   const client = new Client(
@@ -49,10 +53,14 @@ async function withClient(cb: (client: Client) => Promise<void>) {
 function findUidFromSnapshot(snapshotText: string, includes: string): string {
   const lines = snapshotText.split('\n');
   for (const line of lines) {
-    if (!line.includes('uid=')) continue;
+    if (!line.includes('uid=')) {
+      continue;
+    }
     if (line.includes(includes)) {
       const m = line.match(/uid=(\d+_\d+)/);
-      if (m) return m[1];
+      if (m) {
+        return m[1];
+      }
     }
   }
   throw new Error('UID not found in snapshot for: ' + includes);
@@ -79,7 +87,7 @@ describe('e2e styles', () => {
       const snapText = (snapRes as {content?: Array<{text?: string}>})
         .content?.[0]?.text as string;
       const uidBox = findUidFromSnapshot(snapText, 'button "box"');
-      const uidIcon = findUidFromSnapshot(snapText, 'img "icon"');
+      const uidIcon = findUidFromSnapshot(snapText, 'image "icon"');
 
       // get_computed_styles
       const cs = await client.callTool({
@@ -165,7 +173,7 @@ describe('e2e styles', () => {
             (el as HTMLElement).style.display = 'inline';
             return true;
           }),
-          args: [{uid: uidBox}],
+          args: [uidBox],
         },
       });
 
@@ -198,7 +206,7 @@ describe('e2e styles', () => {
             (el as HTMLElement).style.display = 'none';
             return true;
           }),
-          args: [{uid: uidBox}],
+          args: [uidBox],
         },
       });
       const vis2 = await client.callTool({

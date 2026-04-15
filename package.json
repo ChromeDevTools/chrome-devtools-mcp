@@ -30,7 +30,8 @@
     "update-tool-call-metrics": "node --experimental-strip-types scripts/update_tool_call_metrics.ts",
     "verify-npm-package": "node scripts/verify-npm-package.mjs",
     "eval": "npm run build && node --experimental-strip-types scripts/eval_gemini.ts",
-    "count-tokens": "node --experimental-strip-types scripts/count_tokens.ts"
+    "count-tokens": "node --experimental-strip-types scripts/count_tokens.ts",
+    "build:e2e-comparison-pages": "npm run build && node build/tests/e2e/comparison/generate-fixtures.js"
   },
   "files": [
     "build/src",

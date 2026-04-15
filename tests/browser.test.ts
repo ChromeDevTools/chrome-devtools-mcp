@@ -27,6 +27,7 @@ describe('browser', () => {
       userDataDir: folderPath,
       executablePath: executablePath(),
       devtools: false,
+      chromeArgs: ['--no-sandbox', '--disable-setuid-sandbox'],
     });
     try {
       try {
@@ -36,6 +37,7 @@ describe('browser', () => {
           userDataDir: folderPath,
           executablePath: executablePath(),
           devtools: false,
+          chromeArgs: ['--no-sandbox', '--disable-setuid-sandbox'],
         });
         await browser2.close();
         assert.fail('not reached');
@@ -63,6 +65,7 @@ describe('browser', () => {
         height: 801,
       },
       devtools: false,
+      chromeArgs: ['--no-sandbox', '--disable-setuid-sandbox'],
     });
     try {
       const [page] = await browser.pages();
@@ -86,7 +89,11 @@ describe('browser', () => {
       userDataDir: folderPath,
       executablePath: executablePath(),
       devtools: false,
-      chromeArgs: ['--remote-debugging-port=0'],
+      chromeArgs: [
+        '--remote-debugging-port=0',
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+      ],
     });
     try {
       const connectedBrowser = await ensureBrowserConnected({

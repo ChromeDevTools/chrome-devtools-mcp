@@ -13,7 +13,9 @@ const EXTENSIONS_CONDITION = 'experimentalExtensionSupport';
 
 export const installExtension = defineTool({
   name: 'install_extension',
-  description: 'Installs a Chrome extension from the given path.',
+  description:
+    'Load an unpacked extension directory into the browser for E2E ' +
+    'testing.',
   annotations: {
     category: ToolCategory.EXTENSIONS,
     readOnlyHint: false,
@@ -33,7 +35,8 @@ export const installExtension = defineTool({
 
 export const uninstallExtension = defineTool({
   name: 'uninstall_extension',
-  description: 'Uninstalls a Chrome extension by its ID.',
+  description:
+    'Remove an extension previously installed via this server (by id).',
   annotations: {
     category: ToolCategory.EXTENSIONS,
     readOnlyHint: false,
@@ -52,7 +55,8 @@ export const uninstallExtension = defineTool({
 export const listExtensions = defineTool({
   name: 'list_extensions',
   description:
-    'Lists all extensions via this server, including their name, ID, version, and enabled status.',
+    'Show installed extensions from this session: id, version, path, ' +
+    'enabled state.',
   annotations: {
     category: ToolCategory.EXTENSIONS,
     readOnlyHint: true,
@@ -66,7 +70,7 @@ export const listExtensions = defineTool({
 
 export const reloadExtension = defineTool({
   name: 'reload_extension',
-  description: 'Reloads an unpacked Chrome extension by its ID.',
+  description: 'Re-read unpacked extension files from disk after code changes.',
   annotations: {
     category: ToolCategory.EXTENSIONS,
     readOnlyHint: false,
@@ -88,7 +92,8 @@ export const reloadExtension = defineTool({
 
 export const triggerExtensionAction = defineTool({
   name: 'trigger_extension_action',
-  description: 'Triggers an action in a Chrome extension.',
+  description:
+    'Invoke the extension browser-action / toolbar button programmatically.',
   annotations: {
     category: ToolCategory.EXTENSIONS,
     readOnlyHint: false,

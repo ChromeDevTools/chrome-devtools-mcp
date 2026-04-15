@@ -11,9 +11,10 @@ import {definePageTool, timeoutSchema} from './ToolDefinition.js';
 
 export const takeSnapshot = definePageTool({
   name: 'take_snapshot',
-  description: `Take a text snapshot of the currently selected page based on the a11y tree. The snapshot lists page elements along with a unique
-identifier (uid). Always use the latest snapshot. Prefer taking a snapshot over taking a screenshot. The snapshot indicates the element selected
-in the DevTools Elements panel (if any).`,
+  description:
+    'Accessibility tree with stable uids for automation. Always use the ' +
+    'latest snapshot after DOM changes. Prefer over screenshot for ' +
+    'structure; reflects Elements panel selection when set.',
   annotations: {
     category: ToolCategory.DEBUGGING,
     // Not read-only due to filePath param.
@@ -43,7 +44,9 @@ in the DevTools Elements panel (if any).`,
 
 export const waitFor = definePageTool({
   name: 'wait_for',
-  description: `Wait for the specified text to appear on the selected page.`,
+  description:
+    'Wait until any of the given strings appears (async rendering, ' +
+    'SPA transitions).',
   annotations: {
     category: ToolCategory.NAVIGATION,
     readOnlyHint: true,

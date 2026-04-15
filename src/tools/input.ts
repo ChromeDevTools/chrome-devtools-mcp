@@ -44,7 +44,10 @@ function handleActionError(error: unknown, uid: string) {
 
 export const click = definePageTool({
   name: 'click',
-  description: `Clicks on the provided element`,
+  description:
+    'Perform a primary (or double) click on an element identified by ' +
+    'snapshot uid. Prefer this over guessing selectors when automating ' +
+    'from take_snapshot.',
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
@@ -85,7 +88,9 @@ export const click = definePageTool({
 
 export const clickAt = definePageTool({
   name: 'click_at',
-  description: `Clicks at the provided coordinates`,
+  description:
+    'Click at viewport x/y when no stable uid exists (canvas, custom ' +
+    'overlays). Prefer click(uid) whenever take_snapshot exposes a target.',
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
@@ -117,7 +122,9 @@ export const clickAt = definePageTool({
 
 export const hover = definePageTool({
   name: 'hover',
-  description: `Hover over the provided element`,
+  description:
+    'Move the pointer over a uid so hover-only UI (menus, tooltips) ' +
+    'appears before another action.',
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
@@ -219,7 +226,9 @@ async function fillFormElement(
 
 export const fill = definePageTool({
   name: 'fill',
-  description: `Type text into an input, text area or select an option from a <select> element.`,
+  description:
+    'Set value on inputs, textareas, or select/combobox options from ' +
+    'snapshot uid. Prefer over type_text when filling whole fields.',
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
@@ -252,7 +261,9 @@ export const fill = definePageTool({
 
 export const typeText = definePageTool({
   name: 'type_text',
-  description: `Type text using keyboard into a previously focused input`,
+  description:
+    'Send keystrokes to the focused element; optional submitKey (e.g. ' +
+    'Enter). Use after click/fill when key-by-key input matters.',
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
@@ -279,7 +290,9 @@ export const typeText = definePageTool({
 
 export const drag = definePageTool({
   name: 'drag',
-  description: `Drag an element onto another element`,
+  description:
+    'Drag from_uid onto to_uid for drop targets, reorder lists, or ' +
+    'file-like interactions modeled as drag-and-drop.',
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
@@ -313,7 +326,8 @@ export const drag = definePageTool({
 
 export const fillForm = definePageTool({
   name: 'fill_form',
-  description: `Fill out multiple form elements at once`,
+  description:
+    'Batch-fill many {uid, value} pairs in one call for multi-field forms.',
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
@@ -351,7 +365,9 @@ export const fillForm = definePageTool({
 
 export const uploadFile = definePageTool({
   name: 'upload_file',
-  description: 'Upload a file through a provided element.',
+  description:
+    'Attach a local file path to a file input or an element that opens ' +
+    'a file chooser.',
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
@@ -401,7 +417,9 @@ export const uploadFile = definePageTool({
 
 export const pressKey = definePageTool({
   name: 'press_key',
-  description: `Press a key or key combination. Use this when other input methods like fill() cannot be used (e.g., keyboard shortcuts, navigation keys, or special key combinations).`,
+  description:
+    'Press a key chord (e.g. Control+R, Escape). Use for shortcuts or ' +
+    'when fill/type_text cannot model the interaction.',
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,

@@ -21,7 +21,9 @@ const throttlingOptions: [string, ...string[]] = [
 
 export const emulate = definePageTool({
   name: 'emulate',
-  description: `Emulates various features on the selected page.`,
+  description:
+    'Apply one-shot emulation: throttling, CPU slowdown, geolocation, UA, ' +
+    'color scheme, device viewport string.',
   annotations: {
     category: ToolCategory.EMULATION,
     readOnlyHint: false,

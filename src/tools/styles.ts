@@ -13,34 +13,34 @@ import {definePageTool} from './ToolDefinition.js';
 
 type CssPropertyMap = Record<string, string>;
 
-type BorderRect = {
+interface BorderRect {
   left: number;
   top: number;
   right: number;
   bottom: number;
   width: number;
   height: number;
-};
+}
 
-type StyleSnapshotMeta = {
+interface StyleSnapshotMeta {
   capturedAt: string;
   url: string;
   viewportWidth: number;
   viewportHeight: number;
   dpr: number;
-};
+}
 
-type StyleSnapshotElement = {
+interface StyleSnapshotElement {
   computed: CssPropertyMap;
   borderRect?: BorderRect;
   domPath?: string;
   backendNodeId?: number;
-};
+}
 
-type StyleSnapshotData = {
+interface StyleSnapshotData {
   meta: StyleSnapshotMeta;
   elements: Record<string, StyleSnapshotElement>;
-};
+}
 
 /** Legacy: flat uid -> computed map (pre v1). */
 type LegacySnapshotMap = Record<string, CssPropertyMap>;
@@ -65,12 +65,7 @@ function getSnapshots(context: object) {
 function isV1Snapshot(
   s: StyleSnapshotData | LegacySnapshotMap,
 ): s is StyleSnapshotData {
-  return (
-    typeof s === 'object' &&
-    s !== null &&
-    'meta' in s &&
-    'elements' in s
-  );
+  return typeof s === 'object' && s !== null && 'meta' in s && 'elements' in s;
 }
 
 function snapshotElements(
@@ -92,7 +87,9 @@ function snapshotMeta(
   return isV1Snapshot(raw) ? raw.meta : undefined;
 }
 
-function rectFromQuad(quad: Array<{x: number; y: number}> | number[]): BorderRect {
+function rectFromQuad(
+  quad: Array<{x: number; y: number}> | number[],
+): BorderRect {
   if (Array.isArray(quad) && typeof quad[0] === 'number') {
     const xs = [
       quad[0] as number,
@@ -136,7 +133,11 @@ function rectFromQuad(quad: Array<{x: number; y: number}> | number[]): BorderRec
   };
 }
 
-function borderRectsMatch(a?: BorderRect, b?: BorderRect, eps = GEOMETRY_EPS_PX) {
+function borderRectsMatch(
+  a?: BorderRect,
+  b?: BorderRect,
+  eps = GEOMETRY_EPS_PX,
+) {
   if (!a || !b) {
     return !a && !b;
   }
@@ -148,6 +149,28 @@ function borderRectsMatch(a?: BorderRect, b?: BorderRect, eps = GEOMETRY_EPS_PX)
   );
 }
 
+function isLayoutProperty(p: string): boolean {
+  const x = p.toLowerCase();
+  return (
+    x.includes('width') ||
+    x.includes('height') ||
+    x.includes('margin') ||
+    x.includes('padding') ||
+    x.includes('border') ||
+    x === 'display' ||
+    x === 'position' ||
+    x.includes('flex') ||
+    x.includes('grid') ||
+    x.includes('gap') ||
+    x === 'transform' ||
+    x === 'top' ||
+    x === 'left' ||
+    x === 'right' ||
+    x === 'bottom' ||
+    x.includes('inset')
+  );
+}
+
 function classifyStyleDiff(
   styleChanges: Array<{property: string}>,
   geometryEqual: boolean | undefined,
@@ -155,37 +178,10 @@ function classifyStyleDiff(
   changeClass: 'none' | 'cascadeOnly' | 'layoutEffective' | 'paintLikely';
   effectiveLayoutChange: boolean;
 } {
-  if (geometryEqual === undefined) {
-    if (styleChanges.length === 0) {
+  if (styleChanges.length === 0) {
+    if (geometryEqual === undefined) {
       return {changeClass: 'none', effectiveLayoutChange: false};
     }
-    const layoutish = (p: string) => {
-      const x = p.toLowerCase();
-      return (
-        x.includes('width') ||
-        x.includes('height') ||
-        x.includes('margin') ||
-        x.includes('padding') ||
-        x.includes('border') ||
-        x === 'display' ||
-        x === 'position' ||
-        x.includes('flex') ||
-        x.includes('grid') ||
-        x.includes('gap') ||
-        x === 'transform' ||
-        x === 'top' ||
-        x === 'left' ||
-        x === 'right' ||
-        x === 'bottom' ||
-        x.includes('inset')
-      );
-    };
-    const touchedLayout = styleChanges.some(c => layoutish(c.property));
-    return touchedLayout
-      ? {changeClass: 'layoutEffective', effectiveLayoutChange: false}
-      : {changeClass: 'paintLikely', effectiveLayoutChange: false};
-  }
-  if (styleChanges.length === 0) {
     const layoutShift = geometryEqual === false;
     return {
       changeClass: layoutShift ? 'layoutEffective' : 'none',
@@ -195,33 +191,12 @@ function classifyStyleDiff(
   if (geometryEqual === false) {
     return {changeClass: 'layoutEffective', effectiveLayoutChange: true};
   }
-  const layoutish = (p: string) => {
-    const x = p.toLowerCase();
-    return (
-      x.includes('width') ||
-      x.includes('height') ||
-      x.includes('margin') ||
-      x.includes('padding') ||
-      x.includes('border') ||
-      x === 'display' ||
-      x === 'position' ||
-      x.includes('flex') ||
-      x.includes('grid') ||
-      x.includes('gap') ||
-      x === 'transform' ||
-      x === 'top' ||
-      x === 'left' ||
-      x === 'right' ||
-      x === 'bottom' ||
-      x.includes('inset')
-    );
-  };
-  const touchedLayout = styleChanges.some(c => layoutish(c.property));
+  const touchedLayout = styleChanges.some(c => isLayoutProperty(c.property));
   if (geometryEqual === true && touchedLayout) {
-    return {
-      changeClass: 'cascadeOnly',
-      effectiveLayoutChange: false,
-    };
+    return {changeClass: 'cascadeOnly', effectiveLayoutChange: false};
+  }
+  if (geometryEqual === undefined && touchedLayout) {
+    return {changeClass: 'layoutEffective', effectiveLayoutChange: false};
   }
   if (touchedLayout) {
     return {changeClass: 'layoutEffective', effectiveLayoutChange: true};
@@ -341,7 +316,9 @@ function borderQuadToNumbers(
 export const getComputedStyles = definePageTool({
   name: 'get_computed_styles',
   description:
-    'Return CSS computed styles for an element. Optionally filter properties and include rule origins.',
+    'Resolved computed styles for one uid; optional property filter and ' +
+    'winning-rule hints (includeSources). Prefer over scraping styles in ' +
+    'evaluate_script.',
   annotations: {
     category: ToolCategory.DEBUGGING,
     readOnlyHint: true,
@@ -422,31 +399,57 @@ export const getComputedStyles = definePageTool({
             });
           }
 
+          interface OriginEntry {
+            source: string;
+            selector?: string;
+            origin?: string;
+            styleSheetId?: string;
+            range?: unknown;
+            value: string;
+          }
+          const propIndex = new Map<string, OriginEntry[]>();
+          for (const c of candidates) {
+            for (const p of c.properties ?? []) {
+              let arr = propIndex.get(p.name);
+              if (!arr) {
+                arr = [];
+                propIndex.set(p.name, arr);
+              }
+              arr.push({
+                source: c.source,
+                selector: c.selector,
+                origin: c.origin,
+                styleSheetId: c.styleSheetId,
+                range: c.range,
+                value: p.value,
+              });
+            }
+          }
           for (const propName of Object.keys(filtered)) {
+            const entries = propIndex.get(propName);
+            if (!entries) {
+              continue;
+            }
             const computedVal = filtered[propName];
-            let origin = null as unknown as Record<string, unknown> | null;
-            for (const c of candidates) {
-              const found = c.properties?.find(p => p.name === propName);
-              if (!found) continue;
-              // Prefer the candidate whose declaration value equals the
-              // computed value; otherwise fall back to first match.
-              if (found.value === computedVal) {
+            let origin: Record<string, unknown> | null = null;
+            for (const e of entries) {
+              if (e.value === computedVal) {
                 origin = {
-                  source: c.source,
-                  selector: c.selector,
-                  origin: c.origin,
-                  styleSheetId: c.styleSheetId,
-                  range: c.range,
+                  source: e.source,
+                  selector: e.selector,
+                  origin: e.origin,
+                  styleSheetId: e.styleSheetId,
+                  range: e.range,
                 };
                 break;
               }
               if (!origin) {
                 origin = {
-                  source: c.source,
-                  selector: c.selector,
-                  origin: c.origin,
-                  styleSheetId: c.styleSheetId,
-                  range: c.range,
+                  source: e.source,
+                  selector: e.selector,
+                  origin: e.origin,
+                  styleSheetId: e.styleSheetId,
+                  range: e.range,
                 };
               }
             }
@@ -465,7 +468,7 @@ export const getComputedStyles = definePageTool({
       response.appendResponseLine(JSON.stringify(result));
       response.appendResponseLine('```');
     } finally {
-      handle.dispose();
+      await handle.dispose();
     }
   },
 });
@@ -473,7 +476,8 @@ export const getComputedStyles = definePageTool({
 export const getBoxModel = definePageTool({
   name: 'get_box_model',
   description:
-    'Return box model for an element (content/padding/border/margin) and rects (content, padding, border, margin, client, bounding).',
+    'CDP box model quads and rects for layout misalignment, overflow, and ' +
+    'offset debugging.',
   annotations: {
     category: ToolCategory.DEBUGGING,
     readOnlyHint: true,
@@ -586,7 +590,7 @@ export const getBoxModel = definePageTool({
       response.appendResponseLine(JSON.stringify(result));
       response.appendResponseLine('```');
     } finally {
-      handle.dispose();
+      await handle.dispose();
     }
   },
 });
@@ -594,7 +598,8 @@ export const getBoxModel = definePageTool({
 export const getVisibility = definePageTool({
   name: 'get_visibility',
   description:
-    'Return visibility diagnostics for an element: isVisible and reasons.',
+    'Explain why an element is invisible (display, opacity, zero size, ' +
+    'off-viewport, clip-path).',
   annotations: {
     category: ToolCategory.DEBUGGING,
     readOnlyHint: true,
@@ -616,35 +621,36 @@ export const getVisibility = definePageTool({
       const client = pptr._client();
 
       const nodeId = await context.getNodeIdFromHandle(handle, pptr);
-      const {computedStyle} = await client.send('CSS.getComputedStyleForNode', {
-        nodeId,
-      });
+      const [computedRes, boxRes] = await Promise.all([
+        client.send('CSS.getComputedStyleForNode', {nodeId}),
+        client.send('DOM.getBoxModel', {nodeId}).catch(() => null),
+      ]);
       const style = toMap(
-        computedStyle as Array<{name: string; value: string}> | undefined,
+        computedRes.computedStyle as
+          | Array<{name: string; value: string}>
+          | undefined,
       );
 
-      let boxModel: {
+      const boxModel: {
         width: number;
         height: number;
         border: Array<{x: number; y: number}>;
-      } | null = null;
-      try {
-        boxModel = (await client.send('DOM.getBoxModel', {nodeId})).model;
-      } catch {
-        void 0;
-      }
+      } | null = boxRes?.model ?? null;
 
       const reasons: string[] = [];
 
-      if (style['display'] === 'none') reasons.push('display:none');
+      if (style['display'] === 'none') {
+        reasons.push('display:none');
+      }
       if (
         style['visibility'] === 'hidden' ||
         style['visibility'] === 'collapse'
       ) {
         reasons.push('visibility:hidden');
       }
-      if (Number(parseFloat(style['opacity'] ?? '1')) === 0)
+      if (Number(parseFloat(style['opacity'] ?? '1')) === 0) {
         reasons.push('opacity:0');
+      }
 
       if (boxModel) {
         if (boxModel.width === 0 || boxModel.height === 0) {
@@ -670,13 +676,17 @@ export const getVisibility = definePageTool({
             bottom < vTop ||
             top > vBottom
           );
-          if (!intersects) reasons.push('off-viewport');
+          if (!intersects) {
+            reasons.push('off-viewport');
+          }
         } catch {
           void 0;
         }
       }
 
-      if ((style['clip-path'] ?? 'none') !== 'none') reasons.push('clip-path');
+      if ((style['clip-path'] ?? 'none') !== 'none') {
+        reasons.push('clip-path');
+      }
 
       const isVisible = reasons.length === 0;
       const result = {isVisible, reasons};
@@ -685,7 +695,7 @@ export const getVisibility = definePageTool({
       response.appendResponseLine(JSON.stringify(result));
       response.appendResponseLine('```');
     } finally {
-      handle.dispose();
+      await handle.dispose();
     }
   },
 });
@@ -693,7 +703,8 @@ export const getVisibility = definePageTool({
 export const getComputedStylesBatch = definePageTool({
   name: 'get_computed_styles_batch',
   description:
-    'Return CSS computed styles for multiple elements. Optionally filter properties.',
+    'Batch computed styles map keyed by uid—use for design tokens or ' +
+    'multi-node parity checks.',
   annotations: {
     category: ToolCategory.DEBUGGING,
     readOnlyHint: true,
@@ -730,7 +741,7 @@ export const getComputedStylesBatch = definePageTool({
           );
           results[uid] = filterMap(map, request.params.properties);
         } finally {
-          handle.dispose();
+          await handle.dispose();
         }
       }),
     );
@@ -745,7 +756,8 @@ export const getComputedStylesBatch = definePageTool({
 export const diffComputedStyles = definePageTool({
   name: 'diff_computed_styles',
   description:
-    'Return the changed computed properties between two elements (A vs B).',
+    'Side-by-side style diff for two uids on the same page; optional ' +
+    'geometry compare for layout-affecting changes.',
   annotations: {
     category: ToolCategory.DEBUGGING,
     readOnlyHint: true,
@@ -800,7 +812,7 @@ export const diffComputedStyles = definePageTool({
         }
         return {map, rect};
       } finally {
-        handle.dispose();
+        await handle.dispose();
       }
     }
 
@@ -844,8 +856,8 @@ export const diffComputedStyles = definePageTool({
 export const saveComputedStylesSnapshot = definePageTool({
   name: 'save_computed_styles_snapshot',
   description:
-    'Save a named snapshot (schema v1): computed styles, optional border ' +
-    'geometry, domPath, backendNodeId, and page meta for later diff/matching.',
+    'Store baseline computed styles + domPath/meta under a name for ' +
+    'cross-navigation regression checks.',
   annotations: {
     category: ToolCategory.DEBUGGING,
     readOnlyHint: true,
@@ -887,38 +899,24 @@ export const saveComputedStylesSnapshot = definePageTool({
         const handle = await request.page.getElementByUid(uid);
         try {
           const nodeId = await context.getNodeIdFromHandle(handle, pptr);
-          const {computedStyle} = await client.send(
-            'CSS.getComputedStyleForNode',
-            {nodeId},
-          );
+          const [computedRes, bmRes, domPathRes, descRes] = await Promise.all([
+            client.send('CSS.getComputedStyleForNode', {nodeId}),
+            client.send('DOM.getBoxModel', {nodeId}).catch(() => null),
+            domPathForHandle(handle).catch(() => undefined),
+            client.send('DOM.describeNode', {nodeId}).catch(() => null),
+          ]);
           const map = toMap(
-            computedStyle as Array<{name: string; value: string}> | undefined,
+            computedRes.computedStyle as
+              | Array<{name: string; value: string}>
+              | undefined,
           );
           let borderRect: BorderRect | undefined;
-          try {
-            const bm = await client.send('DOM.getBoxModel', {nodeId});
-            if (bm.model?.border) {
-              borderRect = rectFromQuad(bm.model.border as number[]);
-            }
-          } catch {
-            void 0;
+          if (bmRes?.model?.border) {
+            borderRect = rectFromQuad(bmRes.model.border as number[]);
           }
-          let domPath: string | undefined;
-          try {
-            const p = await domPathForHandle(handle);
-            if (p) {
-              domPath = p;
-            }
-          } catch {
-            void 0;
-          }
-          let backendNodeId: number | undefined;
-          try {
-            const desc = await client.send('DOM.describeNode', {nodeId});
-            backendNodeId = desc.node?.backendNodeId as number | undefined;
-          } catch {
-            void 0;
-          }
+          const domPath = domPathRes || undefined;
+          const backendNodeId =
+            (descRes?.node?.backendNodeId as number | undefined) ?? undefined;
           elements[uid] = {
             computed: filterMap(map, request.params.properties),
             borderRect,
@@ -926,7 +924,7 @@ export const saveComputedStylesSnapshot = definePageTool({
             backendNodeId,
           };
         } finally {
-          handle.dispose();
+          await handle.dispose();
         }
       }),
     );
@@ -955,8 +953,8 @@ export const saveComputedStylesSnapshot = definePageTool({
 export const diffComputedStylesSnapshot = definePageTool({
   name: 'diff_computed_styles_snapshot',
   description:
-    'Diff current computed styles (and optional geometry) vs a saved ' +
-    'snapshot. Use domPath to match when a11y uids drift between captures.',
+    'Compare live uid to save_computed_styles_snapshot baseline; domPath ' +
+    'when uids differ between loads.',
   annotations: {
     category: ToolCategory.DEBUGGING,
     readOnlyHint: true,
@@ -1068,7 +1066,7 @@ export const diffComputedStylesSnapshot = definePageTool({
       response.appendResponseLine(JSON.stringify(out));
       response.appendResponseLine('```');
     } finally {
-      handle.dispose();
+      await handle.dispose();
     }
   },
 });
@@ -1076,8 +1074,8 @@ export const diffComputedStylesSnapshot = definePageTool({
 export const highlightElementsForStyles = definePageTool({
   name: 'highlight_elements_for_styles',
   description:
-    'Enable CDP overlay highlights on elements (last uid wins in DevTools; ' +
-    'response lists all border quads for external overlays).',
+    'Highlight border quads in DevTools and return coordinates for ' +
+    'screenshot overlays or docs.',
   annotations: {
     category: ToolCategory.DEBUGGING,
     readOnlyHint: true,
@@ -1098,27 +1096,26 @@ export const highlightElementsForStyles = definePageTool({
     } catch {
       void 0;
     }
-    const regions: Array<{uid: string; borderQuad: number[] | null}> = [];
-    for (const uid of request.params.uids) {
-      const handle = await request.page.getElementByUid(uid);
-      try {
-        const nodeId = await context.getNodeIdFromHandle(handle, pptr);
-        const flat = borderQuadToNumbers(
-          (await client.send('DOM.getBoxModel', {nodeId})).model?.border,
-        );
-        const quad = flat ? [...flat] : null;
-        regions.push({uid, borderQuad: quad});
-        if (quad) {
-          try {
-            await client.send('Overlay.highlightQuad', {quad});
-          } catch {
-            void 0;
+    const regions = await Promise.all(
+      request.params.uids.map(async uid => {
+        const handle = await request.page.getElementByUid(uid);
+        try {
+          const nodeId = await context.getNodeIdFromHandle(handle, pptr);
+          const flat = borderQuadToNumbers(
+            (await client.send('DOM.getBoxModel', {nodeId})).model?.border,
+          );
+          const quad = flat ? [...flat] : null;
+          if (quad) {
+            await client
+              .send('Overlay.highlightQuad', {quad})
+              .catch(() => undefined);
           }
+          return {uid, borderQuad: quad};
+        } finally {
+          await handle.dispose();
         }
-      } finally {
-        handle.dispose();
-      }
-    }
+      }),
+    );
     response.appendResponseLine('Highlight regions (border quads, layout px):');
     response.appendResponseLine('```json');
     response.appendResponseLine(JSON.stringify({regions}));

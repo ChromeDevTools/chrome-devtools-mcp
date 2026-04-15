@@ -11,7 +11,8 @@ import {definePageTool} from '../ToolDefinition.js';
 
 export const screenshot = definePageTool({
   name: 'screenshot',
-  description: `Takes a screenshot`,
+  description:
+    'Viewport PNG saved to a temp path (--slim mode; minimal footprint).',
   annotations: {
     category: ToolCategory.DEBUGGING,
     // Not read-only due to filePath param.
@@ -34,7 +35,8 @@ export const screenshot = definePageTool({
 
 export const navigate = definePageTool({
   name: 'navigate',
-  description: `Loads a URL`,
+  description:
+    'Navigate the selected tab to url (--slim; accepts beforeunload).',
   annotations: {
     category: ToolCategory.NAVIGATION,
     readOnlyHint: false,
@@ -71,7 +73,8 @@ export const navigate = definePageTool({
 
 export const evaluate = definePageTool({
   name: 'evaluate',
-  description: `Evaluates a JavaScript script`,
+  description:
+    'Evaluate a script string in page context; returns text/JSON (--slim).',
   annotations: {
     category: ToolCategory.DEBUGGING,
     readOnlyHint: false,

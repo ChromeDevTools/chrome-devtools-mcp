@@ -27,6 +27,10 @@ describe('e2e', () => {
         '--isolated',
         '--executable-path',
         executablePath(),
+        '--no-usage-statistics',
+        '--no-performance-crux',
+        '--chrome-arg=--no-sandbox',
+        '--chrome-arg=--disable-setuid-sandbox',
         ...extraArgs,
       ],
     });

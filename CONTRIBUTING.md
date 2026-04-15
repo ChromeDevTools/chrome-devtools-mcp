@@ -118,6 +118,8 @@ You can use the `DEBUG` environment variable as usual to control categories that
 
 When adding a new tool or updating a tool name or description, make sure to run `npm run gen` to generate the tool reference documentation.
 
+If the change affects when or why to use a tool, update `docs/mcp-tools-user-guide.md` as well.
+
 ### Contributing to Evals
 
 We use Gemini to evaluate the MCP server tools in `scripts/eval_scenarios`.

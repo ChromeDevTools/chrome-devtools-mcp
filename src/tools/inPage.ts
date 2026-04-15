@@ -42,13 +42,10 @@ declare global {
 
 export const listInPageTools = definePageTool({
   name: 'list_in_page_tools',
-  description: `Lists all in-page tools the page exposes for providing runtime information.
-  In-page tools can be called via the 'execute_in_page_tool()' MCP tool.
-  Alternatively, in-page tools can be executed by calling 'evaluate_script' and adding the
-  following command to the script:
-  'window.__dtmcp.executeTool(toolName, params)'
-  This might be helpful when the in-page-tools return non-serializable values or when composing
-  the in-page-tools with additional functionality.`,
+  description:
+    'Discover custom tools published by the page under window.__dtmcp. ' +
+    'Call them via execute_in_page_tool or evaluate_script ' +
+    '(window.__dtmcp.executeTool).',
   annotations: {
     category: ToolCategory.IN_PAGE,
     readOnlyHint: true,
@@ -62,7 +59,9 @@ export const listInPageTools = definePageTool({
 
 export const executeInPageTool = definePageTool({
   name: 'execute_in_page_tool',
-  description: `Executes a tool exposed by the page.`,
+  description:
+    'Run a page-defined __dtmcp tool by name with JSON params; {uid} refs ' +
+    'resolve to elements.',
   annotations: {
     category: ToolCategory.IN_PAGE,
     readOnlyHint: false,

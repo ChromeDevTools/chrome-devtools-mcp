@@ -22,7 +22,8 @@ async function generateTempFilePath(): Promise<string> {
 export const startScreencast = definePageTool({
   name: 'screencast_start',
   description:
-    'Starts recording a screencast (video) of the selected page in mp4 format.',
+    'Record the tab to MP4 (ffmpeg required). For visual repros; pair with ' +
+    'screencast_stop.',
   annotations: {
     category: ToolCategory.DEBUGGING,
     readOnlyHint: false,
@@ -77,7 +78,8 @@ export const startScreencast = definePageTool({
 
 export const stopScreencast = definePageTool({
   name: 'screencast_stop',
-  description: 'Stops the active screencast recording on the selected page.',
+  description:
+    'Finish MP4 recording started by screencast_start; flushes file path.',
   annotations: {
     category: ToolCategory.DEBUGGING,
     readOnlyHint: false,

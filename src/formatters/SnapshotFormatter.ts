@@ -14,85 +14,71 @@ export class SnapshotFormatter {
   }
 
   toString(): string {
-    const chunks: string[] = [];
+    const lines: string[] = [];
     const root = this.#snapshot.root;
 
-    // Top-level content of the snapshot.
     if (
       this.#snapshot.verbose &&
       this.#snapshot.hasSelectedElement &&
       !this.#snapshot.selectedElementUid
     ) {
-      chunks.push(`Note: there is a selected element in the DevTools Elements panel but it is not included into the current a11y tree snapshot.
-Get a verbose snapshot to include all elements if you are interested in the selected element.\n\n`);
+      lines.push(
+        `Note: there is a selected element in the DevTools Elements panel but it is not included into the current a11y tree snapshot.`,
+      );
+      lines.push(
+        `Get a verbose snapshot to include all elements if you are interested in the selected element.\n`,
+      );
     }
 
-    chunks.push(this.#formatNode(root, 0));
-    return chunks.join('');
+    this.#formatNodeFlat(root, 0, lines);
+    return lines.join('\n') + '\n';
   }
 
   toJSON(): object {
     return this.#nodeToJSON(this.#snapshot.root);
   }
 
-  #formatNode(node: TextSnapshotNode, depth = 0): string {
-    const chunks: string[] = [];
+  #formatNodeFlat(node: TextSnapshotNode, depth: number, out: string[]): void {
     const attributes = this.#getAttributes(node);
-    const line =
-      ' '.repeat(depth * 2) +
-      attributes.join(' ') +
-      (node.id === this.#snapshot.selectedElementUid
+    const indent = '  '.repeat(depth);
+    const selected =
+      node.id === this.#snapshot.selectedElementUid
         ? ' [selected in the DevTools Elements panel]'
-        : '') +
-      '\n';
-    chunks.push(line);
-
+        : '';
+    out.push(indent + attributes.join(' ') + selected);
     for (const child of node.children) {
-      chunks.push(this.#formatNode(child, depth + 1));
+      this.#formatNodeFlat(child, depth + 1, out);
     }
-    return chunks.join('');
   }
 
   #nodeToJSON(node: TextSnapshotNode): object {
     const rawAttrs = this.#getAttributesMap(node);
-    const children = node.children.map(child => this.#nodeToJSON(child));
-    const result: Record<string, unknown> = structuredClone(rawAttrs);
-    if (children.length > 0) {
-      result.children = children;
+    const result: Record<string, unknown> = {...rawAttrs};
+    if (node.children.length > 0) {
+      result.children = node.children.map(child => this.#nodeToJSON(child));
     }
     return result;
   }
 
-  #getAttributes(serializedAXNodeRoot: TextSnapshotNode): string[] {
-    const attributes = [`uid=${serializedAXNodeRoot.id}`];
+  #getAttributes(node: TextSnapshotNode): string[] {
+    const attributes = [`uid=${node.id}`];
 
-    if (serializedAXNodeRoot.role) {
-      attributes.push(
-        serializedAXNodeRoot.role === 'none'
-          ? 'ignored'
-          : serializedAXNodeRoot.role,
-      );
+    if (node.role) {
+      attributes.push(node.role === 'none' ? 'ignored' : node.role);
     }
-    if (serializedAXNodeRoot.name) {
-      attributes.push(`"${serializedAXNodeRoot.name}"`);
+    if (node.name) {
+      attributes.push(`"${node.name}"`);
     }
 
-    const simpleAttrs = this.#getAttributesMap(
-      serializedAXNodeRoot,
-      /* excludeSpecial */ true,
-    );
+    const extracted = this.#extractedAttributes(node);
 
-    for (const attr of Object.keys(serializedAXNodeRoot).sort()) {
-      if (excludedAttributes.has(attr)) {
-        continue;
-      }
-
+    for (const attr of this.#sortedKeys(node)) {
       const mapped = booleanPropertyMap[attr];
-      if (mapped && simpleAttrs[mapped]) {
+      if (mapped && extracted[mapped]) {
         attributes.push(mapped);
       }
 
-      const val = simpleAttrs[attr];
+      const val = extracted[attr];
       if (val === true) {
         attributes.push(attr);
       } else if (typeof val === 'string' || typeof val === 'number') {
@@ -103,35 +89,35 @@ Get a verbose snapshot to include all elements if you are interested in the sele
     return attributes;
   }
 
-  #getAttributesMap(
-    node: TextSnapshotNode,
-    excludeSpecial = false,
-  ): Record<string, unknown> {
+  #getAttributesMap(node: TextSnapshotNode): Record<string, unknown> {
     const result: Record<string, unknown> = {};
-    if (!excludeSpecial) {
-      result.id = node.id;
-      if (node.role) {
-        result.role = node.role;
-      }
-      if (node.name) {
-        result.name = node.name;
-      }
+    result.id = node.id;
+    if (node.role) {
+      result.role = node.role;
     }
+    if (node.name) {
+      result.name = node.name;
+    }
+    return {...result, ...this.#extractedAttributes(node)};
+  }
 
-    // Re-implementing the exact logic from original function for #getAttributes to be safe:
-    return {
-      ...result,
-      ...this.#extractedAttributes(node),
-    };
+  #sortedKeysCache = new WeakMap<TextSnapshotNode, string[]>();
+
+  #sortedKeys(node: TextSnapshotNode): string[] {
+    let cached = this.#sortedKeysCache.get(node);
+    if (!cached) {
+      cached = Object.keys(node)
+        .filter(k => !excludedAttributes.has(k))
+        .sort();
+      this.#sortedKeysCache.set(node, cached);
+    }
+    return cached;
   }
 
   #extractedAttributes(node: TextSnapshotNode): Record<string, unknown> {
     const result: Record<string, unknown> = {};
 
-    for (const attr of Object.keys(node).sort()) {
-      if (excludedAttributes.has(attr)) {
-        continue;
-      }
+    for (const attr of this.#sortedKeys(node)) {
       const value = (node as unknown as Record<string, unknown>)[attr];
       if (typeof value === 'boolean') {
         if (booleanPropertyMap[attr]) {
