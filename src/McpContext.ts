@@ -117,7 +117,7 @@ export class McpContext implements Context {
         uncaughtError: event => {
           collect(event);
         },
-        issue: event => {
+        devtoolsAggregatedIssue: event => {
           collect(event);
         },
       } as ListenerMap;

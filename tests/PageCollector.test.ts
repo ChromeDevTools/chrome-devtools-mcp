@@ -340,7 +340,7 @@ describe('ConsoleCollector', () => {
 
     const collector = new ConsoleCollector(browser, collect => {
       return {
-        issue: issue => {
+        devtoolsAggregateddevtoolsAggregatedIssue: issue => {
           collect(issue as DevTools.AggregatedIssue);
         },
       } as ListenerMap;
@@ -361,7 +361,7 @@ describe('ConsoleCollector', () => {
 
     const collector = new ConsoleCollector(browser, collect => {
       return {
-        issue: issue => {
+        devtoolsAggregatedIssue: issue => {
           collect(issue as DevTools.AggregatedIssue);
         },
       } as ListenerMap;
@@ -380,7 +380,7 @@ describe('ConsoleCollector', () => {
     } satisfies Protocol.Audits.InspectorIssue;
 
     cdpSession.emit('Audits.issueAdded', {issue});
-    cdpSession.emit('Audits.issueAdded', {issue: issue2});
+    cdpSession.emit('Audits.issueAdded', {devtoolsAggregatedIssue: issue2});
     const data = collector.getData(page);
     assert.equal(data.length, 2);
   });
@@ -393,7 +393,7 @@ describe('ConsoleCollector', () => {
 
     const collector = new ConsoleCollector(browser, collect => {
       return {
-        issue: issue => {
+        devtoolsAggregatedIssue: issue => {
           collect(issue as DevTools.AggregatedIssue);
         },
       } as ListenerMap;
