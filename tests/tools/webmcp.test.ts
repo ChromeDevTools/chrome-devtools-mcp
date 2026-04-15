@@ -12,7 +12,7 @@ import {listWebMcpTools} from '../../src/tools/webmcp.js';
 import {getTextContent, html, withMcpContext} from '../utils.js';
 
 describe('webmcp', () => {
-  it('list webmcp tools', async () => {
+  it('list webmcp tools successfully', async () => {
     await withMcpContext(
       async (response, context) => {
         const page = context.getSelectedMcpPage().pptrPage;
@@ -36,30 +36,53 @@ describe('webmcp', () => {
           /name="test_tool", description="A test tool"/,
         );
       },
-      {},
+      {args: ['--enable-features=WebMCPTesting,DevToolsWebMCPSupport']},
+      {experimentalWebmcp: true} as ParsedArguments,
+    );
+  });
+
+  it('list no webmcp tools if there are none', async () => {
+    await withMcpContext(
+      async (response, context) => {
+        const page = context.getSelectedMcpPage().pptrPage;
+
+        await listWebMcpTools.handler(
+          {params: {}, page: context.getSelectedMcpPage()},
+          response,
+          context,
+        );
+
+        const formattedResponse = await response.handle('test', context);
+        const textContent = getTextContent(formattedResponse.content[0]);
+        assert.match(textContent, /No WebMCP tools available/);
+      },
+      {args: ['--enable-features=WebMCPTesting,DevToolsWebMCPSupport']},
       {experimentalWebmcp: true} as ParsedArguments,
     );
   });
 
   it('does not list webmcp tools if not enabled', async () => {
-    await withMcpContext(async (response, context) => {
-      const page = context.getSelectedMcpPage().pptrPage;
-      await page.setContent(
-        html`<form
-          toolname="test_tool"
-          tooldescription="A test tool"
-        ></form>`,
-      );
+    await withMcpContext(
+      async (response, context) => {
+        const page = context.getSelectedMcpPage().pptrPage;
+        await page.setContent(
+          html`<form
+            toolname="test_tool"
+            tooldescription="A test tool"
+          ></form>`,
+        );
 
-      await listWebMcpTools.handler(
-        {params: {}, page: context.getSelectedMcpPage()},
-        response,
-        context,
-      );
+        await listWebMcpTools.handler(
+          {params: {}, page: context.getSelectedMcpPage()},
+          response,
+          context,
+        );
 
-      const formattedResponse = await response.handle('test', context);
-      const textContent = getTextContent(formattedResponse.content[0]);
-      assert.ok(!textContent.includes('name="test_tool"'));
-    }, {});
+        const formattedResponse = await response.handle('test', context);
+        const textContent = getTextContent(formattedResponse.content[0]);
+        assert.ok(!textContent.includes('name="test_tool"'));
+      },
+      {args: ['--enable-features=WebMCPTesting,DevToolsWebMCPSupport']},
+    );
   });
 });
