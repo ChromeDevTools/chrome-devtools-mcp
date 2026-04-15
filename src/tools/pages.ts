@@ -222,7 +222,7 @@ export const navigatePage = definePageTool({
                 );
               } catch (error) {
                 response.appendResponseLine(
-                  `Unable to navigate in the  selected page: ${error.message}.`,
+                  `Unable to navigate in the selected page: ${error.message}.`,
                 );
               }
               break;
