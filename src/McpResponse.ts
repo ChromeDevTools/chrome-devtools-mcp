@@ -236,9 +236,7 @@ export class McpResponse implements Response {
   }
 
   setListWebMcpTools(): void {
-    if (this.#args.experimentalWebmcp) {
-      this.#listWebMcpTools = true;
-    }
+    this.#listWebMcpTools = true;
   }
 
   setIncludeNetworkRequests(
@@ -498,7 +496,7 @@ export class McpResponse implements Response {
     }
 
     let webmcpTools: WebMCPTool[] | undefined;
-    if (this.#listWebMcpTools) {
+    if (this.#listWebMcpTools && this.#args.experimentalWebmcp) {
       const page = this.#page ?? context.getSelectedMcpPage();
       webmcpTools = context.getWebMcpTools(page);
     }
@@ -900,7 +898,14 @@ Call ${handleDialog.name} to handle it before continuing.`);
     }
 
     if (this.#listWebMcpTools && data.webmcpTools) {
-      structuredContent.webmcpTools = data.webmcpTools;
+      structuredContent.webmcpTools = data.webmcpTools.map(
+        ({name, description, inputSchema, annotations}) => ({
+          name,
+          description,
+          inputSchema,
+          annotations,
+        }),
+      );
       response.push('## WebMCP tools');
       if (data.webmcpTools.length === 0) {
         response.push('No WebMCP tools available.');
