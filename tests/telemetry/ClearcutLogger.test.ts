@@ -46,6 +46,8 @@ describe('ClearcutLogger', () => {
       });
       await logger.logToolInvocation({
         toolName: 'test_tool',
+        params: {},
+        schema: {},
         success: true,
         latencyMs: 123,
       });
@@ -56,6 +58,40 @@ describe('ClearcutLogger', () => {
       assert.strictEqual(msg.payload.tool_invocation?.tool_name, 'test_tool');
       assert.strictEqual(msg.payload.tool_invocation?.success, true);
       assert.strictEqual(msg.payload.tool_invocation?.latency_ms, 123);
+    });
+    it('sends sanitized params', async () => {
+      const logger = new ClearcutLogger({
+        persistence: mockPersistence,
+        appVersion: '1.0.0',
+        watchdogClient: mockWatchdogClient,
+      });
+
+      const schema = {
+        uid: zod.string(),
+        myString: zod.string(),
+      };
+
+      const params = {
+        uid: 'sensitive',
+        myString: 'hello',
+      };
+
+      await logger.logToolInvocation({
+        toolName: 'test_tool',
+        params,
+        schema,
+        success: true,
+        latencyMs: 123,
+      });
+
+      assert(mockWatchdogClient.send.calledOnce);
+      const msg = mockWatchdogClient.send.firstCall.args[0];
+      assert.strictEqual(msg.type, WatchdogMessageType.LOG_EVENT);
+      assert.deepStrictEqual(msg.payload.tool_invocation?.tool_params, {
+        test_tool_params: {
+          my_string_length: 5,
+        },
+      });
     });
   });
 

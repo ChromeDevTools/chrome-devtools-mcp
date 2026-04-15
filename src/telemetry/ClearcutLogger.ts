@@ -17,6 +17,7 @@ import {
   type FlagUsage,
   WatchdogMessageType,
   OsType,
+  type ToolInvocation,
 } from './types.js';
 import {WatchdogClient} from './WatchdogClient.js';
 
@@ -207,18 +208,27 @@ export class ClearcutLogger {
 
   async logToolInvocation(args: {
     toolName: string;
+    params: ShapeOutput<zod.ZodRawShape>;
+    schema: zod.ZodRawShape;
     success: boolean;
     latencyMs: number;
   }): Promise<void> {
+    const tool_invocation: ToolInvocation = {
+      tool_name: args.toolName,
+      success: args.success,
+      latency_ms: args.latencyMs,
+    };
+    if (Object.keys(args.params).length > 0) {
+      tool_invocation.tool_params = {
+        [`${args.toolName}_params`]: sanitizeParams(args.params, args.schema),
+      };
+    }
+
     this.#watchdog.send({
       type: WatchdogMessageType.LOG_EVENT,
       payload: {
         mcp_client: this.#mcpClient,
-        tool_invocation: {
-          tool_name: args.toolName,
-          success: args.success,
-          latency_ms: args.latencyMs,
-        },
+        tool_invocation: tool_invocation,
       },
     });
   }
