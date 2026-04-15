@@ -1362,6 +1362,25 @@ exports[`webmcp > includes webmcp tools in select_page response 2`] = `
 }
 `;
 
+exports[`webmcp > list no webmcp tools if experimentalWebmcp is false 1`] = `
+Successfully navigated to about:blank.
+## Pages
+1: about:blank [selected]
+`;
+
+exports[`webmcp > list no webmcp tools if experimentalWebmcp is false 2`] = `
+{
+  "message": "Successfully navigated to about:blank.",
+  "pages": [
+    {
+      "id": 1,
+      "url": "about:blank",
+      "selected": true
+    }
+  ]
+}
+`;
+
 exports[`webmcp > list no webmcp tools if there are none 1`] = `
 ## WebMCP tools
 No WebMCP tools available.

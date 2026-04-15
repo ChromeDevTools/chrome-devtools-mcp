@@ -1459,6 +1459,7 @@ describe('replaceHtmlElementsWithUids', () => {
 describe('webmcp', () => {
   async function testIncludesWebmcpTools(
     t: it.TestContext,
+    parseArguments: ParsedArguments,
     handlerAction: (
       response: McpResponse,
       context: McpContext,
@@ -1470,7 +1471,7 @@ describe('webmcp', () => {
         response.setListWebMcpTools();
 
         await handlerAction(response, context);
-        
+
         const page = context.getSelectedMcpPage().pptrPage;
         await page.setContent(
           html`<form
@@ -1494,13 +1495,14 @@ describe('webmcp', () => {
         );
       },
       {args: ['--enable-features=WebMCPTesting,DevToolsWebMCPSupport']},
-      {experimentalWebmcp: true} as ParsedArguments,
+      parseArguments,
     );
   }
 
   it('includes webmcp tools in list_pages response', async t => {
     await testIncludesWebmcpTools(
       t,
+      {experimentalWebmcp: true} as ParsedArguments,
       async (response, context) => {
         await listPages().handler({params: {}}, response, context);
       },
@@ -1511,6 +1513,7 @@ describe('webmcp', () => {
   it('includes webmcp tools in select_page response', async t => {
     await testIncludesWebmcpTools(
       t,
+      {experimentalWebmcp: true} as ParsedArguments,
       async (response, context) => {
         const pageId =
           context.getPageId(context.getSelectedMcpPage().pptrPage) ?? 1;
@@ -1523,6 +1526,7 @@ describe('webmcp', () => {
   it('includes webmcp tools in navigate_page response', async t => {
     await testIncludesWebmcpTools(
       t,
+      {experimentalWebmcp: true} as ParsedArguments,
       async (response, context) => {
         await navigatePage.handler(
           {
@@ -1557,6 +1561,24 @@ describe('webmcp', () => {
       },
       {args: ['--enable-features=WebMCPTesting,DevToolsWebMCPSupport']},
       {experimentalWebmcp: true} as ParsedArguments,
+    );
+  });
+
+  it('list no webmcp tools if experimentalWebmcp is false', async t => {
+    await testIncludesWebmcpTools(
+      t,
+      {experimentalWebmcp: false} as ParsedArguments,
+      async (response, context) => {
+        await navigatePage.handler(
+          {
+            params: {type: 'url', url: 'about:blank'},
+            page: context.getSelectedMcpPage(),
+          },
+          response,
+          context,
+        );
+      },
+      'navigate_page',
     );
   });
 });

@@ -381,6 +381,10 @@ export class McpResponse implements Response {
     return this.#snapshotParams;
   }
 
+  get listWebMcpTools(): boolean | undefined {
+    return this.#listWebMcpTools;
+  }
+
   async handle(
     toolName: string,
     context: McpContext,
