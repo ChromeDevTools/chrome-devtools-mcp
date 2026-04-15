@@ -56,6 +56,7 @@ export const selectPage = defineTool({
     context.selectPage(page);
     response.setIncludePages(true);
     response.setListInPageTools();
+    response.setListWebMcpTools();
     if (request.params.bringToFront) {
       await page.pptrPage.bringToFront();
     }
