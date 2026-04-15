@@ -10,6 +10,7 @@ import path from 'node:path';
 
 import {zod} from '../third_party/index.js';
 import type {ScreenRecorder} from '../third_party/index.js';
+import {ensureExtension} from '../utils/files.js';
 
 import {ToolCategory} from './categories.js';
 import {definePageTool} from './ToolDefinition.js';
@@ -46,7 +47,7 @@ export const startScreencast = definePageTool({
     }
 
     const filePath = request.params.path ?? (await generateTempFilePath());
-    const resolvedPath = path.resolve(filePath);
+    const resolvedPath = ensureExtension(path.resolve(filePath), '.mp4');
 
     const page = request.page;
 

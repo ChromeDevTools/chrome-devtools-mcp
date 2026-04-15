@@ -24,6 +24,7 @@ export interface NetworkFormatterOptions {
   saveFile?: (
     data: Uint8Array<ArrayBufferLike>,
     filename: string,
+    extension: '.network-request' | '.network-response',
   ) => Promise<{filename: string}>;
   redactNetworkHeaders: boolean;
 }
@@ -88,11 +89,12 @@ export class NetworkFormatter {
           throw new Error('saveFile is not provided');
         }
         if (data) {
-          await this.#options.saveFile(
+          const result = await this.#options.saveFile(
             Buffer.from(data),
             this.#options.requestFilePath,
+            '.network-request',
           );
-          this.#requestBodyFilePath = this.#options.requestFilePath;
+          this.#requestBodyFilePath = result.filename;
         } else {
           this.#requestBody = requestBodyNotAvailableMessage;
         }
@@ -119,8 +121,12 @@ export class NetworkFormatter {
           if (!this.#options.saveFile) {
             throw new Error('saveFile is not provided');
           }
-          await this.#options.saveFile(buffer, this.#options.responseFilePath);
-          this.#responseBodyFilePath = this.#options.responseFilePath;
+          const result = await this.#options.saveFile(
+            buffer,
+            this.#options.responseFilePath,
+            '.network-response',
+          );
+          this.#responseBodyFilePath = result.filename;
         } catch {
           // Flatten error handling for buffer() failure and save failure
         }

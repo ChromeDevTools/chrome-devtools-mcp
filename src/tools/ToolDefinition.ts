@@ -136,6 +136,18 @@ export interface Response {
   setListInPageTools(): void;
 }
 
+export type SupportedExtensions =
+  | '.png'
+  | '.jpeg'
+  | '.webp'
+  | '.json'
+  | '.network-response'
+  | '.network-request'
+  | '.html'
+  | '.txt'
+  | '.csv'
+  | '.json.gz';
+
 /**
  * Only add methods required by tools/*.
  */
@@ -170,7 +182,8 @@ export type Context = Readonly<{
   ): Promise<{filepath: string}>;
   saveFile(
     data: Uint8Array<ArrayBufferLike>,
-    filename: string,
+    clientProvidedFilePath: string,
+    extension: SupportedExtensions,
   ): Promise<{filename: string}>;
   waitForTextOnPage(
     text: string[],
