@@ -282,6 +282,7 @@ export const navigatePage = definePageTool({
 
     response.setIncludePages(true);
     response.setListInPageTools();
+    response.setListWebMcpTools();
   },
 });
 
