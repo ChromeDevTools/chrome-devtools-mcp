@@ -60,7 +60,8 @@ describe('webmcp', () => {
       );
     }
 
-    it('executes a tool successfully', async () => {
+    // TODO: Remove `.skip` once Chrome 149 reaches stable channel.
+    it.skip('executes a tool successfully', async () => {
       await withMcpContext(
         async (response, context) => {
           const page = context.getSelectedMcpPage();
@@ -76,11 +77,7 @@ describe('webmcp', () => {
             JSON.stringify({status: 'Completed', output: 'hello'}, null, 2),
           );
         },
-        {
-          args: ['--enable-features=WebMCPTesting,DevToolsWebMCPSupport'],
-          executablePath:
-            '/Applications/Google Chrome Canary.app/Contents/MacOS/Google Chrome Canary',
-        },
+        {args: ['--enable-features=WebMCPTesting,DevToolsWebMCPSupport']},
         {experimentalWebmcp: true} as ParsedArguments,
       );
     });
