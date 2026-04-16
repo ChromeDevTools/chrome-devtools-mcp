@@ -40,7 +40,7 @@ export const exploreMemorySnapshot = defineTool({
   description:
     'Loads a memory heapsnapshot and returns snapshot summary stats.  ',
   annotations: {
-    category: ToolCategory.PERFORMANCE,
+    category: ToolCategory.MEMORY,
     readOnlyHint: true,
   },
   schema: {

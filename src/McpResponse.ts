@@ -899,6 +899,7 @@ Call ${handleDialog.name} to handle it before continuing.`);
     }
 
     if (this.#heapSnapshotOptions?.include) {
+      response.push('## Heap Snapshot Data');
       const stats = this.#heapSnapshotOptions.stats;
       const staticData = this.#heapSnapshotOptions.staticData;
       if (stats) {
