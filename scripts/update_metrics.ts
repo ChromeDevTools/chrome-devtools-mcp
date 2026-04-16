@@ -10,7 +10,7 @@ import * as path from 'node:path';
 import {
   cliOptions,
   parseArguments,
-} from '../build/src/bin/chrome-devtools-mcp-cli-options.js';
+} from '../build/src/bin/brave-devtools-mcp-cli-options.js';
 import {
   getPossibleFlagMetrics,
   type FlagMetric,

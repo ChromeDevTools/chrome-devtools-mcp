@@ -8,8 +8,8 @@ import fs from 'node:fs';
 
 import type {Tool} from '@modelcontextprotocol/sdk/types.js';
 
-import {cliOptions} from '../build/src/bin/chrome-devtools-mcp-cli-options.js';
-import type {ParsedArguments} from '../build/src/bin/chrome-devtools-mcp-cli-options.js';
+import {cliOptions} from '../build/src/bin/brave-devtools-mcp-cli-options.js';
+import type {ParsedArguments} from '../build/src/bin/brave-devtools-mcp-cli-options.js';
 import {buildFlag} from '../build/src/index.js';
 import {
   ToolCategory,
