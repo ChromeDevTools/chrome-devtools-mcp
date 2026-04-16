@@ -4,9 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
-  zod,
-} from '../third_party/index.js';
+import {zod} from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
 import {definePageTool} from './ToolDefinition.js';
@@ -64,7 +62,9 @@ export const executeWebMcpTool = definePageTool({
       throw new Error(`Tool ${toolName} not found`);
     }
 
-    const {status, output, errorText } = await tool.execute(input);
-    response.appendResponseLine(JSON.stringify({status, output, errorText }, null, 2));
+    const {status, output, errorText} = await tool.execute(input);
+    response.appendResponseLine(
+      JSON.stringify({status, output, errorText}, null, 2),
+    );
   },
 });

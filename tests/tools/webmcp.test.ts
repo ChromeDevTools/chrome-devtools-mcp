@@ -7,11 +7,11 @@
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
+import type {ParsedArguments} from '../../src/bin/chrome-devtools-mcp-cli-options.js';
+import type {McpPage} from '../../src/McpPage.js';
 import {listPages, navigatePage, selectPage} from '../../src/tools/pages.js';
-import {html, withMcpContext} from '../utils.js';
 import {executeWebMcpTool} from '../../src/tools/webmcp.js';
-import {ParsedArguments} from '../../src/bin/chrome-devtools-mcp-cli-options.js';
-import {McpPage} from '../../src/McpPage.js';
+import {html, withMcpContext} from '../utils.js';
 
 describe('webmcp', () => {
   describe('list_webmcp_tools', () => {

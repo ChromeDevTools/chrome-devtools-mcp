@@ -188,7 +188,6 @@ export const cliOptions = {
   experimentalWebmcp: {
     type: 'boolean',
     describe: 'Set to true to enable debugging WebMCP tools.',
-    hidden: true,
   },
   chromeArg: {
     type: 'array',

@@ -168,7 +168,9 @@ describe('e2e', () => {
       async client => {
         const {tools} = await client.listTools();
         const listWebMcpTools = tools.find(t => t.name === 'list_webmcp_tools');
-        const executeWebMcpTool = tools.find(t => t.name === 'execute_webmcp_tool');
+        const executeWebMcpTool = tools.find(
+          t => t.name === 'execute_webmcp_tool',
+        );
         assert.ok(listWebMcpTools);
         assert.ok(executeWebMcpTool);
       },
