@@ -543,5 +543,18 @@
   {
     "name": "list_webmcp_tools",
     "args": []
+  },
+  {
+    "name": "execute_webmcp_tool",
+    "args": [
+      {
+        "name": "tool_name_length",
+        "argType": "number"
+      },
+      {
+        "name": "input_length",
+        "argType": "number"
+      }
+    ]
   }
 ]

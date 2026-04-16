@@ -162,4 +162,19 @@ describe('e2e', () => {
       ['--experimental-interop-tools'],
     );
   });
+
+  it('has experimental webmcp', async () => {
+    await withClient(
+      async client => {
+        const {tools} = await client.listTools();
+        const listWebMcpTools = tools.find(t => t.name === 'list_webmcp_tools');
+        const executeWebMcpTool = tools.find(
+          t => t.name === 'execute_webmcp_tool',
+        );
+        assert.ok(listWebMcpTools);
+        assert.ok(executeWebMcpTool);
+      },
+      ['--experimental-webmcp'],
+    );
+  });
 });
