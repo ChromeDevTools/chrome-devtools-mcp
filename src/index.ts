@@ -153,6 +153,12 @@ export async function createMcpServer(
       return;
     }
     if (
+      tool.annotations.conditions?.includes('experimentalMemory') &&
+      !serverArgs.experimentalMemory
+    ) {
+      return;
+    }
+    if (
       tool.annotations.conditions?.includes('experimentalInteropTools') &&
       !serverArgs.experimentalInteropTools
     ) {

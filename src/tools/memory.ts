@@ -42,6 +42,7 @@ export const exploreMemorySnapshot = defineTool({
   annotations: {
     category: ToolCategory.MEMORY,
     readOnlyHint: true,
+    conditions: ['experimentalMemory'],
   },
   schema: {
     filePath: zod.string().describe('A path to a .heapsnapshot file to read.'),
