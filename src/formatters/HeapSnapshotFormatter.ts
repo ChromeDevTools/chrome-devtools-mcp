@@ -53,4 +53,15 @@ export class HeapSnapshotFormatter {
       retainedSize: info.maxRet,
     }));
   }
+
+  static sort(
+    aggregates: Record<
+      string,
+      DevTools.HeapSnapshotModel.HeapSnapshotModel.AggregatedInfo
+    >,
+  ): Array<
+    [string, DevTools.HeapSnapshotModel.HeapSnapshotModel.AggregatedInfo]
+  > {
+    return Object.entries(aggregates).sort((a, b) => b[1].self - a[1].self);
+  }
 }

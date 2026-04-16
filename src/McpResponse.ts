@@ -912,8 +912,7 @@ Call ${handleDialog.name} to handle it before continuing.`);
       }
       const aggregates = this.#heapSnapshotOptions.aggregates;
       if (aggregates) {
-        const entries = Object.entries(aggregates);
-        const sortedEntries = entries.sort((a, b) => b[1].self - a[1].self);
+        const sortedEntries = HeapSnapshotFormatter.sort(aggregates);
 
         const paginationData = this.#dataWithPagination(
           sortedEntries,
