@@ -4,3 +4,4 @@ src/third_party/lighthouse-devtools-mcp-bundle.js
 
 # Release-please formatting brakes CI checks
 .claude-plugin/plugin.json
+.github/plugin/plugin.json

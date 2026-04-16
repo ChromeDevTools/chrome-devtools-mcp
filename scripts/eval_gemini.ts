@@ -99,7 +99,10 @@ async function runSingleScenario(
     }
 
     // Path to the compiled MCP server
-    const serverPath = path.join(ROOT_DIR, 'build/src/index.js');
+    const serverPath = path.join(
+      ROOT_DIR,
+      'build/src/bin/chrome-devtools-mcp.js',
+    );
     if (!fs.existsSync(serverPath)) {
       throw new Error(
         `MCP server not found at ${serverPath}. Please run 'npm run build' first.`,
