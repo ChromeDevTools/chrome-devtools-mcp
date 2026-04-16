@@ -75,7 +75,7 @@ export async function withBrowser(
     devtools: options.autoOpenDevTools ?? false,
     pipe: true,
     handleDevToolsAsPage: true,
-    args: [...options.args || [], '--screen-info={3840x2160}'],
+    args: [...(options.args || []), '--screen-info={3840x2160}'],
     enableExtensions: true,
   };
   const key = JSON.stringify(launchOptions);
