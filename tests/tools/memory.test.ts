@@ -43,8 +43,11 @@ describe('memory', () => {
   describe('load_memory_snapshot', () => {
     it('with default options', async () => {
       await withMcpContext(async (response, context) => {
-        const filePath = join(process.cwd(), 'tests/fixtures/example.heapsnapshot');
-        
+        const filePath = join(
+          process.cwd(),
+          'tests/fixtures/example.heapsnapshot',
+        );
+
         assert.ok(existsSync(filePath), `Fixture not found at ${filePath}`);
 
         await exploreMemorySnapshot.handler(
@@ -54,8 +57,13 @@ describe('memory', () => {
         );
 
         // Call handle to trigger formatting (similar to network tests)
-        const responseData = await response.handle(exploreMemorySnapshot.name, context);
-        const output = responseData.content.map(c => (c.type === 'text' ? c.text : '')).join('\n');
+        const responseData = await response.handle(
+          exploreMemorySnapshot.name,
+          context,
+        );
+        const output = responseData.content
+          .map(c => (c.type === 'text' ? c.text : ''))
+          .join('\n');
 
         // Check if response contains Statistics or Static Data
         assert.ok(output.includes('Statistics:'));

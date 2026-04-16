@@ -230,8 +230,12 @@ export type Context = Readonly<{
   ): Promise<
     Record<string, DevTools.HeapSnapshotModel.HeapSnapshotModel.AggregatedInfo>
   >;
-  getHeapSnapshotStats(filePath: string): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.Statistics>;
-  getHeapSnapshotStaticData(filePath: string): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.StaticData | null>;
+  getHeapSnapshotStats(
+    filePath: string,
+  ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.Statistics>;
+  getHeapSnapshotStaticData(
+    filePath: string,
+  ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.StaticData | null>;
 }>;
 
 export type ContextPage = Readonly<{

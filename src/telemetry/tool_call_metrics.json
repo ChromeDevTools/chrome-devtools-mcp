@@ -556,5 +556,14 @@
         "argType": "number"
       }
     ]
+  },
+  {
+    "name": "load_memory_snapshot",
+    "args": [
+      {
+        "name": "file_path_length",
+        "argType": "number"
+      }
+    ]
   }
 ]
