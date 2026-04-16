@@ -12,6 +12,7 @@ import {
   getPossibleFlagMetrics,
   type FlagMetric,
 } from '../build/src/telemetry/flagUtils.js';
+import {applyToExisting} from '../build/src/telemetry/toolMetricsUtils.js';
 
 function writeFlagUsageMetrics() {
   const outputPath = path.resolve('src/telemetry/flag_usage_metrics.json');
@@ -21,15 +22,29 @@ function writeFlagUsageMetrics() {
     throw new Error(`Error: Directory ${dir} does not exist.`);
   }
 
-  const metrics = getPossibleFlagMetrics(cliOptions);
+  let existingMetrics: FlagMetric[] = [];
+  if (fs.existsSync(outputPath)) {
+    try {
+      existingMetrics = JSON.parse(
+        fs.readFileSync(outputPath, 'utf8'),
+      ) as FlagMetric[];
+    } catch {
+      console.warn(
+        `Warning: Failed to parse existing metrics from ${outputPath}. Starting fresh.`,
+      );
+    }
+  }
 
-  // Sort metrics by name for deterministic output
-  metrics.sort((a: FlagMetric, b: FlagMetric) => a.name.localeCompare(b.name));
+  const newMetrics = getPossibleFlagMetrics(cliOptions);
+  const mergedMetrics = applyToExisting<FlagMetric>(
+    existingMetrics,
+    newMetrics,
+  );
 
-  fs.writeFileSync(outputPath, JSON.stringify(metrics, null, 2) + '\n');
+  fs.writeFileSync(outputPath, JSON.stringify(mergedMetrics, null, 2) + '\n');
 
   console.log(
-    `Successfully wrote ${metrics.length} flag usage metrics to ${outputPath}`,
+    `Successfully wrote ${mergedMetrics.length} flag usage metrics to ${outputPath}`,
   );
 }
 
