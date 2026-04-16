@@ -4,12 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
-  zod,
-  ajv,
-  type JSONSchema7,
-  type ElementHandle,
-} from '../third_party/index.js';
+import {zod, ajv, type JSONSchema7} from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
 import {definePageTool} from './ToolDefinition.js';
@@ -32,6 +27,7 @@ declare global {
       toolGroup?: ToolGroup<
         ToolDefinition & {execute: (args: Record<string, unknown>) => unknown}
       >;
+      stashedElements?: Element[];
       executeTool?: (
         toolName: string,
         args: Record<string, unknown>,
@@ -75,7 +71,7 @@ export const executeInPageTool = definePageTool({
       .optional()
       .describe('The JSON-stringified parameters to pass to the tool'),
   },
-  handler: async (request, response) => {
+  handler: async (request, response, context) => {
     const toolName = request.params.toolName;
     let params: Record<string, unknown> = {};
     if (request.params.params) {
@@ -89,22 +85,6 @@ export const executeInPageTool = definePageTool({
       } catch (e) {
         const errorMessage = e instanceof Error ? e.message : String(e);
         throw new Error(`Failed to parse params as JSON: ${errorMessage}`);
-      }
-    }
-
-    // Creates array of ElementHandles from the UIDs in the params.
-    // We do not replace the uids with the ElementsHandles yet, because
-    // the `evaluate` function only turns them into DOM elements if they
-    // are passed as non-nested arguments.
-    const handles: ElementHandle[] = [];
-    for (const value of Object.values(params)) {
-      if (
-        value instanceof Object &&
-        'uid' in value &&
-        typeof value.uid === 'string' &&
-        Object.keys(value).length === 1
-      ) {
-        handles.push(await request.page.getElementByUid(value.uid));
       }
     }
 
@@ -122,33 +102,6 @@ export const executeInPageTool = definePageTool({
       );
     }
 
-    const result = await request.page.pptrPage.evaluate(
-      async (name, args, ...elements) => {
-        // Replace the UIDs with DOM elements.
-        for (const [key, value] of Object.entries(args)) {
-          if (
-            value instanceof Object &&
-            'uid' in value &&
-            typeof value.uid === 'string' &&
-            Object.keys(value).length === 1
-          ) {
-            args[key] = elements.shift();
-          }
-        }
-
-        if (!window.__dtmcp?.executeTool) {
-          throw new Error('No tools found on the page');
-        }
-        const toolResult = await window.__dtmcp.executeTool(name, args);
-
-        return {
-          result: toolResult,
-        };
-      },
-      toolName,
-      params,
-      ...handles,
-    );
-    response.appendResponseLine(JSON.stringify(result, null, 2));
+    await request.page.executeInPageTool(toolName, params, response, context);
   },
 });

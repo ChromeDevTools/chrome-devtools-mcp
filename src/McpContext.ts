@@ -31,8 +31,8 @@ import type {
   Target,
   Extension,
 } from './third_party/index.js';
-import type {DevTools} from './third_party/index.js';
-import {Locator} from './third_party/index.js';
+import type {DevTools, Protocol} from './third_party/index.js';
+import {Locator, type ElementHandle} from './third_party/index.js';
 import {PredefinedNetworkConditions} from './third_party/index.js';
 import {listPages} from './tools/pages.js';
 import {CLOSE_PAGE_ERROR} from './tools/ToolDefinition.js';
@@ -691,6 +691,7 @@ export class McpContext implements Context {
     page: McpPage,
     verbose = false,
     devtoolsData: DevToolsData | undefined = undefined,
+    extraHandles: ElementHandle[] = [],
   ): Promise<void> {
     const rootNode = await page.pptrPage.accessibility.snapshot({
       includeIframes: true,
@@ -708,10 +709,13 @@ export class McpContext implements Context {
     let idCounter = 0;
     const idToNode = new Map<string, TextSnapshotNode>();
     const seenUniqueIds = new Set<string>();
+    const seenBackendNodeIds = new Set<number>();
     const assignIds = (node: SerializedAXNode): TextSnapshotNode => {
       let id = '';
-      // @ts-expect-error untyped loaderId & backendNodeId.
-      const uniqueBackendId = `${node.loaderId}_${node.backendNodeId}`;
+      // @ts-expect-error untyped backendNodeId.
+      const backendNodeId: number = node.backendNodeId;
+      // @ts-expect-error untyped loaderId.
+      const uniqueBackendId = `${node.loaderId}_${backendNodeId}`;
       if (uniqueBackendNodeIdToMcpId.has(uniqueBackendId)) {
         // Re-use MCP exposed ID if the uniqueId is the same.
         id = uniqueBackendNodeIdToMcpId.get(uniqueBackendId)!;
@@ -721,6 +725,7 @@ export class McpContext implements Context {
         uniqueBackendNodeIdToMcpId.set(uniqueBackendId, id);
       }
       seenUniqueIds.add(uniqueBackendId);
+      seenBackendNodeIds.add(backendNodeId);
 
       const nodeWithId: TextSnapshotNode = {
         ...node,
@@ -744,6 +749,18 @@ export class McpContext implements Context {
     };
 
     const rootNodeWithId = assignIds(rootNode);
+
+    await this.#insertExtraNodes(
+      page,
+      idToNode,
+      seenUniqueIds,
+      snapshotId,
+      idCounter,
+      rootNodeWithId,
+      seenBackendNodeIds,
+      extraHandles,
+    );
+
     const snapshot: TextSnapshot = {
       root: rootNodeWithId,
       snapshotId: String(snapshotId),
@@ -764,6 +781,172 @@ export class McpContext implements Context {
     for (const key of uniqueBackendNodeIdToMcpId.keys()) {
       if (!seenUniqueIds.has(key)) {
         uniqueBackendNodeIdToMcpId.delete(key);
+      }
+    }
+  }
+
+  // ExtraHandles represent DOM nodes which might not be part of the accessibility tree, e.g. DOM nodes
+  // returned by in-page tools. We insert them into the tree by finding the closest ancestor in the
+  // tree and inserting the node as a child. The ancestor's child nodes are re-parented if necessary.
+  async #insertExtraNodes(
+    page: McpPage,
+    idToNode: Map<string, TextSnapshotNode>,
+    seenUniqueIds: Set<string>,
+    snapshotId: number,
+    idCounter: number,
+    rootNodeWithId: TextSnapshotNode,
+    seenBackendNodeIds: Set<number>,
+    extraHandles: ElementHandle[],
+  ): Promise<void> {
+    const {uniqueBackendNodeIdToMcpId} = page;
+
+    const createExtraNode = async (
+      handle: ElementHandle,
+    ): Promise<TextSnapshotNode | null> => {
+      const backendNodeId = await handle.backendNodeId();
+      if (!backendNodeId || seenBackendNodeIds.has(backendNodeId)) {
+        return null;
+      }
+      const uniqueBackendId = `custom_${backendNodeId}`;
+      if (seenUniqueIds.has(uniqueBackendId)) {
+        return null;
+      }
+      seenBackendNodeIds.add(backendNodeId);
+
+      let id = '';
+      const mcpId = uniqueBackendNodeIdToMcpId.get(uniqueBackendId);
+      if (mcpId !== undefined) {
+        id = mcpId;
+      } else {
+        id = `${snapshotId}_${idCounter++}`;
+        uniqueBackendNodeIdToMcpId.set(uniqueBackendId, id);
+      }
+      seenUniqueIds.add(uniqueBackendId);
+
+      const tagHandle = await handle.getProperty('localName');
+      const tagValue = await tagHandle.jsonValue();
+      const extraNode: TextSnapshotNode = {
+        role: tagValue,
+        id,
+        backendNodeId,
+        children: [],
+        elementHandle: async () => handle,
+      };
+      return extraNode;
+    };
+
+    const findAncestorNode = async (
+      handle: ElementHandle,
+    ): Promise<TextSnapshotNode | null> => {
+      let ancestorHandle = await handle.evaluateHandle(el => el.parentElement);
+
+      while (ancestorHandle) {
+        const ancestorElement = ancestorHandle.asElement();
+        if (!ancestorElement) {
+          await ancestorHandle.dispose();
+          return null;
+        }
+
+        const ancestorBackendId = await ancestorElement.backendNodeId();
+        if (ancestorBackendId) {
+          const ancestorNode = idToNode
+            .values()
+            .find(node => node.backendNodeId === ancestorBackendId);
+          if (ancestorNode) {
+            await ancestorHandle.dispose();
+            return ancestorNode;
+          }
+        }
+
+        const nextHandle = await ancestorElement.evaluateHandle(
+          el => el.parentElement,
+        );
+        await ancestorHandle.dispose();
+        ancestorHandle = nextHandle;
+      }
+      return null;
+    };
+
+    const findDescendantNodes = async (
+      backendNodeId: number,
+    ): Promise<Set<number>> => {
+      const descendantIds = new Set<number>();
+      try {
+        // @ts-expect-error internal API
+        const client = page.pptrPage._client();
+        if (client) {
+          const {node}: {node: Protocol.DOM.Node} = await client.send(
+            'DOM.describeNode',
+            {
+              backendNodeId,
+              depth: -1,
+              pierce: true,
+            },
+          );
+          const collect = (node: Protocol.DOM.Node) => {
+            if (node.backendNodeId && node.backendNodeId !== backendNodeId) {
+              descendantIds.add(node.backendNodeId);
+            }
+            if (node.children) {
+              for (const child of node.children) {
+                collect(child);
+              }
+            }
+          };
+          collect(node);
+        }
+      } catch (e) {
+        this.logger(
+          `Failed to collect descendants for backend node ${backendNodeId}`,
+          e,
+        );
+      }
+      return descendantIds;
+    };
+
+    const moveChildNodes = (
+      attachTarget: TextSnapshotNode,
+      extraNode: TextSnapshotNode,
+      descendantIds: Set<number>,
+    ): number => {
+      let firstMovedIndex = -1;
+      if (descendantIds.size > 0 && attachTarget.children) {
+        const remainingChildren: TextSnapshotNode[] = [];
+        for (const child of attachTarget.children) {
+          if (child.backendNodeId && descendantIds.has(child.backendNodeId)) {
+            if (firstMovedIndex === -1) {
+              firstMovedIndex = remainingChildren.length;
+            }
+            extraNode.children.push(child);
+          } else {
+            remainingChildren.push(child);
+          }
+        }
+        attachTarget.children = remainingChildren;
+      }
+      return firstMovedIndex !== -1
+        ? firstMovedIndex
+        : attachTarget.children
+          ? attachTarget.children.length
+          : 0;
+    };
+
+    if (extraHandles.length) {
+      page.extraHandles = extraHandles;
+    }
+    for (const handle of page.extraHandles) {
+      const extraNode = await createExtraNode(handle);
+      if (!extraNode) {
+        continue;
+      }
+      idToNode.set(extraNode.id, extraNode);
+      const attachTarget = (await findAncestorNode(handle)) || rootNodeWithId;
+      if (extraNode.backendNodeId !== undefined) {
+        const descendantIds = await findDescendantNodes(
+          extraNode.backendNodeId,
+        );
+        const index = moveChildNodes(attachTarget, extraNode, descendantIds);
+        attachTarget.children.splice(index, 0, extraNode);
       }
     }
   }
