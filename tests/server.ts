@@ -95,6 +95,7 @@ export class TestServer {
 
   stop(): Promise<void> {
     return new Promise((res, rej) => {
+      this.#server.closeAllConnections();
       this.#server.close(err => {
         if (err) {
           rej(err);

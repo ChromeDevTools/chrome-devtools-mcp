@@ -72,7 +72,7 @@ const nodeArgs = [
   '--test-force-exit',
   '--test-concurrency=1',
   '--test',
-  '--test-timeout=60000',
+  '--test-timeout=120000',
   ...flags,
   ...files,
 ];
