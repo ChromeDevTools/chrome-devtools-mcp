@@ -316,7 +316,7 @@ function converNetworkRequestDetailedToStringDetailed(
     let indent = 0;
     for (const request of redirectChain.reverse()) {
       response.push(
-        `${'  '.repeat(indent)}${convertNetworkRequestConciseToString(request)})}`,
+        `${'  '.repeat(indent)}${convertNetworkRequestConciseToString(request)}`,
       );
       indent++;
     }

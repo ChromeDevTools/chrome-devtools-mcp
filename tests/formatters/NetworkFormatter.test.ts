@@ -291,7 +291,7 @@ describe('NetworkFormatter', () => {
       assert.match(result, /"response":"body"/);
     });
 
-    it('handles redirect chain', async () => {
+    it('handles redirect chain', async (t) => {
       const redirectRequest = getMockRequest({
         url: 'http://example.com/redirect',
       });
@@ -305,8 +305,7 @@ describe('NetworkFormatter', () => {
         redactNetworkHeaders: false,
       });
       const result = formatter.toStringDetailed();
-      assert.match(result, /Redirect chain/);
-      assert.match(result, /reqid=2/);
+      t.assert.snapshot?.(result);
     });
     it('shows saved to file message in toStringDetailed', async () => {
       const request = {
