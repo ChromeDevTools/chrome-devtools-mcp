@@ -9,6 +9,7 @@ import type {
   ElementHandle,
   Page,
   Viewport,
+  WebMCPTool,
 } from './third_party/index.js';
 import type {ToolGroup, ToolDefinition} from './tools/inPage.js';
 import {takeSnapshot} from './tools/snapshot.js';
@@ -76,6 +77,10 @@ export class McpPage implements ContextPage {
 
   getInPageTools(): ToolGroup<ToolDefinition> | undefined {
     return this.inPageTools;
+  }
+
+  getWebMcpTools(): WebMCPTool[] {
+    return this.pptrPage.webmcp.tools();
   }
 
   get networkConditions(): string | null {

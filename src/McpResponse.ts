@@ -502,7 +502,7 @@ export class McpResponse implements Response {
     let webmcpTools: WebMCPTool[] | undefined;
     if (this.#listWebMcpTools && this.#args.experimentalWebmcp) {
       const page = this.#page ?? context.getSelectedMcpPage();
-      webmcpTools = context.getWebMcpTools(page);
+      webmcpTools = page.getWebMcpTools();
     }
 
     let consoleMessages: Array<ConsoleFormatter | IssueFormatter> | undefined;

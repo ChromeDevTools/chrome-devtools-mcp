@@ -7,8 +7,6 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
-import type {WebMCPTool} from 'puppeteer-core';
-
 import type {TargetUniverse} from './DevtoolsUtils.js';
 import {UniverseManager} from './DevtoolsUtils.js';
 import {McpPage} from './McpPage.js';
@@ -222,10 +220,6 @@ export class McpContext implements Context {
       page.pptrPage,
       includePreservedMessages,
     );
-  }
-
-  getWebMcpTools(page: McpPage): WebMCPTool[] {
-    return page.pptrPage.webmcp.tools();
   }
 
   getDevToolsUniverse(page: McpPage): TargetUniverse | null {
