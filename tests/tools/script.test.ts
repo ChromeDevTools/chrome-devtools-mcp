@@ -121,6 +121,52 @@ describe('script', () => {
       });
     });
 
+    it('work for scripts that trigger dialogs and dismiss them', async () => {
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedPptrPage();
+
+        await page.setContent(html`<button id="test">test</button>`);
+
+        await evaluateScript().handler(
+          {
+            params: {
+              function: String(() => {
+                return confirm('hello');
+              }),
+              dialogAction: 'dismiss',
+            },
+          },
+          response,
+          context,
+        );
+        const lineEvaluation = response.responseLines.at(2)!;
+        assert.strictEqual(JSON.parse(lineEvaluation), false);
+      });
+    });
+
+    it('work for scripts that trigger prompts and fill them', async () => {
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedPptrPage();
+
+        await page.setContent(html`<button id="test">test</button>`);
+
+        await evaluateScript().handler(
+          {
+            params: {
+              function: String(() => {
+                return prompt('Enter your name:');
+              }),
+              dialogAction: 'John Doe',
+            },
+          },
+          response,
+          context,
+        );
+        const lineEvaluation = response.responseLines.at(2)!;
+        assert.strictEqual(JSON.parse(lineEvaluation), 'John Doe');
+      });
+    });
+
     it('work for async functions', async () => {
       await withMcpContext(async (response, context) => {
         const page = context.getSelectedPptrPage();

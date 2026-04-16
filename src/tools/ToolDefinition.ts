@@ -247,7 +247,7 @@ export type ContextPage = Readonly<{
   clearDialog(): void;
   waitForEventsAfterAction(
     action: () => Promise<unknown>,
-    options?: {timeout?: number; handleDialog?: boolean},
+    options?: {timeout?: number; handleDialog?: 'accept' | 'dismiss' | string},
   ): Promise<void>;
   getInPageTools(): ToolGroup<InPageToolDefinition> | undefined;
 }>;

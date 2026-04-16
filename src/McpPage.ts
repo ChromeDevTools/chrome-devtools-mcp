@@ -117,7 +117,7 @@ export class McpPage implements ContextPage {
 
   waitForEventsAfterAction(
     action: () => Promise<unknown>,
-    options?: {timeout?: number; handleDialog?: boolean},
+    options?: {timeout?: number; handleDialog?: 'accept' | 'dismiss' | string},
   ): Promise<void> {
     const helper = this.createWaitForHelper(
       this.cpuThrottlingRate,

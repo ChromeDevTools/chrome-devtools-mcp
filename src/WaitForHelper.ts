@@ -126,11 +126,17 @@ export class WaitForHelper {
 
   async waitForEventsAfterAction(
     action: () => Promise<unknown>,
-    options?: {timeout?: number; handleDialog?: boolean},
+    options?: {timeout?: number; handleDialog?: 'accept' | 'dismiss' | string},
   ): Promise<void> {
     if (options?.handleDialog) {
-      const dialogHandler = (dialog: Pick<Dialog, 'accept'>) => {
-        void dialog.accept();
+      const dialogHandler = (dialog: Pick<Dialog, 'accept' | 'dismiss'>) => {
+        if (options.handleDialog === 'dismiss') {
+          void dialog.dismiss();
+        } else if (options.handleDialog === 'accept') {
+          void dialog.accept();
+        } else {
+          void dialog.accept(options.handleDialog);
+        }
       };
       this.#page.on('dialog', dialogHandler);
       this.#abortController.signal.addEventListener('abort', () => {

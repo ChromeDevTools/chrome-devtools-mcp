@@ -46,6 +46,12 @@ Example with arguments: \`(el) => {
         )
         .optional()
         .describe(`An optional list of arguments to pass to the function.`),
+      dialogAction: zod
+        .string()
+        .optional()
+        .describe(
+          'Handle dialogs while execution. "accept", "dismiss", or a string for window.prompt. Defaults to accept.',
+        ),
       ...(cliArgs?.experimentalPageIdRouting ? pageIdSchema : {}),
       ...(cliArgs?.categoryExtensions
         ? {
@@ -64,6 +70,7 @@ Example with arguments: \`(el) => {
         args: uidArgs,
         function: fnString,
         pageId,
+        dialogAction,
       } = request.params;
 
       if (cliArgs?.categoryExtensions && serviceWorkerId) {
@@ -81,7 +88,7 @@ Example with arguments: \`(el) => {
           async () => {
             await performEvaluation(worker, fnString, [], response);
           },
-          {handleDialog: true},
+          {handleDialog: dialogAction ?? 'accept'},
         );
         return;
       }
@@ -106,7 +113,7 @@ Example with arguments: \`(el) => {
           async () => {
             await performEvaluation(evaluatable, fnString, args, response);
           },
-          {handleDialog: true},
+          {handleDialog: dialogAction ?? 'accept'},
         );
       } finally {
         void Promise.allSettled(args.map(arg => arg.dispose()));
