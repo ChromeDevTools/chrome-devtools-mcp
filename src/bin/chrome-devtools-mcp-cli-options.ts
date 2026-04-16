@@ -187,7 +187,8 @@ export const cliOptions = {
   },
   experimentalWebmcp: {
     type: 'boolean',
-    describe: 'Set to true to enable debugging WebMCP tools.',
+    describe:
+      'Set to true to enable debugging WebMCP tools. Requires Chrome 149+ with the following flags: `--enable-features=WebMCPTesting,DevToolsWebMCPSupport`',
   },
   chromeArg: {
     type: 'array',
