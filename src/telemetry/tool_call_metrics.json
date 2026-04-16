@@ -3,11 +3,11 @@
     "name": "click",
     "args": [
       {
-        "name": "dblClick",
+        "name": "dbl_click",
         "argType": "boolean"
       },
       {
-        "name": "includeSnapshot",
+        "name": "include_snapshot",
         "argType": "boolean"
       }
     ]
@@ -24,11 +24,11 @@
         "argType": "number"
       },
       {
-        "name": "dblClick",
+        "name": "dbl_click",
         "argType": "boolean"
       },
       {
-        "name": "includeSnapshot",
+        "name": "include_snapshot",
         "argType": "boolean"
       }
     ]
@@ -37,7 +37,7 @@
     "name": "close_page",
     "args": [
       {
-        "name": "pageId",
+        "name": "page_id",
         "argType": "number"
       }
     ]
@@ -54,7 +54,7 @@
         "argType": "number"
       },
       {
-        "name": "includeSnapshot",
+        "name": "include_snapshot",
         "argType": "boolean"
       }
     ]
@@ -63,11 +63,11 @@
     "name": "emulate",
     "args": [
       {
-        "name": "networkConditions",
+        "name": "network_conditions",
         "argType": "string"
       },
       {
-        "name": "cpuThrottlingRate",
+        "name": "cpu_throttling_rate",
         "argType": "number"
       },
       {
@@ -75,11 +75,11 @@
         "argType": "number"
       },
       {
-        "name": "userAgent_length",
+        "name": "user_agent_length",
         "argType": "number"
       },
       {
-        "name": "colorScheme",
+        "name": "color_scheme",
         "argType": "string"
       },
       {
@@ -114,7 +114,7 @@
     "name": "execute_in_page_tool",
     "args": [
       {
-        "name": "toolName_length",
+        "name": "tool_name_length",
         "argType": "number"
       },
       {
@@ -131,7 +131,7 @@
         "argType": "number"
       },
       {
-        "name": "includeSnapshot",
+        "name": "include_snapshot",
         "argType": "boolean"
       }
     ]
@@ -144,7 +144,7 @@
         "argType": "number"
       },
       {
-        "name": "includeSnapshot",
+        "name": "include_snapshot",
         "argType": "boolean"
       }
     ]
@@ -157,11 +157,11 @@
     "name": "get_network_request",
     "args": [
       {
-        "name": "requestFilePath_length",
+        "name": "request_file_path_length",
         "argType": "number"
       },
       {
-        "name": "responseFilePath_length",
+        "name": "response_file_path_length",
         "argType": "number"
       }
     ]
@@ -170,7 +170,7 @@
     "name": "get_tab_id",
     "args": [
       {
-        "name": "pageId",
+        "name": "page_id",
         "argType": "number"
       }
     ]
@@ -183,7 +183,7 @@
         "argType": "string"
       },
       {
-        "name": "promptText_length",
+        "name": "prompt_text_length",
         "argType": "number"
       }
     ]
@@ -192,7 +192,7 @@
     "name": "hover",
     "args": [
       {
-        "name": "includeSnapshot",
+        "name": "include_snapshot",
         "argType": "boolean"
       }
     ]
@@ -218,7 +218,7 @@
         "argType": "string"
       },
       {
-        "name": "outputDirPath_length",
+        "name": "output_dir_path_length",
         "argType": "number"
       }
     ]
@@ -227,11 +227,11 @@
     "name": "list_console_messages",
     "args": [
       {
-        "name": "pageSize",
+        "name": "page_size",
         "argType": "number"
       },
       {
-        "name": "pageIdx",
+        "name": "page_idx",
         "argType": "number"
       },
       {
@@ -239,7 +239,7 @@
         "argType": "number"
       },
       {
-        "name": "includePreservedMessages",
+        "name": "include_preserved_messages",
         "argType": "boolean"
       }
     ]
@@ -256,19 +256,19 @@
     "name": "list_network_requests",
     "args": [
       {
-        "name": "pageSize",
+        "name": "page_size",
         "argType": "number"
       },
       {
-        "name": "pageIdx",
+        "name": "page_idx",
         "argType": "number"
       },
       {
-        "name": "resourceTypes_count",
+        "name": "resource_types_count",
         "argType": "number"
       },
       {
-        "name": "includePreservedRequests",
+        "name": "include_preserved_requests",
         "argType": "boolean"
       }
     ]
@@ -298,15 +298,15 @@
         "argType": "number"
       },
       {
-        "name": "ignoreCache",
+        "name": "ignore_cache",
         "argType": "boolean"
       },
       {
-        "name": "handleBeforeUnload",
+        "name": "handle_before_unload",
         "argType": "string"
       },
       {
-        "name": "initScript_length",
+        "name": "init_script_length",
         "argType": "number"
       },
       {
@@ -327,7 +327,7 @@
         "argType": "boolean"
       },
       {
-        "name": "isolatedContext_length",
+        "name": "isolated_context_length",
         "argType": "number"
       },
       {
@@ -340,11 +340,11 @@
     "name": "performance_analyze_insight",
     "args": [
       {
-        "name": "insightSetId_length",
+        "name": "insight_set_id_length",
         "argType": "number"
       },
       {
-        "name": "insightName_length",
+        "name": "insight_name_length",
         "argType": "number"
       }
     ]
@@ -357,11 +357,11 @@
         "argType": "boolean"
       },
       {
-        "name": "autoStop",
+        "name": "auto_stop",
         "argType": "boolean"
       },
       {
-        "name": "filePath_length",
+        "name": "file_path_length",
         "argType": "number"
       }
     ]
@@ -370,7 +370,7 @@
     "name": "performance_stop_trace",
     "args": [
       {
-        "name": "filePath_length",
+        "name": "file_path_length",
         "argType": "number"
       }
     ]
@@ -383,7 +383,7 @@
         "argType": "number"
       },
       {
-        "name": "includeSnapshot",
+        "name": "include_snapshot",
         "argType": "boolean"
       }
     ]
@@ -431,11 +431,11 @@
     "name": "select_page",
     "args": [
       {
-        "name": "pageId",
+        "name": "page_id",
         "argType": "number"
       },
       {
-        "name": "bringToFront",
+        "name": "bring_to_front",
         "argType": "boolean"
       }
     ]
@@ -444,7 +444,7 @@
     "name": "take_memory_snapshot",
     "args": [
       {
-        "name": "filePath_length",
+        "name": "file_path_length",
         "argType": "number"
       }
     ]
@@ -461,11 +461,11 @@
         "argType": "number"
       },
       {
-        "name": "fullPage",
+        "name": "full_page",
         "argType": "boolean"
       },
       {
-        "name": "filePath_length",
+        "name": "file_path_length",
         "argType": "number"
       }
     ]
@@ -478,7 +478,7 @@
         "argType": "boolean"
       },
       {
-        "name": "filePath_length",
+        "name": "file_path_length",
         "argType": "number"
       }
     ]
@@ -500,7 +500,7 @@
         "argType": "number"
       },
       {
-        "name": "submitKey_length",
+        "name": "submit_key_length",
         "argType": "number"
       }
     ]
@@ -518,11 +518,11 @@
     "name": "upload_file",
     "args": [
       {
-        "name": "filePath_length",
+        "name": "file_path_length",
         "argType": "number"
       },
       {
-        "name": "includeSnapshot",
+        "name": "include_snapshot",
         "argType": "boolean"
       }
     ]

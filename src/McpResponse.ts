@@ -414,11 +414,12 @@ export class McpResponse implements Response {
       if (textSnapshot) {
         const formatter = new SnapshotFormatter(textSnapshot);
         if (this.#snapshotParams.filePath) {
-          await context.saveFile(
+          const result = await context.saveFile(
             new TextEncoder().encode(formatter.toString()),
             this.#snapshotParams.filePath,
+            '.txt',
           );
-          snapshot = this.#snapshotParams.filePath;
+          snapshot = result.filename;
         } else {
           snapshot = formatter;
         }
@@ -440,7 +441,8 @@ export class McpResponse implements Response {
         fetchData: true,
         requestFilePath: this.#attachedNetworkRequestOptions?.requestFilePath,
         responseFilePath: this.#attachedNetworkRequestOptions?.responseFilePath,
-        saveFile: (data, filename) => context.saveFile(data, filename),
+        saveFile: (data, filename, extension) =>
+          context.saveFile(data, filename, extension),
         redactNetworkHeaders: this.#redactNetworkHeaders,
       });
       detailedNetworkRequest = formatter;
@@ -590,7 +592,8 @@ export class McpResponse implements Response {
                 context.getNetworkRequestStableId(request) ===
                 this.#networkRequestsOptions?.networkRequestIdInDevToolsUI,
               fetchData: false,
-              saveFile: (data, filename) => context.saveFile(data, filename),
+              saveFile: (data, filename, extension) =>
+                context.saveFile(data, filename, extension),
               redactNetworkHeaders: this.#redactNetworkHeaders,
             }),
           ),

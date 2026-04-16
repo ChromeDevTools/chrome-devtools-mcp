@@ -22,6 +22,7 @@ export interface ToolInvocation {
   tool_name: string;
   success: boolean;
   latency_ms: number;
+  tool_params?: object;
 }
 
 export interface ServerStart {

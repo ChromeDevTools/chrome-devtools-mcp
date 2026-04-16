@@ -55,7 +55,7 @@ describe('toolMetricsUtils', () => {
       assert.strictEqual(metrics.length, 1);
       assert.strictEqual(metrics[0].name, 'test_tool');
       assert.strictEqual(metrics[0].args.length, 1); // uid is blocked
-      assert.strictEqual(metrics[0].args[0].name, 'argStr_length');
+      assert.strictEqual(metrics[0].args[0].name, 'arg_str_length');
       assert.strictEqual(metrics[0].args[0].argType, 'number');
     });
 
@@ -77,7 +77,7 @@ describe('toolMetricsUtils', () => {
 
       const metrics = generateToolMetrics([mockTool]);
       assert.strictEqual(metrics.length, 1);
-      assert.strictEqual(metrics[0].args[0].name, 'argEnum');
+      assert.strictEqual(metrics[0].args[0].name, 'arg_enum');
       assert.strictEqual(metrics[0].args[0].argType, 'string');
     });
   });
