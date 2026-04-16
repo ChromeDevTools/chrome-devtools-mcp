@@ -156,19 +156,16 @@ export const executeInPageTool = definePageTool({
           };
         };
 
+        const ancestors: unknown[] = [];
         // Recursively walks the tool result:
-        // - Replaces DOM elements with UIDs
-        // - Replaces functions with the string 'function'
-        // - Removes items which are deeper than cutoff
+        // - Replaces DOM elements with an ID and stashes the DOM element on the window object
+        // - Replaces non-plain-objects with a string representation of the object
+        // - Replaces circular references with the string '<Circular reference>'
+        // - Replaces functions with the string '<Function object>'
         const processToolResult = (
           data: unknown,
-          depth = 0,
-          cutoff = 8,
+          parentEl?: unknown,
         ): unknown => {
-          if (depth >= cutoff) {
-            return undefined;
-          }
-
           // 1. Handle DOM Elements
           if (data instanceof Element) {
             return stashDOMElement(data);
@@ -176,28 +173,36 @@ export const executeInPageTool = definePageTool({
 
           // 2. Handle Arrays
           if (Array.isArray(data)) {
-            if (depth >= cutoff - 1) {
-              return [];
-            }
             return data.map((item: unknown) =>
-              processToolResult(item, depth + 1, cutoff),
+              processToolResult(item, parentEl),
             );
           }
 
           // 3. Handle Objects
           if (data !== null && typeof data === 'object') {
+            while (ancestors.length > 0 && ancestors.at(-1) !== parentEl) {
+              ancestors.pop();
+            }
+            if (ancestors.includes(data)) {
+              return '<Circular reference>';
+            }
+            ancestors.push(data);
+
+            // If not a plain object, return a string representation of the object
+            if (Object.getPrototypeOf(data) !== Object.prototype) {
+              return `<${data.constructor.name} instance>`;
+            }
+
             const processedObj: Record<string, unknown> = {};
-            if (depth < cutoff - 1) {
-              for (const [key, value] of Object.entries(data)) {
-                processedObj[key] = processToolResult(value, depth + 1, cutoff);
-              }
+            for (const [key, value] of Object.entries(data)) {
+              processedObj[key] = processToolResult(value, data);
             }
             return processedObj;
           }
 
           // 4. Handle Functions
           if (typeof data === 'function') {
-            return 'function';
+            return '<Function object>';
           }
 
           // 5. Return primitives (strings, numbers, booleans) as-is
