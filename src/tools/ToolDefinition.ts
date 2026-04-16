@@ -100,12 +100,16 @@ export interface DevToolsData {
 
 export interface Response {
   appendResponseLine(value: string): void;
-  setHeapSnapshot(
+  setHeapSnapshotAggregates(
     aggregates: Record<
       string,
       DevTools.HeapSnapshotModel.HeapSnapshotModel.AggregatedInfo
     >,
     options?: PaginationOptions,
+  ): void;
+  setHeapSnapshotStats(
+    stats: DevTools.HeapSnapshotModel.HeapSnapshotModel.Statistics,
+    staticData: DevTools.HeapSnapshotModel.HeapSnapshotModel.StaticData | null,
   ): void;
   setIncludePages(value: boolean): void;
   setIncludeNetworkRequests(
@@ -221,9 +225,13 @@ export type Context = Readonly<{
   getExtensionServiceWorkerId(
     extensionServiceWorker: ExtensionServiceWorker,
   ): string | undefined;
-  getHeapSnapshotProxy(
-    heapsnapshotPath: string,
-  ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotProxy.HeapSnapshotProxy>;
+  getHeapSnapshotAggregates(
+    filePath: string,
+  ): Promise<
+    Record<string, DevTools.HeapSnapshotModel.HeapSnapshotModel.AggregatedInfo>
+  >;
+  getHeapSnapshotStats(filePath: string): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.Statistics>;
+  getHeapSnapshotStaticData(filePath: string): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.StaticData | null>;
 }>;
 
 export type ContextPage = Readonly<{

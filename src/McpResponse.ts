@@ -171,11 +171,13 @@ export class McpResponse implements Response {
   #images: ImageContentData[] = [];
   #heapSnapshotOptions?: {
     include: boolean;
-    aggregates: Record<
+    aggregates?: Record<
       string,
       DevTools.HeapSnapshotModel.HeapSnapshotModel.AggregatedInfo
     >;
     pagination?: PaginationOptions;
+    stats?: DevTools.HeapSnapshotModel.HeapSnapshotModel.Statistics;
+    staticData?: DevTools.HeapSnapshotModel.HeapSnapshotModel.StaticData | null;
   };
   #networkRequestsOptions?: {
     include: boolean;
@@ -374,7 +376,7 @@ export class McpResponse implements Response {
     this.#textResponseLines.push(value);
   }
 
-  setHeapSnapshot(
+  setHeapSnapshotAggregates(
     aggregates: Record<
       string,
       DevTools.HeapSnapshotModel.HeapSnapshotModel.AggregatedInfo
@@ -382,9 +384,22 @@ export class McpResponse implements Response {
     options?: PaginationOptions,
   ) {
     this.#heapSnapshotOptions = {
+      ...this.#heapSnapshotOptions,
       include: true,
       aggregates,
       pagination: options,
+    };
+  }
+
+  setHeapSnapshotStats(
+    stats: DevTools.HeapSnapshotModel.HeapSnapshotModel.Statistics,
+    staticData: DevTools.HeapSnapshotModel.HeapSnapshotModel.StaticData | null,
+  ) {
+    this.#heapSnapshotOptions = {
+      ...this.#heapSnapshotOptions,
+      include: true,
+      stats,
+      staticData,
     };
   }
 
@@ -685,6 +700,8 @@ export class McpResponse implements Response {
       pages?: object[];
       pagination?: object;
       heapSnapshot?: object[];
+      heapSnapshotStats?: object;
+      heapSnapshotStaticData?: object;
       extensionServiceWorkers?: object[];
       extensionPages?: object[];
     } = {};
@@ -882,23 +899,35 @@ Call ${handleDialog.name} to handle it before continuing.`);
     }
 
     if (this.#heapSnapshotOptions?.include) {
+      const stats = this.#heapSnapshotOptions.stats;
+      const staticData = this.#heapSnapshotOptions.staticData;
+      if (stats) {
+        response.push(`Statistics: ${JSON.stringify(stats, null, 2)}`);
+        structuredContent.heapSnapshotStats = stats;
+      }
+      if (staticData) {
+        response.push(`Static Data: ${JSON.stringify(staticData, null, 2)}`);
+        structuredContent.heapSnapshotStaticData = staticData;
+      }
       const aggregates = this.#heapSnapshotOptions.aggregates;
-      const entries = Object.entries(aggregates);
-      const sortedEntries = entries.sort((a, b) => b[1].self - a[1].self);
+      if (aggregates) {
+        const entries = Object.entries(aggregates);
+        const sortedEntries = entries.sort((a, b) => b[1].self - a[1].self);
 
-      const paginationData = this.#dataWithPagination(
-        sortedEntries,
-        this.#heapSnapshotOptions.pagination,
-      );
+        const paginationData = this.#dataWithPagination(
+          sortedEntries,
+          this.#heapSnapshotOptions.pagination,
+        );
 
-      structuredContent.pagination = paginationData.pagination;
-      response.push(...paginationData.info);
+        structuredContent.pagination = paginationData.pagination;
+        response.push(...paginationData.info);
 
-      const paginatedRecord = Object.fromEntries(paginationData.items);
-      const formatter = new HeapSnapshotFormatter(paginatedRecord);
+        const paginatedRecord = Object.fromEntries(paginationData.items);
+        const formatter = new HeapSnapshotFormatter(paginatedRecord);
 
-      response.push(formatter.toString());
-      structuredContent.heapSnapshot = formatter.toJSON();
+        response.push(formatter.toString());
+        structuredContent.heapSnapshot = formatter.toJSON();
+      }
     }
 
     if (data.detailedNetworkRequest) {

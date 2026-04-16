@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {zod, DevTools} from '../third_party/index.js';
+import {zod} from '../third_party/index.js';
 import {ensureExtension} from '../utils/files.js';
 
 import {ToolCategory} from './categories.js';
@@ -36,35 +36,22 @@ export const takeMemorySnapshot = definePageTool({
 });
 
 export const exploreMemorySnapshot = defineTool({
-  name: 'explored_memory_snapshot',
-  description: 'Explose ',
+  name: 'load_memory_snapshot',
+  description:
+    'Loads a memory heapsnapshot and returns snapshot summary stats.  ',
   annotations: {
     category: ToolCategory.PERFORMANCE,
     readOnlyHint: true,
   },
   schema: {
     filePath: zod.string().describe('A path to a .heapsnapshot file to read.'),
-    pageSize: zod.number().optional().describe('Page size for pagination.'),
-    pageIdx: zod.number().optional().describe('Page index for pagination.'),
   },
   handler: async (request, response, context) => {
-    const snapshot = await context.getHeapSnapshotProxy(
+    const stats = await context.getHeapSnapshotStats(request.params.filePath);
+    const staticData = await context.getHeapSnapshotStaticData(
       request.params.filePath,
     );
-    const stats = await snapshot.getStatistics();
 
-    response.appendResponseLine(
-      `Statistics: ${JSON.stringify(stats, null, 2)}`,
-    );
-    response.appendResponseLine(
-      `Static Data: ${JSON.stringify(snapshot.staticData, null, 2)}`,
-    );
-
-    const filter =
-      new DevTools.HeapSnapshotModel.HeapSnapshotModel.NodeFilter();
-    const aggregates = await snapshot.aggregatesWithFilter(filter);
-
-    const {pageSize, pageIdx} = request.params;
-    response.setHeapSnapshot(aggregates, {pageSize, pageIdx});
+    response.setHeapSnapshotStats(stats, staticData);
   },
 });

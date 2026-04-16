@@ -4,12 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import fsSync from 'node:fs';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
 import type {TargetUniverse} from './DevtoolsUtils.js';
 import {UniverseManager} from './DevtoolsUtils.js';
+import {HeapSnapshotManager} from './HeapSnapshotManager.js';
 import {McpPage} from './McpPage.js';
 import {
   NetworkCollector,
@@ -29,7 +29,7 @@ import type {
   Viewport,
   Target,
 } from './third_party/index.js';
-import {DevTools} from './third_party/index.js';
+import type {DevTools} from './third_party/index.js';
 import {Locator} from './third_party/index.js';
 import {PredefinedNetworkConditions} from './third_party/index.js';
 import {listPages} from './tools/pages.js';
@@ -100,6 +100,7 @@ export class McpContext implements Context {
 
   #locatorClass: typeof Locator;
   #options: McpContextOptions;
+  #heapSnapshotManager = new HeapSnapshotManager();
 
   private constructor(
     browser: Browser,
@@ -915,44 +916,23 @@ export class McpContext implements Context {
     return this.#extensionRegistry.getById(id);
   }
 
-  async getHeapSnapshotProxy(
-    heapsnapshotPath: string,
-  ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotProxy.HeapSnapshotProxy> {
-    const workerProxy =
-      new DevTools.HeapSnapshotModel.HeapSnapshotProxy.HeapSnapshotWorkerProxy(
-        () => {
-          /* noop */
-        },
-        import.meta.resolve('./third_party/devtools-heap-snapshot-worker.js'),
-      );
+  async getHeapSnapshotAggregates(
+    filePath: string,
+  ): Promise<
+    Record<string, DevTools.HeapSnapshotModel.HeapSnapshotModel.AggregatedInfo>
+  > {
+    return await this.#heapSnapshotManager.getAggregates(filePath);
+  }
 
-    const absolutePath = path.resolve(heapsnapshotPath);
+  async getHeapSnapshotStats(
+    filePath: string,
+  ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.Statistics> {
+    return await this.#heapSnapshotManager.getStats(filePath);
+  }
 
-    const {promise: snapshotPromise, resolve: resolveSnapshot} =
-      Promise.withResolvers<DevTools.HeapSnapshotModel.HeapSnapshotProxy.HeapSnapshotProxy>();
-
-    const loaderProxy = workerProxy.createLoader(1, snapshotProxy => {
-      resolveSnapshot(snapshotProxy);
-    });
-
-    const fileStream = fsSync.createReadStream(absolutePath, {
-      encoding: 'utf-8',
-      highWaterMark: 1024 * 1024,
-    });
-
-    for await (const chunk of fileStream) {
-      await loaderProxy.write(chunk);
-    }
-
-    await loaderProxy.close();
-
-    const snapshot = await snapshotPromise;
-
-    //TODO Figure ot how to dispose the workeProxy.
-    // Also the snapshot methods hangs if the workerProxy is
-    // duposed instead of throwing
-
-    // workerProxy.dispose();
-    return snapshot;
+  async getHeapSnapshotStaticData(
+    filePath: string,
+  ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.StaticData | null> {
+    return await this.#heapSnapshotManager.getStaticData(filePath);
   }
 }
