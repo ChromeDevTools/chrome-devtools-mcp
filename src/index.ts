@@ -164,6 +164,12 @@ export async function createMcpServer(
     ) {
       return;
     }
+    if (
+      tool.annotations.conditions?.includes('experimentalWebmcp') &&
+      !serverArgs.experimentalWebmcp
+    ) {
+      return;
+    }
     const schema =
       'pageScoped' in tool &&
       tool.pageScoped &&

@@ -22,6 +22,7 @@ import * as scriptTools from './script.js';
 import * as slimTools from './slim/tools.js';
 import * as snapshotTools from './snapshot.js';
 import type {ToolDefinition} from './ToolDefinition.js';
+import * as webmcpTools from './webmcp.js';
 
 export const createTools = (args: ParsedArguments) => {
   const rawTools = args.slim
@@ -41,6 +42,7 @@ export const createTools = (args: ParsedArguments) => {
         ...Object.values(screenshotTools),
         ...Object.values(scriptTools),
         ...Object.values(snapshotTools),
+        ...Object.values(webmcpTools),
       ];
 
   const tools = [];

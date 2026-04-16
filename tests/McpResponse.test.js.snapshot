@@ -1281,3 +1281,113 @@ exports[`lighthouse > includes lighthouse report paths 2`] = `
   }
 }
 `;
+
+exports[`webmcp > includes webmcp tools in list_pages response 1`] = `
+## Pages
+1: about:blank [selected]
+## WebMCP tools
+name="test_tool", description="A test tool", inputSchema={}, annotations=undefined
+`;
+
+exports[`webmcp > includes webmcp tools in list_pages response 2`] = `
+{
+  "pages": [
+    {
+      "id": 1,
+      "url": "about:blank",
+      "selected": true
+    }
+  ],
+  "webmcpTools": [
+    {
+      "name": "test_tool",
+      "description": "A test tool",
+      "inputSchema": {}
+    }
+  ]
+}
+`;
+
+exports[`webmcp > includes webmcp tools in navigate_page response 1`] = `
+Successfully navigated to about:blank.
+## Pages
+1: about:blank [selected]
+## WebMCP tools
+name="test_tool", description="A test tool", inputSchema={}, annotations=undefined
+`;
+
+exports[`webmcp > includes webmcp tools in navigate_page response 2`] = `
+{
+  "message": "Successfully navigated to about:blank.",
+  "pages": [
+    {
+      "id": 1,
+      "url": "about:blank",
+      "selected": true
+    }
+  ],
+  "webmcpTools": [
+    {
+      "name": "test_tool",
+      "description": "A test tool",
+      "inputSchema": {}
+    }
+  ]
+}
+`;
+
+exports[`webmcp > includes webmcp tools in select_page response 1`] = `
+## Pages
+1: about:blank [selected]
+## WebMCP tools
+name="test_tool", description="A test tool", inputSchema={}, annotations=undefined
+`;
+
+exports[`webmcp > includes webmcp tools in select_page response 2`] = `
+{
+  "pages": [
+    {
+      "id": 1,
+      "url": "about:blank",
+      "selected": true
+    }
+  ],
+  "webmcpTools": [
+    {
+      "name": "test_tool",
+      "description": "A test tool",
+      "inputSchema": {}
+    }
+  ]
+}
+`;
+
+exports[`webmcp > list no webmcp tools if experimentalWebmcp is false 1`] = `
+Successfully navigated to about:blank.
+## Pages
+1: about:blank [selected]
+`;
+
+exports[`webmcp > list no webmcp tools if experimentalWebmcp is false 2`] = `
+{
+  "message": "Successfully navigated to about:blank.",
+  "pages": [
+    {
+      "id": 1,
+      "url": "about:blank",
+      "selected": true
+    }
+  ]
+}
+`;
+
+exports[`webmcp > list no webmcp tools if there are none 1`] = `
+## WebMCP tools
+No WebMCP tools available.
+`;
+
+exports[`webmcp > list no webmcp tools if there are none 2`] = `
+{
+  "webmcpTools": []
+}
+`;

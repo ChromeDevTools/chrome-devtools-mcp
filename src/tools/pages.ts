@@ -28,6 +28,7 @@ export const listPages = defineTool(args => {
     handler: async (_request, response) => {
       response.setIncludePages(true);
       response.setListInPageTools();
+      response.setListWebMcpTools();
     },
   };
 });
@@ -55,6 +56,7 @@ export const selectPage = defineTool({
     context.selectPage(page);
     response.setIncludePages(true);
     response.setListInPageTools();
+    response.setListWebMcpTools();
     if (request.params.bringToFront) {
       await page.pptrPage.bringToFront();
     }
@@ -280,6 +282,7 @@ export const navigatePage = definePageTool({
 
     response.setIncludePages(true);
     response.setListInPageTools();
+    response.setListWebMcpTools();
   },
 });
 

@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type {WebMCPTool} from 'puppeteer-core';
+
 import type {ParsedArguments} from './bin/chrome-devtools-mcp-cli-options.js';
 import {ConsoleFormatter} from './formatters/ConsoleFormatter.js';
 import {IssueFormatter} from './formatters/IssueFormatter.js';
@@ -181,6 +183,7 @@ export class McpResponse implements Response {
   };
   #listExtensions?: boolean;
   #listInPageTools?: boolean;
+  #listWebMcpTools?: boolean;
   #devToolsData?: DevToolsData;
   #tabId?: string;
   #args: ParsedArguments;
@@ -230,6 +233,10 @@ export class McpResponse implements Response {
     if (this.#args.categoryInPageTools) {
       this.#listInPageTools = true;
     }
+  }
+
+  setListWebMcpTools(): void {
+    this.#listWebMcpTools = true;
   }
 
   setIncludeNetworkRequests(
@@ -374,6 +381,10 @@ export class McpResponse implements Response {
     return this.#snapshotParams;
   }
 
+  get listWebMcpTools(): boolean | undefined {
+    return this.#listWebMcpTools;
+  }
+
   async handle(
     toolName: string,
     context: McpContext,
@@ -490,6 +501,12 @@ export class McpResponse implements Response {
       page.inPageTools = inPageTools;
     }
 
+    let webmcpTools: WebMCPTool[] | undefined;
+    if (this.#listWebMcpTools && this.#args.experimentalWebmcp) {
+      const page = this.#page ?? context.getSelectedMcpPage();
+      webmcpTools = page.getWebMcpTools();
+    }
+
     let consoleMessages: Array<ConsoleFormatter | IssueFormatter> | undefined;
     if (this.#consoleDataOptions?.include) {
       if (!this.#page) {
@@ -595,6 +612,7 @@ export class McpResponse implements Response {
       extensions,
       lighthouseResult: this.#attachedLighthouseResult,
       inPageTools,
+      webmcpTools,
     });
   }
 
@@ -612,6 +630,7 @@ export class McpResponse implements Response {
       extensions?: InstalledExtension[];
       lighthouseResult?: LighthouseData;
       inPageTools?: ToolGroup<ToolDefinition>;
+      webmcpTools?: WebMCPTool[];
     },
   ): {content: Array<TextContent | ImageContent>; structuredContent: object} {
     const structuredContent: {
@@ -627,6 +646,7 @@ export class McpResponse implements Response {
       lighthouseResult?: object;
       extensions?: object[];
       inPageTools?: object;
+      webmcpTools?: object[];
       message?: string;
       networkConditions?: string;
       navigationTimeout?: number;
@@ -881,6 +901,30 @@ Call ${handleDialog.name} to handle it before continuing.`);
           })
           .join('\n');
         response.push(toolDefinitionsMessage);
+      }
+    }
+
+    if (this.#listWebMcpTools && data.webmcpTools) {
+      structuredContent.webmcpTools = data.webmcpTools.map(
+        ({name, description, inputSchema, annotations}) => ({
+          name,
+          description,
+          inputSchema,
+          annotations,
+        }),
+      );
+      response.push('## WebMCP tools');
+      if (data.webmcpTools.length === 0) {
+        response.push('No WebMCP tools available.');
+      } else {
+        const webmcpToolsMessage = data.webmcpTools
+          .map(tool => {
+            return `name="${tool.name}", description="${tool.description}", inputSchema=${JSON.stringify(
+              tool.inputSchema,
+            )}, annotations=${JSON.stringify(tool.annotations)}`;
+          })
+          .join('\n');
+        response.push(webmcpToolsMessage);
       }
     }
 
