@@ -8,7 +8,10 @@ import assert from 'node:assert/strict';
 import {describe, it} from 'node:test';
 
 import type {cliOptions} from '../../src/bin/chrome-devtools-mcp-cli-options.js';
-import {computeFlagUsage} from '../../src/telemetry/flagUtils.js';
+import {
+  computeFlagUsage,
+  getPossibleFlagMetrics,
+} from '../../src/telemetry/flagUtils.js';
 
 describe('computeFlagUsage', () => {
   const mockOptions = {
@@ -103,5 +106,39 @@ describe('computeFlagUsage', () => {
       const usage = computeFlagUsage(args, mockOptions);
       assert.equal(usage.string_flag_present, false);
     });
+  });
+});
+
+describe('getPossibleFlagMetrics', () => {
+  const mockOptions = {
+    boolFlag: {
+      type: 'boolean' as const,
+      description: 'A boolean flag',
+    },
+    stringFlag: {
+      type: 'string' as const,
+      description: 'A string flag',
+    },
+    enumFlag: {
+      type: 'string' as const,
+      description: 'An enum flag',
+      choices: ['a', 'b'],
+    },
+  } as unknown as typeof cliOptions;
+
+  it('returns all possible metrics for given options', () => {
+    const metrics = getPossibleFlagMetrics(mockOptions);
+
+    assert.deepEqual(metrics, [
+      {name: 'bool_flag_present', flagType: 'boolean'},
+      {name: 'bool_flag', flagType: 'boolean'},
+      {name: 'string_flag_present', flagType: 'boolean'},
+      {name: 'enum_flag_present', flagType: 'boolean'},
+      {
+        name: 'enum_flag',
+        flagType: 'enum',
+        choices: ['ENUM_FLAG_UNSPECIFIED', 'ENUM_FLAG_A', 'ENUM_FLAG_B'],
+      },
+    ]);
   });
 });
