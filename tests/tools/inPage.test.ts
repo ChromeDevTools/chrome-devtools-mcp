@@ -441,7 +441,7 @@ describe('inPage', () => {
       });
     });
 
-    it('processToolResult replaces functions with "function"', async () => {
+    it('processToolResult replaces functions with "<Function object>"', async () => {
       await withMcpContext(
         async (response, context) => {
           await setupInPageTools(response, context, () => {
@@ -481,7 +481,7 @@ describe('inPage', () => {
           );
           assert.strictEqual(
             response.responseLines[0],
-            JSON.stringify({foo: 'bar', func: 'function'}, null, 2),
+            JSON.stringify({foo: 'bar', func: '<Function object>'}, null, 2),
           );
         },
         undefined,
@@ -489,7 +489,7 @@ describe('inPage', () => {
       );
     });
 
-    it('processToolResult respects cutoff depth', async () => {
+    it('processToolResult replaces circular references with "<Circular reference>"', async () => {
       await withMcpContext(
         async (response, context) => {
           await setupInPageTools(response, context, () => {
@@ -503,12 +503,8 @@ describe('inPage', () => {
                     description: 'test tool description',
                     inputSchema: {},
                     execute: () => {
-                      const obj: Record<string, unknown> = {};
-                      let current = obj;
-                      for (let i = 0; i < 10; i++) {
-                        current.nested = {};
-                        current = current.nested as Record<string, unknown>;
-                      }
+                      const obj: Record<string, unknown> = {foo: 'bar'};
+                      obj.self = obj;
                       return obj;
                     },
                   },
@@ -532,15 +528,65 @@ describe('inPage', () => {
             response,
             context,
           );
+          assert.strictEqual(
+            response.responseLines[0],
+            JSON.stringify({foo: 'bar', self: '<Circular reference>'}, null, 2),
+          );
+        },
+        undefined,
+        {categoryInPageTools: true} as ParsedArguments,
+      );
+    });
 
-          const parsedResult = JSON.parse(response.responseLines[0]);
-          let current = parsedResult.result;
-          let depth = 0;
-          while (current && Object.keys(current).length > 0) {
-            current = current.nested;
-            depth++;
-          }
-          assert.ok(depth <= 7, `Expected depth to be <= 7, got ${depth}`);
+    it('processToolResult replaces non-plain objects with "<ConstructorName instance>"', async () => {
+      await withMcpContext(
+        async (response, context) => {
+          await setupInPageTools(response, context, () => {
+            class CustomClass {
+              val = 'value';
+            }
+            window.__dtmcp = {
+              toolGroup: {
+                name: 'test-group',
+                description: 'test description',
+                tools: [
+                  {
+                    name: 'test-tool',
+                    description: 'test tool description',
+                    inputSchema: {},
+                    execute: () => ({
+                      foo: 'bar',
+                      custom: new CustomClass(),
+                    }),
+                  },
+                ],
+              },
+            };
+            window.addEventListener('devtoolstooldiscovery', (e: Event) => {
+              // @ts-expect-error Event has `respondWith`
+              e.respondWith(window.__dtmcp?.toolGroup);
+            });
+          });
+
+          await executeInPageTool.handler(
+            {
+              params: {
+                toolName: 'test-tool',
+                params: JSON.stringify({}),
+              },
+              page: context.getSelectedMcpPage(),
+            },
+            response,
+            context,
+          );
+          assert.strictEqual(
+            response.responseLines[0],
+            JSON.stringify(
+              {foo: 'bar', custom: '<CustomClass instance>'},
+              null,
+              2,
+            ),
+          );
         },
         undefined,
         {categoryInPageTools: true} as ParsedArguments,

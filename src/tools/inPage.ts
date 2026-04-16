@@ -159,7 +159,7 @@ export const executeInPageTool = definePageTool({
         const ancestors: unknown[] = [];
         // Recursively walks the tool result:
         // - Replaces DOM elements with an ID and stashes the DOM element on the window object
-        // - Replaces non-plain-objects with a string representation of the object
+        // - Replaces non-plain objects with a string representation of the object
         // - Replaces circular references with the string '<Circular reference>'
         // - Replaces functions with the string '<Function object>'
         const processToolResult = (
