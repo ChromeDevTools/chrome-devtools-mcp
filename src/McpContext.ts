@@ -923,40 +923,36 @@ export class McpContext implements Context {
         () => {
           /* noop */
         },
-        import.meta.resolve('../third_party/devtools-heap-snapshot-worker.js'),
+        import.meta.resolve('./third_party/devtools-heap-snapshot-worker.js'),
       );
 
     const absolutePath = path.resolve(heapsnapshotPath);
 
-    try {
-      const {promise: snapshotPromise, resolve: resolveSnapshot} =
-        Promise.withResolvers<DevTools.HeapSnapshotModel.HeapSnapshotProxy.HeapSnapshotProxy>();
+    const {promise: snapshotPromise, resolve: resolveSnapshot} =
+      Promise.withResolvers<DevTools.HeapSnapshotModel.HeapSnapshotProxy.HeapSnapshotProxy>();
 
-      const loaderProxy = workerProxy.createLoader(
-        1,
-        (
-          snapshotProxy: DevTools.HeapSnapshotModel.HeapSnapshotProxy.HeapSnapshotProxy,
-        ) => {
-          resolveSnapshot(snapshotProxy);
-        },
-      );
+    const loaderProxy = workerProxy.createLoader(1, snapshotProxy => {
+      resolveSnapshot(snapshotProxy);
+    });
 
-      const fileStream = fsSync.createReadStream(absolutePath, {
-        encoding: 'utf-8',
-        highWaterMark: 1024 * 1024,
-      });
+    const fileStream = fsSync.createReadStream(absolutePath, {
+      encoding: 'utf-8',
+      highWaterMark: 1024 * 1024,
+    });
 
-      for await (const chunk of fileStream) {
-        await loaderProxy.write(chunk);
-      }
-
-      await loaderProxy.close();
-
-      const snapshot = await snapshotPromise;
-
-      return snapshot;
-    } finally {
-      workerProxy.dispose();
+    for await (const chunk of fileStream) {
+      await loaderProxy.write(chunk);
     }
+
+    await loaderProxy.close();
+
+    const snapshot = await snapshotPromise;
+
+    //TODO Figure ot how to dispose the workeProxy.
+    // Also the snapshot methods hangs if the workerProxy is
+    // duposed instead of throwing
+
+    // workerProxy.dispose();
+    return snapshot;
   }
 }
