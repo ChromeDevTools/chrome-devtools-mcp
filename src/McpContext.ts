@@ -37,6 +37,7 @@ import type {
   Context,
   DevToolsData,
   ContextPage,
+  SupportedExtensions,
 } from './tools/ToolDefinition.js';
 import type {TraceResult} from './trace-processing/parse.js';
 import type {
@@ -50,7 +51,7 @@ import {
   ExtensionRegistry,
   type InstalledExtension,
 } from './utils/ExtensionRegistry.js';
-import {saveTemporaryFile} from './utils/files.js';
+import {ensureExtension, saveTemporaryFile} from './utils/files.js';
 import {getNetworkMultiplierFromString} from './WaitForHelper.js';
 
 interface McpContextOptions {
@@ -954,10 +955,14 @@ export class McpContext implements Context {
   }
   async saveFile(
     data: Uint8Array<ArrayBufferLike>,
-    filename: string,
+    clientProvidedFilePath: string,
+    extension: SupportedExtensions,
   ): Promise<{filename: string}> {
     try {
-      const filePath = path.resolve(filename);
+      const filePath = ensureExtension(
+        path.resolve(clientProvidedFilePath),
+        extension,
+      );
       await fs.mkdir(path.dirname(filePath), {recursive: true});
       await fs.writeFile(filePath, data);
       return {filename: filePath};

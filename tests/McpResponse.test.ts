@@ -156,7 +156,7 @@ describe('McpResponse', () => {
   });
 
   it('saves snapshot to file and returns structured content', async t => {
-    const filePath = join(tmpdir(), 'test-screenshot.png');
+    const filePath = join(tmpdir(), 'test-snapshot.txt');
     try {
       await withMcpContext(async (response, context) => {
         const page = context.getSelectedPptrPage();
