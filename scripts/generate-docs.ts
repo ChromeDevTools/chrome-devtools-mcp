@@ -11,8 +11,8 @@ import {StdioClientTransport} from '@modelcontextprotocol/sdk/client/stdio.js';
 import type {Tool} from '@modelcontextprotocol/sdk/types.js';
 import {get_encoding} from 'tiktoken';
 
-import {cliOptions} from '../build/src/bin/chrome-devtools-mcp-cli-options.js';
-import type {ParsedArguments} from '../build/src/bin/chrome-devtools-mcp-cli-options.js';
+import {cliOptions} from '../build/src/bin/brave-devtools-mcp-cli-options.js';
+import type {ParsedArguments} from '../build/src/bin/brave-devtools-mcp-cli-options.js';
 import {
   ToolCategory,
   OFF_BY_DEFAULT_CATEGORIES,

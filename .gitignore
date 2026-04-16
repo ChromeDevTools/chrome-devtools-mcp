@@ -149,3 +149,6 @@ build/
 log.txt
 
 .DS_Store
+
+# AI tooling (local only)
+.claude/

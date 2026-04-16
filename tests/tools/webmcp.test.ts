@@ -7,7 +7,7 @@
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
-import type {ParsedArguments} from '../../src/bin/chrome-devtools-mcp-cli-options.js';
+import type {ParsedArguments} from '../../src/bin/brave-devtools-mcp-cli-options.js';
 import type {McpPage} from '../../src/McpPage.js';
 import {listPages, navigatePage, selectPage} from '../../src/tools/pages.js';
 import {executeWebMcpTool} from '../../src/tools/webmcp.js';

@@ -10,7 +10,7 @@ import path from 'node:path';
 import {Client} from '@modelcontextprotocol/sdk/client/index.js';
 import {StdioClientTransport} from '@modelcontextprotocol/sdk/client/stdio.js';
 
-import {parseArguments} from '../build/src/bin/chrome-devtools-mcp-cli-options.js';
+import {parseArguments} from '../build/src/bin/brave-devtools-mcp-cli-options.js';
 import {labels} from '../build/src/tools/categories.js';
 import {createTools} from '../build/src/tools/tools.js';
 
