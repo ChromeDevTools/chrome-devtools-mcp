@@ -73,6 +73,26 @@ describe('checkForUpdates', () => {
     assert.ok(spawnStub.notCalled);
   });
 
+  it('does not notify if incoming version is older than current version', async () => {
+    sinon.stub(os, 'homedir').returns('/home/user');
+    sinon.stub(fs, 'stat').resolves({mtimeMs: Date.now()} as unknown as Stats);
+    sinon.stub(fs, 'readFile').callsFake(async filePath => {
+      if (filePath.toString().includes('latest.json')) {
+        return JSON.stringify({
+          version: '0.0.1',
+        });
+      }
+      throw new Error(`File not found: ${filePath}`);
+    });
+    const warnStub = sinon.stub(console, 'warn');
+    const spawnStub = sinon.stub(child_process, 'spawn');
+
+    await checkForUpdates('Run `npm update` to update.');
+
+    assert.ok(warnStub.notCalled);
+    assert.ok(spawnStub.notCalled);
+  });
+
   it('does not spawn fetch process if cache is fresh', async () => {
     sinon.stub(os, 'homedir').returns('/home/user');
     sinon.stub(fs, 'stat').resolves({mtimeMs: Date.now()} as unknown as Stats);

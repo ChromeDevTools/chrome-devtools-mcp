@@ -10,6 +10,7 @@ import os from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
 
+import {semver} from '../third_party/index.js';
 import {VERSION} from '../version.js';
 
 /**
@@ -46,7 +47,7 @@ export async function checkForUpdates(message: string) {
     // Ignore errors reading cache.
   }
 
-  if (cachedVersion && cachedVersion !== VERSION) {
+  if (cachedVersion && semver.lt(VERSION, cachedVersion)) {
     console.warn(
       `\nUpdate available: ${VERSION} -> ${cachedVersion}\n${message}\n`,
     );
