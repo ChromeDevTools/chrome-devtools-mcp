@@ -373,9 +373,19 @@ export const uploadFile = definePageTool({
   },
   handler: async (request, response) => {
     const {uid} = request.params;
-    const filePaths =
-      request.params.filePaths ??
-      (request.params.filePath ? [request.params.filePath] : []);
+
+    const filePathsFromFilePath = request.params.filePath
+      ? request.params.filePath
+          .split(',')
+          .map((p) => p.trim())
+          .filter(Boolean)
+      : [];
+
+    const filePaths = [
+      ...(request.params.filePaths ?? []),
+      ...filePathsFromFilePath,
+    ];
+
     if (!filePaths.length) {
       throw new Error('Provide filePath or filePaths to upload.');
     }

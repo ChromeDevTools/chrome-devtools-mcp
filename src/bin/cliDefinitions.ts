@@ -692,7 +692,7 @@ export const commands: Commands = {
         name: 'filePath',
         type: 'string',
         description:
-          'The local path of a file to upload. Use filePaths for multiple files.',
+          'The local path of a file to upload. For multiple files, pass a comma-separated list, or use filePaths.',
         required: false,
       },
       filePaths: {
