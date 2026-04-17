@@ -699,9 +699,11 @@ export class McpResponse implements Response {
       };
       pages?: object[];
       pagination?: object;
-      heapSnapshot?: object[];
-      heapSnapshotStats?: object;
-      heapSnapshotStaticData?: object;
+      heapSnapshot?: {
+        stats?: object;
+        staticData?: object;
+      };
+      heapSnapshotData?: object[];
       extensionServiceWorkers?: object[];
       extensionPages?: object[];
     } = {};
@@ -904,11 +906,13 @@ Call ${handleDialog.name} to handle it before continuing.`);
       const staticData = this.#heapSnapshotOptions.staticData;
       if (stats) {
         response.push(`Statistics: ${JSON.stringify(stats, null, 2)}`);
-        structuredContent.heapSnapshotStats = stats;
+        structuredContent.heapSnapshot = structuredContent.heapSnapshot || {};
+        structuredContent.heapSnapshot.stats = stats;
       }
       if (staticData) {
         response.push(`Static Data: ${JSON.stringify(staticData, null, 2)}`);
-        structuredContent.heapSnapshotStaticData = staticData;
+        structuredContent.heapSnapshot = structuredContent.heapSnapshot || {};
+        structuredContent.heapSnapshot.staticData = staticData;
       }
       const aggregates = this.#heapSnapshotOptions.aggregates;
       if (aggregates) {
@@ -926,7 +930,7 @@ Call ${handleDialog.name} to handle it before continuing.`);
         const formatter = new HeapSnapshotFormatter(paginatedRecord);
 
         response.push(formatter.toString());
-        structuredContent.heapSnapshot = formatter.toJSON();
+        structuredContent.heapSnapshotData = formatter.toJSON();
       }
     }
 

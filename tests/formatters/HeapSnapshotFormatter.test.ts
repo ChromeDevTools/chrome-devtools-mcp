@@ -34,15 +34,10 @@ describe('HeapSnapshotFormatter', () => {
   };
 
   describe('toString', () => {
-    it('formats data as CSV and sorts by self size', () => {
+    it('formats data as CSV and sorts by self size', t => {
       const formatter = new HeapSnapshotFormatter(mockAggregates);
       const result = formatter.toString();
-      const expected = [
-        'className,count,selfSize,maxRetainedSize',
-        '"ObjectA",10,100,1000',
-        '"ObjectB",5,50,500',
-      ].join('\n');
-      assert.strictEqual(result, expected);
+      t.assert.snapshot?.(result);
     });
   });
 
@@ -76,12 +71,15 @@ describe('HeapSnapshotFormatter', () => {
         ObjectB: {
           name: 'ObjectB',
           self: 50,
-        } as unknown as DevTools.HeapSnapshotModel.HeapSnapshotModel.AggregatedInfo,
+        },
         ObjectA: {
           name: 'ObjectA',
           self: 100,
-        } as unknown as DevTools.HeapSnapshotModel.HeapSnapshotModel.AggregatedInfo,
-      };
+        },
+      } as unknown as Record<
+        string,
+        DevTools.HeapSnapshotModel.HeapSnapshotModel.AggregatedInfo
+      >;
 
       const result = HeapSnapshotFormatter.sort(unsortedAggregates);
       assert.strictEqual(result.length, 2);

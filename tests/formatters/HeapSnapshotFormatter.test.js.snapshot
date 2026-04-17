@@ -1,0 +1,5 @@
+exports[`HeapSnapshotFormatter > toString > formats data as CSV and sorts by self size 1`] = `
+className,count,selfSize,maxRetainedSize
+"ObjectA",10,100,1000
+"ObjectB",5,50,500
+`;
