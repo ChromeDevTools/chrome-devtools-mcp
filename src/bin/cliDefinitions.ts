@@ -369,7 +369,7 @@ export const commands: Commands = {
     },
   },
   list_pages: {
-    description: 'Get a list of pages  open in the browser.',
+    description: 'Get a list of pages open in the browser.',
     category: 'Navigation automation',
     args: {},
   },

@@ -19,7 +19,7 @@ import {
 export const listPages = defineTool(args => {
   return {
     name: 'list_pages',
-    description: `Get a list of pages ${args?.categoryExtensions ? 'including extension service workers' : ''} open in the browser.`,
+    description: `Get a list of pages${args?.categoryExtensions ? ' including extension service workers' : ''} open in the browser.`,
     annotations: {
       category: ToolCategory.NAVIGATION,
       readOnlyHint: true,

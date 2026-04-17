@@ -291,7 +291,7 @@ describe('NetworkFormatter', () => {
       assert.match(result, /"response":"body"/);
     });
 
-    it('handles redirect chain', async (t) => {
+    it('handles redirect chain', async t => {
       const redirectRequest = getMockRequest({
         url: 'http://example.com/redirect',
       });
