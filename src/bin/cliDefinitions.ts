@@ -214,14 +214,14 @@ export const commands: Commands = {
         name: 'requestFilePath',
         type: 'string',
         description:
-          'The absolute or relative path to save the request body to. If omitted, the body is returned inline.',
+          'The absolute or relative path to a .network-request file to save the request body to. If omitted, the body is returned inline.',
         required: false,
       },
       responseFilePath: {
         name: 'responseFilePath',
         type: 'string',
         description:
-          'The absolute or relative path to save the response body to. If omitted, the body is returned inline.',
+          'The absolute or relative path to a .network-response file to save the response body to. If omitted, the body is returned inline.',
         required: false,
       },
     },
