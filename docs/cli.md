@@ -1,36 +1,36 @@
-# Chrome DevTools CLI
+# Brave DevTools CLI
 
-The `chrome-devtools-mcp` package includes an **experimental** CLI interface that allows you to interact with the browser directly from your terminal. This is particularly useful for debugging or when you want an agent to generate scripts that automate browser actions.
+The `brave-devtools-mcp` package includes an **experimental** CLI interface that allows you to interact with the browser directly from your terminal. This is particularly useful for debugging or when you want an agent to generate scripts that automate browser actions.
 
 ## Getting started
 
-Install the package globally to make the `chrome-devtools` command available:
+Install the package globally to make the `brave-devtools` command available:
 
 ```sh
-npm i chrome-devtools-mcp@latest -g
-chrome-devtools status # check if install worked.
+npm i brave-devtools-mcp@latest -g
+brave-devtools status # check if install worked.
 ```
 
 ## How it works
 
-The CLI acts as a client to a background `chrome-devtools-mcp` daemon (uses Unix sockets on Linux/Mac and named pipes on Windows).
+The CLI acts as a client to a background `brave-devtools-mcp` daemon (uses Unix sockets on Linux/Mac and named pipes on Windows).
 
 - **Automatic Start**: The first time you call a tool (e.g., `list_pages`), the CLI automatically starts the MCP server and the browser in the background if they aren't already running.
 - **Persistence**: The same background instance is reused for subsequent commands, preserving the browser state (open pages, cookies, etc.).
-- **Manual Control**: You can explicitly manage the background process using `start`, `stop`, and `status`. The `start` command forwards all subsequent arguments to the underlying MCP server (e.g., `--headless`, `--userDataDir`) but not all args are supported. Run `chrome-devtools start --help` for supported args. Headless is enabled by default. Isolated is enabled by default unless `--userDataDir` is provided.
+- **Manual Control**: You can explicitly manage the background process using `start`, `stop`, and `status`. The `start` command forwards all subsequent arguments to the underlying MCP server (e.g., `--headless`, `--userDataDir`) but not all args are supported. Run `brave-devtools start --help` for supported args. Headless is enabled by default. Isolated is enabled by default unless `--userDataDir` is provided.
 
 ```sh
 # Check if the daemon is running
-chrome-devtools status
+brave-devtools status
 
 # Navigate the current page to a URL
-chrome-devtools navigate_page "https://google.com"
+brave-devtools navigate_page url --url "https://google.com"
 
 # Take a screenshot and save it to a file
-chrome-devtools take_screenshot --filePath screenshot.png
+brave-devtools take_screenshot --filePath screenshot.png
 
 # Stop the background daemon when finished
-chrome-devtools stop
+brave-devtools stop
 ```
 
 ## Command Usage
@@ -39,7 +39,7 @@ The CLI only supports tools available in the MCP server without additional argum
 Thus, `--categoryExtensions` tools are currently not available in the CLI.
 
 ```sh
-chrome-devtools <tool> [arguments] [flags]
+brave-devtools <tool> [arguments] [flags]
 ```
 
 - **Required Arguments**: Passed as positional arguments.
@@ -50,25 +50,25 @@ chrome-devtools <tool> [arguments] [flags]
 **New Page and Navigation:**
 
 ```sh
-chrome-devtools new_page "https://example.com"
-chrome-devtools navigate_page "https://web.dev" --type url
+brave-devtools new_page "https://example.com"
+brave-devtools navigate_page url --url "https://web.dev"
 ```
 
 **Interaction:**
 
 ```sh
 # Click an element by its UID from a snapshot
-chrome-devtools click "element-uid-123"
+brave-devtools click "element-uid-123"
 
 # Fill a form field
-chrome-devtools fill "input-uid-456" "search query"
+brave-devtools fill "input-uid-456" "search query"
 ```
 
 **Analysis:**
 
 ```sh
 # Run a Lighthouse audit (defaults to navigation mode)
-chrome-devtools lighthouse_audit --mode snapshot
+brave-devtools lighthouse_audit --mode snapshot
 ```
 
 ## Output format
@@ -76,7 +76,7 @@ chrome-devtools lighthouse_audit --mode snapshot
 By default, the CLI outputs a human-readable summary of the tool's result. For programmatic use, you can request raw JSON:
 
 ```sh
-chrome-devtools list_pages --output-format=json
+brave-devtools list_pages --output-format=json
 ```
 
 ## Troubleshooting
@@ -84,13 +84,13 @@ chrome-devtools list_pages --output-format=json
 If the CLI hangs or fails to connect, try stopping the background process:
 
 ```sh
-chrome-devtools stop
+brave-devtools stop
 ```
 
 For more verbose logs, set the `DEBUG` environment variable:
 
 ```sh
-DEBUG=* chrome-devtools list_pages
+DEBUG=* brave-devtools list_pages
 ```
 
 ## CLI generation
@@ -98,5 +98,5 @@ DEBUG=* chrome-devtools list_pages
 Implemented in `scripts/generate-cli.ts`. Some commands are excluded from CLI
 generation such as `wait_for` and `fill_form`.
 
-`chrome-devtools-mcp` args are also filtered in `src/bin/chrome-devtools.ts`
+`brave-devtools-mcp` args are also filtered in `src/bin/brave-devtools.ts`
 because not all args make sense in a CLI interface.
