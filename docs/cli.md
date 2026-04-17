@@ -29,6 +29,9 @@ chrome-devtools navigate_page "https://google.com"
 # Take a screenshot and save it to a file
 chrome-devtools take_screenshot --filePath screenshot.png
 
+# Start the daemon and auto-connect to an existing Chrome profile
+chrome-devtools start --autoConnect
+
 # Stop the background daemon when finished
 chrome-devtools stop
 ```

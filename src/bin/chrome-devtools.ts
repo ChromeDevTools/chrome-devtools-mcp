@@ -43,8 +43,7 @@ const startCliOptions = {
   ...cliOptions,
 } as Partial<typeof cliOptions>;
 
-// Not supported in CLI on purpose.
-delete startCliOptions.autoConnect;
+// autoConnect is supported by the CLI.
 // Missing CLI serialization.
 delete startCliOptions.viewport;
 // CLI is generated based on the default tool definitions. To enable conditional
