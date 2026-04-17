@@ -288,11 +288,6 @@ class PageEventSubscriber {
     this.#page.on('framenavigated', this.#onFrameNavigated);
     this.#page.on('issue', this.#onIssueAdded);
     this.#session.on('Runtime.exceptionThrown', this.#onExceptionThrown);
-    try {
-      await this.#session.send('Audits.enable');
-    } catch (error) {
-      logger('Error subscribing to issues', error);
-    }
   }
 
   unsubscribe() {
@@ -307,9 +302,6 @@ class PageEventSubscriber {
         this.#onAggregatedIssue,
       );
     }
-    void this.#session.send('Audits.disable').catch(() => {
-      // might fail.
-    });
   }
 
   #onAggregatedIssue = (
