@@ -284,7 +284,9 @@ export class McpContext implements Context {
 
   async restoreEmulation(page: McpPage) {
     const currentSetting = page.emulationSettings;
-    await this.emulate(currentSetting, page.pptrPage);
+    await this.emulate(currentSetting, page.pptrPage, {
+      skipNetworkReset: !currentSetting.networkConditions,
+    });
   }
 
   async emulate(
@@ -297,13 +299,18 @@ export class McpContext implements Context {
       viewport?: Viewport;
     },
     targetPage?: Page,
+    internalOptions: {
+      skipNetworkReset?: boolean;
+    } = {},
   ): Promise<void> {
     const page = targetPage ?? this.getSelectedPptrPage();
     const mcpPage = this.#getMcpPage(page);
     const newSettings: EmulationSettings = {...mcpPage.emulationSettings};
 
     if (!options.networkConditions) {
-      await page.emulateNetworkConditions(null);
+      if (!internalOptions.skipNetworkReset) {
+        await page.emulateNetworkConditions(null);
+      }
       delete newSettings.networkConditions;
     } else if (options.networkConditions === 'Offline') {
       await page.emulateNetworkConditions({
