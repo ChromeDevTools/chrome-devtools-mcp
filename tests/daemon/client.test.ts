@@ -107,5 +107,20 @@ describe('daemon client', () => {
       const response = await handleResponse(unsupportedContentResponse, 'md');
       assert.ok(response.includes('.png'));
     });
+
+    it('uses the webp extension for WebP images', async () => {
+      const webpContentResponse = {
+        content: [
+          {
+            type: 'image' as const,
+            data: 'base64data',
+            mimeType: 'image/webp',
+          },
+        ],
+        structuredContent: {},
+      };
+      const response = await handleResponse(webpContentResponse, 'md');
+      assert.ok(response.includes('.webp'));
+    });
   });
 });
