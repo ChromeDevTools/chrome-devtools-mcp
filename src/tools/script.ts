@@ -17,8 +17,10 @@ export type Evaluatable = Page | Frame | WebWorker;
 export const evaluateScript = defineTool(cliArgs => {
   return {
     name: 'evaluate_script',
-    description: `Evaluate a JavaScript function inside the currently selected page. Returns the response as JSON,
-so returned values have to be JSON-serializable.`,
+    description: `Evaluate a JavaScript function inside the currently selected page or frame. Returns the response as JSON,
+so returned values have to be JSON-serializable. The function runs in the current page context only; do not use it to navigate to other pages.
+Use navigate_page or new_page for navigation, then run evaluate_script again after the new page loads. When querying the DOM, use standard browser APIs
+and valid native CSS selectors only. Uids from take_snapshot are not DOM attributes; pass them via the args parameter when you need the referenced elements.`,
     annotations: {
       category: ToolCategory.DEBUGGING,
       readOnlyHint: false,
@@ -34,6 +36,7 @@ Example without arguments: \`() => {
 Example with arguments: \`(el) => {
   return el.innerText;
 }\`
+Use only standard DOM APIs and valid native CSS selectors inside the function. Do not use snapshot uids in querySelector calls, and do not change window.location here to navigate across pages.
 `,
       ),
       args: zod
@@ -45,7 +48,9 @@ Example with arguments: \`(el) => {
             ),
         )
         .optional()
-        .describe(`An optional list of arguments to pass to the function.`),
+        .describe(
+          `An optional list of element uids from take_snapshot. These are resolved to real element handles and passed as function arguments; they are not available as DOM attributes in the page.`,
+        ),
       ...(cliArgs?.experimentalPageIdRouting ? pageIdSchema : {}),
       ...(cliArgs?.categoryExtensions
         ? {

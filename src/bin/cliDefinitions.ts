@@ -139,20 +139,21 @@ export const commands: Commands = {
   },
   evaluate_script: {
     description:
-      'Evaluate a JavaScript function inside the currently selected page. Returns the response as JSON,\nso returned values have to be JSON-serializable.',
+      'Evaluate a JavaScript function inside the currently selected page or frame. Returns the response as JSON,\nso returned values have to be JSON-serializable. The function runs in the current page context only; do not use it to navigate to other pages.\nUse navigate_page or new_page for navigation, then run evaluate_script again after the new page loads. When querying the DOM, use standard browser APIs\nand valid native CSS selectors only. Uids from take_snapshot are not DOM attributes; pass them via the args parameter when you need the referenced elements.',
     category: 'Debugging',
     args: {
       function: {
         name: 'function',
         type: 'string',
         description:
-          'A JavaScript function declaration to be executed by the tool in the currently selected page.\nExample without arguments: `() => {\n  return document.title\n}` or `async () => {\n  return await fetch("example.com")\n}`.\nExample with arguments: `(el) => {\n  return el.innerText;\n}`\n',
+          'A JavaScript function declaration to be executed by the tool in the currently selected page.\nExample without arguments: `() => {\n  return document.title\n}` or `async () => {\n  return await fetch("example.com")\n}`.\nExample with arguments: `(el) => {\n  return el.innerText;\n}`\nUse only standard DOM APIs and valid native CSS selectors inside the function. Do not use snapshot uids in querySelector calls, and do not change window.location here to navigate across pages.\n',
         required: true,
       },
       args: {
         name: 'args',
         type: 'array',
-        description: 'An optional list of arguments to pass to the function.',
+        description:
+          'An optional list of element uids from take_snapshot. These are resolved to real element handles and passed as function arguments; they are not available as DOM attributes in the page.',
         required: false,
       },
     },

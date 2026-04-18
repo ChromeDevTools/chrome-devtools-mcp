@@ -1,6 +1,6 @@
 <!-- AUTO GENERATED DO NOT EDIT - run 'npm run gen' to update-->
 
-# Chrome DevTools MCP Tool Reference (~6962 cl100k_base tokens)
+# Chrome DevTools MCP Tool Reference (~7107 cl100k_base tokens)
 
 - **[Input automation](#input-automation)** (9 tools)
   - [`click`](#click)
@@ -317,8 +317,10 @@
 
 ### `evaluate_script`
 
-**Description:** Evaluate a JavaScript function inside the currently selected page. Returns the response as JSON,
-so returned values have to be JSON-serializable.
+**Description:** Evaluate a JavaScript function inside the currently selected page or frame. Returns the response as JSON,
+so returned values have to be JSON-serializable. The function runs in the current page context only; do not use it to navigate to other pages.
+Use [`navigate_page`](#navigate_page) or [`new_page`](#new_page) for navigation, then run [`evaluate_script`](#evaluate_script) again after the new page loads. When querying the DOM, use standard browser APIs
+and valid native CSS selectors only. Uids from [`take_snapshot`](#take_snapshot) are not DOM attributes; pass them via the args parameter when you need the referenced elements.
 
 **Parameters:**
 
@@ -331,8 +333,9 @@ so returned values have to be JSON-serializable.
   Example with arguments: `(el) => {
   return el.innerText;
 }`
+  Use only standard DOM APIs and valid native CSS selectors inside the function. Do not use snapshot uids in querySelector calls, and do not change window.location here to navigate across pages.
 
-- **args** (array) _(optional)_: An optional list of arguments to pass to the function.
+- **args** (array) _(optional)_: An optional list of element uids from [`take_snapshot`](#take_snapshot). These are resolved to real element handles and passed as function arguments; they are not available as DOM attributes in the page.
 
 ---
 

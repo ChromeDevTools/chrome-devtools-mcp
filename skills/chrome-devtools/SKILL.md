@@ -11,6 +11,10 @@ description: Uses Chrome DevTools via MCP for efficient debugging, troubleshooti
 
 **Element interaction**: Use `take_snapshot` to get page structure with element `uid`s. Each element has a unique `uid` for interaction. If an element isn't found, take a fresh snapshot - the element may have been removed or the page changed.
 
+**Snapshot uid scope**: `uid`s from `take_snapshot` are MCP references, not DOM attributes. Do not use them in `querySelector()` or other selector strings. When a script needs one of those elements, pass the `uid` through `evaluate_script` args so the tool resolves it to a real element handle.
+
+**Script scope**: `evaluate_script` runs in the currently selected page or frame only. Do not try to navigate by setting `window.location` inside the evaluated function. Use `navigate_page` or `new_page`, wait for the destination page, then run another `evaluate_script`.
+
 ## Workflow Patterns
 
 ### Before interacting with a page
@@ -30,7 +34,7 @@ description: Uses Chrome DevTools via MCP for efficient debugging, troubleshooti
 
 - **Automation/interaction**: `take_snapshot` (text-based, faster, better for automation)
 - **Visual inspection**: `take_screenshot` (when user needs to see visual state)
-- **Additional details**: `evaluate_script` for data not in accessibility tree
+- **Additional details**: `evaluate_script` for data not in accessibility tree. Use valid native DOM APIs/selectors only; avoid library-specific pseudo-classes like `:contains(...)`.
 
 ### Parallel execution
 
