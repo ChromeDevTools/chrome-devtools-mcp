@@ -70,6 +70,24 @@ chrome-devtools fill "input-uid-456" "search query"
 chrome-devtools lighthouse_audit --mode snapshot
 ```
 
+**Script evaluation:**
+
+```sh
+# The JavaScript function is the first positional argument.
+chrome-devtools evaluate_script '() => document.title'
+
+# Pass snapshot UIDs through --args instead of putting them in selectors.
+chrome-devtools evaluate_script '(el) => el.innerText' --args 1_4
+
+# For longer scripts, assign the function to a shell variable first.
+script='() => {
+  return [...document.querySelectorAll("time")].map(el => el.textContent?.trim()).filter(Boolean);
+}'
+chrome-devtools evaluate_script "$script"
+```
+
+Do not invent flags like `--expression` for `evaluate_script`. The CLI expects the function as a positional argument, and single quotes are usually the safest way to preserve JavaScript syntax in the shell.
+
 ## Output format
 
 By default, the CLI outputs a human-readable summary of the tool's result. For programmatic use, you can request raw JSON:

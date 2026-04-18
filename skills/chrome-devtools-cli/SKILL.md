@@ -123,6 +123,25 @@ chrome-devtools take_snapshot # Take a text snapshot of the page from the a11y t
 chrome-devtools take_snapshot --verbose true --filePath "s.txt" # Take a verbose snapshot and save to file
 ```
 
+### `evaluate_script` quoting rules
+
+- Pass the JavaScript function as the first positional argument. Do not invent flags like `--expression`.
+- Prefer wrapping the whole function in single quotes in the shell so JavaScript parentheses and double quotes are preserved.
+- Keep the argument as a function expression such as `'() => document.title'` or `'(el) => el.innerText'`.
+- For complex scripts, write the function to a shell variable first and then pass the variable to `chrome-devtools evaluate_script`.
+
+Examples:
+
+```bash
+chrome-devtools evaluate_script '() => document.title'
+chrome-devtools evaluate_script '(el) => el.innerText' --args 1_4
+script='() => {
+  const dates = [...document.querySelectorAll("time")].map(el => el.textContent?.trim()).filter(Boolean);
+  return dates;
+}'
+chrome-devtools evaluate_script "$script"
+```
+
 ## Service Management
 
 ```bash
