@@ -12,6 +12,15 @@ import type {FlagUsage} from './types.js';
 type CliOptions = typeof cliOptions;
 
 /**
+ * For enums, log the value as uppercase.
+ * We're going to have an enum for such flags with choices represented
+ * as an `enum` where the keys of the enum will map to the uppercase `choice`.
+ */
+function formatEnumChoice(snakeCaseName: string, choice: string): string {
+  return `${snakeCaseName}_${choice}`.toUpperCase();
+}
+
+/**
  * Computes telemetry flag usage from parsed arguments and CLI options.
  *
  * Iterates over the defined CLI options to construct a payload:
@@ -21,6 +30,8 @@ type CliOptions = typeof cliOptions;
  *    - The provided value differs from the default value.
  * - Boolean flags are logged with their literal value.
  * - String flags with defined `choices` (Enums) are logged as their uppercase value.
+ *
+ * IMPORTANT: keep getPossibleFlagMetrics() in sync with this function.
  */
 export function computeFlagUsage(
   args: Record<string, unknown>,
@@ -49,12 +60,58 @@ export function computeFlagUsage(
       'choices' in config &&
       config.choices
     ) {
-      // For enums, log the value as uppercase
-      // We're going to have an enum for such flags with choices represented
-      // as an `enum` where the keys of the enum will map to the uppercase `choice`.
-      usage[snakeCaseName] = `${snakeCaseName}_${value}`.toUpperCase();
+      usage[snakeCaseName] = formatEnumChoice(snakeCaseName, value);
     }
   }
 
   return usage;
+}
+
+export interface FlagMetric {
+  name: string;
+  flagType: 'boolean' | 'enum';
+  choices?: string[];
+}
+
+/**
+ * Computes the list of possible flag metrics based on the CLI options.
+ *
+ * IMPORTANT: keep this function in sync with computeFlagUsage().
+ */
+export function getPossibleFlagMetrics(options: CliOptions): FlagMetric[] {
+  const metrics: FlagMetric[] = [];
+
+  for (const [flagName, config] of Object.entries(options)) {
+    const snakeCaseName = toSnakeCase(flagName);
+
+    // _present is always a possible metric
+    metrics.push({
+      name: `${snakeCaseName}_present`,
+      flagType: 'boolean',
+    });
+
+    if (config.type === 'boolean') {
+      metrics.push({
+        name: snakeCaseName,
+        flagType: 'boolean',
+      });
+    } else if (
+      config.type === 'string' &&
+      'choices' in config &&
+      config.choices
+    ) {
+      metrics.push({
+        name: snakeCaseName,
+        flagType: 'enum',
+        choices: [
+          `${snakeCaseName.toUpperCase()}_UNSPECIFIED`,
+          ...config.choices.map(choice =>
+            formatEnumChoice(snakeCaseName, choice),
+          ),
+        ],
+      });
+    }
+  }
+
+  return metrics;
 }

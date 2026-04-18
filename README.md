@@ -558,7 +558,7 @@ The Chrome DevTools MCP server supports the following configuration option:
 - **`--channel`**
   Specify a different Chrome channel that should be used. The default is the stable channel version.
   - **Type:** string
-  - **Choices:** `stable`, `canary`, `beta`, `dev`
+  - **Choices:** `canary`, `dev`, `beta`, `stable`
 
 - **`--logFile`/ `--log-file`**
   Path to a file to write debug logs to. Set the env variable `DEBUG` to `*` to enable verbose logs. Useful for submitting bug reports.

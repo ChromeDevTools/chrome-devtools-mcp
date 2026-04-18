@@ -1,0 +1,257 @@
+[
+  {
+    "name": "accept_insecure_certs",
+    "flagType": "boolean"
+  },
+  {
+    "name": "accept_insecure_certs_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "auto_connect",
+    "flagType": "boolean"
+  },
+  {
+    "name": "auto_connect_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "browser_url_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "category_emulation",
+    "flagType": "boolean"
+  },
+  {
+    "name": "category_emulation_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "category_extensions",
+    "flagType": "boolean"
+  },
+  {
+    "name": "category_extensions_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "category_in_page_tools",
+    "flagType": "boolean"
+  },
+  {
+    "name": "category_in_page_tools_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "category_network",
+    "flagType": "boolean"
+  },
+  {
+    "name": "category_network_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "category_performance",
+    "flagType": "boolean"
+  },
+  {
+    "name": "category_performance_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "channel",
+    "flagType": "enum",
+    "choices": [
+      "CHANNEL_UNSPECIFIED",
+      "CHANNEL_CANARY",
+      "CHANNEL_DEV",
+      "CHANNEL_BETA",
+      "CHANNEL_STABLE"
+    ]
+  },
+  {
+    "name": "channel_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "chrome_arg_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "clearcut_endpoint_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "clearcut_force_flush_interval_ms_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "clearcut_include_pid_header",
+    "flagType": "boolean"
+  },
+  {
+    "name": "clearcut_include_pid_header_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "executable_path_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "experimental_devtools",
+    "flagType": "boolean"
+  },
+  {
+    "name": "experimental_devtools_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "experimental_include_all_pages",
+    "flagType": "boolean"
+  },
+  {
+    "name": "experimental_include_all_pages_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "experimental_interop_tools",
+    "flagType": "boolean"
+  },
+  {
+    "name": "experimental_interop_tools_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "experimental_memory",
+    "flagType": "boolean"
+  },
+  {
+    "name": "experimental_memory_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "experimental_page_id_routing",
+    "flagType": "boolean"
+  },
+  {
+    "name": "experimental_page_id_routing_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "experimental_screencast",
+    "flagType": "boolean"
+  },
+  {
+    "name": "experimental_screencast_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "experimental_structured_content",
+    "flagType": "boolean"
+  },
+  {
+    "name": "experimental_structured_content_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "experimental_vision",
+    "flagType": "boolean"
+  },
+  {
+    "name": "experimental_vision_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "experimental_webmcp",
+    "flagType": "boolean"
+  },
+  {
+    "name": "experimental_webmcp_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "headless",
+    "flagType": "boolean"
+  },
+  {
+    "name": "headless_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "ignore_default_chrome_arg_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "isolated",
+    "flagType": "boolean"
+  },
+  {
+    "name": "isolated_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "log_file_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "performance_crux",
+    "flagType": "boolean"
+  },
+  {
+    "name": "performance_crux_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "proxy_server_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "redact_network_headers",
+    "flagType": "boolean"
+  },
+  {
+    "name": "redact_network_headers_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "slim",
+    "flagType": "boolean"
+  },
+  {
+    "name": "slim_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "usage_statistics",
+    "flagType": "boolean"
+  },
+  {
+    "name": "usage_statistics_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "user_data_dir_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "via_cli",
+    "flagType": "boolean"
+  },
+  {
+    "name": "via_cli_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "viewport_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "ws_endpoint_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "ws_headers_present",
+    "flagType": "boolean"
+  }
+]

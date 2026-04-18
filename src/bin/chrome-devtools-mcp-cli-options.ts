@@ -113,7 +113,7 @@ export const cliOptions = {
     type: 'string',
     description:
       'Specify a different Chrome channel that should be used. The default is the stable channel version.',
-    choices: ['stable', 'canary', 'beta', 'dev'] as const,
+    choices: ['canary', 'dev', 'beta', 'stable'] as const,
     conflicts: ['browserUrl', 'wsEndpoint', 'executablePath'],
   },
   logFile: {
