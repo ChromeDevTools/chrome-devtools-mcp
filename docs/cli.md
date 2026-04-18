@@ -19,6 +19,9 @@ The CLI acts as a client to a background `chrome-devtools-mcp` daemon (uses Unix
 - **Persistence**: The same background instance is reused for subsequent commands, preserving the browser state (open pages, cookies, etc.).
 - **Manual Control**: You can explicitly manage the background process using `start`, `stop`, and `status`. The `start` command forwards all subsequent arguments to the underlying MCP server (e.g., `--headless`, `--userDataDir`) but not all args are supported. Run `chrome-devtools start --help` for supported args. Headless is enabled by default. Isolated is enabled by default unless `--userDataDir` is provided.
 
+> [!NOTE]
+> The CLI intentionally does not support `--autoConnect` on `chrome-devtools start`. If you need to attach to an already running Chrome instance, use `chrome-devtools start --browserUrl http://127.0.0.1:9222` instead.
+
 ```sh
 # Check if the daemon is running
 chrome-devtools status
