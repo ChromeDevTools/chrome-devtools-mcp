@@ -1,0 +1,9 @@
+.git
+.github
+.agent
+.claude-plugin
+build
+node_modules
+npm-debug.log
+coverage
+*.tsbuildinfo
