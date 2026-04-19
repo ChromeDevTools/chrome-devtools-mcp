@@ -56,3 +56,35 @@ export const exploreMemorySnapshot = defineTool({
     response.setHeapSnapshotStats(stats, staticData);
   },
 });
+
+export const getMemorySnapshotDetails = defineTool({
+  name: 'get_memory_snapshot_details',
+  description:
+    'Loads a memory heapsnapshot and returns all available information including statistics, static data, and aggregated node information. Supports pagination for aggregates.',
+  annotations: {
+    category: ToolCategory.MEMORY,
+    readOnlyHint: true,
+    conditions: ['experimentalMemory'],
+  },
+  schema: {
+    filePath: zod.string().describe('A path to a .heapsnapshot file to read.'),
+    pageIdx: zod
+      .number()
+      .optional()
+      .describe('The page index for pagination of aggregates.'),
+    pageSize: zod
+      .number()
+      .optional()
+      .describe('The page size for pagination of aggregates.'),
+  },
+  handler: async (request, response, context) => {
+    const aggregates = await context.getHeapSnapshotAggregates(
+      request.params.filePath,
+    );
+
+    response.setHeapSnapshotAggregates(aggregates, {
+      pageIdx: request.params.pageIdx,
+      pageSize: request.params.pageSize,
+    });
+  },
+});
