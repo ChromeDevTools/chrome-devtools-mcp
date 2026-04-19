@@ -23,6 +23,7 @@ export class HeapSnapshotManager {
     {
       snapshot: DevTools.HeapSnapshotModel.HeapSnapshotProxy.HeapSnapshotProxy;
       worker: DevTools.HeapSnapshotModel.HeapSnapshotProxy.HeapSnapshotWorkerProxy;
+      // TODO: use a multimap
       uidToClassKey: Map<number, string>;
       classKeyToUid: Map<string, number>;
       idGenerator: () => number;
@@ -82,6 +83,20 @@ export class HeapSnapshotManager {
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.StaticData | null> {
     const snapshot = await this.getSnapshot(filePath);
     return snapshot.staticData;
+  }
+
+  async getOrCreateUidForClassKey(
+    filePath: string,
+    classKey: string,
+  ): Promise<number> {
+    const cached = this.#getCachedSnapshot(filePath);
+    let uid = cached.classKeyToUid.get(classKey);
+    if (!uid) {
+      uid = cached.idGenerator();
+      cached.classKeyToUid.set(classKey, uid);
+      cached.uidToClassKey.set(uid, classKey);
+    }
+    return uid;
   }
 
   async #loadSnapshot(absolutePath: string): Promise<{
