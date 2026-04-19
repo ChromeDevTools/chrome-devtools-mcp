@@ -5,6 +5,7 @@
  */
 
 import type {ParsedArguments} from '../bin/chrome-devtools-mcp-cli-options.js';
+import type {AggregatedInfoWithUid} from '../HeapSnapshotManager.js';
 import type {McpPage} from '../McpPage.js';
 import {zod} from '../third_party/index.js';
 import type {
@@ -227,9 +228,7 @@ export type Context = Readonly<{
   ): string | undefined;
   getHeapSnapshotAggregates(
     filePath: string,
-  ): Promise<
-    Record<string, DevTools.HeapSnapshotModel.HeapSnapshotModel.AggregatedInfo>
-  >;
+  ): Promise<Record<string, AggregatedInfoWithUid>>;
   getHeapSnapshotStats(
     filePath: string,
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.Statistics>;

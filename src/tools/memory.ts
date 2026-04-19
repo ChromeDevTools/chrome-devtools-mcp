@@ -14,7 +14,7 @@ export const takeMemorySnapshot = definePageTool({
   name: 'take_memory_snapshot',
   description: `Capture a heap snapshot of the currently selected page. Use to analyze the memory distribution of JavaScript objects and debug memory leaks.`,
   annotations: {
-    category: ToolCategory.PERFORMANCE,
+    category: ToolCategory.MEMORY,
     readOnlyHint: false,
   },
   schema: {
@@ -38,7 +38,7 @@ export const takeMemorySnapshot = definePageTool({
 export const exploreMemorySnapshot = defineTool({
   name: 'load_memory_snapshot',
   description:
-    'Loads a memory heapsnapshot and returns snapshot summary stats.  ',
+    'Loads a memory heapsnapshot and returns snapshot summary stats.',
   annotations: {
     category: ToolCategory.MEMORY,
     readOnlyHint: true,

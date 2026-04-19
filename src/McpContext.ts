@@ -10,6 +10,7 @@ import path from 'node:path';
 import type {TargetUniverse} from './DevtoolsUtils.js';
 import {UniverseManager} from './DevtoolsUtils.js';
 import {HeapSnapshotManager} from './HeapSnapshotManager.js';
+import type {AggregatedInfoWithUid} from './HeapSnapshotManager.js';
 import {McpPage} from './McpPage.js';
 import {
   NetworkCollector,
@@ -918,9 +919,7 @@ export class McpContext implements Context {
 
   async getHeapSnapshotAggregates(
     filePath: string,
-  ): Promise<
-    Record<string, DevTools.HeapSnapshotModel.HeapSnapshotModel.AggregatedInfo>
-  > {
+  ): Promise<Record<string, AggregatedInfoWithUid>> {
     return await this.#heapSnapshotManager.getAggregates(filePath);
   }
 

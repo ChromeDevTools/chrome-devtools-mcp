@@ -8,6 +8,14 @@ import fsSync from 'node:fs';
 import path from 'node:path';
 
 import {DevTools} from './third_party/index.js';
+import {
+  createIdGenerator,
+  stableIdSymbol,
+  type WithSymbolId,
+} from './utils/id.js';
+
+export type AggregatedInfoWithUid =
+  WithSymbolId<DevTools.HeapSnapshotModel.HeapSnapshotModel.AggregatedInfo>;
 
 export class HeapSnapshotManager {
   #snapshots = new Map<
@@ -15,6 +23,9 @@ export class HeapSnapshotManager {
     {
       snapshot: DevTools.HeapSnapshotModel.HeapSnapshotProxy.HeapSnapshotProxy;
       worker: DevTools.HeapSnapshotModel.HeapSnapshotProxy.HeapSnapshotWorkerProxy;
+      uidToClassKey: Map<number, string>;
+      classKeyToUid: Map<string, number>;
+      idGenerator: () => number;
     }
   >();
 
@@ -28,20 +39,35 @@ export class HeapSnapshotManager {
     }
 
     const {snapshot, worker} = await this.#loadSnapshot(absolutePath);
-    this.#snapshots.set(absolutePath, {snapshot, worker});
+    this.#snapshots.set(absolutePath, {
+      snapshot,
+      worker,
+      uidToClassKey: new Map<number, string>(),
+      classKeyToUid: new Map<string, number>(),
+      idGenerator: createIdGenerator(),
+    });
 
     return snapshot;
   }
 
   async getAggregates(
     filePath: string,
-  ): Promise<
-    Record<string, DevTools.HeapSnapshotModel.HeapSnapshotModel.AggregatedInfo>
-  > {
+  ): Promise<Record<string, AggregatedInfoWithUid>> {
     const snapshot = await this.getSnapshot(filePath);
     const filter =
       new DevTools.HeapSnapshotModel.HeapSnapshotModel.NodeFilter();
-    return await snapshot.aggregatesWithFilter(filter);
+    const aggregates: Record<string, AggregatedInfoWithUid> =
+      await snapshot.aggregatesWithFilter(filter);
+
+    for (const key of Object.keys(aggregates)) {
+      const uid = await this.getOrCreateUidForClassKey(filePath, key);
+      const aggregate = aggregates[key];
+      if (aggregate) {
+        aggregate[stableIdSymbol] = uid;
+      }
+    }
+
+    return aggregates;
   }
 
   async getStats(

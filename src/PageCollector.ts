@@ -22,6 +22,11 @@ import {
   type Page,
   type PageEvents as PuppeteerPageEvents,
 } from './third_party/index.js';
+import {
+  createIdGenerator,
+  stableIdSymbol,
+  type WithSymbolId,
+} from './utils/id.js';
 
 export class UncaughtError {
   readonly details: Protocol.Runtime.ExceptionDetails;
@@ -40,21 +45,6 @@ interface PageEvents extends PuppeteerPageEvents {
 
 export type ListenerMap<EventMap extends PageEvents = PageEvents> = {
   [K in keyof EventMap]?: (event: EventMap[K]) => void;
-};
-
-function createIdGenerator() {
-  let i = 1;
-  return () => {
-    if (i === Number.MAX_SAFE_INTEGER) {
-      i = 0;
-    }
-    return i++;
-  };
-}
-
-export const stableIdSymbol = Symbol('stableIdSymbol');
-type WithSymbolId<T> = T & {
-  [stableIdSymbol]?: number;
 };
 
 export class PageCollector<T> {
