@@ -10,6 +10,7 @@ import {zod} from '../third_party/index.js';
 import type {
   Dialog,
   ElementHandle,
+  Extension,
   Page,
   ScreenRecorder,
   Viewport,
@@ -21,7 +22,6 @@ import type {
   GeolocationOptions,
   ExtensionServiceWorker,
 } from '../types.js';
-import type {InstalledExtension} from '../utils/ExtensionRegistry.js';
 import type {PaginationOptions} from '../utils/types.js';
 
 import type {ToolCategory} from './categories.js';
@@ -218,8 +218,8 @@ export type Context = Readonly<{
   installExtension(path: string): Promise<string>;
   uninstallExtension(id: string): Promise<void>;
   triggerExtensionAction(id: string): Promise<void>;
-  listExtensions(): InstalledExtension[];
-  getExtension(id: string): InstalledExtension | undefined;
+  listExtensions(): Promise<Map<string, Extension>>;
+  getExtension(id: string): Promise<Extension | undefined>;
   getSelectedMcpPage(): McpPage;
   getExtensionServiceWorkers(): ExtensionServiceWorker[];
   getExtensionServiceWorkerId(

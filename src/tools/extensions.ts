@@ -77,7 +77,7 @@ export const reloadExtension = defineTool({
   },
   handler: async (request, response, context) => {
     const {id} = request.params;
-    const extension = context.getExtension(id);
+    const extension = await context.getExtension(id);
     if (!extension) {
       throw new Error(`Extension with ID ${id} not found.`);
     }

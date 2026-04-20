@@ -28,6 +28,7 @@ import type {
   SerializedAXNode,
   Viewport,
   Target,
+  Extension,
 } from './third_party/index.js';
 import type {DevTools} from './third_party/index.js';
 import {Locator} from './third_party/index.js';
@@ -47,10 +48,6 @@ import type {
   TextSnapshotNode,
   ExtensionServiceWorker,
 } from './types.js';
-import {
-  ExtensionRegistry,
-  type InstalledExtension,
-} from './utils/ExtensionRegistry.js';
 import {ensureExtension, saveTemporaryFile} from './utils/files.js';
 import {getNetworkMultiplierFromString} from './WaitForHelper.js';
 
@@ -83,7 +80,6 @@ export class McpContext implements Context {
   #networkCollector: NetworkCollector;
   #consoleCollector: ConsoleCollector;
   #devtoolsUniverseManager: UniverseManager;
-  #extensionRegistry = new ExtensionRegistry();
 
   #isRunningTrace = false;
   #screenRecorderData: {recorder: ScreenRecorder; filePath: string} | null =
@@ -882,38 +878,30 @@ export class McpContext implements Context {
 
   async installExtension(extensionPath: string): Promise<string> {
     const id = await this.browser.installExtension(extensionPath);
-    await this.#extensionRegistry.registerExtension(id, extensionPath);
     return id;
   }
 
   async uninstallExtension(id: string): Promise<void> {
     await this.browser.uninstallExtension(id);
-    this.#extensionRegistry.remove(id);
   }
 
   async triggerExtensionAction(id: string): Promise<void> {
-    const page = this.getSelectedPptrPage();
-    // @ts-expect-error internal puppeteer api is needed since we don't have a way to get
-    // a tab id at the moment
-    const theTarget = page._tabId;
-    const session = await this.browser.target().createCDPSession();
-
-    try {
-      await session.send('Extensions.triggerAction', {
-        id,
-        targetId: theTarget,
-      });
-    } finally {
-      await session.detach();
+    const extensions = await this.browser.extensions();
+    const extension = extensions.get(id);
+    if (!extension) {
+      throw new Error(`Extension with ID ${id} not found.`);
     }
+    const page = this.getSelectedPptrPage();
+    await extension.triggerAction(page);
   }
 
-  listExtensions(): InstalledExtension[] {
-    return this.#extensionRegistry.list();
+  listExtensions(): Promise<Map<string, Extension>> {
+    return this.browser.extensions();
   }
 
-  getExtension(id: string): InstalledExtension | undefined {
-    return this.#extensionRegistry.getById(id);
+  async getExtension(id: string): Promise<Extension | undefined> {
+    const pptrExtensions = await this.browser.extensions();
+    return pptrExtensions.get(id);
   }
 
   async getHeapSnapshotAggregates(

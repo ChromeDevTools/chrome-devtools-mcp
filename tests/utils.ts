@@ -18,6 +18,7 @@ import type {
   HTTPResponse,
   LaunchOptions,
   Page,
+  Target,
 } from 'puppeteer-core';
 import sinon from 'sinon';
 
@@ -26,6 +27,13 @@ import {McpContext} from '../src/McpContext.js';
 import {McpResponse} from '../src/McpResponse.js';
 import {stableIdSymbol} from '../src/PageCollector.js';
 import {DevTools} from '../src/third_party/index.js';
+
+export function assertNoServiceWorkerReported(targets: Target[], id: string) {
+  const target = targets.find(target => {
+    return target.url().includes(id) && target.type() === 'service_worker';
+  });
+  assert(target === undefined);
+}
 
 export function getTextContent(
   content: CallToolResult['content'][number],
