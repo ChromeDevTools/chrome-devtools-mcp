@@ -77,11 +77,15 @@ Example with arguments: \`(el) => {
         }
 
         const worker = await getWebWorker(context, serviceWorkerId);
-        await context
-          .getSelectedMcpPage()
-          .waitForEventsAfterAction(async () => {
-            await performEvaluation(worker, fnString, [], response);
-          });
+        const selectedPage = context.getSelectedMcpPage();
+        const result = await selectedPage.waitForEventsAfterAction(async () => {
+          await performEvaluation(worker, fnString, [], response);
+        });
+        if (result.navigated) {
+          response.appendResponseLine(
+            `Page navigated to ${selectedPage.pptrPage.url()}.`,
+          );
+        }
         return;
       }
 
@@ -101,9 +105,12 @@ Example with arguments: \`(el) => {
 
         const evaluatable = await getPageOrFrame(page, frames);
 
-        await mcpPage.waitForEventsAfterAction(async () => {
+        const result = await mcpPage.waitForEventsAfterAction(async () => {
           await performEvaluation(evaluatable, fnString, args, response);
         });
+        if (result.navigated) {
+          response.appendResponseLine(`Page navigated to ${page.url()}.`);
+        }
       } finally {
         void Promise.allSettled(args.map(arg => arg.dispose()));
       }

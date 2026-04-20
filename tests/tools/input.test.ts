@@ -123,6 +123,63 @@ describe('input', () => {
       });
     });
 
+    it('reports the new URL when click triggers a navigation', async () => {
+      server.addHtmlRoute(
+        '/start',
+        html`<a href="/after-click">Navigate page</a>`,
+      );
+      server.addHtmlRoute('/after-click', html`<main>arrived</main>`);
+
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedPptrPage();
+        await page.goto(server.getRoute('/start'));
+        await context.createTextSnapshot(context.getSelectedMcpPage());
+        await click.handler(
+          {
+            params: {
+              uid: '1_1',
+            },
+            page: context.getSelectedMcpPage(),
+          },
+          response,
+          context,
+        );
+        const expectedUrl = server.getRoute('/after-click');
+        assert.ok(
+          response.responseLines.some(
+            line => line === `Page navigated to ${expectedUrl}.`,
+          ),
+          `Expected response to mention navigation to ${expectedUrl}, got: ${response.responseLines.join(' | ')}`,
+        );
+      });
+    });
+
+    it('does not report navigation when click does not navigate', async () => {
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedPptrPage();
+        await page.setContent(
+          html`<button onclick="this.innerText = 'clicked';">test</button>`,
+        );
+        await context.createTextSnapshot(context.getSelectedMcpPage());
+        await click.handler(
+          {
+            params: {
+              uid: '1_1',
+            },
+            page: context.getSelectedMcpPage(),
+          },
+          response,
+          context,
+        );
+        assert.ok(
+          !response.responseLines.some(line =>
+            line.startsWith('Page navigated to '),
+          ),
+          `Did not expect a navigation line, got: ${response.responseLines.join(' | ')}`,
+        );
+      });
+    });
+
     it('waits for stable DOM', async () => {
       server.addHtmlRoute(
         '/unstable',
