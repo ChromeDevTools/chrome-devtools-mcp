@@ -922,4 +922,11 @@ export class McpContext implements Context {
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.StaticData | null> {
     return await this.#heapSnapshotManager.getStaticData(filePath);
   }
+
+  async getHeapSnapshotNodesByUid(
+    filePath: string,
+    uid: number,
+  ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange> {
+    return await this.#heapSnapshotManager.getNodesByUid(filePath, uid);
+  }
 }

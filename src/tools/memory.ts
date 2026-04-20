@@ -88,3 +88,35 @@ export const getMemorySnapshotDetails = defineTool({
     });
   },
 });
+
+export const getNodesByClass = defineTool({
+  name: 'get_nodes_by_class',
+  description:
+    'Loads a memory heapsnapshot and returns instances of a specific class with their stable IDs.',
+  annotations: {
+    category: ToolCategory.MEMORY,
+    readOnlyHint: true,
+    conditions: ['experimentalMemory'],
+  },
+  schema: {
+    filePath: zod.string().describe('A path to a .heapsnapshot file to read.'),
+    uid: zod
+      .number()
+      .describe(
+        'The unique UID for the class, obtained from aggregates listing.',
+      ),
+    pageIdx: zod.number().optional().describe('The page index for pagination.'),
+    pageSize: zod.number().optional().describe('The page size for pagination.'),
+  },
+  handler: async (request, response, context) => {
+    const nodes = await context.getHeapSnapshotNodesByUid(
+      request.params.filePath,
+      request.params.uid,
+    );
+
+    response.setHeapSnapshotNodes(nodes, {
+      pageIdx: request.params.pageIdx,
+      pageSize: request.params.pageSize,
+    });
+  },
+});

@@ -112,6 +112,10 @@ export interface Response {
     stats: DevTools.HeapSnapshotModel.HeapSnapshotModel.Statistics,
     staticData: DevTools.HeapSnapshotModel.HeapSnapshotModel.StaticData | null,
   ): void;
+  setHeapSnapshotNodes(
+    nodes: DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange,
+    options?: PaginationOptions,
+  ): void;
   setIncludePages(value: boolean): void;
   setIncludeNetworkRequests(
     value: boolean,
@@ -235,6 +239,10 @@ export type Context = Readonly<{
   getHeapSnapshotStaticData(
     filePath: string,
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.StaticData | null>;
+  getHeapSnapshotNodesByUid(
+    filePath: string,
+    uid: number,
+  ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange>;
 }>;
 
 export type ContextPage = Readonly<{

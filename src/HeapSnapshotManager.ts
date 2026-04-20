@@ -99,6 +99,23 @@ export class HeapSnapshotManager {
     return uid;
   }
 
+  async getNodesByUid(
+    filePath: string,
+    uid: number,
+  ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange> {
+    const snapshot = await this.getSnapshot(filePath);
+    const filter =
+      new DevTools.HeapSnapshotModel.HeapSnapshotModel.NodeFilter();
+    const className = await this.resolveClassKeyFromUid(filePath, uid);
+    if (!className) {
+      throw new Error(`Class with UID ${uid} not found in heap snapshot`);
+    }
+    const provider = snapshot.createNodesProviderForClass(className, filter);
+
+    const range = await provider.serializeItemsRange(0, 1);
+    return await provider.serializeItemsRange(0, range.totalLength);
+  }
+
   #getCachedSnapshot(filePath: string) {
     const absolutePath = path.resolve(filePath);
     const cached = this.#snapshots.get(absolutePath);
@@ -106,6 +123,14 @@ export class HeapSnapshotManager {
       throw new Error(`Snapshot not loaded for ${filePath}`);
     }
     return cached;
+  }
+
+  async resolveClassKeyFromUid(
+    filePath: string,
+    uid: number,
+  ): Promise<string | undefined> {
+    const cached = this.#getCachedSnapshot(filePath);
+    return cached.uidToClassKey.get(uid);
   }
 
   async #loadSnapshot(absolutePath: string): Promise<{

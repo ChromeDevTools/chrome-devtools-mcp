@@ -161,6 +161,20 @@ uid,className,count,selfSize,maxRetainedSize
 108,"HTMLBodyElement (internal cache) / https://example.com",1,16,16
 `;
 
+exports[`memory > get_nodes_by_class > with default options 1`] = `
+## Heap Snapshot Data
+id,name,type,distance,selfSize,retainedSize
+25307,"Array",object,2,192,2056
+33187,"Array",object,2,192,1664
+36255,"Array",object,2,192,1664
+45899,"Array",object,5,56,56
+45901,"Array",object,5,88,88
+46149,"Array",object,5,56,56
+46151,"Array",object,5,88,88
+46355,"Array",object,2,192,2056
+Showing 1-8 of 8 (Page 1 of 1).
+`;
+
 exports[`memory > load_memory_snapshot > with default options 1`] = `
 ## Heap Snapshot Data
 Statistics: {

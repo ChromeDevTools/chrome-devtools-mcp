@@ -16,11 +16,44 @@ export interface FormattedSnapshotEntry {
   retainedSize: number;
 }
 
+export interface FormattedNodeEntry {
+  id: number;
+  name: string;
+  type: string;
+  distance: number;
+  selfSize: number;
+  retainedSize: number;
+}
+
 export class HeapSnapshotFormatter {
   #aggregates: Record<string, AggregatedInfoWithUid>;
 
   constructor(aggregates: Record<string, AggregatedInfoWithUid>) {
     this.#aggregates = aggregates;
+  }
+
+  static formatNodes(items: readonly unknown[]): string {
+    const lines: string[] = [];
+    lines.push('id,name,type,distance,selfSize,retainedSize');
+
+    for (const item of items) {
+      if (typeof item === 'object' && item !== null) {
+        if (
+          'id' in item &&
+          'name' in item &&
+          'type' in item &&
+          'distance' in item &&
+          'selfSize' in item &&
+          'retainedSize' in item
+        ) {
+          lines.push(
+            `${item.id},"${item.name}",${item.type},${item.distance},${item.selfSize},${item.retainedSize}`,
+          );
+        }
+      }
+    }
+
+    return lines.join('\n');
   }
 
   #getSortedAggregates(): AggregatedInfoWithUid[] {
