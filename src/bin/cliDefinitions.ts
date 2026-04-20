@@ -155,6 +155,13 @@ export const commands: Commands = {
         description: 'An optional list of arguments to pass to the function.',
         required: false,
       },
+      dialogAction: {
+        name: 'dialogAction',
+        type: 'string',
+        description:
+          'Handle dialogs while execution. "accept", "dismiss", or string for response of window.prompt. Defaults to accept.',
+        required: false,
+      },
     },
   },
   fill: {

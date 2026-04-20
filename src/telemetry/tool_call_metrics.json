@@ -107,6 +107,10 @@
       {
         "name": "args_count",
         "argType": "number"
+      },
+      {
+        "name": "dialog_action_length",
+        "argType": "number"
       }
     ]
   },
