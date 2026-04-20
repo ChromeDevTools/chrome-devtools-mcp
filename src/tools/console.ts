@@ -37,60 +37,66 @@ const FILTERABLE_MESSAGE_TYPES: [
   'issue',
 ];
 
-export const listConsoleMessages = definePageTool({
-  name: 'list_console_messages',
-  description:
-    'List all console messages for the currently selected page since the last navigation.',
-  annotations: {
-    category: ToolCategory.DEBUGGING,
-    readOnlyHint: true,
-  },
-  schema: {
-    pageSize: zod
-      .number()
-      .int()
-      .positive()
-      .optional()
-      .describe(
-        'Maximum number of messages to return. When omitted, returns all messages.',
-      ),
-    pageIdx: zod
-      .number()
-      .int()
-      .min(0)
-      .optional()
-      .describe(
-        'Page number to return (0-based). When omitted, returns the first page.',
-      ),
-    types: zod
-      .array(zod.enum(FILTERABLE_MESSAGE_TYPES))
-      .optional()
-      .describe(
-        'Filter messages to only return messages of the specified resource types. When omitted or empty, returns all messages.',
-      ),
-    includePreservedMessages: zod
-      .boolean()
-      .default(false)
-      .optional()
-      .describe(
-        'Set to true to return the preserved messages over the last 3 navigations.',
-      ),
-    serviceWorkerId: zod
-      .string()
-      .optional()
-      .describe(
-        'The ID of the service worker to list messages for. When omitted, returns messages for the currently selected page.',
-      ),
-  },
-  handler: async (request, response) => {
-    response.setIncludeConsoleData(true, {
-      pageSize: request.params.pageSize,
-      pageIdx: request.params.pageIdx,
-      types: request.params.types,
-      includePreservedMessages: request.params.includePreservedMessages,
-      serviceWorkerId: request.params.serviceWorkerId,
-    });
-  },
+export const listConsoleMessages = definePageTool(cliArgs => {
+  return {
+    name: 'list_console_messages',
+    description:
+      'List all console messages for the currently selected page since the last navigation.',
+    annotations: {
+      category: ToolCategory.DEBUGGING,
+      readOnlyHint: true,
+    },
+    schema: {
+      pageSize: zod
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe(
+          'Maximum number of messages to return. When omitted, returns all messages.',
+        ),
+      pageIdx: zod
+        .number()
+        .int()
+        .min(0)
+        .optional()
+        .describe(
+          'Page number to return (0-based). When omitted, returns the first page.',
+        ),
+      types: zod
+        .array(zod.enum(FILTERABLE_MESSAGE_TYPES))
+        .optional()
+        .describe(
+          'Filter messages to only return messages of the specified resource types. When omitted or empty, returns all messages.',
+        ),
+      includePreservedMessages: zod
+        .boolean()
+        .default(false)
+        .optional()
+        .describe(
+          'Set to true to return the preserved messages over the last 3 navigations.',
+        ),
+      ...(cliArgs?.categoryExtensions
+        ? {
+            serviceWorkerId: zod
+              .string()
+              .optional()
+              .describe(
+                `The ID of the service worker to list messages for. When omitted, returns messages for the currently selected page.`,
+              ),
+          }
+        : {}),
+    },
+    handler: async (request, response) => {
+      response.setIncludeConsoleData(true, {
+        pageSize: request.params.pageSize,
+        pageIdx: request.params.pageIdx,
+        types: request.params.types,
+        includePreservedMessages: request.params.includePreservedMessages,
+        serviceWorkerId: request.params.serviceWorkerId,
+      });
+    },
+  };
 });
 
 export const getConsoleMessage = definePageTool({
