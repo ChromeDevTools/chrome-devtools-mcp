@@ -14,6 +14,7 @@ import {describe, it} from 'node:test';
 import {
   takeMemorySnapshot,
   exploreMemorySnapshot,
+  getMemorySnapshotDetails,
 } from '../../src/tools/memory.js';
 import {withMcpContext} from '../utils.js';
 
@@ -41,7 +42,7 @@ describe('memory', () => {
   });
 
   describe('load_memory_snapshot', () => {
-    it('with default options', async () => {
+    it('with default options', async t => {
       await withMcpContext(async (response, context) => {
         const filePath = join(
           process.cwd(),
@@ -65,9 +66,34 @@ describe('memory', () => {
           .map(c => (c.type === 'text' ? c.text : ''))
           .join('\n');
 
-        // Check if response contains Statistics or Static Data
-        assert.ok(output.includes('Statistics:'));
-        assert.ok(output.includes('Static Data:'));
+        t.assert.snapshot?.(output);
+      });
+    });
+  });
+
+  describe('get_memory_snapshot_details', () => {
+    it('with default options', async t => {
+      await withMcpContext(async (response, context) => {
+        const filePath = join(
+          process.cwd(),
+          'tests/fixtures/example.heapsnapshot',
+        );
+
+        await getMemorySnapshotDetails.handler(
+          {params: {filePath}},
+          response,
+          context,
+        );
+
+        const responseData = await response.handle(
+          getMemorySnapshotDetails.name,
+          context,
+        );
+        const output = responseData.content
+          .map(c => (c.type === 'text' ? c.text : ''))
+          .join('\n');
+
+        t.assert.snapshot?.(output);
       });
     });
   });

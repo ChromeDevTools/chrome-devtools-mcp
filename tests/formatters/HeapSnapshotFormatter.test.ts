@@ -9,6 +9,7 @@ import {describe, it} from 'node:test';
 
 import {HeapSnapshotFormatter} from '../../src/formatters/HeapSnapshotFormatter.js';
 import type {DevTools} from '../../src/third_party/index.js';
+import {stableIdSymbol} from '../../src/utils/id.js';
 
 describe('HeapSnapshotFormatter', () => {
   const mockAggregates: Record<
@@ -22,6 +23,7 @@ describe('HeapSnapshotFormatter', () => {
       maxRet: 1000,
       distance: 1,
       idxs: [],
+      [stableIdSymbol]: 1,
     } as unknown as DevTools.HeapSnapshotModel.HeapSnapshotModel.AggregatedInfo,
     ObjectB: {
       name: 'ObjectB',
@@ -30,6 +32,7 @@ describe('HeapSnapshotFormatter', () => {
       maxRet: 500,
       distance: 2,
       idxs: [],
+      [stableIdSymbol]: 2,
     } as unknown as DevTools.HeapSnapshotModel.HeapSnapshotModel.AggregatedInfo,
   };
 
@@ -47,12 +50,14 @@ describe('HeapSnapshotFormatter', () => {
       const result = formatter.toJSON();
       assert.deepStrictEqual(result, [
         {
+          uid: 1,
           className: 'ObjectA',
           count: 10,
           selfSize: 100,
           retainedSize: 1000,
         },
         {
+          uid: 2,
           className: 'ObjectB',
           count: 5,
           selfSize: 50,

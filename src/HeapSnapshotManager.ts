@@ -99,6 +99,15 @@ export class HeapSnapshotManager {
     return uid;
   }
 
+  #getCachedSnapshot(filePath: string) {
+    const absolutePath = path.resolve(filePath);
+    const cached = this.#snapshots.get(absolutePath);
+    if (!cached) {
+      throw new Error(`Snapshot not loaded for ${filePath}`);
+    }
+    return cached;
+  }
+
   async #loadSnapshot(absolutePath: string): Promise<{
     snapshot: DevTools.HeapSnapshotModel.HeapSnapshotProxy.HeapSnapshotProxy;
     worker: DevTools.HeapSnapshotModel.HeapSnapshotProxy.HeapSnapshotWorkerProxy;
