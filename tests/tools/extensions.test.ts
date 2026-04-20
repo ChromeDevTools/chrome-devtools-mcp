@@ -128,6 +128,7 @@ describe('extension', () => {
         assert.ok(list.length === 1, 'List should have only one extension');
         const reinstalled = list.find(e => e.id === extensionId);
         assert.ok(reinstalled, 'Extension should be present after reload');
+        await context.uninstallExtension(extensionId!);
       },
       {},
       {

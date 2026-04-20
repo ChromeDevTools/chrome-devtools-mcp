@@ -16,12 +16,76 @@ import {
   listConsoleMessages,
 } from '../../src/tools/console.js';
 import {serverHooks} from '../server.js';
-import {getTextContent, withMcpContext} from '../utils.js';
+import {extractExtensionId, getTextContent, withMcpContext} from '../utils.js';
+import {installExtension} from '../../src/tools/extensions.js';
+import path from 'node:path';
+
+const EXTENSION_LOGGING_PATH = path.join(
+  import.meta.dirname,
+  '../../../tests/tools/fixtures/extension-logging',
+);
 
 describe('console', () => {
   before(async () => {
     await loadIssueDescriptions();
   });
+
+  it('captures logs and errors from extension service worker', async t => {
+    await withMcpContext(
+      async (response, context) => {
+        await installExtension.handler(
+          {params: {path: EXTENSION_LOGGING_PATH}},
+          response,
+          context,
+        );
+
+        const extensionId = extractExtensionId(response);
+        assert.ok(extensionId, 'Extension ID should be returned');
+
+        // This is important to wait logs from extension.
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        const response2 = new McpResponse({} as ParsedArguments);
+
+        await listConsoleMessages.handler(
+          {
+            params: {serviceWorkerId: extensionId},
+            page: context.getSelectedMcpPage(),
+          },
+          response2,
+          context,
+        );
+
+        const formattedResponse = await response2.handle('test', context);
+        const textContent = getTextContent(formattedResponse.content[0]);
+
+        const sanitizedText = textContent.replaceAll(
+          new RegExp(extensionId, 'g'),
+          '<extension-id>',
+        );
+
+        t.assert.snapshot?.(sanitizedText);
+
+        assert.ok(
+          sanitizedText.includes('Service Worker starting...'),
+          'Should contain start log',
+        );
+        assert.ok(
+          sanitizedText.includes('This is a warning from Service Worker'),
+          'Should contain warning log',
+        );
+        assert.ok(
+          sanitizedText.includes('Intentional error from Service Worker'),
+          'Should contain error log',
+        );
+      },
+      {},
+      {
+        categoryExtensions: true,
+      } as ParsedArguments,
+    );
+  });
+
   describe('list_console_messages', () => {
     it('list messages', async () => {
       await withMcpContext(async (response, context) => {

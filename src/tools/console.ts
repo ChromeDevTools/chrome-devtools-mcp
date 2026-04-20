@@ -75,6 +75,12 @@ export const listConsoleMessages = definePageTool({
       .describe(
         'Set to true to return the preserved messages over the last 3 navigations.',
       ),
+    serviceWorkerId: zod
+      .string()
+      .optional()
+      .describe(
+        'The ID of the service worker to list messages for. When omitted, returns messages for the currently selected page.',
+      ),
   },
   handler: async (request, response) => {
     response.setIncludeConsoleData(true, {
@@ -82,6 +88,7 @@ export const listConsoleMessages = definePageTool({
       pageIdx: request.params.pageIdx,
       types: request.params.types,
       includePreservedMessages: request.params.includePreservedMessages,
+      serviceWorkerId: request.params.serviceWorkerId,
     });
   },
 });
