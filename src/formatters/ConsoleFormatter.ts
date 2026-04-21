@@ -13,6 +13,8 @@ import {UncaughtError} from '../PageCollector.js';
 import * as DevTools from '../third_party/index.js';
 import type {ConsoleMessage} from '../third_party/index.js';
 
+import type {IssueFormatter} from './IssueFormatter.js';
+
 export interface ConsoleFormatterOptions {
   fetchDetailedData?: boolean;
   id: number;
@@ -32,6 +34,7 @@ interface ConsoleMessageConcise {
   text: string;
   argsCount: number;
   id: number;
+  count?: number;
 }
 
 interface ConsoleMessageDetailed extends ConsoleMessageConcise {
@@ -175,6 +178,15 @@ export class ConsoleFormatter {
     return convertConsoleMessageConciseToString(this.toJSON());
   }
 
+  // The short format with a repeat count.
+  toStringGrouped(count: number): string {
+    const json = this.toJSON();
+    if (count > 1) {
+      json.count = count;
+    }
+    return convertConsoleMessageConciseToString(json);
+  }
+
   // The verbose format for a console message, including all details.
   toStringDetailed(): string {
     return convertConsoleMessageConciseDetailedToString(this.toJSONDetailed());
@@ -201,6 +213,42 @@ export class ConsoleFormatter {
     };
   }
 
+  toJSONGrouped(count: number): ConsoleMessageConcise {
+    const json = this.toJSON();
+    if (count > 1) {
+      json.count = count;
+    }
+    return json;
+  }
+
+  /**
+   * Groups consecutive messages with the same type and text.
+   * Similar to Chrome DevTools' console grouping behavior.
+   */
+  static groupConsecutive(
+    messages: Array<ConsoleFormatter | IssueFormatter>,
+  ): Array<{message: ConsoleFormatter | IssueFormatter; count: number}> {
+    const grouped: Array<{
+      message: ConsoleFormatter | IssueFormatter;
+      count: number;
+    }> = [];
+    for (const msg of messages) {
+      const prev = grouped[grouped.length - 1];
+      if (
+        prev &&
+        prev.message instanceof ConsoleFormatter &&
+        msg instanceof ConsoleFormatter &&
+        prev.message.#type === msg.#type &&
+        prev.message.#text === msg.#text
+      ) {
+        prev.count++;
+      } else {
+        grouped.push({message: msg, count: 1});
+      }
+    }
+    return grouped;
+  }
+
   toJSONDetailed(): ConsoleMessageDetailed {
     return {
       id: this.#id,
@@ -216,7 +264,8 @@ export class ConsoleFormatter {
 }
 
 function convertConsoleMessageConciseToString(msg: ConsoleMessageConcise) {
-  return `msgid=${msg.id} [${msg.type}] ${msg.text} (${msg.argsCount} args)`;
+  const countSuffix = msg.count && msg.count > 1 ? ` [${msg.count} times]` : '';
+  return `msgid=${msg.id} [${msg.type}] ${msg.text} (${msg.argsCount} args)${countSuffix}`;
 }
 
 function convertConsoleMessageConciseDetailedToString(
