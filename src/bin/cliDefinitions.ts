@@ -380,6 +380,12 @@ export const commands: Commands = {
     category: 'Navigation automation',
     args: {},
   },
+  list_unique_pages: {
+    description:
+      'Get a list of pages open in the browser enriched with Chrome tabId identity from the tab-ID extension when available.',
+    category: 'Navigation automation',
+    args: {},
+  },
   navigate_page: {
     description:
       'Go to a URL, or back, forward, or reload. Use project URL if not specified otherwise.',
@@ -577,6 +583,26 @@ export const commands: Commands = {
         type: 'number',
         description:
           'The ID of the page to select. Call list_pages to get available pages.',
+        required: true,
+      },
+      bringToFront: {
+        name: 'bringToFront',
+        type: 'boolean',
+        description: 'Whether to focus the page and bring it to the top.',
+        required: false,
+      },
+    },
+  },
+  select_unique_page: {
+    description:
+      'Select a page using its Chrome tabId as reported by the tab-ID extension.',
+    category: 'Navigation automation',
+    args: {
+      tabId: {
+        name: 'tabId',
+        type: 'number',
+        description:
+          'The Chrome tabId to select. Call list_unique_pages to find available tab IDs.',
         required: true,
       },
       bringToFront: {

@@ -586,5 +586,22 @@
         "argType": "number"
       }
     ]
+  },
+  {
+    "name": "list_unique_pages",
+    "args": []
+  },
+  {
+    "name": "select_unique_page",
+    "args": [
+      {
+        "name": "tab_id",
+        "argType": "number"
+      },
+      {
+        "name": "bring_to_front",
+        "argType": "boolean"
+      }
+    ]
   }
 ]

@@ -33,6 +33,7 @@ import type {
   LighthouseData,
   Response,
   SnapshotParams,
+  UniquePageData,
 } from './tools/ToolDefinition.js';
 import type {InsightName, TraceResult} from './trace-processing/parse.js';
 import {getInsightOutput, getTraceSummary} from './trace-processing/parse.js';
@@ -197,6 +198,7 @@ export class McpResponse implements Response {
   #listWebMcpTools?: boolean;
   #devToolsData?: DevToolsData;
   #tabId?: string;
+  #uniquePages?: UniquePageData[];
   #args: ParsedArguments;
   #page?: McpPage;
   #redactNetworkHeaders = true;
@@ -219,6 +221,10 @@ export class McpResponse implements Response {
 
   setTabId(tabId: string): void {
     this.#tabId = tabId;
+  }
+
+  setUniquePages(uniquePages: UniquePageData[]): void {
+    this.#uniquePages = uniquePages;
   }
 
   setIncludePages(value: boolean): void {
@@ -698,6 +704,7 @@ export class McpResponse implements Response {
         defaultValue?: string;
       };
       pages?: object[];
+      uniquePages?: object[];
       pagination?: object;
       heapSnapshot?: {
         stats?: object;
@@ -836,6 +843,30 @@ Call ${handleDialog.name} to handle it before continuing.`);
 
     if (this.#tabId) {
       structuredContent.tabId = this.#tabId;
+    }
+
+    if (this.#uniquePages) {
+      if (this.#uniquePages.length) {
+        response.push('## Unique Pages');
+        for (const page of this.#uniquePages) {
+          const parts = [
+            `${page.pageId}:`,
+            `status=${page.identityStatus}`,
+            `tabId=${page.tabId ?? 'null'}`,
+            page.url,
+          ];
+          if (page.selected) {
+            parts.push('[selected]');
+          }
+          if (page.error) {
+            parts.push(`error="${page.error}"`);
+          }
+          response.push(parts.join(' '));
+        }
+      } else {
+        response.push('No pages found.');
+      }
+      structuredContent.uniquePages = this.#uniquePages;
     }
 
     if (data.traceSummary) {

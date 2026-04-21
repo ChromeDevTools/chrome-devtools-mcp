@@ -14,9 +14,11 @@ import sinon from 'sinon';
 import type {ParsedArguments} from '../../src/bin/chrome-devtools-mcp-cli-options.js';
 import {
   listPages,
+  listUniquePages,
   newPage,
   closePage,
   selectPage,
+  selectUniquePage,
   navigatePage,
   resizePage,
   handleDialog,
@@ -204,6 +206,100 @@ describe('pages', () => {
           categoryExtensions: true,
         } as ParsedArguments,
       );
+    });
+  });
+
+  describe('list_unique_pages', () => {
+    it('returns extension-backed tab identity when available', async () => {
+      await withMcpContext(async (response, context) => {
+        sinon.stub(context, 'listExtensions').resolves(
+          new Map([
+            [
+              'test-extension-id',
+              {
+                id: 'test-extension-id',
+                name: "What's My Tab ID",
+                version: '0.1.0',
+                enabled: true,
+              },
+            ],
+          ]) as never,
+        );
+
+        const page1 = context.getSelectedPptrPage();
+        await page1.setContent(html`
+          <script>
+            globalThis.chrome = {
+              runtime: {
+                lastError: null,
+                sendMessage(extensionId, _message, callback) {
+                  callback({
+                    ok: true,
+                    tabId: 101,
+                    uid: 'uid-101',
+                    windowId: 7,
+                    tabIndex: 0,
+                    tabNumber: 1,
+                  });
+                },
+              },
+            };
+          </script>
+          <h1>Page One</h1>
+        `);
+
+        const page2 = await context.newPage();
+        await page2.pptrPage.setContent('<h1>Page Two</h1>');
+
+        await listUniquePages.handler({params: {}}, response, context);
+        const result = await response.handle('list_unique_pages', context);
+        const uniquePages = (
+          result.structuredContent as {
+            uniquePages: Array<Record<string, unknown>>;
+          }
+        ).uniquePages;
+
+        assert.strictEqual(uniquePages.length, 2);
+        assert.deepStrictEqual(uniquePages[0], {
+          pageId: 1,
+          tabId: 101,
+          selected: false,
+          url: 'about:blank',
+          title: 'My test page',
+          identityStatus: 'resolved',
+          uid: 'uid-101',
+          windowId: 7,
+          tabIndex: 0,
+          tabNumber: 1,
+        });
+        assert.strictEqual(uniquePages[1].pageId, 2);
+        assert.strictEqual(uniquePages[1].tabId, null);
+        assert.strictEqual(
+          uniquePages[1].identityStatus,
+          'unsupported_page',
+        );
+      });
+    });
+
+    it('returns unresolved pages when the extension is unavailable', async () => {
+      await withMcpContext(async (response, context) => {
+        sinon.stub(context, 'listExtensions').resolves(new Map());
+
+        await listUniquePages.handler({params: {}}, response, context);
+        const result = await response.handle('list_unique_pages', context);
+        const uniquePages = (
+          result.structuredContent as {
+            uniquePages: Array<Record<string, unknown>>;
+          }
+        ).uniquePages;
+
+        assert.strictEqual(uniquePages.length, 1);
+        assert.strictEqual(uniquePages[0].tabId, null);
+        assert.strictEqual(
+          uniquePages[0].identityStatus,
+          'unsupported_page',
+        );
+      });
     });
   });
   describe('new_page', () => {
@@ -1119,6 +1215,66 @@ describe('pages', () => {
         // @ts-expect-error _tabId is internal.
         assert.strictEqual(result.structuredContent.tabId, 'test-tab-id');
         assert.deepStrictEqual(response.responseLines, []);
+      });
+    });
+  });
+
+  describe('select_unique_page', () => {
+    it('selects a page by extension-backed tabId', async () => {
+      await withMcpContext(async (response, context) => {
+        sinon.stub(context, 'listExtensions').resolves(
+          new Map([
+            [
+              'test-extension-id',
+              {
+                id: 'test-extension-id',
+                name: "What's My Tab ID",
+                version: '0.1.0',
+                enabled: true,
+              },
+            ],
+          ]) as never,
+        );
+
+        const page1 = context.getSelectedPptrPage();
+        await page1.setContent(html`
+          <script>
+            globalThis.chrome = {
+              runtime: {
+                lastError: null,
+                sendMessage(_extensionId, _message, callback) {
+                  callback({ok: true, tabId: 101});
+                },
+              },
+            };
+          </script>
+        `);
+
+        const page2 = await context.newPage();
+        await page2.pptrPage.setContent(html`
+          <script>
+            globalThis.chrome = {
+              runtime: {
+                lastError: null,
+                sendMessage(_extensionId, _message, callback) {
+                  callback({ok: true, tabId: 202});
+                },
+              },
+            };
+          </script>
+        `);
+
+        await selectUniquePage.handler(
+          {params: {tabId: 101}},
+          response,
+          context,
+        );
+
+        assert.strictEqual(
+          context.getPageById(1),
+          context.getSelectedMcpPage(),
+        );
+        assert.ok(response.includePages);
       });
     });
   });

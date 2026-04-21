@@ -5,7 +5,7 @@
  */
 
 import {logger} from '../logger.js';
-import type {CdpPage, Dialog} from '../third_party/index.js';
+import type {CdpPage, Dialog, Page} from '../third_party/index.js';
 import {zod} from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
@@ -15,6 +15,263 @@ import {
   defineTool,
   timeoutSchema,
 } from './ToolDefinition.js';
+import type {
+  Context,
+  UniquePageData,
+  UniquePageIdentityStatus,
+} from './ToolDefinition.js';
+
+const TAB_ID_EXTENSION_NAME = "What's My Tab ID";
+const UNIQUE_PAGE_TIMEOUT_MS = 1_000;
+
+interface TabIdentityPayload {
+  tabId: number;
+  uid?: string;
+  windowId?: number;
+  tabIndex?: number;
+  tabNumber?: number;
+}
+
+type UniquePageProbeResult =
+  | ({identityStatus: 'resolved'} & TabIdentityPayload)
+  | {
+      identityStatus: Exclude<UniquePageIdentityStatus, 'resolved'>;
+      error: string;
+    };
+
+async function resolveTabIdExtensionId(
+  context: Context,
+): Promise<string | undefined> {
+  try {
+    const extensions = await context.listExtensions();
+    return Array.from(extensions.values()).find(
+      extension => extension.name === TAB_ID_EXTENSION_NAME && extension.enabled,
+    )?.id;
+  } catch {
+    return;
+  }
+}
+
+function getIdentityStatusForUnsupportedTransport(
+  url: string,
+): UniquePageIdentityStatus {
+  const protocol = new URL(url).protocol;
+  if (
+    protocol === 'chrome:' ||
+    protocol === 'devtools:' ||
+    protocol === 'chrome-extension:' ||
+    protocol === 'edge:' ||
+    protocol === 'about:'
+  ) {
+    return 'unsupported_page';
+  }
+  return 'extension_unavailable';
+}
+
+async function resolveUniquePageData(
+  page: Page,
+  context: Context,
+  extensionId?: string,
+): Promise<UniquePageData> {
+  const pageId = context.getPageId(page);
+  if (pageId === undefined) {
+    throw new Error('Page ID not found for page.');
+  }
+
+  const baseData: UniquePageData = {
+    pageId,
+    tabId: null,
+    selected: context.isPageSelected(page),
+    url: page.url(),
+    title: await page.title().catch(() => ''),
+    identityStatus: 'extension_unavailable',
+  };
+
+  if (!extensionId) {
+    return {
+      ...baseData,
+      identityStatus: getIdentityStatusForUnsupportedTransport(baseData.url),
+      error: `Extension "${TAB_ID_EXTENSION_NAME}" is not installed or enabled.`,
+    };
+  }
+
+  try {
+    const probeResult = (await page.evaluate(
+      async ({installedExtensionId, timeoutMs}) => {
+        const protocol = location.protocol;
+        const unsupportedProtocols = new Set([
+          'chrome:',
+          'devtools:',
+          'chrome-extension:',
+          'edge:',
+          'about:',
+        ]);
+
+        const fallbackStatus: 'unsupported_page' | 'extension_unavailable' =
+          unsupportedProtocols.has(protocol)
+            ? 'unsupported_page'
+            : 'extension_unavailable';
+
+        const runtime = (
+          globalThis as typeof globalThis & {
+            chrome?: {
+              runtime?: {
+                lastError?: {message?: string};
+                sendMessage?: (
+                  extensionId: string,
+                  message: {type: string},
+                  callback: (response: unknown) => void,
+                ) => void;
+              };
+            };
+          }
+        ).chrome?.runtime;
+
+        const sendMessage = runtime?.sendMessage;
+
+        if (typeof sendMessage !== 'function') {
+          return {
+            identityStatus: fallbackStatus,
+            error: 'chrome.runtime.sendMessage is not available on this page.',
+          };
+        }
+
+        return await new Promise<UniquePageProbeResult>(resolve => {
+          let settled = false;
+          const finish = (value: UniquePageProbeResult) => {
+            if (settled) {
+              return;
+            }
+            settled = true;
+            clearTimeout(timer);
+            resolve(value);
+          };
+
+          const timer = setTimeout(() => {
+            finish({
+              identityStatus: 'extension_unavailable',
+              error: 'Extension request timed out.',
+            });
+          }, timeoutMs);
+
+          try {
+            sendMessage(
+              installedExtensionId,
+              {type: 'GET_CURRENT_TAB_INFO'},
+              (response: unknown) => {
+                const typedResponse =
+                  typeof response === 'object' && response !== null
+                    ? (response as {
+                        ok?: boolean;
+                        tabId?: number;
+                        uid?: string;
+                        windowId?: number;
+                        tabIndex?: number;
+                        tabNumber?: number;
+                        error?: string;
+                      })
+                    : {};
+                const lastError = runtime?.lastError?.message ?? null;
+                if (lastError) {
+                  finish({
+                    identityStatus: 'extension_unavailable',
+                    error: lastError,
+                  });
+                  return;
+                }
+                if (typedResponse.ok && Number.isInteger(typedResponse.tabId)) {
+                  const resolvedTabId = typedResponse.tabId as number;
+                  finish({
+                    identityStatus: 'resolved',
+                    tabId: resolvedTabId,
+                    uid:
+                      typeof typedResponse.uid === 'string'
+                        ? typedResponse.uid
+                        : undefined,
+                    windowId:
+                      typeof typedResponse.windowId === 'number'
+                        ? typedResponse.windowId
+                        : undefined,
+                    tabIndex:
+                      typeof typedResponse.tabIndex === 'number'
+                        ? typedResponse.tabIndex
+                        : undefined,
+                    tabNumber:
+                      typeof typedResponse.tabNumber === 'number'
+                        ? typedResponse.tabNumber
+                        : undefined,
+                  });
+                  return;
+                }
+                if (
+                  typeof typedResponse.error === 'string' &&
+                  typedResponse.error.includes('Current tab is unavailable')
+                ) {
+                  finish({
+                    identityStatus: 'no_tab_context',
+                    error: typedResponse.error,
+                  });
+                  return;
+                }
+                finish({
+                  identityStatus: 'script_failed',
+                  error:
+                    typeof typedResponse.error === 'string'
+                      ? typedResponse.error
+                      : 'The extension returned an unexpected response.',
+                });
+              },
+            );
+          } catch (error) {
+            finish({
+              identityStatus: fallbackStatus,
+              error: error instanceof Error ? error.message : String(error),
+            });
+          }
+        });
+      },
+      {
+        installedExtensionId: extensionId,
+        timeoutMs: UNIQUE_PAGE_TIMEOUT_MS,
+      },
+    )) as UniquePageProbeResult;
+
+    if (probeResult.identityStatus === 'resolved') {
+      return {
+        ...baseData,
+        identityStatus: 'resolved',
+        tabId: probeResult.tabId,
+        uid: probeResult.uid,
+        windowId: probeResult.windowId,
+        tabIndex: probeResult.tabIndex,
+        tabNumber: probeResult.tabNumber,
+      };
+    }
+
+    return {
+      ...baseData,
+      identityStatus: probeResult.identityStatus,
+      error: probeResult.error,
+    };
+  } catch (error) {
+    return {
+      ...baseData,
+      identityStatus: 'script_failed',
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+async function listUniquePageData(context: Context): Promise<UniquePageData[]> {
+  await context.createPagesSnapshot();
+  const extensionId = await resolveTabIdExtensionId(context);
+  const pages = context.getPages();
+  return Promise.all(
+    pages.map(page => {
+      return resolveUniquePageData(page, context, extensionId);
+    }),
+  );
+}
 
 export const listPages = defineTool(args => {
   return {
@@ -31,6 +288,21 @@ export const listPages = defineTool(args => {
       response.setListWebMcpTools();
     },
   };
+});
+
+export const listUniquePages = defineTool({
+  name: 'list_unique_pages',
+  description:
+    'Get a list of pages open in the browser enriched with Chrome tabId identity from the tab-ID extension when available.',
+  annotations: {
+    category: ToolCategory.NAVIGATION,
+    readOnlyHint: true,
+  },
+  schema: {},
+  handler: async (_request, response, context) => {
+    const uniquePages = await listUniquePageData(context);
+    response.setUniquePages(uniquePages);
+  },
 });
 
 export const selectPage = defineTool({
@@ -54,6 +326,53 @@ export const selectPage = defineTool({
   handler: async (request, response, context) => {
     const page = context.getPageById(request.params.pageId);
     context.selectPage(page);
+    response.setIncludePages(true);
+    response.setListInPageTools();
+    response.setListWebMcpTools();
+    if (request.params.bringToFront) {
+      await page.pptrPage.bringToFront();
+    }
+  },
+});
+
+export const selectUniquePage = defineTool({
+  name: 'select_unique_page',
+  description:
+    'Select a page using its Chrome tabId as reported by the tab-ID extension.',
+  annotations: {
+    category: ToolCategory.NAVIGATION,
+    readOnlyHint: true,
+  },
+  schema: {
+    tabId: zod
+      .number()
+      .describe(
+        `The Chrome tabId to select. Call ${listUniquePages.name} to find available tab IDs.`,
+      ),
+    bringToFront: zod
+      .boolean()
+      .optional()
+      .describe('Whether to focus the page and bring it to the top.'),
+  },
+  handler: async (request, response, context) => {
+    const uniquePages = await listUniquePageData(context);
+    const match = uniquePages.find(page => page.tabId === request.params.tabId);
+    if (!match) {
+      throw new Error(
+        `No page found for tabId ${request.params.tabId}. Call ${listUniquePages.name} to inspect current identity status.`,
+      );
+    }
+    if (match.identityStatus !== 'resolved') {
+      throw new Error(
+        `Page for tabId ${request.params.tabId} is unresolved: ${match.identityStatus}.`,
+      );
+    }
+
+    const page = context.getPageById(match.pageId);
+    context.selectPage(page);
+    response.appendResponseLine(
+      `Selected page ${match.pageId} for tabId ${request.params.tabId}.`,
+    );
     response.setIncludePages(true);
     response.setListInPageTools();
     response.setListWebMcpTools();

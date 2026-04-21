@@ -99,6 +99,27 @@ export interface DevToolsData {
   cdpBackendNodeId?: number;
 }
 
+export type UniquePageIdentityStatus =
+  | 'resolved'
+  | 'extension_unavailable'
+  | 'unsupported_page'
+  | 'script_failed'
+  | 'no_tab_context';
+
+export interface UniquePageData {
+  pageId: number;
+  tabId: number | null;
+  selected: boolean;
+  url: string;
+  title: string;
+  identityStatus: UniquePageIdentityStatus;
+  uid?: string;
+  windowId?: number;
+  tabIndex?: number;
+  tabNumber?: number;
+  error?: string;
+}
+
 export interface Response {
   appendResponseLine(value: string): void;
   setHeapSnapshotAggregates(
@@ -138,6 +159,7 @@ export interface Response {
   // Allows re-using DevTools data queried by some tools.
   attachDevToolsData(data: DevToolsData): void;
   setTabId(tabId: string): void;
+  setUniquePages(uniquePages: UniquePageData[]): void;
   attachTraceSummary(trace: TraceResult): void;
   attachTraceInsight(
     trace: TraceResult,
@@ -222,6 +244,11 @@ export type Context = Readonly<{
   listExtensions(): Promise<Map<string, Extension>>;
   getExtension(id: string): Promise<Extension | undefined>;
   getSelectedMcpPage(): McpPage;
+  createPagesSnapshot(): Promise<Page[]>;
+  getPages(): Page[];
+  getPageId(page: Page): number | undefined;
+  isPageSelected(page: Page): boolean;
+  getIsolatedContextName(page: Page): string | undefined;
   getExtensionServiceWorkers(): ExtensionServiceWorker[];
   getExtensionServiceWorkerId(
     extensionServiceWorker: ExtensionServiceWorker,

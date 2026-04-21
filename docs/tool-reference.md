@@ -1,6 +1,6 @@
 <!-- AUTO GENERATED DO NOT EDIT - run 'npm run gen' to update-->
 
-# Chrome DevTools MCP Tool Reference (~7005 cl100k_base tokens)
+# Chrome DevTools MCP Tool Reference (~7304 cl100k_base tokens)
 
 - **[Input automation](#input-automation)** (9 tools)
   - [`click`](#click)
@@ -12,12 +12,14 @@
   - [`press_key`](#press_key)
   - [`type_text`](#type_text)
   - [`upload_file`](#upload_file)
-- **[Navigation automation](#navigation-automation)** (6 tools)
+- **[Navigation automation](#navigation-automation)** (8 tools)
   - [`close_page`](#close_page)
   - [`list_pages`](#list_pages)
+  - [`list_unique_pages`](#list_unique_pages)
   - [`navigate_page`](#navigate_page)
   - [`new_page`](#new_page)
   - [`select_page`](#select_page)
+  - [`select_unique_page`](#select_unique_page)
   - [`wait_for`](#wait_for)
 - **[Emulation](#emulation)** (2 tools)
   - [`emulate`](#emulate)
@@ -164,6 +166,14 @@
 
 ---
 
+### `list_unique_pages`
+
+**Description:** Get a list of pages open in the browser enriched with Chrome tabId identity from the tab-ID extension when available.
+
+**Parameters:** None
+
+---
+
 ### `navigate_page`
 
 **Description:** Go to a URL, or back, forward, or reload. Use project URL if not specified otherwise.
@@ -199,6 +209,17 @@
 **Parameters:**
 
 - **pageId** (number) **(required)**: The ID of the page to select. Call [`list_pages`](#list_pages) to get available pages.
+- **bringToFront** (boolean) _(optional)_: Whether to focus the page and bring it to the top.
+
+---
+
+### `select_unique_page`
+
+**Description:** Select a page using its Chrome tabId as reported by the tab-ID extension.
+
+**Parameters:**
+
+- **tabId** (number) **(required)**: The Chrome tabId to select. Call [`list_unique_pages`](#list_unique_pages) to find available tab IDs.
 - **bringToFront** (boolean) _(optional)_: Whether to focus the page and bring it to the top.
 
 ---
