@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {logger} from './logger.js';
 import type {
   Dialog,
   ElementHandle,
@@ -163,5 +164,29 @@ export class McpPage implements ContextPage {
 
   getAXNodeByUid(uid: string) {
     return this.textSnapshot?.idToNode.get(uid);
+  }
+
+  resolveCdpElementId(cdpBackendNodeId: number): string | undefined {
+    if (!cdpBackendNodeId) {
+      logger('no cdpBackendNodeId');
+      return;
+    }
+    const snapshot = this.textSnapshot;
+    if (!snapshot) {
+      logger('no text snapshot');
+      return;
+    }
+    // TODO: index by backendNodeId instead.
+    const queue = [snapshot.root];
+    while (queue.length) {
+      const current = queue.pop()!;
+      if (current.backendNodeId === cdpBackendNodeId) {
+        return current.id;
+      }
+      for (const child of current.children) {
+        queue.push(child);
+      }
+    }
+    return;
   }
 }
