@@ -398,6 +398,8 @@ in the DevTools Elements panel (if any).
 
 ## Extensions
 
+> NOTE: Extensions are not active by default. Use the '--category-extensions' flag
+
 ### `install_extension`
 
 **Description:** Installs a Chrome extension from the given path.

@@ -13,7 +13,11 @@ import {get_encoding} from 'tiktoken';
 
 import {cliOptions} from '../build/src/bin/chrome-devtools-mcp-cli-options.js';
 import type {ParsedArguments} from '../build/src/bin/chrome-devtools-mcp-cli-options.js';
-import {ToolCategory, labels} from '../build/src/tools/categories.js';
+import {
+  ToolCategory,
+  OFF_BY_DEFAULT_CATEGORIES,
+  labels,
+} from '../build/src/tools/categories.js';
 import {createTools} from '../build/src/tools/tools.js';
 
 const OUTPUT_PATH = './docs/tool-reference.md';
@@ -350,6 +354,12 @@ async function generateReference(
     const categoryName = labels[category];
 
     markdown += `## ${categoryName}\n\n`;
+
+    if (OFF_BY_DEFAULT_CATEGORIES.includes(category)) {
+      const flagName = `--category-${category}`;
+
+      markdown += `> NOTE: ${categoryName} are not active by default. Use the '${flagName}' flag\n\n`;
+    }
 
     // Sort tools within category
     categoryTools.sort((a: Tool, b: Tool) => a.name.localeCompare(b.name));
