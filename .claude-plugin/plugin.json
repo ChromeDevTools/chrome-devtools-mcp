@@ -2,10 +2,19 @@
   "name": "chrome-devtools-mcp",
   "version": "0.21.0",
   "description": "Reliable automation, in-depth debugging, and performance analysis in Chrome using Chrome DevTools and Puppeteer",
+  "userConfig": {
+    "browserUrl": {
+      "description": "Optional URL of a running debuggable Chrome instance, for example http://127.0.0.1:9222. Leave blank to launch Chrome automatically.",
+      "sensitive": false
+    }
+  },
   "mcpServers": {
     "chrome-devtools": {
       "command": "npx",
-      "args": ["chrome-devtools-mcp@latest"]
+      "args": [
+        "chrome-devtools-mcp@latest",
+        "--browser-url=${user_config.browserUrl}"
+      ]
     }
   }
 }
