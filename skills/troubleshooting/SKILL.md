@@ -47,6 +47,13 @@ If the server starts successfully but only a limited subset of tools (like `list
 
 All tools in `chrome-devtools-mcp` are annotated with `readOnlyHint: true` (for safe, non-modifying tools) or `readOnlyHint: false` (for tools that modify browser state, like `emulate`, `click`, `navigate_page`). To access the full suite of tools, the user must disable read-only mode in their MCP client (e.g., by exiting "Plan Mode" in Gemini CLI or adjusting their client's tool safety settings).
 
+#### Symptom: Extension tools are missing or extensions fail to load
+
+If the tools related to extensions (like `install_extension`) are not available, or if the extensions you load are not functioning:
+
+1. **Check for the `--categoryExtensions` flag**: Ensure this flag is passed in the MCP server configuration to enable the extension category tools.
+2. **Make sure the browser was not started with `--autoConnect`**: When using `--autoConnect`, Chrome is not able to load extensions.
+
 #### Other Common Errors
 
 Identify other error messages from the failed tool call or the MCP initialization logs:

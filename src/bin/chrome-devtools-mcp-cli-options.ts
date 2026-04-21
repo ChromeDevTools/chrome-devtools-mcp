@@ -222,10 +222,10 @@ export const cliOptions = {
   },
   categoryExtensions: {
     type: 'boolean',
-    hidden: true,
+    hidden: false,
     conflicts: ['browserUrl', 'autoConnect', 'wsEndpoint'],
     describe:
-      'Set to true to include tools related to extensions. Note: This feature is only supported with a pipe connection. autoConnect is not supported.',
+      'Set to true to include tools related to extensions. Note: This feature is currently only supported with a pipe connection. autoConnect, browserUrl, and wsEndpoint are not supported with this feature until 149 will be released.',
   },
   categoryInPageTools: {
     type: 'boolean',

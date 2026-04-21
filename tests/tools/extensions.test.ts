@@ -197,7 +197,9 @@ describe('extension', () => {
 
         await page.goto(url);
 
-        await listConsoleMessages.handler(
+        await listConsoleMessages({
+          categoryExtensions: true,
+        } as ParsedArguments).handler(
           {params: {includePreservedMessages: true}, page: mcpPage},
           response,
           context,

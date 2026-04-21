@@ -17,7 +17,7 @@ export type Evaluatable = Page | Frame | WebWorker;
 export const evaluateScript = defineTool(cliArgs => {
   return {
     name: 'evaluate_script',
-    description: `Evaluate a JavaScript function inside the currently selected page. Returns the response as JSON,
+    description: `Evaluate a JavaScript function inside the currently selected page${cliArgs?.categoryExtensions ? ' or service worker' : ''}. Returns the response as JSON,
 so returned values have to be JSON-serializable.`,
     annotations: {
       category: ToolCategory.DEBUGGING,
@@ -59,7 +59,7 @@ Example with arguments: \`(el) => {
               .string()
               .optional()
               .describe(
-                `An optional service worker id to evaluate the script in.`,
+                `The optional service worker id to evaluate the script in. If provided, 'pageId' should be omitted. Note: 'args' (element UIDs) cannot be used when evaluating in a service worker.`,
               ),
           }
         : {}),

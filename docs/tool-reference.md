@@ -36,6 +36,12 @@
   - [`list_console_messages`](#list_console_messages)
   - [`take_screenshot`](#take_screenshot)
   - [`take_snapshot`](#take_snapshot)
+- **[Extensions](#extensions)** (5 tools)
+  - [`install_extension`](#install_extension)
+  - [`list_extensions`](#list_extensions)
+  - [`reload_extension`](#reload_extension)
+  - [`trigger_extension_action`](#trigger_extension_action)
+  - [`uninstall_extension`](#uninstall_extension)
 - **[Memory](#memory)** (1 tools)
   - [`take_memory_snapshot`](#take_memory_snapshot)
 
@@ -387,6 +393,56 @@ in the DevTools Elements panel (if any).
 
 - **filePath** (string) _(optional)_: The absolute path, or a path relative to the current working directory, to save the snapshot to instead of attaching it to the response.
 - **verbose** (boolean) _(optional)_: Whether to include all possible information available in the full a11y tree. Default is false.
+
+---
+
+## Extensions
+
+### `install_extension`
+
+**Description:** Installs a Chrome extension from the given path.
+
+**Parameters:**
+
+- **path** (string) **(required)**: Absolute path to the unpacked extension folder.
+
+---
+
+### `list_extensions`
+
+**Description:** Lists all the Chrome extensions installed in the browser. This includes their name, ID, version, and enabled status.
+
+**Parameters:** None
+
+---
+
+### `reload_extension`
+
+**Description:** Reloads an unpacked Chrome extension by its ID.
+
+**Parameters:**
+
+- **id** (string) **(required)**: ID of the extension to reload.
+
+---
+
+### `trigger_extension_action`
+
+**Description:** Triggers the default action of an extension by its ID.
+
+**Parameters:**
+
+- **id** (string) **(required)**: ID of the extension to trigger the action for.
+
+---
+
+### `uninstall_extension`
+
+**Description:** Uninstalls a Chrome extension by its ID.
+
+**Parameters:**
+
+- **id** (string) **(required)**: ID of the extension to uninstall.
 
 ---
 
