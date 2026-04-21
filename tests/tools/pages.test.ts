@@ -22,7 +22,7 @@ import {
   handleDialog,
   getTabId,
 } from '../../src/tools/pages.js';
-import {html, withMcpContext} from '../utils.js';
+import {assertNoServiceWorkerReported, html, withMcpContext} from '../utils.js';
 
 const EXTENSION_SW_PATH = path.join(
   import.meta.dirname,
@@ -94,10 +94,9 @@ describe('pages', () => {
             '<extension-id>',
           );
           t.assert.snapshot?.(text);
+          await context.uninstallExtension(extensionId);
         },
-        {
-          executablePath: process.env.CHROME_M146_EXECUTABLE_PATH,
-        },
+        {},
         {
           categoryExtensions: true,
         } as ParsedArguments,
@@ -146,6 +145,9 @@ describe('pages', () => {
               '<extension-id>',
             );
             t.assert.snapshot?.(text);
+            await context.uninstallExtension(extensionId);
+            const targets = context.browser.targets();
+            assertNoServiceWorkerReported(targets, extensionId);
           },
           {},
           {
@@ -193,10 +195,11 @@ describe('pages', () => {
             '<extension-id>',
           );
           t.assert.snapshot?.(text);
+          await context.uninstallExtension(extensionId);
+          const targets = context.browser.targets();
+          assertNoServiceWorkerReported(targets, extensionId);
         },
-        {
-          executablePath: process.env.CHROME_M146_EXECUTABLE_PATH,
-        },
+        {},
         {
           categoryExtensions: true,
         } as ParsedArguments,

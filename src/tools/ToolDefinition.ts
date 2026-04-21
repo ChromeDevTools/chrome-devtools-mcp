@@ -5,11 +5,13 @@
  */
 
 import type {ParsedArguments} from '../bin/chrome-devtools-mcp-cli-options.js';
+import type {AggregatedInfoWithUid} from '../HeapSnapshotManager.js';
 import type {McpPage} from '../McpPage.js';
 import {zod} from '../third_party/index.js';
 import type {
   Dialog,
   ElementHandle,
+  Extension,
   Page,
   ScreenRecorder,
   Viewport,
@@ -21,7 +23,6 @@ import type {
   GeolocationOptions,
   ExtensionServiceWorker,
 } from '../types.js';
-import type {InstalledExtension} from '../utils/ExtensionRegistry.js';
 import type {PaginationOptions} from '../utils/types.js';
 
 import type {ToolCategory} from './categories.js';
@@ -218,8 +219,8 @@ export type Context = Readonly<{
   installExtension(path: string): Promise<string>;
   uninstallExtension(id: string): Promise<void>;
   triggerExtensionAction(id: string): Promise<void>;
-  listExtensions(): InstalledExtension[];
-  getExtension(id: string): InstalledExtension | undefined;
+  listExtensions(): Promise<Map<string, Extension>>;
+  getExtension(id: string): Promise<Extension | undefined>;
   getSelectedMcpPage(): McpPage;
   getExtensionServiceWorkers(): ExtensionServiceWorker[];
   getExtensionServiceWorkerId(
@@ -227,9 +228,7 @@ export type Context = Readonly<{
   ): string | undefined;
   getHeapSnapshotAggregates(
     filePath: string,
-  ): Promise<
-    Record<string, DevTools.HeapSnapshotModel.HeapSnapshotModel.AggregatedInfo>
-  >;
+  ): Promise<Record<string, AggregatedInfoWithUid>>;
   getHeapSnapshotStats(
     filePath: string,
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.Statistics>;

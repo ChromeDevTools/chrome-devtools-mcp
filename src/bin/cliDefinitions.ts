@@ -590,7 +590,7 @@ export const commands: Commands = {
   take_memory_snapshot: {
     description:
       'Capture a heap snapshot of the currently selected page. Use to analyze the memory distribution of JavaScript objects and debug memory leaks.',
-    category: 'Performance',
+    category: 'Memory',
     args: {
       filePath: {
         name: 'filePath',

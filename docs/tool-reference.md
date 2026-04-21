@@ -22,11 +22,10 @@
 - **[Emulation](#emulation)** (2 tools)
   - [`emulate`](#emulate)
   - [`resize_page`](#resize_page)
-- **[Performance](#performance)** (4 tools)
+- **[Performance](#performance)** (3 tools)
   - [`performance_analyze_insight`](#performance_analyze_insight)
   - [`performance_start_trace`](#performance_start_trace)
   - [`performance_stop_trace`](#performance_stop_trace)
-  - [`take_memory_snapshot`](#take_memory_snapshot)
 - **[Network](#network)** (2 tools)
   - [`get_network_request`](#get_network_request)
   - [`list_network_requests`](#list_network_requests)
@@ -37,6 +36,8 @@
   - [`list_console_messages`](#list_console_messages)
   - [`take_screenshot`](#take_screenshot)
   - [`take_snapshot`](#take_snapshot)
+- **[Memory](#memory)** (1 tools)
+  - [`take_memory_snapshot`](#take_memory_snapshot)
 
 ## Input automation
 
@@ -276,16 +277,6 @@
 
 ---
 
-### `take_memory_snapshot`
-
-**Description:** Capture a heap snapshot of the currently selected page. Use to analyze the memory distribution of JavaScript objects and debug memory leaks.
-
-**Parameters:**
-
-- **filePath** (string) **(required)**: A path to a .heapsnapshot file to save the heapsnapshot to.
-
----
-
 ## Network
 
 ### `get_network_request`
@@ -396,5 +387,17 @@ in the DevTools Elements panel (if any).
 
 - **filePath** (string) _(optional)_: The absolute path, or a path relative to the current working directory, to save the snapshot to instead of attaching it to the response.
 - **verbose** (boolean) _(optional)_: Whether to include all possible information available in the full a11y tree. Default is false.
+
+---
+
+## Memory
+
+### `take_memory_snapshot`
+
+**Description:** Capture a heap snapshot of the currently selected page. Use to analyze the memory distribution of JavaScript objects and debug memory leaks.
+
+**Parameters:**
+
+- **filePath** (string) **(required)**: A path to a .heapsnapshot file to save the heapsnapshot to.
 
 ---

@@ -172,7 +172,7 @@ export async function handleResponse(
         case 'image/jpeg':
           extension = '.jpeg';
           break;
-        case 'webp':
+        case 'image/webp':
           extension = '.webp';
           break;
       }

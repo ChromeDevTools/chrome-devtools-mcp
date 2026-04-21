@@ -569,5 +569,22 @@
         "argType": "number"
       }
     ]
+  },
+  {
+    "name": "get_memory_snapshot_details",
+    "args": [
+      {
+        "name": "file_path_length",
+        "argType": "number"
+      },
+      {
+        "name": "page_idx",
+        "argType": "number"
+      },
+      {
+        "name": "page_size",
+        "argType": "number"
+      }
+    ]
   }
 ]

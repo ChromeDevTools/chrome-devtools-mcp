@@ -497,11 +497,10 @@ If you run into any issues, checkout our [troubleshooting guide](./docs/troubles
 - **Emulation** (2 tools)
   - [`emulate`](docs/tool-reference.md#emulate)
   - [`resize_page`](docs/tool-reference.md#resize_page)
-- **Performance** (4 tools)
+- **Performance** (3 tools)
   - [`performance_analyze_insight`](docs/tool-reference.md#performance_analyze_insight)
   - [`performance_start_trace`](docs/tool-reference.md#performance_start_trace)
   - [`performance_stop_trace`](docs/tool-reference.md#performance_stop_trace)
-  - [`take_memory_snapshot`](docs/tool-reference.md#take_memory_snapshot)
 - **Network** (2 tools)
   - [`get_network_request`](docs/tool-reference.md#get_network_request)
   - [`list_network_requests`](docs/tool-reference.md#list_network_requests)
@@ -512,6 +511,8 @@ If you run into any issues, checkout our [troubleshooting guide](./docs/troubles
   - [`list_console_messages`](docs/tool-reference.md#list_console_messages)
   - [`take_screenshot`](docs/tool-reference.md#take_screenshot)
   - [`take_snapshot`](docs/tool-reference.md#take_snapshot)
+- **Memory** (1 tools)
+  - [`take_memory_snapshot`](docs/tool-reference.md#take_memory_snapshot)
 
 <!-- END AUTO GENERATED TOOLS -->
 

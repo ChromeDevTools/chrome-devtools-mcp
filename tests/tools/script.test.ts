@@ -12,7 +12,12 @@ import type {ParsedArguments} from '../../src/bin/chrome-devtools-mcp-cli-option
 import {installExtension} from '../../src/tools/extensions.js';
 import {evaluateScript} from '../../src/tools/script.js';
 import {serverHooks} from '../server.js';
-import {extractExtensionId, html, withMcpContext} from '../utils.js';
+import {
+  assertNoServiceWorkerReported,
+  extractExtensionId,
+  html,
+  withMcpContext,
+} from '../utils.js';
 
 const EXTENSION_PATH = path.join(
   import.meta.dirname,
@@ -309,6 +314,9 @@ describe('script', () => {
 
           const lineEvaluation = response.responseLines.at(2)!;
           assert.strictEqual(JSON.parse(lineEvaluation), 'has-chrome');
+          await context.uninstallExtension(extensionId);
+          const targets = context.browser.targets();
+          assertNoServiceWorkerReported(targets, extensionId);
         },
         {},
         {categoryExtensions: true} as ParsedArguments,
