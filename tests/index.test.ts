@@ -12,6 +12,7 @@ import {Client} from '@modelcontextprotocol/sdk/client/index.js';
 import {StdioClientTransport} from '@modelcontextprotocol/sdk/client/stdio.js';
 import {executablePath} from 'puppeteer';
 
+import type {ToolCategory} from '../src/tools/categories.js';
 import {OFF_BY_DEFAULT_CATEGORIES} from '../src/tools/categories.js';
 import type {ToolDefinition} from '../src/tools/ToolDefinition.js';
 
@@ -162,7 +163,7 @@ describe('e2e', () => {
 });
 
 async function getToolsWithFilteredCategories(
-  filterOutCategories: string[] = [],
+  filterOutCategories: ToolCategory[] = [],
 ): Promise<string[]> {
   const files = fs.readdirSync('build/src/tools');
   const definedNames = [];
@@ -176,40 +177,39 @@ async function getToolsWithFilteredCategories(
     }
     const fileTools = await import(`../src/tools/${file}`);
     for (const maybeTool of Object.values<unknown>(fileTools)) {
+      let tool;
       if (typeof maybeTool === 'function') {
-        const tool = (maybeTool as (val: boolean) => ToolDefinition)(false);
-        if (tool && typeof tool === 'object' && 'name' in tool) {
-          if (tool.annotations?.conditions) {
-            continue;
-          }
-          if (
-            tool.annotations?.category &&
-            filterOutCategories.includes(tool.annotations?.category)
-          ) {
-            continue;
-          }
-          definedNames.push(tool.name);
-        }
+        tool = (maybeTool as (val: boolean) => ToolDefinition)(false);
+      } else {
+        tool = maybeTool as ToolDefinition;
+      }
+
+      if (toolShouldBeSkipped(tool, filterOutCategories)) {
         continue;
       }
-      if (
-        typeof maybeTool === 'object' &&
-        maybeTool !== null &&
-        'name' in maybeTool
-      ) {
-        const tool = maybeTool as ToolDefinition;
-        if (tool.annotations?.conditions) {
-          continue;
-        }
-        if (
-          tool.annotations?.category &&
-          filterOutCategories.includes(tool.annotations?.category)
-        ) {
-          continue;
-        }
-        definedNames.push(tool.name);
-      }
+      definedNames.push(tool.name);
     }
   }
   return definedNames;
+}
+
+function toolShouldBeSkipped(
+  tool: ToolDefinition,
+  filteredOutCategories: ToolCategory[],
+) {
+  if (tool === null || typeof tool !== 'object' || !('name' in tool)) {
+    return true;
+  }
+
+  if (tool.annotations?.conditions) {
+    return true;
+  }
+  if (
+    tool.annotations?.category &&
+    filteredOutCategories.includes(tool.annotations?.category)
+  ) {
+    return true;
+  }
+
+  return false;
 }
