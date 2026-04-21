@@ -126,6 +126,7 @@ export interface Response {
     options?: PaginationOptions & {
       types?: string[];
       includePreservedMessages?: boolean;
+      serviceWorkerId?: string;
     },
   ): void;
   includeSnapshot(params?: SnapshotParams): void;

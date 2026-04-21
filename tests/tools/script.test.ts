@@ -296,6 +296,8 @@ describe('script', () => {
 
           const swId = context.getExtensionServiceWorkerId(sw);
 
+          await context.triggerExtensionAction(extensionId);
+
           response.resetResponseLineForTesting();
           await evaluateScript({
             categoryExtensions: true,

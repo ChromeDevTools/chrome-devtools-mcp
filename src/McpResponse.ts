@@ -191,6 +191,7 @@ export class McpResponse implements Response {
     pagination?: PaginationOptions;
     types?: string[];
     includePreservedMessages?: boolean;
+    serviceWorkerId?: string;
   };
   #listExtensions?: boolean;
   #listInPageTools?: boolean;
@@ -283,6 +284,7 @@ export class McpResponse implements Response {
     options?: PaginationOptions & {
       types?: string[];
       includePreservedMessages?: boolean;
+      serviceWorkerId?: string;
     },
   ): void {
     if (!value) {
@@ -301,6 +303,7 @@ export class McpResponse implements Response {
           : undefined,
       types: options?.types,
       includePreservedMessages: options?.includePreservedMessages,
+      serviceWorkerId: options?.serviceWorkerId,
     };
   }
 
@@ -547,14 +550,23 @@ export class McpResponse implements Response {
 
     let consoleMessages: Array<ConsoleFormatter | IssueFormatter> | undefined;
     if (this.#consoleDataOptions?.include) {
-      if (!this.#page) {
-        throw new Error(`Response must have an McpPage`);
+      let messages;
+      let page: McpPage | undefined;
+
+      if (this.#consoleDataOptions.serviceWorkerId) {
+        messages = context.getServiceWorkerConsoleData(
+          this.#consoleDataOptions.serviceWorkerId,
+        );
+      } else {
+        page = this.#page;
+        if (!page) {
+          throw new Error(`Response must have an McpPage`);
+        }
+        messages = context.getConsoleData(
+          page,
+          this.#consoleDataOptions.includePreservedMessages,
+        );
       }
-      const page = this.#page;
-      let messages = context.getConsoleData(
-        this.#page,
-        this.#consoleDataOptions.includePreservedMessages,
-      );
 
       if (this.#consoleDataOptions.types?.length) {
         const normalizedTypes = new Set(this.#consoleDataOptions.types);
@@ -577,7 +589,9 @@ export class McpResponse implements Response {
                 context.getConsoleMessageStableId(item);
               if ('args' in item || item instanceof UncaughtError) {
                 const consoleMessage = item as ConsoleMessage | UncaughtError;
-                const devTools = context.getDevToolsUniverse(page);
+                const devTools = page
+                  ? context.getDevToolsUniverse(page)
+                  : null;
                 return await ConsoleFormatter.from(consoleMessage, {
                   id: consoleMessageStableId,
                   fetchDetailedData: false,

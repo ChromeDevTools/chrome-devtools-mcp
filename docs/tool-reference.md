@@ -1,6 +1,6 @@
 <!-- AUTO GENERATED DO NOT EDIT - run 'npm run gen' to update-->
 
-# Chrome DevTools MCP Tool Reference (~7005 cl100k_base tokens)
+# Chrome DevTools MCP Tool Reference (~7003 cl100k_base tokens)
 
 - **[Input automation](#input-automation)** (9 tools)
   - [`click`](#click)
@@ -314,12 +314,12 @@ so returned values have to be JSON-serializable.
 **Parameters:**
 
 - **function** (string) **(required)**: A JavaScript function declaration to be executed by the tool in the currently selected page.
-  Example without arguments: `() => {
+Example without arguments: `() => {
   return document.title
 }` or `async () => {
   return await fetch("example.com")
 }`.
-  Example with arguments: `(el) => {
+Example with arguments: `(el) => {
   return el.innerText;
 }`
 
@@ -330,7 +330,7 @@ so returned values have to be JSON-serializable.
 
 ### `get_console_message`
 
-**Description:** Gets a console message by its ID. You can get all messages by calling [`list_console_messages`](#list_console_messages).
+**Description:** Gets a console message by its ID. You can get all messages by calling .
 
 **Parameters:**
 
