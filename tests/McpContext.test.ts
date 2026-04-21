@@ -10,6 +10,7 @@ import {afterEach, describe, it} from 'node:test';
 import sinon from 'sinon';
 
 import {NetworkFormatter} from '../src/formatters/NetworkFormatter.js';
+import {TextSnapshot} from '../src/TextSnapshot.js';
 import type {HTTPResponse} from '../src/third_party/index.js';
 import type {TraceResult} from '../src/trace-processing/parse.js';
 import type {TextSnapshotNode} from '../src/types.js';
@@ -31,9 +32,9 @@ describe('McpContext', () => {
             value="Input"
           />`,
       );
-      await context.createTextSnapshot(context.getSelectedMcpPage());
+      page.textSnapshot = await TextSnapshot.create(page, context);
       assert.ok(await page.getElementByUid('1_1'));
-      await context.createTextSnapshot(context.getSelectedMcpPage());
+      page.textSnapshot = await TextSnapshot.create(page, context);
       await page.getElementByUid('1_1');
     });
   });
@@ -103,7 +104,9 @@ describe('McpContext', () => {
       // Page 1: set content and snapshot
       const page1 = context.getSelectedMcpPage();
       await page1.pptrPage.setContent(html`<button>Page1 Button</button>`);
-      await context.createTextSnapshot(page1, false, undefined);
+      page1.textSnapshot = await TextSnapshot.create(page1, context, {
+        verbose: false,
+      });
 
       // Capture a uid from page1's snapshot (snapshotId=1, button is node 1)
       const page1Uid = '1_1';
@@ -114,7 +117,9 @@ describe('McpContext', () => {
       const page2 = await context.newPage();
       context.selectPage(page2);
       await page2.pptrPage.setContent(html`<button>Page2 Button</button>`);
-      await context.createTextSnapshot(page2, false, undefined);
+      page2.textSnapshot = await TextSnapshot.create(page2, context, {
+        verbose: false,
+      });
 
       // Page 2 is now selected. Page 1's uid should still resolve.
       const node = context.getAXNodeByUid(page1Uid);
@@ -238,7 +243,10 @@ describe('McpContext', () => {
       }
 
       // Verify it is not in the snapshot by default (due to role="none")
-      await context.createTextSnapshot(page, false, undefined, []);
+      page.textSnapshot = await TextSnapshot.create(page, context, {
+        verbose: false,
+        extraHandles: [],
+      });
       const snapshotBefore = page.textSnapshot;
       if (!snapshotBefore) {
         throw new Error('Snapshot not created');
@@ -257,7 +265,10 @@ describe('McpContext', () => {
       );
 
       // Now take snapshot with extra handle
-      await context.createTextSnapshot(page, false, undefined, [middleHandle]);
+      page.textSnapshot = await TextSnapshot.create(page, context, {
+        verbose: false,
+        extraHandles: [middleHandle],
+      });
 
       const snapshot = page.textSnapshot;
       if (!snapshot) {

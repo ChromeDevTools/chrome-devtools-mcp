@@ -5,6 +5,7 @@
  */
 
 import {logger} from './logger.js';
+import {TextSnapshot} from './TextSnapshot.js';
 import type {
   Dialog,
   ElementHandle,
@@ -18,7 +19,6 @@ import type {ContextPage, Context, Response} from './tools/ToolDefinition.js';
 import type {
   EmulationSettings,
   GeolocationOptions,
-  TextSnapshot,
   TextSnapshotNode,
 } from './types.js';
 import {
@@ -277,12 +277,9 @@ export class McpPage implements ContextPage {
     }
     const resultWithStashedElements = result.result;
     if (elementHandles.length) {
-      await context.createTextSnapshot(
-        this,
-        false,
-        undefined,
-        elementHandles,
-      );
+      this.textSnapshot = await TextSnapshot.create(this, context, {
+        extraHandles: elementHandles,
+      });
       response.includeSnapshot();
     }
 

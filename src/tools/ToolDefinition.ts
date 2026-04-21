@@ -225,12 +225,7 @@ export type Context = Readonly<{
     page: ContextPage,
     cdpBackendNodeId: number,
   ): string | undefined;
-  createTextSnapshot(
-    page: ContextPage,
-    verbose: boolean,
-    devtoolsData: DevToolsData | undefined,
-    extraHandles?: ElementHandle[],
-  ): Promise<void>;
+
   getSelectedMcpPage(): McpPage;
   getExtensionServiceWorkers(): ExtensionServiceWorker[];
   getExtensionServiceWorkerId(
