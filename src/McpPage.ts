@@ -267,7 +267,7 @@ export class McpPage implements ContextPage {
         cdpElementIds.push(`stashed-${i}`);
         continue;
       }
-      const cdpElementId = context.resolveCdpElementId(this, backendNodeId);
+      const cdpElementId = this.resolveCdpElementId(backendNodeId);
       if (!cdpElementId) {
         logger(`Could not get cdpElementId for backend node ${backendNodeId}`);
         cdpElementIds.push(`stashed-${i}`);

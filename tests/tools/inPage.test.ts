@@ -623,7 +623,7 @@ describe('inPage', () => {
           });
 
           const stub = sinon
-            .stub(context, 'resolveCdpElementId')
+            .stub(page, 'resolveCdpElementId')
             .returns('mock-uid');
 
           await executeInPageTool.handler(

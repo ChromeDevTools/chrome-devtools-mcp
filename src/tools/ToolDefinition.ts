@@ -221,11 +221,6 @@ export type Context = Readonly<{
   triggerExtensionAction(id: string): Promise<void>;
   listExtensions(): Promise<Map<string, Extension>>;
   getExtension(id: string): Promise<Extension | undefined>;
-  resolveCdpElementId(
-    page: ContextPage,
-    cdpBackendNodeId: number,
-  ): string | undefined;
-
   getSelectedMcpPage(): McpPage;
   getExtensionServiceWorkers(): ExtensionServiceWorker[];
   getExtensionServiceWorkerId(

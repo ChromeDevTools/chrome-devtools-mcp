@@ -134,10 +134,7 @@ export class TextSnapshot {
     const data = options.devtoolsData ?? (await context.getDevToolsData(page));
     if (data?.cdpBackendNodeId) {
       snapshot.hasSelectedElement = true;
-      snapshot.selectedElementUid = context.resolveCdpElementId(
-        page,
-        data.cdpBackendNodeId,
-      );
+      snapshot.selectedElementUid = page.resolveCdpElementId(data.cdpBackendNodeId);
     }
 
     // Clean up unique IDs that we did not see anymore.
