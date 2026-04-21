@@ -15,7 +15,11 @@ import type {
 } from './third_party/index.js';
 import type {ToolGroup, ToolDefinition} from './tools/inPage.js';
 import {takeSnapshot} from './tools/snapshot.js';
-import type {ContextPage, Context, Response} from './tools/ToolDefinition.js';
+import type {
+  ContextPage,
+  DevToolsData,
+  Response,
+} from './tools/ToolDefinition.js';
 import type {
   EmulationSettings,
   GeolocationOptions,
@@ -136,7 +140,6 @@ export class McpPage implements ContextPage {
     toolName: string,
     params: Record<string, unknown>,
     response: Response,
-    context: Context,
   ): Promise<void> {
     // Creates array of ElementHandles from the UIDs in the params.
     // We do not replace the uids with the ElementsHandles yet, because
@@ -277,7 +280,7 @@ export class McpPage implements ContextPage {
     }
     const resultWithStashedElements = result.result;
     if (elementHandles.length) {
-      this.textSnapshot = await TextSnapshot.create(this, context, {
+      this.textSnapshot = await TextSnapshot.create(this, {
         extraHandles: elementHandles,
       });
       response.includeSnapshot();
@@ -369,5 +372,38 @@ export class McpPage implements ContextPage {
       }
     }
     return;
+  }
+
+  async getDevToolsData(): Promise<DevToolsData> {
+    try {
+      logger('Getting DevTools UI data');
+      const devtoolsPage = this.devToolsPage;
+      if (!devtoolsPage) {
+        logger('No DevTools page detected');
+        return {};
+      }
+      const {cdpRequestId, cdpBackendNodeId} = await devtoolsPage.evaluate(
+        async () => {
+          // @ts-expect-error no types
+          const UI = await import('/bundled/ui/legacy/legacy.js');
+          // @ts-expect-error no types
+          const SDK = await import('/bundled/core/sdk/sdk.js');
+          const request = UI.Context.Context.instance().flavor(
+            SDK.NetworkRequest.NetworkRequest,
+          );
+          const node = UI.Context.Context.instance().flavor(
+            SDK.DOMModel.DOMNode,
+          );
+          return {
+            cdpRequestId: request?.requestId(),
+            cdpBackendNodeId: node?.backendNodeId(),
+          };
+        },
+      );
+      return {cdpBackendNodeId, cdpRequestId};
+    } catch (err) {
+      logger('error getting devtools data', err);
+    }
+    return {};
   }
 }

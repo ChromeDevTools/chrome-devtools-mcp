@@ -71,7 +71,7 @@ export const executeInPageTool = definePageTool({
       .optional()
       .describe('The JSON-stringified parameters to pass to the tool'),
   },
-  handler: async (request, response, context) => {
+  handler: async (request, response) => {
     const toolName = request.params.toolName;
     let params: Record<string, unknown> = {};
     if (request.params.params) {
@@ -102,6 +102,6 @@ export const executeInPageTool = definePageTool({
       );
     }
 
-    await request.page.executeInPageTool(toolName, params, response, context);
+    await request.page.executeInPageTool(toolName, params, response);
   },
 });

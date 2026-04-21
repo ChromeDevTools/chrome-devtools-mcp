@@ -158,7 +158,6 @@ describe('screenshot', () => {
         await page.setContent(fixture.html);
         context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
           context.getSelectedMcpPage(),
-          context,
         );
         await screenshot.handler(
           {

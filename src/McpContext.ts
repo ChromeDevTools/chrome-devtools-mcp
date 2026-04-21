@@ -35,11 +35,7 @@ import {Locator} from './third_party/index.js';
 import {PredefinedNetworkConditions} from './third_party/index.js';
 import {listPages} from './tools/pages.js';
 import {CLOSE_PAGE_ERROR} from './tools/ToolDefinition.js';
-import type {
-  Context,
-  DevToolsData,
-  SupportedExtensions,
-} from './tools/ToolDefinition.js';
+import type {Context, SupportedExtensions} from './tools/ToolDefinition.js';
 import type {TraceResult} from './trace-processing/parse.js';
 import type {
   EmulationSettings,
@@ -642,47 +638,6 @@ export class McpContext implements Context {
   getIsolatedContextName(page: Page): string | undefined {
     return this.#mcpPages.get(page)?.isolatedContextName;
   }
-
-  getDevToolsPage(page: Page): Page | undefined {
-    return this.#mcpPages.get(page)?.devToolsPage;
-  }
-
-  async getDevToolsData(page: McpPage): Promise<DevToolsData> {
-    try {
-      this.logger('Getting DevTools UI data');
-      const devtoolsPage = this.getDevToolsPage(page.pptrPage);
-      if (!devtoolsPage) {
-        this.logger('No DevTools page detected');
-        return {};
-      }
-      const {cdpRequestId, cdpBackendNodeId} = await devtoolsPage.evaluate(
-        async () => {
-          // @ts-expect-error no types
-          const UI = await import('/bundled/ui/legacy/legacy.js');
-          // @ts-expect-error no types
-          const SDK = await import('/bundled/core/sdk/sdk.js');
-          const request = UI.Context.Context.instance().flavor(
-            SDK.NetworkRequest.NetworkRequest,
-          );
-          const node = UI.Context.Context.instance().flavor(
-            SDK.DOMModel.DOMNode,
-          );
-          return {
-            cdpRequestId: request?.requestId(),
-            cdpBackendNodeId: node?.backendNodeId(),
-          };
-        },
-      );
-      return {cdpBackendNodeId, cdpRequestId};
-    } catch (err) {
-      this.logger('error getting devtools data', err);
-    }
-    return {};
-  }
-
-  /**
-   * Creates a text snapshot of a page.
-   */
 
   async saveTemporaryFile(
     data: Uint8Array<ArrayBufferLike>,

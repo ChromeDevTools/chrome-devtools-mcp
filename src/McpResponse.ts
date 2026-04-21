@@ -444,7 +444,7 @@ export class McpResponse implements Response {
       if (!this.#page) {
         throw new Error('Response must have a page');
       }
-      this.#page.textSnapshot = await TextSnapshot.create(this.#page, context, {
+      this.#page.textSnapshot = await TextSnapshot.create(this.#page, {
         verbose: this.#snapshotParams.verbose,
         devtoolsData: this.#devToolsData,
       });

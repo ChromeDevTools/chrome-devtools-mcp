@@ -204,7 +204,6 @@ describe('script', () => {
 
         context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
           context.getSelectedMcpPage(),
-          context,
         );
 
         await evaluateScript().handler(
@@ -232,7 +231,6 @@ describe('script', () => {
 
         context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
           context.getSelectedMcpPage(),
-          context,
         );
 
         await evaluateScript().handler(
@@ -264,7 +262,6 @@ describe('script', () => {
         await page.goto(server.getRoute('/main'));
         context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
           context.getSelectedMcpPage(),
-          context,
         );
         await evaluateScript().handler(
           {

@@ -32,9 +32,9 @@ describe('McpContext', () => {
             value="Input"
           />`,
       );
-      page.textSnapshot = await TextSnapshot.create(page, context);
+      page.textSnapshot = await TextSnapshot.create(page);
       assert.ok(await page.getElementByUid('1_1'));
-      page.textSnapshot = await TextSnapshot.create(page, context);
+      page.textSnapshot = await TextSnapshot.create(page);
       await page.getElementByUid('1_1');
     });
   });
@@ -92,7 +92,7 @@ describe('McpContext', () => {
       async (_response, context) => {
         const page = await context.newPage();
         await context.createPagesSnapshot();
-        assert.ok(context.getDevToolsPage(page.pptrPage));
+        assert.ok(page.devToolsPage);
       },
       {
         autoOpenDevTools: true,
@@ -104,7 +104,7 @@ describe('McpContext', () => {
       // Page 1: set content and snapshot
       const page1 = context.getSelectedMcpPage();
       await page1.pptrPage.setContent(html`<button>Page1 Button</button>`);
-      page1.textSnapshot = await TextSnapshot.create(page1, context, {
+      page1.textSnapshot = await TextSnapshot.create(page1, {
         verbose: false,
       });
 
@@ -117,7 +117,7 @@ describe('McpContext', () => {
       const page2 = await context.newPage();
       context.selectPage(page2);
       await page2.pptrPage.setContent(html`<button>Page2 Button</button>`);
-      page2.textSnapshot = await TextSnapshot.create(page2, context, {
+      page2.textSnapshot = await TextSnapshot.create(page2, {
         verbose: false,
       });
 
@@ -243,7 +243,7 @@ describe('McpContext', () => {
       }
 
       // Verify it is not in the snapshot by default (due to role="none")
-      page.textSnapshot = await TextSnapshot.create(page, context, {
+      page.textSnapshot = await TextSnapshot.create(page, {
         verbose: false,
         extraHandles: [],
       });
@@ -265,7 +265,7 @@ describe('McpContext', () => {
       );
 
       // Now take snapshot with extra handle
-      page.textSnapshot = await TextSnapshot.create(page, context, {
+      page.textSnapshot = await TextSnapshot.create(page, {
         verbose: false,
         extraHandles: [middleHandle],
       });

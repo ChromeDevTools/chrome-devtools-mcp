@@ -11,7 +11,7 @@ import type {
   SerializedAXNode,
   ElementHandle,
 } from './third_party/index.js';
-import type {Context, DevToolsData} from './tools/ToolDefinition.js';
+import type {DevToolsData} from './tools/ToolDefinition.js';
 import type {TextSnapshotNode} from './types.js';
 
 export class TextSnapshot {
@@ -46,7 +46,6 @@ export class TextSnapshot {
 
   static async create(
     page: McpPage,
-    context: Context,
     options: {
       verbose?: boolean;
       devtoolsData?: DevToolsData;
@@ -131,10 +130,12 @@ export class TextSnapshot {
       verbose,
     });
 
-    const data = options.devtoolsData ?? (await context.getDevToolsData(page));
+    const data = options.devtoolsData ?? (await page.getDevToolsData());
     if (data?.cdpBackendNodeId) {
       snapshot.hasSelectedElement = true;
-      snapshot.selectedElementUid = page.resolveCdpElementId(data.cdpBackendNodeId);
+      snapshot.selectedElementUid = page.resolveCdpElementId(
+        data.cdpBackendNodeId,
+      );
     }
 
     // Clean up unique IDs that we did not see anymore.

@@ -206,7 +206,7 @@ describe('console', () => {
           await page.pptrPage.setContent(
             '<input type="text" name="username" />',
           );
-          page.textSnapshot = await TextSnapshot.create(page, context);
+          page.textSnapshot = await TextSnapshot.create(page);
           await issuePromise;
           await listConsoleMessages().handler(
             {params: {}, page: context.getSelectedMcpPage()},
@@ -251,7 +251,7 @@ describe('console', () => {
               });
             </script>
           `);
-          page.textSnapshot = await TextSnapshot.create(page, context);
+          page.textSnapshot = await TextSnapshot.create(page);
           await issuePromise;
           const messages = context.getConsoleData(page);
           let issueMsg;
