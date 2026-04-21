@@ -52,7 +52,7 @@ All tools in `chrome-devtools-mcp` are annotated with `readOnlyHint: true` (for 
 If the tools related to extensions (like `install_extension`) are not available, or if the extensions you load are not functioning:
 
 1. **Check for the `--categoryExtensions` flag**: Ensure this flag is passed in the MCP server configuration to enable the extension category tools.
-2. **Make sure the MCP server in configured to launch Chrome instead of connecting to an instance. Chrome before 149 is not able to load extensions when connecting to existing instance (`--auto-connect`, `--browserUrl`).
+2. \*\*Make sure the MCP server in configured to launch Chrome instead of connecting to an instance. Chrome before 149 is not able to load extensions when connecting to existing instance (`--auto-connect`, `--browserUrl`).
 
 #### Other Common Errors
 
