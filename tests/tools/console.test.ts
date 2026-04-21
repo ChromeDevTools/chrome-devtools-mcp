@@ -42,10 +42,36 @@ describe('console', () => {
         const extensionId = extractExtensionId(response);
         assert.ok(extensionId, 'Extension ID should be returned');
 
+        const swTarget = await context.browser.waitForTarget(
+          t => t.type() === 'service_worker' && t.url().includes(extensionId),
+        );
+
+        const swList = await context.createExtensionServiceWorkersSnapshot();
+        const sw = swList.find(s => s.target === swTarget);
+        if (!sw) {
+          assert.fail('Service worker not found in context list');
+        }
+        const swId = context.getExtensionServiceWorkerId(sw);
+
+        const response2 = new McpResponse({} as ParsedArguments);
+
+        await context.triggerExtensionAction(extensionId);
+        const worker = await swTarget.worker();
+
+        await worker?.evaluate(
+          `
+            console.log('Service Worker starting...');
+            console.warn('This is a warning from Service Worker');
+            setTimeout(() => {
+              throw new Error('Intentional error from Service Worker');
+            }, 100);
+          `,
+        );
+
         // This is important to wait logs from extension.
         await new Promise(resolve => setTimeout(resolve, 500));
 
-        const response2 = new McpResponse({} as ParsedArguments);
+        response2.resetResponseLineForTesting();
 
         await listConsoleMessages({
           categoryExtensions: true,
