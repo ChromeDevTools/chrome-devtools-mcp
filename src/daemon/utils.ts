@@ -24,56 +24,60 @@ const APP_NAME = 'chrome-devtools-mcp';
 export const DAEMON_CLIENT_NAME = 'chrome-devtools-cli-daemon';
 
 // Using these paths due to strict limits on the POSIX socket path length.
-export function getSocketPath(): string {
+export function getSocketPath(sessionId: string): string {
   const uid = os.userInfo().uid;
+  const suffix = sessionId ? `-${sessionId}` : '';
+  const appName = APP_NAME + suffix;
 
   if (IS_WINDOWS) {
     // Windows uses Named Pipes, not file paths.
     // This format is required for server.listen()
-    return path.join('\\\\.\\pipe', APP_NAME, 'server.sock');
+    return path.join('\\\\.\\pipe', appName, 'server.sock');
   }
 
   // 1. Try XDG_RUNTIME_DIR (Linux standard, sometimes macOS)
   if (process.env.XDG_RUNTIME_DIR) {
-    return path.join(process.env.XDG_RUNTIME_DIR, APP_NAME, 'server.sock');
+    return path.join(process.env.XDG_RUNTIME_DIR, appName, 'server.sock');
   }
 
   // 2. macOS/Unix Fallback: Use /tmp/
   // We use /tmp/ because it is much shorter than ~/Library/Application Support/
   // and keeps us well under the 104-character limit.
-  return path.join('/tmp', `${APP_NAME}-${uid}.sock`);
+  return path.join('/tmp', `${appName}-${uid}.sock`);
 }
 
-export function getRuntimeHome(): string {
+export function getRuntimeHome(sessionId: string): string {
   const platform = os.platform();
   const uid = os.userInfo().uid;
+  const suffix = sessionId ? `-${sessionId}` : '';
+  const appName = APP_NAME + suffix;
 
   // 1. Check for the modern Unix standard
   if (process.env.XDG_RUNTIME_DIR) {
-    return path.join(process.env.XDG_RUNTIME_DIR, APP_NAME);
+    return path.join(process.env.XDG_RUNTIME_DIR, appName);
   }
 
   // 2. Fallback for macOS and older Linux
   if (platform === 'darwin' || platform === 'linux') {
     // /tmp is cleared on boot, making it perfect for PIDs
-    return path.join('/tmp', `${APP_NAME}-${uid}`);
+    return path.join('/tmp', `${appName}-${uid}`);
   }
 
   // 3. Windows Fallback
-  return path.join(os.tmpdir(), APP_NAME);
+  return path.join(os.tmpdir(), appName);
 }
 
 export const IS_WINDOWS = os.platform() === 'win32';
 
-export function getPidFilePath() {
-  const runtimeDir = getRuntimeHome();
+export function getPidFilePath(sessionId: string) {
+  const runtimeDir = getRuntimeHome(sessionId);
   return path.join(runtimeDir, 'daemon.pid');
 }
 
-export function getDaemonPid() {
+export function getDaemonPid(sessionId: string) {
   try {
-    const pidFile = getPidFilePath();
-    logger(`Daemon pid file ${pidFile}`);
+    const pidFile = getPidFilePath(sessionId);
+    logger(`Daemon pid file ${pidFile} sessionId=${sessionId}`);
     if (!fs.existsSync(pidFile)) {
       return null;
     }
@@ -89,7 +93,8 @@ export function getDaemonPid() {
   }
 }
 
-export function isDaemonRunning(pid = getDaemonPid()): pid is number {
+export function isDaemonRunning(sessionId: string): boolean {
+  const pid = getDaemonPid(sessionId);
   if (pid) {
     try {
       process.kill(pid, 0); // Throws if process doesn't exist

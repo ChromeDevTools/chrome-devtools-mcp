@@ -5,6 +5,7 @@
  */
 
 import assert from 'node:assert';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -17,36 +18,39 @@ import {
 } from '../utils.js';
 
 describe('chrome-devtools', () => {
+  let sessionId: string;
+
   beforeEach(async () => {
-    await runCli(['stop']);
-    await assertDaemonIsNotRunning();
+    sessionId = crypto.randomUUID();
+    await runCli(['stop'], sessionId);
+    await assertDaemonIsNotRunning(sessionId);
   });
 
   afterEach(async () => {
-    await runCli(['stop']);
-    await assertDaemonIsNotRunning();
+    await runCli(['stop'], sessionId);
+    await assertDaemonIsNotRunning(sessionId);
   });
 
   it('can start and stop the daemon', async () => {
-    await assertDaemonIsNotRunning();
+    await assertDaemonIsNotRunning(sessionId);
 
-    const startResult = await runCli(['start']);
+    const startResult = await runCli(['start'], sessionId);
     assert.strictEqual(
       startResult.status,
       0,
       `start command failed: ${startResult.stderr}`,
     );
 
-    await assertDaemonIsRunning();
+    await assertDaemonIsRunning(sessionId);
 
-    const stopResult = await runCli(['stop']);
+    const stopResult = await runCli(['stop'], sessionId);
     assert.strictEqual(
       stopResult.status,
       0,
       `stop command failed: ${stopResult.stderr}`,
     );
 
-    await assertDaemonIsNotRunning();
+    await assertDaemonIsNotRunning(sessionId);
   });
 
   it('can start the daemon with userDataDir', async () => {
@@ -56,7 +60,10 @@ describe('chrome-devtools', () => {
     );
     fs.mkdirSync(userDataDir, {recursive: true});
 
-    const startResult = await runCli(['start', '--userDataDir', userDataDir]);
+    const startResult = await runCli(
+      ['start', '--userDataDir', userDataDir],
+      sessionId,
+    );
     assert.strictEqual(
       startResult.status,
       0,
@@ -69,6 +76,6 @@ describe('chrome-devtools', () => {
       `unexpected conflict error: ${startResult.stderr}`,
     );
 
-    await assertDaemonIsRunning();
+    await assertDaemonIsRunning(sessionId);
   });
 });

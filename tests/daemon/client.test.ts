@@ -5,6 +5,7 @@
  */
 
 import assert from 'node:assert';
+import crypto from 'node:crypto';
 import {describe, it, afterEach, beforeEach} from 'node:test';
 
 import {
@@ -16,39 +17,57 @@ import {isDaemonRunning} from '../../src/daemon/utils.js';
 
 describe('daemon client', () => {
   describe('start/stop', () => {
+    let sessionId: string;
+
     beforeEach(async () => {
-      await stopDaemon();
+      sessionId = crypto.randomUUID();
+      await stopDaemon(sessionId);
     });
 
     afterEach(async () => {
-      await stopDaemon();
+      await stopDaemon(sessionId);
     });
 
     it('should start and stop daemon', async () => {
-      assert.ok(!isDaemonRunning(), 'Daemon should not be running initially');
+      assert.ok(
+        !isDaemonRunning(sessionId),
+        'Daemon should not be running initially',
+      );
 
-      await startDaemon();
-      assert.ok(isDaemonRunning(), 'Daemon should be running after start');
+      await startDaemon([], sessionId);
+      assert.ok(
+        isDaemonRunning(sessionId),
+        'Daemon should be running after start',
+      );
 
-      await stopDaemon();
-      assert.ok(!isDaemonRunning(), 'Daemon should not be running after stop');
+      await stopDaemon(sessionId);
+      assert.ok(
+        !isDaemonRunning(sessionId),
+        'Daemon should not be running after stop',
+      );
     });
 
     it('should handle starting daemon when already running', async () => {
-      await startDaemon();
-      assert.ok(isDaemonRunning(), 'Daemon should be running');
+      await startDaemon([], sessionId);
+      assert.ok(isDaemonRunning(sessionId), 'Daemon should be running');
 
       // Starting again should be a no-op
-      await startDaemon();
-      assert.ok(isDaemonRunning(), 'Daemon should still be running');
+      await startDaemon([], sessionId);
+      assert.ok(isDaemonRunning(sessionId), 'Daemon should still be running');
     });
 
     it('should handle stopping daemon when not running', async () => {
-      assert.ok(!isDaemonRunning(), 'Daemon should not be running initially');
+      assert.ok(
+        !isDaemonRunning(sessionId),
+        'Daemon should not be running initially',
+      );
 
       // Stopping when not running should be a no-op
-      await stopDaemon();
-      assert.ok(!isDaemonRunning(), 'Daemon should still not be running');
+      await stopDaemon(sessionId);
+      assert.ok(
+        !isDaemonRunning(sessionId),
+        'Daemon should still not be running',
+      );
     });
   });
 

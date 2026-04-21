@@ -352,9 +352,14 @@ export const CLI_PATH = path.resolve('build/src/bin/chrome-devtools.js');
 
 export async function runCli(
   args: string[],
+  sessionId?: string,
 ): Promise<{status: number | null; stdout: string; stderr: string}> {
   return new Promise((resolve, reject) => {
-    const child = spawn('node', [CLI_PATH, ...args]);
+    const finalArgs = [...args];
+    if (sessionId) {
+      finalArgs.push('--sessionId', sessionId);
+    }
+    const child = spawn('node', [CLI_PATH, ...finalArgs]);
     let stdout = '';
     let stderr = '';
     child.stdout.on('data', chunk => {
@@ -370,16 +375,16 @@ export async function runCli(
   });
 }
 
-export async function assertDaemonIsNotRunning() {
-  const result = await runCli(['status']);
+export async function assertDaemonIsNotRunning(sessionId?: string) {
+  const result = await runCli(['status'], sessionId);
   assert.strictEqual(
     result.stdout,
     'chrome-devtools-mcp daemon is not running.\n',
   );
 }
 
-export async function assertDaemonIsRunning() {
-  const result = await runCli(['status']);
+export async function assertDaemonIsRunning(sessionId?: string) {
+  const result = await runCli(['status'], sessionId);
   assert.ok(
     result.stdout.startsWith('chrome-devtools-mcp daemon is running.\n'),
     'chrome-devtools-mcp daemon is not running',
