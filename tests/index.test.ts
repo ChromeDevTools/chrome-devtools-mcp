@@ -176,12 +176,18 @@ async function getToolsWithFilteredCategories(
       continue;
     }
     const fileTools = await import(`../src/tools/${file}`);
+
     for (const maybeTool of Object.values<unknown>(fileTools)) {
       let tool;
       if (typeof maybeTool === 'function') {
         tool = (maybeTool as (val: boolean) => ToolDefinition)(false);
       } else {
         tool = maybeTool as ToolDefinition;
+      }
+
+      // Skipping all files that are not tool files
+      if (tool === null || typeof tool !== 'object' || !('name' in tool)) {
+        continue;
       }
 
       if (toolShouldBeSkipped(tool, filterOutCategories)) {
@@ -197,10 +203,6 @@ function toolShouldBeSkipped(
   tool: ToolDefinition,
   filteredOutCategories: ToolCategory[],
 ) {
-  if (tool === null || typeof tool !== 'object' || !('name' in tool)) {
-    return true;
-  }
-
   if (tool.annotations?.conditions) {
     return true;
   }
