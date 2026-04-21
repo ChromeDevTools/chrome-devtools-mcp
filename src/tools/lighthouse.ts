@@ -45,7 +45,12 @@ export const lighthouseAudit = definePageTool({
   },
   handler: async (request, response, context) => {
     const page = request.page;
-    const categories = ['accessibility', 'seo', 'best-practices'];
+    const categories = [
+      'accessibility',
+      'seo',
+      'best-practices',
+      'agentic-browsing',
+    ];
     const formats = ['json', 'html'] as OutputMode[];
     const {
       mode = 'navigation',
