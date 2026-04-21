@@ -250,6 +250,7 @@ export class McpPage implements ContextPage {
     );
 
     const elementHandles: ElementHandle[] = [];
+    const cdpElementIds: string[] = [];
     for (let i = 0; i < (result.stashed ?? 0); i++) {
       const elementHandle = await this.pptrPage.evaluateHandle(index => {
         const el = window.__dtmcp?.stashedElements?.[index];
@@ -259,42 +260,35 @@ export class McpPage implements ContextPage {
         return el;
       }, i);
       elementHandles.push(elementHandle);
-    }
-    const resultWithStashedElements = result.result;
 
-    let isPageSnapshotUpdated = false;
-
-    const stashedToUid = async (index: number) => {
-      const backendNodeId = await elementHandles[index].backendNodeId();
+      const backendNodeId = await elementHandle.backendNodeId();
       if (!backendNodeId) {
-        logger(`No backendNodeId for stashed DOM element with index ${index}`);
-        return {uid: `stashed-${index}`};
+        logger(`No backendNodeId for stashed DOM element with index ${i}`);
+        cdpElementIds.push(`stashed-${i}`);
+        continue;
       }
-      let cdpElementId = context.resolveCdpElementId(this, backendNodeId);
-      if (!cdpElementId) {
-        await context.createTextSnapshot(
-          this,
-          false,
-          undefined,
-          elementHandles,
-        );
-        isPageSnapshotUpdated = true;
-        cdpElementId = context.resolveCdpElementId(this, backendNodeId);
-      }
+      const cdpElementId = context.resolveCdpElementId(this, backendNodeId);
       if (!cdpElementId) {
         logger(`Could not get cdpElementId for backend node ${backendNodeId}`);
-        return {uid: `stashed-${index}`};
+        cdpElementIds.push(`stashed-${i}`);
+        continue;
       }
-      return {uid: cdpElementId};
-    };
+      cdpElementIds.push(cdpElementId);
+    }
+    const resultWithStashedElements = result.result;
+    if (elementHandles.length) {
+      await context.createTextSnapshot(
+        this,
+        false,
+        undefined,
+        elementHandles,
+      );
+      response.includeSnapshot();
+    }
 
-    const recursivelyReplaceStashedElements = async (
-      node: unknown,
-    ): Promise<unknown> => {
+    const recursivelyReplaceStashedElements = (node: unknown): unknown => {
       if (Array.isArray(node)) {
-        return await Promise.all(
-          node.map(async x => await recursivelyReplaceStashedElements(x)),
-        );
+        return node.map(x => recursivelyReplaceStashedElements(x));
       }
       if (node !== null && typeof node === 'object') {
         if (
@@ -304,24 +298,21 @@ export class McpPage implements ContextPage {
           Object.keys(node).length === 1
         ) {
           const index = parseInt(node.stashedId.split('-')[1]);
-          return stashedToUid(index);
+          return {uid: cdpElementIds[index]};
         }
         const resultObj: Record<string, unknown> = {};
         for (const [key, value] of Object.entries(node)) {
-          resultObj[key] = await recursivelyReplaceStashedElements(value);
+          resultObj[key] = recursivelyReplaceStashedElements(value);
         }
         return resultObj;
       }
       return node;
     };
 
-    const resultWithUids = await recursivelyReplaceStashedElements(
+    const resultWithUids = recursivelyReplaceStashedElements(
       resultWithStashedElements,
     );
     response.appendResponseLine(JSON.stringify(resultWithUids, null, 2));
-    if (isPageSnapshotUpdated) {
-      response.includeSnapshot();
-    }
   }
 
   async getElementByUid(uid: string): Promise<ElementHandle<Element>> {

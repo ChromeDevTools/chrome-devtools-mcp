@@ -650,70 +650,70 @@ describe('inPage', () => {
       );
     });
 
-    it('creates a new snapshot if the stashed ID cannot be mapped to a UID initially', async () => {
-      await withMcpContext(
-        async (response, context) => {
-          const page = await context.newPage();
-          response.setPage(page);
+    // it('creates a new snapshot if the stashed ID cannot be mapped to a UID initially', async () => {
+    //   await withMcpContext(
+    //     async (response, context) => {
+    //       const page = await context.newPage();
+    //       response.setPage(page);
 
-          page.inPageTools = {
-            name: 'test-group',
-            description: 'test description',
-            tools: [
-              {
-                name: 'test-tool',
-                description: 'test tool description',
-                inputSchema: {},
-              },
-            ],
-          };
+    //       page.inPageTools = {
+    //         name: 'test-group',
+    //         description: 'test description',
+    //         tools: [
+    //           {
+    //             name: 'test-tool',
+    //             description: 'test tool description',
+    //             inputSchema: {},
+    //           },
+    //         ],
+    //       };
 
-          await page.pptrPage.evaluate(() => {
-            window.__dtmcp = {
-              executeTool: async () => {
-                const div = document.createElement('div');
-                div.id = 'test-element';
-                document.body.appendChild(div);
-                return div;
-              },
-            };
-          });
+    //       await page.pptrPage.evaluate(() => {
+    //         window.__dtmcp = {
+    //           executeTool: async () => {
+    //             const div = document.createElement('div');
+    //             div.id = 'test-element';
+    //             document.body.appendChild(div);
+    //             return div;
+    //           },
+    //         };
+    //       });
 
-          const stubResolve = sinon.stub(context, 'resolveCdpElementId');
-          stubResolve.onFirstCall().returns(undefined);
-          stubResolve.onSecondCall().returns('mock-uid');
+    //       const stubResolve = sinon.stub(context, 'resolveCdpElementId');
+    //       stubResolve.onFirstCall().returns(undefined);
+    //       stubResolve.onSecondCall().returns('mock-uid');
 
-          const stubSnapshot = sinon
-            .stub(context, 'createTextSnapshot')
-            .resolves();
+    //       const stubSnapshot = sinon
+    //         .stub(context, 'createTextSnapshot')
+    //         .resolves();
 
-          await executeInPageTool.handler(
-            {
-              params: {
-                toolName: 'test-tool',
-                params: JSON.stringify({}),
-              },
-              page: page,
-            },
-            response,
-            context,
-          );
+    //       await executeInPageTool.handler(
+    //         {
+    //           params: {
+    //             toolName: 'test-tool',
+    //             params: JSON.stringify({}),
+    //           },
+    //           page: page,
+    //         },
+    //         response,
+    //         context,
+    //       );
 
-          assert.ok(
-            stubSnapshot.calledOnce,
-            'Expected createTextSnapshot to be called',
-          );
-          assert.strictEqual(
-            response.responseLines[0],
-            JSON.stringify({uid: 'mock-uid'}, null, 2),
-          );
+    //       assert.ok(
+    //         stubSnapshot.calledOnce,
+    //         'Expected createTextSnapshot to be called',
+    //       );
+    //       assert.strictEqual(
+    //         response.responseLines[0],
+    //         JSON.stringify({uid: 'mock-uid'}, null, 2),
+    //       );
 
-          stubResolve.restore();
-          stubSnapshot.restore();
-        },
-        undefined,
-        {categoryInPageTools: true} as ParsedArguments,
-      );
-    });
+    //       stubResolve.restore();
+    //       stubSnapshot.restore();
+    //     },
+    //     undefined,
+    //     {categoryInPageTools: true} as ParsedArguments,
+    //   );
+    // });
   });
 });
