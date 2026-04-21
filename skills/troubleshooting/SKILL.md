@@ -52,7 +52,7 @@ All tools in `chrome-devtools-mcp` are annotated with `readOnlyHint: true` (for 
 If the tools related to extensions (like `install_extension`) are not available, or if the extensions you load are not functioning:
 
 1. **Check for the `--categoryExtensions` flag**: Ensure this flag is passed in the MCP server configuration to enable the extension category tools.
-2. **Make sure the browser was not started with `--autoConnect`**: When using `--autoConnect`, Chrome is not able to load extensions.
+2. **Make sure the MCP server configuration does not include `--autoConnect`**: when using `--autoConnect`, Chrome is not able to load extensions.
 
 #### Other Common Errors
 
