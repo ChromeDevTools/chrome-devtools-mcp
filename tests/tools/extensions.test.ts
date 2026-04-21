@@ -11,6 +11,7 @@ import {afterEach, describe, it} from 'node:test';
 import sinon from 'sinon';
 
 import type {ParsedArguments} from '../../src/bin/chrome-devtools-mcp-cli-options.js';
+import {listConsoleMessages} from '../../src/tools/console.js';
 import {
   installExtension,
   uninstallExtension,
@@ -18,10 +19,13 @@ import {
   reloadExtension,
   triggerExtensionAction,
 } from '../../src/tools/extensions.js';
+import {serverHooks} from '../server.js';
 import {
   assertNoServiceWorkerReported,
   extractExtensionId,
   withMcpContext,
+  html,
+  getTextContent,
 } from '../utils.js';
 
 const EXTENSION_WITH_SW_PATH = path.join(
@@ -32,8 +36,14 @@ const EXTENSION_PATH = path.join(
   import.meta.dirname,
   '../../../tests/tools/fixtures/extension',
 );
+const EXTENSION_CONTENT_SCRIPT_PATH = path.join(
+  import.meta.dirname,
+  '../../../tests/tools/fixtures/extension-content-script',
+);
 
 describe('extension', () => {
+  const server = serverHooks();
+
   afterEach(() => {
     sinon.restore();
   });
@@ -161,6 +171,46 @@ describe('extension', () => {
         await context.uninstallExtension(extensionId);
         const targets = context.browser.targets();
         assertNoServiceWorkerReported(targets, extensionId);
+      },
+      {},
+      {
+        categoryExtensions: true,
+      } as ParsedArguments,
+    );
+  });
+
+  it('verifies that content script console logs are received', async () => {
+    await withMcpContext(
+      async (response, context) => {
+        server.addHtmlRoute(
+          '/test-content-script',
+          html`<h1>Test Content Script</h1>`,
+        );
+        const url = server.getRoute('/test-content-script');
+
+        const extensionId = await context.installExtension(
+          EXTENSION_CONTENT_SCRIPT_PATH,
+        );
+
+        const mcpPage = context.getSelectedMcpPage();
+        const page = mcpPage.pptrPage;
+
+        await page.goto(url);
+
+        await listConsoleMessages.handler(
+          {params: {includePreservedMessages: true}, page: mcpPage},
+          response,
+          context,
+        );
+
+        const result = await response.handle('list_console_messages', context);
+        const consoleOutput = getTextContent(result.content[0]);
+        assert.ok(
+          consoleOutput.includes('from content script!'),
+          `Console output should contain message from content script. Got: ${consoleOutput}`,
+        );
+
+        await context.uninstallExtension(extensionId);
       },
       {},
       {
