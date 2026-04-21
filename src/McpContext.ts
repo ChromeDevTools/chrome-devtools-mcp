@@ -178,33 +178,6 @@ export class McpContext implements Context {
     return this.#networkCollector.getIdForResource(request);
   }
 
-  resolveCdpElementId(
-    page: McpPage,
-    cdpBackendNodeId: number,
-  ): string | undefined {
-    if (!cdpBackendNodeId) {
-      this.logger('no cdpBackendNodeId');
-      return;
-    }
-    const snapshot = page.textSnapshot;
-    if (!snapshot) {
-      this.logger('no text snapshot');
-      return;
-    }
-    // TODO: index by backendNodeId instead.
-    const queue = [snapshot.root];
-    while (queue.length) {
-      const current = queue.pop()!;
-      if (current.backendNodeId === cdpBackendNodeId) {
-        return current.id;
-      }
-      for (const child of current.children) {
-        queue.push(child);
-      }
-    }
-    return;
-  }
-
   getNetworkRequests(
     page: McpPage,
     includePreservedRequests?: boolean,
@@ -782,8 +755,7 @@ export class McpContext implements Context {
     const data = devtoolsData ?? (await this.getDevToolsData(page));
     if (data?.cdpBackendNodeId) {
       snapshot.hasSelectedElement = true;
-      snapshot.selectedElementUid = this.resolveCdpElementId(
-        page,
+      snapshot.selectedElementUid = page.resolveCdpElementId(
         data?.cdpBackendNodeId,
       );
     }

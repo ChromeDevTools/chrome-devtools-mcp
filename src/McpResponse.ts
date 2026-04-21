@@ -513,10 +513,7 @@ export class McpResponse implements Response {
             context,
             this.#page,
           ),
-          elementIdResolver: context.resolveCdpElementId.bind(
-            context,
-            this.#page,
-          ),
+          elementIdResolver: this.#page.resolveCdpElementId.bind(this.#page),
         });
         if (!formatter.isValid()) {
           throw new Error(
