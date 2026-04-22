@@ -12,8 +12,9 @@ import sinon from 'sinon';
 import type {ParsedArguments} from '../../src/bin/chrome-devtools-mcp-cli-options.js';
 import type {McpContext} from '../../src/McpContext.js';
 import type {McpResponse} from '../../src/McpResponse.js';
-import type {ToolGroup, ToolDefinition} from '../../src/tools/inPage.js';
+import {TextSnapshot} from '../../src/TextSnapshot.js';
 import {executeInPageTool, listInPageTools} from '../../src/tools/inPage.js';
+import type {ToolGroup, ToolDefinition} from '../../src/tools/inPage.js';
 import {withMcpContext} from '../utils.js';
 
 describe('inPage', () => {
@@ -650,70 +651,128 @@ describe('inPage', () => {
       );
     });
 
-    // it('creates a new snapshot if the stashed ID cannot be mapped to a UID initially', async () => {
-    //   await withMcpContext(
-    //     async (response, context) => {
-    //       const page = await context.newPage();
-    //       response.setPage(page);
+    it('creates a new snapshot if the in-page tool response contains a DOM element', async () => {
+      await withMcpContext(
+        async (response, context) => {
+          const page = await context.newPage();
+          response.setPage(page);
 
-    //       page.inPageTools = {
-    //         name: 'test-group',
-    //         description: 'test description',
-    //         tools: [
-    //           {
-    //             name: 'test-tool',
-    //             description: 'test tool description',
-    //             inputSchema: {},
-    //           },
-    //         ],
-    //       };
+          page.inPageTools = {
+            name: 'test-group',
+            description: 'test description',
+            tools: [
+              {
+                name: 'test-tool',
+                description: 'test tool description',
+                inputSchema: {},
+              },
+            ],
+          };
 
-    //       await page.pptrPage.evaluate(() => {
-    //         window.__dtmcp = {
-    //           executeTool: async () => {
-    //             const div = document.createElement('div');
-    //             div.id = 'test-element';
-    //             document.body.appendChild(div);
-    //             return div;
-    //           },
-    //         };
-    //       });
+          await page.pptrPage.evaluate(() => {
+            window.__dtmcp = {
+              executeTool: async () => {
+                const div = document.createElement('div');
+                div.id = 'test-element';
+                document.body.appendChild(div);
+                return div;
+              },
+            };
+          });
 
-    //       const stubResolve = sinon.stub(context, 'resolveCdpElementId');
-    //       stubResolve.onFirstCall().returns(undefined);
-    //       stubResolve.onSecondCall().returns('mock-uid');
+          const stubSnapshot = sinon
+            .stub(TextSnapshot, 'create')
+            .resolves({} as TextSnapshot);
 
-    //       const stubSnapshot = sinon
-    //         .stub(context, 'createTextSnapshot')
-    //         .resolves();
+          const stubResolve = sinon
+            .stub(page, 'resolveCdpElementId')
+            .returns('mock-uid');
 
-    //       await executeInPageTool.handler(
-    //         {
-    //           params: {
-    //             toolName: 'test-tool',
-    //             params: JSON.stringify({}),
-    //           },
-    //           page: page,
-    //         },
-    //         response,
-    //         context,
-    //       );
+          await executeInPageTool.handler(
+            {
+              params: {
+                toolName: 'test-tool',
+                params: JSON.stringify({}),
+              },
+              page: page,
+            },
+            response,
+            context,
+          );
 
-    //       assert.ok(
-    //         stubSnapshot.calledOnce,
-    //         'Expected createTextSnapshot to be called',
-    //       );
-    //       assert.strictEqual(
-    //         response.responseLines[0],
-    //         JSON.stringify({uid: 'mock-uid'}, null, 2),
-    //       );
+          assert.ok(
+            stubSnapshot.calledOnce,
+            'Expected TextSnapshot.create to be called',
+          );
+          assert.strictEqual(
+            response.responseLines[0],
+            JSON.stringify({uid: 'mock-uid'}, null, 2),
+          );
 
-    //       stubResolve.restore();
-    //       stubSnapshot.restore();
-    //     },
-    //     undefined,
-    //     {categoryInPageTools: true} as ParsedArguments,
-    //   );
-    // });
+          stubResolve.restore();
+          stubSnapshot.restore();
+        },
+        undefined,
+        {categoryInPageTools: true} as ParsedArguments,
+      );
+    });
+
+    it('does not create a new snapshot if the in-page tool response does not contain a DOM element', async () => {
+      await withMcpContext(
+        async (response, context) => {
+          const page = await context.newPage();
+          response.setPage(page);
+
+          page.inPageTools = {
+            name: 'test-group',
+            description: 'test description',
+            tools: [
+              {
+                name: 'test-tool',
+                description: 'test tool description',
+                inputSchema: {},
+              },
+            ],
+          };
+
+          await page.pptrPage.evaluate(() => {
+            window.__dtmcp = {
+              executeTool: async () => {
+                return 'simple-result';
+              },
+            };
+          });
+
+          const stubSnapshot = sinon
+            .stub(TextSnapshot, 'create')
+            .resolves({} as TextSnapshot);
+
+          await executeInPageTool.handler(
+            {
+              params: {
+                toolName: 'test-tool',
+                params: JSON.stringify({}),
+              },
+              page: page,
+            },
+            response,
+            context,
+          );
+
+          assert.ok(
+            stubSnapshot.notCalled,
+            'Expected TextSnapshot.create not to be called',
+          );
+          assert.strictEqual(
+            response.responseLines[0],
+            JSON.stringify('simple-result', null, 2),
+          );
+
+          stubSnapshot.restore();
+        },
+        undefined,
+        {categoryInPageTools: true} as ParsedArguments,
+      );
+    });
   });
 });
