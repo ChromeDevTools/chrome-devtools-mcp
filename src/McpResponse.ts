@@ -717,7 +717,7 @@ export class McpResponse implements Response {
         staticData?: object;
       };
       heapSnapshotData?: object[];
-      heapSnapshotNodes?: object[];
+      heapSnapshotNodes?: readonly object[];
       extensionServiceWorkers?: object[];
       extensionPages?: object[];
     } = {};
@@ -958,7 +958,7 @@ Call ${handleDialog.name} to handle it before continuing.`);
         structuredContent.pagination = paginationData.pagination;
         response.push(...paginationData.info);
 
-        structuredContent.heapSnapshotNodes = nodes.items;
+        structuredContent.heapSnapshotNodes = paginationData.items;
       }
     }
 
