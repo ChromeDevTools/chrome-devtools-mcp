@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.23.0](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.22.0...chrome-devtools-mcp-v0.23.0) (2026-04-22)
+
+
+### 🎉 Features
+
+* add an option to customize ffmpeg path ([#1937](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1937)) ([b377454](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/b377454b1bcf9706e8d34c7241593b04f3635257))
+* support experimental allowlist for navigate tool calls ([#1935](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1935)) ([d502557](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/d50255778a6dcb30fb702755f0dd38f8ee2cd858))
+* support webm format in screencast ([#1934](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1934)) ([85b8993](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/85b89931ed7d59ab939abe4c72a63ad02febc29c))
+
+
+### 📄 Documentation
+
+* clarify resource limitations around the number of tabs ([#1927](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1927)) ([42be7c3](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/42be7c32272448b72091d008d1a0edb9b1ad6ec7))
+
+
+### 🏗️ Refactor
+
+* add support for CLI sessionIds in tests ([#1919](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1919)) ([82b67b0](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/82b67b07d3c7b5a1ec22d21c2376d24d7393cb82))
+
 ## [0.22.0](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.21.0...chrome-devtools-mcp-v0.22.0) (2026-04-21)
 
 
