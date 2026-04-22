@@ -14,6 +14,7 @@ import {
   type Flags,
   type RunnerResult,
   type OutputMode,
+  agenticBrowsingConfig,
 } from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
@@ -42,21 +43,26 @@ export const lighthouseAudit = definePageTool({
       .string()
       .optional()
       .describe('Directory for reports. If omitted, uses temporary files.'),
+    categories: zod
+      .array(zod.string())
+      .optional()
+      .describe('Categories to run. If omitted, defaults to accessibility, seo, and best-practices.'),
   },
   handler: async (request, response, context) => {
     const page = request.page;
-    const categories = ['accessibility', 'seo', 'best-practices'];
+    const defaultCategories = ['accessibility', 'seo', 'best-practices'];
     const formats = ['json', 'html'] as OutputMode[];
     const {
       mode = 'navigation',
       device = 'desktop',
       outputDirPath,
+      categories: requestedCategories = defaultCategories,
     } = request.params;
 
     context.validatePath(outputDirPath);
 
     const flags: Flags = {
-      onlyCategories: categories,
+      onlyCategories: requestedCategories,
       output: formats,
       // Default 30 second timeout for page load.
       maxWaitForLoad: 30_000,
@@ -82,16 +88,17 @@ export const lighthouseAudit = definePageTool({
       };
     }
 
+    const options: {flags: Flags; config?: object} = { flags };
+    if (requestedCategories.includes('agentic-browsing')) {
+      options.config = agenticBrowsingConfig;
+    }
+
     let result: RunnerResult | undefined;
     try {
       if (mode === 'navigation') {
-        result = await navigation(page.pptrPage, page.pptrPage.url(), {
-          flags,
-        });
+        result = await navigation(page.pptrPage, page.pptrPage.url(), options);
       } else {
-        result = await snapshot(page.pptrPage, {
-          flags,
-        });
+        result = await snapshot(page.pptrPage, options);
       }
 
       if (!result) {

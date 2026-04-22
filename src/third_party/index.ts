@@ -59,16 +59,19 @@ import {
   snapshot as snapshotImpl,
   navigation as navigationImpl,
   generateReport as generateReportImpl,
+  agenticBrowsingConfig as agenticBrowsingConfigImpl,
 } from './lighthouse-devtools-mcp-bundle.js';
+
+export const agenticBrowsingConfig = agenticBrowsingConfigImpl;
 
 export const snapshot = snapshotImpl as (
   page: Page,
-  options: {flags?: Flags},
+  options: {flags?: Flags; config?: object},
 ) => Promise<RunnerResult>;
 export const navigation = navigationImpl as (
   page: Page,
   url: string,
-  options: {flags?: Flags},
+  options: {flags?: Flags; config?: object},
 ) => Promise<RunnerResult>;
 export const generateReport = generateReportImpl as (
   lhr: Result,
