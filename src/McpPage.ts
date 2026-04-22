@@ -253,7 +253,6 @@ export class McpPage implements ContextPage {
     );
 
     const elementHandles: ElementHandle[] = [];
-    const cdpElementIds: string[] = [];
     for (let i = 0; i < (result.stashed ?? 0); i++) {
       const elementHandle = await this.pptrPage.evaluateHandle(index => {
         const el = window.__dtmcp?.stashedElements?.[index];
@@ -263,27 +262,31 @@ export class McpPage implements ContextPage {
         return el;
       }, i);
       elementHandles.push(elementHandle);
-
-      const backendNodeId = await elementHandle.backendNodeId();
-      if (!backendNodeId) {
-        logger(`No backendNodeId for stashed DOM element with index ${i}`);
-        cdpElementIds.push(`stashed-${i}`);
-        continue;
-      }
-      const cdpElementId = this.resolveCdpElementId(backendNodeId);
-      if (!cdpElementId) {
-        logger(`Could not get cdpElementId for backend node ${backendNodeId}`);
-        cdpElementIds.push(`stashed-${i}`);
-        continue;
-      }
-      cdpElementIds.push(cdpElementId);
     }
-    const resultWithStashedElements = result.result;
+
     if (elementHandles.length) {
       this.textSnapshot = await TextSnapshot.create(this, {
         extraHandles: elementHandles,
       });
       response.includeSnapshot();
+    }
+
+    const cdpElementIds: string[] = [];
+    // can this be mapped?
+    for (const [index, elementHandle] of elementHandles.entries()) {
+      const backendNodeId = await elementHandle.backendNodeId();
+      if (!backendNodeId) {
+        logger(`No backendNodeId for stashed DOM element with index ${index}`);
+        cdpElementIds.push(`stashed-${index}`);
+        continue;
+      }
+      const cdpElementId = this.resolveCdpElementId(backendNodeId);
+      if (!cdpElementId) {
+        logger(`Could not get cdpElementId for backend node ${backendNodeId}`);
+        cdpElementIds.push(`stashed-${index}`);
+        continue;
+      }
+      cdpElementIds.push(cdpElementId);
     }
 
     const recursivelyReplaceStashedElements = (node: unknown): unknown => {
@@ -309,9 +312,7 @@ export class McpPage implements ContextPage {
       return node;
     };
 
-    const resultWithUids = recursivelyReplaceStashedElements(
-      resultWithStashedElements,
-    );
+    const resultWithUids = recursivelyReplaceStashedElements(result.result);
     response.appendResponseLine(JSON.stringify(resultWithUids, null, 2));
   }
 
