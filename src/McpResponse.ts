@@ -1031,17 +1031,16 @@ Call ${handleDialog.name} to handle it before continuing.`);
 
       response.push('## Console messages');
       if (messages.length) {
+        const grouped = ConsoleFormatter.groupConsecutive(messages);
         const paginationData = this.#dataWithPagination(
-          messages,
+          grouped,
           this.#consoleDataOptions.pagination,
         );
         structuredContent.pagination = paginationData.pagination;
         response.push(...paginationData.info);
-        response.push(
-          ...paginationData.items.map(message => message.toString()),
-        );
-        structuredContent.consoleMessages = paginationData.items.map(message =>
-          message.toJSON(),
+        response.push(...paginationData.items.map(item => item.toString()));
+        structuredContent.consoleMessages = paginationData.items.map(item =>
+          item.toJSON(),
         );
       } else {
         response.push('<no console messages found>');
