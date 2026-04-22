@@ -35,6 +35,7 @@ interface ConsoleMessageConcise {
   argsCount: number;
   id: number;
   count?: number;
+  lastId?: number;
 }
 
 interface ConsoleMessageDetailed extends ConsoleMessageConcise {
@@ -179,10 +180,13 @@ export class ConsoleFormatter {
   }
 
   // The short format with a repeat count.
-  toStringGrouped(count: number): string {
+  toStringGrouped(count: number, lastId?: number): string {
     const json = this.toJSON();
     if (count > 1) {
       json.count = count;
+      if (lastId !== undefined) {
+        json.lastId = lastId;
+      }
     }
     return convertConsoleMessageConciseToString(json);
   }
@@ -213,24 +217,28 @@ export class ConsoleFormatter {
     };
   }
 
-  toJSONGrouped(count: number): ConsoleMessageConcise {
+  toJSONGrouped(count: number, lastId?: number): ConsoleMessageConcise {
     const json = this.toJSON();
     if (count > 1) {
       json.count = count;
+      if (lastId !== undefined) {
+        json.lastId = lastId;
+      }
     }
     return json;
   }
 
   /**
-   * Groups consecutive messages with the same type and text.
+   * Groups consecutive messages with the same type, text, and argument count.
    * Similar to Chrome DevTools' console grouping behavior.
    */
   static groupConsecutive(
     messages: Array<ConsoleFormatter | IssueFormatter>,
-  ): Array<{message: ConsoleFormatter | IssueFormatter; count: number}> {
+  ): Array<{message: ConsoleFormatter | IssueFormatter; count: number; lastId?: number}> {
     const grouped: Array<{
       message: ConsoleFormatter | IssueFormatter;
       count: number;
+      lastId?: number;
     }> = [];
     for (const msg of messages) {
       const prev = grouped[grouped.length - 1];
@@ -239,9 +247,11 @@ export class ConsoleFormatter {
         prev.message instanceof ConsoleFormatter &&
         msg instanceof ConsoleFormatter &&
         prev.message.#type === msg.#type &&
-        prev.message.#text === msg.#text
+        prev.message.#text === msg.#text &&
+        prev.message.#argCount === msg.#argCount
       ) {
         prev.count++;
+        prev.lastId = msg.#id;
       } else {
         grouped.push({message: msg, count: 1});
       }
@@ -264,7 +274,9 @@ export class ConsoleFormatter {
 }
 
 function convertConsoleMessageConciseToString(msg: ConsoleMessageConcise) {
-  const countSuffix = msg.count && msg.count > 1 ? ` [${msg.count} times]` : '';
+  const countSuffix = msg.count && msg.count > 1
+    ? ` [${msg.count} times${msg.lastId ? `, last msgid=${msg.lastId}` : ''}]`
+    : '';
   return `msgid=${msg.id} [${msg.type}] ${msg.text} (${msg.argsCount} args)${countSuffix}`;
 }
 

@@ -1039,16 +1039,16 @@ Call ${handleDialog.name} to handle it before continuing.`);
         structuredContent.pagination = paginationData.pagination;
         response.push(...paginationData.info);
         response.push(
-          ...paginationData.items.map(({message, count}) =>
+          ...paginationData.items.map(({message, count, lastId}) =>
             message instanceof ConsoleFormatter
-              ? message.toStringGrouped(count)
+              ? message.toStringGrouped(count, lastId)
               : message.toString(),
           ),
         );
         structuredContent.consoleMessages = paginationData.items.map(
-          ({message, count}) =>
+          ({message, count, lastId}) =>
             message instanceof ConsoleFormatter
-              ? message.toJSONGrouped(count)
+              ? message.toJSONGrouped(count, lastId)
               : message.toJSON(),
         );
       } else {
