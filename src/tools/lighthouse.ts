@@ -23,7 +23,7 @@ import {definePageTool} from './ToolDefinition.js';
 
 export const lighthouseAudit = definePageTool({
   name: 'lighthouse_audit',
-  description: `Get Lighthouse score and reports for accessibility, SEO and best practices. This excludes performance. For performance audits, run ${startTrace.name}`,
+  description: `Get Lighthouse score and reports for accessibility, SEO, best practices, and agentic browsing. This excludes performance. For performance audits, run ${startTrace.name}`,
   annotations: {
     category: ToolCategory.DEBUGGING,
     readOnlyHint: false,
@@ -46,11 +46,11 @@ export const lighthouseAudit = definePageTool({
     categories: zod
       .array(zod.string())
       .optional()
-      .describe('Categories to run. If omitted, defaults to accessibility, seo, and best-practices.'),
+      .describe('Categories to run. If omitted, defaults to accessibility, seo, best-practices, and agentic browsing.'),
   },
   handler: async (request, response, context) => {
     const page = request.page;
-    const defaultCategories = ['accessibility', 'seo', 'best-practices'];
+    const defaultCategories = ['accessibility', 'seo', 'best-practices', 'agentic-browsing'];
     const formats = ['json', 'html'] as OutputMode[];
     const {
       mode = 'navigation',
