@@ -34,7 +34,7 @@ describe('screencast', () => {
 
         await startScreencast.handler(
           {
-            params: {path: '/tmp/test-recording.mp4'},
+            params: {filePath: '/tmp/test-recording.mp4'},
             page: context.getSelectedMcpPage(),
           },
           response,
@@ -112,7 +112,7 @@ describe('screencast', () => {
         await assert.rejects(
           startScreencast.handler(
             {
-              params: {path: '/tmp/test.mp4'},
+              params: {filePath: '/tmp/test.mp4'},
               page: context.getSelectedMcpPage(),
             },
             response,

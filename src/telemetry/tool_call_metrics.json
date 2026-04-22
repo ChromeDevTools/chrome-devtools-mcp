@@ -419,6 +419,11 @@
     "args": [
       {
         "name": "path_length",
+        "argType": "number",
+        "isDeprecated": true
+      },
+      {
+        "name": "file_path_length",
         "argType": "number"
       }
     ]
