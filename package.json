@@ -80,6 +80,7 @@
     "tiktoken": "^1.0.22",
     "typescript": "^6.0.2",
     "typescript-eslint": "^8.43.0",
+    "urlpattern-polyfill": "^10.1.0",
     "yargs": "18.0.0"
   },
   "engines": {

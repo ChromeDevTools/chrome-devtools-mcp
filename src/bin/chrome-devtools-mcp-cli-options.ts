@@ -180,6 +180,11 @@ export const cliOptions = {
       'Whether to include all kinds of pages such as webviews or background pages as pages.',
     hidden: true,
   },
+  experimentalNavigationAllowlist: {
+    type: 'boolean',
+    describe: 'Whether to enable navigation allowlist tool parameter.',
+    hidden: true,
+  },
   experimentalInteropTools: {
     type: 'boolean',
     describe: 'Whether to enable interoperability tools',
@@ -189,6 +194,11 @@ export const cliOptions = {
     type: 'boolean',
     describe:
       'Exposes experimental screencast tools (requires ffmpeg). Install ffmpeg https://www.ffmpeg.org/download.html and ensure it is available in the MCP server PATH.',
+  },
+  experimentalFfmpegPath: {
+    type: 'string',
+    describe: 'Path to ffmpeg executable for screencast recording.',
+    implies: 'experimentalScreencast',
   },
   experimentalWebmcp: {
     type: 'boolean',

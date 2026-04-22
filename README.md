@@ -591,6 +591,10 @@ The Chrome DevTools MCP server supports the following configuration option:
   Exposes experimental screencast tools (requires ffmpeg). Install ffmpeg https://www.ffmpeg.org/download.html and ensure it is available in the MCP server PATH.
   - **Type:** boolean
 
+- **`--experimentalFfmpegPath`/ `--experimental-ffmpeg-path`**
+  Path to ffmpeg executable for screencast recording.
+  - **Type:** string
+
 - **`--experimentalWebmcp`/ `--experimental-webmcp`**
   Set to true to enable debugging WebMCP tools. Requires Chrome 149+ with the following flags: `--enable-features=WebMCPTesting,DevToolsWebMCPSupport`
   - **Type:** boolean

@@ -22,7 +22,7 @@ async function generateTempFilePath(): Promise<string> {
 
 const supportedExtensions: Array<`.${string}`> = ['.webm', '.mp4'];
 
-export const startScreencast = definePageTool({
+export const startScreencast = definePageTool(args => ({
   name: 'screencast_start',
   description: `Starts recording a screencast (video) of the selected page in specified format.`,
   annotations: {
@@ -71,6 +71,7 @@ export const startScreencast = definePageTool({
       recorder = await page.pptrPage.screencast({
         path: resolvedPath,
         format: format,
+        ffmpegPath: args?.experimentalFfmpegPath,
       });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -89,7 +90,7 @@ export const startScreencast = definePageTool({
       `Screencast recording started. The recording will be saved to ${resolvedPath}. Use ${stopScreencast.name} to stop recording.`,
     );
   },
-});
+}));
 
 export const stopScreencast = definePageTool({
   name: 'screencast_stop',

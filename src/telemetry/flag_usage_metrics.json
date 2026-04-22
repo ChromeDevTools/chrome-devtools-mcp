@@ -107,6 +107,10 @@
     "flagType": "boolean"
   },
   {
+    "name": "experimental_ffmpeg_path_present",
+    "flagType": "boolean"
+  },
+  {
     "name": "experimental_include_all_pages",
     "flagType": "boolean"
   },
@@ -128,6 +132,14 @@
   },
   {
     "name": "experimental_memory_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "experimental_navigation_allowlist",
+    "flagType": "boolean"
+  },
+  {
+    "name": "experimental_navigation_allowlist_present",
     "flagType": "boolean"
   },
   {
