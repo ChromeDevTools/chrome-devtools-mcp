@@ -17,7 +17,7 @@ describe('webmcp', () => {
   describe('list_webmcp_tools', () => {
     it('list webmcp tools in navigate_page response', async () => {
       await withMcpContext(async (response, context) => {
-        await navigatePage.handler(
+        await navigatePage().handler(
           {params: {url: 'about:blank'}, page: context.getSelectedMcpPage()},
           response,
           context,

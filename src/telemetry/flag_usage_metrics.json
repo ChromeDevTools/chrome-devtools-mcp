@@ -131,6 +131,14 @@
     "flagType": "boolean"
   },
   {
+    "name": "experimental_navigation_allowlist",
+    "flagType": "boolean"
+  },
+  {
+    "name": "experimental_navigation_allowlist_present",
+    "flagType": "boolean"
+  },
+  {
     "name": "experimental_page_id_routing",
     "flagType": "boolean"
   },

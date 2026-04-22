@@ -1193,7 +1193,7 @@ describe('inPage tools', () => {
 
   it('includes in-page tools in navigate_page response', async () => {
     await testIncludesInPageTools(async (response, context) => {
-      await navigatePage.handler(
+      await navigatePage().handler(
         {
           params: {type: 'url', url: 'about:blank'},
           page: context.getSelectedMcpPage(),
@@ -1209,7 +1209,7 @@ describe('inPage tools', () => {
       // Workaround to ensure the test environment's new page contain in-page tools
       sinon.stub(context, 'newPage').resolves(context.getSelectedMcpPage());
 
-      await newPage.handler(
+      await newPage().handler(
         {
           params: {url: 'about:blank'},
         },
@@ -1540,7 +1540,7 @@ describe('webmcp', () => {
       t,
       {experimentalWebmcp: true} as ParsedArguments,
       async (response, context) => {
-        await navigatePage.handler(
+        await navigatePage().handler(
           {
             params: {type: 'url', url: 'about:blank'},
             page: context.getSelectedMcpPage(),
@@ -1581,7 +1581,7 @@ describe('webmcp', () => {
       t,
       {experimentalWebmcp: false} as ParsedArguments,
       async (response, context) => {
-        await navigatePage.handler(
+        await navigatePage().handler(
           {
             params: {type: 'url', url: 'about:blank'},
             page: context.getSelectedMcpPage(),
