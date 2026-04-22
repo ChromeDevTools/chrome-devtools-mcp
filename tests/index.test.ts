@@ -12,7 +12,9 @@ import {Client} from '@modelcontextprotocol/sdk/client/index.js';
 import {StdioClientTransport} from '@modelcontextprotocol/sdk/client/stdio.js';
 import {executablePath} from 'puppeteer';
 
-import type {ToolDefinition} from '../src/tools/ToolDefinition';
+import type {ToolCategory} from '../src/tools/categories.js';
+import {OFF_BY_DEFAULT_CATEGORIES} from '../src/tools/categories.js';
+import type {ToolDefinition} from '../src/tools/ToolDefinition.js';
 
 describe('e2e', () => {
   async function withClient(
@@ -71,45 +73,26 @@ describe('e2e', () => {
     });
   });
 
+  it('has all tools with off by default categories', async () => {
+    await withClient(
+      async client => {
+        const {tools} = await client.listTools();
+        const exposedNames = tools.map(t => t.name).sort();
+        const definedNames = await getToolsWithFilteredCategories();
+        definedNames.sort();
+        assert.deepStrictEqual(exposedNames, definedNames);
+      },
+      OFF_BY_DEFAULT_CATEGORIES.map(category => `--category-${category}`),
+    );
+  });
+
   it('has all tools', async () => {
     await withClient(async client => {
       const {tools} = await client.listTools();
       const exposedNames = tools.map(t => t.name).sort();
-      const files = fs.readdirSync('build/src/tools');
-      const definedNames = [];
-      for (const file of files) {
-        if (
-          file === 'ToolDefinition.js' ||
-          file === 'tools.js' ||
-          file === 'slim'
-        ) {
-          continue;
-        }
-        const fileTools = await import(`../src/tools/${file}`);
-        for (const maybeTool of Object.values<unknown>(fileTools)) {
-          if (typeof maybeTool === 'function') {
-            const tool = (maybeTool as (val: boolean) => ToolDefinition)(false);
-            if (tool && typeof tool === 'object' && 'name' in tool) {
-              if (tool.annotations?.conditions) {
-                continue;
-              }
-              definedNames.push(tool.name);
-            }
-            continue;
-          }
-          if (
-            typeof maybeTool === 'object' &&
-            maybeTool !== null &&
-            'name' in maybeTool
-          ) {
-            const tool = maybeTool as ToolDefinition;
-            if (tool.annotations?.conditions) {
-              continue;
-            }
-            definedNames.push(tool.name);
-          }
-        }
-      }
+      const definedNames = await getToolsWithFilteredCategories(
+        OFF_BY_DEFAULT_CATEGORIES,
+      );
       definedNames.sort();
       assert.deepStrictEqual(exposedNames, definedNames);
     });
@@ -178,3 +161,57 @@ describe('e2e', () => {
     );
   });
 });
+
+async function getToolsWithFilteredCategories(
+  filterOutCategories: ToolCategory[] = [],
+): Promise<string[]> {
+  const files = fs.readdirSync('build/src/tools');
+  const definedNames = [];
+  for (const file of files) {
+    if (
+      file === 'ToolDefinition.js' ||
+      file === 'tools.js' ||
+      file === 'slim'
+    ) {
+      continue;
+    }
+    const fileTools = await import(`../src/tools/${file}`);
+
+    for (const maybeTool of Object.values<unknown>(fileTools)) {
+      let tool;
+      if (typeof maybeTool === 'function') {
+        tool = (maybeTool as (val: boolean) => ToolDefinition)(false);
+      } else {
+        tool = maybeTool as ToolDefinition;
+      }
+
+      // Skipping all files that are not tool files
+      if (tool === null || typeof tool !== 'object' || !('name' in tool)) {
+        continue;
+      }
+
+      if (toolShouldBeSkipped(tool, filterOutCategories)) {
+        continue;
+      }
+      definedNames.push(tool.name);
+    }
+  }
+  return definedNames;
+}
+
+function toolShouldBeSkipped(
+  tool: ToolDefinition,
+  filteredOutCategories: ToolCategory[],
+) {
+  if (tool.annotations?.conditions) {
+    return true;
+  }
+  if (
+    tool.annotations?.category &&
+    filteredOutCategories.includes(tool.annotations?.category)
+  ) {
+    return true;
+  }
+
+  return false;
+}

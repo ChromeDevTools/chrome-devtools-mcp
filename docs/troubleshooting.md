@@ -175,3 +175,9 @@ If you are using the `--autoConnect` flag and tools like `list_pages`, `new_page
 2. Remote debugging is enabled in Chrome via `chrome://inspect/#remote-debugging`.
 3. You have allowed the remote debugging connection prompt in the browser.
 4. There is no other MCP server or tool trying to connect to the same debugging port.
+
+> [!IMPORTANT]
+> In Chrome versions up to 149, connection issues may be caused by frozen or unloaded tabs.
+> Chrome DevTools MCP forces all tabs to be loaded, so ensure your system has sufficient resources.
+> It is currently not recommended to use Chrome DevTools MCP with browser instances running hundreds of tabs.
+> See [Issue #1921](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1921) for more details.

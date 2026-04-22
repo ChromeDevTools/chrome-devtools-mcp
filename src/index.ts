@@ -136,7 +136,7 @@ export async function createMcpServer(
     }
     if (
       tool.annotations.category === ToolCategory.EXTENSIONS &&
-      !serverArgs.categoryExtensions
+      serverArgs.categoryExtensions === false
     ) {
       return;
     }

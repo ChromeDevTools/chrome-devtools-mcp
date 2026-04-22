@@ -27,3 +27,5 @@ export const labels = {
   [ToolCategory.IN_PAGE]: 'In-page tools',
   [ToolCategory.MEMORY]: 'Memory',
 };
+
+export const OFF_BY_DEFAULT_CATEGORIES = [ToolCategory.EXTENSIONS];

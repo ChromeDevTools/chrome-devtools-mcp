@@ -4,41 +4,39 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type {AggregatedInfoWithUid} from '../HeapSnapshotManager.js';
 import type {DevTools} from '../third_party/index.js';
+import {stableIdSymbol} from '../utils/id.js';
 
 export interface FormattedSnapshotEntry {
   className: string;
+  classUid?: number;
   count: number;
   selfSize: number;
   retainedSize: number;
 }
 
 export class HeapSnapshotFormatter {
-  #aggregates: Record<
-    string,
-    DevTools.HeapSnapshotModel.HeapSnapshotModel.AggregatedInfo
-  >;
+  #aggregates: Record<string, AggregatedInfoWithUid>;
 
-  constructor(
-    aggregates: Record<
-      string,
-      DevTools.HeapSnapshotModel.HeapSnapshotModel.AggregatedInfo
-    >,
-  ) {
+  constructor(aggregates: Record<string, AggregatedInfoWithUid>) {
     this.#aggregates = aggregates;
   }
 
-  #getSortedAggregates(): DevTools.HeapSnapshotModel.HeapSnapshotModel.AggregatedInfo[] {
+  #getSortedAggregates(): AggregatedInfoWithUid[] {
     return Object.values(this.#aggregates).sort((a, b) => b.self - a.self);
   }
 
   toString(): string {
     const sorted = this.#getSortedAggregates();
     const lines: string[] = [];
-    lines.push('className,count,selfSize,maxRetainedSize');
+    lines.push('uid,className,count,selfSize,maxRetainedSize');
 
     for (const info of sorted) {
-      lines.push(`"${info.name}",${info.count},${info.self},${info.maxRet}`);
+      const uid = info[stableIdSymbol] ?? '';
+      lines.push(
+        `${uid},"${info.name}",${info.count},${info.self},${info.maxRet}`,
+      );
     }
 
     return lines.join('\n');
@@ -47,6 +45,7 @@ export class HeapSnapshotFormatter {
   toJSON(): FormattedSnapshotEntry[] {
     const sorted = this.#getSortedAggregates();
     return sorted.map(info => ({
+      uid: info[stableIdSymbol],
       className: info.name,
       count: info.count,
       selfSize: info.self,

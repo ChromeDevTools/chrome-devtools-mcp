@@ -10,6 +10,7 @@ import path from 'node:path';
 import type {TargetUniverse} from './DevtoolsUtils.js';
 import {UniverseManager} from './DevtoolsUtils.js';
 import {HeapSnapshotManager} from './HeapSnapshotManager.js';
+import type {AggregatedInfoWithUid} from './HeapSnapshotManager.js';
 import {McpPage} from './McpPage.js';
 import {
   NetworkCollector,
@@ -28,6 +29,7 @@ import type {
   SerializedAXNode,
   Viewport,
   Target,
+  Extension,
 } from './third_party/index.js';
 import type {DevTools} from './third_party/index.js';
 import {Locator} from './third_party/index.js';
@@ -47,10 +49,6 @@ import type {
   TextSnapshotNode,
   ExtensionServiceWorker,
 } from './types.js';
-import {
-  ExtensionRegistry,
-  type InstalledExtension,
-} from './utils/ExtensionRegistry.js';
 import {ensureExtension, saveTemporaryFile} from './utils/files.js';
 import {getNetworkMultiplierFromString} from './WaitForHelper.js';
 
@@ -83,7 +81,6 @@ export class McpContext implements Context {
   #networkCollector: NetworkCollector;
   #consoleCollector: ConsoleCollector;
   #devtoolsUniverseManager: UniverseManager;
-  #extensionRegistry = new ExtensionRegistry();
 
   #isRunningTrace = false;
   #screenRecorderData: {recorder: ScreenRecorder; filePath: string} | null =
@@ -179,33 +176,6 @@ export class McpContext implements Context {
       return;
     }
     return this.#networkCollector.getIdForResource(request);
-  }
-
-  resolveCdpElementId(
-    page: McpPage,
-    cdpBackendNodeId: number,
-  ): string | undefined {
-    if (!cdpBackendNodeId) {
-      this.logger('no cdpBackendNodeId');
-      return;
-    }
-    const snapshot = page.textSnapshot;
-    if (!snapshot) {
-      this.logger('no text snapshot');
-      return;
-    }
-    // TODO: index by backendNodeId instead.
-    const queue = [snapshot.root];
-    while (queue.length) {
-      const current = queue.pop()!;
-      if (current.backendNodeId === cdpBackendNodeId) {
-        return current.id;
-      }
-      for (const child of current.children) {
-        queue.push(child);
-      }
-    }
-    return;
   }
 
   getNetworkRequests(
@@ -785,8 +755,7 @@ export class McpContext implements Context {
     const data = devtoolsData ?? (await this.getDevToolsData(page));
     if (data?.cdpBackendNodeId) {
       snapshot.hasSelectedElement = true;
-      snapshot.selectedElementUid = this.resolveCdpElementId(
-        page,
+      snapshot.selectedElementUid = page.resolveCdpElementId(
         data?.cdpBackendNodeId,
       );
     }
@@ -882,45 +851,35 @@ export class McpContext implements Context {
 
   async installExtension(extensionPath: string): Promise<string> {
     const id = await this.browser.installExtension(extensionPath);
-    await this.#extensionRegistry.registerExtension(id, extensionPath);
     return id;
   }
 
   async uninstallExtension(id: string): Promise<void> {
     await this.browser.uninstallExtension(id);
-    this.#extensionRegistry.remove(id);
   }
 
   async triggerExtensionAction(id: string): Promise<void> {
-    const page = this.getSelectedPptrPage();
-    // @ts-expect-error internal puppeteer api is needed since we don't have a way to get
-    // a tab id at the moment
-    const theTarget = page._tabId;
-    const session = await this.browser.target().createCDPSession();
-
-    try {
-      await session.send('Extensions.triggerAction', {
-        id,
-        targetId: theTarget,
-      });
-    } finally {
-      await session.detach();
+    const extensions = await this.browser.extensions();
+    const extension = extensions.get(id);
+    if (!extension) {
+      throw new Error(`Extension with ID ${id} not found.`);
     }
+    const page = this.getSelectedPptrPage();
+    await extension.triggerAction(page);
   }
 
-  listExtensions(): InstalledExtension[] {
-    return this.#extensionRegistry.list();
+  listExtensions(): Promise<Map<string, Extension>> {
+    return this.browser.extensions();
   }
 
-  getExtension(id: string): InstalledExtension | undefined {
-    return this.#extensionRegistry.getById(id);
+  async getExtension(id: string): Promise<Extension | undefined> {
+    const pptrExtensions = await this.browser.extensions();
+    return pptrExtensions.get(id);
   }
 
   async getHeapSnapshotAggregates(
     filePath: string,
-  ): Promise<
-    Record<string, DevTools.HeapSnapshotModel.HeapSnapshotModel.AggregatedInfo>
-  > {
+  ): Promise<Record<string, AggregatedInfoWithUid>> {
     return await this.#heapSnapshotManager.getAggregates(filePath);
   }
 

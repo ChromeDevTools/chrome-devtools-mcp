@@ -1192,14 +1192,14 @@ exports[`extensions > lists extensions 2`] = `
       "id": "id1",
       "name": "Extension 1",
       "version": "1.0",
-      "isEnabled": true,
+      "enabled": true,
       "path": "/path/to/ext1"
     },
     {
       "id": "id2",
       "name": "Extension 2",
       "version": "2.0",
-      "isEnabled": false,
+      "enabled": false,
       "path": "/path/to/ext2"
     }
   ]
