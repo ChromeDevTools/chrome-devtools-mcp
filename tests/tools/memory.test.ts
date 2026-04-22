@@ -128,8 +128,6 @@ describe('memory', () => {
       });
     });
 
-
-
     it('with non-existent class name', async () => {
       await withMcpContext(async (response, context) => {
         const filePath = join(
