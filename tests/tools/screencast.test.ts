@@ -9,6 +9,7 @@ import {describe, it, afterEach} from 'node:test';
 
 import sinon from 'sinon';
 
+import type {ParsedArguments} from '../../src/bin/chrome-devtools-mcp-cli-options.js';
 import {startScreencast, stopScreencast} from '../../src/tools/screencast.js';
 import {withMcpContext} from '../utils.js';
 
@@ -32,7 +33,7 @@ describe('screencast', () => {
           .stub(selectedPage, 'screencast')
           .resolves(mockRecorder as never);
 
-        await startScreencast.handler(
+        await startScreencast().handler(
           {
             params: {path: '/tmp/test-recording.mp4'},
             page: context.getSelectedMcpPage(),
@@ -63,7 +64,7 @@ describe('screencast', () => {
           .stub(selectedPage, 'screencast')
           .resolves(mockRecorder as never);
 
-        await startScreencast.handler(
+        await startScreencast().handler(
           {params: {}, page: context.getSelectedMcpPage()},
           response,
           context,
@@ -88,7 +89,7 @@ describe('screencast', () => {
         const selectedPage = context.getSelectedPptrPage();
         const screencastStub = sinon.stub(selectedPage, 'screencast');
 
-        await startScreencast.handler(
+        await startScreencast().handler(
           {params: {}, page: context.getSelectedMcpPage()},
           response,
           context,
@@ -110,7 +111,7 @@ describe('screencast', () => {
         sinon.stub(selectedPage, 'screencast').rejects(error);
 
         await assert.rejects(
-          startScreencast.handler(
+          startScreencast().handler(
             {
               params: {path: '/tmp/test.mp4'},
               page: context.getSelectedMcpPage(),
@@ -122,6 +123,29 @@ describe('screencast', () => {
         );
 
         assert.strictEqual(context.getScreenRecorder(), null);
+      });
+    });
+
+    it('passes ffmpegPath from args to puppeteer', async () => {
+      await withMcpContext(async (response, context) => {
+        const mockRecorder = createMockRecorder();
+        const selectedPage = context.getSelectedPptrPage();
+        const screencastStub = sinon
+          .stub(selectedPage, 'screencast')
+          .resolves(mockRecorder as never);
+
+        const experimentalFfmpegPath = '/custom/path/to/ffmpeg';
+        await startScreencast({
+          experimentalFfmpegPath,
+        } as ParsedArguments).handler(
+          {params: {}, page: context.getSelectedMcpPage()},
+          response,
+          context,
+        );
+
+        sinon.assert.calledOnce(screencastStub);
+        const callArgs = screencastStub.firstCall.args[0];
+        assert.strictEqual(callArgs?.ffmpegPath, experimentalFfmpegPath);
       });
     });
   });

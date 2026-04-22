@@ -190,6 +190,11 @@ export const cliOptions = {
     describe:
       'Exposes experimental screencast tools (requires ffmpeg). Install ffmpeg https://www.ffmpeg.org/download.html and ensure it is available in the MCP server PATH.',
   },
+  experimentalFfmpegPath: {
+    type: 'string',
+    describe: 'Path to ffmpeg executable for screencast recording.',
+    implies: 'experimentalScreencast',
+  },
   experimentalWebmcp: {
     type: 'boolean',
     describe:

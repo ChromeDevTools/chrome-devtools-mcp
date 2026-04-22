@@ -107,6 +107,10 @@
     "flagType": "boolean"
   },
   {
+    "name": "experimental_ffmpeg_path_present",
+    "flagType": "boolean"
+  },
+  {
     "name": "experimental_include_all_pages",
     "flagType": "boolean"
   },
