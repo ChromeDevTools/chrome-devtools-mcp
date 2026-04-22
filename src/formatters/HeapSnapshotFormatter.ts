@@ -16,13 +16,12 @@ export interface FormattedSnapshotEntry {
   retainedSize: number;
 }
 
-export interface FormattedNodeEntry {
-  id: number;
-  name: string;
-  type: string;
-  distance: number;
-  selfSize: number;
-  retainedSize: number;
+function isNodeLike(
+  item: unknown,
+): item is DevTools.HeapSnapshotModel.HeapSnapshotModel.Node {
+  return (
+    typeof item === 'object' && item !== null && 'id' in item && 'name' in item
+  );
 }
 
 export class HeapSnapshotFormatter {
@@ -32,24 +31,23 @@ export class HeapSnapshotFormatter {
     this.#aggregates = aggregates;
   }
 
-  static formatNodes(items: readonly unknown[]): string {
+  static formatNodes(
+    items: ReadonlyArray<
+      | DevTools.HeapSnapshotModel.HeapSnapshotModel.Node
+      | DevTools.HeapSnapshotModel.HeapSnapshotModel.Edge
+    >,
+  ): string {
     const lines: string[] = [];
-    lines.push('id,name,type,distance,selfSize,retainedSize');
+
+    if (items.length > 0 && isNodeLike(items[0])) {
+      lines.push('id,name,type,distance,selfSize,retainedSize');
+    }
 
     for (const item of items) {
-      if (typeof item === 'object' && item !== null) {
-        if (
-          'id' in item &&
-          'name' in item &&
-          'type' in item &&
-          'distance' in item &&
-          'selfSize' in item &&
-          'retainedSize' in item
-        ) {
-          lines.push(
-            `${item.id},"${item.name}",${item.type},${item.distance},${item.selfSize},${item.retainedSize}`,
-          );
-        }
+      if (isNodeLike(item)) {
+        lines.push(
+          `${item.id},"${item.name}",${item.type},${item.distance},${item.selfSize},${item.retainedSize}`,
+        );
       }
     }
 
