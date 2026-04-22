@@ -265,29 +265,32 @@ export class McpPage implements ContextPage {
     }
 
     if (elementHandles.length) {
+      const oldHandles = [...this.extraHandles];
       this.textSnapshot = await TextSnapshot.create(this, {
         extraHandles: elementHandles,
       });
       response.includeSnapshot();
+
+      for (const handle of oldHandles) {
+        await handle.dispose().catch(e => logger('Failed to dispose old handle', e));
+      }
     }
 
-    const cdpElementIds: string[] = [];
-    // can this be mapped?
-    for (const [index, elementHandle] of elementHandles.entries()) {
-      const backendNodeId = await elementHandle.backendNodeId();
-      if (!backendNodeId) {
-        logger(`No backendNodeId for stashed DOM element with index ${index}`);
-        cdpElementIds.push(`stashed-${index}`);
-        continue;
-      }
-      const cdpElementId = this.resolveCdpElementId(backendNodeId);
-      if (!cdpElementId) {
-        logger(`Could not get cdpElementId for backend node ${backendNodeId}`);
-        cdpElementIds.push(`stashed-${index}`);
-        continue;
-      }
-      cdpElementIds.push(cdpElementId);
-    }
+    const cdpElementIds = await Promise.all(
+      elementHandles.map(async (elementHandle, index) => {
+        const backendNodeId = await elementHandle.backendNodeId();
+        if (!backendNodeId) {
+          logger(`No backendNodeId for stashed DOM element with index ${index}`);
+          return `stashed-${index}`;
+        }
+        const cdpElementId = this.resolveCdpElementId(backendNodeId);
+        if (!cdpElementId) {
+          logger(`Could not get cdpElementId for backend node ${backendNodeId}`);
+          return `stashed-${index}`;
+        }
+        return cdpElementId;
+      })
+    );
 
     const recursivelyReplaceStashedElements = (node: unknown): unknown => {
       if (Array.isArray(node)) {
