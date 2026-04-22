@@ -272,7 +272,9 @@ export class McpPage implements ContextPage {
       response.includeSnapshot();
 
       for (const handle of oldHandles) {
-        await handle.dispose().catch(e => logger('Failed to dispose old handle', e));
+        await handle
+          .dispose()
+          .catch(e => logger('Failed to dispose old handle', e));
       }
     }
 
@@ -280,16 +282,20 @@ export class McpPage implements ContextPage {
       elementHandles.map(async (elementHandle, index) => {
         const backendNodeId = await elementHandle.backendNodeId();
         if (!backendNodeId) {
-          logger(`No backendNodeId for stashed DOM element with index ${index}`);
+          logger(
+            `No backendNodeId for stashed DOM element with index ${index}`,
+          );
           return `stashed-${index}`;
         }
         const cdpElementId = this.resolveCdpElementId(backendNodeId);
         if (!cdpElementId) {
-          logger(`Could not get cdpElementId for backend node ${backendNodeId}`);
+          logger(
+            `Could not get cdpElementId for backend node ${backendNodeId}`,
+          );
           return `stashed-${index}`;
         }
         return cdpElementId;
-      })
+      }),
     );
 
     const recursivelyReplaceStashedElements = (node: unknown): unknown => {
