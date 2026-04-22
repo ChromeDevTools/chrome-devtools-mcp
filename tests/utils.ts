@@ -25,6 +25,7 @@ import sinon from 'sinon';
 import type {ParsedArguments} from '../src/bin/chrome-devtools-mcp-cli-options.js';
 import {McpContext} from '../src/McpContext.js';
 import {McpResponse} from '../src/McpResponse.js';
+import {TextSnapshot} from '../src/TextSnapshot.js';
 import {DevTools} from '../src/third_party/index.js';
 import {stableIdSymbol} from '../src/utils/id.js';
 
@@ -118,6 +119,7 @@ export async function withMcpContext(
   args: ParsedArguments = {} as ParsedArguments,
 ) {
   await withBrowser(async browser => {
+    TextSnapshot.resetCounter();
     const response = new McpResponse(args);
     if (context) {
       context.dispose();

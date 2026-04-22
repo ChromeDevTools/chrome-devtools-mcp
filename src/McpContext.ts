@@ -26,7 +26,6 @@ import type {
   HTTPRequest,
   Page,
   ScreenRecorder,
-  SerializedAXNode,
   Viewport,
   Target,
   Extension,
@@ -36,17 +35,11 @@ import {Locator} from './third_party/index.js';
 import {PredefinedNetworkConditions} from './third_party/index.js';
 import {listPages} from './tools/pages.js';
 import {CLOSE_PAGE_ERROR} from './tools/ToolDefinition.js';
-import type {
-  Context,
-  DevToolsData,
-  SupportedExtensions,
-} from './tools/ToolDefinition.js';
+import type {Context, SupportedExtensions} from './tools/ToolDefinition.js';
 import type {TraceResult} from './trace-processing/parse.js';
 import type {
   EmulationSettings,
   GeolocationOptions,
-  TextSnapshot,
-  TextSnapshotNode,
   ExtensionServiceWorker,
 } from './types.js';
 import {ensureExtension, saveTemporaryFile} from './utils/files.js';
@@ -92,7 +85,6 @@ export class McpContext implements Context {
   #extensionServiceWorkerMap = new WeakMap<Target, string>();
   #nextExtensionServiceWorkerId = 1;
 
-  #nextSnapshotId = 1;
   #traceResults: TraceResult[] = [];
 
   #locatorClass: typeof Locator;
@@ -645,127 +637,6 @@ export class McpContext implements Context {
 
   getIsolatedContextName(page: Page): string | undefined {
     return this.#mcpPages.get(page)?.isolatedContextName;
-  }
-
-  getDevToolsPage(page: Page): Page | undefined {
-    return this.#mcpPages.get(page)?.devToolsPage;
-  }
-
-  async getDevToolsData(page: McpPage): Promise<DevToolsData> {
-    try {
-      this.logger('Getting DevTools UI data');
-      const devtoolsPage = this.getDevToolsPage(page.pptrPage);
-      if (!devtoolsPage) {
-        this.logger('No DevTools page detected');
-        return {};
-      }
-      const {cdpRequestId, cdpBackendNodeId} = await devtoolsPage.evaluate(
-        async () => {
-          // @ts-expect-error no types
-          const UI = await import('/bundled/ui/legacy/legacy.js');
-          // @ts-expect-error no types
-          const SDK = await import('/bundled/core/sdk/sdk.js');
-          const request = UI.Context.Context.instance().flavor(
-            SDK.NetworkRequest.NetworkRequest,
-          );
-          const node = UI.Context.Context.instance().flavor(
-            SDK.DOMModel.DOMNode,
-          );
-          return {
-            cdpRequestId: request?.requestId(),
-            cdpBackendNodeId: node?.backendNodeId(),
-          };
-        },
-      );
-      return {cdpBackendNodeId, cdpRequestId};
-    } catch (err) {
-      this.logger('error getting devtools data', err);
-    }
-    return {};
-  }
-
-  /**
-   * Creates a text snapshot of a page.
-   */
-  async createTextSnapshot(
-    page: McpPage,
-    verbose = false,
-    devtoolsData: DevToolsData | undefined = undefined,
-  ): Promise<void> {
-    const rootNode = await page.pptrPage.accessibility.snapshot({
-      includeIframes: true,
-      interestingOnly: !verbose,
-    });
-    if (!rootNode) {
-      return;
-    }
-
-    const {uniqueBackendNodeIdToMcpId} = page;
-
-    const snapshotId = this.#nextSnapshotId++;
-    // Iterate through the whole accessibility node tree and assign node ids that
-    // will be used for the tree serialization and mapping ids back to nodes.
-    let idCounter = 0;
-    const idToNode = new Map<string, TextSnapshotNode>();
-    const seenUniqueIds = new Set<string>();
-    const assignIds = (node: SerializedAXNode): TextSnapshotNode => {
-      let id = '';
-      // @ts-expect-error untyped loaderId & backendNodeId.
-      const uniqueBackendId = `${node.loaderId}_${node.backendNodeId}`;
-      if (uniqueBackendNodeIdToMcpId.has(uniqueBackendId)) {
-        // Re-use MCP exposed ID if the uniqueId is the same.
-        id = uniqueBackendNodeIdToMcpId.get(uniqueBackendId)!;
-      } else {
-        // Only generate a new ID if we have not seen the node before.
-        id = `${snapshotId}_${idCounter++}`;
-        uniqueBackendNodeIdToMcpId.set(uniqueBackendId, id);
-      }
-      seenUniqueIds.add(uniqueBackendId);
-
-      const nodeWithId: TextSnapshotNode = {
-        ...node,
-        id,
-        children: node.children
-          ? node.children.map(child => assignIds(child))
-          : [],
-      };
-
-      // The AXNode for an option doesn't contain its `value`.
-      // Therefore, set text content of the option as value.
-      if (node.role === 'option') {
-        const optionText = node.name;
-        if (optionText) {
-          nodeWithId.value = optionText.toString();
-        }
-      }
-
-      idToNode.set(nodeWithId.id, nodeWithId);
-      return nodeWithId;
-    };
-
-    const rootNodeWithId = assignIds(rootNode);
-    const snapshot: TextSnapshot = {
-      root: rootNodeWithId,
-      snapshotId: String(snapshotId),
-      idToNode,
-      hasSelectedElement: false,
-      verbose,
-    };
-    page.textSnapshot = snapshot;
-    const data = devtoolsData ?? (await this.getDevToolsData(page));
-    if (data?.cdpBackendNodeId) {
-      snapshot.hasSelectedElement = true;
-      snapshot.selectedElementUid = page.resolveCdpElementId(
-        data?.cdpBackendNodeId,
-      );
-    }
-
-    // Clean up unique IDs that we did not see anymore.
-    for (const key of uniqueBackendNodeIdToMcpId.keys()) {
-      if (!seenUniqueIds.has(key)) {
-        uniqueBackendNodeIdToMcpId.delete(key);
-      }
-    }
   }
 
   async saveTemporaryFile(

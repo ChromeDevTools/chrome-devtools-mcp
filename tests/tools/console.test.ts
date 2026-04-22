@@ -10,6 +10,7 @@ import {before, describe, it} from 'node:test';
 import type {ParsedArguments} from '../../src/bin/chrome-devtools-mcp-cli-options.js';
 import {loadIssueDescriptions} from '../../src/issue-descriptions.js';
 import {McpResponse} from '../../src/McpResponse.js';
+import {TextSnapshot} from '../../src/TextSnapshot.js';
 import {DevTools} from '../../src/third_party/index.js';
 import {
   getConsoleMessage,
@@ -205,7 +206,7 @@ describe('console', () => {
           await page.pptrPage.setContent(
             '<input type="text" name="username" />',
           );
-          await context.createTextSnapshot(page);
+          page.textSnapshot = await TextSnapshot.create(page);
           await issuePromise;
           await listConsoleMessages().handler(
             {params: {}, page: context.getSelectedMcpPage()},
@@ -250,7 +251,7 @@ describe('console', () => {
               });
             </script>
           `);
-          await context.createTextSnapshot(page);
+          page.textSnapshot = await TextSnapshot.create(page);
           await issuePromise;
           const messages = context.getConsoleData(page);
           let issueMsg;

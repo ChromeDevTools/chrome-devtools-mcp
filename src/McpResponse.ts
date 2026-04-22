@@ -15,6 +15,7 @@ import {SnapshotFormatter} from './formatters/SnapshotFormatter.js';
 import type {McpContext} from './McpContext.js';
 import type {McpPage} from './McpPage.js';
 import {UncaughtError} from './PageCollector.js';
+import {TextSnapshot} from './TextSnapshot.js';
 import {DevTools, type Protocol} from './third_party/index.js';
 import type {
   ConsoleMessage,
@@ -443,11 +444,10 @@ export class McpResponse implements Response {
       if (!this.#page) {
         throw new Error('Response must have a page');
       }
-      await context.createTextSnapshot(
-        this.#page,
-        this.#snapshotParams.verbose,
-        this.#devToolsData,
-      );
+      this.#page.textSnapshot = await TextSnapshot.create(this.#page, {
+        verbose: this.#snapshotParams.verbose,
+        devtoolsData: this.#devToolsData,
+      });
       const textSnapshot = this.#page.textSnapshot;
       if (textSnapshot) {
         const formatter = new SnapshotFormatter(textSnapshot);

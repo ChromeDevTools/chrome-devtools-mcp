@@ -204,7 +204,6 @@ export type Context = Readonly<{
     timeout?: number,
     page?: Page,
   ): Promise<Element>;
-  getDevToolsData(page: ContextPage): Promise<DevToolsData>;
   /**
    * Returns a reqid for a cdpRequestId.
    */
@@ -249,6 +248,12 @@ export type ContextPage = Readonly<{
     options?: {timeout?: number; handleDialog?: 'accept' | 'dismiss' | string},
   ): Promise<void>;
   getInPageTools(): ToolGroup<InPageToolDefinition> | undefined;
+  executeInPageTool(
+    toolName: string,
+    params: Record<string, unknown>,
+    response: Response,
+  ): Promise<void>;
+  getDevToolsData(): Promise<DevToolsData>;
 }>;
 
 export function defineTool<Schema extends zod.ZodRawShape>(

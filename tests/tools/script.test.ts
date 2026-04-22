@@ -9,6 +9,7 @@ import path from 'node:path';
 import {describe, it} from 'node:test';
 
 import type {ParsedArguments} from '../../src/bin/chrome-devtools-mcp-cli-options.js';
+import {TextSnapshot} from '../../src/TextSnapshot.js';
 import {installExtension} from '../../src/tools/extensions.js';
 import {evaluateScript} from '../../src/tools/script.js';
 import {serverHooks} from '../server.js';
@@ -201,7 +202,9 @@ describe('script', () => {
 
         await page.setContent(html`<button id="test">test</button>`);
 
-        await context.createTextSnapshot(context.getSelectedMcpPage());
+        context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
+          context.getSelectedMcpPage(),
+        );
 
         await evaluateScript().handler(
           {
@@ -226,7 +229,9 @@ describe('script', () => {
 
         await page.setContent(html`<button id="test">test</button>`);
 
-        await context.createTextSnapshot(context.getSelectedMcpPage());
+        context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
+          context.getSelectedMcpPage(),
+        );
 
         await evaluateScript().handler(
           {
@@ -255,7 +260,9 @@ describe('script', () => {
       await withMcpContext(async (response, context) => {
         const page = context.getSelectedPptrPage();
         await page.goto(server.getRoute('/main'));
-        await context.createTextSnapshot(context.getSelectedMcpPage());
+        context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
+          context.getSelectedMcpPage(),
+        );
         await evaluateScript().handler(
           {
             params: {
