@@ -6,6 +6,7 @@
 
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import {fileURLToPath} from 'node:url';
 
 import type {TargetUniverse} from './DevtoolsUtils.js';
 import {UniverseManager} from './DevtoolsUtils.js';
@@ -18,21 +19,22 @@ import {
   type ListenerMap,
   type UncaughtError,
 } from './PageCollector.js';
-import type {
-  Browser,
-  BrowserContext,
-  ConsoleMessage,
-  Debugger,
-  HTTPRequest,
-  Page,
-  ScreenRecorder,
-  Viewport,
-  Target,
-  Extension,
+import {
+  Locator,
+  PredefinedNetworkConditions,
+  type Browser,
+  type BrowserContext,
+  type ConsoleMessage,
+  type Debugger,
+  type HTTPRequest,
+  type Page,
+  type ScreenRecorder,
+  type Viewport,
+  type Target,
+  type Extension,
+  type Root,
+  type DevTools,
 } from './third_party/index.js';
-import type {DevTools} from './third_party/index.js';
-import {Locator} from './third_party/index.js';
-import {PredefinedNetworkConditions} from './third_party/index.js';
 import {listPages} from './tools/pages.js';
 import {CLOSE_PAGE_ERROR} from './tools/ToolDefinition.js';
 import type {Context, SupportedExtensions} from './tools/ToolDefinition.js';
@@ -42,7 +44,7 @@ import type {
   GeolocationOptions,
   ExtensionServiceWorker,
 } from './types.js';
-import {ensureExtension, saveTemporaryFile} from './utils/files.js';
+import {ensureExtension, getTempFilePath} from './utils/files.js';
 import {getNetworkMultiplierFromString} from './WaitForHelper.js';
 
 interface McpContextOptions {
@@ -90,6 +92,7 @@ export class McpContext implements Context {
   #locatorClass: typeof Locator;
   #options: McpContextOptions;
   #heapSnapshotManager = new HeapSnapshotManager();
+  #roots: Root[] | undefined = undefined;
 
   private constructor(
     browser: Browser,
@@ -152,6 +155,34 @@ export class McpContext implements Context {
     const context = new McpContext(browser, logger, opts, locatorClass);
     await context.#init();
     return context;
+  }
+
+  roots(): Root[] | undefined {
+    return this.#roots;
+  }
+
+  setRoots(roots: Root[] | undefined): void {
+    this.#roots = roots;
+  }
+
+  validatePath(filePath: string): void {
+    const roots = this.roots();
+    if (roots === undefined) {
+      return;
+    }
+    const absolutePath = path.resolve(filePath);
+    for (const root of roots) {
+      const rootPath = path.resolve(fileURLToPath(root.uri));
+      if (
+        absolutePath === rootPath ||
+        absolutePath.startsWith(rootPath + path.sep)
+      ) {
+        return;
+      }
+    }
+    throw new Error(
+      `Access denied: path ${filePath} is not within any of the workspace roots ${JSON.stringify(roots)}.`,
+    );
   }
 
   resolveCdpRequestId(page: McpPage, cdpRequestId: string): number | undefined {
@@ -643,13 +674,18 @@ export class McpContext implements Context {
     data: Uint8Array<ArrayBufferLike>,
     filename: string,
   ): Promise<{filepath: string}> {
-    return await saveTemporaryFile(data, filename);
+    const filepath = await getTempFilePath(filename);
+    this.validatePath(filepath);
+    await fs.writeFile(filepath, data);
+    return {filepath};
   }
+
   async saveFile(
     data: Uint8Array<ArrayBufferLike>,
     clientProvidedFilePath: string,
     extension: SupportedExtensions,
   ): Promise<{filename: string}> {
+    this.validatePath(clientProvidedFilePath);
     try {
       const filePath = ensureExtension(
         path.resolve(clientProvidedFilePath),
@@ -721,6 +757,7 @@ export class McpContext implements Context {
   }
 
   async installExtension(extensionPath: string): Promise<string> {
+    this.validatePath(extensionPath);
     const id = await this.browser.installExtension(extensionPath);
     return id;
   }
@@ -751,18 +788,21 @@ export class McpContext implements Context {
   async getHeapSnapshotAggregates(
     filePath: string,
   ): Promise<Record<string, AggregatedInfoWithUid>> {
+    this.validatePath(filePath);
     return await this.#heapSnapshotManager.getAggregates(filePath);
   }
 
   async getHeapSnapshotStats(
     filePath: string,
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.Statistics> {
+    this.validatePath(filePath);
     return await this.#heapSnapshotManager.getStats(filePath);
   }
 
   async getHeapSnapshotStaticData(
     filePath: string,
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.StaticData | null> {
+    this.validatePath(filePath);
     return await this.#heapSnapshotManager.getStaticData(filePath);
   }
 
@@ -770,6 +810,7 @@ export class McpContext implements Context {
     filePath: string,
     uid: number,
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange> {
+    this.validatePath(filePath);
     return await this.#heapSnapshotManager.getNodesByUid(filePath, uid);
   }
 }

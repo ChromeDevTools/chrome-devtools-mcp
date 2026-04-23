@@ -114,6 +114,12 @@ export const getNetworkRequest = definePageTool({
       ),
   },
   handler: async (request, response, context) => {
+    if (request.params.requestFilePath) {
+      context.validatePath(request.params.requestFilePath);
+    }
+    if (request.params.responseFilePath) {
+      context.validatePath(request.params.responseFilePath);
+    }
     if (request.params.reqid) {
       response.attachNetworkRequest(request.params.reqid, {
         requestFilePath: request.params.requestFilePath,

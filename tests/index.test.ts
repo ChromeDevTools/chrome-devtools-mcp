@@ -10,6 +10,12 @@ import {describe, it} from 'node:test';
 
 import {Client} from '@modelcontextprotocol/sdk/client/index.js';
 import {StdioClientTransport} from '@modelcontextprotocol/sdk/client/stdio.js';
+import {
+  ListRootsRequestSchema,
+  RootsListChangedNotificationSchema,
+  type ClientCapabilities,
+  type TextContent,
+} from '@modelcontextprotocol/sdk/types.js';
 import {executablePath} from 'puppeteer';
 
 import type {ToolCategory} from '../src/tools/categories.js';
@@ -20,6 +26,7 @@ describe('e2e', () => {
   async function withClient(
     cb: (client: Client) => Promise<void>,
     extraArgs: string[] = [],
+    options: {capabilities?: ClientCapabilities} = {},
   ) {
     const transport = new StdioClientTransport({
       command: 'node',
@@ -38,7 +45,7 @@ describe('e2e', () => {
         version: '1.0.0',
       },
       {
-        capabilities: {},
+        capabilities: options.capabilities ?? {},
       },
     );
 
@@ -158,6 +165,84 @@ describe('e2e', () => {
         assert.ok(executeWebMcpTool);
       },
       ['--experimental-webmcp'],
+    );
+  });
+
+  it('updates roots when client notifies', async () => {
+    const roots = [{uri: 'file:///test-root', name: 'test-root'}];
+    let resolvePromise: () => void;
+    const promise = new Promise<void>(resolve => {
+      resolvePromise = resolve;
+    });
+
+    await withClient(
+      async client => {
+        client.setRequestHandler(ListRootsRequestSchema, () => {
+          resolvePromise();
+          return {roots};
+        });
+
+        await client.notification({
+          method: RootsListChangedNotificationSchema.shape.method.value,
+        });
+
+        // Wait for the server to process the notification and request roots
+        await promise;
+      },
+      [],
+      {
+        capabilities: {
+          roots: {listChanged: true},
+        },
+      },
+    );
+  });
+
+  it('denies file access if roots list is empty', async () => {
+    await withClient(
+      async client => {
+        client.setRequestHandler(ListRootsRequestSchema, () => {
+          return {roots: []};
+        });
+
+        const result = await client.callTool({
+          name: 'take_screenshot',
+          arguments: {
+            filePath: '/tmp/test.png',
+          },
+        });
+
+        assert.strictEqual(result.isError, true);
+        const content = result.content as TextContent[];
+        assert.match(content[0].text, /Access denied/);
+      },
+      [],
+      {
+        capabilities: {
+          roots: {listChanged: true},
+        },
+      },
+    );
+  });
+
+  it('allows file access if roots capability is missing', async () => {
+    await withClient(
+      async client => {
+        const result = await client.callTool({
+          name: 'take_screenshot',
+          arguments: {
+            filePath: '/tmp/test.png',
+          },
+        });
+
+        assert.strictEqual(result.isError, undefined);
+        const content = result.content as TextContent[];
+        assert.match(content[0].text, /Saved screenshot to/);
+      },
+      [],
+      {
+        capabilities: {},
+      },
     );
   });
 });

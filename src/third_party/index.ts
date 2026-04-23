@@ -30,6 +30,10 @@ export {
   SetLevelRequestSchema,
   type ImageContent,
   type TextContent,
+  type Root,
+  ListRootsRequestSchema,
+  RootsListChangedNotificationSchema,
+  ListRootsResultSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 export {z as zod} from 'zod';
 export {default as ajv} from 'ajv';

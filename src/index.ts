@@ -21,6 +21,8 @@ import {
   McpServer,
   type CallToolResult,
   SetLevelRequestSchema,
+  ListRootsResultSchema,
+  RootsListChangedNotificationSchema,
 } from './third_party/index.js';
 import {ToolCategory} from './tools/categories.js';
 import type {DefinedPageTool, ToolDefinition} from './tools/ToolDefinition.js';
@@ -57,10 +59,34 @@ export async function createMcpServer(
     return {};
   });
 
+  const updateRoots = async () => {
+    if (!server.server.getClientCapabilities()?.roots) {
+      return;
+    }
+    try {
+      const roots = await server.server.request(
+        {method: 'roots/list'},
+        ListRootsResultSchema,
+      );
+      context?.setRoots(roots.roots);
+    } catch (e) {
+      logger('Failed to list roots', e);
+    }
+  };
+
   server.server.oninitialized = () => {
     const clientName = server.server.getClientVersion()?.name;
     if (clientName) {
       clearcutLogger?.setClientName(clientName);
+    }
+    if (server.server.getClientCapabilities()?.roots) {
+      void updateRoots();
+      server.server.setNotificationHandler(
+        RootsListChangedNotificationSchema,
+        () => {
+          void updateRoots();
+        },
+      );
     }
   };
 
@@ -109,6 +135,7 @@ export async function createMcpServer(
         experimentalIncludeAllPages: serverArgs.experimentalIncludeAllPages,
         performanceCrux: serverArgs.performanceCrux,
       });
+      await updateRoots();
     }
     return context;
   }
