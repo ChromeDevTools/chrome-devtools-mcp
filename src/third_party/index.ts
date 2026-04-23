@@ -57,6 +57,14 @@ import {
   generateReport as generateReportImpl,
 } from './lighthouse-devtools-mcp-bundle.js';
 
+// Some vendored DevTools/Lighthouse code paths call window.atob/window.btoa even
+// when running under Node.js. Expose a browser-like alias so those runtime calls
+// resolve to Node's global atob/btoa instead of throwing ReferenceError.
+if (typeof globalThis.window === 'undefined') {
+  globalThis.window = globalThis as typeof globalThis & Window & typeof globalThis;
+}
+
+
 export const snapshot = snapshotImpl as (
   page: Page,
   options: {flags?: Flags},
