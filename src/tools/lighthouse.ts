@@ -43,16 +43,10 @@ export const lighthouseAudit = definePageTool({
       .string()
       .optional()
       .describe('Directory for reports. If omitted, uses temporary files.'),
-    categories: zod
-      .array(zod.string())
-      .optional()
-      .describe(
-        'Categories to run. If omitted, defaults to accessibility, seo, best-practices, and agentic browsing.',
-      ),
   },
   handler: async (request, response, context) => {
     const page = request.page;
-    const defaultCategories = [
+    const categories = [
       'accessibility',
       'seo',
       'best-practices',
@@ -63,13 +57,12 @@ export const lighthouseAudit = definePageTool({
       mode = 'navigation',
       device = 'desktop',
       outputDirPath,
-      categories: requestedCategories = defaultCategories,
     } = request.params;
 
     context.validatePath(outputDirPath);
 
     const flags: Flags = {
-      onlyCategories: requestedCategories,
+      onlyCategories: categories,
       output: formats,
       // Default 30 second timeout for page load.
       maxWaitForLoad: 30_000,
@@ -95,10 +88,10 @@ export const lighthouseAudit = definePageTool({
       };
     }
 
-    const options: {flags: Flags; config?: object} = {flags};
-    if (requestedCategories.includes('agentic-browsing')) {
-      options.config = agenticBrowsingConfig;
-    }
+    const options: {flags: Flags; config?: object} = {
+      flags,
+      config: agenticBrowsingConfig,
+    };
 
     let result: RunnerResult | undefined;
     try {
