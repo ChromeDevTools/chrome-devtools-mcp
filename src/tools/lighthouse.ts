@@ -46,11 +46,18 @@ export const lighthouseAudit = definePageTool({
     categories: zod
       .array(zod.string())
       .optional()
-      .describe('Categories to run. If omitted, defaults to accessibility, seo, best-practices, and agentic browsing.'),
+      .describe(
+        'Categories to run. If omitted, defaults to accessibility, seo, best-practices, and agentic browsing.',
+      ),
   },
   handler: async (request, response, context) => {
     const page = request.page;
-    const defaultCategories = ['accessibility', 'seo', 'best-practices', 'agentic-browsing'];
+    const defaultCategories = [
+      'accessibility',
+      'seo',
+      'best-practices',
+      'agentic-browsing',
+    ];
     const formats = ['json', 'html'] as OutputMode[];
     const {
       mode = 'navigation',
@@ -88,7 +95,7 @@ export const lighthouseAudit = definePageTool({
       };
     }
 
-    const options: {flags: Flags; config?: object} = { flags };
+    const options: {flags: Flags; config?: object} = {flags};
     if (requestedCategories.includes('agentic-browsing')) {
       options.config = agenticBrowsingConfig;
     }
