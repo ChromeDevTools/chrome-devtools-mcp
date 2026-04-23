@@ -169,6 +169,7 @@ async function getToolsWithFilteredCategories(
   const definedNames = [];
   for (const file of files) {
     if (
+      !file.endsWith('.js') ||
       file === 'ToolDefinition.js' ||
       file === 'tools.js' ||
       file === 'slim'

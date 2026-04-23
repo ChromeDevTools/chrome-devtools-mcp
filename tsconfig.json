@@ -19,6 +19,7 @@
     "noImplicitOverride": true,
     "noFallthroughCasesInSwitch": true,
     "incremental": true,
+    "sourceMap": true,
     "allowJs": true,
     "useUnknownInCatchVariables": false
   },

@@ -36,7 +36,8 @@
   "files": [
     "build/src",
     "LICENSE",
-    "!*.tsbuildinfo"
+    "!*.tsbuildinfo",
+    "!*.js.map"
   ],
   "repository": "ChromeDevTools/chrome-devtools-mcp",
   "author": "Google LLC",
