@@ -245,6 +245,37 @@ describe('e2e', () => {
       },
     );
   });
+
+  it('returns blocked message when dialog is opened during tool execution', async t => {
+    await withClient(async client => {
+      // Navigate to a page with a button that triggers a dialog on click
+      await client.callTool({
+        name: 'new_page',
+        arguments: {
+          url: `data:text/html,<button id="test" onclick="alert('test dialog')">Click me</button>`,
+        },
+      });
+
+      const snapshotResult = await client.callTool({
+        name: 'take_snapshot',
+        arguments: {},
+      });
+
+      const snapshotText = (snapshotResult.content as TextContent[])[0].text;
+      const match = snapshotText.match(/uid=(\d+_\d+)\s+button "Click me"/);
+      const uid = match ? match[1] : '1_1';
+
+      // Trigger the dialog
+      const result = await client.callTool({
+        name: 'click',
+        arguments: {
+          uid,
+        },
+      });
+
+      t.assert.snapshot?.(JSON.stringify(result));
+    });
+  });
 });
 
 async function getToolsWithFilteredCategories(

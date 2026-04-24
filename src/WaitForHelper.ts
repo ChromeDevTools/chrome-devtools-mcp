@@ -128,8 +128,10 @@ export class WaitForHelper {
     action: () => Promise<unknown>,
     options?: {timeout?: number; handleDialog?: 'accept' | 'dismiss' | string},
   ): Promise<void> {
+    let dialogOpened = false;
     if (options?.handleDialog) {
       const dialogHandler = (dialog: Pick<Dialog, 'accept' | 'dismiss'>) => {
+        dialogOpened = true;
         if (options.handleDialog === 'dismiss') {
           void dialog.dismiss();
         } else if (options.handleDialog === 'accept') {
@@ -166,6 +168,10 @@ export class WaitForHelper {
 
     try {
       await navigationFinished;
+
+      if (dialogOpened) {
+        return;
+      }
 
       // Wait for stable dom after navigation so we execute in
       // the correct context
