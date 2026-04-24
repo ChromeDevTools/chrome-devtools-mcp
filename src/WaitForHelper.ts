@@ -5,7 +5,8 @@
  */
 
 import {logger} from './logger.js';
-import type {Page, Protocol, CdpPage} from './third_party/index.js';
+import type {Page, Protocol, CdpPage, Dialog} from './third_party/index.js';
+import type {PredefinedNetworkConditions} from './third_party/index.js';
 
 export class WaitForHelper {
   #abortController = new AbortController();
@@ -125,8 +126,24 @@ export class WaitForHelper {
 
   async waitForEventsAfterAction(
     action: () => Promise<unknown>,
-    options?: {timeout?: number},
+    options?: {timeout?: number; handleDialog?: 'accept' | 'dismiss' | string},
   ): Promise<void> {
+    if (options?.handleDialog) {
+      const dialogHandler = (dialog: Pick<Dialog, 'accept' | 'dismiss'>) => {
+        if (options.handleDialog === 'dismiss') {
+          void dialog.dismiss();
+        } else if (options.handleDialog === 'accept') {
+          void dialog.accept();
+        } else {
+          void dialog.accept(options.handleDialog);
+        }
+      };
+      this.#page.on('dialog', dialogHandler);
+      this.#abortController.signal.addEventListener('abort', () => {
+        this.#page.off('dialog', dialogHandler);
+      });
+    }
+
     const navigationFinished = this.waitForNavigationStarted()
       .then(navigationStated => {
         if (navigationStated) {
@@ -159,4 +176,23 @@ export class WaitForHelper {
       this.#abortController.abort();
     }
   }
+}
+
+export function getNetworkMultiplierFromString(
+  condition: string | null,
+): number {
+  const puppeteerCondition =
+    condition as keyof typeof PredefinedNetworkConditions;
+
+  switch (puppeteerCondition) {
+    case 'Fast 4G':
+      return 1;
+    case 'Slow 4G':
+      return 2.5;
+    case 'Fast 3G':
+      return 5;
+    case 'Slow 3G':
+      return 10;
+  }
+  return 1;
 }

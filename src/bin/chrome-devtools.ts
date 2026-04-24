@@ -6,6 +6,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+process.title = 'chrome-devtools';
+
 import process from 'node:process';
 
 import type {Options, PositionalOptions} from 'yargs';
@@ -19,14 +21,19 @@ import {
 import {isDaemonRunning, serializeArgs} from '../daemon/utils.js';
 import {logDisclaimers} from '../index.js';
 import {hideBin, yargs, type CallToolResult} from '../third_party/index.js';
+import {checkForUpdates} from '../utils/check-for-updates.js';
 import {VERSION} from '../version.js';
 
 import {commands} from './chrome-devtools-cli-options.js';
 import {cliOptions, parseArguments} from './chrome-devtools-mcp-cli-options.js';
 
-async function start(args: string[]) {
+await checkForUpdates(
+  'Run `npm install -g chrome-devtools-mcp@latest` and `chrome-devtools start` to update and restart the daemon.',
+);
+
+async function start(args: string[], sessionId: string) {
   const combinedArgs = [...args, ...defaultArgs];
-  await startDaemon(combinedArgs);
+  await startDaemon(combinedArgs, sessionId);
   logDisclaimers(parseArguments(VERSION, combinedArgs));
 }
 
@@ -41,9 +48,10 @@ delete startCliOptions.autoConnect;
 // Missing CLI serialization.
 delete startCliOptions.viewport;
 // CLI is generated based on the default tool definitions. To enable conditional
-// tools, they needs to be enabled during CLI generation.
+// tools, they need to be enabled during CLI generation.
 delete startCliOptions.experimentalPageIdRouting;
 delete startCliOptions.experimentalVision;
+delete startCliOptions.experimentalWebmcp;
 delete startCliOptions.experimentalInteropTools;
 delete startCliOptions.experimentalScreencast;
 delete startCliOptions.categoryEmulation;
@@ -57,9 +65,11 @@ if (!('default' in cliOptions.headless)) {
   throw new Error('headless cli option unexpectedly does not have a default');
 }
 if ('default' in cliOptions.isolated) {
-  throw new Error('headless cli option unexpectedly does not have a default');
+  throw new Error('isolated cli option unexpectedly has a default');
 }
 startCliOptions.headless!.default = true;
+startCliOptions.isolated!.description =
+  'If specified, creates a temporary user-data-dir that is automatically cleaned up after the browser is closed. Defaults to true unless userDataDir is provided.';
 
 const y = yargs(hideBin(process.argv))
   .scriptName('chrome-devtools')
@@ -68,6 +78,12 @@ const y = yargs(hideBin(process.argv))
   .usage(
     `Run 'chrome-devtools <command> --help' for help on the specific command.`,
   )
+  .option('sessionId', {
+    type: 'string',
+    description: 'Session ID for daemon scoping',
+    default: '',
+    hidden: true,
+  })
   .demandCommand()
   .version(VERSION)
   .strict()
@@ -86,57 +102,71 @@ y.command(
       )
       .strict(),
   async argv => {
-    if (isDaemonRunning()) {
-      await stopDaemon();
+    if (isDaemonRunning(argv.sessionId)) {
+      await stopDaemon(argv.sessionId);
     }
     // Defaults but we do not want to affect the yargs conflict resolution.
-    if (argv.isolated === undefined) {
+    if (argv.isolated === undefined && argv.userDataDir === undefined) {
       argv.isolated = true;
     }
     if (argv.headless === undefined) {
       argv.headless = true;
     }
     const args = serializeArgs(cliOptions, argv);
-    await start(args);
+    await start(args, argv.sessionId);
     process.exit(0);
   },
 ).strict(); // Re-enable strict validation for other commands; this is applied to the yargs instance itself
 
-y.command('status', 'Checks if chrome-devtools-mcp is running', async () => {
-  if (isDaemonRunning()) {
-    console.log('chrome-devtools-mcp daemon is running.');
-    const response = await sendCommand({
-      method: 'status',
-    });
-    if (response.success) {
-      const data = JSON.parse(response.result) as {
-        pid: number | null;
-        socketPath: string;
-        startDate: string;
-        version: string;
-        args: string[];
-      };
-      console.log(
-        `pid=${data.pid} socket=${data.socketPath} start-date=${data.startDate} version=${data.version}`,
+y.command(
+  'status',
+  'Checks if chrome-devtools-mcp is running',
+  y => y,
+  async argv => {
+    if (isDaemonRunning(argv.sessionId)) {
+      console.log('chrome-devtools-mcp daemon is running.');
+      const response = await sendCommand(
+        {
+          method: 'status',
+        },
+        argv.sessionId,
       );
-      console.log(`args=${JSON.stringify(data.args)}`);
+      if (response.success) {
+        const data = JSON.parse(response.result) as {
+          pid: number | null;
+          socketPath: string;
+          startDate: string;
+          version: string;
+          args: string[];
+        };
+        console.log(
+          `pid=${data.pid} socket=${data.socketPath} start-date=${data.startDate} version=${data.version}`,
+        );
+        console.log(`args=${JSON.stringify(data.args)}`);
+      } else {
+        console.error('Error:', response.error);
+        process.exit(1);
+      }
     } else {
-      console.error('Error:', response.error);
-      process.exit(1);
+      console.log('chrome-devtools-mcp daemon is not running.');
     }
-  } else {
-    console.log('chrome-devtools-mcp daemon is not running.');
-  }
-  process.exit(0);
-});
-
-y.command('stop', 'Stop chrome-devtools-mcp if any', async () => {
-  if (!isDaemonRunning()) {
     process.exit(0);
-  }
-  await stopDaemon();
-  process.exit(0);
-});
+  },
+);
+
+y.command(
+  'stop',
+  'Stop chrome-devtools-mcp if any',
+  y => y,
+  async argv => {
+    const sessionId = argv.sessionId as string;
+    if (!isDaemonRunning(sessionId)) {
+      process.exit(0);
+    }
+    await stopDaemon(sessionId);
+    process.exit(0);
+  },
+);
 
 for (const [commandName, commandDef] of Object.entries(commands)) {
   const args = commandDef.args;
@@ -203,9 +233,10 @@ for (const [commandName, commandDef] of Object.entries(commands)) {
       }
     },
     async argv => {
+      const sessionId = argv.sessionId as string;
       try {
-        if (!isDaemonRunning()) {
-          await start([]);
+        if (!isDaemonRunning(sessionId)) {
+          await start([], sessionId);
         }
 
         const commandArgs: Record<string, unknown> = {};
@@ -215,11 +246,14 @@ for (const [commandName, commandDef] of Object.entries(commands)) {
           }
         }
 
-        const response = await sendCommand({
-          method: 'invoke_tool',
-          tool: commandName,
-          args: commandArgs,
-        });
+        const response = await sendCommand(
+          {
+            method: 'invoke_tool',
+            tool: commandName,
+            args: commandArgs,
+          },
+          sessionId,
+        );
 
         if (response.success) {
           console.log(

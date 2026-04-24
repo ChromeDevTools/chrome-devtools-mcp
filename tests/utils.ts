@@ -5,6 +5,8 @@
  */
 
 import assert from 'node:assert';
+import {spawn} from 'node:child_process';
+import path from 'node:path';
 
 import type {CallToolResult} from '@modelcontextprotocol/sdk/types.js';
 import logger from 'debug';
@@ -16,14 +18,23 @@ import type {
   HTTPResponse,
   LaunchOptions,
   Page,
+  Target,
 } from 'puppeteer-core';
 import sinon from 'sinon';
 
 import type {ParsedArguments} from '../src/bin/chrome-devtools-mcp-cli-options.js';
 import {McpContext} from '../src/McpContext.js';
 import {McpResponse} from '../src/McpResponse.js';
-import {stableIdSymbol} from '../src/PageCollector.js';
+import {TextSnapshot} from '../src/TextSnapshot.js';
 import {DevTools} from '../src/third_party/index.js';
+import {stableIdSymbol} from '../src/utils/id.js';
+
+export function assertNoServiceWorkerReported(targets: Target[], id: string) {
+  const target = targets.find(target => {
+    return target.url().includes(id) && target.type() === 'service_worker';
+  });
+  assert(target === undefined);
+}
 
 export function getTextContent(
   content: CallToolResult['content'][number],
@@ -62,6 +73,7 @@ export async function withBrowser(
     debug?: boolean;
     autoOpenDevTools?: boolean;
     executablePath?: string;
+    args?: string[];
   } = {},
 ) {
   const launchOptions: LaunchOptions = {
@@ -72,7 +84,7 @@ export async function withBrowser(
     devtools: options.autoOpenDevTools ?? false,
     pipe: true,
     handleDevToolsAsPage: true,
-    args: ['--screen-info={3840x2160}'],
+    args: [...(options.args || []), '--screen-info={3840x2160}'],
     enableExtensions: true,
   };
   const key = JSON.stringify(launchOptions);
@@ -102,10 +114,12 @@ export async function withMcpContext(
     autoOpenDevTools?: boolean;
     performanceCrux?: boolean;
     executablePath?: string;
+    args?: string[];
   } = {},
   args: ParsedArguments = {} as ParsedArguments,
 ) {
   await withBrowser(async browser => {
+    TextSnapshot.resetCounter();
     const response = new McpResponse(args);
     if (context) {
       context.dispose();
@@ -140,6 +154,7 @@ export function getMockRequest(
     navigationRequest?: boolean;
     frame?: Frame;
     redirectChain?: HTTPRequest[];
+    headers?: Record<string, string>;
   } = {},
 ): HTTPRequest {
   return {
@@ -168,9 +183,11 @@ export function getMockRequest(
       return options.resourceType ?? 'document';
     },
     headers(): Record<string, string> {
-      return {
-        'content-size': '10',
-      };
+      return (
+        options.headers ?? {
+          'content-size': '10',
+        }
+      );
     },
     redirectChain(): HTTPRequest[] {
       return options.redirectChain ?? [];
@@ -188,6 +205,7 @@ export function getMockRequest(
 export function getMockResponse(
   options: {
     status?: number;
+    headers?: Record<string, string>;
   } = {},
 ): HTTPResponse {
   return {
@@ -195,9 +213,9 @@ export function getMockResponse(
       return options.status ?? 200;
     },
     headers(): Record<string, string> {
-      return {};
+      return options.headers ?? {};
     },
-  } as HTTPResponse;
+  } as unknown as HTTPResponse;
 }
 
 export function html(
@@ -330,4 +348,47 @@ export function getMockBrowser(): Browser {
     },
     ...mockListener(),
   } as Browser;
+}
+
+export const CLI_PATH = path.resolve('build/src/bin/chrome-devtools.js');
+
+export async function runCli(
+  args: string[],
+  sessionId?: string,
+): Promise<{status: number | null; stdout: string; stderr: string}> {
+  return new Promise((resolve, reject) => {
+    const finalArgs = [...args];
+    if (sessionId) {
+      finalArgs.push('--sessionId', sessionId);
+    }
+    const child = spawn('node', [CLI_PATH, ...finalArgs]);
+    let stdout = '';
+    let stderr = '';
+    child.stdout.on('data', chunk => {
+      stdout += chunk;
+      process.stdout.write(chunk);
+    });
+    child.stderr.on('data', chunk => {
+      stderr += chunk;
+      process.stderr.write(chunk);
+    });
+    child.on('close', status => resolve({status, stdout, stderr}));
+    child.on('error', reject);
+  });
+}
+
+export async function assertDaemonIsNotRunning(sessionId?: string) {
+  const result = await runCli(['status'], sessionId);
+  assert.strictEqual(
+    result.stdout,
+    'chrome-devtools-mcp daemon is not running.\n',
+  );
+}
+
+export async function assertDaemonIsRunning(sessionId?: string) {
+  const result = await runCli(['status'], sessionId);
+  assert.ok(
+    result.stdout.startsWith('chrome-devtools-mcp daemon is running.\n'),
+    'chrome-devtools-mcp daemon is not running',
+  );
 }

@@ -10,6 +10,7 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {describe, it} from 'node:test';
 
+import {TextSnapshot} from '../../src/TextSnapshot.js';
 import {screenshot} from '../../src/tools/screenshot.js';
 import {screenshots} from '../snapshot.js';
 import {html, withMcpContext} from '../utils.js';
@@ -155,7 +156,9 @@ describe('screenshot', () => {
 
         const page = context.getSelectedPptrPage();
         await page.setContent(fixture.html);
-        await context.createTextSnapshot(context.getSelectedMcpPage());
+        context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
+          context.getSelectedMcpPage(),
+        );
         await screenshot.handler(
           {
             params: {

@@ -37,6 +37,7 @@ export default defineConfig([
             'puppeteer.config.cjs',
             'eslint.config.mjs',
             'rollup.config.mjs',
+            'skills/memory-leak-debugging/references/compare_snapshots.js',
           ],
         },
       },
@@ -132,6 +133,20 @@ export default defineConfig([
           ],
         },
       ],
+    },
+  },
+  {
+    name: 'Source files',
+    files: ['src/**/*.ts'],
+    rules: {
+      '@local/no-direct-third-party-imports': 'error',
+    },
+  },
+  {
+    name: 'Tools definitions',
+    files: ['src/tools/**/*.ts'],
+    rules: {
+      '@local/enforce-zod-schema': 'error',
     },
   },
   {

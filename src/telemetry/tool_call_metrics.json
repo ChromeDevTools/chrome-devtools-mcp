@@ -1,0 +1,612 @@
+[
+  {
+    "name": "click",
+    "args": [
+      {
+        "name": "dbl_click",
+        "argType": "boolean"
+      },
+      {
+        "name": "include_snapshot",
+        "argType": "boolean"
+      }
+    ]
+  },
+  {
+    "name": "click_at",
+    "args": [
+      {
+        "name": "x",
+        "argType": "number"
+      },
+      {
+        "name": "y",
+        "argType": "number"
+      },
+      {
+        "name": "dbl_click",
+        "argType": "boolean"
+      },
+      {
+        "name": "include_snapshot",
+        "argType": "boolean"
+      }
+    ]
+  },
+  {
+    "name": "close_page",
+    "args": [
+      {
+        "name": "page_id",
+        "argType": "number"
+      }
+    ]
+  },
+  {
+    "name": "drag",
+    "args": [
+      {
+        "name": "from_uid_length",
+        "argType": "number"
+      },
+      {
+        "name": "to_uid_length",
+        "argType": "number"
+      },
+      {
+        "name": "include_snapshot",
+        "argType": "boolean"
+      }
+    ]
+  },
+  {
+    "name": "emulate",
+    "args": [
+      {
+        "name": "network_conditions",
+        "argType": "string"
+      },
+      {
+        "name": "cpu_throttling_rate",
+        "argType": "number"
+      },
+      {
+        "name": "geolocation_length",
+        "argType": "number"
+      },
+      {
+        "name": "user_agent_length",
+        "argType": "number"
+      },
+      {
+        "name": "color_scheme",
+        "argType": "string"
+      },
+      {
+        "name": "viewport_length",
+        "argType": "number"
+      }
+    ]
+  },
+  {
+    "name": "evaluate",
+    "args": [
+      {
+        "name": "script_length",
+        "argType": "number"
+      }
+    ]
+  },
+  {
+    "name": "evaluate_script",
+    "args": [
+      {
+        "name": "function_length",
+        "argType": "number"
+      },
+      {
+        "name": "args_count",
+        "argType": "number"
+      },
+      {
+        "name": "dialog_action_length",
+        "argType": "number"
+      }
+    ]
+  },
+  {
+    "name": "execute_in_page_tool",
+    "args": [
+      {
+        "name": "tool_name_length",
+        "argType": "number"
+      },
+      {
+        "name": "params_length",
+        "argType": "number"
+      }
+    ]
+  },
+  {
+    "name": "fill",
+    "args": [
+      {
+        "name": "value_length",
+        "argType": "number"
+      },
+      {
+        "name": "include_snapshot",
+        "argType": "boolean"
+      }
+    ]
+  },
+  {
+    "name": "fill_form",
+    "args": [
+      {
+        "name": "elements_count",
+        "argType": "number"
+      },
+      {
+        "name": "include_snapshot",
+        "argType": "boolean"
+      }
+    ]
+  },
+  {
+    "name": "get_console_message",
+    "args": []
+  },
+  {
+    "name": "get_network_request",
+    "args": [
+      {
+        "name": "request_file_path_length",
+        "argType": "number"
+      },
+      {
+        "name": "response_file_path_length",
+        "argType": "number"
+      }
+    ]
+  },
+  {
+    "name": "get_tab_id",
+    "args": [
+      {
+        "name": "page_id",
+        "argType": "number"
+      }
+    ]
+  },
+  {
+    "name": "handle_dialog",
+    "args": [
+      {
+        "name": "action",
+        "argType": "string"
+      },
+      {
+        "name": "prompt_text_length",
+        "argType": "number"
+      }
+    ]
+  },
+  {
+    "name": "hover",
+    "args": [
+      {
+        "name": "include_snapshot",
+        "argType": "boolean"
+      }
+    ]
+  },
+  {
+    "name": "install_extension",
+    "args": [
+      {
+        "name": "path_length",
+        "argType": "number"
+      }
+    ]
+  },
+  {
+    "name": "lighthouse_audit",
+    "args": [
+      {
+        "name": "mode",
+        "argType": "string"
+      },
+      {
+        "name": "device",
+        "argType": "string"
+      },
+      {
+        "name": "output_dir_path_length",
+        "argType": "number"
+      }
+    ]
+  },
+  {
+    "name": "list_console_messages",
+    "args": [
+      {
+        "name": "page_size",
+        "argType": "number"
+      },
+      {
+        "name": "page_idx",
+        "argType": "number"
+      },
+      {
+        "name": "types_count",
+        "argType": "number"
+      },
+      {
+        "name": "include_preserved_messages",
+        "argType": "boolean"
+      }
+    ]
+  },
+  {
+    "name": "list_extensions",
+    "args": []
+  },
+  {
+    "name": "list_in_page_tools",
+    "args": []
+  },
+  {
+    "name": "list_network_requests",
+    "args": [
+      {
+        "name": "page_size",
+        "argType": "number"
+      },
+      {
+        "name": "page_idx",
+        "argType": "number"
+      },
+      {
+        "name": "resource_types_count",
+        "argType": "number"
+      },
+      {
+        "name": "include_preserved_requests",
+        "argType": "boolean"
+      }
+    ]
+  },
+  {
+    "name": "list_pages",
+    "args": []
+  },
+  {
+    "name": "navigate",
+    "args": [
+      {
+        "name": "url_length",
+        "argType": "number"
+      }
+    ]
+  },
+  {
+    "name": "navigate_page",
+    "args": [
+      {
+        "name": "type",
+        "argType": "string"
+      },
+      {
+        "name": "url_length",
+        "argType": "number"
+      },
+      {
+        "name": "ignore_cache",
+        "argType": "boolean"
+      },
+      {
+        "name": "handle_before_unload",
+        "argType": "string"
+      },
+      {
+        "name": "init_script_length",
+        "argType": "number"
+      },
+      {
+        "name": "timeout",
+        "argType": "number"
+      }
+    ]
+  },
+  {
+    "name": "new_page",
+    "args": [
+      {
+        "name": "url_length",
+        "argType": "number"
+      },
+      {
+        "name": "background",
+        "argType": "boolean"
+      },
+      {
+        "name": "isolated_context_length",
+        "argType": "number"
+      },
+      {
+        "name": "timeout",
+        "argType": "number"
+      }
+    ]
+  },
+  {
+    "name": "performance_analyze_insight",
+    "args": [
+      {
+        "name": "insight_set_id_length",
+        "argType": "number"
+      },
+      {
+        "name": "insight_name_length",
+        "argType": "number"
+      }
+    ]
+  },
+  {
+    "name": "performance_start_trace",
+    "args": [
+      {
+        "name": "reload",
+        "argType": "boolean"
+      },
+      {
+        "name": "auto_stop",
+        "argType": "boolean"
+      },
+      {
+        "name": "file_path_length",
+        "argType": "number"
+      }
+    ]
+  },
+  {
+    "name": "performance_stop_trace",
+    "args": [
+      {
+        "name": "file_path_length",
+        "argType": "number"
+      }
+    ]
+  },
+  {
+    "name": "press_key",
+    "args": [
+      {
+        "name": "key_length",
+        "argType": "number"
+      },
+      {
+        "name": "include_snapshot",
+        "argType": "boolean"
+      }
+    ]
+  },
+  {
+    "name": "reload_extension",
+    "args": [
+      {
+        "name": "id_length",
+        "argType": "number"
+      }
+    ]
+  },
+  {
+    "name": "resize_page",
+    "args": [
+      {
+        "name": "width",
+        "argType": "number"
+      },
+      {
+        "name": "height",
+        "argType": "number"
+      }
+    ]
+  },
+  {
+    "name": "screencast_start",
+    "args": [
+      {
+        "name": "path_length",
+        "argType": "number",
+        "isDeprecated": true
+      },
+      {
+        "name": "file_path_length",
+        "argType": "number"
+      }
+    ]
+  },
+  {
+    "name": "screencast_stop",
+    "args": []
+  },
+  {
+    "name": "screenshot",
+    "args": []
+  },
+  {
+    "name": "select_page",
+    "args": [
+      {
+        "name": "page_id",
+        "argType": "number"
+      },
+      {
+        "name": "bring_to_front",
+        "argType": "boolean"
+      }
+    ]
+  },
+  {
+    "name": "take_memory_snapshot",
+    "args": [
+      {
+        "name": "file_path_length",
+        "argType": "number"
+      }
+    ]
+  },
+  {
+    "name": "take_screenshot",
+    "args": [
+      {
+        "name": "format",
+        "argType": "string"
+      },
+      {
+        "name": "quality",
+        "argType": "number"
+      },
+      {
+        "name": "full_page",
+        "argType": "boolean"
+      },
+      {
+        "name": "file_path_length",
+        "argType": "number"
+      }
+    ]
+  },
+  {
+    "name": "take_snapshot",
+    "args": [
+      {
+        "name": "verbose",
+        "argType": "boolean"
+      },
+      {
+        "name": "file_path_length",
+        "argType": "number"
+      }
+    ]
+  },
+  {
+    "name": "trigger_extension_action",
+    "args": [
+      {
+        "name": "id_length",
+        "argType": "number"
+      }
+    ]
+  },
+  {
+    "name": "type_text",
+    "args": [
+      {
+        "name": "text_length",
+        "argType": "number"
+      },
+      {
+        "name": "submit_key_length",
+        "argType": "number"
+      }
+    ]
+  },
+  {
+    "name": "uninstall_extension",
+    "args": [
+      {
+        "name": "id_length",
+        "argType": "number"
+      }
+    ]
+  },
+  {
+    "name": "upload_file",
+    "args": [
+      {
+        "name": "file_path_length",
+        "argType": "number"
+      },
+      {
+        "name": "include_snapshot",
+        "argType": "boolean"
+      }
+    ]
+  },
+  {
+    "name": "wait_for",
+    "args": [
+      {
+        "name": "text_count",
+        "argType": "number"
+      },
+      {
+        "name": "timeout",
+        "argType": "number"
+      }
+    ]
+  },
+  {
+    "name": "list_webmcp_tools",
+    "args": []
+  },
+  {
+    "name": "execute_webmcp_tool",
+    "args": [
+      {
+        "name": "tool_name_length",
+        "argType": "number"
+      },
+      {
+        "name": "input_length",
+        "argType": "number"
+      }
+    ]
+  },
+  {
+    "name": "load_memory_snapshot",
+    "args": [
+      {
+        "name": "file_path_length",
+        "argType": "number"
+      }
+    ]
+  },
+  {
+    "name": "get_memory_snapshot_details",
+    "args": [
+      {
+        "name": "file_path_length",
+        "argType": "number"
+      },
+      {
+        "name": "page_idx",
+        "argType": "number"
+      },
+      {
+        "name": "page_size",
+        "argType": "number"
+      }
+    ]
+  },
+  {
+    "name": "get_nodes_by_class",
+    "args": [
+      {
+        "name": "file_path_length",
+        "argType": "number"
+      },
+      {
+        "name": "page_idx",
+        "argType": "number"
+      },
+      {
+        "name": "page_size",
+        "argType": "number"
+      }
+    ]
+  }
+]

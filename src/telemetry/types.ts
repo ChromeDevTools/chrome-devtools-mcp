@@ -22,6 +22,7 @@ export interface ToolInvocation {
   tool_name: string;
   success: boolean;
   latency_ms: number;
+  tool_params?: object;
 }
 
 export interface ServerStart {
@@ -75,6 +76,11 @@ export enum McpClient {
   MCP_CLIENT_UNSPECIFIED = 0,
   MCP_CLIENT_CLAUDE_CODE = 1,
   MCP_CLIENT_GEMINI_CLI = 2,
+  MCP_CLIENT_DT_MCP_CLI = 4,
+  MCP_CLIENT_OPENCLAW = 5,
+  MCP_CLIENT_CODEX = 6,
+  MCP_CLIENT_ANTIGRAVITY = 7,
+  MCP_CLIENT_OTHER = 3,
 }
 
 // IPC types for messages between the main process and the

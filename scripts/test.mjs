@@ -8,6 +8,7 @@
 // Node 20 does not support --experimental-strip-types flag.
 
 import {spawn, execSync} from 'node:child_process';
+import {readFile} from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 
@@ -38,10 +39,27 @@ if (userArgs.length > 0) {
   }
 } else {
   const isNode20 = process.version.startsWith('v20.');
-  if (isNode20) {
-    files.push('build/tests');
-  } else {
-    files.push('build/tests/**/*.test.js');
+  if (flags.includes('--test-only')) {
+    if (isNode20) {
+      throw new Error(`--test-only is not supported for Node 20`);
+    }
+    const {glob} = await import('node:fs/promises');
+    for await (const tsFile of glob('tests/**/*.test.ts')) {
+      const content = await readFile(tsFile, 'utf8');
+      if (content.includes('.only(')) {
+        files.push(path.join('build', tsFile.replace(/\.ts$/, '.js')));
+      }
+    }
+    if (files.length === 0) {
+      console.warn('no files contain .only');
+      process.exit(0);
+    }
+  } else if (files.length === 0) {
+    if (isNode20) {
+      files.push('build/tests');
+    } else {
+      files.push('build/tests/**/*.test.js');
+    }
   }
 }
 
@@ -52,14 +70,13 @@ const nodeArgs = [
   '--test-reporter',
   (process.env['NODE_TEST_REPORTER'] ?? process.env['CI']) ? 'spec' : 'dot',
   '--test-force-exit',
-  '--test-concurrency=1',
   '--test',
-  '--test-timeout=60000',
+  '--test-timeout=120000',
   ...flags,
   ...files,
 ];
 
-function installChrome(version) {
+function _installChrome(version) {
   try {
     return execSync(
       `npx puppeteer browsers install chrome@${version} --format "{{path}}"`,
@@ -83,6 +100,8 @@ async function runTests(attempt) {
         ...process.env,
         CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: true,
         CHROME_DEVTOOLS_MCP_CRASH_ON_UNCAUGHT: true,
+        CHROME_DEVTOOLS_MCP_NO_UPDATE_CHECKS: true,
+        ...(process.env['RUNNER_DEBUG'] === '1' ? {DEBUG: 'puppeteer:*'} : {}),
       },
     });
 
@@ -91,9 +110,6 @@ async function runTests(attempt) {
     });
   });
 }
-
-const chromePath = installChrome('146.0.7680.31');
-process.env.CHROME_M146_EXECUTABLE_PATH = chromePath;
 
 const maxAttempts = shouldRetry ? 3 : 1;
 let exitCode = 1;

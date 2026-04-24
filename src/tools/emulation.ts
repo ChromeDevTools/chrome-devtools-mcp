@@ -44,7 +44,7 @@ export const emulate = definePageTool({
       .optional()
       .transform(geolocationTransform)
       .describe(
-        'Geolocation (`<latitude>x<longitude>`) to emulate. Latitude between -90 and 90. Longitude between -180 and 180. Omit clear the geolocation override.',
+        'Geolocation (`<latitude>x<longitude>`) to emulate. Latitude between -90 and 90. Longitude between -180 and 180. Omit to clear the geolocation override.',
       ),
     userAgent: zod
       .string()

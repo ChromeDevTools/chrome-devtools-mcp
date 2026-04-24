@@ -60,6 +60,13 @@ version, [search for a PR titled `chore(main): release chrome-devtools-mcp`](htt
 and review, test, and land it. The release PR is automatically opened if there
 are any changes on the main branch that show up in the changelog.
 
+### How to update the Lighthouse dependency
+
+- Update the Lighthouse version in package.json and run `npm install`. The npm version is currently used for types.
+- Check out the corresponding Lighthouse repository revision to a sibling directory (`../lighthouse`).
+- Run `npm run update-lighthouse` (Note that Lighthouse requires yarn).
+- Commit the bundle. If new dependencies are added via the bundle, update `tests/third_party_notices.test.ts`.
+
 ## Installation
 
 Check that you are using node version specified in .nvmrc, then run following commands:
@@ -145,7 +152,5 @@ export const scenario: TestScenario = {
 
 ## Restrictions on JSON schema
 
-- no .nullable(), no .object() types.
+- no .nullable(), no .object() types. Enforced by the `@local/enforce-zod-schema` ESLint rule.
 - represent complex object as a short formatted string.
-
-TODO: implement eslint for schema https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1076

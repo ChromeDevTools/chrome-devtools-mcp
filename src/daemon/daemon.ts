@@ -21,7 +21,7 @@ import {VERSION} from '../version.js';
 
 import type {DaemonMessage} from './types.js';
 import {
-  getDaemonPid,
+  DAEMON_CLIENT_NAME,
   getPidFilePath,
   getSocketPath,
   INDEX_SCRIPT_PATH,
@@ -29,19 +29,20 @@ import {
   isDaemonRunning,
 } from './utils.js';
 
-const pid = getDaemonPid();
-if (isDaemonRunning(pid)) {
+const sessionId = process.env.CHROME_DEVTOOLS_MCP_SESSION_ID || '';
+logger(`Daemon sessionId: ${sessionId}`);
+if (isDaemonRunning(sessionId)) {
   logger('Another daemon process is running.');
   process.exit(1);
 }
-const pidFilePath = getPidFilePath();
+const pidFilePath = getPidFilePath(sessionId);
 fs.mkdirSync(path.dirname(pidFilePath), {
   recursive: true,
 });
 fs.writeFileSync(pidFilePath, process.pid.toString());
 logger(`Writing ${process.pid.toString()} to ${pidFilePath}`);
 
-const socketPath = getSocketPath();
+const socketPath = getSocketPath(sessionId);
 
 const startDate = new Date();
 const mcpServerArgs = process.argv.slice(2);
@@ -54,10 +55,6 @@ async function setupMCPClient() {
   console.log('Setting up MCP client connection...');
 
   // Create stdio transport for chrome-devtools-mcp
-  // Workaround for https://github.com/modelcontextprotocol/typescript-sdk/blob/v1.x/src/client/stdio.ts#L128
-  // which causes the console window to show on Windows.
-  // @ts-expect-error no types for type.
-  process.type = 'mcp-client';
   mcpTransport = new StdioClientTransport({
     command: process.execPath,
     args: [INDEX_SCRIPT_PATH, ...mcpServerArgs],
@@ -65,7 +62,7 @@ async function setupMCPClient() {
   });
   mcpClient = new Client(
     {
-      name: 'chrome-devtools-cli-daemon',
+      name: DAEMON_CLIENT_NAME,
       version: VERSION,
     },
     {

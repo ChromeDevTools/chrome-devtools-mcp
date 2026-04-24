@@ -284,6 +284,29 @@ describe('NetworkCollector', () => {
     page.emit('request', request);
     assert.equal(collector.getData(page, true).length, 3);
   });
+
+  it('should not grow beyond maxNavigationSaved', async () => {
+    const browser = getMockBrowser();
+    const page = (await browser.pages())[0];
+    const mainFrame = page.mainFrame();
+    const collector = new NetworkCollector(browser);
+    await collector.init([page]);
+
+    // Simulate 5 navigations (maxNavigationSaved is 3)
+    for (let i = 0; i < 5; i++) {
+      const req = getMockRequest({
+        url: `http://example.com/nav${i}`,
+        navigationRequest: true,
+        frame: mainFrame,
+      });
+      page.emit('request', req);
+      page.emit('framenavigated', mainFrame);
+    }
+
+    // We expect 3 arrays in navigations (current + 2 saved)
+    // Each navigation has 1 request, so total should be 3
+    assert.equal(collector.getData(page, true).length, 3);
+  });
 });
 
 describe('ConsoleCollector', () => {
@@ -306,40 +329,13 @@ describe('ConsoleCollector', () => {
     sinon.restore();
   });
 
-  it('emits issues on page', async () => {
-    const browser = getMockBrowser();
-    const page = (await browser.pages())[0];
-    // @ts-expect-error internal API.
-    const cdpSession = page._client();
-    const onIssuesListener = sinon.spy();
-
-    page.on('issue', onIssuesListener);
-
-    const collector = new ConsoleCollector(browser, collect => {
-      return {
-        issue: issue => {
-          collect(issue as DevTools.AggregatedIssue);
-        },
-      } as ListenerMap;
-    });
-    await collector.init([page]);
-    cdpSession.emit('Audits.issueAdded', {issue});
-    sinon.assert.calledOnce(onIssuesListener);
-
-    const issueArgument = onIssuesListener.getCall(0).args[0];
-    assert(issueArgument instanceof DevTools.AggregatedIssue);
-  });
-
   it('collects issues', async () => {
     const browser = getMockBrowser();
     const page = (await browser.pages())[0];
-    // @ts-expect-error internal API.
-    const cdpSession = page._client();
-
     const collector = new ConsoleCollector(browser, collect => {
       return {
-        issue: issue => {
-          collect(issue as DevTools.AggregatedIssue);
+        devtoolsAggregatedIssue: issue => {
+          collect(issue);
         },
       } as ListenerMap;
     });
@@ -356,29 +352,56 @@ describe('ConsoleCollector', () => {
       },
     } satisfies Protocol.Audits.InspectorIssue;
 
-    cdpSession.emit('Audits.issueAdded', {issue});
-    cdpSession.emit('Audits.issueAdded', {issue: issue2});
+    page.emit('issue', issue);
+    page.emit('issue', issue2);
     const data = collector.getData(page);
     assert.equal(data.length, 2);
   });
 
-  it('filters duplicated issues', async () => {
+  it('silently ignores unmapped PerformanceIssue events', async () => {
     const browser = getMockBrowser();
     const page = (await browser.pages())[0];
-    // @ts-expect-error internal API.
-    const cdpSession = page._client();
+    const warnStub = sinon.stub(console, 'warn');
 
     const collector = new ConsoleCollector(browser, collect => {
       return {
-        issue: issue => {
-          collect(issue as DevTools.AggregatedIssue);
+        devtoolsAggregatedIssue: issue => {
+          collect(issue);
         },
       } as ListenerMap;
     });
     await collector.init([page]);
 
-    cdpSession.emit('Audits.issueAdded', {issue});
-    cdpSession.emit('Audits.issueAdded', {issue});
+    const performanceIssue = {
+      code: 'PerformanceIssue',
+      details: {
+        performanceIssueDetails: {
+          performanceIssueType: 'DocumentCookie',
+        },
+      },
+    } as unknown as Protocol.Audits.InspectorIssue;
+
+    page.emit('issue', performanceIssue);
+
+    assert.equal(collector.getData(page).length, 0);
+    sinon.assert.notCalled(warnStub);
+  });
+
+  it('filters duplicated issues', async () => {
+    const browser = getMockBrowser();
+    const page = (await browser.pages())[0];
+
+    const collector = new ConsoleCollector(browser, collect => {
+      return {
+        devtoolsAggregatedIssue: issue => {
+          collect(issue);
+        },
+      } as ListenerMap;
+    });
+    await collector.init([page]);
+
+    page.emit('issue', issue);
+    page.emit('issue', issue);
     const data = collector.getData(page);
     assert.equal(data.length, 1);
     const collectedIssue = data[0];

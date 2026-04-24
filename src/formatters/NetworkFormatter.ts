@@ -6,7 +6,11 @@
 
 import {isUtf8} from 'node:buffer';
 
-import type {HTTPRequest, HTTPResponse} from '../third_party/index.js';
+import {
+  DevTools,
+  type HTTPRequest,
+  type HTTPResponse,
+} from '../third_party/index.js';
 
 const BODY_CONTEXT_SIZE_LIMIT = 10000;
 
@@ -20,7 +24,9 @@ export interface NetworkFormatterOptions {
   saveFile?: (
     data: Uint8Array<ArrayBufferLike>,
     filename: string,
+    extension: '.network-request' | '.network-response',
   ) => Promise<{filename: string}>;
+  redactNetworkHeaders: boolean;
 }
 
 interface NetworkRequestConcise {
@@ -83,11 +89,12 @@ export class NetworkFormatter {
           throw new Error('saveFile is not provided');
         }
         if (data) {
-          await this.#options.saveFile(
+          const result = await this.#options.saveFile(
             Buffer.from(data),
             this.#options.requestFilePath,
+            '.network-request',
           );
-          this.#requestBodyFilePath = this.#options.requestFilePath;
+          this.#requestBodyFilePath = result.filename;
         } else {
           this.#requestBody = requestBodyNotAvailableMessage;
         }
@@ -114,8 +121,12 @@ export class NetworkFormatter {
           if (!this.#options.saveFile) {
             throw new Error('saveFile is not provided');
           }
-          await this.#options.saveFile(buffer, this.#options.responseFilePath);
-          this.#responseBodyFilePath = this.#options.responseFilePath;
+          const result = await this.#options.saveFile(
+            buffer,
+            this.#options.responseFilePath,
+            '.network-response',
+          );
+          this.#responseBodyFilePath = result.filename;
         } catch {
           // Flatten error handling for buffer() failure and save failure
         }
@@ -150,6 +161,20 @@ export class NetworkFormatter {
     };
   }
 
+  #redactNetworkHeaders(
+    headers: Record<string, string>,
+  ): Record<string, string> {
+    const headersList = Object.entries(headers).map(item => {
+      return {name: item[0], value: item[1]};
+    });
+    const redacted =
+      DevTools.NetworkRequestFormatter.sanitizeHeaders(headersList);
+    return redacted.reduce<Record<string, string>>((acc, item) => {
+      acc[item.name] = item.value;
+      return acc;
+    }, {});
+  }
+
   toJSONDetailed(): NetworkRequestDetailed {
     const redirectChain = this.#request.redirectChain();
     const formattedRedirectChain = redirectChain.reverse().map(request => {
@@ -159,16 +184,24 @@ export class NetworkFormatter {
       const formatter = new NetworkFormatter(request, {
         requestId: id,
         saveFile: this.#options.saveFile,
+        redactNetworkHeaders: this.#options.redactNetworkHeaders,
       });
       return formatter.toJSON();
     });
 
+    const responseHeaders = this.#request.response()?.headers();
+
     return {
       ...this.toJSON(),
-      requestHeaders: this.#request.headers(),
+      requestHeaders: this.#options.redactNetworkHeaders
+        ? this.#redactNetworkHeaders(this.#request.headers())
+        : this.#request.headers(),
       requestBody: this.#requestBody,
       requestBodyFilePath: this.#requestBodyFilePath,
-      responseHeaders: this.#request.response()?.headers(),
+      responseHeaders:
+        this.#options.redactNetworkHeaders && responseHeaders
+          ? this.#redactNetworkHeaders(responseHeaders)
+          : this.#request.response()?.headers(),
       responseBody: this.#responseBody,
       responseBodyFilePath: this.#responseBodyFilePath,
       failure: this.#request.failure()?.errorText,
@@ -283,7 +316,7 @@ function converNetworkRequestDetailedToStringDetailed(
     let indent = 0;
     for (const request of redirectChain.reverse()) {
       response.push(
-        `${'  '.repeat(indent)}${convertNetworkRequestConciseToString(request)})}`,
+        `${'  '.repeat(indent)}${convertNetworkRequestConciseToString(request)}`,
       );
       indent++;
     }

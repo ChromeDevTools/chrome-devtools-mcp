@@ -24,3 +24,11 @@ export async function saveTemporaryFile(
     throw new Error('Could not save a file', {cause: err});
   }
 }
+
+export function ensureExtension(
+  filepath: string,
+  extension: `.${string}`,
+): string {
+  const ext = path.extname(filepath);
+  return filepath.slice(0, filepath.length - ext.length) + extension;
+}

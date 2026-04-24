@@ -9,7 +9,8 @@ import os from 'node:os';
 import path from 'node:path';
 
 import {zod} from '../third_party/index.js';
-import type {ScreenRecorder} from '../third_party/index.js';
+import type {ScreenRecorder, VideoFormat} from '../third_party/index.js';
+import {ensureExtension} from '../utils/files.js';
 
 import {ToolCategory} from './categories.js';
 import {definePageTool} from './ToolDefinition.js';
@@ -19,10 +20,11 @@ async function generateTempFilePath(): Promise<string> {
   return path.join(dir, `screencast.mp4`);
 }
 
-export const startScreencast = definePageTool({
+const supportedExtensions: Array<`.${string}`> = ['.webm', '.mp4'];
+
+export const startScreencast = definePageTool(args => ({
   name: 'screencast_start',
-  description:
-    'Starts recording a screencast (video) of the selected page in mp4 format.',
+  description: `Starts recording a screencast (video) of the selected page in specified format.`,
   annotations: {
     category: ToolCategory.DEBUGGING,
     readOnlyHint: false,
@@ -30,11 +32,11 @@ export const startScreencast = definePageTool({
     conditions: ['screencast'],
   },
   schema: {
-    path: zod
+    filePath: zod
       .string()
       .optional()
       .describe(
-        'Output path. Uses mkdtemp to generate a unique path if not provided.',
+        `Output file path (${supportedExtensions.join(',')} are supported). Uses mkdtemp to generate a unique path if not provided.`,
       ),
   },
   handler: async (request, response, context) => {
@@ -45,16 +47,31 @@ export const startScreencast = definePageTool({
       return;
     }
 
-    const filePath = request.params.path ?? (await generateTempFilePath());
-    const resolvedPath = path.resolve(filePath);
+    const filePath = request.params.filePath ?? (await generateTempFilePath());
+    let enforcedExtension = '.mp4' as `.${string}`;
+    let format: VideoFormat = 'mp4';
+
+    for (const supportedExtension of supportedExtensions) {
+      if (filePath.endsWith(supportedExtension)) {
+        enforcedExtension = supportedExtension;
+        format = supportedExtension.substring(1) as VideoFormat;
+        break;
+      }
+    }
+
+    const resolvedPath = ensureExtension(
+      path.resolve(filePath),
+      enforcedExtension,
+    ) as `${string}.webm`;
 
     const page = request.page;
 
     let recorder: ScreenRecorder;
     try {
       recorder = await page.pptrPage.screencast({
-        path: resolvedPath as `${string}.mp4`,
-        format: 'mp4' as const,
+        path: resolvedPath,
+        format: format,
+        ffmpegPath: args?.experimentalFfmpegPath,
       });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -73,7 +90,7 @@ export const startScreencast = definePageTool({
       `Screencast recording started. The recording will be saved to ${resolvedPath}. Use ${stopScreencast.name} to stop recording.`,
     );
   },
-});
+}));
 
 export const stopScreencast = definePageTool({
   name: 'screencast_stop',

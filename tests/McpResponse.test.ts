@@ -10,6 +10,23 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {describe, it} from 'node:test';
 
+import sinon from 'sinon';
+
+import type {ParsedArguments} from '../src/bin/chrome-devtools-mcp-cli-options.js';
+import type {McpContext} from '../src/McpContext.js';
+import type {McpResponse} from '../src/McpResponse.js';
+import {replaceHtmlElementsWithUids} from '../src/McpResponse.js';
+import type {
+  Extension,
+  JSONSchema7Definition,
+} from '../src/third_party/index.js';
+import {
+  closePage,
+  listPages,
+  navigatePage,
+  newPage,
+  selectPage,
+} from '../src/tools/pages.js';
 import type {InsightName} from '../src/trace-processing/parse.js';
 import {
   parseRawTraceBuffer,
@@ -142,7 +159,7 @@ describe('McpResponse', () => {
   });
 
   it('saves snapshot to file and returns structured content', async t => {
-    const filePath = join(tmpdir(), 'test-screenshot.png');
+    const filePath = join(tmpdir(), 'test-snapshot.txt');
     try {
       await withMcpContext(async (response, context) => {
         const page = context.getSelectedPptrPage();
@@ -619,7 +636,7 @@ describe('McpResponse', () => {
       try {
         await response.handle('test', context);
       } catch (e) {
-        assert.ok(e.message.includes("Can't provide detals for the msgid 1"));
+        assert.ok(e.message.includes("Can't provide details for the msgid 1"));
       }
     });
   });
@@ -941,22 +958,31 @@ describe('extensions', () => {
 
       response.resetResponseLineForTesting();
       // Testing with extensions
-      context.listExtensions = () => [
-        {
-          id: 'id1',
-          name: 'Extension 1',
-          version: '1.0',
-          isEnabled: true,
-          path: '/path/to/ext1',
-        },
-        {
-          id: 'id2',
-          name: 'Extension 2',
-          version: '2.0',
-          isEnabled: false,
-          path: '/path/to/ext2',
-        },
-      ];
+      context.listExtensions = async () =>
+        Promise.resolve(
+          new Map<string, Extension>([
+            [
+              'id1',
+              {
+                id: 'id1',
+                name: 'Extension 1',
+                version: '1.0',
+                enabled: true,
+                path: '/path/to/ext1',
+              } as Extension,
+            ],
+            [
+              'id2',
+              {
+                id: 'id2',
+                name: 'Extension 2',
+                version: '2.0',
+                enabled: false,
+                path: '/path/to/ext2',
+              } as Extension,
+            ],
+          ]),
+        );
       response.setListExtensions();
       const {content, structuredContent} = await response.handle(
         'test',
@@ -1011,5 +1037,560 @@ describe('lighthouse', () => {
         JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
       );
     });
+  });
+});
+
+describe('inPage tools', () => {
+  function stubToolDiscovery(page: object) {
+    // @ts-expect-error Internal API
+    const client = page._client();
+    const originalSend = client.send.bind(client);
+    sinon
+      .stub(client, 'send')
+      .callsFake(async (method: string, params?: Record<string, unknown>) => {
+        if (method === 'DOMDebugger.getEventListeners') {
+          return {
+            listeners: [
+              {
+                type: 'devtoolstooldiscovery',
+                useCapture: false,
+                passive: false,
+                once: false,
+                scriptId: '0',
+                lineNumber: 0,
+                columnNumber: 0,
+              },
+            ],
+          };
+        }
+        return originalSend(method, params);
+      });
+  }
+
+  it('lists in-page tools', async t => {
+    await withMcpContext(
+      async (response, context) => {
+        response.setListInPageTools();
+        const emptyResult = await response.handle('test', context);
+        const emptyText = getTextContent(emptyResult.content[0]);
+        assert.ok(
+          emptyText.includes('No in-page tools available.'),
+          'Should show message for empty in-page tools',
+        );
+
+        response.resetResponseLineForTesting();
+        const mcpPage = context.getSelectedMcpPage();
+        stubToolDiscovery(mcpPage.pptrPage);
+        sinon.stub(mcpPage.pptrPage, 'evaluate').resolves({
+          name: 'My Tool Group',
+          description: 'A group of tools',
+          tools: [
+            {
+              name: 'myTool',
+              description: 'Does something',
+              inputSchema: {
+                type: 'object',
+                properties: {
+                  foo: {type: 'string'},
+                },
+              },
+            },
+          ],
+        });
+        response.setListInPageTools();
+        const {content, structuredContent} = await response.handle(
+          'test',
+          context,
+        );
+        const responseText = getTextContent(content[0]);
+        t.assert.snapshot?.(responseText);
+        assert.ok(
+          responseText.includes('inputSchema={"type":"object"'),
+          'Response should include inputSchema',
+        );
+        t.assert.snapshot?.(JSON.stringify(structuredContent, null, 2));
+      },
+      undefined,
+      {categoryInPageTools: true} as ParsedArguments,
+    );
+  });
+
+  async function testIncludesInPageTools(
+    handlerAction: (
+      response: McpResponse,
+      context: McpContext,
+    ) => Promise<void>,
+    toolName: string,
+  ) {
+    await withMcpContext(
+      async (response, context) => {
+        const mcpPage = context.getSelectedMcpPage();
+        stubToolDiscovery(mcpPage.pptrPage);
+
+        const initScript = `
+          window.__dtmcp = {
+            toolGroup: {
+              name: 'In-Page group',
+              description: 'Test tools',
+              tools: [
+                {
+                  name: 'inPageTool',
+                  description: 'A test tool',
+                  inputSchema: {
+                    type: 'object',
+                    properties: {},
+                  },
+                  execute: () => 'result',
+                },
+              ],
+            },
+          };
+          window.addEventListener('devtoolstooldiscovery', (e) => {
+            e.respondWith(window.__dtmcp?.toolGroup);
+          });
+        `;
+        await mcpPage.pptrPage.evaluateOnNewDocument(initScript);
+        await mcpPage.pptrPage.evaluate(initScript);
+
+        await handlerAction(response, context);
+
+        const {content} = await response.handle(toolName, context);
+        const responseText = getTextContent(content[0]);
+        assert.ok(
+          responseText.includes('inPageTool'),
+          `Should include in-page tool name in the ${toolName} response`,
+        );
+      },
+      undefined,
+      {categoryInPageTools: true} as ParsedArguments,
+    );
+  }
+
+  it('includes in-page tools in list_pages response', async () => {
+    await testIncludesInPageTools(async (response, context) => {
+      const listPagesDef = listPages({
+        categoryInPageTools: true,
+      } as ParsedArguments);
+      await listPagesDef.handler({params: {}}, response, context);
+    }, 'list_pages');
+  });
+
+  it('includes in-page tools in select_page response', async () => {
+    await testIncludesInPageTools(async (response, context) => {
+      const pageId =
+        context.getPageId(context.getSelectedMcpPage().pptrPage) ?? 1;
+      await selectPage.handler({params: {pageId}}, response, context);
+    }, 'select_page');
+  });
+
+  it('includes in-page tools in close_page response', async () => {
+    await testIncludesInPageTools(async (response, context) => {
+      const pageId =
+        context.getPageId(context.getSelectedMcpPage().pptrPage) ?? 1;
+      await closePage.handler({params: {pageId}}, response, context);
+    }, 'close_page');
+  });
+
+  it('includes in-page tools in navigate_page response', async () => {
+    await testIncludesInPageTools(async (response, context) => {
+      await navigatePage().handler(
+        {
+          params: {type: 'url', url: 'about:blank'},
+          page: context.getSelectedMcpPage(),
+        },
+        response,
+        context,
+      );
+    }, 'navigate_page');
+  });
+
+  it('includes in-page tools in new_page response', async () => {
+    await testIncludesInPageTools(async (response, context) => {
+      // Workaround to ensure the test environment's new page contain in-page tools
+      sinon.stub(context, 'newPage').resolves(context.getSelectedMcpPage());
+
+      await newPage().handler(
+        {
+          params: {url: 'about:blank'},
+        },
+        response,
+        context,
+      );
+    }, 'new_page');
+  });
+});
+
+describe('replaceHtmlElementsWithUids', () => {
+  it('does nothing for boolean schemas', () => {
+    const schemaTrue: JSONSchema7Definition = true;
+    const schemaFalse: JSONSchema7Definition = false;
+
+    replaceHtmlElementsWithUids(schemaTrue);
+    replaceHtmlElementsWithUids(schemaFalse);
+
+    assert.strictEqual(schemaTrue, true);
+    assert.strictEqual(schemaFalse, false);
+  });
+
+  it('replaces HTMLElement type with uid string', () => {
+    const schema: JSONSchema7Definition = {
+      type: 'object',
+      properties: {
+        foo: {type: 'string'},
+        bar: {type: 'number'},
+      },
+      required: ['foo'],
+    };
+    Object.assign(schema, {'x-mcp-type': 'HTMLElement'});
+
+    replaceHtmlElementsWithUids(schema);
+
+    if (typeof schema === 'object') {
+      assert.deepStrictEqual(schema.properties, {
+        uid: {type: 'string'},
+      });
+      assert.deepStrictEqual(schema.required, ['uid']);
+    } else {
+      assert.fail('Schema should be an object');
+    }
+  });
+
+  it('does not replace if x-mcp-type is not HTMLElement', () => {
+    const schema: JSONSchema7Definition = {
+      type: 'object',
+      properties: {
+        foo: {type: 'string'},
+      },
+    };
+    Object.assign(schema, {'x-mcp-type': 'OtherType'});
+
+    replaceHtmlElementsWithUids(schema);
+
+    if (typeof schema === 'object') {
+      assert.deepStrictEqual(schema.properties, {
+        foo: {type: 'string'},
+      });
+      assert.strictEqual(schema.required, undefined);
+    } else {
+      assert.fail('Schema should be an object');
+    }
+  });
+
+  it('recurses into nested properties', () => {
+    const schema: JSONSchema7Definition = {
+      type: 'object',
+      properties: {
+        element: {
+          type: 'object',
+          properties: {
+            foo: {type: 'string'},
+          },
+        },
+        other: {
+          type: 'string',
+        },
+      },
+    };
+    if (typeof schema === 'object' && schema.properties) {
+      Object.assign(schema.properties.element, {'x-mcp-type': 'HTMLElement'});
+    }
+
+    replaceHtmlElementsWithUids(schema);
+
+    if (
+      typeof schema === 'object' &&
+      schema.properties &&
+      typeof schema.properties.element === 'object'
+    ) {
+      const elementSchema = schema.properties.element;
+      assert.deepStrictEqual(elementSchema.properties, {
+        uid: {type: 'string'},
+      });
+      assert.deepStrictEqual(elementSchema.required, ['uid']);
+    } else {
+      assert.fail('Unexpected schema structure');
+    }
+  });
+
+  it('recurses into array items (single schema object)', () => {
+    const schema: JSONSchema7Definition = {
+      type: 'array',
+      items: {
+        type: 'object',
+      },
+    };
+    if (typeof schema === 'object' && typeof schema.items === 'object') {
+      Object.assign(schema.items, {'x-mcp-type': 'HTMLElement'});
+    }
+
+    replaceHtmlElementsWithUids(schema);
+
+    if (typeof schema === 'object' && typeof schema.items === 'object') {
+      const itemsSchema = schema.items;
+      if (!Array.isArray(itemsSchema)) {
+        assert.deepStrictEqual(itemsSchema.properties, {
+          uid: {type: 'string'},
+        });
+        assert.deepStrictEqual(itemsSchema.required, ['uid']);
+      } else {
+        assert.fail('items should not be an array in this test case');
+      }
+    } else {
+      assert.fail('Unexpected schema structure');
+    }
+  });
+
+  it('recurses into array items (array of schemas)', () => {
+    const schema: JSONSchema7Definition = {
+      type: 'array',
+      items: [
+        {
+          type: 'object',
+        },
+        {
+          type: 'string',
+        },
+      ],
+    };
+    if (typeof schema === 'object' && Array.isArray(schema.items)) {
+      Object.assign(schema.items[0], {'x-mcp-type': 'HTMLElement'});
+    }
+
+    replaceHtmlElementsWithUids(schema);
+
+    if (typeof schema === 'object' && Array.isArray(schema.items)) {
+      const firstItem = schema.items[0];
+      if (typeof firstItem === 'object') {
+        assert.deepStrictEqual(firstItem.properties, {
+          uid: {type: 'string'},
+        });
+        assert.deepStrictEqual(firstItem.required, ['uid']);
+      } else {
+        assert.fail('First item should be an object');
+      }
+
+      const secondItem = schema.items[1];
+      if (typeof secondItem === 'object') {
+        assert.strictEqual(secondItem.properties, undefined);
+      } else {
+        assert.fail('Second item should be an object');
+      }
+    } else {
+      assert.fail('Unexpected schema structure');
+    }
+  });
+
+  it('recurses into anyOf', () => {
+    const schema: JSONSchema7Definition = {
+      anyOf: [
+        {
+          type: 'object',
+        },
+        {
+          type: 'string',
+        },
+      ],
+    };
+    if (typeof schema === 'object' && Array.isArray(schema.anyOf)) {
+      Object.assign(schema.anyOf[0], {'x-mcp-type': 'HTMLElement'});
+    }
+
+    replaceHtmlElementsWithUids(schema);
+
+    if (typeof schema === 'object' && Array.isArray(schema.anyOf)) {
+      const firstItem = schema.anyOf[0];
+      if (typeof firstItem === 'object') {
+        assert.deepStrictEqual(firstItem.properties, {
+          uid: {type: 'string'},
+        });
+      } else {
+        assert.fail('First item should be an object');
+      }
+    } else {
+      assert.fail('Unexpected schema structure');
+    }
+  });
+
+  it('recurses into allOf', () => {
+    const schema: JSONSchema7Definition = {
+      allOf: [
+        {
+          type: 'object',
+        },
+      ],
+    };
+    if (typeof schema === 'object' && Array.isArray(schema.allOf)) {
+      Object.assign(schema.allOf[0], {'x-mcp-type': 'HTMLElement'});
+    }
+
+    replaceHtmlElementsWithUids(schema);
+
+    if (typeof schema === 'object' && Array.isArray(schema.allOf)) {
+      const firstItem = schema.allOf[0];
+      if (typeof firstItem === 'object') {
+        assert.deepStrictEqual(firstItem.properties, {
+          uid: {type: 'string'},
+        });
+      } else {
+        assert.fail('First item should be an object');
+      }
+    } else {
+      assert.fail('Unexpected schema structure');
+    }
+  });
+
+  it('recurses into oneOf', () => {
+    const schema: JSONSchema7Definition = {
+      oneOf: [
+        {
+          type: 'object',
+        },
+      ],
+    };
+    if (typeof schema === 'object' && Array.isArray(schema.oneOf)) {
+      Object.assign(schema.oneOf[0], {'x-mcp-type': 'HTMLElement'});
+    }
+
+    replaceHtmlElementsWithUids(schema);
+
+    if (typeof schema === 'object' && Array.isArray(schema.oneOf)) {
+      const firstItem = schema.oneOf[0];
+      if (typeof firstItem === 'object') {
+        assert.deepStrictEqual(firstItem.properties, {
+          uid: {type: 'string'},
+        });
+      } else {
+        assert.fail('First item should be an object');
+      }
+    } else {
+      assert.fail('Unexpected schema structure');
+    }
+  });
+});
+
+describe('webmcp', () => {
+  async function testIncludesWebmcpTools(
+    t: it.TestContext,
+    parseArguments: ParsedArguments,
+    handlerAction: (
+      response: McpResponse,
+      context: McpContext,
+    ) => Promise<void>,
+    toolName: string,
+  ) {
+    await withMcpContext(
+      async (response, context) => {
+        response.setListWebMcpTools();
+
+        await handlerAction(response, context);
+
+        const page = context.getSelectedMcpPage().pptrPage;
+        await page.setContent(
+          html`<form
+            toolname="test_tool"
+            tooldescription="A test tool"
+          ></form>`,
+        );
+
+        const {content, structuredContent} = await response.handle(
+          toolName,
+          context,
+        );
+        assert.ok(getTextContent(content[0]));
+        t.assert.snapshot?.(getTextContent(content[0]));
+        t.assert.snapshot?.(
+          JSON.stringify(
+            stabilizeStructuredContent(structuredContent),
+            null,
+            2,
+          ),
+        );
+      },
+      {args: ['--enable-features=WebMCPTesting,DevToolsWebMCPSupport']},
+      parseArguments,
+    );
+  }
+
+  it('includes webmcp tools in list_pages response', async t => {
+    await testIncludesWebmcpTools(
+      t,
+      {experimentalWebmcp: true} as ParsedArguments,
+      async (response, context) => {
+        await listPages().handler({params: {}}, response, context);
+      },
+      'list_pages',
+    );
+  });
+
+  it('includes webmcp tools in select_page response', async t => {
+    await testIncludesWebmcpTools(
+      t,
+      {experimentalWebmcp: true} as ParsedArguments,
+      async (response, context) => {
+        const pageId =
+          context.getPageId(context.getSelectedMcpPage().pptrPage) ?? 1;
+        await selectPage.handler({params: {pageId}}, response, context);
+      },
+      'select_page',
+    );
+  });
+
+  it('includes webmcp tools in navigate_page response', async t => {
+    await testIncludesWebmcpTools(
+      t,
+      {experimentalWebmcp: true} as ParsedArguments,
+      async (response, context) => {
+        await navigatePage().handler(
+          {
+            params: {type: 'url', url: 'about:blank'},
+            page: context.getSelectedMcpPage(),
+          },
+          response,
+          context,
+        );
+      },
+      'navigate_page',
+    );
+  });
+
+  it('list no webmcp tools if there are none', async t => {
+    await withMcpContext(
+      async (response, context) => {
+        response.setListWebMcpTools();
+        const {content, structuredContent} = await response.handle(
+          'test',
+          context,
+        );
+        assert.ok(getTextContent(content[0]));
+        t.assert.snapshot?.(getTextContent(content[0]));
+        t.assert.snapshot?.(
+          JSON.stringify(
+            stabilizeStructuredContent(structuredContent),
+            null,
+            2,
+          ),
+        );
+      },
+      {args: ['--enable-features=WebMCPTesting,DevToolsWebMCPSupport']},
+      {experimentalWebmcp: true} as ParsedArguments,
+    );
+  });
+
+  it('list no webmcp tools if experimentalWebmcp is false', async t => {
+    await testIncludesWebmcpTools(
+      t,
+      {experimentalWebmcp: false} as ParsedArguments,
+      async (response, context) => {
+        await navigatePage().handler(
+          {
+            params: {type: 'url', url: 'about:blank'},
+            page: context.getSelectedMcpPage(),
+          },
+          response,
+          context,
+        );
+      },
+      'navigate_page',
+    );
   });
 });

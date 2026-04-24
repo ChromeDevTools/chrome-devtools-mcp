@@ -197,7 +197,11 @@ async function stopTracingAndAppendOutput(
           });
         });
       }
-      const file = await context.saveFile(dataToWrite, filePath);
+      const file = await context.saveFile(
+        dataToWrite,
+        filePath,
+        filePath.endsWith('.gz') ? '.json.gz' : '.json',
+      );
       response.appendResponseLine(
         `The raw trace data was saved to ${file.filename}.`,
       );

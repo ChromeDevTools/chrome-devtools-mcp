@@ -9,11 +9,16 @@ import {describe, it, afterEach, beforeEach} from 'node:test';
 
 import sinon from 'sinon';
 
-import {ClearcutLogger} from '../../src/telemetry/ClearcutLogger.js';
+import {DAEMON_CLIENT_NAME} from '../../src/daemon/utils.js';
+import {
+  ClearcutLogger,
+  sanitizeParams,
+} from '../../src/telemetry/ClearcutLogger.js';
 import type {Persistence} from '../../src/telemetry/persistence.js';
 import {FilePersistence} from '../../src/telemetry/persistence.js';
 import {WatchdogMessageType} from '../../src/telemetry/types.js';
 import {WatchdogClient} from '../../src/telemetry/WatchdogClient.js';
+import {zod} from '../../src/third_party/index.js';
 
 describe('ClearcutLogger', () => {
   let mockPersistence: sinon.SinonStubbedInstance<Persistence>;
@@ -41,6 +46,8 @@ describe('ClearcutLogger', () => {
       });
       await logger.logToolInvocation({
         toolName: 'test_tool',
+        params: {},
+        schema: {},
         success: true,
         latencyMs: 123,
       });
@@ -52,6 +59,69 @@ describe('ClearcutLogger', () => {
       assert.strictEqual(msg.payload.tool_invocation?.success, true);
       assert.strictEqual(msg.payload.tool_invocation?.latency_ms, 123);
     });
+    it('sends sanitized params', async () => {
+      const logger = new ClearcutLogger({
+        persistence: mockPersistence,
+        appVersion: '1.0.0',
+        watchdogClient: mockWatchdogClient,
+      });
+
+      const schema = {
+        uid: zod.string(),
+        myString: zod.string(),
+      };
+
+      const params = {
+        uid: 'sensitive',
+        myString: 'hello',
+      };
+
+      await logger.logToolInvocation({
+        toolName: 'test_tool',
+        params,
+        schema,
+        success: true,
+        latencyMs: 123,
+      });
+
+      assert(mockWatchdogClient.send.calledOnce);
+      const msg = mockWatchdogClient.send.firstCall.args[0];
+      assert.strictEqual(msg.type, WatchdogMessageType.LOG_EVENT);
+      assert.deepStrictEqual(msg.payload.tool_invocation?.tool_params, {
+        test_tool_params: {
+          my_string_length: 5,
+        },
+      });
+    });
+  });
+
+  describe('setClientName', () => {
+    const clients = [
+      {name: 'claude-code', expected: 1}, // MCP_CLIENT_CLAUDE_CODE
+      {name: 'gemini-cli', expected: 2}, // MCP_CLIENT_GEMINI_CLI
+      {name: DAEMON_CLIENT_NAME, expected: 4}, // MCP_CLIENT_DT_MCP_CLI
+      {name: 'openclaw-browser', expected: 5}, // MCP_CLIENT_OPENCLAW
+      {name: 'codex-mcp-client', expected: 6}, // MCP_CLIENT_CODEX
+      {name: 'antigravity-client', expected: 7}, // MCP_CLIENT_ANTIGRAVITY
+    ];
+
+    for (const {name, expected} of clients) {
+      it(`maps ${name} client correctly`, async () => {
+        const logger = new ClearcutLogger({
+          persistence: mockPersistence,
+          appVersion: '1.0.0',
+          watchdogClient: mockWatchdogClient,
+        });
+
+        logger.setClientName(name);
+        await logger.logServerStart({headless: true});
+
+        assert(mockWatchdogClient.send.calledOnce);
+        const msg = mockWatchdogClient.send.firstCall.args[0];
+        assert.strictEqual(msg.type, WatchdogMessageType.LOG_EVENT);
+        assert.strictEqual(msg.payload.mcp_client, expected);
+      });
+    }
   });
 
   describe('logServerStart', () => {
@@ -131,6 +201,66 @@ describe('ClearcutLogger', () => {
       assert.strictEqual(msg.type, WatchdogMessageType.LOG_EVENT);
       assert.strictEqual(msg.payload.daily_active?.days_since_last_active, -1);
       assert(mockPersistence.saveState.called);
+    });
+  });
+
+  describe('sanitizeParams', () => {
+    it('filters out uid and transforms strings and arrays', () => {
+      const schema = {
+        uid: zod.string(),
+        myString: zod.string(),
+        myArray: zod.array(zod.string()),
+        myNumber: zod.number(),
+        myBool: zod.boolean(),
+        myEnum: zod.enum(['a', 'b']),
+      };
+
+      const params = {
+        uid: 'sensitive',
+        myString: 'hello',
+        myArray: ['one', 'two'],
+        myNumber: 42,
+        myBool: true,
+        myEnum: 'a' as const,
+      };
+
+      const sanitized = sanitizeParams(params, schema);
+
+      assert.deepStrictEqual(sanitized, {
+        my_string_length: 5,
+        my_array_count: 2,
+        my_number: 42,
+        my_bool: true,
+        my_enum: 'a',
+      });
+    });
+
+    it('throws error for unsupported types', () => {
+      const schema = {
+        myObj: zod.object({foo: zod.string()}),
+      };
+      const params = {
+        myObj: {foo: 'bar'},
+      };
+
+      assert.throws(
+        () => sanitizeParams(params, schema),
+        /Unsupported zod type for tool parameter: ZodObject/,
+      );
+    });
+
+    it('throws error when value is not of equivalent type', () => {
+      const schema = {
+        myString: zod.string(),
+      };
+      const params = {
+        myString: 123,
+      };
+
+      assert.throws(
+        () => sanitizeParams(params, schema),
+        /parameter myString has type ZodString but value 123 is not of equivalent type/,
+      );
     });
   });
 });

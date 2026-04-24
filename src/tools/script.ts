@@ -17,7 +17,7 @@ export type Evaluatable = Page | Frame | WebWorker;
 export const evaluateScript = defineTool(cliArgs => {
   return {
     name: 'evaluate_script',
-    description: `Evaluate a JavaScript function inside the currently selected page. Returns the response as JSON,
+    description: `Evaluate a JavaScript function inside the currently selected page${cliArgs?.categoryExtensions ? ' or service worker' : ''}. Returns the response as JSON,
 so returned values have to be JSON-serializable.`,
     annotations: {
       category: ToolCategory.DEBUGGING,
@@ -46,6 +46,12 @@ Example with arguments: \`(el) => {
         )
         .optional()
         .describe(`An optional list of arguments to pass to the function.`),
+      dialogAction: zod
+        .string()
+        .optional()
+        .describe(
+          'Handle dialogs while execution. "accept", "dismiss", or string for response of window.prompt. Defaults to accept.',
+        ),
       ...(cliArgs?.experimentalPageIdRouting ? pageIdSchema : {}),
       ...(cliArgs?.categoryExtensions
         ? {
@@ -53,7 +59,7 @@ Example with arguments: \`(el) => {
               .string()
               .optional()
               .describe(
-                `An optional service worker id to evaluate the script in.`,
+                `The optional service worker id to evaluate the script in. If provided, 'pageId' should be omitted. Note: 'args' (element UIDs) cannot be used when evaluating in a service worker.`,
               ),
           }
         : {}),
@@ -64,6 +70,7 @@ Example with arguments: \`(el) => {
         args: uidArgs,
         function: fnString,
         pageId,
+        dialogAction,
       } = request.params;
 
       if (cliArgs?.categoryExtensions && serviceWorkerId) {
@@ -77,7 +84,12 @@ Example with arguments: \`(el) => {
         }
 
         const worker = await getWebWorker(context, serviceWorkerId);
-        await performEvaluation(worker, fnString, [], response, context);
+        await context.getSelectedMcpPage().waitForEventsAfterAction(
+          async () => {
+            await performEvaluation(worker, fnString, [], response);
+          },
+          {handleDialog: dialogAction ?? 'accept'},
+        );
         return;
       }
 
@@ -97,7 +109,12 @@ Example with arguments: \`(el) => {
 
         const evaluatable = await getPageOrFrame(page, frames);
 
-        await performEvaluation(evaluatable, fnString, args, response, context);
+        await mcpPage.waitForEventsAfterAction(
+          async () => {
+            await performEvaluation(evaluatable, fnString, args, response);
+          },
+          {handleDialog: dialogAction ?? 'accept'},
+        );
       } finally {
         void Promise.allSettled(args.map(arg => arg.dispose()));
       }
@@ -110,24 +127,21 @@ const performEvaluation = async (
   fnString: string,
   args: Array<JSHandle<unknown>>,
   response: Response,
-  context: Context,
 ) => {
   const fn = await evaluatable.evaluateHandle(`(${fnString})`);
   try {
-    await context.waitForEventsAfterAction(async () => {
-      const result = await evaluatable.evaluate(
-        async (fn, ...args) => {
-          // @ts-expect-error no types for function fn
-          return JSON.stringify(await fn(...args));
-        },
-        fn,
-        ...args,
-      );
-      response.appendResponseLine('Script ran on page and returned:');
-      response.appendResponseLine('```json');
-      response.appendResponseLine(`${result}`);
-      response.appendResponseLine('```');
-    });
+    const result = await evaluatable.evaluate(
+      async (fn, ...args) => {
+        // @ts-expect-error no types for function fn
+        return JSON.stringify(await fn(...args));
+      },
+      fn,
+      ...args,
+    );
+    response.appendResponseLine('Script ran on page and returned:');
+    response.appendResponseLine('```json');
+    response.appendResponseLine(`${result}`);
+    response.appendResponseLine('```');
   } finally {
     void fn.dispose();
   }

@@ -1,0 +1,778 @@
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import assert from 'node:assert';
+import {describe, it} from 'node:test';
+
+import sinon from 'sinon';
+
+import type {ParsedArguments} from '../../src/bin/chrome-devtools-mcp-cli-options.js';
+import type {McpContext} from '../../src/McpContext.js';
+import type {McpResponse} from '../../src/McpResponse.js';
+import {TextSnapshot} from '../../src/TextSnapshot.js';
+import {executeInPageTool, listInPageTools} from '../../src/tools/inPage.js';
+import type {ToolGroup, ToolDefinition} from '../../src/tools/inPage.js';
+import {withMcpContext} from '../utils.js';
+
+describe('inPage', () => {
+  describe('list_in_page_tools', () => {
+    it('lists tools', async () => {
+      await withMcpContext(
+        async (response, context) => {
+          const page = await context.newPage();
+          response.setPage(page);
+
+          await page.pptrPage.evaluate(() => {
+            window.__dtmcp = {
+              toolGroup: {
+                name: 'test-group',
+                description: 'test description',
+                tools: [
+                  {
+                    name: 'test-tool',
+                    description: 'test tool description',
+                    inputSchema: {
+                      type: 'object',
+                      properties: {
+                        arg: {type: 'string'},
+                      },
+                    },
+                    execute: () => 'result',
+                  },
+                ],
+              },
+            };
+            window.addEventListener('devtoolstooldiscovery', (e: Event) => {
+              // @ts-expect-error Event has `respondWith`
+              e.respondWith(window.__dtmcp?.toolGroup);
+            });
+          });
+
+          await listInPageTools.handler({params: {}, page}, response, context);
+
+          const result = await response.handle('list_in_page_tools', context);
+          // @ts-expect-error `structuredContent` has `inPageTools`
+          const actualGroup = result.structuredContent.inPageTools;
+          assert.strictEqual(actualGroup.name, 'test-group');
+          assert.strictEqual(actualGroup.description, 'test description');
+          assert.strictEqual(actualGroup.tools.length, 1);
+          assert.strictEqual(actualGroup.tools[0].name, 'test-tool');
+          assert.strictEqual(
+            actualGroup.tools[0].description,
+            'test tool description',
+          );
+          assert.deepEqual(actualGroup.tools[0].inputSchema, {
+            type: 'object',
+            properties: {
+              arg: {type: 'string'},
+            },
+          });
+        },
+        undefined,
+        {categoryInPageTools: true} as ParsedArguments,
+      );
+    });
+
+    it('handles empty response', async () => {
+      await withMcpContext(
+        async (response, context) => {
+          const page = await context.newPage();
+          response.setPage(page);
+          await page.pptrPage.evaluate(() => {
+            window.addEventListener('devtoolstooldiscovery', (e: Event) => {
+              // @ts-expect-error Event has `respondWith`
+              e.respondWith({});
+            });
+          });
+
+          await listInPageTools.handler({params: {}, page}, response, context);
+
+          const result = await response.handle('list_in_page_tools', context);
+          assert.ok('inPageTools' in result.structuredContent);
+          assert.deepEqual(
+            (
+              result.structuredContent as {
+                inPageTools: ToolGroup<ToolDefinition>;
+              }
+            ).inPageTools,
+            {},
+          );
+        },
+        undefined,
+        {categoryInPageTools: true} as ParsedArguments,
+      );
+    });
+
+    it('handles no response', async () => {
+      await withMcpContext(
+        async (response, context) => {
+          const page = await context.newPage();
+          response.setPage(page);
+          await page.pptrPage.evaluate(() => {
+            window.addEventListener('devtoolstooldiscovery', () => {
+              // do nothing
+            });
+          });
+
+          await listInPageTools.handler({params: {}, page}, response, context);
+
+          const result = await response.handle('list_in_page_tools', context);
+          assert.ok('inPageTools' in result.structuredContent);
+          assert.strictEqual(
+            (
+              result.structuredContent as {
+                inPageTools: ToolGroup<ToolDefinition>;
+              }
+            ).inPageTools,
+            undefined,
+          );
+        },
+        undefined,
+        {categoryInPageTools: true} as ParsedArguments,
+      );
+    });
+
+    it('handles no eventListener', async () => {
+      await withMcpContext(
+        async (response, context) => {
+          const page = await context.newPage();
+          response.setPage(page);
+          await listInPageTools.handler({params: {}, page}, response, context);
+
+          const result = await response.handle('list_in_page_tools', context);
+          assert.ok('inPageTools' in result.structuredContent);
+          assert.strictEqual(
+            (result.structuredContent as {inPageTools: undefined}).inPageTools,
+            undefined,
+          );
+        },
+        undefined,
+        {categoryInPageTools: true} as ParsedArguments,
+      );
+    });
+  });
+
+  describe('execute_in_page_tool', () => {
+    async function setupInPageTools(
+      response: McpResponse,
+      context: McpContext,
+      evaluateFn: () => void,
+    ) {
+      const page = await context.newPage();
+      response.setPage(page);
+      await page.pptrPage.evaluate(evaluateFn);
+      await listInPageTools.handler({params: {}, page}, response, context);
+      await response.handle('list_in_page_tools', context);
+    }
+
+    it('executes a tool', async () => {
+      await withMcpContext(
+        async (response, context) => {
+          await setupInPageTools(response, context, () => {
+            window.__dtmcp = {
+              toolGroup: {
+                name: 'test-group',
+                description: 'test description',
+                tools: [
+                  {
+                    name: 'test-tool',
+                    description: 'test tool description',
+                    inputSchema: {
+                      type: 'object',
+                      properties: {
+                        arg: {type: 'string'},
+                      },
+                      required: ['arg'],
+                    },
+                    execute: () => 'result',
+                  },
+                ],
+              },
+            };
+            window.addEventListener('devtoolstooldiscovery', (e: Event) => {
+              // @ts-expect-error Event has `respondWith`
+              e.respondWith(window.__dtmcp?.toolGroup);
+            });
+          });
+
+          await executeInPageTool.handler(
+            {
+              params: {
+                toolName: 'test-tool',
+                params: JSON.stringify({arg: 'value'}),
+              },
+              page: context.getSelectedMcpPage(),
+            },
+            response,
+            context,
+          );
+          assert.strictEqual(
+            response.responseLines[0],
+            JSON.stringify('result', null, 2),
+          );
+        },
+        undefined,
+        {categoryInPageTools: true} as ParsedArguments,
+      );
+    });
+
+    it('throws if tool not found in list', async () => {
+      await withMcpContext(async (response, context) => {
+        await setupInPageTools(response, context, () => {
+          window.__dtmcp = {
+            toolGroup: {
+              name: 'test-group',
+              description: 'test description',
+              tools: [],
+            },
+          };
+          window.addEventListener('devtoolstooldiscovery', (e: Event) => {
+            // @ts-expect-error Event has `respondWith`
+            e.respondWith(window.__dtmcp?.toolGroup);
+          });
+        });
+
+        await assert.rejects(
+          async () => {
+            await executeInPageTool.handler(
+              {
+                params: {
+                  toolName: 'missing-tool',
+                  params: JSON.stringify({}),
+                },
+                page: context.getSelectedMcpPage(),
+              },
+              response,
+              context,
+            );
+          },
+          {message: /Tool missing-tool not found/},
+        );
+      });
+    });
+
+    it('throws if parameters are invalid', async () => {
+      await withMcpContext(
+        async (response, context) => {
+          await setupInPageTools(response, context, () => {
+            window.__dtmcp = {
+              toolGroup: {
+                name: 'test-group',
+                description: 'test description',
+                tools: [
+                  {
+                    name: 'test-tool',
+                    description: 'test tool description',
+                    inputSchema: {
+                      type: 'object',
+                      properties: {
+                        arg: {type: 'string'},
+                      },
+                      required: ['arg'],
+                    },
+                    execute: () => 'result',
+                  },
+                ],
+              },
+            };
+            window.addEventListener('devtoolstooldiscovery', (e: Event) => {
+              // @ts-expect-error Event has `respondWith`
+              e.respondWith(window.__dtmcp?.toolGroup);
+            });
+          });
+
+          await assert.rejects(
+            async () => {
+              await executeInPageTool.handler(
+                {
+                  params: {
+                    toolName: 'test-tool',
+                    params: JSON.stringify({}), // Missing required 'arg'
+                  },
+                  page: context.getSelectedMcpPage(),
+                },
+                response,
+                context,
+              );
+            },
+            {message: /Invalid parameters for tool test-tool/},
+          );
+        },
+        undefined,
+        {categoryInPageTools: true} as ParsedArguments,
+      );
+    });
+
+    it('handles JSON result', async () => {
+      await withMcpContext(
+        async (response, context) => {
+          await setupInPageTools(response, context, () => {
+            window.__dtmcp = {
+              toolGroup: {
+                name: 'test-group',
+                description: 'test description',
+                tools: [
+                  {
+                    name: 'test-tool',
+                    description: 'test tool description',
+                    inputSchema: {},
+                    execute: () => ({foo: 'bar'}),
+                  },
+                ],
+              },
+            };
+            window.addEventListener('devtoolstooldiscovery', (e: Event) => {
+              // @ts-expect-error Event has `respondWith`
+              e.respondWith(window.__dtmcp?.toolGroup);
+            });
+          });
+
+          await executeInPageTool.handler(
+            {
+              params: {
+                toolName: 'test-tool',
+                params: JSON.stringify({}),
+              },
+              page: context.getSelectedMcpPage(),
+            },
+            response,
+            context,
+          );
+          assert.strictEqual(
+            response.responseLines[0],
+            JSON.stringify({foo: 'bar'}, null, 2),
+          );
+        },
+        undefined,
+        {categoryInPageTools: true} as ParsedArguments,
+      );
+    });
+
+    it('replaces uid with element handle in params', async () => {
+      await withMcpContext(async (response, context) => {
+        const page = await context.newPage();
+        response.setPage(page);
+
+        page.inPageTools = {
+          name: 'test-group',
+          description: 'test description',
+          tools: [
+            {
+              name: 'test-tool',
+              description: 'test tool description',
+              inputSchema: {
+                type: 'object',
+                properties: {
+                  element: {type: 'object'},
+                },
+                required: ['element'],
+              },
+            },
+          ],
+        };
+
+        await page.pptrPage.evaluate(() => {
+          window.__dtmcp = {
+            executeTool: async (
+              _name: string,
+              args: Record<string, unknown>,
+            ) => {
+              const el = args.element;
+              if (el instanceof HTMLElement) {
+                return {
+                  isElement: true,
+                  tagName: el.tagName,
+                  id: el.id,
+                };
+              }
+              return {
+                isElement: false,
+                tagName: '',
+                id: '',
+              };
+            },
+          };
+        });
+
+        await page.pptrPage.evaluate(() => {
+          const div = document.createElement('div');
+          div.id = 'test-id';
+          document.body.appendChild(div);
+        });
+
+        const handle = await page.pptrPage.$('#test-id');
+        if (!handle) {
+          throw new Error('Handle not found');
+        }
+
+        page.getElementByUid = async (uid: string) => {
+          if (uid === 'some-uid') {
+            return handle;
+          }
+          throw new Error('Not found');
+        };
+
+        await executeInPageTool.handler(
+          {
+            params: {
+              toolName: 'test-tool',
+              params: JSON.stringify({element: {uid: 'some-uid'}}),
+            },
+            page: page,
+          },
+          response,
+          context,
+        );
+
+        assert.strictEqual(
+          response.responseLines[0],
+          JSON.stringify(
+            {
+              isElement: true,
+              tagName: 'DIV',
+              id: 'test-id',
+            },
+            null,
+            2,
+          ),
+        );
+      });
+    });
+
+    it('processToolResult replaces functions with "<Function object>"', async () => {
+      await withMcpContext(
+        async (response, context) => {
+          await setupInPageTools(response, context, () => {
+            window.__dtmcp = {
+              toolGroup: {
+                name: 'test-group',
+                description: 'test description',
+                tools: [
+                  {
+                    name: 'test-tool',
+                    description: 'test tool description',
+                    inputSchema: {},
+                    execute: () => ({
+                      foo: 'bar',
+                      func: () => undefined,
+                    }),
+                  },
+                ],
+              },
+            };
+            window.addEventListener('devtoolstooldiscovery', (e: Event) => {
+              // @ts-expect-error Event has `respondWith`
+              e.respondWith(window.__dtmcp?.toolGroup);
+            });
+          });
+
+          await executeInPageTool.handler(
+            {
+              params: {
+                toolName: 'test-tool',
+                params: JSON.stringify({}),
+              },
+              page: context.getSelectedMcpPage(),
+            },
+            response,
+            context,
+          );
+          assert.strictEqual(
+            response.responseLines[0],
+            JSON.stringify({foo: 'bar', func: '<Function object>'}, null, 2),
+          );
+        },
+        undefined,
+        {categoryInPageTools: true} as ParsedArguments,
+      );
+    });
+
+    it('processToolResult replaces circular references with "<Circular reference>"', async () => {
+      await withMcpContext(
+        async (response, context) => {
+          await setupInPageTools(response, context, () => {
+            window.__dtmcp = {
+              toolGroup: {
+                name: 'test-group',
+                description: 'test description',
+                tools: [
+                  {
+                    name: 'test-tool',
+                    description: 'test tool description',
+                    inputSchema: {},
+                    execute: () => {
+                      const obj: Record<string, unknown> = {foo: 'bar'};
+                      obj.self = obj;
+                      return obj;
+                    },
+                  },
+                ],
+              },
+            };
+            window.addEventListener('devtoolstooldiscovery', (e: Event) => {
+              // @ts-expect-error Event has `respondWith`
+              e.respondWith(window.__dtmcp?.toolGroup);
+            });
+          });
+
+          await executeInPageTool.handler(
+            {
+              params: {
+                toolName: 'test-tool',
+                params: JSON.stringify({}),
+              },
+              page: context.getSelectedMcpPage(),
+            },
+            response,
+            context,
+          );
+          assert.strictEqual(
+            response.responseLines[0],
+            JSON.stringify({foo: 'bar', self: '<Circular reference>'}, null, 2),
+          );
+        },
+        undefined,
+        {categoryInPageTools: true} as ParsedArguments,
+      );
+    });
+
+    it('processToolResult replaces non-plain objects with "<ConstructorName instance>"', async () => {
+      await withMcpContext(
+        async (response, context) => {
+          await setupInPageTools(response, context, () => {
+            class CustomClass {
+              val = 'value';
+            }
+            window.__dtmcp = {
+              toolGroup: {
+                name: 'test-group',
+                description: 'test description',
+                tools: [
+                  {
+                    name: 'test-tool',
+                    description: 'test tool description',
+                    inputSchema: {},
+                    execute: () => ({
+                      foo: 'bar',
+                      custom: new CustomClass(),
+                    }),
+                  },
+                ],
+              },
+            };
+            window.addEventListener('devtoolstooldiscovery', (e: Event) => {
+              // @ts-expect-error Event has `respondWith`
+              e.respondWith(window.__dtmcp?.toolGroup);
+            });
+          });
+
+          await executeInPageTool.handler(
+            {
+              params: {
+                toolName: 'test-tool',
+                params: JSON.stringify({}),
+              },
+              page: context.getSelectedMcpPage(),
+            },
+            response,
+            context,
+          );
+          assert.strictEqual(
+            response.responseLines[0],
+            JSON.stringify(
+              {foo: 'bar', custom: '<CustomClass instance>'},
+              null,
+              2,
+            ),
+          );
+        },
+        undefined,
+        {categoryInPageTools: true} as ParsedArguments,
+      );
+    });
+
+    it('stashDOMElement stashes elements and returns UID', async () => {
+      await withMcpContext(
+        async (response, context) => {
+          const page = await context.newPage();
+          response.setPage(page);
+
+          page.inPageTools = {
+            name: 'test-group',
+            description: 'test description',
+            tools: [
+              {
+                name: 'test-tool',
+                description: 'test tool description',
+                inputSchema: {},
+              },
+            ],
+          };
+
+          await page.pptrPage.evaluate(() => {
+            window.__dtmcp = {
+              executeTool: async () => {
+                const div = document.createElement('div');
+                div.id = 'test-element';
+                document.body.appendChild(div);
+                return div;
+              },
+            };
+          });
+
+          const stub = sinon
+            .stub(page, 'resolveCdpElementId')
+            .returns('mock-uid');
+
+          await executeInPageTool.handler(
+            {
+              params: {
+                toolName: 'test-tool',
+                params: JSON.stringify({}),
+              },
+              page: page,
+            },
+            response,
+            context,
+          );
+
+          assert.strictEqual(
+            response.responseLines[0],
+            JSON.stringify({uid: 'mock-uid'}, null, 2),
+          );
+
+          stub.restore();
+        },
+        undefined,
+        {categoryInPageTools: true} as ParsedArguments,
+      );
+    });
+
+    it('creates a new snapshot if the in-page tool response contains a DOM element', async () => {
+      await withMcpContext(
+        async (response, context) => {
+          const page = await context.newPage();
+          response.setPage(page);
+
+          page.inPageTools = {
+            name: 'test-group',
+            description: 'test description',
+            tools: [
+              {
+                name: 'test-tool',
+                description: 'test tool description',
+                inputSchema: {},
+              },
+            ],
+          };
+
+          await page.pptrPage.evaluate(() => {
+            window.__dtmcp = {
+              executeTool: async () => {
+                const div = document.createElement('div');
+                div.id = 'test-element';
+                document.body.appendChild(div);
+                return div;
+              },
+            };
+          });
+
+          const stubSnapshot = sinon
+            .stub(TextSnapshot, 'create')
+            .resolves({} as TextSnapshot);
+
+          const stubResolve = sinon
+            .stub(page, 'resolveCdpElementId')
+            .returns('mock-uid');
+
+          await executeInPageTool.handler(
+            {
+              params: {
+                toolName: 'test-tool',
+                params: JSON.stringify({}),
+              },
+              page: page,
+            },
+            response,
+            context,
+          );
+
+          assert.ok(
+            stubSnapshot.calledOnce,
+            'Expected TextSnapshot.create to be called',
+          );
+          assert.strictEqual(
+            response.responseLines[0],
+            JSON.stringify({uid: 'mock-uid'}, null, 2),
+          );
+
+          stubResolve.restore();
+          stubSnapshot.restore();
+        },
+        undefined,
+        {categoryInPageTools: true} as ParsedArguments,
+      );
+    });
+
+    it('does not create a new snapshot if the in-page tool response does not contain a DOM element', async () => {
+      await withMcpContext(
+        async (response, context) => {
+          const page = await context.newPage();
+          response.setPage(page);
+
+          page.inPageTools = {
+            name: 'test-group',
+            description: 'test description',
+            tools: [
+              {
+                name: 'test-tool',
+                description: 'test tool description',
+                inputSchema: {},
+              },
+            ],
+          };
+
+          await page.pptrPage.evaluate(() => {
+            window.__dtmcp = {
+              executeTool: async () => {
+                return 'simple-result';
+              },
+            };
+          });
+
+          const stubSnapshot = sinon
+            .stub(TextSnapshot, 'create')
+            .resolves({} as TextSnapshot);
+
+          await executeInPageTool.handler(
+            {
+              params: {
+                toolName: 'test-tool',
+                params: JSON.stringify({}),
+              },
+              page: page,
+            },
+            response,
+            context,
+          );
+
+          assert.ok(
+            stubSnapshot.notCalled,
+            'Expected TextSnapshot.create not to be called',
+          );
+          assert.strictEqual(
+            response.responseLines[0],
+            JSON.stringify('simple-result', null, 2),
+          );
+
+          stubSnapshot.restore();
+        },
+        undefined,
+        {categoryInPageTools: true} as ParsedArguments,
+      );
+    });
+  });
+});

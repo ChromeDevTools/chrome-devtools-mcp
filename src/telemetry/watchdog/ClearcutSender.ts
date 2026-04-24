@@ -70,14 +70,14 @@ export class ClearcutSender {
       this.#sessionCreated = Date.now();
     }
 
-    logger('Enqueing telemetry event', JSON.stringify(event, null, 2));
-
-    this.#addToBuffer({
+    const eventToSend = {
       ...event,
       session_id: this.#sessionId,
       app_version: this.#appVersion,
       os_type: this.#osType,
-    });
+    };
+    logger('Enqueing telemetry event', JSON.stringify(eventToSend, null, 2));
+    this.#addToBuffer(eventToSend);
 
     if (!this.#timerStarted) {
       this.#timerStarted = true;

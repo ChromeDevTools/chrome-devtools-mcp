@@ -71,7 +71,7 @@ export const listNetworkRequests = definePageTool({
       ),
   },
   handler: async (request, response, context) => {
-    const data = await context.getDevToolsData(request.page);
+    const data = await request.page.getDevToolsData();
     response.attachDevToolsData(data);
     const reqid = data?.cdpRequestId
       ? context.resolveCdpRequestId(request.page, data.cdpRequestId)
@@ -104,13 +104,13 @@ export const getNetworkRequest = definePageTool({
       .string()
       .optional()
       .describe(
-        'The absolute or relative path to save the request body to. If omitted, the body is returned inline.',
+        'The absolute or relative path to a .network-request file to save the request body to. If omitted, the body is returned inline.',
       ),
     responseFilePath: zod
       .string()
       .optional()
       .describe(
-        'The absolute or relative path to save the response body to. If omitted, the body is returned inline.',
+        'The absolute or relative path to a .network-response file to save the response body to. If omitted, the body is returned inline.',
       ),
   },
   handler: async (request, response, context) => {
@@ -120,7 +120,7 @@ export const getNetworkRequest = definePageTool({
         responseFilePath: request.params.responseFilePath,
       });
     } else {
-      const data = await context.getDevToolsData(request.page);
+      const data = await request.page.getDevToolsData();
       response.attachDevToolsData(data);
       const reqid = data?.cdpRequestId
         ? context.resolveCdpRequestId(request.page, data.cdpRequestId)

@@ -15,16 +15,18 @@ describe('cli args parsing', () => {
     categoryEmulation: true,
     'category-performance': true,
     categoryPerformance: true,
-    'category-extensions': false,
-    categoryExtensions: false,
     'category-network': true,
     categoryNetwork: true,
+    'category-extensions': false,
+    categoryExtensions: false,
     'auto-connect': undefined,
     autoConnect: undefined,
     'performance-crux': true,
     performanceCrux: true,
     'usage-statistics': true,
     usageStatistics: true,
+    'redact-network-headers': false,
+    redactNetworkHeaders: false,
   };
 
   it('parses with default args', async () => {

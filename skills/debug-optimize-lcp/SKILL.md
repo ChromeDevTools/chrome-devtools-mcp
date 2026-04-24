@@ -50,7 +50,7 @@ Use `performance_analyze_insight` to drill into LCP-specific insights. Look for 
 - **RenderBlocking** — Resources blocking the LCP element from rendering.
 - **LCPDiscovery** — Whether the LCP resource was discoverable early.
 
-Call `performance_analyze_insight` with the insight name and the insight set ID from the trace results.
+Call `performance_analyze_insight` with the insight set ID and the insight name from the trace results.
 
 ### Step 3: Identify the LCP Element
 

@@ -57,6 +57,13 @@ export async function createMcpServer(
     return {};
   });
 
+  server.server.oninitialized = () => {
+    const clientName = server.server.getClientVersion()?.name;
+    if (clientName) {
+      clearcutLogger?.setClientName(clientName);
+    }
+  };
+
   let context: McpContext;
   async function getContext(): Promise<McpContext> {
     const chromeArgs: string[] = (serverArgs.chromeArg ?? []).map(String);
@@ -134,8 +141,20 @@ export async function createMcpServer(
       return;
     }
     if (
+      tool.annotations.category === ToolCategory.IN_PAGE &&
+      !serverArgs.categoryInPageTools
+    ) {
+      return;
+    }
+    if (
       tool.annotations.conditions?.includes('computerVision') &&
       !serverArgs.experimentalVision
+    ) {
+      return;
+    }
+    if (
+      tool.annotations.conditions?.includes('experimentalMemory') &&
+      !serverArgs.experimentalMemory
     ) {
       return;
     }
@@ -148,6 +167,12 @@ export async function createMcpServer(
     if (
       tool.annotations.conditions?.includes('screencast') &&
       !serverArgs.experimentalScreencast
+    ) {
+      return;
+    }
+    if (
+      tool.annotations.conditions?.includes('experimentalWebmcp') &&
+      !serverArgs.experimentalWebmcp
     ) {
       return;
     }
@@ -178,6 +203,8 @@ export async function createMcpServer(
           const response = serverArgs.slim
             ? new SlimMcpResponse(serverArgs)
             : new McpResponse(serverArgs);
+
+          response.setRedactNetworkHeaders(serverArgs.redactNetworkHeaders);
           if ('pageScoped' in tool && tool.pageScoped) {
             const page =
               serverArgs.experimentalPageIdRouting &&
@@ -239,6 +266,8 @@ export async function createMcpServer(
         } finally {
           void clearcutLogger?.logToolInvocation({
             toolName: tool.name,
+            params,
+            schema,
             success,
             latencyMs: bucketizeLatency(Date.now() - startTime),
           });

@@ -11,6 +11,7 @@ import {describe, it} from 'node:test';
 
 import type {ParsedArguments} from '../../src/bin/chrome-devtools-mcp-cli-options.js';
 import {McpResponse} from '../../src/McpResponse.js';
+import {TextSnapshot} from '../../src/TextSnapshot.js';
 import {
   click,
   hover,
@@ -36,7 +37,9 @@ describe('input', () => {
         await page.setContent(
           html`<button onclick="this.innerText = 'clicked';">test</button>`,
         );
-        await context.createTextSnapshot(context.getSelectedMcpPage());
+        context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
+          context.getSelectedMcpPage(),
+        );
         await click.handler(
           {
             params: {
@@ -63,7 +66,9 @@ describe('input', () => {
             >test</button
           >`,
         );
-        await context.createTextSnapshot(context.getSelectedMcpPage());
+        context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
+          context.getSelectedMcpPage(),
+        );
         await click.handler(
           {
             params: {
@@ -98,7 +103,9 @@ describe('input', () => {
       await withMcpContext(async (response, context) => {
         const page = context.getSelectedPptrPage();
         await page.goto(server.getRoute('/link'));
-        await context.createTextSnapshot(context.getSelectedMcpPage());
+        context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
+          context.getSelectedMcpPage(),
+        );
         const clickPromise = click.handler(
           {
             params: {
@@ -141,7 +148,9 @@ describe('input', () => {
       await withMcpContext(async (response, context) => {
         const page = context.getSelectedPptrPage();
         await page.goto(server.getRoute('/unstable'));
-        await context.createTextSnapshot(context.getSelectedMcpPage());
+        context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
+          context.getSelectedMcpPage(),
+        );
         const handlerResolveTime = await click
           .handler(
             {
@@ -169,7 +178,9 @@ describe('input', () => {
         await page.setContent(
           html`<button onclick="this.innerText = 'clicked';">test</button>`,
         );
-        await context.createTextSnapshot(context.getSelectedMcpPage());
+        context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
+          context.getSelectedMcpPage(),
+        );
         await click.handler(
           {
             params: {
@@ -194,7 +205,9 @@ describe('input', () => {
         await page.setContent(
           html`<button onclick="this.innerText = 'clicked';">test</button>`,
         );
-        await context.createTextSnapshot(context.getSelectedMcpPage());
+        context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
+          context.getSelectedMcpPage(),
+        );
         await click.handler(
           {
             params: {
@@ -222,7 +235,9 @@ describe('input', () => {
         await page.setContent(
           html`<button onmouseover="this.innerText = 'hovered';">test</button>`,
         );
-        await context.createTextSnapshot(context.getSelectedMcpPage());
+        context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
+          context.getSelectedMcpPage(),
+        );
         await hover.handler(
           {
             params: {
@@ -253,7 +268,9 @@ describe('input', () => {
             onclick="this.innerText = 'clicked'"
           ></div>`,
         );
-        await context.createTextSnapshot(context.getSelectedMcpPage());
+        context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
+          context.getSelectedMcpPage(),
+        );
         await clickAt.handler(
           {
             params: {
@@ -283,7 +300,9 @@ describe('input', () => {
             ondblclick="this.innerText = 'dblclicked'"
           ></div>`,
         );
-        await context.createTextSnapshot(context.getSelectedMcpPage());
+        context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
+          context.getSelectedMcpPage(),
+        );
         await clickAt.handler(
           {
             params: {
@@ -311,7 +330,9 @@ describe('input', () => {
       await withMcpContext(async (response, context) => {
         const page = context.getSelectedPptrPage();
         await page.setContent(html`<input />`);
-        await context.createTextSnapshot(context.getSelectedMcpPage());
+        context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
+          context.getSelectedMcpPage(),
+        );
         await fill.handler(
           {
             params: {
@@ -341,7 +362,9 @@ describe('input', () => {
             ><option value="v2">two</option></select
           >`,
         );
-        await context.createTextSnapshot(context.getSelectedMcpPage());
+        context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
+          context.getSelectedMcpPage(),
+        );
         await fill.handler(
           {
             params: {
@@ -369,7 +392,9 @@ describe('input', () => {
       await withMcpContext(async (response, context) => {
         const page = context.getSelectedPptrPage();
         await page.setContent(html`<textarea role="combobox"></textarea>`);
-        await context.createTextSnapshot(context.getSelectedMcpPage());
+        context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
+          context.getSelectedMcpPage(),
+        );
         await fill.handler(
           {
             params: {
@@ -398,7 +423,9 @@ describe('input', () => {
       await withMcpContext(async (response, context) => {
         const page = context.getSelectedPptrPage();
         await page.setContent(html`<textarea></textarea>`);
-        await context.createTextSnapshot(context.getSelectedMcpPage());
+        context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
+          context.getSelectedMcpPage(),
+        );
         page.setDefaultTimeout(1000);
         await fill.handler(
           {
@@ -431,7 +458,9 @@ describe('input', () => {
         const page = context.getSelectedPptrPage();
         await page.setContent(html`<textarea></textarea>`);
         await page.click('textarea');
-        await context.createTextSnapshot(context.getSelectedMcpPage());
+        context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
+          context.getSelectedMcpPage(),
+        );
         await typeText.handler(
           {
             params: {
@@ -457,7 +486,9 @@ describe('input', () => {
         const page = context.getSelectedPptrPage();
         await page.setContent(html`<textarea></textarea>`);
         await page.click('textarea');
-        await context.createTextSnapshot(context.getSelectedMcpPage());
+        context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
+          context.getSelectedMcpPage(),
+        );
         await typeText.handler(
           {
             params: {
@@ -494,7 +525,9 @@ describe('input', () => {
         const page = context.getSelectedPptrPage();
         await page.setContent(html`<textarea></textarea>`);
         await page.click('textarea');
-        await context.createTextSnapshot(context.getSelectedMcpPage());
+        context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
+          context.getSelectedMcpPage(),
+        );
         try {
           await typeText.handler(
             {
@@ -528,7 +561,9 @@ describe('input', () => {
             />
           </form>`,
         );
-        await context.createTextSnapshot(context.getSelectedMcpPage());
+        context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
+          context.getSelectedMcpPage(),
+        );
 
         // Fill email
         const response1 = new McpResponse({} as ParsedArguments);
@@ -622,7 +657,9 @@ describe('input', () => {
               });
             </script>`,
         );
-        await context.createTextSnapshot(context.getSelectedMcpPage());
+        context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
+          context.getSelectedMcpPage(),
+        );
         await drag.handler(
           {
             params: {
@@ -666,7 +703,9 @@ describe('input', () => {
             />
           </form>`,
         );
-        await context.createTextSnapshot(context.getSelectedMcpPage());
+        context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
+          context.getSelectedMcpPage(),
+        );
         await fillForm.handler(
           {
             params: {
@@ -721,7 +760,9 @@ describe('input', () => {
             />
           </form>`,
         );
-        await context.createTextSnapshot(context.getSelectedMcpPage());
+        context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
+          context.getSelectedMcpPage(),
+        );
         await uploadFile.handler(
           {
             params: {
@@ -764,7 +805,9 @@ describe('input', () => {
                 });
             </script>`,
         );
-        await context.createTextSnapshot(context.getSelectedMcpPage());
+        context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
+          context.getSelectedMcpPage(),
+        );
         await uploadFile.handler(
           {
             params: {
@@ -798,7 +841,9 @@ describe('input', () => {
       await withMcpContext(async (response, context) => {
         const page = context.getSelectedPptrPage();
         await page.setContent(html`<div>Not a file input</div>`);
-        await context.createTextSnapshot(context.getSelectedMcpPage());
+        context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
+          context.getSelectedMcpPage(),
+        );
 
         await assert.rejects(
           uploadFile.handler(
@@ -864,7 +909,9 @@ describe('input', () => {
             document.addEventListener('keyup', e => logs.push('u' + e.key));
           </script>`,
         );
-        await context.createTextSnapshot(context.getSelectedMcpPage());
+        context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
+          context.getSelectedMcpPage(),
+        );
 
         await pressKey.handler(
           {

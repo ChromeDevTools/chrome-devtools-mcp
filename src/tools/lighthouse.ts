@@ -25,7 +25,7 @@ export const lighthouseAudit = definePageTool({
   description: `Get Lighthouse score and reports for accessibility, SEO and best practices. This excludes performance. For performance audits, run ${startTrace.name}`,
   annotations: {
     category: ToolCategory.DEBUGGING,
-    readOnlyHint: true,
+    readOnlyHint: false,
   },
   schema: {
     mode: zod
@@ -107,8 +107,12 @@ export const lighthouseAudit = definePageTool({
       const report = generateReport(lhr, format);
       const data = encoder.encode(report);
       if (outputDirPath) {
-        const reportPath = path.join(outputDirPath, `report.${format}`);
-        const {filename} = await context.saveFile(data, reportPath);
+        const reportPath = path.join(outputDirPath, `report`);
+        const {filename} = await context.saveFile(
+          data,
+          reportPath,
+          `.${format}`,
+        );
         reportPaths.push(filename);
       } else {
         const {filepath} = await context.saveTemporaryFile(

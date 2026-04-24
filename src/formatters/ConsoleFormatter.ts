@@ -13,6 +13,8 @@ import {UncaughtError} from '../PageCollector.js';
 import * as DevTools from '../third_party/index.js';
 import type {ConsoleMessage} from '../third_party/index.js';
 
+import type {IssueFormatter} from './IssueFormatter.js';
+
 export interface ConsoleFormatterOptions {
   fetchDetailedData?: boolean;
   id: number;
@@ -32,6 +34,7 @@ interface ConsoleMessageConcise {
   text: string;
   argsCount: number;
   id: number;
+  count?: number;
 }
 
 interface ConsoleMessageDetailed extends ConsoleMessageConcise {
@@ -54,7 +57,7 @@ export class ConsoleFormatter {
 
   readonly isIgnored: IgnoreCheck;
 
-  private constructor(params: {
+  protected constructor(params: {
     id: number;
     type: string;
     text: string;
@@ -201,6 +204,48 @@ export class ConsoleFormatter {
     };
   }
 
+  /**
+   * Groups consecutive messages with the same type, text, and argument count.
+   * Similar to Chrome DevTools' console grouping behavior.
+   */
+  static groupConsecutive(
+    messages: Array<ConsoleFormatter | IssueFormatter>,
+  ): Array<ConsoleFormatter | IssueFormatter> {
+    const grouped: Array<{
+      message: ConsoleFormatter | IssueFormatter;
+      count: number;
+    }> = [];
+    for (const msg of messages) {
+      const prev = grouped[grouped.length - 1];
+      if (
+        prev &&
+        prev.message instanceof ConsoleFormatter &&
+        msg instanceof ConsoleFormatter &&
+        prev.message.#type === msg.#type &&
+        prev.message.#text === msg.#text &&
+        prev.message.#argCount === msg.#argCount
+      ) {
+        prev.count++;
+      } else {
+        grouped.push({message: msg, count: 1});
+      }
+    }
+    return grouped.map(({message, count}) =>
+      count > 1 && message instanceof ConsoleFormatter
+        ? new GroupedConsoleFormatter(
+            {
+              id: message.#id,
+              type: message.#type,
+              text: message.#text,
+              argCount: message.#argCount,
+              isIgnored: message.isIgnored,
+            },
+            count,
+          )
+        : message,
+    );
+  }
+
   toJSONDetailed(): ConsoleMessageDetailed {
     return {
       id: this.#id,
@@ -215,8 +260,37 @@ export class ConsoleFormatter {
   }
 }
 
+export class GroupedConsoleFormatter extends ConsoleFormatter {
+  readonly #count: number;
+
+  constructor(
+    params: {
+      id: number;
+      type: string;
+      text: string;
+      argCount: number;
+      isIgnored: IgnoreCheck;
+    },
+    count: number,
+  ) {
+    super(params);
+    this.#count = count;
+  }
+
+  override toString(): string {
+    return convertConsoleMessageConciseToString(this.toJSON());
+  }
+
+  override toJSON(): ConsoleMessageConcise {
+    const json = super.toJSON();
+    json.count = this.#count;
+    return json;
+  }
+}
+
 function convertConsoleMessageConciseToString(msg: ConsoleMessageConcise) {
-  return `msgid=${msg.id} [${msg.type}] ${msg.text} (${msg.argsCount} args)`;
+  const countSuffix = msg.count && msg.count > 1 ? ` [${msg.count} times]` : '';
+  return `msgid=${msg.id} [${msg.type}] ${msg.text} (${msg.argsCount} args)${countSuffix}`;
 }
 
 function convertConsoleMessageConciseDetailedToString(

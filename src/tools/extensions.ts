@@ -9,15 +9,12 @@ import {zod} from '../third_party/index.js';
 import {ToolCategory} from './categories.js';
 import {defineTool} from './ToolDefinition.js';
 
-const EXTENSIONS_CONDITION = 'experimentalExtensionSupport';
-
 export const installExtension = defineTool({
   name: 'install_extension',
   description: 'Installs a Chrome extension from the given path.',
   annotations: {
     category: ToolCategory.EXTENSIONS,
     readOnlyHint: false,
-    conditions: [EXTENSIONS_CONDITION],
   },
   schema: {
     path: zod
@@ -37,7 +34,6 @@ export const uninstallExtension = defineTool({
   annotations: {
     category: ToolCategory.EXTENSIONS,
     readOnlyHint: false,
-    conditions: [EXTENSIONS_CONDITION],
   },
   schema: {
     id: zod.string().describe('ID of the extension to uninstall.'),
@@ -52,11 +48,10 @@ export const uninstallExtension = defineTool({
 export const listExtensions = defineTool({
   name: 'list_extensions',
   description:
-    'Lists all extensions via this server, including their name, ID, version, and enabled status.',
+    'Lists all the Chrome extensions installed in the browser. This includes their name, ID, version, and enabled status.',
   annotations: {
     category: ToolCategory.EXTENSIONS,
     readOnlyHint: true,
-    conditions: [EXTENSIONS_CONDITION],
   },
   schema: {},
   handler: async (_request, response, _context) => {
@@ -70,14 +65,13 @@ export const reloadExtension = defineTool({
   annotations: {
     category: ToolCategory.EXTENSIONS,
     readOnlyHint: false,
-    conditions: [EXTENSIONS_CONDITION],
   },
   schema: {
     id: zod.string().describe('ID of the extension to reload.'),
   },
   handler: async (request, response, context) => {
     const {id} = request.params;
-    const extension = context.getExtension(id);
+    const extension = await context.getExtension(id);
     if (!extension) {
       throw new Error(`Extension with ID ${id} not found.`);
     }
@@ -88,18 +82,17 @@ export const reloadExtension = defineTool({
 
 export const triggerExtensionAction = defineTool({
   name: 'trigger_extension_action',
-  description: 'Triggers an action in a Chrome extension.',
+  description: 'Triggers the default action of an extension by its ID.',
   annotations: {
     category: ToolCategory.EXTENSIONS,
     readOnlyHint: false,
-    conditions: [EXTENSIONS_CONDITION],
   },
   schema: {
-    id: zod.string().describe('ID of the extension.'),
+    id: zod.string().describe('ID of the extension to trigger the action for.'),
   },
   handler: async (request, response, context) => {
     const {id} = request.params;
     await context.triggerExtensionAction(id);
-    response.appendResponseLine(`Extension action triggered. Id: ${id}`);
+    response.appendResponseLine(`Extension action triggered for ID ${id}`);
   },
 });

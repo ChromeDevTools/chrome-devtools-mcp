@@ -9,10 +9,15 @@ import path from 'node:path';
 
 import type {TargetUniverse} from './DevtoolsUtils.js';
 import {UniverseManager} from './DevtoolsUtils.js';
+import {HeapSnapshotManager} from './HeapSnapshotManager.js';
+import type {AggregatedInfoWithUid} from './HeapSnapshotManager.js';
 import {McpPage} from './McpPage.js';
-import type {ListenerMap, UncaughtError} from './PageCollector.js';
-import {NetworkCollector, ConsoleCollector} from './PageCollector.js';
-import type {DevTools} from './third_party/index.js';
+import {
+  NetworkCollector,
+  ConsoleCollector,
+  type ListenerMap,
+  type UncaughtError,
+} from './PageCollector.js';
 import type {
   Browser,
   BrowserContext,
@@ -21,36 +26,24 @@ import type {
   HTTPRequest,
   Page,
   ScreenRecorder,
-  SerializedAXNode,
   Viewport,
   Target,
+  Extension,
 } from './third_party/index.js';
+import type {DevTools} from './third_party/index.js';
 import {Locator} from './third_party/index.js';
 import {PredefinedNetworkConditions} from './third_party/index.js';
 import {listPages} from './tools/pages.js';
 import {CLOSE_PAGE_ERROR} from './tools/ToolDefinition.js';
-import type {Context, DevToolsData} from './tools/ToolDefinition.js';
+import type {Context, SupportedExtensions} from './tools/ToolDefinition.js';
 import type {TraceResult} from './trace-processing/parse.js';
 import type {
   EmulationSettings,
   GeolocationOptions,
-  TextSnapshot,
-  TextSnapshotNode,
   ExtensionServiceWorker,
 } from './types.js';
-import {
-  ExtensionRegistry,
-  type InstalledExtension,
-} from './utils/ExtensionRegistry.js';
-import {saveTemporaryFile} from './utils/files.js';
-import {WaitForHelper} from './WaitForHelper.js';
-
-export type {
-  EmulationSettings,
-  GeolocationOptions,
-  TextSnapshot,
-  TextSnapshotNode,
-} from './types.js';
+import {ensureExtension, saveTemporaryFile} from './utils/files.js';
+import {getNetworkMultiplierFromString} from './WaitForHelper.js';
 
 interface McpContextOptions {
   // Whether the DevTools windows are exposed as pages for debugging of DevTools.
@@ -63,23 +56,6 @@ interface McpContextOptions {
 
 const DEFAULT_TIMEOUT = 5_000;
 const NAVIGATION_TIMEOUT = 10_000;
-
-function getNetworkMultiplierFromString(condition: string | null): number {
-  const puppeteerCondition =
-    condition as keyof typeof PredefinedNetworkConditions;
-
-  switch (puppeteerCondition) {
-    case 'Fast 4G':
-      return 1;
-    case 'Slow 4G':
-      return 2.5;
-    case 'Fast 3G':
-      return 5;
-    case 'Slow 3G':
-      return 10;
-  }
-  return 1;
-}
 
 export class McpContext implements Context {
   browser: Browser;
@@ -98,7 +74,6 @@ export class McpContext implements Context {
   #networkCollector: NetworkCollector;
   #consoleCollector: ConsoleCollector;
   #devtoolsUniverseManager: UniverseManager;
-  #extensionRegistry = new ExtensionRegistry();
 
   #isRunningTrace = false;
   #screenRecorderData: {recorder: ScreenRecorder; filePath: string} | null =
@@ -110,11 +85,11 @@ export class McpContext implements Context {
   #extensionServiceWorkerMap = new WeakMap<Target, string>();
   #nextExtensionServiceWorkerId = 1;
 
-  #nextSnapshotId = 1;
   #traceResults: TraceResult[] = [];
 
   #locatorClass: typeof Locator;
   #options: McpContextOptions;
+  #heapSnapshotManager = new HeapSnapshotManager();
 
   private constructor(
     browser: Browser,
@@ -137,7 +112,7 @@ export class McpContext implements Context {
         uncaughtError: event => {
           collect(event);
         },
-        issue: event => {
+        devtoolsAggregatedIssue: event => {
           collect(event);
         },
       } as ListenerMap;
@@ -193,33 +168,6 @@ export class McpContext implements Context {
       return;
     }
     return this.#networkCollector.getIdForResource(request);
-  }
-
-  resolveCdpElementId(
-    page: McpPage,
-    cdpBackendNodeId: number,
-  ): string | undefined {
-    if (!cdpBackendNodeId) {
-      this.logger('no cdpBackendNodeId');
-      return;
-    }
-    const snapshot = page.textSnapshot;
-    if (!snapshot) {
-      this.logger('no text snapshot');
-      return;
-    }
-    // TODO: index by backendNodeId instead.
-    const queue = [snapshot.root];
-    while (queue.length) {
-      const current = queue.pop()!;
-      if (current.backendNodeId === cdpBackendNodeId) {
-        return current.id;
-      }
-      for (const child of current.children) {
-        queue.push(child);
-      }
-    }
-    return;
   }
 
   getNetworkRequests(
@@ -657,9 +605,16 @@ export class McpContext implements Context {
           return;
         }
 
-        if (await page.hasDevTools()) {
-          mcpPage.devToolsPage = await page.openDevTools();
-        } else {
+        // Prior to Chrome 144.0.7559.59, the command fails,
+        // Some Electron apps still use older version
+        // Fall back to not exposing DevTools at all.
+        try {
+          if (await page.hasDevTools()) {
+            mcpPage.devToolsPage = await page.openDevTools();
+          } else {
+            mcpPage.devToolsPage = undefined;
+          }
+        } catch {
           mcpPage.devToolsPage = undefined;
         }
       }),
@@ -684,128 +639,6 @@ export class McpContext implements Context {
     return this.#mcpPages.get(page)?.isolatedContextName;
   }
 
-  getDevToolsPage(page: Page): Page | undefined {
-    return this.#mcpPages.get(page)?.devToolsPage;
-  }
-
-  async getDevToolsData(page: McpPage): Promise<DevToolsData> {
-    try {
-      this.logger('Getting DevTools UI data');
-      const devtoolsPage = this.getDevToolsPage(page.pptrPage);
-      if (!devtoolsPage) {
-        this.logger('No DevTools page detected');
-        return {};
-      }
-      const {cdpRequestId, cdpBackendNodeId} = await devtoolsPage.evaluate(
-        async () => {
-          // @ts-expect-error no types
-          const UI = await import('/bundled/ui/legacy/legacy.js');
-          // @ts-expect-error no types
-          const SDK = await import('/bundled/core/sdk/sdk.js');
-          const request = UI.Context.Context.instance().flavor(
-            SDK.NetworkRequest.NetworkRequest,
-          );
-          const node = UI.Context.Context.instance().flavor(
-            SDK.DOMModel.DOMNode,
-          );
-          return {
-            cdpRequestId: request?.requestId(),
-            cdpBackendNodeId: node?.backendNodeId(),
-          };
-        },
-      );
-      return {cdpBackendNodeId, cdpRequestId};
-    } catch (err) {
-      this.logger('error getting devtools data', err);
-    }
-    return {};
-  }
-
-  /**
-   * Creates a text snapshot of a page.
-   */
-  async createTextSnapshot(
-    page: McpPage,
-    verbose = false,
-    devtoolsData: DevToolsData | undefined = undefined,
-  ): Promise<void> {
-    const rootNode = await page.pptrPage.accessibility.snapshot({
-      includeIframes: true,
-      interestingOnly: !verbose,
-    });
-    if (!rootNode) {
-      return;
-    }
-
-    const {uniqueBackendNodeIdToMcpId} = page;
-
-    const snapshotId = this.#nextSnapshotId++;
-    // Iterate through the whole accessibility node tree and assign node ids that
-    // will be used for the tree serialization and mapping ids back to nodes.
-    let idCounter = 0;
-    const idToNode = new Map<string, TextSnapshotNode>();
-    const seenUniqueIds = new Set<string>();
-    const assignIds = (node: SerializedAXNode): TextSnapshotNode => {
-      let id = '';
-      // @ts-expect-error untyped loaderId & backendNodeId.
-      const uniqueBackendId = `${node.loaderId}_${node.backendNodeId}`;
-      if (uniqueBackendNodeIdToMcpId.has(uniqueBackendId)) {
-        // Re-use MCP exposed ID if the uniqueId is the same.
-        id = uniqueBackendNodeIdToMcpId.get(uniqueBackendId)!;
-      } else {
-        // Only generate a new ID if we have not seen the node before.
-        id = `${snapshotId}_${idCounter++}`;
-        uniqueBackendNodeIdToMcpId.set(uniqueBackendId, id);
-      }
-      seenUniqueIds.add(uniqueBackendId);
-
-      const nodeWithId: TextSnapshotNode = {
-        ...node,
-        id,
-        children: node.children
-          ? node.children.map(child => assignIds(child))
-          : [],
-      };
-
-      // The AXNode for an option doesn't contain its `value`.
-      // Therefore, set text content of the option as value.
-      if (node.role === 'option') {
-        const optionText = node.name;
-        if (optionText) {
-          nodeWithId.value = optionText.toString();
-        }
-      }
-
-      idToNode.set(nodeWithId.id, nodeWithId);
-      return nodeWithId;
-    };
-
-    const rootNodeWithId = assignIds(rootNode);
-    const snapshot: TextSnapshot = {
-      root: rootNodeWithId,
-      snapshotId: String(snapshotId),
-      idToNode,
-      hasSelectedElement: false,
-      verbose,
-    };
-    page.textSnapshot = snapshot;
-    const data = devtoolsData ?? (await this.getDevToolsData(page));
-    if (data?.cdpBackendNodeId) {
-      snapshot.hasSelectedElement = true;
-      snapshot.selectedElementUid = this.resolveCdpElementId(
-        page,
-        data?.cdpBackendNodeId,
-      );
-    }
-
-    // Clean up unique IDs that we did not see anymore.
-    for (const key of uniqueBackendNodeIdToMcpId.keys()) {
-      if (!seenUniqueIds.has(key)) {
-        uniqueBackendNodeIdToMcpId.delete(key);
-      }
-    }
-  }
-
   async saveTemporaryFile(
     data: Uint8Array<ArrayBufferLike>,
     filename: string,
@@ -814,10 +647,14 @@ export class McpContext implements Context {
   }
   async saveFile(
     data: Uint8Array<ArrayBufferLike>,
-    filename: string,
+    clientProvidedFilePath: string,
+    extension: SupportedExtensions,
   ): Promise<{filename: string}> {
     try {
-      const filePath = path.resolve(filename);
+      const filePath = ensureExtension(
+        path.resolve(clientProvidedFilePath),
+        extension,
+      );
       await fs.mkdir(path.dirname(filePath), {recursive: true});
       await fs.writeFile(filePath, data);
       return {filename: filePath};
@@ -835,31 +672,6 @@ export class McpContext implements Context {
 
   recordedTraces(): TraceResult[] {
     return this.#traceResults;
-  }
-
-  getWaitForHelper(
-    page: Page,
-    cpuMultiplier: number,
-    networkMultiplier: number,
-  ) {
-    return new WaitForHelper(page, cpuMultiplier, networkMultiplier);
-  }
-
-  waitForEventsAfterAction(
-    action: () => Promise<unknown>,
-    options?: {timeout?: number},
-  ): Promise<void> {
-    const page = this.#getSelectedMcpPage();
-    const cpuMultiplier = page.cpuThrottlingRate;
-    const networkMultiplier = getNetworkMultiplierFromString(
-      page.networkConditions,
-    );
-    const waitForHelper = this.getWaitForHelper(
-      page.pptrPage,
-      cpuMultiplier,
-      networkMultiplier,
-    );
-    return waitForHelper.waitForEventsAfterAction(action, options);
   }
 
   getNetworkRequestStableId(request: HTTPRequest): number {
@@ -910,37 +722,54 @@ export class McpContext implements Context {
 
   async installExtension(extensionPath: string): Promise<string> {
     const id = await this.browser.installExtension(extensionPath);
-    await this.#extensionRegistry.registerExtension(id, extensionPath);
     return id;
   }
 
   async uninstallExtension(id: string): Promise<void> {
     await this.browser.uninstallExtension(id);
-    this.#extensionRegistry.remove(id);
   }
 
   async triggerExtensionAction(id: string): Promise<void> {
-    const page = this.getSelectedPptrPage();
-    // @ts-expect-error internal puppeteer api is needed since we don't have a way to get
-    // a tab id at the moment
-    const theTarget = page._tabId;
-    const session = await this.browser.target().createCDPSession();
-
-    try {
-      await session.send('Extensions.triggerAction', {
-        id,
-        targetId: theTarget,
-      });
-    } finally {
-      await session.detach();
+    const extensions = await this.browser.extensions();
+    const extension = extensions.get(id);
+    if (!extension) {
+      throw new Error(`Extension with ID ${id} not found.`);
     }
+    const page = this.getSelectedPptrPage();
+    await extension.triggerAction(page);
   }
 
-  listExtensions(): InstalledExtension[] {
-    return this.#extensionRegistry.list();
+  listExtensions(): Promise<Map<string, Extension>> {
+    return this.browser.extensions();
   }
 
-  getExtension(id: string): InstalledExtension | undefined {
-    return this.#extensionRegistry.getById(id);
+  async getExtension(id: string): Promise<Extension | undefined> {
+    const pptrExtensions = await this.browser.extensions();
+    return pptrExtensions.get(id);
+  }
+
+  async getHeapSnapshotAggregates(
+    filePath: string,
+  ): Promise<Record<string, AggregatedInfoWithUid>> {
+    return await this.#heapSnapshotManager.getAggregates(filePath);
+  }
+
+  async getHeapSnapshotStats(
+    filePath: string,
+  ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.Statistics> {
+    return await this.#heapSnapshotManager.getStats(filePath);
+  }
+
+  async getHeapSnapshotStaticData(
+    filePath: string,
+  ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.StaticData | null> {
+    return await this.#heapSnapshotManager.getStaticData(filePath);
+  }
+
+  async getHeapSnapshotNodesByUid(
+    filePath: string,
+    uid: number,
+  ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange> {
+    return await this.#heapSnapshotManager.getNodesByUid(filePath, uid);
   }
 }

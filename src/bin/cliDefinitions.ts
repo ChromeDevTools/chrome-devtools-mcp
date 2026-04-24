@@ -110,7 +110,7 @@ export const commands: Commands = {
         name: 'geolocation',
         type: 'string',
         description:
-          'Geolocation (`<latitude>x<longitude>`) to emulate. Latitude between -90 and 90. Longitude between -180 and 180. Omit clear the geolocation override.',
+          'Geolocation (`<latitude>x<longitude>`) to emulate. Latitude between -90 and 90. Longitude between -180 and 180. Omit to clear the geolocation override.',
         required: false,
       },
       userAgent: {
@@ -155,11 +155,18 @@ export const commands: Commands = {
         description: 'An optional list of arguments to pass to the function.',
         required: false,
       },
+      dialogAction: {
+        name: 'dialogAction',
+        type: 'string',
+        description:
+          'Handle dialogs while execution. "accept", "dismiss", or string for response of window.prompt. Defaults to accept.',
+        required: false,
+      },
     },
   },
   fill: {
     description:
-      'Type text into a input, text area or select an option from a <select> element.',
+      'Type text into an input, text area or select an option from a <select> element.',
     category: 'Input automation',
     args: {
       uid: {
@@ -214,14 +221,14 @@ export const commands: Commands = {
         name: 'requestFilePath',
         type: 'string',
         description:
-          'The absolute or relative path to save the request body to. If omitted, the body is returned inline.',
+          'The absolute or relative path to a .network-request file to save the request body to. If omitted, the body is returned inline.',
         required: false,
       },
       responseFilePath: {
         name: 'responseFilePath',
         type: 'string',
         description:
-          'The absolute or relative path to save the response body to. If omitted, the body is returned inline.',
+          'The absolute or relative path to a .network-response file to save the response body to. If omitted, the body is returned inline.',
         required: false,
       },
     },
@@ -305,7 +312,7 @@ export const commands: Commands = {
         name: 'pageSize',
         type: 'integer',
         description:
-          'Maximum number of messages to return. When omitted, returns all requests.',
+          'Maximum number of messages to return. When omitted, returns all messages.',
         required: false,
       },
       pageIdx: {
@@ -369,7 +376,7 @@ export const commands: Commands = {
     },
   },
   list_pages: {
-    description: 'Get a list of pages  open in the browser.',
+    description: 'Get a list of pages open in the browser.',
     category: 'Navigation automation',
     args: {},
   },
@@ -582,8 +589,8 @@ export const commands: Commands = {
   },
   take_memory_snapshot: {
     description:
-      'Capture a memory heapsnapshot of the currently selected page to memory leak debugging',
-    category: 'Performance',
+      'Capture a heap snapshot of the currently selected page. Use to analyze the memory distribution of JavaScript objects and debug memory leaks.',
+    category: 'Memory',
     args: {
       filePath: {
         name: 'filePath',
@@ -618,7 +625,7 @@ export const commands: Commands = {
         name: 'uid',
         type: 'string',
         description:
-          'The uid of an element on the page from the page content snapshot. If omitted takes a pages screenshot.',
+          'The uid of an element on the page from the page content snapshot. If omitted, takes a page screenshot.',
         required: false,
       },
       fullPage: {

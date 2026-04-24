@@ -35,7 +35,7 @@ export const screenshot = definePageTool({
       .string()
       .optional()
       .describe(
-        'The uid of an element on the page from the page content snapshot. If omitted takes a pages screenshot.',
+        'The uid of an element on the page from the page content snapshot. If omitted, takes a page screenshot.',
       ),
     fullPage: zod
       .boolean()
@@ -87,8 +87,12 @@ export const screenshot = definePageTool({
     }
 
     if (request.params.filePath) {
-      const file = await context.saveFile(screenshot, request.params.filePath);
-      response.appendResponseLine(`Saved screenshot to ${file.filename}.`);
+      const result = await context.saveFile(
+        screenshot,
+        request.params.filePath,
+        `.${format}`,
+      );
+      response.appendResponseLine(`Saved screenshot to ${result.filename}.`);
     } else if (screenshot.length >= 2_000_000) {
       const {filepath} = await context.saveTemporaryFile(
         screenshot,

@@ -10,6 +10,7 @@ import {before, describe, it} from 'node:test';
 import type {ParsedArguments} from '../../src/bin/chrome-devtools-mcp-cli-options.js';
 import {loadIssueDescriptions} from '../../src/issue-descriptions.js';
 import {McpResponse} from '../../src/McpResponse.js';
+import {TextSnapshot} from '../../src/TextSnapshot.js';
 import {DevTools} from '../../src/third_party/index.js';
 import {
   getConsoleMessage,
@@ -25,7 +26,7 @@ describe('console', () => {
   describe('list_console_messages', () => {
     it('list messages', async () => {
       await withMcpContext(async (response, context) => {
-        await listConsoleMessages.handler(
+        await listConsoleMessages().handler(
           {params: {}, page: context.getSelectedMcpPage()},
           response,
           context,
@@ -40,7 +41,7 @@ describe('console', () => {
         await page.pptrPage.setContent(
           '<script>console.error("This is an error")</script>',
         );
-        await listConsoleMessages.handler(
+        await listConsoleMessages().handler(
           {params: {}, page: context.getSelectedMcpPage()},
           response,
           context,
@@ -57,7 +58,7 @@ describe('console', () => {
         await page.pptrPage.setContent(
           '<script>console.error(new Error("This is an error"))</script>',
         );
-        await listConsoleMessages.handler(
+        await listConsoleMessages().handler(
           {params: {}, page: context.getSelectedMcpPage()},
           response,
           context,
@@ -72,7 +73,7 @@ describe('console', () => {
       await withMcpContext(async (response, context) => {
         const page = context.getSelectedMcpPage();
         await page.pptrPage.setContent('<script>throw undefined;</script>');
-        await listConsoleMessages.handler(
+        await listConsoleMessages().handler(
           {params: {}, page: context.getSelectedMcpPage()},
           response,
           context,
@@ -96,7 +97,7 @@ describe('console', () => {
             '<input type="text" name="username" />',
           );
           await issuePromise;
-          await listConsoleMessages.handler(
+          await listConsoleMessages().handler(
             {params: {}, page: context.getSelectedMcpPage()},
             response,
             context,
@@ -125,7 +126,7 @@ describe('console', () => {
             '<input type="text" name="username" />',
           );
           await issuePromise;
-          await listConsoleMessages.handler(
+          await listConsoleMessages().handler(
             {params: {}, page: context.getSelectedMcpPage()},
             response,
             context,
@@ -174,7 +175,7 @@ describe('console', () => {
           '<script>console.error("This is an error")</script>',
         );
         // The list is needed to populate the console messages in the context.
-        await listConsoleMessages.handler(
+        await listConsoleMessages().handler(
           {params: {}, page: context.getSelectedMcpPage()},
           response,
           context,
@@ -205,9 +206,9 @@ describe('console', () => {
           await page.pptrPage.setContent(
             '<input type="text" name="username" />',
           );
-          await context.createTextSnapshot(page);
+          page.textSnapshot = await TextSnapshot.create(page);
           await issuePromise;
-          await listConsoleMessages.handler(
+          await listConsoleMessages().handler(
             {params: {}, page: context.getSelectedMcpPage()},
             response,
             context,
@@ -250,7 +251,7 @@ describe('console', () => {
               });
             </script>
           `);
-          await context.createTextSnapshot(page);
+          page.textSnapshot = await TextSnapshot.create(page);
           await issuePromise;
           const messages = context.getConsoleData(page);
           let issueMsg;
@@ -263,7 +264,7 @@ describe('console', () => {
           assert.ok(issueMsg);
           const id = context.getConsoleMessageStableId(issueMsg);
           assert.ok(id);
-          await listConsoleMessages.handler(
+          await listConsoleMessages().handler(
             {params: {types: ['issue']}, page: context.getSelectedMcpPage()},
             response,
             context,
