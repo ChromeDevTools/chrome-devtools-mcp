@@ -7,7 +7,7 @@
   const SUB_PARTS = [
     { name: "Time to First Byte", key: "ttfb", target: 800 },
     { name: "Resource Load Delay", key: "loadDelay", targetPercent: 10 },
-    { name: "Resource Load Duration", key: "loadduration", targetPercent: 40 },
+    { name: "Resource Load Duration", key: "loadDuration", targetPercent: 40 },
     { name: "Element Render Delay", key: "renderDelay", targetPercent: 10 },
   ];
 
