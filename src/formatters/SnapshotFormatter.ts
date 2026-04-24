@@ -20,7 +20,7 @@ export class SnapshotFormatter {
 
     // Top-level content of the snapshot.
     if (
-      this.#snapshot.verbose &&
+      !this.#snapshot.verbose &&
       this.#snapshot.hasSelectedElement &&
       !this.#snapshot.selectedElementUid
     ) {
