@@ -231,9 +231,12 @@ export class TextSnapshot {
     };
 
     const findDescendantNodes = async (
-      backendNodeId: number,
+      backendNodeId?: number,
     ): Promise<Set<number>> => {
       const descendantIds = new Set<number>();
+      if (!backendNodeId) {
+        return descendantIds;
+      }
       try {
         // @ts-expect-error internal API
         const client = page.pptrPage._client();
@@ -297,6 +300,12 @@ export class TextSnapshot {
     if (extraHandles.length) {
       page.extraHandles = extraHandles;
     }
+    const reorgInfo: Array<{
+      extraNode: TextSnapshotNode;
+      attachTarget: TextSnapshotNode;
+      descendantIds: Set<number>;
+    }> = [];
+
     for (const handle of page.extraHandles) {
       const extraNode = await createExtraNode(handle);
       if (!extraNode) {
@@ -304,13 +313,13 @@ export class TextSnapshot {
       }
       idToNode.set(extraNode.id, extraNode);
       const attachTarget = (await findAncestorNode(handle)) || rootNodeWithId;
-      if (extraNode.backendNodeId !== undefined) {
-        const descendantIds = await findDescendantNodes(
-          extraNode.backendNodeId,
-        );
-        const index = moveChildNodes(attachTarget, extraNode, descendantIds);
-        attachTarget.children.splice(index, 0, extraNode);
-      }
+      const descendantIds = await findDescendantNodes(extraNode.backendNodeId);
+      reorgInfo.push({extraNode, attachTarget, descendantIds});
+    }
+
+    for (const {extraNode, attachTarget, descendantIds} of reorgInfo) {
+      const index = moveChildNodes(attachTarget, extraNode, descendantIds);
+      attachTarget.children.splice(index, 0, extraNode);
     }
   }
 }
