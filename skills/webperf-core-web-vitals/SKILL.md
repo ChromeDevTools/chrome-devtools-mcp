@@ -28,12 +28,12 @@ Scripts fall into two execution patterns:
 
 Run via `evaluate_script` and return structured JSON immediately from buffered performance data. The page must have already loaded.
 
-### Tracking (INP)
+### Measuring (INP)
 
 INP requires real user interactions to measure. The workflow is:
 
-1. Run `INP.js` via `evaluate_script` → returns `{ status: "tracking", getDataFn: "getINP" }`
-2. **Tell the user:** "INP tracking is now active. Please interact with the page — click buttons, open menus, fill form fields — then let me know when you're done."
+1. Run `INP.js` via `evaluate_script` → returns `{ status: "measuring", getDataFn: "getINP" }`
+2. **Tell the user:** "INP measuring is now active. Please interact with the page — click buttons, open menus, fill form fields — then let me know when you're done."
 3. Wait for the user to confirm they've interacted.
 4. Call `evaluate_script("getINP()")` to collect results.
 5. If `getINP()` returns `status: "error"` → the user has not interacted yet. Remind them and wait.
@@ -50,7 +50,7 @@ When the user asks for a comprehensive Core Web Vitals analysis or "audit CWV":
 1. **LCP.js** - Measure Largest Contentful Paint
 2. **CLS.js** - Measure Cumulative Layout Shift
 3. **INP.js** - Measure Interaction to Next Paint
-4. **LCP-Sub-Parts.js** - Break down LCP timing phases
+4. **LCP-Subparts.js** - Break down LCP timing phases
 5. **LCP-Trail.js** - Track LCP candidate evolution
 
 ### LCP Deep Dive
@@ -58,7 +58,7 @@ When the user asks for a comprehensive Core Web Vitals analysis or "audit CWV":
 When LCP is slow or the user asks "debug LCP" or "why is LCP slow":
 
 1. **LCP.js** - Establish baseline LCP value
-2. **LCP-Sub-Parts.js** - Break down into TTFB, resource load, render delay
+2. **LCP-Subparts.js** - Break down into TTFB, resource load, render delay
 3. **LCP-Trail.js** - Identify all LCP candidates and changes
 4. **LCP-Image-Entropy.js** - Check if LCP image has visual complexity issues
 5. **LCP-Video-Candidate.js** - Detect if LCP is a video (poster or video element)
@@ -77,7 +77,7 @@ When layout shifts are detected or the user asks "debug CLS" or "layout shift is
 
 When interactions feel slow or the user asks "debug INP" or "slow interactions":
 
-1. **INP.js** - Start tracking. Tell the user to interact with the page and confirm when done.
+1. **INP.js** - Start measuring. Tell the user to interact with the page and confirm when done.
 2. Call `getINP()` to collect results once the user confirms.
 3. Call `getINPDetails()` to see all interactions ranked by duration.
 4. **Interactions.js** (from `webperf-interaction` skill) - List all interactions with timing
@@ -91,7 +91,7 @@ When LCP is a video element (detected by LCP-Video-Candidate.js):
 
 1. **LCP-Video-Candidate.js** - Identify video as LCP candidate
 2. **Video-Element-Audit.js** (from Media skill) - Audit video loading strategy
-3. **LCP-Sub-Parts.js** - Analyze video loading phases
+3. **LCP-Subparts.js** - Analyze video loading phases
 4. Cross-reference with **webperf-loading** skill:
    - Resource-Hints-Validation.js (check for video preload)
    - Priority-Hints-Audit.js (check for fetchpriority on video)
@@ -101,7 +101,7 @@ When LCP is a video element (detected by LCP-Video-Candidate.js):
 When LCP is an image (most common case):
 
 1. **LCP.js** - Measure LCP timing
-2. **LCP-Sub-Parts.js** - Break down timing phases
+2. **LCP-Subparts.js** - Break down timing phases
 3. **LCP-Image-Entropy.js** - Analyze image complexity
 4. Cross-reference with **webperf-media** skill:
    - Image-Element-Audit.js (check format, dimensions, lazy loading)
@@ -122,7 +122,7 @@ Use this decision tree to automatically run follow-up snippets based on results:
 - **If LCP candidate is a video** → Run **LCP-Video-Candidate.js** and **webperf-media:Video-Element-Audit.js**
 - **Always run** → **LCP-Trail.js** to understand candidate evolution
 
-### After LCP-Sub-Parts.js
+### After LCP-Subparts.js
 
 - **If TTFB phase > 600ms** → Switch to **webperf-loading** skill and run TTFB-Sub-Parts.js
 - **If Resource Load Time > 1500ms** → Run:

@@ -39,7 +39,7 @@
   if (lowEntropyCount > 0) {
     issues.push({
       severity: "warning",
-      message: `${lowEntropyCount} image(s) have low entropy and are LCP-ineligible in Chrome 112+`,
+      message: `${lowEntropyCount} image(s) have low entropy and are not considered for LCP`,
     });
   }
   if (lcpImage?.isLowEntropy) {

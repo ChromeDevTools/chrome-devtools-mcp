@@ -7,7 +7,7 @@
   const SUB_PARTS = [
     { name: "Time to First Byte", key: "ttfb", target: 800 },
     { name: "Resource Load Delay", key: "loadDelay", targetPercent: 10 },
-    { name: "Resource Load Time", key: "loadTime", targetPercent: 40 },
+    { name: "Resource Load Duration", key: "loadduration", targetPercent: 40 },
     { name: "Element Render Delay", key: "renderDelay", targetPercent: 10 },
   ];
 
@@ -56,7 +56,7 @@
     const values = {
       ttfb,
       loadDelay: lcpRequestStart - ttfb,
-      loadTime: lcpResponseEnd - lcpRequestStart,
+      loadDuration: lcpResponseEnd - lcpRequestStart,
       renderDelay: total - lcpResponseEnd,
     };
     SUB_PARTS.forEach((part) => {
@@ -83,13 +83,13 @@
   const totalMs = Math.round(total);
   const ttfbVal = Math.round(ttfb);
   const loadDelayVal = Math.round(lcpRequestStart - ttfb);
-  const loadTimeVal = Math.round(lcpResponseEnd - lcpRequestStart);
+  const loadDurationVal = Math.round(lcpResponseEnd - lcpRequestStart);
   const renderDelayVal = Math.round(total - lcpResponseEnd);
 
   const slowestPhase = [
     { key: "ttfb", value: ttfbVal },
     { key: "resourceLoadDelay", value: loadDelayVal },
-    { key: "resourceLoadTime", value: loadTimeVal },
+    { key: "resourceLoadDuration", value: loadDurationVal },
     { key: "elementRenderDelay", value: renderDelayVal },
   ].reduce((a, b) => (a.value > b.value ? a : b)).key;
 
@@ -118,7 +118,7 @@
       subParts: {
         ttfb: { value: ttfbVal, percent: Math.round((ttfbVal / totalMs) * 100), overTarget: ttfbVal > 800 },
         resourceLoadDelay: { value: loadDelayVal, percent: Math.round((loadDelayVal / totalMs) * 100), overTarget: (loadDelayVal / totalMs) * 100 > 10 },
-        resourceLoadTime: { value: loadTimeVal, percent: Math.round((loadTimeVal / totalMs) * 100), overTarget: (loadTimeVal / totalMs) * 100 > 40 },
+        resourceLoadDuration: { value: loadDurationVal, percent: Math.round((loadDurationVal / totalMs) * 100), overTarget: (loadDurationVal / totalMs) * 100 > 40 },
         elementRenderDelay: { value: renderDelayVal, percent: Math.round((renderDelayVal / totalMs) * 100), overTarget: (renderDelayVal / totalMs) * 100 > 10 },
       },
       slowestPhase,

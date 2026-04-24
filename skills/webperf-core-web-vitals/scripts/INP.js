@@ -29,7 +29,7 @@
     const phases = { inputDelay: 0, processingTime: 0, presentationDelay: 0 };
     if (entry.processingStart && entry.processingEnd) {
       phases.inputDelay = entry.processingStart - entry.startTime;
-      phases.processingTime = entry.processingEnd - entry.processingStart;
+      phases.processingDuration = entry.processingEnd - entry.processingStart;
       phases.presentationDelay = entry.duration - phases.inputDelay - phases.processingTime;
     }
     return phases;
@@ -71,7 +71,7 @@
       details.worstEvent = inpEntry.formattedName;
       details.phases = {
         inputDelay: Math.round(inpEntry.phases.inputDelay),
-        processingTime: Math.round(inpEntry.phases.processingTime),
+        processingDuration: Math.round(inpEntry.phases.processingDuration),
         presentationDelay: Math.round(inpEntry.phases.presentationDelay),
       };
     }
@@ -116,8 +116,8 @@
 
   return {
     script: "INP",
-    status: "tracking",
-    message: "INP tracking active. Interact with the page then call getINP() for results.",
+    status: "measuring",
+    message: "INP measurement active. Interact with the page then call getINP() for results.",
     getDataFn: "getINP",
   };
 })();

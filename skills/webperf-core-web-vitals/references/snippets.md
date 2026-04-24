@@ -15,7 +15,7 @@ Quick check for Largest Contentful Paint, a Core Web Vital that measures loading
 ---
 ## Cumulative Layout Shift (CLS)
 
-Quick check for Cumulative Layout Shift, a Core Web Vital that measures visual stability. CLS tracks how much the page layout shifts unexpectedly during its lifetime, providing a single score that represents the cumulative impact of all unexpected layout shifts.
+Quick check for Cumulative Layout Shift, a Core Web Vital that measures visual stability. CLS tracks how much the page layout shifts unexpectedly during its lifetime, providing a single score that represents the worst batch impact of all unexpected layout shifts.
 
 **Script:** `scripts/CLS.js`
 
@@ -31,33 +31,33 @@ Quick check for Cumulative Layout Shift, a Core Web Vital that measures visual s
 ---
 ## Interaction to Next Paint (INP)
 
-Tracks Interaction to Next Paint, a Core Web Vital that measures responsiveness. INP evaluates how quickly a page responds to user interactions throughout the entire page visit, replacing First Input Delay (FID) as a Core Web Vital in March 2024.
+Tracks Interaction to Next Paint, a Core Web Vital that measures responsiveness. INP evaluates how quickly a page responds to user interactions throughout the entire page visit.
 
 **Script:** `scripts/INP.js`
 
-**Usage:** Run `INP.js` once to start tracking. It returns `status: "tracking"` immediately. After the user interacts with the page, call `getINP()` to retrieve the current INP value.
+**Usage:** Run `INP.js` once to start measuring. It returns `status: "measuring"` immediately. After the user interacts with the page, call `getINP()` to retrieve the current INP value.
 
 **Thresholds:**
 
 | Rating | Time | Meaning |
 |--------|------|---------|
-| 🟢 Good | ≤ 200ms | Responsive, feels instant |
+| 🟢 Good | ≤ 200ms | Responsive, feels responsive |
 | 🟡 Needs Improvement | ≤ 500ms | Noticeable delay |
 | 🔴 Poor | > 500ms | Slow, frustrating experience |
 ---
-## LCP Sub-Parts
+## LCP Subparts
 
 Breaks down Largest Contentful Paint into its four phases to identify optimization opportunities. Understanding which phase is slowest helps focus optimization efforts where they'll have the most impact.
 
-**Script:** `scripts/LCP-Sub-Parts.js`
+**Script:** `scripts/LCP-Subparts.js`
 
-**Sub-parts:**
+**Subparts:**
 
 | Phase | Target | Description |
 |-------|--------|-------------|
 | Time to First Byte (TTFB) | ≤ 800ms | Navigation start → first HTML byte |
 | Resource Load Delay | < 10% of LCP | TTFB → browser starts loading LCP resource |
-| Resource Load Time | ~40% of LCP | Time to download the LCP resource |
+| Resource Load Duration | ~40% of LCP | Time spent waiting for the downloading of the LCP resource |
 | Element Render Delay | < 10% of LCP | Resource downloaded → LCP element rendered |
 ---
 ## LCP Trail
