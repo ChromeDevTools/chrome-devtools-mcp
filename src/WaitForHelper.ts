@@ -196,3 +196,12 @@ export function getNetworkMultiplierFromString(
   }
   return 1;
 }
+
+export function appendNavigatedToUrl(
+  response: {appendResponseLine(value: string): void},
+  result: {navigatedToUrl?: string},
+): void {
+  if (result.navigatedToUrl) {
+    response.appendResponseLine(`Navigated to ${result.navigatedToUrl}`);
+  }
+}

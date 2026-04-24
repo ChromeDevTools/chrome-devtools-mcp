@@ -254,7 +254,7 @@ export type ContextPage = Readonly<{
   waitForEventsAfterAction(
     action: () => Promise<unknown>,
     options?: {timeout?: number; handleDialog?: 'accept' | 'dismiss' | string},
-  ): Promise<void>;
+  ): Promise<{navigatedToUrl?: string}>;
   getInPageTools(): ToolGroup<InPageToolDefinition> | undefined;
   executeInPageTool(
     toolName: string,

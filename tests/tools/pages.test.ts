@@ -535,6 +535,27 @@ describe('pages', () => {
       });
     });
 
+    it('reports final URL after navigation', async () => {
+      await withMcpContext(async (response, context) => {
+        await navigatePage().handler(
+          {
+            params: {url: 'data:text/html,<div>Hello</div>'},
+            page: context.getSelectedMcpPage(),
+          },
+          response,
+          context,
+        );
+        assert.ok(
+          response.responseLines[0]?.startsWith('Successfully navigated to '),
+          `Expected "Successfully navigated to" but got: ${response.responseLines[0]}`,
+        );
+        assert.ok(
+          response.responseLines[0]?.includes('data:text/html'),
+          `Expected URL in response but got: ${response.responseLines[0]}`,
+        );
+      });
+    });
+
     it('throws an error if the page was closed not by the MCP server', async () => {
       await withMcpContext(async (response, context) => {
         const page = await context.newPage();

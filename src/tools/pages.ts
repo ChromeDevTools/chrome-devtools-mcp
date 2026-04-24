@@ -201,6 +201,9 @@ export const newPage = defineTool(args => {
         request.params.timeout,
       );
 
+      response.appendResponseLine(
+        `Successfully navigated to ${page.pptrPage.url()}.`,
+      );
       response.setIncludePages(true);
       response.setListInPageTools();
     },
@@ -303,8 +306,9 @@ export const navigatePage = definePageTool(args => {
                 }
                 try {
                   await page.pptrPage.goto(request.params.url, options);
+                  const finalUrl = page.pptrPage.url();
                   response.appendResponseLine(
-                    `Successfully navigated to ${request.params.url}.`,
+                    `Successfully navigated to ${finalUrl}.`,
                   );
                 } catch (error) {
                   response.appendResponseLine(
