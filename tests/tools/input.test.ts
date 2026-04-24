@@ -130,6 +130,60 @@ describe('input', () => {
       });
     });
 
+    it('reports navigated URL after click', async () => {
+      server.addHtmlRoute('/nav-link', html`<a href="/nav-target">Go</a>`);
+      server.addHtmlRoute('/nav-target', html`<main>Target</main>`);
+
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedPptrPage();
+        await page.goto(server.getRoute('/nav-link'));
+        context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
+          context.getSelectedMcpPage(),
+        );
+        await click.handler(
+          {
+            params: {uid: '1_1'},
+            page: context.getSelectedMcpPage(),
+          },
+          response,
+          context,
+        );
+        assert.strictEqual(
+          response.responseLines[0],
+          'Successfully clicked on the element',
+        );
+        assert.strictEqual(
+          response.responseLines[1],
+          `Navigated to ${server.getRoute('/nav-target')}`,
+        );
+      });
+    });
+
+    it('does not report navigated URL when no navigation occurs', async () => {
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedPptrPage();
+        await page.setContent(
+          html`<button onclick="this.innerText = 'clicked';">test</button>`,
+        );
+        context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
+          context.getSelectedMcpPage(),
+        );
+        await click.handler(
+          {
+            params: {uid: '1_1'},
+            page: context.getSelectedMcpPage(),
+          },
+          response,
+          context,
+        );
+        assert.strictEqual(response.responseLines.length, 1);
+        assert.strictEqual(
+          response.responseLines[0],
+          'Successfully clicked on the element',
+        );
+      });
+    });
+
     it('waits for stable DOM', async () => {
       server.addHtmlRoute(
         '/unstable',

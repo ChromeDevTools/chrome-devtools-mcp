@@ -129,15 +129,18 @@ export class McpPage implements ContextPage {
     return new WaitForHelper(this.pptrPage, cpuMultiplier, networkMultiplier);
   }
 
-  waitForEventsAfterAction(
+  async waitForEventsAfterAction(
     action: () => Promise<unknown>,
     options?: {timeout?: number; handleDialog?: 'accept' | 'dismiss' | string},
-  ): Promise<void> {
+  ): Promise<{navigatedToUrl?: string}> {
+    const urlBefore = this.pptrPage.url();
     const helper = this.createWaitForHelper(
       this.cpuThrottlingRate,
       getNetworkMultiplierFromString(this.networkConditions),
     );
-    return helper.waitForEventsAfterAction(action, options);
+    await helper.waitForEventsAfterAction(action, options);
+    const urlAfter = this.pptrPage.url();
+    return urlAfter === urlBefore ? {} : {navigatedToUrl: urlAfter};
   }
 
   dispose(): void {
