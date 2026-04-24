@@ -52,7 +52,12 @@ export const LOCAL_FETCH_PATTERN = './locales/@LOCALE@.json';`;
   );
   fs.mkdirSync(codeMirrorDir, {recursive: true});
   const codeMirrorFile = path.join(codeMirrorDir, 'codemirror.next.js');
-  const codeMirrorContent = `export default {}`;
+  const codeMirrorContent = `
+export default {};
+export const cssStreamParser = () => Promise.resolve({ startState: () => ({}) });
+export class StringStream { constructor() {} }
+export const css = { cssLanguage: { parser: { parse: () => ({ topNode: { getChild: () => null } }) } } };
+`;
   writeFile(codeMirrorFile, codeMirrorContent);
 
   // Create root mock
@@ -61,7 +66,13 @@ export const LOCAL_FETCH_PATTERN = './locales/@LOCALE@.json';`;
   const runtimeFile = path.join(rootDir, 'Runtime.js');
   const runtimeContent = `
 export function getChromeVersion() { return ''; };
+export function getRemoteBase() { return null; };
 export const hostConfig = {};
+export const GdpProfilesEnterprisePolicyValue = {
+  ENABLED: 0,
+  ENABLED_WITHOUT_BADGES: 1,
+  DISABLED: 2,
+};
 export const Runtime = {
   isDescriptorEnabled: () => true,
   queryParam: () => null,
@@ -93,6 +104,33 @@ export const ExperimentName = {
 }
   `;
   writeFile(runtimeFile, runtimeContent);
+
+  // Copy missing CodeMirror .mjs files that tsc ignores due to .d.mts renames
+  const codemirrorDir = path.join(
+    BUILD_DIR,
+    devtoolsThirdPartyPath,
+    'codemirror',
+  );
+  const codemirrorSrcDir = path.join(
+    process.cwd(),
+    'node_modules',
+    'chrome-devtools-frontend',
+    'front_end',
+    'third_party',
+    'codemirror',
+  );
+  const filesToCopy = [
+    'package/addon/runmode/runmode-standalone.mjs',
+    'package/mode/css/css.mjs',
+    'package/mode/javascript/javascript.mjs',
+    'package/mode/xml/xml.mjs',
+  ];
+  for (const file of filesToCopy) {
+    const src = path.join(codemirrorSrcDir, file);
+    const dest = path.join(codemirrorDir, file);
+    fs.mkdirSync(path.dirname(dest), {recursive: true});
+    fs.copyFileSync(src, dest);
+  }
 
   copyDevToolsDescriptionFiles();
 }
