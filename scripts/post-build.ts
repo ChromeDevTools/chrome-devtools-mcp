@@ -106,8 +106,19 @@ export const ExperimentName = {
   writeFile(runtimeFile, runtimeContent);
 
   // Copy missing CodeMirror .mjs files that tsc ignores due to .d.mts renames
-  const codemirrorDir = path.join(BUILD_DIR, devtoolsThirdPartyPath, 'codemirror');
-  const codemirrorSrcDir = path.join(process.cwd(), 'node_modules', 'chrome-devtools-frontend', 'front_end', 'third_party', 'codemirror');
+  const codemirrorDir = path.join(
+    BUILD_DIR,
+    devtoolsThirdPartyPath,
+    'codemirror',
+  );
+  const codemirrorSrcDir = path.join(
+    process.cwd(),
+    'node_modules',
+    'chrome-devtools-frontend',
+    'front_end',
+    'third_party',
+    'codemirror',
+  );
   const filesToCopy = [
     'package/addon/runmode/runmode-standalone.mjs',
     'package/mode/css/css.mjs',
