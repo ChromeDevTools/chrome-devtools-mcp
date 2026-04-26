@@ -24,7 +24,8 @@ export type Commands = Record<
 >;
 export const commands: Commands = {
   click: {
-    description: 'Clicks on the provided element',
+    description:
+      'Clicks a page element such as a button, link, checkbox, or other interactive control. To choose an option from a native <select> element, use fill instead.',
     category: 'Input automation',
     args: {
       uid: {

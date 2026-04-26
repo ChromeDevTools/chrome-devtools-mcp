@@ -1,6 +1,6 @@
 <!-- AUTO GENERATED DO NOT EDIT - run 'npm run gen' to update-->
 
-# Chrome DevTools MCP Tool Reference (~7005 cl100k_base tokens)
+# Chrome DevTools MCP Tool Reference (~7033 cl100k_base tokens)
 
 - **[Input automation](#input-automation)** (9 tools)
   - [`click`](#click)
@@ -49,7 +49,7 @@
 
 ### `click`
 
-**Description:** Clicks on the provided element
+**Description:** Clicks a page element such as a button, link, checkbox, or other interactive control. To choose an option from a native &lt;select&gt; element, use [`fill`](#fill) instead.
 
 **Parameters:**
 
