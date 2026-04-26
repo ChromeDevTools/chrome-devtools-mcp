@@ -42,6 +42,49 @@ function handleActionError(error: unknown, uid: string) {
   );
 }
 
+async function selectNativeSelectOption(handle: ElementHandle<Element>) {
+  const selectHandle = await handle.evaluateHandle(node => {
+    if (!(node instanceof HTMLOptionElement)) {
+      return null;
+    }
+
+    const select = node.closest('select');
+    if (!select || select.multiple || select.disabled || node.disabled) {
+      return null;
+    }
+
+    const parentElement = node.parentElement;
+    if (
+      parentElement instanceof HTMLOptGroupElement &&
+      parentElement.disabled
+    ) {
+      return null;
+    }
+
+    return select;
+  });
+  try {
+    const select = selectHandle.asElement() as ElementHandle<Element> | null;
+    if (!select) {
+      return false;
+    }
+
+    const valueHandle = await handle.getProperty('value');
+    try {
+      const value = await valueHandle.jsonValue();
+      if (typeof value !== 'string') {
+        return false;
+      }
+      await select.asLocator().fill(value);
+    } finally {
+      void valueHandle.dispose();
+    }
+    return true;
+  } finally {
+    void selectHandle.dispose();
+  }
+}
+
 export const click = definePageTool({
   name: 'click',
   description: `Clicks on the provided element`,
@@ -62,8 +105,18 @@ export const click = definePageTool({
   handler: async (request, response) => {
     const uid = request.params.uid;
     const handle = await request.page.getElementByUid(uid);
+    const aXNode = request.page.getAXNodeByUid(uid);
+    const shouldSelectNativeOption =
+      !request.params.dblClick && aXNode?.role === 'option';
     try {
       await request.page.waitForEventsAfterAction(async () => {
+        if (
+          shouldSelectNativeOption &&
+          (await selectNativeSelectOption(handle))
+        ) {
+          return;
+        }
+
         await handle.asLocator().click({
           count: request.params.dblClick ? 2 : 1,
         });

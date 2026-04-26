@@ -226,6 +226,145 @@ describe('input', () => {
         assert.notStrictEqual(response.snapshotParams, undefined);
       });
     });
+
+    it('selects a collapsed native select option by option uid', async () => {
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedPptrPage();
+        await page.setContent(
+          html`<select onchange="document.body.dataset.selected = this.value">
+            <option value="v1">one</option>
+            <option value="v2">two</option>
+          </select>`,
+        );
+        const mcpPage = context.getSelectedMcpPage();
+        mcpPage.textSnapshot = await TextSnapshot.create(mcpPage);
+        const optionNode = [...mcpPage.textSnapshot.idToNode.values()].find(
+          node => node.role === 'option' && node.name === 'two',
+        );
+        assert.ok(optionNode);
+
+        await click.handler(
+          {
+            params: {
+              uid: optionNode.id,
+            },
+            page: mcpPage,
+          },
+          response,
+          context,
+        );
+
+        assert.strictEqual(
+          response.responseLines[0],
+          'Successfully clicked on the element',
+        );
+        assert.deepStrictEqual(
+          await page.evaluate(() => {
+            const select = document.querySelector('select');
+            return {
+              selectedValue: select?.value,
+              changeEventValue: document.body.dataset.selected,
+            };
+          }),
+          {
+            selectedValue: 'v2',
+            changeEventValue: 'v2',
+          },
+        );
+      });
+    });
+
+    it('selects a collapsed native optgroup option by option uid', async () => {
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedPptrPage();
+        await page.setContent(
+          html`<select onchange="document.body.dataset.selected = this.value">
+            <optgroup label="Numbers">
+              <option value="v1">one</option>
+              <option value="v2">two</option>
+            </optgroup>
+          </select>`,
+        );
+        const mcpPage = context.getSelectedMcpPage();
+        mcpPage.textSnapshot = await TextSnapshot.create(mcpPage);
+        const optionNode = [...mcpPage.textSnapshot.idToNode.values()].find(
+          node => node.role === 'option' && node.name === 'two',
+        );
+        assert.ok(optionNode);
+
+        await click.handler(
+          {
+            params: {
+              uid: optionNode.id,
+            },
+            page: mcpPage,
+          },
+          response,
+          context,
+        );
+
+        assert.strictEqual(
+          response.responseLines[0],
+          'Successfully clicked on the element',
+        );
+        assert.deepStrictEqual(
+          await page.evaluate(() => {
+            const select = document.querySelector('select');
+            return {
+              selectedValue: select?.value,
+              changeEventValue: document.body.dataset.selected,
+            };
+          }),
+          {
+            selectedValue: 'v2',
+            changeEventValue: 'v2',
+          },
+        );
+      });
+    });
+
+    it('clicks custom ARIA option elements through the normal click path', async () => {
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedPptrPage();
+        await page.setContent(
+          html`<div role="listbox">
+            <div
+              role="option"
+              tabindex="0"
+              onclick="document.body.dataset.clicked = this.textContent.trim()"
+            >
+              custom two
+            </div>
+          </div>`,
+        );
+        const mcpPage = context.getSelectedMcpPage();
+        mcpPage.textSnapshot = await TextSnapshot.create(mcpPage);
+        const optionNode = [...mcpPage.textSnapshot.idToNode.values()].find(
+          node => node.role === 'option' && node.name === 'custom two',
+        );
+        assert.ok(optionNode);
+
+        await click.handler(
+          {
+            params: {
+              uid: optionNode.id,
+            },
+            page: mcpPage,
+          },
+          response,
+          context,
+        );
+
+        assert.strictEqual(
+          response.responseLines[0],
+          'Successfully clicked on the element',
+        );
+        assert.strictEqual(
+          await page.evaluate(() => document.body.dataset.clicked),
+          'custom two',
+        );
+      });
+    });
   });
 
   describe('hover', () => {
