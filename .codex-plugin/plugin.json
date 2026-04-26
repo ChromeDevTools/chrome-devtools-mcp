@@ -1,0 +1,16 @@
+{
+  "name": "chrome-devtools-mcp",
+  "version": "0.1.0",
+  "description": "Chrome DevTools for coding agents",
+  "author": {
+    "name": "ChromeDevTools",
+    "url": "https://github.com/ChromeDevTools"
+  },
+  "homepage": "https://github.com/ChromeDevTools/chrome-devtools-mcp",
+  "repository": "https://github.com/ChromeDevTools/chrome-devtools-mcp",
+  "keywords": [
+    "mcp",
+    "codex"
+  ],
+  "mcpServers": "./.mcp.json"
+}

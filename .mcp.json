@@ -1,8 +1,10 @@
 {
   "mcpServers": {
-    "chrome-devtools": {
-      "command": "npx",
-      "args": ["chrome-devtools-mcp@latest"]
+    "chrome-devtools-mcp": {
+      "command": "node",
+      "args": [
+        "./build/src/bin/chrome-devtools-mcp.js"
+      ]
     }
   }
 }
