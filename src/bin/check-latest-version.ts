@@ -12,8 +12,11 @@ const cachePath = process.argv[2];
 
 if (cachePath) {
   try {
+    const registry =
+      process.env.npm_config_registry?.replace(/\/$/, '') ||
+      'https://registry.npmjs.org';
     const response = await fetch(
-      'https://registry.npmjs.org/chrome-devtools-mcp/latest',
+      `${registry}/chrome-devtools-mcp/latest`,
     );
     const data = response.ok ? await response.json() : null;
 
