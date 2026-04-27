@@ -34,9 +34,7 @@ in the DevTools Elements panel (if any).`,
       ),
   },
   handler: async (request, response, context) => {
-    if (request.params.filePath) {
-      context.validatePath(request.params.filePath);
-    }
+    context.validatePath(request.params.filePath);
     response.includeSnapshot({
       verbose: request.params.verbose ?? false,
       filePath: request.params.filePath,

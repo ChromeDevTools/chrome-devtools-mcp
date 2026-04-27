@@ -165,7 +165,10 @@ export class McpContext implements Context {
     this.#roots = roots;
   }
 
-  validatePath(filePath: string): void {
+  validatePath(filePath?: string): void {
+    if (filePath === undefined) {
+      return;
+    }
     const roots = this.roots();
     if (roots === undefined) {
       return;
@@ -676,7 +679,11 @@ export class McpContext implements Context {
   ): Promise<{filepath: string}> {
     const filepath = await getTempFilePath(filename);
     this.validatePath(filepath);
-    await fs.writeFile(filepath, data);
+    try {
+      await fs.writeFile(filepath, data);
+    } catch (err) {
+      throw new Error('Could not save a file', {cause: err});
+    }
     return {filepath};
   }
 
