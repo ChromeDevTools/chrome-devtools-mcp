@@ -16,7 +16,7 @@
     "typecheck": "tsc --noEmit",
     "format": "eslint --cache --fix . && prettier --write --cache .",
     "check-format": "eslint --cache . && prettier --check --cache .;",
-    "gen": "npm run build && npm run docs:generate && npm run cli:generate && npm run update-tool-call-metrics && npm run update-flag-usage-metrics && npm run format",
+    "gen": "npm run build && npm run docs:generate && npm run cli:generate && npm run update-metrics && npm run format",
     "docs:generate": "node --experimental-strip-types scripts/generate-docs.ts",
     "start": "npm run build && node build/src/index.js",
     "start-debug": "DEBUG=mcp:* DEBUG_COLORS=false npm run build && node build/src/index.js",
@@ -27,8 +27,7 @@
     "prepare": "node --experimental-strip-types scripts/prepare.ts",
     "verify-server-json-version": "node --experimental-strip-types scripts/verify-server-json-version.ts",
     "update-lighthouse": "node --experimental-strip-types scripts/update-lighthouse.ts",
-    "update-tool-call-metrics": "node --experimental-strip-types scripts/update_tool_call_metrics.ts",
-    "update-flag-usage-metrics": "node --experimental-strip-types scripts/update_flag_usage_metrics.ts",
+    "update-metrics": "node --experimental-strip-types scripts/update_metrics.ts",
     "verify-npm-package": "node scripts/verify-npm-package.mjs",
     "eval": "npm run build && node --experimental-strip-types scripts/eval_gemini.ts",
     "count-tokens": "node --experimental-strip-types scripts/count_tokens.ts"
