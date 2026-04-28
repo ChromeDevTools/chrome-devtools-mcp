@@ -7,6 +7,7 @@
 import {zod} from '../third_party/index.js';
 import type {Frame, JSHandle, Page, WebWorker} from '../third_party/index.js';
 import type {ExtensionServiceWorker} from '../types.js';
+import {appendNavigatedToUrl} from '../WaitForHelper.js';
 
 import {ToolCategory} from './categories.js';
 import type {Context, Response} from './ToolDefinition.js';
@@ -84,12 +85,15 @@ Example with arguments: \`(el) => {
         }
 
         const worker = await getWebWorker(context, serviceWorkerId);
-        await context.getSelectedMcpPage().waitForEventsAfterAction(
-          async () => {
-            await performEvaluation(worker, fnString, [], response);
-          },
-          {handleDialog: dialogAction ?? 'accept'},
-        );
+        const result = await context
+          .getSelectedMcpPage()
+          .waitForEventsAfterAction(
+            async () => {
+              await performEvaluation(worker, fnString, [], response);
+            },
+            {handleDialog: dialogAction ?? 'accept'},
+          );
+        appendNavigatedToUrl(response, result);
         return;
       }
 
@@ -109,12 +113,13 @@ Example with arguments: \`(el) => {
 
         const evaluatable = await getPageOrFrame(page, frames);
 
-        await mcpPage.waitForEventsAfterAction(
+        const result = await mcpPage.waitForEventsAfterAction(
           async () => {
             await performEvaluation(evaluatable, fnString, args, response);
           },
           {handleDialog: dialogAction ?? 'accept'},
         );
+        appendNavigatedToUrl(response, result);
       } finally {
         void Promise.allSettled(args.map(arg => arg.dispose()));
       }
