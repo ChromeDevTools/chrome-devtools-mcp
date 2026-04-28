@@ -24,11 +24,123 @@ import {
   ListRootsResultSchema,
   RootsListChangedNotificationSchema,
 } from './third_party/index.js';
-import {ToolCategory} from './tools/categories.js';
+import {
+  ToolCategory,
+  labels,
+  OFF_BY_DEFAULT_CATEGORIES,
+} from './tools/categories.js';
 import type {DefinedPageTool, ToolDefinition} from './tools/ToolDefinition.js';
 import {pageIdSchema} from './tools/ToolDefinition.js';
 import {createTools} from './tools/tools.js';
 import {VERSION} from './version.js';
+
+export const CONDITION_TO_FLAG: Record<string, string> = {
+  computerVision: 'experimentalVision',
+  experimentalMemory: 'experimentalMemory',
+  experimentalInteropTools: 'experimentalInteropTools',
+  screencast: 'experimentalScreencast',
+  experimentalWebmcp: 'experimentalWebmcp',
+};
+
+export function buildFlag(category: ToolCategory) {
+  return category === ToolCategory.IN_PAGE
+    ? 'categoryInPageTools'
+    : `category${category.charAt(0).toUpperCase() + category.slice(1)}`;
+}
+
+function buildDisabledMessage(
+  toolName: string,
+  flag: string,
+  categoryLabel?: string,
+): string {
+  const reason = categoryLabel
+    ? `is in category ${categoryLabel} which`
+    : `requires experimental feature ${flag} and`;
+
+  return `Tool ${toolName} ${reason} is currently disabled. Enable it by running chrome-devtools start ${flag}=true. For more information check the README.`;
+}
+
+function getCategoryStatus(
+  category: ToolCategory,
+  serverArgs: ReturnType<typeof parseArguments>,
+): {categoryFlag?: string; disabled: boolean} {
+  const categoryFlag = buildFlag(category);
+
+  const flagValue = serverArgs[categoryFlag];
+
+  const isDisabled = OFF_BY_DEFAULT_CATEGORIES.includes(category)
+    ? !flagValue
+    : flagValue === false;
+
+  if (isDisabled) {
+    return {
+      categoryFlag,
+      disabled: true,
+    };
+  }
+
+  return {
+    disabled: false,
+  };
+}
+
+function getConditionStatus(
+  condition: string,
+  serverArgs: ReturnType<typeof parseArguments>,
+): {conditionFlag?: string; disabled: boolean} {
+  const experimentalFlag = CONDITION_TO_FLAG[condition];
+  if (experimentalFlag && !serverArgs[experimentalFlag]) {
+    return {conditionFlag: experimentalFlag, disabled: true};
+  }
+
+  return {disabled: false};
+}
+
+function getToolStatusInfo(
+  tool: ToolDefinition | DefinedPageTool,
+  serverArgs: ReturnType<typeof parseArguments>,
+): {disabled: boolean; reason?: string} {
+  const category = tool.annotations.category;
+  const categoryCheck = getCategoryStatus(category, serverArgs);
+
+  if (category && categoryCheck.disabled) {
+    if (!categoryCheck.categoryFlag) {
+      throw new Error(
+        'when the category is disabled there should always be a flag set',
+      );
+    }
+
+    return {
+      disabled: true,
+      reason: buildDisabledMessage(
+        tool.name,
+        `--${categoryCheck.categoryFlag}`,
+        labels[category!],
+      ),
+    };
+  }
+
+  for (const condition of tool.annotations.conditions || []) {
+    const conditionCheck = getConditionStatus(condition, serverArgs);
+    if (conditionCheck.disabled) {
+      if (!conditionCheck.conditionFlag) {
+        throw new Error(
+          'when the condition is disabled there should always be a flag set',
+        );
+      }
+
+      return {
+        disabled: true,
+        reason: buildDisabledMessage(
+          tool.name,
+          `--${conditionCheck.conditionFlag}`,
+        ),
+      };
+    }
+  }
+
+  return {disabled: false};
+}
 
 export async function createMcpServer(
   serverArgs: ReturnType<typeof parseArguments>,
@@ -143,66 +255,15 @@ export async function createMcpServer(
   const toolMutex = new Mutex();
 
   function registerTool(tool: ToolDefinition | DefinedPageTool): void {
-    if (
-      tool.annotations.category === ToolCategory.EMULATION &&
-      serverArgs.categoryEmulation === false
-    ) {
+    const {disabled, reason: disabledReason} = getToolStatusInfo(
+      tool,
+      serverArgs,
+    );
+
+    if (disabled && !serverArgs.viaCli) {
       return;
     }
-    if (
-      tool.annotations.category === ToolCategory.PERFORMANCE &&
-      serverArgs.categoryPerformance === false
-    ) {
-      return;
-    }
-    if (
-      tool.annotations.category === ToolCategory.NETWORK &&
-      serverArgs.categoryNetwork === false
-    ) {
-      return;
-    }
-    if (
-      tool.annotations.category === ToolCategory.EXTENSIONS &&
-      serverArgs.categoryExtensions === false
-    ) {
-      return;
-    }
-    if (
-      tool.annotations.category === ToolCategory.IN_PAGE &&
-      !serverArgs.categoryInPageTools
-    ) {
-      return;
-    }
-    if (
-      tool.annotations.conditions?.includes('computerVision') &&
-      !serverArgs.experimentalVision
-    ) {
-      return;
-    }
-    if (
-      tool.annotations.conditions?.includes('experimentalMemory') &&
-      !serverArgs.experimentalMemory
-    ) {
-      return;
-    }
-    if (
-      tool.annotations.conditions?.includes('experimentalInteropTools') &&
-      !serverArgs.experimentalInteropTools
-    ) {
-      return;
-    }
-    if (
-      tool.annotations.conditions?.includes('screencast') &&
-      !serverArgs.experimentalScreencast
-    ) {
-      return;
-    }
-    if (
-      tool.annotations.conditions?.includes('experimentalWebmcp') &&
-      !serverArgs.experimentalWebmcp
-    ) {
-      return;
-    }
+
     const schema =
       'pageScoped' in tool &&
       tool.pageScoped &&
@@ -219,6 +280,18 @@ export async function createMcpServer(
         annotations: tool.annotations,
       },
       async (params): Promise<CallToolResult> => {
+        if (disabledReason) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: disabledReason,
+              },
+            ],
+            isError: true,
+          };
+        }
+
         const guard = await toolMutex.acquire();
         const startTime = Date.now();
         let success = false;

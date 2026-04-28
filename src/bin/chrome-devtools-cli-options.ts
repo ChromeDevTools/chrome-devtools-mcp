@@ -49,6 +49,38 @@ export const commands: Commands = {
       },
     },
   },
+  click_at: {
+    description:
+      'Clicks at the provided coordinates (requires flag: --experimentalVision=true)',
+    category: 'Input automation',
+    args: {
+      x: {
+        name: 'x',
+        type: 'number',
+        description: 'The x coordinate',
+        required: true,
+      },
+      y: {
+        name: 'y',
+        type: 'number',
+        description: 'The y coordinate',
+        required: true,
+      },
+      dblClick: {
+        name: 'dblClick',
+        type: 'boolean',
+        description: 'Set to true for double clicks. Default is false.',
+        required: false,
+      },
+      includeSnapshot: {
+        name: 'includeSnapshot',
+        type: 'boolean',
+        description:
+          'Whether to include a snapshot in the response. Default is false.',
+        required: false,
+      },
+    },
+  },
   close_page: {
     description:
       'Closes the page by its index. The last open page cannot be closed.',
@@ -164,6 +196,26 @@ export const commands: Commands = {
       },
     },
   },
+  execute_webmcp_tool: {
+    description:
+      'Executes a WebMCP tool exposed by the page. (requires flag: --experimentalWebmcp=true)',
+    category: 'Debugging',
+    args: {
+      toolName: {
+        name: 'toolName',
+        type: 'string',
+        description: 'The name of the WebMCP tool to execute',
+        required: true,
+      },
+      input: {
+        name: 'input',
+        type: 'string',
+        description:
+          'The JSON-stringified parameters to pass to the WebMCP tool',
+        required: false,
+      },
+    },
+  },
   fill: {
     description:
       'Type text into an input, text area or select an option from a <select> element.',
@@ -205,6 +257,31 @@ export const commands: Commands = {
       },
     },
   },
+  get_memory_snapshot_details: {
+    description:
+      'Loads a memory heapsnapshot and returns all available information including statistics, static data, and aggregated node information. Supports pagination for aggregates. (requires flag: --experimentalMemory=true)',
+    category: 'Memory',
+    args: {
+      filePath: {
+        name: 'filePath',
+        type: 'string',
+        description: 'A path to a .heapsnapshot file to read.',
+        required: true,
+      },
+      pageIdx: {
+        name: 'pageIdx',
+        type: 'number',
+        description: 'The page index for pagination of aggregates.',
+        required: false,
+      },
+      pageSize: {
+        name: 'pageSize',
+        type: 'number',
+        description: 'The page size for pagination of aggregates.',
+        required: false,
+      },
+    },
+  },
   get_network_request: {
     description:
       'Gets a network request by an optional reqid, if omitted returns the currently selected request in the DevTools Network panel.',
@@ -229,6 +306,38 @@ export const commands: Commands = {
         type: 'string',
         description:
           'The absolute or relative path to a .network-response file to save the response body to. If omitted, the body is returned inline.',
+        required: false,
+      },
+    },
+  },
+  get_nodes_by_class: {
+    description:
+      'Loads a memory heapsnapshot and returns instances of a specific class with their stable IDs. (requires flag: --experimentalMemory=true)',
+    category: 'Memory',
+    args: {
+      filePath: {
+        name: 'filePath',
+        type: 'string',
+        description: 'A path to a .heapsnapshot file to read.',
+        required: true,
+      },
+      uid: {
+        name: 'uid',
+        type: 'number',
+        description:
+          'The unique UID for the class, obtained from aggregates listing.',
+        required: true,
+      },
+      pageIdx: {
+        name: 'pageIdx',
+        type: 'number',
+        description: 'The page index for pagination.',
+        required: false,
+      },
+      pageSize: {
+        name: 'pageSize',
+        type: 'number',
+        description: 'The page size for pagination.',
         required: false,
       },
     },
@@ -270,6 +379,19 @@ export const commands: Commands = {
         description:
           'Whether to include a snapshot in the response. Default is false.',
         required: false,
+      },
+    },
+  },
+  install_extension: {
+    description:
+      'Installs a Chrome extension from the given path. (requires flag: --categoryExtensions=true)',
+    category: 'Extensions',
+    args: {
+      path: {
+        name: 'path',
+        type: 'string',
+        description: 'Absolute path to the unpacked extension folder.',
+        required: true,
       },
     },
   },
@@ -339,6 +461,12 @@ export const commands: Commands = {
       },
     },
   },
+  list_extensions: {
+    description:
+      'Lists all the Chrome extensions installed in the browser. This includes their name, ID, version, and enabled status. (requires flag: --categoryExtensions=true)',
+    category: 'Extensions',
+    args: {},
+  },
   list_network_requests: {
     description:
       'List all requests for the currently selected page since the last navigation.',
@@ -379,6 +507,25 @@ export const commands: Commands = {
     description: 'Get a list of pages open in the browser.',
     category: 'Navigation automation',
     args: {},
+  },
+  list_webmcp_tools: {
+    description:
+      'Lists all WebMCP tools the page exposes. (requires flag: --experimentalWebmcp=true)',
+    category: 'Debugging',
+    args: {},
+  },
+  load_memory_snapshot: {
+    description:
+      'Loads a memory heapsnapshot and returns snapshot summary stats. (requires flag: --experimentalMemory=true)',
+    category: 'Memory',
+    args: {
+      filePath: {
+        name: 'filePath',
+        type: 'string',
+        description: 'A path to a .heapsnapshot file to read.',
+        required: true,
+      },
+    },
   },
   navigate_page: {
     description:
@@ -549,6 +696,19 @@ export const commands: Commands = {
       },
     },
   },
+  reload_extension: {
+    description:
+      'Reloads an unpacked Chrome extension by its ID. (requires flag: --categoryExtensions=true)',
+    category: 'Extensions',
+    args: {
+      id: {
+        name: 'id',
+        type: 'string',
+        description: 'ID of the extension to reload.',
+        required: true,
+      },
+    },
+  },
   resize_page: {
     description:
       "Resizes the selected page's window so that the page has specified dimension",
@@ -567,6 +727,26 @@ export const commands: Commands = {
         required: true,
       },
     },
+  },
+  screencast_start: {
+    description:
+      'Starts recording a screencast (video) of the selected page in specified format. (requires flag: --experimentalScreencast=true)',
+    category: 'Debugging',
+    args: {
+      filePath: {
+        name: 'filePath',
+        type: 'string',
+        description:
+          'Output file path (.webm,.mp4 are supported). Uses mkdtemp to generate a unique path if not provided.',
+        required: false,
+      },
+    },
+  },
+  screencast_stop: {
+    description:
+      'Stops the active screencast recording on the selected page. (requires flag: --experimentalScreencast=true)',
+    category: 'Debugging',
+    args: {},
   },
   select_page: {
     description: 'Select a page as a context for future tool calls.',
@@ -665,6 +845,19 @@ export const commands: Commands = {
       },
     },
   },
+  trigger_extension_action: {
+    description:
+      'Triggers the default action of an extension by its ID. (requires flag: --categoryExtensions=true)',
+    category: 'Extensions',
+    args: {
+      id: {
+        name: 'id',
+        type: 'string',
+        description: 'ID of the extension to trigger the action for.',
+        required: true,
+      },
+    },
+  },
   type_text: {
     description: 'Type text using keyboard into a previously focused input',
     category: 'Input automation',
@@ -681,6 +874,19 @@ export const commands: Commands = {
         description:
           'Optional key to press after typing. E.g., "Enter", "Tab", "Escape"',
         required: false,
+      },
+    },
+  },
+  uninstall_extension: {
+    description:
+      'Uninstalls a Chrome extension by its ID. (requires flag: --categoryExtensions=true)',
+    category: 'Extensions',
+    args: {
+      id: {
+        name: 'id',
+        type: 'string',
+        description: 'ID of the extension to uninstall.',
+        required: true,
       },
     },
   },

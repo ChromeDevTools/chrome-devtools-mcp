@@ -11,7 +11,12 @@ import {Client} from '@modelcontextprotocol/sdk/client/index.js';
 import {StdioClientTransport} from '@modelcontextprotocol/sdk/client/stdio.js';
 
 import {parseArguments} from '../build/src/bin/chrome-devtools-mcp-cli-options.js';
-import {labels} from '../build/src/tools/categories.js';
+import {CONDITION_TO_FLAG, buildFlag} from '../build/src/index.js';
+import {
+  labels,
+  ToolCategory,
+  OFF_BY_DEFAULT_CATEGORIES,
+} from '../build/src/tools/categories.js';
 import {createTools} from '../build/src/tools/tools.js';
 
 const OUTPUT_PATH = path.join(
@@ -29,7 +34,7 @@ async function fetchTools() {
 
   const transport = new StdioClientTransport({
     command: 'node',
-    args: [serverPath],
+    args: [serverPath, '--viaCli'],
     env: {...process.env, CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true'},
   });
 
@@ -103,6 +108,15 @@ function schemaToCLIOptions(schema: JsonSchema): CliOption[] {
 async function generateCli() {
   const tools = await fetchTools();
 
+  const staticTools = createTools(parseArguments());
+  const toolNameToCategoryEnum = new Map<string, string>();
+  const toolNameToConditions = new Map<string, string[]>();
+
+  for (const tool of staticTools) {
+    toolNameToCategoryEnum.set(tool.name, tool.annotations.category);
+    toolNameToConditions.set(tool.name, tool.annotations.conditions || []);
+  }
+
   // Sort tools by name
   const sortedTools = tools
     .sort((a, b) => a.name.localeCompare(b.name))
@@ -117,17 +131,16 @@ async function generateCli() {
       if (tool.name === 'wait_for') {
         return false;
       }
+      // Skipping get_tab_id as it is for internal integrations
+      if (tool.name === 'get_tab_id') {
+        return false;
+      }
+      // Skipping in_page tools as they are not launched yet
+      if (toolNameToCategoryEnum.get(tool.name) === ToolCategory.IN_PAGE) {
+        return false;
+      }
       return true;
     });
-
-  const staticTools = createTools(parseArguments());
-  const toolNameToCategory = new Map<string, string>();
-  for (const tool of staticTools) {
-    toolNameToCategory.set(
-      tool.name,
-      labels[tool.annotations.category as keyof typeof labels],
-    );
-  }
 
   const commands: Record<
     string,
@@ -140,15 +153,40 @@ async function generateCli() {
     for (const opt of options) {
       args[opt.name] = opt;
     }
-    const category = toolNameToCategory.get(tool.name);
-    if (!category) {
+
+    const categoryEnum = toolNameToCategoryEnum.get(tool.name);
+    if (!categoryEnum) {
       throw new Error(`Tool ${tool.name} has no category.`);
     }
+    const category = labels[categoryEnum as unknown as keyof typeof labels];
     if (!tool.description) {
-      throw new Error(`Tool ${tool.name} is missing descripttion`);
+      throw new Error(`Tool ${tool.name} is missing description`);
     }
+
+    let description = tool.description;
+    const requiredFlags: string[] = [];
+
+    const isOffByDefault = OFF_BY_DEFAULT_CATEGORIES.includes(categoryEnum);
+    if (isOffByDefault) {
+      const categoryFlag = buildFlag(categoryEnum);
+      requiredFlags.push(`--${categoryFlag}=true`);
+    }
+
+    const conditions = toolNameToConditions.get(tool.name) || [];
+    for (const condition of conditions) {
+      const flag =
+        CONDITION_TO_FLAG[condition as keyof typeof CONDITION_TO_FLAG];
+      if (flag) {
+        requiredFlags.push(`--${flag}=true`);
+      }
+    }
+
+    if (requiredFlags.length > 0) {
+      description += ` (requires flag: ${requiredFlags.join(', ')})`;
+    }
+
     commands[tool.name] = {
-      description: tool.description,
+      description,
       category,
       args,
     };
