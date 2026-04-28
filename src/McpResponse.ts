@@ -9,6 +9,7 @@ import type {WebMCPTool} from 'puppeteer-core';
 import type {ParsedArguments} from './bin/chrome-devtools-mcp-cli-options.js';
 import {ConsoleFormatter} from './formatters/ConsoleFormatter.js';
 import {HeapSnapshotFormatter} from './formatters/HeapSnapshotFormatter.js';
+import {isNodeLike} from './formatters/HeapSnapshotFormatter.js';
 import {IssueFormatter} from './formatters/IssueFormatter.js';
 import {NetworkFormatter} from './formatters/NetworkFormatter.js';
 import {SnapshotFormatter} from './formatters/SnapshotFormatter.js';
@@ -945,8 +946,12 @@ Call ${handleDialog.name} to handle it before continuing.`);
       }
       const nodes = this.#heapSnapshotOptions.nodes;
       if (nodes) {
+        const sortedItems = nodes.items
+          .filter(isNodeLike)
+          .sort((a, b) => b.retainedSize - a.retainedSize);
+
         const paginationData = this.#dataWithPagination(
-          nodes.items,
+          sortedItems,
           this.#heapSnapshotOptions.pagination,
         );
 
