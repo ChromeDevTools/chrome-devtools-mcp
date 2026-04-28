@@ -101,7 +101,7 @@ async function runSingleScenario(
     // Path to the compiled MCP server
     const serverPath = path.join(
       ROOT_DIR,
-      'build/src/bin/chrome-devtools-mcp.js',
+      'build/src/bin/brave-devtools-mcp.js',
     );
     if (!fs.existsSync(serverPath)) {
       throw new Error(

@@ -28,7 +28,7 @@ async function measureServer(args: string[]) {
   // 1. Connect to your actual MCP server
   const transport = new StdioClientTransport({
     command: 'node',
-    args: ['./build/src/bin/chrome-devtools-mcp.js', ...args], // Point to your built MCP server
+    args: ['./build/src/bin/brave-devtools-mcp.js', ...args], // Point to your built MCP server
   });
 
   const client = new Client(

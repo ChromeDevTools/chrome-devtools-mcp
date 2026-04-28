@@ -31,8 +31,8 @@ describe('checkForUpdates', () => {
     resetUpdateCheckFlagForTesting();
   });
 
-  it('does nothing if CHROME_DEVTOOLS_MCP_NO_UPDATE_CHECKS is set', async () => {
-    process.env['CHROME_DEVTOOLS_MCP_NO_UPDATE_CHECKS'] = 'true';
+  it('does nothing if BRAVE_DEVTOOLS_MCP_NO_UPDATE_CHECKS is set', async () => {
+    process.env['BRAVE_DEVTOOLS_MCP_NO_UPDATE_CHECKS'] = 'true';
 
     const warnStub = sinon.stub(console, 'warn');
     const spawnStub = sinon.stub(child_process, 'spawn');
@@ -46,7 +46,7 @@ describe('checkForUpdates', () => {
     assert.ok(readFileStub.notCalled);
     assert.ok(statStub.notCalled);
 
-    delete process.env['CHROME_DEVTOOLS_MCP_NO_UPDATE_CHECKS'];
+    delete process.env['BRAVE_DEVTOOLS_MCP_NO_UPDATE_CHECKS'];
   });
 
   it('notifies if cache exists and version is different', async () => {

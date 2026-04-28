@@ -9,7 +9,7 @@ import {describe, it, afterEach} from 'node:test';
 
 import sinon from 'sinon';
 
-import type {ParsedArguments} from '../../src/bin/chrome-devtools-mcp-cli-options.js';
+import type {ParsedArguments} from '../../src/bin/brave-devtools-mcp-cli-options.js';
 import {startScreencast, stopScreencast} from '../../src/tools/screencast.js';
 import {withMcpContext} from '../utils.js';
 

@@ -20,11 +20,11 @@ const OUTPUT_PATH = path.join(
 );
 
 async function fetchTools() {
-  console.log('Connecting to chrome-devtools-mcp to fetch tools...');
+  console.log('Connecting to brave-devtools-mcp to fetch tools...');
   // Use the local build of the server
   const serverPath = path.join(
     import.meta.dirname,
-    '../build/src/bin/chrome-devtools-mcp.js',
+    '../build/src/bin/brave-devtools-mcp.js',
   );
 
   const transport = new StdioClientTransport({
