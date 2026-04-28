@@ -98,6 +98,24 @@ If you are interested in doing only basic browser tasks, use the `--slim` mode:
 
 See [Slim tool reference](./docs/slim-tool-reference.md).
 
+### Docker
+
+Build and run the MCP server in a container:
+
+```bash
+docker build -t chrome-devtools-mcp .
+docker run --rm -i chrome-devtools-mcp
+```
+
+The container image installs Google Chrome and starts the MCP server in headless
+mode by default. The bundled command also includes `--no-sandbox` and
+`--disable-dev-shm-usage`, which are commonly needed in containerized
+environments. Extra CLI flags can be appended to `docker run`, for example:
+
+```bash
+docker run --rm -i chrome-devtools-mcp --log-file=/tmp/chrome-devtools.log
+```
+
 ### MCP Client configuration
 
 <details>
