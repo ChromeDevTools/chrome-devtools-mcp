@@ -167,9 +167,10 @@ export type SupportedExtensions =
   | '.json.gz';
 
 /**
- * Only add methods required by tools/*.
+ * Only add methods used by tools/*.
  */
 export type Context = Readonly<{
+  validatePath(filePath?: string): void;
   isRunningPerformanceTrace(): boolean;
   setIsRunningPerformanceTrace(x: boolean): void;
   isCruxEnabled(): boolean;
@@ -244,6 +245,9 @@ export type Context = Readonly<{
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange>;
 }>;
 
+/**
+ * Only add methods used by tools/*.
+ */
 export type ContextPage = Readonly<{
   readonly pptrPage: Page;
   getAXNodeByUid(uid: string): TextSnapshotNode | undefined;

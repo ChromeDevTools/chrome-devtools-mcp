@@ -11,7 +11,7 @@ import net from 'node:net';
 import {logger} from '../logger.js';
 import type {CallToolResult} from '../third_party/index.js';
 import {PipeTransport} from '../third_party/index.js';
-import {saveTemporaryFile} from '../utils/files.js';
+import {getTempFilePath} from '../utils/files.js';
 
 import type {DaemonMessage, DaemonResponse} from './types.js';
 import {
@@ -179,7 +179,8 @@ export async function handleResponse(
       }
       const data = Buffer.from(imageData, 'base64');
       const name = crypto.randomUUID();
-      const {filepath} = await saveTemporaryFile(data, `${name}${extension}`);
+      const filepath = await getTempFilePath(`${name}${extension}`);
+      fs.writeFileSync(filepath, data);
       chunks.push(`Saved to ${filepath}.`);
     } else {
       throw new Error('Not supported response content type');

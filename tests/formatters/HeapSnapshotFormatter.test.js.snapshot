@@ -1,4 +1,4 @@
-exports[`HeapSnapshotFormatter > toString > formats data as CSV and sorts by self size 1`] = `
+exports[`HeapSnapshotFormatter > toString > formats data as CSV and sorts by retained size 1`] = `
 uid,className,count,selfSize,maxRetainedSize
 1,"ObjectA",10,100,1000
 2,"ObjectB",5,50,500

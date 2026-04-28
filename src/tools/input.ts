@@ -365,8 +365,9 @@ export const uploadFile = definePageTool({
     filePath: zod.string().describe('The local path of the file to upload'),
     includeSnapshot: includeSnapshotSchema,
   },
-  handler: async (request, response) => {
+  handler: async (request, response, context) => {
     const {uid, filePath} = request.params;
+    context.validatePath(filePath);
     const handle = (await request.page.getElementByUid(
       uid,
     )) as ElementHandle<HTMLInputElement>;

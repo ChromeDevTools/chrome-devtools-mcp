@@ -51,6 +51,7 @@ export const screenshot = definePageTool({
       ),
   },
   handler: async (request, response, context) => {
+    context.validatePath(request.params.filePath);
     if (request.params.uid && request.params.fullPage) {
       throw new Error('Providing both "uid" and "fullPage" is not allowed.');
     }

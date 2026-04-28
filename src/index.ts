@@ -21,6 +21,8 @@ import {
   McpServer,
   type CallToolResult,
   SetLevelRequestSchema,
+  ListRootsResultSchema,
+  RootsListChangedNotificationSchema,
 } from './third_party/index.js';
 import {ToolCategory} from './tools/categories.js';
 import type {DefinedPageTool, ToolDefinition} from './tools/ToolDefinition.js';
@@ -57,10 +59,34 @@ export async function createMcpServer(
     return {};
   });
 
+  const updateRoots = async () => {
+    if (!server.server.getClientCapabilities()?.roots) {
+      return;
+    }
+    try {
+      const roots = await server.server.request(
+        {method: 'roots/list'},
+        ListRootsResultSchema,
+      );
+      context?.setRoots(roots.roots);
+    } catch (e) {
+      logger('Failed to list roots', e);
+    }
+  };
+
   server.server.oninitialized = () => {
     const clientName = server.server.getClientVersion()?.name;
     if (clientName) {
       clearcutLogger?.setClientName(clientName);
+    }
+    if (server.server.getClientCapabilities()?.roots) {
+      void updateRoots();
+      server.server.setNotificationHandler(
+        RootsListChangedNotificationSchema,
+        () => {
+          void updateRoots();
+        },
+      );
     }
   };
 
@@ -109,6 +135,7 @@ export async function createMcpServer(
         experimentalIncludeAllPages: serverArgs.experimentalIncludeAllPages,
         performanceCrux: serverArgs.performanceCrux,
       });
+      await updateRoots();
     }
     return context;
   }
@@ -205,31 +232,35 @@ export async function createMcpServer(
             : new McpResponse(serverArgs);
 
           response.setRedactNetworkHeaders(serverArgs.redactNetworkHeaders);
-          if ('pageScoped' in tool && tool.pageScoped) {
-            const page =
-              serverArgs.experimentalPageIdRouting &&
-              params.pageId &&
-              !serverArgs.slim
-                ? context.getPageById(params.pageId)
-                : context.getSelectedMcpPage();
-            response.setPage(page);
-            await tool.handler(
-              {
-                params,
-                page,
-              },
-              response,
-              context,
-            );
-          } else {
-            await tool.handler(
-              // @ts-expect-error types do not match.
-              {
-                params,
-              },
-              response,
-              context,
-            );
+          try {
+            if ('pageScoped' in tool && tool.pageScoped) {
+              const page =
+                serverArgs.experimentalPageIdRouting &&
+                params.pageId &&
+                !serverArgs.slim
+                  ? context.getPageById(params.pageId)
+                  : context.getSelectedMcpPage();
+              response.setPage(page);
+              await tool.handler(
+                {
+                  params,
+                  page,
+                },
+                response,
+                context,
+              );
+            } else {
+              await tool.handler(
+                // @ts-expect-error types do not match.
+                {
+                  params,
+                },
+                response,
+                context,
+              );
+            }
+          } catch (err) {
+            response.setError(err);
           }
           const {content, structuredContent} = await response.handle(
             tool.name,
@@ -240,6 +271,9 @@ export async function createMcpServer(
           } = {
             content,
           };
+          if (response.error) {
+            result.isError = true;
+          }
           success = true;
           if (serverArgs.experimentalStructuredContent) {
             result.structuredContent = structuredContent as Record<

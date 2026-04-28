@@ -16,7 +16,7 @@ export interface FormattedSnapshotEntry {
   retainedSize: number;
 }
 
-function isNodeLike(
+export function isNodeLike(
   item: unknown,
 ): item is DevTools.HeapSnapshotModel.HeapSnapshotModel.Node {
   return (
@@ -55,7 +55,7 @@ export class HeapSnapshotFormatter {
   }
 
   #getSortedAggregates(): AggregatedInfoWithUid[] {
-    return Object.values(this.#aggregates).sort((a, b) => b.self - a.self);
+    return Object.values(this.#aggregates).sort((a, b) => b.maxRet - a.maxRet);
   }
 
   toString(): string {
@@ -92,6 +92,6 @@ export class HeapSnapshotFormatter {
   ): Array<
     [string, DevTools.HeapSnapshotModel.HeapSnapshotModel.AggregatedInfo]
   > {
-    return Object.entries(aggregates).sort((a, b) => b[1].self - a[1].self);
+    return Object.entries(aggregates).sort((a, b) => b[1].maxRet - a[1].maxRet);
   }
 }
