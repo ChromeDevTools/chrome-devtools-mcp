@@ -42,9 +42,38 @@ function handleActionError(error: unknown, uid: string) {
   );
 }
 
+async function selectNativeSelectOption(handle: ElementHandle<Element>) {
+  return await handle.evaluate(node => {
+    if (!(node instanceof HTMLOptionElement)) {
+      return false;
+    }
+
+    const select = node.closest('select');
+    if (!select || select.multiple || select.disabled || node.disabled) {
+      return false;
+    }
+
+    const parentElement = node.parentElement;
+    if (
+      parentElement instanceof HTMLOptGroupElement &&
+      parentElement.disabled
+    ) {
+      return false;
+    }
+
+    const wasSelected = node.selected;
+    node.selected = true;
+    if (!wasSelected) {
+      select.dispatchEvent(new Event('input', {bubbles: true}));
+      select.dispatchEvent(new Event('change', {bubbles: true}));
+    }
+    return true;
+  });
+}
+
 export const click = definePageTool({
   name: 'click',
-  description: `Clicks on the provided element`,
+  description: `Clicks a page element such as a button, link, checkbox, or other interactive control. To choose an option from a native <select> element, use fill instead.`,
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
@@ -61,8 +90,18 @@ export const click = definePageTool({
   handler: async (request, response) => {
     const uid = request.params.uid;
     const handle = await request.page.getElementByUid(uid);
+    const aXNode = request.page.getAXNodeByUid(uid);
+    const shouldSelectNativeOption =
+      !request.params.dblClick && aXNode?.role === 'option';
     try {
       await request.page.waitForEventsAfterAction(async () => {
+        if (
+          shouldSelectNativeOption &&
+          (await selectNativeSelectOption(handle))
+        ) {
+          return;
+        }
+
         await handle.asLocator().click({
           count: request.params.dblClick ? 2 : 1,
         });
