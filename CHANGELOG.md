@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.24.0](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.23.0...chrome-devtools-mcp-v0.24.0) (2026-04-28)
+
+
+### 🎉 Features
+
+* group identical consecutive console messages in list_console_messages ([#1939](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1939)) ([dbddb2e](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/dbddb2e4efb01c25ce4c6d96fd45b3ab29a498eb))
+* support MCP client roots feature ([#1945](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1945)) ([def53dd](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/def53ddf1d0d3fe04c41f1572919cef208161151))
+
+
+### 🛠️ Fixes
+
+* **cli:** re-generate cli correctly ([#1969](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1969)) ([8cbdb8d](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/8cbdb8d49491e332c1d30a3884304e1f7a519db2))
+* handle errors due to open dialogs during tool calls ([#1953](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1953)) ([06b331f](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/06b331f403056727850a633dd64b290d60bdb906))
+* note about missing elements should not show in verbose mode ([#1950](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1950)) ([80bee1e](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/80bee1e6cd0e62995496ea9d001994c78ec9dcf0))
+
 ## [0.23.0](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.22.0...chrome-devtools-mcp-v0.23.0) (2026-04-22)
 
 
