@@ -34,13 +34,19 @@ import {pageIdSchema} from './tools/ToolDefinition.js';
 import {createTools} from './tools/tools.js';
 import {VERSION} from './version.js';
 
-const CONDITION_TO_FLAG: Record<string, string> = {
+export const CONDITION_TO_FLAG: Record<string, string> = {
   computerVision: 'experimentalVision',
   experimentalMemory: 'experimentalMemory',
   experimentalInteropTools: 'experimentalInteropTools',
   screencast: 'experimentalScreencast',
   experimentalWebmcp: 'experimentalWebmcp',
 };
+
+export function buildFlag(category: ToolCategory) {
+  return category === ToolCategory.IN_PAGE
+    ? 'categoryInPageTools'
+    : `category${category.charAt(0).toUpperCase() + category.slice(1)}`;
+}
 
 function buildDisabledMessage(
   toolName: string,
@@ -58,10 +64,7 @@ function getCategoryStatus(
   category: ToolCategory,
   serverArgs: ReturnType<typeof parseArguments>,
 ): {categoryFlag?: string; disabled: boolean} {
-  const categoryFlag =
-    category === ToolCategory.IN_PAGE
-      ? 'categoryInPageTools'
-      : `category${category.charAt(0).toUpperCase() + category.slice(1)}`;
+  const categoryFlag = buildFlag(category);
 
   const flagValue = serverArgs[categoryFlag];
 
