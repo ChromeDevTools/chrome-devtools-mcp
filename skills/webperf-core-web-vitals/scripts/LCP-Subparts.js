@@ -19,7 +19,7 @@
     return null;
   };
 
-  const calcSubParts = (lcpEntry, navEntry) => {
+  const calcSubparts = (lcpEntry, navEntry) => {
     const lcpResEntry = performance
       .getEntriesByType("resource")
       .find((e) => e.name === lcpEntry.url);
@@ -44,7 +44,7 @@
     const navEntry = getNavigationEntry();
     if (!navEntry) return;
 
-    const { ttfb, lcpRequestStart, lcpResponseEnd, total } = calcSubParts(lcpEntry, navEntry);
+    const { ttfb, lcpRequestStart, lcpResponseEnd, total } = calcSubparts(lcpEntry, navEntry);
 
     if (HIGHLIGHT && lcpEntry.element) {
       lcpEntry.element.style.outline = "3px dashed lime";
@@ -72,14 +72,14 @@
   // Synchronous return for agent (buffered entries)
   const lcpEntry = performance.getEntriesByType("largest-contentful-paint").at(-1);
   if (!lcpEntry) {
-    return { script: "LCP-Sub-Parts", status: "error", error: "No LCP entries yet" };
+    return { script: "LCP-Subparts", status: "error", error: "No LCP entries yet" };
   }
   const navEntry = getNavigationEntry();
   if (!navEntry) {
-    return { script: "LCP-Sub-Parts", status: "error", error: "No navigation entry" };
+    return { script: "LCP-Subparts", status: "error", error: "No navigation entry" };
   }
 
-  const { ttfb, lcpRequestStart, lcpResponseEnd, total } = calcSubParts(lcpEntry, navEntry);
+  const { ttfb, lcpRequestStart, lcpResponseEnd, total } = calcSubparts(lcpEntry, navEntry);
   const totalMs = Math.round(total);
   const ttfbVal = Math.round(ttfb);
   const loadDelayVal = Math.round(lcpRequestStart - ttfb);
@@ -105,7 +105,7 @@
   }
 
   return {
-    script: "LCP-Sub-Parts",
+    script: "LCP-Subparts",
     status: "ok",
     metric: "LCP",
     value: totalMs,

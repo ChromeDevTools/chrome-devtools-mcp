@@ -12,7 +12,7 @@ JavaScript snippets for measuring web performance in Chrome DevTools. Execute wi
 
 - `scripts/CLS.js` — Cumulative Layout Shift (CLS)
 - `scripts/INP.js` — Interaction to Next Paint (INP)
-- `scripts/LCP-Sub-Parts.js` — LCP Sub-Parts
+- `scripts/LCP-Subparts.js` — LCP Subparts
 - `scripts/LCP-Trail.js` — LCP Trail
 - `scripts/LCP-Video-Candidate.js` — LCP Video Candidate
 - `scripts/LCP.js` — Largest Contentful Paint (LCP)
@@ -23,7 +23,7 @@ Descriptions, thresholds, and return schemas: `references/snippets.md`, `referen
 
 Scripts fall into two execution patterns:
 
-### Synchronous (LCP, CLS, LCP-Sub-Parts, LCP-Trail, LCP-Video-Candidate)
+### Synchronous (LCP, CLS, LCP-Subparts, LCP-Trail, LCP-Video-Candidate)
 
 Run via `evaluate_script` and return structured JSON immediately from buffered performance data. The page must have already loaded.
 
@@ -97,7 +97,7 @@ Use this decision tree to automatically run follow-up snippets based on results:
 
 ### After LCP.js
 
-- **If LCP > 2.5s** → Run **LCP-Sub-Parts.js** to diagnose which phase is slow
+- **If LCP > 2.5s** → Run **LCP-Subparts.js** to diagnose which phase is slow
 - **If LCP > 4.0s (poor)** → Run full LCP deep dive workflow
 - **If LCP candidate is a video** → Run **LCP-Video-Candidate.js**
 - **Always run** → **LCP-Trail.js** to understand candidate evolution
@@ -136,7 +136,7 @@ Use this decision tree to automatically run follow-up snippets based on results:
 
 When a script returns `status: "error"`:
 
-- **LCP/CLS/LCP-Sub-Parts/LCP-Trail** → The page may not have finished loading. Ask the user to wait for full load or reload, then re-run the script.
+- **LCP/CLS/LCP-Subparts/LCP-Trail** → The page may not have finished loading. Ask the user to wait for full load or reload, then re-run the script.
 - **INP** (`getINP()` returns error) → No interactions have been recorded yet. Remind the user to interact with the page, then call `getINP()` again.
 - **LCP-Video-Candidate** → No LCP entries found; see LCP error recovery above.
 
@@ -149,4 +149,4 @@ window.__cwvHighlight = false;
 // then run any LCP script
 ```
 
-Scripts that support this flag: `LCP.js`, `LCP-Sub-Parts.js`, `LCP-Trail.js`.
+Scripts that support this flag: `LCP.js`, `LCP-Subparts.js`, `LCP-Trail.js`.
