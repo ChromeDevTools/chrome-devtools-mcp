@@ -31,7 +31,7 @@ export const commands: Commands = {
         name: 'uid',
         type: 'string',
         description:
-          'The uid of an element on the page from the page content snapshot (required)',
+          'The uid of an element on the page from the page content snapshot',
         required: true,
       },
       dblClick: {
@@ -50,19 +50,20 @@ export const commands: Commands = {
     },
   },
   click_at: {
-    description: 'Clicks at the provided coordinates',
+    description:
+      'Clicks at the provided coordinates (requires flag: --experimentalVision=true)',
     category: 'Input automation',
     args: {
       x: {
         name: 'x',
         type: 'number',
-        description: 'The x coordinate (required)',
+        description: 'The x coordinate',
         required: true,
       },
       y: {
         name: 'y',
         type: 'number',
-        description: 'The y coordinate (required)',
+        description: 'The y coordinate',
         required: true,
       },
       dblClick: {
@@ -89,7 +90,7 @@ export const commands: Commands = {
         name: 'pageId',
         type: 'number',
         description:
-          'The ID of the page to close. Call list_pages to list pages. (required)',
+          'The ID of the page to close. Call list_pages to list pages.',
         required: true,
       },
     },
@@ -101,13 +102,13 @@ export const commands: Commands = {
       from_uid: {
         name: 'from_uid',
         type: 'string',
-        description: 'The uid of the element to drag (required)',
+        description: 'The uid of the element to drag',
         required: true,
       },
       to_uid: {
         name: 'to_uid',
         type: 'string',
-        description: 'The uid of the element to drop into (required)',
+        description: 'The uid of the element to drop into',
         required: true,
       },
       includeSnapshot: {
@@ -177,7 +178,7 @@ export const commands: Commands = {
         name: 'function',
         type: 'string',
         description:
-          'A JavaScript function declaration to be executed by the tool in the currently selected page.\nExample without arguments: `() => {\n  return document.title\n}` or `async () => {\n  return await fetch("example.com")\n}`.\nExample with arguments: `(el) => {\n  return el.innerText;\n}`\n (required)',
+          'A JavaScript function declaration to be executed by the tool in the currently selected page.\nExample without arguments: `() => {\n  return document.title\n}` or `async () => {\n  return await fetch("example.com")\n}`.\nExample with arguments: `(el) => {\n  return el.innerText;\n}`\n',
         required: true,
       },
       args: {
@@ -196,13 +197,14 @@ export const commands: Commands = {
     },
   },
   execute_webmcp_tool: {
-    description: 'Executes a WebMCP tool exposed by the page.',
+    description:
+      'Executes a WebMCP tool exposed by the page. (requires flag: --experimentalWebmcp=true)',
     category: 'Debugging',
     args: {
       toolName: {
         name: 'toolName',
         type: 'string',
-        description: 'The name of the WebMCP tool to execute (required)',
+        description: 'The name of the WebMCP tool to execute',
         required: true,
       },
       input: {
@@ -223,13 +225,13 @@ export const commands: Commands = {
         name: 'uid',
         type: 'string',
         description:
-          'The uid of an element on the page from the page content snapshot (required)',
+          'The uid of an element on the page from the page content snapshot',
         required: true,
       },
       value: {
         name: 'value',
         type: 'string',
-        description: 'The value to fill in (required)',
+        description: 'The value to fill in',
         required: true,
       },
       includeSnapshot: {
@@ -250,20 +252,20 @@ export const commands: Commands = {
         name: 'msgid',
         type: 'number',
         description:
-          'The msgid of a console message on the page from the listed console messages (required)',
+          'The msgid of a console message on the page from the listed console messages',
         required: true,
       },
     },
   },
   get_memory_snapshot_details: {
     description:
-      'Loads a memory heapsnapshot and returns all available information including statistics, static data, and aggregated node information. Supports pagination for aggregates.',
+      'Loads a memory heapsnapshot and returns all available information including statistics, static data, and aggregated node information. Supports pagination for aggregates. (requires flag: --experimentalMemory=true)',
     category: 'Memory',
     args: {
       filePath: {
         name: 'filePath',
         type: 'string',
-        description: 'A path to a .heapsnapshot file to read. (required)',
+        description: 'A path to a .heapsnapshot file to read.',
         required: true,
       },
       pageIdx: {
@@ -310,20 +312,20 @@ export const commands: Commands = {
   },
   get_nodes_by_class: {
     description:
-      'Loads a memory heapsnapshot and returns instances of a specific class with their stable IDs.',
+      'Loads a memory heapsnapshot and returns instances of a specific class with their stable IDs. (requires flag: --experimentalMemory=true)',
     category: 'Memory',
     args: {
       filePath: {
         name: 'filePath',
         type: 'string',
-        description: 'A path to a .heapsnapshot file to read. (required)',
+        description: 'A path to a .heapsnapshot file to read.',
         required: true,
       },
       uid: {
         name: 'uid',
         type: 'number',
         description:
-          'The unique UID for the class, obtained from aggregates listing. (required)',
+          'The unique UID for the class, obtained from aggregates listing.',
         required: true,
       },
       pageIdx: {
@@ -348,7 +350,7 @@ export const commands: Commands = {
       action: {
         name: 'action',
         type: 'string',
-        description: 'Whether to dismiss or accept the dialog (required)',
+        description: 'Whether to dismiss or accept the dialog',
         required: true,
         enum: ['accept', 'dismiss'],
       },
@@ -368,7 +370,7 @@ export const commands: Commands = {
         name: 'uid',
         type: 'string',
         description:
-          'The uid of an element on the page from the page content snapshot (required)',
+          'The uid of an element on the page from the page content snapshot',
         required: true,
       },
       includeSnapshot: {
@@ -381,14 +383,14 @@ export const commands: Commands = {
     },
   },
   install_extension: {
-    description: 'Installs a Chrome extension from the given path.',
+    description:
+      'Installs a Chrome extension from the given path. (requires flag: --categoryExtensions=true)',
     category: 'Extensions',
     args: {
       path: {
         name: 'path',
         type: 'string',
-        description:
-          'Absolute path to the unpacked extension folder. (required)',
+        description: 'Absolute path to the unpacked extension folder.',
         required: true,
       },
     },
@@ -461,7 +463,7 @@ export const commands: Commands = {
   },
   list_extensions: {
     description:
-      'Lists all the Chrome extensions installed in the browser. This includes their name, ID, version, and enabled status.',
+      'Lists all the Chrome extensions installed in the browser. This includes their name, ID, version, and enabled status. (requires flag: --categoryExtensions=true)',
     category: 'Extensions',
     args: {},
   },
@@ -507,19 +509,20 @@ export const commands: Commands = {
     args: {},
   },
   list_webmcp_tools: {
-    description: 'Lists all WebMCP tools the page exposes.',
+    description:
+      'Lists all WebMCP tools the page exposes. (requires flag: --experimentalWebmcp=true)',
     category: 'Debugging',
     args: {},
   },
   load_memory_snapshot: {
     description:
-      'Loads a memory heapsnapshot and returns snapshot summary stats.',
+      'Loads a memory heapsnapshot and returns snapshot summary stats. (requires flag: --experimentalMemory=true)',
     category: 'Memory',
     args: {
       filePath: {
         name: 'filePath',
         type: 'string',
-        description: 'A path to a .heapsnapshot file to read. (required)',
+        description: 'A path to a .heapsnapshot file to read.',
         required: true,
       },
     },
@@ -581,7 +584,7 @@ export const commands: Commands = {
       url: {
         name: 'url',
         type: 'string',
-        description: 'URL to load in a new page. (required)',
+        description: 'URL to load in a new page.',
         required: true,
       },
       background: {
@@ -616,14 +619,14 @@ export const commands: Commands = {
         name: 'insightSetId',
         type: 'string',
         description:
-          'The id for the specific insight set. Only use the ids given in the "Available insight sets" list. (required)',
+          'The id for the specific insight set. Only use the ids given in the "Available insight sets" list.',
         required: true,
       },
       insightName: {
         name: 'insightName',
         type: 'string',
         description:
-          'The name of the Insight you want more information on. For example: "DocumentLatency" or "LCPBreakdown" (required)',
+          'The name of the Insight you want more information on. For example: "DocumentLatency" or "LCPBreakdown"',
         required: true,
       },
     },
@@ -681,7 +684,7 @@ export const commands: Commands = {
         name: 'key',
         type: 'string',
         description:
-          'A key or a combination (e.g., "Enter", "Control+A", "Control++", "Control+Shift+R"). Modifiers: Control, Shift, Alt, Meta (required)',
+          'A key or a combination (e.g., "Enter", "Control+A", "Control++", "Control+Shift+R"). Modifiers: Control, Shift, Alt, Meta',
         required: true,
       },
       includeSnapshot: {
@@ -694,13 +697,14 @@ export const commands: Commands = {
     },
   },
   reload_extension: {
-    description: 'Reloads an unpacked Chrome extension by its ID.',
+    description:
+      'Reloads an unpacked Chrome extension by its ID. (requires flag: --categoryExtensions=true)',
     category: 'Extensions',
     args: {
       id: {
         name: 'id',
         type: 'string',
-        description: 'ID of the extension to reload. (required)',
+        description: 'ID of the extension to reload.',
         required: true,
       },
     },
@@ -713,20 +717,20 @@ export const commands: Commands = {
       width: {
         name: 'width',
         type: 'number',
-        description: 'Page width (required)',
+        description: 'Page width',
         required: true,
       },
       height: {
         name: 'height',
         type: 'number',
-        description: 'Page height (required)',
+        description: 'Page height',
         required: true,
       },
     },
   },
   screencast_start: {
     description:
-      'Starts recording a screencast (video) of the selected page in specified format.',
+      'Starts recording a screencast (video) of the selected page in specified format. (requires flag: --experimentalScreencast=true)',
     category: 'Debugging',
     args: {
       filePath: {
@@ -739,7 +743,8 @@ export const commands: Commands = {
     },
   },
   screencast_stop: {
-    description: 'Stops the active screencast recording on the selected page.',
+    description:
+      'Stops the active screencast recording on the selected page. (requires flag: --experimentalScreencast=true)',
     category: 'Debugging',
     args: {},
   },
@@ -751,7 +756,7 @@ export const commands: Commands = {
         name: 'pageId',
         type: 'number',
         description:
-          'The ID of the page to select. Call list_pages to get available pages. (required)',
+          'The ID of the page to select. Call list_pages to get available pages.',
         required: true,
       },
       bringToFront: {
@@ -771,7 +776,7 @@ export const commands: Commands = {
         name: 'filePath',
         type: 'string',
         description:
-          'A path to a .heapsnapshot file to save the heapsnapshot to. (required)',
+          'A path to a .heapsnapshot file to save the heapsnapshot to.',
         required: true,
       },
     },
@@ -841,14 +846,14 @@ export const commands: Commands = {
     },
   },
   trigger_extension_action: {
-    description: 'Triggers the default action of an extension by its ID.',
+    description:
+      'Triggers the default action of an extension by its ID. (requires flag: --categoryExtensions=true)',
     category: 'Extensions',
     args: {
       id: {
         name: 'id',
         type: 'string',
-        description:
-          'ID of the extension to trigger the action for. (required)',
+        description: 'ID of the extension to trigger the action for.',
         required: true,
       },
     },
@@ -860,7 +865,7 @@ export const commands: Commands = {
       text: {
         name: 'text',
         type: 'string',
-        description: 'The text to type (required)',
+        description: 'The text to type',
         required: true,
       },
       submitKey: {
@@ -873,13 +878,14 @@ export const commands: Commands = {
     },
   },
   uninstall_extension: {
-    description: 'Uninstalls a Chrome extension by its ID.',
+    description:
+      'Uninstalls a Chrome extension by its ID. (requires flag: --categoryExtensions=true)',
     category: 'Extensions',
     args: {
       id: {
         name: 'id',
         type: 'string',
-        description: 'ID of the extension to uninstall. (required)',
+        description: 'ID of the extension to uninstall.',
         required: true,
       },
     },
@@ -892,13 +898,13 @@ export const commands: Commands = {
         name: 'uid',
         type: 'string',
         description:
-          'The uid of the file input element or an element that will open file chooser on the page from the page content snapshot (required)',
+          'The uid of the file input element or an element that will open file chooser on the page from the page content snapshot',
         required: true,
       },
       filePath: {
         name: 'filePath',
         type: 'string',
-        description: 'The local path of the file to upload (required)',
+        description: 'The local path of the file to upload',
         required: true,
       },
       includeSnapshot: {
