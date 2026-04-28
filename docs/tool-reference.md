@@ -1,6 +1,6 @@
 <!-- AUTO GENERATED DO NOT EDIT - run 'npm run gen' to update-->
 
-# Chrome DevTools MCP Tool Reference (~7005 cl100k_base tokens)
+# Chrome DevTools MCP Tool Reference (~7014 cl100k_base tokens)
 
 - **[Input automation](#input-automation)** (9 tools)
   - [`click`](#click)
@@ -85,7 +85,7 @@
 
 ### `fill_form`
 
-**Description:** [`Fill`](#fill) out multiple form elements at once
+**Description:** [`Fill`](#fill) out multiple form elements at once. To set checkboxes [`fill`](#fill) them with 'true'
 
 **Parameters:**
 

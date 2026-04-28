@@ -313,7 +313,7 @@ export const drag = definePageTool({
 
 export const fillForm = definePageTool({
   name: 'fill_form',
-  description: `Fill out multiple form elements at once`,
+  description: `Fill out multiple form elements at once. To set checkboxes fill them with 'true'`,
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
