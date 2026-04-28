@@ -123,6 +123,27 @@ chrome-devtools take_snapshot # Take a text snapshot of the page from the a11y t
 chrome-devtools take_snapshot --verbose true --filePath "s.txt" # Take a verbose snapshot and save to file
 ```
 
+## Extensions
+
+```bash
+chrome-devtools list_extensions # Lists all the Chrome extensions installed in the browser
+chrome-devtools install_extension "/path/to/extension" # Installs a Chrome extension from the given path
+chrome-devtools uninstall_extension "extension_id" # Uninstalls a Chrome extension by its ID
+chrome-devtools reload_extension "extension_id" # Reloads an unpacked Chrome extension by its ID
+chrome-devtools trigger_extension_action "extension_id" # Triggers the default action of an extension by its ID
+```
+
+## Experimental Features
+
+Experimental tools are disabled by default. Enable them with the corresponding flag during `start`.
+
+```bash
+chrome-devtools click_at 100 200 # Clicks at the provided coordinates (requires --experimentalVision=true)
+chrome-devtools screencast_start # Starts a screencast recording (requires --experimentalScreencast=true and ffmpeg)
+chrome-devtools screencast_stop # Stops the active screencast
+chrome-devtools list_webmcp_tools # List all WebMCP tools (requires --experimentalWebmcp=true)
+```
+
 ## Service Management
 
 ```bash
