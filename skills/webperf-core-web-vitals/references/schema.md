@@ -37,7 +37,7 @@ All scripts return a structured JSON object as the return value. This allows age
 ## Agent Workflow
 
 ```
-// Synchronous scripts (LCP, CLS, LCP-Subparts, LCP-Trail, LCP-Image-Entropy, LCP-Video-Candidate)
+// Synchronous scripts (LCP, CLS, LCP-Subparts, LCP-Trail, LCP-Video-Candidate)
 result = evaluate_script(scriptCode)
 // → { status: "ok", value: 1240, rating: "good", ... }
 
@@ -136,18 +136,6 @@ data = evaluate_script("getCLS()")
 }
 ```
 
-### LCP-Image-Entropy
-```json
-{
-  "script": "LCP-Image-Entropy", "status": "ok", "count": 5,
-  "details": { "totalImages": 5, "lowEntropyCount": 1, "lcpImageEligible": true, "lcpImage": { "url": "hero.jpg", "bpp": 1.65, "isLowEntropy": false } },
-  "items": [
-    { "url": "hero.jpg", "width": 1200, "height": 630, "fileSizeBytes": 156000, "bpp": 1.65, "isLowEntropy": false, "lcpEligible": true, "isLCP": true }
-  ],
-  "issues": []
-}
-```
-
 ### LCP-Video-Candidate
 ```json
 {
@@ -155,7 +143,8 @@ data = evaluate_script("getCLS()")
   "value": 1800, "unit": "ms", "rating": "good",
   "thresholds": { "good": 2500, "needsImprovement": 4000 },
   "details": {
-    "isVideo": true, "posterUrl": "https://example.com/hero.avif", "posterFormat": "avif",
+    "isVideo": true, "lcpSource": "poster",
+    "posterUrl": "https://example.com/hero.avif", "posterFormat": "avif",
     "posterPreloaded": true, "fetchpriorityOnPreload": "high", "isCrossOrigin": false,
     "videoAttributes": { "autoplay": true, "muted": true, "playsinline": true, "preload": "auto" }
   },

@@ -46,6 +46,15 @@
   const posterAttr = element.getAttribute("poster") || "";
   const posterUrl = posterAttr ? normalizeUrl(posterAttr) : "";
   const lcpUrl = lcp.url || "";
+
+  // Chrome considers both poster image and first video frame as LCP candidates.
+  // lcpUrl is set when the LCP came from the poster; empty when from the first frame.
+  const lcpSource = lcpUrl
+    ? "poster"
+    : posterAttr
+    ? "unknown"
+    : "first-frame";
+
   const posterFormat = detectFormat(lcpUrl || posterUrl);
   const isModernFormat = ["avif", "webp", "jxl"].includes(posterFormat);
   const isCrossOrigin = lcp.renderTime === 0 && lcp.loadTime > 0;
@@ -65,8 +74,11 @@
   const playsinline = element.hasAttribute("playsinline");
 
   const issues = [];
-  if (!posterAttr) {
-    issues.push({ severity: "error", message: "No poster attribute — the browser has no image to use as LCP candidate" });
+  if (lcpSource === "first-frame") {
+    issues.push({ severity: "info", message: "LCP is the first video frame — adding a poster gives explicit control over the LCP image" });
+  }
+  if (lcpSource === "first-frame" && (!autoplay || !muted)) {
+    issues.push({ severity: "warning", message: "First-frame LCP requires autoplay + muted for the browser to render it immediately" });
   }
   if (posterAttr && !posterPreload) {
     issues.push({ severity: "warning", message: 'No <link rel="preload" as="image"> for the poster — browser discovers it late' });
@@ -77,7 +89,7 @@
     issues.push({ severity: "info", message: `Poster uses ${posterFormat} — AVIF or WebP would reduce file size and LCP load time` });
   }
   if (isCrossOrigin) {
-    issues.push({ severity: "info", message: "renderTime is 0 — poster is cross-origin and the server does not send Timing-Allow-Origin" });
+    issues.push({ severity: "info", message: "renderTime is 0 — resource is cross-origin and the server does not send Timing-Allow-Origin" });
   }
   if (!autoplay && preload === "none") {
     issues.push({ severity: "warning", message: 'preload="none" on a non-autoplay video may delay poster image loading in some browsers' });
@@ -94,6 +106,7 @@
     thresholds: { good: 2500, needsImprovement: 4000 },
     details: {
       isVideo: true,
+      lcpSource,
       posterUrl: lcpUrl || posterUrl || null,
       posterFormat,
       posterPreloaded: !!posterPreload,

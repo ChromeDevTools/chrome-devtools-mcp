@@ -68,27 +68,15 @@ Tracks every LCP candidate element during page load and highlights each one with
 
 **Returns:** Array of all LCP candidates in order, with selector, time, element type, and URL (if applicable). The last entry is the final LCP element.
 ---
-## LCP Image Entropy
-
-Checks if images qualify as LCP candidates based on their entropy (bits per pixel). Since Chrome 112, low-entropy images are ignored for LCP measurement.
-
-**Script:** `scripts/LCP-Image-Entropy.js`
-
-**Thresholds:**
-
-| BPP | Entropy | LCP Eligible | Example |
-|-----|---------|--------------|---------|
-| < 0.05 | 🔴 Low | ❌ No | Solid colors, simple gradients, placeholders |
-| ≥ 0.05 | 🟢 Normal | ✅ Yes | Photos, complex graphics |
----
 ## LCP Video Candidate
 
-Detects whether the LCP element is a `<video>` and audits the poster image configuration — the most common source of avoidable LCP delay when video is the hero element.
+Detects whether the LCP element is a `<video>` and audits the configuration. Chrome considers both the poster image and the first frame of the video as LCP candidates.
 
 **Script:** `scripts/LCP-Video-Candidate.js`
 
 **Checks:**
-- Whether a `poster` attribute exists
+- Whether the LCP source is the poster image or the first video frame (`lcpSource`)
+- Whether a `poster` attribute exists (recommended for explicit control)
 - Whether the poster is preloaded with `<link rel="preload" as="image">`
 - Whether `fetchpriority="high"` is set on the preload
 - Whether the poster uses a modern format (AVIF, WebP)
