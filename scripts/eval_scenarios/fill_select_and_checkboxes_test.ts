@@ -48,11 +48,18 @@ export const scenario: TestScenario = {
     assert.strictEqual(calls[1].name, 'take_snapshot');
     assert.strictEqual(calls[2].name, 'fill_form');
 
-    const elements = calls[2].args.elements as Array<{uid: string; value: string}>;
+    const elements = calls[2].args.elements as Array<{
+      uid: string;
+      value: string;
+    }>;
     assert.strictEqual(elements.length, 3);
 
     const uids = new Set(elements.map(e => e.uid));
-    assert.strictEqual(uids.size, 3, 'fill_form should target three distinct elements');
+    assert.strictEqual(
+      uids.size,
+      3,
+      'fill_form should target three distinct elements',
+    );
 
     const values = elements.map(e => e.value).sort();
     assert.deepStrictEqual(values, ['2 vCPU, 4GB RAM', 'true', 'true']);
