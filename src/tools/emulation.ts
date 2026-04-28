@@ -65,6 +65,12 @@ export const emulate = definePageTool({
       .describe(
         `Emulate device viewports '<width>x<height>x<devicePixelRatio>[,mobile][,touch][,landscape]'. 'touch' and 'mobile' to emulate mobile devices. 'landscape' to emulate landscape mode.`,
       ),
+    extraHTTPHeaders: zod
+      .record(zod.string(), zod.string())
+      .optional()
+      .describe(
+        'Extra HTTP headers to send with every request. Headers persist across navigations until cleared. Pass an empty object {} to clear all extra headers.',
+      ),
   },
   handler: async (request, _response, context) => {
     const page = request.page;
