@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {execSync} from 'node:child_process';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
@@ -12,9 +13,15 @@ const cachePath = process.argv[2];
 
 if (cachePath) {
   try {
-    const registry =
-      process.env.npm_config_registry?.replace(/\/$/, '') ||
-      'https://registry.npmjs.org';
+    let registry;
+    try {
+      registry = execSync('npm config get registry', {
+        encoding: 'utf8',
+      }).trim().replace(/\/$/, '');
+    } catch {
+      // npm not on PATH, fall back to default
+    }
+    registry ||= 'https://registry.npmjs.org';
     const response = await fetch(
       `${registry}/chrome-devtools-mcp/latest`,
     );
