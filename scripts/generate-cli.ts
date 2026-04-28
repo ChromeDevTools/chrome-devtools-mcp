@@ -16,7 +16,7 @@ import {createTools} from '../build/src/tools/tools.js';
 
 const OUTPUT_PATH = path.join(
   import.meta.dirname,
-  '../src/bin/cliDefinitions.ts',
+  '../src/bin/chrome-devtools-cli-options.ts',
 );
 
 async function fetchTools() {
