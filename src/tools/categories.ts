@@ -28,4 +28,7 @@ export const labels = {
   [ToolCategory.MEMORY]: 'Memory',
 };
 
-export const OFF_BY_DEFAULT_CATEGORIES = [ToolCategory.EXTENSIONS];
+export const OFF_BY_DEFAULT_CATEGORIES = [
+  ToolCategory.EXTENSIONS,
+  ToolCategory.IN_PAGE,
+];

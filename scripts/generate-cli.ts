@@ -11,7 +11,7 @@ import {Client} from '@modelcontextprotocol/sdk/client/index.js';
 import {StdioClientTransport} from '@modelcontextprotocol/sdk/client/stdio.js';
 
 import {parseArguments} from '../build/src/bin/chrome-devtools-mcp-cli-options.js';
-import {labels} from '../build/src/tools/categories.js';
+import {labels, ToolCategory} from '../build/src/tools/categories.js';
 import {createTools} from '../build/src/tools/tools.js';
 
 const OUTPUT_PATH = path.join(
@@ -29,7 +29,7 @@ async function fetchTools() {
 
   const transport = new StdioClientTransport({
     command: 'node',
-    args: [serverPath],
+    args: [serverPath, '--viaCli'],
     env: {...process.env, CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true'},
   });
 
@@ -83,7 +83,10 @@ function schemaToCLIOptions(schema: JsonSchema): CliOption[] {
   const properties = schema.properties;
   return Object.entries(properties).map(([name, prop]) => {
     const isRequired = required.includes(name);
-    const description = prop.description || '';
+    let description = prop.description || '';
+    if (isRequired) {
+      description += ' (required)';
+    }
     if (typeof prop.type !== 'string') {
       throw new Error(
         `Property ${name} has a complex type not supported by CLI.`,
@@ -103,6 +106,15 @@ function schemaToCLIOptions(schema: JsonSchema): CliOption[] {
 async function generateCli() {
   const tools = await fetchTools();
 
+  const staticTools = createTools(parseArguments());
+  const toolNameToCategory = new Map<string, string>();
+  for (const tool of staticTools) {
+    toolNameToCategory.set(
+      tool.name,
+      labels[tool.annotations.category as keyof typeof labels],
+    );
+  }
+
   // Sort tools by name
   const sortedTools = tools
     .sort((a, b) => a.name.localeCompare(b.name))
@@ -117,17 +129,16 @@ async function generateCli() {
       if (tool.name === 'wait_for') {
         return false;
       }
+      // Skipping get_tab_id as it is for internal integrations
+      if (tool.name === 'get_tab_id') {
+        return false;
+      }
+      // Skipping in_page tools as they are not launched yet
+      if (toolNameToCategory.get(tool.name) === labels[ToolCategory.IN_PAGE]) {
+        return false;
+      }
       return true;
     });
-
-  const staticTools = createTools(parseArguments());
-  const toolNameToCategory = new Map<string, string>();
-  for (const tool of staticTools) {
-    toolNameToCategory.set(
-      tool.name,
-      labels[tool.annotations.category as keyof typeof labels],
-    );
-  }
 
   const commands: Record<
     string,
