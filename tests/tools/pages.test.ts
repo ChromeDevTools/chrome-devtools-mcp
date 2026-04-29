@@ -205,6 +205,29 @@ describe('pages', () => {
         } as ParsedArguments,
       );
     });
+
+    it('when dialog is open', async t => {
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedPptrPage();
+
+        const dialogPromise = new Promise<Dialog>(resolve => {
+          page.on('dialog', dialog => {
+            resolve(dialog);
+          });
+        });
+
+        page.evaluate(() => {
+          alert('test dialog');
+        });
+        const dialog = await dialogPromise;
+
+        await listPages().handler({params: {}}, response, context);
+
+        const result = await response.handle('list_pages', context);
+        t.assert.snapshot?.(JSON.stringify(result));
+        await dialog.dismiss();
+      });
+    });
   });
   describe('new_page', () => {
     it('create a page', async () => {
@@ -354,6 +377,33 @@ describe('pages', () => {
         assert.ok(page.isClosed());
       });
     });
+
+    it('when dialog is open', async t => {
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedPptrPage();
+
+        const dialogPromise = new Promise<Dialog>(resolve => {
+          page.on('dialog', dialog => {
+            resolve(dialog);
+          });
+        });
+
+        page.evaluate(() => {
+          alert('test dialog');
+        });
+        const dialog = await dialogPromise;
+
+        await newPage().handler(
+          {params: {url: 'about:blank'}},
+          response,
+          context,
+        );
+
+        const result = await response.handle('new_page', context);
+        t.assert.snapshot?.(JSON.stringify(result));
+        await dialog.dismiss();
+      });
+    });
   });
 
   it('navigate_page targets the pageId page, not the global selection', async () => {
@@ -424,6 +474,35 @@ describe('pages', () => {
         );
         assert.ok(response.includePages);
         assert.ok(!page.isClosed());
+      });
+    });
+
+    it('when dialog is open', async t => {
+      await withMcpContext(async (response, context) => {
+        const page = await context.newPage();
+        assert.strictEqual(
+          context.getPageById(2),
+          context.getSelectedMcpPage(),
+        );
+        assert.strictEqual(context.getPageById(2), page);
+
+        const dialogPromise = new Promise<void>(resolve => {
+          page.pptrPage.on('dialog', () => resolve());
+        });
+
+        page.pptrPage
+          .evaluate(() => {
+            alert('test dialog');
+          })
+          .catch(() => {
+            // Ignore TargetCloseError when page is closed with open dialog
+          });
+        await dialogPromise;
+
+        await closePage.handler({params: {pageId: 2}}, response, context);
+
+        const result = await response.handle('close_page', context);
+        t.assert.snapshot?.(JSON.stringify(result));
       });
     });
   });
@@ -512,6 +591,29 @@ describe('pages', () => {
           await pageB.evaluate(() => document.hasFocus()),
           true,
         );
+      });
+    });
+
+    it('when dialog is open', async t => {
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedPptrPage();
+
+        const dialogPromise = new Promise<Dialog>(resolve => {
+          page.on('dialog', dialog => {
+            resolve(dialog);
+          });
+        });
+
+        page.evaluate(() => {
+          alert('test dialog');
+        });
+        const dialog = await dialogPromise;
+
+        await selectPage.handler({params: {pageId: 1}}, response, context);
+
+        const result = await response.handle('select_page', context);
+        t.assert.snapshot?.(JSON.stringify(result));
+        await dialog.dismiss();
       });
     });
   });
@@ -762,6 +864,32 @@ describe('pages', () => {
         assert.ok(response.includePages);
       });
     });
+
+    it('when dialog is open', async t => {
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedPptrPage();
+        const dialogPromise = new Promise<void>(resolve => {
+          page.on('dialog', () => resolve());
+        });
+
+        page.evaluate(() => {
+          alert('test dialog');
+        });
+        await dialogPromise;
+
+        await navigatePage().handler(
+          {
+            params: {url: 'data:text/html,<div>Navigated</div>'},
+            page: context.getSelectedMcpPage(),
+          },
+          response,
+          context,
+        );
+
+        const result = await response.handle('navigate_page', context);
+        t.assert.snapshot?.(JSON.stringify(result));
+      });
+    });
   });
   describe('resize', () => {
     it('resize the page', async () => {
@@ -924,6 +1052,35 @@ describe('pages', () => {
           return [window.innerWidth, window.innerHeight];
         });
         assert.deepStrictEqual(dimensions, [850, 650]);
+      });
+    });
+
+    it('when dialog is open', async t => {
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedPptrPage();
+        const dialogPromise = new Promise<Dialog>(resolve => {
+          page.on('dialog', dialog => {
+            resolve(dialog);
+          });
+        });
+
+        page.evaluate(() => {
+          alert('test dialog');
+        });
+        const dialog = await dialogPromise;
+
+        await resizePage.handler(
+          {
+            params: {width: 1600, height: 1400},
+            page: context.getSelectedMcpPage(),
+          },
+          response,
+          context,
+        );
+
+        const result = await response.handle('resize_page', context);
+        t.assert.snapshot?.(JSON.stringify(result));
+        await dialog.dismiss();
       });
     });
   });

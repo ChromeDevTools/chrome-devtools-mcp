@@ -1,3 +1,7 @@
+exports[`pages > close_page > when dialog is open 1`] = `
+{"content":[{"type":"text","text":"## Pages\\n1: about:blank [selected]"}],"structuredContent":{"pages":[{"id":1,"url":"about:blank","selected":true}]}}
+`;
+
 exports[`pages > list_pages > list pages for extension pages with --category-extensions 1`] = `
 ## Pages
 1: about:blank [selected]
@@ -24,4 +28,24 @@ exports[`pages > list_pages > list pages for side panels with --category-extensi
 2: chrome-extension://<extension-id>/sidepanel.html [selected]
 ## Extension Service Workers
 sw-1: chrome-extension://<extension-id>/sw.js
+`;
+
+exports[`pages > list_pages > when dialog is open 1`] = `
+{"content":[{"type":"text","text":"# Open dialog\\nalert: test dialog.\\nCall handle_dialog to handle it before continuing.\\n## Pages\\n1: about:blank [selected]"}],"structuredContent":{"dialog":{"type":"alert","message":"test dialog","defaultValue":""},"pages":[{"id":1,"url":"about:blank","selected":true}]}}
+`;
+
+exports[`pages > navigate_page > when dialog is open 1`] = `
+{"content":[{"type":"text","text":"Successfully navigated to data:text/html,<div>Navigated</div>.\\n# Open dialog\\nalert: test dialog.\\nCall handle_dialog to handle it before continuing.\\n## Pages\\n1: data:text/html,<div>Navigated</div> [selected]"}],"structuredContent":{"message":"Successfully navigated to data:text/html,<div>Navigated</div>.","dialog":{"type":"alert","message":"test dialog","defaultValue":""},"pages":[{"id":1,"url":"data:text/html,<div>Navigated</div>","selected":true}]}}
+`;
+
+exports[`pages > new_page with isolatedContext > when dialog is open 1`] = `
+{"content":[{"type":"text","text":"# Open dialog\\nalert: test dialog.\\nCall handle_dialog to handle it before continuing.\\n## Pages\\n1: about:blank\\n2: about:blank [selected]"}],"structuredContent":{"dialog":{"type":"alert","message":"test dialog","defaultValue":""},"pages":[{"id":1,"url":"about:blank","selected":false},{"id":2,"url":"about:blank","selected":true}]}}
+`;
+
+exports[`pages > resize > when dialog is open 1`] = `
+{"content":[{"type":"text","text":"# Open dialog\\nalert: test dialog.\\nCall handle_dialog to handle it before continuing.\\n## Pages\\n1: about:blank [selected]"}],"structuredContent":{"dialog":{"type":"alert","message":"test dialog","defaultValue":""},"pages":[{"id":1,"url":"about:blank","selected":true}]}}
+`;
+
+exports[`pages > select_page > when dialog is open 1`] = `
+{"content":[{"type":"text","text":"# Open dialog\\nalert: test dialog.\\nCall handle_dialog to handle it before continuing.\\n## Pages\\n1: about:blank [selected]"}],"structuredContent":{"dialog":{"type":"alert","message":"test dialog","defaultValue":""},"pages":[{"id":1,"url":"about:blank","selected":true}]}}
 `;
