@@ -246,8 +246,8 @@ describe('e2e', () => {
     );
   });
 
-  it('returns blocked message when dialog is opened during tool execution', async t => {
-    await withClient(async client => {
+  describe('Dialogs', () => {
+    async function createNewPageAndTriggerDialog(client: Client) {
       // Navigate to a page with a button that triggers a dialog on click
       await client.callTool({
         name: 'new_page',
@@ -273,7 +273,42 @@ describe('e2e', () => {
         },
       });
 
-      t.assert.snapshot?.(JSON.stringify(result));
+      return result;
+    }
+
+    it('returns blocked message when dialog is opened during tool execution', async t => {
+      await withClient(async client => {
+        const result = await createNewPageAndTriggerDialog(client);
+        t.assert.snapshot?.(JSON.stringify(result));
+      });
+    });
+
+    it('when dialog is open and tool is blocked, returns an error', async t => {
+      await withClient(async client => {
+        await createNewPageAndTriggerDialog(client);
+        const result = await client.callTool({
+          name: 'take_screenshot',
+          arguments: {
+            filePath: '/tmp/test.png',
+          },
+        });
+
+        t.assert.snapshot?.(JSON.stringify(result));
+      });
+    });
+
+    it('when dialog is open and tool is not blocked, executes tool', async t => {
+      await withClient(async client => {
+        await createNewPageAndTriggerDialog(client);
+        const result = await client.callTool({
+          name: 'new_page',
+          arguments: {
+            url: `data:text/html,<h1>New</h1>`,
+          },
+        });
+
+        t.assert.snapshot?.(JSON.stringify(result));
+      });
     });
   });
 });

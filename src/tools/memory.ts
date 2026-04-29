@@ -22,6 +22,7 @@ export const takeMemorySnapshot = definePageTool({
       .string()
       .describe('A path to a .heapsnapshot file to save the heapsnapshot to.'),
   },
+  blockedByDialog: true,
   handler: async (request, response, context) => {
     const page = request.page;
     context.validatePath(request.params.filePath);
@@ -48,6 +49,7 @@ export const exploreMemorySnapshot = defineTool({
   schema: {
     filePath: zod.string().describe('A path to a .heapsnapshot file to read.'),
   },
+  blockedByDialog: false,
   handler: async (request, response, context) => {
     context.validatePath(request.params.filePath);
     const stats = await context.getHeapSnapshotStats(request.params.filePath);
@@ -79,6 +81,7 @@ export const getMemorySnapshotDetails = defineTool({
       .optional()
       .describe('The page size for pagination of aggregates.'),
   },
+  blockedByDialog: false,
   handler: async (request, response, context) => {
     context.validatePath(request.params.filePath);
     const aggregates = await context.getHeapSnapshotAggregates(
@@ -111,6 +114,7 @@ export const getNodesByClass = defineTool({
     pageIdx: zod.number().optional().describe('The page index for pagination.'),
     pageSize: zod.number().optional().describe('The page size for pagination.'),
   },
+  blockedByDialog: false,
   handler: async (request, response, context) => {
     context.validatePath(request.params.filePath);
     const nodes = await context.getHeapSnapshotNodesByUid(

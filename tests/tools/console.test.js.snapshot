@@ -118,6 +118,47 @@ Learn more:
 reqid=<reqid> data={"corsErrorStatus":{"corsError":"PreflightMissingAllowOriginHeader","failedParameter":""},"isWarning":false,"request":{"url":"http://hostname:port/data.json"},"initiatorOrigin":"","clientSecurityState":{"initiatorIsSecureContext":false,"initiatorIPAddressSpace":"Loopback","localNetworkAccessRequestPolicy":"BlockFromInsecureToMorePrivate"}}
 `;
 
+exports[`console > get_console_message > when dialog is open 1`] = `
+{
+  "dialog": {
+    "type": "alert",
+    "message": "test dialog",
+    "defaultValue": ""
+  },
+  "consoleMessage": {
+    "id": 1,
+    "type": "error",
+    "text": "This is an error",
+    "argsCount": 1,
+    "args": [
+      "This is an error"
+    ],
+    "stackTrace": "at  (VM7:1:9)\\nat  (pptr:;CdpFrame.%3Canonymous%3E%20(<file-path>)\\n--- PendingScript ----------------------\\nat  (pptr:;CdpFrame.%3Canonymous%3E%20(<file-path>)\\nNote: line and column numbers use 1-based indexing"
+  },
+  "pagination": {
+    "currentPage": 0,
+    "totalPages": 1,
+    "hasNextPage": false,
+    "hasPreviousPage": false,
+    "startIndex": 0,
+    "endIndex": 1,
+    "invalidPage": false
+  },
+  "consoleMessages": [
+    {
+      "type": "error",
+      "text": "This is an error",
+      "argsCount": 1,
+      "id": 1
+    }
+  ]
+}
+`;
+
+exports[`console > list_console_messages > issues > when dialog is open 1`] = `
+{"content":[{"type":"text","text":"# Open dialog\\nalert: test dialog.\\nCall handle_dialog to handle it before continuing.\\n## Console messages\\nShowing 1-1 of 1 (Page 1 of 1).\\nmsgid=1 [log] Pre-dialog message (1 args)"}],"structuredContent":{"dialog":{"type":"alert","message":"test dialog","defaultValue":""},"pagination":{"currentPage":0,"totalPages":1,"hasNextPage":false,"hasPreviousPage":false,"startIndex":0,"endIndex":1,"invalidPage":false},"consoleMessages":[{"type":"log","text":"Pre-dialog message","argsCount":1,"id":1}]}}
+`;
+
 exports[`console > list_console_messages > lists error objects 1`] = `
 ## Console messages
 Showing 1-1 of 1 (Page 1 of 1).
