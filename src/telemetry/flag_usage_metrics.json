@@ -192,11 +192,13 @@
   },
   {
     "name": "category_in_page_tools",
-    "flagType": "boolean"
+    "flagType": "boolean",
+    "isDeprecated": true
   },
   {
     "name": "category_in_page_tools_present",
-    "flagType": "boolean"
+    "flagType": "boolean",
+    "isDeprecated": true
   },
   {
     "name": "clearcut_endpoint_present",
@@ -264,6 +266,14 @@
   },
   {
     "name": "via_cli_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "category_experimental_in_page_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "category_experimental_in_page",
     "flagType": "boolean"
   }
 ]

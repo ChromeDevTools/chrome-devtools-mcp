@@ -1111,7 +1111,7 @@ describe('inPage tools', () => {
         t.assert.snapshot?.(JSON.stringify(structuredContent, null, 2));
       },
       undefined,
-      {categoryInPageTools: true} as ParsedArguments,
+      {categoryExperimentalInPage: true} as ParsedArguments,
     );
   });
 
@@ -1162,14 +1162,14 @@ describe('inPage tools', () => {
         );
       },
       undefined,
-      {categoryInPageTools: true} as ParsedArguments,
+      {categoryExperimentalInPage: true} as ParsedArguments,
     );
   }
 
   it('includes in-page tools in list_pages response', async () => {
     await testIncludesInPageTools(async (response, context) => {
       const listPagesDef = listPages({
-        categoryInPageTools: true,
+        categoryExperimentalInPage: true,
       } as ParsedArguments);
       await listPagesDef.handler({params: {}}, response, context);
     }, 'list_pages');
