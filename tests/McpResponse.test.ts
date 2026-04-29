@@ -1040,7 +1040,7 @@ describe('lighthouse', () => {
   });
 });
 
-describe('inPage tools', () => {
+describe('third-party developer tools', () => {
   function stubToolDiscovery(page: object) {
     // @ts-expect-error Internal API
     const client = page._client();
@@ -1067,15 +1067,15 @@ describe('inPage tools', () => {
       });
   }
 
-  it('lists in-page tools', async t => {
+  it('lists third-party developer tools', async t => {
     await withMcpContext(
       async (response, context) => {
-        response.setListInPageTools();
+        response.setListThirdPartyDeveloperTools();
         const emptyResult = await response.handle('test', context);
         const emptyText = getTextContent(emptyResult.content[0]);
         assert.ok(
-          emptyText.includes('No in-page tools available.'),
-          'Should show message for empty in-page tools',
+          emptyText.includes('No third-party developer tools available.'),
+          'Should show message for empty third-party developer tools',
         );
 
         response.resetResponseLineForTesting();
@@ -1097,7 +1097,7 @@ describe('inPage tools', () => {
             },
           ],
         });
-        response.setListInPageTools();
+        response.setListThirdPartyDeveloperTools();
         const {content, structuredContent} = await response.handle(
           'test',
           context,
@@ -1111,11 +1111,11 @@ describe('inPage tools', () => {
         t.assert.snapshot?.(JSON.stringify(structuredContent, null, 2));
       },
       undefined,
-      {categoryExperimentalInPage: true} as ParsedArguments,
+      {categoryExperimentalThirdParty: true} as ParsedArguments,
     );
   });
 
-  async function testIncludesInPageTools(
+  async function testIncludesThirdPartyDeveloperTools(
     handlerAction: (
       response: McpResponse,
       context: McpContext,
@@ -1130,11 +1130,11 @@ describe('inPage tools', () => {
         const initScript = `
           window.__dtmcp = {
             toolGroup: {
-              name: 'In-Page group',
+              name: 'Tool group name',
               description: 'Test tools',
               tools: [
                 {
-                  name: 'inPageTool',
+                  name: '3pDeveloperTool',
                   description: 'A test tool',
                   inputSchema: {
                     type: 'object',
@@ -1157,42 +1157,42 @@ describe('inPage tools', () => {
         const {content} = await response.handle(toolName, context);
         const responseText = getTextContent(content[0]);
         assert.ok(
-          responseText.includes('inPageTool'),
-          `Should include in-page tool name in the ${toolName} response`,
+          responseText.includes('3pDeveloperTool'),
+          `Should include third-party developer tool name in the ${toolName} response`,
         );
       },
       undefined,
-      {categoryExperimentalInPage: true} as ParsedArguments,
+      {categoryExperimentalThirdParty: true} as ParsedArguments,
     );
   }
 
-  it('includes in-page tools in list_pages response', async () => {
-    await testIncludesInPageTools(async (response, context) => {
+  it('includes third-party developer tools in list_pages response', async () => {
+    await testIncludesThirdPartyDeveloperTools(async (response, context) => {
       const listPagesDef = listPages({
-        categoryExperimentalInPage: true,
+        categoryExperimentalThirdParty: true,
       } as ParsedArguments);
       await listPagesDef.handler({params: {}}, response, context);
     }, 'list_pages');
   });
 
-  it('includes in-page tools in select_page response', async () => {
-    await testIncludesInPageTools(async (response, context) => {
+  it('includes third-party developer tools in select_page response', async () => {
+    await testIncludesThirdPartyDeveloperTools(async (response, context) => {
       const pageId =
         context.getPageId(context.getSelectedMcpPage().pptrPage) ?? 1;
       await selectPage.handler({params: {pageId}}, response, context);
     }, 'select_page');
   });
 
-  it('includes in-page tools in close_page response', async () => {
-    await testIncludesInPageTools(async (response, context) => {
+  it('includes third-party developer tools in close_page response', async () => {
+    await testIncludesThirdPartyDeveloperTools(async (response, context) => {
       const pageId =
         context.getPageId(context.getSelectedMcpPage().pptrPage) ?? 1;
       await closePage.handler({params: {pageId}}, response, context);
     }, 'close_page');
   });
 
-  it('includes in-page tools in navigate_page response', async () => {
-    await testIncludesInPageTools(async (response, context) => {
+  it('includes third-party developer tools in navigate_page response', async () => {
+    await testIncludesThirdPartyDeveloperTools(async (response, context) => {
       await navigatePage().handler(
         {
           params: {type: 'url', url: 'about:blank'},
@@ -1204,9 +1204,9 @@ describe('inPage tools', () => {
     }, 'navigate_page');
   });
 
-  it('includes in-page tools in new_page response', async () => {
-    await testIncludesInPageTools(async (response, context) => {
-      // Workaround to ensure the test environment's new page contain in-page tools
+  it('includes third-party developer tools in new_page response', async () => {
+    await testIncludesThirdPartyDeveloperTools(async (response, context) => {
+      // Workaround to ensure the test environment's new page contain third-party developer tools
       sinon.stub(context, 'newPage').resolves(context.getSelectedMcpPage());
 
       await newPage().handler(

@@ -237,12 +237,12 @@ export const cliOptions = {
     describe:
       'Set to true to include tools related to extensions. Note: This feature is currently only supported with a pipe connection. autoConnect, browserUrl, and wsEndpoint are not supported with this feature until 149 will be released.',
   },
-  categoryExperimentalInPage: {
+  categoryExperimentalThirdParty: {
     type: 'boolean',
-    hidden: true,
+    hidden: true, // TODO: flip
     default: false,
     describe:
-      'Set to true to enable tools exposed by the inspected page itself',
+      'Set to true to enable third-party developer tools exposed by the inspected page itself',
   },
   performanceCrux: {
     type: 'boolean',

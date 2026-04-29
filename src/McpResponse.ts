@@ -27,8 +27,8 @@ import type {
   JSONSchema7Definition,
   Extension,
 } from './third_party/index.js';
-import type {ToolGroup, ToolDefinition} from './tools/inPage.js';
 import {handleDialog} from './tools/pages.js';
+import type {ToolGroup, ToolDefinition} from './tools/thirdPartyDeveloper.js';
 import type {
   DevToolsData,
   ImageContentData,
@@ -196,7 +196,7 @@ export class McpResponse implements Response {
     includePreservedMessages?: boolean;
   };
   #listExtensions?: boolean;
-  #listInPageTools?: boolean;
+  #listThirdPartyDeveloperTools?: boolean;
   #listWebMcpTools?: boolean;
   #devToolsData?: DevToolsData;
   #tabId?: string;
@@ -244,9 +244,9 @@ export class McpResponse implements Response {
     this.#listExtensions = true;
   }
 
-  setListInPageTools(): void {
-    if (this.#args.categoryExperimentalInPage) {
-      this.#listInPageTools = true;
+  setListThirdPartyDeveloperTools(): void {
+    if (this.#args.categoryExperimentalThirdParty) {
+      this.#listThirdPartyDeveloperTools = true;
     }
   }
 
@@ -552,11 +552,11 @@ export class McpResponse implements Response {
       extensions = await context.listExtensions();
     }
 
-    let inPageTools: ToolGroup<ToolDefinition> | undefined;
-    if (this.#listInPageTools) {
+    let thirdPartyDeveloperTools: ToolGroup<ToolDefinition> | undefined;
+    if (this.#listThirdPartyDeveloperTools) {
       const page = this.#page ?? context.getSelectedMcpPage();
-      inPageTools = await getToolGroup(page);
-      page.inPageTools = inPageTools;
+      thirdPartyDeveloperTools = await getToolGroup(page);
+      page.thirdPartyDeveloperTools = thirdPartyDeveloperTools;
     }
 
     let webmcpTools: WebMCPTool[] | undefined;
@@ -669,7 +669,7 @@ export class McpResponse implements Response {
       traceSummary: this.#attachedTraceSummary,
       extensions,
       lighthouseResult: this.#attachedLighthouseResult,
-      inPageTools,
+      thirdPartyDeveloperTools,
       webmcpTools,
       errorMessage: this.#error?.message,
     });
@@ -688,7 +688,7 @@ export class McpResponse implements Response {
       traceInsight?: TraceInsightData;
       extensions?: Map<string, Extension>;
       lighthouseResult?: LighthouseData;
-      inPageTools?: ToolGroup<ToolDefinition>;
+      thirdPartyDeveloperTools?: ToolGroup<ToolDefinition>;
       webmcpTools?: WebMCPTool[];
       errorMessage?: string;
     },
@@ -705,7 +705,7 @@ export class McpResponse implements Response {
       traceInsights?: Array<{insightName: string; insightKey: string}>;
       lighthouseResult?: object;
       extensions?: object[];
-      inPageTools?: object;
+      thirdPartyDeveloperTools?: object;
       webmcpTools?: object[];
       message?: string;
       networkConditions?: string;
@@ -1004,13 +1004,17 @@ Call ${handleDialog.name} to handle it before continuing.`);
       }
     }
 
-    if (this.#listInPageTools) {
-      structuredContent.inPageTools = data.inPageTools ?? undefined;
-      response.push('## In-page tools');
-      if (!data.inPageTools || !data.inPageTools.tools) {
-        response.push('No in-page tools available.');
+    if (this.#listThirdPartyDeveloperTools) {
+      structuredContent.thirdPartyDeveloperTools =
+        data.thirdPartyDeveloperTools ?? undefined;
+      response.push('## Third-party developer tools');
+      if (
+        !data.thirdPartyDeveloperTools ||
+        !data.thirdPartyDeveloperTools.tools
+      ) {
+        response.push('No third-party developer tools available.');
       } else {
-        const toolGroup = data.inPageTools;
+        const toolGroup = data.thirdPartyDeveloperTools;
         response.push(`${toolGroup.name}: ${toolGroup.description}`);
         response.push('Available tools:');
         const toolDefinitionsMessage = toolGroup.tools

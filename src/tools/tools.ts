@@ -9,7 +9,6 @@ import type {ParsedArguments} from '../bin/chrome-devtools-mcp-cli-options.js';
 import * as consoleTools from './console.js';
 import * as emulationTools from './emulation.js';
 import * as extensionTools from './extensions.js';
-import * as inPageTools from './inPage.js';
 import * as inputTools from './input.js';
 import * as lighthouseTools from './lighthouse.js';
 import * as memoryTools from './memory.js';
@@ -21,6 +20,7 @@ import * as screenshotTools from './screenshot.js';
 import * as scriptTools from './script.js';
 import * as slimTools from './slim/tools.js';
 import * as snapshotTools from './snapshot.js';
+import * as thirdPartyDeveloperTools from './thirdPartyDeveloper.js';
 import type {ToolDefinition} from './ToolDefinition.js';
 import * as webmcpTools from './webmcp.js';
 
@@ -31,7 +31,6 @@ export const createTools = (args: ParsedArguments) => {
         ...Object.values(consoleTools),
         ...Object.values(emulationTools),
         ...Object.values(extensionTools),
-        ...Object.values(inPageTools),
         ...Object.values(inputTools),
         ...Object.values(lighthouseTools),
         ...Object.values(memoryTools),
@@ -42,6 +41,7 @@ export const createTools = (args: ParsedArguments) => {
         ...Object.values(screenshotTools),
         ...Object.values(scriptTools),
         ...Object.values(snapshotTools),
+        ...Object.values(thirdPartyDeveloperTools),
         ...Object.values(webmcpTools),
       ];
 

@@ -28,8 +28,8 @@ import type {PaginationOptions} from '../utils/types.js';
 import type {ToolCategory} from './categories.js';
 import type {
   ToolGroup,
-  ToolDefinition as InPageToolDefinition,
-} from './inPage.js';
+  ToolDefinition as ThirdPartyDeveloperToolDefinition,
+} from './thirdPartyDeveloper.js';
 
 export interface BaseToolDefinition<
   Schema extends zod.ZodRawShape = zod.ZodRawShape,
@@ -151,7 +151,7 @@ export interface Response {
   ): void;
   setListExtensions(): void;
   attachLighthouseResult(result: LighthouseData): void;
-  setListInPageTools(): void;
+  setListThirdPartyDeveloperTools(): void;
   setListWebMcpTools(): void;
 }
 
@@ -261,8 +261,10 @@ export type ContextPage = Readonly<{
     action: () => Promise<unknown>,
     options?: {timeout?: number; handleDialog?: 'accept' | 'dismiss' | string},
   ): Promise<void>;
-  getInPageTools(): ToolGroup<InPageToolDefinition> | undefined;
-  executeInPageTool(
+  getThirdPartyDeveloperTools():
+    | ToolGroup<ThirdPartyDeveloperToolDefinition>
+    | undefined;
+  executeThirdPartyDeveloperTool(
     toolName: string,
     params: Record<string, unknown>,
     response: Response,

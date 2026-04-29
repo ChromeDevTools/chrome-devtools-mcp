@@ -13,8 +13,8 @@ import type {
   Viewport,
   WebMCPTool,
 } from './third_party/index.js';
-import type {ToolGroup, ToolDefinition} from './tools/inPage.js';
 import {takeSnapshot} from './tools/snapshot.js';
+import type {ToolGroup, ToolDefinition} from './tools/thirdPartyDeveloper.js';
 import type {
   ContextPage,
   DevToolsData,
@@ -58,7 +58,7 @@ export class McpPage implements ContextPage {
   #dialog?: Dialog;
   #dialogHandler: (dialog: Dialog) => void;
 
-  inPageTools: ToolGroup<ToolDefinition> | undefined;
+  thirdPartyDeveloperTools: ToolGroup<ToolDefinition> | undefined;
 
   constructor(page: Page, id: number) {
     this.pptrPage = page;
@@ -89,8 +89,8 @@ export class McpPage implements ContextPage {
     }
   }
 
-  getInPageTools(): ToolGroup<ToolDefinition> | undefined {
-    return this.inPageTools;
+  getThirdPartyDeveloperTools(): ToolGroup<ToolDefinition> | undefined {
+    return this.thirdPartyDeveloperTools;
   }
 
   getWebMcpTools(): WebMCPTool[] {
@@ -144,7 +144,7 @@ export class McpPage implements ContextPage {
     this.pptrPage.off('dialog', this.#dialogHandler);
   }
 
-  async executeInPageTool(
+  async executeThirdPartyDeveloperTool(
     toolName: string,
     params: Record<string, unknown>,
     response: Response,

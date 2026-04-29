@@ -13,12 +13,18 @@ import type {ParsedArguments} from '../../src/bin/chrome-devtools-mcp-cli-option
 import type {McpContext} from '../../src/McpContext.js';
 import type {McpResponse} from '../../src/McpResponse.js';
 import {TextSnapshot} from '../../src/TextSnapshot.js';
-import {executeInPageTool, listInPageTools} from '../../src/tools/inPage.js';
-import type {ToolGroup, ToolDefinition} from '../../src/tools/inPage.js';
+import {
+  executeThirdPartyDeveloperTool,
+  listThirdPartyDeveloperTools,
+} from '../../src/tools/thirdPartyDeveloper.js';
+import type {
+  ToolGroup,
+  ToolDefinition,
+} from '../../src/tools/thirdPartyDeveloper.js';
 import {withMcpContext} from '../utils.js';
 
-describe('inPage', () => {
-  describe('list_in_page_tools', () => {
+describe('thirdPartyDeveloperTools', () => {
+  describe('list_3p_developer_tools', () => {
     it('lists tools', async () => {
       await withMcpContext(
         async (response, context) => {
@@ -51,11 +57,18 @@ describe('inPage', () => {
             });
           });
 
-          await listInPageTools.handler({params: {}, page}, response, context);
+          await listThirdPartyDeveloperTools.handler(
+            {params: {}, page},
+            response,
+            context,
+          );
 
-          const result = await response.handle('list_in_page_tools', context);
-          // @ts-expect-error `structuredContent` has `inPageTools`
-          const actualGroup = result.structuredContent.inPageTools;
+          const result = await response.handle(
+            'list_3p_developer_tools',
+            context,
+          );
+          // @ts-expect-error `structuredContent` has `thirdPartyDeveloperTools`
+          const actualGroup = result.structuredContent.thirdPartyDeveloperTools;
           assert.strictEqual(actualGroup.name, 'test-group');
           assert.strictEqual(actualGroup.description, 'test description');
           assert.strictEqual(actualGroup.tools.length, 1);
@@ -72,7 +85,7 @@ describe('inPage', () => {
           });
         },
         undefined,
-        {categoryExperimentalInPage: true} as ParsedArguments,
+        {categoryExperimentalThirdParty: true} as ParsedArguments,
       );
     });
 
@@ -88,21 +101,28 @@ describe('inPage', () => {
             });
           });
 
-          await listInPageTools.handler({params: {}, page}, response, context);
+          await listThirdPartyDeveloperTools.handler(
+            {params: {}, page},
+            response,
+            context,
+          );
 
-          const result = await response.handle('list_in_page_tools', context);
-          assert.ok('inPageTools' in result.structuredContent);
+          const result = await response.handle(
+            'list_3p_developer_tools',
+            context,
+          );
+          assert.ok('thirdPartyDeveloperTools' in result.structuredContent);
           assert.deepEqual(
             (
               result.structuredContent as {
-                inPageTools: ToolGroup<ToolDefinition>;
+                thirdPartyDeveloperTools: ToolGroup<ToolDefinition>;
               }
-            ).inPageTools,
+            ).thirdPartyDeveloperTools,
             {},
           );
         },
         undefined,
-        {categoryExperimentalInPage: true} as ParsedArguments,
+        {categoryExperimentalThirdParty: true} as ParsedArguments,
       );
     });
 
@@ -117,21 +137,28 @@ describe('inPage', () => {
             });
           });
 
-          await listInPageTools.handler({params: {}, page}, response, context);
+          await listThirdPartyDeveloperTools.handler(
+            {params: {}, page},
+            response,
+            context,
+          );
 
-          const result = await response.handle('list_in_page_tools', context);
-          assert.ok('inPageTools' in result.structuredContent);
+          const result = await response.handle(
+            'list_3p_developer_tools',
+            context,
+          );
+          assert.ok('thirdPartyDeveloperTools' in result.structuredContent);
           assert.strictEqual(
             (
               result.structuredContent as {
-                inPageTools: ToolGroup<ToolDefinition>;
+                thirdPartyDeveloperTools: ToolGroup<ToolDefinition>;
               }
-            ).inPageTools,
+            ).thirdPartyDeveloperTools,
             undefined,
           );
         },
         undefined,
-        {categoryExperimentalInPage: true} as ParsedArguments,
+        {categoryExperimentalThirdParty: true} as ParsedArguments,
       );
     });
 
@@ -140,23 +167,31 @@ describe('inPage', () => {
         async (response, context) => {
           const page = await context.newPage();
           response.setPage(page);
-          await listInPageTools.handler({params: {}, page}, response, context);
+          await listThirdPartyDeveloperTools.handler(
+            {params: {}, page},
+            response,
+            context,
+          );
 
-          const result = await response.handle('list_in_page_tools', context);
-          assert.ok('inPageTools' in result.structuredContent);
+          const result = await response.handle(
+            'list_3p_developer_tools',
+            context,
+          );
+          assert.ok('thirdPartyDeveloperTools' in result.structuredContent);
           assert.strictEqual(
-            (result.structuredContent as {inPageTools: undefined}).inPageTools,
+            (result.structuredContent as {thirdPartyDeveloperTools: undefined})
+              .thirdPartyDeveloperTools,
             undefined,
           );
         },
         undefined,
-        {categoryExperimentalInPage: true} as ParsedArguments,
+        {categoryExperimentalThirdParty: true} as ParsedArguments,
       );
     });
   });
 
-  describe('execute_in_page_tool', () => {
-    async function setupInPageTools(
+  describe('execute_3p_developer_tool', () => {
+    async function setupThirdPartyDeveloperTools(
       response: McpResponse,
       context: McpContext,
       evaluateFn: () => void,
@@ -164,14 +199,18 @@ describe('inPage', () => {
       const page = await context.newPage();
       response.setPage(page);
       await page.pptrPage.evaluate(evaluateFn);
-      await listInPageTools.handler({params: {}, page}, response, context);
-      await response.handle('list_in_page_tools', context);
+      await listThirdPartyDeveloperTools.handler(
+        {params: {}, page},
+        response,
+        context,
+      );
+      await response.handle('list_3p_developer_tools', context);
     }
 
     it('executes a tool', async () => {
       await withMcpContext(
         async (response, context) => {
-          await setupInPageTools(response, context, () => {
+          await setupThirdPartyDeveloperTools(response, context, () => {
             window.__dtmcp = {
               toolGroup: {
                 name: 'test-group',
@@ -198,7 +237,7 @@ describe('inPage', () => {
             });
           });
 
-          await executeInPageTool.handler(
+          await executeThirdPartyDeveloperTool.handler(
             {
               params: {
                 toolName: 'test-tool',
@@ -215,13 +254,13 @@ describe('inPage', () => {
           );
         },
         undefined,
-        {categoryExperimentalInPage: true} as ParsedArguments,
+        {categoryExperimentalThirdParty: true} as ParsedArguments,
       );
     });
 
     it('throws if tool not found in list', async () => {
       await withMcpContext(async (response, context) => {
-        await setupInPageTools(response, context, () => {
+        await setupThirdPartyDeveloperTools(response, context, () => {
           window.__dtmcp = {
             toolGroup: {
               name: 'test-group',
@@ -237,7 +276,7 @@ describe('inPage', () => {
 
         await assert.rejects(
           async () => {
-            await executeInPageTool.handler(
+            await executeThirdPartyDeveloperTool.handler(
               {
                 params: {
                   toolName: 'missing-tool',
@@ -257,7 +296,7 @@ describe('inPage', () => {
     it('throws if parameters are invalid', async () => {
       await withMcpContext(
         async (response, context) => {
-          await setupInPageTools(response, context, () => {
+          await setupThirdPartyDeveloperTools(response, context, () => {
             window.__dtmcp = {
               toolGroup: {
                 name: 'test-group',
@@ -286,7 +325,7 @@ describe('inPage', () => {
 
           await assert.rejects(
             async () => {
-              await executeInPageTool.handler(
+              await executeThirdPartyDeveloperTool.handler(
                 {
                   params: {
                     toolName: 'test-tool',
@@ -302,14 +341,14 @@ describe('inPage', () => {
           );
         },
         undefined,
-        {categoryExperimentalInPage: true} as ParsedArguments,
+        {categoryExperimentalThirdParty: true} as ParsedArguments,
       );
     });
 
     it('handles JSON result', async () => {
       await withMcpContext(
         async (response, context) => {
-          await setupInPageTools(response, context, () => {
+          await setupThirdPartyDeveloperTools(response, context, () => {
             window.__dtmcp = {
               toolGroup: {
                 name: 'test-group',
@@ -330,7 +369,7 @@ describe('inPage', () => {
             });
           });
 
-          await executeInPageTool.handler(
+          await executeThirdPartyDeveloperTool.handler(
             {
               params: {
                 toolName: 'test-tool',
@@ -347,7 +386,7 @@ describe('inPage', () => {
           );
         },
         undefined,
-        {categoryExperimentalInPage: true} as ParsedArguments,
+        {categoryExperimentalThirdParty: true} as ParsedArguments,
       );
     });
 
@@ -356,7 +395,7 @@ describe('inPage', () => {
         const page = await context.newPage();
         response.setPage(page);
 
-        page.inPageTools = {
+        page.thirdPartyDeveloperTools = {
           name: 'test-group',
           description: 'test description',
           tools: [
@@ -415,7 +454,7 @@ describe('inPage', () => {
           throw new Error('Not found');
         };
 
-        await executeInPageTool.handler(
+        await executeThirdPartyDeveloperTool.handler(
           {
             params: {
               toolName: 'test-tool',
@@ -445,7 +484,7 @@ describe('inPage', () => {
     it('processToolResult replaces functions with "<Function object>"', async () => {
       await withMcpContext(
         async (response, context) => {
-          await setupInPageTools(response, context, () => {
+          await setupThirdPartyDeveloperTools(response, context, () => {
             window.__dtmcp = {
               toolGroup: {
                 name: 'test-group',
@@ -469,7 +508,7 @@ describe('inPage', () => {
             });
           });
 
-          await executeInPageTool.handler(
+          await executeThirdPartyDeveloperTool.handler(
             {
               params: {
                 toolName: 'test-tool',
@@ -486,14 +525,14 @@ describe('inPage', () => {
           );
         },
         undefined,
-        {categoryExperimentalInPage: true} as ParsedArguments,
+        {categoryExperimentalThirdParty: true} as ParsedArguments,
       );
     });
 
     it('processToolResult replaces circular references with "<Circular reference>"', async () => {
       await withMcpContext(
         async (response, context) => {
-          await setupInPageTools(response, context, () => {
+          await setupThirdPartyDeveloperTools(response, context, () => {
             window.__dtmcp = {
               toolGroup: {
                 name: 'test-group',
@@ -518,7 +557,7 @@ describe('inPage', () => {
             });
           });
 
-          await executeInPageTool.handler(
+          await executeThirdPartyDeveloperTool.handler(
             {
               params: {
                 toolName: 'test-tool',
@@ -535,14 +574,14 @@ describe('inPage', () => {
           );
         },
         undefined,
-        {categoryExperimentalInPage: true} as ParsedArguments,
+        {categoryExperimentalThirdParty: true} as ParsedArguments,
       );
     });
 
     it('processToolResult replaces non-plain objects with "<ConstructorName instance>"', async () => {
       await withMcpContext(
         async (response, context) => {
-          await setupInPageTools(response, context, () => {
+          await setupThirdPartyDeveloperTools(response, context, () => {
             class CustomClass {
               val = 'value';
             }
@@ -569,7 +608,7 @@ describe('inPage', () => {
             });
           });
 
-          await executeInPageTool.handler(
+          await executeThirdPartyDeveloperTool.handler(
             {
               params: {
                 toolName: 'test-tool',
@@ -590,7 +629,7 @@ describe('inPage', () => {
           );
         },
         undefined,
-        {categoryExperimentalInPage: true} as ParsedArguments,
+        {categoryExperimentalThirdParty: true} as ParsedArguments,
       );
     });
 
@@ -600,7 +639,7 @@ describe('inPage', () => {
           const page = await context.newPage();
           response.setPage(page);
 
-          page.inPageTools = {
+          page.thirdPartyDeveloperTools = {
             name: 'test-group',
             description: 'test description',
             tools: [
@@ -627,7 +666,7 @@ describe('inPage', () => {
             .stub(page, 'resolveCdpElementId')
             .returns('mock-uid');
 
-          await executeInPageTool.handler(
+          await executeThirdPartyDeveloperTool.handler(
             {
               params: {
                 toolName: 'test-tool',
@@ -647,17 +686,17 @@ describe('inPage', () => {
           stub.restore();
         },
         undefined,
-        {categoryExperimentalInPage: true} as ParsedArguments,
+        {categoryExperimentalThirdParty: true} as ParsedArguments,
       );
     });
 
-    it('creates a new snapshot if the in-page tool response contains a DOM element', async () => {
+    it('creates a new snapshot if the third-party developer tool response contains a DOM element', async () => {
       await withMcpContext(
         async (response, context) => {
           const page = await context.newPage();
           response.setPage(page);
 
-          page.inPageTools = {
+          page.thirdPartyDeveloperTools = {
             name: 'test-group',
             description: 'test description',
             tools: [
@@ -688,7 +727,7 @@ describe('inPage', () => {
             .stub(page, 'resolveCdpElementId')
             .returns('mock-uid');
 
-          await executeInPageTool.handler(
+          await executeThirdPartyDeveloperTool.handler(
             {
               params: {
                 toolName: 'test-tool',
@@ -713,17 +752,17 @@ describe('inPage', () => {
           stubSnapshot.restore();
         },
         undefined,
-        {categoryExperimentalInPage: true} as ParsedArguments,
+        {categoryExperimentalThirdParty: true} as ParsedArguments,
       );
     });
 
-    it('does not create a new snapshot if the in-page tool response does not contain a DOM element', async () => {
+    it('does not create a new snapshot if the third-party developer tool response does not contain a DOM element', async () => {
       await withMcpContext(
         async (response, context) => {
           const page = await context.newPage();
           response.setPage(page);
 
-          page.inPageTools = {
+          page.thirdPartyDeveloperTools = {
             name: 'test-group',
             description: 'test description',
             tools: [
@@ -747,7 +786,7 @@ describe('inPage', () => {
             .stub(TextSnapshot, 'create')
             .resolves({} as TextSnapshot);
 
-          await executeInPageTool.handler(
+          await executeThirdPartyDeveloperTool.handler(
             {
               params: {
                 toolName: 'test-tool',
@@ -771,7 +810,7 @@ describe('inPage', () => {
           stubSnapshot.restore();
         },
         undefined,
-        {categoryExperimentalInPage: true} as ParsedArguments,
+        {categoryExperimentalThirdParty: true} as ParsedArguments,
       );
     });
   });

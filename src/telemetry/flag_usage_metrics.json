@@ -271,11 +271,11 @@
     "flagType": "boolean"
   },
   {
-    "name": "category_experimental_in_page_present",
+    "name": "category_experimental_third_party_present",
     "flagType": "boolean"
   },
   {
-    "name": "category_experimental_in_page",
+    "name": "category_experimental_third_party",
     "flagType": "boolean"
   },
   {

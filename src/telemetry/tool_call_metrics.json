@@ -115,7 +115,7 @@
     ]
   },
   {
-    "name": "execute_in_page_tool",
+    "name": "execute_3p_developer_tool",
     "args": [
       {
         "name": "tool_name_length",
@@ -253,7 +253,7 @@
     "args": []
   },
   {
-    "name": "list_in_page_tools",
+    "name": "list_3p_developer_tools",
     "args": []
   },
   {
