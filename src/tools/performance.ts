@@ -48,6 +48,7 @@ export const startTrace = definePageTool({
       ),
     filePath: filePathSchema,
   },
+  blockedByDialog: true,
   handler: async (request, response, context) => {
     context.validatePath(request.params.filePath);
     if (context.isRunningPerformanceTrace()) {
@@ -126,6 +127,7 @@ export const stopTrace = definePageTool({
   schema: {
     filePath: filePathSchema,
   },
+  blockedByDialog: true,
   handler: async (request, response, context) => {
     context.validatePath(request.params.filePath);
     if (!context.isRunningPerformanceTrace()) {
@@ -161,6 +163,7 @@ export const analyzeInsight = definePageTool({
         'The name of the Insight you want more information on. For example: "DocumentLatency" or "LCPBreakdown"',
       ),
   },
+  blockedByDialog: false,
   handler: async (request, response, context) => {
     const lastRecording = context.recordedTraces().at(-1);
     if (!lastRecording) {

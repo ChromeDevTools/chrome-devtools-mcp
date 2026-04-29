@@ -46,6 +46,7 @@ export interface BaseToolDefinition<
     conditions?: string[];
   };
   schema: Schema;
+  blockedByDialog: boolean;
 }
 
 export interface ToolDefinition<
@@ -255,6 +256,7 @@ export type ContextPage = Readonly<{
 
   getDialog(): Dialog | undefined;
   clearDialog(): void;
+  throwIfDialogOpen(): void;
   waitForEventsAfterAction(
     action: () => Promise<unknown>,
     options?: {timeout?: number; handleDialog?: 'accept' | 'dismiss' | string},

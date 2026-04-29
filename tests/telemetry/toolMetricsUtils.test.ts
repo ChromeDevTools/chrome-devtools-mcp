@@ -46,6 +46,7 @@ describe('toolMetricsUtils', () => {
           argStr: zod.string(),
           uid: zod.string(), // Should be blocked
         },
+        blockedByDialog: false,
         handler: async () => {
           // no-op
         },
@@ -70,6 +71,7 @@ describe('toolMetricsUtils', () => {
         schema: {
           argEnum: zod.enum(['foo', 'bar']),
         },
+        blockedByDialog: false,
         handler: async () => {
           // no-op
         },

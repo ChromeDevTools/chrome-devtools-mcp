@@ -70,6 +70,7 @@ export const listNetworkRequests = definePageTool({
         'Set to true to return the preserved requests over the last 3 navigations.',
       ),
   },
+  blockedByDialog: false,
   handler: async (request, response, context) => {
     const data = await request.page.getDevToolsData();
     response.attachDevToolsData(data);
@@ -113,6 +114,7 @@ export const getNetworkRequest = definePageTool({
         'The absolute or relative path to a .network-response file to save the response body to. If omitted, the body is returned inline.',
       ),
   },
+  blockedByDialog: true,
   handler: async (request, response, context) => {
     context.validatePath(request.params.requestFilePath);
     context.validatePath(request.params.responseFilePath);

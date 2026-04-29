@@ -66,6 +66,7 @@ export const emulate = definePageTool({
         `Emulate device viewports '<width>x<height>x<devicePixelRatio>[,mobile][,touch][,landscape]'. 'touch' and 'mobile' to emulate mobile devices. 'landscape' to emulate landscape mode.`,
       ),
   },
+  blockedByDialog: true,
   handler: async (request, _response, context) => {
     const page = request.page;
     await context.emulate(request.params, page.pptrPage);

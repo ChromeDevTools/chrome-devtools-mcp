@@ -84,6 +84,7 @@ export const listPages = defineTool(args => {
       readOnlyHint: true,
     },
     schema: {},
+    blockedByDialog: false,
     handler: async (_request, response) => {
       response.setIncludePages(true);
       response.setListInPageTools();
@@ -110,6 +111,7 @@ export const selectPage = defineTool({
       .optional()
       .describe('Whether to focus the page and bring it to the top.'),
   },
+  blockedByDialog: false,
   handler: async (request, response, context) => {
     const page = context.getPageById(request.params.pageId);
     context.selectPage(page);
@@ -134,6 +136,7 @@ export const closePage = defineTool({
       .number()
       .describe('The ID of the page to close. Call list_pages to list pages.'),
   },
+  blockedByDialog: false,
   handler: async (request, response, context) => {
     try {
       await context.closePage(request.params.pageId);
@@ -185,6 +188,7 @@ export const newPage = defineTool(args => {
         : {}),
       ...timeoutSchema,
     },
+    blockedByDialog: false,
     handler: async (request, response, context) => {
       const page = await context.newPage(
         request.params.background,
@@ -251,6 +255,7 @@ export const navigatePage = definePageTool(args => {
         : {}),
       ...timeoutSchema,
     },
+    blockedByDialog: false,
     handler: async (request, response) => {
       const page = request.page;
       const options = {
@@ -385,6 +390,7 @@ export const resizePage = definePageTool({
     width: zod.number().describe('Page width'),
     height: zod.number().describe('Page height'),
   },
+  blockedByDialog: false,
   handler: async (request, response, _context) => {
     const page = request.page;
 
@@ -429,6 +435,7 @@ export const handleDialog = definePageTool({
       .optional()
       .describe('Optional prompt text to enter into the dialog.'),
   },
+  blockedByDialog: false,
   handler: async (request, response, _context) => {
     const page = request.page;
     const dialog = page.getDialog();
@@ -479,6 +486,7 @@ export const getTabId = definePageTool({
         `The ID of the page to get the tab ID for. Call ${listPages().name} to get available pages.`,
       ),
   },
+  blockedByDialog: false,
   handler: async (request, response, context) => {
     const page = context.getPageById(request.params.pageId);
     const tabId = (page.pptrPage as unknown as CdpPage)._tabId;
