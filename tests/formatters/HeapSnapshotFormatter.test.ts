@@ -37,7 +37,7 @@ describe('HeapSnapshotFormatter', () => {
   };
 
   describe('toString', () => {
-    it('formats data as CSV and sorts by self size', t => {
+    it('formats data as CSV and sorts by retained size', t => {
       const formatter = new HeapSnapshotFormatter(mockAggregates);
       const result = formatter.toString();
       t.assert.snapshot?.(result);
@@ -45,7 +45,7 @@ describe('HeapSnapshotFormatter', () => {
   });
 
   describe('toJSON', () => {
-    it('returns structured data sorted by self size', () => {
+    it('returns structured data sorted by retained size', () => {
       const formatter = new HeapSnapshotFormatter(mockAggregates);
       const result = formatter.toJSON();
       assert.deepStrictEqual(result, [
@@ -68,7 +68,7 @@ describe('HeapSnapshotFormatter', () => {
   });
 
   describe('sort', () => {
-    it('sorts aggregates by self size descending', () => {
+    it('sorts aggregates by retained size descending', () => {
       const unsortedAggregates: Record<
         string,
         DevTools.HeapSnapshotModel.HeapSnapshotModel.AggregatedInfo
@@ -76,10 +76,12 @@ describe('HeapSnapshotFormatter', () => {
         ObjectB: {
           name: 'ObjectB',
           self: 50,
+          maxRet: 500,
         },
         ObjectA: {
           name: 'ObjectA',
           self: 100,
+          maxRet: 1000,
         },
       } as unknown as Record<
         string,

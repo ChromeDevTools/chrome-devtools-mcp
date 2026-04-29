@@ -33,7 +33,8 @@ in the DevTools Elements panel (if any).`,
         'The absolute path, or a path relative to the current working directory, to save the snapshot to instead of attaching it to the response.',
       ),
   },
-  handler: async (request, response) => {
+  handler: async (request, response, context) => {
+    context.validatePath(request.params.filePath);
     response.includeSnapshot({
       verbose: request.params.verbose ?? false,
       filePath: request.params.filePath,

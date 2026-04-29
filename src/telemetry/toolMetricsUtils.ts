@@ -62,10 +62,9 @@ export function applyToExistingMetrics(
   });
 }
 
-function applyToExisting<T extends {name: string; isDeprecated?: boolean}>(
-  existing: T[],
-  update: T[],
-): T[] {
+export function applyToExisting<
+  T extends {name: string; isDeprecated?: boolean},
+>(existing: T[], update: T[]): T[] {
   const existingNames = new Set(existing.map(item => item.name));
   const updatedNames = new Set(update.map(item => item.name));
 

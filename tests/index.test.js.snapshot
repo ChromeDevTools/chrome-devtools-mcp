@@ -5,3 +5,7 @@ exports[`e2e > calls a tool 1`] = `
 exports[`e2e > calls a tool multiple times 1`] = `
 [{"type":"text","text":"## Pages\\n1: about:blank [selected]"}]
 `;
+
+exports[`e2e > returns blocked message when dialog is opened during tool execution 1`] = `
+{"content":[{"type":"text","text":"# Open dialog\\nalert: test dialog.\\nCall handle_dialog to handle it before continuing.\\nError: Failed to interact with the element with uid 1_1. The element did not become interactive within the configured timeout."}],"isError":true}
+`;

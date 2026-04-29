@@ -110,7 +110,7 @@ export const commands: Commands = {
         name: 'geolocation',
         type: 'string',
         description:
-          'Geolocation (`<latitude>x<longitude>`) to emulate. Latitude between -90 and 90. Longitude between -180 and 180. Omit clear the geolocation override.',
+          'Geolocation (`<latitude>x<longitude>`) to emulate. Latitude between -90 and 90. Longitude between -180 and 180. Omit to clear the geolocation override.',
         required: false,
       },
       userAgent: {
@@ -155,11 +155,18 @@ export const commands: Commands = {
         description: 'An optional list of arguments to pass to the function.',
         required: false,
       },
+      dialogAction: {
+        name: 'dialogAction',
+        type: 'string',
+        description:
+          'Handle dialogs while execution. "accept", "dismiss", or string for response of window.prompt. Defaults to accept.',
+        required: false,
+      },
     },
   },
   fill: {
     description:
-      'Type text into a input, text area or select an option from a <select> element.',
+      'Type text into an input, text area or select an option from a <select> element.',
     category: 'Input automation',
     args: {
       uid: {
@@ -173,25 +180,6 @@ export const commands: Commands = {
         name: 'value',
         type: 'string',
         description: 'The value to fill in',
-        required: true,
-      },
-      includeSnapshot: {
-        name: 'includeSnapshot',
-        type: 'boolean',
-        description:
-          'Whether to include a snapshot in the response. Default is false.',
-        required: false,
-      },
-    },
-  },
-  fill_form: {
-    description: 'Fill out multiple form elements at once',
-    category: 'Input automation',
-    args: {
-      elements: {
-        name: 'elements',
-        type: 'array',
-        description: 'Elements from snapshot to fill out.',
         required: true,
       },
       includeSnapshot: {
@@ -233,14 +221,14 @@ export const commands: Commands = {
         name: 'requestFilePath',
         type: 'string',
         description:
-          'The absolute or relative path to save the request body to. If omitted, the body is returned inline.',
+          'The absolute or relative path to a .network-request file to save the request body to. If omitted, the body is returned inline.',
         required: false,
       },
       responseFilePath: {
         name: 'responseFilePath',
         type: 'string',
         description:
-          'The absolute or relative path to save the response body to. If omitted, the body is returned inline.',
+          'The absolute or relative path to a .network-response file to save the response body to. If omitted, the body is returned inline.',
         required: false,
       },
     },
@@ -324,7 +312,7 @@ export const commands: Commands = {
         name: 'pageSize',
         type: 'integer',
         description:
-          'Maximum number of messages to return. When omitted, returns all requests.',
+          'Maximum number of messages to return. When omitted, returns all messages.',
         required: false,
       },
       pageIdx: {
@@ -388,7 +376,7 @@ export const commands: Commands = {
     },
   },
   list_pages: {
-    description: 'Get a list of pages  open in the browser.',
+    description: 'Get a list of pages open in the browser.',
     category: 'Navigation automation',
     args: {},
   },
@@ -601,8 +589,8 @@ export const commands: Commands = {
   },
   take_memory_snapshot: {
     description:
-      'Capture a memory heapsnapshot of the currently selected page to memory leak debugging',
-    category: 'Performance',
+      'Capture a heap snapshot of the currently selected page. Use to analyze the memory distribution of JavaScript objects and debug memory leaks.',
+    category: 'Memory',
     args: {
       filePath: {
         name: 'filePath',
@@ -637,7 +625,7 @@ export const commands: Commands = {
         name: 'uid',
         type: 'string',
         description:
-          'The uid of an element on the page from the page content snapshot. If omitted takes a pages screenshot.',
+          'The uid of an element on the page from the page content snapshot. If omitted, takes a page screenshot.',
         required: false,
       },
       fullPage: {
@@ -718,26 +706,6 @@ export const commands: Commands = {
         type: 'boolean',
         description:
           'Whether to include a snapshot in the response. Default is false.',
-        required: false,
-      },
-    },
-  },
-  wait_for: {
-    description: 'Wait for the specified text to appear on the selected page.',
-    category: 'Navigation automation',
-    args: {
-      text: {
-        name: 'text',
-        type: 'array',
-        description:
-          'Non-empty list of texts. Resolves when any value appears on the page.',
-        required: true,
-      },
-      timeout: {
-        name: 'timeout',
-        type: 'integer',
-        description:
-          'Maximum wait time in milliseconds. If set to 0, the default timeout will be used.',
         required: false,
       },
     },

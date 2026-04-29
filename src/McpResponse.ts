@@ -9,6 +9,7 @@ import type {WebMCPTool} from 'puppeteer-core';
 import type {ParsedArguments} from './bin/chrome-devtools-mcp-cli-options.js';
 import {ConsoleFormatter} from './formatters/ConsoleFormatter.js';
 import {HeapSnapshotFormatter} from './formatters/HeapSnapshotFormatter.js';
+import {isNodeLike} from './formatters/HeapSnapshotFormatter.js';
 import {IssueFormatter} from './formatters/IssueFormatter.js';
 import {NetworkFormatter} from './formatters/NetworkFormatter.js';
 import {SnapshotFormatter} from './formatters/SnapshotFormatter.js';
@@ -204,6 +205,7 @@ export class McpResponse implements Response {
   #redactNetworkHeaders = true;
   #pageLimit?: number;
   #pageQuery?: string;
+  #error?: Error;
 
   constructor(args: ParsedArguments) {
     this.#args = args;
@@ -313,6 +315,10 @@ export class McpResponse implements Response {
     };
   }
 
+  setError(error: Error): void {
+    this.#error = error;
+  }
+
   attachNetworkRequest(
     reqId: number,
     options?: {requestFilePath?: string; responseFilePath?: string},
@@ -379,6 +385,10 @@ export class McpResponse implements Response {
   }
   get consoleMessagesTypes(): string[] | undefined {
     return this.#consoleDataOptions?.types;
+  }
+
+  get error(): Error | undefined {
+    return this.#error;
   }
 
   appendResponseLine(value: string): void {
@@ -668,6 +678,7 @@ export class McpResponse implements Response {
       lighthouseResult: this.#attachedLighthouseResult,
       inPageTools,
       webmcpTools,
+      errorMessage: this.#error?.message,
     });
   }
 
@@ -686,6 +697,7 @@ export class McpResponse implements Response {
       lighthouseResult?: LighthouseData;
       inPageTools?: ToolGroup<ToolDefinition>;
       webmcpTools?: WebMCPTool[];
+      errorMessage?: string;
     },
   ): {content: Array<TextContent | ImageContent>; structuredContent: object} {
     const structuredContent: {
@@ -724,6 +736,7 @@ export class McpResponse implements Response {
       heapSnapshotNodes?: readonly object[];
       extensionServiceWorkers?: object[];
       extensionPages?: object[];
+      errorMessage?: string;
     } = {};
 
     const response = [];
@@ -967,8 +980,12 @@ Call ${handleDialog.name} to handle it before continuing.`);
       }
       const nodes = this.#heapSnapshotOptions.nodes;
       if (nodes) {
+        const sortedItems = nodes.items
+          .filter(isNodeLike)
+          .sort((a, b) => b.retainedSize - a.retainedSize);
+
         const paginationData = this.#dataWithPagination(
-          nodes.items,
+          sortedItems,
           this.#heapSnapshotOptions.pagination,
         );
 
@@ -1095,6 +1112,11 @@ Call ${handleDialog.name} to handle it before continuing.`);
       } else {
         response.push('<no console messages found>');
       }
+    }
+
+    if (data.errorMessage) {
+      response.push(`Error: ${data.errorMessage}`);
+      structuredContent.errorMessage = data.errorMessage;
     }
 
     const text: TextContent = {
