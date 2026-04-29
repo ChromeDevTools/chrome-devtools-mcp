@@ -141,8 +141,14 @@ function generateToolsTOC(
     const categoryName = labels[category];
     toc += `- **${categoryName}** (${categoryTools.length} tools)\n`;
 
-    // Sort tools within category for TOC
-    categoryTools.sort((a: Tool, b: Tool) => a.name.localeCompare(b.name));
+    // Sort tools within category for TOC: no-arg tools first, then with args
+    categoryTools.sort((a: Tool, b: Tool) => {
+      const aHasRequired = a.inputSchema?.required?.length ?? 0 > 0;
+      const bHasRequired = b.inputSchema?.required?.length ?? 0 > 0;
+      if (!aHasRequired && bHasRequired) return -1;
+      if (aHasRequired && !bHasRequired) return 1;
+      return a.name.localeCompare(b.name);
+    });
     for (const tool of categoryTools) {
       const anchorLink = tool.name.toLowerCase();
       toc += `  - [\`${tool.name}\`](docs/tool-reference.md#${anchorLink})\n`;
@@ -361,8 +367,14 @@ async function generateReference(
       markdown += `> NOTE: ${categoryName} are not active by default. Use the '${flagName}' flag\n\n`;
     }
 
-    // Sort tools within category
-    categoryTools.sort((a: Tool, b: Tool) => a.name.localeCompare(b.name));
+    // Sort tools within category: no-arg tools first, then tools with required args, then optional-arg tools
+    categoryTools.sort((a: Tool, b: Tool) => {
+      const aHasRequired = a.inputSchema?.required?.length ?? 0 > 0;
+      const bHasRequired = b.inputSchema?.required?.length ?? 0 > 0;
+      if (!aHasRequired && bHasRequired) return -1;
+      if (aHasRequired && !bHasRequired) return 1;
+      return a.name.localeCompare(b.name);
+    });
 
     for (const tool of categoryTools) {
       markdown += `### \`${tool.name}\`\n\n`;
