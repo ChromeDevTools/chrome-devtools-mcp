@@ -2,11 +2,18 @@
   "name": "chrome-devtools-mcp",
   "version": "0.23.0",
   "description": "Reliable automation, in-depth debugging, and performance analysis in Chrome using Chrome DevTools and Puppeteer",
+  "userConfig": {
+    "executablePath": {
+      "description": "Optional path to a custom Chrome executable. Useful when the system has multiple Chrome installations (e.g. point at the Chrome for Testing binary so the MCP-launched Chrome stays separate from the user's regular Chrome and can be scripted unambiguously by AppleScript / OS automation tools). Leave blank to use the auto-detected stable Chrome.",
+      "sensitive": false
+    }
+  },
   "mcpServers": {
     "chrome-devtools": {
       "command": "npx",
       "args": [
-        "chrome-devtools-mcp@latest"
+        "chrome-devtools-mcp@latest",
+        "--executablePath=${user_config.executablePath}"
       ]
     }
   }
