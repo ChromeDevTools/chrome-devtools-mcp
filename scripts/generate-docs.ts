@@ -13,6 +13,7 @@ import {get_encoding} from 'tiktoken';
 
 import {cliOptions} from '../build/src/bin/chrome-devtools-mcp-cli-options.js';
 import type {ParsedArguments} from '../build/src/bin/chrome-devtools-mcp-cli-options.js';
+import {buildFlag} from '../build/src/index.js';
 import {
   ToolCategory,
   OFF_BY_DEFAULT_CATEGORIES,
@@ -356,7 +357,7 @@ async function generateReference(
     markdown += `## ${categoryName}\n\n`;
 
     if (OFF_BY_DEFAULT_CATEGORIES.includes(category)) {
-      const flagName = `--category-${category}`;
+      const flagName = `--${buildFlag(category)}`;
 
       markdown += `> NOTE: ${categoryName} are not active by default. Use the '${flagName}' flag\n\n`;
     }
@@ -446,6 +447,11 @@ function getToolsAndCategories(tools: any) {
   // Convert ToolDefinitions to ToolWithAnnotations
   const toolsWithAnnotations: ToolWithAnnotations[] = tools
     .filter(tool => {
+      // Skipping in_page tools as they are not launched yet
+      if (tool.annotations.category.includes('experimental')) {
+        return false;
+      }
+
       if (!tool.annotations.conditions) {
         return true;
       }

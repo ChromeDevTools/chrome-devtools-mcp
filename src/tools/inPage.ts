@@ -48,7 +48,6 @@ export const listInPageTools = definePageTool({
   annotations: {
     category: ToolCategory.IN_PAGE,
     readOnlyHint: true,
-    conditions: ['experimentalInPageTools'],
   },
   schema: {},
   blockedByDialog: false,
@@ -63,7 +62,6 @@ export const executeInPageTool = definePageTool({
   annotations: {
     category: ToolCategory.IN_PAGE,
     readOnlyHint: false,
-    conditions: ['experimentalInPageTools'],
   },
   schema: {
     toolName: zod.string().describe('The name of the tool to execute'),
