@@ -191,11 +191,11 @@
     "flagType": "boolean"
   },
   {
-    "name": "category_in_page_tools",
+    "name": "category_third_party_developer_tools",
     "flagType": "boolean"
   },
   {
-    "name": "category_in_page_tools_present",
+    "name": "category_third_party_developer_tools_present",
     "flagType": "boolean"
   },
   {

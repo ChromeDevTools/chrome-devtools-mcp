@@ -12,7 +12,7 @@ export enum ToolCategory {
   NETWORK = 'network',
   DEBUGGING = 'debugging',
   EXTENSIONS = 'extensions',
-  IN_PAGE = 'in-page',
+  '3P_DEVELOPER' = '3p-developer',
   MEMORY = 'memory',
 }
 
@@ -24,7 +24,7 @@ export const labels = {
   [ToolCategory.NETWORK]: 'Network',
   [ToolCategory.DEBUGGING]: 'Debugging',
   [ToolCategory.EXTENSIONS]: 'Extensions',
-  [ToolCategory.IN_PAGE]: 'In-page tools',
+  [ToolCategory['3P_DEVELOPER']]: 'Third-party developer tools',
   [ToolCategory.MEMORY]: 'Memory',
 };
 

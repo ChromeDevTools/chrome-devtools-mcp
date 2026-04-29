@@ -36,34 +36,34 @@ declare global {
   }
 }
 
-export const listInPageTools = definePageTool({
-  name: 'list_in_page_tools',
-  description: `Lists all in-page tools the page exposes for providing runtime information.
-  In-page tools can be called via the 'execute_in_page_tool()' MCP tool.
-  Alternatively, in-page tools can be executed by calling 'evaluate_script' and adding the
+export const listThirdPartyDeveloperTools = definePageTool({
+  name: 'list_3p_developer_tools',
+  description: `Lists all third-party developer tools the page exposes for providing runtime information.
+  Third-party developer tools can be called via the 'execute_3p_developer_tool()' MCP tool.
+  Alternatively, third-party developer tools can be executed by calling 'evaluate_script' and adding the
   following command to the script:
   'window.__dtmcp.executeTool(toolName, params)'
-  This might be helpful when the in-page-tools return non-serializable values or when composing
-  the in-page-tools with additional functionality.`,
+  This might be helpful when the third-party developer tools return non-serializable values or when composing
+  third-party developer tools with additional functionality.`,
   annotations: {
-    category: ToolCategory.IN_PAGE,
+    category: ToolCategory['3P_DEVELOPER'],
     readOnlyHint: true,
-    conditions: ['inPageTools'],
+    conditions: ['thirdPartyDeveloperTools'],
   },
   schema: {},
   blockedByDialog: false,
   handler: async (_request, response, _context) => {
-    response.setListInPageTools();
+    response.setListThirdPartyDeveloperTools();
   },
 });
 
-export const executeInPageTool = definePageTool({
-  name: 'execute_in_page_tool',
+export const executeThirdPartyDeveloperTool = definePageTool({
+  name: 'execute_3p_developer_tool',
   description: `Executes a tool exposed by the page.`,
   annotations: {
-    category: ToolCategory.IN_PAGE,
+    category: ToolCategory['3P_DEVELOPER'],
     readOnlyHint: false,
-    conditions: ['inPageTools'],
+    conditions: ['thirdPartyDeveloperTools'],
   },
   schema: {
     toolName: zod.string().describe('The name of the tool to execute'),
@@ -90,7 +90,7 @@ export const executeInPageTool = definePageTool({
       }
     }
 
-    const toolGroup = request.page.getInPageTools();
+    const toolGroup = request.page.getThirdPartyDeveloperTools();
     const tool = toolGroup?.tools.find(t => t.name === toolName);
     if (!tool) {
       throw new Error(`Tool ${toolName} not found`);
@@ -104,6 +104,10 @@ export const executeInPageTool = definePageTool({
       );
     }
 
-    await request.page.executeInPageTool(toolName, params, response);
+    await request.page.executeThirdPartyDeveloperTool(
+      toolName,
+      params,
+      response,
+    );
   },
 });
