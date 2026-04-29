@@ -7,6 +7,8 @@
 import assert from 'node:assert';
 import {before, describe, it} from 'node:test';
 
+import type {Dialog} from 'puppeteer-core';
+
 import type {ParsedArguments} from '../../src/bin/chrome-devtools-mcp-cli-options.js';
 import {loadIssueDescriptions} from '../../src/issue-descriptions.js';
 import {McpResponse} from '../../src/McpResponse.js';
@@ -17,7 +19,11 @@ import {
   listConsoleMessages,
 } from '../../src/tools/console.js';
 import {serverHooks} from '../server.js';
-import {getTextContent, withMcpContext} from '../utils.js';
+import {
+  getTextContent,
+  withMcpContext,
+  stabilizeStructuredContent,
+} from '../utils.js';
 
 describe('console', () => {
   before(async () => {
@@ -160,6 +166,37 @@ describe('console', () => {
               ),
             );
           }
+        });
+      });
+
+      it('when dialog is open', async t => {
+        await withMcpContext(async (response, context) => {
+          const page = context.getSelectedPptrPage();
+          await page.setContent(
+            '<script>console.log("Pre-dialog message")</script>',
+          );
+
+          const dialogPromise = new Promise<Dialog>(resolve => {
+            page.on('dialog', dialog => resolve(dialog));
+          });
+
+          page.evaluate(() => {
+            alert('test dialog');
+          });
+          const dialog = await dialogPromise;
+
+          await listConsoleMessages().handler(
+            {params: {}, page: context.getSelectedMcpPage()},
+            response,
+            context,
+          );
+
+          const result = await response.handle(
+            'list_console_messages',
+            context,
+          );
+          t.assert.snapshot?.(JSON.stringify(result));
+          await dialog.dismiss();
         });
       });
     });
@@ -472,6 +509,45 @@ describe('console', () => {
         const rawText = getTextContent(formattedResponse.content[0]);
 
         t.assert.snapshot?.(rawText);
+      });
+    });
+
+    it('when dialog is open', async t => {
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedPptrPage();
+        await page.setContent(
+          '<script>console.error("This is an error")</script>',
+        );
+
+        await listConsoleMessages().handler(
+          {params: {}, page: context.getSelectedMcpPage()},
+          response,
+          context,
+        );
+
+        const dialogPromise = new Promise<Dialog>(resolve => {
+          page.on('dialog', dialog => resolve(dialog));
+        });
+        page.evaluate(() => {
+          alert('test dialog');
+        });
+        const dialog = await dialogPromise;
+
+        await getConsoleMessage.handler(
+          {params: {msgid: 1}, page: context.getSelectedMcpPage()},
+          response,
+          context,
+        );
+
+        const result = await response.handle('get_console_message', context);
+        t.assert.snapshot?.(
+          JSON.stringify(
+            stabilizeStructuredContent(result.structuredContent),
+            null,
+            2,
+          ),
+        );
+        await dialog.dismiss();
       });
     });
   });
