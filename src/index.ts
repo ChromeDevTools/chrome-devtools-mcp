@@ -168,8 +168,8 @@ export async function createMcpServer(
       return;
     }
     if (
-      tool.annotations.category === ToolCategory.IN_PAGE &&
-      !serverArgs.categoryInPageTools
+      tool.annotations.category === ToolCategory['3P_DEVELOPER'] &&
+      !serverArgs.categoryThirdPartyDeveloperTools
     ) {
       return;
     }

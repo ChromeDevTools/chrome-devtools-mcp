@@ -149,8 +149,8 @@ export class TextSnapshot {
   }
 
   // ExtraHandles represent DOM nodes which might not be part of the accessibility tree, e.g. DOM nodes
-  // returned by in-page tools. We insert them into the tree by finding the closest ancestor in the
-  // tree and inserting the node as a child. The ancestor's child nodes are re-parented if necessary.
+  // returned by third-party developer tools. We insert them into the tree by finding the closest ancestor
+  // in the tree and inserting the node as a child. The ancestor's child nodes are re-parented if necessary.
   private static async insertExtraNodes(
     page: McpPage,
     idToNode: Map<string, TextSnapshotNode>,

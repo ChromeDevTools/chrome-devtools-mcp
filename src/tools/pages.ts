@@ -87,7 +87,7 @@ export const listPages = defineTool(args => {
     blockedByDialog: false,
     handler: async (_request, response) => {
       response.setIncludePages(true);
-      response.setListInPageTools();
+      response.setListThirdPartyDeveloperTools();
       response.setListWebMcpTools();
     },
   };
@@ -116,7 +116,7 @@ export const selectPage = defineTool({
     const page = context.getPageById(request.params.pageId);
     context.selectPage(page);
     response.setIncludePages(true);
-    response.setListInPageTools();
+    response.setListThirdPartyDeveloperTools();
     response.setListWebMcpTools();
     if (request.params.bringToFront) {
       await page.pptrPage.bringToFront();
@@ -148,7 +148,7 @@ export const closePage = defineTool({
       }
     }
     response.setIncludePages(true);
-    response.setListInPageTools();
+    response.setListThirdPartyDeveloperTools();
   },
 });
 
@@ -206,7 +206,7 @@ export const newPage = defineTool(args => {
       );
 
       response.setIncludePages(true);
-      response.setListInPageTools();
+      response.setListThirdPartyDeveloperTools();
     },
   };
 });
@@ -373,7 +373,7 @@ export const navigatePage = definePageTool(args => {
       }
 
       response.setIncludePages(true);
-      response.setListInPageTools();
+      response.setListThirdPartyDeveloperTools();
       response.setListWebMcpTools();
     },
   };
