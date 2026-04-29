@@ -49,6 +49,15 @@ delete startCliOptions.autoConnect;
 delete startCliOptions.viewport;
 
 // Change the defaults for the CLI.
+delete startCliOptions.experimentalStructuredContent;
+delete startCliOptions.experimentalInteropTools;
+delete startCliOptions.experimentalPageIdRouting;
+if (!('default' in cliOptions.headless)) {
+  throw new Error('headless cli option unexpectedly does not have a default');
+}
+if ('default' in cliOptions.isolated) {
+  throw new Error('isolated cli option unexpectedly has a default');
+}
 startCliOptions.headless!.default = true;
 startCliOptions.isolated!.description =
   'If specified, creates a temporary user-data-dir that is automatically cleaned up after the browser is closed. Defaults to true unless userDataDir is provided.';
