@@ -363,6 +363,20 @@ describe('pages', () => {
       });
     });
 
+    it('treats an empty isolatedContext as the default context', async () => {
+      await withMcpContext(async (response, context) => {
+        const defaultContext = context.getSelectedPptrPage().browserContext();
+        await newPage().handler(
+          {params: {url: 'about:blank', isolatedContext: ''}},
+          response,
+          context,
+        );
+        const page = context.getSelectedPptrPage();
+        assert.strictEqual(context.getIsolatedContextName(page), undefined);
+        assert.strictEqual(page.browserContext(), defaultContext);
+      });
+    });
+
     it('closes an isolated page without errors', async () => {
       await withMcpContext(async (response, context) => {
         await newPage().handler(
