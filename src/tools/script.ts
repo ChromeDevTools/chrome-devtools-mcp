@@ -64,6 +64,7 @@ Example with arguments: \`(el) => {
           }
         : {}),
     },
+    blockedByDialog: true,
     handler: async (request, response, context) => {
       const {
         serviceWorkerId,

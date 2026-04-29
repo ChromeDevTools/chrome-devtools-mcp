@@ -78,6 +78,7 @@ export const listConsoleMessages = definePageTool(cliArgs => {
           'Set to true to return the preserved messages over the last 3 navigations.',
         ),
     },
+    blockedByDialog: false,
     handler: async (request, response) => {
       response.setIncludeConsoleData(true, {
         pageSize: request.params.pageSize,
@@ -103,6 +104,7 @@ export const getConsoleMessage = definePageTool({
         'The msgid of a console message on the page from the listed console messages',
       ),
   },
+  blockedByDialog: false,
   handler: async (request, response) => {
     response.attachConsoleMessage(request.params.msgid);
   },

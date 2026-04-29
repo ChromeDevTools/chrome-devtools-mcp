@@ -18,6 +18,7 @@ export const listWebMcpTools = definePageTool({
     conditions: ['experimentalWebmcp'],
   },
   schema: {},
+  blockedByDialog: false,
   handler: async (_request, response, _context) => {
     response.setListWebMcpTools();
   },
@@ -38,6 +39,7 @@ export const executeWebMcpTool = definePageTool({
       .optional()
       .describe('The JSON-stringified parameters to pass to the WebMCP tool'),
   },
+  blockedByDialog: false,
   handler: async (request, response) => {
     const toolName = request.params.toolName;
 
