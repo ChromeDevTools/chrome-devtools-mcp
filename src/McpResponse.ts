@@ -203,10 +203,17 @@ export class McpResponse implements Response {
   #args: ParsedArguments;
   #page?: McpPage;
   #redactNetworkHeaders = true;
+  #pageLimit?: number;
+  #pageQuery?: string;
   #error?: Error;
 
   constructor(args: ParsedArguments) {
     this.#args = args;
+  }
+
+  setPageListOptions(limit?: number, query?: string): void {
+    this.#pageLimit = limit;
+    this.#pageQuery = query;
   }
 
   setPage(page: McpPage): void {
@@ -803,9 +810,24 @@ Call ${handleDialog.name} to handle it before continuing.`);
       );
 
       if (regularPages.length) {
-        const parts = [`## Pages`];
+        // Apply query filter if specified
+        let filteredPages = regularPages;
+        if (this.#pageQuery) {
+          const queryLower = this.#pageQuery.toLowerCase();
+          filteredPages = regularPages.filter(page =>
+            page.url().toLowerCase().includes(queryLower),
+          );
+        }
+
+        // Apply limit if specified
+        const displayPages = this.#pageLimit
+          ? filteredPages.slice(0, this.#pageLimit)
+          : filteredPages;
+        const hasMore = filteredPages.length > displayPages.length;
+
+        const parts = [`## Pages${hasMore ? ` (showing ${displayPages.length} of ${filteredPages.length})` : ''}`];
         const structuredPages = [];
-        for (const page of regularPages) {
+        for (const page of displayPages) {
           const isolatedContextName = context.getIsolatedContextName(page);
           const contextLabel = isolatedContextName
             ? ` isolatedContext=${isolatedContextName}`

@@ -44,7 +44,7 @@ function handleActionError(error: unknown, uid: string) {
 
 export const click = definePageTool({
   name: 'click',
-  description: `Clicks on the provided element`,
+  description: `Clicks on an element (buttons, links, etc.). For <select> dropdowns or comboboxes, use the 'fill' tool instead to select options directly.`,
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
