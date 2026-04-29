@@ -83,11 +83,23 @@ export const listPages = defineTool(args => {
       category: ToolCategory.NAVIGATION,
       readOnlyHint: true,
     },
-    schema: {},
-    handler: async (_request, response) => {
+    schema: {
+      limit: zod
+        .number()
+        .optional()
+        .describe('Maximum number of pages to return.'),
+      query: zod
+        .string()
+        .optional()
+        .describe('Filter pages by URL containing this query string.'),
+    },
+    handler: async (request, response) => {
       response.setIncludePages(true);
       response.setListInPageTools();
       response.setListWebMcpTools();
+      if (request.params.limit || request.params.query) {
+        response.setPageListOptions(request.params.limit, request.params.query);
+      }
     },
   };
 });
