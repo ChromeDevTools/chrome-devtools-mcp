@@ -12,7 +12,7 @@ export enum ToolCategory {
   NETWORK = 'network',
   DEBUGGING = 'debugging',
   EXTENSIONS = 'extensions',
-  IN_PAGE = 'in-page',
+  IN_PAGE = 'inPageTools',
   MEMORY = 'memory',
 }
 

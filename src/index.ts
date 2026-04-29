@@ -24,20 +24,15 @@ import {
   ListRootsResultSchema,
   RootsListChangedNotificationSchema,
 } from './third_party/index.js';
-import {
-  ToolCategory,
-  labels,
-  OFF_BY_DEFAULT_CATEGORIES,
-} from './tools/categories.js';
+import type {ToolCategory} from './tools/categories.js';
+import {labels, OFF_BY_DEFAULT_CATEGORIES} from './tools/categories.js';
 import type {DefinedPageTool, ToolDefinition} from './tools/ToolDefinition.js';
 import {pageIdSchema} from './tools/ToolDefinition.js';
 import {createTools} from './tools/tools.js';
 import {VERSION} from './version.js';
 
 export function buildFlag(category: ToolCategory) {
-  return category === ToolCategory.IN_PAGE
-    ? 'categoryInPageTools'
-    : `category${category.charAt(0).toUpperCase() + category.slice(1)}`;
+  return `category${category.charAt(0).toUpperCase() + category.slice(1)}`;
 }
 
 function buildDisabledMessage(
