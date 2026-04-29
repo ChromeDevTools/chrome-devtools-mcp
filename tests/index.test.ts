@@ -114,7 +114,7 @@ describe('e2e', () => {
         );
         assert.ok(listInPageTools);
       },
-      ['--category-in-page-tools'],
+      ['--category-in-page-tools', '--experimental-in-page-tools'],
     );
   });
 

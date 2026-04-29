@@ -11,7 +11,7 @@ import {Client} from '@modelcontextprotocol/sdk/client/index.js';
 import {StdioClientTransport} from '@modelcontextprotocol/sdk/client/stdio.js';
 
 import {parseArguments} from '../build/src/bin/chrome-devtools-mcp-cli-options.js';
-import {CONDITION_TO_FLAG, buildFlag} from '../build/src/index.js';
+import {buildFlag} from '../build/src/index.js';
 import {
   labels,
   ToolCategory,
@@ -174,11 +174,7 @@ async function generateCli() {
 
     const conditions = toolNameToConditions.get(tool.name) || [];
     for (const condition of conditions) {
-      const flag =
-        CONDITION_TO_FLAG[condition as keyof typeof CONDITION_TO_FLAG];
-      if (flag) {
-        requiredFlags.push(`--${flag}=true`);
-      }
+      requiredFlags.push(`--${condition}=true`);
     }
 
     if (requiredFlags.length > 0) {

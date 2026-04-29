@@ -34,14 +34,6 @@ import {pageIdSchema} from './tools/ToolDefinition.js';
 import {createTools} from './tools/tools.js';
 import {VERSION} from './version.js';
 
-export const CONDITION_TO_FLAG: Record<string, string> = {
-  computerVision: 'experimentalVision',
-  experimentalMemory: 'experimentalMemory',
-  experimentalInteropTools: 'experimentalInteropTools',
-  screencast: 'experimentalScreencast',
-  experimentalWebmcp: 'experimentalWebmcp',
-};
-
 export function buildFlag(category: ToolCategory) {
   return category === ToolCategory.IN_PAGE
     ? 'categoryInPageTools'
@@ -88,9 +80,8 @@ function getConditionStatus(
   condition: string,
   serverArgs: ReturnType<typeof parseArguments>,
 ): {conditionFlag?: string; disabled: boolean} {
-  const experimentalFlag = CONDITION_TO_FLAG[condition];
-  if (experimentalFlag && !serverArgs[experimentalFlag]) {
-    return {conditionFlag: experimentalFlag, disabled: true};
+  if (condition && !serverArgs[condition]) {
+    return {conditionFlag: condition, disabled: true};
   }
 
   return {disabled: false};
