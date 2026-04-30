@@ -245,7 +245,7 @@ export class McpResponse implements Response {
   }
 
   setListInPageTools(): void {
-    if (this.#args.categoryInPageTools) {
+    if (this.#args.categoryExperimentalInPage) {
       this.#listInPageTools = true;
     }
   }
