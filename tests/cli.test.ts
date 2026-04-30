@@ -255,6 +255,28 @@ describe('cli args parsing', () => {
     });
   });
 
+  it('uses stable channel for browser url with auto-connect fallback', async () => {
+    const args = parseArguments('1.0.0', [
+      'node',
+      'main.js',
+      '--browserUrl',
+      'http://127.0.0.1:9222',
+      '--auto-connect',
+    ]);
+    assert.deepStrictEqual(args, {
+      ...defaultArgs,
+      _: [],
+      headless: false,
+      $0: 'npx chrome-devtools-mcp@latest',
+      'browser-url': 'http://127.0.0.1:9222',
+      browserUrl: 'http://127.0.0.1:9222',
+      u: 'http://127.0.0.1:9222',
+      channel: 'stable',
+      'auto-connect': true,
+      autoConnect: true,
+    });
+  });
+
   it('parses usage statistics flag', async () => {
     // Test default (should be true).
     const defaultArgs = parseArguments('1.0.0', ['node', 'main.js']);

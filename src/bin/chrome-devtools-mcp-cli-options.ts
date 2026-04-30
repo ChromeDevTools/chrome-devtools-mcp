@@ -300,9 +300,8 @@ export function parseArguments(version: string, argv = process.argv) {
       // Yargs will complain
       if (
         !args.channel &&
-        !args.browserUrl &&
-        !args.wsEndpoint &&
-        !args.executablePath
+        (args.autoConnect ||
+          (!args.browserUrl && !args.wsEndpoint && !args.executablePath))
       ) {
         args.channel = 'stable';
       }

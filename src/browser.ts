@@ -43,10 +43,24 @@ function makeTargetFilter(enableExtensions = false) {
   };
 }
 
+function toPuppeteerChannel(channel: Channel): ChromeReleaseChannel {
+  switch (channel) {
+    case 'canary':
+      return 'chrome-canary';
+    case 'dev':
+      return 'chrome-dev';
+    case 'beta':
+      return 'chrome-beta';
+    case 'stable':
+      return 'chrome';
+  }
+}
+
 export async function ensureBrowserConnected(options: {
   browserURL?: string;
   wsEndpoint?: string;
   wsHeaders?: Record<string, string>;
+  autoConnect?: boolean;
   devtools: boolean;
   channel?: Channel;
   userDataDir?: string;
@@ -57,24 +71,62 @@ export async function ensureBrowserConnected(options: {
     return browser;
   }
 
-  const connectOptions: Parameters<typeof puppeteer.connect>[0] = {
-    targetFilter: makeTargetFilter(enableExtensions),
-    defaultViewport: null,
-    handleDevToolsAsPage: true,
+  const createConnectOptions = (): Parameters<typeof puppeteer.connect>[0] => {
+    return {
+      targetFilter: makeTargetFilter(enableExtensions),
+      defaultViewport: null,
+      handleDevToolsAsPage: true,
+    };
   };
 
-  let autoConnect = false;
-  if (options.wsEndpoint) {
-    connectOptions.browserWSEndpoint = options.wsEndpoint;
-    if (options.wsHeaders) {
-      connectOptions.headers = options.wsHeaders;
+  const connect = async (
+    connectOptions: Parameters<typeof puppeteer.connect>[0],
+  ): Promise<Browser> => {
+    logger('Connecting Puppeteer to ', JSON.stringify(connectOptions));
+    const connectedBrowser = await puppeteer.connect(connectOptions);
+    logger('Connected Puppeteer');
+    return connectedBrowser;
+  };
+
+  const connectionError = (autoConnect: boolean, cause: unknown): Error => {
+    return new Error(
+      `Could not connect to Chrome. ${autoConnect ? `Check if Chrome is running and remote debugging is enabled by going to chrome://inspect/#remote-debugging.` : `Check if Chrome is running.`}`,
+      {
+        cause,
+      },
+    );
+  };
+
+  if (options.wsEndpoint || options.browserURL) {
+    const connectOptions = createConnectOptions();
+    if (options.wsEndpoint) {
+      connectOptions.browserWSEndpoint = options.wsEndpoint;
+      if (options.wsHeaders) {
+        connectOptions.headers = options.wsHeaders;
+      }
+    } else {
+      connectOptions.browserURL = options.browserURL;
     }
-  } else if (options.browserURL) {
-    connectOptions.browserURL = options.browserURL;
-  } else if (channel || options.userDataDir) {
+    try {
+      browser = await connect(connectOptions);
+      return browser;
+    } catch (error) {
+      if (!options.autoConnect) {
+        throw connectionError(false, error);
+      }
+      logger(
+        'Direct browser connection failed; falling back to auto-connect',
+        error,
+      );
+    }
+  }
+
+  const connectOptions = createConnectOptions();
+  let autoConnect = false;
+  if (channel || options.userDataDir || options.autoConnect) {
     const userDataDir = options.userDataDir;
+    autoConnect = true;
     if (userDataDir) {
-      autoConnect = true;
       // TODO: re-expose this logic via Puppeteer.
       const portPath = path.join(userDataDir, 'DevToolsActivePort');
       try {
@@ -105,12 +157,7 @@ export async function ensureBrowserConnected(options: {
         );
       }
     } else {
-      if (!channel) {
-        throw new Error('Channel must be provided if userDataDir is missing');
-      }
-      connectOptions.channel = (
-        channel === 'stable' ? 'chrome' : `chrome-${channel}`
-      ) as ChromeReleaseChannel;
+      connectOptions.channel = toPuppeteerChannel(channel ?? 'stable');
     }
   } else {
     throw new Error(
@@ -118,18 +165,11 @@ export async function ensureBrowserConnected(options: {
     );
   }
 
-  logger('Connecting Puppeteer to ', JSON.stringify(connectOptions));
   try {
-    browser = await puppeteer.connect(connectOptions);
+    browser = await connect(connectOptions);
   } catch (err) {
-    throw new Error(
-      `Could not connect to Chrome. ${autoConnect ? `Check if Chrome is running and remote debugging is enabled by going to chrome://inspect/#remote-debugging.` : `Check if Chrome is running.`}`,
-      {
-        cause: err,
-      },
-    );
+    throw connectionError(autoConnect, err);
   }
-  logger('Connected Puppeteer');
   return browser;
 }
 

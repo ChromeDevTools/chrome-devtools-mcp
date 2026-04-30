@@ -7,13 +7,19 @@
 import assert from 'node:assert';
 import os from 'node:os';
 import path from 'node:path';
-import {describe, it} from 'node:test';
+import {afterEach, describe, it} from 'node:test';
 
 import {executablePath} from 'puppeteer';
+import sinon from 'sinon';
 
 import {detectDisplay, ensureBrowserConnected, launch} from '../src/browser.js';
+import {puppeteer} from '../src/third_party/index.js';
 
 describe('browser', () => {
+  afterEach(() => {
+    sinon.restore();
+  });
+
   it('detects display does not crash', () => {
     detectDisplay();
   });
@@ -99,5 +105,30 @@ describe('browser', () => {
     } finally {
       await browser.close();
     }
+  });
+
+  it('falls back to auto-connect when browser url cannot connect', async () => {
+    const connect = sinon.stub(puppeteer, 'connect');
+    connect.onFirstCall().rejects(new Error('port unavailable'));
+    connect.onSecondCall().rejects(new Error('auto-connect unavailable'));
+
+    await assert.rejects(
+      ensureBrowserConnected({
+        browserURL: 'http://127.0.0.1:9222',
+        autoConnect: true,
+        channel: 'stable',
+        devtools: false,
+      }),
+      /Could not connect to Chrome/,
+    );
+
+    assert.strictEqual(connect.callCount, 2);
+    assert.strictEqual(
+      connect.firstCall.args[0].browserURL,
+      'http://127.0.0.1:9222',
+    );
+    assert.strictEqual(connect.firstCall.args[0].channel, undefined);
+    assert.strictEqual(connect.secondCall.args[0].browserURL, undefined);
+    assert.strictEqual(connect.secondCall.args[0].channel, 'chrome');
   });
 });
