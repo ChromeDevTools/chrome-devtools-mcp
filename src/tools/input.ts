@@ -363,31 +363,20 @@ export const uploadFile = definePageTool({
       ),
     filePath: zod
       .string()
-      .describe('The local path of a file to upload. Use filePaths for multiple files.')
-      .optional(),
-    filePaths: zod
-      .array(zod.string())
-      .describe('One or more local file paths to upload in a single operation.')
-      .optional(),
+      .describe(
+        'The local path of the file to upload. For multiple files, pass a comma-separated list.',
+      ),
     includeSnapshot: includeSnapshotSchema,
   },
   handler: async (request, response) => {
-    const {uid} = request.params;
-
-    const filePathsFromFilePath = request.params.filePath
-      ? request.params.filePath
-          .split(',')
-          .map((p) => p.trim())
-          .filter(Boolean)
-      : [];
-
-    const filePaths = [
-      ...(request.params.filePaths ?? []),
-      ...filePathsFromFilePath,
-    ];
+    const {uid, filePath} = request.params;
+    const filePaths = filePath
+      .split(',')
+      .map(path => path.trim())
+      .filter(Boolean);
 
     if (!filePaths.length) {
-      throw new Error('Provide filePath or filePaths to upload.');
+      throw new Error('Provide filePath to upload.');
     }
     const handle = (await request.page.getElementByUid(
       uid,

@@ -501,10 +501,6 @@ The Chrome DevTools MCP server supports the following configuration option:
   Custom headers for WebSocket connection in JSON format (e.g., '{"Authorization":"Bearer token"}'). Only works with --wsEndpoint.
   - **Type:** string
 
-- **`--protocolTimeout`/ `--protocol-timeout`**
-  Timeout in milliseconds for Chrome DevTools Protocol commands. Passed to Puppeteer as protocolTimeout.
-  - **Type:** number
-
 - **`--headless`**
   Whether to run in headless (no UI) mode.
   - **Type:** boolean

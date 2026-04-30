@@ -692,14 +692,8 @@ export const commands: Commands = {
         name: 'filePath',
         type: 'string',
         description:
-          'The local path of a file to upload. For multiple files, pass a comma-separated list, or use filePaths.',
-        required: false,
-      },
-      filePaths: {
-        name: 'filePaths',
-        type: 'array',
-        description: 'One or more local file paths to upload in a single call.',
-        required: false,
+          'The local path of the file to upload. For multiple files, pass a comma-separated list.',
+        required: true,
       },
       includeSnapshot: {
         name: 'includeSnapshot',

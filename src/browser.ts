@@ -47,7 +47,6 @@ export async function ensureBrowserConnected(options: {
   browserURL?: string;
   wsEndpoint?: string;
   wsHeaders?: Record<string, string>;
-  protocolTimeout?: number;
   devtools: boolean;
   channel?: Channel;
   userDataDir?: string;
@@ -62,7 +61,6 @@ export async function ensureBrowserConnected(options: {
     targetFilter: makeTargetFilter(enableExtensions),
     defaultViewport: null,
     handleDevToolsAsPage: true,
-    protocolTimeout: options.protocolTimeout,
   };
 
   let autoConnect = false;
@@ -140,7 +138,6 @@ interface McpLaunchOptions {
   executablePath?: string;
   channel?: Channel;
   userDataDir?: string;
-  protocolTimeout?: number;
   headless: boolean;
   isolated: boolean;
   logFile?: fs.WriteStream;
@@ -232,7 +229,6 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
       acceptInsecureCerts: options.acceptInsecureCerts,
       handleDevToolsAsPage: true,
       enableExtensions: options.enableExtensions,
-      protocolTimeout: options.protocolTimeout,
     });
     if (options.logFile) {
       // FIXME: we are probably subscribing too late to catch startup logs. We

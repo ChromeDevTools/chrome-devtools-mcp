@@ -80,7 +80,6 @@ export async function createMcpServer(
             browserURL: serverArgs.browserUrl,
             wsEndpoint: serverArgs.wsEndpoint,
             wsHeaders: serverArgs.wsHeaders,
-            protocolTimeout: serverArgs.protocolTimeout,
             // Important: only pass channel, if autoConnect is true.
             channel: serverArgs.autoConnect
               ? (serverArgs.channel as Channel)
@@ -94,7 +93,6 @@ export async function createMcpServer(
             channel: serverArgs.channel as Channel,
             isolated: serverArgs.isolated ?? false,
             userDataDir: serverArgs.userDataDir,
-            protocolTimeout: serverArgs.protocolTimeout,
             logFile: options.logFile,
             viewport: serverArgs.viewport,
             chromeArgs,
