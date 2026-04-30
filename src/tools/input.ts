@@ -204,11 +204,33 @@ async function fillFormElement(
     if (aXNode && aXNode.role === 'combobox' && hasOptionChildren(aXNode)) {
       await selectOption(handle, aXNode, value);
     } else {
-      // Increase timeout for longer input values.
-      const timeoutPerChar = 10; // ms
-      const fillTimeout =
-        page.pptrPage.getDefaultTimeout() + value.length * timeoutPerChar;
-      await handle.asLocator().setTimeout(fillTimeout).fill(value);
+      const isToggle = await handle.evaluate(el => {
+        if (el instanceof HTMLInputElement) {
+          return el.type === 'checkbox' || el.type === 'radio';
+        }
+        const role = el.getAttribute('role');
+        return role === 'checkbox' || role === 'radio' || role === 'switch';
+      });
+
+      if (isToggle) {
+        const shouldBeChecked = value.toLowerCase() === 'true';
+        const isChecked = await handle.evaluate(el => {
+          if (el instanceof HTMLInputElement) {
+            return el.checked;
+          }
+          return el.getAttribute('aria-checked') === 'true';
+        });
+
+        if (isChecked !== shouldBeChecked) {
+          await handle.asLocator().click();
+        }
+      } else {
+        // Increase timeout for longer input values.
+        const timeoutPerChar = 10; // ms
+        const fillTimeout =
+          page.pptrPage.getDefaultTimeout() + value.length * timeoutPerChar;
+        await handle.asLocator().setTimeout(fillTimeout).fill(value);
+      }
     }
   } catch (error) {
     handleActionError(error, uid);
