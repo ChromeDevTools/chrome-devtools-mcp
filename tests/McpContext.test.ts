@@ -9,14 +9,62 @@ import path from 'node:path';
 import {afterEach, describe, it} from 'node:test';
 import {pathToFileURL} from 'node:url';
 
+import {TargetType} from 'puppeteer-core';
 import sinon from 'sinon';
 
 import {NetworkFormatter} from '../src/formatters/NetworkFormatter.js';
 import {TextSnapshot} from '../src/TextSnapshot.js';
-import type {HTTPResponse} from '../src/third_party/index.js';
+import type {
+  Browser,
+  BrowserContext,
+  CDPSession,
+  HTTPResponse,
+  Page,
+  Target,
+  WebWorker,
+} from '../src/third_party/index.js';
 import type {TraceResult} from '../src/trace-processing/parse.js';
 
 import {getMockRequest, html, withMcpContext} from './utils.js';
+
+function createHangingPageTarget(
+  browser: Browser,
+  browserContext: BrowserContext,
+): Target {
+  return {
+    page(): Promise<Page | null> {
+      return new Promise(() => {
+        // Intentionally never resolves to mimic a stalled target.
+      });
+    },
+    asPage(): Promise<Page> {
+      return new Promise(() => {
+        // Intentionally never resolves to mimic a stalled target.
+      });
+    },
+    url(): string {
+      return 'https://example.com/hanging';
+    },
+    createCDPSession(): Promise<CDPSession> {
+      return Promise.reject(new Error('Not implemented'));
+    },
+    type(): TargetType {
+      return TargetType.PAGE;
+    },
+    browser(): Browser {
+      return browser;
+    },
+    browserContext(): BrowserContext {
+      return browserContext;
+    },
+    opener(): Target | undefined {
+      return;
+    },
+    worker(): Promise<WebWorker | null> {
+      return Promise.resolve(null);
+    },
+  };
+}
 
 describe('McpContext', () => {
   afterEach(() => {
@@ -100,6 +148,29 @@ describe('McpContext', () => {
       },
     );
   });
+
+  it('skips page targets that do not resolve while creating a pages snapshot', async () => {
+    await withMcpContext(async (_response, context) => {
+      const page = context.getSelectedPptrPage();
+      const targets = context.browser.targets();
+      const hangingTarget = createHangingPageTarget(
+        context.browser,
+        page.browserContext(),
+      );
+      sinon
+        .stub(context.browser, 'targets')
+        .returns([...targets, hangingTarget]);
+      sinon.stub(context, 'detectOpenDevToolsWindows').resolves();
+      const clock = sinon.useFakeTimers();
+
+      const pagesPromise = context.createPagesSnapshot();
+      await clock.tickAsync(5_000);
+      const pages = await pagesPromise;
+
+      assert.ok(pages.includes(page));
+    });
+  });
+
   it('resolves uid from a non-selected page snapshot', async () => {
     await withMcpContext(async (_response, context) => {
       // Page 1: set content and snapshot

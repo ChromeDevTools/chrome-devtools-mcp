@@ -59,6 +59,25 @@ interface McpContextOptions {
 const DEFAULT_TIMEOUT = 5_000;
 const NAVIGATION_TIMEOUT = 10_000;
 
+async function resolveWithTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+): Promise<T | undefined> {
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  const timeoutPromise = new Promise<undefined>(resolve => {
+    timeout = setTimeout(() => {
+      resolve(undefined);
+    }, timeoutMs);
+  });
+  try {
+    return await Promise.race([promise, timeoutPromise]);
+  } finally {
+    if (timeout !== undefined) {
+      clearTimeout(timeout);
+    }
+  }
+}
+
 export class McpContext implements Context {
   browser: Browser;
   logger: Debugger;
@@ -564,9 +583,20 @@ export class McpContext implements Context {
     isolatedContextNames: Map<Page, string>;
   }> {
     const defaultCtx = this.browser.defaultBrowserContext();
-    const allPages = await this.browser.pages(
-      this.#options.experimentalIncludeAllPages,
-    );
+    const pagePromises: Array<Promise<Page | null>> = [];
+    for (const target of this.browser.targets()) {
+      if (!this.#isPageTarget(target)) {
+        continue;
+      }
+      pagePromises.push(this.#resolveTargetPage(target));
+    }
+
+    const allPages: Page[] = [];
+    for (const page of await Promise.all(pagePromises)) {
+      if (page && !allPages.includes(page)) {
+        allPages.push(page);
+      }
+    }
 
     const allTargets = this.browser.targets();
     const extensionTargets = allTargets.filter(target => {
@@ -578,17 +608,15 @@ export class McpContext implements Context {
 
     for (const target of extensionTargets) {
       // Right now target.page() returns null for popup and side panel pages.
-      let page = await target.page();
+      let page = await this.#resolveTargetPage(target);
       if (!page) {
         // We need to cache pages instances for targets because target.asPage()
         // returns a new page instance every time.
         page = this.#extensionPages.get(target) ?? null;
         if (!page) {
-          try {
-            page = await target.asPage();
+          page = await this.#resolveTargetPage(target, true);
+          if (page) {
             this.#extensionPages.set(target, page);
-          } catch (e) {
-            this.logger('Failed to get page for extension target', e);
           }
         }
       }
@@ -626,6 +654,42 @@ export class McpContext implements Context {
     }
 
     return {pages: allPages, isolatedContextNames};
+  }
+
+  #isPageTarget(target: Target): boolean {
+    const type = target.type();
+    if (type === 'page') {
+      return true;
+    }
+    if (!this.#options.experimentalIncludeAllPages) {
+      return false;
+    }
+    return type === 'background_page' || type === 'webview' || type === 'other';
+  }
+
+  async #resolveTargetPage(
+    target: Target,
+    force = false,
+  ): Promise<Page | null> {
+    try {
+      const pagePromise: Promise<Page | null> = force
+        ? target.asPage()
+        : target.page();
+      const page = await resolveWithTimeout(pagePromise, DEFAULT_TIMEOUT);
+      if (page === undefined) {
+        this.logger(
+          `Timed out getting page for target ${target.type()} ${target.url()}`,
+        );
+        return null;
+      }
+      return page;
+    } catch (error) {
+      this.logger(
+        `Failed to get page for target ${target.type()} ${target.url()}`,
+        error,
+      );
+      return null;
+    }
   }
 
   async detectOpenDevToolsWindows() {

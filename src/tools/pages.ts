@@ -190,9 +190,13 @@ export const newPage = defineTool(args => {
     },
     blockedByDialog: false,
     handler: async (request, response, context) => {
+      const isolatedContext =
+        request.params.isolatedContext === ''
+          ? undefined
+          : request.params.isolatedContext;
       const page = await context.newPage(
         request.params.background,
-        request.params.isolatedContext,
+        isolatedContext,
       );
 
       await navigateWithInterception(

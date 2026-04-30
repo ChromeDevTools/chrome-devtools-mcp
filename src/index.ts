@@ -30,6 +30,20 @@ import {pageIdSchema} from './tools/ToolDefinition.js';
 import {createTools} from './tools/tools.js';
 import {VERSION} from './version.js';
 
+function resolveChannel(channel: unknown): Channel {
+  switch (channel) {
+    case 'canary':
+      return 'canary';
+    case 'dev':
+      return 'dev';
+    case 'beta':
+      return 'beta';
+    case 'stable':
+    default:
+      return 'stable';
+  }
+}
+
 export async function createMcpServer(
   serverArgs: ReturnType<typeof parseArguments>,
   options: {
@@ -106,9 +120,10 @@ export async function createMcpServer(
             browserURL: serverArgs.browserUrl,
             wsEndpoint: serverArgs.wsEndpoint,
             wsHeaders: serverArgs.wsHeaders,
+            autoConnect: serverArgs.autoConnect,
             // Important: only pass channel, if autoConnect is true.
             channel: serverArgs.autoConnect
-              ? (serverArgs.channel as Channel)
+              ? resolveChannel(serverArgs.channel)
               : undefined,
             userDataDir: serverArgs.userDataDir,
             devtools,
