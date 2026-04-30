@@ -6,6 +6,8 @@
 
 import assert from 'node:assert';
 import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import {describe, it} from 'node:test';
 
 import {Client} from '@modelcontextprotocol/sdk/client/index.js';
@@ -208,7 +210,7 @@ describe('e2e', () => {
         const result = await client.callTool({
           name: 'take_screenshot',
           arguments: {
-            filePath: '/tmp/test.png',
+            filePath: path.resolve(os.homedir(), 'test.png'),
           },
         });
 
