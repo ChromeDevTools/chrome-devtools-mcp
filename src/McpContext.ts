@@ -707,26 +707,10 @@ export class McpContext implements Context {
         // Some Electron apps still use older version
         // Fall back to not exposing DevTools at all.
         try {
-          const hasDevTools = await resolveWithTimeout(
-            page.hasDevTools(),
-            DEFAULT_TIMEOUT,
-          );
-          if (!hasDevTools) {
-            if (hasDevTools === undefined) {
-              this.logger(`Timed out detecting DevTools for ${page.url()}`);
-            }
-            mcpPage.devToolsPage = undefined;
-            return;
-          }
-          const devToolsPage = await resolveWithTimeout(
-            page.openDevTools(),
-            DEFAULT_TIMEOUT,
-          );
-          if (devToolsPage === undefined) {
-            this.logger(`Timed out opening DevTools for ${page.url()}`);
-            mcpPage.devToolsPage = undefined;
+          if (await page.hasDevTools()) {
+            mcpPage.devToolsPage = await page.openDevTools();
           } else {
-            mcpPage.devToolsPage = devToolsPage;
+            mcpPage.devToolsPage = undefined;
           }
         } catch {
           mcpPage.devToolsPage = undefined;

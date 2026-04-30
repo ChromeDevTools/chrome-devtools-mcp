@@ -171,38 +171,6 @@ describe('McpContext', () => {
     });
   });
 
-  it('skips pages whose DevTools state does not resolve', async () => {
-    await withMcpContext(async (_response, context) => {
-      const page = context.getSelectedPptrPage();
-      const target = context.browser.targets().find(target => {
-        return target.type() === 'page';
-      });
-      assert.ok(target);
-      sinon.stub(target, 'page').resolves(page);
-      sinon.stub(context.browser, 'targets').returns([target]);
-      const hasDevTools = sinon.stub(page, 'hasDevTools').returns(
-        new Promise<boolean>(() => {
-          // Intentionally never resolves to mimic a stalled DevTools probe.
-        }),
-      );
-      const clock = sinon.useFakeTimers();
-
-      const detectionPromise = context.detectOpenDevToolsWindows();
-      for (let attempt = 0; attempt < 10 && !hasDevTools.called; attempt++) {
-        await clock.tickAsync(0);
-      }
-      assert.ok(hasDevTools.called);
-      let resolved = false;
-      void detectionPromise.then(() => {
-        resolved = true;
-      });
-      await clock.tickAsync(5_000);
-      await clock.tickAsync(0);
-
-      assert.strictEqual(resolved, true);
-    });
-  });
-
   it('resolves uid from a non-selected page snapshot', async () => {
     await withMcpContext(async (_response, context) => {
       // Page 1: set content and snapshot
