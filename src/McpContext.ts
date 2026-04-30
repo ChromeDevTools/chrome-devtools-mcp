@@ -56,6 +56,14 @@ interface McpContextOptions {
   performanceCrux: boolean;
 }
 
+export interface PageSummary {
+  id: number;
+  url: string;
+  selected: boolean;
+  isExtension: boolean;
+  isolatedContextName?: string;
+}
+
 const DEFAULT_TIMEOUT = 5_000;
 const NAVIGATION_TIMEOUT = 10_000;
 
@@ -88,13 +96,18 @@ export class McpContext implements Context {
   #nextIsolatedContextId = 1;
 
   #pages: Page[] = [];
+  #pageSummaries: PageSummary[] = [];
   #extensionServiceWorkers: ExtensionServiceWorker[] = [];
 
   #mcpPages = new Map<Page, McpPage>();
+  #pageTargets = new Map<Target, number>();
+  #targetsByPageId = new Map<number, Target>();
   #selectedPage?: McpPage;
+  #selectedPageId?: number;
   #networkCollector: NetworkCollector;
   #consoleCollector: ConsoleCollector;
   #devtoolsUniverseManager: UniverseManager;
+  #collectorsInitialized = false;
 
   #isRunningTrace = false;
   #screenRecorderData: {recorder: ScreenRecorder; filePath: string} | null =
@@ -143,11 +156,14 @@ export class McpContext implements Context {
   }
 
   async #init() {
-    const pages = await this.createPagesSnapshot();
+    this.createPageTargetSnapshot();
+    await this.#ensureInitialSelectedPage();
+    const pages = this.#selectedPage ? [this.#selectedPage.pptrPage] : [];
     await this.createExtensionServiceWorkersSnapshot();
     await this.#networkCollector.init(pages);
     await this.#consoleCollector.init(pages);
     await this.#devtoolsUniverseManager.init(pages);
+    this.#collectorsInitialized = true;
   }
 
   dispose() {
@@ -275,22 +291,24 @@ export class McpContext implements Context {
     } else {
       page = await this.browser.newPage({background});
     }
-    await this.createPagesSnapshot();
-    this.selectPage(this.#getMcpPage(page));
-    this.#networkCollector.addPage(page);
-    this.#consoleCollector.addPage(page);
-    return this.#getMcpPage(page);
+    this.createPageTargetSnapshot();
+    const target = page.target();
+    const pageId = this.#getOrCreatePageIdForTarget(target);
+    const mcpPage = this.#registerPage(page, pageId);
+    mcpPage.isolatedContextName = isolatedContextName;
+    this.selectPage(mcpPage);
+    return mcpPage;
   }
   async closePage(pageId: number): Promise<void> {
-    if (this.#pages.length === 1) {
+    this.createPageTargetSnapshot();
+    if (this.#pageSummaries.length === 1) {
       throw new Error(CLOSE_PAGE_ERROR);
     }
-    const page = this.getPageById(pageId);
-    if (page) {
-      page.dispose();
-      this.#mcpPages.delete(page.pptrPage);
-    }
+    const page = await this.ensurePageById(pageId);
+    page.dispose();
+    this.#mcpPages.delete(page.pptrPage);
     await page.pptrPage.close({runBeforeUnload: false});
+    this.createPageTargetSnapshot();
   }
 
   getNetworkRequestById(page: McpPage, reqid: number): HTTPRequest {
@@ -443,6 +461,33 @@ export class McpContext implements Context {
     return page;
   }
 
+  async ensurePageById(pageId: number): Promise<McpPage> {
+    const existingPage = this.#mcpPages
+      .values()
+      .find(mcpPage => mcpPage.id === pageId);
+    if (existingPage && !existingPage.pptrPage.isClosed()) {
+      return existingPage;
+    }
+
+    this.createPageTargetSnapshot();
+    const target = this.#targetsByPageId.get(pageId);
+    if (!target) {
+      throw new Error('No page found');
+    }
+
+    let page = await this.#resolveTargetPage(target);
+    if (!page && target.url().startsWith('chrome-extension://')) {
+      page = await this.#resolveTargetPage(target, true);
+    }
+    if (!page) {
+      throw new Error(
+        `Page ${pageId} is not responding. Call ${listPages().name} to see open pages.`,
+      );
+    }
+
+    return this.#registerPage(page, pageId);
+  }
+
   getPageId(page: Page): number | undefined {
     return this.#mcpPages.get(page)?.id;
   }
@@ -465,6 +510,7 @@ export class McpContext implements Context {
 
   selectPage(newPage: McpPage): void {
     this.#selectedPage = newPage;
+    this.#selectedPageId = newPage.id;
     this.#updateSelectedPageTimeouts();
   }
 
@@ -533,19 +579,76 @@ export class McpContext implements Context {
     return this.#extensionServiceWorkers;
   }
 
+  createPageTargetSnapshot(): PageSummary[] {
+    const contextToName = this.#getContextToName();
+    const targets = this.browser.targets().filter(target => {
+      return (
+        this.#isPageTarget(target) &&
+        (this.#options.experimentalDevToolsDebugging ||
+          !target.url().startsWith('devtools://'))
+      );
+    });
+    const currentTargets = new Set(targets);
+
+    for (const target of targets) {
+      this.#getOrCreatePageIdForTarget(target);
+    }
+
+    for (const [target, id] of this.#pageTargets) {
+      if (!currentTargets.has(target)) {
+        this.#pageTargets.delete(target);
+        this.#targetsByPageId.delete(id);
+      }
+    }
+
+    for (const [page, mcpPage] of this.#mcpPages) {
+      if (page.isClosed()) {
+        mcpPage.dispose();
+        this.#mcpPages.delete(page);
+      }
+    }
+
+    if (this.#selectedPage && this.#selectedPage.pptrPage.isClosed()) {
+      this.#selectedPage = undefined;
+    }
+
+    if (
+      this.#selectedPageId === undefined ||
+      !targets.some(target => {
+        return this.#pageTargets.get(target) === this.#selectedPageId;
+      })
+    ) {
+      this.#selectedPageId = targets[0]
+        ? this.#getOrCreatePageIdForTarget(targets[0])
+        : undefined;
+      this.#selectedPage = undefined;
+    }
+
+    this.#pageSummaries = targets.map(target => {
+      const id = this.#getOrCreatePageIdForTarget(target);
+      const isolatedContextName = contextToName.get(target.browserContext());
+      const summary: PageSummary = {
+        id,
+        url: target.url(),
+        selected: id === this.#selectedPageId,
+        isExtension: target.url().startsWith('chrome-extension://'),
+      };
+      if (isolatedContextName) {
+        summary.isolatedContextName = isolatedContextName;
+      }
+      return summary;
+    });
+
+    return this.#pageSummaries;
+  }
+
   async createPagesSnapshot(): Promise<Page[]> {
     const {pages: allPages, isolatedContextNames} = await this.#getAllPages();
 
     for (const page of allPages) {
-      let mcpPage = this.#mcpPages.get(page);
-      if (!mcpPage) {
-        mcpPage = new McpPage(page, this.#nextPageId++);
-        this.#mcpPages.set(page, mcpPage);
-        // We emulate a focused page for all pages to support multi-agent workflows.
-        void page.emulateFocusedPage(true).catch(error => {
-          this.logger('Error turning on focused page emulation', error);
-        });
-      }
+      const target = page.target();
+      const pageId = this.#getOrCreatePageIdForTarget(target);
+      const mcpPage = this.#registerPage(page, pageId);
       mcpPage.isolatedContextName = isolatedContextNames.get(page);
     }
 
@@ -573,6 +676,7 @@ export class McpContext implements Context {
       this.selectPage(this.#getMcpPage(this.#pages[0]));
     }
 
+    this.createPageTargetSnapshot();
     await this.detectOpenDevToolsWindows();
 
     return this.#pages;
@@ -582,7 +686,6 @@ export class McpContext implements Context {
     pages: Page[];
     isolatedContextNames: Map<Page, string>;
   }> {
-    const defaultCtx = this.browser.defaultBrowserContext();
     const pagePromises: Array<Promise<Page | null>> = [];
     for (const target of this.browser.targets()) {
       if (!this.#isPageTarget(target)) {
@@ -626,7 +729,22 @@ export class McpContext implements Context {
       }
     }
 
-    // Build a reverse lookup from BrowserContext instance → name.
+    const contextToName = this.#getContextToName();
+    // Map each page to its isolated context name (if any).
+    const isolatedContextNames = new Map<Page, string>();
+    for (const page of allPages) {
+      const ctx = page.browserContext();
+      const name = contextToName.get(ctx);
+      if (name) {
+        isolatedContextNames.set(page, name);
+      }
+    }
+
+    return {pages: allPages, isolatedContextNames};
+  }
+
+  #getContextToName(): Map<BrowserContext, string> {
+    const defaultCtx = this.browser.defaultBrowserContext();
     const contextToName = new Map<BrowserContext, string>();
     for (const [name, ctx] of this.#isolatedContexts) {
       contextToName.set(ctx, name);
@@ -642,18 +760,48 @@ export class McpContext implements Context {
         contextToName.set(ctx, name);
       }
     }
+    return contextToName;
+  }
 
-    // Map each page to its isolated context name (if any).
-    const isolatedContextNames = new Map<Page, string>();
-    for (const page of allPages) {
-      const ctx = page.browserContext();
-      const name = contextToName.get(ctx);
-      if (name) {
-        isolatedContextNames.set(page, name);
+  #getOrCreatePageIdForTarget(target: Target): number {
+    const existingId = this.#pageTargets.get(target);
+    if (existingId) {
+      return existingId;
+    }
+    const id = this.#nextPageId++;
+    this.#pageTargets.set(target, id);
+    this.#targetsByPageId.set(id, target);
+    return id;
+  }
+
+  #registerPage(page: Page, pageId: number): McpPage {
+    let mcpPage = this.#mcpPages.get(page);
+    if (!mcpPage) {
+      mcpPage = new McpPage(page, pageId);
+      this.#mcpPages.set(page, mcpPage);
+      // We emulate a focused page for all pages to support multi-agent workflows.
+      void page.emulateFocusedPage(true).catch(error => {
+        this.logger('Error turning on focused page emulation', error);
+      });
+      if (this.#collectorsInitialized) {
+        this.#networkCollector.addPage(page);
+        this.#consoleCollector.addPage(page);
       }
     }
+    return mcpPage;
+  }
 
-    return {pages: allPages, isolatedContextNames};
+  async #ensureInitialSelectedPage(): Promise<void> {
+    const pageId = this.#selectedPageId;
+    if (pageId === undefined) {
+      return;
+    }
+    try {
+      const page = await this.ensurePageById(pageId);
+      this.selectPage(page);
+    } catch (error) {
+      this.logger(`Failed to load initial selected page ${pageId}`, error);
+    }
   }
 
   #isPageTarget(target: Target): boolean {
@@ -694,7 +842,9 @@ export class McpContext implements Context {
 
   async detectOpenDevToolsWindows() {
     this.logger('Detecting open DevTools windows');
-    const {pages} = await this.#getAllPages();
+    const pages = [...this.#mcpPages.keys()].filter(page => {
+      return !page.isClosed();
+    });
 
     await Promise.all(
       pages.map(async page => {
@@ -731,6 +881,10 @@ export class McpContext implements Context {
 
   getPages(): Page[] {
     return this.#pages;
+  }
+
+  getPageSummaries(): PageSummary[] {
+    return this.#pageSummaries;
   }
 
   getIsolatedContextName(page: Page): string | undefined {

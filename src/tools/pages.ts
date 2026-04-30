@@ -111,7 +111,7 @@ export const selectPage = defineTool({
       .describe('Whether to focus the page and bring it to the top.'),
   },
   handler: async (request, response, context) => {
-    const page = context.getPageById(request.params.pageId);
+    const page = await context.ensurePageById(request.params.pageId);
     context.selectPage(page);
     response.setIncludePages(true);
     response.setListInPageTools();
@@ -484,7 +484,7 @@ export const getTabId = definePageTool({
       ),
   },
   handler: async (request, response, context) => {
-    const page = context.getPageById(request.params.pageId);
+    const page = await context.ensurePageById(request.params.pageId);
     const tabId = (page.pptrPage as unknown as CdpPage)._tabId;
     response.setTabId(tabId);
   },

@@ -66,6 +66,42 @@ function createHangingPageTarget(
   };
 }
 
+function createSpyHangingPageTarget(
+  browser: Browser,
+  browserContext: BrowserContext,
+  page: sinon.SinonSpy<[], Promise<Page | null>>,
+): Target {
+  return {
+    page,
+    asPage(): Promise<Page> {
+      return new Promise(() => {
+        // Intentionally never resolves to mimic a stalled target.
+      });
+    },
+    url(): string {
+      return 'https://example.com/hanging';
+    },
+    createCDPSession(): Promise<CDPSession> {
+      return Promise.reject(new Error('Not implemented'));
+    },
+    type(): TargetType {
+      return TargetType.PAGE;
+    },
+    browser(): Browser {
+      return browser;
+    },
+    browserContext(): BrowserContext {
+      return browserContext;
+    },
+    opener(): Target | undefined {
+      return;
+    },
+    worker(): Promise<WebWorker | null> {
+      return Promise.resolve(null);
+    },
+  };
+}
+
 describe('McpContext', () => {
   afterEach(() => {
     sinon.restore();
@@ -168,6 +204,43 @@ describe('McpContext', () => {
       const pages = await pagesPromise;
 
       assert.ok(pages.includes(page));
+    });
+  });
+
+  it('lists page targets without resolving every page', async () => {
+    await withMcpContext(async (response, context) => {
+      const page = context.getSelectedPptrPage();
+      const targets = context.browser.targets();
+      const pageSpy = sinon.spy(
+        (): Promise<Page | null> =>
+          new Promise(() => {
+            // Intentionally never resolves to mimic a stalled target.
+          }),
+      );
+      const hangingTarget = createSpyHangingPageTarget(
+        context.browser,
+        page.browserContext(),
+        pageSpy,
+      );
+      sinon
+        .stub(context.browser, 'targets')
+        .returns([...targets, hangingTarget]);
+      sinon.stub(context, 'detectOpenDevToolsWindows').resolves();
+      const clock = sinon.useFakeTimers();
+
+      response.setIncludePages(true);
+      const resultPromise = response.handle('list_pages', context);
+      await clock.tickAsync(5_000);
+      const result = await resultPromise;
+      const structuredContent: {pages?: Array<{url: string}>} =
+        result.structuredContent;
+
+      assert.strictEqual(pageSpy.called, false);
+      assert.ok(
+        structuredContent.pages?.some(
+          page => page.url === 'https://example.com/hanging',
+        ),
+      );
     });
   });
 
