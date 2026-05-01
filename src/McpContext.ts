@@ -5,8 +5,9 @@
  */
 
 import fs from 'node:fs/promises';
+import os from 'node:os';
 import path from 'node:path';
-import {fileURLToPath} from 'node:url';
+import {fileURLToPath, pathToFileURL} from 'node:url';
 
 import type {TargetUniverse} from './DevtoolsUtils.js';
 import {UniverseManager} from './DevtoolsUtils.js';
@@ -158,7 +159,16 @@ export class McpContext implements Context {
   }
 
   roots(): Root[] | undefined {
-    return this.#roots;
+    if (this.#roots === undefined) {
+      return undefined;
+    }
+    return [
+      ...this.#roots,
+      {
+        uri: pathToFileURL(os.tmpdir()).href,
+        name: 'temp',
+      },
+    ];
   }
 
   setRoots(roots: Root[] | undefined): void {

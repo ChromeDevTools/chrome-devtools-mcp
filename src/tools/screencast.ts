@@ -28,8 +28,7 @@ export const startScreencast = definePageTool(args => ({
   annotations: {
     category: ToolCategory.DEBUGGING,
     readOnlyHint: false,
-
-    conditions: ['screencast'],
+    conditions: ['experimentalScreencast'],
   },
   schema: {
     filePath: zod
@@ -39,6 +38,7 @@ export const startScreencast = definePageTool(args => ({
         `Output file path (${supportedExtensions.join(',')} are supported). Uses mkdtemp to generate a unique path if not provided.`,
       ),
   },
+  blockedByDialog: false,
   handler: async (request, response, context) => {
     context.validatePath(request.params.filePath);
     if (context.getScreenRecorder() !== null) {
@@ -99,9 +99,10 @@ export const stopScreencast = definePageTool({
   annotations: {
     category: ToolCategory.DEBUGGING,
     readOnlyHint: false,
-    conditions: ['screencast'],
+    conditions: ['experimentalScreencast'],
   },
   schema: {},
+  blockedByDialog: false,
   handler: async (_request, response, context) => {
     const data = context.getScreenRecorder();
     if (!data) {

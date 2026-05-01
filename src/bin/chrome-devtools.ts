@@ -47,20 +47,11 @@ const startCliOptions = {
 delete startCliOptions.autoConnect;
 // Missing CLI serialization.
 delete startCliOptions.viewport;
-// CLI is generated based on the default tool definitions. To enable conditional
-// tools, they need to be enabled during CLI generation.
-delete startCliOptions.experimentalPageIdRouting;
-delete startCliOptions.experimentalVision;
-delete startCliOptions.experimentalWebmcp;
-delete startCliOptions.experimentalInteropTools;
-delete startCliOptions.experimentalScreencast;
-delete startCliOptions.categoryEmulation;
-delete startCliOptions.categoryPerformance;
-delete startCliOptions.categoryNetwork;
-delete startCliOptions.categoryExtensions;
-// Always on in CLI.
+
+// Change the defaults for the CLI.
 delete startCliOptions.experimentalStructuredContent;
-// Change the defaults.
+delete startCliOptions.experimentalInteropTools;
+delete startCliOptions.experimentalPageIdRouting;
 if (!('default' in cliOptions.headless)) {
   throw new Error('headless cli option unexpectedly does not have a default');
 }
@@ -70,6 +61,7 @@ if ('default' in cliOptions.isolated) {
 startCliOptions.headless!.default = true;
 startCliOptions.isolated!.description =
   'If specified, creates a temporary user-data-dir that is automatically cleaned up after the browser is closed. Defaults to true unless userDataDir is provided.';
+startCliOptions.categoryExtensions!.default = true;
 
 const y = yargs(hideBin(process.argv))
   .scriptName('chrome-devtools')

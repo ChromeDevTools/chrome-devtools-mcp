@@ -5,6 +5,7 @@
  */
 
 import assert from 'node:assert';
+import os from 'node:os';
 import path from 'node:path';
 import {afterEach, describe, it} from 'node:test';
 import {pathToFileURL} from 'node:url';
@@ -220,13 +221,21 @@ describe('McpContext', () => {
     await withMcpContext(async (_response, context) => {
       const roots = [{uri: 'file:///test', name: 'test'}];
       context.setRoots(roots);
-      assert.deepEqual(context.roots(), roots);
+      const actualRoots = context.roots();
+      assert.ok(
+        actualRoots?.some(r => r.name === 'test'),
+        'Should contain the set root',
+      );
+      assert.ok(
+        actualRoots?.some(r => r.name === 'temp'),
+        'Should contain the temp root',
+      );
     });
   });
 
   it('validatePath allows paths within roots', async () => {
     await withMcpContext(async (_response, context) => {
-      const workspacePath = path.resolve('/tmp/workspace');
+      const workspacePath = path.resolve(os.homedir(), 'workspace-test');
       const roots = [
         {uri: pathToFileURL(workspacePath).href, name: 'workspace'},
       ];
@@ -235,8 +244,8 @@ describe('McpContext', () => {
       context.validatePath(path.join(workspacePath, 'test.txt'));
       context.validatePath(workspacePath);
 
-      // Invalid path outside root
-      const outsidePath = path.resolve('/tmp/outside.txt');
+      // Invalid path outside root and outside temp dir
+      const outsidePath = path.resolve(os.homedir(), 'outside-test.txt');
       assert.throws(() => context.validatePath(outsidePath), /Access denied/);
     });
   });
@@ -244,15 +253,19 @@ describe('McpContext', () => {
   it('validatePath allows all paths if roots are undefined (legacy)', async () => {
     await withMcpContext(async (_response, context) => {
       context.setRoots(undefined);
-      context.validatePath(path.resolve('/tmp/anywhere.txt'));
+      context.validatePath(path.resolve(os.homedir(), 'anywhere.txt'));
     });
   });
 
-  it('validatePath denies all paths if roots list is empty', async () => {
+  it('validatePath denies paths outside os.tmpdir() if roots list is empty', async () => {
     await withMcpContext(async (_response, context) => {
       context.setRoots([]);
+      // Should allow temp dir
+      context.validatePath(path.join(os.tmpdir(), 'test.txt'));
+
+      // Should deny outside temp dir
       assert.throws(
-        () => context.validatePath(path.resolve('/tmp/anywhere.txt')),
+        () => context.validatePath(path.resolve(os.homedir(), 'anywhere.txt')),
         /Access denied/,
       );
     });

@@ -81,6 +81,14 @@ export class McpPage implements ContextPage {
     this.#dialog = undefined;
   }
 
+  throwIfDialogOpen(): void {
+    if (this.#dialog) {
+      throw new Error(
+        `A dialog is open (${this.#dialog.type()}: ${this.#dialog.message()}).`,
+      );
+    }
+  }
+
   getInPageTools(): ToolGroup<ToolDefinition> | undefined {
     return this.inPageTools;
   }

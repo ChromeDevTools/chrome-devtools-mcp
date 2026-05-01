@@ -235,6 +235,35 @@ describe('ClearcutLogger', () => {
       });
     });
 
+    it('bucketizes string lengths correctly', () => {
+      const schema = {
+        str0: zod.string(),
+        str1: zod.string(),
+        str3: zod.string(),
+        str5: zod.string(),
+        str10000: zod.string(),
+        str10001: zod.string(),
+      };
+
+      const params = {
+        str0: '',
+        str1: 'a',
+        str3: 'abc',
+        str5: 'abcde',
+        str10000: 'a'.repeat(10000),
+        str10001: 'a'.repeat(10001),
+      };
+
+      const sanitized = sanitizeParams(params, schema);
+
+      assert.strictEqual(sanitized.str0_length, 0);
+      assert.strictEqual(sanitized.str1_length, 1);
+      assert.strictEqual(sanitized.str3_length, 5); // snaps to 5
+      assert.strictEqual(sanitized.str5_length, 5);
+      assert.strictEqual(sanitized.str10000_length, 10000);
+      assert.strictEqual(sanitized.str10001_length, 10000); // snaps to 10000
+    });
+
     it('throws error for unsupported types', () => {
       const schema = {
         myObj: zod.object({foo: zod.string()}),

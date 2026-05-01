@@ -6,6 +6,8 @@
 
 import assert from 'node:assert';
 import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import {describe, it} from 'node:test';
 
 import {Client} from '@modelcontextprotocol/sdk/client/index.js';
@@ -114,7 +116,7 @@ describe('e2e', () => {
         );
         assert.ok(listInPageTools);
       },
-      ['--category-in-page-tools'],
+      ['--category-experimental-in-page'],
     );
   });
 
@@ -208,7 +210,7 @@ describe('e2e', () => {
         const result = await client.callTool({
           name: 'take_screenshot',
           arguments: {
-            filePath: '/tmp/test.png',
+            filePath: path.resolve(os.homedir(), 'test.png'),
           },
         });
 
@@ -244,6 +246,72 @@ describe('e2e', () => {
         capabilities: {},
       },
     );
+  });
+
+  describe('Dialogs', () => {
+    async function createNewPageAndTriggerDialog(client: Client) {
+      // Navigate to a page with a button that triggers a dialog on click
+      await client.callTool({
+        name: 'new_page',
+        arguments: {
+          url: `data:text/html,<button id="test" onclick="alert('test dialog')">Click me</button>`,
+        },
+      });
+
+      const snapshotResult = await client.callTool({
+        name: 'take_snapshot',
+        arguments: {},
+      });
+
+      const snapshotText = (snapshotResult.content as TextContent[])[0].text;
+      const match = snapshotText.match(/uid=(\d+_\d+)\s+button "Click me"/);
+      const uid = match ? match[1] : '1_1';
+
+      // Trigger the dialog
+      const result = await client.callTool({
+        name: 'click',
+        arguments: {
+          uid,
+        },
+      });
+
+      return result;
+    }
+
+    it('returns blocked message when dialog is opened during tool execution', async t => {
+      await withClient(async client => {
+        const result = await createNewPageAndTriggerDialog(client);
+        t.assert.snapshot?.(JSON.stringify(result));
+      });
+    });
+
+    it('when dialog is open and tool is blocked, returns an error', async t => {
+      await withClient(async client => {
+        await createNewPageAndTriggerDialog(client);
+        const result = await client.callTool({
+          name: 'take_screenshot',
+          arguments: {
+            filePath: '/tmp/test.png',
+          },
+        });
+
+        t.assert.snapshot?.(JSON.stringify(result));
+      });
+    });
+
+    it('when dialog is open and tool is not blocked, executes tool', async t => {
+      await withClient(async client => {
+        await createNewPageAndTriggerDialog(client);
+        const result = await client.callTool({
+          name: 'new_page',
+          arguments: {
+            url: `data:text/html,<h1>New</h1>`,
+          },
+        });
+
+        t.assert.snapshot?.(JSON.stringify(result));
+      });
+    });
   });
 });
 

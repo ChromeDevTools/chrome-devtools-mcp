@@ -287,6 +287,10 @@ export function stabilizeResponseOutput(text: unknown) {
   const acceptLanguageRegEx = /accept-language:.*\n/g;
   output = output.replaceAll(acceptLanguageRegEx, 'accept-language:<lang>\n');
 
+  // Stabilize URL-encoded file paths
+  const fileUriRegEx = /file%3A%2F%2F%2F[^)\n]+/g;
+  output = output.replaceAll(fileUriRegEx, '<file-path>');
+
   return output;
 }
 

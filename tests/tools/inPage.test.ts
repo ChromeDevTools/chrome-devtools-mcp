@@ -72,7 +72,7 @@ describe('inPage', () => {
           });
         },
         undefined,
-        {categoryInPageTools: true} as ParsedArguments,
+        {categoryExperimentalInPage: true} as ParsedArguments,
       );
     });
 
@@ -102,7 +102,7 @@ describe('inPage', () => {
           );
         },
         undefined,
-        {categoryInPageTools: true} as ParsedArguments,
+        {categoryExperimentalInPage: true} as ParsedArguments,
       );
     });
 
@@ -131,7 +131,7 @@ describe('inPage', () => {
           );
         },
         undefined,
-        {categoryInPageTools: true} as ParsedArguments,
+        {categoryExperimentalInPage: true} as ParsedArguments,
       );
     });
 
@@ -150,7 +150,7 @@ describe('inPage', () => {
           );
         },
         undefined,
-        {categoryInPageTools: true} as ParsedArguments,
+        {categoryExperimentalInPage: true} as ParsedArguments,
       );
     });
   });
@@ -215,7 +215,7 @@ describe('inPage', () => {
           );
         },
         undefined,
-        {categoryInPageTools: true} as ParsedArguments,
+        {categoryExperimentalInPage: true} as ParsedArguments,
       );
     });
 
@@ -302,7 +302,7 @@ describe('inPage', () => {
           );
         },
         undefined,
-        {categoryInPageTools: true} as ParsedArguments,
+        {categoryExperimentalInPage: true} as ParsedArguments,
       );
     });
 
@@ -347,7 +347,7 @@ describe('inPage', () => {
           );
         },
         undefined,
-        {categoryInPageTools: true} as ParsedArguments,
+        {categoryExperimentalInPage: true} as ParsedArguments,
       );
     });
 
@@ -486,7 +486,7 @@ describe('inPage', () => {
           );
         },
         undefined,
-        {categoryInPageTools: true} as ParsedArguments,
+        {categoryExperimentalInPage: true} as ParsedArguments,
       );
     });
 
@@ -535,7 +535,7 @@ describe('inPage', () => {
           );
         },
         undefined,
-        {categoryInPageTools: true} as ParsedArguments,
+        {categoryExperimentalInPage: true} as ParsedArguments,
       );
     });
 
@@ -590,7 +590,7 @@ describe('inPage', () => {
           );
         },
         undefined,
-        {categoryInPageTools: true} as ParsedArguments,
+        {categoryExperimentalInPage: true} as ParsedArguments,
       );
     });
 
@@ -647,7 +647,7 @@ describe('inPage', () => {
           stub.restore();
         },
         undefined,
-        {categoryInPageTools: true} as ParsedArguments,
+        {categoryExperimentalInPage: true} as ParsedArguments,
       );
     });
 
@@ -713,7 +713,7 @@ describe('inPage', () => {
           stubSnapshot.restore();
         },
         undefined,
-        {categoryInPageTools: true} as ParsedArguments,
+        {categoryExperimentalInPage: true} as ParsedArguments,
       );
     });
 
@@ -771,7 +771,7 @@ describe('inPage', () => {
           stubSnapshot.restore();
         },
         undefined,
-        {categoryInPageTools: true} as ParsedArguments,
+        {categoryExperimentalInPage: true} as ParsedArguments,
       );
     });
   });

@@ -48,9 +48,9 @@ export const listInPageTools = definePageTool({
   annotations: {
     category: ToolCategory.IN_PAGE,
     readOnlyHint: true,
-    conditions: ['inPageTools'],
   },
   schema: {},
+  blockedByDialog: false,
   handler: async (_request, response, _context) => {
     response.setListInPageTools();
   },
@@ -62,7 +62,6 @@ export const executeInPageTool = definePageTool({
   annotations: {
     category: ToolCategory.IN_PAGE,
     readOnlyHint: false,
-    conditions: ['inPageTools'],
   },
   schema: {
     toolName: zod.string().describe('The name of the tool to execute'),
@@ -71,6 +70,7 @@ export const executeInPageTool = definePageTool({
       .optional()
       .describe('The JSON-stringified parameters to pass to the tool'),
   },
+  blockedByDialog: false,
   handler: async (request, response) => {
     const toolName = request.params.toolName;
     let params: Record<string, unknown> = {};

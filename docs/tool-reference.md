@@ -398,7 +398,7 @@ in the DevTools Elements panel (if any).
 
 ## Extensions
 
-> NOTE: Extensions are not active by default. Use the '--category-extensions' flag
+> NOTE: Extensions are not active by default. Use the '--categoryExtensions' flag
 
 ### `install_extension`
 
