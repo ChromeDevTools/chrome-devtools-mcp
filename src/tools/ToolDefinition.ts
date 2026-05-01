@@ -24,6 +24,7 @@ import type {
   ExtensionServiceWorker,
 } from '../types.js';
 import type {PaginationOptions} from '../utils/types.js';
+import type {WaitForEventsResult} from '../WaitForHelper.js';
 
 import type {ToolCategory} from './categories.js';
 import type {
@@ -260,7 +261,7 @@ export type ContextPage = Readonly<{
   waitForEventsAfterAction(
     action: () => Promise<unknown>,
     options?: {timeout?: number; handleDialog?: 'accept' | 'dismiss' | string},
-  ): Promise<void>;
+  ): Promise<WaitForEventsResult>;
   getThirdPartyDeveloperTools():
     | ToolGroup<ThirdPartyDeveloperToolDefinition>
     | undefined;

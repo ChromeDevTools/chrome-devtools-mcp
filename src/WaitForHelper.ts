@@ -127,7 +127,7 @@ export class WaitForHelper {
   async waitForEventsAfterAction(
     action: () => Promise<unknown>,
     options?: {timeout?: number; handleDialog?: 'accept' | 'dismiss' | string},
-  ): Promise<void> {
+  ): Promise<WaitForEventsResult> {
     let dialogOpened = false;
     if (options?.handleDialog) {
       const dialogHandler = (dialog: Pick<Dialog, 'accept' | 'dismiss'>) => {
@@ -146,6 +146,7 @@ export class WaitForHelper {
       });
     }
 
+    const urlBeforeAction = this.#page.url();
     const navigationFinished = this.waitForNavigationStarted()
       .then(navigationStated => {
         if (navigationStated) {
@@ -170,7 +171,7 @@ export class WaitForHelper {
       await navigationFinished;
 
       if (dialogOpened) {
-        return;
+        return {};
       }
 
       // Wait for stable dom after navigation so we execute in
@@ -181,6 +182,30 @@ export class WaitForHelper {
     } finally {
       this.#abortController.abort();
     }
+
+    const urlAfterAction = this.#page.url();
+    return {
+      ...(urlAfterAction !== urlBeforeAction
+        ? {navigatedToUrl: urlAfterAction}
+        : {}),
+    };
+  }
+}
+
+export interface WaitForEventsResult {
+  /**
+   * The URL the page navigated to during the action, if a navigation
+   * occurred.
+   */
+  navigatedToUrl?: string;
+}
+
+export function appendWaitForResult(
+  response: {appendResponseLine(value: string): void},
+  result: WaitForEventsResult,
+): void {
+  if (result.navigatedToUrl) {
+    response.appendResponseLine(`Page navigated to ${result.navigatedToUrl}.`);
   }
 }
 
