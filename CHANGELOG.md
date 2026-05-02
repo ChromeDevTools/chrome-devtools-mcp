@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.24.0](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.23.0...chrome-devtools-mcp-v0.24.0) (2026-05-02)
+
+
+### 🎉 Features
+
+* agentic browsing in lighthouse ([#1931](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1931)) ([5fa2750](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/5fa2750456d8ea5b73ca851c7c44dcec0a2be01e))
+* **cli:** generate commands for conditional tools ([#1962](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1962)) ([b2b3e99](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/b2b3e99d67e573e65a4cf84258da8560b2753405))
+* group identical consecutive console messages in list_console_messages ([#1939](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1939)) ([dbddb2e](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/dbddb2e4efb01c25ce4c6d96fd45b3ab29a498eb))
+* support MCP client roots feature ([#1945](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1945)) ([def53dd](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/def53ddf1d0d3fe04c41f1572919cef208161151))
+
+
+### 🛠️ Fixes
+
+* add proactive tool rejection when dialog is open ([#1978](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1978)) ([6ce254e](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/6ce254e54153212bf305e28846bc77f1d6b82b74))
+* always allow tmpdir access with client roots ([#1984](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1984)) ([a90378a](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/a90378adf3226e8b27a05cdcfdd801c199acaa93))
+* **cli:** re-generate cli correctly ([#1969](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1969)) ([8cbdb8d](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/8cbdb8d49491e332c1d30a3884304e1f7a519db2))
+* handle errors due to open dialogs during tool calls ([#1953](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1953)) ([06b331f](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/06b331f403056727850a633dd64b290d60bdb906))
+* note about missing elements should not show in verbose mode ([#1950](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1950)) ([80bee1e](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/80bee1e6cd0e62995496ea9d001994c78ec9dcf0))
+* **telemetry:** bucketize string length ([#1972](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1972)) ([bf3cb58](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/bf3cb58d27589ddc5156d7a6ee1b2bb81d9a2cee))
+
 ## [0.23.0](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.22.0...chrome-devtools-mcp-v0.23.0) (2026-04-22)
 
 
