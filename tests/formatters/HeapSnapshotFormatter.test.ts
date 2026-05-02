@@ -9,6 +9,7 @@ import {describe, it} from 'node:test';
 
 import {HeapSnapshotFormatter} from '../../src/formatters/HeapSnapshotFormatter.js';
 import type {DevTools} from '../../src/third_party/index.js';
+import {stableIdSymbol} from '../../src/utils/id.js';
 
 describe('HeapSnapshotFormatter', () => {
   const mockAggregates: Record<
@@ -22,6 +23,7 @@ describe('HeapSnapshotFormatter', () => {
       maxRet: 1000,
       distance: 1,
       idxs: [],
+      [stableIdSymbol]: 1,
     } as unknown as DevTools.HeapSnapshotModel.HeapSnapshotModel.AggregatedInfo,
     ObjectB: {
       name: 'ObjectB',
@@ -30,11 +32,12 @@ describe('HeapSnapshotFormatter', () => {
       maxRet: 500,
       distance: 2,
       idxs: [],
+      [stableIdSymbol]: 2,
     } as unknown as DevTools.HeapSnapshotModel.HeapSnapshotModel.AggregatedInfo,
   };
 
   describe('toString', () => {
-    it('formats data as CSV and sorts by self size', t => {
+    it('formats data as CSV and sorts by retained size', t => {
       const formatter = new HeapSnapshotFormatter(mockAggregates);
       const result = formatter.toString();
       t.assert.snapshot?.(result);
@@ -42,17 +45,19 @@ describe('HeapSnapshotFormatter', () => {
   });
 
   describe('toJSON', () => {
-    it('returns structured data sorted by self size', () => {
+    it('returns structured data sorted by retained size', () => {
       const formatter = new HeapSnapshotFormatter(mockAggregates);
       const result = formatter.toJSON();
       assert.deepStrictEqual(result, [
         {
+          uid: 1,
           className: 'ObjectA',
           count: 10,
           selfSize: 100,
           retainedSize: 1000,
         },
         {
+          uid: 2,
           className: 'ObjectB',
           count: 5,
           selfSize: 50,
@@ -63,7 +68,7 @@ describe('HeapSnapshotFormatter', () => {
   });
 
   describe('sort', () => {
-    it('sorts aggregates by self size descending', () => {
+    it('sorts aggregates by retained size descending', () => {
       const unsortedAggregates: Record<
         string,
         DevTools.HeapSnapshotModel.HeapSnapshotModel.AggregatedInfo
@@ -71,10 +76,12 @@ describe('HeapSnapshotFormatter', () => {
         ObjectB: {
           name: 'ObjectB',
           self: 50,
+          maxRet: 500,
         },
         ObjectA: {
           name: 'ObjectA',
           self: 100,
+          maxRet: 1000,
         },
       } as unknown as Record<
         string,

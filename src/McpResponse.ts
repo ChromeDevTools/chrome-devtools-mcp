@@ -9,12 +9,14 @@ import type {WebMCPTool} from 'puppeteer-core';
 import type {ParsedArguments} from './bin/chrome-devtools-mcp-cli-options.js';
 import {ConsoleFormatter} from './formatters/ConsoleFormatter.js';
 import {HeapSnapshotFormatter} from './formatters/HeapSnapshotFormatter.js';
+import {isNodeLike} from './formatters/HeapSnapshotFormatter.js';
 import {IssueFormatter} from './formatters/IssueFormatter.js';
 import {NetworkFormatter} from './formatters/NetworkFormatter.js';
 import {SnapshotFormatter} from './formatters/SnapshotFormatter.js';
 import type {McpContext} from './McpContext.js';
 import type {McpPage} from './McpPage.js';
 import {UncaughtError} from './PageCollector.js';
+import {TextSnapshot} from './TextSnapshot.js';
 import {DevTools, type Protocol} from './third_party/index.js';
 import type {
   ConsoleMessage,
@@ -23,6 +25,7 @@ import type {
   ResourceType,
   TextContent,
   JSONSchema7Definition,
+  Extension,
 } from './third_party/index.js';
 import type {ToolGroup, ToolDefinition} from './tools/inPage.js';
 import {handleDialog} from './tools/pages.js';
@@ -35,7 +38,6 @@ import type {
 } from './tools/ToolDefinition.js';
 import type {InsightName, TraceResult} from './trace-processing/parse.js';
 import {getInsightOutput, getTraceSummary} from './trace-processing/parse.js';
-import type {InstalledExtension} from './utils/ExtensionRegistry.js';
 import {paginate} from './utils/pagination.js';
 import type {PaginationOptions} from './utils/types.js';
 
@@ -178,6 +180,7 @@ export class McpResponse implements Response {
     pagination?: PaginationOptions;
     stats?: DevTools.HeapSnapshotModel.HeapSnapshotModel.Statistics;
     staticData?: DevTools.HeapSnapshotModel.HeapSnapshotModel.StaticData | null;
+    nodes?: DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange;
   };
   #networkRequestsOptions?: {
     include: boolean;
@@ -200,6 +203,7 @@ export class McpResponse implements Response {
   #args: ParsedArguments;
   #page?: McpPage;
   #redactNetworkHeaders = true;
+  #error?: Error;
 
   constructor(args: ParsedArguments) {
     this.#args = args;
@@ -241,7 +245,7 @@ export class McpResponse implements Response {
   }
 
   setListInPageTools(): void {
-    if (this.#args.categoryInPageTools) {
+    if (this.#args.categoryExperimentalInPage) {
       this.#listInPageTools = true;
     }
   }
@@ -302,6 +306,10 @@ export class McpResponse implements Response {
       types: options?.types,
       includePreservedMessages: options?.includePreservedMessages,
     };
+  }
+
+  setError(error: Error): void {
+    this.#error = error;
   }
 
   attachNetworkRequest(
@@ -372,6 +380,10 @@ export class McpResponse implements Response {
     return this.#consoleDataOptions?.types;
   }
 
+  get error(): Error | undefined {
+    return this.#error;
+  }
+
   appendResponseLine(value: string): void {
     this.#textResponseLines.push(value);
   }
@@ -400,6 +412,18 @@ export class McpResponse implements Response {
       include: true,
       stats,
       staticData,
+    };
+  }
+
+  setHeapSnapshotNodes(
+    nodes: DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange,
+    options?: PaginationOptions,
+  ) {
+    this.#heapSnapshotOptions = {
+      ...this.#heapSnapshotOptions,
+      include: true,
+      nodes,
+      pagination: options,
     };
   }
 
@@ -443,11 +467,10 @@ export class McpResponse implements Response {
       if (!this.#page) {
         throw new Error('Response must have a page');
       }
-      await context.createTextSnapshot(
-        this.#page,
-        this.#snapshotParams.verbose,
-        this.#devToolsData,
-      );
+      this.#page.textSnapshot = await TextSnapshot.create(this.#page, {
+        verbose: this.#snapshotParams.verbose,
+        devtoolsData: this.#devToolsData,
+      });
       const textSnapshot = this.#page.textSnapshot;
       if (textSnapshot) {
         const formatter = new SnapshotFormatter(textSnapshot);
@@ -513,10 +536,7 @@ export class McpResponse implements Response {
             context,
             this.#page,
           ),
-          elementIdResolver: context.resolveCdpElementId.bind(
-            context,
-            this.#page,
-          ),
+          elementIdResolver: this.#page.resolveCdpElementId.bind(this.#page),
         });
         if (!formatter.isValid()) {
           throw new Error(
@@ -527,9 +547,9 @@ export class McpResponse implements Response {
       }
     }
 
-    let extensions: InstalledExtension[] | undefined;
+    let extensions: Map<string, Extension> | undefined;
     if (this.#listExtensions) {
-      extensions = context.listExtensions();
+      extensions = await context.listExtensions();
     }
 
     let inPageTools: ToolGroup<ToolDefinition> | undefined;
@@ -651,6 +671,7 @@ export class McpResponse implements Response {
       lighthouseResult: this.#attachedLighthouseResult,
       inPageTools,
       webmcpTools,
+      errorMessage: this.#error?.message,
     });
   }
 
@@ -665,10 +686,11 @@ export class McpResponse implements Response {
       networkRequests?: NetworkFormatter[];
       traceSummary?: TraceResult;
       traceInsight?: TraceInsightData;
-      extensions?: InstalledExtension[];
+      extensions?: Map<string, Extension>;
       lighthouseResult?: LighthouseData;
       inPageTools?: ToolGroup<ToolDefinition>;
       webmcpTools?: WebMCPTool[];
+      errorMessage?: string;
     },
   ): {content: Array<TextContent | ImageContent>; structuredContent: object} {
     const structuredContent: {
@@ -704,8 +726,10 @@ export class McpResponse implements Response {
         staticData?: object;
       };
       heapSnapshotData?: object[];
+      heapSnapshotNodes?: readonly object[];
       extensionServiceWorkers?: object[];
       extensionPages?: object[];
+      errorMessage?: string;
     } = {};
 
     const response = [];
@@ -932,6 +956,24 @@ Call ${handleDialog.name} to handle it before continuing.`);
         response.push(formatter.toString());
         structuredContent.heapSnapshotData = formatter.toJSON();
       }
+      const nodes = this.#heapSnapshotOptions.nodes;
+      if (nodes) {
+        const sortedItems = nodes.items
+          .filter(isNodeLike)
+          .sort((a, b) => b.retainedSize - a.retainedSize);
+
+        const paginationData = this.#dataWithPagination(
+          sortedItems,
+          this.#heapSnapshotOptions.pagination,
+        );
+
+        response.push(HeapSnapshotFormatter.formatNodes(paginationData.items));
+
+        structuredContent.pagination = paginationData.pagination;
+        response.push(...paginationData.info);
+
+        structuredContent.heapSnapshotNodes = paginationData.items;
+      }
     }
 
     if (data.detailedNetworkRequest) {
@@ -947,14 +989,15 @@ Call ${handleDialog.name} to handle it before continuing.`);
     }
 
     if (data.extensions) {
-      structuredContent.extensions = data.extensions;
+      const extensionArray = Array.from(data.extensions.values());
+      structuredContent.extensions = extensionArray;
       response.push('## Extensions');
-      if (data.extensions.length === 0) {
+      if (extensionArray.length === 0) {
         response.push('No extensions installed.');
       } else {
-        const extensionsMessage = data.extensions
+        const extensionsMessage = extensionArray
           .map(extension => {
-            return `id=${extension.id} "${extension.name}" v${extension.version} ${extension.isEnabled ? 'Enabled' : 'Disabled'}`;
+            return `id=${extension.id} "${extension.name}" v${extension.version} ${extension.enabled ? 'Enabled' : 'Disabled'}`;
           })
           .join('\n');
         response.push(extensionsMessage);
@@ -1033,21 +1076,25 @@ Call ${handleDialog.name} to handle it before continuing.`);
 
       response.push('## Console messages');
       if (messages.length) {
+        const grouped = ConsoleFormatter.groupConsecutive(messages);
         const paginationData = this.#dataWithPagination(
-          messages,
+          grouped,
           this.#consoleDataOptions.pagination,
         );
         structuredContent.pagination = paginationData.pagination;
         response.push(...paginationData.info);
-        response.push(
-          ...paginationData.items.map(message => message.toString()),
-        );
-        structuredContent.consoleMessages = paginationData.items.map(message =>
-          message.toJSON(),
+        response.push(...paginationData.items.map(item => item.toString()));
+        structuredContent.consoleMessages = paginationData.items.map(item =>
+          item.toJSON(),
         );
       } else {
         response.push('<no console messages found>');
       }
+    }
+
+    if (data.errorMessage) {
+      response.push(`Error: ${data.errorMessage}`);
+      structuredContent.errorMessage = data.errorMessage;
     }
 
     const text: TextContent = {

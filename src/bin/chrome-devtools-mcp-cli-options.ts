@@ -12,7 +12,7 @@ export const cliOptions = {
     type: 'boolean',
     description:
       'If specified, automatically connects to a browser (Chrome 144+) running locally from the user data directory identified by the channel param (default channel is stable). Requires the remote debugging server to be started in the Chrome instance via chrome://inspect/#remote-debugging.',
-    conflicts: ['isolated', 'executablePath', 'categoryExtensions'],
+    conflicts: ['isolated', 'executablePath'],
     default: false,
     coerce: (value: boolean | undefined) => {
       if (!value) {
@@ -26,7 +26,7 @@ export const cliOptions = {
     description:
       'Connect to a running, debuggable Chrome instance (e.g. `http://127.0.0.1:9222`). For more details see: https://github.com/ChromeDevTools/chrome-devtools-mcp#connecting-to-a-running-chrome-instance.',
     alias: 'u',
-    conflicts: ['wsEndpoint', 'categoryExtensions'],
+    conflicts: ['wsEndpoint'],
     coerce: (url: string | undefined) => {
       if (!url) {
         return;
@@ -44,7 +44,7 @@ export const cliOptions = {
     description:
       'WebSocket endpoint to connect to a running Chrome instance (e.g., ws://127.0.0.1:9222/devtools/browser/<id>). Alternative to --browserUrl.',
     alias: 'w',
-    conflicts: ['browserUrl', 'categoryExtensions'],
+    conflicts: ['browserUrl'],
     coerce: (url: string | undefined) => {
       if (!url) {
         return;
@@ -180,6 +180,11 @@ export const cliOptions = {
       'Whether to include all kinds of pages such as webviews or background pages as pages.',
     hidden: true,
   },
+  experimentalNavigationAllowlist: {
+    type: 'boolean',
+    describe: 'Whether to enable navigation allowlist tool parameter.',
+    hidden: true,
+  },
   experimentalInteropTools: {
     type: 'boolean',
     describe: 'Whether to enable interoperability tools',
@@ -189,6 +194,11 @@ export const cliOptions = {
     type: 'boolean',
     describe:
       'Exposes experimental screencast tools (requires ffmpeg). Install ffmpeg https://www.ffmpeg.org/download.html and ensure it is available in the MCP server PATH.',
+  },
+  experimentalFfmpegPath: {
+    type: 'string',
+    describe: 'Path to ffmpeg executable for screencast recording.',
+    implies: 'experimentalScreencast',
   },
   experimentalWebmcp: {
     type: 'boolean',
@@ -222,14 +232,15 @@ export const cliOptions = {
   },
   categoryExtensions: {
     type: 'boolean',
-    hidden: true,
-    conflicts: ['browserUrl', 'autoConnect', 'wsEndpoint'],
+    hidden: false,
+    default: false,
     describe:
-      'Set to true to include tools related to extensions. Note: This feature is only supported with a pipe connection. autoConnect is not supported.',
+      'Set to true to include tools related to extensions. Note: This feature is currently only supported with a pipe connection. autoConnect, browserUrl, and wsEndpoint are not supported with this feature until 149 will be released.',
   },
-  categoryInPageTools: {
+  categoryExperimentalInPage: {
     type: 'boolean',
     hidden: true,
+    default: false,
     describe:
       'Set to true to enable tools exposed by the inspected page itself',
   },

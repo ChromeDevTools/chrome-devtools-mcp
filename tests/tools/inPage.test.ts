@@ -7,11 +7,14 @@
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
+import sinon from 'sinon';
+
 import type {ParsedArguments} from '../../src/bin/chrome-devtools-mcp-cli-options.js';
 import type {McpContext} from '../../src/McpContext.js';
 import type {McpResponse} from '../../src/McpResponse.js';
-import type {ToolGroup, ToolDefinition} from '../../src/tools/inPage.js';
+import {TextSnapshot} from '../../src/TextSnapshot.js';
 import {executeInPageTool, listInPageTools} from '../../src/tools/inPage.js';
+import type {ToolGroup, ToolDefinition} from '../../src/tools/inPage.js';
 import {withMcpContext} from '../utils.js';
 
 describe('inPage', () => {
@@ -69,7 +72,7 @@ describe('inPage', () => {
           });
         },
         undefined,
-        {categoryInPageTools: true} as ParsedArguments,
+        {categoryExperimentalInPage: true} as ParsedArguments,
       );
     });
 
@@ -99,7 +102,7 @@ describe('inPage', () => {
           );
         },
         undefined,
-        {categoryInPageTools: true} as ParsedArguments,
+        {categoryExperimentalInPage: true} as ParsedArguments,
       );
     });
 
@@ -128,7 +131,7 @@ describe('inPage', () => {
           );
         },
         undefined,
-        {categoryInPageTools: true} as ParsedArguments,
+        {categoryExperimentalInPage: true} as ParsedArguments,
       );
     });
 
@@ -147,7 +150,7 @@ describe('inPage', () => {
           );
         },
         undefined,
-        {categoryInPageTools: true} as ParsedArguments,
+        {categoryExperimentalInPage: true} as ParsedArguments,
       );
     });
   });
@@ -208,11 +211,11 @@ describe('inPage', () => {
           );
           assert.strictEqual(
             response.responseLines[0],
-            JSON.stringify({result: 'result'}, null, 2),
+            JSON.stringify('result', null, 2),
           );
         },
         undefined,
-        {categoryInPageTools: true} as ParsedArguments,
+        {categoryExperimentalInPage: true} as ParsedArguments,
       );
     });
 
@@ -299,7 +302,7 @@ describe('inPage', () => {
           );
         },
         undefined,
-        {categoryInPageTools: true} as ParsedArguments,
+        {categoryExperimentalInPage: true} as ParsedArguments,
       );
     });
 
@@ -340,11 +343,11 @@ describe('inPage', () => {
           );
           assert.strictEqual(
             response.responseLines[0],
-            JSON.stringify({result: {foo: 'bar'}}, null, 2),
+            JSON.stringify({foo: 'bar'}, null, 2),
           );
         },
         undefined,
-        {categoryInPageTools: true} as ParsedArguments,
+        {categoryExperimentalInPage: true} as ParsedArguments,
       );
     });
 
@@ -428,17 +431,348 @@ describe('inPage', () => {
           response.responseLines[0],
           JSON.stringify(
             {
-              result: {
-                isElement: true,
-                tagName: 'DIV',
-                id: 'test-id',
-              },
+              isElement: true,
+              tagName: 'DIV',
+              id: 'test-id',
             },
             null,
             2,
           ),
         );
       });
+    });
+
+    it('processToolResult replaces functions with "<Function object>"', async () => {
+      await withMcpContext(
+        async (response, context) => {
+          await setupInPageTools(response, context, () => {
+            window.__dtmcp = {
+              toolGroup: {
+                name: 'test-group',
+                description: 'test description',
+                tools: [
+                  {
+                    name: 'test-tool',
+                    description: 'test tool description',
+                    inputSchema: {},
+                    execute: () => ({
+                      foo: 'bar',
+                      func: () => undefined,
+                    }),
+                  },
+                ],
+              },
+            };
+            window.addEventListener('devtoolstooldiscovery', (e: Event) => {
+              // @ts-expect-error Event has `respondWith`
+              e.respondWith(window.__dtmcp?.toolGroup);
+            });
+          });
+
+          await executeInPageTool.handler(
+            {
+              params: {
+                toolName: 'test-tool',
+                params: JSON.stringify({}),
+              },
+              page: context.getSelectedMcpPage(),
+            },
+            response,
+            context,
+          );
+          assert.strictEqual(
+            response.responseLines[0],
+            JSON.stringify({foo: 'bar', func: '<Function object>'}, null, 2),
+          );
+        },
+        undefined,
+        {categoryExperimentalInPage: true} as ParsedArguments,
+      );
+    });
+
+    it('processToolResult replaces circular references with "<Circular reference>"', async () => {
+      await withMcpContext(
+        async (response, context) => {
+          await setupInPageTools(response, context, () => {
+            window.__dtmcp = {
+              toolGroup: {
+                name: 'test-group',
+                description: 'test description',
+                tools: [
+                  {
+                    name: 'test-tool',
+                    description: 'test tool description',
+                    inputSchema: {},
+                    execute: () => {
+                      const obj: Record<string, unknown> = {foo: 'bar'};
+                      obj.self = obj;
+                      return obj;
+                    },
+                  },
+                ],
+              },
+            };
+            window.addEventListener('devtoolstooldiscovery', (e: Event) => {
+              // @ts-expect-error Event has `respondWith`
+              e.respondWith(window.__dtmcp?.toolGroup);
+            });
+          });
+
+          await executeInPageTool.handler(
+            {
+              params: {
+                toolName: 'test-tool',
+                params: JSON.stringify({}),
+              },
+              page: context.getSelectedMcpPage(),
+            },
+            response,
+            context,
+          );
+          assert.strictEqual(
+            response.responseLines[0],
+            JSON.stringify({foo: 'bar', self: '<Circular reference>'}, null, 2),
+          );
+        },
+        undefined,
+        {categoryExperimentalInPage: true} as ParsedArguments,
+      );
+    });
+
+    it('processToolResult replaces non-plain objects with "<ConstructorName instance>"', async () => {
+      await withMcpContext(
+        async (response, context) => {
+          await setupInPageTools(response, context, () => {
+            class CustomClass {
+              val = 'value';
+            }
+            window.__dtmcp = {
+              toolGroup: {
+                name: 'test-group',
+                description: 'test description',
+                tools: [
+                  {
+                    name: 'test-tool',
+                    description: 'test tool description',
+                    inputSchema: {},
+                    execute: () => ({
+                      foo: 'bar',
+                      custom: new CustomClass(),
+                    }),
+                  },
+                ],
+              },
+            };
+            window.addEventListener('devtoolstooldiscovery', (e: Event) => {
+              // @ts-expect-error Event has `respondWith`
+              e.respondWith(window.__dtmcp?.toolGroup);
+            });
+          });
+
+          await executeInPageTool.handler(
+            {
+              params: {
+                toolName: 'test-tool',
+                params: JSON.stringify({}),
+              },
+              page: context.getSelectedMcpPage(),
+            },
+            response,
+            context,
+          );
+          assert.strictEqual(
+            response.responseLines[0],
+            JSON.stringify(
+              {foo: 'bar', custom: '<CustomClass instance>'},
+              null,
+              2,
+            ),
+          );
+        },
+        undefined,
+        {categoryExperimentalInPage: true} as ParsedArguments,
+      );
+    });
+
+    it('stashDOMElement stashes elements and returns UID', async () => {
+      await withMcpContext(
+        async (response, context) => {
+          const page = await context.newPage();
+          response.setPage(page);
+
+          page.inPageTools = {
+            name: 'test-group',
+            description: 'test description',
+            tools: [
+              {
+                name: 'test-tool',
+                description: 'test tool description',
+                inputSchema: {},
+              },
+            ],
+          };
+
+          await page.pptrPage.evaluate(() => {
+            window.__dtmcp = {
+              executeTool: async () => {
+                const div = document.createElement('div');
+                div.id = 'test-element';
+                document.body.appendChild(div);
+                return div;
+              },
+            };
+          });
+
+          const stub = sinon
+            .stub(page, 'resolveCdpElementId')
+            .returns('mock-uid');
+
+          await executeInPageTool.handler(
+            {
+              params: {
+                toolName: 'test-tool',
+                params: JSON.stringify({}),
+              },
+              page: page,
+            },
+            response,
+            context,
+          );
+
+          assert.strictEqual(
+            response.responseLines[0],
+            JSON.stringify({uid: 'mock-uid'}, null, 2),
+          );
+
+          stub.restore();
+        },
+        undefined,
+        {categoryExperimentalInPage: true} as ParsedArguments,
+      );
+    });
+
+    it('creates a new snapshot if the in-page tool response contains a DOM element', async () => {
+      await withMcpContext(
+        async (response, context) => {
+          const page = await context.newPage();
+          response.setPage(page);
+
+          page.inPageTools = {
+            name: 'test-group',
+            description: 'test description',
+            tools: [
+              {
+                name: 'test-tool',
+                description: 'test tool description',
+                inputSchema: {},
+              },
+            ],
+          };
+
+          await page.pptrPage.evaluate(() => {
+            window.__dtmcp = {
+              executeTool: async () => {
+                const div = document.createElement('div');
+                div.id = 'test-element';
+                document.body.appendChild(div);
+                return div;
+              },
+            };
+          });
+
+          const stubSnapshot = sinon
+            .stub(TextSnapshot, 'create')
+            .resolves({} as TextSnapshot);
+
+          const stubResolve = sinon
+            .stub(page, 'resolveCdpElementId')
+            .returns('mock-uid');
+
+          await executeInPageTool.handler(
+            {
+              params: {
+                toolName: 'test-tool',
+                params: JSON.stringify({}),
+              },
+              page: page,
+            },
+            response,
+            context,
+          );
+
+          assert.ok(
+            stubSnapshot.calledOnce,
+            'Expected TextSnapshot.create to be called',
+          );
+          assert.strictEqual(
+            response.responseLines[0],
+            JSON.stringify({uid: 'mock-uid'}, null, 2),
+          );
+
+          stubResolve.restore();
+          stubSnapshot.restore();
+        },
+        undefined,
+        {categoryExperimentalInPage: true} as ParsedArguments,
+      );
+    });
+
+    it('does not create a new snapshot if the in-page tool response does not contain a DOM element', async () => {
+      await withMcpContext(
+        async (response, context) => {
+          const page = await context.newPage();
+          response.setPage(page);
+
+          page.inPageTools = {
+            name: 'test-group',
+            description: 'test description',
+            tools: [
+              {
+                name: 'test-tool',
+                description: 'test tool description',
+                inputSchema: {},
+              },
+            ],
+          };
+
+          await page.pptrPage.evaluate(() => {
+            window.__dtmcp = {
+              executeTool: async () => {
+                return 'simple-result';
+              },
+            };
+          });
+
+          const stubSnapshot = sinon
+            .stub(TextSnapshot, 'create')
+            .resolves({} as TextSnapshot);
+
+          await executeInPageTool.handler(
+            {
+              params: {
+                toolName: 'test-tool',
+                params: JSON.stringify({}),
+              },
+              page: page,
+            },
+            response,
+            context,
+          );
+
+          assert.ok(
+            stubSnapshot.notCalled,
+            'Expected TextSnapshot.create not to be called',
+          );
+          assert.strictEqual(
+            response.responseLines[0],
+            JSON.stringify('simple-result', null, 2),
+          );
+
+          stubSnapshot.restore();
+        },
+        undefined,
+        {categoryExperimentalInPage: true} as ParsedArguments,
+      );
     });
   });
 });

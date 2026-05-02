@@ -14,6 +14,8 @@ import {describe, it} from 'node:test';
 import {
   takeMemorySnapshot,
   exploreMemorySnapshot,
+  getMemorySnapshotDetails,
+  getNodesByClass,
 } from '../../src/tools/memory.js';
 import {withMcpContext} from '../utils.js';
 
@@ -41,7 +43,7 @@ describe('memory', () => {
   });
 
   describe('load_memory_snapshot', () => {
-    it('with default options', async () => {
+    it('with default options', async t => {
       await withMcpContext(async (response, context) => {
         const filePath = join(
           process.cwd(),
@@ -65,9 +67,84 @@ describe('memory', () => {
           .map(c => (c.type === 'text' ? c.text : ''))
           .join('\n');
 
-        // Check if response contains Statistics or Static Data
-        assert.ok(output.includes('Statistics:'));
-        assert.ok(output.includes('Static Data:'));
+        t.assert.snapshot?.(output);
+      });
+    });
+  });
+
+  describe('get_memory_snapshot_details', () => {
+    it('with default options', async t => {
+      await withMcpContext(async (response, context) => {
+        const filePath = join(
+          process.cwd(),
+          'tests/fixtures/example.heapsnapshot',
+        );
+
+        await getMemorySnapshotDetails.handler(
+          {params: {filePath}},
+          response,
+          context,
+        );
+
+        const responseData = await response.handle(
+          getMemorySnapshotDetails.name,
+          context,
+        );
+        const output = responseData.content
+          .map(c => (c.type === 'text' ? c.text : ''))
+          .join('\n');
+
+        t.assert.snapshot?.(output);
+      });
+    });
+  });
+
+  describe('get_nodes_by_class', () => {
+    it('with default options', async t => {
+      await withMcpContext(async (response, context) => {
+        const filePath = join(
+          process.cwd(),
+          'tests/fixtures/example.heapsnapshot',
+        );
+
+        await context.getHeapSnapshotAggregates(filePath);
+
+        await getNodesByClass.handler(
+          {params: {filePath, uid: 19}},
+          response,
+          context,
+        );
+
+        const responseData = await response.handle(
+          getNodesByClass.name,
+          context,
+        );
+
+        const output = responseData.content
+          .map(c => (c.type === 'text' ? c.text : ''))
+          .join('\n');
+
+        t.assert.snapshot?.(output);
+      });
+    });
+
+    it('with non-existent class name', async () => {
+      await withMcpContext(async (response, context) => {
+        const filePath = join(
+          process.cwd(),
+          'tests/fixtures/example.heapsnapshot',
+        );
+
+        await context.getHeapSnapshotAggregates(filePath);
+
+        await assert.rejects(
+          getNodesByClass.handler(
+            {params: {filePath, uid: 999999}},
+            response,
+            context,
+          ),
+          {message: 'Class with UID 999999 not found in heap snapshot'},
+        );
       });
     });
   });

@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import 'urlpattern-polyfill';
 import 'core-js/modules/es.promise.with-resolvers.js';
 import 'core-js/modules/es.set.union.v2.js';
 import 'core-js/proposals/iterator-helpers.js';
@@ -29,6 +30,10 @@ export {
   SetLevelRequestSchema,
   type ImageContent,
   type TextContent,
+  type Root,
+  ListRootsRequestSchema,
+  RootsListChangedNotificationSchema,
+  ListRootsResultSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 export {z as zod} from 'zod';
 export {default as ajv} from 'ajv';

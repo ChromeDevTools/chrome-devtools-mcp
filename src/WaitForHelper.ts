@@ -5,7 +5,7 @@
  */
 
 import {logger} from './logger.js';
-import type {Page, Protocol, CdpPage} from './third_party/index.js';
+import type {Page, Protocol, CdpPage, Dialog} from './third_party/index.js';
 import type {PredefinedNetworkConditions} from './third_party/index.js';
 
 export class WaitForHelper {
@@ -126,8 +126,26 @@ export class WaitForHelper {
 
   async waitForEventsAfterAction(
     action: () => Promise<unknown>,
-    options?: {timeout?: number},
+    options?: {timeout?: number; handleDialog?: 'accept' | 'dismiss' | string},
   ): Promise<void> {
+    let dialogOpened = false;
+    if (options?.handleDialog) {
+      const dialogHandler = (dialog: Pick<Dialog, 'accept' | 'dismiss'>) => {
+        dialogOpened = true;
+        if (options.handleDialog === 'dismiss') {
+          void dialog.dismiss();
+        } else if (options.handleDialog === 'accept') {
+          void dialog.accept();
+        } else {
+          void dialog.accept(options.handleDialog);
+        }
+      };
+      this.#page.on('dialog', dialogHandler);
+      this.#abortController.signal.addEventListener('abort', () => {
+        this.#page.off('dialog', dialogHandler);
+      });
+    }
+
     const navigationFinished = this.waitForNavigationStarted()
       .then(navigationStated => {
         if (navigationStated) {
@@ -150,6 +168,10 @@ export class WaitForHelper {
 
     try {
       await navigationFinished;
+
+      if (dialogOpened) {
+        return;
+      }
 
       // Wait for stable dom after navigation so we execute in
       // the correct context

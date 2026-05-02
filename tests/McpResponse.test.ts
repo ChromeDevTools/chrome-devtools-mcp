@@ -16,7 +16,10 @@ import type {ParsedArguments} from '../src/bin/chrome-devtools-mcp-cli-options.j
 import type {McpContext} from '../src/McpContext.js';
 import type {McpResponse} from '../src/McpResponse.js';
 import {replaceHtmlElementsWithUids} from '../src/McpResponse.js';
-import type {JSONSchema7Definition} from '../src/third_party/index.js';
+import type {
+  Extension,
+  JSONSchema7Definition,
+} from '../src/third_party/index.js';
 import {
   closePage,
   listPages,
@@ -955,22 +958,31 @@ describe('extensions', () => {
 
       response.resetResponseLineForTesting();
       // Testing with extensions
-      context.listExtensions = () => [
-        {
-          id: 'id1',
-          name: 'Extension 1',
-          version: '1.0',
-          isEnabled: true,
-          path: '/path/to/ext1',
-        },
-        {
-          id: 'id2',
-          name: 'Extension 2',
-          version: '2.0',
-          isEnabled: false,
-          path: '/path/to/ext2',
-        },
-      ];
+      context.listExtensions = async () =>
+        Promise.resolve(
+          new Map<string, Extension>([
+            [
+              'id1',
+              {
+                id: 'id1',
+                name: 'Extension 1',
+                version: '1.0',
+                enabled: true,
+                path: '/path/to/ext1',
+              } as Extension,
+            ],
+            [
+              'id2',
+              {
+                id: 'id2',
+                name: 'Extension 2',
+                version: '2.0',
+                enabled: false,
+                path: '/path/to/ext2',
+              } as Extension,
+            ],
+          ]),
+        );
       response.setListExtensions();
       const {content, structuredContent} = await response.handle(
         'test',
@@ -1099,7 +1111,7 @@ describe('inPage tools', () => {
         t.assert.snapshot?.(JSON.stringify(structuredContent, null, 2));
       },
       undefined,
-      {categoryInPageTools: true} as ParsedArguments,
+      {categoryExperimentalInPage: true} as ParsedArguments,
     );
   });
 
@@ -1150,14 +1162,14 @@ describe('inPage tools', () => {
         );
       },
       undefined,
-      {categoryInPageTools: true} as ParsedArguments,
+      {categoryExperimentalInPage: true} as ParsedArguments,
     );
   }
 
   it('includes in-page tools in list_pages response', async () => {
     await testIncludesInPageTools(async (response, context) => {
       const listPagesDef = listPages({
-        categoryInPageTools: true,
+        categoryExperimentalInPage: true,
       } as ParsedArguments);
       await listPagesDef.handler({params: {}}, response, context);
     }, 'list_pages');
@@ -1181,7 +1193,7 @@ describe('inPage tools', () => {
 
   it('includes in-page tools in navigate_page response', async () => {
     await testIncludesInPageTools(async (response, context) => {
-      await navigatePage.handler(
+      await navigatePage().handler(
         {
           params: {type: 'url', url: 'about:blank'},
           page: context.getSelectedMcpPage(),
@@ -1197,7 +1209,7 @@ describe('inPage tools', () => {
       // Workaround to ensure the test environment's new page contain in-page tools
       sinon.stub(context, 'newPage').resolves(context.getSelectedMcpPage());
 
-      await newPage.handler(
+      await newPage().handler(
         {
           params: {url: 'about:blank'},
         },
@@ -1528,7 +1540,7 @@ describe('webmcp', () => {
       t,
       {experimentalWebmcp: true} as ParsedArguments,
       async (response, context) => {
-        await navigatePage.handler(
+        await navigatePage().handler(
           {
             params: {type: 'url', url: 'about:blank'},
             page: context.getSelectedMcpPage(),
@@ -1569,7 +1581,7 @@ describe('webmcp', () => {
       t,
       {experimentalWebmcp: false} as ParsedArguments,
       async (response, context) => {
-        await navigatePage.handler(
+        await navigatePage().handler(
           {
             params: {type: 'url', url: 'about:blank'},
             page: context.getSelectedMcpPage(),

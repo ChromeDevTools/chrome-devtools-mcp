@@ -5,6 +5,7 @@
  */
 
 import assert from 'node:assert';
+import crypto from 'node:crypto';
 import {describe, it, afterEach, beforeEach} from 'node:test';
 
 import {
@@ -14,26 +15,29 @@ import {
 } from '../utils.js';
 
 describe('chrome-devtools', () => {
+  let sessionId: string;
+
   beforeEach(async () => {
-    await runCli(['stop']);
-    await assertDaemonIsNotRunning();
+    sessionId = crypto.randomUUID();
+    await runCli(['stop'], sessionId);
+    await assertDaemonIsNotRunning(sessionId);
   });
 
   afterEach(async () => {
-    await runCli(['stop']);
-    await assertDaemonIsNotRunning();
+    await runCli(['stop'], sessionId);
+    await assertDaemonIsNotRunning(sessionId);
   });
 
   it('reports daemon status correctly', async () => {
-    await assertDaemonIsNotRunning();
+    await assertDaemonIsNotRunning(sessionId);
 
-    const startResult = await runCli(['start']);
+    const startResult = await runCli(['start'], sessionId);
     assert.strictEqual(
       startResult.status,
       0,
       `start command failed: ${startResult.stderr}`,
     );
 
-    await assertDaemonIsRunning();
+    await assertDaemonIsRunning(sessionId);
   });
 });

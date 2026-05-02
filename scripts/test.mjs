@@ -70,14 +70,13 @@ const nodeArgs = [
   '--test-reporter',
   (process.env['NODE_TEST_REPORTER'] ?? process.env['CI']) ? 'spec' : 'dot',
   '--test-force-exit',
-  '--test-concurrency=1',
   '--test',
   '--test-timeout=120000',
   ...flags,
   ...files,
 ];
 
-function installChrome(version) {
+function _installChrome(version) {
   try {
     return execSync(
       `npx puppeteer browsers install chrome@${version} --format "{{path}}"`,
@@ -111,9 +110,6 @@ async function runTests(attempt) {
     });
   });
 }
-
-const chromePath = installChrome('146.0.7680.31');
-process.env.CHROME_M146_EXECUTABLE_PATH = chromePath;
 
 const maxAttempts = shouldRetry ? 3 : 1;
 let exitCode = 1;

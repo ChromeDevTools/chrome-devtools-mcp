@@ -1,6 +1,6 @@
 {
   "name": "chrome-devtools-mcp",
-  "version": "0.21.0",
+  "version": "0.23.0",
   "description": "MCP server for Chrome DevTools",
   "type": "module",
   "bin": {
@@ -16,10 +16,10 @@
     "typecheck": "tsc --noEmit",
     "format": "eslint --cache --fix . && prettier --write --cache .",
     "check-format": "eslint --cache . && prettier --check --cache .;",
-    "gen": "npm run build && npm run docs:generate && npm run cli:generate && npm run update-tool-call-metrics && npm run update-flag-usage-metrics && npm run format",
+    "gen": "npm run build && npm run docs:generate && npm run cli:generate && npm run update-metrics && npm run format",
     "docs:generate": "node --experimental-strip-types scripts/generate-docs.ts",
-    "start": "npm run build && node build/src/index.js",
-    "start-debug": "DEBUG=mcp:* DEBUG_COLORS=false npm run build && node build/src/index.js",
+    "start": "npm run build && node build/src/bin/chrome-devtools-mcp.js",
+    "start-debug": "DEBUG=mcp:* DEBUG_COLORS=false npm run build && node build/src/bin/chrome-devtools-mcp.js",
     "test": "npm run build && node scripts/test.mjs",
     "test:no-build": "node scripts/test.mjs",
     "test:only": "npm run build && node scripts/test.mjs --test-only",
@@ -27,8 +27,7 @@
     "prepare": "node --experimental-strip-types scripts/prepare.ts",
     "verify-server-json-version": "node --experimental-strip-types scripts/verify-server-json-version.ts",
     "update-lighthouse": "node --experimental-strip-types scripts/update-lighthouse.ts",
-    "update-tool-call-metrics": "node --experimental-strip-types scripts/update_tool_call_metrics.ts",
-    "update-flag-usage-metrics": "node --experimental-strip-types scripts/update_flag_usage_metrics.ts",
+    "update-metrics": "node --experimental-strip-types scripts/update_metrics.ts",
     "verify-npm-package": "node scripts/verify-npm-package.mjs",
     "eval": "npm run build && node --experimental-strip-types scripts/eval_gemini.ts",
     "count-tokens": "node --experimental-strip-types scripts/count_tokens.ts"
@@ -36,7 +35,8 @@
   "files": [
     "build/src",
     "LICENSE",
-    "!*.tsbuildinfo"
+    "!*.tsbuildinfo",
+    "!*.js.map"
   ],
   "repository": "ChromeDevTools/chrome-devtools-mcp",
   "author": "Google LLC",
@@ -62,7 +62,7 @@
     "@types/yargs": "^17.0.33",
     "@typescript-eslint/eslint-plugin": "^8.43.0",
     "@typescript-eslint/parser": "^8.43.0",
-    "chrome-devtools-frontend": "1.0.1613625",
+    "chrome-devtools-frontend": "1.0.1618066",
     "core-js": "3.49.0",
     "debug": "4.4.3",
     "eslint": "^9.35.0",
@@ -71,8 +71,8 @@
     "globals": "^17.0.0",
     "lighthouse": "13.1.0",
     "prettier": "^3.6.2",
-    "puppeteer": "24.41.0",
-    "rollup": "4.60.1",
+    "puppeteer": "24.42.0",
+    "rollup": "4.60.2",
     "rollup-plugin-cleanup": "^3.2.1",
     "rollup-plugin-license": "^3.6.0",
     "semver": "^7.7.4",
@@ -80,6 +80,7 @@
     "tiktoken": "^1.0.22",
     "typescript": "^6.0.2",
     "typescript-eslint": "^8.43.0",
+    "urlpattern-polyfill": "^10.1.0",
     "yargs": "18.0.0"
   },
   "engines": {

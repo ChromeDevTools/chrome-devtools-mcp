@@ -1,6 +1,6 @@
 <!-- AUTO GENERATED DO NOT EDIT - run 'npm run gen' to update-->
 
-# Chrome DevTools MCP Tool Reference (~6962 cl100k_base tokens)
+# Chrome DevTools MCP Tool Reference (~7005 cl100k_base tokens)
 
 - **[Input automation](#input-automation)** (9 tools)
   - [`click`](#click)
@@ -22,11 +22,10 @@
 - **[Emulation](#emulation)** (2 tools)
   - [`emulate`](#emulate)
   - [`resize_page`](#resize_page)
-- **[Performance](#performance)** (4 tools)
+- **[Performance](#performance)** (3 tools)
   - [`performance_analyze_insight`](#performance_analyze_insight)
   - [`performance_start_trace`](#performance_start_trace)
   - [`performance_stop_trace`](#performance_stop_trace)
-  - [`take_memory_snapshot`](#take_memory_snapshot)
 - **[Network](#network)** (2 tools)
   - [`get_network_request`](#get_network_request)
   - [`list_network_requests`](#list_network_requests)
@@ -37,6 +36,14 @@
   - [`list_console_messages`](#list_console_messages)
   - [`take_screenshot`](#take_screenshot)
   - [`take_snapshot`](#take_snapshot)
+- **[Extensions](#extensions)** (5 tools)
+  - [`install_extension`](#install_extension)
+  - [`list_extensions`](#list_extensions)
+  - [`reload_extension`](#reload_extension)
+  - [`trigger_extension_action`](#trigger_extension_action)
+  - [`uninstall_extension`](#uninstall_extension)
+- **[Memory](#memory)** (1 tools)
+  - [`take_memory_snapshot`](#take_memory_snapshot)
 
 ## Input automation
 
@@ -276,16 +283,6 @@
 
 ---
 
-### `take_memory_snapshot`
-
-**Description:** Capture a heap snapshot of the currently selected page. Use to analyze the memory distribution of JavaScript objects and debug memory leaks.
-
-**Parameters:**
-
-- **filePath** (string) **(required)**: A path to a .heapsnapshot file to save the heapsnapshot to.
-
----
-
 ## Network
 
 ### `get_network_request`
@@ -333,6 +330,7 @@ so returned values have to be JSON-serializable.
 }`
 
 - **args** (array) _(optional)_: An optional list of arguments to pass to the function.
+- **dialogAction** (string) _(optional)_: Handle dialogs while execution. "accept", "dismiss", or string for response of window.prompt. Defaults to accept.
 
 ---
 
@@ -395,5 +393,69 @@ in the DevTools Elements panel (if any).
 
 - **filePath** (string) _(optional)_: The absolute path, or a path relative to the current working directory, to save the snapshot to instead of attaching it to the response.
 - **verbose** (boolean) _(optional)_: Whether to include all possible information available in the full a11y tree. Default is false.
+
+---
+
+## Extensions
+
+> NOTE: Extensions are not active by default. Use the '--categoryExtensions' flag
+
+### `install_extension`
+
+**Description:** Installs a Chrome extension from the given path.
+
+**Parameters:**
+
+- **path** (string) **(required)**: Absolute path to the unpacked extension folder.
+
+---
+
+### `list_extensions`
+
+**Description:** Lists all the Chrome extensions installed in the browser. This includes their name, ID, version, and enabled status.
+
+**Parameters:** None
+
+---
+
+### `reload_extension`
+
+**Description:** Reloads an unpacked Chrome extension by its ID.
+
+**Parameters:**
+
+- **id** (string) **(required)**: ID of the extension to reload.
+
+---
+
+### `trigger_extension_action`
+
+**Description:** Triggers the default action of an extension by its ID.
+
+**Parameters:**
+
+- **id** (string) **(required)**: ID of the extension to trigger the action for.
+
+---
+
+### `uninstall_extension`
+
+**Description:** Uninstalls a Chrome extension by its ID.
+
+**Parameters:**
+
+- **id** (string) **(required)**: ID of the extension to uninstall.
+
+---
+
+## Memory
+
+### `take_memory_snapshot`
+
+**Description:** Capture a heap snapshot of the currently selected page. Use to analyze the memory distribution of JavaScript objects and debug memory leaks.
+
+**Parameters:**
+
+- **filePath** (string) **(required)**: A path to a .heapsnapshot file to save the heapsnapshot to.
 
 ---

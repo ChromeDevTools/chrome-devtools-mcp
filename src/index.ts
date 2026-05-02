@@ -21,12 +21,112 @@ import {
   McpServer,
   type CallToolResult,
   SetLevelRequestSchema,
+  ListRootsResultSchema,
+  RootsListChangedNotificationSchema,
 } from './third_party/index.js';
-import {ToolCategory} from './tools/categories.js';
+import type {ToolCategory} from './tools/categories.js';
+import {labels, OFF_BY_DEFAULT_CATEGORIES} from './tools/categories.js';
 import type {DefinedPageTool, ToolDefinition} from './tools/ToolDefinition.js';
 import {pageIdSchema} from './tools/ToolDefinition.js';
 import {createTools} from './tools/tools.js';
 import {VERSION} from './version.js';
+
+export function buildFlag(category: ToolCategory) {
+  return `category${category.charAt(0).toUpperCase() + category.slice(1)}`;
+}
+
+function buildDisabledMessage(
+  toolName: string,
+  flag: string,
+  categoryLabel?: string,
+): string {
+  const reason = categoryLabel
+    ? `is in category ${categoryLabel} which`
+    : `requires experimental feature ${flag} and`;
+
+  return `Tool ${toolName} ${reason} is currently disabled. Enable it by running chrome-devtools start ${flag}=true. For more information check the README.`;
+}
+
+function getCategoryStatus(
+  category: ToolCategory,
+  serverArgs: ReturnType<typeof parseArguments>,
+): {categoryFlag?: string; disabled: boolean} {
+  const categoryFlag = buildFlag(category);
+
+  const flagValue = serverArgs[categoryFlag];
+
+  const isDisabled = OFF_BY_DEFAULT_CATEGORIES.includes(category)
+    ? !flagValue
+    : flagValue === false;
+
+  if (isDisabled) {
+    return {
+      categoryFlag,
+      disabled: true,
+    };
+  }
+
+  return {
+    disabled: false,
+  };
+}
+
+function getConditionStatus(
+  condition: string,
+  serverArgs: ReturnType<typeof parseArguments>,
+): {conditionFlag?: string; disabled: boolean} {
+  if (condition && !serverArgs[condition]) {
+    return {conditionFlag: condition, disabled: true};
+  }
+
+  return {disabled: false};
+}
+
+function getToolStatusInfo(
+  tool: ToolDefinition | DefinedPageTool,
+  serverArgs: ReturnType<typeof parseArguments>,
+): {disabled: boolean; reason?: string} {
+  const category = tool.annotations.category;
+  const categoryCheck = getCategoryStatus(category, serverArgs);
+
+  if (category && categoryCheck.disabled) {
+    if (!categoryCheck.categoryFlag) {
+      throw new Error(
+        'when the category is disabled there should always be a flag set',
+      );
+    }
+
+    return {
+      disabled: true,
+      reason: buildDisabledMessage(
+        tool.name,
+        `--${categoryCheck.categoryFlag}`,
+        labels[category!],
+      ),
+    };
+  }
+
+  for (const condition of tool.annotations.conditions || []) {
+    const conditionCheck = getConditionStatus(condition, serverArgs);
+    if (conditionCheck.disabled) {
+      if (!conditionCheck.conditionFlag) {
+        throw new Error(
+          'when the condition is disabled there should always be a flag set',
+        );
+      }
+
+      return {
+        disabled: true,
+        reason: buildDisabledMessage(
+          tool.name,
+          `--${conditionCheck.conditionFlag}`,
+        ),
+      };
+    }
+  }
+
+  return {disabled: false};
+}
 
 export async function createMcpServer(
   serverArgs: ReturnType<typeof parseArguments>,
@@ -57,10 +157,34 @@ export async function createMcpServer(
     return {};
   });
 
+  const updateRoots = async () => {
+    if (!server.server.getClientCapabilities()?.roots) {
+      return;
+    }
+    try {
+      const roots = await server.server.request(
+        {method: 'roots/list'},
+        ListRootsResultSchema,
+      );
+      context?.setRoots(roots.roots);
+    } catch (e) {
+      logger('Failed to list roots', e);
+    }
+  };
+
   server.server.oninitialized = () => {
     const clientName = server.server.getClientVersion()?.name;
     if (clientName) {
       clearcutLogger?.setClientName(clientName);
+    }
+    if (server.server.getClientCapabilities()?.roots) {
+      void updateRoots();
+      server.server.setNotificationHandler(
+        RootsListChangedNotificationSchema,
+        () => {
+          void updateRoots();
+        },
+      );
     }
   };
 
@@ -109,6 +233,7 @@ export async function createMcpServer(
         experimentalIncludeAllPages: serverArgs.experimentalIncludeAllPages,
         performanceCrux: serverArgs.performanceCrux,
       });
+      await updateRoots();
     }
     return context;
   }
@@ -116,66 +241,15 @@ export async function createMcpServer(
   const toolMutex = new Mutex();
 
   function registerTool(tool: ToolDefinition | DefinedPageTool): void {
-    if (
-      tool.annotations.category === ToolCategory.EMULATION &&
-      serverArgs.categoryEmulation === false
-    ) {
+    const {disabled, reason: disabledReason} = getToolStatusInfo(
+      tool,
+      serverArgs,
+    );
+
+    if (disabled && !serverArgs.viaCli) {
       return;
     }
-    if (
-      tool.annotations.category === ToolCategory.PERFORMANCE &&
-      serverArgs.categoryPerformance === false
-    ) {
-      return;
-    }
-    if (
-      tool.annotations.category === ToolCategory.NETWORK &&
-      serverArgs.categoryNetwork === false
-    ) {
-      return;
-    }
-    if (
-      tool.annotations.category === ToolCategory.EXTENSIONS &&
-      !serverArgs.categoryExtensions
-    ) {
-      return;
-    }
-    if (
-      tool.annotations.category === ToolCategory.IN_PAGE &&
-      !serverArgs.categoryInPageTools
-    ) {
-      return;
-    }
-    if (
-      tool.annotations.conditions?.includes('computerVision') &&
-      !serverArgs.experimentalVision
-    ) {
-      return;
-    }
-    if (
-      tool.annotations.conditions?.includes('experimentalMemory') &&
-      !serverArgs.experimentalMemory
-    ) {
-      return;
-    }
-    if (
-      tool.annotations.conditions?.includes('experimentalInteropTools') &&
-      !serverArgs.experimentalInteropTools
-    ) {
-      return;
-    }
-    if (
-      tool.annotations.conditions?.includes('screencast') &&
-      !serverArgs.experimentalScreencast
-    ) {
-      return;
-    }
-    if (
-      tool.annotations.conditions?.includes('experimentalWebmcp') &&
-      !serverArgs.experimentalWebmcp
-    ) {
-      return;
-    }
+
     const schema =
       'pageScoped' in tool &&
       tool.pageScoped &&
@@ -192,6 +266,18 @@ export async function createMcpServer(
         annotations: tool.annotations,
       },
       async (params): Promise<CallToolResult> => {
+        if (disabledReason) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: disabledReason,
+              },
+            ],
+            isError: true,
+          };
+        }
+
         const guard = await toolMutex.acquire();
         const startTime = Date.now();
         let success = false;
@@ -205,7 +291,7 @@ export async function createMcpServer(
             : new McpResponse(serverArgs);
 
           response.setRedactNetworkHeaders(serverArgs.redactNetworkHeaders);
-          if ('pageScoped' in tool && tool.pageScoped) {
+          try {
             const page =
               serverArgs.experimentalPageIdRouting &&
               params.pageId &&
@@ -213,23 +299,30 @@ export async function createMcpServer(
                 ? context.getPageById(params.pageId)
                 : context.getSelectedMcpPage();
             response.setPage(page);
-            await tool.handler(
-              {
-                params,
-                page,
-              },
-              response,
-              context,
-            );
-          } else {
-            await tool.handler(
-              // @ts-expect-error types do not match.
-              {
-                params,
-              },
-              response,
-              context,
-            );
+            if (tool.blockedByDialog) {
+              page.throwIfDialogOpen();
+            }
+            if ('pageScoped' in tool && tool.pageScoped) {
+              await tool.handler(
+                {
+                  params,
+                  page,
+                },
+                response,
+                context,
+              );
+            } else {
+              await tool.handler(
+                // @ts-expect-error types do not match.
+                {
+                  params,
+                },
+                response,
+                context,
+              );
+            }
+          } catch (err) {
+            response.setError(err);
           }
           const {content, structuredContent} = await response.handle(
             tool.name,
@@ -240,6 +333,9 @@ export async function createMcpServer(
           } = {
             content,
           };
+          if (response.error) {
+            result.isError = true;
+          }
           success = true;
           if (serverArgs.experimentalStructuredContent) {
             result.structuredContent = structuredContent as Record<

@@ -4,7 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {TextSnapshot, TextSnapshotNode} from '../types.js';
+import type {TextSnapshot} from '../TextSnapshot.js';
+import type {TextSnapshotNode} from '../types.js';
 
 export class SnapshotFormatter {
   #snapshot: TextSnapshot;
@@ -19,7 +20,7 @@ export class SnapshotFormatter {
 
     // Top-level content of the snapshot.
     if (
-      this.#snapshot.verbose &&
+      !this.#snapshot.verbose &&
       this.#snapshot.hasSelectedElement &&
       !this.#snapshot.selectedElementUid
     ) {

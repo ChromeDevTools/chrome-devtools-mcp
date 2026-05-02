@@ -1,3 +1,15 @@
+exports[`e2e > Dialogs > returns blocked message when dialog is opened during tool execution 1`] = `
+{"content":[{"type":"text","text":"# Open dialog\\nalert: test dialog.\\nCall handle_dialog to handle it before continuing.\\nError: Failed to interact with the element with uid 1_1. The element did not become interactive within the configured timeout."}],"isError":true}
+`;
+
+exports[`e2e > Dialogs > when dialog is open and tool is blocked, returns an error 1`] = `
+{"content":[{"type":"text","text":"# Open dialog\\nalert: test dialog.\\nCall handle_dialog to handle it before continuing.\\nError: A dialog is open (alert: test dialog)."}],"isError":true}
+`;
+
+exports[`e2e > Dialogs > when dialog is open and tool is not blocked, executes tool 1`] = `
+{"content":[{"type":"text","text":"# Open dialog\\nalert: test dialog.\\nCall handle_dialog to handle it before continuing.\\n## Pages\\n1: about:blank\\n2: data:text/html,<button id=\\"test\\" onclick=\\"alert('test dialog')\\">Click me</button>\\n3: data:text/html,<h1>New</h1> [selected]"}]}
+`;
+
 exports[`e2e > calls a tool 1`] = `
 [{"type":"text","text":"## Pages\\n1: about:blank [selected]"}]
 `;

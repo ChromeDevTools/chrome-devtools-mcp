@@ -13,7 +13,12 @@ import {get_encoding} from 'tiktoken';
 
 import {cliOptions} from '../build/src/bin/chrome-devtools-mcp-cli-options.js';
 import type {ParsedArguments} from '../build/src/bin/chrome-devtools-mcp-cli-options.js';
-import {ToolCategory, labels} from '../build/src/tools/categories.js';
+import {buildFlag} from '../build/src/index.js';
+import {
+  ToolCategory,
+  OFF_BY_DEFAULT_CATEGORIES,
+  labels,
+} from '../build/src/tools/categories.js';
 import {createTools} from '../build/src/tools/tools.js';
 
 const OUTPUT_PATH = './docs/tool-reference.md';
@@ -351,6 +356,12 @@ async function generateReference(
 
     markdown += `## ${categoryName}\n\n`;
 
+    if (OFF_BY_DEFAULT_CATEGORIES.includes(category)) {
+      const flagName = `--${buildFlag(category)}`;
+
+      markdown += `> NOTE: ${categoryName} are not active by default. Use the '${flagName}' flag\n\n`;
+    }
+
     // Sort tools within category
     categoryTools.sort((a: Tool, b: Tool) => a.name.localeCompare(b.name));
 
@@ -436,6 +447,11 @@ function getToolsAndCategories(tools: any) {
   // Convert ToolDefinitions to ToolWithAnnotations
   const toolsWithAnnotations: ToolWithAnnotations[] = tools
     .filter(tool => {
+      // Skipping in_page tools as they are not launched yet
+      if (tool.annotations.category.includes('experimental')) {
+        return false;
+      }
+
       if (!tool.annotations.conditions) {
         return true;
       }

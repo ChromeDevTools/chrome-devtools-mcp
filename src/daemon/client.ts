@@ -11,7 +11,7 @@ import net from 'node:net';
 import {logger} from '../logger.js';
 import type {CallToolResult} from '../third_party/index.js';
 import {PipeTransport} from '../third_party/index.js';
-import {saveTemporaryFile} from '../utils/files.js';
+import {getTempFilePath} from '../utils/files.js';
 
 import type {DaemonMessage, DaemonResponse} from './types.js';
 import {
@@ -67,13 +67,13 @@ function waitForFile(filePath: string, removed = false) {
   });
 }
 
-export async function startDaemon(mcpArgs: string[] = []) {
-  if (isDaemonRunning()) {
+export async function startDaemon(mcpArgs: string[] = [], sessionId: string) {
+  if (isDaemonRunning(sessionId)) {
     logger('Daemon is already running');
     return;
   }
 
-  const pidFilePath = getPidFilePath();
+  const pidFilePath = getPidFilePath(sessionId);
 
   if (fs.existsSync(pidFilePath)) {
     fs.unlinkSync(pidFilePath);
@@ -83,7 +83,7 @@ export async function startDaemon(mcpArgs: string[] = []) {
   const child = spawn(process.execPath, [DAEMON_SCRIPT_PATH, ...mcpArgs], {
     detached: true,
     stdio: 'ignore',
-    env: process.env,
+    env: {...process.env, CHROME_DEVTOOLS_MCP_SESSION_ID: sessionId},
     cwd: process.cwd(),
     windowsHide: true,
   });
@@ -99,8 +99,9 @@ const SEND_COMMAND_TIMEOUT = 60_000; // ms
  */
 export async function sendCommand(
   command: DaemonMessage,
+  sessionId: string,
 ): Promise<DaemonResponse> {
-  const socketPath = getSocketPath();
+  const socketPath = getSocketPath(sessionId);
 
   const socket = net.createConnection({
     path: socketPath,
@@ -133,15 +134,15 @@ export async function sendCommand(
   });
 }
 
-export async function stopDaemon() {
-  if (!isDaemonRunning()) {
+export async function stopDaemon(sessionId: string) {
+  if (!isDaemonRunning(sessionId)) {
     logger('Daemon is not running');
     return;
   }
 
-  const pidFilePath = getPidFilePath();
+  const pidFilePath = getPidFilePath(sessionId);
 
-  await sendCommand({method: 'stop'});
+  await sendCommand({method: 'stop'}, sessionId);
 
   await waitForFile(pidFilePath, /*removed=*/ true);
 }
@@ -172,13 +173,14 @@ export async function handleResponse(
         case 'image/jpeg':
           extension = '.jpeg';
           break;
-        case 'webp':
+        case 'image/webp':
           extension = '.webp';
           break;
       }
       const data = Buffer.from(imageData, 'base64');
       const name = crypto.randomUUID();
-      const {filepath} = await saveTemporaryFile(data, `${name}${extension}`);
+      const filepath = await getTempFilePath(`${name}${extension}`);
+      fs.writeFileSync(filepath, data);
       chunks.push(`Saved to ${filepath}.`);
     } else {
       throw new Error('Not supported response content type');
