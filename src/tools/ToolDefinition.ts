@@ -181,6 +181,7 @@ export type Context = Readonly<{
   newPage(
     background?: boolean,
     isolatedContextName?: string,
+    incognito?: boolean,
   ): Promise<ContextPage>;
   closePage(pageId: number): Promise<void>;
   selectPage(page: ContextPage): void;

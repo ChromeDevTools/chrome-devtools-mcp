@@ -594,6 +594,13 @@ export const commands: Commands = {
           'Whether to open the page in the background without bringing it to the front. Default is false (foreground).',
         required: false,
       },
+      incognito: {
+        name: 'incognito',
+        type: 'boolean',
+        description:
+          'Whether to create the page in a fresh incognito browser context. A new context is created for each call and is isolated from all other pages.',
+        required: false,
+      },
       isolatedContext: {
         name: 'isolatedContext',
         type: 'string',

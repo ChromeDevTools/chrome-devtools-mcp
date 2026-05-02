@@ -168,6 +168,12 @@ export const newPage = defineTool(args => {
         .describe(
           'Whether to open the page in the background without bringing it to the front. Default is false (foreground).',
         ),
+      incognito: zod
+        .boolean()
+        .optional()
+        .describe(
+          'Whether to create the page in a fresh incognito browser context. A new context is created for each call and is isolated from all other pages.',
+        ),
       isolatedContext: zod
         .string()
         .optional()
@@ -190,9 +196,16 @@ export const newPage = defineTool(args => {
     },
     blockedByDialog: false,
     handler: async (request, response, context) => {
+      if (request.params.incognito && request.params.isolatedContext) {
+        throw new Error(
+          'The incognito and isolatedContext parameters are mutually exclusive.',
+        );
+      }
+
       const page = await context.newPage(
         request.params.background,
         request.params.isolatedContext,
+        request.params.incognito,
       );
 
       await navigateWithInterception(

@@ -275,6 +275,64 @@ describe('pages', () => {
         assert.ok(response.includePages);
       });
     });
+
+    it('creates a page in a fresh incognito context', async () => {
+      await withMcpContext(async (response, context) => {
+        await newPage().handler(
+          {params: {url: 'about:blank', incognito: true}},
+          response,
+          context,
+        );
+        const page = context.getSelectedPptrPage();
+        const isolatedContextName = context.getIsolatedContextName(page);
+        assert.ok(isolatedContextName);
+        assert.ok(isolatedContextName.startsWith('incognito-context-'));
+        assert.ok(response.includePages);
+      });
+    });
+
+    it('creates a new context for each incognito page', async () => {
+      await withMcpContext(async (response, context) => {
+        await newPage().handler(
+          {params: {url: 'about:blank', incognito: true}},
+          response,
+          context,
+        );
+        const page1 = context.getSelectedPptrPage();
+        const isolatedContext1 = context.getIsolatedContextName(page1);
+
+        await newPage().handler(
+          {params: {url: 'about:blank', incognito: true}},
+          response,
+          context,
+        );
+        const page2 = context.getSelectedPptrPage();
+        const isolatedContext2 = context.getIsolatedContextName(page2);
+
+        assert.notStrictEqual(page1.browserContext(), page2.browserContext());
+        assert.notStrictEqual(isolatedContext1, isolatedContext2);
+      });
+    });
+
+    it('throws when incognito and isolatedContext are both provided', async () => {
+      await withMcpContext(async (response, context) => {
+        await assert.rejects(
+          () =>
+            newPage().handler(
+              {
+                params: {
+                  url: 'about:blank',
+                  incognito: true,
+                  isolatedContext: 'session-a',
+                },
+              },
+              response,
+              context,
+            ),
+          /mutually exclusive/,
+        );
+      });
+    });
   });
   describe('new_page with isolatedContext', () => {
     it('creates a page in an isolated context', async () => {

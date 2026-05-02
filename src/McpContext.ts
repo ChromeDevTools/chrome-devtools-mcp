@@ -254,6 +254,7 @@ export class McpContext implements Context {
   async newPage(
     background?: boolean,
     isolatedContextName?: string,
+    incognito = false,
   ): Promise<McpPage> {
     let page: Page;
     if (isolatedContextName !== undefined) {
@@ -262,6 +263,11 @@ export class McpContext implements Context {
         ctx = await this.browser.createBrowserContext();
         this.#isolatedContexts.set(isolatedContextName, ctx);
       }
+      page = await ctx.newPage();
+    } else if (incognito) {
+      const contextName = `incognito-context-${this.#nextIsolatedContextId++}`;
+      const ctx = await this.browser.createBrowserContext();
+      this.#isolatedContexts.set(contextName, ctx);
       page = await ctx.newPage();
     } else {
       page = await this.browser.newPage({background});
