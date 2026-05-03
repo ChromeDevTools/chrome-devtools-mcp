@@ -28,6 +28,7 @@ import type {
 import {
   getNetworkMultiplierFromString,
   WaitForHelper,
+  type WaitForEventsResult,
 } from './WaitForHelper.js';
 
 /**
@@ -132,7 +133,7 @@ export class McpPage implements ContextPage {
   waitForEventsAfterAction(
     action: () => Promise<unknown>,
     options?: {timeout?: number; handleDialog?: 'accept' | 'dismiss' | string},
-  ): Promise<void> {
+  ): Promise<WaitForEventsResult> {
     const helper = this.createWaitForHelper(
       this.cpuThrottlingRate,
       getNetworkMultiplierFromString(this.networkConditions),
