@@ -14,6 +14,7 @@ import {
   type Flags,
   type RunnerResult,
   type OutputMode,
+  agenticBrowsingConfig,
 } from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
@@ -22,7 +23,7 @@ import {definePageTool} from './ToolDefinition.js';
 
 export const lighthouseAudit = definePageTool({
   name: 'lighthouse_audit',
-  description: `Get Lighthouse score and reports for accessibility, SEO and best practices. This excludes performance. For performance audits, run ${startTrace.name}`,
+  description: `Get Lighthouse score and reports for accessibility, SEO, best practices, and agentic browsing. This excludes performance. For performance audits, run ${startTrace.name}`,
   annotations: {
     category: ToolCategory.DEBUGGING,
     readOnlyHint: false,
@@ -46,7 +47,12 @@ export const lighthouseAudit = definePageTool({
   blockedByDialog: true,
   handler: async (request, response, context) => {
     const page = request.page;
-    const categories = ['accessibility', 'seo', 'best-practices'];
+    const categories = [
+      'accessibility',
+      'seo',
+      'best-practices',
+      'agentic-browsing',
+    ];
     const formats = ['json', 'html'] as OutputMode[];
     const {
       mode = 'navigation',
@@ -83,16 +89,17 @@ export const lighthouseAudit = definePageTool({
       };
     }
 
+    const options: {flags: Flags; config?: object} = {
+      flags,
+      config: agenticBrowsingConfig,
+    };
+
     let result: RunnerResult | undefined;
     try {
       if (mode === 'navigation') {
-        result = await navigation(page.pptrPage, page.pptrPage.url(), {
-          flags,
-        });
+        result = await navigation(page.pptrPage, page.pptrPage.url(), options);
       } else {
-        result = await snapshot(page.pptrPage, {
-          flags,
-        });
+        result = await snapshot(page.pptrPage, options);
       }
 
       if (!result) {

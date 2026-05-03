@@ -397,7 +397,7 @@ export const commands: Commands = {
   },
   lighthouse_audit: {
     description:
-      'Get Lighthouse score and reports for accessibility, SEO and best practices. This excludes performance. For performance audits, run performance_start_trace',
+      'Get Lighthouse score and reports for accessibility, SEO, best practices, and agentic browsing. This excludes performance. For performance audits, run performance_start_trace',
     category: 'Debugging',
     args: {
       mode: {
