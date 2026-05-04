@@ -166,6 +166,22 @@ Then, install the plugin:
 
 Restart Claude Code to have the MCP server and skills load (check with `/skills`).
 
+To point the plugin at a custom Chrome binary (e.g. [Chrome for Testing](https://developer.chrome.com/blog/chrome-for-testing/) so the MCP-launched Chrome has a separate bundle ID from the user's regular Chrome and can be scripted unambiguously by macOS AppleScript), set the plugin's `executablePath` option in your Claude Code settings:
+
+```json
+{
+  "pluginConfigs": {
+    "chrome-devtools-mcp@claude-plugins-official": {
+      "options": {
+        "executablePath": "/Applications/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing"
+      }
+    }
+  }
+}
+```
+
+Leave `executablePath` blank to use the default behavior where Chrome DevTools MCP auto-detects stable Chrome.
+
 > [!TIP]
 > If the plugin installation fails with a `Failed to clone repository` error (e.g., HTTPS connectivity issues behind a corporate firewall), see the [troubleshooting guide](./docs/troubleshooting.md#claude-code-plugin-installation-fails-with-failed-to-clone-repository) for workarounds, or use the CLI installation method above instead.
 
