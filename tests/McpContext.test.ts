@@ -71,6 +71,20 @@ describe('McpContext', () => {
     });
   });
 
+  it('does not reset network during restore when no network emulation exists', async () => {
+    await withMcpContext(async (_response, context) => {
+      const page = context.getSelectedMcpPage();
+      const emulateNetworkConditionsSpy = sinon.spy(
+        page.pptrPage,
+        'emulateNetworkConditions',
+      );
+
+      await context.restoreEmulation(page);
+
+      sinon.assert.notCalled(emulateNetworkConditionsSpy);
+    });
+  });
+
   it('should call waitForEventsAfterAction with correct multipliers', async () => {
     await withMcpContext(async (_response, context) => {
       const page = await context.newPage();
