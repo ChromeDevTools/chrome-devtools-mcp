@@ -134,9 +134,8 @@ export async function createMcpServer(
     logFile?: fs.WriteStream;
   },
 ) {
-  let clearcutLogger: ClearcutLogger | undefined;
   if (serverArgs.usageStatistics) {
-    clearcutLogger = new ClearcutLogger({
+    ClearcutLogger.initialize({
       logFile: serverArgs.logFile,
       appVersion: VERSION,
       clearcutEndpoint: serverArgs.clearcutEndpoint,
@@ -175,7 +174,7 @@ export async function createMcpServer(
   server.server.oninitialized = () => {
     const clientName = server.server.getClientVersion()?.name;
     if (clientName) {
-      clearcutLogger?.setClientName(clientName);
+      ClearcutLogger.get()?.setClientName(clientName);
     }
     if (server.server.getClientCapabilities()?.roots) {
       void updateRoots();
@@ -360,7 +359,7 @@ export async function createMcpServer(
             isError: true,
           };
         } finally {
-          void clearcutLogger?.logToolInvocation({
+          void ClearcutLogger.get()?.logToolInvocation({
             toolName: tool.name,
             params,
             schema,
@@ -380,7 +379,7 @@ export async function createMcpServer(
 
   await loadIssueDescriptions();
 
-  return {server, clearcutLogger};
+  return {server};
 }
 
 export const logDisclaimers = (args: ReturnType<typeof parseArguments>) => {
