@@ -132,10 +132,8 @@ function addCrossLinks(text: string, tools: ToolWithAnnotations[]): string {
 }
 
 function sortTools(a: ToolWithAnnotations, b: ToolWithAnnotations): number {
-  const aHasConditions =
-    (a.annotations?.conditions && a.annotations.conditions.length > 0) || false;
-  const bHasConditions =
-    (b.annotations?.conditions && b.annotations.conditions.length > 0) || false;
+  const aHasConditions = Boolean(a.annotations?.conditions?.length > 0);
+  const bHasConditions = Boolean(b.annotations?.conditions?.length > 0);
 
   if (aHasConditions && !bHasConditions) {
     return 1;
