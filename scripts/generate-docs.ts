@@ -131,6 +131,22 @@ function addCrossLinks(text: string, tools: ToolWithAnnotations[]): string {
   return result;
 }
 
+function sortTools(a: ToolWithAnnotations, b: ToolWithAnnotations): number {
+  const aHasConditions =
+    (a.annotations?.conditions && a.annotations.conditions.length > 0) || false;
+  const bHasConditions =
+    (b.annotations?.conditions && b.annotations.conditions.length > 0) || false;
+
+  if (aHasConditions && !bHasConditions) {
+    return 1;
+  }
+  if (!aHasConditions && bHasConditions) {
+    return -1;
+  }
+
+  return a.name.localeCompare(b.name);
+}
+
 function generateToolsTOC(
   categories: Record<string, ToolWithAnnotations[]>,
   sortedCategories: string[],
@@ -143,7 +159,7 @@ function generateToolsTOC(
     toc += `- **${categoryName}** (${categoryTools.length} tools)\n`;
 
     // Sort tools within category for TOC
-    categoryTools.sort((a: Tool, b: Tool) => a.name.localeCompare(b.name));
+    categoryTools.sort(sortTools);
     for (const tool of categoryTools) {
       const anchorLink = tool.name.toLowerCase();
       toc += `  - [\`${tool.name}\`](docs/tool-reference.md#${anchorLink})\n`;
@@ -341,7 +357,7 @@ async function generateReference(
     markdown += `- **[${categoryName}](#${anchorName})** (${categoryTools.length} tools)\n`;
 
     // Sort tools within category for TOC
-    categoryTools.sort((a: Tool, b: Tool) => a.name.localeCompare(b.name));
+    categoryTools.sort(sortTools);
     for (const tool of categoryTools) {
       // Generate proper markdown anchor link: backticks are removed, keep underscores, lowercase
       const anchorLink = tool.name.toLowerCase();
@@ -363,7 +379,7 @@ async function generateReference(
     }
 
     // Sort tools within category
-    categoryTools.sort((a: Tool, b: Tool) => a.name.localeCompare(b.name));
+    categoryTools.sort(sortTools);
 
     for (const tool of categoryTools) {
       markdown += `### \`${tool.name}\`\n\n`;
@@ -371,6 +387,23 @@ async function generateReference(
       if (tool.description) {
         // Escape HTML tags but preserve JS function syntax
         let escapedDescription = escapeHtmlTags(tool.description);
+
+        const requiredFlags: string[] = [];
+
+        const isOffByDefault = OFF_BY_DEFAULT_CATEGORIES.includes(category);
+        if (isOffByDefault) {
+          const categoryFlag = buildFlag(category);
+          requiredFlags.push(`--${categoryFlag}=true`);
+        }
+
+        const conditions = tool.annotations?.conditions || [];
+        for (const condition of conditions) {
+          requiredFlags.push(`--${condition}=true`);
+        }
+
+        if (requiredFlags.length > 0) {
+          escapedDescription += ` (requires flag: ${requiredFlags.join(', ')})`;
+        }
 
         // Add cross-links to mentioned tools
         escapedDescription = addCrossLinks(
@@ -448,16 +481,17 @@ function getToolsAndCategories(tools: any) {
   const toolsWithAnnotations: ToolWithAnnotations[] = tools
     .filter(tool => {
       // Skipping in_page tools as they are not launched yet
-      if (tool.annotations.category.includes('experimental')) {
+      if (tool.annotations.category === ToolCategory.IN_PAGE) {
         return false;
       }
 
-      if (!tool.annotations.conditions) {
-        return true;
+      // Skipping internal interop tools not meant for public documentation
+      const skipTools = ['get_tab_id'];
+      if (skipTools.includes(tool.name)) {
+        return false;
       }
 
-      // Only include unconditional tools.
-      return tool.annotations.conditions.length === 0;
+      return true;
     })
     .map(tool => {
       const properties: Record<string, TypeInfo> = {};
@@ -497,8 +531,16 @@ function getToolsAndCategories(tools: any) {
   // Sort categories using the enum order
   const categoryOrder = Object.values(ToolCategory);
   const sortedCategories = Object.keys(categories).sort((a, b) => {
-    const aIndex = categoryOrder.indexOf(a);
-    const bIndex = categoryOrder.indexOf(b);
+    const aOff = OFF_BY_DEFAULT_CATEGORIES.includes(a as ToolCategory);
+    const bOff = OFF_BY_DEFAULT_CATEGORIES.includes(b as ToolCategory);
+
+    if (aOff !== bOff) {
+      return aOff ? 1 : -1;
+    }
+
+    const aIndex = categoryOrder.indexOf(a as ToolCategory);
+    const bIndex = categoryOrder.indexOf(b as ToolCategory);
+
     // Put known categories first, unknown categories last
     if (aIndex === -1 && bIndex === -1) {
       return a.localeCompare(b);

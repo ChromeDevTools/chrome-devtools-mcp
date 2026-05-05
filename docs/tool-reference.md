@@ -2,7 +2,7 @@
 
 # Chrome DevTools MCP Tool Reference (~7010 cl100k_base tokens)
 
-- **[Input automation](#input-automation)** (9 tools)
+- **[Input automation](#input-automation)** (10 tools)
   - [`click`](#click)
   - [`drag`](#drag)
   - [`fill`](#fill)
@@ -12,6 +12,7 @@
   - [`press_key`](#press_key)
   - [`type_text`](#type_text)
   - [`upload_file`](#upload_file)
+  - [`click_at`](#click_at)
 - **[Navigation automation](#navigation-automation)** (6 tools)
   - [`close_page`](#close_page)
   - [`list_pages`](#list_pages)
@@ -29,21 +30,28 @@
 - **[Network](#network)** (2 tools)
   - [`get_network_request`](#get_network_request)
   - [`list_network_requests`](#list_network_requests)
-- **[Debugging](#debugging)** (6 tools)
+- **[Debugging](#debugging)** (10 tools)
   - [`evaluate_script`](#evaluate_script)
   - [`get_console_message`](#get_console_message)
   - [`lighthouse_audit`](#lighthouse_audit)
   - [`list_console_messages`](#list_console_messages)
   - [`take_screenshot`](#take_screenshot)
   - [`take_snapshot`](#take_snapshot)
+  - [`execute_webmcp_tool`](#execute_webmcp_tool)
+  - [`list_webmcp_tools`](#list_webmcp_tools)
+  - [`screencast_start`](#screencast_start)
+  - [`screencast_stop`](#screencast_stop)
+- **[Memory](#memory)** (4 tools)
+  - [`take_memory_snapshot`](#take_memory_snapshot)
+  - [`get_memory_snapshot_details`](#get_memory_snapshot_details)
+  - [`get_nodes_by_class`](#get_nodes_by_class)
+  - [`load_memory_snapshot`](#load_memory_snapshot)
 - **[Extensions](#extensions)** (5 tools)
   - [`install_extension`](#install_extension)
   - [`list_extensions`](#list_extensions)
   - [`reload_extension`](#reload_extension)
   - [`trigger_extension_action`](#trigger_extension_action)
   - [`uninstall_extension`](#uninstall_extension)
-- **[Memory](#memory)** (1 tools)
-  - [`take_memory_snapshot`](#take_memory_snapshot)
 
 ## Input automation
 
@@ -146,6 +154,19 @@
 
 - **filePath** (string) **(required)**: The local path of the file to upload
 - **uid** (string) **(required)**: The uid of the file input element or an element that will open file chooser on the page from the page content snapshot
+- **includeSnapshot** (boolean) _(optional)_: Whether to include a snapshot in the response. Default is false.
+
+---
+
+### `click_at`
+
+**Description:** Clicks at the provided coordinates (requires flag: --experimentalVision=true)
+
+**Parameters:**
+
+- **x** (number) **(required)**: The x coordinate
+- **y** (number) **(required)**: The y coordinate
+- **dblClick** (boolean) _(optional)_: Set to true for double clicks. Default is false.
 - **includeSnapshot** (boolean) _(optional)_: Whether to include a snapshot in the response. Default is false.
 
 ---
@@ -396,55 +417,40 @@ in the DevTools Elements panel (if any).
 
 ---
 
-## Extensions
+### `execute_webmcp_tool`
 
-> NOTE: Extensions are not active by default. Use the '--categoryExtensions' flag
-
-### `install_extension`
-
-**Description:** Installs a Chrome extension from the given path.
+**Description:** Executes a WebMCP tool exposed by the page. (requires flag: --experimentalWebmcp=true)
 
 **Parameters:**
 
-- **path** (string) **(required)**: Absolute path to the unpacked extension folder.
+- **toolName** (string) **(required)**: The name of the WebMCP tool to execute
+- **input** (string) _(optional)_: The JSON-stringified parameters to pass to the WebMCP tool
 
 ---
 
-### `list_extensions`
+### `list_webmcp_tools`
 
-**Description:** Lists all the Chrome extensions installed in the browser. This includes their name, ID, version, and enabled status.
+**Description:** Lists all WebMCP tools the page exposes. (requires flag: --experimentalWebmcp=true)
 
 **Parameters:** None
 
 ---
 
-### `reload_extension`
+### `screencast_start`
 
-**Description:** Reloads an unpacked Chrome extension by its ID.
+**Description:** Starts recording a screencast (video) of the selected page in specified format. (requires flag: --experimentalScreencast=true)
 
 **Parameters:**
 
-- **id** (string) **(required)**: ID of the extension to reload.
+- **filePath** (string) _(optional)_: Output file path (.webm,.mp4 are supported). Uses mkdtemp to generate a unique path if not provided.
 
 ---
 
-### `trigger_extension_action`
+### `screencast_stop`
 
-**Description:** Triggers the default action of an extension by its ID.
+**Description:** Stops the active screencast recording on the selected page. (requires flag: --experimentalScreencast=true)
 
-**Parameters:**
-
-- **id** (string) **(required)**: ID of the extension to trigger the action for.
-
----
-
-### `uninstall_extension`
-
-**Description:** Uninstalls a Chrome extension by its ID.
-
-**Parameters:**
-
-- **id** (string) **(required)**: ID of the extension to uninstall.
+**Parameters:** None
 
 ---
 
@@ -457,5 +463,92 @@ in the DevTools Elements panel (if any).
 **Parameters:**
 
 - **filePath** (string) **(required)**: A path to a .heapsnapshot file to save the heapsnapshot to.
+
+---
+
+### `get_memory_snapshot_details`
+
+**Description:** Loads a memory heapsnapshot and returns all available information including statistics, static data, and aggregated node information. Supports pagination for aggregates. (requires flag: --experimentalMemory=true)
+
+**Parameters:**
+
+- **filePath** (string) **(required)**: A path to a .heapsnapshot file to read.
+- **pageIdx** (number) _(optional)_: The page index for pagination of aggregates.
+- **pageSize** (number) _(optional)_: The page size for pagination of aggregates.
+
+---
+
+### `get_nodes_by_class`
+
+**Description:** Loads a memory heapsnapshot and returns instances of a specific class with their stable IDs. (requires flag: --experimentalMemory=true)
+
+**Parameters:**
+
+- **filePath** (string) **(required)**: A path to a .heapsnapshot file to read.
+- **uid** (number) **(required)**: The unique UID for the class, obtained from aggregates listing.
+- **pageIdx** (number) _(optional)_: The page index for pagination.
+- **pageSize** (number) _(optional)_: The page size for pagination.
+
+---
+
+### `load_memory_snapshot`
+
+**Description:** Loads a memory heapsnapshot and returns snapshot summary stats. (requires flag: --experimentalMemory=true)
+
+**Parameters:**
+
+- **filePath** (string) **(required)**: A path to a .heapsnapshot file to read.
+
+---
+
+## Extensions
+
+> NOTE: Extensions are not active by default. Use the '--categoryExtensions' flag
+
+### `install_extension`
+
+**Description:** Installs a Chrome extension from the given path. (requires flag: --categoryExtensions=true)
+
+**Parameters:**
+
+- **path** (string) **(required)**: Absolute path to the unpacked extension folder.
+
+---
+
+### `list_extensions`
+
+**Description:** Lists all the Chrome extensions installed in the browser. This includes their name, ID, version, and enabled status. (requires flag: --categoryExtensions=true)
+
+**Parameters:** None
+
+---
+
+### `reload_extension`
+
+**Description:** Reloads an unpacked Chrome extension by its ID. (requires flag: --categoryExtensions=true)
+
+**Parameters:**
+
+- **id** (string) **(required)**: ID of the extension to reload.
+
+---
+
+### `trigger_extension_action`
+
+**Description:** Triggers the default action of an extension by its ID. (requires flag: --categoryExtensions=true)
+
+**Parameters:**
+
+- **id** (string) **(required)**: ID of the extension to trigger the action for.
+
+---
+
+### `uninstall_extension`
+
+**Description:** Uninstalls a Chrome extension by its ID. (requires flag: --categoryExtensions=true)
+
+**Parameters:**
+
+- **id** (string) **(required)**: ID of the extension to uninstall.
 
 ---
