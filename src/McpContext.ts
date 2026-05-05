@@ -574,11 +574,47 @@ export class McpContext implements Context {
     isolatedContextNames: Map<Page, string>;
   }> {
     const defaultCtx = this.browser.defaultBrowserContext();
-    const allPages = await this.browser.pages(
-      this.#options.experimentalIncludeAllPages,
-    );
 
+    // Enumerate targets individually instead of calling browser.pages() so
+    // that a single frozen/discarded background tab that times out on
+    // Network.enable cannot abort the entire page enumeration (see #1230).
     const allTargets = this.browser.targets();
+    const pageTargets = allTargets.filter(target => {
+      const type = target.type();
+      if (type === 'page') return true;
+      if (this.#options.experimentalIncludeAllPages) {
+        return type === 'background_page' || type === 'webview';
+      }
+      return false;
+    });
+    const pageResults = await Promise.all(
+      pageTargets.map(async target => {
+        try {
+          const page = await Promise.race([
+            target.page(),
+            new Promise<null>(resolve =>
+              setTimeout(() => resolve(null), DEFAULT_TIMEOUT),
+            ),
+          ]);
+          if (!page) {
+            this.logger(
+              'Timed out attaching to target at',
+              target.url(),
+              '— likely frozen or discarded',
+            );
+          }
+          return page;
+        } catch (err) {
+          this.logger(
+            'Skipping frozen/discarded target at',
+            target.url(),
+            err,
+          );
+          return null;
+        }
+      }),
+    );
+    const allPages = pageResults.filter((p): p is Page => p !== null);
     const extensionTargets = allTargets.filter(target => {
       return (
         target.url().startsWith('chrome-extension://') &&
@@ -588,7 +624,12 @@ export class McpContext implements Context {
 
     for (const target of extensionTargets) {
       // Right now target.page() returns null for popup and side panel pages.
-      let page = await target.page();
+      let page = await Promise.race([
+        target.page(),
+        new Promise<null>(resolve =>
+          setTimeout(() => resolve(null), DEFAULT_TIMEOUT),
+        ),
+      ]);
       if (!page) {
         // We need to cache pages instances for targets because target.asPage()
         // returns a new page instance every time.

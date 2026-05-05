@@ -10,8 +10,12 @@ import path from 'node:path';
 import {afterEach, describe, it} from 'node:test';
 import {pathToFileURL} from 'node:url';
 
+import logger from 'debug';
+import puppeteer, {Locator} from 'puppeteer';
+import type {Target} from 'puppeteer-core';
 import sinon from 'sinon';
 
+import {McpContext} from '../src/McpContext.js';
 import {NetworkFormatter} from '../src/formatters/NetworkFormatter.js';
 import {TextSnapshot} from '../src/TextSnapshot.js';
 import type {HTTPResponse} from '../src/third_party/index.js';
@@ -269,5 +273,93 @@ describe('McpContext', () => {
         /Access denied/,
       );
     });
+  });
+
+  it('should skip frozen targets that hang on target.page()', async () => {
+    await withMcpContext(async (_response, context) => {
+      const browser = context.browser;
+      const realTargets = browser.targets();
+
+      // Inject a fake target whose page() never resolves (simulates a frozen tab).
+      const frozenTarget = {
+        type: () => 'page',
+        url: () => 'https://frozen-tab.example.com',
+        page: () => new Promise<null>(() => {}),
+      } as unknown as Target;
+
+      sinon.stub(browser, 'targets').returns([...realTargets, frozenTarget]);
+
+      const start = Date.now();
+      const pages = await context.createPagesSnapshot();
+      const elapsed = Date.now() - start;
+
+      // The frozen target should be skipped, not block for 180s.
+      assert.ok(elapsed < 15_000, `Took ${elapsed}ms, expected < 15s`);
+      // Real pages should still be enumerated.
+      assert.ok(pages.length > 0, 'Should still enumerate healthy pages');
+    });
+  });
+
+  it('should enumerate pages when a tab has a crashed renderer', async () => {
+    const browser = await puppeteer.launch({
+      headless: true,
+      args: ['--remote-debugging-port=0'],
+      enableExtensions: true,
+      handleDevToolsAsPage: true,
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH,
+    });
+
+    try {
+      const wsEndpoint = browser.wsEndpoint();
+
+      const activePage = await browser.newPage();
+      await activePage.goto('data:text/html,<h1>Active</h1>');
+
+      const crashPage = await browser.newPage();
+      await crashPage.goto('data:text/html,<h1>Will crash</h1>');
+      try {
+        await crashPage.goto('chrome://crash');
+      } catch {}
+
+      browser.disconnect();
+
+      const reconnected = await puppeteer.connect({
+        browserWSEndpoint: wsEndpoint,
+        handleDevToolsAsPage: true,
+      });
+
+      try {
+        const start = Date.now();
+        const ctx = await McpContext.from(
+          reconnected,
+          logger('test'),
+          {
+            experimentalDevToolsDebugging: false,
+            performanceCrux: false,
+          },
+          Locator,
+        );
+        const elapsed = Date.now() - start;
+
+        assert.ok(
+          elapsed < 20_000,
+          `Took ${elapsed}ms, expected < 20s`,
+        );
+        const pages = ctx.getPages();
+        assert.ok(
+          pages.length >= 1,
+          `Expected at least 1 page, got ${pages.length}`,
+        );
+
+        ctx.dispose();
+      } finally {
+        await reconnected.close();
+      }
+    } catch (e) {
+      if (browser.connected) {
+        await browser.close();
+      }
+      throw e;
+    }
   });
 });
