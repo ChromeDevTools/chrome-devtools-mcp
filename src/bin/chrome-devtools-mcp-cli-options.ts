@@ -292,7 +292,11 @@ export const cliOptions = {
 
 export type ParsedArguments = ReturnType<typeof parseArguments>;
 
-export function parseArguments(version: string, argv = process.argv) {
+export function parseArguments(
+  version: string,
+  argv = process.argv,
+  env = process.env,
+) {
   const yargsInstance = yargs(hideBin(argv))
     .scriptName('npx chrome-devtools-mcp@latest')
     .options(cliOptions)
@@ -306,6 +310,12 @@ export function parseArguments(version: string, argv = process.argv) {
         !args.executablePath
       ) {
         args.channel = 'stable';
+      }
+      if (env['CI'] || env['CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS']) {
+        console.error(
+          "turning off usage statistics. process.env['CI'] || process.env['CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS'] is set.",
+        );
+        args.usageStatistics = false;
       }
       return true;
     })

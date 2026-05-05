@@ -365,7 +365,9 @@ export async function runCli(
     if (sessionId) {
       finalArgs.push('--sessionId', sessionId);
     }
-    const child = spawn('node', [CLI_PATH, ...finalArgs]);
+    const child = spawn('node', [CLI_PATH, ...finalArgs], {
+      env: process.env,
+    });
     let stdout = '';
     let stderr = '';
     child.stdout.on('data', chunk => {

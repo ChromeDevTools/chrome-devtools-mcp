@@ -40,6 +40,7 @@ describe('e2e', () => {
         executablePath(),
         ...extraArgs,
       ],
+      env: {...process.env, CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true'},
     });
     const client = new Client(
       {
