@@ -139,26 +139,12 @@ Chrome DevTools MCP will not start the browser instance automatically using this
 <details>
   <summary>Claude Code</summary>
 
-**Install via CLI (MCP only)**
-
-Use the Claude Code CLI to add the Chrome DevTools MCP server (<a href="https://code.claude.com/docs/en/mcp">guide</a>):
-
-```bash
-claude mcp add chrome-devtools --scope user npx chrome-devtools-mcp@latest
-```
-
 **Install as a Plugin (MCP + Skills)**
 
 > [!NOTE]
 > If you already had Chrome DevTools MCP installed previously for Claude Code, make sure to remove it first from your installation and configuration files.
 
-To install Chrome DevTools MCP with skills, add the marketplace registry in Claude Code:
-
-```sh
-/plugin marketplace add ChromeDevTools/chrome-devtools-mcp
-```
-
-Then, install the plugin:
+To install Chrome DevTools for agents with skills, install the Claude Code plugin:
 
 ```sh
 /plugin install chrome-devtools-mcp
@@ -168,6 +154,14 @@ Restart Claude Code to have the MCP server and skills load (check with `/skills`
 
 > [!TIP]
 > If the plugin installation fails with a `Failed to clone repository` error (e.g., HTTPS connectivity issues behind a corporate firewall), see the [troubleshooting guide](./docs/troubleshooting.md#claude-code-plugin-installation-fails-with-failed-to-clone-repository) for workarounds, or use the CLI installation method above instead.
+
+**Install via CLI (MCP only)**
+
+Use the Claude Code CLI to add the Chrome DevTools MCP server (<a href="https://code.claude.com/docs/en/mcp">guide</a>) without skills:
+
+```bash
+claude mcp add chrome-devtools --scope user npx chrome-devtools-mcp@latest
+```
 
 </details>
 
