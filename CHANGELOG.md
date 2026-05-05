@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.24.1](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.24.0...chrome-devtools-mcp-v0.24.1) (2026-05-05)
+
+
+### 🛠️ Fixes
+
+* **input:** stop native select option clicks from timing out ([#1960](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1960)) ([510ec0f](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/510ec0f48bbfc7cad3d5d1f9805e901cc992ea89))
+* make sure env variables are consistently applied when parsing args ([#1994](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1994)) ([f45f068](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/f45f0681a295e96a66c8247bbc1d9fe445ee04ac))
+
+
+### 📄 Documentation
+
+* extract WebMCP into its own category ([#1993](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1993)) ([da0441d](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/da0441d4250702898f5f07815ffb9c708393fe96))
+* update generate-docs.ts tools output order ([#1991](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1991)) ([895fc65](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/895fc65a1f2b426c8644baa0cda23ee5de98624e)), closes [#1932](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1932)
+
 ## [0.24.0](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.23.0...chrome-devtools-mcp-v0.24.0) (2026-05-02)
 
 
