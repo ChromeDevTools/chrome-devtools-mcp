@@ -87,6 +87,34 @@ export const listNetworkRequests = definePageTool({
   },
 });
 
+export const setExtraHttpHeaders = definePageTool({
+  name: 'set_extra_http_headers',
+  description: `Set extra HTTP headers that will be included in every request the page makes. These headers are applied to all resource types including document, script, stylesheet, image, fetch, and XHR requests. The headers persist across navigations until explicitly cleared by calling this tool with an empty headers object.`,
+  annotations: {
+    category: ToolCategory.NETWORK,
+    readOnlyHint: false,
+  },
+  schema: {
+    headers: zod
+      .record(zod.string(), zod.string())
+      .describe(
+        'HTTP headers as key-value pairs to include in every request. Pass an empty object {} to clear previously set headers.',
+      ),
+  },
+  handler: async (request, response) => {
+    const page = request.page;
+    await page.pptrPage.setExtraHTTPHeaders(request.params.headers);
+    const count = Object.keys(request.params.headers).length;
+    if (count === 0) {
+      response.appendResponseLine('Cleared all extra HTTP headers.');
+    } else {
+      response.appendResponseLine(
+        `Set ${count} extra HTTP header(s): ${Object.keys(request.params.headers).join(', ')}`,
+      );
+    }
+  },
+});
+
 export const getNetworkRequest = definePageTool({
   name: 'get_network_request',
   description: `Gets a network request by an optional reqid, if omitted returns the currently selected request in the DevTools Network panel.`,

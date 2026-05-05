@@ -10,6 +10,7 @@ import {describe, it} from 'node:test';
 import {
   getNetworkRequest,
   listNetworkRequests,
+  setExtraHttpHeaders,
 } from '../../src/tools/network.js';
 import {serverHooks} from '../server.js';
 import {
@@ -132,6 +133,65 @@ describe('network', () => {
       });
     });
   });
+  describe('set_extra_http_headers', () => {
+    it('sets headers and reports count', async () => {
+      await withMcpContext(async (response, context) => {
+        await setExtraHttpHeaders.handler(
+          {
+            params: {headers: {'X-Custom': 'value', 'X-Lane': 'test'}},
+            page: context.getSelectedMcpPage(),
+          },
+          response,
+          context,
+        );
+        assert.strictEqual(
+          response.responseLines[0],
+          'Set 2 extra HTTP header(s): X-Custom, X-Lane',
+        );
+      });
+    });
+
+    it('clears headers when empty object is passed', async () => {
+      await withMcpContext(async (response, context) => {
+        await setExtraHttpHeaders.handler(
+          {
+            params: {headers: {}},
+            page: context.getSelectedMcpPage(),
+          },
+          response,
+          context,
+        );
+        assert.strictEqual(
+          response.responseLines[0],
+          'Cleared all extra HTTP headers.',
+        );
+      });
+    });
+
+    it('headers are included in subsequent requests', async () => {
+      server.addRoute('/echo-headers', async (req, res) => {
+        res.writeHead(200, {'Content-Type': 'application/json'});
+        res.end(JSON.stringify(req.headers));
+      });
+
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedPptrPage();
+        await setExtraHttpHeaders.handler(
+          {
+            params: {headers: {'X-Test-Header': 'hello-mcp'}},
+            page: context.getSelectedMcpPage(),
+          },
+          response,
+          context,
+        );
+
+        const navResponse = await page.goto(server.getRoute('/echo-headers'));
+        const body = await navResponse!.json();
+        assert.strictEqual(body['x-test-header'], 'hello-mcp');
+      });
+    });
+  });
+
   describe('network_get_request', () => {
     it('attaches request', async () => {
       await withMcpContext(async (response, context) => {
