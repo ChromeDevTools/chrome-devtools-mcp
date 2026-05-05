@@ -141,7 +141,7 @@ Experimental tools are disabled by default. Enable them with the corresponding f
 chrome-devtools click_at 100 200 # Clicks at the provided coordinates (requires --experimentalVision=true)
 chrome-devtools screencast_start # Starts a screencast recording (requires --experimentalScreencast=true and ffmpeg)
 chrome-devtools screencast_stop # Stops the active screencast
-chrome-devtools list_webmcp_tools # List all WebMCP tools (requires --experimentalWebmcp=true)
+chrome-devtools list_webmcp_tools # List all WebMCP tools (requires --categoryExperimentalWebmcp=true)
 ```
 
 ## Service Management

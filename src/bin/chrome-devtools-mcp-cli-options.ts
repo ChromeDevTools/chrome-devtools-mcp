@@ -200,7 +200,7 @@ export const cliOptions = {
     describe: 'Path to ffmpeg executable for screencast recording.',
     implies: 'experimentalScreencast',
   },
-  experimentalWebmcp: {
+  categoryExperimentalWebmcp: {
     type: 'boolean',
     describe:
       'Set to true to enable debugging WebMCP tools. Requires Chrome 149+ with the following flags: `--enable-features=WebMCPTesting,DevToolsWebMCPSupport`',

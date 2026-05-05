@@ -166,7 +166,7 @@ describe('e2e', () => {
         assert.ok(listWebMcpTools);
         assert.ok(executeWebMcpTool);
       },
-      ['--experimental-webmcp'],
+      ['--categoryExperimentalWebmcp'],
     );
   });
 

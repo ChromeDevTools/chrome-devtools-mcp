@@ -505,15 +505,13 @@ If you run into any issues, checkout our [troubleshooting guide](./docs/troubles
 - **Network** (2 tools)
   - [`get_network_request`](docs/tool-reference.md#get_network_request)
   - [`list_network_requests`](docs/tool-reference.md#list_network_requests)
-- **Debugging** (10 tools)
+- **Debugging** (8 tools)
   - [`evaluate_script`](docs/tool-reference.md#evaluate_script)
   - [`get_console_message`](docs/tool-reference.md#get_console_message)
   - [`lighthouse_audit`](docs/tool-reference.md#lighthouse_audit)
   - [`list_console_messages`](docs/tool-reference.md#list_console_messages)
   - [`take_screenshot`](docs/tool-reference.md#take_screenshot)
   - [`take_snapshot`](docs/tool-reference.md#take_snapshot)
-  - [`execute_webmcp_tool`](docs/tool-reference.md#execute_webmcp_tool)
-  - [`list_webmcp_tools`](docs/tool-reference.md#list_webmcp_tools)
   - [`screencast_start`](docs/tool-reference.md#screencast_start)
   - [`screencast_stop`](docs/tool-reference.md#screencast_stop)
 - **Memory** (4 tools)
@@ -527,6 +525,9 @@ If you run into any issues, checkout our [troubleshooting guide](./docs/troubles
   - [`reload_extension`](docs/tool-reference.md#reload_extension)
   - [`trigger_extension_action`](docs/tool-reference.md#trigger_extension_action)
   - [`uninstall_extension`](docs/tool-reference.md#uninstall_extension)
+- **WebMCP** (2 tools)
+  - [`execute_webmcp_tool`](docs/tool-reference.md#execute_webmcp_tool)
+  - [`list_webmcp_tools`](docs/tool-reference.md#list_webmcp_tools)
 
 <!-- END AUTO GENERATED TOOLS -->
 
@@ -603,7 +604,7 @@ The Chrome DevTools MCP server supports the following configuration option:
   Path to ffmpeg executable for screencast recording.
   - **Type:** string
 
-- **`--experimentalWebmcp`/ `--experimental-webmcp`**
+- **`--categoryExperimentalWebmcp`/ `--category-experimental-webmcp`**
   Set to true to enable debugging WebMCP tools. Requires Chrome 149+ with the following flags: `--enable-features=WebMCPTesting,DevToolsWebMCPSupport`
   - **Type:** boolean
 

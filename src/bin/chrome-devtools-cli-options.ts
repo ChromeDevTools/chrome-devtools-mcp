@@ -198,8 +198,8 @@ export const commands: Commands = {
   },
   execute_webmcp_tool: {
     description:
-      'Executes a WebMCP tool exposed by the page. (requires flag: --experimentalWebmcp=true)',
-    category: 'Debugging',
+      'Executes a WebMCP tool exposed by the page. (requires flag: --categoryExperimentalWebmcp=true)',
+    category: 'WebMCP',
     args: {
       toolName: {
         name: 'toolName',
@@ -510,8 +510,8 @@ export const commands: Commands = {
   },
   list_webmcp_tools: {
     description:
-      'Lists all WebMCP tools the page exposes. (requires flag: --experimentalWebmcp=true)',
-    category: 'Debugging',
+      'Lists all WebMCP tools the page exposes. (requires flag: --categoryExperimentalWebmcp=true)',
+    category: 'WebMCP',
     args: {},
   },
   load_memory_snapshot: {

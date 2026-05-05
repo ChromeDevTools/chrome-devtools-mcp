@@ -560,7 +560,7 @@ export class McpResponse implements Response {
     }
 
     let webmcpTools: WebMCPTool[] | undefined;
-    if (this.#listWebMcpTools && this.#args.experimentalWebmcp) {
+    if (this.#listWebMcpTools && this.#args.categoryExperimentalWebmcp) {
       const page = this.#page ?? context.getSelectedMcpPage();
       webmcpTools = page.getWebMcpTools();
     }

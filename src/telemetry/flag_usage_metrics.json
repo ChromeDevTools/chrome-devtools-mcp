@@ -246,11 +246,13 @@
   },
   {
     "name": "experimental_webmcp",
-    "flagType": "boolean"
+    "flagType": "boolean",
+    "isDeprecated": true
   },
   {
     "name": "experimental_webmcp_present",
-    "flagType": "boolean"
+    "flagType": "boolean",
+    "isDeprecated": true
   },
   {
     "name": "redact_network_headers",
@@ -274,6 +276,14 @@
   },
   {
     "name": "category_experimental_in_page",
+    "flagType": "boolean"
+  },
+  {
+    "name": "category_experimental_webmcp_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "category_experimental_webmcp",
     "flagType": "boolean"
   }
 ]

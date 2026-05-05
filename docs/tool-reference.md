@@ -30,15 +30,13 @@
 - **[Network](#network)** (2 tools)
   - [`get_network_request`](#get_network_request)
   - [`list_network_requests`](#list_network_requests)
-- **[Debugging](#debugging)** (10 tools)
+- **[Debugging](#debugging)** (8 tools)
   - [`evaluate_script`](#evaluate_script)
   - [`get_console_message`](#get_console_message)
   - [`lighthouse_audit`](#lighthouse_audit)
   - [`list_console_messages`](#list_console_messages)
   - [`take_screenshot`](#take_screenshot)
   - [`take_snapshot`](#take_snapshot)
-  - [`execute_webmcp_tool`](#execute_webmcp_tool)
-  - [`list_webmcp_tools`](#list_webmcp_tools)
   - [`screencast_start`](#screencast_start)
   - [`screencast_stop`](#screencast_stop)
 - **[Memory](#memory)** (4 tools)
@@ -52,6 +50,9 @@
   - [`reload_extension`](#reload_extension)
   - [`trigger_extension_action`](#trigger_extension_action)
   - [`uninstall_extension`](#uninstall_extension)
+- **[WebMCP](#webmcp)** (2 tools)
+  - [`execute_webmcp_tool`](#execute_webmcp_tool)
+  - [`list_webmcp_tools`](#list_webmcp_tools)
 
 ## Input automation
 
@@ -417,25 +418,6 @@ in the DevTools Elements panel (if any).
 
 ---
 
-### `execute_webmcp_tool`
-
-**Description:** Executes a WebMCP tool exposed by the page. (requires flag: --experimentalWebmcp=true)
-
-**Parameters:**
-
-- **toolName** (string) **(required)**: The name of the WebMCP tool to execute
-- **input** (string) _(optional)_: The JSON-stringified parameters to pass to the WebMCP tool
-
----
-
-### `list_webmcp_tools`
-
-**Description:** Lists all WebMCP tools the page exposes. (requires flag: --experimentalWebmcp=true)
-
-**Parameters:** None
-
----
-
 ### `screencast_start`
 
 **Description:** Starts recording a screencast (video) of the selected page in specified format. (requires flag: --experimentalScreencast=true)
@@ -503,7 +485,7 @@ in the DevTools Elements panel (if any).
 
 ## Extensions
 
-> NOTE: Extensions are not active by default. Use the '--categoryExtensions' flag
+> NOTE: The Extensions category is not active by default. Use the '--categoryExtensions' flag.
 
 ### `install_extension`
 
@@ -550,5 +532,28 @@ in the DevTools Elements panel (if any).
 **Parameters:**
 
 - **id** (string) **(required)**: ID of the extension to uninstall.
+
+---
+
+## WebMCP
+
+> NOTE: The WebMCP category is not active by default. Use the '--categoryExperimentalWebmcp' flag.
+
+### `execute_webmcp_tool`
+
+**Description:** Executes a WebMCP tool exposed by the page. (requires flag: --categoryExperimentalWebmcp=true)
+
+**Parameters:**
+
+- **toolName** (string) **(required)**: The name of the WebMCP tool to execute
+- **input** (string) _(optional)_: The JSON-stringified parameters to pass to the WebMCP tool
+
+---
+
+### `list_webmcp_tools`
+
+**Description:** Lists all WebMCP tools the page exposes. (requires flag: --categoryExperimentalWebmcp=true)
+
+**Parameters:** None
 
 ---

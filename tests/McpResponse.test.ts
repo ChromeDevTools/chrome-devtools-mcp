@@ -1514,7 +1514,7 @@ describe('webmcp', () => {
   it('includes webmcp tools in list_pages response', async t => {
     await testIncludesWebmcpTools(
       t,
-      {experimentalWebmcp: true} as ParsedArguments,
+      {categoryExperimentalWebmcp: true} as ParsedArguments,
       async (response, context) => {
         await listPages().handler({params: {}}, response, context);
       },
@@ -1525,7 +1525,7 @@ describe('webmcp', () => {
   it('includes webmcp tools in select_page response', async t => {
     await testIncludesWebmcpTools(
       t,
-      {experimentalWebmcp: true} as ParsedArguments,
+      {categoryExperimentalWebmcp: true} as ParsedArguments,
       async (response, context) => {
         const pageId =
           context.getPageId(context.getSelectedMcpPage().pptrPage) ?? 1;
@@ -1538,7 +1538,7 @@ describe('webmcp', () => {
   it('includes webmcp tools in navigate_page response', async t => {
     await testIncludesWebmcpTools(
       t,
-      {experimentalWebmcp: true} as ParsedArguments,
+      {categoryExperimentalWebmcp: true} as ParsedArguments,
       async (response, context) => {
         await navigatePage().handler(
           {
@@ -1572,14 +1572,14 @@ describe('webmcp', () => {
         );
       },
       {args: ['--enable-features=WebMCPTesting,DevToolsWebMCPSupport']},
-      {experimentalWebmcp: true} as ParsedArguments,
+      {categoryExperimentalWebmcp: true} as ParsedArguments,
     );
   });
 
   it('list no webmcp tools if experimentalWebmcp is false', async t => {
     await testIncludesWebmcpTools(
       t,
-      {experimentalWebmcp: false} as ParsedArguments,
+      {categoryExperimentalWebmcp: false} as ParsedArguments,
       async (response, context) => {
         await navigatePage().handler(
           {

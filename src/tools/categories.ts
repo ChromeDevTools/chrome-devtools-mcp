@@ -14,6 +14,7 @@ export enum ToolCategory {
   EXTENSIONS = 'extensions',
   IN_PAGE = 'experimentalInPage',
   MEMORY = 'memory',
+  WEBMCP = 'experimentalWebmcp',
 }
 
 export const labels = {
@@ -26,9 +27,11 @@ export const labels = {
   [ToolCategory.EXTENSIONS]: 'Extensions',
   [ToolCategory.IN_PAGE]: 'In-page tools',
   [ToolCategory.MEMORY]: 'Memory',
+  [ToolCategory.WEBMCP]: 'WebMCP',
 };
 
 export const OFF_BY_DEFAULT_CATEGORIES = [
   ToolCategory.EXTENSIONS,
   ToolCategory.IN_PAGE,
+  ToolCategory.WEBMCP,
 ];

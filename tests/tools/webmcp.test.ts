@@ -78,7 +78,7 @@ describe('webmcp', () => {
           );
         },
         {args: ['--enable-features=WebMCPTesting,DevToolsWebMCPSupport']},
-        {experimentalWebmcp: true} as ParsedArguments,
+        {categoryExperimentalWebmcp: true} as ParsedArguments,
       );
     });
 
@@ -100,7 +100,7 @@ describe('webmcp', () => {
           );
         },
         {args: ['--enable-features=WebMCPTesting,DevToolsWebMCPSupport']},
-        {experimentalWebmcp: true} as ParsedArguments,
+        {categoryExperimentalWebmcp: true} as ParsedArguments,
       );
     });
 
@@ -125,7 +125,7 @@ describe('webmcp', () => {
           );
         },
         {args: ['--enable-features=WebMCPTesting,DevToolsWebMCPSupport']},
-        {experimentalWebmcp: true} as ParsedArguments,
+        {categoryExperimentalWebmcp: true} as ParsedArguments,
       );
     });
   });

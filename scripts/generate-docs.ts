@@ -373,7 +373,7 @@ async function generateReference(
     if (OFF_BY_DEFAULT_CATEGORIES.includes(category)) {
       const flagName = `--${buildFlag(category)}`;
 
-      markdown += `> NOTE: ${categoryName} are not active by default. Use the '${flagName}' flag\n\n`;
+      markdown += `> NOTE: The ${categoryName} category is not active by default. Use the '${flagName}' flag.\n\n`;
     }
 
     // Sort tools within category
