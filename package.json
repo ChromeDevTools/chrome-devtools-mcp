@@ -77,7 +77,6 @@
     "rollup-plugin-license": "^3.6.0",
     "semver": "^7.7.4",
     "sinon": "^21.0.0",
-    "tiktoken": "^1.0.22",
     "typescript": "^6.0.2",
     "typescript-eslint": "^8.43.0",
     "urlpattern-polyfill": "^10.1.0",

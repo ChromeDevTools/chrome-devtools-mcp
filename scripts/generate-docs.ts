@@ -6,10 +6,7 @@
 
 import fs from 'node:fs';
 
-import {Client} from '@modelcontextprotocol/sdk/client/index.js';
-import {StdioClientTransport} from '@modelcontextprotocol/sdk/client/stdio.js';
 import type {Tool} from '@modelcontextprotocol/sdk/types.js';
-import {get_encoding} from 'tiktoken';
 
 import {cliOptions} from '../build/src/bin/chrome-devtools-mcp-cli-options.js';
 import type {ParsedArguments} from '../build/src/bin/chrome-devtools-mcp-cli-options.js';
@@ -24,42 +21,6 @@ import {createTools} from '../build/src/tools/tools.js';
 const OUTPUT_PATH = './docs/tool-reference.md';
 const SLIM_OUTPUT_PATH = './docs/slim-tool-reference.md';
 const README_PATH = './README.md';
-
-async function measureServer(args: string[]) {
-  // 1. Connect to your actual MCP server
-  const transport = new StdioClientTransport({
-    command: 'node',
-    args: ['./build/src/bin/chrome-devtools-mcp.js', ...args], // Point to your built MCP server
-  });
-
-  const client = new Client(
-    {name: 'measurer', version: '1.0.0'},
-    {capabilities: {}},
-  );
-  await client.connect(transport);
-
-  // 2. Fetch all tools
-  const toolsList = await client.listTools();
-
-  // 3. Serialize exactly how an LLM would see it (JSON)
-  const jsonString = JSON.stringify(toolsList.tools, null, 2);
-
-  // 4. Count tokens (using cl100k_base which is standard for GPT-4/Claude-3.5 approximation)
-  const enc = get_encoding('cl100k_base');
-  const tokenCount = enc.encode(jsonString).length;
-
-  console.log(`--- Measurement Results ---`);
-  console.log(`Total Tools: ${toolsList.tools.length}`);
-  console.log(`JSON Character Count: ${jsonString.length}`);
-  console.log(`Estimated Token Count: ~${tokenCount}`);
-
-  // Clean up
-  enc.free();
-  await client.close();
-  return {
-    tokenCount,
-  };
-}
 
 // Extend the MCP Tool type to include our annotations
 interface ToolWithAnnotations extends Tool {
@@ -337,14 +298,13 @@ async function generateReference(
   toolsWithAnnotations: ToolWithAnnotations[],
   categories: Record<string, ToolWithAnnotations[]>,
   sortedCategories: string[],
-  serverArgs: string[],
 ) {
   console.log(`Found ${toolsWithAnnotations.length} tools`);
 
   // Generate markdown documentation
   let markdown = `<!-- AUTO GENERATED DO NOT EDIT - run 'npm run gen' to update-->
 
-# ${title} (~${(await measureServer(serverArgs)).tokenCount} cl100k_base tokens)
+# ${title}
 
 `;
   // Generate table of contents
@@ -567,7 +527,6 @@ async function generateToolDocumentation(): Promise<void> {
         toolsWithAnnotations,
         categories,
         sortedCategories,
-        [],
       );
 
       // Generate tools TOC and update README
@@ -584,7 +543,6 @@ async function generateToolDocumentation(): Promise<void> {
         toolsWithAnnotations,
         categories,
         sortedCategories,
-        ['--slim'],
       );
     }
 

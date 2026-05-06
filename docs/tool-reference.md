@@ -1,6 +1,6 @@
 <!-- AUTO GENERATED DO NOT EDIT - run 'npm run gen' to update-->
 
-# Chrome DevTools MCP Tool Reference (~7010 cl100k_base tokens)
+# Chrome DevTools MCP Tool Reference
 
 - **[Input automation](#input-automation)** (10 tools)
   - [`click`](#click)
