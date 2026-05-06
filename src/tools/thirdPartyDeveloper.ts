@@ -46,7 +46,7 @@ export const listThirdPartyDeveloperTools = definePageTool({
   This might be helpful when the third-party developer tools return non-serializable values or when composing
   third-party developer tools with additional functionality.`,
   annotations: {
-    category: ToolCategory['3P_DEVELOPER'],
+    category: ToolCategory.THIRD_PARTY,
     readOnlyHint: true,
   },
   schema: {},
@@ -60,7 +60,7 @@ export const executeThirdPartyDeveloperTool = definePageTool({
   name: 'execute_3p_developer_tool',
   description: `Executes a tool exposed by the page.`,
   annotations: {
-    category: ToolCategory['3P_DEVELOPER'],
+    category: ToolCategory.THIRD_PARTY,
     readOnlyHint: false,
   },
   schema: {

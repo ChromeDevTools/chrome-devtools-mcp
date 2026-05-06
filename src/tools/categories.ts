@@ -12,7 +12,7 @@ export enum ToolCategory {
   NETWORK = 'network',
   DEBUGGING = 'debugging',
   EXTENSIONS = 'extensions',
-  '3P_DEVELOPER' = 'experimental3pDeveloper',
+  THIRD_PARTY = 'experimentalThirdParty',
   MEMORY = 'memory',
   WEBMCP = 'experimentalWebmcp',
 }
@@ -25,13 +25,13 @@ export const labels = {
   [ToolCategory.NETWORK]: 'Network',
   [ToolCategory.DEBUGGING]: 'Debugging',
   [ToolCategory.EXTENSIONS]: 'Extensions',
-  [ToolCategory['3P_DEVELOPER']]: 'Third-party developer tools',
+  [ToolCategory.THIRD_PARTY]: 'Third-party',
   [ToolCategory.MEMORY]: 'Memory',
   [ToolCategory.WEBMCP]: 'WebMCP',
 };
 
 export const OFF_BY_DEFAULT_CATEGORIES = [
   ToolCategory.EXTENSIONS,
-  ToolCategory['3P_DEVELOPER'],
+  ToolCategory.THIRD_PARTY,
   ToolCategory.WEBMCP,
 ];
