@@ -147,6 +147,11 @@ export const cliOptions = {
     type: 'boolean',
     description: `If enabled, ignores errors relative to self-signed and expired certificates. Use with caution.`,
   },
+  protocolTimeout: {
+    type: 'number',
+    description:
+      'Override the Puppeteer protocol timeout (in milliseconds) applied to both `puppeteer.launch` and `puppeteer.connect`. Pass `0` to disable the timeout. Useful when long-running CDP commands such as `Network.emulateNetworkConditions` (used by the `lighthouse_audit` and `emulate` tools) hit the default timeout on slow targets. Can also be set via the `CHROME_DEVTOOLS_MCP_PROTOCOL_TIMEOUT` environment variable. When omitted, Puppeteer uses its default.',
+  },
   experimentalPageIdRouting: {
     type: 'boolean',
     describe:
@@ -316,6 +321,34 @@ export function parseArguments(
           "turning off usage statistics. process.env['CI'] || process.env['CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS'] is set.",
         );
         args.usageStatistics = false;
+      }
+      if (
+        args.protocolTimeout === undefined &&
+        env['CHROME_DEVTOOLS_MCP_PROTOCOL_TIMEOUT']
+      ) {
+        const raw = env['CHROME_DEVTOOLS_MCP_PROTOCOL_TIMEOUT'];
+        const parsed = Number(raw);
+        if (
+          !Number.isFinite(parsed) ||
+          parsed < 0 ||
+          !Number.isInteger(parsed)
+        ) {
+          throw new Error(
+            `CHROME_DEVTOOLS_MCP_PROTOCOL_TIMEOUT must be a non-negative integer, received '${raw}'.`,
+          );
+        }
+        args.protocolTimeout = parsed;
+        args['protocol-timeout'] = parsed;
+      }
+      if (
+        args.protocolTimeout !== undefined &&
+        (!Number.isFinite(args.protocolTimeout) ||
+          args.protocolTimeout < 0 ||
+          !Number.isInteger(args.protocolTimeout))
+      ) {
+        throw new Error(
+          `--protocol-timeout must be a non-negative integer (in milliseconds), received '${args.protocolTimeout}'.`,
+        );
       }
       return true;
     })

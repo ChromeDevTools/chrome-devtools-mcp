@@ -51,6 +51,7 @@ export async function ensureBrowserConnected(options: {
   channel?: Channel;
   userDataDir?: string;
   enableExtensions?: boolean;
+  protocolTimeout?: number;
 }) {
   const {channel, enableExtensions} = options;
   if (browser?.connected) {
@@ -62,6 +63,9 @@ export async function ensureBrowserConnected(options: {
     defaultViewport: null,
     handleDevToolsAsPage: true,
   };
+  if (options.protocolTimeout !== undefined) {
+    connectOptions.protocolTimeout = options.protocolTimeout;
+  }
 
   let autoConnect = false;
   if (options.wsEndpoint) {
@@ -150,6 +154,7 @@ interface McpLaunchOptions {
   devtools: boolean;
   enableExtensions?: boolean;
   viaCli?: boolean;
+  protocolTimeout?: number;
 }
 
 export function detectDisplay(): void {
@@ -229,6 +234,7 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
       acceptInsecureCerts: options.acceptInsecureCerts,
       handleDevToolsAsPage: true,
       enableExtensions: options.enableExtensions,
+      protocolTimeout: options.protocolTimeout,
     });
     if (options.logFile) {
       // FIXME: we are probably subscribing too late to catch startup logs. We

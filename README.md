@@ -592,6 +592,10 @@ The Chrome DevTools MCP server supports the following configuration option:
   If enabled, ignores errors relative to self-signed and expired certificates. Use with caution.
   - **Type:** boolean
 
+- **`--protocolTimeout`/ `--protocol-timeout`**
+  Override the Puppeteer protocol timeout (in milliseconds) applied to both `puppeteer.launch` and `puppeteer.connect`. Pass `0` to disable the timeout. Useful when long-running CDP commands such as `Network.emulateNetworkConditions` (used by the `lighthouse_audit` and `emulate` tools) hit the default timeout on slow targets. Can also be set via the `CHROME_DEVTOOLS_MCP_PROTOCOL_TIMEOUT` environment variable. When omitted, Puppeteer uses its default.
+  - **Type:** number
+
 - **`--experimentalVision`/ `--experimental-vision`**
   Whether to enable coordinate-based tools such as click_at(x,y). Usually requires a computer-use model able to produce accurate coordinates by looking at screenshots.
   - **Type:** boolean

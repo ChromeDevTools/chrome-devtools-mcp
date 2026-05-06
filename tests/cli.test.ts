@@ -326,6 +326,44 @@ describe('cli args parsing', () => {
     assert.strictEqual(disabledArgs.usageStatistics, false);
   });
 
+  it('parses protocol timeout flag', async () => {
+    // Default is undefined — Puppeteer uses its built-in default.
+    const defaultArgs = parseArguments('1.0.0', ['node', 'main.js'], {});
+    assert.strictEqual(defaultArgs.protocolTimeout, undefined);
+
+    const flagArgs = parseArguments(
+      '1.0.0',
+      ['node', 'main.js', '--protocol-timeout', '600000'],
+      {},
+    );
+    assert.strictEqual(flagArgs.protocolTimeout, 600000);
+
+    // 0 means "disable protocol timeout" (Puppeteer convention).
+    const zeroArgs = parseArguments(
+      '1.0.0',
+      ['node', 'main.js', '--protocol-timeout', '0'],
+      {},
+    );
+    assert.strictEqual(zeroArgs.protocolTimeout, 0);
+  });
+
+  it('parses protocol timeout from env variable', async () => {
+    const envArgs = parseArguments('1.0.0', ['node', 'main.js'], {
+      CHROME_DEVTOOLS_MCP_PROTOCOL_TIMEOUT: '450000',
+    });
+    assert.strictEqual(envArgs.protocolTimeout, 450000);
+
+    // CLI flag wins over env when both are set.
+    const overrideArgs = parseArguments(
+      '1.0.0',
+      ['node', 'main.js', '--protocol-timeout', '600000'],
+      {
+        CHROME_DEVTOOLS_MCP_PROTOCOL_TIMEOUT: '450000',
+      },
+    );
+    assert.strictEqual(overrideArgs.protocolTimeout, 600000);
+  });
+
   it('parses performance crux flag', async () => {
     const defaultArgs = parseArguments('1.0.0', ['node', 'main.js']);
     assert.strictEqual(defaultArgs.performanceCrux, true);
