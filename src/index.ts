@@ -210,6 +210,7 @@ export async function createMcpServer(
               : undefined,
             userDataDir: serverArgs.userDataDir,
             devtools,
+            protocolTimeout: serverArgs.protocolTimeout,
           })
         : await ensureBrowserLaunched({
             headless: serverArgs.headless,
@@ -225,6 +226,7 @@ export async function createMcpServer(
             devtools,
             enableExtensions: serverArgs.categoryExtensions,
             viaCli: serverArgs.viaCli,
+            protocolTimeout: serverArgs.protocolTimeout,
           });
 
     if (context?.browser !== browser) {
