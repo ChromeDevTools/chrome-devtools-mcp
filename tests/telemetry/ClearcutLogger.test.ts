@@ -25,6 +25,7 @@ describe('ClearcutLogger', () => {
   let mockWatchdogClient: sinon.SinonStubbedInstance<WatchdogClient>;
 
   beforeEach(() => {
+    ClearcutLogger.resetForTesting();
     mockPersistence = sinon.createStubInstance(FilePersistence, {
       loadState: Promise.resolve({
         lastActive: '',
@@ -35,11 +36,12 @@ describe('ClearcutLogger', () => {
 
   afterEach(() => {
     sinon.restore();
+    ClearcutLogger.resetForTesting();
   });
 
   describe('logToolInvocation', () => {
     it('sends correct payload', async () => {
-      const logger = new ClearcutLogger({
+      const logger = ClearcutLogger.initialize({
         persistence: mockPersistence,
         appVersion: '1.0.0',
         watchdogClient: mockWatchdogClient,
@@ -60,7 +62,7 @@ describe('ClearcutLogger', () => {
       assert.strictEqual(msg.payload.tool_invocation?.latency_ms, 123);
     });
     it('sends sanitized params', async () => {
-      const logger = new ClearcutLogger({
+      const logger = ClearcutLogger.initialize({
         persistence: mockPersistence,
         appVersion: '1.0.0',
         watchdogClient: mockWatchdogClient,
@@ -107,7 +109,7 @@ describe('ClearcutLogger', () => {
 
     for (const {name, expected} of clients) {
       it(`maps ${name} client correctly`, async () => {
-        const logger = new ClearcutLogger({
+        const logger = ClearcutLogger.initialize({
           persistence: mockPersistence,
           appVersion: '1.0.0',
           watchdogClient: mockWatchdogClient,
@@ -126,7 +128,7 @@ describe('ClearcutLogger', () => {
 
   describe('logServerStart', () => {
     it('logs flag usage', async () => {
-      const logger = new ClearcutLogger({
+      const logger = ClearcutLogger.initialize({
         persistence: mockPersistence,
         appVersion: '1.0.0',
         watchdogClient: mockWatchdogClient,
@@ -150,7 +152,7 @@ describe('ClearcutLogger', () => {
         lastActive: yesterday.toISOString(),
       });
 
-      const logger = new ClearcutLogger({
+      const logger = ClearcutLogger.initialize({
         persistence: mockPersistence,
         appVersion: '1.0.0',
         watchdogClient: mockWatchdogClient,
@@ -171,7 +173,7 @@ describe('ClearcutLogger', () => {
         lastActive: new Date().toISOString(),
       });
 
-      const logger = new ClearcutLogger({
+      const logger = ClearcutLogger.initialize({
         persistence: mockPersistence,
         appVersion: '1.0.0',
         watchdogClient: mockWatchdogClient,
@@ -188,7 +190,7 @@ describe('ClearcutLogger', () => {
         lastActive: '',
       });
 
-      const logger = new ClearcutLogger({
+      const logger = ClearcutLogger.initialize({
         persistence: mockPersistence,
         appVersion: '1.0.0',
         watchdogClient: mockWatchdogClient,
@@ -290,6 +292,48 @@ describe('ClearcutLogger', () => {
         () => sanitizeParams(params, schema),
         /parameter myString has type ZodString but value 123 is not of equivalent type/,
       );
+    });
+  });
+
+  describe('Singleton', () => {
+    it('returns undefined if not initialized', () => {
+      assert.strictEqual(ClearcutLogger.get(), undefined);
+    });
+
+    it('returns instance after initialization', () => {
+      const logger = ClearcutLogger.initialize({
+        persistence: mockPersistence,
+        appVersion: '1.0.0',
+        watchdogClient: mockWatchdogClient,
+      });
+      assert.strictEqual(ClearcutLogger.get(), logger);
+    });
+
+    it('throws error if initialized twice', () => {
+      ClearcutLogger.initialize({
+        persistence: mockPersistence,
+        appVersion: '1.0.0',
+        watchdogClient: mockWatchdogClient,
+      });
+
+      assert.throws(() => {
+        ClearcutLogger.initialize({
+          persistence: mockPersistence,
+          appVersion: '1.0.0',
+          watchdogClient: mockWatchdogClient,
+        });
+      }, /ClearcutLogger is already initialized/);
+    });
+
+    it('resets instance for testing', () => {
+      ClearcutLogger.initialize({
+        persistence: mockPersistence,
+        appVersion: '1.0.0',
+        watchdogClient: mockWatchdogClient,
+      });
+
+      ClearcutLogger.resetForTesting();
+      assert.strictEqual(ClearcutLogger.get(), undefined);
     });
   });
 });

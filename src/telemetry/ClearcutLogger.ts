@@ -171,20 +171,42 @@ function detectOsType(): OsType {
   }
 }
 
+export interface ClearcutLoggerOptions {
+  appVersion: string;
+  logFile?: string;
+  persistence?: Persistence;
+  watchdogClient?: WatchdogClient;
+  clearcutEndpoint?: string;
+  clearcutForceFlushIntervalMs?: number;
+  clearcutIncludePidHeader?: boolean;
+}
+
 export class ClearcutLogger {
   #persistence: Persistence;
   #watchdog: WatchdogClient;
   #mcpClient: McpClient;
 
-  constructor(options: {
-    appVersion: string;
-    logFile?: string;
-    persistence?: Persistence;
-    watchdogClient?: WatchdogClient;
-    clearcutEndpoint?: string;
-    clearcutForceFlushIntervalMs?: number;
-    clearcutIncludePidHeader?: boolean;
-  }) {
+  static initialize(options: ClearcutLoggerOptions): ClearcutLogger {
+    const symbolKey = Symbol.for('ClearcutLogger.instance');
+    if ((globalThis as Record<symbol, ClearcutLogger>)[symbolKey]) {
+      throw new Error('ClearcutLogger is already initialized');
+    }
+    const instance = new ClearcutLogger(options);
+    (globalThis as Record<symbol, ClearcutLogger>)[symbolKey] = instance;
+    return instance;
+  }
+
+  static get(): ClearcutLogger | undefined {
+    const symbolKey = Symbol.for('ClearcutLogger.instance');
+    return (globalThis as Record<symbol, ClearcutLogger>)[symbolKey];
+  }
+
+  static resetForTesting(): void {
+    const symbolKey = Symbol.for('ClearcutLogger.instance');
+    delete (globalThis as Record<symbol, ClearcutLogger>)[symbolKey];
+  }
+
+  private constructor(options: ClearcutLoggerOptions) {
     this.#persistence = options.persistence ?? new FilePersistence();
     this.#watchdog =
       options.watchdogClient ??
