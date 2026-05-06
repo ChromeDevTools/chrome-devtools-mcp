@@ -171,20 +171,41 @@ function detectOsType(): OsType {
   }
 }
 
+export interface ClearcutLoggerOptions {
+  appVersion: string;
+  logFile?: string;
+  persistence?: Persistence;
+  watchdogClient?: WatchdogClient;
+  clearcutEndpoint?: string;
+  clearcutForceFlushIntervalMs?: number;
+  clearcutIncludePidHeader?: boolean;
+}
+
+// Not const to allow resetting the instance for testing purposes.
+let _clearcut_logger_instance: ClearcutLogger | undefined;
+
 export class ClearcutLogger {
   #persistence: Persistence;
   #watchdog: WatchdogClient;
   #mcpClient: McpClient;
 
-  constructor(options: {
-    appVersion: string;
-    logFile?: string;
-    persistence?: Persistence;
-    watchdogClient?: WatchdogClient;
-    clearcutEndpoint?: string;
-    clearcutForceFlushIntervalMs?: number;
-    clearcutIncludePidHeader?: boolean;
-  }) {
+  static initialize(options: ClearcutLoggerOptions): ClearcutLogger {
+    if (_clearcut_logger_instance) {
+      throw new Error('ClearcutLogger is already initialized');
+    }
+    _clearcut_logger_instance = new ClearcutLogger(options);
+    return _clearcut_logger_instance;
+  }
+
+  static get(): ClearcutLogger | undefined {
+    return _clearcut_logger_instance;
+  }
+
+  static resetForTesting(): void {
+    _clearcut_logger_instance = undefined;
+  }
+
+  private constructor(options: ClearcutLoggerOptions) {
     this.#persistence = options.persistence ?? new FilePersistence();
     this.#watchdog =
       options.watchdogClient ??
