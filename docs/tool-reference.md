@@ -50,6 +50,9 @@
   - [`reload_extension`](#reload_extension)
   - [`trigger_extension_action`](#trigger_extension_action)
   - [`uninstall_extension`](#uninstall_extension)
+- **[Third-party](#third-party)** (2 tools)
+  - [`execute_3p_developer_tool`](#execute_3p_developer_tool)
+  - [`list_3p_developer_tools`](#list_3p_developer_tools)
 - **[WebMCP](#webmcp)** (2 tools)
   - [`execute_webmcp_tool`](#execute_webmcp_tool)
   - [`list_webmcp_tools`](#list_webmcp_tools)
@@ -532,6 +535,35 @@ in the DevTools Elements panel (if any).
 **Parameters:**
 
 - **id** (string) **(required)**: ID of the extension to uninstall.
+
+---
+
+## Third-party
+
+> NOTE: The Third-party category is not active by default. Use the '--categoryExperimentalThirdParty' flag.
+
+### `execute_3p_developer_tool`
+
+**Description:** Executes a tool exposed by the page. (requires flag: --categoryExperimentalThirdParty=true)
+
+**Parameters:**
+
+- **toolName** (string) **(required)**: The name of the tool to execute
+- **params** (string) _(optional)_: The JSON-stringified parameters to pass to the tool
+
+---
+
+### `list_3p_developer_tools`
+
+**Description:** Lists all third-party developer tools the page exposes for providing runtime information.
+Third-party developer tools can be called via the '[`execute_3p_developer_tool`](#execute_3p_developer_tool)()' MCP tool.
+Alternatively, third-party developer tools can be executed by calling '[`evaluate_script`](#evaluate_script)' and adding the
+following command to the script:
+'window.\_\_dtmcp.executeTool(toolName, params)'
+This might be helpful when the third-party developer tools return non-serializable values or when composing
+third-party developer tools with additional functionality. (requires flag: --categoryExperimentalThirdParty=true)
+
+**Parameters:** None
 
 ---
 

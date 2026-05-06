@@ -239,7 +239,6 @@ export const cliOptions = {
   },
   categoryExperimentalThirdParty: {
     type: 'boolean',
-    hidden: true, // TODO: flip
     default: false,
     describe:
       'Set to true to enable third-party developer tools exposed by the inspected page itself',

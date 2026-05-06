@@ -196,6 +196,25 @@ export const commands: Commands = {
       },
     },
   },
+  execute_3p_developer_tool: {
+    description:
+      'Executes a tool exposed by the page. (requires flag: --categoryExperimentalThirdParty=true)',
+    category: 'Third-party',
+    args: {
+      toolName: {
+        name: 'toolName',
+        type: 'string',
+        description: 'The name of the tool to execute',
+        required: true,
+      },
+      params: {
+        name: 'params',
+        type: 'string',
+        description: 'The JSON-stringified parameters to pass to the tool',
+        required: false,
+      },
+    },
+  },
   execute_webmcp_tool: {
     description:
       'Executes a WebMCP tool exposed by the page. (requires flag: --categoryExperimentalWebmcp=true)',
@@ -424,6 +443,12 @@ export const commands: Commands = {
         required: false,
       },
     },
+  },
+  list_3p_developer_tools: {
+    description:
+      "Lists all third-party developer tools the page exposes for providing runtime information.\n  Third-party developer tools can be called via the 'execute_3p_developer_tool()' MCP tool.\n  Alternatively, third-party developer tools can be executed by calling 'evaluate_script' and adding the\n  following command to the script:\n  'window.__dtmcp.executeTool(toolName, params)'\n  This might be helpful when the third-party developer tools return non-serializable values or when composing\n  third-party developer tools with additional functionality. (requires flag: --categoryExperimentalThirdParty=true)",
+    category: 'Third-party',
+    args: {},
   },
   list_console_messages: {
     description:

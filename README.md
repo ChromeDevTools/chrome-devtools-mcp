@@ -525,6 +525,9 @@ If you run into any issues, checkout our [troubleshooting guide](./docs/troubles
   - [`reload_extension`](docs/tool-reference.md#reload_extension)
   - [`trigger_extension_action`](docs/tool-reference.md#trigger_extension_action)
   - [`uninstall_extension`](docs/tool-reference.md#uninstall_extension)
+- **Third-party** (2 tools)
+  - [`execute_3p_developer_tool`](docs/tool-reference.md#execute_3p_developer_tool)
+  - [`list_3p_developer_tools`](docs/tool-reference.md#list_3p_developer_tools)
 - **WebMCP** (2 tools)
   - [`execute_webmcp_tool`](docs/tool-reference.md#execute_webmcp_tool)
   - [`list_webmcp_tools`](docs/tool-reference.md#list_webmcp_tools)
@@ -633,6 +636,11 @@ The Chrome DevTools MCP server supports the following configuration option:
 
 - **`--categoryExtensions`/ `--category-extensions`**
   Set to true to include tools related to extensions. Note: This feature is currently only supported with a pipe connection. autoConnect, browserUrl, and wsEndpoint are not supported with this feature until 149 will be released.
+  - **Type:** boolean
+  - **Default:** `false`
+
+- **`--categoryExperimentalThirdParty`/ `--category-experimental-third-party`**
+  Set to true to enable third-party developer tools exposed by the inspected page itself
   - **Type:** boolean
   - **Default:** `false`
 
