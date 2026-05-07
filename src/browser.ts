@@ -20,6 +20,17 @@ import {puppeteer} from './third_party/index.js';
 
 let browser: Browser | undefined;
 
+// Heavy pages (e.g. dev bundles >100MB) cannot ack `Network.enable` and
+// other auto-attached domain calls within puppeteer's default 180s.
+// Once that fires, the CDP connection is marked dead and every
+// subsequent call throws — only daemon restart recovers. Bumping the
+// ceiling to 10min covers realistic loads; override via env for power
+// users.
+const PROTOCOL_TIMEOUT_MS = parseInt(
+  process.env.CHROME_DEVTOOLS_PROTOCOL_TIMEOUT_MS ?? '600000',
+  10,
+);
+
 function makeTargetFilter(enableExtensions = false) {
   const ignoredPrefixes = new Set(['chrome://', 'chrome-untrusted://']);
   if (!enableExtensions) {
@@ -61,6 +72,7 @@ export async function ensureBrowserConnected(options: {
     targetFilter: makeTargetFilter(enableExtensions),
     defaultViewport: null,
     handleDevToolsAsPage: true,
+    protocolTimeout: PROTOCOL_TIMEOUT_MS,
   };
 
   let autoConnect = false;
@@ -228,6 +240,7 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
       ignoreDefaultArgs: ignoreDefaultArgs,
       acceptInsecureCerts: options.acceptInsecureCerts,
       handleDevToolsAsPage: true,
+      protocolTimeout: PROTOCOL_TIMEOUT_MS,
       enableExtensions: options.enableExtensions,
     });
     if (options.logFile) {
