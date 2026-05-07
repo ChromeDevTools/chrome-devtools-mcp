@@ -260,11 +260,29 @@ async function fillFormElement(
     if (aXNode && aXNode.role === 'combobox' && hasOptionChildren(aXNode)) {
       await selectOption(handle, aXNode, value);
     } else {
-      // Increase timeout for longer input values.
-      const timeoutPerChar = 10; // ms
-      const fillTimeout =
-        page.pptrPage.getDefaultTimeout() + value.length * timeoutPerChar;
-      await handle.asLocator().setTimeout(fillTimeout).fill(value);
+      const isToggle = await handle.evaluate(el => {
+        if (el instanceof HTMLInputElement) {
+          return el.type === 'checkbox' || el.type === 'radio';
+        }
+        const role = el.getAttribute('role');
+        return role === 'checkbox' || role === 'radio' || role === 'switch';
+      });
+
+      if (isToggle) {
+        if (['true', 'false'].includes(value)) {
+          await handle.asLocator().fill(value === 'true');
+        } else {
+          throw new Error(
+            `Checkboxes, radio boxes and toggles require "true" or "false" value, but ${value} was used`,
+          );
+        }
+      } else {
+        // Increase timeout for longer input values.
+        const timeoutPerChar = 10; // ms
+        const fillTimeout =
+          page.pptrPage.getDefaultTimeout() + value.length * timeoutPerChar;
+        await handle.asLocator().setTimeout(fillTimeout).fill(value);
+      }
     }
   } catch (error) {
     handleActionError(error, uid);
@@ -286,7 +304,11 @@ export const fill = definePageTool({
       .describe(
         'The uid of an element on the page from the page content snapshot',
       ),
-    value: zod.string().describe('The value to fill in'),
+    value: zod
+      .string()
+      .describe(
+        'The value to fill in. "true" or "false" for checkboxes and toggles, "true" for radio buttons.',
+      ),
     includeSnapshot: includeSnapshotSchema,
   },
   blockedByDialog: true,
@@ -372,7 +394,7 @@ export const drag = definePageTool({
 
 export const fillForm = definePageTool({
   name: 'fill_form',
-  description: `Fill out multiple form elements at once`,
+  description: `Fill out multiple form elements (inputs, selects, checkboxes, radios) at once. ALWAYS prefer this tool over multiple individual 'fill' or 'click' calls when interacting with forms. It is significantly faster, more reliable, and reduces turn count. Example: Fill username, password, and check "Remember Me" in one call.`,
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
@@ -383,7 +405,11 @@ export const fillForm = definePageTool({
         // eslint-disable-next-line @local/enforce-zod-schema
         zod.object({
           uid: zod.string().describe('The uid of the element to fill out'),
-          value: zod.string().describe('Value for the element'),
+          value: zod
+            .string()
+            .describe(
+              'Value for the element. "true" or "false" for checkboxes and toggles, "true" for radio buttons.',
+            ),
         }),
       )
       .describe('Elements from snapshot to fill out.'),

@@ -761,6 +761,180 @@ describe('input', () => {
         );
       });
     });
+
+    it('toggles checkboxes', async () => {
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedPptrPage();
+        await page.setContent(
+          html`<input
+            type="checkbox"
+            id="cb"
+          />`,
+        );
+        context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
+          context.getSelectedMcpPage(),
+        );
+
+        // Check it
+        await fill.handler(
+          {
+            params: {
+              uid: '1_1',
+              value: 'true',
+            },
+            page: context.getSelectedMcpPage(),
+          },
+          response,
+          context,
+        );
+
+        assert.strictEqual(
+          response.responseLines[0],
+          'Successfully filled out the element',
+        );
+        assert.ok(response.includeSnapshot);
+        let isChecked = await page.$eval(
+          '#cb',
+          el => (el as HTMLInputElement).checked,
+        );
+        assert.strictEqual(isChecked, true);
+
+        // Uncheck it
+        await fill.handler(
+          {
+            params: {
+              uid: '1_1',
+              value: 'false',
+            },
+            page: context.getSelectedMcpPage(),
+          },
+          new McpResponse({} as ParsedArguments),
+          context,
+        );
+
+        isChecked = await page.$eval(
+          '#cb',
+          el => (el as HTMLInputElement).checked,
+        );
+        assert.strictEqual(isChecked, false);
+      });
+    });
+
+    it('toggles switches', async () => {
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedPptrPage();
+        await page.setContent(html`
+          <div
+            role="switch"
+            aria-checked="false"
+            id="sw"
+            style="width: 20px; height: 20px; background: blue;"
+            onclick="this.setAttribute('aria-checked', this.getAttribute('aria-checked') === 'true' ? 'false' : 'true')"
+          >
+            switch
+          </div>
+        `);
+        context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
+          context.getSelectedMcpPage(),
+        );
+
+        // Turn it on
+        await fill.handler(
+          {
+            params: {
+              uid: '1_1',
+              value: 'true',
+            },
+            page: context.getSelectedMcpPage(),
+          },
+          response,
+          context,
+        );
+
+        let swChecked = await page.$eval(
+          '#sw',
+          el => el.getAttribute('aria-checked') === 'true',
+        );
+        assert.strictEqual(swChecked, true);
+
+        // Turn it off
+        await fill.handler(
+          {
+            params: {
+              uid: '1_1',
+              value: 'false',
+            },
+            page: context.getSelectedMcpPage(),
+          },
+          new McpResponse({} as ParsedArguments),
+          context,
+        );
+
+        swChecked = await page.$eval(
+          '#sw',
+          el => el.getAttribute('aria-checked') === 'true',
+        );
+        assert.strictEqual(swChecked, false);
+      });
+    });
+
+    it('selects radio buttons', async () => {
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedPptrPage();
+        await page.setContent(html`
+          <input
+            type="radio"
+            name="group1"
+            id="r1"
+            checked
+          />
+          <input
+            type="radio"
+            name="group1"
+            id="r2"
+          />
+        `);
+        context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
+          context.getSelectedMcpPage(),
+        );
+
+        // Initial state
+        let r1Checked = await page.$eval(
+          '#r1',
+          el => (el as HTMLInputElement).checked,
+        );
+        let r2Checked = await page.$eval(
+          '#r2',
+          el => (el as HTMLInputElement).checked,
+        );
+        assert.strictEqual(r1Checked, true);
+        assert.strictEqual(r2Checked, false);
+
+        // Fill second radio with true
+        await fill.handler(
+          {
+            params: {
+              uid: '1_2',
+              value: 'true',
+            },
+            page: context.getSelectedMcpPage(),
+          },
+          response,
+          context,
+        );
+
+        r1Checked = await page.$eval(
+          '#r1',
+          el => (el as HTMLInputElement).checked,
+        );
+        r2Checked = await page.$eval(
+          '#r2',
+          el => (el as HTMLInputElement).checked,
+        );
+        assert.strictEqual(r1Checked, false);
+        assert.strictEqual(r2Checked, true);
+      });
+    });
   });
 
   describe('drags', () => {
@@ -879,6 +1053,57 @@ describe('input', () => {
             ];
           }),
           ['test', 'test2'],
+        );
+      });
+    });
+
+    it('fill_form handles checkboxes', async () => {
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedPptrPage();
+        await page.setContent(
+          html`<input
+              name="username"
+              type="text"
+            /><input
+              name="cb"
+              type="checkbox"
+            />`,
+        );
+        context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
+          context.getSelectedMcpPage(),
+        );
+        await fillForm.handler(
+          {
+            params: {
+              elements: [
+                {
+                  uid: '1_1',
+                  value: 'test',
+                },
+                {
+                  uid: '1_2',
+                  value: 'true',
+                },
+              ],
+            },
+            page: context.getSelectedMcpPage(),
+          },
+          response,
+          context,
+        );
+        assert.strictEqual(
+          await page.evaluate(() => {
+            // @ts-expect-error missing types
+            return document.querySelector('input[name=username]').value;
+          }),
+          'test',
+        );
+        assert.strictEqual(
+          await page.evaluate(() => {
+            // @ts-expect-error missing types
+            return document.querySelector('input[name=cb]').checked;
+          }),
+          true,
         );
       });
     });

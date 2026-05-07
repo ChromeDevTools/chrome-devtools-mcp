@@ -250,7 +250,8 @@ export const commands: Commands = {
       value: {
         name: 'value',
         type: 'string',
-        description: 'The value to fill in',
+        description:
+          'The value to fill in. "true" or "false" for checkboxes and toggles, "true" for radio buttons.',
         required: true,
       },
       includeSnapshot: {
