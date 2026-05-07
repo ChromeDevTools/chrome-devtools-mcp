@@ -14,9 +14,10 @@ import {
   ClearcutLogger,
   sanitizeParams,
 } from '../../src/telemetry/ClearcutLogger.js';
+import {ErrorCode} from '../../src/telemetry/errors.js';
 import type {Persistence} from '../../src/telemetry/persistence.js';
 import {FilePersistence} from '../../src/telemetry/persistence.js';
-import {WatchdogMessageType} from '../../src/telemetry/types.js';
+import {McpClient, WatchdogMessageType} from '../../src/telemetry/types.js';
 import {WatchdogClient} from '../../src/telemetry/WatchdogClient.js';
 import {zod} from '../../src/third_party/index.js';
 
@@ -124,6 +125,59 @@ describe('ClearcutLogger', () => {
         assert.strictEqual(msg.payload.mcp_client, expected);
       });
     }
+  });
+
+  describe('logServerError', () => {
+    it('sends correct payload with toolName', async () => {
+      const logger = ClearcutLogger.initialize({
+        persistence: mockPersistence,
+        appVersion: '1.0.0',
+        watchdogClient: mockWatchdogClient,
+      });
+
+      await logger.logServerError({
+        toolName: 'my_tool',
+        errorCode: ErrorCode.ERROR_CODE_UNSPECIFIED,
+      });
+
+      assert(mockWatchdogClient.send.calledOnce);
+      const msg = mockWatchdogClient.send.firstCall.args[0];
+      assert.deepStrictEqual(msg, {
+        type: WatchdogMessageType.LOG_EVENT,
+        payload: {
+          mcp_client: McpClient.MCP_CLIENT_UNSPECIFIED,
+          server_error: {
+            tool_name: 'my_tool',
+            error_code: ErrorCode.ERROR_CODE_UNSPECIFIED,
+          },
+        },
+      });
+    });
+
+    it('sends correct payload without toolName defaulting to empty string', async () => {
+      const logger = ClearcutLogger.initialize({
+        persistence: mockPersistence,
+        appVersion: '1.0.0',
+        watchdogClient: mockWatchdogClient,
+      });
+
+      await logger.logServerError({
+        errorCode: ErrorCode.ERROR_CODE_UNSPECIFIED,
+      });
+
+      assert(mockWatchdogClient.send.calledOnce);
+      const msg = mockWatchdogClient.send.firstCall.args[0];
+      assert.deepStrictEqual(msg, {
+        type: WatchdogMessageType.LOG_EVENT,
+        payload: {
+          mcp_client: McpClient.MCP_CLIENT_UNSPECIFIED,
+          server_error: {
+            tool_name: '',
+            error_code: ErrorCode.ERROR_CODE_UNSPECIFIED,
+          },
+        },
+      });
+    });
   });
 
   describe('logServerStart', () => {

@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type {ErrorCode} from './errors.js';
+
 // Protobuf message interfaces
 export interface ChromeDevToolsMcpExtension {
   os_type?: OsType;
@@ -14,6 +16,12 @@ export interface ChromeDevToolsMcpExtension {
   server_start?: ServerStart;
   daily_active?: DailyActive;
   server_shutdown?: ServerShutdown;
+  server_error?: ServerError;
+}
+
+export interface ServerError {
+  tool_name?: string;
+  error_code: ErrorCode;
 }
 
 export type ServerShutdown = Record<string, never>;
