@@ -21,6 +21,17 @@ let browser: Browser | undefined;
 
 export type Channel = 'release' | 'beta' | 'nightly' | 'dev';
 
+// Heavy pages (e.g. Studio module dev bundles >100MB) cannot ack
+// `Network.enable` and other auto-attached domain calls within
+// puppeteer's default 180s. Once that fires, the CDP connection is
+// marked dead and every subsequent call throws — only daemon restart
+// recovers. Bumping the ceiling to 10min covers realistic loads;
+// override via env for power users.
+const PROTOCOL_TIMEOUT_MS = parseInt(
+  process.env.BRAVE_DEVTOOLS_PROTOCOL_TIMEOUT_MS ?? '600000',
+  10,
+);
+
 function makeTargetFilter(enableExtensions = false) {
   const ignoredPrefixes = new Set([
     'chrome://',
@@ -189,6 +200,7 @@ export async function ensureBrowserConnected(options: {
     targetFilter: makeTargetFilter(enableExtensions),
     defaultViewport: null,
     handleDevToolsAsPage: true,
+    protocolTimeout: PROTOCOL_TIMEOUT_MS,
   };
 
   let autoConnect = false;
@@ -340,6 +352,7 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
       acceptInsecureCerts: options.acceptInsecureCerts,
       handleDevToolsAsPage: true,
       enableExtensions: options.enableExtensions,
+      protocolTimeout: PROTOCOL_TIMEOUT_MS,
     });
     if (options.logFile) {
       browser.process()?.stderr?.pipe(options.logFile);

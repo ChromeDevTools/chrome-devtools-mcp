@@ -97,12 +97,29 @@ y.command(
     if (isDaemonRunning(argv.sessionId)) {
       await stopDaemon(argv.sessionId);
     }
-    // Defaults but we do not want to affect the yargs conflict resolution.
-    if (argv.isolated === undefined && argv.userDataDir === undefined) {
-      argv.isolated = true;
-    }
-    if (argv.headless === undefined) {
-      argv.headless = true;
+    // Defaults only apply to *spawn* mode. Skip / clear them when
+    // attaching to an existing browser, otherwise `status` shows
+    // misleading args like `--browserUrl X --headless --isolated`
+    // together (the runtime ignores headless/isolated under attach,
+    // but storing them anyway is a footgun if the resolver order ever
+    // changes — and confuses anyone reading `status` output).
+    const isAttachMode =
+      argv.browserUrl !== undefined ||
+      argv.wsEndpoint !== undefined ||
+      argv.autoConnect === true;
+    if (isAttachMode) {
+      // Strip spawn-mode flags so serializeArgs doesn't emit them.
+      // Headless has `default: true` in the CLI override, so this is
+      // necessary even when the user didn't pass `--headless`.
+      delete argv.headless;
+      delete argv.isolated;
+    } else {
+      if (argv.isolated === undefined && argv.userDataDir === undefined) {
+        argv.isolated = true;
+      }
+      if (argv.headless === undefined) {
+        argv.headless = true;
+      }
     }
     const args = serializeArgs(cliOptions, argv);
     await start(args, argv.sessionId);
