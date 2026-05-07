@@ -11,7 +11,7 @@ import type {TestScenario} from '../eval_gemini.ts';
 export const scenario: TestScenario = {
   prompt:
     'Go to <TEST_URL>, fill the form with size = 2 CPUs and components = [docker, nginx].',
-  maxTurns: 3,
+  maxTurns: 4, // allow for at least one extra turn to verify there are no extra clicks after fill_form
   htmlRoute: {
     path: '/input_test.html',
     htmlContent: `
@@ -41,7 +41,7 @@ export const scenario: TestScenario = {
     `,
   },
   expectations: calls => {
-    assert.strictEqual(calls.length, 3);
+    assert.ok(calls.length >= 3, 'Not enough calls made');
     assert.ok(
       calls[0].name === 'navigate_page' || calls[0].name === 'new_page',
     );
@@ -52,7 +52,11 @@ export const scenario: TestScenario = {
       uid: string;
       value: string;
     }>;
-    assert.strictEqual(elements.length, 3);
+    assert.strictEqual(
+      elements.length,
+      3,
+      'fill_form should be used with all form elements at once',
+    );
 
     const uids = new Set(elements.map(e => e.uid));
     assert.strictEqual(
@@ -62,6 +66,23 @@ export const scenario: TestScenario = {
     );
 
     const values = elements.map(e => e.value).sort();
-    assert.deepStrictEqual(values, ['2 vCPU, 4GB RAM', 'true', 'true']);
+    assert.deepStrictEqual(
+      values,
+      ['2 vCPU, 4GB RAM', 'true', 'true'],
+      'fill_form should be used with correct values',
+    );
+
+    const submitUid = '1_15';
+
+    const extraFormInteractions = calls
+      .slice(3)
+      .filter(
+        c => ['fill', 'click'].includes(c.name) && c.args.uid !== submitUid,
+      );
+    assert.deepEqual(
+      extraFormInteractions.length,
+      0,
+      'No extra clicks and fills after fill_form',
+    );
   },
 };
