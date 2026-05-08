@@ -12,7 +12,6 @@ import type {zod, ShapeOutput} from '../third_party/index.js';
 
 import type {ErrorCode} from './errors.js';
 import type {LocalState, Persistence} from './persistence.js';
-import {FilePersistence} from './persistence.js';
 import {
   McpClient,
   type FlagUsage,
@@ -174,8 +173,8 @@ function detectOsType(): OsType {
 
 export interface ClearcutLoggerOptions {
   appVersion: string;
+  persistence: Persistence;
   logFile?: string;
-  persistence?: Persistence;
   watchdogClient?: WatchdogClient;
   clearcutEndpoint?: string;
   clearcutForceFlushIntervalMs?: number;
@@ -207,7 +206,7 @@ export class ClearcutLogger {
   }
 
   private constructor(options: ClearcutLoggerOptions) {
-    this.#persistence = options.persistence ?? new FilePersistence();
+    this.#persistence = options.persistence;
     this.#watchdog =
       options.watchdogClient ??
       new WatchdogClient({
