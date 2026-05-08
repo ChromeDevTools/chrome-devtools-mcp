@@ -277,6 +277,57 @@ export const commands: Commands = {
       },
     },
   },
+  get_element_at: {
+    description:
+      'Returns the DOM element at viewport-relative CSS-pixel coordinates (x, y). Pairs with take_screenshot + a vision model that emits coordinates. Pierces open shadow roots by default. Limitations: cannot enter closed shadow roots; cannot enter cross-origin/OOPIF iframes (you\'ll get the <iframe> element with crossOriginFrame=true); css="matched" requires the experimentalVision flag and uses Chrome DevTools Protocol. For huge elements use mode="schema" (default) or pass filePath to write the full descriptor to disk. (requires flag: --experimentalVision=true)',
+    category: 'Input automation',
+    args: {
+      x: {
+        name: 'x',
+        type: 'number',
+        description: 'CSS-pixel X coordinate, viewport-relative.',
+        required: true,
+      },
+      y: {
+        name: 'y',
+        type: 'number',
+        description: 'CSS-pixel Y coordinate, viewport-relative.',
+        required: true,
+      },
+      mode: {
+        name: 'mode',
+        type: 'string',
+        description:
+          'Output detail level. auto/schema = compact MD descriptor. raw = full outerHTML (truncated to 50KB or saved to file). selector-only = just the CSS selector.',
+        required: false,
+        default: 'auto',
+        enum: ['auto', 'schema', 'raw', 'selector-only'],
+      },
+      css: {
+        name: 'css',
+        type: 'string',
+        description:
+          'CSS data to include. matched = author rules from cascade (uses CDP). computed-visual = ~30 visually relevant computed properties. computed-full = all computed properties (saved to file when large).',
+        required: false,
+        default: 'none',
+        enum: ['none', 'matched', 'computed-visual', 'computed-full'],
+      },
+      pierceShadow: {
+        name: 'pierceShadow',
+        type: 'boolean',
+        description:
+          'Whether to descend into open shadow roots. Default true. Closed shadow roots are never pierced.',
+        required: false,
+      },
+      filePath: {
+        name: 'filePath',
+        type: 'string',
+        description:
+          'If set, writes the full descriptor (raw outerHTML + full computed CSS) to this path and returns a summary in the response.',
+        required: false,
+      },
+    },
+  },
   get_memory_snapshot_details: {
     description:
       'Loads a memory heapsnapshot and returns all available information including statistics, static data, and aggregated node information. Supports pagination for aggregates. (requires flag: --experimentalMemory=true)',

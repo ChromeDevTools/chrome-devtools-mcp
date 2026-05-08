@@ -140,6 +140,8 @@ describe('e2e', () => {
         const {tools} = await client.listTools();
         const clickAt = tools.find(t => t.name === 'click_at');
         assert.ok(clickAt);
+        const getElementAt = tools.find(t => t.name === 'get_element_at');
+        assert.ok(getElementAt);
       },
       ['--experimental-vision'],
     );

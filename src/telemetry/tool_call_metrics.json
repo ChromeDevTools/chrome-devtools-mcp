@@ -627,5 +627,34 @@
   {
     "name": "list_3p_developer_tools",
     "args": []
+  },
+  {
+    "name": "get_element_at",
+    "args": [
+      {
+        "name": "x",
+        "argType": "number"
+      },
+      {
+        "name": "y",
+        "argType": "number"
+      },
+      {
+        "name": "mode",
+        "argType": "string"
+      },
+      {
+        "name": "css",
+        "argType": "string"
+      },
+      {
+        "name": "pierce_shadow",
+        "argType": "boolean"
+      },
+      {
+        "name": "file_path_length",
+        "argType": "number"
+      }
+    ]
   }
 ]

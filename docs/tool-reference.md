@@ -2,7 +2,7 @@
 
 # Chrome DevTools MCP Tool Reference
 
-- **[Input automation](#input-automation)** (10 tools)
+- **[Input automation](#input-automation)** (11 tools)
   - [`click`](#click)
   - [`drag`](#drag)
   - [`fill`](#fill)
@@ -13,6 +13,7 @@
   - [`type_text`](#type_text)
   - [`upload_file`](#upload_file)
   - [`click_at`](#click_at)
+  - [`get_element_at`](#get_element_at)
 - **[Navigation automation](#navigation-automation)** (6 tools)
   - [`close_page`](#close_page)
   - [`list_pages`](#list_pages)
@@ -172,6 +173,21 @@
 - **y** (number) **(required)**: The y coordinate
 - **dblClick** (boolean) _(optional)_: Set to true for double clicks. Default is false.
 - **includeSnapshot** (boolean) _(optional)_: Whether to include a snapshot in the response. Default is false.
+
+---
+
+### `get_element_at`
+
+**Description:** Returns the DOM element at viewport-relative CSS-pixel coordinates (x, y). Pairs with [`take_screenshot`](#take_screenshot) + a vision model that emits coordinates. Pierces open shadow roots by default. Limitations: cannot enter closed shadow roots; cannot enter cross-origin/OOPIF iframes (you'll get the &lt;iframe&gt; element with crossOriginFrame=true); css="matched" requires the experimentalVision flag and uses Chrome DevTools Protocol. For huge elements use mode="schema" (default) or pass filePath to write the full descriptor to disk. (requires flag: --experimentalVision=true)
+
+**Parameters:**
+
+- **x** (number) **(required)**: CSS-pixel X coordinate, viewport-relative.
+- **y** (number) **(required)**: CSS-pixel Y coordinate, viewport-relative.
+- **css** (enum: "none", "matched", "computed-visual", "computed-full") _(optional)_: CSS data to include. matched = author rules from cascade (uses CDP). computed-visual = ~30 visually relevant computed properties. computed-full = all computed properties (saved to file when large).
+- **filePath** (string) _(optional)_: If set, writes the full descriptor (raw outerHTML + full computed CSS) to this path and returns a summary in the response.
+- **mode** (enum: "auto", "schema", "raw", "selector-only") _(optional)_: Output detail level. auto/schema = compact MD descriptor. raw = full outerHTML (truncated to 50KB or saved to file). selector-only = just the CSS selector.
+- **pierceShadow** (boolean) _(optional)_: Whether to descend into open shadow roots. Default true. Closed shadow roots are never pierced.
 
 ---
 
