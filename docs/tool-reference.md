@@ -90,14 +90,14 @@
 **Parameters:**
 
 - **uid** (string) **(required)**: The uid of an element on the page from the page content snapshot
-- **value** (string) **(required)**: The value to [`fill`](#fill) in
+- **value** (string) **(required)**: The value to [`fill`](#fill) in. "true" or "false" for checkboxes and toggles, "true" for radio buttons.
 - **includeSnapshot** (boolean) _(optional)_: Whether to include a snapshot in the response. Default is false.
 
 ---
 
 ### `fill_form`
 
-**Description:** [`Fill`](#fill) out multiple form elements at once
+**Description:** [`Fill`](#fill) out multiple form elements (inputs, selects, checkboxes, radios) at once. ALWAYS prefer this tool over multiple individual '[`fill`](#fill)' or '[`click`](#click)' calls when interacting with forms. It is significantly faster, more reliable, and reduces turn count. Example: [`Fill`](#fill) username, password, and check "Remember Me" in one call.
 
 **Parameters:**
 

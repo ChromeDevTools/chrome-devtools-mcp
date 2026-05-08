@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type {ErrorCode} from './errors.js';
+
 // Protobuf message interfaces
 export interface ChromeDevToolsMcpExtension {
   os_type?: OsType;
@@ -14,6 +16,12 @@ export interface ChromeDevToolsMcpExtension {
   server_start?: ServerStart;
   daily_active?: DailyActive;
   server_shutdown?: ServerShutdown;
+  server_error?: ServerError;
+}
+
+export interface ServerError {
+  tool_name?: string;
+  error_code: ErrorCode;
 }
 
 export type ServerShutdown = Record<string, never>;
@@ -62,14 +70,6 @@ export enum OsType {
   OS_TYPE_WINDOWS = 1,
   OS_TYPE_MACOS = 2,
   OS_TYPE_LINUX = 3,
-}
-
-export enum ChromeChannel {
-  CHROME_CHANNEL_UNSPECIFIED = 0,
-  CHROME_CHANNEL_CANARY = 1,
-  CHROME_CHANNEL_DEV = 2,
-  CHROME_CHANNEL_BETA = 3,
-  CHROME_CHANNEL_STABLE = 4,
 }
 
 export enum McpClient {

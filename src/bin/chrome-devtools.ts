@@ -43,8 +43,6 @@ const startCliOptions = {
   ...cliOptions,
 } as Partial<typeof cliOptions>;
 
-// Not supported in CLI on purpose.
-delete startCliOptions.autoConnect;
 // Missing CLI serialization.
 delete startCliOptions.viewport;
 

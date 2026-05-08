@@ -872,9 +872,13 @@ describe('pages', () => {
           page.on('dialog', () => resolve());
         });
 
-        page.evaluate(() => {
-          alert('test dialog');
-        });
+        page
+          .evaluate(() => {
+            alert('test dialog');
+          })
+          .catch(() => {
+            // Ignore error when navigation destroys the execution context
+          });
         await dialogPromise;
 
         await navigatePage().handler(

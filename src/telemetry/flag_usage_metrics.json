@@ -281,19 +281,19 @@
     "isDeprecated": true
   },
   {
-    "name": "category_experimental_third_party_present",
-    "flagType": "boolean"
-  },
-  {
-    "name": "category_experimental_third_party",
-    "flagType": "boolean"
-  },
-  {
     "name": "category_experimental_webmcp_present",
     "flagType": "boolean"
   },
   {
     "name": "category_experimental_webmcp",
+    "flagType": "boolean"
+  },
+  {
+    "name": "category_experimental_third_party_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "category_experimental_third_party",
     "flagType": "boolean"
   }
 ]

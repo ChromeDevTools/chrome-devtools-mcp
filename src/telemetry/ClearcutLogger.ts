@@ -10,6 +10,7 @@ import {DAEMON_CLIENT_NAME} from '../daemon/utils.js';
 import {logger} from '../logger.js';
 import type {zod, ShapeOutput} from '../third_party/index.js';
 
+import type {ErrorCode} from './errors.js';
 import type {LocalState, Persistence} from './persistence.js';
 import {FilePersistence} from './persistence.js';
 import {
@@ -171,20 +172,41 @@ function detectOsType(): OsType {
   }
 }
 
+export interface ClearcutLoggerOptions {
+  appVersion: string;
+  logFile?: string;
+  persistence?: Persistence;
+  watchdogClient?: WatchdogClient;
+  clearcutEndpoint?: string;
+  clearcutForceFlushIntervalMs?: number;
+  clearcutIncludePidHeader?: boolean;
+}
+
+// Not const to allow resetting the instance for testing purposes.
+let _clearcut_logger_instance: ClearcutLogger | undefined;
+
 export class ClearcutLogger {
   #persistence: Persistence;
   #watchdog: WatchdogClient;
   #mcpClient: McpClient;
 
-  constructor(options: {
-    appVersion: string;
-    logFile?: string;
-    persistence?: Persistence;
-    watchdogClient?: WatchdogClient;
-    clearcutEndpoint?: string;
-    clearcutForceFlushIntervalMs?: number;
-    clearcutIncludePidHeader?: boolean;
-  }) {
+  static initialize(options: ClearcutLoggerOptions): ClearcutLogger {
+    if (_clearcut_logger_instance) {
+      throw new Error('ClearcutLogger is already initialized');
+    }
+    _clearcut_logger_instance = new ClearcutLogger(options);
+    return _clearcut_logger_instance;
+  }
+
+  static get(): ClearcutLogger | undefined {
+    return _clearcut_logger_instance;
+  }
+
+  static resetForTesting(): void {
+    _clearcut_logger_instance = undefined;
+  }
+
+  private constructor(options: ClearcutLoggerOptions) {
     this.#persistence = options.persistence ?? new FilePersistence();
     this.#watchdog =
       options.watchdogClient ??
@@ -287,6 +309,22 @@ export class ClearcutLogger {
     } catch (err) {
       logger('Error in logDailyActiveIfNeeded:', err);
     }
+  }
+
+  async logServerError(args: {
+    toolName?: string;
+    errorCode: ErrorCode;
+  }): Promise<void> {
+    this.#watchdog.send({
+      type: WatchdogMessageType.LOG_EVENT,
+      payload: {
+        mcp_client: this.#mcpClient,
+        server_error: {
+          tool_name: args.toolName ?? '',
+          error_code: args.errorCode,
+        },
+      },
+    });
   }
 
   #shouldLogDailyActive(state: LocalState): boolean {

@@ -115,7 +115,7 @@
     ]
   },
   {
-    "name": "execute_3p_developer_tool",
+    "name": "execute_in_page_tool",
     "args": [
       {
         "name": "tool_name_length",
@@ -125,7 +125,8 @@
         "name": "params_length",
         "argType": "number"
       }
-    ]
+    ],
+    "isDeprecated": true
   },
   {
     "name": "fill",
@@ -253,8 +254,9 @@
     "args": []
   },
   {
-    "name": "list_3p_developer_tools",
-    "args": []
+    "name": "list_in_page_tools",
+    "args": [],
+    "isDeprecated": true
   },
   {
     "name": "list_network_requests",
@@ -608,5 +610,22 @@
         "argType": "number"
       }
     ]
+  },
+  {
+    "name": "execute_3p_developer_tool",
+    "args": [
+      {
+        "name": "tool_name_length",
+        "argType": "number"
+      },
+      {
+        "name": "params_length",
+        "argType": "number"
+      }
+    ]
+  },
+  {
+    "name": "list_3p_developer_tools",
+    "args": []
   }
 ]

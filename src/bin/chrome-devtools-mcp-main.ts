@@ -10,6 +10,7 @@ import process from 'node:process';
 
 import {createMcpServer, logDisclaimers} from '../index.js';
 import {logger, saveLogsToFile} from '../logger.js';
+import {ClearcutLogger} from '../telemetry/ClearcutLogger.js';
 import {computeFlagUsage} from '../telemetry/flagUtils.js';
 import {StdioServerTransport} from '../third_party/index.js';
 import {checkForUpdates} from '../utils/check-for-updates.js';
@@ -32,12 +33,12 @@ if (process.env['CHROME_DEVTOOLS_MCP_CRASH_ON_UNCAUGHT'] !== 'true') {
 }
 
 logger(`Starting Chrome DevTools MCP Server v${VERSION}`);
-const {server, clearcutLogger} = await createMcpServer(args, {
+const {server} = await createMcpServer(args, {
   logFile,
 });
 const transport = new StdioServerTransport();
 await server.connect(transport);
 logger('Chrome DevTools MCP Server connected');
 logDisclaimers(args);
-void clearcutLogger?.logDailyActiveIfNeeded();
-void clearcutLogger?.logServerStart(computeFlagUsage(args, cliOptions));
+void ClearcutLogger.get()?.logDailyActiveIfNeeded();
+void ClearcutLogger.get()?.logServerStart(computeFlagUsage(args, cliOptions));
