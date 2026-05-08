@@ -564,7 +564,6 @@ interface ElementDescriptor {
   inOpenShadow: boolean;
   closedShadowEncountered: boolean;
   frameOrigin: string;
-  crossOriginFrame: boolean;
   computedStyle?: Record<string, string>;
 }
 
@@ -640,8 +639,9 @@ interface InPageOptions {
 
 /**
  * In-page hit-test + descriptor builder. Self-contained: must not reference
- * any closure variables since it is shipped to the page (and to CDP via
- * Runtime.callFunctionOn).
+ * any closure variables since it is shipped to the page via
+ * Page.evaluate(). Always runs in the main frame so that (x, y) are
+ * interpreted in main-frame viewport coordinates.
  */
 function buildElementDescriptorInPage(
   options: InPageOptions,
@@ -839,7 +839,7 @@ function buildElementDescriptorInPage(
   }
 
   let inOpenShadow = false;
-  let closedShadowEncountered = false;
+  const closedShadowEncountered = false;
   let crossOriginFrame = false;
   let frameOrigin = '';
   try {
@@ -854,12 +854,10 @@ function buildElementDescriptorInPage(
   let hit: Element | null = null;
 
   for (let descents = 0; descents < 32; descents++) {
-    let candidate: Element | null = null;
-    if (currentDoc instanceof Document) {
-      candidate = currentDoc.elementFromPoint(currentX, currentY);
-    } else {
-      candidate = currentDoc.elementFromPoint(currentX, currentY);
-    }
+    const candidate: Element | null = currentDoc.elementFromPoint(
+      currentX,
+      currentY,
+    );
     if (!candidate) {
       if (!hit) {
         return {found: false, reason: 'outside-viewport'};
@@ -899,12 +897,8 @@ function buildElementDescriptorInPage(
         currentDoc = shadowRoot;
         continue;
       }
-      // Closed shadow root cannot be detected directly; we infer when the
-      // browser stops descending (no shadowRoot but the element looks like a
-      // host). The conservative choice is to leave closedShadowEncountered
-      // false unless we detect an explicit signal.
-    } else {
-      closedShadowEncountered = candidate.shadowRoot !== null;
+      // Closed shadow roots cannot be detected from JS. Leave
+      // closedShadowEncountered false.
     }
     break;
   }
@@ -918,6 +912,24 @@ function buildElementDescriptorInPage(
   const classList: string[] = [];
   for (const c of Array.from(hit.classList)) {
     classList.push(c);
+  }
+  if (crossOriginFrame) {
+    const partial: Partial<ElementDescriptor> = {
+      tag: hit.nodeName.toLowerCase(),
+      attributes: collectAttributes(hit),
+      boundingBox: {
+        x: roundTenth(rect.x),
+        y: roundTenth(rect.y),
+        width: roundTenth(rect.width),
+        height: roundTenth(rect.height),
+      },
+      frameOrigin,
+    };
+    return {
+      found: false,
+      reason: 'cross-origin-blocked',
+      partialDescriptor: partial,
+    };
   }
   const role = hit.getAttribute('role') ?? undefined;
   const summary = summarizeChildren(hit);
@@ -942,27 +954,12 @@ function buildElementDescriptorInPage(
     inOpenShadow,
     closedShadowEncountered,
     frameOrigin,
-    crossOriginFrame,
     computedStyle: collectComputedStyle(
       hit,
       options.cssMode,
       options.computedVisualProperties,
     ),
   };
-  if (crossOriginFrame) {
-    const partial: Partial<ElementDescriptor> = {
-      tag: descriptor.tag,
-      attributes: descriptor.attributes,
-      boundingBox: descriptor.boundingBox,
-      frameOrigin,
-      crossOriginFrame,
-    };
-    return {
-      found: false,
-      reason: 'cross-origin-blocked',
-      partialDescriptor: partial,
-    };
-  }
   return descriptor;
 }
 
@@ -1115,7 +1112,6 @@ function appendSchemaSummary(
   const flags = [
     `inOpenShadow=${descriptor.inOpenShadow}`,
     `closedShadowEncountered=${descriptor.closedShadowEncountered}`,
-    `crossOriginFrame=${descriptor.crossOriginFrame}`,
     `frameOrigin=${descriptor.frameOrigin || '(unknown)'}`,
   ];
   response.appendResponseLine(`- **flags**: ${flags.join(', ')}`);
@@ -1147,6 +1143,8 @@ function appendComputedCss(
   response: Response,
   descriptor: ElementDescriptor,
   cssMode: CssMode,
+  outputMode: OutputMode,
+  filePath: string | undefined,
 ): void {
   if (
     !descriptor.computedStyle ||
@@ -1165,12 +1163,26 @@ function appendComputedCss(
       }
     }
     response.appendResponseLine(lines.join(' | '));
-  } else {
-    const entries = Object.entries(descriptor.computedStyle);
-    response.appendResponseLine(
-      `${entries.length} computed properties (full set saved when filePath is set).`,
-    );
+    return;
   }
+  const entries = Object.entries(descriptor.computedStyle);
+  if (outputMode === 'raw') {
+    for (const [name, value] of entries) {
+      response.appendResponseLine(`${name}: ${value}`);
+    }
+    return;
+  }
+  if (filePath) {
+    response.appendResponseLine(
+      `Full computed style (${entries.length} properties) saved to ${filePath}.`,
+    );
+    return;
+  }
+  // The handler enforces filePath when cssMode==='computed-full'; this branch
+  // is unreachable, but emit a defensive summary in case the invariant breaks.
+  response.appendResponseLine(
+    `Full computed style (${entries.length} properties) — pass filePath to persist.`,
+  );
 }
 
 function appendMatchedRules(
@@ -1371,7 +1383,6 @@ function parseElementDescriptor(
     inOpenShadow: raw.inOpenShadow === true,
     closedShadowEncountered: raw.closedShadowEncountered === true,
     frameOrigin: typeof raw.frameOrigin === 'string' ? raw.frameOrigin : '',
-    crossOriginFrame: raw.crossOriginFrame === true,
     computedStyle,
   };
 }
@@ -1392,9 +1403,6 @@ function parsePartialDescriptor(
   if (typeof raw.frameOrigin === 'string') {
     partial.frameOrigin = raw.frameOrigin;
   }
-  if (raw.crossOriginFrame === true) {
-    partial.crossOriginFrame = true;
-  }
   return partial;
 }
 
@@ -1402,6 +1410,21 @@ async function fetchDescriptorViaCdp(
   page: ContextPage,
   options: InPageOptions,
 ): Promise<CdpDescriptorFetchResult> {
+  // Build the descriptor in the main frame so that hit-test coordinates and
+  // iframe descent (same-origin) are handled in main-frame viewport space.
+  // Running the descriptor function via Runtime.callFunctionOn against an
+  // iframe-resolved objectId would execute elementFromPoint in the iframe's
+  // JS context where (x, y) means iframe-local coordinates — which produces
+  // the wrong target for a main-frame coordinate input.
+  const rawDescriptor = await page.pptrPage.evaluate(
+    buildElementDescriptorInPage,
+    options,
+  );
+  const descriptor = parseDescriptorResult(rawDescriptor);
+  if (descriptor.found === false) {
+    return {descriptor, matchedRules: []};
+  }
+
   const cdp: CDPSession = await page.pptrPage.createCDPSession();
   try {
     await Promise.all([cdp.send('DOM.enable'), cdp.send('CSS.enable')]);
@@ -1417,64 +1440,32 @@ async function fetchDescriptorViaCdp(
       });
     } catch (error) {
       logger('DOM.getNodeForLocation failed', error);
-      return {
-        descriptor: {found: false, reason: 'no-node'},
-        matchedRules: [],
-      };
+      return {descriptor, matchedRules: []};
     }
 
-    const pushed = await cdp.send('DOM.pushNodesByBackendIdsToFrontend', {
-      backendNodeIds: [nodeRef.backendNodeId],
-    });
-    const nodeId = pushed.nodeIds[0];
+    let nodeId: Protocol.DOM.NodeId | undefined;
+    try {
+      const pushed = await cdp.send('DOM.pushNodesByBackendIdsToFrontend', {
+        backendNodeIds: [nodeRef.backendNodeId],
+      });
+      nodeId = pushed.nodeIds[0];
+    } catch (error) {
+      logger('DOM.pushNodesByBackendIdsToFrontend failed', error);
+      return {descriptor, matchedRules: []};
+    }
     if (!nodeId) {
-      return {
-        descriptor: {found: false, reason: 'no-node'},
-        matchedRules: [],
-      };
+      return {descriptor, matchedRules: []};
     }
 
-    const fnSource = buildElementDescriptorInPage.toString();
-    const callArgument: Protocol.Runtime.CallArgument = {
-      value: {
-        x: options.x,
-        y: options.y,
-        pierceShadow: options.pierceShadow,
-        cssMode: options.cssMode,
-        computedVisualProperties: options.computedVisualProperties,
-      },
-    };
-
-    const resolved = await cdp.send('DOM.resolveNode', {
-      backendNodeId: nodeRef.backendNodeId,
-    });
-    const objectId = resolved.object.objectId;
-    if (!objectId) {
-      return {
-        descriptor: {found: false, reason: 'no-node'},
-        matchedRules: [],
-      };
+    let matchedRes: Protocol.CSS.GetMatchedStylesForNodeResponse | undefined;
+    try {
+      matchedRes = await cdp.send('CSS.getMatchedStylesForNode', {nodeId});
+    } catch (error) {
+      logger('CSS.getMatchedStylesForNode failed', error);
+      matchedRes = undefined;
     }
-
-    const [matchedRes, descriptorCall] = await Promise.all([
-      cdp
-        .send('CSS.getMatchedStylesForNode', {nodeId})
-        .catch((error: unknown) => {
-          logger('CSS.getMatchedStylesForNode failed', error);
-          return undefined;
-        }),
-      cdp.send('Runtime.callFunctionOn', {
-        objectId,
-        functionDeclaration: `function() { return (${fnSource}).call(null, arguments[0]); }`,
-        arguments: [callArgument],
-        returnByValue: true,
-      }),
-    ]);
-
-    const descriptor = parseDescriptorResult(descriptorCall.result.value);
 
     const matchedRules = matchedRes ? buildMatchedRulesSummary(matchedRes) : [];
-
     return {descriptor, matchedRules};
   } finally {
     try {
@@ -1530,7 +1521,7 @@ function describeNotFound(
 
 export const getElementAt = definePageTool({
   name: 'get_element_at',
-  description: `Returns the DOM element at viewport-relative CSS-pixel coordinates (x, y). Pairs with take_screenshot + a vision model that emits coordinates. Pierces open shadow roots by default. Limitations: cannot enter closed shadow roots; cannot enter cross-origin/OOPIF iframes (you'll get the <iframe> element with crossOriginFrame=true); css="matched" requires the experimentalVision flag and uses Chrome DevTools Protocol. For huge elements use mode="schema" (default) or pass filePath to write the full descriptor to disk.`,
+  description: `Returns the DOM element at viewport-relative CSS-pixel coordinates (x, y). Pairs with take_screenshot + a vision model that emits coordinates. Pierces open shadow roots by default. Limitations: cannot enter closed shadow roots; cannot enter cross-origin/OOPIF iframes (the call returns a 'cross-origin-blocked' result with partial metadata about the iframe); css="matched" requires the experimentalVision flag and uses Chrome DevTools Protocol. For huge elements use mode="schema" (default) or pass filePath to write the full descriptor to disk.`,
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: true,
@@ -1571,6 +1562,14 @@ export const getElementAt = definePageTool({
     const cssMode: CssMode = request.params.css;
     const pierceShadow = request.params.pierceShadow ?? true;
     const filePath = request.params.filePath;
+
+    if (cssMode === 'computed-full' && !filePath) {
+      throw new Error(
+        "css='computed-full' requires filePath to be set. The full computed style set (~340 properties) " +
+          'is too large to embed inline. Either pass a filePath to save the descriptor, or use ' +
+          "css='computed-visual' for the curated subset.",
+      );
+    }
 
     if (filePath) {
       context.validatePath(filePath);
@@ -1621,7 +1620,7 @@ export const getElementAt = definePageTool({
     }
 
     appendSchemaSummary(response, descriptor, x, y);
-    appendComputedCss(response, descriptor, cssMode);
+    appendComputedCss(response, descriptor, cssMode, mode, filePath);
     if (cssMode === 'matched') {
       appendMatchedRules(
         response,

@@ -178,7 +178,7 @@
 
 ### `get_element_at`
 
-**Description:** Returns the DOM element at viewport-relative CSS-pixel coordinates (x, y). Pairs with [`take_screenshot`](#take_screenshot) + a vision model that emits coordinates. Pierces open shadow roots by default. Limitations: cannot enter closed shadow roots; cannot enter cross-origin/OOPIF iframes (you'll get the &lt;iframe&gt; element with crossOriginFrame=true); css="matched" requires the experimentalVision flag and uses Chrome DevTools Protocol. For huge elements use mode="schema" (default) or pass filePath to write the full descriptor to disk. (requires flag: --experimentalVision=true)
+**Description:** Returns the DOM element at viewport-relative CSS-pixel coordinates (x, y). Pairs with [`take_screenshot`](#take_screenshot) + a vision model that emits coordinates. Pierces open shadow roots by default. Limitations: cannot enter closed shadow roots; cannot enter cross-origin/OOPIF iframes (the call returns a 'cross-origin-blocked' result with partial metadata about the iframe); css="matched" requires the experimentalVision flag and uses Chrome DevTools Protocol. For huge elements use mode="schema" (default) or pass filePath to write the full descriptor to disk. (requires flag: --experimentalVision=true)
 
 **Parameters:**
 
