@@ -205,6 +205,17 @@ export const cliOptions = {
     describe:
       'Additional arguments for Chrome. Only applies when Chrome is launched by chrome-devtools-mcp.',
   },
+  blocklist: {
+    type: 'array',
+    describe:
+      'URL patterns to block access to. Uses standard URLPattern API. Cannot be used with --blocklist',
+  },
+  allowlist: {
+    type: 'array',
+    describe:
+      'URL patterns to allow access to (blocks everything else). Uses standard URLPattern API. Cannot be used with --blocklist.',
+    conflicts: ['blocklist'],
+  },
   ignoreDefaultChromeArg: {
     type: 'array',
     describe:

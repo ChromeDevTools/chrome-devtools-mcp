@@ -99,6 +99,13 @@ export async function createMcpServer(
       chromeArgs.push(`--proxy-server=${serverArgs.proxyServer}`);
     }
     const devtools = serverArgs.experimentalDevtools ?? false;
+    const blocklist = serverArgs.blocklist
+      ? serverArgs.blocklist.map(String)
+      : undefined;
+    const allowlist = serverArgs.allowlist
+      ? serverArgs.allowlist.map(String)
+      : undefined;
+
     const browser =
       serverArgs.browserUrl || serverArgs.wsEndpoint || serverArgs.autoConnect
         ? await ensureBrowserConnected({
@@ -111,6 +118,8 @@ export async function createMcpServer(
               : undefined,
             userDataDir: serverArgs.userDataDir,
             devtools,
+            blocklist,
+            allowlist,
           })
         : await ensureBrowserLaunched({
             headless: serverArgs.headless,
@@ -126,6 +135,8 @@ export async function createMcpServer(
             devtools,
             enableExtensions: serverArgs.categoryExtensions,
             viaCli: serverArgs.viaCli,
+            blocklist,
+            allowlist,
           });
 
     if (context?.browser !== browser) {
