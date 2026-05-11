@@ -134,6 +134,20 @@ describe('McpContext', () => {
     });
   });
 
+  it('selects an open page when the selected page is closed externally', async () => {
+    await withMcpContext(async (_response, context) => {
+      const closedPage = context.getSelectedMcpPage();
+      const openPage = await context.newPage();
+      context.selectPage(closedPage);
+
+      await closedPage.pptrPage.close({runBeforeUnload: false});
+      await context.createPagesSnapshot();
+
+      assert.strictEqual(context.getSelectedMcpPage(), openPage);
+      assert.ok(!context.getPages().includes(closedPage.pptrPage));
+    });
+  });
+
   it('should include network requests in structured content', async t => {
     await withMcpContext(async (response, context) => {
       const mockRequest = getMockRequest({

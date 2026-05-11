@@ -527,7 +527,9 @@ export class McpContext implements Context {
   async createPagesSnapshot(): Promise<Page[]> {
     const {pages: allPages, isolatedContextNames} = await this.#getAllPages();
 
-    for (const page of allPages) {
+    const openPages = allPages.filter(page => !page.isClosed());
+
+    for (const page of openPages) {
       let mcpPage = this.#mcpPages.get(page);
       if (!mcpPage) {
         mcpPage = new McpPage(page, this.#nextPageId++);
@@ -541,7 +543,7 @@ export class McpContext implements Context {
     }
 
     // Prune orphaned #mcpPages entries (pages that no longer exist).
-    const currentPages = new Set(allPages);
+    const currentPages = new Set(openPages);
     for (const [page, mcpPage] of this.#mcpPages) {
       if (!currentPages.has(page)) {
         mcpPage.dispose();
@@ -549,7 +551,7 @@ export class McpContext implements Context {
       }
     }
 
-    this.#pages = allPages.filter(page => {
+    this.#pages = openPages.filter(page => {
       return (
         this.#options.experimentalDevToolsDebugging ||
         !page.url().startsWith('devtools://')

@@ -98,6 +98,15 @@ Possible workarounds include:
   3. Start `chrome-devtools-mcp` with:
      `npx chrome-devtools-mcp --browser-url http://127.0.0.1:9222`
 
+- **Connect to Windows Chrome 144+ remote debugging from WSL:**
+  `--auto-connect` only discovers Chrome through the local OS user data
+  directory, so it cannot find a Windows-hosted Chrome profile from inside WSL.
+  If you enabled remote debugging through `chrome://inspect/#remote-debugging`
+  on Windows, use the full WebSocket endpoint instead:
+  `npx chrome-devtools-mcp --ws-endpoint ws://127.0.0.1:9222/devtools/browser/<id>`.
+  The `/json/version` endpoint may return 404 for that Chrome flow; in that
+  case `--browser-url` cannot discover the WebSocket endpoint automatically.
+
 - **Use PowerShell or Git Bash** instead of WSL.
 
 ### Windows 10: Error during discovery for MCP server 'chrome-devtools': MCP error -32000: Connection closed
