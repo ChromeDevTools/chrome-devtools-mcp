@@ -14,6 +14,8 @@ import {logger} from './logger.js';
 import {McpContext} from './McpContext.js';
 import {McpResponse} from './McpResponse.js';
 import {Mutex} from './Mutex.js';
+import {allPageResources, matchPageResource} from './resources/index.js';
+import {SubscriptionManager} from './resources/SubscriptionManager.js';
 import {SlimMcpResponse} from './SlimMcpResponse.js';
 import {ClearcutLogger} from './telemetry/ClearcutLogger.js';
 import {bucketizeLatency} from './telemetry/metricUtils.js';
@@ -21,6 +23,11 @@ import {
   McpServer,
   type CallToolResult,
   SetLevelRequestSchema,
+  ListResourcesRequestSchema,
+  ListResourceTemplatesRequestSchema,
+  ReadResourceRequestSchema,
+  SubscribeRequestSchema,
+  UnsubscribeRequestSchema,
 } from './third_party/index.js';
 import {ToolCategory} from './tools/categories.js';
 import type {DefinedPageTool, ToolDefinition} from './tools/ToolDefinition.js';
@@ -51,11 +58,13 @@ export async function createMcpServer(
       title: 'Chrome DevTools MCP server',
       version: VERSION,
     },
-    {capabilities: {logging: {}}},
+    {capabilities: {logging: {}, resources: {subscribe: true}}},
   );
   server.server.setRequestHandler(SetLevelRequestSchema, () => {
     return {};
   });
+
+  const subscriptionManager = new SubscriptionManager();
 
   let context: McpContext;
   async function getContext(): Promise<McpContext> {
@@ -101,6 +110,15 @@ export async function createMcpServer(
         experimentalDevToolsDebugging: devtools,
         experimentalIncludeAllPages: serverArgs.experimentalIncludeAllPages,
         performanceCrux: serverArgs.performanceCrux,
+        onDevToolsMessage: (pageId, _message) => {
+          const uri = `page://${pageId}/devtools-messages`;
+          if (subscriptionManager.isSubscribed(uri)) {
+            void server.server.notification({
+              method: 'notifications/resources/updated',
+              params: {uri},
+            });
+          }
+        },
       });
     }
     return context;
@@ -252,6 +270,66 @@ export async function createMcpServer(
   for (const tool of tools) {
     registerTool(tool);
   }
+
+  server.server.setRequestHandler(ListResourceTemplatesRequestSchema, () => {
+    return {
+      resourceTemplates: allPageResources.map(r => r.template),
+    };
+  });
+
+  server.server.setRequestHandler(ListResourcesRequestSchema, async () => {
+    const context = await getContext();
+    const pages = context.getPages();
+    const resources = [];
+    for (const page of pages) {
+      const pageId = context.getPageId(page);
+      if (pageId === undefined) {
+        continue;
+      }
+      for (const resourceDef of allPageResources) {
+        resources.push({
+          uri: resourceDef.template.uriTemplate.replace(
+            '{pageId}',
+            String(pageId),
+          ),
+          name: `${resourceDef.template.name} (Page ${pageId})`,
+          mimeType: resourceDef.template.mimeType,
+        });
+      }
+    }
+    return {resources};
+  });
+
+  server.server.setRequestHandler(ReadResourceRequestSchema, async request => {
+    const matched = matchPageResource(request.params.uri);
+    if (!matched) {
+      throw new Error(`Resource not found: ${request.params.uri}`);
+    }
+    const context = await getContext();
+    const page = context.getPageById(matched.pageId);
+    const {content, mimeType} = await matched.resource.handler(page, context);
+    return {
+      contents: [
+        {
+          uri: request.params.uri,
+          mimeType,
+          ...(typeof content === 'string'
+            ? {text: content}
+            : {blob: content.toString('base64')}),
+        },
+      ],
+    };
+  });
+
+  server.server.setRequestHandler(SubscribeRequestSchema, async request => {
+    subscriptionManager.subscribe(request.params.uri);
+    return {};
+  });
+
+  server.server.setRequestHandler(UnsubscribeRequestSchema, async request => {
+    subscriptionManager.unsubscribe(request.params.uri);
+    return {};
+  });
 
   await loadIssueDescriptions();
 

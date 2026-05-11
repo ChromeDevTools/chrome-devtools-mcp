@@ -42,6 +42,9 @@ export class McpPage implements ContextPage {
   isolatedContextName?: string;
   devToolsPage?: Page;
 
+  // DevTools Messages
+  devtoolsMessages: Array<Record<string, unknown>> = [];
+
   // Dialog
   #dialog?: Dialog;
   #dialogHandler: (dialog: Dialog) => void;
@@ -53,6 +56,10 @@ export class McpPage implements ContextPage {
       this.#dialog = dialog;
     };
     page.on('dialog', this.#dialogHandler);
+  }
+
+  addDevToolsMessage(message: Record<string, unknown>): void {
+    this.devtoolsMessages.push(message);
   }
 
   get dialog(): Dialog | undefined {

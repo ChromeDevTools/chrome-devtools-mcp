@@ -59,6 +59,10 @@ interface McpContextOptions {
   experimentalIncludeAllPages?: boolean;
   // Whether CrUX data should be fetched.
   performanceCrux: boolean;
+  onDevToolsMessage?: (
+    pageId: number,
+    message: Record<string, unknown>,
+  ) => void;
 }
 
 const DEFAULT_TIMEOUT = 5_000;
@@ -177,6 +181,11 @@ export class McpContext implements Context {
     const context = new McpContext(browser, logger, opts, locatorClass);
     await context.#init();
     return context;
+  }
+
+  addDevToolsMessage(page: McpPage, message: Record<string, unknown>): void {
+    page.addDevToolsMessage(message);
+    this.#options.onDevToolsMessage?.(page.id, message);
   }
 
   resolveCdpRequestId(page: McpPage, cdpRequestId: string): number | undefined {
@@ -658,7 +667,31 @@ export class McpContext implements Context {
         }
 
         if (await page.hasDevTools()) {
-          mcpPage.devToolsPage = await page.openDevTools();
+          const devtoolsPage = await page.openDevTools();
+          if (mcpPage.devToolsPage !== devtoolsPage) {
+            mcpPage.devToolsPage = devtoolsPage;
+            // Listen for MCP messages from DevTools
+            try {
+              await devtoolsPage.exposeFunction(
+                'sendMcpMessage',
+                (message: Record<string, unknown>) => {
+                  this.addDevToolsMessage(mcpPage, message);
+                },
+              );
+              await devtoolsPage.evaluateOnNewDocument(() => {
+                // @ts-expect-error no types
+                globalThis.sendMcpMessageToHost = (
+                  message: Record<string, unknown>,
+                ) => {
+                  // @ts-expect-error no types
+                  globalThis.sendMcpMessage(message);
+                };
+              });
+            } catch (err) {
+              // Ignore if already exposed.
+              this.logger('Error exposing sendMcpMessage', err);
+            }
+          }
         } else {
           mcpPage.devToolsPage = undefined;
         }

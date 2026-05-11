@@ -25,6 +25,11 @@ export {Client} from '@modelcontextprotocol/sdk/client/index.js';
 export {
   type CallToolResult,
   SetLevelRequestSchema,
+  ListResourcesRequestSchema,
+  ListResourceTemplatesRequestSchema,
+  ReadResourceRequestSchema,
+  SubscribeRequestSchema,
+  UnsubscribeRequestSchema,
   type ImageContent,
   type TextContent,
 } from '@modelcontextprotocol/sdk/types.js';

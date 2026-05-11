@@ -184,6 +184,32 @@ export type Context = Readonly<{
     page: ContextPage,
     cdpRequestId: string,
   ): number | undefined;
+  /**
+   * Returns a uid for a cdpBackendNodeId.
+   */
+  resolveCdpElementId(
+    page: ContextPage,
+    cdpBackendNodeId: number,
+  ): string | undefined;
+  getConsoleData(
+    page: ContextPage,
+    includePreservedMessages?: boolean,
+  ): unknown[];
+  getNetworkRequests(
+    page: ContextPage,
+    includePreservedRequests?: boolean,
+  ): unknown[];
+  getNetworkRequestById(page: ContextPage, reqid: number): unknown;
+  getNetworkRequestStableId(request: unknown): number;
+  getConsoleMessageStableId(message: unknown): number;
+  getDevToolsUniverse(page: ContextPage): unknown;
+  getPageId(page: Page): number | undefined;
+  getPages(): Page[];
+  createTextSnapshot(
+    page: ContextPage,
+    verbose?: boolean,
+    devtoolsData?: DevToolsData,
+  ): Promise<void>;
   getScreenRecorder(): {recorder: ScreenRecorder; filePath: string} | null;
   setScreenRecorder(
     data: {recorder: ScreenRecorder; filePath: string} | null,

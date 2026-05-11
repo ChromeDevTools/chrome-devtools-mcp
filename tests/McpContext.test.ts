@@ -212,4 +212,27 @@ describe('McpContext', () => {
       fromStub.restore();
     });
   });
+
+  it('should notify on DevTools messages', async () => {
+    let notifiedPageId: number | undefined;
+    let notifiedMessage: Record<string, unknown> | undefined;
+
+    await withMcpContext(
+      async (_response, context) => {
+        const page = context.getSelectedMcpPage();
+        const message = {foo: 'bar'};
+        context.addDevToolsMessage(page, message);
+
+        assert.strictEqual(notifiedPageId, page.id);
+        assert.deepStrictEqual(notifiedMessage, message);
+        assert.deepStrictEqual(page.devtoolsMessages, [message]);
+      },
+      {
+        onDevToolsMessage: (pageId, message) => {
+          notifiedPageId = pageId;
+          notifiedMessage = message;
+        },
+      },
+    );
+  });
 });

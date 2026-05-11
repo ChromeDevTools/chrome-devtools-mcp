@@ -102,6 +102,10 @@ export async function withMcpContext(
     autoOpenDevTools?: boolean;
     performanceCrux?: boolean;
     executablePath?: string;
+    onDevToolsMessage?: (
+      pageId: number,
+      message: Record<string, unknown>,
+    ) => void;
   } = {},
   args: ParsedArguments = {} as ParsedArguments,
 ) {
@@ -116,6 +120,7 @@ export async function withMcpContext(
       {
         experimentalDevToolsDebugging: false,
         performanceCrux: options.performanceCrux ?? true,
+        onDevToolsMessage: options.onDevToolsMessage,
       },
       Locator,
     );
