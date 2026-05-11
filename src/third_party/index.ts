@@ -46,6 +46,8 @@ export {
 export {default as puppeteer} from 'puppeteer-core';
 export type * from 'puppeteer-core';
 export {PipeTransport} from 'puppeteer-core/internal/node/PipeTransport.js';
+export {Connection as InternalConnection} from 'puppeteer-core/internal/cdp/Connection.js';
+export {CallbackRegistry as InternalCallbackRegistry} from 'puppeteer-core/internal/common/CallbackRegistry.js';
 export type {CdpPage} from 'puppeteer-core/internal/cdp/Page.js';
 export type {JSONSchema7, JSONSchema7Definition} from 'json-schema';
 export {

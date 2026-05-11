@@ -5,6 +5,7 @@
  */
 
 import '../polyfill.js';
+import '../puppeteer-patches.js';
 
 import process from 'node:process';
 

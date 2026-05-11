@@ -5,6 +5,7 @@
  */
 
 import '../src/polyfill.js';
+import '../src/puppeteer-patches.js';
 
 import path from 'node:path';
 import {it} from 'node:test';
