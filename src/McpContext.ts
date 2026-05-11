@@ -59,6 +59,7 @@ interface McpContextOptions {
 
 const DEFAULT_TIMEOUT = 5_000;
 const NAVIGATION_TIMEOUT = 10_000;
+const DEVTOOLS_DETECTION_CONCURRENCY = 10;
 
 export class McpContext implements Context {
   browser: Browser;
@@ -644,27 +645,30 @@ export class McpContext implements Context {
     this.logger('Detecting open DevTools windows');
     const {pages} = await this.#getAllPages();
 
-    await Promise.all(
-      pages.map(async page => {
-        const mcpPage = this.#mcpPages.get(page);
-        if (!mcpPage) {
-          return;
-        }
+    for (let i = 0; i < pages.length; i += DEVTOOLS_DETECTION_CONCURRENCY) {
+      const batch = pages.slice(i, i + DEVTOOLS_DETECTION_CONCURRENCY);
+      await Promise.all(
+        batch.map(async page => {
+          const mcpPage = this.#mcpPages.get(page);
+          if (!mcpPage) {
+            return;
+          }
 
-        // Prior to Chrome 144.0.7559.59, the command fails,
-        // Some Electron apps still use older version
-        // Fall back to not exposing DevTools at all.
-        try {
-          if (await page.hasDevTools()) {
-            mcpPage.devToolsPage = await page.openDevTools();
-          } else {
+          // Prior to Chrome 144.0.7559.59, the command fails,
+          // Some Electron apps still use older version
+          // Fall back to not exposing DevTools at all.
+          try {
+            if (await page.hasDevTools()) {
+              mcpPage.devToolsPage = await page.openDevTools();
+            } else {
+              mcpPage.devToolsPage = undefined;
+            }
+          } catch {
             mcpPage.devToolsPage = undefined;
           }
-        } catch {
-          mcpPage.devToolsPage = undefined;
-        }
-      }),
-    );
+        }),
+      );
+    }
   }
 
   getExtensionServiceWorkers(): ExtensionServiceWorker[] {

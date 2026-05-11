@@ -178,7 +178,7 @@ export const commands: Commands = {
         name: 'function',
         type: 'string',
         description:
-          'A JavaScript function declaration to be executed by the tool in the currently selected page.\nExample without arguments: `() => {\n  return document.title\n}` or `async () => {\n  return await fetch("example.com")\n}`.\nExample with arguments: `(el) => {\n  return el.innerText;\n}`.\nDo not use jQuery-only selector extensions like `:contains()`; use standard DOM APIs such as `querySelector`, `querySelectorAll`, and text filtering with `Array.from(...).find(...)` instead.\nSnapshot `uid` values are not DOM attributes. To pass a snapshot element to this function, include its `uid` in `args` and receive it as an argument. Do not query for it with selectors like `[uid="..."]`.\nDo not navigate to new URLs by assigning to `window.location`, `location.href`, or similar from inside this function. Use the `navigate_page` tool to navigate instead, then run `evaluate_script` again after navigation.\nWhen using the CLI, pass the function as the first positional argument: `chrome-devtools evaluate_script \'() => document.title\'`. Do not use a `--expression` flag.\n',
+          'A JavaScript function declaration to be executed by the tool in the currently selected page.\nExample without arguments: `() => {\n  return document.title\n}` or `async () => {\n  return await fetch("example.com")\n}`.\nExample with arguments: `(el) => {\n  return el.innerText;\n}`.\nDo not use jQuery-only selector extensions like `:contains()`; use standard DOM APIs such as `querySelector`, `querySelectorAll`, and text filtering with `Array.from(...).find(...)` instead.\nSnapshot `uid` values are not DOM attributes. To pass a snapshot element to this function, include its `uid` in `args` and receive it as an argument. Do not query for it with selectors like `[uid="..."]`.\nDo not navigate to new URLs by assigning to `window.location`, `location.href`, or similar from inside this function. Use the `navigate_page` tool to navigate instead, then run `evaluate_script` again after navigation.\nSome restricted pages, including Google Docs, Google Sheets, Google Accounts, Chrome Web Store, and browser-internal pages, may block script execution. If this happens, use `take_snapshot` or other non-script tools instead of trying to bypass the restriction.\nWhen using the CLI, pass the function as the first positional argument: `chrome-devtools evaluate_script \'() => document.title\'`. Do not use a `--expression` flag.\n',
         required: true,
       },
       args: {
@@ -633,6 +633,13 @@ export const commands: Commands = {
         type: 'string',
         description:
           'If specified, the page is created in an isolated browser context with the given name. Pages in the same browser context share cookies and storage. Pages in different browser contexts are fully isolated.',
+        required: false,
+      },
+      incognito: {
+        name: 'incognito',
+        type: 'boolean',
+        description:
+          'If true, open the page in a new temporary isolated browser context. Cannot be used together with isolatedContext.',
         required: false,
       },
       timeout: {

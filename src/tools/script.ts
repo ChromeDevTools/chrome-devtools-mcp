@@ -37,6 +37,7 @@ Example with arguments: \`(el) => {
 Do not use jQuery-only selector extensions like \`:contains()\`; use standard DOM APIs such as \`querySelector\`, \`querySelectorAll\`, and text filtering with \`Array.from(...).find(...)\` instead.
 Snapshot \`uid\` values are not DOM attributes. To pass a snapshot element to this function, include its \`uid\` in \`args\` and receive it as an argument. Do not query for it with selectors like \`[uid="..."]\`.
 Do not navigate to new URLs by assigning to \`window.location\`, \`location.href\`, or similar from inside this function. Use the \`navigate_page\` tool to navigate instead, then run \`evaluate_script\` again after navigation.
+Some restricted pages, including Google Docs, Google Sheets, Google Accounts, Chrome Web Store, and browser-internal pages, may block script execution. If this happens, use \`take_snapshot\` or other non-script tools instead of trying to bypass the restriction.
 When using the CLI, pass the function as the first positional argument: \`chrome-devtools evaluate_script '() => document.title'\`. Do not use a \`--expression\` flag.
 `,
       ),

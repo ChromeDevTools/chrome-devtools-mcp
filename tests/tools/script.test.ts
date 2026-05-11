@@ -45,6 +45,8 @@ describe('script', () => {
       assert.match(functionDescription, /\[uid="\.\.\."\]/);
       assert.match(functionDescription, /window\.location/);
       assert.match(functionDescription, /navigate_page/);
+      assert.match(functionDescription, /Google Sheets/);
+      assert.match(functionDescription, /take_snapshot/);
       assert.match(functionDescription, /--expression/);
       assert.match(argsDescription, /not DOM attributes/);
     });

@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import crypto from 'node:crypto';
+
 import {logger} from '../logger.js';
 import type {CdpPage, Dialog, HTTPRequest} from '../third_party/index.js';
 import {zod} from '../third_party/index.js';
@@ -176,6 +178,12 @@ export const newPage = defineTool(args => {
             'Pages in the same browser context share cookies and storage. ' +
             'Pages in different browser contexts are fully isolated.',
         ),
+      incognito: zod
+        .boolean()
+        .optional()
+        .describe(
+          'If true, open the page in a new temporary isolated browser context. Cannot be used together with isolatedContext.',
+        ),
       ...(args?.experimentalNavigationAllowlist
         ? {
             allowList: zod
@@ -190,9 +198,17 @@ export const newPage = defineTool(args => {
     },
     blockedByDialog: false,
     handler: async (request, response, context) => {
+      if (request.params.incognito && request.params.isolatedContext) {
+        throw new Error(
+          'Specify either incognito or isolatedContext, not both.',
+        );
+      }
+      const isolatedContextName = request.params.incognito
+        ? `incognito-${crypto.randomUUID()}`
+        : request.params.isolatedContext;
       const page = await context.newPage(
         request.params.background,
-        request.params.isolatedContext,
+        isolatedContextName,
       );
 
       await navigateWithInterception(

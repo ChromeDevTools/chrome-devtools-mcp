@@ -347,6 +347,50 @@ describe('pages', () => {
       });
     });
 
+    it('creates a one-off isolated context when incognito is true', async () => {
+      await withMcpContext(async (response, context) => {
+        await newPage().handler(
+          {params: {url: 'about:blank', incognito: true}},
+          response,
+          context,
+        );
+        const pageA = context.getSelectedPptrPage();
+        const contextNameA = context.getIsolatedContextName(pageA);
+
+        await newPage().handler(
+          {params: {url: 'about:blank', incognito: true}},
+          response,
+          context,
+        );
+        const pageB = context.getSelectedPptrPage();
+        const contextNameB = context.getIsolatedContextName(pageB);
+
+        assert.match(contextNameA ?? '', /^incognito-/);
+        assert.match(contextNameB ?? '', /^incognito-/);
+        assert.notStrictEqual(contextNameA, contextNameB);
+        assert.notStrictEqual(pageA.browserContext(), pageB.browserContext());
+      });
+    });
+
+    it('rejects new_page with both incognito and isolatedContext', async () => {
+      await withMcpContext(async (response, context) => {
+        await assert.rejects(
+          newPage().handler(
+            {
+              params: {
+                url: 'about:blank',
+                incognito: true,
+                isolatedContext: 'session-a',
+              },
+            },
+            response,
+            context,
+          ),
+          /Specify either incognito or isolatedContext/,
+        );
+      });
+    });
+
     it('does not set isolatedContext for pages in the default context', async () => {
       await withMcpContext(async (response, context) => {
         const page = context.getSelectedPptrPage();
