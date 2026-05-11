@@ -291,17 +291,17 @@ export async function createMcpServer(
 
           response.setRedactNetworkHeaders(serverArgs.redactNetworkHeaders);
           try {
-            const page =
-              serverArgs.experimentalPageIdRouting &&
-              params.pageId &&
-              !serverArgs.slim
-                ? context.getPageById(params.pageId)
-                : context.getSelectedMcpPage();
-            response.setPage(page);
-            if (tool.blockedByDialog) {
-              page.throwIfDialogOpen();
-            }
             if ('pageScoped' in tool && tool.pageScoped) {
+              const page =
+                serverArgs.experimentalPageIdRouting &&
+                params.pageId &&
+                !serverArgs.slim
+                  ? context.getPageById(params.pageId)
+                  : context.getSelectedMcpPage();
+              response.setPage(page);
+              if (tool.blockedByDialog) {
+                page.throwIfDialogOpen();
+              }
               await tool.handler(
                 {
                   params,
