@@ -8,6 +8,7 @@ import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
 import {
+  addFieldMetricRatings,
   getTraceSummary,
   parseRawTraceBuffer,
 } from '../../src/trace-processing/parse.js';
@@ -38,6 +39,24 @@ describe('Trace parsing', async () => {
 
     const output = getTraceSummary(result);
     t.assert.snapshot?.(output);
+  });
+
+  it('adds ratings to field metrics only', () => {
+    const summary = addFieldMetricRatings(`Metrics (lab / observed):
+  - LCP: 129 ms
+Metrics (field / real users):
+  - LCP: 1404 ms (scope: url)
+  - LCP breakdown:
+    - TTFB: 209 ms (scope: url)
+  - INP: 65 ms (scope: url)
+  - CLS: 0.26 (scope: url)
+Available insights:`);
+
+    assert.match(summary, /- LCP: 129 ms/);
+    assert.match(summary, /- LCP: 1404 ms \(good\)/);
+    assert.match(summary, /- TTFB: 209 ms \(good\)/);
+    assert.match(summary, /- INP: 65 ms \(good\)/);
+    assert.match(summary, /- CLS: 0.26 \(poor\)/);
   });
 
   it('will return a message if there is an error', async () => {

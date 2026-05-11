@@ -250,6 +250,43 @@ function hasOptionChildren(aXNode: TextSnapshotNode) {
   return aXNode.children.some(child => child.role === 'option');
 }
 
+async function verifyTextControlValue(
+  handle: ElementHandle<Element>,
+  expectedValue: string,
+) {
+  const result = await handle.evaluate(el => {
+    if (el instanceof HTMLTextAreaElement) {
+      return {
+        actualValue: el.value,
+      };
+    }
+    if (
+      el instanceof HTMLInputElement &&
+      ['', 'email', 'password', 'search', 'tel', 'text', 'url'].includes(
+        el.type,
+      )
+    ) {
+      return {
+        actualValue: el.value,
+        maxLength: el.maxLength > -1 ? el.maxLength : undefined,
+      };
+    }
+    return undefined;
+  });
+
+  if (!result || result.actualValue === expectedValue) {
+    return;
+  }
+
+  const maxLengthNote =
+    result.maxLength !== undefined
+      ? ` The element maxlength is ${result.maxLength}.`
+      : '';
+  throw new Error(
+    `The element value was truncated or normalized after filling. Expected ${expectedValue.length} characters, but the element contains ${result.actualValue.length}.${maxLengthNote}`,
+  );
+}
+
 async function fillFormElement(
   uid: string,
   value: string,
@@ -286,6 +323,7 @@ async function fillFormElement(
         const fillTimeout =
           page.pptrPage.getDefaultTimeout() + value.length * timeoutPerChar;
         await handle.asLocator().setTimeout(fillTimeout).fill(value);
+        await verifyTextControlValue(handle, value);
       }
     }
   } catch (error) {

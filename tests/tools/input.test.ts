@@ -653,6 +653,37 @@ describe('input', () => {
       });
     });
 
+    it('reports an error when a text input truncates the requested value', async () => {
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedPptrPage();
+        await page.setContent(html`<input maxlength="5" />`);
+        context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
+          context.getSelectedMcpPage(),
+        );
+
+        await assert.rejects(
+          fill.handler(
+            {
+              params: {
+                uid: '1_1',
+                value: '123456',
+              },
+              page: context.getSelectedMcpPage(),
+            },
+            response,
+            context,
+          ),
+          (error: Error & {cause?: Error}) => {
+            assert.match(
+              error.cause?.message ?? '',
+              /Expected 6 characters, but the element contains 5/,
+            );
+            return true;
+          },
+        );
+      });
+    });
+
     it('types text', async () => {
       await withMcpContext(async (response, context) => {
         const page = context.getSelectedPptrPage();

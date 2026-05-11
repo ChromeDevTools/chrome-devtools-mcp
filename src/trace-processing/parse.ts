@@ -79,12 +79,77 @@ ${DevTools.PerformanceTraceFormatter.networkDataFormatDescription}`;
 export function getTraceSummary(result: TraceResult): string {
   const focus = DevTools.AgentFocus.fromParsedTrace(result.parsedTrace);
   const formatter = new DevTools.PerformanceTraceFormatter(focus);
-  const summaryText = formatter.formatTraceSummary();
+  const summaryText = addFieldMetricRatings(formatter.formatTraceSummary());
   return `## Summary of Performance trace findings:
 ${summaryText}
 
 ## Details on call tree & network request formats:
 ${extraFormatDescriptions}`;
+}
+
+type MetricRating = 'good' | 'needs improvement' | 'poor';
+
+const FIELD_METRIC_THRESHOLDS = new Map<
+  string,
+  {good: number; needsImprovement: number}
+>([
+  ['LCP', {good: 2500, needsImprovement: 4000}],
+  ['INP', {good: 200, needsImprovement: 500}],
+  ['CLS', {good: 0.1, needsImprovement: 0.25}],
+  ['FCP', {good: 1800, needsImprovement: 3000}],
+  ['TTFB', {good: 800, needsImprovement: 1800}],
+]);
+
+function rateMetric(
+  metricName: string,
+  value: number,
+): MetricRating | undefined {
+  const thresholds = FIELD_METRIC_THRESHOLDS.get(metricName);
+  if (!thresholds) {
+    return;
+  }
+  if (value <= thresholds.good) {
+    return 'good';
+  }
+  if (value <= thresholds.needsImprovement) {
+    return 'needs improvement';
+  }
+  return 'poor';
+}
+
+export function addFieldMetricRatings(summaryText: string): string {
+  const lines = summaryText.split('\n');
+  let inFieldMetrics = false;
+
+  return lines
+    .map(line => {
+      if (line.startsWith('Metrics (field / real users):')) {
+        inFieldMetrics = true;
+        return line;
+      }
+      if (inFieldMetrics && line.startsWith('Available insights:')) {
+        inFieldMetrics = false;
+        return line;
+      }
+      if (!inFieldMetrics) {
+        return line;
+      }
+
+      const match = line.match(
+        /^(\s*-\s+)(LCP|INP|CLS|FCP|TTFB): ([\d.]+)(\s*ms)?(.*)$/,
+      );
+      if (!match) {
+        return line;
+      }
+
+      const [, prefix, metricName, rawValue, unit = '', suffix] = match;
+      const rating = rateMetric(metricName, Number(rawValue));
+      if (!rating || suffix.includes('rating:')) {
+        return line;
+      }
+      return `${prefix}${metricName}: ${rawValue}${unit} (${rating})${suffix}`;
+    })
+    .join('\n');
 }
 
 export type InsightName =
