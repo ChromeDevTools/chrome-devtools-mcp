@@ -29,6 +29,13 @@ describe('script', () => {
   const server = serverHooks();
 
   describe('browser_evaluate_script', () => {
+    it('describes that functions run with standard DOM selectors', () => {
+      const functionDescription = evaluateScript().schema.function.description;
+
+      assert.match(functionDescription ?? '', /Do not use jQuery-only/);
+      assert.match(functionDescription ?? '', /querySelectorAll/);
+    });
+
     it('evaluates', async () => {
       await withMcpContext(async (response, context) => {
         await evaluateScript().handler(

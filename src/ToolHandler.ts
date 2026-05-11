@@ -12,7 +12,7 @@ import type {Mutex} from './Mutex.js';
 import {SlimMcpResponse} from './SlimMcpResponse.js';
 import {ClearcutLogger} from './telemetry/ClearcutLogger.js';
 import {bucketizeLatency} from './telemetry/transformation.js';
-import type {CallToolResult, zod} from './third_party/index.js';
+import {type CallToolResult, zod} from './third_party/index.js';
 import type {ToolCategory} from './tools/categories.js';
 import {labels, OFF_BY_DEFAULT_CATEGORIES} from './tools/categories.js';
 import type {DefinedPageTool, ToolDefinition} from './tools/ToolDefinition.js';
@@ -123,8 +123,10 @@ function isPageScopedTool(
 
 export class ToolHandler {
   readonly inputSchema: zod.ZodRawShape;
+  readonly registrationInputSchema: zod.ZodObject<zod.ZodRawShape>;
   readonly shouldRegister: boolean;
   private readonly disabledReason?: string;
+  private readonly paramsSchema: zod.ZodObject<zod.ZodRawShape>;
 
   constructor(
     private readonly tool: ToolDefinition | DefinedPageTool,
@@ -143,6 +145,8 @@ export class ToolHandler {
       !serverArgs.slim
         ? {...tool.schema, ...pageIdSchema}
         : tool.schema;
+    this.paramsSchema = zod.object(this.inputSchema);
+    this.registrationInputSchema = this.paramsSchema.passthrough();
   }
 
   async handle(params: Record<string, unknown>): Promise<CallToolResult> {
@@ -165,6 +169,7 @@ export class ToolHandler {
       logger(
         `${this.tool.name} request: ${JSON.stringify(params, null, '  ')}`,
       );
+      params = this.paramsSchema.parse(params);
       const context = await this.getContext();
       logger(`${this.tool.name} context: resolved`);
       await context.detectOpenDevToolsWindows();

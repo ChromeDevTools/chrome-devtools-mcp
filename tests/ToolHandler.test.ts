@@ -13,6 +13,7 @@ import {parseArguments} from '../src/bin/chrome-devtools-mcp-cli-options.js';
 import {McpContext} from '../src/McpContext.js';
 import {McpPage} from '../src/McpPage.js';
 import {Mutex} from '../src/Mutex.js';
+import {zod} from '../src/third_party/index.js';
 import {ToolHandler} from '../src/ToolHandler.js';
 import {ToolCategory} from '../src/tools/categories.js';
 import type {
@@ -104,6 +105,60 @@ describe('ToolHandler', () => {
     assert.strictEqual(mockContext.getPageById.called, false);
     assert.strictEqual(handlerCalled, true);
     assert.strictEqual(result.isError, undefined);
+  });
+
+  it('accepts extra MCP arguments but strips them before calling a tool', async () => {
+    let receivedParams: Record<string, unknown> | undefined;
+    const tool: ToolDefinition = {
+      name: 'global_tool',
+      description: 'A global tool',
+      annotations: {
+        category: ToolCategory.NAVIGATION,
+        readOnlyHint: true,
+      },
+      schema: {
+        url: zod.string(),
+      },
+      blockedByDialog: false,
+      handler: async request => {
+        receivedParams = request.params;
+      },
+    };
+
+    const mockContext = sinon.createStubInstance(McpContext);
+    mockContext.detectOpenDevToolsWindows.resolves();
+
+    const toolMutex = new Mutex();
+    const serverArgs = parseArguments('1.0.0', ['node', 'script.js'], {
+      CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
+    });
+
+    const toolHandler = new ToolHandler(
+      tool,
+      serverArgs,
+      async () => mockContext,
+      toolMutex,
+    );
+
+    const registrationParse = toolHandler.registrationInputSchema.safeParse({
+      url: 'https://example.com',
+      description: 'extra agent commentary',
+    });
+    assert.strictEqual(registrationParse.success, true);
+    assert.deepStrictEqual(registrationParse.data, {
+      url: 'https://example.com',
+      description: 'extra agent commentary',
+    });
+
+    const result = await toolHandler.handle({
+      url: 'https://example.com',
+      description: 'extra agent commentary',
+    });
+
+    assert.strictEqual(result.isError, undefined);
+    assert.deepStrictEqual(receivedParams, {
+      url: 'https://example.com',
+    });
   });
 
   it('sets shouldRegister to false and returns disabled reason when category is disabled', async () => {

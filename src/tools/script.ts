@@ -33,7 +33,8 @@ Example without arguments: \`() => {
 }\`.
 Example with arguments: \`(el) => {
   return el.innerText;
-}\`
+}\`.
+Do not use jQuery-only selector extensions like \`:contains()\`; use standard DOM APIs such as \`querySelector\`, \`querySelectorAll\`, and text filtering with \`Array.from(...).find(...)\` instead.
 `,
       ),
       args: zod
