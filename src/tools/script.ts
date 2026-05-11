@@ -35,6 +35,9 @@ Example with arguments: \`(el) => {
   return el.innerText;
 }\`.
 Do not use jQuery-only selector extensions like \`:contains()\`; use standard DOM APIs such as \`querySelector\`, \`querySelectorAll\`, and text filtering with \`Array.from(...).find(...)\` instead.
+Snapshot \`uid\` values are not DOM attributes. To pass a snapshot element to this function, include its \`uid\` in \`args\` and receive it as an argument. Do not query for it with selectors like \`[uid="..."]\`.
+Do not navigate to new URLs by assigning to \`window.location\`, \`location.href\`, or similar from inside this function. Use the \`navigate_page\` tool to navigate instead, then run \`evaluate_script\` again after navigation.
+When using the CLI, pass the function as the first positional argument: \`chrome-devtools evaluate_script '() => document.title'\`. Do not use a \`--expression\` flag.
 `,
       ),
       args: zod
@@ -46,7 +49,9 @@ Do not use jQuery-only selector extensions like \`:contains()\`; use standard DO
             ),
         )
         .optional()
-        .describe(`An optional list of arguments to pass to the function.`),
+        .describe(
+          `An optional list of snapshot element uids to pass to the function as arguments. These uids are not DOM attributes and cannot be queried with selectors like [uid="..."].`,
+        ),
       filePath: zod
         .string()
         .optional()

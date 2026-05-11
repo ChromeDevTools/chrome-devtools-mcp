@@ -127,6 +127,31 @@ describe('daemon client', () => {
       assert.ok(response.includes('.png'));
     });
 
+    it('returns image file metadata when json format is requested', async () => {
+      const imageResponse = {
+        content: [
+          {
+            type: 'image' as const,
+            data: Buffer.from('image-data').toString('base64'),
+            mimeType: 'image/png',
+          },
+        ],
+        structuredContent: {},
+      };
+      const response = await handleResponse(imageResponse, 'json');
+      const parsed = JSON.parse(response);
+
+      assert.deepStrictEqual(parsed, [
+        {
+          type: 'image',
+          mimeType: 'image/png',
+          filepath: parsed[0].filepath,
+          bytes: 10,
+        },
+      ]);
+      assert.match(parsed[0].filepath, /\.png$/);
+    });
+
     it('uses the webp extension for WebP images', async () => {
       const webpContentResponse = {
         content: [

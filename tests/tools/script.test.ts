@@ -36,6 +36,19 @@ describe('script', () => {
       assert.match(functionDescription ?? '', /querySelectorAll/);
     });
 
+    it('describes snapshot uid, navigation, and CLI limits', () => {
+      const tool = evaluateScript();
+      const functionDescription = tool.schema.function.description ?? '';
+      const argsDescription = tool.schema.args.description ?? '';
+
+      assert.match(functionDescription, /uid.*not DOM attributes/);
+      assert.match(functionDescription, /\[uid="\.\.\."\]/);
+      assert.match(functionDescription, /window\.location/);
+      assert.match(functionDescription, /navigate_page/);
+      assert.match(functionDescription, /--expression/);
+      assert.match(argsDescription, /not DOM attributes/);
+    });
+
     it('evaluates', async () => {
       await withMcpContext(async (response, context) => {
         await evaluateScript().handler(

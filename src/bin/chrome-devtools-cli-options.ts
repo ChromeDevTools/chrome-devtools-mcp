@@ -178,13 +178,14 @@ export const commands: Commands = {
         name: 'function',
         type: 'string',
         description:
-          'A JavaScript function declaration to be executed by the tool in the currently selected page.\nExample without arguments: `() => {\n  return document.title\n}` or `async () => {\n  return await fetch("example.com")\n}`.\nExample with arguments: `(el) => {\n  return el.innerText;\n}`\n',
+          'A JavaScript function declaration to be executed by the tool in the currently selected page.\nExample without arguments: `() => {\n  return document.title\n}` or `async () => {\n  return await fetch("example.com")\n}`.\nExample with arguments: `(el) => {\n  return el.innerText;\n}`.\nDo not use jQuery-only selector extensions like `:contains()`; use standard DOM APIs such as `querySelector`, `querySelectorAll`, and text filtering with `Array.from(...).find(...)` instead.\nSnapshot `uid` values are not DOM attributes. To pass a snapshot element to this function, include its `uid` in `args` and receive it as an argument. Do not query for it with selectors like `[uid="..."]`.\nDo not navigate to new URLs by assigning to `window.location`, `location.href`, or similar from inside this function. Use the `navigate_page` tool to navigate instead, then run `evaluate_script` again after navigation.\nWhen using the CLI, pass the function as the first positional argument: `chrome-devtools evaluate_script \'() => document.title\'`. Do not use a `--expression` flag.\n',
         required: true,
       },
       args: {
         name: 'args',
         type: 'array',
-        description: 'An optional list of arguments to pass to the function.',
+        description:
+          'An optional list of snapshot element uids to pass to the function as arguments. These uids are not DOM attributes and cannot be queried with selectors like [uid="..."].',
         required: false,
       },
       filePath: {
