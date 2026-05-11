@@ -12,11 +12,8 @@ import {ensureBrowserConnected, ensureBrowserLaunched} from './browser.js';
 import {loadIssueDescriptions} from './issue-descriptions.js';
 import {logger} from './logger.js';
 import {McpContext} from './McpContext.js';
-import {McpResponse} from './McpResponse.js';
 import {Mutex} from './Mutex.js';
-import {SlimMcpResponse} from './SlimMcpResponse.js';
 import {ClearcutLogger} from './telemetry/ClearcutLogger.js';
-import {bucketizeLatency} from './telemetry/metricUtils.js';
 import {
   McpServer,
   type CallToolResult,
@@ -24,109 +21,12 @@ import {
   ListRootsResultSchema,
   RootsListChangedNotificationSchema,
 } from './third_party/index.js';
-import type {ToolCategory} from './tools/categories.js';
-import {labels, OFF_BY_DEFAULT_CATEGORIES} from './tools/categories.js';
+import {ToolHandler} from './ToolHandler.js';
 import type {DefinedPageTool, ToolDefinition} from './tools/ToolDefinition.js';
-import {pageIdSchema} from './tools/ToolDefinition.js';
 import {createTools} from './tools/tools.js';
 import {VERSION} from './version.js';
 
-export function buildFlag(category: ToolCategory) {
-  return `category${category.charAt(0).toUpperCase() + category.slice(1)}`;
-}
-
-function buildDisabledMessage(
-  toolName: string,
-  flag: string,
-  categoryLabel?: string,
-): string {
-  const reason = categoryLabel
-    ? `is in category ${categoryLabel} which`
-    : `requires experimental feature ${flag} and`;
-
-  return `Tool ${toolName} ${reason} is currently disabled. Enable it by running chrome-devtools start ${flag}=true. For more information check the README.`;
-}
-
-function getCategoryStatus(
-  category: ToolCategory,
-  serverArgs: ReturnType<typeof parseArguments>,
-): {categoryFlag?: string; disabled: boolean} {
-  const categoryFlag = buildFlag(category);
-
-  const flagValue = serverArgs[categoryFlag];
-
-  const isDisabled = OFF_BY_DEFAULT_CATEGORIES.includes(category)
-    ? !flagValue
-    : flagValue === false;
-
-  if (isDisabled) {
-    return {
-      categoryFlag,
-      disabled: true,
-    };
-  }
-
-  return {
-    disabled: false,
-  };
-}
-
-function getConditionStatus(
-  condition: string,
-  serverArgs: ReturnType<typeof parseArguments>,
-): {conditionFlag?: string; disabled: boolean} {
-  if (condition && !serverArgs[condition]) {
-    return {conditionFlag: condition, disabled: true};
-  }
-
-  return {disabled: false};
-}
-
-function getToolStatusInfo(
-  tool: ToolDefinition | DefinedPageTool,
-  serverArgs: ReturnType<typeof parseArguments>,
-): {disabled: boolean; reason?: string} {
-  const category = tool.annotations.category;
-  const categoryCheck = getCategoryStatus(category, serverArgs);
-
-  if (category && categoryCheck.disabled) {
-    if (!categoryCheck.categoryFlag) {
-      throw new Error(
-        'when the category is disabled there should always be a flag set',
-      );
-    }
-
-    return {
-      disabled: true,
-      reason: buildDisabledMessage(
-        tool.name,
-        `--${categoryCheck.categoryFlag}`,
-        labels[category!],
-      ),
-    };
-  }
-
-  for (const condition of tool.annotations.conditions || []) {
-    const conditionCheck = getConditionStatus(condition, serverArgs);
-    if (conditionCheck.disabled) {
-      if (!conditionCheck.conditionFlag) {
-        throw new Error(
-          'when the condition is disabled there should always be a flag set',
-        );
-      }
-
-      return {
-        disabled: true,
-        reason: buildDisabledMessage(
-          tool.name,
-          `--${conditionCheck.conditionFlag}`,
-        ),
-      };
-    }
-  }
-
-  return {disabled: false};
-}
+export {buildFlag} from './ToolHandler.js';
 
 export async function createMcpServer(
   serverArgs: ReturnType<typeof parseArguments>,
@@ -240,134 +140,26 @@ export async function createMcpServer(
   const toolMutex = new Mutex();
 
   function registerTool(tool: ToolDefinition | DefinedPageTool): void {
-    const {disabled, reason: disabledReason} = getToolStatusInfo(
+    const toolHandler = new ToolHandler(
       tool,
       serverArgs,
+      getContext,
+      toolMutex,
     );
 
-    if (disabled && !serverArgs.viaCli) {
+    if (!toolHandler.shouldRegister) {
       return;
     }
-
-    const schema =
-      'pageScoped' in tool &&
-      tool.pageScoped &&
-      serverArgs.experimentalPageIdRouting &&
-      !serverArgs.slim
-        ? {...tool.schema, ...pageIdSchema}
-        : tool.schema;
 
     server.registerTool(
       tool.name,
       {
         description: tool.description,
-        inputSchema: schema,
+        inputSchema: toolHandler.inputSchema,
         annotations: tool.annotations,
       },
       async (params): Promise<CallToolResult> => {
-        if (disabledReason) {
-          return {
-            content: [
-              {
-                type: 'text',
-                text: disabledReason,
-              },
-            ],
-            isError: true,
-          };
-        }
-
-        const guard = await toolMutex.acquire();
-        const startTime = Date.now();
-        let success = false;
-        try {
-          logger(`${tool.name} request: ${JSON.stringify(params, null, '  ')}`);
-          const context = await getContext();
-          logger(`${tool.name} context: resolved`);
-          await context.detectOpenDevToolsWindows();
-          const response = serverArgs.slim
-            ? new SlimMcpResponse(serverArgs)
-            : new McpResponse(serverArgs);
-
-          response.setRedactNetworkHeaders(serverArgs.redactNetworkHeaders);
-          try {
-            if ('pageScoped' in tool && tool.pageScoped) {
-              const page =
-                serverArgs.experimentalPageIdRouting &&
-                params.pageId &&
-                !serverArgs.slim
-                  ? context.getPageById(params.pageId)
-                  : context.getSelectedMcpPage();
-              response.setPage(page);
-              if (tool.blockedByDialog) {
-                page.throwIfDialogOpen();
-              }
-              await tool.handler(
-                {
-                  params,
-                  page,
-                },
-                response,
-                context,
-              );
-            } else {
-              await tool.handler(
-                // @ts-expect-error types do not match.
-                {
-                  params,
-                },
-                response,
-                context,
-              );
-            }
-          } catch (err) {
-            response.setError(err);
-          }
-          const {content, structuredContent} = await response.handle(
-            tool.name,
-            context,
-          );
-          const result: CallToolResult & {
-            structuredContent?: Record<string, unknown>;
-          } = {
-            content,
-          };
-          if (response.error) {
-            result.isError = true;
-          }
-          success = true;
-          if (serverArgs.experimentalStructuredContent) {
-            result.structuredContent = structuredContent as Record<
-              string,
-              unknown
-            >;
-          }
-          return result;
-        } catch (err) {
-          logger(`${tool.name} error:`, err, err?.stack);
-          let errorText = err && 'message' in err ? err.message : String(err);
-          if ('cause' in err && err.cause) {
-            errorText += `\nCause: ${err.cause.message}`;
-          }
-          return {
-            content: [
-              {
-                type: 'text',
-                text: errorText,
-              },
-            ],
-            isError: true,
-          };
-        } finally {
-          void ClearcutLogger.get()?.logToolInvocation({
-            toolName: tool.name,
-            params,
-            schema,
-            success,
-            latencyMs: bucketizeLatency(Date.now() - startTime),
-          });
-          guard.dispose();
-        }
+        return await toolHandler.handle(params);
       },
     );
   }
