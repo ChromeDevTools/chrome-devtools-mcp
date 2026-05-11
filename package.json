@@ -48,7 +48,7 @@
   "mcpName": "io.github.ChromeDevTools/chrome-devtools-mcp",
   "devDependencies": {
     "@eslint/js": "^9.35.0",
-    "@google/genai": "^1.37.0",
+    "@google/genai": "^2.0.1",
     "@modelcontextprotocol/sdk": "1.29.0",
     "@rollup/plugin-commonjs": "^29.0.0",
     "@rollup/plugin-json": "^6.1.0",
