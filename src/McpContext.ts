@@ -301,6 +301,7 @@ export class McpContext implements Context {
       userAgent?: string;
       colorScheme?: 'dark' | 'light' | 'auto';
       viewport?: Viewport;
+      extraHTTPHeaders?: Record<string, string> | null | undefined;
     },
     targetPage?: Page,
   ): Promise<void> {
@@ -377,6 +378,18 @@ export class McpContext implements Context {
       const viewport = {...defaults, ...options.viewport};
       await page.setViewport(viewport);
       newSettings.viewport = viewport;
+    }
+
+    if (options.extraHTTPHeaders !== undefined) {
+      if (options.extraHTTPHeaders === null) {
+        // Clear headers when null (from empty string)
+        await page.setExtraHTTPHeaders({});
+        delete newSettings.extraHTTPHeaders;
+      } else {
+        // Set headers when we have an object
+        await page.setExtraHTTPHeaders(options.extraHTTPHeaders);
+        newSettings.extraHTTPHeaders = options.extraHTTPHeaders;
+      }
     }
 
     mcpPage.emulationSettings = Object.keys(newSettings).length

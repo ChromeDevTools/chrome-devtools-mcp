@@ -14,6 +14,28 @@ import {
   viewportTransform,
 } from './ToolDefinition.js';
 
+function headerStringTransform(
+  value: string | undefined,
+): Record<string, string> | null | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (value === '') {
+    return null;
+  }
+  try {
+    const parsed = JSON.parse(value);
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+      throw new Error('Headers must be a JSON object');
+    }
+    return parsed as Record<string, string>;
+  } catch (error) {
+    throw new Error(
+      `Invalid JSON for headers: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+}
+
 const throttlingOptions: [string, ...string[]] = [
   'Offline',
   ...Object.keys(PredefinedNetworkConditions),
@@ -64,6 +86,13 @@ export const emulate = definePageTool({
       .transform(viewportTransform)
       .describe(
         `Emulate device viewports '<width>x<height>x<devicePixelRatio>[,mobile][,touch][,landscape]'. 'touch' and 'mobile' to emulate mobile devices. 'landscape' to emulate landscape mode.`,
+      ),
+    extraHTTPHeaders: zod
+      .string()
+      .optional()
+      .transform(headerStringTransform)
+      .describe(
+        'Extra HTTP headers as a JSON string object, e.g. {"X-Custom": "value", "Authorization": "Bearer token"}. Headers persist across navigations until cleared. Pass an empty string to clear all extra headers.',
       ),
   },
   blockedByDialog: true,
