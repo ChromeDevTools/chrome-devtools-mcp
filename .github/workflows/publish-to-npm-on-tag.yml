@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       npm-publish:
-        description: 'Try to publish to NPM'
+        description: 'Try to publish to npm'
         default: false
         type: boolean
       mcp-publish:
@@ -44,8 +44,20 @@ jobs:
         env:
           NODE_ENV: 'production'
 
-      - name: Publish
+      - name: Publish chrome-devtools-mcp
         run: |
+          npm publish --provenance --access public
+
+      - name: Publish chrome-devtools
+        run: |
+          node --input-type=module --eval '
+            import * as fs from "node:fs/promises";
+            const json = await fs.readFile("package.json", "utf8");
+            const pkg = JSON.parse(json);
+            pkg.name = "chrome-devtools";
+            await fs.writeFile("package.json", JSON.stringify(pkg, null, 2) + "\n");
+          '
+          echo 'This is the **Chrome DevTools for agents** package. Docs: https://github.com/ChromeDevTools/chrome-devtools-mcp' > README.md
           npm publish --provenance --access public
 
   publish-to-mcp-registry:
