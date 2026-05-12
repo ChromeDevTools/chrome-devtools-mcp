@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.26.0](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.25.0...chrome-devtools-mcp-v0.26.0) (2026-05-11)
+
+
+### 🎉 Features
+
+* add an error logging method ([#2006](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/2006)) ([06e0ab6](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/06e0ab602258edf90adafd954f9a7d55f5ca05e4))
+
+
+### 🛠️ Fixes
+
+* **cli:** allow --autoConnect on CLI start ([#2015](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/2015)) ([9882391](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/98823918dde184759f47095ce386705b0fabb653)), closes [#1859](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1859) [#1184](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1184)
+* Make fill_form more appealing when filling forms with checkboxes ([#1971](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1971)) ([407c2bd](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/407c2bd03fbdc45a66690a32cfeac1937ce86f10))
+* only require a page in page-scoped tools ([#2030](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/2030)) ([8e06761](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/8e06761572592764327da00ee653bd4ec2a4a30e))
+* **telemetry:** re-run the update metrics script ([#2005](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/2005)) ([e9ec375](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/e9ec375f95622a21d9f9f8b1e8210436cc7695d5))
+
+
+### 📄 Documentation
+
+* Fix Claude Code instructions ([#2018](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/2018)) ([a5ad67b](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/a5ad67bdafa60a774f9c7dea490393b9c845777b))
+
+
+### 🏗️ Refactor
+
+* extract ToolHandler ([#2032](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/2032)) ([178b790](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/178b79049318a63d1df1bd40e069f0627fa06fcc))
+
 ## [0.25.0](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.24.0...chrome-devtools-mcp-v0.25.0) (2026-05-06)
 
 
