@@ -10,10 +10,7 @@ import {zod} from '../third_party/index.js';
 import type {ElementHandle, KeyInput} from '../third_party/index.js';
 import type {TextSnapshotNode} from '../types.js';
 import {parseKey} from '../utils/keyboard.js';
-import {
-  appendWaitForResult,
-  type WaitForEventsResult,
-} from '../WaitForHelper.js';
+import type {WaitForEventsResult} from '../WaitForHelper.js';
 
 import {ToolCategory} from './categories.js';
 import type {ContextPage} from './ToolDefinition.js';
@@ -130,7 +127,7 @@ export const click = definePageTool({
           ? `Successfully double clicked on the element`
           : `Successfully clicked on the element`,
       );
-      appendWaitForResult(response, result);
+      response.appendWaitForResult(result);
       if (request.params.includeSnapshot) {
         response.includeSnapshot();
       }
@@ -169,7 +166,7 @@ export const clickAt = definePageTool({
         ? `Successfully double clicked at the coordinates`
         : `Successfully clicked at the coordinates`,
     );
-    appendWaitForResult(response, result);
+    response.appendWaitForResult(result);
     if (request.params.includeSnapshot) {
       response.includeSnapshot();
     }
@@ -200,7 +197,7 @@ export const hover = definePageTool({
         await handle.asLocator().hover();
       });
       response.appendResponseLine(`Successfully hovered over the element`);
-      appendWaitForResult(response, result);
+      response.appendWaitForResult(result);
       if (request.params.includeSnapshot) {
         response.includeSnapshot();
       }
@@ -330,7 +327,7 @@ export const fill = definePageTool({
       );
     });
     response.appendResponseLine(`Successfully filled out the element`);
-    appendWaitForResult(response, result);
+    response.appendWaitForResult(result);
     if (request.params.includeSnapshot) {
       response.includeSnapshot();
     }
@@ -362,7 +359,7 @@ export const typeText = definePageTool({
     response.appendResponseLine(
       `Typed text "${request.params.text}${request.params.submitKey ? ` + ${request.params.submitKey}` : ''}"`,
     );
-    appendWaitForResult(response, result);
+    response.appendWaitForResult(result);
   },
 });
 
@@ -391,7 +388,7 @@ export const drag = definePageTool({
         await toHandle.drop(fromHandle);
       });
       response.appendResponseLine(`Successfully dragged an element`);
-      appendWaitForResult(response, result);
+      response.appendWaitForResult(result);
       if (request.params.includeSnapshot) {
         response.includeSnapshot();
       }
@@ -440,7 +437,7 @@ export const fillForm = definePageTool({
       });
     }
     response.appendResponseLine(`Successfully filled out the form`);
-    appendWaitForResult(response, lastResult);
+    response.appendWaitForResult(lastResult);
     if (request.params.includeSnapshot) {
       response.includeSnapshot();
     }
@@ -533,7 +530,7 @@ export const pressKey = definePageTool({
     response.appendResponseLine(
       `Successfully pressed key: ${request.params.key}`,
     );
-    appendWaitForResult(response, result);
+    response.appendWaitForResult(result);
     if (request.params.includeSnapshot) {
       response.includeSnapshot();
     }

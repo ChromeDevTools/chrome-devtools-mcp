@@ -7,7 +7,6 @@
 import {zod} from '../third_party/index.js';
 import type {Frame, JSHandle, Page, WebWorker} from '../third_party/index.js';
 import type {ExtensionServiceWorker} from '../types.js';
-import {appendWaitForResult} from '../WaitForHelper.js';
 
 import {ToolCategory} from './categories.js';
 import type {Context, Response} from './ToolDefinition.js';
@@ -94,7 +93,7 @@ Example with arguments: \`(el) => {
             },
             {handleDialog: dialogAction ?? 'accept'},
           );
-        appendWaitForResult(response, result);
+        response.appendWaitForResult(result);
         return;
       }
 
@@ -120,7 +119,7 @@ Example with arguments: \`(el) => {
           },
           {handleDialog: dialogAction ?? 'accept'},
         );
-        appendWaitForResult(response, result);
+        response.appendWaitForResult(result);
       } finally {
         void Promise.allSettled(args.map(arg => arg.dispose()));
       }

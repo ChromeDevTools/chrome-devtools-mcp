@@ -40,6 +40,7 @@ import type {InsightName, TraceResult} from './trace-processing/parse.js';
 import {getInsightOutput, getTraceSummary} from './trace-processing/parse.js';
 import {paginate} from './utils/pagination.js';
 import type {PaginationOptions} from './utils/types.js';
+import type {WaitForEventsResult} from './WaitForHelper.js';
 
 interface TraceInsightData {
   trace: TraceResult;
@@ -386,6 +387,12 @@ export class McpResponse implements Response {
 
   appendResponseLine(value: string): void {
     this.#textResponseLines.push(value);
+  }
+
+  appendWaitForResult(result: WaitForEventsResult): void {
+    if (result.navigatedToUrl) {
+      this.appendResponseLine(`Page navigated to ${result.navigatedToUrl}.`);
+    }
   }
 
   setHeapSnapshotAggregates(
