@@ -285,70 +285,6 @@ export const cliOptions = {
 
 export type ParsedArguments = ReturnType<typeof parseArguments>;
 
-export function pluginEnvVarName(optionName: string) {
-  return `CHROME_DEVTOOLS_MCP_${optionName
-    .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
-    .replace(/[^a-zA-Z0-9]/g, '_')
-    .toUpperCase()}`;
-}
-
-function parsePluginEnvValue(
-  optionName: string,
-  optionConfig: YargsOptions,
-  rawValue: string | undefined,
-) {
-  if (rawValue === undefined || rawValue === '') {
-    return undefined;
-  }
-
-  switch (optionConfig.type) {
-    case 'boolean': {
-      if (rawValue === 'true' || rawValue === '1') {
-        return true;
-      }
-      if (rawValue === 'false' || rawValue === '0') {
-        return false;
-      }
-      throw new Error(
-        `Invalid ${pluginEnvVarName(optionName)} value ${rawValue}. Expected true or false.`,
-      );
-    }
-    case 'number': {
-      const value = Number(rawValue);
-      if (Number.isNaN(value)) {
-        throw new Error(
-          `Invalid ${pluginEnvVarName(optionName)} value ${rawValue}. Expected a number.`,
-        );
-      }
-      return value;
-    }
-    case 'array':
-      if (rawValue.trim().startsWith('[')) {
-        return JSON.parse(rawValue);
-      }
-      return [rawValue];
-    default:
-      return rawValue;
-  }
-}
-
-function pluginEnvDefaults(env: NodeJS.ProcessEnv) {
-  const defaults: Record<string, unknown> = {};
-
-  for (const [optionName, optionConfig] of Object.entries(cliOptions)) {
-    const value = parsePluginEnvValue(
-      optionName,
-      optionConfig,
-      env[pluginEnvVarName(optionName)],
-    );
-    if (value !== undefined) {
-      defaults[optionName] = value;
-    }
-  }
-
-  return defaults;
-}
-
 export function parseArguments(
   version: string,
   argv = process.argv,
@@ -356,7 +292,6 @@ export function parseArguments(
 ) {
   const yargsInstance = yargs(hideBin(argv))
     .scriptName('npx chrome-devtools-mcp@latest')
-    .config(pluginEnvDefaults(env))
     .options(cliOptions)
     .check(args => {
       // We can't set default in the options else

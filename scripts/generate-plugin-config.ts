@@ -7,10 +7,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-import {
-  cliOptions,
-  pluginEnvVarName,
-} from '../build/src/bin/chrome-devtools-mcp-cli-options.js';
+import {cliOptions} from '../build/src/bin/chrome-devtools-mcp-cli-options.js';
 
 const PLUGIN_MANIFEST_PATHS = [
   '.claude-plugin/plugin.json',
@@ -74,8 +71,8 @@ function generateUserConfig() {
   return userConfig;
 }
 
-function generatePluginEnv() {
-  const env: Record<string, string> = {};
+function generatePluginArgs(existingArgs: string[]) {
+  const args = existingArgs.filter(arg => !arg.includes('${user_config.'));
 
   for (const [optionName, optionConfig] of Object.entries(cliOptions)) {
     if (optionConfig.hidden) {
@@ -86,10 +83,10 @@ function generatePluginEnv() {
       continue;
     }
 
-    env[pluginEnvVarName(optionName)] = `\${user_config.${optionName}}`;
+    args.push(`--${optionName}=\${user_config.${optionName}}`);
   }
 
-  return env;
+  return args;
 }
 
 function updatePluginManifest(manifestPath: string) {
@@ -102,7 +99,8 @@ function updatePluginManifest(manifestPath: string) {
   }
 
   manifest.userConfig = generateUserConfig();
-  server.env = generatePluginEnv();
+  server.args = generatePluginArgs(server.args || []);
+  delete server.env;
 
   fs.writeFileSync(absolutePath, `${JSON.stringify(manifest, null, 2)}\n`);
   console.log(`Updated ${manifestPath}`);
