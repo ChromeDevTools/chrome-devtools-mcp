@@ -57,6 +57,7 @@ jobs:
             pkg.name = "chrome-devtools";
             await fs.writeFile("package.json", JSON.stringify(pkg, null, 2) + "\n");
           '
+          echo 'This is the **Chrome DevTools for agents** package. Docs: https://github.com/ChromeDevTools/chrome-devtools-mcp' > README.md
           npm publish --provenance --access public
 
   publish-to-mcp-registry:
