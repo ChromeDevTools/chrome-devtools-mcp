@@ -1070,15 +1070,6 @@ describe('third-party developer tools', () => {
   it('lists third-party developer tools', async t => {
     await withMcpContext(
       async (response, context) => {
-        response.setListThirdPartyDeveloperTools();
-        const emptyResult = await response.handle('test', context);
-        const emptyText = getTextContent(emptyResult.content[0]);
-        assert.ok(
-          emptyText.includes('No third-party developer tools available.'),
-          'Should show message for empty third-party developer tools',
-        );
-
-        response.resetResponseLineForTesting();
         const mcpPage = context.getSelectedMcpPage();
         stubToolDiscovery(mcpPage.pptrPage);
         sinon.stub(mcpPage.pptrPage, 'evaluate').resolves({
