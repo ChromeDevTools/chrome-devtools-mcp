@@ -147,7 +147,6 @@ describe('thirdPartyDeveloperTools', () => {
             'list_3p_developer_tools',
             context,
           );
-          assert.ok('thirdPartyDeveloperTools' in result.structuredContent);
           assert.strictEqual(
             (
               result.structuredContent as {
@@ -177,7 +176,6 @@ describe('thirdPartyDeveloperTools', () => {
             'list_3p_developer_tools',
             context,
           );
-          assert.ok('thirdPartyDeveloperTools' in result.structuredContent);
           assert.strictEqual(
             (result.structuredContent as {thirdPartyDeveloperTools: undefined})
               .thirdPartyDeveloperTools,
