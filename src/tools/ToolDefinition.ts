@@ -154,7 +154,7 @@ export interface Response {
   attachLighthouseResult(result: LighthouseData): void;
   setListThirdPartyDeveloperTools(): void;
   setListWebMcpTools(): void;
-  appendWaitForResult(result: WaitForEventsResult): void;
+  attachWaitForResult(result: WaitForEventsResult): void;
 }
 
 export type SupportedExtensions =

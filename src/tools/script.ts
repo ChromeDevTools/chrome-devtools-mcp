@@ -93,7 +93,7 @@ Example with arguments: \`(el) => {
             },
             {handleDialog: dialogAction ?? 'accept'},
           );
-        response.appendWaitForResult(result);
+        response.attachWaitForResult(result);
         return;
       }
 
@@ -119,7 +119,7 @@ Example with arguments: \`(el) => {
           },
           {handleDialog: dialogAction ?? 'accept'},
         );
-        response.appendWaitForResult(result);
+        response.attachWaitForResult(result);
       } finally {
         void Promise.allSettled(args.map(arg => arg.dispose()));
       }

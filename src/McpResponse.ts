@@ -207,6 +207,7 @@ export class McpResponse implements Response {
   #page?: McpPage;
   #redactNetworkHeaders = true;
   #error?: Error;
+  #attachedWaitForResult?: WaitForEventsResult;
 
   constructor(args: ParsedArguments) {
     this.#args = args;
@@ -389,10 +390,8 @@ export class McpResponse implements Response {
     this.#textResponseLines.push(value);
   }
 
-  appendWaitForResult(result: WaitForEventsResult): void {
-    if (result.navigatedToUrl) {
-      this.appendResponseLine(`Page navigated to ${result.navigatedToUrl}.`);
-    }
+  attachWaitForResult(result: WaitForEventsResult): void {
+    this.#attachedWaitForResult = result;
   }
 
   setHeapSnapshotAggregates(
@@ -439,7 +438,11 @@ export class McpResponse implements Response {
   }
 
   get responseLines(): readonly string[] {
-    return this.#textResponseLines;
+    const lines = [...this.#textResponseLines];
+    if (this.#attachedWaitForResult?.navigatedToUrl) {
+      lines.push(`Page navigated to ${this.#attachedWaitForResult.navigatedToUrl}.`);
+    }
+    return lines;
   }
 
   get images(): ImageContentData[] {
@@ -746,12 +749,18 @@ export class McpResponse implements Response {
       extensionServiceWorkers?: object[];
       extensionPages?: object[];
       errorMessage?: string;
+      navigatedToUrl?: string;
     } = {};
 
     const response = [];
     if (this.#textResponseLines.length) {
       structuredContent.message = this.#textResponseLines.join('\n');
       response.push(...this.#textResponseLines);
+    }
+
+    if (this.#attachedWaitForResult?.navigatedToUrl) {
+      response.push(`Page navigated to ${this.#attachedWaitForResult.navigatedToUrl}.`);
+      structuredContent.navigatedToUrl = this.#attachedWaitForResult.navigatedToUrl;
     }
 
     const networkConditions = this.#page?.networkConditions;
