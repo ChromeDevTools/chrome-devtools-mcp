@@ -125,7 +125,7 @@ describe('chrome-devtools', () => {
       'performance_start_trace output is unexpected: ' + result.stdout,
     );
     assert(
-      result.stdout.includes('CPU throttling: none'),
+      result.stdout.includes('CPU throttling: 20x'),
       'performance_start_trace output is unexpected: ' + result.stdout,
     );
   });

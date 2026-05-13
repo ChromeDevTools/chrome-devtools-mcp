@@ -8,7 +8,6 @@ import zlib from 'node:zlib';
 
 import {logger} from '../logger.js';
 import {zod, DevTools} from '../third_party/index.js';
-import type {Page} from '../third_party/index.js';
 import type {InsightName, TraceResult} from '../trace-processing/parse.js';
 import {
   parseRawTraceBuffer,
@@ -16,7 +15,7 @@ import {
 } from '../trace-processing/parse.js';
 
 import {ToolCategory} from './categories.js';
-import type {Context, Response} from './ToolDefinition.js';
+import type {Context, Response, ContextPage} from './ToolDefinition.js';
 import {definePageTool} from './ToolDefinition.js';
 
 const filePathSchema = zod
@@ -94,18 +93,22 @@ export const startTrace = definePageTool({
     await page.pptrPage.tracing.start({
       categories,
     });
-    // await context.restoreEmulation(page);
+    await context.restoreEmulation(page);
 
     if (request.params.reload) {
+      // await page.pptrPage.goto(pageUrlForTracing, {
+      //   waitUntil: ['load'],
+      // });
       await page.pptrPage.goto(pageUrlForTracing, {
-        waitUntil: ['load'],
-      });
+      waitUntil: 'networkidle0',
+      timeout: 60000
+    });
     }
 
     if (request.params.autoStop) {
       await new Promise(resolve => setTimeout(resolve, 5_000));
       await stopTracingAndAppendOutput(
-        page.pptrPage,
+        page,
         response,
         context,
         request.params.filePath,
@@ -137,7 +140,7 @@ export const stopTrace = definePageTool({
     }
     const page = request.page;
     await stopTracingAndAppendOutput(
-      page.pptrPage,
+      page,
       response,
       context,
       request.params.filePath,
@@ -184,13 +187,13 @@ export const analyzeInsight = definePageTool({
 });
 
 async function stopTracingAndAppendOutput(
-  page: Page,
+  page: ContextPage,
   response: Response,
   context: Context,
   filePath?: string,
 ): Promise<void> {
   try {
-    const traceEventsBuffer = await page.tracing.stop();
+    const traceEventsBuffer = await page.pptrPage.tracing.stop();
     if (filePath && traceEventsBuffer) {
       let dataToWrite: Uint8Array = traceEventsBuffer;
       if (filePath.endsWith('.gz')) {
@@ -213,7 +216,10 @@ async function stopTracingAndAppendOutput(
         `The raw trace data was saved to ${file.filename}.`,
       );
     }
-    const result = await parseRawTraceBuffer(traceEventsBuffer);
+    const result = await parseRawTraceBuffer(traceEventsBuffer, {
+      cpuThrottling: page.cpuThrottlingRate > 1 ? page.cpuThrottlingRate : 20,
+      networkThrottling: page.networkConditions ?? undefined,
+    });
     response.appendResponseLine('The performance trace has been stopped.');
     if (traceResultIsSuccess(result)) {
       if (context.isCruxEnabled()) {

@@ -26,6 +26,10 @@ export interface TraceParseError {
 
 export async function parseRawTraceBuffer(
   buffer: Uint8Array<ArrayBufferLike> | undefined,
+  metadata?: {
+    cpuThrottling?: number;
+    networkThrottling?: string;
+  },
 ): Promise<TraceResult | TraceParseError> {
   engine.resetProcessor();
   if (!buffer) {
@@ -47,7 +51,7 @@ export async function parseRawTraceBuffer(
       | DevTools.TraceEngine.Types.Events.Event[];
 
     const events = Array.isArray(data) ? data : data.traceEvents;
-    await engine.parse(events);
+    await engine.parse(events, {metadata});
     const parsedTrace = engine.parsedTrace();
     if (!parsedTrace) {
       return {

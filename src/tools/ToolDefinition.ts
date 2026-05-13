@@ -257,6 +257,8 @@ export type Context = Readonly<{
  */
 export type ContextPage = Readonly<{
   readonly pptrPage: Page;
+  readonly cpuThrottlingRate: number;
+  readonly networkConditions: string | null;
   getAXNodeByUid(uid: string): TextSnapshotNode | undefined;
   getElementByUid(uid: string): Promise<ElementHandle<Element>>;
 
