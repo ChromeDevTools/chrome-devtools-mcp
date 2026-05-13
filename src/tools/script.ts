@@ -46,6 +46,12 @@ Example with arguments: \`(el) => {
         )
         .optional()
         .describe(`An optional list of arguments to pass to the function.`),
+      filePath: zod
+        .string()
+        .optional()
+        .describe(
+          'The absolute or relative path to a file to save the script output to. If omitted, the output is returned inline.',
+        ),
       dialogAction: zod
         .string()
         .optional()
@@ -72,7 +78,10 @@ Example with arguments: \`(el) => {
         function: fnString,
         pageId,
         dialogAction,
+        filePath,
       } = request.params;
+
+      context.validatePath(filePath);
 
       if (cliArgs?.categoryExtensions && serviceWorkerId) {
         if (uidArgs && uidArgs.length > 0) {
@@ -89,7 +98,10 @@ Example with arguments: \`(el) => {
           .getSelectedMcpPage()
           .waitForEventsAfterAction(
             async () => {
-              await performEvaluation(worker, fnString, [], response);
+              await performEvaluation(worker, fnString, [], response, {
+                filePath,
+                context,
+              });
             },
             {handleDialog: dialogAction ?? 'accept'},
           );
@@ -115,7 +127,10 @@ Example with arguments: \`(el) => {
 
         const result = await mcpPage.waitForEventsAfterAction(
           async () => {
-            await performEvaluation(evaluatable, fnString, args, response);
+            await performEvaluation(evaluatable, fnString, args, response, {
+              filePath,
+              context,
+            });
           },
           {handleDialog: dialogAction ?? 'accept'},
         );
@@ -132,6 +147,7 @@ const performEvaluation = async (
   fnString: string,
   args: Array<JSHandle<unknown>>,
   response: Response,
+  options?: {filePath?: string; context?: Context},
 ) => {
   const fn = await evaluatable.evaluateHandle(`(${fnString})`);
   try {
@@ -143,10 +159,22 @@ const performEvaluation = async (
       fn,
       ...args,
     );
-    response.appendResponseLine('Script ran on page and returned:');
-    response.appendResponseLine('```json');
-    response.appendResponseLine(`${result}`);
-    response.appendResponseLine('```');
+    if (options?.filePath && options.context) {
+      const data = new TextEncoder().encode(result ?? 'undefined');
+      const {filename} = await options.context.saveFile(
+        data,
+        options.filePath,
+        '.json',
+      );
+      response.appendResponseLine(
+        `Script ran on page. Output saved to ${filename}.`,
+      );
+    } else {
+      response.appendResponseLine('Script ran on page and returned:');
+      response.appendResponseLine('```json');
+      response.appendResponseLine(`${result}`);
+      response.appendResponseLine('```');
+    }
   } finally {
     void fn.dispose();
   }
