@@ -128,3 +128,34 @@ export const getNodesByClass = defineTool({
     });
   },
 });
+
+export const getNodeRetainers = defineTool({
+  name: 'get_node_retainers',
+  description:
+    'Loads a memory heapsnapshot and returns retainers for a specific node ID.',
+  annotations: {
+    category: ToolCategory.MEMORY,
+    readOnlyHint: true,
+    conditions: ['experimentalMemory'],
+  },
+  blockedByDialog: false,
+  schema: {
+    filePath: zod.string().describe('A path to a .heapsnapshot file to read.'),
+    nodeId: zod.number().describe('The stable node ID to get retainers for.'),
+    pageIdx: zod.number().optional().describe('The page index for pagination.'),
+    pageSize: zod.number().optional().describe('The page size for pagination.'),
+  },
+  handler: async (request, response, context) => {
+    context.validatePath(request.params.filePath);
+
+    const retainers = await context.getHeapSnapshotRetainers(
+      request.params.filePath,
+      request.params.nodeId,
+    );
+
+    response.setHeapSnapshotNodes(retainers, {
+      pageIdx: request.params.pageIdx,
+      pageSize: request.params.pageSize,
+    });
+  },
+});

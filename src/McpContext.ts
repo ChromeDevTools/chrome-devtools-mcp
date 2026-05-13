@@ -830,4 +830,11 @@ export class McpContext implements Context {
     this.validatePath(filePath);
     return await this.#heapSnapshotManager.getNodesByUid(filePath, uid);
   }
+
+  async getHeapSnapshotRetainers(
+    filePath: string,
+    nodeId: number,
+  ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange> {
+    return await this.#heapSnapshotManager.getRetainers(filePath, nodeId);
+  }
 }

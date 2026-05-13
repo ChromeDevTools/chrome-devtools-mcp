@@ -39,9 +39,10 @@
   - [`take_snapshot`](#take_snapshot)
   - [`screencast_start`](#screencast_start)
   - [`screencast_stop`](#screencast_stop)
-- **[Memory](#memory)** (4 tools)
+- **[Memory](#memory)** (5 tools)
   - [`take_memory_snapshot`](#take_memory_snapshot)
   - [`get_memory_snapshot_details`](#get_memory_snapshot_details)
+  - [`get_node_retainers`](#get_node_retainers)
   - [`get_nodes_by_class`](#get_nodes_by_class)
   - [`load_memory_snapshot`](#load_memory_snapshot)
 - **[Extensions](#extensions)** (5 tools)
@@ -461,6 +462,19 @@ in the DevTools Elements panel (if any).
 - **filePath** (string) **(required)**: A path to a .heapsnapshot file to read.
 - **pageIdx** (number) _(optional)_: The page index for pagination of aggregates.
 - **pageSize** (number) _(optional)_: The page size for pagination of aggregates.
+
+---
+
+### `get_node_retainers`
+
+**Description:** Loads a memory heapsnapshot and returns retainers for a specific node ID. (requires flag: --experimentalMemory=true)
+
+**Parameters:**
+
+- **filePath** (string) **(required)**: A path to a .heapsnapshot file to read.
+- **nodeId** (number) **(required)**: The stable node ID to get retainers for.
+- **pageIdx** (number) _(optional)_: The page index for pagination.
+- **pageSize** (number) _(optional)_: The page size for pagination.
 
 ---
 

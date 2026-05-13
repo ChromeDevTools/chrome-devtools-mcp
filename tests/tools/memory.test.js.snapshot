@@ -2,176 +2,185 @@ exports[`memory > get_memory_snapshot_details > with default options 1`] = `
 ## Heap Snapshot Data
 Showing 1-157 of 157 (Page 1 of 1).
 uid,className,count,selfSize,maxRetainedSize
-2,"(system)",3205,199264,655004
-11,"Function",3581,111464,237120
-16,"(object shape)",2878,181480,184320
-3,"(array)",34,41416,117472
-42,"Window (global*) / https://example.com",2,81068,101832
-94,"Window (prototype) / https://example.com",4,53336,53712
-1,"(compiled code)",713,42812,46988
-6,"(string)",846,27880,27880
-96,"Window (internal cache) / https://example.com",4,400,20256
-15,"Object (global*)",2,3856,13488
-55,"{constructor, toString, toDateString, toTimeString, toISOString, toUTCString, toGMTString, getDate, setDate, getDay}",4,848,8848
-49,"TypedArray",48,1424,8784
-109,"Document",1,8448,8700
-50,"Error",48,1344,7872
-47,"Math",4,816,7792
-19,"Array",8,1056,7728
-39,"{constructor, buffer, get buffer, byteLength, get byteLength, byteOffset, get byteOffset, length, get length}",4,624,7008
-10,"HTMLDocument",1,3288,6192
-44,"console",4,488,6152
-32,"String",4,960,6056
-68,"DataView",4,480,5504
-105,"HTMLElement",1,4728,4768
-62,"Intl.Locale",4,288,4672
-104,"Element",1,4224,4540
-76,"{constructor, getColumnNumber, getEnclosingColumnNumber, getEnclosingLineNumber, getEvalOrigin, getFileName, getFunction}",4,480,4448
-45,"Intl",4,336,4192
-25,"{<symbol Symbol.iterator>, constructor, get constructor, set constructor, reduce, toArray, forEach, some, every, find}",4,288,3600
-89,"system / Context",116,2544,3488
-43,"Atomics",4,336,3056
-91,"DisposableStack",4,240,3040
-92,"AsyncDisposableStack",4,240,3040
-46,"Reflect",4,336,2480
-72,"ArrayBuffer",4,192,2160
-9,"Window / https://example.com",1,904,1944
-37,"WebAssembly",4,416,1904
-58,"{constructor, <symbol Symbol.toStringTag>, resolvedOptions, adoptText, get adoptText, first, get first, next, get next}",4,112,1808
-103,"Node",1,1764,1804
-126,"Performance",1,1040,1784
-30,"Set",4,384,1616
-40,"{constructor}",14,392,1560
-90,"SharedArrayBuffer",4,112,1552
-56,"Intl.NumberFormat",4,192,1536
-66,"Intl.DateTimeFormat",4,192,1536
-27,"Map",4,336,1504
-48,"Number",4,240,1488
-70,"Symbol",4,192,1376
-67,"{at, copyWithin, entries, fill, find, findIndex, findLast, findLastIndex, flat, flatMap, includes, keys, toReversed}",4,336,1344
-106,"HTMLBodyElement (prototype) / https://example.com",1,1188,1228
-54,"Object",22,928,1168
-59,"Intl.PluralRules",4,192,1168
-60,"Intl.RelativeTimeFormat",4,192,1168
-61,"Intl.ListFormat",4,192,1168
-65,"Intl.DurationFormat",4,192,1168
-69,"BigInt",4,192,1168
-28,"{constructor, __defineGetter__, __defineSetter__, hasOwnProperty, __lookupGetter__, __lookupSetter__, isPrototypeOf}",4,288,1128
-17,"{isTraceCategoryEnabled, trace, getContinuationPreservedEmbedderData, setContinuationPreservedEmbedderData, console}",4,192,1120
-130,"StyleEngine",1,912,1104
-118,"CSSStyleRule",8,576,1024
-21,"Generator",4,192,1008
-23,"AsyncGenerator",4,192,1008
-34,"JSON",4,192,1008
-35,"Promise",4,192,1000
-57,"Intl.Collator",4,112,976
-119,"CSSStyleSheet",3,528,976
-33,"WeakMap",4,240,960
-52,"FinalizationRegistry",4,112,928
-63,"Intl.DisplayNames",4,112,928
-64,"Intl.Segmenter",4,112,928
-73,"Async-from-Sync Iterator",4,112,880
-22,"{<symbol Symbol.asyncIterator>, <symbol Symbol.asyncDispose>}",4,112,864
-85,"{containing, <symbol Symbol.iterator>}",4,112,832
-51,"WeakRef",4,112,768
-79,"WebAssembly.Table",4,192,768
-80,"WebAssembly.Memory",4,192,768
-71,"Boolean",4,144,752
-18,"Array Iterator",4,112,720
-24,"Iterator Helper",4,112,720
-26,"Map Iterator",4,112,720
-29,"Set Iterator",4,112,720
-31,"String Iterator",4,112,720
-86,"Segmenter String Iterator",4,112,720
-88,"RegExp String Iterator",4,112,720
-20,"{constructor, name, message, toString}",4,112,704
-87,"{next, return}",4,112,672
-75,"AsyncGeneratorFunction",4,112,656
-84,"GeneratorFunction",4,112,656
-74,"AsyncFunction",4,112,608
-81,"WebAssembly.Global",4,112,592
-93,"WebAssembly.Suspending",4,112,592
-100,"{loadTimes, csi}",2,56,580
-36,"{constructor, exec, dotAll, get dotAll, flags, get flags, global, get global, hasIndices, get hasIndices, ignoreCase}",4,240,576
-78,"WebAssembly.Instance",4,112,544
-83,"WebAssembly.Exception",4,112,544
-110,"Text",6,480,480
-77,"WebAssembly.Module",4,112,448
-82,"WebAssembly.Tag",4,112,448
-101,"EventTarget",2,92,436
-53,"WeakSet",4,192,416
-135,"EventListener",10,400,400
-99,"{parse, stringify}",2,40,384
-127,"Navigation",1,152,384
-4,"{<symbol handler_function>, <symbol feature_name>}",8,224,352
-134,"FontFaceSet",1,328,328
-133,"StylePropertyMap",8,320,320
-139,"MutationObserver",2,320,320
-102,"WindowProperties",2,56,280
-115,"<style>",1,128,264
-123,"IntersectionObserver",1,200,240
-132,"MutationObserver::Delegate",2,64,224
-131,"ScriptedAnimationController",1,208,208
-95,"MutationObserver (prototype) / https://example.com",1,156,196
-7,"(number)",16,192,192
-120,"NavigationHistoryEntry",1,192,192
-129,"StyleSheetCollection",1,192,192
-147,"<a>",1,136,192
-146,"DocumentTimeline",1,184,184
-5,"RegExp",1,100,176
-114,"<title>",1,96,176
-116,"PerformancePaintTiming",2,176,176
-145,"<p>",2,176,176
-111,"<div>",1,88,168
-122,"ServiceWorkerContainer",1,168,168
-125,"Navigator",1,168,168
-155,"PerformanceNavigationTiming",1,168,168
-113,"<head>",1,88,152
-98,"HTMLDocument (prototype) / https://example.com",1,108,148
-117,"PerformanceResourceTiming",1,136,136
-152,"LargestContentfulPaint",1,136,136
-38,"Tag",4,128,128
-136,"CustomElementRegistry",1,128,128
-138,"CSSRuleList",4,128,128
-141,"Storage",2,128,128
-13,"<body>",1,112,112
-14,"Object (global)",2,32,112
-121,"DOMTokenList",2,112,112
-148,"HTMLCollection",1,104,104
-150,"ScriptRunner",1,104,104
-112,"<meta>",1,96,96
-41,"(concatenated string)",2,40,88
-140,"<html>",1,88,88
-144,"<h1>",1,88,88
-149,"Screen",1,88,88
-153,"DocumentType",1,88,88
-156,"VisibilityStateEntry",1,88,88
-137,"MutationObserverRegistration",1,64,64
-8,"Window (global) / https://example.com",1,16,56
-151,"FragmentDirective",1,56,56
-124,"IntersectionObserverDelegate",1,40,40
-128,"NavigationActivation",1,40,40
-154,"PerformanceTiming",1,40,40
-157,"Pending activities",1,40,40
-142,"VisualViewport",1,32,32
-143,"Viewport",1,32,32
-12,"HTMLBodyElement",1,16,16
-97,"HTMLDocument (internal cache) / https://example.com",1,16,16
-107,"MutationObserver (internal cache) / https://example.com",1,16,16
-108,"HTMLBodyElement (internal cache) / https://example.com",1,16,16
+2,(system),3205,199 kB,655 kB
+11,Function,3581,111 kB,237 kB
+16,(object shape),2878,181 kB,184 kB
+3,(array),34,41.4 kB,117 kB
+42,Window (global*) / https://example.com,2,81.1 kB,102 kB
+94,Window (prototype) / https://example.com,4,53.3 kB,53.7 kB
+1,(compiled code),713,42.8 kB,47.0 kB
+6,(string),846,27.9 kB,27.9 kB
+96,Window (internal cache) / https://example.com,4,0.4 kB,20.3 kB
+15,Object (global*),2,3.9 kB,13.5 kB
+55,{constructor, toString, toDateString, toTimeString, toISOString, toUTCString, toGMTString, getDate, setDate, getDay},4,0.8 kB,8.8 kB
+49,TypedArray,48,1.4 kB,8.8 kB
+109,Document,1,8.4 kB,8.7 kB
+50,Error,48,1.3 kB,7.9 kB
+47,Math,4,0.8 kB,7.8 kB
+19,Array,8,1.1 kB,7.7 kB
+39,{constructor, buffer, get buffer, byteLength, get byteLength, byteOffset, get byteOffset, length, get length},4,0.6 kB,7.0 kB
+10,HTMLDocument,1,3.3 kB,6.2 kB
+44,console,4,0.5 kB,6.2 kB
+32,String,4,1.0 kB,6.1 kB
+68,DataView,4,0.5 kB,5.5 kB
+105,HTMLElement,1,4.7 kB,4.8 kB
+62,Intl.Locale,4,0.3 kB,4.7 kB
+104,Element,1,4.2 kB,4.5 kB
+76,{constructor, getColumnNumber, getEnclosingColumnNumber, getEnclosingLineNumber, getEvalOrigin, getFileName, getFunction},4,0.5 kB,4.4 kB
+45,Intl,4,0.3 kB,4.2 kB
+25,{<symbol Symbol.iterator>, constructor, get constructor, set constructor, reduce, toArray, forEach, some, every, find},4,0.3 kB,3.6 kB
+89,system / Context,116,2.5 kB,3.5 kB
+43,Atomics,4,0.3 kB,3.1 kB
+91,DisposableStack,4,0.2 kB,3.0 kB
+92,AsyncDisposableStack,4,0.2 kB,3.0 kB
+46,Reflect,4,0.3 kB,2.5 kB
+72,ArrayBuffer,4,0.2 kB,2.2 kB
+9,Window / https://example.com,1,0.9 kB,1.9 kB
+37,WebAssembly,4,0.4 kB,1.9 kB
+58,{constructor, <symbol Symbol.toStringTag>, resolvedOptions, adoptText, get adoptText, first, get first, next, get next},4,0.1 kB,1.8 kB
+103,Node,1,1.8 kB,1.8 kB
+126,Performance,1,1.0 kB,1.8 kB
+30,Set,4,0.4 kB,1.6 kB
+40,{constructor},14,0.4 kB,1.6 kB
+90,SharedArrayBuffer,4,0.1 kB,1.6 kB
+56,Intl.NumberFormat,4,0.2 kB,1.5 kB
+66,Intl.DateTimeFormat,4,0.2 kB,1.5 kB
+27,Map,4,0.3 kB,1.5 kB
+48,Number,4,0.2 kB,1.5 kB
+70,Symbol,4,0.2 kB,1.4 kB
+67,{at, copyWithin, entries, fill, find, findIndex, findLast, findLastIndex, flat, flatMap, includes, keys, toReversed},4,0.3 kB,1.3 kB
+106,HTMLBodyElement (prototype) / https://example.com,1,1.2 kB,1.2 kB
+54,Object,22,0.9 kB,1.2 kB
+59,Intl.PluralRules,4,0.2 kB,1.2 kB
+60,Intl.RelativeTimeFormat,4,0.2 kB,1.2 kB
+61,Intl.ListFormat,4,0.2 kB,1.2 kB
+65,Intl.DurationFormat,4,0.2 kB,1.2 kB
+69,BigInt,4,0.2 kB,1.2 kB
+28,{constructor, __defineGetter__, __defineSetter__, hasOwnProperty, __lookupGetter__, __lookupSetter__, isPrototypeOf},4,0.3 kB,1.1 kB
+17,{isTraceCategoryEnabled, trace, getContinuationPreservedEmbedderData, setContinuationPreservedEmbedderData, console},4,0.2 kB,1.1 kB
+130,StyleEngine,1,0.9 kB,1.1 kB
+118,CSSStyleRule,8,0.6 kB,1.0 kB
+21,Generator,4,0.2 kB,1.0 kB
+23,AsyncGenerator,4,0.2 kB,1.0 kB
+34,JSON,4,0.2 kB,1.0 kB
+35,Promise,4,0.2 kB,1.0 kB
+57,Intl.Collator,4,0.1 kB,1.0 kB
+119,CSSStyleSheet,3,0.5 kB,1.0 kB
+33,WeakMap,4,0.2 kB,1.0 kB
+52,FinalizationRegistry,4,0.1 kB,0.9 kB
+63,Intl.DisplayNames,4,0.1 kB,0.9 kB
+64,Intl.Segmenter,4,0.1 kB,0.9 kB
+73,Async-from-Sync Iterator,4,0.1 kB,0.9 kB
+22,{<symbol Symbol.asyncIterator>, <symbol Symbol.asyncDispose>},4,0.1 kB,0.9 kB
+85,{containing, <symbol Symbol.iterator>},4,0.1 kB,0.8 kB
+51,WeakRef,4,0.1 kB,0.8 kB
+79,WebAssembly.Table,4,0.2 kB,0.8 kB
+80,WebAssembly.Memory,4,0.2 kB,0.8 kB
+71,Boolean,4,0.1 kB,0.8 kB
+18,Array Iterator,4,0.1 kB,0.7 kB
+24,Iterator Helper,4,0.1 kB,0.7 kB
+26,Map Iterator,4,0.1 kB,0.7 kB
+29,Set Iterator,4,0.1 kB,0.7 kB
+31,String Iterator,4,0.1 kB,0.7 kB
+86,Segmenter String Iterator,4,0.1 kB,0.7 kB
+88,RegExp String Iterator,4,0.1 kB,0.7 kB
+20,{constructor, name, message, toString},4,0.1 kB,0.7 kB
+87,{next, return},4,0.1 kB,0.7 kB
+75,AsyncGeneratorFunction,4,0.1 kB,0.7 kB
+84,GeneratorFunction,4,0.1 kB,0.7 kB
+74,AsyncFunction,4,0.1 kB,0.6 kB
+81,WebAssembly.Global,4,0.1 kB,0.6 kB
+93,WebAssembly.Suspending,4,0.1 kB,0.6 kB
+100,{loadTimes, csi},2,0.1 kB,0.6 kB
+36,{constructor, exec, dotAll, get dotAll, flags, get flags, global, get global, hasIndices, get hasIndices, ignoreCase},4,0.2 kB,0.6 kB
+78,WebAssembly.Instance,4,0.1 kB,0.5 kB
+83,WebAssembly.Exception,4,0.1 kB,0.5 kB
+110,Text,6,0.5 kB,0.5 kB
+77,WebAssembly.Module,4,0.1 kB,0.4 kB
+82,WebAssembly.Tag,4,0.1 kB,0.4 kB
+101,EventTarget,2,0.1 kB,0.4 kB
+53,WeakSet,4,0.2 kB,0.4 kB
+135,EventListener,10,0.4 kB,0.4 kB
+99,{parse, stringify},2,0.0 kB,0.4 kB
+127,Navigation,1,0.2 kB,0.4 kB
+4,{<symbol handler_function>, <symbol feature_name>},8,0.2 kB,0.4 kB
+134,FontFaceSet,1,0.3 kB,0.3 kB
+133,StylePropertyMap,8,0.3 kB,0.3 kB
+139,MutationObserver,2,0.3 kB,0.3 kB
+102,WindowProperties,2,0.1 kB,0.3 kB
+115,<style>,1,0.1 kB,0.3 kB
+123,IntersectionObserver,1,0.2 kB,0.2 kB
+132,MutationObserver::Delegate,2,0.1 kB,0.2 kB
+131,ScriptedAnimationController,1,0.2 kB,0.2 kB
+95,MutationObserver (prototype) / https://example.com,1,0.2 kB,0.2 kB
+7,(number),16,0.2 kB,0.2 kB
+120,NavigationHistoryEntry,1,0.2 kB,0.2 kB
+129,StyleSheetCollection,1,0.2 kB,0.2 kB
+147,<a>,1,0.1 kB,0.2 kB
+146,DocumentTimeline,1,0.2 kB,0.2 kB
+5,RegExp,1,0.1 kB,0.2 kB
+114,<title>,1,0.1 kB,0.2 kB
+116,PerformancePaintTiming,2,0.2 kB,0.2 kB
+145,<p>,2,0.2 kB,0.2 kB
+111,<div>,1,0.1 kB,0.2 kB
+122,ServiceWorkerContainer,1,0.2 kB,0.2 kB
+125,Navigator,1,0.2 kB,0.2 kB
+155,PerformanceNavigationTiming,1,0.2 kB,0.2 kB
+113,<head>,1,0.1 kB,0.2 kB
+98,HTMLDocument (prototype) / https://example.com,1,0.1 kB,0.1 kB
+117,PerformanceResourceTiming,1,0.1 kB,0.1 kB
+152,LargestContentfulPaint,1,0.1 kB,0.1 kB
+38,Tag,4,0.1 kB,0.1 kB
+136,CustomElementRegistry,1,0.1 kB,0.1 kB
+138,CSSRuleList,4,0.1 kB,0.1 kB
+141,Storage,2,0.1 kB,0.1 kB
+13,<body>,1,0.1 kB,0.1 kB
+14,Object (global),2,0.0 kB,0.1 kB
+121,DOMTokenList,2,0.1 kB,0.1 kB
+148,HTMLCollection,1,0.1 kB,0.1 kB
+150,ScriptRunner,1,0.1 kB,0.1 kB
+112,<meta>,1,0.1 kB,0.1 kB
+41,(concatenated string),2,0.0 kB,0.1 kB
+140,<html>,1,0.1 kB,0.1 kB
+144,<h1>,1,0.1 kB,0.1 kB
+149,Screen,1,0.1 kB,0.1 kB
+153,DocumentType,1,0.1 kB,0.1 kB
+156,VisibilityStateEntry,1,0.1 kB,0.1 kB
+137,MutationObserverRegistration,1,0.1 kB,0.1 kB
+8,Window (global) / https://example.com,1,0.0 kB,0.1 kB
+151,FragmentDirective,1,0.1 kB,0.1 kB
+124,IntersectionObserverDelegate,1,0.0 kB,0.0 kB
+128,NavigationActivation,1,0.0 kB,0.0 kB
+154,PerformanceTiming,1,0.0 kB,0.0 kB
+157,Pending activities,1,0.0 kB,0.0 kB
+142,VisualViewport,1,0.0 kB,0.0 kB
+143,Viewport,1,0.0 kB,0.0 kB
+12,HTMLBodyElement,1,0.0 kB,0.0 kB
+97,HTMLDocument (internal cache) / https://example.com,1,0.0 kB,0.0 kB
+107,MutationObserver (internal cache) / https://example.com,1,0.0 kB,0.0 kB
+108,HTMLBodyElement (internal cache) / https://example.com,1,0.0 kB,0.0 kB
+`;
+
+exports[`memory > get_node_retainers > with valid nodeId 1`] = `
+## Heap Snapshot Data
+edgeIndex,edgeName,edgeType,targetNodeId,targetNodeName
+145296,prototype,internal,29287,system / Map
+108096,prototype,property,25575,String
+48828,initial_string_prototype,internal,7199,system / NativeContext
+Showing 1-3 of 3 (Page 1 of 1).
 `;
 
 exports[`memory > get_nodes_by_class > with default options 1`] = `
 ## Heap Snapshot Data
 id,name,type,distance,selfSize,retainedSize
-25307,"Array",object,2,192,2056
-46355,"Array",object,2,192,2056
-33187,"Array",object,2,192,1664
-36255,"Array",object,2,192,1664
-45901,"Array",object,5,88,88
-46151,"Array",object,5,88,88
-45899,"Array",object,5,56,56
-46149,"Array",object,5,56,56
+25307,Array,object,2,0.2 kB,2.1 kB
+46355,Array,object,2,0.2 kB,2.1 kB
+33187,Array,object,2,0.2 kB,1.7 kB
+36255,Array,object,2,0.2 kB,1.7 kB
+45901,Array,object,5,0.1 kB,0.1 kB
+46151,Array,object,5,0.1 kB,0.1 kB
+45899,Array,object,5,0.1 kB,0.1 kB
+46149,Array,object,5,0.1 kB,0.1 kB
 Showing 1-8 of 8 (Page 1 of 1).
 `;
 

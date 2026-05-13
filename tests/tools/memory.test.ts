@@ -16,6 +16,7 @@ import {
   exploreMemorySnapshot,
   getMemorySnapshotDetails,
   getNodesByClass,
+  getNodeRetainers,
 } from '../../src/tools/memory.js';
 import {withMcpContext} from '../utils.js';
 
@@ -145,6 +146,33 @@ describe('memory', () => {
           ),
           {message: 'Class with UID 999999 not found in heap snapshot'},
         );
+      });
+    });
+  });
+
+  describe('get_node_retainers', () => {
+    it('with valid nodeId', async t => {
+      await withMcpContext(async (response, context) => {
+        const filePath = join(
+          process.cwd(),
+          'tests/fixtures/example.heapsnapshot',
+        );
+
+        await getNodeRetainers.handler(
+          {params: {filePath, nodeId: 25341}},
+          response,
+          context,
+        );
+
+        const responseData = await response.handle(
+          getNodeRetainers.name,
+          context,
+        );
+        const output = responseData.content
+          .map(c => (c.type === 'text' ? c.text : ''))
+          .join('\n');
+
+        t.assert.snapshot?.(output);
       });
     });
   });
