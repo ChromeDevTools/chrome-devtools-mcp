@@ -90,9 +90,11 @@ export const startTrace = definePageTool({
       'v8.execute',
       'v8',
     ];
+    await page.pptrPage.emulateCPUThrottling(20);
     await page.pptrPage.tracing.start({
       categories,
     });
+    // await context.restoreEmulation(page);
 
     if (request.params.reload) {
       await page.pptrPage.goto(pageUrlForTracing, {
