@@ -7,6 +7,7 @@
 import type {cliOptions} from '../bin/chrome-devtools-mcp-cli-options.js';
 import {toSnakeCase} from '../utils/string.js';
 
+import {stripUnderscoreBeforeNumber} from './transformation.js';
 import type {FlagUsage} from './types.js';
 
 type CliOptions = typeof cliOptions;
@@ -17,7 +18,9 @@ type CliOptions = typeof cliOptions;
  * as an `enum` where the keys of the enum will map to the uppercase `choice`.
  */
 function formatEnumChoice(snakeCaseName: string, choice: string): string {
-  return `${snakeCaseName}_${choice}`.toUpperCase();
+  return stripUnderscoreBeforeNumber(
+    `${snakeCaseName}_${choice}`,
+  ).toUpperCase();
 }
 
 /**
@@ -41,7 +44,7 @@ export function computeFlagUsage(
 
   for (const [flagName, config] of Object.entries(options)) {
     const value = args[flagName];
-    const snakeCaseName = toSnakeCase(flagName);
+    const snakeCaseName = stripUnderscoreBeforeNumber(toSnakeCase(flagName));
 
     // If there isn't a default value provided for the flag,
     // we're going to log whether it's present on the args user
@@ -82,7 +85,7 @@ export function getPossibleFlagMetrics(options: CliOptions): FlagMetric[] {
   const metrics: FlagMetric[] = [];
 
   for (const [flagName, config] of Object.entries(options)) {
-    const snakeCaseName = toSnakeCase(flagName);
+    const snakeCaseName = stripUnderscoreBeforeNumber(toSnakeCase(flagName));
 
     // _present is always a possible metric
     metrics.push({

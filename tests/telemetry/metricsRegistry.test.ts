@@ -82,6 +82,26 @@ describe('metricsRegistry', () => {
       assert.strictEqual(metrics[0].args[0].name, 'arg_enum');
       assert.strictEqual(metrics[0].args[0].argType, 'string');
     });
+
+    it('should sanitize tool names containing underscores before numbers', () => {
+      const mockTool: ToolDefinition = {
+        name: 'list_3p_developer_tools',
+        description: 'test description',
+        annotations: {
+          category: ToolCategory.THIRD_PARTY,
+          readOnlyHint: true,
+        },
+        schema: {},
+        blockedByDialog: false,
+        handler: async () => {
+          // no-op
+        },
+      };
+
+      const metrics = generateToolMetrics([mockTool]);
+      assert.strictEqual(metrics.length, 1);
+      assert.strictEqual(metrics[0].name, 'list3p_developer_tools');
+    });
   });
 
   describe('applyToExistingMetrics', () => {

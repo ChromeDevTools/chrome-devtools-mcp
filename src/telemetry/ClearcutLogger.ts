@@ -12,7 +12,7 @@ import type {zod, ShapeOutput} from '../third_party/index.js';
 
 import type {ErrorCode} from './errors.js';
 import type {LocalState, Persistence} from './persistence.js';
-import {sanitizeParams} from './transformation.js';
+import {sanitizeParams, stripUnderscoreBeforeNumber} from './transformation.js';
 import {
   McpClient,
   type FlagUsage,
@@ -113,14 +113,18 @@ export class ClearcutLogger {
     success: boolean;
     latencyMs: number;
   }): Promise<void> {
+    const sanitizedToolName = stripUnderscoreBeforeNumber(args.toolName);
     const tool_invocation: ToolInvocation = {
-      tool_name: args.toolName,
+      tool_name: sanitizedToolName,
       success: args.success,
       latency_ms: args.latencyMs,
     };
     if (Object.keys(args.params).length > 0) {
       tool_invocation.tool_params = {
-        [`${args.toolName}_params`]: sanitizeParams(args.params, args.schema),
+        [`${sanitizedToolName}_params`]: sanitizeParams(
+          args.params,
+          args.schema,
+        ),
       };
     }
 
@@ -185,7 +189,9 @@ export class ClearcutLogger {
       payload: {
         mcp_client: this.#mcpClient,
         server_error: {
-          tool_name: args.toolName ?? '',
+          tool_name: args.toolName
+            ? stripUnderscoreBeforeNumber(args.toolName)
+            : '',
           error_code: args.errorCode,
         },
       },
