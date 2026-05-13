@@ -438,11 +438,7 @@ export class McpResponse implements Response {
   }
 
   get responseLines(): readonly string[] {
-    const lines = [...this.#textResponseLines];
-    if (this.#attachedWaitForResult?.navigatedToUrl) {
-      lines.push(`Page navigated to ${this.#attachedWaitForResult.navigatedToUrl}.`);
-    }
-    return lines;
+    return this.#textResponseLines;
   }
 
   get images(): ImageContentData[] {
@@ -758,9 +754,12 @@ export class McpResponse implements Response {
       response.push(...this.#textResponseLines);
     }
 
-    if (this.#attachedWaitForResult?.navigatedToUrl) {
-      response.push(`Page navigated to ${this.#attachedWaitForResult.navigatedToUrl}.`);
-      structuredContent.navigatedToUrl = this.#attachedWaitForResult.navigatedToUrl;
+    if (this.#attachedWaitForResult) {
+      if (this.#attachedWaitForResult.navigatedToUrl) {
+        response.push(
+          `Page navigated to ${this.#attachedWaitForResult.navigatedToUrl}.`,
+        );
+      }
     }
 
     const networkConditions = this.#page?.networkConditions;
