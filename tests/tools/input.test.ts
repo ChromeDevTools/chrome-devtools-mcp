@@ -25,7 +25,7 @@ import {
 } from '../../src/tools/input.js';
 import {parseKey} from '../../src/utils/keyboard.js';
 import {serverHooks} from '../server.js';
-import {html, withMcpContext} from '../utils.js';
+import {html, withMcpContext, getTextContent} from '../utils.js';
 
 describe('input', () => {
   const server = serverHooks();
@@ -153,12 +153,12 @@ describe('input', () => {
           response,
           context,
         );
+        const result = await response.handle('click', context);
+        const textContent = getTextContent(result.content[0]);
         const expectedUrl = server.getRoute('/after-click');
         assert.ok(
-          response.responseLines.some(
-            line => line === `Page navigated to ${expectedUrl}.`,
-          ),
-          `Expected response to mention navigation to ${expectedUrl}, got: ${response.responseLines.join(' | ')}`,
+          textContent.includes(`Page navigated to ${expectedUrl}.`),
+          `Expected response to mention navigation to ${expectedUrl}, got: ${textContent}`,
         );
       });
     });
@@ -182,11 +182,11 @@ describe('input', () => {
           response,
           context,
         );
+        const result = await response.handle('click', context);
+        const textContent = getTextContent(result.content[0]);
         assert.ok(
-          !response.responseLines.some(line =>
-            line.startsWith('Page navigated to '),
-          ),
-          `Did not expect a navigation line, got: ${response.responseLines.join(' | ')}`,
+          !textContent.includes('Page navigated to '),
+          `Did not expect a navigation line, got: ${textContent}`,
         );
       });
     });
