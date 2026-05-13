@@ -759,6 +759,8 @@ export class McpResponse implements Response {
         response.push(
           `Page navigated to ${this.#attachedWaitForResult.navigatedToUrl}.`,
         );
+        structuredContent.navigatedToUrl =
+          this.#attachedWaitForResult.navigatedToUrl;
       }
     }
 
