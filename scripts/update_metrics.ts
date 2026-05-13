@@ -20,7 +20,7 @@ import {
   applyToExistingMetrics,
   generateToolMetrics,
   type ToolMetric,
-} from '../build/src/telemetry/toolMetricsUtils.js';
+} from '../build/src/telemetry/metricsRegistry.js';
 import {createTools} from '../build/src/tools/tools.js';
 
 export function HaveUniqueNames(tools: Array<{name: string}>): boolean {

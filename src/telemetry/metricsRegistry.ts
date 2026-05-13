@@ -11,7 +11,7 @@ import {
   transformArgType,
   getZodType,
   PARAM_BLOCKLIST,
-} from './ClearcutLogger.js';
+} from './transformation.js';
 
 /**
  * Validates that all values in an enum are of the homogeneous primitive type.

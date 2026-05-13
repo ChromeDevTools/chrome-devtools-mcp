@@ -11,7 +11,7 @@ import {McpResponse} from './McpResponse.js';
 import type {Mutex} from './Mutex.js';
 import {SlimMcpResponse} from './SlimMcpResponse.js';
 import {ClearcutLogger} from './telemetry/ClearcutLogger.js';
-import {bucketizeLatency} from './telemetry/metricUtils.js';
+import {bucketizeLatency} from './telemetry/transformation.js';
 import type {CallToolResult, zod} from './third_party/index.js';
 import type {ToolCategory} from './tools/categories.js';
 import {labels, OFF_BY_DEFAULT_CATEGORIES} from './tools/categories.js';

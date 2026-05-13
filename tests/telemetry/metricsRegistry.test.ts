@@ -11,12 +11,12 @@ import {
   applyToExistingMetrics,
   generateToolMetrics,
   validateEnumHomogeneity,
-} from '../../src/telemetry/toolMetricsUtils.js';
+} from '../../src/telemetry/metricsRegistry.js';
 import {zod} from '../../src/third_party/index.js';
 import {ToolCategory} from '../../src/tools/categories.js';
 import type {ToolDefinition} from '../../src/tools/ToolDefinition.js';
 
-describe('toolMetricsUtils', () => {
+describe('metricsRegistry', () => {
   describe('validateEnumHomogeneity', () => {
     it('should return the primitive type of a homogeneous enum', () => {
       const result = validateEnumHomogeneity(['a', 'b', 'c']);
