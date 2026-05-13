@@ -147,7 +147,7 @@ const performEvaluation = async (
   fnString: string,
   args: Array<JSHandle<unknown>>,
   response: Response,
-  options?: {filePath?: string; context?: Context},
+  options?: {filePath: string; context: Context},
 ) => {
   const fn = await evaluatable.evaluateHandle(`(${fnString})`);
   try {
@@ -159,7 +159,7 @@ const performEvaluation = async (
       fn,
       ...args,
     );
-    if (options?.filePath && options.context) {
+    if (options?.filePath) {
       const data = new TextEncoder().encode(result ?? 'undefined');
       const {filename} = await options.context.saveFile(
         data,
