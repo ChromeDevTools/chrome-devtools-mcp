@@ -595,8 +595,28 @@ The Chrome DevTools MCP server supports the following configuration option:
   If enabled, ignores errors relative to self-signed and expired certificates. Use with caution.
   - **Type:** boolean
 
+- **`--experimentalPageIdRouting`/ `--experimental-page-id-routing`**
+  Whether to expose pageId on page-scoped tools and route requests by page ID (useful for concurrent agent sessions).
+  - **Type:** boolean
+
+- **`--experimentalDevtools`/ `--experimental-devtools`**
+  Whether to enable automation over DevTools targets
+  - **Type:** boolean
+
 - **`--experimentalVision`/ `--experimental-vision`**
   Whether to enable coordinate-based tools such as click_at(x,y). Usually requires a computer-use model able to produce accurate coordinates by looking at screenshots.
+  - **Type:** boolean
+
+- **`--experimentalMemory`/ `--experimental-memory`**
+  Whether to enable experimental memory tools.
+  - **Type:** boolean
+
+- **`--experimentalStructuredContent`/ `--experimental-structured-content`**
+  Whether to output structured formatted content.
+  - **Type:** boolean
+
+- **`--experimentalIncludeAllPages`/ `--experimental-include-all-pages`**
+  Whether to include all kinds of pages such as webviews or background pages as pages.
   - **Type:** boolean
 
 - **`--experimentalScreencast`/ `--experimental-screencast`**
