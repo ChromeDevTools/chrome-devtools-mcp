@@ -25,7 +25,11 @@ function headerStringTransform(
   }
   try {
     const parsed = JSON.parse(value);
-    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    if (
+      typeof parsed !== 'object' ||
+      parsed === null ||
+      Array.isArray(parsed)
+    ) {
       throw new Error('Headers must be a JSON object');
     }
     return parsed as Record<string, string>;
@@ -92,7 +96,7 @@ export const emulate = definePageTool({
       .optional()
       .transform(headerStringTransform)
       .describe(
-        'Extra HTTP headers as a JSON string object, e.g. {"X-Custom": "value", "Authorization": "Bearer token"}. Headers persist across navigations until cleared. Pass an empty string to clear all extra headers.',
+        'Extra HTTP headers as a JSON string object, e.g. {"X-Custom": "value", "Authorization": "Bearer token"}. Headers are included into every HTTP request originating from the page and persist across navigations until cleared. Pass an empty string to clear all extra headers.',
       ),
   },
   blockedByDialog: true,
