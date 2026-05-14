@@ -187,6 +187,13 @@ export const commands: Commands = {
         description: 'An optional list of arguments to pass to the function.',
         required: false,
       },
+      filePath: {
+        name: 'filePath',
+        type: 'string',
+        description:
+          'The absolute or relative path to a file to save the script output to. If omitted, the output is returned inline.',
+        required: false,
+      },
       dialogAction: {
         name: 'dialogAction',
         type: 'string',

@@ -111,6 +111,10 @@
       {
         "name": "dialog_action_length",
         "argType": "number"
+      },
+      {
+        "name": "file_path_length",
+        "argType": "number"
       }
     ]
   },
