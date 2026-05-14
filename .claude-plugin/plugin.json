@@ -20,7 +20,12 @@
         "--viewport=${user_config.viewport}",
         "--proxyServer=${user_config.proxyServer}",
         "--acceptInsecureCerts=${user_config.acceptInsecureCerts}",
+        "--experimentalPageIdRouting=${user_config.experimentalPageIdRouting}",
+        "--experimentalDevtools=${user_config.experimentalDevtools}",
         "--experimentalVision=${user_config.experimentalVision}",
+        "--experimentalMemory=${user_config.experimentalMemory}",
+        "--experimentalStructuredContent=${user_config.experimentalStructuredContent}",
+        "--experimentalIncludeAllPages=${user_config.experimentalIncludeAllPages}",
         "--experimentalScreencast=${user_config.experimentalScreencast}",
         "--experimentalFfmpegPath=${user_config.experimentalFfmpegPath}",
         "--categoryExperimentalWebmcp=${user_config.categoryExperimentalWebmcp}",
@@ -119,10 +124,40 @@
       "description": "If enabled, ignores errors relative to self-signed and expired certificates. Use with caution.",
       "sensitive": false
     },
+    "experimentalPageIdRouting": {
+      "type": "boolean",
+      "title": "Experimental Page Id Routing",
+      "description": "Whether to expose pageId on page-scoped tools and route requests by page ID (useful for concurrent agent sessions).",
+      "sensitive": false
+    },
+    "experimentalDevtools": {
+      "type": "boolean",
+      "title": "Experimental Devtools",
+      "description": "Whether to enable automation over DevTools targets",
+      "sensitive": false
+    },
     "experimentalVision": {
       "type": "boolean",
       "title": "Experimental Vision",
       "description": "Whether to enable coordinate-based tools such as click_at(x,y). Usually requires a computer-use model able to produce accurate coordinates by looking at screenshots.",
+      "sensitive": false
+    },
+    "experimentalMemory": {
+      "type": "boolean",
+      "title": "Experimental Memory",
+      "description": "Whether to enable experimental memory tools.",
+      "sensitive": false
+    },
+    "experimentalStructuredContent": {
+      "type": "boolean",
+      "title": "Experimental Structured Content",
+      "description": "Whether to output structured formatted content.",
+      "sensitive": false
+    },
+    "experimentalIncludeAllPages": {
+      "type": "boolean",
+      "title": "Experimental Include All Pages",
+      "description": "Whether to include all kinds of pages such as webviews or background pages as pages.",
       "sensitive": false
     },
     "experimentalScreencast": {
