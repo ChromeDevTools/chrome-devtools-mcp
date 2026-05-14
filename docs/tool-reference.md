@@ -345,12 +345,12 @@ so returned values have to be JSON-serializable.
 **Parameters:**
 
 - **function** (string) **(required)**: A JavaScript function declaration to be executed by the tool in the currently selected page.
-Example without arguments: `() => {
+  Example without arguments: `() => {
   return document.title
 }` or `async () => {
   return await fetch("example.com")
 }`.
-Example with arguments: `(el) => {
+  Example with arguments: `(el) => {
   return el.innerText;
 }`
 
@@ -557,12 +557,12 @@ in the DevTools Elements panel (if any).
 ### `list_3p_developer_tools`
 
 **Description:** Lists all third-party developer tools the page exposes for providing runtime information.
-  Third-party developer tools can be called via the '[`execute_3p_developer_tool`](#execute_3p_developer_tool)()' MCP tool.
-  Alternatively, third-party developer tools can be executed by calling '[`evaluate_script`](#evaluate_script)' and adding the
-  following command to the script:
-  'window.__dtmcp.executeTool(toolName, params)'
-  This might be helpful when the third-party developer tools return non-serializable values or when composing
-  third-party developer tools with additional functionality. (requires flag: --categoryExperimentalThirdParty=true)
+Third-party developer tools can be called via the '[`execute_3p_developer_tool`](#execute_3p_developer_tool)()' MCP tool.
+Alternatively, third-party developer tools can be executed by calling '[`evaluate_script`](#evaluate_script)' and adding the
+following command to the script:
+'window.\_\_dtmcp.executeTool(toolName, params)'
+This might be helpful when the third-party developer tools return non-serializable values or when composing
+third-party developer tools with additional functionality. (requires flag: --categoryExperimentalThirdParty=true)
 
 **Parameters:** None
 
