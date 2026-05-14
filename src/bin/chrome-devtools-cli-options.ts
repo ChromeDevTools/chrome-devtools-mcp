@@ -167,6 +167,13 @@ export const commands: Commands = {
           "Emulate device viewports '<width>x<height>x<devicePixelRatio>[,mobile][,touch][,landscape]'. 'touch' and 'mobile' to emulate mobile devices. 'landscape' to emulate landscape mode.",
         required: false,
       },
+      extraHTTPHeaders: {
+        name: 'extraHTTPHeaders',
+        type: 'string',
+        description:
+          'Extra HTTP headers as a JSON string object, e.g. {"X-Custom": "value", "Authorization": "Bearer token"}. Headers are included into every HTTP request originating from the page and persist across navigations until cleared. Pass an empty string to clear all extra headers.',
+        required: false,
+      },
     },
   },
   evaluate_script: {

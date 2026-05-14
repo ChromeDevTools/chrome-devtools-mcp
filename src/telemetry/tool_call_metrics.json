@@ -85,6 +85,10 @@
       {
         "name": "viewport_length",
         "argType": "number"
+      },
+      {
+        "name": "extra_h_t_t_p_headers_length",
+        "argType": "number"
       }
     ]
   },
