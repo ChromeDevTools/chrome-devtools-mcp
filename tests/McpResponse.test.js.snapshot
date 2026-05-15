@@ -184,7 +184,7 @@ exports[`McpResponse > adds color scheme emulation setting when it is set 2`] = 
 exports[`McpResponse > adds console messages when the setting is true 1`] = `
 ## Console messages
 Showing 1-1 of 1 (Page 1 of 1).
-msgid=1 [log] Hello from the test (1 args)
+msgid=1 [log] Hello from the test (1 args) McpResponse.test.js:2:25
 `;
 
 exports[`McpResponse > adds console messages when the setting is true 2`] = `
@@ -203,7 +203,13 @@ exports[`McpResponse > adds console messages when the setting is true 2`] = `
       "type": "log",
       "text": "Hello from the test",
       "argsCount": 1,
-      "id": 1
+      "id": 1,
+      "location": {
+        "url": "pptr:evaluate;<file-path>",
+        "displayName": "McpResponse.test.js",
+        "lineNumber": 2,
+        "columnNumber": 25
+      }
     }
   ]
 }

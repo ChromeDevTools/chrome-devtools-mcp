@@ -5,13 +5,14 @@
  */
 
 import {
+  createStackTrace,
   createStackTraceForConsoleMessage,
   type TargetUniverse,
   SymbolizedError,
 } from '../DevtoolsUtils.js';
 import {UncaughtError} from '../PageCollector.js';
 import * as DevTools from '../third_party/index.js';
-import type {ConsoleMessage} from '../third_party/index.js';
+import type {ConsoleMessage, Protocol} from '../third_party/index.js';
 
 import type {IssueFormatter} from './IssueFormatter.js';
 
@@ -29,11 +30,23 @@ export type IgnoreCheck = (
   frame: DevTools.DevTools.StackTrace.StackTrace.Frame,
 ) => boolean;
 
+interface ConsoleMessageLocation {
+  /** Full URL of the source. May be empty for inline scripts. */
+  url: string;
+  /** Short display name (filename) used for compact text output. */
+  displayName: string;
+  /** 1-based line number. */
+  lineNumber: number;
+  /** 1-based column number. */
+  columnNumber: number;
+}
+
 interface ConsoleMessageConcise {
   type: string;
   text: string;
   argsCount: number;
   id: number;
+  location?: ConsoleMessageLocation;
   count?: number;
 }
 
@@ -54,6 +67,7 @@ export class ConsoleFormatter {
 
   readonly #stack?: DevTools.DevTools.StackTrace.StackTrace.StackTrace;
   readonly #cause?: SymbolizedError;
+  readonly #location?: ConsoleMessageLocation;
 
   readonly isIgnored: IgnoreCheck;
 
@@ -65,6 +79,7 @@ export class ConsoleFormatter {
     resolvedArgs?: unknown[];
     stack?: DevTools.DevTools.StackTrace.StackTrace.StackTrace;
     cause?: SymbolizedError;
+    location?: ConsoleMessageLocation;
     isIgnored: IgnoreCheck;
   }) {
     this.#id = params.id;
@@ -74,6 +89,7 @@ export class ConsoleFormatter {
     this.#resolvedArgs = params.resolvedArgs ?? [];
     this.#stack = params.stack;
     this.#cause = params.cause;
+    this.#location = params.location;
     this.isIgnored = params.isIgnored;
   }
 
@@ -106,20 +122,45 @@ export class ConsoleFormatter {
       });
 
     if (msg instanceof UncaughtError) {
+      // Fetch stack trace eagerly so that source-mapped location is available
+      // for both the concise and detailed outputs. Cause resolution remains
+      // gated by `fetchDetailedData` since it can be more expensive.
+      let stack: DevTools.DevTools.StackTrace.StackTrace.StackTrace | undefined;
+      if (options.resolvedStackTraceForTesting) {
+        stack = options.resolvedStackTraceForTesting;
+      } else if (options.devTools && msg.details.stackTrace) {
+        try {
+          stack = await withResolveTimeout(
+            createStackTrace(
+              options.devTools,
+              msg.details.stackTrace,
+              msg.targetId,
+            ),
+            options.fetchDetailedData,
+          );
+        } catch {
+          // ignore
+        }
+      }
+
       const error = await SymbolizedError.fromDetails({
         devTools: options?.devTools,
         details: msg.details,
         targetId: msg.targetId,
         includeStackAndCause: options?.fetchDetailedData,
-        resolvedStackTraceForTesting: options?.resolvedStackTraceForTesting,
+        resolvedStackTraceForTesting: stack,
         resolvedCauseForTesting: options?.resolvedCauseForTesting,
       });
+      const location =
+        extractLocationFromStack(error.stackTrace, isIgnored) ??
+        extractLocationFromExceptionDetails(msg.details);
       return new ConsoleFormatter({
         id: options.id,
         type: 'error',
         text: error.message,
         stack: error.stackTrace,
         cause: error.cause,
+        location,
         isIgnored,
       });
     }
@@ -151,17 +192,27 @@ export class ConsoleFormatter {
       );
     }
 
+    // Always try to resolve the stack trace so we can derive a source-mapped
+    // location, even for the concise output. We use a short timeout to bound
+    // the work in case underlying CDP calls hang (e.g. when the page is
+    // paused on a dialog).
     let stack: DevTools.DevTools.StackTrace.StackTrace.StackTrace | undefined;
     if (options.resolvedStackTraceForTesting) {
       stack = options.resolvedStackTraceForTesting;
-    } else if (options.fetchDetailedData && options.devTools) {
+    } else if (options.devTools) {
       try {
-        stack = await createStackTraceForConsoleMessage(options.devTools, msg);
+        stack = await withResolveTimeout(
+          createStackTraceForConsoleMessage(options.devTools, msg),
+          options.fetchDetailedData,
+        );
       } catch {
         // ignore
       }
     }
 
+    const location =
+      extractLocationFromStack(stack, isIgnored) ??
+      extractLocationFromConsoleMessage(msg);
     return new ConsoleFormatter({
       id: options.id,
       type: msg.type(),
@@ -169,6 +220,7 @@ export class ConsoleFormatter {
       argCount: resolvedArgs.length || msg.args().length,
       resolvedArgs,
       stack,
+      location,
       isIgnored,
     });
   }
@@ -201,12 +253,13 @@ export class ConsoleFormatter {
       text: this.#text,
       argsCount: this.#argCount,
       id: this.#id,
+      ...(this.#location ? {location: this.#location} : {}),
     };
   }
 
   /**
-   * Groups consecutive messages with the same type, text, and argument count.
-   * Similar to Chrome DevTools' console grouping behavior.
+   * Groups consecutive messages with the same type, text, argument count, and
+   * source location. Similar to Chrome DevTools' console grouping behavior.
    */
   static groupConsecutive(
     messages: Array<ConsoleFormatter | IssueFormatter>,
@@ -223,7 +276,8 @@ export class ConsoleFormatter {
         msg instanceof ConsoleFormatter &&
         prev.message.#type === msg.#type &&
         prev.message.#text === msg.#text &&
-        prev.message.#argCount === msg.#argCount
+        prev.message.#argCount === msg.#argCount &&
+        sameLocation(prev.message.#location, msg.#location)
       ) {
         prev.count++;
       } else {
@@ -238,6 +292,7 @@ export class ConsoleFormatter {
               type: message.#type,
               text: message.#text,
               argCount: message.#argCount,
+              location: message.#location,
               isIgnored: message.isIgnored,
             },
             count,
@@ -252,6 +307,7 @@ export class ConsoleFormatter {
       type: this.#type,
       text: this.#text,
       argsCount: this.#argCount,
+      ...(this.#location ? {location: this.#location} : {}),
       args: this.#getArgs().map(arg => formatArg(arg, this)),
       stackTrace: this.#stack
         ? formatStackTrace(this.#stack, this.#cause, this)
@@ -269,6 +325,7 @@ export class GroupedConsoleFormatter extends ConsoleFormatter {
       type: string;
       text: string;
       argCount: number;
+      location?: ConsoleMessageLocation;
       isIgnored: IgnoreCheck;
     },
     count: number,
@@ -290,7 +347,8 @@ export class GroupedConsoleFormatter extends ConsoleFormatter {
 
 function convertConsoleMessageConciseToString(msg: ConsoleMessageConcise) {
   const countSuffix = msg.count && msg.count > 1 ? ` [${msg.count} times]` : '';
-  return `msgid=${msg.id} [${msg.type}] ${msg.text} (${msg.argsCount} args)${countSuffix}`;
+  const locationStr = msg.location ? ` ${formatLocation(msg.location)}` : '';
+  return `msgid=${msg.id} [${msg.type}] ${msg.text} (${msg.argsCount} args)${locationStr}${countSuffix}`;
 }
 
 function convertConsoleMessageConciseDetailedToString(
@@ -299,10 +357,33 @@ function convertConsoleMessageConciseDetailedToString(
   const result = [
     `ID: ${msg.id}`,
     `Message: ${msg.type}> ${msg.text}`,
+    msg.location ? `Location: ${formatLocation(msg.location)}` : '',
     formatArgs(msg),
     ...(msg.stackTrace ? ['### Stack trace', msg.stackTrace] : []),
   ].filter(line => !!line);
   return result.join('\n');
+}
+
+function formatLocation(location: ConsoleMessageLocation): string {
+  const name = location.displayName || '<anonymous>';
+  return `${name}:${location.lineNumber}:${location.columnNumber}`;
+}
+
+function sameLocation(
+  a: ConsoleMessageLocation | undefined,
+  b: ConsoleMessageLocation | undefined,
+): boolean {
+  if (!a && !b) {
+    return true;
+  }
+  if (!a || !b) {
+    return false;
+  }
+  return (
+    a.url === b.url &&
+    a.lineNumber === b.lineNumber &&
+    a.columnNumber === b.columnNumber
+  );
 }
 
 function formatArgs(msg: ConsoleMessageDetailed): string {
@@ -421,4 +502,136 @@ function formatCause(
     `Caused by: ${cause.message}`,
     ...formatStackTraceInner(cause.stackTrace, cause.cause, formatter),
   ];
+}
+
+/**
+ * Returns the source-mapped location of the top non-ignored frame in the
+ * given stack trace. Falls back to the raw frame URL when the frame does not
+ * have an associated `uiSourceCode`.
+ */
+function extractLocationFromStack(
+  stack: DevTools.DevTools.StackTrace.StackTrace.StackTrace | undefined,
+  isIgnored: IgnoreCheck,
+): ConsoleMessageLocation | undefined {
+  if (!stack) {
+    return undefined;
+  }
+  const frame = stack.syncFragment.frames.find(f => !isIgnored(f));
+  if (!frame) {
+    return undefined;
+  }
+  if (frame.uiSourceCode) {
+    const uiLocation = frame.uiSourceCode.uiLocation(frame.line, frame.column);
+    const url = uiLocation.uiSourceCode.url();
+    return {
+      url,
+      displayName: shortUrl(url) || uiLocation.uiSourceCode.displayName(),
+      // UILocation stores 0-based line/column indices.
+      lineNumber: uiLocation.lineNumber + 1,
+      columnNumber: (uiLocation.columnNumber ?? 0) + 1,
+    };
+  }
+  if (frame.url) {
+    return {
+      url: frame.url,
+      displayName: shortUrl(frame.url),
+      // StackTrace frames are already 1-based.
+      lineNumber: frame.line,
+      columnNumber: frame.column,
+    };
+  }
+  return undefined;
+}
+
+function extractLocationFromConsoleMessage(
+  msg: ConsoleMessage,
+): ConsoleMessageLocation | undefined {
+  const loc = msg.location();
+  if (loc.lineNumber !== undefined && loc.columnNumber !== undefined) {
+    const url = loc.url ?? '';
+    return {
+      url,
+      displayName: shortUrl(url),
+      lineNumber: loc.lineNumber + 1,
+      columnNumber: loc.columnNumber + 1,
+    };
+  }
+  return undefined;
+}
+
+function extractLocationFromExceptionDetails(
+  details: Protocol.Runtime.ExceptionDetails,
+): ConsoleMessageLocation | undefined {
+  const frame = details.stackTrace?.callFrames?.[0];
+  if (frame) {
+    return {
+      url: frame.url,
+      displayName: shortUrl(frame.url),
+      lineNumber: frame.lineNumber + 1,
+      columnNumber: frame.columnNumber + 1,
+    };
+  }
+  if (details.lineNumber !== undefined) {
+    const url = details.url ?? '';
+    return {
+      url,
+      displayName: shortUrl(url),
+      lineNumber: details.lineNumber + 1,
+      columnNumber: (details.columnNumber ?? 0) + 1,
+    };
+  }
+  return undefined;
+}
+
+/**
+ * Returns the last path segment of a URL as a short display name.
+ * Decodes percent-encoded characters, unwraps parenthesised inner URLs
+ * used by puppeteer (e.g.
+ * `pptr:evaluateHandle;performEvaluation (file:///.../script.js:104:34)`),
+ * and strips any trailing `:line:col` suffix so URLs reduce to the
+ * inner file's basename.
+ */
+function shortUrl(url: string): string {
+  if (!url) {
+    return '';
+  }
+  let str = url;
+  try {
+    str = decodeURIComponent(str);
+  } catch {
+    // Leave url as-is when it is not validly percent-encoded.
+  }
+  // Unwrap parenthesised inner URL for puppeteer-style wrappers.
+  const parenMatch = str.match(/\(([^()]+)\)/);
+  if (parenMatch) {
+    str = parenMatch[1];
+  }
+  // Strip trailing :line:col or :line so the basename is extractable.
+  str = str.replace(/:\d+(?::\d+)?$/, '');
+  const slashIdx = str.lastIndexOf('/');
+  return slashIdx >= 0 ? str.slice(slashIdx + 1) : str;
+}
+
+/**
+ * Bounds a stack-trace resolution promise with a timeout so that hanging CDP
+ * calls (for example, when the page is paused on a dialog) do not block the
+ * containing tool call. Required because we resolve the stack trace eagerly
+ * even for the concise output to derive a source-mapped location.
+ */
+async function withResolveTimeout<T>(
+  promise: Promise<T>,
+  fetchDetailedData: boolean | undefined,
+): Promise<T | undefined> {
+  const timeoutMs = fetchDetailedData ? 10_000 : 5_000;
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  const timeoutPromise = new Promise<undefined>(resolve => {
+    timeoutId = setTimeout(() => resolve(undefined), timeoutMs);
+  });
+  try {
+    return await Promise.race([promise.catch(() => undefined), timeoutPromise]);
+  } finally {
+    if (timeoutId !== undefined) {
+      clearTimeout(timeoutId);
+    }
+  }
 }

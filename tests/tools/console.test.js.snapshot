@@ -1,6 +1,7 @@
 exports[`console > get_console_message > applies source maps to stack traces of Error object (with cause) console.log arguments 1`] = `
 ID: 1
 Message: log> foo failed Error: bar failed
+Location: main.js:18:13
 ### Arguments
 Arg #0: foo failed
 Arg #1: Error: bar failed
@@ -22,6 +23,7 @@ Note: line and column numbers use 1-based indexing
 exports[`console > get_console_message > applies source maps to stack traces of Error object console.log arguments 1`] = `
 ID: 1
 Message: log> An error happened: Error: b00m!
+Location: main.js:14:13
 ### Arguments
 Arg #0: An error happened:
 Arg #1: Error: b00m!
@@ -39,6 +41,7 @@ Note: line and column numbers use 1-based indexing
 exports[`console > get_console_message > applies source maps to stack traces of console messages 1`] = `
 ID: 1
 Message: warn> hello world
+Location: main.js:3:11
 ### Arguments
 Arg #0: hello world
 ### Stack trace
@@ -52,6 +55,7 @@ Note: line and column numbers use 1-based indexing
 exports[`console > get_console_message > applies source maps to stack traces of uncaught exceptions 1`] = `
 ID: 1
 Message: error> Uncaught Error: b00m!
+Location: main.js:3:9
 ### Stack trace
 at bar (main.js:3:9)
 at foo (main.js:7:3)
@@ -63,6 +67,7 @@ Note: line and column numbers use 1-based indexing
 exports[`console > get_console_message > applies source maps to stack traces of uncaught exceptions with cause 1`] = `
 ID: 1
 Message: error> Uncaught Error: foo failed
+Location: main.js:18:11
 ### Stack trace
 at Iife (main.js:18:11)
 at <anonymous> (main.js:14:1)
@@ -81,6 +86,7 @@ Note: line and column numbers use 1-based indexing
 exports[`console > get_console_message > ignores frames from ignore listed URLs 1`] = `
 ID: 1
 Message: log> hello from callback
+Location: 'main.js':3:21
 ### Arguments
 Arg #0: hello from callback
 ### Stack trace
@@ -130,6 +136,12 @@ exports[`console > get_console_message > when dialog is open 1`] = `
     "type": "error",
     "text": "This is an error",
     "argsCount": 1,
+    "location": {
+      "url": "debugger:///VM7",
+      "displayName": "VM7",
+      "lineNumber": 1,
+      "columnNumber": 9
+    },
     "args": [
       "This is an error"
     ],
@@ -149,18 +161,24 @@ exports[`console > get_console_message > when dialog is open 1`] = `
       "type": "error",
       "text": "This is an error",
       "argsCount": 1,
-      "id": 1
+      "id": 1,
+      "location": {
+        "url": "debugger:///VM7",
+        "displayName": "VM7",
+        "lineNumber": 1,
+        "columnNumber": 9
+      }
     }
   ]
 }
 `;
 
 exports[`console > list_console_messages > issues > when dialog is open 1`] = `
-{"content":[{"type":"text","text":"# Open dialog\\nalert: test dialog.\\nCall handle_dialog to handle it before continuing.\\n## Console messages\\nShowing 1-1 of 1 (Page 1 of 1).\\nmsgid=1 [log] Pre-dialog message (1 args)"}],"structuredContent":{"dialog":{"type":"alert","message":"test dialog","defaultValue":""},"pagination":{"currentPage":0,"totalPages":1,"hasNextPage":false,"hasPreviousPage":false,"startIndex":0,"endIndex":1,"invalidPage":false},"consoleMessages":[{"type":"log","text":"Pre-dialog message","argsCount":1,"id":1}]}}
+{"content":[{"type":"text","text":"# Open dialog\\nalert: test dialog.\\nCall handle_dialog to handle it before continuing.\\n## Console messages\\nShowing 1-1 of 1 (Page 1 of 1).\\nmsgid=1 [log] Pre-dialog message (1 args) <anonymous>:1:9"}],"structuredContent":{"dialog":{"type":"alert","message":"test dialog","defaultValue":""},"pagination":{"currentPage":0,"totalPages":1,"hasNextPage":false,"hasPreviousPage":false,"startIndex":0,"endIndex":1,"invalidPage":false},"consoleMessages":[{"type":"log","text":"Pre-dialog message","argsCount":1,"id":1,"location":{"url":"","displayName":"","lineNumber":1,"columnNumber":9}}]}}
 `;
 
 exports[`console > list_console_messages > lists error objects 1`] = `
 ## Console messages
 Showing 1-1 of 1 (Page 1 of 1).
-msgid=1 [error] Error: This is an error (1 args)
+msgid=1 [error] Error: This is an error (1 args) VM7:1:9
 `;
