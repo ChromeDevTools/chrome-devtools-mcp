@@ -7,7 +7,7 @@ exports[`e2e > Dialogs > when dialog is open and tool is blocked, returns an err
 `;
 
 exports[`e2e > Dialogs > when dialog is open and tool is not blocked, executes tool 1`] = `
-{"content":[{"type":"text","text":"# Open dialog\\nalert: test dialog.\\nCall handle_dialog to handle it before continuing.\\n## Pages\\n1: about:blank\\n2: data:text/html,<button id=\\"test\\" onclick=\\"alert('test dialog')\\">Click me</button>\\n3: data:text/html,<h1>New</h1> [selected]"}]}
+{"content":[{"type":"text","text":"## Pages\\n1: about:blank\\n2: data:text/html,<button id=\\"test\\" onclick=\\"alert('test dialog')\\">Click me</button>\\n3: data:text/html,<h1>New</h1> [selected]"}]}
 `;
 
 exports[`e2e > calls a tool 1`] = `

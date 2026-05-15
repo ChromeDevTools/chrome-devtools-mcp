@@ -11,6 +11,9 @@ import process from 'node:process';
 
 import {logger} from '../logger.js';
 
+import {ClearcutLogger} from './ClearcutLogger.js';
+import {ErrorCode} from './errors.js';
+
 export interface LocalState {
   lastActive: string; // ISO 8601 UTC date string
 }
@@ -50,11 +53,24 @@ export class FilePersistence implements Persistence {
   }
 
   async loadState(): Promise<LocalState> {
+    const filePath = path.join(this.#dataFolder, STATE_FILE_NAME);
     try {
-      const filePath = path.join(this.#dataFolder, STATE_FILE_NAME);
+      await fs.access(filePath);
+    } catch {
+      // File doesn't exist. Not an error because new users do not have the state file.
+      return {
+        lastActive: '',
+      };
+    }
+
+    try {
       const content = await fs.readFile(filePath, 'utf-8');
       return JSON.parse(content) as LocalState;
-    } catch {
+    } catch (error) {
+      logger(`Failed to read telemetry state from ${filePath}:`, error);
+      void ClearcutLogger.get()?.logServerError({
+        errorCode: ErrorCode.ERROR_CODE_PERSISTENCE_FILE_READ_FAILED,
+      });
       return {
         lastActive: '',
       };
@@ -69,6 +85,9 @@ export class FilePersistence implements Persistence {
     } catch (error) {
       // Ignore errors during state saving to avoid crashing the server
       logger(`Failed to save telemetry state to ${filePath}:`, error);
+      void ClearcutLogger.get()?.logServerError({
+        errorCode: ErrorCode.ERROR_CODE_PERSISTENCE_FILE_SAVE_FAILED,
+      });
     }
   }
 }

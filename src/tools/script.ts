@@ -46,6 +46,12 @@ Example with arguments: \`(el) => {
         )
         .optional()
         .describe(`An optional list of arguments to pass to the function.`),
+      filePath: zod
+        .string()
+        .optional()
+        .describe(
+          'The absolute or relative path to a file to save the script output to. If omitted, the output is returned inline.',
+        ),
       dialogAction: zod
         .string()
         .optional()
@@ -72,7 +78,10 @@ Example with arguments: \`(el) => {
         function: fnString,
         pageId,
         dialogAction,
+        filePath,
       } = request.params;
+
+      context.validatePath(filePath);
 
       if (cliArgs?.categoryExtensions && serviceWorkerId) {
         if (uidArgs && uidArgs.length > 0) {
@@ -85,12 +94,18 @@ Example with arguments: \`(el) => {
         }
 
         const worker = await getWebWorker(context, serviceWorkerId);
-        await context.getSelectedMcpPage().waitForEventsAfterAction(
-          async () => {
-            await performEvaluation(worker, fnString, [], response);
-          },
-          {handleDialog: dialogAction ?? 'accept'},
-        );
+        const result = await context
+          .getSelectedMcpPage()
+          .waitForEventsAfterAction(
+            async () => {
+              await performEvaluation(worker, fnString, [], response, {
+                filePath,
+                context,
+              });
+            },
+            {handleDialog: dialogAction ?? 'accept'},
+          );
+        response.attachWaitForResult(result);
         return;
       }
 
@@ -110,12 +125,16 @@ Example with arguments: \`(el) => {
 
         const evaluatable = await getPageOrFrame(page, frames);
 
-        await mcpPage.waitForEventsAfterAction(
+        const result = await mcpPage.waitForEventsAfterAction(
           async () => {
-            await performEvaluation(evaluatable, fnString, args, response);
+            await performEvaluation(evaluatable, fnString, args, response, {
+              filePath,
+              context,
+            });
           },
           {handleDialog: dialogAction ?? 'accept'},
         );
+        response.attachWaitForResult(result);
       } finally {
         void Promise.allSettled(args.map(arg => arg.dispose()));
       }
@@ -128,6 +147,7 @@ const performEvaluation = async (
   fnString: string,
   args: Array<JSHandle<unknown>>,
   response: Response,
+  options?: {filePath: string; context: Context},
 ) => {
   const fn = await evaluatable.evaluateHandle(`(${fnString})`);
   try {
@@ -139,10 +159,22 @@ const performEvaluation = async (
       fn,
       ...args,
     );
-    response.appendResponseLine('Script ran on page and returned:');
-    response.appendResponseLine('```json');
-    response.appendResponseLine(`${result}`);
-    response.appendResponseLine('```');
+    if (options?.filePath) {
+      const data = new TextEncoder().encode(result ?? 'undefined');
+      const {filename} = await options.context.saveFile(
+        data,
+        options.filePath,
+        '.json',
+      );
+      response.appendResponseLine(
+        `Script ran on page. Output saved to ${filename}.`,
+      );
+    } else {
+      response.appendResponseLine('Script ran on page and returned:');
+      response.appendResponseLine('```json');
+      response.appendResponseLine(`${result}`);
+      response.appendResponseLine('```');
+    }
   } finally {
     void fn.dispose();
   }

@@ -111,6 +111,10 @@
       {
         "name": "dialog_action_length",
         "argType": "number"
+      },
+      {
+        "name": "file_path_length",
+        "argType": "number"
       }
     ]
   },
@@ -612,7 +616,7 @@
     ]
   },
   {
-    "name": "execute_3p_developer_tool",
+    "name": "execute3p_developer_tool",
     "args": [
       {
         "name": "tool_name_length",
@@ -625,7 +629,7 @@
     ]
   },
   {
-    "name": "list_3p_developer_tools",
+    "name": "list3p_developer_tools",
     "args": []
   },
   {

@@ -26,7 +26,7 @@ import {
 } from '../../src/tools/input.js';
 import {parseKey} from '../../src/utils/keyboard.js';
 import {serverHooks} from '../server.js';
-import {html, withMcpContext} from '../utils.js';
+import {html, withMcpContext, getTextContent} from '../utils.js';
 
 describe('input', () => {
   const server = serverHooks();
@@ -128,6 +128,67 @@ describe('input', () => {
         ]);
 
         assert(t1 > t2, 'Waited for navigation');
+      });
+    });
+
+    it('reports the new URL when click triggers a navigation', async () => {
+      server.addHtmlRoute(
+        '/start',
+        html`<a href="/after-click">Navigate page</a>`,
+      );
+      server.addHtmlRoute('/after-click', html`<main>arrived</main>`);
+
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedPptrPage();
+        await page.goto(server.getRoute('/start'));
+        context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
+          context.getSelectedMcpPage(),
+        );
+        await click.handler(
+          {
+            params: {
+              uid: '1_1',
+            },
+            page: context.getSelectedMcpPage(),
+          },
+          response,
+          context,
+        );
+        const result = await response.handle('click', context);
+        const textContent = getTextContent(result.content[0]);
+        const expectedUrl = server.getRoute('/after-click');
+        assert.ok(
+          textContent.includes(`Page navigated to ${expectedUrl}.`),
+          `Expected response to mention navigation to ${expectedUrl}, got: ${textContent}`,
+        );
+      });
+    });
+
+    it('does not report navigation when click does not navigate', async () => {
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedPptrPage();
+        await page.setContent(
+          html`<button onclick="this.innerText = 'clicked';">test</button>`,
+        );
+        context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
+          context.getSelectedMcpPage(),
+        );
+        await click.handler(
+          {
+            params: {
+              uid: '1_1',
+            },
+            page: context.getSelectedMcpPage(),
+          },
+          response,
+          context,
+        );
+        const result = await response.handle('click', context);
+        const textContent = getTextContent(result.content[0]);
+        assert.ok(
+          !textContent.includes('Page navigated to '),
+          `Did not expect a navigation line, got: ${textContent}`,
+        );
       });
     });
 

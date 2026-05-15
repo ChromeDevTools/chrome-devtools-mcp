@@ -14,7 +14,6 @@ import {
   type Flags,
   type RunnerResult,
   type OutputMode,
-  agenticBrowsingConfig,
 } from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
@@ -89,17 +88,16 @@ export const lighthouseAudit = definePageTool({
       };
     }
 
-    const options: {flags: Flags; config?: object} = {
-      flags,
-      config: agenticBrowsingConfig,
-    };
-
     let result: RunnerResult | undefined;
     try {
       if (mode === 'navigation') {
-        result = await navigation(page.pptrPage, page.pptrPage.url(), options);
+        result = await navigation(page.pptrPage, page.pptrPage.url(), {
+          flags,
+        });
       } else {
-        result = await snapshot(page.pptrPage, options);
+        result = await snapshot(page.pptrPage, {
+          flags,
+        });
       }
 
       if (!result) {

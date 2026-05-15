@@ -150,35 +150,29 @@ export const cliOptions = {
   experimentalPageIdRouting: {
     type: 'boolean',
     describe:
-      'Whether to expose pageId on page-scoped tools and route requests by page ID.',
-    hidden: true,
+      'Whether to expose pageId on page-scoped tools and route requests by page ID (useful for concurrent agent sessions).',
   },
   experimentalDevtools: {
     type: 'boolean',
     describe: 'Whether to enable automation over DevTools targets',
-    hidden: true,
   },
   experimentalVision: {
     type: 'boolean',
     describe:
       'Whether to enable coordinate-based tools such as click_at(x,y). Usually requires a computer-use model able to produce accurate coordinates by looking at screenshots.',
-    hidden: false,
   },
   experimentalMemory: {
     type: 'boolean',
     describe: 'Whether to enable experimental memory tools.',
-    hidden: true,
   },
   experimentalStructuredContent: {
     type: 'boolean',
     describe: 'Whether to output structured formatted content.',
-    hidden: true,
   },
   experimentalIncludeAllPages: {
     type: 'boolean',
     describe:
       'Whether to include all kinds of pages such as webviews or background pages as pages.',
-    hidden: true,
   },
   experimentalNavigationAllowlist: {
     type: 'boolean',
