@@ -178,16 +178,12 @@
 
 ### `get_element_at`
 
-**Description:** Returns the DOM element at viewport-relative CSS-pixel coordinates (x, y). Pairs with [`take_screenshot`](#take_screenshot) + a vision model that emits coordinates. Pierces open shadow roots by default. Limitations: cannot enter closed shadow roots; cannot enter cross-origin/OOPIF iframes (the call returns a 'cross-origin-blocked' result with partial metadata about the iframe); css="matched" requires the experimentalVision flag and uses Chrome DevTools Protocol. For huge elements use mode="schema" (default) or pass filePath to write the full descriptor to disk. (requires flag: --experimentalVision=true)
+**Description:** Returns the uid of the DOM element at viewport-relative CSS-pixel coordinates (x, y). Pair with [`take_screenshot`](#take_screenshot) + a vision model that emits coordinates; feed the returned uid into uid-based tools such as [`click`](#click), [`hover`](#hover), or [`fill`](#fill). The response also includes the refreshed page snapshot. Pierces open shadow roots and descends same-origin iframes. Cannot reach closed shadow roots or cross-origin / OOPIF iframes. (requires flag: --experimentalVision=true)
 
 **Parameters:**
 
 - **x** (number) **(required)**: CSS-pixel X coordinate, viewport-relative.
 - **y** (number) **(required)**: CSS-pixel Y coordinate, viewport-relative.
-- **css** (enum: "none", "matched", "computed-visual", "computed-full") _(optional)_: CSS data to include. matched = author rules from cascade (uses CDP). computed-visual = ~30 visually relevant computed properties. computed-full = all computed properties (saved to file when large).
-- **filePath** (string) _(optional)_: If set, writes the full descriptor (raw outerHTML + full computed CSS) to this path and returns a summary in the response.
-- **mode** (enum: "auto", "schema", "raw", "selector-only") _(optional)_: Output detail level. auto/schema = compact MD descriptor. raw = full outerHTML (truncated to 50KB or saved to file). selector-only = just the CSS selector.
-- **pierceShadow** (boolean) _(optional)_: Whether to descend into open shadow roots. Default true. Closed shadow roots are never pierced.
 
 ---
 

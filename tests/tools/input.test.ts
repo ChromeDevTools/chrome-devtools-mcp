@@ -6,7 +6,6 @@
 
 import assert from 'node:assert';
 import fs from 'node:fs/promises';
-import os from 'node:os';
 import path from 'node:path';
 import {describe, it} from 'node:test';
 
@@ -1303,97 +1302,7 @@ describe('input', () => {
   });
 
   describe('get_element_at', () => {
-    it('returns a basic descriptor for an element at coordinates', async () => {
-      await withMcpContext(async (response, context) => {
-        const page = context.getSelectedPptrPage();
-        await page.setContent(
-          html`<button
-            id="x"
-            class="btn primary"
-            style="position:absolute;left:0;top:0;width:100px;height:100px;"
-          >
-            Hi
-          </button>`,
-        );
-        await getElementAt.handler(
-          {
-            params: {
-              x: 50,
-              y: 50,
-              mode: 'auto',
-              css: 'none',
-            },
-            page: context.getSelectedMcpPage(),
-          },
-          response,
-          context,
-        );
-        const output = response.responseLines.join('\n');
-        assert.ok(output.includes('tag'), `output missing tag: ${output}`);
-        assert.ok(
-          output.includes('button'),
-          `output missing tag value 'button': ${output}`,
-        );
-        assert.ok(output.includes('id'), `output missing id: ${output}`);
-        assert.ok(output.includes('`x`'), `output missing id value: ${output}`);
-        assert.ok(
-          output.includes('btn primary'),
-          `output missing class list: ${output}`,
-        );
-        assert.ok(
-          output.includes('Hi'),
-          `output missing button text: ${output}`,
-        );
-        assert.ok(
-          output.includes('#x'),
-          `output missing selector containing #x: ${output}`,
-        );
-      });
-    });
-
-    it('returns only the selector in selector-only mode', async () => {
-      await withMcpContext(async (response, context) => {
-        const page = context.getSelectedPptrPage();
-        await page.setContent(
-          html`<button
-            id="x"
-            class="btn primary"
-            style="position:absolute;left:0;top:0;width:100px;height:100px;"
-          >
-            Hi
-          </button>`,
-        );
-        await getElementAt.handler(
-          {
-            params: {
-              x: 50,
-              y: 50,
-              mode: 'selector-only',
-              css: 'none',
-            },
-            page: context.getSelectedMcpPage(),
-          },
-          response,
-          context,
-        );
-        assert.strictEqual(response.responseLines.length, 1);
-        const selector = response.responseLines[0];
-        assert.ok(
-          selector.includes('#x'),
-          `selector should contain #x: ${selector}`,
-        );
-        assert.ok(
-          !selector.includes('##'),
-          `selector should not contain markdown headers: ${selector}`,
-        );
-        assert.ok(
-          !selector.startsWith('-'),
-          `selector should not be a markdown list: ${selector}`,
-        );
-      });
-    });
-
-    it('returns the outerHTML wrapped in a fenced html block in raw mode', async () => {
+    it('returns a uid for an element at coordinates and refreshes the snapshot', async () => {
       await withMcpContext(async (response, context) => {
         const page = context.getSelectedPptrPage();
         await page.setContent(
@@ -1406,147 +1315,25 @@ describe('input', () => {
         );
         await getElementAt.handler(
           {
-            params: {
-              x: 50,
-              y: 50,
-              mode: 'raw',
-              css: 'none',
-            },
+            params: {x: 50, y: 50},
             page: context.getSelectedMcpPage(),
           },
           response,
           context,
         );
         const output = response.responseLines.join('\n');
-        assert.ok(
-          output.includes('```html'),
-          `output should include fenced html block opener: ${output}`,
-        );
-        assert.ok(
-          output.includes('<button'),
-          `output should include the actual outerHTML: ${output}`,
-        );
-        assert.ok(
-          output.includes('Hi'),
-          `output should include the button text: ${output}`,
-        );
+        const match = /Element uid: (\S+)/.exec(output);
+        assert.ok(match, `output should contain a uid line: ${output}`);
+        assert.notStrictEqual(response.snapshotParams, undefined);
+
+        const mcpPage = context.getSelectedMcpPage();
+        const handle = await mcpPage.getElementByUid(match[1]);
+        const id = await handle.evaluate(el => (el as HTMLElement).id);
+        assert.strictEqual(id, 'x');
       });
     });
 
-    it('saves a file path when raw outerHTML exceeds the inline limit', async () => {
-      await withMcpContext(async (response, context) => {
-        const page = context.getSelectedPptrPage();
-        const big = 'x'.repeat(60_000);
-        await page.setContent(
-          html`<div
-            id="big"
-            style="position:absolute;left:0;top:0;width:200px;height:200px;background:yellow;overflow:hidden;"
-          >
-            ${big}
-          </div>`,
-        );
-        await getElementAt.handler(
-          {
-            params: {
-              x: 50,
-              y: 50,
-              mode: 'raw',
-              css: 'none',
-            },
-            page: context.getSelectedMcpPage(),
-          },
-          response,
-          context,
-        );
-        const output = response.responseLines.join('\n');
-        assert.ok(
-          /full content saved to /.test(output),
-          `output should mention saved file: ${output}`,
-        );
-      });
-    });
-
-    it('includes computed-visual CSS when css="computed-visual"', async () => {
-      await withMcpContext(async (response, context) => {
-        const page = context.getSelectedPptrPage();
-        await page.setContent(
-          html`<button
-            style="position:absolute;left:0;top:0;width:100px;height:100px;color: rgb(255, 0, 0); font-weight: 700;"
-          >
-            x
-          </button>`,
-        );
-        await getElementAt.handler(
-          {
-            params: {
-              x: 50,
-              y: 50,
-              mode: 'auto',
-              css: 'computed-visual',
-            },
-            page: context.getSelectedMcpPage(),
-          },
-          response,
-          context,
-        );
-        const output = response.responseLines.join('\n');
-        assert.ok(
-          output.includes('### CSS (computed-visual)'),
-          `output should include computed-visual heading: ${output}`,
-        );
-        assert.ok(
-          output.includes('color'),
-          `output should include color property: ${output}`,
-        );
-        assert.ok(
-          output.includes('font-weight'),
-          `output should include font-weight property: ${output}`,
-        );
-      });
-    });
-
-    it('includes matched CSS rules when css="matched"', async () => {
-      await withMcpContext(async (response, context) => {
-        const page = context.getSelectedPptrPage();
-        await page.setContent(
-          html`<style>
-              .foo {
-                color: blue;
-              }
-            </style>
-            <button
-              class="foo"
-              style="position:absolute;left:0;top:0;width:100px;height:100px;"
-            >
-              x
-            </button>`,
-        );
-        await getElementAt.handler(
-          {
-            params: {
-              x: 50,
-              y: 50,
-              mode: 'auto',
-              css: 'matched',
-            },
-            page: context.getSelectedMcpPage(),
-          },
-          response,
-          context,
-        );
-        const output = response.responseLines.join('\n');
-        assert.ok(
-          output.includes('### CSS (matched)'),
-          `output should include matched CSS heading: ${output}`,
-        );
-        assert.ok(
-          output.includes('.foo'),
-          `output should reference the .foo selector: ${output}`,
-        );
-      });
-    });
-
-    it('reports no element found with self-healing guidance when out of viewport', async () => {
+    it('throws when no element is found at the coordinates', async () => {
       await withMcpContext(async (response, context) => {
         const page = context.getSelectedPptrPage();
         await page.setContent(
@@ -1556,32 +1343,49 @@ describe('input', () => {
             x
           </button>`,
         );
+        await assert.rejects(
+          getElementAt.handler(
+            {
+              params: {x: 5000, y: 5000},
+              page: context.getSelectedMcpPage(),
+            },
+            response,
+            context,
+          ),
+          /No element found at \(5000, 5000\)/,
+        );
+      });
+    });
+
+    it('resolves a plain non-accessible element via the extraHandles fallback', async () => {
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedPptrPage();
+        await page.setContent(
+          html`<div
+            id="plain"
+            style="position:absolute;left:0;top:0;width:100px;height:100px;background:red;"
+          ></div>`,
+        );
         await getElementAt.handler(
           {
-            params: {
-              x: 5000,
-              y: 5000,
-              mode: 'auto',
-              css: 'none',
-            },
+            params: {x: 50, y: 50},
             page: context.getSelectedMcpPage(),
           },
           response,
           context,
         );
         const output = response.responseLines.join('\n');
-        assert.ok(
-          output.includes('No element found'),
-          `output should report no element found: ${output}`,
-        );
-        assert.ok(
-          output.includes('outside the viewport'),
-          `output should mention 'outside the viewport': ${output}`,
-        );
+        const match = /Element uid: (\S+)/.exec(output);
+        assert.ok(match, `output should contain a uid line: ${output}`);
+
+        const mcpPage = context.getSelectedMcpPage();
+        const handle = await mcpPage.getElementByUid(match[1]);
+        const id = await handle.evaluate(el => (el as HTMLElement).id);
+        assert.strictEqual(id, 'plain');
       });
     });
 
-    it('pierces open shadow roots and reports inOpenShadow=true', async () => {
+    it('pierces open shadow roots', async () => {
       await withMcpContext(async (response, context) => {
         const page = context.getSelectedPptrPage();
         await page.setContent(
@@ -1609,30 +1413,24 @@ describe('input', () => {
         );
         await getElementAt.handler(
           {
-            params: {
-              x: 50,
-              y: 50,
-              mode: 'auto',
-              css: 'none',
-            },
+            params: {x: 50, y: 50},
             page: context.getSelectedMcpPage(),
           },
           response,
           context,
         );
         const output = response.responseLines.join('\n');
-        assert.ok(
-          output.includes('`inner`'),
-          `output should identify the inner button id: ${output}`,
-        );
-        assert.ok(
-          output.includes('inOpenShadow=true'),
-          `output should set inOpenShadow=true: ${output}`,
-        );
+        const match = /Element uid: (\S+)/.exec(output);
+        assert.ok(match, `output should contain a uid line: ${output}`);
+
+        const mcpPage = context.getSelectedMcpPage();
+        const handle = await mcpPage.getElementByUid(match[1]);
+        const id = await handle.evaluate(el => (el as HTMLElement).id);
+        assert.strictEqual(id, 'inner');
       });
     });
 
-    it('descends into a same-origin iframe and identifies the inner element', async () => {
+    it('descends into a same-origin iframe', async () => {
       await withMcpContext(async (response, context) => {
         const page = context.getSelectedPptrPage();
         await page.setContent(
@@ -1650,84 +1448,20 @@ describe('input', () => {
         );
         await getElementAt.handler(
           {
-            params: {
-              x: 50,
-              y: 50,
-              mode: 'auto',
-              css: 'none',
-            },
+            params: {x: 50, y: 50},
             page: context.getSelectedMcpPage(),
           },
           response,
           context,
         );
         const output = response.responseLines.join('\n');
-        assert.ok(
-          output.includes('`inner`'),
-          `output should identify the inner element id: ${output}`,
-        );
-        assert.ok(
-          output.includes('frameOrigin='),
-          `output should include a frameOrigin indicator: ${output}`,
-        );
-      });
-    });
+        const match = /Element uid: (\S+)/.exec(output);
+        assert.ok(match, `output should contain a uid line: ${output}`);
 
-    it('writes the full descriptor to disk when filePath is provided', async () => {
-      await withMcpContext(async (response, context) => {
-        const page = context.getSelectedPptrPage();
-        await page.setContent(
-          html`<button
-            id="x"
-            style="position:absolute;left:0;top:0;width:100px;height:100px;"
-          >
-            Hi
-          </button>`,
-        );
-        const tmpDir = await fs.mkdtemp(
-          path.join(os.tmpdir(), 'get-element-at-test-'),
-        );
-        const filePath = path.join(tmpDir, 'desc.json');
-        try {
-          await getElementAt.handler(
-            {
-              params: {
-                x: 50,
-                y: 50,
-                mode: 'auto',
-                css: 'none',
-                filePath,
-              },
-              page: context.getSelectedMcpPage(),
-            },
-            response,
-            context,
-          );
-          const output = response.responseLines.join('\n');
-          assert.ok(
-            output.includes('Saved full element descriptor to'),
-            `output should reference the saved descriptor: ${output}`,
-          );
-          assert.ok(
-            output.includes('desc.json'),
-            `output should include the file name: ${output}`,
-          );
-          const written = await fs.readFile(filePath, 'utf8');
-          const parsed: unknown = JSON.parse(written);
-          assert.ok(
-            parsed !== null &&
-              typeof parsed === 'object' &&
-              'descriptor' in parsed,
-            'written file should contain a JSON object with a descriptor field',
-          );
-          const descriptorField = parsed.descriptor;
-          assert.ok(
-            descriptorField !== null && typeof descriptorField === 'object',
-            'descriptor field should be an object',
-          );
-        } finally {
-          await fs.rm(tmpDir, {recursive: true, force: true});
-        }
+        const mcpPage = context.getSelectedMcpPage();
+        const handle = await mcpPage.getElementByUid(match[1]);
+        const id = await handle.evaluate(el => (el as HTMLElement).id);
+        assert.strictEqual(id, 'inner');
       });
     });
   });

@@ -641,19 +641,23 @@
       },
       {
         "name": "mode",
-        "argType": "string"
+        "argType": "string",
+        "isDeprecated": true
       },
       {
         "name": "css",
-        "argType": "string"
+        "argType": "string",
+        "isDeprecated": true
       },
       {
         "name": "pierce_shadow",
-        "argType": "boolean"
+        "argType": "boolean",
+        "isDeprecated": true
       },
       {
         "name": "file_path_length",
-        "argType": "number"
+        "argType": "number",
+        "isDeprecated": true
       }
     ]
   }
