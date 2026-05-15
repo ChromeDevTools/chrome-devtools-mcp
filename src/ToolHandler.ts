@@ -12,7 +12,8 @@ import type {Mutex} from './Mutex.js';
 import {SlimMcpResponse} from './SlimMcpResponse.js';
 import {ClearcutLogger} from './telemetry/ClearcutLogger.js';
 import {bucketizeLatency} from './telemetry/transformation.js';
-import type {CallToolResult, zod} from './third_party/index.js';
+import type {CallToolResult} from './third_party/index.js';
+import {zod} from './third_party/index.js';
 import type {ToolCategory} from './tools/categories.js';
 import {labels, OFF_BY_DEFAULT_CATEGORIES} from './tools/categories.js';
 import type {DefinedPageTool, ToolDefinition} from './tools/ToolDefinition.js';
@@ -121,8 +122,29 @@ function isPageScopedTool(
   return 'pageScoped' in tool && tool.pageScoped === true;
 }
 
+function formatArgumentNames(names: string[]): string {
+  return names.map(name => `"${name}"`).join(', ');
+}
+
+function buildUnknownArgumentsMessage(
+  toolName: string,
+  unknownArgumentNames: string[],
+  expectedArgumentNames: string[],
+): string {
+  const unknownLabel =
+    unknownArgumentNames.length === 1 ? 'argument' : 'arguments';
+  const expectedArguments = expectedArgumentNames.length
+    ? `Expected arguments: ${formatArgumentNames(expectedArgumentNames)}.`
+    : 'This tool does not accept any arguments.';
+  const correction =
+    unknownArgumentNames.length === 1 ? 'Remove it' : 'Remove them';
+
+  return `Unknown ${unknownLabel} for tool "${toolName}": ${formatArgumentNames(unknownArgumentNames)}. ${expectedArguments} ${correction} and retry.`;
+}
+
 export class ToolHandler {
   readonly inputSchema: zod.ZodRawShape;
+  readonly registeredInputSchema: zod.ZodTypeAny;
   readonly shouldRegister: boolean;
   private readonly disabledReason?: string;
 
@@ -143,6 +165,13 @@ export class ToolHandler {
       !serverArgs.slim
         ? {...tool.schema, ...pageIdSchema}
         : tool.schema;
+    this.registeredInputSchema = zod.object(this.inputSchema).passthrough();
+  }
+
+  unknownArgumentNames(params: Record<string, unknown>): string[] {
+    return Object.keys(params).filter(
+      key => !Object.hasOwn(this.inputSchema, key),
+    );
   }
 
   async handle(params: Record<string, unknown>): Promise<CallToolResult> {
@@ -152,6 +181,23 @@ export class ToolHandler {
           {
             type: 'text',
             text: this.disabledReason,
+          },
+        ],
+        isError: true,
+      };
+    }
+
+    const unknownArgumentNames = this.unknownArgumentNames(params);
+    if (unknownArgumentNames.length) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: buildUnknownArgumentsMessage(
+              this.tool.name,
+              unknownArgumentNames,
+              Object.keys(this.inputSchema),
+            ),
           },
         ],
         isError: true,
