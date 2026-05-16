@@ -21,6 +21,7 @@ import {
   uploadFile,
   pressKey,
   clickAt,
+  getElementAt,
   typeText,
 } from '../../src/tools/input.js';
 import {parseKey} from '../../src/utils/keyboard.js';
@@ -1357,6 +1358,171 @@ describe('input', () => {
           'uShift',
           'uControl',
         ]);
+      });
+    });
+  });
+
+  describe('get_element_at', () => {
+    it('returns a uid for an element at coordinates and refreshes the snapshot', async () => {
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedPptrPage();
+        await page.setContent(
+          html`<button
+            id="x"
+            style="position:absolute;left:0;top:0;width:100px;height:100px;"
+          >
+            Hi
+          </button>`,
+        );
+        await getElementAt.handler(
+          {
+            params: {x: 50, y: 50},
+            page: context.getSelectedMcpPage(),
+          },
+          response,
+          context,
+        );
+        const output = response.responseLines.join('\n');
+        const match = /Element uid: (\S+)/.exec(output);
+        assert.ok(match, `output should contain a uid line: ${output}`);
+        assert.notStrictEqual(response.snapshotParams, undefined);
+
+        const mcpPage = context.getSelectedMcpPage();
+        const handle = await mcpPage.getElementByUid(match[1]);
+        const id = await handle.evaluate(el => (el as HTMLElement).id);
+        assert.strictEqual(id, 'x');
+      });
+    });
+
+    it('throws when no element is found at the coordinates', async () => {
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedPptrPage();
+        await page.setContent(
+          html`<button
+            style="position:absolute;left:0;top:0;width:50px;height:50px;"
+          >
+            x
+          </button>`,
+        );
+        await assert.rejects(
+          getElementAt.handler(
+            {
+              params: {x: 5000, y: 5000},
+              page: context.getSelectedMcpPage(),
+            },
+            response,
+            context,
+          ),
+          /No element found at \(5000, 5000\)/,
+        );
+      });
+    });
+
+    it('resolves a plain non-accessible element via the extraHandles fallback', async () => {
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedPptrPage();
+        await page.setContent(
+          html`<div
+            id="plain"
+            style="position:absolute;left:0;top:0;width:100px;height:100px;background:red;"
+          ></div>`,
+        );
+        await getElementAt.handler(
+          {
+            params: {x: 50, y: 50},
+            page: context.getSelectedMcpPage(),
+          },
+          response,
+          context,
+        );
+        const output = response.responseLines.join('\n');
+        const match = /Element uid: (\S+)/.exec(output);
+        assert.ok(match, `output should contain a uid line: ${output}`);
+
+        const mcpPage = context.getSelectedMcpPage();
+        const handle = await mcpPage.getElementByUid(match[1]);
+        const id = await handle.evaluate(el => (el as HTMLElement).id);
+        assert.strictEqual(id, 'plain');
+      });
+    });
+
+    it('pierces open shadow roots', async () => {
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedPptrPage();
+        await page.setContent(
+          html`<my-host
+              style="position:absolute;left:0;top:0;width:100px;height:100px;display:block;"
+            ></my-host>
+            <script>
+              class MyHost extends HTMLElement {
+                constructor() {
+                  super();
+                  const root = this.attachShadow({mode: 'open'});
+                  root.innerHTML =
+                    '<button id="inner" style="width:100px;height:100px;">deep</button>';
+                }
+              }
+              customElements.define('my-host', MyHost);
+            </script>`,
+        );
+        await page.waitForFunction(
+          () => {
+            const host = document.querySelector('my-host');
+            return Boolean(host?.shadowRoot?.querySelector('#inner'));
+          },
+          {timeout: 5000},
+        );
+        await getElementAt.handler(
+          {
+            params: {x: 50, y: 50},
+            page: context.getSelectedMcpPage(),
+          },
+          response,
+          context,
+        );
+        const output = response.responseLines.join('\n');
+        const match = /Element uid: (\S+)/.exec(output);
+        assert.ok(match, `output should contain a uid line: ${output}`);
+
+        const mcpPage = context.getSelectedMcpPage();
+        const handle = await mcpPage.getElementByUid(match[1]);
+        const id = await handle.evaluate(el => (el as HTMLElement).id);
+        assert.strictEqual(id, 'inner');
+      });
+    });
+
+    it('descends into a same-origin iframe', async () => {
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedPptrPage();
+        await page.setContent(
+          html`<iframe
+            srcdoc="<button id='inner' style='position:absolute;left:0;top:0;width:100px;height:100px;'>deep</button>"
+            style="position:absolute;left:0;top:0;width:200px;height:200px;border:0;"
+          ></iframe>`,
+        );
+        await page.waitForFunction(
+          () => {
+            const frame = document.querySelector('iframe');
+            return Boolean(frame?.contentDocument?.querySelector('#inner'));
+          },
+          {timeout: 5000},
+        );
+        await getElementAt.handler(
+          {
+            params: {x: 50, y: 50},
+            page: context.getSelectedMcpPage(),
+          },
+          response,
+          context,
+        );
+        const output = response.responseLines.join('\n');
+        const match = /Element uid: (\S+)/.exec(output);
+        assert.ok(match, `output should contain a uid line: ${output}`);
+
+        const mcpPage = context.getSelectedMcpPage();
+        const handle = await mcpPage.getElementByUid(match[1]);
+        const id = await handle.evaluate(el => (el as HTMLElement).id);
+        assert.strictEqual(id, 'inner');
       });
     });
   });

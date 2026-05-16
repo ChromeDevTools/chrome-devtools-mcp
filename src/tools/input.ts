@@ -6,6 +6,8 @@
 
 import {logger} from '../logger.js';
 import type {McpContext} from '../McpContext.js';
+import type {McpPage} from '../McpPage.js';
+import {TextSnapshot} from '../TextSnapshot.js';
 import {zod} from '../third_party/index.js';
 import type {ElementHandle, KeyInput} from '../third_party/index.js';
 import type {TextSnapshotNode} from '../types.js';
@@ -534,5 +536,121 @@ export const pressKey = definePageTool({
     if (request.params.includeSnapshot) {
       response.includeSnapshot();
     }
+  },
+});
+
+async function hitTestElementHandle(
+  page: ContextPage,
+  x: number,
+  y: number,
+): Promise<ElementHandle<Element> | null> {
+  const handle = await page.pptrPage.evaluateHandle(
+    (px, py) => {
+      let doc: Document | ShadowRoot = document;
+      let cx = px;
+      let cy = py;
+      let hit: Element | null = null;
+      for (let i = 0; i < 32; i++) {
+        const candidate: Element | null = doc.elementFromPoint(cx, cy);
+        if (!candidate) {
+          break;
+        }
+        hit = candidate;
+        if (
+          candidate instanceof HTMLIFrameElement ||
+          candidate instanceof HTMLFrameElement
+        ) {
+          const rect = candidate.getBoundingClientRect();
+          let inner: Document | null = null;
+          try {
+            inner = candidate.contentDocument;
+          } catch {
+            inner = null;
+          }
+          if (inner) {
+            doc = inner;
+            cx -= rect.left;
+            cy -= rect.top;
+            continue;
+          }
+          break;
+        }
+        const shadow: ShadowRoot | null = candidate.shadowRoot;
+        if (shadow) {
+          doc = shadow;
+          continue;
+        }
+        break;
+      }
+      return hit;
+    },
+    x,
+    y,
+  );
+  const element = handle.asElement() as ElementHandle<Element> | null;
+  if (!element) {
+    void handle.dispose();
+    return null;
+  }
+  return element;
+}
+
+export const getElementAt = definePageTool({
+  name: 'get_element_at',
+  description: `Returns the uid of the DOM element at viewport-relative CSS-pixel coordinates (x, y). Pair with take_screenshot + a vision model that emits coordinates; feed the returned uid into uid-based tools such as click, hover, or fill. The response also includes the refreshed page snapshot. Pierces open shadow roots and descends same-origin iframes. Cannot reach closed shadow roots or cross-origin / OOPIF iframes.`,
+  annotations: {
+    category: ToolCategory.INPUT,
+    readOnlyHint: true,
+    conditions: ['experimentalVision'],
+  },
+  schema: {
+    x: zod.number().describe('CSS-pixel X coordinate, viewport-relative.'),
+    y: zod.number().describe('CSS-pixel Y coordinate, viewport-relative.'),
+  },
+  blockedByDialog: true,
+  handler: async (request, response) => {
+    const {x, y} = request.params;
+    const page = request.page as McpPage;
+
+    const element = await hitTestElementHandle(page, x, y);
+    if (!element) {
+      throw new Error(
+        `No element found at (${x}, ${y}). The coordinate may be outside the viewport, inside a closed shadow root, or inside a cross-origin iframe. Call take_screenshot to verify the page state, or list_pages + select_page to switch into a cross-origin frame.`,
+      );
+    }
+
+    const backendNodeId = await element.backendNodeId();
+    if (!backendNodeId) {
+      void element.dispose();
+      throw new Error(`Could not resolve element identity at (${x}, ${y}).`);
+    }
+
+    if (!page.textSnapshot) {
+      page.textSnapshot = await TextSnapshot.create(page);
+    }
+
+    let uid = page.resolveCdpElementId(backendNodeId);
+    let elementOwned = true;
+    if (!uid) {
+      // Hit-tested element is not in the a11y-tree snapshot (e.g. a plain
+      // div with no accessible role). Inject it via extraHandles so the
+      // refreshed snapshot exposes it with a uid that uid-based tools
+      // (click, hover, fill, …) can consume.
+      const extraHandles = [...page.extraHandles, element];
+      page.textSnapshot = await TextSnapshot.create(page, {extraHandles});
+      elementOwned = false;
+      uid = page.resolveCdpElementId(backendNodeId);
+    }
+
+    if (elementOwned) {
+      void element.dispose();
+    }
+
+    if (!uid) {
+      throw new Error(`Could not assign a uid to element at (${x}, ${y}).`);
+    }
+
+    response.appendResponseLine(`Element uid: ${uid}`);
+    response.includeSnapshot();
   },
 });

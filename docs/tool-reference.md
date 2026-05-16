@@ -2,7 +2,7 @@
 
 # Chrome DevTools MCP Tool Reference
 
-- **[Input automation](#input-automation)** (10 tools)
+- **[Input automation](#input-automation)** (11 tools)
   - [`click`](#click)
   - [`drag`](#drag)
   - [`fill`](#fill)
@@ -13,6 +13,7 @@
   - [`type_text`](#type_text)
   - [`upload_file`](#upload_file)
   - [`click_at`](#click_at)
+  - [`get_element_at`](#get_element_at)
 - **[Navigation automation](#navigation-automation)** (6 tools)
   - [`close_page`](#close_page)
   - [`list_pages`](#list_pages)
@@ -172,6 +173,17 @@
 - **y** (number) **(required)**: The y coordinate
 - **dblClick** (boolean) _(optional)_: Set to true for double clicks. Default is false.
 - **includeSnapshot** (boolean) _(optional)_: Whether to include a snapshot in the response. Default is false.
+
+---
+
+### `get_element_at`
+
+**Description:** Returns the uid of the DOM element at viewport-relative CSS-pixel coordinates (x, y). Pair with [`take_screenshot`](#take_screenshot) + a vision model that emits coordinates; feed the returned uid into uid-based tools such as [`click`](#click), [`hover`](#hover), or [`fill`](#fill). The response also includes the refreshed page snapshot. Pierces open shadow roots and descends same-origin iframes. Cannot reach closed shadow roots or cross-origin / OOPIF iframes. (requires flag: --experimentalVision=true)
+
+**Parameters:**
+
+- **x** (number) **(required)**: CSS-pixel X coordinate, viewport-relative.
+- **y** (number) **(required)**: CSS-pixel Y coordinate, viewport-relative.
 
 ---
 

@@ -284,6 +284,25 @@ export const commands: Commands = {
       },
     },
   },
+  get_element_at: {
+    description:
+      'Returns the uid of the DOM element at viewport-relative CSS-pixel coordinates (x, y). Pair with take_screenshot + a vision model that emits coordinates; feed the returned uid into uid-based tools such as click, hover, or fill. The response also includes the refreshed page snapshot. Pierces open shadow roots and descends same-origin iframes. Cannot reach closed shadow roots or cross-origin / OOPIF iframes. (requires flag: --experimentalVision=true)',
+    category: 'Input automation',
+    args: {
+      x: {
+        name: 'x',
+        type: 'number',
+        description: 'CSS-pixel X coordinate, viewport-relative.',
+        required: true,
+      },
+      y: {
+        name: 'y',
+        type: 'number',
+        description: 'CSS-pixel Y coordinate, viewport-relative.',
+        required: true,
+      },
+    },
+  },
   get_memory_snapshot_details: {
     description:
       'Loads a memory heapsnapshot and returns all available information including statistics, static data, and aggregated node information. Supports pagination for aggregates. (requires flag: --experimentalMemory=true)',
