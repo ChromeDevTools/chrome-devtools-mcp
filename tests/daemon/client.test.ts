@@ -6,6 +6,8 @@
 
 import assert from 'node:assert';
 import crypto from 'node:crypto';
+import {existsSync, rmSync} from 'node:fs';
+import {dirname} from 'node:path';
 import {describe, it, afterEach, beforeEach} from 'node:test';
 
 import {
@@ -125,6 +127,43 @@ describe('daemon client', () => {
       };
       const response = await handleResponse(unsupportedContentResponse, 'md');
       assert.ok(response.includes('.png'));
+    });
+
+    it('includes saved image file paths in structured JSON responses', async () => {
+      const imageContentResponse = {
+        content: [
+          {
+            type: 'text' as const,
+            text: 'Took a screenshot.',
+          },
+          {
+            type: 'image' as const,
+            data: Buffer.from('image data').toString('base64'),
+            mimeType: 'image/png',
+          },
+        ],
+        structuredContent: {
+          message: 'Took a screenshot.',
+        },
+      };
+      let filePath: string | undefined;
+      try {
+        const response = await handleResponse(imageContentResponse, 'json');
+        const parsed = JSON.parse(response) as {
+          message: string;
+          images: Array<{filePath: string; mimeType: string}>;
+        };
+        assert.strictEqual(parsed.message, 'Took a screenshot.');
+        assert.strictEqual(parsed.images.length, 1);
+        assert.strictEqual(parsed.images[0].mimeType, 'image/png');
+        filePath = parsed.images[0].filePath;
+        assert.ok(filePath.endsWith('.png'));
+        assert.ok(existsSync(filePath));
+      } finally {
+        if (filePath) {
+          rmSync(dirname(filePath), {recursive: true, force: true});
+        }
+      }
     });
 
     it('uses the webp extension for WebP images', async () => {

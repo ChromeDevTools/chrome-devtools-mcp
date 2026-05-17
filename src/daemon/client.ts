@@ -154,13 +154,8 @@ export async function handleResponse(
   if (response.isError) {
     return JSON.stringify(response.content);
   }
-  if (format === 'json') {
-    if (response.structuredContent) {
-      return JSON.stringify(response.structuredContent);
-    }
-    // Fall-through to text for backward compatibility.
-  }
   const chunks = [];
+  const images: Array<{filePath: string; mimeType: string}> = [];
   for (const content of response.content) {
     if (content.type === 'text') {
       chunks.push(content.text);
@@ -181,10 +176,21 @@ export async function handleResponse(
       const name = crypto.randomUUID();
       const filepath = await getTempFilePath(`${name}${extension}`);
       fs.writeFileSync(filepath, data);
+      images.push({filePath: filepath, mimeType});
       chunks.push(`Saved to ${filepath}.`);
     } else {
       throw new Error('Not supported response content type');
     }
+  }
+  if (format === 'json') {
+    if (response.structuredContent) {
+      const structuredContent = {
+        ...response.structuredContent,
+        ...(images.length ? {images} : {}),
+      };
+      return JSON.stringify(structuredContent);
+    }
+    // Fall-through to text for backward compatibility.
   }
   return format === 'md' ? chunks.join(' ') : JSON.stringify(chunks);
 }
