@@ -1556,7 +1556,7 @@ SOFTWARE.
 
 Name: puppeteer-core
 URL: https://github.com/puppeteer/puppeteer/tree/main/packages/puppeteer-core
-Version: 24.43.0
+Version: 25.0.2
 License: Apache-2.0
 
 -------------------- DEPENDENCY DIVIDER --------------------
