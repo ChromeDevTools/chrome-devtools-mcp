@@ -46,7 +46,8 @@ jobs:
       - name: Patch
         if: ${{ matrix.os == 'windows-latest' }}
         shell: bash
-        run: sed -i "s|await execFileAsync('tar.exe'.*);|await execFileAsync('tar.exe', ['-xf', path.relative(process.cwd(), archivePath), '-C', path.relative(process.cwd(), folderPath)]);|g" ./node_modules/@puppeteer/browsers/lib/fileUtil.js
+        run: |
+          node scripts/patch.mjs
 
       - name: Install browser
         shell: bash
