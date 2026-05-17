@@ -40,6 +40,17 @@ jobs:
       - name: Install dependencies
         shell: bash
         run: npm ci
+        env:
+          PUPPETEER_SKIP_DOWNLOAD: true
+
+      - name: Patch
+        if: ${{ matrix.os == 'windows-latest' }}
+        shell: bash
+        run: sed -i "s|await execFileAsync('tar.exe'.*);|await execFileAsync('tar.exe', ['-xf', path.relative(process.cwd(), archivePath), '-C', path.relative(process.cwd(), folderPath)]);|g" ./node_modules/@puppeteer/browsers/lib/fileUtil.js
+
+      - name: Install browser
+        shell: bash
+        run: npx puppeteer browsers install chrome
 
       - name: Build
         run: npm run bundle
