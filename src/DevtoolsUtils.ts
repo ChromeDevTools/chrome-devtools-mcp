@@ -7,7 +7,6 @@
 import {PuppeteerDevToolsConnection} from './DevToolsConnectionAdapter.js';
 import {Mutex} from './Mutex.js';
 import {DevTools} from './third_party/index.js';
-import {NetworkManager} from '../node_modules/chrome-devtools-frontend/front_end/core/sdk/NetworkManager.js';
 import type {
   Browser,
   ConsoleMessage,
@@ -145,7 +144,10 @@ const DEFAULT_FACTORY: TargetUniverseFactoryFn = async (page: Page) => {
 
   const targetManager = universe.context.get(DevTools.TargetManager);
   targetManager.observeModels(DevTools.DebuggerModel, SKIP_ALL_PAUSES);
-  targetManager.observeModels(NetworkManager, DISABLE_NETWORK);
+  targetManager.observeModels(
+    DevTools.NetworkManager.NetworkManager,
+    DISABLE_NETWORK,
+  );
 
   const target = targetManager.createTarget(
     'main',
@@ -178,11 +180,8 @@ const SKIP_ALL_PAUSES = {
 //
 // The network requests are collected through pptr and there isn't a use case for
 // enabling devtools SDK's network domain.
-//
-// If enabled, the NetworkManager collects NetworkRequests that are not properly
-// deleted when the page navigates away. See http://b/493046293 for context (internal).
 const DISABLE_NETWORK = {
-  modelAdded(model: NetworkManager): void {
+  modelAdded(model: DevTools.NetworkManager.NetworkManager): void {
     void model.target().networkAgent().invoke_disable();
   },
 

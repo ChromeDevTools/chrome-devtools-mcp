@@ -12,7 +12,6 @@ import sinon from 'sinon';
 import {UniverseManager} from '../src/DevtoolsUtils.js';
 import {DevTools} from '../src/third_party/index.js';
 import type {Browser, Target} from '../src/third_party/index.js';
-import {Events as NetworkManagerEvents, NetworkManager} from '../node_modules/chrome-devtools-frontend/front_end/core/sdk/NetworkManager.js';
 
 import {serverHooks} from './server.js';
 import {
@@ -101,11 +100,16 @@ describe('UniverseManager', () => {
       const targetUniverse = manager.get(page);
       assert.ok(targetUniverse);
 
-      const networkManager = targetUniverse.target.model(NetworkManager);
+      const networkManager = targetUniverse.target.model(
+        DevTools.NetworkManager.NetworkManager,
+      );
       assert.ok(networkManager);
 
       const requestStartedSpy = sinon.stub();
-      networkManager.addEventListener(NetworkManagerEvents.RequestStarted as any, requestStartedSpy);
+      networkManager.addEventListener(
+        DevTools.NetworkManager.Events.RequestStarted,
+        requestStartedSpy,
+      );
 
       await page.goto(server.getRoute('/test'));
 
