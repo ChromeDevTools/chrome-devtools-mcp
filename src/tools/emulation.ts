@@ -44,7 +44,7 @@ export const emulate = definePageTool({
       .optional()
       .transform(geolocationTransform)
       .describe(
-        'Geolocation (`<latitude>x<longitude>`) to emulate. Latitude between -90 and 90. Longitude between -180 and 180. Omit to clear the geolocation override.',
+        'Geolocation (`<latitude>,<longitude>`) to emulate. Latitude between -90 and 90. Longitude between -180 and 180. Omit to clear the geolocation override.',
       ),
     userAgent: zod
       .string()
@@ -67,8 +67,9 @@ export const emulate = definePageTool({
       ),
   },
   blockedByDialog: true,
-  handler: async (request, _response, context) => {
+  handler: async (request, response, context) => {
     const page = request.page;
     await context.emulate(request.params, page.pptrPage);
+    response.appendResponseLine('Emulation configured successfully');
   },
 });

@@ -142,7 +142,7 @@ export const commands: Commands = {
         name: 'geolocation',
         type: 'string',
         description:
-          'Geolocation (`<latitude>x<longitude>`) to emulate. Latitude between -90 and 90. Longitude between -180 and 180. Omit to clear the geolocation override.',
+          'Geolocation (`<latitude>,<longitude>`) to emulate. Latitude between -90 and 90. Longitude between -180 and 180. Omit to clear the geolocation override.',
         required: false,
       },
       userAgent: {
