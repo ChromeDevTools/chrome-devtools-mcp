@@ -1,5 +1,35 @@
 # Changelog
 
+## [1.0.0](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.26.0...chrome-devtools-mcp-v1.0.0) (2026-05-18)
+
+
+### 🎉 Features
+
+* report new URL after actions that trigger navigation ([#1853](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1853)) ([b594858](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/b5948582a0a143d48b43d64a87cff1f9027e12e3))
+* support filePath in evaluate_script ([#2054](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/2054)) ([90d368d](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/90d368d34365507d88b1eabf0e7a7a8a240ac019))
+
+
+### 🛠️ Fixes
+
+* disable NetworkManager in DevTools ([#1834](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1834)) ([d0e6539](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/d0e6539ef426a8313ec9266a3b3c5f0511275bdf))
+* do not use getSelectedMcpPage ([85f935b](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/85f935b2be2d202545d4b8c2af4f15b77a271418))
+* improve geolocation emulation ([#2036](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/2036)) ([213720b](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/213720b69cdc84fc03e1e5b96bfae287d8ffe812))
+* report unknown tool arguments ([#2064](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/2064)) ([041b208](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/041b2083781e4c2f027ea9c71479e4db3beb7fa7))
+* respect user's npm registry configuration in update check ([#2038](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/2038)) ([83a299f](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/83a299fc95c6d561acab520837c805ab37ecfde3))
+
+
+### 📄 Documentation
+
+* explain concurrent session options ([#2062](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/2062)) ([41944b3](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/41944b3265a3d2c812fcb55843acd20d039a8748))
+* fix typo ([#2075](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/2075)) ([1deb4f8](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/1deb4f8a8b414a06bd0caac37b78acfc46143703))
+* remove windows workaround and document Node LTS support ([#2074](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/2074)) ([30dcd0b](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/30dcd0ba965d7195952af141c6799a7e50ee4038))
+* unhide various experimental flags ([#2055](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/2055)) ([081c903](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/081c9033d601703e19e97072c69b4263efae5b6a))
+
+
+### 🏗️ Refactor
+
+* waitForResult helpers ([#2041](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/2041)) ([f6a12be](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/f6a12be091dc033a31edfbe4b3a47c41579f6e92))
+
 ## [0.26.0](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.25.0...chrome-devtools-mcp-v0.26.0) (2026-05-11)
 
 
