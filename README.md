@@ -61,7 +61,7 @@ You can disable these update checks by setting the `CHROME_DEVTOOLS_MCP_NO_UPDAT
 
 ## Requirements
 
-- [Node.js](https://nodejs.org/) v20.19 or a newer [latest maintenance LTS](https://github.com/nodejs/Release#release-schedule) version.
+- [Node.js](https://nodejs.org/) [LTS](https://github.com/nodejs/Release#release-schedule).
 - [Chrome](https://www.google.com/chrome/) current stable version or newer.
 - [npm](https://www.npmjs.com/)
 
