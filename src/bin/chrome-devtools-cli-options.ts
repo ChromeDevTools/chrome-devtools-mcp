@@ -286,7 +286,7 @@ export const commands: Commands = {
   },
   get_heapsnapshot_class_nodes: {
     description:
-      'Loads a memory heapsnapshot and returns instances of a specific class with their stable IDs. (requires flag: --experimentalMemory=true)',
+      'Loads a memory heapsnapshot and returns instances of a specific class with their IDs. (requires flag: --experimentalMemory=true)',
     category: 'Memory',
     args: {
       filePath: {
@@ -298,7 +298,7 @@ export const commands: Commands = {
       id: {
         name: 'id',
         type: 'number',
-        description: 'The unique ID for the class, obtained from details.',
+        description: 'The ID for the class, obtained from details.',
         required: true,
       },
       pageIdx: {

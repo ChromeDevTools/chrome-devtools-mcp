@@ -455,12 +455,12 @@ in the DevTools Elements panel (if any).
 
 ### `get_heapsnapshot_class_nodes`
 
-**Description:** Loads a memory heapsnapshot and returns instances of a specific class with their stable IDs. (requires flag: --experimentalMemory=true)
+**Description:** Loads a memory heapsnapshot and returns instances of a specific class with their IDs. (requires flag: --experimentalMemory=true)
 
 **Parameters:**
 
 - **filePath** (string) **(required)**: A path to a .heapsnapshot file to read.
-- **id** (number) **(required)**: The unique ID for the class, obtained from details.
+- **id** (number) **(required)**: The ID for the class, obtained from details.
 - **pageIdx** (number) _(optional)_: The page index for pagination.
 - **pageSize** (number) _(optional)_: The page size for pagination.
 

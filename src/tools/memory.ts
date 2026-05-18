@@ -98,7 +98,7 @@ export const getHeapSnapshotDetails = defineTool({
 export const getHeapSnapshotClassNodes = defineTool({
   name: 'get_heapsnapshot_class_nodes',
   description:
-    'Loads a memory heapsnapshot and returns instances of a specific class with their stable IDs.',
+    'Loads a memory heapsnapshot and returns instances of a specific class with their IDs.',
   annotations: {
     category: ToolCategory.MEMORY,
     readOnlyHint: true,
@@ -106,9 +106,7 @@ export const getHeapSnapshotClassNodes = defineTool({
   },
   schema: {
     filePath: zod.string().describe('A path to a .heapsnapshot file to read.'),
-    id: zod
-      .number()
-      .describe('The unique ID for the class, obtained from details.'),
+    id: zod.number().describe('The ID for the class, obtained from details.'),
     pageIdx: zod.number().optional().describe('The page index for pagination.'),
     pageSize: zod.number().optional().describe('The page size for pagination.'),
   },
