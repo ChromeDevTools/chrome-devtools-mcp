@@ -30,6 +30,41 @@ export class FakeIssuesManager extends DevTools.Common.ObjectWrapper
 // DevTools CDP errors can get noisy.
 DevTools.ProtocolClient.InspectorBackend.test.suppressRequestErrors = true;
 
+// Stub out Network emulation commands on the DevTools Agent prototype globally.
+// This prevents the DevTools Frontend from ever resetting/clearing Puppeteer's
+// active network blocking/throttling rules during target setup or session lifetime.
+const networkAgentPrototype =
+  DevTools.ProtocolClient.InspectorBackend.inspectorBackend.agentPrototypes.get(
+    'Network',
+  );
+if (networkAgentPrototype) {
+  Object.defineProperty(
+    networkAgentPrototype,
+    'invoke_emulateNetworkConditionsByRule',
+    {
+      value: () => {
+        return Promise.resolve({
+          ruleIds: [],
+          getError: () => undefined,
+        });
+      },
+      writable: true,
+      configurable: true,
+      enumerable: true,
+    },
+  );
+  Object.defineProperty(networkAgentPrototype, 'invoke_overrideNetworkState', {
+    value: () => {
+      return Promise.resolve({
+        getError: () => undefined,
+      });
+    },
+    writable: true,
+    configurable: true,
+    enumerable: true,
+  });
+}
+
 DevTools.I18n.DevToolsLocale.DevToolsLocale.instance({
   create: true,
   data: {
@@ -146,6 +181,7 @@ const DEFAULT_FACTORY: TargetUniverseFactoryFn = async (page: Page) => {
   const connection = new PuppeteerDevToolsConnection(session);
 
   const targetManager = universe.context.get(DevTools.TargetManager);
+
   targetManager.observeModels(DevTools.DebuggerModel, SKIP_ALL_PAUSES);
   targetManager.observeModels(
     DevTools.NetworkManager.NetworkManager,
