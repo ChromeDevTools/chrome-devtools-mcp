@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.0.1](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v1.0.0...chrome-devtools-mcp-v1.0.1) (2026-05-18)
+
+
+### 🛠️ Fixes
+
+* include saved image paths in CLI JSON output ([#2070](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/2070)) ([a9fb555](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/a9fb555c806122bc03bbca75d9bc03197d7f45b6))
+
+
+### 📄 Documentation
+
+* add version to the LTS ([#2080](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/2080)) ([a2083a2](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/a2083a2eddc687e53646877e36b784f2d4ced0e0))
+
 ## [1.0.0](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v0.26.0...chrome-devtools-mcp-v1.0.0) (2026-05-18)
 
 
