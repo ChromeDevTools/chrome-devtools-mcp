@@ -39,9 +39,10 @@
   - [`take_snapshot`](#take_snapshot)
   - [`screencast_start`](#screencast_start)
   - [`screencast_stop`](#screencast_stop)
-- **[Memory](#memory)** (4 tools)
+- **[Memory](#memory)** (5 tools)
   - [`take_memory_snapshot`](#take_memory_snapshot)
   - [`get_memory_snapshot_details`](#get_memory_snapshot_details)
+  - [`get_node_retainers`](#get_node_retainers)
   - [`get_nodes_by_class`](#get_nodes_by_class)
   - [`load_memory_snapshot`](#load_memory_snapshot)
 - **[Extensions](#extensions)** (5 tools)
@@ -255,7 +256,7 @@
 
 - **colorScheme** (enum: "dark", "light", "auto") _(optional)_: [`Emulate`](#emulate) the dark or the light mode. Set to "auto" to reset to the default.
 - **cpuThrottlingRate** (number) _(optional)_: Represents the CPU slowdown factor. Omit or set the rate to 1 to disable throttling
-- **geolocation** (string) _(optional)_: Geolocation (`&lt;latitude&gt;x&lt;longitude&gt;`) to [`emulate`](#emulate). Latitude between -90 and 90. Longitude between -180 and 180. Omit to clear the geolocation override.
+- **geolocation** (string) _(optional)_: Geolocation (`&lt;latitude&gt;,&lt;longitude&gt;`) to [`emulate`](#emulate). Latitude between -90 and 90. Longitude between -180 and 180. Omit to clear the geolocation override.
 - **networkConditions** (enum: "Offline", "Slow 3G", "Fast 3G", "Slow 4G", "Fast 4G") _(optional)_: Throttle network. Omit to disable throttling.
 - **userAgent** (string) _(optional)_: User agent to [`emulate`](#emulate). Set to empty string to clear the user agent override.
 - **viewport** (string) _(optional)_: [`Emulate`](#emulate) device viewports '&lt;width&gt;x&lt;height&gt;x&lt;devicePixelRatio&gt;[,mobile][,touch][,landscape]'. 'touch' and 'mobile' to [`emulate`](#emulate) mobile devices. 'landscape' to [`emulate`](#emulate) landscape mode.
@@ -461,6 +462,19 @@ in the DevTools Elements panel (if any).
 - **filePath** (string) **(required)**: A path to a .heapsnapshot file to read.
 - **pageIdx** (number) _(optional)_: The page index for pagination of aggregates.
 - **pageSize** (number) _(optional)_: The page size for pagination of aggregates.
+
+---
+
+### `get_node_retainers`
+
+**Description:** Loads a memory heapsnapshot and returns retainers for a specific node ID. (requires flag: --experimentalMemory=true)
+
+**Parameters:**
+
+- **filePath** (string) **(required)**: A path to a .heapsnapshot file to read.
+- **nodeId** (number) **(required)**: The stable node ID to get retainers for.
+- **pageIdx** (number) _(optional)_: The page index for pagination.
+- **pageSize** (number) _(optional)_: The page size for pagination.
 
 ---
 

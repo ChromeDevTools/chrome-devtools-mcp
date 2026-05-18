@@ -246,6 +246,10 @@ export type Context = Readonly<{
     filePath: string,
     uid: number,
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange>;
+  getHeapSnapshotRetainers(
+    filePath: string,
+    nodeId: number,
+  ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange>;
 }>;
 
 /**
@@ -413,7 +417,7 @@ export function geolocationTransform(arg: string | undefined) {
   if (!arg) {
     return undefined;
   }
-  const [latitude, longitude] = arg.split('x').map(Number) as [number, number];
+  const [latitude, longitude] = arg.split(',').map(Number) as [number, number];
   return {
     latitude,
     longitude,

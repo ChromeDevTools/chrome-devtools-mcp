@@ -9,7 +9,7 @@ import type {WebMCPTool} from 'puppeteer-core';
 import type {ParsedArguments} from './bin/chrome-devtools-mcp-cli-options.js';
 import {ConsoleFormatter} from './formatters/ConsoleFormatter.js';
 import {HeapSnapshotFormatter} from './formatters/HeapSnapshotFormatter.js';
-import {isNodeLike} from './formatters/HeapSnapshotFormatter.js';
+import {isEdgeLike, isNodeLike} from './formatters/HeapSnapshotFormatter.js';
 import {IssueFormatter} from './formatters/IssueFormatter.js';
 import {NetworkFormatter} from './formatters/NetworkFormatter.js';
 import {SnapshotFormatter} from './formatters/SnapshotFormatter.js';
@@ -746,6 +746,7 @@ export class McpResponse implements Response {
       extensionPages?: object[];
       errorMessage?: string;
       navigatedToUrl?: string;
+      geolocation?: {latitude: number; longitude: number};
     } = {};
 
     const response = [];
@@ -771,6 +772,14 @@ export class McpResponse implements Response {
       response.push(`Default navigation timeout set to ${timeout} ms`);
       structuredContent.networkConditions = networkConditions;
       structuredContent.navigationTimeout = timeout;
+    }
+
+    const geolocation = this.#page?.geolocation;
+    if (geolocation) {
+      response.push(
+        `Emulating geolocation: latitude=${geolocation.latitude}, longtitude=${geolocation.longitude}`,
+      );
+      structuredContent.geolocation = geolocation;
     }
 
     const viewport = this.#page?.viewport;
@@ -984,12 +993,20 @@ Call ${handleDialog.name} to handle it before continuing.`);
       }
       const nodes = this.#heapSnapshotOptions.nodes;
       if (nodes) {
-        const sortedItems = nodes.items
-          .filter(isNodeLike)
-          .sort((a, b) => b.retainedSize - a.retainedSize);
+        let items = Array.from(nodes.items);
+        const firstItem = nodes.items[0];
+        if (firstItem) {
+          if (isNodeLike(firstItem)) {
+            items = items
+              .filter(isNodeLike)
+              .sort((a, b) => b.retainedSize - a.retainedSize);
+          } else if (isEdgeLike(firstItem)) {
+            items = items.filter(isEdgeLike);
+          }
+        }
 
         const paginationData = this.#dataWithPagination(
-          sortedItems,
+          items,
           this.#heapSnapshotOptions.pagination,
         );
 

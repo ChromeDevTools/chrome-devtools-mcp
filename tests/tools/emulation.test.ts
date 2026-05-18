@@ -75,7 +75,7 @@ describe('emulation', () => {
       });
 
       it('parses latitude and longitude', () => {
-        assert.deepStrictEqual(geolocationTransform('48.137154x11.576124'), {
+        assert.deepStrictEqual(geolocationTransform('48.137154,11.576124'), {
           latitude: 48.137154,
           longitude: 11.576124,
         });

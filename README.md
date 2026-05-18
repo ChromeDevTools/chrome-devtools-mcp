@@ -61,7 +61,7 @@ You can disable these update checks by setting the `CHROME_DEVTOOLS_MCP_NO_UPDAT
 
 ## Requirements
 
-- [Node.js](https://nodejs.org/) [LTS](https://github.com/nodejs/Release#release-schedule).
+- [Node.js](https://nodejs.org/) [LTS](https://github.com/nodejs/Release#release-schedule) version.
 - [Chrome](https://www.google.com/chrome/) current stable version or newer.
 - [npm](https://www.npmjs.com/)
 
@@ -514,9 +514,10 @@ If you run into any issues, checkout our [troubleshooting guide](./docs/troubles
   - [`take_snapshot`](docs/tool-reference.md#take_snapshot)
   - [`screencast_start`](docs/tool-reference.md#screencast_start)
   - [`screencast_stop`](docs/tool-reference.md#screencast_stop)
-- **Memory** (4 tools)
+- **Memory** (5 tools)
   - [`take_memory_snapshot`](docs/tool-reference.md#take_memory_snapshot)
   - [`get_memory_snapshot_details`](docs/tool-reference.md#get_memory_snapshot_details)
+  - [`get_node_retainers`](docs/tool-reference.md#get_node_retainers)
   - [`get_nodes_by_class`](docs/tool-reference.md#get_nodes_by_class)
   - [`load_memory_snapshot`](docs/tool-reference.md#load_memory_snapshot)
 - **Extensions** (5 tools)
@@ -679,7 +680,7 @@ The Chrome DevTools MCP server supports the following configuration option:
   - **Type:** boolean
 
 - **`--redactNetworkHeaders`/ `--redact-network-headers`**
-  If true, redacts some of the network headers considered senstive before returning to the client.
+  If true, redacts some of the network headers considered sensitive before returning to the client.
   - **Type:** boolean
   - **Default:** `false`
 
