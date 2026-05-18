@@ -14,7 +14,7 @@ import {evaluateScript} from '../src/tools/script.js';
 import {serverHooks} from './server.js';
 import {withMcpContext} from './utils.js';
 
-describe('Security Policies Integration', () => {
+describe('Network Blocking Integration', () => {
   const server = serverHooks();
 
   it('blocks URLs in blocklist', async () => {
