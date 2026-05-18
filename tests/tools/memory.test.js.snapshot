@@ -1,7 +1,21 @@
-exports[`memory > get_memory_snapshot_details > with default options 1`] = `
+exports[`memory > get_heapsnapshot_class_nodes > with default options 1`] = `
+## Heap Snapshot Data
+nodeId,nodeName,type,distance,selfSize,retainedSize
+25307,Array,object,2,0.2 kB,2.1 kB
+46355,Array,object,2,0.2 kB,2.1 kB
+33187,Array,object,2,0.2 kB,1.7 kB
+36255,Array,object,2,0.2 kB,1.7 kB
+45901,Array,object,5,0.1 kB,0.1 kB
+46151,Array,object,5,0.1 kB,0.1 kB
+45899,Array,object,5,0.1 kB,0.1 kB
+46149,Array,object,5,0.1 kB,0.1 kB
+Showing 1-8 of 8 (Page 1 of 1).
+`;
+
+exports[`memory > get_heapsnapshot_details > with default options 1`] = `
 ## Heap Snapshot Data
 Showing 1-157 of 157 (Page 1 of 1).
-uid,className,count,selfSize,maxRetainedSize
+uid,name,count,selfSize,maxRetainedSize
 2,(system),3205,199 kB,655 kB
 11,Function,3581,111 kB,237 kB
 16,(object shape),2878,181 kB,184 kB
@@ -161,30 +175,16 @@ uid,className,count,selfSize,maxRetainedSize
 108,HTMLBodyElement (internal cache) / https://example.com,1,0.0 kB,0.0 kB
 `;
 
-exports[`memory > get_node_retainers > with valid nodeId 1`] = `
+exports[`memory > get_heapsnapshot_retainers > with valid nodeId 1`] = `
 ## Heap Snapshot Data
-edgeIndex,edgeName,edgeType,targetNodeId,targetNodeName
-145296,prototype,internal,29287,system / Map
-108096,prototype,property,25575,String
-48828,initial_string_prototype,internal,7199,system / NativeContext
+name,type,nodeId,nodeName
+prototype,internal,29287,system / Map
+prototype,property,25575,String
+initial_string_prototype,internal,7199,system / NativeContext
 Showing 1-3 of 3 (Page 1 of 1).
 `;
 
-exports[`memory > get_nodes_by_class > with default options 1`] = `
-## Heap Snapshot Data
-id,name,type,distance,selfSize,retainedSize
-25307,Array,object,2,0.2 kB,2.1 kB
-46355,Array,object,2,0.2 kB,2.1 kB
-33187,Array,object,2,0.2 kB,1.7 kB
-36255,Array,object,2,0.2 kB,1.7 kB
-45901,Array,object,5,0.1 kB,0.1 kB
-46151,Array,object,5,0.1 kB,0.1 kB
-45899,Array,object,5,0.1 kB,0.1 kB
-46149,Array,object,5,0.1 kB,0.1 kB
-Showing 1-8 of 8 (Page 1 of 1).
-`;
-
-exports[`memory > load_memory_snapshot > with default options 1`] = `
+exports[`memory > get_heapsnapshot_summary > with default options 1`] = `
 ## Heap Snapshot Data
 Statistics: {
   "total": 1121496,
