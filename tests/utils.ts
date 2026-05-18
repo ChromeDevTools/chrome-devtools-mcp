@@ -74,8 +74,8 @@ export async function withBrowser(
     autoOpenDevTools?: boolean;
     executablePath?: string;
     args?: string[];
-    blocklist?: string[];
-    allowlist?: string[];
+    blockedUrlPattern?: string[];
+    allowedUrlPattern?: string[];
   } = {},
 ) {
   const launchOptions: LaunchOptions = {
@@ -88,8 +88,8 @@ export async function withBrowser(
     handleDevToolsAsPage: true,
     args: [...(options.args || []), '--screen-info={3840x2160}'],
     enableExtensions: true,
-    blocklist: options.blocklist,
-    allowlist: options.allowlist,
+    blocklist: options.blockedUrlPattern,
+    allowlist: options.allowedUrlPattern,
   };
   const key = JSON.stringify(launchOptions);
 
@@ -119,8 +119,8 @@ export async function withMcpContext(
     performanceCrux?: boolean;
     executablePath?: string;
     args?: string[];
-    blocklist?: string[];
-    allowlist?: string[];
+    blockedUrlPattern?: string[];
+    allowedUrlPattern?: string[];
   } = {},
   args: ParsedArguments = {} as ParsedArguments,
 ) {

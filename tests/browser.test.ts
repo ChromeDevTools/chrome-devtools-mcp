@@ -113,7 +113,7 @@ describe('browser', () => {
       const browser = await launch({
         headless: true,
         isolated: true,
-        executablePath: executablePath(),
+        executablePath: await executablePath(),
         devtools: false,
         blocklist: ['*://*:*/blocked.html'],
       });
@@ -157,7 +157,7 @@ describe('browser', () => {
         const browser = await launch({
           headless: true,
           isolated: true,
-          executablePath: executablePath(),
+          executablePath: await executablePath(),
           devtools: false,
           allowlist: ['*://*/allowed.html'],
         });

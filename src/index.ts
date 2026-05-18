@@ -99,11 +99,11 @@ export async function createMcpServer(
       chromeArgs.push(`--proxy-server=${serverArgs.proxyServer}`);
     }
     const devtools = serverArgs.experimentalDevtools ?? false;
-    const blocklist = serverArgs.blocklist
-      ? serverArgs.blocklist.map(String)
+    const blocklist = serverArgs.blockedUrlPattern
+      ? serverArgs.blockedUrlPattern.map(String)
       : undefined;
-    const allowlist = serverArgs.allowlist
-      ? serverArgs.allowlist.map(String)
+    const allowlist = serverArgs.allowedUrlPattern
+      ? serverArgs.allowedUrlPattern.map(String)
       : undefined;
 
     const browser =

@@ -75,7 +75,7 @@ describe('Security Policies Integration', () => {
         );
       },
       {
-        blocklist: [server.getRoute('/blocked.html')],
+        blockedUrlPattern: [server.getRoute('/blocked.html')],
       },
     );
   });
@@ -138,7 +138,7 @@ describe('Security Policies Integration', () => {
         );
       },
       {
-        allowlist: [server.getRoute('/allowed.html')],
+        allowedUrlPattern: [server.getRoute('/allowed.html')],
       },
     );
   });
@@ -231,7 +231,7 @@ describe('Security Policies Integration', () => {
         );
       },
       {
-        blocklist: [server.getRoute('/blocked.html')],
+        blockedUrlPattern: [server.getRoute('/blocked.html')],
       },
     );
   });
