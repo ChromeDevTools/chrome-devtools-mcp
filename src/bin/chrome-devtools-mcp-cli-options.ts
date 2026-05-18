@@ -278,7 +278,7 @@ export const cliOptions = {
   redactNetworkHeaders: {
     type: 'boolean',
     describe:
-      'If true, redacts some of the network headers considered senstive before returning to the client.',
+      'If true, redacts some of the network headers considered sensitive before returning to the client.',
     default: false,
   },
 } satisfies Record<string, YargsOptions>;

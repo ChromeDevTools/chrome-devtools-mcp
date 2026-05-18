@@ -679,7 +679,7 @@ The Chrome DevTools MCP server supports the following configuration option:
   - **Type:** boolean
 
 - **`--redactNetworkHeaders`/ `--redact-network-headers`**
-  If true, redacts some of the network headers considered senstive before returning to the client.
+  If true, redacts some of the network headers considered sensitive before returning to the client.
   - **Type:** boolean
   - **Default:** `false`
 
