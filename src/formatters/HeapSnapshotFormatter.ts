@@ -58,9 +58,9 @@ export class HeapSnapshotFormatter {
     if (items.length > 0) {
       const firstItem = items[0];
       if (isNodeLike(firstItem)) {
-        lines.push('id,name,type,distance,selfSize,retainedSize');
+        lines.push('nodeId,nodeName,type,distance,selfSize,retainedSize');
       } else if (isEdgeLike(firstItem)) {
-        lines.push('edgeIndex,edgeName,edgeType,targetNodeId,targetNodeName');
+        lines.push('name,type,nodeId,nodeName');
       }
     }
 
@@ -71,7 +71,7 @@ export class HeapSnapshotFormatter {
         );
       } else if (isEdgeLike(item)) {
         lines.push(
-          `${item.edgeIndex},${item.name},${item.type},${item.node.id},${item.node.name}`,
+          `${item.name},${item.type},${item.node.id},${item.node.name}`,
         );
       }
     }
@@ -86,7 +86,7 @@ export class HeapSnapshotFormatter {
   toString(): string {
     const sorted = this.#getSortedAggregates();
     const lines: string[] = [];
-    lines.push('uid,className,count,selfSize,maxRetainedSize');
+    lines.push('uid,name,count,selfSize,maxRetainedSize');
 
     for (const info of sorted) {
       const uid = info[stableIdSymbol] ?? '';

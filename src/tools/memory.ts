@@ -10,8 +10,8 @@ import {ensureExtension} from '../utils/files.js';
 import {ToolCategory} from './categories.js';
 import {definePageTool, defineTool} from './ToolDefinition.js';
 
-export const takeMemorySnapshot = definePageTool({
-  name: 'take_memory_snapshot',
+export const takeHeapSnapshot = definePageTool({
+  name: 'take_heapsnapshot',
   description: `Capture a heap snapshot of the currently selected page. Use to analyze the memory distribution of JavaScript objects and debug memory leaks.`,
   annotations: {
     category: ToolCategory.MEMORY,
@@ -37,8 +37,8 @@ export const takeMemorySnapshot = definePageTool({
   },
 });
 
-export const exploreMemorySnapshot = defineTool({
-  name: 'load_memory_snapshot',
+export const getHeapSnapshotSummary = defineTool({
+  name: 'get_heapsnapshot_summary',
   description:
     'Loads a memory heapsnapshot and returns snapshot summary stats.',
   annotations: {
@@ -61,8 +61,8 @@ export const exploreMemorySnapshot = defineTool({
   },
 });
 
-export const getMemorySnapshotDetails = defineTool({
-  name: 'get_memory_snapshot_details',
+export const getHeapSnapshotDetails = defineTool({
+  name: 'get_heapsnapshot_details',
   description:
     'Loads a memory heapsnapshot and returns all available information including statistics, static data, and aggregated node information. Supports pagination for aggregates.',
   annotations: {
@@ -95,8 +95,8 @@ export const getMemorySnapshotDetails = defineTool({
   },
 });
 
-export const getNodesByClass = defineTool({
-  name: 'get_nodes_by_class',
+export const getHeapSnapshotClassNodes = defineTool({
+  name: 'get_heapsnapshot_class_nodes',
   description:
     'Loads a memory heapsnapshot and returns instances of a specific class with their stable IDs.',
   annotations: {
@@ -108,9 +108,7 @@ export const getNodesByClass = defineTool({
     filePath: zod.string().describe('A path to a .heapsnapshot file to read.'),
     uid: zod
       .number()
-      .describe(
-        'The unique UID for the class, obtained from aggregates listing.',
-      ),
+      .describe('The unique ID for the class, obtained from details.'),
     pageIdx: zod.number().optional().describe('The page index for pagination.'),
     pageSize: zod.number().optional().describe('The page size for pagination.'),
   },
@@ -129,8 +127,8 @@ export const getNodesByClass = defineTool({
   },
 });
 
-export const getNodeRetainers = defineTool({
-  name: 'get_node_retainers',
+export const getHeapSnapshotRetainers = defineTool({
+  name: 'get_heapsnapshot_retainers',
   description:
     'Loads a memory heapsnapshot and returns retainers for a specific node ID.',
   annotations: {
@@ -141,7 +139,7 @@ export const getNodeRetainers = defineTool({
   blockedByDialog: false,
   schema: {
     filePath: zod.string().describe('A path to a .heapsnapshot file to read.'),
-    nodeId: zod.number().describe('The stable node ID to get retainers for.'),
+    nodeId: zod.number().describe('The node ID to get retainers for.'),
     pageIdx: zod.number().optional().describe('The page index for pagination.'),
     pageSize: zod.number().optional().describe('The page size for pagination.'),
   },
