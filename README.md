@@ -61,7 +61,7 @@ You can disable these update checks by setting the `CHROME_DEVTOOLS_MCP_NO_UPDAT
 
 ## Requirements
 
-- [Node.js](https://nodejs.org/) v20.19 or a newer [latest maintenance LTS](https://github.com/nodejs/Release#release-schedule) version.
+- [Node.js](https://nodejs.org/) [LTS](https://github.com/nodejs/Release#release-schedule).
 - [Chrome](https://www.google.com/chrome/) current stable version or newer.
 - [npm](https://www.npmjs.com/)
 
@@ -727,6 +727,34 @@ To get the WebSocket endpoint from a running Chrome instance, visit `http://127.
 You can also run `npx chrome-devtools-mcp@latest --help` to see all available configuration options.
 
 ## Concepts
+
+### Concurrent sessions
+
+Most MCP clients start one Chrome DevTools MCP server per conversation. If your
+client shares a single server instance across concurrent agents or subagents,
+start the server with `--experimentalPageIdRouting`. This exposes `pageId` on
+page-scoped tools so each agent can route tool calls to the tab it is working
+with.
+
+```json
+{
+  "mcpServers": {
+    "chrome-devtools": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "chrome-devtools-mcp@latest",
+        "--experimentalPageIdRouting"
+      ]
+    }
+  }
+}
+```
+
+If you run multiple independent MCP client sessions and want each session to
+launch its own temporary Chrome profile, also pass `--isolated`. This avoids
+sharing the default Chrome DevTools MCP user data directory between those
+server instances.
 
 ### User data directory
 
