@@ -103,6 +103,9 @@ async function runTests(attempt) {
   });
 }
 
+const chromePath = _installChrome('149.0.7827.14');
+process.env.CHROME_M149_EXECUTABLE_PATH = chromePath;
+
 const maxAttempts = shouldRetry ? 3 : 1;
 let exitCode = 1;
 

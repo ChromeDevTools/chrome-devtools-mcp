@@ -76,6 +76,7 @@ describe('Network Blocking Integration', () => {
       },
       {
         blockedUrlPattern: [server.getRoute('/blocked.html')],
+        executablePath: process.env.CHROME_M149_EXECUTABLE_PATH,
       },
     );
   });
@@ -139,6 +140,7 @@ describe('Network Blocking Integration', () => {
       },
       {
         allowedUrlPattern: [server.getRoute('/allowed.html')],
+        executablePath: process.env.CHROME_M149_EXECUTABLE_PATH,
       },
     );
   });
@@ -232,6 +234,7 @@ describe('Network Blocking Integration', () => {
       },
       {
         blockedUrlPattern: [server.getRoute('/blocked.html')],
+        executablePath: process.env.CHROME_M149_EXECUTABLE_PATH,
       },
     );
   });
