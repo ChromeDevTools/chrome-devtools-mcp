@@ -106,7 +106,7 @@ export const getHeapSnapshotClassNodes = defineTool({
   },
   schema: {
     filePath: zod.string().describe('A path to a .heapsnapshot file to read.'),
-    uid: zod
+    id: zod
       .number()
       .describe('The unique ID for the class, obtained from details.'),
     pageIdx: zod.number().optional().describe('The page index for pagination.'),
@@ -115,9 +115,9 @@ export const getHeapSnapshotClassNodes = defineTool({
   blockedByDialog: false,
   handler: async (request, response, context) => {
     context.validatePath(request.params.filePath);
-    const nodes = await context.getHeapSnapshotNodesByUid(
+    const nodes = await context.getHeapSnapshotNodesById(
       request.params.filePath,
-      request.params.uid,
+      request.params.id,
     );
 
     response.setHeapSnapshotNodes(nodes, {

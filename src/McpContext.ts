@@ -12,7 +12,7 @@ import {fileURLToPath, pathToFileURL} from 'node:url';
 import type {TargetUniverse} from './DevtoolsUtils.js';
 import {UniverseManager} from './DevtoolsUtils.js';
 import {HeapSnapshotManager} from './HeapSnapshotManager.js';
-import type {AggregatedInfoWithUid} from './HeapSnapshotManager.js';
+import type {AggregatedInfoWithId} from './HeapSnapshotManager.js';
 import {McpPage} from './McpPage.js';
 import {
   NetworkCollector,
@@ -804,7 +804,7 @@ export class McpContext implements Context {
 
   async getHeapSnapshotAggregates(
     filePath: string,
-  ): Promise<Record<string, AggregatedInfoWithUid>> {
+  ): Promise<Record<string, AggregatedInfoWithId>> {
     this.validatePath(filePath);
     return await this.#heapSnapshotManager.getAggregates(filePath);
   }
@@ -823,12 +823,12 @@ export class McpContext implements Context {
     return await this.#heapSnapshotManager.getStaticData(filePath);
   }
 
-  async getHeapSnapshotNodesByUid(
+  async getHeapSnapshotNodesById(
     filePath: string,
-    uid: number,
+    id: number,
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange> {
     this.validatePath(filePath);
-    return await this.#heapSnapshotManager.getNodesByUid(filePath, uid);
+    return await this.#heapSnapshotManager.getNodesById(filePath, id);
   }
 
   async getHeapSnapshotRetainers(

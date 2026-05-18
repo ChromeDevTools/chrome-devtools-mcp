@@ -15,7 +15,7 @@ Showing 1-8 of 8 (Page 1 of 1).
 exports[`memory > get_heapsnapshot_details > with default options 1`] = `
 ## Heap Snapshot Data
 Showing 1-157 of 157 (Page 1 of 1).
-uid,name,count,selfSize,maxRetainedSize
+id,name,count,selfSize,maxRetainedSize
 2,(system),3205,199 kB,655 kB
 11,Function,3581,111 kB,237 kB
 16,(object shape),2878,181 kB,184 kB

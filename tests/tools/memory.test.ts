@@ -111,7 +111,7 @@ describe('memory', () => {
         await context.getHeapSnapshotAggregates(filePath);
 
         await getHeapSnapshotClassNodes.handler(
-          {params: {filePath, uid: 19}},
+          {params: {filePath, id: 19}},
           response,
           context,
         );
@@ -140,11 +140,11 @@ describe('memory', () => {
 
         await assert.rejects(
           getHeapSnapshotClassNodes.handler(
-            {params: {filePath, uid: 999999}},
+            {params: {filePath, id: 999999}},
             response,
             context,
           ),
-          {message: 'Class with UID 999999 not found in heap snapshot'},
+          {message: 'Class with ID 999999 not found in heap snapshot'},
         );
       });
     });

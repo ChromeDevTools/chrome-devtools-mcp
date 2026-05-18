@@ -59,14 +59,14 @@ describe('HeapSnapshotFormatter', () => {
       const result = formatter.toJSON();
       assert.deepStrictEqual(result, [
         {
-          uid: 1,
+          id: 1,
           className: 'ObjectA',
           count: 10,
           selfSize: DevTools.I18n.ByteUtilities.formatBytesToKb(100),
           retainedSize: DevTools.I18n.ByteUtilities.formatBytesToKb(1000),
         },
         {
-          uid: 2,
+          id: 2,
           className: 'ObjectB',
           count: 5,
           selfSize: DevTools.I18n.ByteUtilities.formatBytesToKb(50),
@@ -121,9 +121,9 @@ describe('HeapSnapshotFormatter', () => {
 
       const result = HeapSnapshotFormatter.formatNodes(mockEdges);
       const expected = [
-        'edgeIndex,edgeName,edgeType,targetNodeId,targetNodeName',
-        '0,edge1,property,1,NodeA',
-        '1,edge2,element,2,NodeB',
+        'name,type,nodeId,nodeName',
+        'edge1,property,1,NodeA',
+        'edge2,element,2,NodeB',
       ].join('\n');
 
       assert.strictEqual(result, expected);

@@ -284,7 +284,38 @@ export const commands: Commands = {
       },
     },
   },
-  get_memory_snapshot_details: {
+  get_heapsnapshot_class_nodes: {
+    description:
+      'Loads a memory heapsnapshot and returns instances of a specific class with their stable IDs. (requires flag: --experimentalMemory=true)',
+    category: 'Memory',
+    args: {
+      filePath: {
+        name: 'filePath',
+        type: 'string',
+        description: 'A path to a .heapsnapshot file to read.',
+        required: true,
+      },
+      id: {
+        name: 'id',
+        type: 'number',
+        description: 'The unique ID for the class, obtained from details.',
+        required: true,
+      },
+      pageIdx: {
+        name: 'pageIdx',
+        type: 'number',
+        description: 'The page index for pagination.',
+        required: false,
+      },
+      pageSize: {
+        name: 'pageSize',
+        type: 'number',
+        description: 'The page size for pagination.',
+        required: false,
+      },
+    },
+  },
+  get_heapsnapshot_details: {
     description:
       'Loads a memory heapsnapshot and returns all available information including statistics, static data, and aggregated node information. Supports pagination for aggregates. (requires flag: --experimentalMemory=true)',
     category: 'Memory',
@@ -306,6 +337,50 @@ export const commands: Commands = {
         type: 'number',
         description: 'The page size for pagination of aggregates.',
         required: false,
+      },
+    },
+  },
+  get_heapsnapshot_retainers: {
+    description:
+      'Loads a memory heapsnapshot and returns retainers for a specific node ID. (requires flag: --experimentalMemory=true)',
+    category: 'Memory',
+    args: {
+      filePath: {
+        name: 'filePath',
+        type: 'string',
+        description: 'A path to a .heapsnapshot file to read.',
+        required: true,
+      },
+      nodeId: {
+        name: 'nodeId',
+        type: 'number',
+        description: 'The node ID to get retainers for.',
+        required: true,
+      },
+      pageIdx: {
+        name: 'pageIdx',
+        type: 'number',
+        description: 'The page index for pagination.',
+        required: false,
+      },
+      pageSize: {
+        name: 'pageSize',
+        type: 'number',
+        description: 'The page size for pagination.',
+        required: false,
+      },
+    },
+  },
+  get_heapsnapshot_summary: {
+    description:
+      'Loads a memory heapsnapshot and returns snapshot summary stats. (requires flag: --experimentalMemory=true)',
+    category: 'Memory',
+    args: {
+      filePath: {
+        name: 'filePath',
+        type: 'string',
+        description: 'A path to a .heapsnapshot file to read.',
+        required: true,
       },
     },
   },
@@ -333,69 +408,6 @@ export const commands: Commands = {
         type: 'string',
         description:
           'The absolute or relative path to a .network-response file to save the response body to. If omitted, the body is returned inline.',
-        required: false,
-      },
-    },
-  },
-  get_node_retainers: {
-    description:
-      'Loads a memory heapsnapshot and returns retainers for a specific node ID. (requires flag: --experimentalMemory=true)',
-    category: 'Memory',
-    args: {
-      filePath: {
-        name: 'filePath',
-        type: 'string',
-        description: 'A path to a .heapsnapshot file to read.',
-        required: true,
-      },
-      nodeId: {
-        name: 'nodeId',
-        type: 'number',
-        description: 'The stable node ID to get retainers for.',
-        required: true,
-      },
-      pageIdx: {
-        name: 'pageIdx',
-        type: 'number',
-        description: 'The page index for pagination.',
-        required: false,
-      },
-      pageSize: {
-        name: 'pageSize',
-        type: 'number',
-        description: 'The page size for pagination.',
-        required: false,
-      },
-    },
-  },
-  get_nodes_by_class: {
-    description:
-      'Loads a memory heapsnapshot and returns instances of a specific class with their stable IDs. (requires flag: --experimentalMemory=true)',
-    category: 'Memory',
-    args: {
-      filePath: {
-        name: 'filePath',
-        type: 'string',
-        description: 'A path to a .heapsnapshot file to read.',
-        required: true,
-      },
-      uid: {
-        name: 'uid',
-        type: 'number',
-        description:
-          'The unique UID for the class, obtained from aggregates listing.',
-        required: true,
-      },
-      pageIdx: {
-        name: 'pageIdx',
-        type: 'number',
-        description: 'The page index for pagination.',
-        required: false,
-      },
-      pageSize: {
-        name: 'pageSize',
-        type: 'number',
-        description: 'The page size for pagination.',
         required: false,
       },
     },
@@ -577,19 +589,6 @@ export const commands: Commands = {
       'Lists all WebMCP tools the page exposes. (requires flag: --categoryExperimentalWebmcp=true)',
     category: 'WebMCP',
     args: {},
-  },
-  load_memory_snapshot: {
-    description:
-      'Loads a memory heapsnapshot and returns snapshot summary stats. (requires flag: --experimentalMemory=true)',
-    category: 'Memory',
-    args: {
-      filePath: {
-        name: 'filePath',
-        type: 'string',
-        description: 'A path to a .heapsnapshot file to read.',
-        required: true,
-      },
-    },
   },
   navigate_page: {
     description:
@@ -831,7 +830,7 @@ export const commands: Commands = {
       },
     },
   },
-  take_memory_snapshot: {
+  take_heapsnapshot: {
     description:
       'Capture a heap snapshot of the currently selected page. Use to analyze the memory distribution of JavaScript objects and debug memory leaks.',
     category: 'Memory',
