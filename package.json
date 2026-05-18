@@ -71,7 +71,7 @@
     "globals": "^17.0.0",
     "lighthouse": "13.3.0",
     "prettier": "^3.6.2",
-    "puppeteer": "25.0.2",
+    "puppeteer": "25.0.3",
     "rollup": "4.60.4",
     "rollup-plugin-cleanup": "^3.2.1",
     "rollup-plugin-license": "^3.6.0",
