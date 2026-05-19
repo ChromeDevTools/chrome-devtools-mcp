@@ -31,5 +31,5 @@ export interface EmulationSettings {
   userAgent?: string;
   colorScheme?: 'dark' | 'light';
   viewport?: Viewport;
-  extraHTTPHeaders?: Record<string, string>;
+  extraHttpHeaders?: Record<string, string>;
 }

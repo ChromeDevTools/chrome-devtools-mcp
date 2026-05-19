@@ -87,8 +87,14 @@
         "argType": "number"
       },
       {
+        "name": "extra_http_headers_length",
+        "argType": "number",
+        "isDeprecated": true
+      },
+      {
         "name": "extra_h_t_t_p_headers_length",
-        "argType": "number"
+        "argType": "number",
+        "isDeprecated": true
       }
     ]
   },

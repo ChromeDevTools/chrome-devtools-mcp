@@ -572,7 +572,7 @@ describe('emulation', () => {
     });
   });
 
-  describe('extraHTTPHeaders', () => {
+  describe('extraHttpHeaders', () => {
     it('sets extra headers on requests', async () => {
       let receivedHeaders: IncomingHttpHeaders = {};
       server.addRoute('/headers-test', async (req, res) => {
@@ -586,7 +586,7 @@ describe('emulation', () => {
         await emulate.handler(
           {
             params: {
-              extraHTTPHeaders: {'X-Custom-Header': 'test-value'},
+              extraHttpHeaders: {'X-Custom-Header': 'test-value'},
             },
             page: context.getSelectedMcpPage(),
           },
@@ -613,7 +613,7 @@ describe('emulation', () => {
         await emulate.handler(
           {
             params: {
-              extraHTTPHeaders: {'X-To-Clear': 'value'},
+              extraHttpHeaders: {'X-To-Clear': 'value'},
             },
             page: context.getSelectedMcpPage(),
           },
@@ -625,7 +625,7 @@ describe('emulation', () => {
         await emulate.handler(
           {
             params: {
-              extraHTTPHeaders: null,
+              extraHttpHeaders: {},
             },
             page: context.getSelectedMcpPage(),
           },
@@ -636,7 +636,7 @@ describe('emulation', () => {
         await page.goto(server.getRoute('/headers-clear'));
         assert.strictEqual(receivedHeaders['x-to-clear'], undefined);
         assert.strictEqual(
-          context.getSelectedMcpPage().emulationSettings.extraHTTPHeaders,
+          context.getSelectedMcpPage().emulationSettings.extraHttpHeaders,
           undefined,
         );
       });
@@ -660,7 +660,7 @@ describe('emulation', () => {
         await emulate.handler(
           {
             params: {
-              extraHTTPHeaders: {'X-Persist': 'yes'},
+              extraHttpHeaders: {'X-Persist': 'yes'},
             },
             page: context.getSelectedMcpPage(),
           },
@@ -694,7 +694,7 @@ describe('emulation', () => {
         await emulate.handler(
           {
             params: {
-              extraHTTPHeaders: {'X-Test': 'value'},
+              extraHttpHeaders: {'X-Test': 'value'},
             },
             page: context.getSelectedMcpPage(),
           },
@@ -703,7 +703,7 @@ describe('emulation', () => {
         );
 
         const settings = context.getSelectedMcpPage().emulationSettings;
-        assert.deepStrictEqual(settings.extraHTTPHeaders, {
+        assert.deepStrictEqual(settings.extraHttpHeaders, {
           'X-Test': 'value',
         });
       });
@@ -714,7 +714,7 @@ describe('emulation', () => {
         await emulate.handler(
           {
             params: {
-              extraHTTPHeaders: {'X-Page': 'one'},
+              extraHttpHeaders: {'X-Page': 'one'},
             },
             page: context.getSelectedMcpPage(),
           },
@@ -723,7 +723,7 @@ describe('emulation', () => {
         );
 
         assert.deepStrictEqual(
-          context.getSelectedMcpPage().emulationSettings.extraHTTPHeaders,
+          context.getSelectedMcpPage().emulationSettings.extraHttpHeaders,
           {'X-Page': 'one'},
         );
 
@@ -731,7 +731,7 @@ describe('emulation', () => {
         context.selectPage(page);
 
         assert.strictEqual(
-          context.getSelectedMcpPage().emulationSettings.extraHTTPHeaders,
+          context.getSelectedMcpPage().emulationSettings.extraHttpHeaders,
           undefined,
         );
       });

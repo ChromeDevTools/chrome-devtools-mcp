@@ -16,12 +16,12 @@ import {
 
 function headerStringTransform(
   value: string | undefined,
-): Record<string, string> | null | undefined {
+): Record<string, string> | undefined {
   if (value === undefined) {
     return undefined;
   }
   if (value === '') {
-    return null;
+    return {};
   }
   try {
     const parsed = JSON.parse(value);
@@ -91,7 +91,7 @@ export const emulate = definePageTool({
       .describe(
         `Emulate device viewports '<width>x<height>x<devicePixelRatio>[,mobile][,touch][,landscape]'. 'touch' and 'mobile' to emulate mobile devices. 'landscape' to emulate landscape mode.`,
       ),
-    extraHTTPHeaders: zod
+    extraHttpHeaders: zod
       .string()
       .optional()
       .transform(headerStringTransform)
