@@ -9,6 +9,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 
+import {disconnectBrowser} from './browser.js';
 import type {TargetUniverse} from './DevtoolsUtils.js';
 import {UniverseManager} from './DevtoolsUtils.js';
 import {HeapSnapshotManager} from './HeapSnapshotManager.js';
@@ -144,6 +145,11 @@ export class McpContext implements Context {
     // Either the entire browser will be closed or we disconnect
     // without destroying browser state.
     this.#isolatedContexts.clear();
+  }
+
+  async disconnect(): Promise<void> {
+    this.dispose();
+    await disconnectBrowser();
   }
 
   static async from(

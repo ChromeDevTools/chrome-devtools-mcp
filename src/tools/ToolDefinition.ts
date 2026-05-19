@@ -179,6 +179,7 @@ export type Context = Readonly<{
   isCruxEnabled(): boolean;
   recordedTraces(): TraceResult[];
   storeTraceRecording(result: TraceResult): void;
+  disconnect(): Promise<void>;
   getPageById(pageId: number): ContextPage;
   newPage(
     background?: boolean,

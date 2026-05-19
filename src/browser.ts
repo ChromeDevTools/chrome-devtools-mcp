@@ -270,4 +270,16 @@ export async function ensureBrowserLaunched(
   return browser;
 }
 
+export async function disconnectBrowser(): Promise<void> {
+  const current = browser;
+  browser = undefined;
+  if (current?.connected) {
+    try {
+      await current.disconnect();
+    } catch (err) {
+      logger('Error while disconnecting browser', err);
+    }
+  }
+}
+
 export type Channel = 'stable' | 'canary' | 'beta' | 'dev';
