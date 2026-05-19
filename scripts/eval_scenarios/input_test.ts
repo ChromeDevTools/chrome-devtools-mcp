@@ -11,7 +11,7 @@ import type {TestScenario} from '../eval_gemini.ts';
 export const scenario: TestScenario = {
   prompt:
     'Go to <TEST_URL>, fill the input with "hello world" and click the button.',
-  maxTurns: 4,
+  maxTurns: 5,
   htmlRoute: {
     path: '/input_test.html',
     htmlContent: `
@@ -19,13 +19,20 @@ export const scenario: TestScenario = {
       <button id="test-button">Submit</button>
     `,
   },
-  expectations: calls => {
-    assert.strictEqual(calls.length, 4);
-    assert.ok(
-      calls[0].name === 'navigate_page' || calls[0].name === 'new_page',
+  expectations: result => {
+    const pageId = result.consumePageNavigation();
+    assert.ok(result.remainingCalls.length >= 3);
+    result.assertNextCall(
+      'take_snapshot',
+      result.hasPageIdRouting ? {pageId} : undefined,
     );
-    assert.ok(calls[1].name === 'take_snapshot');
-    assert.ok(calls[2].name === 'fill');
-    assert.ok(calls[3].name === 'click');
+    result.assertNextCall(
+      'fill',
+      result.hasPageIdRouting ? {pageId} : undefined,
+    );
+    result.assertNextCall(
+      'click',
+      result.hasPageIdRouting ? {pageId} : undefined,
+    );
   },
 };

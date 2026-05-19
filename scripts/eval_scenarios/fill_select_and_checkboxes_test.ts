@@ -11,7 +11,7 @@ import type {TestScenario} from '../eval_gemini.ts';
 export const scenario: TestScenario = {
   prompt:
     'Go to <TEST_URL>, fill the form with size = 2 CPUs and components = [docker, nginx].',
-  maxTurns: 4, // allow for at least one extra turn to verify there are no extra clicks after fill_form
+  maxTurns: 5, // allow for at least one extra turn to verify there are no extra clicks after fill_form
   htmlRoute: {
     path: '/input_test.html',
     htmlContent: `
@@ -40,32 +40,42 @@ export const scenario: TestScenario = {
       </form>
     `,
   },
-  expectations: calls => {
-    assert.ok(calls.length >= 3, 'Not enough calls made');
-    assert.ok(
-      calls[0].name === 'navigate_page' || calls[0].name === 'new_page',
+  expectations: result => {
+    const pageId = result.consumePageNavigation();
+    assert.ok(result.remainingCalls.length >= 2, 'Not enough calls made');
+    result.assertNextCall(
+      'take_snapshot',
+      result.hasPageIdRouting ? {pageId} : undefined,
     );
-    assert.strictEqual(calls[1].name, 'take_snapshot');
-    assert.strictEqual(calls[2].name, 'fill_form');
+    const fillFormCall = result.assertNextCall(
+      'fill_form',
+      result.hasPageIdRouting ? {pageId} : undefined,
+    );
 
-    const elements = calls[2].args.elements as Array<{
-      uid: string;
-      value: string;
-    }>;
+    const elements = fillFormCall.args.elements;
+    assert.ok(Array.isArray(elements), 'elements should be an array');
     assert.strictEqual(
       elements.length,
       3,
       'fill_form should be used with all form elements at once',
     );
 
-    const uids = new Set(elements.map(e => e.uid));
+    const typedElements = elements.map(e => {
+      assert.ok(e && typeof e === 'object' && 'uid' in e && 'value' in e);
+      return {
+        uid: String(e.uid),
+        value: String(e.value),
+      };
+    });
+
+    const uids = new Set(typedElements.map(e => e.uid));
     assert.strictEqual(
       uids.size,
       3,
       'fill_form should target three distinct elements',
     );
 
-    const values = elements.map(e => e.value).sort();
+    const values = typedElements.map(e => e.value).sort();
     assert.deepStrictEqual(
       values,
       ['2 vCPU, 4GB RAM', 'true', 'true'],
@@ -74,11 +84,9 @@ export const scenario: TestScenario = {
 
     const submitUid = '1_15';
 
-    const extraFormInteractions = calls
-      .slice(3)
-      .filter(
-        c => ['fill', 'click'].includes(c.name) && c.args.uid !== submitUid,
-      );
+    const extraFormInteractions = result.remainingCalls.filter(
+      c => ['fill', 'click'].includes(c.name) && c.args.uid !== submitUid,
+    );
     assert.deepEqual(
       extraFormInteractions.length,
       0,

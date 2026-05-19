@@ -25,7 +25,7 @@ const INSPECTION_TOOLS = [
 ];
 
 export const scenario: TestScenario = {
-  prompt: 'Can you fix issues with my webpage?',
+  prompt: 'Can you fix issues with my webpage at <TEST_URL>?',
   maxTurns: 4,
   htmlRoute: {
     path: '/fix_issues_test.html',
@@ -37,26 +37,23 @@ export const scenario: TestScenario = {
       </script>
     `,
   },
-  expectations: calls => {
-    const NAVIGATION_TOOLS = ['navigate_page', 'new_page'];
-    assert.ok(
-      calls.length >= 2,
-      'Expected at least navigation and one inspection',
-    );
-    const navigationIndex = calls.findIndex(c =>
-      NAVIGATION_TOOLS.includes(c.name),
-    );
-    assert.ok(
-      navigationIndex !== -1,
-      `Expected a navigation call (${NAVIGATION_TOOLS.join(' or ')}), got: ${calls.map(c => c.name).join(', ')}`,
-    );
-    const afterNavigation = calls.slice(navigationIndex + 1);
-    const inspectionCalls = afterNavigation.filter(c =>
+  expectations: result => {
+    const pageId = result.consumePageNavigation();
+    const inspectionCalls = result.remainingCalls.filter(c =>
       INSPECTION_TOOLS.includes(c.name),
     );
     assert.ok(
       inspectionCalls.length >= 1,
-      `Expected at least one inspection tool (${INSPECTION_TOOLS.join(', ')}) after navigation, got: ${calls.map(c => c.name).join(', ')}`,
+      `Expected at least one inspection tool (${INSPECTION_TOOLS.join(', ')}) after navigation, got: ${result.remainingCalls.map(c => c.name).join(', ')}`,
     );
+    if (result.hasPageIdRouting) {
+      for (const inspectionCall of inspectionCalls) {
+        assert.strictEqual(
+          inspectionCall.args.pageId,
+          pageId,
+          `Inspection call ${inspectionCall.name} should target pageId: ${pageId}`,
+        );
+      }
+    }
   },
 };

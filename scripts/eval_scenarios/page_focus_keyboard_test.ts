@@ -16,22 +16,29 @@ export const scenario: TestScenario = {
 
 Now use the press_key tool to type "a" on Page 1 without selecting it first. You must use press_key, not fill or type_text. If you encounter any errors, recover from them.`,
   maxTurns: 10,
-  expectations: calls => {
+  expectations: result => {
     // Should open 2 pages in the same context.
-    const newPages = calls.filter(c => c.name === 'new_page');
+    const newPages = result.calls.filter(c => c.name === 'new_page');
     assert.strictEqual(newPages.length, 2, 'Should open 2 pages');
     assert.strictEqual(newPages[0].args.isolatedContext, 'session');
     assert.strictEqual(newPages[1].args.isolatedContext, 'session');
 
     // Should attempt press_key at least once.
-    const pressKeys = calls.filter(c => c.name === 'press_key');
+    const pressKeys = result.calls.filter(c => c.name === 'press_key');
     assert.ok(pressKeys.length >= 1, 'Should attempt press_key at least once');
+    for (const pk of pressKeys) {
+      assert.strictEqual(
+        pk.args.pageId,
+        2,
+        'press_key should target Page 1 (pageId: 2)',
+      );
+    }
 
-    const selectPages = calls.filter(c => c.name === 'select_page');
+    const selectPages = result.calls.filter(c => c.name === 'select_page');
 
     if (selectPages.length > 0) {
-      const firstPressKeyIndex = calls.indexOf(pressKeys[0]);
-      const firstSelectPageIndex = calls.indexOf(selectPages[0]);
+      const firstPressKeyIndex = result.calls.indexOf(pressKeys[0]);
+      const firstSelectPageIndex = result.calls.indexOf(selectPages[0]);
 
       if (firstPressKeyIndex < firstSelectPageIndex) {
         // Error path: press_key was attempted first and failed.
@@ -40,7 +47,7 @@ Now use the press_key tool to type "a" on Page 1 without selecting it first. You
           pressKeys.length >= 2,
           'Should retry press_key after error recovery',
         );
-        const lastPressKeyIndex = calls.lastIndexOf(pressKeys.at(-1)!);
+        const lastPressKeyIndex = result.calls.lastIndexOf(pressKeys.at(-1)!);
         assert.ok(
           firstSelectPageIndex < lastPressKeyIndex,
           'select_page should precede the successful press_key',

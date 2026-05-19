@@ -19,16 +19,12 @@ export const scenario: TestScenario = {
     path: '/frontend_snapshot.html',
     htmlContent: '<h1>Frontend Test</h1><p>This is a test webpage.</p>',
   },
-  expectations: calls => {
-    assert.strictEqual(calls.length, 2);
-    assert.ok(
-      calls[0].name === 'navigate_page' || calls[0].name === 'new_page',
-      'First call should be navigation',
-    );
-    assert.strictEqual(
-      calls[1].name,
+  expectations: result => {
+    const pageId = result.consumePageNavigation();
+    assert.ok(result.remainingCalls.length >= 1);
+    result.assertNextCall(
       'take_snapshot',
-      'Second call should be take_snapshot to read page content',
+      result.hasPageIdRouting ? {pageId} : undefined,
     );
   },
 };

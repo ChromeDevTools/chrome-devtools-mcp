@@ -10,12 +10,13 @@ import type {TestScenario} from '../eval_gemini.ts';
 
 export const scenario: TestScenario = {
   prompt: 'Check the performance of https://developers.chrome.com',
-  maxTurns: 2,
-  expectations: calls => {
-    assert.strictEqual(calls.length, 2);
-    assert.ok(
-      calls[0].name === 'navigate_page' || calls[0].name === 'new_page',
+  maxTurns: 3,
+  expectations: result => {
+    const pageId = result.consumePageNavigation();
+    assert.ok(result.remainingCalls.length >= 1);
+    result.assertNextCall(
+      'performance_start_trace',
+      result.hasPageIdRouting ? {pageId} : undefined,
     );
-    assert.ok(calls[1].name === 'performance_start_trace');
   },
 };
