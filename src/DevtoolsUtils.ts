@@ -63,6 +63,36 @@ if (networkAgentPrototype) {
     configurable: true,
     enumerable: true,
   });
+  Object.defineProperty(networkAgentPrototype, 'invoke_enable', {
+    value: () => {
+      return Promise.resolve({
+        getError: () => undefined,
+      });
+    },
+    writable: true,
+    configurable: true,
+    enumerable: true,
+  });
+  Object.defineProperty(networkAgentPrototype, 'invoke_disable', {
+    value: () => {
+      return Promise.resolve({
+        getError: () => undefined,
+      });
+    },
+    writable: true,
+    configurable: true,
+    enumerable: true,
+  });
+  Object.defineProperty(networkAgentPrototype, 'invoke_setBlockedURLs', {
+    value: () => {
+      return Promise.resolve({
+        getError: () => undefined,
+      });
+    },
+    writable: true,
+    configurable: true,
+    enumerable: true,
+  });
 }
 
 DevTools.I18n.DevToolsLocale.DevToolsLocale.instance({
