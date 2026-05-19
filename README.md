@@ -249,7 +249,7 @@ and the expert guidance it needs to use them effectively.
 
 1.  Open the **Command Palette** (`Cmd+Shift+P` on macOS or `Ctrl+Shift+P` on Windows/Linux).
 2.  Search for and run the **Chat: Install Plugin From Source** command.
-3.  Paste in our repository URL: `https://github.com/ChromeDevTools/chrome-devtools-mcp`
+3.  Paste in our repository name: `ChromeDevTools/chrome-devtools-mcp`.
 
 That's it! Your agent is now supercharged with Chrome DevTools capabilities.
 
