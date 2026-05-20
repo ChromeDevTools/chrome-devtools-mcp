@@ -481,7 +481,7 @@ export class McpContext implements Context {
       page.networkConditions,
     );
     page.pptrPage.setDefaultNavigationTimeout(
-      NAVIGATION_TIMEOUT * networkMultiplier,
+      NAVIGATION_TIMEOUT * networkMultiplier * cpuMultiplier,
     );
   }
 

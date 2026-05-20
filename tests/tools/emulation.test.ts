@@ -209,6 +209,29 @@ describe('emulation', () => {
       });
     });
 
+    it('scales the default navigation timeout with cpu throttling rate', async () => {
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedMcpPage();
+        let lastNavTimeout: number | undefined;
+        page.pptrPage.setDefaultNavigationTimeout = (timeout: number) => {
+          lastNavTimeout = timeout;
+        };
+
+        await emulate.handler(
+          {
+            params: {
+              cpuThrottlingRate: 4,
+            },
+            page,
+          },
+          response,
+          context,
+        );
+
+        assert.strictEqual(lastNavTimeout, 40000);
+      });
+    });
+
     it('disables cpu throttling', async () => {
       await withMcpContext(async (response, context) => {
         await context.emulate({
