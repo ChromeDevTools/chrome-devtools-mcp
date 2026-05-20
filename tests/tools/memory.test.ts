@@ -17,6 +17,7 @@ import {
   getMemorySnapshotDetails,
   getNodesByClass,
   getNodeRetainers,
+  compareMemorySnapshots,
 } from '../../src/tools/memory.js';
 import {withMcpContext} from '../utils.js';
 
@@ -129,6 +130,34 @@ describe('memory', () => {
       });
     });
 
+    it('with baseFilePath (diff filtering)', async t => {
+      await withMcpContext(async (response, context) => {
+        const filePath = join(
+          process.cwd(),
+          'tests/fixtures/example.heapsnapshot',
+        );
+
+        await context.getHeapSnapshotAggregates(filePath);
+
+        await getNodesByClass.handler(
+          {params: {filePath, uid: 19, baseFilePath: filePath}},
+          response,
+          context,
+        );
+
+        const responseData = await response.handle(
+          getNodesByClass.name,
+          context,
+        );
+
+        const output = responseData.content
+          .map(c => (c.type === 'text' ? c.text : ''))
+          .join('\n');
+
+        t.assert.snapshot?.(output);
+      });
+    });
+
     it('with non-existent class name', async () => {
       await withMcpContext(async (response, context) => {
         const filePath = join(
@@ -166,6 +195,36 @@ describe('memory', () => {
 
         const responseData = await response.handle(
           getNodeRetainers.name,
+          context,
+        );
+        const output = responseData.content
+          .map(c => (c.type === 'text' ? c.text : ''))
+          .join('\n');
+
+        t.assert.snapshot?.(output);
+      });
+    });
+  });
+
+  describe('compare_memory_snapshots', () => {
+    it('with valid snapshots', async t => {
+      await withMcpContext(async (response, context) => {
+        const filePath = join(
+          process.cwd(),
+          'tests/fixtures/example.heapsnapshot',
+        );
+
+        await compareMemorySnapshots.handler(
+          {
+            params: {beforeFilePath: filePath, afterFilePath: filePath},
+            page: context.getSelectedMcpPage(),
+          },
+          response,
+          context,
+        );
+
+        const responseData = await response.handle(
+          compareMemorySnapshots.name,
           context,
         );
         const output = responseData.content

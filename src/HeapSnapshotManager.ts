@@ -116,6 +116,43 @@ export class HeapSnapshotManager {
     return await provider.serializeItemsRange(0, Infinity);
   }
 
+  async getNewNodesByUid(
+    filePath: string,
+    baseFilePath: string,
+    uid: number,
+  ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange> {
+    const className = await this.resolveClassKeyFromUid(filePath, uid);
+    if (!className) {
+      throw new Error(
+        `Class with UID ${uid} not found in heap snapshot ${filePath}`,
+      );
+    }
+
+    const snapshotAfter = await this.getSnapshot(filePath);
+    const snapshotBefore = await this.getSnapshot(baseFilePath);
+
+    const interfaceDefs = await snapshotAfter.interfaceDefinitions();
+    const aggregatesForDiff =
+      await snapshotBefore.aggregatesForDiff(interfaceDefs);
+
+    const baseSnapshotId = path.resolve(baseFilePath);
+    const diff = await snapshotAfter.calculateSnapshotDiff(
+      baseSnapshotId,
+      aggregatesForDiff,
+    );
+
+    const diffForClass = diff[className];
+    if (!diffForClass || !diffForClass.addedIndexes.length) {
+      return {items: [], startPosition: 0, endPosition: 0, totalLength: 0};
+    }
+
+    const provider = snapshotAfter.createAddedNodesProvider(
+      baseSnapshotId,
+      className,
+    );
+    return await provider.serializeItemsRange(0, Infinity);
+  }
+
   async findNodeIndexById(
     filePath: string,
     nodeId: number,
@@ -148,6 +185,24 @@ export class HeapSnapshotManager {
     const snapshot = await this.getSnapshot(filePath);
     const provider = snapshot.createRetainingEdgesProvider(nodeIndex);
     return await provider.serializeItemsRange(0, Infinity);
+  }
+
+  async compareSnapshots(
+    beforeFilePath: string,
+    afterFilePath: string,
+  ): Promise<
+    Record<string, DevTools.HeapSnapshotModel.HeapSnapshotModel.Diff>
+  > {
+    const snapshotBefore = await this.getSnapshot(beforeFilePath);
+    const snapshotAfter = await this.getSnapshot(afterFilePath);
+
+    const interfaceDefs = await snapshotAfter.interfaceDefinitions();
+    const aggregatesForDiff =
+      await snapshotBefore.aggregatesForDiff(interfaceDefs);
+    return await snapshotAfter.calculateSnapshotDiff(
+      'before',
+      aggregatesForDiff,
+    );
   }
 
   #getCachedSnapshot(filePath: string) {

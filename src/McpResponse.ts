@@ -8,6 +8,7 @@ import type {WebMCPTool} from 'puppeteer-core';
 
 import type {ParsedArguments} from './bin/chrome-devtools-mcp-cli-options.js';
 import {ConsoleFormatter} from './formatters/ConsoleFormatter.js';
+import {HeapDiffFormatter} from './formatters/HeapDiffFormatter.js';
 import {HeapSnapshotFormatter} from './formatters/HeapSnapshotFormatter.js';
 import {isEdgeLike, isNodeLike} from './formatters/HeapSnapshotFormatter.js';
 import {IssueFormatter} from './formatters/IssueFormatter.js';
@@ -111,7 +112,7 @@ async function getToolGroup(
       objectId: windowHandle.remoteObject().objectId,
     });
   if (listeners.find(l => l.type === 'devtoolstooldiscovery') === undefined) {
-    return;
+    return undefined;
   }
 
   const toolGroup = await page.pptrPage.evaluate(() => {
@@ -174,6 +175,11 @@ export class McpResponse implements Response {
   #attachedLighthouseResult?: LighthouseData;
   #textResponseLines: string[] = [];
   #images: ImageContentData[] = [];
+  #heapDiffOptions?: {
+    include: boolean;
+    diff: Record<string, DevTools.HeapSnapshotModel.HeapSnapshotModel.Diff>;
+    pagination?: PaginationOptions;
+  };
   #heapSnapshotOptions?: {
     include: boolean;
     aggregates?: Record<
@@ -392,6 +398,17 @@ export class McpResponse implements Response {
 
   attachWaitForResult(result: WaitForEventsResult): void {
     this.#attachedWaitForResult = result;
+  }
+
+  setHeapDiff(
+    diff: Record<string, DevTools.HeapSnapshotModel.HeapSnapshotModel.Diff>,
+    options?: PaginationOptions,
+  ) {
+    this.#heapDiffOptions = {
+      include: true,
+      diff,
+      pagination: options,
+    };
   }
 
   setHeapSnapshotAggregates(
@@ -742,6 +759,7 @@ export class McpResponse implements Response {
       };
       heapSnapshotData?: object[];
       heapSnapshotNodes?: readonly object[];
+      heapDiff?: object[];
       extensionServiceWorkers?: object[];
       extensionPages?: object[];
       errorMessage?: string;
@@ -957,6 +975,29 @@ Call ${handleDialog.name} to handle it before continuing.`);
         response.push(data.snapshot.toString());
         structuredContent.snapshot = data.snapshot.toJSON();
       }
+    }
+
+    if (this.#heapDiffOptions?.include) {
+      const diff = this.#heapDiffOptions.diff;
+      const entries = Object.entries(diff);
+
+      const sortedEntries = entries.sort(
+        (a, b) => b[1].sizeDelta - a[1].sizeDelta,
+      );
+
+      const paginationData = this.#dataWithPagination(
+        sortedEntries,
+        this.#heapDiffOptions.pagination,
+      );
+
+      structuredContent.pagination = paginationData.pagination;
+      response.push(...paginationData.info);
+
+      const paginatedRecord = Object.fromEntries(paginationData.items);
+      const formatter = new HeapDiffFormatter(paginatedRecord);
+
+      response.push(formatter.toString());
+      structuredContent.heapDiff = formatter.toJSON();
     }
 
     if (this.#heapSnapshotOptions?.include) {

@@ -103,6 +103,10 @@ export interface DevToolsData {
 
 export interface Response {
   appendResponseLine(value: string): void;
+  setHeapDiff(
+    diff: Record<string, DevTools.HeapSnapshotModel.HeapSnapshotModel.Diff>,
+    options?: PaginationOptions,
+  ): void;
   setHeapSnapshotAggregates(
     aggregates: Record<
       string,
@@ -246,10 +250,19 @@ export type Context = Readonly<{
     filePath: string,
     uid: number,
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange>;
+  getHeapSnapshotNewNodesByUid(
+    filePath: string,
+    baseFilePath: string,
+    uid: number,
+  ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange>;
   getHeapSnapshotRetainers(
     filePath: string,
     nodeId: number,
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange>;
+  compareHeapSnapshots(
+    beforeFilePath: string,
+    afterFilePath: string,
+  ): Promise<Record<string, DevTools.HeapSnapshotModel.HeapSnapshotModel.Diff>>;
 }>;
 
 /**

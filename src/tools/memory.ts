@@ -98,7 +98,7 @@ export const getMemorySnapshotDetails = defineTool({
 export const getNodesByClass = defineTool({
   name: 'get_nodes_by_class',
   description:
-    'Loads a memory heapsnapshot and returns instances of a specific class with their stable IDs.',
+    'Loads a memory heapsnapshot and returns instances of a specific class with their stable IDs. Supports filtering by base snapshot to show only new nodes.',
   annotations: {
     category: ToolCategory.MEMORY,
     readOnlyHint: true,
@@ -111,16 +111,31 @@ export const getNodesByClass = defineTool({
       .describe(
         'The unique UID for the class, obtained from aggregates listing.',
       ),
+    baseFilePath: zod
+      .string()
+      .optional()
+      .describe('Optional base snapshot file path to show only new nodes.'),
     pageIdx: zod.number().optional().describe('The page index for pagination.'),
     pageSize: zod.number().optional().describe('The page size for pagination.'),
   },
   blockedByDialog: false,
   handler: async (request, response, context) => {
     context.validatePath(request.params.filePath);
-    const nodes = await context.getHeapSnapshotNodesByUid(
-      request.params.filePath,
-      request.params.uid,
-    );
+
+    let nodes;
+    if (request.params.baseFilePath) {
+      context.validatePath(request.params.baseFilePath);
+      nodes = await context.getHeapSnapshotNewNodesByUid(
+        request.params.filePath,
+        request.params.baseFilePath,
+        request.params.uid,
+      );
+    } else {
+      nodes = await context.getHeapSnapshotNodesByUid(
+        request.params.filePath,
+        request.params.uid,
+      );
+    }
 
     response.setHeapSnapshotNodes(nodes, {
       pageIdx: request.params.pageIdx,
@@ -157,5 +172,34 @@ export const getNodeRetainers = defineTool({
       pageIdx: request.params.pageIdx,
       pageSize: request.params.pageSize,
     });
+  },
+});
+
+export const compareMemorySnapshots = definePageTool({
+  name: 'compare_memory_snapshots',
+  description: 'Compare two heap snapshots and return the diff.',
+  annotations: {
+    category: ToolCategory.PERFORMANCE,
+    readOnlyHint: true,
+  },
+  schema: {
+    beforeFilePath: zod.string().describe('Path to the before snapshot.'),
+    afterFilePath: zod.string().describe('Path to the after snapshot.'),
+    pageSize: zod.number().optional().describe('Page size for pagination.'),
+    pageIdx: zod.number().optional().describe('Page index for pagination.'),
+  },
+  blockedByDialog: false,
+  handler: async (request, response, context) => {
+    const {beforeFilePath, afterFilePath, pageSize, pageIdx} = request.params;
+
+    try {
+      const diff = await context.compareHeapSnapshots(
+        beforeFilePath,
+        afterFilePath,
+      );
+      response.setHeapDiff(diff, {pageSize, pageIdx});
+    } catch (err) {
+      response.appendResponseLine(`Comparison failed: ${err}`);
+    }
   },
 });

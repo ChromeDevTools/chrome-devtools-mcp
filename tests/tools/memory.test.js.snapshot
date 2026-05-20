@@ -1,3 +1,8 @@
+exports[`memory > compare_memory_snapshots > with valid snapshots 1`] = `
+Showing 1-0 of 0 (Page 1 of 1).
+
+`;
+
 exports[`memory > get_memory_snapshot_details > with default options 1`] = `
 ## Heap Snapshot Data
 Showing 1-157 of 157 (Page 1 of 1).
@@ -168,6 +173,12 @@ edgeIndex,edgeName,edgeType,targetNodeId,targetNodeName
 108096,prototype,property,25575,String
 48828,initial_string_prototype,internal,7199,system / NativeContext
 Showing 1-3 of 3 (Page 1 of 1).
+`;
+
+exports[`memory > get_nodes_by_class > with baseFilePath (diff filtering) 1`] = `
+## Heap Snapshot Data
+
+Showing 1-0 of 0 (Page 1 of 1).
 `;
 
 exports[`memory > get_nodes_by_class > with default options 1`] = `
