@@ -29,6 +29,8 @@ describe('cli args parsing', () => {
     usageStatistics: true,
     'redact-network-headers': false,
     redactNetworkHeaders: false,
+    'page-id-routing': true,
+    pageIdRouting: true,
   };
 
   it('parses with default args', async () => {

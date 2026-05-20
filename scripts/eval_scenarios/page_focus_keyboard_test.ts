@@ -9,7 +9,6 @@ import assert from 'node:assert';
 import type {TestScenario} from '../eval_gemini.ts';
 
 export const scenario: TestScenario = {
-  serverArgs: ['--experimental-page-id-routing'],
   prompt: `Open two pages in the same isolated context "session":
 - Page 1 at data:text/html,<textarea id="ta"></textarea>
 - Page 2 at data:text/html,<h1>Other</h1>

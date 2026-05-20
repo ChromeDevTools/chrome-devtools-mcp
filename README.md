@@ -611,10 +611,10 @@ The Chrome DevTools MCP server supports the following configuration option:
   - **Type:** boolean
   - **Default:** `false`
 
-- **`--experimentalPageIdRouting`/ `--experimental-page-id-routing`**
-  Whether to expose pageId on page-scoped tools and route requests by page ID (useful for concurrent agent sessions).
+- **`--pageIdRouting`/ `--page-id-routing`**
+  Expose pageId on page-scoped tools and route requests by page ID (useful for concurrent agent sessions). Use --no-page-id-routing to disable.
   - **Type:** boolean
-  - **Default:** `false`
+  - **Default:** `true`
 
 - **`--experimentalDevtools`/ `--experimental-devtools`**
   Whether to enable automation over DevTools targets

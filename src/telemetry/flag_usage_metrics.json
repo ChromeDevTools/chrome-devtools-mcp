@@ -240,11 +240,13 @@
   },
   {
     "name": "experimental_page_id_routing",
-    "flagType": "boolean"
+    "flagType": "boolean",
+    "isDeprecated": true
   },
   {
     "name": "experimental_page_id_routing_present",
-    "flagType": "boolean"
+    "flagType": "boolean",
+    "isDeprecated": true
   },
   {
     "name": "experimental_webmcp",
@@ -296,6 +298,14 @@
   },
   {
     "name": "category_experimental_third_party",
+    "flagType": "boolean"
+  },
+  {
+    "name": "page_id_routing_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "page_id_routing",
     "flagType": "boolean"
   },
   {
