@@ -49,7 +49,6 @@ delete startCliOptions.viewport;
 // Change the defaults for the CLI.
 delete startCliOptions.experimentalStructuredContent;
 delete startCliOptions.experimentalInteropTools;
-delete startCliOptions.experimentalPageIdRouting;
 if (!('default' in cliOptions.headless)) {
   throw new Error('headless cli option unexpectedly does not have a default');
 }

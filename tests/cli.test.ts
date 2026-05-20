@@ -31,6 +31,8 @@ describe('cli args parsing', () => {
     redactNetworkHeaders: false,
     'allow-unrestricted-paths': false,
     allowUnrestrictedPaths: false,
+    'page-id-routing': true,
+    pageIdRouting: true,
   };
 
   it('parses with default args', async () => {
