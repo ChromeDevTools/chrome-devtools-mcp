@@ -6,7 +6,7 @@
 
 import assert from 'node:assert';
 import type {IncomingHttpHeaders} from 'node:http';
-import {beforeEach, describe, it} from 'node:test';
+import {beforeEach, describe, it, mock} from 'node:test';
 
 import {emulate} from '../../src/tools/emulation.js';
 import {
@@ -209,26 +209,33 @@ describe('emulation', () => {
       });
     });
 
-    it('scales the default navigation timeout with cpu throttling rate', async () => {
+    it('applies cpu throttling to secondary session', async () => {
       await withMcpContext(async (response, context) => {
-        const page = context.getSelectedMcpPage();
-        let lastNavTimeout: number | undefined;
-        page.pptrPage.setDefaultNavigationTimeout = (timeout: number) => {
-          lastNavTimeout = timeout;
-        };
+        const mcpPage = context.getSelectedMcpPage();
+        const universe = context.getDevToolsUniverse(mcpPage);
+        assert.ok(universe);
+
+        const sendSpy = mock.method(universe.session, 'send');
 
         await emulate.handler(
           {
             params: {
               cpuThrottlingRate: 4,
             },
-            page,
+            page: mcpPage,
           },
           response,
           context,
         );
 
-        assert.strictEqual(lastNavTimeout, 40000);
+        assert.ok(sendSpy.mock.calls.length > 0);
+        const cpuCall = sendSpy.mock.calls.find(
+          call => call.arguments[0] === 'Emulation.setCPUThrottlingRate',
+        );
+        assert.ok(cpuCall);
+        assert.deepStrictEqual(cpuCall.arguments[1], {rate: 4});
+
+        sendSpy.mock.restore();
       });
     });
 
