@@ -60,7 +60,6 @@ function getCliOptions() {
   // Change the defaults for the CLI.
   delete options.experimentalStructuredContent;
   delete options.experimentalInteropTools;
-  delete options.experimentalPageIdRouting;
 
   return options;
 }

@@ -242,7 +242,7 @@ export class ToolHandler {
     this.inputSchema =
       'pageScoped' in tool &&
       tool.pageScoped &&
-      serverArgs.experimentalPageIdRouting &&
+      serverArgs.pageIdRouting &&
       !serverArgs.slim
         ? {...pageIdSchema, ...tool.schema}
         : tool.schema;
@@ -310,8 +310,8 @@ export class ToolHandler {
         if (isPageScopedTool(this.tool)) {
           const pageId =
             typeof params.pageId === 'number' ? params.pageId : undefined;
-          page =
-            this.serverArgs.experimentalPageIdRouting &&
+          const page =
+            this.serverArgs.pageIdRouting &&
             pageId !== undefined &&
             !this.serverArgs.slim
               ? context.getPageById(pageId)

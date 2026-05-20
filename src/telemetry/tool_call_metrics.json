@@ -123,6 +123,10 @@
       {
         "name": "wait_for_stable_dom",
         "argType": "boolean"
+      },
+      {
+        "name": "page_id",
+        "argType": "number"
       }
     ]
   },
