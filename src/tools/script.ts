@@ -58,6 +58,7 @@ Example with arguments: \`(el) => el.innerText\`
         .describe(
           'Whether to wait for the DOM to settle. Pass false if the script only reads data. Defaults to true.',
         ),
+      ...(cliArgs?.pageIdRouting ? pageIdSchema : {}),
       ...(cliArgs?.categoryExtensions
         ? {
             serviceWorkerId: zod
