@@ -12,40 +12,7 @@
     "chrome-devtools": {
       "command": "npx",
       "args": [
-        "chrome-devtools-mcp@latest",
-        "--autoConnect=${user_config.autoConnect}",
-        "--browserUrl=${user_config.browserUrl}",
-        "--wsEndpoint=${user_config.wsEndpoint}",
-        "--wsHeaders=${user_config.wsHeaders}",
-        "--headless=${user_config.headless}",
-        "--executablePath=${user_config.executablePath}",
-        "--isolated=${user_config.isolated}",
-        "--userDataDir=${user_config.userDataDir}",
-        "--channel=${user_config.channel}",
-        "--logFile=${user_config.logFile}",
-        "--viewport=${user_config.viewport}",
-        "--proxyServer=${user_config.proxyServer}",
-        "--acceptInsecureCerts=${user_config.acceptInsecureCerts}",
-        "--experimentalPageIdRouting=${user_config.experimentalPageIdRouting}",
-        "--experimentalDevtools=${user_config.experimentalDevtools}",
-        "--experimentalVision=${user_config.experimentalVision}",
-        "--experimentalMemory=${user_config.experimentalMemory}",
-        "--experimentalStructuredContent=${user_config.experimentalStructuredContent}",
-        "--experimentalIncludeAllPages=${user_config.experimentalIncludeAllPages}",
-        "--experimentalScreencast=${user_config.experimentalScreencast}",
-        "--experimentalFfmpegPath=${user_config.experimentalFfmpegPath}",
-        "--categoryExperimentalWebmcp=${user_config.categoryExperimentalWebmcp}",
-        "--chromeArg=${user_config.chromeArg}",
-        "--ignoreDefaultChromeArg=${user_config.ignoreDefaultChromeArg}",
-        "--categoryEmulation=${user_config.categoryEmulation}",
-        "--categoryPerformance=${user_config.categoryPerformance}",
-        "--categoryNetwork=${user_config.categoryNetwork}",
-        "--categoryExtensions=${user_config.categoryExtensions}",
-        "--categoryExperimentalThirdParty=${user_config.categoryExperimentalThirdParty}",
-        "--performanceCrux=${user_config.performanceCrux}",
-        "--usageStatistics=${user_config.usageStatistics}",
-        "--slim=${user_config.slim}",
-        "--redactNetworkHeaders=${user_config.redactNetworkHeaders}"
+        "chrome-devtools-mcp@latest"
       ]
     }
   }
