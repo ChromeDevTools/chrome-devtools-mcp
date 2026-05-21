@@ -1,0 +1,17 @@
+[Unit]
+Description=Chrome DevTools MCP Server (Streamable HTTP)
+After=network.target
+
+[Service]
+Type=simple
+ExecStart={{NODE_PATH}} --max-old-space-size=4096 {{BIN_PATH}} {{CONNECT_FLAG}} --experimentalPageIdRouting --port {{PORT}}
+Restart=on-failure
+RestartSec=5
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+Environment=CHROME_DEVTOOLS_MCP_NO_UPDATE_CHECKS=1
+Environment=CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS=1
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target

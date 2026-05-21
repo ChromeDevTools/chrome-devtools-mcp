@@ -23,7 +23,10 @@ export type {Debugger} from 'debug';
 export {McpServer} from '@modelcontextprotocol/sdk/server/mcp.js';
 export {type ShapeOutput} from '@modelcontextprotocol/sdk/server/zod-compat.js';
 export {StdioServerTransport} from '@modelcontextprotocol/sdk/server/stdio.js';
+export {StreamableHTTPServerTransport} from '@modelcontextprotocol/sdk/server/streamableHttp.js';
+export {isInitializeRequest} from '@modelcontextprotocol/sdk/types.js';
 export {StdioClientTransport} from '@modelcontextprotocol/sdk/client/stdio.js';
+export {StreamableHTTPClientTransport} from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 export {Client} from '@modelcontextprotocol/sdk/client/index.js';
 export {
   type CallToolResult,

@@ -281,6 +281,12 @@ export const cliOptions = {
       'If true, redacts some of the network headers considered sensitive before returning to the client.',
     default: false,
   },
+  port: {
+    type: 'number',
+    describe:
+      'If specified, starts a Streamable HTTP transport on the given port instead of stdio. Allows multiple agents to connect to the same MCP server instance over HTTP.',
+    alias: 'p',
+  },
 } satisfies Record<string, YargsOptions>;
 
 export type ParsedArguments = ReturnType<typeof parseArguments>;

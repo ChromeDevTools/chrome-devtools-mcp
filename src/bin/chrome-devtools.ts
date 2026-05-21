@@ -18,6 +18,13 @@ import {
   sendCommand,
   handleResponse,
 } from '../daemon/client.js';
+import {
+  fetchRemoteHealth,
+  invokeRemoteTool,
+  parseHeaderFlags,
+  stopRemoteSession,
+  type RemoteOptions,
+} from '../daemon/remote-client.js';
 import {isDaemonRunning, serializeArgs} from '../daemon/utils.js';
 import {logDisclaimers} from '../index.js';
 import {hideBin, yargs, type CallToolResult} from '../third_party/index.js';
@@ -74,11 +81,71 @@ const y = yargs(hideBin(process.argv))
     default: '',
     hidden: true,
   })
+  .option('remote', {
+    type: 'string',
+    description:
+      'Connect to a remote chrome-devtools-mcp HTTP endpoint (e.g. https://host.tailnet/mcp) instead of running a local daemon. Defaults to $CHROME_DEVTOOLS_MCP_REMOTE_URL.',
+    default: process.env['CHROME_DEVTOOLS_MCP_REMOTE_URL'],
+  })
+  .option('header', {
+    type: 'array',
+    string: true,
+    description:
+      'Header to attach to remote requests, e.g. --header "Authorization: Bearer ...". Repeatable. Only honored with --remote.',
+    default: [] as string[],
+  })
+  .option('insecure', {
+    type: 'boolean',
+    description:
+      'Disable TLS certificate verification for --remote. Useful for self-signed tailnet certs. Defaults to $CHROME_DEVTOOLS_MCP_REMOTE_INSECURE.',
+    default:
+      process.env['CHROME_DEVTOOLS_MCP_REMOTE_INSECURE'] === '1' ||
+      process.env['CHROME_DEVTOOLS_MCP_REMOTE_INSECURE'] === 'true',
+  })
   .demandCommand()
   .version(VERSION)
   .strict()
   .help(true)
   .wrap(120);
+
+/**
+ * Parse and validate top-level --remote flags into a RemoteOptions value.
+ * Returns undefined when --remote is not set (i.e. local daemon mode).
+ * Exits with a non-zero status on user-visible validation errors so the
+ * caller can stay in the happy path.
+ */
+function resolveRemoteOptions(argv: {
+  remote?: string;
+  header?: string[];
+  insecure?: boolean;
+}): RemoteOptions | undefined {
+  if (!argv.remote) {
+    return undefined;
+  }
+  let url: URL;
+  try {
+    url = new URL(argv.remote);
+  } catch {
+    console.error(
+      `Invalid --remote URL: ${JSON.stringify(argv.remote)}. Expected e.g. https://host.tailnet/mcp.`,
+    );
+    process.exit(2);
+  }
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+    console.error(
+      `Invalid --remote URL: ${url.toString()} (must use http:// or https://).`,
+    );
+    process.exit(2);
+  }
+  let headers: Record<string, string> | undefined;
+  try {
+    headers = parseHeaderFlags(argv.header);
+  } catch (err) {
+    console.error((err as Error).message);
+    process.exit(2);
+  }
+  return {url, headers, insecure: argv.insecure};
+}
 
 y.command(
   'start',
@@ -92,6 +159,15 @@ y.command(
       )
       .strict(),
   async argv => {
+    if (argv.remote) {
+      console.error(
+        'start is not supported with --remote: the server lives on the remote host.',
+      );
+      console.error(
+        'Start chrome-devtools-mcp on the remote host directly (e.g. as a service or `npx chrome-devtools-mcp --port 3100`).',
+      );
+      process.exit(2);
+    }
     if (isDaemonRunning(argv.sessionId)) {
       await stopDaemon(argv.sessionId);
     }
@@ -113,6 +189,20 @@ y.command(
   'Checks if chrome-devtools-mcp is running',
   y => y,
   async argv => {
+    const remote = resolveRemoteOptions(argv);
+    if (remote) {
+      try {
+        const health = await fetchRemoteHealth(remote);
+        console.log(
+          `remote=${remote.url.toString()} status=${health.ok ? 'ok' : 'error'} http=${health.status}`,
+        );
+        console.log(JSON.stringify(health.body, null, 2));
+        process.exit(health.ok ? 0 : 1);
+      } catch (err) {
+        console.error('Failed to reach remote:', (err as Error).message);
+        process.exit(1);
+      }
+    }
     if (isDaemonRunning(argv.sessionId)) {
       console.log('chrome-devtools-mcp daemon is running.');
       const response = await sendCommand(
@@ -149,6 +239,11 @@ y.command(
   'Stop chrome-devtools-mcp if any',
   y => y,
   async argv => {
+    const remote = resolveRemoteOptions(argv);
+    if (remote) {
+      await stopRemoteSession(remote);
+      process.exit(0);
+    }
     const sessionId = argv.sessionId as string;
     if (!isDaemonRunning(sessionId)) {
       process.exit(0);
@@ -224,16 +319,31 @@ for (const [commandName, commandDef] of Object.entries(commands)) {
     },
     async argv => {
       const sessionId = argv.sessionId as string;
+      const remote = resolveRemoteOptions(argv);
+      const commandArgs: Record<string, unknown> = {};
+      for (const argName of Object.keys(args)) {
+        if (argName in argv) {
+          commandArgs[argName] = argv[argName];
+        }
+      }
       try {
-        if (!isDaemonRunning(sessionId)) {
-          await start([], sessionId);
+        if (remote) {
+          const result = await invokeRemoteTool({
+            ...remote,
+            tool: commandName,
+            args: commandArgs,
+          });
+          console.log(
+            await handleResponse(
+              result,
+              argv['output-format'] as 'json' | 'md',
+            ),
+          );
+          return;
         }
 
-        const commandArgs: Record<string, unknown> = {};
-        for (const argName of Object.keys(args)) {
-          if (argName in argv) {
-            commandArgs[argName] = argv[argName];
-          }
+        if (!isDaemonRunning(sessionId)) {
+          await start([], sessionId);
         }
 
         const response = await sendCommand(

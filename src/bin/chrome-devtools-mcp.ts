@@ -33,4 +33,20 @@ if (major < 20) {
   process.exit(1);
 }
 
-await import('./chrome-devtools-mcp-main.js');
+const subcommand = process.argv[2];
+if (
+  subcommand === 'install' ||
+  subcommand === 'uninstall' ||
+  subcommand === 'status'
+) {
+  // Pass remaining args after the subcommand, then append the action
+  process.argv = [
+    process.argv[0]!,
+    process.argv[1]!,
+    ...process.argv.slice(3),
+    subcommand,
+  ];
+  await import('./install-service.js');
+} else {
+  await import('./chrome-devtools-mcp-main.js');
+}
