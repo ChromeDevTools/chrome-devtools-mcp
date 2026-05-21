@@ -89,20 +89,14 @@ export const startTrace = definePageTool({
       'v8.execute',
       'v8',
     ];
-    await page.pptrPage.emulateCPUThrottling(20);
     await page.pptrPage.tracing.start({
       categories,
     });
-    await context.restoreEmulation(page);
 
     if (request.params.reload) {
-      // await page.pptrPage.goto(pageUrlForTracing, {
-      //   waitUntil: ['load'],
-      // });
       await page.pptrPage.goto(pageUrlForTracing, {
-      waitUntil: 'networkidle0',
-      timeout: 60000
-    });
+        waitUntil: ['load'],
+      });
     }
 
     if (request.params.autoStop) {
@@ -217,7 +211,7 @@ async function stopTracingAndAppendOutput(
       );
     }
     const result = await parseRawTraceBuffer(traceEventsBuffer, {
-      cpuThrottling: page.cpuThrottlingRate > 1 ? page.cpuThrottlingRate : 20,
+      cpuThrottling: page.cpuThrottlingRate,
       networkThrottling: page.networkConditions ?? undefined,
     });
     response.appendResponseLine('The performance trace has been stopped.');

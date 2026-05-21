@@ -80,15 +80,9 @@ ${DevTools.PerformanceTraceFormatter.callFrameDataFormatDescription}
 
 ${DevTools.PerformanceTraceFormatter.networkDataFormatDescription}`;
 
-// here
 export function getTraceSummary(result: TraceResult): string {
   const focus = DevTools.AgentFocus.fromParsedTrace(result.parsedTrace);
   const formatter = new DevTools.PerformanceTraceFormatter(focus);
-  logger(
-    'METADATA',
-    focus.parsedTrace.metadata,
-    JSON.stringify(focus.parsedTrace.metadata),
-  );
   const summaryText = formatter.formatTraceSummary();
   return `## Summary of Performance trace findings:
 ${summaryText}

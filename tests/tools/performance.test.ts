@@ -48,7 +48,6 @@ describe('performance', () => {
         context.setIsRunningPerformanceTrace(false);
         const selectedPage = context.getSelectedPptrPage();
         const startTracingStub = sinon.stub(selectedPage.tracing, 'start');
-        const restoreEmulationSpy = sinon.spy(context, 'restoreEmulation');
         await startTrace.handler(
           {
             params: {reload: true, autoStop: false},
@@ -58,7 +57,6 @@ describe('performance', () => {
           context,
         );
         sinon.assert.calledOnce(startTracingStub);
-        sinon.assert.calledOnce(restoreEmulationSpy);
         assert.ok(context.isRunningPerformanceTrace());
         assert.ok(
           response.responseLines
@@ -111,7 +109,6 @@ describe('performance', () => {
           .callsFake(() => {
             return Promise.resolve(rawData);
           });
-        sinon.stub(context, 'restoreEmulation').resolves();
 
         const clock = sinon.useFakeTimers();
         const handlerPromise = startTrace.handler(
@@ -182,7 +179,6 @@ describe('performance', () => {
         sinon.stub(selectedPage, 'goto').callsFake(() => Promise.resolve(null));
         sinon.stub(selectedPage.tracing, 'start');
         sinon.stub(selectedPage.tracing, 'stop').resolves(rawData);
-        sinon.stub(context, 'restoreEmulation').resolves();
         const saveFileStub = sinon
           .stub(context, 'saveFile')
           .resolves({filename: filePath});
