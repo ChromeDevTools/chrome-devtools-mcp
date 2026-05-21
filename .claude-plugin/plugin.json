@@ -250,7 +250,7 @@
     "redactNetworkHeaders": {
       "type": "boolean",
       "title": "Redact Network Headers",
-      "description": "If true, redacts some of the network headers considered senstive before returning to the client.",
+      "description": "If true, redacts some of the network headers considered sensitive before returning to the client.",
       "sensitive": false,
       "default": false
     }
