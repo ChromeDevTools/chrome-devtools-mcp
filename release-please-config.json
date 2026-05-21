@@ -42,6 +42,11 @@
         },
         {
           "type": "json",
+          "path": ".cursor-plugin/plugin.json",
+          "jsonpath": "version"
+        },
+        {
+          "type": "json",
           "path": ".github/plugin/plugin.json",
           "jsonpath": "version"
         }

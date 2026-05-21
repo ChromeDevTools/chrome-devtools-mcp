@@ -1,0 +1,17 @@
+{
+  "name": "devtools-for-agents",
+  "description": "Help your agent build, debug, and verify your code correctly. With Chrome DevTools for agents, your AI agent can interact with the Chrome browser to test code, emulate users, and catch bugs using Chrome DevTools’ capabilities before shipping.",
+  "version": "1.0.1",
+  "author": {
+    "name": "Google Chrome"
+  },
+  "logo": "https://github.com/ChromeDevTools/devtools-logo/blob/master/logos/svg/chrome-devtools-square-responsive.svg",
+  "homepage": "https://cursor.com/marketplace/devtools-for-agents",
+  "repository": "https://github.com/ChromeDevTools/chrome-devtools-mcp",
+  "mcpServers": {
+    "chrome-devtools": {
+      "command": "npx",
+      "args": ["chrome-devtools-mcp@latest"]
+    }
+  }
+}
