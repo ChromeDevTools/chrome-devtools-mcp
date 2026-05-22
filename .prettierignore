@@ -2,6 +2,7 @@
 CHANGELOG.md
 src/third_party/lighthouse-devtools-mcp-bundle.js
 
-# Release-please formatting brakes CI checks
+# Release-please formatting breaks CI checks
 .claude-plugin/plugin.json
 .github/plugin/plugin.json
+.cursor-plugin/plugin.json
