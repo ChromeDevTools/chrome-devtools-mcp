@@ -131,6 +131,7 @@ export const click = definePageTool({
       if (request.params.includeSnapshot) {
         response.includeSnapshot();
       }
+      response.setIncludePages(true);
     } catch (error) {
       handleActionError(error, uid);
     } finally {
@@ -170,6 +171,7 @@ export const clickAt = definePageTool({
     if (request.params.includeSnapshot) {
       response.includeSnapshot();
     }
+    response.setIncludePages(true);
   },
 });
 
@@ -201,6 +203,7 @@ export const hover = definePageTool({
       if (request.params.includeSnapshot) {
         response.includeSnapshot();
       }
+      response.setIncludePages(true);
     } catch (error) {
       handleActionError(error, uid);
     } finally {
