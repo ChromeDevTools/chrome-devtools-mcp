@@ -18,7 +18,16 @@ export const evaluateScript = defineTool(cliArgs => {
   return {
     name: 'evaluate_script',
     description: `Evaluate a JavaScript function inside the currently selected page${cliArgs?.categoryExtensions ? ' or service worker' : ''}. Returns the response as JSON,
-so returned values have to be JSON-serializable.`,
+so returned values have to be JSON-serializable.
+
+IMPORTANT GUIDELINES FOR LLM AGENTS:
+
+1. Do NOT use window.location.href to navigate inside this function — it kills the execution context and the script will hang. Use the navigate_page tool for page navigation instead.
+
+2. The uid values in page snapshots (e.g., uid="3_125") are MCP-internal identifiers, NOT actual DOM attributes. You CANNOT use uid in document.querySelector() or any DOM selector.
+
+3. Pseudo-classes like :contains(), :has-text(), or :visible are library-specific (Playwright / Testing Library) and will throw errors in native querySelector(). Use standard CSS selectors and filter results manually with JavaScript.
+`, 
     annotations: {
       category: ToolCategory.DEBUGGING,
       readOnlyHint: false,
