@@ -18,7 +18,9 @@ export const evaluateScript = defineTool(cliArgs => {
   return {
     name: 'evaluate_script',
     description: `Evaluate a JavaScript function inside the currently selected page${cliArgs?.categoryExtensions ? ' or service worker' : ''}. Returns the response as JSON,
-so returned values have to be JSON-serializable.`,
+so returned values have to be JSON-serializable.
+IMPORTANT: Do NOT use window.location.href to navigate inside this function — it kills the execution context and the script will hang.
+Use the navigate_page tool for page navigation instead, then call evaluate_script again on the new page.`,
     annotations: {
       category: ToolCategory.DEBUGGING,
       readOnlyHint: false,
