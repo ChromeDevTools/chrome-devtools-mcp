@@ -35,6 +35,7 @@ interface ConsoleMessageConcise {
   argsCount: number;
   id: number;
   count?: number;
+  sourceLocation?: string;
 }
 
 interface ConsoleMessageDetailed extends ConsoleMessageConcise {
@@ -42,6 +43,7 @@ interface ConsoleMessageDetailed extends ConsoleMessageConcise {
   args: string[];
   // pre-formatted stacktrace.
   stackTrace?: string;
+  sourceLocation?: string;
 }
 
 export class ConsoleFormatter {
@@ -195,12 +197,22 @@ export class ConsoleFormatter {
     return [];
   }
 
+  get #sourceLocation(): string | undefined {
+    const frame = this.#stack?.callFrames?.[0];
+    if (!frame) return undefined;
+    const url = frame.url || '<unknown>';
+    const line = frame.lineNumber ?? 0;
+    const col = frame.columnNumber ?? 0;
+    return `${url}:${line}:${col}`;
+  }
+
   toJSON(): ConsoleMessageConcise {
     return {
       type: this.#type,
       text: this.#text,
       argsCount: this.#argCount,
       id: this.#id,
+      sourceLocation: this.#sourceLocation,
     };
   }
 
@@ -256,6 +268,7 @@ export class ConsoleFormatter {
       stackTrace: this.#stack
         ? formatStackTrace(this.#stack, this.#cause, this)
         : undefined,
+      sourceLocation: this.#sourceLocation,
     };
   }
 }
@@ -283,6 +296,7 @@ export class GroupedConsoleFormatter extends ConsoleFormatter {
 
   override toJSON(): ConsoleMessageConcise {
     const json = super.toJSON();
+    json.sourceLocation = undefined; // grouped messages don't have a single source
     json.count = this.#count;
     return json;
   }
@@ -290,15 +304,17 @@ export class GroupedConsoleFormatter extends ConsoleFormatter {
 
 function convertConsoleMessageConciseToString(msg: ConsoleMessageConcise) {
   const countSuffix = msg.count && msg.count > 1 ? ` [${msg.count} times]` : '';
-  return `msgid=${msg.id} [${msg.type}] ${msg.text} (${msg.argsCount} args)${countSuffix}`;
+  const source = msg.sourceLocation ? ` at ${msg.sourceLocation}` : '';
+  return `msgid=${msg.id} [${msg.type}] ${msg.text} (${msg.argsCount} args)${source}${countSuffix}`;
 }
 
 function convertConsoleMessageConciseDetailedToString(
   msg: ConsoleMessageDetailed,
 ) {
+  const source = msg.sourceLocation ? ` at ${msg.sourceLocation}` : '';
   const result = [
     `ID: ${msg.id}`,
-    `Message: ${msg.type}> ${msg.text}`,
+    `Message: ${msg.type}> ${msg.text}${source}`,
     formatArgs(msg),
     ...(msg.stackTrace ? ['### Stack trace', msg.stackTrace] : []),
   ].filter(line => !!line);
