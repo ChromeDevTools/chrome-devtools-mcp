@@ -17,7 +17,9 @@ export type Evaluatable = Page | Frame | WebWorker;
 export const evaluateScript = defineTool(cliArgs => {
   return {
     name: 'evaluate_script',
-    description: `Evaluate a JavaScript function inside the currently selected page${cliArgs?.categoryExtensions ? ' or service worker' : ''}. Returns the response as JSON,
+    description: `Evaluate a JavaScript function inside the currently selected page${cliArgs?.categoryExtensions ? ' or service worker' : ''}. Returns the response as JSON.
+IMPORTANT: This function executes in the browser using native DOM APIs. Pseudo-classes such as :contains(), :has-text(), or :visible are library-specific (e.g., Playwright/Testing Library) and will throw errors in native querySelector.
+Use standard CSS selectors and filter results manually with JavaScript.
 so returned values have to be JSON-serializable.`,
     annotations: {
       category: ToolCategory.DEBUGGING,
