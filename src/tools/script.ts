@@ -58,7 +58,7 @@ Example with arguments: \`(el) => {
         .describe(
           'Handle dialogs while execution. "accept", "dismiss", or string for response of window.prompt. Defaults to accept.',
         ),
-      ...(cliArgs?.experimentalPageIdRouting ? pageIdSchema : {}),
+      ...pageIdSchema,
       ...(cliArgs?.categoryExtensions
         ? {
             serviceWorkerId: zod
@@ -109,7 +109,7 @@ Example with arguments: \`(el) => {
         return;
       }
 
-      const mcpPage = cliArgs?.experimentalPageIdRouting
+      const mcpPage = request.params.pageId
         ? context.getPageById(request.params.pageId)
         : context.getSelectedMcpPage();
       const page: Page = mcpPage.pptrPage;

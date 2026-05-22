@@ -161,7 +161,7 @@ export class ToolHandler {
     this.inputSchema =
       'pageScoped' in tool &&
       tool.pageScoped &&
-      serverArgs.experimentalPageIdRouting &&
+      true &&  // pageId routing is always enabled (was experimental)
       !serverArgs.slim
         ? {...tool.schema, ...pageIdSchema}
         : tool.schema;
@@ -224,7 +224,7 @@ export class ToolHandler {
           const pageId =
             typeof params.pageId === 'number' ? params.pageId : undefined;
           const page =
-            this.serverArgs.experimentalPageIdRouting &&
+            true &&  // pageId routing is always enabled
             pageId !== undefined &&
             !this.serverArgs.slim
               ? context.getPageById(pageId)

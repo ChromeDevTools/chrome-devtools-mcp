@@ -147,11 +147,12 @@ export const cliOptions = {
     type: 'boolean',
     description: `If enabled, ignores errors relative to self-signed and expired certificates. Use with caution.`,
   },
-  experimentalPageIdRouting: {
+  // pageId routing is now always enabled (removed from experimental flags)
+  /* experimentalPageIdRouting: {
     type: 'boolean',
     describe:
       'Whether to expose pageId on page-scoped tools and route requests by page ID (useful for concurrent agent sessions).',
-  },
+  },*/
   experimentalDevtools: {
     type: 'boolean',
     describe: 'Whether to enable automation over DevTools targets',
