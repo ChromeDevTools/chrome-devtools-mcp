@@ -30,6 +30,34 @@ chrome-devtools <tool> [arguments] [flags]
 
 Use `--help` on any command. Output defaults to Markdown, use `--output-format=json` for JSON.
 
+### Passing JavaScript to `evaluate_script`
+
+The JavaScript function for `evaluate_script` is a **positional argument**, not a flag. There is no `--expression` / `--script` flag — passing one will fail with `Unknown arguments` or `Not enough non-option arguments`.
+
+```bash
+# correct: function is a single positional argument
+chrome-devtools evaluate_script '() => document.title'
+
+# wrong: --expression is not a flag
+chrome-devtools evaluate_script --expression '() => document.title'
+```
+
+Quote the function with **outer single quotes** so the shell does not interpret `$`, backticks, or parentheses inside it. Use double quotes inside the function for string literals:
+
+```bash
+chrome-devtools evaluate_script '() => document.querySelector("h1").innerText'
+```
+
+For multi-line or large scripts, assign to a shell variable first to keep quoting simple:
+
+```bash
+script='async () => {
+  const r = await fetch("/api/items");
+  return (await r.json()).length;
+}'
+chrome-devtools evaluate_script "$script"
+```
+
 ## Input Automation (<uid> from snapshot)
 
 ```bash
@@ -108,6 +136,7 @@ chrome-devtools list_network_requests --includePreservedRequests true # Include 
 ```bash
 chrome-devtools evaluate_script "() => document.title" # Evaluate a JavaScript function on the page
 chrome-devtools evaluate_script "(a) => a.innerText" --args 1_4 # Evaluate JS with UID arguments
+chrome-devtools evaluate_script 'async () => { const r = await fetch("/api"); return await r.json(); }' # Multi-statement async function; outer single quotes keep the inner double quotes intact
 chrome-devtools get_console_message 1 # Gets a console message by its ID
 chrome-devtools lighthouse_audit --mode "navigation" # Run Lighthouse audit for navigation
 chrome-devtools lighthouse_audit --mode "snapshot" --device "mobile" # Run Lighthouse audit for a snapshot on mobile
