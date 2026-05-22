@@ -8,7 +8,43 @@ import zlib from 'node:zlib';
 
 import {logger} from '../logger.js';
 import {zod, DevTools} from '../third_party/index.js';
+
 import type {InsightName, TraceResult} from '../trace-processing/parse.js';
+// CrUX web vital thresholds (per web.dev)
+const CRUX_THRESHOLDS: Record<string, {good: number; needsImprovement: number}> = {
+  LCP: {good: 2500, needsImprovement: 4000},
+  FID: {good: 100, needsImprovement: 300},
+  CLS: {good: 0.1, needsImprovement: 0.25},
+  INP: {good: 200, needsImprovement: 500},
+  TTFB: {good: 800, needsImprovement: 1800},
+};
+
+function getCruxRating(metric: string, value: number): string {
+  const thresholds = CRUX_THRESHOLDS[metric];
+  if (!thresholds) return 'unknown';
+  if (value <= thresholds.good) return 'good';
+  if (value <= thresholds.needsImprovement) return 'needs improvement';
+  return 'poor';
+}
+
+function formatCruxFieldData(data: Record<string, number | undefined>): string {
+  if (!data || Object.keys(data).length === 0) return 'No CrUX field data available.';
+  
+  const lines: string[] = [];
+  lines.push('--- CrUX Field Data (real-user metrics) ---');
+  
+  const metrics: Record<string, string> = {lcp: 'LCP', fid: 'FID', cls: 'CLS', inp: 'INP', ttfb: 'TTFB'};
+  for (const [key, metric] of Object.entries(metrics)) {
+    const value = data[key as keyof typeof data];
+    if (value !== undefined) {
+      const rating = getCruxRating(metric, value);
+      lines.push(`  ${metric}: ${value} -- ${rating}`);
+    }
+  }
+  
+  return lines.join('\n');
+}
+
 import {
   parseRawTraceBuffer,
   traceResultIsSuccess,
@@ -268,5 +304,17 @@ async function populateCruxData(result: TraceResult): Promise<void> {
     }),
   );
 
-  result.parsedTrace.metadata.cruxFieldData = cruxData;
+  // Add ratings to each CrUX record
+  const cruxDataWithRatings = cruxData.map((entry: Record<string, unknown>) => ({
+    ...entry,
+    ratings: {
+      lcp: entry.lcp !== undefined ? getCruxRating('LCP', entry.lcp as number) : undefined,
+      fid: entry.fid !== undefined ? getCruxRating('FID', entry.fid as number) : undefined,
+      cls: entry.cls !== undefined ? getCruxRating('CLS', entry.cls as number) : undefined,
+      inp: entry.inp !== undefined ? getCruxRating('INP', entry.inp as number) : undefined,
+      ttfb: entry.ttfb !== undefined ? getCruxRating('TTFB', entry.ttfb as number) : undefined,
+    },
+  }));
+  logger(formatCruxFieldData({}));  // log format for debugging
+  result.parsedTrace.metadata.cruxFieldData = cruxDataWithRatings;
 }
