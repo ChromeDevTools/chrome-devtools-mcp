@@ -178,20 +178,21 @@ export const commands: Commands = {
   },
   evaluate_script: {
     description:
-      'Evaluate a JavaScript function inside the currently selected page. Returns the response as JSON,\nso returned values have to be JSON-serializable.',
+      'Evaluate a JavaScript function inside the currently selected page. Returns the response as JSON,\nso returned values have to be JSON-serializable.\nThe function runs in the current page context only; do not navigate by setting `window.location` inside it. Use navigate_page or new_page to change pages, then call evaluate_script again on the new page.\nWhen querying the DOM, use standard browser APIs and valid native CSS selectors only (no library-specific pseudo-classes such as `:contains()`). `uid`s from take_snapshot are MCP references, not DOM attributes; pass them via the `args` parameter when the function needs the referenced elements.',
     category: 'Debugging',
     args: {
       function: {
         name: 'function',
         type: 'string',
         description:
-          'A JavaScript function declaration to be executed by the tool in the currently selected page.\nExample without arguments: `() => {\n  return document.title\n}` or `async () => {\n  return await fetch("example.com")\n}`.\nExample with arguments: `(el) => {\n  return el.innerText;\n}`\n',
+          'A JavaScript function declaration to be executed by the tool in the currently selected page.\nExample without arguments: `() => {\n  return document.title\n}` or `async () => {\n  return await fetch("example.com")\n}`.\nExample with arguments: `(el) => {\n  return el.innerText;\n}`\nInside the function, use only standard DOM APIs and valid native CSS selectors. Do not use snapshot `uid`s in `querySelector` calls, and do not set `window.location` here to navigate across pages.\n',
         required: true,
       },
       args: {
         name: 'args',
         type: 'array',
-        description: 'An optional list of arguments to pass to the function.',
+        description:
+          'An optional list of element `uid`s from take_snapshot. Each `uid` is resolved to a real element handle and passed to the function as a parameter; `uid`s are not DOM attributes and cannot be used in selector strings inside the function.',
         required: false,
       },
       filePath: {

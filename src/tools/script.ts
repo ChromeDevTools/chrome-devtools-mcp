@@ -18,7 +18,9 @@ export const evaluateScript = defineTool(cliArgs => {
   return {
     name: 'evaluate_script',
     description: `Evaluate a JavaScript function inside the currently selected page${cliArgs?.categoryExtensions ? ' or service worker' : ''}. Returns the response as JSON,
-so returned values have to be JSON-serializable.`,
+so returned values have to be JSON-serializable.
+The function runs in the current page context only; do not navigate by setting \`window.location\` inside it. Use navigate_page or new_page to change pages, then call evaluate_script again on the new page.
+When querying the DOM, use standard browser APIs and valid native CSS selectors only (no library-specific pseudo-classes such as \`:contains()\`). \`uid\`s from take_snapshot are MCP references, not DOM attributes; pass them via the \`args\` parameter when the function needs the referenced elements.`,
     annotations: {
       category: ToolCategory.DEBUGGING,
       readOnlyHint: false,
@@ -34,6 +36,7 @@ Example without arguments: \`() => {
 Example with arguments: \`(el) => {
   return el.innerText;
 }\`
+Inside the function, use only standard DOM APIs and valid native CSS selectors. Do not use snapshot \`uid\`s in \`querySelector\` calls, and do not set \`window.location\` here to navigate across pages.
 `,
       ),
       args: zod
@@ -45,7 +48,9 @@ Example with arguments: \`(el) => {
             ),
         )
         .optional()
-        .describe(`An optional list of arguments to pass to the function.`),
+        .describe(
+          `An optional list of element \`uid\`s from take_snapshot. Each \`uid\` is resolved to a real element handle and passed to the function as a parameter; \`uid\`s are not DOM attributes and cannot be used in selector strings inside the function.`,
+        ),
       filePath: zod
         .string()
         .optional()

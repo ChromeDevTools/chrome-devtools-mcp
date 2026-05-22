@@ -343,6 +343,8 @@
 
 **Description:** Evaluate a JavaScript function inside the currently selected page. Returns the response as JSON,
 so returned values have to be JSON-serializable.
+The function runs in the current page context only; do not navigate by setting `window.location` inside it. Use [`navigate_page`](#navigate_page) or [`new_page`](#new_page) to change pages, then call [`evaluate_script`](#evaluate_script) again on the new page.
+When querying the DOM, use standard browser APIs and valid native CSS selectors only (no library-specific pseudo-classes such as `:contains()`). `uid`s from [`take_snapshot`](#take_snapshot) are MCP references, not DOM attributes; pass them via the `args` parameter when the function needs the referenced elements.
 
 **Parameters:**
 
@@ -355,8 +357,9 @@ so returned values have to be JSON-serializable.
   Example with arguments: `(el) => {
   return el.innerText;
 }`
+  Inside the function, use only standard DOM APIs and valid native CSS selectors. Do not use snapshot `uid`s in `querySelector` calls, and do not set `window.location` here to navigate across pages.
 
-- **args** (array) _(optional)_: An optional list of arguments to pass to the function.
+- **args** (array) _(optional)_: An optional list of element `uid`s from [`take_snapshot`](#take_snapshot). Each `uid` is resolved to a real element handle and passed to the function as a parameter; `uid`s are not DOM attributes and cannot be used in selector strings inside the function.
 - **dialogAction** (string) _(optional)_: Handle dialogs while execution. "accept", "dismiss", or string for response of window.prompt. Defaults to accept.
 - **filePath** (string) _(optional)_: The absolute or relative path to a file to save the script output to. If omitted, the output is returned inline.
 
