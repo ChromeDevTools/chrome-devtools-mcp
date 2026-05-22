@@ -185,7 +185,7 @@ export const commands: Commands = {
         name: 'function',
         type: 'string',
         description:
-          'A JavaScript function declaration to be executed by the tool in the currently selected page.\nExample without arguments: `() => {\n  return document.title\n}` or `async () => {\n  return await fetch("example.com")\n}`.\nExample with arguments: `(el) => {\n  return el.innerText;\n}`\n',
+          'A JavaScript function declaration to be executed by the tool in the currently selected page.\nExample without arguments: `() => {\n  return document.title\n}` or `async () => {\n  return await fetch("example.com")\n}`.\nExample with arguments: `(el) => {\n  return el.innerText;\n}`\n\nSHELL TIP: Use double quotes and escape inner quotes, or use a heredoc to avoid quoting issues.\n',
         required: true,
       },
       args: {
