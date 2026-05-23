@@ -16,6 +16,11 @@ export interface FormattedSnapshotEntry {
   retainedSize: string;
 }
 
+export interface FormatOptions {
+  classNameFilter?: string;
+  limit?: number;
+}
+
 export function isNodeLike(
   item: unknown,
 ): item is DevTools.HeapSnapshotModel.HeapSnapshotModel.Node {
@@ -34,6 +39,103 @@ export function isEdgeLike(
     'node' in item &&
     'type' in item &&
     typeof item.node === 'object' &&
+    item.node !== null &&
+    'id' in item.node &&
+    'name' in item.node
+  );
+}
+
+export class HeapSnapshotFormatter {
+  #aggregates: Record<string, AggregatedInfoWithId>;
+
+  constructor(aggregates: Record<string, AggregatedInfoWithId>) {
+    this.#aggregates = aggregates;
+  }
+
+  static formatNodes(
+    items: ReadonlyArray<
+      | DevTools.HeapSnapshotModel.HeapSnapshotModel.Node
+      | DevTools.HeapSnapshotModel.HeapSnapshotModel.Edge
+    >,
+  ): string {
+    const lines: string[] = [];
+
+    if (items.length > 0) {
+      const firstItem = items[0];
+      if (isNodeLike(firstItem)) {
+        lines.push('nodeId,nodeName,type,distance,selfSize,retainedSize');
+      } else if (isEdgeLike(firstItem)) {
+        lines.push('name,type,nodeId,nodeName');
+      }
+    }
+
+    for (const item of items) {
+      if (isNodeLike(item)) {
+        lines.push(
+          `${item.id},${item.name},${item.type},${item.distance},${DevTools.I18n.ByteUtilities.formatBytesToKb(item.selfSize)},${DevTools.I18n.ByteUtilities.formatBytesToKb(item.retainedSize)}`,
+        );
+      } else if (isEdgeLike(item)) {
+        lines.push(
+          `${item.name},${item.type},${item.node.id},${item.node.name}`,
+        );
+      }
+    }
+
+    return lines.join('\n');
+  }
+
+  #getSortedAggregates(options?: FormatOptions): AggregatedInfoWithId[] {
+    let list = Object.values(this.#aggregates).sort((a, b) => b.maxRet - a.maxRet);
+    
+    if (options?.classNameFilter) {
+      const filter = options.classNameFilter.toLowerCase();
+      list = list.filter(info => info.name.toLowerCase().includes(filter));
+    }
+    
+    if (typeof options?.limit === 'number') {
+      list = list.slice(0, options.limit);
+    }
+    
+    return list;
+  }
+
+  toString(options?: FormatOptions): string {
+    const sorted = this.#getSortedAggregates(options);
+    const lines: string[] = [];
+    lines.push('id,name,count,selfSize,maxRetainedSize');
+
+    for (const info of sorted) {
+      const id = info[stableIdSymbol] ?? '';
+      lines.push(
+        `${id},${info.name},${info.count},${DevTools.I18n.ByteUtilities.formatBytesToKb(info.self)},${DevTools.I18n.ByteUtilities.formatBytesToKb(info.maxRet)}`,
+      );
+    }
+
+    return lines.join('\n');
+  }
+
+  toJSON(options?: FormatOptions): FormattedSnapshotEntry[] {
+    const sorted = this.#getSortedAggregates(options);
+    return sorted.map(info => ({
+      id: info[stableIdSymbol],
+      className: info.name,
+      count: info.count,
+      selfSize: DevTools.I18n.ByteUtilities.formatBytesToKb(info.self),
+      retainedSize: DevTools.I18n.ByteUtilities.formatBytesToKb(info.maxRet),
+    }));
+  }
+
+  static sort(
+    aggregates: Record<
+      string,
+      DevTools.HeapSnapshotModel.HeapSnapshotModel.AggregatedInfo
+    >,
+  ): Array<
+    [string, DevTools.HeapSnapshotModel.HeapSnapshotModel.AggregatedInfo]
+  > {
+    return Object.entries(aggregates).sort((a, b) => b[1].maxRet - a[1].maxRet);
+  }
+}
     item.node !== null &&
     'id' in item.node &&
     'name' in item.node
