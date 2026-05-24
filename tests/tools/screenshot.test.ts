@@ -11,9 +11,45 @@ import {join} from 'node:path';
 import {describe, it} from 'node:test';
 
 import {TextSnapshot} from '../../src/TextSnapshot.js';
+import type {Page} from '../../src/third_party/index.js';
 import {screenshot} from '../../src/tools/screenshot.js';
 import {screenshots} from '../snapshot.js';
 import {html, withMcpContext} from '../utils.js';
+
+async function getScreenshotPixel(
+  page: Page,
+  image: string | Uint8Array,
+  x: number,
+  y: number,
+) {
+  const data =
+    typeof image === 'string' ? image : Buffer.from(image).toString('base64');
+  return await page.evaluate(
+    async ({data, x, y}) => {
+      const image = new Image();
+      image.src = `data:image/png;base64,${data}`;
+      await image.decode();
+
+      const canvas = document.createElement('canvas');
+      canvas.width = image.naturalWidth;
+      canvas.height = image.naturalHeight;
+      const context = canvas.getContext('2d');
+      if (!context) {
+        throw new Error('Could not read screenshot pixels.');
+      }
+
+      context.drawImage(image, 0, 0);
+      const pixel = context.getImageData(x, y, 1, 1).data;
+      return {
+        red: pixel[0],
+        green: pixel[1],
+        blue: pixel[2],
+        alpha: pixel[3],
+      };
+    },
+    {data, x, y},
+  );
+}
 
 describe('screenshot', () => {
   describe('browser_take_screenshot', () => {
@@ -110,6 +146,153 @@ describe('screenshot', () => {
           response.responseLines.at(0),
           'Took a screenshot of the full current page.',
         );
+      });
+    });
+
+    it('preserves the visible background behind transparent canvas content', async () => {
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedPptrPage();
+        const backgroundOverrides: unknown[] = [];
+        const originalCreateCDPSession = page.createCDPSession.bind(page);
+        page.createCDPSession = async () => {
+          const session = await originalCreateCDPSession();
+          const originalSend = session.send.bind(session);
+          const sendWithTracking: typeof session.send = async (
+            method,
+            params,
+            options,
+          ) => {
+            if (method === 'Emulation.setDefaultBackgroundColorOverride') {
+              backgroundOverrides.push(params ?? {});
+            }
+            return await originalSend(method, params, options);
+          };
+          Object.defineProperty(session, 'send', {value: sendWithTracking});
+          return session;
+        };
+        await page.setContent(html`
+          <style>
+            html,
+            body {
+              background: transparent;
+              height: 100%;
+              margin: 0;
+              width: 100%;
+            }
+
+            canvas {
+              display: block;
+              height: 80px;
+              width: 80px;
+            }
+          </style>
+          <canvas
+            width="80"
+            height="80"
+          ></canvas>
+        `);
+        const defaultScreenshot = await page.screenshot({
+          type: 'png',
+          optimizeForSpeed: true,
+        });
+        const defaultPixel = await getScreenshotPixel(
+          page,
+          defaultScreenshot,
+          10,
+          10,
+        );
+
+        await page.setContent(html`
+          <style>
+            html,
+            body {
+              height: 100%;
+              margin: 0;
+              width: 100%;
+            }
+
+            #container {
+              background: rgb(12, 34, 56);
+              height: 120px;
+              width: 120px;
+            }
+
+            canvas {
+              display: block;
+              height: 120px;
+              width: 120px;
+            }
+          </style>
+          <div id="container">
+            <canvas
+              width="120"
+              height="120"
+            ></canvas>
+          </div>
+        `);
+
+        await screenshot.handler(
+          {params: {format: 'png'}, page: context.getSelectedMcpPage()},
+          response,
+          context,
+        );
+
+        const pixel = await getScreenshotPixel(
+          page,
+          response.images[0].data,
+          10,
+          10,
+        );
+        assert.deepEqual(pixel, {
+          red: 12,
+          green: 34,
+          blue: 56,
+          alpha: 255,
+        });
+        assert.deepEqual(backgroundOverrides, [
+          {
+            color: {
+              r: 12,
+              g: 34,
+              b: 56,
+              a: 1,
+            },
+          },
+          {},
+        ]);
+
+        await page.setContent(html`
+          <style>
+            html,
+            body {
+              background: transparent;
+              height: 100%;
+              margin: 0;
+              width: 100%;
+            }
+
+            canvas {
+              display: block;
+              height: 80px;
+              width: 80px;
+            }
+          </style>
+          <canvas
+            width="80"
+            height="80"
+          ></canvas>
+        `);
+        const resetScreenshot = await page.screenshot({
+          type: 'png',
+          optimizeForSpeed: true,
+        });
+        const resetPixel = await getScreenshotPixel(
+          page,
+          resetScreenshot,
+          10,
+          10,
+        );
+        assert.deepEqual(resetPixel, defaultPixel);
       });
     });
 

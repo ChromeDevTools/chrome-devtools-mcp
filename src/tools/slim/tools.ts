@@ -6,6 +6,7 @@
 
 import type {Dialog} from '../../third_party/index.js';
 import {zod} from '../../third_party/index.js';
+import {captureWithPageBackground} from '../../utils/screenshot-background.js';
 import {ToolCategory} from '../categories.js';
 import {definePageTool} from '../ToolDefinition.js';
 
@@ -21,10 +22,15 @@ export const screenshot = definePageTool({
   blockedByDialog: true,
   handler: async (request, response, context) => {
     const page = request.page;
-    const screenshot = await page.pptrPage.screenshot({
-      type: 'png',
-      optimizeForSpeed: true,
-    });
+    const screenshot = await captureWithPageBackground(
+      page.pptrPage,
+      async () => {
+        return await page.pptrPage.screenshot({
+          type: 'png',
+          optimizeForSpeed: true,
+        });
+      },
+    );
     const {filepath} = await context.saveTemporaryFile(
       screenshot,
       `screenshot.png`,

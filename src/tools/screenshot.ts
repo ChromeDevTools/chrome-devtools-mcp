@@ -6,6 +6,7 @@
 
 import {zod} from '../third_party/index.js';
 import type {ElementHandle, Page} from '../third_party/index.js';
+import {captureWithPageBackground} from '../utils/screenshot-background.js';
 
 import {ToolCategory} from './categories.js';
 import {definePageTool} from './ToolDefinition.js';
@@ -67,12 +68,17 @@ export const screenshot = definePageTool({
     const format = request.params.format;
     const quality = format === 'png' ? undefined : request.params.quality;
 
-    const screenshot = await pageOrHandle.screenshot({
-      type: format,
-      fullPage: request.params.fullPage,
-      quality,
-      optimizeForSpeed: true, // Bonus: optimize encoding for speed
-    });
+    const screenshot = await captureWithPageBackground(
+      request.page.pptrPage,
+      async () => {
+        return await pageOrHandle.screenshot({
+          type: format,
+          fullPage: request.params.fullPage,
+          quality,
+          optimizeForSpeed: true, // Bonus: optimize encoding for speed
+        });
+      },
+    );
 
     if (request.params.uid) {
       response.appendResponseLine(
