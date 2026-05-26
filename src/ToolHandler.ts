@@ -163,7 +163,7 @@ export class ToolHandler {
       tool.pageScoped &&
       serverArgs.experimentalPageIdRouting &&
       !serverArgs.slim
-        ? {...tool.schema, ...pageIdSchema}
+        ? {...pageIdSchema, ...tool.schema}
         : tool.schema;
     this.registeredInputSchema = zod.object(this.inputSchema).passthrough();
   }

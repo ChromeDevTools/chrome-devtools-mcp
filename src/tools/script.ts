@@ -24,6 +24,7 @@ so returned values have to be JSON-serializable.`,
       readOnlyHint: false,
     },
     schema: {
+      ...(cliArgs?.experimentalPageIdRouting ? pageIdSchema : {}),
       function: zod.string().describe(
         `A JavaScript function declaration to be executed by the tool in the currently selected page.
 Example without arguments: \`() => {
@@ -58,7 +59,6 @@ Example with arguments: \`(el) => {
         .describe(
           'Handle dialogs while execution. "accept", "dismiss", or string for response of window.prompt. Defaults to accept.',
         ),
-      ...(cliArgs?.experimentalPageIdRouting ? pageIdSchema : {}),
       ...(cliArgs?.categoryExtensions
         ? {
             serviceWorkerId: zod
