@@ -300,7 +300,9 @@ export async function closeBrowser(): Promise<void> {
     });
     return;
   }
-  b.disconnect();
+  await b.disconnect().catch(err => {
+    logger('Failed to disconnect from browser', err);
+  });
 }
 
 export type Channel = 'stable' | 'canary' | 'beta' | 'dev';
