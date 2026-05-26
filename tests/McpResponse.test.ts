@@ -1476,12 +1476,17 @@ describe('webmcp', () => {
         await handlerAction(response, context);
 
         const page = context.getSelectedMcpPage().pptrPage;
+        const {resolve, promise} = Promise.withResolvers();
+        page.webmcp.once('toolsadded', () => {
+          resolve(undefined);
+        });
         await page.setContent(
           html`<form
             toolname="test_tool"
             tooldescription="A test tool"
           ></form>`,
         );
+        await promise;
 
         const {content, structuredContent} = await response.handle(
           toolName,
