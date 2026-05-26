@@ -209,6 +209,10 @@ export class McpResponse implements Response {
   #error?: Error;
   #attachedWaitForResult?: WaitForEventsResult;
 
+  get #deviceScope(): DevTools.CrUXManager.DeviceScope {
+    return this.#page?.viewport?.isMobile ? 'PHONE' : 'DESKTOP';
+  }
+
   constructor(args: ParsedArguments) {
     this.#args = args;
   }
@@ -898,7 +902,7 @@ Call ${handleDialog.name} to handle it before continuing.`);
     }
 
     if (data.traceSummary) {
-      const summary = getTraceSummary(data.traceSummary);
+      const summary = getTraceSummary(data.traceSummary, this.#deviceScope);
       response.push(summary);
       structuredContent.traceSummary = summary;
       structuredContent.traceInsights = [];
@@ -917,6 +921,7 @@ Call ${handleDialog.name} to handle it before continuing.`);
         data.traceInsight.trace,
         data.traceInsight.insightSetId,
         data.traceInsight.insightName,
+        this.#deviceScope,
       );
       if ('error' in insightOutput) {
         response.push(insightOutput.error);

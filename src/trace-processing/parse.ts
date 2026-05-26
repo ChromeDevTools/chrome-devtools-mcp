@@ -80,9 +80,12 @@ ${DevTools.PerformanceTraceFormatter.callFrameDataFormatDescription}
 
 ${DevTools.PerformanceTraceFormatter.networkDataFormatDescription}`;
 
-export function getTraceSummary(result: TraceResult): string {
+export function getTraceSummary(
+  result: TraceResult,
+  deviceScope?: DevTools.CrUXManager.DeviceScope | null,
+): string {
   const focus = DevTools.AgentFocus.fromParsedTrace(result.parsedTrace);
-  const formatter = new DevTools.PerformanceTraceFormatter(focus);
+  const formatter = new DevTools.PerformanceTraceFormatter(focus, deviceScope);
   const summaryText = formatter.formatTraceSummary();
   return `## Summary of Performance trace findings:
 ${summaryText}
@@ -99,6 +102,7 @@ export function getInsightOutput(
   result: TraceResult,
   insightSetId: string,
   insightName: InsightName,
+  deviceScope?: DevTools.CrUXManager.DeviceScope | null,
 ): InsightOutput {
   if (!result.insights) {
     return {
@@ -125,6 +129,7 @@ export function getInsightOutput(
   const formatter = new DevTools.PerformanceInsightFormatter(
     DevTools.AgentFocus.fromParsedTrace(result.parsedTrace),
     matchingInsight,
+    deviceScope,
   );
   return {output: formatter.formatInsight()};
 }
