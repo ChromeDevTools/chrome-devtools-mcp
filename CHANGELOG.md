@@ -1,5 +1,37 @@
 # Changelog
 
+## [1.1.0](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v1.0.1...chrome-devtools-mcp-v1.1.0) (2026-05-26)
+
+
+### 🎉 Features
+
+* add extraHttpHeaders emulation to emulate tool ([#1176](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1176)) ([6992106](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/6992106d1ca3bcd9390165035e7b0a3acb7e7317))
+* created cursor plugin.json setting file with release auto versioning ([#2091](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/2091)) ([10c8205](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/10c82055d82eda9e7f229f8ddf3b8770a8732aa7))
+
+
+### 🛠️ Fixes
+
+* Apply CPU throttling to secondary CDP session ([#2092](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/2092)) ([3ade962](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/3ade962a8da6b100800304146dc3e50e6419a6ee))
+* **cli:** address pid file creation issues ([#2124](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/2124)) ([1b51a52](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/1b51a520f248d809ab4383cd357cae13280735d4))
+* exit on stdin EOF and SIGTERM/SIGINT/SIGHUP, closing the browser cleanly ([#2117](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/2117)) ([43b934c](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/43b934cd98d5d585fcde38e24d5d7b3eeb133498))
+* Fix throttling info in performance trace output ([#2096](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/2096)) ([57f32b0](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/57f32b0cd4afe1775b96ba35c27f25d6f0770331))
+* make pageId required ([#2084](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/2084)) ([d751693](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/d751693d887fae4ef7a1e7204545192322cf7820)), closes [#2052](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/2052)
+* remove duplicate .mcp.json ([#2095](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/2095)) ([dbf6ba9](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/dbf6ba93746c4975fc1ed385a8bf0f6395a9a79e))
+* Set viewport after updating timeouts when setting emulation ([#2134](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/2134)) ([0c3ac37](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/0c3ac378a91fa0463ce2302fd963e7946c9f2771))
+* use pinned version for plugins ([#2135](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/2135)) ([8ea5f09](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/8ea5f098ef7e8d8ae4f4bbaea5291cef84b8f15f))
+* use realpath for MCP roots validation ([#2127](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/2127)) ([176eb69](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/176eb695137d9c46a61e2d4d5571880c5145cf46))
+
+
+### 📄 Documentation
+
+* align coding agent examples with Antigravity ([#2094](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/2094)) ([ce31594](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/ce31594d6c9614c63a93cd7abddf4522a4c4a053))
+* fix installation instructions for VS Code ([#2087](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/2087)) ([9f47df3](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/9f47df36847cd69b99873709e7ed3936347b648e))
+
+
+### 🏗️ Refactor
+
+* remove redundant validatePath calls ([#2136](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/2136)) ([521c388](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/521c388624d448c8c55ee3b5415971ebc35b1ec3))
+
 ## [1.0.1](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v1.0.0...chrome-devtools-mcp-v1.0.1) (2026-05-18)
 
 

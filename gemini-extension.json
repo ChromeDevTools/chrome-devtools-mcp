@@ -1,10 +1,12 @@
 {
   "name": "chrome-devtools-mcp",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "mcpServers": {
     "chrome-devtools": {
       "command": "npx",
-      "args": ["chrome-devtools-mcp@1.0.1"]
+      "args": [
+        "chrome-devtools-mcp@1.0.1"
+      ]
     }
   }
 }
