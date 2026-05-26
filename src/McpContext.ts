@@ -413,7 +413,6 @@ export class McpContext implements Context {
     }
 
     if (!options.viewport) {
-      await page.setViewport(null);
       delete newSettings.viewport;
     } else {
       const defaults = {
@@ -422,9 +421,7 @@ export class McpContext implements Context {
         hasTouch: false,
         isLandscape: false,
       };
-      const viewport = {...defaults, ...options.viewport};
-      await page.setViewport(viewport);
-      newSettings.viewport = viewport;
+      newSettings.viewport = {...defaults, ...options.viewport};
     }
 
     if (options.extraHttpHeaders !== undefined) {
@@ -440,6 +437,10 @@ export class McpContext implements Context {
       : {};
 
     this.#updateSelectedPageTimeouts();
+
+    // This should happen after updating the page timeouts.
+    // Setting the viewport can trigger a reload which we don't want to timeout.    
+    await page.setViewport(newSettings.viewport ?? null);
   }
 
   setIsRunningPerformanceTrace(x: boolean): void {
@@ -523,7 +524,7 @@ export class McpContext implements Context {
     page.pptrPage.setDefaultTimeout(DEFAULT_TIMEOUT * cpuMultiplier);
     // 10sec should be enough for the load event to be emitted during
     // navigations.
-    // Increased in case we throttle the network requests
+    // Increased in case we throttle the network requests or the CPU
     const networkMultiplier = getNetworkMultiplierFromString(
       page.networkConditions,
     );
