@@ -25,7 +25,7 @@ export const takeHeapSnapshot = definePageTool({
   blockedByDialog: true,
   handler: async (request, response, context) => {
     const page = request.page;
-    context.validatePath(request.params.filePath);
+    await context.validatePath(request.params.filePath);
 
     await page.pptrPage.captureHeapSnapshot({
       path: ensureExtension(request.params.filePath, '.heapsnapshot'),
@@ -51,7 +51,7 @@ export const getHeapSnapshotSummary = defineTool({
   },
   blockedByDialog: false,
   handler: async (request, response, context) => {
-    context.validatePath(request.params.filePath);
+    await context.validatePath(request.params.filePath);
     const stats = await context.getHeapSnapshotStats(request.params.filePath);
     const staticData = await context.getHeapSnapshotStaticData(
       request.params.filePath,
@@ -83,7 +83,7 @@ export const getHeapSnapshotDetails = defineTool({
   },
   blockedByDialog: false,
   handler: async (request, response, context) => {
-    context.validatePath(request.params.filePath);
+    await context.validatePath(request.params.filePath);
     const aggregates = await context.getHeapSnapshotAggregates(
       request.params.filePath,
     );
@@ -112,7 +112,7 @@ export const getHeapSnapshotClassNodes = defineTool({
   },
   blockedByDialog: false,
   handler: async (request, response, context) => {
-    context.validatePath(request.params.filePath);
+    await context.validatePath(request.params.filePath);
     const nodes = await context.getHeapSnapshotNodesById(
       request.params.filePath,
       request.params.id,
@@ -142,7 +142,7 @@ export const getHeapSnapshotRetainers = defineTool({
     pageSize: zod.number().optional().describe('The page size for pagination.'),
   },
   handler: async (request, response, context) => {
-    context.validatePath(request.params.filePath);
+    await context.validatePath(request.params.filePath);
 
     const retainers = await context.getHeapSnapshotRetainers(
       request.params.filePath,

@@ -5,6 +5,7 @@
  */
 
 import assert from 'node:assert';
+import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import {afterEach, describe, it} from 'node:test';
@@ -236,24 +237,51 @@ describe('McpContext', () => {
   it('validatePath allows paths within roots', async () => {
     await withMcpContext(async (_response, context) => {
       const workspacePath = path.resolve(os.homedir(), 'workspace-test');
-      const roots = [
-        {uri: pathToFileURL(workspacePath).href, name: 'workspace'},
-      ];
-      context.setRoots(roots);
-      // Valid path within root
-      context.validatePath(path.join(workspacePath, 'test.txt'));
-      context.validatePath(workspacePath);
+      await fs.mkdir(workspacePath, {recursive: true});
+      try {
+        const roots = [
+          {uri: pathToFileURL(workspacePath).href, name: 'workspace'},
+        ];
+        context.setRoots(roots);
+        // Valid path within root
+        await context.validatePath(path.join(workspacePath, 'test.txt'));
+        await context.validatePath(workspacePath);
 
-      // Invalid path outside root and outside temp dir
-      const outsidePath = path.resolve(os.homedir(), 'outside-test.txt');
-      assert.throws(() => context.validatePath(outsidePath), /Access denied/);
+        // Invalid path outside root and outside temp dir
+        const outsidePath = path.resolve(os.homedir(), 'outside-test.txt');
+        await assert.rejects(
+          context.validatePath(outsidePath),
+          /Access denied/,
+        );
+      } finally {
+        await fs.rm(workspacePath, {recursive: true, force: true});
+      }
+    });
+  });
+
+  it('validatePath allows non-existent nested paths within roots', async () => {
+    await withMcpContext(async (_response, context) => {
+      const workspacePath = path.resolve(os.homedir(), 'workspace-test-nested');
+      await fs.mkdir(workspacePath, {recursive: true});
+      try {
+        const roots = [
+          {uri: pathToFileURL(workspacePath).href, name: 'workspace'},
+        ];
+        context.setRoots(roots);
+        // Valid path within root with non-existent intermediate directories
+        await context.validatePath(
+          path.join(workspacePath, 'dir1', 'dir2', 'test.txt'),
+        );
+      } finally {
+        await fs.rm(workspacePath, {recursive: true, force: true});
+      }
     });
   });
 
   it('validatePath allows all paths if roots are undefined (legacy)', async () => {
     await withMcpContext(async (_response, context) => {
       context.setRoots(undefined);
-      context.validatePath(path.resolve(os.homedir(), 'anywhere.txt'));
+      await context.validatePath(path.resolve(os.homedir(), 'anywhere.txt'));
     });
   });
 
@@ -261,11 +289,11 @@ describe('McpContext', () => {
     await withMcpContext(async (_response, context) => {
       context.setRoots([]);
       // Should allow temp dir
-      context.validatePath(path.join(os.tmpdir(), 'test.txt'));
+      await context.validatePath(path.join(os.tmpdir(), 'test.txt'));
 
       // Should deny outside temp dir
-      assert.throws(
-        () => context.validatePath(path.resolve(os.homedir(), 'anywhere.txt')),
+      await assert.rejects(
+        context.validatePath(path.resolve(os.homedir(), 'anywhere.txt')),
         /Access denied/,
       );
     });

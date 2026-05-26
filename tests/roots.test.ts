@@ -5,6 +5,7 @@
  */
 
 import assert from 'node:assert';
+import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import {describe, it} from 'node:test';
@@ -18,7 +19,7 @@ describe('McpContext Roots', () => {
       context.setRoots([]);
       const tmpPath = path.join(os.tmpdir(), 'test-file.txt');
       // This should not throw
-      context.validatePath(tmpPath);
+      await context.validatePath(tmpPath);
     });
   });
 
@@ -26,24 +27,31 @@ describe('McpContext Roots', () => {
     await withMcpContext(async (_response, context) => {
       const otherRoot = path.resolve(
         os.tmpdir(),
-        '..',
         'other_workspace_root_for_test',
       );
-      context.setRoots([{uri: pathToFileURL(otherRoot).href, name: 'other'}]);
+      await fs.mkdir(otherRoot, {recursive: true});
+      try {
+        context.setRoots([{uri: pathToFileURL(otherRoot).href, name: 'other'}]);
 
-      const tmpPath = path.join(os.tmpdir(), 'test-file.txt');
-      // This should not throw.
-      context.validatePath(tmpPath);
+        const tmpPath = path.join(os.tmpdir(), 'test-file.txt');
+        // This should not throw.
+        await context.validatePath(tmpPath);
 
-      // Other root should also be allowed.
-      context.validatePath(path.join(otherRoot, 'file.txt'));
+        // Other root should also be allowed.
+        await context.validatePath(path.join(otherRoot, 'file.txt'));
 
-      // Outside should still be denied. Use a path that is definitely not a root or temp dir.
-      const outsidePath = path.resolve(
-        os.homedir(),
-        'a_very_unlikely_path_name_12345',
-      );
-      assert.throws(() => context.validatePath(outsidePath), /Access denied/);
+        // Outside should still be denied. Use a path that is definitely not a root or temp dir.
+        const outsidePath = path.resolve(
+          os.homedir(),
+          'a_very_unlikely_path_name_12345',
+        );
+        await assert.rejects(
+          context.validatePath(outsidePath),
+          /Access denied/,
+        );
+      } finally {
+        await fs.rm(otherRoot, {recursive: true, force: true});
+      }
     });
   });
 });

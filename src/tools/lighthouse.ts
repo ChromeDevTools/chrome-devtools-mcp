@@ -59,7 +59,7 @@ export const lighthouseAudit = definePageTool({
       outputDirPath,
     } = request.params;
 
-    context.validatePath(outputDirPath);
+    await context.validatePath(outputDirPath);
 
     const flags: Flags = {
       onlyCategories: categories,

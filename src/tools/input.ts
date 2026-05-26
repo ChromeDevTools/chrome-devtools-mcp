@@ -463,7 +463,7 @@ export const uploadFile = definePageTool({
   blockedByDialog: true,
   handler: async (request, response, context) => {
     const {uid, filePath} = request.params;
-    context.validatePath(filePath);
+    await context.validatePath(filePath);
     const handle = (await request.page.getElementByUid(
       uid,
     )) as ElementHandle<HTMLInputElement>;
