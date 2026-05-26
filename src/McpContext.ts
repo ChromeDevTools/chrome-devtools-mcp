@@ -830,7 +830,6 @@ export class McpContext implements Context {
   }
 
   async installExtension(extensionPath: string): Promise<string> {
-    await this.validatePath(extensionPath);
     const id = await this.browser.installExtension(extensionPath);
     return id;
   }
@@ -861,21 +860,18 @@ export class McpContext implements Context {
   async getHeapSnapshotAggregates(
     filePath: string,
   ): Promise<Record<string, AggregatedInfoWithId>> {
-    await this.validatePath(filePath);
     return await this.#heapSnapshotManager.getAggregates(filePath);
   }
 
   async getHeapSnapshotStats(
     filePath: string,
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.Statistics> {
-    await this.validatePath(filePath);
     return await this.#heapSnapshotManager.getStats(filePath);
   }
 
   async getHeapSnapshotStaticData(
     filePath: string,
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.StaticData | null> {
-    await this.validatePath(filePath);
     return await this.#heapSnapshotManager.getStaticData(filePath);
   }
 
@@ -883,7 +879,6 @@ export class McpContext implements Context {
     filePath: string,
     id: number,
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange> {
-    await this.validatePath(filePath);
     return await this.#heapSnapshotManager.getNodesById(filePath, id);
   }
 
@@ -891,7 +886,6 @@ export class McpContext implements Context {
     filePath: string,
     nodeId: number,
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange> {
-    await this.validatePath(filePath);
     return await this.#heapSnapshotManager.getRetainers(filePath, nodeId);
   }
 }
