@@ -781,7 +781,7 @@ export class McpResponse implements Response {
     const geolocation = this.#page?.geolocation;
     if (geolocation) {
       response.push(
-        `Emulating geolocation: latitude=${geolocation.latitude}, longtitude=${geolocation.longitude}`,
+        `Emulating geolocation: latitude=${geolocation.latitude}, longitude=${geolocation.longitude}`,
       );
       structuredContent.geolocation = geolocation;
     }

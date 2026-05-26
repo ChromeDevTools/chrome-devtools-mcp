@@ -49,7 +49,7 @@ export const startTrace = definePageTool({
   },
   blockedByDialog: true,
   handler: async (request, response, context) => {
-    context.validatePath(request.params.filePath);
+    await context.validatePath(request.params.filePath);
     if (context.isRunningPerformanceTrace()) {
       response.appendResponseLine(
         'Error: a performance trace is already running. Use performance_stop_trace to stop it. Only one trace can be running at any given time.',
@@ -128,7 +128,7 @@ export const stopTrace = definePageTool({
   },
   blockedByDialog: true,
   handler: async (request, response, context) => {
-    context.validatePath(request.params.filePath);
+    await context.validatePath(request.params.filePath);
     if (!context.isRunningPerformanceTrace()) {
       return;
     }

@@ -81,7 +81,7 @@ Example with arguments: \`(el) => {
         filePath,
       } = request.params;
 
-      context.validatePath(filePath);
+      await context.validatePath(filePath);
 
       if (cliArgs?.categoryExtensions && serviceWorkerId) {
         if (uidArgs && uidArgs.length > 0) {

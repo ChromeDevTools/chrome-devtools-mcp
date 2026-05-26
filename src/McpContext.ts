@@ -5,6 +5,7 @@
  */
 
 import fs from 'node:fs/promises';
+import fsPromises from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import {fileURLToPath, pathToFileURL} from 'node:url';
@@ -45,7 +46,11 @@ import type {
   GeolocationOptions,
   ExtensionServiceWorker,
 } from './types.js';
-import {ensureExtension, getTempFilePath} from './utils/files.js';
+import {
+  ensureExtension,
+  getTempFilePath,
+  resolveCanonicalPath,
+} from './utils/files.js';
 import {getNetworkMultiplierFromString} from './WaitForHelper.js';
 
 interface McpContextOptions {
@@ -175,7 +180,7 @@ export class McpContext implements Context {
     this.#roots = roots;
   }
 
-  validatePath(filePath?: string): void {
+  async validatePath(filePath?: string): Promise<void> {
     if (filePath === undefined) {
       return;
     }
@@ -183,19 +188,50 @@ export class McpContext implements Context {
     if (roots === undefined) {
       return;
     }
-    const absolutePath = path.resolve(filePath);
+
+    let canonicalPath: string;
+
+    try {
+      canonicalPath = await resolveCanonicalPath(filePath);
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      console.error(
+        `[MCP Context] Error resolving real path for ${filePath}: ${errMsg}`,
+      );
+      throw new Error(
+        `Access denied: Cannot resolve base path for ${filePath}.`,
+      );
+    }
+
+    let allowed = false;
     for (const root of roots) {
-      const rootPath = path.resolve(fileURLToPath(root.uri));
-      if (
-        absolutePath === rootPath ||
-        absolutePath.startsWith(rootPath + path.sep)
-      ) {
-        return;
+      try {
+        const rootPathUri = root.uri;
+        const rootPath = path.resolve(fileURLToPath(rootPathUri));
+        const canonicalRoot = await fsPromises.realpath(rootPath);
+
+        if (
+          canonicalPath === canonicalRoot ||
+          canonicalPath.startsWith(canonicalRoot + path.sep)
+        ) {
+          allowed = true;
+          break;
+        }
+      } catch (rootErr) {
+        const errMsg =
+          rootErr instanceof Error ? rootErr.message : String(rootErr);
+        console.warn(
+          `[MCP Context] Could not resolve configured root ${root.uri}: ${errMsg}`,
+        );
+        // Skip this root if it cannot be resolved.
       }
     }
-    throw new Error(
-      `Access denied: path ${filePath} is not within any of the workspace roots ${JSON.stringify(roots)}.`,
-    );
+
+    if (!allowed) {
+      throw new Error(
+        `Access denied: path ${filePath} (canonical: ${canonicalPath}) is not within any of the configured workspace roots.`,
+      );
+    }
   }
 
   resolveCdpRequestId(page: McpPage, cdpRequestId: string): number | undefined {
@@ -708,7 +744,7 @@ export class McpContext implements Context {
     filename: string,
   ): Promise<{filepath: string}> {
     const filepath = await getTempFilePath(filename);
-    this.validatePath(filepath);
+    await this.validatePath(filepath);
     try {
       await fs.writeFile(filepath, data);
     } catch (err) {
@@ -722,7 +758,7 @@ export class McpContext implements Context {
     clientProvidedFilePath: string,
     extension: SupportedExtensions,
   ): Promise<{filename: string}> {
-    this.validatePath(clientProvidedFilePath);
+    await this.validatePath(clientProvidedFilePath);
     try {
       const filePath = ensureExtension(
         path.resolve(clientProvidedFilePath),
@@ -794,7 +830,7 @@ export class McpContext implements Context {
   }
 
   async installExtension(extensionPath: string): Promise<string> {
-    this.validatePath(extensionPath);
+    await this.validatePath(extensionPath);
     const id = await this.browser.installExtension(extensionPath);
     return id;
   }
@@ -825,21 +861,21 @@ export class McpContext implements Context {
   async getHeapSnapshotAggregates(
     filePath: string,
   ): Promise<Record<string, AggregatedInfoWithId>> {
-    this.validatePath(filePath);
+    await this.validatePath(filePath);
     return await this.#heapSnapshotManager.getAggregates(filePath);
   }
 
   async getHeapSnapshotStats(
     filePath: string,
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.Statistics> {
-    this.validatePath(filePath);
+    await this.validatePath(filePath);
     return await this.#heapSnapshotManager.getStats(filePath);
   }
 
   async getHeapSnapshotStaticData(
     filePath: string,
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.StaticData | null> {
-    this.validatePath(filePath);
+    await this.validatePath(filePath);
     return await this.#heapSnapshotManager.getStaticData(filePath);
   }
 
@@ -847,7 +883,7 @@ export class McpContext implements Context {
     filePath: string,
     id: number,
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange> {
-    this.validatePath(filePath);
+    await this.validatePath(filePath);
     return await this.#heapSnapshotManager.getNodesById(filePath, id);
   }
 
@@ -855,6 +891,7 @@ export class McpContext implements Context {
     filePath: string,
     nodeId: number,
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange> {
+    await this.validatePath(filePath);
     return await this.#heapSnapshotManager.getRetainers(filePath, nodeId);
   }
 }

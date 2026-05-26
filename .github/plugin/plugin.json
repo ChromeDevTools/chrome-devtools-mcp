@@ -6,7 +6,7 @@
     "chrome-devtools": {
       "command": "npx",
       "args": [
-        "chrome-devtools-mcp@latest"
+        "chrome-devtools-mcp@1.0.1"
       ]
     }
   }
