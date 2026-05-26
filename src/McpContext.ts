@@ -439,7 +439,7 @@ export class McpContext implements Context {
     this.#updateSelectedPageTimeouts();
 
     // This should happen after updating the page timeouts.
-    // Setting the viewport can trigger a reload which we don't want to timeout.    
+    // Setting the viewport can trigger a reload which we don't want to timeout.
     await page.setViewport(newSettings.viewport ?? null);
   }
 
