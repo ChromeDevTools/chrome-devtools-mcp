@@ -24,6 +24,7 @@ export const installExtension = defineTool({
   blockedByDialog: false,
   handler: async (request, response, context) => {
     const {path} = request.params;
+    await context.validatePath(path);
     const id = await context.installExtension(path);
     response.appendResponseLine(`Extension installed. Id: ${id}`);
   },
@@ -79,6 +80,7 @@ export const reloadExtension = defineTool({
     if (!extension) {
       throw new Error(`Extension with ID ${id} not found.`);
     }
+    await context.validatePath(extension.path);
     await context.installExtension(extension.path);
     response.appendResponseLine('Extension reloaded.');
   },
