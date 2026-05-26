@@ -1,5 +1,5 @@
 name: Feature
-description: Suggest an idea for for chrome-devtools-mcp
+description: Suggest an idea for chrome-devtools-mcp
 title: '<short description of the feature request>'
 type: 'Feature'
 labels:
