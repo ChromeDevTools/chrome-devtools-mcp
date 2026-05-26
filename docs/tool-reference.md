@@ -39,11 +39,12 @@
   - [`take_snapshot`](#take_snapshot)
   - [`screencast_start`](#screencast_start)
   - [`screencast_stop`](#screencast_stop)
-- **[Memory](#memory)** (4 tools)
-  - [`take_memory_snapshot`](#take_memory_snapshot)
-  - [`get_memory_snapshot_details`](#get_memory_snapshot_details)
-  - [`get_nodes_by_class`](#get_nodes_by_class)
-  - [`load_memory_snapshot`](#load_memory_snapshot)
+- **[Memory](#memory)** (5 tools)
+  - [`take_heapsnapshot`](#take_heapsnapshot)
+  - [`get_heapsnapshot_class_nodes`](#get_heapsnapshot_class_nodes)
+  - [`get_heapsnapshot_details`](#get_heapsnapshot_details)
+  - [`get_heapsnapshot_retainers`](#get_heapsnapshot_retainers)
+  - [`get_heapsnapshot_summary`](#get_heapsnapshot_summary)
 - **[Extensions](#extensions)** (5 tools)
   - [`install_extension`](#install_extension)
   - [`list_extensions`](#list_extensions)
@@ -255,7 +256,8 @@
 
 - **colorScheme** (enum: "dark", "light", "auto") _(optional)_: [`Emulate`](#emulate) the dark or the light mode. Set to "auto" to reset to the default.
 - **cpuThrottlingRate** (number) _(optional)_: Represents the CPU slowdown factor. Omit or set the rate to 1 to disable throttling
-- **geolocation** (string) _(optional)_: Geolocation (`&lt;latitude&gt;x&lt;longitude&gt;`) to [`emulate`](#emulate). Latitude between -90 and 90. Longitude between -180 and 180. Omit to clear the geolocation override.
+- **extraHttpHeaders** (string) _(optional)_: Extra HTTP headers as a JSON string object, e.g. {"X-Custom": "value", "Authorization": "Bearer token"}. Headers are included into every HTTP request originating from the page and persist across navigations until cleared. Pass an empty string to clear all extra headers.
+- **geolocation** (string) _(optional)_: Geolocation (`&lt;latitude&gt;,&lt;longitude&gt;`) to [`emulate`](#emulate). Latitude between -90 and 90. Longitude between -180 and 180. Omit to clear the geolocation override.
 - **networkConditions** (enum: "Offline", "Slow 3G", "Fast 3G", "Slow 4G", "Fast 4G") _(optional)_: Throttle network. Omit to disable throttling.
 - **userAgent** (string) _(optional)_: User agent to [`emulate`](#emulate). Set to empty string to clear the user agent override.
 - **viewport** (string) _(optional)_: [`Emulate`](#emulate) device viewports '&lt;width&gt;x&lt;height&gt;x&lt;devicePixelRatio&gt;[,mobile][,touch][,landscape]'. 'touch' and 'mobile' to [`emulate`](#emulate) mobile devices. 'landscape' to [`emulate`](#emulate) landscape mode.
@@ -442,7 +444,7 @@ in the DevTools Elements panel (if any).
 
 ## Memory
 
-### `take_memory_snapshot`
+### `take_heapsnapshot`
 
 **Description:** Capture a heap snapshot of the currently selected page. Use to analyze the memory distribution of JavaScript objects and debug memory leaks.
 
@@ -452,7 +454,20 @@ in the DevTools Elements panel (if any).
 
 ---
 
-### `get_memory_snapshot_details`
+### `get_heapsnapshot_class_nodes`
+
+**Description:** Loads a memory heapsnapshot and returns instances of a specific class with their IDs. (requires flag: --experimentalMemory=true)
+
+**Parameters:**
+
+- **filePath** (string) **(required)**: A path to a .heapsnapshot file to read.
+- **id** (number) **(required)**: The ID for the class, obtained from details.
+- **pageIdx** (number) _(optional)_: The page index for pagination.
+- **pageSize** (number) _(optional)_: The page size for pagination.
+
+---
+
+### `get_heapsnapshot_details`
 
 **Description:** Loads a memory heapsnapshot and returns all available information including statistics, static data, and aggregated node information. Supports pagination for aggregates. (requires flag: --experimentalMemory=true)
 
@@ -464,20 +479,20 @@ in the DevTools Elements panel (if any).
 
 ---
 
-### `get_nodes_by_class`
+### `get_heapsnapshot_retainers`
 
-**Description:** Loads a memory heapsnapshot and returns instances of a specific class with their stable IDs. (requires flag: --experimentalMemory=true)
+**Description:** Loads a memory heapsnapshot and returns retainers for a specific node ID. (requires flag: --experimentalMemory=true)
 
 **Parameters:**
 
 - **filePath** (string) **(required)**: A path to a .heapsnapshot file to read.
-- **uid** (number) **(required)**: The unique UID for the class, obtained from aggregates listing.
+- **nodeId** (number) **(required)**: The node ID to get retainers for.
 - **pageIdx** (number) _(optional)_: The page index for pagination.
 - **pageSize** (number) _(optional)_: The page size for pagination.
 
 ---
 
-### `load_memory_snapshot`
+### `get_heapsnapshot_summary`
 
 **Description:** Loads a memory heapsnapshot and returns snapshot summary stats. (requires flag: --experimentalMemory=true)
 

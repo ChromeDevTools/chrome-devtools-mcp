@@ -106,4 +106,41 @@ describe('chrome-devtools', () => {
       'restart command suggestion is miss: ' + result.stdout,
     );
   });
+
+  it('can record a performance trace', async () => {
+    const startResult = await runCli(
+      ['start', '--performanceCrux=false'],
+      sessionId,
+    );
+    assert.strictEqual(
+      startResult.status,
+      0,
+      `start command failed: ${startResult.stderr}`,
+    );
+
+    const emulateResult = await runCli(
+      ['emulate', '--cpuThrottlingRate', '2'],
+      sessionId,
+    );
+    assert.strictEqual(
+      emulateResult.status,
+      0,
+      `emulate command failed: ${emulateResult.stderr}`,
+    );
+
+    const result = await runCli(['performance_start_trace'], sessionId);
+    assert.strictEqual(
+      result.status,
+      0,
+      `performance_start_trace command failed: ${result.stderr}`,
+    );
+    assert(
+      result.stdout.includes('The performance trace has been stopped.'),
+      'performance_start_trace output is unexpected: ' + result.stdout,
+    );
+    assert(
+      result.stdout.includes('CPU throttling: 2x'),
+      'performance_start_trace output is unexpected: ' + result.stdout,
+    );
+  });
 });

@@ -4,16 +4,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {AggregatedInfoWithUid} from '../HeapSnapshotManager.js';
-import type {DevTools} from '../third_party/index.js';
+import type {AggregatedInfoWithId} from '../HeapSnapshotManager.js';
+import {DevTools} from '../third_party/index.js';
 import {stableIdSymbol} from '../utils/id.js';
 
 export interface FormattedSnapshotEntry {
   className: string;
-  classUid?: number;
+  id?: number;
   count: number;
-  selfSize: number;
-  retainedSize: number;
+  selfSize: string;
+  retainedSize: string;
 }
 
 export function isNodeLike(
@@ -24,10 +24,26 @@ export function isNodeLike(
   );
 }
 
-export class HeapSnapshotFormatter {
-  #aggregates: Record<string, AggregatedInfoWithUid>;
+export function isEdgeLike(
+  item: unknown,
+): item is DevTools.HeapSnapshotModel.HeapSnapshotModel.Edge {
+  return (
+    typeof item === 'object' &&
+    item !== null &&
+    'name' in item &&
+    'node' in item &&
+    'type' in item &&
+    typeof item.node === 'object' &&
+    item.node !== null &&
+    'id' in item.node &&
+    'name' in item.node
+  );
+}
 
-  constructor(aggregates: Record<string, AggregatedInfoWithUid>) {
+export class HeapSnapshotFormatter {
+  #aggregates: Record<string, AggregatedInfoWithId>;
+
+  constructor(aggregates: Record<string, AggregatedInfoWithId>) {
     this.#aggregates = aggregates;
   }
 
@@ -39,14 +55,23 @@ export class HeapSnapshotFormatter {
   ): string {
     const lines: string[] = [];
 
-    if (items.length > 0 && isNodeLike(items[0])) {
-      lines.push('id,name,type,distance,selfSize,retainedSize');
+    if (items.length > 0) {
+      const firstItem = items[0];
+      if (isNodeLike(firstItem)) {
+        lines.push('nodeId,nodeName,type,distance,selfSize,retainedSize');
+      } else if (isEdgeLike(firstItem)) {
+        lines.push('name,type,nodeId,nodeName');
+      }
     }
 
     for (const item of items) {
       if (isNodeLike(item)) {
         lines.push(
-          `${item.id},"${item.name}",${item.type},${item.distance},${item.selfSize},${item.retainedSize}`,
+          `${item.id},${item.name},${item.type},${item.distance},${DevTools.I18n.ByteUtilities.formatBytesToKb(item.selfSize)},${DevTools.I18n.ByteUtilities.formatBytesToKb(item.retainedSize)}`,
+        );
+      } else if (isEdgeLike(item)) {
+        lines.push(
+          `${item.name},${item.type},${item.node.id},${item.node.name}`,
         );
       }
     }
@@ -54,19 +79,19 @@ export class HeapSnapshotFormatter {
     return lines.join('\n');
   }
 
-  #getSortedAggregates(): AggregatedInfoWithUid[] {
+  #getSortedAggregates(): AggregatedInfoWithId[] {
     return Object.values(this.#aggregates).sort((a, b) => b.maxRet - a.maxRet);
   }
 
   toString(): string {
     const sorted = this.#getSortedAggregates();
     const lines: string[] = [];
-    lines.push('uid,className,count,selfSize,maxRetainedSize');
+    lines.push('id,name,count,selfSize,maxRetainedSize');
 
     for (const info of sorted) {
-      const uid = info[stableIdSymbol] ?? '';
+      const id = info[stableIdSymbol] ?? '';
       lines.push(
-        `${uid},"${info.name}",${info.count},${info.self},${info.maxRet}`,
+        `${id},${info.name},${info.count},${DevTools.I18n.ByteUtilities.formatBytesToKb(info.self)},${DevTools.I18n.ByteUtilities.formatBytesToKb(info.maxRet)}`,
       );
     }
 
@@ -76,11 +101,11 @@ export class HeapSnapshotFormatter {
   toJSON(): FormattedSnapshotEntry[] {
     const sorted = this.#getSortedAggregates();
     return sorted.map(info => ({
-      uid: info[stableIdSymbol],
+      id: info[stableIdSymbol],
       className: info.name,
       count: info.count,
-      selfSize: info.self,
-      retainedSize: info.maxRet,
+      selfSize: DevTools.I18n.ByteUtilities.formatBytesToKb(info.self),
+      retainedSize: DevTools.I18n.ByteUtilities.formatBytesToKb(info.maxRet),
     }));
   }
 

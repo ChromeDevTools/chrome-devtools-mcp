@@ -53,6 +53,10 @@ export function getZodType(zodType: zod.ZodTypeAny): ZodType {
   throw new Error(`Unsupported zod type for tool parameter: ${typeName}`);
 }
 
+export function stripUnderscoreBeforeNumber(name: string): string {
+  return name.replace(/_([0-9])/g, '$1');
+}
+
 type LoggedToolCallArgValue = string | number | boolean;
 
 export function transformArgName(zodType: ZodType, name: string): string {
@@ -60,13 +64,15 @@ export function transformArgName(zodType: ZodType, name: string): string {
     /[A-Z]/g,
     letter => `_${letter.toLowerCase()}`,
   );
+  let transformed: string;
   if (zodType === 'ZodString') {
-    return `${snakeCaseName}_length`;
+    transformed = `${snakeCaseName}_length`;
   } else if (zodType === 'ZodArray') {
-    return `${snakeCaseName}_count`;
+    transformed = `${snakeCaseName}_count`;
   } else {
-    return snakeCaseName;
+    transformed = snakeCaseName;
   }
+  return stripUnderscoreBeforeNumber(transformed);
 }
 
 export function transformArgType(zodType: ZodType): string {

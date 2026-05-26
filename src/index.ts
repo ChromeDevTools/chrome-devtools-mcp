@@ -157,7 +157,7 @@ export async function createMcpServer(
       tool.name,
       {
         description: tool.description,
-        inputSchema: toolHandler.inputSchema,
+        inputSchema: toolHandler.registeredInputSchema,
         annotations: tool.annotations,
       },
       async (params): Promise<CallToolResult> => {

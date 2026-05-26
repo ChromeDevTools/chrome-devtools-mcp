@@ -5,7 +5,8 @@
  */
 
 import assert from 'node:assert';
-import {beforeEach, describe, it} from 'node:test';
+import type {IncomingHttpHeaders} from 'node:http';
+import {beforeEach, describe, it, mock} from 'node:test';
 
 import {emulate} from '../../src/tools/emulation.js';
 import {
@@ -75,7 +76,7 @@ describe('emulation', () => {
       });
 
       it('parses latitude and longitude', () => {
-        assert.deepStrictEqual(geolocationTransform('48.137154x11.576124'), {
+        assert.deepStrictEqual(geolocationTransform('48.137154,11.576124'), {
           latitude: 48.137154,
           longitude: 11.576124,
         });
@@ -205,6 +206,36 @@ describe('emulation', () => {
         );
 
         assert.strictEqual(context.getSelectedMcpPage().cpuThrottlingRate, 4);
+      });
+    });
+
+    it('applies cpu throttling to secondary session', async () => {
+      await withMcpContext(async (response, context) => {
+        const mcpPage = context.getSelectedMcpPage();
+        const universe = context.getDevToolsUniverse(mcpPage);
+        assert.ok(universe);
+
+        const sendSpy = mock.method(universe.session, 'send');
+
+        await emulate.handler(
+          {
+            params: {
+              cpuThrottlingRate: 4,
+            },
+            page: mcpPage,
+          },
+          response,
+          context,
+        );
+
+        assert.ok(sendSpy.mock.calls.length > 0);
+        const cpuCall = sendSpy.mock.calls.find(
+          call => call.arguments[0] === 'Emulation.setCPUThrottlingRate',
+        );
+        assert.ok(cpuCall);
+        assert.deepStrictEqual(cpuCall.arguments[1], {rate: 4});
+
+        sendSpy.mock.restore();
       });
     });
 
@@ -566,6 +597,172 @@ describe('emulation', () => {
           await context.getSelectedPptrPage().evaluate(() => {
             return navigator.userAgent !== 'MyUA';
           }),
+        );
+      });
+    });
+  });
+
+  describe('extraHttpHeaders', () => {
+    it('sets extra headers on requests', async () => {
+      let receivedHeaders: IncomingHttpHeaders = {};
+      server.addRoute('/headers-test', async (req, res) => {
+        receivedHeaders = req.headers;
+        res.writeHead(200, {'Content-Type': 'text/html'});
+        res.end('<main>Headers Test</main>');
+      });
+
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedPptrPage();
+        await emulate.handler(
+          {
+            params: {
+              extraHttpHeaders: {'X-Custom-Header': 'test-value'},
+            },
+            page: context.getSelectedMcpPage(),
+          },
+          response,
+          context,
+        );
+
+        await page.goto(server.getRoute('/headers-test'));
+        assert.strictEqual(receivedHeaders['x-custom-header'], 'test-value');
+      });
+    });
+
+    it('clears extra headers when null is passed', async () => {
+      let receivedHeaders: IncomingHttpHeaders = {};
+      server.addRoute('/headers-clear', async (req, res) => {
+        receivedHeaders = req.headers;
+        res.writeHead(200, {'Content-Type': 'text/html'});
+        res.end('<main>Headers Clear</main>');
+      });
+
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedPptrPage();
+        // Set headers first
+        await emulate.handler(
+          {
+            params: {
+              extraHttpHeaders: {'X-To-Clear': 'value'},
+            },
+            page: context.getSelectedMcpPage(),
+          },
+          response,
+          context,
+        );
+
+        // Clear headers
+        await emulate.handler(
+          {
+            params: {
+              extraHttpHeaders: {},
+            },
+            page: context.getSelectedMcpPage(),
+          },
+          response,
+          context,
+        );
+
+        await page.goto(server.getRoute('/headers-clear'));
+        assert.strictEqual(receivedHeaders['x-to-clear'], undefined);
+        assert.strictEqual(
+          context.getSelectedMcpPage().emulationSettings.extraHttpHeaders,
+          undefined,
+        );
+      });
+    });
+
+    it('headers persist across navigations', async () => {
+      const receivedHeaders: IncomingHttpHeaders[] = [];
+      server.addRoute('/persist-one', async (req, res) => {
+        receivedHeaders.push({...req.headers});
+        res.writeHead(200, {'Content-Type': 'text/html'});
+        res.end('<main>Page One</main>');
+      });
+      server.addRoute('/persist-two', async (req, res) => {
+        receivedHeaders.push({...req.headers});
+        res.writeHead(200, {'Content-Type': 'text/html'});
+        res.end('<main>Page Two</main>');
+      });
+
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedPptrPage();
+        await emulate.handler(
+          {
+            params: {
+              extraHttpHeaders: {'X-Persist': 'yes'},
+            },
+            page: context.getSelectedMcpPage(),
+          },
+          response,
+          context,
+        );
+
+        await page.goto(server.getRoute('/persist-one'));
+        await page.goto(server.getRoute('/persist-two'));
+
+        assert.strictEqual(receivedHeaders[0]?.['x-persist'], 'yes');
+        assert.strictEqual(receivedHeaders[1]?.['x-persist'], 'yes');
+      });
+    });
+
+    it('does not affect other emulation settings', async () => {
+      await withMcpContext(async (response, context) => {
+        // Set userAgent first
+        await emulate.handler(
+          {
+            params: {
+              userAgent: 'MyUA',
+            },
+            page: context.getSelectedMcpPage(),
+          },
+          response,
+          context,
+        );
+
+        // Set extraHTTPHeaders separately
+        await emulate.handler(
+          {
+            params: {
+              extraHttpHeaders: {'X-Test': 'value'},
+            },
+            page: context.getSelectedMcpPage(),
+          },
+          response,
+          context,
+        );
+
+        const settings = context.getSelectedMcpPage().emulationSettings;
+        assert.deepStrictEqual(settings.extraHttpHeaders, {
+          'X-Test': 'value',
+        });
+      });
+    });
+
+    it('reports correctly for the currently selected page', async () => {
+      await withMcpContext(async (response, context) => {
+        await emulate.handler(
+          {
+            params: {
+              extraHttpHeaders: {'X-Page': 'one'},
+            },
+            page: context.getSelectedMcpPage(),
+          },
+          response,
+          context,
+        );
+
+        assert.deepStrictEqual(
+          context.getSelectedMcpPage().emulationSettings.extraHttpHeaders,
+          {'X-Page': 'one'},
+        );
+
+        const page = await context.newPage();
+        context.selectPage(page);
+
+        assert.strictEqual(
+          context.getSelectedMcpPage().emulationSettings.extraHttpHeaders,
+          undefined,
         );
       });
     });

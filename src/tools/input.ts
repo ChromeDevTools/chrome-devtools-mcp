@@ -158,7 +158,7 @@ export const clickAt = definePageTool({
     const page = request.page;
     const result = await page.waitForEventsAfterAction(async () => {
       await page.pptrPage.mouse.click(request.params.x, request.params.y, {
-        clickCount: request.params.dblClick ? 2 : 1,
+        count: request.params.dblClick ? 2 : 1,
       });
     });
     response.appendResponseLine(

@@ -9,13 +9,29 @@ import assert from 'node:assert';
 import type {TestScenario} from '../eval_gemini.ts';
 
 export const scenario: TestScenario = {
-  prompt: 'Check a11y issues on the current page',
-  maxTurns: 1,
-  expectations: calls => {
-    assert.strictEqual(calls.length, 1);
-    assert.ok(
-      calls[0].name === 'lighthouse_audit',
-      'First call should be lighthouse_audit',
+  prompt: 'Check a11y issues on the page at <TEST_URL>',
+  maxTurns: 3,
+  htmlRoute: {
+    path: '/lighthouse_test.html',
+    htmlContent: `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Lighthouse Audit Test</title>
+        </head>
+        <body>
+          <h1>Lighthouse Audit Test</h1>
+          <p>This is a valid test page for running audits.</p>
+        </body>
+      </html>
+    `,
+  },
+  expectations: result => {
+    const pageId = result.consumePageNavigation();
+    assert.ok(result.remainingCalls.length >= 1);
+    result.assertNextCall(
+      'lighthouse_audit',
+      result.hasPageIdRouting ? {pageId} : undefined,
     );
   },
 };

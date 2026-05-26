@@ -85,6 +85,10 @@
       {
         "name": "viewport_length",
         "argType": "number"
+      },
+      {
+        "name": "extra_http_headers_length",
+        "argType": "number"
       }
     ]
   },
@@ -462,7 +466,8 @@
         "name": "file_path_length",
         "argType": "number"
       }
-    ]
+    ],
+    "isDeprecated": true
   },
   {
     "name": "take_screenshot",
@@ -579,7 +584,8 @@
         "name": "file_path_length",
         "argType": "number"
       }
-    ]
+    ],
+    "isDeprecated": true
   },
   {
     "name": "get_memory_snapshot_details",
@@ -596,7 +602,8 @@
         "name": "page_size",
         "argType": "number"
       }
-    ]
+    ],
+    "isDeprecated": true
   },
   {
     "name": "get_nodes_by_class",
@@ -613,10 +620,11 @@
         "name": "page_size",
         "argType": "number"
       }
-    ]
+    ],
+    "isDeprecated": true
   },
   {
-    "name": "execute_3p_developer_tool",
+    "name": "execute3p_developer_tool",
     "args": [
       {
         "name": "tool_name_length",
@@ -629,7 +637,106 @@
     ]
   },
   {
-    "name": "list_3p_developer_tools",
+    "name": "list3p_developer_tools",
     "args": []
+  },
+  {
+    "name": "get_node_retainers",
+    "args": [
+      {
+        "name": "file_path_length",
+        "argType": "number"
+      },
+      {
+        "name": "node_id",
+        "argType": "number"
+      },
+      {
+        "name": "page_idx",
+        "argType": "number"
+      },
+      {
+        "name": "page_size",
+        "argType": "number"
+      }
+    ],
+    "isDeprecated": true
+  },
+  {
+    "name": "get_heapsnapshot_class_nodes",
+    "args": [
+      {
+        "name": "file_path_length",
+        "argType": "number"
+      },
+      {
+        "name": "page_idx",
+        "argType": "number"
+      },
+      {
+        "name": "page_size",
+        "argType": "number"
+      },
+      {
+        "name": "id",
+        "argType": "number"
+      }
+    ]
+  },
+  {
+    "name": "get_heapsnapshot_details",
+    "args": [
+      {
+        "name": "file_path_length",
+        "argType": "number"
+      },
+      {
+        "name": "page_idx",
+        "argType": "number"
+      },
+      {
+        "name": "page_size",
+        "argType": "number"
+      }
+    ]
+  },
+  {
+    "name": "get_heapsnapshot_retainers",
+    "args": [
+      {
+        "name": "file_path_length",
+        "argType": "number"
+      },
+      {
+        "name": "node_id",
+        "argType": "number"
+      },
+      {
+        "name": "page_idx",
+        "argType": "number"
+      },
+      {
+        "name": "page_size",
+        "argType": "number"
+      }
+    ]
+  },
+  {
+    "name": "get_heapsnapshot_summary",
+    "args": [
+      {
+        "name": "file_path_length",
+        "argType": "number"
+      }
+    ]
+  },
+  {
+    "name": "take_heapsnapshot",
+    "args": [
+      {
+        "name": "file_path_length",
+        "argType": "number"
+      }
+    ]
   }
 ]

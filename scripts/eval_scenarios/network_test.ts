@@ -10,7 +10,7 @@ import type {TestScenario} from '../eval_gemini.ts';
 
 export const scenario: TestScenario = {
   prompt: 'Navigate to <TEST_URL> and list all network requests.',
-  maxTurns: 2,
+  maxTurns: 3,
   htmlRoute: {
     path: '/network_test.html',
     htmlContent: `
@@ -20,16 +20,12 @@ export const scenario: TestScenario = {
       </script>
     `,
   },
-  expectations: calls => {
-    assert.strictEqual(calls.length, 2);
-    assert.ok(
-      calls[0].name === 'navigate_page' || calls[0].name === 'new_page',
-      'First call should be navigation',
-    );
-    assert.strictEqual(
-      calls[1].name,
+  expectations: result => {
+    const pageId = result.consumePageNavigation();
+    assert.ok(result.remainingCalls.length >= 1);
+    result.assertNextCall(
       'list_network_requests',
-      'Second call should be list_network_requests',
+      result.hasPageIdRouting ? {pageId} : undefined,
     );
   },
 };

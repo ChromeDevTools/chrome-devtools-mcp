@@ -5,7 +5,7 @@
  */
 
 import type {ParsedArguments} from '../bin/chrome-devtools-mcp-cli-options.js';
-import type {AggregatedInfoWithUid} from '../HeapSnapshotManager.js';
+import type {AggregatedInfoWithId} from '../HeapSnapshotManager.js';
 import type {McpPage} from '../McpPage.js';
 import {zod} from '../third_party/index.js';
 import type {
@@ -235,16 +235,20 @@ export type Context = Readonly<{
   ): string | undefined;
   getHeapSnapshotAggregates(
     filePath: string,
-  ): Promise<Record<string, AggregatedInfoWithUid>>;
+  ): Promise<Record<string, AggregatedInfoWithId>>;
   getHeapSnapshotStats(
     filePath: string,
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.Statistics>;
   getHeapSnapshotStaticData(
     filePath: string,
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.StaticData | null>;
-  getHeapSnapshotNodesByUid(
+  getHeapSnapshotNodesById(
     filePath: string,
-    uid: number,
+    id: number,
+  ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange>;
+  getHeapSnapshotRetainers(
+    filePath: string,
+    nodeId: number,
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange>;
 }>;
 
@@ -253,6 +257,8 @@ export type Context = Readonly<{
  */
 export type ContextPage = Readonly<{
   readonly pptrPage: Page;
+  readonly cpuThrottlingRate: number;
+  readonly networkConditions: string | null;
   getAXNodeByUid(uid: string): TextSnapshotNode | undefined;
   getElementByUid(uid: string): Promise<ElementHandle<Element>>;
 
@@ -361,7 +367,7 @@ export const CLOSE_PAGE_ERROR =
   'The last open page cannot be closed. It is fine to keep it open.';
 
 export const pageIdSchema = {
-  pageId: zod.number().optional().describe('Targets a specific page by ID.'),
+  pageId: zod.number().describe('Targets a specific page by ID.'),
 };
 
 export const timeoutSchema = {
@@ -413,7 +419,7 @@ export function geolocationTransform(arg: string | undefined) {
   if (!arg) {
     return undefined;
   }
-  const [latitude, longitude] = arg.split('x').map(Number) as [number, number];
+  const [latitude, longitude] = arg.split(',').map(Number) as [number, number];
   return {
     latitude,
     longitude,

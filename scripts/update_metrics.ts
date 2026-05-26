@@ -11,6 +11,7 @@ import {
   cliOptions,
   parseArguments,
 } from '../build/src/bin/chrome-devtools-mcp-cli-options.js';
+import {ErrorCode} from '../build/src/telemetry/errors.js';
 import {
   getPossibleFlagMetrics,
   type FlagMetric,
@@ -104,7 +105,34 @@ function writeFlagUsageMetrics() {
   );
 }
 
+function validateErrorCodes(): void {
+  // The compiled JavaScript object has both forward and backward mappings of the enum,
+  // for example: { '0': 'ERROR_CODE_UNSPECIFIED', 'ERROR_CODE_UNSPECIFIED': 0 }.
+  // This filters out the numeric keys.
+  const stringKeysOnly = Object.entries(ErrorCode).filter(([key]) =>
+    isNaN(Number(key)),
+  );
+
+  let expectedIndex = 0;
+  for (const [key, index] of stringKeysOnly) {
+    if (index !== expectedIndex) {
+      throw new Error(
+        `Error: ErrorCode enums must be sequentially numbered from 0.`,
+      );
+    }
+    if (/_\d/.test(key)) {
+      throw new Error(
+        `Error: ErrorCode enum ${key} is invalid. No numbers should be preceded with an underscore.`,
+      );
+    }
+    expectedIndex++;
+  }
+
+  console.log(`Successfully validated ${expectedIndex} ErrorCode enums.`);
+}
+
 function main() {
+  validateErrorCodes();
   writeToolCallMetricsConfig();
   writeFlagUsageMetrics();
 }

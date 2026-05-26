@@ -11,9 +11,12 @@ import type {TestScenario} from '../eval_gemini.ts';
 export const scenario: TestScenario = {
   prompt: 'Emulate offline network conditions.',
   maxTurns: 2,
-  expectations: calls => {
-    assert.strictEqual(calls.length, 1);
-    assert.strictEqual(calls[0].name, 'emulate');
-    assert.strictEqual(calls[0].args.networkConditions, 'Offline');
+  expectations: result => {
+    assert.ok(result.remainingCalls.length >= 1);
+    result.assertNextCall('list_pages');
+    result.assertNextCall('emulate', {
+      networkConditions: 'Offline',
+      pageId: result.hasPageIdRouting ? 1 : undefined,
+    });
   },
 };

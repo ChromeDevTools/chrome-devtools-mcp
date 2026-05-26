@@ -12,7 +12,7 @@ import {fileURLToPath, pathToFileURL} from 'node:url';
 import type {TargetUniverse} from './DevtoolsUtils.js';
 import {UniverseManager} from './DevtoolsUtils.js';
 import {HeapSnapshotManager} from './HeapSnapshotManager.js';
-import type {AggregatedInfoWithUid} from './HeapSnapshotManager.js';
+import type {AggregatedInfoWithId} from './HeapSnapshotManager.js';
 import {McpPage} from './McpPage.js';
 import {
   NetworkCollector,
@@ -301,6 +301,7 @@ export class McpContext implements Context {
       userAgent?: string;
       colorScheme?: 'dark' | 'light' | 'auto';
       viewport?: Viewport;
+      extraHttpHeaders?: Record<string, string> | undefined;
     },
     targetPage?: Page,
   ): Promise<void> {
@@ -328,11 +329,22 @@ export class McpContext implements Context {
       newSettings.networkConditions = options.networkConditions;
     }
 
+    const secondarySession = this.getDevToolsUniverse(mcpPage)?.session;
     if (!options.cpuThrottlingRate) {
       await page.emulateCPUThrottling(1);
+      if (secondarySession) {
+        await secondarySession.send('Emulation.setCPUThrottlingRate', {
+          rate: 1,
+        });
+      }
       delete newSettings.cpuThrottlingRate;
     } else {
       await page.emulateCPUThrottling(options.cpuThrottlingRate);
+      if (secondarySession) {
+        await secondarySession.send('Emulation.setCPUThrottlingRate', {
+          rate: options.cpuThrottlingRate,
+        });
+      }
       newSettings.cpuThrottlingRate = options.cpuThrottlingRate;
     }
 
@@ -377,6 +389,14 @@ export class McpContext implements Context {
       const viewport = {...defaults, ...options.viewport};
       await page.setViewport(viewport);
       newSettings.viewport = viewport;
+    }
+
+    if (options.extraHttpHeaders !== undefined) {
+      await page.setExtraHTTPHeaders(options.extraHttpHeaders);
+      newSettings.extraHttpHeaders = options.extraHttpHeaders;
+      if (Object.keys(options.extraHttpHeaders).length === 0) {
+        delete newSettings.extraHttpHeaders;
+      }
     }
 
     mcpPage.emulationSettings = Object.keys(newSettings).length
@@ -472,7 +492,7 @@ export class McpContext implements Context {
       page.networkConditions,
     );
     page.pptrPage.setDefaultNavigationTimeout(
-      NAVIGATION_TIMEOUT * networkMultiplier,
+      NAVIGATION_TIMEOUT * networkMultiplier * cpuMultiplier,
     );
   }
 
@@ -804,7 +824,7 @@ export class McpContext implements Context {
 
   async getHeapSnapshotAggregates(
     filePath: string,
-  ): Promise<Record<string, AggregatedInfoWithUid>> {
+  ): Promise<Record<string, AggregatedInfoWithId>> {
     this.validatePath(filePath);
     return await this.#heapSnapshotManager.getAggregates(filePath);
   }
@@ -823,11 +843,18 @@ export class McpContext implements Context {
     return await this.#heapSnapshotManager.getStaticData(filePath);
   }
 
-  async getHeapSnapshotNodesByUid(
+  async getHeapSnapshotNodesById(
     filePath: string,
-    uid: number,
+    id: number,
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange> {
     this.validatePath(filePath);
-    return await this.#heapSnapshotManager.getNodesByUid(filePath, uid);
+    return await this.#heapSnapshotManager.getNodesById(filePath, id);
+  }
+
+  async getHeapSnapshotRetainers(
+    filePath: string,
+    nodeId: number,
+  ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange> {
+    return await this.#heapSnapshotManager.getRetainers(filePath, nodeId);
   }
 }

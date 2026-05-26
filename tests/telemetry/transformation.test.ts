@@ -10,6 +10,8 @@ import {describe, it} from 'node:test';
 import {
   bucketizeLatency,
   sanitizeParams,
+  stripUnderscoreBeforeNumber,
+  transformArgName,
 } from '../../src/telemetry/transformation.js';
 import {zod} from '../../src/third_party/index.js';
 
@@ -130,6 +132,36 @@ describe('sanitizeParams', () => {
     assert.throws(
       () => sanitizeParams(params, schema),
       /parameter myString has type ZodString but value 123 is not of equivalent type/,
+    );
+  });
+});
+
+describe('stripUnderscoreBeforeNumber', () => {
+  it('removes underscores immediately preceding numbers', () => {
+    assert.strictEqual(
+      stripUnderscoreBeforeNumber('list_3p_developer_tools'),
+      'list3p_developer_tools',
+    );
+    assert.strictEqual(
+      stripUnderscoreBeforeNumber('make_2g_network_request'),
+      'make2g_network_request',
+    );
+    assert.strictEqual(
+      stripUnderscoreBeforeNumber('no_numbers_here'),
+      'no_numbers_here',
+    );
+  });
+});
+
+describe('transformArgName', () => {
+  it('sanitizes argument names containing underscores before numbers', () => {
+    assert.strictEqual(
+      transformArgName('ZodNumber', 'my3pParam'),
+      'my3p_param',
+    );
+    assert.strictEqual(
+      transformArgName('ZodString', 'my3pParam'),
+      'my3p_param_length',
     );
   });
 });

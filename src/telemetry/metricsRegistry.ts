@@ -11,6 +11,7 @@ import {
   transformArgType,
   getZodType,
   PARAM_BLOCKLIST,
+  stripUnderscoreBeforeNumber,
 } from './transformation.js';
 
 /**
@@ -118,7 +119,7 @@ export function generateToolMetrics(tools: ToolDefinition[]): ToolMetric[] {
     }
 
     return {
-      name: tool.name,
+      name: stripUnderscoreBeforeNumber(tool.name),
       args,
     };
   });
