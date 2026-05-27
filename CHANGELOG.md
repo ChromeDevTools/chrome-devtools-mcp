@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.1](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v1.1.0...chrome-devtools-mcp-v1.1.1) (2026-05-27)
+
+
+### 🛠️ Fixes
+
+* **cli:** have pageId as first argument ([#2142](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/2142)) ([60be3e6](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/60be3e6bc157bd1121ea1d4b6ad59e37a73cac3e))
+
 ## [1.1.0](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v1.0.1...chrome-devtools-mcp-v1.1.0) (2026-05-26)
 
 
