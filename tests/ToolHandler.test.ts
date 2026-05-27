@@ -12,7 +12,7 @@ import sinon from 'sinon';
 import {parseArguments} from '../src/bin/chrome-devtools-mcp-cli-options.js';
 import {McpContext} from '../src/McpContext.js';
 import {McpPage} from '../src/McpPage.js';
-import {Mutex} from '../src/Mutex.js';
+import {MutexRegistry} from '../src/Mutex.js';
 import {zod} from '../src/third_party/index.js';
 import {ToolHandler} from '../src/ToolHandler.js';
 import {ToolCategory} from '../src/tools/categories.js';
@@ -48,7 +48,7 @@ describe('ToolHandler', () => {
     mockContext.getSelectedMcpPage.returns(mockPage);
     mockContext.detectOpenDevToolsWindows.resolves();
 
-    const toolMutex = new Mutex();
+    const mutexRegistry = new MutexRegistry();
     const serverArgs = parseArguments('1.0.0', ['node', 'script.js'], {
       CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
     });
@@ -57,7 +57,7 @@ describe('ToolHandler', () => {
       tool,
       serverArgs,
       async () => mockContext,
-      toolMutex,
+      mutexRegistry,
     );
 
     assert.strictEqual(toolHandler.shouldRegister, true);
@@ -86,7 +86,7 @@ describe('ToolHandler', () => {
     const mockContext = sinon.createStubInstance(McpContext);
     mockContext.detectOpenDevToolsWindows.resolves();
 
-    const toolMutex = new Mutex();
+    const mutexRegistry = new MutexRegistry();
     const serverArgs = parseArguments('1.0.0', ['node', 'script.js'], {
       CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
     });
@@ -95,7 +95,7 @@ describe('ToolHandler', () => {
       tool,
       serverArgs,
       async () => mockContext,
-      toolMutex,
+      mutexRegistry,
     );
 
     assert.strictEqual(toolHandler.shouldRegister, true);
@@ -128,7 +128,7 @@ describe('ToolHandler', () => {
     const mockContext = sinon.createStubInstance(McpContext);
     mockContext.detectOpenDevToolsWindows.resolves();
 
-    const toolMutex = new Mutex();
+    const mutexRegistry = new MutexRegistry();
     const serverArgs = parseArguments('1.0.0', ['node', 'script.js'], {
       CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
     });
@@ -137,7 +137,7 @@ describe('ToolHandler', () => {
       tool,
       serverArgs,
       async () => mockContext,
-      toolMutex,
+      mutexRegistry,
     );
 
     const params = {url: 'https://example.com', description: 'open the page'};
@@ -173,7 +173,7 @@ describe('ToolHandler', () => {
     };
 
     const mockContext = sinon.createStubInstance(McpContext);
-    const toolMutex = new Mutex();
+    const mutexRegistry = new MutexRegistry();
     const serverArgs = parseArguments(
       '1.0.0',
       ['node', 'script.js', '--categoryEmulation=false'],
@@ -184,7 +184,7 @@ describe('ToolHandler', () => {
       tool,
       serverArgs,
       async () => mockContext,
-      toolMutex,
+      mutexRegistry,
     );
 
     assert.strictEqual(toolHandler.shouldRegister, false);

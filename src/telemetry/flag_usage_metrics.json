@@ -295,5 +295,17 @@
   {
     "name": "category_experimental_third_party",
     "flagType": "boolean"
+  },
+  {
+    "name": "http_port_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "http_host_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "http_token_present",
+    "flagType": "boolean"
   }
 ]

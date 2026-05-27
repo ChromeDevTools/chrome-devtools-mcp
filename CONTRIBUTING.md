@@ -1,156 +1,57 @@
-# How to contribute
+# Contributing
 
-We'd love to accept your patches and contributions to this project.
+This is a fork of [ChromeDevTools/chrome-devtools-mcp](https://github.com/ChromeDevTools/chrome-devtools-mcp). It is not the upstream project. The upstream project's CLA-based contribution process does not apply here.
 
-## Before you begin
+## Where to send your contribution
 
-### Sign our Contributor License Agreement
+- **If your change is broadly useful** (bug fix, generally applicable feature), please open a PR against [the upstream repository](https://github.com/ChromeDevTools/chrome-devtools-mcp/pulls) directly. That benefits more people than this fork.
+- **If your change is specific to this fork's additions** (per-page mutex, HTTP transport — see [FORK.md](./FORK.md)), open a PR here.
 
-Contributions to this project must be accompanied by a
-[Contributor License Agreement](https://cla.developers.google.com/about) (CLA).
-You (or your employer) retain the copyright to your contribution; this simply
-gives us permission to use and redistribute your contributions as part of the
-project.
+## Workflow
 
-If you or your current employer have already signed the Google CLA (even if it
-was for a different project), you probably don't need to do it again.
+1. Fork this repo and create a feature branch.
+2. Make your changes. Match the existing style (run `npm run format`).
+3. Add or update tests under `tests/`. Run `npm test` locally and ensure it passes.
+4. Open a PR against `main` here.
+5. CI runs on the PR. The maintainer reviews and merges.
 
-Visit <https://cla.developers.google.com/> to see your current agreements or to
-sign a new one.
+`main` is protected — no direct pushes, no force pushes, no deletion. All changes go through PRs. The single maintainer ([@cejor6](https://github.com/cejor6)) reviews and merges.
 
-### Review our community guidelines
-
-This project follows
-[Google's Open Source Community Guidelines](https://opensource.google/conduct/).
-
-## Development process
-
-### Code reviews
-
-All submissions, including submissions by project members, require review. We
-use GitHub pull requests for this purpose. Consult
-[GitHub Help](https://help.github.com/articles/about-pull-requests/) for more
-information on using pull requests.
-
-### Conventional commits
-
-Please follow [conventional commits](https://www.conventionalcommits.org/en/v1.0.0/)
-for PR and commit titles.
-
-### Feature release checklist
-
-Use `chore:` for commits containing incomplete features that are not available
-to users yet. Once the feature is ready to be released, create a PR with a
-`feat:` prefix that enables the feature. The following criteria need to be
-completed:
-
-- Documentation for the feature is up to date. For example, README.md and tools
-  reference are updated.
-- The feature can be used with Chrome stable or version restrictions are
-  documented otherwise.
-- Corresponding skills are updated or new skills are added if needed.
-- The feature fulfills the use case by its own or in conjunction with existing
-  features (we want to avoid features that offer some tools but cannot be used
-  successfully to debug things).
-
-### Release process
-
-Releasing `chrome-devtools-mcp` is automated by GitHub Actions. To release a new
-version, [search for a PR titled `chore(main): release chrome-devtools-mcp`](https://github.com/ChromeDevTools/chrome-devtools-mcp/pulls?q=is%3Apr+is%3Aopen+%22chore%28main%29%3A+release+chrome-devtools-mcp%22)
-and review, test, and land it. The release PR is automatically opened if there
-are any changes on the main branch that show up in the changelog.
-
-### How to update the Lighthouse dependency
-
-- Update the Lighthouse version in package.json and run `npm install`. The npm version is currently used for types.
-- Check out the corresponding Lighthouse repository revision to a sibling directory (`../lighthouse`).
-- Run `npm run update-lighthouse` (Note that Lighthouse requires yarn).
-- Commit the bundle. If new dependencies are added via the bundle, update `tests/third_party_notices.test.ts`.
-
-## Installation
-
-Check that you are using node version specified in .nvmrc, then run following commands:
+## Development
 
 ```sh
-git clone https://github.com/ChromeDevTools/chrome-devtools-mcp.git
+git clone https://github.com/cejor6/chrome-devtools-mcp.git
 cd chrome-devtools-mcp
 npm ci
 npm run build
+npm test
 ```
 
-### Testing with @modelcontextprotocol/inspector
+To skip the heavy Puppeteer Chrome download during install (you can still run the server against your system Chrome):
 
 ```sh
-npx @modelcontextprotocol/inspector node /build/src/bin/chrome-devtools-mcp.js
+PUPPETEER_SKIP_DOWNLOAD=true npm install
 ```
 
-### Testing with an MCP client
+## TypeScript rules
 
-Add the MCP server to your client's config.
+Per the upstream conventions, maintained here too:
 
-```json
-{
-  "mcpServers": {
-    "chrome-devtools": {
-      "command": "node",
-      "args": ["/path-to/build/src/bin/chrome-devtools-mcp.js"]
-    }
-  }
-}
-```
+- Do not use `any`, `as`, `!`, `// @ts-ignore`, `// @ts-nocheck`, or `// @ts-expect-error`.
+- Prefer `for..of` over `forEach`.
 
-#### Using with VS Code SSH
+## Modifying upstream files
 
-When running the `@modelcontextprotocol/inspector` it spawns 2 services - one on port `6274` and one on `6277`.
-Usually VS Code automatically detects and forwards `6274` but fails to detect `6277` so you need to manually forward it.
+Per Apache 2.0 §4(b), any file you modify that originated upstream must carry a "Modifications Copyright" notice. Add it right below the existing `Copyright Google` block. See `src/Mutex.ts` for the established style. New files you create are entirely yours and need only your own copyright.
 
-### Debugging
-
-To write debug logs to `log.txt` in the working directory, run with the following commands:
+## Keeping in sync with upstream
 
 ```sh
-npx @modelcontextprotocol/inspector node /build/src/bin/chrome-devtools-mcp.js --log-file=/your/desired/path/log.txt
+git fetch upstream
+git checkout main
+git merge upstream/main
+# resolve conflicts; opens as a PR via your fork-of-this-fork workflow
+git push origin main
 ```
 
-You can use the `DEBUG` environment variable as usual to control categories that are logged.
-
-### Updating documentation
-
-When adding a new tool or updating a tool name or description, make sure to run `npm run gen` to generate the tool reference documentation.
-
-### Contributing to Evals
-
-We use Gemini to evaluate the MCP server tools in `scripts/eval_scenarios`.
-Each scenario is a TypeScript file that exports a `scenario` object implementing `TestScenario`.
-
-- **prompt**: The prompt to send to the model.
-- **maxTurns**: Maximum number of conversation turns.
-- **expectations**: A function that verifies the tool calls made by the model.
-- **htmlRoute** (Optional): Serve custom HTML content for the test at a specific path.
-
-We look to test that the tools are used correctly without too rigid assertions. Avoid asserting exact argument values if they can vary (e.g., natural language reasoning), but ensure the core parameters (like URLs or selectors) were correct.
-
-Example:
-
-```ts
-import {TestScenario} from '../eval_gemini.js';
-
-export const scenario: TestScenario = {
-  prompt: 'Navigate to example.com',
-  maxTurns: 2,
-  expectations: calls => {
-    // Check that at least one call was 'browse_page'
-    const navigation = calls.find(c => c.name === 'browse_page');
-    if (!navigation) throw new Error('Model did not browse the page');
-    // Verify essential args
-    if (navigation.args.url !== 'http://example.com') {
-      throw new Error(`Wrong URL: ${navigation.args.url}`);
-    }
-  },
-};
-```
-
-## Restrictions on JSON schema
-
-- no .nullable(), no .object() types. Enforced by the `@local/enforce-zod-schema` ESLint rule.
-- represent complex object as a short formatted string.
+(Note: only the maintainer can push to `main` — they'll handle upstream merges.)

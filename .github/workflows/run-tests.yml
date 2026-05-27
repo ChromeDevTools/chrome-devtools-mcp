@@ -48,7 +48,11 @@ jobs:
         run: npx puppeteer browsers install chrome
 
       - name: Build
-        run: npm run bundle
+        # Fork uses `build` instead of `bundle`: we don't publish a bundled
+        # release, and `bundle` produces a THIRD_PARTY_NOTICES file whose
+        # snapshot test drifts whenever our package-lock differs from
+        # upstream. `build` produces everything the test suite needs.
+        run: npm run build
         env:
           NODE_OPTIONS: '--max_old_space_size=4096'
 
@@ -65,8 +69,12 @@ jobs:
 
       - name: Run tests
         shell: bash
-        # Retry tests if they fail in the merge queue.
-        run: npm run test:no-build -- ${{ github.event_name == 'merge_group' && '--retry' || '' }}
+        # Always retry on flake. Upstream only enabled --retry for merge_group;
+        # the fork enables it for PRs too because Windows + Node 24+ shutdown
+        # and e2e tests are inherently slow on GH Actions runners and
+        # occasionally cross thresholds without any real regression. With
+        # --retry the test runner attempts up to 3 times.
+        run: npm run test:no-build -- --retry
 
   # Gating job for branch protection.
   test-success:

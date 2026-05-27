@@ -71,7 +71,10 @@ const nodeArgs = [
   (process.env['NODE_TEST_REPORTER'] ?? process.env['CI']) ? 'spec' : 'dot',
   '--test-force-exit',
   '--test',
-  '--test-timeout=120000',
+  // 4 min per file. The e2e CLI/daemon roundtrip suite takes ~90s locally
+  // but Windows GitHub Actions runners are noticeably slower and routinely
+  // exceeded the prior 120s. 240s gives headroom without masking real hangs.
+  '--test-timeout=240000',
   ...flags,
   ...files,
 ];

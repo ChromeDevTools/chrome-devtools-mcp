@@ -4,11 +4,21 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+/**
+ * Modifications Copyright 2026 Colin (@cejor6)
+ * - Optionally also start an HTTP transport (--http-port) sharing one
+ *   browser with stdio. Graceful shutdown closes both transports.
+ */
+
 import '../polyfill.js';
 
 import process from 'node:process';
 
 import {closeBrowser} from '../browser.js';
+import {
+  type HttpTransportHandle,
+  startHttpTransport,
+} from '../HttpTransport.js';
 import {createMcpServer, logDisclaimers} from '../index.js';
 import {logger, saveLogsToFile} from '../logger.js';
 import {ClearcutLogger} from '../telemetry/ClearcutLogger.js';
@@ -33,6 +43,8 @@ if (process.env['CHROME_DEVTOOLS_MCP_CRASH_ON_UNCAUGHT'] !== 'true') {
   });
 }
 
+let httpHandle: HttpTransportHandle | undefined;
+
 // Shutdown on stdin EOF (stdio MCP convention — the client closes the
 // transport to signal exit) and on standard termination signals. Without
 // this, an active Chrome subprocess keeps the Node event loop ref'd after
@@ -52,6 +64,13 @@ async function shutdown(reason: string): Promise<void> {
     logger('Shutdown timeout exceeded, forcing exit');
     process.exit(0);
   }, 10000).unref();
+  if (httpHandle) {
+    try {
+      await httpHandle.close();
+    } catch (e) {
+      logger('Error closing HTTP transport', e);
+    }
+  }
   await closeBrowser();
   process.exit(0);
 }
@@ -72,12 +91,30 @@ process.on('SIGHUP', () => {
 });
 
 logger(`Starting Chrome DevTools MCP Server v${VERSION}`);
-const {server} = await createMcpServer(args, {
+const {server, sharedState} = await createMcpServer(args, {
   logFile,
 });
 const transport = new StdioServerTransport();
 await server.connect(transport);
 logger('Chrome DevTools MCP Server connected');
+
+if (args.httpPort !== undefined) {
+  const host = (args.httpHost as string | undefined) ?? '127.0.0.1';
+  httpHandle = await startHttpTransport({
+    host,
+    port: args.httpPort,
+    token: args.httpToken,
+    args,
+    sharedState,
+    logFile,
+  });
+  console.error(
+    `HTTP transport listening on http://${host}:${args.httpPort}${
+      args.httpToken ? ' (bearer auth required)' : ' (no auth)'
+    }`,
+  );
+}
+
 logDisclaimers(args);
 void ClearcutLogger.get()?.logDailyActiveIfNeeded();
 void ClearcutLogger.get()?.logServerStart(computeFlagUsage(args, cliOptions));

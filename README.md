@@ -1,4 +1,10 @@
-# Chrome DevTools for agents
+# Chrome DevTools for agents — fork
+
+> **This is a fork of [ChromeDevTools/chrome-devtools-mcp](https://github.com/ChromeDevTools/chrome-devtools-mcp), maintained by [@cejor6](https://github.com/cejor6).** It adds a per-page mutex (concurrent page-scoped tool calls across different pages) and a Streamable HTTP transport (multiple client processes sharing one browser). See **[FORK.md](./FORK.md)** for divergence details and the **[NOTICE](./NOTICE)** for attribution. The original README from the upstream project follows below, unmodified.
+>
+> The fork is intentionally not published to npm (`"private": true`). Install by cloning and running locally.
+
+---
 
 [![npm chrome-devtools-mcp package](https://img.shields.io/npm/v/chrome-devtools-mcp.svg)](https://npmjs.org/package/chrome-devtools-mcp)
 
@@ -683,6 +689,18 @@ The Chrome DevTools MCP server supports the following configuration option:
   If true, redacts some of the network headers considered sensitive before returning to the client.
   - **Type:** boolean
   - **Default:** `false`
+
+- **`--httpPort`/ `--http-port`**
+  If set, also expose the MCP server over HTTP (Streamable HTTP transport) on this port. Stdio remains active simultaneously. Multiple concurrent sessions share one browser via shared state.
+  - **Type:** number
+
+- **`--httpHost`/ `--http-host`**
+  Hostname/IP for HTTP transport to bind to. Defaults to 127.0.0.1 (loopback only) when --http-port is set. Use 0.0.0.0 to expose on all interfaces — REQUIRES --http-token.
+  - **Type:** string
+
+- **`--httpToken`/ `--http-token`**
+  Bearer token required in Authorization header for HTTP clients. Strongly recommended; required when --http-host is non-loopback.
+  - **Type:** string
 
 <!-- END AUTO GENERATED OPTIONS -->
 
