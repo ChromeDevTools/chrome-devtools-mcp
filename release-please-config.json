@@ -43,7 +43,7 @@
         {
           "type": "json",
           "path": ".claude-plugin/plugin.json",
-          "jsonpath": "mcpServers['chrome-devtools'].args[1]"
+          "jsonpath": "mcpServers['chrome-devtools'].args[0]"
         },
         {
           "type": "json",
@@ -53,7 +53,7 @@
         {
           "type": "json",
           "path": ".cursor-plugin/plugin.json",
-          "jsonpath": "mcpServers.[['chrome-devtools']'].args[1]"
+          "jsonpath": "mcpServers['chrome-devtools'].args[0]"
         },
         {
           "type": "json",
@@ -63,7 +63,7 @@
         {
           "type": "json",
           "path": "gemini-extension.json",
-          "jsonpath": "mcpServers['chrome-devtools'].args[1]"
+          "jsonpath": "mcpServers['chrome-devtools'].args[0]"
         },
         {
           "type": "json",
@@ -73,7 +73,7 @@
         {
           "type": "json",
           "path": ".github/plugin/plugin.json",
-          "jsonpath": "mcpServers['chrome-devtools'].args[1]"
+          "jsonpath": "mcpServers['chrome-devtools'].args[0]"
         }
       ]
     }

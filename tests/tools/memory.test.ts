@@ -68,7 +68,7 @@ describe('memory', () => {
           .map(c => (c.type === 'text' ? c.text : ''))
           .join('\n');
 
-        t.assert.snapshot?.(output);
+        t.assert.snapshot(output);
       });
     });
   });
@@ -95,7 +95,7 @@ describe('memory', () => {
           .map(c => (c.type === 'text' ? c.text : ''))
           .join('\n');
 
-        t.assert.snapshot?.(output);
+        t.assert.snapshot(output);
       });
     });
   });
@@ -125,7 +125,7 @@ describe('memory', () => {
           .map(c => (c.type === 'text' ? c.text : ''))
           .join('\n');
 
-        t.assert.snapshot?.(output);
+        t.assert.snapshot(output);
       });
     });
 
@@ -172,7 +172,7 @@ describe('memory', () => {
           .map(c => (c.type === 'text' ? c.text : ''))
           .join('\n');
 
-        t.assert.snapshot?.(output);
+        t.assert.snapshot(output);
       });
     });
   });

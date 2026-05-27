@@ -146,7 +146,7 @@ describe('input', () => {
         await click.handler(
           {
             params: {
-              uid: '1_1',
+              uid: '1_2',
             },
             page: context.getSelectedMcpPage(),
           },
@@ -770,7 +770,7 @@ describe('input', () => {
         await fill.handler(
           {
             params: {
-              uid: '1_1', // email input
+              uid: '1_2', // email input
               value: 'new@test.com',
             },
             page: context.getSelectedMcpPage(),
@@ -788,7 +788,7 @@ describe('input', () => {
         await fill.handler(
           {
             params: {
-              uid: '1_2', // password input
+              uid: '1_3', // password input
               value: 'secret',
             },
             page: context.getSelectedMcpPage(),
@@ -1085,11 +1085,11 @@ describe('input', () => {
             params: {
               elements: [
                 {
-                  uid: '1_2',
+                  uid: '1_3',
                   value: 'test',
                 },
                 {
-                  uid: '1_4',
+                  uid: '1_5',
                   value: 'test2',
                 },
               ],
@@ -1191,7 +1191,7 @@ describe('input', () => {
         await uploadFile.handler(
           {
             params: {
-              uid: '1_1',
+              uid: '1_2',
               filePath: testFilePath,
             },
             page: context.getSelectedMcpPage(),

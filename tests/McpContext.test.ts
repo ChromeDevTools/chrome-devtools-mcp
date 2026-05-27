@@ -148,7 +148,7 @@ describe('McpContext', () => {
       response.setIncludeNetworkRequests(true);
       const result = await response.handle('test', context);
 
-      t.assert.snapshot?.(JSON.stringify(result.structuredContent, null, 2));
+      t.assert.snapshot(JSON.stringify(result.structuredContent, null, 2));
     });
   });
 
@@ -165,7 +165,7 @@ describe('McpContext', () => {
       response.attachNetworkRequest(456);
       const result = await response.handle('test', context);
 
-      t.assert.snapshot?.(JSON.stringify(result.structuredContent, null, 2));
+      t.assert.snapshot(JSON.stringify(result.structuredContent, null, 2));
     });
   });
 
@@ -212,7 +212,7 @@ describe('McpContext', () => {
       });
       const result = await response.handle('test', context);
 
-      t.assert.snapshot?.(JSON.stringify(result.structuredContent, null, 2));
+      t.assert.snapshot(JSON.stringify(result.structuredContent, null, 2));
 
       fromStub.restore();
     });

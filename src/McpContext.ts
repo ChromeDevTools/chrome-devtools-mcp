@@ -413,7 +413,6 @@ export class McpContext implements Context {
     }
 
     if (!options.viewport) {
-      await page.setViewport(null);
       delete newSettings.viewport;
     } else {
       const defaults = {
@@ -422,9 +421,7 @@ export class McpContext implements Context {
         hasTouch: false,
         isLandscape: false,
       };
-      const viewport = {...defaults, ...options.viewport};
-      await page.setViewport(viewport);
-      newSettings.viewport = viewport;
+      newSettings.viewport = {...defaults, ...options.viewport};
     }
 
     if (options.extraHttpHeaders !== undefined) {
@@ -440,6 +437,10 @@ export class McpContext implements Context {
       : {};
 
     this.#updateSelectedPageTimeouts();
+
+    // This should happen after updating the page timeouts.
+    // Setting the viewport can trigger a reload which we don't want to timeout.
+    await page.setViewport(newSettings.viewport ?? null);
   }
 
   setIsRunningPerformanceTrace(x: boolean): void {
@@ -523,7 +524,7 @@ export class McpContext implements Context {
     page.pptrPage.setDefaultTimeout(DEFAULT_TIMEOUT * cpuMultiplier);
     // 10sec should be enough for the load event to be emitted during
     // navigations.
-    // Increased in case we throttle the network requests
+    // Increased in case we throttle the network requests or the CPU
     const networkMultiplier = getNetworkMultiplierFromString(
       page.networkConditions,
     );
@@ -830,7 +831,6 @@ export class McpContext implements Context {
   }
 
   async installExtension(extensionPath: string): Promise<string> {
-    await this.validatePath(extensionPath);
     const id = await this.browser.installExtension(extensionPath);
     return id;
   }
@@ -861,21 +861,18 @@ export class McpContext implements Context {
   async getHeapSnapshotAggregates(
     filePath: string,
   ): Promise<Record<string, AggregatedInfoWithId>> {
-    await this.validatePath(filePath);
     return await this.#heapSnapshotManager.getAggregates(filePath);
   }
 
   async getHeapSnapshotStats(
     filePath: string,
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.Statistics> {
-    await this.validatePath(filePath);
     return await this.#heapSnapshotManager.getStats(filePath);
   }
 
   async getHeapSnapshotStaticData(
     filePath: string,
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.StaticData | null> {
-    await this.validatePath(filePath);
     return await this.#heapSnapshotManager.getStaticData(filePath);
   }
 
@@ -883,7 +880,6 @@ export class McpContext implements Context {
     filePath: string,
     id: number,
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange> {
-    await this.validatePath(filePath);
     return await this.#heapSnapshotManager.getNodesById(filePath, id);
   }
 
@@ -891,7 +887,6 @@ export class McpContext implements Context {
     filePath: string,
     nodeId: number,
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange> {
-    await this.validatePath(filePath);
     return await this.#heapSnapshotManager.getRetainers(filePath, nodeId);
   }
 }

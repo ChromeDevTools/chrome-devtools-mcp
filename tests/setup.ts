@@ -9,17 +9,6 @@ import '../src/polyfill.js';
 import path from 'node:path';
 import {it} from 'node:test';
 
-if (!it.snapshot) {
-  it.snapshot = {
-    setResolveSnapshotPath: () => {
-      // Internally empty
-    },
-    setDefaultSnapshotSerializers: () => {
-      // Internally empty
-    },
-  };
-}
-
 // This is run by Node when we execute the tests via the --import flag.
 it.snapshot.setResolveSnapshotPath(testPath => {
   // By default the snapshots go into the build directory, but we want them
