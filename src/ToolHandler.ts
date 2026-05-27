@@ -4,11 +4,18 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+/**
+ * Modifications Copyright 2026 Colin (@cejor6)
+ * - Take a MutexRegistry instead of a single Mutex and pick per-page or
+ *   exclusive locking based on whether the tool is page-scoped and whether
+ *   pageId routing is enabled.
+ */
+
 import type {parseArguments} from './bin/chrome-devtools-mcp-cli-options.js';
 import {logger} from './logger.js';
 import type {McpContext} from './McpContext.js';
 import {McpResponse} from './McpResponse.js';
-import type {Mutex} from './Mutex.js';
+import type {Guard, MutexRegistry} from './Mutex.js';
 import {SlimMcpResponse} from './SlimMcpResponse.js';
 import {ClearcutLogger} from './telemetry/ClearcutLogger.js';
 import {bucketizeLatency} from './telemetry/transformation.js';
@@ -152,7 +159,7 @@ export class ToolHandler {
     private readonly tool: ToolDefinition | DefinedPageTool,
     private readonly serverArgs: ReturnType<typeof parseArguments>,
     private readonly getContext: () => Promise<McpContext>,
-    private readonly toolMutex: Mutex,
+    private readonly mutexRegistry: MutexRegistry,
   ) {
     const {disabled, reason} = getToolStatusInfo(tool, serverArgs);
     this.disabledReason = reason;
@@ -204,7 +211,30 @@ export class ToolHandler {
       };
     }
 
-    const guard = await this.toolMutex.acquire();
+    const pageScoped = isPageScopedTool(this.tool);
+    const routingOn =
+      this.serverArgs.experimentalPageIdRouting && !this.serverArgs.slim;
+    const pageId =
+      typeof params.pageId === 'number' ? params.pageId : undefined;
+
+    let guard: Guard;
+    if (pageScoped && routingOn && pageId !== undefined) {
+      // Per-page lock. Briefly touch global first so any in-flight topology
+      // op (which holds global and is draining per-page mutexes) finishes
+      // before we acquire our page's mutex.
+      const g = await this.mutexRegistry.global().acquire();
+      g.dispose();
+      guard = await this.mutexRegistry.forPage(pageId).acquire();
+    } else if (pageScoped) {
+      // Legacy single-flight behavior when pageId routing is off.
+      guard = await this.mutexRegistry.global().acquire();
+    } else {
+      // Topology / non-page-scoped tools (e.g. new_page, list_pages,
+      // select_page, close_page): drain everything so no per-page work is
+      // in flight while page topology mutates.
+      guard = await this.mutexRegistry.acquireExclusive();
+    }
+
     const startTime = Date.now();
     let success = false;
     try {
@@ -221,12 +251,8 @@ export class ToolHandler {
       response.setRedactNetworkHeaders(this.serverArgs.redactNetworkHeaders);
       try {
         if (isPageScopedTool(this.tool)) {
-          const pageId =
-            typeof params.pageId === 'number' ? params.pageId : undefined;
           const page =
-            this.serverArgs.experimentalPageIdRouting &&
-            pageId !== undefined &&
-            !this.serverArgs.slim
+            routingOn && pageId !== undefined
               ? context.getPageById(pageId)
               : context.getSelectedMcpPage();
           response.setPage(page);

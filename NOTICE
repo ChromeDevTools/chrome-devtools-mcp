@@ -1,0 +1,22 @@
+chrome-devtools-mcp (fork)
+Copyright 2025-2026 Google LLC
+Copyright 2026 Colin (@cejor6) (modifications)
+
+This product includes software originally developed by Google LLC as
+"chrome-devtools-mcp" (https://github.com/ChromeDevTools/chrome-devtools-mcp),
+licensed under the Apache License, Version 2.0.
+
+Modifications by Colin (@cejor6) (https://github.com/cejor6) include:
+  - Replaced the single global tool mutex with a MutexRegistry that hands
+    out per-page mutexes plus a global "exclusive" mode for topology
+    operations. Page-scoped tools acting on different pages now run
+    concurrently when --experimentalPageIdRouting is enabled.
+  - Added a Streamable HTTP transport (alongside stdio) that supports
+    multiple concurrent MCP client sessions sharing one Chrome browser,
+    with optional bearer-token authentication and host validation.
+  - Extracted shared state (browser/context lifecycle + MutexRegistry)
+    from createMcpServer so multiple McpServer instances can share one
+    browser.
+
+Each modified file carries an additional copyright notice describing the
+modifications made to it, per Apache License 2.0 §4(b).

@@ -1,23 +1,11 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
-  "name": "io.github.ChromeDevTools/chrome-devtools-mcp",
-  "title": "Chrome DevTools MCP",
-  "description": "MCP server for Chrome DevTools",
+  "name": "io.github.cejor6/chrome-devtools-mcp",
+  "title": "Chrome DevTools MCP (cejor6 fork)",
+  "description": "Fork of chrome-devtools-mcp adding per-page mutex and Streamable HTTP transport for concurrent multi-agent sessions. Not published to npm.",
   "repository": {
-    "url": "https://github.com/ChromeDevTools/chrome-devtools-mcp",
+    "url": "https://github.com/cejor6/chrome-devtools-mcp",
     "source": "github"
   },
-  "version": "1.1.0",
-  "packages": [
-    {
-      "registryType": "npm",
-      "registryBaseUrl": "https://registry.npmjs.org",
-      "identifier": "chrome-devtools-mcp",
-      "version": "1.1.0",
-      "transport": {
-        "type": "stdio"
-      },
-      "environmentVariables": []
-    }
-  ]
+  "version": "1.1.0"
 }

@@ -1,4 +1,10 @@
-# Chrome DevTools for agents
+# Chrome DevTools for agents — fork
+
+> **This is a fork of [ChromeDevTools/chrome-devtools-mcp](https://github.com/ChromeDevTools/chrome-devtools-mcp), maintained by [@cejor6](https://github.com/cejor6).** It adds a per-page mutex (concurrent page-scoped tool calls across different pages) and a Streamable HTTP transport (multiple client processes sharing one browser). See **[FORK.md](./FORK.md)** for divergence details and the **[NOTICE](./NOTICE)** for attribution. The original README from the upstream project follows below, unmodified.
+>
+> The fork is intentionally not published to npm (`"private": true`). Install by cloning and running locally.
+
+---
 
 [![npm chrome-devtools-mcp package](https://img.shields.io/npm/v/chrome-devtools-mcp.svg)](https://npmjs.org/package/chrome-devtools-mcp)
 

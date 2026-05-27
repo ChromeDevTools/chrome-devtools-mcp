@@ -1,7 +1,8 @@
 {
   "name": "chrome-devtools-mcp",
   "version": "1.1.0",
-  "description": "MCP server for Chrome DevTools",
+  "private": true,
+  "description": "Fork of chrome-devtools-mcp with per-page mutex and Streamable HTTP transport for concurrent multi-agent sessions. Upstream: ChromeDevTools/chrome-devtools-mcp.",
   "type": "module",
   "bin": {
     "chrome-devtools-mcp": "./build/src/bin/chrome-devtools-mcp.js",
@@ -38,14 +39,20 @@
     "!*.tsbuildinfo",
     "!*.js.map"
   ],
-  "repository": "ChromeDevTools/chrome-devtools-mcp",
+  "repository": "cejor6/chrome-devtools-mcp",
   "author": "Google LLC",
+  "contributors": [
+    {
+      "name": "Colin (@cejor6)",
+      "url": "https://github.com/cejor6"
+    }
+  ],
   "license": "Apache-2.0",
   "bugs": {
-    "url": "https://github.com/ChromeDevTools/chrome-devtools-mcp/issues"
+    "url": "https://github.com/cejor6/chrome-devtools-mcp/issues"
   },
-  "homepage": "https://github.com/ChromeDevTools/chrome-devtools-mcp#readme",
-  "mcpName": "io.github.ChromeDevTools/chrome-devtools-mcp",
+  "homepage": "https://github.com/cejor6/chrome-devtools-mcp#readme",
+  "mcpName": "io.github.cejor6/chrome-devtools-mcp",
   "devDependencies": {
     "@eslint/js": "^9.35.0",
     "@google/genai": "^2.0.1",

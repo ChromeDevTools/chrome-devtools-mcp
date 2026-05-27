@@ -4,6 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+/**
+ * Modifications Copyright 2026 Colin (@cejor6)
+ * - Added --http-port, --http-host, --http-token CLI options for the HTTP
+ *   transport (multi-agent / cross-process clients).
+ */
+
+import {isLoopbackHost} from '../HttpTransport.js';
 import type {YargsOptions} from '../third_party/index.js';
 import {yargs, hideBin} from '../third_party/index.js';
 
@@ -281,6 +288,23 @@ export const cliOptions = {
       'If true, redacts some of the network headers considered sensitive before returning to the client.',
     default: false,
   },
+  httpPort: {
+    type: 'number',
+    describe:
+      'If set, also expose the MCP server over HTTP (Streamable HTTP transport) on this port. Stdio remains active simultaneously. Multiple concurrent sessions share one browser via shared state.',
+  },
+  httpHost: {
+    type: 'string',
+    describe:
+      'Hostname/IP for HTTP transport to bind to. Defaults to 127.0.0.1 (loopback only) when --http-port is set. Use 0.0.0.0 to expose on all interfaces — REQUIRES --http-token.',
+    implies: 'httpPort',
+  },
+  httpToken: {
+    type: 'string',
+    describe:
+      'Bearer token required in Authorization header for HTTP clients. Strongly recommended; required when --http-host is non-loopback.',
+    implies: 'httpPort',
+  },
 } satisfies Record<string, YargsOptions>;
 
 export type ParsedArguments = ReturnType<typeof parseArguments>;
@@ -309,6 +333,16 @@ export function parseArguments(
           "turning off usage statistics. process.env['CI'] || process.env['CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS'] is set.",
         );
         args.usageStatistics = false;
+      }
+      if (args.httpPort !== undefined) {
+        const host = (args.httpHost as string | undefined) ?? '127.0.0.1';
+        if (!isLoopbackHost(host) && !args.httpToken) {
+          throw new Error(
+            '--http-token is required when --http-host is non-loopback (got ' +
+              host +
+              '). Without a token, anyone reachable on that interface could drive your browser.',
+          );
+        }
       }
       return true;
     })
