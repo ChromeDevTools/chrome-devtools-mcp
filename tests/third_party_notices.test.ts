@@ -19,7 +19,7 @@ describe('THIRD_PARTY_NOTICES', () => {
       const normalizedContent = content
         .replace(/^Version: .*$/gm, 'Version: <VERSION>')
         .replaceAll('\r', '');
-      t.assert.snapshot?.(normalizedContent);
+      t.assert.snapshot(normalizedContent);
     }
   });
 });

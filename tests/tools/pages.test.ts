@@ -93,7 +93,7 @@ describe('pages', () => {
             extensionId,
             '<extension-id>',
           );
-          t.assert.snapshot?.(text);
+          t.assert.snapshot(text);
           await context.uninstallExtension(extensionId);
         },
         {},
@@ -144,7 +144,7 @@ describe('pages', () => {
               extensionId,
               '<extension-id>',
             );
-            t.assert.snapshot?.(text);
+            t.assert.snapshot(text);
             await context.uninstallExtension(extensionId);
             const targets = context.browser.targets();
             assertNoServiceWorkerReported(targets, extensionId);
@@ -194,7 +194,7 @@ describe('pages', () => {
             extensionId,
             '<extension-id>',
           );
-          t.assert.snapshot?.(text);
+          t.assert.snapshot(text);
           await context.uninstallExtension(extensionId);
           const targets = context.browser.targets();
           assertNoServiceWorkerReported(targets, extensionId);
@@ -224,7 +224,7 @@ describe('pages', () => {
         await listPages().handler({params: {}}, response, context);
 
         const result = await response.handle('list_pages', context);
-        t.assert.snapshot?.(JSON.stringify(result));
+        t.assert.snapshot(JSON.stringify(result));
         await dialog.dismiss();
       });
     });
@@ -400,7 +400,7 @@ describe('pages', () => {
         );
 
         const result = await response.handle('new_page', context);
-        t.assert.snapshot?.(JSON.stringify(result));
+        t.assert.snapshot(JSON.stringify(result));
         await dialog.dismiss();
       });
     });
@@ -502,7 +502,7 @@ describe('pages', () => {
         await closePage.handler({params: {pageId: 2}}, response, context);
 
         const result = await response.handle('close_page', context);
-        t.assert.snapshot?.(JSON.stringify(result));
+        t.assert.snapshot(JSON.stringify(result));
       });
     });
   });
@@ -612,7 +612,7 @@ describe('pages', () => {
         await selectPage.handler({params: {pageId: 1}}, response, context);
 
         const result = await response.handle('select_page', context);
-        t.assert.snapshot?.(JSON.stringify(result));
+        t.assert.snapshot(JSON.stringify(result));
         await dialog.dismiss();
       });
     });
@@ -891,7 +891,7 @@ describe('pages', () => {
         );
 
         const result = await response.handle('navigate_page', context);
-        t.assert.snapshot?.(JSON.stringify(result));
+        t.assert.snapshot(JSON.stringify(result));
       });
     });
   });
@@ -1083,7 +1083,7 @@ describe('pages', () => {
         );
 
         const result = await response.handle('resize_page', context);
-        t.assert.snapshot?.(JSON.stringify(result));
+        t.assert.snapshot(JSON.stringify(result));
         await dialog.dismiss();
       });
     });

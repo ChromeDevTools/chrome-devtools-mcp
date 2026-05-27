@@ -38,11 +38,7 @@ if (userArgs.length > 0) {
     files.push(testPath);
   }
 } else {
-  const isNode20 = process.version.startsWith('v20.');
   if (flags.includes('--test-only')) {
-    if (isNode20) {
-      throw new Error(`--test-only is not supported for Node 20`);
-    }
     const {glob} = await import('node:fs/promises');
     for await (const tsFile of glob('tests/**/*.test.ts')) {
       const content = await readFile(tsFile, 'utf8');
@@ -55,11 +51,7 @@ if (userArgs.length > 0) {
       process.exit(0);
     }
   } else if (files.length === 0) {
-    if (isNode20) {
-      files.push('build/tests');
-    } else {
-      files.push('build/tests/**/*.test.js');
-    }
+    files.push('build/tests/**/*.test.js');
   }
 }
 

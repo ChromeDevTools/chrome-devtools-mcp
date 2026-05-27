@@ -71,7 +71,7 @@ describe('console', () => {
         );
         const formattedResponse = await response.handle('test', context);
         const textContent = getTextContent(formattedResponse.content[0]);
-        t.assert.snapshot?.(textContent);
+        t.assert.snapshot(textContent);
       });
     });
 
@@ -195,7 +195,7 @@ describe('console', () => {
             'list_console_messages',
             context,
           );
-          t.assert.snapshot?.(JSON.stringify(result));
+          t.assert.snapshot(JSON.stringify(result));
           await dialog.dismiss();
         });
       });
@@ -258,7 +258,7 @@ describe('console', () => {
             context,
           );
           const formattedResponse = await response2.handle('test', context);
-          t.assert.snapshot?.(getTextContent(formattedResponse.content[0]));
+          t.assert.snapshot(getTextContent(formattedResponse.content[0]));
         });
       });
       it('gets issue details with request id parsing', async t => {
@@ -319,7 +319,7 @@ describe('console', () => {
             .replaceAll(/ID: \d+/g, 'ID: <ID>')
             .replaceAll(/reqid=\d+/g, 'reqid=<reqid>')
             .replaceAll(/localhost:\d+/g, 'hostname:port');
-          t.assert.snapshot?.(sanitizedText);
+          t.assert.snapshot(sanitizedText);
         });
       });
     });
@@ -349,7 +349,7 @@ describe('console', () => {
         const formattedResponse = await response.handle('test', context);
         const rawText = getTextContent(formattedResponse.content[0]);
 
-        t.assert.snapshot?.(rawText);
+        t.assert.snapshot(rawText);
       });
     });
 
@@ -378,7 +378,7 @@ describe('console', () => {
         const formattedResponse = await response.handle('test', context);
         const rawText = getTextContent(formattedResponse.content[0]);
 
-        t.assert.snapshot?.(rawText);
+        t.assert.snapshot(rawText);
       });
     });
 
@@ -407,7 +407,7 @@ describe('console', () => {
         const formattedResponse = await response.handle('test', context);
         const rawText = getTextContent(formattedResponse.content[0]);
 
-        t.assert.snapshot?.(rawText);
+        t.assert.snapshot(rawText);
       });
     });
 
@@ -436,7 +436,7 @@ describe('console', () => {
         const formattedResponse = await response.handle('test', context);
         const rawText = getTextContent(formattedResponse.content[0]);
 
-        t.assert.snapshot?.(rawText);
+        t.assert.snapshot(rawText);
       });
     });
 
@@ -465,7 +465,7 @@ describe('console', () => {
         const formattedResponse = await response.handle('test', context);
         const rawText = getTextContent(formattedResponse.content[0]);
 
-        t.assert.snapshot?.(rawText);
+        t.assert.snapshot(rawText);
       });
     });
 
@@ -508,7 +508,7 @@ describe('console', () => {
         const formattedResponse = await response.handle('test', context);
         const rawText = getTextContent(formattedResponse.content[0]);
 
-        t.assert.snapshot?.(rawText);
+        t.assert.snapshot(rawText);
       });
     });
 
@@ -540,7 +540,7 @@ describe('console', () => {
         );
 
         const result = await response.handle('get_console_message', context);
-        t.assert.snapshot?.(
+        t.assert.snapshot(
           JSON.stringify(
             stabilizeStructuredContent(result.structuredContent),
             null,

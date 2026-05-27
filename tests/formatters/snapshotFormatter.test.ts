@@ -191,7 +191,7 @@ describe('snapshotFormatter', () => {
     });
     const formatted = formatter.toString();
 
-    t.assert.snapshot?.(formatted);
+    t.assert.snapshot(formatted);
   });
 
   it('does not include a note if the snapshot is already verbose', t => {
@@ -225,7 +225,7 @@ describe('snapshotFormatter', () => {
     });
     const formatted = formatter.toString();
 
-    t.assert.snapshot?.(formatted);
+    t.assert.snapshot(formatted);
   });
 
   it('formats with DevTools data included into a snapshot', t => {
@@ -260,7 +260,7 @@ describe('snapshotFormatter', () => {
     });
     const formatted = formatter.toString();
 
-    t.assert.snapshot?.(formatted);
+    t.assert.snapshot(formatted);
   });
 
   it('toJSON returns expected structure', () => {

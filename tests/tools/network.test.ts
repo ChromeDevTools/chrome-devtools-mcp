@@ -55,7 +55,7 @@ describe('network', () => {
           context,
         );
         const responseData = await response.handle('list_request', context);
-        t.assert.snapshot?.(
+        t.assert.snapshot(
           stabilizeResponseOutput(getTextContent(responseData.content[0])),
         );
       });
@@ -83,7 +83,7 @@ describe('network', () => {
           context,
         );
         const responseData = await response.handle('list_request', context);
-        t.assert.snapshot?.(
+        t.assert.snapshot(
           stabilizeResponseOutput(getTextContent(responseData.content[0])),
         );
       });
@@ -126,7 +126,7 @@ describe('network', () => {
           context,
         );
         const responseData = await response.handle('list_request', context);
-        t.assert.snapshot?.(
+        t.assert.snapshot(
           stabilizeResponseOutput(getTextContent(responseData.content[0])),
         );
       });
@@ -181,7 +181,7 @@ describe('network', () => {
         );
         const responseData = await response.handle('get_request', context);
 
-        t.assert.snapshot?.(
+        t.assert.snapshot(
           stabilizeResponseOutput(getTextContent(responseData.content[0])),
         );
       });

@@ -49,7 +49,7 @@ describe('HeapSnapshotFormatter', () => {
     it('formats data as CSV and sorts by retained size', t => {
       const formatter = new HeapSnapshotFormatter(mockAggregates);
       const result = formatter.toString();
-      t.assert.snapshot?.(result);
+      t.assert.snapshot(result);
     });
   });
 

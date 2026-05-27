@@ -65,7 +65,7 @@ describe('e2e', () => {
         name: 'list_pages',
         arguments: {},
       });
-      t.assert.snapshot?.(JSON.stringify(result.content));
+      t.assert.snapshot(JSON.stringify(result.content));
     });
   });
 
@@ -79,7 +79,7 @@ describe('e2e', () => {
         name: 'list_pages',
         arguments: {},
       });
-      t.assert.snapshot?.(JSON.stringify(result.content));
+      t.assert.snapshot(JSON.stringify(result.content));
     });
   });
 
@@ -282,7 +282,7 @@ describe('e2e', () => {
     it('returns blocked message when dialog is opened during tool execution', async t => {
       await withClient(async client => {
         const result = await createNewPageAndTriggerDialog(client);
-        t.assert.snapshot?.(JSON.stringify(result));
+        t.assert.snapshot(JSON.stringify(result));
       });
     });
 
@@ -296,7 +296,7 @@ describe('e2e', () => {
           },
         });
 
-        t.assert.snapshot?.(JSON.stringify(result));
+        t.assert.snapshot(JSON.stringify(result));
       });
     });
 
@@ -310,7 +310,7 @@ describe('e2e', () => {
           },
         });
 
-        t.assert.snapshot?.(JSON.stringify(result));
+        t.assert.snapshot(JSON.stringify(result));
       });
     });
   });

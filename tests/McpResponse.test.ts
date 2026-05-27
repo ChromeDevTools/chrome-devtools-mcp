@@ -56,8 +56,8 @@ describe('McpResponse', () => {
         context,
       );
       assert.equal(content[0].type, 'text');
-      t.assert.snapshot?.(getTextContent(content[0]));
-      t.assert.snapshot?.(
+      t.assert.snapshot(getTextContent(content[0]));
+      t.assert.snapshot(
         JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
       );
     });
@@ -72,8 +72,8 @@ describe('McpResponse', () => {
         context,
       );
       assert.equal(content[0].type, 'text');
-      t.assert.snapshot?.(getTextContent(content[0]));
-      t.assert.snapshot?.(
+      t.assert.snapshot(getTextContent(content[0]));
+      t.assert.snapshot(
         JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
       );
     });
@@ -87,8 +87,8 @@ describe('McpResponse', () => {
         'test',
         context,
       );
-      t.assert.snapshot?.(getTextContent(content[0]));
-      t.assert.snapshot?.(
+      t.assert.snapshot(getTextContent(content[0]));
+      t.assert.snapshot(
         JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
       );
     });
@@ -110,8 +110,8 @@ describe('McpResponse', () => {
         'test',
         context,
       );
-      t.assert.snapshot?.(getTextContent(content[0]));
-      t.assert.snapshot?.(
+      t.assert.snapshot(getTextContent(content[0]));
+      t.assert.snapshot(
         JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
       );
     });
@@ -134,8 +134,8 @@ describe('McpResponse', () => {
         context,
       );
       assert.equal(content[0].type, 'text');
-      t.assert.snapshot?.(getTextContent(content[0]));
-      t.assert.snapshot?.(
+      t.assert.snapshot(getTextContent(content[0]));
+      t.assert.snapshot(
         JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
       );
     });
@@ -153,8 +153,8 @@ describe('McpResponse', () => {
         context,
       );
       assert.equal(content[0].type, 'text');
-      t.assert.snapshot?.(getTextContent(content[0]));
-      t.assert.snapshot?.(JSON.stringify(structuredContent, null, 2));
+      t.assert.snapshot(getTextContent(content[0]));
+      t.assert.snapshot(JSON.stringify(structuredContent, null, 2));
     });
   });
 
@@ -173,10 +173,8 @@ describe('McpResponse', () => {
           context,
         );
         assert.equal(content[0].type, 'text');
-        t.assert.snapshot?.(
-          stabilizeResponseOutput(getTextContent(content[0])),
-        );
-        t.assert.snapshot?.(
+        t.assert.snapshot(stabilizeResponseOutput(getTextContent(content[0])));
+        t.assert.snapshot(
           JSON.stringify(
             stabilizeStructuredContent(structuredContent),
             null,
@@ -185,7 +183,7 @@ describe('McpResponse', () => {
         );
       });
       const content = await readFile(filePath, 'utf-8');
-      t.assert.snapshot?.(stabilizeResponseOutput(content));
+      t.assert.snapshot(stabilizeResponseOutput(content));
     } finally {
       await rm(filePath, {force: true});
     }
@@ -304,8 +302,8 @@ describe('McpResponse', () => {
         context,
       );
       assert.equal(content[0].type, 'text');
-      t.assert.snapshot?.(getTextContent(content[0]));
-      t.assert.snapshot?.(
+      t.assert.snapshot(getTextContent(content[0]));
+      t.assert.snapshot(
         JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
       );
     });
@@ -318,8 +316,8 @@ describe('McpResponse', () => {
         context,
       );
       await context.emulate({});
-      t.assert.snapshot?.(getTextContent(content[0]));
-      t.assert.snapshot?.(
+      t.assert.snapshot(getTextContent(content[0]));
+      t.assert.snapshot(
         JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
       );
     });
@@ -331,11 +329,11 @@ describe('McpResponse', () => {
         'test',
         context,
       );
-      t.assert.snapshot?.(getTextContent(content[0]));
+      t.assert.snapshot(getTextContent(content[0]));
       assert.equal(content[1].type, 'image');
       assert.strictEqual(getImageContent(content[1]).data, 'imageBase64');
       assert.strictEqual(getImageContent(content[1]).mimeType, 'image/png');
-      t.assert.snapshot?.(
+      t.assert.snapshot(
         JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
       );
     });
@@ -348,8 +346,8 @@ describe('McpResponse', () => {
         'test',
         context,
       );
-      t.assert.snapshot?.(getTextContent(content[0]));
-      t.assert.snapshot?.(
+      t.assert.snapshot(getTextContent(content[0]));
+      t.assert.snapshot(
         JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
       );
     });
@@ -362,8 +360,8 @@ describe('McpResponse', () => {
         'test',
         context,
       );
-      t.assert.snapshot?.(getTextContent(content[0]));
-      t.assert.snapshot?.(
+      t.assert.snapshot(getTextContent(content[0]));
+      t.assert.snapshot(
         JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
       );
     });
@@ -378,8 +376,8 @@ describe('McpResponse', () => {
         'test',
         context,
       );
-      t.assert.snapshot?.(getTextContent(content[0]));
-      t.assert.snapshot?.(
+      t.assert.snapshot(getTextContent(content[0]));
+      t.assert.snapshot(
         JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
       );
     });
@@ -392,8 +390,8 @@ describe('McpResponse', () => {
         'test',
         context,
       );
-      t.assert.snapshot?.(getTextContent(content[0]));
-      t.assert.snapshot?.(
+      t.assert.snapshot(getTextContent(content[0]));
+      t.assert.snapshot(
         JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
       );
     });
@@ -406,8 +404,8 @@ describe('McpResponse', () => {
         'test',
         context,
       );
-      t.assert.snapshot?.(getTextContent(content[0]));
-      t.assert.snapshot?.(
+      t.assert.snapshot(getTextContent(content[0]));
+      t.assert.snapshot(
         JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
       );
     });
@@ -430,8 +428,8 @@ describe('McpResponse', () => {
         context,
       );
       await page.getDialog()?.dismiss();
-      t.assert.snapshot?.(getTextContent(content[0]));
-      t.assert.snapshot?.(
+      t.assert.snapshot(getTextContent(content[0]));
+      t.assert.snapshot(
         JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
       );
     });
@@ -454,8 +452,8 @@ describe('McpResponse', () => {
         context,
       );
       await page.getDialog()?.dismiss();
-      t.assert.snapshot?.(getTextContent(content[0]));
-      t.assert.snapshot?.(
+      t.assert.snapshot(getTextContent(content[0]));
+      t.assert.snapshot(
         JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
       );
     });
@@ -471,8 +469,8 @@ describe('McpResponse', () => {
         'test',
         context,
       );
-      t.assert.snapshot?.(getTextContent(content[0]));
-      t.assert.snapshot?.(
+      t.assert.snapshot(getTextContent(content[0]));
+      t.assert.snapshot(
         JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
       );
     });
@@ -488,8 +486,8 @@ describe('McpResponse', () => {
         'test',
         context,
       );
-      t.assert.snapshot?.(getTextContent(content[0]));
-      t.assert.snapshot?.(
+      t.assert.snapshot(getTextContent(content[0]));
+      t.assert.snapshot(
         JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
       );
     });
@@ -526,8 +524,8 @@ describe('McpResponse', () => {
         context,
       );
 
-      t.assert.snapshot?.(getTextContent(content[0]));
-      t.assert.snapshot?.(
+      t.assert.snapshot(getTextContent(content[0]));
+      t.assert.snapshot(
         JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
       );
     });
@@ -548,8 +546,8 @@ describe('McpResponse', () => {
         'test',
         context,
       );
-      t.assert.snapshot?.(getTextContent(content[0]));
-      t.assert.snapshot?.(
+      t.assert.snapshot(getTextContent(content[0]));
+      t.assert.snapshot(
         JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
       );
     });
@@ -573,8 +571,8 @@ describe('McpResponse', () => {
         context,
       );
       assert.ok(getTextContent(content[0]));
-      t.assert.snapshot?.(getTextContent(content[0]));
-      t.assert.snapshot?.(
+      t.assert.snapshot(getTextContent(content[0]));
+      t.assert.snapshot(
         JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
       );
     });
@@ -588,8 +586,8 @@ describe('McpResponse', () => {
         context,
       );
       assert.ok(getTextContent(content[0]));
-      t.assert.snapshot?.(getTextContent(content[0]));
-      t.assert.snapshot?.(
+      t.assert.snapshot(getTextContent(content[0]));
+      t.assert.snapshot(
         JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
       );
     });
@@ -614,7 +612,7 @@ describe('McpResponse', () => {
       );
       const text = getTextContent(content[0]);
       assert.ok(text.includes('<no console messages found>'));
-      t.assert.snapshot?.(
+      t.assert.snapshot(
         JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
       );
     });
@@ -660,8 +658,8 @@ describe('McpResponse network request filtering', () => {
         'test',
         context,
       );
-      t.assert.snapshot?.(getTextContent(content[0]));
-      t.assert.snapshot?.(
+      t.assert.snapshot(getTextContent(content[0]));
+      t.assert.snapshot(
         JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
       );
     });
@@ -683,8 +681,8 @@ describe('McpResponse network request filtering', () => {
         'test',
         context,
       );
-      t.assert.snapshot?.(getTextContent(content[0]));
-      t.assert.snapshot?.(
+      t.assert.snapshot(getTextContent(content[0]));
+      t.assert.snapshot(
         JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
       );
     });
@@ -706,8 +704,8 @@ describe('McpResponse network request filtering', () => {
         'test',
         context,
       );
-      t.assert.snapshot?.(getTextContent(content[0]));
-      t.assert.snapshot?.(
+      t.assert.snapshot(getTextContent(content[0]));
+      t.assert.snapshot(
         JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
       );
     });
@@ -730,8 +728,8 @@ describe('McpResponse network request filtering', () => {
         context,
       );
 
-      t.assert.snapshot?.(getTextContent(content[0]));
-      t.assert.snapshot?.(
+      t.assert.snapshot(getTextContent(content[0]));
+      t.assert.snapshot(
         JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
       );
     });
@@ -755,8 +753,8 @@ describe('McpResponse network request filtering', () => {
         'test',
         context,
       );
-      t.assert.snapshot?.(getTextContent(content[0]));
-      t.assert.snapshot?.(
+      t.assert.snapshot(getTextContent(content[0]));
+      t.assert.snapshot(
         JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
       );
     });
@@ -777,7 +775,7 @@ describe('McpResponse network pagination', () => {
       assert.ok(text.includes('Showing 1-5 of 5 (Page 1 of 1).'));
       assert.ok(!text.includes('Next page:'));
       assert.ok(!text.includes('Previous page:'));
-      t.assert.snapshot?.(
+      t.assert.snapshot(
         JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
       );
     });
@@ -800,7 +798,7 @@ describe('McpResponse network pagination', () => {
       assert.ok(text.includes('Showing 1-10 of 30 (Page 1 of 3).'));
       assert.ok(text.includes('Next page: 1'));
       assert.ok(!text.includes('Previous page:'));
-      t.assert.snapshot?.(
+      t.assert.snapshot(
         JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
       );
     });
@@ -824,7 +822,7 @@ describe('McpResponse network pagination', () => {
       assert.ok(text.includes('Showing 11-20 of 25 (Page 2 of 3).'));
       assert.ok(text.includes('Next page: 2'));
       assert.ok(text.includes('Previous page: 0'));
-      t.assert.snapshot?.(
+      t.assert.snapshot(
         JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
       );
     });
@@ -847,7 +845,7 @@ describe('McpResponse network pagination', () => {
         text.includes('Invalid page number provided. Showing first page.'),
       );
       assert.ok(text.includes('Showing 1-2 of 5 (Page 1 of 3).'));
-      t.assert.snapshot?.(
+      t.assert.snapshot(
         JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
       );
     });
@@ -868,15 +866,15 @@ describe('McpResponse network pagination', () => {
           context,
         );
 
-        t.assert.snapshot?.(getTextContent(content[0]));
+        t.assert.snapshot(getTextContent(content[0]));
         const typedStructuredContent = structuredContent as {
           traceSummary?: string;
           traceInsights?: unknown[];
         };
-        t.assert.snapshot?.(
+        t.assert.snapshot(
           JSON.stringify(typedStructuredContent.traceSummary, null, 2),
         );
-        t.assert.snapshot?.(
+        t.assert.snapshot(
           JSON.stringify(typedStructuredContent.traceInsights, null, 2),
         );
       });
@@ -902,8 +900,8 @@ describe('McpResponse network pagination', () => {
           context,
         );
 
-        t.assert.snapshot?.(getTextContent(content[0]));
-        t.assert.snapshot?.(
+        t.assert.snapshot(getTextContent(content[0]));
+        t.assert.snapshot(
           JSON.stringify(
             stabilizeStructuredContent(structuredContent),
             null,
@@ -931,8 +929,8 @@ describe('McpResponse network pagination', () => {
           context,
         );
 
-        t.assert.snapshot?.(getTextContent(content[0]));
-        t.assert.snapshot?.(
+        t.assert.snapshot(getTextContent(content[0]));
+        t.assert.snapshot(
           JSON.stringify(
             stabilizeStructuredContent(structuredContent),
             null,
@@ -989,8 +987,8 @@ describe('extensions', () => {
         context,
       );
 
-      t.assert.snapshot?.(getTextContent(content[0]));
-      t.assert.snapshot?.(JSON.stringify(structuredContent, null, 2));
+      t.assert.snapshot(getTextContent(content[0]));
+      t.assert.snapshot(JSON.stringify(structuredContent, null, 2));
     });
   });
 });
@@ -1032,8 +1030,8 @@ describe('lighthouse', () => {
       assert.ok(text.includes('- /tmp/report.json'));
       assert.ok(text.includes('- /tmp/report.html'));
 
-      t.assert.snapshot?.(getTextContent(content[0]));
-      t.assert.snapshot?.(
+      t.assert.snapshot(getTextContent(content[0]));
+      t.assert.snapshot(
         JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
       );
     });
@@ -1094,12 +1092,12 @@ describe('third-party developer tools', () => {
           context,
         );
         const responseText = getTextContent(content[0]);
-        t.assert.snapshot?.(responseText);
+        t.assert.snapshot(responseText);
         assert.ok(
           responseText.includes('inputSchema={"type":"object"'),
           'Response should include inputSchema',
         );
-        t.assert.snapshot?.(JSON.stringify(structuredContent, null, 2));
+        t.assert.snapshot(JSON.stringify(structuredContent, null, 2));
       },
       undefined,
       {categoryExperimentalThirdParty: true} as ParsedArguments,
@@ -1493,8 +1491,8 @@ describe('webmcp', () => {
           context,
         );
         assert.ok(getTextContent(content[0]));
-        t.assert.snapshot?.(getTextContent(content[0]));
-        t.assert.snapshot?.(
+        t.assert.snapshot(getTextContent(content[0]));
+        t.assert.snapshot(
           JSON.stringify(
             stabilizeStructuredContent(structuredContent),
             null,
@@ -1558,8 +1556,8 @@ describe('webmcp', () => {
           context,
         );
         assert.ok(getTextContent(content[0]));
-        t.assert.snapshot?.(getTextContent(content[0]));
-        t.assert.snapshot?.(
+        t.assert.snapshot(getTextContent(content[0]));
+        t.assert.snapshot(
           JSON.stringify(
             stabilizeStructuredContent(structuredContent),
             null,
