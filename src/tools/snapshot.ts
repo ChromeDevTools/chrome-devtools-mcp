@@ -34,8 +34,8 @@ in the DevTools Elements panel (if any).`,
       ),
   },
   blockedByDialog: true,
-  handler: async (request, response, context) => {
-    await context.validatePath(request.params.filePath);
+  verifyFilesSchema: ['filePath'],
+  handler: async (request, response) => {
     response.includeSnapshot({
       verbose: request.params.verbose ?? false,
       filePath: request.params.filePath,

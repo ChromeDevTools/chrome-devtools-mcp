@@ -39,8 +39,8 @@ export const startScreencast = definePageTool(args => ({
       ),
   },
   blockedByDialog: false,
+  verifyFilesSchema: ['filePath'],
   handler: async (request, response, context) => {
-    await context.validatePath(request.params.filePath);
     if (context.getScreenRecorder() !== null) {
       response.appendResponseLine(
         'Error: a screencast recording is already in progress. Use screencast_stop to stop it before starting a new one.',

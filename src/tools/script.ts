@@ -71,6 +71,7 @@ Example with arguments: \`(el) => {
         : {}),
     },
     blockedByDialog: true,
+    verifyFilesSchema: ['filePath'],
     handler: async (request, response, context) => {
       const {
         serviceWorkerId,
@@ -80,8 +81,6 @@ Example with arguments: \`(el) => {
         dialogAction,
         filePath,
       } = request.params;
-
-      await context.validatePath(filePath);
 
       if (cliArgs?.categoryExtensions && serviceWorkerId) {
         if (uidArgs && uidArgs.length > 0) {

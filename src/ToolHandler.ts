@@ -220,6 +220,12 @@ export class ToolHandler {
 
       response.setRedactNetworkHeaders(this.serverArgs.redactNetworkHeaders);
       try {
+        if (this.tool.verifyFilesSchema) {
+          for (const key of this.tool.verifyFilesSchema) {
+            const filePath = params[key];
+            await context.validatePath(filePath as string);
+          }
+        }
         if (isPageScopedTool(this.tool)) {
           const pageId =
             typeof params.pageId === 'number' ? params.pageId : undefined;

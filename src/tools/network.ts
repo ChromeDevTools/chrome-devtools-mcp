@@ -115,9 +115,8 @@ export const getNetworkRequest = definePageTool({
       ),
   },
   blockedByDialog: true,
+  verifyFilesSchema: ['requestFilePath', 'responseFilePath'],
   handler: async (request, response, context) => {
-    await context.validatePath(request.params.requestFilePath);
-    await context.validatePath(request.params.responseFilePath);
     if (request.params.reqid) {
       response.attachNetworkRequest(request.params.reqid, {
         requestFilePath: request.params.requestFilePath,

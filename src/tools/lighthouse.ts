@@ -44,6 +44,7 @@ export const lighthouseAudit = definePageTool({
       .describe('Directory for reports. If omitted, uses temporary files.'),
   },
   blockedByDialog: true,
+  verifyFilesSchema: ['outputDirPath'],
   handler: async (request, response, context) => {
     const page = request.page;
     const categories = [
@@ -58,8 +59,6 @@ export const lighthouseAudit = definePageTool({
       device = 'desktop',
       outputDirPath,
     } = request.params;
-
-    await context.validatePath(outputDirPath);
 
     const flags: Flags = {
       onlyCategories: categories,

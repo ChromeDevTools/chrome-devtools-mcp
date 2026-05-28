@@ -461,9 +461,9 @@ export const uploadFile = definePageTool({
     includeSnapshot: includeSnapshotSchema,
   },
   blockedByDialog: true,
-  handler: async (request, response, context) => {
+  verifyFilesSchema: ['filePath'],
+  handler: async (request, response, _context) => {
     const {uid, filePath} = request.params;
-    await context.validatePath(filePath);
     const handle = (await request.page.getElementByUid(
       uid,
     )) as ElementHandle<HTMLInputElement>;
