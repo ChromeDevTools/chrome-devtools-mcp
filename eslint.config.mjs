@@ -19,6 +19,8 @@ export default defineConfig([
     '**/build/',
     'tests/tools/fixtures/',
     'src/third_party/lighthouse-devtools-mcp-bundle.js',
+    // Ad-hoc local smoke-test scripts (gitignored; not part of the suite).
+    'test-output/',
   ]),
   importPlugin.flatConfigs.typescript,
   {

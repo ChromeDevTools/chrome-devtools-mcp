@@ -129,6 +129,16 @@ function isPageScopedTool(
   return 'pageScoped' in tool && tool.pageScoped === true;
 }
 
+// Tools that mutate the set of pages. Even when they accept a pageId
+// (close_page, select_page), they should hold the exclusive lock so per-page
+// work doesn't race against topology changes.
+const TOPOLOGY_TOOL_NAMES: ReadonlySet<string> = new Set([
+  'new_page',
+  'close_page',
+  'list_pages',
+  'select_page',
+]);
+
 function formatArgumentNames(names: string[]): string {
   return names.map(name => `"${name}"`).join(', ');
 }
@@ -211,22 +221,38 @@ export class ToolHandler {
       };
     }
 
-    const pageScoped = isPageScopedTool(this.tool);
     const routingOn =
       this.serverArgs.experimentalPageIdRouting && !this.serverArgs.slim;
     const pageId =
       typeof params.pageId === 'number' ? params.pageId : undefined;
 
+    // Locking decision is intentionally NOT just `tool.pageScoped`. Some
+    // upstream tools (notably evaluate_script) use defineTool() rather than
+    // definePageTool() but still accept a pageId in their schema via the
+    // experimentalPageIdRouting flag. Treating those as non-page-scoped
+    // would route them to acquireExclusive() and serialize all page work
+    // through the global lock — exactly what this fork is meant to avoid.
+    // So: a tool is page-scoped for locking purposes if its registered
+    // schema accepts pageId AND it isn't a topology operation that mutates
+    // the set of pages.
+    const isTopologyToolByName = TOPOLOGY_TOOL_NAMES.has(this.tool.name);
+    const schemaAcceptsPageId = 'pageId' in this.inputSchema;
+    const isPageScopedForLocking =
+      !isTopologyToolByName &&
+      (schemaAcceptsPageId ||
+        ('pageScoped' in this.tool && this.tool.pageScoped === true));
+
     let guard: Guard;
-    if (pageScoped && routingOn && pageId !== undefined) {
+    if (isPageScopedForLocking && routingOn && pageId !== undefined) {
       // Per-page lock. Briefly touch global first so any in-flight topology
       // op (which holds global and is draining per-page mutexes) finishes
       // before we acquire our page's mutex.
       const g = await this.mutexRegistry.global().acquire();
       g.dispose();
       guard = await this.mutexRegistry.forPage(pageId).acquire();
-    } else if (pageScoped) {
-      // Legacy single-flight behavior when pageId routing is off.
+    } else if (isPageScopedForLocking) {
+      // Legacy single-flight behavior when pageId routing is off or the
+      // request doesn't carry a pageId.
       guard = await this.mutexRegistry.global().acquire();
     } else {
       // Topology / non-page-scoped tools (e.g. new_page, list_pages,

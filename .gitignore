@@ -1,3 +1,6 @@
+# Ad-hoc test fixtures (mutex/transport smoke tests, screenshots)
+test-output/
+
 # Logs
 logs
 *.log

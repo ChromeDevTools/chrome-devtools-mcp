@@ -156,6 +156,119 @@ describe('ToolHandler', () => {
     assert.strictEqual(handlerCalled, false);
   });
 
+  it('uses per-page lock for tools whose schema accepts pageId (e.g. evaluate_script via defineTool, not definePageTool)', async () => {
+    // Regression test: evaluate_script upstream is registered via
+    // defineTool() (so `pageScoped` is undefined) but includes pageId in
+    // its native schema when --experimentalPageIdRouting is on. An earlier
+    // version of this fork only checked tool.pageScoped, which routed
+    // those calls into acquireExclusive() and serialised everything.
+    let handlerCalled = false;
+    const tool: ToolDefinition = {
+      name: 'custom_eval',
+      description: 'evaluate_script-like tool defined via defineTool',
+      annotations: {
+        category: ToolCategory.DEBUGGING,
+        readOnlyHint: false,
+      },
+      schema: {
+        function: zod.string(),
+        pageId: zod.number(),
+      },
+      blockedByDialog: false,
+      handler: async () => {
+        handlerCalled = true;
+      },
+    };
+
+    const mockContext = sinon.createStubInstance(McpContext);
+    const mockPage = sinon.createStubInstance(McpPage);
+    mockContext.getPageById.returns(mockPage);
+    mockContext.detectOpenDevToolsWindows.resolves();
+
+    const mutexRegistry = new MutexRegistry();
+    const acquireExclusiveSpy = sinon.spy(mutexRegistry, 'acquireExclusive');
+    const forPageSpy = sinon.spy(mutexRegistry, 'forPage');
+
+    const serverArgs = parseArguments(
+      '1.0.0',
+      ['node', 'script.js', '--experimentalPageIdRouting'],
+      {CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true'},
+    );
+
+    const toolHandler = new ToolHandler(
+      tool,
+      serverArgs,
+      async () => mockContext,
+      mutexRegistry,
+    );
+
+    await toolHandler.handle({pageId: 5, function: '() => {}'});
+
+    assert.strictEqual(handlerCalled, true);
+    assert.strictEqual(
+      acquireExclusiveSpy.callCount,
+      0,
+      'should not drop to acquireExclusive for a page-targeted call',
+    );
+    assert.ok(
+      forPageSpy.calledWith(5),
+      'should acquire the per-page mutex keyed by the request pageId',
+    );
+  });
+
+  it('uses exclusive lock for topology tools even when their schema accepts pageId (e.g. close_page)', async () => {
+    let handlerCalled = false;
+    const tool: ToolDefinition = {
+      name: 'close_page',
+      description: 'Closes a page by id',
+      annotations: {
+        category: ToolCategory.NAVIGATION,
+        readOnlyHint: false,
+      },
+      schema: {
+        pageId: zod.number(),
+      },
+      blockedByDialog: false,
+      handler: async () => {
+        handlerCalled = true;
+      },
+    };
+
+    const mockContext = sinon.createStubInstance(McpContext);
+    mockContext.detectOpenDevToolsWindows.resolves();
+
+    const mutexRegistry = new MutexRegistry();
+    const acquireExclusiveSpy = sinon.spy(mutexRegistry, 'acquireExclusive');
+    const forPageSpy = sinon.spy(mutexRegistry, 'forPage');
+
+    const serverArgs = parseArguments(
+      '1.0.0',
+      ['node', 'script.js', '--experimentalPageIdRouting'],
+      {CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true'},
+    );
+
+    const toolHandler = new ToolHandler(
+      tool,
+      serverArgs,
+      async () => mockContext,
+      mutexRegistry,
+    );
+
+    await toolHandler.handle({pageId: 5});
+
+    assert.strictEqual(handlerCalled, true);
+    assert.strictEqual(
+      acquireExclusiveSpy.callCount,
+      1,
+      'close_page must drain all per-page work via acquireExclusive',
+    );
+    assert.strictEqual(
+      forPageSpy.called,
+      false,
+      'close_page must not take the per-page lock',
+    );
+  });
+
   it('sets shouldRegister to false and returns disabled reason when category is disabled', async () => {
     let handlerCalled = false;
     const tool: ToolDefinition = {
