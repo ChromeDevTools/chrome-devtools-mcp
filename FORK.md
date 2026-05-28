@@ -66,6 +66,20 @@ The modifications are concentrated in a handful of files:
 
 Each modified file carries a `Modifications Copyright 2026 Colin (@cejor6)` notice in addition to the original `Copyright Google LLC` header. New files are copyright Colin (@cejor6). See `NOTICE` for the consolidated list.
 
+## Shared HTTP setup
+
+For the per-page mutex to deliver actual parallelism across multiple Claude Code windows, the server has to be shared — one long-lived process that every session connects to over HTTP. The repo ships per-OS setup scripts in [`scripts/`](./scripts/README.md):
+
+| OS              | Setup                               | Uninstall                               |
+| --------------- | ----------------------------------- | --------------------------------------- |
+| Windows         | `scripts\setup-shared-mcp.ps1`      | `scripts\uninstall-shared-mcp.ps1`      |
+| macOS           | `scripts/setup-shared-mcp.macos.sh` | `scripts/uninstall-shared-mcp.macos.sh` |
+| Linux (systemd) | `scripts/setup-shared-mcp.linux.sh` | `scripts/uninstall-shared-mcp.linux.sh` |
+
+All variants register a per-user OS service (Task Scheduler / launchd / systemd user), bind to `127.0.0.1:9876` only, require a bearer token (stored 0600 / Windows ACL: user-only), and use a dedicated `--user-data-dir` so the shared profile never collides with the default stdio Chrome profile. The Claude Code user MCP config is rewritten atomically via the `claude mcp` CLI.
+
+See [`scripts/README.md`](./scripts/README.md) for OS-specific file locations, common knobs (`PORT`, `FORK_PATH`, `FORCE`), and rollback flags.
+
 ## Issues and contributions
 
 Open an issue at <https://github.com/cejor6/chrome-devtools-mcp/issues>. PRs welcome — `main` is protected; everything goes through a PR. Maintainer reviews and merges.
