@@ -60,6 +60,7 @@ export const waitFor = definePageTool({
     ...timeoutSchema,
   },
   blockedByDialog: true,
+  verifyFilesSchema: [],
   handler: async (request, response, context) => {
     const page = request.page;
     await context.waitForTextOnPage(

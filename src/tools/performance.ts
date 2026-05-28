@@ -163,6 +163,7 @@ export const analyzeInsight = definePageTool({
       ),
   },
   blockedByDialog: false,
+  verifyFilesSchema: [],
   handler: async (request, response, context) => {
     const lastRecording = context.recordedTraces().at(-1);
     if (!lastRecording) {

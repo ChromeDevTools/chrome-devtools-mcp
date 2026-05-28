@@ -37,6 +37,7 @@ describe('ToolHandler', () => {
       },
       schema: {},
       blockedByDialog: false,
+      verifyFilesSchema: [],
       pageScoped: true,
       handler: async () => {
         handlerCalled = true;
@@ -78,6 +79,7 @@ describe('ToolHandler', () => {
       },
       schema: {},
       blockedByDialog: false,
+      verifyFilesSchema: [],
       handler: async () => {
         handlerCalled = true;
       },
@@ -120,6 +122,7 @@ describe('ToolHandler', () => {
         url: zod.string(),
       },
       blockedByDialog: false,
+      verifyFilesSchema: [],
       handler: async () => {
         handlerCalled = true;
       },
@@ -167,6 +170,7 @@ describe('ToolHandler', () => {
       },
       schema: {},
       blockedByDialog: false,
+      verifyFilesSchema: [],
       handler: async () => {
         handlerCalled = true;
       },

@@ -103,6 +103,7 @@ export const click = definePageTool({
     includeSnapshot: includeSnapshotSchema,
   },
   blockedByDialog: true,
+  verifyFilesSchema: [],
   handler: async (request, response) => {
     const uid = request.params.uid;
     const handle = await request.page.getElementByUid(uid);
@@ -154,6 +155,7 @@ export const clickAt = definePageTool({
     includeSnapshot: includeSnapshotSchema,
   },
   blockedByDialog: true,
+  verifyFilesSchema: [],
   handler: async (request, response) => {
     const page = request.page;
     const result = await page.waitForEventsAfterAction(async () => {
@@ -189,6 +191,7 @@ export const hover = definePageTool({
     includeSnapshot: includeSnapshotSchema,
   },
   blockedByDialog: true,
+  verifyFilesSchema: [],
   handler: async (request, response) => {
     const uid = request.params.uid;
     const handle = await request.page.getElementByUid(uid);
@@ -316,6 +319,7 @@ export const fill = definePageTool({
     includeSnapshot: includeSnapshotSchema,
   },
   blockedByDialog: true,
+  verifyFilesSchema: [],
   handler: async (request, response, context) => {
     const page = request.page;
     const result = await page.waitForEventsAfterAction(async () => {
@@ -346,6 +350,7 @@ export const typeText = definePageTool({
     submitKey: submitKeySchema,
   },
   blockedByDialog: true,
+  verifyFilesSchema: [],
   handler: async (request, response) => {
     const page = request.page;
     const result = await page.waitForEventsAfterAction(async () => {
@@ -376,6 +381,7 @@ export const drag = definePageTool({
     includeSnapshot: includeSnapshotSchema,
   },
   blockedByDialog: true,
+  verifyFilesSchema: [],
   handler: async (request, response) => {
     const fromHandle = await request.page.getElementByUid(
       request.params.from_uid,
@@ -423,6 +429,7 @@ export const fillForm = definePageTool({
     includeSnapshot: includeSnapshotSchema,
   },
   blockedByDialog: true,
+  verifyFilesSchema: [],
   handler: async (request, response, context) => {
     const page = request.page;
     let lastResult: WaitForEventsResult = {};
@@ -512,6 +519,7 @@ export const pressKey = definePageTool({
     includeSnapshot: includeSnapshotSchema,
   },
   blockedByDialog: true,
+  verifyFilesSchema: [],
   handler: async (request, response) => {
     const page = request.page;
     const tokens = parseKey(request.params.key);

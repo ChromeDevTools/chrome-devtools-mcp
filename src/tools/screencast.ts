@@ -103,6 +103,7 @@ export const stopScreencast = definePageTool({
   },
   schema: {},
   blockedByDialog: false,
+  verifyFilesSchema: [],
   handler: async (_request, response, context) => {
     const data = context.getScreenRecorder();
     if (!data) {

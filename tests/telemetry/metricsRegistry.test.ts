@@ -47,6 +47,7 @@ describe('metricsRegistry', () => {
           uid: zod.string(), // Should be blocked
         },
         blockedByDialog: false,
+        verifyFilesSchema: [],
         handler: async () => {
           // no-op
         },
@@ -72,6 +73,7 @@ describe('metricsRegistry', () => {
           argEnum: zod.enum(['foo', 'bar']),
         },
         blockedByDialog: false,
+        verifyFilesSchema: [],
         handler: async () => {
           // no-op
         },
@@ -93,6 +95,7 @@ describe('metricsRegistry', () => {
         },
         schema: {},
         blockedByDialog: false,
+        verifyFilesSchema: [],
         handler: async () => {
           // no-op
         },

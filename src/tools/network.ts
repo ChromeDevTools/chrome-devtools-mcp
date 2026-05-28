@@ -71,6 +71,7 @@ export const listNetworkRequests = definePageTool({
       ),
   },
   blockedByDialog: false,
+  verifyFilesSchema: [],
   handler: async (request, response, context) => {
     const data = await request.page.getDevToolsData();
     response.attachDevToolsData(data);
